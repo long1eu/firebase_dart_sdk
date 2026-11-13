@@ -184,6 +184,63 @@ class RemoteDocumentCacheTestCase {
   }
 
   @testMethod
+  Future<void> testRemoveAllDocuments() async {
+    // More keys than one SQLite statement takes (LongQuery splits at 900).
+    final List<String> removed = <String>[
+      for (int i = 0; i < 1000; i++) 'a/${i.toString().padLeft(4, '0')}',
+    ];
+    await _persistence.runTransaction('add entries', () async {
+      for (String path in <String>[...removed, 'a/kept', 'b/kept']) {
+        await _remoteDocumentCache.add(
+            doc(path, 42, map(<dynamic>['data', 2])), version(42));
+      }
+    });
+
+    await _persistence.runTransaction(
+        'remove entries',
+        () => _remoteDocumentCache.removeAll(<DocumentKey>[
+              for (String path in removed) key(path),
+              key('a/missing'),
+            ]));
+
+    final Map<DocumentKey, MaybeDocument?> read =
+        await _getAll(<String>[...removed, 'a/kept', 'b/kept']);
+    expect(
+        read.values
+            .whereType<MaybeDocument>()
+            .map((MaybeDocument d) => d.key),
+        <DocumentKey>[key('a/kept'), key('b/kept')]);
+    await _persistence.runTransaction('remove nothing',
+        () => _remoteDocumentCache.removeAll(<DocumentKey>[]));
+    expect(await _get('a/kept'), isNotNull);
+  }
+
+  @testMethod
+  Future<void> testDocumentsMatchingQueryExcludesSubcollections() async {
+    final Map<String, Object> docData = map(<dynamic>['data', 2]);
+    await _addTestDocumentAtPath('a/1');
+    await _addTestDocumentAtPath('a/1/b/1');
+    await _addTestDocumentAtPath('a/2/b/2/c/1');
+    await _addTestDocumentAtPath('a/3', readTime: 50);
+    await _addTestDocumentAtPath('a/3/b/3', readTime: 50);
+    await _addTestDocumentAtPath('ab/1');
+
+    final Query query = Query(path('a'));
+    expect(
+        values(await _remoteDocumentCache.getAllDocumentsMatchingQuery(
+            query, IndexOffset.none)),
+        <Document>[doc('a/1', 42, docData), doc('a/3', 42, docData)]);
+    expect(
+        values(await _remoteDocumentCache.getAllDocumentsMatchingQuery(
+            query, IndexOffset.createSuccessor(version(42), -1))),
+        <Document>[doc('a/3', 42, docData)]);
+    expect(
+        values(await _remoteDocumentCache.getAllDocumentsMatchingQuery(
+            Query(path('a/1/b')), IndexOffset.none)),
+        <Document>[doc('a/1/b/1', 42, docData)]);
+  }
+
+  @testMethod
   Future<void> testAddingDocumentWithReadTimeOfZeroFails() async {
     await expectLater(
         _add(doc('a/b', 1, map(<dynamic>['data', 2])), SnapshotVersion.none),

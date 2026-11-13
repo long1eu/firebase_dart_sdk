@@ -575,6 +575,9 @@ Documentation and tests:
   function caught the error.
 - `FieldValue.arrayUnion` and `FieldValue.arrayRemove` are equal (`==`) when their elements are
   equal in the same order, as `isEqual` of the JS SDK.
+- LRU garbage collection of the SQLite cache read every orphaned document in one query, so its memory grew with
+  the cache (several hundred MB for a million cached documents). It now works in batches as the Android SDK does.
+  Collection queries no longer read the documents of subcollections out of the cache.
 
 ### Not done
 

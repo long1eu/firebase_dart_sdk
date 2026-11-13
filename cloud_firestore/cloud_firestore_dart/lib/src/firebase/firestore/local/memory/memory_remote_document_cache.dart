@@ -45,6 +45,13 @@ class MemoryRemoteDocumentCache implements RemoteDocumentCache {
   }
 
   @override
+  Future<void> removeAll(Iterable<DocumentKey> documentKeys) async {
+    for (DocumentKey key in documentKeys) {
+      await remove(key);
+    }
+  }
+
+  @override
   Future<MaybeDocument?> get(DocumentKey key) async {
     _statsCollector.recordRowsRead(RemoteDocumentCache.statsTag, 1);
     return documents[key];

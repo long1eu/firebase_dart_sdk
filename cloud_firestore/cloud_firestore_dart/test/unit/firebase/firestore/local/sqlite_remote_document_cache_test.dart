@@ -46,6 +46,9 @@ void main() {
       () => testCase.testDocumentsMatchingQuerySinceReadTime());
   test('testDocumentsMatchingUsesReadTimeNotUpdateTime',
       () => testCase.testDocumentsMatchingUsesReadTimeNotUpdateTime());
+  test('testRemoveAllDocuments', () => testCase.testRemoveAllDocuments());
+  test('testDocumentsMatchingQueryExcludesSubcollections',
+      () => testCase.testDocumentsMatchingQueryExcludesSubcollections());
   test('testAddingDocumentWithReadTimeOfZeroFails',
       () => testCase.testAddingDocumentWithReadTimeOfZeroFails());
 }

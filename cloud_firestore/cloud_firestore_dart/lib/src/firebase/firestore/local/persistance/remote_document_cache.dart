@@ -48,6 +48,9 @@ abstract class RemoteDocumentCache {
   /// Removes the cached entry for the given key (no-op if no entry exists).
   Future<void> remove(DocumentKey documentKey);
 
+  /// Removes the cached entries for the given keys (keys without an entry are ignored).
+  Future<void> removeAll(Iterable<DocumentKey> documentKeys);
+
   /// Looks up an entry by [documentKey] in the cache
   ///
   /// Returns the cached [Document] or [NoDocument] entry, or null if we have

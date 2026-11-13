@@ -79,6 +79,38 @@ class SQLiteRemoteDocumentCache implements RemoteDocumentCache {
   }
 
   @override
+  Future<void> removeAll(Iterable<DocumentKey> documentKeys) async {
+    final List<Object?> paths = <Object?>[];
+    final Map<DocumentKey, MaybeDocument?> deletedDocs =
+        <DocumentKey, MaybeDocument?>{};
+    for (DocumentKey key in documentKeys) {
+      paths.add(_pathForKey(key));
+      deletedDocs[key] = null;
+    }
+    if (paths.isEmpty) {
+      return;
+    }
+
+    _statsCollector.recordRowsDeleted(
+      RemoteDocumentCache.statsTag,
+      paths.length,
+    );
+    final LongQuery longQuery = LongQuery(
+      db,
+      'DELETE FROM remote_documents WHERE path IN (',
+      null,
+      paths,
+      ')',
+    );
+    while (longQuery.hasMoreSubqueries) {
+      await longQuery.performNextSubquery();
+    }
+
+    // A removed document has no index entries.
+    await _indexManager?.updateIndexEntries(deletedDocs);
+  }
+
+  @override
   Future<MaybeDocument?> get(DocumentKey documentKey) async {
     final String path = _pathForKey(documentKey);
 
@@ -272,13 +304,14 @@ class SQLiteRemoteDocumentCache implements RemoteDocumentCache {
       result = await db.query(
         // @formatter:off
         '''
-            SELECT path, contents
+            SELECT contents
             FROM remote_documents
             WHERE path >= ?
-              AND path < ?;
+              AND path < ?
+              AND path_length = ?;
           ''',
         // @formatter:on
-        <String>[prefixPath, prefixSuccessorPath],
+        <Object>[prefixPath, prefixSuccessorPath, immediateChildrenPathLength],
       );
     } else {
       // Execute an index-free query and filter by read time (and by key, for the documents read at the read time of
@@ -288,10 +321,11 @@ class SQLiteRemoteDocumentCache implements RemoteDocumentCache {
       result = await db.query(
         // @formatter:off
         '''
-            SELECT path, contents
+            SELECT contents
             FROM remote_documents
             WHERE path >= ?
               AND path < ?
+              AND path_length = ?
               AND (read_time_seconds > ?
                 OR (read_time_seconds = ? AND read_time_nanos > ?)
                 OR (read_time_seconds = ? AND read_time_nanos = ? AND path > ?));
@@ -300,6 +334,7 @@ class SQLiteRemoteDocumentCache implements RemoteDocumentCache {
         <Object>[
           prefixPath,
           prefixSuccessorPath,
+          immediateChildrenPathLength,
           readTime.seconds,
           readTime.seconds,
           readTime.nanoseconds,
@@ -311,17 +346,8 @@ class SQLiteRemoteDocumentCache implements RemoteDocumentCache {
     }
 
     for (Map<String, dynamic> row in result) {
-      // TODO(long1eu): Actually implement a single-collection query
-      //  The query is actually returning any path that starts with the query path prefix which may include documents in
-      //  subcollections. For example, a query on 'rooms' will return rooms/abc/messages/xyx but we shouldn't match it.
-      //  Fix this by discarding rows with document keys more than one segment longer than the query path.
-
-      final String _path = row['path'];
-      final ResourcePath path = EncodedPath.decodeResourcePath(_path);
-      if (path.length != immediateChildrenPathLength) {
-        continue;
-      }
-
+      // `path_length` keeps the documents of subcollections out (as upstream does), so that they are neither copied out
+      // of the database nor their paths decoded.
       final Uint8List contents = row['contents'];
       final MaybeDocument maybeDoc = decodeMaybeDocument(contents);
 

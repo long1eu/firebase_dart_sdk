@@ -334,6 +334,106 @@ class LruGarbageCollectorTestCase {
     expect(removed, 21);
   }
 
+  /// Orphaned documents in path order: a run of pinned documents longer than a batch of the SQLite delegate (100),
+  /// documents newer than the upper bound and documents still in a target in between the removable ones.
+  @testMethod
+  Future<void> testRemoveOrphanedDocumentsAcrossBatches() async {
+    final QueryData target = await _addNextQuery();
+    final List<DocumentKey> pinned = <DocumentKey>[];
+    final List<DocumentKey> removable = <DocumentKey>[];
+    final List<DocumentKey> targeted = <DocumentKey>[];
+    await _persistence.runTransaction('add old documents', () async {
+      for (int i = 0; i < 450; i++) {
+        final DocumentKey docKey =
+            key('docs/${i.toString().padLeft(4, '0')}');
+        await _cacheDocumentInTransaction(docKey);
+        if (i < 250) {
+          // Pinned by a mutation.
+          pinned.add(docKey);
+          await _markDocumentEligibleForGcInTransaction(docKey);
+          await _mutationQueue.addMutationBatch(
+              Timestamp.now(), <Mutation>[], <Mutation>[_mutation(docKey)]);
+        } else if (i % 3 == 0) {
+          targeted.add(docKey);
+          await _addDocumentToTarget(docKey, target.targetId);
+        } else if (i % 3 == 1) {
+          removable.add(docKey);
+          await _markDocumentEligibleForGcInTransaction(docKey);
+        }
+      }
+    });
+    final int upperBound =
+        await _persistence.runTransactionAndReturn('read sequence number',
+            () async => _persistence.referenceDelegate.currentSequenceNumber);
+    final List<DocumentKey> newer = <DocumentKey>[];
+    await _persistence.runTransaction('add newer documents', () async {
+      for (int i = 250; i < 450; i++) {
+        if (i % 3 == 2) {
+          final DocumentKey docKey =
+              key('docs/${i.toString().padLeft(4, '0')}');
+          newer.add(docKey);
+          await _cacheDocumentInTransaction(docKey);
+          await _markDocumentEligibleForGcInTransaction(docKey);
+        }
+      }
+    });
+
+    final int removed = await _persistence.runTransactionAndReturn(
+        'GC', () => _garbageCollector.removeOrphanedDocuments(upperBound));
+    expect(removed, removable.length);
+    for (DocumentKey docKey in removable) {
+      expect(await _documentCache.get(docKey), isNull);
+    }
+    for (DocumentKey docKey in <DocumentKey>[
+      ...pinned,
+      ...targeted,
+      ...newer,
+    ]) {
+      expect(await _documentCache.get(docKey), isNotNull);
+    }
+
+    // Nothing is left to collect up to the upper bound; the newer documents go with a higher one.
+    expect(
+        await _persistence.runTransactionAndReturn(
+            'GC', () => _garbageCollector.removeOrphanedDocuments(upperBound)),
+        0);
+    expect(
+        await _persistence.runTransactionAndReturn('GC',
+            () => _garbageCollector.removeOrphanedDocuments(upperBound + 1)),
+        newer.length);
+  }
+
+  /// More orphaned documents than the SQLite delegate reads per page (1000), interleaved with documents in a target.
+  @testMethod
+  Future<void> testOrphanedDocumentSequenceNumbersAcrossPages() async {
+    final QueryData target = await _addNextQuery();
+    int orphaned = 0;
+    await _persistence.runTransaction('add documents', () async {
+      for (int i = 0; i < 2500; i++) {
+        final DocumentKey docKey =
+            key('docs/${i.toString().padLeft(4, '0')}');
+        if (i % 4 == 0) {
+          await _addDocumentToTarget(docKey, target.targetId);
+        } else {
+          orphaned++;
+          await _markDocumentEligibleForGcInTransaction(docKey);
+        }
+      }
+    });
+
+    final LruDelegate delegate = _garbageCollector.delegate;
+    final List<int> sequenceNumbers = <int>[];
+    await _persistence.runTransaction(
+        'enumerate',
+        () => delegate
+            .forEachOrphanedDocumentSequenceNumber(sequenceNumbers.add));
+    expect(sequenceNumbers.length, orphaned);
+    expect(
+        await _persistence.runTransactionAndReturn(
+            'count', delegate.getSequenceNumberCount),
+        orphaned + 1);
+  }
+
   @testMethod
   Future<void> testRemoveTargetsThenGC() async {
     // * Create 3 targets, add docs to all of them
@@ -673,6 +773,11 @@ class LruGarbageCollectorTestCase {
     final Document doc = _nextTestDocument();
     await _documentCache.add(doc, doc.version);
     return doc;
+  }
+
+  Future<void> _cacheDocumentInTransaction(DocumentKey key) async {
+    await _documentCache.add(
+        doc(key, 1, <String, Object>{'baz': true}), version(1));
   }
 
   Future<void> _markDocumentEligibleForGcInTransaction(DocumentKey key) async {

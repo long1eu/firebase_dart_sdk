@@ -52,6 +52,10 @@ void main() {
           .testRemoveRunToCompleteWhenNoDocumentsIsRemovedWithLargeNumberOfDocs());
   test('testRemoveWhatCanBeRemovedWithLargeNumberOfDocs',
       () => testCase.testRemoveWhatCanBeRemovedWithLargeNumberOfDocs());
+  test('testRemoveOrphanedDocumentsAcrossBatches',
+      () => testCase.testRemoveOrphanedDocumentsAcrossBatches());
+  test('testOrphanedDocumentSequenceNumbersAcrossPages',
+      () => testCase.testOrphanedDocumentSequenceNumbersAcrossPages());
   test('testRemoveTargetsThenGC', () => testCase.testRemoveTargetsThenGC());
   test('testGetsSize', () => testCase.testGetsSize());
   test('testDisabled', () => testCase.testDisabled());

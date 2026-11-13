@@ -10,6 +10,21 @@ class SQLiteLruReferenceDelegate implements ReferenceDelegate, LruDelegate {
     garbageCollector = LruGarbageCollector(this, params);
   }
 
+  /// The batch size for orphaned document GC in [removeOrphanedDocuments].
+  ///
+  /// Upstream (`REMOVE_ORPHANED_DOCUMENTS_BATCH_SIZE`) added it for https://github.com/firebase/firebase-android-sdk/issues/706,
+  /// where LRU GC hit a CursorWindow size limit during orphaned document removal. Here it bounds the rows a single
+  /// query returns: the database adapter reads every row of a query into memory.
+  @visibleForTesting
+  static const int removeOrphanedDocumentsBatchSize = 100;
+
+  /// The number of rows [forEachOrphanedDocumentSequenceNumber] reads per query.
+  ///
+  /// PORTING NOTE: upstream walks a cursor over all orphaned documents (and JS an IndexedDB cursor); the database
+  /// adapter of the port has no cursor, so the documents are read in pages by path.
+  @visibleForTesting
+  static const int orphanedSequenceNumbersPageSize = 1000;
+
   final SQLitePersistence persistence;
   late ListenSequence listenSequence;
   int _currentSequenceNumber;
@@ -82,20 +97,31 @@ class SQLiteLruReferenceDelegate implements ReferenceDelegate, LruDelegate {
   Future<void> forEachOrphanedDocumentSequenceNumber(
     Consumer<int> consumer,
   ) async {
-    final List<Map<String, dynamic>> result = await persistence.query(
-      // @formatter:off
-      '''
-         SELECT sequence_number
-         FROM target_documents
-         GROUP BY path
-         HAVING COUNT(*) = 1
-          AND target_id = 0;
-        ''',
-      // @formatter:on
-    );
+    String startPath = EncodedPath.encode(ResourcePath.empty);
+    while (true) {
+      final List<Map<String, dynamic>> rows = await persistence.query(
+        // @formatter:off
+        '''
+           SELECT path, sequence_number
+           FROM target_documents
+           WHERE path > ?
+           GROUP BY path
+           HAVING COUNT(*) = 1
+              AND target_id = 0
+           ORDER BY path
+           LIMIT ?;
+          ''',
+        // @formatter:on
+        <Object>[startPath, orphanedSequenceNumbersPageSize],
+      );
 
-    for (Map<String, dynamic> row in result) {
-      consumer(row['sequence_number']);
+      for (Map<String, dynamic> row in rows) {
+        consumer(row['sequence_number']);
+      }
+      if (rows.length < orphanedSequenceNumbersPageSize) {
+        return;
+      }
+      startPath = rows.last['path'];
     }
   }
 
@@ -161,28 +187,49 @@ class SQLiteLruReferenceDelegate implements ReferenceDelegate, LruDelegate {
   @override
   Future<int> removeOrphanedDocuments(int upperBound) async {
     int count = 0;
-    final List<Map<String, dynamic>> result = await persistence.query(
-      // @formatter:off
-      '''
-          SELECT path
-          FROM target_documents
-          GROUP BY path
-          HAVING count(*) = 1
-             AND target_id = 0
-             AND sequence_number <= ?;
-        ''',
-      // @formatter:on
-      <int>[upperBound],
-    );
+    String startPath = EncodedPath.encode(ResourcePath.empty);
+    bool resultsRemaining = true;
+    while (resultsRemaining) {
+      // PORTING NOTE: upstream has `path > ?` in the HAVING clause. In WHERE, older SQLite versions (which do not move
+      // the term themselves) also start every batch at [startPath] instead of at the first document; ORDER BY makes
+      // the order the paging relies on explicit.
+      final List<Map<String, dynamic>> rows = await persistence.query(
+        // @formatter:off
+        '''
+            SELECT path
+            FROM target_documents
+            WHERE path > ?
+            GROUP BY path
+            HAVING COUNT(*) = 1
+               AND target_id = 0
+               AND sequence_number <= ?
+            ORDER BY path
+            LIMIT ?;
+          ''',
+        // @formatter:on
+        <Object>[startPath, upperBound, removeOrphanedDocumentsBatchSize],
+      );
 
-    for (Map<String, dynamic> row in result) {
-      final ResourcePath path = EncodedPath.decodeResourcePath(row['path']);
-      final DocumentKey key = DocumentKey.fromPath(path);
-      if (!await _isPinned(key)) {
-        count++;
-        await persistence.remoteDocumentCache.remove(key);
-        await _removeSentinel(key);
+      final List<DocumentKey> docsToRemove = <DocumentKey>[];
+      for (Map<String, dynamic> row in rows) {
+        final String encodedPath = row['path'];
+        final ResourcePath path = EncodedPath.decodeResourcePath(encodedPath);
+        final DocumentKey key = DocumentKey.fromPath(path);
+        if (!await _isPinned(key)) {
+          count++;
+          docsToRemove.add(key);
+          await _removeSentinel(key);
+        }
+
+        // Set startPath so the next batch (if necessary) picks up where this one left off.
+        startPath = encodedPath;
       }
+
+      // PORTING NOTE: upstream collects the keys of all batches and removes the documents once at the end; removing
+      // them per batch is equivalent (the remote documents are not part of the query above) and keeps the memory
+      // bounded by the batch size.
+      await persistence.remoteDocumentCache.removeAll(docsToRemove);
+      resultsRemaining = rows.length == removeOrphanedDocumentsBatchSize;
     }
 
     return count;

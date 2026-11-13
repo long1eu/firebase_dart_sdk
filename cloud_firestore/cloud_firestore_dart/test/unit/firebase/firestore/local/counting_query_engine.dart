@@ -132,6 +132,10 @@ class _CountingRemoteDocumentCache implements RemoteDocumentCache {
   Future<void> remove(DocumentKey documentKey) => _subject.remove(documentKey);
 
   @override
+  Future<void> removeAll(Iterable<DocumentKey> documentKeys) =>
+      _subject.removeAll(documentKeys);
+
+  @override
   Future<MaybeDocument?> get(DocumentKey documentKey) async {
     final MaybeDocument? result = await _subject.get(documentKey);
     _counter.documentsReadByKey += result != null ? 1 : 0;

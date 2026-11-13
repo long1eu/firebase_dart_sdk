@@ -473,6 +473,42 @@ Future<void> main(List<String> args) async {
   await median('query matches==true on c0 after acks, previous results', 7,
       () => runQuery(store, filteredQuery(0), usePreviousResults: true));
 
+  // --- Subcollections: N/10 documents below one document of c5 (in their own target); a query of c5 must skip them.
+  await median('query whole collection c5 (no subcollection)', 7,
+      () => runQuery(store, collectionQuery(5), usePreviousResults: false));
+  final Query subcollection =
+      Query(keyOf(5, 0).path.appendSegment('sub'));
+  final QueryData subTarget = await store.allocateTarget(subcollection.toTarget());
+  for (int start = 0; start < perCollection; start += eventSize) {
+    final Map<DocumentKey, MaybeDocument> updates = <DocumentKey, MaybeDocument>{};
+    for (int i = start; i < min(start + eventSize, perCollection); i++) {
+      final Document doc = docOf(5, i, clock);
+      final Document sub = Document(
+          DocumentKey.fromPath(subcollection.path.appendSegment(doc.key.path.getLastSegment())),
+          doc.version,
+          DocumentState.synced,
+          doc.data);
+      updates[sub.key] = sub;
+    }
+    clock++;
+    await store.applyRemoteEvent(RemoteEvent(
+      documentUpdates: updates,
+      resolvedLimboDocuments: const <DocumentKey>{},
+      snapshotVersion: version(clock),
+      targetChanges: <int, TargetChange>{
+        subTarget.targetId: TargetChange(
+          resumeToken: Uint8List.fromList(<int>[1, 2, 3]),
+          current: true,
+          addedDocuments: keys(updates.keys),
+          modifiedDocuments: DocumentKey.emptyKeySet,
+          removedDocuments: DocumentKey.emptyKeySet,
+        ),
+      },
+    ));
+  }
+  await median('query whole collection c5, $perCollection documents in a subcollection', 7,
+      () => runQuery(store, collectionQuery(5), usePreviousResults: false));
+
   // --- Garbage collection: release collection targets, then collect; once without and once with pending mutations.
   final LruGarbageCollector collector = LruGarbageCollector(
       persistence.referenceDelegate,
@@ -505,6 +541,7 @@ Future<void> main(List<String> args) async {
       <int>[6, 8]);
 
   await persistence.shutdown();
+  record('peak resident set size of the process', ProcessInfo.maxRss / (1024 * 1024), 'MB');
   print('\n=== $engineName, $n documents ===');
   results.forEach(print);
 }
