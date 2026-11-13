@@ -492,6 +492,25 @@ class LocalStore implements BundleCallback {
     );
   }
 
+  /// Returns the stored session token, or an empty token when none was stored (Android `LocalStore.getSessionToken`).
+  ///
+  /// PORTING NOTE: Android reads the globals cache outside a transaction; this runs in one, as the JS
+  /// `TestGlobalsCache` does, so that it is ordered with the other persistence work.
+  Future<Uint8List> getSessionToken() {
+    return _persistence.runTransactionAndReturn(
+      'Get session token',
+      () => _persistence.globalsCache.getSessionToken(),
+    );
+  }
+
+  /// Stores [sessionToken] (Android `LocalStore.setSessionsToken`).
+  Future<void> setSessionToken(Uint8List sessionToken) {
+    return _persistence.runTransaction(
+      'Set session token',
+      () => _persistence.globalsCache.setSessionToken(sessionToken),
+    );
+  }
+
   /// Returns the last consistent snapshot processed (used by the [RemoteStore] to determine whether to buffer incoming
   /// snapshots from the backend).
   SnapshotVersion getLastRemoteSnapshotVersion() {

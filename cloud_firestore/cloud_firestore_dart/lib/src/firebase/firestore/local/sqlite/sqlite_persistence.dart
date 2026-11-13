@@ -26,6 +26,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/local/local_serializ
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/lru_delegate.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/lru_garbage_collector.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/persistance/bundle_cache.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/local/persistance/globals_cache.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/persistance/document_overlay_cache.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/persistance/index_manager.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/persistance/mutation_queue.dart';
@@ -39,6 +40,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/local/query_data.dar
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/query_context.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/reference_set.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/sqlite/sqlite_bundle_cache.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/local/sqlite/sqlite_globals_cache.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/sqlite/sqlite_database_files.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/sqlite/sqlite_document_overlay_cache.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/sqlite/sqlite_overlay_migration_manager.dart';
@@ -177,6 +179,9 @@ class SQLitePersistence extends Persistence {
 
   @override
   late final BundleCache bundleCache = SQLiteBundleCache(this, serializer);
+
+  @override
+  late final GlobalsCache globalsCache = SQLiteGlobalsCache(this);
 
   @override
   late SqliteIndexManager indexManager;

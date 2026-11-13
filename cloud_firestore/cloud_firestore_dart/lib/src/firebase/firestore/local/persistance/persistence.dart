@@ -9,6 +9,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/firestore_error.dart
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/local_store.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/persistance/bundle_cache.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/persistance/document_overlay_cache.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/local/persistance/globals_cache.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/persistance/mutation_queue.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/persistance/overlay_migration_manager.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/persistance/query_cache.dart';
@@ -105,6 +106,9 @@ abstract class Persistence {
 
   /// Returns a [BundleCache] representing the persisted cache of loaded bundles.
   BundleCache get bundleCache;
+
+  /// Returns the [GlobalsCache] that stores values that cut across components, such as the session token.
+  GlobalsCache get globalsCache;
 
   /// Creates a [RemoteDocumentCache] representing the persisted cache of remote
   /// documents.

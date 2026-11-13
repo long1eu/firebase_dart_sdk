@@ -16,7 +16,7 @@ class SQLiteSchema {
   const SQLiteSchema(this.db);
 
   /// The version of the schema. Increase this by one for each migration added to [runMigrations] below.
-  static const int version = 15;
+  static const int version = 16;
 
   /// The batch size for data migrations on a large table. This is chosen to balance the memory usage of the rows read
   /// with the number of round trips.
@@ -126,6 +126,12 @@ class SQLiteSchema {
     // the primary lease and the epoch of the cache, as the `clientMetadata` and `owner` stores of the JS SDK.
     if (fromVersion < 15 && toVersion >= 15) {
       await _createV15ClientMetadata();
+    }
+
+    // Migration 16 corresponds to migration 17 of the Android SDK (`createGlobalsTable`): the key and value pairs of
+    // the globals cache, which holds the session token.
+    if (fromVersion < 16 && toVersion >= 16) {
+      await _createV16GlobalsTable();
     }
 
     // Adding a new migration? READ THIS FIRST!
@@ -581,6 +587,13 @@ class SQLiteSchema {
   ///   * `primary_client`: the single row of the primary lease;
   ///   * `persistence_epoch`: a counter that `clearPersistence` increments when it empties a cache that other clients
   ///     still have open.
+  Future<void> _createV16GlobalsTable() {
+    return _ifTablesDontExist(<String>['globals'], () async {
+      // A table of key value pairs.
+      await db.execute(SQLiteGlobalsCache.createTableStatement);
+    });
+  }
+
   Future<void> _createV15ClientMetadata() async {
     await db.execute(
       'CREATE TABLE IF NOT EXISTS clients ('
