@@ -99,7 +99,10 @@ class Firestore {
           DatabaseId.defaultDatabaseId,
         )];
     if (firestore == null) {
-      throw StateError('You must call [Firestore.getInstance] first.');
+      throw StateError(
+        'Firestore.instance has no default instance yet: call '
+        'Firestore.instanceFor(app: FirebaseApp.instance) first.',
+      );
     }
 
     if (app == app.authProvider) {

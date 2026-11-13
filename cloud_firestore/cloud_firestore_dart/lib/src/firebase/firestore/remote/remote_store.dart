@@ -181,13 +181,11 @@ class RemoteStore implements TargetMetadataProvider {
   @visibleForTesting
   int? getRemoteTargetId(int sdkTargetId) => _sdkToRemoteTargetId[sdkTargetId];
 
-  /// Maps [sdkTargetId] to a new remote target id and forgets the one it was mapped to before.
+  /// Maps [sdkTargetId] to a new remote target id.
+  ///
+  /// [sdkTargetId] is never mapped already: a mapping exists exactly while its listen target does ([stopListening]
+  /// and a target error remove both), and [listen] returns early for a target that is still listened to.
   int _allocateRemoteTargetId(int sdkTargetId) {
-    final int? current = _sdkToRemoteTargetId[sdkTargetId];
-    if (current != null) {
-      _remoteToSdkTargetId.remove(current);
-    }
-
     // Remote ids keep the parity of the SDK id: odd for the sync engine (limbo resolution), even for the query cache.
     final int remoteTargetId = sdkTargetId.isOdd
         ? _lastSyncEngineRemoteTargetId += 2

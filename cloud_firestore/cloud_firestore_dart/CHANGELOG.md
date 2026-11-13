@@ -1,3 +1,8 @@
+## Unreleased
+
+- `Firestore.instance` before the default instance exists: the `StateError` now says to call
+  `Firestore.instanceFor(app: FirebaseApp.instance)` (it named the deprecated `Firestore.getInstance`).
+
 ## 0.1.0
 
 First release under the new name. This package was published as `cloud_firestore_vm` (last

@@ -190,7 +190,7 @@ abstract class BaseStream<
     if (Log.isDebugEnabled) {
       final Iterable<MapEntry<String, String>> entries = headers.entries.where(
         (MapEntry<String, String> entry) =>
-            whiteListedHeaders.contains(entry.key.toLowerCase()),
+            Datastore.whiteListedHeaders.contains(entry.key.toLowerCase()),
       );
 
       final Map<String, String> values = Map<String, String>.fromEntries(
@@ -378,14 +378,6 @@ abstract class BaseStream<
   /// The time a stream stays open after it is marked idle (one minute, as on
   /// Android).
   static const Duration idleTimeout = Duration(minutes: 1);
-
-  static final Set<String> whiteListedHeaders = <String>{
-    'date',
-    'x-google-backends',
-    'x-google-netmon-label',
-    'x-google-service',
-    'x-google-gfe-request-trace',
-  };
 }
 
 enum State { initial, starting, open, error, backoff, closing }

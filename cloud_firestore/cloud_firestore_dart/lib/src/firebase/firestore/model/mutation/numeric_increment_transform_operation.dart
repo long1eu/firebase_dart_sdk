@@ -6,7 +6,6 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/decimal128_value.dar
 import 'package:cloud_firestore_dart/src/firebase/firestore/int32_value.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/numeric_transform_operation.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/value/field_value.dart';
-import 'package:cloud_firestore_dart/src/firebase/firestore/util/assert.dart';
 import 'package:cloud_firestore_dart/src/firebase/timestamp.dart';
 
 /// Implements the backend semantics for locally computed NUMERIC_ADD
@@ -63,17 +62,9 @@ class NumericIncrementTransformOperation extends NumericTransformOperation {
     } else if (baseValue is IntegerValue) {
       final double sum = baseValue.value + operandAsDouble();
       return DoubleValue.valueOf(sum);
-    } else if (baseValue is DoubleValue) {
-      final double sum = baseValue.value + operandAsDouble();
-      return DoubleValue.valueOf(sum);
     } else {
-      hardAssertLazy(
-        baseValue is DoubleValue,
-        () =>
-            'Expected NumberValue to be of type DoubleValue, but was $previousValue',
-      );
-
-      final double sum = (baseValue.value as num) + operandAsDouble();
+      // Every other number type is handled above: this is a double.
+      final double sum = (baseValue as DoubleValue).value + operandAsDouble();
       return DoubleValue.valueOf(sum);
     }
   }
