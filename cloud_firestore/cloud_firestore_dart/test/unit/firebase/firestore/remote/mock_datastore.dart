@@ -64,6 +64,9 @@ class MockDatastore extends Datastore {
   /// `allowUnlistedTargetRemoval`, used by specs where the server removes a target the client already unlistened).
   bool allowUnlistedTargetRemoval = false;
 
+  /// Called for every target the remote store listens to, after it was recorded: a test can answer like a backend.
+  void Function(QueryData queryData)? onWatchQuery;
+
   final FirestoreClient _client;
   final TaskScheduler _scheduler;
   final RemoteSerializer _serializer;
@@ -247,6 +250,7 @@ class _MockWatchStream extends WatchStream {
         .withExpectedCount(queryData.expectedCount);
     _datastore._watchStreamRequestCount += 1;
     _activeTargets[queryData.targetId] = sentQueryData;
+    _datastore.onWatchQuery?.call(sentQueryData);
   }
 
   @override

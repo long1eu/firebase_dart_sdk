@@ -35,6 +35,10 @@ class RetryableOperationQueue {
   /// place.
   bool _running = false;
 
+  /// A recovery of the persistence started ([enqueueRecovery]) and was not confirmed yet ([confirmRecovery]): its probe
+  /// may have succeeded, but nothing showed yet that the persistence stores data again.
+  bool _unconfirmedRecovery = false;
+
   /// Whether an operation is waiting to be retried.
   bool get hasPendingOperations => _operations.isNotEmpty;
 
@@ -52,6 +56,40 @@ class RetryableOperationQueue {
       await _retryNext();
     });
   }
+
+  /// Like [enqueue], for the [probe] of a recovery of the persistence (RemoteStore goes offline until it succeeds).
+  ///
+  /// The first recovery probes right away. A recovery that starts again before the last one was confirmed
+  /// ([confirmRecovery]) waits for the backoff, which keeps growing meanwhile: a probe that succeeds says little when
+  /// the persistence reads but does not write (a full disk), and the network would otherwise come back, fail to store
+  /// what it receives and go offline again in a loop without delay.
+  Future<void> enqueueRecovery(Future<void> Function() probe) {
+    return _queue.run<void>(() async {
+      final bool repeated = _unconfirmedRecovery;
+      _unconfirmedRecovery = true;
+      _operations.add(probe);
+      if (_running) {
+        return;
+      }
+      if (repeated && _operations.length == 1) {
+        _scheduleRetry();
+        return;
+      }
+      await _retryNext();
+    });
+  }
+
+  /// Records that the persistence stored data again (a remote event or an acknowledgement): the next recovery
+  /// probes right away again, and the backoff starts from the beginning.
+  void confirmRecovery() {
+    if (_unconfirmedRecovery) {
+      _unconfirmedRecovery = false;
+      _backoff.reset();
+    }
+  }
+
+  /// Whether a recovery waits for its confirmation (see [enqueueRecovery]).
+  bool get hasUnconfirmedRecovery => _unconfirmedRecovery;
 
   /// Drops the pending operations and the scheduled retry.
   void stop() {
@@ -74,7 +112,7 @@ class RetryableOperationQueue {
       // An operation that enqueued another one ran into the persistence again (RemoteStore probes the persistence
       // with a read, restarts the network, and the next write fails): the backoff keeps growing, otherwise a
       // persistence that reads but does not write would be retried in a loop without delay.
-      if (_operations.length < pending) {
+      if (_operations.length < pending && !_unconfirmedRecovery) {
         _backoff.reset();
       }
     } catch (error) {

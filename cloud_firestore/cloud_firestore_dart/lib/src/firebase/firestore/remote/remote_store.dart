@@ -391,6 +391,11 @@ class RemoteStore implements TargetMetadataProvider {
   /// The recovery of the JS SDK for a persistence that fails: takes the network offline and probes the persistence
   /// with [operation] (by default a read of the last remote snapshot version) with a backoff; the network comes back
   /// once [operation] succeeds. Rethrows [error] when it is not a recoverable persistence error.
+  ///
+  /// Unlike JS, the backoff is only reset once the persistence stored a remote event or an acknowledgement again
+  /// ([RetryableOperationQueue.confirmRecovery]): a failure that comes back before that is probed after the backoff,
+  /// not right away, so a disk that stays full does not loop through reconnecting, downloading the same changes again
+  /// and failing to store them.
   Future<void> _disableNetworkUntilRecovery(
     Object error,
     StackTrace stackTrace, [
@@ -408,22 +413,31 @@ class RemoteStore implements TargetMetadataProvider {
 
     final Future<void> Function() probe =
         operation ?? _localStore.readLastRemoteSnapshotVersion;
-    // Probe the persistence periodically and re-enable the network. The first attempt runs right away.
-    await enqueueRetryable(() async {
-      Log.d('RemoteStore', 'Retrying the persistence');
-      await probe();
-      _persistenceFailed = false;
-      await _startNetworkIfPossible();
-    }).catchError(_reportError);
+    // Probe the persistence periodically and re-enable the network. The first attempt runs right away, unless the last
+    // recovery was not confirmed.
+    await _retryableOperations
+        .enqueueRecovery(() async {
+          Log.d('RemoteStore', 'Retrying the persistence');
+          await probe();
+          _persistenceFailed = false;
+          await _startNetworkIfPossible();
+        })
+        .catchError(_reportError);
   }
 
   /// Runs [operation]; when it fails because the persistence is not available, takes the network offline until a
   /// retry of [operation] succeeds. Completes after the first attempt.
   Future<void> _executeWithRecovery(Future<void> Function() operation) async {
-    try {
+    // The operations run this way store something: when one succeeds, the persistence works again.
+    Future<void> storing() async {
       await operation();
+      _retryableOperations.confirmRecovery();
+    }
+
+    try {
+      await storing();
     } catch (error, stackTrace) {
-      await _disableNetworkUntilRecovery(error, stackTrace, operation);
+      await _disableNetworkUntilRecovery(error, stackTrace, storing);
     }
   }
 
@@ -687,6 +701,8 @@ class RemoteStore implements TargetMetadataProvider {
             // We have received a target change with a global snapshot if the snapshot version is not equal to
             // SnapshotVersion.MIN.
             await _raiseWatchSnapshot(snapshotVersion);
+            // The event was stored: a recovery from an earlier failure is confirmed.
+            _retryableOperations.confirmRecovery();
           }
         } catch (error, stackTrace) {
           Log.d('RemoteStore', 'Failed to raise snapshot: $error');
@@ -917,7 +933,13 @@ class RemoteStore implements TargetMetadataProvider {
       try {
         batch = await _localStore.getNextMutationBatch(lastBatchIdRetrieved);
       } catch (error, stackTrace) {
-        await _disableNetworkUntilRecovery(error, stackTrace);
+        // Probe with the read that failed: another read (the default probe) can work while this one does not.
+        final int afterBatchId = lastBatchIdRetrieved;
+        await _disableNetworkUntilRecovery(
+          error,
+          stackTrace,
+          () => _localStore.getNextMutationBatch(afterBatchId),
+        );
         // The first probe of the recovery runs right away (JS only queues it): when it succeeds, starting the network
         // again already refilled the pipeline, so continue after what is in it now, not after what this loop read.
         lastBatchIdRetrieved = _writePipeline.isEmpty

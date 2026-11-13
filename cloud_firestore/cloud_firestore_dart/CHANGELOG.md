@@ -215,6 +215,10 @@ Deprecated, still working:
   An operation that is retried and itself runs into the failing cache again (an acknowledgement that is stored, after
   which reading the next write fails) no longer runs twice or drops the operation it queued, and the retries back off
   instead of looping without delay.
+  A cache that reads but does not write (a full disk) no longer makes the client reconnect, download the same changes
+  and fail to store them in a loop: after a failure, the next one waits for the backoff until a remote event or an
+  acknowledgement was stored again. A write that can not be read from the cache is probed with that read, so the
+  network stays offline until it works.
   `TransientDatabaseException.toString()` names the type of its `cause` instead of repeating it: the string of a
   `SqliteException` holds the statement and its arguments (document contents, paths, user ids), and Firestore puts
   this exception into the `unavailable` error the app gets and into a warning in its log.

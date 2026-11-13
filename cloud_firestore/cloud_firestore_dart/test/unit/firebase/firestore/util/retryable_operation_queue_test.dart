@@ -152,6 +152,27 @@ void main() {
     queue.stop();
   });
 
+  test(
+    'a recovery that comes back before it was confirmed waits for the backoff',
+    () async {
+      int probes = 0;
+      await queue.enqueueRecovery(() async => probes++);
+      expect(probes, 1, reason: 'the first recovery probes right away');
+
+      // The probe succeeded, but nothing was stored since: the next recovery waits.
+      await queue.enqueueRecovery(() async => probes++);
+      expect(probes, 1);
+      await runRetry();
+      expect(probes, 2);
+
+      // Once the persistence stored something, a recovery probes right away again.
+      queue.confirmRecovery();
+      expect(queue.hasUnconfirmedRecovery, isFalse);
+      await queue.enqueueRecovery(() async => probes++);
+      expect(probes, 3);
+    },
+  );
+
   test('throws an error that is not recoverable to the caller', () async {
     await expectLater(
       queue.enqueue(() async => throw StateError('fatal')),

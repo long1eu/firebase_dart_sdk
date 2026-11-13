@@ -1,6 +1,8 @@
 // RemoteStore when the persistence fails (the JS SDK's recovery, see RemoteStore._disableNetworkUntilRecovery): a
 // recoverable error takes the network offline until a probe of the persistence succeeds, any other error is thrown.
 
+import 'dart:async';
+
 import 'package:cloud_firestore_dart/src/firebase/firestore/auth/user.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/online_state.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/local_serializer.dart';
@@ -11,8 +13,11 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/local/query_purpose.
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/sqlite/sqlite_persistence.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/database_id.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/mutation.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/model/snapshot_version.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/remote/remote_event.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/remote/remote_serializer.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/remote/remote_store.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/remote/watch_change.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/database.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/timer_task.dart';
 import 'package:rxdart/subjects.dart';
@@ -33,6 +38,9 @@ class _FlakyDatabase implements Database {
   Object? nextError;
   int nextBatchReads = 0;
 
+  /// Every read of the next batch fails while set (a page of the mutations table that can not be read).
+  Object? batchReadError;
+
   @override
   String get path => _inner.path;
 
@@ -48,6 +56,9 @@ class _FlakyDatabase implements Database {
     if (statement.contains('FROM mutations') &&
         statement.contains('batch_id >=')) {
       nextBatchReads++;
+      if (batchReadError != null) {
+        return Future<List<Map<String, dynamic>>>.error(batchReadError!);
+      }
       final Object? error = nextError;
       if (error != null) {
         nextError = null;
@@ -67,6 +78,20 @@ class _FlakyDatabase implements Database {
 
 class _OnlineStates extends MockRemoteStoreCallback {
   final List<OnlineState> states = <OnlineState>[];
+
+  /// Remote events can not be stored while set (a disk that is full: reads work, writes do not).
+  bool diskFull = false;
+  int remoteEvents = 0;
+  int storedRemoteEvents = 0;
+
+  @override
+  Future<void> handleRemoteEvent(RemoteEvent remoteEvent) async {
+    remoteEvents++;
+    if (diskFull) {
+      throw TransientDatabaseException('database or disk is full');
+    }
+    storedRemoteEvents++;
+  }
 
   @override
   Future<void> handleOnlineStateChange(OnlineState onlineState) async {
@@ -204,6 +229,119 @@ void main() {
         await remoteStore.handleCredentialChange(() async {});
         await _settle();
         expect(datastore.watchStreamRequestCount, greaterThan(requests));
+      },
+    );
+  });
+
+  group('a persistence that keeps failing', () {
+    /// Runs the retry of the persistence that is scheduled, if any, and lets what it starts settle.
+    Future<void> runRecoveryRetry() async {
+      expect(
+        scheduler.getTask(TaskId.asyncQueueRetry),
+        isNotNull,
+        reason: 'the next attempt waits for the backoff',
+      );
+      scheduler.runUntil(TaskId.asyncQueueRetry);
+      await _settle();
+    }
+
+    test(
+      'a full disk is probed with the backoff, not in a loop of reconnects',
+      () async {
+        // A backend that answers every listen with a consistent snapshot.
+        int snapshot = 1;
+        datastore.onWatchQuery = (QueryData queryData) {
+          unawaited(
+            Future<void>(() async {
+              await datastore.writeWatchChange(
+                WatchChangeWatchTargetChange(WatchTargetChangeType.added, <int>[
+                  queryData.targetId,
+                ]),
+                SnapshotVersion.none,
+              );
+              await datastore.writeWatchChange(
+                WatchChangeWatchTargetChange(
+                  WatchTargetChangeType.current,
+                  <int>[queryData.targetId],
+                  resumeToken(snapshot),
+                ),
+                SnapshotVersion.none,
+              );
+              await datastore.writeWatchChange(
+                WatchChangeWatchTargetChange(
+                  WatchTargetChangeType.noChange,
+                  <int>[],
+                ),
+                version(1000 * snapshot++),
+              );
+            }),
+          );
+        };
+        callback.diskFull = true;
+        await remoteStore.start();
+        await remoteStore.listen(
+          QueryData(query('foo').toTarget(), 2, 1, QueryPurpose.listen),
+        );
+        await _settle();
+
+        // The first failure is probed at once; the read works, the network comes back, the next snapshot can not be
+        // stored either. From then on each attempt waits for the backoff.
+        final int first = callback.remoteEvents;
+        expect(first, inInclusiveRange(1, 3));
+        final int streams = datastore.watchStreamRequestCount;
+        await _settle();
+        await _settle();
+        expect(
+          callback.remoteEvents,
+          first,
+          reason: 'nothing happens between two attempts',
+        );
+        expect(datastore.watchStreamRequestCount, streams);
+
+        // One attempt per run of the backoff: one reconnect, one snapshot that can not be stored.
+        for (int i = 1; i <= 3; i++) {
+          await runRecoveryRetry();
+          expect(callback.remoteEvents, first + i);
+          expect(datastore.watchStreamRequestCount, streams + i);
+        }
+        expect(callback.storedRemoteEvents, 0);
+
+        // Once there is room again, the next attempt stores the snapshot and the client stays online.
+        callback.diskFull = false;
+        await runRecoveryRetry();
+        expect(callback.storedRemoteEvents, 1);
+        expect(callback.states.last, OnlineState.online);
+        expect(scheduler.getTask(TaskId.asyncQueueRetry), isNull);
+      },
+    );
+
+    test(
+      'a write that can not be read is probed with that read, so the network stays offline',
+      () async {
+        await localStore.writeLocally(<Mutation>[
+          setMutation('foo/bar', map(<String>['a', 'b'])),
+        ]);
+        db.batchReadError = TransientDatabaseException('disk I/O error');
+
+        await remoteStore.start();
+        await _settle();
+        await _settle();
+        expect(callback.states, <OnlineState>[OnlineState.offline]);
+        // The read of the pipeline, the probe right away, and the first retry (its backoff starts at 0).
+        final int reads = db.nextBatchReads;
+        expect(reads, lessThanOrEqualTo(3));
+
+        // Each run of the backoff reads the batch once and does not bring the network back.
+        for (int i = 1; i <= 3; i++) {
+          await runRecoveryRetry();
+          expect(db.nextBatchReads, reads + i);
+        }
+        expect(callback.states, <OnlineState>[OnlineState.offline]);
+        expect(datastore.writesSent, 0);
+
+        db.batchReadError = null;
+        await runRecoveryRetry();
+        expect(datastore.writesSent, 1);
       },
     );
   });
