@@ -13,7 +13,8 @@ topics:
   - offline
 
 # The VM uses native gRPC over HTTP/2 (dart:io). The web uses REST and
-# WebChannel over fetch, with a memory cache only; it is experimental.
+# WebChannel over fetch, with a memory cache or an opt-in SQLite cache in
+# IndexedDB; it is experimental.
 platforms:
   android:
   ios:

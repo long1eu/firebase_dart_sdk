@@ -7,10 +7,12 @@
 // ignore_for_file: type=lint, unused_local_variable, unused_import
 // ignore_for_file: unused_element
 
+import 'dart:convert';
 import 'dart:io';
 import 'package:cloud_firestore_dart/cloud_firestore_dart.dart';
 import 'package:cloud_firestore_dart/pipelines.dart';
 import 'package:firebase_app_dart/firebase_app_dart.dart';
+import 'package:firebase_auth_providers_dart/adc.dart'; // needs dart:io
 import 'package:firebase_auth_providers_dart/firebase_auth_providers_dart.dart';
 
 late FirebaseApp app;
@@ -18,6 +20,8 @@ late Firestore firestore;
 late CollectionReference<Map<String, Object?>> users;
 late Query<Map<String, Object?>> query;
 late List<int> bundleBytes;
+late String password;
+late String keyFilePath;
 
 class City {
   const City(this.name, this.population);
@@ -26,6 +30,14 @@ class City {
   final String name;
   final int population;
   Map<String, Object?> toMap() => {'name': name, 'population': population};
+}
+
+class FileAuthStorage implements AuthStorage {
+  @override
+  Future<String?> read(String key) async { /* ... */ return null; } // null: no value
+
+  @override
+  Future<void> write(String key, String? value) async { /* null removes the key */ }
 }
 
 class MyDatabase implements Database {
@@ -273,6 +285,58 @@ Future<void> appReadmeLine49() async {
   }
 
   FirebaseApp.withOptions(options);
+}
+
+// ../../firebase_auth/firebase_auth_providers_dart/README.md:53
+Future<void> authProvidersReadmeLine53() async {
+  final app = FirebaseApp.withOptions(const FirebaseOptions(
+    apiKey: '<the Web API key of the project>',
+    applicationId: '1:1234567890:dart:example',
+    projectId: 'my-project',
+  ));
+
+  // Before the Firestore instance is created: it becomes the token provider of the app.
+  final auth = await FirebaseUserAuth.forApp(app);
+  final firestore = Firestore.instanceFor(app: app);
+
+  await auth.signInWithEmailAndPassword('ada@example.com', password);
+  // or: auth.signInAnonymously(), auth.createUserWithEmailAndPassword(...),
+  //     auth.signInWithCustomToken(tokenFromYourServer)
+
+  await firestore.doc('users/${auth.uid}/notes/first').set({'text': 'hello'});
+
+  await auth.signOut();
+}
+
+// ../../firebase_auth/firebase_auth_providers_dart/README.md:102
+Future<void> authProvidersReadmeLine102() async {
+  final auth = await FirebaseUserAuth.forApp(app, storage: FileAuthStorage());
+  // auth.currentUser is the user of the last run, if there was one.
+}
+
+// ../../firebase_auth/firebase_auth_providers_dart/README.md:120
+Future<void> authProvidersReadmeLine120() async {
+  final auth = await FirebaseUserAuth.forApp(app,
+      emulatorHost: FirebaseUserAuth.emulatorHostFromEnvironment); // FIREBASE_AUTH_EMULATOR_HOST
+  // or emulatorHost: '127.0.0.1:9099'
+}
+
+// ../../firebase_auth/firebase_auth_providers_dart/README.md:137
+Future<void> authProvidersReadmeLine137() async {
+  final app = FirebaseApp.withOptions(const FirebaseOptions(
+    apiKey: 'unused',            // required by FirebaseOptions, not sent with these credentials
+    applicationId: '1:1234567890:dart:server',
+    projectId: 'my-project',
+  ));
+
+  // Application Default Credentials: GOOGLE_APPLICATION_CREDENTIALS, gcloud, or the metadata server.
+  app.authProvider = applicationDefaultCredentials();
+
+  // Or a service account key (the decoded JSON of the key file, or its content as a string):
+  app.authProvider = OAuthTokenProvider.serviceAccount(
+      jsonDecode(File(keyFilePath).readAsStringSync()));
+
+  final firestore = Firestore.instanceFor(app: app);
 }
 
 // ../../docs/migrating_from_vm_packages.md:57

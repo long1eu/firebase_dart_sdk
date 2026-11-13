@@ -63,7 +63,7 @@ final app = FirebaseApp.withOptions(const FirebaseOptions(
 
 // Before the Firestore instance is created: it becomes the token provider of the app.
 final auth = await FirebaseUserAuth.forApp(app);
-final firestore = await Firestore.instanceFor(app: app);
+final firestore = Firestore.instanceFor(app: app);
 
 await auth.signInWithEmailAndPassword('ada@example.com', password);
 // or: auth.signInAnonymously(), auth.createUserWithEmailAndPassword(...),
@@ -102,7 +102,7 @@ restarts, implement the two methods on top of your own storage and pass it in:
 ```dart
 class FileAuthStorage implements AuthStorage {
   @override
-  Future<String?> read(String key) async { /* ... */ }
+  Future<String?> read(String key) async { /* ... */ return null; } // null: no value
 
   @override
   Future<void> write(String key, String? value) async { /* null removes the key */ }
@@ -153,7 +153,7 @@ app.authProvider = applicationDefaultCredentials();
 app.authProvider = OAuthTokenProvider.serviceAccount(
     jsonDecode(File(keyFilePath).readAsStringSync()));
 
-final firestore = await Firestore.instanceFor(app: app);
+final firestore = Firestore.instanceFor(app: app);
 ```
 
 - The access token is fetched when it is first needed and replaced five minutes before it

@@ -1,7 +1,7 @@
 // Keeps the Dart snippets of the READMEs compiling.
 //
-// Every ```dart block of the three READMEs (repository root, this package,
-// firebase_app_dart) and of docs/migrating_from_vm_packages.md (whose
+// Every ```dart block of the four READMEs (repository root, this package,
+// firebase_app_dart, firebase_auth_providers_dart) and of docs/migrating_from_vm_packages.md (whose
 // "before" blocks are fenced as ```dart before and skipped) is copied into
 // test/readme/readme_snippets.dart, one function per block, and that file is analyzed (here, and by any
 // `dart analyze test`), so a snippet that no longer matches the API is an
@@ -32,6 +32,8 @@ const Map<String, String> _readmes = <String, String>{
   '../../README.md': 'rootReadme',
   'README.md': 'firestoreReadme',
   '../../firebase_core/firebase_app_dart/README.md': 'appReadme',
+  '../../firebase_auth/firebase_auth_providers_dart/README.md':
+      'authProvidersReadme',
   '../../docs/migrating_from_vm_packages.md': 'migrationGuide',
 };
 
@@ -45,6 +47,8 @@ late Firestore firestore;
 late CollectionReference<Map<String, Object?>> users;
 late Query<Map<String, Object?>> query;
 late List<int> bundleBytes;
+late String password;
+late String keyFilePath;
 ''';
 
 final RegExp _open = RegExp(r'^\s*```dart\s*$');

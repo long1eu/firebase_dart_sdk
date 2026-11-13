@@ -66,16 +66,17 @@ API changes that need code changes:
   document data (see typed data converters under Added). Code that uses the references returned
   by `Firestore` keeps compiling (they are `...<Map<String, Object?>>`); a bare type annotation
   such as `DocumentSnapshot` now means `dynamic` data.
-- `Firestore.instanceFor` (and the deprecated `getInstance`) return the `Firestore` instead of a
-  `Future<Firestore>`, like Firestore Lite, the JS, Android and FlutterFire SDKs. The instance
+- `Firestore.instanceFor` (new) and the deprecated `getInstance` return the `Firestore` instead of
+  a `Future<Firestore>`, like Firestore Lite, the JS, Android and FlutterFire SDKs. The instance
   initializes in the background as the first task of its queue: it waits for the first user of
   the auth provider, opens and migrates the cache, and starts the local and remote stores, and
   every operation runs after that. A failed initialization (the opener throws, a migration fails)
   is reported by the operations of the instance instead of by `instanceFor`. A new `FirebaseApp`
   with the name of a deleted one gets its instance at once; it opens the cache once the instance
   of the deleted app has closed it. `await Firestore.instanceFor(...)` keeps compiling.
-- `Firestore.databaseName` is renamed `Firestore.databaseId` (a `String`, as FlutterFire's), in
-  the main library and in Firestore Lite.
+- `Firestore.databaseId` is the database name as a `String` (as FlutterFire's), no longer the
+  `DatabaseId` model; the new `Firestore.projectId` gives the project. The same in Firestore
+  Lite.
 - `Database.file` (a `dart:io` `File`) is replaced by `Database.path` (a `String`), so the
   persistence interface no longer needs `dart:io`. Implementations of `Database` must rename
   the getter.
@@ -140,7 +141,7 @@ Behaviour changes without a compile error:
     `/`, `@`, `?`, `#`, `\` or whitespace is an `ArgumentError` (a value such as
     `firestore.googleapis.com@other.example` made the web transport talk to the other host).
   - Bundles are treated as untrusted input: a length prefix has to be at most 10 plain decimal
-    digits, an element is at most 64 MiB (`BundleReader.maxElementBytes`), values and filters
+    digits, an element is at most 64 MiB, values and filters
     may be nested at most 100 levels, and fields of the wrong JSON type are reported as an
     invalid bundle. A stream without a valid element is rejected at once instead of being
     buffered, and elements that arrive in small chunks are no longer re-copied per chunk.
@@ -182,8 +183,8 @@ Behaviour changes without a compile error:
 - With overlays, array transforms (`arrayUnion` / `arrayRemove`) keep their local result until
   the write is acknowledged instead of being re-applied on top of newer server data (as
   upstream).
-- `Timestamp.fromDate` / `toDate` are microsecond-accurate (they truncated to milliseconds);
-  results for millisecond inputs are unchanged, and `DateTime` values written to documents keep
+- `Timestamp.fromDate` / `toDate` are microsecond-accurate (they truncated to milliseconds), also
+  on the web up to the end of the `Timestamp` range; results for millisecond inputs are unchanged, and `DateTime` values written to documents keep
   their microseconds. `Timestamp.now()` still has millisecond precision.
 - `Blob.bytes` returns a copy.
 - `FirebaseApp.persistenceKey` (`firebase_app_dart`) now uses URL-safe base64 without padding;
@@ -196,6 +197,7 @@ Deprecated, still working:
   `documentChanges` (use `docs` / `docChanges`), `FieldPath.documentId()` (use
   `documentIdField`), `Source.defaultSource` (use `serverAndCache`). `FirebaseFirestore` and
   `Settings` are typedefs of `Firestore` and `FirestoreSettings`.
+
 ### Added
 
 - Authentication with ready-made token providers from the new `firebase_auth_providers_dart`
@@ -203,6 +205,7 @@ Deprecated, still working:
   Default Credentials); see the README section "Authentication". `test/integration_auth` shows a
   signed-in user's token reaching Firestore over gRPC, the web transport and Firestore Lite, the
   streams restarting on a user switch and access ending at sign-out. Emulators only.
+
 Queries and aggregations:
 
 - Queries: `!=` / `not-in`, composite `Filter.or` / `Filter.and` (OR queries), multiple
@@ -533,8 +536,10 @@ Documentation and tests:
 - `Firestore.instanceFor` no longer returns an instance whose `terminate()` is still in
   progress. With a new `FirebaseApp` that has the name of a deleted one it no longer returns the
   instance of the deleted app (which was about to be terminated, since `FirebaseApp.delete()`
-  terminates the instances of the app in the background): it waits for that instance to close
-  and returns a new one on the same cache.
+  terminates the instances of the app in the background): it returns a new instance at once,
+  which opens the same cache after the old instance has closed it.
+- The `x-goog-api-client` header carries only the Dart version (`gl-dart/3.12.2`); it carried
+  the whole `Platform.version` string, with spaces, a date and a quoted platform name.
 - `FirestoreSettings.copyWith(cacheSettings: ...)` on settings that set `persistenceEnabled` or
   `cacheSizeBytes` throws instead of dropping them.
 
@@ -542,12 +547,15 @@ Documentation and tests:
 
 - Persistent cache indexes for queries with inequalities on several fields (they are scanned,
   as upstream), and indexes with a memory cache.
-- Sharing one persistent cache between running clients (the multi-tab support of the JS SDK):
-  one process or browser tab at a time.
+- Coordinating running clients that share one persistent cache (the multi-tab support of the JS
+  SDK). Two clients on one SQLite file keep it consistent (see Fixed) but do not share listens or
+  hand over the network; in the browser the cache is refused to a second tab.
 - On the web: OPFS storage, and any browser other than Chrome.
 - Pipelines beyond the preview: full-text search, window functions, pipelines in a
   `Transaction`, evaluation against the local cache and real-time pipelines.
-- A Firebase Auth client: the app supplies the ID token through `PlatformDependencies`.
+- A port of the Firebase Auth SDK. The app supplies tokens through `PlatformDependencies`, for
+  example with the providers of `firebase_auth_providers_dart` (email/password, anonymous and
+  custom-token sign-in, service accounts); there are no federated or phone sign-in providers.
 - Any run against production Firestore; the packages are not published yet.
 
 ## Versions published as `cloud_firestore_vm`
