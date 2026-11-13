@@ -852,10 +852,17 @@ class RemoteStore implements TargetMetadataProvider {
       }
     }
 
+    final Set<int> currentTargets = <int>{
+      for (final int remoteTargetId in remoteEvent.currentTargets)
+        if (_remoteToSdkTargetId[remoteTargetId] case final int sdkTargetId)
+          sdkTargetId,
+    };
+
     return RemoteEvent(
       snapshotVersion: remoteEvent.snapshotVersion,
       targetChanges: targetChanges,
       targetMismatches: targetMismatches,
+      currentTargets: currentTargets,
       documentUpdates: remoteEvent.documentUpdates,
       resolvedLimboDocuments: remoteEvent.resolvedLimboDocuments,
     );

@@ -1016,10 +1016,33 @@ void main() {
         ackTarget(), false, version(1));
     view.applyChanges(view.computeDocChanges(docUpdates(<Document>[committed])));
     final ViewChange change = view.applyChanges(
-        view.computeDocChanges(docUpdates()), ackTarget(), false, version(3));
+        view.computeDocChanges(docUpdates()), ackTarget(), false, version(3),
+        /* targetCurrentInStream= */ true);
     expect(change.limboChanges, <LimboDocumentChange>[
       LimboDocumentChange(LimboDocumentChangeType.added, local.key)
     ]);
+  });
+
+  test(
+      'an acknowledged document that watch never had is not in limbo when the '
+      'target was not CURRENT on the current watch stream', () {
+    // Final review 2026-11-14, finding 3: after a reconnect the view is still current, but the target was resumed
+    // from an older resume token and has not caught up with the commit.
+    final Query query = messageQuery();
+    final Document local = doc('rooms/eros/messages/1', 0,
+        map(<dynamic>['v', 2]), DocumentState.localMutations);
+    final Document committed = doc('rooms/eros/messages/1', 3,
+        map(<dynamic>['v', 2]), DocumentState.committedMutations);
+
+    final View view = View(query, DocumentKey.emptyKeySet);
+    view.applyChanges(view.computeDocChanges(docUpdates(<Document>[local])),
+        ackTarget(), false, version(1), true);
+    view.applyChanges(view.computeDocChanges(docUpdates(<Document>[committed])));
+    // A global snapshot after the commit while the target is not CURRENT on the new stream.
+    final ViewChange change = view.applyChanges(
+        view.computeDocChanges(docUpdates()), null, false, version(3));
+    expect(change.limboChanges, isEmpty);
+    expect(view.limboDocuments, isEmpty);
   });
 
   test(

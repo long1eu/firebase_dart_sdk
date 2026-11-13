@@ -19,6 +19,7 @@ class RemoteEvent {
     this.snapshotVersion = SnapshotVersion.none,
     this.targetChanges = const <int, TargetChange>{},
     this.targetMismatches = const <int, QueryPurpose>{},
+    this.currentTargets = const <int>{},
   });
 
   /// Returns the snapshot version this event brings us up to.
@@ -31,6 +32,13 @@ class RemoteEvent {
   /// for re-listening. Listens for these targets should be re-established
   /// without resume tokens.
   final Map<int, QueryPurpose> targetMismatches;
+
+  /// The targets that watch marked CURRENT on the current watch stream, and did not reset since: their documents are
+  /// consistent with [snapshotVersion]. A target resumed after the stream reconnected is not in it until watch marks
+  /// it CURRENT again, even when the view of the target still is (see `View._removedByWatch`).
+  ///
+  /// PORTING NOTE: not upstream, which has no use for it.
+  final Set<int> currentTargets;
 
   /// Returns a set of which documents have changed or been deleted, along with
   /// the doc's new values (if not deleted).
@@ -46,6 +54,7 @@ class RemoteEvent {
           ..add('snapshotVersion', snapshotVersion)
           ..add('targetChanges', targetChanges)
           ..add('targetMismatches', targetMismatches)
+          ..add('currentTargets', currentTargets)
           ..add('documentUpdates', documentUpdates)
           ..add('resolvedLimboDocuments', resolvedLimboDocuments))
         .toString();

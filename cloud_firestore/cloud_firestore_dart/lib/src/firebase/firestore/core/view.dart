@@ -343,11 +343,15 @@ class View {
   ///
   /// [snapshotVersion] is the version of the remote event the changes come from, if any. Synced snapshots report the
   /// last one as their [ViewSnapshot.readTime].
+  ///
+  /// [targetCurrentInStream] is whether watch marked the target of the view CURRENT on the current watch stream (see
+  /// `RemoteEvent.currentTargets`).
   ViewChange applyChanges(
     ViewDocumentChanges docChanges, [
     TargetChange? targetChange,
     bool targetIsPendingReset = false,
     SnapshotVersion? snapshotVersion,
+    bool targetCurrentInStream = false,
   ]) {
     hardAssert(
       !docChanges.needsRefill,
@@ -382,9 +386,11 @@ class View {
           });
 
     _applyTargetChange(targetChange);
-    if (snapshotVersion != null && _current) {
+    if (snapshotVersion != null && _current && targetCurrentInStream) {
       // A snapshot of watch at or after the commit of a document the view waits for, without the document: watch is
-      // past the write and will not send it.
+      // past the write and will not send it. Only when watch marked the target CURRENT on the current stream: [_current]
+      // survives a reconnect of the stream, and a target resumed from an older resume token has not caught up yet
+      // (it can lack the document at a snapshot after the commit, and send it later).
       _awaitingSync.forEach((DocumentKey key, SnapshotVersion committed) {
         if (!_syncedDocuments.contains(key) &&
             snapshotVersion.compareTo(committed) >= 0) {

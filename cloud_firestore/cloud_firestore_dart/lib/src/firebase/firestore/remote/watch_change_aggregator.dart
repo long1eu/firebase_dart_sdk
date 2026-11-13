@@ -281,6 +281,7 @@ class WatchChangeAggregator {
   /// Resets the accumulated changes before returning.
   RemoteEvent createRemoteEvent(SnapshotVersion snapshotVersion) {
     final Map<int, TargetChange> targetChanges = <int, TargetChange>{};
+    final Set<int> currentTargets = <int>{};
 
     for (MapEntry<int, TargetState> entry in _targetStates.entries) {
       final int targetId = entry.key;
@@ -288,6 +289,9 @@ class WatchChangeAggregator {
 
       final QueryData? queryData = _queryDataForActiveTarget(targetId);
       if (queryData != null) {
+        if (targetState.isCurrent) {
+          currentTargets.add(targetId);
+        }
         if (targetState.isCurrent && queryData.target.isDocumentQuery) {
           // Document queries for document that don't exist can produce an empty result set. To
           // update our local cache, we synthesize a document delete if we have not previously
@@ -348,6 +352,7 @@ class WatchChangeAggregator {
         _pendingDocumentUpdates,
       ),
       resolvedLimboDocuments: Set<DocumentKey>.from(resolvedLimboDocuments),
+      currentTargets: currentTargets,
     );
 
     // Re-initialize the current state to ensure that we do not modify the generated [RemoteEvent].

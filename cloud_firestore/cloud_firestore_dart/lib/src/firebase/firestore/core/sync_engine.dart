@@ -1063,6 +1063,7 @@ class SyncEngine implements RemoteStoreCallback, SharedClientStateSyncer {
         targetChange,
         targetIsPendingReset,
         remoteEvent?.snapshotVersion,
+        remoteEvent?.currentTargets.contains(queryView.targetId) ?? false,
       );
       // If there are changes, or this is a global snapshot, tell the other clients the state of the target: it is
       // current if the view is synced, or (without changes) if the target change says so.
