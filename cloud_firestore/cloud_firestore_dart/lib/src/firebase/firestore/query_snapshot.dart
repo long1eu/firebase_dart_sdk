@@ -3,6 +3,7 @@
 // on 25/09/2018
 
 import 'package:cloud_firestore_dart/src/firebase/firestore/firestore_data_converter.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/firestore_error.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/snapshot_json.dart'
     as snapshot_json;
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/view_snapshot.dart';
@@ -14,7 +15,6 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/model/document.dart'
     as core;
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/document.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/query.dart';
-import 'package:cloud_firestore_dart/src/firebase/firestore/query_document_snapshot.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/snapshot_metadata.dart';
 import 'package:firebase_app_dart/internal.dart';
 

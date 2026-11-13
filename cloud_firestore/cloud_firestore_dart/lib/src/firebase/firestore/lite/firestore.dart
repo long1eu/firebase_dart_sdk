@@ -261,7 +261,7 @@ class Firestore {
   /// connection is closed. A transaction in progress is not waited for: its
   /// next read or its commit fails (see [runTransaction]).
   ///
-  /// [instanceFor] returns a new instance afterwards. Calling this again does
+  /// [Firestore.instanceFor] returns a new instance afterwards. Calling this again does
   /// nothing.
   Future<void> terminate() {
     return _termination ??= _terminate();

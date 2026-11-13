@@ -7,6 +7,7 @@ import 'package:googleapis_auth/googleapis_auth.dart' as gapi;
 import 'package:http/http.dart' as http;
 
 import 'auth_exception.dart';
+import 'firebase_user_auth.dart';
 import 'rs256.dart';
 
 /// An OAuth 2.0 access token and when it expires.

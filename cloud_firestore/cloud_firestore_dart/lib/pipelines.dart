@@ -1,7 +1,10 @@
 /// Firestore Pipelines: queries made of stages and expressions that the
 /// server executes (Enterprise edition databases only).
 ///
-/// **Preview**: this API is experimental and may change in any release.
+/// **Preview, Enterprise only**: this API is experimental, may change in any
+/// release and needs a Firestore Enterprise edition database. Pipelines are
+/// always executed by the server: they do not use the local cache, do not see
+/// pending writes and cannot be listened to.
 ///
 /// ```dart
 /// import 'package:cloud_firestore_dart/cloud_firestore_dart.dart';

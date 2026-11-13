@@ -16,7 +16,6 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/auth/credentials_pro
 import 'package:cloud_firestore_dart/src/firebase/firestore/auth/empty_credentials_provider.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/auth/emulator_credentials_provider.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/auth/firebase_auth_credentials_provider.dart';
-import 'package:cloud_firestore_dart/src/firebase/firestore/collection_reference.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/database_info.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/firestore_client.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/query.dart'

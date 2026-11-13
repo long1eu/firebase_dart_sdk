@@ -19,7 +19,7 @@ class FirebaseError implements Error {
 }
 
 /// Internal use only, indicates that no signed-in user and operations like
-/// [InternalTokenProvider.getAccessToken] will fail.
+/// `InternalTokenProvider.getAccessToken` will fail.
 class FirebaseNoSignedInUserError extends FirebaseError {
   /// Creates the error with a [message].
   FirebaseNoSignedInUserError(String message) : super(message);

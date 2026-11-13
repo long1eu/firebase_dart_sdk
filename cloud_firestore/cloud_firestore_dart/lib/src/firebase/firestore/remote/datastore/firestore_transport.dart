@@ -77,7 +77,7 @@ class FirestoreRpc<Req extends GeneratedMessage, Res extends GeneratedMessage> {
       >._('BeginTransaction', proto.BeginTransactionResponse.create);
 
   static const FirestoreRpc<proto.RollbackRequest, Empty> rollback =
-      FirestoreRpc<proto.RollbackRequest, Empty>._('Rollback', Empty.create);
+      FirestoreRpc<proto.RollbackRequest, Empty>._('Rollback', Empty.new);
 
   static const FirestoreRpc<proto.CommitRequest, proto.CommitResponse> commit =
       FirestoreRpc<proto.CommitRequest, proto.CommitResponse>._(

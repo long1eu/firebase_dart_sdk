@@ -1,3 +1,5 @@
+import 'firebase_user_auth.dart';
+
 /// The signed-in user of a [FirebaseUserAuth].
 class AuthUser {
   /// Creates a user.

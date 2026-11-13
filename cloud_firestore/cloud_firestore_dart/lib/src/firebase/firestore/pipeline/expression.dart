@@ -122,7 +122,8 @@ Expression _vectorArgument(Object vector) {
 /// Wherever a method takes an `Object?` operand, an [Expression] is used as is
 /// and any other value is treated as a constant.
 ///
-/// **Preview**: the Pipelines API is experimental and may change.
+/// **Preview, Enterprise only**: the Pipelines API is experimental, may change
+/// in any release and needs a Firestore Enterprise edition database.
 abstract class Expression {
   /// Returns the wire representation of this expression.
   @internal
@@ -752,6 +753,9 @@ abstract class Expression {
 }
 
 /// An expression with a name: something that can be selected into a result.
+///
+/// **Preview, Enterprise only**: the Pipelines API is experimental, may change
+/// in any release and needs a Firestore Enterprise edition database.
 abstract class Selectable {
   /// The name of the output field.
   String get alias;
@@ -761,7 +765,11 @@ abstract class Selectable {
 }
 
 /// A reference to a field of the input document.
+///
+/// **Preview, Enterprise only**: the Pipelines API is experimental, may change
+/// in any release and needs a Firestore Enterprise edition database.
 class Field extends Expression implements Selectable {
+  /// A reference to the field at [path]. Use [Field.of] or `field()` instead.
   @internal
   Field(this.path);
 
@@ -784,6 +792,7 @@ class Field extends Expression implements Selectable {
   /// The field name that refers to the document name (key).
   static const String documentIdName = '__name__';
 
+  /// The path of the referenced field.
   @internal
   final model.FieldPath path;
 
@@ -812,12 +821,16 @@ class Field extends Expression implements Selectable {
 }
 
 /// A fixed value.
+///
+/// **Preview, Enterprise only**: the Pipelines API is experimental, may change
+/// in any release and needs a Firestore Enterprise edition database.
 class Constant extends Expression {
   /// Creates a constant from a plain value: `null`, `bool`, `int`, `double`,
   /// `String`, `DateTime`, `Timestamp`, `GeoPoint`, `Blob`, `VectorValue`,
   /// `DocumentReference`, or lists and maps of those.
   Constant(this.value) : _modelValue = null;
 
+  /// A constant holding an already-encoded [value].
   @internal
   Constant.fromModel(model.FieldValue value)
     : value = value.value,
@@ -842,6 +855,9 @@ class Constant extends Expression {
 /// A reference to a variable: one defined with `Pipeline.define`, or the
 /// element of a lambda such as [Expression.arrayFilter]. Create it with
 /// `variable(name)`.
+///
+/// **Preview, Enterprise only**: the Pipelines API is experimental, may change
+/// in any release and needs a Firestore Enterprise edition database.
 class VariableExpression extends Expression {
   /// A reference to the variable [name].
   VariableExpression(this.name);
@@ -897,6 +913,9 @@ class _ListOfExpressions extends Expression {
 /// ```dart
 /// FunctionExpression('to_lower', [field('title')]);
 /// ```
+///
+/// **Preview, Enterprise only**: the Pipelines API is experimental, may change
+/// in any release and needs a Firestore Enterprise edition database.
 class FunctionExpression extends Expression {
   /// Creates a call of the server function [name] (snake case) with [args].
   /// Arguments that are not expressions are treated as constants.
@@ -923,6 +942,9 @@ class FunctionExpression extends Expression {
 
 /// An expression that evaluates to a boolean: the condition of
 /// `Pipeline.where`.
+///
+/// **Preview, Enterprise only**: the Pipelines API is experimental, may change
+/// in any release and needs a Firestore Enterprise edition database.
 class BooleanExpression extends Expression {
   /// Treats [expression] as a boolean. Prefer [Expression.asBoolean].
   BooleanExpression(this.expression);
@@ -973,7 +995,11 @@ class BooleanExpression extends Expression {
 }
 
 /// An [Expression] with a name, created with [Expression.as].
+///
+/// **Preview, Enterprise only**: the Pipelines API is experimental, may change
+/// in any release and needs a Firestore Enterprise edition database.
 class AliasedExpression implements Selectable {
+  /// Names the result of [expression] [alias]. Prefer [Expression.as].
   AliasedExpression(this.expression, this.alias);
 
   @override
@@ -987,19 +1013,31 @@ class AliasedExpression implements Selectable {
 }
 
 /// The direction of an [Ordering].
+///
+/// **Preview, Enterprise only**: the Pipelines API is experimental, may change
+/// in any release and needs a Firestore Enterprise edition database.
 enum OrderingDirection {
+  /// Smaller values first.
   ascending('ascending'),
+
+  /// Larger values first.
   descending('descending');
 
   const OrderingDirection(this.serverName);
 
+  /// The name of this direction in the wire protocol.
   @internal
   final String serverName;
 }
 
 /// A sort key of `Pipeline.sort`, created with [Expression.ascending] or
 /// [Expression.descending].
+///
+/// **Preview, Enterprise only**: the Pipelines API is experimental, may change
+/// in any release and needs a Firestore Enterprise edition database.
 class Ordering {
+  /// Sorts by [expression] in [direction]. Prefer [Expression.ascending]
+  /// and [Expression.descending].
   Ordering(this.expression, this.direction);
 
   /// The expression to sort by.
@@ -1008,6 +1046,7 @@ class Ordering {
   /// Whether smaller or larger values come first.
   final OrderingDirection direction;
 
+  /// Returns the wire representation of this ordering.
   @internal
   pb.Value toProto(PipelineEncoder encoder) {
     return pb.Value()
@@ -1024,6 +1063,9 @@ class Ordering {
 /// `Pipeline.aggregate`.
 ///
 /// Create it directly to call an aggregate this SDK has no helper for yet.
+///
+/// **Preview, Enterprise only**: the Pipelines API is experimental, may change
+/// in any release and needs a Firestore Enterprise edition database.
 class AggregateFunction {
   /// Creates a call of the server aggregate [name] (snake case) with [args].
   AggregateFunction(this.name, [List<Object?> args = const <Object?>[]])
@@ -1057,6 +1099,7 @@ class AggregateFunction {
   WindowFunction over(WindowFrame frame) =>
       WindowFunction.withFrame(name, args, frame);
 
+  /// Returns the wire representation of this aggregate.
   @internal
   pb.Value toProto(PipelineEncoder encoder) {
     return pb.Value()
@@ -1070,7 +1113,11 @@ class AggregateFunction {
 }
 
 /// An [AggregateFunction] with a name, created with [AggregateFunction.as].
+///
+/// **Preview, Enterprise only**: the Pipelines API is experimental, may change
+/// in any release and needs a Firestore Enterprise edition database.
 class AliasedAggregate {
+  /// Names the result of [aggregate] [alias]. Prefer [AggregateFunction.as].
   AliasedAggregate(this.aggregate, this.alias);
 
   /// The aggregate that produces the value.

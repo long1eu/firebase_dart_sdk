@@ -36,8 +36,10 @@ import 'package:meta/meta.dart';
 /// The BSON types of Enterprise edition databases are returned as their value
 /// classes (`Int32Value`, `Decimal128Value`, ...).
 ///
-/// **Preview**: the Pipelines API is experimental and may change.
+/// **Preview, Enterprise only**: the Pipelines API is experimental, may change
+/// in any release and needs a Firestore Enterprise edition database.
 class PipelineResult {
+  /// A result with the decoded fields of one row. Created by the SDK.
   @internal
   PipelineResult(
     this._firestore,
@@ -135,8 +137,10 @@ bool pipelineResultEqual(PipelineResult left, PipelineResult right) {
 
 /// The results of executing a pipeline.
 ///
-/// **Preview**: the Pipelines API is experimental and may change.
+/// **Preview, Enterprise only**: the Pipelines API is experimental, may change
+/// in any release and needs a Firestore Enterprise edition database.
 class PipelineSnapshot {
+  /// The [results] of [pipeline]. Created by the SDK.
   @internal
   PipelineSnapshot(
     this.pipeline,
@@ -170,7 +174,8 @@ class PipelineSnapshot {
 
 /// The explanation of a pipeline execution, as sent by the server.
 ///
-/// **Preview**: the Pipelines API is experimental and may change.
+/// **Preview, Enterprise only**: the Pipelines API is experimental, may change
+/// in any release and needs a Firestore Enterprise edition database.
 class PipelineExplainStats {
   /// Wraps the `Any` message of the response.
   @internal

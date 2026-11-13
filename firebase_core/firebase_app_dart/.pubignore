@@ -14,3 +14,6 @@ pubspec_overrides.yaml
 
 # Tests are not published: a dependency does not need them (see the GitHub repository).
 test/
+
+# Includes the analysis options of the repository root, which are not part of the package.
+analysis_options.yaml

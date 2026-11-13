@@ -28,12 +28,16 @@ import 'package:cloud_firestore_dart/src/proto/index.dart' as proto;
 import 'package:meta/meta.dart';
 
 /// How the server chooses indexes for a pipeline.
+///
+/// **Preview, Enterprise only**: the Pipelines API is experimental, may change
+/// in any release and needs a Firestore Enterprise edition database.
 enum PipelineIndexMode {
   /// Let the server use the indexes it recommends.
   recommended('recommended');
 
   const PipelineIndexMode(this.serverName);
 
+  /// The name of this mode in the wire protocol.
   @internal
   final String serverName;
 }
@@ -62,8 +66,11 @@ enum PipelineIndexMode {
 /// Every stage accepts `rawOptions`, named options sent to the server as they
 /// are, for options this SDK has no parameter for yet.
 ///
-/// **Preview**: the Pipelines API is experimental and may change.
+/// **Preview, Enterprise only**: the Pipelines API is experimental, may change
+/// in any release and needs a Firestore Enterprise edition database.
 class Pipeline {
+  /// A pipeline over [firestore] made of [stages]. Start one with
+  /// `firestore.pipeline()` instead.
   @internal
   Pipeline(this.firestore, List<Stage> stages)
     : stages = List<Stage>.unmodifiable(stages);
@@ -71,6 +78,7 @@ class Pipeline {
   /// The database this pipeline runs against.
   final Firestore firestore;
 
+  /// The stages of this pipeline, in the order they run.
   @internal
   final List<Stage> stages;
 

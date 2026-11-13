@@ -8,6 +8,10 @@
 /// This library does not import `dart:io` and works on the web.
 library;
 
+// Imported for the references in the documentation above.
+import 'src/firebase_user_auth.dart';
+import 'src/oauth_token_provider.dart';
+
 export 'src/auth_exception.dart';
 export 'src/auth_storage.dart';
 export 'src/auth_user.dart';

@@ -14,7 +14,6 @@
 
 import 'package:cloud_firestore_dart/src/firebase/firestore/aggregate_field.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/aggregate_query.dart';
-import 'package:cloud_firestore_dart/src/firebase/firestore/collection_reference.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/user_data.dart'
     show UserDataParseAccumulator, UserDataParseContext, UserDataSource;
 import 'package:cloud_firestore_dart/src/firebase/firestore/distance_measure.dart';
@@ -40,8 +39,11 @@ import 'package:meta/meta.dart';
 /// Chooses where a [Pipeline] reads its input from. Get one with
 /// `firestore.pipeline()`.
 ///
-/// **Preview**: the Pipelines API is experimental and may change.
+/// **Preview, Enterprise only**: the Pipelines API is experimental, may change
+/// in any release and needs a Firestore Enterprise edition database.
 class PipelineSource {
+  /// A source for pipelines over the given database. Use `firestore.pipeline()`
+  /// instead.
   @internal
   PipelineSource(this._firestore);
 

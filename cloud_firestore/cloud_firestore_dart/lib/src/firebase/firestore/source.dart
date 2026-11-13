@@ -3,6 +3,7 @@
 // on 26/09/2018
 import 'package:cloud_firestore_dart/src/firebase/firestore/document_reference.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/query.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/query_snapshot.dart';
 
 /// Configures the behavior of [DocumentReference.get] and [Query.get]. By providing a [Source]
 /// value, these methods can be configured to fetch results only from the server, only from the
@@ -22,7 +23,7 @@ enum Source {
 
   /// Causes Firestore to immediately return a value from the cache, ignoring the server completely
   /// (implying that the returned value may be stale with respect to the value on the server). If
-  /// there is no data in the cache to satisfy the [get] call, [DocumentReference.get] will return
+  /// there is no data in the cache to satisfy the `get` call, [DocumentReference.get] will return
   /// can error and [Query.get] will return an empty [QuerySnapshot] with no documents.
   cache;
 

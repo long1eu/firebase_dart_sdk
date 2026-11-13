@@ -1,6 +1,6 @@
 import 'package:cloud_firestore_dart/src/firebase/timestamp.dart';
 
-/// Options to customize transaction behavior for [Firestore.runTransaction].
+/// Options to customize transaction behavior for `Firestore.runTransaction`.
 class TransactionOptions {
   /// Creates the options. [maxAttempts] is the maximum number of times the
   /// transaction is attempted before it fails, it must be at least 1. Throws

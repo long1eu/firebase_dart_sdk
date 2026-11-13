@@ -1,0 +1,9 @@
+# Options for `dart doc` (also used by pub.dev).
+dartdoc:
+  # cloud_firestore_dart.dart and lite.dart both export the value types
+  # (Timestamp, GeoPoint, FieldValue, ...). The library documentation of
+  # cloud_firestore_dart.dart names itself canonical for each of those classes
+  # with {@canonicalFor}; dartdoc still reports the source libraries under
+  # lib/src (which are not documented) as ambiguous, with a confidence of 0.01.
+  # Below this threshold that report is not shown.
+  ambiguousReexportScorerMinConfidence: 0.005

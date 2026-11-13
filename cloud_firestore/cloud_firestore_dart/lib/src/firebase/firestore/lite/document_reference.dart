@@ -14,6 +14,7 @@
 import 'dart:async';
 
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/user_data.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/firestore_error.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/keyed_document_reference.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/lite/data_converter.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/lite/firestore.dart';

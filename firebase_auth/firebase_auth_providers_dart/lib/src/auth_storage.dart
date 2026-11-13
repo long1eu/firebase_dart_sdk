@@ -1,5 +1,7 @@
 import 'dart:async';
 
+import 'firebase_user_auth.dart';
+
 /// Where [FirebaseUserAuth] keeps the session of the signed-in user (its refresh token), so that the user is still
 /// signed in after a restart.
 ///

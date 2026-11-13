@@ -27,6 +27,9 @@ import 'package:meta/meta.dart';
 ///
 /// **Beta**: window functions are a preview feature of the server; the
 /// Enterprise emulator rejects them.
+///
+/// **Preview, Enterprise only**: the Pipelines API is experimental, may change
+/// in any release and needs a Firestore Enterprise edition database.
 class WindowFrame {
   /// A frame of inputs counted by position: [preceding] inputs before the
   /// current one up to [following] inputs after it. `current` is the
@@ -141,6 +144,9 @@ class WindowFrame {
 /// the current one.
 ///
 /// **Beta**: window functions are a preview feature of the server.
+///
+/// **Preview, Enterprise only**: the Pipelines API is experimental, may change
+/// in any release and needs a Firestore Enterprise edition database.
 class WindowSpec {
   /// A window over the [partition] keys (field names as `String`s or
   /// expressions), ordered by [sort], with the default [frame].
@@ -199,6 +205,9 @@ class WindowSpec {
 /// Create it directly to call a window function this SDK has no helper for.
 ///
 /// **Beta**: window functions are a preview feature of the server.
+///
+/// **Preview, Enterprise only**: the Pipelines API is experimental, may change
+/// in any release and needs a Firestore Enterprise edition database.
 class WindowFunction {
   /// A call of the server window function [name] (snake case) with [args],
   /// evaluated over the frame of the enclosing stage.
@@ -260,7 +269,12 @@ class WindowFunction {
 /// A [WindowFunction] with a name, created with [WindowFunction.as].
 ///
 /// **Beta**: window functions are a preview feature of the server.
+///
+/// **Preview, Enterprise only**: the Pipelines API is experimental, may change
+/// in any release and needs a Firestore Enterprise edition database.
 class AliasedWindowFunction {
+  /// Names the result of [windowFunction] [alias]. Prefer
+  /// [WindowFunction.as].
   AliasedWindowFunction(this.windowFunction, this.alias);
 
   /// The function that produces the value.

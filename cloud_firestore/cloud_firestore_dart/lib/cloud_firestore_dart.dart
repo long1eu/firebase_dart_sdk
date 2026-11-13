@@ -1,4 +1,5 @@
-/// A pure-Dart Cloud Firestore client for the Dart VM and Flutter (no web).
+/// A pure-Dart Cloud Firestore client for the Dart VM and Flutter, with
+/// experimental web support (REST and WebChannel over `fetch`).
 ///
 /// Start from [Firestore.instanceFor] with a `FirebaseApp` created with
 /// `package:firebase_app_dart`, then use [Firestore.collection] and
@@ -9,6 +10,34 @@
 ///
 /// The offline cache is stored in SQLite when an [OpenDatabase] function is
 /// supplied, and in memory otherwise.
+///
+/// The value types shared with `package:cloud_firestore_dart/lite.dart` are
+/// documented here.
+///
+/// {@canonicalFor aggregate_field.AggregateField}
+/// {@canonicalFor aggregate_field.AverageAggregateField}
+/// {@canonicalFor aggregate_field.CountAggregateField}
+/// {@canonicalFor aggregate_field.SumAggregateField}
+/// {@canonicalFor blob.Blob}
+/// {@canonicalFor bson_object_id.BsonObjectId}
+/// {@canonicalFor bson_timestamp.BsonTimestamp}
+/// {@canonicalFor decimal128_value.Decimal128Value}
+/// {@canonicalFor field_path.FieldPath}
+/// {@canonicalFor field_value.FieldValue}
+/// {@canonicalFor filter.Filter}
+/// {@canonicalFor firestore_error.FirestoreError}
+/// {@canonicalFor firestore_error.FirestoreErrorCode}
+/// {@canonicalFor geo_point.GeoPoint}
+/// {@canonicalFor int32_value.Int32Value}
+/// {@canonicalFor log_level.LogLevel}
+/// {@canonicalFor max_key.MaxKey}
+/// {@canonicalFor min_key.MinKey}
+/// {@canonicalFor query.Direction}
+/// {@canonicalFor regex_value.RegexValue}
+/// {@canonicalFor set_options.SetOptions}
+/// {@canonicalFor timestamp.Timestamp}
+/// {@canonicalFor transaction_options.TransactionOptions}
+/// {@canonicalFor vector_value.VectorValue}
 library cloud_firestore_dart;
 
 export 'src/firebase/firestore/aggregate_field.dart'

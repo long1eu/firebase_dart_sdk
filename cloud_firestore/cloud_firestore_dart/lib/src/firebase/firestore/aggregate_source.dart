@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import 'package:cloud_firestore_dart/src/firebase/firestore/aggregate_query.dart';
+
 /// The sources from which an [AggregateQuery] can retrieve its results.
 enum AggregateSource {
   /// Causes the result to be computed on the server and fails if the server

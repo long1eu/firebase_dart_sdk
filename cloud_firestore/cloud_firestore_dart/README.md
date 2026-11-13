@@ -49,7 +49,7 @@ Firestore the way the JS SDK does: REST/JSON for the one-shot calls and WebChann
 listen and write streams, over `fetch`. What to know:
 
 - The cache is in memory by default. To keep it across page loads, pass the `OpenDatabase` of
-  [`example/sqlite_database_web.dart`](example/sqlite_database_web.dart) (copy the file into
+  [`example/sqlite_database_web.dart`](https://github.com/long1eu/firebase_dart_sdk/blob/main/cloud_firestore/cloud_firestore_dart/example/sqlite_database_web.dart) (copy the file into
   your app): SQLite compiled to WebAssembly by `package:sqlite3`, with the database in
   IndexedDB. It needs the `sqlite3.wasm` file of that package next to your page. One tab at a
   time: a second tab that opens the same cache gets a `FirestoreError` with
@@ -275,7 +275,7 @@ compiled against the library by `test/unit/api/readme_snippets_test.dart` (they 
 The public entry point is `package:cloud_firestore_dart/cloud_firestore_dart.dart` (class
 `Firestore`). It needs a `FirebaseApp` from `firebase_app_dart`. Runnable programs, one per topic
 (queries, aggregations, converters, transactions, bundles, snapshot JSON, offline persistence,
-emulator, lifecycle), are in [`example/`](example/README.md). See [Testing](#testing) for how
+emulator, lifecycle), are in [`example/`](https://github.com/long1eu/firebase_dart_sdk/blob/main/cloud_firestore/cloud_firestore_dart/example/README.md). See [Testing](#testing) for how
 to run the tests.
 
 ## Authentication

@@ -1,4 +1,5 @@
-/// A pure-Dart `FirebaseApp` for the Dart VM and Flutter (no web).
+/// A pure-Dart `FirebaseApp` for the Dart VM and Flutter, with experimental
+/// web support.
 ///
 /// Create an app with [FirebaseApp.withOptions] and a set of
 /// [FirebaseOptions], then hand it to a service such as
@@ -6,6 +7,10 @@
 /// connectivity, auth and App Check tokens) are supplied through
 /// `PlatformDependencies` from `package:firebase_app_dart/platform_dependencies.dart`.
 library firebase_app_dart;
+
+// Imported for the references in the documentation above.
+import 'src/firebase_app.dart';
+import 'src/firebase_options.dart';
 
 export 'src/firebase_app.dart';
 export 'src/firebase_error.dart';

@@ -59,7 +59,7 @@ typedef OnConfigure = Future<void> Function(Database db);
 /// implement it over the SQLite binding of your choice; Firestore runs its own
 /// SQL through it.
 ///
-/// Statements use `?` positional placeholders; [arguments] may contain `null`,
+/// Statements use `?` positional placeholders; `arguments` may contain `null`,
 /// [int], [double], [String] and `Uint8List` values.
 abstract class Database {
   /// The path (or, where there is no file system, the name) this database was

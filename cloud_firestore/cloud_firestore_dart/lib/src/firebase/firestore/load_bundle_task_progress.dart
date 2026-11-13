@@ -13,6 +13,7 @@
 // limitations under the License.
 
 import 'package:cloud_firestore_dart/src/firebase/firestore/bundle/bundle_metadata.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/load_bundle_task.dart';
 
 /// Represents the state of bundle loading tasks.
 ///

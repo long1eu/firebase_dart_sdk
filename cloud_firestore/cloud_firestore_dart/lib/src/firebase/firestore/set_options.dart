@@ -8,9 +8,10 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/model/field_path.dar
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/field_mask.dart';
 
 /// An options object that configures the behavior of set() calls. By providing one of the
-/// [SetOptions] objects returned by [mergeAllFields], [mergeFields] and [mergeFieldPaths], the set() calls in
-/// [DocumentReference], [WriteBatch] and [Transaction] can be configured to perform granular merges
-/// instead of overwriting the target documents in their entirety.
+/// [SetOptions] objects returned by [SetOptions.mergeAllFields], [SetOptions.mergeFields] and
+/// [SetOptions.mergeFieldPaths], the set() calls in `DocumentReference`, `WriteBatch` and
+/// `Transaction` can be configured to perform granular merges instead of overwriting the target
+/// documents in their entirety.
 class SetOptions {
   const SetOptions._(this.merge, this._fieldMask)
     : assert(

@@ -18,6 +18,9 @@ import 'package:cloud_firestore_dart/src/proto/google/firestore/v1/index.dart'
 import 'package:meta/meta.dart';
 
 /// What the server does when it is asked to explain a pipeline.
+///
+/// **Preview, Enterprise only**: the Pipelines API is experimental, may change
+/// in any release and needs a Firestore Enterprise edition database.
 enum PipelineExplainMode {
   /// Run the pipeline and return its results, without an explanation.
   execute('execute'),
@@ -37,6 +40,9 @@ enum PipelineExplainMode {
 }
 
 /// The format of `PipelineSnapshot.explainStats`.
+///
+/// **Preview, Enterprise only**: the Pipelines API is experimental, may change
+/// in any release and needs a Firestore Enterprise edition database.
 enum PipelineExplainOutputFormat {
   /// Human readable text, read with `PipelineExplainStats.text`.
   text('text');
@@ -56,6 +62,9 @@ enum PipelineExplainOutputFormat {
 /// those of the Node.js server SDK (`@google-cloud/firestore`), which has the
 /// same typed option. The Enterprise emulator ignores the option, so the
 /// explanation itself was not seen in a test.
+///
+/// **Preview, Enterprise only**: the Pipelines API is experimental, may change
+/// in any release and needs a Firestore Enterprise edition database.
 class PipelineExplainOptions {
   /// Explain in [mode] (the server default, `execute`, when null), with the
   /// explanation in [outputFormat] (the server default when null).

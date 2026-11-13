@@ -14,6 +14,7 @@
 
 import 'dart:async';
 
+import 'package:cloud_firestore_dart/src/firebase/firestore/firestore.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/load_bundle_task_progress.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/assert.dart';
 

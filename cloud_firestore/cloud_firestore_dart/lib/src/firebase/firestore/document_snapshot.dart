@@ -2,6 +2,7 @@
 // Lung Razvan <long1eu>
 // on 26/09/2018
 
+import 'package:cloud_firestore_dart/src/firebase/firestore/firestore_error.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/snapshot_json.dart'
     as snapshot_json;
 import 'package:cloud_firestore_dart/src/firebase/firestore/blob.dart';

@@ -31,6 +31,9 @@ const Set<String> _writeStages = <String>{
 
 /// Adds [execute] to [Transaction]. Importing
 /// `package:cloud_firestore_dart/pipelines.dart` makes it available.
+///
+/// **Preview, Enterprise only**: the Pipelines API is experimental, may change
+/// in any release and needs a Firestore Enterprise edition database.
 extension TransactionPipelines on Transaction {
   /// Executes [pipeline] on the server inside this transaction. Only in a
   /// read-only transaction (`TransactionOptions(readOnly: true)`): the

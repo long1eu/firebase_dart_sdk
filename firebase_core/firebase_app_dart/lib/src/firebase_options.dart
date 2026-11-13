@@ -3,6 +3,7 @@
 // on 16/09/2018
 
 import 'package:firebase_app_dart/internal.dart';
+import 'package:firebase_app_dart/src/firebase_app.dart';
 
 /// The configuration of a [FirebaseApp]: the identifiers and keys of the Firebase project it talks
 /// to.

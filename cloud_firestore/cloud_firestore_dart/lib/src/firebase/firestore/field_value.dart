@@ -226,17 +226,24 @@ extension FieldValueInternal on FieldValue {
   /// `FieldValue.delete`), for error messages.
   String get methodName => _methodName;
 
+  /// Whether this value was created with [FieldValue.delete].
   bool get isDelete => this is _DeleteFieldValue;
 
+  /// Whether this value was created with [FieldValue.serverTimestamp].
   bool get isServerTimestamp => this is _ServerTimestampFieldValue;
 
+  /// Whether this value was created with [FieldValue.arrayUnion].
   bool get isArrayUnion => this is _ArrayUnionFieldValue;
 
+  /// Whether this value was created with [FieldValue.arrayRemove].
   bool get isArrayRemove => this is _ArrayRemoveFieldValue;
 
+  /// Whether this value was created with [FieldValue.increment].
   bool get isIncrement => this is _NumericIncrementFieldValue;
 
+  /// Whether this value was created with [FieldValue.minimum].
   bool get isMinimum => this is _NumericMinimumFieldValue;
 
+  /// Whether this value was created with [FieldValue.maximum].
   bool get isMaximum => this is _NumericMaximumFieldValue;
 }
