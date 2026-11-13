@@ -1,0 +1,249 @@
+name: Nightly
+
+# The slow and opt-in suites, every night on main and on demand ("Run workflow"): the scale soak
+# (short configuration), the property tests in long mode, the browser suites on both compilers,
+# the unit suite in a Linux amd64 container, and the Firebase Auth emulator tests. Each job
+# uploads its logs when it fails. None of them gates a pull request; ci.yml does. tool/README.md
+# ("CI") describes the jobs.
+on:
+  schedule:
+    # 03:17 UTC, off the hour to avoid the queue at :00.
+    - cron: '17 3 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# One nightly run at a time; a run started by hand waits for the scheduled one.
+concurrency:
+  group: nightly
+  cancel-in-progress: false
+
+jobs:
+  # The scale soak (test/integration/firebase/firestore/chaos/scale_soak_test.dart), opt-in by
+  # SCALE_SOAK_SECONDS, in a short configuration: two worker isolates of three clients for two
+  # minutes. The seed is printed; set SCALE_SOAK_SEED to repeat a failed run.
+  scale-soak:
+    name: Scale soak (short)
+    runs-on: ubuntu-26.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Set the emulator work directory
+        run: echo "EMULATOR_DIR=$RUNNER_TEMP/emulator" >> "$GITHUB_ENV"
+      - uses: ./.github/actions/dart
+        with:
+          sdk: stable
+      - uses: ./.github/actions/emulators
+      - name: Start a private Firestore emulator
+        run: ./tool/start_private_emulator.sh 8090
+      - name: Run the scale soak
+        working-directory: cloud_firestore/cloud_firestore_dart
+        env:
+          FIRESTORE_EMULATOR_HOST: 127.0.0.1:8090
+          FIRESTORE_EMULATOR_EDITION: standard
+          SCALE_SOAK_SECONDS: '120'
+          SCALE_SOAK_ISOLATES: '2'
+          SCALE_SOAK_CLIENTS: '3'
+        run: |
+          dart pub get
+          dart test --reporter expanded --timeout 20m \
+            test/integration/firebase/firestore/chaos/scale_soak_test.dart 2>&1 | tee "$EMULATOR_DIR/scale_soak.log"
+          exit "${PIPESTATUS[0]}"
+      - name: Stop the private Firestore emulator
+        if: always()
+        run: ./tool/stop_private_emulator.sh 8090
+      - name: Upload the logs
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: scale-soak-log
+          path: |
+            ${{ runner.temp }}/emulator/*.log
+            cloud_firestore/cloud_firestore_dart/build/test/integration/scale_soak/*.log
+
+  # The property tests with 20 times the cases of a pull request run (PROPERTY_SCALE): the unit
+  # ones, the integration ones against the standard emulator and the Enterprise ones against
+  # both emulators. A failure prints the seed (PROPERTY_SEED) that repeats it.
+  property-long:
+    name: Property tests (long)
+    runs-on: ubuntu-26.04
+    timeout-minutes: 120
+    env:
+      PROPERTY_SCALE: '20'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Set the emulator work directory
+        run: echo "EMULATOR_DIR=$RUNNER_TEMP/emulator" >> "$GITHUB_ENV"
+      - uses: ./.github/actions/dart
+        with:
+          sdk: stable
+      - uses: ./.github/actions/emulators
+      - name: Start the emulators (standard on 8090, Enterprise on 8181)
+        run: |
+          ./tool/start_private_emulator.sh 8090
+          ./tool/start_enterprise_emulator.sh
+      - name: Unit property tests
+        working-directory: cloud_firestore/cloud_firestore_dart
+        run: |
+          dart pub get
+          dart test --reporter expanded --timeout 30m test/unit/property 2>&1 | tee "$EMULATOR_DIR/property_unit.log"
+          exit "${PIPESTATUS[0]}"
+      - name: Integration property tests (standard emulator)
+        if: ${{ !cancelled() }}
+        working-directory: cloud_firestore/cloud_firestore_dart
+        env:
+          FIRESTORE_EMULATOR_HOST: 127.0.0.1:8090
+          FIRESTORE_EMULATOR_EDITION: standard
+        run: |
+          dart test --reporter expanded --timeout 30m -j 1 \
+            test/integration/firebase/firestore/property_query_test.dart \
+            test/integration/firebase/firestore/property_query_cache_test.dart \
+            test/integration/firebase/firestore/property_value_order_test.dart \
+            test/integration/firebase/firestore/property_mutation_test.dart \
+            2>&1 | tee "$EMULATOR_DIR/property_integration.log"
+          exit "${PIPESTATUS[0]}"
+      - name: Enterprise property tests (both emulators)
+        if: ${{ !cancelled() }}
+        working-directory: cloud_firestore/cloud_firestore_dart
+        env:
+          FIRESTORE_EMULATOR_HOST: 127.0.0.1:8090
+          FIRESTORE_ENTERPRISE_EMULATOR_HOST: 127.0.0.1:8181
+        run: |
+          dart test --reporter expanded --timeout 30m -j 1 \
+            test/integration_enterprise/property_query_test.dart \
+            test/integration_enterprise/property_value_order_test.dart \
+            test/integration_enterprise/pipeline_evaluation_property_test.dart \
+            test/integration_enterprise/pipeline_executor_property_test.dart \
+            2>&1 | tee "$EMULATOR_DIR/property_enterprise.log"
+          exit "${PIPESTATUS[0]}"
+      - name: Stop the emulators
+        if: always()
+        run: |
+          ./tool/stop_private_emulator.sh 8090
+          ./tool/stop_enterprise_emulator.sh
+      - name: Upload the logs
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: property-long-log
+          path: ${{ runner.temp }}/emulator/*.log
+
+  # The browser tests (test/browser) in headless Chrome, compiled with dart2wasm and with
+  # dart2js: tool/test_browser.sh, which starts its own emulator on port 8090 and runs the test
+  # files one after the other; then the SQLite unit tests on the WebAssembly build of SQLite
+  # (tool/test_unit_browser.sh). Chrome is preinstalled on the runner image.
+  browser:
+    name: Browser tests in Chrome (dart2wasm and dart2js)
+    runs-on: ubuntu-26.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Set the emulator work directory
+        run: echo "EMULATOR_DIR=$RUNNER_TEMP/emulator" >> "$GITHUB_ENV"
+      - uses: ./.github/actions/dart
+        with:
+          sdk: stable
+      - uses: ./.github/actions/emulators
+      - name: Run browser tests (dart2wasm and dart2js)
+        # tool/build_web_test_assets.sh, which the script calls, downloads sqlite3.wasm for the
+        # persistence tests from the releases of the sqlite3 package (checked against the sha256
+        # pinned there) and compiles the worker of the crash test.
+        run: |
+          (cd cloud_firestore/cloud_firestore_dart && dart pub get)
+          TEST_LOG_DIR="$EMULATOR_DIR" ./tool/test_browser.sh both
+      - name: Run the SQLite unit tests in Chrome (dart2js)
+        if: ${{ !cancelled() }}
+        run: TEST_LOG_DIR="$EMULATOR_DIR" ./tool/test_unit_browser.sh
+      - name: Upload the logs
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: browser-log
+          path: ${{ runner.temp }}/emulator/*.log
+
+  # The unit suite of every package (tool/test_all.sh) in a Debian container on linux/amd64
+  # (tool/linux/run_in_container.sh unit), with CAP_NET_ADMIN so that the connectivity test that
+  # changes the network interfaces runs too.
+  linux-amd64-unit:
+    name: Unit tests in a Linux amd64 container
+    runs-on: ubuntu-26.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Run the unit tests in the container
+        env:
+          TEST_LOG_DIR: ${{ runner.temp }}/linux
+        run: ./tool/linux/run_in_container.sh unit linux/amd64
+      - name: Upload the logs
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: linux-amd64-unit-log
+          path: ${{ runner.temp }}/linux
+
+  # firebase_auth_providers_dart against the Firebase Auth emulator, and the end-to-end tests of
+  # cloud_firestore_dart (test/integration_auth) against a private Firestore emulator whose
+  # security rules require a signed-in user: tool/start_auth_emulators.sh starts both (Auth on
+  # 9197, Firestore on 8197). Also the browser test of the package in Chrome (dart2js and
+  # dart2wasm).
+  auth-emulators:
+    name: Firebase Auth emulator tests
+    runs-on: ubuntu-26.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Set the emulator work directory
+        run: echo "EMULATOR_DIR=$RUNNER_TEMP/emulator" >> "$GITHUB_ENV"
+      - uses: ./.github/actions/dart
+        with:
+          sdk: stable
+      - uses: ./.github/actions/emulators
+      - name: Start the Auth emulator and the Firestore emulator with auth rules
+        # The script uses `firebase` from the PATH when $EMULATOR_DIR has no local install.
+        run: ./tool/start_auth_emulators.sh 9197 8197
+      - name: Run the emulator tests of firebase_auth_providers_dart
+        working-directory: firebase_auth/firebase_auth_providers_dart
+        env:
+          FIREBASE_AUTH_EMULATOR_HOST: 127.0.0.1:9197
+        run: |
+          dart pub get
+          dart test --reporter expanded 2>&1 | tee "$EMULATOR_DIR/auth_providers.log"
+          exit "${PIPESTATUS[0]}"
+      - name: Run the browser test of firebase_auth_providers_dart (dart2js and dart2wasm)
+        # The test reads FIREBASE_AUTH_EMULATOR_HOST in a hybrid isolate on the VM (a browser has
+        # no environment) and skips itself when the emulator does not answer, so a skip here
+        # means the wiring broke: the step fails then.
+        if: ${{ !cancelled() }}
+        working-directory: firebase_auth/firebase_auth_providers_dart
+        env:
+          FIREBASE_AUTH_EMULATOR_HOST: 127.0.0.1:9197
+        run: |
+          set -o pipefail
+          for compiler in dart2js dart2wasm; do
+            log="$EMULATOR_DIR/auth_providers_$compiler.log"
+            dart test --reporter expanded -p chrome -c "$compiler" test/browser 2>&1 | tee "$log"
+            if grep -Eq ' ~[0-9]+' "$log"; then
+              echo "::error::The auth browser test skipped under $compiler: the Auth emulator on $FIREBASE_AUTH_EMULATOR_HOST did not answer."
+              exit 1
+            fi
+          done
+      - name: Run the end-to-end tests of cloud_firestore_dart (test/integration_auth)
+        if: ${{ !cancelled() }}
+        working-directory: cloud_firestore/cloud_firestore_dart
+        env:
+          FIREBASE_AUTH_EMULATOR_HOST: 127.0.0.1:9197
+          FIRESTORE_AUTH_RULES_EMULATOR_HOST: 127.0.0.1:8197
+        run: |
+          dart pub get
+          dart test --reporter expanded test/integration_auth 2>&1 | tee "$EMULATOR_DIR/integration_auth.log"
+          exit "${PIPESTATUS[0]}"
+      - name: Stop the emulators
+        if: always()
+        run: ./tool/stop_auth_emulators.sh 9197 8197
+      - name: Upload the logs
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: auth-emulators-log
+          path: ${{ runner.temp }}/emulator/*.log

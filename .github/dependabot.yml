@@ -1,0 +1,33 @@
+# Weekly dependency updates, one grouped pull request per ecosystem.
+#
+# pub: the three published packages. Their dependencies on each other are path overrides
+# (pubspec_overrides.yaml) in this repository, so those are not updated here.
+# github-actions: the workflows and the two composite actions; the actions are pinned by commit
+# with the release in a comment, which Dependabot updates together.
+version: 2
+updates:
+  - package-ecosystem: pub
+    directories:
+      - /firebase_core/firebase_app_dart
+      - /firebase_auth/firebase_auth_providers_dart
+      - /cloud_firestore/cloud_firestore_dart
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    groups:
+      pub:
+        patterns:
+          - '*'
+  - package-ecosystem: github-actions
+    directories:
+      - /
+      - /.github/actions/dart
+      - /.github/actions/emulators
+    schedule:
+      interval: weekly
+      day: monday
+    groups:
+      github-actions:
+        patterns:
+          - '*'

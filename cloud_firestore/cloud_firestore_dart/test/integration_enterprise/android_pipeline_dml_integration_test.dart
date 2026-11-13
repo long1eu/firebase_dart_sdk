@@ -30,7 +30,8 @@
 // ignore_for_file: unnecessary_await_in_return, unnecessary_parenthesis
 // ignore_for_file: unnecessary_statements
 
-import 'package:test/test.dart' show expect, group, isA, setUp, tearDown, test;
+import 'package:test/test.dart'
+    show expect, group, isA, setUp, tearDown, test, unorderedEquals;
 
 import '../util/integration_test_util.dart';
 import 'android_pipeline_test_util.dart';
@@ -488,12 +489,15 @@ void main() {
             .union(db.pipeline().collection(emptyCol.path))
             .execute();
         assertThat(snapshot.results).hasSize(2);
-        assertThat(
-          snapshot.results[0].data(),
-        ).containsExactly(["name", "Alice", "age", 30]);
-        assertThat(
-          snapshot.results[1].data(),
-        ).containsExactly(["name", "Bob", "age", 25]);
+        // PORTING NOTE: upstream expects the literals in the order given, but a union has no
+        // order: the emulator on Linux returned Bob first. The two documents in any order.
+        expect(
+          snapshot.results.map((PipelineResult result) => result.data()),
+          unorderedEquals(<Map<String, Object?>>[
+            <String, Object?>{"name": "Alice", "age": 30},
+            <String, Object?>{"name": "Bob", "age": 25},
+          ]),
+        );
       });
 
       test('testLiteralsWithExpressions', () async {

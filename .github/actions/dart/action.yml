@@ -1,0 +1,21 @@
+name: Set up Dart with a pub cache
+description: >-
+  Installs the Dart SDK and restores the pub cache, keyed on the SDK and on every pubspec.yaml and
+  pubspec.lock of the repository.
+inputs:
+  sdk:
+    description: The Dart SDK (a version or a channel).
+    required: true
+runs:
+  using: composite
+  steps:
+    - uses: dart-lang/setup-dart@2286a0c042b44434fe26d292bbce8d34f7ec662b # v1.8.2
+      with:
+        sdk: ${{ inputs.sdk }}
+    - name: Cache pub packages
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ~/.pub-cache
+        key: pub-${{ runner.os }}-${{ runner.arch }}-${{ inputs.sdk }}-${{ hashFiles('**/pubspec.yaml', '**/pubspec.lock') }}
+        restore-keys: |
+          pub-${{ runner.os }}-${{ runner.arch }}-${{ inputs.sdk }}-

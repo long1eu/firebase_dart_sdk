@@ -1,0 +1,37 @@
+name: Set up the Firebase emulators
+description: >-
+  Installs Java and Node, the Firebase CLI and the Firestore emulator JAR. The JAR (in
+  ~/.cache/firebase/emulators) is cached per version of the Firebase CLI, which decides the
+  version of the emulator.
+inputs:
+  npm-lockfile:
+    description: A package-lock.json whose npm downloads are cached too (optional).
+    required: false
+    default: ''
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
+      with:
+        distribution: temurin
+        java-version: '21'
+    - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+      with:
+        node-version: '22'
+        cache: ${{ inputs.npm-lockfile != '' && 'npm' || '' }}
+        cache-dependency-path: ${{ inputs.npm-lockfile }}
+    - name: Install the Firebase CLI
+      id: cli
+      shell: bash
+      run: |
+        npm install -g firebase-tools
+        echo "version=$(firebase --version)" >> "$GITHUB_OUTPUT"
+    - name: Cache the emulator JAR
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ~/.cache/firebase/emulators
+        key: firebase-emulators-${{ runner.os }}-${{ steps.cli.outputs.version }}
+    - name: Download the Firestore emulator JAR
+      # Does nothing when the cache restored the JAR of this version.
+      shell: bash
+      run: firebase setup:emulators:firestore
