@@ -67,7 +67,15 @@ class View {
 
   /// Documents whose local version the view still shows although their writes were acknowledged or rejected, because
   /// the change was held back until watch sends the document (see [shouldWaitForSyncedDocument]).
-  ImmutableSortedSet<DocumentKey> _awaitingSync = DocumentKey.emptyKeySet;
+  ///
+  /// The value is the version of the cached document (the commit version of its last write).
+  Map<DocumentKey, SnapshotVersion> _awaitingSync =
+      const <DocumentKey, SnapshotVersion>{};
+
+  /// Documents of the view that watch shows are not in the target: it took them out (and did not put them back), or
+  /// a snapshot of watch at or after the commit of a document of [_awaitingSync] did not have it. Watch will not send
+  /// them unless they match again. Only kept for documents in the view.
+  final Set<DocumentKey> _removedByWatch = <DocumentKey>{};
 
   /// Documents that are left out of this view although they are in the cache and match [query] locally, because the
   /// backend has shown that it does not consider them results of the query (see [backendMismatches]).
@@ -157,9 +165,12 @@ class View {
             null //
         ? previousChanges.mutatedKeys
         : mutatedKeys;
-    ImmutableSortedSet<DocumentKey> newAwaitingSync = previousChanges != null
-        ? previousChanges.awaitingSyncKeys
-        : _awaitingSync;
+    final Map<DocumentKey, SnapshotVersion> newAwaitingSync =
+        Map<DocumentKey, SnapshotVersion>.of(
+          previousChanges != null
+              ? previousChanges.awaitingSync
+              : _awaitingSync,
+        );
 
     DocumentSet newDocumentSet = oldDocumentSet;
     bool needsRefill = false;
@@ -225,7 +236,7 @@ class View {
         final bool docsEqual = oldDoc.data == newDoc.data;
         if (!docsEqual) {
           if (shouldWaitForSyncedDocument(oldDoc, newDoc)) {
-            newAwaitingSync = newAwaitingSync.insert(key);
+            newAwaitingSync[key] = newDoc.version;
           } else {
             changeSet.addChange(
               DocumentViewChange(DocumentViewChangeType.modified, newDoc),
@@ -246,6 +257,10 @@ class View {
             DocumentViewChange(DocumentViewChangeType.metadata, newDoc),
           );
           changeApplied = true;
+        } else if (shouldWaitForSyncedDocument(oldDoc, newDoc)) {
+          // Acknowledged with the data of the local version: the view keeps showing the local version (with its
+          // pending writes, see [newDocHasPendingMutations]) until watch sends the document, like a held back change.
+          newAwaitingSync[key] = newDoc.version;
         }
       } else if (oldDoc == null && newDoc != null) {
         changeSet.addChange(
@@ -265,7 +280,7 @@ class View {
       }
 
       if (changeApplied) {
-        newAwaitingSync = newAwaitingSync.remove(key);
+        newAwaitingSync.remove(key);
         if (newDoc != null) {
           newDocumentSet = newDocumentSet.add(newDoc);
           if (newDoc.hasLocalMutations) {
@@ -288,7 +303,7 @@ class View {
             : newDocumentSet.getFirstDocument()!;
         newDocumentSet = newDocumentSet.remove(oldDoc.key);
         newMutatedKeys = newMutatedKeys.remove(oldDoc.key);
-        newAwaitingSync = newAwaitingSync.remove(oldDoc.key);
+        newAwaitingSync.remove(oldDoc.key);
         changeSet.addChange(
           DocumentViewChange(DocumentViewChangeType.removed, oldDoc),
         );
@@ -345,7 +360,10 @@ class View {
     final DocumentSet oldDocumentSet = documentSet;
     documentSet = docChanges.documentSet;
     mutatedKeys = docChanges.mutatedKeys;
-    _awaitingSync = docChanges.awaitingSyncKeys;
+    _awaitingSync = docChanges.awaitingSync;
+    _removedByWatch.removeWhere(
+      (DocumentKey key) => !documentSet.contains(key),
+    );
     // A rejected document that is back in the view (it has a local mutation) is a regular document again.
     _backendRejected.removeWhere(documentSet.contains);
 
@@ -364,6 +382,16 @@ class View {
           });
 
     _applyTargetChange(targetChange);
+    if (snapshotVersion != null && _current) {
+      // A snapshot of watch at or after the commit of a document the view waits for, without the document: watch is
+      // past the write and will not send it.
+      _awaitingSync.forEach((DocumentKey key, SnapshotVersion committed) {
+        if (!_syncedDocuments.contains(key) &&
+            snapshotVersion.compareTo(committed) >= 0) {
+          _removedByWatch.add(key);
+        }
+      });
+    }
 
     final List<LimboDocumentChange> limboDocumentChanges =
         targetIsPendingReset || !limboResolutionEnabled
@@ -463,6 +491,7 @@ class View {
     if (targetChange != null) {
       for (DocumentKey documentKey in targetChange.addedDocuments) {
         _syncedDocuments = _syncedDocuments.insert(documentKey);
+        _removedByWatch.remove(documentKey);
       }
       for (DocumentKey documentKey in targetChange.modifiedDocuments) {
         hardAssertLazy(
@@ -472,6 +501,9 @@ class View {
       }
       for (DocumentKey documentKey in targetChange.removedDocuments) {
         _syncedDocuments = _syncedDocuments.remove(documentKey);
+        if (documentSet.contains(documentKey)) {
+          _removedByWatch.add(documentKey);
+        }
       }
       _current = targetChange.current;
     }
@@ -526,11 +558,12 @@ class View {
     //
     // TODO(long1eu): Ideally, we would only consider changes that might actually affect this specific query.
     //
-    // PORTING NOTE: not for a local version that is only kept until watch sends the document (see [_awaitingSync]):
-    // its writes are done and explain nothing. Watch does not send a document again once it left the target (deleted
-    // on the backend, or a target reset without it), so without limbo resolution the view would show the stale local
-    // version, with pending writes, for ever. Upstream has the same gap.
-    if (doc.hasLocalMutations && !_awaitingSync.contains(key)) {
+    // PORTING NOTE: not for a local version that is only kept until watch sends the document (see [_awaitingSync])
+    // when watch took the document out of the target meanwhile (deleted on the backend, or a target reset without
+    // it): its writes are done and explain nothing, and watch will not send it again, so without limbo resolution the
+    // view would show the stale local version, with pending writes, for ever. Upstream has the same gap.
+    if (doc.hasLocalMutations &&
+        !(_awaitingSync.containsKey(key) && _removedByWatch.contains(key))) {
       return false;
     }
 
@@ -576,7 +609,7 @@ class ViewDocumentChanges {
     this.changeSet,
     this.mutatedKeys,
     this.needsRefill,
-    this.awaitingSyncKeys,
+    this.awaitingSync,
   );
 
   /// The new set of docs that should be in the view.
@@ -592,7 +625,7 @@ class ViewDocumentChanges {
   final ImmutableSortedSet<DocumentKey> mutatedKeys;
 
   /// The documents whose change is held back until watch sends them, see [View.shouldWaitForSyncedDocument].
-  final ImmutableSortedSet<DocumentKey> awaitingSyncKeys;
+  final Map<DocumentKey, SnapshotVersion> awaitingSync;
 
   @override
   String toString() {

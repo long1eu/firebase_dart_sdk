@@ -7,7 +7,10 @@
 import 'dart:async';
 
 import 'package:cloud_firestore_dart/cloud_firestore_dart.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/firestore.dart'
+    show FirestoreInternal;
 import 'package:cloud_firestore_dart/src/firebase/firestore/remote/connectivity_change_detector.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/util/timer_task.dart';
 import 'package:test/test.dart';
 
 import '../../../../util/integration_test_util.dart';
@@ -43,15 +46,25 @@ void main() {
   /// With [acceptAndClose] the proxy does not refuse the connections during the outage: it accepts every one and
   /// closes it at once. [connectionsDuringOutage] is then how often the client connected.
   int connectionsDuringOutage = 0;
+
+  /// How much of the backoff of the listen stream was left when the network came back, in the last [recoveryTime]
+  /// (zero if no attempt was scheduled).
+  Duration backoffLeftAtRecovery = Duration.zero;
   Future<Duration> recoveryTime({
     required bool hint,
     bool acceptAndClose = false,
   }) async {
     final Set<String> addresses = <String>{};
     int signals = 0;
+    // The clock of the detector advances by one poll interval per reading: under the load of a full suite a poll can
+    // run more than 10 s late, which the detector takes for a wake-up from sleep and signals (a run without a hint then
+    // saw one signal). This test is about the interface hint; the wake-up check has its own unit tests.
+    const Duration pollInterval = Duration(milliseconds: 100);
+    DateTime clock = DateTime.utc(2026);
     final ConnectivityChangeDetector detector = ConnectivityChangeDetector(
       listAddresses: () async => Set<String>.of(addresses),
-      pollInterval: const Duration(milliseconds: 100),
+      pollInterval: pollInterval,
+      now: () => clock = clock.add(pollInterval),
     );
     final Firestore db = await env.newClient(connectivityDetector: detector);
     // The remote store installed its handler; count the signals on top of it.
@@ -113,6 +126,13 @@ void main() {
       // The backend moved on while the client was away.
       await serverDoc.set(<String, Object?>{'n': 1});
 
+      final TimerTask? backoff = db.scheduler.getTask(
+        TaskId.listenStreamConnectionBackoff,
+      );
+      final Duration left = backoff == null
+          ? Duration.zero
+          : backoff.targetTime.difference(DateTime.now());
+      backoffLeftAtRecovery = left.isNegative ? Duration.zero : left;
       final Stopwatch stopwatch = Stopwatch()..start();
       if (acceptAndClose) {
         env.proxy.restore();
@@ -143,20 +163,38 @@ void main() {
     'a connectivity hint makes the client reconnect without its backoff',
     () async {
       final Duration withHint = await recoveryTime(hint: true);
+      final Duration backoffLeftWithHint = backoffLeftAtRecovery;
       final Duration withoutHint = await recoveryTime(hint: false);
+      final Duration backoffLeftWithoutHint = backoffLeftAtRecovery;
       // ignore: avoid_print
       print(
         'Recovery after a ${outage.inSeconds}s outage: '
-        '${withHint.inMilliseconds} ms with a connectivity hint, '
-        '${withoutHint.inMilliseconds} ms without',
+        '${withHint.inMilliseconds} ms with a connectivity hint '
+        '(${backoffLeftWithHint.inMilliseconds} ms of backoff left), '
+        '${withoutHint.inMilliseconds} ms without '
+        '(${backoffLeftWithoutHint.inMilliseconds} ms of backoff left)',
       );
 
       // The poll takes up to 100 ms, then the stream is opened and the listen is
       // answered.
       expect(withHint, lessThan(const Duration(seconds: 2)));
-      // Without a hint the client waits for the rest of a backoff of several
-      // seconds; how much is left when the network comes back is random.
-      expect(withHint, lessThan(withoutHint));
+      // Without a hint the client waits for the rest of its backoff. How much is left when the network comes back is
+      // random (it can be next to nothing), so the two runs are not compared with each other: each is compared with
+      // the backoff that was left in it.
+      expect(
+        withoutHint,
+        greaterThanOrEqualTo(
+          backoffLeftWithoutHint - const Duration(milliseconds: 100),
+        ),
+        reason: 'without a hint the client waits for its backoff',
+      );
+      if (backoffLeftWithHint > const Duration(seconds: 2)) {
+        expect(
+          withHint,
+          lessThan(backoffLeftWithHint),
+          reason: 'with a hint the client does not wait for its backoff',
+        );
+      }
     },
     skip:
         chaosSkipReason ??

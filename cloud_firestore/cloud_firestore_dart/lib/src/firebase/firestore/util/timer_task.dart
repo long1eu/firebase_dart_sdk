@@ -105,6 +105,9 @@ class TimerTask implements Comparable<TimerTask> {
   final TaskFunction _function;
   final TaskScheduler _scheduler;
 
+  /// When the task is due.
+  DateTime get targetTime => _targetTime;
+
   /// Set once the task ran or was canceled; a finished task is never run again.
   bool _finished = false;
 

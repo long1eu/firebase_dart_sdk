@@ -624,9 +624,12 @@ Documentation and tests:
   after its writes were acknowledged or rejected, when the backend deleted the document (or
   stopped returning it) before watch sent it again. The view waits for watch after such a
   change (as the JS and Android SDKs do, which have the same gap), and watch never sends a
-  document that left the query: the document now goes through limbo resolution. Found by the
-  chaos soak test (a write rejected with `not-found` on top of the result of an earlier,
-  acknowledged write); emulator-verified only.
+  document that left the query: the document now goes through limbo resolution once watch
+  took it out of the target, or once a snapshot of watch at or after the commit of the write
+  does not have it (also when the acknowledgement left the data unchanged, and for a document
+  that watch never had). Found by the chaos soak test (a write rejected with `not-found` on top
+  of the result of an earlier, acknowledged write; a document created by one client and
+  deleted by another before watch sent it); emulator-verified only.
 - A double and an integer beyond 2^53 are compared by their exact values (the order used to
   depend on the side of the operands).
 - Fixes from the upstream sync (UTF-8 string ordering, limbo handling, limbo-resolution

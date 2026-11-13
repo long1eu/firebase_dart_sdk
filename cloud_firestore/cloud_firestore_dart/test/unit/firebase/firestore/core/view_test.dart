@@ -935,6 +935,114 @@ void main() {
   });
 
   test(
+      'an acknowledged document with the data of its local version is in '
+      'limbo once watch drops it from the target', () {
+    // The soak chaos test got stuck on this under load: the acknowledgement left the document with the same data, so
+    // the view kept the local version (and its pending writes) and waited for watch, which had dropped the document
+    // (deleted on the backend) and never sent it again.
+    final Query query = messageQuery();
+    final Document synced =
+        doc('rooms/eros/messages/1', 1, map(<dynamic>['v', 1]));
+    final Document local = doc('rooms/eros/messages/1', 1,
+        map(<dynamic>['v', 2]), DocumentState.localMutations);
+    final Document committed = doc('rooms/eros/messages/1', 3,
+        map(<dynamic>['v', 2]), DocumentState.committedMutations);
+
+    final View view = View(query, DocumentKey.emptyKeySet);
+    view.applyChanges(view.computeDocChanges(docUpdates(<Document>[synced])),
+        ackTarget(<Document>[synced]));
+    view.applyChanges(view.computeDocChanges(docUpdates(<Document>[local])));
+
+    // The write is acknowledged; watch has not sent the document yet.
+    ViewChange change = view.applyChanges(
+        view.computeDocChanges(docUpdates(<Document>[committed])));
+    expect(change.snapshot, isNull);
+    expect(view.limboDocuments, isEmpty);
+
+    // Watch resets the target without the document.
+    change = view.applyChanges(
+        view.computeDocChanges(docUpdates()),
+        targetChange(Uint8List.fromList(<int>[]), null, null,
+            <Document>[synced], current: true),
+        false,
+        version(5));
+    expect(change.limboChanges, <LimboDocumentChange>[
+      LimboDocumentChange(LimboDocumentChangeType.added, synced.key)
+    ]);
+  });
+
+  test(
+      'a document that watch dropped before its write was acknowledged is in '
+      'limbo after the acknowledgement', () {
+    final Query query = messageQuery();
+    final Document synced =
+        doc('rooms/eros/messages/1', 1, map(<dynamic>['v', 1]));
+    final Document local = doc('rooms/eros/messages/1', 1,
+        map(<dynamic>['v', 2]), DocumentState.localMutations);
+    final Document committed = doc('rooms/eros/messages/1', 3,
+        map(<dynamic>['v', 2]), DocumentState.committedMutations);
+
+    final View view = View(query, DocumentKey.emptyKeySet);
+    view.applyChanges(view.computeDocChanges(docUpdates(<Document>[synced])),
+        ackTarget(<Document>[synced]));
+    view.applyChanges(view.computeDocChanges(docUpdates(<Document>[local])));
+    // Watch resets the target without the document while the write is pending: the pending write explains it.
+    ViewChange change = view.applyChanges(
+        view.computeDocChanges(docUpdates()),
+        targetChange(Uint8List.fromList(<int>[]), null, null,
+            <Document>[synced], current: true));
+    expect(change.limboChanges, isEmpty);
+    // The write is acknowledged: nothing explains the document any more.
+    change = view.applyChanges(
+        view.computeDocChanges(docUpdates(<Document>[committed])), ackTarget());
+    expect(change.limboChanges, <LimboDocumentChange>[
+      LimboDocumentChange(LimboDocumentChangeType.added, synced.key)
+    ]);
+  });
+
+  test(
+      'an acknowledged document that watch never had is in limbo once a '
+      'snapshot of watch at or after the commit does not have it', () {
+    // The rest of the soak chaos flake: the client created the document, another client deleted it before watch sent
+    // it, so watch never mentioned it.
+    final Query query = messageQuery();
+    final Document local = doc('rooms/eros/messages/1', 0,
+        map(<dynamic>['v', 2]), DocumentState.localMutations);
+    final Document committed = doc('rooms/eros/messages/1', 3,
+        map(<dynamic>['v', 2]), DocumentState.committedMutations);
+
+    final View view = View(query, DocumentKey.emptyKeySet);
+    view.applyChanges(view.computeDocChanges(docUpdates(<Document>[local])),
+        ackTarget(), false, version(1));
+    view.applyChanges(view.computeDocChanges(docUpdates(<Document>[committed])));
+    final ViewChange change = view.applyChanges(
+        view.computeDocChanges(docUpdates()), ackTarget(), false, version(3));
+    expect(change.limboChanges, <LimboDocumentChange>[
+      LimboDocumentChange(LimboDocumentChangeType.added, local.key)
+    ]);
+  });
+
+  test(
+      'an acknowledged document that watch did not add yet is not in limbo '
+      'before watch reaches the commit', () {
+    final Query query = messageQuery();
+    final Document local = doc('rooms/eros/messages/1', 0,
+        map(<dynamic>['v', 2]), DocumentState.localMutations);
+    final Document committed = doc('rooms/eros/messages/1', 3,
+        map(<dynamic>['v', 2]), DocumentState.committedMutations);
+
+    final View view = View(query, DocumentKey.emptyKeySet);
+    view.applyChanges(view.computeDocChanges(docUpdates(<Document>[local])),
+        ackTarget(), false, version(1));
+    view.applyChanges(view.computeDocChanges(docUpdates(<Document>[committed])));
+    // A snapshot of watch older than the commit: the document may still come.
+    final ViewChange change = view.applyChanges(
+        view.computeDocChanges(docUpdates()), ackTarget(), false, version(2));
+    expect(change.limboChanges, isEmpty);
+    expect(view.limboDocuments, isEmpty);
+  });
+
+  test(
       'a document held back for watch is in limbo once watch drops it from the '
       'target', () {
     // The soak chaos test got stuck on this: a write of the document was rejected while the cache held the committed
@@ -965,7 +1073,9 @@ void main() {
     change = view.applyChanges(
         view.computeDocChanges(docUpdates()),
         targetChange(Uint8List.fromList(<int>[]), null, null,
-            <Document>[synced], current: true));
+            <Document>[synced], current: true),
+        false,
+        version(5));
     expect(change.limboChanges, <LimboDocumentChange>[
       LimboDocumentChange(LimboDocumentChangeType.added, synced.key)
     ]);
