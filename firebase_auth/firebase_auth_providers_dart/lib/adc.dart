@@ -23,18 +23,17 @@ OAuthTokenProvider applicationDefaultCredentials({
   http.Client? httpClient,
   Duration refreshBefore = const Duration(minutes: 5),
 }) {
-  return OAuthTokenProvider(
-    () async {
-      final gapi.AutoRefreshingAuthClient client =
-          await gapi.clientViaApplicationDefaultCredentials(
-              scopes: scopes, baseClient: httpClient);
-      try {
-        final gapi.AccessToken token = client.credentials.accessToken;
-        return OAuthAccessToken(token.data, token.expiry);
-      } finally {
-        client.close();
-      }
-    },
-    refreshBefore: refreshBefore,
-  );
+  return OAuthTokenProvider(() async {
+    final gapi.AutoRefreshingAuthClient client = await gapi
+        .clientViaApplicationDefaultCredentials(
+          scopes: scopes,
+          baseClient: httpClient,
+        );
+    try {
+      final gapi.AccessToken token = client.credentials.accessToken;
+      return OAuthAccessToken(token.data, token.expiry);
+    } finally {
+      client.close();
+    }
+  }, refreshBefore: refreshBefore);
 }

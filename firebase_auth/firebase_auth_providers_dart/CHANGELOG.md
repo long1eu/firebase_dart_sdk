@@ -9,7 +9,9 @@ First version. Not published yet.
   sends the ID token and follows user switches.
 - `OAuthTokenProvider.serviceAccount` and, in `adc.dart`, `applicationDefaultCredentials()`:
   OAuth 2.0 access tokens for servers and command line tools. These bypass security rules.
-- Web-compatible main library (no `dart:io`).
+- Web-compatible main library (no `dart:io`); `FirebaseUserAuth` was run in Chrome (dart2js and
+  dart2wasm) against the Auth emulator.
+- Requires Dart 3.8.0 or later.
 
 Verified with unit tests and against the Firebase Auth and Firestore emulators only. Nothing was
 run against the real Firebase Auth service or Google's token endpoint.

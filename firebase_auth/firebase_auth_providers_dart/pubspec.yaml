@@ -22,7 +22,7 @@ platforms:
   windows:
 
 environment:
-  sdk: ^3.6.0
+  sdk: ^3.8.0
 
 dependencies:
   crypto: ^3.0.3

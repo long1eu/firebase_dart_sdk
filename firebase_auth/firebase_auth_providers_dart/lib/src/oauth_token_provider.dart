@@ -50,8 +50,8 @@ class OAuthTokenProvider implements InternalTokenProvider {
     Future<OAuthAccessToken> Function() fetch, {
     this.refreshBefore = const Duration(minutes: 5),
     DateTime Function()? clock,
-  })  : _fetch = fetch,
-        _clock = clock ?? DateTime.now;
+  }) : _fetch = fetch,
+       _clock = clock ?? DateTime.now;
 
   /// A provider for the service account described by [json]: the decoded content of a service account key file
   /// (a `Map`), or the content itself (a `String`).
@@ -77,8 +77,9 @@ class OAuthTokenProvider implements InternalTokenProvider {
     } on Object {
       // The original error may quote the input, which holds the private key.
       throw ArgumentError(
-          'Not a service account key: expected the JSON of a key file with "type": "service_account", '
-          '"client_email", "client_id" and "private_key".');
+        'Not a service account key: expected the JSON of a key file with "type": "service_account", '
+        '"client_email", "client_id" and "private_key".',
+      );
     }
     final DateTime Function() now = clock ?? DateTime.now;
     return OAuthTokenProvider(
@@ -98,8 +99,9 @@ class OAuthTokenProvider implements InternalTokenProvider {
   }
 
   /// Google's OAuth 2.0 token endpoint.
-  static final Uri googleTokenUri =
-      Uri.parse('https://oauth2.googleapis.com/token');
+  static final Uri googleTokenUri = Uri.parse(
+    'https://oauth2.googleapis.com/token',
+  );
 
   /// The JWT bearer flow (RFC 7523) of a service account: a self-signed assertion is exchanged for an access token.
   static Future<OAuthAccessToken> _jwtBearer(
@@ -114,17 +116,9 @@ class OAuthTokenProvider implements InternalTokenProvider {
     final DateTime issuedAt = now();
     // A little in the past, for clocks that are slightly ahead of Google's.
     final int iat = issuedAt.millisecondsSinceEpoch ~/ 1000 - 20;
-    final String input = '${encode(utf8.encode(jsonEncode(<String, Object?>{
-          'alg': 'RS256',
-          'typ': 'JWT'
-        })))}.'
-        '${encode(utf8.encode(jsonEncode(<String, Object?>{
-          'iss': credentials.email,
-          'scope': scopes.join(' '),
-          'aud': googleTokenUri.toString(),
-          'iat': iat,
-          'exp': iat + 3600,
-        })))}';
+    final String input =
+        '${encode(utf8.encode(jsonEncode(<String, Object?>{'alg': 'RS256', 'typ': 'JWT'})))}.'
+        '${encode(utf8.encode(jsonEncode(<String, Object?>{'iss': credentials.email, 'scope': scopes.join(' '), 'aud': googleTokenUri.toString(), 'iat': iat, 'exp': iat + 3600})))}';
     // The type of the key is not exported by every supported version of googleapis_auth.
     // ignore: always_specify_types
     final key = credentials.privateRSAKey;
@@ -141,13 +135,18 @@ class OAuthTokenProvider implements InternalTokenProvider {
 
     final http.Response response;
     try {
-      response = await client.post(tokenUri, body: <String, String>{
-        'grant_type': 'urn:ietf:params:oauth:grant-type:jwt-bearer',
-        'assertion': assertion,
-      });
+      response = await client.post(
+        tokenUri,
+        body: <String, String>{
+          'grant_type': 'urn:ietf:params:oauth:grant-type:jwt-bearer',
+          'assertion': assertion,
+        },
+      );
     } on Object catch (_) {
-      throw const FirebaseAuthProviderException('network-request-failed',
-          'The request to the token endpoint failed (network error).');
+      throw const FirebaseAuthProviderException(
+        'network-request-failed',
+        'The request to the token endpoint failed (network error).',
+      );
     }
     Object? body;
     try {
@@ -162,13 +161,15 @@ class OAuthTokenProvider implements InternalTokenProvider {
       return OAuthAccessToken(
         body['access_token']! as String,
         issuedAt.add(
-            Duration(seconds: expiresIn is num ? expiresIn.toInt() : 3600)),
+          Duration(seconds: expiresIn is num ? expiresIn.toInt() : 3600),
+        ),
       );
     }
     // For example {"error": "invalid_grant", "error_description": "Invalid JWT Signature."}.
     final Object? error = body is Map<String, Object?> ? body['error'] : null;
-    final Object? description =
-        body is Map<String, Object?> ? body['error_description'] : null;
+    final Object? description = body is Map<String, Object?>
+        ? body['error_description']
+        : null;
     throw FirebaseAuthProviderException(
       error == 'invalid_grant' ? 'invalid-credential' : 'internal-error',
       'The token endpoint refused the service account'
@@ -202,12 +203,12 @@ class OAuthTokenProvider implements InternalTokenProvider {
       return GetTokenResult(current.token);
     }
     // One request at a time: callers that arrive while a token is being fetched share it.
-    final Future<OAuthAccessToken> pending = _pending ??= _fetch().then(
-      (OAuthAccessToken token) {
-        _current = token;
-        return token;
-      },
-    ).whenComplete(() => _pending = null);
+    final Future<OAuthAccessToken> pending = _pending ??= _fetch()
+        .then((OAuthAccessToken token) {
+          _current = token;
+          return token;
+        })
+        .whenComplete(() => _pending = null);
     return GetTokenResult((await pending).token);
   }
 

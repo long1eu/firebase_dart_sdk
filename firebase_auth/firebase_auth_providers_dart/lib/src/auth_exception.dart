@@ -1,20 +1,28 @@
 /// Thrown when a Firebase Auth request fails.
 class FirebaseAuthProviderException implements Exception {
   /// Creates an exception with the SDK style [code] (for example `wrong-password`).
-  const FirebaseAuthProviderException(this.code, this.message,
-      {this.serverCode, this.httpStatus});
+  const FirebaseAuthProviderException(
+    this.code,
+    this.message, {
+    this.serverCode,
+    this.httpStatus,
+  });
 
   /// Maps the error message of the Identity Toolkit or Secure Token API ([serverMessage], for example
   /// `EMAIL_EXISTS` or `WEAK_PASSWORD : Password should be at least 6 characters`) to an exception.
-  factory FirebaseAuthProviderException.fromServer(String serverMessage,
-      {int? httpStatus}) {
+  factory FirebaseAuthProviderException.fromServer(
+    String serverMessage, {
+    int? httpStatus,
+  }) {
     final int separator = serverMessage.indexOf(' : ');
     final String serverCode =
         (separator < 0 ? serverMessage : serverMessage.substring(0, separator))
             .trim();
-    final String? detail =
-        separator < 0 ? null : serverMessage.substring(separator + 3).trim();
-    final String code = _codes[serverCode] ??
+    final String? detail = separator < 0
+        ? null
+        : serverMessage.substring(separator + 3).trim();
+    final String code =
+        _codes[serverCode] ??
         (serverCode.contains('API key not valid') ||
                 serverCode.contains('API_KEY_INVALID')
             ? 'invalid-api-key'
@@ -43,11 +51,11 @@ class FirebaseAuthProviderException implements Exception {
   /// Whether the session is no longer valid: the refresh token was revoked or the account is gone or disabled.
   /// The user is signed out when a token refresh fails with such an error.
   bool get invalidatesSession => const <String>{
-        'user-token-expired',
-        'invalid-refresh-token',
-        'user-disabled',
-        'user-not-found',
-      }.contains(code);
+    'user-token-expired',
+    'invalid-refresh-token',
+    'user-disabled',
+    'user-not-found',
+  }.contains(code);
 
   static const Map<String, String> _codes = <String, String>{
     'EMAIL_EXISTS': 'email-already-in-use',

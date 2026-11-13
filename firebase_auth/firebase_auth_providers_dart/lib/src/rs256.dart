@@ -35,7 +35,10 @@ Uint8List signRs256(
     ..[1] = 0x01
     ..fillRange(2, 2 + padding, 0xff)
     ..setRange(
-        3 + padding, 3 + padding + _sha256DigestInfo.length, _sha256DigestInfo)
+      3 + padding,
+      3 + padding + _sha256DigestInfo.length,
+      _sha256DigestInfo,
+    )
     ..setRange(length - digest.length, length, digest);
 
   BigInt message = BigInt.zero;

@@ -18,8 +18,13 @@ int _counter = 0;
 String uniqueEmail() =>
     'user${DateTime.now().microsecondsSinceEpoch}x${_counter++}@example.com';
 
-Matcher throwsAuth(Object code) => throwsA(isA<FirebaseAuthProviderException>()
-    .having((FirebaseAuthProviderException e) => e.code, 'code', code));
+Matcher throwsAuth(Object code) => throwsA(
+  isA<FirebaseAuthProviderException>().having(
+    (FirebaseAuthProviderException e) => e.code,
+    'code',
+    code,
+  ),
+);
 
 void main() {
   final String? host = FirebaseUserAuth.emulatorHostFromEnvironment;
@@ -32,7 +37,10 @@ void main() {
 
   FirebaseUserAuth create() {
     final FirebaseUserAuth auth = FirebaseUserAuth(
-        apiKey: 'fake-api-key', emulatorHost: host, storage: storage);
+      apiKey: 'fake-api-key',
+      emulatorHost: host,
+      storage: storage,
+    );
     created.add(auth);
     return auth;
   }
@@ -53,57 +61,76 @@ void main() {
       expect(user.isAnonymous, isTrue);
       expect(user.uid, isNotEmpty);
 
-      final GetTokenResult token =
-          await auth.getAccessToken(forceRefresh: false);
+      final GetTokenResult token = await auth.getAccessToken(
+        forceRefresh: false,
+      );
       expect(token.claims['user_id'], user.uid);
       expect(token.signInProvider, 'anonymous');
       expect(token.expirationTimestamp.isAfter(DateTime.now()), isTrue);
 
       // The token endpoint issues a token with a later `iat` (one second resolution).
       await Future<void>.delayed(const Duration(milliseconds: 1100));
-      final GetTokenResult refreshed =
-          await auth.getAccessToken(forceRefresh: true);
+      final GetTokenResult refreshed = await auth.getAccessToken(
+        forceRefresh: true,
+      );
       expect(refreshed.token, isNot(token.token));
       expect(refreshed.claims['user_id'], user.uid);
 
       await auth.signOut();
       expect(auth.uid, isNull);
-      await expectLater(auth.getAccessToken(forceRefresh: false),
-          throwsA(isA<FirebaseNoSignedInUserError>()));
+      await expectLater(
+        auth.getAccessToken(forceRefresh: false),
+        throwsA(isA<FirebaseNoSignedInUserError>()),
+      );
     });
 
-    test('email and password: create, sign in, and the errors of the backend',
-        () async {
-      final FirebaseUserAuth auth = create();
-      final String email = uniqueEmail();
-      final AuthUser createdUser =
-          await auth.createUserWithEmailAndPassword(email, 'correct horse');
-      expect(createdUser.email, email);
-      expect(createdUser.isAnonymous, isFalse);
-      await auth.signOut();
+    test(
+      'email and password: create, sign in, and the errors of the backend',
+      () async {
+        final FirebaseUserAuth auth = create();
+        final String email = uniqueEmail();
+        final AuthUser createdUser = await auth.createUserWithEmailAndPassword(
+          email,
+          'correct horse',
+        );
+        expect(createdUser.email, email);
+        expect(createdUser.isAnonymous, isFalse);
+        await auth.signOut();
 
-      final AuthUser signedIn =
-          await auth.signInWithEmailAndPassword(email, 'correct horse');
-      expect(signedIn.uid, createdUser.uid);
-      expect((await auth.getAccessToken(forceRefresh: false)).claims['email'],
-          email);
-      await auth.signOut();
+        final AuthUser signedIn = await auth.signInWithEmailAndPassword(
+          email,
+          'correct horse',
+        );
+        expect(signedIn.uid, createdUser.uid);
+        expect(
+          (await auth.getAccessToken(forceRefresh: false)).claims['email'],
+          email,
+        );
+        await auth.signOut();
 
-      await expectLater(auth.signInWithEmailAndPassword(email, 'wrong'),
-          throwsAuth(anyOf('wrong-password', 'invalid-credential')));
-      await expectLater(
+        await expectLater(
+          auth.signInWithEmailAndPassword(email, 'wrong'),
+          throwsAuth(anyOf('wrong-password', 'invalid-credential')),
+        );
+        await expectLater(
           auth.signInWithEmailAndPassword(uniqueEmail(), 'whatever'),
-          throwsAuth(anyOf('user-not-found', 'invalid-credential')));
-      await expectLater(
+          throwsAuth(anyOf('user-not-found', 'invalid-credential')),
+        );
+        await expectLater(
           auth.createUserWithEmailAndPassword(email, 'another password'),
-          throwsAuth('email-already-in-use'));
-      await expectLater(auth.createUserWithEmailAndPassword(uniqueEmail(), '1'),
-          throwsAuth('weak-password'));
-      await expectLater(
+          throwsAuth('email-already-in-use'),
+        );
+        await expectLater(
+          auth.createUserWithEmailAndPassword(uniqueEmail(), '1'),
+          throwsAuth('weak-password'),
+        );
+        await expectLater(
           auth.createUserWithEmailAndPassword('not an email', 'password'),
-          throwsAuth('invalid-email'));
-      expect(auth.uid, isNull);
-    });
+          throwsAuth('invalid-email'),
+        );
+        expect(auth.uid, isNull);
+      },
+    );
 
     test('custom token sign-in', () async {
       // The emulator accepts an unsigned custom token; a real one is signed by a service account.
@@ -116,8 +143,7 @@ void main() {
           '${encode(<String, Object?>{
             'iss': 'tests@example.com',
             'sub': 'tests@example.com',
-            'aud':
-                'https://identitytoolkit.googleapis.com/google.identity.identitytoolkit.v1.IdentityToolkit',
+            'aud': 'https://identitytoolkit.googleapis.com/google.identity.identitytoolkit.v1.IdentityToolkit',
             'iat': now,
             'exp': now + 3600,
             'uid': uid,
@@ -126,13 +152,16 @@ void main() {
       final FirebaseUserAuth auth = create();
       final AuthUser user = await auth.signInWithCustomToken(customToken);
       expect(user.uid, uid);
-      final GetTokenResult token =
-          await auth.getAccessToken(forceRefresh: false);
+      final GetTokenResult token = await auth.getAccessToken(
+        forceRefresh: false,
+      );
       expect(token.claims['role'], 'tester');
       expect(token.signInProvider, 'custom');
 
-      await expectLater(auth.signInWithCustomToken('garbage'),
-          throwsAuth('invalid-custom-token'));
+      await expectLater(
+        auth.signInWithCustomToken('garbage'),
+        throwsAuth('invalid-custom-token'),
+      );
     });
 
     test('a stored session is restored by a new instance', () async {
@@ -144,8 +173,9 @@ void main() {
       await second.restore();
       expect(second.uid, user.uid);
       expect(
-          (await second.getAccessToken(forceRefresh: false)).claims['user_id'],
-          user.uid);
+        (await second.getAccessToken(forceRefresh: false)).claims['user_id'],
+        user.uid,
+      );
     });
 
     test('a deleted account ends the session at the next refresh', () async {
@@ -161,11 +191,15 @@ void main() {
       // The first instance still has its ID token; the refresh is refused and it signs out.
       expect(auth.uid, user.uid);
       await expectLater(
-          auth.getAccessToken(forceRefresh: true),
-          throwsA(isA<FirebaseAuthProviderException>().having(
-              (FirebaseAuthProviderException e) => e.invalidatesSession,
-              'invalidatesSession',
-              isTrue)));
+        auth.getAccessToken(forceRefresh: true),
+        throwsA(
+          isA<FirebaseAuthProviderException>().having(
+            (FirebaseAuthProviderException e) => e.invalidatesSession,
+            'invalidatesSession',
+            isTrue,
+          ),
+        ),
+      );
       expect(auth.uid, isNull);
     });
   }, skip: skip);

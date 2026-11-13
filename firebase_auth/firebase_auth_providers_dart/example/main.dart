@@ -16,7 +16,8 @@ Future<void> main() async {
   final String? emulator = FirebaseUserAuth.emulatorHostFromEnvironment;
   if (emulator == null) {
     print(
-        'Set FIREBASE_AUTH_EMULATOR_HOST (see the comment at the top of this file).');
+      'Set FIREBASE_AUTH_EMULATOR_HOST (see the comment at the top of this file).',
+    );
     return;
   }
 
@@ -27,15 +28,20 @@ Future<void> main() async {
       projectId: 'demo-test',
     ),
   );
-  final FirebaseUserAuth auth =
-      await FirebaseUserAuth.forApp(app, emulatorHost: emulator);
+  final FirebaseUserAuth auth = await FirebaseUserAuth.forApp(
+    app,
+    emulatorHost: emulator,
+  );
   auth.userChanges.listen(
-      (AuthUser? user) => print('user changed: ${user?.uid ?? 'signed out'}'));
+    (AuthUser? user) => print('user changed: ${user?.uid ?? 'signed out'}'),
+  );
 
   final AuthUser user = await auth.signInAnonymously();
   final GetTokenResult token = await auth.getAccessToken(forceRefresh: false);
-  print('signed in: ${user.uid} (anonymous: ${user.isAnonymous}), '
-      'token expires ${token.expirationTimestamp.toUtc()}');
+  print(
+    'signed in: ${user.uid} (anonymous: ${user.isAnonymous}), '
+    'token expires ${token.expirationTimestamp.toUtc()}',
+  );
 
   await auth.deleteCurrentUser();
   await auth.dispose();

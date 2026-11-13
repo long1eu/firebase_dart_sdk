@@ -52,12 +52,12 @@ class FirebaseUserAuth implements InternalTokenProvider {
     http.Client? httpClient,
     DateTime Function()? clock,
     Timer Function(Duration delay, void Function() callback)? createTimer,
-  })  : _storage = storage ?? InMemoryAuthStorage(),
-        _storageKey = storageKey ?? 'firebase_auth_providers_dart:$apiKey',
-        _http = httpClient ?? http.Client(),
-        _ownsHttp = httpClient == null,
-        _clock = clock ?? DateTime.now,
-        _createTimer = createTimer ?? Timer.new {
+  }) : _storage = storage ?? InMemoryAuthStorage(),
+       _storageKey = storageKey ?? 'firebase_auth_providers_dart:$apiKey',
+       _http = httpClient ?? http.Client(),
+       _ownsHttp = httpClient == null,
+       _clock = clock ?? DateTime.now,
+       _createTimer = createTimer ?? Timer.new {
     // Synchronous: a listener (Firestore) hears about a new user before the sign-in call returns.
     _tokenChanges = StreamController<InternalTokenResult>.broadcast(
       sync: true,
@@ -187,19 +187,19 @@ class FirebaseUserAuth implements InternalTokenProvider {
   /// Throws a [FirebaseAuthProviderException] with the code `email-already-in-use`, `weak-password`,
   /// `invalid-email`, `operation-not-allowed`, ...
   Future<AuthUser> createUserWithEmailAndPassword(
-          String email, String password) =>
-      _signIn('accounts:signUp', <String, Object?>{
-        'email': email,
-        'password': password,
-        'returnSecureToken': true,
-      });
+    String email,
+    String password,
+  ) => _signIn('accounts:signUp', <String, Object?>{
+    'email': email,
+    'password': password,
+    'returnSecureToken': true,
+  });
 
   /// Signs in with a custom token minted by a server (for example with the Admin SDK).
-  Future<AuthUser> signInWithCustomToken(String token) =>
-      _signIn('accounts:signInWithCustomToken', <String, Object?>{
-        'token': token,
-        'returnSecureToken': true,
-      });
+  Future<AuthUser> signInWithCustomToken(String token) => _signIn(
+    'accounts:signInWithCustomToken',
+    <String, Object?>{'token': token, 'returnSecureToken': true},
+  );
 
   /// Signs the user out: the session is forgotten, also in the storage. Does nothing when nobody is signed in.
   Future<void> signOut() async {
@@ -213,8 +213,10 @@ class FirebaseUserAuth implements InternalTokenProvider {
   /// accounts; the backend refuses it (`requires-recent-login`) when the sign-in is too long ago.
   Future<void> deleteCurrentUser() async {
     final GetTokenResult token = await getAccessToken(forceRefresh: false);
-    await _send(_identityToolkit('accounts:delete'),
-        json: <String, Object?>{'idToken': token.token});
+    await _send(
+      _identityToolkit('accounts:delete'),
+      json: <String, Object?>{'idToken': token.token},
+    );
     await _clearSession();
   }
 
@@ -264,37 +266,50 @@ class FirebaseUserAuth implements InternalTokenProvider {
   Uri _identityToolkit(String method) {
     final String? emulator = emulatorHost;
     return emulator == null
-        ? Uri.https('identitytoolkit.googleapis.com', '/v1/$method',
-            <String, String>{'key': apiKey})
+        ? Uri.https(
+            'identitytoolkit.googleapis.com',
+            '/v1/$method',
+            <String, String>{'key': apiKey},
+          )
         : Uri.parse(
-            'http://$emulator/identitytoolkit.googleapis.com/v1/$method?key=${Uri.encodeQueryComponent(apiKey)}');
+            'http://$emulator/identitytoolkit.googleapis.com/v1/$method?key=${Uri.encodeQueryComponent(apiKey)}',
+          );
   }
 
   Uri get _secureToken {
     final String? emulator = emulatorHost;
     return emulator == null
-        ? Uri.https('securetoken.googleapis.com', '/v1/token',
-            <String, String>{'key': apiKey})
+        ? Uri.https('securetoken.googleapis.com', '/v1/token', <String, String>{
+            'key': apiKey,
+          })
         : Uri.parse(
-            'http://$emulator/securetoken.googleapis.com/v1/token?key=${Uri.encodeQueryComponent(apiKey)}');
+            'http://$emulator/securetoken.googleapis.com/v1/token?key=${Uri.encodeQueryComponent(apiKey)}',
+          );
   }
 
   /// Sends a request and returns the decoded JSON object of the answer, or throws.
-  Future<Map<String, Object?>> _send(Uri url,
-      {Map<String, Object?>? json, Map<String, String>? form}) async {
+  Future<Map<String, Object?>> _send(
+    Uri url, {
+    Map<String, Object?>? json,
+    Map<String, String>? form,
+  }) async {
     final http.Response response;
     try {
       response = json != null
-          ? await _http.post(url,
+          ? await _http.post(
+              url,
               headers: const <String, String>{
-                'Content-Type': 'application/json'
+                'Content-Type': 'application/json',
               },
-              body: jsonEncode(json))
+              body: jsonEncode(json),
+            )
           : await _http.post(url, body: form);
     } on Object catch (_) {
       // The error of the HTTP client may quote the URL, which holds the API key.
-      throw const FirebaseAuthProviderException('network-request-failed',
-          'The request to the authentication service failed (network error).');
+      throw const FirebaseAuthProviderException(
+        'network-request-failed',
+        'The request to the authentication service failed (network error).',
+      );
     }
     Object? body;
     try {
@@ -306,32 +321,43 @@ class FirebaseUserAuth implements InternalTokenProvider {
       return body;
     }
     final Object? error = body is Map<String, Object?> ? body['error'] : null;
-    final Object? message =
-        error is Map<String, Object?> ? error['message'] : null;
+    final Object? message = error is Map<String, Object?>
+        ? error['message']
+        : null;
     if (message is String) {
-      throw FirebaseAuthProviderException.fromServer(message,
-          httpStatus: response.statusCode);
+      throw FirebaseAuthProviderException.fromServer(
+        message,
+        httpStatus: response.statusCode,
+      );
     }
-    throw FirebaseAuthProviderException('internal-error',
-        'The authentication service answered with HTTP ${response.statusCode}.',
-        httpStatus: response.statusCode);
+    throw FirebaseAuthProviderException(
+      'internal-error',
+      'The authentication service answered with HTTP ${response.statusCode}.',
+      httpStatus: response.statusCode,
+    );
   }
 
   Future<AuthUser> _signIn(String method, Map<String, Object?> request) async {
     _checkNotDisposed();
     final int generation = ++_generation;
-    final Map<String, Object?> response =
-        await _send(_identityToolkit(method), json: request);
+    final Map<String, Object?> response = await _send(
+      _identityToolkit(method),
+      json: request,
+    );
     final Object? idToken = response['idToken'];
     final Object? refreshToken = response['refreshToken'];
     if (idToken is! String || refreshToken is! String) {
-      throw const FirebaseAuthProviderException('internal-error',
-          'The authentication service did not return tokens.');
+      throw const FirebaseAuthProviderException(
+        'internal-error',
+        'The authentication service did not return tokens.',
+      );
     }
     if (generation != _generation) {
       // Another sign-in or a sign-out happened meanwhile and wins.
-      throw const FirebaseAuthProviderException('cancelled',
-          'The sign-in was overtaken by another sign-in or a sign-out.');
+      throw const FirebaseAuthProviderException(
+        'cancelled',
+        'The sign-in was overtaken by another sign-in or a sign-out.',
+      );
     }
     final GetTokenResult token = GetTokenResult(idToken);
     final Object? localId = response['localId'];
@@ -339,8 +365,10 @@ class FirebaseUserAuth implements InternalTokenProvider {
         ? localId
         : token.claims['user_id'] ?? token.claims['sub'];
     if (uid is! String) {
-      throw const FirebaseAuthProviderException('internal-error',
-          'The authentication service did not return the id of the user.');
+      throw const FirebaseAuthProviderException(
+        'internal-error',
+        'The authentication service did not return the id of the user.',
+      );
     }
     final Object? email = response['email'] ?? token.claims['email'];
     final _Session session = _Session(
@@ -381,10 +409,13 @@ class FirebaseUserAuth implements InternalTokenProvider {
     final int generation = _generation;
     final Map<String, Object?> response;
     try {
-      response = await _send(_secureToken, form: <String, String>{
-        'grant_type': 'refresh_token',
-        'refresh_token': session.refreshToken,
-      });
+      response = await _send(
+        _secureToken,
+        form: <String, String>{
+          'grant_type': 'refresh_token',
+          'refresh_token': session.refreshToken,
+        },
+      );
     } on FirebaseAuthProviderException catch (e) {
       if (e.invalidatesSession && generation == _generation) {
         await _clearSession();
@@ -395,7 +426,9 @@ class FirebaseUserAuth implements InternalTokenProvider {
     final Object? refreshToken = response['refresh_token'];
     if (idToken is! String) {
       throw const FirebaseAuthProviderException(
-          'internal-error', 'The token service did not return an ID token.');
+        'internal-error',
+        'The token service did not return an ID token.',
+      );
     }
     if (generation != _generation) {
       return null;
@@ -407,8 +440,10 @@ class FirebaseUserAuth implements InternalTokenProvider {
       idToken,
       _expiry(token, response['expires_in']),
     );
-    await _setSession(refreshed,
-        persist: refreshed.refreshToken != session.refreshToken);
+    await _setSession(
+      refreshed,
+      persist: refreshed.refreshToken != session.refreshToken,
+    );
     _refreshFailures = 0;
     if (!_tokenChanges.isClosed) {
       _tokenChanges.add(InternalTokenResult(idToken));
@@ -420,13 +455,14 @@ class FirebaseUserAuth implements InternalTokenProvider {
     _session = session;
     if (persist) {
       await _storage.write(
-          _storageKey,
-          jsonEncode(<String, Object?>{
-            'uid': session.user.uid,
-            'email': session.user.email,
-            'isAnonymous': session.user.isAnonymous,
-            'refreshToken': session.refreshToken,
-          }));
+        _storageKey,
+        jsonEncode(<String, Object?>{
+          'uid': session.user.uid,
+          'email': session.user.email,
+          'isAnonymous': session.user.isAnonymous,
+          'refreshToken': session.refreshToken,
+        }),
+      );
     }
     if (_tokenChanges.hasListener) {
       _scheduleProactiveRefresh();
@@ -480,15 +516,18 @@ class FirebaseUserAuth implements InternalTokenProvider {
       if (_session == null || _disposed || !_tokenChanges.hasListener) {
         return;
       }
-      _refresh().then<void>((String? _) {}, onError: (Object error) {
-        if (error is FirebaseAuthProviderException &&
-            !error.invalidatesSession &&
-            _session != null &&
-            _tokenChanges.hasListener) {
-          _refreshFailures++;
-          _scheduleProactiveRefresh();
-        }
-      });
+      _refresh().then<void>(
+        (String? _) {},
+        onError: (Object error) {
+          if (error is FirebaseAuthProviderException &&
+              !error.invalidatesSession &&
+              _session != null &&
+              _tokenChanges.hasListener) {
+            _refreshFailures++;
+            _scheduleProactiveRefresh();
+          }
+        },
+      );
     });
   }
 

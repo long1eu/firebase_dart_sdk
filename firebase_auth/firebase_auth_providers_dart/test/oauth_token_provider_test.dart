@@ -41,7 +41,9 @@ void main() {
           return fetchOverride!();
         }
         return OAuthAccessToken(
-            'token-$fetches', clock.now.add(const Duration(hours: 1)));
+          'token-$fetches',
+          clock.now.add(const Duration(hours: 1)),
+        );
       }, clock: clock.call);
     });
 
@@ -50,26 +52,40 @@ void main() {
       expect(await provider.onTokenChanged.isEmpty, isTrue);
     });
 
-    test('a token is fetched once and reused until five minutes before expiry',
-        () async {
-      expect(fetches, 0, reason: 'nothing is fetched before a token is needed');
-      expect((await provider.getAccessToken(forceRefresh: false)).token,
-          'token-1');
-      clock.advance(const Duration(minutes: 54, seconds: 59));
-      expect((await provider.getAccessToken(forceRefresh: false)).token,
-          'token-1');
-      expect(fetches, 1);
+    test(
+      'a token is fetched once and reused until five minutes before expiry',
+      () async {
+        expect(
+          fetches,
+          0,
+          reason: 'nothing is fetched before a token is needed',
+        );
+        expect(
+          (await provider.getAccessToken(forceRefresh: false)).token,
+          'token-1',
+        );
+        clock.advance(const Duration(minutes: 54, seconds: 59));
+        expect(
+          (await provider.getAccessToken(forceRefresh: false)).token,
+          'token-1',
+        );
+        expect(fetches, 1);
 
-      clock.advance(const Duration(seconds: 2));
-      expect((await provider.getAccessToken(forceRefresh: false)).token,
-          'token-2');
-      expect(fetches, 2);
-    });
+        clock.advance(const Duration(seconds: 2));
+        expect(
+          (await provider.getAccessToken(forceRefresh: false)).token,
+          'token-2',
+        );
+        expect(fetches, 2);
+      },
+    );
 
     test('forceRefresh fetches a new token', () async {
       await provider.getAccessToken(forceRefresh: false);
       expect(
-          (await provider.getAccessToken(forceRefresh: true)).token, 'token-2');
+        (await provider.getAccessToken(forceRefresh: true)).token,
+        'token-2',
+      );
     });
 
     test('concurrent requests share one fetch', () async {
@@ -77,30 +93,41 @@ void main() {
       fetchOverride = () => pending.future;
       final Future<List<GetTokenResult>> results =
           Future.wait(<Future<GetTokenResult>>[
-        provider.getAccessToken(forceRefresh: false),
-        provider.getAccessToken(forceRefresh: true),
-      ]);
+            provider.getAccessToken(forceRefresh: false),
+            provider.getAccessToken(forceRefresh: true),
+          ]);
       await pump();
       pending.complete(
-          OAuthAccessToken('shared', clock.now.add(const Duration(hours: 1))));
-      expect((await results).map((GetTokenResult r) => r.token),
-          <String>['shared', 'shared']);
+        OAuthAccessToken('shared', clock.now.add(const Duration(hours: 1))),
+      );
+      expect((await results).map((GetTokenResult r) => r.token), <String>[
+        'shared',
+        'shared',
+      ]);
       expect(fetches, 1);
     });
 
-    test('a failed fetch is reported and the next request tries again',
-        () async {
-      fetchOverride = () async => throw StateError('no credentials');
-      await expectLater(
-          provider.getAccessToken(forceRefresh: false), throwsStateError);
-      fetchOverride = null;
-      expect((await provider.getAccessToken(forceRefresh: false)).token,
-          'token-2');
-    });
+    test(
+      'a failed fetch is reported and the next request tries again',
+      () async {
+        fetchOverride = () async => throw StateError('no credentials');
+        await expectLater(
+          provider.getAccessToken(forceRefresh: false),
+          throwsStateError,
+        );
+        fetchOverride = null;
+        expect(
+          (await provider.getAccessToken(forceRefresh: false)).token,
+          'token-2',
+        );
+      },
+    );
 
     test('the string form of a token hides it', () {
-      expect('${OAuthAccessToken('secret-token', DateTime.utc(2026))}',
-          isNot(contains('secret-token')));
+      expect(
+        '${OAuthAccessToken('secret-token', DateTime.utc(2026))}',
+        isNot(contains('secret-token')),
+      );
     });
   });
 
@@ -145,12 +172,13 @@ void main() {
       requests = <http.Request>[];
       int issued = 0;
       handler = (http.Request request) async => http.Response(
-          jsonEncode(<String, Object?>{
-            'access_token': 'ya29.token-${++issued}',
-            'expires_in': 3599,
-            'token_type': 'Bearer',
-          }),
-          200);
+        jsonEncode(<String, Object?>{
+          'access_token': 'ya29.token-${++issued}',
+          'expires_in': 3599,
+          'token_type': 'Bearer',
+        }),
+        200,
+      );
     });
 
     tearDown(() => temp.deleteSync(recursive: true));
@@ -173,16 +201,19 @@ void main() {
     test('exchanges a signed assertion for an access token', () async {
       final OAuthTokenProvider provider = create();
       expect(requests, isEmpty);
-      final GetTokenResult token =
-          await provider.getAccessToken(forceRefresh: false);
+      final GetTokenResult token = await provider.getAccessToken(
+        forceRefresh: false,
+      );
       expect(token.token, 'ya29.token-1');
       expect(token.claims, isEmpty, reason: 'an access token is not a JWT');
 
       final http.Request request = requests.single;
       expect(request.method, 'POST');
       expect(request.url.toString(), 'https://oauth2.googleapis.com/token');
-      expect(request.bodyFields['grant_type'],
-          'urn:ietf:params:oauth:grant-type:jwt-bearer');
+      expect(
+        request.bodyFields['grant_type'],
+        'urn:ietf:params:oauth:grant-type:jwt-bearer',
+      );
       final List<String> parts = request.bodyFields['assertion']!.split('.');
       expect(parts, hasLength(3));
       expect(decode(parts[0]), <String, Object?>{'alg': 'RS256', 'typ': 'JWT'});
@@ -196,10 +227,12 @@ void main() {
       });
 
       // The signature is the RS256 signature of the first two parts, by the key of the key file.
-      File('${temp.path}/signed.txt')
-          .writeAsStringSync('${parts[0]}.${parts[1]}');
-      File('${temp.path}/signature.bin')
-          .writeAsBytesSync(base64Url.decode(base64Url.normalize(parts[2])));
+      File(
+        '${temp.path}/signed.txt',
+      ).writeAsStringSync('${parts[0]}.${parts[1]}');
+      File(
+        '${temp.path}/signature.bin',
+      ).writeAsBytesSync(base64Url.decode(base64Url.normalize(parts[2])));
       final ProcessResult verify = Process.runSync('openssl', <String>[
         'dgst',
         '-sha256',
@@ -213,61 +246,89 @@ void main() {
       expect('${verify.stdout}', contains('Verified OK'));
     });
 
-    test('accepts the content of the key file as a string, and other scopes',
-        () async {
-      final OAuthTokenProvider provider = create(
-          json: jsonEncode(keyFile), scopes: <String>['scope-a', 'scope-b']);
-      await provider.getAccessToken(forceRefresh: false);
-      expect(
+    test(
+      'accepts the content of the key file as a string, and other scopes',
+      () async {
+        final OAuthTokenProvider provider = create(
+          json: jsonEncode(keyFile),
+          scopes: <String>['scope-a', 'scope-b'],
+        );
+        await provider.getAccessToken(forceRefresh: false);
+        expect(
           decode(
-              requests.single.bodyFields['assertion']!.split('.')[1])['scope'],
-          'scope-a scope-b');
-    });
+            requests.single.bodyFields['assertion']!.split('.')[1],
+          )['scope'],
+          'scope-a scope-b',
+        );
+      },
+    );
 
     test('the token is refreshed five minutes before it expires', () async {
       final OAuthTokenProvider provider = create();
       await provider.getAccessToken(forceRefresh: false);
       // expires_in was 3599 s.
       clock.advance(const Duration(seconds: 3599 - 301));
-      expect((await provider.getAccessToken(forceRefresh: false)).token,
-          'ya29.token-1');
+      expect(
+        (await provider.getAccessToken(forceRefresh: false)).token,
+        'ya29.token-1',
+      );
       expect(requests, hasLength(1));
       clock.advance(const Duration(seconds: 2));
-      expect((await provider.getAccessToken(forceRefresh: false)).token,
-          'ya29.token-2');
+      expect(
+        (await provider.getAccessToken(forceRefresh: false)).token,
+        'ya29.token-2',
+      );
       expect(requests, hasLength(2));
       // The new assertion is issued at the new time.
       expect(
-          decode(requests.last.bodyFields['assertion']!.split('.')[1])['iat'],
-          clock.now.millisecondsSinceEpoch ~/ 1000 - 20);
+        decode(requests.last.bodyFields['assertion']!.split('.')[1])['iat'],
+        clock.now.millisecondsSinceEpoch ~/ 1000 - 20,
+      );
     });
 
     test('errors of the token endpoint are mapped', () async {
       handler = (http.Request request) async => http.Response(
-          jsonEncode(<String, Object?>{
-            'error': 'invalid_grant',
-            'error_description': 'Invalid JWT Signature.',
-          }),
-          400);
+        jsonEncode(<String, Object?>{
+          'error': 'invalid_grant',
+          'error_description': 'Invalid JWT Signature.',
+        }),
+        400,
+      );
       final OAuthTokenProvider provider = create();
       await expectLater(
-          provider.getAccessToken(forceRefresh: false),
-          throwsA(isA<FirebaseAuthProviderException>()
-              .having((FirebaseAuthProviderException e) => e.code, 'code',
-                  'invalid-credential')
-              .having((FirebaseAuthProviderException e) => e.message, 'message',
-                  contains('Invalid JWT Signature'))
-              .having((FirebaseAuthProviderException e) => e.httpStatus,
-                  'status', 400)));
+        provider.getAccessToken(forceRefresh: false),
+        throwsA(
+          isA<FirebaseAuthProviderException>()
+              .having(
+                (FirebaseAuthProviderException e) => e.code,
+                'code',
+                'invalid-credential',
+              )
+              .having(
+                (FirebaseAuthProviderException e) => e.message,
+                'message',
+                contains('Invalid JWT Signature'),
+              )
+              .having(
+                (FirebaseAuthProviderException e) => e.httpStatus,
+                'status',
+                400,
+              ),
+        ),
+      );
 
       handler = (http.Request request) =>
           throw http.ClientException('offline', request.url);
       await expectLater(
-          provider.getAccessToken(forceRefresh: false),
-          throwsA(isA<FirebaseAuthProviderException>().having(
-              (FirebaseAuthProviderException e) => e.code,
-              'code',
-              'network-request-failed')));
+        provider.getAccessToken(forceRefresh: false),
+        throwsA(
+          isA<FirebaseAuthProviderException>().having(
+            (FirebaseAuthProviderException e) => e.code,
+            'code',
+            'network-request-failed',
+          ),
+        ),
+      );
     });
 
     test('something that is not a key file is rejected without quoting it', () {
@@ -278,9 +339,15 @@ void main() {
         'not json',
       ]) {
         expect(
-            () => OAuthTokenProvider.serviceAccount(bad),
-            throwsA(isA<ArgumentError>().having((ArgumentError e) => '$e',
-                'text', isNot(contains('PRIVATE KEY')))));
+          () => OAuthTokenProvider.serviceAccount(bad),
+          throwsA(
+            isA<ArgumentError>().having(
+              (ArgumentError e) => '$e',
+              'text',
+              isNot(contains('PRIVATE KEY')),
+            ),
+          ),
+        );
       }
     });
   }, skip: skip);

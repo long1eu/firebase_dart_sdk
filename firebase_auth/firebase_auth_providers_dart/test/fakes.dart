@@ -52,11 +52,13 @@ String _encode(Object json) =>
     base64Url.encode(utf8.encode(jsonEncode(json))).replaceAll('=', '');
 
 /// An unsigned ID token like the ones the Auth emulator returns.
-String idToken(String uid,
-    {required DateTime expires,
-    String provider = 'password',
-    String? email,
-    String tag = ''}) {
+String idToken(
+  String uid, {
+  required DateTime expires,
+  String provider = 'password',
+  String? email,
+  String tag = '',
+}) {
   return '${_encode(<String, Object?>{'alg': 'none', 'typ': 'JWT'})}.'
       '${_encode(<String, Object?>{
         'user_id': uid,
