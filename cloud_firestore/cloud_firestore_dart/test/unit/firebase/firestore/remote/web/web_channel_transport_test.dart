@@ -312,8 +312,13 @@ void main() {
           handshake.url.path, '/google.firestore.v1.Firestore/Write/channel');
       expect(handshake.query['database'], database);
       expect(handshake.form['headers'], contains('Authorization:Bearer owner'));
+      // As the JS WebChannelConnection: the stream is routed by its
+      // `database` parameter, the routing headers are for unary calls only.
       expect(handshake.form['headers'],
-          contains('google-cloud-resource-prefix:$database'));
+          isNot(contains('google-cloud-resource-prefix')));
+      expect(handshake.form['headers'],
+          isNot(contains('x-goog-request-params')));
+      expect(handshake.form['headers'], contains('Content-Type:text/plain'));
       expect(jsonDecode(handshake.form['req0___data__']!),
           <String, Object?>{'database': database});
       handshake.respond(200,

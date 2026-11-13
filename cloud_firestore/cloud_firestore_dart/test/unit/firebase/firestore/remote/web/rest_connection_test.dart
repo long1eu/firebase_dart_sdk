@@ -348,5 +348,48 @@ void main() {
         await connection.shutdown();
       },
     );
+
+    test(
+      'a stream sends the headers of the JS WebChannelConnection, no more',
+      () async {
+        final FakeHttpClient http = FakeHttpClient();
+        final WebChannelTransport connection = WebChannelTransport(
+          http,
+          testDatabaseInfo(apiKey: 'wc-connection-test-api-key'),
+          options(
+            credentials: _OwnerCredentialsProvider(),
+            appCheck: _FixedAppCheckTokenProvider('some-app-check-token'),
+            apiKey: 'wc-connection-test-api-key',
+          ),
+        );
+        final StreamController<proto.ListenRequest> requests =
+            StreamController<proto.ListenRequest>();
+        connection
+            .startCall(FirestoreRpc.listen, requests.stream)
+            .listen((_) {}, onError: (Object _) {});
+        requests.add(proto.ListenRequest()..database = database);
+
+        final FakeRequest handshake = await http.next();
+        final Map<String, String> headers = <String, String>{
+          for (final String line in handshake.form['headers']!.split('\r\n'))
+            if (line.isNotEmpty)
+              line.substring(0, line.indexOf(':')).toLowerCase(): line
+                  .substring(line.indexOf(':') + 1),
+        };
+        // PORTING NOTE: JS sends `gl-js/ fire/<version>` as the client.
+        expect(headers.remove('x-goog-api-client'), startsWith('gl-dart/'));
+        expect(headers, <String, String>{
+          'content-type': 'text/plain',
+          'x-firebase-gmpid': 'test-app-id',
+          'authorization': 'Bearer owner',
+          'x-firebase-appcheck': 'some-app-check-token',
+          'x-goog-api-key': 'wc-connection-test-api-key',
+        });
+        // The routing of the JS messageUrlParams.
+        expect(handshake.query['database'], database);
+        await requests.close();
+        await connection.shutdown();
+      },
+    );
   });
 }

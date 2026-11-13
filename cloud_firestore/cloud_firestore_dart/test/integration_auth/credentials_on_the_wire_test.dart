@@ -376,12 +376,16 @@ void main() {
               'Bearer $idToken',
               reason: '$request',
             );
-            // REST calls use the format of the JS SDK's RestConnection.
+            // gRPC sends the routing headers of the Android SDK; REST calls
+            // those of the JS SDK's RestConnection; WebChannel streams, as in
+            // JS, none (they are routed by their `database` parameter).
             expect(
               request.headers['x-goog-request-params'],
-              request.transport == 'rest'
-                  ? 'project_id=$projectId'
-                  : 'projects/$projectId/databases/(default)',
+              switch (request.transport) {
+                'rest' => 'project_id=$projectId',
+                'webchannel' => isNull,
+                _ => 'projects/$projectId/databases/(default)',
+              },
               reason: '$request',
             );
           }

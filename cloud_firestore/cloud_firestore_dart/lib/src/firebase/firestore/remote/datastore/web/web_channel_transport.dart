@@ -17,6 +17,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/remote/datastore/web
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/grpc_status.dart';
 import 'package:cloud_firestore_dart/src/proto/google/firestore/v1/index.dart'
     as proto;
+import 'package:meta/meta.dart';
 import 'package:protobuf/protobuf.dart';
 
 /// A [FirestoreTransport] that only needs HTTP requests with streamed
@@ -130,6 +131,27 @@ class WebChannelTransport implements FirestoreTransport {
     return headers;
   }
 
+  /// The headers a stream sends with its handshake, from the request
+  /// [metadata]: those of the JS SDK's WebChannelConnection
+  /// (`modifyHeadersForRequest()`), the client, `Content-Type: text/plain`, the
+  /// app id, the credentials and the API key. The routing headers are left
+  /// out: JS sends them only with unary calls, a stream is routed by its
+  /// `database` URL parameter.
+  @visibleForTesting
+  static Map<String, String> streamHeaders(Map<String, String> metadata) {
+    return <String, String>{
+      for (final MapEntry<String, String> header in metadata.entries)
+        if (!_unaryOnlyHeaders.contains(header.key.toLowerCase()))
+          header.key: header.value,
+      'Content-Type': 'text/plain',
+    };
+  }
+
+  static const Set<String> _unaryOnlyHeaders = <String>{
+    'google-cloud-resource-prefix',
+    'x-goog-request-params',
+  };
+
   Future<void>
   _runUnary<Req extends GeneratedMessage, Res extends GeneratedMessage>(
     FirestoreRpc<Req, Res> rpc,
@@ -196,7 +218,7 @@ class WebChannelTransport implements FirestoreTransport {
       _http,
       '$_baseUrl${rpc.path}/channel',
       _database,
-      headers,
+      streamHeaders(headers),
       forceLongPolling: _forceLongPolling,
       autoDetectLongPolling: _autoDetectLongPolling,
       longPollingDetectionTimeout: longPollingDetectionTimeout,

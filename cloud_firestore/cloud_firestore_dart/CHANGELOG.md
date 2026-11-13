@@ -1,5 +1,9 @@
 ## Unreleased
 
+- Web transport: a WebChannel stream (Listen, Write) sends the headers of the JS SDK's
+  WebChannelConnection: the client, `Content-Type: text/plain`, the app id, the credentials and
+  the API key. It no longer sends `google-cloud-resource-prefix` or `x-goog-request-params`, which
+  JS sends only with unary calls; the stream is routed by its `database` URL parameter.
 - The app id of the app (`FirebaseOptions.applicationId`) is sent with every request in the
   `x-firebase-gmpid` header, as the Android SDK (`x-firebase-gmpid`) and the JS SDK
   (`X-Firebase-GMPID`) do.
