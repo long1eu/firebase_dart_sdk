@@ -293,7 +293,36 @@ EvaluateResult _arrayTransform(_Call call) {
   return _list(result);
 }
 
+/// `sum(array)` (`Expression.arraySum`): the sum of the numbers of the
+/// array, as the aggregate `sum` adds them (the emulator agrees on every
+/// recorded case): elements that are not numbers are skipped, an array
+/// without numbers gives null, an int64 overflow of the running total is an
+/// error, integers and doubles give a double, a Decimal128 gives a
+/// Decimal128. Null or a missing value gives null; any other value is an
+/// error. Neither Android nor JS evaluates this locally.
+EvaluateResult _arraySum(_Call call) {
+  if (call.length != 1) {
+    return _error;
+  }
+  final EvaluateResult result = call.arg(0);
+  if (result.isError) {
+    return _error;
+  }
+  final FieldValue? array = result.value;
+  if (_isNull(array)) {
+    return _null;
+  } else if (array is! ArrayValue) {
+    return _error;
+  }
+  final SumAccumulator sum = SumAccumulator();
+  for (final FieldValue element in array.internalValue) {
+    sum.add(EvaluateValue(element));
+  }
+  return sum.result;
+}
+
 final Map<String, _Function> _arrayFunctions = <String, _Function>{
+  'sum': _arraySum,
   'array_length': _arrayLength,
   'array_contains': _arrayContains,
   'array_contains_any': _arrayContainsList(all: false),

@@ -34,7 +34,7 @@ class AggregateEvaluator {
         'count': _Count.new,
         'count_if': _CountIf.new,
         'count_distinct': _CountDistinct.new,
-        'sum': _Sum.new,
+        'sum': SumAccumulator.new,
         'average': _Average.new,
         'minimum': () => _Extremum(maximum: false),
         'maximum': () => _Extremum(maximum: true),
@@ -159,7 +159,11 @@ class _CountDistinct implements Accumulator {
 
 /// The sum of the numbers among the values; other values are ignored. An
 /// integer sum that overflows is an error.
-class _Sum implements Accumulator {
+/// The sum of the numbers added, as the backend computes `sum`: other values
+/// are skipped, no number gives null, an int64 overflow of the running total
+/// is an error. Also the scalar `sum(array)` (`Expression.arraySum`), which
+/// the emulator computes the same way.
+class SumAccumulator implements Accumulator {
   BigInt _integers = BigInt.zero;
   double _doubles = 0;
   Decimal? _decimals;
@@ -235,7 +239,7 @@ class _Sum implements Accumulator {
 }
 
 class _Average implements Accumulator {
-  final _Sum _sum = _Sum();
+  final SumAccumulator _sum = SumAccumulator();
 
   @override
   void add(EvaluateResult result) => _sum.add(result);

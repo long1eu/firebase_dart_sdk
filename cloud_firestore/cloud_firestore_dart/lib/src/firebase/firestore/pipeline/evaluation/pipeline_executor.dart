@@ -31,7 +31,8 @@
 ///   it.
 ///
 /// What is not run locally throws an [UnsupportedExpression]: the `sample`,
-/// `let` (`define`), `subcollection`, `literals`, search and write stages,
+/// `let` (`define`), `subcollection`, `literals`, `search`,
+/// `add_window_fields` and write stages,
 /// stages and options this file does not know, and the expressions the
 /// [ExpressionEvaluator] does not evaluate.
 library;
@@ -275,6 +276,20 @@ class PipelineExecutor {
       case 'find_nearest':
         _options(stage, const <String>{'limit', 'distance_field'});
         return _findNearest(stage, rows);
+      case 'add_window_fields':
+        // Android's AddWindowFieldsStage has no local evaluation and JS has
+        // no local pipeline runner for it; the emulator rejects the stage, so
+        // there is no reference for its frames, ties and defaults either.
+        throw UnsupportedExpression(
+          'The stage add_window_fields (window functions) is not run '
+          'locally: no SDK evaluates it offline and the emulator does not '
+          'support it, so there is no reference for its semantics',
+        );
+      case 'search':
+        throw UnsupportedExpression(
+          'The stage search is not run locally: full-text and geo search '
+          'need the search index of the backend',
+        );
     }
     if (const <String>{
       'collection',

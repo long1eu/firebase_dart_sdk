@@ -1220,6 +1220,56 @@
 {"expression":"map_get(map_set(Field(m), Constant(q), Constant(null)), Constant(q))","result":"WAA="}
 {"expression":"map_set(Field(n), Constant(k), Constant(1))","result":"UNSET"}
 {"expression":"map_set(Field(s), Constant(k), Constant(1))","result":"UNSET"}
+{"expression":"map_set(Field(m), Constant(a), Constant(1), Constant(b), Constant(2))","result":"Mi8KBwoBYRICEAEKBwoBYhICEAIKCQoBahIEigEBeAoHCgFrEgIQAQoHCgFuEgJYAA=="}
+{"expression":"map_set(Field(m), Constant(a), Constant(1), Constant(a), Constant(2))","result":"MiYKBwoBYRICEAIKCQoBahIEigEBeAoHCgFrEgIQAQoHCgFuEgJYAA=="}
+{"expression":"map_set(Field(m), Constant(k), Field(missing), Constant(q), Constant(1))","result":"Mh0KCQoBahIEigEBeAoHCgFuEgJYAAoHCgFxEgIQAQ=="}
+{"expression":"map_set(Field(m), Constant(q), Constant(1), Constant(q), Field(missing))","result":"Mh0KCQoBahIEigEBeAoHCgFrEgIQAQoHCgFuEgJYAA=="}
+{"expression":"map_set(Field(m), Constant(a), Constant(1), Constant(null), Constant(2))","result":"REJECTED"}
+{"expression":"map_set(Field(m), Constant(null), Constant(1), Constant(b), Constant(2))","result":"REJECTED"}
+{"expression":"map_set(Field(m), Constant(a), Constant(1), Constant(7), Constant(2))","result":"REJECTED"}
+{"expression":"map_set(Field(m), Constant(a), Constant(1), Constant(b), add(Field(i), Field(s)))","result":"ERROR"}
+{"expression":"map_set(Field(m), Constant(a), add(Field(i), Field(s)), Constant(null), Constant(2))","result":"REJECTED"}
+{"expression":"map_set(Field(n), Constant(a), Constant(1), Constant(b), Constant(2))","result":"UNSET"}
+{"expression":"map_set(Field(m), Constant(a), Constant(1), Constant(b), Constant(2), Constant(c), Constant(3))","result":"MjgKBwoBYRICEAEKBwoBYhICEAIKBwoBYxICEAMKCQoBahIEigEBeAoHCgFrEgIQAQoHCgFuEgJYAA=="}
+{"expression":"map_set(Field(m), Constant(a), Constant(1), Constant(b))","result":"REJECTED"}
+{"expression":"map_set(Field(m), Constant(a))","result":"REJECTED"}
+{"expression":"map_set(Field(m))","result":"REJECTED"}
+{"expression":"sum(Field(nums))","result":"EAY="}
+{"expression":"sum(Field(arr))","result":"GQAAAAAAABhA"}
+{"expression":"sum(Field(ea))","result":"WAA="}
+{"expression":"sum(Field(n))","result":"WAA="}
+{"expression":"sum(Field(missing))","result":"WAA="}
+{"expression":"sum(Field(i))","result":"ERROR"}
+{"expression":"sum(Field(s))","result":"ERROR"}
+{"expression":"sum(Field(m))","result":"ERROR"}
+{"expression":"sum(Field(v))","result":"ERROR"}
+{"expression":"sum(Constant([1, 2.5]))","result":"GQAAAAAAAAxA"}
+{"expression":"sum(Constant([1.5, 2.5]))","result":"GQAAAAAAABBA"}
+{"expression":"sum(Constant([1, null, 2]))","result":"EAM="}
+{"expression":"sum(Constant([1, a]))","result":"EAE="}
+{"expression":"sum(Constant([true]))","result":"WAA="}
+{"expression":"sum(Constant([[1, 2]]))","result":"WAA="}
+{"expression":"sum(Constant([null]))","result":"WAA="}
+{"expression":"sum(Constant([null, null]))","result":"WAA="}
+{"expression":"sum(Constant([1, NaN]))","result":"GQAAAAAAAPh/"}
+{"expression":"sum(Constant([Infinity, -Infinity]))","result":"GQAAAAAAAPh/"}
+{"expression":"sum(Constant([9223372036854775807, 1]))","result":"ERROR"}
+{"expression":"sum(Constant([-9223372036854775808, -1]))","result":"ERROR"}
+{"expression":"sum(Constant([9223372036854775807, 1.0]))","result":"GQAAAAAAAOBD"}
+{"expression":"sum(Constant([9223372036854775807, 1, -2]))","result":"ERROR"}
+{"expression":"sum(Constant([Int32Value{value=2147483647}, Int32Value{value=1}]))","result":"EICAgIAI"}
+{"expression":"sum(Constant([Int32Value{value=2}, 3]))","result":"EAU="}
+{"expression":"sum(Constant([Int32Value{value=2}, Int32Value{value=3}]))","result":"EAU="}
+{"expression":"sum(Constant([Decimal128Value{value=1.5}, 1]))","result":"MhoKGAoOX19kZWNpbWFsMTI4X18SBooBAzIuNQ=="}
+{"expression":"sum(Constant([Decimal128Value{value=1.5}, 2.5]))","result":"MhoKGAoOX19kZWNpbWFsMTI4X18SBooBAzQuMA=="}
+{"expression":"sum(Constant([-0.0]))","result":"GQAAAAAAAAAA"}
+{"expression":"sum(Constant([-0.0, -0.0]))","result":"GQAAAAAAAAAA"}
+{"expression":"sum(Constant([0.1, 0.2, 0.3]))","result":"GTMzMzMzM+M/"}
+{"expression":"sum(array(Field(i), add(Field(i), Field(s))))","result":"ERROR"}
+{"expression":"sum(Field(nums), Field(nums))","result":"REJECTED"}
+{"expression":"sum()","result":"REJECTED"}
+{"expression":"document_matches(Constant(waffles))","result":"REJECTED"}
+{"expression":"score()","result":"REJECTED"}
 {"expression":"timestamp_add(Field(ts), Constant(microsecond), Constant(1))","result":"UgsIgOLPqgYQ6JvvOg=="}
 {"expression":"timestamp_add(Field(ts), Constant(microsecond), Constant(-1500))","result":"UgsIgOLPqgYQoM2TOg=="}
 {"expression":"timestamp_subtract(Field(ts), Constant(microsecond), Constant(90))","result":"UgsIgOLPqgYQ8NTpOg=="}
@@ -3236,6 +3286,11 @@
 {"expression":"array_concat(Constant([3, a, null, 1.5]), Field(zz))","result":"WAA="}
 {"expression":"array_concat(Constant([3, a, null, 1.5]), Constant({a: 1}))","result":"ERROR"}
 {"expression":"array_concat(Constant([3, a, null, 1.5]), divide(Constant(1), Constant(0)))","result":"ERROR"}
+{"expression":"sum(Constant([3, 1, 2]))","result":"EAY="}
+{"expression":"sum(Constant(null))","result":"WAA="}
+{"expression":"sum(Field(zz))","result":"WAA="}
+{"expression":"sum(Constant({a: 1}))","result":"ERROR"}
+{"expression":"sum(divide(Constant(1), Constant(0)))","result":"ERROR"}
 {"expression":"map_get(Constant({a: 1, b: x}), Constant(a))","result":"EAE="}
 {"expression":"map_get(Constant(null), Constant(a))","result":"WAA="}
 {"expression":"map_get(Field(zz), Constant(a))","result":"WAA="}
@@ -3308,6 +3363,28 @@
 {"expression":"map_set(Constant({a: 1, b: x}), Constant(a), Constant(null))","result":"MhQKBwoBYRICWAAKCQoBYhIEigEBeA=="}
 {"expression":"map_set(Constant({a: 1, b: x}), Constant(a), Field(zz))","result":"MgsKCQoBYhIEigEBeA=="}
 {"expression":"map_set(Constant({a: 1, b: x}), Constant(a), divide(Constant(1), Constant(0)))","result":"ERROR"}
+{"expression":"map_set(Constant({a: 1, b: x}), Constant(a), Constant(7), Constant(a), Constant(7))","result":"MhQKBwoBYRICEAcKCQoBYhIEigEBeA=="}
+{"expression":"map_set(Constant(null), Constant(a), Constant(7), Constant(a), Constant(7))","result":"UNSET"}
+{"expression":"map_set(Constant(null), Constant(a), Constant(null), Constant(a), Constant(7))","result":"UNSET"}
+{"expression":"map_set(Constant(null), Constant(a), Field(zz), Constant(a), Constant(7))","result":"UNSET"}
+{"expression":"map_set(Constant(null), Constant(a), divide(Constant(1), Constant(0)), Constant(a), Constant(7))","result":"UNSET"}
+{"expression":"map_set(Field(zz), Constant(a), Constant(7), Constant(a), Constant(7))","result":"UNSET"}
+{"expression":"map_set(Field(zz), Constant(a), Constant(null), Constant(a), Constant(7))","result":"UNSET"}
+{"expression":"map_set(Field(zz), Constant(a), Field(zz), Constant(a), Constant(7))","result":"UNSET"}
+{"expression":"map_set(Field(zz), Constant(a), divide(Constant(1), Constant(0)), Constant(a), Constant(7))","result":"UNSET"}
+{"expression":"map_set(Constant(7), Constant(a), Constant(7), Constant(a), Constant(7))","result":"UNSET"}
+{"expression":"map_set(Constant(7), Constant(a), Constant(null), Constant(a), Constant(7))","result":"UNSET"}
+{"expression":"map_set(Constant(7), Constant(a), Field(zz), Constant(a), Constant(7))","result":"UNSET"}
+{"expression":"map_set(Constant(7), Constant(a), divide(Constant(1), Constant(0)), Constant(a), Constant(7))","result":"UNSET"}
+{"expression":"map_set(divide(Constant(1), Constant(0)), Constant(a), Constant(7), Constant(a), Constant(7))","result":"ERROR"}
+{"expression":"map_set(divide(Constant(1), Constant(0)), Constant(a), Constant(null), Constant(a), Constant(7))","result":"ERROR"}
+{"expression":"map_set(divide(Constant(1), Constant(0)), Constant(a), Field(zz), Constant(a), Constant(7))","result":"ERROR"}
+{"expression":"map_set(Constant({a: 1, b: x}), Constant(a), Constant(null), Constant(a), Constant(7))","result":"MhQKBwoBYRICEAcKCQoBYhIEigEBeA=="}
+{"expression":"map_set(Constant({a: 1, b: x}), Constant(a), Field(zz), Constant(a), Constant(7))","result":"MhQKBwoBYRICEAcKCQoBYhIEigEBeA=="}
+{"expression":"map_set(Constant({a: 1, b: x}), Constant(a), divide(Constant(1), Constant(0)), Constant(a), Constant(7))","result":"ERROR"}
+{"expression":"map_set(Constant({a: 1, b: x}), Constant(a), Constant(7), Constant(a), Constant(null))","result":"MhQKBwoBYRICWAAKCQoBYhIEigEBeA=="}
+{"expression":"map_set(Constant({a: 1, b: x}), Constant(a), Constant(7), Constant(a), Field(zz))","result":"MgsKCQoBYhIEigEBeA=="}
+{"expression":"map_set(Constant({a: 1, b: x}), Constant(a), Constant(7), Constant(a), divide(Constant(1), Constant(0)))","result":"ERROR"}
 {"expression":"timestamp_add(Constant(Timestamp {   seconds=1700000000,   nanoseconds=123456000, }), Constant(microsecond), Constant(7))","result":"UgsIgOLPqgYQ2MrvOg=="}
 {"expression":"timestamp_add(Constant(null), Constant(microsecond), Constant(7))","result":"WAA="}
 {"expression":"timestamp_add(Constant(null), Constant(microsecond), Constant(null))","result":"WAA="}

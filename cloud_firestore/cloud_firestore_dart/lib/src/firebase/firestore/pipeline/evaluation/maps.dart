@@ -78,11 +78,16 @@ EvaluateResult _mapRemove(_Call call) => _strict(
       EvaluateValue(ObjectValue.fromMap(_entries(v[0])..remove(_text(v[1])))),
 );
 
-/// `map_set(map, key, value)`: the map with the value under the key. A
-/// value that is missing removes the key. Like `get_field`, anything that is
-/// not a map has no fields to set: the result is missing too.
+/// `map_set(map, key, value, key2, value2, ...)`: the map with each value
+/// under its key, the pairs applied in order (a later pair wins). A value that
+/// is missing removes the key. Like `get_field`, anything that is not a map
+/// has no fields to set: the result is missing too, whatever the pairs are.
+///
+/// The emulator rejects a pipeline with an odd number of arguments or a key
+/// that is a constant other than a string before it runs it; here those are
+/// an error (and a null key gives null, as with one pair).
 EvaluateResult _mapSet(_Call call) {
-  if (call.length != 3) {
+  if (call.length < 3 || call.length.isEven) {
     return _error;
   }
   final EvaluateResult mapResult = call.arg(0);
@@ -93,23 +98,25 @@ EvaluateResult _mapSet(_Call call) {
   if (map is! ObjectValue) {
     return _unset;
   }
-  final EvaluateResult keyResult = call.arg(1);
-  final EvaluateResult valueResult = call.arg(2);
-  if (keyResult.isError || valueResult.isError) {
-    return _error;
-  }
-  final FieldValue? key = keyResult.value;
-  if (_isNull(key)) {
-    return _null;
-  } else if (key is! StringValue) {
-    return _error;
-  }
   final Map<String, FieldValue> entries = _entries(map);
-  final FieldValue? value = valueResult.value;
-  if (value == null) {
-    entries.remove(key.value);
-  } else {
-    entries[key.value] = value;
+  for (int i = 1; i < call.length; i += 2) {
+    final EvaluateResult keyResult = call.arg(i);
+    final EvaluateResult valueResult = call.arg(i + 1);
+    if (keyResult.isError || valueResult.isError) {
+      return _error;
+    }
+    final FieldValue? key = keyResult.value;
+    if (_isNull(key)) {
+      return _null;
+    } else if (key is! StringValue) {
+      return _error;
+    }
+    final FieldValue? value = valueResult.value;
+    if (value == null) {
+      entries.remove(key.value);
+    } else {
+      entries[key.value] = value;
+    }
   }
   return EvaluateValue(ObjectValue.fromMap(entries));
 }

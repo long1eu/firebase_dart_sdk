@@ -367,6 +367,49 @@ List<Expression> curatedCases() {
     s.mapRemove('k'), n.mapRemove('k'), m.mapSet('k', 9).mapGet('k'),
     m.mapSet('q', 9).length(), m.mapSet('k', x).length(),
     m.mapSet('q', null).mapGet('q'), n.mapSet('k', 1), s.mapSet('k', 1),
+    // Several pairs: later pairs see the earlier ones.
+    m.mapSet('a', 1, <Object?>['b', 2]), m.mapSet('a', 1, <Object?>['a', 2]),
+    m.mapSet('k', x, <Object?>['q', 1]), m.mapSet('q', 1, <Object?>['q', x]),
+    m.mapSet('a', 1, <Object?>[null, 2]),
+    m.mapSet(constant(null), 1, <Object?>['b', 2]),
+    m.mapSet('a', 1, <Object?>[7, 2]), m.mapSet('a', 1, <Object?>['b', err]),
+    m.mapSet('a', err, <Object?>[null, 2]), n.mapSet('a', 1, <Object?>['b', 2]),
+    m.mapSet('a', 1, <Object?>['b', 2, 'c', 3]),
+    _f('map_set', <Object?>[m, 'a', 1, 'b']), _f('map_set', <Object?>[m, 'a']),
+    _f('map_set', <Object?>[m]),
+
+    // Sum of an array.
+    nums.arraySum(), arr.arraySum(), field('ea').arraySum(), n.arraySum(),
+    x.arraySum(), i.arraySum(), s.arraySum(), m.arraySum(), v.arraySum(),
+    constant(<Object?>[1, 2.5]).arraySum(),
+    constant(<Object?>[1.5, 2.5]).arraySum(),
+    constant(<Object?>[1, null, 2]).arraySum(),
+    constant(<Object?>[1, 'a']).arraySum(),
+    constant(<Object?>[true]).arraySum(),
+    constant(<Object?>[
+      <Object?>[1, 2],
+    ]).arraySum(),
+    constant(<Object?>[null]).arraySum(),
+    constant(<Object?>[null, null]).arraySum(),
+    constant(<Object?>[1, double.nan]).arraySum(),
+    constant(<Object?>[double.infinity, double.negativeInfinity]).arraySum(),
+    constant(<Object?>[9223372036854775807, 1]).arraySum(),
+    constant(<Object?>[-9223372036854775807 - 1, -1]).arraySum(),
+    constant(<Object?>[9223372036854775807, 1.0]).arraySum(),
+    constant(<Object?>[9223372036854775807, 1, -2]).arraySum(),
+    constant(<Object?>[Int32Value(2147483647), Int32Value(1)]).arraySum(),
+    constant(<Object?>[Int32Value(2), 3]).arraySum(),
+    constant(<Object?>[Int32Value(2), Int32Value(3)]).arraySum(),
+    constant(<Object?>[Decimal128Value('1.5'), 1]).arraySum(),
+    constant(<Object?>[Decimal128Value('1.5'), 2.5]).arraySum(),
+    constant(<Object?>[-0.0]).arraySum(),
+    constant(<Object?>[-0.0, -0.0]).arraySum(),
+    constant(<Object?>[0.1, 0.2, 0.3]).arraySum(),
+    array(<Object?>[i, err]).arraySum(), _f('sum', <Object?>[nums, nums]),
+    _f('sum', <Object?>[]),
+
+    // Search functions (the emulator has none).
+    documentMatches('waffles'), score(),
 
     // Timestamps.
     for (final String unit in <String>[

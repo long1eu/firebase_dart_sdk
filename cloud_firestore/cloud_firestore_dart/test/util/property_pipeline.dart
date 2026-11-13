@@ -229,6 +229,7 @@ const List<Fn> functionCatalog = <Fn>[
   Fn('maximum_n', Kind.arr, <Kind>[Kind.arr, Kind.small]),
   Fn('minimum_n', Kind.arr, <Kind>[Kind.arr, Kind.small]),
   Fn('array_concat', Kind.arr, <Kind>[Kind.arr, Kind.arr], more: Kind.arr),
+  Fn('sum', Kind.num, <Kind>[Kind.numArr]),
   // Maps.
   Fn(
     'map_get',
@@ -264,6 +265,15 @@ const List<Fn> functionCatalog = <Fn>[
     <Kind>[Kind.map, Kind.str, Kind.any],
     literals: <int, List<String>>{
       1: <String>['a', 'b', 'zz'],
+    },
+  ),
+  Fn(
+    'map_set',
+    Kind.map,
+    <Kind>[Kind.map, Kind.str, Kind.any, Kind.str, Kind.any],
+    literals: <int, List<String>>{
+      1: <String>['a', 'b', 'zz'],
+      3: <String>['a', 'c', 'zz'],
     },
   ),
   // Timestamps.

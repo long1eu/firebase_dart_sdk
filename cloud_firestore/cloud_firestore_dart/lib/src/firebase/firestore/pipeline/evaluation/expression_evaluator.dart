@@ -28,6 +28,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/model/document_key.d
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/field_path.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/resource_path.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/value/field_value.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/pipeline/evaluation/aggregate_evaluator.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/pipeline/evaluation/decimal.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/pipeline/evaluation/evaluate_result.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/pipeline/evaluation/re2.dart';
@@ -141,6 +142,24 @@ class ExpressionEvaluator {
   }
 }
 
+/// Why some functions are not evaluated locally, appended to the message of
+/// the [UnsupportedExpression].
+const Map<String, String> _unsupportedReasons = <String, String>{
+  'document_matches':
+      ': it is a full-text search function, evaluated only by the backend '
+      '(in a search stage, against its search index); no SDK evaluates it '
+      'locally',
+  'score':
+      ': it is the relevance of a full-text search, computed only by the '
+      'backend in a search stage; no SDK evaluates it locally',
+  'over':
+      ': window functions are evaluated only by the add_window_fields stage '
+      'on the backend',
+  'rank':
+      ': window functions are evaluated only by the add_window_fields stage '
+      'on the backend',
+};
+
 /// The input and the variables an expression is evaluated with.
 class _Scope {
   _Scope(this.evaluator, this.input, this.variables);
@@ -161,7 +180,8 @@ class _Scope {
         final _Function? implementation = _functions[function.name];
         if (implementation == null) {
           throw UnsupportedExpression(
-            'The function ${function.name}() is not evaluated locally',
+            'The function ${function.name}() is not evaluated locally'
+            '${_unsupportedReasons[function.name] ?? ''}',
           );
         }
         return implementation(_Call(this, function));
