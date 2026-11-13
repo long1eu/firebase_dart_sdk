@@ -105,7 +105,8 @@ void main() {
       final List<String> log = <String>[];
       await queue.enqueue(() async {
         log.add('a');
-        await queue.enqueue(() async => log.add('b'));
+        // As in JS, code on the queue does not wait for what it enqueues.
+        unawaited(queue.enqueue(() async => log.add('b')));
         log.add('a done');
       });
       await runRetry();
@@ -122,7 +123,7 @@ void main() {
       if (failing) {
         throw TransientDatabaseException('busy');
       }
-      await queue.enqueue(() async => log.add('b'));
+      unawaited(queue.enqueue(() async => log.add('b')));
     });
     await pumpEventQueue();
     failing = false;
@@ -142,7 +143,7 @@ void main() {
     int runs = 0;
     Future<void> probe() async {
       runs++;
-      await queue.enqueue(probe);
+      unawaited(queue.enqueue(probe));
     }
 
     await queue.enqueue(probe);

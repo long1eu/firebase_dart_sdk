@@ -485,12 +485,7 @@ class SpecClient implements RemoteStoreCallback {
     _localPersistence.setPrimaryStateListener((bool isPrimary) {
       // Retried while it fails with a recoverable persistence error (the JS `enqueueRetryable`).
       unawaited(
-        _enqueueSharedStateEvent(
-          () => _retryQueue.enqueue(
-            () => _syncEngine.applyPrimaryState(isPrimary),
-          ),
-          later: true,
-        ),
+        _enqueueRetryable(() => _syncEngine.applyPrimaryState(isPrimary)),
       );
     });
     await _drainSharedStateEvents();
@@ -547,15 +542,9 @@ class SpecClient implements RemoteStoreCallback {
 
   late RetryableOperationQueue _retryQueue;
 
-  Future<void> _enqueueSharedStateEvent(
-    Future<void> Function() operation, {
-    bool later = false,
-  }) {
+  Future<void> _enqueueSharedStateEvent(Future<void> Function() operation) {
     _pendingSharedStateEvents++;
-    final Future<void> Function<T>(Future<T> Function()) run = later
-        ? _sharedStateQueue.runLater
-        : _sharedStateQueue.run;
-    return run<void>(() async {
+    return _sharedStateQueue.run<void>(() async {
       try {
         await operation();
       } finally {

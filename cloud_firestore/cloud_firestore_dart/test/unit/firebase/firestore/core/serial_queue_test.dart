@@ -49,24 +49,21 @@ void main() {
     expect(await next, 42);
   });
 
-  test(
-    'a task running on the queue can call run again without deadlocking',
-    () async {
-      final SerialQueue queue = SerialQueue();
-      final List<String> events = <String>[];
+  test('a run requested by the running task runs after it', () async {
+    final SerialQueue queue = SerialQueue();
+    final List<String> events = <String>[];
+    late Future<void> inner;
 
-      await queue
-          .run<void>(() async {
-            events.add('outer:start');
-            await Future<void>.delayed(const Duration(milliseconds: 5));
-            await queue.run<void>(() async => events.add('inner'));
-            events.add('outer:end');
-          })
-          .timeout(const Duration(seconds: 2));
+    await queue.run<void>(() async {
+      events.add('outer:start');
+      inner = queue.run<void>(() async => events.add('inner'));
+      await Future<void>.delayed(const Duration(milliseconds: 5));
+      events.add('outer:end');
+    });
+    await inner;
 
-      expect(events, <String>['outer:start', 'inner', 'outer:end']);
-    },
-  );
+    expect(events, <String>['outer:start', 'outer:end', 'inner']);
+  });
 
   test(
     'work that outlives its task is queued again instead of running inline',
@@ -106,29 +103,63 @@ void main() {
     },
   );
 
-  // PORTING NOTE: JS SDK test/unit/util/async_queue.test.ts cases whose JS
-  // AsyncQueue semantics differ from SerialQueue. SerialQueue keeps its
-  // inline run of a nested run() call (pending a decision on aligning it with
-  // upstream), so these two stay skipped. The delayed operation cases are
-  // ported against TaskScheduler in util/task_scheduler_test.dart, the
-  // retryable ones against RetryableOperationQueue in
-  // util/retryable_operation_queue_test.dart.
-  test(
-    'schedules ops in right order',
-    skip:
-        'SerialQueue runs a run() call made from the running task inline '
-        '(see "a task running on the queue can call run again without '
-        'deadlocking"); the JS AsyncQueue queues it after the current '
-        'operation, so "Bye for good." is pushed before "Welcome back."',
-    () {},
-  );
+  // Ported from the JS SDK test/unit/util/async_queue.test.ts. The delayed
+  // operation cases are ported against TaskScheduler in
+  // util/task_scheduler_test.dart, the retryable ones against
+  // RetryableOperationQueue in util/retryable_operation_queue_test.dart.
+  Future<T> defer<T>(T Function() op) => Future<T>(op);
 
+  test('schedules ops in right order', () async {
+    final SerialQueue queue = SerialQueue();
+    final List<String> results = <String>[];
+
+    void pushResult(String result) {
+      results.add(result);
+    }
+
+    final Future<void> op1 = queue.run<void>(() {
+      return defer(
+        () => 'Hello',
+      ).then((String result) => defer(() => '$result world!')).then(pushResult);
+    });
+
+    final Future<void> op2 = queue.run<void>(() {
+      return defer(() => 'Bye bye.').then(pushResult);
+    });
+
+    final Completer<void> op4 = Completer<void>();
+    final Future<void> op3 = queue.run<void>(() {
+      unawaited(
+        queue.run<void>(() {
+          return Future<String>.value(
+            'Bye for good.',
+          ).then(pushResult).then((_) => op4.complete());
+        }),
+      );
+
+      return Future<String>.value('Welcome back.').then(pushResult);
+    });
+
+    await Future.wait(<Future<void>>[op1, op2, op3]);
+    expect(results[0], 'Hello world!');
+    expect(results[1], 'Bye bye.');
+    expect(results[2], 'Welcome back.');
+    await op4.future;
+    expect(results[3], 'Bye for good.');
+  });
+
+  // PORTING NOTE: the JS AsyncQueue enters a failed state on any error of an
+  // operation, because every JS operation handles its expected errors itself.
+  // Client operations of the port still let expected errors (a persistence
+  // error of a cache read, the error of a failed initialization, the
+  // non-recoverable error of a retryable operation) reach the queue and their
+  // caller, so the queue keeps going after a failure.
   test(
     'handles failures',
     skip:
-        'SerialQueue keeps running operations after one fails (see "a '
-        'failing operation does not block the ones behind it"); the JS '
-        'AsyncQueue enters a failed state and rejects every later operation',
+        'Expected errors of client operations still reach SerialQueue (see '
+        'the PORTING NOTE above); the JS AsyncQueue enters a failed state and '
+        'rejects every later operation',
     () {},
   );
 }

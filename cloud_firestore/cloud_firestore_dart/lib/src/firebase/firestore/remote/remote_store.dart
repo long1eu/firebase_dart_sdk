@@ -61,10 +61,6 @@ class RemoteStore implements TargetMetadataProvider {
        _connectivityDetector = connectivityDetector,
        _listenTargets = <int, QueryData>{},
        _writePipeline = Queue<MutationBatch>(),
-       _onlineStateTracker = OnlineStateTracker(
-         scheduler,
-         _remoteStoreCallback.handleOnlineStateChange,
-       ),
        _watchStream = _datastore.watchStream,
        _writeStream = _datastore.writeStream {
     _watchStreamSub = _watchStream.listen(_watchEvents);
@@ -195,7 +191,12 @@ class RemoteStore implements TargetMetadataProvider {
     return remoteTargetId;
   }
 
-  final OnlineStateTracker _onlineStateTracker;
+  /// The timer of the tracker runs its work on [_queue], like the other events (the JS `enqueueAfterDelay`).
+  late final OnlineStateTracker _onlineStateTracker = OnlineStateTracker(
+    _scheduler,
+    _remoteStoreCallback.handleOnlineStateChange,
+    runOnQueue: _queue.run,
+  );
   final BehaviorSubject<bool> _onNetworkConnected;
   final WatchStream _watchStream;
   final WriteStream _writeStream;
@@ -225,7 +226,10 @@ class RemoteStore implements TargetMetadataProvider {
   final Queue<MutationBatch> _writePipeline;
 
   /// Re-enables the network. Only to be called as the counterpart to [disableNetwork].
-  Future<void> enableNetwork() => _queue.run<void>(_enableNetwork);
+  ///
+  /// Like the other methods that [SyncEngine] and the client call, it runs on the queue already and does not queue
+  /// itself (the JS `remoteStoreEnableNetwork`).
+  Future<void> enableNetwork() => _enableNetwork();
 
   Future<void> _enableNetwork() async {
     _networkEnabled = true;
@@ -243,7 +247,7 @@ class RemoteStore implements TargetMetadataProvider {
       }
 
       // This will start the write stream if necessary.
-      await fillWritePipeline();
+      await _fillWritePipeline();
     }
   }
 
@@ -260,7 +264,7 @@ class RemoteStore implements TargetMetadataProvider {
   /// primary from the state the clients share. Clients do not share state yet, so a secondary reports
   /// [OnlineState.offline] as with a disabled network: its listeners and gets are served from the cache instead of
   /// waiting for a connection that it does not open.
-  Future<void> applyPrimaryState(bool isPrimary) => _queue.run<void>(() async {
+  Future<void> applyPrimaryState(bool isPrimary) async {
     if (_isPrimary == isPrimary) {
       return;
     }
@@ -273,11 +277,11 @@ class RemoteStore implements TargetMetadataProvider {
         await _onlineStateTracker.updateState(OnlineState.offline);
       }
     }
-  });
+  }
 
   /// Temporarily disables the network. The network can be re-enabled using
   /// [enableNetwork].
-  Future<void> disableNetwork() => _queue.run<void>(_disableNetwork);
+  Future<void> disableNetwork() => _disableNetwork();
 
   Future<void> _disableNetwork() async {
     _networkEnabled = false;
@@ -351,7 +355,7 @@ class RemoteStore implements TargetMetadataProvider {
   /// `remoteStoreHandleCredentialChange`). When it fails, the network stays offline; run the change through
   /// [enqueueRetryable] so that it is retried.
   Future<void> handleCredentialChange(Future<void> Function() switchUser) =>
-      _queue.run<void>(() => _handleCredentialChange(switchUser));
+      _handleCredentialChange(switchUser);
 
   Future<void> _handleCredentialChange(
     Future<void> Function() switchUser,
@@ -382,9 +386,9 @@ class RemoteStore implements TargetMetadataProvider {
     await _startNetworkIfPossible();
   }
 
-  /// Runs [operation] now, or after the retryable operations that are still waiting for the persistence, and retries
-  /// it with a backoff while it fails because the persistence is not available (the JS `enqueueRetryable`). Completes
-  /// after the first attempt.
+  /// Runs [operation] after the operations on the queue, and after the retryable operations that are still waiting for
+  /// the persistence, and retries it with a backoff while it fails because the persistence is not available (the JS
+  /// `enqueueRetryable`). Completes after the first attempt; code that runs on the queue must not wait for it.
   Future<void> enqueueRetryable(Future<void> Function() operation) =>
       _retryableOperations.enqueue(operation);
 
@@ -413,16 +417,18 @@ class RemoteStore implements TargetMetadataProvider {
 
     final Future<void> Function() probe =
         operation ?? _localStore.readLastRemoteSnapshotVersion;
-    // Probe the persistence periodically and re-enable the network. The first attempt runs right away, unless the last
-    // recovery was not confirmed.
-    await _retryableOperations
-        .enqueueRecovery(() async {
-          Log.d('RemoteStore', 'Retrying the persistence');
-          await probe();
-          _persistenceFailed = false;
-          await _startNetworkIfPossible();
-        })
-        .catchError(_reportError);
+    // Probe the persistence periodically and re-enable the network. The first attempt runs after the running operation,
+    // unless the last recovery was not confirmed. This runs on the queue: as in JS, it does not wait for the probe.
+    unawaited(
+      _retryableOperations
+          .enqueueRecovery(() async {
+            Log.d('RemoteStore', 'Retrying the persistence');
+            await probe();
+            _persistenceFailed = false;
+            await _startNetworkIfPossible();
+          })
+          .catchError(_reportError),
+    );
   }
 
   /// Runs [operation]; when it fails because the persistence is not available, takes the network offline until a
@@ -439,16 +445,6 @@ class RemoteStore implements TargetMetadataProvider {
     } catch (error, stackTrace) {
       await _disableNetworkUntilRecovery(error, stackTrace, storing);
     }
-  }
-
-  /// Re-enables the network, and forces the state to ONLINE. Without this, the
-  /// state will be [OnlineState.unknown]. If the [OnlineStateTracker] updates
-  /// the state from [OnlineState.unknown] to [OnlineState.unknown], then it
-  /// doesn't trigger the callback.
-  @visibleForTesting
-  void forceEnableNetwork() {
-    enableNetwork();
-    _onlineStateTracker.updateState(OnlineState.online);
   }
 
   Future<void> _restartNetwork() async {
@@ -941,7 +937,7 @@ class RemoteStore implements TargetMetadataProvider {
   /// [SyncEngine] whenever there are new mutations to process.
   ///
   /// Starts the write stream if necessary.
-  Future<void> fillWritePipeline() => _queue.run<void>(_fillWritePipeline);
+  Future<void> fillWritePipeline() => _fillWritePipeline();
 
   Future<void> _fillWritePipeline() async {
     int lastBatchIdRetrieved = _writePipeline.isEmpty

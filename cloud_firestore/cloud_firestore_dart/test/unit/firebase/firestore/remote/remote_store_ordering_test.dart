@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:cloud_firestore_dart/src/database_collection/database_collection.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/auth/user.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/online_state.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/core/serial_queue.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/local_store.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/memory/memory_persistence.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/query_data.dart';
@@ -112,19 +113,22 @@ void main() {
     await persistence.start();
     final LocalStore localStore = LocalStore(persistence, User.unauthenticated);
     await localStore.start();
+    final SerialQueue queue = SerialQueue();
     final RemoteStore remoteStore = RemoteStore(
-        _SlowCallback(), localStore, datastore, connected, scheduler);
-    await remoteStore.start();
+        _SlowCallback(), localStore, datastore, connected, scheduler,
+        queue: queue);
+    await queue.run<void>(remoteStore.start);
 
     await localStore.writeLocally(<Mutation>[
       setMutation('foo/bar', map(<String>['a', 'b']))
     ]);
 
-    // The sync engine and the write stream handlers can both ask for a refill at the same time.
+    // The sync engine and the write stream handlers can both ask for a refill at the same time. As in JS, they ask
+    // from the queue.
     await Future.wait(<Future<void>>[
-      remoteStore.fillWritePipeline(),
-      remoteStore.fillWritePipeline(),
-      remoteStore.fillWritePipeline(),
+      queue.run<void>(remoteStore.fillWritePipeline),
+      queue.run<void>(remoteStore.fillWritePipeline),
+      queue.run<void>(remoteStore.fillWritePipeline),
     ]);
     await Future<void>.delayed(const Duration(milliseconds: 50));
 

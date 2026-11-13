@@ -25,10 +25,14 @@ typedef OnlineStateCallback = Future<void> Function(OnlineState onlineState);
 /// [OnlineState.offline], and the client will behave as if it is offline (get() calls will return
 /// cached data, etc.).
 class OnlineStateTracker {
-  OnlineStateTracker(this._scheduler, this._onlineStateCallback)
-    : _state = OnlineState.unknown,
-      _watchStreamFailures = 0,
-      _shouldWarnClientIsOffline = false;
+  OnlineStateTracker(
+    this._scheduler,
+    this._onlineStateCallback, {
+    Future<void> Function(Future<void> Function() operation)? runOnQueue,
+  }) : _runOnQueue = runOnQueue ?? _runNow,
+       _state = OnlineState.unknown,
+       _watchStreamFailures = 0,
+       _shouldWarnClientIsOffline = false;
 
   /// The current OnlineState.
   OnlineState _state;
@@ -50,6 +54,11 @@ class OnlineStateTracker {
   final OnlineStateCallback _onlineStateCallback;
   final TaskScheduler _scheduler;
 
+  /// Runs the work of [_onlineStateTimer] on the queue of the [RemoteStore] (the JS `enqueueAfterDelay`).
+  final Future<void> Function(Future<void> Function() operation) _runOnQueue;
+
+  static Future<void> _runNow(Future<void> Function() operation) => operation();
+
   /// Called by [RemoteStore] when a watch stream is started (including on each
   /// backoff attempt).
   ///
@@ -64,10 +73,15 @@ class OnlineStateTracker {
         'onlineStateTimer shouldn\'t be started yet',
       );
 
-      _onlineStateTimer = _scheduler.add(
+      late final TimerTask timer;
+      timer = _onlineStateTimer = _scheduler.add(
         TaskId.onlineStateTimeout,
         const Duration(milliseconds: _onlineStateTimeoutMs),
-        () async {
+        () => _runOnQueue(() async {
+          // Canceled while it waited for its turn on the queue.
+          if (!identical(_onlineStateTimer, timer)) {
+            return;
+          }
           _onlineStateTimer = null;
           hardAssert(
             _state == OnlineState.unknown,
@@ -80,7 +94,7 @@ class OnlineStateTracker {
 
           // NOTE: [handleWatchStreamFailure] will continue to increment [watchStreamFailures] even
           // though we are already marked [OnlineState.offline] but this is non-harmful.
-        },
+        }),
       );
     }
   }

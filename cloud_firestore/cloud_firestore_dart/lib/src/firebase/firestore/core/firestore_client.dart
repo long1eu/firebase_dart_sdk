@@ -192,15 +192,14 @@ class FirestoreClient implements RemoteStoreCallback {
         hardAssert(!firstUser.isCompleted, 'Already fulfilled first user task');
         firstUser.complete(user);
       } else {
-        // Wait for the initialization outside of the queue: the initialization itself runs on the queue.
+        // Wait for the initialization outside of the queue: the initialization itself runs on the queue. The change
+        // is a retryable operation that queues itself (as the JS credential providers call `enqueueRetryable`).
         initDone.future.then<void>((_) {
-          client._enqueue<void>(() async {
-            if (client._isShutdown) {
-              return;
-            }
-            Log.d(logTag, 'Credential changed. Current user: ${user.uid}');
-            await client.syncEngine.handleCredentialChange(user);
-          });
+          if (client._isShutdown) {
+            return;
+          }
+          Log.d(logTag, 'Credential changed. Current user: ${user.uid}');
+          client.syncEngine.handleCredentialChange(user);
         });
       }
     });
@@ -705,14 +704,10 @@ class FirestoreClient implements RemoteStoreCallback {
 
     // Called right away with the current state; a lone client is always primary, and nothing changes then.
     persistence.setPrimaryStateListener((bool isPrimary) {
-      // Called inside a transaction of the persistence: the work waits for the task that is running to finish. A
+      // Called inside a transaction of the persistence: the work is queued behind the task that is running. A
       // retryable operation, as in JS: it is retried while the persistence fails.
-      _queue
-          .runLater<void>(
-            () => remoteStore.enqueueRetryable(
-              () => _applyPrimaryState(isPrimary),
-            ),
-          )
+      remoteStore
+          .enqueueRetryable(() => _applyPrimaryState(isPrimary))
           .catchError((Object error) {
             Log.w(
               logTag,
@@ -766,36 +761,28 @@ class FirestoreClient implements RemoteStoreCallback {
   static const String terminatedMessage =
       'The client has already been terminated.';
 
-  @override
-  Future<void> handleRemoteEvent(RemoteEvent remoteEvent) {
-    return _enqueue<void>(() => syncEngine.handleRemoteEvent(remoteEvent));
-  }
+  // The callbacks of the remote store run on the queue already (they are the JS `remoteSyncer`): they call the sync
+  // engine directly.
 
   @override
-  Future<void> handleRejectedListen(int targetId, GrpcError error) {
-    return _enqueue<void>(
-      () => syncEngine.handleRejectedListen(targetId, error),
-    );
-  }
+  Future<void> handleRemoteEvent(RemoteEvent remoteEvent) =>
+      syncEngine.handleRemoteEvent(remoteEvent);
 
   @override
-  Future<void> handleSuccessfulWrite(MutationBatchResult mutationBatchResult) {
-    return _enqueue<void>(
-      () => syncEngine.handleSuccessfulWrite(mutationBatchResult),
-    );
-  }
+  Future<void> handleRejectedListen(int targetId, GrpcError error) =>
+      syncEngine.handleRejectedListen(targetId, error);
 
   @override
-  Future<void> handleRejectedWrite(int batchId, GrpcError error) {
-    return _enqueue<void>(() => syncEngine.handleRejectedWrite(batchId, error));
-  }
+  Future<void> handleSuccessfulWrite(MutationBatchResult mutationBatchResult) =>
+      syncEngine.handleSuccessfulWrite(mutationBatchResult);
 
   @override
-  Future<void> handleOnlineStateChange(OnlineState onlineState) {
-    return _enqueue<void>(
-      () => syncEngine.handleOnlineStateChange(onlineState),
-    );
-  }
+  Future<void> handleRejectedWrite(int batchId, GrpcError error) =>
+      syncEngine.handleRejectedWrite(batchId, error);
+
+  @override
+  Future<void> handleOnlineStateChange(OnlineState onlineState) =>
+      syncEngine.handleOnlineStateChange(onlineState);
 
   @override
   ImmutableSortedSet<DocumentKey> Function(int targetId)

@@ -35,6 +35,20 @@ class RetryableOperationQueue {
   /// place.
   bool _running = false;
 
+  /// Marks the zone the operation at the head runs in, to tell the operations it enqueues (directly or through what it
+  /// calls) from the ones that other code enqueues meanwhile.
+  static final Object _headZoneKey = Object();
+  Object? _headToken;
+
+  /// How many operations the running head enqueued.
+  int _addedByHead = 0;
+
+  /// Whether the operation at the head is running and the code calling this belongs to it.
+  bool get _calledByRunningHead =>
+      _running &&
+      _headToken != null &&
+      identical(Zone.current[_headZoneKey], _headToken);
+
   /// A recovery of the persistence started ([enqueueRecovery]) and was not confirmed yet ([confirmRecovery]): its probe
   /// may have succeeded, but nothing showed yet that the persistence stores data again.
   bool _unconfirmedRecovery = false;
@@ -42,15 +56,21 @@ class RetryableOperationQueue {
   /// Whether an operation is waiting to be retried.
   bool get hasPendingOperations => _operations.isNotEmpty;
 
-  /// Adds [operation] to the queue and tries the operation at its head right away (which is [operation] when nothing
-  /// is pending). Completes after that attempt, also when it failed with a recoverable error (the operation is then
-  /// retried later).
+  /// Adds [operation] to the queue and tries the operation at its head (which is [operation] when nothing is pending)
+  /// after the operations already on [queue]. Completes after that attempt, also when it failed with a recoverable
+  /// error (the operation is then retried later). Code that runs on [queue] must not wait for it.
   ///
-  /// Called while the operation at the head runs (by that operation), it only adds [operation], which runs after it.
+  /// Requested while the operation at the head runs (by that operation), it only adds [operation], which runs after
+  /// it.
   Future<void> enqueue(Future<void> Function() operation) {
+    // Added right away, as in JS: the operation at the head sees that it enqueued another one (see [_retryNext]).
+    _operations.add(operation);
+    final bool addedByRunning = _calledByRunningHead;
+    if (addedByRunning) {
+      _addedByHead++;
+    }
     return _queue.run<void>(() async {
-      _operations.add(operation);
-      if (_running) {
+      if (addedByRunning || _running) {
         return;
       }
       await _retryNext();
@@ -64,14 +84,19 @@ class RetryableOperationQueue {
   /// the persistence reads but does not write (a full disk), and the network would otherwise come back, fail to store
   /// what it receives and go offline again in a loop without delay.
   Future<void> enqueueRecovery(Future<void> Function() probe) {
+    final bool repeated = _unconfirmedRecovery;
+    _unconfirmedRecovery = true;
+    _operations.add(probe);
+    final bool addedByRunning = _calledByRunningHead;
+    if (addedByRunning) {
+      _addedByHead++;
+    }
+    final bool alone = _operations.length == 1;
     return _queue.run<void>(() async {
-      final bool repeated = _unconfirmedRecovery;
-      _unconfirmedRecovery = true;
-      _operations.add(probe);
-      if (_running) {
+      if (addedByRunning || _running) {
         return;
       }
-      if (repeated && _operations.length == 1) {
+      if (repeated && alone) {
         _scheduleRetry();
         return;
       }
@@ -104,15 +129,18 @@ class RetryableOperationQueue {
     }
 
     final Future<void> Function() operation = _operations.first;
-    final int pending = _operations.length;
+    _addedByHead = 0;
     _running = true;
     try {
-      await operation();
+      final Object token = _headToken = Object();
+      await Zone.current
+          .fork(zoneValues: <Object, Object>{_headZoneKey: token})
+          .run(operation);
       _remove(operation);
       // An operation that enqueued another one ran into the persistence again (RemoteStore probes the persistence
       // with a read, restarts the network, and the next write fails): the backoff keeps growing, otherwise a
       // persistence that reads but does not write would be retried in a loop without delay.
-      if (_operations.length < pending && !_unconfirmedRecovery) {
+      if (_addedByHead == 0 && !_unconfirmedRecovery) {
         _backoff.reset();
       }
     } catch (error) {
