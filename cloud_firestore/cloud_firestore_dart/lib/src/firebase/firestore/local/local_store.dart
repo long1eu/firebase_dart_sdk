@@ -281,18 +281,33 @@ class LocalStore implements BundleCallback {
     User user,
   ) async {
     // Swap out the mutation queue, grabbing the pending mutation batches before and after.
-    final List<MutationBatch> oldBatches = await _mutationQueue
-        .getAllMutationBatches();
+    //
+    // The components of the new user are started before any of them replaces the current one: when the persistence
+    // fails on the way (see isRecoverablePersistenceError), the local store still belongs to the previous user and the
+    // whole change can be retried.
+    final List<MutationBatch> oldBatches = await _persistence
+        .runTransactionAndReturn<List<MutationBatch>>(
+          'Handle user change',
+          _mutationQueue.getAllMutationBatches,
+        );
 
-    _mutationQueue = _persistence.getMutationQueue(user);
+    final MutationQueue mutationQueue = _persistence.getMutationQueue(user);
+    final IndexManager indexManager = _persistence.getIndexManager(user);
+    await _persistence.runTransaction('Start IndexManager', indexManager.start);
+    await _persistence.runTransaction(
+      'Start MutationQueue',
+      mutationQueue.start,
+    );
+    final List<MutationBatch> newBatches = await _persistence
+        .runTransactionAndReturn<List<MutationBatch>>(
+          'Handle user change',
+          mutationQueue.getAllMutationBatches,
+        );
+
+    _mutationQueue = mutationQueue;
     _documentOverlayCache = _persistence.getDocumentOverlayCache(user);
-    _indexManager = _persistence.getIndexManager(user);
-    await startIndexManager();
+    _indexManager = indexManager;
     _remoteDocuments.indexManager = _indexManager;
-    await startMutationQueue();
-
-    final List<MutationBatch> newBatches = await _mutationQueue
-        .getAllMutationBatches();
 
     // Recreate our LocalDocumentsView using the new MutationQueue.
     _localDocuments = LocalDocumentsView(
@@ -517,12 +532,40 @@ class LocalStore implements BundleCallback {
     return _queryCache.lastRemoteSnapshotVersion;
   }
 
+  /// Reads the last consistent snapshot processed in a transaction of its own (the JS
+  /// `localStoreGetLastRemoteSnapshotVersion`). The [RemoteStore] uses it for every global snapshot of Watch and to
+  /// probe whether a failed persistence works again.
+  Future<SnapshotVersion> readLastRemoteSnapshotVersion() {
+    return _persistence.runTransactionAndReturn<SnapshotVersion>(
+      'Get last remote snapshot version',
+      () async => _queryCache.lastRemoteSnapshotVersion,
+    );
+  }
+
   /// Updates the 'ground-state' (remote) documents. We assume that the remote event reflects any write batches that
   /// have been acknowledged or rejected (i.e. we do not re-apply local mutations to updates from this event).
   ///
   /// [LocalDocuments] are re-calculated if there are remaining mutations in the queue.
   Future<ImmutableSortedMap<DocumentKey, MaybeDocument>> applyRemoteEvent(
     RemoteEvent remoteEvent,
+  ) async {
+    // The new target data replaces the in-memory one only once the transaction committed (as JS): a transaction that
+    // fails leaves the resume tokens of the targets where they were, so the changes are asked for again.
+    final Map<int, QueryData> updatedTargets = <int, QueryData>{};
+    final ImmutableSortedMap<DocumentKey, MaybeDocument> changes =
+        await _applyRemoteEvent(remoteEvent, updatedTargets);
+    for (final MapEntry<int, QueryData> entry in updatedTargets.entries) {
+      // The target may have been released meanwhile.
+      if (_targetIds.containsKey(entry.key)) {
+        _targetIds[entry.key] = entry.value;
+      }
+    }
+    return changes;
+  }
+
+  Future<ImmutableSortedMap<DocumentKey, MaybeDocument>> _applyRemoteEvent(
+    RemoteEvent remoteEvent,
+    Map<int, QueryData> updatedTargets,
   ) {
     // TODO(long1eu): Call queryEngine.handleDocumentChange() appropriately.
     return _persistence.runPrimaryTransaction<
@@ -573,7 +616,7 @@ class LocalStore implements BundleCallback {
           );
         }
 
-        _targetIds[targetId] = newQueryData;
+        updatedTargets[targetId] = newQueryData;
 
         // Update the query data if there are target changes (or if sufficient time has passed since the last update).
         // A cleared resume token is always persisted, otherwise the stale token would be used again after a restart.
@@ -708,6 +751,29 @@ class LocalStore implements BundleCallback {
   Future<void> notifyLocalViewChanges(
     List<LocalViewChanges> viewChanges,
   ) async {
+    try {
+      await _notifyLocalViewChanges(viewChanges);
+    } catch (e) {
+      if (!isRecoverablePersistenceError(e)) {
+        rethrow;
+      }
+      // As JS: the sequence numbers of the documents of these views were not advanced, which may let the garbage
+      // collector remove them earlier than it would have, but does not make the data inconsistent. The last limbo free
+      // snapshot versions are still advanced in memory.
+      Log.d('LocalStore', 'Failed to update sequence numbers: $e');
+      for (final LocalViewChanges viewChange in viewChanges) {
+        final QueryData? queryData = _targetIds[viewChange.targetId];
+        if (!viewChange.fromCache && queryData != null) {
+          _targetIds[viewChange.targetId] = queryData
+              .withLastLimboFreeSnapshotVersion(queryData.snapshotVersion);
+        }
+      }
+    }
+  }
+
+  Future<void> _notifyLocalViewChanges(
+    List<LocalViewChanges> viewChanges,
+  ) async {
     await _persistence.runTransaction('notifyLocalViewChanges', () async {
       for (LocalViewChanges viewChange in viewChanges) {
         if (!_targetIds.containsKey(viewChange.targetId)) {
@@ -770,37 +836,27 @@ class LocalStore implements BundleCallback {
   Future<QueryData> allocateTarget(Target target) async {
     late int targetId;
     late QueryData cached;
-    final QueryData? existing = await _queryCache.getQueryData(target);
+    // One transaction, as in JS, so that a failing persistence fails the listen whether or not the target is cached.
+    await _persistence.runTransaction('Allocate target', () async {
+      // This client, or another client of the same cache, may have listened to the target before.
+      final QueryData? existing = await _queryCache.getQueryData(target);
+      if (existing != null) {
+        // TODO(long1eu): freshen last accessed date?
+        cached = existing;
+        targetId = cached.targetId;
+        return;
+      }
+      _targetIdGenerator.advancePast(_queryCache.highestTargetId);
+      targetId = _targetIdGenerator.nextId;
+      cached = QueryData(
+        target,
+        targetId,
+        _persistence.referenceDelegate.currentSequenceNumber,
+        QueryPurpose.listen,
+      );
 
-    if (existing != null) {
-      // This target has been listened to previously, so reuse the previous targetId.
-      // TODO(long1eu): freshen last accessed date?
-      cached = existing;
-      targetId = cached.targetId;
-    } else {
-      await _persistence.runTransaction('Allocate target', () async {
-        // Another client of the same cache may have allocated targets, this one included, since this client last
-        // looked.
-        final QueryData? allocatedMeanwhile = await _queryCache.getQueryData(
-          target,
-        );
-        if (allocatedMeanwhile != null) {
-          cached = allocatedMeanwhile;
-          targetId = cached.targetId;
-          return;
-        }
-        _targetIdGenerator.advancePast(_queryCache.highestTargetId);
-        targetId = _targetIdGenerator.nextId;
-        cached = QueryData(
-          target,
-          targetId,
-          _persistence.referenceDelegate.currentSequenceNumber,
-          QueryPurpose.listen,
-        );
-
-        await _queryCache.addQueryData(cached);
-      });
-    }
+      await _queryCache.addQueryData(cached);
+    });
 
     // Several queries may map to the same target (e.g. a limit query and a mirroring limitToLast query), in which case
     // the target is already active and its in-memory data must not be replaced.
@@ -832,9 +888,38 @@ class LocalStore implements BundleCallback {
   /// [keepPersistedTargetData] (a client that is not primary), or when this client turns out not to be primary, the
   /// target is only released in memory: the target data was recorded while the target was active, so the loss is a
   /// slightly older sequence number for the LRU garbage collector.
+  ///
+  /// When the persistence fails (see [isRecoverablePersistenceError]) the target is released in memory all the same (as
+  /// JS): the release only records the final state of the target, which has been recorded periodically while the
+  /// target was active.
   Future<void> releaseTarget(
     int targetId, {
     bool keepPersistedTargetData = false,
+  }) async {
+    final QueryData? cachedQueryData = _targetIds[targetId];
+    hardAssertLazy(
+      cachedQueryData != null,
+      () => 'Tried to release nonexistent target: $targetId',
+    );
+    try {
+      await _releaseTargetInTransaction(
+        targetId,
+        keepPersistedTargetData: keepPersistedTargetData,
+      );
+    } catch (e) {
+      if (!isRecoverablePersistenceError(e)) {
+        rethrow;
+      }
+      Log.d(_tag, 'Failed to update sequence numbers for target $targetId: $e');
+      _localViewReferences.removeReferencesForId(targetId);
+      _targetIds.remove(targetId);
+      _targetIdByTarget.remove(cachedQueryData!.target);
+    }
+  }
+
+  Future<void> _releaseTargetInTransaction(
+    int targetId, {
+    required bool keepPersistedTargetData,
   }) async {
     if (!keepPersistedTargetData) {
       try {

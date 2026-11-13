@@ -9,10 +9,13 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/core/query.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/query_stream.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/sync_engine.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/view_snapshot.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/firestore_error.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/listen_source.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/local/persistance/persistence.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/assert.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/grpc_status.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/util.dart';
+import 'package:firebase_app_dart/internal.dart';
 
 /// EventManager is responsible for mapping queries to query event listeners.
 /// It handles 'fan-out.' (Identical queries will re-use the same watch on the
@@ -35,7 +38,8 @@ class EventManager implements SyncEngineCallback {
   /// to a single listen in the [SyncEngine] and will perform a listen if it's
   /// the first [QueryStream] added for a query.
   ///
-  /// Returns the targetId of the listen call in the [SyncEngine].
+  /// Returns the targetId of the listen call in the [SyncEngine], or 0 when the listen could not be stored (see
+  /// [isRecoverablePersistenceError]): the listener then gets an `unavailable` error, as in JS.
   Future<int> addQueryListener(QueryStream queryListener) async {
     final Query query = queryListener.query;
 
@@ -83,13 +87,23 @@ class EventManager implements SyncEngineCallback {
       } else if (listenRemotely) {
         await _syncEngine.listenToRemoteStore(query);
       }
-    } catch (_) {
+    } catch (e) {
       // Do not leave a half registered listener behind: later listeners would never trigger a listen.
       queryInfo.listeners.remove(queryListener);
       if (listenLocally && identical(_queries[query], queryInfo)) {
         _queries.remove(query);
       }
-      rethrow;
+      if (!isRecoverablePersistenceError(e)) {
+        rethrow;
+      }
+      Log.w('EventManager', 'Initialization of query $query failed: $e');
+      queryListener.onError(
+        FirestoreError(
+          'Initialization of query $query failed: $e',
+          FirestoreErrorCode.unavailable,
+        ),
+      );
+      return 0;
     }
     return queryInfo.targetId;
   }

@@ -99,7 +99,8 @@ export 'src/firebase/firestore/util/database.dart'
         OnCreate,
         OnOpen,
         OnVersionChange,
-        OpenDatabase;
+        OpenDatabase,
+        TransientDatabaseException;
 export 'src/firebase/firestore/vector_query.dart' show VectorQuery;
 export 'src/firebase/firestore/vector_query_snapshot.dart'
     hide VectorQuerySnapshotInternal;

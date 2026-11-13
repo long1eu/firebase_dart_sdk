@@ -7,6 +7,7 @@ import 'dart:async';
 import 'package:cloud_firestore_dart/cloud_firestore_dart.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/listent_sequence.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/lru_delegate.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/local/persistance/persistence.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/query_data.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/timer_task.dart';
 import 'package:collection/collection.dart';
@@ -291,8 +292,19 @@ class LruGarbageCollectorScheduler {
       try {
         await _localStore.collectGarbage(_garbageCollector);
       } catch (e) {
-        // A failed run (e.g. a locked or closed database) must not end the scheduling for the whole process.
-        Log.w('LruGarbageCollectorScheduler', 'Garbage collection failed: $e');
+        // A failed run (e.g. a locked or closed database) must not end the scheduling for the whole process. A
+        // persistence that is not available right now is expected to work again (JS logs it at debug level).
+        if (isRecoverablePersistenceError(e)) {
+          Log.d(
+            'LruGarbageCollectorScheduler',
+            'Ignoring a retryable error during garbage collection: $e',
+          );
+        } else {
+          Log.w(
+            'LruGarbageCollectorScheduler',
+            'Garbage collection failed: $e',
+          );
+        }
       }
       _hasRun = true;
       if (!_stopped && generation == _generation) {

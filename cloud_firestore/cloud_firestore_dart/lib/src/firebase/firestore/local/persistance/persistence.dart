@@ -15,6 +15,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/local/persistance/ov
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/persistance/query_cache.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/persistance/reference_delegate.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/persistance/remote_document_cache.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/util/database.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/types.dart';
 
 import 'index_manager.dart';
@@ -69,7 +70,12 @@ bool isPrimaryLeaseLoss(Object error) =>
 /// writes in order to avoid relying on being able to read back uncommitted
 /// writes.
 abstract class Persistence {
-  const Persistence();
+  Persistence();
+
+  /// Called with the action of every transaction before the transaction starts. When it throws, the transaction fails
+  /// with that error and does not run. Tests use it to simulate a failing database (the `failDatabase` spec step);
+  /// implementations call it first thing in [runTransactionAndReturn].
+  void Function(String action)? beforeTransaction;
 
   /// Starts persistent storage, opening the database or similar.
   Future<void> start();
@@ -166,3 +172,9 @@ abstract class Persistence {
   /// Empty for a cache that only one client can use.
   Future<List<String>> getActiveClients() async => const <String>[];
 }
+
+/// Whether [error], thrown by a persistence transaction, means that the transaction did not take effect and may work
+/// when it is tried again later (the JS SDK's `isIndexedDbTransactionError`). The recovery paths retry such operations
+/// with a backoff and keep the network offline meanwhile; every other error is fatal for the operation.
+bool isRecoverablePersistenceError(Object? error) =>
+    error is TransientDatabaseException;

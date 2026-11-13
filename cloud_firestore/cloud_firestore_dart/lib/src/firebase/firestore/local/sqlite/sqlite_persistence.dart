@@ -665,6 +665,7 @@ class SQLitePersistence extends Persistence {
     Transaction<T> operation, {
     required bool primary,
   }) async {
+    beforeTransaction?.call(action);
     await _lock();
     Log.d(tag, 'Starting transaction: $action');
 

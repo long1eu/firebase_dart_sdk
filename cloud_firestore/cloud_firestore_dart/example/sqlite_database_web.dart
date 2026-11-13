@@ -35,6 +35,13 @@
 //    transaction, and at most one that was not acknowledged yet. Not covered:
 //    a crash of the browser itself or a power cut, where IndexedDB may lose
 //    its last transactions.
+//  * When IndexedDB fails. A transaction is committed in memory before it is
+//    copied to IndexedDB. When the wait for the copy fails, the next
+//    transaction fails with a [TransientDatabaseException] until a wait
+//    succeeds; the client goes offline meanwhile and retries (see
+//    `SqliteWebDatabase._stored`). With sqlite3 2.9.4 only a closed IndexedDB
+//    file system makes the wait fail: the file system does not report a copy
+//    that failed.
 //  * Memory and speed. The whole database is read into memory when it is
 //    opened and stays there. Measured in Chrome with documents of about
 //    1 KB: 10,000 cached documents are a 17 MB database that opens in 0.1 s
@@ -393,14 +400,54 @@ class SqliteWebDatabase implements ClearableDatabase {
   /// Completes when everything is stored and the lock is released.
   Future<void>? _closed;
 
+  /// The error of the last wait for IndexedDB that failed, until a wait
+  /// succeeds.
+  Object? _unstored;
+
   /// Waits until what the statement changed is stored in IndexedDB, unless a
   /// transaction is open: its end is what makes the changes durable.
-  Future<void> _stored() {
-    return _database.autocommit ? _fileSystem.flush() : Future<void>.value();
+  ///
+  /// The changes are already committed in memory when this waits, so a
+  /// failure here is not reported for this statement (Firestore would treat
+  /// the transaction as not applied and run it again). It is kept, and the
+  /// next statement that starts outside a transaction (in practice the
+  /// `BEGIN` of the next transaction) waits again and fails with a
+  /// [TransientDatabaseException] while IndexedDB still fails: the client
+  /// then goes offline and retries until IndexedDB works. A tab closed in the
+  /// meantime loses the transactions IndexedDB did not store.
+  Future<void> _stored() async {
+    if (!_database.autocommit) {
+      return;
+    }
+    try {
+      await _fileSystem.flush();
+      _unstored = null;
+    } catch (e) {
+      _unstored = e;
+    }
+  }
+
+  /// Fails with a [TransientDatabaseException] while what was committed
+  /// before can not be stored in IndexedDB (see [_stored]).
+  Future<void> _checkStored() async {
+    if (_unstored == null || !_database.autocommit) {
+      return;
+    }
+    try {
+      await _fileSystem.flush();
+      _unstored = null;
+    } catch (e) {
+      _unstored = e;
+      throw TransientDatabaseException(
+        'IndexedDB did not store the last transaction',
+        e,
+      );
+    }
   }
 
   @override
   Future<void> execute(String statement, [List<Object?>? arguments]) async {
+    await _checkStored();
     _database.execute(statement, arguments ?? const <Object?>[]);
     await _stored();
   }
@@ -410,6 +457,7 @@ class SqliteWebDatabase implements ClearableDatabase {
     String statement, [
     List<Object?>? arguments,
   ]) async {
+    await _checkStored();
     final sqlite.ResultSet rows = _database.select(
       statement,
       arguments ?? const <Object?>[],
@@ -422,6 +470,7 @@ class SqliteWebDatabase implements ClearableDatabase {
   /// Runs a DELETE and returns the number of rows it removed.
   @override
   Future<int> delete(String statement, [List<Object?>? arguments]) async {
+    await _checkStored();
     _database.execute(statement, arguments ?? const <Object?>[]);
     final int rows = _database.updatedRows;
     await _stored();

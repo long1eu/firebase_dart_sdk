@@ -33,7 +33,13 @@ class _FakeRemoteStore extends Fake implements RemoteStore {
   Future<void> fillWritePipeline() async {}
 
   @override
-  Future<void> handleCredentialChange() async {}
+  Future<void> handleCredentialChange(
+    Future<void> Function() switchUser,
+  ) => switchUser();
+
+  @override
+  Future<void> enqueueRetryable(Future<void> Function() operation) =>
+      operation();
 }
 
 class _NoopCallback implements SyncEngineCallback {

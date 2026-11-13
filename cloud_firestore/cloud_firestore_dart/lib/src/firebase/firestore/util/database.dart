@@ -83,6 +83,39 @@ abstract class Database {
   void close();
 }
 
+/// Thrown by a [Database] when a statement failed for a reason that may go
+/// away on its own, and nothing of the failed statement (nor of the
+/// transaction it belongs to) was stored: the database was busy or locked, an
+/// I/O error occurred, the disk was full, or the storage behind the database
+/// is not reachable right now.
+///
+/// Firestore treats it as the JS SDK treats a failed IndexedDB transaction:
+/// the listen or write that needed the database fails with
+/// `FirestoreErrorCode.unavailable`, an acknowledgement from the backend is
+/// kept and stored again later, and the client goes offline and tries the
+/// database again with a backoff until it works. Any other error of a
+/// [Database] is fatal for the operation that ran into it.
+///
+/// Throw it only when the transaction did not take effect: Firestore runs the
+/// operation again, and a transaction that was in fact stored would then be
+/// applied twice. The openers in `example/` show which SQLite errors
+/// qualify.
+class TransientDatabaseException implements Exception {
+  /// Creates the exception. [cause] is the error of the SQLite binding, if
+  /// any.
+  TransientDatabaseException(this.message, [this.cause]);
+
+  /// What failed.
+  final String message;
+
+  /// The original error, if any.
+  final Object? cause;
+
+  @override
+  String toString() =>
+      'TransientDatabaseException: $message${cause == null ? '' : ' ($cause)'}';
+}
+
 /// A [Database] that deletes its own storage for `Firestore.clearPersistence`.
 ///
 /// By default `clearPersistence` deletes the file at [Database.path] and

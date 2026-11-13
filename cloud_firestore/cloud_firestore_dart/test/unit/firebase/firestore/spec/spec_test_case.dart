@@ -61,6 +61,7 @@ import 'package:test/test.dart';
 
 import '../../../../util/test_util.dart';
 import '../local/mock/database_mock.dart';
+import '../local/persistence_fault_injector.dart';
 import '../remote/mock_datastore.dart';
 import 'query_event.dart';
 
@@ -639,9 +640,12 @@ class SpecClient implements RemoteStoreCallback {
         .then((_) => _acknowledgedDocs.add(documentKey))
         .catchError((dynamic e) => _rejectedDocs.add(documentKey));
 
-    _getCurrentOutstandingWrites().add(
-      Pair<Mutation, Future<void>>(mutation, writeProcessed),
-    );
+    // A write that can not be stored is rejected locally and never sent (as the JS runner).
+    if (!_isFailing('Locally write mutations')) {
+      _getCurrentOutstandingWrites().add(
+        Pair<Mutation, Future<void>>(mutation, writeProcessed),
+      );
+    }
     log('      Sending this write: $mutation');
 
     await _syncEngine.writeMutations(<Mutation>[mutation], callback);
@@ -896,13 +900,12 @@ class SpecClient implements RemoteStoreCallback {
 
   Future<void> _doWriteAck(Map<String, dynamic> writeAckSpec) async {
     final int _version = writeAckSpec['version'];
+    // keepInQueue: the acknowledgement is not stored (failDatabase) or not seen by this client, the write stays
+    // outstanding (as the JS runner).
     final bool keepInQueue = writeAckSpec['keepInQueue'] ?? false;
-    assert(
-      !keepInQueue,
-      '"keepInQueue=true" is not supported on Android and should only be set in multi-client tests',
-    );
-    final Pair<Mutation, Future<void>> write =
-        _getCurrentOutstandingWrites().removeAt(0);
+    final Pair<Mutation, Future<void>> write = keepInQueue
+        ? _getCurrentOutstandingWrites().first
+        : _getCurrentOutstandingWrites().removeAt(0);
     _validateNextWriteSent(write.first);
 
     final List<FieldValue> transformResults = <FieldValue>[
@@ -962,6 +965,14 @@ class SpecClient implements RemoteStoreCallback {
         break;
       case 'online_state_timeout':
         taskId = TaskId.onlineStateTimeout;
+        break;
+      case 'async_queue_retry':
+        taskId = TaskId.asyncQueueRetry;
+        // As in JS (runAllDelayedOperationsUntil does not require the timer), nothing may be waiting for a retry.
+        if (_queue.getTask(taskId) == null) {
+          await Future<void>.delayed(_delayDuration);
+          return;
+        }
         break;
       case 'client_metadata_refresh':
         throw UnsupportedSpecFeature(
@@ -1037,7 +1048,6 @@ class SpecClient implements RemoteStoreCallback {
   static const Set<String> unsupportedSteps = <String>{
     // Visibility and primary state of a client: needs the primary lease (stage 1) and SyncEngine.applyPrimaryState.
     'applyClientState',
-    'failDatabase',
     'clearPersistence',
   };
 
@@ -1114,6 +1124,34 @@ class SpecClient implements RemoteStoreCallback {
     await _syncEngine.registerPendingWritesTask(task);
   }
 
+  // --- failDatabase / recoverDatabase (persistence failure recovery) ---
+
+  /// Fails the transactions of the persistence of this client by action name (the JS `injectFailures`). Attached at
+  /// the first `failDatabase` step; a restart creates a new persistence, which starts without failures (as in JS).
+  PersistenceFaultInjector? _faultInjector;
+
+  /// The `failDatabase` step: a list of actions makes their transactions fail, `false` (the JS `recoverDatabase`)
+  /// makes them work again.
+  void _doFailDatabase(Object? failActions) {
+    PersistenceFaultInjector? injector = _faultInjector;
+    if (injector == null || !identical(injector.persistence, _localPersistence)) {
+      injector = _faultInjector = PersistenceFaultInjector(_localPersistence);
+    }
+    injector.failActions = failActions is List
+        ? failActions.cast<String>().toList()
+        : <String>[];
+  }
+
+  /// Whether the transactions of [action] fail right now.
+  bool _isFailing(String action) {
+    final PersistenceFaultInjector? injector = _faultInjector;
+    return injector != null &&
+        identical(injector.persistence, _localPersistence) &&
+        injector.failActions.contains(action);
+  }
+
+  // --- end of failDatabase / recoverDatabase ---
+
   Future<void> _doStep(Map<String, dynamic> step) async {
     // The `clientIndex` of the step was used by SpecTestCase to pick this client.
     if (step.containsKey('userListen')) {
@@ -1188,6 +1226,8 @@ class SpecClient implements RemoteStoreCallback {
       // steps address.
       final dynamic index = step['watchUsesTargetIndex'];
       _currentRemoteTargetIndex = index == 'latest' ? null : index as int;
+    } else if (step.containsKey('failDatabase')) {
+      _doFailDatabase(step['failDatabase']);
     } else {
       for (String unsupported in unsupportedSteps) {
         if (step.containsKey(unsupported)) {
@@ -1463,9 +1503,12 @@ class SpecClient implements RemoteStoreCallback {
       _syncEngine.getActiveLimboDocumentResolutions(),
     );
 
-    // Validate that each limbo doc has an expected active target
-    for (MapEntry<DocumentKey, int> limboDoc in actualLimboDocs.entries) {
-      expect(_expectedActiveTargets.containsKey(limboDoc.value), isTrue);
+    // Validate that each limbo doc has an expected active target (as JS, only while the watch stream is open: an
+    // offline client keeps its limbo resolutions without active targets).
+    if (_datastore.isWatchStreamOpen) {
+      for (MapEntry<DocumentKey, int> limboDoc in actualLimboDocs.entries) {
+        expect(_expectedActiveTargets.containsKey(limboDoc.value), isTrue);
+      }
     }
 
     for (DocumentKey expectedLimboDoc in _expectedLimboDocs) {

@@ -190,6 +190,13 @@ Deprecated, still working:
 
 ### Added
 
+- Recovery from a cache that is not available for a while, as in the JS SDK: a `Database` can throw the new
+  `TransientDatabaseException` (the example openers do for SQLite's busy, locked, I/O and full-disk errors, and on the
+  web when IndexedDB fails to store a transaction). A listen or write that can not be stored then fails with
+  `unavailable`; an acknowledgement, watch update or user change that can not be stored takes the client offline and
+  is retried with a backoff until the cache works again. Before, such an error failed the operation that ran into it
+  and could leave the client stuck. Verified with the shared recovery spec tests (simulated failures); not run against
+  a real failing disk.
 - Authentication with ready-made token providers from the new `firebase_auth_providers_dart`
   package of this repository (Firebase Auth user sign-in over REST, service accounts, Application
   Default Credentials); see the README section "Authentication". `test/integration_auth` shows a

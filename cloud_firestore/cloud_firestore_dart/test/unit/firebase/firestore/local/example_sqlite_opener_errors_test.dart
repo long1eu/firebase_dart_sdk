@@ -1,0 +1,55 @@
+// File created by
+// Lung Razvan <long1eu>
+// on 13/11/2026
+
+import 'dart:io';
+
+import 'package:cloud_firestore_dart/cloud_firestore_dart.dart';
+import 'package:sqlite3/sqlite3.dart' as sqlite;
+import 'package:test/test.dart';
+
+import '../../../../../example/sqlite_database.dart';
+
+/// The opener of `example/sqlite_database.dart` reports the SQLite errors that may go away on their own as a
+/// [TransientDatabaseException] (Firestore then goes offline and retries), and every other error as it is.
+void main() {
+  late Directory directory;
+  late Database database;
+  late sqlite.Database other;
+
+  setUp(() async {
+    directory = await Directory.systemTemp.createTemp('example_opener_test');
+    database = await sqliteOpener(directory)('errors', version: 1);
+    await database.execute('CREATE TABLE t (a INTEGER)');
+    other = sqlite.sqlite3.open('${directory.path}/errors.db');
+  });
+
+  tearDown(() async {
+    other.dispose();
+    database.close();
+    await directory.delete(recursive: true);
+  });
+
+  test('a database locked by another connection is transient', () async {
+    other.execute('BEGIN IMMEDIATE');
+    other.execute('INSERT INTO t VALUES (1)');
+
+    await expectLater(
+      database.execute('BEGIN IMMEDIATE'),
+      throwsA(isA<TransientDatabaseException>()),
+    );
+
+    other.execute('COMMIT');
+    // Once the lock is gone, the same statement works.
+    await database.execute('BEGIN IMMEDIATE');
+    await database.execute('COMMIT');
+    expect(await database.query('SELECT a FROM t'), hasLength(1));
+  });
+
+  test('other errors are thrown as they are', () async {
+    await expectLater(
+      database.query('SELECT * FROM missing_table'),
+      throwsA(isA<sqlite.SqliteException>()),
+    );
+  });
+}

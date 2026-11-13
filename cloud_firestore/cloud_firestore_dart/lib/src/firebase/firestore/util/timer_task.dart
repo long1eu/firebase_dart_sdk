@@ -179,6 +179,10 @@ class TaskId implements Comparable<TaskId> {
   /// A timer used to refresh the metadata and the primary lease of a client of a persistent cache.
   static const TaskId clientMetadataRefresh = TaskId._(9);
 
+  /// A timer used to retry operations that failed because the persistence was not available (the JS
+  /// `TimerId.AsyncQueueRetry`), see [RetryableOperationQueue].
+  static const TaskId asyncQueueRetry = TaskId._(10);
+
   @override
   int compareTo(TaskId other) => _i.compareTo(other._i);
 
@@ -209,6 +213,7 @@ class TaskId implements Comparable<TaskId> {
     'retryTransaction',
     'indexBackfill',
     'clientMetadataRefresh',
+    'asyncQueueRetry',
   ];
 
   @override

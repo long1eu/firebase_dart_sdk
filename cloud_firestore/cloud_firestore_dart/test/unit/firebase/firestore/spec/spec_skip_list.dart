@@ -33,9 +33,9 @@ const Map<String, String?> skippedSpecFeatures = <String, String?>{
   // group by group (parity/multi_client_plan.md).
   'multi-client':
       'Needs the primary lease (multi-client stage 1) and SharedClientState with SyncEngine.applyPrimaryState (stage 2).',
-  // Upstream Android skips the tag; the port runs these specs. The single-client ones pass (the bloom filter one and
-  // the three "Fix #8474" limbo ones, after porting the JS fix to WatchChangeAggregator), except those caught by a
-  // more precise entry below: 'fail-database' (the recovery specs).
+  // Upstream Android skips the tag; the port runs these specs. The single-client ones pass (the bloom filter one, the
+  // three "Fix #8474" limbo ones after porting the JS fix to WatchChangeAggregator, the recovery ones after porting
+  // the JS persistence recovery), except one entry of [knownSpecDivergences].
   'no-android': null,
   // Upstream runs them only with RUN_BENCHMARK_TESTS; they pass here and take about 3 s for both persistences.
   'benchmark': null,
@@ -53,10 +53,9 @@ const Map<String, String?> skippedSpecFeatures = <String, String?>{
   'wait-for-pending-writes': null,
   // Landed (Decimal128Value and the other BSON types): enabled.
   'decimal128': null,
-  'fail-database':
-      'Persistence failure recovery (the JS IndexedDbTransactionError handling) is not ported, like Android; see '
-      'docs/ARCHITECTURE.md, "Deliberate deviations from upstream" > Persistence. The runner would also need a '
-      'failDatabase step over a fault-injecting persistence.',
+  // Landed (recovery from a failing persistence: RemoteStore.enqueueRetryable / disableNetworkUntilRecovery, the
+  // failDatabase step over PersistenceFaultInjector): enabled.
+  'fail-database': null,
   'clear-persistence':
       'clearPersistence step shuts down other clients of a shared persistence; the only spec is multi-client.',
   'write-ack-transform-results': null,
@@ -76,10 +75,17 @@ const Map<String, String> sqliteExcludedTags = <String, String>{
       'eager-gc: relies on eager garbage collection, which only exists for memory persistence (as upstream).',
 };
 
-/// Single specs that need a library design the port (like upstream Android) does not have, keyed by
-/// `'<describeName> <itName>'`. Unlike [skippedSpecFeatures] these are not detectable from the spec JSON: the spec
-/// uses only supported steps but expects behaviour that only the JS SDK implements.
-const Map<String, String> knownSpecDivergences = <String, String>{};
+/// Single specs that need a library design the port (like upstream Android) does not have, or that the harness can
+/// not express, keyed by `'<describeName> <itName>'`. Unlike [skippedSpecFeatures] these are not detectable from the
+/// spec JSON: the spec uses only supported steps.
+const Map<String, String> knownSpecDivergences = <String, String>{
+  'Persistence Recovery Multiple user changes during transaction failure (with recovery)':
+      'Harness timing, not the library: after a retried operation succeeds, the next one is scheduled with the reset '
+      'backoff, a zero delay (as JS). The JS runner validates a step before such a timer fires; this runner lets the '
+      'event loop settle after every step, which runs it, so both user changes surface in the first runTimer step. '
+      'The library behaviour (both changes applied in order after the recovery) is the JS one. See '
+      'docs/ARCHITECTURE.md, "Tests".',
+};
 
 /// What a multi-client spec uses beyond a second client, keyed by a short name, with the library part it needs. Only
 /// used to explain the skip reason of a multi-client spec (see [multiClientCapabilitiesOf]).

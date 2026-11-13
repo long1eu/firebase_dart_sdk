@@ -385,8 +385,9 @@ class FirestoreClient implements RemoteStoreCallback {
   Future<Document?> getDocumentFromLocalCache(DocumentKey docKey) async {
     _verifyNotShutdown();
 
-    final MaybeDocument? maybeDoc = await _enqueue<MaybeDocument?>(
-      () => localStore.readDocument(docKey),
+    final MaybeDocument? maybeDoc = await _userErrorIfRecoverable(
+      _enqueue<MaybeDocument?>(() => localStore.readDocument(docKey)),
+      'Failed to get document \'$docKey\' from cache',
     );
 
     if (maybeDoc is Document) {
@@ -402,11 +403,29 @@ class FirestoreClient implements RemoteStoreCallback {
     }
   }
 
+  /// Fails with an `unavailable` [FirestoreError] when [future] fails because the persistence is not available (the JS
+  /// `wrapInUserErrorIfRecoverable`).
+  static Future<T> _userErrorIfRecoverable<T>(
+    Future<T> future,
+    String message,
+  ) {
+    return future.catchError(
+      (Object error) => throw FirestoreError(
+        '$message: $error',
+        FirestoreErrorCode.unavailable,
+      ),
+      test: isRecoverablePersistenceError,
+    );
+  }
+
   Future<ViewSnapshot> getDocumentsFromLocalCache(Query query) async {
     _verifyNotShutdown();
 
-    final QueryResult queryResult = await _enqueue<QueryResult>(
-      () => localStore.executeQuery(query, /* usePreviousResults= */ true),
+    final QueryResult queryResult = await _userErrorIfRecoverable(
+      _enqueue<QueryResult>(
+        () => localStore.executeQuery(query, /* usePreviousResults= */ true),
+      ),
+      'Failed to execute query \'$query\' against cache',
     );
 
     final View view = View(query, queryResult.remoteKeys);
@@ -667,12 +686,20 @@ class FirestoreClient implements RemoteStoreCallback {
 
     // Called right away with the current state; a lone client is always primary, and nothing changes then.
     persistence.setPrimaryStateListener((bool isPrimary) {
-      // Called inside a transaction of the persistence: the work waits for the task that is running to finish.
-      _queue.runLater<void>(() => _applyPrimaryState(isPrimary)).catchError((
-        Object error,
-      ) {
-        Log.w(logTag, 'Applying the primary state $isPrimary failed: $error');
-      });
+      // Called inside a transaction of the persistence: the work waits for the task that is running to finish. A
+      // retryable operation, as in JS: it is retried while the persistence fails.
+      _queue
+          .runLater<void>(
+            () => remoteStore.enqueueRetryable(
+              () => _applyPrimaryState(isPrimary),
+            ),
+          )
+          .catchError((Object error) {
+            Log.w(
+              logTag,
+              'Applying the primary state $isPrimary failed: $error',
+            );
+          });
     });
   }
 

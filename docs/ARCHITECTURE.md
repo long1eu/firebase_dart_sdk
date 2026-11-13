@@ -94,12 +94,15 @@ the `RemoteStore`, and a task that is already on the queue runs nested calls inl
 The spec tests are the shared, data-driven tests of the official SDKs: the JSON is generated
 from the JS SDK sources (`test/unit/specs/*.test.ts`) and describes sequences of user actions,
 watch events and expected snapshots. `spec/spec_skip_list.dart` names every spec that does not
-run and why (for example multi-client specs). One kind of skip there is a limit of the test
-harness, not of the library: there is no `failDatabase` step (see the persistence recovery row
-below). The mock watch stream (`test/unit/firebase/firestore/remote/mock_datastore.dart`) goes
-through a backoff timer (`TaskId.listenStreamConnectionBackoff`) after an error, as the JS mock
-connection does; the runner fires it on `watchStreamClose` with `runBackoffTimer: true` and
-before a listen, and otherwise leaves it pending.
+run and why (for example multi-client specs). One skip there is a limit of the test harness,
+not of the library: the runner lets the event loop settle after every step, so a timer with no
+delay that the JS runner would still see pending has run (the recovery spec "Multiple user
+changes during transaction failure"). The mock watch stream
+(`test/unit/firebase/firestore/remote/mock_datastore.dart`) goes through a backoff timer
+(`TaskId.listenStreamConnectionBackoff`) after an error, as the JS mock connection does; the
+runner fires it on `watchStreamClose` with `runBackoffTimer: true` and before a listen, and
+otherwise leaves it pending. The `failDatabase` step makes the transactions of the persistence
+fail by name through `local/persistence_fault_injector.dart` (the JS `injectFailures`).
 
 Rules that the suite relies on: do not weaken or remove assertions; a skip needs a reason
 string; tests that need a backend are skipped with a reason when its environment variable is
@@ -121,7 +124,7 @@ changes. `PORTING NOTE` comments in `lib/` mark these places in the code.
 | The overlay migration rebuilds all overlays from the mutation queues (Android keeps existing rows). | Rows can be stale when an older version of the port, without overlays, changed the queue in between. | `test/unit/firebase/firestore/local/sqlite_overlay_migration_manager_test.dart` (`testRebuildsStaleOverlaysAfterDowngrade`) |
 | Recalculating overlays removes the overlay of a document whose mutations no longer apply (Android keeps it). | The kept overlay would still be applied on the next read. | no dedicated test was found; the code is in `local/local_documents_view.dart` |
 | A patch that creates a document, and a patch of no fields, are treated as mutating the whole document when the overlay mask is computed. | Android's mask loses the document for a merge of no fields on a deleted document. | no test that names this case was found; the overlay mask cases are in `test/unit/firebase/firestore/model/mutation/overlay_mutation_test.dart` |
-| There is no recovery from a persistence transaction that fails, as in Android. The JS SDK catches an `IndexedDbTransactionError`, fails only the affected listen or write, and takes the network offline until a retried transaction succeeds (`RemoteStore.disableNetworkUntilRecovery`). | JS needs it because the browser can abort an IndexedDB transaction at any time. The port's cache is SQLite, whose failures (corruption, a full disk, an unknown schema) a retry rarely fixes. Not ported; on the web, where the opt-in cache is SQLite over IndexedDB, this is an open gap. | the 18 single-client recovery specs (`recovery_spec_test.json`) are skipped as `fail-database` in `test/unit/firebase/firestore/spec/spec_skip_list.dart` |
+| A persistence transaction that fails with a `TransientDatabaseException` is recovered from as in JS (its `IndexedDbTransactionError`), not as in Android, which has no recovery: a listen or a write that can not be stored fails with `unavailable`, a failed release or view update is ignored, and an acknowledgement, a rejection, a watch snapshot or a credential change that can not be stored takes the network offline and is retried with a backoff (`RemoteStore.enqueueRetryable` and `_disableNetworkUntilRecovery`, `util/retryable_operation_queue.dart`). The `Database` of the application decides what is transient; the example openers report SQLite's busy, locked, I/O and full-disk errors, and on the web a failed copy to IndexedDB (reported at the next transaction, since SQLite has committed in memory). Differences to JS: the in-memory resume tokens of the `RemoteStore` and the target data of the `LocalStore` change only once a remote event is stored (JS updates the tokens first); a retried operation that fails with another error is dropped (JS fails the client); a failed refresh of the primary lease keeps the current state (as JS; `SQLitePersistence.refreshClientMetadata`) and a change of the primary state is applied as a retryable operation. | Another connection holding the database (two isolates, a hot restart), a full disk or a closed IndexedDB must not fail the client for good; the backend resends what was not stored. | 17 of the 18 single-client recovery specs (`recovery_spec_test.json`; 15 on memory, which skips the durable ones), `test/unit/firebase/firestore/util/retryable_operation_queue_test.dart`, `local/example_sqlite_opener_errors_test.dart` |
 | The canonical id of a target writes cursor positions without a separator (upstream uses a comma). | Canonical ids are persisted with the targets; changing the format would orphan cached targets. | `test/unit/firebase/firestore/core/bound_order_by_test.dart`, `legacy_cache_upgrade_test.dart` |
 
 ### Persistent cache indexes

@@ -96,7 +96,7 @@ class SqliteDatabase implements Database {
 
   @override
   Future<void> execute(String statement, [List<Object?>? arguments]) async {
-    _database.execute(statement, arguments ?? const <Object?>[]);
+    _run(() => _database.execute(statement, arguments ?? const <Object?>[]));
   }
 
   @override
@@ -104,9 +104,8 @@ class SqliteDatabase implements Database {
     String statement, [
     List<Object?>? arguments,
   ]) async {
-    final sqlite.ResultSet rows = _database.select(
-      statement,
-      arguments ?? const <Object?>[],
+    final sqlite.ResultSet rows = _run(
+      () => _database.select(statement, arguments ?? const <Object?>[]),
     );
     return <Map<String, dynamic>>[
       for (final sqlite.Row row in rows) Map<String, dynamic>.of(row),
@@ -116,8 +115,30 @@ class SqliteDatabase implements Database {
   /// Runs a DELETE and returns the number of rows it removed.
   @override
   Future<int> delete(String statement, [List<Object?>? arguments]) async {
-    _database.execute(statement, arguments ?? const <Object?>[]);
+    _run(() => _database.execute(statement, arguments ?? const <Object?>[]));
     return _database.updatedRows;
+  }
+
+  /// Reports the errors that may go away on their own as a
+  /// [TransientDatabaseException]: another connection holds the lock (also
+  /// after Firestore's busy timeout), an I/O error, a full disk. SQLite does
+  /// not keep a statement or a transaction that failed with one of these
+  /// (Firestore rolls the transaction back), so Firestore can go offline and
+  /// try again later. Every other error is fatal for the operation.
+  static T _run<T>(T Function() statement) {
+    try {
+      return statement();
+    } on sqlite.SqliteException catch (e) {
+      switch (e.resultCode) {
+        case sqlite.SqlError.SQLITE_BUSY:
+        case sqlite.SqlError.SQLITE_LOCKED:
+        case sqlite.SqlError.SQLITE_IOERR:
+        case sqlite.SqlError.SQLITE_FULL:
+          throw TransientDatabaseException(e.message, e);
+        default:
+          rethrow;
+      }
+    }
   }
 
   @override

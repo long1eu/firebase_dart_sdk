@@ -192,8 +192,14 @@ class IndexBackfillerScheduler {
         Log.d(_tag, 'Documents written: $documentsProcessed');
       } catch (e) {
         // A failed run (for example a closed database) must not end the
-        // scheduling for the whole process.
-        Log.w(_tag, 'Index backfill failed: $e');
+        // scheduling for the whole process. A persistence that is not
+        // available right now is expected to work again (JS logs it at debug
+        // level).
+        if (isRecoverablePersistenceError(e)) {
+          Log.d(_tag, 'Ignoring a retryable error during index backfill: $e');
+        } else {
+          Log.w(_tag, 'Index backfill failed: $e');
+        }
       }
       if (!_stopped && generation == _generation) {
         _scheduleBackfill(regularBackfillDelay);

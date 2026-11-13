@@ -550,6 +550,11 @@ class TransactionOptions
   static final defaultMaxAttempts: int
   static final defaultOptions: TransactionOptions
   toString(): String
+class TransientDatabaseException
+  final cause: Object
+  final message: String
+  new TransientDatabaseException(String message, [Object cause])
+  toString(): String
 class VectorQuery
   ==(Object other): bool
   final distanceMeasure: DistanceMeasure

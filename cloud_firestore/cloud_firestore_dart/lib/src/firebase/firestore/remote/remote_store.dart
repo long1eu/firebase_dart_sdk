@@ -14,6 +14,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/core/serial_queue.da
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/transaction.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/firestore_error.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/local_store.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/local/persistance/persistence.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/query_data.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/query_purpose.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/database_id.dart';
@@ -33,6 +34,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/remote/watch_change.
 import 'package:cloud_firestore_dart/src/firebase/firestore/remote/watch_change_aggregator.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/assert.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/grpc_status.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/util/retryable_operation_queue.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/timer_task.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/util.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/vector_query.dart';
@@ -55,6 +57,7 @@ class RemoteStore implements TargetMetadataProvider {
     SerialQueue? queue,
     ConnectivityChangeDetector? connectivityDetector,
   }) : _queue = queue ?? SerialQueue(),
+       _scheduler = scheduler,
        _connectivityDetector = connectivityDetector,
        _listenTargets = <int, QueryData>{},
        _writePipeline = Queue<MutationBatch>(),
@@ -132,6 +135,20 @@ class RemoteStore implements TargetMetadataProvider {
 
   /// The queue on which every operation and every stream event handler runs, one at a time (see [SerialQueue]).
   final SerialQueue _queue;
+
+  final TaskScheduler _scheduler;
+
+  /// The operations retried while the persistence fails (the JS `AsyncQueue.enqueueRetryable`).
+  late final RetryableOperationQueue _retryableOperations =
+      RetryableOperationQueue(_scheduler, _queue);
+
+  /// The persistence failed and the network stays offline until a retried operation succeeds (the JS
+  /// `OfflineCause.IndexedDbFailed`).
+  bool _persistenceFailed = false;
+
+  /// The streams are being torn down for a credential change (the JS `OfflineCause.CredentialChange`). Stays set when
+  /// the change failed, until its retry succeeds.
+  bool _credentialChangeInProgress = false;
 
   final RemoteStoreCallback _remoteStoreCallback;
   final LocalStore _localStore;
@@ -314,6 +331,7 @@ class RemoteStore implements TargetMetadataProvider {
 
   Future<void> _shutdown() async {
     Log.d('RemoteStore', 'Shutting down');
+    _retryableOperations.stop();
     _networkEnabled = false;
     await _disableNetworkInternal();
     await _datastore.shutdown();
@@ -330,19 +348,84 @@ class RemoteStore implements TargetMetadataProvider {
   ///
   /// In response the remote store tears down streams and clears up any tracked operations that should not persist
   /// across users. Restarts the streams if appropriate.
-  Future<void> handleCredentialChange() =>
-      _queue.run<void>(_handleCredentialChange);
+  ///
+  /// [switchUser] switches the local state to the new user while the streams are down (the JS
+  /// `remoteStoreHandleCredentialChange`). When it fails, the network stays offline; run the change through
+  /// [enqueueRetryable] so that it is retried.
+  Future<void> handleCredentialChange(Future<void> Function() switchUser) =>
+      _queue.run<void>(() => _handleCredentialChange(switchUser));
 
-  Future<void> _handleCredentialChange() async {
-    // If the network has been explicitly disabled, make sure we don't accidentally re-enable it.
-    if (_canUseNetwork) {
-      // Tear down and re-create our network streams. This will ensure we get a fresh auth token for the new user and
-      // re-fill the write pipeline with new mutations from the [LocalStore] (since mutations are per-user).
-      Log.d('RemoteStore', 'Restarting streams for new credential.');
-      _networkEnabled = false;
-      await _disableNetworkInternal();
+  Future<void> _handleCredentialChange(
+    Future<void> Function() switchUser,
+  ) async {
+    // Tear down and re-create our network streams. This will ensure we get a fresh auth token for the new user and
+    // re-fill the write pipeline with new mutations from the [LocalStore] (since mutations are per-user). If the network
+    // has been explicitly disabled, it stays disabled.
+    Log.d('RemoteStore', 'Restarting streams for new credential.');
+    final bool usesNetwork = _canUseNetwork;
+    _credentialChangeInProgress = true;
+    await _disableNetworkInternal();
+    if (usesNetwork) {
+      // Don't set the network status to unknown if we are offline.
       await _onlineStateTracker.updateState(OnlineState.unknown);
-      await _enableNetwork();
+    }
+    try {
+      await switchUser();
+    } catch (error) {
+      if (isRecoverablePersistenceError(error)) {
+        // The network stays offline until the retry of the change succeeds.
+        rethrow;
+      }
+      _credentialChangeInProgress = false;
+      await _startNetworkIfPossible();
+      rethrow;
+    }
+    _credentialChangeInProgress = false;
+    await _startNetworkIfPossible();
+  }
+
+  /// Runs [operation] now, or after the retryable operations that are still waiting for the persistence, and retries
+  /// it with a backoff while it fails because the persistence is not available (the JS `enqueueRetryable`). Completes
+  /// after the first attempt.
+  Future<void> enqueueRetryable(Future<void> Function() operation) =>
+      _retryableOperations.enqueue(operation);
+
+  /// The recovery of the JS SDK for a persistence that fails: takes the network offline and probes the persistence
+  /// with [operation] (by default a read of the last remote snapshot version) with a backoff; the network comes back
+  /// once [operation] succeeds. Rethrows [error] when it is not a recoverable persistence error.
+  Future<void> _disableNetworkUntilRecovery(
+    Object error,
+    StackTrace stackTrace, [
+    Future<void> Function()? operation,
+  ]) async {
+    if (!isRecoverablePersistenceError(error)) {
+      Error.throwWithStackTrace(error, stackTrace);
+    }
+    Log.w('RemoteStore', 'The persistence failed, going offline: $error');
+    _persistenceFailed = true;
+
+    // Disable the network and raise offline snapshots.
+    await _disableNetworkInternal();
+    await _onlineStateTracker.updateState(OnlineState.offline);
+
+    final Future<void> Function() probe =
+        operation ?? _localStore.readLastRemoteSnapshotVersion;
+    // Probe the persistence periodically and re-enable the network. The first attempt runs right away.
+    await enqueueRetryable(() async {
+      Log.d('RemoteStore', 'Retrying the persistence');
+      await probe();
+      _persistenceFailed = false;
+      await _startNetworkIfPossible();
+    }).catchError(_reportError);
+  }
+
+  /// Runs [operation]; when it fails because the persistence is not available, takes the network offline until a
+  /// retry of [operation] succeeds. Completes after the first attempt.
+  Future<void> _executeWithRecovery(Future<void> Function() operation) async {
+    try {
+      await operation();
+    } catch (error, stackTrace) {
+      await _disableNetworkUntilRecovery(error, stackTrace, operation);
     }
   }
 
@@ -598,13 +681,18 @@ class RemoteStore implements TargetMetadataProvider {
       }
 
       if (snapshotVersion != SnapshotVersion.none) {
-        final SnapshotVersion lastRemoteSnapshotVersion = _localStore
-            .getLastRemoteSnapshotVersion();
+        try {
+          final SnapshotVersion lastRemoteSnapshotVersion = await _localStore
+              .readLastRemoteSnapshotVersion();
 
-        if (snapshotVersion.compareTo(lastRemoteSnapshotVersion) >= 0) {
-          // We have received a target change with a global snapshot if the snapshot version is not equal to
-          // SnapshotVersion.MIN.
-          await _raiseWatchSnapshot(snapshotVersion);
+          if (snapshotVersion.compareTo(lastRemoteSnapshotVersion) >= 0) {
+            // We have received a target change with a global snapshot if the snapshot version is not equal to
+            // SnapshotVersion.MIN.
+            await _raiseWatchSnapshot(snapshotVersion);
+          }
+        } catch (error, stackTrace) {
+          Log.d('RemoteStore', 'Failed to raise snapshot: $error');
+          await _disableNetworkUntilRecovery(error, stackTrace);
         }
       }
     }
@@ -639,7 +727,11 @@ class RemoteStore implements TargetMetadataProvider {
   /// the primary client of its cache).
   bool get canUseNetwork => _canUseNetwork;
 
-  bool get _canUseNetwork => _networkEnabled && _isPrimary;
+  bool get _canUseNetwork =>
+      _networkEnabled &&
+      _isPrimary &&
+      !_persistenceFailed &&
+      !_credentialChangeInProgress;
 
   /// Takes a batch of changes from the [Datastore], repackages them as a [RemoteEvent], and passes that on to the
   /// listener, which is typically the [SyncEngine].
@@ -652,24 +744,9 @@ class RemoteStore implements TargetMetadataProvider {
       snapshotVersion,
     );
 
-    // Update in-memory resume tokens. [LocalStore] will update the persistent view of these when applying the
-    // completed [RemoteEvent].
-    for (MapEntry<int, TargetChange> entry
-        in remoteEvent.targetChanges.entries) {
-      final TargetChange targetChange = entry.value;
-      if (targetChange.resumeToken.isNotEmpty) {
-        final int targetId = entry.key;
-        final QueryData? queryData = _listenTargets[targetId];
-        // A watched target might have been removed already.
-        if (queryData != null) {
-          _listenTargets[targetId] = queryData.copyWith(
-            snapshotVersion: snapshotVersion,
-            resumeToken: targetChange.resumeToken,
-            sequenceNumber: queryData.sequenceNumber,
-          );
-        }
-      }
-    }
+    // The in-memory resume tokens are updated once the [LocalStore] has applied the event (and updated the persistent
+    // view of these): when it fails, the targets are listened to again with the tokens they had, so the backend sends
+    // the changes again. (JS updates them first.)
 
     // Re-establish listens for the targets that have been invalidated by existence filter mismatches.
     for (MapEntry<int, QueryPurpose> entry
@@ -706,6 +783,25 @@ class RemoteStore implements TargetMetadataProvider {
     await _remoteStoreCallback.handleRemoteEvent(
       _toSdkRemoteEvent(remoteEvent),
     );
+
+    // Update in-memory resume tokens.
+    for (MapEntry<int, TargetChange> entry
+        in remoteEvent.targetChanges.entries) {
+      final TargetChange targetChange = entry.value;
+      final int targetId = entry.key;
+      if (targetChange.resumeToken.isNotEmpty &&
+          !remoteEvent.targetMismatches.containsKey(targetId)) {
+        final QueryData? queryData = _listenTargets[targetId];
+        // A watched target might have been removed already.
+        if (queryData != null) {
+          _listenTargets[targetId] = queryData.copyWith(
+            snapshotVersion: snapshotVersion,
+            resumeToken: targetChange.resumeToken,
+            sequenceNumber: queryData.sequenceNumber,
+          );
+        }
+      }
+    }
   }
 
   /// Converts a [RemoteEvent] keyed by remote target ids to one keyed by SDK target ids, dropping the changes of
@@ -747,12 +843,29 @@ class RemoteStore implements TargetMetadataProvider {
       // Ignore targets that have been removed already (an error for an earlier listen of a target names a remote
       // target id that is no longer tracked).
       if (_listenTargets.containsKey(targetId)) {
-        _listenTargets.remove(targetId);
+        final QueryData queryData = _listenTargets.remove(targetId)!;
         final int? sdkTargetId = _remoteToSdkTargetId.remove(targetId);
         _watchChangeAggregator!.removeTarget(targetId);
         if (sdkTargetId != null) {
           _sdkToRemoteTargetId.remove(sdkTargetId);
-          await _remoteStoreCallback.handleRejectedListen(sdkTargetId, cause!);
+          try {
+            await _remoteStoreCallback.handleRejectedListen(
+              sdkTargetId,
+              cause!,
+            );
+          } catch (error, stackTrace) {
+            if (!isRecoverablePersistenceError(error)) {
+              rethrow;
+            }
+            // As JS: the target stays listened when the rejection could not be stored, so it is listened to again once
+            // the persistence works, and the backend rejects it again.
+            Log.d('RemoteStore', 'Failed to remove target $targetId: $error');
+            _listenTargets[targetId] = queryData;
+            _remoteToSdkTargetId[targetId] = sdkTargetId;
+            _sdkToRemoteTargetId[sdkTargetId] = targetId;
+            await _disableNetworkUntilRecovery(error, stackTrace);
+            return;
+          }
         }
       } else {
         _watchChangeAggregator!.removeTarget(targetId);
@@ -802,9 +915,13 @@ class RemoteStore implements TargetMetadataProvider {
         : _writePipeline.last.batchId;
 
     while (_canAddToWritePipeline()) {
-      final MutationBatch? batch = await _localStore.getNextMutationBatch(
-        lastBatchIdRetrieved,
-      );
+      final MutationBatch? batch;
+      try {
+        batch = await _localStore.getNextMutationBatch(lastBatchIdRetrieved);
+      } catch (error, stackTrace) {
+        await _disableNetworkUntilRecovery(error, stackTrace);
+        continue;
+      }
 
       if (batch == null) {
         if (_writePipeline.isEmpty) {
@@ -884,7 +1001,11 @@ class RemoteStore implements TargetMetadataProvider {
       results,
       _writeStream.lastStreamToken,
     );
-    await _remoteStoreCallback.handleSuccessfulWrite(mutationBatchResult);
+    // When the acknowledgement can not be stored, the network goes offline and the acknowledgement is stored by a
+    // retry (as JS).
+    await _executeWithRecovery(
+      () => _remoteStoreCallback.handleSuccessfulWrite(mutationBatchResult),
+    );
 
     // It's possible that with the completion of this mutation another slot has freed up.
     await fillWritePipeline();
@@ -958,7 +1079,9 @@ class RemoteStore implements TargetMetadataProvider {
       // inhibit backoff on the next restart
       _writeStream.inhibitBackoff();
 
-      await _remoteStoreCallback.handleRejectedWrite(batch.batchId, status);
+      await _executeWithRecovery(
+        () => _remoteStoreCallback.handleRejectedWrite(batch.batchId, status),
+      );
 
       // It's possible that with the completion of this mutation another slot has freed up.
       await fillWritePipeline();

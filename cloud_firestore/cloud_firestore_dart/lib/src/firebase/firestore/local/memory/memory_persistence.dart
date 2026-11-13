@@ -187,6 +187,7 @@ class MemoryPersistence extends Persistence {
     String action,
     Transaction<T> operation,
   ) async {
+    beforeTransaction?.call(action);
     await _semaphore.acquire();
 
     try {

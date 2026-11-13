@@ -323,7 +323,23 @@ class SyncEngine implements RemoteStoreCallback {
   ) async {
     _assertCallback('writeMutations');
 
-    final LocalWriteResult result = await _localStore.writeLocally(mutations);
+    final LocalWriteResult result;
+    try {
+      result = await _localStore.writeLocally(mutations);
+    } catch (e) {
+      if (!isRecoverablePersistenceError(e)) {
+        rethrow;
+      }
+      // As JS: a write that could not be stored fails, and nothing else happens.
+      Log.w(_tag, 'Failed to persist write: $e');
+      userTask.completeError(
+        FirestoreError(
+          'Failed to persist write: $e',
+          FirestoreErrorCode.unavailable,
+        ),
+      );
+      return;
+    }
     _addUserCallback(result.batchId, userTask);
 
     await _emitNewSnapsAndNotifyLocalStore(
@@ -539,7 +555,6 @@ class SyncEngine implements RemoteStoreCallback {
       // Since this query failed, we won't want to manually unlisten to it. So go ahead and remove it from bookkeeping.
       _activeLimboTargetsByKey.remove(limboKey);
       _activeLimboResolutionsByTarget.remove(targetId);
-      await _pumpEnqueuedLimboResolutions();
 
       // TODO(long1eu): Retry on transient errors?
 
@@ -559,7 +574,16 @@ class SyncEngine implements RemoteStoreCallback {
         documentUpdates: documentUpdates,
         resolvedLimboDocuments: limboDocuments,
       );
-      await handleRemoteEvent(event);
+      try {
+        await handleRemoteEvent(event);
+      } catch (_) {
+        // As JS: the resolution stays active when the event could not be applied, so that the RemoteStore listens to
+        // the limbo target again once the persistence works, which brings the rejection back.
+        _activeLimboTargetsByKey[limboKey] = targetId;
+        _activeLimboResolutionsByTarget[targetId] = limboResolution!;
+        rethrow;
+      }
+      await _pumpEnqueuedLimboResolutions();
     } else {
       hardAssertLazy(
         _queriesByTarget.containsKey(targetId),
@@ -579,9 +603,29 @@ class SyncEngine implements RemoteStoreCallback {
   ) async {
     _assertCallback('handleSuccessfulWrite');
 
+    // The acknowledgement is stored first (as JS): when that fails (see isRecoverablePersistenceError), the RemoteStore
+    // keeps the result and calls this again once the persistence works, and the user is told only then.
+    final ImmutableSortedMap<DocumentKey, MaybeDocument> changes;
+    try {
+      changes = await _localStore.acknowledgeBatch(mutationBatchResult);
+    } on FirestoreError catch (e) {
+      if (!isPrimaryLeaseLoss(e)) {
+        rethrow;
+      }
+      // The backend did apply the write: the user is told, the batch stays in the queue for the primary client.
+      _notifyAcknowledged(mutationBatchResult);
+      _logPrimaryLeaseLoss();
+      return;
+    }
+
     // The local store may or may not be able to apply the write result and raise events immediately (depending on
-    // whether the watcher is caught up), so we raise user callbacks first so that they consistently happen before
-    // listen events.
+    // whether the watcher is caught up), so we raise user callbacks before the listen events.
+    _notifyAcknowledged(mutationBatchResult);
+
+    await _emitNewSnapsAndNotifyLocalStore(changes, /*remoteEvent:*/ null);
+  }
+
+  void _notifyAcknowledged(MutationBatchResult mutationBatchResult) {
     _notifyUser(mutationBatchResult.batch.batchId, /*status:*/ null);
 
     _resolvePendingWriteTasks(mutationBatchResult.batch.batchId);
@@ -592,19 +636,6 @@ class SyncEngine implements RemoteStoreCallback {
         0) {
       _lastAcknowledgedCommitVersion = mutationBatchResult.commitVersion;
     }
-
-    final ImmutableSortedMap<DocumentKey, MaybeDocument> changes;
-    try {
-      changes = await _localStore.acknowledgeBatch(mutationBatchResult);
-    } on FirestoreError catch (e) {
-      if (!isPrimaryLeaseLoss(e)) {
-        rethrow;
-      }
-      _logPrimaryLeaseLoss();
-      return;
-    }
-
-    await _emitNewSnapsAndNotifyLocalStore(changes, /*remoteEvent:*/ null);
   }
 
   @override
@@ -648,8 +679,22 @@ class SyncEngine implements RemoteStoreCallback {
       );
     }
 
-    final int largestPendingBatchId = await _localStore
-        .getHighestUnacknowledgedBatchId();
+    final int largestPendingBatchId;
+    try {
+      largestPendingBatchId = await _localStore
+          .getHighestUnacknowledgedBatchId();
+    } catch (e) {
+      if (!isRecoverablePersistenceError(e)) {
+        rethrow;
+      }
+      userTask.completeError(
+        FirestoreError(
+          'Initialization of waitForPendingWrites() operation failed: $e',
+          FirestoreErrorCode.unavailable,
+        ),
+      );
+      return;
+    }
 
     if (largestPendingBatchId == MutationBatch.unknown) {
       // Complete the task right away if there is no pending writes at the moment.
@@ -900,7 +945,17 @@ class SyncEngine implements RemoteStoreCallback {
     return List<DocumentKey>.from(_enqueuedLimboResolutions);
   }
 
-  Future<void> handleCredentialChange(User user) async {
+  ///
+  /// As in JS, credential changes are retryable operations (see [RemoteStore.enqueueRetryable]): one that fails
+  /// because the persistence is not available keeps the network offline and is tried again, and the changes that
+  /// follow it wait for it. The returned future completes after the first attempt.
+  Future<void> handleCredentialChange(User user) {
+    return _remoteStore.enqueueRetryable(
+      () => _remoteStore.handleCredentialChange(() => _switchUser(user)),
+    );
+  }
+
+  Future<void> _switchUser(User user) async {
     final bool userChanged = _currentUser != user;
 
     if (userChanged) {
@@ -913,9 +968,6 @@ class SyncEngine implements RemoteStoreCallback {
       _currentUser = user;
       await _emitNewSnapsAndNotifyLocalStore(changes, /*remoteEvent:*/ null);
     }
-
-    // Notify remote store so it can restart its streams.
-    await _remoteStore.handleCredentialChange();
   }
 
   /// Loads the bundle read by [bundleReader] into the local store and reports the progress to [resultTask].
