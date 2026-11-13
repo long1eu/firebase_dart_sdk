@@ -34,24 +34,43 @@ void main() {
 
   /// Connects through the proxy. `received` collects what comes back; `closed` completes when the connection ends.
   Future<({Socket socket, StringBuffer received, Future<void> closed})>
-      connect() async {
+  connect() async {
     final Socket socket = await Socket.connect(proxy.host, proxy.port);
     sockets.add(socket);
     socket.done.catchError((Object _) {});
     final StringBuffer received = StringBuffer();
     final Completer<void> closed = Completer<void>();
-    socket.listen((Uint8List data) => received.write(utf8.decode(data)),
-        onError: (Object _) {}, onDone: closed.complete);
+    socket.listen(
+      (Uint8List data) => received.write(utf8.decode(data)),
+      onError: (Object _) {},
+      onDone: closed.complete,
+    );
     return (socket: socket, received: received, closed: closed.future);
   }
 
   Future<void> settle([int milliseconds = 100]) =>
       Future<void>.delayed(Duration(milliseconds: milliseconds));
 
+  /// Waits until [condition] holds, checking every few milliseconds, for at
+  /// most 10 seconds: for what must happen (bytes that arrive), so that a
+  /// loaded machine only makes the test slower. What must not happen is
+  /// still checked after a fixed [settle].
+  Future<void> until(bool Function() condition) async {
+    final Stopwatch watch = Stopwatch()..start();
+    while (!condition() && watch.elapsed < const Duration(seconds: 10)) {
+      await Future<void>.delayed(const Duration(milliseconds: 5));
+    }
+  }
+
   test('forwards in both directions and counts', () async {
     final connection = await connect();
     connection.socket.add(utf8.encode('hello'));
-    await settle();
+    await until(
+      () =>
+          connection.received.toString() == 'hello' &&
+          proxy.bytesUp == 5 &&
+          proxy.bytesDown == 5,
+    );
     expect(connection.received.toString(), 'hello');
     expect(proxy.bytesUp, 5);
     expect(proxy.bytesDown, 5);
@@ -117,18 +136,20 @@ void main() {
     expect(connection.received.toString(), 'updown');
   });
 
-  test('a black hole drops the bytes and the connection dies on restore',
-      () async {
-    final connection = await connect();
-    proxy.mode = ChaosMode.blackHole;
-    connection.socket.add(utf8.encode('lost'));
-    await settle();
-    expect(connection.received.toString(), isEmpty);
-    expect(proxy.openConnections, 1);
-    proxy.restore();
-    await connection.closed.timeout(const Duration(seconds: 2));
-    expect(connection.received.toString(), isEmpty);
-  });
+  test(
+    'a black hole drops the bytes and the connection dies on restore',
+    () async {
+      final connection = await connect();
+      proxy.mode = ChaosMode.blackHole;
+      connection.socket.add(utf8.encode('lost'));
+      await settle();
+      expect(connection.received.toString(), isEmpty);
+      expect(proxy.openConnections, 1);
+      proxy.restore();
+      await connection.closed.timeout(const Duration(seconds: 2));
+      expect(connection.received.toString(), isEmpty);
+    },
+  );
 
   test('delay adds latency and keeps the order', () async {
     final connection = await connect();
@@ -148,74 +169,90 @@ void main() {
     expect(watch.elapsedMilliseconds, greaterThanOrEqualTo(300));
   });
 
-  test('cutAfter and cutOnNext cut mid-stream without forwarding the chunk',
-      () async {
-    final first = await connect();
-    final Future<void> cut = proxy.cutAfter(ChaosDirection.up, 4);
-    first.socket.add(utf8.encode('1234'));
-    await settle();
-    expect(first.received.toString(), '1234');
-    first.socket.add(utf8.encode('5'));
-    await cut.timeout(const Duration(seconds: 2));
-    await first.closed.timeout(const Duration(seconds: 2));
-    expect(first.received.toString(), '1234');
+  test(
+    'cutAfter and cutOnNext cut mid-stream without forwarding the chunk',
+    () async {
+      final first = await connect();
+      final Future<void> cut = proxy.cutAfter(ChaosDirection.up, 4);
+      first.socket.add(utf8.encode('1234'));
+      await settle();
+      expect(first.received.toString(), '1234');
+      first.socket.add(utf8.encode('5'));
+      await cut.timeout(const Duration(seconds: 2));
+      await first.closed.timeout(const Duration(seconds: 2));
+      expect(first.received.toString(), '1234');
 
-    final second = await connect();
-    final Future<void> onResponse =
-        proxy.cutOnNext(ChaosDirection.down, minBytes: 3);
-    second.socket.add(utf8.encode('ab'));
-    await settle();
-    expect(second.received.toString(), 'ab', reason: 'too small to cut');
-    second.socket.add(utf8.encode('abc'));
-    await onResponse.timeout(const Duration(seconds: 2));
-    await second.closed.timeout(const Duration(seconds: 2));
-    expect(second.received.toString(), 'ab',
-        reason: 'the echo server got the request, the answer was lost');
-    expect(proxy.cuts, 2);
-  });
+      final second = await connect();
+      final Future<void> onResponse = proxy.cutOnNext(
+        ChaosDirection.down,
+        minBytes: 3,
+      );
+      second.socket.add(utf8.encode('ab'));
+      await settle();
+      expect(second.received.toString(), 'ab', reason: 'too small to cut');
+      second.socket.add(utf8.encode('abc'));
+      await onResponse.timeout(const Duration(seconds: 2));
+      await second.closed.timeout(const Duration(seconds: 2));
+      expect(
+        second.received.toString(),
+        'ab',
+        reason: 'the echo server got the request, the answer was lost',
+      );
+      expect(proxy.cuts, 2);
+    },
+  );
 
-  test('what was received is delivered when the sender closes right after',
-      () async {
-    // A server that answers and closes, like an HTTP/1.1 response with `Connection: close`.
-    final ServerSocket server =
-        await ServerSocket.bind(InternetAddress.loopbackIPv4, 0);
-    server.listen((Socket socket) {
-      socket.done.catchError((Object _) {});
-      socket.listen((Uint8List data) async {
-        socket.add(utf8.encode('answer to ${utf8.decode(data)}'));
-        await socket.flush();
-        await socket.close();
-      }, onError: (Object _) {});
-    });
-    final ChaosProxy closing =
-        await ChaosProxy.start(server.address.address, server.port);
-    addTearDown(() async {
-      await closing.close();
-      await server.close();
-    });
+  test(
+    'what was received is delivered when the sender closes right after',
+    () async {
+      // A server that answers and closes, like an HTTP/1.1 response with `Connection: close`.
+      final ServerSocket server = await ServerSocket.bind(
+        InternetAddress.loopbackIPv4,
+        0,
+      );
+      server.listen((Socket socket) {
+        socket.done.catchError((Object _) {});
+        socket.listen((Uint8List data) async {
+          socket.add(utf8.encode('answer to ${utf8.decode(data)}'));
+          await socket.flush();
+          await socket.close();
+        }, onError: (Object _) {});
+      });
+      final ChaosProxy closing = await ChaosProxy.start(
+        server.address.address,
+        server.port,
+      );
+      addTearDown(() async {
+        await closing.close();
+        await server.close();
+      });
 
-    Future<String> request() async {
-      final Socket socket = await Socket.connect(closing.host, closing.port);
-      sockets.add(socket);
-      socket.done.catchError((Object _) {});
-      final StringBuffer received = StringBuffer();
-      final Completer<void> closed = Completer<void>();
-      socket.listen((Uint8List data) => received.write(utf8.decode(data)),
-          onError: (Object _) {}, onDone: closed.complete);
-      socket.add(utf8.encode('q'));
-      await closed.future.timeout(const Duration(seconds: 3));
-      return received.toString();
-    }
+      Future<String> request() async {
+        final Socket socket = await Socket.connect(closing.host, closing.port);
+        sockets.add(socket);
+        socket.done.catchError((Object _) {});
+        final StringBuffer received = StringBuffer();
+        final Completer<void> closed = Completer<void>();
+        socket.listen(
+          (Uint8List data) => received.write(utf8.decode(data)),
+          onError: (Object _) {},
+          onDone: closed.complete,
+        );
+        socket.add(utf8.encode('q'));
+        await closed.future.timeout(const Duration(seconds: 3));
+        return received.toString();
+      }
 
-    expect(await request(), 'answer to q');
-    closing.delay = const Duration(milliseconds: 100);
-    expect(await request(), 'answer to q', reason: 'with latency');
-    closing.delay = Duration.zero;
-    closing.mode = ChaosMode.stallDown;
-    final Future<String> stalled = request();
-    await settle(200);
-    closing.mode = ChaosMode.forward;
-    expect(await stalled, 'answer to q', reason: 'after a stall');
-    expect(closing.cuts, 0);
-  });
+      expect(await request(), 'answer to q');
+      closing.delay = const Duration(milliseconds: 100);
+      expect(await request(), 'answer to q', reason: 'with latency');
+      closing.delay = Duration.zero;
+      closing.mode = ChaosMode.stallDown;
+      final Future<String> stalled = request();
+      await settle(200);
+      closing.mode = ChaosMode.forward;
+      expect(await stalled, 'answer to q', reason: 'after a stall');
+      expect(closing.cuts, 0);
+    },
+  );
 }

@@ -13,7 +13,8 @@ enum Misbehavior {
   /// backend, a captive portal).
   closeAtOnce,
 
-  /// Completes the TLS handshake and then closes the connection (a
+  /// Completes the TLS handshake and then closes the connection, without
+  /// answering, as soon as the client sends its first bytes over TLS (a
   /// TLS-terminating middlebox without a backend).
   closeAfterTlsHandshake,
 
@@ -101,13 +102,20 @@ class MisbehavingServer {
       case Misbehavior.closeAtOnce:
         socket.destroy();
       case Misbehavior.closeAfterTlsHandshake:
-        // The handshake is complete on this side; give the client the time to
-        // complete it too before the connection goes away.
+        // The handshake is complete on this side. The connection goes away
+        // when the client sends its first bytes over TLS (the HTTP/2
+        // preface): the client has then completed the handshake too, however
+        // slow it is. A timer here raced the client's handshake on a loaded
+        // machine.
         _open.add(socket);
-        Timer(const Duration(milliseconds: 5), () {
-          _open.remove(socket);
-          socket.destroy();
-        });
+        socket.listen(
+          (Uint8List _) {
+            _open.remove(socket);
+            socket.destroy();
+          },
+          onError: (Object _) {},
+          onDone: () => _open.remove(socket),
+        );
       case Misbehavior.closeAfterPreface:
         _open.add(socket);
         int received = 0;
@@ -126,10 +134,16 @@ class MisbehavingServer {
       case Misbehavior.goAwayAtOnce:
         _open.add(socket);
         socket
-          // An empty SETTINGS frame.
-          ..add(<int>[0, 0, 0, 4, 0, 0, 0, 0, 0])
-          // GOAWAY: last stream id 0, NO_ERROR.
-          ..add(<int>[0, 0, 8, 7, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
+          // In one write, so that the client reads both frames together and
+          // handles the GOAWAY before it can start a call on the connection.
+          // Two writes could reach it apart on a loaded machine; the client
+          // would then use the connection in between, which is another case.
+          ..add(<int>[
+            // An empty SETTINGS frame.
+            0, 0, 0, 4, 0, 0, 0, 0, 0,
+            // GOAWAY: last stream id 0, NO_ERROR.
+            0, 0, 8, 7, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+          ])
           ..listen(
             (Uint8List _) {},
             onError: (Object _) {},

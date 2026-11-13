@@ -21,6 +21,7 @@
 import 'dart:async';
 
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/timer_task.dart';
+import 'package:fake_async/fake_async.dart';
 import 'package:test/test.dart';
 
 void main() {
@@ -59,33 +60,45 @@ void main() {
     };
   }
 
-  Future<void> waitForExpectedSteps() =>
-      expectedStepsCompleted.future.timeout(const Duration(seconds: 10));
-
-  test('canScheduleTasksInTheFuture', () async {
-    expectedSteps = <int>[1, 2, 3, 4];
-    runnableForStep(1)();
-    queue.add(timerId1, const Duration(milliseconds: 5), runnableForStep(4));
-    runnableForStep(2)();
-    queue.add(timerId2, const Duration(milliseconds: 1), runnableForStep(3));
-    await waitForExpectedSteps();
+  // The delayed tasks run in virtual time (package:fake_async): the order of
+  // two timers is then the order of their due times, as upstream asserts,
+  // however long the machine takes between the two `add` calls.
+  test('canScheduleTasksInTheFuture', () {
+    fakeAsync((FakeAsync async) {
+      expectedSteps = <int>[1, 2, 3, 4];
+      runnableForStep(1)();
+      queue.add(timerId1, const Duration(milliseconds: 5), runnableForStep(4));
+      runnableForStep(2)();
+      queue.add(timerId2, const Duration(milliseconds: 1), runnableForStep(3));
+      async.elapse(const Duration(milliseconds: 1));
+      expect(completedSteps, <int>[1, 2, 3]);
+      async.elapse(const Duration(milliseconds: 4));
+      expect(completedSteps, <int>[1, 2, 3, 4]);
+      expect(expectedStepsCompleted.isCompleted, isTrue);
+    });
   });
 
-  test('canCancelDelayedTasks', () async {
-    expectedSteps = <int>[1, 3];
-    runnableForStep(1)();
-    final TimerTask step2Timer = queue.add(
-      timerId1,
-      const Duration(milliseconds: 1),
-      runnableForStep(2),
-    );
-    queue.add(timerId3, const Duration(milliseconds: 5), runnableForStep(3));
+  test('canCancelDelayedTasks', () {
+    fakeAsync((FakeAsync async) {
+      expectedSteps = <int>[1, 3];
+      runnableForStep(1)();
+      final TimerTask step2Timer = queue.add(
+        timerId1,
+        const Duration(milliseconds: 1),
+        runnableForStep(2),
+      );
+      queue.add(timerId3, const Duration(milliseconds: 5), runnableForStep(3));
 
-    expect(queue.getTask(timerId1), isNotNull);
-    step2Timer.cancel();
-    expect(queue.getTask(timerId1), isNull);
+      expect(queue.getTask(timerId1), isNotNull);
+      step2Timer.cancel();
+      expect(queue.getTask(timerId1), isNull);
 
-    await waitForExpectedSteps();
+      async.elapse(const Duration(milliseconds: 5));
+      expect(completedSteps, <int>[1, 3]);
+      expect(expectedStepsCompleted.isCompleted, isTrue);
+      async.flushTimers();
+      expect(completedSteps, <int>[1, 3]);
+    });
   });
 
   test('canManuallyDrainAllDelayedTasksForTesting', () {
@@ -109,30 +122,36 @@ void main() {
     expect(completedSteps, <int>[1, 2, 3, 4]);
   });
 
-  test('a manual task runs only through runUntil', () async {
-    // A list of its own: timers of the tests before may still fire into completedSteps.
-    final List<int> steps = <int>[];
-    void Function() step(int n) =>
-        () => steps.add(n);
-    final TaskScheduler manual = TaskScheduler(
-      'manual',
-      manualTasks: <TaskId>{TaskId.asyncQueueRetry},
-    );
-    manual.add(TaskId.asyncQueueRetry, Duration.zero, step(1));
-    manual.add(TaskId.indexBackfill, Duration.zero, step(2));
+  test('a manual task runs only through runUntil', () {
+    fakeAsync((FakeAsync async) {
+      // A list of its own, apart from the steps of the tests above.
+      final List<int> steps = <int>[];
+      void Function() step(int n) =>
+          () => steps.add(n);
+      final TaskScheduler manual = TaskScheduler(
+        'manual',
+        manualTasks: <TaskId>{TaskId.asyncQueueRetry},
+      );
+      manual.add(TaskId.asyncQueueRetry, Duration.zero, step(1));
+      manual.add(TaskId.indexBackfill, Duration.zero, step(2));
 
-    await Future<void>.delayed(const Duration(milliseconds: 20));
-    // The other task ran on its own, the manual one waits.
-    expect(steps, <int>[2]);
-    expect(manual.getTask(TaskId.asyncQueueRetry), isNotNull);
+      // In virtual time: the timers that are due fire, however loaded the
+      // machine is.
+      async.elapse(const Duration(milliseconds: 20));
+      // The other task ran on its own, the manual one waits.
+      expect(steps, <int>[2]);
+      expect(manual.getTask(TaskId.asyncQueueRetry), isNotNull);
 
-    manual.runUntil(TaskId.asyncQueueRetry);
-    expect(steps, <int>[2, 1]);
-    expect(manual.getTask(TaskId.asyncQueueRetry), isNull);
+      manual.runUntil(TaskId.asyncQueueRetry);
+      expect(steps, <int>[2, 1]);
+      expect(manual.getTask(TaskId.asyncQueueRetry), isNull);
 
-    // A canceled manual task does not run.
-    manual.add(TaskId.asyncQueueRetry, Duration.zero, step(3)).cancel();
-    expect(manual.getTask(TaskId.asyncQueueRetry), isNull);
+      // A canceled manual task does not run.
+      manual.add(TaskId.asyncQueueRetry, Duration.zero, step(3)).cancel();
+      expect(manual.getTask(TaskId.asyncQueueRetry), isNull);
+      async.flushTimers();
+      expect(steps, <int>[2, 1]);
+    });
   });
 
   test(

@@ -6,6 +6,7 @@ import 'dart:math';
 
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/timer_task.dart';
 import 'package:firebase_app_dart/internal.dart';
+import 'package:meta/meta.dart';
 
 /// Helper for running delayed tasks following an exponential backoff curve between attempts using the [backoffFactor]
 /// to determine the extended base delay after each attempt.
@@ -25,12 +26,14 @@ class ExponentialBackoff {
     Duration initialDelay = const Duration(seconds: 1),
     double backoffFactor = 1.5,
     Duration maxDelay = const Duration(minutes: 1),
+    @visibleForTesting DateTime Function() now = DateTime.now,
   }) : _scheduler = scheduler,
+       _now = now,
        _taskId = taskId,
        _initialDelay = initialDelay,
        _backoffFactor = backoffFactor,
        _maxDelay = maxDelay,
-       _lastAttemptTime = DateTime.now(),
+       _lastAttemptTime = now(),
        _currentBase = Duration.zero;
 
   final TaskScheduler _scheduler;
@@ -38,6 +41,9 @@ class ExponentialBackoff {
   final Duration _initialDelay;
   final double _backoffFactor;
   final Duration _maxDelay;
+
+  /// The clock the time since the last attempt is measured with (a test's virtual clock in tests).
+  final DateTime Function() _now;
 
   Duration _currentBase;
   DateTime _lastAttemptTime;
@@ -63,7 +69,7 @@ class ExponentialBackoff {
     final Duration desiredDelayWithJitter = _currentBase + _jitterDelay();
 
     // Guard against lastAttemptTime being in the future due to a clock change.
-    final Duration difference = DateTime.now().difference(_lastAttemptTime);
+    final Duration difference = _now().difference(_lastAttemptTime);
     final Duration delaySoFar = difference < Duration.zero
         ? Duration.zero
         : difference;
@@ -83,7 +89,7 @@ class ExponentialBackoff {
     }
 
     _timerTask = _scheduler.add(_taskId, remainingDelay, () {
-      _lastAttemptTime = DateTime.now();
+      _lastAttemptTime = _now();
       task();
     });
 

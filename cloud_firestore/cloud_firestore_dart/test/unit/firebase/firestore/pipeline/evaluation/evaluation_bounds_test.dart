@@ -102,11 +102,15 @@ void main() {
 
     test('a match too costly for the step budget is not evaluated locally', () {
       // A program of thousands of instructions over a long input: linear,
-      // but beyond the budget the expression goes to the backend.
-      timed(() {
+      // but beyond the budget the expression goes to the backend. The budget
+      // (maxRe2Steps, 5e7 steps) takes a few seconds on a loaded machine, so
+      // the bound is generous; the input is long enough that matching it
+      // without the budget (about 1,800 instructions x 2e6 positions, 70
+      // times the budget) would take minutes and still fail the bound.
+      timed(seconds: 30, () {
         expect(
           () => evaluate(
-            constant('a' * 200000).regexContains('(?:a?){900}(?:a){900}b'),
+            constant('a' * 2000000).regexContains('(?:a?){900}(?:a){900}b'),
           ),
           unsupported('too long'),
         );
