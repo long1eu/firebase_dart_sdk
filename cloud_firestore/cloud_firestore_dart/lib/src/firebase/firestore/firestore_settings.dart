@@ -68,12 +68,6 @@ class FirestoreSettings {
          persistenceEnabled,
          cacheSizeBytes,
          cacheSettings,
-       ),
-       assert(
-         !persistenceEnabled ||
-             cacheSizeBytes == cacheSizeUnlimited ||
-             cacheSizeBytes >= _minimumCacheBytes,
-         'Cache size must be set to at least $_minimumCacheBytes bytes',
        );
 
   /// The host of the production Firestore service.
@@ -263,6 +257,16 @@ class FirestoreSettings {
     LocalCacheSettings? cacheSettings,
   ) {
     if (cacheSettings == null) {
+      // Not an assert: the check has to hold in release builds too.
+      if (persistenceEnabled &&
+          cacheSizeBytes != cacheSizeUnlimited &&
+          cacheSizeBytes < _minimumCacheBytes) {
+        throw ArgumentError.value(
+          cacheSizeBytes,
+          'cacheSizeBytes',
+          'Cache size must be set to at least $_minimumCacheBytes bytes',
+        );
+      }
       return cacheSizeBytes;
     }
     _checkNotMixed(persistenceEnabled, cacheSizeBytes);

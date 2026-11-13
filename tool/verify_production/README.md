@@ -18,7 +18,8 @@ The parts that could not be exercised that way are listed under "Not verified" b
 - It writes only below one document that is unique to the run:
   `verify_production_kit/run_<utc time>_<suffix>/<collection>/<document>`. The collection ids
   below it are fixed (`vp_crud`, `vp_listen`, `vp_queries`, `vp_lost_ack`, `vp_lost_commit`,
-  `vp_resume`, `vp_targets`, `vp_edition`, `vp_bson`, `vp_values`, `vp_tokens`, `vp_web`).
+  `vp_resume`, `vp_targets`, `vp_edition`, `vp_bson`, `vp_values`, `vp_tokens`, `vp_web`,
+  `vp_lite_grpc`, `vp_lite_rest`).
 - It reads only those documents. It never lists, reads or deletes anything else.
 - At the end it deletes every document it could have written (also when a check failed). If the
   clean-up fails it says so and prints the path to delete by hand. `--keep` skips the clean-up.
@@ -34,8 +35,8 @@ bypass security rules.
 
 | | per full run |
 | --- | --- |
-| document writes | 40 on the emulator; capped at 60 (`--max-writes=N`), the run stops a check before it would exceed the cap |
-| document deletes | one per document of the run, about 21 (the clean-up; not counted against the cap) |
+| document writes | 54 on the emulator; capped at 80 (`--max-writes=N`), the run stops a check before it would exceed the cap |
+| document deletes | one per document of the run, about 27 (the clean-up; not counted against the cap) |
 | document reads | normally under 200; a few hundred more when a check has to wait and poll |
 | listen streams | about 15 short-lived listeners |
 | duration | about 5 s on the emulator; allow a few minutes |
@@ -98,15 +99,17 @@ does not handle. `INCONCLUSIVE` means the check could not reach a result and say
 | 9 | Half-close timing after unlisten | How long the backend takes to end a Listen stream after the client unlistened and half-closed (three samples, in ms). The SDK waits 10 s before it resets the call; `FAIL` when the backend takes longer or ends the stream with an error. |
 | 10 | Auth token acceptance | Requests with the OAuth access token are served; the detail line says what the same read without a token gets. App Check is not covered: the kit has no App Check token provider. `SKIPPED` on the emulator. |
 | 11 | Web transport | The experimental web transport (REST unary calls and WebChannel streams over `dart:io` HTTP) against the same database: read, transaction, aggregation, listen, batch. The detail lines list the endpoints used and whether the backend asked for session routing (`gsessionid`). |
+| 12 | Firestore Lite over gRPC and REST | The lite library (`package:cloud_firestore_dart/lite.dart`, no cache, no listeners), once over gRPC and once over the transport it has on the web (REST only): set, get, update with transforms, a batch, queries (filter, `limitToLast`, cursor), an aggregation with aliases, a transaction, a read-only transaction with a query (`BeginTransaction` / `Rollback`), delete. `FAIL` names the transport and the step, or says that a client did not use the transport it was asked for (the REST client must not open a WebChannel session). The detail line lists the REST calls used. The clients are made through the public API; their requests carry the credentials of the kit, not those of a `FirebaseApp`. |
 
-What to send back: the whole report. The most valuable lines are the answers of 2, 3, 4, 6, 8, 9
-and 11, which nobody has seen for production yet.
+What to send back: the whole report. The most valuable lines are the answers of 2, 3, 4, 6, 8, 9,
+11 and 12, which nobody has seen for production yet.
 
 ## Known results on the emulators
 
 | id | Standard emulator | Enterprise emulator |
 | --- | --- | --- |
 | 1a, 1b, 5, 9, 11 | PASS | PASS |
+| 12 | PASS | PASS |
 | 1c | PASS (the emulator needs no index) | PASS (one unexplained FAIL in six runs while other test suites used the emulator; not reproduced) |
 | 2 | PASS, `APPLIED TWICE` | PASS, `APPLIED TWICE` |
 | 3 | PASS, `APPLIED TWICE`, 2 attempts | PASS, `APPLIED TWICE` |
@@ -143,7 +146,9 @@ database, that fix does not hold there.
   checks report `INCONCLUSIVE` ("could not write through the TCP proxy").
 - **Application Default Credentials end to end.** The token plumbing is unit-tested with a fake
   authenticator; no real token was ever fetched by this code.
-- **The web transport against production** (check 11) and with an OAuth token.
+- **The web transport against production** (check 11) and with an OAuth token. The same holds for
+  Firestore Lite (check 12): its REST transport was never used with TLS or a token, and the
+  read-only transaction of the check (`BeginTransaction`, `Rollback`) was only run on the emulator.
 - **The index link** of check 1c: the kit looks for a `https://console...` link in the error
   message; if the backend words it differently the message is printed as is.
 - The edition of the database is inferred from check 6; the kit cannot ask the backend for it.

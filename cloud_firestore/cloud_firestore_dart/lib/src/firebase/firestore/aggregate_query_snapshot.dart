@@ -130,14 +130,19 @@ class AggregateQuerySnapshot {
     return value;
   }
 
+  /// Two snapshots are equal when they aggregate the same query and hold the
+  /// same results under the same names (as `aggregateQuerySnapshotEqual` of
+  /// the JS SDK): the order the aggregations were asked in does not matter.
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       other is AggregateQuerySnapshot &&
-          query == other.query &&
-          const MapEquality<String, FieldValue>().equals(_data, other._data);
+          query.query == other.query.query &&
+          const MapEquality<String, Object?>().equals(data(), other.data());
 
   @override
-  int get hashCode =>
-      Object.hash(query, const MapEquality<String, FieldValue>().hash(_data));
+  int get hashCode => Object.hash(
+    query.query,
+    const MapEquality<String, Object?>().hash(data()),
+  );
 }

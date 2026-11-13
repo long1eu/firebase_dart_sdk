@@ -11,6 +11,8 @@ import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:cloud_firestore_dart/lite.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/remote/datastore/grpc_transport.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/remote/datastore/web/rest_transport.dart';
 import 'package:firebase_app_dart/firebase_app_dart.dart';
 import 'package:test/test.dart';
 
@@ -648,6 +650,43 @@ void main() {
       expect(db.collection('coll').parent, isNull);
     });
   });
+
+  group('transport', () {
+    test('the run uses the transport it asks for', () async {
+      final int transportsBefore = liteTestTransports.length;
+      final int clientsBefore = liteTestHttpClients.length;
+      final DocumentReference<Map<String, Object?>> ref = await newLiteTestDoc(
+        <String, Object?>{'n': 1},
+      );
+      expect((await ref.get()).data, <String, Object?>{'n': 1});
+      expect((await ref.parent.where('n', isEqualTo: 1).get()).length, 1);
+      expect((await ref.parent.count().get()).getCount(), 1);
+
+      // One instance, one transport.
+      expect(liteTestTransports, hasLength(transportsBefore + 1));
+      if (liteWebTransportRequested) {
+        expect(liteTestTransports.last, isA<RestTransport>());
+        // Every call was an HTTP request to a REST endpoint.
+        expect(liteTestHttpClients, hasLength(clientsBefore + 1));
+        final String documents =
+            '/v1/projects/${ref.firestore.projectId}/databases/(default)'
+            '/documents';
+        expect(liteTestHttpClients.last.log, <String>[
+          'POST $documents:commit',
+          'POST $documents:batchGet',
+          'POST $documents:runQuery',
+          'POST $documents:runAggregationQuery',
+        ]);
+      } else {
+        expect(liteTestTransports.last, isA<GrpcTransport>());
+        expect(
+          liteTestHttpClients,
+          hasLength(clientsBefore),
+          reason: 'no HTTP client is made for a gRPC run',
+        );
+      }
+    });
+  }, skip: skip);
 
   group('getDoc()', () {
     test('can get a non-existing document', () async {

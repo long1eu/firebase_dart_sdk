@@ -320,3 +320,22 @@ jobs:
         with:
           name: standard-suite-on-enterprise-log
           path: ${{ runner.temp }}/emulator/*.log
+
+  # The size of a program that uses Firestore Lite, and that it does not contain the sync
+  # engine, the local store or WebChannel (tool/check_size.sh, budget in
+  # tool/size/check_size.dart). Pinned to the SDK the budget was measured with: most of the
+  # compiled program is the Dart runtime, so the numbers move with the SDK. When the pin moves,
+  # measure again and update the budget and the README. Allowed to fail.
+  size:
+    name: Firestore Lite size check (Dart 3.12.2, allowed to fail)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: dart-lang/setup-dart@v1.8.2
+        with:
+          sdk: 3.12.2
+      - name: Compile the sample applications and check the lite one
+        env:
+          SIZE_OUT_DIR: ${{ runner.temp }}/size
+        run: ./tool/check_size.sh

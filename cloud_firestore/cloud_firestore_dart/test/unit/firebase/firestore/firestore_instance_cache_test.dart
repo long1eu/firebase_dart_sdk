@@ -26,6 +26,8 @@ void main() {
     // ignore: deprecated_member_use_from_same_package
     final Firestore first = await Firestore.getInstance(app);
     expect(identical(await Firestore.getInstance(app), first), isTrue);
+    expect(first.app, same(app));
+    expect(first.app, same(first.firebaseApp));
 
     // Concurrent callers share the instance that is being created.
     final List<Firestore> both = await Future.wait(<Future<Firestore>>[

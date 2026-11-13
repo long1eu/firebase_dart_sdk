@@ -371,6 +371,17 @@ class UserDataConverter {
       final int truncatedNanoseconds = timestamp.nanoseconds ~/ 1000 * 1000;
       return TimestampValue.valueOf(Timestamp(seconds, truncatedNanoseconds));
     } else if (input is GeoPoint) {
+      // The const constructor of [GeoPoint] only checks its range with asserts, which a release build skips.
+      if (!(input.latitude >= -90 && input.latitude <= 90)) {
+        throw context.createError(
+          'Latitude must be in the range of [-90, 90] but was ${input.latitude}',
+        );
+      }
+      if (!(input.longitude >= -180 && input.longitude <= 180)) {
+        throw context.createError(
+          'Longitude must be in the range of [-180, 180] but was ${input.longitude}',
+        );
+      }
       return GeoPointValue.valueOf(input);
     } else if (input is Blob) {
       return BlobValue.valueOf(input);

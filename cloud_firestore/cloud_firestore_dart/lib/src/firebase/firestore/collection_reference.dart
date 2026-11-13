@@ -30,12 +30,18 @@ class CollectionReference<T extends dynamic> extends Query<T> {
     ResourcePath path,
     Firestore firestore, [
     FirestoreDataConverter<T>? converter,
-  ]) : assert(
-         path.length.remainder(2) == 1,
-         'Invalid collection reference. Collection references must have an odd number of '
-         'segments, but ${path.canonicalString} has ${path.length}',
-       ),
-       super(core.Query(path), firestore, converter);
+  ]) : super(core.Query(_checkPath(path)), firestore, converter);
+
+  /// Not an assert: the check has to hold in release builds too.
+  static ResourcePath _checkPath(ResourcePath path) {
+    if (path.length.remainder(2) != 1) {
+      throw ArgumentError(
+        'Invalid collection reference. Collection references must have an odd number of '
+        'segments, but ${path.canonicalString} has ${path.length}',
+      );
+    }
+    return path;
+  }
 
   /// Return The id of the collection.
   String get id => query.path.last;

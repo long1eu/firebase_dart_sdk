@@ -237,6 +237,7 @@ Emulator and logging:
   uses `user_id` for the user.
 - `Firestore.setLogLevel(LogLevel)` with `debug`, `error` and `silent` (as the JS SDK);
   `setLoggingEnabled` still works.
+- `Firestore.app`, an alias of `Firestore.firebaseApp` under the name the JS SDK and FlutterFire use.
 
 Pipelines (preview):
 
@@ -380,6 +381,16 @@ Documentation and tests:
 
 ### Fixed
 
+- Argument checks that were only `assert`s, and so did nothing in release builds, now throw an `ArgumentError`
+  in every build: a collection path with an even number of segments (`firestore.collection('coll/doc')`,
+  `doc.collection('')`), a `cacheSizeBytes` below the minimum of 1 MB with persistence enabled, and a `GeoPoint`
+  outside its range when it is written or used in a query (the `GeoPoint` and `Timestamp` constructors are
+  `const` and keep their asserts; both values are checked when they enter the SDK).
+- `firestore.doc('')` returned a reference to nothing instead of failing, and `collectionGroup('')` was
+  accepted. Both throw an `ArgumentError` (as the JS SDK; also for a document path that is only a slash).
+- Two `AggregateQuerySnapshot`s made with `aggregateWithAliases` (or `aggregate`) were only equal when the
+  aggregations were asked for in the same order. They are now equal when they aggregate the same query and hold
+  the same results under the same names, as `aggregateQuerySnapshotEqual` of the JS SDK.
 - Cache after a lost write acknowledgement: a write that is sent again and changes nothing on the backend is
   acknowledged with the unchanged update time of the document, and was then dropped from the cached document
   (as in the other SDKs), so `get(Source.cache)` returned the old value without a pending write until the document

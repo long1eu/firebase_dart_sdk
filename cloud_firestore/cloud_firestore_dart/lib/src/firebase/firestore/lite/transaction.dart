@@ -29,6 +29,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/model/document.dart'
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/document_key.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/maybe_document.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/value/field_value.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/query_builder.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/set_options.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/assert.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/util.dart';
@@ -80,12 +81,7 @@ class Transaction {
   Future<QuerySnapshot<T>> getQuery<T extends Object?>(Query<T> query) async {
     _validateQuery(query);
     final core.Query internalQuery = query.query;
-    if (internalQuery.hasLimitToLast &&
-        internalQuery.explicitSortOrder.isEmpty) {
-      throw StateError(
-        'limitToLast() queries require specifying at least one orderBy() clause',
-      );
-    }
+    QueryBuilder.validateHasExplicitOrderByForLimitToLast(internalQuery);
     final List<Document> documents = await _transaction.runQuery(internalQuery);
     return QuerySnapshot<T>(
       query,

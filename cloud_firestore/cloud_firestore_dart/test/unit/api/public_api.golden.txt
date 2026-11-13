@@ -251,6 +251,7 @@ class Firestore
   final dataConverter: UserDataConverter @internal
   final databaseId: DatabaseId @internal
   final firebaseApp: FirebaseApp
+  get app: FirebaseApp
   get databaseName: String
   get persistentCacheIndexManager: PersistentCacheIndexManager
   get projectId: String

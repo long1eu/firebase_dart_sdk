@@ -162,6 +162,19 @@ void main() {
           'documents:commit',
         ]));
 
+    // Firestore Lite: both transports, and REST without a WebChannel session.
+    expect(status('12'), Status.pass, reason: why('12'));
+    expect(observed('12')['grpcTransport'], 'GrpcTransport');
+    expect(observed('12')['restTransport'], 'RestTransport');
+    expect(observed('12')['restEndpoints'], <String>[
+      'batchGet',
+      'beginTransaction',
+      'commit',
+      'rollback',
+      'runAggregationQuery',
+      'runQuery',
+    ]);
+
     // The accounting: within the cap, and everything that was handed out was deleted.
     expect(run.writes, lessThanOrEqualTo(defaultMaxWrites));
     expect(run.writes, greaterThan(20));

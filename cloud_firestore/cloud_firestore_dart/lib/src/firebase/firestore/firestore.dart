@@ -76,6 +76,10 @@ class Firestore {
   /// The [FirebaseApp] this instance belongs to.
   final FirebaseApp? firebaseApp;
 
+  /// The app this instance belongs to: the same as [firebaseApp], under the
+  /// name the JS SDK, FlutterFire and Firestore Lite use.
+  FirebaseApp? get app => firebaseApp;
+
   /// Implementation detail of the SDK; not part of the supported API.
   @internal
   final UserDataConverter dataConverter;
@@ -273,6 +277,11 @@ class Firestore {
   /// segment of its path will be included. Cannot contain a slash.
   Query<Map<String, Object?>> collectionGroup(String collectionId) {
     checkNotNull(collectionId, 'Provided collection ID must not be null.');
+    if (collectionId.isEmpty) {
+      throw ArgumentError(
+        'Invalid collectionId. Collection IDs must not be empty.',
+      );
+    }
     if (collectionId.contains('/')) {
       throw ArgumentError(
         'Invalid collectionId \'$collectionId\'. Collection IDs must not contain \'/\'.',

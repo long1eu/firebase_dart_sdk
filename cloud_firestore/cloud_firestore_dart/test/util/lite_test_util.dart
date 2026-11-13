@@ -9,6 +9,8 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/core/database_info.d
 import 'package:cloud_firestore_dart/src/firebase/firestore/lite/firestore.dart'
     show liteTransportOverride;
 import 'package:cloud_firestore_dart/src/firebase/firestore/remote/datastore/channel_options_provider.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/remote/datastore/firestore_transport.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/remote/datastore/grpc_transport.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/remote/datastore/web/rest_transport.dart';
 import 'package:firebase_app_dart/firebase_app_dart.dart';
 import 'package:test/test.dart';
@@ -24,21 +26,43 @@ String? get liteEmulatorSkipReason => TestBackend().emulatorHost != null
     ? null
     : '${TestBackend.emulatorHostVariable} is not set';
 
-/// With `FIRESTORE_TEST_TRANSPORT=rest` (or `webchannel`, the value the
-/// suite of the main library uses for its web transport run) Firestore Lite
-/// runs over the transport it uses on the web: REST, here over `dart:io`
-/// HTTP. Returns whether it is in use.
-bool useLiteWebTransportIfRequested() {
+/// Whether the run asks for the transport Firestore Lite has on the web:
+/// `FIRESTORE_TEST_TRANSPORT=rest`, or `webchannel` / `webchannel-longpolling`,
+/// the values the suite of the main library uses for its web transport runs.
+bool get liteWebTransportRequested {
   final String? transport = Platform.environment['FIRESTORE_TEST_TRANSPORT'];
-  if (transport != 'rest' &&
-      transport != 'webchannel' &&
-      transport != 'webchannel-longpolling') {
-    return false;
-  }
+  return transport == 'rest' ||
+      transport == 'webchannel' ||
+      transport == 'webchannel-longpolling';
+}
+
+/// The transports the instances of the tests were given, in order, so that a
+/// test can check which one a run really uses.
+final List<FirestoreTransport> liteTestTransports = <FirestoreTransport>[];
+
+/// The HTTP clients of the REST transports in [liteTestTransports]. Each one
+/// logs its requests.
+final List<IoWebHttpClient> liteTestHttpClients = <IoWebHttpClient>[];
+
+/// Makes Firestore Lite use the transport of the run: REST over `dart:io`
+/// HTTP when [liteWebTransportRequested], gRPC otherwise. Both are recorded
+/// in [liteTestTransports]. Returns whether REST is in use.
+bool useLiteWebTransportIfRequested() {
+  final bool rest = liteWebTransportRequested;
   liteTransportOverride =
-      (DatabaseInfo databaseInfo, ChannelOptionsProvider options) =>
-          RestTransport(IoWebHttpClient(), databaseInfo, options);
-  return true;
+      (DatabaseInfo databaseInfo, ChannelOptionsProvider options) {
+        final FirestoreTransport transport;
+        if (rest) {
+          final IoWebHttpClient http = IoWebHttpClient();
+          liteTestHttpClients.add(http);
+          transport = RestTransport(http, databaseInfo, options);
+        } else {
+          transport = createTransport(databaseInfo, options);
+        }
+        liteTestTransports.add(transport);
+        return transport;
+      };
+  return rest;
 }
 
 /// The settings for the emulator of FIRESTORE_EMULATOR_HOST.

@@ -52,6 +52,11 @@ class DocumentReference<T extends dynamic> {
     Firestore firestore, [
     FirestoreDataConverter<T>? converter,
   ]) {
+    if (path.isEmpty) {
+      throw ArgumentError(
+        'Invalid document reference. A document path must not be empty.',
+      );
+    }
     if (path.length.remainder(2) != 0) {
       throw ArgumentError(
         'Invalid document reference. Document references must have an even number of segments, but '

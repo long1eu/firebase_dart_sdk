@@ -40,8 +40,8 @@ Also in the tree:
 - **Firestore Lite** (experimental, separate library `lib/lite.dart`): `lib/lite/`. No cache, no
   listeners: the API classes call `Datastore` directly (`remote/datastore/unary_client.dart`,
   `TransactionClient`), over gRPC or, on the web, over `remote/datastore/web/rest_transport.dart`
-  (REST without WebChannel). The query builder is a copy of the one in `query.dart`: keep them
-  in step. JS `lite-api/`.
+  (REST without WebChannel). Both `Query` classes build and validate their internal query with
+  `lib/query_builder.dart`, which depends on neither client. JS `lite-api/`.
 - **Index engine building blocks**: `lib/index/` (Android `index/FirestoreIndexValueWriter.java`),
   `lib/model/target_index_matcher.dart` (Android `model/TargetIndexMatcher.java`) and the index
   manager `lib/local/sqlite/sqlite_index_manager.dart` (Android `local/IndexManager.java`). The

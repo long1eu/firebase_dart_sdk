@@ -19,7 +19,10 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:cloud_firestore_dart/cloud_firestore_dart.dart';
+import 'package:cloud_firestore_dart/lite.dart' as lite;
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/database_info.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/lite/firestore.dart'
+    show liteTransportOverride;
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/database_id.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/remote/datastore/channel_options_provider.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/remote/datastore/datastore.dart';
@@ -27,12 +30,14 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/remote/datastore/fir
 import 'package:cloud_firestore_dart/src/firebase/firestore/remote/datastore/grpc_channel.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/remote/datastore/grpc_transport.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/remote/datastore/keep_alive_transport.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/remote/datastore/web/rest_transport.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/remote/datastore/web/web_channel_transport.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/remote/datastore/web/web_http_client.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/timer_task.dart';
 import 'package:cloud_firestore_dart/src/proto/google/firestore/v1/index.dart'
     as proto_v1;
 import 'package:cloud_firestore_dart/src/proto/index.dart' as proto;
+import 'package:firebase_app_dart/firebase_app_dart.dart';
 import 'package:grpc/grpc.dart'
     show ChannelCredentials, ChannelOptions, ClientTransportConnectorChannel;
 import 'package:grpc/grpc_connection_interface.dart' show ClientChannelBase;
@@ -214,6 +219,15 @@ class Kit {
   /// The recorder of the last web client that was created.
   RecordingWebHttpClient? lastWebRecorder;
 
+  final List<lite.Firestore> _liteClients = <lite.Firestore>[];
+  final List<FirebaseApp> _liteApps = <FirebaseApp>[];
+
+  /// The transport the last Firestore Lite client was given, once it made its first call.
+  FirestoreTransport? lastLiteTransport;
+
+  /// The recorder of the last Firestore Lite client over REST, once it made its first call.
+  RecordingWebHttpClient? lastLiteRecorder;
+
   void log(String message) => _out.writeln(message);
 
   DatabaseId get databaseId =>
@@ -301,6 +315,49 @@ class Kit {
     }
   }
 
+  /// A new Firestore Lite client (`package:cloud_firestore_dart/lite.dart`), made through its public API with an app
+  /// of its own. Over [Transport.web] it uses the transport the lite library has on the web: REST only, here over
+  /// `dart:io` HTTP.
+  ///
+  /// The lite library takes its credentials from the app; the kit has none there, so the transport is given the
+  /// credentials of the kit instead.
+  lite.Firestore liteClient({required Transport transport}) {
+    final FirebaseApp app = FirebaseApp.withOptions(
+      FirebaseOptions(
+          apiKey: 'verify-production',
+          applicationId: 'verify-production',
+          projectId: backend.projectId),
+      dependencies: null,
+      name: 'verify-production-lite-$runId-${_clientIndex++}',
+    );
+    _liteApps.add(app);
+    lastLiteTransport = null;
+    lastLiteRecorder = null;
+    // The lite library opens its transport at the first call: the override stays until the next lite client or
+    // the end of the run.
+    liteTransportOverride =
+        (DatabaseInfo databaseInfo, ChannelOptionsProvider ignored) {
+      final ChannelOptionsProvider options = ChannelOptionsProvider(
+          databaseId: databaseId, credentialsProvider: _credentials());
+      if (transport == Transport.web) {
+        final RecordingWebHttpClient recorder =
+            RecordingWebHttpClient(IoWebHttpClient());
+        lastLiteRecorder = recorder;
+        return lastLiteTransport =
+            RestTransport(recorder, databaseInfo, options);
+      }
+      return lastLiteTransport = _grpcTransport(options, null);
+    };
+    final lite.Firestore firestore = lite.Firestore.instanceFor(
+      app: app,
+      database: backend.databaseId,
+      settings: lite.FirestoreSettings(
+          host: backend.host, port: backend.port, sslEnabled: backend.ssl),
+    );
+    _liteClients.add(firestore);
+    return firestore;
+  }
+
   /// The client that talks to the backend directly over gRPC, shared by the checks (the oracle of the chaos checks).
   Future<Firestore> get direct async => _direct ??= await client();
 
@@ -330,6 +387,14 @@ class Kit {
     final String path = '${collectionPath(collection)}/$id';
     _touched.add(path);
     return db.doc(path);
+  }
+
+  /// The path of a document of the run, for a client that is not a [Firestore] of the main library. Like [doc], it
+  /// registers the document for the clean-up.
+  String documentPath(String collection, String id) {
+    final String path = '${collectionPath(collection)}/$id';
+    _touched.add(path);
+    return path;
   }
 
   /// The resource name of a document of the run.
@@ -374,6 +439,17 @@ class Kit {
       } catch (_) {
         // Nothing to do about a client that does not terminate.
       }
+    }
+    liteTransportOverride = null;
+    for (final lite.Firestore client in _liteClients) {
+      try {
+        await client.terminate().timeout(const Duration(seconds: 20));
+      } catch (_) {
+        // Nothing to do about a client that does not terminate.
+      }
+    }
+    for (final FirebaseApp app in _liteApps) {
+      app.delete();
     }
     for (final FirestoreTransport transport in _transports) {
       try {
@@ -1404,6 +1480,160 @@ Future<CheckResult> _webTransport(Kit kit) async {
   }
 }
 
+/// The operations of the Firestore Lite check over [transport]. Returns null when everything worked, else what
+/// went wrong.
+Future<String?> _liteOver(Kit kit, Transport transport) async {
+  final String name = transport == Transport.web ? 'vp_lite_rest' : 'vp_lite_grpc';
+  final lite.Firestore db = kit.liteClient(transport: transport);
+  final lite.CollectionReference<Map<String, Object?>> collection =
+      db.collection(kit.collectionPath(name));
+  final lite.DocumentReference<Map<String, Object?>> a =
+      db.doc(kit.documentPath(name, 'a'));
+  final lite.DocumentReference<Map<String, Object?>> b =
+      db.doc(kit.documentPath(name, 'b'));
+  final lite.DocumentReference<Map<String, Object?>> c =
+      db.doc(kit.documentPath(name, 'c'));
+  kit.spend(7);
+
+  // CRUD.
+  await a.set(<String, Object?>{'n': 1, 's': 'text é \u{1F60A}'});
+  lite.DocumentSnapshot<Map<String, Object?>> snapshot = await a.get();
+  if (!snapshot.exists || snapshot.data!['n'] != 1) {
+    return 'the document read back is not what was written: ${snapshot.data}';
+  }
+  await a.update(<String, Object?>{
+    'n': FieldValue.increment(2),
+    'tags': FieldValue.arrayUnion(<Object>['x']),
+  });
+  snapshot = await a.get();
+  if (snapshot.data!['n'] != 3 || '${snapshot.data!['tags']}' != '[x]') {
+    return 'the update was not applied as expected: ${snapshot.data}';
+  }
+  await (db.batch()
+        ..set(b, <String, Object?>{'n': 10})
+        ..set(c, <String, Object?>{'n': 20}))
+      .commit();
+
+  // Queries (single-field indexes only) and an aggregation.
+  List<String> ids(lite.QuerySnapshot<Map<String, Object?>> result) => result
+      .docs
+      .map((lite.QueryDocumentSnapshot<Map<String, Object?>> doc) => doc.id)
+      .toList();
+  final String filtered =
+      ids(await collection.where('n', isGreaterThan: 5).orderBy('n').get())
+          .join(',');
+  final String last =
+      ids(await collection.orderBy('n').limitToLast(2).get()).join(',');
+  final String page = ids(await collection
+          .orderBy('n')
+          .startAfter(<Object?>[3])
+          .limit(1)
+          .get())
+      .join(',');
+  if (filtered != 'b,c' || last != 'b,c' || page != 'b') {
+    return 'queries returned filter=[$filtered] (expected b,c), limitToLast=[$last] (expected b,c) and '
+        'cursor=[$page] (expected b)';
+  }
+  final Map<String, Object?> totals =
+      (await collection.aggregateWithAliases(<String, AggregateField>{
+    'count': AggregateField.count(),
+    'sum': AggregateField.sum('n'),
+  }).get())
+          .data();
+  if (totals['count'] != 3 || totals['sum'] != 33) {
+    return 'the aggregation returned $totals (expected count 3, sum 33)';
+  }
+
+  // A read-write transaction, then a read-only one (BeginTransaction, reads in it, Rollback).
+  await db.runTransaction<void>((lite.Transaction transaction) async {
+    final lite.DocumentSnapshot<Map<String, Object?>> read =
+        await transaction.get(a);
+    transaction
+        .update(a, <String, Object?>{'n': (read.data!['n']! as num).toInt() + 1});
+  });
+  final int inSnapshot = await db.runTransaction<int>(
+    (lite.Transaction transaction) async {
+      final lite.DocumentSnapshot<Map<String, Object?>> read =
+          await transaction.get(a);
+      final lite.QuerySnapshot<Map<String, Object?>> all =
+          await transaction.getQuery(collection.orderBy('n'));
+      return (read.data!['n']! as num).toInt() * 100 + all.length;
+    },
+    options: TransactionOptions(readOnly: true),
+  );
+  if (inSnapshot != 403) {
+    return 'the transactions left n and the document count at $inSnapshot (expected 403: n=4, 3 documents)';
+  }
+
+  await c.delete();
+  if ((await c.get()).exists) {
+    return 'the document still exists after the delete';
+  }
+  return null;
+}
+
+Future<CheckResult> _lite(Kit kit) async {
+  final Map<String, Object?> observed = <String, Object?>{};
+  final List<String> problems = <String>[];
+
+  String? outcome;
+  try {
+    outcome = await _liteOver(kit, Transport.grpc);
+  } on WriteCapExceeded {
+    rethrow;
+  } catch (e) {
+    outcome = _describeError(e);
+  }
+  observed['grpcTransport'] = kit.lastLiteTransport.runtimeType.toString();
+  if (kit.lastLiteTransport is! GrpcTransport) {
+    problems.add('gRPC: the lite client did not use the gRPC transport but ${kit.lastLiteTransport.runtimeType}');
+  }
+  if (outcome != null) {
+    problems.add('gRPC: $outcome');
+  }
+
+  try {
+    outcome = await _liteOver(kit, Transport.web);
+  } on WriteCapExceeded {
+    rethrow;
+  } catch (e) {
+    outcome = _describeError(e);
+  }
+  // The REST verbs (`commit`, `runQuery`, ...): the part before the colon is `documents` or, for a query, its
+  // parent document.
+  final List<String> endpoints = <String>{
+    for (final String endpoint
+        in kit.lastLiteRecorder?.endpoints ?? const <String>[])
+      endpoint.substring(endpoint.lastIndexOf(':') + 1),
+  }.toList()
+    ..sort();
+  observed['restTransport'] = kit.lastLiteTransport.runtimeType.toString();
+  observed['restEndpoints'] = endpoints;
+  if (kit.lastLiteTransport is! RestTransport) {
+    problems.add('REST: the lite client did not use the REST transport but ${kit.lastLiteTransport.runtimeType}');
+  }
+  if (endpoints.contains('channel')) {
+    problems.add('REST: the lite client opened a WebChannel session');
+  }
+  if (outcome != null) {
+    problems.add('REST: $outcome');
+  }
+  observed['problems'] = problems;
+
+  if (problems.isNotEmpty) {
+    return CheckResult(Status.fail, 'Firestore Lite: ${problems.first}',
+        details: <String>[
+          ...problems.skip(1),
+          'REST calls used: $endpoints',
+        ],
+        observed: observed);
+  }
+  return CheckResult(Status.pass,
+      'Firestore Lite works over gRPC and over REST: CRUD, a batch, queries, an aggregation, a transaction and a '
+      'read-only transaction.',
+      details: <String>['REST calls used: $endpoints'], observed: observed);
+}
+
 /// The checks, in the order they run.
 final List<Check> checks = <Check>[
   const Check('1a', 'Basic CRUD', _crud),
@@ -1419,10 +1649,11 @@ final List<Check> checks = <Check>[
   const Check('9', 'Half-close timing after unlisten', _halfClose),
   const Check('10', 'Auth token acceptance (App Check: not covered)', _tokens),
   const Check('11', 'Web transport (WebChannel and REST)', _webTransport),
+  const Check('12', 'Firestore Lite over gRPC and REST', _lite),
 ];
 
 /// The most writes a full run can make (the sum of what the checks spend), with some room for retries.
-const int defaultMaxWrites = 60;
+const int defaultMaxWrites = 80;
 
 const String usage = '''
 Usage: dart run test/production/verify_production.dart --backend=production|emulator [options]

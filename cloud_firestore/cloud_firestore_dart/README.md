@@ -466,14 +466,20 @@ keeps the converter of the reference, as in the JS SDK; `firestore.doc('')` thro
 any order.
 
 **Size.** A program that only imports `lite.dart` does not contain the sync engine, the local
-store, the SQLite layer or WebChannel. A small web application (writes, a read, a query, an
-aggregation, a batch and a transaction) compiled with `dart compile js -O2` came to 415 kB of
-JavaScript (127 kB gzipped) with the lite library and to 640 kB (194 kB gzipped) with the main
-library and a memory cache (Dart 3.12, measured once, not tracked by a test). The code of this
-package in it is 128 kB and 294 kB; most of the rest is the Dart runtime and `package:protobuf`.
-The compiler's `--dump-info` output for the lite build lists no code from
-`src/firebase/firestore/local/`, the sync engine, the views, the event manager, the remote
-store or the WebChannel transport.
+store, the SQLite layer or WebChannel. `tool/check_size.sh` (repository root) compiles the same
+small web application (writes, a read, a query, an aggregation, a batch and a transaction) with
+both libraries, `dart compile js -O2`, Dart 3.12.2:
+
+| | JavaScript | gzipped | of it code of this package |
+|---|---|---|---|
+| Firestore Lite | 415,850 | 128,303 | 129,045 |
+| main library, memory cache | 641,418 | 196,065 | 294,546 |
+
+Most of the rest is the Dart runtime and `package:protobuf`. The script fails when the lite
+program grows past 450,000 characters (140,000 bytes gzipped) or when the compiler's
+`--dump-info` output lists code from `src/firebase/firestore/local/`, the sync engine, the
+views, the event manager, the remote store or the WebChannel transport in it. CI runs it as a
+job that is allowed to fail.
 
 ## Transactions
 
