@@ -94,6 +94,7 @@ class WebChannelStream {
     this.autoDetectLongPolling = false,
     this.longPollingDetectionTimeout = const Duration(seconds: 10),
     this.releaseTimeout = const Duration(seconds: 3),
+    this.forwardRequestTimeout = const Duration(seconds: 20),
     this.retryDelays = const <Duration>[
       Duration(milliseconds: 100),
       Duration(seconds: 1),
@@ -126,6 +127,15 @@ class WebChannelStream {
 
   /// How long the requests that end a session may take, see [released].
   final Duration releaseTimeout;
+
+  /// How long a request that carries messages to the server (and the
+  /// handshake) may take. The server answers them at once; one that stays
+  /// silent was swallowed by the network, and is aborted and handled like a
+  /// request that failed (sent again, see [retryDelays]). Without this a
+  /// connection that drops data without closing would block everything behind
+  /// the request for ever, while the back channel keeps the session looking
+  /// alive. The closure WebChannel uses the same 20 seconds.
+  final Duration forwardRequestTimeout;
 
   /// Whether the back channel is requested in long polling mode.
   bool get isLongPolling => _longPolling;
@@ -305,8 +315,17 @@ class WebChannelStream {
             body: form.join('&'),
           );
           _forwardRequest = request;
-          final WebHttpResponse received = await request.response;
-          final String body = await received.readAll();
+          final (WebHttpResponse received, String body) =
+              await () async {
+                final WebHttpResponse received = await request.response;
+                return (received, await received.readAll());
+              }().timeout(
+                forwardRequestTimeout,
+                onTimeout: () {
+                  request.abort();
+                  throw TimeoutException('The stream request timed out');
+                },
+              );
           response = received;
           text = body;
           break;

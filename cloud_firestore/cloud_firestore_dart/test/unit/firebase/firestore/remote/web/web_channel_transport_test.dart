@@ -459,7 +459,7 @@ void main() {
     });
   });
 
-  group('write requests go out one at a time', () {
+  group('write requests are sent ahead when they can be repeated', () {
     late StreamController<proto.WriteRequest> requests;
     late List<proto.WriteResponse> responses;
     late List<Object> errors;
@@ -469,15 +469,38 @@ void main() {
       ..streamToken = <int>[0x30]
       ..writes.add(proto.Write()..delete = '$database/documents/c/$id');
 
-    String deleted(FakeRequest request) =>
-        ((((jsonDecode(request.form['req0___data__']!)
-                        as Map<String, Object?>)['writes']!
-                    as List<Object?>)
-                .single!
-            as Map<String, Object?>)['delete']!
-            as String)
-            .split('/')
-            .last;
+    proto.WriteRequest increment(String id) => proto.WriteRequest()
+      ..streamToken = <int>[0x30]
+      ..writes.add(proto.Write()
+        ..update = (proto.Document()..name = '$database/documents/c/$id')
+        ..updateMask = proto.DocumentMask()
+        ..updateTransforms.add(proto.DocumentTransform_FieldTransform()
+          ..fieldPath = 'n'
+          ..increment = (proto.Value()..integerValue = Int64(1))));
+
+    /// The last path segments of the documents written by [request], one per
+    /// message of the request.
+    List<String> written(FakeRequest request) {
+      final int count = int.parse(request.form['count']!);
+      return <String>[
+        for (int i = 0; i < count; i++)
+          () {
+            final Map<String, Object?> write =
+                ((jsonDecode(request.form['req${i}___data__']!)
+                            as Map<String, Object?>)['writes']!
+                        as List<Object?>)
+                    .single!
+                    as Map<String, Object?>;
+            final String name = write.containsKey('delete')
+                ? write['delete']! as String
+                : (write['update']! as Map<String, Object?>)['name']! as String;
+            return name.split('/').last;
+          }(),
+      ];
+    }
+
+    const String ack =
+        '[{"streamToken":"MQ==","writeResults":[{}],"commitTime":"2026-11-12T21:14:41.553199Z"}]';
 
     setUp(() async {
       requests = StreamController<proto.WriteRequest>();
@@ -496,51 +519,77 @@ void main() {
 
     tearDown(() => requests.close());
 
-    test('the next write waits for the response to the previous one',
-        () async {
-      // Queued while the handshake is not answered yet.
-      requests.add(write('a'));
-      requests.add(write('b'));
-      await pump();
-      expect(http.hasUnclaimed, isFalse);
-
+    test('repeatable writes do not wait for the earlier responses', () async {
       back.add('49\n[[1,[{"streamId":"15395","streamToken":"MA=="}]]]');
+      await pump();
+      requests.add(write('a'));
       final FakeRequest first = await http.next();
-      expect(first.form['count'], '1');
-      expect(deleted(first), 'a');
+      expect(written(first), <String>['a']);
+      // More writes while `a` is neither delivered nor answered: they go out
+      // together as soon as the request in progress is done.
+      requests.add(write('b'));
+      requests.add(write('c'));
+      await pump();
       first.respond(200, body: '7\n[1,2,7]');
-      await pump();
-      // Delivered, but not answered: `b` stays back.
-      expect(http.hasUnclaimed, isFalse);
-
-      back.add(chunk(
-          '[[2,[{"streamToken":"MQ==","writeResults":[{}],"commitTime":"2026-11-12T21:14:41.553199Z"}]]]'));
       final FakeRequest second = await http.next();
-      expect(deleted(second), 'b');
+      expect(written(second), <String>['b', 'c']);
       expect(second.form['ofs'], '2');
-      second.respond(200, body: '7\n[1,3,7]');
+      second.respond(200, body: '7\n[1,4,7]');
+
+      back.add(chunk('[[2,$ack],[3,$ack],[4,$ack]]'));
       await pump();
-      expect(responses, hasLength(2));
+      expect(responses, hasLength(4));
       expect(errors, isEmpty);
     });
 
-    test('a write that fails is not followed by the writes behind it',
+    test('an increment waits for the responses to everything before it',
         () async {
       back.add('49\n[[1,[{"streamId":"15395","streamToken":"MA=="}]]]');
+      await pump();
       requests.add(write('a'));
+      requests.add(increment('counter'));
       requests.add(write('b'));
+      final FakeRequest first = await http.next();
+      expect(written(first), <String>['a']);
+      first.respond(200, body: '7\n[1,2,7]');
+      await pump();
+      // `a` is delivered but not answered: the increment stays back, and so
+      // does `b` behind it (requests go out in order).
+      expect(http.hasUnclaimed, isFalse);
+
+      back.add(chunk('[[2,$ack]]'));
+      final FakeRequest second = await http.next();
+      expect(written(second), <String>['counter']);
+      second.respond(200, body: '7\n[1,3,7]');
+      // `b` can be repeated: it is sent ahead of the answer to the increment.
+      final FakeRequest third = await http.next();
+      expect(written(third), <String>['b']);
+      third.respond(200, body: '7\n[1,4,7]');
+      back.add(chunk('[[3,$ack],[4,$ack]]'));
+      await pump();
+      expect(responses, hasLength(4));
+      expect(errors, isEmpty);
+    });
+
+    test('a write that fails is not followed by an increment behind it',
+        () async {
+      back.add('49\n[[1,[{"streamId":"15395","streamToken":"MA=="}]]]');
+      await pump();
+      requests.add(write('a'));
+      requests.add(increment('counter'));
       final FakeRequest first = await http.next();
       first.respond(200, body: '7\n[1,2,7]');
       await pump();
 
       // As the emulator reports a failed write: a message, and the session
-      // goes on, so `b` would be applied if it had been sent ahead.
+      // goes on, so the increment would be applied if it had been sent ahead
+      // (and applied again when the client sends it on its next stream).
       back.add(chunk(
           '[[2,[{"error":{"message":"NOT_FOUND: no entity to update","status":"NOT_FOUND"}}]]]'));
       await pump();
       expect((errors.single as GrpcError).code, StatusCode.notFound);
 
-      // Only the end of the session follows; `b` goes out on the next stream.
+      // Only the end of the session follows.
       final FakeRequest terminate = await http.next();
       expect(terminate.query['TYPE'], 'terminate');
       terminate.respond(200);

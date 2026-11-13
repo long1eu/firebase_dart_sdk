@@ -13,6 +13,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/remote/datastore/web
 import 'package:cloud_firestore_dart/src/firebase/firestore/remote/datastore/web/rest_client.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/remote/datastore/web/web_channel.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/remote/datastore/web/web_http_client.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/remote/datastore/web/write_send_ahead.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/grpc_status.dart';
 import 'package:cloud_firestore_dart/src/proto/google/firestore/v1/index.dart'
     as proto;
@@ -204,23 +205,27 @@ class WebChannelTransport implements FirestoreTransport {
     };
     unawaited(channel.handshakeHeaders.then(call.completeHeaders));
 
-    // The Write RPC answers every request with one response, and the next
-    // request is only sent once the answer to the previous one arrived.
-    //
-    // Over gRPC the backend ends the call when a write fails, so the writes
-    // that were sent ahead are not applied. Over WebChannel the error is a
-    // message like any other and the session goes on (observed on the
-    // emulator, v1.22.0): writes sent ahead of it are applied although the
-    // client, which closes the stream on the error, never sees their
-    // acknowledgements and sends them again. An `increment` behind a rejected
-    // write was counted twice that way.
-    final bool oneAtATime = identical(rpc, FirestoreRpc.write);
+    // The Write RPC answers every request with one response. A write is sent
+    // before the responses to the earlier ones arrived only when it can be
+    // applied twice without harm, see [WriteSendAheadGate]: the backend may
+    // apply writes that were sent ahead of a failed one, and the client sends
+    // those again.
+    final WriteSendAheadGate? gate = identical(rpc, FirestoreRpc.write)
+        ? WriteSendAheadGate()
+        : null;
     final Queue<Req> waiting = Queue<Req>();
-    bool awaitingResponse = false;
     void sendNext() {
-      while (waiting.isNotEmpty && !(oneAtATime && awaitingResponse)) {
-        awaitingResponse = true;
-        channel.send(jsonEncode(toFirestoreProto3Json(waiting.removeFirst())));
+      while (waiting.isNotEmpty) {
+        final Req request = waiting.first;
+        if (gate != null) {
+          final proto.WriteRequest write = request as proto.WriteRequest;
+          if (!gate.canSend(write)) {
+            return;
+          }
+          gate.sent(write);
+        }
+        waiting.removeFirst();
+        channel.send(jsonEncode(toFirestoreProto3Json(request)));
       }
     }
 
@@ -238,8 +243,8 @@ class WebChannelTransport implements FirestoreTransport {
           return;
         }
         responses.add(response);
-        if (oneAtATime) {
-          awaitingResponse = false;
+        if (gate != null) {
+          gate.responseReceived();
           sendNext();
         }
       },

@@ -316,11 +316,18 @@ Networking:
     now encoded like the JS SDK does (`"bytesValue": ""`, `"doubleValue": "-0"`). The JSON
     endpoints of the emulator (v1.22.0) still store `-0.0` as `0.0`, whatever its spelling, so
     the sign only round-trips there over gRPC.
-  - Write requests go out one at a time over WebChannel: the next one is sent when the
-    previous one was answered. There a failed write is reported as a message and the session
-    goes on (seen on the emulator), so writes sent ahead of the failure were applied although
-    the client closes the stream and sends them again: an `increment` behind a rejected write
-    was counted twice. Over gRPC the backend ends the call instead.
+  - Over WebChannel a failed write is reported as a message and the session goes on (seen on
+    the emulator), so writes sent ahead of the failure are applied although the client closes
+    the stream and sends them again: an `increment` behind a rejected write was counted twice.
+    Over gRPC the backend ends the call instead. Writes are therefore only sent ahead of the
+    answers to earlier writes when applying them twice is harmless: a write with an
+    `increment` waits for all earlier answers, and so does a write that shares a document
+    with a write in flight when one of the two has a precondition (`update`). Sets, merges,
+    deletes and updates of distinct documents are sent ahead, up to the ten writes the client
+    keeps in flight.
+  - A WebChannel request that carries messages to the server and is not answered within 20
+    seconds is aborted and sent again (with the same request id), instead of blocking every
+    later message of the stream for ever on a connection that silently drops data.
   - Request headers with a line break are refused instead of being sent in the handshake, and
     `fetch` no longer follows redirects (a redirect would re-send the credentials elsewhere).
   - A clear `UnsupportedError` at start when the application was compiled with

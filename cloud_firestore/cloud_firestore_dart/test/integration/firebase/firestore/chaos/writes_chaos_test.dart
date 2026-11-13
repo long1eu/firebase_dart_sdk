@@ -306,11 +306,11 @@ void main() {
       expect((await doc.get(Source.server)).data, server);
       expect((await doc.get(Source.cache)).data, server);
     },
-        // Over WebChannel a client message is a request of its own, and one is sent at a time (as WebChannel does
-        // over HTTP/1.1): while the answer to the first write is held back the second write is not sent, so the
+        // Over WebChannel a write with an increment is never sent before the answers to the earlier writes arrived
+        // (WriteSendAheadGate): while the answer to the first write is held back the second one is not sent, so the
         // backend never has both. The lost acknowledgement itself is covered by the scenarios above.
         skip: webTransportSkipReason(
-            'needs two writes in flight at once; the web transport sends one request at a time'));
+            'needs two increments in flight at once; the web transport does not send an increment ahead'));
 
     test('survive a stalled connection that is then cut', () async {
       final Firestore db = await env.newClient();
@@ -328,6 +328,25 @@ void main() {
       await Future.wait(writes).timeout(const Duration(seconds: 20));
       await expectLanded(db, collection);
     });
+
+    test('survive a connection that swallows the traffic for a while',
+        () async {
+      final Firestore db = await env.newClient();
+      final CollectionReference<Map<String, Object?>> collection =
+          await prepare(db);
+      await collection.doc('warmup').set(<String, Object?>{});
+      await collection.doc('warmup').delete();
+
+      // The requests and the answers on the way are lost, the connections stay open: nothing fails by itself.
+      env.proxy.mode = ChaosMode.blackHole;
+      final List<Future<void>> writes = issueWrites(db, collection);
+      await pause(1500);
+      env.proxy.mode = ChaosMode.forward;
+      // The client has to notice by itself: the keepalive of gRPC (30 s + 20 s), or the timeout of a WebChannel
+      // request (20 s).
+      await Future.wait(writes).timeout(const Duration(seconds: 70));
+      await expectLanded(db, collection);
+    }, timeout: const Timeout(Duration(seconds: 120)));
 
     test('survive a stalled connection that recovers, and latency', () async {
       final Firestore db = await env.newClient();

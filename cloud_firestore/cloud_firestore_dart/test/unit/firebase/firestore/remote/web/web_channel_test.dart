@@ -90,6 +90,7 @@ void main() {
       Map<String, String> headers = const <String, String>{},
       bool forceLongPolling = false,
       bool autoDetectLongPolling = false,
+      Duration forwardRequestTimeout = const Duration(seconds: 20),
     }) {
       http = FakeHttpClient();
       stream = WebChannelStream(http, channelUrl, database, headers,
@@ -100,7 +101,8 @@ void main() {
           ],
           forceLongPolling: forceLongPolling,
           autoDetectLongPolling: autoDetectLongPolling,
-          longPollingDetectionTimeout: const Duration(milliseconds: 60));
+          longPollingDetectionTimeout: const Duration(milliseconds: 60),
+          forwardRequestTimeout: forwardRequestTimeout);
       messages = <Map<String, Object?>>[];
       errors = <Object>[];
       done = false;
@@ -608,6 +610,43 @@ void main() {
       expect(int.parse(next.query['RID']!), int.parse(again.query['RID']!) + 1);
       expect(next.form['ofs'], '2');
       await stream.close();
+    });
+
+    test(
+        'a forward request that is never answered is aborted and sent again '
+        'with the same id', () async {
+      // A connection that swallows the request without failing (a black hole):
+      // nothing would ever be sent again, the session looks alive as long as
+      // its back channel works.
+      open(forwardRequestTimeout: const Duration(milliseconds: 50));
+      await handshake();
+      (await http.next()).stream(200);
+      await pump();
+
+      stream.send('{"removeTarget":2}');
+      final FakeRequest silent = await http.next();
+      final FakeRequest again = await http.next();
+      expect(silent.aborted, isTrue);
+      expect(again.query['RID'], silent.query['RID']);
+      expect(again.body, silent.body);
+      again.respond(200, body: '7\n[1,2,7]');
+      await pump();
+      expect(errors, isEmpty);
+
+      stream.send('{"x":1}');
+      final FakeRequest next = await http.next();
+      expect(next.form['ofs'], '2');
+      await stream.close();
+    });
+
+    test('a handshake that is never answered fails the stream', () async {
+      open(forwardRequestTimeout: const Duration(milliseconds: 50));
+      stream.send(addTarget);
+      final FakeRequest silent = await http.next();
+      await Future<void>.delayed(const Duration(milliseconds: 150));
+      expect(silent.aborted, isTrue);
+      expect((errors.single as GrpcError).code, StatusCode.unavailable);
+      expect(done, isTrue);
     });
 
     test('a forward request that keeps failing ends the stream', () async {
