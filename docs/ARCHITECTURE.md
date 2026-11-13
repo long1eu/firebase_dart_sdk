@@ -93,7 +93,11 @@ the `RemoteStore`, and a task that is already on the queue runs nested calls inl
 The spec tests are the shared, data-driven tests of the official SDKs: the JSON is generated
 from the JS SDK sources (`test/unit/specs/*.test.ts`) and describes sequences of user actions,
 watch events and expected snapshots. `spec/spec_skip_list.dart` names every spec that does not
-run and why (for example multi-client specs).
+run and why (for example multi-client specs). Two kinds of skips there are limits of the test
+harness, not of the library: the mock watch stream restarts at once after an error, without the
+backoff timer (as Android's), so a spec that leaves the stream closed in backoff
+(`watchStreamClose` with `runBackoffTimer: false`) can not run; and there is no `failDatabase`
+step (see the persistence recovery row below).
 
 Rules that the suite relies on: do not weaken or remove assertions; a skip needs a reason
 string; tests that need a backend are skipped with a reason when its environment variable is
@@ -115,6 +119,7 @@ changes. `PORTING NOTE` comments in `lib/` mark these places in the code.
 | The overlay migration rebuilds all overlays from the mutation queues (Android keeps existing rows). | Rows can be stale when an older version of the port, without overlays, changed the queue in between. | `test/unit/firebase/firestore/local/sqlite_overlay_migration_manager_test.dart` (`testRebuildsStaleOverlaysAfterDowngrade`) |
 | Recalculating overlays removes the overlay of a document whose mutations no longer apply (Android keeps it). | The kept overlay would still be applied on the next read. | no dedicated test was found; the code is in `local/local_documents_view.dart` |
 | A patch that creates a document, and a patch of no fields, are treated as mutating the whole document when the overlay mask is computed. | Android's mask loses the document for a merge of no fields on a deleted document. | no test that names this case was found; the overlay mask cases are in `test/unit/firebase/firestore/model/mutation/overlay_mutation_test.dart` |
+| There is no recovery from a persistence transaction that fails, as in Android. The JS SDK catches an `IndexedDbTransactionError`, fails only the affected listen or write, and takes the network offline until a retried transaction succeeds (`RemoteStore.disableNetworkUntilRecovery`). | JS needs it because the browser can abort an IndexedDB transaction at any time. The port's cache is SQLite, whose failures (corruption, a full disk, an unknown schema) a retry rarely fixes. Not ported; on the web, where the opt-in cache is SQLite over IndexedDB, this is an open gap. | the 18 single-client recovery specs (`recovery_spec_test.json`) are skipped as `fail-database` in `test/unit/firebase/firestore/spec/spec_skip_list.dart` |
 | The canonical id of a target writes cursor positions without a separator (upstream uses a comma). | Canonical ids are persisted with the targets; changing the format would orphan cached targets. | `test/unit/firebase/firestore/core/bound_order_by_test.dart`, `legacy_cache_upgrade_test.dart` |
 
 ### Persistent cache indexes

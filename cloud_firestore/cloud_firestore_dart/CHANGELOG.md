@@ -476,6 +476,10 @@ Documentation and tests:
   `docs/upstream_sync/UPSTREAM_PLAN.md`.
 - Every listen is sent to the backend with a fresh remote target id (as the JS SDK), so a late
   removal or error for an earlier listen of a query no longer rejects a newer listen of it.
+- A document in limbo whose limbo resolution finds it deleted is now removed even when another
+  query's target sent and removed the same document in the same snapshot window (the JS fix for
+  firebase-js-sdk#8474; Android does not have it). Before, the stale document stayed in the
+  view of the other query.
 - A pending `set(..., merge)` on a document that the cache knows as deleted no longer hides the other
   fields of the document when the backend creates it before the write is acknowledged.
 - Web transport: a listen or write stream that the client closes ends its WebChannel session right away

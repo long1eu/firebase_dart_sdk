@@ -38,6 +38,12 @@ class WatchChangeAggregator {
   Map<DocumentKey, MaybeDocument> _pendingDocumentUpdates =
       <DocumentKey, MaybeDocument>{};
 
+  /// The targets that added each document of [_pendingDocumentUpdates] since the last raised snapshot (JS
+  /// `pendingDocumentUpdatesByTarget`). Removals are not recorded: a limbo target that only saw its document removed,
+  /// or saw it through another target, has not received it.
+  Map<DocumentKey, Set<int>> _pendingDocumentUpdatesByTarget =
+      <DocumentKey, Set<int>>{};
+
   /// A mapping of document keys to their set of target IDs.
   Map<DocumentKey, Set<int>> _pendingDocumentTargetMapping =
       <DocumentKey, Set<int>>{};
@@ -277,8 +283,12 @@ class WatchChangeAggregator {
           // update our local cache, we synthesize a document delete if we have not previously
           // received the document. This resolves the limbo state of the document, removing it from
           // [limboDocumentRefs].
+          //
+          // Only an update this target received counts (as JS, firebase-js-sdk#8474): an update of the document that
+          // arrived through another target in the same snapshot window does not resolve the limbo target.
           final DocumentKey key = DocumentKey.fromPath(queryData.target.path);
-          if (_pendingDocumentUpdates[key] == null &&
+          if (!(_pendingDocumentUpdatesByTarget[key]?.contains(targetId) ??
+                  false) &&
               !_targetContainsDocument(targetId, key)) {
             _removeDocumentFromTarget(
               targetId,
@@ -332,6 +342,7 @@ class WatchChangeAggregator {
 
     // Re-initialize the current state to ensure that we do not modify the generated [RemoteEvent].
     _pendingDocumentUpdates = <DocumentKey, MaybeDocument>{};
+    _pendingDocumentUpdatesByTarget = <DocumentKey, Set<int>>{};
     _pendingDocumentTargetMapping = <DocumentKey, Set<int>>{};
     _pendingTargetResets = <int, QueryPurpose>{};
 
@@ -354,6 +365,7 @@ class WatchChangeAggregator {
     targetState.addDocumentChange(document.key, changeType);
 
     _pendingDocumentUpdates[document.key] = document;
+    (_pendingDocumentUpdatesByTarget[document.key] ??= <int>{}).add(targetId);
 
     _ensureDocumentTargetMapping(document.key).add(targetId);
   }
