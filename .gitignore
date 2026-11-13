@@ -35,5 +35,13 @@ cloud_firestore/cloud_firestore_dart/test/browser/crash/crash_worker.js
 cloud_firestore/cloud_firestore_dart/test/browser/crash/crash_worker.js.deps
 cloud_firestore/cloud_firestore_dart/test/browser/crash/crash_worker.js.map
 
+# The emulator port of a browser test run (tool/test_browser.sh writes it).
+cloud_firestore/cloud_firestore_dart/test/browser/emulator_port.txt
+
+# The compiled OPFS worker of the browser tests (tool/build_web_test_assets.sh).
+cloud_firestore/cloud_firestore_dart/test/browser/opfs/sqlite_opfs_worker.js
+cloud_firestore/cloud_firestore_dart/test/browser/opfs/sqlite_opfs_worker.js.deps
+cloud_firestore/cloud_firestore_dart/test/browser/opfs/sqlite_opfs_worker.js.map
+
 # remote test logs (notes/mini/remote_test.sh)
 .remote_logs/

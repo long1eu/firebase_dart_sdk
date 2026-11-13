@@ -17,14 +17,8 @@ import 'package:cloud_firestore_dart/lite.dart';
 import 'package:firebase_app_dart/firebase_app_dart.dart';
 import 'package:test/test.dart';
 
-const String emulatorHost = String.fromEnvironment(
-  'FIRESTORE_EMULATOR_HOST_NAME',
-  defaultValue: '127.0.0.1',
-);
-const int emulatorPort = int.fromEnvironment(
-  'FIRESTORE_EMULATOR_PORT',
-  defaultValue: 8090,
-);
+import 'emulator_port.dart';
+
 const String projectId = String.fromEnvironment(
   'FIRESTORE_PROJECT_ID',
   defaultValue: 'demo-test',
@@ -71,6 +65,7 @@ List<Object?> values(QuerySnapshot<Map<String, Object?>> snapshot) => <Object?>[
 ];
 
 void main() {
+  setUpAll(loadEmulatorPort);
   test('writes a document and reads it back', () async {
     final DocumentReference<Map<String, Object?>> doc = newCollection().doc(
       'a',

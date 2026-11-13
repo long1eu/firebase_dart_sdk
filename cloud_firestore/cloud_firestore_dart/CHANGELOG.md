@@ -395,9 +395,9 @@ Networking:
     IndexedDB (below).
   - Verified against the emulator only: on the VM, where the whole standard integration suite
     runs over the web transport (`tool/test_integration.sh standard --transport=webchannel`, or
-    `FIRESTORE_TEST_TRANSPORT=webchannel`), and in Chrome with 41 browser tests
-    (`tool/test_browser.sh both`; 40 pass and 1 is skipped with each compiler: the crash
-    harness under dart2wasm, the 64 bit integer test under dart2js). No other browser and no production backend was tried.
+    `FIRESTORE_TEST_TRANSPORT=webchannel`), and in Chrome with 52 browser tests
+    (`tool/test_browser.sh both`; 51 pass and 1 is skipped with each compiler: the IndexedDB
+    crash harness under dart2wasm, the 64 bit integer test under dart2js). No other browser and no production backend was tried.
   - Compile with dart2wasm to keep 64 bit integers exact. Compiled with dart2js, integers
     above 2^53 lose precision.
 - **Opt-in persistence on the web** (experimental): `example/sqlite_database_web.dart` is a
@@ -421,6 +421,19 @@ Networking:
   statement on a 1.2 MB database; opening a cache of 1,000 documents went from 0.7 s to 19 ms,
   scanning it from 2.4 s to 39 ms, a write from 0.7 s to 17 ms). Not verified: other browsers,
   a crash of the browser itself.
+- **OPFS storage for the web cache** (experimental): `sqliteWebOpener(opfsWorker: ...)` in
+  `example/sqlite_database_web.dart` keeps the database in the origin private file system,
+  with SQLite in a dedicated worker (`example/sqlite_opfs_worker.dart`, compiled with
+  `dart compile js`) on the synchronous access handles of `SimpleOpfsFileSystem`
+  (`package:sqlite3`), instead of a copy of the whole database in memory. No cross-origin
+  isolation is needed. IndexedDB stays the default, and the fallback in a browser without
+  synchronous OPFS access in workers; the first OPFS open of a cache that is in IndexedDB
+  moves it, pending writes included. Measured in Chrome with 100,000 documents of about 1 KB:
+  3 to 7 MB once open instead of 133 to 138 MB, opens in 45 to 170 ms instead of 0.55 to
+  1.2 s; reads by id and scans cost about the same (a scan of 100,000 documents needs about
+  0.45 GB for its snapshot with either storage). A worker killed at random moments 1500 times
+  always left an intact database with every acknowledged transaction. Not verified: browsers
+  other than Chrome.
 - Web transport robustness (web only, the gRPC transport is unchanged):
   - `FirestoreSettings.experimentalForceLongPolling` and
     `experimentalAutoDetectLongPolling` (on by default), for networks where a proxy buffers
@@ -602,7 +615,7 @@ Documentation and tests:
   SDK). Two clients on one SQLite file keep it consistent and elect a primary client that alone
   uses the network (see Fixed), but they do not share listens or writes; in the browser the cache
   is refused to a second tab.
-- On the web: OPFS storage, and any browser other than Chrome.
+- On the web: any browser other than Chrome.
 - Pipelines beyond the preview: pipelines in a read-write `Transaction`, evaluation against the
   local cache (an internal evaluator exists but is not wired into the client) and real-time
   pipelines. Search and window functions are only checked for their encoding.

@@ -55,6 +55,7 @@ Future<bool> hasSqlite3Wasm() async {
 }
 
 void main() {
+  setUpAll(loadEmulatorPort);
   test('page 1 writes, and leaves without closing the client', () async {
     if (!await hasSqlite3Wasm()) {
       markTestSkipped('test/browser/sqlite3.wasm is missing: see '

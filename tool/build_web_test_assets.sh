@@ -14,6 +14,9 @@
 #   test/browser/sqlite3.wasm           the WebAssembly build of SQLite for the persistence
 #                                       tests and the SQLite unit tests in a browser
 #   test/browser/crash/crash_worker.js  the worker of web_persistence_crash_test.dart
+#   test/browser/opfs/sqlite_opfs_worker.js
+#                                       example/sqlite_opfs_worker.dart compiled, for the
+#                                       OPFS storage tests
 #
 # Environment:
 #   SQLITE3_WASM  a sqlite3.wasm to use instead of downloading one
@@ -88,6 +91,24 @@ else
     test/browser/crash/crash_worker.dart) >"$COMPILE_LOG" 2>&1; then
     cat "$COMPILE_LOG"; rm -f "$WORKER" "$COMPILE_LOG"
     echo "Could not compile crash_worker.js"
+    exit 1
+  fi
+  rm -f "$COMPILE_LOG"
+fi
+
+# --- sqlite_opfs_worker.js ----------------------------------------------------------------
+# The worker of the OPFS storage of example/sqlite_database_web.dart, compiled the way its
+# header tells apps to.
+OPFS_WORKER="$PKG/test/browser/opfs/sqlite_opfs_worker.js"
+if up_to_date "$OPFS_WORKER" "$PKG/example/sqlite_opfs_worker.dart" "$PKG/pubspec.lock"; then
+  :
+else
+  echo "Compiling test/browser/opfs/sqlite_opfs_worker.js"
+  COMPILE_LOG="$(mktemp)"
+  if ! (cd "$PKG" && dart compile js -O2 -o test/browser/opfs/sqlite_opfs_worker.js \
+    example/sqlite_opfs_worker.dart) >"$COMPILE_LOG" 2>&1; then
+    cat "$COMPILE_LOG"; rm -f "$OPFS_WORKER" "$COMPILE_LOG"
+    echo "Could not compile sqlite_opfs_worker.js"
     exit 1
   fi
   rm -f "$COMPILE_LOG"

@@ -10,13 +10,14 @@ import 'package:cloud_firestore_dart/src/internal_access.dart';
 import 'package:firebase_app_dart/firebase_app_dart.dart';
 import 'package:test/test.dart';
 
-const String emulatorHost = String.fromEnvironment(
-    'FIRESTORE_EMULATOR_HOST_NAME',
-    defaultValue: '127.0.0.1');
-const int emulatorPort =
-    int.fromEnvironment('FIRESTORE_EMULATOR_PORT', defaultValue: 8090);
-const String projectId =
-    String.fromEnvironment('FIRESTORE_PROJECT_ID', defaultValue: 'demo-test');
+import 'emulator_port.dart';
+
+export 'emulator_port.dart';
+
+const String projectId = String.fromEnvironment(
+  'FIRESTORE_PROJECT_ID',
+  defaultValue: 'demo-test',
+);
 
 final Random _random = Random();
 int _apps = 0;
@@ -33,6 +34,7 @@ Future<Firestore> newClient({
   bool forceLongPolling = false,
   String? appName,
 }) async {
+  await loadEmulatorPort();
   final FirebaseApp app = FirebaseApp.withOptions(
     const FirebaseOptions(
       apiKey: 'demo-key',
@@ -47,10 +49,11 @@ Future<Firestore> newClient({
       app: app,
       openDatabase: openDatabase,
       settings: FirestoreSettings(
-              experimentalForceLongPolling: forceLongPolling,
-              cacheSettings:
-                  openDatabase == null ? const MemoryCacheSettings() : null)
-          .withEmulator(emulatorHost, emulatorPort),
+        experimentalForceLongPolling: forceLongPolling,
+        cacheSettings: openDatabase == null
+            ? const MemoryCacheSettings()
+            : null,
+      ).withEmulator(emulatorHost, emulatorPort),
     );
   } catch (_) {
     app.delete();
@@ -85,13 +88,16 @@ String newCollectionName() =>
 /// Collects the events of [stream] and waits for one that matches.
 class EventLog<T> {
   EventLog(Stream<T> stream) {
-    _sub = stream.listen((T event) {
-      events.add(event);
-      _changed.add(null);
-    }, onError: (Object error) {
-      errors.add(error);
-      _changed.add(null);
-    });
+    _sub = stream.listen(
+      (T event) {
+        events.add(event);
+        _changed.add(null);
+      },
+      onError: (Object error) {
+        errors.add(error);
+        _changed.add(null);
+      },
+    );
     addTearDown(cancel);
   }
 
@@ -101,8 +107,10 @@ class EventLog<T> {
   late final StreamSubscription<T> _sub;
 
   /// The first event (already received or still to come) that [test] accepts.
-  Future<T> waitFor(bool Function(T event) test,
-      {Duration timeout = const Duration(seconds: 20)}) async {
+  Future<T> waitFor(
+    bool Function(T event) test, {
+    Duration timeout = const Duration(seconds: 20),
+  }) async {
     final Stopwatch watch = Stopwatch()..start();
     int checked = 0;
     while (true) {
@@ -117,7 +125,9 @@ class EventLog<T> {
       final Duration left = timeout - watch.elapsed;
       if (left <= Duration.zero) {
         throw TimeoutException(
-            'No matching event among ${events.length} events', timeout);
+          'No matching event among ${events.length} events',
+          timeout,
+        );
       }
       await _changed.stream.first.timeout(left, onTimeout: () {});
     }

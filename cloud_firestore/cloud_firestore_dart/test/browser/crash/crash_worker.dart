@@ -1,5 +1,6 @@
 // The worker of web_persistence_crash_test.dart: it opens a database with the
-// opener of example/sqlite_database_web.dart and writes transactions until the
+// opener of example/sqlite_database_web.dart (in IndexedDB, or in OPFS when
+// the test passes `opfsWorker`) and writes transactions until the
 // test terminates it, at a moment of the test's choosing. Terminating a
 // worker ends its JavaScript and aborts its IndexedDB transactions wherever
 // they are, like closing the tab does to a page.
@@ -73,15 +74,21 @@ Future<void> run(Map<String, Object?> config) async {
   final int largeEvery = config['largeEvery']! as int;
   final int hugeEvery = config['hugeEvery']! as int;
 
-  final Database db = await sqliteWebOpener(
-    sqlite3Wasm: Uri.parse(config['wasm']! as String),
-    storagePrefix: 'crash-test',
-  )(
-    config['name']! as String,
-    version: version,
-    onCreate: (Database db, int to) => migrate(db, 0, to),
-    onUpgrade: migrate,
-  );
+  final Database db =
+      await sqliteWebOpener(
+        sqlite3Wasm: Uri.parse(config['wasm']! as String),
+        // With it the database is in OPFS, in a worker this worker starts and
+        // takes down with it when it is terminated.
+        opfsWorker: config['opfsWorker'] == null
+            ? null
+            : Uri.parse(config['opfsWorker']! as String),
+        storagePrefix: 'crash-test',
+      )(
+        config['name']! as String,
+        version: version,
+        onCreate: (Database db, int to) => migrate(db, 0, to),
+        onUpgrade: migrate,
+      );
   final int userVersion =
       (await db.query('PRAGMA user_version')).single.values.first as int;
   _post('open $userVersion');

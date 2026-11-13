@@ -1,6 +1,7 @@
 // A complete `OpenDatabase` for cloud_firestore_dart in a browser, on top of
 // the WebAssembly build of package:sqlite3, with the database stored in
-// IndexedDB. The counterpart of sqlite_database.dart for the web.
+// IndexedDB, or in the origin private file system (OPFS). The counterpart of
+// sqlite_database.dart for the web.
 //
 // EXPERIMENTAL. Verified in Chrome against the emulator only.
 //
@@ -14,41 +15,70 @@
 //       openDatabase: sqliteWebOpener(sqlite3Wasm: Uri.parse('sqlite3.wasm')),
 //     );
 //
+// For OPFS, also copy sqlite_opfs_worker.dart, compile it to JavaScript as
+// its header says and pass its URL as `opfsWorker`:
+//
+//     sqliteWebOpener(
+//       sqlite3Wasm: Uri.parse('sqlite3.wasm'),
+//       opfsWorker: Uri.parse('sqlite_opfs_worker.js'),
+//     )
+//
+// Which storage:
+//
+//  * IndexedDB (the default, and the fallback). SQLite runs in the page on
+//    a copy of the whole database in memory, which package:sqlite3 copies
+//    back to IndexedDB file by file.
+//  * OPFS (with `opfsWorker`). SQLite runs in a dedicated worker of its own
+//    on a file in OPFS, through synchronous access handles
+//    (`SimpleOpfsFileSystem` of package:sqlite3), and reads from the file
+//    what it needs: the database is not in memory. Every statement is a
+//    message to the worker and back. No cross-origin isolation is needed.
+//    In a browser without synchronous OPFS access in workers the opener uses
+//    IndexedDB instead (decided by the worker from what the browser offers,
+//    never because an open failed). The first OPFS open of a cache that is
+//    in IndexedDB moves it, pending writes included, and deletes the
+//    IndexedDB database once the move committed.
+//
 // What to know:
 //
 //  * One tab at a time. The client has no way to share its cache between
 //    tabs, so the database is guarded with a Web Lock: opening it in a second
 //    tab (or twice in one page) fails, after two seconds of waiting for the
-//    lock, with a [FirestoreError] with the code `failedPrecondition`. Catch it and create the instance without
-//    `openDatabase` (a memory cache) for that tab, as in
-//    `openWithMemoryFallback` below.
-//  * Crash safety. SQLite runs in memory and the IndexedDB file system of
-//    package:sqlite3 copies its files, the rollback journal included, to
-//    IndexedDB in the background, in the order SQLite wrote them and one
-//    IndexedDB transaction per file. This opener waits for the copies at the
-//    end of every transaction, so what a write future acknowledged is
-//    stored. A tab that dies in the middle of a transaction leaves a journal
-//    behind and SQLite rolls that transaction back on the next open; the
-//    setup of a new or upgraded cache is one transaction as well. Tested by
-//    killing a worker at random moments (test/browser, 2700 kills): the
-//    database always passed `PRAGMA integrity_check`, had every acknowledged
-//    transaction, and at most one that was not acknowledged yet. Not covered:
-//    a crash of the browser itself or a power cut, where IndexedDB may lose
-//    its last transactions.
-//  * When IndexedDB fails. A transaction is committed in memory before it is
-//    copied to IndexedDB. When the wait for the copy fails, the next
-//    transaction fails with a [TransientDatabaseException] until a wait
-//    succeeds; the client goes offline meanwhile and retries (see
+//    lock, with a [FirestoreError] with the code `failedPrecondition`. Catch
+//    it and create the instance without `openDatabase` (a memory cache) for
+//    that tab, as in `openWithMemoryFallback` below.
+//  * Crash safety. With IndexedDB, SQLite runs in memory and the IndexedDB
+//    file system of package:sqlite3 copies its files, the rollback journal
+//    included, to IndexedDB in the background, in the order SQLite wrote them
+//    and one IndexedDB transaction per file. This opener waits for the copies
+//    at the end of every transaction, so what a write future acknowledged is
+//    stored. With OPFS, SQLite writes its journal and its database file
+//    itself and flushes them at the end of every transaction, as on disk. A
+//    tab that dies in the middle of a transaction leaves a journal behind and
+//    SQLite rolls that transaction back on the next open; the setup of a new
+//    or upgraded cache is one transaction as well. Tested by killing a worker
+//    at random moments (test/browser, 2700 kills on IndexedDB, 1500 on OPFS):
+//    the database always passed `PRAGMA integrity_check`, had every
+//    acknowledged transaction, and at most one that was not acknowledged yet.
+//    Not covered: a crash of the browser itself or a power cut.
+//  * When IndexedDB fails (IndexedDB storage). A transaction is committed in
+//    memory before it is copied to IndexedDB. When the wait for the copy
+//    fails, the next transaction fails with a [TransientDatabaseException]
+//    until a wait succeeds; the client goes offline meanwhile and retries (see
 //    `SqliteWebDatabase._stored`). With sqlite3 2.9.4 only a closed IndexedDB
 //    file system makes the wait fail: the file system does not report a copy
 //    that failed.
-//  * Memory and speed. The whole database is read into memory when it is
-//    opened and stays there. Measured in Chrome with documents of about
-//    1 KB: 10,000 cached documents are a 17 MB database that opens in 0.1 s
-//    and is scanned in 0.4 s; 100,000 are 160 MB, open in 1.2 s compiled
-//    with dart2wasm (0.6 s with dart2js), take about 0.5 GB of JavaScript
-//    heap once open and 4 s to scan (2.5 s with dart2js).
-//  * `Firestore.clearPersistence()` deletes the IndexedDB database.
+//  * Memory and speed, measured in Chrome with documents of about 1 KB
+//    (tool/web_storage_benchmark): with IndexedDB the whole database is read
+//    into memory when it is opened and stays there, 133 to 138 MB for
+//    100,000 cached documents, and the open takes 0.5 to 1.2 s. With OPFS the
+//    page and the worker hold 3 to 8 MB once open, whatever the size, and the
+//    open takes 45 to 170 ms. Reads by id take 0.1 to 0.2 ms with both. A
+//    query that scans 100,000 documents takes 1 to 2 s with both, and its
+//    snapshot of 100,000 documents needs about 0.45 GB with either storage.
+//  * `Firestore.clearPersistence()` deletes the IndexedDB database or the
+//    OPFS directory (and an IndexedDB database of the same name left from
+//    before).
 
 import 'dart:async';
 import 'dart:js_interop';
@@ -60,16 +90,27 @@ import 'package:firebase_app_dart/firebase_app_dart.dart';
 import 'package:sqlite3/wasm.dart' as sqlite;
 import 'package:web/web.dart' as web;
 
-/// Returns an [OpenDatabase] that keeps each database in IndexedDB.
+/// Returns an [OpenDatabase] that keeps each database in IndexedDB, or in the
+/// origin private file system (OPFS) when [opfsWorker] is given and the
+/// browser supports it.
 ///
 /// [sqlite3Wasm] is the URL of the `sqlite3.wasm` file of the sqlite3 package
 /// version in use; it is fetched on the first open. [storagePrefix] names the
-/// IndexedDB databases (`<prefix>/<database name>`) and the Web Locks.
-/// [lockTimeout] is how long an open waits for a database that is open
-/// elsewhere before it fails: long enough for the page that was just reloaded
-/// to be gone, short for a second tab.
+/// IndexedDB databases and OPFS directories (`<prefix>/<database name>`) and
+/// the Web Locks. [lockTimeout] is how long an open waits for a database that
+/// is open elsewhere before it fails: long enough for the page that was just
+/// reloaded to be gone, short for a second tab.
+///
+/// [opfsWorker] is the URL of sqlite_opfs_worker.dart compiled to JavaScript
+/// (see that file). With it the database is a file in OPFS that SQLite reads
+/// from as it needs, in that dedicated worker, instead of a copy of the whole
+/// database in memory ([SqliteOpfsDatabase]). In a browser without
+/// synchronous OPFS access in workers the opener uses IndexedDB as without
+/// it ([SqliteWebDatabase]). The first OPFS open of a cache that exists in
+/// IndexedDB only moves it to OPFS, pending writes included.
 OpenDatabase sqliteWebOpener({
   required Uri sqlite3Wasm,
+  Uri? opfsWorker,
   String storagePrefix = 'cloud_firestore_dart',
   Duration lockTimeout = const Duration(seconds: 2),
 }) {
@@ -103,6 +144,37 @@ OpenDatabase sqliteWebOpener({
         'in this tab.',
         FirestoreErrorCode.failedPrecondition,
       );
+    }
+
+    if (opfsWorker != null) {
+      final SqliteOpfsDatabase? opened;
+      try {
+        opened = await _openOpfs(
+          worker: Uri.base.resolveUri(opfsWorker),
+          sqlite3Wasm: Uri.base.resolveUri(sqlite3Wasm),
+          storageName: storageName,
+          releaseLock: releaseLock,
+          // The Web Lock keeps other tabs out, so files that are still busy
+          // belong to the worker of a page that is gone: the browser ends it
+          // a moment later, usually well within a second, rarely after more
+          // than two (seen in test/browser/web_persistence_crash_test.dart).
+          handleTimeout: _opfsHandleTimeout,
+          version: version,
+          onConfigure: onConfigure,
+          onCreate: onCreate,
+          onUpgrade: onUpgrade,
+          onDowngrade: onDowngrade,
+          onOpen: onOpen,
+        );
+      } catch (_) {
+        await releaseLock();
+        rethrow;
+      }
+      if (opened != null) {
+        return opened;
+      }
+      // No synchronous OPFS access in this browser: IndexedDB, as without a
+      // worker. The lock is still held.
     }
 
     sqlite.IndexedDbFileSystem? fileSystem;
@@ -200,12 +272,16 @@ OpenDatabase sqliteWebOpener({
 Future<Firestore> openWithMemoryFallback({
   required FirebaseApp app,
   required Uri sqlite3Wasm,
+  Uri? opfsWorker,
   FirestoreSettings? settings,
 }) async {
   try {
     return Firestore.instanceFor(
       app: app,
-      openDatabase: sqliteWebOpener(sqlite3Wasm: sqlite3Wasm),
+      openDatabase: sqliteWebOpener(
+        sqlite3Wasm: sqlite3Wasm,
+        opfsWorker: opfsWorker,
+      ),
       settings: settings,
     );
   } on FirestoreError catch (e) {
@@ -512,4 +588,455 @@ class SqliteWebDatabase implements ClearableDatabase {
     await _closed;
     await sqlite.IndexedDbFileSystem.deleteDatabase(path);
   }
+}
+
+// --- OPFS ------------------------------------------------------------------
+
+/// Opens [storageName] in OPFS, in a new dedicated [worker] running
+/// sqlite_opfs_worker.dart. Returns null, having changed nothing, when the
+/// browser has no synchronous OPFS access in workers.
+///
+/// The caller holds the Web Lock of [storageName]; the returned database
+/// releases it with [releaseLock] when it is closed. When the open fails the
+/// lock is left to the caller.
+Future<SqliteOpfsDatabase?> _openOpfs({
+  required Uri worker,
+  required Uri sqlite3Wasm,
+  required String storageName,
+  required Future<void> Function() releaseLock,
+  required Duration handleTimeout,
+  int? version,
+  OnConfigure? onConfigure,
+  OnCreate? onCreate,
+  OnVersionChange? onUpgrade,
+  OnVersionChange? onDowngrade,
+  OnOpen? onOpen,
+}) async {
+  final _OpfsWorker? connection = _OpfsWorker.start(worker);
+  if (connection == null) {
+    return null;
+  }
+  try {
+    final JSObject loaded =
+        (await connection.call(
+              'load',
+              JSObject()
+                ..['wasm'] = sqlite3Wasm.toString().toJS
+                ..['path'] = storageName.toJS
+                ..['waitMs'] = handleTimeout.inMilliseconds.toJS,
+            ))!
+            as JSObject;
+    if (!(loaded['supported']! as JSBoolean).toDart) {
+      connection.terminate();
+      return null;
+    }
+
+    // A cache that is in IndexedDB only, from before OPFS was used: it is
+    // moved, so that its pending writes are not lost.
+    bool imported = false;
+    if (!(loaded['exists']! as JSBoolean).toDart) {
+      imported = await _importFromIndexedDb(connection, storageName);
+    }
+
+    await connection.call('open');
+    final SqliteOpfsDatabase db = SqliteOpfsDatabase._(
+      connection,
+      storageName,
+      releaseLock,
+    );
+
+    await onConfigure?.call(db);
+
+    // The setup and the schema version it leads to are one transaction, as
+    // for IndexedDB above.
+    final int wanted = version ?? 1;
+    await db.execute('BEGIN IMMEDIATE');
+    try {
+      final int current =
+          (await db.query('PRAGMA user_version')).single.values.first as int;
+      final bool isNew =
+          current == 0 &&
+          (await db.query('SELECT 1 FROM sqlite_master LIMIT 1')).isEmpty;
+      if (isNew) {
+        await onCreate?.call(db, wanted);
+      } else if (current < wanted) {
+        await onUpgrade?.call(db, current, wanted);
+      } else if (current > wanted) {
+        await onDowngrade?.call(db, current, wanted);
+      }
+      await db.execute('PRAGMA user_version = $wanted');
+      await db.execute('COMMIT');
+    } catch (_) {
+      await connection.call('rollback');
+      rethrow;
+    }
+    if (imported) {
+      // It is in OPFS now.
+      await sqlite.IndexedDbFileSystem.deleteDatabase(storageName);
+    }
+
+    await onOpen?.call(db);
+    return db;
+  } catch (_) {
+    try {
+      await connection.call('close');
+    } catch (_) {
+      // The worker failed; terminating it closes its files as well.
+    }
+    connection.terminate();
+    rethrow;
+  }
+}
+
+/// Copies the IndexedDB database [storageName] of the IndexedDB storage, if
+/// there is one, to the OPFS files of [connection] before they are opened.
+/// Returns whether there was one.
+Future<bool> _importFromIndexedDb(
+  _OpfsWorker connection,
+  String storageName,
+) async {
+  final List<String>? stored = await sqlite.IndexedDbFileSystem.databases();
+  if (stored == null || !stored.contains(storageName)) {
+    return false;
+  }
+  final sqlite.IndexedDbFileSystem fileSystem =
+      await sqlite.IndexedDbFileSystem.open(
+        dbName: storageName,
+        vfsName: 'indexeddb-import-${_fileSystems++}',
+      );
+  final Uint8List? database;
+  final Uint8List? journal;
+  try {
+    Uint8List? read(String file) {
+      if (fileSystem.xAccess(file, 0) == 0) {
+        return null;
+      }
+      final sqlite.VirtualFileSystemFile opened = fileSystem
+          .xOpen(
+            sqlite.Sqlite3Filename(file),
+            sqlite.SqlFlag.SQLITE_OPEN_READWRITE,
+          )
+          .file;
+      try {
+        final Uint8List bytes = Uint8List(opened.xFileSize());
+        opened.xRead(bytes, 0);
+        return bytes;
+      } finally {
+        opened.xClose();
+      }
+    }
+
+    database = read('/database');
+    journal = read('/database-journal');
+  } finally {
+    await fileSystem.close();
+  }
+  if (database == null || database.isEmpty) {
+    return false;
+  }
+  final JSUint8Array databaseBytes = database.toJS;
+  final JSUint8Array? journalBytes = journal?.toJS;
+  await connection.call(
+    'import',
+    JSObject()
+      ..['database'] = databaseBytes
+      ..['journal'] = journalBytes,
+    <JSObject>[
+      databaseBytes['buffer']! as JSObject,
+      if (journalBytes != null) journalBytes['buffer']! as JSObject,
+    ],
+  );
+  return true;
+}
+
+/// Opens the OPFS database [storageName] as it is, without the Web Lock,
+/// the schema steps or the IndexedDB import of [sqliteWebOpener]: to look at
+/// a database that nothing else has open (tests, debugging). Returns null
+/// when the browser has no synchronous OPFS access in workers.
+Future<SqliteOpfsDatabase?> inspectOpfsDatabase({
+  required Uri opfsWorker,
+  required Uri sqlite3Wasm,
+  required String storageName,
+}) async {
+  final _OpfsWorker? connection = _OpfsWorker.start(
+    Uri.base.resolveUri(opfsWorker),
+  );
+  if (connection == null) {
+    return null;
+  }
+  try {
+    final JSObject loaded =
+        (await connection.call(
+              'load',
+              JSObject()
+                ..['wasm'] = Uri.base.resolveUri(sqlite3Wasm).toString().toJS
+                ..['path'] = storageName.toJS
+                ..['waitMs'] = _opfsHandleTimeout.inMilliseconds.toJS,
+            ))!
+            as JSObject;
+    if (!(loaded['supported']! as JSBoolean).toDart) {
+      connection.terminate();
+      return null;
+    }
+    await connection.call('open');
+    return SqliteOpfsDatabase._(connection, storageName, () async {});
+  } catch (_) {
+    connection.terminate();
+    rethrow;
+  }
+}
+
+/// How long an OPFS open waits for files that the worker of a closed page
+/// still holds.
+const Duration _opfsHandleTimeout = Duration(seconds: 10);
+
+/// An error that SQLite (or the file system) reported in the OPFS worker.
+class SqliteOpfsException implements Exception {
+  SqliteOpfsException(this.message);
+
+  final String message;
+
+  @override
+  String toString() => 'SqliteOpfsException: $message';
+}
+
+/// The messages to and from one worker running sqlite_opfs_worker.dart.
+class _OpfsWorker {
+  _OpfsWorker._(this._script, this._worker) {
+    _worker.onmessage = _onMessage.toJS;
+    _worker.onerror = _onError.toJS;
+    _worker.onmessageerror = _onError.toJS;
+  }
+
+  /// Null in a context without workers.
+  static _OpfsWorker? start(Uri script) {
+    if (!globalContext.has('Worker')) {
+      return null;
+    }
+    return _OpfsWorker._(script, web.Worker(script.toString().toJS));
+  }
+
+  final Uri _script;
+  final web.Worker _worker;
+  final Map<int, Completer<JSAny?>> _pending = <int, Completer<JSAny?>>{};
+  int _next = 0;
+  Object? _failure;
+
+  Future<JSAny?> call(
+    String op, [
+    JSObject? request,
+    List<JSObject> transfer = const <JSObject>[],
+  ]) {
+    if (_failure != null) {
+      return Future<JSAny?>.error(_failure!);
+    }
+    final int id = _next++;
+    final JSObject message = (request ?? JSObject())
+      ..['id'] = id.toJS
+      ..['op'] = op.toJS;
+    final Completer<JSAny?> reply = Completer<JSAny?>();
+    _pending[id] = reply;
+    if (transfer.isEmpty) {
+      _worker.postMessage(message);
+    } else {
+      _worker.postMessage(message, transfer.toJS);
+    }
+    return reply.future;
+  }
+
+  void _onMessage(web.MessageEvent event) {
+    final JSObject reply = event.data! as JSObject;
+    final Completer<JSAny?>? completer = _pending.remove(
+      (reply['id']! as JSNumber).toDartInt,
+    );
+    if (completer == null) {
+      return;
+    }
+    if (reply.has('error')) {
+      completer.completeError(
+        SqliteOpfsException((reply['error']! as JSString).toDart),
+      );
+    } else {
+      completer.complete(reply['result']);
+    }
+  }
+
+  void _onError(web.Event event) {
+    event.preventDefault();
+    final String detail = event.isA<web.ErrorEvent>()
+        ? (event as web.ErrorEvent).message
+        : 'the script could not be loaded or a message could not be read';
+    _fail(StateError('The OPFS worker $_script failed: $detail'));
+  }
+
+  void _fail(Object error) {
+    _failure ??= error;
+    final List<Completer<JSAny?>> waiting = _pending.values.toList();
+    _pending.clear();
+    for (final Completer<JSAny?> completer in waiting) {
+      completer.completeError(error);
+    }
+  }
+
+  void terminate() {
+    _worker.terminate();
+    _fail(StateError('The OPFS worker was terminated'));
+  }
+}
+
+/// One open SQLite database in OPFS, kept by its own dedicated worker.
+/// Firestore runs its own SQL through it.
+class SqliteOpfsDatabase implements ClearableDatabase {
+  SqliteOpfsDatabase._(this._worker, this.path, this._releaseLock);
+
+  final _OpfsWorker _worker;
+  final Future<void> Function() _releaseLock;
+
+  /// The OPFS directory of the database.
+  @override
+  final String path;
+
+  /// Completes when the worker closed the files and the lock is released.
+  Future<void>? _closed;
+
+  JSObject _statement(String statement, List<Object?>? arguments) {
+    final JSObject request = JSObject()..['sql'] = statement.toJS;
+    if (arguments != null && arguments.isNotEmpty) {
+      request['args'] = <JSAny?>[
+        for (final Object? value in arguments) _encodeValue(value),
+      ].toJS;
+    }
+    return request;
+  }
+
+  @override
+  Future<void> execute(String statement, [List<Object?>? arguments]) async {
+    await _worker.call('execute', _statement(statement, arguments));
+  }
+
+  @override
+  Future<List<Map<String, dynamic>>> query(
+    String statement, [
+    List<Object?>? arguments,
+  ]) async {
+    final JSObject result =
+        (await _worker.call('query', _statement(statement, arguments)))!
+            as JSObject;
+    final List<String> columns = <String>[
+      for (final JSString column
+          in (result['columns']! as JSArray<JSString>).toDart)
+        column.toDart,
+    ];
+    final List<JSArray<JSAny?>> rows =
+        (result['rows']! as JSArray<JSArray<JSAny?>>).toDart;
+    return <Map<String, dynamic>>[
+      for (final JSArray<JSAny?> row in rows) _row(columns, row.toDart),
+    ];
+  }
+
+  static Map<String, dynamic> _row(List<String> columns, List<JSAny?> values) {
+    final Map<String, dynamic> row = <String, dynamic>{};
+    for (int i = 0; i < columns.length; i++) {
+      row[columns[i]] = _decodeValue(values[i]);
+    }
+    return row;
+  }
+
+  /// Runs a DELETE and returns the number of rows it removed.
+  @override
+  Future<int> delete(String statement, [List<Object?>? arguments]) async {
+    final JSNumber rows =
+        (await _worker.call('delete', _statement(statement, arguments)))!
+            as JSNumber;
+    return rows.toDartInt;
+  }
+
+  @override
+  void close() {
+    if (_closed != null) {
+      return;
+    }
+    final Future<void> closed = () async {
+      try {
+        await _worker.call('close');
+      } finally {
+        _worker.terminate();
+        await _releaseLock();
+      }
+    }();
+    _closed = closed;
+    // Never fails, so that the next open can simply wait for it.
+    late final Future<void> pending;
+    pending = closed.then<void>((_) {}, onError: (Object _) {}).whenComplete(
+      () {
+        if (identical(_closing[path], pending)) {
+          _closing.remove(path);
+        }
+      },
+    );
+    _closing[path] = pending;
+  }
+
+  /// Completes when [close] has ended the worker and released the lock (at
+  /// once when it was not called). Never fails.
+  Future<void> get whenClosed => (_closed ?? Future<void>.value()).then<void>(
+    (_) {},
+    onError: (Object _) {},
+  );
+
+  /// Deletes the OPFS directory (and an IndexedDB database of the same name
+  /// that may be left from before), for `Firestore.clearPersistence`.
+  @override
+  Future<void> clearStorage() async {
+    close();
+    await _closed;
+    await sqlite.SimpleOpfsFileSystem.deleteFromStorage(path);
+    await sqlite.IndexedDbFileSystem.deleteDatabase(path);
+  }
+}
+
+const bool _isWasm = bool.fromEnvironment('dart.tool.dart2wasm');
+
+JSAny? _encodeValue(Object? value) {
+  if (value == null) {
+    return null;
+  } else if (value is int &&
+      value <= 9007199254740991 &&
+      value >= -9007199254740991) {
+    return value.toJS;
+  } else if (value is double) {
+    // Compiled to JavaScript every number is a double (and an int): only
+    // those that are not safe integers get here.
+    return JSObject()..['d'] = value.toJS;
+  } else if (value is int) {
+    return JSObject()..['i'] = value.toString().toJS;
+  } else if (value is String) {
+    return value.toJS;
+  } else if (value is Uint8List) {
+    return value.toJS;
+  } else if (value is bool) {
+    return (value ? 1 : 0).toJS;
+  }
+  throw ArgumentError.value(value, 'value', 'Not a SQLite value');
+}
+
+Object? _decodeValue(JSAny? value) {
+  if (value == null) {
+    return null;
+  } else if (value.typeofEquals('number')) {
+    return (value as JSNumber).toDartInt;
+  } else if (value.typeofEquals('string')) {
+    return (value as JSString).toDart;
+  } else if (value.isA<JSUint8Array>()) {
+    final Uint8List view = (value as JSUint8Array).toDart;
+    // Compiled with dart2wasm `toDart` is a view of the JavaScript array whose
+    // every element access is a call into JavaScript: Firestore decodes the
+    // blob byte by byte, so it gets a copy of its own.
+    return _isWasm ? Uint8List.fromList(view) : view;
+  }
+  final JSObject object = value as JSObject;
+  if (object.has('i')) {
+    return int.parse((object['i']! as JSString).toDart);
+  }
+  return (object['d']! as JSNumber).toDartDouble;
 }

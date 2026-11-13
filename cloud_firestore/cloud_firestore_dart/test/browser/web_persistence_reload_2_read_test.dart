@@ -16,6 +16,7 @@ import 'web_persistence_reload_1_write_test.dart'
 typedef Json = Map<String, Object?>;
 
 void main() {
+  setUpAll(loadEmulatorPort);
   test('page 2 finds the data and the pending writes of page 1', () async {
     if (!await hasSqlite3Wasm()) {
       markTestSkipped('test/browser/sqlite3.wasm is missing: see '

@@ -44,7 +44,7 @@ yet**, so the `dart pub add` command above only works once it is.
 - Features of the Enterprise edition (BSON value types, Pipelines) were verified against the
   emulator in Enterprise edition only, never against a production Enterprise database.
 - Web support is experimental: tested in Chrome only, against the emulator only. The cache is
-  in memory unless you opt in to SQLite in IndexedDB. See [Platforms](#platforms).
+  in memory unless you opt in to SQLite in IndexedDB or OPFS. See [Platforms](#platforms).
 
 ## Platforms
 
@@ -68,42 +68,66 @@ listen and write streams, over `fetch`. What to know:
 
 - The cache is in memory by default. To keep it across page loads, pass the `OpenDatabase` of
   [`example/sqlite_database_web.dart`](https://github.com/long1eu/firebase_dart_sdk/blob/main/cloud_firestore/cloud_firestore_dart/example/sqlite_database_web.dart) (copy the file into
-  your app): SQLite compiled to WebAssembly by `package:sqlite3`, with the database in
-  IndexedDB. It needs the `sqlite3.wasm` file of that package next to your page. One tab at a
-  time: a second tab that opens the same cache gets a `FirestoreError` with
-  `failedPrecondition` (a Web Lock guards the database) and should use a memory cache;
-  `openWithMemoryFallback` in that file does this. `clearPersistence()` deletes the IndexedDB
-  database. Cost, measured for a small app compiled with `dart compile js -O2`: 588 KB (180 KB
-  gzipped) with a memory cache, 807 KB (239 KB gzipped) with the persistent cache, plus
-  `sqlite3.wasm`, 731 KB (349 KB gzipped).
+  your app): SQLite compiled to WebAssembly by `package:sqlite3`. It needs the `sqlite3.wasm`
+  file of that package next to your page. It stores the database in one of two places:
+  - **IndexedDB** (the default): SQLite runs in the page on a copy of the whole database in
+    memory, and the opener waits for IndexedDB at the end of every transaction.
+  - **OPFS** (the origin private file system), when you also copy
+    [`example/sqlite_opfs_worker.dart`](https://github.com/long1eu/firebase_dart_sdk/blob/main/cloud_firestore/cloud_firestore_dart/example/sqlite_opfs_worker.dart), compile it with
+    `dart compile js` and pass its URL as `opfsWorker`. SQLite then runs in that dedicated
+    worker on a file it reads as it needs (synchronous access handles, `SimpleOpfsFileSystem`
+    of `package:sqlite3`), so the database is not held in memory. No cross-origin isolation
+    headers are needed. In a browser without synchronous OPFS access in workers the opener
+    falls back to IndexedDB. The first OPFS open of a cache that is in IndexedDB moves it to
+    OPFS, pending writes included.
+
+  One tab at a time with either: a second tab that opens the same cache gets a
+  `FirestoreError` with `failedPrecondition` (a Web Lock guards the database) and should use a
+  memory cache; `openWithMemoryFallback` in that file does this. `clearPersistence()` deletes
+  the IndexedDB database or the OPFS directory. Cost, measured for a small app compiled with
+  `dart compile js -O2`: 588 KB (180 KB gzipped) with a memory cache, 807 KB (239 KB gzipped)
+  with the persistent cache, plus `sqlite3.wasm`, 731 KB (349 KB gzipped); the OPFS worker is
+  183 KB more (`-O2`).
   - Crash safety: what a write future acknowledged is stored, and a tab that dies in the middle
     of a transaction loses only that transaction (SQLite's rollback journal is stored too and
-    is applied on the next open). Tested by killing a worker at random moments, 2700 times.
-    A crash of the browser itself or a power cut is not covered.
-  - Memory and speed: the whole database is read into memory when it is opened. Measured in
-    Chrome with documents of about 1 KB (database size; time to open; full scan from the
-    cache; one write):
+    is applied on the next open). Tested by killing a worker at random moments, 2700 times on
+    IndexedDB and 1500 times on OPFS. A crash of the browser itself or a power cut is not
+    covered.
+  - Memory and speed, measured in headless Chrome 157 with documents of about 1 KB
+    (`dart run tool/web_storage_benchmark/run.dart`; memory is
+    `performance.measureUserAgentSpecificMemory()` of the page and its workers; open; median
+    read of one document by id; a query that scans the collection for one document; a full
+    scan; memory once open; memory holding the snapshot of the full scan):
 
-    | Cached documents | Database | dart2wasm | dart2js |
-    |---|---|---|---|
-    | 1,000 | 2 MB | 19 ms; 39 ms; 17 ms | 13 ms; 24 ms; 13 ms |
-    | 10,000 | 17 MB | 0.13 s; 0.39 s; 21 ms | 0.08 s; 0.27 s; 17 ms |
-    | 100,000 | 160 MB | 1.2 s; 4.1 s; 18 ms | 0.6 s; 2.5 s; 12 ms |
+    | Documents | Compiler | Storage | Open | Read by id | Filtered | Full scan | Memory open | With the scan |
+    |---|---|---|---|---|---|---|---|---|
+    | 10,000 | dart2js | IndexedDB | 66 ms | 0.06 ms | 0.10 s | 0.21 s | 20 MB | 66 MB |
+    | 10,000 | dart2js | OPFS | 34 ms | 0.14 ms | 0.11 s | 0.19 s | 7 MB | 53 MB |
+    | 10,000 | dart2wasm | IndexedDB | 76 ms | 0.10 ms | 0.16 s | 0.09 s | 15 MB | 57 MB |
+    | 10,000 | dart2wasm | OPFS | 42 ms | 0.13 ms | 0.09 s | 0.13 s | 3 MB | 46 MB |
+    | 100,000 | dart2js | IndexedDB | 1.05 s | 0.09 ms | 0.98 s | 2.0 s | 138 MB | 592 MB |
+    | 100,000 | dart2js | OPFS | 52 ms | 0.16 ms | 1.0 s | 2.3 s | 7 MB | 462 MB |
+    | 100,000 | dart2wasm | IndexedDB | 0.55 s | 0.17 ms | 1.5 s | 2.2 s | 133 MB | 557 MB |
+    | 100,000 | dart2wasm | OPFS | 45 ms | 0.12 ms | 0.83 s | 1.5 s | 3 MB | 427 MB |
 
-    With 100,000 documents the JavaScript heap was about 0.5 GB once open (dart2js). Treat
-    some tens of thousands of documents as the practical limit; the default cache size limit
-    of 100 MB starts evicting unused documents before that.
+    A second run gave the same memory to the MB and times up to twice as long (100,000
+    documents: open 0.6 to 1.2 s with IndexedDB, 77 to 166 ms with OPFS). OPFS keeps memory
+    flat (a few MB) and opens in well under 0.2 s at any size; IndexedDB holds the whole database (about 1.4 KB per document)
+    and opens in time proportional to it. A query that returns 100,000 documents needs about
+    0.45 GB with either storage: that is the snapshot, not the storage. Reads cost about the
+    same; with OPFS each statement is a round trip to the worker (tens of microseconds).
+    The default cache size limit of 100 MB starts evicting unused documents before 100,000.
   - The opener works around a slowness of `sqlite3` 2.9.4 compiled with dart2wasm, where
-    every read of the database cost a copy of the whole file (0.7 s to open and 2.4 s to scan
-    the 1,000 documents above, and worse with the size). Use the opener as it is in
+    every read of the IndexedDB database cost a copy of the whole file (0.7 s to open and
+    2.4 s to scan 1,000 documents, and worse with the size). Use the opener as it is in
     `example/`; an older copy without `_ReadCopyFileSystem` is that slow.
 - Against the emulator, a query that returns more than about 10,000 documents fails on the
   web with `unavailable` (the emulator's WebChannel endpoint drops the stream; over gRPC the
   same query works). Read such collections in pages there. Whether the production backend
   has such a limit was not checked.
-- It was verified against the emulator only: 41 tests in Chrome (`tool/test_browser.sh both`
-  from the repository root; 40 pass and 1 is skipped with each compiler: under dart2wasm the
-  crash harness of the persistent cache, under dart2js the test of 64 bit integers), and the
+- It was verified against the emulator only: 52 tests in Chrome (`tool/test_browser.sh both`
+  from the repository root; 51 pass and 1 is skipped with each compiler: under dart2wasm the
+  crash harness of the IndexedDB storage, under dart2js the test of 64 bit integers), and the
   whole standard integration suite on the VM over the web transport
   (`tool/test_integration.sh standard --transport=webchannel`). Other browsers and the
   production backend are untested.
@@ -751,7 +775,7 @@ repository root (see `tool/README.md`).
 | Unit | `dart test test/unit` | none |
 | Integration | `FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 dart test test/integration` | standard emulator (`tool/start_emulator.sh`) |
 | Enterprise | `FIRESTORE_ENTERPRISE_EMULATOR_HOST=127.0.0.1:8181 dart test test/integration_enterprise` | Enterprise edition emulator (`tool/start_enterprise_emulator.sh`) |
-| Browser | `tool/test_browser.sh [dart2wasm\|dart2js\|both]` (repository root) | a private emulator on 127.0.0.1:8090 that the script starts, Chrome |
+| Browser | `tool/test_browser.sh [dart2wasm\|dart2js\|both]` (repository root) | a private emulator on 127.0.0.1:8090 (or `FIRESTORE_EMULATOR_PORT`) that the script starts, Chrome |
 | Integration over the web transport | `tool/test_integration.sh standard --transport=webchannel` (repository root; also `--transport=webchannel-longpolling`) | the private emulator on 127.0.0.1:8090; runs on the VM |
 | Chaos tests | part of `test/integration` (`firebase/firestore/chaos/`) | standard emulator behind a TCP proxy that cuts and stalls connections |
 | Firestore Lite size check | `tool/check_size.sh` (repository root) | none; compiles two programs with `dart compile js` |
@@ -863,7 +887,8 @@ Not done:
   features only against the Enterprise edition emulator. The production verification kit and
   the opt-in real-project test mode exist but have not been run. The packages are not
   published.
-- **Web beyond the experiment**: OPFS storage, and any browser other than Chrome.
+- **Web beyond the experiment**: any browser other than Chrome (the OPFS storage was not run
+  in Safari or Firefox either), and a cache shared between tabs or owned by a shared worker.
 - **Pipelines** beyond the [preview](#pipelines-preview) described above: local evaluation (an
   evaluator exists inside the package but the client does not use it yet) and real-time
   pipelines. Full-text search, window functions and explain options are encoded but were not

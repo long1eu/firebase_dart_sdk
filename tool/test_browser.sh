@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Runs the browser tests of cloud_firestore_dart (test/browser) in Chrome, compiled with
-# dart2wasm and with dart2js, against a private Firestore emulator on 127.0.0.1:8090.
+# dart2wasm and with dart2js, against a private Firestore emulator on 127.0.0.1:8090 (or the
+# port in FIRESTORE_EMULATOR_PORT).
 #
 # Usage: tool/test_browser.sh [dart2wasm|dart2js|both] [dart test arguments...]
 #
@@ -19,17 +20,25 @@
 # Environment:
 #   TEST_LOG_DIR  where the full outputs go (default: a new temp dir)
 #   SQLITE3_WASM  a sqlite3.wasm to use instead of downloading one (build_web_test_assets.sh)
+#   FIRESTORE_EMULATOR_PORT  the port of the private emulator (default 8090). The tests read
+#                 it from test/browser/emulator_port.txt, which this script writes for the
+#                 run (see test/browser/emulator_port.dart); 8080, the shared emulator, is
+#                 refused.
 #
 # Exits non-zero if a run fails.
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 PKG="$ROOT/cloud_firestore/cloud_firestore_dart"
-PORT=8090
+PORT="${FIRESTORE_EMULATOR_PORT:-8090}"
+case "$PORT" in
+  ''|*[!0-9]*) echo "FIRESTORE_EMULATOR_PORT must be a port number"; exit 2;;
+  8080) echo "8080 is the shared emulator; use a private one (start_private_emulator.sh)"; exit 2;;
+esac
 
 COMPILERS=(dart2wasm dart2js)
 case "${1:-}" in
   dart2wasm|dart2js) COMPILERS=("$1"); shift;;
   both) shift;;
-  -h|--help) sed -n '2,23p' "$0" | sed 's/^# \{0,1\}//'; exit 0;;
+  -h|--help) sed -n '2,28p' "$0" | sed 's/^# \{0,1\}//'; exit 0;;
 esac
 if [ $# -eq 0 ]; then
   # The files one by one, in the order of their names: the runner loads them in the order
@@ -46,6 +55,11 @@ mkdir -p "$LOG_DIR" || exit 2
 
 # sqlite3.wasm, the crash test worker and whatever else the tests load at run time.
 "$ROOT/tool/build_web_test_assets.sh" || exit 1
+
+# The browser cannot read the environment: the tests fetch the port from this file.
+PORT_FILE="$PKG/test/browser/emulator_port.txt"
+echo "$PORT" >"$PORT_FILE" || exit 2
+trap 'rm -f "$PORT_FILE"' EXIT
 
 STARTED=0
 if ! curl -s -o /dev/null "http://127.0.0.1:$PORT"; then
