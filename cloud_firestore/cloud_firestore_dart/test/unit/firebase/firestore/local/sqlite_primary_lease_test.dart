@@ -618,6 +618,35 @@ void main() {
       );
     });
 
+    test('leaves nothing of the deleted rows in the file', () async {
+      const String marker = 'secret-document-marker-0123456789';
+      final SQLitePersistence a = await start('A');
+      final SQLitePersistence b = await start('B');
+      await a.runTransaction('write', () async {
+        for (int i = 0; i < 50; i++) {
+          await a.execute(
+            'INSERT INTO bundles (bundle_id, create_time_seconds, create_time_nanos, schema_version, '
+            'total_documents, total_bytes) VALUES (?, 0, 0, 1, 0, 0)',
+            <Object?>['$marker-$i'],
+          );
+        }
+      });
+      await a.shutdown();
+      await a.clearPersistence();
+
+      expect(await b.query('SELECT * FROM bundles'), isEmpty);
+      final String path = DatabaseMock.pathForName(name).path;
+      for (final String file in <String>[path, '$path-wal']) {
+        if (File(file).existsSync()) {
+          expect(
+            String.fromCharCodes(File(file).readAsBytesSync()),
+            isNot(contains(marker)),
+            reason: file,
+          );
+        }
+      }
+    });
+
     test('deletes the file when the other clients are gone', () async {
       final SQLitePersistence a = await start('A');
       await a.execute(
@@ -627,6 +656,139 @@ void main() {
       await a.shutdown();
       await a.clearPersistence();
       expect(DatabaseMock.pathForName(name).existsSync(), isFalse);
+    });
+  });
+
+  group('rows that this SDK did not write (S16, S17)', () {
+    test('a malformed lease counts as no lease', () async {
+      final SQLitePersistence a = await start('A');
+      for (final List<Object?> row in <List<Object?>>[
+        <Object?>['A', 1, 1.5],
+        <Object?>[42, 1, clock.now],
+        <Object?>['A', 'yes', clock.now],
+      ]) {
+        await a.execute(
+          'UPDATE primary_client SET owner_id = ?, allow_synchronization = ?, lease_timestamp_ms = ?',
+          row,
+        );
+        // A new client starts and takes the lease, which is well-formed again.
+        final SQLitePersistence b = await start('B-${row.join()}');
+        expect(b.isPrimary, isTrue, reason: '$row');
+        expect((await lease(b))!['lease_timestamp_ms'], clock.now);
+        // A running client refreshes without failing.
+        await a.refreshClientMetadata();
+        await b.shutdown();
+      }
+    });
+
+    test('malformed client rows take no part in the election', () async {
+      final SQLitePersistence a = await start('A');
+      await a.execute(
+        'INSERT INTO clients (client_id, update_time_ms, network_enabled, in_foreground) VALUES (?, ?, ?, ?)',
+        <Object?>['odd', 'now', 1, 1],
+      );
+      await a.execute(
+        'INSERT INTO clients (client_id, update_time_ms, network_enabled, in_foreground) VALUES (?, ?, ?, ?)',
+        <Object?>['odd too', clock.now, 'yes', 1],
+      );
+      await a.execute(
+        'INSERT INTO clients (client_id, update_time_ms, network_enabled, in_foreground) VALUES (?, ?, ?, ?)',
+        <Object?>[7, clock.now, 0, 1],
+      );
+      // Well-formed rows of clients with network would take the lease from A now.
+      await a.setNetworkEnabled(false);
+      expect(a.isPrimary, isTrue);
+      // The client id column has TEXT affinity: 7 is stored as '7'.
+      expect(await a.getActiveClients(), <String>['7', 'A', 'odd too']);
+    });
+
+    test(
+      'a missing epoch row: running clients stop, new clients start',
+      () async {
+        final SQLitePersistence a = await start('A');
+        final SQLitePersistence b = await start('B');
+        await b.execute('DELETE FROM persistence_epoch');
+        // The deletion is a commit of another connection for A: as after a clear.
+        await expectLater(
+          a.runTransaction('after', () async {}),
+          throwsA(isA<FirestoreError>()),
+        );
+
+        final SQLitePersistence c = await start('C');
+        expect(c.started, isTrue);
+        expect(
+          (await c.query(
+            'SELECT epoch FROM persistence_epoch',
+          )).single['epoch'],
+          0,
+        );
+      },
+    );
+
+    test(
+      'an epoch that is not an integer is repaired by a new client',
+      () async {
+        final SQLitePersistence a = await start('A');
+        // An epoch past 2^63 is stored as a REAL.
+        await a.execute('UPDATE persistence_epoch SET epoch = 9.3e18');
+        await a.shutdown();
+        final SQLitePersistence b = await start('B');
+        expect(b.started, isTrue);
+        expect(
+          (await b.query(
+            'SELECT epoch FROM persistence_epoch',
+          )).single['epoch'],
+          0,
+        );
+        // A clear in place still moves it on.
+        await b.execute('UPDATE persistence_epoch SET epoch = 1.5');
+        final SQLitePersistence c = await start('C');
+        await b.shutdown();
+        await b.clearPersistence();
+        expect(
+          (await c.query(
+            'SELECT epoch FROM persistence_epoch',
+          )).single['epoch'],
+          isA<int>(),
+        );
+      },
+    );
+
+    test('a client row from the future does not keep the file from being '
+        'deleted', () async {
+      final SQLitePersistence a = await start('A');
+      await a.execute(
+        'INSERT INTO clients (client_id, update_time_ms, network_enabled, in_foreground) VALUES (?, ?, 1, 1)',
+        <Object?>['clock ahead', clock.now + 60000],
+      );
+      await a.shutdown();
+      await a.clearPersistence();
+      expect(DatabaseMock.pathForName(name).existsSync(), isFalse);
+    });
+
+    test('a lease from the future is reported once a minute', () async {
+      final SQLitePersistence a = await start('A');
+      final List<String> printed = await capturePrints(() async {
+        // Every refresh finds a lease from the future again (A takes it, something writes it back).
+        Future<void> refreshWithFutureLease() async {
+          await a.execute(
+            'UPDATE primary_client SET owner_id = ?, lease_timestamp_ms = ?',
+            <Object?>['Z', clock.now + 3600000],
+          );
+          await a.refreshClientMetadata();
+        }
+
+        for (int i = 0; i < 10; i++) {
+          clock.advance(refresh);
+          await refreshWithFutureLease();
+        }
+        clock.advance(60000);
+        await refreshWithFutureLease();
+      });
+      expect(
+        printed.where((String line) => line.contains('in the future')),
+        hasLength(2),
+      );
     });
   });
 

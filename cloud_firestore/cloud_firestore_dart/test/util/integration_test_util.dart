@@ -4,6 +4,7 @@
 
 import 'dart:async';
 import 'dart:io';
+import 'dart:math';
 
 import 'package:cloud_firestore_dart/src/firebase/firestore/auth/credentials_provider.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/auth/user.dart';
@@ -41,6 +42,20 @@ import 'test_hygiene.dart';
 /// A set of helper methods for tests
 class IntegrationTestUtil {
   static int dbIndex = 0;
+
+  /// Unique to this isolate: `dart test -j` runs several test files in isolates of one process (and several
+  /// processes may share `build/test`), each with its own [dbIndex]. Without it two files that use the same database
+  /// path open the same SQLite file, and the client that opened it last takes over the primary lease.
+  static final String _isolateId =
+      '${pid}_${Random.secure().nextInt(1 << 32).toRadixString(36)}';
+
+  /// The database files created by [testFirestoreInstance] (without a fixed name), deleted by [tearDown].
+  static final List<String> _createdDatabases = <String>[];
+
+  /// A database name for a new test instance that no other test file, isolate or process uses: [dbPath], this
+  /// isolate's id and a counter.
+  static String newDatabaseName(String dbPath) =>
+      '${dbPath}_${_isolateId}_${dbIndex++}.db';
 
   // Alternate project ID for creating 'bad' references. Doesn't actually need
   // to work.
@@ -279,10 +294,11 @@ class IntegrationTestUtil {
 
     print('index: $dbIndex');
     // A name relative to build/test: DatabaseMock resolves it to a path itself.
-    final String dbName = fixedDbName ?? '$dbPath\_${dbIndex++}.db';
+    final String dbName = fixedDbName ?? newDatabaseName(dbPath);
 
     if (fixedDbName == null) {
       DatabaseMock.deleteDatabaseFiles(dbName);
+      _createdDatabases.add(dbName);
     }
 
     final TaskScheduler scheduler = TaskScheduler('');
@@ -320,6 +336,21 @@ class IntegrationTestUtil {
 
     firestoreStatus[firestore] = true;
     credentialsProviders[firestore] = credentialsProvider;
+    if (fixedDbName == null) {
+      // Also for the test files that never call [tearDown]: the name is not used again, so without this every run
+      // would leave its files in build/test. The instance is shut down first (its writes may still be in flight
+      // after the test body), then the files are deleted. Outside a test [tearDown] does it.
+      try {
+        addTearDown(() async {
+          await firestore.shutdown();
+          if (_createdDatabases.remove(dbName)) {
+            DatabaseMock.deleteDatabaseFiles(dbName);
+          }
+        });
+      } on StateError {
+        // Not inside a test or a setUpAll.
+      }
+    }
     return firestore;
   }
 
@@ -329,6 +360,11 @@ class IntegrationTestUtil {
     }
     firestoreStatus.clear();
     credentialsProviders.clear();
+    // The names are never used again: without this every run would leave its files in build/test.
+    for (final String name in _createdDatabases) {
+      DatabaseMock.deleteDatabaseFiles(name);
+    }
+    _createdDatabases.clear();
     // Instances that a test created through the public API are its own to terminate.
     await expectTestLeftNothingBehind();
   }

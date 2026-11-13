@@ -538,6 +538,20 @@ Documentation and tests:
   becomes primary again (when the new client terminates or disables its network). A lone client is always primary.
 - `clearPersistence()` with another live client on the cache empties the cache in place instead of deleting the
   file under that client; the other client fails with `failedPrecondition` at its next use and terminates.
+- `clearPersistence()` deletes the `-journal`, `-wal` and `-shm` files before the database file, tries all of them,
+  and keeps the database file when one of them can't be deleted (a journal left next to a new database of the same
+  name would be applied to it); the error names every file that failed. A persistent cache whose start fails after
+  the database was opened closes it again instead of leaving the handle open.
+- A malformed primary lease or client row in a SQLite cache (a value of the wrong type) counts as no lease or no
+  client instead of making every new client fail to start; a missing or malformed epoch row is repaired by a new
+  client and makes running clients stop as after a clear. The warning about a lease or client row dated in the
+  future is logged once a minute instead of at every refresh. Clearing a cache in place (another client is alive)
+  overwrites the deleted rows with zeros (`PRAGMA secure_delete`) and checkpoints the write-ahead log, and a client
+  row from the future no longer counts as a live client there.
+- When the cache can't be opened, the operations that were queued while it was opening fail with the error of the
+  open, like the later ones, instead of `LateInitializationError: Field 'localStore'`. `openWithMemoryFallback` in
+  `example/sqlite_database_web.dart` waits for a first operation to see that error, since `Firestore.instanceFor`
+  returns before the cache is open.
 - Argument checks that were only `assert`s, and so did nothing in release builds, now throw an `ArgumentError`
   in every build: a collection path with an even number of segments (`firestore.collection('coll/doc')`,
   `doc.collection('')`), a `cacheSizeBytes` below the minimum of 1 MB with persistence enabled, and a `GeoPoint`

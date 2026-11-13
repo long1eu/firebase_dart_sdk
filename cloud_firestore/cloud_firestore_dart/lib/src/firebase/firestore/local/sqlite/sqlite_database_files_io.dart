@@ -13,21 +13,40 @@ const List<String> sqliteSideFileSuffixes = <String>[
 /// Deletes the SQLite database file at [path] and its side files. Files that
 /// don't exist are skipped.
 ///
-/// Throws a [FirestoreError] with [FirestoreErrorCode.unknown] when a file
-/// can't be deleted (like `SQLitePersistence.clearPersistence` on Android).
+/// The side files go first, and every one of them is attempted. The database
+/// file is deleted only when they are all gone: a journal or write-ahead log
+/// left next to a new database with the same name would be applied to it (a
+/// hot journal is rolled back into whatever file has that name), while one
+/// left next to its own database is harmless.
+///
+/// Throws a [FirestoreError] with [FirestoreErrorCode.unknown] that names every
+/// file that couldn't be deleted (like `SQLitePersistence.clearPersistence` on
+/// Android).
 void deleteSqliteDatabaseFiles(String path) {
-  try {
-    for (final String suffix in <String>['', ...sqliteSideFileSuffixes]) {
-      final File target = File('$path$suffix');
-      if (target.existsSync()) {
-        target.deleteSync();
-      }
+  final List<FileSystemException> failures = <FileSystemException>[];
+  void delete(String name) {
+    if (FileSystemEntity.typeSync(name, followLinks: false) ==
+        FileSystemEntityType.notFound) {
+      return;
     }
-  } on FileSystemException catch (e) {
+    try {
+      File(name).deleteSync();
+    } on FileSystemException catch (e) {
+      failures.add(e);
+    }
+  }
+
+  for (final String suffix in sqliteSideFileSuffixes) {
+    delete('$path$suffix');
+  }
+  if (failures.isEmpty) {
+    delete(path);
+  }
+  if (failures.isNotEmpty) {
     throw FirestoreError(
-      'Failed to clear persistence.$e',
+      'Failed to clear persistence: ${failures.join('; ')}',
       FirestoreErrorCode.unknown,
-      e,
+      failures.first,
     );
   }
 }

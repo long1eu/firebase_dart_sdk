@@ -454,8 +454,8 @@ Future<void> gettingStartedGuideLine140() async {
   );
 }
 
-// ../../docs/guides/multiple_clients.md:67
-Future<void> multipleClientsGuideLine67() async {
+// ../../docs/guides/multiple_clients.md:70
+Future<void> multipleClientsGuideLine70() async {
   final Directory directory = Directory('/home/ada/.local/share/my_app');
 
   // In the background isolate: the same project, another app name, another cache file.
@@ -466,8 +466,8 @@ Future<void> multipleClientsGuideLine67() async {
   );
 }
 
-// ../../docs/guides/multiple_clients.md:93
-Future<void> multipleClientsGuideLine93() async {
+// ../../docs/guides/multiple_clients.md:96
+Future<void> multipleClientsGuideLine96() async {
   await firestore.terminate();
   await firestore.clearPersistence();
 }
@@ -558,15 +558,15 @@ Future<void> offlinePersistenceGuideLine156() async {
   );
 }
 
-// ../../docs/guides/offline_persistence.md:193
-Future<void> offlinePersistenceGuideLine193() async {
+// ../../docs/guides/offline_persistence.md:192
+Future<void> offlinePersistenceGuideLine192() async {
   await firestore.terminate();        // the cache must not be in use by this instance
   await firestore.clearPersistence(); // deletes the files (or the browser storage)
   final Firestore fresh = Firestore.instanceFor(app: app);
 }
 
-// ../../docs/guides/offline_persistence.md:212
-Future<void> offlinePersistenceGuideLine212() async {
+// ../../docs/guides/offline_persistence.md:211
+Future<void> offlinePersistenceGuideLine211() async {
   final indexes = firestore.persistentCacheIndexManager; // null with a memory cache
   await indexes?.enableIndexAutoCreation();
 }

@@ -170,12 +170,11 @@ What to know (all measured in Chrome against the emulator; other browsers are un
 - **One tab at a time.** The database is guarded by a Web Lock. A second tab (or a second
   instance in the same page) that opens the same cache waits two seconds for the lock and then
   fails: the operations of that instance fail with a `FirestoreError` whose code is
-  `failedPrecondition`. Such a tab should use a memory cache.
-  *Known issue*: `Firestore.instanceFor` now returns at once and opens the cache in the
-  background, so the `openWithMemoryFallback` helper of the example, which catches the error
-  around `instanceFor`, no longer sees it; and the first operation queued on the instance can
-  fail with an internal error instead of the `FirestoreError`. Until this is fixed, open the
-  persistent cache in one tab only, for example the tab that holds a lock of your own.
+  `failedPrecondition`. Such a tab should use a memory cache. `Firestore.instanceFor` returns
+  at once and opens the cache in the background, so the error comes from the first operation:
+  the `openWithMemoryFallback` helper of the example waits for a first operation that only
+  reads the cache, and on `failedPrecondition` terminates that instance and creates one with a
+  memory cache.
 - **Crash safety.** What a write future acknowledged is stored. A tab that dies in the middle
   of a transaction loses only that transaction. A crash of the browser itself or a power cut is
   not covered.

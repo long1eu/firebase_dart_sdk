@@ -293,33 +293,71 @@ class SQLitePersistence extends Persistence {
       hardAssert(!started, 'SQLitePersistence double-started!');
       _db = await _openDb(databaseName, openDatabase);
       _databasePath = _db.path;
-      // A persistence that is started again already holds the lock of its file (from [_lock]): the semaphores are
-      // not reentrant, taking it twice would wait forever.
-      final Semaphore file = GlobalSemaphore('sqlite-file:${_db.path}');
-      if (!identical(file, _fileSemaphore)) {
-        await file.acquire();
-        _fileSemaphore?.release();
-        _fileSemaphore = file;
+      try {
+        await _startOpened();
+      } catch (_) {
+        // Nothing else would close the handle: [shutdown] requires a started persistence.
+        started = false;
+        try {
+          _db.close();
+        } catch (e) {
+          Log.w(tag, 'Closing the database after a failed start failed: $e');
+        }
+        rethrow;
       }
-      final Database db = _db;
-      _clearStorage = db is ClearableDatabase ? db.clearStorage : null;
-      // Read before the state: a commit of another connection in between is then seen by the next transaction.
-      _dataVersion = await _readDataVersion();
-      await queryCache.start();
-      _epoch = await _readEpoch();
-      started = true;
-      referenceDelegate.start(queryCache.highestListenSequenceNumber);
-      await _metadataTransaction(() => clientMetadata._update(atStart: true));
     } finally {
       _unlock();
     }
   }
 
-  Future<int> _readEpoch() async {
-    return (await _db.query(
-          'SELECT epoch FROM persistence_epoch WHERE id = 0',
-        )).single['epoch']
-        as int;
+  /// The part of [start] after the database is open. The caller holds [_semaphore].
+  Future<void> _startOpened() async {
+    // A persistence that is started again already holds the lock of its file (from [_lock]): the semaphores are
+    // not reentrant, taking it twice would wait forever.
+    final Semaphore file = GlobalSemaphore('sqlite-file:${_db.path}');
+    if (!identical(file, _fileSemaphore)) {
+      await file.acquire();
+      _fileSemaphore?.release();
+      _fileSemaphore = file;
+    }
+    final Database db = _db;
+    _clearStorage = db is ClearableDatabase ? db.clearStorage : null;
+    // Read before the state: a commit of another connection in between is then seen by the next transaction.
+    _dataVersion = await _readDataVersion();
+    await queryCache.start();
+    _epoch = await _metadataTransaction(
+      _ensureEpoch,
+      checkForeignCommits: false,
+    );
+    started = true;
+    referenceDelegate.start(queryCache.highestListenSequenceNumber);
+    await _metadataTransaction(() => clientMetadata._update(atStart: true));
+  }
+
+  /// The epoch of the cache, or null when its row is missing or does not hold an integer (a damaged file, or a row
+  /// written by something else than this SDK). A running client treats null as a changed epoch: it terminates as
+  /// after a clear by another client.
+  Future<int?> _readEpoch() async {
+    final List<Map<String, dynamic>> rows = await _db.query(
+      'SELECT epoch FROM persistence_epoch WHERE id = 0',
+    );
+    final Object? epoch = rows.isEmpty ? null : rows.single['epoch'];
+    return epoch is int ? epoch : null;
+  }
+
+  /// Reads the epoch when this client starts, and repairs a missing or malformed row first: a new client starts on
+  /// such a file instead of failing. The caller runs it in a transaction.
+  Future<int> _ensureEpoch() async {
+    await _db.execute(
+      'INSERT OR IGNORE INTO persistence_epoch (id, epoch) VALUES (0, 0)',
+    );
+    final int? epoch = await _readEpoch();
+    if (epoch != null) {
+      return epoch;
+    }
+    Log.w(tag, 'Replacing the malformed epoch of the cache "$databaseName".');
+    await _db.execute('UPDATE persistence_epoch SET epoch = 0 WHERE id = 0');
+    return 0;
   }
 
   /// A transaction for the client metadata: no listen sequence number is used up. The caller holds [_semaphore].
@@ -540,7 +578,7 @@ class SQLitePersistence extends Persistence {
           rethrow;
         } catch (e) {
           throw FirestoreError(
-            'Failed to clear persistence.$e',
+            'Failed to clear persistence: $e',
             FirestoreErrorCode.unknown,
             e,
           );
@@ -561,16 +599,24 @@ class SQLitePersistence extends Persistence {
   /// no other client refreshed its metadata within [SQLiteClientMetadata.maxClientAgeMs]: the file is deleted then.
   Future<bool> _clearInPlaceIfOthersAreAlive() async {
     final Database db = await _openDb(databaseName, openDatabase);
+    bool cleared = false;
     try {
+      // Applications clear the cache for privacy (on sign-out): the deleted rows must not stay readable in the free
+      // pages of the file. secure_delete overwrites them with zeros; it is a setting of this connection, which is
+      // closed afterwards. A query: the pragma returns a row.
+      await db.query('PRAGMA secure_delete = ON');
       await db.execute('BEGIN EXCLUSIVE;');
       try {
         final int now = clientMetadata._clock();
         final int others =
             (await db.query(
-                  'SELECT COUNT(*) AS c FROM clients WHERE client_id != ? AND update_time_ms >= ?',
+                  // A row from the future is not a live client (as for the garbage collection of the primary).
+                  'SELECT COUNT(*) AS c FROM clients WHERE client_id != ? AND update_time_ms >= ? '
+                  'AND update_time_ms <= ?',
                   <Object?>[
                     clientMetadata.clientId,
                     now - SQLiteClientMetadata.maxClientAgeMs,
+                    now,
                   ],
                 )).single['c']
                 as int;
@@ -600,11 +646,14 @@ class SQLitePersistence extends Persistence {
         // The one row that a new cache has.
         await SQLiteSchema(db)._ensureTargetGlobal();
         await db.execute('UPDATE target_globals SET target_count = 0');
+        // An epoch that is missing or not an integer becomes 1: the other clients notice a change either way.
         await db.execute(
-          'UPDATE persistence_epoch SET epoch = epoch + 1 WHERE id = 0',
+          'INSERT OR REPLACE INTO persistence_epoch (id, epoch) VALUES (0, '
+          "(SELECT CASE WHEN typeof(epoch) = 'integer' THEN epoch + 1 ELSE 1 END "
+          'FROM persistence_epoch WHERE id = 0))',
         );
         await db.execute('COMMIT;');
-        return true;
+        cleared = true;
       } catch (_) {
         try {
           await db.execute('ROLLBACK;');
@@ -613,6 +662,24 @@ class SQLitePersistence extends Persistence {
         }
         rethrow;
       }
+      // In WAL mode the old pages are still in the log (and the zeroed ones only in the log): copy the log into the
+      // file and empty it. Other clients reading at this moment can keep the checkpoint from completing; it is then
+      // logged, and finishes with a later checkpoint. Does nothing with a rollback journal. VACUUM is not used: it
+      // rewrites the whole file while the other clients have it open, and secure_delete already zeroes the pages.
+      try {
+        final List<Map<String, dynamic>> result = await db.query(
+          'PRAGMA wal_checkpoint(TRUNCATE)',
+        );
+        if (result.isNotEmpty && result.first.values.first != 0) {
+          Log.w(
+            tag,
+            'clearPersistence: the write-ahead log of "$databaseName" could not be emptied now.',
+          );
+        }
+      } catch (e) {
+        Log.w(tag, 'clearPersistence: checkpoint failed: $e');
+      }
+      return cleared;
     } finally {
       db.close();
     }

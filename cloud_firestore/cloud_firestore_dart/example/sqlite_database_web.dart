@@ -269,25 +269,35 @@ OpenDatabase sqliteWebOpener({
 
 /// Creates the instance with the offline cache in IndexedDB, or with a memory
 /// cache when another tab has that cache open.
+///
+/// `Firestore.instanceFor` returns at once and opens the cache in the
+/// background, so the error of a cache that can't be opened comes from the
+/// first operation, not from `instanceFor`. This waits for a first operation
+/// that only reads the cache (looking up a named query that does not exist),
+/// and on `failedPrecondition` terminates that instance (which frees the app
+/// for a new one) and creates one with a memory cache.
 Future<Firestore> openWithMemoryFallback({
   required FirebaseApp app,
   required Uri sqlite3Wasm,
   Uri? opfsWorker,
   FirestoreSettings? settings,
 }) async {
+  final Firestore persistent = Firestore.instanceFor(
+    app: app,
+    openDatabase: sqliteWebOpener(
+      sqlite3Wasm: sqlite3Wasm,
+      opfsWorker: opfsWorker,
+    ),
+    settings: settings,
+  );
   try {
-    return Firestore.instanceFor(
-      app: app,
-      openDatabase: sqliteWebOpener(
-        sqlite3Wasm: sqlite3Wasm,
-        opfsWorker: opfsWorker,
-      ),
-      settings: settings,
-    );
+    await persistent.getNamedQuery('openWithMemoryFallback');
+    return persistent;
   } on FirestoreError catch (e) {
     if (e.code != FirestoreErrorCode.failedPrecondition) {
       rethrow;
     }
+    await persistent.terminate();
     return Firestore.instanceFor(
       app: app,
       settings: (settings ?? FirestoreSettings()).copyWith(

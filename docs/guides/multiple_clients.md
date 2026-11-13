@@ -27,7 +27,10 @@ The connection never switches to `PRAGMA locking_mode = EXCLUSIVE`, which the An
 Flutter hot restart the new isolate must be able to open the file that the old isolate still
 holds. SQLite's normal file locking keeps the file consistent. The repository tests this with two
 clients in one process (`sqlite_shared_clients_test.dart`) and with two processes
-(`sqlite_shared_processes_test.dart`, both in `test/unit/firebase/firestore/local/`).
+(`sqlite_shared_processes_test.dart`, both in `test/unit/firebase/firestore/local/`). Inside one
+process the clients of a file also wait for each other's transactions without blocking the
+isolate, including two app names that an `OpenDatabase` maps to the same file
+(`sqlite_persistence_file_test.dart`).
 
 ## One primary client
 

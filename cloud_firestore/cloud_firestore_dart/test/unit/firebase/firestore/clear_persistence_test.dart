@@ -105,6 +105,39 @@ void main() {
       expect(other.existsSync(), isTrue);
     });
 
+    test(
+        'attempts every side file, keeps the database file when one fails, '
+        'and names the failures', () {
+      final String dbName = 'clear-fail-${const Uuid().v4()}.db';
+      final File file = DatabaseMock.pathForName(dbName);
+      addTearDown(() {
+        final Directory journal = Directory('${file.path}-journal');
+        if (journal.existsSync()) {
+          journal.deleteSync(recursive: true);
+        }
+        DatabaseMock.deleteDatabaseFiles(dbName);
+      });
+      file.createSync(recursive: true);
+      // A journal that can't be deleted as a file (it is a directory), between the other side files.
+      Directory('${file.path}-journal/inside').createSync(recursive: true);
+      final File wal = File('${file.path}-wal')..createSync();
+      final File shm = File('${file.path}-shm')..createSync();
+
+      expect(
+        () => deleteSqliteDatabaseFiles(file.path),
+        throwsA(isA<FirestoreError>()
+            .having((FirestoreError e) => e.code, 'code',
+                FirestoreErrorCode.unknown)
+            .having((FirestoreError e) => e.message, 'message',
+                allOf(startsWith('Failed to clear persistence: '),
+                    contains('-journal')))),
+      );
+      // The other side files are gone; the database keeps its journal.
+      expect(wal.existsSync(), isFalse);
+      expect(shm.existsSync(), isFalse);
+      expect(file.existsSync(), isTrue);
+    });
+
     test('skips files that do not exist', () {
       final File file =
           DatabaseMock.pathForName('clear-missing-${const Uuid().v4()}.db');

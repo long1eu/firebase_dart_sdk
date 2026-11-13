@@ -242,11 +242,16 @@ class FirestoreClient implements RemoteStoreCallback {
   final SerialQueue _queue = SerialQueue();
 
   /// Runs [task] on the queue, after the initialization. Fails with the error of the initialization if that failed.
-  Future<T> _enqueue<T>(Future<T> Function() task) => _queue.run<T>(() {
+  ///
+  /// The initialization future is awaited rather than [_initError] read: a task that was queued while the
+  /// initialization ran starts before the listener that records the error (the queue listens to the future first),
+  /// and would otherwise run against a client whose stores were never created.
+  Future<T> _enqueue<T>(Future<T> Function() task) => _queue.run<T>(() async {
     final Object? initError = _initError;
     if (initError != null) {
       Error.throwWithStackTrace(initError, _initStackTrace!);
     }
+    await _initialized;
     return task();
   });
 

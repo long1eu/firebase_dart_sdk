@@ -97,13 +97,31 @@ class SQLiteClientMetadata {
     }
   }
 
+  /// How often at most the warnings about the rows of the file are logged: a row in the future (or a malformed one)
+  /// is seen at every refresh, every 4 s, for as long as it is there.
+  static const int _warningIntervalMs = 60 * 1000;
+
+  /// When each kind of warning was last logged, see [_warnRateLimited].
+  final Map<String, int> _lastWarnings = <String, int>{};
+
+  /// Logs [message] unless a warning of the same [kind] was logged within [_warningIntervalMs].
+  void _warnRateLimited(String kind, String message) {
+    final int now = _clock();
+    final int? last = _lastWarnings[kind];
+    if (last != null && now >= last && now - last < _warningIntervalMs) {
+      return;
+    }
+    _lastWarnings[kind] = now;
+    Log.w(_tag, message);
+  }
+
   bool _isWithinAge(int updateTimeMs, int maxAgeMs) {
     final int now = _clock();
     if (updateTimeMs < now - maxAgeMs) {
       return false;
     } else if (updateTimeMs > now) {
-      Log.w(
-        _tag,
+      _warnRateLimited(
+        'future',
         'Detected an update time that is in the future: $updateTimeMs > $now',
       );
       return false;
@@ -111,6 +129,9 @@ class SQLiteClientMetadata {
     return true;
   }
 
+  /// The lease, or null when there is none. The columns are typed by affinity only, so a row written by something
+  /// else than this SDK (or a damaged file) can hold any value: such a row counts as no lease, and is overwritten by
+  /// the next client that takes the lease, instead of failing the start of every client.
   Future<_PrimaryLease?> _readLease() async {
     final List<Map<String, dynamic>> rows = await _db.query(
       'SELECT owner_id, allow_synchronization, lease_timestamp_ms FROM primary_client WHERE id = 0',
@@ -119,11 +140,19 @@ class SQLiteClientMetadata {
       return null;
     }
     final Map<String, dynamic> row = rows.single;
-    return _PrimaryLease(
-      row['owner_id'] as String,
-      (row['allow_synchronization'] as int) != 0,
-      row['lease_timestamp_ms'] as int,
-    );
+    final Object? ownerId = row['owner_id'];
+    final Object? allowSynchronization = row['allow_synchronization'];
+    final Object? timestamp = row['lease_timestamp_ms'];
+    if (ownerId is! String ||
+        allowSynchronization is! int ||
+        timestamp is! int) {
+      _warnRateLimited(
+        'lease',
+        'Ignoring a malformed primary lease: ($ownerId, $allowSynchronization, $timestamp)',
+      );
+      return null;
+    }
+    return _PrimaryLease(ownerId, allowSynchronization != 0, timestamp);
   }
 
   bool _isValid(_PrimaryLease? lease) =>
@@ -184,14 +213,18 @@ class SQLiteClientMetadata {
       <Object?>[clientId, minimum],
     );
     for (final Map<String, dynamic> other in others) {
-      if (!_isWithinAge(
-        other['update_time_ms'] as int,
-        maxPrimaryEligibleAgeMs,
-      )) {
+      final Object? updateTime = other['update_time_ms'];
+      final Object? network = other['network_enabled'];
+      final Object? foreground = other['in_foreground'];
+      // A malformed row is not a client that takes part in the election.
+      if (updateTime is! int ||
+          network is! int ||
+          foreground is! int ||
+          !_isWithinAge(updateTime, maxPrimaryEligibleAgeMs)) {
         continue;
       }
-      final bool otherNetwork = (other['network_enabled'] as int) != 0;
-      final bool otherForeground = (other['in_foreground'] as int) != 0;
+      final bool otherNetwork = network != 0;
+      final bool otherForeground = foreground != 0;
       final bool betterNetwork = !networkEnabled && otherNetwork;
       final bool betterVisibility =
           !inForeground && otherForeground && networkEnabled == otherNetwork;
@@ -299,8 +332,10 @@ class SQLiteClientMetadata {
     );
     return <String>[
       for (final Map<String, dynamic> row in rows)
-        if (_isWithinAge(row['update_time_ms'] as int, maxClientAgeMs))
-          row['client_id'] as String,
+        if (row['client_id'] case final String id
+            when row['update_time_ms'] is int &&
+                _isWithinAge(row['update_time_ms'] as int, maxClientAgeMs))
+          id,
     ];
   }
 
