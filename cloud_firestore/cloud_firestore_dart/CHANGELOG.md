@@ -86,6 +86,37 @@ Behaviour changes without a compile error:
   synchronous throw. Builders that do no I/O (`collection`, `doc`, `batch`, `where`, ...) and
   committing an empty `WriteBatch` keep working, as upstream.
 - Default transaction attempts changed from 6 to 5 (now `TransactionOptions.defaultMaxAttempts`).
+- Read-only transactions (`TransactionOptions(readOnly: true)`, new in this release) run on the
+  backend: they read one snapshot, commit nothing and are not run again when documents change.
+  Revisions of this package before the release verified the documents at commit and retried;
+  code written against those sees the snapshot instead. See Added.
+- Arguments are validated in every build mode, not only with asserts: a collection path with an
+  even number of segments, a `cacheSizeBytes` below 1 MB with persistence, a `GeoPoint` or
+  `Timestamp` outside its range when it is written or used in a query. `firestore.doc('')`,
+  a document path that is only a slash and `collectionGroup('')` throw an `ArgumentError`
+  (they were accepted). Details under Fixed.
+- Settings and input are validated more strictly (from a security review):
+  - `FirestoreSettings` throws an `ArgumentError` for `sslEnabled: false` with the production
+    host in every build mode (it was an `assert`, which release builds drop, so the auth token
+    could be sent without TLS), whatever the case of the host or a trailing dot.
+  - `FirestoreSettings.host` must be a host name or IP address: an empty value or one with
+    `/`, `@`, `?`, `#`, `\` or whitespace is an `ArgumentError` (a value such as
+    `firestore.googleapis.com@other.example` made the web transport talk to the other host).
+  - Bundles are treated as untrusted input: a length prefix has to be at most 10 plain decimal
+    digits, an element is at most 64 MiB (`BundleReader.maxElementBytes`), values and filters
+    may be nested at most 100 levels, and fields of the wrong JSON type are reported as an
+    invalid bundle. A stream without a valid element is rejected at once instead of being
+    buffered, and elements that arrive in small chunks are no longer re-copied per chunk.
+- The local evaluation of queries and transforms follows the backend where 0.0.7 (and the JS
+  and Android SDKs) did not; details under Fixed:
+  - `whereIn`, `whereNotIn`, `arrayContains`, `arrayContainsAny`, `arrayUnion` and
+    `arrayRemove` compare numbers by value (`1` is `1.0`), whatever their type.
+  - `<`, `<=`, `>` and `>=` do not match `null` and `NaN`.
+  - A cached document that the client matches for a query but the backend does not return is
+    dropped from that query's view once the backend confirms that it exists, instead of
+    keeping the listener in `isFromCache`.
+  - A write that is acknowledged without changing the document on the backend (a re-sent
+    write) is applied to the cached document.
 - Idle stream timeout changed from 10 seconds to 1 minute (as Android).
 - A clean close of a stream by the server is now reported as `UNAVAILABLE` and retried instead
   of being ignored (fixes a start hang).
@@ -93,9 +124,9 @@ Behaviour changes without a compile error:
   (`update_transforms`). Stored legacy transform writes are squashed on load by the local
   serializer.
 - Locally mutated documents carry `SnapshotVersion.none`, as upstream.
-- The SQLite schema goes from version 8 to 13 (bundle tables, read times on remote documents,
-  document overlays, and the tables of the client-side index engine, which nothing reads yet;
-  see index-free queries and document overlays under Added). The migration
+- The SQLite schema goes from version 8 to 14 (bundle tables, read times on remote documents,
+  document overlays, the tables of the persistent cache indexes and two lookup indexes; see
+  index-free queries, document overlays and persistent cache indexes under Added). The migration
   runs through the opener's `onUpgrade` callback on the first open; pending writes are
   converted to overlays the first time the client starts. A cache written by
   `cloud_firestore_vm` 0.0.7 (schema 8) is migrated with its documents, targets (reused: the
@@ -109,8 +140,7 @@ Behaviour changes without a compile error:
 - `Timestamp.fromDate` / `toDate` are microsecond-accurate (they truncated to milliseconds);
   results for millisecond inputs are unchanged, and `DateTime` values written to documents keep
   their microseconds. `Timestamp.now()` still has millisecond precision.
-- `Blob.bytes` returns a copy. Out-of-range `Timestamp`s are rejected with an `ArgumentError`
-  when written, also in builds without asserts.
+- `Blob.bytes` returns a copy.
 - `FirebaseApp.persistenceKey` (`firebase_app_dart`) now uses URL-safe base64 without padding;
   keys computed by older versions differ.
 
@@ -121,21 +151,6 @@ Deprecated, still working:
   `documentChanges` (use `docs` / `docChanges`), `FieldPath.documentId()` (use
   `documentIdField`), `Source.defaultSource` (use `serverAndCache`). `FirebaseFirestore` and
   `Settings` are typedefs of `Firestore` and `FirestoreSettings`.
-- Security hardening (from a review of both packages):
-  - `FirestoreSettings` throws an `ArgumentError` for `sslEnabled: false` with the production
-    host in every build mode (it was an `assert`, which release builds drop, so the auth token
-    could be sent without TLS), whatever the case of the host or a trailing dot.
-  - `FirestoreSettings.host` must be a host name or IP address: an empty value or one with
-    `/`, `@`, `?`, `#`, `\` or whitespace is an `ArgumentError` (a value such as
-    `firestore.googleapis.com@other.example` made the web transport talk to the other host).
-  - Bundles are treated as untrusted input: a length prefix has to be at most 10 plain decimal
-    digits, an element is at most 64 MiB (`BundleReader.maxElementBytes`), values and filters
-    may be nested at most 100 levels, and fields of the wrong JSON type are reported as an
-    invalid bundle. A stream without a valid element is rejected at once instead of being
-    buffered, and elements that arrive in small chunks are no longer re-copied per chunk.
-  - WebChannel responses with a negative, non-decimal or larger than 64 MiB chunk length end
-    the stream with `unavailable`.
-
 ### Added
 
 Queries and aggregations:
@@ -300,9 +315,9 @@ Networking:
     IndexedDB (below).
   - Verified against the emulator only: on the VM, where the whole standard integration suite
     runs over the web transport (`tool/test_integration.sh standard --transport=webchannel`, or
-    `FIRESTORE_TEST_TRANSPORT=webchannel`), and in Chrome with 19 browser tests
-    (`dart test -p chrome -c dart2wasm test/browser`; with `-c dart2js` 18 pass and 1 is
-    skipped). No other browser and no production backend was tried.
+    `FIRESTORE_TEST_TRANSPORT=webchannel`), and in Chrome with 41 browser tests
+    (`tool/test_browser.sh both`; 40 pass and 1 is skipped with each compiler: the crash
+    harness under dart2wasm, the 64 bit integer test under dart2js). No other browser and no production backend was tried.
   - Compile with dart2wasm to keep 64 bit integers exact. Compiled with dart2js, integers
     above 2^53 lose precision.
 - **Opt-in persistence on the web** (experimental): `example/sqlite_database_web.dart` is a
@@ -365,6 +380,8 @@ Networking:
   - A WebChannel request that carries messages to the server and is not answered within 20
     seconds is aborted and sent again (with the same request id), instead of blocking every
     later message of the stream for ever on a connection that silently drops data.
+  - WebChannel responses with a negative, non-decimal or larger than 64 MiB chunk length end
+    the stream with `unavailable`.
   - Request headers with a line break are refused instead of being sent in the handshake, and
     `fetch` no longer follows redirects (a redirect would re-send the credentials elsewhere).
   - A clear `UnsupportedError` at start when the application was compiled with
@@ -376,11 +393,17 @@ Documentation and tests:
 - Every exported class and member has a doc comment (members marked `@internal` say so), the
   library has an overview, and `dart doc` runs without warnings.
 - Runnable examples in `example/`, README and migration guide snippets that are compiled by a
-  test, and public API golden files for both libraries.
-- Test suite: unit tests, the spec tests re-synced with JS SDK `main`, an emulator integration
-  suite (also run against the Enterprise edition emulator), Enterprise-only tests in
-  `test/integration_enterprise`, and an opt-in mode against a real project that has not been
-  run. Protos resynced with current googleapis (`tool/gen_protos.sh`).
+  test, and public API golden files for the three libraries (main, pipelines, lite).
+- Test suite (in the repository, not in the published package): unit tests, the spec tests
+  re-synced with JS SDK `main`, seeded property tests, an emulator integration suite (also run
+  over the web transport and against the Enterprise edition emulator), chaos tests behind a
+  TCP proxy that cuts and stalls connections, Enterprise-only tests in
+  `test/integration_enterprise`, browser tests in Chrome, interop tests with the JS SDK, and a
+  size check of Firestore Lite. Protos regenerated from current googleapis
+  (`tool/gen_protos.sh`).
+- A production verification kit (`tool/verify_production`): 14 named checks that run against
+  the emulator and, only with your own credentials and an explicit `--yes`, against a real
+  project. **It has not been run against a real project.**
 
 ### Fixed
 
@@ -455,12 +478,13 @@ Documentation and tests:
 
 - Persistent cache indexes for queries with inequalities on several fields (they are scanned,
   as upstream), and indexes with a memory cache.
-- Sharing the persistent cache between browser tabs (one tab at a time), OPFS storage, and
-  any browser other than Chrome.
+- Sharing one persistent cache between running clients (the multi-tab support of the JS SDK):
+  one process or browser tab at a time.
+- On the web: OPFS storage, and any browser other than Chrome.
 - Pipelines beyond the preview: full-text search, window functions, pipelines in a
   `Transaction`, evaluation against the local cache and real-time pipelines.
-- Multi-tab / multi-process sharing of one cache, as in the JS SDK.
-- Any run against production Firestore.
+- A Firebase Auth client: the app supplies the ID token through `PlatformDependencies`.
+- Any run against production Firestore; the packages are not published yet.
 
 ## Versions published as `cloud_firestore_vm`
 

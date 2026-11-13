@@ -202,8 +202,8 @@ A complete implementation on top of `package:sqlite3` that you can copy is
 
 The database name passed to the opener is built the same way as in 0.0.7
 (`firestore.<app name>.<project id>.<database>`), so an opener that maps names to files the same
-way finds the existing cache. 0.0.7 wrote schema version 8 and this version is at 13 (bundle
-tables, read times on cached documents, document overlays); the first open with the new package
+way finds the existing cache. 0.0.7 wrote schema version 8 and this version is at 14 (bundle
+tables, read times on cached documents, document overlays, persistent cache indexes); the first open with the new package
 runs the newer migrations through your opener's `onUpgrade` callback (it must call it when the
 stored `user_version` is lower than the requested one, see the contract on `OpenDatabase`), and
 pending writes are converted to overlays the first time the client starts.
@@ -395,6 +395,28 @@ print('${firestore.projectId} / ${firestore.databaseName}');
 - **`Blob.bytes`** returns a copy, so changing the returned list no longer changes the blob.
 - **Out-of-range `Timestamp`s** (before year 1 or after year 9999) are rejected with an
   `ArgumentError` when they are written, also in builds without asserts.
+
+- **Arguments are checked in release builds too.** Checks that were asserts now throw an
+  `ArgumentError` in every build: a collection path with an even number of segments, a
+  `cacheSizeBytes` below 1 MB with persistence, a `GeoPoint` outside its range when it is
+  written, an empty application id in `FirebaseOptions`. `firestore.doc('')` and
+  `collectionGroup('')` throw as well; they were accepted.
+- **Settings.** `FirestoreSettings.host` must be a plain host name or IP address (no `/`, `@`,
+  `?`, `#`, `\`, whitespace), and `sslEnabled: false` with the production host throws in every
+  build.
+- **Numbers in `whereIn`, `whereNotIn`, the array filters and array transforms** are compared
+  by value against the local cache, as the backend does: `whereIn('n', [1])` matches a
+  document with `1.0`, and `arrayUnion([1])` adds nothing to an array that holds `1.0`.
+  0.0.7 compared them by type as well.
+- **Range filters do not match `null` and `NaN`** in the local cache (`a < 1` does not match a
+  `NaN` value), as on the backend.
+- **A cached document that only the client matches for a query** is removed from that query's
+  results once the backend confirms that the document exists but is not a result, instead of
+  keeping the listener at `isFromCache` for ever.
+- **Bundles** are parsed as untrusted input: an element larger than 64 MiB, or values nested
+  more than 100 levels deep, make `loadBundle` fail.
+- **`toString()` of token results** (`GetTokenResult`, `InternalTokenResult`) no longer
+  contains the token.
 
 ## 10. The example app
 

@@ -83,9 +83,10 @@ listen and write streams, over `fetch`. What to know:
   web with `unavailable` (the emulator's WebChannel endpoint drops the stream; over gRPC the
   same query works). Read such collections in pages there. Whether the production backend
   has such a limit was not checked.
-- It was verified against the emulator only: 19 tests in Chrome
-  (`dart test -p chrome -c dart2wasm test/browser`; with `-c dart2js` 18 pass and 1 is skipped),
-  and the whole standard integration suite on the VM over the web transport
+- It was verified against the emulator only: 41 tests in Chrome (`tool/test_browser.sh both`
+  from the repository root; 40 pass and 1 is skipped with each compiler: under dart2wasm the
+  crash harness of the persistent cache, under dart2js the test of 64 bit integers), and the
+  whole standard integration suite on the VM over the web transport
   (`tool/test_integration.sh standard --transport=webchannel`). Other browsers and the
   production backend are untested.
 - Prefer dart2wasm. Compiled to JavaScript, integers above 2^53 lose precision.
@@ -654,8 +655,11 @@ repository root (see `tool/README.md`).
 | Unit | `dart test test/unit` | none |
 | Integration | `FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 dart test test/integration` | standard emulator (`tool/start_emulator.sh`) |
 | Enterprise | `FIRESTORE_ENTERPRISE_EMULATOR_HOST=127.0.0.1:8181 dart test test/integration_enterprise` | Enterprise edition emulator (`tool/start_enterprise_emulator.sh`) |
-| Browser | `dart test -p chrome -c dart2wasm test/browser` | standard emulator on 127.0.0.1:8080, Chrome |
-| Integration over the web transport | `tool/test_integration.sh standard --transport=webchannel` (repository root) | standard emulator; runs on the VM |
+| Browser | `tool/test_browser.sh [dart2wasm\|dart2js\|both]` (repository root) | a private emulator on 127.0.0.1:8090 that the script starts, Chrome |
+| Integration over the web transport | `tool/test_integration.sh standard --transport=webchannel` (repository root; also `--transport=webchannel-longpolling`) | the private emulator on 127.0.0.1:8090; runs on the VM |
+| Chaos tests | part of `test/integration` (`firebase/firestore/chaos/`) | standard emulator behind a TCP proxy that cuts and stalls connections |
+| Firestore Lite size check | `tool/check_size.sh` (repository root) | none; compiles two programs with `dart compile js` |
+| Production verification kit | `FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 tool/verify_production/run.sh --backend=emulator` (repository root) | standard emulator; a real project only with `--backend=production --yes` and your credentials (not run yet) |
 | Standard suite on Enterprise | `FIRESTORE_EMULATOR_HOST=127.0.0.1:8181 FIRESTORE_EMULATOR_EDITION=enterprise dart test test/integration` | Enterprise edition emulator |
 
 The environment variables are read by `test/util/test_backend.dart`:
@@ -722,6 +726,12 @@ before string ids; the emulator does not show that.)
 
 ### Against a real Firebase project (opt-in)
 
+Nothing in this repository has been run against a real project yet. There are two ways to do it,
+both opt-in. The production verification kit (`tool/verify_production`, see its README) is the
+smaller one: 14 named checks that make at most 80 writes below one document of their own,
+print a plan first and only run with `--yes`. It passes against both emulators, with
+the known emulator differences listed in its README.
+
 The integration suite can also run against a real project. Nothing does this by default: it
 only happens when you set `FIRESTORE_TEST_PROJECT_ID` yourself and `FIRESTORE_EMULATOR_HOST` is
 not set (the emulator always wins, so an emulator run can never reach a real project).
@@ -754,25 +764,25 @@ not set (the emulator always wins, so an emulator run can never reach a real pro
 Not done:
 
 - **Production.** Nothing has been run against production Firestore, and the Enterprise edition
-  features only against the Enterprise edition emulator. The opt-in real-project test mode
-  exists but has not been run.
-- **Web beyond the experiment**: sharing the persistent cache between tabs (it is one tab at
-  a time), OPFS storage, and any browser other than Chrome.
+  features only against the Enterprise edition emulator. The production verification kit and
+  the opt-in real-project test mode exist but have not been run. The packages are not
+  published.
+- **Web beyond the experiment**: OPFS storage, and any browser other than Chrome.
 - **Pipelines** beyond the [preview](#pipelines-preview) described above: full-text search,
   window functions, pipelines in a `Transaction`, local evaluation and real-time pipelines.
 - `Query.findNearest` evaluation against the local cache.
-- **Sharing one cache between running clients** (the multi-tab support of the JS SDK): see
+- **Sharing one cache between running clients** (the multi-tab support of the JS SDK): one
+  process, or one browser tab, at a time. See
   [Persistence and connectivity](#persistence-and-connectivity).
+- **Persistent cache indexes** for queries with inequalities on several fields (they are
+  scanned, as upstream), and with a memory cache.
+- **A Firebase Auth client.** The app supplies the ID token through `PlatformDependencies`.
 - Android-specific pieces of the Android SDK.
 - Auth, Storage, Realtime Database: see
   [appsup-dart/firebase_dart](https://github.com/appsup-dart/firebase_dart).
 
 Known gaps in what is done:
 
-- **BSON numbers in membership filters.** `in`, `not-in`, `array-contains` and
-  `array-contains-any` match a number against the local cache only if it has the same type
-  (`Int32Value(5)` does not match `5`), while the backend compares numbers by value; the JS SDK
-  has the same gap. Comparisons and ordering compare numbers by value, as the backend does.
 - **Plain maps with a reserved key.** A plain `Map` with one of the reserved keys (for example
   `{'__int__': 5}`) is rejected in document data, like every field name that begins and ends
   with `__`; as a query value or an `arrayUnion` / `arrayRemove` element it is read as the BSON

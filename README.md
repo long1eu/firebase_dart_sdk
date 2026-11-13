@@ -45,14 +45,18 @@ dart pub add cloud_firestore_dart firebase_app_dart   # once 0.1.0 is published;
   (server timestamp, increment, min/max, array union/remove).
 - Data bundles and named queries, snapshots as JSON (in the format of the JS SDK), vector values
   with `findNearest`, App Check token plumbing, emulator support with a mock user token.
+- Persistent cache indexes (`persistentCacheIndexManager`, `setIndexConfiguration`), and a
+  built-in detector of connectivity changes on the VM.
 - For Enterprise edition databases: the BSON value types, and Pipelines as a preview library
   (server-executed only).
+- Firestore Lite (experimental, `package:cloud_firestore_dart/lite.dart`): a client without
+  cache and listeners where every call is one request.
 
 ## Status
 
 Revival of the original port, which stopped at the 2019 Android SDK; it now follows the Android
-SDK's behaviour up to late 2026 on Dart 3 with sound null safety, and parts of its public API
-follow the JS SDK.
+SDK's behaviour up to late 2026 on Dart 3 (`cloud_firestore_dart` needs Dart 3.8) with sound
+null safety, and parts of its public API follow the JS SDK.
 
 - **Tested against the Firestore emulator only. Nothing has been run against production Firestore.**
   Treat it as untested there, and test against your own project before relying on it. The
@@ -68,10 +72,11 @@ follow the JS SDK.
   pass in Chrome against the emulator (dart2wasm and dart2js), and the whole standard
   integration suite passes on the VM over the web transport. No other browser and no production backend was
   tried.
-- Not implemented: the client-side index engine (`setIndexConfiguration`, auto-indexing; only
-  its internal building blocks exist), sharing one cache between running clients, and Pipelines
-  beyond the preview (no search, no local evaluation, no listeners). The package README lists the
-  known gaps.
+- A production verification kit exists (`tool/verify_production`) and passes against the
+  emulators; **it has not been run against a real project**.
+- Not implemented: sharing one cache between running clients (the multi-tab support of the JS
+  SDK), a Firebase Auth client, and Pipelines beyond the preview (no search, no local
+  evaluation, no listeners). The package README lists the known gaps.
 
 This repository ports Firestore and the Firebase Core pieces it needs. There is no Auth, Storage or
 Realtime Database client here; for those see
@@ -123,8 +128,24 @@ hand, from `cloud_firestore/cloud_firestore_dart`:
     FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 dart test test/integration
     FIRESTORE_ENTERPRISE_EMULATOR_HOST=127.0.0.1:8181 dart test test/integration_enterprise
 
+The web transport and the browser tests use a private emulator on port 8090, which the scripts
+start themselves:
+
+    ./tool/test_integration.sh standard --transport=webchannel   # the suite on the VM, over REST and WebChannel
+    ./tool/test_browser.sh both                                  # test/browser in Chrome, dart2wasm and dart2js
+
+Two more checks:
+
+    ./tool/check_size.sh                                         # Firestore Lite stays small and free of the sync engine
+    FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 ./tool/verify_production/run.sh --backend=emulator
+
+The last one is the production verification kit run against the emulator. Against a real project
+it only runs with your own credentials and `--yes` (see `tool/verify_production/README.md`); that
+has not been done yet.
+
 See `tool/README.md` for details, and the Testing section of
-`cloud_firestore/cloud_firestore_dart/README.md` for the opt-in run against a real project.
+`cloud_firestore/cloud_firestore_dart/README.md` for the opt-in run of the integration suite
+against a real project.
 
 ## Regenerating protos
 

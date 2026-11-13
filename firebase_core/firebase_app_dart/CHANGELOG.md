@@ -28,6 +28,8 @@ production Firebase.
 - The Flutter example app is replaced by a command-line `example/main.dart`.
 - `GetTokenResult.toString()` and `InternalTokenResult.toString()` no longer contain the token
   (or, for `GetTokenResult`, the claims); they print `<redacted>`.
+- `FirebaseApp.withOptions` throws an `ArgumentError` for options with an empty application id
+  in every build; the check was an `assert` of the `const` `FirebaseOptions` constructor only.
 
 ### Added
 
@@ -42,8 +44,6 @@ production Firebase.
 ### Fixed
 
 - `FirebaseApp.delete` removes the app by name.
-- `FirebaseApp.withOptions` throws an `ArgumentError` for options with an empty application id in every
-  build; the check was an `assert` of the `const` `FirebaseOptions` constructor only.
 - `GetTokenResult` tolerates tokens with missing claims.
 
 ## Versions published as `firebase_core_vm`

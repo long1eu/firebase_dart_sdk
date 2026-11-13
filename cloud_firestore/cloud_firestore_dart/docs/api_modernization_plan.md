@@ -229,7 +229,7 @@ Both new test files live under `test/unit/` so `tool/test_all.sh` runs them.
 
 ## Status at the end of the revival
 
-Checklist items from section 4, as of `main` on 2026-11-13 (checked against the golden API file
+Checklist items from section 4, as of `main` at `606a73c` on 2026-11-13 (checked against the golden API file
 `test/unit/api/public_api.golden.txt` and the code; verified with unit tests and the emulator only, never against
 production Firestore). The sections above this one describe the plan and the state when it was written and were not
 rewritten; where they disagree with this table, the table is right.
@@ -241,7 +241,7 @@ rewritten; where they disagree with this table, the table is right.
 | 3 | `doc`, `docs`, `docChanges`, `ref`, `terminate`, `instanceFor`, `documentIdField`, `Source.serverAndCache` | done (`instanceFor` still returns a `Future`); `shutdown` is deprecated in favour of `terminate` |
 | 4 | `FirebaseFirestore` / `Settings` typedefs | done |
 | 5 | `FirestoreErrorCode` as enhanced enum / `FirebaseException` alignment | not done (`FirestoreErrorCode` is still a class with constants; `FirestoreError.code` is a `FirestoreErrorCode`) |
-| 6 | Drop dead `checkNotNull` in the public layer | not done (18 calls left in the seven public files) |
+| 6 | Drop dead `checkNotNull` in the public layer | not done (21 calls left in the public files, `query_builder.dart` included) |
 | 7 | `where({named})`, `orderByField`, `update(Map<Object, Object?>)` | partly: `where(field, isEqualTo: ..., ...)` with named arguments is done (the `where*` methods and `where(Filter)` are kept, not deprecated); `orderBy` still takes a `Direction`, and `update` still takes `Map<String, Object?>` next to `updateFromList` |
 | 8 | `snapshots` options method, `GetOptions` | partly: `getSnapshotsWithOptions(SnapshotListenOptions)` and `ListenSource` exist next to the `snapshots` getter and `getSnapshots([MetadataChanges])`; `GetOptions` not added (`get([Source])`) |
 | 9 | `sealed` FieldValue hierarchy | not done; the `isX` getters, `elements` and `methodName` are marked `@internal` instead (`FieldValue.maximum/minimum/vector` added) |
@@ -254,13 +254,18 @@ rewritten; where they disagree with this table, the table is right.
 | 16 | `Filter.or/and` | done (`Filter` class, `where(Filter)`) |
 | 17 | Breaking release: move `util/database.dart`, private constructors, remove deprecated names | partly: `ConflictAlgorithm` is no longer exported and `Database.file` became `Database.path`; the opener types are still exported from the main library, the leaking constructors are `@internal` rather than private, and the deprecated names are still there |
 | 18 | Bundles | done (`loadBundle`, `loadBundleStream`, `getNamedQuery`) |
-| 19 | Golden surface test, emulator CI | golden tests done for both libraries (`public_api.golden.txt`, `pipelines_api.golden.txt`); a CI workflow exists (`.github/workflows/ci.yml`) but has not been run |
+| 19 | Golden surface test, emulator CI | golden tests done for the three libraries (`public_api.golden.txt`, `pipelines_api.golden.txt`, `lite_api.golden.txt`); the CI workflow (`.github/workflows/ci.yml`) has run: unit tests on Dart 3.8.0 and stable are required, the emulator, browser and size jobs are allowed to fail |
 
 Also added beyond the original list: vector values and `Query.findNearest`, cache settings
-(`PersistentCacheSettings`, `MemoryCacheSettings`), `TransactionOptions` (`maxAttempts`, `readOnly`),
-`snapshotsInSync`, App Check plumbing, `Firestore.setLogLevel`, `Firestore.projectId` / `databaseName`, value helpers
-(`Timestamp.fromMillis` / `toMillis`, `Blob` base64, `toJson` / `fromJson` on the value types), snapshot and reference
-JSON (`toJson` / `fromJson`, `documentSnapshotsFromJson` / `querySnapshotsFromJson`), the BSON value types, and
-Pipelines as a preview in a separate library (`package:cloud_firestore_dart/pipelines.dart`).
+(`PersistentCacheSettings`, `MemoryCacheSettings`), `TransactionOptions` (`maxAttempts`, `readOnly`, `readTime`) with
+`Transaction.getQuery` / `getAggregate` in read-only transactions, `snapshotsInSync`, App Check plumbing,
+`Firestore.setLogLevel`, `Firestore.projectId` / `databaseName`, `Firestore.app` (the JS and FlutterFire name of
+`firebaseApp`), value helpers (`Timestamp.fromMillis` / `toMillis`, `Blob` base64, `toJson` / `fromJson` on the value
+types), snapshot and reference JSON (`toJson` / `fromJson`, `documentSnapshotsFromJson` / `querySnapshotsFromJson`),
+the BSON value types, persistent cache indexes (`Firestore.persistentCacheIndexManager`, the deprecated
+`setIndexConfiguration`), the web settings `experimentalForceLongPolling` / `experimentalAutoDetectLongPolling`,
+`ClearableDatabase`, and two more libraries: Pipelines as a preview (`package:cloud_firestore_dart/pipelines.dart`)
+and Firestore Lite (`package:cloud_firestore_dart/lite.dart`, experimental), whose `Query` only has the
+named-argument `where` and whose `instanceFor` is synchronous.
 
 Still open from this plan, in the order it suggests: 5, 6, the rest of 7 and 8, 9, 10, and the breaking clean-up of 17.

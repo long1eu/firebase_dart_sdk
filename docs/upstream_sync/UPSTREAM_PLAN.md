@@ -2,7 +2,7 @@
 
 ## Status at the end of the revival
 
-Updated 2026-11-13 at `main`. The port was at `576da00e85` (2019-07-23); behaviour has now been brought forward to
+Updated 2026-11-13 at `main` (`606a73c`). The port was at `576da00e85` (2019-07-23); behaviour has now been brought forward to
 roughly the current upstream `main` (checked against a clone whose `main` was at `51b35e869`, 2026-11-11), for the
 items marked done. Everything is ported in Dart, not copied, and verified with unit tests, the shared spec tests and
 the local emulator only. **Nothing was run against production Firestore**, and the Enterprise edition features were
@@ -18,18 +18,30 @@ rewritten; the table here is the current state.
 | Wave 4: bundles and named queries, OR queries / multiple inequality filters / Query-Target split, bloom filters, vector values | done |
 | Wave 4: index-free queries (read time on remote documents, upstream 21.3.0) | done (SQLite schema 10; `2f53c69`) |
 | Wave 4: document overlays (upstream 24.0.0) | done (SQLite schema 11, with a migration that builds the overlays from existing mutation queues; `2f53c69`) |
-| Wave 4: client-side index engine, auto-indexing | in progress. Stage 0 (index value encoding, `FieldIndex` model, index configuration parsing; `ab398b4`) and stage 1 (`Bound.inclusive`, target index bounds, `TargetIndexMatcher`; `6a7c99c`) and stage 2 (SQLite schema 12 and 13, index manager; `b8fc0ab`) are merged; nothing reads the indexes yet. Stage 3 (backfiller, query engine) and stage 4 (public API, auto-indexing) are in progress and not merged |
+| Wave 4: client-side index engine, auto-indexing | done: index value encoding, `FieldIndex` model and configuration parsing (`ab398b4`), target index bounds and `TargetIndexMatcher` (`6a7c99c`), SQLite schema 12 and 13 with the index manager (`b8fc0ab`), the backfiller and the three-step query engine (`8cff87f`), and the public API `setIndexConfiguration` / `PersistentCacheIndexManager` with automatic index creation (`994df46`). Schema 14 adds two lookup indexes of the port's own (`c4958ab`). SQLite persistence only; the index entries differ from Android's in two places where its encoding returns wrong results (see `docs/ARCHITECTURE.md`) |
 | BSON value types | done (`9709a29`, `c9ade8d`); Enterprise edition emulator only |
-| Read-only transactions | done (`TransactionOptions.readOnly`, client-side `VerifyMutation`; emulator-verified) |
+| Read-only transactions | done, and beyond the client SDKs: `TransactionOptions.readOnly` runs a read-only transaction of the backend (`BeginTransaction`, reads with its id, `Rollback`), with queries, aggregations and an optional read time (`d97ff59`). The Android and JS client SDKs have no such mode; emulator-verified only |
 | Verify documents read in a transaction (upstream ef38ef7) | done (`58674f9`) |
 | Persistence clearing | done (`Firestore.clearPersistence()` on a terminated instance; `ee0ee5b`) |
 | Pipelines | preview, in a separate library (`99f3706`, `02444ca`, `5d732eb`): server-executed only, Enterprise edition emulator only. Search, window functions, local evaluation and real-time pipelines are not done |
-| Web | not part of the Android plan. The library compiles with dart2js and dart2wasm, the RPCs are behind a transport interface (`76f975a`, `41e9b46`), and an experimental web transport (REST and WebChannel over `fetch`, `6d95cf5`) passes 16 browser tests in Chrome and the standard integration suite on the VM, against the emulator (`6d95cf5`, `5226466`). Memory cache only; no other browser and no production backend was tried |
+| Web | not part of the Android plan; experimental. The RPCs are behind a transport interface (`76f975a`, `41e9b46`); the web transport is REST for unary calls and a WebChannel client over `fetch` for the streams (`6d95cf5`), hardened with long polling, timeouts, retransmission and session cleanup (`9d7d257`, `9fafdc2`), and there is an opt-in persistent cache, SQLite as WebAssembly on IndexedDB (`e10c909`, `e17faf9`, `606a73c`). 41 browser tests in Chrome (40 pass and 1 is skipped with each compiler) and the standard integration suite on the VM over the web transport, against the emulator. Chrome only; no production backend was tried |
+| Firestore Lite | not part of the Android plan; experimental (`b184f30`): a second library without cache and listeners, as `firebase/firestore/lite` of the JS SDK, over gRPC on the VM and REST on the web |
 | Kotlin/ktx, Android-only | skipped by design |
 
-Not from upstream, found while testing: the client no longer resets a call that the backend may be finishing
-(`5174ba2`, `5497721`), because `package:http2` then terminated the whole connection and a transaction commit that had
-been applied could be retried.
+Not from upstream, found while testing:
+
+- The client no longer resets a call that the backend may be finishing (`5174ba2`, `5497721`), because
+  `package:http2` then terminated the whole connection and a transaction commit that had been applied could be retried.
+- The transport connector fails the reconnect that follows a connection lost before any call started (`dd2668d`),
+  because `package:grpc` otherwise reconnects about 43 times per second to a peer that accepts and closes.
+- Local filter and transform evaluation follows the backend where upstream does not (`eec6cf2`), a limbo document
+  that the backend confirms but does not match is dropped from the view (`4c72e9e`), and an acknowledged write with
+  an unchanged version is applied to the cache (`36f35e3`). These are deliberate deviations; `docs/ARCHITECTURE.md`
+  lists them with their tests.
+- A built-in connectivity change detector for the VM (`ea747eb`), in place of Android's network callback.
+
+A production verification kit exists (`tool/verify_production`, `36f35e3`) and passes against the emulators. It has
+not been run against a real project.
 
 Still open from the original "Open / unverified" list: `0eaca5e` (`useEmulator`) is covered by
 `FirestoreSettings.withEmulator` but not compared line by line; the `grpc` inbound message size question is unanswered.
