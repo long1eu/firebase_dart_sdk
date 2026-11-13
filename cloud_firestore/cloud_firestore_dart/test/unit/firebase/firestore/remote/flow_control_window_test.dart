@@ -148,7 +148,7 @@ class _BigService extends Service {
 }
 
 class _BigClient extends Client {
-  _BigClient(ClientChannelBase channel) : super(channel);
+  _BigClient(ClientChannelBase super.channel);
 
   static final ClientMethod<int, List<int>> _big = ClientMethod<int, List<int>>(
     '/test.Flow/Big',

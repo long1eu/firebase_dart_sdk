@@ -373,7 +373,7 @@ Future<Map<String, Set<String>>> _getCurrentSchema(
     SQLiteSchema schema, Database db) async {
   final Map<String, Set<String>> tables = <String, Set<String>>{};
   final List<Map<String, dynamic>> data = await db
-      .query('SELECT tbl_name FROM sqlite_master WHERE type = \"table\"');
+      .query('SELECT tbl_name FROM sqlite_master WHERE type = "table"');
   for (Map<String, dynamic> row in data) {
     final String table = row['tbl_name'];
     final Set<String> columns = <String>{

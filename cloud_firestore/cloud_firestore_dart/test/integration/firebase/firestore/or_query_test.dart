@@ -15,7 +15,6 @@
 import 'dart:async';
 
 import 'package:cloud_firestore_dart/src/firebase/firestore/aggregate_query_snapshot.dart';
-import 'package:cloud_firestore_dart/src/firebase/firestore/collection_reference.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/filter.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/firestore.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/query.dart';

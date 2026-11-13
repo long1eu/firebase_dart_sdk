@@ -101,6 +101,8 @@ class FirebaseAuthCredentialsProvider extends CredentialsProvider {
         'FirebaseAuthCredentialsProvider',
         'getToken aborted due to token change',
       );
+      // A retry, as upstream's `return getToken();`.
+      // ignore: recursive_getters
       return token;
     }
 

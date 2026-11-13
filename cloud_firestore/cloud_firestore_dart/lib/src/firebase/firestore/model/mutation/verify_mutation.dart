@@ -1,8 +1,6 @@
-import 'package:cloud_firestore_dart/src/firebase/firestore/model/document_key.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/maybe_document.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/mutation.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/mutation_result.dart';
-import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/precondition.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/assert.dart';
 import 'package:cloud_firestore_dart/src/firebase/timestamp.dart';
 import 'package:firebase_app_dart/internal.dart';
@@ -11,8 +9,7 @@ import 'package:firebase_app_dart/internal.dart';
 /// fails the commit if it does not hold. It is only sent as part of a transaction, to verify the documents that were
 /// read but not written, and it is never applied locally.
 class VerifyMutation extends Mutation {
-  const VerifyMutation(DocumentKey key, Precondition precondition)
-    : super(key, precondition);
+  const VerifyMutation(super.key, super.precondition);
 
   @override
   MaybeDocument applyToRemoteDocument(

@@ -263,7 +263,7 @@ class WebChannelStream {
   Uri _url(Map<String, String> params) {
     final Map<String, String> all = <String, String>{
       'database': _database,
-      if (_httpSessionId != null) 'gsessionid': _httpSessionId!,
+      'gsessionid': ?_httpSessionId,
       'VER': _protocolVersion,
       // The attempt number of the request.
       't': '1',

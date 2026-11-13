@@ -102,7 +102,7 @@ Future<List<String>> opfsDirectories(String app) async {
     final JSObject step = await iterator
         .callMethod<JSPromise<JSObject>>('next'.toJS)
         .toDart;
-    if ((step.getProperty<JSBoolean>('done'.toJS)).toDart) {
+    if (step.getProperty<JSBoolean>('done'.toJS).toDart) {
       break;
     }
     final String name = step.getProperty<JSString>('value'.toJS).toDart;

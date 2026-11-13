@@ -62,10 +62,10 @@ Map<String, Object?> event(
   required bool fromCache,
   bool hasPendingWrites = false,
 }) => <String, Object?>{
-  if (added != null) 'added': added,
-  if (removed != null) 'removed': removed,
-  if (modified != null) 'modified': modified,
-  if (metadata != null) 'metadata': metadata,
+  'added': ?added,
+  'removed': ?removed,
+  'modified': ?modified,
+  'metadata': ?metadata,
   'errorCode': 0,
   'fromCache': fromCache,
   'hasPendingWrites': hasPendingWrites,
@@ -89,8 +89,8 @@ Map<String, Object?> userListen(
   Map<String, Object?>? state,
 }) => <String, Object?>{
   'userListen': <String, Object?>{'query': query, 'targetId': targetId},
-  if (events != null) 'expectedSnapshotEvents': events,
-  if (state != null) 'expectedState': state,
+  'expectedSnapshotEvents': ?events,
+  'expectedState': ?state,
 };
 
 Map<String, Object?> watchAck(int targetId) => <String, Object?>{
@@ -105,7 +105,7 @@ Map<String, Object?> watchSends(
   'watchEntity': <String, Object?>{
     'docs': docs,
     if (targets.isNotEmpty) 'targets': targets,
-    if (removedTargets != null) 'removedTargets': removedTargets,
+    'removedTargets': ?removedTargets,
   },
 };
 
@@ -130,8 +130,8 @@ Map<String, Object?> watchSnapshot(
     'targetIds': <Object?>[],
     'version': version,
   },
-  if (events != null) 'expectedSnapshotEvents': events,
-  if (state != null) 'expectedState': state,
+  'expectedSnapshotEvents': ?events,
+  'expectedState': ?state,
 };
 
 final Map<String, Object?> docA = doc('collection/a', 1000, <String, Object?>{

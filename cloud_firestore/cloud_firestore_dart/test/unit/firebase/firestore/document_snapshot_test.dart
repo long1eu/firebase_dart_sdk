@@ -107,7 +107,7 @@ void main() {
     runZoned(
       () => snapshot.data,
       zoneSpecification: ZoneSpecification(
-        print: (_, __, ___, String line) => logs.add(line),
+        print: (_, _, _, String line) => logs.add(line),
       ),
     );
 

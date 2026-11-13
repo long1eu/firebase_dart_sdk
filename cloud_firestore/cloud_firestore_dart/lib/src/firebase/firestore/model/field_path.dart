@@ -7,7 +7,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/model/document_key.d
 
 /// A dot separated path for navigating sub-objects with in a document
 class FieldPath extends BasePath<FieldPath> {
-  const FieldPath._(List<String> segments) : super(segments);
+  const FieldPath._(super.segments);
 
   /// Creates a [FieldPath] with a single field. Does not split on dots.
   factory FieldPath.fromSingleSegment(String fieldName) {

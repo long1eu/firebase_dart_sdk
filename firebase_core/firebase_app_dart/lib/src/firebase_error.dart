@@ -22,13 +22,13 @@ class FirebaseError implements Error {
 /// `InternalTokenProvider.getAccessToken` will fail.
 class FirebaseNoSignedInUserError extends FirebaseError {
   /// Creates the error with a [message].
-  FirebaseNoSignedInUserError(String message) : super(message);
+  FirebaseNoSignedInUserError(super.message);
 }
 
 /// Thrown when a Firebase service or feature that an operation needs is not available.
 class FirebaseApiNotAvailableError extends FirebaseError {
   /// Creates the error with a [message].
-  const FirebaseApiNotAvailableError(String message) : super(message);
+  const FirebaseApiNotAvailableError(super.message);
 }
 
 /// Exception thrown when a request to a Firebase service has failed due to a
@@ -36,7 +36,7 @@ class FirebaseApiNotAvailableError extends FirebaseError {
 /// later to resolve.
 class FirebaseNetworkError extends FirebaseError {
   /// Creates the error with a [message].
-  const FirebaseNetworkError(String message) : super(message);
+  const FirebaseNetworkError(super.message);
 }
 
 /// Exception thrown when a request to a Firebase service has been blocked due
@@ -44,7 +44,7 @@ class FirebaseNetworkError extends FirebaseError {
 /// the request later to resolve.
 class FirebaseTooManyRequestsError extends FirebaseError {
   /// Creates the error with a [message].
-  const FirebaseTooManyRequestsError(String message) : super(message);
+  const FirebaseTooManyRequestsError(super.message);
 }
 
 /// Represents API errors. This is for internal usage only and we don't expose

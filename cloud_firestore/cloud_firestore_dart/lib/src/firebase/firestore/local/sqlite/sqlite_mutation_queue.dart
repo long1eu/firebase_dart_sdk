@@ -268,7 +268,7 @@ class SQLiteMutationQueue implements MutationQueue {
   @override
   Future<MutationBatch?> getNextMutationBatchAfterBatchId(int batchId) async {
     _statsCollector.recordRowsRead(MutationQueue.statsTag, 1);
-    final int _nextBatchId = batchId + 1;
+    final int nextBatchId = batchId + 1;
 
     final List<Map<String, dynamic>> result = await db.query(
       // @formatter:off
@@ -281,7 +281,7 @@ class SQLiteMutationQueue implements MutationQueue {
           LIMIT 1;
         ''',
       // @formatter:on
-      <dynamic>[uid, _nextBatchId],
+      <dynamic>[uid, nextBatchId],
     );
 
     if (result.isNotEmpty) {

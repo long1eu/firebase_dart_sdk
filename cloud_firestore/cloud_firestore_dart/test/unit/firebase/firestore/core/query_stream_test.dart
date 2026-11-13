@@ -570,11 +570,11 @@ void main() {
       doc2,
     );
     final ViewSnapshot expectedSnapshot = ViewSnapshot(
-      snap3!.query,
-      snap3!.documents,
-      DocumentSet.emptySet(snap3!.query.comparator),
+      snap3.query,
+      snap3.documents,
+      DocumentSet.emptySet(snap3.query.comparator),
       <DocumentViewChange>[change1, change2],
-      snap3!.mutatedKeys /*hasPendingWrites*/,
+      snap3.mutatedKeys /*hasPendingWrites*/,
       isFromCache: false,
       didSyncStateChange: true,
       excludesMetadataChanges: true,

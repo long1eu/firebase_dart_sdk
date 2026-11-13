@@ -80,7 +80,7 @@ bool _sameElement(FieldValue a, FieldValue b) => a.compareTo(b) == 0;
 
 /// An array union transform operation.
 class ArrayTransformOperationUnion extends ArrayTransformOperation {
-  ArrayTransformOperationUnion(List<FieldValue> elements) : super(elements);
+  ArrayTransformOperationUnion(super.elements);
 
   @override
   ArrayValue apply(FieldValue? previousValue) {
@@ -97,7 +97,7 @@ class ArrayTransformOperationUnion extends ArrayTransformOperation {
 
 /// An array remove transform operation.
 class ArrayTransformOperationRemove extends ArrayTransformOperation {
-  ArrayTransformOperationRemove(List<FieldValue> elements) : super(elements);
+  ArrayTransformOperationRemove(super.elements);
 
   @override
   ArrayValue apply(FieldValue? previousValue) {

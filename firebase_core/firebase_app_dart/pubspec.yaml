@@ -29,4 +29,5 @@ dependencies:
   rxdart: ^0.28.0
 
 dev_dependencies:
+  lints: ^6.1.0
   test: ^1.25.0

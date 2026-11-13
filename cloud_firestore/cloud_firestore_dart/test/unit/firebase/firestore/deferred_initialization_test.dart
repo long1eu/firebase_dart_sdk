@@ -40,9 +40,9 @@ OpenDatabase recording(OpenDatabase inner, List<String> log) {
       path,
       version: version ?? 1,
       onConfigure: onConfigure ?? (Database _) async {},
-      onCreate: onCreate ?? (Database _, int __) async {},
-      onUpgrade: onUpgrade ?? (Database _, int __, int ___) async {},
-      onDowngrade: onDowngrade ?? (Database _, int __, int ___) async {},
+      onCreate: onCreate ?? (Database _, int _) async {},
+      onUpgrade: onUpgrade ?? (Database _, int _, int _) async {},
+      onDowngrade: onDowngrade ?? (Database _, int _, int _) async {},
       onOpen: onOpen ?? (Database _) async {},
     );
     return _Recording(db, log);

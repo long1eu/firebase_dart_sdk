@@ -105,7 +105,7 @@ class _ServerTimestampFieldValue extends FieldValue {
 
 /// FieldValue class for arrayUnion() transforms.
 class _ArrayUnionFieldValue extends FieldValue {
-  const _ArrayUnionFieldValue._(List<Object?> elements) : super._(elements);
+  const _ArrayUnionFieldValue._(super.elements) : super._();
 
   @override
   String get _methodName => 'FieldValue.arrayUnion';
@@ -125,7 +125,7 @@ class _ArrayUnionFieldValue extends FieldValue {
 
 /// FieldValue class for arrayRemove() transforms.
 class _ArrayRemoveFieldValue extends FieldValue {
-  const _ArrayRemoveFieldValue._(List<Object?> elements) : super._(elements);
+  const _ArrayRemoveFieldValue._(super.elements) : super._();
 
   @override
   String get _methodName => 'FieldValue.arrayRemove';

@@ -53,11 +53,11 @@ void main() {
       show: (Query query) => query.toTarget().canonicalId,
       check: (Query query) {
         final Target target = query.toTarget();
-        final Target? other = byId.putIfAbsent(
+        final Target other = byId.putIfAbsent(
           target.canonicalId,
           () => target,
         );
-        if (other != null && other != target) {
+        if (other != target) {
           fail(
             'Two different targets share the canonical id '
             '${target.canonicalId}\n    $target\n    $other',
@@ -75,8 +75,8 @@ void main() {
       generate: (Gen gen) => Gen(gen.seed, size: gen.size.clamp(0, 2)).query(),
       show: (Query query) => query.canonicalId,
       check: (Query query) {
-        final Query? other = byId.putIfAbsent(query.canonicalId, () => query);
-        if (other != null && other != query) {
+        final Query other = byId.putIfAbsent(query.canonicalId, () => query);
+        if (other != query) {
           fail(
             'Two different queries share the canonical id '
             '${query.canonicalId}\n    $query\n    $other',

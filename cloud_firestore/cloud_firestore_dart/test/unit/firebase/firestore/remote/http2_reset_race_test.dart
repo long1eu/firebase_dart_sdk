@@ -66,7 +66,7 @@ class _TestService extends Service {
 }
 
 class _TestClient extends Client {
-  _TestClient(ClientChannelBase channel) : super(channel);
+  _TestClient(ClientChannelBase super.channel);
 
   static final ClientMethod<int, int> _hang =
       ClientMethod<int, int>('/test.Race/Hang', _encode, _decode);

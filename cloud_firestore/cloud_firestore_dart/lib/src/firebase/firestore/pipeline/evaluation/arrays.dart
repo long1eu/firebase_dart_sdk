@@ -287,7 +287,7 @@ EvaluateResult _arrayTransform(_Call call) {
     final EvaluateResult element = call.scope
         .withVariables(<String, EvaluateResult>{
           alias: EvaluateValue(array.internalValue[i]),
-          if (indexAlias != null) indexAlias: _int(i),
+          ?indexAlias: _int(i),
         })
         .eval(call.args.last);
     if (element.isError) {

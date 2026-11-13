@@ -6,8 +6,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/model/base_path.dart
 
 /// A slash separated path for navigating resources (documents and collections) within Firestore.
 class ResourcePath extends BasePath<ResourcePath> {
-  const ResourcePath._([List<String> segments = const <String>[]])
-    : super(segments);
+  const ResourcePath._([super.segments = const <String>[]]);
 
   factory ResourcePath.fromSegments(List<String> segments) {
     return segments.isEmpty ? empty : ResourcePath._(segments);

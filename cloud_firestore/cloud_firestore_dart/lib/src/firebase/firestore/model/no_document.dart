@@ -2,18 +2,16 @@
 // Lung Razvan <long1eu>
 // on 17/09/2018
 
-import 'package:cloud_firestore_dart/src/firebase/firestore/model/document_key.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/maybe_document.dart';
-import 'package:cloud_firestore_dart/src/firebase/firestore/model/snapshot_version.dart';
 import 'package:firebase_app_dart/internal.dart';
 
 /// Represents that no documents exists for the key at the given version.
 class NoDocument extends MaybeDocument {
   const NoDocument(
-    DocumentKey key,
-    SnapshotVersion version, {
+    super.key,
+    super.version, {
     required this.hasCommittedMutations,
-  }) : super(key, version);
+  });
 
   final bool hasCommittedMutations;
 

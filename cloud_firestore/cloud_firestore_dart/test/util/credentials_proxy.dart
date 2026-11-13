@@ -155,17 +155,19 @@ class GrpcCredentialsProxy with _Recording {
     // the handler refused the call ("Cannot add event after closing", uncaught, in the zone of `serve`). The client
     // just sees the refusal; only that error is ignored.
     final Completer<void> serving = Completer<void>();
-    runZonedGuarded(
-      () => proxy._server
-          .serve(address: InternetAddress.loopbackIPv4, port: 0)
-          .then(serving.complete, onError: serving.completeError),
-      (Object error, StackTrace stackTrace) {
-        if (error is StateError &&
-            error.message == 'Cannot add event after closing') {
-          return;
-        }
-        proxy.serverErrors.add(error);
-      },
+    unawaited(
+      runZonedGuarded(
+        () => proxy._server
+            .serve(address: InternetAddress.loopbackIPv4, port: 0)
+            .then(serving.complete, onError: serving.completeError),
+        (Object error, StackTrace stackTrace) {
+          if (error is StateError &&
+              error.message == 'Cannot add event after closing') {
+            return;
+          }
+          proxy.serverErrors.add(error);
+        },
+      ),
     );
     await serving.future;
     return proxy;

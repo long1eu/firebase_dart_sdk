@@ -45,7 +45,7 @@ const List<String> hostileNames = <String>[
   'projects/project',
   'projects/project/databases',
   'projects/project/databases/(default)',
-  '$root',
+  root,
   '$root/',
   '$root/c',
   '$root/c/d',

@@ -292,15 +292,15 @@ abstract class Expression {
   /// This string without leading and trailing whitespace, or without the
   /// leading and trailing characters of [characters] when given.
   FunctionExpression trim([Object? characters]) =>
-      _function('trim', <Object?>[if (characters != null) characters]);
+      _function('trim', <Object?>[?characters]);
 
   /// Like [trim], for the start of the string only.
   FunctionExpression ltrim([Object? characters]) =>
-      _function('ltrim', <Object?>[if (characters != null) characters]);
+      _function('ltrim', <Object?>[?characters]);
 
   /// Like [trim], for the end of the string only.
   FunctionExpression rtrim([Object? characters]) =>
-      _function('rtrim', <Object?>[if (characters != null) characters]);
+      _function('rtrim', <Object?>[?characters]);
 
   /// The number of bytes of this string (in UTF-8) or of these bytes.
   FunctionExpression byteLength() => _function('byte_length');
@@ -311,7 +311,7 @@ abstract class Expression {
   /// The part of this string that starts at [position] (0-based) and has
   /// [length] characters, or runs to the end without [length].
   FunctionExpression substring(Object position, [Object? length]) =>
-      _function('substring', <Object?>[position, if (length != null) length]);
+      _function('substring', <Object?>[position, ?length]);
 
   /// The parts of this string between occurrences of [delimiter].
   FunctionExpression split(Object delimiter) =>
@@ -393,12 +393,12 @@ abstract class Expression {
 
   /// This number rounded to [decimalPlaces] (to a whole number without it).
   FunctionExpression round([Object? decimalPlaces]) =>
-      _function('round', <Object?>[if (decimalPlaces != null) decimalPlaces]);
+      _function('round', <Object?>[?decimalPlaces]);
 
   /// This number cut off after [decimalPlaces] (at the decimal point without
   /// it).
   FunctionExpression trunc([Object? decimalPlaces]) =>
-      _function('trunc', <Object?>[if (decimalPlaces != null) decimalPlaces]);
+      _function('trunc', <Object?>[?decimalPlaces]);
 
   /// This number raised to the power [exponent].
   FunctionExpression pow(Object exponent) =>
@@ -452,18 +452,12 @@ abstract class Expression {
   FunctionExpression timestampTruncate(
     Object granularity, [
     Object? timezone,
-  ]) => _function('timestamp_trunc', <Object?>[
-    granularity,
-    if (timezone != null) timezone,
-  ]);
+  ]) => _function('timestamp_trunc', <Object?>[granularity, ?timezone]);
 
   /// The [part] (for example `'year'` or `'dayofweek'`) of this timestamp,
   /// optionally in [timezone].
   FunctionExpression timestampExtract(Object part, [Object? timezone]) =>
-      _function('timestamp_extract', <Object?>[
-        part,
-        if (timezone != null) timezone,
-      ]);
+      _function('timestamp_extract', <Object?>[part, ?timezone]);
 
   /// This timestamp as microseconds since the Unix epoch.
   FunctionExpression timestampToUnixMicros() =>
@@ -520,7 +514,7 @@ abstract class Expression {
 
   /// The elements of this array from [offset], at most [length] of them.
   FunctionExpression arraySlice(Object offset, [Object? length]) =>
-      _function('array_slice', <Object?>[offset, if (length != null) length]);
+      _function('array_slice', <Object?>[offset, ?length]);
 
   /// This array in reverse order.
   FunctionExpression arrayReverse() => _function('array_reverse');

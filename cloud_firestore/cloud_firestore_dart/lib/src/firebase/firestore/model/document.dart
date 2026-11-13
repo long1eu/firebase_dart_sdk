@@ -2,10 +2,8 @@
 // Lung Razvan <long1eu>
 // on 17/09/2018
 
-import 'package:cloud_firestore_dart/src/firebase/firestore/model/document_key.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/field_path.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/maybe_document.dart';
-import 'package:cloud_firestore_dart/src/firebase/firestore/model/snapshot_version.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/value/field_value.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/assert.dart';
 import 'package:cloud_firestore_dart/src/proto/google/firestore/v1/document.pb.dart';
@@ -27,23 +25,17 @@ enum DocumentState {
 }
 
 class Document extends MaybeDocument implements Comparable<Document> {
-  Document(
-    DocumentKey key,
-    SnapshotVersion version,
-    this.documentState,
-    this._objectValue,
-  ) : proto = null,
-      converter = null,
-      super(key, version);
+  Document(super.key, super.version, this.documentState, this._objectValue)
+    : proto = null,
+      converter = null;
 
   Document.fromProto(
-    DocumentKey key,
-    SnapshotVersion version,
+    super.key,
+    super.version,
     this.documentState,
     this.proto,
     this.converter,
-  ) : _objectValue = null,
-      super(key, version);
+  ) : _objectValue = null;
 
   final DocumentState documentState;
   final pb.Document? proto;

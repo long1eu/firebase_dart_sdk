@@ -195,7 +195,7 @@ const List<String> _ddl = <String>[
 ];
 
 proto.Timestamp _timestamp(int seconds, [int nanos = 0]) =>
-    proto.Timestamp.create()
+    proto.Timestamp()
       ..seconds = Int64(seconds)
       ..nanos = nanos;
 
@@ -289,7 +289,7 @@ Map<int, proto.Target> legacyTargetProtos() {
             _order('members', desc),
             _order('__name__', desc),
           ])
-          ..limit = (proto.Int32Value.create()..value = 10))),
+          ..limit = (proto.Int32Value()..value = 10))),
     6: base(legacyTargets[2])
       ..documents = (proto.Target_DocumentsTarget.create()
         ..documents.add('$_documents/rooms/eros')),

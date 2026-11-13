@@ -149,7 +149,7 @@ class MisbehavingServer {
             onError: (Object _) {},
             onDone: () => _open.remove(socket),
           );
-        socket.flush().catchError((Object _) {});
+        unawaited(socket.flush().catchError((Object _) {}));
     }
   }
 

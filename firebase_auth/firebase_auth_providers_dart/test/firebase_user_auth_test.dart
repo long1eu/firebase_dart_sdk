@@ -76,7 +76,7 @@ void main() {
     return json(<String, Object?>{
       // The custom token answer has no localId: the uid comes from the ID token.
       if (!custom) 'localId': uid,
-      if (email != null) 'email': email,
+      'email': ?email,
       'idToken': idToken(
         uid,
         expires: clock.now.add(const Duration(hours: 1)),

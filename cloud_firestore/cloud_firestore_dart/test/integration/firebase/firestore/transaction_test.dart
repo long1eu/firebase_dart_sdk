@@ -509,7 +509,7 @@ void main() {
       }
       // Now try to set the doc within the transaction. This should fail once with ALREADY_EXISTS error.
       transaction.set(doc, map(<String>['foo2', 'bar2']));
-      return null;
+      return;
     });
     final DocumentSnapshot snapshot = await doc.get();
     expect(transactionCallbackCount, 2);
@@ -586,7 +586,7 @@ void main() {
             doc,
             map(<dynamic>['count', snapshot.getDouble('count')! + 1.0]),
           );
-          return null;
+          return;
         }),
       );
     }
@@ -612,7 +612,7 @@ void main() {
         firestore.collection('nonexistent').document('__badpath__'),
       );
       transaction.set(doc.reference, map(<String>['foo', 'value']));
-      return null;
+      return;
     });
 
     try {
@@ -656,7 +656,7 @@ void main() {
             doc,
             map(<dynamic>['count', snapshot.getDouble('count')! + 1.0]),
           );
-          return null;
+          return;
         }),
       );
     }
@@ -856,7 +856,7 @@ void main() {
         // This should fail, because the document didn't exist at the
         // start of the transaction.
         transaction.update(doc, <String, int>{'count': 16});
-        return null;
+        return;
       });
     } on FirestoreError catch (e) {
       // We currently require every document read to also be written.
@@ -1158,7 +1158,7 @@ class TransactionTester {
       for (TransactionStage stage in _stages) {
         await stage(transaction, _docRef);
       }
-      return null;
+      return;
     });
   }
 

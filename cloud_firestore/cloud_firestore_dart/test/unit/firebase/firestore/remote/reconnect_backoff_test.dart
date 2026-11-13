@@ -352,21 +352,23 @@ void main() {
           'an empty 200': (HttpRequest request) => request.response.close(),
           'a 500': (HttpRequest request) {
             request.response.statusCode = HttpStatus.internalServerError;
-            request.response.close();
+            unawaited(request.response.close());
           },
           'a 200 that is not a WebChannel': (HttpRequest request) {
             request.response
               ..headers.contentType = ContentType.html
               ..write('<html><body>Please log in to the Wi-Fi</body></html>');
-            request.response.close();
+            unawaited(request.response.close());
           },
           'a connection that is closed': (HttpRequest request) {
-            request.response
-                .detachSocket(writeHeaders: false)
-                .then(
-                  (Socket socket) => socket.destroy(),
-                  onError: (Object _) {},
-                );
+            unawaited(
+              request.response
+                  .detachSocket(writeHeaders: false)
+                  .then(
+                    (Socket socket) => socket.destroy(),
+                    onError: (Object _) {},
+                  ),
+            );
           },
         };
 

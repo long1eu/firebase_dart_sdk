@@ -2,7 +2,6 @@
 // sugar: the named arguments must select the same documents on the backend
 // and in the local cache as the filters they stand for.
 
-import 'package:cloud_firestore_dart/src/firebase/firestore/collection_reference.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/document_snapshot.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/field_path.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/filter.dart';

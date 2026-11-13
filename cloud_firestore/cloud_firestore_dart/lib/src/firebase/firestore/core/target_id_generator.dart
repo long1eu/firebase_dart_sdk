@@ -61,8 +61,8 @@ class TargetIdGenerator {
   }
 
   int get nextId {
-    final int _nextId = this._nextId;
-    this._nextId += 1 << _reservedBits;
-    return _nextId;
+    final int nextId = _nextId;
+    _nextId += 1 << _reservedBits;
+    return nextId;
   }
 }

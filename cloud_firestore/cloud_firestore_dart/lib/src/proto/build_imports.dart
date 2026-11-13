@@ -15,7 +15,7 @@ void main() {
       .whereType<Directory>()
       .toList();
 
-  final StringBuffer _buffer = StringBuffer();
+  final StringBuffer userExports = StringBuffer();
   for (Directory dir in dirs) {
     final List<String> names =
         dir
@@ -36,10 +36,10 @@ void main() {
       '${dir.absolute.path}/index.dart',
     ).writeAsStringSync(buffer.toString());
 
-    _buffer.writeln(
+    userExports.writeln(
       // `posix` separators also on Windows: an import URI always uses `/`.
       'export \'${posix.joinAll(split(relative(dir.path, from: directory.path)))}/index.dart\';',
     );
   }
-  File('${directory.path}/user.dart').writeAsStringSync(_buffer.toString());
+  File('${directory.path}/user.dart').writeAsStringSync(userExports.toString());
 }

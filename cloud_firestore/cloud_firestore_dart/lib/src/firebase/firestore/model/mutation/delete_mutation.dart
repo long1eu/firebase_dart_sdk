@@ -2,11 +2,9 @@
 // Lung Razvan <long1eu>
 // on 17/09/2018
 
-import 'package:cloud_firestore_dart/src/firebase/firestore/model/document_key.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/maybe_document.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/mutation.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/mutation_result.dart';
-import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/precondition.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/no_document.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/snapshot_version.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/assert.dart';
@@ -15,8 +13,7 @@ import 'package:firebase_app_dart/internal.dart';
 
 /// Represents a Delete operation
 class DeleteMutation extends Mutation {
-  const DeleteMutation(DocumentKey key, Precondition precondition)
-    : super(key, precondition);
+  const DeleteMutation(super.key, super.precondition);
 
   @override
   MaybeDocument applyToRemoteDocument(

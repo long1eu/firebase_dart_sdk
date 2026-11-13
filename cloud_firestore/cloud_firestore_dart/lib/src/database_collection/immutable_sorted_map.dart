@@ -101,7 +101,7 @@ abstract class ImmutableSortedMap<K, V> extends Iterable<MapEntry<K, V>> {
 
     // Read through `dynamic` so the comparator's type argument isn't checked
     // (a Comparator<String> is not a Comparator<dynamic> at runtime).
-    final Object? thatComparator = (other as dynamic).comparator;
+    final Object? thatComparator = (that as dynamic).comparator;
     final Object thisComparator = comparator;
     if (thisComparator != thatComparator) {
       return false;

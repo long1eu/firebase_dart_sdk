@@ -146,7 +146,7 @@ void main() {
                 in snapshot.docs) {
               acceptOrReject(
                 () => document.data,
-                () => '${document.reference.path}',
+                () => document.reference.path,
               );
             }
           }
@@ -162,7 +162,7 @@ void main() {
           if (snapshot != null) {
             acceptOrReject(
               () => snapshot.data,
-              () => '${snapshot.reference.path}',
+              () => snapshot.reference.path,
             );
           }
         }

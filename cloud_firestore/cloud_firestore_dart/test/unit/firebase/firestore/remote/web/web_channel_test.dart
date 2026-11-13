@@ -370,7 +370,7 @@ void main() {
           await pump();
         },
         zoneSpecification: ZoneSpecification(
-          print: (_, __, ___, String line) => logs.add(line),
+          print: (_, _, _, String line) => logs.add(line),
         ),
       );
       expect((errors.single as GrpcError).code, StatusCode.notFound);
@@ -400,7 +400,7 @@ void main() {
           await pump();
         },
         zoneSpecification: ZoneSpecification(
-          print: (_, __, ___, String line) => logs.add(line),
+          print: (_, _, _, String line) => logs.add(line),
         ),
       );
       expect((errors.single as GrpcError).code, StatusCode.notFound);

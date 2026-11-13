@@ -70,7 +70,7 @@ class FakeAppCheck implements InternalAppCheckTokenProvider {
   Object? error;
 
   /// Thrown by [getToken].
-  Object? throwError;
+  Error? throwError;
 
   final List<bool> forceRefreshArgs = <bool>[];
   final StreamController<AppCheckTokenResult> changes =

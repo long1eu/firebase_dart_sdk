@@ -155,9 +155,11 @@ void main() {
   _self.onmessage = (web.MessageEvent event) {
     final Map<String, Object?> config =
         jsonDecode((event.data! as JSString).toDart) as Map<String, Object?>;
-    run(config).catchError((Object error, StackTrace stackTrace) {
-      _post('error $error\n$stackTrace');
-    });
+    unawaited(
+      run(config).catchError((Object error, StackTrace stackTrace) {
+        _post('error $error\n$stackTrace');
+      }),
+    );
   }.toJS;
   _post('ready');
 }

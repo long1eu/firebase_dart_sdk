@@ -102,7 +102,7 @@ void main() {
   Map<String, dynamic> from(String collectionId, {bool? allDescendants}) =>
       <String, dynamic>{
         'collectionId': collectionId,
-        if (allDescendants != null) 'allDescendants': allDescendants,
+        'allDescendants': ?allDescendants,
       };
 
   Map<String, dynamic> collQuery({
@@ -110,7 +110,7 @@ void main() {
     Map<String, dynamic>? extra,
   }) => <String, dynamic>{
     'from': <Object?>[from('coll')],
-    if (where != null) 'where': where,
+    'where': ?where,
     ...?extra,
   };
 

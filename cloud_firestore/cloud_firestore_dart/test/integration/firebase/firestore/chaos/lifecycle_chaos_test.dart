@@ -170,7 +170,7 @@ void main() {
         CollectionReference<Map<String, Object?>> collection, int writes) {
       void ignore(Future<void> future) {
         // The futures of a terminated instance never complete (or fail): nobody waits for them.
-        future.catchError((Object _) {});
+        unawaited(future.catchError((Object _) {}));
       }
 
       ignore(collection

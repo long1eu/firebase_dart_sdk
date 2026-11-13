@@ -104,10 +104,10 @@ extension PipelineStageGen on Gen {
     } else {
       final List<String> paths = data.documents.keys.toList();
       pipeline = source.documents(
-        <String>[
+        <String>{
           for (int i = between(1, 4); i > 0; i--) pick(paths),
           '${data.collection}/missing',
-        ].toSet().toList(),
+        }.toList(),
       );
       described.add('documents');
     }

@@ -26,7 +26,7 @@ void main() {
     // A re-created database starts empty (onCreate is called again).
     bool created = false;
     final DatabaseMock again =
-        await DatabaseMock.create(name, onCreate: (_, __) async {
+        await DatabaseMock.create(name, onCreate: (_, _) async {
       created = true;
     });
     expect(created, isTrue);

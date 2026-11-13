@@ -4,7 +4,6 @@
 
 import 'dart:async';
 
-import 'package:cloud_firestore_dart/src/firebase/firestore/collection_reference.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/document_reference.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/document_snapshot.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/field_path.dart';
@@ -66,7 +65,7 @@ void main() {
         await expectError(() => transaction.update(ref, data), reason);
       }
 
-      return null;
+      return;
     });
   }
 
@@ -396,7 +395,7 @@ void main() {
       await expectError(() => transaction.set(badRef, data), reason);
       await expectError(() => transaction.update(badRef, data), reason);
       await expectError(() => transaction.delete(badRef), reason);
-      return null;
+      return;
     });
   });
 
@@ -487,13 +486,13 @@ void main() {
 
   test('arrayTransformsRejectInvalidElements', () async {
     final DocumentReference doc = await testDocument();
-    const String reason = 'Invalid data. Unsupported type: Throws';
+    const String reason = 'Invalid data. Unsupported type: _ValidationTest';
 
     await expectError(
       () => doc.set(
         map(<dynamic>[
           'x',
-          FieldValue.arrayUnion(<dynamic>[1, throwsCyclicInitializationError]),
+          FieldValue.arrayUnion(<dynamic>[1, const _ValidationTest()]),
         ]),
       ),
       reason,
@@ -502,7 +501,7 @@ void main() {
       () => doc.set(
         map(<dynamic>[
           'x',
-          FieldValue.arrayRemove(<dynamic>[1, throwsCyclicInitializationError]),
+          FieldValue.arrayRemove(<dynamic>[1, const _ValidationTest()]),
         ]),
       ),
       reason,
@@ -1318,3 +1317,10 @@ const testCollection = IntegrationTestUtil.testCollection;
 const testDocument = IntegrationTestUtil.testDocument;
 // ignore: always_specify_types, type_annotate_public_apis
 const testAlternateFirestore = IntegrationTestUtil.testAlternateFirestore;
+
+/// Stands in for the `this` (the test class) that upstream's
+/// arrayTransformsRejectInvalidElements puts in the array: a type that cannot
+/// be stored.
+class _ValidationTest {
+  const _ValidationTest();
+}

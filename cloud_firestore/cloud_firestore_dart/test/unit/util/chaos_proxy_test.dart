@@ -17,7 +17,7 @@ void main() {
   setUp(() async {
     echo = await ServerSocket.bind(InternetAddress.loopbackIPv4, 0);
     echo.listen((Socket socket) {
-      socket.done.catchError((Object _) {});
+      unawaited(socket.done.catchError((Object _) {}));
       socket.listen(socket.add, onError: (Object _) {}, onDone: socket.destroy);
     });
     proxy = await ChaosProxy.start(echo.address.address, echo.port);
@@ -37,7 +37,7 @@ void main() {
   connect() async {
     final Socket socket = await Socket.connect(proxy.host, proxy.port);
     sockets.add(socket);
-    socket.done.catchError((Object _) {});
+    unawaited(socket.done.catchError((Object _) {}));
     final StringBuffer received = StringBuffer();
     final Completer<void> closed = Completer<void>();
     socket.listen(
@@ -240,7 +240,7 @@ void main() {
         0,
       );
       server.listen((Socket socket) {
-        socket.done.catchError((Object _) {});
+        unawaited(socket.done.catchError((Object _) {}));
         socket.listen((Uint8List data) async {
           socket.add(utf8.encode('answer to ${utf8.decode(data)}'));
           await socket.flush();
@@ -259,7 +259,7 @@ void main() {
       Future<String> request() async {
         final Socket socket = await Socket.connect(closing.host, closing.port);
         sockets.add(socket);
-        socket.done.catchError((Object _) {});
+        unawaited(socket.done.catchError((Object _) {}));
         final StringBuffer received = StringBuffer();
         final Completer<void> closed = Completer<void>();
         socket.listen(

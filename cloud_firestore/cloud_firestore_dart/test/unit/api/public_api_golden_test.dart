@@ -13,7 +13,6 @@
 import 'dart:io';
 import 'dart:mirrors';
 
-import 'package:cloud_firestore_dart/cloud_firestore_dart.dart';
 // Loaded so that the lite library can be found by the mirror system.
 // ignore: unused_import
 import 'package:cloud_firestore_dart/lite.dart' as lite;

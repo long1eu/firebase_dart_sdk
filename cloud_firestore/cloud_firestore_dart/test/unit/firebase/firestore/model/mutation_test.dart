@@ -339,7 +339,7 @@ void main() {
   });
 
   test('testAppliesPatchWithMergeToDocuments', () {
-    final MaybeDocument? baseDoc = deletedDoc('collection/key', 0);
+    final MaybeDocument baseDoc = deletedDoc('collection/key', 0);
     final Mutation upsert = patchMutation(
         'collection/key',
         map(<String>['foo.bar', 'new-bar-value']),
@@ -412,7 +412,7 @@ void main() {
   });
 
   test('testPatchingDeletedDocumentsDoesNothing', () {
-    final MaybeDocument? baseDoc = deletedDoc('collection/key', 0);
+    final MaybeDocument baseDoc = deletedDoc('collection/key', 0);
     final Mutation patch =
         patchMutation('collection/key', map(<String>['foo', 'bar']));
     final MaybeDocument? patchedDoc =
@@ -896,7 +896,7 @@ void main() {
     final MutationResult mutationResult =
         MutationResult(version(1), <IntegerValue>[IntegerValue.valueOf(3)]);
 
-    final MaybeDocument? transformedDoc =
+    final MaybeDocument transformedDoc =
         transform.applyToRemoteDocument(baseDoc, mutationResult);
 
     final Map<String, Object> expectedData = map(<dynamic>['sum', 3]);
@@ -923,7 +923,7 @@ void main() {
     final MutationResult mutationResult = MutationResult(
         version(1), <TimestampValue>[TimestampValue.valueOf(serverTimestamp)]);
 
-    final MaybeDocument? transformedDoc =
+    final MaybeDocument transformedDoc =
         transform.applyToRemoteDocument(baseDoc, mutationResult);
 
     final Map<String, Object> expectedData = map(<dynamic>[
@@ -958,7 +958,7 @@ void main() {
     // Server just sends null transform results for array operations.
     final MutationResult mutationResult =
         MutationResult(version(1), <FieldValue>[wrap(null), wrap(null)]);
-    final MaybeDocument? transformedDoc =
+    final MaybeDocument transformedDoc =
         transform.applyToRemoteDocument(baseDoc, mutationResult);
 
     final Map<String, Object> expectedData = map(<dynamic>[
@@ -989,7 +989,7 @@ void main() {
 
     final Mutation set =
         setMutation('collection/key', map(<String>['foo', 'new-bar']));
-    final MaybeDocument? setDoc =
+    final MaybeDocument setDoc =
         set.applyToRemoteDocument(baseDoc, mutationResult(4));
 
     expect(
@@ -1004,7 +1004,7 @@ void main() {
 
     final Mutation patch =
         patchMutation('collection/key', map(<String>['foo', 'new-bar']));
-    final MaybeDocument? patchDoc =
+    final MaybeDocument patchDoc =
         patch.applyToRemoteDocument(baseDoc, mutationResult(4));
 
     expect(
@@ -1015,7 +1015,7 @@ void main() {
 
   void _assertVersionTransitions(Mutation mutation, MaybeDocument? base,
       MutationResult mutationResult, MaybeDocument expected) {
-    final MaybeDocument? actual =
+    final MaybeDocument actual =
         mutation.applyToRemoteDocument(base, mutationResult);
     expect(actual, expected);
   }
@@ -1282,7 +1282,7 @@ void main() {
     final MutationResult mutationResult = MutationResult(version(1),
         <FieldValue>[IntegerValue.valueOf(20), IntegerValue.valueOf(2)]);
 
-    final MaybeDocument? transformedDoc =
+    final MaybeDocument transformedDoc =
         transform.applyToRemoteDocument(baseDoc, mutationResult);
 
     expect(

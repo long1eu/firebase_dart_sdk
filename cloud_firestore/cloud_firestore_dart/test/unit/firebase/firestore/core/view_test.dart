@@ -61,15 +61,15 @@ void main() {
     final ViewSnapshot snapshot = view
         .applyChanges(docViewChanges, targetChange)
         .snapshot!;
-    expect(snapshot!.query, query);
-    expect(snapshot!.documents.toList(), <Document>[doc1, doc2]);
-    expect(snapshot!.changes, <DocumentViewChange>[
+    expect(snapshot.query, query);
+    expect(snapshot.documents.toList(), <Document>[doc1, doc2]);
+    expect(snapshot.changes, <DocumentViewChange>[
       DocumentViewChange(DocumentViewChangeType.added, doc1),
       DocumentViewChange(DocumentViewChangeType.added, doc2),
     ]);
-    expect(snapshot!.isFromCache, isFalse);
-    expect(snapshot!.didSyncStateChange, isTrue);
-    expect(snapshot!.hasPendingWrites, isFalse);
+    expect(snapshot.isFromCache, isFalse);
+    expect(snapshot.didSyncStateChange, isTrue);
+    expect(snapshot.hasPendingWrites, isFalse);
   });
 
   test('testRemovesDocument', () {
@@ -108,14 +108,14 @@ void main() {
         )
         .snapshot!;
 
-    expect(snapshot!.query, query);
-    expect(snapshot!.documents.toList(), <Document>[doc1, doc3]);
-    expect(snapshot!.changes, <DocumentViewChange>[
+    expect(snapshot.query, query);
+    expect(snapshot.documents.toList(), <Document>[doc1, doc3]);
+    expect(snapshot.changes, <DocumentViewChange>[
       DocumentViewChange(DocumentViewChangeType.removed, doc2),
       DocumentViewChange(DocumentViewChangeType.added, doc3),
     ]);
-    expect(snapshot!.isFromCache, isFalse);
-    expect(snapshot!.didSyncStateChange, isTrue);
+    expect(snapshot.isFromCache, isFalse);
+    expect(snapshot.didSyncStateChange, isTrue);
   });
 
   test('testReturnsNilIfNoChange', () {
@@ -189,15 +189,15 @@ void main() {
       doc5,
     ]).snapshot!;
 
-    expect(snapshot!.query, query);
-    expect(snapshot!.documents.toList(), <Document>[doc1, doc5, doc2]);
-    expect(snapshot!.changes, <DocumentViewChange>[
+    expect(snapshot.query, query);
+    expect(snapshot.documents.toList(), <Document>[doc1, doc5, doc2]);
+    expect(snapshot.changes, <DocumentViewChange>[
       DocumentViewChange(DocumentViewChangeType.added, doc1),
       DocumentViewChange(DocumentViewChangeType.added, doc5),
       DocumentViewChange(DocumentViewChangeType.added, doc2),
     ]);
-    expect(snapshot!.isFromCache, isTrue);
-    expect(snapshot!.didSyncStateChange, isTrue);
+    expect(snapshot.isFromCache, isTrue);
+    expect(snapshot.didSyncStateChange, isTrue);
   });
 
   test('testUpdatesDocumentsBasedOnQueryWithFilters', () {
@@ -228,8 +228,8 @@ void main() {
       doc4,
     ]).snapshot!;
 
-    expect(snapshot!.query, query);
-    expect(snapshot!.documents.toList(), <Document>[doc1, doc3]);
+    expect(snapshot.query, query);
+    expect(snapshot.documents.toList(), <Document>[doc1, doc3]);
 
     final Document newDoc2 = doc(
       'rooms/eros/messages/2',
@@ -253,16 +253,16 @@ void main() {
       newDoc4,
     ]).snapshot!;
 
-    expect(snapshot!.query, query);
-    expect(snapshot!.documents.toList(), <Document>[newDoc4, doc1, newDoc2]);
+    expect(snapshot.query, query);
+    expect(snapshot.documents.toList(), <Document>[newDoc4, doc1, newDoc2]);
 
-    expect(snapshot!.changes, <DocumentViewChange>[
+    expect(snapshot.changes, <DocumentViewChange>[
       DocumentViewChange(DocumentViewChangeType.removed, doc3),
       DocumentViewChange(DocumentViewChangeType.added, newDoc4),
       DocumentViewChange(DocumentViewChangeType.added, newDoc2),
     ]);
-    expect(snapshot!.isFromCache, isTrue);
-    expect(snapshot!.didSyncStateChange, isFalse);
+    expect(snapshot.isFromCache, isTrue);
+    expect(snapshot.didSyncStateChange, isFalse);
   });
 
   test('testRemovesDocumentsForQueryWithLimit', () {
@@ -294,15 +294,15 @@ void main() {
           ackTarget(<Document>[doc1, doc2, doc3]),
         )
         .snapshot!;
-    expect(snapshot!.query, query);
-    expect(snapshot!.documents.toList(), <Document>[doc1, doc2]);
+    expect(snapshot.query, query);
+    expect(snapshot.documents.toList(), <Document>[doc1, doc2]);
 
-    expect(snapshot!.changes, <DocumentViewChange>[
+    expect(snapshot.changes, <DocumentViewChange>[
       DocumentViewChange(DocumentViewChangeType.removed, doc3),
       DocumentViewChange(DocumentViewChangeType.added, doc2),
     ]);
-    expect(snapshot!.isFromCache, isFalse);
-    expect(snapshot!.didSyncStateChange, isTrue);
+    expect(snapshot.isFromCache, isFalse);
+    expect(snapshot.didSyncStateChange, isTrue);
   });
 
   test('testDoesNotReportChangesForDocumentBeyondLimit', () {
@@ -349,15 +349,15 @@ void main() {
         )
         .snapshot!;
 
-    expect(snapshot!.query, query);
-    expect(snapshot!.documents.toList(), <Document>[doc1, doc3]);
+    expect(snapshot.query, query);
+    expect(snapshot.documents.toList(), <Document>[doc1, doc3]);
 
-    expect(snapshot!.changes, <DocumentViewChange>[
+    expect(snapshot.changes, <DocumentViewChange>[
       DocumentViewChange(DocumentViewChangeType.removed, doc2),
       DocumentViewChange(DocumentViewChangeType.added, doc3),
     ]);
-    expect(snapshot!.isFromCache, isFalse);
-    expect(snapshot!.didSyncStateChange, isTrue);
+    expect(snapshot.isFromCache, isFalse);
+    expect(snapshot.didSyncStateChange, isTrue);
   });
 
   test('testKeepsTrackOfLimboDocuments', () {

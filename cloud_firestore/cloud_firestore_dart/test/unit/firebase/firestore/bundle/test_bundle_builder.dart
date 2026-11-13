@@ -51,7 +51,7 @@ class TestBundleBuilder {
         'name': serializer.encodeKey(key(path)),
         'readTime': timestamp(version(readTimeMicros)),
         'exists': exists,
-        if (queries != null) 'queries': queries,
+        'queries': ?queries,
       },
     });
     elements.add(json);

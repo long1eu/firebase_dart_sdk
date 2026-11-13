@@ -263,7 +263,7 @@ class DocumentSnapshot<T extends dynamic> {
   /// Returns the value of the field
   double? getDouble(String field) {
     final num? val = _getTypedValue(field);
-    return val != null ? val.toDouble() : null;
+    return val?.toDouble();
   }
 
   /// Returns the value of the field as a int.
@@ -274,7 +274,7 @@ class DocumentSnapshot<T extends dynamic> {
   /// Returns the value of the field
   int? getInt(String field) {
     final num? val = _getTypedValue(field);
-    return val != null ? val.toInt() : null;
+    return val?.toInt();
   }
 
   /// Returns the value of the field as a String.
@@ -574,16 +574,13 @@ class _FieldValueOptions {
 /// does so.
 class QueryDocumentSnapshot<T extends dynamic> extends DocumentSnapshot<T> {
   QueryDocumentSnapshot._(
-    Firestore firestore,
-    DocumentKey key,
-    Document doc,
+    super.firestore,
+    super.key,
+    Document super.doc,
     bool isFromCache,
     bool hasPendingWrites,
     FirestoreDataConverter<T>? converter,
   ) : super._(
-        firestore,
-        key,
-        doc,
         isFromCache: isFromCache,
         hasPendingWrites: hasPendingWrites,
         converter: converter,

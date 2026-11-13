@@ -564,7 +564,7 @@ Future<void> expectError(
   }
 }
 
-const _Test testMethod = _Test();
+const Object testMethod = _Test();
 
 class _Test {
   const _Test();

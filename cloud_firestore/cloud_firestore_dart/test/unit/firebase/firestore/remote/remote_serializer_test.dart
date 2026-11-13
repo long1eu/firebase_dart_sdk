@@ -242,7 +242,7 @@ void main() {
       'a',
       'abc def',
       'æ',
-      '\0\ud7ff\ue000\uffff',
+      '0\ud7ff\ue000\uffff',
       '(╯°□°）╯︵ ┻━┻'
     ];
     for (String test in tests) {

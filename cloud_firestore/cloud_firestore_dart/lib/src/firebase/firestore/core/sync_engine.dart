@@ -743,9 +743,7 @@ class SyncEngine implements RemoteStoreCallback, SharedClientStateSyncer {
 
     final _LimboResolution? limboResolution =
         _activeLimboResolutionsByTarget[targetId];
-    final DocumentKey? limboKey = limboResolution != null
-        ? limboResolution.key
-        : null;
+    final DocumentKey? limboKey = limboResolution?.key;
     if (limboKey != null) {
       // Since this query failed, we won't want to manually unlisten to it. So go ahead and remove it from bookkeeping.
       _activeLimboTargetsByKey.remove(limboKey);

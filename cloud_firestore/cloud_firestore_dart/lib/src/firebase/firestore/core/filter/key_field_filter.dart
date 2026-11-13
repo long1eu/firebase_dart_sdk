@@ -6,8 +6,7 @@ part of 'filter.dart';
 
 /// Filter that matches on key fields (i.e. '__name__').
 class KeyFieldFilter extends FieldFilter {
-  KeyFieldFilter(FieldPath field, FilterOperator operator, FieldValue value)
-    : super._(field, operator, value);
+  KeyFieldFilter(super.field, super.operator, super.value) : super._();
 
   @override
   bool matches(Document doc) {

@@ -5,7 +5,6 @@
 import 'dart:async';
 
 import 'package:cloud_firestore_dart/src/firebase/firestore/auth/user.dart';
-import 'package:cloud_firestore_dart/src/firebase/firestore/collection_reference.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/document_reference.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/document_snapshot.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/field_path.dart';
@@ -677,9 +676,7 @@ void main() {
 
       await barrier.future;
     } finally {
-      if (listenerRegistration != null) {
-        await listenerRegistration.cancel();
-      }
+      await listenerRegistration.cancel();
     }
   });
 

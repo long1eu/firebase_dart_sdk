@@ -110,7 +110,7 @@ void main() {
     final Timestamp now = Timestamp.now();
     expect((when.seconds - now.seconds).abs() < deltaSec, isTrue,
         reason:
-            'resolved timestamp ($when) should be within $deltaSec\s of now '
+            'resolved timestamp ($when) should be within ${deltaSec}s of now '
             '($now)');
 
     // Validate the rest of the document.

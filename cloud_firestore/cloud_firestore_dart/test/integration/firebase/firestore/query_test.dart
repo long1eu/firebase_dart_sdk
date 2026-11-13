@@ -6,7 +6,6 @@ import 'dart:convert';
 import 'dart:math';
 
 import 'package:cloud_firestore_dart/src/firebase/firestore/blob.dart';
-import 'package:cloud_firestore_dart/src/firebase/firestore/collection_reference.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/document_change.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/document_reference.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/document_snapshot.dart';

@@ -18,7 +18,6 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/aggregate_field.dart
 import 'package:cloud_firestore_dart/src/firebase/firestore/aggregate_query.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/aggregate_query_snapshot.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/aggregate_source.dart';
-import 'package:cloud_firestore_dart/src/firebase/firestore/collection_reference.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/firestore.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/firestore_data_converter.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/firestore_error.dart';
@@ -846,9 +845,9 @@ void main() {
           .where('author', isEqualTo: 'authorA')
           .withConverter<Object>(
             FirestoreDataConverter<Object>.from(
-              fromFirestore: (_, __) =>
+              fromFirestore: (_, _) =>
                   throw StateError('should never be called'),
-              toFirestore: (_, __) =>
+              toFirestore: (_, _) =>
                   throw StateError('should never be called'),
             ),
           );

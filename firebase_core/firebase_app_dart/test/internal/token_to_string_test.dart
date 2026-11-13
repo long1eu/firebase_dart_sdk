@@ -5,7 +5,6 @@
 import 'dart:convert';
 
 import 'package:firebase_app_dart/firebase_app_dart.dart';
-import 'package:firebase_app_dart/internal.dart' show AppCheckTokenResult;
 import 'package:test/test.dart';
 
 String _jwt(Map<String, Object?> claims) {

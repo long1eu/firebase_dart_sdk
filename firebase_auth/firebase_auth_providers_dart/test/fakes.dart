@@ -63,7 +63,7 @@ String idToken(
       '${_encode(<String, Object?>{
         'user_id': uid,
         'sub': uid,
-        if (email != null) 'email': email,
+        'email': ?email,
         'exp': expires.millisecondsSinceEpoch ~/ 1000,
         'iat': expires.millisecondsSinceEpoch ~/ 1000 - 3600,
         'firebase': <String, Object?>{'sign_in_provider': provider},

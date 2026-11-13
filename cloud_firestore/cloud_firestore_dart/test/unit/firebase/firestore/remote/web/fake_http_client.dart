@@ -71,7 +71,7 @@ class FakeRequest implements WebHttpRequest {
     if (body.isNotEmpty) {
       _body.add(body);
     }
-    _body.close();
+    unawaited(_body.close());
   }
 
   /// Answers with the headers only; the body is fed with [add] and [end].
@@ -91,7 +91,7 @@ class FakeRequest implements WebHttpRequest {
   /// cut in the middle of a response.
   void cutBody() {
     _body.addError(StateError('connection cut'));
-    _body.close();
+    unawaited(_body.close());
   }
 
   @override
@@ -109,7 +109,7 @@ class FakeRequest implements WebHttpRequest {
       _response.future.ignore();
     }
     if (!_body.isClosed) {
-      _body.close();
+      unawaited(_body.close());
     }
   }
 }

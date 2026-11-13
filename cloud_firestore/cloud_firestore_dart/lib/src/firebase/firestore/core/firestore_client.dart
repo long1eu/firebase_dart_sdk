@@ -261,13 +261,15 @@ class FirestoreClient implements RemoteStoreCallback {
     _verifyNotShutdown();
 
     final Completer<void> source = Completer<void>();
-    _enqueue<void>(
-      () => syncEngine.registerPendingWritesTask(source),
-    ).catchError((Object error, StackTrace stackTrace) {
-      if (!source.isCompleted) {
-        source.completeError(error, stackTrace);
-      }
-    });
+    unawaited(
+      _enqueue<void>(
+        () => syncEngine.registerPendingWritesTask(source),
+      ).catchError((Object error, StackTrace stackTrace) {
+        if (!source.isCompleted) {
+          source.completeError(error, stackTrace);
+        }
+      }),
+    );
     return source.future;
   }
 

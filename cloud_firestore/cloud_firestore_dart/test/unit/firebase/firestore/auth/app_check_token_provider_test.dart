@@ -17,7 +17,7 @@ class FakeAppCheck implements InternalAppCheckTokenProvider {
   final List<bool> forceRefreshArgs = <bool>[];
   final StreamController<AppCheckTokenResult> changes =
       StreamController<AppCheckTokenResult>.broadcast();
-  Object? throwError;
+  Error? throwError;
   AppCheckTokenResult result = const AppCheckTokenResult('token-1');
 
   @override

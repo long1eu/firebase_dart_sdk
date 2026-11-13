@@ -40,7 +40,6 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/util/timer_task.dart
 import 'package:cloud_firestore_dart/src/proto/google/firestore/v1/index.dart'
     as proto_v1;
 import 'package:cloud_firestore_dart/src/proto/index.dart' as proto;
-import 'package:firebase_app_dart/firebase_app_dart.dart' show GetTokenResult;
 import 'package:firebase_auth_providers_dart/firebase_auth_providers_dart.dart';
 import 'package:firebase_app_dart/firebase_app_dart.dart';
 import 'package:grpc/grpc.dart'
@@ -297,7 +296,7 @@ class Kit {
     try {
       final Firestore firestore = await IntegrationTestUtil.forTests(
         databaseId,
-        'verify-production-${_clientIndex}',
+        'verify-production-$_clientIndex',
         credentials ?? _credentials(authenticated: authenticated),
         TaskScheduler(''),
         (String path,

@@ -26,7 +26,7 @@ import 'package:cloud_firestore_dart/src/firebase/timestamp.dart';
 /// previous value is kept; NaN wins over any other number.
 abstract class _NumericExtremumTransformOperation
     extends NumericTransformOperation {
-  _NumericExtremumTransformOperation(NumberValue operand) : super(operand);
+  _NumericExtremumTransformOperation(super.operand);
 
   /// Picks between two integers.
   int _pickInt(int previous, int operand);
@@ -93,7 +93,7 @@ abstract class _NumericExtremumTransformOperation
 /// transforms.
 class NumericMinimumTransformOperation
     extends _NumericExtremumTransformOperation {
-  NumericMinimumTransformOperation(NumberValue operand) : super(operand);
+  NumericMinimumTransformOperation(super.operand);
 
   @override
   int _pickInt(int previous, int operand) => math.min(previous, operand);
@@ -106,7 +106,7 @@ class NumericMinimumTransformOperation
 /// transforms.
 class NumericMaximumTransformOperation
     extends _NumericExtremumTransformOperation {
-  NumericMaximumTransformOperation(NumberValue operand) : super(operand);
+  NumericMaximumTransformOperation(super.operand);
 
   @override
   int _pickInt(int previous, int operand) => math.max(previous, operand);

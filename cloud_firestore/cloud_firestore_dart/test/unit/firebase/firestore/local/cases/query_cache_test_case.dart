@@ -46,8 +46,8 @@ class QueryCacheTestCase {
     final QueryData? result = await _queryCache.getQueryData(query('rooms').toTarget());
     expect(result, isNotNull);
     expect(result!.target, queryData.target);
-    expect(result!.targetId, queryData.targetId);
-    expect(result!.resumeToken, queryData.resumeToken);
+    expect(result.targetId, queryData.targetId);
+    expect(result.resumeToken, queryData.resumeToken);
   }
 
   @testMethod
@@ -126,7 +126,7 @@ class QueryCacheTestCase {
     expect(queryData2.snapshotVersion, isNot(queryData1.snapshotVersion));
     expect(result, isNotNull);
     expect(result!.resumeToken, queryData2.resumeToken);
-    expect(result!.snapshotVersion, queryData2.snapshotVersion);
+    expect(result.snapshotVersion, queryData2.snapshotVersion);
   }
 
   @testMethod
@@ -299,7 +299,7 @@ class QueryCacheTestCase {
     if (_persistence is SQLitePersistence) {
       // Verify that the highestTargetID even survives restarts.
       final SQLitePersistence sqLitePersistence =
-          _persistence as SQLitePersistence;
+          _persistence;
       final DatabaseMock databaseMock =
           sqLitePersistence.database as DatabaseMock;
 
@@ -328,7 +328,7 @@ class QueryCacheTestCase {
     // Snapshot version persists restarts.
     if (_persistence is SQLitePersistence) {
       final SQLitePersistence sqLitePersistence =
-          _persistence as SQLitePersistence;
+          _persistence;
       final DatabaseMock databaseMock =
           sqLitePersistence.database as DatabaseMock;
 

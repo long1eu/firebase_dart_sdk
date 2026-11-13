@@ -109,9 +109,7 @@ class UserDataParseContext {
 
   UserDataParseContext childContextForSegment(String fieldName) {
     final FieldPath? path = this.path;
-    final FieldPath? childPath = path == null
-        ? null
-        : path.appendSegment(fieldName);
+    final FieldPath? childPath = path?.appendSegment(fieldName);
     final UserDataParseContext context = UserDataParseContext._(
       _accumulator,
       childPath,
@@ -122,9 +120,7 @@ class UserDataParseContext {
 
   UserDataParseContext childContextForField(FieldPath fieldPath) {
     final FieldPath? path = this.path;
-    final FieldPath? childPath = path == null
-        ? null
-        : path.appendField(fieldPath);
+    final FieldPath? childPath = path?.appendField(fieldPath);
     final UserDataParseContext context = UserDataParseContext._(
       _accumulator,
       childPath,

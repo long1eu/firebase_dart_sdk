@@ -231,7 +231,7 @@ void main() {
     final _Call call = transport.calls.single;
     call.responses
       // A document of another database can not be decoded.
-      ..add(
+      .add(
         proto.RunQueryResponse(
           document: proto.Document(
             name: 'projects/other/databases/(default)/documents/coll/a',

@@ -12,7 +12,7 @@ import 'package:cloud_firestore_dart/src/firebase/timestamp.dart';
 /// (increment) transforms. Converts all field values to ints or doubles and
 /// resolves overflows to [IntegerValue.max]/[IntegerValue.min].
 class NumericIncrementTransformOperation extends NumericTransformOperation {
-  NumericIncrementTransformOperation(NumberValue operand) : super(operand);
+  NumericIncrementTransformOperation(super.operand);
 
   @override
   FieldValue applyToLocalView(

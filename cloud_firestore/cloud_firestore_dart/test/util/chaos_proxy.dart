@@ -290,8 +290,8 @@ class _Connection {
 
   void start() {
     // Writing to a socket the peer closed fails asynchronously: that is a closed connection, not a test failure.
-    _client.done.catchError((Object _) {});
-    _upstream.done.catchError((Object _) {});
+    unawaited(_client.done.catchError((Object _) {}));
+    unawaited(_upstream.done.catchError((Object _) {}));
     _pipe(_client, ChaosDirection.up);
     _pipe(_upstream, ChaosDirection.down);
   }
@@ -361,12 +361,14 @@ class _Connection {
       // when both directions ended.
       _ended.add(direction);
       if (_ended.length == 2) {
-        _target(direction)
-            .flush()
-            .catchError((Object _) {})
-            .whenComplete(() => destroy(countAsCut: false));
+        unawaited(
+          _target(direction)
+              .flush()
+              .catchError((Object _) {})
+              .whenComplete(() => destroy(countAsCut: false)),
+        );
       } else {
-        _target(direction).close().catchError((Object _) {});
+        unawaited(_target(direction).close().catchError((Object _) {}));
       }
       return;
     }

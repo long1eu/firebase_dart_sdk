@@ -50,13 +50,13 @@ class FirebaseApp with _PlatformDependenciesMixin {
     );
 
     final LocalStorage? storage = dependencies?.storage;
-    final String _dataCollectionDefaultEnabled =
+    final String dataCollectionDefaultEnabled =
         storage?.get(_dataCollectionDefaultEnabledPreferenceKey) ?? 'true';
     final FirebaseApp firebaseApp = FirebaseApp._(
       normalizedName,
       options,
       dependencies,
-      _dataCollectionDefaultEnabled == 'true',
+      dataCollectionDefaultEnabled == 'true',
     ).._initPlatformDependencies();
     _instances[normalizedName] = firebaseApp;
     return firebaseApp;

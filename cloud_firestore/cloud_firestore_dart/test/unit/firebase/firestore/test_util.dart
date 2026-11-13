@@ -3,7 +3,6 @@
 // on 28/09/2018
 
 import 'package:cloud_firestore_dart/src/database_collection/database_collection.dart';
-import 'package:cloud_firestore_dart/src/firebase/firestore/collection_reference.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/document_view_change.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/view_snapshot.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/document_reference.dart';

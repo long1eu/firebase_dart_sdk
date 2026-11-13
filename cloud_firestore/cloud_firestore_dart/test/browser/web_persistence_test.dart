@@ -237,7 +237,7 @@ void main() {
     // The other "tab" goes away: the cache can be opened again, with its data.
     release.complete();
     await Future<void>.delayed(const Duration(milliseconds: 100));
-    firestore = await newClient(openDatabase: opener(), appName: '$app');
+    firestore = await newClient(openDatabase: opener(), appName: app);
     await firestore.disableNetwork();
     expect((await firestore.collection(collection).doc('a').get(Source.cache)).data,
         <String, Object?>{'a': 1});
@@ -330,7 +330,7 @@ void main() {
       () async {
     Future<List<String>> schemaOf(Database db) async => <String>[
           for (final Map<String, dynamic> row in await db.query(
-            "SELECT type, name, sql FROM sqlite_master "
+            'SELECT type, name, sql FROM sqlite_master '
             "WHERE name NOT LIKE 'sqlite_%' ORDER BY type, name",
           ))
             '${row['type']} ${row['name']}: ${row['sql']}',

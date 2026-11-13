@@ -30,15 +30,9 @@ TestTargetMetadataProvider get testTargetMetadataProvider {
 /// these callbacks must be registered beforehand via [setSyncedKeys].
 class TestTargetMetadataProvider extends TargetMetadataProvider {
   TestTargetMetadataProvider(this.syncedKeys, this.queryDataMap,
-      {required ImmutableSortedSet<DocumentKey> Function(int targetId)
-          getRemoteKeysForTarget,
-      required QueryData? Function(int targetId) getQueryDataForTarget,
-      required DatabaseId Function() getDatabaseId})
-      : super(
-          getRemoteKeysForTarget: getRemoteKeysForTarget,
-          getQueryDataForTarget: getQueryDataForTarget,
-          getDatabaseId: getDatabaseId,
-        );
+      {required super.getRemoteKeysForTarget,
+      required super.getQueryDataForTarget,
+      required super.getDatabaseId});
 
   /// The database id reported to the aggregator.
   DatabaseId databaseId = DatabaseId.forDatabase('p', 'd');

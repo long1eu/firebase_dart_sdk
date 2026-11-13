@@ -44,7 +44,7 @@ void main() {
       Zone.root
           .fork(
         specification: ZoneSpecification(
-          print: (_, __, ___, String line) => printed.add(line),
+          print: (_, _, _, String line) => printed.add(line),
         ),
       )
           .run(() {
@@ -59,7 +59,7 @@ void main() {
       Zone.root
           .fork(
         specification: ZoneSpecification(
-          print: (_, __, ___, String line) => printed.add(line),
+          print: (_, _, _, String line) => printed.add(line),
         ),
       )
           .run(() {

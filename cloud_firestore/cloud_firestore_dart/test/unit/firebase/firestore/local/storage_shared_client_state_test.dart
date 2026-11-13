@@ -110,6 +110,8 @@ class _TestSharedClientSyncer implements SharedClientStateSyncer {
     }
   }
 
+  // The method of the JS TestSharedClientSyncer, torn off as the online state handler.
+  // ignore: use_setters_to_change_properties
   void applyOnlineStateChange(OnlineState onlineState) {
     this.onlineState = onlineState;
   }

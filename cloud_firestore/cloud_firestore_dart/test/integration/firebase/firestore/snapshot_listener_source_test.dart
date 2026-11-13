@@ -19,7 +19,6 @@ import 'package:test/test.dart';
 
 import '../../../util/event_accumulator.dart';
 import '../../../util/integration_test_util.dart';
-import '../../../util/test_util.dart';
 
 // Port of the upstream SnapshotListenerSourceTest (the cases that listen_source_test.dart does not cover).
 void main() {

@@ -1096,14 +1096,14 @@ void main() {
                 .as("instanceTransform"),
             ex("arr")
                 .arrayTransformWithIndex(
-                  (_, __) => ex(variable("element")).add(variable("i")),
+                  (_, _) => ex(variable("element")).add(variable("i")),
                   elementAlias: "element",
                   indexAlias: "i",
                 )
                 .as("staticTransformWithIndex"),
             field("arr")
                 .arrayTransformWithIndex(
-                  (_, __) => ex(variable("element")).add(variable("i")),
+                  (_, _) => ex(variable("element")).add(variable("i")),
                   elementAlias: "element",
                   indexAlias: "i",
                 )
@@ -1148,14 +1148,14 @@ void main() {
                 .as("transformedEmpty"),
             field("arr")
                 .arrayTransformWithIndex(
-                  (_, __) => ex(variable("element")).add(variable("idx")),
+                  (_, _) => ex(variable("element")).add(variable("idx")),
                   elementAlias: "element",
                   indexAlias: "idx",
                 )
                 .as("transformedWithIndex"),
             field("empty")
                 .arrayTransformWithIndex(
-                  (_, __) => ex(variable("element")).add(variable("idx")),
+                  (_, _) => ex(variable("element")).add(variable("idx")),
                   elementAlias: "element",
                   indexAlias: "idx",
                 )

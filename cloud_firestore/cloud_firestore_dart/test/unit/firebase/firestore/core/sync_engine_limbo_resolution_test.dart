@@ -110,6 +110,8 @@ class _Fixture {
           ),
         },
         documentUpdates: <DocumentKey, MaybeDocument>{
+          // The key is read from the document, so `?document` cannot replace the check.
+          // ignore: use_null_aware_elements
           if (document != null) document.key: document,
         },
         resolvedLimboDocuments: const <DocumentKey>{},
