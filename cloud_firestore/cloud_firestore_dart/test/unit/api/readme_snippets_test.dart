@@ -1,8 +1,8 @@
 // Keeps the Dart snippets of the READMEs compiling.
 //
 // Every ```dart block of the four READMEs (repository root, this package,
-// firebase_app_dart, firebase_auth_providers_dart) and of docs/migrating_from_vm_packages.md (whose
-// "before" blocks are fenced as ```dart before and skipped) is copied into
+// firebase_app_dart, firebase_auth_providers_dart), of docs/migrating_from_vm_packages.md (whose
+// "before" blocks are fenced as ```dart before and skipped) and of the guides in docs/guides is copied into
 // test/readme/readme_snippets.dart, one function per block, and that file is analyzed (here, and by any
 // `dart analyze test`), so a snippet that no longer matches the API is an
 // analyzer error. This test also fails when the file is out of date;
@@ -15,7 +15,10 @@
 // Rules for a snippet: `import` lines and top-level classes are hoisted out
 // of the function; everything else is a statement and may use `await`. The
 // names declared in [_context] (app, firestore, users, ...) can be used
-// without declaring them.
+// without declaring them. An import of a file of this package's example/
+// folder (`import 'sqlite_database.dart';`, which the guides tell the reader
+// to copy) is rewritten to import that file, so the snippet is checked
+// against it.
 //
 // A block fenced as ```dart lite is a snippet for Firestore Lite: its classes
 // have the names of the main library, so these blocks go to a file of their
@@ -35,7 +38,25 @@ const Map<String, String> _readmes = <String, String>{
   '../../firebase_auth/firebase_auth_providers_dart/README.md':
       'authProvidersReadme',
   '../../docs/migrating_from_vm_packages.md': 'migrationGuide',
+  '../../docs/guides/getting_started.md': 'gettingStartedGuide',
+  '../../docs/guides/offline_persistence.md': 'persistenceGuide',
+  '../../docs/guides/multiple_clients.md': 'multipleClientsGuide',
+  '../../docs/guides/pipelines.md': 'pipelinesGuide',
+  '../../docs/guides/lite.md': 'liteGuide',
+  '../../docs/guides/emulator_and_testing.md': 'testingGuide',
 };
+
+/// `import 'name.dart';` of a file that the reader copies from example/.
+final RegExp _exampleImport = RegExp(r"^import '(\w+\.dart)';");
+
+/// [line] (an import) with a file of example/ imported from there.
+String _resolveImport(String line) {
+  final RegExpMatch? match = _exampleImport.firstMatch(line);
+  if (match != null && File('example/${match[1]}').existsSync()) {
+    return "import '../../example/${match[1]}';";
+  }
+  return line;
+}
 
 const String _generated = 'test/readme/readme_snippets.dart';
 const String _generatedLite = 'test/readme/readme_lite_snippets.dart';
@@ -85,7 +106,7 @@ String generate({bool lite = false}) {
       for (i++; i < lines.length && !_close.hasMatch(lines[i]); i++) {
         final String line = lines[i];
         if (line.startsWith('import ')) {
-          imports.add(line.trim());
+          imports.add(_resolveImport(line.trim()));
         } else if (_classStart.hasMatch(line)) {
           for (; i < lines.length; i++) {
             declarations.add(lines[i]);

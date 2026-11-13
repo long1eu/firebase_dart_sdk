@@ -57,6 +57,12 @@ dart pub add cloud_firestore_dart firebase_app_dart   # once 0.1.0 is published;
 - Firestore Lite (experimental, `package:cloud_firestore_dart/lite.dart`): a client without
   cache and listeners where every call is one request.
 
+## Guides
+
+[docs/guides](docs/guides/README.md): getting started (VM, Flutter, web), offline persistence
+and cache settings, several clients on one cache, Pipelines (preview, Enterprise only),
+Firestore Lite, the emulator and testing, and migrating from the `_vm` packages.
+
 ## Status
 
 Revival of the original port, which stopped at the 2019 Android SDK; it now follows the Android

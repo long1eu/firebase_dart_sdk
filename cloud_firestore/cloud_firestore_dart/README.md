@@ -21,6 +21,15 @@ CHANGELOG for the API changes since 0.0.7 and the
 [migration guide](https://github.com/long1eu/firebase_dart_sdk/blob/main/docs/migrating_from_vm_packages.md)
 for before/after code.
 
+## Guides
+
+In the repository: [getting started](https://github.com/long1eu/firebase_dart_sdk/blob/main/docs/guides/getting_started.md),
+[offline persistence and cache settings](https://github.com/long1eu/firebase_dart_sdk/blob/main/docs/guides/offline_persistence.md),
+[several clients on one cache](https://github.com/long1eu/firebase_dart_sdk/blob/main/docs/guides/multiple_clients.md),
+[Pipelines](https://github.com/long1eu/firebase_dart_sdk/blob/main/docs/guides/pipelines.md), [Firestore Lite](https://github.com/long1eu/firebase_dart_sdk/blob/main/docs/guides/lite.md),
+[the emulator and testing](https://github.com/long1eu/firebase_dart_sdk/blob/main/docs/guides/emulator_and_testing.md) and the
+[migration guide](https://github.com/long1eu/firebase_dart_sdk/blob/main/docs/migrating_from_vm_packages.md).
+
 ## Status
 
 First release of the revived port (0.1.0). It is prepared for pub.dev but **not published

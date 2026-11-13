@@ -1,0 +1,92 @@
+# Several clients on one cache
+
+A persistent cache is one SQLite file per app name, project and database. Sometimes two live
+clients open the same file:
+
+- a Flutter **hot restart**, where the new isolate opens the cache while the old one has not let
+  go of it yet;
+- a **background isolate** that creates its own instance for the same app name;
+- a **second process** of the same program.
+
+This page describes what the client does then. In short: the file stays consistent, one client
+at a time (the *primary*) talks to the backend, and the others work from the cache. The clients
+do not share listeners or writes. That is stage 1 of the multi-tab support of the JS SDK; the
+rest is not done. In a browser a cache can only be open in one tab (see
+[Offline persistence on the web](offline_persistence.md#on-the-web)).
+
+## The file stays consistent
+
+Every transaction on the cache takes SQLite's write lock at its start (`BEGIN IMMEDIATE`,
+waiting up to 10 seconds for the other connection). A client reads the state it keeps in memory
+again when another connection has committed, so target ids and write batch ids stay unique, and
+a schema migration runs once. A client fails with `failedPrecondition` when a different version
+of the SDK moves the cache to another schema version under it.
+
+## One primary client
+
+The clients of one cache elect a primary client with the lease of the JS SDK:
+
+- the lease is valid for 5 seconds and the primary refreshes it every 4 seconds;
+- a client that is terminated gives it up at once; a client that dies loses it when it expires,
+  and another live client takes it over;
+- a client that opens a cache whose lease another live client holds **takes the lease** and logs
+  a warning. This is what makes a hot restart work: the new isolate becomes primary even though
+  the old one has not stopped yet;
+- a client whose network is disabled (`disableNetwork()`) hands the lease to a client with
+  network;
+- a lone client is always primary, so a program with one client behaves as before.
+
+Only the primary client uses the network, applies what the backend sends and acknowledges, and
+runs garbage collection and the index backfill. A client that is not primary (a *secondary*):
+
+- reports itself offline: snapshots have `metadata.isFromCache == true`;
+- answers its listeners and its `get()` calls from the cache, as it does while offline;
+- keeps its own writes pending: they are in the cache, and their futures do not complete while
+  it is secondary;
+- becomes primary again, and goes online, when the client that took the lease terminates or
+  disables its network.
+
+Clients do not see each other's listeners. The listeners of a secondary are not updated with the
+changes the primary receives from the backend; a later read of the secondary sees what the
+primary has stored in the cache by then.
+
+## In practice
+
+- **Hot restart** needs nothing from you: the new isolate takes over, and the old one is gone
+  shortly after.
+- **A background isolate or a second process that must be online at the same time** as the main
+  one should not share its cache: give it its own app name (or database), and so its own file.
+
+```dart
+import 'dart:io';
+
+import 'sqlite_database.dart'; // copied from the package's example/ folder
+
+final Directory directory = Directory('/home/ada/.local/share/my_app');
+
+// In the background isolate: the same project, another app name, another cache file.
+final FirebaseApp worker = FirebaseApp.withOptions(app.options, name: 'background-sync');
+final Firestore workerFirestore = Firestore.instanceFor(
+  app: worker,
+  openDatabase: sqliteOpener(directory),
+);
+```
+
+## clearPersistence
+
+`clearPersistence()` needs a terminated instance. When no other client has the file open it
+deletes the files. When another live client still uses the cache, it empties the cache in place
+instead of deleting the file under that client; the other client then fails with
+`failedPrecondition` at its next operation and terminates itself, as in the JS SDK.
+
+```dart
+await firestore.terminate();
+await firestore.clearPersistence();
+```
+
+## Not done
+
+The JS SDK goes further: secondary tabs share the listeners and the writes of the primary
+through the cache, so every tab is online through one connection. Here the clients share only
+the file and the lease. Until that exists, do not run two active clients on one cache on
+purpose.

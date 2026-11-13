@@ -13,8 +13,8 @@ import 'package:firebase_app_dart/firebase_app_dart.dart';
 late FirebaseApp app;
 late Firestore firestore;
 
-// README.md:471
-Future<void> firestoreReadmeLine471() async {
+// README.md:480
+Future<void> firestoreReadmeLine480() async {
   // Synchronous: there is no cache to open. Nothing is sent until the first call.
   final Firestore firestore = Firestore.instanceFor(app: app);
 
@@ -42,6 +42,29 @@ Future<void> firestoreReadmeLine471() async {
     final DocumentSnapshot<Map<String, Object?>> city = await transaction.get(cities.doc('SF'));
     transaction.update(cities.doc('SF'), {'population': (city.get('population')! as int) + 1});
   });
+
+  await firestore.terminate();
+}
+
+// ../../docs/guides/lite.md:23
+Future<void> liteGuideLine23() async {
+  // Synchronous, and nothing is sent until the first call.
+  final Firestore firestore = Firestore.instanceFor(app: app);
+
+  final CollectionReference<Map<String, Object?>> cities = firestore.collection('cities');
+  await cities.doc('LA').set({'name': 'Los Angeles', 'state': 'CA', 'population': 3900000});
+
+  final QuerySnapshot<Map<String, Object?>> californian =
+      await cities.where('state', isEqualTo: 'CA').get();
+  print(californian.docs.map((QueryDocumentSnapshot<Map<String, Object?>> doc) => doc.id).toList());
+
+  final WriteBatch batch = firestore.batch()
+    ..update(cities.doc('LA'), {'population': FieldValue.increment(1000)})
+    ..delete(cities.doc('old'));
+  await batch.commit();
+
+  final AggregateQuerySnapshot count = await cities.count().get();
+  print(count.getCount());
 
   await firestore.terminate();
 }
