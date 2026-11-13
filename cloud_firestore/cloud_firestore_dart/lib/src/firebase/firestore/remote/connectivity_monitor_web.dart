@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:js_interop';
 
+import 'package:cloud_firestore_dart/src/firebase/firestore/remote/connectivity_change_detector.dart';
 import 'package:rxdart/rxdart.dart';
 import 'package:web/web.dart' as web;
 
@@ -39,3 +40,7 @@ BehaviorSubject<bool> withPlatformConnectivity(
   );
   return subject;
 }
+
+/// Browsers report reachability with events (see [withPlatformConnectivity]),
+/// so nothing has to be polled.
+ConnectivityChangeDetector? createConnectivityChangeDetector() => null;

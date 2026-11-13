@@ -229,6 +229,7 @@ class Firestore {
       withPlatformConnectivity(app.onNetworkConnected),
       scheduler,
       appCheckProvider: appCheck,
+      connectivityDetector: createConnectivityChangeDetector(),
     );
     final Firestore firestore = Firestore(
       databaseId,

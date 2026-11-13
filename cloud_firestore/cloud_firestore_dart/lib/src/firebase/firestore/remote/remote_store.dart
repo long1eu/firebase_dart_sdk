@@ -24,6 +24,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/mutat
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/mutation_result.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/snapshot_version.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/value/field_value.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/remote/connectivity_change_detector.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/remote/datastore/datastore.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/remote/online_state_tracker.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/remote/remote_event.dart';
@@ -52,7 +53,9 @@ class RemoteStore implements TargetMetadataProvider {
     TaskScheduler scheduler, {
     Duration networkDebounce = const Duration(seconds: 5),
     SerialQueue? queue,
+    ConnectivityChangeDetector? connectivityDetector,
   }) : _queue = queue ?? SerialQueue(),
+       _connectivityDetector = connectivityDetector,
        _listenTargets = <int, QueryData>{},
        _writePipeline = Queue<MutationBatch>(),
        _onlineStateTracker = OnlineStateTracker(
@@ -66,8 +69,65 @@ class RemoteStore implements TargetMetadataProvider {
     // we skip the seed value
     _onNetworkConnectedSub = _onNetworkConnected
         .skip(1)
+        // An app that reports the connectivity itself knows better than the
+        // built-in detector, which is switched off for good by its first event.
+        .doOnData((_) => _disposeConnectivityDetector())
         .debounceTime(networkDebounce)
         .listen(onNetworkConnectivityChanged);
+    _connectivityDetector?.onChange = _onConnectivityMayHaveChanged;
+  }
+
+  /// Hints that the connectivity may be back, used to retry failed streams
+  /// without waiting for their backoff. Null where the platform has none, and
+  /// once the app reported the connectivity itself.
+  ConnectivityChangeDetector? _connectivityDetector;
+
+  /// Whether the watch (write) stream failed and was not seen working since.
+  bool _watchStreamFailed = false;
+  bool _writeStreamFailed = false;
+
+  /// Whether the built-in connectivity detector is looking for changes, which
+  /// it only does while a stream is failing.
+  @visibleForTesting
+  bool get isWatchingConnectivity => _connectivityDetector?.isRunning ?? false;
+
+  void _disposeConnectivityDetector() {
+    _connectivityDetector?.dispose();
+    _connectivityDetector = null;
+  }
+
+  /// Runs the connectivity detector while a stream is failing and the network
+  /// is wanted, and stops it otherwise.
+  void _updateConnectivityDetector() {
+    final ConnectivityChangeDetector? detector = _connectivityDetector;
+    if (detector == null) {
+      return;
+    }
+    if (_canUseNetwork && (_watchStreamFailed || _writeStreamFailed)) {
+      detector.start();
+    } else {
+      detector.stop();
+    }
+  }
+
+  void _onConnectivityMayHaveChanged() {
+    if (_eventsDisabled) {
+      return;
+    }
+    _queue
+        .run<void>(() async {
+          // The streams may have recovered, or the network may have been disabled,
+          // while this was waiting for its turn.
+          if (!_canUseNetwork || !(_watchStreamFailed || _writeStreamFailed)) {
+            return;
+          }
+          Log.d(
+            '$runtimeType',
+            'Restarting streams: the network interfaces changed or the machine woke up.',
+          );
+          await _restartNetwork();
+        })
+        .catchError(_reportError);
   }
 
   /// The queue on which every operation and every stream event handler runs, one at a time (see [SerialQueue]).
@@ -200,6 +260,10 @@ class RemoteStore implements TargetMetadataProvider {
 
     // Everything the torn down streams reported (including their close) is stale from now on.
     _networkEpoch++;
+
+    _watchStreamFailed = false;
+    _writeStreamFailed = false;
+    _updateConnectivityDetector();
   }
 
   /// Starts up the remote store, creating streams, restoring state from [LocalStore], etc. This should called before
@@ -228,6 +292,7 @@ class RemoteStore implements TargetMetadataProvider {
     await _watchStreamSub.cancel();
     await _writeStreamSub.cancel();
     await _onNetworkConnectedSub.cancel();
+    _disposeConnectivityDetector();
   }
 
   /// Tells the [RemoteStore] that the currently authenticated user has changed.
@@ -474,6 +539,8 @@ class RemoteStore implements TargetMetadataProvider {
   ) async {
     // Mark the connection as ONLINE because we got a message from the server.
     await _onlineStateTracker.updateState(OnlineState.online);
+    _watchStreamFailed = false;
+    _updateConnectivityDetector();
 
     if (_watchChangeAggregator == null) {
       // The watch stream state was cleaned up (the network was disabled or restarted) while this event was waiting.
@@ -525,6 +592,8 @@ class RemoteStore implements TargetMetadataProvider {
 
     // If we still need the watch stream, retry the connection.
     if (_shouldStartWatchStream) {
+      _watchStreamFailed = true;
+      _updateConnectivityDetector();
       await _onlineStateTracker.handleWatchStreamFailure(status);
 
       await _startWatchStream();
@@ -757,6 +826,8 @@ class RemoteStore implements TargetMetadataProvider {
   Future<void> _handleWriteStreamHandshakeComplete() async {
     // Send the write pipeline now that stream is established. From now on new writes are sent right away.
     _writeHandshakeHandled = true;
+    _writeStreamFailed = false;
+    _updateConnectivityDetector();
     for (MutationBatch batch in _writePipeline) {
       _writeStream.writeMutations(batch.mutations);
     }
@@ -817,6 +888,12 @@ class RemoteStore implements TargetMetadataProvider {
     // we don't want to start the write stream again.
     if (_shouldStartWriteStream) {
       _startWriteStream();
+    }
+
+    // A stream that is retried after an error may be failing because the network is gone.
+    if (status.code != StatusCode.ok && _writeStream.isStarted) {
+      _writeStreamFailed = true;
+      _updateConnectivityDetector();
     }
   }
 

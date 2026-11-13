@@ -18,6 +18,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/metadata_change.dart
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/database_id.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/query.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/query_snapshot.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/remote/connectivity_change_detector.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/remote/datastore/channel_options_provider.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/remote/datastore/datastore.dart'
     show Datastore;
@@ -235,7 +236,8 @@ class IntegrationTestUtil {
       CredentialsProvider provider,
       TaskScheduler scheduler,
       OpenDatabase openDatabase,
-      FirestoreSettings settings) async {
+      FirestoreSettings settings,
+      {ConnectivityChangeDetector? connectivityDetector}) async {
     final DatabaseInfo databaseInfo = DatabaseInfo(
         databaseId, persistenceKey, settings.host,
         port: settings.port, sslEnabled: settings.sslEnabled);
@@ -250,6 +252,7 @@ class IntegrationTestUtil {
       openDatabase,
       onNetworkConnected,
       scheduler,
+      connectivityDetector: connectivityDetector,
     );
 
     return Firestore(databaseId, null, client, scheduler);
@@ -263,7 +266,8 @@ class IntegrationTestUtil {
   static Future<Firestore> testFirestoreInstance(String projectId,
       InternalLogLevel logLevel, FirestoreSettings settings, String dbPath,
       {String? fixedDbName,
-      String databaseName = DatabaseId.defaultDatabaseId}) async {
+      String databaseName = DatabaseId.defaultDatabaseId,
+      ConnectivityChangeDetector? connectivityDetector}) async {
     // This unfortunately is a global setting that affects existing Firestore clients.
     Log.level = logLevel;
 
@@ -309,6 +313,7 @@ class IntegrationTestUtil {
         return db;
       },
       settings,
+      connectivityDetector: connectivityDetector,
     );
 
     firestoreStatus[firestore] = true;

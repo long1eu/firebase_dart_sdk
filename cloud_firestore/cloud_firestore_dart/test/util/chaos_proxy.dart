@@ -53,15 +53,42 @@ class ChaosProxy {
     return proxy;
   }
 
-  final ServerSocket _server;
+  ServerSocket _server;
   final String _targetHost;
   final int _targetPort;
   final Set<_Connection> _connections = <_Connection>{};
   bool _closed = false;
 
-  String get host => _server.address.address;
+  late final String host = _server.address.address;
 
-  int get port => _server.port;
+  /// The port stays the same across [unplug] and [plug].
+  late final int port = _server.port;
+
+  bool _unplugged = false;
+
+  /// Stops listening and drops the open connections: connecting to the proxy fails (connection refused), as it does
+  /// when the network is gone. [refuseConnections] is different: there the connection is established and then closed.
+  Future<void> unplug() async {
+    if (_unplugged || _closed) {
+      return;
+    }
+    // Read the address before the socket goes away.
+    host;
+    port;
+    _unplugged = true;
+    cut();
+    await _server.close();
+  }
+
+  /// Listens again on the same port after [unplug].
+  Future<void> plug() async {
+    if (!_unplugged || _closed) {
+      return;
+    }
+    _server = await ServerSocket.bind(InternetAddress.loopbackIPv4, port);
+    _unplugged = false;
+    _server.listen(_accept);
+  }
 
   /// The latency added to every chunk, in both directions.
   Duration delay = Duration.zero;
@@ -180,7 +207,9 @@ class ChaosProxy {
   Future<void> close() async {
     _closed = true;
     cut();
-    await _server.close();
+    if (!_unplugged) {
+      await _server.close();
+    }
   }
 
   Future<void> _accept(Socket client) async {

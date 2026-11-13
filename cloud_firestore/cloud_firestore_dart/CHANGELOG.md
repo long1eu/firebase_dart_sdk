@@ -264,6 +264,12 @@ Pipelines (preview):
 
 Networking:
 
+- A built-in connectivity detector on the VM. While a stream is failing, the client watches the
+  addresses of the network interfaces (and the clock, for a wake-up from sleep) and restarts
+  its streams at once when the connectivity may be back, instead of waiting for the backoff. It
+  only speeds up recovery: it never declares the client offline, and it has no timer while the
+  streams work. An app that feeds `PlatformDependencies.onNetworkConnected` itself replaces it.
+  Tested on macOS only.
 - App Check token plumbing (`x-firebase-appcheck` header); the enforcement side was not tested.
 - Bloom-filter existence-filter handling, gRPC keepalive and connect timeout, backoff reset on
   connectivity change, instance cache per app and database, serial queue for remote store work.

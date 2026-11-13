@@ -44,6 +44,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/mutat
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/mutation_batch_result.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/no_document.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/value/field_value.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/remote/connectivity_change_detector.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/remote/datastore/datastore.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/remote/remote_event.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/remote/remote_serializer.dart';
@@ -99,6 +100,7 @@ class FirestoreClient implements RemoteStoreCallback {
     BehaviorSubject<bool> onNetworkConnected,
     TaskScheduler scheduler, {
     AppCheckTokenProvider? appCheckProvider,
+    ConnectivityChangeDetector? connectivityDetector,
   }) async {
     final FirestoreClient client = FirestoreClient._(
       databaseInfo,
@@ -146,6 +148,7 @@ class FirestoreClient implements RemoteStoreCallback {
         openDatabase,
         onNetworkConnected,
         scheduler,
+        connectivityDetector: connectivityDetector,
         memoryLruGcSettings: switch (settings.cacheSettings) {
           final MemoryCacheSettings memory => memory.gcSettings,
           _ => null,
@@ -447,6 +450,7 @@ class FirestoreClient implements RemoteStoreCallback {
     BehaviorSubject<bool> onNetworkConnected,
     TaskScheduler scheduler, {
     MemoryGarbageCollectorSettings? memoryLruGcSettings,
+    ConnectivityChangeDetector? connectivityDetector,
   }) async {
     // Note: The initialization work must all be synchronous (we can't dispatch more work) since external write/listen
     // operations could get queued to run before that subsequent work completes.
@@ -519,6 +523,7 @@ class FirestoreClient implements RemoteStoreCallback {
       onNetworkConnected,
       scheduler,
       queue: _queue,
+      connectivityDetector: connectivityDetector,
     );
 
     syncEngine = SyncEngine(localStore, remoteStore, user);

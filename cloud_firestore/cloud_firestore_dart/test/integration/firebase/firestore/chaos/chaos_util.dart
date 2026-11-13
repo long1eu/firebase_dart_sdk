@@ -5,6 +5,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:cloud_firestore_dart/cloud_firestore_dart.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/remote/connectivity_change_detector.dart';
 import 'package:firebase_app_dart/internal.dart' show InternalLogLevel;
 import 'package:test/test.dart';
 
@@ -63,13 +64,19 @@ class ChaosEnv {
   ///
   /// With [fixedDbName] the client uses that SQLite file and keeps it, so that a later client created with the same
   /// name starts from the persisted state (a restart).
-  Future<Firestore> newClient({ChaosProxy? proxy, String? fixedDbName}) {
+  ///
+  /// The clients of the tests have no connectivity detector unless [connectivityDetector] is given.
+  Future<Firestore> newClient(
+      {ChaosProxy? proxy,
+      String? fixedDbName,
+      ConnectivityChangeDetector? connectivityDetector}) {
     return IntegrationTestUtil.testFirestoreInstance(
       IntegrationTestUtil.provider.projectId,
       InternalLogLevel.w,
       _settings(proxy ?? this.proxy),
       IntegrationTestUtil.currentDatabasePath,
       fixedDbName: fixedDbName,
+      connectivityDetector: connectivityDetector,
     );
   }
 

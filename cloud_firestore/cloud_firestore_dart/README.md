@@ -469,11 +469,23 @@ then fails whichever test is running.
   or databases. Handles inside one process are serialized per database name.
 - Instances are independent: each `Firestore` has its own scheduler and work queue, and the
   persistence lock is per database, so an instance never waits for another one (issue #2).
-- Connectivity: `firebase_app_dart` has no built-in monitor on any OS. `FirebaseApp.onNetworkConnected`
-  is seeded with `true` and Firestore restarts its streams (resetting backoff) on every `true`
-  event. To react to real connectivity changes, subclass `PlatformDependencies`, override
-  `onNetworkConnected` and feed it from your own source (for example the `connectivity_plus`
-  plugin in a Flutter app, or a periodic reachability probe in a server process).
+- Connectivity: a failed stream is the only thing that makes the client consider itself
+  offline, and it retries with an exponential backoff (up to one minute). Two things can make
+  it retry at once instead of waiting for the backoff:
+  - **Built in, on the VM** (not on the web, which uses the `online` / `offline` events of the
+    browser): while a stream is failing, and only then, the client reads the addresses of the
+    network interfaces every 2 seconds (`NetworkInterface.list`). When an address appears (Wi-Fi
+    joined again, a cable, a VPN, a new DHCP lease), or when the clock shows that the machine
+    was asleep, it restarts its streams right away. This is a hint only: it never declares the
+    client offline, a wrong hint costs one connection attempt, and a client whose streams work
+    has no timer. In a test, after a 16 second outage a listener received a change 40 to 140 ms
+    after such a hint, and 2 to 8 seconds after the network was back without one (the rest of
+    the backoff, which is random). Only tested on macOS; the hint itself was simulated.
+  - **From your app**: subclass `PlatformDependencies`, override `onNetworkConnected` and feed
+    it from your own source (for example the `connectivity_plus` plugin in a Flutter app).
+    Firestore restarts its streams, resetting the backoff, on every `true` event (after a 5
+    second debounce); `false` is ignored. The first event from the app switches the built-in
+    detector off for that instance, so there is nothing to configure to replace it.
 
 ## Persistent cache indexes
 
