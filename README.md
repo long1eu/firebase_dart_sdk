@@ -88,7 +88,7 @@ null safety, and parts of its public API follow the JS SDK.
 - A production verification kit exists (`tool/verify_production`) and passes against the
   emulators; **it has not been run against a real project**.
 - Not implemented: coordination between clients that share one cache (the multi-tab support of
-  the JS SDK), a full Firebase Auth SDK (no federated sign-in), and Pipelines beyond the preview
+  the JS SDK; deferred until after 0.1.0), a full Firebase Auth SDK (no federated sign-in), and Pipelines beyond the preview
   (no real-time pipelines and no offline evaluation; a local evaluator exists but is internal
   and not used yet; search, window functions and explain options are only checked for their
   encoding, since the emulator rejects them). [docs/guides/features.md](docs/guides/features.md) lists the known gaps.
@@ -201,4 +201,7 @@ currently 3.8.0, the lowest supported one). Do not format
 
 ## License
 
-Apache License 2.0, as upstream. See the `LICENSE` file in each package.
+`cloud_firestore_dart`, `firebase_app_dart` and `firebase_auth_providers_dart` are licensed under
+the Apache License 2.0, as upstream; see the `LICENSE` and `NOTICE` files of each package. The
+`_vm` packages they replace were licensed under BSD-3-Clause. The packages of this repository
+that were not migrated keep their own `LICENSE` files.

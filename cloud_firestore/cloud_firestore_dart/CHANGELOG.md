@@ -84,6 +84,8 @@ How this was verified:
 
 ### Renamed packages
 
+- **License:** Apache-2.0 (see `LICENSE` and `NOTICE`). `cloud_firestore_vm` and the two
+  internal `_vm` packages were licensed under BSD-3-Clause.
 - `cloud_firestore_vm` is now `cloud_firestore_dart`: import
   `package:cloud_firestore_dart/cloud_firestore_dart.dart`.
 - `firebase_core_vm` is now `firebase_app_dart` (`FirebaseApp`, `FirebaseOptions`, ... keep
@@ -376,7 +378,8 @@ Emulator and logging:
   set through `withEmulator`; settings that have a token and are pointed at another host throw an
   `ArgumentError`, so the unsigned token is never sent to production. A token with an empty `sub`
   uses `user_id` for the user.
-- `Firestore.setLogLevel(LogLevel)` with `debug`, `error` and `silent` (as the JS SDK);
+- `Firestore.setLogLevel(LogLevel)` with the six levels of the JS SDK: `verbose`, `debug`,
+  `info`, `warn` (the default), `error` and `silent`; also in Firestore Lite.
   `setLoggingEnabled` still works.
 - `Firestore.app`, an alias of `Firestore.firebaseApp` under the name the JS SDK and FlutterFire use.
 
@@ -729,7 +732,8 @@ Documentation and tests:
 - Coordinating running clients that share one persistent cache (the multi-tab support of the JS
   SDK). Two clients on one SQLite file keep it consistent and elect a primary client that alone
   uses the network (see Fixed), but they do not share listens or writes; in the browser the cache
-  is refused to a second tab.
+  is refused to a second tab. Sharing them (stage 3 of the multi-client plan) is deferred until
+  after 0.1.0.
 - On the web: any browser other than Chrome.
 - Pipelines beyond the preview: pipelines in a read-write `Transaction`, evaluation against the
   local cache (an internal evaluator exists but is not wired into the client) and real-time

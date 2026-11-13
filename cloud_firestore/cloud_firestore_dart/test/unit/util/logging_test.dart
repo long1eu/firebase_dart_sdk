@@ -71,6 +71,68 @@ void main() {
       expect(printed.single, contains('error'));
     });
 
+    test('the levels are the JS ones, from the most to the least verbose', () {
+      expect(LogLevel.values, <LogLevel>[
+        LogLevel.verbose,
+        LogLevel.debug,
+        LogLevel.info,
+        LogLevel.warn,
+        LogLevel.error,
+        LogLevel.silent,
+      ]);
+    });
+
+    test('warn is the default level', () {
+      Firestore.setLogLevel(LogLevel.debug);
+      Firestore.setLogLevel(LogLevel.warn);
+      expect(internal.Log.level, internal.InternalLogLevel.w);
+      expect(internal.Log.level, original);
+    });
+
+    test('each level prints its messages and the more severe ones', () {
+      List<String> printedAt(LogLevel level) {
+        final List<String> printed = <String>[];
+        Firestore.setLogLevel(level);
+        Zone.root
+            .fork(
+              specification: ZoneSpecification(
+                print: (_, _, _, String line) => printed.add(line),
+              ),
+            )
+            .run(() {
+              internal.Log.i('tag', 'verbose');
+              internal.Log.d('tag', 'debug');
+              internal.Log.w('tag', 'warn');
+              internal.Log.e('tag', 'error');
+            });
+        return printed
+            .map((String line) => line.split('||').last)
+            .toList();
+      }
+
+      expect(printedAt(LogLevel.verbose), <String>[
+        'verbose',
+        'debug',
+        'warn',
+        'error',
+      ]);
+      expect(printedAt(LogLevel.debug), <String>['debug', 'warn', 'error']);
+      // No message is logged at info level; info is between debug and warn.
+      expect(printedAt(LogLevel.info), <String>['warn', 'error']);
+      expect(
+        internal.InternalLogLevel.d <= internal.InternalLogLevel.info,
+        isTrue,
+      );
+      expect(
+        internal.InternalLogLevel.info <= internal.InternalLogLevel.w,
+        isTrue,
+      );
+      expect(internal.Log.level, internal.InternalLogLevel.info);
+      expect(printedAt(LogLevel.warn), <String>['warn', 'error']);
+      expect(printedAt(LogLevel.error), <String>['error']);
+      expect(printedAt(LogLevel.silent), isEmpty);
+    });
+
     test('setLoggingEnabled still works after setLogLevel', () {
       Firestore.setLogLevel(LogLevel.silent);
       Firestore.setLoggingEnabled(loggingEnabled: true);

@@ -7,6 +7,8 @@ production Firebase.
 
 ### Renamed package
 
+- **License:** Apache-2.0 (see `LICENSE` and `NOTICE`). `firebase_core_vm` was licensed under
+  BSD-3-Clause.
 - `firebase_core_vm` is now `firebase_app_dart`: import
   `package:firebase_app_dart/firebase_app_dart.dart` instead of
   `package:firebase_core_vm/firebase_core_vm.dart`. Class names (`FirebaseApp`,

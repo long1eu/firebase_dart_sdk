@@ -64,7 +64,8 @@ Not done:
 - `Query.findNearest` evaluation against the local cache.
 - **Coordination between running clients that share one cache** (the multi-tab support of the
   JS SDK). Two clients on one SQLite file keep it consistent but do not see each other's
-  listeners or pending writes; in a browser, one tab at a time. See
+  listeners or pending writes; in a browser, one tab at a time. Sharing them (stage 3 of the
+  multi-client plan) is deferred until after 0.1.0. See
   [Several clients on one cache](multiple_clients.md).
 - **Persistent cache indexes** for queries with inequalities on several fields, and with a
   memory cache (neither exists upstream: such queries are scanned).

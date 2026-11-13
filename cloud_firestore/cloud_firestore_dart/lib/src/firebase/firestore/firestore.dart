@@ -615,17 +615,17 @@ class Firestore {
 
   /// Globally enables / disables Firestore logging for the SDK.
   ///
-  /// Enabled logs everything ([LogLevel.debug]); disabled goes back to the
-  /// default, which logs warnings and errors. [setLogLevel] gives finer
+  /// Enabled is [LogLevel.debug]; disabled goes back to the default,
+  /// [LogLevel.warn] (warnings and errors). [setLogLevel] gives finer
   /// control.
   static void setLoggingEnabled({bool loggingEnabled = false}) {
     applyLoggingEnabled(loggingEnabled);
   }
 
-  /// Sets the verbosity of the Cloud Firestore logs: [LogLevel.debug] for the
-  /// most verbose logging, [LogLevel.error] to log errors only, or
-  /// [LogLevel.silent] to turn logging off. Like `setLogLevel` of the JS SDK,
-  /// with three of its six levels (see [LogLevel]).
+  /// Sets the verbosity of the Cloud Firestore logs: from [LogLevel.verbose]
+  /// (everything) and [LogLevel.debug] through [LogLevel.warn] (the default)
+  /// to [LogLevel.error] (errors only) and [LogLevel.silent] (nothing). The
+  /// levels of `setLogLevel` of the JS SDK.
   ///
   /// The setting is global: it applies to every instance (and to the logs of
   /// the other Firebase packages of this SDK, which share the logger).

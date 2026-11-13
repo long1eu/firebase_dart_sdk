@@ -2,6 +2,9 @@
 
 First version. Not published yet.
 
+- Licensed under Apache-2.0 (see `LICENSE` and `NOTICE`), like `cloud_firestore_dart` and
+  `firebase_app_dart`; the `_vm` packages they replace were licensed under BSD-3-Clause.
+
 - `FirebaseUserAuth`: Firebase Auth user sign-in over the Identity Toolkit and Secure Token REST
   APIs (anonymous, email and password, custom token), ID token refresh on demand and ahead of
   expiry, sign-out, `AuthStorage` for the session (in memory by default), Auth emulator support.

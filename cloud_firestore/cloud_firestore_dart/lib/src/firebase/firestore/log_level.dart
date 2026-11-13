@@ -1,13 +1,21 @@
 /// The verbosity of the Cloud Firestore logs, set with
-/// `Firestore.setLogLevel`.
+/// `Firestore.setLogLevel`: the levels of `setLogLevel` of the JS SDK, from
+/// the most to the least verbose. Each level logs its own messages and those
+/// of every level after it.
 ///
-/// Three of the levels of `setLogLevel` of the JS SDK, which also has
-/// `verbose`, `info` and `warn`. The default, before any call, logs warnings
-/// and errors; no value of this enum selects it again, but
-/// `Firestore.setLoggingEnabled(loggingEnabled: false)` does.
+/// The default, before any call, is [warn].
 enum LogLevel {
-  /// The most verbose level, primarily for debugging.
+  /// Everything, including the most detailed messages.
+  verbose,
+
+  /// Debug messages and above, primarily for debugging.
   debug,
+
+  /// Informational messages and above.
+  info,
+
+  /// Warnings and errors. The default.
+  warn,
 
   /// Only errors are logged.
   error,

@@ -92,7 +92,9 @@ has the changes with before and after code.
   features only against the Enterprise edition emulator.
 - **Coordination between clients that share one cache** (the multi-tab support of the JS SDK):
   clients keep the file consistent and elect a primary, but do not share listeners or writes;
-  in a browser, one tab at a time.
+  in a browser, one tab at a time. Sharing them (stage 3 of the multi-client plan: shared state
+  in SQLite between isolates and processes, and the tab manager settings of the JS SDK) is
+  deferred until after 0.1.0.
 - **Pipelines** beyond the preview: evaluation against the local cache, and real-time pipelines.
 - **The web** beyond the experiment: browsers other than Chrome, and a cache shared between tabs.
 - `findNearest` evaluation against the local cache, and cache indexes for queries with
@@ -102,5 +104,9 @@ has the changes with before and after code.
 
 The full list, with the known gaps of what is done, is in
 [features and limits](https://github.com/long1eu/firebase_dart_sdk/blob/main/docs/guides/features.md).
+
+## License
+
+Apache License 2.0; see `LICENSE` and `NOTICE`. `cloud_firestore_vm` was licensed under BSD-3-Clause.
 
 Issues and pull requests: https://github.com/long1eu/firebase_dart_sdk

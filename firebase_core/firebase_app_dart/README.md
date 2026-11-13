@@ -68,4 +68,8 @@ has the details.
 - No heartbeat or analytics: `dataCollectionEnabled` and `gaTrackingId` are stored, not used.
 - Nothing was run against production Firebase.
 
+## License
+
+Apache License 2.0; see `LICENSE` and `NOTICE`. `firebase_core_vm` was licensed under BSD-3-Clause.
+
 Issues and pull requests: https://github.com/long1eu/firebase_dart_sdk

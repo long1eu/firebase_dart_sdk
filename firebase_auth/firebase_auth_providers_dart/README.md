@@ -112,4 +112,8 @@ A server uses `app.authProvider = OAuthTokenProvider.serviceAccount(keyJson)` or
 - Nothing was run against the real services, and Application Default Credentials are delegated
   to `package:googleapis_auth` without a test of their own.
 
+## License
+
+Apache License 2.0; see `LICENSE` and `NOTICE`.
+
 Issues and pull requests: https://github.com/long1eu/firebase_dart_sdk

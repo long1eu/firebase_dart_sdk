@@ -248,8 +248,11 @@ enum LogLevel
   new LogLevel(int #index, String #name)
   static final debug: LogLevel
   static final error: LogLevel
+  static final info: LogLevel
   static final silent: LogLevel
   static final values: List<LogLevel>
+  static final verbose: LogLevel
+  static final warn: LogLevel
 class MaxKey
   static final instance: MaxKey
   toString(): String

@@ -10,8 +10,8 @@ clients open the same file:
 
 This page describes what the client does then. In short: the file stays consistent, one client
 at a time (the *primary*) talks to the backend, and the others work from the cache. The clients
-do not share listeners or writes. That is stage 1 of the multi-tab support of the JS SDK; the
-rest is not done. In a browser a cache can only be open in one tab (see
+do not share listeners or writes. That is the first part of the multi-tab support of the JS
+SDK; sharing listeners and writes between clients is deferred until after 0.1.0. In a browser a cache can only be open in one tab (see
 [Offline persistence on the web](offline_persistence.md#on-the-web)).
 
 ## The file stays consistent

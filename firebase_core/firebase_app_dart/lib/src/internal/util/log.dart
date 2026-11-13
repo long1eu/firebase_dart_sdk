@@ -27,7 +27,8 @@ class Log {
     return '${message.substring(0, maxMessageLength)}... <message truncated>';
   }
 
-  /// Logs [message] at info level.
+  /// Logs [message] at the most detailed level ([InternalLogLevel.i], below
+  /// debug).
   static void i(String tag, dynamic message) {
     if (level <= InternalLogLevel.i) {
       print('${_formatTag('I:$tag')}||${truncate('$message')}');
@@ -58,26 +59,31 @@ class Log {
   static String _formatTag(String tag) => tag.padRight(30, ' ');
 }
 
-/// The severity of a log message, ordered from [i] (lowest) to [e].
+/// The severity of a log message, ordered from [i] (lowest) to [e]:
+/// [i] < [d] < [info] < [w] < [e] < [none].
 class InternalLogLevel implements Comparable<InternalLogLevel> {
   const InternalLogLevel._(this._i);
 
   final int _i;
 
-  /// Info.
+  /// The most detailed level, below debug: what the JS SDK calls `verbose`.
+  /// (The name and [Log.i] predate the JS level names.)
   static const InternalLogLevel i = InternalLogLevel._(0);
 
   /// Debug.
   static const InternalLogLevel d = InternalLogLevel._(1);
 
+  /// Info as in the JS SDK: above debug and below warning.
+  static const InternalLogLevel info = InternalLogLevel._(2);
+
   /// Warning.
-  static const InternalLogLevel w = InternalLogLevel._(2);
+  static const InternalLogLevel w = InternalLogLevel._(3);
 
   /// Error.
-  static const InternalLogLevel e = InternalLogLevel._(3);
+  static const InternalLogLevel e = InternalLogLevel._(4);
 
   /// Above every message level: nothing is printed.
-  static const InternalLogLevel none = InternalLogLevel._(4);
+  static const InternalLogLevel none = InternalLogLevel._(5);
 
   @override
   int compareTo(InternalLogLevel other) => _i.compareTo(other._i);
