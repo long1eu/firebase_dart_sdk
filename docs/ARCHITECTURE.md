@@ -94,12 +94,14 @@ the `RemoteStore`, and a task that is already on the queue runs nested calls inl
 The spec tests are the shared, data-driven tests of the official SDKs: the JSON is generated
 from the JS SDK sources (`test/unit/specs/*.test.ts`) and describes sequences of user actions,
 watch events and expected snapshots. `spec/spec_skip_list.dart` names every spec that does not
-run and why (for example multi-client specs). One skip there is a limit of the test harness,
-not of the library: the runner lets the event loop settle after every step, so a timer with no
-delay that the JS runner would still see pending has run (the recovery spec "Multiple user
-changes during transaction failure"). A `TaskScheduler` created with
-`manualTasks: {TaskId.asyncQueueRetry}` holds such retries back until `runTimer`, which makes
-that spec pass; the runner does not use it yet. The mock watch stream
+run and why (memory persistence skips the multi-client specs, as the JS SDK). The runner lets
+the event loop settle after every step; its `TaskScheduler` is created with
+`manualTasks: {TaskId.asyncQueueRetry}`, so that a retry with no delay, which the JS runner
+would still see pending when it checks a step, only runs on `runTimer`. A multi-client spec runs
+one client stack per `clientIndex` on one SQLite file, each with its own client id, a primary
+lease with a fixed clock, and a `StorageSharedClientState` on an in-memory bus (the JS
+`SharedFakeWebStorage`); the changes of the other clients are applied with retries on
+`async_queue_retry`, as the JS `enqueueRetryable`. The mock watch stream
 (`test/unit/firebase/firestore/remote/mock_datastore.dart`) goes through a backoff timer
 (`TaskId.listenStreamConnectionBackoff`) after an error, as the JS mock connection does; the
 runner fires it on `watchStreamClose` with `runBackoffTimer: true` and before a listen, and
@@ -173,7 +175,8 @@ changes. `PORTING NOTE` comments in `lib/` mark these places in the code.
 | Calls on a terminated instance fail with `FirestoreError` `failedPrecondition` through the returned `Future` or `Stream`, never synchronously (the JS behaviour). | One way to handle the error, whatever the call. | `test/integration/firebase/firestore/terminated_instance_test.dart` |
 | `Query.where('field')` with no non-null named argument throws an `ArgumentError` (FlutterFire returns the query unchanged). | A filter that silently does nothing hides mistakes. | `test/unit/firebase/firestore/query_where_test.dart` |
 | The public API is classes and methods with Java-style names plus Dart aliases, not the modular functions of the JS SDK. Internal members are library-private and reached through extensions that the public libraries do not export. | Dart tree-shakes methods. | `test/unit/api/public_api.golden.txt` is the exact surface |
-| There is no multi-tab coordination (the JS SDK's primary lease and `SharedClientState`): two clients on one SQLite file keep it consistent (see Persistence) but do not share listeners or pending writes, and on the web a second tab is refused by a Web Lock. Android and iOS have none either; the staged plan for it is in progress. | A VM client usually has one process per cache. | `test/unit/firebase/firestore/local/sqlite_shared_clients_test.dart`; the `multi-client` entry of `spec/spec_skip_list.dart` |
+| Multi-client coordination (the JS SDK's primary lease, `SharedClientState` and `applyPrimaryState`) exists in the library and runs the multi-client specs on SQLite, but a `FirestoreClient` does not share state yet: the shared state lives on an in-process bus that only the spec runner uses (stage 3 of the plan, the SQLite-backed shared state for isolates and processes, is not started). Two clients on one SQLite file elect a primary and keep the file consistent (see Persistence) but do not share listeners or pending writes; on the web a second tab is refused by a Web Lock. Android and iOS have no multi-client support. | A VM client usually has one process per cache. | `test/unit/firebase/firestore/local/sqlite_shared_clients_test.dart`, `local/sqlite_primary_lease_test.dart`, `local/storage_shared_client_state_test.dart`; the multi-client specs in `spec/sqlite_spec_test.dart` |
+| One multi-client recovery spec stays skipped although nothing is known to be missing: "Persistence Recovery Query is listened to by primary (with recovery)". With the "Release target" transaction failing, the primary releases the target that another client stopped listening to and unlistens at once, because `LocalStore.releaseTarget` ignores a recoverable failure. The JS SDK's `localStoreReleaseTarget` does the same as read in its source, and neither `syncEngineApplyActiveTargetsChange`, `removeAndCleanupTarget`, `syncEngineUnlisten` nor `enqueueRetryable` gives a retry there; the spec nevertheless expects the primary to keep the target until the database recovers. The JS test was not run to settle it. | Not understood: the port follows the JS source rather than adjust the behaviour to the spec. | the `knownSpecDivergences` entry of `spec/spec_skip_list.dart` |
 
 ### Not deviations, but worth knowing
 
