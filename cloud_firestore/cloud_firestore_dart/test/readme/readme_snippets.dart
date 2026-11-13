@@ -308,21 +308,21 @@ Future<void> authProvidersReadmeLine53() async {
   await auth.signOut();
 }
 
-// ../../firebase_auth/firebase_auth_providers_dart/README.md:102
-Future<void> authProvidersReadmeLine102() async {
+// ../../firebase_auth/firebase_auth_providers_dart/README.md:107
+Future<void> authProvidersReadmeLine107() async {
   final auth = await FirebaseUserAuth.forApp(app, storage: FileAuthStorage());
   // auth.currentUser is the user of the last run, if there was one.
 }
 
-// ../../firebase_auth/firebase_auth_providers_dart/README.md:132
-Future<void> authProvidersReadmeLine132() async {
+// ../../firebase_auth/firebase_auth_providers_dart/README.md:137
+Future<void> authProvidersReadmeLine137() async {
   final auth = await FirebaseUserAuth.forApp(app,
       emulatorHost: FirebaseUserAuth.emulatorHostFromEnvironment); // FIREBASE_AUTH_EMULATOR_HOST
   // or emulatorHost: '127.0.0.1:9099'
 }
 
-// ../../firebase_auth/firebase_auth_providers_dart/README.md:158
-Future<void> authProvidersReadmeLine158() async {
+// ../../firebase_auth/firebase_auth_providers_dart/README.md:163
+Future<void> authProvidersReadmeLine163() async {
   final app = FirebaseApp.withOptions(const FirebaseOptions(
     apiKey: 'unused',            // required by FirebaseOptions, not sent with these credentials
     applicationId: '1:1234567890:dart:server',
