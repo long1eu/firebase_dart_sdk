@@ -133,11 +133,24 @@ void main() {
     for (int i = 0; i < 3; i++) {
       expect(progressEvents[i].taskState, LoadBundleTaskState.running);
       expect(progressEvents[i].documentsLoaded, i);
-      expect(progressEvents[i].bytesLoaded,
-          lessThanOrEqualTo(progressEvents[i].totalBytes));
+      expect(
+        progressEvents[i].bytesLoaded,
+        lessThanOrEqualTo(progressEvents[i].totalBytes),
+      );
     }
     verifySuccessProgress(progressEvents[3]);
     expect(progressEvents[3], result);
+
+    await verifyQueryResults();
+  });
+
+  // JS bundle.test.ts "load with documents and queries with promise
+  // interface": only the Future, nobody listens to the progress.
+  test('testLoadWithDocumentsAndQueriesWithFutureInterface', () async {
+    final LoadBundleTaskProgress result = await db
+        .loadBundle(createBundle())
+        .future;
+    verifySuccessProgress(result);
 
     await verifyQueryResults();
   });
@@ -146,11 +159,12 @@ void main() {
     final List<int> bundle = createBundle();
     final Stream<List<int>> chunks = Stream<List<int>>.fromIterable(<List<int>>[
       for (int i = 0; i < bundle.length; i += 37)
-        bundle.sublist(i, i + 37 > bundle.length ? bundle.length : i + 37)
+        bundle.sublist(i, i + 37 > bundle.length ? bundle.length : i + 37),
     ]);
 
-    final LoadBundleTaskProgress result =
-        await db.loadBundleStream(chunks).future;
+    final LoadBundleTaskProgress result = await db
+        .loadBundleStream(chunks)
+        .future;
     verifySuccessProgress(result);
 
     await verifyQueryResults();
@@ -178,8 +192,9 @@ void main() {
     await db.document('coll-1/a').set(<String, Object?>{'bar': 'newValueA'});
     await db.document('coll-1/b').set(<String, Object?>{'bar': 'newValueB'});
 
-    final LoadBundleTaskProgress result =
-        await db.loadBundle(createBundle()).future;
+    final LoadBundleTaskProgress result = await db
+        .loadBundle(createBundle())
+        .future;
     verifySuccessProgress(result);
 
     // The test bundle is holding ancient documents, so the cache keeps the documents from the backend.
@@ -192,14 +207,21 @@ void main() {
   test('testLoadWithDocumentsFromOtherProjectFails', () async {
     final List<LoadBundleTaskProgress> progressEvents =
         <LoadBundleTaskProgress>[];
-    final LoadBundleTask bundleTask =
-        db.loadBundle(createBundle('other-project'));
+    final LoadBundleTask bundleTask = db.loadBundle(
+      createBundle('other-project'),
+    );
     final Future<void> done = bundleTask.stream.forEach(progressEvents.add);
 
     await expectLater(
-        bundleTask.future,
-        throwsA(isA<FirestoreError>().having((FirestoreError e) => e.code,
-            'code', FirestoreErrorCode.invalidArgument)));
+      bundleTask.future,
+      throwsA(
+        isA<FirestoreError>().having(
+          (FirestoreError e) => e.code,
+          'code',
+          FirestoreErrorCode.invalidArgument,
+        ),
+      ),
+    );
     await done;
 
     expect(progressEvents.length, 2);
@@ -215,15 +237,18 @@ void main() {
   test('testLoadedDocumentsShouldNotBeGarbageCollectedRightAway', () async {
     // Only meaningful with memory persistence (SQLite only ever deletes lazily): use a memory cache with eager GC.
     final FirestoreSettings base = IntegrationTestUtil.newTestSettings();
-    db = await IntegrationTestUtil.testFirestore(FirestoreSettings(
-      host: base.host,
-      port: base.port,
-      sslEnabled: base.sslEnabled,
-      cacheSettings: MemoryCacheSettings(),
-    ));
+    db = await IntegrationTestUtil.testFirestore(
+      FirestoreSettings(
+        host: base.host,
+        port: base.port,
+        sslEnabled: base.sslEnabled,
+        cacheSettings: MemoryCacheSettings(),
+      ),
+    );
 
-    final LoadBundleTaskProgress result =
-        await db.loadBundle(createBundle()).future;
+    final LoadBundleTaskProgress result = await db
+        .loadBundle(createBundle())
+        .future;
     verifySuccessProgress(result);
 
     // Read a different collection. This triggers GC.

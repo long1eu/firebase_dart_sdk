@@ -60,12 +60,16 @@ void main() {
     DocumentSnapshot snap = await accumulator.awaitLocalEvent();
 
     expect(snap.get('sum'), isA<double>());
-    expect(snap.getDouble('sum'),
-        moreOrLessEquals(expectedSum, epsilon: doubleEpsilon));
+    expect(
+      snap.getDouble('sum'),
+      moreOrLessEquals(expectedSum, epsilon: doubleEpsilon),
+    );
     snap = await accumulator.awaitRemoteEvent();
     expect(snap.get('sum'), isA<double>());
-    expect(snap.getDouble('sum'),
-        moreOrLessEquals(expectedSum, epsilon: doubleEpsilon));
+    expect(
+      snap.getDouble('sum'),
+      moreOrLessEquals(expectedSum, epsilon: doubleEpsilon),
+    );
   }
 
   Future<void> _expectLocalAndRemoteValueInt(int expectedSum) async {
@@ -196,8 +200,9 @@ void main() {
     await _expectLocalAndRemoteNaN();
 
     await _writeInitialData(map(<dynamic>['sum', 5]));
-    await docRef
-        .update(<String, dynamic>{'sum': FieldValue.minimum(double.nan)});
+    await docRef.update(<String, dynamic>{
+      'sum': FieldValue.minimum(double.nan),
+    });
     await _expectLocalAndRemoteNaN();
   });
 
@@ -207,15 +212,50 @@ void main() {
     await _expectLocalAndRemoteNaN();
 
     await _writeInitialData(map(<dynamic>['sum', 5]));
-    await docRef
-        .update(<String, dynamic>{'sum': FieldValue.maximum(double.nan)});
+    await docRef.update(<String, dynamic>{
+      'sum': FieldValue.maximum(double.nan),
+    });
     await _expectLocalAndRemoteNaN();
   });
 
   test('mergeOnNonExistingDocumentWithMaximum', () async {
-    await docRef.set(map(<dynamic>['sum', FieldValue.maximum(1337)]),
-        SetOptions.mergeAllFields);
+    await docRef.set(
+      map(<dynamic>['sum', FieldValue.maximum(1337)]),
+      SetOptions.mergeAllFields,
+    );
     await _expectLocalAndRemoteValueInt(1337);
+  });
+
+  // JS numeric_transforms.test.ts: the transform is applied locally while
+  // offline and by the backend once online.
+  test('minimum with disableNetwork', () async {
+    await _writeInitialData(map(<dynamic>['sum', 2]));
+
+    await docRef.firestore.disableNetwork();
+    unawaited(docRef.update(<String, dynamic>{'sum': FieldValue.minimum(1)}));
+
+    DocumentSnapshot snap = await accumulator.awaitLocalEvent();
+    expect(snap.get('sum'), 1);
+
+    await docRef.firestore.enableNetwork();
+
+    snap = await accumulator.awaitRemoteEvent();
+    expect(snap.get('sum'), 1);
+  });
+
+  test('maximum with disableNetwork', () async {
+    await _writeInitialData(map(<dynamic>['sum', 1]));
+
+    await docRef.firestore.disableNetwork();
+    unawaited(docRef.update(<String, dynamic>{'sum': FieldValue.maximum(2)}));
+
+    DocumentSnapshot snap = await accumulator.awaitLocalEvent();
+    expect(snap.get('sum'), 2);
+
+    await docRef.firestore.enableNetwork();
+
+    snap = await accumulator.awaitRemoteEvent();
+    expect(snap.get('sum'), 2);
   });
 }
 

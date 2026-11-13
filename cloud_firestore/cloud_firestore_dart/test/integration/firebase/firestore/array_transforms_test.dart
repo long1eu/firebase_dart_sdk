@@ -51,7 +51,8 @@ void main() {
   });
 
   Future<void> expectLocalAndRemoteEvent(
-      Map<String, Object?> expectedData) async {
+    Map<String, Object?> expectedData,
+  ) async {
     DocumentSnapshot snap = await accumulator.awaitLocalEvent();
     expect(snap.data, expectedData);
     snap = await accumulator.awaitRemoteEvent();
@@ -65,126 +66,173 @@ void main() {
   }
 
   test('createDocumentWithArrayUnion', () async {
-    await docRef.set(map(<dynamic>[
-      'array',
-      FieldValue.arrayUnion(<int>[1, 2])
-    ]));
-    await expectLocalAndRemoteEvent(map(<dynamic>[
-      'array',
-      <int>[1, 2]
-    ]));
+    await docRef.set(
+      map(<dynamic>[
+        'array',
+        FieldValue.arrayUnion(<int>[1, 2]),
+      ]),
+    );
+    await expectLocalAndRemoteEvent(
+      map(<dynamic>[
+        'array',
+        <int>[1, 2],
+      ]),
+    );
   });
 
   test('appendToArrayViaUpdate', () async {
-    await writeInitialData(map(<dynamic>[
-      'array',
-      <int>[1, 3]
-    ]));
-    await docRef.update(map(<dynamic>[
-      'array',
-      FieldValue.arrayUnion(<int>[2, 1, 4])
-    ]));
-    await expectLocalAndRemoteEvent(map(<dynamic>[
-      'array',
-      <int>[1, 3, 2, 4]
-    ]));
+    await writeInitialData(
+      map(<dynamic>[
+        'array',
+        <int>[1, 3],
+      ]),
+    );
+    await docRef.update(
+      map(<dynamic>[
+        'array',
+        FieldValue.arrayUnion(<int>[2, 1, 4]),
+      ]),
+    );
+    await expectLocalAndRemoteEvent(
+      map(<dynamic>[
+        'array',
+        <int>[1, 3, 2, 4],
+      ]),
+    );
   });
 
   test('appendToArrayViaSetWithMerge', () async {
-    await writeInitialData(map(<dynamic>[
-      'array',
-      <int>[1, 3]
-    ]));
+    await writeInitialData(
+      map(<dynamic>[
+        'array',
+        <int>[1, 3],
+      ]),
+    );
     await docRef.set(
-        map(<dynamic>[
-          'array',
-          FieldValue.arrayUnion(<int>[2, 1, 4])
-        ]),
-        SetOptions.mergeAllFields);
-    await expectLocalAndRemoteEvent(map(<dynamic>[
-      'array',
-      <int>[1, 3, 2, 4]
-    ]));
+      map(<dynamic>[
+        'array',
+        FieldValue.arrayUnion(<int>[2, 1, 4]),
+      ]),
+      SetOptions.mergeAllFields,
+    );
+    await expectLocalAndRemoteEvent(
+      map(<dynamic>[
+        'array',
+        <int>[1, 3, 2, 4],
+      ]),
+    );
   });
 
   test('appendObjectToArrayViaUpdate', () async {
-    await writeInitialData(map(<dynamic>[
-      'array',
-      <Map<String, String>>[
-        map(<String>['a', 'hi'])
-      ]
-    ]));
-    await docRef.update(map(<dynamic>[
-      'array',
-      FieldValue.arrayUnion(<Map<String, String>>[
-        map(<String>['a', 'hi']),
-        map(<String>['a', 'bye'])
-      ])
-    ]));
-    await expectLocalAndRemoteEvent(map(<dynamic>[
-      'array',
-      <Map<String, String>>[
-        map(<String>['a', 'hi']),
-        map(<String>['a', 'bye'])
-      ]
-    ]));
+    await writeInitialData(
+      map(<dynamic>[
+        'array',
+        <Map<String, String>>[
+          map(<String>['a', 'hi']),
+        ],
+      ]),
+    );
+    await docRef.update(
+      map(<dynamic>[
+        'array',
+        FieldValue.arrayUnion(<Map<String, String>>[
+          map(<String>['a', 'hi']),
+          map(<String>['a', 'bye']),
+        ]),
+      ]),
+    );
+    await expectLocalAndRemoteEvent(
+      map(<dynamic>[
+        'array',
+        <Map<String, String>>[
+          map(<String>['a', 'hi']),
+          map(<String>['a', 'bye']),
+        ],
+      ]),
+    );
   });
 
   test('removeFromArrayViaUpdate', () async {
-    await writeInitialData(map(<dynamic>[
-      'array',
-      <int>[1, 3, 1, 3]
-    ]));
-    await docRef.update(map(<dynamic>[
-      'array',
-      FieldValue.arrayRemove(<int>[1, 4])
-    ]));
-    await expectLocalAndRemoteEvent(map(<dynamic>[
-      'array',
-      <int>[3, 3]
-    ]));
+    await writeInitialData(
+      map(<dynamic>[
+        'array',
+        <int>[1, 3, 1, 3],
+      ]),
+    );
+    await docRef.update(
+      map(<dynamic>[
+        'array',
+        FieldValue.arrayRemove(<int>[1, 4]),
+      ]),
+    );
+    await expectLocalAndRemoteEvent(
+      map(<dynamic>[
+        'array',
+        <int>[3, 3],
+      ]),
+    );
   });
 
   test('removeFromArrayViaSetMerge', () async {
-    await writeInitialData(map(<dynamic>[
-      'array',
-      <int>[1, 3, 1, 3]
-    ]));
+    await writeInitialData(
+      map(<dynamic>[
+        'array',
+        <int>[1, 3, 1, 3],
+      ]),
+    );
 
     await docRef.set(
       map(<dynamic>[
         'array',
-        FieldValue.arrayRemove(<int>[1, 4])
+        FieldValue.arrayRemove(<int>[1, 4]),
       ]),
       SetOptions.mergeAllFields,
     );
 
-    await expectLocalAndRemoteEvent(map(<dynamic>[
-      'array',
-      <int>[3, 3]
-    ]));
+    await expectLocalAndRemoteEvent(
+      map(<dynamic>[
+        'array',
+        <int>[3, 3],
+      ]),
+    );
   });
 
   test('removeObjectFromArrayViaUpdate', () async {
-    await writeInitialData(map(<dynamic>[
-      'array',
-      <Map<String, String>>[
-        map(<String>['a', 'hi']),
-        map(<String>['a', 'bye'])
-      ]
-    ]));
-    await docRef.update(map(<dynamic>[
-      'array',
-      FieldValue.arrayRemove(<Map<String, String>>[
-        map(<String>['a', 'hi'])
-      ])
-    ]));
-    await expectLocalAndRemoteEvent(map(<dynamic>[
-      'array',
-      <Map<String, String>>[
-        map(<String>['a', 'bye'])
-      ]
-    ]));
+    await writeInitialData(
+      map(<dynamic>[
+        'array',
+        <Map<String, String>>[
+          map(<String>['a', 'hi']),
+          map(<String>['a', 'bye']),
+        ],
+      ]),
+    );
+    await docRef.update(
+      map(<dynamic>[
+        'array',
+        FieldValue.arrayRemove(<Map<String, String>>[
+          map(<String>['a', 'hi']),
+        ]),
+      ]),
+    );
+    await expectLocalAndRemoteEvent(
+      map(<dynamic>[
+        'array',
+        <Map<String, String>>[
+          map(<String>['a', 'bye']),
+        ],
+      ]),
+    );
+  });
+
+  // JS array_transforms.test.ts
+  test('arrayUnion supports DocumentReference', () async {
+    await docRef.set(<String, Object?>{
+      'array': FieldValue.arrayUnion(<Object?>[docRef]),
+    });
+    await expectLocalAndRemoteEvent(<String, Object?>{
+      'array': <Object?>[docRef],
+    });
   });
 }
 

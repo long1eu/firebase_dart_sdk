@@ -33,97 +33,114 @@ void main() {
   });
 
   Future<CollectionReference> withTestDocs(
-          Map<String, Map<String, Object?>> docs) =>
-      IntegrationTestUtil.testCollectionWithDocs(docs);
+    Map<String, Map<String, Object?>> docs,
+  ) => IntegrationTestUtil.testCollectionWithDocs(docs);
 
   void expectIds(QuerySnapshot snapshot, List<String> expectedIds) {
     expect(IntegrationTestUtil.querySnapshotToIds(snapshot), expectedIds);
   }
 
   Future<void> assertOnlineAndOfflineResultsMatch(
-      CollectionReference collection, Query query, List<String> expected) {
+    CollectionReference collection,
+    Query query,
+    List<String> expected,
+  ) {
     return IntegrationTestUtil.checkOnlineAndOfflineResultsMatch(
-        collection, query, expected);
+      collection,
+      query,
+      expected,
+    );
   }
 
   final Map<String, Map<String, Object?>> books =
       <String, Map<String, Object?>>{
-    'a': <String, Object?>{
-      'author': 'authorA',
-      'title': 'titleA',
-      'pages': 100,
-      'year': 1980,
-      'rating': 5.0,
-    },
-    'b': <String, Object?>{
-      'author': 'authorB',
-      'title': 'titleB',
-      'pages': 50,
-      'year': 2020,
-      'rating': 4.0,
-    },
-  };
+        'a': <String, Object?>{
+          'author': 'authorA',
+          'title': 'titleA',
+          'pages': 100,
+          'year': 1980,
+          'rating': 5.0,
+        },
+        'b': <String, Object?>{
+          'author': 'authorB',
+          'title': 'titleB',
+          'pages': 50,
+          'year': 2020,
+          'rating': 4.0,
+        },
+      };
 
   test('testOrQueriesWithCompositeIndexes', () async {
-    final CollectionReference collection =
-        await withTestDocs(<String, Map<String, Object?>>{
-      'doc1': <String, Object?>{'a': 1, 'b': 0},
-      'doc2': <String, Object?>{'a': 2, 'b': 1},
-      'doc3': <String, Object?>{'a': 3, 'b': 2},
-      'doc4': <String, Object?>{'a': 1, 'b': 3},
-      'doc5': <String, Object?>{'a': 1, 'b': 1},
-    });
+    final CollectionReference collection = await withTestDocs(
+      <String, Map<String, Object?>>{
+        'doc1': <String, Object?>{'a': 1, 'b': 0},
+        'doc2': <String, Object?>{'a': 2, 'b': 1},
+        'doc3': <String, Object?>{'a': 3, 'b': 2},
+        'doc4': <String, Object?>{'a': 1, 'b': 3},
+        'doc5': <String, Object?>{'a': 1, 'b': 1},
+      },
+    );
 
     // With one inequality: a>2 || b==1.
-    Query query = collection.where(Filter.or(<Filter>[
-      Filter.greaterThan('a', 2),
-      Filter.equalTo('b', 1),
-    ]));
-    await assertOnlineAndOfflineResultsMatch(
-        collection, query, <String>['doc5', 'doc2', 'doc3']);
+    Query query = collection.where(
+      Filter.or(<Filter>[Filter.greaterThan('a', 2), Filter.equalTo('b', 1)]),
+    );
+    await assertOnlineAndOfflineResultsMatch(collection, query, <String>[
+      'doc5',
+      'doc2',
+      'doc3',
+    ]);
 
     // With limit (implicit order by ASC): (a==1) || (b > 0) LIMIT 2
     query = collection
-        .where(Filter.or(<Filter>[
-          Filter.equalTo('a', 1),
-          Filter.greaterThan('b', 0),
-        ]))
+        .where(
+          Filter.or(<Filter>[
+            Filter.equalTo('a', 1),
+            Filter.greaterThan('b', 0),
+          ]),
+        )
         .limit(2);
-    await assertOnlineAndOfflineResultsMatch(
-        collection, query, <String>['doc1', 'doc2']);
+    await assertOnlineAndOfflineResultsMatch(collection, query, <String>[
+      'doc1',
+      'doc2',
+    ]);
 
     // With limit (explicit order by): (a==1) || (b > 0) LIMIT_TO_LAST 2
     query = collection
-        .where(Filter.or(<Filter>[
-          Filter.equalTo('a', 1),
-          Filter.greaterThan('b', 0),
-        ]))
+        .where(
+          Filter.or(<Filter>[
+            Filter.equalTo('a', 1),
+            Filter.greaterThan('b', 0),
+          ]),
+        )
         .limitToLast(2)
         .orderBy('b');
-    await assertOnlineAndOfflineResultsMatch(
-        collection, query, <String>['doc3', 'doc4']);
+    await assertOnlineAndOfflineResultsMatch(collection, query, <String>[
+      'doc3',
+      'doc4',
+    ]);
 
     // With limit (explicit order by ASC): (a==2) || (b == 1) ORDER BY a LIMIT 1
     query = collection
-        .where(Filter.or(<Filter>[
-          Filter.equalTo('a', 2),
-          Filter.equalTo('b', 1),
-        ]))
+        .where(
+          Filter.or(<Filter>[Filter.equalTo('a', 2), Filter.equalTo('b', 1)]),
+        )
         .limit(1)
         .orderBy('a');
-    await assertOnlineAndOfflineResultsMatch(
-        collection, query, <String>['doc5']);
+    await assertOnlineAndOfflineResultsMatch(collection, query, <String>[
+      'doc5',
+    ]);
 
     // With limit (explicit order by DESC): (a==2) || (b == 1) ORDER BY a LIMIT_TO_LAST 1
     query = collection
-        .where(Filter.or(<Filter>[
-          Filter.equalTo('a', 2),
-          Filter.equalTo('b', 1),
-        ]))
+        .where(
+          Filter.or(<Filter>[Filter.equalTo('a', 2), Filter.equalTo('b', 1)]),
+        )
         .limitToLast(1)
         .orderBy('a');
-    await assertOnlineAndOfflineResultsMatch(
-        collection, query, <String>['doc2']);
+    await assertOnlineAndOfflineResultsMatch(collection, query, <String>[
+      'doc2',
+    ]);
   });
 
   test('testCanRunAggregateCollectionGroupQuery', () async {
@@ -144,17 +161,21 @@ void main() {
     ];
     final WriteBatch batch = db.batch();
     for (final String path in docPaths) {
-      batch.set(db.document(path.replaceAll(r'${collectionGroup}', group)),
-          <String, Object?>{'a': 2});
+      batch.set(
+        db.document(path.replaceAll(r'${collectionGroup}', group)),
+        <String, Object?>{'a': 2},
+      );
     }
     await batch.commit();
 
-    final AggregateQuerySnapshot snapshot =
-        await db.collectionGroup(group).aggregate(<AggregateField>[
-      AggregateField.count(),
-      AggregateField.sum('a'),
-      AggregateField.average('a'),
-    ]).get(AggregateSource.server);
+    final AggregateQuerySnapshot snapshot = await db
+        .collectionGroup(group)
+        .aggregate(<AggregateField>[
+          AggregateField.count(),
+          AggregateField.sum('a'),
+          AggregateField.average('a'),
+        ])
+        .get(AggregateSource.server);
     // cg-doc1 .. cg-doc5.
     expect(snapshot.get(AggregateField.count()), 5);
     expect(snapshot.get(AggregateField.sum('a')), 10);
@@ -170,8 +191,9 @@ void main() {
     final AggregateField f4 = AggregateField.sum('year');
     final AggregateField f5 = AggregateField.average('rating');
 
-    final AggregateQuerySnapshot snapshot = await collection.aggregate(
-        <AggregateField>[f1, f2, f3, f4, f5]).get(AggregateSource.server);
+    final AggregateQuerySnapshot snapshot = await collection
+        .aggregate(<AggregateField>[f1, f2, f3, f4, f5])
+        .get(AggregateSource.server);
 
     expect(snapshot.get(f1), 150);
     expect(snapshot.get(f2), 75.0);
@@ -183,79 +205,119 @@ void main() {
   test('testCanGetCorrectTypeForSum', () async {
     final CollectionReference collection = await withTestDocs(books);
 
-    final AggregateQuerySnapshot snapshot =
-        await collection.aggregate(<AggregateField>[
-      AggregateField.sum('pages'),
-      AggregateField.sum('year'),
-      AggregateField.sum('rating'),
-    ]).get(AggregateSource.server);
+    final AggregateQuerySnapshot snapshot = await collection
+        .aggregate(<AggregateField>[
+          AggregateField.sum('pages'),
+          AggregateField.sum('year'),
+          AggregateField.sum('rating'),
+        ])
+        .get(AggregateSource.server);
 
     expect(snapshot.get(AggregateField.sum('pages')), isA<int>());
     expect(snapshot.get(AggregateField.sum('year')), isA<int>());
     expect(snapshot.get(AggregateField.sum('rating')), isA<double>());
   });
 
-  test('testPerformsAggregationWhenUsingArrayContainsAnyOperator',
-      skip: IntegrationTestUtil.skipOnEnterprise(
-          'the sum over no documents is null instead of 0'), () async {
-    final CollectionReference collection =
-        await withTestDocs(<String, Map<String, Object?>>{
-      'a': <String, Object?>{
-        'author': 'authorA',
-        'title': 'titleA',
-        'pages': 100,
-        'year': 1980,
-        'rating': <int>[5, 1000],
-      },
-      'b': <String, Object?>{
-        'author': 'authorB',
-        'title': 'titleB',
-        'pages': 50,
-        'year': 2020,
-        'rating': <int>[4],
-      },
-      'c': <String, Object?>{
-        'author': 'authorC',
-        'title': 'titleC',
-        'pages': 100,
-        'year': 1980,
-        'rating': <int>[2222, 3],
-      },
-      'd': <String, Object?>{
-        'author': 'authorD',
-        'title': 'titleD',
-        'pages': 50,
-        'year': 2020,
-        'rating': <int>[0],
-      },
-    });
+  test(
+    'testPerformsAggregationWhenUsingArrayContainsAnyOperator',
+    skip: IntegrationTestUtil.skipOnEnterprise(
+      'the sum over no documents is null instead of 0',
+    ),
+    () async {
+      final CollectionReference collection = await withTestDocs(
+        <String, Map<String, Object?>>{
+          'a': <String, Object?>{
+            'author': 'authorA',
+            'title': 'titleA',
+            'pages': 100,
+            'year': 1980,
+            'rating': <int>[5, 1000],
+          },
+          'b': <String, Object?>{
+            'author': 'authorB',
+            'title': 'titleB',
+            'pages': 50,
+            'year': 2020,
+            'rating': <int>[4],
+          },
+          'c': <String, Object?>{
+            'author': 'authorC',
+            'title': 'titleC',
+            'pages': 100,
+            'year': 1980,
+            'rating': <int>[2222, 3],
+          },
+          'd': <String, Object?>{
+            'author': 'authorD',
+            'title': 'titleD',
+            'pages': 50,
+            'year': 2020,
+            'rating': <int>[0],
+          },
+        },
+      );
 
-    final AggregateQuerySnapshot snapshot = await collection
-        .whereArrayContainsAny(
-            'rating', <Object?>[5, 3]).aggregate(<AggregateField>[
-      AggregateField.sum('rating'),
-      AggregateField.average('rating'),
-      AggregateField.sum('pages'),
-      AggregateField.average('pages'),
-      AggregateField.count(),
-    ]).get(AggregateSource.server);
+      final AggregateQuerySnapshot snapshot = await collection
+          .whereArrayContainsAny('rating', <Object?>[5, 3])
+          .aggregate(<AggregateField>[
+            AggregateField.sum('rating'),
+            AggregateField.average('rating'),
+            AggregateField.sum('pages'),
+            AggregateField.average('pages'),
+            AggregateField.count(),
+          ])
+          .get(AggregateSource.server);
 
-    expect(snapshot.get(AggregateField.sum('rating')), 0);
-    expect(snapshot.get(AggregateField.average('rating')), isNull);
-    expect(snapshot.get(AggregateField.sum('pages')), 200);
-    expect(snapshot.get(AggregateField.average('pages')), 100.0);
-    expect(snapshot.get(AggregateField.count()), 2);
-  });
+      expect(snapshot.get(AggregateField.sum('rating')), 0);
+      expect(snapshot.get(AggregateField.average('rating')), isNull);
+      expect(snapshot.get(AggregateField.sum('pages')), 200);
+      expect(snapshot.get(AggregateField.average('pages')), 100.0);
+      expect(snapshot.get(AggregateField.count()), 2);
+    },
+  );
+
+  // JS composite_index_query.test.ts: one NaN sum must not short-circuit the
+  // other aggregations of the same request.
+  test(
+    'testPerformsAggregationsOnMultipleFieldsWhereOneCouldShortCircuitDueToNaN',
+    () async {
+      final CollectionReference collection = await withTestDocs(
+        <String, Map<String, Object?>>{
+          'a': <String, Object?>{'pages': 100, 'year': 1980, 'rating': 5},
+          'b': <String, Object?>{'pages': 50, 'year': 2020, 'rating': 4},
+          'c': <String, Object?>{
+            'pages': 100,
+            'year': 1980,
+            'rating': double.nan,
+          },
+          'd': <String, Object?>{'pages': 50, 'year': 2020, 'rating': 0},
+        },
+      );
+
+      final AggregateQuerySnapshot snapshot = await collection
+          .aggregateWithAliases(<String, AggregateField>{
+            'totalRating': AggregateField.sum('rating'),
+            'totalPages': AggregateField.sum('pages'),
+            'averageYear': AggregateField.average('year'),
+          })
+          .get(AggregateSource.server);
+
+      expect(snapshot.data()['totalRating'], isNaN);
+      expect(snapshot.data()['totalPages'], 300);
+      expect(snapshot.data()['averageYear'], 2000.0);
+    },
+  );
 
   group('Multiple inequality', () {
     test('testMultipleInequalityOnDifferentFields', () async {
-      final CollectionReference collection =
-          await withTestDocs(<String, Map<String, Object?>>{
-        'doc1': <String, Object?>{'key': 'a', 'sort': 0, 'v': 0},
-        'doc2': <String, Object?>{'key': 'b', 'sort': 3, 'v': 1},
-        'doc3': <String, Object?>{'key': 'c', 'sort': 1, 'v': 3},
-        'doc4': <String, Object?>{'key': 'd', 'sort': 2, 'v': 2},
-      });
+      final CollectionReference collection = await withTestDocs(
+        <String, Map<String, Object?>>{
+          'doc1': <String, Object?>{'key': 'a', 'sort': 0, 'v': 0},
+          'doc2': <String, Object?>{'key': 'b', 'sort': 3, 'v': 1},
+          'doc3': <String, Object?>{'key': 'c', 'sort': 1, 'v': 3},
+          'doc4': <String, Object?>{'key': 'd', 'sort': 2, 'v': 2},
+        },
+      );
 
       QuerySnapshot snapshot = await collection
           .whereNotEqualTo('key', 'a')
@@ -276,15 +338,17 @@ void main() {
       snapshot = await collection
           .whereGreaterThanOrEqualTo('key', 'a')
           .whereLessThanOrEqualTo('sort', 2)
-          .whereIn('v', <Object?>[2, 3, 4]).whereIn(
-              'sort', <Object?>[2, 3]).get();
+          .whereIn('v', <Object?>[2, 3, 4])
+          .whereIn('sort', <Object?>[2, 3])
+          .get();
       expectIds(snapshot, <String>['doc4']);
 
       // With NOT-IN.
       snapshot = await collection
           .whereGreaterThanOrEqualTo('key', 'a')
           .whereLessThanOrEqualTo('sort', 2)
-          .whereNotIn('v', <Object?>[2, 4, 5]).get();
+          .whereNotIn('v', <Object?>[2, 4, 5])
+          .get();
       expectIds(snapshot, <String>['doc1', 'doc3']);
 
       // With orderBy.
@@ -315,15 +379,16 @@ void main() {
     });
 
     test('testMultipleInequalityOnSpecialValues', () async {
-      final CollectionReference collection =
-          await withTestDocs(<String, Map<String, Object?>>{
-        'doc1': <String, Object?>{'key': 'a', 'sort': 0, 'v': 0},
-        'doc2': <String, Object?>{'key': 'b', 'sort': double.nan, 'v': 1},
-        'doc3': <String, Object?>{'key': 'c', 'sort': null, 'v': 3},
-        'doc4': <String, Object?>{'key': 'd', 'v': 2},
-        'doc5': <String, Object?>{'key': 'e', 'sort': 0},
-        'doc6': <String, Object?>{'key': 'f', 'sort': 1, 'v': 1},
-      });
+      final CollectionReference collection = await withTestDocs(
+        <String, Map<String, Object?>>{
+          'doc1': <String, Object?>{'key': 'a', 'sort': 0, 'v': 0},
+          'doc2': <String, Object?>{'key': 'b', 'sort': double.nan, 'v': 1},
+          'doc3': <String, Object?>{'key': 'c', 'sort': null, 'v': 3},
+          'doc4': <String, Object?>{'key': 'd', 'v': 2},
+          'doc5': <String, Object?>{'key': 'e', 'sort': 0},
+          'doc6': <String, Object?>{'key': 'f', 'sort': 1, 'v': 1},
+        },
+      );
 
       QuerySnapshot snapshot = await collection
           .whereNotEqualTo('key', 'a')
@@ -340,40 +405,41 @@ void main() {
     });
 
     test('testMultipleInequalityWithArrayMembership', () async {
-      final CollectionReference collection =
-          await withTestDocs(<String, Map<String, Object?>>{
-        'doc1': <String, Object?>{
-          'key': 'a',
-          'sort': 0,
-          'v': <int>[0]
+      final CollectionReference collection = await withTestDocs(
+        <String, Map<String, Object?>>{
+          'doc1': <String, Object?>{
+            'key': 'a',
+            'sort': 0,
+            'v': <int>[0],
+          },
+          'doc2': <String, Object?>{
+            'key': 'b',
+            'sort': 1,
+            'v': <int>[0, 1, 3],
+          },
+          'doc3': <String, Object?>{'key': 'c', 'sort': 1, 'v': <int>[]},
+          'doc4': <String, Object?>{
+            'key': 'd',
+            'sort': 2,
+            'v': <int>[1],
+          },
+          'doc5': <String, Object?>{
+            'key': 'e',
+            'sort': 3,
+            'v': <int>[2, 4],
+          },
+          'doc6': <String, Object?>{
+            'key': 'f',
+            'sort': 4,
+            'v': <double>[double.nan],
+          },
+          'doc7': <String, Object?>{
+            'key': 'g',
+            'sort': 4,
+            'v': <Object?>[null],
+          },
         },
-        'doc2': <String, Object?>{
-          'key': 'b',
-          'sort': 1,
-          'v': <int>[0, 1, 3]
-        },
-        'doc3': <String, Object?>{'key': 'c', 'sort': 1, 'v': <int>[]},
-        'doc4': <String, Object?>{
-          'key': 'd',
-          'sort': 2,
-          'v': <int>[1]
-        },
-        'doc5': <String, Object?>{
-          'key': 'e',
-          'sort': 3,
-          'v': <int>[2, 4]
-        },
-        'doc6': <String, Object?>{
-          'key': 'f',
-          'sort': 4,
-          'v': <double>[double.nan]
-        },
-        'doc7': <String, Object?>{
-          'key': 'g',
-          'sort': 4,
-          'v': <Object?>[null]
-        },
-      });
+      );
 
       QuerySnapshot snapshot = await collection
           .whereNotEqualTo('key', 'a')
@@ -385,26 +451,27 @@ void main() {
       snapshot = await collection
           .whereNotEqualTo('key', 'a')
           .whereGreaterThanOrEqualTo('sort', 1)
-          .whereArrayContainsAny('v', <Object?>[0, 1]).get();
+          .whereArrayContainsAny('v', <Object?>[0, 1])
+          .get();
       expectIds(snapshot, <String>['doc2', 'doc4']);
     });
 
     Map<String, Object?> nestedObject(int number) => <String, Object?>{
-          'name': 'room $number',
-          'metadata': <String, Object?>{'createdAt': number},
-          'field': 'field $number',
-          'field.dot': number,
-          r'field\slash': number,
-        };
+      'name': 'room $number',
+      'metadata': <String, Object?>{'createdAt': number},
+      'field': 'field $number',
+      'field.dot': number,
+      r'field\slash': number,
+    };
 
     test('testMultipleInequalityWithNestedField', () async {
       final CollectionReference collection =
           await withTestDocs(<String, Map<String, Object?>>{
-        'doc1': nestedObject(400),
-        'doc2': nestedObject(200),
-        'doc3': nestedObject(100),
-        'doc4': nestedObject(300),
-      });
+            'doc1': nestedObject(400),
+            'doc2': nestedObject(200),
+            'doc3': nestedObject(100),
+            'doc4': nestedObject(300),
+          });
 
       QuerySnapshot snapshot = await collection
           .whereLessThanOrEqualTo('metadata.createdAt', 500)
@@ -424,15 +491,16 @@ void main() {
     });
 
     test('testMultipleInequalityWithCompositeFilters', () async {
-      final CollectionReference collection =
-          await withTestDocs(<String, Map<String, Object?>>{
-        'doc1': <String, Object?>{'key': 'a', 'sort': 0, 'v': 5},
-        'doc2': <String, Object?>{'key': 'aa', 'sort': 4, 'v': 4},
-        'doc3': <String, Object?>{'key': 'c', 'sort': 3, 'v': 3},
-        'doc4': <String, Object?>{'key': 'b', 'sort': 2, 'v': 2},
-        'doc5': <String, Object?>{'key': 'b', 'sort': 2, 'v': 1},
-        'doc6': <String, Object?>{'key': 'b', 'sort': 0, 'v': 0},
-      });
+      final CollectionReference collection = await withTestDocs(
+        <String, Map<String, Object?>>{
+          'doc1': <String, Object?>{'key': 'a', 'sort': 0, 'v': 5},
+          'doc2': <String, Object?>{'key': 'aa', 'sort': 4, 'v': 4},
+          'doc3': <String, Object?>{'key': 'c', 'sort': 3, 'v': 3},
+          'doc4': <String, Object?>{'key': 'b', 'sort': 2, 'v': 2},
+          'doc5': <String, Object?>{'key': 'b', 'sort': 2, 'v': 1},
+          'doc6': <String, Object?>{'key': 'b', 'sort': 0, 'v': 0},
+        },
+      );
 
       final Filter filter = Filter.or(<Filter>[
         Filter.and(<Filter>[
@@ -458,69 +526,77 @@ void main() {
       expectIds(snapshot, <String>['doc5', 'doc4', 'doc1', 'doc6']);
 
       snapshot = await collection
-          .where(Filter.and(<Filter>[
-            Filter.or(<Filter>[
-              Filter.and(<Filter>[
-                Filter.equalTo('key', 'b'),
-                Filter.lessThanOrEqualTo('sort', 4),
+          .where(
+            Filter.and(<Filter>[
+              Filter.or(<Filter>[
+                Filter.and(<Filter>[
+                  Filter.equalTo('key', 'b'),
+                  Filter.lessThanOrEqualTo('sort', 4),
+                ]),
+                Filter.and(<Filter>[
+                  Filter.notEqualTo('key', 'b'),
+                  Filter.greaterThanOrEqualTo('v', 4),
+                ]),
               ]),
-              Filter.and(<Filter>[
-                Filter.notEqualTo('key', 'b'),
-                Filter.greaterThanOrEqualTo('v', 4),
+              Filter.or(<Filter>[
+                Filter.and(<Filter>[
+                  Filter.greaterThan('key', 'b'),
+                  Filter.greaterThanOrEqualTo('sort', 1),
+                ]),
+                Filter.and(<Filter>[
+                  Filter.lessThan('key', 'b'),
+                  Filter.greaterThan('v', 0),
+                ]),
               ]),
             ]),
-            Filter.or(<Filter>[
-              Filter.and(<Filter>[
-                Filter.greaterThan('key', 'b'),
-                Filter.greaterThanOrEqualTo('sort', 1),
-              ]),
-              Filter.and(<Filter>[
-                Filter.lessThan('key', 'b'),
-                Filter.greaterThan('v', 0),
-              ]),
-            ]),
-          ]))
+          )
           .get();
       // Implicitly ordered by: 'key' asc, 'sort' asc, 'v' asc, __name__ asc.
       expectIds(snapshot, <String>['doc1', 'doc2']);
     });
 
-    test('testMultipleInequalityFieldsWillBeImplicitlyOrderedLexicographically',
-        () async {
-      final CollectionReference collection =
-          await withTestDocs(<String, Map<String, Object?>>{
-        'doc1': <String, Object?>{'key': 'a', 'sort': 0, 'v': 5},
-        'doc2': <String, Object?>{'key': 'aa', 'sort': 4, 'v': 4},
-        'doc3': <String, Object?>{'key': 'b', 'sort': 3, 'v': 3},
-        'doc4': <String, Object?>{'key': 'b', 'sort': 2, 'v': 2},
-        'doc5': <String, Object?>{'key': 'b', 'sort': 2, 'v': 1},
-        'doc6': <String, Object?>{'key': 'b', 'sort': 0, 'v': 0},
-      });
+    test(
+      'testMultipleInequalityFieldsWillBeImplicitlyOrderedLexicographically',
+      () async {
+        final CollectionReference collection = await withTestDocs(
+          <String, Map<String, Object?>>{
+            'doc1': <String, Object?>{'key': 'a', 'sort': 0, 'v': 5},
+            'doc2': <String, Object?>{'key': 'aa', 'sort': 4, 'v': 4},
+            'doc3': <String, Object?>{'key': 'b', 'sort': 3, 'v': 3},
+            'doc4': <String, Object?>{'key': 'b', 'sort': 2, 'v': 2},
+            'doc5': <String, Object?>{'key': 'b', 'sort': 2, 'v': 1},
+            'doc6': <String, Object?>{'key': 'b', 'sort': 0, 'v': 0},
+          },
+        );
 
-      QuerySnapshot snapshot = await collection
-          .whereNotEqualTo('key', 'a')
-          .whereGreaterThan('sort', 1)
-          .whereIn('v', <Object?>[1, 2, 3, 4]).get();
-      // Implicitly ordered by: 'key' asc, 'sort' asc, __name__ asc.
-      expectIds(snapshot, <String>['doc2', 'doc4', 'doc5', 'doc3']);
+        QuerySnapshot snapshot = await collection
+            .whereNotEqualTo('key', 'a')
+            .whereGreaterThan('sort', 1)
+            .whereIn('v', <Object?>[1, 2, 3, 4])
+            .get();
+        // Implicitly ordered by: 'key' asc, 'sort' asc, __name__ asc.
+        expectIds(snapshot, <String>['doc2', 'doc4', 'doc5', 'doc3']);
 
-      snapshot = await collection
-          .whereGreaterThan('sort', 1)
-          .whereNotEqualTo('key', 'a')
-          .whereIn('v', <Object?>[1, 2, 3, 4]).get();
-      expectIds(snapshot, <String>['doc2', 'doc4', 'doc5', 'doc3']);
-    });
+        snapshot = await collection
+            .whereGreaterThan('sort', 1)
+            .whereNotEqualTo('key', 'a')
+            .whereIn('v', <Object?>[1, 2, 3, 4])
+            .get();
+        expectIds(snapshot, <String>['doc2', 'doc4', 'doc5', 'doc3']);
+      },
+    );
 
     test('testMultipleInequalityWithMultipleExplicitOrderBy', () async {
-      final CollectionReference collection =
-          await withTestDocs(<String, Map<String, Object?>>{
-        'doc1': <String, Object?>{'key': 'a', 'sort': 5, 'v': 0},
-        'doc2': <String, Object?>{'key': 'aa', 'sort': 4, 'v': 0},
-        'doc3': <String, Object?>{'key': 'b', 'sort': 3, 'v': 1},
-        'doc4': <String, Object?>{'key': 'b', 'sort': 2, 'v': 1},
-        'doc5': <String, Object?>{'key': 'bb', 'sort': 1, 'v': 1},
-        'doc6': <String, Object?>{'key': 'c', 'sort': 0, 'v': 2},
-      });
+      final CollectionReference collection = await withTestDocs(
+        <String, Map<String, Object?>>{
+          'doc1': <String, Object?>{'key': 'a', 'sort': 5, 'v': 0},
+          'doc2': <String, Object?>{'key': 'aa', 'sort': 4, 'v': 0},
+          'doc3': <String, Object?>{'key': 'b', 'sort': 3, 'v': 1},
+          'doc4': <String, Object?>{'key': 'b', 'sort': 2, 'v': 1},
+          'doc5': <String, Object?>{'key': 'bb', 'sort': 1, 'v': 1},
+          'doc6': <String, Object?>{'key': 'c', 'sort': 0, 'v': 2},
+        },
+      );
 
       Query base() => collection
           .whereGreaterThan('key', 'a')
@@ -539,21 +615,24 @@ void main() {
       // Ordered by: 'v' desc, 'key' desc, 'sort' desc, __name__ desc.
       expectIds(snapshot, <String>['doc5', 'doc3', 'doc4', 'doc2']);
 
-      snapshot =
-          await base().orderBy('v', Direction.descending).orderBy('sort').get();
+      snapshot = await base()
+          .orderBy('v', Direction.descending)
+          .orderBy('sort')
+          .get();
       // Ordered by: 'v' desc, 'sort' asc, 'key' asc, __name__ asc.
       expectIds(snapshot, <String>['doc5', 'doc4', 'doc3', 'doc2']);
     });
 
     test('testMultipleInequalityInAggregateQuery', () async {
-      final CollectionReference collection =
-          await withTestDocs(<String, Map<String, Object?>>{
-        'doc1': <String, Object?>{'key': 'a', 'sort': 5, 'v': 0},
-        'doc2': <String, Object?>{'key': 'aa', 'sort': 4, 'v': 0},
-        'doc3': <String, Object?>{'key': 'b', 'sort': 3, 'v': 1},
-        'doc4': <String, Object?>{'key': 'b', 'sort': 2, 'v': 1},
-        'doc5': <String, Object?>{'key': 'bb', 'sort': 1, 'v': 1},
-      });
+      final CollectionReference collection = await withTestDocs(
+        <String, Map<String, Object?>>{
+          'doc1': <String, Object?>{'key': 'a', 'sort': 5, 'v': 0},
+          'doc2': <String, Object?>{'key': 'aa', 'sort': 4, 'v': 0},
+          'doc3': <String, Object?>{'key': 'b', 'sort': 3, 'v': 1},
+          'doc4': <String, Object?>{'key': 'b', 'sort': 2, 'v': 1},
+          'doc5': <String, Object?>{'key': 'bb', 'sort': 1, 'v': 1},
+        },
+      );
 
       final AggregateQuerySnapshot snapshot1 = await collection
           .whereGreaterThan('key', 'a')
@@ -568,24 +647,26 @@ void main() {
           .whereGreaterThanOrEqualTo('sort', 1)
           .whereNotEqualTo('v', 0)
           .aggregate(<AggregateField>[
-        AggregateField.count(),
-        AggregateField.sum('sort'),
-        AggregateField.average('v'),
-      ]).get(AggregateSource.server);
+            AggregateField.count(),
+            AggregateField.sum('sort'),
+            AggregateField.average('v'),
+          ])
+          .get(AggregateSource.server);
       expect(snapshot2.get(AggregateField.count()), 3);
       expect(snapshot2.get(AggregateField.sum('sort')), 6);
       expect(snapshot2.get(AggregateField.average('v')), 1.0);
     });
 
     test('testMultipleInequalityFieldsWithDocumentKey', () async {
-      final CollectionReference collection =
-          await withTestDocs(<String, Map<String, Object?>>{
-        'doc1': <String, Object?>{'key': 'a', 'sort': 5},
-        'doc2': <String, Object?>{'key': 'aa', 'sort': 4},
-        'doc3': <String, Object?>{'key': 'b', 'sort': 3},
-        'doc4': <String, Object?>{'key': 'b', 'sort': 2},
-        'doc5': <String, Object?>{'key': 'bb', 'sort': 1},
-      });
+      final CollectionReference collection = await withTestDocs(
+        <String, Map<String, Object?>>{
+          'doc1': <String, Object?>{'key': 'a', 'sort': 5},
+          'doc2': <String, Object?>{'key': 'aa', 'sort': 4},
+          'doc3': <String, Object?>{'key': 'b', 'sort': 3},
+          'doc4': <String, Object?>{'key': 'b', 'sort': 2},
+          'doc5': <String, Object?>{'key': 'bb', 'sort': 1},
+        },
+      );
 
       QuerySnapshot snapshot = await collection
           .whereGreaterThan('sort', 1)
@@ -615,13 +696,14 @@ void main() {
     });
 
     test('testMultipleInequalityReadFromCacheWhenOffline', () async {
-      final CollectionReference collection =
-          await withTestDocs(<String, Map<String, Object?>>{
-        'doc1': <String, Object?>{'key': 'a', 'sort': 1},
-        'doc2': <String, Object?>{'key': 'aa', 'sort': 4},
-        'doc3': <String, Object?>{'key': 'b', 'sort': 3},
-        'doc4': <String, Object?>{'key': 'b', 'sort': 2},
-      });
+      final CollectionReference collection = await withTestDocs(
+        <String, Map<String, Object?>>{
+          'doc1': <String, Object?>{'key': 'a', 'sort': 1},
+          'doc2': <String, Object?>{'key': 'aa', 'sort': 4},
+          'doc3': <String, Object?>{'key': 'b', 'sort': 3},
+          'doc4': <String, Object?>{'key': 'b', 'sort': 2},
+        },
+      );
 
       final Query query = collection
           .whereNotEqualTo('key', 'a')
@@ -642,97 +724,124 @@ void main() {
     });
 
     test('testMultipleInequalityFromCacheAndFromServer', () async {
-      final CollectionReference collection =
-          await withTestDocs(<String, Map<String, Object?>>{
-        'doc1': <String, Object?>{'a': 1, 'b': 0},
-        'doc2': <String, Object?>{'a': 2, 'b': 1},
-        'doc3': <String, Object?>{'a': 3, 'b': 2},
-        'doc4': <String, Object?>{'a': 1, 'b': 3},
-        'doc5': <String, Object?>{'a': 1, 'b': 1},
-      });
+      final CollectionReference collection = await withTestDocs(
+        <String, Map<String, Object?>>{
+          'doc1': <String, Object?>{'a': 1, 'b': 0},
+          'doc2': <String, Object?>{'a': 2, 'b': 1},
+          'doc3': <String, Object?>{'a': 3, 'b': 2},
+          'doc4': <String, Object?>{'a': 1, 'b': 3},
+          'doc5': <String, Object?>{'a': 1, 'b': 1},
+        },
+      );
 
       // Implicit AND: a != 1 && b < 2.
       await assertOnlineAndOfflineResultsMatch(
-          collection,
-          collection.whereNotEqualTo('a', 1).whereLessThan('b', 2),
-          <String>['doc2']);
+        collection,
+        collection.whereNotEqualTo('a', 1).whereLessThan('b', 2),
+        <String>['doc2'],
+      );
 
       // Explicit AND: a != 1 && b < 2.
       await assertOnlineAndOfflineResultsMatch(
-          collection,
-          collection.where(Filter.and(<Filter>[
+        collection,
+        collection.where(
+          Filter.and(<Filter>[
             Filter.notEqualTo('a', 1),
             Filter.lessThan('b', 2),
-          ])),
-          <String>['doc2']);
+          ]),
+        ),
+        <String>['doc2'],
+      );
 
       // Explicit AND: a < 3 && b not-in [2, 3], implicitly ordered by: a asc, b asc, __name__ asc.
       await assertOnlineAndOfflineResultsMatch(
-          collection,
-          collection.where(Filter.and(<Filter>[
+        collection,
+        collection.where(
+          Filter.and(<Filter>[
             Filter.lessThan('a', 3),
             Filter.notInArray('b', <Object?>[2, 3]),
-          ])),
-          <String>['doc1', 'doc5', 'doc2']);
+          ]),
+        ),
+        <String>['doc1', 'doc5', 'doc2'],
+      );
 
       // a < 3 && b != 0, ordered by: b desc, a desc, __name__ desc.
       await assertOnlineAndOfflineResultsMatch(
-          collection,
-          collection
-              .whereLessThan('a', 3)
-              .whereNotEqualTo('b', 0)
-              .orderBy('b', Direction.descending)
-              .limit(2),
-          <String>['doc4', 'doc2']);
+        collection,
+        collection
+            .whereLessThan('a', 3)
+            .whereNotEqualTo('b', 0)
+            .orderBy('b', Direction.descending)
+            .limit(2),
+        <String>['doc4', 'doc2'],
+      );
 
       // Explicit OR: a > 2 || b < 1.
       await assertOnlineAndOfflineResultsMatch(
-          collection,
-          collection.where(Filter.or(<Filter>[
+        collection,
+        collection.where(
+          Filter.or(<Filter>[
             Filter.greaterThan('a', 2),
             Filter.lessThan('b', 1),
-          ])),
-          <String>['doc1', 'doc3']);
-    });
-
-    test('testMultipleInequalityRejectsIfDocumentKeyIsNotTheLastOrderByField',
-        () async {
-      final CollectionReference collection =
-          await withTestDocs(<String, Map<String, Object?>>{
-        'doc1': <String, Object?>{'key': 1}
-      });
-
-      // Implicitly ordered by: __name__ asc, 'key' asc.
-      final Query query = collection
-          .whereNotEqualTo('key', 42)
-          .orderByField(FieldPath.documentId());
-      await expectLater(
-          query.get(),
-          throwsA(isA<FirestoreError>().having(
-              (FirestoreError e) => e.message.toLowerCase(),
-              'message',
-              contains(
-                  'order by clause cannot contain more fields after the key'))));
+          ]),
+        ),
+        <String>['doc1', 'doc3'],
+      );
     });
 
     test(
-        'testMultipleInequalityRejectsIfDocumentKeyAppearsOnlyInEqualityFilter',
-        () async {
-      final CollectionReference collection =
-          await withTestDocs(<String, Map<String, Object?>>{
-        'doc1': <String, Object?>{'key': 1}
-      });
+      'testMultipleInequalityRejectsIfDocumentKeyIsNotTheLastOrderByField',
+      () async {
+        final CollectionReference collection = await withTestDocs(
+          <String, Map<String, Object?>>{
+            'doc1': <String, Object?>{'key': 1},
+          },
+        );
 
-      final Query query = collection
-          .whereNotEqualTo('key', 42)
-          .whereEqualToField(FieldPath.documentId(), 'doc1');
-      await expectLater(
+        // Implicitly ordered by: __name__ asc, 'key' asc.
+        final Query query = collection
+            .whereNotEqualTo('key', 42)
+            .orderByField(FieldPath.documentId());
+        await expectLater(
           query.get(),
-          throwsA(isA<FirestoreError>().having(
+          throwsA(
+            isA<FirestoreError>().having(
+              (FirestoreError e) => e.message.toLowerCase(),
+              'message',
+              contains(
+                'order by clause cannot contain more fields after the key',
+              ),
+            ),
+          ),
+        );
+      },
+    );
+
+    test(
+      'testMultipleInequalityRejectsIfDocumentKeyAppearsOnlyInEqualityFilter',
+      () async {
+        final CollectionReference collection = await withTestDocs(
+          <String, Map<String, Object?>>{
+            'doc1': <String, Object?>{'key': 1},
+          },
+        );
+
+        final Query query = collection
+            .whereNotEqualTo('key', 42)
+            .whereEqualToField(FieldPath.documentId(), 'doc1');
+        await expectLater(
+          query.get(),
+          throwsA(
+            isA<FirestoreError>().having(
               (FirestoreError e) => e.message,
               'message',
               contains(
-                  'Equality on key is not allowed if there are other inequality fields and key does not appear in inequalities.'))));
-    });
+                'Equality on key is not allowed if there are other inequality fields and key does not appear in inequalities.',
+              ),
+            ),
+          ),
+        );
+      },
+    );
   });
 }

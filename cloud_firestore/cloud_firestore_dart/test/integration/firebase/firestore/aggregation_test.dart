@@ -20,6 +20,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/aggregate_query_snap
 import 'package:cloud_firestore_dart/src/firebase/firestore/aggregate_source.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/collection_reference.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/firestore.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/firestore_data_converter.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/firestore_error.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/query.dart';
 import 'package:test/test.dart';
@@ -62,82 +63,94 @@ void main() {
   };
 
   Docs ratings(List<Object?> values) => <String, Map<String, Object?>>{
-        for (int i = 0; i < values.length; i++)
-          'doc$i': <String, Object?>{'rating': values[i]},
-      };
+    for (int i = 0; i < values.length; i++)
+      'doc$i': <String, Object?>{'rating': values[i]},
+  };
 
   Future<AggregateQuerySnapshot> run(
-          CollectionReference c, List<AggregateField> fields) =>
-      c.aggregate(fields).get(AggregateSource.server);
+    CollectionReference c,
+    List<AggregateField> fields,
+  ) => c.aggregate(fields).get(AggregateSource.server);
 
   group('count', () {
     test('testCanRunCount', () async {
       final CollectionReference c = await testCollectionWithDocs(books);
-      final AggregateQuerySnapshot s =
-          await c.count().get(AggregateSource.server);
+      final AggregateQuerySnapshot s = await c.count().get(
+        AggregateSource.server,
+      );
       expect(s.getCount(), 2);
       expect(s.query, c.count());
     });
 
     test('testCanRunCountWithFilters', () async {
-      final CollectionReference c =
-          await testCollectionWithDocs(<String, Map<String, Object?>>{
-        'a': <String, Object?>{'k': 'a'},
-        'b': <String, Object?>{'k': 'b'},
-        'c': <String, Object?>{'k': 'b'},
-      });
+      final CollectionReference c = await testCollectionWithDocs(
+        <String, Map<String, Object?>>{
+          'a': <String, Object?>{'k': 'a'},
+          'b': <String, Object?>{'k': 'b'},
+          'c': <String, Object?>{'k': 'b'},
+        },
+      );
       expect((await c.whereEqualTo('k', 'b').count().get()).getCount(), 2);
       expect((await c.whereEqualTo('k', 'a').count().get()).getCount(), 1);
       expect((await c.whereGreaterThan('k', 'a').count().get()).getCount(), 2);
     });
 
     test('testCanRunCountWithOrderBy', () async {
-      final CollectionReference c =
-          await testCollectionWithDocs(<String, Map<String, Object?>>{
-        'a': <String, Object?>{'k': 'a'},
-        'b': <String, Object?>{'k': 'b'},
-        'c': <String, Object?>{'other': 'c'},
-      });
+      final CollectionReference c = await testCollectionWithDocs(
+        <String, Map<String, Object?>>{
+          'a': <String, Object?>{'k': 'a'},
+          'b': <String, Object?>{'k': 'b'},
+          'c': <String, Object?>{'other': 'c'},
+        },
+      );
       // The orderBy excludes the document that lacks the field.
       expect((await c.orderBy('k').count().get()).getCount(), 2);
       expect((await c.count().get()).getCount(), 3);
     });
 
     test('testCanRunCountAggregateWithFiltersAndLimits', () async {
-      final CollectionReference c =
-          await testCollectionWithDocs(<String, Map<String, Object?>>{
-        'a': <String, Object?>{'k': 'a'},
-        'b': <String, Object?>{'k': 'a'},
-        'c': <String, Object?>{'k': 'a'},
-        'd': <String, Object?>{'k': 'd'},
-      });
-      expect((await c.whereEqualTo('k', 'a').limit(2).count().get()).getCount(),
-          2);
+      final CollectionReference c = await testCollectionWithDocs(
+        <String, Map<String, Object?>>{
+          'a': <String, Object?>{'k': 'a'},
+          'b': <String, Object?>{'k': 'a'},
+          'c': <String, Object?>{'k': 'a'},
+          'd': <String, Object?>{'k': 'd'},
+        },
+      );
       expect(
-          (await c.whereEqualTo('k', 'd').limit(1000).count().get()).getCount(),
-          1);
+        (await c.whereEqualTo('k', 'a').limit(2).count().get()).getCount(),
+        2,
+      );
+      expect(
+        (await c.whereEqualTo('k', 'd').limit(1000).count().get()).getCount(),
+        1,
+      );
     });
 
     test('testCanRunCountWithLimitToLast', () async {
-      final CollectionReference c =
-          await testCollectionWithDocs(<String, Map<String, Object?>>{
-        'a': <String, Object?>{'k': 'a'},
-        'b': <String, Object?>{'k': 'b'},
-        'c': <String, Object?>{'k': 'c'},
-        'd': <String, Object?>{'k': 'd'},
-      });
+      final CollectionReference c = await testCollectionWithDocs(
+        <String, Map<String, Object?>>{
+          'a': <String, Object?>{'k': 'a'},
+          'b': <String, Object?>{'k': 'b'},
+          'c': <String, Object?>{'k': 'c'},
+          'd': <String, Object?>{'k': 'd'},
+        },
+      );
       expect((await c.orderBy('k').limitToLast(2).count().get()).getCount(), 2);
       expect(
-          (await c.orderBy('k').limitToLast(1000).count().get()).getCount(), 4);
+        (await c.orderBy('k').limitToLast(1000).count().get()).getCount(),
+        4,
+      );
       expect(
-          (await c
-                  .whereGreaterThan('k', 'a')
-                  .orderBy('k')
-                  .limitToLast(2)
-                  .count()
-                  .get())
-              .getCount(),
-          2);
+        (await c
+                .whereGreaterThan('k', 'a')
+                .orderBy('k')
+                .limitToLast(2)
+                .count()
+                .get())
+            .getCount(),
+        2,
+      );
     });
 
     test('testCanRunCountCollectionGroupQuery', () async {
@@ -162,30 +175,40 @@ void main() {
       }
       await batch.commit();
 
-      final AggregateQuerySnapshot s =
-          await db.collectionGroup(group).count().get();
+      final AggregateQuerySnapshot s = await db
+          .collectionGroup(group)
+          .count()
+          .get();
       expect(s.getCount(), 5);
     });
 
     test('testCanRunCountOnNonExistentCollection', () async {
-      final CollectionReference c =
-          (await testFirestore()).collection('random-coll');
+      final CollectionReference c = (await testFirestore()).collection(
+        'random-coll',
+      );
       expect((await c.count().get()).getCount(), 0);
       expect((await c.whereEqualTo('k', 100).count().get()).getCount(), 0);
     });
 
     test('testCountFailWithoutNetwork', () async {
-      final CollectionReference c =
-          await testCollectionWithDocs(<String, Map<String, Object?>>{
-        'a': <String, Object?>{'k': 'a'},
-        'b': <String, Object?>{'k': 'b'},
-        'c': <String, Object?>{'k': 'c'},
-      });
+      final CollectionReference c = await testCollectionWithDocs(
+        <String, Map<String, Object?>>{
+          'a': <String, Object?>{'k': 'a'},
+          'b': <String, Object?>{'k': 'b'},
+          'c': <String, Object?>{'k': 'c'},
+        },
+      );
       await c.firestore.disableNetwork();
       await expectLater(
-          c.count().get(AggregateSource.server),
-          throwsA(isA<FirestoreError>().having((FirestoreError e) => e.code,
-              'code', FirestoreErrorCode.unavailable)));
+        c.count().get(AggregateSource.server),
+        throwsA(
+          isA<FirestoreError>().having(
+            (FirestoreError e) => e.code,
+            'code',
+            FirestoreErrorCode.unavailable,
+          ),
+        ),
+      );
 
       await c.firestore.enableNetwork();
       expect((await c.count().get()).getCount(), 3);
@@ -221,11 +244,14 @@ void main() {
       expect(s.getCount(), 2);
     });
 
-    test('testCannotPerformMoreThanMaxAggregations',
-        skip: IntegrationTestUtil.skipOnEnterprise(
-            'no limit of 5 aggregations per query'), () async {
-      final CollectionReference c = await testCollectionWithDocs(books);
-      await expectLater(
+    test(
+      'testCannotPerformMoreThanMaxAggregations',
+      skip: IntegrationTestUtil.skipOnEnterprise(
+        'no limit of 5 aggregations per query',
+      ),
+      () async {
+        final CollectionReference c = await testCollectionWithDocs(books);
+        await expectLater(
           run(c, <AggregateField>[
             AggregateField.sum('pages'),
             AggregateField.average('pages'),
@@ -234,12 +260,22 @@ void main() {
             AggregateField.sum('bar'),
             AggregateField.sum('baz'),
           ]),
-          throwsA(isA<FirestoreError>()
-              .having((FirestoreError e) => e.code, 'code',
-                  FirestoreErrorCode.invalidArgument)
-              .having((FirestoreError e) => e.message, 'message',
-                  contains('maximum number of aggregations'))));
-    });
+          throwsA(
+            isA<FirestoreError>()
+                .having(
+                  (FirestoreError e) => e.code,
+                  'code',
+                  FirestoreErrorCode.invalidArgument,
+                )
+                .having(
+                  (FirestoreError e) => e.message,
+                  'message',
+                  contains('maximum number of aggregations'),
+                ),
+          ),
+        );
+      },
+    );
 
     test('testThrowsWhenGettingUnrequestedAggregation', () async {
       final CollectionReference c = await testCollectionWithDocs(books);
@@ -254,15 +290,16 @@ void main() {
     });
 
     test('testPerformsAggregationsOnNestedMapValues', () async {
-      final CollectionReference c =
-          await testCollectionWithDocs(<String, Map<String, Object?>>{
-        'a': <String, Object?>{
-          'metadata': <String, Object?>{'pages': 100, 'rating': 4.0}
+      final CollectionReference c = await testCollectionWithDocs(
+        <String, Map<String, Object?>>{
+          'a': <String, Object?>{
+            'metadata': <String, Object?>{'pages': 100, 'rating': 4.0},
+          },
+          'b': <String, Object?>{
+            'metadata': <String, Object?>{'pages': 50, 'rating': 5.0},
+          },
         },
-        'b': <String, Object?>{
-          'metadata': <String, Object?>{'pages': 50, 'rating': 5.0}
-        },
-      });
+      );
       final AggregateQuerySnapshot s = await run(c, <AggregateField>[
         AggregateField.sum('metadata.pages'),
         AggregateField.average('metadata.pages'),
@@ -274,95 +311,116 @@ void main() {
     });
 
     test('testPerformsAggregationWhenUsingInOperator', () async {
-      final CollectionReference c =
-          await testCollectionWithDocs(<String, Map<String, Object?>>{
-        'a': <String, Object?>{'pages': 100, 'year': 1980},
-        'b': <String, Object?>{'pages': 50, 'year': 2020},
-        'c': <String, Object?>{'pages': 150, 'year': 2010},
-      });
+      final CollectionReference c = await testCollectionWithDocs(
+        <String, Map<String, Object?>>{
+          'a': <String, Object?>{'pages': 100, 'year': 1980},
+          'b': <String, Object?>{'pages': 50, 'year': 2020},
+          'c': <String, Object?>{'pages': 150, 'year': 2010},
+        },
+      );
       final AggregateQuerySnapshot s = await c
-          .whereIn('year', <Object>[1980, 2020]).aggregate(<AggregateField>[
-        AggregateField.sum('pages'),
-        AggregateField.average('pages'),
-        AggregateField.count(),
-      ]).get();
+          .whereIn('year', <Object>[1980, 2020])
+          .aggregate(<AggregateField>[
+            AggregateField.sum('pages'),
+            AggregateField.average('pages'),
+            AggregateField.count(),
+          ])
+          .get();
       expect(s.get(AggregateField.sum('pages')), 150);
       expect(s.get(AggregateField.average('pages')), 75.0);
       expect(s.getCount(), 2);
     });
 
     test('testSumTypes', () async {
-      final CollectionReference ints =
-          await testCollectionWithDocs(ratings(<Object?>[1, 2, 3]));
-      final Object? intSum =
-          (await run(ints, <AggregateField>[AggregateField.sum('rating')]))
-              .get(AggregateField.sum('rating'));
+      final CollectionReference ints = await testCollectionWithDocs(
+        ratings(<Object?>[1, 2, 3]),
+      );
+      final Object? intSum = (await run(ints, <AggregateField>[
+        AggregateField.sum('rating'),
+      ])).get(AggregateField.sum('rating'));
       expect(intSum, isA<int>());
       expect(intSum, 6);
 
-      final CollectionReference doubles =
-          await testCollectionWithDocs(ratings(<Object?>[0.5, 0.5]));
-      final Object? doubleSum =
-          (await run(doubles, <AggregateField>[AggregateField.sum('rating')]))
-              .get(AggregateField.sum('rating'));
+      final CollectionReference doubles = await testCollectionWithDocs(
+        ratings(<Object?>[0.5, 0.5]),
+      );
+      final Object? doubleSum = (await run(doubles, <AggregateField>[
+        AggregateField.sum('rating'),
+      ])).get(AggregateField.sum('rating'));
       expect(doubleSum, isA<double>());
       expect(doubleSum, 1.0);
     });
 
-    test('testPerformsSumThatOverflowsMaxLong',
-        skip: IntegrationTestUtil.skipOnEnterprise(
-            'the emulator fails an integer sum that overflows with "Long overflow" instead of returning a double'),
-        () async {
-      final CollectionReference c =
-          await testCollectionWithDocs(ratings(<Object?>[maxLong, maxLong]));
-      final Object? sum =
-          (await run(c, <AggregateField>[AggregateField.sum('rating')]))
-              .get(AggregateField.sum('rating'));
-      expect(sum, isA<double>());
-      expect(sum, maxLong.toDouble() + maxLong.toDouble());
-    });
+    test(
+      'testPerformsSumThatOverflowsMaxLong',
+      skip: IntegrationTestUtil.skipOnEnterprise(
+        'the emulator fails an integer sum that overflows with "Long overflow" instead of returning a double',
+      ),
+      () async {
+        final CollectionReference c = await testCollectionWithDocs(
+          ratings(<Object?>[maxLong, maxLong]),
+        );
+        final Object? sum = (await run(c, <AggregateField>[
+          AggregateField.sum('rating'),
+        ])).get(AggregateField.sum('rating'));
+        expect(sum, isA<double>());
+        expect(sum, maxLong.toDouble() + maxLong.toDouble());
+      },
+    );
 
-    test('testPerformsSumThatCanOverflowIntegerValuesDuringAccumulation',
-        () async {
-      final CollectionReference c =
-          await testCollectionWithDocs(ratings(<Object?>[maxLong, 1, -101]));
-      final Object? sum =
-          (await run(c, <AggregateField>[AggregateField.sum('rating')]))
-              .get(AggregateField.sum('rating'));
-      expect(sum, isA<int>());
-      expect(sum, maxLong - 100);
-    });
+    test(
+      'testPerformsSumThatCanOverflowIntegerValuesDuringAccumulation',
+      () async {
+        final CollectionReference c = await testCollectionWithDocs(
+          ratings(<Object?>[maxLong, 1, -101]),
+        );
+        final Object? sum = (await run(c, <AggregateField>[
+          AggregateField.sum('rating'),
+        ])).get(AggregateField.sum('rating'));
+        expect(sum, isA<int>());
+        expect(sum, maxLong - 100);
+      },
+    );
 
-    test('testPerformsSumThatIsNegative',
-        skip: IntegrationTestUtil.skipOnEnterprise(
-            'the emulator fails an integer sum that overflows during accumulation with "Long overflow"'),
-        () async {
-      final CollectionReference c = await testCollectionWithDocs(
-          ratings(<Object?>[maxLong, -maxLong, -101, -10000]));
-      final AggregateQuerySnapshot s =
-          await run(c, <AggregateField>[AggregateField.sum('rating')]);
-      expect(s.get(AggregateField.sum('rating')), -10101);
-    });
+    test(
+      'testPerformsSumThatIsNegative',
+      skip: IntegrationTestUtil.skipOnEnterprise(
+        'the emulator fails an integer sum that overflows during accumulation with "Long overflow"',
+      ),
+      () async {
+        final CollectionReference c = await testCollectionWithDocs(
+          ratings(<Object?>[maxLong, -maxLong, -101, -10000]),
+        );
+        final AggregateQuerySnapshot s = await run(c, <AggregateField>[
+          AggregateField.sum('rating'),
+        ]);
+        expect(s.get(AggregateField.sum('rating')), -10101);
+      },
+    );
 
     test('testPerformsSumThatIsInfinite', () async {
       final CollectionReference pos = await testCollectionWithDocs(
-          ratings(<Object?>[double.maxFinite, double.maxFinite]));
-      AggregateQuerySnapshot s =
-          await run(pos, <AggregateField>[AggregateField.sum('rating')]);
+        ratings(<Object?>[double.maxFinite, double.maxFinite]),
+      );
+      AggregateQuerySnapshot s = await run(pos, <AggregateField>[
+        AggregateField.sum('rating'),
+      ]);
       expect(s.get(AggregateField.sum('rating')), double.infinity);
       expect(s.getDouble(AggregateField.sum('rating')), double.infinity);
       expect(s.getInt(AggregateField.sum('rating')), maxLong);
 
       final CollectionReference neg = await testCollectionWithDocs(
-          ratings(<Object?>[-double.maxFinite, -double.maxFinite]));
+        ratings(<Object?>[-double.maxFinite, -double.maxFinite]),
+      );
       s = await run(neg, <AggregateField>[AggregateField.sum('rating')]);
       expect(s.get(AggregateField.sum('rating')), double.negativeInfinity);
       expect(s.getInt(AggregateField.sum('rating')), -maxLong - 1);
     });
 
     test('testPerformsAggregationsWhenNaNExists', () async {
-      final CollectionReference c =
-          await testCollectionWithDocs(ratings(<Object?>[5, 4, double.nan, 0]));
+      final CollectionReference c = await testCollectionWithDocs(
+        ratings(<Object?>[5, 4, double.nan, 0]),
+      );
       final AggregateQuerySnapshot s = await run(c, <AggregateField>[
         AggregateField.sum('rating'),
         AggregateField.average('rating'),
@@ -373,31 +431,40 @@ void main() {
     });
 
     test('testPerformsSumOfMinIEEE754', () async {
-      final CollectionReference c =
-          await testCollectionWithDocs(ratings(<Object?>[5e-324]));
-      final AggregateQuerySnapshot s =
-          await run(c, <AggregateField>[AggregateField.sum('rating')]);
+      final CollectionReference c = await testCollectionWithDocs(
+        ratings(<Object?>[5e-324]),
+      );
+      final AggregateQuerySnapshot s = await run(c, <AggregateField>[
+        AggregateField.sum('rating'),
+      ]);
       expect(s.get(AggregateField.sum('rating')), 5e-324);
     });
 
-    test('testPerformsSumAndAverageOverZeroDocuments',
-        skip: IntegrationTestUtil.skipOnEnterprise(
-            'the sum over no documents is null instead of 0'), () async {
-      final CollectionReference c = await testCollectionWithDocs(books);
-      final AggregateQuerySnapshot s =
-          await c.whereGreaterThan('pages', 200).aggregate(<AggregateField>[
-        AggregateField.sum('pages'),
-        AggregateField.average('pages'),
-      ]).get();
-      expect(s.get(AggregateField.sum('pages')), 0);
-      expect(s.get(AggregateField.average('pages')), isNull);
-      expect(s.getDouble(AggregateField.average('pages')), isNull);
-      expect(s.getInt(AggregateField.average('pages')), isNull);
-    });
+    test(
+      'testPerformsSumAndAverageOverZeroDocuments',
+      skip: IntegrationTestUtil.skipOnEnterprise(
+        'the sum over no documents is null instead of 0',
+      ),
+      () async {
+        final CollectionReference c = await testCollectionWithDocs(books);
+        final AggregateQuerySnapshot s = await c
+            .whereGreaterThan('pages', 200)
+            .aggregate(<AggregateField>[
+              AggregateField.sum('pages'),
+              AggregateField.average('pages'),
+            ])
+            .get();
+        expect(s.get(AggregateField.sum('pages')), 0);
+        expect(s.get(AggregateField.average('pages')), isNull);
+        expect(s.getDouble(AggregateField.average('pages')), isNull);
+        expect(s.getInt(AggregateField.average('pages')), isNull);
+      },
+    );
 
     test('testPerformsSumAndAverageOnlyOnNumericFields', () async {
-      final CollectionReference c =
-          await testCollectionWithDocs(ratings(<Object?>[5, 4, '3', 6]));
+      final CollectionReference c = await testCollectionWithDocs(
+        ratings(<Object?>[5, 4, '3', 6]),
+      );
       final AggregateQuerySnapshot s = await run(c, <AggregateField>[
         AggregateField.sum('rating'),
         AggregateField.average('rating'),
@@ -409,39 +476,50 @@ void main() {
     });
 
     test('testPerformsAverageResults', () async {
-      CollectionReference c =
-          await testCollectionWithDocs(ratings(<Object?>[10, 5, 0]));
+      CollectionReference c = await testCollectionWithDocs(
+        ratings(<Object?>[10, 5, 0]),
+      );
       expect(
-          (await run(c, <AggregateField>[AggregateField.average('rating')]))
-              .get(AggregateField.average('rating')),
-          5.0);
+        (await run(c, <AggregateField>[
+          AggregateField.average('rating'),
+        ])).get(AggregateField.average('rating')),
+        5.0,
+      );
 
       c = await testCollectionWithDocs(ratings(<Object?>[10, 1.5, 3, 5.5]));
       expect(
-          (await run(c, <AggregateField>[AggregateField.average('rating')]))
-              .get(AggregateField.average('rating')),
-          5.0);
+        (await run(c, <AggregateField>[
+          AggregateField.average('rating'),
+        ])).get(AggregateField.average('rating')),
+        5.0,
+      );
 
       c = await testCollectionWithDocs(ratings(<Object?>[10, 5, 0, 0]));
       expect(
-          (await run(c, <AggregateField>[AggregateField.average('rating')]))
-              .get(AggregateField.average('rating')),
-          3.75);
+        (await run(c, <AggregateField>[
+          AggregateField.average('rating'),
+        ])).get(AggregateField.average('rating')),
+        3.75,
+      );
     });
 
     test('testPerformsAverageOfMinIEEE754', () async {
-      final CollectionReference c =
-          await testCollectionWithDocs(ratings(<Object?>[5e-324]));
-      final AggregateQuerySnapshot s =
-          await run(c, <AggregateField>[AggregateField.average('rating')]);
+      final CollectionReference c = await testCollectionWithDocs(
+        ratings(<Object?>[5e-324]),
+      );
+      final AggregateQuerySnapshot s = await run(c, <AggregateField>[
+        AggregateField.average('rating'),
+      ]);
       expect(s.get(AggregateField.average('rating')), 5e-324);
     });
 
     test('testPerformsAverageOverflowDuringAccumulation', () async {
       final CollectionReference c = await testCollectionWithDocs(
-          ratings(<Object?>[double.maxFinite, double.maxFinite]));
-      final AggregateQuerySnapshot s =
-          await run(c, <AggregateField>[AggregateField.average('rating')]);
+        ratings(<Object?>[double.maxFinite, double.maxFinite]),
+      );
+      final AggregateQuerySnapshot s = await run(c, <AggregateField>[
+        AggregateField.average('rating'),
+      ]);
       expect(s.get(AggregateField.average('rating')), double.infinity);
     });
 
@@ -450,19 +528,24 @@ void main() {
       expect(c.count(), c.count());
       expect(c.count().hashCode, c.count().hashCode);
       expect(
-          c.aggregate(<AggregateField>[
-            AggregateField.sum('a'),
-            AggregateField.average('b')
-          ]),
-          c.aggregate(<AggregateField>[
-            AggregateField.sum('a'),
-            AggregateField.average('b')
-          ]));
+        c.aggregate(<AggregateField>[
+          AggregateField.sum('a'),
+          AggregateField.average('b'),
+        ]),
+        c.aggregate(<AggregateField>[
+          AggregateField.sum('a'),
+          AggregateField.average('b'),
+        ]),
+      );
       expect(c.count(), isNot(c.whereEqualTo('a', 1).count()));
-      expect(c.aggregate(<AggregateField>[AggregateField.sum('a')]),
-          isNot(c.aggregate(<AggregateField>[AggregateField.average('a')])));
-      expect(c.aggregate(<AggregateField>[AggregateField.sum('a')]),
-          isNot(c.aggregate(<AggregateField>[AggregateField.sum('b')])));
+      expect(
+        c.aggregate(<AggregateField>[AggregateField.sum('a')]),
+        isNot(c.aggregate(<AggregateField>[AggregateField.average('a')])),
+      );
+      expect(
+        c.aggregate(<AggregateField>[AggregateField.sum('a')]),
+        isNot(c.aggregate(<AggregateField>[AggregateField.sum('b')])),
+      );
       expect(c.aggregate(<AggregateField>[AggregateField.count()]), c.count());
     });
 
@@ -481,13 +564,15 @@ void main() {
 
     test('allowsAliasesLongerThan1500Bytes', () async {
       final String field = 'a' * 1499;
-      final CollectionReference c =
-          await testCollectionWithDocs(<String, Map<String, Object?>>{
-        'a': <String, Object?>{field: 1},
-        'b': <String, Object?>{field: 2},
-      });
-      final AggregateQuerySnapshot s =
-          await run(c, <AggregateField>[AggregateField.sum(field)]);
+      final CollectionReference c = await testCollectionWithDocs(
+        <String, Map<String, Object?>>{
+          'a': <String, Object?>{field: 1},
+          'b': <String, Object?>{field: 2},
+        },
+      );
+      final AggregateQuerySnapshot s = await run(c, <AggregateField>[
+        AggregateField.sum(field),
+      ]);
       expect(s.get(AggregateField.sum(field)), 3);
     });
   });
@@ -495,8 +580,9 @@ void main() {
   group('Upstream CountTest / AggregationTest leftovers', () {
     test('testCountQueryEquals', () async {
       final CollectionReference coll1 = await testCollection('foo');
-      final CollectionReference coll1Same =
-          coll1.firestore.collection(coll1.path);
+      final CollectionReference coll1Same = coll1.firestore.collection(
+        coll1.path,
+      );
       final AggregateQuery query1 = coll1.count();
       final AggregateQuery query1Same = coll1Same.count();
       AggregateQuery query2() => coll1
@@ -529,12 +615,15 @@ void main() {
     test('testAggregateQueryNotEquals', () async {
       final CollectionReference coll = await testCollection('foo');
 
-      final AggregateQuery query1 =
-          coll.aggregate(<AggregateField>[AggregateField.count()]);
-      final AggregateQuery query2 =
-          coll.aggregate(<AggregateField>[AggregateField.sum('baz')]);
-      final AggregateQuery query3 =
-          coll.aggregate(<AggregateField>[AggregateField.average('baz')]);
+      final AggregateQuery query1 = coll.aggregate(<AggregateField>[
+        AggregateField.count(),
+      ]);
+      final AggregateQuery query2 = coll.aggregate(<AggregateField>[
+        AggregateField.sum('baz'),
+      ]);
+      final AggregateQuery query3 = coll.aggregate(<AggregateField>[
+        AggregateField.average('baz'),
+      ]);
       expect(query1, isNot(query2));
       expect(query2, isNot(query3));
       expect(query3, isNot(query1));
@@ -547,12 +636,15 @@ void main() {
           .collection('baz')
           .whereEqualTo('a', 1)
           .limit(100);
-      final AggregateQuery query4 =
-          base.aggregate(<AggregateField>[AggregateField.count()]);
-      final AggregateQuery query5 =
-          base.aggregate(<AggregateField>[AggregateField.sum('baz')]);
-      final AggregateQuery query6 =
-          base.aggregate(<AggregateField>[AggregateField.average('baz')]);
+      final AggregateQuery query4 = base.aggregate(<AggregateField>[
+        AggregateField.count(),
+      ]);
+      final AggregateQuery query5 = base.aggregate(<AggregateField>[
+        AggregateField.sum('baz'),
+      ]);
+      final AggregateQuery query6 = base.aggregate(<AggregateField>[
+        AggregateField.average('baz'),
+      ]);
       expect(query4, isNot(query5));
       expect(query5, isNot(query6));
       expect(query6, isNot(query4));
@@ -562,12 +654,13 @@ void main() {
     });
 
     test('testCountSnapshotEquals', () async {
-      final CollectionReference collection =
-          await testCollectionWithDocs(<String, Map<String, Object?>>{
-        'a': <String, Object?>{'k': 'a'},
-        'b': <String, Object?>{'k': 'b'},
-        'c': <String, Object?>{'k': 'c'},
-      });
+      final CollectionReference collection = await testCollectionWithDocs(
+        <String, Map<String, Object?>>{
+          'a': <String, Object?>{'k': 'a'},
+          'b': <String, Object?>{'k': 'b'},
+          'c': <String, Object?>{'k': 'c'},
+        },
+      );
 
       final AggregateQuerySnapshot snapshot1 = await collection
           .whereEqualTo('k', 'b')
@@ -600,44 +693,51 @@ void main() {
     });
 
     test('testTerminateDoesNotCrashWithFlyingCountQuery', () async {
-      final CollectionReference collection =
-          await testCollectionWithDocs(<String, Map<String, Object?>>{
-        'a': <String, Object?>{'k': 'a'},
-        'b': <String, Object?>{'k': 'b'},
-        'c': <String, Object?>{'k': 'c'},
-      });
+      final CollectionReference collection = await testCollectionWithDocs(
+        <String, Map<String, Object?>>{
+          'a': <String, Object?>{'k': 'a'},
+          'b': <String, Object?>{'k': 'b'},
+          'c': <String, Object?>{'k': 'c'},
+        },
+      );
 
       // The result is intentionally not awaited: terminating with the query in flight must not crash.
-      unawaited(collection
-          .orderBy('k')
-          .count()
-          .get(AggregateSource.server)
-          .then<void>((_) {}, onError: (Object _) {}));
+      unawaited(
+        collection
+            .orderBy('k')
+            .count()
+            .get(AggregateSource.server)
+            .then<void>((_) {}, onError: (Object _) {}),
+      );
       await collection.firestore.terminate();
     });
 
     test('testTerminateDoesNotCrashWithFlyingAggregateQuery', () async {
-      final CollectionReference collection =
-          await testCollectionWithDocs(books);
+      final CollectionReference collection = await testCollectionWithDocs(
+        books,
+      );
 
-      unawaited(collection
-          .aggregate(<AggregateField>[
-            AggregateField.count(),
-            AggregateField.sum('pages'),
-            AggregateField.average('pages'),
-          ])
-          .get(AggregateSource.server)
-          .then<void>((_) {}, onError: (Object _) {}));
+      unawaited(
+        collection
+            .aggregate(<AggregateField>[
+              AggregateField.count(),
+              AggregateField.sum('pages'),
+              AggregateField.average('pages'),
+            ])
+            .get(AggregateSource.server)
+            .then<void>((_) {}, onError: (Object _) {}),
+      );
       await collection.firestore.terminate();
     });
 
     test('testCanGetCorrectTypeForAvg', () async {
-      final CollectionReference collection =
-          await testCollectionWithDocs(books);
+      final CollectionReference collection = await testCollectionWithDocs(
+        books,
+      );
 
       final AggregateQuerySnapshot snapshot = await collection
-          .aggregate(<AggregateField>[AggregateField.average('pages')]).get(
-              AggregateSource.server);
+          .aggregate(<AggregateField>[AggregateField.average('pages')])
+          .get(AggregateSource.server);
 
       expect(snapshot.get(AggregateField.average('pages')), isA<double>());
     });
@@ -648,15 +748,16 @@ void main() {
   group('aliases', () {
     test('can alias aggregations', () async {
       final CollectionReference c = await testCollectionWithDocs(books);
-      final AggregateQuery query =
-          c.aggregateWithAliases(<String, AggregateField>{
-        'foo': AggregateField.count(),
-        'bar': AggregateField.sum('pages'),
-        'baz': AggregateField.average('pages'),
-        'pagesAgain': AggregateField.sum('pages'),
-      });
-      final AggregateQuerySnapshot snapshot =
-          await query.get(AggregateSource.server);
+      final AggregateQuery query = c
+          .aggregateWithAliases(<String, AggregateField>{
+            'foo': AggregateField.count(),
+            'bar': AggregateField.sum('pages'),
+            'baz': AggregateField.average('pages'),
+            'pagesAgain': AggregateField.sum('pages'),
+          });
+      final AggregateQuerySnapshot snapshot = await query.get(
+        AggregateSource.server,
+      );
       expect(snapshot.data(), <String, Object?>{
         'foo': 2,
         'bar': 150,
@@ -673,31 +774,155 @@ void main() {
       final AggregateQuerySnapshot snapshot = await c
           .where('pages', isGreaterThan: 1000)
           .aggregateWithAliases(<String, AggregateField>{
-        'n': AggregateField.count(),
-        'avg': AggregateField.average('pages'),
-      }).get(AggregateSource.server);
+            'n': AggregateField.count(),
+            'avg': AggregateField.average('pages'),
+          })
+          .get(AggregateSource.server);
       expect(snapshot.data(), <String, Object?>{'n': 0, 'avg': null});
     });
 
-    test('allows special characters, backticks, backslashes and long aliases',
-        () async {
+    test(
+      'allows special characters, backticks, backslashes and long aliases',
+      () async {
+        final CollectionReference c = await testCollectionWithDocs(books);
+        final String longAlias = 'a' * 1500;
+        final AggregateQuerySnapshot snapshot = await c
+            .aggregateWithAliases(<String, AggregateField>{
+              'with-un/su+pp[or]ted': AggregateField.count(),
+              'with `backticks`': AggregateField.sum('pages'),
+              r'with\backshash\es': AggregateField.sum('year'),
+              longAlias: AggregateField.average('rating'),
+              '': AggregateField.count(),
+            })
+            .get(AggregateSource.server);
+        expect(snapshot.data(), <String, Object?>{
+          'with-un/su+pp[or]ted': 2,
+          'with `backticks`': 150,
+          r'with\backshash\es': 4000,
+          longAlias: 4.5,
+          '': 2,
+        });
+      },
+    );
+  });
+
+  // Cases of the Android AggregationTest and the JS aggregation.test.ts that
+  // the groups above do not cover (see notes/parity/integration_test_map.md).
+  group('upstream parity', () {
+    test('testCanRunCountUsingAggregationMethod', () async {
       final CollectionReference c = await testCollectionWithDocs(books);
-      final String longAlias = 'a' * 1500;
-      final AggregateQuerySnapshot snapshot =
-          await c.aggregateWithAliases(<String, AggregateField>{
-        'with-un/su+pp[or]ted': AggregateField.count(),
-        'with `backticks`': AggregateField.sum('pages'),
-        r'with\backshash\es': AggregateField.sum('year'),
-        longAlias: AggregateField.average('rating'),
-        '': AggregateField.count(),
-      }).get(AggregateSource.server);
-      expect(snapshot.data(), <String, Object?>{
-        'with-un/su+pp[or]ted': 2,
-        'with `backticks`': 150,
-        r'with\backshash\es': 4000,
-        longAlias: 4.5,
-        '': 2,
-      });
+      final AggregateQuerySnapshot s = await run(c, <AggregateField>[
+        AggregateField.count(),
+      ]);
+      expect(s.get(AggregateField.count()), 2);
+      expect(s.getCount(), 2);
+    });
+
+    test('aggregate query does not use the converter', () async {
+      final CollectionReference c = await testCollectionWithDocs(books);
+      final Query<Object> converted = c
+          .where('author', isEqualTo: 'authorA')
+          .withConverter<Object>(
+            FirestoreDataConverter<Object>.from(
+              fromFirestore: (_, __) =>
+                  throw StateError('should never be called'),
+              toFirestore: (_, __) =>
+                  throw StateError('should never be called'),
+            ),
+          );
+      final AggregateQuerySnapshot s = await converted
+          .aggregateWithAliases(<String, AggregateField>{
+            'count': AggregateField.count(),
+          })
+          .get(AggregateSource.server);
+      expect(s.data()['count'], 1);
+    });
+
+    test('testPerformsSumOfIntsAndFloatsThatResultsInAnInt', () async {
+      final CollectionReference c = await testCollectionWithDocs(
+        ratings(<Object?>[5, 4.5, 3.5]),
+      );
+      final AggregateQuerySnapshot s = await run(c, <AggregateField>[
+        AggregateField.sum('rating'),
+      ]);
+      expect(s.get(AggregateField.sum('rating')), 13);
+      expect(s.getInt(AggregateField.sum('rating')), 13);
+      expect(s.getDouble(AggregateField.sum('rating')), 13.0);
+    });
+
+    test(
+      'testPerformsSumThatIsValidButCouldOverflowDuringAggregation',
+      () async {
+        // The sum is 0, but if the accumulation overflows the result is an
+        // infinity.
+        final CollectionReference c = await testCollectionWithDocs(
+          ratings(<Object?>[
+            double.maxFinite,
+            double.maxFinite,
+            -double.maxFinite,
+            -double.maxFinite,
+          ]),
+        );
+        final Object? sum = (await run(c, <AggregateField>[
+          AggregateField.sum('rating'),
+        ])).get(AggregateField.sum('rating'));
+        expect(sum, isA<double>());
+        expect(sum, anyOf(0.0, double.infinity, double.negativeInfinity));
+      },
+    );
+
+    test('testPerformsAverageOfFloatsThatResultsInAnInt', () async {
+      final CollectionReference c = await testCollectionWithDocs(
+        ratings(<Object?>[10.5, 9.5]),
+      );
+      final AggregateQuerySnapshot s = await run(c, <AggregateField>[
+        AggregateField.average('rating'),
+      ]);
+      expect(s.get(AggregateField.average('rating')), 10.0);
+      expect(s.getInt(AggregateField.average('rating')), 10);
+      expect(s.getDouble(AggregateField.average('rating')), 10.0);
+    });
+
+    test('testPerformsAverageOfFloatsThatResultsInAFloat', () async {
+      final CollectionReference c = await testCollectionWithDocs(
+        ratings(<Object?>[5.5, 4.5, 3.5]),
+      );
+      final AggregateQuerySnapshot s = await run(c, <AggregateField>[
+        AggregateField.average('rating'),
+      ]);
+      expect(s.get(AggregateField.average('rating')), 4.5);
+      expect(s.getInt(AggregateField.average('rating')), 4);
+      expect(s.getDouble(AggregateField.average('rating')), 4.5);
+    });
+
+    test('testPerformsAverageOfFloatsAndIntsThatResultsInAFloat', () async {
+      final CollectionReference c = await testCollectionWithDocs(
+        ratings(<Object?>[8.6, 9, 10]),
+      );
+      final AggregateQuerySnapshot s = await run(c, <AggregateField>[
+        AggregateField.average('rating'),
+      ]);
+      expect(
+        s.get(AggregateField.average('rating')),
+        moreOrLessEquals(9.2, epsilon: 1e-14),
+      );
+      expect(
+        s.getDouble(AggregateField.average('rating')),
+        moreOrLessEquals(9.2, epsilon: 1e-14),
+      );
+      expect(s.getInt(AggregateField.average('rating')), 9);
+    });
+
+    test('testPerformsAverageCausingUnderflow', () async {
+      final CollectionReference c = await testCollectionWithDocs(
+        ratings(<Object?>[5e-324, 0]),
+      );
+      final AggregateQuerySnapshot s = await run(c, <AggregateField>[
+        AggregateField.average('rating'),
+      ]);
+      expect(s.get(AggregateField.average('rating')), 0.0);
+      expect(s.getDouble(AggregateField.average('rating')), 0.0);
+      expect(s.getInt(AggregateField.average('rating')), 0);
     });
   });
 }

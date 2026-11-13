@@ -41,7 +41,8 @@ void main() {
 
   CollectionReference testCollection() {
     return firestore.collection(
-        'bson-${DateTime.now().microsecondsSinceEpoch}-${collectionIndex++}');
+      'bson-${DateTime.now().microsecondsSinceEpoch}-${collectionIndex++}',
+    );
   }
 
   Future<CollectionReference> testCollectionWithDocs(_Docs docs) async {
@@ -57,17 +58,34 @@ void main() {
     expect(snapshot.data, data);
   }
 
-  Future<void> expectConsistent(CollectionReference collection, Query query,
-      _Docs docs, List<String> expected) {
+  Future<void> expectConsistent(
+    CollectionReference collection,
+    Query query,
+    _Docs docs,
+    List<String> expected,
+  ) {
     return IntegrationTestUtil.assertSDKQueryResultsConsistentWithBackend(
-        collection, query, docs, expected);
+      collection,
+      query,
+      docs,
+      expected,
+    );
   }
 
   Matcher throwsInvalidArgument(String message) {
-    return throwsA(isA<FirestoreError>()
-        .having((FirestoreError e) => e.code, 'code',
-            FirestoreErrorCode.invalidArgument)
-        .having((FirestoreError e) => e.message, 'message', contains(message)));
+    return throwsA(
+      isA<FirestoreError>()
+          .having(
+            (FirestoreError e) => e.code,
+            'code',
+            FirestoreErrorCode.invalidArgument,
+          )
+          .having(
+            (FirestoreError e) => e.message,
+            'message',
+            contains(message),
+          ),
+    );
   }
 
   Map<String, Object?> allTypes() {
@@ -117,11 +135,13 @@ void main() {
 
       // Adding docs to cache, do not wait for the write to be acknowledged.
       unawaited(docRef.set(allTypes()));
-      unawaited(docRef.update(<String, Object?>{
-        'bsonObjectId': BsonObjectId('507f191e810c19729de860eb'),
-        'regex': const RegexValue('^foo', 'm'),
-        'bsonTimestamp': BsonTimestamp(1, 3),
-      }));
+      unawaited(
+        docRef.update(<String, Object?>{
+          'bsonObjectId': BsonObjectId('507f191e810c19729de860eb'),
+          'regex': const RegexValue('^foo', 'm'),
+          'bsonTimestamp': BsonTimestamp(1, 3),
+        }),
+      );
 
       final Map<String, Object?> expected = allTypes()
         ..['bsonObjectId'] = BsonObjectId('507f191e810c19729de860eb')
@@ -139,7 +159,7 @@ void main() {
         'b': <String, Object?>{'key': const RegexValue('^foo', 'i')},
         'c': <String, Object?>{'key': BsonObjectId('507f191e810c19729de860ea')},
         'd': <String, Object?>{
-          'key': _binary(1, <int>[1, 2, 3])
+          'key': _binary(1, <int>[1, 2, 3]),
         },
         'e': <String, Object?>{'key': BsonTimestamp(1, 2)},
         'f': <String, Object?>{'key': Decimal128Value('1.2e3')},
@@ -154,33 +174,50 @@ void main() {
       final StreamSubscription<QuerySnapshot> subscription = query
           .getSnapshots(MetadataChanges.include)
           .listen((QuerySnapshot snapshot) {
-        snapshots.add(snapshot);
-        if (!snapshot.metadata.isFromCache &&
-            !snapshot.metadata.hasPendingWrites &&
-            !next.isCompleted) {
-          next.complete();
-        }
-      });
+            snapshots.add(snapshot);
+            if (!snapshot.metadata.isFromCache &&
+                !snapshot.metadata.hasPendingWrites &&
+                !next.isCompleted) {
+              next.complete();
+            }
+          });
       try {
         await next.future.timeout(const Duration(seconds: 20));
-        expect(IntegrationTestUtil.querySnapshotToIds(snapshots.last),
-            <String>['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h']);
+        expect(IntegrationTestUtil.querySnapshotToIds(snapshots.last), <String>[
+          'a',
+          'b',
+          'c',
+          'd',
+          'e',
+          'f',
+          'g',
+          'h',
+        ]);
 
         // A document that sorts in the middle moves to its place.
         next = Completer<void>();
-        await collection
-            .document('i')
-            .set(<String, Object?>{'key': BsonTimestamp(1, 3)});
-        await collection
-            .document('g')
-            .set(<String, Object?>{'key': Decimal128Value('1.3e3')});
+        await collection.document('i').set(<String, Object?>{
+          'key': BsonTimestamp(1, 3),
+        });
+        await collection.document('g').set(<String, Object?>{
+          'key': Decimal128Value('1.3e3'),
+        });
         if (IntegrationTestUtil.querySnapshotToIds(snapshots.last).length !=
                 9 ||
             snapshots.last.metadata.hasPendingWrites) {
           await next.future.timeout(const Duration(seconds: 20));
         }
-        expect(IntegrationTestUtil.querySnapshotToIds(snapshots.last),
-            <String>['a', 'b', 'c', 'd', 'i', 'e', 'g', 'f', 'h']);
+        expect(IntegrationTestUtil.querySnapshotToIds(snapshots.last), <String>[
+          'a',
+          'b',
+          'c',
+          'd',
+          'i',
+          'e',
+          'g',
+          'f',
+          'h',
+        ]);
       } finally {
         await subscription.cancel();
       }
@@ -195,18 +232,21 @@ void main() {
       final CollectionReference collection = await testCollectionWithDocs(docs);
 
       await expectConsistent(
-          collection,
-          collection.orderBy('key', Direction.descending).whereGreaterThan(
-              'key', BsonObjectId('507f191e810c19729de860ea')),
-          docs,
-          <String>['c', 'b']);
+        collection,
+        collection
+            .orderBy('key', Direction.descending)
+            .whereGreaterThan('key', BsonObjectId('507f191e810c19729de860ea')),
+        docs,
+        <String>['c', 'b'],
+      );
       await expectConsistent(
-          collection,
-          collection
-              .orderBy('key', Direction.descending)
-              .whereNotEqualTo('key', BsonObjectId('507f191e810c19729de860eb')),
-          docs,
-          <String>['c', 'a']);
+        collection,
+        collection
+            .orderBy('key', Direction.descending)
+            .whereNotEqualTo('key', BsonObjectId('507f191e810c19729de860eb')),
+        docs,
+        <String>['c', 'a'],
+      );
     });
 
     test('filterAndOrderBsonTimestamps', () async {
@@ -218,49 +258,53 @@ void main() {
       final CollectionReference collection = await testCollectionWithDocs(docs);
 
       await expectConsistent(
-          collection,
-          collection
-              .orderBy('key', Direction.descending)
-              .whereGreaterThan('key', BsonTimestamp(1, 1)),
-          docs,
-          <String>['c', 'b']);
+        collection,
+        collection
+            .orderBy('key', Direction.descending)
+            .whereGreaterThan('key', BsonTimestamp(1, 1)),
+        docs,
+        <String>['c', 'b'],
+      );
       await expectConsistent(
-          collection,
-          collection
-              .orderBy('key', Direction.descending)
-              .whereNotEqualTo('key', BsonTimestamp(1, 2)),
-          docs,
-          <String>['c', 'a']);
+        collection,
+        collection
+            .orderBy('key', Direction.descending)
+            .whereNotEqualTo('key', BsonTimestamp(1, 2)),
+        docs,
+        <String>['c', 'a'],
+      );
     });
 
     test('filterAndOrderBlob', () async {
       final _Docs docs = <String, Map<String, Object?>>{
         'a': <String, Object?>{
-          'key': _binary(1, <int>[1, 2, 3])
+          'key': _binary(1, <int>[1, 2, 3]),
         },
         'b': <String, Object?>{
-          'key': _binary(1, <int>[1, 2, 4])
+          'key': _binary(1, <int>[1, 2, 4]),
         },
         'c': <String, Object?>{
-          'key': _binary(2, <int>[1, 2, 2])
+          'key': _binary(2, <int>[1, 2, 2]),
         },
       };
       final CollectionReference collection = await testCollectionWithDocs(docs);
 
       await expectConsistent(
-          collection,
-          collection
-              .orderBy('key', Direction.descending)
-              .whereGreaterThan('key', _binary(1, <int>[1, 2, 3])),
-          docs,
-          <String>['c', 'b']);
+        collection,
+        collection
+            .orderBy('key', Direction.descending)
+            .whereGreaterThan('key', _binary(1, <int>[1, 2, 3])),
+        docs,
+        <String>['c', 'b'],
+      );
       await expectConsistent(
-          collection,
-          collection
-              .orderBy('key', Direction.descending)
-              .whereNotEqualTo('key', _binary(1, <int>[1, 2, 4])),
-          docs,
-          <String>['c', 'a']);
+        collection,
+        collection
+            .orderBy('key', Direction.descending)
+            .whereNotEqualTo('key', _binary(1, <int>[1, 2, 4])),
+        docs,
+        <String>['c', 'a'],
+      );
     });
 
     test('filterAndOrderRegex', () async {
@@ -272,19 +316,21 @@ void main() {
       final CollectionReference collection = await testCollectionWithDocs(docs);
 
       await expectConsistent(
-          collection,
-          collection
-              .orderBy('key', Direction.descending)
-              .whereGreaterThan('key', const RegexValue('^bar', 'i')),
-          docs,
-          <String>['c', 'b']);
+        collection,
+        collection
+            .orderBy('key', Direction.descending)
+            .whereGreaterThan('key', const RegexValue('^bar', 'i')),
+        docs,
+        <String>['c', 'b'],
+      );
       await expectConsistent(
-          collection,
-          collection
-              .orderBy('key', Direction.descending)
-              .whereNotEqualTo('key', const RegexValue('^bar', 'm')),
-          docs,
-          <String>['c', 'a']);
+        collection,
+        collection
+            .orderBy('key', Direction.descending)
+            .whereNotEqualTo('key', const RegexValue('^bar', 'm')),
+        docs,
+        <String>['c', 'a'],
+      );
     });
 
     test('filterAndOrderInt32', () async {
@@ -296,19 +342,21 @@ void main() {
       final CollectionReference collection = await testCollectionWithDocs(docs);
 
       await expectConsistent(
-          collection,
-          collection
-              .orderBy('key', Direction.descending)
-              .whereGreaterThan('key', Int32Value(-1)),
-          docs,
-          <String>['c', 'b']);
+        collection,
+        collection
+            .orderBy('key', Direction.descending)
+            .whereGreaterThan('key', Int32Value(-1)),
+        docs,
+        <String>['c', 'b'],
+      );
       await expectConsistent(
-          collection,
-          collection
-              .orderBy('key', Direction.descending)
-              .whereNotEqualTo('key', Int32Value(1)),
-          docs,
-          <String>['c', 'a']);
+        collection,
+        collection
+            .orderBy('key', Direction.descending)
+            .whereNotEqualTo('key', Int32Value(1)),
+        docs,
+        <String>['c', 'a'],
+      );
     });
 
     test('filterAndOrderDecimal128', () async {
@@ -324,35 +372,41 @@ void main() {
       final Query descending = collection.orderBy('key', Direction.descending);
 
       await expectConsistent(
-          collection,
-          descending.whereGreaterThan('key', Decimal128Value('-1.2e3')),
-          docs,
-          <String>['f', 'c', 'b']);
+        collection,
+        descending.whereGreaterThan('key', Decimal128Value('-1.2e3')),
+        docs,
+        <String>['f', 'c', 'b'],
+      );
       await expectConsistent(
-          collection,
-          descending.whereGreaterThan('key', Decimal128Value('-1.2e-3')),
-          docs,
-          <String>['f', 'c', 'b']);
+        collection,
+        descending.whereGreaterThan('key', Decimal128Value('-1.2e-3')),
+        docs,
+        <String>['f', 'c', 'b'],
+      );
       await expectConsistent(
-          collection,
-          descending.whereNotEqualTo('key', Decimal128Value('0.0')),
-          docs,
-          <String>['f', 'c', 'a', 'e', 'd']);
+        collection,
+        descending.whereNotEqualTo('key', Decimal128Value('0.0')),
+        docs,
+        <String>['f', 'c', 'a', 'e', 'd'],
+      );
       await expectConsistent(
-          collection,
-          collection.whereNotEqualTo('key', Decimal128Value('NaN')),
-          docs,
-          <String>['e', 'a', 'b', 'c', 'f']);
+        collection,
+        collection.whereNotEqualTo('key', Decimal128Value('NaN')),
+        docs,
+        <String>['e', 'a', 'b', 'c', 'f'],
+      );
       await expectConsistent(
-          collection,
-          descending.whereEqualTo('key', Decimal128Value('1.2e3')),
-          docs,
-          <String>['c']);
+        collection,
+        descending.whereEqualTo('key', Decimal128Value('1.2e3')),
+        docs,
+        <String>['c'],
+      );
       await expectConsistent(
-          collection,
-          descending.whereNotEqualTo('key', Decimal128Value('1.2e3')),
-          docs,
-          <String>['f', 'b', 'a', 'e', 'd']);
+        collection,
+        descending.whereNotEqualTo('key', Decimal128Value('1.2e3')),
+        docs,
+        <String>['f', 'b', 'a', 'e', 'd'],
+      );
     });
 
     test('filterAndOrderMinKey', () async {
@@ -367,27 +421,31 @@ void main() {
 
       // MinKeys are equal, they sort by document id as the secondary order.
       await expectConsistent(
-          collection,
-          collection
-              .orderBy('key', Direction.descending)
-              .whereEqualTo('key', MinKey.instance),
-          docs,
-          <String>['b', 'a']);
+        collection,
+        collection
+            .orderBy('key', Direction.descending)
+            .whereEqualTo('key', MinKey.instance),
+        docs,
+        <String>['b', 'a'],
+      );
       await expectConsistent(
-          collection,
-          collection.whereNotEqualTo('key', MinKey.instance),
-          docs,
-          <String>['d', 'e']);
+        collection,
+        collection.whereNotEqualTo('key', MinKey.instance),
+        docs,
+        <String>['d', 'e'],
+      );
       await expectConsistent(
-          collection,
-          collection.whereGreaterThanOrEqualTo('key', MinKey.instance),
-          docs,
-          <String>['a', 'b']);
+        collection,
+        collection.whereGreaterThanOrEqualTo('key', MinKey.instance),
+        docs,
+        <String>['a', 'b'],
+      );
       await expectConsistent(
-          collection,
-          collection.whereLessThanOrEqualTo('key', MinKey.instance),
-          docs,
-          <String>['a', 'b']);
+        collection,
+        collection.whereLessThanOrEqualTo('key', MinKey.instance),
+        docs,
+        <String>['a', 'b'],
+      );
       for (final Query empty in <Query>[
         collection.whereGreaterThan('key', MinKey.instance),
         collection.whereLessThan('key', MinKey.instance),
@@ -408,27 +466,31 @@ void main() {
       final CollectionReference collection = await testCollectionWithDocs(docs);
 
       await expectConsistent(
-          collection,
-          collection
-              .orderBy('key', Direction.descending)
-              .whereEqualTo('key', MaxKey.instance),
-          docs,
-          <String>['d', 'c']);
+        collection,
+        collection
+            .orderBy('key', Direction.descending)
+            .whereEqualTo('key', MaxKey.instance),
+        docs,
+        <String>['d', 'c'],
+      );
       await expectConsistent(
-          collection,
-          collection.whereNotEqualTo('key', MaxKey.instance),
-          docs,
-          <String>['a', 'b']);
+        collection,
+        collection.whereNotEqualTo('key', MaxKey.instance),
+        docs,
+        <String>['a', 'b'],
+      );
       await expectConsistent(
-          collection,
-          collection.whereGreaterThanOrEqualTo('key', MaxKey.instance),
-          docs,
-          <String>['c', 'd']);
+        collection,
+        collection.whereGreaterThanOrEqualTo('key', MaxKey.instance),
+        docs,
+        <String>['c', 'd'],
+      );
       await expectConsistent(
-          collection,
-          collection.whereLessThanOrEqualTo('key', MaxKey.instance),
-          docs,
-          <String>['c', 'd']);
+        collection,
+        collection.whereLessThanOrEqualTo('key', MaxKey.instance),
+        docs,
+        <String>['c', 'd'],
+      );
       for (final Query empty in <Query>[
         collection.whereLessThan('key', MaxKey.instance),
         collection.whereGreaterThan('key', MaxKey.instance),
@@ -448,13 +510,18 @@ void main() {
       };
       final CollectionReference collection = await testCollectionWithDocs(docs);
 
-      await expectConsistent(collection, collection.whereEqualTo('key', null),
-          docs, <String>['b', 'c']);
       await expectConsistent(
-          collection,
-          collection.whereNotEqualTo('key', null),
-          docs,
-          <String>['a', 'd', 'e']);
+        collection,
+        collection.whereEqualTo('key', null),
+        docs,
+        <String>['b', 'c'],
+      );
+      await expectConsistent(
+        collection,
+        collection.whereNotEqualTo('key', null),
+        docs,
+        <String>['a', 'd', 'e'],
+      );
     });
 
     test('filterAndOrderNumericalValues', () async {
@@ -490,12 +557,17 @@ void main() {
         'i', // NaN
       ]);
       await expectConsistent(
-          collection,
-          descending.whereNotEqualTo('key', Decimal128Value('1.0')),
-          docs,
-          <String>['l', 'h', 'g', 'b', 'a', 'j', 'k', 'i']);
-      await expectConsistent(collection, descending.whereEqualTo('key', 1),
-          docs, <String>['f', 'e', 'd', 'c']);
+        collection,
+        descending.whereNotEqualTo('key', Decimal128Value('1.0')),
+        docs,
+        <String>['l', 'h', 'g', 'b', 'a', 'j', 'k', 'i'],
+      );
+      await expectConsistent(
+        collection,
+        descending.whereEqualTo('key', 1),
+        docs,
+        <String>['f', 'e', 'd', 'c'],
+      );
     });
 
     test('decimal128ValuesWithNo2sComplementRepresentation', () async {
@@ -511,31 +583,41 @@ void main() {
       final CollectionReference collection = await testCollectionWithDocs(docs);
 
       await expectConsistent(
-          collection,
-          collection.whereEqualTo('key', Decimal128Value('1.1')),
-          docs,
-          <String>['b']);
+        collection,
+        collection.whereEqualTo('key', Decimal128Value('1.1')),
+        docs,
+        <String>['b'],
+      );
       await expectConsistent(
-          collection,
-          collection.whereNotEqualTo('key', Decimal128Value('1.1')),
-          docs,
-          <String>['a', 'e', 'd', 'c']);
+        collection,
+        collection.whereNotEqualTo('key', Decimal128Value('1.1')),
+        docs,
+        <String>['a', 'e', 'd', 'c'],
+      );
       await expectConsistent(
-          collection, collection.whereEqualTo('key', 1.1), docs, <String>['c']);
-      await expectConsistent(collection, collection.whereNotEqualTo('key', 1.1),
-          docs, <String>['a', 'e', 'd', 'b']);
+        collection,
+        collection.whereEqualTo('key', 1.1),
+        docs,
+        <String>['c'],
+      );
+      await expectConsistent(
+        collection,
+        collection.whereNotEqualTo('key', 1.1),
+        docs,
+        <String>['a', 'e', 'd', 'b'],
+      );
     });
 
     test('orderBsonTypesTogether', () async {
       final _Docs docs = <String, Map<String, Object?>>{
         'bsonObjectId1': <String, Object?>{
-          'key': BsonObjectId('507f191e810c19729de860ea')
+          'key': BsonObjectId('507f191e810c19729de860ea'),
         },
         'bsonObjectId2': <String, Object?>{
-          'key': BsonObjectId('507f191e810c19729de860eb')
+          'key': BsonObjectId('507f191e810c19729de860eb'),
         },
         'bsonObjectId3': <String, Object?>{
-          'key': BsonObjectId('407f191e810c19729de860ea')
+          'key': BsonObjectId('407f191e810c19729de860ea'),
         },
         'regex1': <String, Object?>{'key': const RegexValue('^bar', 'm')},
         'regex2': <String, Object?>{'key': const RegexValue('^bar', 'i')},
@@ -544,13 +626,13 @@ void main() {
         'bsonTimestamp2': <String, Object?>{'key': BsonTimestamp(1, 2)},
         'bsonTimestamp3': <String, Object?>{'key': BsonTimestamp(1, 1)},
         'bsonBinary1': <String, Object?>{
-          'key': _binary(1, <int>[1, 2, 3])
+          'key': _binary(1, <int>[1, 2, 3]),
         },
         'bsonBinary2': <String, Object?>{
-          'key': _binary(1, <int>[1, 2, 4])
+          'key': _binary(1, <int>[1, 2, 4]),
         },
         'bsonBinary3': <String, Object?>{
-          'key': _binary(2, <int>[1, 2, 2])
+          'key': _binary(2, <int>[1, 2, 2]),
         },
         'int32Value1': <String, Object?>{'key': Int32Value(-1)},
         'int32Value2': <String, Object?>{'key': Int32Value(1)},
@@ -565,34 +647,38 @@ void main() {
       };
       final CollectionReference collection = await testCollectionWithDocs(docs);
 
-      await expectConsistent(collection,
-          collection.orderBy('key', Direction.descending), docs, <String>[
-        'maxKey2',
-        'maxKey1',
-        'regex3',
-        'regex1',
-        'regex2',
-        'bsonObjectId2',
-        'bsonObjectId1',
-        'bsonObjectId3',
-        'bsonBinary3',
-        'bsonBinary2',
-        'bsonBinary1',
-        'bsonTimestamp1',
-        'bsonTimestamp2',
-        'bsonTimestamp3',
-        // Int32Value and Decimal128Value are sorted together.
-        'decimal128Value3',
-        'int32Value2',
-        // An Int32Value of 0 equals a Decimal128Value of 0, they sort by
-        // document key as the secondary order.
-        'int32Value3',
-        'decimal128Value2',
-        'int32Value1',
-        'decimal128Value1',
-        'minKey2',
-        'minKey1',
-      ]);
+      await expectConsistent(
+        collection,
+        collection.orderBy('key', Direction.descending),
+        docs,
+        <String>[
+          'maxKey2',
+          'maxKey1',
+          'regex3',
+          'regex1',
+          'regex2',
+          'bsonObjectId2',
+          'bsonObjectId1',
+          'bsonObjectId3',
+          'bsonBinary3',
+          'bsonBinary2',
+          'bsonBinary1',
+          'bsonTimestamp1',
+          'bsonTimestamp2',
+          'bsonTimestamp3',
+          // Int32Value and Decimal128Value are sorted together.
+          'decimal128Value3',
+          'int32Value2',
+          // An Int32Value of 0 equals a Decimal128Value of 0, they sort by
+          // document key as the secondary order.
+          'int32Value3',
+          'decimal128Value2',
+          'int32Value1',
+          'decimal128Value1',
+          'minKey2',
+          'minKey1',
+        ],
+      );
     });
 
     test('canRunTransactionsOnDocumentsWithBsonTypes', () async {
@@ -600,50 +686,66 @@ void main() {
         'a': <String, Object?>{'key': BsonObjectId('507f191e810c19729de860ea')},
         'b': <String, Object?>{'key': const RegexValue('^foo', 'i')},
         'c': <String, Object?>{
-          'key': _binary(1, <int>[1, 2, 3])
+          'key': _binary(1, <int>[1, 2, 3]),
         },
       };
       final CollectionReference collection = await testCollectionWithDocs(docs);
 
       await firestore.runTransaction((Transaction transaction) async {
-        final DocumentSnapshot snapshot =
-            await transaction.get(collection.document('a'));
-        expect(snapshot.getBsonObjectId('key'),
-            BsonObjectId('507f191e810c19729de860ea'));
+        final DocumentSnapshot snapshot = await transaction.get(
+          collection.document('a'),
+        );
+        expect(
+          snapshot.getBsonObjectId('key'),
+          BsonObjectId('507f191e810c19729de860ea'),
+        );
         transaction
-          ..update(collection.document('b'),
-              <String, Object?>{'key': const RegexValue('^bar', 'i')})
+          ..update(collection.document('b'), <String, Object?>{
+            'key': const RegexValue('^bar', 'i'),
+          })
           ..delete(collection.document('c'));
       });
 
       final QuerySnapshot snapshot = await collection.get(Source.server);
+      expect(IntegrationTestUtil.querySnapshotToIds(snapshot), <String>[
+        'a',
+        'b',
+      ]);
       expect(
-          IntegrationTestUtil.querySnapshotToIds(snapshot), <String>['a', 'b']);
-      expect(snapshot.documents[0].getBsonObjectId('key'),
-          BsonObjectId('507f191e810c19729de860ea'));
-      expect(snapshot.documents[1].getRegexValue('key'),
-          const RegexValue('^bar', 'i'));
+        snapshot.documents[0].getBsonObjectId('key'),
+        BsonObjectId('507f191e810c19729de860ea'),
+      );
+      expect(
+        snapshot.documents[1].getRegexValue('key'),
+        const RegexValue('^bar', 'i'),
+      );
     });
 
-    test('numericIncrementWithBsonTypes', () async {
-      final DocumentReference docRef = testCollection().document();
+    test(
+      'numericIncrementWithBsonTypes',
+      () async {
+        final DocumentReference docRef = testCollection().document();
 
-      await docRef.set(<String, Object?>{'val': Decimal128Value('10.5')});
-      await docRef.update(<String, Object?>{'val': FieldValue.increment(5.0)});
-      DocumentSnapshot actual = await docRef.get(Source.server);
-      expect(actual.get('val'), Decimal128Value('15.5'));
+        await docRef.set(<String, Object?>{'val': Decimal128Value('10.5')});
+        await docRef.update(<String, Object?>{
+          'val': FieldValue.increment(5.0),
+        });
+        DocumentSnapshot actual = await docRef.get(Source.server);
+        expect(actual.get('val'), Decimal128Value('15.5'));
 
-      await docRef.set(<String, Object?>{'val': Int32Value(10)});
-      await docRef.update(<String, Object?>{'val': FieldValue.increment(5)});
-      actual = await docRef.get(Source.server);
-      expect(actual.get('val'), 15);
-    },
-        // Verified over REST: the emulator (v1.22.0) does not treat an
-        // Int32Value or a Decimal128Value as a number in an increment, it
-        // replaces the field with the operand. The backend adds them.
-        skip: skip ??
-            'The Firestore emulator ignores BSON numbers in increment '
-                'transforms (v1.22.0), this needs a real Enterprise database');
+        await docRef.set(<String, Object?>{'val': Int32Value(10)});
+        await docRef.update(<String, Object?>{'val': FieldValue.increment(5)});
+        actual = await docRef.get(Source.server);
+        expect(actual.get('val'), 15);
+      },
+      // Verified over REST: the emulator (v1.22.0) does not treat an
+      // Int32Value or a Decimal128Value as a number in an increment, it
+      // replaces the field with the operand. The backend adds them.
+      skip:
+          skip ??
+          'The Firestore emulator ignores BSON numbers in increment '
+              'transforms (v1.22.0), this needs a real Enterprise database',
+    );
 
     test('numericMinimumAndMaximumWithBsonTypes', () async {
       final DocumentReference docRef = testCollection().document();
@@ -676,23 +778,27 @@ void main() {
 
   group('TypeTest', () {
     test('testCanReadAndWriteMinKey', () {
-      return verifySuccessfulWriteReadCycle(
-          <String, Object?>{'minKey': MinKey.instance});
+      return verifySuccessfulWriteReadCycle(<String, Object?>{
+        'minKey': MinKey.instance,
+      });
     });
 
     test('testCanReadAndWriteMaxKey', () {
-      return verifySuccessfulWriteReadCycle(
-          <String, Object?>{'maxKey': MaxKey.instance});
+      return verifySuccessfulWriteReadCycle(<String, Object?>{
+        'maxKey': MaxKey.instance,
+      });
     });
 
     test('testCanReadAndWriteRegexValue', () {
-      return verifySuccessfulWriteReadCycle(
-          <String, Object?>{'regex': const RegexValue('^foo', 'i')});
+      return verifySuccessfulWriteReadCycle(<String, Object?>{
+        'regex': const RegexValue('^foo', 'i'),
+      });
     });
 
     test('testCanReadAndWriteInt32Value', () {
-      return verifySuccessfulWriteReadCycle(
-          <String, Object?>{'int32': Int32Value(1)});
+      return verifySuccessfulWriteReadCycle(<String, Object?>{
+        'int32': Int32Value(1),
+      });
     });
 
     test('testCanReadAndWriteDecimal128Value', () async {
@@ -715,25 +821,27 @@ void main() {
     });
 
     test('testCanReadAndWriteBsonTimestampValue', () {
-      return verifySuccessfulWriteReadCycle(
-          <String, Object?>{'bsonTimestamp': BsonTimestamp(1, 2)});
+      return verifySuccessfulWriteReadCycle(<String, Object?>{
+        'bsonTimestamp': BsonTimestamp(1, 2),
+      });
     });
 
     test('testCanReadAndWriteBsonObjectIdValue', () {
       return verifySuccessfulWriteReadCycle(<String, Object?>{
-        'bsonObjectId': BsonObjectId('507f191e810c19729de860ea')
+        'bsonObjectId': BsonObjectId('507f191e810c19729de860ea'),
       });
     });
 
     test('testCanReadAndWriteBsonBinaryValue', () async {
       await verifySuccessfulWriteReadCycle(<String, Object?>{
-        'bsonBinary': _binary(1, <int>[1, 2, 3])
+        'bsonBinary': _binary(1, <int>[1, 2, 3]),
       });
       await verifySuccessfulWriteReadCycle(<String, Object?>{
-        'bsonBinary': _binary(128, <int>[1, 2, 3])
+        'bsonBinary': _binary(128, <int>[1, 2, 3]),
       });
-      await verifySuccessfulWriteReadCycle(
-          <String, Object?>{'bsonBinary': _binary(255)});
+      await verifySuccessfulWriteReadCycle(<String, Object?>{
+        'bsonBinary': _binary(255),
+      });
     });
 
     test('testCanReadAndWriteBsonTypesInLists', () {
@@ -743,8 +851,9 @@ void main() {
     });
 
     test('testCanReadAndWriteBsonTypesInMaps', () {
-      return verifySuccessfulWriteReadCycle(
-          <String, Object?>{'BsonTypes': allTypes()});
+      return verifySuccessfulWriteReadCycle(<String, Object?>{
+        'BsonTypes': allTypes(),
+      });
     });
 
     test('testNativeAndBsonBinaryOrderingAndEquality', () async {
@@ -752,65 +861,125 @@ void main() {
       final _Docs docs = <String, Map<String, Object?>>{
         // BSON binary with the subtype 0 is a regular blob.
         'doc1': <String, Object?>{
-          'binary': _binary(0, <int>[2])
+          'binary': _binary(0, <int>[2]),
         },
         'doc2': <String, Object?>{
-          'binary': Blob(Uint8List.fromList(<int>[1]))
+          'binary': Blob(Uint8List.fromList(<int>[1])),
         },
       };
       await IntegrationTestUtil.writeAllDocs(collection, docs);
-      await expectConsistent(collection, collection.orderBy('binary'), docs,
-          <String>['doc2', 'doc1']);
+      await expectConsistent(
+        collection,
+        collection.orderBy('binary'),
+        docs,
+        <String>['doc2', 'doc1'],
+      );
 
       docs['doc3'] = <String, Object?>{
-        'binary': _binary(0, <int>[1])
+        'binary': _binary(0, <int>[1]),
       };
       await collection.document('doc3').set(docs['doc3']!);
       await expectConsistent(
-          collection,
-          collection.whereEqualTo('binary', Blob(Uint8List.fromList(<int>[1]))),
-          docs,
-          <String>['doc2', 'doc3']);
+        collection,
+        collection.whereEqualTo('binary', Blob(Uint8List.fromList(<int>[1]))),
+        docs,
+        <String>['doc2', 'doc3'],
+      );
     });
 
     test('invalidRegexGetsRejected', () async {
       await expectLater(
-          testCollection()
-              .document()
-              .set(<String, Object?>{'key': const RegexValue('foo', 'a')}),
-          throwsInvalidArgument("Invalid regex option 'a'"));
+        testCollection().document().set(<String, Object?>{
+          'key': const RegexValue('foo', 'a'),
+        }),
+        throwsInvalidArgument("Invalid regex option 'a'"),
+      );
     });
 
     test('invalidBsonObjectIdGetsRejected', () async {
       // An ObjectId whose length is not 24 gets rejected.
       await expectLater(
-          testCollection()
-              .document()
-              .set(<String, Object?>{'key': BsonObjectId('foobar')}),
-          throwsInvalidArgument('Object ID hex string has incorrect length.'));
+        testCollection().document().set(<String, Object?>{
+          'key': BsonObjectId('foobar'),
+        }),
+        throwsInvalidArgument('Object ID hex string has incorrect length.'),
+      );
     });
 
     test('invalidDecimal128ValueGetsRejected', () async {
       // More significant digits than a decimal128 can hold.
       await expectLater(
-          testCollection().document().set(<String, Object?>{
-            'key': Decimal128Value('1.0000000000000000000000000000000001')
-          }),
-          throwsInvalidArgument('Invalid decimal128 string'));
+        testCollection().document().set(<String, Object?>{
+          'key': Decimal128Value('1.0000000000000000000000000000000001'),
+        }),
+        throwsInvalidArgument('Invalid decimal128 string'),
+      );
+    });
+
+    // The Dart port rejects these values when they are constructed, before
+    // any write.
+    test('invalidBlobGetsRejected', () {
+      expect(
+        () => Blob.bsonBinary(1234, Uint8List.fromList(<int>[1, 2, 3])),
+        throwsA(
+          isA<ArgumentError>().having(
+            (ArgumentError e) => e.message,
+            'message',
+            'The subtype for Blob must be a value in the inclusive [0, 255] range.',
+          ),
+        ),
+      );
+      expect(
+        () => Blob.bsonBinary(-1, Uint8List.fromList(<int>[1])),
+        throwsArgumentError,
+      );
+    });
+
+    test('invalidBsonTimestampDataGetsRejected', () {
+      Matcher rejects(String field, int value) => throwsA(
+        isA<ArgumentError>()
+            .having((ArgumentError e) => e.invalidValue, 'invalidValue', value)
+            .having(
+              (ArgumentError e) => e.message,
+              'message',
+              "The field '$field' does not represent an unsigned 32-bit integer",
+            ),
+      );
+      expect(() => BsonTimestamp(-1, 1), rejects('seconds', -1));
+      expect(
+        () => BsonTimestamp(4294967296, 1),
+        rejects('seconds', 4294967296),
+      );
+      expect(() => BsonTimestamp(1, -1), rejects('increment', -1));
+      expect(
+        () => BsonTimestamp(1, 4294967296),
+        rejects('increment', 4294967296),
+      );
+    });
+
+    test('invalid 32-bit integer gets rejected', () {
+      expect(() => Int32Value(2147483648), throwsArgumentError);
+      expect(() => Int32Value(-2147483650), throwsArgumentError);
+      expect(Int32Value(2147483647).value, 2147483647);
+      expect(Int32Value(-2147483648).value, -2147483648);
     });
 
     test('testCanUseTypedAccessors', () async {
       final DocumentReference docRef = testCollection().document();
       await docRef.set(allTypes());
       final DocumentSnapshot snapshot = await docRef.get(Source.server);
-      expect(snapshot.getBsonObjectId('bsonObjectId'),
-          BsonObjectId('507f191e810c19729de860ea'));
+      expect(
+        snapshot.getBsonObjectId('bsonObjectId'),
+        BsonObjectId('507f191e810c19729de860ea'),
+      );
       expect(snapshot.getRegexValue('regex'), const RegexValue('^foo', 'i'));
       expect(snapshot.getBsonTimestamp('bsonTimestamp'), BsonTimestamp(1, 2));
       expect(snapshot.getBlob('bsonBinary'), _binary(1, <int>[1, 2, 3]));
       expect(snapshot.getInt32Value('int32'), Int32Value(1));
       expect(
-          snapshot.getDecimal128Value('decimal128'), Decimal128Value('1.2e3'));
+        snapshot.getDecimal128Value('decimal128'),
+        Decimal128Value('1.2e3'),
+      );
       expect(snapshot.getMinKey('minKey'), MinKey.instance);
       expect(snapshot.getMaxKey('maxKey'), MaxKey.instance);
       expect(snapshot.getInt32Value('missing'), isNull);
@@ -831,16 +1000,16 @@ void main() {
         'bsonTimestamp': <String, Object?>{'value': BsonTimestamp(1, 2)},
         'string': <String, Object?>{'value': 'a'},
         'bytes': <String, Object?>{
-          'value': Blob(Uint8List.fromList(<int>[1, 2, 3]))
+          'value': Blob(Uint8List.fromList(<int>[1, 2, 3])),
         },
         'bsonBinary': <String, Object?>{
-          'value': _binary(1, <int>[1, 2, 3])
+          'value': _binary(1, <int>[1, 2, 3]),
         },
         'reference': <String, Object?>{
-          'value': collection.document('testDocRef')
+          'value': collection.document('testDocRef'),
         },
         'bsonObjectId': <String, Object?>{
-          'value': BsonObjectId('507f191e810c19729de860ea')
+          'value': BsonObjectId('507f191e810c19729de860ea'),
         },
         'geoPoint': <String, Object?>{'value': GeoPoint(1.23, 4.56)},
         'regex': <String, Object?>{'value': const RegexValue('^foo', 'i')},
@@ -849,14 +1018,14 @@ void main() {
             1.0,
             'foo',
             <String, Object?>{'key': true},
-            null
-          ]
+            null,
+          ],
         },
         'vector': <String, Object?>{
-          'value': FieldValue.vector(<double>[1, 2, 3])
+          'value': FieldValue.vector(<double>[1, 2, 3]),
         },
         'map': <String, Object?>{
-          'value': <String, Object?>{'key': true}
+          'value': <String, Object?>{'key': true},
         },
         'max': <String, Object?>{'value': MaxKey.instance},
       };
@@ -888,11 +1057,15 @@ void main() {
       ];
       final Query query = collection.orderBy('value');
       await IntegrationTestUtil.checkOnlineAndOfflineResultsMatch(
-          collection, query, expected);
+        collection,
+        query,
+        expected,
+      );
       final QuerySnapshot snapshot = await query
           .getSnapshots(MetadataChanges.include)
           .firstWhere(
-              (QuerySnapshot snapshot) => !snapshot.metadata.isFromCache);
+            (QuerySnapshot snapshot) => !snapshot.metadata.isFromCache,
+          );
       expect(IntegrationTestUtil.querySnapshotToIds(snapshot), expected);
     });
   }, skip: skip);
