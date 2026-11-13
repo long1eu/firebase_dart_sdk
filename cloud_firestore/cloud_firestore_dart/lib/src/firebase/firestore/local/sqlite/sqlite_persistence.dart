@@ -593,7 +593,9 @@ class SQLitePersistence extends Persistence {
               (name.startsWith('sqlite_') && name != 'sqlite_sequence')) {
             continue;
           }
-          await db.execute('DELETE FROM "$name"');
+          // The name comes from the file, which another process may have written: quoted as an identifier, never
+          // run as SQL.
+          await db.execute('DELETE FROM "${name.replaceAll('"', '""')}"');
         }
         // The one row that a new cache has.
         await SQLiteSchema(db)._ensureTargetGlobal();

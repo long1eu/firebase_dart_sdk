@@ -142,6 +142,9 @@ Behaviour changes without a compile error:
   - Decimal128 values are parsed, compared and hashed in linear time: a value with a million
     digits (in a bundle or a snapshot JSON) took seconds to minutes and blocked the isolate.
     The accepted strings and the order are unchanged.
+  - `clearPersistence()` that empties a cache other clients still use quotes the table names it
+    reads from the file: a table named by another process could run SQL (for example attach and
+    create another file with the permissions of this process).
 - The local evaluation of queries and transforms follows the backend where 0.0.7 (and the JS
   and Android SDKs) did not; details under Fixed:
   - `whereIn`, `whereNotIn`, `arrayContains`, `arrayContainsAny`, `arrayUnion` and

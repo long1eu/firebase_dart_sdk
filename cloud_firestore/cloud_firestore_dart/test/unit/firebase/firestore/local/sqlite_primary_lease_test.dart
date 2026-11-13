@@ -592,6 +592,32 @@ void main() {
       expect(c.queryCache.targetCount, 0);
     });
 
+    test('a table name from the file is not run as SQL', () async {
+      // Another process that can write the file names a table so that the
+      // statement which empties it would attach (create) another file.
+      final Directory temp = Directory.systemTemp.createTempSync('lease');
+      addTearDown(() => temp.deleteSync(recursive: true));
+      final String attached = '${temp.path}/attached.db';
+      final SQLitePersistence a = await start('A');
+      final SQLitePersistence b = await start('B');
+      final String table =
+          'x"; ATTACH DATABASE \'$attached\' AS other; '
+          'CREATE TABLE other.t (a); --';
+      await b.execute('CREATE TABLE x (a)');
+      await b.execute('CREATE TABLE "${table.replaceAll('"', '""')}" (a)');
+      await b.execute(
+        'INSERT INTO "${table.replaceAll('"', '""')}" (a) VALUES (1)',
+      );
+      await a.shutdown();
+      await a.clearPersistence();
+
+      expect(File(attached).existsSync(), isFalse);
+      expect(
+        await b.query('SELECT * FROM "${table.replaceAll('"', '""')}"'),
+        isEmpty,
+      );
+    });
+
     test('deletes the file when the other clients are gone', () async {
       final SQLitePersistence a = await start('A');
       await a.execute(
