@@ -477,7 +477,7 @@ class DocumentSnapshot<T extends dynamic> {
       // TODO(long1eu): Somehow support foreign references.
       Log.w(
         '$DocumentSnapshot',
-        'Document ${key.path} contains a document reference within a different database (${refDatabase.projectId}/${refDatabase.databaseId}) which is not supported. It will be treated as a reference in the current database (${database.projectId}/${database.databaseId}) instead.',
+        'A document reference to ${key.path} refers to a different database (${refDatabase.projectId}/${refDatabase.databaseId}), which is not supported. It will be treated as a reference in the current database (${database.projectId}/${database.databaseId}) instead.',
       );
     }
     return DocumentReferenceInternal.create<Map<String, Object?>>(

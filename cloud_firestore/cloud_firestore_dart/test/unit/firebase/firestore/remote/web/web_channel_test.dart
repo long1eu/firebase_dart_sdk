@@ -352,6 +352,61 @@ void main() {
       expect(done, isTrue);
     });
 
+    // firebase-js-sdk #9472: log a warning when the database is not found.
+    test('a missing database is reported with a warning', () async {
+      final List<String> logs = <String>[];
+      await runZoned(
+        () async {
+          open();
+          await handshake();
+          final FakeRequest back = await http.next();
+          back
+            ..stream(200)
+            ..add(
+              chunk(
+                '[[1,[{"error":{"code":404,"message":"The database (default) does not exist for project demo-test Please visit https://console.cloud.google.com/datastore/setup?project=demo-test to add a Cloud Datastore or Cloud Firestore database.","status":"NOT_FOUND"}}]]]',
+              ),
+            );
+          await pump();
+        },
+        zoneSpecification: ZoneSpecification(
+          print: (_, __, ___, String line) => logs.add(line),
+        ),
+      );
+      expect((errors.single as GrpcError).code, StatusCode.notFound);
+      expect(logs, hasLength(1));
+      expect(
+        logs.single,
+        contains(
+          "Database '(default)' not found. Please check your project configuration.",
+        ),
+      );
+    });
+
+    test('a NOT_FOUND that is not about the database logs nothing', () async {
+      final List<String> logs = <String>[];
+      await runZoned(
+        () async {
+          open();
+          await handshake();
+          final FakeRequest back = await http.next();
+          back
+            ..stream(200)
+            ..add(
+              chunk(
+                '[[1,[{"error":{"code":404,"message":"gone","status":"NOT_FOUND"}}]]]',
+              ),
+            );
+          await pump();
+        },
+        zoneSpecification: ZoneSpecification(
+          print: (_, __, ___, String line) => logs.add(line),
+        ),
+      );
+      expect((errors.single as GrpcError).code, StatusCode.notFound);
+      expect(logs, isEmpty);
+    });
+
     test('an unknown session (HTTP 400) is reported as UNAVAILABLE', () async {
       open();
       await handshake();
@@ -745,6 +800,43 @@ void main() {
       again.add(chunk('[[5,[{"targetChange":{"targetChangeType":"NO_CHANGE"}}]]]'));
       await pump();
       expect(messages, hasLength(5));
+      expect(errors, isEmpty);
+      await stream.close();
+    });
+
+    // firebase-js-sdk #9242: WebChannel ignores duplicate messages received
+    // from the server.
+    test('arrays the server sends again are not delivered twice', () async {
+      open();
+      await handshake();
+      final FakeRequest back = await http.next();
+      back
+        ..stream(200)
+        ..add(chunk(listenChunk));
+      await pump();
+      expect(messages, hasLength(4));
+
+      back.cutBody();
+      final FakeRequest again = await http.next();
+      expect(again.query['AID'], '4');
+      // The server repeats arrays 3 and 4 before the new array 5.
+      again
+        ..stream(200)
+        ..add(
+          chunk(
+            '[[3,[{"targetChange":{"targetChangeType":"CURRENT","targetIds":[2]}}]],'
+            '[4,[{"targetChange":{"targetChangeType":"NO_CHANGE"}}]],'
+            '[5,[{"targetChange":{"targetChangeType":"REMOVE","targetIds":[2]}}]]]',
+          ),
+        );
+      await pump();
+      expect(messages, hasLength(5));
+      expect(messages.last, <String, Object?>{
+        'targetChange': <String, Object?>{
+          'targetChangeType': 'REMOVE',
+          'targetIds': <Object?>[2],
+        },
+      });
       expect(errors, isEmpty);
       await stream.close();
     });

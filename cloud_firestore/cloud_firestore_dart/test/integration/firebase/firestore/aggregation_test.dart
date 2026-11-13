@@ -182,6 +182,28 @@ void main() {
       expect(s.getCount(), 5);
     });
 
+    // Port of the JS SDK test 'can run count query getCountFromServer with
+    // special chars in the document path' (firebase-js-sdk #7402).
+    for (final String documentPath in <String>[
+      r'so!@#$%^&*()_+special/sub',
+      r'b1/so!@#$%^&*()_+special',
+    ]) {
+      test('can run count query getCountFromServer with special chars in the '
+          'document path: $documentPath', () async {
+        final CollectionReference coll = await testCollection();
+        final List<String> segments = documentPath.split('/');
+        final CollectionReference sub = coll
+            .document(segments[0])
+            .collection(segments[1]);
+        await sub.add(<String, Object?>{'foo': 'bar'});
+        await sub.add(<String, Object?>{'foo': 'baz'});
+        final AggregateQuerySnapshot snapshot = await sub.count().get(
+          AggregateSource.server,
+        );
+        expect(snapshot.getCount(), 2);
+      });
+    }
+
     test('testCanRunCountOnNonExistentCollection', () async {
       final CollectionReference c = (await testFirestore()).collection(
         'random-coll',

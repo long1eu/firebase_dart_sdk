@@ -33,6 +33,7 @@ import 'dart:math';
 import 'package:cloud_firestore_dart/src/firebase/firestore/remote/datastore/web/rpc_error.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/remote/datastore/web/web_http_client.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/grpc_status.dart';
+import 'package:firebase_app_dart/internal.dart';
 
 /// Splits a WebChannel response body into its JSON chunks.
 class WebChannelChunkParser {
@@ -640,7 +641,14 @@ class WebChannelStream {
     if (array is! List || array.length < 2 || array[0] is! int) {
       return;
     }
-    _lastArrayId = array[0] as int;
+    final int arrayId = array[0] as int;
+    if (arrayId <= _lastArrayId) {
+      // An array the server sent again (for example after a back channel
+      // request was cut) was already delivered: drop it, as the WebChannel of
+      // the JS SDK does since firebase-js-sdk #9242 (closure-net).
+      return;
+    }
+    _lastArrayId = arrayId;
     final Object? payload = array[1];
 
     Object? message;
@@ -671,11 +679,31 @@ class WebChannelStream {
 
     final Map<String, Object?>? error = findErrorJson(message);
     if (error != null) {
+      _warnIfDatabaseNotFound(error);
       _fail(grpcErrorFromJson(error));
       return;
     }
     if (message is Map) {
       _messages.add(message.cast<String, Object?>());
+    }
+  }
+
+  /// Port of the "Database not found" warning of the JS SDK
+  /// `WebChannelConnection` (firebase-js-sdk #9472).
+  void _warnIfDatabaseNotFound(Map<String, Object?> error) {
+    final Object? message = error['message'];
+    final String databaseId = _database.substring(
+      _database.lastIndexOf('/') + 1,
+    );
+    if (error['status'] == 'NOT_FOUND' &&
+        message is String &&
+        message.contains('database') &&
+        message.contains('does not exist') &&
+        message.contains(databaseId)) {
+      Log.w(
+        'WebChannelStream',
+        "Database '$databaseId' not found. Please check your project configuration.",
+      );
     }
   }
 

@@ -912,6 +912,22 @@ void main() {
     expect(snapshot.exists, isFalse);
   });
 
+  // Port of the JS SDK test 'runTransaction with empty message reject inside'
+  // (firebase-js-sdk #9177): the error of the update function is rethrown as
+  // is, without retrying the transaction until a timeout.
+  test('runTransaction with empty message reject inside', () async {
+    int attempts = 0;
+    final Object error = Exception();
+    await expectLater(
+      firestore.runTransaction<void>((Transaction transaction) {
+        attempts++;
+        return Future<void>.error(error);
+      }),
+      throwsA(same(error)),
+    );
+    expect(attempts, 1);
+  });
+
   test('testCanHaveGetsWithoutMutations', () async {
     final DocumentReference doc = firestore.collection('foo').document();
     final DocumentReference doc2 = firestore.collection('foo').document();

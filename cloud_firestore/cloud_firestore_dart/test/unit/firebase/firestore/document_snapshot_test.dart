@@ -1,8 +1,12 @@
 // File created by
 // Lung Razvan <long1eu>
 // on 28/09/2018
+import 'dart:async';
+
 import 'package:cloud_firestore_dart/src/firebase/firestore/document_snapshot.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/model/database_id.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/document.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/model/value/field_value.dart';
 import 'package:test/test.dart';
 
 import '../../../util/test_util.dart' as util;
@@ -76,5 +80,45 @@ void main() {
       hasPendingWrites: false,
     );
     expect(differentData, isNot(base));
+  });
+
+  // firebase-js-sdk #10250: the warning names the referenced document, not
+  // the document that contains the reference.
+  test('a reference to another database is logged with the referenced key', () {
+    final DocumentSnapshot<Map<String, Object?>> snapshot =
+        DocumentSnapshotInternal.fromDocument(
+          firestore,
+          Document(
+            util.key('rooms/holder'),
+            util.version(1),
+            DocumentState.synced,
+            ObjectValue.fromMap(<String, FieldValue>{
+              'ref': ReferenceValue.valueOf(
+                DatabaseId.forDatabase('other-project', 'other-db'),
+                util.key('rooms/target'),
+              ),
+            }),
+          ),
+          isFromCache: false,
+          hasPendingWrites: false,
+        );
+
+    final List<String> logs = <String>[];
+    runZoned(
+      () => snapshot.data,
+      zoneSpecification: ZoneSpecification(
+        print: (_, __, ___, String line) => logs.add(line),
+      ),
+    );
+
+    expect(logs, hasLength(1));
+    expect(
+      logs.single,
+      contains(
+        'A document reference to rooms/target refers to a different '
+        'database (other-project/other-db), which is not supported.',
+      ),
+    );
+    expect(logs.single, isNot(contains('rooms/holder')));
   });
 }
