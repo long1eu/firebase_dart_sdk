@@ -20,25 +20,36 @@
 //    first snapshot of a listener). The writes are then committed and the
 //    backend's answer after the commit is the reference.
 //
+// The second test opens two clients on one SQLite file: A writes, B reads
+// from the cache after a listen, and the primary lease moves between them
+// (the primary disables its network). Both are compared with the backend;
+// see [_checkSharedCacheCase].
+//
 // Operands null and NaN of `in`, `not-in`, the array filters, `<=` and `>=`
 // are not generated: a Standard edition backend never matches them, the SDK
 // does (see "Values, queries and API" in docs/ARCHITECTURE.md and
 // property_query_test.dart, which covers that case).
 //
-// The default run (8 collections) takes 15 to 80 seconds on the emulator,
-// depending on the load of the machine. PROPERTY_SCALE=<n> runs n times as
-// many collections, PROPERTY_SEED=<seed> reruns a failing case and
-// PROPERTY_TRACE=1 prints every step.
+// By default the first test takes 15 to 80 seconds on the emulator (8
+// collections), depending on the load of the machine, and the second about 75
+// seconds (2 collections, mostly waiting for the lease to move).
+// PROPERTY_SCALE=<n> runs n times as many collections, PROPERTY_SEED=<seed>
+// reruns a failing case and PROPERTY_TRACE=1 prints every step.
 
 import 'dart:async';
+import 'dart:io';
 
 import 'package:cloud_firestore_dart/cloud_firestore_dart.dart';
 import 'package:cloud_firestore_dart/lite.dart' as lite;
+import 'package:cloud_firestore_dart/src/firebase/firestore/local/sqlite/sqlite_persistence.dart'
+    show SQLiteClientMetadata;
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/util.dart'
     show autoId;
 import 'package:cloud_firestore_dart/src/internal_access.dart';
+import 'package:firebase_app_dart/internal.dart' show InternalLogLevel;
 import 'package:test/test.dart';
 
+import '../../../unit/firebase/firestore/local/mock/database_mock.dart';
 import '../../../util/integration_test_util.dart';
 import '../../../util/lite_test_util.dart' show newLiteTestFirestore;
 import '../../../util/property.dart';
@@ -52,6 +63,17 @@ const int documentCount = 30;
 const int queriesPerPhase = 40;
 const int writeCount = 14;
 const Duration syncTimeout = Duration(seconds: 15);
+
+/// The queries of each phase of the shared cache property.
+const int sharedQueriesPerPhase = 20;
+
+/// How often the primary lease moves from A to B and back per collection of
+/// the shared cache property.
+const int leaseRounds = 2;
+
+/// The longest a move of the primary lease may take: the lease is refreshed
+/// every four seconds.
+const Duration leaseTimeout = Duration(seconds: 20);
 
 void main() {
   configureGeneratorsForBackend();
@@ -121,6 +143,49 @@ void main() {
     },
     timeout: Timeout(Duration(minutes: 2 + 2 * cases(1))),
   );
+
+  test(
+    'two clients on one SQLite cache agree with the backend while the '
+    'primary lease moves between them',
+    skip:
+        needsEmulator ??
+        IntegrationTestUtil.skipOnEnterprise(
+          'an Enterprise edition database returns other documents for `!=` '
+          'and `not-in` with a limit; see property_query_test.dart',
+        ),
+    () async {
+      final _Stats stats = _Stats();
+      final lite.Firestore backend = newLiteTestFirestore();
+      final Firestore writer = await IntegrationTestUtil.testFirestore();
+      for (int i = 0; i < cases(2); i++) {
+        await _checkSharedCacheCase(
+          caseSeed(5000 + i),
+          backend: backend,
+          writer: writer,
+          stats: stats,
+        );
+        if (stats.failures.length >= _Stats.maxFailures) {
+          break;
+        }
+      }
+      print('shared cache query property: $stats');
+      if (stats.failures.isNotEmpty) {
+        fail(
+          '${stats.failures.length} failure(s):\n\n'
+          '${stats.failures.join('\n')}',
+        );
+      }
+      // One comparison per query and phase (two phases per round); the SDK
+      // and the backend must accept at least half of the queries.
+      expect(
+        stats.compared,
+        greaterThan(cases(2) * leaseRounds * sharedQueriesPerPhase),
+        reason: '$stats',
+      );
+      expect(stats.writesApplied, greaterThan(0), reason: '$stats');
+    },
+    timeout: Timeout(Duration(minutes: 2 + 2 * cases(1))),
+  );
 }
 
 class _Client {
@@ -140,6 +205,8 @@ class _Stats {
   int rejectedByBackend = 0;
   int writesApplied = 0;
   int writesRejected = 0;
+  int limitListenersInLimbo = 0;
+  int leaseTakenAfterStall = 0;
   final List<String> failures = <String>[];
 
   static const int maxFailures = 8;
@@ -148,7 +215,11 @@ class _Stats {
   String toString() =>
       'compared $compared query results; the SDK rejected $rejectedBySdk, '
       'the backend $rejectedByBackend queries; $writesApplied writes '
-      'committed, $writesRejected rejected (update of a missing document)';
+      'committed, $writesRejected rejected (update of a missing document)'
+      '${limitListenersInLimbo == 0 ? '' : '; $limitListenersInLimbo limit '
+                'listeners waited for the writes of the other client'}'
+      '${leaseTakenAfterStall == 0 ? '' : '; the secondary took the lease '
+                'after $leaseTakenAfterStall stalls and gave it back'}';
 }
 
 /// One generated write; [data] holds references of the writer, see [_rebind].
@@ -298,16 +369,22 @@ Future<Map<String, Object?>> _backendData(
   };
 }
 
+String _describeSnapshot(QuerySnapshot<Map<String, Object?>> snapshot) =>
+    '${_ids(snapshot)}${snapshot.metadata.isFromCache ? ' from cache' : ''}'
+    '${snapshot.metadata.hasPendingWrites ? ' with pending writes' : ''}';
+
 /// Listens to [query] until a snapshot is in sync with the backend. Returns
 /// the ids of that snapshot and the subscription, which stays active.
 Future<(List<String>, StreamSubscription<QuerySnapshot<Map<String, Object?>>>)>
 _listenUntilSynced(Query<Map<String, Object?>> query) async {
   final Completer<List<String>> synced = Completer<List<String>>();
+  final List<String> seen = <String>[];
   final StreamSubscription<QuerySnapshot<Map<String, Object?>>> subscription =
       query
           .getSnapshots(MetadataChanges.include)
           .listen(
             (QuerySnapshot<Map<String, Object?>> snapshot) {
+              seen.add(_describeSnapshot(snapshot));
               if (!snapshot.metadata.isFromCache &&
                   !snapshot.metadata.hasPendingWrites &&
                   !synced.isCompleted) {
@@ -321,10 +398,82 @@ _listenUntilSynced(Query<Map<String, Object?>> query) async {
             },
           );
   try {
-    return (await synced.future.timeout(syncTimeout), subscription);
+    return (
+      await synced.future.timeout(
+        syncTimeout,
+        onTimeout: () => throw TimeoutException(
+          'no snapshot in sync without pending writes; snapshots: $seen',
+          syncTimeout,
+        ),
+      ),
+      subscription,
+    );
   } catch (_) {
     await subscription.cancel();
     rethrow;
+  }
+}
+
+/// Listens to [query] until a snapshot is in sync with the backend, pending
+/// writes allowed, or, with [settle], until that time passed with no such
+/// snapshot. Returns the ids of the snapshot in sync (or the latest one),
+/// whether it is in sync, and the subscription, which stays active.
+Future<
+  (List<String>, bool, StreamSubscription<QuerySnapshot<Map<String, Object?>>>)
+>
+_listenUntilSyncedOrSettled(
+  Query<Map<String, Object?>> query, {
+  Duration? settle,
+}) async {
+  final Completer<(List<String>, bool)> done =
+      Completer<(List<String>, bool)>();
+  final List<String> seen = <String>[];
+  List<String>? latest;
+  bool settled = false;
+  final StreamSubscription<QuerySnapshot<Map<String, Object?>>> subscription =
+      query
+          .getSnapshots(MetadataChanges.include)
+          .listen(
+            (QuerySnapshot<Map<String, Object?>> snapshot) {
+              seen.add(_describeSnapshot(snapshot));
+              latest = _ids(snapshot);
+              if (done.isCompleted) {
+                return;
+              }
+              if (!snapshot.metadata.isFromCache) {
+                done.complete((latest!, true));
+              } else if (settled) {
+                done.complete((latest!, false));
+              }
+            },
+            onError: (Object error, StackTrace stack) {
+              if (!done.isCompleted) {
+                done.completeError(error, stack);
+              }
+            },
+          );
+  final Timer? timer = settle == null
+      ? null
+      : Timer(settle, () {
+          settled = true;
+          if (!done.isCompleted && latest != null) {
+            done.complete((latest!, false));
+          }
+        });
+  try {
+    final (List<String> ids, bool inSync) = await done.future.timeout(
+      syncTimeout,
+      onTimeout: () => throw TimeoutException(
+        'no snapshot in sync; snapshots: $seen',
+        syncTimeout,
+      ),
+    );
+    return (ids, inSync, subscription);
+  } catch (_) {
+    await subscription.cancel();
+    rethrow;
+  } finally {
+    timer?.cancel();
   }
 }
 
@@ -562,5 +711,375 @@ Future<void> _checkCase(
         data: serverData,
       );
     }
+  }
+}
+
+String _describeLease(String name, Firestore firestore) =>
+    '$name holds the lease ${firestore.client.isPrimaryClient}, acts as '
+    'primary ${firestore.client.syncEngine.isPrimaryClient}, can use the '
+    'network ${firestore.client.remoteStore.canUseNetwork}';
+
+/// Waits until [primary] holds the primary lease of the shared cache and
+/// [secondary] knows that it does not.
+Future<void> _waitForLease(Firestore primary, Firestore secondary) async {
+  bool settled() =>
+      primary.client.isPrimaryClient &&
+      primary.client.syncEngine.isPrimaryClient &&
+      !secondary.client.isPrimaryClient &&
+      !secondary.client.syncEngine.isPrimaryClient;
+  final Stopwatch watch = Stopwatch()..start();
+  while (!settled()) {
+    if (watch.elapsed > leaseTimeout) {
+      throw TimeoutException('the primary lease did not move', leaseTimeout);
+    }
+    await Future<void>.delayed(const Duration(milliseconds: 50));
+  }
+}
+
+/// One collection of the shared cache property: clients A and B open one
+/// SQLite file. A writes, B reads; the primary lease moves from A to B and
+/// back [leaseRounds] times.
+///
+/// Each round:
+///  1. A is primary. A commits random writes. For each query, A listens until
+///     it is in sync and reads it from the cache; B, the secondary, listens
+///     (from the cache) and reads it from the cache. All four answers are
+///     compared with the backend.
+///  2. A disables its network and B enables its own, which gives the lease to
+///     B. A makes random writes, which stay pending in the shared mutation
+///     queue: only A sends them, once it is primary again. For each query B
+///     listens until it is in sync with the backend and reads it from the
+///     cache, and A reads it from the cache. Both see A's pending writes.
+///  3. A enables its network and B disables its own, which moves the lease
+///     back to A. A sends its writes; the answers of step 2 are compared with
+///     the backend after they are committed.
+///
+/// The secondary always has its network disabled (it does not use it). The
+/// lease is valid for five seconds after a refresh, and refreshed every four:
+/// when the timers of the isolate run more than a second late (a loaded
+/// machine), the lease expires and the other client takes it. With the
+/// network of the secondary disabled, the election gives the lease back to
+/// the client with network on the next refreshes. With both online the
+/// lease would stay with the client that took it, and the pending writes of
+/// the other one would not be sent until it is primary again: clients that
+/// share a cache do not share their pending writes yet (see the multi-client
+/// row in docs/ARCHITECTURE.md).
+Future<void> _checkSharedCacheCase(
+  int seed, {
+  required lite.Firestore backend,
+  required Firestore writer,
+  required _Stats stats,
+}) async {
+  final Gen gen = Gen(seed);
+  final List<Object?> pool = queryValuePool(
+    gen,
+    (String id) => writer.doc('property_refs/$id'),
+  );
+  final Map<String, Map<String, Object?>> data = <String, Map<String, Object?>>{
+    for (int i = 0; i < documentCount; i++) _id(i): queryDocument(gen, pool),
+  };
+  final String path = 'property_query_shared_${autoId()}';
+  final String dbName = 'property_query_shared_${autoId()}.db';
+  DatabaseMock.deleteDatabaseFiles(dbName);
+  Future<Firestore> open() => IntegrationTestUtil.testFirestoreInstance(
+    IntegrationTestUtil.provider.projectId,
+    InternalLogLevel.w,
+    IntegrationTestUtil.newTestSettings(),
+    IntegrationTestUtil.currentDatabasePath,
+    fixedDbName: dbName,
+  );
+
+  String phase = 'opening the clients';
+  final List<(String, Firestore)> opened = <(String, Firestore)>[];
+  String leaseState() => <String>[
+    for (final (String name, Firestore f) in opened) _describeLease(name, f),
+  ].join('; ');
+  Future<T> step<T>(String what, Future<T> future) {
+    if (traceProperties) {
+      print('TRACE seed $seed, $phase: $what');
+    }
+    String failed(String reason) =>
+        'seed $seed (rerun with PROPERTY_SEED=$seed), $phase: $what $reason '
+        '(${leaseState()})';
+    // A timeout inside [future] (a listener that never gets in sync) is
+    // reported with the step too.
+    return future
+        .timeout(
+          leaseTimeout * 2,
+          onTimeout: () => throw TimeoutException(failed('did not complete')),
+        )
+        .catchError(
+          (Object error) => throw TimeoutException(failed('timed out: $error')),
+          test: (Object error) =>
+              error is TimeoutException &&
+              !(error.message ?? '').startsWith('seed '),
+        );
+  }
+
+  // The client that opens the cache last takes the primary lease.
+  final Firestore b = await step('open B', open());
+  opened.add(('B', b));
+  final Firestore a = await step('open A', open());
+  opened.add(('A', a));
+  final List<StreamSubscription<Object?>> subscriptions =
+      <StreamSubscription<Object?>>[];
+  try {
+    await step('B disables its network', b.disableNetwork());
+    await step('B learns that A holds the lease', _waitForLease(a, b));
+    await step('write the documents', writeAll(writer.collection(path), data));
+    final CollectionReference<Map<String, Object?>> collectionA = a.collection(
+      path,
+    );
+    final CollectionReference<Map<String, Object?>> collectionB = b.collection(
+      path,
+    );
+    final List<Object?> poolA = <Object?>[
+      for (final Object? v in pool) _rebind(v, a),
+    ];
+    final List<Object?> poolB = <Object?>[
+      for (final Object? v in pool) _rebind(v, b),
+    ];
+    // The same query (same seed) on A and on B.
+    (GeneratedQuery, GeneratedQuery)? query(int q) {
+      Gen queryGen() => Gen((seed + (q + 1) * 104729) & 0x7fffffff);
+      final GeneratedQuery? forA = generateQuery(
+        queryGen(),
+        collectionA,
+        poolA,
+      );
+      final GeneratedQuery? forB = generateQuery(
+        queryGen(),
+        collectionB,
+        poolB,
+      );
+      if (forA == null || forB == null) {
+        stats.rejectedBySdk++;
+        return null;
+      }
+      return (forA, forB);
+    }
+
+    String context(int q, GeneratedQuery generated) =>
+        '  seed: $seed (rerun with PROPERTY_SEED=$seed), shared SQLite cache, '
+        '$phase, query #$q:\n    $generated';
+
+    // A keeps every document of the collection in the cache: the primary
+    // client writes what it hears from the backend to the shared file.
+    phase = 'round 1, A primary';
+    final (
+      _,
+      StreamSubscription<QuerySnapshot<Map<String, Object?>>> all,
+    ) = await step(
+      'A listens to the collection',
+      _listenUntilSynced(collectionA),
+    );
+    subscriptions.add(all);
+
+    for (int round = 1; round <= leaseRounds; round++) {
+      final int first = (round - 1) * 2 * sharedQueriesPerPhase;
+
+      // ------------------------------------------------------ A primary
+      phase = 'round $round, A primary';
+      if (round == 1) {
+        // The isolate of both clients stalls for longer than the lease is
+        // valid, as on a loaded machine: B may take the lease on its next
+        // refresh. The election must give it back to A, which has network.
+        sleep(const Duration(milliseconds: 5500));
+        bool taken = false;
+        final Timer watch = Timer.periodic(
+          const Duration(milliseconds: 20),
+          (_) => taken = taken || b.client.isPrimaryClient,
+        );
+        await Future<void>.delayed(SQLiteClientMetadata.refreshInterval * 2);
+        watch.cancel();
+        if (taken) {
+          stats.leaseTakenAfterStall++;
+        }
+        await step(
+          'A holds the lease again after a stall',
+          _waitForLease(a, b),
+        );
+      }
+      final List<_Write> online = _generateWrites(gen, pool);
+      await step(
+        'A commits its writes',
+        Future.wait(<Future<void>>[
+          for (final _Write write in online) _apply(write, collectionA, stats),
+        ]),
+      );
+      Map<String, Object?> serverData = await step(
+        'read the collection from the backend',
+        _backendData(backend, path),
+      );
+      for (int q = first; q < first + sharedQueriesPerPhase; q++) {
+        final (GeneratedQuery, GeneratedQuery)? generated = query(q);
+        if (generated == null) {
+          continue;
+        }
+        final (GeneratedQuery forA, GeneratedQuery forB) = generated;
+        final List<String>? expected = await step(
+          'run query #$q on the backend',
+          _backendIds(backend, forA.query, stats),
+        );
+        if (expected == null) {
+          continue;
+        }
+        final (
+          List<String> listenedA,
+          StreamSubscription<QuerySnapshot<Map<String, Object?>>> subscription,
+        ) = await step(
+          'A listens to query #$q: $forA',
+          _listenUntilSynced(forA.query),
+        );
+        final List<String> cachedA = _ids(
+          await step(
+            'A reads query #$q from the cache',
+            forA.query.get(Source.cache),
+          ),
+        );
+        await step('A stops listening to query #$q', subscription.cancel());
+        final List<String> listenedB = await step(
+          'B listens to query #$q: $forB',
+          _firstSnapshot(forB.query),
+        );
+        final List<String> cachedB = _ids(
+          await step(
+            'B reads query #$q from the cache',
+            forB.query.get(Source.cache),
+          ),
+        );
+        _compare(
+          stats: stats,
+          context: '${context(q, forA)}\n  writes of A: ${online.join(', ')}',
+          expected: expected,
+          results: <String, List<String>>{
+            'A listener in sync': listenedA,
+            'A cache while listening': cachedA,
+            'B listener (secondary, from the cache)': listenedB,
+            'B cache (secondary)': cachedB,
+          },
+          data: serverData,
+        );
+      }
+
+      // ---------------------------------- B primary, A offline with writes
+      phase = 'round $round, B primary';
+      await step('A disables its network', a.disableNetwork());
+      await step('B enables its network', b.enableNetwork());
+      await step('B takes the lease', _waitForLease(b, a));
+      final List<_Write> pending = _generateWrites(gen, pool);
+      final List<Future<void>> committed = <Future<void>>[
+        for (final _Write write in pending) _apply(write, collectionA, stats),
+      ];
+      final Map<int, (GeneratedQuery, Map<String, List<String>>)> answers =
+          <int, (GeneratedQuery, Map<String, List<String>>)>{};
+      for (
+        int q = first + sharedQueriesPerPhase;
+        q < first + 2 * sharedQueriesPerPhase;
+        q++
+      ) {
+        final (GeneratedQuery, GeneratedQuery)? generated = query(q);
+        if (generated == null) {
+          continue;
+        }
+        final (GeneratedQuery forA, GeneratedQuery forB) = generated;
+        // Only queries that the backend accepts (it is asked again after the
+        // commit).
+        if (await step(
+              'run query #$q on the backend',
+              _backendIds(backend, forA.query, stats),
+            ) ==
+            null) {
+          continue;
+        }
+        // A pending write of A can move a document into the window of a
+        // limit query that the backend does not return yet: the document is
+        // in limbo until the write is committed, and B can not send the
+        // writes of A. Its listener stays `isFromCache` until A is primary
+        // again (as a single client's does while offline with such a write).
+        // Every other query must get in sync.
+        final bool limited =
+            forB.query.query.hasLimitToFirst || forB.query.query.hasLimitToLast;
+        final (
+          List<String> listenedB,
+          bool inSync,
+          StreamSubscription<QuerySnapshot<Map<String, Object?>>> subscription,
+        ) = await step(
+          'B listens to query #$q: $forB',
+          _listenUntilSyncedOrSettled(
+            forB.query,
+            settle: limited ? const Duration(seconds: 3) : null,
+          ),
+        );
+        if (!inSync) {
+          stats.limitListenersInLimbo++;
+        }
+        final List<String> cachedB = _ids(
+          await step(
+            'B reads query #$q from the cache',
+            forB.query.get(Source.cache),
+          ),
+        );
+        await step('B stops listening to query #$q', subscription.cancel());
+        final List<String> cachedA = _ids(
+          await step(
+            'A reads query #$q from the cache',
+            forA.query.get(Source.cache),
+          ),
+        );
+        answers[q] = (
+          forA,
+          <String, List<String>>{
+            'B listener (primary), with the writes of A': listenedB,
+            'B cache while listening': cachedB,
+            'A cache (secondary, offline, its own writes pending)': cachedA,
+          },
+        );
+      }
+
+      // ------------------------------------------ the lease goes back to A
+      phase = 'round $round, the lease goes back to A';
+      await step('A enables its network', a.enableNetwork());
+      await step('B disables its network', b.disableNetwork());
+      await step('A takes the lease', _waitForLease(a, b));
+      await step('A commits its pending writes', Future.wait(committed));
+      serverData = await step(
+        'read the collection from the backend',
+        _backendData(backend, path),
+      );
+      phase = 'round $round, B primary, compared after the commit';
+      for (final MapEntry<int, (GeneratedQuery, Map<String, List<String>>)>
+          entry
+          in answers.entries) {
+        final (GeneratedQuery generated, Map<String, List<String>> results) =
+            entry.value;
+        final List<String>? expected = await step(
+          'run query #${entry.key} on the backend',
+          _backendIds(backend, generated.query, stats),
+        );
+        if (expected == null) {
+          continue;
+        }
+        _compare(
+          stats: stats,
+          context:
+              '${context(entry.key, generated)}\n'
+              '  pending writes of A: ${pending.join(', ')}',
+          expected: expected,
+          results: results,
+          data: serverData,
+        );
+      }
+    }
+  } finally {
+    for (final StreamSubscription<Object?> subscription in subscriptions) {
+      await subscription.cancel();
+    }
+    for (final Firestore firestore in <Firestore>[a, b]) {
+      IntegrationTestUtil.firestoreStatus.remove(firestore);
+      IntegrationTestUtil.credentialsProviders.remove(firestore);
+      await firestore.shutdown();
+    }
+    DatabaseMock.deleteDatabaseFiles(dbName);
   }
 }
