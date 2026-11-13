@@ -156,6 +156,12 @@ class PipelineSource {
           'number of segments.',
         );
       }
+      if (paths.contains(resourcePath.canonicalString)) {
+        // As the JS SDK's DocumentsSource.
+        throw ArgumentError(
+          'Duplicate document paths are not allowed in documents(): $path',
+        );
+      }
       paths.add(resourcePath.canonicalString);
     }
     return _start(
