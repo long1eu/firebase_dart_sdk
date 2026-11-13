@@ -1,20 +1,3 @@
-## Unreleased
-
-- `FirestoreSettings.grpcFlowControlWindow` (also in the settings of Firestore Lite): the
-  HTTP/2 flow-control window of the gRPC transport, 256 KiB by default
-  (`FirestoreSettings.defaultGrpcFlowControlWindow`) as in the Android and JS SDKs. It applies to
-  the connection as a whole and to each request; before, the window was the HTTP/2 default of
-  64 KiB, which limited a large read to 64 KiB per round trip. package:http2 can only set the
-  window of the streams, so the client grows the window of the connection itself and holds back
-  data that package:http2 would refuse while a response is not read. With another window than
-  65535 bytes a new connection waits for the backend to acknowledge it before its first request,
-  and a server that answers with GOAWAY instead fails the connection attempt. Ignored by the web
-  transport.
-- Web transport: a WebChannel response of many megabytes (for example a query or a listener
-  with many large documents) is no longer copied once per network chunk; reading 12 documents
-  of 1 MiB from the emulator went from about 4 s to 0.2 s. The longest accepted chunk is now
-  256 Mi characters (was 64 Mi), enough for a 16 MiB document as JSON.
-
 ## 0.1.0
 
 First release under the new name. This package was published as `cloud_firestore_vm` (last
@@ -176,9 +159,10 @@ Behaviour changes without a compile error:
   (`update_transforms`). Stored legacy transform writes are squashed on load by the local
   serializer.
 - Locally mutated documents carry `SnapshotVersion.none`, as upstream.
-- The SQLite schema goes from version 8 to 14 (bundle tables, read times on remote documents,
-  document overlays, the tables of the persistent cache indexes and two lookup indexes; see
-  index-free queries, document overlays and persistent cache indexes under Added). The migration
+- The SQLite schema goes from version 8 to 15 (bundle tables, read times on remote documents,
+  document overlays, the tables of the persistent cache indexes, two lookup indexes, and the
+  client lease tables of version 15; see index-free queries, document overlays and persistent
+  cache indexes under Added, and the primary client under Fixed). The migration
   runs through the opener's `onUpgrade` callback on the first open; pending writes are
   converted to overlays the first time the client starts. A cache written by
   `cloud_firestore_vm` 0.0.7 (schema 8) is migrated with its documents, targets (reused: the
@@ -377,6 +361,16 @@ Networking:
   SDK and Lite): the App Check and ID tokens on every request, their refresh after
   `UNAUTHENTICATED`, a new App Check token used from the next request on, and a failing
   provider. Enforcement by the backend is not testable on the emulator and remains untested.
+- `FirestoreSettings.grpcFlowControlWindow` (also in the settings of Firestore Lite): the
+  HTTP/2 flow-control window of the gRPC transport, 256 KiB by default
+  (`FirestoreSettings.defaultGrpcFlowControlWindow`) as in the Android and JS SDKs, for the
+  connection as a whole and for each request (0.0.7 used the HTTP/2 default of 64 KiB, which
+  limited a large read to 64 KiB per round trip). package:http2 can only set the window of the
+  streams, so the client grows the window of the connection itself and holds back data that
+  package:http2 would refuse while a response is not read. With another window than 65535
+  bytes a new connection waits for the backend to acknowledge it before its first request, and
+  a server that answers with GOAWAY instead fails the connection attempt. Ignored by the web
+  transport.
 - Bloom-filter existence-filter handling, gRPC keepalive and connect timeout, backoff reset on
   connectivity change, instance cache per app and database, serial queue for remote store work.
 - **Experimental web support.** The RPCs are behind a transport interface and the
@@ -404,8 +398,8 @@ Networking:
   it deletes its own storage for `clearPersistence()`, which is how the IndexedDB database is
   removed (by default `clearPersistence` deletes the file at `Database.path`). Verified in
   Chrome against the emulator: data and pending writes survive a new page load of a tab that
-  was not closed properly, a cache held by another browsing context is refused, the 14 schema
-  migrations run one by one and at once, automatic cache indexes work, `clearPersistence`
+  was not closed properly, a cache held by another browsing context is refused, the schema
+  migrations (up to version 14 when this was run) run one by one and at once, automatic cache indexes work, `clearPersistence`
   removes the database. The opener creates or upgrades a cache in one transaction and keeps
   SQLite from writing pages before their commit, and a worker that is killed at random moments
   (2700 times) always left a database that passed `PRAGMA integrity_check` with every
@@ -455,8 +449,11 @@ Networking:
   - A WebChannel request that carries messages to the server and is not answered within 20
     seconds is aborted and sent again (with the same request id), instead of blocking every
     later message of the stream for ever on a connection that silently drops data.
-  - WebChannel responses with a negative, non-decimal or larger than 64 MiB chunk length end
-    the stream with `unavailable`.
+  - WebChannel responses with a negative or non-decimal chunk length, or one above 256 Mi
+    characters (enough for a 16 MiB document as JSON), end the stream with `unavailable`.
+  - A WebChannel response of many megabytes (for example a query or a listener with many large
+    documents) is parsed in one pass instead of being copied once per network chunk; reading 12
+    documents of 1 MiB from the emulator takes about 0.2 s instead of 4 s.
   - Request headers with a line break are refused instead of being sent in the handshake, and
     `fetch` no longer follows redirects (a redirect would re-send the credentials elsewhere).
   - A clear `UnsupportedError` at start when the application was compiled with

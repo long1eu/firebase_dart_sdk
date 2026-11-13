@@ -1,13 +1,3 @@
-## Unreleased
-
-- `FirebaseUserAuth`: the emulator host is checked like the Firestore host. User info, a path,
-  a query, a bad port and Google hosts throw an `ArgumentError`. `http://` and `https://` URLs are
-  accepted as `connectAuthEmulator` takes them, and an emulator off the loopback interface logs a
-  warning.
-- The RS256 signer of service accounts blinds the message and verifies the signature before using
-  it.
-- Documented that the stored refresh token is a credential and how to protect the `AuthStorage`.
-
 ## 0.1.0
 
 First version. Not published yet.
@@ -17,8 +7,14 @@ First version. Not published yet.
   expiry, sign-out, `AuthStorage` for the session (in memory by default), Auth emulator support.
   It implements the token provider interface of `firebase_app_dart`, so `cloud_firestore_dart`
   sends the ID token and follows user switches.
+- The Auth emulator host is checked like the Firestore host: user info, a path, a query, a bad
+  port and Google hosts throw an `ArgumentError`; `http://` and `https://` URLs are accepted as
+  `connectAuthEmulator` takes them, and an emulator off the loopback interface logs a warning.
+  The stored refresh token is a credential; the `AuthStorage` docs say how to protect it.
 - `OAuthTokenProvider.serviceAccount` and, in `adc.dart`, `applicationDefaultCredentials()`:
   OAuth 2.0 access tokens for servers and command line tools. These bypass security rules.
+  The RS256 signer of the service account assertion blinds the message and verifies each
+  signature before using it.
 - Web-compatible main library (no `dart:io`); `FirebaseUserAuth` was run in Chrome (dart2js and
   dart2wasm) against the Auth emulator.
 - Requires Dart 3.8.0 or later.
