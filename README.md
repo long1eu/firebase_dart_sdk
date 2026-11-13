@@ -81,8 +81,9 @@ null safety, and parts of its public API follow the JS SDK.
   emulators; **it has not been run against a real project**.
 - Not implemented: coordination between clients that share one cache (the multi-tab support of
   the JS SDK), a full Firebase Auth SDK (no federated sign-in), and Pipelines beyond the preview
-  (no search stage, no window functions, no real-time pipelines; a local evaluator exists but
-  is internal and not used yet). The package README lists the known gaps.
+  (no real-time pipelines and no offline evaluation; a local evaluator exists but is internal
+  and not used yet; search, window functions and explain options are only checked for their
+  encoding, since the emulator rejects them). The package README lists the known gaps.
 
 This repository ports Firestore and the Firebase Core pieces it needs, plus token providers for
 Firestore in `firebase_auth/firebase_auth_providers_dart`. There is no full Auth SDK, no Storage

@@ -837,8 +837,8 @@ Not done:
   JS SDK). Two clients on one SQLite file keep it consistent but do not see each other's
   listeners or pending writes; in a browser, one tab at a time. See
   [Persistence and connectivity](#persistence-and-connectivity).
-- **Persistent cache indexes** for queries with inequalities on several fields (they are
-  scanned, as upstream), and with a memory cache.
+- **Persistent cache indexes** for queries with inequalities on several fields, and with a
+  memory cache (neither exists upstream: such queries are scanned).
 - Android-specific pieces of the Android SDK.
 - A Firebase Auth SDK. Tokens for Firestore (user sign-in over REST, service accounts,
   Application Default Credentials) are in `firebase_auth_providers_dart`, see
@@ -858,7 +858,8 @@ Known gaps in what is done:
   the local result (which adds) could not be compared with a backend.
 - **Transactions** can be applied twice when the answer to a commit is lost; see
   [Transactions](#transactions).
-- **App Check** tokens are sent, but enforcement cannot be tested on the emulator.
+- **App Check** tokens are sent on every gRPC, WebChannel, REST and Lite request (checked by
+  a test proxy), but enforcement cannot be tested on the emulator.
 - The Enterprise edition differences listed under [Testing](#enterprise-edition) and the
   emulator gaps listed under [Pipelines](#pipelines-preview).
 
