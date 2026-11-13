@@ -934,6 +934,63 @@ void main() {
     ]);
   });
 
+  test(
+      'a document held back for watch is in limbo once watch drops it from the '
+      'target', () {
+    // The soak chaos test got stuck on this: a write of the document was rejected while the cache held the committed
+    // result of an earlier acknowledged write, so the view kept the (stale) local version and waited for watch. The
+    // document had been deleted on the backend in the meantime: watch only took it out of the target (a reset without
+    // it), never sent it again, and the local version kept the document out of limbo, so nothing resolved it.
+    final Query query = messageQuery();
+    final Document synced =
+        doc('rooms/eros/messages/1', 1, map(<dynamic>['v', 1]));
+    final Document local = doc('rooms/eros/messages/1', 1,
+        map(<dynamic>['v', 2]), DocumentState.localMutations);
+    final Document committed = doc('rooms/eros/messages/1', 3,
+        map(<dynamic>['v', 1]), DocumentState.committedMutations);
+
+    final View view = View(query, DocumentKey.emptyKeySet);
+    view.applyChanges(view.computeDocChanges(docUpdates(<Document>[synced])),
+        ackTarget(<Document>[synced]));
+    view.applyChanges(view.computeDocChanges(docUpdates(<Document>[local])));
+
+    // The pending write is rejected: the cache only has the committed result of an earlier write, which watch did not
+    // confirm yet. The view waits for watch.
+    ViewChange change =
+        view.applyChanges(view.computeDocChanges(docUpdates(<Document>[committed])));
+    expect(change.snapshot, isNull);
+    expect(view.limboDocuments, isEmpty);
+
+    // Watch resets the target without the document.
+    change = view.applyChanges(
+        view.computeDocChanges(docUpdates()),
+        targetChange(Uint8List.fromList(<int>[]), null, null,
+            <Document>[synced], current: true));
+    expect(change.limboChanges, <LimboDocumentChange>[
+      LimboDocumentChange(LimboDocumentChangeType.added, synced.key)
+    ]);
+  });
+
+  test('a document held back for watch while watch still has it is not in limbo',
+      () {
+    final Query query = messageQuery();
+    final Document synced =
+        doc('rooms/eros/messages/1', 1, map(<dynamic>['v', 1]));
+    final Document local = doc('rooms/eros/messages/1', 1,
+        map(<dynamic>['v', 2]), DocumentState.localMutations);
+    final Document committed = doc('rooms/eros/messages/1', 3,
+        map(<dynamic>['v', 3]), DocumentState.committedMutations);
+
+    final View view = View(query, DocumentKey.emptyKeySet);
+    view.applyChanges(view.computeDocChanges(docUpdates(<Document>[synced])),
+        ackTarget(<Document>[synced]));
+    view.applyChanges(view.computeDocChanges(docUpdates(<Document>[local])));
+    final ViewChange change =
+        view.applyChanges(view.computeDocChanges(docUpdates(<Document>[committed])), ackTarget());
+    expect(change.limboChanges, isEmpty);
+    expect(view.limboDocuments, isEmpty);
+  });
+
   group('limitToLast', () {
     Document numDoc(int id, int num, [int version = 0]) =>
         doc('rooms/eros/messages/$id', version, map(<dynamic>['num', num]));

@@ -593,6 +593,13 @@ Documentation and tests:
   difference; it comes back when the backend returns it or when it is written locally. This
   covers the remaining known difference (`null` / `NaN` operands of `whereIn`, the array
   filters, `<=` and `>=` on a Standard edition database) and any other disagreement.
+- A listener no longer keeps showing the local version of a document, with `hasPendingWrites`,
+  after its writes were acknowledged or rejected, when the backend deleted the document (or
+  stopped returning it) before watch sent it again. The view waits for watch after such a
+  change (as the JS and Android SDKs do, which have the same gap), and watch never sends a
+  document that left the query: the document now goes through limbo resolution. Found by the
+  chaos soak test (a write rejected with `not-found` on top of the result of an earlier,
+  acknowledged write); emulator-verified only.
 - A double and an integer beyond 2^53 are compared by their exact values (the order used to
   depend on the side of the operands).
 - Fixes from the upstream sync (UTF-8 string ordering, limbo handling, limbo-resolution

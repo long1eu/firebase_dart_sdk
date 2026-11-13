@@ -30,8 +30,8 @@ enum ChaosMode {
   /// applies) the requests. Cutting after a moment in this mode loses the answers.
   stallDown,
 
-  /// Drops the bytes without closing anything. The connections that lost bytes are unusable, so going back to
-  /// [forward] cuts them.
+  /// Drops the bytes without closing anything. The connections that lost bytes are unusable, so leaving this mode
+  /// (for any other mode) cuts them.
   blackHole,
 }
 
@@ -128,15 +128,22 @@ class ChaosProxy {
   set mode(ChaosMode value) {
     final ChaosMode previous = _mode;
     _mode = value;
+    if (previous == ChaosMode.blackHole && value != ChaosMode.blackHole) {
+      // The black hole is over, whatever comes next: a connection that lost bytes has a hole in its byte stream that
+      // no real network produces (TCP resends what was lost), so it is cut now. Kept open, it could go on with a
+      // request or a response silently missing (a stall that follows the black hole would flush the bytes after the
+      // hole on the next [forward]).
+      for (final _Connection connection in _connections.toList()) {
+        if (connection.lostBytes) {
+          connection.destroy();
+        }
+      }
+    }
     if (value != ChaosMode.forward) {
       return;
     }
     for (final _Connection connection in _connections.toList()) {
-      if (previous == ChaosMode.blackHole && connection.lostBytes) {
-        connection.destroy();
-      } else {
-        connection.flush();
-      }
+      connection.flush();
     }
   }
 

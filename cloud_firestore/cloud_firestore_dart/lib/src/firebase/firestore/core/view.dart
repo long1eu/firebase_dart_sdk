@@ -65,6 +65,10 @@ class View {
   /// Documents that have local changes
   ImmutableSortedSet<DocumentKey> mutatedKeys;
 
+  /// Documents whose local version the view still shows although their writes were acknowledged or rejected, because
+  /// the change was held back until watch sends the document (see [shouldWaitForSyncedDocument]).
+  ImmutableSortedSet<DocumentKey> _awaitingSync = DocumentKey.emptyKeySet;
+
   /// Documents that are left out of this view although they are in the cache and match [query] locally, because the
   /// backend has shown that it does not consider them results of the query (see [backendMismatches]).
   ///
@@ -153,6 +157,9 @@ class View {
             null //
         ? previousChanges.mutatedKeys
         : mutatedKeys;
+    ImmutableSortedSet<DocumentKey> newAwaitingSync = previousChanges != null
+        ? previousChanges.awaitingSyncKeys
+        : _awaitingSync;
 
     DocumentSet newDocumentSet = oldDocumentSet;
     bool needsRefill = false;
@@ -217,7 +224,9 @@ class View {
       if (oldDoc != null && newDoc != null) {
         final bool docsEqual = oldDoc.data == newDoc.data;
         if (!docsEqual) {
-          if (!shouldWaitForSyncedDocument(oldDoc, newDoc)) {
+          if (shouldWaitForSyncedDocument(oldDoc, newDoc)) {
+            newAwaitingSync = newAwaitingSync.insert(key);
+          } else {
             changeSet.addChange(
               DocumentViewChange(DocumentViewChangeType.modified, newDoc),
             );
@@ -256,6 +265,7 @@ class View {
       }
 
       if (changeApplied) {
+        newAwaitingSync = newAwaitingSync.remove(key);
         if (newDoc != null) {
           newDocumentSet = newDocumentSet.add(newDoc);
           if (newDoc.hasLocalMutations) {
@@ -278,6 +288,7 @@ class View {
             : newDocumentSet.getFirstDocument()!;
         newDocumentSet = newDocumentSet.remove(oldDoc.key);
         newMutatedKeys = newMutatedKeys.remove(oldDoc.key);
+        newAwaitingSync = newAwaitingSync.remove(oldDoc.key);
         changeSet.addChange(
           DocumentViewChange(DocumentViewChangeType.removed, oldDoc),
         );
@@ -294,6 +305,7 @@ class View {
       changeSet,
       newMutatedKeys,
       needsRefill,
+      newAwaitingSync,
     );
   }
 
@@ -333,6 +345,7 @@ class View {
     final DocumentSet oldDocumentSet = documentSet;
     documentSet = docChanges.documentSet;
     mutatedKeys = docChanges.mutatedKeys;
+    _awaitingSync = docChanges.awaitingSyncKeys;
     // A rejected document that is back in the view (it has a local mutation) is a regular document again.
     _backendRejected.removeWhere(documentSet.contains);
 
@@ -437,6 +450,7 @@ class View {
           DocumentViewChangeSet(),
           mutatedKeys,
           /*needsRefill*/ false,
+          _awaitingSync,
         ),
       );
     } else {
@@ -511,7 +525,12 @@ class View {
     // query. So don't put it in limbo.
     //
     // TODO(long1eu): Ideally, we would only consider changes that might actually affect this specific query.
-    if (doc.hasLocalMutations) {
+    //
+    // PORTING NOTE: not for a local version that is only kept until watch sends the document (see [_awaitingSync]):
+    // its writes are done and explain nothing. Watch does not send a document again once it left the target (deleted
+    // on the backend, or a target reset without it), so without limbo resolution the view would show the stale local
+    // version, with pending writes, for ever. Upstream has the same gap.
+    if (doc.hasLocalMutations && !_awaitingSync.contains(key)) {
       return false;
     }
 
@@ -557,6 +576,7 @@ class ViewDocumentChanges {
     this.changeSet,
     this.mutatedKeys,
     this.needsRefill,
+    this.awaitingSyncKeys,
   );
 
   /// The new set of docs that should be in the view.
@@ -570,6 +590,9 @@ class ViewDocumentChanges {
   final bool needsRefill;
 
   final ImmutableSortedSet<DocumentKey> mutatedKeys;
+
+  /// The documents whose change is held back until watch sends them, see [View.shouldWaitForSyncedDocument].
+  final ImmutableSortedSet<DocumentKey> awaitingSyncKeys;
 
   @override
   String toString() {

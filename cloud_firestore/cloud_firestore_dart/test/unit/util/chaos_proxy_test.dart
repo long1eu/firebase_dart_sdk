@@ -151,6 +151,35 @@ void main() {
     },
   );
 
+  test(
+      'a black hole followed by a stall cuts the connection that lost bytes: '
+      'it never resumes with a hole in its byte stream', () async {
+    final connection = await connect();
+    proxy.mode = ChaosMode.blackHole;
+    connection.socket.add(utf8.encode('lost'));
+    await settle();
+    // The soak test starts a stall while a black hole is still on, and resumes later.
+    proxy.mode = ChaosMode.stall;
+    await connection.closed.timeout(const Duration(seconds: 2));
+    expect(proxy.openConnections, 0);
+    proxy.mode = ChaosMode.forward;
+    await settle();
+    expect(connection.received.toString(), isEmpty);
+  });
+
+  test('a connection that lost nothing in a black hole stays open', () async {
+    final connection = await connect();
+    proxy.mode = ChaosMode.blackHole;
+    await settle();
+    proxy.mode = ChaosMode.stall;
+    connection.socket.add(utf8.encode('kept'));
+    await settle();
+    proxy.mode = ChaosMode.forward;
+    await settle();
+    expect(connection.received.toString(), 'kept');
+    expect(proxy.openConnections, 1);
+  });
+
   test('delay adds latency and keeps the order', () async {
     final connection = await connect();
     proxy.delay = const Duration(milliseconds: 150);
