@@ -29,3 +29,8 @@ tool/interop/node_modules/
 # The WebAssembly build of SQLite for the browser tests (tool/test_browser.sh downloads it).
 cloud_firestore/cloud_firestore_dart/test/browser/sqlite3.wasm
 cloud_firestore/cloud_firestore_dart/test/browser/sqlite3.wasm.version
+
+# The compiled worker of the browser crash test (see test/browser/crash/crash_worker.dart).
+cloud_firestore/cloud_firestore_dart/test/browser/crash/crash_worker.js
+cloud_firestore/cloud_firestore_dart/test/browser/crash/crash_worker.js.deps
+cloud_firestore/cloud_firestore_dart/test/browser/crash/crash_worker.js.map

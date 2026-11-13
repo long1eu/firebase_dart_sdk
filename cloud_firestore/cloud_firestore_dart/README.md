@@ -57,8 +57,20 @@ listen and write streams, over `fetch`. What to know:
   `openWithMemoryFallback` in that file does this. `clearPersistence()` deletes the IndexedDB
   database. Cost, measured for a small app compiled with `dart compile js -O2`: 588 KB (180 KB
   gzipped) with a memory cache, 807 KB (239 KB gzipped) with the persistent cache, plus
-  `sqlite3.wasm`, 731 KB (349 KB gzipped). The whole database is read into memory when it is
-  opened, and a tab that is killed in the middle of a transaction can lose that transaction.
+  `sqlite3.wasm`, 731 KB (349 KB gzipped).
+  - Crash safety: what a write future acknowledged is stored, and a tab that dies in the middle
+    of a transaction loses only that transaction (SQLite's rollback journal is stored too and
+    is applied on the next open). Tested by killing a worker at random moments, 2700 times.
+    A crash of the browser itself or a power cut is not covered.
+  - Memory: the whole database is read into memory when it is opened. With documents of about
+    1 KB, compiled with dart2js: 10,000 cached documents are 17 MB and open in 0.1 s; 100,000
+    are 166 MB, open in 0.6 s, need about 0.5 GB of JavaScript heap and 2.5 s for a full scan.
+    Treat some tens of thousands of documents as the practical limit.
+  - **Compile with dart2js when you use the persistent cache.** With dart2wasm, `sqlite3`
+    2.9.4 copies every database page between SQLite and Dart one byte at a time: a cache of
+    1,000 documents takes 0.7 s to open and 2.4 s to scan (0.03 s with dart2js), a single
+    write 0.7 s, and it gets worse with the size. With dart2js, integers above 2^53 lose
+    precision (see below).
 - It was verified against the emulator only: 19 tests in Chrome
   (`dart test -p chrome -c dart2wasm test/browser`; with `-c dart2js` 18 pass and 1 is skipped),
   and the whole standard integration suite on the VM over the web transport

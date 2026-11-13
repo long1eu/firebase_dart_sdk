@@ -402,4 +402,84 @@ void main() {
     }
     expect(await storedDatabases('schema-'), isEmpty);
   });
+
+  persistenceTest(
+      'an upgrade that fails halfway leaves the previous schema and version',
+      () async {
+    final String name = 'atomic-${newAppName()}';
+    Future<List<String>> tables(Database db) async => <String>[
+          for (final Map<String, dynamic> row in await db.query(
+            "SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name",
+          ))
+            row['name'] as String,
+        ];
+    Future<int> userVersion(Database db) async =>
+        (await db.query('PRAGMA user_version')).single.values.first as int;
+
+    Database db = await opener()(
+      name,
+      version: 1,
+      onCreate: (Database db, int to) => db.execute('CREATE TABLE one (a)'),
+    );
+    db.close();
+
+    // The second statement of the upgrade fails: the first one must not stay.
+    await expectLater(
+        opener()(
+          name,
+          version: 2,
+          onUpgrade: (Database db, int from, int to) async {
+            await db.execute('CREATE TABLE two (a)');
+            await db.execute('INSERT INTO one VALUES (1)');
+            throw StateError('the tab would die here');
+          },
+        ),
+        throwsStateError);
+
+    // The next open finds version 1 and runs the whole upgrade again.
+    final List<String> upgrades = <String>[];
+    db = await opener()(
+      name,
+      version: 2,
+      onCreate: (Database db, int to) async => fail('not a new database'),
+      onUpgrade: (Database db, int from, int to) async {
+        upgrades.add('$from->$to');
+        expect(await tables(db), <String>['one']);
+        expect(await db.query('SELECT * FROM one'), isEmpty);
+        await db.execute('CREATE TABLE two (a)');
+      },
+    );
+    expect(upgrades, <String>['1->2']);
+    expect(await tables(db), <String>['one', 'two']);
+    expect(await userVersion(db), 2);
+    await (db as ClearableDatabase).clearStorage();
+
+    // The same for a new cache whose creation fails: it stays new.
+    final String fresh = 'atomic-new-${newAppName()}';
+    await expectLater(
+        opener()(
+          fresh,
+          version: 3,
+          onCreate: (Database db, int to) async {
+            await db.execute('CREATE TABLE one (a)');
+            throw StateError('the tab would die here');
+          },
+        ),
+        throwsStateError);
+    bool created = false;
+    db = await opener()(
+      fresh,
+      version: 3,
+      onCreate: (Database db, int to) async {
+        created = true;
+        expect(await tables(db), isEmpty);
+        await db.execute('CREATE TABLE one (a)');
+      },
+      onUpgrade: (Database db, int from, int to) async =>
+          fail('still a new database'),
+    );
+    expect(created, isTrue);
+    expect(await userVersion(db), 3);
+    await (db as ClearableDatabase).clearStorage();
+  });
 }

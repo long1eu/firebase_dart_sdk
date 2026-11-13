@@ -18,16 +18,33 @@
 //
 //  * One tab at a time. The client has no way to share its cache between
 //    tabs, so the database is guarded with a Web Lock: opening it in a second
-//    tab (or twice in one page) fails with a [FirestoreError] with the code
-//    `failedPrecondition`. Catch it and create the instance without
+//    tab (or twice in one page) fails, after two seconds of waiting for the
+//    lock, with a [FirestoreError] with the code `failedPrecondition`. Catch it and create the instance without
 //    `openDatabase` (a memory cache) for that tab, as in
 //    `openWithMemoryFallback` below.
-//  * Durability. SQLite runs in memory and its pages are copied to IndexedDB
-//    in the background. This opener waits for the copy at the end of every
-//    transaction, so what a write future acknowledged is stored. A tab that
-//    is killed in the middle of a transaction can lose that transaction, and
-//    IndexedDB does not write the pages of one SQLite transaction atomically.
-//  * The whole database is read into memory when it is opened.
+//  * Crash safety. SQLite runs in memory and the IndexedDB file system of
+//    package:sqlite3 copies its files, the rollback journal included, to
+//    IndexedDB in the background, in the order SQLite wrote them and one
+//    IndexedDB transaction per file. This opener waits for the copies at the
+//    end of every transaction, so what a write future acknowledged is
+//    stored. A tab that dies in the middle of a transaction leaves a journal
+//    behind and SQLite rolls that transaction back on the next open; the
+//    setup of a new or upgraded cache is one transaction as well. Tested by
+//    killing a worker at random moments (test/browser, 2700 kills): the
+//    database always passed `PRAGMA integrity_check`, had every acknowledged
+//    transaction, and at most one that was not acknowledged yet. Not covered:
+//    a crash of the browser itself or a power cut, where IndexedDB may lose
+//    its last transactions.
+//  * Memory and speed. The whole database is read into memory when it is
+//    opened and stays there. Measured in Chrome with documents of about
+//    1 KB, compiled with dart2js: 10,000 cached documents are a 17 MB
+//    database that opens in 0.1 s; 100,000 are 166 MB, open in 0.6 s, take
+//    about 0.5 GB of JavaScript heap once open and 2.5 s to scan. Compiled
+//    with dart2wasm, sqlite3 2.9.4 moves every page between SQLite and Dart
+//    one byte at a time: a cache of 1,000 documents (2 MB) already takes
+//    0.7 s to open and 2.4 s to scan instead of 0.03 s, and it gets worse
+//    with the size. Until that changes, use this opener in applications
+//    compiled with dart2js, or for small caches only.
 //  * `Firestore.clearPersistence()` deletes the IndexedDB database.
 
 import 'dart:async';
@@ -44,9 +61,13 @@ import 'package:web/web.dart' as web;
 /// [sqlite3Wasm] is the URL of the `sqlite3.wasm` file of the sqlite3 package
 /// version in use; it is fetched on the first open. [storagePrefix] names the
 /// IndexedDB databases (`<prefix>/<database name>`) and the Web Locks.
+/// [lockTimeout] is how long an open waits for a database that is open
+/// elsewhere before it fails: long enough for the page that was just reloaded
+/// to be gone, short for a second tab.
 OpenDatabase sqliteWebOpener({
   required Uri sqlite3Wasm,
   String storagePrefix = 'cloud_firestore_dart',
+  Duration lockTimeout = const Duration(seconds: 2),
 }) {
   Future<sqlite.WasmSqlite3>? loading;
 
@@ -67,7 +88,10 @@ OpenDatabase sqliteWebOpener({
     await _closing[storageName];
 
     // One open database per name, in this tab and in every other.
-    final Future<void> Function()? releaseLock = await _tryLock(storageName);
+    final Future<void> Function()? releaseLock = await _tryLock(
+      storageName,
+      lockTimeout,
+    );
     if (releaseLock == null) {
       throw FirestoreError(
         'The offline cache "$name" is already open in another tab (or in this '
@@ -97,7 +121,6 @@ OpenDatabase sqliteWebOpener({
       sqlite3.registerVirtualFileSystem(fileSystem);
 
       const String file = '/database';
-      final bool isNew = fileSystem.xAccess(file, 0) == 0;
       db = SqliteWebDatabase._(
         sqlite3.open(file, vfs: fileSystem.name),
         sqlite3,
@@ -106,23 +129,46 @@ OpenDatabase sqliteWebOpener({
         releaseLock,
       );
 
+      // Keep every changed page in memory until its transaction commits.
+      // SQLite would otherwise write pages of a large transaction to the
+      // database file early, and the IndexedDB file system may store such a
+      // page before the journal record that can undo it (it merges queued
+      // writes to the same file), which a tab that dies at that moment could
+      // not recover from.
+      db._database.execute('PRAGMA cache_spill = OFF');
+
       // The callbacks run Firestore's schema setup and migrations. They must
       // be called in this order and awaited before the database is returned.
       await onConfigure?.call(db);
 
+      // The setup and the schema version it leads to are one transaction (as
+      // in Android's SQLiteOpenHelper): a tab that is closed while a new
+      // cache is being created, or upgraded, leaves the old state behind and
+      // the next open starts over, instead of finding half of the tables. A
+      // database without any table is new, whatever was stored of it.
       final int wanted = version ?? 1;
-      if (isNew) {
-        await onCreate?.call(db, wanted);
-      } else {
+      db._database.execute('BEGIN IMMEDIATE');
+      try {
         final int current = db._database.userVersion;
-        if (current < wanted) {
+        final bool isNew =
+            current == 0 &&
+            db._database.select('SELECT 1 FROM sqlite_master LIMIT 1').isEmpty;
+        if (isNew) {
+          await onCreate?.call(db, wanted);
+        } else if (current < wanted) {
           await onUpgrade?.call(db, current, wanted);
         } else if (current > wanted) {
           await onDowngrade?.call(db, current, wanted);
         }
+        // The schema version is kept in `PRAGMA user_version`.
+        db._database.userVersion = wanted;
+        db._database.execute('COMMIT');
+      } catch (_) {
+        if (!db._database.autocommit) {
+          db._database.execute('ROLLBACK');
+        }
+        rethrow;
       }
-      // The schema version is kept in `PRAGMA user_version`.
-      db._database.userVersion = wanted;
       await fileSystem.flush();
 
       await onOpen?.call(db);
@@ -173,10 +219,11 @@ int _fileSystems = 0;
 /// The databases of this page that are being closed, by storage name.
 final Map<String, Future<void>> _closing = <String, Future<void>>{};
 
-/// Takes the Web Lock [name] if nobody holds it. Returns the function that
-/// releases it (its future completes when the lock is free again), or null
-/// when the lock is held, by this or by another tab.
-Future<Future<void> Function()?> _tryLock(String name) {
+/// Takes the Web Lock [name], waiting up to [wait] for it. Returns the
+/// function that releases it (its future completes when the lock is free
+/// again), or null when the lock is still held then, by this or by another
+/// tab.
+Future<Future<void> Function()?> _tryLock(String name, Duration wait) {
   final web.LockManager? locks = _lockManager;
   if (locks == null) {
     throw UnsupportedError(
@@ -191,8 +238,15 @@ Future<Future<void> Function()?> _tryLock(String name) {
   // Settled by the browser once the lock is released.
   late final Future<void> requestDone;
 
+  // Not `ifAvailable`: the lock of a page that was just reloaded or closed
+  // is released a moment after the page is gone, so the request waits for
+  // [wait] before it is given up.
+  final web.AbortController giveUp = web.AbortController();
+  final Timer timer = Timer(wait, () => giveUp.abort());
+
   // The lock is held until the promise the callback returns is settled.
   JSPromise<JSAny?>? granted(web.Lock? lock) {
+    timer.cancel();
     if (lock == null) {
       result.complete(null);
       return null;
@@ -207,12 +261,19 @@ Future<Future<void> Function()?> _tryLock(String name) {
   }
 
   requestDone = locks
-      .request(name, web.LockOptions(ifAvailable: true), granted.toJS)
+      .request(name, web.LockOptions(signal: giveUp.signal), granted.toJS)
       .toDart
       .then<void>(
         (_) {},
         onError: (Object error, StackTrace stackTrace) {
-          if (!result.isCompleted) {
+          timer.cancel();
+          if (result.isCompleted) {
+            return;
+          }
+          if (giveUp.signal.aborted) {
+            // Still held after [wait]: by another tab, or by this page.
+            result.complete(null);
+          } else {
             result.completeError(error, stackTrace);
           }
         },

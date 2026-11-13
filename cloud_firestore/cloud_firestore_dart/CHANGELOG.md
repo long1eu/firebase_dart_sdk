@@ -315,8 +315,13 @@ Networking:
   Chrome against the emulator: data and pending writes survive a new page load of a tab that
   was not closed properly, a cache held by another browsing context is refused, the 14 schema
   migrations run one by one and at once, automatic cache indexes work, `clearPersistence`
-  removes the database. Not verified: other browsers, large caches (the database is held in
-  memory), a tab killed in the middle of a transaction.
+  removes the database. The opener creates or upgrades a cache in one transaction and keeps
+  SQLite from writing pages before their commit, and a worker that is killed at random moments
+  (2700 times) always left a database that passed `PRAGMA integrity_check` with every
+  acknowledged transaction in it. Measured with dart2js: 10,000 cached documents of 1 KB are
+  17 MB and open in 0.1 s, 100,000 are 166 MB and open in 0.6 s. Compiled with dart2wasm the
+  SQLite layer of `sqlite3` 2.9.4 is 30 to 80 times slower already at 1,000 documents: use the
+  persistent cache with dart2js. Not verified: other browsers, a crash of the browser itself.
 - Web transport robustness (web only, the gRPC transport is unchanged):
   - `FirestoreSettings.experimentalForceLongPolling` and
     `experimentalAutoDetectLongPolling` (on by default), for networks where a proxy buffers
