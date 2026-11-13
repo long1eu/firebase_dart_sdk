@@ -289,6 +289,27 @@ void queryEngineTestCase(
     expect(docs, docSet(q.comparator, <Document>[_matchingDocB]));
   });
 
+  /// Port of the JS SDK's `filters non-matching changes since initial results` (query_engine.test.ts).
+  test('filters non-matching changes since initial results', () async {
+    final Query q = query('coll').filter(filter('matches', '==', true));
+
+    await addDocument(<Document>[_matchingDocA, _matchingDocB]);
+    await persistQueryMapping(<DocumentKey>[
+      _matchingDocA.key,
+      _matchingDocB.key,
+    ]);
+
+    // Add a mutation that is not yet part of query's set of remote keys.
+    await addMutation(
+      patchMutation('coll/a', map(<dynamic>['matches', false])),
+    );
+
+    final DocumentSet docs = await expectOptimizedCollectionScan(
+      () => runQuery(q, _lastLimboFreeSnapshot),
+    );
+    expect(docs, docSet(q.comparator, <Document>[_matchingDocB]));
+  });
+
   test('includesChangesSinceInitialResults', () async {
     final Query q = query('coll').filter(filter('matches', '==', true));
 

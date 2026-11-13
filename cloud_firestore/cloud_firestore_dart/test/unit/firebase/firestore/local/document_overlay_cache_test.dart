@@ -67,7 +67,9 @@ void _run(String name, Future<Persistence> Function() createPersistence) {
     }
 
     void verifyOverlayContains(
-        Map<DocumentKey, Overlay> overlays, List<String> keys) {
+      Map<DocumentKey, Overlay> overlays,
+      List<String> keys,
+    ) {
       expect(overlays.keys.toSet(), keys.map(key).toSet());
     }
 
@@ -84,18 +86,24 @@ void _run(String name, Future<Persistence> Function() createPersistence) {
     });
 
     test('testCanReadSavedOverlay', () async {
-      final Mutation m =
-          patchMutation('coll/doc1', map(<dynamic>['foo', 'bar']));
+      final Mutation m = patchMutation(
+        'coll/doc1',
+        map(<dynamic>['foo', 'bar']),
+      );
       await saveOverlays(2, <Mutation>[m]);
 
       expect((await cache.getOverlay(key('coll/doc1')))!.mutation, m);
     });
 
     test('testCanReadSavedOverlays', () async {
-      final Mutation m1 =
-          patchMutation('coll/doc1', map(<dynamic>['foo', 'bar']));
-      final Mutation m2 =
-          setMutation('coll/doc2', map(<dynamic>['foo', 'bar']));
+      final Mutation m1 = patchMutation(
+        'coll/doc1',
+        map(<dynamic>['foo', 'bar']),
+      );
+      final Mutation m2 = setMutation(
+        'coll/doc2',
+        map(<dynamic>['foo', 'bar']),
+      );
       final Mutation m3 = deleteMutation('coll/doc3');
       await saveOverlays(3, <Mutation>[m1, m2, m3]);
 
@@ -111,7 +119,8 @@ void _run(String name, Future<Persistence> Function() createPersistence) {
       await saveOverlays(3, <Mutation>[m1, m2, m3]);
 
       final Map<DocumentKey, Overlay> overlays = await cache.getOverlays(
-          <DocumentKey>[key('coll1/a'), key('coll1/b'), key('coll2/c')]);
+        <DocumentKey>[key('coll1/a'), key('coll1/b'), key('coll2/c')],
+      );
       expect(overlays[key('coll1/a')]!.mutation, m1);
       expect(overlays[key('coll1/b')]!.mutation, m2);
       expect(overlays[key('coll2/c')]!.mutation, m3);
@@ -128,10 +137,14 @@ void _run(String name, Future<Persistence> Function() createPersistence) {
     });
 
     test('testSavingOverlayOverwrites', () async {
-      final Mutation m1 =
-          patchMutation('coll/doc1', map(<dynamic>['foo', 'bar']));
-      final Mutation m2 =
-          setMutation('coll/doc1', map(<dynamic>['foo', 'set', 'bar', 42]));
+      final Mutation m1 = patchMutation(
+        'coll/doc1',
+        map(<dynamic>['foo', 'bar']),
+      );
+      final Mutation m2 = setMutation(
+        'coll/doc1',
+        map(<dynamic>['foo', 'set', 'bar', 42]),
+      );
       await saveOverlays(2, <Mutation>[m1]);
       await saveOverlays(2, <Mutation>[m2]);
 
@@ -139,8 +152,10 @@ void _run(String name, Future<Persistence> Function() createPersistence) {
     });
 
     test('testDeleteRepeatedlyWorks', () async {
-      final Mutation m =
-          patchMutation('coll/doc1', map(<dynamic>['foo', 'bar']));
+      final Mutation m = patchMutation(
+        'coll/doc1',
+        map(<dynamic>['foo', 'bar']),
+      );
       await saveOverlays(2, <Mutation>[m]);
 
       await cache.removeOverlaysForBatchId(2);
@@ -151,23 +166,73 @@ void _run(String name, Future<Persistence> Function() createPersistence) {
       expect(await cache.getOverlay(key('coll/doc1')), isNull);
     });
 
+    /// Port of the JS SDK's `can delete overlays` (document_overlay_cache.test.ts). The port removes the overlays of a
+    /// batch by batch id only, as the Android SDK does.
+    test('can delete overlays', () async {
+      final Mutation m1 = patchMutation('coll1/doc1', map(<dynamic>['a', 'b']));
+      final Mutation m2 = patchMutation('coll1/doc2', map(<dynamic>['a', 'b']));
+      final Mutation m3 = patchMutation('coll1/doc3', map(<dynamic>['a', 'b']));
+      final Mutation m4 = patchMutation('coll1/doc4', map(<dynamic>['a', 'b']));
+      final Mutation m5 = patchMutation(
+        'coll2/doc1/coll3/doc1',
+        map(<dynamic>['a', 'b']),
+      );
+      final Mutation m6 = patchMutation(
+        'coll2/doc2/coll3/doc2',
+        map(<dynamic>['a', 'b']),
+      );
+      await saveOverlays(2, <Mutation>[m1, m2]);
+      await saveOverlays(3, <Mutation>[m3]);
+      await saveOverlays(4, <Mutation>[m4]);
+      await saveOverlays(2, <Mutation>[m5, m6]);
+
+      // Remove documents with batch id 2.
+      await cache.removeOverlaysForBatchId(2);
+      expect(await cache.getOverlay(key('coll1/doc1')), isNull);
+      expect(await cache.getOverlay(key('coll1/doc2')), isNull);
+      expect(await cache.getOverlay(key('coll2/doc1/coll3/doc1')), isNull);
+      expect(await cache.getOverlay(key('coll2/doc2/coll3/doc2')), isNull);
+      expect(await cache.getOverlay(key('coll1/doc3')), isNotNull);
+      expect(await cache.getOverlay(key('coll1/doc4')), isNotNull);
+
+      // Remove documents with batch id 3.
+      await cache.removeOverlaysForBatchId(3);
+      expect(await cache.getOverlay(key('coll1/doc3')), isNull);
+      expect(await cache.getOverlay(key('coll1/doc4')), isNotNull);
+
+      // Remove documents with batch id 4.
+      await cache.removeOverlaysForBatchId(4);
+      expect(await cache.getOverlay(key('coll1/doc4')), isNull);
+    });
+
     test('testGetAllOverlaysForCollection', () async {
-      final Mutation m1 =
-          patchMutation('coll/doc1', map(<dynamic>['foo', 'bar']));
-      final Mutation m2 =
-          setMutation('coll/doc2', map(<dynamic>['foo', 'bar']));
+      final Mutation m1 = patchMutation(
+        'coll/doc1',
+        map(<dynamic>['foo', 'bar']),
+      );
+      final Mutation m2 = setMutation(
+        'coll/doc2',
+        map(<dynamic>['foo', 'bar']),
+      );
       final Mutation m3 = deleteMutation('coll/doc3');
       // m4 and m5 are not under "coll"
-      final Mutation m4 =
-          setMutation('coll/doc1/sub/sub_doc', map(<dynamic>['foo', 'bar']));
-      final Mutation m5 =
-          setMutation('other/doc1', map(<dynamic>['foo', 'bar']));
+      final Mutation m4 = setMutation(
+        'coll/doc1/sub/sub_doc',
+        map(<dynamic>['foo', 'bar']),
+      );
+      final Mutation m5 = setMutation(
+        'other/doc1',
+        map(<dynamic>['foo', 'bar']),
+      );
       await saveOverlays(3, <Mutation>[m1, m2, m3, m4, m5]);
 
-      final Map<DocumentKey, Overlay> overlays =
-          await cache.getOverlaysForCollection(path('coll'), -1);
-      verifyOverlayContains(
-          overlays, <String>['coll/doc1', 'coll/doc2', 'coll/doc3']);
+      final Map<DocumentKey, Overlay> overlays = await cache
+          .getOverlaysForCollection(path('coll'), -1);
+      verifyOverlayContains(overlays, <String>[
+        'coll/doc1',
+        'coll/doc2',
+        'coll/doc3',
+      ]);
     });
 
     test('testGetAllOverlaysSinceBatchId', () async {
@@ -175,28 +240,30 @@ void _run(String name, Future<Persistence> Function() createPersistence) {
       await saveOverlaysForKeys(3, <String>['coll/doc3']);
       await saveOverlaysForKeys(4, <String>['coll/doc4']);
 
-      final Map<DocumentKey, Overlay> overlays =
-          await cache.getOverlaysForCollection(path('coll'), 2);
+      final Map<DocumentKey, Overlay> overlays = await cache
+          .getOverlaysForCollection(path('coll'), 2);
       verifyOverlayContains(overlays, <String>['coll/doc3', 'coll/doc4']);
     });
 
-    test('testGetAllOverlaysFromCollectionGroupEnforcesCollectionGroup',
-        () async {
-      await saveOverlaysForKeys(2, <String>['coll1/doc1', 'coll2/doc1']);
-      await saveOverlaysForKeys(3, <String>['coll1/doc2']);
-      await saveOverlaysForKeys(4, <String>['coll2/doc2']);
+    test(
+      'testGetAllOverlaysFromCollectionGroupEnforcesCollectionGroup',
+      () async {
+        await saveOverlaysForKeys(2, <String>['coll1/doc1', 'coll2/doc1']);
+        await saveOverlaysForKeys(3, <String>['coll1/doc2']);
+        await saveOverlaysForKeys(4, <String>['coll2/doc2']);
 
-      final Map<DocumentKey, Overlay> overlays =
-          await cache.getOverlaysForCollectionGroup('coll1', -1, 50);
-      verifyOverlayContains(overlays, <String>['coll1/doc1', 'coll1/doc2']);
-    });
+        final Map<DocumentKey, Overlay> overlays = await cache
+            .getOverlaysForCollectionGroup('coll1', -1, 50);
+        verifyOverlayContains(overlays, <String>['coll1/doc1', 'coll1/doc2']);
+      },
+    );
 
     test('testGetAllOverlaysFromCollectionGroupEnforcesBatchId', () async {
       await saveOverlaysForKeys(2, <String>['coll/doc1']);
       await saveOverlaysForKeys(3, <String>['coll/doc2']);
 
-      final Map<DocumentKey, Overlay> overlays =
-          await cache.getOverlaysForCollectionGroup('coll', 2, 50);
+      final Map<DocumentKey, Overlay> overlays = await cache
+          .getOverlaysForCollectionGroup('coll', 2, 50);
       verifyOverlayContains(overlays, <String>['coll/doc2']);
     });
 
@@ -205,27 +272,36 @@ void _run(String name, Future<Persistence> Function() createPersistence) {
       await saveOverlaysForKeys(2, <String>['coll/doc2']);
       await saveOverlaysForKeys(3, <String>['coll/doc3']);
 
-      final Map<DocumentKey, Overlay> overlays =
-          await cache.getOverlaysForCollectionGroup('coll', -1, 2);
+      final Map<DocumentKey, Overlay> overlays = await cache
+          .getOverlaysForCollectionGroup('coll', -1, 2);
       verifyOverlayContains(overlays, <String>['coll/doc1', 'coll/doc2']);
     });
 
-    test('testGetAllOverlaysFromCollectionGroupWithLimitIncludesFullBatches',
-        () async {
-      await saveOverlaysForKeys(1, <String>['coll/doc1']);
-      await saveOverlaysForKeys(2, <String>['coll/doc2', 'coll/doc3']);
+    test(
+      'testGetAllOverlaysFromCollectionGroupWithLimitIncludesFullBatches',
+      () async {
+        await saveOverlaysForKeys(1, <String>['coll/doc1']);
+        await saveOverlaysForKeys(2, <String>['coll/doc2', 'coll/doc3']);
 
-      final Map<DocumentKey, Overlay> overlays =
-          await cache.getOverlaysForCollectionGroup('coll', -1, 2);
-      verifyOverlayContains(
-          overlays, <String>['coll/doc1', 'coll/doc2', 'coll/doc3']);
-    });
+        final Map<DocumentKey, Overlay> overlays = await cache
+            .getOverlaysForCollectionGroup('coll', -1, 2);
+        verifyOverlayContains(overlays, <String>[
+          'coll/doc1',
+          'coll/doc2',
+          'coll/doc3',
+        ]);
+      },
+    );
 
     test('testUpdateDocumentOverlay', () async {
-      final Mutation mutation1 =
-          setMutation('coll/doc', map(<dynamic>['foo', 1]));
-      final Mutation mutation2 =
-          setMutation('coll/doc', map(<dynamic>['foo', 2]));
+      final Mutation mutation1 = setMutation(
+        'coll/doc',
+        map(<dynamic>['foo', 1]),
+      );
+      final Mutation mutation2 = setMutation(
+        'coll/doc',
+        map(<dynamic>['foo', 2]),
+      );
       await saveOverlays(1, <Mutation>[mutation1]);
       await saveOverlays(2, <Mutation>[mutation2]);
 
@@ -241,27 +317,36 @@ void _run(String name, Future<Persistence> Function() createPersistence) {
       final Mutation m = setMutation('coll/doc', map(<dynamic>['foo', 1]));
       await saveOverlays(1, <Mutation>[m]);
 
-      final DocumentOverlayCache other =
-          persistence.getDocumentOverlayCache(const User('other'));
+      final DocumentOverlayCache other = persistence.getDocumentOverlayCache(
+        const User('other'),
+      );
       expect(await other.getOverlay(key('coll/doc')), isNull);
       expect(
-          await persistence
-              .getDocumentOverlayCache(User.unauthenticated)
-              .getOverlay(key('coll/doc')),
-          Overlay(1, m));
+        await persistence
+            .getDocumentOverlayCache(User.unauthenticated)
+            .getOverlay(key('coll/doc')),
+        Overlay(1, m),
+      );
     });
 
     test('testStoresPendingServerTimestamps', () async {
       final Mutation patch = UserDataConverter(DatabaseId.forProject('p'))
           .parseUpdateData(<String, Object>{
-        'time': firestore.FieldValue.serverTimestamp()
-      }).toMutation(key('coll/doc'), Precondition.none);
+            'time': firestore.FieldValue.serverTimestamp(),
+          })
+          .toMutation(key('coll/doc'), Precondition.none);
       final Mutation overlay = Mutation.calculateOverlayMutation(
-          patch.applyToLocalView(doc('coll/doc', 1, map(<dynamic>['time', 1])),
-              null, Timestamp(10, 0)),
-          null)!;
-      expect((overlay as dynamic).value.get(field('time')),
-          isA<ServerTimestampValue>());
+        patch.applyToLocalView(
+          doc('coll/doc', 1, map(<dynamic>['time', 1])),
+          null,
+          Timestamp(10, 0),
+        ),
+        null,
+      )!;
+      expect(
+        (overlay as dynamic).value.get(field('time')),
+        isA<ServerTimestampValue>(),
+      );
       await saveOverlays(5, <Mutation>[overlay]);
 
       expect(await cache.getOverlay(key('coll/doc')), Overlay(5, overlay));

@@ -55,6 +55,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/model/resource_path.
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/snapshot_version.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/value/field_value.dart'
     as model;
+import 'package:cloud_firestore_dart/src/firebase/firestore/remote/existence_filter.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/remote/remote_event.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/remote/target_change.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/remote/watch_change.dart';
@@ -70,9 +71,11 @@ import '../accumulating_stats_collector.dart';
 import '../counting_query_engine.dart';
 
 class LocalStoreTestCase {
-  LocalStoreTestCase(this._persistence, this._statsCollector,
-      {required bool garbageCollectorIsEager})
-      : _garbageCollectorIsEager = garbageCollectorIsEager;
+  LocalStoreTestCase(
+    this._persistence,
+    this._statsCollector, {
+    required bool garbageCollectorIsEager,
+  }) : _garbageCollectorIsEager = garbageCollectorIsEager;
 
   final AccumulatingStatsCollector _statsCollector;
   final Persistence _persistence;
@@ -96,8 +99,11 @@ class LocalStoreTestCase {
     _defaultEngine = DefaultQueryEngine();
     _backfillerMaxDocumentsToProcess = null;
     _queryEngine = CountingQueryEngine(_defaultEngine);
-    _localStore = LocalStore(_persistence, User.unauthenticated,
-        queryEngine: _queryEngine);
+    _localStore = LocalStore(
+      _persistence,
+      User.unauthenticated,
+      queryEngine: _queryEngine,
+    );
     await _localStore.start();
   }
 
@@ -105,15 +111,20 @@ class LocalStoreTestCase {
 
   @testMethod
   Future<void> testMutationBatchKeys() async {
-    final SetMutation set1 =
-        setMutation('foo/bar', map(<String>['foo', 'bar']));
-    final SetMutation set2 =
-        setMutation('foo/baz', map(<String>['foo', 'baz']));
+    final SetMutation set1 = setMutation(
+      'foo/bar',
+      map(<String>['foo', 'bar']),
+    );
+    final SetMutation set2 = setMutation(
+      'foo/baz',
+      map(<String>['foo', 'baz']),
+    );
     final MutationBatch batch = MutationBatch(
-        batchId: 1,
-        localWriteTime: Timestamp.now(),
-        baseMutations: <Mutation>[],
-        mutations: <SetMutation>[set1, set2]);
+      batchId: 1,
+      localWriteTime: Timestamp.now(),
+      baseMutations: <Mutation>[],
+      mutations: <SetMutation>[set1, set2],
+    );
     final Set<DocumentKey> keys = batch.keys;
     expect(keys.length, 2);
   }
@@ -123,25 +134,45 @@ class LocalStoreTestCase {
     await _writeMutation(setMutation('foo/bar', map(<String>['foo', 'bar'])));
 
     _expectChanged(<Document>[
-      doc('foo/bar', 0, map(<String>['foo', 'bar']),
-          DocumentState.localMutations)
+      doc(
+        'foo/bar',
+        0,
+        map(<String>['foo', 'bar']),
+        DocumentState.localMutations,
+      ),
     ]);
-    await _expectContains(doc('foo/bar', 0, map(<String>['foo', 'bar']),
-        DocumentState.localMutations));
+    await _expectContains(
+      doc(
+        'foo/bar',
+        0,
+        map(<String>['foo', 'bar']),
+        DocumentState.localMutations,
+      ),
+    );
 
     await _acknowledgeMutation(1);
 
     _expectChanged(<Document>[
-      doc('foo/bar', 1, map(<String>['foo', 'bar']),
-          DocumentState.committedMutations)
+      doc(
+        'foo/bar',
+        1,
+        map(<String>['foo', 'bar']),
+        DocumentState.committedMutations,
+      ),
     ]);
 
     if (_garbageCollectorIsEager) {
       // Nothing is pinning this anymore, as it has been acknowledged and there are no targets active.
       await _expectNotContains('foo/bar');
     } else {
-      await _expectContains(doc('foo/bar', 1, map(<String>['foo', 'bar']),
-          DocumentState.committedMutations));
+      await _expectContains(
+        doc(
+          'foo/bar',
+          1,
+          map(<String>['foo', 'bar']),
+          DocumentState.committedMutations,
+        ),
+      );
     }
   }
 
@@ -149,25 +180,52 @@ class LocalStoreTestCase {
   Future<void> testHandlesSetMutationThenDocument() async {
     await _writeMutation(setMutation('foo/bar', map(<String>['foo', 'bar'])));
     _expectChanged(<Document>[
-      doc('foo/bar', 0, map(<String>['foo', 'bar']),
-          DocumentState.localMutations)
+      doc(
+        'foo/bar',
+        0,
+        map(<String>['foo', 'bar']),
+        DocumentState.localMutations,
+      ),
     ]);
-    await _expectContains(doc('foo/bar', 0, map(<String>['foo', 'bar']),
-        DocumentState.localMutations));
+    await _expectContains(
+      doc(
+        'foo/bar',
+        0,
+        map(<String>['foo', 'bar']),
+        DocumentState.localMutations,
+      ),
+    );
 
     final Query query = Query(ResourcePath.fromString('foo'));
     final int targetId = await _allocateQuery(query);
-    await _applyRemoteEvent(updateRemoteEvent(
-        doc('foo/bar', 2, map(<String>['it', 'changed']),
-            DocumentState.localMutations),
+    await _applyRemoteEvent(
+      updateRemoteEvent(
+        doc(
+          'foo/bar',
+          2,
+          map(<String>['it', 'changed']),
+          DocumentState.localMutations,
+        ),
         <int>[targetId],
-        <int>[]));
+        <int>[],
+      ),
+    );
     _expectChanged(<Document>[
-      doc('foo/bar', 0, map(<String>['foo', 'bar']),
-          DocumentState.localMutations)
+      doc(
+        'foo/bar',
+        0,
+        map(<String>['foo', 'bar']),
+        DocumentState.localMutations,
+      ),
     ]);
-    await _expectContains(doc('foo/bar', 0, map(<String>['foo', 'bar']),
-        DocumentState.localMutations));
+    await _expectContains(
+      doc(
+        'foo/bar',
+        0,
+        map(<String>['foo', 'bar']),
+        DocumentState.localMutations,
+      ),
+    );
   }
 
   @testMethod
@@ -176,24 +234,45 @@ class LocalStoreTestCase {
     await _allocateQuery(query);
 
     await _writeMutation(setMutation('foo/bar', map(<String>['foo', 'bar'])));
-    await _notifyLocalViewChanges(viewChanges(
-        2, /* fromCache= */ false, <String>['foo/bar'], <String>[]));
+    await _notifyLocalViewChanges(
+      viewChanges(2, /* fromCache= */ false, <String>['foo/bar'], <String>[]),
+    );
 
     _expectChanged(<Document>[
-      doc('foo/bar', 0, map(<String>['foo', 'bar']),
-          DocumentState.localMutations)
+      doc(
+        'foo/bar',
+        0,
+        map(<String>['foo', 'bar']),
+        DocumentState.localMutations,
+      ),
     ]);
-    await _expectContains(doc('foo/bar', 0, map(<String>['foo', 'bar']),
-        DocumentState.localMutations));
+    await _expectContains(
+      doc(
+        'foo/bar',
+        0,
+        map(<String>['foo', 'bar']),
+        DocumentState.localMutations,
+      ),
+    );
 
     await _acknowledgeMutation(1);
 
     _expectChanged(<Document>[
-      doc('foo/bar', 1, map(<String>['foo', 'bar']),
-          DocumentState.committedMutations)
+      doc(
+        'foo/bar',
+        1,
+        map(<String>['foo', 'bar']),
+        DocumentState.committedMutations,
+      ),
     ]);
-    await _expectContains(doc('foo/bar', 1, map(<String>['foo', 'bar']),
-        DocumentState.committedMutations));
+    await _expectContains(
+      doc(
+        'foo/bar',
+        1,
+        map(<String>['foo', 'bar']),
+        DocumentState.committedMutations,
+      ),
+    );
 
     await _releaseQuery(query);
 
@@ -201,8 +280,14 @@ class LocalStoreTestCase {
     if (_garbageCollectorIsEager) {
       await _expectNotContains('foo/bar');
     } else {
-      await _expectContains(doc('foo/bar', 1, map(<String>['foo', 'bar']),
-          DocumentState.committedMutations));
+      await _expectContains(
+        doc(
+          'foo/bar',
+          1,
+          map(<String>['foo', 'bar']),
+          DocumentState.committedMutations,
+        ),
+      );
     }
   }
 
@@ -214,11 +299,21 @@ class LocalStoreTestCase {
 
     await _writeMutation(setMutation('foo/bar', map(<String>['foo', 'bar'])));
     _expectChanged(<Document>[
-      doc('foo/bar', 0, map(<String>['foo', 'bar']),
-          DocumentState.localMutations)
+      doc(
+        'foo/bar',
+        0,
+        map(<String>['foo', 'bar']),
+        DocumentState.localMutations,
+      ),
     ]);
-    await _expectContains(doc('foo/bar', 0, map(<String>['foo', 'bar']),
-        DocumentState.localMutations));
+    await _expectContains(
+      doc(
+        'foo/bar',
+        0,
+        map(<String>['foo', 'bar']),
+        DocumentState.localMutations,
+      ),
+    );
 
     // The last seen version is zero, so this ack must be held.
     await _acknowledgeMutation(1);
@@ -226,28 +321,45 @@ class LocalStoreTestCase {
       // Nothing is pinning this anymore, as it has been acknowledged and there are no targets active.
       await _expectNotContains('foo/bar');
     } else {
-      await _expectContains(doc('foo/bar', 1, map(<String>['foo', 'bar']),
-          DocumentState.committedMutations));
+      await _expectContains(
+        doc(
+          'foo/bar',
+          1,
+          map(<String>['foo', 'bar']),
+          DocumentState.committedMutations,
+        ),
+      );
     }
 
     await _writeMutation(setMutation('bar/baz', map(<String>['bar', 'baz'])));
     _expectChanged(<Document>[
-      doc('bar/baz', 0, map(<String>['bar', 'baz']),
-          DocumentState.localMutations)
+      doc(
+        'bar/baz',
+        0,
+        map(<String>['bar', 'baz']),
+        DocumentState.localMutations,
+      ),
     ]);
-    await _expectContains(doc('bar/baz', 0, map(<String>['bar', 'baz']),
-        DocumentState.localMutations));
+    await _expectContains(
+      doc(
+        'bar/baz',
+        0,
+        map(<String>['bar', 'baz']),
+        DocumentState.localMutations,
+      ),
+    );
 
     await _rejectMutation();
     _expectRemoved(<String>['bar/baz']);
     await _expectNotContains('bar/baz');
 
-    await _applyRemoteEvent(addedRemoteEvent(
-        doc('foo/bar', 2, map(<String>['it', 'changed'])),
-        <int>[targetId],
-        <int>[]));
+    await _applyRemoteEvent(
+      addedRemoteEvent(doc('foo/bar', 2, map(<String>['it', 'changed'])), <int>[
+        targetId,
+      ], <int>[]),
+    );
     _expectChanged(<Document>[
-      doc('foo/bar', 2, map(<String>['it', 'changed']))
+      doc('foo/bar', 2, map(<String>['it', 'changed'])),
     ]);
     await _expectContains(doc('foo/bar', 2, map(<String>['it', 'changed'])));
     await _expectNotContains('bar/baz');
@@ -258,7 +370,8 @@ class LocalStoreTestCase {
     final Query _query = query('foo');
     final int targetId = await _allocateQuery(_query);
     await _applyRemoteEvent(
-        updateRemoteEvent(deletedDoc('foo/bar', 2), <int>[targetId], <int>[]));
+      updateRemoteEvent(deletedDoc('foo/bar', 2), <int>[targetId], <int>[]),
+    );
     _expectRemoved(<String>['foo/bar']);
     // Under eager GC, there is no longer a reference for the document, and it should be deleted.
     if (_garbageCollectorIsEager) {
@@ -269,17 +382,31 @@ class LocalStoreTestCase {
 
     await _writeMutation(setMutation('foo/bar', map(<String>['foo', 'bar'])));
     _expectChanged(<Document>[
-      doc('foo/bar', 0, map(<String>['foo', 'bar']),
-          DocumentState.localMutations)
+      doc(
+        'foo/bar',
+        0,
+        map(<String>['foo', 'bar']),
+        DocumentState.localMutations,
+      ),
     ]);
-    await _expectContains(doc('foo/bar', 0, map(<String>['foo', 'bar']),
-        DocumentState.localMutations));
+    await _expectContains(
+      doc(
+        'foo/bar',
+        0,
+        map(<String>['foo', 'bar']),
+        DocumentState.localMutations,
+      ),
+    );
 
     await _releaseQuery(_query);
     await _acknowledgeMutation(3);
     _expectChanged(<Document>[
-      doc('foo/bar', 3, map(<String>['foo', 'bar']),
-          DocumentState.committedMutations)
+      doc(
+        'foo/bar',
+        3,
+        map(<String>['foo', 'bar']),
+        DocumentState.committedMutations,
+      ),
     ]);
     // It has been acknowledged, and should no longer be retained as there is no target and mutation
     if (_garbageCollectorIsEager) {
@@ -293,56 +420,95 @@ class LocalStoreTestCase {
     final int targetId = await _allocateQuery(_query);
     await _writeMutation(setMutation('foo/bar', map(<String>['foo', 'bar'])));
     _expectChanged(<Document>[
-      doc('foo/bar', 0, map(<String>['foo', 'bar']),
-          DocumentState.localMutations)
+      doc(
+        'foo/bar',
+        0,
+        map(<String>['foo', 'bar']),
+        DocumentState.localMutations,
+      ),
     ]);
 
     await _applyRemoteEvent(
-        updateRemoteEvent(deletedDoc('foo/bar', 2), <int>[targetId], <int>[]));
+      updateRemoteEvent(deletedDoc('foo/bar', 2), <int>[targetId], <int>[]),
+    );
     _expectChanged(<Document>[
-      doc('foo/bar', 0, map(<String>['foo', 'bar']),
-          DocumentState.localMutations)
+      doc(
+        'foo/bar',
+        0,
+        map(<String>['foo', 'bar']),
+        DocumentState.localMutations,
+      ),
     ]);
-    await _expectContains(doc('foo/bar', 0, map(<String>['foo', 'bar']),
-        DocumentState.localMutations));
+    await _expectContains(
+      doc(
+        'foo/bar',
+        0,
+        map(<String>['foo', 'bar']),
+        DocumentState.localMutations,
+      ),
+    );
   }
 
   @testMethod
   Future<void> testHandlesDocumentThenSetMutationThenAckThenDocument() async {
     final Query query = Query(ResourcePath.fromString('foo'));
     final int targetId = await _allocateQuery(query);
-    await _applyRemoteEvent(addedRemoteEvent(
-        doc('foo/bar', 2, map(<String>['it', 'base'])),
-        <int>[targetId],
-        <int>[]));
+    await _applyRemoteEvent(
+      addedRemoteEvent(doc('foo/bar', 2, map(<String>['it', 'base'])), <int>[
+        targetId,
+      ], <int>[]),
+    );
 
     _expectChanged(<Document>[
-      doc('foo/bar', 2, map(<String>['it', 'base']))
+      doc('foo/bar', 2, map(<String>['it', 'base'])),
     ]);
     await _expectContains(doc('foo/bar', 2, map(<String>['it', 'base'])));
 
     await _writeMutation(setMutation('foo/bar', map(<String>['foo', 'bar'])));
     _expectChanged(<Document>[
-      doc('foo/bar', 0, map(<String>['foo', 'bar']),
-          DocumentState.localMutations)
+      doc(
+        'foo/bar',
+        0,
+        map(<String>['foo', 'bar']),
+        DocumentState.localMutations,
+      ),
     ]);
-    await _expectContains(doc('foo/bar', 0, map(<String>['foo', 'bar']),
-        DocumentState.localMutations));
+    await _expectContains(
+      doc(
+        'foo/bar',
+        0,
+        map(<String>['foo', 'bar']),
+        DocumentState.localMutations,
+      ),
+    );
 
     await _acknowledgeMutation(3);
     _expectChanged(<Document>[
-      doc('foo/bar', 3, map(<String>['foo', 'bar']),
-          DocumentState.committedMutations)
+      doc(
+        'foo/bar',
+        3,
+        map(<String>['foo', 'bar']),
+        DocumentState.committedMutations,
+      ),
     ]);
-    await _expectContains(doc('foo/bar', 3, map(<String>['foo', 'bar']),
-        DocumentState.committedMutations));
+    await _expectContains(
+      doc(
+        'foo/bar',
+        3,
+        map(<String>['foo', 'bar']),
+        DocumentState.committedMutations,
+      ),
+    );
 
-    await _applyRemoteEvent(updateRemoteEvent(
+    await _applyRemoteEvent(
+      updateRemoteEvent(
         doc('foo/bar', 3, map(<String>['it', 'changed'])),
         <int>[targetId],
-        <int>[]));
+        <int>[],
+      ),
+    );
     _expectChanged(<Document>[
-      doc('foo/bar', 3, map(<String>['it', 'changed']))
+      doc('foo/bar', 3, map(<String>['it', 'changed'])),
     ]);
     await _expectContains(doc('foo/bar', 3, map(<String>['it', 'changed'])));
   }
@@ -372,42 +538,67 @@ class LocalStoreTestCase {
 
     final Query query = Query(ResourcePath.fromString('foo'));
     final int targetId = await _allocateQuery(query);
-    await _applyRemoteEvent(addedRemoteEvent(
-        doc('foo/bar', 1, map(<String>['it', 'base']),
-            DocumentState.localMutations),
+    await _applyRemoteEvent(
+      addedRemoteEvent(
+        doc(
+          'foo/bar',
+          1,
+          map(<String>['it', 'base']),
+          DocumentState.localMutations,
+        ),
         <int>[targetId],
-        <int>[]));
+        <int>[],
+      ),
+    );
     _expectChanged(<MaybeDocument>[
-      doc('foo/bar', 0, map(<String>['foo', 'bar', 'it', 'base']),
-          DocumentState.localMutations)
-    ]);
-    await _expectContains(doc(
+      doc(
         'foo/bar',
         0,
         map(<String>['foo', 'bar', 'it', 'base']),
-        DocumentState.localMutations));
+        DocumentState.localMutations,
+      ),
+    ]);
+    await _expectContains(
+      doc(
+        'foo/bar',
+        0,
+        map(<String>['foo', 'bar', 'it', 'base']),
+        DocumentState.localMutations,
+      ),
+    );
 
     await _acknowledgeMutation(2);
 
     _expectChanged(<Document>[
-      doc('foo/bar', 2, map(<String>['foo', 'bar', 'it', 'base']),
-          DocumentState.committedMutations)
-    ]);
-    await _expectContains(doc(
+      doc(
         'foo/bar',
         2,
         map(<String>['foo', 'bar', 'it', 'base']),
-        DocumentState.committedMutations));
-
-    await _applyRemoteEvent(updateRemoteEvent(
-        doc('foo/bar', 2, map(<String>['foo', 'bar', 'it', 'base'])),
-        <int>[targetId],
-        <int>[]));
-    _expectChanged(<Document>[
-      doc('foo/bar', 2, map(<String>['foo', 'bar', 'it', 'base']))
+        DocumentState.committedMutations,
+      ),
     ]);
     await _expectContains(
-        doc('foo/bar', 2, map(<String>['foo', 'bar', 'it', 'base'])));
+      doc(
+        'foo/bar',
+        2,
+        map(<String>['foo', 'bar', 'it', 'base']),
+        DocumentState.committedMutations,
+      ),
+    );
+
+    await _applyRemoteEvent(
+      updateRemoteEvent(
+        doc('foo/bar', 2, map(<String>['foo', 'bar', 'it', 'base'])),
+        <int>[targetId],
+        <int>[],
+      ),
+    );
+    _expectChanged(<Document>[
+      doc('foo/bar', 2, map(<String>['foo', 'bar', 'it', 'base'])),
+    ]);
+    await _expectContains(
+      doc('foo/bar', 2, map(<String>['foo', 'bar', 'it', 'base'])),
+    );
   }
 
   @testMethod
@@ -427,12 +618,13 @@ class LocalStoreTestCase {
 
     final Query query = Query(ResourcePath.fromString('foo'));
     final int targetId = await _allocateQuery(query);
-    await _applyRemoteEvent(updateRemoteEvent(
-        doc('foo/bar', 1, map(<String>['it', 'base'])),
-        <int>[targetId],
-        <int>[]));
+    await _applyRemoteEvent(
+      updateRemoteEvent(doc('foo/bar', 1, map(<String>['it', 'base'])), <int>[
+        targetId,
+      ], <int>[]),
+    );
     _expectChanged(<Document>[
-      doc('foo/bar', 1, map(<String>['it', 'base']))
+      doc('foo/bar', 1, map(<String>['it', 'base'])),
     ]);
     await _expectContains(doc('foo/bar', 1, map(<String>['it', 'base'])));
   }
@@ -450,7 +642,8 @@ class LocalStoreTestCase {
       await _expectNotContains('foo/bar');
     } else {
       await _expectContains(
-          deletedDoc('foo/bar', 1, hasCommittedMutations: true));
+        deletedDoc('foo/bar', 1, hasCommittedMutations: true),
+      );
     }
   }
 
@@ -458,12 +651,13 @@ class LocalStoreTestCase {
   Future<void> testHandlesDocumentThenDeleteMutationThenAck() async {
     final Query query = Query(ResourcePath.fromString('foo'));
     final int targetId = await _allocateQuery(query);
-    await _applyRemoteEvent(updateRemoteEvent(
-        doc('foo/bar', 1, map(<String>['it', 'base'])),
-        <int>[targetId],
-        <int>[]));
+    await _applyRemoteEvent(
+      updateRemoteEvent(doc('foo/bar', 1, map(<String>['it', 'base'])), <int>[
+        targetId,
+      ], <int>[]),
+    );
     _expectChanged(<Document>[
-      doc('foo/bar', 1, map(<String>['it', 'base']))
+      doc('foo/bar', 1, map(<String>['it', 'base'])),
     ]);
     await _expectContains(doc('foo/bar', 1, map(<String>['it', 'base'])));
 
@@ -479,7 +673,8 @@ class LocalStoreTestCase {
       await _expectNotContains('foo/bar');
     } else {
       await _expectContains(
-          deletedDoc('foo/bar', 2, hasCommittedMutations: true));
+        deletedDoc('foo/bar', 2, hasCommittedMutations: true),
+      );
     }
   }
 
@@ -491,10 +686,11 @@ class LocalStoreTestCase {
     _expectRemoved(<String>['foo/bar']);
     await _expectContains(deletedDoc('foo/bar', 0));
 
-    await _applyRemoteEvent(updateRemoteEvent(
-        doc('foo/bar', 1, map(<String>['it', 'base'])),
-        <int>[targetId],
-        <int>[]));
+    await _applyRemoteEvent(
+      updateRemoteEvent(doc('foo/bar', 1, map(<String>['it', 'base'])), <int>[
+        targetId,
+      ], <int>[]),
+    );
     _expectRemoved(<String>['foo/bar']);
     await _expectContains(deletedDoc('foo/bar', 0));
 
@@ -506,7 +702,8 @@ class LocalStoreTestCase {
       await _expectNotContains('foo/bar');
     } else {
       await _expectContains(
-          deletedDoc('foo/bar', 2, hasCommittedMutations: true));
+        deletedDoc('foo/bar', 2, hasCommittedMutations: true),
+      );
     }
   }
 
@@ -514,87 +711,149 @@ class LocalStoreTestCase {
   Future<void> testHandlesDocumentThenDeletedDocumentThenDocument() async {
     final Query query = Query(ResourcePath.fromString('foo'));
     final int targetId = await _allocateQuery(query);
-    await _applyRemoteEvent(updateRemoteEvent(
-        doc('foo/bar', 1, map(<String>['it', 'base'])),
-        <int>[targetId],
-        <int>[]));
+    await _applyRemoteEvent(
+      updateRemoteEvent(doc('foo/bar', 1, map(<String>['it', 'base'])), <int>[
+        targetId,
+      ], <int>[]),
+    );
     _expectChanged(<Document>[
-      doc('foo/bar', 1, map(<String>['it', 'base']))
+      doc('foo/bar', 1, map(<String>['it', 'base'])),
     ]);
     await _expectContains(doc('foo/bar', 1, map(<String>['it', 'base'])));
 
     await _applyRemoteEvent(
-        updateRemoteEvent(deletedDoc('foo/bar', 2), <int>[targetId], <int>[]));
+      updateRemoteEvent(deletedDoc('foo/bar', 2), <int>[targetId], <int>[]),
+    );
     _expectRemoved(<String>['foo/bar']);
     if (!_garbageCollectorIsEager) {
       await _expectContains(deletedDoc('foo/bar', 2));
     }
 
-    await _applyRemoteEvent(updateRemoteEvent(
+    await _applyRemoteEvent(
+      updateRemoteEvent(
         doc('foo/bar', 3, map(<String>['it', 'changed'])),
         <int>[targetId],
-        <int>[]));
+        <int>[],
+      ),
+    );
     _expectChanged(<Document>[
-      doc('foo/bar', 3, map(<String>['it', 'changed']))
+      doc('foo/bar', 3, map(<String>['it', 'changed'])),
     ]);
     await _expectContains(doc('foo/bar', 3, map(<String>['it', 'changed'])));
   }
 
   @testMethod
   Future<void>
-      testHandlesSetMutationThenPatchMutationThenDocumentThenAckThenAck() async {
+  testHandlesSetMutationThenPatchMutationThenDocumentThenAckThenAck() async {
     await _writeMutation(setMutation('foo/bar', map(<String>['foo', 'old'])));
     _expectChanged(<Document>[
-      doc('foo/bar', 0, map(<String>['foo', 'old']),
-          DocumentState.localMutations)
+      doc(
+        'foo/bar',
+        0,
+        map(<String>['foo', 'old']),
+        DocumentState.localMutations,
+      ),
     ]);
-    await _expectContains(doc('foo/bar', 0, map(<String>['foo', 'old']),
-        DocumentState.localMutations));
+    await _expectContains(
+      doc(
+        'foo/bar',
+        0,
+        map(<String>['foo', 'old']),
+        DocumentState.localMutations,
+      ),
+    );
 
     await _writeMutation(patchMutation('foo/bar', map(<String>['foo', 'bar'])));
     _expectChanged(<Document>[
-      doc('foo/bar', 0, map(<String>['foo', 'bar']),
-          DocumentState.localMutations)
+      doc(
+        'foo/bar',
+        0,
+        map(<String>['foo', 'bar']),
+        DocumentState.localMutations,
+      ),
     ]);
-    await _expectContains(doc('foo/bar', 0, map(<String>['foo', 'bar']),
-        DocumentState.localMutations));
+    await _expectContains(
+      doc(
+        'foo/bar',
+        0,
+        map(<String>['foo', 'bar']),
+        DocumentState.localMutations,
+      ),
+    );
 
     final Query query = Query(ResourcePath.fromString('foo'));
 
     final int targetId = await _allocateQuery(query);
-    await _applyRemoteEvent(updateRemoteEvent(
-        doc('foo/bar', 1, map(<String>['it', 'base']),
-            DocumentState.localMutations),
+    await _applyRemoteEvent(
+      updateRemoteEvent(
+        doc(
+          'foo/bar',
+          1,
+          map(<String>['it', 'base']),
+          DocumentState.localMutations,
+        ),
         <int>[targetId],
-        <int>[]));
+        <int>[],
+      ),
+    );
     _expectChanged(<Document>[
-      doc('foo/bar', 0, map(<String>['foo', 'bar']),
-          DocumentState.localMutations)
+      doc(
+        'foo/bar',
+        0,
+        map(<String>['foo', 'bar']),
+        DocumentState.localMutations,
+      ),
     ]);
-    await _expectContains(doc('foo/bar', 0, map(<String>['foo', 'bar']),
-        DocumentState.localMutations));
+    await _expectContains(
+      doc(
+        'foo/bar',
+        0,
+        map(<String>['foo', 'bar']),
+        DocumentState.localMutations,
+      ),
+    );
 
     await _releaseQuery(query);
     await _acknowledgeMutation(2); // delete mutation
     _expectChanged(<Document>[
-      doc('foo/bar', 0, map(<String>['foo', 'bar']),
-          DocumentState.localMutations)
+      doc(
+        'foo/bar',
+        0,
+        map(<String>['foo', 'bar']),
+        DocumentState.localMutations,
+      ),
     ]);
-    await _expectContains(doc('foo/bar', 0, map(<String>['foo', 'bar']),
-        DocumentState.localMutations));
+    await _expectContains(
+      doc(
+        'foo/bar',
+        0,
+        map(<String>['foo', 'bar']),
+        DocumentState.localMutations,
+      ),
+    );
 
     await _acknowledgeMutation(3); // patch mutation
     _expectChanged(<Document>[
-      doc('foo/bar', 3, map(<String>['foo', 'bar']),
-          DocumentState.committedMutations)
+      doc(
+        'foo/bar',
+        3,
+        map(<String>['foo', 'bar']),
+        DocumentState.committedMutations,
+      ),
     ]);
 
     if (_garbageCollectorIsEager) {
       // we've ack'd all of the mutations, nothing is keeping this pinned anymore
       await _expectNotContains('foo/bar');
     } else {
-      await _expectContains(doc('foo/bar', 3, map(<String>['foo', 'bar']),
-          DocumentState.committedMutations));
+      await _expectContains(
+        doc(
+          'foo/bar',
+          3,
+          map(<String>['foo', 'bar']),
+          DocumentState.committedMutations,
+        ),
+      );
     }
   }
 
@@ -602,15 +861,25 @@ class LocalStoreTestCase {
   Future<void> testHandlesSetMutationAndPatchMutationTogether() async {
     await _writeMutations(<Mutation>[
       setMutation('foo/bar', map(<String>['foo', 'old'])),
-      patchMutation('foo/bar', map(<String>['foo', 'bar']))
+      patchMutation('foo/bar', map(<String>['foo', 'bar'])),
     ]);
 
     _expectChanged(<Document>[
-      doc('foo/bar', 0, map(<String>['foo', 'bar']),
-          DocumentState.localMutations)
+      doc(
+        'foo/bar',
+        0,
+        map(<String>['foo', 'bar']),
+        DocumentState.localMutations,
+      ),
     ]);
-    await _expectContains(doc('foo/bar', 0, map(<String>['foo', 'bar']),
-        DocumentState.localMutations));
+    await _expectContains(
+      doc(
+        'foo/bar',
+        0,
+        map(<String>['foo', 'bar']),
+        DocumentState.localMutations,
+      ),
+    );
   }
 
   @testMethod
@@ -620,8 +889,14 @@ class LocalStoreTestCase {
     }
 
     await _writeMutation(setMutation('foo/bar', map(<String>['foo', 'old'])));
-    await _expectContains(doc('foo/bar', 0, map(<String>['foo', 'old']),
-        DocumentState.localMutations));
+    await _expectContains(
+      doc(
+        'foo/bar',
+        0,
+        map(<String>['foo', 'old']),
+        DocumentState.localMutations,
+      ),
+    );
     await _acknowledgeMutation(1);
     await _expectNotContains('foo/bar');
 
@@ -635,29 +910,49 @@ class LocalStoreTestCase {
 
   @testMethod
   Future<void>
-      testHandlesSetMutationsAndPatchMutationOfJustOneTogether() async {
+  testHandlesSetMutationsAndPatchMutationOfJustOneTogether() async {
     await _writeMutations(<Mutation>[
       setMutation('foo/bar', map(<String>['foo', 'old'])),
       setMutation('bar/baz', map(<String>['bar', 'baz'])),
-      patchMutation('foo/bar', map(<String>['foo', 'bar']))
+      patchMutation('foo/bar', map(<String>['foo', 'bar'])),
     ]);
 
     _expectChanged(<Document>[
-      doc('bar/baz', 0, map(<String>['bar', 'baz']),
-          DocumentState.localMutations),
-      doc('foo/bar', 0, map(<String>['foo', 'bar']),
-          DocumentState.localMutations)
+      doc(
+        'bar/baz',
+        0,
+        map(<String>['bar', 'baz']),
+        DocumentState.localMutations,
+      ),
+      doc(
+        'foo/bar',
+        0,
+        map(<String>['foo', 'bar']),
+        DocumentState.localMutations,
+      ),
     ]);
 
-    await _expectContains(doc('foo/bar', 0, map(<String>['foo', 'bar']),
-        DocumentState.localMutations));
-    await _expectContains(doc('bar/baz', 0, map(<String>['bar', 'baz']),
-        DocumentState.localMutations));
+    await _expectContains(
+      doc(
+        'foo/bar',
+        0,
+        map(<String>['foo', 'bar']),
+        DocumentState.localMutations,
+      ),
+    );
+    await _expectContains(
+      doc(
+        'bar/baz',
+        0,
+        map(<String>['bar', 'baz']),
+        DocumentState.localMutations,
+      ),
+    );
   }
 
   @testMethod
   Future<void>
-      testHandlesDeleteMutationThenPatchMutationThenAckThenAck() async {
+  testHandlesDeleteMutationThenPatchMutationThenAckThenAck() async {
     await _writeMutation(deleteMutation('foo/bar'));
     _expectRemoved(<String>['foo/bar']);
     await _expectContains(deletedDoc('foo/bar', 0));
@@ -688,15 +983,21 @@ class LocalStoreTestCase {
     }
 
     const int targetId = 1;
-    await _applyRemoteEvent(updateRemoteEvent(
-        deletedDoc('foo/bar', 2), <int>[], <int>[], <int>[targetId]));
+    await _applyRemoteEvent(
+      updateRemoteEvent(deletedDoc('foo/bar', 2), <int>[], <int>[], <int>[
+        targetId,
+      ]),
+    );
     await _expectNotContains('foo/bar');
 
-    await _applyRemoteEvent(updateRemoteEvent(
+    await _applyRemoteEvent(
+      updateRemoteEvent(
         doc('foo/bar', 2, map(<String>['foo', 'bar'])),
         <int>[],
         <int>[],
-        <int>[targetId]));
+        <int>[targetId],
+      ),
+    );
     await _expectNotContains('foo/bar');
   }
 
@@ -712,12 +1013,22 @@ class LocalStoreTestCase {
 
     final List<int> none = <int>[];
     final List<int> two = <int>[2];
-    await _applyRemoteEvent(addedRemoteEvent(
-        doc('foo/bar', 2, map(<String>['foo', 'bar'])), two, none));
+    await _applyRemoteEvent(
+      addedRemoteEvent(
+        doc('foo/bar', 2, map(<String>['foo', 'bar'])),
+        two,
+        none,
+      ),
+    );
     await _expectContains(doc('foo/bar', 2, map(<String>['foo', 'bar'])));
 
-    await _applyRemoteEvent(updateRemoteEvent(
-        doc('foo/bar', 2, map(<String>['foo', 'baz'])), none, two));
+    await _applyRemoteEvent(
+      updateRemoteEvent(
+        doc('foo/bar', 2, map(<String>['foo', 'baz'])),
+        none,
+        two,
+      ),
+    );
 
     await _expectNotContains('foo/bar');
   }
@@ -730,24 +1041,43 @@ class LocalStoreTestCase {
 
     final Query query = Query(ResourcePath.fromString('foo'));
     final int targetId = await _allocateQuery(query);
-    await _applyRemoteEvent(updateRemoteEvent(
-        doc('foo/bar', 1, map(<String>['foo', 'old'])),
-        <int>[targetId],
-        <int>[]));
+    await _applyRemoteEvent(
+      updateRemoteEvent(doc('foo/bar', 1, map(<String>['foo', 'old'])), <int>[
+        targetId,
+      ], <int>[]),
+    );
     await _writeMutation(patchMutation('foo/bar', map(<String>['foo', 'bar'])));
     await _releaseQuery(query);
     await _writeMutation(setMutation('foo/bah', map(<String>['foo', 'bah'])));
     await _writeMutation(deleteMutation('foo/baz'));
-    await _expectContains(doc('foo/bar', 0, map(<String>['foo', 'bar']),
-        DocumentState.localMutations));
-    await _expectContains(doc('foo/bah', 0, map(<String>['foo', 'bah']),
-        DocumentState.localMutations));
+    await _expectContains(
+      doc(
+        'foo/bar',
+        0,
+        map(<String>['foo', 'bar']),
+        DocumentState.localMutations,
+      ),
+    );
+    await _expectContains(
+      doc(
+        'foo/bah',
+        0,
+        map(<String>['foo', 'bah']),
+        DocumentState.localMutations,
+      ),
+    );
     await _expectContains(deletedDoc('foo/baz', 0));
 
     await _acknowledgeMutation(3);
     await _expectNotContains('foo/bar');
-    await _expectContains(doc('foo/bah', 0, map(<String>['foo', 'bah']),
-        DocumentState.localMutations));
+    await _expectContains(
+      doc(
+        'foo/bah',
+        0,
+        map(<String>['foo', 'bah']),
+        DocumentState.localMutations,
+      ),
+    );
     await _expectContains(deletedDoc('foo/baz', 0));
 
     await _acknowledgeMutation(4);
@@ -769,25 +1099,44 @@ class LocalStoreTestCase {
 
     final Query query = Query(ResourcePath.fromString('foo'));
     final int targetId = await _allocateQuery(query);
-    await _applyRemoteEvent(updateRemoteEvent(
-        doc('foo/bar', 1, map(<String>['foo', 'old'])),
-        <int>[targetId],
-        <int>[]));
+    await _applyRemoteEvent(
+      updateRemoteEvent(doc('foo/bar', 1, map(<String>['foo', 'old'])), <int>[
+        targetId,
+      ], <int>[]),
+    );
     await _writeMutation(patchMutation('foo/bar', map(<String>['foo', 'bar'])));
     // Release the query so that our target count goes back to 0 and we are considered up-to-date.
     await _releaseQuery(query);
     await _writeMutation(setMutation('foo/bah', map(<String>['foo', 'bah'])));
     await _writeMutation(deleteMutation('foo/baz'));
-    await _expectContains(doc('foo/bar', 0, map(<String>['foo', 'bar']),
-        DocumentState.localMutations));
-    await _expectContains(doc('foo/bah', 0, map(<String>['foo', 'bah']),
-        DocumentState.localMutations));
+    await _expectContains(
+      doc(
+        'foo/bar',
+        0,
+        map(<String>['foo', 'bar']),
+        DocumentState.localMutations,
+      ),
+    );
+    await _expectContains(
+      doc(
+        'foo/bah',
+        0,
+        map(<String>['foo', 'bah']),
+        DocumentState.localMutations,
+      ),
+    );
     await _expectContains(deletedDoc('foo/baz', 0));
 
     await _rejectMutation(); // patch mutation
     await _expectNotContains('foo/bar');
-    await _expectContains(doc('foo/bah', 0, map(<String>['foo', 'bah']),
-        DocumentState.localMutations));
+    await _expectContains(
+      doc(
+        'foo/bah',
+        0,
+        map(<String>['foo', 'bah']),
+        DocumentState.localMutations,
+      ),
+    );
     await _expectContains(deletedDoc('foo/baz', 0));
 
     await _rejectMutation(); // set mutation
@@ -813,25 +1162,54 @@ class LocalStoreTestCase {
 
     final List<int> none = <int>[];
     final List<int> two = <int>[2];
-    await _applyRemoteEvent(addedRemoteEvent(
-        doc('foo/bar', 1, map(<String>['foo', 'bar'])), two, none));
+    await _applyRemoteEvent(
+      addedRemoteEvent(
+        doc('foo/bar', 1, map(<String>['foo', 'bar'])),
+        two,
+        none,
+      ),
+    );
     await _writeMutation(setMutation('foo/baz', map(<String>['foo', 'baz'])));
     await _expectContains(doc('foo/bar', 1, map(<String>['foo', 'bar'])));
-    await _expectContains(doc('foo/baz', 0, map(<String>['foo', 'baz']),
-        DocumentState.localMutations));
+    await _expectContains(
+      doc(
+        'foo/baz',
+        0,
+        map(<String>['foo', 'baz']),
+        DocumentState.localMutations,
+      ),
+    );
 
-    await _notifyLocalViewChanges(viewChanges(
-        2, /* fromCache= */ false, <String>['foo/bar', 'foo/baz'], <String>[]));
-    await _applyRemoteEvent(updateRemoteEvent(
-        doc('foo/bar', 1, map(<String>['foo', 'bar'])), none, two));
-    await _applyRemoteEvent(updateRemoteEvent(
-        doc('foo/baz', 2, map(<String>['foo', 'baz'])), two, none));
+    await _notifyLocalViewChanges(
+      viewChanges(2, /* fromCache= */ false, <String>[
+        'foo/bar',
+        'foo/baz',
+      ], <String>[]),
+    );
+    await _applyRemoteEvent(
+      updateRemoteEvent(
+        doc('foo/bar', 1, map(<String>['foo', 'bar'])),
+        none,
+        two,
+      ),
+    );
+    await _applyRemoteEvent(
+      updateRemoteEvent(
+        doc('foo/baz', 2, map(<String>['foo', 'baz'])),
+        two,
+        none,
+      ),
+    );
     await _acknowledgeMutation(2);
     await _expectContains(doc('foo/bar', 1, map(<String>['foo', 'bar'])));
     await _expectContains(doc('foo/baz', 2, map(<String>['foo', 'baz'])));
 
-    await _notifyLocalViewChanges(viewChanges(
-        2, /* fromCache= */ false, <String>[], <String>['foo/bar', 'foo/baz']));
+    await _notifyLocalViewChanges(
+      viewChanges(2, /* fromCache= */ false, <String>[], <String>[
+        'foo/bar',
+        'foo/baz',
+      ]),
+    );
     await _releaseQuery(query);
 
     await _expectNotContains('foo/bar');
@@ -845,8 +1223,11 @@ class LocalStoreTestCase {
     }
 
     const int targetID = 321;
-    await _applyRemoteEvent(updateRemoteEvent(
-        doc('foo/bar', 1, map()), <int>[], <int>[], <int>[targetID]));
+    await _applyRemoteEvent(
+      updateRemoteEvent(doc('foo/bar', 1, map()), <int>[], <int>[], <int>[
+        targetID,
+      ]),
+    );
 
     await _expectNotContains('foo/bar');
   }
@@ -856,17 +1237,24 @@ class LocalStoreTestCase {
     await _localStore.writeLocally(<Mutation>[
       setMutation('foo/bar', map(<String>['foo', 'bar'])),
       setMutation('foo/baz', map(<String>['foo', 'baz'])),
-      setMutation('foo/bar/Foo/Bar', map(<String>['Foo', 'Bar']))
+      setMutation('foo/bar/Foo/Bar', map(<String>['Foo', 'Bar'])),
     ]);
 
-    final Query query =
-        Query(ResourcePath.fromSegments(<String>['foo', 'bar']));
+    final Query query = Query(
+      ResourcePath.fromSegments(<String>['foo', 'bar']),
+    );
     final ImmutableSortedMap<DocumentKey, Document> docs =
-        (await _localStore.executeQuery(query, /* usePreviousResults= */ true))
-            .documents;
+        (await _localStore.executeQuery(
+          query,
+          /* usePreviousResults= */ true,
+        )).documents;
     expect(values(docs), <Document>[
-      doc('foo/bar', 0, map(<String>['foo', 'bar']),
-          DocumentState.localMutations)
+      doc(
+        'foo/bar',
+        0,
+        map(<String>['foo', 'bar']),
+        DocumentState.localMutations,
+      ),
     ]);
   }
 
@@ -877,19 +1265,29 @@ class LocalStoreTestCase {
       setMutation('foo/bar', map(<String>['foo', 'bar'])),
       setMutation('foo/baz', map(<String>['foo', 'baz'])),
       setMutation('foo/bar/Foo/Bar', map(<String>['Foo', 'Bar'])),
-      setMutation('fooo/blah', map(<String>['fooo', 'blah']))
+      setMutation('fooo/blah', map(<String>['fooo', 'blah'])),
     ]);
 
     final Query query = Query(ResourcePath.fromString('foo'));
     final ImmutableSortedMap<DocumentKey, Document> docs =
-        (await _localStore.executeQuery(query, /* usePreviousResults= */ true))
-            .documents;
+        (await _localStore.executeQuery(
+          query,
+          /* usePreviousResults= */ true,
+        )).documents;
 
     expect(values(docs), <Document>[
-      doc('foo/bar', 0, map(<String>['foo', 'bar']),
-          DocumentState.localMutations),
-      doc('foo/baz', 0, map(<String>['foo', 'baz']),
-          DocumentState.localMutations)
+      doc(
+        'foo/bar',
+        0,
+        map(<String>['foo', 'bar']),
+        DocumentState.localMutations,
+      ),
+      doc(
+        'foo/baz',
+        0,
+        map(<String>['foo', 'baz']),
+        DocumentState.localMutations,
+      ),
     ]);
   }
 
@@ -899,20 +1297,28 @@ class LocalStoreTestCase {
     await _allocateQuery(query);
     _expectTargetId(2);
 
-    await _applyRemoteEvent(updateRemoteEvent(
-        doc('foo/baz', 10, map(<String>['a', 'b'])), <int>[2], <int>[]));
-    await _applyRemoteEvent(updateRemoteEvent(
-        doc('foo/bar', 20, map(<String>['a', 'b'])), <int>[2], <int>[]));
+    await _applyRemoteEvent(
+      updateRemoteEvent(doc('foo/baz', 10, map(<String>['a', 'b'])), <int>[
+        2,
+      ], <int>[]),
+    );
+    await _applyRemoteEvent(
+      updateRemoteEvent(doc('foo/bar', 20, map(<String>['a', 'b'])), <int>[
+        2,
+      ], <int>[]),
+    );
     await _writeMutation(setMutation('foo/bonk', map(<String>['a', 'b'])));
 
     final ImmutableSortedMap<DocumentKey, Document> docs =
-        (await _localStore.executeQuery(query, /* usePreviousResults= */ true))
-            .documents;
+        (await _localStore.executeQuery(
+          query,
+          /* usePreviousResults= */ true,
+        )).documents;
 
     expect(values(docs), <Document>[
       doc('foo/bar', 20, map(<String>['a', 'b'])),
       doc('foo/baz', 10, map(<String>['a', 'b'])),
-      doc('foo/bonk', 0, map(<String>['a', 'b']), DocumentState.localMutations)
+      doc('foo/bonk', 0, map(<String>['a', 'b']), DocumentState.localMutations),
     ]);
   }
 
@@ -922,9 +1328,11 @@ class LocalStoreTestCase {
     await _allocateQuery(query);
 
     await _applyRemoteEvent(
-        updateRemoteEvent(doc('foo/baz', 10, map()), <int>[2], <int>[]));
+      updateRemoteEvent(doc('foo/baz', 10, map()), <int>[2], <int>[]),
+    );
     await _applyRemoteEvent(
-        updateRemoteEvent(doc('foo/bar', 20, map()), <int>[2], <int>[]));
+      updateRemoteEvent(doc('foo/bar', 20, map()), <int>[2], <int>[]),
+    );
     await _writeMutation(setMutation('foo/bonk', map()));
 
     _resetPersistenceStats();
@@ -948,18 +1356,23 @@ class LocalStoreTestCase {
     final int targetId = await _allocateQuery(_query);
     final Uint8List _resumeToken = resumeToken(1000)!;
 
-    final QueryData _queryData =
-        queryData(targetId, QueryPurpose.listen, 'foo/bar');
-    final t.TestTargetMetadataProvider testTargetMetadataProvider = t
-        .testTargetMetadataProvider
-      ..setSyncedKeys(_queryData, DocumentKey.emptyKeySet);
+    final QueryData _queryData = queryData(
+      targetId,
+      QueryPurpose.listen,
+      'foo/bar',
+    );
+    final t.TestTargetMetadataProvider testTargetMetadataProvider =
+        t.testTargetMetadataProvider
+          ..setSyncedKeys(_queryData, DocumentKey.emptyKeySet);
 
-    final WatchChangeAggregator aggregator =
-        WatchChangeAggregator(testTargetMetadataProvider);
+    final WatchChangeAggregator aggregator = WatchChangeAggregator(
+      testTargetMetadataProvider,
+    );
 
     final WatchChangeWatchTargetChange watchChange =
-        WatchChangeWatchTargetChange(
-            WatchTargetChangeType.current, <int>[targetId], _resumeToken);
+        WatchChangeWatchTargetChange(WatchTargetChangeType.current, <int>[
+          targetId,
+        ], _resumeToken);
     aggregator.handleTargetChange(watchChange);
     final RemoteEvent remoteEvent = aggregator.createRemoteEvent(version(1000));
     await _applyRemoteEvent(remoteEvent);
@@ -968,7 +1381,9 @@ class LocalStoreTestCase {
     await _releaseQuery(_query);
 
     // Should come back with the same resume token
-    final QueryData queryData2 = await _localStore.allocateTarget(_query.toTarget());
+    final QueryData queryData2 = await _localStore.allocateTarget(
+      _query.toTarget(),
+    );
     expect(queryData2.resumeToken, _resumeToken);
   }
 
@@ -983,39 +1398,50 @@ class LocalStoreTestCase {
     final int targetId = await _allocateQuery(_query);
     final Uint8List _resumeToken = resumeToken(1000)!;
 
-    final QueryData _queryData =
-        queryData(targetId, QueryPurpose.listen, 'foo/bar');
-    final t.TestTargetMetadataProvider testTargetMetadataProvider = t
-        .testTargetMetadataProvider
-      ..setSyncedKeys(_queryData, DocumentKey.emptyKeySet);
+    final QueryData _queryData = queryData(
+      targetId,
+      QueryPurpose.listen,
+      'foo/bar',
+    );
+    final t.TestTargetMetadataProvider testTargetMetadataProvider =
+        t.testTargetMetadataProvider
+          ..setSyncedKeys(_queryData, DocumentKey.emptyKeySet);
 
-    final WatchChangeAggregator aggregator1 =
-        WatchChangeAggregator(testTargetMetadataProvider);
+    final WatchChangeAggregator aggregator1 = WatchChangeAggregator(
+      testTargetMetadataProvider,
+    );
 
     final WatchChangeWatchTargetChange watchChange1 =
-        WatchChangeWatchTargetChange(
-            WatchTargetChangeType.current, <int>[targetId], _resumeToken);
+        WatchChangeWatchTargetChange(WatchTargetChangeType.current, <int>[
+          targetId,
+        ], _resumeToken);
     aggregator1.handleTargetChange(watchChange1);
-    final RemoteEvent remoteEvent1 =
-        aggregator1.createRemoteEvent(version(1000));
+    final RemoteEvent remoteEvent1 = aggregator1.createRemoteEvent(
+      version(1000),
+    );
     await _applyRemoteEvent(remoteEvent1);
 
     // New message with empty resume token should not replace the old resume token
-    final WatchChangeAggregator aggregator2 =
-        WatchChangeAggregator(testTargetMetadataProvider);
+    final WatchChangeAggregator aggregator2 = WatchChangeAggregator(
+      testTargetMetadataProvider,
+    );
     final WatchChangeWatchTargetChange watchChange2 =
-        WatchChangeWatchTargetChange(
-            WatchTargetChangeType.current, <int>[targetId], Uint8List(0));
+        WatchChangeWatchTargetChange(WatchTargetChangeType.current, <int>[
+          targetId,
+        ], Uint8List(0));
     aggregator2.handleTargetChange(watchChange2);
-    final RemoteEvent remoteEvent2 =
-        aggregator2.createRemoteEvent(version(2000));
+    final RemoteEvent remoteEvent2 = aggregator2.createRemoteEvent(
+      version(2000),
+    );
     await _applyRemoteEvent(remoteEvent2);
 
     // Stop listening so that the query should become inactive (but persistent)
     await _releaseQuery(_query);
 
     // Should come back with the same resume token
-    final QueryData queryData2 = await _localStore.allocateTarget(_query.toTarget());
+    final QueryData queryData2 = await _localStore.allocateTarget(
+      _query.toTarget(),
+    );
     expect(queryData2.resumeToken, _resumeToken);
   }
 
@@ -1025,14 +1451,20 @@ class LocalStoreTestCase {
     await _allocateQuery(query);
     _expectTargetId(2);
 
-    await _applyRemoteEvent(addedRemoteEvent(
-        doc('foo/baz', 10, map(<String>['a', 'b'])), <int>[2], <int>[]));
-    await _applyRemoteEvent(addedRemoteEvent(
-        doc('foo/bar', 20, map(<String>['a', 'b'])), <int>[2], <int>[]));
+    await _applyRemoteEvent(
+      addedRemoteEvent(doc('foo/baz', 10, map(<String>['a', 'b'])), <int>[
+        2,
+      ], <int>[]),
+    );
+    await _applyRemoteEvent(
+      addedRemoteEvent(doc('foo/bar', 20, map(<String>['a', 'b'])), <int>[
+        2,
+      ], <int>[]),
+    );
     await _writeMutation(setMutation('foo/bonk', map(<String>['a', 'b'])));
 
-    ImmutableSortedSet<DocumentKey> keys =
-        await _localStore.getRemoteDocumentKeys(2);
+    ImmutableSortedSet<DocumentKey> keys = await _localStore
+        .getRemoteDocumentKeys(2);
     expect(keys, <DocumentKey>[key('foo/bar'), key('foo/baz')]);
 
     keys = await _localStore.getRemoteDocumentKeys(2);
@@ -1042,31 +1474,42 @@ class LocalStoreTestCase {
   // TODO(mrschmidt): The FieldValue.increment() field transform tests below
   //  would probably be better implemented as spec tests but currently they
   //  don't support transforms.
+  // PORTING NOTE: upstream MutableDocument.setHasLocalMutations() resets the version to 0, so the
+  //  documents with local mutations below are expected at version 0.
   @testMethod
-  Future<void>
-      testHandlesSetMutationThenTransformMutationThenTransformMutation() async {
+  Future<void> testHandlesSetMutationThenTransformThenTransform() async {
     await _writeMutation(setMutation('foo/bar', map(<dynamic>['sum', 0])));
-    await _expectContains(doc(
-        'foo/bar', 0, map(<dynamic>['sum', 0]), DocumentState.localMutations));
-
+    await _expectContains(
+      doc('foo/bar', 0, map(<dynamic>['sum', 0]), DocumentState.localMutations),
+    );
     _expectChanged(<Document>[
-      doc('foo/bar', 0, map(<dynamic>['sum', 0]), DocumentState.localMutations)
+      doc('foo/bar', 0, map(<dynamic>['sum', 0]), DocumentState.localMutations),
     ]);
 
-    await _writeMutation(transformMutation(
-        'foo/bar', map(<dynamic>['sum', FieldValue.increment(1)])));
-    await _expectContains(doc(
-        'foo/bar', 0, map(<dynamic>['sum', 1]), DocumentState.localMutations));
+    await _writeMutation(
+      transformMutation(
+        'foo/bar',
+        map(<dynamic>['sum', FieldValue.increment(1)]),
+      ),
+    );
+    await _expectContains(
+      doc('foo/bar', 0, map(<dynamic>['sum', 1]), DocumentState.localMutations),
+    );
     _expectChanged(<Document>[
-      doc('foo/bar', 0, map(<dynamic>['sum', 1]), DocumentState.localMutations)
+      doc('foo/bar', 0, map(<dynamic>['sum', 1]), DocumentState.localMutations),
     ]);
 
-    await _writeMutation(transformMutation(
-        'foo/bar', map(<dynamic>['sum', FieldValue.increment(2)])));
-    await _expectContains(doc(
-        'foo/bar', 0, map(<dynamic>['sum', 3]), DocumentState.localMutations));
+    await _writeMutation(
+      transformMutation(
+        'foo/bar',
+        map(<dynamic>['sum', FieldValue.increment(2)]),
+      ),
+    );
+    await _expectContains(
+      doc('foo/bar', 0, map(<dynamic>['sum', 3]), DocumentState.localMutations),
+    );
     _expectChanged(<Document>[
-      doc('foo/bar', 0, map(<dynamic>['sum', 3]), DocumentState.localMutations)
+      doc('foo/bar', 0, map(<dynamic>['sum', 3]), DocumentState.localMutations),
     ]);
   }
 
@@ -1079,213 +1522,351 @@ class LocalStoreTestCase {
     // A single set mutation that carries its transform (as produced by the
     // user data converter); it goes through the mutation queue serializer.
     final Mutation set = SetMutation(
-        key('foo/bar'),
-        wrapMap(map(<dynamic>['x', 1])),
-        Precondition.none,
-        transformMutation(
-                'foo/bar', map(<dynamic>['sum', FieldValue.increment(2)]))
-            .fieldTransforms);
+      key('foo/bar'),
+      wrapMap(map(<dynamic>['x', 1])),
+      Precondition.none,
+      transformMutation(
+        'foo/bar',
+        map(<dynamic>['sum', FieldValue.increment(2)]),
+      ).fieldTransforms,
+    );
     await _writeMutation(set);
-    await _expectContains(doc('foo/bar', 0, map(<dynamic>['x', 1, 'sum', 2]),
-        DocumentState.localMutations));
+    await _expectContains(
+      doc(
+        'foo/bar',
+        0,
+        map(<dynamic>['x', 1, 'sum', 2]),
+        DocumentState.localMutations,
+      ),
+    );
 
     await _acknowledgeMutation(1, 2);
-    await _expectContains(doc('foo/bar', 1, map(<dynamic>['x', 1, 'sum', 2]),
-        DocumentState.committedMutations));
+    await _expectContains(
+      doc(
+        'foo/bar',
+        1,
+        map(<dynamic>['x', 1, 'sum', 2]),
+        DocumentState.committedMutations,
+      ),
+    );
   }
 
   @testMethod
   Future<void>
-      testHandlesSetMutationThenAckThenTransformMutationThenAckThenTransformMutation() async {
+  testHandlesSetMutationThenAckThenTransformThenAckThenTransform() async {
+    // Since this test doesn't start a listen, Eager GC removes the documents from the cache as
+    // soon as the mutation is applied. This creates a lot of special casing in this unit test but
+    // does not expand its test coverage.
     if (_garbageCollectorIsEager) {
-      // Since this test doesn't start a listen, Eager GC removes the documents from the cache as
-      // soon as the mutation is applied. This creates a lot of special casing in this unit test but
-      // does not expand its test coverage.
       return;
     }
 
     await _writeMutation(setMutation('foo/bar', map(<dynamic>['sum', 0])));
-    await _expectContains(doc(
-        'foo/bar', 0, map(<dynamic>['sum', 0]), DocumentState.localMutations));
+    await _expectContains(
+      doc('foo/bar', 0, map(<dynamic>['sum', 0]), DocumentState.localMutations),
+    );
     _expectChanged(<Document>[
-      doc('foo/bar', 0, map(<dynamic>['sum', 0]), DocumentState.localMutations)
+      doc('foo/bar', 0, map(<dynamic>['sum', 0]), DocumentState.localMutations),
     ]);
 
     await _acknowledgeMutation(1);
     _expectChanged(<Document>[
-      doc('foo/bar', 1, map(<dynamic>['sum', 0]),
-          DocumentState.committedMutations)
+      doc(
+        'foo/bar',
+        1,
+        map(<dynamic>['sum', 0]),
+        DocumentState.committedMutations,
+      ),
     ]);
-    await _expectContains(doc('foo/bar', 1, map(<dynamic>['sum', 0]),
-        DocumentState.committedMutations));
+    await _expectContains(
+      doc(
+        'foo/bar',
+        1,
+        map(<dynamic>['sum', 0]),
+        DocumentState.committedMutations,
+      ),
+    );
 
-    await _writeMutation(transformMutation(
-        'foo/bar', map(<dynamic>['sum', FieldValue.increment(1)])));
-    await _expectContains(doc(
-        'foo/bar', 0, map(<dynamic>['sum', 1]), DocumentState.localMutations));
+    await _writeMutation(
+      transformMutation(
+        'foo/bar',
+        map(<dynamic>['sum', FieldValue.increment(1)]),
+      ),
+    );
+    await _expectContains(
+      doc('foo/bar', 0, map(<dynamic>['sum', 1]), DocumentState.localMutations),
+    );
     _expectChanged(<Document>[
-      doc('foo/bar', 0, map(<dynamic>['sum', 1]), DocumentState.localMutations)
+      doc('foo/bar', 0, map(<dynamic>['sum', 1]), DocumentState.localMutations),
     ]);
 
     await _acknowledgeMutation(2, 1);
     _expectChanged(<Document>[
-      doc('foo/bar', 2, map(<dynamic>['sum', 1]),
-          DocumentState.committedMutations)
+      doc(
+        'foo/bar',
+        2,
+        map(<dynamic>['sum', 1]),
+        DocumentState.committedMutations,
+      ),
     ]);
-    await _expectContains(doc('foo/bar', 2, map(<dynamic>['sum', 1]),
-        DocumentState.committedMutations));
+    await _expectContains(
+      doc(
+        'foo/bar',
+        2,
+        map(<dynamic>['sum', 1]),
+        DocumentState.committedMutations,
+      ),
+    );
 
-    await _writeMutation(transformMutation(
-        'foo/bar', map(<dynamic>['sum', FieldValue.increment(2)])));
-    await _expectContains(doc(
-        'foo/bar', 0, map(<dynamic>['sum', 3]), DocumentState.localMutations));
+    await _writeMutation(
+      transformMutation(
+        'foo/bar',
+        map(<dynamic>['sum', FieldValue.increment(2)]),
+      ),
+    );
+    await _expectContains(
+      doc('foo/bar', 0, map(<dynamic>['sum', 3]), DocumentState.localMutations),
+    );
     _expectChanged(<Document>[
-      doc('foo/bar', 0, map(<dynamic>['sum', 3]), DocumentState.localMutations)
+      doc('foo/bar', 0, map(<dynamic>['sum', 3]), DocumentState.localMutations),
     ]);
   }
 
   @testMethod
   Future<void>
-      testHandlesSetMutationThenTransformMutationThenRemoteEventThenTransformMutation() async {
+  testHandlesSetMutationThenTransformThenRemoteEventThenTransform() async {
     final Query query = Query(ResourcePath.fromString('foo'));
     await _allocateQuery(query);
     _expectTargetId(2);
 
     await _writeMutation(setMutation('foo/bar', map(<dynamic>['sum', 0])));
     _expectChanged(<Document>[
-      doc('foo/bar', 0, map(<dynamic>['sum', 0]), DocumentState.localMutations)
-    ]);
-    await _expectContains(doc(
-        'foo/bar', 0, map(<dynamic>['sum', 0]), DocumentState.localMutations));
-
-    await _applyRemoteEvent(addedRemoteEvent(
-        doc('foo/bar', 1, map(<dynamic>['sum', 0])), <int>[2], <int>[]));
-    await _acknowledgeMutation(1);
-    _expectChanged(<Document>[
-      doc('foo/bar', 1, map(<dynamic>['sum', 0]), DocumentState.synced)
+      doc('foo/bar', 0, map(<dynamic>['sum', 0]), DocumentState.localMutations),
     ]);
     await _expectContains(
-        doc('foo/bar', 1, map(<dynamic>['sum', 0]), DocumentState.synced));
+      doc('foo/bar', 0, map(<dynamic>['sum', 0]), DocumentState.localMutations),
+    );
 
-    await _writeMutation(transformMutation(
-        'foo/bar', map(<dynamic>['sum', FieldValue.increment(1)])));
+    await _applyRemoteEvent(
+      addedRemoteEvent(doc('foo/bar', 1, map(<dynamic>['sum', 0])), <int>[
+        2,
+      ], <int>[]),
+    );
+    await _acknowledgeMutation(1);
     _expectChanged(<Document>[
-      doc('foo/bar', 0, map(<dynamic>['sum', 1]), DocumentState.localMutations)
+      doc('foo/bar', 1, map(<dynamic>['sum', 0])),
     ]);
-    await _expectContains(doc(
-        'foo/bar', 0, map(<dynamic>['sum', 1]), DocumentState.localMutations));
+    await _expectContains(doc('foo/bar', 1, map(<dynamic>['sum', 0])));
+
+    await _writeMutation(
+      transformMutation(
+        'foo/bar',
+        map(<dynamic>['sum', FieldValue.increment(1)]),
+      ),
+    );
+    _expectChanged(<Document>[
+      doc('foo/bar', 0, map(<dynamic>['sum', 1]), DocumentState.localMutations),
+    ]);
+    await _expectContains(
+      doc('foo/bar', 0, map(<dynamic>['sum', 1]), DocumentState.localMutations),
+    );
 
     // The value in this remote event gets ignored since we still have a pending transform mutation.
-    await _applyRemoteEvent(addedRemoteEvent(
-        doc('foo/bar', 2, map(<dynamic>['sum', 1337])), <int>[2], <int>[]));
+    await _applyRemoteEvent(
+      addedRemoteEvent(doc('foo/bar', 2, map(<dynamic>['sum', 1337])), <int>[
+        2,
+      ], <int>[]),
+    );
     _expectChanged(<Document>[
-      doc('foo/bar', 0, map(<dynamic>['sum', 1]), DocumentState.localMutations)
+      doc('foo/bar', 0, map(<dynamic>['sum', 1]), DocumentState.localMutations),
     ]);
-    await _expectContains(doc(
-        'foo/bar', 0, map(<dynamic>['sum', 1]), DocumentState.localMutations));
+    await _expectContains(
+      doc('foo/bar', 0, map(<dynamic>['sum', 1]), DocumentState.localMutations),
+    );
 
     // Add another increment. Note that we still compute the increment based on the local value.
-    await _writeMutation(transformMutation(
-        'foo/bar', map(<dynamic>['sum', FieldValue.increment(2)])));
+    await _writeMutation(
+      transformMutation(
+        'foo/bar',
+        map(<dynamic>['sum', FieldValue.increment(2)]),
+      ),
+    );
     _expectChanged(<Document>[
-      doc('foo/bar', 0, map(<dynamic>['sum', 3]), DocumentState.localMutations)
+      doc('foo/bar', 0, map(<dynamic>['sum', 3]), DocumentState.localMutations),
     ]);
-    await _expectContains(doc(
-        'foo/bar', 0, map(<dynamic>['sum', 3]), DocumentState.localMutations));
+    await _expectContains(
+      doc('foo/bar', 0, map(<dynamic>['sum', 3]), DocumentState.localMutations),
+    );
 
     await _acknowledgeMutation(3, 1);
     _expectChanged(<Document>[
-      doc('foo/bar', 0, map(<dynamic>['sum', 3]), DocumentState.localMutations)
+      doc('foo/bar', 0, map(<dynamic>['sum', 3]), DocumentState.localMutations),
     ]);
-    await _expectContains(doc(
-        'foo/bar', 0, map(<dynamic>['sum', 3]), DocumentState.localMutations));
+    await _expectContains(
+      doc('foo/bar', 0, map(<dynamic>['sum', 3]), DocumentState.localMutations),
+    );
 
     await _acknowledgeMutation(4, 1339);
     _expectChanged(<Document>[
-      doc('foo/bar', 4, map(<dynamic>['sum', 1339]),
-          DocumentState.committedMutations)
+      doc(
+        'foo/bar',
+        4,
+        map(<dynamic>['sum', 1339]),
+        DocumentState.committedMutations,
+      ),
     ]);
-    await _expectContains(doc('foo/bar', 4, map(<dynamic>['sum', 1339]),
-        DocumentState.committedMutations));
+    await _expectContains(
+      doc(
+        'foo/bar',
+        4,
+        map(<dynamic>['sum', 1339]),
+        DocumentState.committedMutations,
+      ),
+    );
   }
 
   @testMethod
-  Future<void> testHoldsBackOnlyNonIdempotentTransforms() async {
+  Future<void> testHoldsBackTransforms() async {
     final Query query = Query(ResourcePath.fromString('foo'));
     await _allocateQuery(query);
     _expectTargetId(2);
 
-    await _writeMutation(setMutation(
-        'foo/bar', map(<dynamic>['sum', 0, 'array_union', <dynamic>[]])));
+    await _writeMutation(
+      setMutation(
+        'foo/bar',
+        map(<dynamic>['sum', 0, 'array_union', <dynamic>[]]),
+      ),
+    );
     _expectChanged(<Document>[
-      doc('foo/bar', 0, map(<dynamic>['sum', 0, 'array_union', <dynamic>[]]),
-          DocumentState.localMutations)
+      doc(
+        'foo/bar',
+        0,
+        map(<dynamic>['sum', 0, 'array_union', <dynamic>[]]),
+        DocumentState.localMutations,
+      ),
     ]);
 
     await _acknowledgeMutation(1);
     _expectChanged(<Document>[
-      doc('foo/bar', 1, map(<dynamic>['sum', 0, 'array_union', <dynamic>[]]),
-          DocumentState.committedMutations)
+      doc(
+        'foo/bar',
+        1,
+        map(<dynamic>['sum', 0, 'array_union', <dynamic>[]]),
+        DocumentState.committedMutations,
+      ),
     ]);
 
-    await _applyRemoteEvent(addedRemoteEvent(
+    await _applyRemoteEvent(
+      addedRemoteEvent(
         doc('foo/bar', 1, map(<dynamic>['sum', 0, 'array_union', <dynamic>[]])),
         <int>[2],
-        <int>[]));
+        <int>[],
+      ),
+    );
     _expectChanged(<Document>[
-      doc('foo/bar', 1, map(<dynamic>['sum', 0, 'array_union', <dynamic>[]]),
-          DocumentState.synced)
+      doc('foo/bar', 1, map(<dynamic>['sum', 0, 'array_union', <dynamic>[]])),
     ]);
 
-    await _writeMutations(<Mutation>[
+    await _writeMutation(
       transformMutation(
-          'foo/bar', map(<dynamic>['sum', FieldValue.increment(1)])),
-      transformMutation(
-          'foo/bar',
-          map(<dynamic>[
-            'array_union',
-            FieldValue.arrayUnion(<String>['foo'])
-          ]))
-    ]);
+        'foo/bar',
+        map(<dynamic>['sum', FieldValue.increment(1)]),
+      ),
+    );
     _expectChanged(<Document>[
       doc(
-          'foo/bar',
-          0,
-          map(<dynamic>[
-            'sum',
-            1,
-            'array_union',
-            <String>['foo']
-          ]),
-          DocumentState.localMutations)
+        'foo/bar',
+        0,
+        map(<dynamic>['sum', 1, 'array_union', <dynamic>[]]),
+        DocumentState.localMutations,
+      ),
     ]);
 
-    // The sum transform and array union transform make the SDK ignore the backend's updated value: both are part of
-    // the overlay (upstream testHoldsBackTransforms; before overlays the array union was recomputed on the backend
-    // value).
-    await _applyRemoteEvent(addedRemoteEvent(
+    await _writeMutation(
+      transformMutation(
+        'foo/bar',
+        map(<dynamic>[
+          'array_union',
+          FieldValue.arrayUnion(<String>['foo']),
+        ]),
+      ),
+    );
+    _expectChanged(<Document>[
+      doc(
+        'foo/bar',
+        0,
+        map(<dynamic>[
+          'sum',
+          1,
+          'array_union',
+          <String>['foo'],
+        ]),
+        DocumentState.localMutations,
+      ),
+    ]);
+
+    // The sum transform and array union transform make the SDK ignore the
+    // backend's updated value.
+    await _applyRemoteEvent(
+      addedRemoteEvent(
         doc(
-            'foo/bar',
-            2,
-            map(<dynamic>[
-              'sum',
-              1337,
-              'array_union',
-              <String>['bar']
-            ])),
-        <int>[2],
-        <int>[]));
-    _expectChanged(<Document>[
-      doc(
           'foo/bar',
-          0,
+          2,
           map(<dynamic>[
             'sum',
-            1,
+            1337,
             'array_union',
-            <String>['foo']
+            <String>['bar'],
           ]),
-          DocumentState.localMutations)
+        ),
+        <int>[2],
+        <int>[],
+      ),
+    );
+    _expectChanged(<Document>[
+      doc(
+        'foo/bar',
+        0,
+        map(<dynamic>[
+          'sum',
+          1,
+          'array_union',
+          <String>['foo'],
+        ]),
+        DocumentState.localMutations,
+      ),
+    ]);
+
+    // With a field transform acknowledgement, the overlay is recalculated with
+    // remaining local mutations.
+    await _acknowledgeMutation(3, 1338);
+    _expectChanged(<Document>[
+      doc(
+        'foo/bar',
+        0,
+        map(<dynamic>[
+          'sum',
+          1338,
+          'array_union',
+          <String>['bar', 'foo'],
+        ]),
+        DocumentState.localMutations,
+      ),
+    ]);
+
+    await _acknowledgeMutation(4, <String>['bar', 'foo']);
+    _expectChanged(<Document>[
+      doc(
+        'foo/bar',
+        4,
+        map(<dynamic>[
+          'sum',
+          1338,
+          'array_union',
+          <String>['bar', 'foo'],
+        ]),
+        DocumentState.committedMutations,
+      ),
     ]);
   }
 
@@ -1298,21 +1879,28 @@ class LocalStoreTestCase {
     await _writeMutations(<Mutation>[
       patchMutation('foo/bar', map(), <FieldPath>[]),
       transformMutation(
-          'foo/bar', map(<dynamic>['sum', FieldValue.increment(1)]))
+        'foo/bar',
+        map(<dynamic>['sum', FieldValue.increment(1)]),
+      ),
     ]);
     _expectChanged(<Document>[
-      doc('foo/bar', 0, map(<dynamic>['sum', 1]), DocumentState.localMutations)
+      doc('foo/bar', 0, map(<dynamic>['sum', 1]), DocumentState.localMutations),
     ]);
-    await _expectContains(doc(
-        'foo/bar', 0, map(<dynamic>['sum', 1]), DocumentState.localMutations));
+    await _expectContains(
+      doc('foo/bar', 0, map(<dynamic>['sum', 1]), DocumentState.localMutations),
+    );
 
-    await _applyRemoteEvent(addedRemoteEvent(
-        doc('foo/bar', 1, map(<dynamic>['sum', 1337])), <int>[2], <int>[]));
+    await _applyRemoteEvent(
+      addedRemoteEvent(doc('foo/bar', 1, map(<dynamic>['sum', 1337])), <int>[
+        2,
+      ], <int>[]),
+    );
     _expectChanged(<Document>[
-      doc('foo/bar', 0, map(<dynamic>['sum', 1]), DocumentState.localMutations)
+      doc('foo/bar', 0, map(<dynamic>['sum', 1]), DocumentState.localMutations),
     ]);
-    await _expectContains(doc(
-        'foo/bar', 0, map(<dynamic>['sum', 1]), DocumentState.localMutations));
+    await _expectContains(
+      doc('foo/bar', 0, map(<dynamic>['sum', 1]), DocumentState.localMutations),
+    );
   }
 
   @testMethod
@@ -1324,7 +1912,9 @@ class LocalStoreTestCase {
     await _writeMutations(<Mutation>[
       patchMutation('foo/bar', map()),
       transformMutation(
-          'foo/bar', map(<dynamic>['sum', FieldValue.increment(1)]))
+        'foo/bar',
+        map(<dynamic>['sum', FieldValue.increment(1)]),
+      ),
     ]);
     _expectChanged(<NoDocument>[deletedDoc('foo/bar', 0)]);
     await _expectNotContains('foo/bar');
@@ -1332,13 +1922,17 @@ class LocalStoreTestCase {
     // Note: This test reflects the current behavior, but it may be preferable to replay the
     // mutation once we receive the first value from the remote event.
 
-    await _applyRemoteEvent(addedRemoteEvent(
-        doc('foo/bar', 1, map(<dynamic>['sum', 1337])), <int>[2], <int>[]));
+    await _applyRemoteEvent(
+      addedRemoteEvent(doc('foo/bar', 1, map(<dynamic>['sum', 1337])), <int>[
+        2,
+      ], <int>[]),
+    );
     _expectChanged(<Document>[
-      doc('foo/bar', 0, map(<dynamic>['sum', 1]), DocumentState.localMutations)
+      doc('foo/bar', 0, map(<dynamic>['sum', 1]), DocumentState.localMutations),
     ]);
-    await _expectContains(doc(
-        'foo/bar', 0, map(<dynamic>['sum', 1]), DocumentState.localMutations));
+    await _expectContains(
+      doc('foo/bar', 0, map(<dynamic>['sum', 1]), DocumentState.localMutations),
+    );
   }
 
   Future<void> _writeMutation(Mutation mutation) async {
@@ -1347,12 +1941,14 @@ class LocalStoreTestCase {
 
   Future<void> _writeMutations(List<Mutation> mutations) async {
     final LocalWriteResult result = await _localStore.writeLocally(mutations);
-    _batches.add(MutationBatch(
-      batchId: result.batchId,
-      localWriteTime: Timestamp.now(),
-      baseMutations: <Mutation>[],
-      mutations: mutations,
-    ));
+    _batches.add(
+      MutationBatch(
+        batchId: result.batchId,
+        localWriteTime: Timestamp.now(),
+        baseMutations: <Mutation>[],
+        mutations: mutations,
+      ),
+    );
     _lastChanges = result.changes;
   }
 
@@ -1364,17 +1960,24 @@ class LocalStoreTestCase {
     await _localStore.notifyLocalViewChanges(<LocalViewChanges>[changes]);
   }
 
-  Future<void> _acknowledgeMutation(int documentVersion,
-      [Object? transformResult]) async {
+  Future<void> _acknowledgeMutation(
+    int documentVersion, [
+    Object? transformResult,
+  ]) async {
     final MutationBatch batch = _batches.removeAt(0);
     final SnapshotVersion _version = version(documentVersion);
     final MutationResult mutationResult = MutationResult(
-        _version,
-        transformResult != null
-            ? <model.FieldValue>[wrap(transformResult)]
-            : <model.FieldValue>[]);
+      _version,
+      transformResult != null
+          ? <model.FieldValue>[wrap(transformResult)]
+          : <model.FieldValue>[],
+    );
     final MutationBatchResult result = MutationBatchResult.create(
-        batch, _version, <MutationResult>[mutationResult], Uint8List(0));
+      batch,
+      _version,
+      <MutationResult>[mutationResult],
+      Uint8List(0),
+    );
     _lastChanges = await _localStore.acknowledgeBatch(result);
   }
 
@@ -1388,28 +1991,31 @@ class LocalStoreTestCase {
     // A limit query and a limitToLast query with the flipped ordering are sent
     // to the backend (and stored) as one and the same target.
     final Query limit = query('foo').orderBy(orderBy('sort')).limit(2);
-    final Query limitToLast =
-        query('foo').orderBy(orderBy('sort', 'desc')).limitToLast(2);
+    final Query limitToLast = query(
+      'foo',
+    ).orderBy(orderBy('sort', 'desc')).limitToLast(2);
 
     final QueryData first = await _localStore.allocateTarget(limit.toTarget());
-    final QueryData second =
-        await _localStore.allocateTarget(limitToLast.toTarget());
+    final QueryData second = await _localStore.allocateTarget(
+      limitToLast.toTarget(),
+    );
     expect(second.targetId, first.targetId);
     expect(second.target, first.target);
 
     // The cache is keyed by target, so both queries find the same entry.
-    final QueryData? byLimit =
-        await _persistence.queryCache.getQueryData(limit.toTarget());
-    final QueryData? byLimitToLast =
-        await _persistence.queryCache.getQueryData(limitToLast.toTarget());
+    final QueryData? byLimit = await _persistence.queryCache.getQueryData(
+      limit.toTarget(),
+    );
+    final QueryData? byLimitToLast = await _persistence.queryCache.getQueryData(
+      limitToLast.toTarget(),
+    );
     expect(byLimit, isNotNull);
     expect(byLimit!.targetId, first.targetId);
     expect(byLimitToLast!.targetId, first.targetId);
 
     // A limitToLast query with the same ordering as the limit query is a
     // different target.
-    final Query other =
-        query('foo').orderBy(orderBy('sort')).limitToLast(2);
+    final Query other = query('foo').orderBy(orderBy('sort')).limitToLast(2);
     final QueryData third = await _localStore.allocateTarget(other.toTarget());
     expect(third.targetId, isNot(first.targetId));
   }
@@ -1425,8 +2031,10 @@ class LocalStoreTestCase {
     final Query q = query('foo').orderBy(orderBy('sort')).limitToLast(2);
     await _allocateQuery(q);
     final ImmutableSortedMap<DocumentKey, Document> docs =
-        (await _localStore.executeQuery(q, /* usePreviousResults= */ true))
-            .documents;
+        (await _localStore.executeQuery(
+          q,
+          /* usePreviousResults= */ true,
+        )).documents;
     expect(docs.length, 3);
   }
 
@@ -1436,9 +2044,11 @@ class LocalStoreTestCase {
     await _allocateQuery(query);
 
     await _applyRemoteEvent(
-        updateRemoteEvent(doc('foo/baz', 10, map()), <int>[2], <int>[]));
+      updateRemoteEvent(doc('foo/baz', 10, map()), <int>[2], <int>[]),
+    );
     await _applyRemoteEvent(
-        updateRemoteEvent(doc('foo/bar', 20, map()), <int>[2], <int>[]));
+      updateRemoteEvent(doc('foo/bar', 20, map()), <int>[2], <int>[]),
+    );
     await _writeMutation(setMutation('foo/bonk', map()));
 
     _resetPersistenceStats();
@@ -1458,14 +2068,16 @@ class LocalStoreTestCase {
 
     // This test verifies that once a target mapping has been written, only documents that match the query are read
     // from the RemoteDocumentCache.
-    final Query query = Query(ResourcePath.fromString('foo'))
-        .filter(filter('matches', '==', true));
+    final Query query = Query(
+      ResourcePath.fromString('foo'),
+    ).filter(filter('matches', '==', true));
     final int targetId = await _allocateQuery(query);
 
     await _writeMutation(setMutation('foo/a', map(<dynamic>['matches', true])));
     await _writeMutation(setMutation('foo/b', map(<dynamic>['matches', true])));
     await _writeMutation(
-        setMutation('foo/ignored', map(<dynamic>['matches', false])));
+      setMutation('foo/ignored', map(<dynamic>['matches', false])),
+    );
     await _acknowledgeMutation(10);
     await _acknowledgeMutation(10);
     await _acknowledgeMutation(10);
@@ -1476,12 +2088,15 @@ class LocalStoreTestCase {
     _expectRemoteDocumentsReadByEngine(byKey: 0, byQuery: 2);
 
     // Issue a RemoteEvent to persist the target mapping.
-    await _applyRemoteEvent(_addedRemoteEvents(<MaybeDocument>[
-      doc('foo/a', 10, map(<dynamic>['matches', true])),
-      doc('foo/b', 10, map(<dynamic>['matches', true])),
-    ], <int>[
-      targetId
-    ]));
+    await _applyRemoteEvent(
+      _addedRemoteEvents(
+        <MaybeDocument>[
+          doc('foo/a', 10, map(<dynamic>['matches', true])),
+          doc('foo/b', 10, map(<dynamic>['matches', true])),
+        ],
+        <int>[targetId],
+      ),
+    );
     await _applyRemoteEvent(_noChangeEvent(targetId, 10));
     await _updateViews(targetId, fromCache: false);
 
@@ -1528,15 +2143,19 @@ class LocalStoreTestCase {
 
     // This test verifies that queries that have a persisted TargetMapping include documents that were modified by
     // local edits after the target mapping was written.
-    final Query query = Query(ResourcePath.fromString('foo'))
-        .filter(filter('matches', '==', true));
+    final Query query = Query(
+      ResourcePath.fromString('foo'),
+    ).filter(filter('matches', '==', true));
     final int targetId = await _allocateQuery(query);
 
-    await _applyRemoteEvent(_addedRemoteEvents(<MaybeDocument>[
-      doc('foo/a', 10, map(<dynamic>['matches', true]))
-    ], <int>[
-      targetId
-    ]));
+    await _applyRemoteEvent(
+      _addedRemoteEvents(
+        <MaybeDocument>[
+          doc('foo/a', 10, map(<dynamic>['matches', true])),
+        ],
+        <int>[targetId],
+      ),
+    );
     await _applyRemoteEvent(_noChangeEvent(targetId, 10));
     await _updateViews(targetId, fromCache: false);
 
@@ -1566,15 +2185,19 @@ class LocalStoreTestCase {
 
     // This test verifies that queries that have a persisted TargetMapping include documents that were modified by
     // other queries after the target mapping was written.
-    final Query filteredQuery = Query(ResourcePath.fromString('foo'))
-        .filter(filter('matches', '==', true));
+    final Query filteredQuery = Query(
+      ResourcePath.fromString('foo'),
+    ).filter(filter('matches', '==', true));
     int targetId = await _allocateQuery(filteredQuery);
 
-    await _applyRemoteEvent(_addedRemoteEvents(<MaybeDocument>[
-      doc('foo/a', 10, map(<dynamic>['matches', true]))
-    ], <int>[
-      targetId
-    ]));
+    await _applyRemoteEvent(
+      _addedRemoteEvents(
+        <MaybeDocument>[
+          doc('foo/a', 10, map(<dynamic>['matches', true])),
+        ],
+        <int>[targetId],
+      ),
+    );
     await _applyRemoteEvent(_noChangeEvent(targetId, 10));
     await _updateViews(targetId, fromCache: false);
     await _localStore.releaseTarget(targetId);
@@ -1582,12 +2205,15 @@ class LocalStoreTestCase {
     // Start another query and add more matching documents to the collection.
     final Query fullQuery = Query(ResourcePath.fromString('foo'));
     targetId = await _allocateQuery(fullQuery);
-    await _applyRemoteEvent(_addedRemoteEvents(<MaybeDocument>[
-      doc('foo/a', 10, map(<dynamic>['matches', true])),
-      doc('foo/b', 20, map(<dynamic>['matches', true])),
-    ], <int>[
-      targetId
-    ]));
+    await _applyRemoteEvent(
+      _addedRemoteEvents(
+        <MaybeDocument>[
+          doc('foo/a', 10, map(<dynamic>['matches', true])),
+          doc('foo/b', 20, map(<dynamic>['matches', true])),
+        ],
+        <int>[targetId],
+      ),
+    );
     await _localStore.releaseTarget(targetId);
 
     // Run the original query again and ensure that both the original matches as well as all new matches are included
@@ -1607,16 +2233,20 @@ class LocalStoreTestCase {
     // filter.
 
     // Add two document results for a simple filter query
-    final Query filteredQuery = Query(ResourcePath.fromString('foo'))
-        .filter(filter('matches', '==', true));
+    final Query filteredQuery = Query(
+      ResourcePath.fromString('foo'),
+    ).filter(filter('matches', '==', true));
     int targetId = await _allocateQuery(filteredQuery);
 
-    await _applyRemoteEvent(_addedRemoteEvents(<MaybeDocument>[
-      doc('foo/a', 10, map(<dynamic>['matches', true])),
-      doc('foo/b', 10, map(<dynamic>['matches', true])),
-    ], <int>[
-      targetId
-    ]));
+    await _applyRemoteEvent(
+      _addedRemoteEvents(
+        <MaybeDocument>[
+          doc('foo/a', 10, map(<dynamic>['matches', true])),
+          doc('foo/b', 10, map(<dynamic>['matches', true])),
+        ],
+        <int>[targetId],
+      ),
+    );
     await _applyRemoteEvent(_noChangeEvent(targetId, 10));
     await _updateViews(targetId, fromCache: false);
     await _localStore.releaseTarget(targetId);
@@ -1624,12 +2254,15 @@ class LocalStoreTestCase {
     // Modify one of the documents to no longer match while the filtered query is inactive.
     final Query fullQuery = Query(ResourcePath.fromString('foo'));
     targetId = await _allocateQuery(fullQuery);
-    await _applyRemoteEvent(_addedRemoteEvents(<MaybeDocument>[
-      doc('foo/a', 10, map(<dynamic>['matches', true])),
-      doc('foo/b', 20, map(<dynamic>['matches', false])),
-    ], <int>[
-      targetId
-    ]));
+    await _applyRemoteEvent(
+      _addedRemoteEvents(
+        <MaybeDocument>[
+          doc('foo/a', 10, map(<dynamic>['matches', true])),
+          doc('foo/b', 20, map(<dynamic>['matches', false])),
+        ],
+        <int>[targetId],
+      ),
+    );
     await _localStore.releaseTarget(targetId);
 
     // Re-run the filtered query and verify that the modified document is no longer returned.
@@ -1640,31 +2273,38 @@ class LocalStoreTestCase {
 
   @testMethod
   Future<void>
-      testQueriesIncludeBundledDocumentsReadAfterTheTargetWasSynced() async {
+  testQueriesIncludeBundledDocumentsReadAfterTheTargetWasSynced() async {
     if (_garbageCollectorIsEager) {
       return;
     }
 
     // A bundled document is stored with the read time of the bundle, not its update time: a query that was synced
     // before the bundle was loaded must see it even if the document was last updated before that.
-    final Query filteredQuery = Query(ResourcePath.fromString('foo'))
-        .filter(filter('matches', '==', true));
+    final Query filteredQuery = Query(
+      ResourcePath.fromString('foo'),
+    ).filter(filter('matches', '==', true));
     final int targetId = await _allocateQuery(filteredQuery);
 
-    await _applyRemoteEvent(_addedRemoteEvents(
-        <MaybeDocument>[doc('foo/a', 10, map(<dynamic>['matches', true]))],
-        <int>[targetId]));
+    await _applyRemoteEvent(
+      _addedRemoteEvents(
+        <MaybeDocument>[
+          doc('foo/a', 10, map(<dynamic>['matches', true])),
+        ],
+        <int>[targetId],
+      ),
+    );
     await _applyRemoteEvent(_noChangeEvent(targetId, 10));
     await _updateViews(targetId, fromCache: false);
     await _localStore.releaseTarget(targetId);
 
     final Document bundled = doc('foo/b', 5, map(<dynamic>['matches', true]));
     await _localStore.applyBundledDocuments(
-        ImmutableSortedMap<DocumentKey, MaybeDocument>.emptyMap(
-                DocumentKey.comparator)
-            .insert(bundled.key, bundled),
-        'bundle',
-        readTimes: <DocumentKey, SnapshotVersion>{bundled.key: version(20)});
+      ImmutableSortedMap<DocumentKey, MaybeDocument>.emptyMap(
+        DocumentKey.comparator,
+      ).insert(bundled.key, bundled),
+      'bundle',
+      readTimes: <DocumentKey, SnapshotVersion>{bundled.key: version(20)},
+    );
 
     await _allocateQuery(filteredQuery);
     await _executeQuery(filteredQuery);
@@ -1672,58 +2312,72 @@ class LocalStoreTestCase {
   }
 
   @testMethod
-  Future<void>
-      testClearsLastLimboFreeSnapshotOnExistenceFilterMismatch() async {
-    // An existence filter mismatch invalidates the previous results of a target: the next execution must not reuse
-    // them (upstream LocalStore.applyRemoteEvent).
-    final Query query = Query(ResourcePath.fromString('foo'))
-        .filter(filter('matches', '==', true));
-    final Target target = query.toTarget();
-    final int targetId = await _allocateQuery(query);
+  Future<void> testIgnoresTargetMappingAfterExistenceFilterMismatch() async {
+    if (_garbageCollectorIsEager) {
+      return;
+    }
 
+    final Query query = Query(
+      ResourcePath.fromString('foo'),
+    ).filter(filter('matches', '==', true));
+    final int targetId = await _allocateQuery(query);
+    final Target target = query.toTarget();
+
+    await _executeQuery(query);
+
+    // Persist a mapping with a single document
+    await _applyRemoteEvent(
+      addedRemoteEvent(doc('foo/a', 10, map(<dynamic>['matches', true])), <int>[
+        targetId,
+      ], <int>[]),
+    );
     await _applyRemoteEvent(_noChangeEvent(targetId, 10));
     await _updateViews(targetId, fromCache: false);
-    expect(
-        (await _localStore.getQueryData(target))!.lastLimboFreeSnapshotVersion,
-        version(10));
 
-    await _applyRemoteEvent(RemoteEvent(
-      documentUpdates: <DocumentKey, MaybeDocument>{},
-      resolvedLimboDocuments: <DocumentKey>{},
-      snapshotVersion: version(20),
-      targetChanges: <int, TargetChange>{
-        targetId: TargetChange(
-          resumeToken: Uint8List(0),
-          current: false,
-          addedDocuments: DocumentKey.emptyKeySet,
-          modifiedDocuments: DocumentKey.emptyKeySet,
-          removedDocuments: DocumentKey.emptyKeySet,
-        )
-      },
-      targetMismatches: <int, QueryPurpose>{
-        targetId: QueryPurpose.existenceFilterMismatch
-      },
-    ));
+    QueryData cachedTargetData = (await _localStore.getQueryData(target))!;
+    expect(cachedTargetData.lastLimboFreeSnapshotVersion, version(10));
 
-    expect(
-        (await _localStore.getQueryData(target))!.lastLimboFreeSnapshotVersion,
-        SnapshotVersion.none);
+    // Create an existence filter mismatch and verify that the last limbo free snapshot version
+    // is deleted
+    await _applyRemoteEvent(
+      _existenceFilterEvent(
+        targetId,
+        keySet(<DocumentKey>[key('foo/a')]),
+        2,
+        20,
+      ),
+    );
+    cachedTargetData = (await _localStore.getQueryData(target))!;
+    expect(cachedTargetData.lastLimboFreeSnapshotVersion, version(0));
+    expect(cachedTargetData.resumeToken, isEmpty);
+
+    // Re-run the query as a collection scan
+    await _executeQuery(query);
+    _expectRemoteDocumentsReadByEngine(byKey: 0, byQuery: 1);
+    _expectQueryReturned(<String>['foo/a']);
   }
 
   @testMethod
   Future<void> testWritesOverlaysAndRemovesThemOnAck() async {
     final Query query = Query(ResourcePath.fromString('foo'));
     final int targetId = await _allocateQuery(query);
-    await _applyRemoteEvent(_addedRemoteEvents(
-        <MaybeDocument>[doc('foo/remote', 1, map(<dynamic>['a', 1]))],
-        <int>[targetId]));
+    await _applyRemoteEvent(
+      _addedRemoteEvents(
+        <MaybeDocument>[
+          doc('foo/remote', 1, map(<dynamic>['a', 1])),
+        ],
+        <int>[targetId],
+      ),
+    );
 
     await _writeMutation(setMutation('foo/local', map(<dynamic>['a', 1])));
     await _writeMutation(patchMutation('foo/remote', map(<dynamic>['b', 2])));
 
     // A document without remote version gets a set overlay, a patched remote document a patch overlay.
-    expect(await _overlay('foo/local'),
-        Overlay(1, setMutation('foo/local', map(<dynamic>['a', 1]))));
+    expect(
+      await _overlay('foo/local'),
+      Overlay(1, setMutation('foo/local', map(<dynamic>['a', 1]))),
+    );
     final Overlay remoteOverlay = (await _overlay('foo/remote'))!;
     expect(remoteOverlay.largestBatchId, 2);
     expect(remoteOverlay.mutation, isA<PatchMutation>());
@@ -1759,16 +2413,22 @@ class LocalStoreTestCase {
   Future<void> testDeviationRemoteDeleteRemovesPatchOverlay() async {
     final Query query = Query(ResourcePath.fromString('foo'));
     final int targetId = await _allocateQuery(query);
-    await _applyRemoteEvent(_addedRemoteEvents(
-        <MaybeDocument>[doc('foo/bar', 1, map(<dynamic>['a', 1]))],
-        <int>[targetId]));
+    await _applyRemoteEvent(
+      _addedRemoteEvents(
+        <MaybeDocument>[
+          doc('foo/bar', 1, map(<dynamic>['a', 1])),
+        ],
+        <int>[targetId],
+      ),
+    );
     await _writeMutation(patchMutation('foo/bar', map(<dynamic>['b', 2])));
     expect((await _overlay('foo/bar'))!.mutation, isA<PatchMutation>());
 
     // The document is deleted remotely: the pending update no longer applies (its precondition fails), so the
     // document must not come back from its old patch overlay.
-    await _applyRemoteEvent(updateRemoteEvent(
-        deletedDoc('foo/bar', 2), <int>[targetId], <int>[]));
+    await _applyRemoteEvent(
+      updateRemoteEvent(deletedDoc('foo/bar', 2), <int>[targetId], <int>[]),
+    );
     _expectChanged(<MaybeDocument>[deletedDoc('foo/bar', 2)]);
     expect(await _overlay('foo/bar'), isNull);
     await _expectContains(deletedDoc('foo/bar', 2));
@@ -1780,11 +2440,17 @@ class LocalStoreTestCase {
   Future<void> testDeviationEmptyMergeKeepsItsOverlay() async {
     final Query query = Query(ResourcePath.fromString('foo'));
     final int targetId = await _allocateQuery(query);
-    await _applyRemoteEvent(updateRemoteEvent(
-        deletedDoc('foo/deleted', 1), <int>[targetId], <int>[]));
-    await _applyRemoteEvent(_addedRemoteEvents(
-        <MaybeDocument>[doc('foo/existing', 1, map(<dynamic>['x', 1]))],
-        <int>[targetId]));
+    await _applyRemoteEvent(
+      updateRemoteEvent(deletedDoc('foo/deleted', 1), <int>[targetId], <int>[]),
+    );
+    await _applyRemoteEvent(
+      _addedRemoteEvents(
+        <MaybeDocument>[
+          doc('foo/existing', 1, map(<dynamic>['x', 1])),
+        ],
+        <int>[targetId],
+      ),
+    );
 
     // set({}, merge: true) on a document that is cached as deleted and on one that exists.
     await _writeMutation(patchMutation('foo/deleted', map(), <FieldPath>[]));
@@ -1801,16 +2467,34 @@ class LocalStoreTestCase {
       expect((deletedOverlay as PatchMutation).mask.mask, isEmpty);
     }
     await _expectContains(
-        doc('foo/deleted', 0, map(), DocumentState.localMutations));
-    await _expectContains(doc('foo/existing', 0, map(<dynamic>['x', 1]),
-        DocumentState.localMutations));
+      doc('foo/deleted', 0, map(), DocumentState.localMutations),
+    );
+    await _expectContains(
+      doc(
+        'foo/existing',
+        0,
+        map(<dynamic>['x', 1]),
+        DocumentState.localMutations,
+      ),
+    );
 
     // The overlay is a patch, so the document picks up the remote fields when it appears on the backend.
-    await _applyRemoteEvent(_addedRemoteEvents(
-        <MaybeDocument>[doc('foo/deleted', 2, map(<dynamic>['y', 2]))],
-        <int>[targetId]));
-    await _expectContains(doc('foo/deleted', 0, map(<dynamic>['y', 2]),
-        DocumentState.localMutations));
+    await _applyRemoteEvent(
+      _addedRemoteEvents(
+        <MaybeDocument>[
+          doc('foo/deleted', 2, map(<dynamic>['y', 2])),
+        ],
+        <int>[targetId],
+      ),
+    );
+    await _expectContains(
+      doc(
+        'foo/deleted',
+        0,
+        map(<dynamic>['y', 2]),
+        DocumentState.localMutations,
+      ),
+    );
   }
 
   /// DEVIATION FROM UPSTREAM (set overlay of a merge): a merge on a document without remote version is stored as a set
@@ -1818,25 +2502,42 @@ class LocalStoreTestCase {
   /// does not touch show up (as when replaying the mutation queue). Upstream keeps applying the set overlay.
   @testMethod
   Future<void>
-      testDeviationSetOverlayOfMergeIsRecalculatedWhenDocumentArrives() async {
+  testDeviationSetOverlayOfMergeIsRecalculatedWhenDocumentArrives() async {
     final Query query = Query(ResourcePath.fromString('foo'));
     final int targetId = await _allocateQuery(query);
 
-    await _writeMutation(patchMutation(
-        'foo/bar', map(<dynamic>['a', 1]), <FieldPath>[field('a')]));
+    await _writeMutation(
+      patchMutation('foo/bar', map(<dynamic>['a', 1]), <FieldPath>[field('a')]),
+    );
     expect((await _overlay('foo/bar'))!.mutation, isA<SetMutation>());
-    await _expectContains(doc(
-        'foo/bar', 0, map(<dynamic>['a', 1]), DocumentState.localMutations));
+    await _expectContains(
+      doc('foo/bar', 0, map(<dynamic>['a', 1]), DocumentState.localMutations),
+    );
 
-    await _applyRemoteEvent(_addedRemoteEvents(
-        <MaybeDocument>[doc('foo/bar', 1, map(<dynamic>['x', 1]))],
-        <int>[targetId]));
+    await _applyRemoteEvent(
+      _addedRemoteEvents(
+        <MaybeDocument>[
+          doc('foo/bar', 1, map(<dynamic>['x', 1])),
+        ],
+        <int>[targetId],
+      ),
+    );
     _expectChanged(<Document>[
-      doc('foo/bar', 0, map(<dynamic>['a', 1, 'x', 1]),
-          DocumentState.localMutations)
+      doc(
+        'foo/bar',
+        0,
+        map(<dynamic>['a', 1, 'x', 1]),
+        DocumentState.localMutations,
+      ),
     ]);
-    await _expectContains(doc('foo/bar', 0, map(<dynamic>['a', 1, 'x', 1]),
-        DocumentState.localMutations));
+    await _expectContains(
+      doc(
+        'foo/bar',
+        0,
+        map(<dynamic>['a', 1, 'x', 1]),
+        DocumentState.localMutations,
+      ),
+    );
     expect((await _overlay('foo/bar'))!.mutation, isA<PatchMutation>());
   }
 
@@ -1848,24 +2549,51 @@ class LocalStoreTestCase {
 
   Future<void> _executeQuery(Query query) async {
     _resetPersistenceStats();
-    _lastQueryResult =
-        await _localStore.executeQuery(query, /* usePreviousResults= */ true);
+    _lastQueryResult = await _localStore.executeQuery(
+      query,
+      /* usePreviousResults= */ true,
+    );
   }
 
   Future<void> _updateViews(int targetId, {required bool fromCache}) {
     return _notifyLocalViewChanges(
-        viewChanges(targetId, fromCache, <String>[], <String>[]));
+      viewChanges(targetId, fromCache, <String>[], <String>[]),
+    );
   }
 
   RemoteEvent _noChangeEvent(int targetId, int theVersion) {
     final t.TestTargetMetadataProvider provider = t.testTargetMetadataProvider;
-    provider.setSyncedKeys(queryData(targetId, QueryPurpose.listen, 'foo/bar'),
-        DocumentKey.emptyKeySet);
+    provider.setSyncedKeys(
+      queryData(targetId, QueryPurpose.listen, 'foo/bar'),
+      DocumentKey.emptyKeySet,
+    );
     final WatchChangeAggregator aggregator = WatchChangeAggregator(provider)
-      ..handleTargetChange(WatchChangeWatchTargetChange(
-          WatchTargetChangeType.noChange,
-          <int>[targetId],
-          resumeToken(theVersion)));
+      ..handleTargetChange(
+        WatchChangeWatchTargetChange(WatchTargetChangeType.noChange, <int>[
+          targetId,
+        ], resumeToken(theVersion)),
+      );
+    return aggregator.createRemoteEvent(version(theVersion));
+  }
+
+  RemoteEvent _existenceFilterEvent(
+    int targetId,
+    ImmutableSortedSet<DocumentKey> syncedKeys,
+    int remoteCount,
+    int theVersion,
+  ) {
+    final t.TestTargetMetadataProvider provider = t.testTargetMetadataProvider;
+    provider.setSyncedKeys(
+      queryData(targetId, QueryPurpose.listen, 'foo'),
+      syncedKeys,
+    );
+    final WatchChangeAggregator aggregator = WatchChangeAggregator(provider)
+      ..handleExistenceFilter(
+        WatchChangeExistenceFilterWatchChange(
+          targetId,
+          ExistenceFilter(remoteCount),
+        ),
+      );
     return aggregator.createRemoteEvent(version(theVersion));
   }
 
@@ -2809,51 +3537,81 @@ class LocalStoreTestCase {
     final ImmutableSortedMap<DocumentKey, Document> documents =
         _lastQueryResult!.documents;
     for (String k in keys) {
-      expect(documents.containsKey(key(k)), isTrue,
-          reason: 'Expected query to return: $k');
+      expect(
+        documents.containsKey(key(k)),
+        isTrue,
+        reason: 'Expected query to return: $k',
+      );
     }
     expect(documents.length, keys.length);
   }
 
   /// Asserts the expected numbers of mutations read by the query engine's [MutationQueue] since the last call to
   /// [_resetPersistenceStats].
-  void _expectMutationsReadByEngine(
-      {required int byKey, required int byQuery}) {
-    expect(_queryEngine.mutationsReadByQuery, byQuery,
-        reason: 'Mutations read (by query)');
-    expect(_queryEngine.mutationsReadByKey, byKey,
-        reason: 'Mutations read (by key)');
+  void _expectMutationsReadByEngine({
+    required int byKey,
+    required int byQuery,
+  }) {
+    expect(
+      _queryEngine.mutationsReadByQuery,
+      byQuery,
+      reason: 'Mutations read (by query)',
+    );
+    expect(
+      _queryEngine.mutationsReadByKey,
+      byKey,
+      reason: 'Mutations read (by key)',
+    );
   }
 
   /// Asserts the expected numbers of overlays read by the query engine's [DocumentOverlayCache] since the last call to
   /// [_resetPersistenceStats].
-  void _expectOverlaysReadByEngine(
-      {required int byKey, required int byCollection}) {
-    expect(_queryEngine.overlaysReadByCollection, byCollection,
-        reason: 'Overlays read (by collection)');
-    expect(_queryEngine.overlaysReadByKey, byKey,
-        reason: 'Overlays read (by key)');
+  void _expectOverlaysReadByEngine({
+    required int byKey,
+    required int byCollection,
+  }) {
+    expect(
+      _queryEngine.overlaysReadByCollection,
+      byCollection,
+      reason: 'Overlays read (by collection)',
+    );
+    expect(
+      _queryEngine.overlaysReadByKey,
+      byKey,
+      reason: 'Overlays read (by key)',
+    );
   }
 
   /// Asserts the expected numbers of documents read by the query engine's [RemoteDocumentCache] since the last call
   /// to [_resetPersistenceStats].
-  void _expectRemoteDocumentsReadByEngine(
-      {required int byKey, required int byQuery}) {
-    expect(_queryEngine.documentsReadByQuery, byQuery,
-        reason: 'Remote documents read (by query)');
-    expect(_queryEngine.documentsReadByKey, byKey,
-        reason: 'Remote documents read (by key)');
+  void _expectRemoteDocumentsReadByEngine({
+    required int byKey,
+    required int byQuery,
+  }) {
+    expect(
+      _queryEngine.documentsReadByQuery,
+      byQuery,
+      reason: 'Remote documents read (by query)',
+    );
+    expect(
+      _queryEngine.documentsReadByKey,
+      byKey,
+      reason: 'Remote documents read (by key)',
+    );
   }
 
   Future<int> _allocateQuery(Query query) async {
-    final QueryData queryData = await _localStore.allocateTarget(query.toTarget());
+    final QueryData queryData = await _localStore.allocateTarget(
+      query.toTarget(),
+    );
     _lastTargetId = queryData.targetId;
     return queryData.targetId;
   }
 
   Future<void> _releaseQuery(Query query) async {
-    final QueryData? queryData =
-        await _persistence.queryCache.getQueryData(query.toTarget());
+    final QueryData? queryData = await _persistence.queryCache.getQueryData(
+      query.toTarget(),
+    );
     await _localStore.releaseTarget(queryData!.targetId);
   }
 
@@ -2863,8 +3621,9 @@ class LocalStoreTestCase {
   }
 
   /// Asserts that a the [_lastChanges] contain the docs in the given array.
-  void _expectChanged(
-      [List<MaybeDocument> expected = const <MaybeDocument>[]]) {
+  void _expectChanged([
+    List<MaybeDocument> expected = const <MaybeDocument>[],
+  ]) {
     expect(_lastChanges, isNotNull);
 
     final List<MaybeDocument> actualList = _lastChanges!
@@ -2881,22 +3640,28 @@ class LocalStoreTestCase {
     final int targetId = await _allocateQuery(query);
     expect(targetId, 2);
 
-    await _applyRemoteEvent(addedRemoteEvent(
-        doc('foo/bar', 1, map(<String>['val', 'old'])), <int>[2], <int>[]));
+    await _applyRemoteEvent(
+      addedRemoteEvent(doc('foo/bar', 1, map(<String>['val', 'old'])), <int>[
+        2,
+      ], <int>[]),
+    );
     _expectChanged(<Document>[
-      doc('foo/bar', 1, map(<String>['val', 'old']))
+      doc('foo/bar', 1, map(<String>['val', 'old'])),
     ]);
     await _expectContains(doc('foo/bar', 1, map(<String>['val', 'old'])));
 
-    await _applyRemoteEvent(_addedRemoteEvents(<MaybeDocument>[
-      doc('foo/bar', 1, map(<String>['val', 'new'])),
-      doc('foo/baz', 2, map(<String>['val', 'new']))
-    ], <int>[
-      2
-    ]));
+    await _applyRemoteEvent(
+      _addedRemoteEvents(
+        <MaybeDocument>[
+          doc('foo/bar', 1, map(<String>['val', 'new'])),
+          doc('foo/baz', 2, map(<String>['val', 'new'])),
+        ],
+        <int>[2],
+      ),
+    );
 
     _expectChanged(<Document>[
-      doc('foo/baz', 2, map(<String>['val', 'new']))
+      doc('foo/baz', 2, map(<String>['val', 'new'])),
     ]);
     // The update for foo/bar is ignored.
     await _expectContains(doc('foo/bar', 1, map(<String>['val', 'old'])));
@@ -2908,21 +3673,24 @@ class LocalStoreTestCase {
     final Query query = Query(ResourcePath.fromString('foo'));
     final int targetId = await _allocateQuery(query);
 
-    await _applyRemoteEvent(addedRemoteEvent(
-        doc('foo/bar', 1, map(<String>['val', 'old'])),
-        <int>[targetId],
-        <int>[]));
+    await _applyRemoteEvent(
+      addedRemoteEvent(doc('foo/bar', 1, map(<String>['val', 'old'])), <int>[
+        targetId,
+      ], <int>[]),
+    );
     await _expectContains(doc('foo/bar', 1, map(<String>['val', 'old'])));
 
     // A failed limbo resolution manufactures a NoDocument with a version of NONE. It must remove the document from
     // the cache, even though its version is older than the cached one.
     final NoDocument manufactured = deletedDoc('foo/bar', 0);
-    await _applyRemoteEvent(RemoteEvent(
-      documentUpdates: <DocumentKey, MaybeDocument>{
-        manufactured.key: manufactured
-      },
-      resolvedLimboDocuments: <DocumentKey>{manufactured.key},
-    ));
+    await _applyRemoteEvent(
+      RemoteEvent(
+        documentUpdates: <DocumentKey, MaybeDocument>{
+          manufactured.key: manufactured,
+        },
+        resolvedLimboDocuments: <DocumentKey>{manufactured.key},
+      ),
+    );
     _expectRemoved(<String>['foo/bar']);
     await _expectNotContains('foo/bar');
   }
@@ -2933,51 +3701,108 @@ class LocalStoreTestCase {
     final int targetId = await _allocateQuery(query);
 
     // Persist a resume token for the target.
-    await _applyRemoteEvent(RemoteEvent(
-      documentUpdates: <DocumentKey, MaybeDocument>{},
-      resolvedLimboDocuments: <DocumentKey>{},
-      snapshotVersion: version(10),
-      targetChanges: <int, TargetChange>{
-        targetId: TargetChange(
-          resumeToken: resumeToken(10)!,
-          current: true,
-          addedDocuments: DocumentKey.emptyKeySet,
-          modifiedDocuments: DocumentKey.emptyKeySet,
-          removedDocuments: DocumentKey.emptyKeySet,
-        )
-      },
-    ));
-    QueryData? cached = await _persistence.queryCache.getQueryData(query.toTarget());
+    await _applyRemoteEvent(
+      RemoteEvent(
+        documentUpdates: <DocumentKey, MaybeDocument>{},
+        resolvedLimboDocuments: <DocumentKey>{},
+        snapshotVersion: version(10),
+        targetChanges: <int, TargetChange>{
+          targetId: TargetChange(
+            resumeToken: resumeToken(10)!,
+            current: true,
+            addedDocuments: DocumentKey.emptyKeySet,
+            modifiedDocuments: DocumentKey.emptyKeySet,
+            removedDocuments: DocumentKey.emptyKeySet,
+          ),
+        },
+      ),
+    );
+    QueryData? cached = await _persistence.queryCache.getQueryData(
+      query.toTarget(),
+    );
     expect(cached!.resumeToken, resumeToken(10));
     expect(cached.snapshotVersion, version(10));
 
     // An existence filter mismatch invalidates the target: the resume token must be cleared, also in the cache.
-    await _applyRemoteEvent(RemoteEvent(
-      documentUpdates: <DocumentKey, MaybeDocument>{},
-      resolvedLimboDocuments: <DocumentKey>{},
-      snapshotVersion: version(20),
-      targetChanges: <int, TargetChange>{
-        targetId: TargetChange(
-          resumeToken: Uint8List(0),
-          current: false,
-          addedDocuments: DocumentKey.emptyKeySet,
-          modifiedDocuments: DocumentKey.emptyKeySet,
-          removedDocuments: DocumentKey.emptyKeySet,
-        )
-      },
-      targetMismatches: <int, QueryPurpose>{
-        targetId: QueryPurpose.existenceFilterMismatch
-      },
-    ));
+    await _applyRemoteEvent(
+      RemoteEvent(
+        documentUpdates: <DocumentKey, MaybeDocument>{},
+        resolvedLimboDocuments: <DocumentKey>{},
+        snapshotVersion: version(20),
+        targetChanges: <int, TargetChange>{
+          targetId: TargetChange(
+            resumeToken: Uint8List(0),
+            current: false,
+            addedDocuments: DocumentKey.emptyKeySet,
+            modifiedDocuments: DocumentKey.emptyKeySet,
+            removedDocuments: DocumentKey.emptyKeySet,
+          ),
+        },
+        targetMismatches: <int, QueryPurpose>{
+          targetId: QueryPurpose.existenceFilterMismatch,
+        },
+      ),
+    );
     cached = await _persistence.queryCache.getQueryData(query.toTarget());
     expect(cached!.resumeToken, isEmpty);
     expect(cached.snapshotVersion, SnapshotVersion.none);
   }
 
   @testMethod
+  Future<void> testUpdateOnRemoteDocLeadsToUpdateOverlay() async {
+    final Query query = Query(ResourcePath.fromString('foo'));
+    await _allocateQuery(query);
+
+    await _applyRemoteEvent(
+      updateRemoteEvent(doc('foo/baz', 10, map(<dynamic>['a', 1])), <int>[
+        2,
+      ], <int>[]),
+    );
+    await _applyRemoteEvent(
+      updateRemoteEvent(doc('foo/bar', 20, map()), <int>[2], <int>[]),
+    );
+    await _writeMutation(patchMutation('foo/baz', map(<dynamic>['b', 2])));
+
+    await _executeQuery(query);
+    _expectRemoteDocumentsReadByEngine(byKey: 0, byQuery: 2);
+    _expectOverlaysReadByEngine(byKey: 0, byCollection: 1);
+    _expectOverlayTypes(<String, OverlayType>{'foo/baz': OverlayType.patch});
+  }
+
+  /// Port of the JS SDK's `add then update while offline` (local_store.test.ts).
+  @testMethod
+  Future<void> testAddThenUpdateWhileOffline() async {
+    await _writeMutations(<Mutation>[
+      setMutation('foo/bar', map(<dynamic>['foo', 'foo-value', 'bar', 1])),
+    ]);
+    await _expectContains(
+      doc(
+        'foo/bar',
+        0,
+        map(<dynamic>['foo', 'foo-value', 'bar', 1]),
+        DocumentState.localMutations,
+      ),
+    );
+
+    await _writeMutations(<Mutation>[
+      patchMutation('foo/bar', map(<dynamic>['bar', 2])),
+    ]);
+    await _expectContains(
+      doc(
+        'foo/bar',
+        0,
+        map(<dynamic>['foo', 'foo-value', 'bar', 2]),
+        DocumentState.localMutations,
+      ),
+    );
+  }
+
+  @testMethod
   Future<void> testGetHighestUnacknowledgedBatchId() async {
-    expect(await _localStore.getHighestUnacknowledgedBatchId(),
-        MutationBatch.unknown);
+    expect(
+      await _localStore.getHighestUnacknowledgedBatchId(),
+      MutationBatch.unknown,
+    );
 
     await _writeMutation(setMutation('foo/bar', map(<dynamic>['abc', 123])));
     expect(await _localStore.getHighestUnacknowledgedBatchId(), 1);
@@ -2989,23 +3814,29 @@ class LocalStoreTestCase {
     expect(await _localStore.getHighestUnacknowledgedBatchId(), 2);
 
     await _rejectMutation();
-    expect(await _localStore.getHighestUnacknowledgedBatchId(),
-        MutationBatch.unknown);
+    expect(
+      await _localStore.getHighestUnacknowledgedBatchId(),
+      MutationBatch.unknown,
+    );
   }
 
   RemoteEvent _addedRemoteEvents(
-      List<MaybeDocument> docs, List<int> updatedInTargets) {
-    final WatchChangeAggregator aggregator =
-        WatchChangeAggregator(TargetMetadataProvider(
-      getRemoteKeysForTarget: (int targetId) => DocumentKey.emptyKeySet,
-      getDatabaseId: () => DatabaseId.forDatabase('p', 'd'),
-      getQueryDataForTarget: (int targetId) =>
-          queryData(targetId, QueryPurpose.listen, 'foo'),
-    ));
+    List<MaybeDocument> docs,
+    List<int> updatedInTargets,
+  ) {
+    final WatchChangeAggregator aggregator = WatchChangeAggregator(
+      TargetMetadataProvider(
+        getRemoteKeysForTarget: (int targetId) => DocumentKey.emptyKeySet,
+        getDatabaseId: () => DatabaseId.forDatabase('p', 'd'),
+        getQueryDataForTarget: (int targetId) =>
+            queryData(targetId, QueryPurpose.listen, 'foo'),
+      ),
+    );
     SnapshotVersion snapshotVersion = SnapshotVersion.none;
     for (MaybeDocument doc in docs) {
       aggregator.handleDocumentChange(
-          WatchChangeDocumentChange(updatedInTargets, <int>[], doc.key, doc));
+        WatchChangeDocumentChange(updatedInTargets, <int>[], doc.key, doc),
+      );
       if (doc.version.compareTo(snapshotVersion) > 0) {
         snapshotVersion = doc.version;
       }
@@ -3068,8 +3899,10 @@ class LocalStoreTestCase {
   }
 
   Future<void> _backfillIndexes() async {
-    final IndexBackfiller backfiller =
-        IndexBackfiller(_persistence, _localStore);
+    final IndexBackfiller backfiller = IndexBackfiller(
+      _persistence,
+      _localStore,
+    );
     final int? maxDocumentsToProcess = _backfillerMaxDocumentsToProcess;
     if (maxDocumentsToProcess != null) {
       backfiller.maxDocumentsToProcess = maxDocumentsToProcess;
@@ -3087,23 +3920,29 @@ class LocalStoreTestCase {
 
   @testMethod
   Future<void> testAddsIndexes() async {
-    final FieldIndex indexA = fieldIndex('coll',
-        indexId: 0,
-        indexState: FieldIndex.initialState,
-        fieldsAndKinds: <Object>['a', SegmentKind.ascending]);
-    final FieldIndex indexB = fieldIndex('coll',
-        indexId: 1,
-        indexState: FieldIndex.initialState,
-        fieldsAndKinds: <Object>['b', SegmentKind.descending]);
-    final FieldIndex indexC = fieldIndex('coll',
-        indexId: 2,
-        indexState: FieldIndex.initialState,
-        fieldsAndKinds: <Object>[
-          'c1',
-          SegmentKind.ascending,
-          'c2',
-          SegmentKind.contains
-        ]);
+    final FieldIndex indexA = fieldIndex(
+      'coll',
+      indexId: 0,
+      indexState: FieldIndex.initialState,
+      fieldsAndKinds: <Object>['a', SegmentKind.ascending],
+    );
+    final FieldIndex indexB = fieldIndex(
+      'coll',
+      indexId: 1,
+      indexState: FieldIndex.initialState,
+      fieldsAndKinds: <Object>['b', SegmentKind.descending],
+    );
+    final FieldIndex indexC = fieldIndex(
+      'coll',
+      indexId: 2,
+      indexState: FieldIndex.initialState,
+      fieldsAndKinds: <Object>[
+        'c1',
+        SegmentKind.ascending,
+        'c2',
+        SegmentKind.contains,
+      ],
+    );
 
     await _configureFieldIndexes(<FieldIndex>[indexA, indexB]);
     List<FieldIndex> fieldIndexes = _localStore.getFieldIndexes();
@@ -3116,14 +3955,18 @@ class LocalStoreTestCase {
 
   @testMethod
   Future<void> testRemovesIndexes() async {
-    final FieldIndex indexA = fieldIndex('coll',
-        indexId: 0,
-        indexState: FieldIndex.initialState,
-        fieldsAndKinds: <Object>['a', SegmentKind.ascending]);
-    final FieldIndex indexB = fieldIndex('coll',
-        indexId: 1,
-        indexState: FieldIndex.initialState,
-        fieldsAndKinds: <Object>['b', SegmentKind.descending]);
+    final FieldIndex indexA = fieldIndex(
+      'coll',
+      indexId: 0,
+      indexState: FieldIndex.initialState,
+      fieldsAndKinds: <Object>['a', SegmentKind.ascending],
+    );
+    final FieldIndex indexB = fieldIndex(
+      'coll',
+      indexId: 1,
+      indexState: FieldIndex.initialState,
+      fieldsAndKinds: <Object>['b', SegmentKind.descending],
+    );
 
     await _configureFieldIndexes(<FieldIndex>[indexA, indexB]);
     List<FieldIndex> fieldIndexes = _localStore.getFieldIndexes();
@@ -3136,10 +3979,12 @@ class LocalStoreTestCase {
 
   @testMethod
   Future<void> testDoesNotResetIndexWhenSameIndexIsAdded() async {
-    final FieldIndex indexA = fieldIndex('coll',
-        indexId: 0,
-        indexState: FieldIndex.initialState,
-        fieldsAndKinds: <Object>['a', SegmentKind.ascending]);
+    final FieldIndex indexA = fieldIndex(
+      'coll',
+      indexId: 0,
+      indexState: FieldIndex.initialState,
+      fieldsAndKinds: <Object>['a', SegmentKind.ascending],
+    );
 
     await _configureFieldIndexes(<FieldIndex>[indexA]);
     List<FieldIndex> fieldIndexes = _localStore.getFieldIndexes();
@@ -3147,14 +3992,19 @@ class LocalStoreTestCase {
 
     Query qry = query('coll').filter(filter('a', '==', 1));
     final int targetId = await _allocateQuery(qry);
-    await _applyRemoteEvent(addedRemoteEvent(
-        doc('coll/a', 10, map(<dynamic>['a', 1])), <int>[targetId], <int>[]));
+    await _applyRemoteEvent(
+      addedRemoteEvent(doc('coll/a', 10, map(<dynamic>['a', 1])), <int>[
+        targetId,
+      ], <int>[]),
+    );
 
     await _backfillIndexes();
-    final FieldIndex updatedIndexA = fieldIndex('coll',
-        indexId: 0,
-        indexState: IndexState(1, IndexOffset(version(10), key('coll/a'), -1)),
-        fieldsAndKinds: <Object>['a', SegmentKind.ascending]);
+    final FieldIndex updatedIndexA = fieldIndex(
+      'coll',
+      indexId: 0,
+      indexState: IndexState(1, IndexOffset(version(10), key('coll/a'), -1)),
+      fieldsAndKinds: <Object>['a', SegmentKind.ascending],
+    );
 
     fieldIndexes = _localStore.getFieldIndexes();
     expect(fieldIndexes, unorderedEquals(<FieldIndex>[updatedIndexA]));
@@ -3167,19 +4017,24 @@ class LocalStoreTestCase {
 
   @testMethod
   Future<void> testDeletedDocumentRemovesIndex() async {
-    final FieldIndex index = fieldIndex('coll',
-        indexId: 0,
-        indexState: FieldIndex.initialState,
-        fieldsAndKinds: <Object>['matches', SegmentKind.ascending]);
+    final FieldIndex index = fieldIndex(
+      'coll',
+      indexId: 0,
+      indexState: FieldIndex.initialState,
+      fieldsAndKinds: <Object>['matches', SegmentKind.ascending],
+    );
     await _configureFieldIndexes(<FieldIndex>[index]);
 
     Query qry = query('coll').filter(filter('matches', '==', true));
     final int targetId = await _allocateQuery(qry);
 
-    await _applyRemoteEvent(addedRemoteEvent(
+    await _applyRemoteEvent(
+      addedRemoteEvent(
         doc('coll/a', 10, map(<dynamic>['matches', true])),
         <int>[targetId],
-        <int>[]));
+        <int>[],
+      ),
+    );
 
     // Add the document to the index
     await _backfillIndexes();
@@ -3189,7 +4044,8 @@ class LocalStoreTestCase {
     _expectQueryReturned(<String>['coll/a']);
 
     await _applyRemoteEvent(
-        updateRemoteEvent(deletedDoc('coll/a', 0), <int>[targetId], <int>[]));
+      updateRemoteEvent(deletedDoc('coll/a', 0), <int>[targetId], <int>[]),
+    );
 
     // No backfill needed for deleted document.
     await _executeQuery(qry);
@@ -3199,19 +4055,24 @@ class LocalStoreTestCase {
 
   @testMethod
   Future<void> testUsesIndexes() async {
-    final FieldIndex index = fieldIndex('coll',
-        indexId: 0,
-        indexState: FieldIndex.initialState,
-        fieldsAndKinds: <Object>['matches', SegmentKind.ascending]);
+    final FieldIndex index = fieldIndex(
+      'coll',
+      indexId: 0,
+      indexState: FieldIndex.initialState,
+      fieldsAndKinds: <Object>['matches', SegmentKind.ascending],
+    );
     await _configureFieldIndexes(<FieldIndex>[index]);
 
     Query qry = query('coll').filter(filter('matches', '==', true));
     final int targetId = await _allocateQuery(qry);
 
-    await _applyRemoteEvent(addedRemoteEvent(
+    await _applyRemoteEvent(
+      addedRemoteEvent(
         doc('coll/a', 10, map(<dynamic>['matches', true])),
         <int>[targetId],
-        <int>[]));
+        <int>[],
+      ),
+    );
 
     await _backfillIndexes();
 
@@ -3222,25 +4083,33 @@ class LocalStoreTestCase {
 
   @testMethod
   Future<void> testUsesPartiallyIndexedRemoteDocumentsWhenAvailable() async {
-    final FieldIndex index = fieldIndex('coll',
-        indexId: 0,
-        indexState: FieldIndex.initialState,
-        fieldsAndKinds: <Object>['matches', SegmentKind.ascending]);
+    final FieldIndex index = fieldIndex(
+      'coll',
+      indexId: 0,
+      indexState: FieldIndex.initialState,
+      fieldsAndKinds: <Object>['matches', SegmentKind.ascending],
+    );
     await _configureFieldIndexes(<FieldIndex>[index]);
 
     Query qry = query('coll').filter(filter('matches', '==', true));
     final int targetId = await _allocateQuery(qry);
 
-    await _applyRemoteEvent(addedRemoteEvent(
+    await _applyRemoteEvent(
+      addedRemoteEvent(
         doc('coll/a', 10, map(<dynamic>['matches', true])),
         <int>[targetId],
-        <int>[]));
+        <int>[],
+      ),
+    );
     await _backfillIndexes();
 
-    await _applyRemoteEvent(addedRemoteEvent(
+    await _applyRemoteEvent(
+      addedRemoteEvent(
         doc('coll/b', 20, map(<dynamic>['matches', true])),
         <int>[targetId],
-        <int>[]));
+        <int>[],
+      ),
+    );
 
     await _executeQuery(qry);
     _expectRemoteDocumentsReadByEngine(byKey: 1, byQuery: 1);
@@ -3249,47 +4118,57 @@ class LocalStoreTestCase {
 
   @testMethod
   Future<void> testUsesPartiallyIndexedOverlaysWhenAvailable() async {
-    final FieldIndex index = fieldIndex('coll',
-        indexId: 0,
-        indexState: FieldIndex.initialState,
-        fieldsAndKinds: <Object>['matches', SegmentKind.ascending]);
+    final FieldIndex index = fieldIndex(
+      'coll',
+      indexId: 0,
+      indexState: FieldIndex.initialState,
+      fieldsAndKinds: <Object>['matches', SegmentKind.ascending],
+    );
     await _configureFieldIndexes(<FieldIndex>[index]);
 
     await _writeMutation(
-        setMutation('coll/a', map(<dynamic>['matches', true])));
+      setMutation('coll/a', map(<dynamic>['matches', true])),
+    );
     await _backfillIndexes();
 
     await _writeMutation(
-        setMutation('coll/b', map(<dynamic>['matches', true])));
+      setMutation('coll/b', map(<dynamic>['matches', true])),
+    );
 
     Query qry = query('coll').filter(filter('matches', '==', true));
     await _executeQuery(qry);
     _expectOverlaysReadByEngine(byKey: 1, byCollection: 1);
     _expectOverlayTypes(<String, OverlayType>{
       'coll/a': OverlayType.set,
-      'coll/b': OverlayType.set
+      'coll/b': OverlayType.set,
     });
     _expectQueryReturned(<String>['coll/a', 'coll/b']);
   }
 
   @testMethod
   Future<void> testDoesNotUseLimitWhenIndexIsOutdated() async {
-    final FieldIndex index = fieldIndex('coll',
-        indexId: 0,
-        indexState: FieldIndex.initialState,
-        fieldsAndKinds: <Object>['count', SegmentKind.ascending]);
+    final FieldIndex index = fieldIndex(
+      'coll',
+      indexId: 0,
+      indexState: FieldIndex.initialState,
+      fieldsAndKinds: <Object>['count', SegmentKind.ascending],
+    );
     await _configureFieldIndexes(<FieldIndex>[index]);
 
     Query qry = query('coll').orderBy(orderBy('count')).limitToFirst(2);
     final int targetId = await _allocateQuery(qry);
 
-    await _applyRemoteEvent(addedRemoteEvents(<MaybeDocument>[
-      doc('coll/a', 10, map(<dynamic>['count', 1])),
-      doc('coll/b', 10, map(<dynamic>['count', 2])),
-      doc('coll/c', 10, map(<dynamic>['count', 3]))
-    ], <int>[
-      targetId
-    ], <int>[]));
+    await _applyRemoteEvent(
+      addedRemoteEvents(
+        <MaybeDocument>[
+          doc('coll/a', 10, map(<dynamic>['count', 1])),
+          doc('coll/b', 10, map(<dynamic>['count', 2])),
+          doc('coll/c', 10, map(<dynamic>['count', 3])),
+        ],
+        <int>[targetId],
+        <int>[],
+      ),
+    );
     await _backfillIndexes();
 
     await _writeMutation(deleteMutation('coll/b'));
@@ -3307,22 +4186,28 @@ class LocalStoreTestCase {
 
   @testMethod
   Future<void> testUsesIndexForLimitQueryWhenIndexIsUpdated() async {
-    final FieldIndex index = fieldIndex('coll',
-        indexId: 0,
-        indexState: FieldIndex.initialState,
-        fieldsAndKinds: <Object>['count', SegmentKind.ascending]);
+    final FieldIndex index = fieldIndex(
+      'coll',
+      indexId: 0,
+      indexState: FieldIndex.initialState,
+      fieldsAndKinds: <Object>['count', SegmentKind.ascending],
+    );
     await _configureFieldIndexes(<FieldIndex>[index]);
 
     Query qry = query('coll').orderBy(orderBy('count')).limitToFirst(2);
     final int targetId = await _allocateQuery(qry);
 
-    await _applyRemoteEvent(addedRemoteEvents(<MaybeDocument>[
-      doc('coll/a', 10, map(<dynamic>['count', 1])),
-      doc('coll/b', 10, map(<dynamic>['count', 2])),
-      doc('coll/c', 10, map(<dynamic>['count', 3]))
-    ], <int>[
-      targetId
-    ], <int>[]));
+    await _applyRemoteEvent(
+      addedRemoteEvents(
+        <MaybeDocument>[
+          doc('coll/a', 10, map(<dynamic>['count', 1])),
+          doc('coll/b', 10, map(<dynamic>['count', 2])),
+          doc('coll/c', 10, map(<dynamic>['count', 3])),
+        ],
+        <int>[targetId],
+        <int>[],
+      ),
+    );
     await _writeMutation(deleteMutation('coll/b'));
     await _backfillIndexes();
 
@@ -3336,50 +4221,69 @@ class LocalStoreTestCase {
 
   @testMethod
   Future<void> testIndexesVectorValues() async {
-    final FieldIndex index = fieldIndex('coll',
-        indexId: 0,
-        indexState: FieldIndex.initialState,
-        fieldsAndKinds: <Object>['embedding', SegmentKind.ascending]);
+    final FieldIndex index = fieldIndex(
+      'coll',
+      indexId: 0,
+      indexState: FieldIndex.initialState,
+      fieldsAndKinds: <Object>['embedding', SegmentKind.ascending],
+    );
     await _configureFieldIndexes(<FieldIndex>[index]);
 
-    await _writeMutation(setMutation(
+    await _writeMutation(
+      setMutation(
         'coll/arr1',
         map(<dynamic>[
           'embedding',
-          <Object?>[0.1, 0.2, 0.3]
-        ])));
+          <Object?>[0.1, 0.2, 0.3],
+        ]),
+      ),
+    );
     await _writeMutation(
-        setMutation('coll/map2', map(<dynamic>['embedding', map()])));
-    await _writeMutation(setMutation(
+      setMutation('coll/map2', map(<dynamic>['embedding', map()])),
+    );
+    await _writeMutation(
+      setMutation(
         'coll/doc3',
         map(<dynamic>[
           'embedding',
-          VectorValue(<double>[4, 5, 6])
-        ])));
-    await _writeMutation(setMutation(
+          VectorValue(<double>[4, 5, 6]),
+        ]),
+      ),
+    );
+    await _writeMutation(
+      setMutation(
         'coll/doc4',
         map(<dynamic>[
           'embedding',
-          VectorValue(<double>[5])
-        ])));
+          VectorValue(<double>[5]),
+        ]),
+      ),
+    );
 
     Query qry = query('coll').orderBy(orderBy('embedding', 'asc'));
     await _executeQuery(qry);
-    _expectQueryReturned(
-        <String>['coll/arr1', 'coll/doc4', 'coll/doc3', 'coll/map2']);
+    _expectQueryReturned(<String>[
+      'coll/arr1',
+      'coll/doc4',
+      'coll/doc3',
+      'coll/map2',
+    ]);
 
-    qry = query('coll')
-        .filter(filter('embedding', '==', VectorValue(<double>[4, 5, 6])));
+    qry = query(
+      'coll',
+    ).filter(filter('embedding', '==', VectorValue(<double>[4, 5, 6])));
     await _executeQuery(qry);
     _expectQueryReturned(<String>['coll/doc3']);
 
-    qry = query('coll')
-        .filter(filter('embedding', '>', VectorValue(<double>[4, 5, 6])));
+    qry = query(
+      'coll',
+    ).filter(filter('embedding', '>', VectorValue(<double>[4, 5, 6])));
     await _executeQuery(qry);
     _expectQueryReturned(<String>[]);
 
-    qry = query('coll')
-        .filter(filter('embedding', '>=', VectorValue(<double>[4])));
+    qry = query(
+      'coll',
+    ).filter(filter('embedding', '>=', VectorValue(<double>[4])));
     await _executeQuery(qry);
     _expectQueryReturned(<String>['coll/doc4', 'coll/doc3']);
 
@@ -3392,50 +4296,71 @@ class LocalStoreTestCase {
       'coll/arr1': OverlayType.set,
       'coll/map2': OverlayType.set,
       'coll/doc3': OverlayType.set,
-      'coll/doc4': OverlayType.set
+      'coll/doc4': OverlayType.set,
     });
-    _expectQueryReturned(
-        <String>['coll/arr1', 'coll/doc4', 'coll/doc3', 'coll/map2']);
+    _expectQueryReturned(<String>[
+      'coll/arr1',
+      'coll/doc4',
+      'coll/doc3',
+      'coll/map2',
+    ]);
 
-    qry = query('coll')
-        .filter(filter('embedding', '==', VectorValue(<double>[4, 5, 6])));
+    qry = query(
+      'coll',
+    ).filter(filter('embedding', '==', VectorValue(<double>[4, 5, 6])));
     await _executeQuery(qry);
     _expectOverlaysReadByEngine(byKey: 1, byCollection: 0);
     _expectOverlayTypes(<String, OverlayType>{'coll/doc3': OverlayType.set});
     _expectQueryReturned(<String>['coll/doc3']);
 
-    qry = query('coll')
-        .filter(filter('embedding', '>', VectorValue(<double>[4, 5, 6])));
+    qry = query(
+      'coll',
+    ).filter(filter('embedding', '>', VectorValue(<double>[4, 5, 6])));
     await _executeQuery(qry);
     _expectOverlaysReadByEngine(byKey: 0, byCollection: 0);
     _expectOverlayTypes(<String, OverlayType>{});
     _expectQueryReturned(<String>[]);
 
-    qry = query('coll')
-        .filter(filter('embedding', '>=', VectorValue(<double>[4])));
+    qry = query(
+      'coll',
+    ).filter(filter('embedding', '>=', VectorValue(<double>[4])));
     await _executeQuery(qry);
     _expectOverlaysReadByEngine(byKey: 2, byCollection: 0);
     _expectOverlayTypes(<String, OverlayType>{
       'coll/doc4': OverlayType.set,
-      'coll/doc3': OverlayType.set
+      'coll/doc3': OverlayType.set,
     });
     _expectQueryReturned(<String>['coll/doc4', 'coll/doc3']);
   }
 
   @testMethod
   Future<void> testIndexesBsonObjectId() async {
-    final FieldIndex index = fieldIndex('coll',
-        indexId: 0,
-        indexState: FieldIndex.initialState,
-        fieldsAndKinds: <Object>['key', SegmentKind.ascending]);
+    final FieldIndex index = fieldIndex(
+      'coll',
+      indexId: 0,
+      indexState: FieldIndex.initialState,
+      fieldsAndKinds: <Object>['key', SegmentKind.ascending],
+    );
     await _configureFieldIndexes(<FieldIndex>[index]);
 
-    await _writeMutation(setMutation('coll/doc1',
-        map(<dynamic>['key', BsonObjectId('507f191e810c19729de860ea')])));
-    await _writeMutation(setMutation('coll/doc2',
-        map(<dynamic>['key', BsonObjectId('507f191e810c19729de860eb')])));
-    await _writeMutation(setMutation('coll/doc3',
-        map(<dynamic>['key', BsonObjectId('507f191e810c19729de860ec')])));
+    await _writeMutation(
+      setMutation(
+        'coll/doc1',
+        map(<dynamic>['key', BsonObjectId('507f191e810c19729de860ea')]),
+      ),
+    );
+    await _writeMutation(
+      setMutation(
+        'coll/doc2',
+        map(<dynamic>['key', BsonObjectId('507f191e810c19729de860eb')]),
+      ),
+    );
+    await _writeMutation(
+      setMutation(
+        'coll/doc3',
+        map(<dynamic>['key', BsonObjectId('507f191e810c19729de860ec')]),
+      ),
+    );
 
     await _backfillIndexes();
 
@@ -3445,88 +4370,110 @@ class LocalStoreTestCase {
     _expectOverlayTypes(<String, OverlayType>{
       'coll/doc1': OverlayType.set,
       'coll/doc2': OverlayType.set,
-      'coll/doc3': OverlayType.set
+      'coll/doc3': OverlayType.set,
     });
     _expectQueryReturned(<String>['coll/doc1', 'coll/doc2', 'coll/doc3']);
 
-    qry = query('coll')
-        .filter(filter('key', '==', BsonObjectId('507f191e810c19729de860ea')));
+    qry = query(
+      'coll',
+    ).filter(filter('key', '==', BsonObjectId('507f191e810c19729de860ea')));
     await _executeQuery(qry);
     _expectOverlaysReadByEngine(byKey: 1, byCollection: 0);
     _expectOverlayTypes(<String, OverlayType>{'coll/doc1': OverlayType.set});
     _expectQueryReturned(<String>['coll/doc1']);
 
-    qry = query('coll')
-        .filter(filter('key', '!=', BsonObjectId('507f191e810c19729de860ea')));
+    qry = query(
+      'coll',
+    ).filter(filter('key', '!=', BsonObjectId('507f191e810c19729de860ea')));
     await _executeQuery(qry);
     _expectOverlaysReadByEngine(byKey: 2, byCollection: 0);
     _expectOverlayTypes(<String, OverlayType>{
       'coll/doc2': OverlayType.set,
-      'coll/doc3': OverlayType.set
+      'coll/doc3': OverlayType.set,
     });
     _expectQueryReturned(<String>['coll/doc2', 'coll/doc3']);
 
-    qry = query('coll')
-        .filter(filter('key', '>=', BsonObjectId('507f191e810c19729de860eb')));
+    qry = query(
+      'coll',
+    ).filter(filter('key', '>=', BsonObjectId('507f191e810c19729de860eb')));
     await _executeQuery(qry);
     _expectOverlaysReadByEngine(byKey: 2, byCollection: 0);
     _expectOverlayTypes(<String, OverlayType>{
       'coll/doc2': OverlayType.set,
-      'coll/doc3': OverlayType.set
+      'coll/doc3': OverlayType.set,
     });
     _expectQueryReturned(<String>['coll/doc2', 'coll/doc3']);
 
-    qry = query('coll')
-        .filter(filter('key', '<=', BsonObjectId('507f191e810c19729de860eb')));
+    qry = query(
+      'coll',
+    ).filter(filter('key', '<=', BsonObjectId('507f191e810c19729de860eb')));
     await _executeQuery(qry);
     _expectOverlaysReadByEngine(byKey: 2, byCollection: 0);
     _expectOverlayTypes(<String, OverlayType>{
       'coll/doc1': OverlayType.set,
-      'coll/doc2': OverlayType.set
+      'coll/doc2': OverlayType.set,
     });
     _expectQueryReturned(<String>['coll/doc1', 'coll/doc2']);
 
-    qry = query('coll')
-        .filter(filter('key', '>', BsonObjectId('507f191e810c19729de860ec')));
+    qry = query(
+      'coll',
+    ).filter(filter('key', '>', BsonObjectId('507f191e810c19729de860ec')));
     await _executeQuery(qry);
     _expectOverlaysReadByEngine(byKey: 0, byCollection: 0);
     _expectOverlayTypes(<String, OverlayType>{});
     _expectQueryReturned(<String>[]);
 
-    qry = query('coll')
-        .filter(filter('key', '<', BsonObjectId('507f191e810c19729de860ea')));
+    qry = query(
+      'coll',
+    ).filter(filter('key', '<', BsonObjectId('507f191e810c19729de860ea')));
     await _executeQuery(qry);
     _expectOverlaysReadByEngine(byKey: 0, byCollection: 0);
     _expectOverlayTypes(<String, OverlayType>{});
     _expectQueryReturned(<String>[]);
 
-    qry = query('coll').filter(filter('key', 'in', <Object?>[
-      BsonObjectId('507f191e810c19729de860ea'),
-      BsonObjectId('507f191e810c19729de860eb')
-    ]));
+    qry = query('coll').filter(
+      filter('key', 'in', <Object?>[
+        BsonObjectId('507f191e810c19729de860ea'),
+        BsonObjectId('507f191e810c19729de860eb'),
+      ]),
+    );
     await _executeQuery(qry);
     _expectOverlaysReadByEngine(byKey: 2, byCollection: 0);
     _expectOverlayTypes(<String, OverlayType>{
       'coll/doc1': OverlayType.set,
-      'coll/doc2': OverlayType.set
+      'coll/doc2': OverlayType.set,
     });
     _expectQueryReturned(<String>['coll/doc1', 'coll/doc2']);
   }
 
   @testMethod
   Future<void> testIndexesBsonTimestamp() async {
-    final FieldIndex index = fieldIndex('coll',
-        indexId: 0,
-        indexState: FieldIndex.initialState,
-        fieldsAndKinds: <Object>['key', SegmentKind.ascending]);
+    final FieldIndex index = fieldIndex(
+      'coll',
+      indexId: 0,
+      indexState: FieldIndex.initialState,
+      fieldsAndKinds: <Object>['key', SegmentKind.ascending],
+    );
     await _configureFieldIndexes(<FieldIndex>[index]);
 
-    await _writeMutation(setMutation(
-        'coll/doc1', map(<dynamic>['key', BsonTimestamp(1000, 1000)])));
-    await _writeMutation(setMutation(
-        'coll/doc2', map(<dynamic>['key', BsonTimestamp(1001, 1000)])));
-    await _writeMutation(setMutation(
-        'coll/doc3', map(<dynamic>['key', BsonTimestamp(1000, 1001)])));
+    await _writeMutation(
+      setMutation(
+        'coll/doc1',
+        map(<dynamic>['key', BsonTimestamp(1000, 1000)]),
+      ),
+    );
+    await _writeMutation(
+      setMutation(
+        'coll/doc2',
+        map(<dynamic>['key', BsonTimestamp(1001, 1000)]),
+      ),
+    );
+    await _writeMutation(
+      setMutation(
+        'coll/doc3',
+        map(<dynamic>['key', BsonTimestamp(1000, 1001)]),
+      ),
+    );
 
     await _backfillIndexes();
 
@@ -3536,7 +4483,7 @@ class LocalStoreTestCase {
     _expectOverlayTypes(<String, OverlayType>{
       'coll/doc1': OverlayType.set,
       'coll/doc2': OverlayType.set,
-      'coll/doc3': OverlayType.set
+      'coll/doc3': OverlayType.set,
     });
     _expectQueryReturned(<String>['coll/doc1', 'coll/doc3', 'coll/doc2']);
 
@@ -3551,7 +4498,7 @@ class LocalStoreTestCase {
     _expectOverlaysReadByEngine(byKey: 2, byCollection: 0);
     _expectOverlayTypes(<String, OverlayType>{
       'coll/doc2': OverlayType.set,
-      'coll/doc3': OverlayType.set
+      'coll/doc3': OverlayType.set,
     });
     _expectQueryReturned(<String>['coll/doc3', 'coll/doc2']);
 
@@ -3560,7 +4507,7 @@ class LocalStoreTestCase {
     _expectOverlaysReadByEngine(byKey: 2, byCollection: 0);
     _expectOverlayTypes(<String, OverlayType>{
       'coll/doc2': OverlayType.set,
-      'coll/doc3': OverlayType.set
+      'coll/doc3': OverlayType.set,
     });
     _expectQueryReturned(<String>['coll/doc3', 'coll/doc2']);
 
@@ -3569,7 +4516,7 @@ class LocalStoreTestCase {
     _expectOverlaysReadByEngine(byKey: 2, byCollection: 0);
     _expectOverlayTypes(<String, OverlayType>{
       'coll/doc1': OverlayType.set,
-      'coll/doc3': OverlayType.set
+      'coll/doc3': OverlayType.set,
     });
     _expectQueryReturned(<String>['coll/doc1', 'coll/doc3']);
 
@@ -3585,49 +4532,67 @@ class LocalStoreTestCase {
     _expectOverlayTypes(<String, OverlayType>{});
     _expectQueryReturned(<String>[]);
 
-    qry = query('coll').filter(filter('key', 'in',
-        <Object?>[BsonTimestamp(1000, 1000), BsonTimestamp(1000, 1001)]));
+    qry = query('coll').filter(
+      filter('key', 'in', <Object?>[
+        BsonTimestamp(1000, 1000),
+        BsonTimestamp(1000, 1001),
+      ]),
+    );
     await _executeQuery(qry);
     _expectOverlaysReadByEngine(byKey: 2, byCollection: 0);
     _expectOverlayTypes(<String, OverlayType>{
       'coll/doc1': OverlayType.set,
-      'coll/doc3': OverlayType.set
+      'coll/doc3': OverlayType.set,
     });
     _expectQueryReturned(<String>['coll/doc1', 'coll/doc3']);
   }
 
   @testMethod
   Future<void> testIndexesBsonBinary() async {
-    final FieldIndex index = fieldIndex('coll',
-        indexId: 0,
-        indexState: FieldIndex.initialState,
-        fieldsAndKinds: <Object>['key', SegmentKind.ascending]);
+    final FieldIndex index = fieldIndex(
+      'coll',
+      indexId: 0,
+      indexState: FieldIndex.initialState,
+      fieldsAndKinds: <Object>['key', SegmentKind.ascending],
+    );
     await _configureFieldIndexes(<FieldIndex>[index]);
 
-    await _writeMutation(setMutation(
+    await _writeMutation(
+      setMutation(
         'coll/doc1',
         map(<dynamic>[
           'key',
-          Blob.bsonBinary(1, Uint8List.fromList(<int>[1, 2, 3]))
-        ])));
-    await _writeMutation(setMutation(
+          Blob.bsonBinary(1, Uint8List.fromList(<int>[1, 2, 3])),
+        ]),
+      ),
+    );
+    await _writeMutation(
+      setMutation(
         'coll/doc2',
         map(<dynamic>[
           'key',
-          Blob.bsonBinary(1, Uint8List.fromList(<int>[1, 2]))
-        ])));
-    await _writeMutation(setMutation(
+          Blob.bsonBinary(1, Uint8List.fromList(<int>[1, 2])),
+        ]),
+      ),
+    );
+    await _writeMutation(
+      setMutation(
         'coll/doc3',
         map(<dynamic>[
           'key',
-          Blob.bsonBinary(1, Uint8List.fromList(<int>[1, 2, 4]))
-        ])));
-    await _writeMutation(setMutation(
+          Blob.bsonBinary(1, Uint8List.fromList(<int>[1, 2, 4])),
+        ]),
+      ),
+    );
+    await _writeMutation(
+      setMutation(
         'coll/doc4',
         map(<dynamic>[
           'key',
-          Blob.bsonBinary(2, Uint8List.fromList(<int>[1, 2]))
-        ])));
+          Blob.bsonBinary(2, Uint8List.fromList(<int>[1, 2])),
+        ]),
+      ),
+    );
 
     await _backfillIndexes();
 
@@ -3638,91 +4603,124 @@ class LocalStoreTestCase {
       'coll/doc1': OverlayType.set,
       'coll/doc2': OverlayType.set,
       'coll/doc3': OverlayType.set,
-      'coll/doc4': OverlayType.set
+      'coll/doc4': OverlayType.set,
     });
-    _expectQueryReturned(
-        <String>['coll/doc2', 'coll/doc1', 'coll/doc3', 'coll/doc4']);
+    _expectQueryReturned(<String>[
+      'coll/doc2',
+      'coll/doc1',
+      'coll/doc3',
+      'coll/doc4',
+    ]);
 
-    qry = query('coll').filter(filter(
-        'key', '==', Blob.bsonBinary(1, Uint8List.fromList(<int>[1, 2, 3]))));
+    qry = query('coll').filter(
+      filter(
+        'key',
+        '==',
+        Blob.bsonBinary(1, Uint8List.fromList(<int>[1, 2, 3])),
+      ),
+    );
     await _executeQuery(qry);
     _expectOverlaysReadByEngine(byKey: 1, byCollection: 0);
     _expectOverlayTypes(<String, OverlayType>{'coll/doc1': OverlayType.set});
     _expectQueryReturned(<String>['coll/doc1']);
 
-    qry = query('coll').filter(filter(
-        'key', '!=', Blob.bsonBinary(1, Uint8List.fromList(<int>[1, 2, 3]))));
+    qry = query('coll').filter(
+      filter(
+        'key',
+        '!=',
+        Blob.bsonBinary(1, Uint8List.fromList(<int>[1, 2, 3])),
+      ),
+    );
     await _executeQuery(qry);
     _expectOverlaysReadByEngine(byKey: 3, byCollection: 0);
     _expectOverlayTypes(<String, OverlayType>{
       'coll/doc2': OverlayType.set,
       'coll/doc3': OverlayType.set,
-      'coll/doc4': OverlayType.set
+      'coll/doc4': OverlayType.set,
     });
     _expectQueryReturned(<String>['coll/doc2', 'coll/doc3', 'coll/doc4']);
 
-    qry = query('coll').filter(filter(
-        'key', '>=', Blob.bsonBinary(1, Uint8List.fromList(<int>[1, 2, 3]))));
+    qry = query('coll').filter(
+      filter(
+        'key',
+        '>=',
+        Blob.bsonBinary(1, Uint8List.fromList(<int>[1, 2, 3])),
+      ),
+    );
     await _executeQuery(qry);
     _expectOverlaysReadByEngine(byKey: 3, byCollection: 0);
     _expectOverlayTypes(<String, OverlayType>{
       'coll/doc1': OverlayType.set,
       'coll/doc3': OverlayType.set,
-      'coll/doc4': OverlayType.set
+      'coll/doc4': OverlayType.set,
     });
     _expectQueryReturned(<String>['coll/doc1', 'coll/doc3', 'coll/doc4']);
 
-    qry = query('coll').filter(filter(
-        'key', '<=', Blob.bsonBinary(1, Uint8List.fromList(<int>[1, 2, 3]))));
+    qry = query('coll').filter(
+      filter(
+        'key',
+        '<=',
+        Blob.bsonBinary(1, Uint8List.fromList(<int>[1, 2, 3])),
+      ),
+    );
     await _executeQuery(qry);
     _expectOverlaysReadByEngine(byKey: 2, byCollection: 0);
     _expectOverlayTypes(<String, OverlayType>{
       'coll/doc1': OverlayType.set,
-      'coll/doc2': OverlayType.set
+      'coll/doc2': OverlayType.set,
     });
     _expectQueryReturned(<String>['coll/doc2', 'coll/doc1']);
 
-    qry = query('coll').filter(filter(
-        'key', '>', Blob.bsonBinary(2, Uint8List.fromList(<int>[1, 2]))));
+    qry = query('coll').filter(
+      filter('key', '>', Blob.bsonBinary(2, Uint8List.fromList(<int>[1, 2]))),
+    );
     await _executeQuery(qry);
     _expectOverlaysReadByEngine(byKey: 0, byCollection: 0);
     _expectOverlayTypes(<String, OverlayType>{});
     _expectQueryReturned(<String>[]);
 
-    qry = query('coll').filter(filter(
-        'key', '<', Blob.bsonBinary(1, Uint8List.fromList(<int>[1, 2]))));
+    qry = query('coll').filter(
+      filter('key', '<', Blob.bsonBinary(1, Uint8List.fromList(<int>[1, 2]))),
+    );
     await _executeQuery(qry);
     _expectOverlaysReadByEngine(byKey: 0, byCollection: 0);
     _expectOverlayTypes(<String, OverlayType>{});
     _expectQueryReturned(<String>[]);
 
-    qry = query('coll').filter(filter('key', 'in', <Object?>[
-      Blob.bsonBinary(1, Uint8List.fromList(<int>[1, 2, 3])),
-      Blob.bsonBinary(1, Uint8List.fromList(<int>[1, 2]))
-    ]));
+    qry = query('coll').filter(
+      filter('key', 'in', <Object?>[
+        Blob.bsonBinary(1, Uint8List.fromList(<int>[1, 2, 3])),
+        Blob.bsonBinary(1, Uint8List.fromList(<int>[1, 2])),
+      ]),
+    );
     await _executeQuery(qry);
     _expectOverlaysReadByEngine(byKey: 2, byCollection: 0);
     _expectOverlayTypes(<String, OverlayType>{
       'coll/doc1': OverlayType.set,
-      'coll/doc2': OverlayType.set
+      'coll/doc2': OverlayType.set,
     });
     _expectQueryReturned(<String>['coll/doc1', 'coll/doc2']);
   }
 
   @testMethod
   Future<void> testIndexesRegex() async {
-    final FieldIndex index = fieldIndex('coll',
-        indexId: 0,
-        indexState: FieldIndex.initialState,
-        fieldsAndKinds: <Object>['key', SegmentKind.ascending]);
+    final FieldIndex index = fieldIndex(
+      'coll',
+      indexId: 0,
+      indexState: FieldIndex.initialState,
+      fieldsAndKinds: <Object>['key', SegmentKind.ascending],
+    );
     await _configureFieldIndexes(<FieldIndex>[index]);
 
-    await _writeMutation(setMutation(
-        'coll/doc1', map(<dynamic>['key', RegexValue('^bar', 'i')])));
-    await _writeMutation(setMutation(
-        'coll/doc2', map(<dynamic>['key', RegexValue('^bar', 'm')])));
-    await _writeMutation(setMutation(
-        'coll/doc3', map(<dynamic>['key', RegexValue('^foo', 'i')])));
+    await _writeMutation(
+      setMutation('coll/doc1', map(<dynamic>['key', RegexValue('^bar', 'i')])),
+    );
+    await _writeMutation(
+      setMutation('coll/doc2', map(<dynamic>['key', RegexValue('^bar', 'm')])),
+    );
+    await _writeMutation(
+      setMutation('coll/doc3', map(<dynamic>['key', RegexValue('^foo', 'i')])),
+    );
 
     await _backfillIndexes();
 
@@ -3732,7 +4730,7 @@ class LocalStoreTestCase {
     _expectOverlayTypes(<String, OverlayType>{
       'coll/doc1': OverlayType.set,
       'coll/doc2': OverlayType.set,
-      'coll/doc3': OverlayType.set
+      'coll/doc3': OverlayType.set,
     });
     _expectQueryReturned(<String>['coll/doc1', 'coll/doc2', 'coll/doc3']);
 
@@ -3747,7 +4745,7 @@ class LocalStoreTestCase {
     _expectOverlaysReadByEngine(byKey: 2, byCollection: 0);
     _expectOverlayTypes(<String, OverlayType>{
       'coll/doc2': OverlayType.set,
-      'coll/doc3': OverlayType.set
+      'coll/doc3': OverlayType.set,
     });
     _expectQueryReturned(<String>['coll/doc2', 'coll/doc3']);
 
@@ -3763,30 +4761,39 @@ class LocalStoreTestCase {
     _expectOverlayTypes(<String, OverlayType>{});
     _expectQueryReturned(<String>[]);
 
-    qry = query('coll').filter(filter('key', 'in',
-        <Object?>[RegexValue('^bar', 'i'), RegexValue('^foo', 'i')]));
+    qry = query('coll').filter(
+      filter('key', 'in', <Object?>[
+        RegexValue('^bar', 'i'),
+        RegexValue('^foo', 'i'),
+      ]),
+    );
     await _executeQuery(qry);
     _expectOverlaysReadByEngine(byKey: 2, byCollection: 0);
     _expectOverlayTypes(<String, OverlayType>{
       'coll/doc1': OverlayType.set,
-      'coll/doc3': OverlayType.set
+      'coll/doc3': OverlayType.set,
     });
     _expectQueryReturned(<String>['coll/doc1', 'coll/doc3']);
   }
 
   @testMethod
   Future<void> testIndexesInt32() async {
-    final FieldIndex index = fieldIndex('coll',
-        indexId: 0,
-        indexState: FieldIndex.initialState,
-        fieldsAndKinds: <Object>['key', SegmentKind.ascending]);
+    final FieldIndex index = fieldIndex(
+      'coll',
+      indexId: 0,
+      indexState: FieldIndex.initialState,
+      fieldsAndKinds: <Object>['key', SegmentKind.ascending],
+    );
     await _configureFieldIndexes(<FieldIndex>[index]);
     await _writeMutation(
-        setMutation('coll/doc1', map(<dynamic>['key', Int32Value(-1)])));
+      setMutation('coll/doc1', map(<dynamic>['key', Int32Value(-1)])),
+    );
     await _writeMutation(
-        setMutation('coll/doc2', map(<dynamic>['key', Int32Value(0)])));
+      setMutation('coll/doc2', map(<dynamic>['key', Int32Value(0)])),
+    );
     await _writeMutation(
-        setMutation('coll/doc3', map(<dynamic>['key', Int32Value(1)])));
+      setMutation('coll/doc3', map(<dynamic>['key', Int32Value(1)])),
+    );
 
     await _backfillIndexes();
 
@@ -3796,7 +4803,7 @@ class LocalStoreTestCase {
     _expectOverlayTypes(<String, OverlayType>{
       'coll/doc1': OverlayType.set,
       'coll/doc2': OverlayType.set,
-      'coll/doc3': OverlayType.set
+      'coll/doc3': OverlayType.set,
     });
     _expectQueryReturned(<String>['coll/doc1', 'coll/doc2', 'coll/doc3']);
 
@@ -3811,7 +4818,7 @@ class LocalStoreTestCase {
     _expectOverlaysReadByEngine(byKey: 2, byCollection: 0);
     _expectOverlayTypes(<String, OverlayType>{
       'coll/doc2': OverlayType.set,
-      'coll/doc3': OverlayType.set
+      'coll/doc3': OverlayType.set,
     });
     _expectQueryReturned(<String>['coll/doc2', 'coll/doc3']);
 
@@ -3820,7 +4827,7 @@ class LocalStoreTestCase {
     _expectOverlaysReadByEngine(byKey: 2, byCollection: 0);
     _expectOverlayTypes(<String, OverlayType>{
       'coll/doc2': OverlayType.set,
-      'coll/doc3': OverlayType.set
+      'coll/doc3': OverlayType.set,
     });
     _expectQueryReturned(<String>['coll/doc2', 'coll/doc3']);
 
@@ -3829,7 +4836,7 @@ class LocalStoreTestCase {
     _expectOverlaysReadByEngine(byKey: 2, byCollection: 0);
     _expectOverlayTypes(<String, OverlayType>{
       'coll/doc1': OverlayType.set,
-      'coll/doc2': OverlayType.set
+      'coll/doc2': OverlayType.set,
     });
     _expectQueryReturned(<String>['coll/doc1', 'coll/doc2']);
 
@@ -3845,30 +4852,39 @@ class LocalStoreTestCase {
     _expectOverlayTypes(<String, OverlayType>{});
     _expectQueryReturned(<String>[]);
 
-    qry = query('coll')
-        .filter(filter('key', 'in', <Object?>[Int32Value(-1), Int32Value(0)]));
+    qry = query(
+      'coll',
+    ).filter(filter('key', 'in', <Object?>[Int32Value(-1), Int32Value(0)]));
     await _executeQuery(qry);
     _expectOverlaysReadByEngine(byKey: 2, byCollection: 0);
     _expectOverlayTypes(<String, OverlayType>{
       'coll/doc1': OverlayType.set,
-      'coll/doc2': OverlayType.set
+      'coll/doc2': OverlayType.set,
     });
     _expectQueryReturned(<String>['coll/doc1', 'coll/doc2']);
   }
 
   @testMethod
   Future<void> testIndexesDecimal128Value() async {
-    final FieldIndex index = fieldIndex('coll',
-        indexId: 0,
-        indexState: FieldIndex.initialState,
-        fieldsAndKinds: <Object>['key', SegmentKind.ascending]);
+    final FieldIndex index = fieldIndex(
+      'coll',
+      indexId: 0,
+      indexState: FieldIndex.initialState,
+      fieldsAndKinds: <Object>['key', SegmentKind.ascending],
+    );
     await _configureFieldIndexes(<FieldIndex>[index]);
-    await _writeMutation(setMutation(
-        'coll/doc1', map(<dynamic>['key', Decimal128Value('-1.2e3')])));
     await _writeMutation(
-        setMutation('coll/doc2', map(<dynamic>['key', Decimal128Value('0')])));
-    await _writeMutation(setMutation(
-        'coll/doc3', map(<dynamic>['key', Decimal128Value('1.2e3')])));
+      setMutation(
+        'coll/doc1',
+        map(<dynamic>['key', Decimal128Value('-1.2e3')]),
+      ),
+    );
+    await _writeMutation(
+      setMutation('coll/doc2', map(<dynamic>['key', Decimal128Value('0')])),
+    );
+    await _writeMutation(
+      setMutation('coll/doc3', map(<dynamic>['key', Decimal128Value('1.2e3')])),
+    );
 
     await _backfillIndexes();
 
@@ -3878,7 +4894,7 @@ class LocalStoreTestCase {
     _expectOverlayTypes(<String, OverlayType>{
       'coll/doc1': OverlayType.set,
       'coll/doc2': OverlayType.set,
-      'coll/doc3': OverlayType.set
+      'coll/doc3': OverlayType.set,
     });
     _expectQueryReturned(<String>['coll/doc1', 'coll/doc2', 'coll/doc3']);
 
@@ -3893,7 +4909,7 @@ class LocalStoreTestCase {
     _expectOverlaysReadByEngine(byKey: 2, byCollection: 0);
     _expectOverlayTypes(<String, OverlayType>{
       'coll/doc1': OverlayType.set,
-      'coll/doc3': OverlayType.set
+      'coll/doc3': OverlayType.set,
     });
     _expectQueryReturned(<String>['coll/doc1', 'coll/doc3']);
 
@@ -3902,7 +4918,7 @@ class LocalStoreTestCase {
     _expectOverlaysReadByEngine(byKey: 2, byCollection: 0);
     _expectOverlayTypes(<String, OverlayType>{
       'coll/doc2': OverlayType.set,
-      'coll/doc3': OverlayType.set
+      'coll/doc3': OverlayType.set,
     });
     _expectQueryReturned(<String>['coll/doc2', 'coll/doc3']);
 
@@ -3913,7 +4929,7 @@ class LocalStoreTestCase {
     _expectOverlaysReadByEngine(byKey: 2, byCollection: 0);
     _expectOverlayTypes(<String, OverlayType>{
       'coll/doc1': OverlayType.set,
-      'coll/doc2': OverlayType.set
+      'coll/doc2': OverlayType.set,
     });
     _expectQueryReturned(<String>['coll/doc1', 'coll/doc2']);
 
@@ -3929,38 +4945,45 @@ class LocalStoreTestCase {
     _expectOverlayTypes(<String, OverlayType>{});
     _expectQueryReturned(<String>[]);
 
-    qry = query('coll').filter(filter('key', 'in',
-        <Object?>[Decimal128Value('-1.2e3'), Decimal128Value('0')]));
+    qry = query('coll').filter(
+      filter('key', 'in', <Object?>[
+        Decimal128Value('-1.2e3'),
+        Decimal128Value('0'),
+      ]),
+    );
     await _executeQuery(qry);
     _expectOverlaysReadByEngine(byKey: 2, byCollection: 0);
     _expectOverlayTypes(<String, OverlayType>{
       'coll/doc1': OverlayType.set,
-      'coll/doc2': OverlayType.set
+      'coll/doc2': OverlayType.set,
     });
     _expectQueryReturned(<String>['coll/doc1', 'coll/doc2']);
   }
 
   @testMethod
   Future<void> testIndexesDecimal128ValueWithPrecisionLoss() async {
-    final FieldIndex index = fieldIndex('coll',
-        indexId: 0,
-        indexState: FieldIndex.initialState,
-        fieldsAndKinds: <Object>['key', SegmentKind.ascending]);
+    final FieldIndex index = fieldIndex(
+      'coll',
+      indexId: 0,
+      indexState: FieldIndex.initialState,
+      fieldsAndKinds: <Object>['key', SegmentKind.ascending],
+    );
     await _configureFieldIndexes(<FieldIndex>[index]);
-    await _writeMutation(setMutation(
-        'coll/doc1',
-        map(<dynamic>[
-          'key',
-          Decimal128Value('-0.1234567890123456789')
-        ]))); // will be rounded to -0.12345678901234568
     await _writeMutation(
-        setMutation('coll/doc2', map(<dynamic>['key', Decimal128Value('0')])));
-    await _writeMutation(setMutation(
+      setMutation(
+        'coll/doc1',
+        map(<dynamic>['key', Decimal128Value('-0.1234567890123456789')]),
+      ),
+    ); // will be rounded to -0.12345678901234568
+    await _writeMutation(
+      setMutation('coll/doc2', map(<dynamic>['key', Decimal128Value('0')])),
+    );
+    await _writeMutation(
+      setMutation(
         'coll/doc3',
-        map(<dynamic>[
-          'key',
-          Decimal128Value('0.1234567890123456789')
-        ]))); // will be rounded to 0.12345678901234568
+        map(<dynamic>['key', Decimal128Value('0.1234567890123456789')]),
+      ),
+    ); // will be rounded to 0.12345678901234568
 
     await _backfillIndexes();
 
@@ -3970,12 +4993,13 @@ class LocalStoreTestCase {
     _expectOverlayTypes(<String, OverlayType>{
       'coll/doc1': OverlayType.set,
       'coll/doc2': OverlayType.set,
-      'coll/doc3': OverlayType.set
+      'coll/doc3': OverlayType.set,
     });
     _expectQueryReturned(<String>['coll/doc1', 'coll/doc2', 'coll/doc3']);
 
-    qry = query('coll')
-        .filter(filter('key', '==', Decimal128Value('0.1234567890123456789')));
+    qry = query(
+      'coll',
+    ).filter(filter('key', '==', Decimal128Value('0.1234567890123456789')));
     await _executeQuery(qry);
     _expectOverlaysReadByEngine(byKey: 1, byCollection: 0);
     _expectOverlayTypes(<String, OverlayType>{'coll/doc3': OverlayType.set});
@@ -3983,8 +5007,9 @@ class LocalStoreTestCase {
 
     // Mismatch behaviour caused by rounding error. Firestore fetches the doc3 from SQLite DB as
     // doc3 rounds to the same number, but, it is not presented on the final qry result.
-    qry = query('coll')
-        .filter(filter('key', '==', Decimal128Value('0.12345678901234568')));
+    qry = query(
+      'coll',
+    ).filter(filter('key', '==', Decimal128Value('0.12345678901234568')));
     await _executeQuery(qry);
     _expectOverlaysReadByEngine(byKey: 1, byCollection: 0);
     _expectOverlayTypes(<String, OverlayType>{'coll/doc3': OverlayType.set});
@@ -3997,7 +5022,7 @@ class LocalStoreTestCase {
     _expectOverlaysReadByEngine(byKey: 2, byCollection: 0);
     _expectOverlayTypes(<String, OverlayType>{
       'coll/doc1': OverlayType.set,
-      'coll/doc3': OverlayType.set
+      'coll/doc3': OverlayType.set,
     });
     _expectQueryReturned(<String>['coll/doc1', 'coll/doc3']);
 
@@ -4007,8 +5032,9 @@ class LocalStoreTestCase {
     _expectOverlayTypes(<String, OverlayType>{'coll/doc3': OverlayType.set});
     _expectQueryReturned(<String>['coll/doc3']);
 
-    qry =
-        query('coll').filter(filter('key', '<=', Decimal128Value('-1.23e-1')));
+    qry = query(
+      'coll',
+    ).filter(filter('key', '<=', Decimal128Value('-1.23e-1')));
     await _executeQuery(qry);
     _expectOverlaysReadByEngine(byKey: 1, byCollection: 0);
     _expectOverlayTypes(<String, OverlayType>{'coll/doc1': OverlayType.set});
@@ -4029,20 +5055,25 @@ class LocalStoreTestCase {
 
   @testMethod
   Future<void> testIndexesMinKey() async {
-    final FieldIndex index = fieldIndex('coll',
-        indexId: 0,
-        indexState: FieldIndex.initialState,
-        fieldsAndKinds: <Object>['key', SegmentKind.ascending]);
+    final FieldIndex index = fieldIndex(
+      'coll',
+      indexId: 0,
+      indexState: FieldIndex.initialState,
+      fieldsAndKinds: <Object>['key', SegmentKind.ascending],
+    );
     await _configureFieldIndexes(<FieldIndex>[index]);
 
     await _writeMutation(setMutation('coll/doc1', map(<dynamic>['key', null])));
     await _writeMutation(
-        setMutation('coll/doc2', map(<dynamic>['key', MinKey.instance])));
+      setMutation('coll/doc2', map(<dynamic>['key', MinKey.instance])),
+    );
     await _writeMutation(
-        setMutation('coll/doc3', map(<dynamic>['key', MinKey.instance])));
+      setMutation('coll/doc3', map(<dynamic>['key', MinKey.instance])),
+    );
     await _writeMutation(setMutation('coll/doc4', map(<dynamic>['key', 1])));
     await _writeMutation(
-        setMutation('coll/doc5', map(<dynamic>['key', MaxKey.instance])));
+      setMutation('coll/doc5', map(<dynamic>['key', MaxKey.instance])),
+    );
 
     await _backfillIndexes();
 
@@ -4054,14 +5085,14 @@ class LocalStoreTestCase {
       'coll/doc2': OverlayType.set,
       'coll/doc3': OverlayType.set,
       'coll/doc4': OverlayType.set,
-      'coll/doc5': OverlayType.set
+      'coll/doc5': OverlayType.set,
     });
     _expectQueryReturned(<String>[
       'coll/doc1',
       'coll/doc2',
       'coll/doc3',
       'coll/doc4',
-      'coll/doc5'
+      'coll/doc5',
     ]);
 
     qry = query('coll').filter(filter('key', '==', MinKey.instance));
@@ -4069,7 +5100,7 @@ class LocalStoreTestCase {
     _expectOverlaysReadByEngine(byKey: 2, byCollection: 0);
     _expectOverlayTypes(<String, OverlayType>{
       'coll/doc2': OverlayType.set,
-      'coll/doc3': OverlayType.set
+      'coll/doc3': OverlayType.set,
     });
     _expectQueryReturned(<String>['coll/doc2', 'coll/doc3']);
 
@@ -4078,7 +5109,7 @@ class LocalStoreTestCase {
     _expectOverlaysReadByEngine(byKey: 2, byCollection: 0);
     _expectOverlayTypes(<String, OverlayType>{
       'coll/doc4': OverlayType.set,
-      'coll/doc5': OverlayType.set
+      'coll/doc5': OverlayType.set,
     });
     _expectQueryReturned(<String>['coll/doc4', 'coll/doc5']);
 
@@ -4087,7 +5118,7 @@ class LocalStoreTestCase {
     _expectOverlaysReadByEngine(byKey: 2, byCollection: 0);
     _expectOverlayTypes(<String, OverlayType>{
       'coll/doc2': OverlayType.set,
-      'coll/doc3': OverlayType.set
+      'coll/doc3': OverlayType.set,
     });
     _expectQueryReturned(<String>['coll/doc2', 'coll/doc3']);
 
@@ -4096,7 +5127,7 @@ class LocalStoreTestCase {
     _expectOverlaysReadByEngine(byKey: 2, byCollection: 0);
     _expectOverlayTypes(<String, OverlayType>{
       'coll/doc2': OverlayType.set,
-      'coll/doc3': OverlayType.set
+      'coll/doc3': OverlayType.set,
     });
     _expectQueryReturned(<String>['coll/doc2', 'coll/doc3']);
 
@@ -4112,34 +5143,40 @@ class LocalStoreTestCase {
     _expectOverlayTypes(<String, OverlayType>{});
     _expectQueryReturned(<String>[]);
 
-    qry = query('coll').filter(
-        filter('key', 'in', <Object?>[MinKey.instance, MaxKey.instance]));
+    qry = query(
+      'coll',
+    ).filter(filter('key', 'in', <Object?>[MinKey.instance, MaxKey.instance]));
     await _executeQuery(qry);
     _expectOverlaysReadByEngine(byKey: 3, byCollection: 0);
     _expectOverlayTypes(<String, OverlayType>{
       'coll/doc2': OverlayType.set,
       'coll/doc3': OverlayType.set,
-      'coll/doc5': OverlayType.set
+      'coll/doc5': OverlayType.set,
     });
     _expectQueryReturned(<String>['coll/doc2', 'coll/doc3', 'coll/doc5']);
   }
 
   @testMethod
   Future<void> testIndexesMaxKey() async {
-    final FieldIndex index = fieldIndex('coll',
-        indexId: 0,
-        indexState: FieldIndex.initialState,
-        fieldsAndKinds: <Object>['key', SegmentKind.ascending]);
+    final FieldIndex index = fieldIndex(
+      'coll',
+      indexId: 0,
+      indexState: FieldIndex.initialState,
+      fieldsAndKinds: <Object>['key', SegmentKind.ascending],
+    );
     await _configureFieldIndexes(<FieldIndex>[index]);
 
     await _writeMutation(setMutation('coll/doc1', map(<dynamic>['key', null])));
     await _writeMutation(
-        setMutation('coll/doc2', map(<dynamic>['key', MinKey.instance])));
+      setMutation('coll/doc2', map(<dynamic>['key', MinKey.instance])),
+    );
     await _writeMutation(setMutation('coll/doc3', map(<dynamic>['key', 1])));
     await _writeMutation(
-        setMutation('coll/doc4', map(<dynamic>['key', MaxKey.instance])));
+      setMutation('coll/doc4', map(<dynamic>['key', MaxKey.instance])),
+    );
     await _writeMutation(
-        setMutation('coll/doc5', map(<dynamic>['key', MaxKey.instance])));
+      setMutation('coll/doc5', map(<dynamic>['key', MaxKey.instance])),
+    );
 
     await _backfillIndexes();
 
@@ -4151,14 +5188,14 @@ class LocalStoreTestCase {
       'coll/doc2': OverlayType.set,
       'coll/doc3': OverlayType.set,
       'coll/doc4': OverlayType.set,
-      'coll/doc5': OverlayType.set
+      'coll/doc5': OverlayType.set,
     });
     _expectQueryReturned(<String>[
       'coll/doc1',
       'coll/doc2',
       'coll/doc3',
       'coll/doc4',
-      'coll/doc5'
+      'coll/doc5',
     ]);
 
     qry = query('coll').filter(filter('key', '==', MaxKey.instance));
@@ -4166,7 +5203,7 @@ class LocalStoreTestCase {
     _expectOverlaysReadByEngine(byKey: 2, byCollection: 0);
     _expectOverlayTypes(<String, OverlayType>{
       'coll/doc4': OverlayType.set,
-      'coll/doc5': OverlayType.set
+      'coll/doc5': OverlayType.set,
     });
     _expectQueryReturned(<String>['coll/doc4', 'coll/doc5']);
 
@@ -4175,7 +5212,7 @@ class LocalStoreTestCase {
     _expectOverlaysReadByEngine(byKey: 2, byCollection: 0);
     _expectOverlayTypes(<String, OverlayType>{
       'coll/doc2': OverlayType.set,
-      'coll/doc3': OverlayType.set
+      'coll/doc3': OverlayType.set,
     });
     _expectQueryReturned(<String>['coll/doc2', 'coll/doc3']);
 
@@ -4184,7 +5221,7 @@ class LocalStoreTestCase {
     _expectOverlaysReadByEngine(byKey: 2, byCollection: 0);
     _expectOverlayTypes(<String, OverlayType>{
       'coll/doc4': OverlayType.set,
-      'coll/doc5': OverlayType.set
+      'coll/doc5': OverlayType.set,
     });
     _expectQueryReturned(<String>['coll/doc4', 'coll/doc5']);
 
@@ -4193,7 +5230,7 @@ class LocalStoreTestCase {
     _expectOverlaysReadByEngine(byKey: 2, byCollection: 0);
     _expectOverlayTypes(<String, OverlayType>{
       'coll/doc4': OverlayType.set,
-      'coll/doc5': OverlayType.set
+      'coll/doc5': OverlayType.set,
     });
     _expectQueryReturned(<String>['coll/doc4', 'coll/doc5']);
 
@@ -4212,48 +5249,80 @@ class LocalStoreTestCase {
 
   @testMethod
   Future<void> testIndexesAllBsonTypesTogether() async {
-    final FieldIndex index = fieldIndex('coll',
-        indexId: 0,
-        indexState: FieldIndex.initialState,
-        fieldsAndKinds: <Object>['key', SegmentKind.descending]);
+    final FieldIndex index = fieldIndex(
+      'coll',
+      indexId: 0,
+      indexState: FieldIndex.initialState,
+      fieldsAndKinds: <Object>['key', SegmentKind.descending],
+    );
     await _configureFieldIndexes(<FieldIndex>[index]);
 
     await _writeMutation(
-        setMutation('coll/doc1', map(<dynamic>['key', MinKey.instance])));
+      setMutation('coll/doc1', map(<dynamic>['key', MinKey.instance])),
+    );
     await _writeMutation(
-        setMutation('coll/doc2', map(<dynamic>['key', Int32Value(2)])));
+      setMutation('coll/doc2', map(<dynamic>['key', Int32Value(2)])),
+    );
     await _writeMutation(
-        setMutation('coll/doc3', map(<dynamic>['key', Int32Value(-1)])));
-    await _writeMutation(setMutation(
-        'coll/doc4', map(<dynamic>['key', Decimal128Value('1.2e3')])));
-    await _writeMutation(setMutation(
-        'coll/doc5', map(<dynamic>['key', Decimal128Value('-0.0')])));
-    await _writeMutation(setMutation(
-        'coll/doc6', map(<dynamic>['key', BsonTimestamp(1000, 1001)])));
-    await _writeMutation(setMutation(
-        'coll/doc7', map(<dynamic>['key', BsonTimestamp(1000, 1000)])));
-    await _writeMutation(setMutation(
+      setMutation('coll/doc3', map(<dynamic>['key', Int32Value(-1)])),
+    );
+    await _writeMutation(
+      setMutation('coll/doc4', map(<dynamic>['key', Decimal128Value('1.2e3')])),
+    );
+    await _writeMutation(
+      setMutation('coll/doc5', map(<dynamic>['key', Decimal128Value('-0.0')])),
+    );
+    await _writeMutation(
+      setMutation(
+        'coll/doc6',
+        map(<dynamic>['key', BsonTimestamp(1000, 1001)]),
+      ),
+    );
+    await _writeMutation(
+      setMutation(
+        'coll/doc7',
+        map(<dynamic>['key', BsonTimestamp(1000, 1000)]),
+      ),
+    );
+    await _writeMutation(
+      setMutation(
         'coll/doc8',
         map(<dynamic>[
           'key',
-          Blob.bsonBinary(1, Uint8List.fromList(<int>[1, 2, 4]))
-        ])));
-    await _writeMutation(setMutation(
+          Blob.bsonBinary(1, Uint8List.fromList(<int>[1, 2, 4])),
+        ]),
+      ),
+    );
+    await _writeMutation(
+      setMutation(
         'coll/doc9',
         map(<dynamic>[
           'key',
-          Blob.bsonBinary(1, Uint8List.fromList(<int>[1, 2, 3]))
-        ])));
-    await _writeMutation(setMutation('coll/doc10',
-        map(<dynamic>['key', BsonObjectId('507f191e810c19729de860eb')])));
-    await _writeMutation(setMutation('coll/doc11',
-        map(<dynamic>['key', BsonObjectId('507f191e810c19729de860ea')])));
-    await _writeMutation(setMutation(
-        'coll/doc12', map(<dynamic>['key', RegexValue('^bar', 'm')])));
-    await _writeMutation(setMutation(
-        'coll/doc13', map(<dynamic>['key', RegexValue('^bar', 'i')])));
+          Blob.bsonBinary(1, Uint8List.fromList(<int>[1, 2, 3])),
+        ]),
+      ),
+    );
     await _writeMutation(
-        setMutation('coll/doc14', map(<dynamic>['key', MaxKey.instance])));
+      setMutation(
+        'coll/doc10',
+        map(<dynamic>['key', BsonObjectId('507f191e810c19729de860eb')]),
+      ),
+    );
+    await _writeMutation(
+      setMutation(
+        'coll/doc11',
+        map(<dynamic>['key', BsonObjectId('507f191e810c19729de860ea')]),
+      ),
+    );
+    await _writeMutation(
+      setMutation('coll/doc12', map(<dynamic>['key', RegexValue('^bar', 'm')])),
+    );
+    await _writeMutation(
+      setMutation('coll/doc13', map(<dynamic>['key', RegexValue('^bar', 'i')])),
+    );
+    await _writeMutation(
+      setMutation('coll/doc14', map(<dynamic>['key', MaxKey.instance])),
+    );
 
     await _backfillIndexes();
 
@@ -4274,7 +5343,7 @@ class LocalStoreTestCase {
       'coll/doc11': OverlayType.set,
       'coll/doc12': OverlayType.set,
       'coll/doc13': OverlayType.set,
-      'coll/doc14': OverlayType.set
+      'coll/doc14': OverlayType.set,
     });
     _expectQueryReturned(<String>[
       'coll/doc14', // maxKey
@@ -4290,76 +5359,111 @@ class LocalStoreTestCase {
       'coll/doc2', // int32 2
       'coll/doc5', // decimal128 -0.0
       'coll/doc3', // int32 -1
-      'coll/doc1' // minKey
+      'coll/doc1', // minKey
     ]);
   }
 
   @testMethod
   Future<void> testIndexesAllTypesTogether() async {
-    final FieldIndex index = fieldIndex('coll',
-        indexId: 0,
-        indexState: FieldIndex.initialState,
-        fieldsAndKinds: <Object>['key', SegmentKind.ascending]);
+    final FieldIndex index = fieldIndex(
+      'coll',
+      indexId: 0,
+      indexState: FieldIndex.initialState,
+      fieldsAndKinds: <Object>['key', SegmentKind.ascending],
+    );
     await _configureFieldIndexes(<FieldIndex>[index]);
 
     await _writeMutation(setMutation('coll/doc1', map(<dynamic>['key', null])));
     await _writeMutation(
-        setMutation('coll/doc2', map(<dynamic>['key', MinKey.instance])));
+      setMutation('coll/doc2', map(<dynamic>['key', MinKey.instance])),
+    );
     await _writeMutation(setMutation('coll/doc3', map(<dynamic>['key', true])));
     await _writeMutation(
-        setMutation('coll/doc4', map(<dynamic>['key', double.nan])));
+      setMutation('coll/doc4', map(<dynamic>['key', double.nan])),
+    );
     await _writeMutation(
-        setMutation('coll/doc5', map(<dynamic>['key', Int32Value(1)])));
+      setMutation('coll/doc5', map(<dynamic>['key', Int32Value(1)])),
+    );
     await _writeMutation(setMutation('coll/doc6', map(<dynamic>['key', 2.0])));
     await _writeMutation(setMutation('coll/doc7', map(<dynamic>['key', 3])));
-    await _writeMutation(setMutation(
-        'coll/doc8', map(<dynamic>['key', Decimal128Value('1.2e3')])));
-    await _writeMutation(setMutation(
-        'coll/doc9', map(<dynamic>['key', Timestamp(100, 123456000)])));
     await _writeMutation(
-        setMutation('coll/doc10', map(<dynamic>['key', BsonTimestamp(1, 2)])));
+      setMutation('coll/doc8', map(<dynamic>['key', Decimal128Value('1.2e3')])),
+    );
     await _writeMutation(
-        setMutation('coll/doc11', map(<dynamic>['key', 'string'])));
-    await _writeMutation(setMutation(
+      setMutation(
+        'coll/doc9',
+        map(<dynamic>['key', Timestamp(100, 123456000)]),
+      ),
+    );
+    await _writeMutation(
+      setMutation('coll/doc10', map(<dynamic>['key', BsonTimestamp(1, 2)])),
+    );
+    await _writeMutation(
+      setMutation('coll/doc11', map(<dynamic>['key', 'string'])),
+    );
+    await _writeMutation(
+      setMutation(
         'coll/doc12',
         map(<dynamic>[
           'key',
-          blob(<int>[1, 2, 3])
-        ])));
-    await _writeMutation(setMutation(
+          blob(<int>[1, 2, 3]),
+        ]),
+      ),
+    );
+    await _writeMutation(
+      setMutation(
         'coll/doc13',
         map(<dynamic>[
           'key',
-          Blob.bsonBinary(1, Uint8List.fromList(<int>[1, 2, 3]))
-        ])));
+          Blob.bsonBinary(1, Uint8List.fromList(<int>[1, 2, 3])),
+        ]),
+      ),
+    );
     await _writeMutation(
-        setMutation('coll/doc14', map(<dynamic>['key', ref('foo/bar')])));
-    await _writeMutation(setMutation('coll/doc15',
-        map(<dynamic>['key', BsonObjectId('507f191e810c19729de860ea')])));
+      setMutation('coll/doc14', map(<dynamic>['key', ref('foo/bar')])),
+    );
     await _writeMutation(
-        setMutation('coll/doc16', map(<dynamic>['key', GeoPoint(1, 2)])));
-    await _writeMutation(setMutation(
-        'coll/doc17', map(<dynamic>['key', RegexValue('^bar', 'm')])));
-    await _writeMutation(setMutation(
+      setMutation(
+        'coll/doc15',
+        map(<dynamic>['key', BsonObjectId('507f191e810c19729de860ea')]),
+      ),
+    );
+    await _writeMutation(
+      setMutation('coll/doc16', map(<dynamic>['key', GeoPoint(1, 2)])),
+    );
+    await _writeMutation(
+      setMutation('coll/doc17', map(<dynamic>['key', RegexValue('^bar', 'm')])),
+    );
+    await _writeMutation(
+      setMutation(
         'coll/doc18',
         map(<dynamic>[
           'key',
-          <Object?>[2, 'foo']
-        ])));
-    await _writeMutation(setMutation(
+          <Object?>[2, 'foo'],
+        ]),
+      ),
+    );
+    await _writeMutation(
+      setMutation(
         'coll/doc19',
         map(<dynamic>[
           'key',
-          VectorValue(<double>[1, 2, 3])
-        ])));
-    await _writeMutation(setMutation(
+          VectorValue(<double>[1, 2, 3]),
+        ]),
+      ),
+    );
+    await _writeMutation(
+      setMutation(
         'coll/doc20',
         map(<dynamic>[
           'key',
-          map(<dynamic>['bar', 1, 'foo', 2])
-        ])));
+          map(<dynamic>['bar', 1, 'foo', 2]),
+        ]),
+      ),
+    );
     await _writeMutation(
-        setMutation('coll/doc21', map(<dynamic>['key', MaxKey.instance])));
+      setMutation('coll/doc21', map(<dynamic>['key', MaxKey.instance])),
+    );
 
     await _backfillIndexes();
 
@@ -4387,7 +5491,7 @@ class LocalStoreTestCase {
       'coll/doc18': OverlayType.set,
       'coll/doc19': OverlayType.set,
       'coll/doc20': OverlayType.set,
-      'coll/doc21': OverlayType.set
+      'coll/doc21': OverlayType.set,
     });
     _expectQueryReturned(<String>[
       'coll/doc1',
@@ -4410,23 +5514,27 @@ class LocalStoreTestCase {
       'coll/doc18',
       'coll/doc19',
       'coll/doc20',
-      'coll/doc21'
+      'coll/doc21',
     ]);
   }
 
   @testMethod
   Future<void> testIndexesServerTimestamps() async {
-    final FieldIndex index = fieldIndex('coll',
-        indexId: 0,
-        indexState: FieldIndex.initialState,
-        fieldsAndKinds: <Object>['time', SegmentKind.ascending]);
+    final FieldIndex index = fieldIndex(
+      'coll',
+      indexId: 0,
+      indexState: FieldIndex.initialState,
+      fieldsAndKinds: <Object>['time', SegmentKind.ascending],
+    );
     await _configureFieldIndexes(<FieldIndex>[index]);
 
     // PORTING NOTE: the `setMutation` helper of the port does not take sentinels, so the mutation is built the way the
     // public API builds it.
-    await _writeMutation(UserDataConverter(DatabaseId.forProject('project'))
-        .parseSetData(<String, Object?>{'time': FieldValue.serverTimestamp()})
-        .toMutation(key('coll/a'), Precondition.none));
+    await _writeMutation(
+      UserDataConverter(DatabaseId.forProject('project'))
+          .parseSetData(<String, Object?>{'time': FieldValue.serverTimestamp()})
+          .toMutation(key('coll/a'), Precondition.none),
+    );
     await _backfillIndexes();
 
     Query qry = query('coll').orderBy(orderBy('time', 'asc'));
@@ -5241,7 +6349,9 @@ class LocalStoreTestCase {
       FieldTransform(path, ServerTimestampOperation()),
     ];
     final DocumentKey key = DocumentKey.fromPathString('some/object/for/test');
-    await _writeMutation(setMutation(key.path.toString(), map(<Object>['timestamp', 42])));
+    await _writeMutation(
+      setMutation(key.path.toString(), map(<Object>['timestamp', 42])),
+    );
 
     for (int i = 0; i < 1000; ++i) {
       await _writeMutation(

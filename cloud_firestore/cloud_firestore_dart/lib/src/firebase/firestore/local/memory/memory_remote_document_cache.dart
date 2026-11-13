@@ -92,9 +92,10 @@ class MemoryRemoteDocumentCache implements RemoteDocumentCache {
   Future<ImmutableSortedMap<DocumentKey, Document>>
   getAllDocumentsMatchingQuery(
     Query query,
-    IndexOffset offset, [
+    IndexOffset offset, {
+    Set<DocumentKey> mutatedKeys = const <DocumentKey>{},
     QueryContext? context,
-  ]) async {
+  }) async {
     hardAssert(
       !query.isCollectionGroupQuery,
       'CollectionGroup queries should be handled in LocalDocumentsView',
@@ -119,6 +120,11 @@ class MemoryRemoteDocumentCache implements RemoteDocumentCache {
         break;
       }
 
+      if (key.path.length > queryPath.length + 1) {
+        // Exclude entries from subcollections.
+        continue;
+      }
+
       final MaybeDocument maybeDoc = entry.value;
       if (maybeDoc is! Document) {
         continue;
@@ -135,7 +141,7 @@ class MemoryRemoteDocumentCache implements RemoteDocumentCache {
       }
 
       final Document doc = maybeDoc;
-      if (query.matches(doc)) {
+      if (mutatedKeys.contains(doc.key) || query.matches(doc)) {
         result = result.insert(doc.key, doc);
       }
     }

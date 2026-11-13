@@ -64,8 +64,8 @@ class CountingQueryEngine implements QueryEngine {
       overlayTypes[overlay.key] = mutation is PatchMutation
           ? OverlayType.patch
           : mutation is SetMutation
-              ? OverlayType.set
-              : OverlayType.delete;
+          ? OverlayType.set
+          : OverlayType.delete;
     }
   }
 
@@ -88,28 +88,43 @@ class CountingQueryEngine implements QueryEngine {
 
   @override
   void setLocalDocumentsView(LocalDocumentsView localDocuments) {
-    subject.setLocalDocumentsView(LocalDocumentsView(
-      remoteDocumentCache: _CountingRemoteDocumentCache(
-          localDocuments.remoteDocumentCache, this),
-      mutationQueue: _CountingMutationQueue(localDocuments.mutationQueue, this),
-      documentOverlayCache: _CountingDocumentOverlayCache(
-          localDocuments.documentOverlayCache, this),
-      indexManager: localDocuments.indexManager,
-    ));
+    subject.setLocalDocumentsView(
+      LocalDocumentsView(
+        remoteDocumentCache: _CountingRemoteDocumentCache(
+          localDocuments.remoteDocumentCache,
+          this,
+        ),
+        mutationQueue: _CountingMutationQueue(
+          localDocuments.mutationQueue,
+          this,
+        ),
+        documentOverlayCache: _CountingDocumentOverlayCache(
+          localDocuments.documentOverlayCache,
+          this,
+        ),
+        indexManager: localDocuments.indexManager,
+      ),
+    );
   }
 
   @override
   Future<ImmutableSortedMap<DocumentKey, Document>> getDocumentsMatchingQuery(
-      Query query,
-      SnapshotVersion lastLimboFreeSnapshotVersion,
-      ImmutableSortedSet<DocumentKey> remoteKeys) {
+    Query query,
+    SnapshotVersion lastLimboFreeSnapshotVersion,
+    ImmutableSortedSet<DocumentKey> remoteKeys,
+  ) {
     return subject.getDocumentsMatchingQuery(
-        query, lastLimboFreeSnapshotVersion, remoteKeys);
+      query,
+      lastLimboFreeSnapshotVersion,
+      remoteKeys,
+    );
   }
 
   @override
   void handleDocumentChange(
-      MaybeDocument oldDocument, MaybeDocument newDocument) {
+    MaybeDocument oldDocument,
+    MaybeDocument newDocument,
+  ) {
     subject.handleDocumentChange(oldDocument, newDocument);
   }
 }
@@ -144,28 +159,42 @@ class _CountingRemoteDocumentCache implements RemoteDocumentCache {
 
   @override
   Future<Map<DocumentKey, MaybeDocument?>> getAll(
-      Iterable<DocumentKey> documentKeys) async {
-    final Map<DocumentKey, MaybeDocument?> result =
-        await _subject.getAll(documentKeys);
+    Iterable<DocumentKey> documentKeys,
+  ) async {
+    final Map<DocumentKey, MaybeDocument?> result = await _subject.getAll(
+      documentKeys,
+    );
     _counter.documentsReadByKey += result.length;
     return result;
   }
 
   @override
   Future<Map<DocumentKey, ReadDocument>> getAllForCollectionGroup(
-      String collectionGroup, IndexOffset offset, int limit) async {
-    final Map<DocumentKey, ReadDocument> result =
-        await _subject.getAllForCollectionGroup(collectionGroup, offset, limit);
+    String collectionGroup,
+    IndexOffset offset,
+    int limit,
+  ) async {
+    final Map<DocumentKey, ReadDocument> result = await _subject
+        .getAllForCollectionGroup(collectionGroup, offset, limit);
     _counter.documentsReadByQuery += result.length;
     return result;
   }
 
   @override
   Future<ImmutableSortedMap<DocumentKey, Document>>
-      getAllDocumentsMatchingQuery(Query query, IndexOffset offset,
-          [QueryContext? context]) async {
-    final ImmutableSortedMap<DocumentKey, Document> result =
-        await _subject.getAllDocumentsMatchingQuery(query, offset, context);
+  getAllDocumentsMatchingQuery(
+    Query query,
+    IndexOffset offset, {
+    Set<DocumentKey> mutatedKeys = const <DocumentKey>{},
+    QueryContext? context,
+  }) async {
+    final ImmutableSortedMap<DocumentKey, Document> result = await _subject
+        .getAllDocumentsMatchingQuery(
+          query,
+          offset,
+          mutatedKeys: mutatedKeys,
+          context: context,
+        );
     _counter.documentsReadByQuery += result.length;
     return result;
   }
@@ -189,7 +218,8 @@ class _CountingDocumentOverlayCache implements DocumentOverlayCache {
 
   @override
   Future<Map<DocumentKey, Overlay>> getOverlays(
-      Iterable<DocumentKey> keys) async {
+    Iterable<DocumentKey> keys,
+  ) async {
     final Map<DocumentKey, Overlay> result = await _subject.getOverlays(keys);
     _counter.overlaysReadByKey += result.length;
     _counter._recordOverlays(result.values);
@@ -198,8 +228,9 @@ class _CountingDocumentOverlayCache implements DocumentOverlayCache {
 
   @override
   Future<void> saveOverlays(
-          int largestBatchId, Map<DocumentKey, Mutation> overlays) =>
-      _subject.saveOverlays(largestBatchId, overlays);
+    int largestBatchId,
+    Map<DocumentKey, Mutation> overlays,
+  ) => _subject.saveOverlays(largestBatchId, overlays);
 
   @override
   Future<void> removeOverlaysForBatchId(int batchId) =>
@@ -211,9 +242,11 @@ class _CountingDocumentOverlayCache implements DocumentOverlayCache {
 
   @override
   Future<Map<DocumentKey, Overlay>> getOverlaysForCollection(
-      ResourcePath collection, int sinceBatchId) async {
-    final Map<DocumentKey, Overlay> result =
-        await _subject.getOverlaysForCollection(collection, sinceBatchId);
+    ResourcePath collection,
+    int sinceBatchId,
+  ) async {
+    final Map<DocumentKey, Overlay> result = await _subject
+        .getOverlaysForCollection(collection, sinceBatchId);
     _counter.overlaysReadByCollection += result.length;
     _counter._recordOverlays(result.values);
     return result;
@@ -221,7 +254,10 @@ class _CountingDocumentOverlayCache implements DocumentOverlayCache {
 
   @override
   Future<Map<DocumentKey, Overlay>> getOverlaysForCollectionGroup(
-      String collectionGroup, int sinceBatchId, int count) async {
+    String collectionGroup,
+    int sinceBatchId,
+    int count,
+  ) async {
     final Map<DocumentKey, Overlay> result = await _subject
         .getOverlaysForCollectionGroup(collectionGroup, sinceBatchId, count);
     _counter.overlaysReadByCollection += result.length;
@@ -258,9 +294,11 @@ class _CountingMutationQueue implements MutationQueue {
       _subject.setLastStreamToken(streamToken);
 
   @override
-  Future<MutationBatch> addMutationBatch(Timestamp localWriteTime,
-          List<Mutation> baseMutations, List<Mutation> mutations) =>
-      _subject.addMutationBatch(localWriteTime, baseMutations, mutations);
+  Future<MutationBatch> addMutationBatch(
+    Timestamp localWriteTime,
+    List<Mutation> baseMutations,
+    List<Mutation> mutations,
+  ) => _subject.addMutationBatch(localWriteTime, baseMutations, mutations);
 
   @override
   Future<MutationBatch?> lookupMutationBatch(int batchId) =>
@@ -279,27 +317,30 @@ class _CountingMutationQueue implements MutationQueue {
 
   @override
   Future<List<MutationBatch>> getAllMutationBatchesAffectingDocumentKey(
-      DocumentKey documentKey) async {
-    final List<MutationBatch> result =
-        await _subject.getAllMutationBatchesAffectingDocumentKey(documentKey);
+    DocumentKey documentKey,
+  ) async {
+    final List<MutationBatch> result = await _subject
+        .getAllMutationBatchesAffectingDocumentKey(documentKey);
     _counter.mutationsReadByKey += result.length;
     return result;
   }
 
   @override
   Future<List<MutationBatch>> getAllMutationBatchesAffectingDocumentKeys(
-      Iterable<DocumentKey> documentKeys) async {
-    final List<MutationBatch> result =
-        await _subject.getAllMutationBatchesAffectingDocumentKeys(documentKeys);
+    Iterable<DocumentKey> documentKeys,
+  ) async {
+    final List<MutationBatch> result = await _subject
+        .getAllMutationBatchesAffectingDocumentKeys(documentKeys);
     _counter.mutationsReadByKey += result.length;
     return result;
   }
 
   @override
   Future<List<MutationBatch>> getAllMutationBatchesAffectingQuery(
-      Query query) async {
-    final List<MutationBatch> result =
-        await _subject.getAllMutationBatchesAffectingQuery(query);
+    Query query,
+  ) async {
+    final List<MutationBatch> result = await _subject
+        .getAllMutationBatchesAffectingQuery(query);
     _counter.mutationsReadByQuery += result.length;
     return result;
   }

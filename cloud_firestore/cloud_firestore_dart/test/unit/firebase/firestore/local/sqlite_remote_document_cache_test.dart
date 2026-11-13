@@ -17,38 +17,86 @@ void main() {
   setUp(() async {
     print('setUp');
     final SQLitePersistence persistence = await createSQLitePersistence(
-        'firebase/firestore/local/sqlite_remote_document_cache_test-${const Uuid().v4()}.db');
+      'firebase/firestore/local/sqlite_remote_document_cache_test-${const Uuid().v4()}.db',
+    );
     testCase = RemoteDocumentCacheTestCase(persistence)..setUp();
     print('setUpDone');
   });
 
-  tearDown(() => Future<void>.delayed(
-      const Duration(milliseconds: 250), () => testCase.tearDown()));
+  tearDown(
+    () => Future<void>.delayed(
+      const Duration(milliseconds: 250),
+      () => testCase.tearDown(),
+    ),
+  );
 
-  test('testReadDocumentNotInCache',
-      () => testCase.testReadDocumentNotInCache());
+  test(
+    'testReadDocumentNotInCache',
+    () => testCase.testReadDocumentNotInCache(),
+  );
   test('testSetAndReadDocument', () => testCase.testSetAndReadDocument());
-  test('testSetAndReadSeveralDocuments',
-      () => testCase.testSetAndReadSeveralDocuments());
-  test('testReadSeveralDocumentsIncludingMissingDocument',
-      () => testCase.testReadSeveralDocumentsIncludingMissingDocument());
-  test('testSetAndReadLotsOfDocuments',
-      () => testCase.testSetAndReadLotsOfDocuments());
-  test('testSetAndReadDeletedDocument',
-      () => testCase.testSetAndReadDeletedDocument());
+  test(
+    'testSetAndReadSeveralDocuments',
+    () => testCase.testSetAndReadSeveralDocuments(),
+  );
+  test(
+    'testReadSeveralDocumentsIncludingMissingDocument',
+    () => testCase.testReadSeveralDocumentsIncludingMissingDocument(),
+  );
+  test(
+    'testSetAndReadSeveralDocumentsWithOverlappingKeys',
+    () => testCase.testSetAndReadSeveralDocumentsWithOverlappingKeys(),
+  );
+  test(
+    'testSetAndReadSeveralDocumentsWithDeeplyNestedKeys',
+    () => testCase.testSetAndReadSeveralDocumentsWithDeeplyNestedKeys(),
+  );
+  test(
+    'testSetAndReadDeletedDocument',
+    () => testCase.testSetAndReadDeletedDocument(),
+  );
   test('testSetDocumentToNewValue', () => testCase.testSetDocumentToNewValue());
   test('testRemoveDocument', () => testCase.testRemoveDocument());
-  test('testRemoveNonExistentDocument',
-      () => testCase.testRemoveNonExistentDocument());
-  test('testDocumentsMatchingQuery',
-      () => testCase.testDocumentsMatchingQuery());
-  test('testDocumentsMatchingQuerySinceReadTime',
-      () => testCase.testDocumentsMatchingQuerySinceReadTime());
-  test('testDocumentsMatchingUsesReadTimeNotUpdateTime',
-      () => testCase.testDocumentsMatchingUsesReadTimeNotUpdateTime());
+  test(
+    'testRemoveNonExistentDocument',
+    () => testCase.testRemoveNonExistentDocument(),
+  );
+  test('testGetAllFromCollection', () => testCase.testGetAllFromCollection());
+  test(
+    'testGetAllFromExcludesSubcollections',
+    () => testCase.testGetAllFromExcludesSubcollections(),
+  );
+  test(
+    'testGetAllFromSinceReadTimeAndSeconds',
+    () => testCase.testGetAllFromSinceReadTimeAndSeconds(),
+  );
+  test(
+    'testGetAllFromSinceReadTimeAndNanoseconds',
+    () => testCase.testGetAllFromSinceReadTimeAndNanoseconds(),
+  );
+  test(
+    'testGetAllFromSinceReadTimeAndDocumentKey',
+    () => testCase.testGetAllFromSinceReadTimeAndDocumentKey(),
+  );
+  test(
+    'testGetAllFromUsesReadTimeNotUpdateTime',
+    () => testCase.testGetAllFromUsesReadTimeNotUpdateTime(),
+  );
+  test(
+    'testGetMatchingDocsAppliesQueryCheck',
+    () => testCase.testGetMatchingDocsAppliesQueryCheck(),
+  );
+  test(
+    'testGetMatchingDocsRespectsMutatedDocs',
+    () => testCase.testGetMatchingDocsRespectsMutatedDocs(),
+  );
   test('testRemoveAllDocuments', () => testCase.testRemoveAllDocuments());
-  test('testDocumentsMatchingQueryExcludesSubcollections',
-      () => testCase.testDocumentsMatchingQueryExcludesSubcollections());
-  test('testAddingDocumentWithReadTimeOfZeroFails',
-      () => testCase.testAddingDocumentWithReadTimeOfZeroFails());
+  test(
+    'testDocumentsMatchingQueryExcludesSubcollections',
+    () => testCase.testDocumentsMatchingQueryExcludesSubcollections(),
+  );
+  test(
+    'testAddingDocumentWithReadTimeOfZeroFails',
+    () => testCase.testAddingDocumentWithReadTimeOfZeroFails(),
+  );
 }

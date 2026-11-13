@@ -88,12 +88,16 @@ abstract class RemoteDocumentCache {
   /// its read time, or at its read time with a key after its key, are returned. [IndexOffset.none] returns all
   /// documents; `IndexOffset.createSuccessor(version, ...)` the documents read after `version`.
   ///
+  /// [mutatedKeys] are the keys of the documents that have local mutations: they are returned even if their cached
+  /// version does not match the query, because a mutation can make them match.
+  ///
   /// [context] is an optional tracker that records the number of documents the scan went through (SQLite only, as
   /// upstream).
   Future<ImmutableSortedMap<DocumentKey, Document>>
   getAllDocumentsMatchingQuery(
     Query query,
-    IndexOffset offset, [
+    IndexOffset offset, {
+    Set<DocumentKey> mutatedKeys = const <DocumentKey>{},
     QueryContext? context,
-  ]);
+  });
 }

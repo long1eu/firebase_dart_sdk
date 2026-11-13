@@ -422,7 +422,8 @@ class LocalDocumentsView {
         await remoteDocumentCache.getAllDocumentsMatchingQuery(
           overlaysSinceBatch ? Query(query.path) : query,
           offset,
-          context,
+          mutatedKeys: overlays.keys.toSet(),
+          context: context,
         );
     if (overlaysSinceBatch) {
       final List<DocumentKey> withoutOverlay = <DocumentKey>[
@@ -440,8 +441,9 @@ class LocalDocumentsView {
     }
 
     // As documents might match the query because of their overlay we need to include documents for all overlays in
-    // the initial document set. A patch overlay can make a cached document match the query even if the cached version
-    // does not (yet), so those are read from the cache; set and delete overlays do not need a base document.
+    // the initial document set. The remote document cache returned the cached documents with an overlay that were read
+    // after the offset; a patch overlay of a document that is not among them (it was read before the offset or is
+    // cached as deleted) needs its base read by key. Set and delete overlays do not need a base document.
     final List<DocumentKey> missingPatchBases = <DocumentKey>[
       for (Overlay overlay in overlays.values)
         if (overlay.mutation is PatchMutation &&

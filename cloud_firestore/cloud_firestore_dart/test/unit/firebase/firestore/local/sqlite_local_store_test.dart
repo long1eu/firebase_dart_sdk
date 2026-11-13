@@ -28,156 +28,316 @@ void main() {
       statsCollector,
     );
 
-    testCase = LocalStoreTestCase(persistence, statsCollector,
-        garbageCollectorIsEager: false);
+    testCase = LocalStoreTestCase(
+      persistence,
+      statsCollector,
+      garbageCollectorIsEager: false,
+    );
     await testCase.setUp();
     print('setUpDone');
   });
 
-  tearDown(() => Future<void>.delayed(
-      const Duration(milliseconds: 250), () => testCase?.tearDown()));
+  tearDown(
+    () => Future<void>.delayed(
+      const Duration(milliseconds: 250),
+      () => testCase.tearDown(),
+    ),
+  );
 
   test('testMutationBatchKeys', () => testCase.testMutationBatchKeys());
-  test('testAllocatesTheSameTargetForMirrorQueries',
-      () => testCase.testAllocatesTheSameTargetForMirrorQueries());
-  test('testExecutesLimitToLastQueryInTheQueryOrder',
-      () => testCase.testExecutesLimitToLastQueryInTheQueryOrder());
+  test(
+    'testAllocatesTheSameTargetForMirrorQueries',
+    () => testCase.testAllocatesTheSameTargetForMirrorQueries(),
+  );
+  test(
+    'testExecutesLimitToLastQueryInTheQueryOrder',
+    () => testCase.testExecutesLimitToLastQueryInTheQueryOrder(),
+  );
   test('testHandlesSetMutation', () => testCase.testHandlesSetMutation());
-  test('testHandlesSetMutationThenDocument',
-      () => testCase.testHandlesSetMutationThenDocument());
-  test('testHandlesSetMutationThenAckThenRelease',
-      () => testCase.testHandlesSetMutationThenAckThenRelease());
-  test('testHandlesAckThenRejectThenRemoteEvent',
-      () => testCase.testHandlesAckThenRejectThenRemoteEvent());
-  test('testHandlesDeletedDocumentThenSetMutationThenAck',
-      () => testCase.testHandlesDeletedDocumentThenSetMutationThenAck());
-  test('testHandlesSetMutationThenDeletedDocument',
-      () => testCase.testHandlesSetMutationThenDeletedDocument());
-  test('testHandlesDocumentThenSetMutationThenAckThenDocument',
-      () => testCase.testHandlesDocumentThenSetMutationThenAckThenDocument());
-  test('testHandlesPatchWithoutPriorDocument',
-      () => testCase.testHandlesPatchWithoutPriorDocument());
-  test('testHandlesPatchMutationThenDocumentThenAck',
-      () => testCase.testHandlesPatchMutationThenDocumentThenAck());
-  test('testHandlesPatchMutationThenAckThenDocument',
-      () => testCase.testHandlesPatchMutationThenAckThenDocument());
-  test('testHandlesDeleteMutationThenAck',
-      () => testCase.testHandlesDeleteMutationThenAck());
-  test('testHandlesDocumentThenDeleteMutationThenAck',
-      () => testCase.testHandlesDocumentThenDeleteMutationThenAck());
-  test('testHandlesDeleteMutationThenDocumentThenAck',
-      () => testCase.testHandlesDeleteMutationThenDocumentThenAck());
-  test('testHandlesDocumentThenDeletedDocumentThenDocument',
-      () => testCase.testHandlesDocumentThenDeletedDocumentThenDocument());
   test(
-      'testHandlesSetMutationThenPatchMutationThenDocumentThenAckThenAck',
-      () => testCase
-          .testHandlesSetMutationThenPatchMutationThenDocumentThenAckThenAck());
-  test('testHandlesSetMutationAndPatchMutationTogether',
-      () => testCase.testHandlesSetMutationAndPatchMutationTogether());
-  test('testHandlesSetMutationThenPatchMutationThenReject',
-      () => testCase.testHandlesSetMutationThenPatchMutationThenReject());
+    'testHandlesSetMutationThenDocument',
+    () => testCase.testHandlesSetMutationThenDocument(),
+  );
   test(
-      'testHandlesSetMutationsAndPatchMutationOfJustOneTogether',
-      () =>
-          testCase.testHandlesSetMutationsAndPatchMutationOfJustOneTogether());
+    'testHandlesSetMutationThenAckThenRelease',
+    () => testCase.testHandlesSetMutationThenAckThenRelease(),
+  );
   test(
-      'testHandlesDeleteMutationThenPatchMutationThenAckThenAck',
-      () =>
-          testCase.testHandlesDeleteMutationThenPatchMutationThenAckThenAck());
-  test('testCollectsGarbageAfterChangeBatchWithNoTargetIDs',
-      () => testCase.testCollectsGarbageAfterChangeBatchWithNoTargetIDs());
-  test('testCollectsGarbageAfterChangeBatch',
-      () => testCase.testCollectsGarbageAfterChangeBatch());
-  test('testCollectsGarbageAfterAcknowledgedMutation',
-      () => testCase.testCollectsGarbageAfterAcknowledgedMutation());
-  test('testCollectsGarbageAfterRejectedMutation',
-      () => testCase.testCollectsGarbageAfterRejectedMutation());
-  test('testPinsDocumentsInTheLocalView',
-      () => testCase.testPinsDocumentsInTheLocalView());
-  test('testThrowsAwayDocumentsWithUnknownTargetIDsImmediately',
-      () => testCase.testThrowsAwayDocumentsWithUnknownTargetIDsImmediately());
-  test('testCanExecuteDocumentQueries',
-      () => testCase.testCanExecuteDocumentQueries());
-  test('testCanExecuteCollectionQueries',
-      () => testCase.testCanExecuteCollectionQueries());
-  test('testCanExecuteMixedCollectionQueries',
-      () => testCase.testCanExecuteMixedCollectionQueries());
-  test('testReadsAllDocumentsForCollectionQueries',
-      () => testCase.testReadsAllDocumentsForCollectionQueries());
-  test('testWritesOverlaysAndRemovesThemOnAck', () => testCase.testWritesOverlaysAndRemovesThemOnAck());
-  test('testDeviationRejectRemovesOverlayThatNoLongerApplies', () => testCase.testDeviationRejectRemovesOverlayThatNoLongerApplies());
-  test('testDeviationRemoteDeleteRemovesPatchOverlay', () => testCase.testDeviationRemoteDeleteRemovesPatchOverlay());
-  test('testDeviationEmptyMergeKeepsItsOverlay', () => testCase.testDeviationEmptyMergeKeepsItsOverlay());
-  test('testDeviationSetOverlayOfMergeIsRecalculatedWhenDocumentArrives', () => testCase.testDeviationSetOverlayOfMergeIsRecalculatedWhenDocumentArrives());
-  test('testReadsAllDocumentsForInitialCollectionQueries', () => testCase.testReadsAllDocumentsForInitialCollectionQueries());
-  test('testUsesTargetMappingToExecuteQueries', () => testCase.testUsesTargetMappingToExecuteQueries());
-  test('testLastLimboFreeSnapshotIsAdvancedDuringViewProcessing', () => testCase.testLastLimboFreeSnapshotIsAdvancedDuringViewProcessing());
-  test('testQueriesIncludeLocallyModifiedDocuments', () => testCase.testQueriesIncludeLocallyModifiedDocuments());
-  test('testQueriesIncludeDocumentsFromOtherQueries', () => testCase.testQueriesIncludeDocumentsFromOtherQueries());
-  test('testQueriesFilterDocumentsThatNoLongerMatch', () => testCase.testQueriesFilterDocumentsThatNoLongerMatch());
-  test('testQueriesIncludeBundledDocumentsReadAfterTheTargetWasSynced',
-      () => testCase.testQueriesIncludeBundledDocumentsReadAfterTheTargetWasSynced());
-  test('testClearsLastLimboFreeSnapshotOnExistenceFilterMismatch', () => testCase.testClearsLastLimboFreeSnapshotOnExistenceFilterMismatch());
+    'testHandlesAckThenRejectThenRemoteEvent',
+    () => testCase.testHandlesAckThenRejectThenRemoteEvent(),
+  );
+  test(
+    'testHandlesDeletedDocumentThenSetMutationThenAck',
+    () => testCase.testHandlesDeletedDocumentThenSetMutationThenAck(),
+  );
+  test(
+    'testHandlesSetMutationThenDeletedDocument',
+    () => testCase.testHandlesSetMutationThenDeletedDocument(),
+  );
+  test(
+    'testHandlesDocumentThenSetMutationThenAckThenDocument',
+    () => testCase.testHandlesDocumentThenSetMutationThenAckThenDocument(),
+  );
+  test(
+    'testHandlesPatchWithoutPriorDocument',
+    () => testCase.testHandlesPatchWithoutPriorDocument(),
+  );
+  test(
+    'testHandlesPatchMutationThenDocumentThenAck',
+    () => testCase.testHandlesPatchMutationThenDocumentThenAck(),
+  );
+  test(
+    'testHandlesPatchMutationThenAckThenDocument',
+    () => testCase.testHandlesPatchMutationThenAckThenDocument(),
+  );
+  test(
+    'testHandlesDeleteMutationThenAck',
+    () => testCase.testHandlesDeleteMutationThenAck(),
+  );
+  test(
+    'testHandlesDocumentThenDeleteMutationThenAck',
+    () => testCase.testHandlesDocumentThenDeleteMutationThenAck(),
+  );
+  test(
+    'testHandlesDeleteMutationThenDocumentThenAck',
+    () => testCase.testHandlesDeleteMutationThenDocumentThenAck(),
+  );
+  test(
+    'testHandlesDocumentThenDeletedDocumentThenDocument',
+    () => testCase.testHandlesDocumentThenDeletedDocumentThenDocument(),
+  );
+  test(
+    'testHandlesSetMutationThenPatchMutationThenDocumentThenAckThenAck',
+    () => testCase
+        .testHandlesSetMutationThenPatchMutationThenDocumentThenAckThenAck(),
+  );
+  test(
+    'testHandlesSetMutationAndPatchMutationTogether',
+    () => testCase.testHandlesSetMutationAndPatchMutationTogether(),
+  );
+  test(
+    'testHandlesSetMutationThenPatchMutationThenReject',
+    () => testCase.testHandlesSetMutationThenPatchMutationThenReject(),
+  );
+  test(
+    'testHandlesSetMutationsAndPatchMutationOfJustOneTogether',
+    () => testCase.testHandlesSetMutationsAndPatchMutationOfJustOneTogether(),
+  );
+  test(
+    'testHandlesDeleteMutationThenPatchMutationThenAckThenAck',
+    () => testCase.testHandlesDeleteMutationThenPatchMutationThenAckThenAck(),
+  );
+  test(
+    'testCollectsGarbageAfterChangeBatchWithNoTargetIDs',
+    () => testCase.testCollectsGarbageAfterChangeBatchWithNoTargetIDs(),
+  );
+  test(
+    'testCollectsGarbageAfterChangeBatch',
+    () => testCase.testCollectsGarbageAfterChangeBatch(),
+  );
+  test(
+    'testCollectsGarbageAfterAcknowledgedMutation',
+    () => testCase.testCollectsGarbageAfterAcknowledgedMutation(),
+  );
+  test(
+    'testCollectsGarbageAfterRejectedMutation',
+    () => testCase.testCollectsGarbageAfterRejectedMutation(),
+  );
+  test(
+    'testPinsDocumentsInTheLocalView',
+    () => testCase.testPinsDocumentsInTheLocalView(),
+  );
+  test(
+    'testThrowsAwayDocumentsWithUnknownTargetIDsImmediately',
+    () => testCase.testThrowsAwayDocumentsWithUnknownTargetIDsImmediately(),
+  );
+  test(
+    'testCanExecuteDocumentQueries',
+    () => testCase.testCanExecuteDocumentQueries(),
+  );
+  test(
+    'testCanExecuteCollectionQueries',
+    () => testCase.testCanExecuteCollectionQueries(),
+  );
+  test(
+    'testCanExecuteMixedCollectionQueries',
+    () => testCase.testCanExecuteMixedCollectionQueries(),
+  );
+  test(
+    'testReadsAllDocumentsForCollectionQueries',
+    () => testCase.testReadsAllDocumentsForCollectionQueries(),
+  );
+  test(
+    'testWritesOverlaysAndRemovesThemOnAck',
+    () => testCase.testWritesOverlaysAndRemovesThemOnAck(),
+  );
+  test(
+    'testDeviationRejectRemovesOverlayThatNoLongerApplies',
+    () => testCase.testDeviationRejectRemovesOverlayThatNoLongerApplies(),
+  );
+  test(
+    'testDeviationRemoteDeleteRemovesPatchOverlay',
+    () => testCase.testDeviationRemoteDeleteRemovesPatchOverlay(),
+  );
+  test(
+    'testDeviationEmptyMergeKeepsItsOverlay',
+    () => testCase.testDeviationEmptyMergeKeepsItsOverlay(),
+  );
+  test(
+    'testDeviationSetOverlayOfMergeIsRecalculatedWhenDocumentArrives',
+    () => testCase
+        .testDeviationSetOverlayOfMergeIsRecalculatedWhenDocumentArrives(),
+  );
+  test(
+    'testReadsAllDocumentsForInitialCollectionQueries',
+    () => testCase.testReadsAllDocumentsForInitialCollectionQueries(),
+  );
+  test(
+    'testUsesTargetMappingToExecuteQueries',
+    () => testCase.testUsesTargetMappingToExecuteQueries(),
+  );
+  test(
+    'testLastLimboFreeSnapshotIsAdvancedDuringViewProcessing',
+    () => testCase.testLastLimboFreeSnapshotIsAdvancedDuringViewProcessing(),
+  );
+  test(
+    'testQueriesIncludeLocallyModifiedDocuments',
+    () => testCase.testQueriesIncludeLocallyModifiedDocuments(),
+  );
+  test(
+    'testQueriesIncludeDocumentsFromOtherQueries',
+    () => testCase.testQueriesIncludeDocumentsFromOtherQueries(),
+  );
+  test(
+    'testQueriesFilterDocumentsThatNoLongerMatch',
+    () => testCase.testQueriesFilterDocumentsThatNoLongerMatch(),
+  );
+  test(
+    'testQueriesIncludeBundledDocumentsReadAfterTheTargetWasSynced',
+    () => testCase
+        .testQueriesIncludeBundledDocumentsReadAfterTheTargetWasSynced(),
+  );
+  test(
+    'testIgnoresTargetMappingAfterExistenceFilterMismatch',
+    () => testCase.testIgnoresTargetMappingAfterExistenceFilterMismatch(),
+  );
   test('testPersistsResumeTokens', () => testCase.testPersistsResumeTokens());
-  test('testDoesNotReplaceResumeTokenWithEmptyByteString',
-      () => testCase.testDoesNotReplaceResumeTokenWithEmptyByteString());
-  test('testRemoteDocumentKeysForTarget',
-      () => testCase.testRemoteDocumentKeysForTarget());
-  test('testRemoteDocumentKeysForTarget',
-      () => testCase.testRemoteDocumentKeysForTarget());
   test(
-      'testHandlesSetMutationThenTransformMutationThenTransformMutation',
-      () => testCase
-          .testHandlesSetMutationThenTransformMutationThenTransformMutation());
+    'testDoesNotReplaceResumeTokenWithEmptyByteString',
+    () => testCase.testDoesNotReplaceResumeTokenWithEmptyByteString(),
+  );
   test(
-      'testHandlesSetMutationThenAckThenTransformMutationThenAckThenTransformMutation',
-      () => testCase
-          .testHandlesSetMutationThenAckThenTransformMutationThenAckThenTransformMutation());
+    'testRemoteDocumentKeysForTarget',
+    () => testCase.testRemoteDocumentKeysForTarget(),
+  );
   test(
-      'testHandlesSetMutationThenTransformMutationThenRemoteEventThenTransformMutation',
-      () => testCase
-          .testHandlesSetMutationThenTransformMutationThenRemoteEventThenTransformMutation());
-  test('testHandlesSetMutationWithFoldedTransformThenAck',
-      () => testCase.testHandlesSetMutationWithFoldedTransformThenAck());
-  test('testHoldsBackOnlyNonIdempotentTransforms',
-      () => testCase.testHoldsBackOnlyNonIdempotentTransforms());
-  test('testHandlesMergeMutationWithTransformThenRemoteEvent',
-      () => testCase.testHandlesMergeMutationWithTransformThenRemoteEvent());
-  test('testHandlesPatchMutationWithTransformThenRemoteEvent',
-      () => testCase.testHandlesPatchMutationWithTransformThenRemoteEvent());
-  test('testOnlyPersistsUpdatesForDocumentsWhenVersionChanges',
-      () => testCase.testOnlyPersistsUpdatesForDocumentsWhenVersionChanges());
-  test('testRemovesManufacturedNoDocumentsFromTheCache',
-      () => testCase.testRemovesManufacturedNoDocumentsFromTheCache());
-  test('testClearsResumeTokenOnExistenceFilterMismatch',
-      () => testCase.testClearsResumeTokenOnExistenceFilterMismatch());
-  test('testGetHighestUnacknowledgedBatchId',
-      () => testCase.testGetHighestUnacknowledgedBatchId());
+    'testHandlesSetMutationThenTransformThenTransform',
+    () => testCase.testHandlesSetMutationThenTransformThenTransform(),
+  );
+  test(
+    'testHandlesSetMutationThenAckThenTransformThenAckThenTransform',
+    () => testCase
+        .testHandlesSetMutationThenAckThenTransformThenAckThenTransform(),
+  );
+  test(
+    'testHandlesSetMutationThenTransformThenRemoteEventThenTransform',
+    () => testCase
+        .testHandlesSetMutationThenTransformThenRemoteEventThenTransform(),
+  );
+  test(
+    'testHandlesSetMutationWithFoldedTransformThenAck',
+    () => testCase.testHandlesSetMutationWithFoldedTransformThenAck(),
+  );
+  test('testHoldsBackTransforms', () => testCase.testHoldsBackTransforms());
+  test(
+    'testHandlesMergeMutationWithTransformThenRemoteEvent',
+    () => testCase.testHandlesMergeMutationWithTransformThenRemoteEvent(),
+  );
+  test(
+    'testHandlesPatchMutationWithTransformThenRemoteEvent',
+    () => testCase.testHandlesPatchMutationWithTransformThenRemoteEvent(),
+  );
+  test(
+    'testOnlyPersistsUpdatesForDocumentsWhenVersionChanges',
+    () => testCase.testOnlyPersistsUpdatesForDocumentsWhenVersionChanges(),
+  );
+  test(
+    'testRemovesManufacturedNoDocumentsFromTheCache',
+    () => testCase.testRemovesManufacturedNoDocumentsFromTheCache(),
+  );
+  test(
+    'testClearsResumeTokenOnExistenceFilterMismatch',
+    () => testCase.testClearsResumeTokenOnExistenceFilterMismatch(),
+  );
+  test(
+    'testUpdateOnRemoteDocLeadsToUpdateOverlay',
+    () => testCase.testUpdateOnRemoteDocLeadsToUpdateOverlay(),
+  );
+  test(
+    'testAddThenUpdateWhileOffline',
+    () => testCase.testAddThenUpdateWhileOffline(),
+  );
+  test(
+    'testGetHighestUnacknowledgedBatchId',
+    () => testCase.testGetHighestUnacknowledgedBatchId(),
+  );
 
   // The index cases of SQLiteLocalStoreTest of the Android SDK.
   test('testAddsIndexes', () => testCase.testAddsIndexes());
   test('testRemovesIndexes', () => testCase.testRemovesIndexes());
-  test('testDoesNotResetIndexWhenSameIndexIsAdded', () => testCase.testDoesNotResetIndexWhenSameIndexIsAdded());
-  test('testDeletedDocumentRemovesIndex', () => testCase.testDeletedDocumentRemovesIndex());
+  test(
+    'testDoesNotResetIndexWhenSameIndexIsAdded',
+    () => testCase.testDoesNotResetIndexWhenSameIndexIsAdded(),
+  );
+  test(
+    'testDeletedDocumentRemovesIndex',
+    () => testCase.testDeletedDocumentRemovesIndex(),
+  );
   test('testUsesIndexes', () => testCase.testUsesIndexes());
-  test('testUsesPartiallyIndexedRemoteDocumentsWhenAvailable', () => testCase.testUsesPartiallyIndexedRemoteDocumentsWhenAvailable());
-  test('testUsesPartiallyIndexedOverlaysWhenAvailable', () => testCase.testUsesPartiallyIndexedOverlaysWhenAvailable());
-  test('testDoesNotUseLimitWhenIndexIsOutdated', () => testCase.testDoesNotUseLimitWhenIndexIsOutdated());
-  test('testUsesIndexForLimitQueryWhenIndexIsUpdated', () => testCase.testUsesIndexForLimitQueryWhenIndexIsUpdated());
+  test(
+    'testUsesPartiallyIndexedRemoteDocumentsWhenAvailable',
+    () => testCase.testUsesPartiallyIndexedRemoteDocumentsWhenAvailable(),
+  );
+  test(
+    'testUsesPartiallyIndexedOverlaysWhenAvailable',
+    () => testCase.testUsesPartiallyIndexedOverlaysWhenAvailable(),
+  );
+  test(
+    'testDoesNotUseLimitWhenIndexIsOutdated',
+    () => testCase.testDoesNotUseLimitWhenIndexIsOutdated(),
+  );
+  test(
+    'testUsesIndexForLimitQueryWhenIndexIsUpdated',
+    () => testCase.testUsesIndexForLimitQueryWhenIndexIsUpdated(),
+  );
   test('testIndexesVectorValues', () => testCase.testIndexesVectorValues());
   test('testIndexesBsonObjectId', () => testCase.testIndexesBsonObjectId());
   test('testIndexesBsonTimestamp', () => testCase.testIndexesBsonTimestamp());
   test('testIndexesBsonBinary', () => testCase.testIndexesBsonBinary());
   test('testIndexesRegex', () => testCase.testIndexesRegex());
   test('testIndexesInt32', () => testCase.testIndexesInt32());
-  test('testIndexesDecimal128Value', () => testCase.testIndexesDecimal128Value());
-  test('testIndexesDecimal128ValueWithPrecisionLoss', () => testCase.testIndexesDecimal128ValueWithPrecisionLoss());
+  test(
+    'testIndexesDecimal128Value',
+    () => testCase.testIndexesDecimal128Value(),
+  );
+  test(
+    'testIndexesDecimal128ValueWithPrecisionLoss',
+    () => testCase.testIndexesDecimal128ValueWithPrecisionLoss(),
+  );
   test('testIndexesMinKey', () => testCase.testIndexesMinKey());
   test('testIndexesMaxKey', () => testCase.testIndexesMaxKey());
-  test('testIndexesAllBsonTypesTogether', () => testCase.testIndexesAllBsonTypesTogether());
-  test('testIndexesAllTypesTogether', () => testCase.testIndexesAllTypesTogether());
-  test('testIndexesServerTimestamps', () => testCase.testIndexesServerTimestamps());
+  test(
+    'testIndexesAllBsonTypesTogether',
+    () => testCase.testIndexesAllBsonTypesTogether(),
+  );
+  test(
+    'testIndexesAllTypesTogether',
+    () => testCase.testIndexesAllTypesTogether(),
+  );
+  test(
+    'testIndexesServerTimestamps',
+    () => testCase.testIndexesServerTimestamps(),
+  );
 
   // The BSON cases of local_store_indexeddb.test.ts of the JS SDK, which query differently from Android's.
   test('testJsIndexesBSONObjectIdFields', () => testCase.testJsIndexesBSONObjectIdFields());
@@ -193,15 +353,49 @@ void main() {
 
   // The automatic index creation cases of SQLiteLocalStoreTest of the Android SDK.
   test('testCanAutoCreateIndexes', () => testCase.testCanAutoCreateIndexes());
-  test('testCanAutoCreateIndexesWorksWithOrQuery', () => testCase.testCanAutoCreateIndexesWorksWithOrQuery());
-  test('testDoesNotAutoCreateIndexesForSmallCollections', () => testCase.testDoesNotAutoCreateIndexesForSmallCollections());
-  test('testDoesNotAutoCreateIndexesWhenIndexLookUpIsExpensive', () => testCase.testDoesNotAutoCreateIndexesWhenIndexLookUpIsExpensive());
-  test('testIndexAutoCreationWorksWhenBackfillerRunsHalfway', () => testCase.testIndexAutoCreationWorksWhenBackfillerRunsHalfway());
-  test('testIndexCreatedByIndexAutoCreationExistsAfterTurnOffAutoCreation', () => testCase.testIndexCreatedByIndexAutoCreationExistsAfterTurnOffAutoCreation());
-  test('testDisableIndexAutoCreationWorks', () => testCase.testDisableIndexAutoCreationWorks());
-  test('testDeleteAllIndexesWorksWithIndexAutoCreation', () => testCase.testDeleteAllIndexesWorksWithIndexAutoCreation());
-  test('testDeleteAllIndexesWorksWithManualAddedIndexes', () => testCase.testDeleteAllIndexesWorksWithManualAddedIndexes());
-  test('testIndexAutoCreationWorksWithMutation', () => testCase.testIndexAutoCreationWorksWithMutation());
-  test('testIndexAutoCreationDoesnotWorkWithMultipleInequality', () => testCase.testIndexAutoCreationDoesnotWorkWithMultipleInequality());
-  test('testDeeplyNestedServerTimestamps', () => testCase.testDeeplyNestedServerTimestamps());
+  test(
+    'testCanAutoCreateIndexesWorksWithOrQuery',
+    () => testCase.testCanAutoCreateIndexesWorksWithOrQuery(),
+  );
+  test(
+    'testDoesNotAutoCreateIndexesForSmallCollections',
+    () => testCase.testDoesNotAutoCreateIndexesForSmallCollections(),
+  );
+  test(
+    'testDoesNotAutoCreateIndexesWhenIndexLookUpIsExpensive',
+    () => testCase.testDoesNotAutoCreateIndexesWhenIndexLookUpIsExpensive(),
+  );
+  test(
+    'testIndexAutoCreationWorksWhenBackfillerRunsHalfway',
+    () => testCase.testIndexAutoCreationWorksWhenBackfillerRunsHalfway(),
+  );
+  test(
+    'testIndexCreatedByIndexAutoCreationExistsAfterTurnOffAutoCreation',
+    () => testCase
+        .testIndexCreatedByIndexAutoCreationExistsAfterTurnOffAutoCreation(),
+  );
+  test(
+    'testDisableIndexAutoCreationWorks',
+    () => testCase.testDisableIndexAutoCreationWorks(),
+  );
+  test(
+    'testDeleteAllIndexesWorksWithIndexAutoCreation',
+    () => testCase.testDeleteAllIndexesWorksWithIndexAutoCreation(),
+  );
+  test(
+    'testDeleteAllIndexesWorksWithManualAddedIndexes',
+    () => testCase.testDeleteAllIndexesWorksWithManualAddedIndexes(),
+  );
+  test(
+    'testIndexAutoCreationWorksWithMutation',
+    () => testCase.testIndexAutoCreationWorksWithMutation(),
+  );
+  test(
+    'testIndexAutoCreationDoesnotWorkWithMultipleInequality',
+    () => testCase.testIndexAutoCreationDoesnotWorkWithMultipleInequality(),
+  );
+  test(
+    'testDeeplyNestedServerTimestamps',
+    () => testCase.testDeeplyNestedServerTimestamps(),
+  );
 }
