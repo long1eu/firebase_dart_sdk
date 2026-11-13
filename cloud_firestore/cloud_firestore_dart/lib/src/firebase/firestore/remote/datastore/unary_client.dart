@@ -32,6 +32,7 @@ Datastore newUnaryDatastore(
     databaseId: databaseInfo.databaseId,
     credentialsProvider: credentialsProvider,
     appCheckProvider: appCheckProvider,
+    apiKey: databaseInfo.apiKey,
   );
   return Datastore.test(
     scheduler,

@@ -8,6 +8,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/auth/empty_credentia
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/mutation.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/remote/datastore/datastore.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/timer_task.dart';
+import 'package:grpc/grpc.dart' show GrpcError;
 import 'package:test/test.dart';
 
 import '../../../../util/integration_test_util.dart';
@@ -107,8 +108,10 @@ void main() {
         expect(writeStream.lastStreamToken, isEmpty);
 
         // Writing before the handshake should throw
-        expect(() => writeStream.writeMutations(mutations),
-            throwsA(isA<AssertionError>()));
+        expect(
+          () => writeStream.writeMutations(mutations),
+          throwsA(isA<AssertionError>()),
+        );
 
         // Handshake should always be called
         writeStream.writeHandshake();
@@ -172,8 +175,10 @@ void main() {
     final WriteStream writeStream = await createAndOpenWriteStream(scheduler);
 
     // Subscribed before the stream stops, awaited so that the expectation is checked before the test ends.
-    final Future<void> closed =
-        expectLater(writeStream, emits(isA<CloseEvent>()));
+    final Future<void> closed = expectLater(
+      writeStream,
+      emits(isA<CloseEvent>()),
+    );
     await writeStream.stop();
     await closed;
   });
@@ -209,6 +214,69 @@ void main() {
       ..markIdle();
 
     expect(scheduler.getTask(TaskId.writeStreamIdle), isNotNull);
+  });
+
+  /// Starts [writeStream] (after its backoff when it failed before) and waits
+  /// until its handshake completed.
+  Future<void> restartWriteStream(WriteStream writeStream) async {
+    final Future<StreamEvent> opened = writeStream.firstWhere(
+      (StreamEvent event) => event is OpenEvent,
+    );
+    await writeStream.start();
+    await opened;
+    final Future<StreamEvent> handshake = writeStream.firstWhere(
+      (StreamEvent event) => event is HandshakeCompleteEvent,
+    );
+    writeStream.writeHandshake();
+    await handshake;
+  }
+
+  test('testStreamRefreshesTokenUponExpiration', () async {
+    final TaskScheduler scheduler = TaskScheduler('');
+    final MockCredentialsProvider credentials = MockCredentialsProvider();
+    final Datastore datastore = Datastore(
+      scheduler,
+      IntegrationTestUtil.testEnvDatabaseInfo(),
+      credentials,
+    );
+    addTearDown(datastore.shutdown);
+    final WriteStream writeStream = datastore.writeStream;
+    await restartWriteStream(writeStream);
+
+    // A server close with UNAUTHENTICATED: the token is invalidated.
+    await writeStream.handleServerClose(const GrpcError.unauthenticated());
+    await restartWriteStream(writeStream);
+
+    // Another error: the token is not invalidated.
+    await writeStream.handleServerClose(const GrpcError.unavailable());
+    await restartWriteStream(writeStream);
+
+    expect(credentials.states, <String>[
+      'getToken',
+      'invalidateToken',
+      'getToken',
+      'getToken',
+    ]);
+    await writeStream.stop();
+  });
+
+  test('testTokenIsNotInvalidatedOnceStreamIsHealthy', () async {
+    final TaskScheduler scheduler = TaskScheduler('');
+    final MockCredentialsProvider credentials = MockCredentialsProvider();
+    final Datastore datastore = Datastore(
+      scheduler,
+      IntegrationTestUtil.testEnvDatabaseInfo(),
+      credentials,
+    );
+    addTearDown(datastore.shutdown);
+    final WriteStream writeStream = datastore.writeStream;
+    await restartWriteStream(writeStream);
+    scheduler.runUntil(TaskId.writeStreamHealthCheck);
+
+    // A server close with UNAUTHENTICATED after the stream became healthy:
+    // the token is kept.
+    await writeStream.handleServerClose(const GrpcError.unauthenticated());
+    expect(credentials.states, <String>['getToken']);
   });
 }
 

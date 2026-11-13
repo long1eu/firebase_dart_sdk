@@ -14,19 +14,29 @@ abstract class BaseStream<
     TaskScheduler scheduler,
     TaskId idleTaskId,
     TaskId connectionTaskId,
+    TaskId healthTaskId,
   ) : _backoff = ExponentialBackoff(scheduler, connectionTaskId),
       _eventsController = eventsController,
       _scheduler = scheduler,
       _idleTimerId = idleTaskId,
+      _healthTimerId = healthTaskId,
       super(eventsController.stream);
 
   final ExponentialBackoff _backoff;
   final StreamController<StreamEvent> _eventsController;
   final TaskScheduler _scheduler;
   final TaskId _idleTimerId;
+  final TaskId _healthTimerId;
 
   State _state = State.initial;
   TimerTask? _idleTimer;
+
+  /// Marks the stream [State.healthy] once it has been open for
+  /// [healthyTimeout].
+  TimerTask? _healthCheck;
+
+  /// The client of the calls of this stream.
+  FirestoreClient get _client;
 
   ResponseStream<Res>? _writeResponse;
   StreamSubscription<Res>? _responseSub;
@@ -40,11 +50,9 @@ abstract class BaseStream<
   Future<void>? _closeFuture;
 
   bool get isStarted =>
-      _state == State.starting ||
-      _state == State.open ||
-      _state == State.backoff;
+      _state == State.starting || isOpen || _state == State.backoff;
 
-  bool get isOpen => _state == State.open;
+  bool get isOpen => _state == State.open || _state == State.healthy;
 
   @mustCallSuper
   Future<void> start() async {
@@ -95,6 +103,15 @@ abstract class BaseStream<
     // the error. It is reported through the response stream instead.
     unawaited(writeResponse.headers.then(_onHeaders, onError: (Object _) {}));
     _changeState(State.open);
+
+    // Mark this stream as healthy if it's still open after 10 seconds: a
+    // rejected token is only invalidated before that, see [_close].
+    _healthCheck ??= _scheduler.add(_healthTimerId, healthyTimeout, () {
+      _healthCheck = null;
+      if (isOpen) {
+        _state = State.healthy;
+      }
+    });
   }
 
   Future<void> stop() async {
@@ -278,10 +295,12 @@ abstract class BaseStream<
       tearDown();
     }
 
+    final bool wasHealthy = _state == State.healthy;
     _changeState(State.closing);
 
     // Cancel any outstanding timers (they're guaranteed not to execute).
     _cancelIdleCheck();
+    _cancelHealthCheck();
     _backoff.cancel();
 
     final int code = grpcError.code;
@@ -295,13 +314,19 @@ abstract class BaseStream<
         '($hashCode) Using maximum backoff delay to prevent overloading the backend.',
       );
       _backoff.resetToMax();
-    } else if (code == StatusCode.unauthenticated) {
-      // 'unauthenticated' error means the token was rejected. Force refreshing
-      // was done by the FirestoreClient
+    } else if (code == StatusCode.unauthenticated && !wasHealthy) {
+      // "unauthenticated" means the token was rejected. This should rarely
+      // happen since both Auth and App Check ensure a sufficient TTL when we
+      // request a token. If a user manually resets their system clock this can
+      // fail, however. In this case, we should get an UNAUTHENTICATED error
+      // before we received the first message and we need to invalidate the
+      // token to ensure that we fetch a new token. A stream that was healthy
+      // keeps its token, as upstream.
       Log.d(
         '$runtimeType',
-        '($hashCode) Unauthenticated trying to refresh the token.',
+        '($hashCode) Unauthenticated, invalidating the token.',
       );
+      _client.invalidateToken();
     }
 
     if (grpcError.code == StatusCode.ok) {
@@ -358,6 +383,11 @@ abstract class BaseStream<
     _idleTimer = null;
   }
 
+  void _cancelHealthCheck() {
+    _healthCheck?.cancel();
+    _healthCheck = null;
+  }
+
   /// Called by the idle timer when the stream should close due to inactivity.
   Future<void> _handleIdleCloseTimer() async {
     if (isOpen) {
@@ -378,9 +408,14 @@ abstract class BaseStream<
   /// The time a stream stays open after it is marked idle (one minute, as on
   /// Android).
   static const Duration idleTimeout = Duration(minutes: 1);
+
+  /// The time a stream stays open until it is considered healthy (10 seconds,
+  /// as on Android and in the JS SDK).
+  static const Duration healthyTimeout = Duration(seconds: 10);
 }
 
-enum State { initial, starting, open, error, backoff, closing }
+/// The states of a stream. [healthy] is [open] for 10 seconds or more.
+enum State { initial, starting, open, healthy, error, backoff, closing }
 
 abstract class StreamEvent {
   const StreamEvent();

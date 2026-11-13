@@ -11,7 +11,15 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/util/grpc_status.dar
 
 /// Calls the REST endpoints of the Firestore service.
 class RestClient {
-  RestClient(this._http, this._baseUrl, {this.timeout = defaultTimeout});
+  RestClient(
+    this._http,
+    this._baseUrl, {
+    this.timeout = defaultTimeout,
+    this.apiKey,
+  });
+
+  /// Sent as the `key` query parameter of every call, as the JS SDK does.
+  final String? apiKey;
 
   /// The time a call may take, as in the JS SDK (`XHR_TIMEOUT_SECS`).
   static const Duration defaultTimeout = Duration(seconds: 15);
@@ -72,7 +80,11 @@ class RestClient {
       }
     }
     final String path = segments.map(Uri.encodeComponent).join('/');
-    return Uri.parse('$_baseUrl/v1/$path:${_verbs[rpcName]}');
+    final String? key = apiKey;
+    final String query = key == null || key.isEmpty
+        ? ''
+        : '?key=${Uri.encodeQueryComponent(key)}';
+    return Uri.parse('$_baseUrl/v1/$path:${_verbs[rpcName]}$query');
   }
 
   /// Sends [request] (proto3 JSON) and returns the responses (proto3 JSON):

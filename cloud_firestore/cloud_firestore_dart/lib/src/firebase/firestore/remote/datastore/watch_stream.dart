@@ -30,8 +30,10 @@ class WatchStream
         scheduler,
         TaskId.listenStreamIdle,
         TaskId.listenStreamConnectionBackoff,
+        TaskId.listenStreamHealthCheck,
       );
 
+  @override
   final FirestoreClient _client;
   final RemoteSerializer _serializer;
 

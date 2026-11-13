@@ -29,7 +29,12 @@ class RestTransport implements FirestoreTransport {
            '${databaseInfo.sslEnabled ? 'https' : 'http'}://'
            '${databaseInfo.host}:${databaseInfo.port}' {
     checkProto3JsonNames();
-    _rest = RestClient(_http, _baseUrl, timeout: timeout);
+    _rest = RestClient(
+      _http,
+      _baseUrl,
+      timeout: timeout,
+      apiKey: _options.apiKey,
+    );
   }
 
   /// Proto3 JSON is built from the field and enum names of the generated
@@ -109,6 +114,8 @@ class RestTransport implements FirestoreTransport {
     for (final MetadataProvider provider in merged.metadataProviders) {
       await provider(headers, _baseUrl);
     }
+    // The API key goes in the URL instead, as in the JS SDK (Lite).
+    headers.remove(ChannelOptionsProvider.apiKeyHeader);
     return headers;
   }
 

@@ -29,8 +29,10 @@ class WriteStream extends BaseStream<proto.WriteRequest, proto.WriteResponse> {
         scheduler,
         TaskId.writeStreamIdle,
         TaskId.writeStreamConnectionBackoff,
+        TaskId.writeStreamHealthCheck,
       );
 
+  @override
   final FirestoreClient _client;
   final RemoteSerializer _serializer;
 

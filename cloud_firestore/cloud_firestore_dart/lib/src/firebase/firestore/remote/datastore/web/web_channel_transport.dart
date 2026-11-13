@@ -37,7 +37,12 @@ class WebChannelTransport implements FirestoreTransport {
            'projects/${databaseInfo.databaseId.projectId}'
            '/databases/${databaseInfo.databaseId.databaseId}' {
     checkProto3JsonNames();
-    _rest = RestClient(_http, _baseUrl, timeout: unaryTimeout);
+    _rest = RestClient(
+      _http,
+      _baseUrl,
+      timeout: unaryTimeout,
+      apiKey: _options.apiKey,
+    );
   }
 
   final bool _forceLongPolling;

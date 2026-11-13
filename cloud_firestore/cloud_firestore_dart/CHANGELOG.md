@@ -1,3 +1,14 @@
+## Unreleased
+
+- A listen or write stream that the backend closes with UNAUTHENTICATED invalidates the token
+  only if it has been open for less than 10 seconds, as in the Android and JS SDKs; a stream that
+  was healthy keeps it. Before, every UNAUTHENTICATED of a stream invalidated the token (unary
+  calls still do, as upstream).
+- The API key of the app (`FirebaseOptions.apiKey`) is sent with every request, as the JS SDK
+  does: the `x-goog-api-key` header over gRPC and WebChannel, and the `key` query parameter of a
+  REST call (Firestore Lite on the web sends only the parameter). Requests used to carry no API key,
+  so API key restrictions of the project did not apply to them. The Android SDK sends none.
+
 ## 0.1.0
 
 First release under the new name. This package was published as `cloud_firestore_vm` (last

@@ -17,6 +17,7 @@ class DatabaseInfo {
     this.forceLongPolling = false,
     this.autoDetectLongPolling = true,
     this.grpcFlowControlWindow = FirestoreSettings.defaultGrpcFlowControlWindow,
+    this.apiKey,
   });
 
   final DatabaseId databaseId;
@@ -34,6 +35,11 @@ class DatabaseInfo {
 
   /// gRPC transport only: the HTTP/2 flow-control window, in bytes.
   final int grpcFlowControlWindow;
+
+  /// The API key of the app (`FirebaseOptions.apiKey`), sent with every
+  /// request as the JS SDK does: in the `x-goog-api-key` header, and as the
+  /// `key` query parameter of a REST call. Null (or empty) sends none.
+  final String? apiKey;
 
   @override
   String toString() {

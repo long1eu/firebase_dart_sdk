@@ -183,6 +183,12 @@ class TaskId implements Comparable<TaskId> {
   /// `TimerId.AsyncQueueRetry`), see [RetryableOperationQueue].
   static const TaskId asyncQueueRetry = TaskId._(10);
 
+  /// Timers that mark a listen (write) stream healthy once it has been open
+  /// for 10 seconds (the Android `TimerId.HEALTH_CHECK_TIMEOUT`, one per stream
+  /// here because a scheduler runs one task per id).
+  static const TaskId listenStreamHealthCheck = TaskId._(11);
+  static const TaskId writeStreamHealthCheck = TaskId._(12);
+
   @override
   int compareTo(TaskId other) => _i.compareTo(other._i);
 
@@ -214,6 +220,8 @@ class TaskId implements Comparable<TaskId> {
     'indexBackfill',
     'clientMetadataRefresh',
     'asyncQueueRetry',
+    'listenStreamHealthCheck',
+    'writeStreamHealthCheck',
   ];
 
   @override

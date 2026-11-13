@@ -4,8 +4,9 @@
 
 part of 'datastore.dart';
 
-/// Helper class that wraps the gRPC calls and invalidates the auth token when [StatusCode.unauthenticated] is received
-/// for both the [Future]s and the [Stream]s.
+/// Helper class that wraps the gRPC calls and invalidates the auth token when a unary call fails with
+/// [StatusCode.unauthenticated]. The listen and write streams invalidate it themselves, only while they are not
+/// healthy (see [BaseStream]), as upstream does.
 class FirestoreClient {
   @visibleForTesting
   FirestoreClient(
@@ -141,7 +142,10 @@ class FirestoreClient {
       FirestoreRpc.listen,
       request,
     );
-    return ResponseStream<proto.ListenResponse>(call, _buildStream(call));
+    return ResponseStream<proto.ListenResponse>(
+      call,
+      _buildStream(call, invalidateToken: false),
+    );
   }
 
   /// Streams batches of document updates and deletes, in order.
@@ -152,7 +156,10 @@ class FirestoreClient {
       FirestoreRpc.write,
       request,
     );
-    return ResponseStream<proto.WriteResponse>(call, _buildStream(call));
+    return ResponseStream<proto.WriteResponse>(
+      call,
+      _buildStream(call, invalidateToken: false),
+    );
   }
 
   /// Terminates this connection.
@@ -163,12 +170,17 @@ class FirestoreClient {
     return _transport.shutdown();
   }
 
-  Stream<R> _buildStream<R>(Stream<R> response) {
+  /// Invalidates the token of the credentials and App Check providers, so that
+  /// the next call gets a fresh one.
+  void invalidateToken() => _optionsProvider.invalidateToken();
+
+  Stream<R> _buildStream<R>(Stream<R> response, {bool invalidateToken = true}) {
     return response
         .transform(
           DoStreamTransformer<R>(
             onError: (Object error, StackTrace stackTrace) {
-              if (error is GrpcError &&
+              if (invalidateToken &&
+                  error is GrpcError &&
                   error.code == StatusCode.unauthenticated) {
                 Log.d(
                   'FirestoreClient',

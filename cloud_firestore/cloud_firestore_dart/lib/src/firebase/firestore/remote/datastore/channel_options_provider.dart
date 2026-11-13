@@ -4,6 +4,7 @@
 
 import 'package:cloud_firestore_dart/src/firebase/firestore/auth/app_check_token_provider.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/auth/credentials_provider.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/core/database_info.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/version.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/database_id.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/platform_info.dart';
@@ -17,13 +18,25 @@ class ChannelOptionsProvider {
     required DatabaseId databaseId,
     required CredentialsProvider credentialsProvider,
     AppCheckTokenProvider? appCheckProvider,
+    String? apiKey,
   }) : _databaseId = databaseId,
        _credentialsProvider = credentialsProvider,
-       _appCheckProvider = appCheckProvider;
+       _appCheckProvider = appCheckProvider,
+       _apiKey = apiKey;
+
+  /// The header of the API key of the app, see [DatabaseInfo.apiKey].
+  static const String apiKeyHeader = 'x-goog-api-key';
 
   final DatabaseId _databaseId;
   final CredentialsProvider _credentialsProvider;
   final AppCheckTokenProvider? _appCheckProvider;
+  final String? _apiKey;
+
+  /// The API key sent with the requests, or null.
+  String? get apiKey {
+    final String? key = _apiKey;
+    return key == null || key.isEmpty ? null : key;
+  }
 
   CallOptions get callOptions {
     return CallOptions(
@@ -37,6 +50,11 @@ class ChannelOptionsProvider {
           // #3498).
           map['google-cloud-resource-prefix'] = _resourcePrefix;
           map['x-goog-request-params'] = _resourcePrefix;
+          // As the JS SDK (the Android SDK sends no API key).
+          final String? key = apiKey;
+          if (key != null) {
+            map[apiKeyHeader] = key;
+          }
         },
       ],
     );
