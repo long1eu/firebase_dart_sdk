@@ -97,7 +97,9 @@ watch events and expected snapshots. `spec/spec_skip_list.dart` names every spec
 run and why (for example multi-client specs). One skip there is a limit of the test harness,
 not of the library: the runner lets the event loop settle after every step, so a timer with no
 delay that the JS runner would still see pending has run (the recovery spec "Multiple user
-changes during transaction failure"). The mock watch stream
+changes during transaction failure"). A `TaskScheduler` created with
+`manualTasks: {TaskId.asyncQueueRetry}` holds such retries back until `runTimer`, which makes
+that spec pass; the runner does not use it yet. The mock watch stream
 (`test/unit/firebase/firestore/remote/mock_datastore.dart`) goes through a backoff timer
 (`TaskId.listenStreamConnectionBackoff`) after an error, as the JS mock connection does; the
 runner fires it on `watchStreamClose` with `runBackoffTimer: true` and before a listen, and

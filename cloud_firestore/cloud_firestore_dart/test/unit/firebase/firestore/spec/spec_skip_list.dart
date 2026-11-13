@@ -82,7 +82,9 @@ const Map<String, String> knownSpecDivergences = <String, String>{
       'Harness timing, not the library: after a retried operation succeeds, the next one is scheduled with the reset '
       'backoff, a zero delay (as JS). The JS runner validates a step before such a timer fires; this runner lets the '
       'event loop settle after every step, which runs it, so both user changes surface in the first runTimer step. '
-      'The library behaviour (both changes applied in order after the recovery) is the JS one. See '
+      'The library behaviour (both changes applied in order after the recovery) is the JS one. Fix (verified on '
+      'memory and SQLite, no other spec affected): create the TaskScheduler of SpecClient._initClient with '
+      'manualTasks: {TaskId.asyncQueueRetry}, so that retries only run on runTimer, and remove this entry. See '
       'docs/ARCHITECTURE.md, "Tests".',
   'Writes: Writes are held during primary failover':
       'The SQLite primary lease (stage 1) notices that another client took the lease at the first transaction after '

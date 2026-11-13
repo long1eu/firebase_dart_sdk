@@ -14,11 +14,13 @@ import 'package:test/test.dart';
 /// recoverable persistence error is retried with a backoff and holds back the ones after it.
 void main() {
   late TaskScheduler scheduler;
+  late SerialQueue serial;
   late RetryableOperationQueue queue;
 
   setUp(() {
     scheduler = TaskScheduler('retry-test');
-    queue = RetryableOperationQueue(scheduler, SerialQueue());
+    serial = SerialQueue();
+    queue = RetryableOperationQueue(scheduler, serial);
   });
 
   tearDown(() => queue.stop());
@@ -156,5 +158,130 @@ void main() {
       throwsStateError,
     );
     expect(queue.hasPendingOperations, isFalse);
+  });
+
+  // The tests of `enqueueRetryable` in the JS SDK (packages/firestore/test/unit/util/async_queue.test.ts). The JS
+  // `enqueueAndForget` / `enqueue` are runs on the [SerialQueue] the retryable operations share.
+  group('JS async_queue.test.ts', () {
+    TransientDatabaseException simulatedError() => TransientDatabaseException(
+      'Simulated error',
+      'Simulated retryable error',
+    );
+
+    test('Retries retryable operations', () async {
+      final List<int> completedSteps = <int>[];
+      await queue.enqueue(() async {
+        completedSteps.add(1);
+        if (completedSteps.length == 1) {
+          throw simulatedError();
+        }
+      });
+      await runRetry();
+      expect(completedSteps, <int>[1, 1]);
+    });
+
+    test("Doesn't retry internal exceptions", () async {
+      // PORTING NOTE: the JS queue fails for good (every later operation is rejected with the error). Here the
+      // operation is dropped, its caller gets the error, and nothing is retried.
+      int attempts = 0;
+      await expectLater(
+        queue.enqueue(() async {
+          attempts++;
+          throw StateError('Simulated test failure');
+        }),
+        throwsStateError,
+      );
+      expect(scheduler.getTask(TaskId.asyncQueueRetry), isNull);
+      await serial.run<void>(() async {});
+      expect(attempts, 1);
+    });
+
+    test('Schedules first retryable attempt with no delay', () async {
+      final List<int> completedSteps = <int>[];
+      final Future<void> done = queue.enqueue(
+        () async => completedSteps.add(1),
+      );
+      expect(scheduler.getTask(TaskId.asyncQueueRetry), isNull);
+      await done;
+      expect(completedSteps, <int>[1]);
+      expect(scheduler.getTask(TaskId.asyncQueueRetry), isNull);
+    });
+
+    test('Retries retryable operations with backoff', () async {
+      final List<int> completedSteps = <int>[];
+      await queue.enqueue(() async {
+        completedSteps.add(1);
+        if (completedSteps.length == 1) {
+          throw simulatedError();
+        }
+      });
+
+      // Verify that only one attempt has been made: the retry waits for its timer.
+      expect(completedSteps, <int>[1]);
+      expect(scheduler.getTask(TaskId.asyncQueueRetry), isNotNull);
+
+      // Fast forward all operations.
+      await runRetry();
+      expect(completedSteps, <int>[1, 1]);
+    });
+
+    test('Retries retryable operations in order', () async {
+      final List<int> completedSteps = <int>[];
+      final Completer<void> blocking = Completer<void>();
+
+      unawaited(
+        queue.enqueue(() async {
+          completedSteps.add(1);
+          if (completedSteps.length == 1) {
+            throw simulatedError();
+          }
+        }),
+      );
+      unawaited(
+        queue.enqueue(() async {
+          completedSteps.add(2);
+          blocking.complete();
+        }),
+      );
+
+      await blocking.future;
+      expect(completedSteps, <int>[1, 1, 2]);
+    });
+
+    test('Does not delay retryable operations that succeed', () async {
+      final List<int> completedSteps = <int>[];
+      unawaited(queue.enqueue(() async => completedSteps.add(1)));
+      unawaited(serial.run<void>(() async => completedSteps.add(2)));
+      await serial.run<void>(() async => completedSteps.add(3));
+      expect(completedSteps, <int>[1, 2, 3]);
+    });
+
+    test('Catches up when retryable operation fails', () async {
+      final List<int> completedSteps = <int>[];
+      final Completer<void> blocking = Completer<void>();
+
+      unawaited(
+        queue.enqueue(() async {
+          completedSteps.add(1);
+          if (completedSteps.length == 1) {
+            throw simulatedError();
+          }
+        }),
+      );
+      unawaited(serial.run<void>(() async => completedSteps.add(2)));
+      unawaited(
+        queue.enqueue(() async {
+          completedSteps.add(3);
+          blocking.complete();
+        }),
+      );
+      await blocking.future;
+
+      // Once all existing retryable operations succeeded, they are scheduled in the order they are enqueued.
+      unawaited(serial.run<void>(() async => completedSteps.add(4)));
+      await serial.run<void>(() async => completedSteps.add(5));
+
+      expect(completedSteps, <int>[1, 2, 1, 3, 4, 5]);
+    });
   });
 }

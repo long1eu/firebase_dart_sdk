@@ -69,6 +69,49 @@ void main() {
     },
   );
 
+  test(
+    'a lock held at COMMIT is transient and the transaction can be rolled back',
+    () async {
+      await database.execute('BEGIN IMMEDIATE');
+      await database.execute('INSERT INTO t VALUES (1)');
+      // Another connection reads: in rollback journal mode the COMMIT needs the exclusive lock and is busy.
+      other.execute('BEGIN');
+      other.select('SELECT * FROM t');
+
+      await expectLater(
+        database.execute('COMMIT'),
+        throwsA(isA<TransientDatabaseException>()),
+      );
+      // As SQLitePersistence does after a failed transaction: nothing was stored.
+      await database.execute('ROLLBACK');
+      other.execute('COMMIT');
+      expect(await database.query('SELECT a FROM t'), isEmpty);
+    },
+  );
+
+  test(
+    'a full database is transient and keeps nothing of the transaction',
+    () async {
+      final int pages =
+          (await database.query('PRAGMA page_count')).single.values.single
+              as int;
+      await database.query('PRAGMA max_page_count = $pages');
+
+      await database.execute('BEGIN IMMEDIATE');
+      await expectLater(
+        database.execute('INSERT INTO t VALUES (randomblob(1048576))'),
+        throwsA(isA<TransientDatabaseException>()),
+      );
+      // SQLite rolls the transaction back itself on a full disk (SQLitePersistence logs the ROLLBACK that then
+      // fails): nothing of it was stored.
+      await expectLater(
+        database.execute('ROLLBACK'),
+        throwsA(isA<sqlite.SqliteException>()),
+      );
+      expect(await database.query('SELECT a FROM t'), isEmpty);
+    },
+  );
+
   test('other errors are thrown as they are', () async {
     await expectLater(
       database.query('SELECT * FROM missing_table'),

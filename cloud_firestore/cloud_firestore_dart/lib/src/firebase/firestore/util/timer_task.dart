@@ -10,9 +10,15 @@ import 'package:firebase_app_dart/internal.dart';
 typedef TaskFunction = FutureOr<void> Function();
 
 class TaskScheduler {
-  TaskScheduler(this._name) : _tasks = <TaskId, TimerTask>{};
+  /// Tasks whose id is in [manualTasks] never run on their own: only [runUntil] runs them. Tests use it to hold back
+  /// a timer that the JS spec runner would still see pending when it checks a step (a timer with no delay that the
+  /// event loop would otherwise run while the step settles), e.g. [TaskId.asyncQueueRetry].
+  TaskScheduler(this._name, {Set<TaskId> manualTasks = const <TaskId>{}})
+    : _tasks = <TaskId, TimerTask>{},
+      _manualTasks = manualTasks;
 
   final Map<TaskId, TimerTask> _tasks;
+  final Set<TaskId> _manualTasks;
   final String _name;
 
   int _index = 0;
@@ -29,7 +35,9 @@ class TaskScheduler {
       id: id,
       function: function,
       targetTime: DateTime.now().add(delay),
-      timer: Timer(delay, () => task._execute()),
+      timer: _manualTasks.contains(id)
+          ? null
+          : Timer(delay, () => task._execute()),
       scheduler: this,
     );
 
@@ -54,7 +62,7 @@ class TaskScheduler {
 
     final List<TimerTask> pending = _tasks.values.toList()..sort();
     for (final TimerTask task in pending) {
-      task._timer.cancel();
+      task._timer?.cancel();
       task._execute();
       if (id != TaskId.all && task._id == id) {
         break;
@@ -80,7 +88,7 @@ class TimerTask implements Comparable<TimerTask> {
     required int index,
     required TaskId id,
     required DateTime targetTime,
-    required Timer timer,
+    required Timer? timer,
     required TaskFunction function,
     required TaskScheduler scheduler,
   }) : _index = index,
@@ -93,7 +101,7 @@ class TimerTask implements Comparable<TimerTask> {
   final int _index;
   final TaskId _id;
   final DateTime _targetTime;
-  final Timer _timer;
+  final Timer? _timer;
   final TaskFunction _function;
   final TaskScheduler _scheduler;
 
@@ -104,7 +112,7 @@ class TimerTask implements Comparable<TimerTask> {
     _log('Canceling task $_id');
     _finished = true;
     _scheduler._remove(this);
-    _timer.cancel();
+    _timer?.cancel();
   }
 
   void _execute() {
