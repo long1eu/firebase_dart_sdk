@@ -25,12 +25,14 @@ void main() {
     addTearDown(app.delete);
     final String dbName = 'cache-index-${const Uuid().v4()}.db';
     addTearDown(() => DatabaseMock.deleteDatabaseFiles(dbName));
-    final Firestore firestore = await Firestore.instanceFor(
+    final Firestore firestore = Firestore.instanceFor(
       app: app,
       settings: offlineSettings,
       openDatabase: persistent ? openFixed(dbName) : null,
     );
     addTearDown(firestore.terminate);
+    // The tests below reach into the local store of the client, which exists once the instance is initialized.
+    await firestore.initialized;
     return firestore;
   }
 

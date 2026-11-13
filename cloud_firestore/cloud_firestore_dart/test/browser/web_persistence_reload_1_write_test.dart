@@ -36,7 +36,7 @@ FirebaseApp reloadApp() => FirebaseApp.withOptions(
       name: reloadAppName,
     );
 
-Future<Firestore> reloadClient() => Firestore.instanceFor(
+Firestore reloadClient() => Firestore.instanceFor(
       app: reloadApp(),
       openDatabase:
           sqliteWebOpener(sqlite3Wasm: Uri.base.resolve('sqlite3.wasm')),
@@ -64,7 +64,7 @@ void main() {
     web.window.localStorage.removeItem(reloadStorageKey);
 
     // Not terminated and not torn down: the page just goes away.
-    final Firestore firestore = await reloadClient();
+    final Firestore firestore = reloadClient();
     final String collection = newCollectionName();
     await firestore.collection(collection).doc('acknowledged').set(
       <String, Object?>{'v': 1},

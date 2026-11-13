@@ -578,7 +578,7 @@ class Pipeline {
         'be used as part of another pipeline.',
       );
     }
-    final PipelineEncoder encoder = PipelineEncoder(firestore.databaseId);
+    final PipelineEncoder encoder = PipelineEncoder(firestore.modelDatabaseId);
     final proto.ExecutePipelineRequest request = toExecuteRequest(
       encoder,
       atomic: atomic,

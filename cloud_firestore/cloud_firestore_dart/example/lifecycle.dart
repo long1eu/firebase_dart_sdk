@@ -21,7 +21,7 @@ Future<void> main() async {
     'firestore_example_',
   );
   final FirebaseApp app = exampleApp();
-  Future<Firestore> open() {
+  Firestore open() {
     return Firestore.instanceFor(
       app: app,
       openDatabase: sqliteOpener(directory),
@@ -31,7 +31,7 @@ Future<void> main() async {
 
   bool hasDatabaseFile() => directory.listSync().isNotEmpty;
 
-  Firestore firestore = await open();
+  Firestore firestore = open();
   final String path = '${scratch('settings')}/theme';
 
   // waitForPendingWrites completes when the backend has acknowledged every
@@ -69,7 +69,7 @@ Future<void> main() async {
 
   // The same app and database can be opened again; the cache starts empty
   // and the data is still on the backend.
-  firestore = await open();
+  firestore = open();
   try {
     await firestore.doc(path).get(Source.cache);
   } on FirestoreError catch (e) {

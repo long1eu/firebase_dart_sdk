@@ -21,7 +21,7 @@ Future<void> main() async {
   );
   final FirebaseApp app = exampleApp();
 
-  Future<Firestore> open() {
+  Firestore open() {
     return Firestore.instanceFor(
       app: app,
       // Without `openDatabase` the cache is in memory, whatever the settings.
@@ -36,7 +36,7 @@ Future<void> main() async {
 
   // First run: write a document; it is stored in the cache and sent to the
   // backend.
-  Firestore firestore = await open();
+  Firestore firestore = open();
   await firestore.doc(path).set(<String, Object?>{'text': 'written online'});
   await firestore.terminate();
   print(
@@ -45,7 +45,7 @@ Future<void> main() async {
 
   // "Restart": a new instance on the same file. With the network disabled,
   // everything is answered from the cache.
-  firestore = await open();
+  firestore = open();
   await firestore.disableNetwork();
   final DocumentSnapshot<Map<String, Object?>> cached = await firestore
       .doc(path)

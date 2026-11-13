@@ -18,7 +18,7 @@ class MyAppCheck implements InternalAppCheckTokenProvider {
 }
 
 app.appCheckProvider = MyAppCheck();            // or PlatformDependencies.appCheckProvider
-final firestore = await Firestore.getInstance(app);
+final firestore = Firestore.getInstance(app);
 ```
 
 Set it before the first `Firestore.getInstance`; Firestore reads it when the instance is created.

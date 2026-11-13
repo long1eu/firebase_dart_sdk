@@ -11,7 +11,7 @@ with or endorsed by Google or Firebase.
 ```dart
 import 'package:cloud_firestore_dart/cloud_firestore_dart.dart';
 
-final firestore = await Firestore.instanceFor(app: app);
+final firestore = Firestore.instanceFor(app: app);
 await firestore.collection('users').doc('ada').set({'name': 'Ada', 'age': 36});
 
 firestore

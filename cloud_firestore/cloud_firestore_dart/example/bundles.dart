@@ -50,7 +50,7 @@ List<int> buildBundle() {
 }
 
 Future<void> main() async {
-  final Firestore firestore = await connect();
+  final Firestore firestore = connect();
 
   // loadBundle takes the bytes; loadBundleStream takes a stream of chunks
   // (for example the body of an HTTP response).

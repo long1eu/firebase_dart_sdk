@@ -69,8 +69,8 @@ liteTransportOverride;
 ///     await firestore.doc('cities/SF').get();
 /// ```
 class Firestore {
-  Firestore._(this.app, this.databaseId, this.settings)
-    : dataConverter = UserDataConverter(databaseId);
+  Firestore._(this.app, this.modelDatabaseId, this.settings)
+    : dataConverter = UserDataConverter(modelDatabaseId);
 
   /// Returns the instance of [app] for [database], creating it at the first
   /// call. Nothing is sent or opened until the instance is used.
@@ -144,18 +144,18 @@ class Firestore {
 
   /// Implementation detail of the SDK; not part of the supported API.
   @internal
-  final DatabaseId databaseId;
+  final DatabaseId modelDatabaseId;
 
   /// Implementation detail of the SDK; not part of the supported API.
   @internal
   final UserDataConverter dataConverter;
 
   /// The ID of the project of this instance.
-  String get projectId => databaseId.projectId;
+  String get projectId => modelDatabaseId.projectId;
 
-  /// The name of the database of this instance (`(default)` for the default
-  /// database).
-  String get databaseName => databaseId.databaseId;
+  /// The id of the database of this instance (`(default)` for the default
+  /// database), as FlutterFire's `FirebaseFirestore.databaseId`.
+  String get databaseId => modelDatabaseId.databaseId;
 
   StreamSubscription<String>? _deleteSubscription;
   Datastore? _datastore;
@@ -262,7 +262,7 @@ class Firestore {
 
   Future<void> _terminate() async {
     _terminated = true;
-    final String key = _keyFor(app.name, databaseName);
+    final String key = _keyFor(app.name, databaseId);
     if (identical(_instances[key], this)) {
       _instances.remove(key);
     }
@@ -344,7 +344,7 @@ class Firestore {
     return newUnaryDatastore(
       TaskScheduler(app.name),
       DatabaseInfo(
-        databaseId,
+        modelDatabaseId,
         app.name,
         settings.host,
         port: settings.port,
@@ -367,5 +367,5 @@ class Firestore {
   }
 
   @override
-  String toString() => 'Firestore{app: ${app.name}, database: $databaseName}';
+  String toString() => 'Firestore{app: ${app.name}, database: $databaseId}';
 }

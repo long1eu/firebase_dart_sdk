@@ -13,8 +13,8 @@ import 'common.dart';
 
 Future<void> main() async {
   // Two instances stand in for the two processes.
-  final Firestore server = await connect('server');
-  final Firestore client = await connect('client');
+  final Firestore server = connect('server');
+  final Firestore client = connect('client');
 
   final CollectionReference<Map<String, Object?>> scores = server.collection(
     scratch('scores'),

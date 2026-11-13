@@ -335,7 +335,7 @@ class Query<T extends dynamic> {
   }
 
   QueryBuilder get _builder => QueryBuilder(
-    firestore.databaseId,
+    firestore.modelDatabaseId,
     firestore.dataConverter,
     _referenceKey,
   );

@@ -48,7 +48,7 @@ FirestoreSettings emulatorSettings({
 }
 
 /// A [Firestore] instance with an in-memory cache, connected to the emulator.
-Future<Firestore> connect([String appName = FirebaseApp.defaultAppName]) {
+Firestore connect([String appName = FirebaseApp.defaultAppName]) {
   return Firestore.instanceFor(
     app: exampleApp(appName),
     settings: emulatorSettings(),

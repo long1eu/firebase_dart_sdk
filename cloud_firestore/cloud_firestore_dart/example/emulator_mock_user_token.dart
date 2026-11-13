@@ -22,7 +22,7 @@ Future<void> main() async {
   // The claims of the ID token the emulator should see. `sub` (or `user_id`)
   // is the uid that `request.auth.uid` has in the security rules; the other
   // claims are available as `request.auth.token`.
-  final Firestore asAlice = await Firestore.instanceFor(
+  final Firestore asAlice = Firestore.instanceFor(
     app: exampleApp('alice'),
     settings: FirestoreSettings(cacheSettings: const MemoryCacheSettings())
         .withEmulator(
@@ -36,7 +36,7 @@ Future<void> main() async {
         ),
   );
   print(
-    'connected to ${asAlice.projectId} / ${asAlice.databaseName} '
+    'connected to ${asAlice.projectId} / ${asAlice.databaseId} '
     'on $host:$port',
   );
 
@@ -53,7 +53,7 @@ Future<void> main() async {
   //
   // rejects the write below with `permissionDenied`, while open rules (the
   // emulator's default without a rules file) accept it.
-  final Firestore anonymous = await Firestore.instanceFor(
+  final Firestore anonymous = Firestore.instanceFor(
     app: exampleApp('anonymous'),
     settings: emulatorSettings(),
   );

@@ -20,7 +20,7 @@ void main() {
     final FirebaseApp app = newApp('hygieneRunning');
     addTearDown(app.delete);
     final Firestore firestore =
-        await Firestore.instanceFor(app: app, settings: settings);
+        Firestore.instanceFor(app: app, settings: settings);
 
     expect(runningFirestoreInstances(), <String>['hygieneRunning/(default)']);
     await expectLater(expectTestLeftNothingBehind(),

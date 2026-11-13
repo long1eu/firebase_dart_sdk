@@ -66,6 +66,7 @@ class FirestoreClient implements RemoteStoreCallback {
     this.databaseInfo,
     this.credentialsProvider,
     this.appCheckProvider,
+    this.supportsFieldIndexes,
   );
 
   static const String logTag = 'FirestoreClient';
@@ -89,9 +90,27 @@ class FirestoreClient implements RemoteStoreCallback {
   IndexBackfillerScheduler? _indexBackfillScheduler;
   IndexBackfiller? _indexBackfiller;
 
-  /// Whether this client has field indexes: only with SQLite persistence.
-  bool get supportsFieldIndexes => _indexBackfiller != null;
+  /// Whether this client has field indexes: only with SQLite persistence. Known when the client is created, before
+  /// the persistence is opened.
+  final bool supportsFieldIndexes;
 
+  /// Completes when the client is initialized: the first user is known, the persistence is open (and migrated) and
+  /// the local and remote stores are started. Fails with the error of the initialization.
+  late final Future<void> _initialized;
+
+  /// The error the initialization failed with: every operation fails with it.
+  Object? _initError;
+  StackTrace? _initStackTrace;
+
+  /// Whether [persistence] was started and [remoteStore] created, so that [shutdown] knows what to close after an
+  /// initialization that failed half way.
+  bool _persistenceStarted = false;
+  bool _remoteStoreCreated = false;
+
+  /// Waits for the initialization of the client (see [start]) and throws its error if it failed.
+  Future<void> get initialized => _initialized;
+
+  /// Creates a client and starts it [initialize]s, then returns once that is done (or throws its error).
   static Future<FirestoreClient> initialize(
     DatabaseInfo databaseInfo,
     FirestoreSettings settings,
@@ -102,10 +121,46 @@ class FirestoreClient implements RemoteStoreCallback {
     AppCheckTokenProvider? appCheckProvider,
     ConnectivityChangeDetector? connectivityDetector,
   }) async {
+    final FirestoreClient client = start(
+      databaseInfo,
+      settings,
+      credentialsProvider,
+      openDatabase,
+      onNetworkConnected,
+      scheduler,
+      appCheckProvider: appCheckProvider,
+      connectivityDetector: connectivityDetector,
+    );
+    await client._initialized;
+    return client;
+  }
+
+  /// Creates a client and returns it at once. The initialization (waiting for the first user of [credentialsProvider],
+  /// opening the persistence, starting the stores) is the first task of the client's queue, so every operation runs
+  /// after it, as in the Android and JS SDKs. If [after] is given, the initialization waits for it first (and ignores
+  /// its error): the shutdown of another client that has the same persistence open.
+  ///
+  /// When the initialization fails, every operation fails with its error.
+  static FirestoreClient start(
+    DatabaseInfo databaseInfo,
+    FirestoreSettings settings,
+    CredentialsProvider credentialsProvider,
+    OpenDatabase? openDatabase,
+    BehaviorSubject<bool> onNetworkConnected,
+    TaskScheduler scheduler, {
+    AppCheckTokenProvider? appCheckProvider,
+    ConnectivityChangeDetector? connectivityDetector,
+    Future<void>? after,
+  }) {
+    final bool usePersistence =
+        // TODO(long1eu): Make sure you remove the openDatabase != null once we
+        //  provide a default way to instantiate a db instance
+        settings.persistenceEnabled && openDatabase != null;
     final FirestoreClient client = FirestoreClient._(
       databaseInfo,
       credentialsProvider,
       appCheckProvider,
+      usePersistence,
     );
 
     final Completer<User> firstUser = Completer<User>();
@@ -137,13 +192,15 @@ class FirestoreClient implements RemoteStoreCallback {
       }
     });
 
-    final User user = await firstUser.future;
-    await client._enqueue<void>(
-      () => client._initialize(
+    // The first task of the queue: every operation is queued behind it.
+    client._initialized = client._queue.run<void>(() async {
+      if (after != null) {
+        await after.then<void>((_) {}, onError: (Object _) {});
+      }
+      final User user = await firstUser.future;
+      await client._initialize(
         user,
-        // TODO(long1eu): Make sure you remove the openDatabase != null once we
-        //  provide a default way to instantiate a db instance
-        settings.persistenceEnabled && openDatabase != null,
+        usePersistence,
         settings.cacheSizeBytes,
         openDatabase,
         onNetworkConnected,
@@ -153,9 +210,16 @@ class FirestoreClient implements RemoteStoreCallback {
           final MemoryCacheSettings memory => memory.gcSettings,
           _ => null,
         },
-      ),
+      );
+    });
+    client._initialized.then<void>(
+      (_) => initDone.complete(),
+      onError: (Object error, StackTrace stackTrace) {
+        client._initError = error;
+        client._initStackTrace = stackTrace;
+        Log.w(logTag, 'Initializing the client failed: $error');
+      },
     );
-    initDone.complete();
     return client;
   }
 
@@ -164,7 +228,14 @@ class FirestoreClient implements RemoteStoreCallback {
   /// queue plays that role; it is shared with the [RemoteStore].
   final SerialQueue _queue = SerialQueue();
 
-  Future<T> _enqueue<T>(Future<T> Function() task) => _queue.run<T>(task);
+  /// Runs [task] on the queue, after the initialization. Fails with the error of the initialization if that failed.
+  Future<T> _enqueue<T>(Future<T> Function() task) => _queue.run<T>(() {
+    final Object? initError = _initError;
+    if (initError != null) {
+      Error.throwWithStackTrace(initError, _initStackTrace!);
+    }
+    return task();
+  });
 
   /// Returns a future that completes when all the writes that are pending right now were acknowledged (or rejected)
   /// by the backend.
@@ -220,13 +291,24 @@ class FirestoreClient implements RemoteStoreCallback {
     // Reject new client calls and stop the background GC before anything is closed, so nothing starts against a
     // closed database.
     _isShutdown = true;
+    // An initialization that is still running (the instance was terminated right after it was created) finishes
+    // first: it may already have opened the persistence, and clearPersistence needs to know the file it opened.
+    try {
+      await _initialized;
+    } catch (_) {
+      // Close what the failed initialization opened.
+    }
     _lruScheduler?.stop();
     _indexBackfillScheduler?.stop();
 
     await onCredentialChangeSubscription.cancel();
     await appCheckProvider?.close();
-    await remoteStore.shutdown();
-    await persistence.shutdown();
+    if (_remoteStoreCreated) {
+      await remoteStore.shutdown();
+    }
+    if (_persistenceStarted) {
+      await persistence.shutdown();
+    }
   }
 
   /// Whether [shutdown] was called on this client.
@@ -247,6 +329,10 @@ class FirestoreClient implements RemoteStoreCallback {
     }
     // The database has to be closed before its files go away.
     await _shutdownFuture;
+    if (!_persistenceStarted) {
+      // The initialization failed before the persistence was opened: there is no file this client knows of.
+      return;
+    }
     final Persistence persistence = this.persistence;
     if (persistence is SQLitePersistence) {
       await persistence.clearPersistence();
@@ -343,7 +429,7 @@ class FirestoreClient implements RemoteStoreCallback {
   /// Removes all field indexes and their entries.
   Future<void> deleteAllFieldIndexes() async {
     _verifyNotShutdown();
-    return _enqueue<void>(localStore.deleteAllFieldIndexes);
+    return _enqueue<void>(() => localStore.deleteAllFieldIndexes());
   }
 
   /// Runs one index backfill now, without waiting for the scheduled one, and returns the number of documents that
@@ -351,11 +437,10 @@ class FirestoreClient implements RemoteStoreCallback {
   @visibleForTesting
   Future<int> backfillIndexes() async {
     _verifyNotShutdown();
-    final IndexBackfiller? backfiller = _indexBackfiller;
-    if (backfiller == null) {
-      return 0;
-    }
-    return _enqueue<int>(backfiller.backfill);
+    return _enqueue<int>(() async {
+      final IndexBackfiller? backfiller = _indexBackfiller;
+      return backfiller == null ? 0 : backfiller.backfill();
+    });
   }
 
   /// Returns the named query saved by a loaded bundle under [queryName], or null if there is none.
@@ -426,6 +511,8 @@ class FirestoreClient implements RemoteStoreCallback {
     SnapshotVersion? readTime,
   }) async {
     _verifyNotShutdown();
+    // The runner calls the remote store outside the queue: it has to exist.
+    await _initialized;
 
     return TransactionRunner<TResult>(
       createTransaction: () =>
@@ -492,6 +579,7 @@ class FirestoreClient implements RemoteStoreCallback {
     }
 
     await persistence.start();
+    _persistenceStarted = true;
     localStore = LocalStore(persistence, user);
     if (gc != null) {
       _lruScheduler =
@@ -525,6 +613,7 @@ class FirestoreClient implements RemoteStoreCallback {
       queue: _queue,
       connectivityDetector: connectivityDetector,
     );
+    _remoteStoreCreated = true;
 
     syncEngine = SyncEngine(localStore, remoteStore, user);
     eventManager = EventManager(syncEngine);

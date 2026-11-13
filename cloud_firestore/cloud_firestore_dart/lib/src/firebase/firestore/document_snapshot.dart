@@ -471,7 +471,7 @@ class DocumentSnapshot<T extends dynamic> {
   Object _convertReference(ReferenceValue value) {
     final DocumentKey key = value.value;
     final DatabaseId refDatabase = value.databaseId;
-    final DatabaseId database = _firestore.databaseId;
+    final DatabaseId database = _firestore.modelDatabaseId;
     if (refDatabase != database) {
       // TODO(long1eu): Somehow support foreign references.
       Log.w(

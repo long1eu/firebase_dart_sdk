@@ -148,7 +148,7 @@ import 'package:cloud_firestore_dart/cloud_firestore_dart.dart';
 import 'package:firebase_app_dart/firebase_app_dart.dart';
 
 // `app` is a FirebaseApp created with firebase_app_dart.
-final firestore = await Firestore.instanceFor(app: app);
+final firestore = Firestore.instanceFor(app: app);
 final users = firestore.collection('users');
 await users.doc('ada').set({'name': 'Ada', 'age': 36});
 final adults = await users.whereGreaterThanOrEqualTo('age', 18).get();
@@ -162,7 +162,7 @@ final adults = await users.whereGreaterThanOrEqualTo('age', 18).get();
 Emulator (the settings must be passed when the instance is created):
 
 ```dart
-final firestore = await Firestore.instanceFor(
+final firestore = Firestore.instanceFor(
   app: app,
   settings: FirestoreSettings().withEmulator('127.0.0.1', 8080),
 );
@@ -243,6 +243,27 @@ firestore.snapshotsInSync.listen((_) {});
 await firestore.terminate();
 ```
 
+### Coming from FlutterFire or the JS SDK
+
+The API follows the Android SDK, with FlutterFire's spelling where the two differ only in name
+(`Firestore.instanceFor`, `doc`, `docs`, `docChanges`, `where(field, isEqualTo: ...)`,
+`databaseId`). Where the shapes differ, there is one way, not both:
+
+| FlutterFire / JS | This package |
+|---|---|
+| `ref.get(const GetOptions(source: Source.cache))` | `ref.get(Source.cache)` (same `Source` values) |
+| `GetOptions(serverTimestampBehavior: ...)` / JS `data({serverTimestamps: ...})` | `snapshot.getData(ServerTimestampBehavior.estimate)`, or `get(field, behavior)` per field |
+| JS `getDocFromCache(ref)` / `getDocFromServer(ref)` | `ref.get(Source.cache)` / `ref.get(Source.server)` |
+| `snapshot.data()` | `snapshot.data` (a getter) |
+| `SetOptions(merge: true)` | `SetOptions.mergeAllFields` |
+| `SetOptions(mergeFields: ['a', FieldPath(...)])` | `SetOptions.mergeFields(['a'])` / `SetOptions.mergeFieldPaths([...])` |
+
+A `GetOptions` class would only add the server timestamp default of FlutterFire, which is a
+property of reading the data rather than of fetching it; `SnapshotOptions` (with
+`serverTimestamps`, as in JS) is what a `FirestoreDataConverter` receives.
+
+### The supported API
+
 The main library exposes no implementation members: what the golden listing shows is the
 supported API. (The Firestore Lite and Pipelines listings still mark a few members of their own
 classes `@internal`; the analyzer warns when you use those and they may change in any release.)
@@ -269,7 +290,7 @@ import 'package:firebase_auth_providers_dart/firebase_auth_providers_dart.dart';
 
 // A signed-in Firebase Auth user: the security rules see request.auth.
 final auth = await FirebaseUserAuth.forApp(app);
-final firestore = await Firestore.instanceFor(app: app);
+final firestore = Firestore.instanceFor(app: app);
 await auth.signInWithEmailAndPassword('ada@example.com', 'the password'); // or signInAnonymously(), ...
 
 // A server (bypasses security rules; access is decided by IAM):

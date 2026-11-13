@@ -30,7 +30,7 @@ void main() {
     final FirebaseApp app = newApp('terminatePendingWrite');
     addTearDown(app.delete);
     final Firestore firestore =
-        await Firestore.instanceFor(app: app, settings: offline);
+        Firestore.instanceFor(app: app, settings: offline);
     final DocumentReference<Map<String, Object?>> doc = firestore.doc('a/b');
 
     String outcome = 'pending';
@@ -49,7 +49,7 @@ void main() {
     final FirebaseApp app = newApp('terminateThenUse');
     addTearDown(app.delete);
     final Firestore firestore =
-        await Firestore.instanceFor(app: app, settings: offline);
+        Firestore.instanceFor(app: app, settings: offline);
     await firestore.terminate();
 
     expect(() => firestore.doc('a/b').set(<String, Object?>{'a': 1}),

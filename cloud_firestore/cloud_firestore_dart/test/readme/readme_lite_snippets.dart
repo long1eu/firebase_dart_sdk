@@ -13,8 +13,8 @@ import 'package:firebase_app_dart/firebase_app_dart.dart';
 late FirebaseApp app;
 late Firestore firestore;
 
-// README.md:437
-Future<void> firestoreReadmeLine437() async {
+// README.md:458
+Future<void> firestoreReadmeLine458() async {
   // Synchronous: there is no cache to open. Nothing is sent until the first call.
   final Firestore firestore = Firestore.instanceFor(app: app);
 

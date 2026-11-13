@@ -9,7 +9,7 @@
 // to your page (from https://github.com/simolus3/sqlite3.dart/releases) and
 // pass `sqliteWebOpener(...)` to `Firestore.instanceFor`:
 //
-//     final Firestore firestore = await Firestore.instanceFor(
+//     final Firestore firestore = Firestore.instanceFor(
 //       app: app,
 //       openDatabase: sqliteWebOpener(sqlite3Wasm: Uri.parse('sqlite3.wasm')),
 //     );
@@ -196,7 +196,7 @@ Future<Firestore> openWithMemoryFallback({
   FirestoreSettings? settings,
 }) async {
   try {
-    return await Firestore.instanceFor(
+    return Firestore.instanceFor(
       app: app,
       openDatabase: sqliteWebOpener(sqlite3Wasm: sqlite3Wasm),
       settings: settings,

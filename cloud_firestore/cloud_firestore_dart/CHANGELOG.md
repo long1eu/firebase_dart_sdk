@@ -48,6 +48,16 @@ API changes that need code changes:
   document data (see typed data converters under Added). Code that uses the references returned
   by `Firestore` keeps compiling (they are `...<Map<String, Object?>>`); a bare type annotation
   such as `DocumentSnapshot` now means `dynamic` data.
+- `Firestore.instanceFor` (and the deprecated `getInstance`) return the `Firestore` instead of a
+  `Future<Firestore>`, like Firestore Lite, the JS, Android and FlutterFire SDKs. The instance
+  initializes in the background as the first task of its queue: it waits for the first user of
+  the auth provider, opens and migrates the cache, and starts the local and remote stores, and
+  every operation runs after that. A failed initialization (the opener throws, a migration fails)
+  is reported by the operations of the instance instead of by `instanceFor`. A new `FirebaseApp`
+  with the name of a deleted one gets its instance at once; it opens the cache once the instance
+  of the deleted app has closed it. `await Firestore.instanceFor(...)` keeps compiling.
+- `Firestore.databaseName` is renamed `Firestore.databaseId` (a `String`, as FlutterFire's), in
+  the main library and in Firestore Lite.
 - `Database.file` (a `dart:io` `File`) is replaced by `Database.path` (a `String`), so the
   persistence interface no longer needs `dart:io`. Implementations of `Database` must rename
   the getter.
@@ -64,8 +74,9 @@ API changes that need code changes:
     not export). None of the classes below has a public constructor any more, so they cannot be
     subclassed outside the SDK (`implements` for a test double still works): `Firestore(...)`
     constructor, `Firestore.newInstance`, `client`,
-    `scheduler`, `dataConverter`, `databaseId` (use the new `Firestore.projectId` and
-    `Firestore.databaseName` getters), `validateReference`; `Query.query`;
+    `scheduler`, `dataConverter`, the `DatabaseId` model of `databaseId` (`Firestore.databaseId`
+    is now the database name as a `String`, as in FlutterFire; with the new `Firestore.projectId`
+    it replaces the model), `validateReference`; `Query.query`;
     `QuerySnapshot.snapshot`; `DocumentSnapshot.document`; `DocumentReference.key`;
     `SetOptions.fieldMask`; `FieldPath(...)` unnamed constructor, `internalPath`, `reserved`,
     `documentIdInstance` (use `FieldPath.documentIdField`); `FieldValue.elements`, `methodName`

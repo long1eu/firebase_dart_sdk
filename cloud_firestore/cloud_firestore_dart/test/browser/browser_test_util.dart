@@ -6,6 +6,7 @@ import 'dart:async';
 import 'dart:math';
 
 import 'package:cloud_firestore_dart/cloud_firestore_dart.dart';
+import 'package:cloud_firestore_dart/src/internal_access.dart';
 import 'package:firebase_app_dart/firebase_app_dart.dart';
 import 'package:test/test.dart';
 
@@ -42,7 +43,7 @@ Future<Firestore> newClient({
   );
   final Firestore firestore;
   try {
-    firestore = await Firestore.instanceFor(
+    firestore = Firestore.instanceFor(
       app: app,
       openDatabase: openDatabase,
       settings: FirestoreSettings(
@@ -52,6 +53,14 @@ Future<Firestore> newClient({
           .withEmulator(emulatorHost, emulatorPort),
     );
   } catch (_) {
+    app.delete();
+    rethrow;
+  }
+  // instanceFor returns at once; the tests want a client whose cache is open (and the error if it can't be).
+  try {
+    await firestore.initialized;
+  } catch (_) {
+    await firestore.terminate();
     app.delete();
     rethrow;
   }

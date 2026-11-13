@@ -75,7 +75,7 @@ void main() {
   /// Returns a valid bundle by replacing the project id in [bundleTemplates] (also recalculates the length
   /// prefixes and the metadata).
   List<int> createBundle([String? projectId]) {
-    final String project = projectId ?? db.databaseId.projectId;
+    final String project = projectId ?? db.modelDatabaseId.projectId;
     final StringBuffer bundle = StringBuffer();
     for (final String template in bundleTemplates) {
       final String element = template.replaceAll('{projectId}', project);

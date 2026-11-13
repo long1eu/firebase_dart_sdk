@@ -22,11 +22,6 @@ class FirestoreMultiDbComponent {
   /// A static map from instance key (see [keyFor]) to [Firestore] instances.
   static final Map<String, Firestore> instances = <String, Firestore>{};
 
-  /// Instances that are still being created, so that concurrent callers share
-  /// one instance.
-  static final Map<String, Future<Firestore>> _pending =
-      <String, Future<Firestore>>{};
-
   /// Deleting a [FirebaseApp] shuts down the instances created for it.
   static final Map<String, StreamSubscription<String>> _deleteSubscriptions =
       <String, StreamSubscription<String>>{};
@@ -53,10 +48,10 @@ class FirestoreMultiDbComponent {
     });
   }
 
-  /// Whether an instance for [appName] and [database] exists or is being created.
+  /// Whether an instance for [appName] and [database] exists.
   static bool hasInstance(String appName, String database) {
     final String key = keyFor(appName, database);
-    return instances.containsKey(key) || _pending.containsKey(key);
+    return instances.containsKey(key);
   }
 
   /// Forgets [firestore] (called when it is shut down), so the next
@@ -83,33 +78,25 @@ class FirestoreMultiDbComponent {
   /// Provides the instance of Firestore for the given database name, creating
   /// it on first use. Later calls return the same instance until it is shut
   /// down ([openDatabase] and [settings] only apply to the first call).
-  Future<Firestore> get(String databaseName, OpenDatabase? openDatabase) {
+  Firestore get(String databaseName, OpenDatabase? openDatabase) {
     final String key = keyFor(app.name, databaseName);
     final Firestore? existing = instances[key];
     if (existing != null && identical(existing.firebaseApp, app)) {
-      return Future<Firestore>.value(existing);
+      return existing;
     }
 
-    Future<Firestore> create() => FirestoreInternal.newInstance(
+    // The instance of another FirebaseApp object with the same name: app names are unique among live apps, so that
+    // app was deleted and its delete event (which is delivered asynchronously) has not terminated the instance yet.
+    // Terminate it; the new instance opens the same persistence only once it is closed.
+    final Future<void>? closing = existing?.terminate();
+    return FirestoreInternal.newInstance(
       app,
       databaseName,
       authProvider: authProvider,
       appCheckProvider: appCheckProvider,
       openDatabase: openDatabase,
       settings: settings,
+      after: closing,
     );
-
-    return _pending[key] ??=
-        (existing == null
-                ? create()
-                // The instance of another FirebaseApp object with the same name: app names are unique among live apps,
-                // so that app was deleted and its delete event (which is delivered asynchronously) has not terminated
-                // the instance yet. Terminate it before the new instance opens the same persistence.
-                : existing.terminate().then((_) => create()))
-            .whenComplete(() {
-              // Not an arrow: remove() returns this very future, which whenComplete
-              // would then wait for.
-              _pending.remove(key);
-            });
   }
 }

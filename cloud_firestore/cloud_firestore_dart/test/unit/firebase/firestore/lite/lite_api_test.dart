@@ -112,7 +112,7 @@ void main() {
     test('defaults to the production service', () async {
       final Firestore firestore = newFirestore();
       expect(firestore.projectId, 'lite-project');
-      expect(firestore.databaseName, '(default)');
+      expect(firestore.databaseId, '(default)');
       await firestore.doc('coll/doc').get();
       expect(transport().databaseInfo.host, 'firestore.googleapis.com');
       expect(transport().databaseInfo.port, 443);

@@ -28,7 +28,7 @@ void main() {
       name: 'mockUserToken-${const Uuid().v4()}',
     );
     addTearDown(app.delete);
-    final Firestore firestore = await Firestore.instanceFor(
+    final Firestore firestore = Firestore.instanceFor(
       app: app,
       settings: base
           .withEmulator(base.host, base.port, mockUserToken: mockUserToken)

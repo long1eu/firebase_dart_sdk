@@ -24,22 +24,22 @@ void main() {
     });
 
     // ignore: deprecated_member_use_from_same_package
-    final Firestore first = await Firestore.getInstance(app);
-    expect(identical(await Firestore.getInstance(app), first), isTrue);
+    final Firestore first = Firestore.getInstance(app);
+    expect(identical(Firestore.getInstance(app), first), isTrue);
     expect(first.app, same(app));
     expect(first.app, same(first.firebaseApp));
 
-    // Concurrent callers share the instance that is being created.
-    final List<Firestore> both = await Future.wait(<Future<Firestore>>[
+    // Repeated calls return the same instance.
+    final List<Firestore> both = <Firestore>[
       Firestore.getInstance(other),
       Firestore.getInstance(other),
-    ]);
+    ];
     expect(identical(both[0], both[1]), isTrue);
     expect(identical(both[0], first), isFalse);
 
-    final Firestore named = await Firestore.getInstance(app, database: 'db2');
+    final Firestore named = Firestore.getInstance(app, database: 'db2');
     expect(identical(named, first), isFalse);
-    expect(identical(await Firestore.getInstance(app, database: 'db2'), named),
+    expect(identical(Firestore.getInstance(app, database: 'db2'), named),
         isTrue);
   });
 
@@ -47,16 +47,16 @@ void main() {
     final FirebaseApp app = newApp('cacheTestShutdownApp');
     addTearDown(app.delete);
 
-    final Firestore first = await Firestore.getInstance(app);
+    final Firestore first = Firestore.getInstance(app);
     await first.shutdown();
-    final Firestore second = await Firestore.getInstance(app);
+    final Firestore second = Firestore.getInstance(app);
     expect(identical(second, first), isFalse);
     await second.shutdown();
   });
 
   test('deleting the app shuts its instances down', () async {
     final FirebaseApp app = newApp('cacheTestDeleteApp');
-    final Firestore first = await Firestore.getInstance(app);
+    final Firestore first = Firestore.getInstance(app);
     app.delete();
     await Future<void>.delayed(const Duration(milliseconds: 50));
     expect(() => first.collection('a').get(), throwsA(anything));

@@ -40,7 +40,7 @@ class CityConverter extends FirestoreDataConverter<City> {
 }
 
 Future<void> main() async {
-  final Firestore firestore = await connect();
+  final Firestore firestore = connect();
 
   // From two functions...
   final FirestoreDataConverter<City> converter =

@@ -12,7 +12,7 @@ List<String> ids(QuerySnapshot<Map<String, Object?>> snapshot) => <String>[
 ];
 
 Future<void> main() async {
-  final Firestore firestore = await connect();
+  final Firestore firestore = connect();
   final CollectionReference<Map<String, Object?>> cities = firestore.collection(
     scratch('cities'),
   );

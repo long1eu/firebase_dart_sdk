@@ -13,7 +13,7 @@ import 'common.dart';
 Future<void> main() async {
   // No `openDatabase` is passed, so the cache lives in memory. See
   // offline_persistence.dart for a cache on disk.
-  final Firestore firestore = await connect();
+  final Firestore firestore = connect();
 
   final CollectionReference<Map<String, Object?>> users = firestore.collection(
     scratch('users'),

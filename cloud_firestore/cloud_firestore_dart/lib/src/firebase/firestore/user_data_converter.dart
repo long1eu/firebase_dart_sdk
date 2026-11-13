@@ -404,7 +404,7 @@ class UserDataConverter {
       return RegexFieldValue.valueOf(input);
     } else if (input is DocumentReference) {
       final DocumentReference ref = input;
-      final DatabaseId otherDb = ref.firestore.databaseId;
+      final DatabaseId otherDb = ref.firestore.modelDatabaseId;
       if (otherDb != databaseId) {
         throw context.createError(
           'Document reference is for database ${otherDb.projectId}/${otherDb.databaseId} but '

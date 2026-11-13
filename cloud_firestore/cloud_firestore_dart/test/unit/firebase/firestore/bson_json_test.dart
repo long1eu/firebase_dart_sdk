@@ -75,7 +75,7 @@ QuerySnapshot<Map<String, Object?>> querySnapshot(
 
 Future<List<BundleElement>> readBundle(String bundle) async {
   final BundleReader reader = BundleReader.fromBytes(
-      BundleSerializer(RemoteSerializer(firestore.databaseId)),
+      BundleSerializer(RemoteSerializer(firestore.modelDatabaseId)),
       utf8.encode(bundle));
   final List<BundleElement> elements = <BundleElement>[
     await reader.getBundleMetadata()

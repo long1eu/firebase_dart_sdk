@@ -10,6 +10,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:cloud_firestore_dart/cloud_firestore_dart.dart';
+import 'package:cloud_firestore_dart/src/internal_access.dart';
 import 'package:firebase_app_dart/firebase_app_dart.dart';
 import 'package:test/test.dart';
 
@@ -111,13 +112,15 @@ void main() {
 
   Future<Firestore> open(FirebaseApp app) async {
     final FirestoreSettings base = IntegrationTestUtil.newTestSettings();
-    final Firestore firestore = await Firestore.instanceFor(
+    final Firestore firestore = Firestore.instanceFor(
       app: app,
       openDatabase: recording(sqliteOpener(directory), log),
       settings: FirestoreSettings(cacheSettings: PersistentCacheSettings())
           .withEmulator(base.host, base.port),
     );
     opened.add(firestore);
+    // instanceFor returns at once; the log below is about when the cache is opened.
+    await firestore.initialized;
     return firestore;
   }
 

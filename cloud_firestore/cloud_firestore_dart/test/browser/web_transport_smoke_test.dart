@@ -76,7 +76,7 @@ void main() {
         projectId: projectId,
       ),
     );
-    final Firestore firestore = await Firestore.instanceFor(
+    final Firestore firestore = Firestore.instanceFor(
       app: app,
       settings: FirestoreSettings(cacheSettings: const MemoryCacheSettings())
           .withEmulator(emulatorHost, emulatorPort),

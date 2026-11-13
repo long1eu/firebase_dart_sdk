@@ -34,3 +34,6 @@ cloud_firestore/cloud_firestore_dart/test/browser/sqlite3.wasm.version
 cloud_firestore/cloud_firestore_dart/test/browser/crash/crash_worker.js
 cloud_firestore/cloud_firestore_dart/test/browser/crash/crash_worker.js.deps
 cloud_firestore/cloud_firestore_dart/test/browser/crash/crash_worker.js.map
+
+# remote test logs (notes/mini/remote_test.sh)
+.remote_logs/

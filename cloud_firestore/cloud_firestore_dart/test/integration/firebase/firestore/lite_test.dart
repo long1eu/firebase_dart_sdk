@@ -378,8 +378,8 @@ void main() {
         addTearDown(firestore.terminate);
       }
       expect(instances.toSet(), hasLength(5));
-      expect(instances[0].databaseName, 'init1');
-      expect(instances[2].databaseName, '(default)');
+      expect(instances[0].databaseId, 'init1');
+      expect(instances[2].databaseId, '(default)');
     });
 
     test('returns different instance from different named app', () {

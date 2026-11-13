@@ -114,7 +114,11 @@ app.setDataCollectionDefaultEnabled(enabled: false);
 ## 4. Creating the Firestore instance
 
 `Firestore.getInstance` still works but is deprecated; use `Firestore.instanceFor`, where the
-app is a named argument.
+app is a named argument. Both now return the instance at once instead of a `Future`, as the
+other Firebase SDKs do: the cache is opened in the background and every operation waits for it.
+An `await` in front of the call still compiles (the analyzer suggests removing it). If opening
+the cache fails (for example your opener throws), the operations of the instance fail with that
+error instead of the call itself.
 
 Before:
 
@@ -129,7 +133,7 @@ final Firestore firestore = await Firestore.getInstance(
 After:
 
 ```dart
-final Firestore firestore = await Firestore.instanceFor(
+final Firestore firestore = Firestore.instanceFor(
   app: app,
   settings: FirestoreSettings(cacheSettings: PersistentCacheSettings()),
   // openDatabase: yourOpener, see section 5
@@ -144,7 +148,7 @@ For the emulator, build the settings with `withEmulator` instead of setting `hos
 `sslEnabled` by hand:
 
 ```dart
-final Firestore emulated = await Firestore.instanceFor(
+final Firestore emulated = Firestore.instanceFor(
   app: app,
   settings: FirestoreSettings().withEmulator('127.0.0.1', 8080),
 );
@@ -300,7 +304,7 @@ library any more. The classes of the API have no public constructor either: inst
 | Before | After |
 |---|---|
 | `firestore.databaseId.projectId` | `firestore.projectId` |
-| `firestore.databaseId.databaseId` | `firestore.databaseName` |
+| `firestore.databaseId.databaseId` | `firestore.databaseId` (now the database name as a `String`) |
 | `Firestore.newInstance(...)`, `Firestore(...)` | `Firestore.instanceFor(...)`; an auth or App Check provider comes from the `FirebaseApp` (`PlatformDependencies.authProvider` / `appCheckProvider`) |
 | `firestore.client`, `scheduler`, `dataConverter`, `validateReference` | no replacement (implementation) |
 | `query.query`, `querySnapshot.snapshot`, `snapshot.document`, `reference.key` | no replacement (core model types); use `path`, `id`, `data`, `metadata` |
@@ -321,7 +325,7 @@ print(firestore.databaseId.projectId);
 After:
 
 ```dart
-print('${firestore.projectId} / ${firestore.databaseName}');
+print('${firestore.projectId} / ${firestore.databaseId}');
 ```
 
 ## 9. Behaviour changes without a compile error

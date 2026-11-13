@@ -117,7 +117,7 @@ class DocumentReference<T extends dynamic> implements KeyedDocumentReference {
   /// Implementation detail of the SDK; not part of the supported API.
   @internal
   @override
-  DatabaseId get databaseId => firestore.databaseId;
+  DatabaseId get databaseId => firestore.modelDatabaseId;
 
   /// The Firestore instance of this reference.
   final Firestore firestore;

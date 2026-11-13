@@ -114,7 +114,7 @@ Matcher throwsFirestoreError(FirestoreErrorCode code, [Object? message]) {
 /// Reads [bundle] with the streaming [BundleReader] used by `loadBundle`.
 Future<List<BundleElement>> readBundle(String bundle) async {
   final BundleReader reader = BundleReader.fromBytes(
-      BundleSerializer(RemoteSerializer(firestore.databaseId)),
+      BundleSerializer(RemoteSerializer(firestore.modelDatabaseId)),
       utf8.encode(bundle));
   final List<BundleElement> elements = <BundleElement>[
     await reader.getBundleMetadata()

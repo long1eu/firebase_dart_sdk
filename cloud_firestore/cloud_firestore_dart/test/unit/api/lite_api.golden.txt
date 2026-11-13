@@ -167,9 +167,9 @@ class Firestore
   doc(String documentPath): DocumentReference<Map<String, Object>>
   final app: FirebaseApp
   final dataConverter: UserDataConverter @internal
-  final databaseId: DatabaseId @internal
+  final modelDatabaseId: DatabaseId @internal
   final settings: FirestoreSettings
-  get databaseName: String
+  get databaseId: String
   get projectId: String
   new Firestore.instanceFor({FirebaseApp app, String database, FirestoreSettings settings})
   run((datastore.Datastore) -> dart.async.Future operation): Future<dynamic> @internal

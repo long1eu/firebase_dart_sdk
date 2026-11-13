@@ -186,7 +186,7 @@ void main() {
         ? (DatabaseInfo databaseInfo, ChannelOptionsProvider options) =>
             WebChannelTransport(IoWebHttpClient(), databaseInfo, options)
         : null;
-    final Firestore firestore = await Firestore.instanceFor(
+    final Firestore firestore = Firestore.instanceFor(
       app: app,
       settings: FirestoreSettings(
         host: firestoreAddress!.host,

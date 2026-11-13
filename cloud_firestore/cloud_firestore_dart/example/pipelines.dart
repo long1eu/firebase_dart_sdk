@@ -27,7 +27,7 @@ Future<void> main() async {
     return;
   }
   final int colon = emulator.lastIndexOf(':');
-  final Firestore firestore = await Firestore.instanceFor(
+  final Firestore firestore = Firestore.instanceFor(
     app: exampleApp(),
     settings: FirestoreSettings(cacheSettings: const MemoryCacheSettings())
         .withEmulator(

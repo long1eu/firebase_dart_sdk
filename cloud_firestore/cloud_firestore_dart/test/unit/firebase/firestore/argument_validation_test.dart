@@ -33,7 +33,7 @@ void main() {
       dependencies: null,
       name: 'argumentValidation${apps++}',
     );
-    firestore = await Firestore.instanceFor(
+    firestore = Firestore.instanceFor(
       app: app,
       settings: FirestoreSettings(cacheSettings: const MemoryCacheSettings()),
     );

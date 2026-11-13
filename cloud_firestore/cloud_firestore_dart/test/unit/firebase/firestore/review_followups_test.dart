@@ -102,18 +102,18 @@ void main() {
           cacheSettings: const MemoryCacheSettings());
 
       final Firestore first =
-          await Firestore.instanceFor(app: app, settings: memory);
+          Firestore.instanceFor(app: app, settings: memory);
       final Future<void> terminating = first.terminate();
       // terminate() was called: from now on the app has no usable instance.
       final Firestore second =
-          await Firestore.instanceFor(app: app, settings: memory);
+          Firestore.instanceFor(app: app, settings: memory);
       addTearDown(second.terminate);
       await terminating;
 
       expect(second, isNot(same(first)));
       expect(second.client.isTerminated, isFalse);
       // The new instance stays registered after the old one finished.
-      expect(await Firestore.instanceFor(app: app, settings: memory),
+      expect(Firestore.instanceFor(app: app, settings: memory),
           same(second));
     });
 
@@ -125,11 +125,11 @@ void main() {
       final FirebaseApp app = newApp('reviewClearWhileRestarted');
       addTearDown(app.delete);
 
-      final Firestore first = await Firestore.instanceFor(
+      final Firestore first = Firestore.instanceFor(
           app: app, settings: offlineSettings, openDatabase: openFixed(dbName));
       await first.terminate();
 
-      final Firestore second = await Firestore.instanceFor(
+      final Firestore second = Firestore.instanceFor(
           app: app, settings: offlineSettings, openDatabase: openFixed(dbName));
 
       // The file is open in [second]: deleting it would silently detach the

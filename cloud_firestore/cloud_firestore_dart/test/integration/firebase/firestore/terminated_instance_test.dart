@@ -262,8 +262,6 @@ final List<Entry> entries = <Entry>[
 /// Public members that return a Future, Stream or LoadBundleTask and are not
 /// in [entries], with the reason.
 const Map<String, String> exempt = <String, String>{
-  'Firestore.instanceFor': 'static: creates an instance',
-  'Firestore.getInstance': 'static: creates an instance',
   'Firestore.terminate': 'tested below: completes, also when repeated',
   'Firestore.shutdown': 'deprecated alias of terminate, tested below',
   'Firestore.clearPersistence':

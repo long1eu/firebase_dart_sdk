@@ -16,7 +16,7 @@ Future<void> main() async {
     ),
     name: 'size',
   );
-  final Firestore firestore = await Firestore.instanceFor(
+  final Firestore firestore = Firestore.instanceFor(
     app: app,
     settings: FirestoreSettings(
       cacheSettings: const MemoryCacheSettings(),

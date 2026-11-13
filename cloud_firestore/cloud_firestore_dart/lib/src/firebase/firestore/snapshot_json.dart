@@ -69,7 +69,7 @@ Map<String, Object?> documentSnapshotToJson(
   String bundle = '';
   if (document != null) {
     final BundleBuilder builder = BundleBuilder(
-      RemoteSerializer(firestore.databaseId),
+      RemoteSerializer(firestore.modelDatabaseId),
       autoId(),
     )..addDocument(document);
     bundle = builder.build();
@@ -96,7 +96,7 @@ Map<String, Object?> querySnapshotToJson(
   }
   final String bundleName = autoId();
   final BundleBuilder builder =
-      BundleBuilder(RemoteSerializer(firestore.databaseId), bundleName)
+      BundleBuilder(RemoteSerializer(firestore.modelDatabaseId), bundleName)
         ..addNamedQuery(
           bundleName,
           snapshot.query,
@@ -411,7 +411,7 @@ class _ParsedBundle {
 
   factory _ParsedBundle.parse(Firestore firestore, String bundle) {
     final BundleSerializer serializer = BundleSerializer(
-      RemoteSerializer(firestore.databaseId),
+      RemoteSerializer(firestore.modelDatabaseId),
     );
     final List<NamedQuery> queries = <NamedQuery>[];
     final List<Document> documents = <Document>[];

@@ -221,7 +221,7 @@ void main() {
       final FirebaseApp app = newApp('clearPersistenceRunning');
       addTearDown(app.delete);
       final Firestore firestore =
-          await Firestore.instanceFor(app: app, settings: offlineSettings);
+          Firestore.instanceFor(app: app, settings: offlineSettings);
       addTearDown(firestore.terminate);
 
       await expectLater(
@@ -237,7 +237,7 @@ void main() {
     test('is a no-op for memory persistence after terminate', () async {
       final FirebaseApp app = newApp('clearPersistenceMemory');
       addTearDown(app.delete);
-      final Firestore firestore = await Firestore.instanceFor(
+      final Firestore firestore = Firestore.instanceFor(
           app: app,
           settings: offlineSettings.copyWith(
               cacheSettings: const MemoryCacheSettings()));
@@ -251,7 +251,7 @@ void main() {
       final FirebaseApp app = newApp('clearPersistenceSqlite');
       addTearDown(app.delete);
 
-      final Firestore firestore = await Firestore.instanceFor(
+      final Firestore firestore = Firestore.instanceFor(
           app: app, settings: offlineSettings, openDatabase: openFixed(dbName));
       final DocumentReference<Map<String, Object?>> doc =
           firestore.doc('col/doc');
@@ -265,7 +265,7 @@ void main() {
       // Calling it again is fine.
       await firestore.clearPersistence();
 
-      final Firestore restarted = await Firestore.instanceFor(
+      final Firestore restarted = Firestore.instanceFor(
           app: app, settings: offlineSettings, openDatabase: openFixed(dbName));
       addTearDown(restarted.terminate);
       await expectLater(restarted.doc('col/doc').get(Source.cache),
@@ -280,13 +280,13 @@ void main() {
       final FirebaseApp app = newApp('clearPersistenceControl');
       addTearDown(app.delete);
 
-      final Firestore firestore = await Firestore.instanceFor(
+      final Firestore firestore = Firestore.instanceFor(
           app: app, settings: offlineSettings, openDatabase: openFixed(dbName));
       firestore.doc('col/doc').set(<String, Object?>{'a': 1}).ignore();
       await firestore.doc('col/doc').get(Source.cache);
       await firestore.terminate();
 
-      final Firestore restarted = await Firestore.instanceFor(
+      final Firestore restarted = Firestore.instanceFor(
           app: app, settings: offlineSettings, openDatabase: openFixed(dbName));
       addTearDown(restarted.terminate);
       expect((await restarted.doc('col/doc').get(Source.cache)).data,

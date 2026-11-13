@@ -66,11 +66,13 @@ class Firestore {
   final DatabaseId _databaseId;
 
   /// The id of the Google Cloud project this instance talks to.
-  String get projectId => databaseId.projectId;
+  String get projectId => _databaseId.projectId;
 
-  /// The name of the database inside the project, `(default)` unless another
-  /// one was passed to [instanceFor].
-  String get databaseName => databaseId.databaseId;
+  /// The id of the database inside the project: `(default)` unless another
+  /// one was passed to [instanceFor]. The same name as FlutterFire's
+  /// `FirebaseFirestore.databaseId` and the `database` argument of
+  /// [instanceFor].
+  String get databaseId => _databaseId.databaseId;
 
   /// The [FirebaseApp] this instance belongs to.
   final FirebaseApp? firebaseApp;
@@ -111,9 +113,13 @@ class Firestore {
     return firestore;
   }
 
-  /// Gets the instance for [app] and [database]. Same as [getInstance]; this is
-  /// the name used by the current official Firestore API.
-  static Future<Firestore> instanceFor({
+  /// Gets the instance for [app] and [database], creating it on the first call. Later calls return the same instance
+  /// until it is terminated ([openDatabase] and [settings] only apply to the call that creates it).
+  ///
+  /// Returns at once, as the other SDKs do: the instance opens its cache and connects in the background, and every
+  /// operation waits for that. If opening fails (for example [openDatabase] throws), the operations of the instance
+  /// fail with that error.
+  static Firestore instanceFor({
     required FirebaseApp app,
     String database = DatabaseId.defaultDatabaseId,
     OpenDatabase? openDatabase,
@@ -127,14 +133,14 @@ class Firestore {
     );
   }
 
-  /// Gets the instance for [app] and [database], creating it on the first call.
+  /// Gets the instance for [app] and [database], creating it on the first call. Same as [instanceFor].
   @Deprecated('Use instanceFor instead.')
-  static Future<Firestore> getInstance(
+  static Firestore getInstance(
     FirebaseApp app, {
     String database = DatabaseId.defaultDatabaseId,
     OpenDatabase? openDatabase,
     FirestoreSettings? settings,
-  }) async {
+  }) {
     checkNotNull(app, 'Provided FirebaseApp must not be null.');
 
     final FirestoreMultiDbComponent component = FirestoreMultiDbComponent(
@@ -145,19 +151,19 @@ class Firestore {
     );
     checkNotNull(component, 'Firestore component is not present.');
 
-    final Firestore firestore = await component.get(database, openDatabase);
-    return firestore;
+    return component.get(database, openDatabase);
   }
 
   /// Implementation detail of the SDK; not part of the supported API. Use [instanceFor].
-  static Future<Firestore> _newInstance(
+  static Firestore _newInstance(
     FirebaseApp app,
     String database, {
     InternalTokenProvider? authProvider,
     InternalAppCheckTokenProvider? appCheckProvider,
     OpenDatabase? openDatabase,
     FirestoreSettings? settings,
-  }) async {
+    Future<void>? after,
+  }) {
     final String? projectId = app.options.projectId;
     if (projectId == null) {
       throw ArgumentError('FirebaseOptions.getProjectId() cannot be null');
@@ -216,7 +222,7 @@ class Firestore {
     );
 
     final TaskScheduler scheduler = TaskScheduler(app.name);
-    final FirestoreClient firestoreClient = await FirestoreClient.initialize(
+    final FirestoreClient firestoreClient = FirestoreClient.start(
       databaseInfo,
       firestoreSettings,
       provider,
@@ -225,6 +231,7 @@ class Firestore {
       scheduler,
       appCheckProvider: appCheck,
       connectivityDetector: createConnectivityChangeDetector(),
+      after: after,
     );
     final Firestore firestore = Firestore._(
       databaseId,
@@ -448,7 +455,7 @@ class Firestore {
     final FirebaseApp? app = firebaseApp;
     if (client.isTerminated &&
         app != null &&
-        FirestoreMultiDbComponent.hasInstance(app.name, databaseName)) {
+        FirestoreMultiDbComponent.hasInstance(app.name, databaseId)) {
       // This instance was terminated and a newer one has the same cache open: deleting the files under it would
       // detach it from its cache without any error.
       throw FirestoreError(
@@ -628,7 +635,7 @@ class Firestore {
 /// Members of [Firestore] for the SDK itself. Not exported by the public libraries.
 extension FirestoreInternal on Firestore {
   /// The project and database this instance talks to.
-  DatabaseId get databaseId => _databaseId;
+  DatabaseId get modelDatabaseId => _databaseId;
 
   /// Converts user data to model values for this database.
   UserDataConverter get dataConverter => _dataConverter;
@@ -658,14 +665,17 @@ extension FirestoreInternal on Firestore {
   static Firestore detached(DatabaseId databaseId) =>
       Firestore._(databaseId, null, null, TaskScheduler('detached'));
 
-  /// Creates and starts a new instance for [app] and [database], without registering it. Use `Firestore.instanceFor`.
-  static Future<Firestore> newInstance(
+  /// Creates a new instance for [app] and [database] and registers it as the instance of that app and database. Use
+  /// `Firestore.instanceFor`. The instance initializes in the background, after [after] (the shutdown of an instance
+  /// that has the same persistence open) completed; [initialized] completes when it is ready.
+  static Firestore newInstance(
     FirebaseApp app,
     String database, {
     InternalTokenProvider? authProvider,
     InternalAppCheckTokenProvider? appCheckProvider,
     OpenDatabase? openDatabase,
     FirestoreSettings? settings,
+    Future<void>? after,
   }) => Firestore._newInstance(
     app,
     database,
@@ -673,5 +683,9 @@ extension FirestoreInternal on Firestore {
     appCheckProvider: appCheckProvider,
     openDatabase: openDatabase,
     settings: settings,
+    after: after,
   );
+
+  /// Completes when the client of this instance is initialized; fails with the error of the initialization.
+  Future<void> get initialized => client.initialized;
 }

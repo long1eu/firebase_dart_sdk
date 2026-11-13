@@ -54,7 +54,10 @@ class PipelineSource {
   }) {
     final String path;
     if (collection is CollectionReference) {
-      _validateDatabase(collection.firestore.databaseId, 'CollectionReference');
+      _validateDatabase(
+        collection.firestore.modelDatabaseId,
+        'CollectionReference',
+      );
       path = collection.path;
     } else if (collection is String) {
       path = collection;
@@ -127,7 +130,10 @@ class PipelineSource {
     for (final Object document in documents) {
       final String path;
       if (document is DocumentReference) {
-        _validateDatabase(document.firestore.databaseId, 'DocumentReference');
+        _validateDatabase(
+          document.firestore.modelDatabaseId,
+          'DocumentReference',
+        );
         path = document.path;
       } else if (document is String) {
         path = document;
@@ -218,7 +224,7 @@ class PipelineSource {
   /// Creates the pipeline that returns the same documents, in the same
   /// order, as the classic [query].
   Pipeline createFrom(Query<Object?> query) {
-    _validateDatabase(query.firestore.databaseId, 'Query');
+    _validateDatabase(query.firestore.modelDatabaseId, 'Query');
     return queryToPipeline(_firestore, query.query);
   }
 
@@ -315,7 +321,7 @@ class PipelineSource {
     final String path;
     if (collection is CollectionReference) {
       PipelineSource(firestore)._validateDatabase(
-        collection.firestore.databaseId,
+        collection.firestore.modelDatabaseId,
         'CollectionReference',
       );
       path = collection.path;
@@ -351,7 +357,7 @@ class PipelineSource {
   }
 
   void _validateDatabase(DatabaseId other, String type) {
-    final DatabaseId own = _firestore.databaseId;
+    final DatabaseId own = _firestore.modelDatabaseId;
     if (other != own) {
       throw ArgumentError(
         'Invalid $type. The project ID '

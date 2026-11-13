@@ -286,7 +286,7 @@ void main() {
         FirestoreSettings settings, String appName) async {
       final FirebaseApp app = newApp(appName);
       addTearDown(app.delete);
-      final Firestore firestore = await Firestore.instanceFor(
+      final Firestore firestore = Firestore.instanceFor(
           app: app,
           settings:
               settings.copyWith(cacheSettings: const MemoryCacheSettings()));

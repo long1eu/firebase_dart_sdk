@@ -34,7 +34,7 @@ void main() {
     web.window.localStorage.removeItem(reloadStorageKey);
 
     // The first page is gone, and with it its Web Lock.
-    final Firestore firestore = await reloadClient();
+    final Firestore firestore = reloadClient();
     addTearDown(() async {
       await firestore.terminate();
       await firestore.clearPersistence();

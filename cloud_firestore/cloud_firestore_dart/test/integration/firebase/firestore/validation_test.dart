@@ -136,7 +136,7 @@ void main() {
 
   test('firestoreGetInstanceWithNonNullAppReturnsNonNullInstance', () async {
     await withApp('firestoreTestApp', (FirebaseApp app) async {
-      expect(await Firestore.getInstance(app, openDatabase: DatabaseMock.create),
+      expect(Firestore.getInstance(app, openDatabase: DatabaseMock.create),
           isNotNull);
     });
   });
