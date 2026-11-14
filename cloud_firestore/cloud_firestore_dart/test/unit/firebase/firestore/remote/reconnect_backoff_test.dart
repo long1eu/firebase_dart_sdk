@@ -54,7 +54,15 @@ class _FakeFirestoreService extends proto.FirestoreServiceBase {
   Stream<proto.ListenResponse> listen(
     ServiceCall call,
     Stream<proto.ListenRequest> request,
-  ) => Stream<proto.ListenResponse>.value(proto.ListenResponse());
+  ) async* {
+    // The requests are read (the client of these tests ends them at once): a
+    // server connection that terminates with unread messages of a stream fails
+    // an assertion of package:http2 (ConnectionMessageQueueIn.onTerminated,
+    // '_stream2messageQueue.isEmpty'), about one run in 50 when the server
+    // shuts down.
+    await request.drain<void>();
+    yield proto.ListenResponse();
+  }
 
   @override
   dynamic noSuchMethod(Invocation invocation) =>
@@ -260,6 +268,11 @@ void main() {
 
       // The backend restarts right away.
       await server.shutdown();
+      // Once the client saw its connection end: a call started before that
+      // goes out on the old connection, which refuses it with a GOAWAY that
+      // package:grpc reports as UNKNOWN instead of retrying the call on a new
+      // connection (about one run in 150).
+      await connector.done.timeout(const Duration(seconds: 5));
       server = await serve(port);
       addTearDown(() => server.shutdown());
 

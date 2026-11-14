@@ -258,6 +258,34 @@ void main() {
     }
   });
 
+  test('the leading zeros of an exponent, and the exponent of zero, are not '
+      'limited in length', () {
+    // Found by test/unit/fuzz/decimal128_fuzz_test.dart: the length limit of
+    // the exponent counted its leading zeros, and applied to zero, whose
+    // value does not depend on its exponent.
+    for (final (String text, String same) in <(String, String)>[
+      ('9e-00000005455', '9e-5455'),
+      ('1e+000000000000000006111', '1e6111'),
+      ('1E${'0' * 20}', '1'),
+      ('0e99999999999999999999', '0'),
+      ('-0.0e-${'9' * 30}', '0'),
+    ]) {
+      expect(Decimal128Value(text), Decimal128Value(same), reason: text);
+      expect(Decimal128Value(text).stringValue, text);
+    }
+    // A long exponent of a number that is not zero is still out of range.
+    for (final String rejected in <String>[
+      '1e1000000000',
+      '1e-0001000000000',
+    ]) {
+      expect(
+        () => Decimal128Value(rejected),
+        throwsFormatException,
+        reason: rejected,
+      );
+    }
+  });
+
   group('ExactNumber', () {
     int compare(ExactNumber a, ExactNumber b) => a.compareTo(b).sign;
     ExactNumber dec(String s) => ExactNumber.parse(s);

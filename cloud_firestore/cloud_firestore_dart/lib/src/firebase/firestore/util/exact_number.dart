@@ -142,9 +142,20 @@ class ExactNumber implements Comparable<ExactNumber> {
         }
       }
       final int firstExponent = i;
+      // The value of zero does not depend on its exponent, which can then be
+      // of any size.
+      final bool zero = !'$integer$fraction'.codeUnits.any(
+        (int c) => c != 0x30,
+      );
+      int significantDigits = 0;
       while (i < length && _isDigit(source.codeUnitAt(i))) {
-        exponentValue = exponentValue * 10 + source.codeUnitAt(i++) - 0x30;
-        if (i - firstExponent > 9) {
+        final int digit = source.codeUnitAt(i++) - 0x30;
+        if (zero) {
+          continue;
+        }
+        exponentValue = exponentValue * 10 + digit;
+        // Leading zeros do not count.
+        if (exponentValue != 0 && ++significantDigits > 9) {
           throw FormatException('Exponent too large', source);
         }
       }
