@@ -541,8 +541,8 @@ Networking:
     IndexedDB (below).
   - Verified against the emulator only: on the VM, where the whole standard integration suite
     runs over the web transport (`tool/test_integration.sh standard --transport=webchannel`, or
-    `FIRESTORE_TEST_TRANSPORT=webchannel`), and in Chrome with 52 browser tests
-    (`tool/test_browser.sh both`; 51 pass and 1 is skipped with each compiler: the IndexedDB
+    `FIRESTORE_TEST_TRANSPORT=webchannel`), and in Chrome with 54 browser tests
+    (`tool/test_browser.sh both`; 53 pass and 1 is skipped with each compiler: the IndexedDB
     crash harness under dart2wasm, the 64 bit integer test under dart2js). No other browser and no production backend was tried.
   - Compile with dart2wasm to keep 64 bit integers exact. Compiled with dart2js, integers
     above 2^53 lose precision.

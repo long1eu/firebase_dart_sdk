@@ -30,7 +30,7 @@ These are the numbers behind the statements below. Each one says where it comes 
 | Integration, `test/integration` over gRPC (`tool/test_integration.sh standard --transport=grpc test/integration`, emulator v1.22.0) | 887 passed, 21 skipped, 0 failed | run for this page on 2026-11-14 |
 | The same tests over the web transport (`--transport=webchannel`: REST and WebChannel, on the VM) | 882 passed, 26 skipped, 0 failed | run for this page on 2026-11-14 |
 | The same tests with WebChannel in long-polling mode (`--transport=webchannel-longpolling`) | 882 passed, 26 skipped, 0 failed | run for this page on 2026-11-14 |
-| Browser tests in Chrome (`tool/test_browser.sh both`) | 52 tests per compiler, 51 pass and 1 is skipped, on dart2js and dart2wasm | [Platforms](guides/platforms.md); not re-run for this page (the machine used for it has no browser) |
+| Browser tests in Chrome (`tool/test_browser.sh both`) | 54 tests per compiler, 53 pass and 1 is skipped, on dart2js and dart2wasm | [Platforms](guides/platforms.md); run on 2026-11-14 at main 50470689 |
 | Production verification kit (`tool/verify_production`) against a real Standard edition database | 13 of 15 checks passed, 2 skipped | [Features and limits](guides/features.md), [The emulator and testing](guides/emulator_and_testing.md) |
 
 Each integration run used a fresh emulator. The same 908 tests run on every transport. The web transport skips five

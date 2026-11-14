@@ -18,7 +18,7 @@ has the current ones.
 | Integration over WebChannel | Standard edition emulator | 882 run, 26 skipped | `./tool/test_integration.sh standard --transport=webchannel` |
 | Integration over WebChannel with long polling | Standard edition emulator | 882 run, 26 skipped | `./tool/test_integration.sh standard --transport=webchannel-longpolling` |
 | Enterprise edition | Enterprise edition emulator | 447 run, 86 skipped | `./tool/test_integration.sh enterprise` |
-| Browser | Chrome, dart2wasm and dart2js, against the emulator | 52 per compiler: 51 pass, 1 skipped (source: [platforms guide](guides/platforms.md)) | `./tool/test_browser.sh both` |
+| Browser | Chrome, dart2wasm and dart2js, against the emulator | 54 per compiler: 53 pass, 1 skipped (source: [platforms guide](guides/platforms.md)) | `./tool/test_browser.sh both` |
 | Production verification kit | a real Firestore database (opt-in), or the emulator | 15 checks; latest production run: 13 passed, 2 skipped | `tool/verify_production/run.sh` |
 
 The skipped tests are skipped with a reason that the test runner prints. 361 of the 498 skipped

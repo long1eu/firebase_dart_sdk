@@ -85,8 +85,8 @@ listen and write streams, over `fetch`. What to know:
   web with `unavailable` (the emulator's WebChannel endpoint drops the stream; over gRPC the
   same query works). Read such collections in pages there. Whether the production backend
   has such a limit was not checked.
-- It was verified against the emulator only: 52 tests in Chrome (`tool/test_browser.sh both`
-  from the repository root; 51 pass and 1 is skipped with each compiler: under dart2wasm the
+- It was verified against the emulator only: 54 tests in Chrome (`tool/test_browser.sh both`
+  from the repository root; 53 pass and 1 is skipped with each compiler: under dart2wasm the
   crash harness of the IndexedDB storage, under dart2js the test of 64 bit integers), and the
   whole standard integration suite on the VM over the web transport
   (`tool/test_integration.sh standard --transport=webchannel`). Other browsers and the
