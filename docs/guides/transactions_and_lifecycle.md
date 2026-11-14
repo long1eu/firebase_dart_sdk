@@ -24,8 +24,9 @@ writing) instead of relying on a relative change.
 
 Writes outside transactions (`set`, `update`, `delete`, `WriteBatch`) go through the write stream.
 When the stream breaks, the writes that were not acknowledged are sent again on the new stream, as
-upstream does. Overwrites and deletes are harmless to repeat; whether the backend recognises a
-repeated write that carries a relative transform such as `FieldValue.increment` was not verified.
+upstream does. Overwrites and deletes are harmless to repeat. A relative transform such as
+`FieldValue.increment` is not: in the runs of the production verification kit, the backend applied
+a re-sent increment a second time after its acknowledgement was lost, as the emulator does.
 
 ### Read-only transactions
 

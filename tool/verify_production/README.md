@@ -10,9 +10,11 @@ The code is `cloud_firestore/cloud_firestore_dart/test/production/verify_product
 
 **Status of the kit itself:** it runs against the emulators (Standard and Enterprise edition),
 where the expected results are known (`test/production/verify_production_test.dart`). It was
-also run against a real Firestore database in Standard edition: 13 checks passed and 2 were
-skipped (7, which needs an Enterprise edition database, and 13, which needs a Web API key with
-anonymous sign-in). What that run did not cover is listed under "Not verified" below.
+also run against a real Firestore database in Standard edition: in one run 13 checks passed and 2
+were skipped (7, which needs an Enterprise edition database, and 13, which needs a Web API key
+with anonymous sign-in). An earlier run found a bug of the SDK that is fixed since. The result of
+each check is in the table under "Known results" below; what these runs did not cover is listed
+under "Not verified".
 
 ## What it does to your project
 
@@ -107,40 +109,63 @@ does not handle. `INCONCLUSIVE` means the check could not reach a result and say
 What to send back: the whole report. The most valuable lines are the answers of 2, 3, 4, 6, 8, 9,
 11 and 12, and of 7 and 13, which have not been run against production.
 
-## Known results on the emulators
+## Known results
 
-| id | Standard emulator | Enterprise emulator |
-| --- | --- | --- |
-| 1a, 1b, 5, 9, 11 | PASS | PASS |
-| 12 | PASS | PASS |
-| 13 | SKIPPED; PASS with the Auth emulator (`tool/start_auth_emulators.sh`) | not run |
-| 1c | PASS (the emulator needs no index) | PASS (one unexplained FAIL in six runs while other test suites used the emulator; not reproduced) |
-| 2 | PASS, `APPLIED TWICE` | PASS, `APPLIED TWICE` |
-| 3 | PASS, `APPLIED TWICE`, 2 attempts | PASS, `APPLIED TWICE` |
-| 4 | PASS (the emulator accepts any read time) | PASS |
-| 6 | PASS, `STANDARD` | PASS, `ENTERPRISE` |
-| 7 | SKIPPED | **FAIL**: the emulator (v1.22.0) replaces the field with the operand |
-| 8 | **FAIL**: -0.0 written over the web transport comes back as 0.0 | **FAIL**, the same |
-| 10 | SKIPPED | SKIPPED |
+The production column is the latest run against a real Standard edition database: 13 PASS, 2
+SKIPPED, in one run. The answers of 2, 3, 4, 6, 9, 10 and 11 are what that run observed.
 
-The failures are real and not about the kit:
+| id | Standard emulator | Enterprise emulator | Production (Standard edition) |
+| --- | --- | --- | --- |
+| 1a | PASS | PASS | PASS |
+| 1b | PASS | PASS | PASS |
+| 1c | PASS (the emulator needs no index) | PASS (one unexplained FAIL in six runs while other test suites used the emulator; not reproduced) | PASS: filters, order, limit, OR, `count()` and the composite-index query returned the expected documents |
+| 2 | PASS, `APPLIED TWICE` | PASS, `APPLIED TWICE` | PASS, `APPLIED TWICE`: the backend applied the re-sent `increment` again (n == 2); no write was lost and the cache agreed |
+| 3 | PASS, `APPLIED TWICE`, 2 attempts | PASS, `APPLIED TWICE` | PASS, `APPLIED TWICE`: the commit whose answer was lost was applied, the retry applied the body again (n == 2), and the transaction reported success after 2 attempts |
+| 4 | PASS (the emulator accepts any read time) | PASS | PASS: the listener got in sync with the read time unchanged, 2 hours old and 8 days old |
+| 5 | PASS | PASS | PASS: the backend accepted the target ids 1002, 1003, 123456789, 2147483646 and 2147483647 |
+| 6 | PASS, `STANDARD` | PASS, `ENTERPRISE` | PASS, `STANDARD`: `array-contains`, `array-contains-any` and `in` with `null` or `NaN` matched nothing |
+| 7 | SKIPPED | **FAIL**: the emulator (v1.22.0) replaces the field with the operand | SKIPPED: the database behaves like the Standard edition (check 6) |
+| 8 | **FAIL**: -0.0 written over the web transport comes back as 0.0 | **FAIL**, the same | PASS: -0.0, 0.0 and empty bytes round trip over gRPC and over the web transport, in all four combinations |
+| 9 | PASS | PASS | PASS: the backend ended the half-closed Listen stream after 68, 39 and 53 ms (the SDK waits up to 10 s) |
+| 10 | SKIPPED | SKIPPED | PASS: requests with the OAuth access token were accepted; the same read without a token was rejected with `permissionDenied` |
+| 11 | PASS | PASS | PASS: REST unary calls (read, transaction, aggregation) and the WebChannel streams (listen and write); the backend asked for session routing and the channel requests carried a `gsessionid` |
+| 12 | PASS | PASS | PASS over gRPC and over REST: CRUD, a batch, queries, an aggregation, a transaction and a read-only transaction |
+| 13 | SKIPPED; PASS with the Auth emulator (`tool/start_auth_emulators.sh`) | not run | SKIPPED: no Web API key was given |
+
+Each production run made 55 of at most 80 writes and deleted its 28 documents at the end.
+
+An earlier production run had 11 PASS, 1 FAIL, 1 INCONCLUSIVE and the same 2 SKIPPED:
+
+- **1c was INCONCLUSIVE** until its composite index existed: the single-field queries worked, the
+  backend answered the composite query with `FAILED_PRECONDITION` and a link to create the index,
+  and the kit printed the link.
+- **8 FAILED** and exposed a bug of the SDK: -0.0 read over the web transport came back as 0.0,
+  whether it was written over gRPC or over the web transport (also inside an array). Read over
+  gRPC it kept its sign, and empty bytes were not affected. Production sends the value as the JSON
+  number `-0`, which `jsonDecode` reads as the integer 0; the responses of the web transport are
+  now decoded keeping the sign (see the CHANGELOG of `cloud_firestore_dart`), and the check passes.
+- The other checks had the same results in both runs, including the answers of 2, 3, 4, 6, 10 and
+  11. Only the samples of check 9 differ, as expected of a timing: 43, 53 and 50 ms in the earlier
+  run.
+
+The failures on the emulators are real and not about the kit:
 
 - **8:** the emulator's JSON front end stores `-0` as `0` (also for a plain REST request with
-  `"doubleValue": "-0"`). Whether production does the same is what the check is for.
+  `"doubleValue": "-0"`). Production keeps the sign.
 - **7 on Enterprise:** emulator behaviour; the check is for a production Enterprise database.
 
 Check 6 on Standard used to fail: the SDK itself matches `null` and `NaN` in `in`,
 `array-contains` and `array-contains-any` (the Enterprise behaviour), the Standard backend does
 not, and with the documents in the cache a server read of such a query did not complete. The
 sync engine now drops a limbo document that the backend confirms but does not match (4c72e9ea),
-so the server read returns what the backend returns and the check passes. Its detail lines still
-list the difference that remains: a query answered from the cache alone (`get(Source.cache)`)
-returns those documents on a Standard database. If check 6 fails on a production Standard
-database, that fix does not hold there.
+so the server read returns what the backend returns and the check passes, on the Standard
+emulator and on the production Standard database. Its detail lines still list the difference that
+remains: a query answered from the cache alone (`get(Source.cache)`) returns those documents on
+a Standard database.
 
 ## Not verified
 
-The run against a production Standard edition database passed the checks that use the TCP proxy
+The runs against a production Standard edition database passed the checks that use the TCP proxy
 in front of Google's front end (2 and 3; they report `INCONCLUSIVE` when the proxy can not
 write), the OAuth access token from Application Default Credentials (10), the web transport
 (11) and Firestore Lite over gRPC and REST (12). Still not verified against production:
@@ -151,6 +176,4 @@ write), the OAuth access token from Application Default Credentials (10), the we
   sign-in provider.
 - **App Check:** the kit has no App Check token provider.
 - **Load:** the kit makes at most 80 writes; it says nothing about long-running use.
-- **The index link** of check 1c: the kit looks for a `https://console...` link in the error
-  message; if the backend words it differently the message is printed as is.
 - The edition of the database is inferred from check 6; the kit cannot ask the backend for it.

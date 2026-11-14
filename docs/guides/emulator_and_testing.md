@@ -208,9 +208,10 @@ There are two ways to run against a real project, both opt-in. The production ve
 (`tool/verify_production`, see its README) is the smaller one: 15 named checks that make at most
 80 writes below one document of their own, print a plan first and only run with `--yes`. It
 passes against both emulators, with the known emulator differences listed in its README, and it
-was run against a real Firestore database in Standard edition: 13 checks passed and 2 were
-skipped (one needs an Enterprise edition database, the other a Web API key with anonymous
-sign-in).
+was run against a real Firestore database in Standard edition: 13 checks passed in one run and 2
+were skipped (one needs an Enterprise edition database, the other a Web API key with anonymous
+sign-in). An earlier run found one bug of the SDK, which is fixed (-0.0 read over the web transport
+lost its sign). Its README has the result of each check.
 
 The integration suite can also run against a real project. Nothing does this by default: it
 only happens when you set `FIRESTORE_TEST_PROJECT_ID` yourself and `FIRESTORE_EMULATOR_HOST` is

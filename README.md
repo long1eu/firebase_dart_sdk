@@ -73,8 +73,9 @@ null safety, and parts of its public API follow the JS SDK.
 
 - **Tested mostly against the Firestore emulator.** Against production, only the production
   verification kit (`tool/verify_production`) was run, on a real Firestore database in Standard
-  edition: 13 of its 15 checks passed and 2 were skipped (one needs an Enterprise edition
-  database, the other a Web API key with anonymous sign-in). Not verified against production:
+  edition: 13 of its 15 checks passed in one run and 2 were skipped (one needs an Enterprise
+  edition database, the other a Web API key with anonymous sign-in). An earlier run found one bug
+  of this SDK, which is fixed (-0.0 read over the web transport lost its sign). Not verified against production:
   the Enterprise edition features (BSON value types, Pipelines; tested against the emulator in
   Enterprise edition only), Firebase Auth user sign-in, the integration suite as a whole and
   long-running load. Test against your own project before relying on it.
@@ -160,7 +161,7 @@ Two more checks:
 
 The last one is the production verification kit run against the emulator. Against a real project
 it only runs with your own credentials and `--yes` (see `tool/verify_production/README.md`); that
-was done on a Standard edition database (13 checks passed, 2 were skipped).
+was done on a Standard edition database (the results are in that README).
 
 See `tool/README.md` for details, and the Testing section of
 `cloud_firestore/cloud_firestore_dart/README.md` for the opt-in run of the integration suite

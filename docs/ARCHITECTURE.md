@@ -86,7 +86,7 @@ the `RemoteStore`, and a task that is already on the queue runs nested calls inl
 | Browser | `test/browser` (transport, features, Firestore Lite, web persistence and its crash harness) | the private emulator on 127.0.0.1:8090, Chrome | `tool/test_browser.sh [dart2wasm\|dart2js\|both]`, from the repository root |
 | Property tests | `test/unit/property/` (value order, serializers, canonical ids), `test/integration/firebase/firestore/property_*_test.dart` and `test/integration_enterprise/property_*_test.dart` (queries and mutations against the backend) | nothing, or the emulators | run with the unit and integration suites; seeded, the seed is printed on failure |
 | Chaos | `test/integration/firebase/firestore/chaos/` behind `test/util/chaos_proxy.dart`, a TCP proxy that cuts, stalls and delays connections | standard emulator | run with the standard integration suite |
-| Production verification kit | `tool/verify_production` (`test/production/`) | an emulator, or a real project with your credentials and `--yes` (run on a Standard edition database: 13 checks passed, 2 skipped) | `tool/verify_production/run.sh --backend=emulator`, from the repository root |
+| Production verification kit | `tool/verify_production` (`test/production/`) | an emulator, or a real project with your credentials and `--yes` (run on a Standard edition database; the results are in its README) | `tool/verify_production/run.sh --backend=emulator`, from the repository root |
 | Size check | `tool/size`, `tool/check_size.sh` | nothing | `tool/check_size.sh`, from the repository root |
 | Interop with the JS SDK | `test/integration/firebase/firestore/js_interop_test.dart` | standard emulator and the Node harness in `tool/interop` (`npm install` there) | runs with the standard integration suite; skipped without the harness |
 | Examples | `example/*.dart`, run by `test/integration/firebase/firestore/examples_smoke_test.dart` and `test/integration_enterprise/examples_enterprise_smoke_test.dart` | the emulators | run with the integration suites |
@@ -203,8 +203,10 @@ changes. `PORTING NOTE` comments in `lib/` mark these places in the code.
   stream token in the handshake. So a batch that the backend applied but whose acknowledgement
   never reached the client is applied again. Idempotent writes (set, update of fixed values,
   delete, `arrayUnion`, `arrayRemove`, batches, which are atomic) end in the same state;
-  `FieldValue.increment` is counted again. The emulator does not deduplicate; whether production
-  Firestore does is not verified. A write that was acknowledged to the caller is never sent again,
+  `FieldValue.increment` is counted again. The emulator does not deduplicate, and neither did
+  production Firestore in the two runs of the verification kit: after a lost acknowledgement the re-sent
+  increment was applied a second time (check 2), and a transaction whose commit answer was lost was
+  applied and then applied again by its retry (check 3). A write that was acknowledged to the caller is never sent again,
   and a request lost before it reached the backend (the acknowledgement was never sent) is applied
   exactly once. Tests: `test/integration/firebase/firestore/chaos/writes_chaos_test.dart` asserts
   exactly once when only requests are lost (and checks, through the proxy, that no answer was

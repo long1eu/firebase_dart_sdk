@@ -90,8 +90,10 @@ has the changes with before and after code.
 
 - **Production.** Most of the testing is against the emulator. The production verification kit
   (`tool/verify_production` in the repository) was run against a real Firestore database in
-  Standard edition: 13 of its 15 checks passed and 2 were skipped (one needs an Enterprise
-  edition database, the other a Web API key with anonymous sign-in). Not verified against
+  Standard edition: 13 of its 15 checks passed in one run and 2 were skipped (one needs an
+  Enterprise edition database, the other a Web API key with anonymous sign-in). An earlier run
+  found one bug of this SDK, which is fixed (-0.0 read over the web transport lost its sign). Not
+  verified against
   production: the Enterprise edition features (only against the Enterprise edition emulator),
   Firebase Auth user sign-in, the integration suite as a whole and long-running load.
 - **Coordination between clients that share one cache** (the multi-tab support of the JS SDK):

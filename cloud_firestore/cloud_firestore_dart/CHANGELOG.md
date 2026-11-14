@@ -122,9 +122,10 @@ How this was verified:
 
 - Unit tests, the spec tests shared with the JS and Android SDKs, and integration tests against
   the local Firestore emulator. Against production Firestore only the verification kit
-  (`tool/verify_production`) was run, on a Standard edition database: 13 of its 15 checks passed
-  and 2 were skipped (one needs an Enterprise edition database, the other a Web API key with
-  anonymous sign-in).
+  (`tool/verify_production`) was run, on a Standard edition database: 13 of its 15 checks
+  passed in one run and 2 were skipped (one needs an Enterprise edition database, the other a Web
+  API key with anonymous sign-in). An earlier run found the -0.0 bug of the web transport that is
+  fixed in this version.
 - Features of the Enterprise edition (BSON value types, Pipelines) were run against the
   emulator in Enterprise edition only.
 - Web support is experimental: it was run in Chrome only, against the emulator only, with a
@@ -643,7 +644,7 @@ Documentation and tests:
   (`tool/gen_protos.sh`).
 - A production verification kit (`tool/verify_production`): 15 named checks that run against
   the emulator and, only with your own credentials and an explicit `--yes`, against a real
-  project. It was run against a real Standard edition database (13 passed, 2 skipped).
+  project. It was run against a real Standard edition database; its README lists the results.
 
 ### Fixed
 

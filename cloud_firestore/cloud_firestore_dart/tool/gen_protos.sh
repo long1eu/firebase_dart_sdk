@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 # Regenerates lib/src/proto from res/protos. Requires protoc_plugin 25.1.0 (matches protobuf 6.x): dart pub global activate protoc_plugin 25.1.0;
 # and either a working `protoc` or `python -m grpc_tools.protoc` (set PROTOC to override).
+# The generated files do not record the version of the plugin that wrote them, so the version of the committed
+# *.pb.dart files is not known from the files; 25.1.0 is the version this header and the commit that regenerated
+# them name. protoc_plugin 25.0.0 writes different *.pb.dart files (no `$_createMessage`, `create()` not deprecated),
+# so it is not the one that was used; the barrels, *.pbenum.dart and *.pbgrpc.dart files come out the same with it.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 export PATH="$PATH:$HOME/.pub-cache/bin"
