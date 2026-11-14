@@ -42,7 +42,8 @@ final FirestoreSettings lru = FirestoreSettings(
   1 MB; a smaller value throws an `ArgumentError`.
 - Without an `openDatabase` the cache is in memory whatever the settings say.
 - Pending writes are never removed by garbage collection.
-- Settings only apply to the `instanceFor` call that creates the instance.
+- Settings are given to the `instanceFor` call that creates the instance. A later call with
+  different settings throws a `StateError`; `terminate()` the instance first to change them.
 
 ## SQLite on the Dart VM
 

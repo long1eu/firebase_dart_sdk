@@ -58,9 +58,14 @@ class Firestore {
     this._databaseId,
     this.firebaseApp,
     FirestoreClient? client,
-    this._scheduler,
-  ) : _clientOrNull = client,
-      _dataConverter = UserDataConverter(_databaseId);
+    this._scheduler, {
+    FirestoreSettings? settings,
+  }) : _clientOrNull = client,
+       _settings = settings ?? FirestoreSettings(),
+       _dataConverter = UserDataConverter(_databaseId);
+
+  /// The settings this instance was created with.
+  final FirestoreSettings _settings;
 
   static const String _tag = 'FirebaseFirestore';
 
@@ -118,7 +123,13 @@ class Firestore {
   }
 
   /// Gets the instance for [app] and [database], creating it on the first call. Later calls return the same instance
-  /// until it is terminated ([openDatabase] and [settings] only apply to the call that creates it).
+  /// until it is terminated.
+  ///
+  /// [settings] are those of the call that creates the instance. A later call without settings, or with equal
+  /// settings, returns the existing instance; a later call with different settings throws a [StateError], as the
+  /// other SDKs do (`initializeFirestore` called twice with different options in the JS SDK, settings changed after
+  /// the start on Android): [terminate] the instance first to get one with other settings. [openDatabase] only
+  /// applies to the call that creates the instance.
   ///
   /// Returns at once, as the other SDKs do: the instance opens its cache and connects in the background, and every
   /// operation waits for that. If opening fails (for example [openDatabase] throws), the operations of the instance
@@ -246,6 +257,7 @@ class Firestore {
       app,
       firestoreClient,
       scheduler,
+      settings: firestoreSettings,
     );
     FirestoreMultiDbComponent.register(app, database, firestore);
     return firestore;
@@ -660,6 +672,9 @@ extension FirestoreInternal on Firestore {
 
   /// The scheduler of the timers of this instance.
   TaskScheduler get scheduler => _scheduler;
+
+  /// The settings this instance was created with.
+  FirestoreSettings get settings => _settings;
 
   /// Throws an [ArgumentError] unless [docRef] belongs to this instance. Used by `WriteBatch` and `Transaction`.
   void validateReference(DocumentReference<Object?> docRef) =>

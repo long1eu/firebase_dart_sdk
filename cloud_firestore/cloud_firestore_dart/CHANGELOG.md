@@ -1,5 +1,9 @@
 ## Unreleased
 
+- **Behaviour change:** `Firestore.instanceFor()` (and `getInstance`) throws a `StateError` when it is given settings
+  that differ from those of the instance that already exists for the app and database, as the JS and Android SDKs
+  do. Before, the new settings were silently ignored. Call it without settings to get the existing instance, or
+  `terminate()` that instance first.
 - A listener no longer gets an extra `modified` event, with pending writes and unchanged fields, when watch sends a
   document before the acknowledgement of a set with a server timestamp. A set overlay that comes from a real set is
   now applied as stored when the document arrives, as in the other SDKs; only one that stands for a merge or update

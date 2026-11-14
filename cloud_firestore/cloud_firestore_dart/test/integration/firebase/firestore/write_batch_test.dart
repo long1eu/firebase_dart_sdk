@@ -235,16 +235,32 @@ void main() {
       err = e;
     }
 
-    // Local event with the set document.
-    final QuerySnapshot localSnap = await accumulator.wait();
-    expect(localSnap.metadata.hasPendingWrites, isTrue);
+    // Under load the listener can also raise metadata-only events (for
+    // example when its first server response arrives after the write), so,
+    // as upstream does with awaitLocalEvent() / awaitRemoteEvent(), wait for
+    // the event with the expected pending writes state. Every event in
+    // between must show the same documents as the one before it: the batch
+    // is never seen half applied.
+
+    // Local event with the set document. Events before it are still empty.
+    QuerySnapshot localSnap = await accumulator.wait();
+    while (!localSnap.metadata.hasPendingWrites) {
+      expect(localSnap.length, 0);
+      localSnap = await accumulator.wait();
+    }
     expect(querySnapshotToValues(localSnap), <Map<String, int>>[
       map<int>(<dynamic>['a', 1])
     ]);
 
-    // Server event with the set reverted
-    final QuerySnapshot serverSnap = await accumulator.wait();
-    expect(serverSnap.metadata.hasPendingWrites, isFalse);
+    // Server event with the set reverted. Events before it still hold the
+    // local write.
+    QuerySnapshot serverSnap = await accumulator.wait();
+    while (serverSnap.metadata.hasPendingWrites) {
+      expect(querySnapshotToValues(serverSnap), <Map<String, int>>[
+        map<int>(<dynamic>['a', 1])
+      ]);
+      serverSnap = await accumulator.wait();
+    }
     expect(serverSnap.length, 0);
 
     expect(err, isNotNull);

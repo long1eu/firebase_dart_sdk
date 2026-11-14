@@ -44,8 +44,11 @@ final Firestore firestore = Firestore.instanceFor(app: app);
   [`firebase_app_dart` README](../../firebase_core/firebase_app_dart/README.md) explains how to
   make an application id for a desktop platform.
 - `Firestore.instanceFor` returns the same instance for the same app and database until that
-  instance is terminated. Settings and the cache opener are only used by the call that creates
-  it. Use `database: 'my-database'` for a named database.
+  instance is terminated. The settings are those of the call that creates it: a later call
+  without settings or with equal ones returns the instance, a later call with different settings
+  throws a `StateError` (as the JS and Android SDKs refuse new settings once the instance exists).
+  The cache opener is only used by the first call. Use `database: 'my-database'` for a named
+  database.
 - Without a token provider the requests are not authenticated, so the security rules see no
   user. See [Authentication](authentication.md).
 

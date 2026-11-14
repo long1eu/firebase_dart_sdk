@@ -148,7 +148,7 @@ make an application id for desktop and servers.
 |---|---|---|
 | Default instance | `FirebaseFirestore.instance` (creates it) | `Firestore.instance` returns the default app's instance **only after** `Firestore.instanceFor(app: ...)` created it; before that it throws a `StateError` |
 | Instance for an app | `FirebaseFirestore.instanceFor(app: app, databaseId: 'db')` | `Firestore.instanceFor(app: app, database: 'db', settings: ..., openDatabase: ...)` |
-| Settings | `FirebaseFirestore.instance.settings = Settings(...)` (a setter) | passed to the `instanceFor` call that creates the instance; there is no setter, and a later `instanceFor` with other settings returns the existing instance unchanged |
+| Settings | `FirebaseFirestore.instance.settings = Settings(...)` (a setter) | passed to the `instanceFor` call that creates the instance; there is no setter. A later `instanceFor` without settings or with equal ones returns the instance; with different settings it throws a `StateError` |
 | Class name | `FirebaseFirestore` | `Firestore`; `FirebaseFirestore` is a typedef of it |
 | Settings class | `Settings` | `FirestoreSettings`; `Settings` is a typedef of it |
 

@@ -77,11 +77,22 @@ class FirestoreMultiDbComponent {
 
   /// Provides the instance of Firestore for the given database name, creating
   /// it on first use. Later calls return the same instance until it is shut
-  /// down ([openDatabase] and [settings] only apply to the first call).
+  /// down, unless they ask for other [settings]: that throws a [StateError],
+  /// like `initializeFirestore` with different options in the JS SDK and
+  /// `setFirestoreSettings` after the start on Android. [openDatabase] only
+  /// applies to the first call.
   Firestore get(String databaseName, OpenDatabase? openDatabase) {
     final String key = keyFor(app.name, databaseName);
     final Firestore? existing = instances[key];
     if (existing != null && identical(existing.firebaseApp, app)) {
+      final FirestoreSettings? requested = settings;
+      if (requested != null && requested != existing.settings) {
+        throw StateError(
+          'Firestore.instanceFor() has already been called with different '
+          'settings for this app and database. Call it without settings to '
+          'get the existing instance, or terminate() that instance first.',
+        );
+      }
       return existing;
     }
 
