@@ -5,6 +5,9 @@
 //   CHAOS_SOAK_SECONDS  how long the random phase lasts (default 4; the default run stays short)
 //   CHAOS_SOAK_SEED     the seed of the operations (default: taken from the clock and printed)
 //   CHAOS_SOAK_CLIENTS  the number of clients (default 3)
+//   CHAOS_SOAK_SDK_LOG  1 to also keep the debug log of the SDK (all clients, on the clock of the test) and print
+//                       its last lines when the test fails: for failures inside a client that the wire does not
+//                       explain (a listener that stops getting snapshots). Off by default: it slows the clients.
 //
 // On failure the seed and the log of the operations are printed. The seed fixes the sequence of operations of each
 // client, not their exact timing. So the failure output also holds what is needed to explain a failure without
@@ -18,6 +21,7 @@ import 'dart:io';
 import 'dart:math';
 
 import 'package:cloud_firestore_dart/cloud_firestore_dart.dart';
+import 'package:firebase_app_dart/internal.dart' show InternalLogLevel, Log;
 import 'package:test/test.dart';
 
 import '../../../../util/chaos_proxy.dart';
@@ -36,8 +40,14 @@ void main() {
       _env('CHAOS_SOAK_SEED', DateTime.now().millisecondsSinceEpoch % 1000000);
   final int clientCount = _env('CHAOS_SOAK_CLIENTS', 3);
 
-  test('random operations with random cuts converge on the backend state',
-      () async {
+  final bool keepSdkLog = Platform.environment['CHAOS_SOAK_SDK_LOG'] == '1';
+
+  /// The last lines of the debug log of the SDK, when it is kept.
+  final List<String> sdkLog = <String>[];
+  const int sdkLogLines = 60000;
+  final RegExp sdkLogLine = RegExp(r'^[DIWE]:');
+
+  Future<void> soak() async {
     final ChaosEnv env = await ChaosEnv.start();
     final List<String> log = <String>[];
     void record(String message) => log.add(
@@ -60,6 +70,10 @@ void main() {
       }
       for (final _SoakClient client in clients) {
         await client.main.synced();
+      }
+      if (keepSdkLog) {
+        // After the clients exist: creating one sets the level.
+        Log.level = InternalLogLevel.d;
       }
 
       // ignore: avoid_print
@@ -116,12 +130,37 @@ void main() {
       print('SOAK FAILED: rerun with CHAOS_SOAK_SEED=$seed '
           'CHAOS_SOAK_CLIENTS=$clientCount CHAOS_SOAK_SECONDS=$seconds\n'
           '${log.join('\n')}\n'
-          '${_diagnostics(clients, freshListeners, backend, wire)}');
+          '${_diagnostics(clients, freshListeners, backend, wire)}'
+          '${keepSdkLog ? '--- debug log of the SDK (last ${sdkLog.length} lines)\n${sdkLog.join('\n')}\n' : ''}');
       rethrow;
     } finally {
+      Log.level = InternalLogLevel.w;
       wire.uninstall();
       await env.close();
     }
+  }
+
+  test('random operations with random cuts converge on the backend state', () {
+    if (!keepSdkLog) {
+      return soak();
+    }
+    // The SDK logs with print: its lines are kept instead of printed.
+    return runZoned(
+      soak,
+      zoneSpecification: ZoneSpecification(
+        print: (Zone self, ZoneDelegate parent, Zone zone, String line) {
+          if (sdkLogLine.hasMatch(line)) {
+            if (sdkLog.length >= sdkLogLines) {
+              sdkLog.removeRange(0, sdkLogLines ~/ 4);
+            }
+            sdkLog.add(
+                '${chaosClock.elapsedMilliseconds.toString().padLeft(6)} $line');
+          } else {
+            parent.print(zone, line);
+          }
+        },
+      ),
+    );
   }, skip: chaosSkipReason, timeout: Timeout(Duration(seconds: seconds + 120)));
 }
 
