@@ -157,12 +157,7 @@ class DocumentSnapshot<T extends dynamic> {
   int get hashCode => Object.hash(_firestore, _key, document?.data);
 
   @override
-  String toString() {
-    return (ToStringHelper(runtimeType)
-          ..add('key', _key)
-          ..add('document', document))
-        .toString();
-  }
+  String toString() => 'DocumentSnapshot{key=$_key, doc=$document}';
 }
 
 /// A [QueryDocumentSnapshot] contains the data of a document that exists: one
@@ -218,5 +213,5 @@ class QuerySnapshot<T extends dynamic> {
       Object.hash(query, const ListEquality<Object?>().hash(docs));
 
   @override
-  String toString() => 'QuerySnapshot{query: $query, docs: $docs}';
+  String toString() => 'QuerySnapshot{query: $query, size: $length}';
 }

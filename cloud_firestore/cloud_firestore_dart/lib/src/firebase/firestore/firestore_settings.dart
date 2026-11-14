@@ -5,7 +5,6 @@
 import 'package:cloud_firestore_dart/src/firebase/firestore/auth/emulator_credentials_provider.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local_cache_settings.dart';
 import 'package:collection/collection.dart';
-import 'package:firebase_app_dart/internal.dart';
 
 /// Settings used to configure a FirebaseFirestore instance.
 class FirestoreSettings {
@@ -474,21 +473,12 @@ class FirestoreSettings {
       const DeepCollectionEquality().hash(mockUserToken);
 
   @override
-  String toString() {
-    return (ToStringHelper(FirestoreSettings)
-          ..add('host', host)
-          ..add('port', port)
-          ..add('sslEnabled', sslEnabled)
-          ..add('persistenceEnabled', persistenceEnabled)
-          ..add('cacheSizeBytes', cacheSizeBytes)
-          ..add('cacheSettings', cacheSettings)
-          ..add('experimentalForceLongPolling', experimentalForceLongPolling)
-          ..add(
-            'experimentalAutoDetectLongPolling',
-            experimentalAutoDetectLongPolling,
-          )
-          ..add('grpcFlowControlWindow', grpcFlowControlWindow)
-          ..add('mockUserToken', mockUserToken == null ? null : '<set>'))
-        .toString();
-  }
+  String toString() =>
+      'FirestoreSettings{host=$host, port=$port, sslEnabled=$sslEnabled, '
+      'persistenceEnabled=$persistenceEnabled, cacheSizeBytes=$cacheSizeBytes, '
+      'grpcFlowControlWindow=$grpcFlowControlWindow, cacheSettings=$cacheSettings, '
+      'experimentalForceLongPolling=$experimentalForceLongPolling, '
+      'experimentalAutoDetectLongPolling=$experimentalAutoDetectLongPolling, '
+      // The token is a credential: only whether there is one.
+      'mockUserToken=${mockUserToken == null ? null : '<set>'}}';
 }

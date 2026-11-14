@@ -209,8 +209,9 @@ void main() {
   });
 
   test('testRegularBlobStringIsUnchanged', () {
-    // Part of the canonical id of persisted queries.
-    expect(Blob(_bytes(<int>[1, 2, 3])).toString(), 'Blob { bytes= 010203 }');
+    // The Android format. (It is no longer part of the canonical id of a
+    // query.)
+    expect(Blob(_bytes(<int>[1, 2, 3])).toString(), 'Blob { bytes=010203, subtype=0 }');
   });
 
   test('a Decimal128Value is a value decimal128 holds exactly', () {

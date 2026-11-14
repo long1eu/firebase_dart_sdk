@@ -20,6 +20,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/model/database_id.da
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/document_key.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/field_path.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/field_mask.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/model/value/canonical_value.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/regex_value.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/server_timestamp_behavior.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/assert.dart';

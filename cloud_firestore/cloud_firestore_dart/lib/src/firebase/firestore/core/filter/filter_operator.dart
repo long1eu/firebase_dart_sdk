@@ -5,6 +5,7 @@
 part of 'filter.dart';
 
 class FilterOperator {
+  // The names of the operators in the JS SDK.
   const FilterOperator._(this._value);
 
   final String _value;
@@ -16,17 +17,17 @@ class FilterOperator {
   static const FilterOperator graterThan = FilterOperator._('>');
   static const FilterOperator graterThanOrEqual = FilterOperator._('>=');
   static const FilterOperator arrayContains = FilterOperator._(
-    'array_contains',
+    'array-contains',
   );
   static const FilterOperator arrayContainsAny = FilterOperator._(
-    'array_contains_any',
+    'array-contains-any',
   );
 
   // ignore: constant_identifier_names
   static const FilterOperator IN = FilterOperator._('in');
 
   // ignore: constant_identifier_names
-  static const FilterOperator NOT_IN = FilterOperator._('not_in');
+  static const FilterOperator NOT_IN = FilterOperator._('not-in');
 
   static const List<FilterOperator> arrayOperators = <FilterOperator>[
     arrayContains,
@@ -48,17 +49,9 @@ class FilterOperator {
   ];
 
   /// The name of this operator in the canonical id of a query, which is stored in the cache: the name in the JS SDK.
-  String get canonicalName {
-    if (this == arrayContains) {
-      return 'array-contains';
-    } else if (this == arrayContainsAny) {
-      return 'array-contains-any';
-    } else if (this == NOT_IN) {
-      return 'not-in';
-    }
-    return _value;
-  }
+  String get canonicalName => _value;
 
+  /// The name of this operator in the JS SDK (`array-contains`, `not-in`), for messages.
   @override
   String toString() => _value;
 }

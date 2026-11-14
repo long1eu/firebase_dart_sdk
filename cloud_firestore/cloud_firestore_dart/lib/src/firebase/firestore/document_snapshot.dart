@@ -549,13 +549,8 @@ class DocumentSnapshot<T extends dynamic> {
   }
 
   @override
-  String toString() {
-    return (ToStringHelper(runtimeType) //
-          ..add('key', _key)
-          ..add('metadata', metadata)
-          ..add('document', document))
-        .toString();
-  }
+  String toString() =>
+      'DocumentSnapshot{key=$_key, metadata=$metadata, doc=$document}';
 }
 
 /// Holds settings that define field value deserialization options.

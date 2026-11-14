@@ -37,7 +37,6 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/model/resource_path.
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/util.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/vector_query.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/vector_value.dart';
-import 'package:firebase_app_dart/internal.dart';
 
 /// An enum for the direction of a sort.
 enum Direction {
@@ -840,10 +839,10 @@ class Query<T extends dynamic> {
 
   @override
   String toString() {
-    return (ToStringHelper(runtimeType)
-          ..add('query', query)
-          ..add('firestore', firestore))
-        .toString();
+    final Query<T> self = this;
+    return self is CollectionReference<T>
+        ? 'CollectionReference(path: ${self.path})'
+        : '$_query';
   }
 }
 

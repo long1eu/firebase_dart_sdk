@@ -16,7 +16,6 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/model/document.dart'
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/document.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/query.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/snapshot_metadata.dart';
-import 'package:firebase_app_dart/internal.dart';
 
 /// A [QuerySnapshot] contains the results of a query. It can contain zero or more [DocumentSnapshot] objects.
 ///
@@ -178,15 +177,8 @@ class QuerySnapshot<T extends dynamic>
   }
 
   @override
-  String toString() {
-    return (ToStringHelper(QuerySnapshot)
-          ..add('query', query)
-          ..add('metadata', metadata)
-          ..add('snapshot', snapshot)
-          ..add('cachedChanges', _cachedChanges)
-          ..add('cachedChangesMetadataState', _cachedChangesMetadataState))
-        .toString();
-  }
+  String toString() =>
+      'QuerySnapshot(query: $query, metadata: $metadata, size: $length)';
 }
 
 /// Members of [QuerySnapshot] for the SDK itself. Not exported by the public libraries.

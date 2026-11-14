@@ -216,9 +216,9 @@ void main() {
     expect(_dec('1.2e3').toString(), '{__decimal128__:1.2e3}');
     expect(wrap(MinKey.instance).toString(), '{__min__:null}');
     expect(wrap(MaxKey.instance).toString(), '{__max__:null}');
-    // Persisted with the queries, the ids of the existing types must not
-    // change.
-    expect(wrap(blob(<int>[1, 2, 3])).toString(), 'Blob { bytes= 010203 }');
+    // The strings of the other values (the canonical ids of queries are
+    // built by canonifyValue, see canonical_value_test.dart).
+    expect(wrap(blob(<int>[1, 2, 3])).toString(), 'Blob { bytes=010203, subtype=0 }');
     expect(wrap(1).toString(), '1');
     expect(wrap(1.0).toString(), '1.0');
     expect(wrap(_binary(1, <int>[1, 2, 3])).toString(),

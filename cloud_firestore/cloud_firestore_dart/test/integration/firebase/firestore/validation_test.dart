@@ -776,7 +776,7 @@ void main() {
       () async => (await testCollection())
           .whereNotEqualTo('x', 32)
           .whereNotEqualTo('x', 33),
-      'Invalid Query. You cannot use more than one "!=" filter.',
+      'Invalid query. You cannot use more than one \'!=\' filter.',
     );
   });
 
@@ -785,7 +785,7 @@ void main() {
       () async => (await testCollection())
           .whereNotIn('foo', <int>[1, 2])
           .whereNotEqualTo('foo', 1),
-      'Invalid Query. You cannot use "!=" filters with "not_in" filters.',
+      'Invalid query. You cannot use \'!=\' filters with \'not-in\' filters.',
     );
 
     await expectError(
@@ -793,7 +793,7 @@ void main() {
         'foo',
         <int>[1, 2],
       ),
-      'Invalid Query. You cannot use "not_in" filters with "!=" filters.',
+      'Invalid query. You cannot use \'not-in\' filters with \'!=\' filters.',
     );
   });
 
@@ -802,28 +802,28 @@ void main() {
       () async => (await testCollection())
           .whereNotIn('foo', <int>[1, 2])
           .whereNotIn('bar', <int>[1, 2]),
-      'Invalid Query. You cannot use more than one "not_in" filter.',
+      'Invalid query. You cannot use more than one \'not-in\' filter.',
     );
 
     await expectError(
       () async => (await testCollection())
           .whereNotIn('bar', <int>[1, 2])
           .whereArrayContainsAny('foo', <int>[1, 2]),
-      'Invalid Query. You cannot use "array_contains_any" filters with "not_in" filters.',
+      'Invalid query. You cannot use \'array-contains-any\' filters with \'not-in\' filters.',
     );
 
     await expectError(
       () async => (await testCollection())
           .whereNotIn('bar', <int>[1, 2])
           .whereIn('foo', <int>[1, 2]),
-      'Invalid Query. You cannot use "in" filters with "not_in" filters.',
+      'Invalid query. You cannot use \'in\' filters with \'not-in\' filters.',
     );
 
     await expectError(
       () async => (await testCollection())
           .whereIn('bar', <int>[1, 2])
           .whereNotIn('foo', <int>[1, 2]),
-      'Invalid Query. You cannot use "not_in" filters with "in" filters.',
+      'Invalid query. You cannot use \'not-in\' filters with \'in\' filters.',
     );
   });
 
@@ -848,13 +848,13 @@ void main() {
 
     await expectError(
       () async => (await testCollection()).whereNotIn('bar', <dynamic>[]),
-      'Invalid Query. A non-empty array is required for "not_in" filters.',
+      'Invalid Query. A non-empty array is required for "not-in" filters.',
     );
 
     await expectError(
       () async =>
           (await testCollection()).whereArrayContainsAny('bar', <dynamic>[]),
-      'Invalid Query. A non-empty array is required for "array_contains_any" filters.',
+      'Invalid Query. A non-empty array is required for "array-contains-any" filters.',
     );
   });
 
@@ -870,7 +870,7 @@ void main() {
     final CollectionReference collection = await testCollection();
     // Composite queries can validate conflicting operators in multiple
     // inequality.
-    String reason = 'Invalid Query. You cannot use more than one "!=" filter.';
+    String reason = 'Invalid query. You cannot use more than one \'!=\' filter.';
     await expectError(
       () => collection
           .where(
@@ -900,7 +900,7 @@ void main() {
       reason,
     );
 
-    reason = 'Invalid Query. You cannot use more than one "not_in" filter.';
+    reason = 'Invalid query. You cannot use more than one \'not-in\' filter.';
     await expectError(
       () => collection
           .where(
@@ -931,7 +931,7 @@ void main() {
     );
 
     reason =
-        'Invalid Query. You cannot use "not_in" filters with "!=" filters.';
+        'Invalid query. You cannot use \'not-in\' filters with \'!=\' filters.';
     await expectError(
       () => collection
           .where(
@@ -962,7 +962,7 @@ void main() {
     );
 
     reason =
-        'Invalid Query. You cannot use "not_in" filters with "in" filters.';
+        'Invalid query. You cannot use \'not-in\' filters with \'in\' filters.';
     await expectError(
       () => collection
           .where(
@@ -997,7 +997,7 @@ void main() {
     final CollectionReference collection = await testCollection();
     // Conflicting operations within a composite filter.
     String reason =
-        'Invalid Query. You cannot use "not_in" filters with "in" filters.';
+        'Invalid query. You cannot use \'not-in\' filters with \'in\' filters.';
     await expectError(
       () => collection.where(
         Filter.or(<Filter>[
@@ -1016,7 +1016,7 @@ void main() {
 
     // Conflicting operations between a field filter and a composite filter.
     reason =
-        'Invalid Query. You cannot use "not_in" filters with "in" filters.';
+        'Invalid query. You cannot use \'not-in\' filters with \'in\' filters.';
     await expectError(
       () => collection
           .where(
@@ -1037,7 +1037,7 @@ void main() {
 
     // Conflicting operations between two composite filters.
     reason =
-        'Invalid Query. You cannot use "not_in" filters with "in" filters.';
+        'Invalid query. You cannot use \'not-in\' filters with \'in\' filters.';
     await expectError(
       () => collection
           .where(
@@ -1127,14 +1127,14 @@ void main() {
     );
 
     reason =
-        "Invalid query. You can't perform \"array_contains\" queries on FieldPath.documentId().";
+        "Invalid query. You can't perform \"array-contains\" queries on FieldPath.documentId().";
     await expectError(
       () => collection.whereArrayContainsField(FieldPath.documentId(), 1),
       reason,
     );
 
     reason =
-        "Invalid query. You can't perform \"array_contains_any\" queries on FieldPath.documentId().";
+        "Invalid query. You can't perform \"array-contains-any\" queries on FieldPath.documentId().";
     await expectError(
       () => collection.whereArrayContainsAnyField(FieldPath.documentId(), <int>[
         1,

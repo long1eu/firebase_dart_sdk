@@ -3,7 +3,6 @@
 // on 25/09/2018
 
 import 'package:cloud_firestore_dart/src/firebase/firestore/metadata_change.dart';
-import 'package:firebase_app_dart/internal.dart';
 
 /// Metadata about a snapshot, describing the state of the snapshot.
 ///
@@ -38,10 +37,6 @@ class SnapshotMetadata {
   int get hashCode => (hasPendingWrites ? 1 : 0) + (isFromCache ? 2 : 3);
 
   @override
-  String toString() {
-    return (ToStringHelper(runtimeType)
-          ..add('hasPendingWrites', hasPendingWrites)
-          ..add('isFromCache', isFromCache))
-        .toString();
-  }
+  String toString() =>
+      'SnapshotMetadata{hasPendingWrites=$hasPendingWrites, isFromCache=$isFromCache}';
 }

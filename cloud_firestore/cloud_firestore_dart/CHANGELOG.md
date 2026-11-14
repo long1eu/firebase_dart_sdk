@@ -6,6 +6,12 @@
   whose opener holds an exclusive lock while it is open now says so with the new `ExclusiveDatabase` interface
   (the web openers of the example do, with their Web Lock): every other client of the cache is then known to be
   gone. If you copied `example/sqlite_database_web.dart` into your app, copy it again. On the VM the 60 s remain.
+- `toString()` of the public classes is one line now, in the format of the Android SDK where it has one:
+  `DocumentSnapshot{key=..., metadata=..., doc=...}`, `SnapshotMetadata{hasPendingWrites=..., isFromCache=...}`,
+  `Blob { bytes=0102, subtype=0 }`, `FirestoreSettings{host=..., ...}`. A `QuerySnapshot` prints its query and the
+  number of its documents, a `Query` its filters and orderings. `FirestoreErrorCode.cancelled` and
+  `resourceExhausted` print their own names (they printed `canceled` and `resourcesExhausted`), and messages name
+  the query operators as the JS SDK does (`array-contains`, `array-contains-any`, `not-in`).
 - `Timestamp.toString()` is now `Timestamp(seconds=1, nanoseconds=2)`, as in the JS and Android SDKs. It used to
   print the two fields over four lines.
 - The canonical ids of queries, which the SQLite cache stores to find the cached results of a query again, are now

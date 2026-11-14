@@ -167,7 +167,8 @@ class ObjectValue extends FieldValue {
   }
 
   @override
-  String toString() => _value.toString();
+  // As Android: the canonical string of the map, on one line.
+  String toString() => 'ObjectValue{internalValue=${canonifyValue(this)}}';
 
   @override
   bool operator ==(Object other) =>

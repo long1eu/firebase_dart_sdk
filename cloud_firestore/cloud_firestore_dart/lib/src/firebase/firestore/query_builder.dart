@@ -307,11 +307,11 @@ class QueryBuilder {
       // error message.
       if (conflictingOperator == filterOp) {
         throw ArgumentError(
-          'Invalid Query. You cannot use more than one "$filterOp" filter.',
+          'Invalid query. You cannot use more than one \'$filterOp\' filter.',
         );
       } else {
         throw ArgumentError(
-          'Invalid Query. You cannot use "$filterOp" filters with "$conflictingOperator" filters.',
+          'Invalid query. You cannot use \'$filterOp\' filters with \'$conflictingOperator\' filters.',
         );
       }
     }

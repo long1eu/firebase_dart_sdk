@@ -8,7 +8,6 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/model/value/field_va
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/assert.dart';
 import 'package:cloud_firestore_dart/src/proto/google/firestore/v1/document.pb.dart';
 import 'package:cloud_firestore_dart/src/proto/index.dart' as pb;
-import 'package:firebase_app_dart/internal.dart';
 
 typedef Converter = FieldValue Function(Value value);
 
@@ -150,12 +149,6 @@ class Document extends MaybeDocument implements Comparable<Document> {
   }
 
   @override
-  String toString() {
-    return (ToStringHelper(runtimeType)
-          ..add('key', key)
-          ..add('data', data)
-          ..add('version', version)
-          ..add('documentState', documentState))
-        .toString();
-  }
+  String toString() =>
+      'Document{key=$key, version=$version, documentState=$documentState, value=$data}';
 }

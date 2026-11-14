@@ -559,12 +559,12 @@
 {"expression":"less_than_or_equal(Field(s), Constant(héllo))","result":"CAA="}
 {"expression":"greater_than(Field(s), Constant(héllo))","result":"CAE="}
 {"expression":"greater_than_or_equal(Field(s), Constant(héllo))","result":"CAE="}
-{"expression":"equal(Field(b), Constant(Blob { bytes= 0103 }))","result":"CAA="}
-{"expression":"not_equal(Field(b), Constant(Blob { bytes= 0103 }))","result":"CAE="}
-{"expression":"less_than(Field(b), Constant(Blob { bytes= 0103 }))","result":"CAE="}
-{"expression":"less_than_or_equal(Field(b), Constant(Blob { bytes= 0103 }))","result":"CAE="}
-{"expression":"greater_than(Field(b), Constant(Blob { bytes= 0103 }))","result":"CAA="}
-{"expression":"greater_than_or_equal(Field(b), Constant(Blob { bytes= 0103 }))","result":"CAA="}
+{"expression":"equal(Field(b), Constant(Blob { bytes=0103, subtype=0 }))","result":"CAA="}
+{"expression":"not_equal(Field(b), Constant(Blob { bytes=0103, subtype=0 }))","result":"CAE="}
+{"expression":"less_than(Field(b), Constant(Blob { bytes=0103, subtype=0 }))","result":"CAE="}
+{"expression":"less_than_or_equal(Field(b), Constant(Blob { bytes=0103, subtype=0 }))","result":"CAE="}
+{"expression":"greater_than(Field(b), Constant(Blob { bytes=0103, subtype=0 }))","result":"CAA="}
+{"expression":"greater_than_or_equal(Field(b), Constant(Blob { bytes=0103, subtype=0 }))","result":"CAA="}
 {"expression":"equal(Constant([NaN]), array(Constant(NaN)))","result":"CAE="}
 {"expression":"not_equal(Constant([NaN]), array(Constant(NaN)))","result":"CAA="}
 {"expression":"less_than(Constant([NaN]), array(Constant(NaN)))","result":"CAA="}
@@ -832,7 +832,7 @@
 {"expression":"rtrim(Constant(xxaxx), Constant(x))","result":"igEDeHhh"}
 {"expression":"trim(Constant( a ), Constant())","result":"igEDIGEg"}
 {"expression":"trim(Field(b))","result":"kgEEAQJB/w=="}
-{"expression":"trim(Constant(Blob { bytes= 200941200a }))","result":"kgEBQQ=="}
+{"expression":"trim(Constant(Blob { bytes=200941200a, subtype=0 }))","result":"kgEBQQ=="}
 {"expression":"trim(Field(i))","result":"ERROR"}
 {"expression":"trim(Field(s), Constant(1))","result":"ERROR"}
 {"expression":"reverse(Field(s))","result":"igENZGxyw7Z3IG9sbMOpaA=="}
@@ -2354,7 +2354,7 @@
 {"expression":"byte_length(Field(zz))","result":"WAA="}
 {"expression":"byte_length(Constant(7))","result":"ERROR"}
 {"expression":"byte_length(divide(Constant(1), Constant(0)))","result":"ERROR"}
-{"expression":"byte_length(Constant(Blob { bytes= 416200 }))","result":"EAM="}
+{"expression":"byte_length(Constant(Blob { bytes=416200, subtype=0 }))","result":"EAM="}
 {"expression":"byte_length(Constant(null))","result":"WAA="}
 {"expression":"byte_length(Field(zz))","result":"WAA="}
 {"expression":"byte_length(Constant(7))","result":"ERROR"}
@@ -2373,7 +2373,7 @@
 {"expression":"to_upper(Field(zz))","result":"WAA="}
 {"expression":"to_upper(Constant(7))","result":"ERROR"}
 {"expression":"to_upper(divide(Constant(1), Constant(0)))","result":"ERROR"}
-{"expression":"to_upper(Constant(Blob { bytes= 416200 }))","result":"kgEDQUIA"}
+{"expression":"to_upper(Constant(Blob { bytes=416200, subtype=0 }))","result":"kgEDQUIA"}
 {"expression":"to_upper(Constant(null))","result":"WAA="}
 {"expression":"to_upper(Field(zz))","result":"WAA="}
 {"expression":"to_upper(Constant(7))","result":"ERROR"}
@@ -2407,7 +2407,7 @@
 {"expression":"trim(Constant(abab), Field(zz))","result":"WAA="}
 {"expression":"trim(Constant(abab), Constant(7))","result":"ERROR"}
 {"expression":"trim(Constant(abab), divide(Constant(1), Constant(0)))","result":"ERROR"}
-{"expression":"trim(Constant(Blob { bytes= 416200 }))","result":"kgEDQWIA"}
+{"expression":"trim(Constant(Blob { bytes=416200, subtype=0 }))","result":"kgEDQWIA"}
 {"expression":"trim(Constant(null))","result":"WAA="}
 {"expression":"trim(Field(zz))","result":"WAA="}
 {"expression":"trim(Constant(7))","result":"ERROR"}
@@ -2480,7 +2480,7 @@
 {"expression":"reverse(Field(zz))","result":"WAA="}
 {"expression":"reverse(Constant({a: 1}))","result":"ERROR"}
 {"expression":"reverse(divide(Constant(1), Constant(0)))","result":"ERROR"}
-{"expression":"reverse(Constant(Blob { bytes= 416200 }))","result":"kgEDAGJB"}
+{"expression":"reverse(Constant(Blob { bytes=416200, subtype=0 }))","result":"kgEDAGJB"}
 {"expression":"reverse(Constant(null))","result":"WAA="}
 {"expression":"reverse(Field(zz))","result":"WAA="}
 {"expression":"reverse(Constant(7))","result":"ERROR"}
@@ -2572,7 +2572,7 @@
 {"expression":"substring(Constant(abab), Constant(2), Field(zz))","result":"WAA="}
 {"expression":"substring(Constant(abab), Constant(2), Constant(x))","result":"ERROR"}
 {"expression":"substring(Constant(abab), Constant(2), divide(Constant(1), Constant(0)))","result":"ERROR"}
-{"expression":"substring(Constant(Blob { bytes= 416200 }), Constant(2), Constant(2))","result":"kgEBAA=="}
+{"expression":"substring(Constant(Blob { bytes=416200, subtype=0 }), Constant(2), Constant(2))","result":"kgEBAA=="}
 {"expression":"substring(Constant(null), Constant(2), Constant(2))","result":"WAA="}
 {"expression":"substring(Constant(null), Constant(null), Constant(2))","result":"WAA="}
 {"expression":"substring(Constant(null), Field(zz), Constant(2))","result":"WAA="}
@@ -2607,29 +2607,29 @@
 {"expression":"substring(divide(Constant(1), Constant(0)), Constant(2), Constant(null))","result":"ERROR"}
 {"expression":"substring(divide(Constant(1), Constant(0)), Constant(2), Field(zz))","result":"ERROR"}
 {"expression":"substring(divide(Constant(1), Constant(0)), Constant(2), Constant(x))","result":"ERROR"}
-{"expression":"substring(Constant(Blob { bytes= 416200 }), Constant(null), Constant(2))","result":"WAA="}
-{"expression":"substring(Constant(Blob { bytes= 416200 }), Constant(null), Constant(null))","result":"WAA="}
-{"expression":"substring(Constant(Blob { bytes= 416200 }), Constant(null), Field(zz))","result":"WAA="}
-{"expression":"substring(Constant(Blob { bytes= 416200 }), Constant(null), Constant(x))","result":"ERROR"}
-{"expression":"substring(Constant(Blob { bytes= 416200 }), Constant(null), divide(Constant(1), Constant(0)))","result":"ERROR"}
-{"expression":"substring(Constant(Blob { bytes= 416200 }), Field(zz), Constant(2))","result":"WAA="}
-{"expression":"substring(Constant(Blob { bytes= 416200 }), Field(zz), Constant(null))","result":"WAA="}
-{"expression":"substring(Constant(Blob { bytes= 416200 }), Field(zz), Field(zz))","result":"WAA="}
-{"expression":"substring(Constant(Blob { bytes= 416200 }), Field(zz), Constant(x))","result":"ERROR"}
-{"expression":"substring(Constant(Blob { bytes= 416200 }), Field(zz), divide(Constant(1), Constant(0)))","result":"ERROR"}
-{"expression":"substring(Constant(Blob { bytes= 416200 }), Constant(x), Constant(2))","result":"ERROR"}
-{"expression":"substring(Constant(Blob { bytes= 416200 }), Constant(x), Constant(null))","result":"ERROR"}
-{"expression":"substring(Constant(Blob { bytes= 416200 }), Constant(x), Field(zz))","result":"ERROR"}
-{"expression":"substring(Constant(Blob { bytes= 416200 }), Constant(x), Constant(x))","result":"ERROR"}
-{"expression":"substring(Constant(Blob { bytes= 416200 }), Constant(x), divide(Constant(1), Constant(0)))","result":"ERROR"}
-{"expression":"substring(Constant(Blob { bytes= 416200 }), divide(Constant(1), Constant(0)), Constant(2))","result":"ERROR"}
-{"expression":"substring(Constant(Blob { bytes= 416200 }), divide(Constant(1), Constant(0)), Constant(null))","result":"ERROR"}
-{"expression":"substring(Constant(Blob { bytes= 416200 }), divide(Constant(1), Constant(0)), Field(zz))","result":"ERROR"}
-{"expression":"substring(Constant(Blob { bytes= 416200 }), divide(Constant(1), Constant(0)), Constant(x))","result":"ERROR"}
-{"expression":"substring(Constant(Blob { bytes= 416200 }), Constant(2), Constant(null))","result":"WAA="}
-{"expression":"substring(Constant(Blob { bytes= 416200 }), Constant(2), Field(zz))","result":"WAA="}
-{"expression":"substring(Constant(Blob { bytes= 416200 }), Constant(2), Constant(x))","result":"ERROR"}
-{"expression":"substring(Constant(Blob { bytes= 416200 }), Constant(2), divide(Constant(1), Constant(0)))","result":"ERROR"}
+{"expression":"substring(Constant(Blob { bytes=416200, subtype=0 }), Constant(null), Constant(2))","result":"WAA="}
+{"expression":"substring(Constant(Blob { bytes=416200, subtype=0 }), Constant(null), Constant(null))","result":"WAA="}
+{"expression":"substring(Constant(Blob { bytes=416200, subtype=0 }), Constant(null), Field(zz))","result":"WAA="}
+{"expression":"substring(Constant(Blob { bytes=416200, subtype=0 }), Constant(null), Constant(x))","result":"ERROR"}
+{"expression":"substring(Constant(Blob { bytes=416200, subtype=0 }), Constant(null), divide(Constant(1), Constant(0)))","result":"ERROR"}
+{"expression":"substring(Constant(Blob { bytes=416200, subtype=0 }), Field(zz), Constant(2))","result":"WAA="}
+{"expression":"substring(Constant(Blob { bytes=416200, subtype=0 }), Field(zz), Constant(null))","result":"WAA="}
+{"expression":"substring(Constant(Blob { bytes=416200, subtype=0 }), Field(zz), Field(zz))","result":"WAA="}
+{"expression":"substring(Constant(Blob { bytes=416200, subtype=0 }), Field(zz), Constant(x))","result":"ERROR"}
+{"expression":"substring(Constant(Blob { bytes=416200, subtype=0 }), Field(zz), divide(Constant(1), Constant(0)))","result":"ERROR"}
+{"expression":"substring(Constant(Blob { bytes=416200, subtype=0 }), Constant(x), Constant(2))","result":"ERROR"}
+{"expression":"substring(Constant(Blob { bytes=416200, subtype=0 }), Constant(x), Constant(null))","result":"ERROR"}
+{"expression":"substring(Constant(Blob { bytes=416200, subtype=0 }), Constant(x), Field(zz))","result":"ERROR"}
+{"expression":"substring(Constant(Blob { bytes=416200, subtype=0 }), Constant(x), Constant(x))","result":"ERROR"}
+{"expression":"substring(Constant(Blob { bytes=416200, subtype=0 }), Constant(x), divide(Constant(1), Constant(0)))","result":"ERROR"}
+{"expression":"substring(Constant(Blob { bytes=416200, subtype=0 }), divide(Constant(1), Constant(0)), Constant(2))","result":"ERROR"}
+{"expression":"substring(Constant(Blob { bytes=416200, subtype=0 }), divide(Constant(1), Constant(0)), Constant(null))","result":"ERROR"}
+{"expression":"substring(Constant(Blob { bytes=416200, subtype=0 }), divide(Constant(1), Constant(0)), Field(zz))","result":"ERROR"}
+{"expression":"substring(Constant(Blob { bytes=416200, subtype=0 }), divide(Constant(1), Constant(0)), Constant(x))","result":"ERROR"}
+{"expression":"substring(Constant(Blob { bytes=416200, subtype=0 }), Constant(2), Constant(null))","result":"WAA="}
+{"expression":"substring(Constant(Blob { bytes=416200, subtype=0 }), Constant(2), Field(zz))","result":"WAA="}
+{"expression":"substring(Constant(Blob { bytes=416200, subtype=0 }), Constant(2), Constant(x))","result":"ERROR"}
+{"expression":"substring(Constant(Blob { bytes=416200, subtype=0 }), Constant(2), divide(Constant(1), Constant(0)))","result":"ERROR"}
 {"expression":"concat(Constant(abab), Constant(abab))","result":"igEIYWJhYmFiYWI="}
 {"expression":"concat(Constant(null), Constant(abab))","result":"WAA="}
 {"expression":"concat(Constant(null), Constant(null))","result":"WAA="}
@@ -2678,30 +2678,30 @@
 {"expression":"concat(Constant([3, a, null, 1.5]), Field(zz))","result":"WAA="}
 {"expression":"concat(Constant([3, a, null, 1.5]), Constant({a: 1}))","result":"ERROR"}
 {"expression":"concat(Constant([3, a, null, 1.5]), divide(Constant(1), Constant(0)))","result":"ERROR"}
-{"expression":"concat(Constant(Blob { bytes= 416200 }), Constant(Blob { bytes= 416200 }))","result":"kgEGQWIAQWIA"}
-{"expression":"concat(Constant(null), Constant(Blob { bytes= 416200 }))","result":"WAA="}
+{"expression":"concat(Constant(Blob { bytes=416200, subtype=0 }), Constant(Blob { bytes=416200, subtype=0 }))","result":"kgEGQWIAQWIA"}
+{"expression":"concat(Constant(null), Constant(Blob { bytes=416200, subtype=0 }))","result":"WAA="}
 {"expression":"concat(Constant(null), Constant(null))","result":"WAA="}
 {"expression":"concat(Constant(null), Field(zz))","result":"WAA="}
 {"expression":"concat(Constant(null), Constant(7))","result":"ERROR"}
 {"expression":"concat(Constant(null), divide(Constant(1), Constant(0)))","result":"ERROR"}
-{"expression":"concat(Field(zz), Constant(Blob { bytes= 416200 }))","result":"WAA="}
+{"expression":"concat(Field(zz), Constant(Blob { bytes=416200, subtype=0 }))","result":"WAA="}
 {"expression":"concat(Field(zz), Constant(null))","result":"WAA="}
 {"expression":"concat(Field(zz), Field(zz))","result":"WAA="}
 {"expression":"concat(Field(zz), Constant(7))","result":"ERROR"}
 {"expression":"concat(Field(zz), divide(Constant(1), Constant(0)))","result":"ERROR"}
-{"expression":"concat(Constant(7), Constant(Blob { bytes= 416200 }))","result":"ERROR"}
+{"expression":"concat(Constant(7), Constant(Blob { bytes=416200, subtype=0 }))","result":"ERROR"}
 {"expression":"concat(Constant(7), Constant(null))","result":"ERROR"}
 {"expression":"concat(Constant(7), Field(zz))","result":"ERROR"}
 {"expression":"concat(Constant(7), Constant(7))","result":"ERROR"}
 {"expression":"concat(Constant(7), divide(Constant(1), Constant(0)))","result":"ERROR"}
-{"expression":"concat(divide(Constant(1), Constant(0)), Constant(Blob { bytes= 416200 }))","result":"ERROR"}
+{"expression":"concat(divide(Constant(1), Constant(0)), Constant(Blob { bytes=416200, subtype=0 }))","result":"ERROR"}
 {"expression":"concat(divide(Constant(1), Constant(0)), Constant(null))","result":"ERROR"}
 {"expression":"concat(divide(Constant(1), Constant(0)), Field(zz))","result":"ERROR"}
 {"expression":"concat(divide(Constant(1), Constant(0)), Constant(7))","result":"ERROR"}
-{"expression":"concat(Constant(Blob { bytes= 416200 }), Constant(null))","result":"WAA="}
-{"expression":"concat(Constant(Blob { bytes= 416200 }), Field(zz))","result":"WAA="}
-{"expression":"concat(Constant(Blob { bytes= 416200 }), Constant(7))","result":"ERROR"}
-{"expression":"concat(Constant(Blob { bytes= 416200 }), divide(Constant(1), Constant(0)))","result":"ERROR"}
+{"expression":"concat(Constant(Blob { bytes=416200, subtype=0 }), Constant(null))","result":"WAA="}
+{"expression":"concat(Constant(Blob { bytes=416200, subtype=0 }), Field(zz))","result":"WAA="}
+{"expression":"concat(Constant(Blob { bytes=416200, subtype=0 }), Constant(7))","result":"ERROR"}
+{"expression":"concat(Constant(Blob { bytes=416200, subtype=0 }), divide(Constant(1), Constant(0)))","result":"ERROR"}
 {"expression":"string_concat(Constant(abab), Constant(abab))","result":"igEIYWJhYmFiYWI="}
 {"expression":"string_concat(Constant(null), Constant(abab))","result":"WAA="}
 {"expression":"string_concat(Constant(null), Constant(null))","result":"WAA="}

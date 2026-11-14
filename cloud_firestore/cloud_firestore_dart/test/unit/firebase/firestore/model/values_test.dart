@@ -31,6 +31,7 @@ import 'package:cloud_firestore_dart/cloud_firestore_dart.dart'
         RegexValue,
         Timestamp,
         VectorValue;
+import 'package:cloud_firestore_dart/src/firebase/firestore/model/value/canonical_value.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/value/field_value.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/value/value_bounds.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/remote/remote_serializer.dart';
@@ -255,11 +256,10 @@ void main() {
   test(
     'testCanonicalIds',
     skip:
-        'the port uses FieldValue.toString() as the canonical id of a '
-        'value (for example "Blob { bytes= 010203 }" instead of "010203"); '
-        'the ids are persisted with the targets, so the format is kept. '
-        'The BSON ids, which match upstream, are checked in '
-        'bson_values_test.dart',
+        'the canonical ids of the port are the ones of the JS SDK, which '
+        'differ from Android for doubles ("1" instead of "1.0") and bytes '
+        '(base64 instead of hex); the JS test is ported in '
+        'model/value/canonical_value_test.dart',
     () {
       expect(wrap(null).toString(), 'null');
       expect(wrap(true).toString(), 'true');
@@ -315,17 +315,13 @@ void main() {
   );
 
   test('testObjectCanonicalIdsIgnoreSortOrder', () {
-    // PORTING NOTE: upstream expects "{a:1,b:2,c:3}"; the port's canonical id
-    // of a map is its toString() (see testCanonicalIds).
-    const String expected =
-        'ArraySortedMap<String, FieldValue>{(a=>1), (b=>2), (c=>3)};';
     expect(
-      wrap(<String, Object>{'a': 1, 'b': 2, 'c': '3'}).toString(),
-      expected,
+      canonifyValue(wrap(<String, Object>{'a': 1, 'b': 2, 'c': '3'})),
+      '{a:1,b:2,c:3}',
     );
     expect(
-      wrap(<String, Object>{'c': 3, 'b': 2, 'a': '1'}).toString(),
-      expected,
+      canonifyValue(wrap(<String, Object>{'c': 3, 'b': 2, 'a': '1'})),
+      '{a:1,b:2,c:3}',
     );
   });
 

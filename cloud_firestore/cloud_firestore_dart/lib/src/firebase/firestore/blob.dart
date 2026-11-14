@@ -126,7 +126,6 @@ class Blob implements Comparable<Blob> {
       : Object.hash(subtype, const ListEquality<int>().hash(_bytes));
 
   @override
-  String toString() => subtype == 0
-      ? 'Blob { bytes= ${toDebugString(_bytes)} }'
-      : 'Blob { bytes= ${toDebugString(_bytes)}, subtype= $subtype }';
+  String toString() =>
+      'Blob { bytes=${toDebugString(_bytes)}, subtype=$subtype }';
 }

@@ -11,7 +11,6 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/model/document.dart'
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/document_set.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/query_document_snapshot.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/assert.dart';
-import 'package:firebase_app_dart/internal.dart';
 
 /// The kind of change a [DocumentChange] describes.
 enum DocumentChangeType {
@@ -173,14 +172,8 @@ class DocumentChange<T extends dynamic> {
       type.hashCode ^ document.hashCode ^ oldIndex.hashCode ^ newIndex.hashCode;
 
   @override
-  String toString() {
-    return (ToStringHelper(runtimeType)
-          ..add('type', type)
-          ..add('document', document)
-          ..add('oldIndex', oldIndex)
-          ..add('newIndex', newIndex))
-        .toString();
-  }
+  String toString() =>
+      'DocumentChange(type: ${type.name}, document: ${document.reference.path}, oldIndex: $oldIndex, newIndex: $newIndex)';
 }
 
 /// Members of [DocumentChange] for the SDK itself. Not exported by the public libraries.

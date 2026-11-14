@@ -114,11 +114,11 @@ void main() {
       expect(
           () => collection().whereArrayContainsAny('a', <int>[]),
           throwsInvalidQuery(
-              'A non-empty array is required for "array_contains_any" filters'));
+              'A non-empty array is required for "array-contains-any" filters'));
       expect(
           () => collection().whereNotIn('a', <int>[]),
           throwsInvalidQuery(
-              'A non-empty array is required for "not_in" filters'));
+              'A non-empty array is required for "not-in" filters'));
     });
 
     test('the number of values in a disjunctive filter is not limited', () {
@@ -130,7 +130,7 @@ void main() {
 
     test('only one not-equal filter', () {
       expect(() => collection().whereNotEqualTo('a', 1).whereNotEqualTo('a', 2),
-          throwsInvalidQuery('You cannot use more than one "!=" filter'));
+          throwsInvalidQuery('You cannot use more than one \'!=\' filter'));
     });
 
     test('not-in cannot be combined with in, not-in, != or array-contains-any',
@@ -142,16 +142,16 @@ void main() {
         (Query q) => q.whereNotIn('a', <int>[1]),
       ]) {
         expect(() => other(collection()).whereNotIn('a', <int>[2]),
-            throwsInvalidQuery('Invalid Query. You cannot use'));
+            throwsInvalidQuery('Invalid query. You cannot use'));
         expect(() => collection().whereNotIn('a', <int>[2]), returnsNormally);
       }
       expect(
           () => collection().whereNotIn('a', <int>[2]).whereNotEqualTo('a', 1),
           throwsInvalidQuery(
-              'You cannot use "!=" filters with "not_in" filters'));
+              'You cannot use \'!=\' filters with \'not-in\' filters'));
       expect(
           () => collection().whereNotIn('a', <int>[2]).whereIn('a', <int>[1]),
-          throwsInvalidQuery('You cannot use "in" filters with "not_in"'));
+          throwsInvalidQuery('You cannot use \'in\' filters with \'not-in\''));
       // array-contains is not in conflict with not-in anymore.
       expect(
           collection().whereArrayContains('a', 1).whereNotIn('b', <int>[2]),
@@ -163,12 +163,12 @@ void main() {
           () => collection()
               .whereArrayContainsField(FieldPath.documentIdField, 'x'),
           throwsInvalidQuery(
-              'You can\'t perform "array_contains" queries on FieldPath.documentId()'));
+              'You can\'t perform "array-contains" queries on FieldPath.documentId()'));
       expect(
           () => collection().whereArrayContainsAnyField(
               FieldPath.documentIdField, <String>['x']),
           throwsInvalidQuery(
-              'You can\'t perform "array_contains_any" queries on FieldPath.documentId()'));
+              'You can\'t perform "array-contains-any" queries on FieldPath.documentId()'));
     });
 
     test('document id values must be plain ids in a collection query', () {
@@ -382,7 +382,7 @@ void main() {
                 Filter.equalTo('a', 1),
                 Filter.arrayContainsField(FieldPath.documentIdField, 1),
               ])),
-          throwsInvalidQuery('You can\'t perform "array_contains" queries'));
+          throwsInvalidQuery('You can\'t perform "array-contains" queries'));
       expect(
           () => collection().where(Filter.or(<Filter>[
                 Filter.equalToField(FieldPath.documentIdField, 'a/b'),
@@ -401,7 +401,7 @@ void main() {
                 Filter.equalTo('b', 1),
                 Filter.notInArray('c', <int>[1]),
               ])),
-          throwsInvalidQuery('You cannot use "not_in" filters with "!="'));
+          throwsInvalidQuery('You cannot use \'not-in\' filters with \'!=\''));
       // A new filter against the filters nested in a composite filter.
       expect(
           () => collection()
@@ -410,7 +410,7 @@ void main() {
                 Filter.inArray('c', <int>[1]),
               ]))
               .whereNotIn('d', <int>[2]),
-          throwsInvalidQuery('You cannot use "not_in" filters with "in"'));
+          throwsInvalidQuery('You cannot use \'not-in\' filters with \'in\''));
       // Within a single composite filter.
       expect(
           () => collection().where(Filter.and(<Filter>[
@@ -420,13 +420,13 @@ void main() {
                   Filter.notEqualTo('c', 1),
                 ]),
               ])),
-          throwsInvalidQuery('You cannot use more than one "!=" filter'));
+          throwsInvalidQuery('You cannot use more than one \'!=\' filter'));
       expect(
           () => collection().where(Filter.or(<Filter>[
                 Filter.notInArray('a', <int>[1]),
                 Filter.notInArray('b', <int>[1]),
               ])),
-          throwsInvalidQuery('You cannot use more than one "not_in" filter'));
+          throwsInvalidQuery('You cannot use more than one \'not-in\' filter'));
     });
 
     test('several in / array-contains filters are allowed in OR queries', () {

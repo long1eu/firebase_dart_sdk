@@ -180,8 +180,8 @@ void main() {
     test('FilterOperator toString is the wire name', () {
       expect(FilterOperator.lessThan.toString(), '<');
       expect(FilterOperator.notEqual.toString(), '!=');
-      expect(FilterOperator.arrayContainsAny.toString(), 'array_contains_any');
-      expect(FilterOperator.NOT_IN.toString(), 'not_in');
+      expect(FilterOperator.arrayContainsAny.toString(), 'array-contains-any');
+      expect(FilterOperator.NOT_IN.toString(), 'not-in');
     });
   });
 }

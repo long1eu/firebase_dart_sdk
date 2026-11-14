@@ -102,14 +102,14 @@ class FirestoreErrorCode {
 
   static const List<String> _names = <String>[
     'ok',
-    'canceled',
+    'cancelled',
     'unknown',
     'invalidArgument',
     'deadlineExceeded',
     'notFound',
     'alreadyExists',
     'permissionDenied',
-    'resourcesExhausted',
+    'resourceExhausted',
     'failedPrecondition',
     'aborted',
     'outOfRange',

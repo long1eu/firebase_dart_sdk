@@ -170,7 +170,7 @@ class PipelineSnapshot {
 
   @override
   String toString() =>
-      'PipelineSnapshot{executionTime: $executionTime, results: $results}';
+      'PipelineSnapshot{executionTime: $executionTime, size: ${results.length}}';
 }
 
 /// The explanation of a pipeline execution, as sent by the server.
