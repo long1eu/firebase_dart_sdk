@@ -1,6 +1,6 @@
 ## 0.1.0
 
-First version. Not published yet.
+First version.
 
 - Licensed under Apache-2.0 (see `LICENSE` and `NOTICE`), like `cloud_firestore_dart` and
   `firebase_app_dart`; the `_vm` packages they replace were licensed under BSD-3-Clause.

@@ -37,7 +37,8 @@ FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 dart test
   by hand.
 - **Not run against a real Firebase project.** The Docker image of `cloud_run_job/` has not
   been built.
-- The packages are not published yet, so each example takes them from this repository with
-  `dependency_overrides` in its `pubspec.yaml`. Once they are on pub.dev, those lines go away.
+- Each example takes the three packages from this repository, with path dependencies and
+  `dependency_overrides` in its `pubspec.yaml`, so it runs against the code next to it. To use
+  an example outside the repository, replace both with the versions on pub.dev (`^0.1.0`).
 - `firestore_from_env.dart` is copied, not shared, so that each directory can be copied out on
   its own.

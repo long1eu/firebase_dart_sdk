@@ -19,9 +19,10 @@ dev_dependencies:
   lints: ^6.0.0
   test: ^1.25.0
 
-# The packages are not on pub.dev yet, and each declares the others as hosted
-# dependencies (^0.1.0): the overrides make every one of them come from this
-# repository. Remove this section once they are published.
+# The examples run against the code of this repository. Each package declares
+# the others as hosted dependencies (^0.1.0): the overrides make every one of
+# them come from this repository. Outside the repository, remove this section
+# and depend on the versions on pub.dev.
 dependency_overrides:
   cloud_firestore_dart:
     path: ../../cloud_firestore/cloud_firestore_dart

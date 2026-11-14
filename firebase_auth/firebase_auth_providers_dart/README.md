@@ -7,7 +7,7 @@ a token with its requests. For apps whose users sign in with Firebase Auth, and 
 tools that use a service account or Application Default Credentials. It is not affiliated with
 or supported by Google or Firebase.
 
-> **Status: 0.1.0, not published yet.** Verified with unit tests and against the Firebase
+> **Status: 0.1.0.** Verified with unit tests and against the Firebase
 > emulators only: nothing was run against the real Firebase Auth service or Google's token
 > endpoint.
 

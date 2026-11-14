@@ -222,8 +222,8 @@ Preview, Enterprise edition only, as in the JS SDK. See [Pipelines](guides/pipel
 
 Every gap and behaviour difference we know of, the ones you are most likely to meet first.
 
-1. **Not published, little production use.** The packages are not on pub.dev yet (0.1.0 is in
-   preparation). Most testing is against the emulator. Against a real Firestore database only the
+1. **A first release with little production use.** 0.1.0 is the first version on pub.dev under
+   these names. Most testing is against the emulator. Against a real Firestore database only the
    production verification kit has run (13 of 15 checks passed, 2 skipped); the integration
    suite's real-project mode, the Enterprise edition features and long-running load have not.
 2. **The web is experimental.** Chrome only; a persistent cache can be open in one tab at a time;

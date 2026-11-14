@@ -57,8 +57,7 @@ Not done:
   the other a Web API key with anonymous sign-in). An earlier run found one bug of this SDK, which
   is fixed (-0.0 read over the web transport lost its sign). Not verified against production: the Enterprise edition
   features (only against the Enterprise edition emulator), Firebase Auth user sign-in, the
-  integration suite (its opt-in real-project mode has not been run) and long-running load. The
-  packages are not published.
+  integration suite (its opt-in real-project mode has not been run) and long-running load.
 - **Web beyond the experiment**: any browser other than Chrome (the OPFS storage was not run
   in Safari or Firefox either), and a cache shared between tabs or owned by a shared worker.
 - **Pipelines** beyond the [preview](pipelines.md): local evaluation (an

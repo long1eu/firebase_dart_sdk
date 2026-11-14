@@ -9,7 +9,7 @@ It is a port of the open-source Firebase Android SDK, kept close to its current 
 parts of the API following the JS SDK and FlutterFire. It is not affiliated with or endorsed by
 Google or Firebase.
 
-> **Status: 0.1.0, not published yet.** Most of it was verified against the Firestore emulator
+> **Status: 0.1.0.** Most of it was verified against the Firestore emulator
 > only. Against production Firestore, a short verification kit was run on a Standard edition
 > database (see [Not done](#not-done)). Test against your own project before relying on it.
 

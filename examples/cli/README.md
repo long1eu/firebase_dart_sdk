@@ -88,6 +88,7 @@ This tool has been run against the emulator only, not against a real project.
 
 ## Notes
 
-- The packages are not on pub.dev yet, so `pubspec.yaml` takes them from this repository through
-  `dependency_overrides`.
+- `pubspec.yaml` takes the three packages from this repository (path dependencies and
+  `dependency_overrides`), so the example runs against the code next to it. Outside the
+  repository, replace both with the versions on pub.dev (`^0.1.0`).
 - `lib/firestore_from_env.dart` is the same file in the three examples of `examples/`.
