@@ -22,7 +22,9 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/field
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/mutation.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/mutation_batch.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/overlay.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/delete_mutation.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/patch_mutation.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/set_mutation.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/no_document.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/resource_path.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/snapshot_version.dart';
@@ -143,6 +145,10 @@ class LocalDocumentsView {
     final Map<DocumentKey, OverlayedDocument> result =
         <DocumentKey, OverlayedDocument>{};
     final Timestamp now = Timestamp.now();
+    final Set<DocumentKey> writtenWhole = await _keysWithPendingSetOrDelete(
+      existenceStateChanged,
+      overlays,
+    );
     for (MapEntry<DocumentKey, MaybeDocument?> entry in docs.entries) {
       final DocumentKey key = entry.key;
       final MaybeDocument? doc = entry.value;
@@ -152,11 +158,15 @@ class LocalDocumentsView {
       // document existence state can change if some patch mutation's preconditions are met (also when there is no
       // overlay yet: a patch whose precondition did not match before the change may match now).
       //
-      // DEVIATION FROM UPSTREAM (set overlay of a merge): upstream only recalculates when the overlay is missing or a
-      // patch. A merge or update on top of a document without remote version is stored as a set overlay; when the
-      // document then arrives from the backend, that set would hide the remote fields the pending writes do not
-      // touch, so set and delete overlays are recalculated as well.
-      if (existenceStateChanged.contains(key)) {
+      // PORTING NOTE (deviation, set overlay of a merge): upstream only recalculates when the overlay is missing or a
+      // patch. A merge or update on top of a document without remote version is stored as a set overlay (the
+      // `docsWithoutRemoteVersion` of `LocalStore.writeLocally`, as upstream); when the document then arrives from the
+      // backend, that set would hide the remote fields the pending writes do not touch, so such a set overlay is
+      // recalculated as well. A set or delete overlay that comes from a set or delete among the pending writes of the
+      // document is applied as stored, as upstream: the pending writes determine the whole document, and recalculating
+      // it would only rebase its server timestamps on the remote document (their previous value), which changes the
+      // local view without a visible change and raises an extra `modified` event.
+      if (existenceStateChanged.contains(key) && !writtenWhole.contains(key)) {
         recalculateDocuments[key] = doc;
       } else if (overlay != null) {
         final Mutation mutation = overlay.mutation;
@@ -172,6 +182,31 @@ class LocalDocumentsView {
 
     result.addAll(await _recalculateAndSaveOverlays(recalculateDocuments));
     return result;
+  }
+
+  /// The keys of [existenceStateChanged] whose overlay in [overlays] is a set or a delete and whose pending mutations
+  /// contain a set or a delete of the document: their overlay does not depend on the remote document (see the
+  /// PORTING NOTE in [_computeViews]).
+  Future<Set<DocumentKey>> _keysWithPendingSetOrDelete(
+    Set<DocumentKey> existenceStateChanged,
+    Map<DocumentKey, Overlay> overlays,
+  ) async {
+    final Set<DocumentKey> candidates = <DocumentKey>{
+      for (final DocumentKey key in existenceStateChanged)
+        if (overlays[key]?.mutation case SetMutation() || DeleteMutation()) key,
+    };
+    if (candidates.isEmpty) {
+      return const <DocumentKey>{};
+    }
+    final List<MutationBatch> batches = await mutationQueue
+        .getAllMutationBatchesAffectingDocumentKeys(candidates);
+    return <DocumentKey>{
+      for (final MutationBatch batch in batches)
+        for (final Mutation mutation in batch.mutations)
+          if (candidates.contains(mutation.key) &&
+              (mutation is SetMutation || mutation is DeleteMutation))
+            mutation.key,
+    };
   }
 
   /// Given a collection group, returns the next documents that follow the provided offset, along with an updated batch

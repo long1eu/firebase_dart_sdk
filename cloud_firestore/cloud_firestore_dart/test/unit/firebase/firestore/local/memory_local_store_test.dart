@@ -187,9 +187,13 @@ void main() {
         .testDeviationSetOverlayOfMergeIsRecalculatedWhenDocumentArrives(),
   );
   test(
-    'testDeviationSetOverlayWithServerTimestampIsRecalculatedWhenDocumentArrives',
+    'testSetOverlayWithServerTimestampIsKeptWhenDocumentArrives',
     () => testCase
-        .testDeviationSetOverlayWithServerTimestampIsRecalculatedWhenDocumentArrives(),
+        .testSetOverlayWithServerTimestampIsKeptWhenDocumentArrives(),
+  );
+  test(
+    'testViewSeesTwoEventsForSetWithServerTimestamp',
+    () => testCase.testViewSeesTwoEventsForSetWithServerTimestamp(),
   );
   test(
     'testReadsAllDocumentsForInitialCollectionQueries',

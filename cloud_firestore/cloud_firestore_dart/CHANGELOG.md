@@ -1,5 +1,12 @@
 ## Unreleased
 
+- A listener no longer gets an extra `modified` event, with pending writes and unchanged fields, when watch sends a
+  document before the acknowledgement of a set with a server timestamp. A set overlay that comes from a real set is
+  now applied as stored when the document arrives, as in the other SDKs; only one that stands for a merge or update
+  of a document without a remote version is computed again.
+- `FirestoreSettings.experimentalLongPollingOptions` (`timeoutSeconds`, 5 to 30) sets the long-polling timeout of
+  the web transport, as in the JS SDK. The client reports online as soon as the watch stream connects rather than
+  at its first message.
 - Web transport: writes that were in flight when the write stream was closed by the client (`disableNetwork()`, a
   credential change, an idle stream) could reach the backend later, after the same writes and newer ones had been
   sent on the next stream, and replace the newer values: the WebChannel session of the closed stream went on

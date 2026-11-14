@@ -21,6 +21,9 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/auth/user.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/filter/filter.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/query.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/target.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/core/document_view_change.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/core/view_snapshot.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/core/view.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/field_value.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/default_query_engine.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/encoded_path.dart';
@@ -2581,16 +2584,14 @@ class LocalStoreTestCase {
     expect((await _overlay('foo/bar'))!.mutation, isA<PatchMutation>());
   }
 
-  /// A side effect of the deviation above: the set overlay of a plain set (`add` / `set` with
-  /// `FieldValue.serverTimestamp()`) on a document without remote version is recalculated as well when watch sends
-  /// the document before the acknowledgement. The pending write is applied again on top of watch's document, so its
-  /// sentinel now records the backend's timestamp as its previous value: the local view changes and the view raises
-  /// a `modified` event with pending writes (seen against the emulator as three events for one `add`). Upstream keeps
-  /// applying the stored set overlay (JS local_documents_view.ts, `existenceStateChanged.has(doc.key) && (overlay ===
-  /// undefined || overlay.mutation instanceof PatchMutation)`), whose data does not change: two events.
+  /// The set overlay of a plain set (`add` / `set` with `FieldValue.serverTimestamp()`) on a document without remote
+  /// version is applied as stored when watch sends the document before the acknowledgement, as upstream (JS
+  /// local_documents_view.ts recalculates only a missing or patch overlay): the pending set determines the whole
+  /// document, so its local view stays the same, including the previous value of the server timestamp, and the view
+  /// raises no event until the acknowledgement. Only the set overlay of a merge is recalculated (the deviation above).
   @testMethod
   Future<void>
-  testDeviationSetOverlayWithServerTimestampIsRecalculatedWhenDocumentArrives() async {
+  testSetOverlayWithServerTimestampIsKeptWhenDocumentArrives() async {
     final Query query = Query(ResourcePath.fromString('foo'));
     final int targetId = await _allocateQuery(query);
 
@@ -2602,7 +2603,8 @@ class LocalStoreTestCase {
           })
           .toMutation(key('foo/bar'), Precondition.none),
     );
-    expect((await _overlay('foo/bar'))!.mutation, isA<SetMutation>());
+    final Overlay overlay = (await _overlay('foo/bar'))!;
+    expect(overlay.mutation, isA<SetMutation>());
     final Document written =
         (await _localStore.readDocument(key('foo/bar')))! as Document;
     final model.ServerTimestampValue before =
@@ -2619,15 +2621,65 @@ class LocalStoreTestCase {
         <int>[targetId],
       ),
     );
-    final Document rebased =
+    final Document afterWatch =
         (await _localStore.readDocument(key('foo/bar')))! as Document;
-    expect(rebased.hasLocalMutations, isTrue);
+    expect(afterWatch.hasLocalMutations, isTrue);
     final model.ServerTimestampValue after =
-        rebased.getField(field('t'))! as model.ServerTimestampValue;
+        afterWatch.getField(field('t'))! as model.ServerTimestampValue;
     expect(after.localWriteTime, before.localWriteTime);
-    // Upstream: still null, and rebased.data == written.data.
-    expect(after.previousValue, serverTime);
-    expect(rebased.data == written.data, isFalse);
+    expect(after.previousFieldValue, isNull);
+    expect(afterWatch.data, written.data);
+    expect(await _overlay('foo/bar'), overlay);
+
+    // The acknowledgement removes the overlay: the document is watch's.
+    await _acknowledgeMutation(1, serverTime);
+    expect(await _overlay('foo/bar'), isNull);
+  }
+
+  /// What a listener sees for `add` with a server timestamp when watch sends the document before the acknowledgement
+  /// (the order of the emulator): a view fed with the changes of the local store raises two events, as upstream:
+  /// added with pending writes, then modified with the backend's timestamp. Watch's document under the pending set
+  /// changes nothing the view can see (see [testSetOverlayWithServerTimestampIsKeptWhenDocumentArrives]).
+  @testMethod
+  Future<void> testViewSeesTwoEventsForSetWithServerTimestamp() async {
+    final Query query = Query(ResourcePath.fromString('foo'));
+    final int targetId = await _allocateQuery(query);
+    final View view = View(query, DocumentKey.emptyKeySet);
+    ViewSnapshot? apply() =>
+        view.applyChanges(view.computeDocChanges(_lastChanges!)).snapshot;
+
+    await _writeMutation(
+      UserDataConverter(DatabaseId.forProject('project'))
+          .parseSetData(<String, Object?>{
+            'a': 1,
+            't': FieldValue.serverTimestamp(),
+          })
+          .toMutation(key('foo/bar'), Precondition.none),
+    );
+    final ViewSnapshot written = apply()!;
+    expect(written.changes.single.type, DocumentViewChangeType.added);
+    expect(written.hasPendingWrites, isTrue);
+
+    final Timestamp serverTime = Timestamp(1700000000, 200000000);
+    await _applyRemoteEvent(
+      _addedRemoteEvents(
+        <MaybeDocument>[
+          doc('foo/bar', 1000, map(<dynamic>['a', 1, 't', serverTime])),
+        ],
+        <int>[targetId],
+      ),
+    );
+    expect(apply(), isNull, reason: 'no event while the set is pending');
+
+    await _acknowledgeMutation(1000, serverTime);
+    final ViewSnapshot acknowledged = apply()!;
+    final DocumentViewChange change = acknowledged.changes.single;
+    expect(change.type, DocumentViewChangeType.modified);
+    expect(acknowledged.hasPendingWrites, isFalse);
+    expect(
+      change.document.getField(field('t')),
+      model.TimestampValue.valueOf(serverTime),
+    );
   }
 
   Future<Overlay?> _overlay(String path) {
