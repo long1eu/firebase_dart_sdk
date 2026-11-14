@@ -9,9 +9,9 @@ It is a port of the open-source Firebase Android SDK, kept close to its current 
 parts of the API following the JS SDK and FlutterFire. It is not affiliated with or endorsed by
 Google or Firebase.
 
-> **Status: 0.1.0, not published yet.** Everything was verified against the Firestore emulator
-> only; nothing has been run against production Firestore. Test against your own project before
-> relying on it.
+> **Status: 0.1.0, not published yet.** Most of it was verified against the Firestore emulator
+> only. Against production Firestore, a short verification kit was run on a Standard edition
+> database (see [Not done](#not-done)). Test against your own project before relying on it.
 
 ## Features
 
@@ -88,8 +88,12 @@ has the changes with before and after code.
 
 ## Not done
 
-- **Production.** Nothing has been run against production Firestore, and the Enterprise edition
-  features only against the Enterprise edition emulator.
+- **Production.** Most of the testing is against the emulator. The production verification kit
+  (`tool/verify_production` in the repository) was run against a real Firestore database in
+  Standard edition: 13 of its 15 checks passed and 2 were skipped (one needs an Enterprise
+  edition database, the other a Web API key with anonymous sign-in). Not verified against
+  production: the Enterprise edition features (only against the Enterprise edition emulator),
+  Firebase Auth user sign-in, the integration suite as a whole and long-running load.
 - **Coordination between clients that share one cache** (the multi-tab support of the JS SDK):
   clients keep the file consistent and elect a primary, but do not share listeners or writes;
   in a browser, one tab at a time. Sharing them (stage 3 of the multi-client plan: shared state

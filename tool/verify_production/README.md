@@ -1,6 +1,6 @@
 # Production verification kit
 
-Everything in this repository was verified against the Firestore emulator only. This kit runs a
+Most of this repository was verified against the Firestore emulator only. This kit runs a
 short list of named checks against a **real** Firestore database and prints, for each one,
 `PASS`, `FAIL`, `INCONCLUSIVE` or `SKIPPED` with a one-line explanation. It answers the questions
 the emulator cannot answer.
@@ -8,10 +8,11 @@ the emulator cannot answer.
 The code is `cloud_firestore/cloud_firestore_dart/test/production/verify_production.dart`;
 `run.sh` here is a wrapper that runs it from the right directory.
 
-**Status of the kit itself:** it was run against the emulators only (Standard and Enterprise
-edition), where the expected results are known
-(`test/production/verify_production_test.dart`). It has never been run against production.
-The parts that could not be exercised that way are listed under "Not verified" below.
+**Status of the kit itself:** it runs against the emulators (Standard and Enterprise edition),
+where the expected results are known (`test/production/verify_production_test.dart`). It was
+also run against a real Firestore database in Standard edition: 13 checks passed and 2 were
+skipped (7, which needs an Enterprise edition database, and 13, which needs a Web API key with
+anonymous sign-in). What that run did not cover is listed under "Not verified" below.
 
 ## What it does to your project
 
@@ -104,7 +105,7 @@ does not handle. `INCONCLUSIVE` means the check could not reach a result and say
 | 13 | Firebase Auth user token (optional) | Only when `FIREBASE_TEST_WEB_API_KEY` is set (the Web API key of the project; the Anonymous sign-in provider must be enabled). Signs in an anonymous user with `firebase_auth_providers_dart` against the real Firebase Auth service, reads one document of the run with the ID token, and deletes the account again. `PASS`: Firestore accepted the token; the line says whether the security rules then served or refused the read (both are a pass). `FAIL`: the token itself was refused. `INCONCLUSIVE`: the sign-in failed (provider not enabled, wrong key). `SKIPPED` without the variable. On the emulator it runs when `FIREBASE_AUTH_EMULATOR_HOST` is set. |
 
 What to send back: the whole report. The most valuable lines are the answers of 2, 3, 4, 6, 8, 9,
-11 and 12, which nobody has seen for production yet.
+11 and 12, and of 7 and 13, which have not been run against production.
 
 ## Known results on the emulators
 
@@ -139,19 +140,17 @@ database, that fix does not hold there.
 
 ## Not verified
 
-- **TLS through the proxy (checks 2 and 3)** was verified locally, not against production:
-  `test/production/proxy_tls_test.dart` puts the proxy in front of a `package:grpc` server with
-  a self-signed certificate and uses the channel of the kit (`proxiedGrpcChannel`). The client
-  dials the proxy with the name of the server for SNI, certificate verification and the call
-  authority; a wrong name or an untrusted certificate is rejected; holding back answers or
-  requests and cutting ends the call exactly as on plain TCP, and the next call reconnects.
-  What remains unverified is only Google's front end itself. If it does not work there, the
-  checks report `INCONCLUSIVE` ("could not write through the TCP proxy").
-- **Application Default Credentials end to end.** The token plumbing is unit-tested with a fake
-  authenticator; no real token was ever fetched by this code.
-- **The web transport against production** (check 11) and with an OAuth token. The same holds for
-  Firestore Lite (check 12): its REST transport was never used with TLS or a token, and the
-  read-only transaction of the check (`BeginTransaction`, `Rollback`) was only run on the emulator.
+The run against a production Standard edition database passed the checks that use the TCP proxy
+in front of Google's front end (2 and 3; they report `INCONCLUSIVE` when the proxy can not
+write), the OAuth access token from Application Default Credentials (10), the web transport
+(11) and Firestore Lite over gRPC and REST (12). Still not verified against production:
+
+- **An Enterprise edition database:** check 7 (BSON numeric increment) and the Enterprise answer
+  of check 6.
+- **Firebase Auth user sign-in:** check 13 needs the Web API key of the project and the Anonymous
+  sign-in provider.
+- **App Check:** the kit has no App Check token provider.
+- **Load:** the kit makes at most 80 writes; it says nothing about long-running use.
 - **The index link** of check 1c: the kit looks for a `https://console...` link in the error
   message; if the backend words it differently the message is printed as is.
 - The edition of the database is inferred from check 6; the kit cannot ask the backend for it.

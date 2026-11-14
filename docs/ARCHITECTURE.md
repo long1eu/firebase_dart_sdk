@@ -7,9 +7,9 @@ package are relative to `cloud_firestore/cloud_firestore_dart/`; `lib/...` below
 
 The port follows the Firebase Android SDK (`firebase-firestore/src/main/java/com/google/firebase/firestore/`,
 "Android" below) class by class, and takes some later pieces from the JS SDK
-(`packages/firestore/src/`, "JS" below). Behaviour is ported in Dart, not copied. Everything was
-verified with unit tests and the Firestore emulator only; nothing was run against production
-Firestore.
+(`packages/firestore/src/`, "JS" below). Behaviour is ported in Dart, not copied. It was
+verified with unit tests and the Firestore emulator; against production Firestore only the
+verification kit (`tool/verify_production`) was run, on a Standard edition database.
 
 ## Layers
 
@@ -86,7 +86,7 @@ the `RemoteStore`, and a task that is already on the queue runs nested calls inl
 | Browser | `test/browser` (transport, features, Firestore Lite, web persistence and its crash harness) | the private emulator on 127.0.0.1:8090, Chrome | `tool/test_browser.sh [dart2wasm\|dart2js\|both]`, from the repository root |
 | Property tests | `test/unit/property/` (value order, serializers, canonical ids), `test/integration/firebase/firestore/property_*_test.dart` and `test/integration_enterprise/property_*_test.dart` (queries and mutations against the backend) | nothing, or the emulators | run with the unit and integration suites; seeded, the seed is printed on failure |
 | Chaos | `test/integration/firebase/firestore/chaos/` behind `test/util/chaos_proxy.dart`, a TCP proxy that cuts, stalls and delays connections | standard emulator | run with the standard integration suite |
-| Production verification kit | `tool/verify_production` (`test/production/`) | an emulator, or a real project with your credentials and `--yes` (not run yet) | `tool/verify_production/run.sh --backend=emulator`, from the repository root |
+| Production verification kit | `tool/verify_production` (`test/production/`) | an emulator, or a real project with your credentials and `--yes` (run on a Standard edition database: 13 checks passed, 2 skipped) | `tool/verify_production/run.sh --backend=emulator`, from the repository root |
 | Size check | `tool/size`, `tool/check_size.sh` | nothing | `tool/check_size.sh`, from the repository root |
 | Interop with the JS SDK | `test/integration/firebase/firestore/js_interop_test.dart` | standard emulator and the Node harness in `tool/interop` (`npm install` there) | runs with the standard integration suite; skipped without the harness |
 | Examples | `example/*.dart`, run by `test/integration/firebase/firestore/examples_smoke_test.dart` and `test/integration_enterprise/examples_enterprise_smoke_test.dart` | the emulators | run with the integration suites |

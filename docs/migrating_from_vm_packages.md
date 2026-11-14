@@ -7,7 +7,9 @@ what you have to change, in the order you will hit it. Each item is a breaking c
 0.1.0 CHANGELOG of one of the two packages.
 
 0.1.0 is prepared for pub.dev but not published yet. It was verified with unit tests and the
-Firestore emulator only; nothing was run against production Firestore.
+Firestore emulator. Against production Firestore only the verification kit
+(`tool/verify_production`) was run, on a Standard edition database (13 of 15 checks passed, 2
+were skipped); the Enterprise edition features and long-running load were not.
 
 The code blocks marked "after" are compiled by
 `cloud_firestore/cloud_firestore_dart/test/unit/api/readme_snippets_test.dart`. They assume an

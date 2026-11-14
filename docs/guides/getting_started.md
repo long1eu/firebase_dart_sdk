@@ -6,7 +6,8 @@ browser. It assumes you have a Firebase project with a Firestore database, or th
 [emulator](emulator_and_testing.md).
 
 `cloud_firestore_dart` is an unofficial port of the Firebase Android SDK. It has been verified
-against the Firestore emulator only; nothing has been run against production Firestore yet.
+mostly against the Firestore emulator; against production Firestore only a short verification
+kit was run, on a Standard edition database.
 See [Features and limits](features.md) for what is done and what is not.
 
 ## Install

@@ -102,8 +102,8 @@ Future<void> firestoreReadmeLine50() async {
   }
 }
 
-// ../../firebase_core/firebase_app_dart/README.md:34
-Future<void> appReadmeLine34() async {
+// ../../firebase_core/firebase_app_dart/README.md:35
+Future<void> appReadmeLine35() async {
   final FirebaseApp app = FirebaseApp.withOptions(
     const FirebaseOptions(
       apiKey: '<YOUR_API_KEY>',
@@ -125,25 +125,25 @@ Future<void> authProvidersReadmeLine80() async {
   await auth.signOut();
 }
 
-// ../../docs/migrating_from_vm_packages.md:60
-Future<void> migrationGuideLine60() async {
+// ../../docs/migrating_from_vm_packages.md:62
+Future<void> migrationGuideLine62() async {
 }
 
-// ../../docs/migrating_from_vm_packages.md:89
-Future<void> migrationGuideLine89() async {
+// ../../docs/migrating_from_vm_packages.md:91
+Future<void> migrationGuideLine91() async {
   final DocumentSnapshot<Map<String, Object?>> snapshot =
       await users.doc('ada').get();
   final Map<String, Object?>? data = snapshot.data; // null if it does not exist
   final int? age = data?['age'] as int?;
 }
 
-// ../../docs/migrating_from_vm_packages.md:113
-Future<void> migrationGuideLine113() async {
+// ../../docs/migrating_from_vm_packages.md:115
+Future<void> migrationGuideLine115() async {
   app.setDataCollectionDefaultEnabled(enabled: false);
 }
 
-// ../../docs/migrating_from_vm_packages.md:138
-Future<void> migrationGuideLine138() async {
+// ../../docs/migrating_from_vm_packages.md:140
+Future<void> migrationGuideLine140() async {
   final Firestore firestore = Firestore.instanceFor(
     app: app,
     settings: FirestoreSettings(cacheSettings: PersistentCacheSettings()),
@@ -151,20 +151,20 @@ Future<void> migrationGuideLine138() async {
   );
 }
 
-// ../../docs/migrating_from_vm_packages.md:153
-Future<void> migrationGuideLine153() async {
+// ../../docs/migrating_from_vm_packages.md:155
+Future<void> migrationGuideLine155() async {
   final Firestore emulated = Firestore.instanceFor(
     app: app,
     settings: FirestoreSettings().withEmulator('127.0.0.1', 8080),
   );
 }
 
-// ../../docs/migrating_from_vm_packages.md:182
-Future<void> migrationGuideLine182() async {
+// ../../docs/migrating_from_vm_packages.md:184
+Future<void> migrationGuideLine184() async {
 }
 
-// ../../docs/migrating_from_vm_packages.md:270
-Future<void> migrationGuideLine270() async {
+// ../../docs/migrating_from_vm_packages.md:272
+Future<void> migrationGuideLine272() async {
   final QuerySnapshot<Map<String, Object?>> result = await firestore
       .collection('users')
       .where(FieldPath.documentIdField, isEqualTo: 'ada')
@@ -175,20 +175,20 @@ Future<void> migrationGuideLine270() async {
   await firestore.terminate();
 }
 
-// ../../docs/migrating_from_vm_packages.md:301
-Future<void> migrationGuideLine301() async {
+// ../../docs/migrating_from_vm_packages.md:303
+Future<void> migrationGuideLine303() async {
   final DocumentReference<Map<String, Object?>> ref =
       firestore.collection('users').doc('ada');
   final DocumentSnapshot<Map<String, Object?>> snapshot = await ref.get();
 }
 
-// ../../docs/migrating_from_vm_packages.md:336
-Future<void> migrationGuideLine336() async {
+// ../../docs/migrating_from_vm_packages.md:338
+Future<void> migrationGuideLine338() async {
   print('${firestore.projectId} / ${firestore.databaseId}');
 }
 
-// ../../docs/migrating_from_vm_packages.md:359
-Future<void> migrationGuideLine359() async {
+// ../../docs/migrating_from_vm_packages.md:361
+Future<void> migrationGuideLine361() async {
     final configRef = firestore.doc('config/plans');
     final userRef = users.doc('ada');
     await firestore.runTransaction<void>((Transaction tx) async {
@@ -197,16 +197,16 @@ Future<void> migrationGuideLine359() async {
     });
 }
 
-// ../../docs/migrating_from_vm_packages.md:375
-Future<void> migrationGuideLine375() async {
+// ../../docs/migrating_from_vm_packages.md:377
+Future<void> migrationGuideLine377() async {
     await firestore.runTransaction<void>(
       (Transaction tx) async {},
       options: TransactionOptions(maxAttempts: 6),
     );
 }
 
-// ../../docs/migrating_from_vm_packages.md:398
-Future<void> migrationGuideLine398() async {
+// ../../docs/migrating_from_vm_packages.md:400
+Future<void> migrationGuideLine400() async {
     await firestore.terminate();
     try {
       await users.doc('ada').get();
@@ -388,8 +388,8 @@ Future<void> firebaseAppGuideLine67() async {
   dependencies.connectivity.add(true);
 }
 
-// ../../docs/guides/getting_started.md:24
-Future<void> gettingStartedGuideLine24() async {
+// ../../docs/guides/getting_started.md:25
+Future<void> gettingStartedGuideLine25() async {
   final FirebaseApp app = FirebaseApp.withOptions(
     const FirebaseOptions(
       apiKey: '<the Web API key of the project>',
@@ -403,8 +403,8 @@ Future<void> gettingStartedGuideLine24() async {
   final Firestore firestore = Firestore.instanceFor(app: app);
 }
 
-// ../../docs/guides/getting_started.md:53
-Future<void> gettingStartedGuideLine53() async {
+// ../../docs/guides/getting_started.md:54
+Future<void> gettingStartedGuideLine54() async {
   final CollectionReference<Map<String, Object?>> cities = firestore.collection('cities');
 
   // Writes complete when the backend has acknowledged them.
@@ -438,16 +438,16 @@ Future<void> gettingStartedGuideLine53() async {
   await added.delete();
 }
 
-// ../../docs/guides/getting_started.md:97
-Future<void> gettingStartedGuideLine97() async {
+// ../../docs/guides/getting_started.md:98
+Future<void> gettingStartedGuideLine98() async {
   // Writes that the backend has not acknowledged yet are kept in a persistent
   // cache and sent by the next instance; with a memory cache they are lost.
   await firestore.waitForPendingWrites();
   await firestore.terminate();
 }
 
-// ../../docs/guides/getting_started.md:140
-Future<void> gettingStartedGuideLine140() async {
+// ../../docs/guides/getting_started.md:141
+Future<void> gettingStartedGuideLine141() async {
   final Firestore firestore = Firestore.instanceFor(
     app: app,
     settings: FirestoreSettings(experimentalForceLongPolling: true),

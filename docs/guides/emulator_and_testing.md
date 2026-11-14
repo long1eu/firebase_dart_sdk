@@ -184,7 +184,7 @@ repository root (see `tool/README.md`).
 | Integration over the web transport | `tool/test_integration.sh standard --transport=webchannel` (repository root; also `--transport=webchannel-longpolling`) | the private emulator on 127.0.0.1:8090; runs on the VM |
 | Chaos tests | part of `test/integration` (`firebase/firestore/chaos/`) | standard emulator behind a TCP proxy that cuts and stalls connections |
 | Firestore Lite size check | `tool/check_size.sh` (repository root) | none; compiles two programs with `dart compile js` |
-| Production verification kit | `FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 tool/verify_production/run.sh --backend=emulator` (repository root) | standard emulator; a real project only with `--backend=production --yes` and your credentials (not run yet) |
+| Production verification kit | `FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 tool/verify_production/run.sh --backend=emulator` (repository root) | standard emulator; a real project only with `--backend=production --yes` and your credentials (run on a Standard edition database) |
 | Standard suite on Enterprise | `FIRESTORE_EMULATOR_HOST=127.0.0.1:8181 FIRESTORE_EMULATOR_EDITION=enterprise dart test test/integration` | Enterprise edition emulator |
 
 The environment variables are read by `test/util/test_backend.dart`:
@@ -204,11 +204,13 @@ edition emulator first and then `test/integration_enterprise`.
 
 ### Against a real Firebase project (opt-in)
 
-Nothing in this repository has been run against a real project yet. There are two ways to do it,
-both opt-in. The production verification kit (`tool/verify_production`, see its README) is the
-smaller one: 14 named checks that make at most 80 writes below one document of their own,
-print a plan first and only run with `--yes`. It passes against both emulators, with
-the known emulator differences listed in its README.
+There are two ways to run against a real project, both opt-in. The production verification kit
+(`tool/verify_production`, see its README) is the smaller one: 15 named checks that make at most
+80 writes below one document of their own, print a plan first and only run with `--yes`. It
+passes against both emulators, with the known emulator differences listed in its README, and it
+was run against a real Firestore database in Standard edition: 13 checks passed and 2 were
+skipped (one needs an Enterprise edition database, the other a Web API key with anonymous
+sign-in).
 
 The integration suite can also run against a real project. Nothing does this by default: it
 only happens when you set `FIRESTORE_TEST_PROJECT_ID` yourself and `FIRESTORE_EMULATOR_HOST` is

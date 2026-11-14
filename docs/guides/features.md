@@ -51,10 +51,13 @@ What `cloud_firestore_dart` does, what it does not do yet, and the known gaps. T
 
 Not done:
 
-- **Production.** Nothing has been run against production Firestore, and the Enterprise edition
-  features only against the Enterprise edition emulator. The production verification kit and
-  the opt-in real-project test mode exist but have not been run. The packages are not
-  published.
+- **Production.** Most of the testing is against the emulator. The production verification kit
+  (`tool/verify_production`) was run against a real Firestore database in Standard edition: 13
+  of its 15 checks passed and 2 were skipped (one needs an Enterprise edition database, the other
+  a Web API key with anonymous sign-in). Not verified against production: the Enterprise edition
+  features (only against the Enterprise edition emulator), Firebase Auth user sign-in, the
+  integration suite (its opt-in real-project mode has not been run) and long-running load. The
+  packages are not published.
 - **Web beyond the experiment**: any browser other than Chrome (the OPFS storage was not run
   in Safari or Firefox either), and a cache shared between tabs or owned by a shared worker.
 - **Pipelines** beyond the [preview](pipelines.md): local evaluation (an

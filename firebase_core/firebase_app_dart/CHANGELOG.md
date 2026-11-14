@@ -2,8 +2,8 @@
 
 First release under the new name. This package was published as `firebase_core_vm` (last
 version 0.0.4); it is the same code base, revived as part of the Firestore port. Verified with
-its unit tests and through `cloud_firestore_dart`'s emulator suite; nothing was run against
-production Firebase.
+its unit tests and through `cloud_firestore_dart`'s emulator suite; against production Firebase
+it was only used by the verification kit of `cloud_firestore_dart`, on one Firestore database.
 
 ### Renamed package
 

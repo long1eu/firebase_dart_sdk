@@ -23,6 +23,9 @@ if [ -n "${PROTOC_GEN_DART:-}" ]; then PLUGIN=(--plugin="protoc-gen-dart=$PROTOC
 # Keep hand-written barrel files, drop old generated output.
 find "$OUT" -name '*.pb*.dart' -delete
 cp -R "$TMP"/. "$OUT"/
+# The JSON descriptors (*.pbjson.dart) are for reflection, which nothing here uses: they are not
+# kept, and the barrels below do not export them.
+find "$OUT" -name '*.pbjson.dart' -delete
 # Per-directory index.dart barrels.
 find "$OUT" -type d | while read -r d; do
   : > "$d/index.dart.tmp"
@@ -36,7 +39,6 @@ WKT=package:protobuf/well_known_types/google/protobuf
   for t in any duration empty struct timestamp wrappers; do
     echo "export '$WKT/$t.pb.dart';"
     [ "$t" = struct ] && echo "export '$WKT/$t.pbenum.dart';"
-    echo "export '$WKT/$t.pbjson.dart';"
   done
 } > "$OUT/google/protobuf/index.dart"
 # The barrels are hand-written by this script: format them so that the output is what

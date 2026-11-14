@@ -71,10 +71,13 @@ Revival of the original port, which stopped at the 2019 Android SDK; it now foll
 SDK's behaviour up to late 2026 on Dart 3.8 or later with sound
 null safety, and parts of its public API follow the JS SDK.
 
-- **Tested against the Firestore emulator only. Nothing has been run against production Firestore.**
-  Treat it as untested there, and test against your own project before relying on it. The
-  Enterprise edition features (BSON value types, Pipelines) were tested against the emulator in
-  Enterprise edition only.
+- **Tested mostly against the Firestore emulator.** Against production, only the production
+  verification kit (`tool/verify_production`) was run, on a real Firestore database in Standard
+  edition: 13 of its 15 checks passed and 2 were skipped (one needs an Enterprise edition
+  database, the other a Web API key with anonymous sign-in). Not verified against production:
+  the Enterprise edition features (BSON value types, Pipelines; tested against the emulator in
+  Enterprise edition only), Firebase Auth user sign-in, the integration suite as a whole and
+  long-running load. Test against your own project before relying on it.
 - Version 0.1.0 is prepared for pub.dev as `cloud_firestore_dart` and `firebase_app_dart`, and is
   **not published yet**. They replace the packages published as `cloud_firestore_vm` and
   `firebase_core_vm` (and the internal `_firebase_internal_vm` and
@@ -83,10 +86,9 @@ null safety, and parts of its public API follow the JS SDK.
 - Web support is experimental. In a browser the client uses REST and WebChannel over `fetch`
   instead of gRPC, with a memory cache or an opt-in SQLite cache in IndexedDB. The browser tests
   pass in Chrome against the emulator (dart2wasm and dart2js), and the whole standard
-  integration suite passes on the VM over the web transport. No other browser and no production backend was
-  tried.
-- A production verification kit exists (`tool/verify_production`) and passes against the
-  emulators; **it has not been run against a real project**.
+  integration suite passes on the VM over the web transport. No other browser was tried, and no
+  browser was run against a production backend (the verification kit used the web transport
+  against production from the VM).
 - Not implemented: coordination between clients that share one cache (the multi-tab support of
   the JS SDK; deferred until after 0.1.0), a full Firebase Auth SDK (no federated sign-in), and Pipelines beyond the preview
   (no real-time pipelines and no offline evaluation; a local evaluator exists but is internal
@@ -158,7 +160,7 @@ Two more checks:
 
 The last one is the production verification kit run against the emulator. Against a real project
 it only runs with your own credentials and `--yes` (see `tool/verify_production/README.md`); that
-has not been done yet.
+was done on a Standard edition database (13 checks passed, 2 were skipped).
 
 See `tool/README.md` for details, and the Testing section of
 `cloud_firestore/cloud_firestore_dart/README.md` for the opt-in run of the integration suite

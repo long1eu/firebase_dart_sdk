@@ -8,7 +8,8 @@ services to the platform (storage, connectivity, auth and App Check tokens). It 
 with or endorsed by Google or Firebase.
 
 > **Status: 0.1.0, not published yet.** Unit tests, plus `cloud_firestore_dart`'s integration
-> suite against the Firestore emulator. Nothing has been run against production Firebase.
+> suite against the Firestore emulator. Against production it was only used by the short
+> verification kit of `cloud_firestore_dart`, on one Firestore database.
 
 ## Features
 
@@ -66,7 +67,8 @@ has the details.
 - Only Firestore uses it. There is no Firebase Auth SDK, Storage or Realtime Database on top of
   it in this repository (tokens come from `firebase_auth_providers_dart` or your own provider).
 - No heartbeat or analytics: `dataCollectionEnabled` and `gaTrackingId` are stored, not used.
-- Nothing was run against production Firebase.
+- Against production Firebase it was only used by the verification kit of `cloud_firestore_dart`
+  (`tool/verify_production` in the repository), on one Firestore database.
 
 ## License
 

@@ -121,7 +121,10 @@ The published package contains `lib/` and `example/`. Tests, tooling and design 
 How this was verified:
 
 - Unit tests, the spec tests shared with the JS and Android SDKs, and integration tests against
-  the local Firestore emulator. **Nothing was run against production Firestore.**
+  the local Firestore emulator. Against production Firestore only the verification kit
+  (`tool/verify_production`) was run, on a Standard edition database: 13 of its 15 checks passed
+  and 2 were skipped (one needs an Enterprise edition database, the other a Web API key with
+  anonymous sign-in).
 - Features of the Enterprise edition (BSON value types, Pipelines) were run against the
   emulator in Enterprise edition only.
 - Web support is experimental: it was run in Chrome only, against the emulator only, with a
@@ -638,9 +641,9 @@ Documentation and tests:
   `test/integration_enterprise`, browser tests in Chrome, interop tests with the JS SDK, and size
   budgets for a small web app with Firestore Lite and with the main library (`tool/check_size.sh`). Protos regenerated from current googleapis
   (`tool/gen_protos.sh`).
-- A production verification kit (`tool/verify_production`): 14 named checks that run against
+- A production verification kit (`tool/verify_production`): 15 named checks that run against
   the emulator and, only with your own credentials and an explicit `--yes`, against a real
-  project. **It has not been run against a real project.**
+  project. It was run against a real Standard edition database (13 passed, 2 skipped).
 
 ### Fixed
 
@@ -802,7 +805,9 @@ Documentation and tests:
 - A port of the Firebase Auth SDK. The app supplies tokens through `PlatformDependencies`, for
   example with the providers of `firebase_auth_providers_dart` (email/password, anonymous and
   custom-token sign-in, service accounts); there are no federated or phone sign-in providers.
-- Any run against production Firestore; the packages are not published yet.
+- Any run against production Firestore beyond the verification kit: no Enterprise edition
+  database, no Firebase Auth user sign-in, no long-running load. The packages are not published
+  yet.
 
 ## Versions published as `cloud_firestore_vm`
 
