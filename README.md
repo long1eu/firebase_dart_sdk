@@ -58,8 +58,10 @@ dart pub add cloud_firestore_dart firebase_app_dart   # once 0.1.0 is published;
 - [Parity with upstream Firestore](docs/parity.md): what matches the Android and JS SDKs, and
   what does not.
 - [Migrating from FlutterFire](docs/guides/migrating_from_flutterfire.md) (`cloud_firestore`).
-- [Examples](cloud_firestore/cloud_firestore_dart/example/): runnable programs, listed in
-  [example/README.md](cloud_firestore/cloud_firestore_dart/example/README.md).
+- [Example apps](examples/README.md): an HTTP server with a live change feed, a command-line
+  import, export and watch tool, and a Cloud Run job.
+- [API examples](cloud_firestore/cloud_firestore_dart/example/): short runnable programs, listed
+  in [example/README.md](cloud_firestore/cloud_firestore_dart/example/README.md).
 - [How we test](docs/how_we_test.md): the suites, how to run them, and bugs they caught.
 - [Support policy](docs/support_policy.md): supported Dart SDKs and platforms, how upstream
   changes are tracked, versioning.
