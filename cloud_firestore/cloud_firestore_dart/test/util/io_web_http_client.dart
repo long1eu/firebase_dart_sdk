@@ -56,6 +56,10 @@ class _IoRequest implements WebHttpRequest {
   HttpClientRequest? _request;
   bool _aborted = false;
 
+  /// The body handed to the caller, and the subscription that feeds it.
+  StreamController<String>? _body;
+  StreamSubscription<String>? _bodySubscription;
+
   @override
   late final Future<WebHttpResponse> response;
 
@@ -81,17 +85,39 @@ class _IoRequest implements WebHttpRequest {
     response.headers.forEach((String name, List<String> values) {
       responseHeaders[name.toLowerCase()] = values.join(', ');
     });
-    return WebHttpResponse(
-      response.statusCode,
-      responseHeaders,
-      // An aborted body ends with an error; the stream just ends.
-      response.transform(utf8.decoder).handleError((Object _) {}),
-    );
+    // [abort] ends the body, as the WebHttpRequest contract asks: dart:io
+    // does not end the body of a response that already started when its
+    // request is aborted (Dart 3.12), a stalled body would stay open.
+    final StreamController<String> received = StreamController<String>();
+    _body = received;
+    received
+      ..onListen = () {
+        _bodySubscription = response.transform(utf8.decoder).listen(
+              received.add,
+              // An aborted body ends with an error; the stream just ends.
+              onError: (Object _) {},
+              onDone: () {
+                if (!received.isClosed) {
+                  unawaited(received.close());
+                }
+              },
+            );
+      }
+      ..onCancel = () => _bodySubscription?.cancel();
+    if (_aborted) {
+      unawaited(received.close());
+    }
+    return WebHttpResponse(response.statusCode, responseHeaders, received.stream);
   }
 
   @override
   void abort() {
     _aborted = true;
     _request?.abort();
+    unawaited(_bodySubscription?.cancel());
+    final StreamController<String>? body = _body;
+    if (body != null && !body.isClosed) {
+      unawaited(body.close());
+    }
   }
 }
