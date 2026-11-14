@@ -162,7 +162,7 @@ import 'dart:io';
 import 'package:firebase_auth_providers_dart/adc.dart'; // needs dart:io
 
 final app = FirebaseApp.withOptions(const FirebaseOptions(
-  apiKey: 'unused',            // required by FirebaseOptions, not sent with these credentials
+  apiKey: '',                  // an empty key is not sent; any other key is, with each request
   applicationId: '1:1234567890:dart:server',
   projectId: 'my-project',
 ));

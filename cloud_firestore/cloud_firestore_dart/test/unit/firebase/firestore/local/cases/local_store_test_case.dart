@@ -2581,6 +2581,55 @@ class LocalStoreTestCase {
     expect((await _overlay('foo/bar'))!.mutation, isA<PatchMutation>());
   }
 
+  /// A side effect of the deviation above: the set overlay of a plain set (`add` / `set` with
+  /// `FieldValue.serverTimestamp()`) on a document without remote version is recalculated as well when watch sends
+  /// the document before the acknowledgement. The pending write is applied again on top of watch's document, so its
+  /// sentinel now records the backend's timestamp as its previous value: the local view changes and the view raises
+  /// a `modified` event with pending writes (seen against the emulator as three events for one `add`). Upstream keeps
+  /// applying the stored set overlay (JS local_documents_view.ts, `existenceStateChanged.has(doc.key) && (overlay ===
+  /// undefined || overlay.mutation instanceof PatchMutation)`), whose data does not change: two events.
+  @testMethod
+  Future<void>
+  testDeviationSetOverlayWithServerTimestampIsRecalculatedWhenDocumentArrives() async {
+    final Query query = Query(ResourcePath.fromString('foo'));
+    final int targetId = await _allocateQuery(query);
+
+    await _writeMutation(
+      UserDataConverter(DatabaseId.forProject('project'))
+          .parseSetData(<String, Object?>{
+            'a': 1,
+            't': FieldValue.serverTimestamp(),
+          })
+          .toMutation(key('foo/bar'), Precondition.none),
+    );
+    expect((await _overlay('foo/bar'))!.mutation, isA<SetMutation>());
+    final Document written =
+        (await _localStore.readDocument(key('foo/bar')))! as Document;
+    final model.ServerTimestampValue before =
+        written.getField(field('t'))! as model.ServerTimestampValue;
+    expect(before.previousFieldValue, isNull);
+
+    // Watch sends the document, with the timestamp the backend set, before the acknowledgement.
+    final Timestamp serverTime = Timestamp(1700000000, 200000000);
+    await _applyRemoteEvent(
+      _addedRemoteEvents(
+        <MaybeDocument>[
+          doc('foo/bar', 1, map(<dynamic>['a', 1, 't', serverTime])),
+        ],
+        <int>[targetId],
+      ),
+    );
+    final Document rebased =
+        (await _localStore.readDocument(key('foo/bar')))! as Document;
+    expect(rebased.hasLocalMutations, isTrue);
+    final model.ServerTimestampValue after =
+        rebased.getField(field('t'))! as model.ServerTimestampValue;
+    expect(after.localWriteTime, before.localWriteTime);
+    // Upstream: still null, and rebased.data == written.data.
+    expect(after.previousValue, serverTime);
+    expect(rebased.data == written.data, isFalse);
+  }
+
   Future<Overlay?> _overlay(String path) {
     return _persistence
         .getDocumentOverlayCache(User.unauthenticated)

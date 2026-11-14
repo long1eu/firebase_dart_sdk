@@ -187,6 +187,11 @@ void main() {
         .testDeviationSetOverlayOfMergeIsRecalculatedWhenDocumentArrives(),
   );
   test(
+    'testDeviationSetOverlayWithServerTimestampIsRecalculatedWhenDocumentArrives',
+    () => testCase
+        .testDeviationSetOverlayWithServerTimestampIsRecalculatedWhenDocumentArrives(),
+  );
+  test(
     'testReadsAllDocumentsForInitialCollectionQueries',
     () => testCase.testReadsAllDocumentsForInitialCollectionQueries(),
   );

@@ -24,8 +24,12 @@ What it shows:
   awaited, so a `201` means the backend accepted the write.
 - One listener shared by every client (`lib/change_feed.dart`) instead of one per HTTP
   connection. A task created through the API shows up as `added` with the local estimate of its
-  server timestamp, then as `modified` once the backend has filled the timestamp in. You may also
-  see a `modified` event with unchanged data in between.
+  server timestamp, then as `modified` once the backend has filled the timestamp in. When the
+  backend's copy of the task reaches the listener before the write is acknowledged, a
+  `modified` event with the same fields comes in between. By their source, the JS and Android
+  SDKs do not raise it (not run); the cause is described in
+  `testDeviationSetOverlayWithServerTimestampIsRecalculatedWhenDocumentArrives` in
+  `cloud_firestore/cloud_firestore_dart/test/unit/firebase/firestore/local/cases/local_store_test_case.dart`.
 - Firestore errors mapped to HTTP statuses (`not-found` 404, `permission-denied` 403,
   `unavailable` 503, ...).
 
