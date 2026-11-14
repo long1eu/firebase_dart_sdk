@@ -153,13 +153,9 @@ The table as a chart, on one scale; the index bars are the short ones next to ea
 
 ![Grouped bar chart on 50,000 cached documents: a == 7, scan 149.8 ms and index 3.9 ms; r in a range, scan 151.9 ms and index 4.3 ms; array-contains, scan 157.4 ms and index 6.6 ms; orderBy descending with limit 10, scan 305.3 ms with 234 MB more memory and index 0.35 ms; a == 7 with 10 % of the documents not yet indexed, index 26.5 ms.](../images/readme/perf_index_vs_scan.svg)
 
-**The known gap.** A query served by an index can leave out a document in one rare case, described in
-[Parity, known limitations](../parity.md#known-limitations) (item 15): watch sends a document in a later
-snapshot at the same version as an earlier one, after the index was already brought up to date for that
-version, and the document's id sorts before the documents indexed last. The document is then missing from
-`get(const GetOptions(source: Source.cache))`, the first snapshot of a new listener and a refilled limit window, until it changes
-again. It has not been seen against the emulator or production, the JS and Android SDKs have the same gap, and
-queries that no index serves are not affected.
+**Late documents at the same version.** When watch sends a document in a later snapshot at the same version
+as an earlier one, after the index was already filled for that version, the fill reads the documents of that
+version again, so a query served by the index does not miss it (the JS and Android SDKs do).
 
 **What to do.**
 

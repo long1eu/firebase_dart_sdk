@@ -98,6 +98,10 @@
 - IndexedDB cache: a database of a schema version other than 18 is refused as before, and the
   error now says the cache was left as it is; for a newer version it says that a new schema
   version of the JS SDK needs a new release of this package.
+- Persistent cache indexes: a query served by a field index could miss a document that watch sent in a later
+  snapshot with the same version as an earlier one, when the index had already been brought up to date for that
+  version and the document's id sorted before the documents indexed last. Such a snapshot now makes the index read
+  its documents again. The JS and Android SDKs have the same gap.
 
 ## 0.3.0
 

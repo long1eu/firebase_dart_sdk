@@ -895,4 +895,76 @@ class SqliteIndexManager extends IndexManager {
       _memoizeIndex(updatedIndex);
     }
   }
+
+  @override
+  Future<void> moveOffsetsBefore(
+    String collectionGroup,
+    SnapshotVersion readTime,
+    DocumentKey documentKey,
+  ) async {
+    hardAssert(_started, 'IndexManager not started');
+    final List<FieldIndex> fieldIndexes = getFieldIndexes(collectionGroup);
+    if (fieldIndexes.isEmpty) {
+      return;
+    }
+    final Map<int, FieldIndex> byId = <int, FieldIndex>{
+      for (final FieldIndex fieldIndex in fieldIndexes)
+        fieldIndex.indexId: fieldIndex,
+    };
+    final IndexOffset document = IndexOffset(
+      readTime,
+      documentKey,
+      FieldIndex.initialLargestBatchId,
+    );
+    // The offsets of all users: each one backfills its own.
+    final List<Map<String, dynamic>> rows = await db.query(
+      'SELECT index_id, uid, sequence_number, read_time_seconds, read_time_nanos, document_key, largest_batch_id '
+      'FROM index_state WHERE index_id IN (${List<String>.filled(byId.length, '?').join(', ')})',
+      byId.keys.toList(),
+    );
+    for (final Map<String, dynamic> row in rows) {
+      final IndexOffset offset = IndexOffset(
+        SnapshotVersion(
+          Timestamp(row['read_time_seconds'], row['read_time_nanos']),
+        ),
+        DocumentKey.fromPath(
+          EncodedPath.decodeResourcePath(row['document_key']),
+        ),
+        FieldIndex.initialLargestBatchId,
+      );
+      if (offset.compareTo(document) < 0) {
+        continue;
+      }
+      final int indexId = row['index_id'];
+      final String uid = row['uid'];
+      final int largestBatchId = row['largest_batch_id'];
+      final IndexOffset movedBack = IndexOffset(
+        readTime,
+        DocumentKey.empty(),
+        largestBatchId,
+      );
+      await db.execute(
+        'UPDATE index_state SET read_time_seconds = ?, read_time_nanos = ?, document_key = ? '
+        'WHERE index_id = ? AND uid = ?',
+        <Object>[
+          readTime.timestamp.seconds,
+          readTime.timestamp.nanoseconds,
+          EncodedPath.encode(DocumentKey.empty().path),
+          indexId,
+          uid,
+        ],
+      );
+      if (uid == _uid) {
+        final FieldIndex fieldIndex = byId[indexId]!;
+        _memoizeIndex(
+          FieldIndex(
+            fieldIndex.indexId,
+            fieldIndex.collectionGroup,
+            fieldIndex.segments,
+            IndexState(row['sequence_number'], movedBack),
+          ),
+        );
+      }
+    }
+  }
 }

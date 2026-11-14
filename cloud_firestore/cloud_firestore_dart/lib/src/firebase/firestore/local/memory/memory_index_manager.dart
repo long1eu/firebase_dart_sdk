@@ -55,6 +55,13 @@ class MemoryIndexManager extends IndexManager {
   ) async {}
 
   @override
+  Future<void> moveOffsetsBefore(
+    String collectionGroup,
+    SnapshotVersion readTime,
+    DocumentKey documentKey,
+  ) async {}
+
+  @override
   List<FieldIndex> getFieldIndexes([String? collectionGroup]) =>
       const <FieldIndex>[];
 

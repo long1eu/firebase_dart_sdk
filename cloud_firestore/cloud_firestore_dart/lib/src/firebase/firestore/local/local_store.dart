@@ -1009,6 +1009,7 @@ class LocalStore implements BundleCallback {
       final Map<DocumentKey, MaybeDocument?> existingDocs =
           await _remoteDocuments.getAll(documentUpdates.keys);
       final Set<DocumentKey> existenceChangedKeys = <DocumentKey>{};
+      final List<DocumentKey> storedKeys = <DocumentKey>[];
       for (MapEntry<DocumentKey, MaybeDocument> entry
           in documentUpdates.entries) {
         final DocumentKey key = entry.key;
@@ -1036,6 +1037,7 @@ class LocalStore implements BundleCallback {
           );
           await _remoteDocuments.add(doc, remoteEvent.snapshotVersion);
           changedDocs[key] = doc;
+          storedKeys.add(key);
         } else {
           Log.d(
             'LocalStore',
@@ -1060,6 +1062,9 @@ class LocalStore implements BundleCallback {
           () =>
               'Watch stream reverted to previous snapshot?? ($remoteVersion < $lastRemoteVersion)',
         );
+        if (remoteVersion == lastRemoteVersion) {
+          await _moveIndexOffsetsBefore(storedKeys, remoteVersion);
+        }
         await _queryCache.setLastRemoteSnapshotVersion(remoteVersion);
       }
 
@@ -1068,6 +1073,30 @@ class LocalStore implements BundleCallback {
         existenceChangedKeys,
       );
     });
+  }
+
+  /// Makes the index backfill read again the documents of [keys], which a remote event stored at [readTime], the
+  /// snapshot version of the event before it.
+  ///
+  /// PORTING NOTE: the backfill may already have moved its offset to ([readTime], some key) with the documents of that
+  /// earlier event; a document of this event whose key sorts before that key would be behind the offset and never be
+  /// indexed (the JS and Android SDKs have this gap). The offset never passes the last snapshot version of watch (see
+  /// `IndexBackfiller._getNewOffset`), so an event at a newer version can not land behind it.
+  Future<void> _moveIndexOffsetsBefore(
+    List<DocumentKey> keys,
+    SnapshotVersion readTime,
+  ) async {
+    final Map<String, DocumentKey> smallestKeyByGroup = <String, DocumentKey>{};
+    for (final DocumentKey key in keys) {
+      final DocumentKey? smallest = smallestKeyByGroup[key.collectionGroup];
+      if (smallest == null || key.compareTo(smallest) < 0) {
+        smallestKeyByGroup[key.collectionGroup] = key;
+      }
+    }
+    for (final MapEntry<String, DocumentKey> entry
+        in smallestKeyByGroup.entries) {
+      await _indexManager.moveOffsetsBefore(entry.key, readTime, entry.value);
+    }
   }
 
   /// Returns true if the [newQueryData] should be persisted during an update of an active target. [QueryData] should
