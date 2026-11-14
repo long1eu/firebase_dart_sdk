@@ -13,7 +13,12 @@
 // The messages it posts (strings):
 //   open <userVersion>       the database is open
 //   ack <id>                 the transaction that inserted <id> was committed,
-//                            and its future (which waits for IndexedDB) ended
+//                            and its future (which waits for IndexedDB) ended.
+//                            Posted on the MessagePort that came with the
+//                            configuration: what was posted there still
+//                            arrives after the worker was terminated, while
+//                            the messages of the worker itself that the page
+//                            has not handled yet are dropped.
 //   error <text>             anything that went wrong
 
 import 'dart:async';
@@ -31,6 +36,9 @@ import '../../../example/sqlite_database_web.dart';
 external web.DedicatedWorkerGlobalScope get _self;
 
 void _post(String message) => _self.postMessage(message.toJS);
+
+/// Where the acknowledgements go (see the top of the file).
+web.MessagePort? _ackPort;
 
 /// The tables of schema version [version]: `log` and `totals` from the
 /// start, and one table `v<n>` per later version, created by its migration.
@@ -147,7 +155,12 @@ Future<void> run(Map<String, Object?> config) async {
       ]);
     }
     await db.execute('COMMIT');
-    _post('ack $next');
+    final web.MessagePort? ackPort = _ackPort;
+    if (ackPort != null) {
+      ackPort.postMessage('ack $next'.toJS);
+    } else {
+      _post('ack $next');
+    }
   }
 }
 
@@ -155,6 +168,8 @@ void main() {
   _self.onmessage = (web.MessageEvent event) {
     final Map<String, Object?> config =
         jsonDecode((event.data! as JSString).toDart) as Map<String, Object?>;
+    final List<web.MessagePort> ports = event.ports.toDart;
+    _ackPort = ports.isEmpty ? null : ports.first;
     unawaited(
       run(config).catchError((Object error, StackTrace stackTrace) {
         _post('error $error\n$stackTrace');

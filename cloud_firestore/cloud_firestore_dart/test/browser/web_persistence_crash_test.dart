@@ -29,6 +29,23 @@ final Uri sqlite3Wasm = Uri.base.resolve('sqlite3.wasm');
 final Uri workerScript = Uri.base.resolve('crash/crash_worker.js');
 final Uri opfsWorker = Uri.base.resolve('opfs/sqlite_opfs_worker.js');
 
+/// A file with the seed of a run to repeat (the test cannot read the environment). The seed fixes when the workers
+/// are killed and what they write, not how far they get.
+final Uri seedFile = Uri.base.resolve('crash/seed.txt');
+
+Future<int?> seedOverride() async {
+  try {
+    final web.Response response = await web.window
+        .fetch(seedFile.toString().toJS)
+        .toDart;
+    return response.ok
+        ? int.tryParse((await response.text().toDart).toDart.trim())
+        : null;
+  } catch (_) {
+    return null;
+  }
+}
+
 Future<bool> exists(Uri uri) async {
   try {
     return (await web.window.fetch(uri.toString().toJS).toDart).ok;
@@ -115,7 +132,8 @@ Future<void> crashTest({required bool opfs}) async {
     await probe.clearStorage();
   }
 
-  final int seed = DateTime.now().millisecondsSinceEpoch % 1000000;
+  final int seed =
+      await seedOverride() ?? DateTime.now().millisecondsSinceEpoch % 1000000;
   // ignore: avoid_print
   print('crash test: seed=$seed iterations=$crashIterations');
   final Random random = Random(seed);
@@ -159,6 +177,13 @@ Future<void> crashTest({required bool opfs}) async {
     'killed before open': 0,
     'killed during the open (schema or migration)': 0,
     'killed with a transaction not acknowledged but stored': 0,
+    // Acknowledgements the worker had posted when it was killed and that the
+    // page had not handled yet.
+    'kills with acknowledgements in flight': 0,
+    'most acknowledgements in flight at a kill': 0,
+    // What the bound was checked against before the acknowledgements had a
+    // port of their own.
+    'most stored transactions the page did not know of at the kill': 0,
     'hot journal found': 0,
     // OPFS: how long the files of the killed worker's worker stayed busy.
     'files still held after 2 s': 0,
@@ -299,7 +324,11 @@ Future<void> crashTest({required bool opfs}) async {
         greaterThanOrEqualTo(acknowledged),
         reason: 'an acknowledged transaction is missing. $context',
       );
-      // And at most one transaction that was not acknowledged yet.
+      // And at most one transaction that was not acknowledged yet: the one
+      // the worker was committing. The acknowledgements count that were on
+      // their way to the page when the worker was killed (see the kill
+      // below): a busy page is several acknowledgements behind the worker
+      // (five on a CI runner, 1593 stored against a bound of 1590 locally).
       expect(
         seen.maxId ?? 0,
         lessThanOrEqualTo(max(acknowledged, verifiedMaxId) + 1),
@@ -332,9 +361,16 @@ Future<void> crashTest({required bool opfs}) async {
     final int killAtAck = 1 + random.nextInt(12);
 
     final web.Worker worker = web.Worker(workerScript.toString().toJS);
+    // The acknowledgements come through a port of their own: terminating a
+    // worker drops the messages it posted to the page that the page has not
+    // handled yet, and the transactions of those were committed. What was
+    // posted on this port still arrives after the kill.
+    final web.MessageChannel ackChannel = web.MessageChannel();
     final Completer<void> kill = Completer<void>();
     bool opened = false;
+    bool killed = false;
     int acks = 0;
+    int acksInFlight = 0;
     String? error;
     void killSoon(int ms) {
       Timer(Duration(milliseconds: ms), () {
@@ -359,23 +395,30 @@ Future<void> crashTest({required bool opfs}) async {
             // Slow migrations, so that kills fall between their statements.
             'migrationPauseMs': 4,
           }).toJS,
+          <JSObject>[ackChannel.port2].toJS,
         );
         if (mode == 0 || mode == 3) {
           killSoon(killAfterMs);
         }
       } else if (message.startsWith('open ')) {
         opened = true;
-      } else if (message.startsWith('ack ')) {
-        acks++;
-        acknowledged = int.parse(message.substring(4));
-        if ((mode == 1 || mode == 2) && acks == killAtAck) {
-          mode == 1 ? kill.complete() : killSoon(killAfterMs);
-        }
       } else if (message.startsWith('error ')) {
         error = message;
         if (!kill.isCompleted) {
           kill.complete();
         }
+      }
+    }.toJS;
+    ackChannel.port1.onmessage = (web.MessageEvent event) {
+      final String message = (event.data! as JSString).toDart;
+      acknowledged = int.parse(message.substring('ack '.length));
+      if (killed) {
+        acksInFlight++;
+        return;
+      }
+      acks++;
+      if ((mode == 1 || mode == 2) && acks == killAtAck) {
+        mode == 1 ? kill.complete() : killSoon(killAfterMs);
       }
     }.toJS;
     worker.onerror = (web.Event event) {
@@ -387,11 +430,35 @@ Future<void> crashTest({required bool opfs}) async {
 
     await kill.future.timeout(const Duration(seconds: 60));
     worker.terminate();
+    killed = true;
+    final int knownAtKill = acknowledged;
     expect(error, isNull, reason: 'iteration $i');
+    // The acknowledgements that were on their way: wait until none arrived
+    // for a moment (with a page that is busy three quarters of the time up
+    // to 15 of them were, and all arrived within this wait).
+    for (int quiet = 0, seen = acksInFlight; quiet < 2;) {
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+      if (acksInFlight == seen) {
+        quiet++;
+      } else {
+        quiet = 0;
+        seen = acksInFlight;
+      }
+    }
+    ackChannel.port1.close();
+    if (acksInFlight > 0) {
+      stats['kills with acknowledgements in flight'] =
+          stats['kills with acknowledgements in flight']! + 1;
+      stats['most acknowledgements in flight at a kill'] = max(
+        stats['most acknowledgements in flight at a kill']!,
+        acksInFlight,
+      );
+    }
 
     final String context =
         'iteration $i (seed $seed): mode $mode, killed after $acks '
-        'acknowledgements${opened ? '' : ', before the open finished'}; '
+        'acknowledgements (and $acksInFlight in flight)'
+        '${opened ? '' : ', before the open finished'}; '
         'acknowledged up to $acknowledged, stored before $verifiedMaxId';
     final Observed seen = await verify(context);
     if (!opened) {
@@ -406,6 +473,10 @@ Future<void> crashTest({required bool opfs}) async {
       stats['killed with a transaction not acknowledged but stored'] =
           stats['killed with a transaction not acknowledged but stored']! + 1;
     }
+    stats['most stored transactions the page did not know of at the kill'] = max(
+      stats['most stored transactions the page did not know of at the kill']!,
+      (seen.maxId ?? 0) - knownAtKill,
+    );
     verifiedMaxId = seen.maxId ?? 0;
     // A transaction that is stored will be there next time, acknowledged
     // or not.
