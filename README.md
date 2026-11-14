@@ -1,5 +1,25 @@
 # Firebase Dart SDK: Cloud Firestore for pure Dart
 
+[![CI](../../actions/workflows/ci.yml/badge.svg)](../../actions/workflows/ci.yml)
+[![Nightly](../../actions/workflows/nightly.yml/badge.svg)](../../actions/workflows/nightly.yml)
+
+> **Revived, November 2026.** The Firestore port had its last change in August 2020, the
+> repository in June 2021, and it was then archived. In November 2026 it was revived: the
+> Firestore client was rebuilt on Dart 3 with sound null safety and brought forward toward parity
+> with the current upstream Firestore SDKs (the Android SDK, which it ports class by class, and
+> the JS SDK, which is the reference for the public API and for the behaviour the SDKs share). It
+> has about 5,900 unit tests and about 880 integration tests per transport (gRPC, WebChannel,
+> WebChannel with long polling) against the Firestore emulator, and a short verification kit was
+> run against production Firestore ([how we test](docs/how_we_test.md)).
+>
+> **Status:** version 0.1.0 is in preparation and not on pub.dev yet. What is not done is listed
+> openly in [features and limits](docs/guides/features.md).
+>
+> **Issues:** <https://github.com/long1eu/firebase_dart_sdk/issues>.
+>
+> **Maintenance:** _[MAINTAINER: one sentence on who maintains this project and how. Not
+> written yet.]_
+
 A pure-Dart client for Cloud Firestore: no Flutter plugin, no native SDK, just `dart:io`, gRPC and
 SQLite. Use it from Dart servers, CLIs and Flutter apps. (Web support is experimental.)
 
@@ -32,6 +52,18 @@ firestore
 ```shell
 dart pub add cloud_firestore_dart firebase_app_dart   # once 0.1.0 is published; it is not yet
 ```
+
+## Start here
+
+- [Parity with upstream Firestore](docs/parity.md): what matches the Android and JS SDKs, and
+  what does not.
+- [Migrating from FlutterFire](docs/guides/migrating_from_flutterfire.md) (`cloud_firestore`).
+- [Examples](cloud_firestore/cloud_firestore_dart/example/): runnable programs, listed in
+  [example/README.md](cloud_firestore/cloud_firestore_dart/example/README.md).
+- [How we test](docs/how_we_test.md): the suites, how to run them, and bugs they caught.
+- [Support policy](docs/support_policy.md): supported Dart SDKs and platforms, how upstream
+  changes are tracked, versioning.
+- [Guides](docs/guides/README.md).
 
 ## What it does
 
@@ -80,7 +112,8 @@ null safety, and parts of its public API follow the JS SDK.
   Enterprise edition only), Firebase Auth user sign-in, the integration suite as a whole and
   long-running load. Test against your own project before relying on it.
 - Version 0.1.0 is prepared for pub.dev as `cloud_firestore_dart` and `firebase_app_dart`, and is
-  **not published yet**. They replace the packages published as `cloud_firestore_vm` and
+  **not published yet**. `cloud_firestore_dart` 0.0.1 on pub.dev (2020) is an early release of the
+  same package. They replace the packages published as `cloud_firestore_vm` and
   `firebase_core_vm` (and the internal `_firebase_internal_vm` and
   `_firebase_database_collection_vm`, now folded in). See
   [docs/migrating_from_vm_packages.md](docs/migrating_from_vm_packages.md).
@@ -163,9 +196,10 @@ The last one is the production verification kit run against the emulator. Agains
 it only runs with your own credentials and `--yes` (see `tool/verify_production/README.md`); that
 was done on a Standard edition database (the results are in that README).
 
-See `tool/README.md` for details, and the Testing section of
-`cloud_firestore/cloud_firestore_dart/README.md` for the opt-in run of the integration suite
-against a real project.
+See `tool/README.md` for details, [docs/how_we_test.md](docs/how_we_test.md) for an overview of
+all the suites, and "Against a real Firebase project" in
+[docs/guides/emulator_and_testing.md](docs/guides/emulator_and_testing.md) for the opt-in run of
+the integration suite against a real project.
 
 ## Regenerating protos
 

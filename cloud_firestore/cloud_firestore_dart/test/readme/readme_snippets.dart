@@ -73,8 +73,8 @@ class City {
   Map<String, Object?> toMap() => {'name': name, 'population': population};
 }
 
-// ../../README.md:11
-Future<void> rootReadmeLine11() async {
+// ../../README.md:31
+Future<void> rootReadmeLine31() async {
   final firestore = Firestore.instanceFor(app: app);
   await firestore.collection('users').doc('ada').set({'name': 'Ada', 'age': 36});
 

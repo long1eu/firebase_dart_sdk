@@ -79,6 +79,11 @@ Future<void> main() async {
 - **API reference**: [pub.dev/documentation/cloud_firestore_dart](https://pub.dev/documentation/cloud_firestore_dart/latest/).
 - **Examples**: one runnable program per topic in
   [`example/`](https://github.com/long1eu/firebase_dart_sdk/blob/main/cloud_firestore/cloud_firestore_dart/example/README.md).
+- **Coming from FlutterFire** (`cloud_firestore`):
+  [migration guide](https://github.com/long1eu/firebase_dart_sdk/blob/main/docs/guides/migrating_from_flutterfire.md).
+- **Parity with the Android and JS SDKs**: [docs/parity.md](https://github.com/long1eu/firebase_dart_sdk/blob/main/docs/parity.md).
+- **How it is tested**: [docs/how_we_test.md](https://github.com/long1eu/firebase_dart_sdk/blob/main/docs/how_we_test.md);
+  supported SDKs and platforms: [docs/support_policy.md](https://github.com/long1eu/firebase_dart_sdk/blob/main/docs/support_policy.md).
 
 **Coming from `cloud_firestore_vm`?** This package was published as
 [`cloud_firestore_vm`](https://pub.dev/packages/cloud_firestore_vm), and its app layer as
@@ -110,6 +115,16 @@ has the changes with before and after code.
 
 The full list, with the known gaps of what is done, is in
 [features and limits](https://github.com/long1eu/firebase_dart_sdk/blob/main/docs/guides/features.md).
+
+## Package history
+
+This is the same package as `cloud_firestore_dart` 0.0.1 on pub.dev, published in April 2020
+from the same repository (then under the fluttercommunity organisation on GitHub). Development
+of that early port went on under the name `cloud_firestore_vm` (0.0.1 to 0.0.7, April 2020); its
+last change was in August 2020. Version 0.1.0 is the revived port, rebuilt on Dart 3 with sound null safety and
+brought forward to the current upstream Firestore SDKs; it goes back to this name. Code written
+for 0.0.1 or for `cloud_firestore_vm` needs the changes in the
+[migration guide](https://github.com/long1eu/firebase_dart_sdk/blob/main/docs/migrating_from_vm_packages.md).
 
 ## License
 
