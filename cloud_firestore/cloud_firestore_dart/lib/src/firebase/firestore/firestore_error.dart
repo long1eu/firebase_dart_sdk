@@ -142,5 +142,5 @@ class FirestoreError extends FirebaseError {
   final Object? cause;
 
   @override
-  String toString() => '$runtimeType:$code $message $cause $stackTrace';
+  String toString() => '$runtimeType: [code=$code]: $message';
 }

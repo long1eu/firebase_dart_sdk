@@ -29,5 +29,6 @@ class SnapshotVersion implements Comparable<SnapshotVersion> {
   int get hashCode => timestamp.hashCode;
 
   @override
-  String toString() => 'SnapshotVersion{timestamp: $timestamp}';
+  String toString() =>
+      'SnapshotVersion(seconds=${timestamp.seconds}, nanos=${timestamp.nanoseconds})';
 }

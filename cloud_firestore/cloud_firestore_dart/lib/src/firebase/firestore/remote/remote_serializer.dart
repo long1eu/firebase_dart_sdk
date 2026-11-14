@@ -591,7 +591,7 @@ class RemoteSerializer {
     } else if (response.hasMissing()) {
       return _decodeMissingDocument(response);
     } else {
-      throw ArgumentError('Unknown result case: $response');
+      throw ArgumentError('Unknown result case: ${response.whichResult()}');
     }
   }
 
@@ -688,7 +688,7 @@ class RemoteSerializer {
     } else if (mutation.hasVerify()) {
       return VerifyMutation(decodeKey(mutation.verify), precondition);
     } else {
-      throw fail('Unknown mutation operation: $mutation');
+      throw fail('Unknown mutation operation: ${mutation.whichOperation()}');
     }
   }
 
@@ -835,7 +835,9 @@ class RemoteSerializer {
         ),
       );
     } else {
-      throw fail('Unknown FieldTransform proto: $fieldTransform');
+      throw fail(
+        'Unknown FieldTransform proto: ${fieldTransform.whichTransformType()}',
+      );
     }
   }
 
@@ -1086,7 +1088,7 @@ class RemoteSerializer {
     } else if (filter is CompositeFilter) {
       return encodeCompositeFilter(filter);
     } else {
-      throw fail('Unrecognized filter type $filter');
+      throw fail('Unrecognized filter type ${filter.runtimeType}');
     }
   }
 

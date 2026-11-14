@@ -96,10 +96,10 @@ class EventManager implements SyncEngineCallback {
       if (!isRecoverablePersistenceError(e)) {
         rethrow;
       }
-      Log.w('EventManager', 'Initialization of query $query failed: $e');
+      Log.w('EventManager', 'Initialization of query \'$query\' failed: $e');
       queryListener.onError(
         FirestoreError(
-          'Initialization of query $query failed: $e',
+          'Initialization of query \'$query\' failed: $e',
           FirestoreErrorCode.unavailable,
         ),
       );

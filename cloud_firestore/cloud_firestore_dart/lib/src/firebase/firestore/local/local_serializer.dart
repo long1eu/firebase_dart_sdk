@@ -362,7 +362,7 @@ class LocalSerializer {
     } else if (target.hasQuery()) {
       decodedTarget = rpcSerializer.decodeQueryTarget(target.query);
     } else {
-      throw fail('Unknown targetType $target}');
+      throw fail('Unknown targetType ${target.whichTargetType()}');
     }
 
     return QueryData(

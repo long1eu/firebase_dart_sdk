@@ -1,5 +1,9 @@
 ## Unreleased
 
+- Error messages no longer contain multi-line debug output. `FirestoreError.toString()` is now
+  `FirestoreError: [code=<code>]: <message>` (the JS format; it used to end in the cause and the stack trace, or
+  `null null`), and messages that name a document print its path, for example
+  `Failed to get document 'rooms/eros' from cache` (it printed `'DocumentKey {\n  path=rooms/eros,\n}'`).
 - Two clients on one SQLite cache: the primary client now sends the pending writes of a client that is gone (it
   crashed or was killed, see below) at its next metadata refresh, every 4 s. It only looked for them when it wrote
   something itself, so with an idle primary they were never sent.

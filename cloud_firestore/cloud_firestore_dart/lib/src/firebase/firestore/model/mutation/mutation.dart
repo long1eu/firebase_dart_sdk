@@ -186,7 +186,7 @@ abstract class Mutation {
       } else {
         hardAssert(
           doc is NoDocument,
-          'A local delete must result in a NoDocument, got $doc',
+          'A local delete must result in a NoDocument, got ${doc.runtimeType} for ${doc.key.path}',
         );
         return DeleteMutation(doc.key, Precondition.none);
       }

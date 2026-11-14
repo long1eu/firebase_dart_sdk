@@ -150,10 +150,12 @@ void main() {
       await expectLater(
         doc.get(Source.cache),
         throwsA(
+          // The path of the document, as the JS SDK prints it.
           _unavailable('Failed to get document ').having(
             (FirestoreError e) => e.message,
             'message',
-            contains('from cache: TransientDatabaseException: busy'),
+            "Failed to get document 'col/doc' from cache: "
+                'TransientDatabaseException: busy',
           ),
         ),
       );
@@ -228,7 +230,15 @@ void main() {
       database.fail(r'\btargets\b', _busy);
       await expectLater(
         doc.snapshots.first,
-        throwsA(_unavailable('Initialization of query ')),
+        throwsA(
+          _unavailable('Initialization of query ').having(
+            (FirestoreError e) => e.message,
+            'message',
+            "Initialization of query 'Query(target=Query(col/doc order by "
+                "__name__);limitType=LIMIT_TO_FIRST)' failed: "
+                'TransientDatabaseException: busy',
+          ),
+        ),
       );
       await expectClientWorks();
     });
