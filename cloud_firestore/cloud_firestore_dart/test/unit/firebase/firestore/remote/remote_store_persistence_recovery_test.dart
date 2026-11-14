@@ -305,14 +305,16 @@ void main() {
         };
         callback.diskFull = true;
         bool listening = false;
-        remoteStore
-            .start()
-            .then(
-              (_) => remoteStore.listen(
-                QueryData(query('foo').toTarget(), 2, 1, QueryPurpose.listen),
-              ),
-            )
-            .then((_) => listening = true);
+        unawaited(
+          remoteStore
+              .start()
+              .then(
+                (_) => remoteStore.listen(
+                  QueryData(query('foo').toTarget(), 2, 1, QueryPurpose.listen),
+                ),
+              )
+              .then((_) => listening = true),
+        );
         settle();
         expect(listening, isTrue);
 
@@ -349,8 +351,10 @@ void main() {
       // The shutdown also waits for work of the persistence, which setUp started outside virtual time: let real and
       // virtual time take turns until it is done.
       bool stopped = false;
-      virtual.run(
-        (FakeAsync _) => remoteStore.shutdown().then((_) => stopped = true),
+      unawaited(
+        virtual.run(
+          (FakeAsync _) => remoteStore.shutdown().then((_) => stopped = true),
+        ),
       );
       for (int i = 0; i < 500 && !stopped; i++) {
         await Future<void>.delayed(Duration.zero);

@@ -77,7 +77,7 @@ the `RemoteStore`, and a task that is already on the queue runs nested calls inl
 
 | Kind | Where | What it needs | Command (from the package directory unless noted) |
 |---|---|---|---|
-| Unit | `test/unit` | nothing | `dart test test/unit` (or `./tool/test_all.sh` from the repository root: pub get, analyze, unit tests of both packages) |
+| Unit | `test/unit` | nothing | `dart test test/unit` (or `./tool/test_all.sh` from the repository root: pub get, analyze, unit tests of the three packages, and analysis of `examples/`) |
 | Spec tests | `test/res/json/*.json`, run by `test/unit/firebase/firestore/spec/` on memory and SQLite persistence | nothing; part of the unit run | `dart test test/unit/firebase/firestore/spec` |
 | API goldens | `test/unit/api/` (`public_api.golden.txt`, `pipelines_api.golden.txt`, `lite_api.golden.txt`, README snippets) | nothing | `dart test test/unit/api`; regenerate with `UPDATE_GOLDEN=1` |
 | Integration, standard | `test/integration` | emulator on 127.0.0.1:8080 (`tool/start_emulator.sh`) | `tool/test_integration.sh standard` (repository root), or `FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 dart test test/integration` |

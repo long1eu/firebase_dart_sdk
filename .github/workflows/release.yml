@@ -2,8 +2,8 @@ name: Release check
 
 # Validates a release when a version tag is pushed. It does NOT publish anything.
 #
-# Publishing to pub.dev stays a manual step that the maintainer runs and approves himself, from
-# his own machine and account (`dart pub publish` in each package, in the order below; see the
+# Publishing to pub.dev stays a manual step that the maintainer runs and approves, from
+# their own machine and account (`dart pub publish` in each package, in the order below; see the
 # release notes of the packages). This workflow has no credentials for pub.dev and must never
 # get any: there is no `dart pub publish` without `--dry-run` here, no OIDC token permission and
 # no secret.

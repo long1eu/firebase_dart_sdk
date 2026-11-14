@@ -59,8 +59,7 @@ void main() {
 
   test('a key that is not in a DocumentSet is named by its path', () {
     expect(
-      () =>
-          DocumentSet.emptySet((_, __) => 0).getPredecessor(key('rooms/eros')),
+      () => DocumentSet.emptySet((_, _) => 0).getPredecessor(key('rooms/eros')),
       throwsA(
         isA<ArgumentError>().having(
           (ArgumentError e) => e.message,

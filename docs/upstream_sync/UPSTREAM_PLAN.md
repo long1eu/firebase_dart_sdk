@@ -5,8 +5,11 @@
 Updated 2026-11-13 at `main` (`606a73c`). The port was at `576da00e85` (2019-07-23); behaviour has now been brought forward to
 roughly the current upstream `main` (checked against a clone whose `main` was at `51b35e869`, 2026-11-11), for the
 items marked done. Everything is ported in Dart, not copied, and verified with unit tests, the shared spec tests and
-the local emulator only. **Nothing was run against production Firestore**, and the Enterprise edition features were
-run against the emulator in Enterprise edition only. The per-commit tables below are the original triage and were not
+the local emulator. Against production Firestore only the production verification kit (`tool/verify_production`)
+was run, on a Standard edition database: in its latest run 13 of its 15 checks passed and 2 were skipped, and an
+earlier run found one bug of the SDK (-0.0 read over the web transport lost its sign), since fixed; the results are in
+[`tool/verify_production/README.md`](../../tool/verify_production/README.md). The integration suite was not run
+against production, and the Enterprise edition features were run against the emulator in Enterprise edition only. The per-commit tables below are the original triage and were not
 rewritten; the table here is the current state.
 
 | Plan item | State |
@@ -24,7 +27,7 @@ rewritten; the table here is the current state.
 | Verify documents read in a transaction (upstream ef38ef7) | done (`58674f9`) |
 | Persistence clearing | done (`Firestore.clearPersistence()` on a terminated instance; `ee0ee5b`) |
 | Pipelines | preview, in a separate library (`99f3706`, `02444ca`, `5d732eb`): server-executed only, Enterprise edition emulator only. Search, window functions, local evaluation and real-time pipelines are not done |
-| Web | not part of the Android plan; experimental. The RPCs are behind a transport interface (`76f975a`, `41e9b46`); the web transport is REST for unary calls and a WebChannel client over `fetch` for the streams (`6d95cf5`), hardened with long polling, timeouts, retransmission and session cleanup (`9d7d257`, `9fafdc2`), and there is an opt-in persistent cache, SQLite as WebAssembly on IndexedDB (`e10c909`, `e17faf9`, `606a73c`). 41 browser tests in Chrome (40 pass and 1 is skipped with each compiler) and the standard integration suite on the VM over the web transport, against the emulator. Chrome only; no production backend was tried |
+| Web | not part of the Android plan; experimental. The RPCs are behind a transport interface (`76f975a`, `41e9b46`); the web transport is REST for unary calls and a WebChannel client over `fetch` for the streams (`6d95cf5`), hardened with long polling, timeouts, retransmission and session cleanup (`9d7d257`, `9fafdc2`), and there is an opt-in persistent cache, SQLite as WebAssembly on IndexedDB (`e10c909`, `e17faf9`, `606a73c`). 54 browser tests in Chrome (53 pass and 1 is skipped with each compiler, per [platforms](../guides/platforms.md)) and the standard integration suite on the VM over the web transport, against the emulator. Chrome only; no browser was run against a production backend (the production verification kit used the web transport against production from the VM) |
 | Firestore Lite | not part of the Android plan; experimental (`b184f30`): a second library without cache and listeners, as `firebase/firestore/lite` of the JS SDK, over gRPC on the VM and REST on the web |
 | Kotlin/ktx, Android-only | skipped by design |
 
@@ -40,8 +43,10 @@ Not from upstream, found while testing:
   lists them with their tests.
 - A built-in connectivity change detector for the VM (`ea747eb`), in place of Android's network callback.
 
-A production verification kit exists (`tool/verify_production`, `36f35e3`) and passes against the emulators. It has
-not been run against a real project.
+A production verification kit exists (`tool/verify_production`, `36f35e3`). It was run against a real Standard
+edition database: 13 of its 15 checks passed and 2 were skipped (one needs an Enterprise edition database, the other a
+Web API key); see [`tool/verify_production/README.md`](../../tool/verify_production/README.md) for each result and for
+the two checks that fail on the emulators because of the emulators.
 
 Still open from the original "Open / unverified" list: `0eaca5e` (`useEmulator`) is covered by
 `FirestoreSettings.withEmulator` but not compared line by line; the inbound message size question is answered: package:grpc (5.2.0) has no limit on a response message (`GrpcHttpDecoder` allocates what the length prefix says), so the 17 MiB of Android and JS is not needed; it is not enforced either.

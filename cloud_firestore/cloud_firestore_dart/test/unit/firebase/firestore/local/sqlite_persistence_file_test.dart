@@ -120,6 +120,7 @@ class _SwitchFailingDatabase extends Database {
       attempts++;
       final int? limit = failures;
       if (limit == null || attempts <= limit) {
+        // ignore: only_throw_errors, the tests inject arbitrary thrown objects on purpose.
         throw error;
       }
     }
@@ -309,30 +310,30 @@ void main() {
     });
 
     test('a journal mode that the opener chose is kept', () async {
-      final OpenDatabase opener =
-          (
-            String path, {
-            int? version,
-            OnConfigure? onConfigure,
-            OnCreate? onCreate,
-            OnVersionChange? onUpgrade,
-            OnVersionChange? onDowngrade,
-            OnOpen? onOpen,
-          }) async {
-            final DatabaseMock db = await DatabaseMock.create(
-              dbName,
-              version: version,
-              onConfigure: (Database db) async {
-                await db.query('PRAGMA journal_mode = TRUNCATE');
-                await onConfigure?.call(db);
-              },
-              onCreate: onCreate,
-              onUpgrade: onUpgrade,
-              onDowngrade: onDowngrade,
-              onOpen: onOpen,
-            );
-            return db..renamePath = false;
-          };
+      Future<Database> opener(
+        String path, {
+        int? version,
+        OnConfigure? onConfigure,
+        OnCreate? onCreate,
+        OnVersionChange? onUpgrade,
+        OnVersionChange? onDowngrade,
+        OnOpen? onOpen,
+      }) async {
+        final DatabaseMock db = await DatabaseMock.create(
+          dbName,
+          version: version,
+          onConfigure: (Database db) async {
+            await db.query('PRAGMA journal_mode = TRUNCATE');
+            await onConfigure?.call(db);
+          },
+          onCreate: onCreate,
+          onUpgrade: onUpgrade,
+          onDowngrade: onDowngrade,
+          onOpen: onOpen,
+        );
+        return db..renamePath = false;
+      }
+
       final SQLitePersistence a = await start('app-a', opener: opener);
       expect(await a.query('PRAGMA journal_mode'), <Object>[
         <String, Object?>{'journal_mode': 'truncate'},

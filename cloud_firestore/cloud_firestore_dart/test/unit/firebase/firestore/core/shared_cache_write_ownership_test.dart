@@ -255,7 +255,8 @@ void main() {
       });
 
       bool aDone = false;
-      final Future<void> aWritten = a.write(writeA)..then((_) => aDone = true);
+      final Future<void> aWritten = a.write(writeA);
+      unawaited(aWritten.then((_) => aDone = true));
       expect(a.datastore.writesSent, 0, reason: 'a secondary sends nothing');
 
       final Future<void> bWritten = b.write(writeB);

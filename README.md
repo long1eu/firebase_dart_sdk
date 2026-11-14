@@ -102,21 +102,21 @@ migrating from the `_vm` packages.
 ## Status
 
 Revival of the original port, which stopped at the 2019 Android SDK; it now follows the Android
-SDK's behaviour up to late 2026 on Dart 3.8 or later with sound
-null safety, and parts of its public API follow the JS SDK.
+SDK's behaviour up to late 2026 on Dart 3.8 or later with sound null safety, and parts of its
+public API follow the JS SDK.
 
 - **Tested mostly against the Firestore emulator.** Against production, only the production
   verification kit (`tool/verify_production`) was run, on a real Firestore database in Standard
   edition: 13 of its 15 checks passed in one run and 2 were skipped (one needs an Enterprise
   edition database, the other a Web API key with anonymous sign-in). An earlier run found one bug
-  of this SDK, which is fixed (-0.0 read over the web transport lost its sign). Not verified against production:
-  the Enterprise edition features (BSON value types, Pipelines; tested against the emulator in
-  Enterprise edition only), Firebase Auth user sign-in, the integration suite as a whole and
-  long-running load. Test against your own project before relying on it.
-- Version 0.1.0 is prepared for pub.dev as `cloud_firestore_dart` and `firebase_app_dart`, and is
-  **not published yet**. `cloud_firestore_dart` 0.0.1 on pub.dev (2020) is an early release of the
-  same package. They replace the packages published as `cloud_firestore_vm` and
-  `firebase_core_vm` (and the internal `_firebase_internal_vm` and
+  of this SDK, which is fixed (-0.0 read over the web transport lost its sign). Not verified
+  against production: the Enterprise edition features (BSON value types, Pipelines; tested
+  against the emulator in Enterprise edition only), Firebase Auth user sign-in, the integration
+  suite as a whole and long-running load. Test against your own project before relying on it.
+- Version 0.1.0 is prepared for pub.dev as `cloud_firestore_dart`, `firebase_app_dart` and
+  `firebase_auth_providers_dart`, and is **not published yet**. `cloud_firestore_dart` 0.0.1 on
+  pub.dev (2020) is an early release of the same package. They replace the packages published as
+  `cloud_firestore_vm` and `firebase_core_vm` (and the internal `_firebase_internal_vm` and
   `_firebase_database_collection_vm`, now folded in). See
   [docs/migrating_from_vm_packages.md](docs/migrating_from_vm_packages.md).
 - Web support is experimental. In a browser the client uses REST and WebChannel over `fetch`
@@ -126,10 +126,11 @@ null safety, and parts of its public API follow the JS SDK.
   browser was run against a production backend (the verification kit used the web transport
   against production from the VM).
 - Not implemented: coordination between clients that share one cache (the multi-tab support of
-  the JS SDK; deferred until after 0.1.0), a full Firebase Auth SDK (no federated sign-in), and Pipelines beyond the preview
-  (no real-time pipelines and no offline evaluation; a local evaluator exists but is internal
-  and not used yet; search, window functions and explain options are only checked for their
-  encoding, since the emulator rejects them). [docs/guides/features.md](docs/guides/features.md) lists the known gaps.
+  the JS SDK; deferred until after 0.1.0), a full Firebase Auth SDK (no federated sign-in), and
+  Pipelines beyond the preview (no real-time pipelines and no offline evaluation; a local
+  evaluator exists but is internal and not used yet; search, window functions and explain
+  options are only checked for their encoding, since the emulator rejects them).
+  [docs/guides/features.md](docs/guides/features.md) lists the known gaps.
 
 This repository ports Firestore and the Firebase Core pieces it needs, plus token providers for
 Firestore in `firebase_auth/firebase_auth_providers_dart`. There is no full Auth SDK, no Storage
@@ -144,7 +145,7 @@ the original project and are not part of the migrated, tested set.
 |---|---|---|
 | `cloud_firestore_dart` | `cloud_firestore/cloud_firestore_dart` | The Firestore client (formerly `cloud_firestore_vm`) |
 | `firebase_app_dart` | `firebase_core/firebase_app_dart` | `FirebaseApp` and options (formerly `firebase_core_vm`) |
-| `firebase_auth_providers_dart` | `firebase_auth/firebase_auth_providers_dart` | Optional token providers: Firebase Auth users over REST, service accounts, Application Default Credentials (not published) |
+| `firebase_auth_providers_dart` | `firebase_auth/firebase_auth_providers_dart` | Optional token providers: Firebase Auth users over REST, service accounts, Application Default Credentials |
 
 The former internal packages are folded in: `_firebase_database_collection_vm` into
 `cloud_firestore_dart` (`lib/src/database_collection`) and `_firebase_internal_vm` into
@@ -154,8 +155,9 @@ The former internal packages are folded in: `_firebase_database_collection_vm` i
 
 ## Running the tests
 
-Unit tests (pub get, analyze `lib`, and tests for both packages; only `test/unit` for
-Firestore):
+Unit tests (pub get, analyze `lib`, and tests for the three packages, only `test/unit` for
+Firestore; then pub get and analyze for each example in `examples/`, whose tests need an
+emulator):
 
     ./tool/test_all.sh
 
@@ -218,7 +220,8 @@ If the installed `protoc` is unusable, set up the Python wrapper (instructions a
 [`docs/upstream_sync/UPSTREAM_PLAN.md`](docs/upstream_sync/UPSTREAM_PLAN.md) lists the
 upstream Android SDK commits since the sync point, triaged per commit (`analysis_0.md` to
 `analysis_4.md`), and the order in which they are being ported. Rows the analysis did not read in
-depth are marked unverified there. The top of that file has the current status. Behaviour is ported in Dart, not copied verbatim.
+depth are marked unverified there. The top of that file has the current status. Behaviour is
+ported in Dart, not copied verbatim.
 
 ## Architecture
 
@@ -232,8 +235,8 @@ Issues and pull requests are welcome. Before opening a pull request, run `./tool
 and, for changes that touch networking or the local store, the emulator integration tests. Do not
 weaken or remove assertions to get a test passing; report flaky tests instead.
 
-`lib` and `example` of both packages are kept formatted with `dart format lib example` (run it in
-the package directory; CI checks it with
+`lib` and `example` of the three packages are kept formatted with `dart format lib example`
+(run it in the package directory; CI checks it with
 `dart format --output=none --set-exit-if-changed lib example` on a pinned Dart SDK,
 currently 3.8.0, the lowest supported one). Do not format
 `test/readme/readme_snippets.dart`, which is generated from the README.

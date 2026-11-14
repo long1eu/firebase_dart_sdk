@@ -33,6 +33,7 @@ class _FaultyDatabase implements Database {
   void _maybeFail(String statement) {
     final RegExp? pattern = this.pattern;
     if (pattern != null && pattern.hasMatch(statement)) {
+      // ignore: only_throw_errors, the tests inject arbitrary thrown objects on purpose.
       throw error!();
     }
   }
@@ -120,6 +121,7 @@ void main() {
             OnOpen? onOpen,
           }) async {
             if (openError != null) {
+              // ignore: only_throw_errors, the tests inject arbitrary thrown objects on purpose.
               throw openError();
             }
             final DatabaseMock mock = await DatabaseMock.create(

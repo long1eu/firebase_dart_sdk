@@ -32,9 +32,11 @@ WebChannel endpoint.
 
 ### Unit tests
 
-`./tool/test_all.sh` runs, for each of the three packages, `dart pub get`, `dart analyze` and the
-tests (for `cloud_firestore_dart` only `test/unit`). In `cloud_firestore/cloud_firestore_dart`,
-`dart test test/unit -j 2` runs the Firestore unit suite alone.
+`./tool/test_all.sh` runs, for each of the three packages, `dart pub get`, `dart analyze lib` and
+the tests (for `cloud_firestore_dart` only `test/unit`), then `dart pub get` and `dart analyze` for
+each example in `examples/` (their tests need an emulator, see below). In
+`cloud_firestore/cloud_firestore_dart`, `dart test test/unit -j 2` runs the Firestore unit suite
+alone.
 
 The Firestore unit tests by area (tests run, at the commit above):
 
@@ -69,6 +71,13 @@ script starts itself. [`tool/README.md`](../tool/README.md) has the details.
 `test/integration_enterprise` runs against the emulator in Enterprise edition (port 8181):
 the BSON value types and Pipelines, mostly ported from the integration tests of the Android and
 JS SDKs.
+
+### Example apps
+
+Each package in [`examples/`](../examples/README.md) (an HTTP server, a command-line tool, a Cloud
+Run job) has tests that run it against the Firestore emulator and are skipped without one: in the
+example's directory, `dart pub get`, then `FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 dart test`.
+`tool/test_all.sh` only analyzes them, and CI does not run their tests.
 
 ### Browser tests
 
@@ -126,7 +135,8 @@ each check is in [`tool/verify_production/README.md`](../tool/verify_production/
 
 - `./tool/check_size.sh`: Firestore Lite compiled to JavaScript stays small and does not pull in
   the sync engine.
-- `dart format` and `dart analyze` in CI, on the lowest supported Dart SDK (3.8.0) and on stable.
+- `dart analyze` in CI on the lowest supported Dart SDK (3.8.0) and on stable, and the formatting
+  check (`dart format --output=none --set-exit-if-changed lib example`) on 3.8.0 only.
 - Migration tests open SQLite caches written by older versions, including a cache written by the
   published `cloud_firestore_vm` 0.0.7.
 
@@ -173,7 +183,8 @@ and an integration test that a restarted client reuses its cached queries
 
 The production verification kit also found one: `-0.0` read over the web transport came back as
 `0.0`, because production sends it as the JSON number `-0`, which `jsonDecode` reads as the
-integer 0. The emulator writes `-0.0`, so the emulator suites could not see it.
+integer 0. The emulator itself stores `-0` as `0`, so no emulator test could tell the SDK's loss
+of the sign from the emulator's.
 
 ## What is not tested
 

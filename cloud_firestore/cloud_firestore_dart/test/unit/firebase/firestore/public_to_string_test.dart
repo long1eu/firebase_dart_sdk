@@ -230,7 +230,7 @@ void main() {
       );
       expectString(
         rooms.where('tags', arrayContainsAny: <Object?>['a']).limitToLast(2),
-        "Query(target=Query(rooms where tags array-contains-any [a] order by "
+        'Query(target=Query(rooms where tags array-contains-any [a] order by '
         '-__name__);limitType=LIMIT_TO_LAST)',
       );
     });
