@@ -125,25 +125,25 @@ Future<void> authProvidersReadmeLine80() async {
   await auth.signOut();
 }
 
-// ../../docs/migrating_from_vm_packages.md:62
-Future<void> migrationGuideLine62() async {
+// ../../docs/migrating_from_vm_packages.md:64
+Future<void> migrationGuideLine64() async {
 }
 
-// ../../docs/migrating_from_vm_packages.md:91
-Future<void> migrationGuideLine91() async {
+// ../../docs/migrating_from_vm_packages.md:93
+Future<void> migrationGuideLine93() async {
   final DocumentSnapshot<Map<String, Object?>> snapshot =
       await users.doc('ada').get();
   final Map<String, Object?>? data = snapshot.data; // null if it does not exist
   final int? age = data?['age'] as int?;
 }
 
-// ../../docs/migrating_from_vm_packages.md:115
-Future<void> migrationGuideLine115() async {
+// ../../docs/migrating_from_vm_packages.md:117
+Future<void> migrationGuideLine117() async {
   app.setDataCollectionDefaultEnabled(enabled: false);
 }
 
-// ../../docs/migrating_from_vm_packages.md:140
-Future<void> migrationGuideLine140() async {
+// ../../docs/migrating_from_vm_packages.md:142
+Future<void> migrationGuideLine142() async {
   final Firestore firestore = Firestore.instanceFor(
     app: app,
     settings: FirestoreSettings(cacheSettings: PersistentCacheSettings()),
@@ -151,20 +151,20 @@ Future<void> migrationGuideLine140() async {
   );
 }
 
-// ../../docs/migrating_from_vm_packages.md:155
-Future<void> migrationGuideLine155() async {
+// ../../docs/migrating_from_vm_packages.md:157
+Future<void> migrationGuideLine157() async {
   final Firestore emulated = Firestore.instanceFor(
     app: app,
     settings: FirestoreSettings().withEmulator('127.0.0.1', 8080),
   );
 }
 
-// ../../docs/migrating_from_vm_packages.md:184
-Future<void> migrationGuideLine184() async {
+// ../../docs/migrating_from_vm_packages.md:186
+Future<void> migrationGuideLine186() async {
 }
 
-// ../../docs/migrating_from_vm_packages.md:272
-Future<void> migrationGuideLine272() async {
+// ../../docs/migrating_from_vm_packages.md:274
+Future<void> migrationGuideLine274() async {
   final QuerySnapshot<Map<String, Object?>> result = await firestore
       .collection('users')
       .where(FieldPath.documentIdField, isEqualTo: 'ada')
@@ -175,20 +175,20 @@ Future<void> migrationGuideLine272() async {
   await firestore.terminate();
 }
 
-// ../../docs/migrating_from_vm_packages.md:303
-Future<void> migrationGuideLine303() async {
+// ../../docs/migrating_from_vm_packages.md:305
+Future<void> migrationGuideLine305() async {
   final DocumentReference<Map<String, Object?>> ref =
       firestore.collection('users').doc('ada');
   final DocumentSnapshot<Map<String, Object?>> snapshot = await ref.get();
 }
 
-// ../../docs/migrating_from_vm_packages.md:338
-Future<void> migrationGuideLine338() async {
+// ../../docs/migrating_from_vm_packages.md:340
+Future<void> migrationGuideLine340() async {
   print('${firestore.projectId} / ${firestore.databaseId}');
 }
 
-// ../../docs/migrating_from_vm_packages.md:361
-Future<void> migrationGuideLine361() async {
+// ../../docs/migrating_from_vm_packages.md:363
+Future<void> migrationGuideLine363() async {
     final configRef = firestore.doc('config/plans');
     final userRef = users.doc('ada');
     await firestore.runTransaction<void>((Transaction tx) async {
@@ -197,16 +197,16 @@ Future<void> migrationGuideLine361() async {
     });
 }
 
-// ../../docs/migrating_from_vm_packages.md:377
-Future<void> migrationGuideLine377() async {
+// ../../docs/migrating_from_vm_packages.md:379
+Future<void> migrationGuideLine379() async {
     await firestore.runTransaction<void>(
       (Transaction tx) async {},
       options: TransactionOptions(maxAttempts: 6),
     );
 }
 
-// ../../docs/migrating_from_vm_packages.md:400
-Future<void> migrationGuideLine400() async {
+// ../../docs/migrating_from_vm_packages.md:402
+Future<void> migrationGuideLine402() async {
     await firestore.terminate();
     try {
       await users.doc('ada').get();
@@ -454,8 +454,8 @@ Future<void> gettingStartedGuideLine144() async {
   );
 }
 
-// ../../docs/guides/migrating_from_flutterfire.md:126
-Future<void> migratingFromFlutterfireGuideLine126() async {
+// ../../docs/guides/migrating_from_flutterfire.md:105
+Future<void> migratingFromFlutterfireGuideLine105() async {
   // The values of a web app of the project (Firebase console, Project settings,
   // Your apps) work on every platform. From a generated firebase_options.dart:
   // apiKey -> apiKey, appId -> applicationId, projectId -> projectId.
@@ -468,8 +468,8 @@ Future<void> migratingFromFlutterfireGuideLine126() async {
   );
 }
 
-// ../../docs/guides/migrating_from_flutterfire.md:172
-Future<void> migratingFromFlutterfireGuideLine172() async {
+// ../../docs/guides/migrating_from_flutterfire.md:151
+Future<void> migratingFromFlutterfireGuideLine151() async {
   final Directory cacheDirectory = Directory('<the application support directory>');
   final Firestore persistent = Firestore.instanceFor(
     app: app,
@@ -478,15 +478,15 @@ Future<void> migratingFromFlutterfireGuideLine172() async {
   );
 }
 
-// ../../docs/guides/migrating_from_flutterfire.md:195
-Future<void> migratingFromFlutterfireGuideLine195() async {
+// ../../docs/guides/migrating_from_flutterfire.md:174
+Future<void> migratingFromFlutterfireGuideLine174() async {
   final FirebaseUserAuth auth = await FirebaseUserAuth.forApp(app);
   final Firestore signedIn = Firestore.instanceFor(app: app);
   await auth.signInWithEmailAndPassword('ada@example.com', password);
 }
 
-// ../../docs/guides/migrating_from_flutterfire.md:349
-Future<void> migratingFromFlutterfireGuideLine349() async {
+// ../../docs/guides/migrating_from_flutterfire.md:328
+Future<void> migratingFromFlutterfireGuideLine328() async {
   final QuerySnapshot<Map<String, Object?>> page = await firestore
       .collection('users')
       .where('age', isGreaterThanOrEqualTo: 18)
