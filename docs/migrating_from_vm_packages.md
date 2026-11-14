@@ -1,12 +1,14 @@
 # Migrating from `cloud_firestore_vm` / `firebase_core_vm`
 
-`cloud_firestore_vm` 0.0.7 and `firebase_core_vm` 0.0.4 (April 2020) continue as
+`cloud_firestore_vm` 0.0.7 (April 2020) and `firebase_core_vm` 0.0.4 (March 2020) continue as
 `cloud_firestore_dart` 0.1.0 and `firebase_app_dart` 0.1.0. It is the same code base, moved to
-Dart 3 with null safety and synced with newer versions of the official SDKs. This guide lists
+Dart 3 with null safety and synced with newer versions of the official SDKs. (`firebase_core_vm`
+0.0.5 to 0.0.8 were published later in 2020 from another branch; this guide starts from 0.0.4,
+the version `cloud_firestore_vm` 0.0.7 depends on.) This guide lists
 what you have to change, in the order you will hit it. Each item is a breaking change from the
 0.1.0 CHANGELOG of one of the two packages.
 
-0.1.0 is prepared for pub.dev but not published yet. It was verified with unit tests and the
+0.1.0 was verified with unit tests and the
 Firestore emulator. Against production Firestore only the verification kit
 (`tool/verify_production`) was run, on a Standard edition database (13 of its 15 checks passed in
 one run and 2 were skipped); the Enterprise edition features and long-running load were not.

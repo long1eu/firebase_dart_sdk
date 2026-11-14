@@ -1,152 +1,3 @@
-## Unreleased
-
-- Persistent cache indexes: a limit query served by a field index could show a document that had left its window.
-  The query engine looked beyond the window only when the document at its edge had a version (update time) after the
-  index offset; a document delivered late by a target that lagged behind has an older version. It now also refills
-  the window when the document at its edge changed in the cache after the offset. The JS and Android SDKs only test
-  the version.
-- Persistent cache indexes: the query engine could return documents that do not match the query, among the
-  documents that changed after the offset of a field index, when none of them had a pending write.
-- Persistent cache indexes: a query served by a field index could miss a document for good after one of the
-  client's own writes. The acknowledged document is stored with the commit version as read time, and the index
-  backfill moved past it; a document that watch delivered afterwards in a snapshot at or before that version was
-  never indexed. While such an acknowledged document has not been sent by watch, the backfill now stops at the last
-  snapshot version of watch. The JS and Android SDKs have the same gap.
-- Web transport: a listener could stop getting snapshots for good (it stayed on its last snapshot from the cache,
-  with pending writes) when the server no longer had messages of a listen stream it had never delivered. Seen with
-  the emulator after a connection was stalled and cut while the stream had a large backlog: the server answered a
-  request for the messages after the last one the client had from a later message on. One of the lost messages
-  confirmed a target, and the client ignores every change of a target that is not confirmed. Such an answer now
-  fails the stream, and the client opens a new one.
-- **Behaviour change:** `Firestore.instanceFor()` (and `getInstance`) throws a `StateError` when it is given settings
-  that differ from those of the instance that already exists for the app and database, as the JS and Android SDKs
-  do. Before, the new settings were silently ignored. Call it without settings to get the existing instance, or
-  `terminate()` that instance first.
-- A listener no longer gets an extra `modified` event, with pending writes and unchanged fields, when watch sends a
-  document before the acknowledgement of a set with a server timestamp. A set overlay that comes from a real set is
-  now applied as stored when the document arrives, as in the other SDKs; only one that stands for a merge or update
-  of a document without a remote version is computed again.
-- `FirestoreSettings.experimentalLongPollingOptions` (`timeoutSeconds`, 5 to 30) sets the long-polling timeout of
-  the web transport, as in the JS SDK. The client reports online as soon as the watch stream connects rather than
-  at its first message.
-- Persistent cache indexes: after a write was rejected by the backend, a query served by a field index could miss
-  the document, or return it as the rejected write had left it (for example a document that the user deleted, and
-  whose delete was rejected, stayed out of the result). The index entries of the documents of a rejected write are
-  now written when it is rejected. The Android SDK has the same gap.
-- Web transport: writes that were in flight when the write stream was closed by the client (`disableNetwork()`, a
-  credential change, an idle stream) could reach the backend later, after the same writes and newer ones had been
-  sent on the next stream, and replace the newer values: the WebChannel session of the closed stream went on
-  delivering what it had queued, sending a failed request again for up to its timeout. The session now ends when
-  the stream is closed, as in the JS SDK: what was not sent is dropped (the client keeps unacknowledged writes and
-  sends them again anyway), and a request in flight is not sent again.
-- A listener could lose a document for good after an existence filter mismatch. The client then resets the target
-  and listens to it again, and its documents go through limbo resolution. When a resolution confirmed a document
-  before the backend had sent the target again, the view concluded that the backend does not return the document
-  for the query and dropped it; it did not come back, and the snapshot was reported as in sync. That conclusion is
-  now only drawn once watch marked the target CURRENT on the current stream.
-- Web: a page sends the pending writes that the page before it left in a persistent cache as soon as it starts,
-  and `waitForPendingWrites()` waits for them. Since the change below (writes belong to the client that made them)
-  they were held back for 60 s after a reload, and `waitForPendingWrites()` returned without them. A `Database`
-  whose opener holds an exclusive lock while it is open now says so with the new `ExclusiveDatabase` interface
-  (the web openers of the example do, with their Web Lock): every other client of the cache is then known to be
-  gone. If you copied `example/sqlite_database_web.dart` into your app, copy it again. On the VM the 60 s remain.
-- `toString()` of the public classes is one line now, in the format of the Android SDK where it has one:
-  `DocumentSnapshot{key=..., metadata=..., doc=...}`, `SnapshotMetadata{hasPendingWrites=..., isFromCache=...}`,
-  `Blob { bytes=0102, subtype=0 }`, `FirestoreSettings{host=..., ...}`. A `QuerySnapshot` prints its query and the
-  number of its documents, a `Query` its filters and orderings. `FirestoreErrorCode.cancelled` and
-  `resourceExhausted` print their own names (they printed `canceled` and `resourcesExhausted`), and messages name
-  the query operators as the JS SDK does (`array-contains`, `array-contains-any`, `not-in`).
-- `Timestamp.toString()` is now `Timestamp(seconds=1, nanoseconds=2)`, as in the JS and Android SDKs. It used to
-  print the two fields over four lines.
-- The canonical ids of queries, which the SQLite cache stores to find the cached results of a query again, are now
-  the ids of the JS SDK (`rooms|f:at<=time(60,3000)|ob:atasc,__name__asc`). They were built from the `toString()`
-  of the values of a query, so they contained multi-line debug output and changed whenever such a `toString()`
-  changed. An existing cache keeps its cached queries: the ids of its stored targets are computed again when it is
-  opened (SQLite schema version 19).
-- Error messages no longer contain multi-line debug output. `FirestoreError.toString()` is now
-  `FirestoreError: [code=<code>]: <message>` (the JS format; it used to end in the cause and the stack trace, or
-  `null null`), and messages that name a document print its path, for example
-  `Failed to get document 'rooms/eros' from cache` (it printed `'DocumentKey {\n  path=rooms/eros,\n}'`).
-- Two clients on one SQLite cache: the primary client now sends the pending writes of a client that is gone (it
-  crashed or was killed, see below) at its next metadata refresh, every 4 s. It only looked for them when it wrote
-  something itself, so with an idle primary they were never sent.
-- Web transport: the double -0.0 read from production Firestore came back as 0.0. Production writes it as the
-  JSON number `-0`, which `jsonDecode` reads as the int 0; the responses of REST and WebChannel are now decoded
-  keeping the sign, as `JSON.parse` does in the JS SDK. (The emulator writes `-0.0`, so its tests did not show
-  it.) Empty bytes were not affected.
-- Two clients on one SQLite cache: the primary client no longer sends the pending writes of the other client. It
-  sent them, but the other client was never told the result, so its `set()` and `waitForPendingWrites()` futures
-  never completed. Each write now records the client that made it (SQLite schema version 18), and the primary sends
-  only its own writes, the writes of a client that is gone (it terminated, or did not refresh its metadata, which a
-  live client does every 4 s, for 60 s: it crashed or its app was killed) and the writes stored before this version.
-  The other client sends its writes, and its futures complete, once it is primary itself. A client that stalls for
-  more than 60 s (a paused isolate, an app in the background) can still have a write sent by the primary without
-  being told the result.
-- The switch of a SQLite cache to write-ahead logging is tried again a few times (within 1.5 s) when
-  another connection opening the same file at that moment makes it fail with `database is locked`;
-  if it still fails, that is logged at debug level instead of as a warning, and the next open
-  switches the file.
-- Web transport (and Firestore Lite on the web): the calls in flight when the instance is terminated fail with
-  `unavailable`, as over gRPC. Their responses used to just end, so a transaction read failed with "Mismatch in
-  docs returned from document lookup" and a commit with `unimplemented` ("No responses received").
-- Web transport: a WebChannel stream (Listen, Write) sends the headers of the JS SDK's
-  WebChannelConnection: the client, `Content-Type: text/plain`, the app id, the credentials and
-  the API key. It no longer sends `google-cloud-resource-prefix` or `x-goog-request-params`, which
-  JS sends only with unary calls; the stream is routed by its `database` URL parameter.
-- The app id of the app (`FirebaseOptions.applicationId`) is sent with every request in the
-  `x-firebase-gmpid` header, as the Android SDK (`x-firebase-gmpid`) and the JS SDK
-  (`X-Firebase-GMPID`) do.
-- Web transport: a REST call sends `x-goog-request-params` as the JS SDK's RestConnection does,
-  `project_id=<project>` (with `&database_id=<database>` for a named database), instead of the
-  database name the gRPC transport sends.
-- Firestore Lite on the web sends the browser's cookies with its REST calls to a Cloud Workstations
-  host (`*.cloudworkstations.dev`), as the JS SDK's FetchConnection does; other hosts get none.
-- `FieldPath.fromServerFormat` (used for field paths from the backend, bundles and index configurations) rejects
-  a path with an unterminated backtick, as the JS SDK does.
-- A bundle whose document or document metadata names something other than a document (a collection, the
-  `documents` root) or that holds a reference value that is not a document is now rejected as an invalid bundle
-  (an `ArgumentError`), as in the iOS SDK. Before, the root name loaded a document with an empty key and the other
-  names failed an internal assertion.
-- The local view of a document is now right when its pending writes delete a nested field and later its
-  parent (for example `a.b.c` set, then `a.b.c` and `a.b` deleted): the overlay kept for it handles the fields
-  in order, as the JS and iOS SDKs do, and no longer drops the parent `a` left as an empty map.
-- Argument validation errors are worded like the JS SDK's (the error types do not change).
-  Invalid document data names the method, the field and the document, for example "Function
-  WriteBatch.set() called with invalid data. Unsupported field value: a custom Foo object (found in
-  field a in document c/d)", with "(via `toFirestore()`)" when a converter produced the data; this
-  applies to where() and cursor values and to field path arguments too. An empty path passed to
-  collection() or doc() fails with "Function Firestore.collection() cannot be called with an empty
-  path." instead of a segment count. The messages of the pipelines are unchanged.
-- A listen or write stream that the backend closes with UNAUTHENTICATED invalidates the token
-  only if it has been open for less than 10 seconds, as in the Android and JS SDKs; a stream that
-  was healthy keeps it. Before, every UNAUTHENTICATED of a stream invalidated the token (unary
-  calls still do, as upstream).
-- The API key of the app (`FirebaseOptions.apiKey`) is sent with every request, as the JS SDK
-  does: the `x-goog-api-key` header over gRPC and WebChannel, and the `key` query parameter of a
-  REST call (Firestore Lite on the web sends only the parameter). Requests used to carry no API key,
-  so API key restrictions of the project did not apply to them. The Android SDK sends none.
-- gRPC transport: a server that ignores HTTP/2 flow control can no longer make the client buffer without
-  limit. More data than the flow-control window allows, more than 1 MiB of held frames without data, or a
-  frame larger than 16 KiB ends the connection (package:http2 does the same, but only once a frame is
-  complete); the call fails as for any lost connection. A padded frame with more padding than payload is no
-  longer counted as negative.
-- A query, vector query or commit whose response can not be used (a document that does not decode, a second
-  commit response) no longer resets its HTTP/2 stream: the call is left to end and cancelled only if the
-  backend keeps it open. A reset that races the end of the call made package:http2 terminate the connection
-  and fail every other call on it. The same for a Listen or Write call that was started for a stream stopped
-  in the meantime.
-- Errors of auth and App Check providers are logged and passed on with anything that looks like a token
-  (JWTs, bearer and `token=` values, long opaque strings) replaced by `<redacted>`; the stack trace of a
-  failed auth token request is logged at debug level only.
-- Web transport: a REST response or the answer to a WebChannel request is read up to 256 Mi characters
-  (`WebHttpResponse.maxBodyLength`, the bound of one WebChannel chunk); a larger one fails the call with
-  RESOURCE_EXHAUSTED and the request is aborted. An error body of the back channel is read up to 1 MiB.
-- Web transport: an HTTP 400 without a status in its body maps to FAILED_PRECONDITION as in the JS SDK
-  (was INVALID_ARGUMENT).
-- A write whose mutation can not be stored because the cache is busy for a moment (a
-  `TransientDatabaseException`) fails only its future with `unavailable`, as in the JS SDK. Before,
-  the error was also raised as an uncaught error of the zone, which ends a command-line program.
-
 ## 0.1.0
 
 First release under the new name. This package was published as `cloud_firestore_vm` (last
@@ -706,9 +557,9 @@ Documentation and tests:
   the network, applies remote events and acknowledgements, collects garbage and backfills indexes. A client that
   opens a cache another live client holds takes the lease and logs a warning (as after a hot restart); the other
   client then reports offline, serves its listeners and gets from the cache and keeps its writes pending, until it
-  becomes primary again (when the new client terminates or disables its network). (In this version the primary
-  sent the pending writes of the other client, whose futures then never completed; fixed in the next version, see
-  Unreleased.) A lone client is always primary.
+  becomes primary again (when the new client terminates or disables its network). (At first the primary
+  sent the pending writes of the other client, whose futures then never completed; that is fixed, see "Changes
+  made after the lists above were written".) A lone client is always primary.
 - `clearPersistence()` with another live client on the cache empties the cache in place instead of deleting the
   file under that client; the other client fails with `failedPrecondition` at its next use and terminates.
 - `clearPersistence()` deletes the `-journal`, `-wal` and `-shm` files before the database file, tries all of them,
@@ -829,10 +680,168 @@ Documentation and tests:
 - A write stream that failed right after its handshake no longer crashes the client with "Writing mutations
   requires an opened stream": as in the Android SDK, the late report of a stream that already failed is dropped.
 
+### Changes made after the lists above were written
+
+Newest first. Several of these correct changes from the lists above before they were ever
+published. A change in behaviour is marked in bold.
+
+- Persistent cache indexes: a limit query served by a field index could show a document that had left its window.
+  The query engine looked beyond the window only when the document at its edge had a version (update time) after the
+  index offset; a document delivered late by a target that lagged behind has an older version. It now also refills
+  the window when the document at its edge changed in the cache after the offset. The JS and Android SDKs only test
+  the version.
+- Persistent cache indexes: the query engine could return documents that do not match the query, among the
+  documents that changed after the offset of a field index, when none of them had a pending write.
+- Persistent cache indexes: a query served by a field index could miss a document for good after one of the
+  client's own writes. The acknowledged document is stored with the commit version as read time, and the index
+  backfill moved past it; a document that watch delivered afterwards in a snapshot at or before that version was
+  never indexed. While such an acknowledged document has not been sent by watch, the backfill now stops at the last
+  snapshot version of watch. The JS and Android SDKs have the same gap.
+- Web transport: a listener could stop getting snapshots for good (it stayed on its last snapshot from the cache,
+  with pending writes) when the server no longer had messages of a listen stream it had never delivered. Seen with
+  the emulator after a connection was stalled and cut while the stream had a large backlog: the server answered a
+  request for the messages after the last one the client had from a later message on. One of the lost messages
+  confirmed a target, and the client ignores every change of a target that is not confirmed. Such an answer now
+  fails the stream, and the client opens a new one.
+- **Behaviour change:** `Firestore.instanceFor()` (and `getInstance`) throws a `StateError` when it is given settings
+  that differ from those of the instance that already exists for the app and database, as the JS and Android SDKs
+  do. Before, the new settings were silently ignored. Call it without settings to get the existing instance, or
+  `terminate()` that instance first.
+- A listener no longer gets an extra `modified` event, with pending writes and unchanged fields, when watch sends a
+  document before the acknowledgement of a set with a server timestamp. A set overlay that comes from a real set is
+  now applied as stored when the document arrives, as in the other SDKs; only one that stands for a merge or update
+  of a document without a remote version is computed again.
+- `FirestoreSettings.experimentalLongPollingOptions` (`timeoutSeconds`, 5 to 30) sets the long-polling timeout of
+  the web transport, as in the JS SDK. The client reports online as soon as the watch stream connects rather than
+  at its first message.
+- Persistent cache indexes: after a write was rejected by the backend, a query served by a field index could miss
+  the document, or return it as the rejected write had left it (for example a document that the user deleted, and
+  whose delete was rejected, stayed out of the result). The index entries of the documents of a rejected write are
+  now written when it is rejected. The Android SDK has the same gap.
+- Web transport: writes that were in flight when the write stream was closed by the client (`disableNetwork()`, a
+  credential change, an idle stream) could reach the backend later, after the same writes and newer ones had been
+  sent on the next stream, and replace the newer values: the WebChannel session of the closed stream went on
+  delivering what it had queued, sending a failed request again for up to its timeout. The session now ends when
+  the stream is closed, as in the JS SDK: what was not sent is dropped (the client keeps unacknowledged writes and
+  sends them again anyway), and a request in flight is not sent again.
+- A listener could lose a document for good after an existence filter mismatch. The client then resets the target
+  and listens to it again, and its documents go through limbo resolution. When a resolution confirmed a document
+  before the backend had sent the target again, the view concluded that the backend does not return the document
+  for the query and dropped it; it did not come back, and the snapshot was reported as in sync. That conclusion is
+  now only drawn once watch marked the target CURRENT on the current stream.
+- Web: a page sends the pending writes that the page before it left in a persistent cache as soon as it starts,
+  and `waitForPendingWrites()` waits for them. Since the change below (writes belong to the client that made them)
+  they were held back for 60 s after a reload, and `waitForPendingWrites()` returned without them. A `Database`
+  whose opener holds an exclusive lock while it is open now says so with the new `ExclusiveDatabase` interface
+  (the web openers of the example do, with their Web Lock): every other client of the cache is then known to be
+  gone. If you copied `example/sqlite_database_web.dart` into your app, copy it again. On the VM the 60 s remain.
+- `toString()` of the public classes is one line now, in the format of the Android SDK where it has one:
+  `DocumentSnapshot{key=..., metadata=..., doc=...}`, `SnapshotMetadata{hasPendingWrites=..., isFromCache=...}`,
+  `Blob { bytes=0102, subtype=0 }`, `FirestoreSettings{host=..., ...}`. A `QuerySnapshot` prints its query and the
+  number of its documents, a `Query` its filters and orderings. `FirestoreErrorCode.cancelled` and
+  `resourceExhausted` print their own names (they printed `canceled` and `resourcesExhausted`), and messages name
+  the query operators as the JS SDK does (`array-contains`, `array-contains-any`, `not-in`).
+- `Timestamp.toString()` is now `Timestamp(seconds=1, nanoseconds=2)`, as in the JS and Android SDKs. It used to
+  print the two fields over four lines.
+- The canonical ids of queries, which the SQLite cache stores to find the cached results of a query again, are now
+  the ids of the JS SDK (`rooms|f:at<=time(60,3000)|ob:atasc,__name__asc`). They were built from the `toString()`
+  of the values of a query, so they contained multi-line debug output and changed whenever such a `toString()`
+  changed. An existing cache keeps its cached queries: the ids of its stored targets are computed again when it is
+  opened (SQLite schema version 19).
+- Error messages no longer contain multi-line debug output. `FirestoreError.toString()` is now
+  `FirestoreError: [code=<code>]: <message>` (the JS format; it used to end in the cause and the stack trace, or
+  `null null`), and messages that name a document print its path, for example
+  `Failed to get document 'rooms/eros' from cache` (it printed `'DocumentKey {\n  path=rooms/eros,\n}'`).
+- Two clients on one SQLite cache: the primary client now sends the pending writes of a client that is gone (it
+  crashed or was killed, see below) at its next metadata refresh, every 4 s. It only looked for them when it wrote
+  something itself, so with an idle primary they were never sent.
+- Web transport: the double -0.0 read from production Firestore came back as 0.0. Production writes it as the
+  JSON number `-0`, which `jsonDecode` reads as the int 0; the responses of REST and WebChannel are now decoded
+  keeping the sign, as `JSON.parse` does in the JS SDK. (The emulator writes `-0.0`, so its tests did not show
+  it.) Empty bytes were not affected.
+- Two clients on one SQLite cache: the primary client no longer sends the pending writes of the other client. It
+  sent them, but the other client was never told the result, so its `set()` and `waitForPendingWrites()` futures
+  never completed. Each write now records the client that made it (SQLite schema version 18), and the primary sends
+  only its own writes, the writes of a client that is gone (it terminated, or did not refresh its metadata, which a
+  live client does every 4 s, for 60 s: it crashed or its app was killed) and the writes stored before this version.
+  The other client sends its writes, and its futures complete, once it is primary itself. A client that stalls for
+  more than 60 s (a paused isolate, an app in the background) can still have a write sent by the primary without
+  being told the result.
+- The switch of a SQLite cache to write-ahead logging is tried again a few times (within 1.5 s) when
+  another connection opening the same file at that moment makes it fail with `database is locked`;
+  if it still fails, that is logged at debug level instead of as a warning, and the next open
+  switches the file.
+- Web transport (and Firestore Lite on the web): the calls in flight when the instance is terminated fail with
+  `unavailable`, as over gRPC. Their responses used to just end, so a transaction read failed with "Mismatch in
+  docs returned from document lookup" and a commit with `unimplemented` ("No responses received").
+- Web transport: a WebChannel stream (Listen, Write) sends the headers of the JS SDK's
+  WebChannelConnection: the client, `Content-Type: text/plain`, the app id, the credentials and
+  the API key. It no longer sends `google-cloud-resource-prefix` or `x-goog-request-params`, which
+  JS sends only with unary calls; the stream is routed by its `database` URL parameter.
+- The app id of the app (`FirebaseOptions.applicationId`) is sent with every request in the
+  `x-firebase-gmpid` header, as the Android SDK (`x-firebase-gmpid`) and the JS SDK
+  (`X-Firebase-GMPID`) do.
+- Web transport: a REST call sends `x-goog-request-params` as the JS SDK's RestConnection does,
+  `project_id=<project>` (with `&database_id=<database>` for a named database), instead of the
+  database name the gRPC transport sends.
+- Firestore Lite on the web sends the browser's cookies with its REST calls to a Cloud Workstations
+  host (`*.cloudworkstations.dev`), as the JS SDK's FetchConnection does; other hosts get none.
+- `FieldPath.fromServerFormat` (used for field paths from the backend, bundles and index configurations) rejects
+  a path with an unterminated backtick, as the JS SDK does.
+- A bundle whose document or document metadata names something other than a document (a collection, the
+  `documents` root) or that holds a reference value that is not a document is now rejected as an invalid bundle
+  (an `ArgumentError`), as in the iOS SDK. Before, the root name loaded a document with an empty key and the other
+  names failed an internal assertion.
+- The local view of a document is now right when its pending writes delete a nested field and later its
+  parent (for example `a.b.c` set, then `a.b.c` and `a.b` deleted): the overlay kept for it handles the fields
+  in order, as the JS and iOS SDKs do, and no longer drops the parent `a` left as an empty map.
+- Argument validation errors are worded like the JS SDK's (the error types do not change).
+  Invalid document data names the method, the field and the document, for example "Function
+  WriteBatch.set() called with invalid data. Unsupported field value: a custom Foo object (found in
+  field a in document c/d)", with "(via `toFirestore()`)" when a converter produced the data; this
+  applies to where() and cursor values and to field path arguments too. An empty path passed to
+  collection() or doc() fails with "Function Firestore.collection() cannot be called with an empty
+  path." instead of a segment count. The messages of the pipelines are unchanged.
+- A listen or write stream that the backend closes with UNAUTHENTICATED invalidates the token
+  only if it has been open for less than 10 seconds, as in the Android and JS SDKs; a stream that
+  was healthy keeps it. Before, every UNAUTHENTICATED of a stream invalidated the token (unary
+  calls still do, as upstream).
+- The API key of the app (`FirebaseOptions.apiKey`) is sent with every request, as the JS SDK
+  does: the `x-goog-api-key` header over gRPC and WebChannel, and the `key` query parameter of a
+  REST call (Firestore Lite on the web sends only the parameter). Requests used to carry no API key,
+  so API key restrictions of the project did not apply to them. The Android SDK sends none.
+- gRPC transport: a server that ignores HTTP/2 flow control can no longer make the client buffer without
+  limit. More data than the flow-control window allows, more than 1 MiB of held frames without data, or a
+  frame larger than 16 KiB ends the connection (package:http2 does the same, but only once a frame is
+  complete); the call fails as for any lost connection. A padded frame with more padding than payload is no
+  longer counted as negative.
+- A query, vector query or commit whose response can not be used (a document that does not decode, a second
+  commit response) no longer resets its HTTP/2 stream: the call is left to end and cancelled only if the
+  backend keeps it open. A reset that races the end of the call made package:http2 terminate the connection
+  and fail every other call on it. The same for a Listen or Write call that was started for a stream stopped
+  in the meantime.
+- Errors of auth and App Check providers are logged and passed on with anything that looks like a token
+  (JWTs, bearer and `token=` values, long opaque strings) replaced by `<redacted>`; the stack trace of a
+  failed auth token request is logged at debug level only.
+- Web transport: a REST response or the answer to a WebChannel request is read up to 256 Mi characters
+  (`WebHttpResponse.maxBodyLength`, the bound of one WebChannel chunk); a larger one fails the call with
+  RESOURCE_EXHAUSTED and the request is aborted. An error body of the back channel is read up to 1 MiB.
+- Web transport: an HTTP 400 without a status in its body maps to FAILED_PRECONDITION as in the JS SDK
+  (was INVALID_ARGUMENT).
+- A write whose mutation can not be stored because the cache is busy for a moment (a
+  `TransientDatabaseException`) fails only its future with `unavailable`, as in the JS SDK. Before,
+  the error was also raised as an uncaught error of the zone, which ends a command-line program.
+
 ### Not done
 
 - Persistent cache indexes for queries with inequalities on several fields (they are scanned,
   as upstream), and indexes with a memory cache.
+- Known gap of persistent cache indexes: a query served by a field index can miss a document
+  that watch sends in a later snapshot with the same version as an earlier one, when the index
+  was already brought up to date for that version, until the document changes again. We have
+  not seen watch do this against the emulator or production. Queries that no index serves are
+  not affected. The JS and Android SDKs have the same gap. See "Known limitations" in
+  [docs/parity.md](https://github.com/long1eu/firebase_dart_sdk/blob/main/docs/parity.md#known-limitations).
 - Coordinating running clients that share one persistent cache (the multi-tab support of the JS
   SDK). Two clients on one SQLite file keep it consistent and elect a primary client that alone
   uses the network (see Fixed), but they do not share listens or writes; in the browser the cache
@@ -846,8 +855,7 @@ Documentation and tests:
   example with the providers of `firebase_auth_providers_dart` (email/password, anonymous and
   custom-token sign-in, service accounts); there are no federated or phone sign-in providers.
 - Any run against production Firestore beyond the verification kit: no Enterprise edition
-  database, no Firebase Auth user sign-in, no long-running load. The packages are not published
-  yet.
+  database, no Firebase Auth user sign-in, no long-running load.
 
 ## Versions published as `cloud_firestore_vm`
 
