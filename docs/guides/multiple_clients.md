@@ -72,6 +72,12 @@ minute. The other side of this: a client that stalls for more than 60 seconds (a
 an app in the background) can have a write sent by the primary, and that client is then not
 told the result, so its future for that write does not complete.
 
+A write can reach the backend twice when the lease moves while it is in flight: the client that
+sent it can only store the acknowledgement while it holds the lease, so a client that lost the
+lease in the meantime keeps the write and sends it again once it is primary. The JS SDK does
+the same. A `set()` gives the same result twice, but an `increment` or an `arrayUnion` of a
+value that another write removed in between can be applied twice.
+
 Clients do not see each other's listeners. The listeners of a secondary are not updated with the
 changes the primary receives from the backend; a later read of the secondary sees what the
 primary has stored in the cache by then.

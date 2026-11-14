@@ -25,6 +25,7 @@ import 'package:cloud_firestore_dart/src/database_collection/database_collection
 import 'package:cloud_firestore_dart/src/firebase/firestore/auth/user.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/event_manager.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/online_state.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/core/serial_queue.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/sync_engine.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/local_store.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/sqlite/sqlite_persistence.dart';
@@ -100,12 +101,15 @@ class _Client {
     final TaskScheduler scheduler = TaskScheduler(clientId);
     final MockDatastore datastore = MockDatastore(scheduler);
     final _Callback callback = _Callback();
+    // As the client: one queue for the remote store and for every call into the sync engine.
+    final SerialQueue queue = SerialQueue();
     final RemoteStore remoteStore = RemoteStore(
       callback,
       localStore,
       datastore,
       BehaviorSubject<bool>.seeded(true),
       scheduler,
+      queue: queue,
     );
     final SyncEngine syncEngine = SyncEngine(
       localStore,
@@ -114,16 +118,22 @@ class _Client {
     );
     callback.syncEngine = syncEngine;
     EventManager(syncEngine);
-    await localStore.start();
-    // As the client: the primary state is applied after the transaction that changed it.
-    persistence.setPrimaryStateListener((bool isPrimary) {
-      scheduleMicrotask(() => syncEngine.applyPrimaryState(isPrimary));
+    await queue.run<void>(() async {
+      await localStore.start();
+      await remoteStore.start();
+      // As the client: the primary state is applied on the queue, after the task that changed it.
+      persistence.setPrimaryStateListener((bool isPrimary) {
+        unawaited(
+          remoteStore.enqueueRetryable(
+            () => syncEngine.applyPrimaryState(isPrimary),
+          ),
+        );
+      });
     });
     await _settle();
-    await remoteStore.start();
-    await _settle();
     return _Client._(persistence, datastore, remoteStore, syncEngine)
-      ..scheduler = scheduler;
+      ..scheduler = scheduler
+      ..queue = queue;
   }
 
   final SQLitePersistence persistence;
@@ -131,20 +141,30 @@ class _Client {
   final RemoteStore remoteStore;
   final SyncEngine syncEngine;
   late final TaskScheduler scheduler;
+
+  /// The queue of the client: the remote store runs its events on it, and so does every call of the tests into the
+  /// sync engine (as `FirestoreClient` does).
+  late final SerialQueue queue;
   bool _shutDown = false;
 
   /// Writes [mutation] and returns the future of the user (completed by the acknowledgement).
   Future<void> write(Mutation mutation) async {
     final Completer<void> userTask = Completer<void>();
-    await syncEngine.writeMutations(<Mutation>[mutation], userTask);
+    await queue.run<void>(
+      () => syncEngine.writeMutations(<Mutation>[mutation], userTask),
+    );
     await _settle();
     return userTask.future;
   }
 
   Future<void> refresh() async {
-    await persistence.refreshClientMetadata();
+    await queue.run<void>(persistence.refreshClientMetadata);
     await _settle();
   }
+
+  /// What the client does after each refresh of its metadata.
+  Future<void> handleClientMetadataRefresh() =>
+      queue.run<void>(syncEngine.handleClientMetadataRefresh);
 
   /// The backend acknowledges the oldest write in flight, which must be [expected].
   Future<void> acknowledge(Mutation expected, int commitVersion) async {
@@ -235,7 +255,9 @@ void main() {
       // B's waitForPendingWrites waits for B's own batch, not for A's.
       bool bPendingDone = false;
       final Completer<void> bPending = Completer<void>();
-      await b.syncEngine.registerPendingWritesTask(bPending);
+      await b.queue.run<void>(
+        () => b.syncEngine.registerPendingWritesTask(bPending),
+      );
       unawaited(bPending.future.then((_) => bPendingDone = true));
 
       await b.acknowledge(writeB, 1000);
@@ -294,7 +316,7 @@ void main() {
       // C crashed. B's next refresh (as the client runs it every 4 s) makes B send C's batch.
       now += SQLiteClientMetadata.maxBatchOwnerAgeMs + 1;
       await b.refresh();
-      await b.syncEngine.handleClientMetadataRefresh();
+      await b.handleClientMetadataRefresh();
       await _expectSent(b.datastore, 1);
       await b.acknowledge(writeC, 1000);
     },
@@ -306,7 +328,7 @@ void main() {
     // An idle client: no write stream is opened, however often the metadata is refreshed.
     for (int i = 0; i < 3; i++) {
       await b.refresh();
-      await b.syncEngine.handleClientMetadataRefresh();
+      await b.handleClientMetadataRefresh();
     }
     await _settle();
     expect(b.datastore.writeStreamRequestCount, 0);
@@ -324,7 +346,7 @@ void main() {
     expect(idleTimer, isNotNull);
     for (int i = 0; i < 3; i++) {
       await b.refresh();
-      await b.syncEngine.handleClientMetadataRefresh();
+      await b.handleClientMetadataRefresh();
     }
     await _settle();
     expect(b.datastore.writeStreamRequestCount, requests);
