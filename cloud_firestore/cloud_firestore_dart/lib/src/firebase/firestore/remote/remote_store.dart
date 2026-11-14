@@ -520,6 +520,11 @@ class RemoteStore implements TargetMetadataProvider {
   void _watchEvents(StreamEvent event) {
     if (event is OpenEvent) {
       _enqueueEvent(_handleWatchStreamOpen, staleWhenNetworkRestarted: true);
+    } else if (event is ConnectedEvent) {
+      _enqueueEvent(
+        _handleWatchStreamConnected,
+        staleWhenNetworkRestarted: true,
+      );
     } else if (event is CloseEvent) {
       _enqueueEvent(
         () => _handleWatchStreamClose(event.error),
@@ -651,6 +656,15 @@ class RemoteStore implements TargetMetadataProvider {
       return;
     }
     await _onlineStateTracker.handleWatchStreamStart();
+  }
+
+  /// Port of `onWatchStreamConnected` of the JS SDK (firebase-js-sdk #8145):
+  /// the client is online as soon as the watch stream has a connection, not
+  /// only once the backend sent the first message. A connection whose first
+  /// answer is slow (a large initial query) no longer reports the client
+  /// offline after [OnlineStateTracker]'s 10 seconds.
+  Future<void> _handleWatchStreamConnected() async {
+    await _onlineStateTracker.updateState(OnlineState.online);
   }
 
   Future<void> _handleWatchStreamOpen() async {

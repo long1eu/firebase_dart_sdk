@@ -138,7 +138,17 @@ void main() {
         'sslEnabled=true, persistenceEnabled=true, cacheSizeBytes=104857600, '
         'grpcFlowControlWindow=262144, cacheSettings=null, '
         'experimentalForceLongPolling=false, '
-        'experimentalAutoDetectLongPolling=true, mockUserToken=null}',
+        'experimentalAutoDetectLongPolling=true, '
+        'experimentalLongPollingOptions='
+        'ExperimentalLongPollingOptions{timeoutSeconds=null}, '
+        'mockUserToken=null}',
+      );
+    });
+
+    test('ExperimentalLongPollingOptions', () {
+      expectString(
+        const ExperimentalLongPollingOptions(timeoutSeconds: 25),
+        'ExperimentalLongPollingOptions{timeoutSeconds=25}',
       );
     });
 

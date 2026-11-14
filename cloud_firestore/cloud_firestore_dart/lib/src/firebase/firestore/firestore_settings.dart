@@ -4,6 +4,7 @@
 
 import 'package:cloud_firestore_dart/src/firebase/firestore/auth/emulator_credentials_provider.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local_cache_settings.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/long_polling_options.dart';
 import 'package:collection/collection.dart';
 
 /// Settings used to configure a FirebaseFirestore instance.
@@ -18,10 +19,13 @@ class FirestoreSettings {
     LocalCacheSettings? cacheSettings,
     bool experimentalForceLongPolling = false,
     bool? experimentalAutoDetectLongPolling,
+    ExperimentalLongPollingOptions experimentalLongPollingOptions =
+        const ExperimentalLongPollingOptions(),
     int grpcFlowControlWindow = defaultGrpcFlowControlWindow,
   }) : this._(
          experimentalForceLongPolling: experimentalForceLongPolling,
          experimentalAutoDetectLongPolling: experimentalAutoDetectLongPolling,
+         experimentalLongPollingOptions: experimentalLongPollingOptions,
          grpcFlowControlWindow: grpcFlowControlWindow,
          host: host,
          port: port,
@@ -47,8 +51,12 @@ class FirestoreSettings {
     required Object? mockUserToken,
     required this.experimentalForceLongPolling,
     required bool? experimentalAutoDetectLongPolling,
+    required ExperimentalLongPollingOptions experimentalLongPollingOptions,
     required int grpcFlowControlWindow,
   }) : _emulator = emulator,
+       experimentalLongPollingOptions = _checkLongPollingOptions(
+         experimentalLongPollingOptions,
+       ),
        grpcFlowControlWindow = _checkGrpcFlowControlWindow(
          grpcFlowControlWindow,
        ),
@@ -158,6 +166,47 @@ class FirestoreSettings {
   /// [experimentalForceLongPolling] is set. The option of the same name of the
   /// JS SDK has the same purpose but detects differently.
   final bool experimentalAutoDetectLongPolling;
+
+  /// Web only: options of long polling, see [ExperimentalLongPollingOptions].
+  /// Same as `experimentalLongPollingOptions` of the JS SDK. Throws an
+  /// [ArgumentError] when [ExperimentalLongPollingOptions.timeoutSeconds] is
+  /// NaN or not between 5 and 30.
+  final ExperimentalLongPollingOptions experimentalLongPollingOptions;
+
+  /// The minimum long-polling timeout is hard-coded on the server, which
+  /// silently ignores a smaller value (as noted in the JS SDK).
+  static const int _minLongPollingTimeoutSeconds = 5;
+
+  /// The server has no maximum and defaults to 30 seconds, which is what
+  /// Watch appears to use (as noted in the JS SDK).
+  static const int _maxLongPollingTimeoutSeconds = 30;
+
+  /// Port of `validateLongPollingOptions` of the JS SDK.
+  static ExperimentalLongPollingOptions _checkLongPollingOptions(
+    ExperimentalLongPollingOptions options,
+  ) {
+    final num? timeoutSeconds = options.timeoutSeconds;
+    if (timeoutSeconds != null) {
+      if (timeoutSeconds.isNaN) {
+        throw ArgumentError(
+          'invalid long polling timeout: $timeoutSeconds (must not be NaN)',
+        );
+      }
+      if (timeoutSeconds < _minLongPollingTimeoutSeconds) {
+        throw ArgumentError(
+          'invalid long polling timeout: $timeoutSeconds '
+          '(minimum allowed value is $_minLongPollingTimeoutSeconds)',
+        );
+      }
+      if (timeoutSeconds > _maxLongPollingTimeoutSeconds) {
+        throw ArgumentError(
+          'invalid long polling timeout: $timeoutSeconds '
+          '(maximum allowed value is $_maxLongPollingTimeoutSeconds)',
+        );
+      }
+    }
+    return options;
+  }
 
   /// The HTTP/2 flow-control window of the gRPC transport, in bytes: how much
   /// the backend may send on the connection, and on each request, before the
@@ -366,6 +415,7 @@ class FirestoreSettings {
     LocalCacheSettings? cacheSettings,
     bool? experimentalForceLongPolling,
     bool? experimentalAutoDetectLongPolling,
+    ExperimentalLongPollingOptions? experimentalLongPollingOptions,
     int? grpcFlowControlWindow,
   }) {
     // The settings stay emulator settings (and keep their mock user token)
@@ -385,6 +435,7 @@ class FirestoreSettings {
       cacheSettings: cacheSettings,
       experimentalForceLongPolling: experimentalForceLongPolling,
       experimentalAutoDetectLongPolling: experimentalAutoDetectLongPolling,
+      experimentalLongPollingOptions: experimentalLongPollingOptions,
       grpcFlowControlWindow: grpcFlowControlWindow,
       emulator: emulator,
       mockUserToken: mockUserToken,
@@ -400,6 +451,7 @@ class FirestoreSettings {
     LocalCacheSettings? cacheSettings,
     bool? experimentalForceLongPolling,
     bool? experimentalAutoDetectLongPolling,
+    ExperimentalLongPollingOptions? experimentalLongPollingOptions,
     int? grpcFlowControlWindow,
     required bool emulator,
     required Object? mockUserToken,
@@ -432,6 +484,8 @@ class FirestoreSettings {
           (experimentalForceLongPolling == null
               ? this.experimentalAutoDetectLongPolling
               : null),
+      experimentalLongPollingOptions:
+          experimentalLongPollingOptions ?? this.experimentalLongPollingOptions,
       grpcFlowControlWindow:
           grpcFlowControlWindow ?? this.grpcFlowControlWindow,
       emulator: emulator,
@@ -453,6 +507,8 @@ class FirestoreSettings {
           experimentalForceLongPolling == other.experimentalForceLongPolling &&
           experimentalAutoDetectLongPolling ==
               other.experimentalAutoDetectLongPolling &&
+          experimentalLongPollingOptions ==
+              other.experimentalLongPollingOptions &&
           grpcFlowControlWindow == other.grpcFlowControlWindow &&
           const DeepCollectionEquality().equals(
             mockUserToken,
@@ -469,6 +525,7 @@ class FirestoreSettings {
       cacheSettings.hashCode ^
       experimentalForceLongPolling.hashCode ^
       experimentalAutoDetectLongPolling.hashCode ^
+      experimentalLongPollingOptions.hashCode ^
       grpcFlowControlWindow.hashCode ^
       const DeepCollectionEquality().hash(mockUserToken);
 
@@ -479,6 +536,7 @@ class FirestoreSettings {
       'grpcFlowControlWindow=$grpcFlowControlWindow, cacheSettings=$cacheSettings, '
       'experimentalForceLongPolling=$experimentalForceLongPolling, '
       'experimentalAutoDetectLongPolling=$experimentalAutoDetectLongPolling, '
+      'experimentalLongPollingOptions=$experimentalLongPollingOptions, '
       // The token is a credential: only whether there is one.
       'mockUserToken=${mockUserToken == null ? null : '<set>'}}';
 }

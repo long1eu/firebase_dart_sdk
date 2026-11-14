@@ -123,9 +123,17 @@ abstract class FirestoreTransport {
 
 /// A gRPC response producing a stream of values.
 class ResponseStream<R> extends DelegatingStream<R> implements Response {
-  ResponseStream(this._response, Stream<R> response) : super(response);
+  ResponseStream(this._response, Stream<R> response, {this.connected})
+    : super(response);
 
   final Response _response;
+
+  /// Completes when the transport has a connection to the backend for this
+  /// call, before any message arrives (the WebChannel handshake). Null when
+  /// the transport has no such signal (gRPC): the first message then marks
+  /// the connection, as in the JS SDK, where the gRPC connection emulates the
+  /// `onConnected` event of WebChannel on its first message.
+  final Future<void>? connected;
 
   @override
   Future<Map<String, String>> get headers => _response.headers;

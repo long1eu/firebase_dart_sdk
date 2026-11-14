@@ -119,6 +119,10 @@ class MockDatastore extends Datastore {
     await _watchStream.writeWatchChange(change, snapshotVersion);
   }
 
+  /// Reports a connection of the open watch stream, as the transport does
+  /// when the WebChannel handshake succeeds.
+  void connectWatchStream() => _watchStream.addEvent(const ConnectedEvent());
+
   /// Injects a stream failure as though it had come from the backend.
   void failWatchStream(GrpcError status) {
     _watchStream.failStream(status);

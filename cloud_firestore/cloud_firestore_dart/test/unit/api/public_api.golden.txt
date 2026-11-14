@@ -170,6 +170,12 @@ class DocumentSnapshot
   toString(): String
 abstract class ExclusiveDatabase
   new ExclusiveDatabase()
+class ExperimentalLongPollingOptions
+  ==(Object other): bool
+  final timeoutSeconds: num
+  get hashCode: int
+  new ExperimentalLongPollingOptions({num timeoutSeconds})
+  toString(): String
 class FieldPath
   ==(Object other): bool
   get hashCode: int
@@ -277,11 +283,12 @@ class FirestoreErrorCode
   toString(): String
 class FirestoreSettings
   ==(Object other): bool
-  copyWith({String host, int port, bool sslEnabled, bool persistenceEnabled, int cacheSizeBytes, LocalCacheSettings cacheSettings, bool experimentalForceLongPolling, bool experimentalAutoDetectLongPolling, int grpcFlowControlWindow}): FirestoreSettings
+  copyWith({String host, int port, bool sslEnabled, bool persistenceEnabled, int cacheSizeBytes, LocalCacheSettings cacheSettings, bool experimentalForceLongPolling, bool experimentalAutoDetectLongPolling, ExperimentalLongPollingOptions experimentalLongPollingOptions, int grpcFlowControlWindow}): FirestoreSettings
   final cacheSettings: LocalCacheSettings
   final cacheSizeBytes: int
   final experimentalAutoDetectLongPolling: bool
   final experimentalForceLongPolling: bool
+  final experimentalLongPollingOptions: ExperimentalLongPollingOptions
   final grpcFlowControlWindow: int
   final host: String
   final mockUserToken: Object
@@ -289,7 +296,7 @@ class FirestoreSettings
   final port: int
   final sslEnabled: bool
   get hashCode: int
-  new FirestoreSettings({String host, int port, bool sslEnabled, bool persistenceEnabled, int cacheSizeBytes, LocalCacheSettings cacheSettings, bool experimentalForceLongPolling, bool experimentalAutoDetectLongPolling, int grpcFlowControlWindow})
+  new FirestoreSettings({String host, int port, bool sslEnabled, bool persistenceEnabled, int cacheSizeBytes, LocalCacheSettings cacheSettings, bool experimentalForceLongPolling, bool experimentalAutoDetectLongPolling, ExperimentalLongPollingOptions experimentalLongPollingOptions, int grpcFlowControlWindow})
   static final cacheSizeUnlimited: int
   static final defaultCacheSizeBytes: int
   static final defaultGrpcFlowControlWindow: int

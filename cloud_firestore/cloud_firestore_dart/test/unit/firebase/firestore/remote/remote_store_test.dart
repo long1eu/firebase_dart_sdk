@@ -156,6 +156,39 @@ void main() {
     await onNetworkConnected.close();
   });
 
+  // firebase-js-sdk #8145 (onWatchStreamConnected): the client is online as
+  // soon as the watch stream is connected, before the backend sent anything.
+  test('a connected watch stream sets the online state before any message',
+      () async {
+    final TaskScheduler scheduler = TaskScheduler('');
+    final MockDatastore datastore = MockDatastore(scheduler);
+    final BehaviorSubject<bool> onNetworkConnected =
+        BehaviorSubject<bool>.seeded(true);
+    final Persistence persistence =
+        MemoryPersistence.createEagerGcMemoryPersistence();
+    await persistence.start();
+    final LocalStore localStore = LocalStore(persistence, User.unauthenticated);
+    await localStore.start();
+    final _OnlineStateCallback callback = _OnlineStateCallback();
+    final RemoteStore remoteStore = RemoteStore(
+        callback, localStore, datastore, onNetworkConnected, scheduler);
+    await remoteStore.start();
+    Future<void> settle() =>
+        Future<void>.delayed(const Duration(milliseconds: 50));
+
+    await remoteStore.listen(
+        QueryData(query('foo').toTarget(), 2, 1, QueryPurpose.listen));
+    await settle();
+    expect(callback.states, isNot(contains(OnlineState.online)));
+
+    datastore.connectWatchStream();
+    await settle();
+    expect(callback.states.last, OnlineState.online);
+
+    await remoteStore.shutdown();
+    await onNetworkConnected.close();
+  });
+
   test('the empty write stream token is empty', () {
     expect(WriteStream.emptyStreamToken, isEmpty);
   });
@@ -219,5 +252,14 @@ class _RecordingCallback extends MockRemoteStoreCallback {
   @override
   Future<void> handleRejectedListen(int targetId, GrpcError error) async {
     rejectedListens.add(targetId);
+  }
+}
+
+class _OnlineStateCallback extends MockRemoteStoreCallback {
+  final List<OnlineState> states = <OnlineState>[];
+
+  @override
+  Future<void> handleOnlineStateChange(OnlineState onlineState) async {
+    states.add(onlineState);
   }
 }

@@ -100,6 +100,17 @@ abstract class BaseStream<
     }
     _writeResponse = writeResponse;
 
+    _connectedReported = false;
+    final Future<void>? connected = writeResponse.connected;
+    if (connected != null) {
+      unawaited(
+        connected.then((_) {
+          if (_generation == generation && isOpen) {
+            _reportConnected();
+          }
+        }),
+      );
+    }
     _responseSub = writeResponse.listen(
       _onData,
       onError: _onError,
@@ -198,9 +209,25 @@ abstract class BaseStream<
   /// Lets go of the call of a stream that the client closed, see [CallReleaser].
   CallReleaser get _callReleaser;
 
+  /// Whether the [ConnectedEvent] of the current call was emitted.
+  bool _connectedReported = false;
+
+  /// Emits the [ConnectedEvent] of the current call, once. Port of the
+  /// `onConnected` callback of the JS SDK's `PersistentStream`
+  /// (firebase-js-sdk #8145): the transport reports a connection
+  /// ([ResponseStream.connected]) or, without that signal, the first message
+  /// does, before the message itself is handled.
+  void _reportConnected() {
+    if (!_connectedReported) {
+      _connectedReported = true;
+      addEvent(const ConnectedEvent());
+    }
+  }
+
   @mustCallSuper
   void _onData(Res response) {
     if (_state != State.closing) {
+      _reportConnected();
       if (Log.isDebugEnabled) {
         Log.d(
           '$runtimeType',
@@ -430,6 +457,14 @@ abstract class StreamEvent {
 
 class OpenEvent extends StreamEvent {
   const OpenEvent();
+}
+
+/// The stream has a connection to the backend: the WebChannel handshake
+/// succeeded, or the first message arrived. Emitted at most once per call,
+/// after [OpenEvent] and before the first message. Port of `onConnected` of
+/// the JS SDK.
+class ConnectedEvent extends StreamEvent {
+  const ConnectedEvent();
 }
 
 class CloseEvent extends StreamEvent {

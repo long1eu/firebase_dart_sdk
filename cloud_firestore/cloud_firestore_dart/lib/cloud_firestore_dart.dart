@@ -76,6 +76,7 @@ export 'src/firebase/firestore/load_bundle_task_progress.dart'
     hide LoadBundleTaskProgressInternal;
 export 'src/firebase/firestore/log_level.dart' show LogLevel;
 export 'src/firebase/firestore/local_cache_settings.dart';
+export 'src/firebase/firestore/long_polling_options.dart';
 export 'src/firebase/firestore/max_key.dart';
 export 'src/firebase/firestore/metadata_change.dart';
 export 'src/firebase/firestore/min_key.dart';

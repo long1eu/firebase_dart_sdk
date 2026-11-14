@@ -240,6 +240,115 @@ void main() {
     });
   });
 
+  // Ports of the `timeoutSeconds` tests of the JS SDK
+  // (packages/firestore/test/unit/api/database.test.ts). The JS SDK throws a
+  // FirestoreError with code invalid-argument; this port throws an
+  // ArgumentError, like its other settings, with the same message.
+  group('experimentalLongPollingOptions', () {
+    FirestoreSettings withTimeout(num? timeoutSeconds) => FirestoreSettings(
+          experimentalLongPollingOptions:
+              ExperimentalLongPollingOptions(timeoutSeconds: timeoutSeconds),
+        );
+
+    Matcher throwsInvalidTimeout(String pattern) => throwsA(
+          isA<ArgumentError>().having(
+            (ArgumentError e) => '${e.message}',
+            'message',
+            matches(RegExp(pattern, caseSensitive: false)),
+          ),
+        );
+
+    test('timeoutSeconds is undefined by default', () {
+      expect(
+          FirestoreSettings().experimentalLongPollingOptions.timeoutSeconds,
+          isNull);
+    });
+
+    test('timeoutSeconds minimum value is allowed', () {
+      expect(withTimeout(5).experimentalLongPollingOptions.timeoutSeconds, 5);
+    });
+
+    test('timeoutSeconds maximum value is allowed', () {
+      expect(withTimeout(30).experimentalLongPollingOptions.timeoutSeconds, 30);
+    });
+
+    test('timeoutSeconds typical value is allowed', () {
+      expect(withTimeout(25).experimentalLongPollingOptions.timeoutSeconds, 25);
+    });
+
+    test('timeoutSeconds floating point value is allowed', () {
+      expect(
+          withTimeout(12.3456).experimentalLongPollingOptions.timeoutSeconds,
+          12.3456);
+    });
+
+    test('timeoutSeconds value one less than minimum throws', () {
+      expect(() => withTimeout(4),
+          throwsInvalidTimeout(r'invalid.*timeout.*4.*\(.*5.*\)'));
+    });
+
+    test('timeoutSeconds value one more than maximum throws', () {
+      expect(() => withTimeout(31),
+          throwsInvalidTimeout(r'invalid.*timeout.*31.*\(.*30.*\)'));
+    });
+
+    test('timeoutSeconds value of 0 throws', () {
+      expect(() => withTimeout(0),
+          throwsInvalidTimeout(r'invalid.*timeout.*0.*\(.*5.*\)'));
+    });
+
+    test('timeoutSeconds value of -0 throws', () {
+      expect(() => withTimeout(-0.0),
+          throwsInvalidTimeout(r'invalid.*timeout.*0.*\(.*5.*\)'));
+    });
+
+    test('timeoutSeconds value of -1 throws', () {
+      expect(() => withTimeout(-1),
+          throwsInvalidTimeout(r'invalid.*timeout.*-1.*\(.*5.*\)'));
+    });
+
+    test('timeoutSeconds value of -infinity throws', () {
+      expect(() => withTimeout(double.negativeInfinity),
+          throwsInvalidTimeout(r'invalid.*timeout.*-Infinity.*\(.*5.*\)'));
+    });
+
+    test('timeoutSeconds value of +infinity throws', () {
+      expect(() => withTimeout(double.infinity),
+          throwsInvalidTimeout(r'invalid.*timeout.*Infinity.*\(.*30.*\)'));
+    });
+
+    test('timeoutSeconds value of NaN throws', () {
+      expect(() => withTimeout(double.nan),
+          throwsInvalidTimeout(r'invalid.*timeout.*NaN'));
+    });
+
+    test('copies keep the options, which are part of equality', () {
+      final FirestoreSettings settings = withTimeout(25);
+      expect(
+          settings
+              .copyWith(host: 'example.com')
+              .experimentalLongPollingOptions
+              .timeoutSeconds,
+          25);
+      expect(
+          settings
+              .copyWith(
+                  experimentalLongPollingOptions:
+                      const ExperimentalLongPollingOptions(timeoutSeconds: 10))
+              .experimentalLongPollingOptions
+              .timeoutSeconds,
+          10);
+      expect(() => settings.copyWith(
+              experimentalLongPollingOptions:
+                  const ExperimentalLongPollingOptions(timeoutSeconds: 31)),
+          throwsArgumentError);
+      expect(withTimeout(25), withTimeout(25));
+      expect(withTimeout(25).hashCode, withTimeout(25).hashCode);
+      expect(withTimeout(25), isNot(withTimeout(26)));
+      expect(withTimeout(25), isNot(FirestoreSettings()));
+    });
+  });
+
   group('grpcFlowControlWindow', () {
     // Upstream: FirebaseFirestoreSettingsTest (Android) and the settings
     // validation of the JS SDK.

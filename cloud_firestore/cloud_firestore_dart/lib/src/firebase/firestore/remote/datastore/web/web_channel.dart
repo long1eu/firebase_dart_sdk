@@ -122,6 +122,7 @@ class WebChannelStream {
     bool forceLongPolling = false,
     this.autoDetectLongPolling = false,
     this.longPollingDetectionTimeout = const Duration(seconds: 10),
+    this.longPollingTimeoutMs,
     this.releaseTimeout = const Duration(seconds: 3),
     this.forwardRequestTimeout = const Duration(seconds: 20),
     this.retryDelays = const <Duration>[
@@ -148,6 +149,13 @@ class WebChannelStream {
   /// How long the first back channel request may stay silent, see
   /// [autoDetectLongPolling].
   final Duration longPollingDetectionTimeout;
+
+  /// How long, in milliseconds, the backend may hold a long-polling back
+  /// channel request open (`ExperimentalLongPollingOptions.timeoutSeconds`).
+  /// Sent as the `TO` parameter of the back channel requests while the
+  /// stream long-polls (`CI=1`), as the closure WebChannel does with its
+  /// `longPollingTimeout` option. Null leaves it to the backend (30 seconds).
+  final int? longPollingTimeoutMs;
 
   /// How long to wait before a request that failed on the way (not one the
   /// server answered with an error) is sent again, once per element. After
@@ -227,6 +235,13 @@ class WebChannelStream {
 
   /// The response headers of the handshake (empty if it never succeeded).
   Future<Map<String, String>> get handshakeHeaders => _handshakeHeaders.future;
+
+  final Completer<void> _sessionOpened = Completer<void>();
+
+  /// Completes when the handshake succeeded and the session is open: the
+  /// `OPEN` event of the closure WebChannel. Never completes for a session
+  /// that failed before.
+  Future<void> get opened => _sessionOpened.future;
 
   /// Queues [json], one encoded message, for the server. The session is
   /// opened by the first message, which travels with the handshake.
@@ -531,6 +546,9 @@ class WebChannelStream {
     if (!_handshakeHeaders.isCompleted) {
       _handshakeHeaders.complete(response.headers);
     }
+    if (!_sessionOpened.isCompleted) {
+      _sessionOpened.complete();
+    }
     unawaited(_runBackChannel());
     return true;
   }
@@ -549,6 +567,8 @@ class WebChannelStream {
           // 0: the response may be streamed in chunks. 1: long polling, the
           // response ends once it carries data.
           'CI': _longPolling ? '1' : '0',
+          if (_longPolling && longPollingTimeoutMs != null)
+            'TO': '$longPollingTimeoutMs',
           'TYPE': 'xmlhttp',
         }),
       );

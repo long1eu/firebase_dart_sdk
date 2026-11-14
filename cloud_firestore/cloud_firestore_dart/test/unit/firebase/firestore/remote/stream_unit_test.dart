@@ -68,6 +68,10 @@ class _FakeClient extends FirestoreClient {
   final StreamController<proto.ListenResponse> listenResponses =
       StreamController<proto.ListenResponse>();
 
+  /// When set, the listen call reports its connection through
+  /// [ResponseStream.connected], as the WebChannel transport does.
+  Completer<void>? listenConnected;
+
   @override
   Future<ResponseStream<proto.WriteResponse>> write(
       Stream<proto.WriteRequest> request) async {
@@ -81,7 +85,8 @@ class _FakeClient extends FirestoreClient {
       Stream<proto.ListenRequest> request) async {
     request.listen(listenRequests.add);
     return ResponseStream<proto.ListenResponse>(
-        _FakeResponse(), listenResponses.stream);
+        _FakeResponse(), listenResponses.stream,
+        connected: listenConnected?.future);
   }
 }
 
@@ -179,6 +184,66 @@ void main() {
       expect(target.resumeToken, Uint8List.fromList(<int>[9, 9]));
       // A change for specific targets carries no global snapshot version.
       expect(change.snapshotVersion, SnapshotVersion.none);
+    });
+
+    // firebase-js-sdk #8145: the stream reports its connection before the
+    // first message. Without a signal of the transport (gRPC) the first message
+    // is the connection, as the JS gRPC connection emulates it.
+    test('the first message raises a ConnectedEvent before the change',
+        () async {
+      await stream.start();
+      client.listenResponses.add(proto.ListenResponse(
+        targetChange: proto.TargetChange(
+          targetChangeType: proto.TargetChange_TargetChangeType.CURRENT,
+          targetIds: <int>[2],
+        ),
+      ));
+      client.listenResponses.add(proto.ListenResponse(
+        targetChange: proto.TargetChange(
+          targetChangeType: proto.TargetChange_TargetChangeType.NO_CHANGE,
+          targetIds: <int>[2],
+        ),
+      ));
+      await pump();
+
+      expect(events, <Matcher>[
+        isA<OpenEvent>(),
+        isA<ConnectedEvent>(),
+        isA<OnWatchChange>(),
+        isA<OnWatchChange>(),
+      ]);
+    });
+
+    test('a connection of the transport raises the ConnectedEvent, once',
+        () async {
+      client.listenConnected = Completer<void>();
+      await stream.start();
+      await pump();
+      expect(events, <Matcher>[isA<OpenEvent>()]);
+
+      // The WebChannel handshake succeeded: no message yet.
+      client.listenConnected!.complete();
+      await pump();
+      expect(events, <Matcher>[isA<OpenEvent>(), isA<ConnectedEvent>()]);
+
+      client.listenResponses.add(proto.ListenResponse(
+        targetChange: proto.TargetChange(
+          targetChangeType: proto.TargetChange_TargetChangeType.CURRENT,
+          targetIds: <int>[2],
+        ),
+      ));
+      await pump();
+      expect(events.whereType<ConnectedEvent>(), hasLength(1));
+      expect(events.last, isA<OnWatchChange>());
+    });
+
+    test('a connection after the stream stopped raises nothing', () async {
+      client.listenConnected = Completer<void>();
+      await stream.start();
+      await stream.stop();
+      client.listenConnected!.complete();
+      await pump();
+      expect(events.whereType<ConnectedEvent>(), isEmpty);
     });
 
     test('a global target change carries the read time as version', () async {

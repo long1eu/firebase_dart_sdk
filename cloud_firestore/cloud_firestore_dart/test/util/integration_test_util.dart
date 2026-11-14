@@ -168,6 +168,7 @@ class IntegrationTestUtil {
           forceLongPolling: longPolling,
           autoDetectLongPolling:
               !longPolling && databaseInfo.autoDetectLongPolling,
+          longPollingOptions: databaseInfo.longPollingOptions,
         ),
         options,
       );

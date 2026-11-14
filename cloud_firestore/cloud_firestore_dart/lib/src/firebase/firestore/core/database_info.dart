@@ -3,6 +3,7 @@
 // on 17/09/2018
 
 import 'package:cloud_firestore_dart/src/firebase/firestore/firestore_settings.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/long_polling_options.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/database_id.dart';
 import 'package:firebase_app_dart/internal.dart';
 
@@ -16,6 +17,7 @@ class DatabaseInfo {
     this.port = 443,
     this.forceLongPolling = false,
     this.autoDetectLongPolling = true,
+    this.longPollingOptions = const ExperimentalLongPollingOptions(),
     this.grpcFlowControlWindow = FirestoreSettings.defaultGrpcFlowControlWindow,
     this.apiKey,
     this.appId,
@@ -33,6 +35,9 @@ class DatabaseInfo {
   /// Web transport only: switch a stream to long polling when its responses
   /// seem to be held back by a buffering proxy.
   final bool autoDetectLongPolling;
+
+  /// Web transport only: the options of long polling.
+  final ExperimentalLongPollingOptions longPollingOptions;
 
   /// gRPC transport only: the HTTP/2 flow-control window, in bytes.
   final int grpcFlowControlWindow;

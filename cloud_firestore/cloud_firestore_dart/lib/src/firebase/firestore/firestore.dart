@@ -223,6 +223,7 @@ class Firestore {
       forceLongPolling: firestoreSettings.experimentalForceLongPolling,
       autoDetectLongPolling:
           firestoreSettings.experimentalAutoDetectLongPolling,
+      longPollingOptions: firestoreSettings.experimentalLongPollingOptions,
       grpcFlowControlWindow: firestoreSettings.grpcFlowControlWindow,
       apiKey: app.options.apiKey,
       appId: app.options.applicationId,

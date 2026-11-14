@@ -137,6 +137,7 @@ void main() {
       bool forceLongPolling = false,
       bool autoDetectLongPolling = false,
       Duration forwardRequestTimeout = const Duration(seconds: 20),
+      int? longPollingTimeoutMs,
     }) {
       http = FakeHttpClient();
       stream = WebChannelStream(http, channelUrl, database, headers,
@@ -148,6 +149,7 @@ void main() {
           forceLongPolling: forceLongPolling,
           autoDetectLongPolling: autoDetectLongPolling,
           longPollingDetectionTimeout: const Duration(milliseconds: 60),
+          longPollingTimeoutMs: longPollingTimeoutMs,
           forwardRequestTimeout: forwardRequestTimeout);
       messages = <Map<String, Object?>>[];
       errors = <Object>[];
@@ -579,6 +581,46 @@ void main() {
         await stream.close();
       },
     );
+
+    // experimentalLongPollingOptions.timeoutSeconds of the JS SDK: the closure
+    // WebChannel sends its `longPollingTimeout` as `TO` on the back channel
+    // requests of long polling (CI=1) only.
+    test('long polling sends the long-polling timeout as TO', () async {
+      open(forceLongPolling: true, longPollingTimeoutMs: 25000);
+      await handshake();
+      final FakeRequest back = await http.next();
+      expect(back.query['CI'], '1');
+      expect(back.query['TO'], '25000');
+      back.respond(200, body: chunk(listenChunk));
+      await pump();
+      final FakeRequest again = await http.next();
+      expect(again.query['TO'], '25000');
+      await stream.close();
+    });
+
+    test('long polling without a timeout sends no TO', () async {
+      open(forceLongPolling: true);
+      await handshake();
+      final FakeRequest back = await http.next();
+      expect(back.query['CI'], '1');
+      expect(back.query.containsKey('TO'), isFalse);
+      await stream.close();
+    });
+
+    test('a streamed back channel never sends TO, until it long-polls',
+        () async {
+      open(autoDetectLongPolling: true, longPollingTimeoutMs: 12346);
+      await handshake();
+      final FakeRequest first = await http.next();
+      expect(first.query['CI'], '0');
+      expect(first.query.containsKey('TO'), isFalse);
+      // A buffering proxy: the stream switches to long polling.
+      first.stream(200);
+      final FakeRequest second = await http.next();
+      expect(second.query['CI'], '1');
+      expect(second.query['TO'], '12346');
+      await stream.close();
+    });
 
     test(
       'switches to long polling when the first response is held back',

@@ -7,6 +7,7 @@ import 'dart:io';
 
 import 'package:cloud_firestore_dart/src/firebase/firestore/auth/empty_credentials_provider.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/database_info.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/long_polling_options.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/database_id.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/remote/datastore/channel_options_provider.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/remote/datastore/firestore_transport.dart';
@@ -887,6 +888,107 @@ void main() {
         body: '52\n[[0,["c","4ApGpUebBDNnT9YbQeHo6g==","",8,12,30000]]]',
       );
       expect((await http.next()).query['CI'], '1');
+      await call.cancel();
+      await requests.close();
+    });
+
+    // firebase-js-sdk #8145: the stream is connected when the WebChannel
+    // opens (the handshake succeeded), before any message.
+    test('a stream call is connected once its handshake succeeded', () async {
+      final StreamController<proto.ListenRequest> requests =
+          StreamController<proto.ListenRequest>();
+      final ResponseStream<proto.ListenResponse> call =
+          transport.startCall(FirestoreRpc.listen, requests.stream);
+      final List<proto.ListenResponse> messages = <proto.ListenResponse>[];
+      call.listen(messages.add);
+      bool connected = false;
+      unawaited(call.connected!.then((_) => connected = true));
+
+      requests.add(proto.ListenRequest()..database = database);
+      final FakeRequest handshake = await http.next();
+      await pump();
+      expect(connected, isFalse);
+
+      handshake.respond(
+        200,
+        body: '52\n[[0,["c","4ApGpUebBDNnT9YbQeHo6g==","",8,12,30000]]]',
+      );
+      final FakeRequest back = await http.next();
+      back.stream(200);
+      await pump();
+      expect(connected, isTrue);
+      expect(messages, isEmpty);
+
+      await call.cancel();
+      await requests.close();
+    });
+
+    test('a failed handshake does not connect the call', () async {
+      final StreamController<proto.ListenRequest> requests =
+          StreamController<proto.ListenRequest>();
+      final ResponseStream<proto.ListenResponse> call =
+          transport.startCall(FirestoreRpc.listen, requests.stream);
+      final List<Object> errors = <Object>[];
+      call.listen((_) {}, onError: errors.add);
+      bool connected = false;
+      unawaited(call.connected!.then((_) => connected = true));
+
+      requests.add(proto.ListenRequest()..database = database);
+      (await http.next()).respond(503);
+      await pump();
+      await pump();
+      expect(errors, isNotEmpty);
+      expect(connected, isFalse);
+      await requests.close();
+    });
+
+    test('a unary call has no connection signal', () {
+      final ResponseStream<proto.CommitResponse> call = transport.startCall(
+        FirestoreRpc.commit,
+        Stream<proto.CommitRequest>.value(
+            proto.CommitRequest()..database = database),
+      );
+      expect(call.connected, isNull);
+      call.listen((_) {}, onError: (Object _) {});
+    });
+
+    // JS: `request.longPollingTimeout = Math.round(timeoutSeconds * 1000)`.
+    test('the long-polling timeout reaches the streams in milliseconds',
+        () async {
+      final DatabaseId databaseId = DatabaseId.forProject('demo-test');
+      final WebChannelTransport polling = WebChannelTransport(
+        http,
+        DatabaseInfo(
+          databaseId,
+          'key',
+          '127.0.0.1',
+          port: 8080,
+          sslEnabled: false,
+          forceLongPolling: true,
+          autoDetectLongPolling: false,
+          longPollingOptions:
+              const ExperimentalLongPollingOptions(timeoutSeconds: 12.3456),
+        ),
+        ChannelOptionsProvider(
+          databaseId: databaseId,
+          credentialsProvider: _TokenProvider(),
+        ),
+      );
+      final StreamController<proto.ListenRequest> requests =
+          StreamController<proto.ListenRequest>();
+      final ResponseStream<proto.ListenResponse> call = polling.startCall(
+        FirestoreRpc.listen,
+        requests.stream,
+      );
+      call.listen((_) {});
+      requests.add(proto.ListenRequest()..database = database);
+      (await http.next()).respond(
+        200,
+        body: '52\n[[0,["c","4ApGpUebBDNnT9YbQeHo6g==","",8,12,30000]]]',
+      );
+      final FakeRequest back = await http.next();
+      expect(back.query['CI'], '1');
+      expect(back.query['TO'], '12346');
       await call.cancel();
       await requests.close();
     });

@@ -4,8 +4,9 @@ This page compares `cloud_firestore_dart` (with `firebase_app_dart`) with the Fi
 Firebase JS SDK, area by area, and then lists every gap and behaviour difference we know of.
 
 **Compared against:** `@firebase/firestore` **4.20.0** (Firebase JS SDK 13.3.0), source at
-firebase-js-sdk commit `c03d2aa` of 2026-11-12. The repository has no earlier record of a JS
-version: `docs/upstream_sync/` tracks the sync with the **Android** SDK, which this port follows
+firebase-js-sdk commit `c03d2aa` of 2026-11-12, recorded in
+[`docs/upstream_sync/js_reference.md`](upstream_sync/js_reference.md) with how to compare next time.
+The rest of `docs/upstream_sync/` tracks the sync with the **Android** SDK, which this port follows
 more closely. Where the Android and JS SDKs differ, the port usually follows Android and says so.
 
 **How the status was decided:** from the code and the tests of this repository, not from the
@@ -199,11 +200,11 @@ Preview, Enterprise edition only, as in the JS SDK. See [Pipelines](guides/pipel
 | WebChannel streams for listen and write | supported (experimental) | Used automatically on the web; the integration suite runs over it on the VM (see the numbers above) and `test/browser/web_transport_smoke_test.dart` in Chrome |
 | REST for one-shot calls (fetch) | supported | `test/unit/firebase/firestore/remote/web/rest_transport_test.dart` |
 | `experimentalForceLongPolling`, `experimentalAutoDetectLongPolling` | supported | Same names on `FirestoreSettings`; long polling has its own integration run (above) and `test/browser/web_robustness_test.dart` |
-| `experimentalLongPollingOptions.timeoutSeconds` | not supported | No setting for the long-polling timeout |
+| `experimentalLongPollingOptions.timeoutSeconds` | supported | `FirestoreSettings(experimentalLongPollingOptions: ExperimentalLongPollingOptions(timeoutSeconds: 25))`, validated as in JS (5 to 30 seconds), sent as the `TO` parameter of long-polling requests; `test/unit/firebase/firestore/firestore_settings_test.dart`, `long_polling_options_test.dart`, `test/unit/firebase/firestore/remote/web/web_channel_test.dart` |
 | `useFetchStreams` | not applicable | The web transport always uses `fetch` |
 | HTTP/2 flow control window (`grpcFlowControlWindow`, Node) | supported | `FirestoreSettings.grpcFlowControlWindow` on the gRPC transport; `test/integration/firebase/firestore/transport_limits_test.dart` |
 | WebChannel drops duplicate server messages, closes on terminate | supported | `test/unit/firebase/firestore/remote/web/web_channel_test.dart`, `web_channel_transport_test.dart` |
-| Online state as soon as the WebChannel connection opens | not supported | The client goes online at the first message of the watch stream; a slow first answer can still log "Backend didn't respond within 10 seconds" |
+| Online state as soon as the stream connects (JS 4.6.1) | supported | The client is online once the WebChannel handshake succeeds (gRPC: at the first message, as JS on Node), not only at the first watch change; `test/unit/firebase/firestore/remote/stream_unit_test.dart`, `remote_store_test.dart`, `web/web_channel_transport_test.dart`, `test/integration/firebase/firestore/remote/stream_test.dart` |
 
 ## Platforms
 
@@ -253,44 +254,40 @@ Every gap and behaviour difference we know of, the ones you are most likely to m
    it: a listener sees it with `isFromCache: true`, then its removal. The JS SDK keeps it in limbo
    and `getDocsFromServer` does not complete. See
    [Enterprise edition differences](guides/emulator_and_testing.md#enterprise-edition-differences).
-9. **The online state of a WebChannel stream** is set at the first watch message, not when the
-   connection opens (JS 4.6.1). A slow first answer can log "Backend didn't respond within 10
-   seconds" and briefly report offline.
-10. **No long-polling timeout setting** (`experimentalLongPollingOptions.timeoutSeconds`).
-11. **Pipelines are a preview and were run against the Enterprise emulator only.** Server only
+9. **Pipelines are a preview and were run against the Enterprise emulator only.** Server only
     (no cache, no pending writes, `unavailable` offline); no real-time pipelines (not public in JS
     either); full-text search, geo search and window functions were only checked for their
     encoding; explain options are ignored by the emulator.
-12. **`createFrom(query)` keeps classic-query results.** For `!=` and `not-in` the Dart conversion
+10. **`createFrom(query)` keeps classic-query results.** For `!=` and `not-in` the Dart conversion
     excludes documents where the field is `null` or missing, like the query does. JS 4.20.0
     (#9444) drops that check, so its pipeline returns documents without the field. A cursor on a
     field with values of several types only returns documents whose value has the type of the
     cursor value. Cursors on descending orderings compare in the direction of the ordering (JS
     and Android always use `greater_than` for start bounds).
-13. **`!=` and `not-in` with `limit` on an Enterprise database** can return a page with fewer
+11. **`!=` and `not-in` with `limit` on an Enterprise database** can return a page with fewer
     documents than the limit: the backend counts documents where the field is missing or `null`,
     and the client drops them.
-14. **BSON value details.** `Decimal128Value` accepts only strings that decimal128 holds exactly
+12. **BSON value details.** `Decimal128Value` accepts only strings that decimal128 holds exactly
     (the backend rejects the others; JS accepts any and rounds); the sum and average of an
     aggregation that includes a `Decimal128Value` are a `Decimal128Value`; increments on BSON
     numbers could not be compared with a backend (the emulator replaces the value); a plain `Map`
     with a reserved key such as `{'__int__': 5}` is rejected as document data and read as the
     BSON value in a query.
-15. **Lite differences.** No `whereEqualTo(...)`-style query methods (use `where`);
+13. **Lite differences.** No `whereEqualTo(...)`-style query methods (use `where`);
     `FirestoreDataConverter.fromFirestore` takes only the snapshot; `DocumentReference.parent`
     keeps the converter; `firestore.doc('')` throws.
-16. **Persistent cache indexes** are not used for queries with inequalities on several fields
+14. **Persistent cache indexes** are not used for queries with inequalities on several fields
     (scanned, as in JS) and do not exist for a memory cache (as in JS). The stored index entries
     are not byte-compatible with the Android SDK's (they are never exchanged).
-17. **Snapshot JSON edge cases.** `toJson()` of a missing document writes an empty bundle, which
+15. **Snapshot JSON edge cases.** `toJson()` of a missing document writes an empty bundle, which
     the JS SDK cannot read; this port reads it back as the missing document. A serialized query
     snapshot whose documents lack a field the query orders by is rejected as invalid (the JS SDK
     fails an internal assertion).
-18. **Platform details.** Windows is untested; there `clearPersistence()` fails with `unknown`
+16. **Platform details.** Windows is untested; there `clearPersistence()` fails with `unknown`
     while another isolate or process has the file open. On Linux, `package:sqlite3` needs
     `libsqlite3.so` (the example opener falls back to `libsqlite3.so.0`).
-19. **Not ported:** the console-only `_customHeaders` setting of the JS SDK.
-20. **Behaviour that is not a gap but differs from JS by design:** listeners are Dart `Stream`s,
+17. **Not ported:** the console-only `_customHeaders` setting of the JS SDK.
+18. **Behaviour that is not a gap but differs from JS by design:** listeners are Dart `Stream`s,
     `snapshot.data` is a getter, `Source` replaces `getDocFromCache` / `getDocFromServer`, and the
     API spelling follows the Android SDK and FlutterFire (see
     [Coming from FlutterFire or the JS SDK](guides/queries_and_data.md#coming-from-flutterfire-or-the-js-sdk)).

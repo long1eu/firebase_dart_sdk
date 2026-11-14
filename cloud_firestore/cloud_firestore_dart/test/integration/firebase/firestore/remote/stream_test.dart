@@ -5,6 +5,7 @@
 import 'dart:async';
 
 import 'package:cloud_firestore_dart/src/firebase/firestore/auth/empty_credentials_provider.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/local/query_purpose.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/mutation.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/remote/datastore/datastore.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/timer_task.dart';
@@ -87,6 +88,60 @@ void main() {
     });
 
     await completer.future;
+  });
+
+  // Ports of the 'connected' expectations of the JS SDK's stream.test.ts
+  // (firebase-js-sdk #8145): the stream reports its connection before the
+  // first message, over gRPC (first message) and WebChannel (handshake).
+  test('gets connected event before first message', () async {
+    final Datastore datastore = Datastore(
+      TaskScheduler(''),
+      IntegrationTestUtil.testEnvDatabaseInfo(),
+      EmptyCredentialsProvider(),
+    );
+    final WatchStream watchStream = datastore.watchStream;
+    final List<StreamEvent> events = <StreamEvent>[];
+    final Future<StreamEvent> firstChange = watchStream
+        .map((StreamEvent event) {
+          events.add(event);
+          return event;
+        })
+        .firstWhere((StreamEvent event) => event is OnWatchChange);
+    await watchStream.start();
+    watchStream.watchQuery(queryData(1, QueryPurpose.listen, 'connected-test'));
+    await firstChange;
+
+    expect(events.whereType<ConnectedEvent>(), hasLength(1));
+    expect(events.indexWhere((StreamEvent e) => e is ConnectedEvent),
+        lessThan(events.indexWhere((StreamEvent e) => e is OnWatchChange)));
+    await watchStream.stop();
+  });
+
+  test('write stream gets connected event before the handshake response',
+      () async {
+    final Datastore datastore = Datastore(
+      TaskScheduler(''),
+      IntegrationTestUtil.testEnvDatabaseInfo(),
+      EmptyCredentialsProvider(),
+    );
+    final WriteStream writeStream = datastore.writeStream;
+    final List<StreamEvent> events = <StreamEvent>[];
+    final Future<StreamEvent> handshake = writeStream
+        .map((StreamEvent event) {
+          events.add(event);
+          return event;
+        })
+        .firstWhere((StreamEvent event) => event is HandshakeCompleteEvent);
+    await writeStream.start();
+    writeStream.writeHandshake();
+    await handshake;
+
+    expect(events, <Matcher>[
+      isA<OpenEvent>(),
+      isA<ConnectedEvent>(),
+      isA<HandshakeCompleteEvent>(),
+    ]);
+    await writeStream.stop();
   });
 
   test('testWriteStreamStopAfterHandshake', () async {

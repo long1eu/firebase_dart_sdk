@@ -95,7 +95,10 @@ listen and write streams, over `fetch`. What to know:
 - If listeners or writes never complete on some network (a proxy or antivirus that buffers
   streamed responses), set `FirestoreSettings(experimentalForceLongPolling: true)`. The
   client also tries to detect this by itself (`experimentalAutoDetectLongPolling`, on by
-  default).
+  default). If such a proxy cuts long-polling requests before the 30 seconds the backend holds
+  them, ask for a shorter timeout:
+  `experimentalLongPollingOptions: ExperimentalLongPollingOptions(timeoutSeconds: 25)`
+  (5 to 30 seconds, as in the JS SDK).
 - Do not compile with `-Dprotobuf.omit_field_names=true` or `-Dprotobuf.omit_enum_names=true`:
   the web transport needs those names, and refuses to start without them.
 

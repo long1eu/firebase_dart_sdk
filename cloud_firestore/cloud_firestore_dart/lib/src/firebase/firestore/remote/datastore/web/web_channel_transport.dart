@@ -31,6 +31,9 @@ class WebChannelTransport implements FirestoreTransport {
     this.longPollingDetectionTimeout = const Duration(seconds: 10),
   }) : _forceLongPolling = databaseInfo.forceLongPolling,
        _autoDetectLongPolling = databaseInfo.autoDetectLongPolling,
+       _longPollingTimeoutMs = _timeoutMs(
+         databaseInfo.longPollingOptions.timeoutSeconds,
+       ),
        _baseUrl =
            '${databaseInfo.sslEnabled ? 'https' : 'http'}://'
            '${databaseInfo.host}:${databaseInfo.port}',
@@ -48,6 +51,13 @@ class WebChannelTransport implements FirestoreTransport {
 
   final bool _forceLongPolling;
   final bool _autoDetectLongPolling;
+
+  /// See [WebChannelStream.longPollingTimeoutMs].
+  final int? _longPollingTimeoutMs;
+
+  /// Rounded to the nearest millisecond, as the JS SDK does.
+  static int? _timeoutMs(num? seconds) =>
+      seconds == null ? null : (seconds * 1000).round();
 
   /// See [WebChannelStream.longPollingDetectionTimeout].
   final Duration longPollingDetectionTimeout;
@@ -117,7 +127,11 @@ class WebChannelTransport implements FirestoreTransport {
     } else {
       unawaited(_runUnary(rpc, requests, options, call, responses));
     }
-    return ResponseStream<Res>(call, responses.stream);
+    return ResponseStream<Res>(
+      call,
+      responses.stream,
+      connected: rpc.clientStreaming ? call.connected : null,
+    );
   }
 
   /// The request headers: credentials and routing, from the same metadata
@@ -230,6 +244,7 @@ class WebChannelTransport implements FirestoreTransport {
       forceLongPolling: _forceLongPolling,
       autoDetectLongPolling: _autoDetectLongPolling,
       longPollingDetectionTimeout: longPollingDetectionTimeout,
+      longPollingTimeoutMs: _longPollingTimeoutMs,
     );
     _sessions.add(channel);
     unawaited(channel.released.then((_) => _sessions.remove(channel)));
@@ -239,6 +254,7 @@ class WebChannelTransport implements FirestoreTransport {
       unawaited(channel.close());
     };
     unawaited(channel.handshakeHeaders.then(call.completeHeaders));
+    unawaited(channel.opened.then((_) => call.markConnected()));
 
     // The Write RPC answers every request with one response. A write is sent
     // before the responses to the earlier ones arrived only when it can be
@@ -393,6 +409,17 @@ class _WebCall implements Response {
   void Function()? onCancel;
 
   Future<void> get done => _done.future;
+
+  final Completer<void> _connected = Completer<void>();
+
+  /// See [ResponseStream.connected].
+  Future<void> get connected => _connected.future;
+
+  void markConnected() {
+    if (!_connected.isCompleted && !isCancelled) {
+      _connected.complete();
+    }
+  }
 
   void completeHeaders(Map<String, String> headers) {
     if (!_headers.isCompleted) {
