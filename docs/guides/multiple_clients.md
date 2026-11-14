@@ -72,6 +72,13 @@ minute. The other side of this: a client that stalls for more than 60 seconds (a
 an app in the background) can have a write sent by the primary, and that client is then not
 told the result, so its future for that write does not complete.
 
+On the web there is no waiting: the opener of the example holds a Web Lock on the cache while
+it is open, so only one page has the cache at a time and the page that opens it knows that
+every earlier page is gone. A page sends the pending writes that the page before it left
+behind as soon as it starts (a reload, a closed tab), and `waitForPendingWrites()` waits for
+them. A `Database` says so by implementing `ExclusiveDatabase`; do that in your own opener only
+if its lock keeps every other client out and is released when the client dies.
+
 A write can reach the backend twice when the lease moves while it is in flight: the client that
 sent it can only store the acknowledgement while it holds the lease, so a client that lost the
 lease in the meantime keeps the write and sends it again once it is primary. The JS SDK does

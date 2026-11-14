@@ -90,8 +90,10 @@ Future<SQLitePersistence> createSharedSQLitePersistenceForProject(
   String projectId,
   String name,
   String clientId,
-  int Function() clock,
-) async {
+  int Function() clock, {
+  PrimaryLeaseMode leaseMode = PrimaryLeaseMode.multipleClients,
+  bool exclusive = false,
+}) async {
   final DatabaseId databaseId = DatabaseId.forProject(projectId);
   final SQLitePersistence persistence =
       await SQLitePersistence.createWithLease(
@@ -114,12 +116,44 @@ Future<SQLitePersistence> createSharedSQLitePersistenceForProject(
                 onUpgrade: onUpgrade,
                 onDowngrade: onDowngrade,
                 onOpen: onOpen)
-            .then((DatabaseMock db) => db..renamePath = false),
+            .then<Database>((DatabaseMock db) {
+          db.renamePath = false;
+          return exclusive ? ExclusiveDatabaseMock(db) : db;
+        }),
     const LruGarbageCollectorParams(),
     clientId: clientId,
     clock: clock,
-    leaseMode: PrimaryLeaseMode.multipleClients,
+    leaseMode: leaseMode,
   );
   await persistence.start();
   return persistence;
+}
+
+/// A database whose opener holds an exclusive lock on it, as the web opener does with a Web Lock: no other client
+/// has it open (the test only opens it so once the other clients are "gone").
+class ExclusiveDatabaseMock implements ExclusiveDatabase {
+  ExclusiveDatabaseMock(this._inner);
+
+  final DatabaseMock _inner;
+
+  @override
+  String get path => _inner.path;
+
+  @override
+  Future<void> execute(String statement, [List<Object?>? arguments]) =>
+      _inner.execute(statement, arguments);
+
+  @override
+  Future<List<Map<String, dynamic>>> query(
+    String statement, [
+    List<Object?>? arguments,
+  ]) =>
+      _inner.query(statement, arguments);
+
+  @override
+  Future<int> delete(String statement, [List<Object?>? arguments]) =>
+      _inner.delete(statement, arguments);
+
+  @override
+  void close() => _inner.close();
 }

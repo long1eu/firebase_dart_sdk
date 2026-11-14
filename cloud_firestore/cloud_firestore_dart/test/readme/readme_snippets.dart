@@ -454,8 +454,8 @@ Future<void> gettingStartedGuideLine140() async {
   );
 }
 
-// ../../docs/guides/multiple_clients.md:92
-Future<void> multipleClientsGuideLine92() async {
+// ../../docs/guides/multiple_clients.md:99
+Future<void> multipleClientsGuideLine99() async {
   final Directory directory = Directory('/home/ada/.local/share/my_app');
 
   // In the background isolate: the same project, another app name, another cache file.
@@ -466,8 +466,8 @@ Future<void> multipleClientsGuideLine92() async {
   );
 }
 
-// ../../docs/guides/multiple_clients.md:118
-Future<void> multipleClientsGuideLine118() async {
+// ../../docs/guides/multiple_clients.md:125
+Future<void> multipleClientsGuideLine125() async {
   await firestore.terminate();
   await firestore.clearPersistence();
 }

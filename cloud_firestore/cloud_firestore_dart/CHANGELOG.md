@@ -1,5 +1,11 @@
 ## Unreleased
 
+- Web: a page sends the pending writes that the page before it left in a persistent cache as soon as it starts,
+  and `waitForPendingWrites()` waits for them. Since the change below (writes belong to the client that made them)
+  they were held back for 60 s after a reload, and `waitForPendingWrites()` returned without them. A `Database`
+  whose opener holds an exclusive lock while it is open now says so with the new `ExclusiveDatabase` interface
+  (the web openers of the example do, with their Web Lock): every other client of the cache is then known to be
+  gone. If you copied `example/sqlite_database_web.dart` into your app, copy it again. On the VM the 60 s remain.
 - `Timestamp.toString()` is now `Timestamp(seconds=1, nanoseconds=2)`, as in the JS and Android SDKs. It used to
   print the two fields over four lines.
 - The canonical ids of queries, which the SQLite cache stores to find the cached results of a query again, are now

@@ -472,7 +472,11 @@ web.LockManager? get _lockManager {
 
 /// One open SQLite database in IndexedDB. Firestore runs its own SQL through
 /// it.
-class SqliteWebDatabase implements ClearableDatabase {
+///
+/// The Web Lock of the database is held from the open to the close, and lost
+/// with the page: no other client has the database open meanwhile
+/// ([ExclusiveDatabase]).
+class SqliteWebDatabase implements ClearableDatabase, ExclusiveDatabase {
   SqliteWebDatabase._(
     this._database,
     this._sqlite3,
@@ -925,8 +929,9 @@ class _OpfsWorker {
 }
 
 /// One open SQLite database in OPFS, kept by its own dedicated worker.
-/// Firestore runs its own SQL through it.
-class SqliteOpfsDatabase implements ClearableDatabase {
+/// Firestore runs its own SQL through it. Like [SqliteWebDatabase] it holds
+/// the Web Lock of the database while it is open ([ExclusiveDatabase]).
+class SqliteOpfsDatabase implements ClearableDatabase, ExclusiveDatabase {
   SqliteOpfsDatabase._(this._worker, this.path, this._releaseLock);
 
   final _OpfsWorker _worker;

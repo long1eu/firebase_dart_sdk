@@ -117,6 +117,11 @@ class SQLitePersistence extends Persistence {
   /// Set when the cache was cleared by another client: every transaction fails from then on.
   bool _clearedByOtherClient = false;
 
+  /// Whether no other client can have the database open while this one does (see [ExclusiveDatabase]): every other
+  /// client that left something in the cache is then known to be gone.
+  bool get hasExclusiveAccess => _hasExclusiveAccess;
+  bool _hasExclusiveAccess = false;
+
   /// Called (once) when this client notices that another client cleared the cache. The client terminates.
   void Function()? databaseClearedListener;
 
@@ -353,6 +358,7 @@ class SQLitePersistence extends Persistence {
     }
     final Database db = _db;
     _clearStorage = db is ClearableDatabase ? db.clearStorage : null;
+    _hasExclusiveAccess = db is ExclusiveDatabase;
     // Read before the state: a commit of another connection in between is then seen by the next transaction.
     _dataVersion = await _readDataVersion();
     await queryCache.start();

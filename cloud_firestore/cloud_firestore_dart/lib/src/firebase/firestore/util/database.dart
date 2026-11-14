@@ -134,6 +134,17 @@ abstract interface class ClearableDatabase implements Database {
   Future<void> clearStorage();
 }
 
+/// A [Database] that no other client can have open at the same time: its opener holds an exclusive lock for as long
+/// as the database is open, and the lock is released when the client is gone, however it ends (a Web Lock in a
+/// browser, as the example opener for the web takes: a page that is reloaded or closed loses it).
+///
+/// Firestore then knows that every other client that left something in the cache is gone. In particular it sends
+/// the pending writes that a previous page left behind right away, instead of waiting until that client has not
+/// been seen for a minute (see "Multiple clients on one cache" in the guides).
+///
+/// Only implement it for a lock that excludes every other client of the database, in any tab, isolate or process.
+abstract interface class ExclusiveDatabase implements Database {}
+
 /// Not used by the SDK; kept out of the public API.
 @internal
 enum ConflictAlgorithm {

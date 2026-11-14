@@ -148,15 +148,21 @@ class SQLiteMutationQueue implements MutationQueue {
   }) async {
     final List<Map<String, dynamic>> result = await db.query(
       'SELECT IFNULL(MAX(batch_id), ?) AS highest FROM mutations WHERE uid = ?'
-      '${skipOtherClients ? ' AND $_sendableByThisClient' : ''}',
+      '${_skips(skipOtherClients) ? ' AND $_sendableByThisClient' : ''}',
       <Object?>[
         MutationBatch.unknown,
         uid,
-        if (skipOtherClients) ..._sendableByThisClientArguments(),
+        if (_skips(skipOtherClients)) ..._sendableByThisClientArguments(),
       ],
     );
     return result.first['highest'] as int;
   }
+
+  /// Whether batches of other clients are left out: not when this client has the database to itself (see
+  /// [ExclusiveDatabase]). The clients that wrote them are gone then, whenever they last refreshed their metadata: a
+  /// page that was reloaded did so a moment ago.
+  bool _skips(bool skipOtherClients) =>
+      skipOtherClients && !db.hasExclusiveAccess;
 
   /// The condition on a row of `mutations` that this client sends the batch: the batch has no owner (written before
   /// schema 18), this client wrote it, or its owner is gone (it has no row in `clients` that it refreshed within
@@ -303,12 +309,12 @@ class SQLiteMutationQueue implements MutationQueue {
 
     final List<Map<String, dynamic>> result = await db.query(
       'SELECT mutations FROM mutations WHERE uid = ? AND batch_id >= ?'
-      '${skipOtherClients ? ' AND $_sendableByThisClient' : ''} '
+      '${_skips(skipOtherClients) ? ' AND $_sendableByThisClient' : ''} '
       'ORDER BY batch_id ASC LIMIT 1',
       <Object?>[
         uid,
         nextBatchId,
-        if (skipOtherClients) ..._sendableByThisClientArguments(),
+        if (_skips(skipOtherClients)) ..._sendableByThisClientArguments(),
       ],
     );
 

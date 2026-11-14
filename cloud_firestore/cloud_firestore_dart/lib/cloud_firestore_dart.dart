@@ -96,6 +96,7 @@ export 'src/firebase/firestore/util/database.dart'
     show
         ClearableDatabase,
         Database,
+        ExclusiveDatabase,
         OnConfigure,
         OnCreate,
         OnOpen,

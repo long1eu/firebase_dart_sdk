@@ -88,15 +88,21 @@ class _Client {
   static Future<_Client> start(
     String name,
     String clientId,
-    int Function() clock,
-  ) async {
-    final SQLitePersistence persistence =
-        await createSharedSQLitePersistenceForProject(
-          'test-project',
-          name,
-          clientId,
-          clock,
-        );
+    int Function() clock, {
+    bool exclusive = false,
+  }) async {
+    final SQLitePersistence
+    persistence = await createSharedSQLitePersistenceForProject(
+      'test-project',
+      name,
+      clientId,
+      clock,
+      exclusive: exclusive,
+      // As a page that opens the cache of a page that is gone: it takes the lease at once (the default mode).
+      leaseMode: exclusive
+          ? PrimaryLeaseMode.forceOwnership
+          : PrimaryLeaseMode.multipleClients,
+    );
     final LocalStore localStore = LocalStore(persistence, User.unauthenticated);
     final TaskScheduler scheduler = TaskScheduler(clientId);
     final MockDatastore datastore = MockDatastore(scheduler);
@@ -222,8 +228,13 @@ void main() {
     DatabaseMock.deleteDatabaseFiles(name);
   });
 
-  Future<_Client> start(String clientId) async {
-    final _Client client = await _Client.start(name, clientId, clock);
+  Future<_Client> start(String clientId, {bool exclusive = false}) async {
+    final _Client client = await _Client.start(
+      name,
+      clientId,
+      clock,
+      exclusive: exclusive,
+    );
     clients.add(client);
     return client;
   }
@@ -297,10 +308,50 @@ void main() {
 
     final Future<void> bWritten = b.write(writeB);
     await _expectSent(b.datastore, 2);
+
+    // waitForPendingWrites covers every batch this client sends, the one of the client that is gone included (as
+    // the JS SDK, whose primary sends every batch in the queue).
+    bool pendingDone = false;
+    final Completer<void> pending = Completer<void>();
+    await b.syncEngine.registerPendingWritesTask(pending);
+    unawaited(pending.future.then((_) => pendingDone = true));
+
     await b.acknowledge(writeC, 1000);
+    expect(pendingDone, isFalse);
     await b.acknowledge(writeB, 2000);
     await bWritten;
+    expect(pendingDone, isTrue);
   });
+
+  test(
+    'a client with exclusive access to the database sends the batches of the other clients at once',
+    () async {
+      // A page writes and is gone without terminating (a reload): its metadata was refreshed a moment ago.
+      final _Client old = await start('old');
+      final Mutation oldWrite = setMutation('col/old', <String, Object?>{
+        'by': 'old',
+      });
+      unawaited(old.write(oldWrite));
+      await _settle();
+
+      // The next page holds the lock of the database, so the old page is gone: it sends that write right away, and
+      // waitForPendingWrites waits for it.
+      final _Client next = await start('next', exclusive: true);
+      expect(next.persistence.hasExclusiveAccess, isTrue);
+      expect(next.syncEngine.isPrimaryClient, isTrue);
+      await _expectSent(next.datastore, 1);
+
+      bool pendingDone = false;
+      final Completer<void> pending = Completer<void>();
+      await next.syncEngine.registerPendingWritesTask(pending);
+      unawaited(pending.future.then((_) => pendingDone = true));
+      await _settle();
+      expect(pendingDone, isFalse);
+
+      await next.acknowledge(oldWrite, 1000);
+      expect(pendingDone, isTrue);
+    },
+  );
 
   test(
     'after a refresh, the primary sends the batch of a client that is gone without writing itself',

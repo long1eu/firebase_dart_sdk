@@ -168,6 +168,8 @@ class DocumentSnapshot
   static final jsonType: String
   toJson(): Map<String, Object>
   toString(): String
+abstract class ExclusiveDatabase
+  new ExclusiveDatabase()
 class FieldPath
   ==(Object other): bool
   get hashCode: int
