@@ -180,6 +180,8 @@ void main() {
       throwsStateError,
     );
     expect(queue.hasPendingOperations, isFalse);
+    // The error is for the caller: it did not leave the operation on the queue.
+    expect(serial.escapedErrors, 0);
   });
 
   // The tests of `enqueueRetryable` in the JS SDK (packages/firestore/test/unit/util/async_queue.test.ts). The JS

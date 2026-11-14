@@ -69,12 +69,27 @@ class RetryableOperationQueue {
     if (addedByRunning) {
       _addedByHead++;
     }
-    return _queue.run<void>(() async {
+    return _runAttempt(() async {
       if (addedByRunning || _running) {
         return;
       }
       await _retryNext();
     });
+  }
+
+  /// Runs [attempt] on the queue. The operation on the queue settles the returned future itself: an error of the
+  /// attempt that is not recoverable is for the caller of [enqueue] and does not leave the operation.
+  Future<void> _runAttempt(Future<void> Function() attempt) {
+    final Completer<void> result = Completer<void>();
+    _queue.run<void>(() async {
+      try {
+        await attempt();
+        result.complete();
+      } catch (error, stackTrace) {
+        result.completeError(error, stackTrace);
+      }
+    });
+    return result.future;
   }
 
   /// Like [enqueue], for the [probe] of a recovery of the persistence (RemoteStore goes offline until it succeeds).
@@ -92,7 +107,7 @@ class RetryableOperationQueue {
       _addedByHead++;
     }
     final bool alone = _operations.length == 1;
-    return _queue.run<void>(() async {
+    return _runAttempt(() async {
       if (addedByRunning || _running) {
         return;
       }

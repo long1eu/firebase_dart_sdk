@@ -204,25 +204,33 @@ class FirestoreClient implements RemoteStoreCallback {
       }
     });
 
-    // The first task of the queue: every operation is queued behind it.
-    client._initialized = client._queue.run<void>(() async {
-      if (after != null) {
-        await after.then<void>((_) {}, onError: (Object _) {});
+    // The first task of the queue: every operation is queued behind it. An initialization that fails is an expected
+    // error (a cache that can not be opened): the task settles [_initialized] itself.
+    final Completer<void> initialization = Completer<void>();
+    client._initialized = initialization.future;
+    client._queue.run<void>(() async {
+      try {
+        if (after != null) {
+          await after.then<void>((_) {}, onError: (Object _) {});
+        }
+        final User user = await firstUser.future;
+        await client._initialize(
+          user,
+          usePersistence,
+          settings.cacheSizeBytes,
+          openDatabase,
+          onNetworkConnected,
+          scheduler,
+          connectivityDetector: connectivityDetector,
+          memoryLruGcSettings: switch (settings.cacheSettings) {
+            final MemoryCacheSettings memory => memory.gcSettings,
+            _ => null,
+          },
+        );
+        initialization.complete();
+      } catch (error, stackTrace) {
+        initialization.completeError(error, stackTrace);
       }
-      final User user = await firstUser.future;
-      await client._initialize(
-        user,
-        usePersistence,
-        settings.cacheSizeBytes,
-        openDatabase,
-        onNetworkConnected,
-        scheduler,
-        connectivityDetector: connectivityDetector,
-        memoryLruGcSettings: switch (settings.cacheSettings) {
-          final MemoryCacheSettings memory => memory.gcSettings,
-          _ => null,
-        },
-      );
     });
     client._initialized.then<void>(
       (_) => initDone.complete(),
@@ -240,19 +248,35 @@ class FirestoreClient implements RemoteStoreCallback {
   /// queue plays that role; it is shared with the [RemoteStore].
   final SerialQueue _queue = SerialQueue();
 
+  /// The queue of this client, for tests.
+  @visibleForTesting
+  SerialQueue get queue => _queue;
+
   /// Runs [task] on the queue, after the initialization. Fails with the error of the initialization if that failed.
+  ///
+  /// The operation on the queue settles the returned future itself, with the result or the error of [task] (the JS
+  /// operations do that with a `Deferred`): the error of a client operation is for its caller and never leaves the
+  /// operation on the queue.
   ///
   /// The initialization future is awaited rather than [_initError] read: a task that was queued while the
   /// initialization ran starts before the listener that records the error (the queue listens to the future first),
   /// and would otherwise run against a client whose stores were never created.
-  Future<T> _enqueue<T>(Future<T> Function() task) => _queue.run<T>(() async {
-    final Object? initError = _initError;
-    if (initError != null) {
-      Error.throwWithStackTrace(initError, _initStackTrace!);
-    }
-    await _initialized;
-    return task();
-  });
+  Future<T> _enqueue<T>(Future<T> Function() task) {
+    final Completer<T> result = Completer<T>();
+    _queue.run<void>(() async {
+      try {
+        final Object? initError = _initError;
+        if (initError != null) {
+          Error.throwWithStackTrace(initError, _initStackTrace!);
+        }
+        await _initialized;
+        result.complete(await task());
+      } catch (error, stackTrace) {
+        result.completeError(error, stackTrace);
+      }
+    });
+    return result.future;
+  }
 
   /// Returns a future that completes when all the writes that are pending right now were acknowledged (or rejected)
   /// by the backend.
@@ -391,9 +415,12 @@ class FirestoreClient implements RemoteStoreCallback {
   Future<Document?> getDocumentFromLocalCache(DocumentKey docKey) async {
     _verifyNotShutdown();
 
-    final MaybeDocument? maybeDoc = await _userErrorIfRecoverable(
-      _enqueue<MaybeDocument?>(() => localStore.readDocument(docKey)),
-      'Failed to get document \'$docKey\' from cache',
+    // As the JS `readDocumentFromCache`: the error of the read is turned into the error of the user on the queue.
+    final MaybeDocument? maybeDoc = await _enqueue<MaybeDocument?>(
+      () => _userErrorIfRecoverable(
+        localStore.readDocument(docKey),
+        'Failed to get document \'$docKey\' from cache',
+      ),
     );
 
     if (maybeDoc is Document) {
@@ -427,11 +454,12 @@ class FirestoreClient implements RemoteStoreCallback {
   Future<ViewSnapshot> getDocumentsFromLocalCache(Query query) async {
     _verifyNotShutdown();
 
-    final QueryResult queryResult = await _userErrorIfRecoverable(
-      _enqueue<QueryResult>(
-        () => localStore.executeQuery(query, /* usePreviousResults= */ true),
+    // As the JS `executeQueryFromCache`.
+    final QueryResult queryResult = await _enqueue<QueryResult>(
+      () => _userErrorIfRecoverable(
+        localStore.executeQuery(query, /* usePreviousResults= */ true),
+        'Failed to execute query \'$query\' against cache',
       ),
-      'Failed to execute query \'$query\' against cache',
     );
 
     final View view = View(query, queryResult.remoteKeys);

@@ -392,11 +392,13 @@ class SyncEngine implements RemoteStoreCallback, SharedClientStateSyncer {
     final LocalWriteResult result;
     try {
       result = await _localStore.writeLocally(mutations);
-    } catch (e) {
+    } catch (e, s) {
+      // As JS (`syncEngineWrite`): a write that could not be stored fails, and nothing else happens. The error is for
+      // the user, whatever it is: it does not leave the operation.
       if (!isRecoverablePersistenceError(e)) {
-        rethrow;
+        userTask.completeError(e, s);
+        return;
       }
-      // As JS: a write that could not be stored fails, and nothing else happens.
       Log.w(_tag, 'Failed to persist write: $e');
       userTask.completeError(
         FirestoreError(
@@ -895,9 +897,11 @@ class SyncEngine implements RemoteStoreCallback, SharedClientStateSyncer {
     try {
       // The batches that this client sends: it is told when they are acknowledged.
       largestPendingBatchId = await _localStore.getHighestBatchIdToSend();
-    } catch (e) {
+    } catch (e, s) {
+      // As JS (`syncEngineRegisterPendingWritesCallback`): the error is for the user, whatever it is.
       if (!isRecoverablePersistenceError(e)) {
-        rethrow;
+        userTask.completeError(e, s);
+        return;
       }
       userTask.completeError(
         FirestoreError(

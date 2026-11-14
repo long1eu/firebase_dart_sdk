@@ -343,9 +343,11 @@ void main() {
       secondaryClientStateKey = _clientKey(secondaryClientId);
       final String existingClientId = _newClientId();
 
-      // Seed the storage with the state of an existing client. It is not shut down, which would delete the data.
+      // Seed the storage with the state of an existing client. It is not shut down, which would delete the data. It
+      // writes through the connection of the client under test, as the JS test does (one `localStorage`): its writes
+      // are then not storage events for that client, which would replay the states the seeding went through.
       StorageSharedClientState(
-          bus.connect(),
+          storage,
           (Future<void> Function() operation) async {},
           _persistencePrefix,
           existingClientId,
