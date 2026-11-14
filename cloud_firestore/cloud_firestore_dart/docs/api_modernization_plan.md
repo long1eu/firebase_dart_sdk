@@ -254,7 +254,7 @@ rewritten; where they disagree with this table, the table is right.
 | 16 | `Filter.or/and` | done (`Filter` class, `where(Filter)`) |
 | 17 | Breaking release: move `util/database.dart`, private constructors, remove deprecated names | partly: `ConflictAlgorithm` is no longer exported and `Database.file` became `Database.path`; the opener types are still exported from the main library, the leaking constructors are `@internal` rather than private, and the deprecated names are still there |
 | 18 | Bundles | done (`loadBundle`, `loadBundleStream`, `getNamedQuery`) |
-| 19 | Golden surface test, emulator CI | golden tests done for the three libraries (`public_api.golden.txt`, `pipelines_api.golden.txt`, `lite_api.golden.txt`); the CI workflow (`.github/workflows/ci.yml`) has run: unit tests on Dart 3.8.0 and stable are required, the emulator, browser and size jobs are allowed to fail |
+| 19 | Golden surface test, emulator CI | golden tests done for the three libraries (`public_api.golden.txt`, `pipelines_api.golden.txt`, `lite_api.golden.txt`); the CI workflow (`.github/workflows/ci.yml`) has run: which jobs are required and which are allowed to fail is listed in `tool/README.md` ("CI") |
 
 Also added beyond the original list: vector values and `Query.findNearest`, cache settings
 (`PersistentCacheSettings`, `MemoryCacheSettings`), `TransactionOptions` (`maxAttempts`, `readOnly`, `readTime`) with
