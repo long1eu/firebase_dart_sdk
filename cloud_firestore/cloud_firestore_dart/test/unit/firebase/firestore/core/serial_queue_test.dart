@@ -37,18 +37,6 @@ void main() {
     },
   );
 
-  test('a failing operation does not block the ones behind it', () async {
-    final SerialQueue queue = SerialQueue();
-
-    final Future<void> failing = queue.run<void>(
-      () async => throw StateError('boom'),
-    );
-    final Future<int> next = queue.run<int>(() async => 42);
-
-    await expectLater(failing, throwsStateError);
-    expect(await next, 42);
-  });
-
   test('a run requested by the running task runs after it', () async {
     final SerialQueue queue = SerialQueue();
     final List<String> events = <String>[];
@@ -148,18 +136,108 @@ void main() {
     expect(results[3], 'Bye for good.');
   });
 
-  // PORTING NOTE: the JS AsyncQueue enters a failed state on any error of an
-  // operation, because every JS operation handles its expected errors itself.
-  // Client operations of the port still let expected errors (a persistence
-  // error of a cache read, the error of a failed initialization, the
-  // non-recoverable error of a retryable operation) reach the queue and their
-  // caller, so the queue keeps going after a failure.
+  // PORTING NOTE: the JS `enqueue` throws synchronously on a failed queue;
+  // `run` returns a future that fails, and `enqueueAndForget` drops the
+  // operation (see SerialQueue).
+  test('handles failures', () async {
+    final SerialQueue queue = SerialQueue();
+    final StateError expected = StateError('Firestore Test Simulated Error');
+
+    // Schedule a failing operation and make sure it's handled correctly.
+    final Future<void> op1Promise = queue
+        .run<void>(() {
+          // This future represents something that is rejected.
+          return defer<void>(() => throw expected);
+        })
+        .then<void>(
+          (_) => fail('expected op1 to fail'),
+          onError: (Object err) {
+            expect(err, same(expected));
+          },
+        )
+        .then<void>((_) {
+          expect(queue.failure, same(expected));
+        });
+
+    // Schedule a second failing operation (before the first one has actually
+    // executed and failed). It should not be run.
+    final Future<void> op2Promise = queue
+        .run<void>(() {
+          return defer<void>(() => fail('op2 should not be executed.'));
+        })
+        .then<void>(
+          (_) => fail('expected op2 to fail'),
+          onError: (Object err) {
+            // should be the original failure still.
+            expect(err, same(expected));
+            expect(queue.failure, same(expected));
+          },
+        );
+
+    await Future.wait(<Future<void>>[op1Promise, op2Promise]);
+
+    // Once the queue is failed, trying to queue new operations fails with
+    // the "already failed" error.
+    bool dummyRan = false;
+    Future<void> dummyOp() async => dummyRan = true;
+    await expectLater(
+      queue.run<void>(dummyOp),
+      throwsA(
+        isA<AssertionError>().having(
+          (AssertionError e) => '${e.message}',
+          'message',
+          matches(RegExp('already failed.*Simulated Error', dotAll: true)),
+        ),
+      ),
+    );
+    await queue.enqueueAndForget(dummyOp);
+    expect(dummyRan, isFalse, reason: 'dummyOp should not be run');
+  });
+
+  test('an operation that must run on a failed queue still runs', () async {
+    final SerialQueue queue = SerialQueue();
+    final StateError expected = StateError('boom');
+    await expectLater(
+      queue.run<void>(() async => throw expected),
+      throwsA(same(expected)),
+    );
+
+    expect(await queue.run<int>(() async => 42, evenIfFailed: true), 42);
+    // Its error does not replace the failure of the queue.
+    await expectLater(
+      queue.run<void>(
+        () async => throw StateError('later'),
+        evenIfFailed: true,
+      ),
+      throwsStateError,
+    );
+    expect(queue.failure, same(expected));
+  });
+
   test(
-    'handles failures',
-    skip:
-        'Expected errors of client operations still reach SerialQueue (see '
-        'the PORTING NOTE above); the JS AsyncQueue enters a failed state and '
-        'rejects every later operation',
-    () {},
+    'enqueueAndForget reports the error that fails the queue once',
+    () async {
+      final SerialQueue queue = SerialQueue();
+      final List<Object> uncaught = <Object>[];
+      final StateError expected = StateError('boom');
+      bool ranAfter = false;
+
+      await runZonedGuarded(() async {
+        final Future<void> failing = queue.enqueueAndForget(
+          () async => throw expected,
+        );
+        // Requested before the failure: it is dropped, and nothing is reported.
+        final Future<void> waiting = queue.enqueueAndForget(
+          () async => ranAfter = true,
+        );
+        await failing;
+        await waiting;
+        await queue.enqueueAndForget(() async => ranAfter = true);
+      }, (Object error, StackTrace _) => uncaught.add(error));
+
+      expect(uncaught, <Object>[expected]);
+      expect(ranAfter, isFalse);
+      expect(queue.failure, same(expected));
+    },
   );
 }

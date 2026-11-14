@@ -65,7 +65,7 @@ void main() {
   });
 
   test(
-    'drops an operation that fails with another error and runs the next',
+    'an operation that fails with another error fails the queue, as in JS',
     () async {
       final List<String> log = <String>[];
       bool failing = true;
@@ -76,7 +76,7 @@ void main() {
         log.add('a');
       });
       await pumpEventQueue();
-      // While 'a' waits, 'b' is queued behind it.
+      // While 'a' waits, 'b' and 'c' are queued behind it.
       unawaited(
         queue
             .enqueue(() async => throw StateError('fatal'))
@@ -91,9 +91,10 @@ void main() {
         await pumpEventQueue();
       }, (Object error, StackTrace _) => uncaught.add(error));
 
-      expect(log, <String>['a', 'c']);
+      // 'b' failed the queue: 'c' never runs.
+      expect(log, <String>['a']);
       expect(uncaught.single, isA<StateError>());
-      expect(queue.hasPendingOperations, isFalse);
+      expect(serial.failure, isA<StateError>());
     },
   );
 
@@ -180,8 +181,12 @@ void main() {
       throwsStateError,
     );
     expect(queue.hasPendingOperations, isFalse);
-    // The error is for the caller: it did not leave the operation on the queue.
-    expect(serial.escapedErrors, 0);
+    // As in JS, it also fails the queue.
+    expect(serial.failure, isA<StateError>());
+    await expectLater(
+      queue.enqueue(() async {}),
+      throwsA(isA<AssertionError>()),
+    );
   });
 
   // The tests of `enqueueRetryable` in the JS SDK (packages/firestore/test/unit/util/async_queue.test.ts). The JS
@@ -205,8 +210,7 @@ void main() {
     });
 
     test("Doesn't retry internal exceptions", () async {
-      // PORTING NOTE: the JS queue fails for good (every later operation is rejected with the error). Here the
-      // operation is dropped, its caller gets the error, and nothing is retried.
+      // As in JS, the queue fails for good: every later operation is rejected with the error.
       int attempts = 0;
       await expectLater(
         queue.enqueue(() async {
@@ -216,7 +220,16 @@ void main() {
         throwsStateError,
       );
       expect(scheduler.getTask(TaskId.asyncQueueRetry), isNull);
-      await serial.run<void>(() async {});
+      await expectLater(
+        serial.run<void>(() async {}),
+        throwsA(
+          isA<AssertionError>().having(
+            (AssertionError e) => '${e.message}',
+            'message',
+            contains('Simulated test failure'),
+          ),
+        ),
+      );
       expect(attempts, 1);
     });
 
