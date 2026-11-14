@@ -14,6 +14,7 @@ import 'dart:typed_data';
 
 import 'package:cloud_firestore_dart/src/database_collection/database_collection.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/auth/user.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/core/bound.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/document_view_change.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/event_manager.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/online_state.dart';
@@ -22,13 +23,16 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/core/query_stream.da
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/serial_queue.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/sync_engine.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/view_snapshot.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/local/index_backfiller.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/local_store.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/local/persistance/index_manager.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/persistance/persistence.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/query_data.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/query_purpose.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/document.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/document_key.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/document_set.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/model/field_index.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/mutation.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/mutation_batch_result.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/mutation_result.dart';
@@ -100,37 +104,131 @@ class BackendDoc {
   int get v => data['v']! as int;
 }
 
-/// A query of the properties: `c`, optionally `where m == true`, optionally
-/// ordered by `v` with a limit (to first or to last).
+/// A query of the properties on `c`:
+///  * filters: `m == true`, an inequality on `v`, `v in [...]`;
+///  * ordered by `v` (explicitly, or implied by a limit, a cursor or the
+///    inequality), ascending or descending; otherwise by key;
+///  * cursors on `v`: startAt / startAfter and endAt / endBefore;
+///  * a limit, to first or to last.
 class QuerySpec {
   QuerySpec(
     this.name, {
     this.onlyM = false,
+    this.vOperator,
+    this.vOperand,
+    this.vIn,
+    bool ordered = false,
     this.descending = false,
+    this.start,
+    this.startInclusive = true,
+    this.end,
+    this.endInclusive = true,
     this.limit,
     this.limitToLast = false,
-  }) {
+  }) : byV =
+           ordered ||
+           limit != null ||
+           start != null ||
+           end != null ||
+           vOperator != null {
     Query query = Query(path('c'));
     if (onlyM) {
       query = query.filter(filter('m', '==', true));
     }
-    if (limit != null) {
+    if (vOperator != null) {
+      query = query.filter(filter('v', vOperator!, vOperand));
+    }
+    if (vIn != null) {
+      query = query.filter(filter('v', 'in', vIn));
+    }
+    if (byV) {
       query = query.orderBy(orderBy('v', descending ? 'desc' : 'asc'));
+    }
+    if (start != null) {
+      query = query.startAt(
+        Bound(position: <FieldValue>[wrap(start)], inclusive: startInclusive),
+      );
+    }
+    if (end != null) {
+      query = query.endAt(
+        Bound(position: <FieldValue>[wrap(end)], inclusive: endInclusive),
+      );
+    }
+    final int? limit = this.limit;
+    if (limit != null) {
       query = limitToLast
-          ? query.limitToLast(limit!)
-          : query.limitToFirst(limit!);
+          ? query.limitToLast(limit)
+          : query.limitToFirst(limit);
     }
     this.query = query;
   }
 
   final String name;
   final bool onlyM;
+
+  /// An inequality on `v`: `<`, `<=`, `>` or `>=` and its operand.
+  final String? vOperator;
+  final int? vOperand;
+
+  /// `v in [...]`.
+  final List<int>? vIn;
+
+  /// The result is ordered by `v` (then by key), not by key.
+  final bool byV;
   final bool descending;
+
+  /// The cursors, on `v`: startAt ([startInclusive]) or startAfter, endAt
+  /// ([endInclusive]) or endBefore.
+  final int? start;
+  final bool startInclusive;
+  final int? end;
+  final bool endInclusive;
   final int? limit;
   final bool limitToLast;
   late final Query query;
 
-  bool matches(BackendDoc? doc) => doc != null && (!onlyM || doc.m);
+  /// Whether the query has a cursor.
+  bool get hasCursor => start != null || end != null;
+
+  /// Whether [doc] passes the filters and lies between the cursors.
+  bool matches(BackendDoc? doc) {
+    if (doc == null || (onlyM && !doc.m)) {
+      return false;
+    }
+    final int v = doc.v;
+    final int? operand = vOperand;
+    if (operand != null) {
+      final bool passes = switch (vOperator) {
+        '<' => v < operand,
+        '<=' => v <= operand,
+        '>' => v > operand,
+        _ => v >= operand,
+      };
+      if (!passes) {
+        return false;
+      }
+    }
+    if (vIn != null && !vIn!.contains(v)) {
+      return false;
+    }
+    // The position in the order of the query, for the cursors.
+    final int position = descending ? -v : v;
+    final int? start = this.start;
+    if (start != null) {
+      final int bound = descending ? -start : start;
+      if (startInclusive ? position < bound : position <= bound) {
+        return false;
+      }
+    }
+    final int? end = this.end;
+    if (end != null) {
+      final int bound = descending ? -end : end;
+      if (endInclusive ? position > bound : position >= bound) {
+        return false;
+      }
+    }
+    return true;
+  }
 
   /// The ids of the result for [docs], in the order of the query.
   List<String> result(Map<String, BackendDoc> docs) {
@@ -138,8 +236,7 @@ class QuerySpec {
       for (final MapEntry<String, BackendDoc> entry in docs.entries)
         if (matches(entry.value)) entry.key,
     ];
-    final int? limit = this.limit;
-    if (limit == null) {
+    if (!byV) {
       return ids..sort();
     }
     // By `v`, then by key, both in the direction of the order.
@@ -148,7 +245,8 @@ class QuerySpec {
       final int order = byV != 0 ? byV : a.compareTo(b);
       return descending ? -order : order;
     });
-    if (ids.length <= limit) {
+    final int? limit = this.limit;
+    if (limit == null || ids.length <= limit) {
       return ids;
     }
     return limitToLast
@@ -301,6 +399,8 @@ class Stats {
   int listenersAdded = 0;
   int listenersRemoved = 0;
   int sharedQueries = 0;
+  int indexedListenerSteps = 0;
+  int staleWindows = 0;
 
   @override
   String toString() =>
@@ -311,7 +411,11 @@ class Stats {
       'from a view'
       '${listenersAdded == 0 ? '' : ', $listenersAdded listeners added '
                 '($sharedQueries on a query that had one) and '
-                '$listenersRemoved removed'}';
+                '$listenersRemoved removed'}'
+      '${indexedListenerSteps == 0 ? '' : ', $indexedListenerSteps times a '
+                'listener was served by a field index after a step, '
+                '$staleWindows interleavings stopped at a window computed '
+                'from an index that was behind'}';
 }
 
 /// What a run does.
@@ -320,6 +424,8 @@ class RunConfig {
     required this.queries,
     required this.documents,
     this.maxListeners = 1,
+    this.indexes,
+    this.snapshotsAfterCommits = false,
   });
 
   /// The queries of the listeners; the first listener uses the first one.
@@ -331,6 +437,20 @@ class RunConfig {
   /// With more than one, listeners are added and removed during the run,
   /// with and without metadata changes.
   final int maxListeners;
+
+  /// With these, [runProperty] runs every interleaving twice on SQLite, with
+  /// and without the field indexes, and compares the listeners after every
+  /// step (see [runIndexPair]).
+  final List<FieldIndex>? indexes;
+
+  /// The global snapshots of watch are at the latest version of the backend,
+  /// and their version is just after it and after the one before, so that
+  /// every snapshot is after the commit version of every acknowledged write
+  /// and no two snapshots have the same version. See the skipped test "the
+  /// index backfill misses a document that watch delivers at or before the
+  /// commit version of an acknowledged write" in
+  /// view_listeners_property_test.dart.
+  final bool snapshotsAfterCommits;
 
   bool get churn => maxListeners > 1;
 }
@@ -346,6 +466,8 @@ class ViewRun {
 
   late final Persistence persistence;
   late final SerialQueue queue;
+  late final LocalStore localStore;
+  IndexBackfiller? _backfiller;
   late final MockDatastore datastore;
   late final RemoteStore remoteStore;
   late final SyncEngine syncEngine;
@@ -384,6 +506,7 @@ class ViewRun {
   String? _justRejected;
   int _counter = 0;
   int _listenerCount = 0;
+  int _snapshotCount = 0;
 
   final List<String> trace = <String>[];
   final List<String> violations = <String>[];
@@ -413,9 +536,15 @@ class ViewRun {
 
   // ------------------------------------------------------------ the client
 
-  Future<void> start(Persistence persistence) async {
+  /// With [indexes], the field indexes are configured before the first
+  /// listener starts, and backfilled after every step (see [backfill]).
+  Future<void> start(
+    Persistence persistence, {
+    List<FieldIndex>? indexes,
+  }) async {
     this.persistence = persistence;
     final LocalStore localStore = LocalStore(persistence, User.unauthenticated);
+    this.localStore = localStore;
     final TaskScheduler scheduler = TaskScheduler('view-property-$seed');
     datastore = MockDatastore(scheduler)..onWatchQuery = _onWatchQuery;
     final _Callback callback = _Callback();
@@ -436,9 +565,79 @@ class ViewRun {
     await onQueue<void>(() async {
       await localStore.start();
       await remoteStore.start();
+      if (indexes != null) {
+        await localStore.configureFieldIndexes(indexes);
+        _backfiller = IndexBackfiller(persistence, localStore);
+      }
     });
     await addListener(config.queries.first, includeMetadata: true);
   }
+
+  /// Brings the field indexes up to date with the cache, as the index
+  /// backfiller of the client does when it runs.
+  Future<void> backfill() async {
+    final IndexBackfiller? backfiller = _backfiller;
+    if (backfiller != null) {
+      while (await onQueue<int>(backfiller.backfill) > 0) {}
+    }
+  }
+
+  /// Compares, for the query of every listener, what the query engine
+  /// returns from the cache (through a field index where one serves the
+  /// query) with a scan of the collection in the same cache: the documents
+  /// of the window of the query, in its order. Returns the differences.
+  Future<List<String>> engineDifferences() async {
+    final List<String> result = <String>[];
+    for (final QuerySpec spec in <QuerySpec>{
+      for (final Listener l in listeners) l.spec,
+    }) {
+      final Query query = spec.query;
+      List<String> window(Iterable<Document> documents) {
+        final List<Document> sorted = documents.toList()
+          ..sort(query.comparator);
+        final int? limit = spec.limit;
+        final List<Document> kept = limit == null || sorted.length <= limit
+            ? sorted
+            : spec.limitToLast
+            ? sorted.sublist(sorted.length - limit)
+            : sorted.sublist(0, limit);
+        return <String>[
+          for (final Document doc in kept)
+            '${doc.key.path.last}: ${doc.getFieldValue(field('v'))}',
+        ];
+      }
+
+      final List<String> engine = window(
+        (await onQueue(
+          () => localStore.executeQuery(query, false),
+        )).documents.map((MapEntry<DocumentKey, Document> e) => e.value),
+      );
+      final List<String> scan = window(
+        (await onQueue(
+          () => localStore.localDocumentsForCurrentUser
+              .getDocumentsMatchingQuery(query, IndexOffset.none),
+        )).map((MapEntry<DocumentKey, Document> e) => e.value),
+      );
+      if (engine.toString() != scan.toString()) {
+        result.add(
+          'the query engine returns $engine for $spec, a scan of the cache '
+          '$scan',
+        );
+      }
+    }
+    return result;
+  }
+
+  /// How many of the listeners' queries are served by a field index alone.
+  int get fullyIndexedListeners => listeners
+      .where(
+        (Listener l) =>
+            localStore.indexManagerForCurrentUser.getIndexType(
+              l.spec.query.toTarget(),
+            ) ==
+            IndexType.full,
+      )
+      .length;
 
   Future<void> shutdown() async {
     for (final Listener listener in listeners) {
@@ -691,32 +890,52 @@ class ViewRun {
   /// limbo after the acknowledgement"), also when the user wrote the
   /// document again afterwards, and puts it in limbo when that write is
   /// acknowledged. The resolution finds the document.
+  ///
+  /// Decided after the step, with the views it left: a document that one
+  /// view holds back can be an ordinary document of another view (it just
+  /// entered the window of a limit query), which is what went to limbo.
   void _checkLimbo(String docId) {
-    final bool heldBack =
-        pending.every((PendingWrite w) => w.id != docId) &&
-        listeners.any(
-          (Listener l) =>
-              l.includeMetadata &&
-              (l.view?.documents
-                      .getDocument(key('c/$docId'))
-                      ?.hasLocalMutations ??
-                  false),
-        );
-    if (heldBack &&
+    if (pending.every((PendingWrite w) => w.id != docId) &&
         !removedByWatch.contains(docId) &&
         !sentOnStream.contains(docId) &&
         refillPending.isEmpty &&
         !queryTargets.any((WatchTarget t) => t.current)) {
-      violations.add(
-        'the held-back $docId entered limbo while no target of a query was '
-        'CURRENT on the current watch stream',
-      );
+      _limboToCheck.add(docId);
     }
+  }
+
+  final List<String> _limboToCheck = <String>[];
+
+  void _checkLimboAfterStep() {
+    for (final String docId in _limboToCheck) {
+      // A listener without metadata changes is not told when a document
+      // stops being local, but a document it shows as acknowledged is one.
+      final List<Document> shown = <Document>[
+        for (final Listener l in listeners)
+          ?l.view?.documents.getDocument(key('c/$docId')),
+      ];
+      final bool local = listeners.any(
+        (Listener l) =>
+            l.includeMetadata &&
+            (l.view?.documents
+                    .getDocument(key('c/$docId'))
+                    ?.hasLocalMutations ??
+                false),
+      );
+      if (local && shown.every((Document doc) => doc.hasLocalMutations)) {
+        violations.add(
+          'the held-back $docId entered limbo while no target of a query was '
+          'CURRENT on the current watch stream',
+        );
+      }
+    }
+    _limboToCheck.clear();
   }
 
   /// Forgets the targets the client stopped watching; the backend confirms
   /// their removal.
   Future<void> syncTargets() async {
+    _checkLimboAfterStep();
     if (!streamOpen) {
       return;
     }
@@ -780,8 +999,11 @@ class ViewRun {
 
   /// The backend answers the oldest write the client sent: it applies and
   /// acknowledges it, or rejects it (always for a patch of a missing
-  /// document; any write with [mayReject]).
-  Future<void> answerWrite({required bool mayReject}) async {
+  /// document; any write with [mayReject]; this one with [reject]).
+  Future<void> answerWrite({
+    required bool mayReject,
+    bool reject = false,
+  }) async {
     if (datastore.writesSent == 0) {
       return;
     }
@@ -789,7 +1011,7 @@ class ViewRun {
     final PendingWrite write = pending.removeAt(0);
     final BackendDoc? existing = backend.at(backend.latest)[write.id];
     final bool missing = write.kind == 'patch' && existing == null;
-    if (missing || (mayReject && gen.chance(15))) {
+    if (missing || reject || (mayReject && gen.chance(15))) {
       log('the backend rejects $write');
       stats.rejected++;
       _justRejected = write.id;
@@ -844,7 +1066,10 @@ class ViewRun {
         change,
         snapshotVersion == null
             ? SnapshotVersion.none
-            : version(snapshotVersion),
+            : version(
+                snapshotVersion +
+                    (config.snapshotsAfterCommits ? ++_snapshotCount : 0),
+              ),
       );
 
   /// The documents of [target] at [version].
@@ -993,7 +1218,9 @@ class ViewRun {
         atLeast = sent;
       }
     }
-    final int snapshot = at ?? _pickVersion(atLeast);
+    final int snapshot = config.snapshotsAfterCommits
+        ? backend.latest
+        : at ?? _pickVersion(atLeast);
     for (final WatchTarget target in targets.values.toList()) {
       if (target.current) {
         await sendChanges(target, snapshot);
@@ -1245,6 +1472,100 @@ Future<(List<String>, List<String>)> runSeed(
   }
 }
 
+/// Runs the interleaving of [seed] twice on SQLite, in step: once with the
+/// field indexes of [config] (backfilled after every step) and once without.
+/// After every step, and after the drain, the listeners of both runs must
+/// show the same documents in the same order. Returns the failures and the
+/// trace of the run with indexes.
+Future<(List<String>, List<String>)> runIndexPair(
+  int seed,
+  int steps,
+  RunConfig config, {
+  Stats? stats,
+}) async {
+  final List<String> names = <String>[
+    for (int i = 0; i < 2; i++)
+      'firebase/firestore/core/view_property_${const Uuid().v4()}',
+  ];
+  final ViewRun indexed = ViewRun(seed, Gen(seed), stats ?? Stats(), config);
+  final ViewRun plain = ViewRun(seed, Gen(seed), Stats(), config);
+  final List<String> failures = <String>[];
+
+  String shown(ViewRun run) => <String>[
+    for (final Listener l in run.listeners) '${l.name}: ${l.documents}',
+  ].join('; ');
+  void compare(String when) {
+    if (failures.isEmpty && shown(indexed) != shown(plain)) {
+      failures.add(
+        '$when the listeners differ.\n'
+        '      with the field indexes: ${shown(indexed)}\n'
+        '      without:                ${shown(plain)}',
+      );
+    }
+  }
+
+  try {
+    await indexed.start(
+      await createSQLitePersistenceForProject('test-project', names[0]),
+      indexes: config.indexes,
+    );
+    await plain.start(
+      await createSQLitePersistenceForProject('test-project', names[1]),
+    );
+    for (
+      int i = 0;
+      i < steps && failures.isEmpty && indexed.violations.isEmpty;
+      i++
+    ) {
+      await indexed.step();
+      await indexed.backfill();
+      await plain.step();
+      stats?.indexedListenerSteps += indexed.fullyIndexedListeners;
+      final String step =
+          'after step ${i + 1} '
+          '(${indexed.trace.lastWhere((String t) => !t.startsWith(' '), orElse: () => '')})';
+      // The query engine itself: with the indexes up to date, it must return
+      // what a scan of the same cache returns.
+      for (final String difference in await indexed.engineDifferences()) {
+        failures.add('$step $difference');
+      }
+      if (failures.isEmpty && shown(indexed) != shown(plain)) {
+        // The index is right now, but a view was computed during the step,
+        // before the backfill, from an index that was behind: a limit query
+        // served by an index only refills its window when the document at
+        // its edge has a version after the read time of the index offset,
+        // and a document can arrive later with an older version (see the
+        // skipped test "a limit query served by a field index refills ..." in
+        // view_listeners_property_test.dart). From here on the two runs
+        // are not the same interleaving any more.
+        if (indexed.listeners.any((Listener l) => l.spec.limit != null)) {
+          stats?.staleWindows++;
+          stats?.runs++;
+          return (<String>[...indexed.violations], indexed.trace);
+        }
+        compare(step);
+      }
+    }
+    await indexed.drain();
+    await plain.drain();
+    compare('after the drain');
+    stats?.runs++;
+    return (
+      <String>[
+        ...failures,
+        ...indexed.violations,
+        ...indexed.differences(),
+        for (final String d in plain.differences()) 'without indexes: $d',
+      ],
+      indexed.trace,
+    );
+  } finally {
+    await indexed.shutdown();
+    await plain.shutdown();
+    names.forEach(DatabaseMock.deleteDatabaseFiles);
+  }
+}
+
 /// Runs [count] interleavings of [steps] steps; on a failure, the message
 /// has the seed, the shortest failing prefix and its trace.
 Future<String?> runProperty(
@@ -1257,13 +1578,10 @@ Future<String?> runProperty(
 }) async {
   for (int i = 0; i < count; i++) {
     final int seed = caseSeed(i);
-    final (List<String> failures, List<String> trace) = await runSeed(
-      seed,
-      steps,
-      config,
-      sqlite: sqlite,
-      stats: stats,
-    );
+    final bool pair = config.indexes != null;
+    final (List<String> failures, List<String> trace) = pair
+        ? await runIndexPair(seed, steps, config, stats: stats)
+        : await runSeed(seed, steps, config, sqlite: sqlite, stats: stats);
     if (failures.isEmpty) {
       continue;
     }
@@ -1272,12 +1590,9 @@ Future<String?> runProperty(
     List<String> shortestFailures = failures;
     List<String> shortestTrace = trace;
     for (int n = 0; n < steps; n++) {
-      final (List<String> f, List<String> t) = await runSeed(
-        seed,
-        n,
-        config,
-        sqlite: sqlite,
-      );
+      final (List<String> f, List<String> t) = pair
+          ? await runIndexPair(seed, n, config)
+          : await runSeed(seed, n, config, sqlite: sqlite);
       if (f.isNotEmpty) {
         shortest = n;
         shortestFailures = f;

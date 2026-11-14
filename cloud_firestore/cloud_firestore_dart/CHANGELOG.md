@@ -11,6 +11,10 @@
 - `FirestoreSettings.experimentalLongPollingOptions` (`timeoutSeconds`, 5 to 30) sets the long-polling timeout of
   the web transport, as in the JS SDK. The client reports online as soon as the watch stream connects rather than
   at its first message.
+- Persistent cache indexes: after a write was rejected by the backend, a query served by a field index could miss
+  the document, or return it as the rejected write had left it (for example a document that the user deleted, and
+  whose delete was rejected, stayed out of the result). The index entries of the documents of a rejected write are
+  now written when it is rejected. The Android SDK has the same gap.
 - Web transport: writes that were in flight when the write stream was closed by the client (`disableNetwork()`, a
   credential change, an idle stream) could reach the backend later, after the same writes and newer ones had been
   sent on the next stream, and replace the newer values: the WebChannel session of the closed stream went on

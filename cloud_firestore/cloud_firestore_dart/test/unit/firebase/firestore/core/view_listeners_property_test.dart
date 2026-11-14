@@ -38,6 +38,30 @@
 //    last) N documents; with metadata changes also not from cache and
 //    without pending writes; nothing is left in limbo.
 //
+// More query shapes, each case with up to three listeners that come and go:
+//  * cursors: `c order by v startAt(5) endBefore(20)`, `c where m == true
+//    order by v desc startAfter(18) limit 2`, `c order by v endAt(12)
+//    limitToLast 2`, `c order by v desc endAt(6)`;
+//  * an inequality on v and `in`: `c where v > 8`, `c where v <= 15 limit
+//    2`, `c where m == true and v >= 6 limit 3`, `c where v in [2, 4, ...
+//    24]`, `c where m == true and v in [...]`.
+//
+// The last case compares the local query engine with and without field
+// indexes: every interleaving runs twice on SQLite, in step, once with the
+// indexes (v), (m, v), (v desc) and (m, v desc) configured and backfilled
+// after every step, and once without. After every step and after the drain
+// the listeners of both runs must show the same documents in the same
+// order. Its queries are a mix of the shapes above.
+//
+// Which invariant applies to which query shape:
+//  * snapshot sequence, limit never exceeded, same documents for listeners
+//    of one query, settled result equals the backend's, with and without
+//    indexes: all shapes;
+//  * no unexplained removal: the queries without a limit (plain, filtered,
+//    inequality, `in`, and cursors without a limit: the cursor bounds are
+//    part of what "the backend had it" means);
+//  * held-back limbo: all shapes (it is about the documents, not the query).
+//
 // A failure shows the seed, the shortest failing prefix and its trace.
 // PROPERTY_SCALE=<n> runs n times as many interleavings, PROPERTY_SEED=<seed>
 // reruns a failing one and PROPERTY_TRACE=1 prints every step.
@@ -45,10 +69,16 @@
 @TestOn('vm')
 library;
 
+import 'package:cloud_firestore_dart/src/firebase/firestore/model/field_index.dart';
 import 'package:firebase_app_dart/internal.dart' show InternalLogLevel, Log;
 import 'package:test/test.dart';
+import 'package:uuid/uuid.dart';
 
+import '../../../../util/index_helpers.dart';
 import '../../../../util/property.dart';
+import '../../../../util/test_util.dart';
+import '../local/mock/database_mock.dart';
+import '../local/persistence_test_helpers.dart';
 import 'view_property_harness.dart';
 
 const int _steps = 60;
@@ -71,6 +101,60 @@ final QuerySpec _mLast2 = QuerySpec(
   onlyM: true,
   limit: 2,
   limitToLast: true,
+);
+
+// Cursors.
+final QuerySpec _between = QuerySpec(
+  'c order by v startAt(5) endBefore(20)',
+  start: 5,
+  end: 20,
+  endInclusive: false,
+);
+final QuerySpec _mAfter18Desc = QuerySpec(
+  'c where m == true order by v desc startAfter(18) limit 2',
+  onlyM: true,
+  descending: true,
+  start: 18,
+  startInclusive: false,
+  limit: 2,
+);
+final QuerySpec _until12Last2 = QuerySpec(
+  'c order by v endAt(12) limitToLast 2',
+  end: 12,
+  limit: 2,
+  limitToLast: true,
+);
+final QuerySpec _descUntil6 = QuerySpec(
+  'c order by v desc endAt(6)',
+  descending: true,
+  end: 6,
+);
+
+// An inequality on v, and `in`.
+final QuerySpec _above8 = QuerySpec(
+  'c where v > 8',
+  vOperator: '>',
+  vOperand: 8,
+);
+final QuerySpec _upTo15First2 = QuerySpec(
+  'c where v <= 15 limit 2',
+  vOperator: '<=',
+  vOperand: 15,
+  limit: 2,
+);
+final QuerySpec _mFrom6First3 = QuerySpec(
+  'c where m == true and v >= 6 limit 3',
+  onlyM: true,
+  vOperator: '>=',
+  vOperand: 6,
+  limit: 3,
+);
+const List<int> _even = <int>[2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24];
+final QuerySpec _inEven = QuerySpec('c where v in $_even', vIn: _even);
+final QuerySpec _mInEven = QuerySpec(
+  'c where m == true and v in $_even',
+  onlyM: true,
+  vIn: _even,
 );
 
 void main() {
@@ -96,7 +180,297 @@ void main() {
       documents: 6,
       maxListeners: 3,
     ),
+    'listeners on queries with cursors': RunConfig(
+      queries: <QuerySpec>[_between, _mAfter18Desc, _until12Last2, _descUntil6],
+      documents: 6,
+      maxListeners: 3,
+    ),
+    'listeners on queries with an inequality or in': RunConfig(
+      queries: <QuerySpec>[
+        _above8,
+        _upTo15First2,
+        _mFrom6First3,
+        _inEven,
+        _mInEven,
+      ],
+      documents: 6,
+      maxListeners: 3,
+    ),
   };
+
+  // Found by the index comparison (seed 20261113, 52 steps). The backfill wrote the index entries of a document as
+  // its pending writes left it; when one of those writes was rejected, the document changed back but nothing made
+  // the backfill look at it again (its remote version and the batch ids of its other writes are behind the offset of
+  // the index). A query served by the index then missed the document, or found it at the old place.
+  test('a query served by a field index sees a document after one of its '
+      'pending writes was rejected', () async {
+    final List<FieldIndex> indexes = <FieldIndex>[
+      fieldIndex(
+        'c',
+        fieldsAndKinds: <Object>[
+          'm',
+          SegmentKind.ascending,
+          'v',
+          SegmentKind.ascending,
+        ],
+      ),
+      fieldIndex(
+        'c',
+        fieldsAndKinds: <Object>[
+          'm',
+          SegmentKind.ascending,
+          'v',
+          SegmentKind.descending,
+        ],
+      ),
+    ];
+    final String name =
+        'firebase/firestore/core/view_property_${const Uuid().v4()}';
+    final ViewRun run = ViewRun(
+      0,
+      Gen(0),
+      Stats(),
+      RunConfig(queries: <QuerySpec>[_mFirst2, _mLast2], documents: 2),
+    );
+    try {
+      await run.start(
+        await createSQLitePersistenceForProject('test-project', name),
+        indexes: indexes,
+      );
+      run.backend.change('d0', <String, Object?>{'m': true, 'v': 5});
+      run.backend.change('d1', <String, Object?>{'m': true, 'v': 3});
+      await run.sendChanges(run.main!, run.backend.latest);
+      await run.markCurrent(run.main!);
+      await run.globalSnapshot(run.backend.latest);
+      expect(run.listener.documents, <String>['d1: 3', 'd0: 5']);
+
+      // The user deletes d0 and then patches it (the patch does nothing to a deleted document); the index is
+      // brought up to date: it has no entry for d0.
+      await run.writeMutation(
+        PendingWrite('d0', 'delete', null),
+        deleteMutation('c/d0'),
+      );
+      await run.writeMutation(
+        PendingWrite('d0', 'patch', <String, Object?>{'v': 9}),
+        patchMutation('c/d0', <String, Object?>{'v': 9}),
+      );
+      await run.backfill();
+      expect(run.listener.documents, <String>['d1: 3']);
+
+      // The backend rejects the delete: d0 is back, with the patch.
+      await run.answerWrite(mayReject: false, reject: true);
+      await run.backfill();
+      expect(run.listener.documents, <String>['d1: 3', 'd0: 9']);
+
+      // A new listener on another query, which the index serves, sees d0 too.
+      await run.addListener(_mLast2, includeMetadata: true);
+      expect(run.fullyIndexedListeners, 2);
+      expect(run.listeners.last.documents, <String>[
+        'd1: 3',
+        'd0: 9',
+      ], reason: run.trace.join('\n'));
+    } finally {
+      await run.shutdown();
+      DatabaseMock.deleteDatabaseFiles(name);
+    }
+  });
+
+  // Found by the index comparison (seed 20569954 at PROPERTY_SCALE=10: 60 steps, and 47 steps with the check of the
+  // query engine). An acknowledged write stores its document with the commit version as read time; a backfill then
+  // moves the offset of the index to (that time, that document). Watch can deliver other documents afterwards in a
+  // snapshot of an older version (it lags behind the commit), or of the same version with a key that sorts before:
+  // they are behind the offset and the backfill never writes their entries. The Android SDK does the same. Not fixed
+  // (see the summary of the property work); the comparison case avoids it with `RunConfig.snapshotsAfterCommits`.
+  test(
+    'the index backfill misses a document that watch delivers at or before '
+    'the commit version of an acknowledged write',
+    skip:
+        'Known gap, inherited from the Android SDK, waiting for a decision: '
+        'the offset of the index backfill passes the documents that watch '
+        'delivers at or before the commit version of an acknowledged write.',
+    () async {
+      final List<FieldIndex> indexes = <FieldIndex>[
+        for (final SegmentKind kind in SegmentKind.values)
+          if (kind != SegmentKind.contains)
+            fieldIndex(
+              'c',
+              fieldsAndKinds: <Object>['m', SegmentKind.ascending, 'v', kind],
+            ),
+      ];
+      final String name =
+          'firebase/firestore/core/view_property_${const Uuid().v4()}';
+      final ViewRun run = ViewRun(
+        0,
+        Gen(0),
+        Stats(),
+        RunConfig(queries: <QuerySpec>[_mFirst2, _mLast2], documents: 2),
+      );
+      try {
+        await run.start(
+          await createSQLitePersistenceForProject('test-project', name),
+          indexes: indexes,
+        );
+        await run.sendChanges(run.main!, 1000);
+        await run.markCurrent(run.main!);
+        await run.globalSnapshot(1000);
+        // Another client creates d0 at 2000; the user's write of d1 is committed at 3000 and acknowledged before
+        // watch sends anything. The backfill indexes d1.
+        run.backend.change('d0', <String, Object?>{'m': true, 'v': 1});
+        await run.writeMutation(
+          PendingWrite('d1', 'set', <String, Object?>{'m': true, 'v': 2}),
+          setMutation('c/d1', <String, Object?>{'m': true, 'v': 2}),
+        );
+        await run.answerWrite(mayReject: false);
+        await run.backfill();
+        // Watch delivers d0 (and d1) in the snapshot at 3000, the commit version.
+        await run.sendChanges(run.main!, 3000);
+        await run.globalSnapshot(3000);
+        await run.backfill();
+        expect(run.listener.documents, <String>['d0: 1', 'd1: 2']);
+
+        // A new listener on another query, which the index serves.
+        await run.addListener(_mLast2, includeMetadata: true);
+        expect(run.fullyIndexedListeners, 2);
+        expect(run.listeners.last.documents, <String>[
+          'd0: 1',
+          'd1: 2',
+        ], reason: run.trace.join('\n'));
+      } finally {
+        await run.shutdown();
+        DatabaseMock.deleteDatabaseFiles(name);
+      }
+    },
+  );
+
+  // Found by the index comparison (seed 20791686 at PROPERTY_SCALE=10, 21 steps). A limit query served by an index
+  // takes the first documents of the index and only looks further when the document at the edge of the window has
+  // pending writes or a version after the read time of the index offset. A document that arrives with an older
+  // version than that (from a target that lags, or after an acknowledgement moved the offset ahead) and moves out of
+  // the window is not noticed: the window keeps it until the next backfill and a later change of the view. The
+  // Android SDK has the same check. Not fixed (see the summary of the property work).
+  test(
+    'a limit query served by a field index refills its window when a '
+    'document arrives with a version before the read time of the index',
+    skip:
+        'Known gap, inherited from the Android SDK, waiting for a decision: '
+        'the refill check of a limit query served by an index compares the '
+        'version of the document with the read time of the index offset.',
+    () async {
+      final String name =
+          'firebase/firestore/core/view_property_${const Uuid().v4()}';
+      final ViewRun run = ViewRun(
+        0,
+        Gen(0),
+        Stats(),
+        RunConfig(queries: <QuerySpec>[_mFirst2], documents: 4),
+      );
+      try {
+        await run.start(
+          await createSQLitePersistenceForProject('test-project', name),
+          indexes: <FieldIndex>[
+            fieldIndex(
+              'c',
+              fieldsAndKinds: <Object>[
+                'm',
+                SegmentKind.ascending,
+                'v',
+                SegmentKind.ascending,
+              ],
+            ),
+          ],
+        );
+        run.backend.change('d0', <String, Object?>{'m': true, 'v': 1});
+        run.backend.change('d1', <String, Object?>{'m': true, 'v': 2});
+        await run.sendChanges(run.main!, 3000);
+        await run.markCurrent(run.main!);
+        await run.globalSnapshot(3000);
+        expect(run.listener.documents, <String>['d0: 1', 'd1: 2']);
+
+        // Another client moves d0 behind the others (4000). The user writes d2, the next one in the order, and d3,
+        // which is acknowledged at 5000: the index is backfilled up to that read time.
+        run.backend.change('d0', <String, Object?>{'m': true, 'v': 5});
+        await run.writeMutation(
+          PendingWrite('d3', 'set', <String, Object?>{'m': false, 'v': 9}),
+          setMutation('c/d3', <String, Object?>{'m': false, 'v': 9}),
+        );
+        await run.answerWrite(mayReject: false);
+        await run.writeMutation(
+          PendingWrite('d2', 'set', <String, Object?>{'m': true, 'v': 3}),
+          setMutation('c/d2', <String, Object?>{'m': true, 'v': 3}),
+        );
+        await run.backfill();
+        expect(run.fullyIndexedListeners, 1);
+
+        // Watch delivers the change of d0, at its version 4000.
+        await run.sendChanges(run.main!, 4000);
+        await run.globalSnapshot(4000);
+        expect(run.listener.documents, <String>[
+          'd1: 2',
+          'd2: 3',
+        ], reason: run.trace.join('\n'));
+      } finally {
+        await run.shutdown();
+        DatabaseMock.deleteDatabaseFiles(name);
+      }
+    },
+  );
+
+  test('the listeners show the same documents with and without field '
+      'indexes', () async {
+    final RunConfig config = RunConfig(
+      queries: <QuerySpec>[
+        _mFirst2,
+        _between,
+        _mAfter18Desc,
+        _upTo15First2,
+        _above8,
+        _inEven,
+        _top3,
+        _mLast2,
+      ],
+      documents: 6,
+      maxListeners: 3,
+      snapshotsAfterCommits: true,
+      indexes: <FieldIndex>[
+        fieldIndex('c', fieldsAndKinds: <Object>['v', SegmentKind.ascending]),
+        fieldIndex(
+          'c',
+          fieldsAndKinds: <Object>[
+            'm',
+            SegmentKind.ascending,
+            'v',
+            SegmentKind.ascending,
+          ],
+        ),
+        fieldIndex('c', fieldsAndKinds: <Object>['v', SegmentKind.descending]),
+        fieldIndex(
+          'c',
+          fieldsAndKinds: <Object>[
+            'm',
+            SegmentKind.ascending,
+            'v',
+            SegmentKind.descending,
+          ],
+        ),
+      ],
+    );
+    final Stats stats = Stats();
+    final String? failure = await runProperty(
+      'the same documents with and without field indexes',
+      config,
+      count: cases(20),
+      steps: _steps,
+      sqlite: true,
+      stats: stats,
+    );
+    if (failure != null) {
+      fail(failure);
+    }
+    print('with and without field indexes (SQLite): $stats');
+    // The run with indexes must really serve queries from them.
+    expect(stats.indexedListenerSteps, greaterThan(0), reason: '$stats');
+    expect(stats.reconnects, greaterThan(0), reason: '$stats');
+  }, timeout: Timeout(Duration(minutes: 2 + 2 * cases(1))));
 
   for (final MapEntry<String, RunConfig> config in configs.entries) {
     for (final bool sqlite in <bool>[false, true]) {

@@ -492,7 +492,16 @@ class LocalStore implements BundleCallback {
       await _documentOverlayCache.removeOverlaysForBatchId(batchId);
       await _localDocuments.recalculateAndSaveOverlays(toReject.keys);
 
-      return _localDocuments.getDocuments(toReject.keys);
+      final ImmutableSortedMap<DocumentKey, MaybeDocument> documents =
+          await _localDocuments.getDocuments(toReject.keys);
+      // PORTING NOTE: the documents changed back without anything that the index backfill looks for (their remote
+      // version is the same, and the overlays that are left keep the batch ids they had), so the entries of the
+      // field indexes are written here. Android does not, and a query served by an index keeps the rejected state.
+      await _indexManager.updateIndexEntries(<DocumentKey, MaybeDocument?>{
+        for (final MapEntry<DocumentKey, MaybeDocument> entry in documents)
+          entry.key: entry.value,
+      });
+      return documents;
     });
   }
 
