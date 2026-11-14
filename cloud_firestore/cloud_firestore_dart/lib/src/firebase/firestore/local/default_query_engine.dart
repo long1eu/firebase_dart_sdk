@@ -204,7 +204,40 @@ class DefaultQueryEngine implements QueryEngine {
       return _performQueryUsingIndex(query.limitToFirst(Target.noLimit));
     }
 
-    return _appendRemainingResults(previousResults, query, offset);
+    // The documents that changed after the offset: the index does not know them yet.
+    final ImmutableSortedMap<DocumentKey, Document> changedSinceOffset =
+        await localDocumentsView.getDocumentsMatchingQuery(query, offset);
+    if (_edgeChangedSince(query, previousResults, changedSinceOffset)) {
+      return _performQueryUsingIndex(query.limitToFirst(Target.noLimit));
+    }
+
+    ImmutableSortedMap<DocumentKey, Document> results = changedSinceOffset;
+    for (final Document document in previousResults) {
+      results = results.insert(document.key, document);
+    }
+    return results;
+  }
+
+  /// Whether the document at the edge of the window of the limit [query] changed after the offset of the index that
+  /// served [previousResults]: the index has it at its old place, so documents beyond the window may now belong in it.
+  ///
+  /// PORTING NOTE: the JS and Android SDKs only test the version of the edge document against the read time of the
+  /// offset (see [_needsRefill]). A document can change in the cache after the offset with an older version, when a
+  /// target that lags behind delivers it; its move out of the window then went unnoticed.
+  bool _edgeChangedSince(
+    Query query,
+    ImmutableSortedSet<Document> previousResults,
+    ImmutableSortedMap<DocumentKey, Document> changedSinceOffset,
+  ) {
+    if (!query.hasLimit) {
+      return false;
+    }
+    final Document? documentAtLimitEdge =
+        query.limitType == LimitType.limitToFirst
+        ? previousResults.maxEntry
+        : previousResults.minEntry;
+    return documentAtLimitEdge != null &&
+        changedSinceOffset.containsKey(documentAtLimitEdge.key);
   }
 
   /// Performs a query based on the target's persisted query mapping. Returns null if the mapping is not available or

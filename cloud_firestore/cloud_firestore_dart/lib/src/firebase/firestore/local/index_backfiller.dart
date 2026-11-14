@@ -8,6 +8,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/local/persistance/in
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/persistance/persistence.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/document_key.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/field_index.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/model/maybe_document.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/snapshot_version.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/timer_task.dart';
 import 'package:firebase_app_dart/internal.dart';
@@ -102,18 +103,26 @@ class IndexBackfiller {
         );
     await indexManager.updateIndexEntries(nextBatch.documents);
 
-    final IndexOffset newOffset = _getNewOffset(existingOffset, nextBatch);
+    final IndexOffset newOffset = await _getNewOffset(
+      existingOffset,
+      nextBatch,
+    );
     Log.d(_tag, 'Updating offset: $newOffset');
     await indexManager.updateCollectionGroup(collectionGroup, newOffset);
 
+    // Documents that are only read again because the offset stops at the last snapshot version of watch (see
+    // [_getNewOffset]) are not progress: a caller that backfills until nothing is processed must not loop on them.
+    if (newOffset.compareTo(existingOffset) == 0) {
+      return 0;
+    }
     return nextBatch.documents.length;
   }
 
   /// Returns the next offset based on the provided documents.
-  IndexOffset _getNewOffset(
+  Future<IndexOffset> _getNewOffset(
     IndexOffset existingOffset,
     LocalDocumentsResult lookupResult,
-  ) {
+  ) async {
     IndexOffset maxOffset = existingOffset;
     for (final DocumentKey key in lookupResult.documents.keys) {
       final IndexOffset newOffset = IndexOffset(
@@ -125,10 +134,57 @@ class IndexBackfiller {
         maxOffset = newOffset;
       }
     }
+    final int largestBatchId = max(
+      lookupResult.batchId,
+      existingOffset.largestBatchId,
+    );
+    // PORTING NOTE: an acknowledged write stores its document with the commit version as read time, which can be at
+    // or ahead of the last snapshot version of watch. A document that watch delivers later, in a snapshot at or before
+    // that commit version, would then be behind the offset and never indexed (the JS and Android SDKs have this gap).
+    // So while such an acknowledged document (watch has not sent it yet) is read, the offset stops at the last
+    // snapshot version of watch, which every later document of watch is at or after. The documents above it are read
+    // again by the next backfill; queries find them meanwhile as documents changed after the offset.
+    final SnapshotVersion lastRemoteSnapshotVersion =
+        _persistence.queryCache.lastRemoteSnapshotVersion;
+    if (maxOffset.readTime.compareTo(lastRemoteSnapshotVersion) >= 0 &&
+        await _readsAcknowledgedAtOrAfter(
+          lookupResult,
+          lastRemoteSnapshotVersion,
+        )) {
+      return IndexOffset(
+        lastRemoteSnapshotVersion,
+        DocumentKey.empty(),
+        largestBatchId,
+      );
+    }
     return IndexOffset(
       maxOffset.readTime,
       maxOffset.documentKey,
-      max(lookupResult.batchId, existingOffset.largestBatchId),
+      largestBatchId,
+    );
+  }
+
+  /// Whether [lookupResult] has a document, with a read time at or after [readTime], whose cached version comes from
+  /// an acknowledged write (a set, an update or a delete) that watch has not sent yet.
+  Future<bool> _readsAcknowledgedAtOrAfter(
+    LocalDocumentsResult lookupResult,
+    SnapshotVersion readTime,
+  ) async {
+    final List<DocumentKey> keys = <DocumentKey>[
+      for (final MapEntry<DocumentKey, SnapshotVersion> entry
+          in lookupResult.readTimes.entries)
+        if (entry.value.compareTo(readTime) >= 0) entry.key,
+    ];
+    if (keys.isEmpty) {
+      return false;
+    }
+    final Map<DocumentKey, MaybeDocument?> documents = await _persistence
+        .remoteDocumentCache
+        .getAll(keys);
+    // Also a deleted or unknown document, from an acknowledged delete or update: it moves the offset all the same.
+    // An entry of the remote document cache has no local mutations, so its pending writes are committed ones.
+    return documents.values.any(
+      (MaybeDocument? document) => document?.hasPendingWrites ?? false,
     );
   }
 }

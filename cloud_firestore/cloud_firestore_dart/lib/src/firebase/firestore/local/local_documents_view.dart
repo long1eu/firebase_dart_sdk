@@ -470,9 +470,19 @@ class LocalDocumentsView {
       }
     }
 
+    // The documents without an overlay are results as they are. They were read without the filters of the query
+    // when the overlays of the earlier batches had to be looked up.
+    ImmutableSortedMap<DocumentKey, Document> matching = remoteDocuments;
+    if (overlaysSinceBatch) {
+      for (final MapEntry<DocumentKey, Document> entry in remoteDocuments) {
+        if (!overlays.containsKey(entry.key) && !query.matches(entry.value)) {
+          matching = matching.remove(entry.key);
+        }
+      }
+    }
+
     if (overlays.isEmpty) {
-      // The remote document cache already matched the documents against the query.
-      return remoteDocuments;
+      return matching;
     }
 
     // As documents might match the query because of their overlay we need to include documents for all overlays in
@@ -491,9 +501,9 @@ class LocalDocumentsView {
         : await remoteDocumentCache.getAll(missingPatchBases);
 
     // Apply the overlays and match against the query. Only the documents with an overlay are touched: the others were
-    // matched by the remote document cache.
+    // matched above.
     final Timestamp now = Timestamp.now();
-    ImmutableSortedMap<DocumentKey, Document> results = remoteDocuments;
+    ImmutableSortedMap<DocumentKey, Document> results = matching;
     for (Overlay overlay in overlays.values) {
       final DocumentKey key = overlay.key;
       final MaybeDocument? base = remoteDocuments[key] ?? patchBases[key];

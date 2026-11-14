@@ -1,5 +1,17 @@
 ## Unreleased
 
+- Persistent cache indexes: a limit query served by a field index could show a document that had left its window.
+  The query engine looked beyond the window only when the document at its edge had a version (update time) after the
+  index offset; a document delivered late by a target that lagged behind has an older version. It now also refills
+  the window when the document at its edge changed in the cache after the offset. The JS and Android SDKs only test
+  the version.
+- Persistent cache indexes: the query engine could return documents that do not match the query, among the
+  documents that changed after the offset of a field index, when none of them had a pending write.
+- Persistent cache indexes: a query served by a field index could miss a document for good after one of the
+  client's own writes. The acknowledged document is stored with the commit version as read time, and the index
+  backfill moved past it; a document that watch delivered afterwards in a snapshot at or before that version was
+  never indexed. While such an acknowledged document has not been sent by watch, the backfill now stops at the last
+  snapshot version of watch. The JS and Android SDKs have the same gap.
 - **Behaviour change:** `Firestore.instanceFor()` (and `getInstance`) throws a `StateError` when it is given settings
   that differ from those of the instance that already exists for the app and database, as the JS and Android SDKs
   do. Before, the new settings were silently ignored. Call it without settings to get the existing instance, or

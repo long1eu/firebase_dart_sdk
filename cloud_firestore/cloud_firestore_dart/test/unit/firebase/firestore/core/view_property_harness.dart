@@ -400,7 +400,6 @@ class Stats {
   int listenersRemoved = 0;
   int sharedQueries = 0;
   int indexedListenerSteps = 0;
-  int staleWindows = 0;
 
   @override
   String toString() =>
@@ -413,9 +412,7 @@ class Stats {
                 '($sharedQueries on a query that had one) and '
                 '$listenersRemoved removed'}'
       '${indexedListenerSteps == 0 ? '' : ', $indexedListenerSteps times a '
-                'listener was served by a field index after a step, '
-                '$staleWindows interleavings stopped at a window computed '
-                'from an index that was behind'}';
+                'listener was served by a field index after a step'}';
 }
 
 /// What a run does.
@@ -425,7 +422,7 @@ class RunConfig {
     required this.documents,
     this.maxListeners = 1,
     this.indexes,
-    this.snapshotsAfterCommits = false,
+    this.distinctSnapshotVersions = false,
   });
 
   /// The queries of the listeners; the first listener uses the first one.
@@ -443,14 +440,12 @@ class RunConfig {
   /// step (see [runIndexPair]).
   final List<FieldIndex>? indexes;
 
-  /// The global snapshots of watch are at the latest version of the backend,
-  /// and their version is just after it and after the one before, so that
-  /// every snapshot is after the commit version of every acknowledged write
-  /// and no two snapshots have the same version. See the skipped test "the
-  /// index backfill misses a document that watch delivers at or before the
-  /// commit version of an acknowledged write" in
+  /// Every global snapshot of watch gets a version above the one before (the
+  /// version of the backend it stands for, plus a count). See the skipped
+  /// test "the index backfill indexes a document that watch delivers in a
+  /// later event at the snapshot version of the offset" in
   /// view_listeners_property_test.dart.
-  final bool snapshotsAfterCommits;
+  final bool distinctSnapshotVersions;
 
   bool get churn => maxListeners > 1;
 }
@@ -1068,7 +1063,7 @@ class ViewRun {
             ? SnapshotVersion.none
             : version(
                 snapshotVersion +
-                    (config.snapshotsAfterCommits ? ++_snapshotCount : 0),
+                    (config.distinctSnapshotVersions ? ++_snapshotCount : 0),
               ),
       );
 
@@ -1218,9 +1213,7 @@ class ViewRun {
         atLeast = sent;
       }
     }
-    final int snapshot = config.snapshotsAfterCommits
-        ? backend.latest
-        : at ?? _pickVersion(atLeast);
+    final int snapshot = at ?? _pickVersion(atLeast);
     for (final WatchTarget target in targets.values.toList()) {
       if (target.current) {
         await sendChanges(target, snapshot);
@@ -1529,22 +1522,7 @@ Future<(List<String>, List<String>)> runIndexPair(
       for (final String difference in await indexed.engineDifferences()) {
         failures.add('$step $difference');
       }
-      if (failures.isEmpty && shown(indexed) != shown(plain)) {
-        // The index is right now, but a view was computed during the step,
-        // before the backfill, from an index that was behind: a limit query
-        // served by an index only refills its window when the document at
-        // its edge has a version after the read time of the index offset,
-        // and a document can arrive later with an older version (see the
-        // skipped test "a limit query served by a field index refills ..." in
-        // view_listeners_property_test.dart). From here on the two runs
-        // are not the same interleaving any more.
-        if (indexed.listeners.any((Listener l) => l.spec.limit != null)) {
-          stats?.staleWindows++;
-          stats?.runs++;
-          return (<String>[...indexed.violations], indexed.trace);
-        }
-        compare(step);
-      }
+      compare(step);
     }
     await indexed.drain();
     await plain.drain();
