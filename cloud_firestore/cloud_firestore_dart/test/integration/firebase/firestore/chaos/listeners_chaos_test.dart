@@ -1,6 +1,8 @@
 // Listeners under a bad network: after the network is back, the last snapshot is the state of the backend.
 
 import 'dart:async';
+import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:cloud_firestore_dart/cloud_firestore_dart.dart';
 import 'package:test/test.dart';
@@ -264,5 +266,47 @@ void main() {
       await all.cancel();
       await some.cancel();
     });
+
+    // The emulator (v1.22.0) keeps a bounded part of what it sent and the client did not acknowledge: after the
+    // answer to the first back channel request of this listener was lost, it answered the next request (AID=0) from
+    // array 105 on. The arrays in between held the confirmation of the target (ADD); without it the client ignores
+    // every change of the target, and the listener never got in sync. Found by the soak test (seed 328635).
+    test('with a large backlog get in sync after the first answer of watch was lost',
+        () async {
+      final String name = uniqueName('backlog');
+      final WriteBatch batch = env.oracle.batch();
+      for (int i = 0; i < 300; i++) {
+        batch.set(
+            env.oracle.collection(name).doc('d${i.toString().padLeft(3, '0')}'),
+            <String, Object?>{'n': i, 'pad': 'x' * 2000});
+      }
+      await batch.commit();
+
+      final Firestore db = await env.newClient();
+      bool stalled = false;
+      env.proxy.cutWhen = (ChaosDirection direction, Uint8List data) {
+        if (!stalled &&
+            direction == ChaosDirection.up &&
+            latin1.decode(data).startsWith('GET')) {
+          // The answer reaches the proxy, which is all the server knows, and goes no further.
+          stalled = true;
+          env.proxy.mode = ChaosMode.stallDown;
+          unawaited(pause(800).then((_) => env.proxy
+            ..cut()
+            ..restore()));
+        }
+        return false;
+      };
+      final RecordingListener all = RecordingListener(db.collection(name));
+      final Map<String, Map<String, Object?>> server =
+          await env.serverDocs(name);
+      await all.settlesOn(server.keys.toList()..sort(), server);
+      expect(stalled, isTrue,
+          reason: 'the first back channel answer was stalled');
+      await all.cancel();
+    },
+        skip: usesWebTransport
+            ? null
+            : 'Only the WebChannel has back channel requests');
   }, skip: chaosSkipReason);
 }

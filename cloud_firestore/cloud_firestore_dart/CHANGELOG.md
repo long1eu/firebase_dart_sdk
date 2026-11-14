@@ -12,6 +12,12 @@
   backfill moved past it; a document that watch delivered afterwards in a snapshot at or before that version was
   never indexed. While such an acknowledged document has not been sent by watch, the backfill now stops at the last
   snapshot version of watch. The JS and Android SDKs have the same gap.
+- Web transport: a listener could stop getting snapshots for good (it stayed on its last snapshot from the cache,
+  with pending writes) when the server no longer had messages of a listen stream it had never delivered. Seen with
+  the emulator after a connection was stalled and cut while the stream had a large backlog: the server answered a
+  request for the messages after the last one the client had from a later message on. One of the lost messages
+  confirmed a target, and the client ignores every change of a target that is not confirmed. Such an answer now
+  fails the stream, and the client opens a new one.
 - **Behaviour change:** `Firestore.instanceFor()` (and `getInstance`) throws a `StateError` when it is given settings
   that differ from those of the instance that already exists for the app and database, as the JS and Android SDKs
   do. Before, the new settings were silently ignored. Call it without settings to get the existing instance, or

@@ -558,6 +558,8 @@ class WebChannelStream {
     while (!_closed) {
       bool receivedData = false;
       bool failed = false;
+      final int requestedAfter = _lastArrayId;
+      bool resumed = false;
       final WebHttpRequest request = _http.send(
         'GET',
         _url(<String, String>{
@@ -609,6 +611,12 @@ class WebChannelStream {
               receivedData = true;
               _receivedBackChannelData = true;
               _detectionTimer?.cancel();
+              if (!resumed && _isNewArray(array)) {
+                resumed = true;
+                if (!_resumesAfter(array, requestedAfter)) {
+                  break;
+                }
+              }
               _onArray(array);
               if (_closed) {
                 break;
@@ -674,6 +682,40 @@ class WebChannelStream {
       _switchedToLongPolling = true;
       request.abort();
     });
+  }
+
+  /// Whether [array] is an `[arrayId, payload]` the client does not have yet.
+  bool _isNewArray(Object? array) =>
+      array is List &&
+      array.length >= 2 &&
+      array[0] is int &&
+      (array[0] as int) > _lastArrayId;
+
+  /// Checks that the first new [array] of a back channel answer is the one
+  /// after [requestedAfter], the `AID` of the request: the server sends again
+  /// what the client did not acknowledge. Otherwise fails the stream and
+  /// returns false.
+  ///
+  /// The WebChannel of the JS SDK (closure-net) takes any array id above the
+  /// last one, and so does [_onArray] within an answer. But an answer that
+  /// does not start after `AID` means the server no longer has the arrays in
+  /// between, and asking again would not bring them back. The emulator
+  /// (v1.22.0) answered `AID=0` from array 47 after a stalled back channel;
+  /// one of the lost arrays confirmed a target (`ADD`), without which the
+  /// client ignores every change of that target, and the listener got no
+  /// snapshot any more. A new stream adds its targets again.
+  bool _resumesAfter(Object? array, int requestedAfter) {
+    final int arrayId = (array! as List<Object?>)[0]! as int;
+    if (arrayId == requestedAfter + 1) {
+      return true;
+    }
+    _fail(
+      GrpcError.unavailable(
+        'The stream lost messages: asked for the messages after '
+        '$requestedAfter, the server answered from $arrayId',
+      ),
+    );
+    return false;
   }
 
   /// Handles one `[arrayId, payload]` of the server.
