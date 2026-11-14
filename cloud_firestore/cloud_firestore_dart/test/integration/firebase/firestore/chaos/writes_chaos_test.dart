@@ -142,6 +142,42 @@ void main() {
       await expectLanded(db, collection);
     });
 
+    test(
+        'in flight when the network is disabled are not applied after the '
+        'newer writes that follow', () async {
+      // Found by the soak test on the web transports: the WebChannel session of a write stream that the client
+      // closed went on sending its request again (after 100 ms, then after 1 s) until it got through, after the
+      // client had sent the same write and a newer one on its next stream. The backend applied the old write last.
+      final Firestore db = await env.newClient();
+      final DocumentReference<Map<String, Object?>> doc =
+          db.collection(uniqueName('late')).doc('k');
+      // Opens the write stream.
+      await doc.set(<String, Object?>{'v': 0});
+
+      // The request of this write is held by the network, then its connection is cut and nothing connects.
+      env.proxy.mode = ChaosMode.stallUp;
+      final Future<void> first = doc.set(<String, Object?>{'v': 1});
+      await pause(100);
+      env.proxy.disconnect();
+      // The client closes its streams. A session that still tries to deliver fails again now (100 ms after the
+      // cut), and tries once more a second later.
+      await db.disableNetwork();
+      await pause(250);
+
+      // The network is back: the write goes out again on a new stream, followed by a newer one.
+      env.proxy.restore();
+      await db.enableNetwork();
+      await first.timeout(const Duration(seconds: 10));
+      await doc.set(<String, Object?>{'v': 2}).timeout(const Duration(seconds: 10));
+
+      // Past the last attempt of the old session.
+      await pause(2500);
+      expect((await env.serverDocs(doc.parent.path))['k'], <String, Object?>{'v': 2});
+      final DocumentSnapshot<Map<String, Object?>> seen =
+          await doc.get(Source.server);
+      expect(seen.data, <String, Object?>{'v': 2});
+    });
+
     test('issued before the first connection land exactly once', () async {
       env.proxy.disconnect();
       final Firestore db = await env.newClient();

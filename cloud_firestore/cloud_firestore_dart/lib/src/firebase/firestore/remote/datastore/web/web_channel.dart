@@ -205,7 +205,6 @@ class WebChannelStream {
   bool _sending = false;
   bool _opened = false;
   bool _closed = false;
-  bool _closeWhenFlushed = false;
 
   late int _requestId;
   String? _sessionId;
@@ -240,7 +239,10 @@ class WebChannelStream {
   }
 
   /// Ends the session right away: [messages] ends now, the server is told in
-  /// the background (see [released]).
+  /// the background (see [released]). Messages that were not sent yet are
+  /// dropped, and a request in flight is not sent again if it fails: nothing
+  /// is delivered for a stream once its owner closed it, beyond what is on
+  /// the wire.
   Future<void> close() => _shutdown();
 
   /// Completes when the session is over on the server too, or could not be
@@ -255,15 +257,6 @@ class WebChannelStream {
   Future<void> get released => _released.future;
   final Completer<void> _released = Completer<void>();
   Future<void>? _flushing;
-
-  /// Closes the stream once everything that was passed to [send] has been delivered. WebChannel has no half-close:
-  /// this is what the end of the client's requests means for it.
-  void closeWhenFlushed() {
-    _closeWhenFlushed = true;
-    if (!_sending && _outgoing.isEmpty) {
-      unawaited(_shutdown());
-    }
-  }
 
   Uri _url(Map<String, String> params) {
     final Map<String, String> all = <String, String>{
@@ -417,10 +410,6 @@ class WebChannelStream {
       return;
     } finally {
       _sending = false;
-    }
-    if (_closeWhenFlushed && _outgoing.isEmpty) {
-      unawaited(_shutdown());
-      return;
     }
     unawaited(_flush());
   }

@@ -22,6 +22,10 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/remote/connectivity_
 import 'package:cloud_firestore_dart/src/firebase/firestore/remote/datastore/channel_options_provider.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/remote/datastore/datastore.dart'
     show Datastore;
+import 'package:cloud_firestore_dart/src/firebase/firestore/remote/datastore/firestore_transport.dart'
+    show FirestoreTransport;
+import 'package:cloud_firestore_dart/src/firebase/firestore/remote/datastore/transport_factory.dart'
+    show createTransport;
 import 'package:cloud_firestore_dart/src/firebase/firestore/remote/datastore/web/web_channel_transport.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/source.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/database.dart';
@@ -137,27 +141,49 @@ class IntegrationTestUtil {
     final String? transport = Platform.environment['FIRESTORE_TEST_TRANSPORT'];
     // `webchannel-longpolling` requests the streams in long polling mode.
     final bool longPolling = transport == 'webchannel-longpolling';
+    final FirestoreTransport Function(FirestoreTransport, DatabaseInfo)?
+        decorate = transportDecorator;
     if (transport != 'webchannel' && !longPolling) {
+      if (decorate != null) {
+        Datastore.transportOverride =
+            (DatabaseInfo databaseInfo, ChannelOptionsProvider options) =>
+                decorate(createTransport(databaseInfo, options), databaseInfo);
+        _decorated = true;
+      } else if (_decorated) {
+        Datastore.transportOverride = null;
+        _decorated = false;
+      }
       return false;
     }
     Datastore.transportOverride =
-        (DatabaseInfo databaseInfo, ChannelOptionsProvider options) =>
-            WebChannelTransport(
-              IoWebHttpClient(),
-              DatabaseInfo(
-                databaseInfo.databaseId,
-                databaseInfo.persistenceKey,
-                databaseInfo.host,
-                port: databaseInfo.port,
-                sslEnabled: databaseInfo.sslEnabled,
-                forceLongPolling: longPolling,
-                autoDetectLongPolling:
-                    !longPolling && databaseInfo.autoDetectLongPolling,
-              ),
-              options,
-            );
+        (DatabaseInfo databaseInfo, ChannelOptionsProvider options) {
+      final FirestoreTransport web = WebChannelTransport(
+        IoWebHttpClient(),
+        DatabaseInfo(
+          databaseInfo.databaseId,
+          databaseInfo.persistenceKey,
+          databaseInfo.host,
+          port: databaseInfo.port,
+          sslEnabled: databaseInfo.sslEnabled,
+          forceLongPolling: longPolling,
+          autoDetectLongPolling:
+              !longPolling && databaseInfo.autoDetectLongPolling,
+        ),
+        options,
+      );
+      return decorate == null ? web : decorate(web, databaseInfo);
+    };
     return true;
   }
+
+  /// Wraps the transport of every client created afterwards, whatever the transport of the run is: for tests that
+  /// record what goes over the wire (see `WireRecorder` of the chaos tests). Set it back to null afterwards.
+  static FirestoreTransport Function(
+      FirestoreTransport transport, DatabaseInfo databaseInfo)?
+      transportDecorator;
+
+  /// Whether [useWebTransportIfRequested] installed a decorated gRPC transport, to remove it again.
+  static bool _decorated = false;
 
   /// The emulator the low-level tests talk to: the one of
   /// `FIRESTORE_EMULATOR_HOST`, or 127.0.0.1:8080 when it is not set.

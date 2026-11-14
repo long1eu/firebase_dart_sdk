@@ -626,7 +626,7 @@ void main() {
     );
 
     test(
-      'closeWhenFlushed delivers the queued messages before it ends the session',
+      'close drops the messages that wait for the request in flight',
       () async {
         open();
         await handshake();
@@ -636,32 +636,57 @@ void main() {
 
         stream.send('{"removeTarget":2}');
         final FakeRequest forward = await http.next();
-        stream.closeWhenFlushed();
+        // Waits for the request in flight.
+        stream.send('{"removeTarget":3}');
         await pump();
-        // Still waiting for the request in flight.
-        expect(done, isFalse);
-        expect(forward.aborted, isFalse);
-        expect(back.aborted, isFalse);
+        final int sent = http.requests.length;
 
+        final Future<void> closing = stream.close();
+        await pump();
+        expect(done, isTrue);
+        // The request in flight is left to finish.
+        expect(forward.aborted, isFalse);
         forward.respond(200, body: '7\n[1,2,7]');
+
         final FakeRequest terminate = await http.next();
         expect(terminate.query['TYPE'], 'terminate');
         terminate.respond(200);
-        await pump();
+        await closing;
+        await stream.released;
         expect(back.aborted, isTrue);
-        expect(done, isTrue);
+        // Nothing but the terminate request was sent after the close.
+        expect(http.requests.skip(sent), <FakeRequest>[terminate]);
         expect(errors, isEmpty);
       },
     );
 
     test(
-      'closeWhenFlushed on a session that never opened just ends it',
+      'close does not send the request in flight again when it fails',
       () async {
         open();
-        stream.closeWhenFlushed();
+        await handshake();
+        final FakeRequest back = await http.next();
+        back.stream(200);
         await pump();
-        expect(http.requests, isEmpty);
-        expect(done, isTrue);
+
+        stream.send('{"removeTarget":2}');
+        final FakeRequest forward = await http.next();
+        final int sent = http.requests.length;
+
+        final Future<void> closing = stream.close();
+        await pump();
+        // The connection of the request is cut: an open session sends it
+        // again (after 5 and 10 ms here), a closed one does not.
+        forward.fail(StateError('connection cut'));
+
+        final FakeRequest terminate = await http.next();
+        expect(terminate.query['TYPE'], 'terminate');
+        terminate.respond(200);
+        await closing;
+        await stream.released;
+        await Future<void>.delayed(const Duration(milliseconds: 50));
+        expect(http.requests.skip(sent), <FakeRequest>[terminate]);
+        expect(errors, isEmpty);
       },
     );
 

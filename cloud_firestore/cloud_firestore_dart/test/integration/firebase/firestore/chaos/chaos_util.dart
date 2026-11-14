@@ -148,6 +148,10 @@ Future<void> eventually(
   }
 }
 
+/// The clock of the chaos tests: the logs of the operations, of the wire (`WireRecorder`) and of the snapshots
+/// use it, so that their lines can be read next to each other.
+final Stopwatch chaosClock = Stopwatch()..start();
+
 Future<void> pause(int milliseconds) =>
     Future<void>.delayed(Duration(milliseconds: milliseconds));
 
@@ -164,6 +168,8 @@ class RecordingListener {
   final Query<Map<String, Object?>> query;
   final List<QuerySnapshot<Map<String, Object?>>> events =
       <QuerySnapshot<Map<String, Object?>>>[];
+  /// When each of the [events] arrived, on the [chaosClock].
+  final List<int> times = <int>[];
   final List<Object> errors = <Object>[];
   final List<String> violations = <String>[];
   late final StreamSubscription<QuerySnapshot<Map<String, Object?>>>
@@ -180,6 +186,7 @@ class RecordingListener {
   void _onSnapshot(QuerySnapshot<Map<String, Object?>> snapshot) {
     final int index = events.length;
     events.add(snapshot);
+    times.add(chaosClock.elapsedMilliseconds);
     final List<String> ids = idsOf(snapshot);
     if (ids.toSet().length != ids.length) {
       violations.add('event $index has duplicate documents: $ids');
@@ -226,6 +233,43 @@ class RecordingListener {
     buffer
       ..writeln('errors: $errors')
       ..writeln('violations: $violations');
+    return buffer.toString();
+  }
+
+  /// The history of the documents [ids] in the snapshots of this listener: one line for every snapshot in which
+  /// the state of one of them changed (absent, or its fields and whether it has pending writes), with the time and
+  /// the metadata of the snapshot. For the output of a failed test.
+  String history(Iterable<String> ids) {
+    final StringBuffer buffer = StringBuffer();
+    final Map<String, String> previous = <String, String>{};
+    for (int i = 0; i < events.length; i++) {
+      final QuerySnapshot<Map<String, Object?>> event = events[i];
+      final Map<String, String> now = <String, String>{
+        for (final QueryDocumentSnapshot<Map<String, Object?>> doc
+            in event.docs)
+          doc.id: '${doc.data}${doc.metadata.hasPendingWrites ? ' pending' : ''}'
+              '${doc.metadata.isFromCache ? '' : ' synced'}',
+      };
+      final List<String> changes = <String>[
+        for (final String id in ids)
+          if ((now[id] ?? 'absent') != (previous[id] ?? 'absent'))
+            '$id ${now[id] ?? 'absent'}',
+      ];
+      if (changes.isNotEmpty) {
+        buffer.writeln('${times[i].toString().padLeft(6)} event $i '
+            'fromCache=${event.metadata.isFromCache} '
+            'pending=${event.metadata.hasPendingWrites}: '
+            '${changes.join('; ')}');
+      }
+      for (final String id in ids) {
+        final String? state = now[id];
+        if (state == null) {
+          previous.remove(id);
+        } else {
+          previous[id] = state;
+        }
+      }
+    }
     return buffer.toString();
   }
 

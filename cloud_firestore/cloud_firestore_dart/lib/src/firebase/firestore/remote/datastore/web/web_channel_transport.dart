@@ -302,22 +302,28 @@ class WebChannelTransport implements FirestoreTransport {
         waiting.add(request);
         sendNext();
       },
-      // The client is done with the stream (the half-close of gRPC): deliver
-      // what was queued and end the session, which also ends the responses.
+      // The client is done with the stream (the half-close of gRPC): the
+      // session ends now, as the WebChannel of the JS SDK does when the
+      // stream is closed (it cancels its requests and terminates the session).
+      //
+      // What the session did not deliver yet must not be delivered later.
+      // The caller keeps every write that was not acknowledged and sends it
+      // again on its next stream, followed by newer writes; a session that
+      // went on flushing (and sending a failed request again) delivered the
+      // old copies after those, up to the request timeout later, and the
+      // backend applied them last: an older write of the client replaced a
+      // newer one. A request that is in flight is left to finish, without
+      // being sent again (see WebChannelStream.close).
       //
       // A gRPC call is not cancelled at this point, because resetting an HTTP/2
       // stream that the backend is finishing can break the whole connection
       // (see CallReleaser). There is no such hazard here: the session is a set
       // of independent HTTP requests, ending it is a request of its own, and
       // aborting the back channel request only concerns that one request,
-      // whose connection handling belongs to the browser. Waiting for the
-      // grace period of CallReleaser would only keep the back channel request
-      // open, and a browser allows few connections per host over HTTP/1.1.
+      // whose connection handling belongs to the browser.
       onDone: () {
-        // What was not sent stays with the caller (the writes are still in
-        // its queue and go out on its next stream).
         waiting.clear();
-        channel.closeWhenFlushed();
+        unawaited(channel.close());
       },
     );
   }

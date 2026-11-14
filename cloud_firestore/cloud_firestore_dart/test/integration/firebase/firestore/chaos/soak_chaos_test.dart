@@ -7,7 +7,11 @@
 //   CHAOS_SOAK_CLIENTS  the number of clients (default 3)
 //
 // On failure the seed and the log of the operations are printed. The seed fixes the sequence of operations of each
-// client, not their exact timing.
+// client, not their exact timing. So the failure output also holds what is needed to explain a failure without
+// running it again, all on one clock: for the documents a client got wrong, their history in the snapshots of
+// every client (fromCache, hasPendingWrites, fields), and what every client sent and received (WireRecorder): its
+// write batches in order with the commit and update times of their acknowledgements, what watch delivered, and
+// every start and end of a stream.
 
 import 'dart:async';
 import 'dart:io';
@@ -18,6 +22,7 @@ import 'package:test/test.dart';
 
 import '../../../../util/chaos_proxy.dart';
 import '../../../../util/integration_test_util.dart';
+import '../../../../util/wire_recorder.dart';
 import 'chaos_util.dart';
 
 int _env(String name, int fallback) =>
@@ -35,15 +40,20 @@ void main() {
       () async {
     final ChaosEnv env = await ChaosEnv.start();
     final List<String> log = <String>[];
-    final Stopwatch clock = Stopwatch()..start();
-    void record(String message) =>
-        log.add('${clock.elapsedMilliseconds.toString().padLeft(6)} $message');
+    void record(String message) => log.add(
+        '${chaosClock.elapsedMilliseconds.toString().padLeft(6)} $message');
+    final WireRecorder wire = WireRecorder(chaosClock)..install();
+    final List<_SoakClient> clients = <_SoakClient>[];
+    // What the failure output needs: the state of the backend and the new listeners, once they exist.
+    Map<String, Map<String, Object?>>? backend;
+    final Map<int, RecordingListener> freshListeners =
+        <int, RecordingListener>{};
 
     try {
       final String name = uniqueName('soak');
-      final List<_SoakClient> clients = <_SoakClient>[];
       for (int i = 0; i < clientCount; i++) {
         final ChaosProxy proxy = await env.newProxy();
+        wire.names[proxy.port] = 'c$i';
         final Firestore db = await env.newClient(proxy: proxy);
         clients.add(_SoakClient(
             i, db, proxy, db.collection(name), Random(seed * 31 + i), record));
@@ -77,6 +87,7 @@ void main() {
 
       final Map<String, Map<String, Object?>> server =
           await env.serverDocs(name);
+      backend = server;
       final List<String> ids = server.keys.toList()..sort();
       record('--- backend: $server');
       for (final _SoakClient client in clients) {
@@ -84,6 +95,7 @@ void main() {
         await client.main.settlesOn(ids, server);
         // A new listener.
         final RecordingListener fresh = RecordingListener(client.collection);
+        freshListeners[client.id] = fresh;
         await fresh.settlesOn(ids, server);
         await fresh.cancel();
         // The cache alone, which the listeners kept up to date.
@@ -103,12 +115,69 @@ void main() {
       // ignore: avoid_print
       print('SOAK FAILED: rerun with CHAOS_SOAK_SEED=$seed '
           'CHAOS_SOAK_CLIENTS=$clientCount CHAOS_SOAK_SECONDS=$seconds\n'
-          '${log.join('\n')}');
+          '${log.join('\n')}\n'
+          '${_diagnostics(clients, freshListeners, backend, wire)}');
       rethrow;
     } finally {
+      wire.uninstall();
       await env.close();
     }
   }, skip: chaosSkipReason, timeout: Timeout(Duration(seconds: seconds + 120)));
+}
+
+/// The failure output beyond the log of the operations, see the top of this file.
+String _diagnostics(
+    List<_SoakClient> clients,
+    Map<int, RecordingListener> freshListeners,
+    Map<String, Map<String, Object?>>? backend,
+    WireRecorder wire) {
+  // The documents that the last snapshot of a listener has wrong; all of them when that is not what failed.
+  final Set<String> wrong = <String>{};
+  if (backend != null) {
+    for (final _SoakClient client in clients) {
+      for (final RecordingListener listener in <RecordingListener?>[
+        client.main,
+        freshListeners[client.id],
+      ].whereType<RecordingListener>()) {
+        if (listener.events.isEmpty) {
+          continue;
+        }
+        final Map<String, Map<String, Object?>> shown =
+            docsById(listener.last);
+        for (final String id in <String>{...shown.keys, ...backend.keys}) {
+          if ('${shown[id]}' != '${backend[id]}') {
+            wrong.add(id);
+          }
+        }
+      }
+    }
+  }
+  final List<String> ids = wrong.isEmpty
+      ? <String>[for (int i = 0; i < _SoakClient.documents; i++) 'k$i']
+      : (wrong.toList()..sort());
+  final StringBuffer buffer = StringBuffer()
+    ..writeln('--- diagnostics for $ids '
+        '(${wrong.isEmpty ? 'no listener ends on a wrong document' : 'wrong in the last snapshot of a listener'})')
+    ..writeln('backend: ${backend == null ? 'not read yet' : <String, Object?>{
+            for (final String id in ids) id: backend[id]
+          }}');
+  for (final _SoakClient client in clients) {
+    buffer
+      ..writeln('--- c${client.id}: history in the listener that lived through the run')
+      ..write(client.main.history(ids));
+    final RecordingListener? fresh = freshListeners[client.id];
+    if (fresh != null) {
+      buffer
+        ..writeln('--- c${client.id}: history in the new listener')
+        ..write(fresh.history(ids));
+    }
+  }
+  buffer
+    ..writeln('--- wire: these documents, and every start and end of a stream')
+    ..writeln(wire.about(ids.toSet()).join('\n'))
+    ..writeln('--- wire: everything')
+    ..writeln(wire.log.join('\n'));
+  return buffer.toString();
 }
 
 class _SoakClient {
@@ -142,8 +211,11 @@ class _SoakClient {
 
   void record(String message) => _record('c$id $message');
 
+  /// The clients write the documents k0 to k7.
+  static const int documents = 8;
+
   DocumentReference<Map<String, Object?>> _doc() =>
-      collection.doc('k${random.nextInt(8)}');
+      collection.doc('k${random.nextInt(documents)}');
 
   void _track(String what, Future<void> future) {
     final int op = _ops++;

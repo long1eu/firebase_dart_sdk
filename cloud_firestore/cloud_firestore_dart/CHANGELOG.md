@@ -1,5 +1,11 @@
 ## Unreleased
 
+- Web transport: writes that were in flight when the write stream was closed by the client (`disableNetwork()`, a
+  credential change, an idle stream) could reach the backend later, after the same writes and newer ones had been
+  sent on the next stream, and replace the newer values: the WebChannel session of the closed stream went on
+  delivering what it had queued, sending a failed request again for up to its timeout. The session now ends when
+  the stream is closed, as in the JS SDK: what was not sent is dropped (the client keeps unacknowledged writes and
+  sends them again anyway), and a request in flight is not sent again.
 - A listener could lose a document for good after an existence filter mismatch. The client then resets the target
   and listens to it again, and its documents go through limbo resolution. When a resolution confirmed a document
   before the backend had sent the target again, the view concluded that the backend does not return the document

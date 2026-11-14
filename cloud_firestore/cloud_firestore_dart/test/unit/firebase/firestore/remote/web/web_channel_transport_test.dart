@@ -3,6 +3,7 @@
 
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:cloud_firestore_dart/src/firebase/firestore/auth/empty_credentials_provider.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/database_info.dart';
@@ -401,19 +402,15 @@ void main() {
       await requests.close();
     });
 
-    test(
-        'closing the requests sends what is queued, then ends the session '
-        'and the call', () async {
-      // The client closes a stream by closing its requests (a half-close for
-      // gRPC). WebChannel has no half-close: the session is terminated once
-      // the last request was delivered.
+    /// Opens a Write stream and answers its handshake. Returns the requests
+    /// of the client and the back channel request.
+    Future<(StreamController<proto.WriteRequest>, FakeRequest)> openWrites(
+        void Function() onDone, List<Object> errors) async {
       final StreamController<proto.WriteRequest> requests =
           StreamController<proto.WriteRequest>();
-      bool done = false;
-      final List<Object> errors = <Object>[];
       transport
           .startCall(FirestoreRpc.write, requests.stream)
-          .listen((_) {}, onError: errors.add, onDone: () => done = true);
+          .listen((_) {}, onError: errors.add, onDone: onDone);
 
       requests.add(proto.WriteRequest()..database = database);
       (await http.next()).respond(200,
@@ -423,14 +420,43 @@ void main() {
       // The answer to the handshake: the next request is only sent after it.
       back.add('49\n[[1,[{"streamId":"15395","streamToken":"MA=="}]]]');
       await pump();
+      return (requests, back);
+    }
+
+    proto.WriteRequest setDoc(String id, int value) => proto.WriteRequest()
+      ..streamToken = <int>[0x30]
+      ..writes.add(proto.Write()
+        ..update = (proto.Document()
+          ..name = '$database/documents/rooms/$id'
+          ..fields['v'] = (proto.Value()..integerValue = Int64(value))));
+
+    /// The POSTs with messages (not the terminate request, not the back
+    /// channel) among the requests from [start] on.
+    List<FakeRequest> forwardRequests(int start) => <FakeRequest>[
+          for (final FakeRequest request in http.requests.skip(start))
+            if (request.method == 'POST') request,
+        ];
+
+    test(
+        'closing the requests ends the session and the call, with the '
+        'request in flight left to finish', () async {
+      // The client closes a stream by closing its requests (a half-close for
+      // gRPC). WebChannel has no half-close: the session is terminated.
+      bool done = false;
+      final List<Object> errors = <Object>[];
+      final (StreamController<proto.WriteRequest> requests, FakeRequest back) =
+          await openWrites(() => done = true, errors);
 
       // The final (empty) write of a write stream, then the close.
       requests.add(proto.WriteRequest()..streamToken = <int>[0x30]);
-      unawaited(requests.close());
       final FakeRequest lastWrite = await http.next();
       expect(jsonDecode(lastWrite.form['req0___data__']!),
           <String, Object?>{'streamToken': 'MA=='});
-      expect(done, isFalse);
+      unawaited(requests.close());
+      await pump();
+      // The call is over for the client at once.
+      expect(done, isTrue);
+      expect(lastWrite.aborted, isFalse);
       lastWrite.respond(200, body: '7\n[1,2,7]');
 
       final FakeRequest terminate = await http.next();
@@ -438,6 +464,72 @@ void main() {
       terminate.respond(200);
       await pump();
       expect(back.aborted, isTrue);
+      expect(errors, isEmpty);
+    });
+
+    test(
+        'writes of a stream the client closed are not delivered afterwards: '
+        'a failed request is not sent again', () async {
+      // Found by the chaos soak test: disableNetwork() closed the write
+      // stream while the request with its writes was failing (a cut); the
+      // session went on sending the request again until it got through, a
+      // second later, after the client had sent the same writes and newer
+      // ones on its next stream. The backend applied the old writes last.
+      bool done = false;
+      final List<Object> errors = <Object>[];
+      final (StreamController<proto.WriteRequest> requests, FakeRequest _) =
+          await openWrites(() => done = true, errors);
+
+      requests.add(setDoc('a', 1));
+      final FakeRequest write = await http.next();
+      expect(write.form['req0___data__'], contains('rooms/a'));
+      final int sent = http.requests.length;
+
+      // The client closes the stream (disableNetwork), then the connection
+      // of the request in flight is cut.
+      unawaited(requests.close());
+      await pump();
+      write.fail(const SocketException('connection cut'));
+
+      final FakeRequest terminate = await http.next();
+      expect(terminate.query['TYPE'], 'terminate');
+      terminate.respond(200);
+      // Longer than the delays before a request is sent again (100 ms, 1 s).
+      await Future<void>.delayed(const Duration(milliseconds: 1400));
+      expect(forwardRequests(sent), isEmpty,
+          reason: 'the write was sent again after the client closed the '
+              'stream');
+      expect(done, isTrue);
+      expect(errors, isEmpty);
+    });
+
+    test(
+        'writes of a stream the client closed are not delivered afterwards: '
+        'what waited for the request in flight is dropped', () async {
+      bool done = false;
+      final List<Object> errors = <Object>[];
+      final (StreamController<proto.WriteRequest> requests, FakeRequest _) =
+          await openWrites(() => done = true, errors);
+
+      requests.add(setDoc('a', 1));
+      final FakeRequest first = await http.next();
+      // Sent ahead: it waits for the request in flight.
+      requests.add(setDoc('b', 2));
+      await pump();
+      final int sent = http.requests.length;
+
+      unawaited(requests.close());
+      await pump();
+      // The request in flight is answered: before, the write that waited
+      // went out now.
+      first.respond(200, body: '7\n[1,2,7]');
+
+      final FakeRequest terminate = await http.next();
+      expect(terminate.query['TYPE'], 'terminate');
+      terminate.respond(200);
+      await pump();
+      expect(forwardRequests(sent), isEmpty,
+          reason: 'a write went out after the client closed the stream');
       expect(done, isTrue);
       expect(errors, isEmpty);
     });
