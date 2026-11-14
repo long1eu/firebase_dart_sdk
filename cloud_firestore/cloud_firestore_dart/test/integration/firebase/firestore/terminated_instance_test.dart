@@ -46,7 +46,12 @@ enum After {
 /// Everything the entries need, created while the instance is running.
 class Fixture {
   Fixture(
-      this.firestore, this.collection, this.doc, this.docJson, this.queryJson);
+    this.firestore,
+    this.collection,
+    this.doc,
+    this.docJson,
+    this.queryJson,
+  );
 
   final Firestore firestore;
   final CollectionReference<Map<String, Object?>> collection;
@@ -72,191 +77,297 @@ const Map<String, Object?> _data = <String, Object?>{'a': 1};
 
 /// A bundle with only its metadata element.
 List<int> _emptyBundle() {
-  const String metadata = '{"metadata":{"id":"terminated-test",'
+  const String metadata =
+      '{"metadata":{"id":"terminated-test",'
       '"createTime":{"seconds":1,"nanos":0},"version":1,'
       '"totalDocuments":0,"totalBytes":0}}';
   return utf8.encode('${utf8.encode(metadata).length}$metadata');
 }
 
-const String _indexConfiguration = '{"indexes":[{"collectionGroup":"terminated",'
+const String _indexConfiguration =
+    '{"indexes":[{"collectionGroup":"terminated",'
     '"fields":[{"fieldPath":"a","order":"ASCENDING"}]}]}';
 
 final List<Entry> entries = <Entry>[
   // Documents.
-  Entry('DocumentReference.get', <String>{'DocumentReference.get'},
-      After.futureFails, (Fixture f) => f.doc.get()),
-  Entry('DocumentReference.get(Source.cache)', <String>{}, After.futureFails,
-      (Fixture f) => f.doc.get(Source.cache)),
-  Entry('DocumentReference.get(Source.server)', <String>{}, After.futureFails,
-      (Fixture f) => f.doc.get(Source.server)),
-  Entry('DocumentReference.set', <String>{'DocumentReference.set'},
-      After.futureFails, (Fixture f) => f.doc.set(_data)),
-  Entry('DocumentReference.update', <String>{'DocumentReference.update'},
-      After.futureFails, (Fixture f) => f.doc.update(_data)),
   Entry(
-      'DocumentReference.updateFromList',
-      <String>{'DocumentReference.updateFromList'},
-      After.futureFails,
-      (Fixture f) => f.doc.updateFromList(<Object?>['a', 2])),
-  Entry('DocumentReference.delete', <String>{'DocumentReference.delete'},
-      After.futureFails, (Fixture f) => f.collection.doc('gone').delete()),
-  Entry('CollectionReference.add', <String>{'CollectionReference.add'},
-      After.futureFails, (Fixture f) => f.collection.add(_data)),
+    'DocumentReference.get',
+    <String>{'DocumentReference.get'},
+    After.futureFails,
+    (Fixture f) => f.doc.get(),
+  ),
+  Entry(
+    'DocumentReference.get(Source.cache)',
+    <String>{},
+    After.futureFails,
+    (Fixture f) => f.doc.get(Source.cache),
+  ),
+  Entry(
+    'DocumentReference.get(Source.server)',
+    <String>{},
+    After.futureFails,
+    (Fixture f) => f.doc.get(Source.server),
+  ),
+  Entry(
+    'DocumentReference.set',
+    <String>{'DocumentReference.set'},
+    After.futureFails,
+    (Fixture f) => f.doc.set(_data),
+  ),
+  Entry(
+    'DocumentReference.update',
+    <String>{'DocumentReference.update'},
+    After.futureFails,
+    (Fixture f) => f.doc.update(_data),
+  ),
+  Entry(
+    'DocumentReference.updateFromList',
+    <String>{'DocumentReference.updateFromList'},
+    After.futureFails,
+    (Fixture f) => f.doc.updateFromList(<Object?>['a', 2]),
+  ),
+  Entry(
+    'DocumentReference.delete',
+    <String>{'DocumentReference.delete'},
+    After.futureFails,
+    (Fixture f) => f.collection.doc('gone').delete(),
+  ),
+  Entry(
+    'CollectionReference.add',
+    <String>{'CollectionReference.add'},
+    After.futureFails,
+    (Fixture f) => f.collection.add(_data),
+  ),
 
   // Document listeners.
-  Entry('DocumentReference.snapshots', <String>{'DocumentReference.snapshots'},
-      After.streamFails, (Fixture f) => f.doc.snapshots),
   Entry(
-      'DocumentReference.getSnapshots',
-      <String>{'DocumentReference.getSnapshots'},
-      After.streamFails,
-      (Fixture f) => f.doc.getSnapshots(MetadataChanges.include)),
+    'DocumentReference.snapshots',
+    <String>{'DocumentReference.snapshots'},
+    After.streamFails,
+    (Fixture f) => f.doc.snapshots,
+  ),
   Entry(
-      'DocumentReference.getSnapshotsWithOptions',
-      <String>{'DocumentReference.getSnapshotsWithOptions'},
-      After.streamFails,
-      (Fixture f) => f.doc.getSnapshotsWithOptions(
-          const SnapshotListenOptions(source: ListenSource.cache))),
+    'DocumentReference.getSnapshots',
+    <String>{'DocumentReference.getSnapshots'},
+    After.streamFails,
+    (Fixture f) => f.doc.getSnapshots(MetadataChanges.include),
+  ),
+  Entry(
+    'DocumentReference.getSnapshotsWithOptions',
+    <String>{'DocumentReference.getSnapshotsWithOptions'},
+    After.streamFails,
+    (Fixture f) => f.doc.getSnapshotsWithOptions(
+      const SnapshotListenOptions(source: ListenSource.cache),
+    ),
+  ),
 
   // Queries.
-  Entry('Query.get', <String>{'Query.get'}, After.futureFails,
-      (Fixture f) => f.collection.where('a', isEqualTo: 1).get()),
-  Entry('Query.get(Source.cache)', <String>{}, After.futureFails,
-      (Fixture f) => f.collection.get(Source.cache)),
-  Entry('Query.get(Source.server)', <String>{}, After.futureFails,
-      (Fixture f) => f.collection.get(Source.server)),
-  Entry('Query.snapshots', <String>{'Query.snapshots'}, After.streamFails,
-      (Fixture f) => f.collection.snapshots),
-  Entry('Query.getSnapshots', <String>{'Query.getSnapshots'}, After.streamFails,
-      (Fixture f) => f.collection.limit(1).getSnapshots()),
   Entry(
-      'Query.getSnapshotsWithOptions',
-      <String>{'Query.getSnapshotsWithOptions'},
-      After.streamFails,
-      (Fixture f) =>
-          f.collection.getSnapshotsWithOptions(const SnapshotListenOptions())),
-  Entry('AggregateQuery.get', <String>{'AggregateQuery.get'}, After.futureFails,
-      (Fixture f) => f.collection.count().get()),
+    'Query.get',
+    <String>{'Query.get'},
+    After.futureFails,
+    (Fixture f) => f.collection.where('a', isEqualTo: 1).get(),
+  ),
   Entry(
-      'VectorQuery.get',
-      <String>{'VectorQuery.get'},
-      After.futureFails,
-      (Fixture f) => f.collection
-          .findNearest('embedding', FieldValue.vector(<double>[1, 2]), 1,
-              DistanceMeasure.euclidean)
-          .get()),
+    'Query.get(Source.cache)',
+    <String>{},
+    After.futureFails,
+    (Fixture f) => f.collection.get(Source.cache),
+  ),
+  Entry(
+    'Query.get(Source.server)',
+    <String>{},
+    After.futureFails,
+    (Fixture f) => f.collection.get(Source.server),
+  ),
+  Entry(
+    'Query.snapshots',
+    <String>{'Query.snapshots'},
+    After.streamFails,
+    (Fixture f) => f.collection.snapshots,
+  ),
+  Entry(
+    'Query.getSnapshots',
+    <String>{'Query.getSnapshots'},
+    After.streamFails,
+    (Fixture f) => f.collection.limit(1).getSnapshots(),
+  ),
+  Entry(
+    'Query.getSnapshotsWithOptions',
+    <String>{'Query.getSnapshotsWithOptions'},
+    After.streamFails,
+    (Fixture f) =>
+        f.collection.getSnapshotsWithOptions(const SnapshotListenOptions()),
+  ),
+  Entry(
+    'AggregateQuery.get',
+    <String>{'AggregateQuery.get'},
+    After.futureFails,
+    (Fixture f) => f.collection.count().get(),
+  ),
+  Entry(
+    'VectorQuery.get',
+    <String>{'VectorQuery.get'},
+    After.futureFails,
+    (Fixture f) => f.collection
+        .findNearest(
+          'embedding',
+          FieldValue.vector(<double>[1, 2]),
+          1,
+          DistanceMeasure.euclidean,
+        )
+        .get(),
+  ),
   // On the standard edition emulator a pipeline is rejected by the server
   // while the instance runs; that is still not the terminated error.
   Entry(
-      'Pipeline.execute',
-      <String>{'Pipeline.execute'},
-      After.futureFails,
-      (Fixture f) =>
-          f.firestore.pipeline().collection(f.collection.path).execute()),
+    'Pipeline.execute',
+    <String>{'Pipeline.execute'},
+    After.futureFails,
+    (Fixture f) =>
+        f.firestore.pipeline().collection(f.collection.path).execute(),
+  ),
 
   // Batches and transactions.
-  Entry('WriteBatch.commit', <String>{'WriteBatch.commit'}, After.futureFails,
-      (Fixture f) => (f.firestore.batch()..set(f.doc, _data)).commit()),
+  Entry(
+    'WriteBatch.commit',
+    <String>{'WriteBatch.commit'},
+    After.futureFails,
+    (Fixture f) => (f.firestore.batch()..set(f.doc, _data)).commit(),
+  ),
   // As upstream (JS and Android): a batch without writes never reaches the
   // client, so committing it completes.
-  Entry('WriteBatch.commit (empty)', <String>{}, After.completes,
-      (Fixture f) => f.firestore.batch().commit()),
   Entry(
-      'Firestore.runBatch',
-      <String>{'Firestore.runBatch'},
-      After.futureFails,
-      (Fixture f) => f.firestore
-          .runBatch((WriteBatch batch) async => batch.set(f.doc, _data))),
+    'WriteBatch.commit (empty)',
+    <String>{},
+    After.completes,
+    (Fixture f) => f.firestore.batch().commit(),
+  ),
   Entry(
-      'Firestore.runTransaction',
-      <String>{'Firestore.runTransaction', 'Transaction.get'},
-      After.futureFails,
-      (Fixture f) =>
-          f.firestore.runTransaction<void>((Transaction transaction) async {
-            await transaction.get(f.doc);
-            transaction.set(f.doc, _data);
-          })),
+    'Firestore.runBatch',
+    <String>{'Firestore.runBatch'},
+    After.futureFails,
+    (Fixture f) => f.firestore.runBatch(
+      (WriteBatch batch) async => batch.set(f.doc, _data),
+    ),
+  ),
   Entry(
-      'Firestore.runTransaction (read-only)',
-      <String>{'Transaction.getQuery', 'Transaction.getAggregate'},
-      After.futureFails,
-      (Fixture f) =>
-          f.firestore.runTransaction<void>((Transaction transaction) async {
-            await transaction.get(f.doc);
-            await transaction.getQuery(f.doc.parent);
-            await transaction.getAggregate(f.doc.parent.count());
-          }, options: TransactionOptions(readOnly: true))),
+    'Firestore.runTransaction',
+    <String>{'Firestore.runTransaction', 'Transaction.get'},
+    After.futureFails,
+    (Fixture f) =>
+        f.firestore.runTransaction<void>((Transaction transaction) async {
+          await transaction.get(f.doc);
+          transaction.set(f.doc, _data);
+        }),
+  ),
+  Entry(
+    'Firestore.runTransaction (read-only)',
+    <String>{'Transaction.getQuery', 'Transaction.getAggregate'},
+    After.futureFails,
+    (Fixture f) =>
+        f.firestore.runTransaction<void>((Transaction transaction) async {
+          await transaction.get(f.doc);
+          await transaction.getQuery(f.doc.parent);
+          await transaction.getAggregate(f.doc.parent.count());
+        }, options: TransactionOptions(readOnly: true)),
+  ),
 
   // Bundles and snapshot JSON.
   Entry(
+    'Firestore.loadBundle',
+    <String>{
       'Firestore.loadBundle',
-      <String>{
-        'Firestore.loadBundle',
-        'LoadBundleTask.future',
-        'LoadBundleTask.stream'
-      },
-      After.taskFails,
-      (Fixture f) => f.firestore.loadBundle(_emptyBundle())),
+      'LoadBundleTask.future',
+      'LoadBundleTask.stream',
+    },
+    After.taskFails,
+    (Fixture f) => f.firestore.loadBundle(_emptyBundle()),
+  ),
   Entry(
-      'Firestore.loadBundleStream',
-      <String>{'Firestore.loadBundleStream'},
-      After.taskFails,
-      (Fixture f) => f.firestore.loadBundleStream(
-          Stream<List<int>>.fromIterable(<List<int>>[_emptyBundle()]))),
-  Entry('Firestore.getNamedQuery', <String>{'Firestore.getNamedQuery'},
-      After.futureFails, (Fixture f) => f.firestore.getNamedQuery('missing')),
+    'Firestore.loadBundleStream',
+    <String>{'Firestore.loadBundleStream'},
+    After.taskFails,
+    (Fixture f) => f.firestore.loadBundleStream(
+      Stream<List<int>>.fromIterable(<List<int>>[_emptyBundle()]),
+    ),
+  ),
   Entry(
-      'Firestore.documentSnapshotsFromJson',
-      <String>{'Firestore.documentSnapshotsFromJson'},
-      After.streamFails,
-      (Fixture f) => f.firestore
-          .documentSnapshotsFromJson<Map<String, Object?>>(f.docJson)),
+    'Firestore.getNamedQuery',
+    <String>{'Firestore.getNamedQuery'},
+    After.futureFails,
+    (Fixture f) => f.firestore.getNamedQuery('missing'),
+  ),
   Entry(
-      'Firestore.querySnapshotsFromJson',
-      <String>{'Firestore.querySnapshotsFromJson'},
-      After.streamFails,
-      (Fixture f) => f.firestore
-          .querySnapshotsFromJson<Map<String, Object?>>(f.queryJson)),
+    'Firestore.documentSnapshotsFromJson',
+    <String>{'Firestore.documentSnapshotsFromJson'},
+    After.streamFails,
+    (Fixture f) =>
+        f.firestore.documentSnapshotsFromJson<Map<String, Object?>>(f.docJson),
+  ),
+  Entry(
+    'Firestore.querySnapshotsFromJson',
+    <String>{'Firestore.querySnapshotsFromJson'},
+    After.streamFails,
+    (Fixture f) =>
+        f.firestore.querySnapshotsFromJson<Map<String, Object?>>(f.queryJson),
+  ),
 
   // Instance.
   Entry(
-      'Firestore.waitForPendingWrites',
-      <String>{'Firestore.waitForPendingWrites'},
-      After.futureFails,
-      (Fixture f) => f.firestore.waitForPendingWrites()),
-  Entry('Firestore.snapshotsInSync', <String>{'Firestore.snapshotsInSync'},
-      After.streamFails, (Fixture f) => f.firestore.snapshotsInSync),
-  Entry('Firestore.disableNetwork', <String>{'Firestore.disableNetwork'},
-      After.futureFails, (Fixture f) => f.firestore.disableNetwork()),
-  Entry('Firestore.enableNetwork', <String>{'Firestore.enableNetwork'},
-      After.futureFails, (Fixture f) => f.firestore.enableNetwork()),
+    'Firestore.waitForPendingWrites',
+    <String>{'Firestore.waitForPendingWrites'},
+    After.futureFails,
+    (Fixture f) => f.firestore.waitForPendingWrites(),
+  ),
+  Entry(
+    'Firestore.snapshotsInSync',
+    <String>{'Firestore.snapshotsInSync'},
+    After.streamFails,
+    (Fixture f) => f.firestore.snapshotsInSync,
+  ),
+  Entry(
+    'Firestore.disableNetwork',
+    <String>{'Firestore.disableNetwork'},
+    After.futureFails,
+    (Fixture f) => f.firestore.disableNetwork(),
+  ),
+  Entry(
+    'Firestore.enableNetwork',
+    <String>{'Firestore.enableNetwork'},
+    After.futureFails,
+    (Fixture f) => f.firestore.enableNetwork(),
+  ),
 
   // Persistent cache indexes. The getter of the manager keeps working after
   // terminate (see the test below); its methods fail.
   Entry(
-      'Firestore.setIndexConfiguration',
-      <String>{'Firestore.setIndexConfiguration'},
-      After.futureFails,
-      // ignore: deprecated_member_use_from_same_package
-      (Fixture f) => f.firestore.setIndexConfiguration(_indexConfiguration)),
+    'Firestore.setIndexConfiguration',
+    <String>{'Firestore.setIndexConfiguration'},
+    After.futureFails,
+    // ignore: deprecated_member_use_from_same_package
+    (Fixture f) => f.firestore.setIndexConfiguration(_indexConfiguration),
+  ),
   Entry(
-      'PersistentCacheIndexManager.enableIndexAutoCreation',
-      <String>{'PersistentCacheIndexManager.enableIndexAutoCreation'},
-      After.futureFails,
-      (Fixture f) =>
-          f.firestore.persistentCacheIndexManager!.enableIndexAutoCreation()),
+    'PersistentCacheIndexManager.enableIndexAutoCreation',
+    <String>{'PersistentCacheIndexManager.enableIndexAutoCreation'},
+    After.futureFails,
+    (Fixture f) =>
+        f.firestore.persistentCacheIndexManager!.enableIndexAutoCreation(),
+  ),
   Entry(
-      'PersistentCacheIndexManager.disableIndexAutoCreation',
-      <String>{'PersistentCacheIndexManager.disableIndexAutoCreation'},
-      After.futureFails,
-      (Fixture f) =>
-          f.firestore.persistentCacheIndexManager!.disableIndexAutoCreation()),
+    'PersistentCacheIndexManager.disableIndexAutoCreation',
+    <String>{'PersistentCacheIndexManager.disableIndexAutoCreation'},
+    After.futureFails,
+    (Fixture f) =>
+        f.firestore.persistentCacheIndexManager!.disableIndexAutoCreation(),
+  ),
   Entry(
-      'PersistentCacheIndexManager.deleteAllIndexes',
-      <String>{'PersistentCacheIndexManager.deleteAllIndexes'},
-      After.futureFails,
-      (Fixture f) =>
-          f.firestore.persistentCacheIndexManager!.deleteAllIndexes()),
+    'PersistentCacheIndexManager.deleteAllIndexes',
+    <String>{'PersistentCacheIndexManager.deleteAllIndexes'},
+    After.futureFails,
+    (Fixture f) => f.firestore.persistentCacheIndexManager!.deleteAllIndexes(),
+  ),
 ];
 
 /// Public members that return a Future, Stream or LoadBundleTask and are not
@@ -278,42 +389,57 @@ const Map<String, String> exempt = <String, String>{
 /// a LoadBundleTask.
 Set<String> publicIoMembers() {
   final Set<String> result = <String>{};
-  for (final Symbol library in <Symbol>[
-    #cloud_firestore_dart,
-    #cloud_firestore_dart.pipelines
+  // The libraries have no names (`library;`), so they are found by their URI.
+  for (final String library in <String>[
+    'cloud_firestore_dart.dart',
+    'pipelines.dart',
   ]) {
-    final LibraryMirror barrel = currentMirrorSystem().findLibrary(library);
+    final LibraryMirror barrel = currentMirrorSystem()
+        .libraries[Uri.parse('package:cloud_firestore_dart/$library')]!;
     for (final LibraryDependencyMirror dep in barrel.libraryDependencies) {
       if (!dep.isExport) {
         continue;
       }
-      final Iterable<CombinatorMirror> shows =
-          dep.combinators.where((CombinatorMirror c) => c.isShow);
+      final Iterable<CombinatorMirror> shows = dep.combinators.where(
+        (CombinatorMirror c) => c.isShow,
+      );
       for (final ClassMirror cls
           in dep.targetLibrary!.declarations.values.whereType<ClassMirror>()) {
-        final bool shown = shows.isEmpty ||
+        final bool shown =
+            shows.isEmpty ||
             shows.any(
-                (CombinatorMirror c) => c.identifiers.contains(cls.simpleName));
-        final bool hidden = dep.combinators.any((CombinatorMirror c) =>
-            c.isHide && c.identifiers.contains(cls.simpleName));
+              (CombinatorMirror c) => c.identifiers.contains(cls.simpleName),
+            );
+        final bool hidden = dep.combinators.any(
+          (CombinatorMirror c) =>
+              c.isHide && c.identifiers.contains(cls.simpleName),
+        );
         if (!shown || hidden || cls.isPrivate) {
           continue;
         }
         for (final MethodMirror method
             in cls.declarations.values.whereType<MethodMirror>()) {
-          final String returns =
-              MirrorSystem.getName(method.returnType.simpleName);
-          final bool internal = method.metadata.any((InstanceMirror m) =>
-              m.reflectee.runtimeType.toString() == '_Internal');
+          final String returns = MirrorSystem.getName(
+            method.returnType.simpleName,
+          );
+          final bool internal = method.metadata.any(
+            (InstanceMirror m) =>
+                m.reflectee.runtimeType.toString() == '_Internal',
+          );
           if (method.isPrivate ||
               method.isConstructor ||
               internal ||
-              !const <String>{'Future', 'Stream', 'LoadBundleTask'}
-                  .contains(returns)) {
+              !const <String>{
+                'Future',
+                'Stream',
+                'LoadBundleTask',
+              }.contains(returns)) {
             continue;
           }
-          result.add('${MirrorSystem.getName(cls.simpleName)}.'
-              '${MirrorSystem.getName(method.simpleName)}');
+          result.add(
+            '${MirrorSystem.getName(cls.simpleName)}.'
+            '${MirrorSystem.getName(method.simpleName)}',
+          );
         }
       }
     }
@@ -326,8 +452,12 @@ bool isTerminatedError(Object? error) =>
     error.code == FirestoreErrorCode.failedPrecondition &&
     error.message == terminatedMessage;
 
-final Matcher throwsTerminated = throwsA(predicate<Object?>(isTerminatedError,
-    'FirestoreError(failedPrecondition, "$terminatedMessage")'));
+final Matcher throwsTerminated = throwsA(
+  predicate<Object?>(
+    isTerminatedError,
+    'FirestoreError(failedPrecondition, "$terminatedMessage")',
+  ),
+);
 
 /// The outcome of [call]: `null` if it completed (a stream: delivered an
 /// event), otherwise the error. A synchronous throw fails the test.
@@ -345,19 +475,23 @@ Future<Object?> outcome(Entry entry, Fixture fixture) async {
   } else if (result is Stream) {
     final Completer<void> first = Completer<void>();
     late final StreamSubscription<Object?> subscription;
-    subscription = result.listen((Object? _) {
-      if (!first.isCompleted) {
-        first.complete();
-      }
-    }, onError: (Object e, StackTrace s) {
-      if (!first.isCompleted) {
-        first.completeError(e, s);
-      }
-    }, onDone: () {
-      if (!first.isCompleted) {
-        first.completeError(StateError('closed without an event'));
-      }
-    });
+    subscription = result.listen(
+      (Object? _) {
+        if (!first.isCompleted) {
+          first.complete();
+        }
+      },
+      onError: (Object e, StackTrace s) {
+        if (!first.isCompleted) {
+          first.completeError(e, s);
+        }
+      },
+      onDone: () {
+        if (!first.isCompleted) {
+          first.completeError(StateError('closed without an event'));
+        }
+      },
+    );
     future = first.future.whenComplete(subscription.cancel);
   } else {
     future = result as Future<Object?>;
@@ -402,10 +536,16 @@ void main() {
       ...exempt.keys,
     };
     final Set<String> public = publicIoMembers();
-    expect(public.difference(covered), isEmpty,
-        reason: 'Add these members to `entries` (or to `exempt`).');
-    expect(covered.difference(public), isEmpty,
-        reason: 'These are listed but no longer part of the public API.');
+    expect(
+      public.difference(covered),
+      isEmpty,
+      reason: 'Add these members to `entries` (or to `exempt`).',
+    );
+    expect(
+      covered.difference(public),
+      isEmpty,
+      reason: 'These are listed but no longer part of the public API.',
+    );
   });
 
   group('on a running instance', () {
@@ -422,8 +562,10 @@ void main() {
         // Pipelines need an Enterprise edition database, and a vector query
         // an index the emulator may not have: the server answers, which is
         // all this row is about. Everything else has to succeed.
-        if (!const <String>{'Pipeline.execute', 'VectorQuery.get'}
-            .contains(entry.name)) {
+        if (!const <String>{
+          'Pipeline.execute',
+          'VectorQuery.get',
+        }.contains(entry.name)) {
           expect(error, isNull);
         }
       });
@@ -431,9 +573,15 @@ void main() {
 
     test('clearPersistence fails with failedPrecondition', () async {
       await expectLater(
-          fixture.firestore.clearPersistence(),
-          throwsA(isA<FirestoreError>().having((FirestoreError e) => e.code,
-              'code', FirestoreErrorCode.failedPrecondition)));
+        fixture.firestore.clearPersistence(),
+        throwsA(
+          isA<FirestoreError>().having(
+            (FirestoreError e) => e.code,
+            'code',
+            FirestoreErrorCode.failedPrecondition,
+          ),
+        ),
+      );
     });
   });
 
@@ -452,8 +600,11 @@ void main() {
           case After.futureFails:
           case After.streamFails:
           case After.taskFails:
-            expect(isTerminatedError(error), isTrue,
-                reason: 'Expected the terminated error, got: $error');
+            expect(
+              isTerminatedError(error),
+              isTrue,
+              reason: 'Expected the terminated error, got: $error',
+            );
           case After.completes:
             expect(error, isNull);
         }
@@ -463,8 +614,11 @@ void main() {
     test('a stream closes after the error', () async {
       final List<Object> errors = <Object>[];
       final Completer<void> done = Completer<void>();
-      fixture.doc.snapshots.listen((_) {},
-          onError: (Object e) => errors.add(e), onDone: done.complete);
+      fixture.doc.snapshots.listen(
+        (_) {},
+        onError: (Object e) => errors.add(e),
+        onDone: done.complete,
+      );
       await done.future.timeout(const Duration(seconds: 20));
       expect(errors, hasLength(1));
       expect(isTerminatedError(errors.single), isTrue);
@@ -488,31 +642,38 @@ void main() {
       await fixture.firestore.clearPersistence();
     });
 
-    test('persistentCacheIndexManager is still the manager of the instance',
-        () async {
-      final Fixture running = await newFixture();
-      final PersistentCacheIndexManager? manager =
-          running.firestore.persistentCacheIndexManager;
-      expect(manager, isNotNull);
-      await running.firestore.terminate();
-      expect(running.firestore.persistentCacheIndexManager, same(manager));
-      await expectLater(manager!.deleteAllIndexes(), throwsTerminated);
-    });
+    test(
+      'persistentCacheIndexManager is still the manager of the instance',
+      () async {
+        final Fixture running = await newFixture();
+        final PersistentCacheIndexManager? manager =
+            running.firestore.persistentCacheIndexManager;
+        expect(manager, isNotNull);
+        await running.firestore.terminate();
+        expect(running.firestore.persistentCacheIndexManager, same(manager));
+        await expectLater(manager!.deleteAllIndexes(), throwsTerminated);
+      },
+    );
 
-    test('setIndexConfiguration reports termination before a bad definition',
-        () async {
-      await expectLater(
+    test(
+      'setIndexConfiguration reports termination before a bad definition',
+      () async {
+        await expectLater(
           // ignore: deprecated_member_use_from_same_package
           fixture.firestore.setIndexConfiguration('not json'),
-          throwsTerminated);
-    });
+          throwsTerminated,
+        );
+      },
+    );
 
     test('builders that do no I/O keep working', () {
       final Firestore firestore = fixture.firestore;
       expect(firestore.collection('a').doc('b').path, 'a/b');
       expect(firestore.doc('a/b').parent.id, 'a');
-      expect(firestore.collectionGroup('a').where('x', isEqualTo: 1).limit(1),
-          isNotNull);
+      expect(
+        firestore.collectionGroup('a').where('x', isEqualTo: 1).limit(1),
+        isNotNull,
+      );
       expect(firestore.batch()..set(fixture.doc, _data), isNotNull);
       expect(fixture.collection.count(), isNotNull);
       expect(firestore.pipeline().collection('a'), isNotNull);
@@ -520,13 +681,17 @@ void main() {
     });
   });
 
-  test('a transaction that is running when the instance is terminated fails',
-      () async {
-    final Fixture fixture = await newFixture();
-    await expectLater(
+  test(
+    'a transaction that is running when the instance is terminated fails',
+    () async {
+      final Fixture fixture = await newFixture();
+      await expectLater(
         fixture.firestore.runTransaction<void>((Transaction transaction) async {
-      await fixture.firestore.terminate();
-      await transaction.get(fixture.doc);
-    }), throwsA(isA<FirestoreError>()));
-  });
+          await fixture.firestore.terminate();
+          await transaction.get(fixture.doc);
+        }),
+        throwsA(isA<FirestoreError>()),
+      );
+    },
+  );
 }
