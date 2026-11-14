@@ -75,47 +75,26 @@ supported by Firebase.
   snapshots as JSON and listeners resumed from them, and the BSON value types of Enterprise
   edition databases.
 
-**Know the gaps before you switch**: the packages are not on pub.dev; the testing is mostly
-against the emulator; the web support is experimental and was tested in Chrome only; the
-repository runs no tests on Android or iOS devices (Flutter apps can use the package as a plain
-Dart package, see [Platforms](platforms.md)); two clients on one cache do not share listeners or
-pending writes ([Several clients on one cache](multiple_clients.md)).
+**Know the gaps before you switch**: 0.1.0 is a first release with little production use; the
+testing is mostly against the emulator; the web support is experimental and was tested in Chrome
+only; the repository runs no tests on Android or iOS devices (Flutter apps can use the package as
+a plain Dart package, see [Platforms](platforms.md)); two clients on one cache do not share
+listeners or pending writes ([Several clients on one cache](multiple_clients.md)).
 
 ## Setup
 
 ### Dependencies
 
-Until the packages are published, depend on them from the Git repository. `cloud_firestore_dart`
-and `firebase_auth_providers_dart` ask for `firebase_app_dart` from pub.dev, so that one also
-needs an override:
-
 ```yaml
 dependencies:
-  cloud_firestore_dart:
-    git:
-      url: https://github.com/long1eu/firebase_dart_sdk
-      path: cloud_firestore/cloud_firestore_dart
-  firebase_app_dart:
-    git:
-      url: https://github.com/long1eu/firebase_dart_sdk
-      path: firebase_core/firebase_app_dart
-  firebase_auth_providers_dart: # only for signed-in users or server credentials
-    git:
-      url: https://github.com/long1eu/firebase_dart_sdk
-      path: firebase_auth/firebase_auth_providers_dart
-
-dependency_overrides:
-  firebase_app_dart:
-    git:
-      url: https://github.com/long1eu/firebase_dart_sdk
-      path: firebase_core/firebase_app_dart
+  cloud_firestore_dart: ^0.1.0
+  firebase_app_dart: ^0.1.0
+  firebase_auth_providers_dart: ^0.1.0 # only for signed-in users or server credentials
 ```
 
-(Without the override `dart pub get` fails with "firebase_auth_providers_dart ... depends on
-firebase_app_dart from hosted"; this was checked with path dependencies on a checkout, which
-resolve the same way.) There is no plugin to register, no `flutterfire configure` step, and
-nothing to add to the Android, iOS or macOS projects. For a persistent cache in a Flutter app,
-add `sqlite3` and `sqlite3_flutter_libs` (see below).
+There is no plugin to register, no `flutterfire configure` step, and nothing to add to the
+Android, iOS or macOS projects. For a persistent cache in a Flutter app, add `sqlite3` and
+`sqlite3_flutter_libs` (see below).
 
 ### The app: options instead of native configuration
 

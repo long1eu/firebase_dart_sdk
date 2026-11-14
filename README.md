@@ -50,7 +50,7 @@ firestore
 `cloud_firestore/cloud_firestore_dart/example/main.dart` for a runnable program.)
 
 ```shell
-dart pub add cloud_firestore_dart firebase_app_dart   # once 0.1.0 is published; it is not yet
+dart pub add cloud_firestore_dart firebase_app_dart
 ```
 
 ## Start here
