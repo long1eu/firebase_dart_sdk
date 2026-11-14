@@ -14,12 +14,12 @@ dependencies:
     path: ../../firebase_core/firebase_app_dart
   firebase_auth_providers_dart:
     path: ../../firebase_auth/firebase_auth_providers_dart
-  shelf: 1.4.3
-  shelf_router: 1.1.5
+  shelf: ^1.4.0
+  shelf_router: ^1.1.4
 
 dev_dependencies:
-  lints: 6.1.0
-  test: 1.33.0
+  lints: ^6.0.0
+  test: ^1.25.0
 
 # The packages are not on pub.dev yet, and each declares the others as hosted
 # dependencies (^0.1.0): the overrides make every one of them come from this

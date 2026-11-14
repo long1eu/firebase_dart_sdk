@@ -11,7 +11,7 @@ executables:
   firestore_cli:
 
 dependencies:
-  args: 2.7.0
+  args: ^2.5.0
   cloud_firestore_dart:
     path: ../../cloud_firestore/cloud_firestore_dart
   firebase_app_dart:
@@ -20,8 +20,8 @@ dependencies:
     path: ../../firebase_auth/firebase_auth_providers_dart
 
 dev_dependencies:
-  lints: 6.1.0
-  test: 1.33.0
+  lints: ^6.0.0
+  test: ^1.25.0
 
 # The packages are not on pub.dev yet, and each declares the others as hosted
 # dependencies (^0.1.0): the overrides make every one of them come from this
