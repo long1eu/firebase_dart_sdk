@@ -1041,8 +1041,16 @@ class SyncEngine implements RemoteStoreCallback, SharedClientStateSyncer {
 
       // Documents that the backend does not consider results of this query are taken out of its view. They go through
       // computeDocChanges like changed documents, which removes them (and refills a limit query).
+      //
+      // Only when watch marked the target CURRENT on the current stream (as for the held back documents, see
+      // [View.applyChanges]): the view stays current across a reconnect of the stream and across the reset of its
+      // target after an existence filter mismatch, while the target is still being filled again. A limbo resolution
+      // that confirms a document before that says nothing about the target, and the document would be dropped although
+      // the backend is about to send it.
       ImmutableSortedMap<DocumentKey, MaybeDocument> viewChanges = changes;
-      if (remoteEvent != null && !targetIsPendingReset) {
+      if (remoteEvent != null &&
+          !targetIsPendingReset &&
+          remoteEvent.currentTargets.contains(queryView.targetId)) {
         for (final Document document in view.backendMismatches(
           limboDocumentsConfirmedToExist,
           targetChange,

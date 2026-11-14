@@ -1,5 +1,10 @@
 ## Unreleased
 
+- A listener could lose a document for good after an existence filter mismatch. The client then resets the target
+  and listens to it again, and its documents go through limbo resolution. When a resolution confirmed a document
+  before the backend had sent the target again, the view concluded that the backend does not return the document
+  for the query and dropped it; it did not come back, and the snapshot was reported as in sync. That conclusion is
+  now only drawn once watch marked the target CURRENT on the current stream.
 - Web: a page sends the pending writes that the page before it left in a persistent cache as soon as it starts,
   and `waitForPendingWrites()` waits for them. Since the change below (writes belong to the client that made them)
   they were held back for 60 s after a reload, and `waitForPendingWrites()` returned without them. A `Database`
