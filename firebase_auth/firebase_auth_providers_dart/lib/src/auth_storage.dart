@@ -23,6 +23,9 @@ import 'firebase_user_auth.dart';
 ///
 /// Delete the value ([write] with null) when the user signs out; [FirebaseUserAuth] does that itself.
 abstract class AuthStorage {
+  /// Constructor for subclasses.
+  AuthStorage();
+
   /// Returns the value stored under [key], or null.
   FutureOr<String?> read(String key);
 
@@ -32,6 +35,9 @@ abstract class AuthStorage {
 
 /// An [AuthStorage] that lives as long as the object.
 class InMemoryAuthStorage implements AuthStorage {
+  /// Creates an empty storage.
+  InMemoryAuthStorage();
+
   final Map<String, String> _values = <String, String>{};
 
   @override

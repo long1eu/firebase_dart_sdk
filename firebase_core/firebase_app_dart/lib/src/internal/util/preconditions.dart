@@ -4,6 +4,9 @@
 
 /// Argument and state checks that throw when they fail.
 class Preconditions {
+  /// Not needed: every member of [Preconditions] is static.
+  Preconditions();
+
   /// Throws a [StateError] with [message] unless [condition] holds.
   static void checkState(bool condition, Object? message) {
     if (!condition) {

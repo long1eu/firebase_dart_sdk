@@ -5,6 +5,9 @@
 // ignore: avoid_classes_with_only_static_members
 /// Minimal leveled logger that prints to stdout.
 class Log {
+  /// Not needed: every member of [Log] is static.
+  Log();
+
   /// Whether [d] currently prints. Use it to avoid building expensive messages.
   static bool get isDebugEnabled => level <= InternalLogLevel.d;
 

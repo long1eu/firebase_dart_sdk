@@ -125,6 +125,9 @@ Expression _vectorArgument(Object vector) {
 /// **Preview, Enterprise only**: the Pipelines API is experimental, may change
 /// in any release and needs a Firestore Enterprise edition database.
 abstract class Expression {
+  /// Constructor for subclasses.
+  Expression();
+
   /// Returns the wire representation of this expression.
   @internal
   pb.Value toProto(PipelineEncoder encoder);
@@ -751,6 +754,9 @@ abstract class Expression {
 /// **Preview, Enterprise only**: the Pipelines API is experimental, may change
 /// in any release and needs a Firestore Enterprise edition database.
 abstract class Selectable {
+  /// Constructor for subclasses.
+  Selectable();
+
   /// The name of the output field.
   String get alias;
 

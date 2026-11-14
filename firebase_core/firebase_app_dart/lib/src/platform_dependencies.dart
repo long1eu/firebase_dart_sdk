@@ -64,6 +64,9 @@ class PlatformDependencies extends LocalStorage {
 
 /// Local persistence interface to store key/value pairs
 abstract class LocalStorage {
+  /// Constructor for subclasses.
+  LocalStorage();
+
   /// Gets the values at [key], or null if none found.
   String? get(String key);
 

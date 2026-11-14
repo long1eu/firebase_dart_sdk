@@ -33,6 +33,9 @@ class AppCheckTokenResult {
 /// example one backed by a device attestation service) is registered on the
 /// FirebaseApp; services that find none simply send no App Check header.
 abstract class InternalAppCheckTokenProvider {
+  /// Constructor for subclasses.
+  InternalAppCheckTokenProvider();
+
   /// Fetches a token. [forceRefresh] must only be set when the cached token was
   /// invalidated out of band (for example the backend answered UNAUTHENTICATED).
   ///

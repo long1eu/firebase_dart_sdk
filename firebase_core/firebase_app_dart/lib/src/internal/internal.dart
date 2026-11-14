@@ -10,6 +10,9 @@ import 'util/to_string_helper.dart';
 /// Provides a way for `FirebaseApp` to get an access token if there exists
 /// a logged in user.
 abstract class InternalTokenProvider {
+  /// Constructor for subclasses.
+  InternalTokenProvider();
+
   /// Fetch a valid STS Token.
   ///
   /// [forceRefresh] force refreshes the token. Should only be set to true if
