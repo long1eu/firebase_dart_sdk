@@ -454,6 +454,57 @@ Future<void> gettingStartedGuideLine141() async {
   );
 }
 
+// ../../docs/guides/migrating_from_flutterfire.md:126
+Future<void> migratingFromFlutterfireGuideLine126() async {
+  // The values of a web app of the project (Firebase console, Project settings,
+  // Your apps) work on every platform. From a generated firebase_options.dart:
+  // apiKey -> apiKey, appId -> applicationId, projectId -> projectId.
+  final FirebaseApp firebaseApp = FirebaseApp.withOptions(
+    const FirebaseOptions(
+      apiKey: '<the apiKey of DefaultFirebaseOptions.web>',
+      applicationId: '<the appId of DefaultFirebaseOptions.web>',
+      projectId: '<the projectId>',
+    ),
+  );
+}
+
+// ../../docs/guides/migrating_from_flutterfire.md:172
+Future<void> migratingFromFlutterfireGuideLine172() async {
+  final Directory cacheDirectory = Directory('<the application support directory>');
+  final Firestore persistent = Firestore.instanceFor(
+    app: app,
+    openDatabase: sqliteOpener(cacheDirectory),
+    settings: FirestoreSettings(cacheSettings: PersistentCacheSettings()),
+  );
+}
+
+// ../../docs/guides/migrating_from_flutterfire.md:195
+Future<void> migratingFromFlutterfireGuideLine195() async {
+  final FirebaseUserAuth auth = await FirebaseUserAuth.forApp(app);
+  final Firestore signedIn = Firestore.instanceFor(app: app);
+  await auth.signInWithEmailAndPassword('ada@example.com', password);
+}
+
+// ../../docs/guides/migrating_from_flutterfire.md:349
+Future<void> migratingFromFlutterfireGuideLine349() async {
+  final QuerySnapshot<Map<String, Object?>> page = await firestore
+      .collection('users')
+      .where('age', isGreaterThanOrEqualTo: 18)
+      .orderBy('age', Direction.descending)
+      .limit(20)
+      .get(Source.cache);
+  print(page.length);
+  for (final DocumentChange<Map<String, Object?>> change in page.docChanges) {
+    print(change.document.id);
+  }
+
+  final AggregateQuerySnapshot totals = await users.aggregate(<AggregateField>[
+    AggregateField.count(),
+    AggregateField.sum('age'),
+  ]).get();
+  print('${totals.getCount()} users, ${totals.get(AggregateField.sum('age'))} years');
+}
+
 // ../../docs/guides/multiple_clients.md:99
 Future<void> multipleClientsGuideLine99() async {
   final Directory directory = Directory('/home/ada/.local/share/my_app');

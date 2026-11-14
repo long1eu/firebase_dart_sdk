@@ -33,6 +33,9 @@ READMEs are short landing pages; the API reference is on pub.dev.
     `cloud_firestore_vm` and `firebase_core_vm` 0.0.x, with before and after code.
 14. [Parity with the Firebase JS SDK](../parity.md): every area compared with the JS SDK,
     feature by feature, with the test that covers it and a list of the known limitations.
+15. [Coming from FlutterFire](migrating_from_flutterfire.md): when to use this package instead
+    of the FlutterFire `cloud_firestore` plugin and when not to, the setup differences, the API
+    side by side, and running both in one app.
 
 Every Dart snippet in these guides is compiled against the current API by
 `cloud_firestore/cloud_firestore_dart/test/unit/api/readme_snippets_test.dart`.
