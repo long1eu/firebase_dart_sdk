@@ -3,7 +3,7 @@
 /// Subclass [PlatformDependencies] and pass it to `FirebaseApp.withOptions` to
 /// provide persistent storage, connectivity and background signals, extra
 /// request headers, and auth or App Check tokens.
-library platform_dependencies;
+library;
 
 // Imported for the references in the documentation above.
 import 'src/firebase_app.dart';

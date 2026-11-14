@@ -2,7 +2,7 @@
 // Lung Razvan <long1eu>
 // on 17/09/2018
 
-library field_value;
+library;
 
 import 'dart:math';
 import 'dart:typed_data';

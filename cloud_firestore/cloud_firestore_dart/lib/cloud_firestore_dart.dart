@@ -38,7 +38,7 @@
 /// {@canonicalFor timestamp.Timestamp}
 /// {@canonicalFor transaction_options.TransactionOptions}
 /// {@canonicalFor vector_value.VectorValue}
-library cloud_firestore_dart;
+library;
 
 export 'src/firebase/firestore/aggregate_field.dart'
     hide AggregateFieldInternal;

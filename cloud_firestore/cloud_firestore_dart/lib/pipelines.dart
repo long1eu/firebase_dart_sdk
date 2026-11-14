@@ -20,7 +20,7 @@
 ///
 /// The helper functions have short names (`field`, `and`, `or`, `not`, ...);
 /// import the library with a prefix if they clash with your own names.
-library cloud_firestore_dart.pipelines;
+library;
 
 export 'src/firebase/firestore/pipeline/explain_options.dart';
 export 'src/firebase/firestore/pipeline/expression.dart'

@@ -160,8 +160,12 @@ List<String> _describeClass(ClassMirror cls) {
   return <String>[...lines, ...members];
 }
 
-String describePublicApi([Symbol library = #cloud_firestore_dart]) {
-  final LibraryMirror barrel = currentMirrorSystem().findLibrary(library);
+/// The API exported by the library file [library] of the package. The libraries have no names (`library;`), so they
+/// are found by their URI.
+String describePublicApi([String library = 'cloud_firestore_dart.dart']) {
+  final LibraryMirror barrel = currentMirrorSystem().libraries[Uri.parse(
+    'package:cloud_firestore_dart/$library',
+  )]!;
   final Map<String, List<String>> entries = <String, List<String>>{};
   for (final LibraryDependencyMirror dep in barrel.libraryDependencies) {
     if (!dep.isExport) {
@@ -223,7 +227,7 @@ void main() {
 
   test('exported pipelines API matches the golden listing', () {
     final File golden = File('test/unit/api/pipelines_api.golden.txt');
-    final String actual = describePublicApi(#cloud_firestore_dart.pipelines);
+    final String actual = describePublicApi('pipelines.dart');
     if (Platform.environment['UPDATE_GOLDEN'] == '1') {
       golden.writeAsStringSync(actual);
       return;
@@ -238,7 +242,7 @@ void main() {
 
   test('exported Firestore Lite API matches the golden listing', () {
     final File golden = File('test/unit/api/lite_api.golden.txt');
-    final String actual = describePublicApi(#cloud_firestore_dart.lite);
+    final String actual = describePublicApi('lite.dart');
     if (Platform.environment['UPDATE_GOLDEN'] == '1') {
       golden.writeAsStringSync(actual);
       return;

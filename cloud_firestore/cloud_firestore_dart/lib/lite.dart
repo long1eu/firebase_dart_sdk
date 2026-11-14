@@ -25,7 +25,7 @@
 ///
 /// A program that only imports this library does not contain the sync engine,
 /// the local store or the SQLite layer of the main library.
-library cloud_firestore_dart.lite;
+library;
 
 export 'src/firebase/firestore/aggregate_field.dart'
     hide AggregateFieldInternal;

@@ -172,7 +172,7 @@ class Firestore
   get databaseId: String
   get projectId: String
   new Firestore.instanceFor({FirebaseApp app, String database, FirestoreSettings settings})
-  run((datastore.Datastore) -> dart.async.Future operation): Future<dynamic> @internal
+  run((.Datastore) -> dart.async.Future operation): Future<dynamic> @internal
   runTransaction((.Transaction) -> dart.async.Future updateFunction, {TransactionOptions options}): Future<dynamic>
   static get instance: Firestore
   static setLogLevel(LogLevel level): void

@@ -4,7 +4,7 @@
 /// **Not public API.** This library exists so that other packages of this
 /// repository can share code. It can change in any release, including patch
 /// releases, without notice. Do not import it from application code.
-library firebase_app_dart.internal;
+library;
 
 export 'src/internal/app_check.dart';
 export 'src/internal/auth.dart';

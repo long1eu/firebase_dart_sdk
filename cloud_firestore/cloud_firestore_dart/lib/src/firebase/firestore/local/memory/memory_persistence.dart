@@ -2,7 +2,7 @@
 // Lung Razvan <long1eu>
 // on 20/09/2018
 
-library memory_persistence;
+library;
 
 import 'dart:async';
 import 'dart:typed_data';

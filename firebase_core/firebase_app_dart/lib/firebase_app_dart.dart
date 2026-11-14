@@ -6,7 +6,7 @@
 /// `package:cloud_firestore_dart`. Platform specific services (storage,
 /// connectivity, auth and App Check tokens) are supplied through
 /// `PlatformDependencies` from `package:firebase_app_dart/platform_dependencies.dart`.
-library firebase_app_dart;
+library;
 
 // Imported for the references in the documentation above.
 import 'src/firebase_app.dart';

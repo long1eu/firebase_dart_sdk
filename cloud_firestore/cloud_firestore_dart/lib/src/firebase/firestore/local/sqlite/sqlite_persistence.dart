@@ -2,7 +2,7 @@
 // Lung Razvan <long1eu>
 // on 21/09/2018
 
-library sqlite_persistence;
+library;
 
 import 'dart:async';
 import 'dart:collection';
