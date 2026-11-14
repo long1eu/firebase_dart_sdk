@@ -8,6 +8,10 @@
 //   CHAOS_SOAK_SDK_LOG  1 to also keep the debug log of the SDK (all clients, on the clock of the test) and print
 //                       its last lines when the test fails: for failures inside a client that the wire does not
 //                       explain (a listener that stops getting snapshots). Off by default: it slows the clients.
+//   CHAOS_SOAK_HTTP_LOG 1 to also keep, for the web transports, the requests and answers of the WebChannel sessions
+//                       as the proxy of each client sees them (the array id each request acknowledges, the array
+//                       ids of each answer, received from the backend and handed to the client), and print them
+//                       when the test fails: for messages that are lost below the transport.
 //
 // On failure the seed and the log of the operations are printed. The seed fixes the sequence of operations of each
 // client, not their exact timing. So the failure output also holds what is needed to explain a failure without
@@ -17,8 +21,10 @@
 // every start and end of a stream.
 
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
+import 'dart:typed_data';
 
 import 'package:cloud_firestore_dart/cloud_firestore_dart.dart';
 import 'package:firebase_app_dart/internal.dart' show InternalLogLevel, Log;
@@ -47,6 +53,12 @@ void main() {
   const int sdkLogLines = 60000;
   final RegExp sdkLogLine = RegExp(r'^[DIWE]:');
 
+  final bool keepHttpLog = Platform.environment['CHAOS_SOAK_HTTP_LOG'] == '1';
+
+  /// The last lines about the WebChannel requests of the clients, when they are kept.
+  final List<String> httpLog = <String>[];
+  const int httpLogLines = 40000;
+
   Future<void> soak() async {
     final ChaosEnv env = await ChaosEnv.start();
     final List<String> log = <String>[];
@@ -64,6 +76,22 @@ void main() {
       for (int i = 0; i < clientCount; i++) {
         final ChaosProxy proxy = await env.newProxy();
         wire.names[proxy.port] = 'c$i';
+        if (keepHttpLog) {
+          proxy.tap = (int connection, ChaosDirection direction,
+              Uint8List data,
+              {required bool delivered}) {
+            final String? text = _describeHttp(direction, data);
+            if (text == null) {
+              return;
+            }
+            if (httpLog.length >= httpLogLines) {
+              httpLog.removeRange(0, httpLogLines ~/ 4);
+            }
+            httpLog.add(
+                '${chaosClock.elapsedMilliseconds.toString().padLeft(6)} c$i '
+                'http#$connection ${delivered ? 'handed on' : 'received'} $text');
+          };
+        }
         final Firestore db = await env.newClient(proxy: proxy);
         clients.add(_SoakClient(
             i, db, proxy, db.collection(name), Random(seed * 31 + i), record));
@@ -131,6 +159,7 @@ void main() {
           'CHAOS_SOAK_CLIENTS=$clientCount CHAOS_SOAK_SECONDS=$seconds\n'
           '${log.join('\n')}\n'
           '${_diagnostics(clients, freshListeners, backend, wire)}'
+          '${keepHttpLog ? '--- http: the WebChannel requests (last ${httpLog.length} lines)\n${httpLog.join('\n')}\n' : ''}'
           '${keepSdkLog ? '--- debug log of the SDK (last ${sdkLog.length} lines)\n${sdkLog.join('\n')}\n' : ''}');
       rethrow;
     } finally {
@@ -217,6 +246,39 @@ String _diagnostics(
     ..writeln('--- wire: everything')
     ..writeln(wire.log.join('\n'));
   return buffer.toString();
+}
+
+final RegExp _httpRequest = RegExp(r'^(GET|POST) \S*/channel\?(\S*) HTTP');
+final RegExp _httpArray = RegExp(r'\[(\d+),\[');
+
+/// A line for a chunk of a WebChannel session, or null for a chunk that says nothing about it: the request with the
+/// parameters that matter (`AID` is the last array the client has), or the ids of the arrays of an answer.
+String? _describeHttp(ChaosDirection direction, Uint8List data) {
+  final String text = utf8.decode(data, allowMalformed: true);
+  if (direction == ChaosDirection.up) {
+    final RegExpMatch? request = _httpRequest.firstMatch(text);
+    if (request == null) {
+      return null;
+    }
+    final Map<String, String> query = Uri.splitQueryString(request[2]!);
+    final String? session = query['SID'];
+    return '> ${request[1]}'
+        '${session == null ? ' handshake' : ' SID=${session.substring(0, min(6, session.length))}'}'
+        ' RID=${query['RID']} AID=${query['AID']}'
+        '${query['TYPE'] == 'terminate' ? ' terminate' : ''}'
+        '${query['t'] == null || query['t'] == '1' ? '' : ' attempt ${query['t']}'}';
+  }
+  final List<int> ids = <int>[
+    for (final RegExpMatch array in _httpArray.allMatches(text))
+      int.parse(array[1]!),
+  ];
+  if (ids.isEmpty) {
+    return text.startsWith('HTTP/')
+        ? '< ${text.split('\r').first}'
+        : null;
+  }
+  return '< arrays ${ids.first}${ids.length > 1 ? '..${ids.last} (${ids.length})' : ''}'
+      '${text.contains('"c",') ? ', the session' : ''}';
 }
 
 class _SoakClient {

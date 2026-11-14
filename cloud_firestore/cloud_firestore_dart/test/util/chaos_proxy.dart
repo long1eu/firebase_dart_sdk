@@ -96,6 +96,13 @@ class ChaosProxy {
   /// While true, new connections are closed as soon as they are accepted.
   bool refuseConnections = false;
 
+  /// Called with every chunk the proxy receives ([delivered] false) and with every chunk it hands to the other side
+  /// ([delivered] true), with the number of the connection. For the failure output of a test: it changes nothing.
+  void Function(int connection, ChaosDirection direction, Uint8List data,
+      {required bool delivered})? tap;
+
+  int _connectionCount = 0;
+
   /// Called with every chunk before it is forwarded. Returning true cuts the connection instead of forwarding the
   /// chunk. It stays installed until it is cleared.
   bool Function(ChaosDirection direction, Uint8List data)? cutWhen;
@@ -257,8 +264,10 @@ class ChaosProxy {
 }
 
 class _Connection {
-  _Connection(this._proxy, this._client, this._upstream);
+  _Connection(this._proxy, this._client, this._upstream)
+      : _id = _proxy._connectionCount++;
 
+  final int _id;
   final ChaosProxy _proxy;
   final Socket _client;
   final Socket _upstream;
@@ -316,6 +325,7 @@ class _Connection {
         _proxy.bytesDown += data.length;
         _downReceived += data.length;
       }
+      _proxy.tap?.call(_id, direction, data, delivered: false);
       final bool Function(ChaosDirection, Uint8List)? cutWhen = _proxy.cutWhen;
       if (cutWhen != null && cutWhen(direction, data)) {
         destroy();
@@ -375,6 +385,7 @@ class _Connection {
     if (direction == ChaosDirection.down) {
       _downDelivered += data.length;
     }
+    _proxy.tap?.call(_id, direction, data, delivered: true);
     try {
       _target(direction).add(data);
     } catch (_) {
