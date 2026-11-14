@@ -90,7 +90,8 @@ credential path it uses is the one of `firebase_auth_providers_dart`, whose own 
 
 ## Notes
 
-- The packages are not on pub.dev yet, so `pubspec.yaml` takes them from this repository through
-  `dependency_overrides`.
+- `pubspec.yaml` takes the three packages from this repository (path dependencies and
+  `dependency_overrides`), so the example runs against the code next to it. Outside the
+  repository, replace both with the versions on pub.dev (`^0.1.0`).
 - [dart_frog](https://dartfrog.vgv.dev) would also work; it needs its own CLI (`dart_frog_cli`)
   to generate the server, so this example sticks to plain shelf, which runs with `dart run`.

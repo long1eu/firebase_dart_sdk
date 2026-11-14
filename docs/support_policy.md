@@ -2,7 +2,7 @@
 
 What this repository supports today, how it follows upstream Firestore, and how versions are
 numbered. The packages are `cloud_firestore_dart`, `firebase_app_dart` and
-`firebase_auth_providers_dart`; version 0.1.0 is in preparation and not published yet.
+`firebase_auth_providers_dart`; the current version is 0.1.0.
 
 Lines marked **DRAFT** are proposals that the maintainer has not confirmed. Until they are
 confirmed they are not commitments.

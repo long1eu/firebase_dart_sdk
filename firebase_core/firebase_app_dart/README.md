@@ -7,7 +7,7 @@ Firestore instance; on its own it holds the configuration of a Firebase project 
 services to the platform (storage, connectivity, auth and App Check tokens). It is not affiliated
 with or endorsed by Google or Firebase.
 
-> **Status: 0.1.0, not published yet.** Unit tests, plus `cloud_firestore_dart`'s integration
+> **Status: 0.1.0.** Unit tests, plus `cloud_firestore_dart`'s integration
 > suite against the Firestore emulator. Against production it was only used by the short
 > verification kit of `cloud_firestore_dart`, on one Firestore database.
 
