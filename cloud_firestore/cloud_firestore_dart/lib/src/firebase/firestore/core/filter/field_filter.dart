@@ -140,10 +140,15 @@ class FieldFilter extends Filter {
   //  same description, such as the int 3 and the string '3'. So we should add
   //  the types in here somehow, too.
   @override
-  String get canonicalId => '${field.canonicalString} $operator $value';
+  String get canonicalId =>
+      // TODO(b/29183165): Technically, this won't be unique if two values have the same description, such as the int
+      //  3 and the string "3". So we should add the types in here somehow, too.
+      '${field.canonicalString}${operator.canonicalName}${canonifyValue(value)}';
 
   @override
-  String toString() => canonicalId;
+  // For messages (the JS `stringifyFilter`); the canonical id does not use it.
+  String toString() =>
+      '${field.canonicalString} ${operator.canonicalName} ${canonifyValue(value)}';
 
   @override
   bool operator ==(Object other) =>

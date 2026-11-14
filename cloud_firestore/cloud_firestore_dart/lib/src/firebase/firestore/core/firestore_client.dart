@@ -419,7 +419,7 @@ class FirestoreClient implements RemoteStoreCallback {
     final MaybeDocument? maybeDoc = await _enqueue<MaybeDocument?>(
       () => _userErrorIfRecoverable(
         localStore.readDocument(docKey),
-        'Failed to get document \'${docKey.path}\' from cache',
+        'Failed to get document \'$docKey\' from cache',
       ),
     );
 

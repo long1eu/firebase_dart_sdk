@@ -84,7 +84,7 @@ class DocumentSet extends Iterable<Document> {
   Document? getPredecessor(DocumentKey key) {
     final Document? document = _keyIndex[key];
     if (document == null) {
-      throw ArgumentError('Key not contained in DocumentSet: ${key.path}');
+      throw ArgumentError('Key not contained in DocumentSet: $key');
     }
     return sortedSet.getPredecessorEntry(document);
   }

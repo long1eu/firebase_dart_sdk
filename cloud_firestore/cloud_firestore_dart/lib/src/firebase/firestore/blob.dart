@@ -125,8 +125,6 @@ class Blob implements Comparable<Blob> {
       ? const ListEquality<int>().hash(_bytes)
       : Object.hash(subtype, const ListEquality<int>().hash(_bytes));
 
-  // The string of a regular blob is part of the canonical id of a query, which
-  // is persisted, so it must not change.
   @override
   String toString() => subtype == 0
       ? 'Blob { bytes= ${toDebugString(_bytes)} }'

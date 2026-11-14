@@ -1050,7 +1050,7 @@ class SyncEngine implements RemoteStoreCallback, SharedClientStateSyncer {
         )) {
           Log.d(
             _tag,
-            'Document ${document.key.path} exists but the backend does not return it for target ${queryView.targetId}: '
+            'Document ${document.key} exists but the backend does not return it for target ${queryView.targetId}: '
             'removing it from the view',
           );
           viewChanges = viewChanges.insert(document.key, document);
@@ -1121,7 +1121,7 @@ class SyncEngine implements RemoteStoreCallback, SharedClientStateSyncer {
           await _trackLimboChange(limboChange);
           break;
         case LimboDocumentChangeType.removed:
-          Log.d(_tag, 'Document no longer in limbo: ${limboChange.key.path}');
+          Log.d(_tag, 'Document no longer in limbo: ${limboChange.key}');
           final DocumentKey limboDocKey = limboChange.key;
           _limboDocumentRefs.removeReference(limboDocKey, targetId);
           if (!_limboDocumentRefs.containsKey(limboDocKey)) {
@@ -1137,7 +1137,7 @@ class SyncEngine implements RemoteStoreCallback, SharedClientStateSyncer {
     final DocumentKey key = change.key;
     if (!_activeLimboTargetsByKey.containsKey(key) &&
         !_enqueuedLimboResolutions.contains(key)) {
-      Log.d(_tag, 'New document in limbo: ${key.path}');
+      Log.d(_tag, 'New document in limbo: $key');
       _enqueuedLimboResolutions.add(key);
       await _pumpEnqueuedLimboResolutions();
     }

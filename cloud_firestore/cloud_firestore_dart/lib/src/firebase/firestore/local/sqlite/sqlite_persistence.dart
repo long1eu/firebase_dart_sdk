@@ -59,6 +59,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/model/snapshot_versi
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/target_index_matcher.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/unknown_document.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/value/field_value.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/remote/remote_serializer.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/assert.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/database.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/logic_utils.dart';

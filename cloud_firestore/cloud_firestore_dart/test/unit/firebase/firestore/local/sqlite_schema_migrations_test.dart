@@ -164,6 +164,8 @@ const Map<int, List<String>> _additions = <int, List<String>>{
   16: <String>['table:globals', 'column:globals.name', 'column:globals.value'],
   17: <String>['column:remote_documents.document_type'],
   18: <String>['column:mutations.client_id'],
+  // 19 computes the canonical ids of the targets again: no new table or column.
+  19: <String>[],
 };
 
 Set<String> _expectedSchema(int version) => <String>{

@@ -53,10 +53,7 @@ void main() {
       show: (Query query) => query.toTarget().canonicalId,
       check: (Query query) {
         final Target target = query.toTarget();
-        final Target other = byId.putIfAbsent(
-          target.canonicalId,
-          () => target,
-        );
+        final Target other = byId.putIfAbsent(target.canonicalId, () => target);
         if (other != target) {
           fail(
             'Two different targets share the canonical id '
@@ -106,17 +103,18 @@ void main() {
     );
     expect(where(null).canonicalId, where('null').canonicalId);
     expect(where(true).canonicalId, where('true').canonicalId);
-    // An integer and the same double are different.
-    expect(where(1).canonicalId, isNot(where(1.0).canonicalId));
-    expect(where(0.0).canonicalId, isNot(where(-0.0).canonicalId));
+    // As in JS, where both are the number 1: an integer and the same double
+    // share the id, and so do 0.0 and -0.0.
+    expect(where(1), isNot(where(1.0)));
+    expect(where(1).canonicalId, where(1.0).canonicalId);
+    expect(where(0.0).canonicalId, where(-0.0).canonicalId);
   });
 
   group('canonical ids are stable (they are persisted)', () {
     // A change of one of these strings means that the targets a released
-    // version stored in the local cache are no longer found. The ids show
-    // values with their toString(), so changing the toString() of Timestamp,
-    // GeoPoint, Blob, DocumentKey or of the map behind ObjectValue changes
-    // them too.
+    // version stored in the local cache are no longer found. The ids are the
+    // ones of the JS SDK and are built by canonifyValue, not by the
+    // toString() of a value.
     Query base() => Query(ResourcePath.fromString('coll'));
     FieldFilter filter(String field, FilterOperator op, Object? value) =>
         FieldFilter(FieldPath.fromServerFormat(field), op, toModel(value));
@@ -128,41 +126,45 @@ void main() {
           ResourcePath.empty,
           collectionGroup: 'coll',
         ),
-        'coll|f:a == 1|ob:__name__asc': base().filter(
+        'coll|f:a==1|ob:__name__asc': base().filter(
           filter('a', FilterOperator.equal, 1),
         ),
-        'coll|f:a == 1.0|ob:__name__asc': base().filter(
-          filter('a', FilterOperator.equal, 1.0),
+        // As in JS, a double without a fraction is written like the integer.
+        'coll|f:b==1|ob:__name__asc': base().filter(
+          filter('b', FilterOperator.equal, 1.0),
         ),
-        'coll|f:a == text|ob:__name__asc': base().filter(
+        'coll|f:a==1.5|ob:__name__asc': base().filter(
+          filter('a', FilterOperator.equal, 1.5),
+        ),
+        'coll|f:a==text|ob:__name__asc': base().filter(
           filter('a', FilterOperator.equal, 'text'),
         ),
-        'coll|f:a == null|ob:__name__asc': base().filter(
+        'coll|f:a==null|ob:__name__asc': base().filter(
           filter('a', FilterOperator.equal, null),
         ),
-        'coll|f:a == NaN|ob:__name__asc': base().filter(
+        'coll|f:a==NaN|ob:__name__asc': base().filter(
           filter('a', FilterOperator.equal, double.nan),
         ),
-        'coll|f:a.b > true|ob:a.basc__name__asc': base().filter(
+        'coll|f:a.b>true|ob:a.basc,__name__asc': base().filter(
           filter('a.b', FilterOperator.graterThan, true),
         ),
-        'coll|f:a != 1|ob:aasc__name__asc': base().filter(
+        'coll|f:a!=1|ob:aasc,__name__asc': base().filter(
           filter('a', FilterOperator.notEqual, 1),
         ),
-        'coll|f:a in [1, x]|ob:__name__asc': base().filter(
+        'coll|f:ain[1,x]|ob:__name__asc': base().filter(
           filter('a', FilterOperator.IN, <Object?>[1, 'x']),
         ),
-        'coll|f:a not_in [1]|ob:aasc__name__asc': base().filter(
+        'coll|f:anot-in[1]|ob:aasc,__name__asc': base().filter(
           filter('a', FilterOperator.NOT_IN, <Object?>[1]),
         ),
-        'coll|f:a array_contains 1|ob:__name__asc': base().filter(
+        'coll|f:aarray-contains1|ob:__name__asc': base().filter(
           filter('a', FilterOperator.arrayContains, 1),
         ),
-        'coll|f:a array_contains_any [1]|ob:__name__asc': base().filter(
+        'coll|f:aarray-contains-any[1]|ob:__name__asc': base().filter(
           filter('a', FilterOperator.arrayContainsAny, <Object?>[1]),
         ),
-        // A flat AND is written without a separator, as in the Android SDK.
-        'coll|f:or(a == 1,b == 2c == 3)|ob:__name__asc': base().filter(
+        // A flat AND is the list of its filters, as in the JS SDK.
+        'coll|f:or(a==1,b==2,c==3)|ob:__name__asc': base().filter(
           CompositeFilter.or(<Filter>[
             filter('a', FilterOperator.equal, 1),
             CompositeFilter.and(<Filter>[
@@ -171,7 +173,7 @@ void main() {
             ]),
           ]),
         ),
-        'coll|f:|ob:adesc__name__desc|l:5': base()
+        'coll|f:|ob:adesc,__name__desc|l:5': base()
             .orderBy(
               OrderBy.getInstance(
                 OrderByDirection.descending,
@@ -179,7 +181,7 @@ void main() {
               ),
             )
             .limitToFirst(5),
-        'coll|f:|ob:aasc__name__asc|lb:b:1|ub:a:2': base()
+        'coll|f:|ob:aasc,__name__asc|lb:b:1|ub:a:2': base()
             .orderBy(
               OrderBy.getInstance(
                 OrderByDirection.ascending,
@@ -188,43 +190,46 @@ void main() {
             )
             .startAt(Bound(position: <FieldValue>[toModel(1)], inclusive: true))
             .endAt(Bound(position: <FieldValue>[toModel(2)], inclusive: true)),
-        'coll|f:a == Timestamp {\n  seconds=1,\n  nanoseconds=2000,\n}|ob:__name__asc':
-            base().filter(
-              filter('a', FilterOperator.equal, const api.Timestamp(1, 2000)),
-            ),
-        'coll|f:a == GeoPoint { latitude=1.0, longitude=2.0 }|ob:__name__asc':
-            base().filter(
-              filter('a', FilterOperator.equal, const api.GeoPoint(1, 2)),
-            ),
-        'coll|f:a == Blob { bytes= 0102 }|ob:__name__asc': base().filter(
+        'coll|f:a==time(1,2000)|ob:__name__asc': base().filter(
+          filter('a', FilterOperator.equal, const api.Timestamp(1, 2000)),
+        ),
+        'coll|f:a==geo(1,2)|ob:__name__asc': base().filter(
+          filter('a', FilterOperator.equal, const api.GeoPoint(1, 2)),
+        ),
+        'coll|f:a==AQI=|ob:__name__asc': base().filter(
           filter(
             'a',
             FilterOperator.equal,
             api.Blob(Uint8List.fromList(<int>[1, 2])),
           ),
         ),
-        'coll|f:a == DocumentKey {\n  path=c/d,\n}|ob:__name__asc': base()
-            .filter(filter('a', FilterOperator.equal, modelReference('c/d'))),
-        'coll|f:a == VectorValue([1.0, 2.0])|ob:__name__asc': base().filter(
-          filter('a', FilterOperator.equal, api.VectorValue(<double>[1, 2])),
+        'coll|f:a==c/d|ob:__name__asc': base().filter(
+          filter('a', FilterOperator.equal, modelReference('c/d')),
         ),
-        'coll|f:a == [1, {b: 2}]|ob:__name__asc': base().filter(
+        'coll|f:a=={__type__:__vector__,value:[1,2]}|ob:__name__asc': base()
+            .filter(
+              filter(
+                'a',
+                FilterOperator.equal,
+                api.VectorValue(<double>[1, 2]),
+              ),
+            ),
+        'coll|f:a==[1,{b:2}]|ob:__name__asc': base().filter(
           filter('a', FilterOperator.equal, <Object?>[
             1,
             <String, Object?>{'b': 2},
           ]),
         ),
-        'coll|f:a == ArraySortedMap<String, FieldValue>{(b=>2), (c=>x)};|ob:__name__asc':
-            base().filter(
-              filter('a', FilterOperator.equal, <String, Object?>{
-                'c': 'x',
-                'b': 2,
-              }),
-            ),
-        'coll|f:a == {__int__:7}|ob:__name__asc': base().filter(
+        'coll|f:a=={b:2,c:x}|ob:__name__asc': base().filter(
+          filter('a', FilterOperator.equal, <String, Object?>{
+            'c': 'x',
+            'b': 2,
+          }),
+        ),
+        'coll|f:a=={__int__:7}|ob:__name__asc': base().filter(
           filter('a', FilterOperator.equal, api.Int32Value(7)),
         ),
-        'coll|f:a == {__min__:null}|ob:__name__asc': base().filter(
+        'coll|f:a=={__min__:null}|ob:__name__asc': base().filter(
           filter('a', FilterOperator.equal, api.MinKey.instance),
         ),
       };
@@ -246,18 +251,18 @@ void main() {
       }
 
       const Map<int, int> pinned = <int, int>{
-        1: 158198358,
-        2: 2127590354,
-        3: 1130152560,
-        5: 1228955145,
-        8: 2158989775,
-        13: 603518596,
-        21: 3120479133,
-        34: 2374660318,
-        55: 1195256439,
-        89: 3176914865,
-        144: 1074331126,
-        233: 195457582,
+        1: 463450283,
+        2: 1604122725,
+        3: 494328544,
+        5: 2500013891,
+        8: 2669954619,
+        13: 1036299174,
+        21: 144917028,
+        34: 3567369770,
+        55: 3034820261,
+        89: 1363453568,
+        144: 3676493110,
+        233: 1039955076,
       };
       final Map<int, int> actual = <int, int>{
         for (final int seed in <int>[

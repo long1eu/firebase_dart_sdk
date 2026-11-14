@@ -529,12 +529,12 @@
 {"expression":"less_than_or_equal(Field(t), Constant(false))","result":"CAA="}
 {"expression":"greater_than(Field(t), Constant(false))","result":"CAE="}
 {"expression":"greater_than_or_equal(Field(t), Constant(false))","result":"CAE="}
-{"expression":"equal(Field(ts), Constant(Timestamp {   seconds=1,   nanoseconds=0, }))","result":"CAA="}
-{"expression":"not_equal(Field(ts), Constant(Timestamp {   seconds=1,   nanoseconds=0, }))","result":"CAE="}
-{"expression":"less_than(Field(ts), Constant(Timestamp {   seconds=1,   nanoseconds=0, }))","result":"CAA="}
-{"expression":"less_than_or_equal(Field(ts), Constant(Timestamp {   seconds=1,   nanoseconds=0, }))","result":"CAA="}
-{"expression":"greater_than(Field(ts), Constant(Timestamp {   seconds=1,   nanoseconds=0, }))","result":"CAE="}
-{"expression":"greater_than_or_equal(Field(ts), Constant(Timestamp {   seconds=1,   nanoseconds=0, }))","result":"CAE="}
+{"expression":"equal(Field(ts), Constant(Timestamp(seconds=1, nanoseconds=0)))","result":"CAA="}
+{"expression":"not_equal(Field(ts), Constant(Timestamp(seconds=1, nanoseconds=0)))","result":"CAE="}
+{"expression":"less_than(Field(ts), Constant(Timestamp(seconds=1, nanoseconds=0)))","result":"CAA="}
+{"expression":"less_than_or_equal(Field(ts), Constant(Timestamp(seconds=1, nanoseconds=0)))","result":"CAA="}
+{"expression":"greater_than(Field(ts), Constant(Timestamp(seconds=1, nanoseconds=0)))","result":"CAE="}
+{"expression":"greater_than_or_equal(Field(ts), Constant(Timestamp(seconds=1, nanoseconds=0)))","result":"CAE="}
 {"expression":"equal(Field(v), Constant(VectorValue([1.0, 2.0, 3.0])))","result":"CAE="}
 {"expression":"not_equal(Field(v), Constant(VectorValue([1.0, 2.0, 3.0])))","result":"CAA="}
 {"expression":"less_than(Field(v), Constant(VectorValue([1.0, 2.0, 3.0])))","result":"CAA="}
@@ -1407,190 +1407,190 @@
 {"expression":"timestamp_add(Field(ts), Constant(second), Field(i32))","result":"UgsIheLPqgYQgJTvOg=="}
 {"expression":"timestamp_add(Field(ts), Constant(second), Field(big))","result":"ERROR"}
 {"expression":"timestamp_subtract(Field(ts), Constant(day), Constant(800000))","result":"REJECTED"}
-{"expression":"timestamp_trunc(Constant(Timestamp {   seconds=1700000000,   nanoseconds=123456000, }), Constant(microsecond))","result":"UgsIgOLPqgYQgJTvOg=="}
-{"expression":"timestamp_trunc(Constant(Timestamp {   seconds=-1,   nanoseconds=999999000, }), Constant(microsecond))","result":"UhEI////////////ARCYjOvcAw=="}
-{"expression":"timestamp_trunc(Constant(Timestamp {   seconds=1704067199,   nanoseconds=999999000, }), Constant(microsecond))","result":"UgwI/4DIrAYQmIzr3AM="}
-{"expression":"timestamp_trunc(Constant(Timestamp {   seconds=1609459200,   nanoseconds=0, }), Constant(microsecond))","result":"UggIgMy5/wUQAA=="}
-{"expression":"timestamp_trunc(Constant(Timestamp {   seconds=-62135596800,   nanoseconds=0, }), Constant(microsecond))","result":"Ug0IgJK4w5j+////ARAA"}
-{"expression":"timestamp_trunc(Constant(Timestamp {   seconds=951782400,   nanoseconds=0, }), Constant(microsecond))","result":"UggIgJjsxQMQAA=="}
-{"expression":"timestamp_trunc(Constant(Timestamp {   seconds=1700000000,   nanoseconds=123456000, }), Constant(millisecond))","result":"UgsIgOLPqgYQwKnTOg=="}
-{"expression":"timestamp_trunc(Constant(Timestamp {   seconds=-1,   nanoseconds=999999000, }), Constant(millisecond))","result":"UhEI////////////ARDAj67cAw=="}
-{"expression":"timestamp_trunc(Constant(Timestamp {   seconds=1704067199,   nanoseconds=999999000, }), Constant(millisecond))","result":"UgwI/4DIrAYQwI+u3AM="}
-{"expression":"timestamp_trunc(Constant(Timestamp {   seconds=1609459200,   nanoseconds=0, }), Constant(millisecond))","result":"UggIgMy5/wUQAA=="}
-{"expression":"timestamp_trunc(Constant(Timestamp {   seconds=-62135596800,   nanoseconds=0, }), Constant(millisecond))","result":"Ug0IgJK4w5j+////ARAA"}
-{"expression":"timestamp_trunc(Constant(Timestamp {   seconds=951782400,   nanoseconds=0, }), Constant(millisecond))","result":"UggIgJjsxQMQAA=="}
-{"expression":"timestamp_trunc(Constant(Timestamp {   seconds=1700000000,   nanoseconds=123456000, }), Constant(second))","result":"UggIgOLPqgYQAA=="}
-{"expression":"timestamp_trunc(Constant(Timestamp {   seconds=-1,   nanoseconds=999999000, }), Constant(second))","result":"Ug0I////////////ARAA"}
-{"expression":"timestamp_trunc(Constant(Timestamp {   seconds=1704067199,   nanoseconds=999999000, }), Constant(second))","result":"UggI/4DIrAYQAA=="}
-{"expression":"timestamp_trunc(Constant(Timestamp {   seconds=1609459200,   nanoseconds=0, }), Constant(second))","result":"UggIgMy5/wUQAA=="}
-{"expression":"timestamp_trunc(Constant(Timestamp {   seconds=-62135596800,   nanoseconds=0, }), Constant(second))","result":"Ug0IgJK4w5j+////ARAA"}
-{"expression":"timestamp_trunc(Constant(Timestamp {   seconds=951782400,   nanoseconds=0, }), Constant(second))","result":"UggIgJjsxQMQAA=="}
-{"expression":"timestamp_trunc(Constant(Timestamp {   seconds=1700000000,   nanoseconds=123456000, }), Constant(minute))","result":"UggI7OHPqgYQAA=="}
-{"expression":"timestamp_trunc(Constant(Timestamp {   seconds=-1,   nanoseconds=999999000, }), Constant(minute))","result":"Ug0IxP//////////ARAA"}
-{"expression":"timestamp_trunc(Constant(Timestamp {   seconds=1704067199,   nanoseconds=999999000, }), Constant(minute))","result":"UggIxIDIrAYQAA=="}
-{"expression":"timestamp_trunc(Constant(Timestamp {   seconds=1609459200,   nanoseconds=0, }), Constant(minute))","result":"UggIgMy5/wUQAA=="}
-{"expression":"timestamp_trunc(Constant(Timestamp {   seconds=-62135596800,   nanoseconds=0, }), Constant(minute))","result":"Ug0IgJK4w5j+////ARAA"}
-{"expression":"timestamp_trunc(Constant(Timestamp {   seconds=951782400,   nanoseconds=0, }), Constant(minute))","result":"UggIgJjsxQMQAA=="}
-{"expression":"timestamp_trunc(Constant(Timestamp {   seconds=1700000000,   nanoseconds=123456000, }), Constant(hour))","result":"UggI4NvPqgYQAA=="}
-{"expression":"timestamp_trunc(Constant(Timestamp {   seconds=-1,   nanoseconds=999999000, }), Constant(hour))","result":"Ug0I8OP/////////ARAA"}
-{"expression":"timestamp_trunc(Constant(Timestamp {   seconds=1704067199,   nanoseconds=999999000, }), Constant(hour))","result":"UggI8OTHrAYQAA=="}
-{"expression":"timestamp_trunc(Constant(Timestamp {   seconds=1609459200,   nanoseconds=0, }), Constant(hour))","result":"UggIgMy5/wUQAA=="}
-{"expression":"timestamp_trunc(Constant(Timestamp {   seconds=-62135596800,   nanoseconds=0, }), Constant(hour))","result":"Ug0IgJK4w5j+////ARAA"}
-{"expression":"timestamp_trunc(Constant(Timestamp {   seconds=951782400,   nanoseconds=0, }), Constant(hour))","result":"UggIgJjsxQMQAA=="}
-{"expression":"timestamp_trunc(Constant(Timestamp {   seconds=1700000000,   nanoseconds=123456000, }), Constant(day))","result":"UggIgPHKqgYQAA=="}
-{"expression":"timestamp_trunc(Constant(Timestamp {   seconds=-1,   nanoseconds=999999000, }), Constant(day))","result":"Ug0IgN36////////ARAA"}
-{"expression":"timestamp_trunc(Constant(Timestamp {   seconds=1704067199,   nanoseconds=999999000, }), Constant(day))","result":"UggIgN7CrAYQAA=="}
-{"expression":"timestamp_trunc(Constant(Timestamp {   seconds=1609459200,   nanoseconds=0, }), Constant(day))","result":"UggIgMy5/wUQAA=="}
-{"expression":"timestamp_trunc(Constant(Timestamp {   seconds=-62135596800,   nanoseconds=0, }), Constant(day))","result":"Ug0IgJK4w5j+////ARAA"}
-{"expression":"timestamp_trunc(Constant(Timestamp {   seconds=951782400,   nanoseconds=0, }), Constant(day))","result":"UggIgJjsxQMQAA=="}
-{"expression":"timestamp_trunc(Constant(Timestamp {   seconds=1700000000,   nanoseconds=123456000, }), Constant(week))","result":"UggIgKvAqgYQAA=="}
-{"expression":"timestamp_trunc(Constant(Timestamp {   seconds=-1,   nanoseconds=999999000, }), Constant(week))","result":"Ug0IgPTq////////ARAA"}
-{"expression":"timestamp_trunc(Constant(Timestamp {   seconds=1704067199,   nanoseconds=999999000, }), Constant(week))","result":"UggIgN7CrAYQAA=="}
-{"expression":"timestamp_trunc(Constant(Timestamp {   seconds=1609459200,   nanoseconds=0, }), Constant(week))","result":"UggIgJ2f/wUQAA=="}
-{"expression":"timestamp_trunc(Constant(Timestamp {   seconds=-62135596800,   nanoseconds=0, }), Constant(week))","result":"ERROR"}
-{"expression":"timestamp_trunc(Constant(Timestamp {   seconds=951782400,   nanoseconds=0, }), Constant(week))","result":"UggIgNLhxQMQAA=="}
-{"expression":"timestamp_trunc(Constant(Timestamp {   seconds=1700000000,   nanoseconds=123456000, }), Constant(isoweek))","result":"UggIgM7FqgYQAA=="}
-{"expression":"timestamp_trunc(Constant(Timestamp {   seconds=-1,   nanoseconds=999999000, }), Constant(isoweek))","result":"Ug0IgJfw////////ARAA"}
-{"expression":"timestamp_trunc(Constant(Timestamp {   seconds=1704067199,   nanoseconds=999999000, }), Constant(isoweek))","result":"UggIgIyjrAYQAA=="}
-{"expression":"timestamp_trunc(Constant(Timestamp {   seconds=1609459200,   nanoseconds=0, }), Constant(isoweek))","result":"UggIgMCk/wUQAA=="}
-{"expression":"timestamp_trunc(Constant(Timestamp {   seconds=-62135596800,   nanoseconds=0, }), Constant(isoweek))","result":"Ug0IgJK4w5j+////ARAA"}
-{"expression":"timestamp_trunc(Constant(Timestamp {   seconds=951782400,   nanoseconds=0, }), Constant(isoweek))","result":"UggIgPXmxQMQAA=="}
-{"expression":"timestamp_trunc(Constant(Timestamp {   seconds=1700000000,   nanoseconds=123456000, }), Constant(month))","result":"UggIgKqGqgYQAA=="}
-{"expression":"timestamp_trunc(Constant(Timestamp {   seconds=-1,   nanoseconds=999999000, }), Constant(month))","result":"Ug0IgMPc/v//////ARAA"}
-{"expression":"timestamp_trunc(Constant(Timestamp {   seconds=1704067199,   nanoseconds=999999000, }), Constant(month))","result":"UggIgMSkqwYQAA=="}
-{"expression":"timestamp_trunc(Constant(Timestamp {   seconds=1609459200,   nanoseconds=0, }), Constant(month))","result":"UggIgMy5/wUQAA=="}
-{"expression":"timestamp_trunc(Constant(Timestamp {   seconds=-62135596800,   nanoseconds=0, }), Constant(month))","result":"Ug0IgJK4w5j+////ARAA"}
-{"expression":"timestamp_trunc(Constant(Timestamp {   seconds=951782400,   nanoseconds=0, }), Constant(month))","result":"UggIgMTYxAMQAA=="}
-{"expression":"timestamp_trunc(Constant(Timestamp {   seconds=1700000000,   nanoseconds=123456000, }), Constant(quarter))","result":"UggIgO3iqAYQAA=="}
-{"expression":"timestamp_trunc(Constant(Timestamp {   seconds=-1,   nanoseconds=999999000, }), Constant(quarter))","result":"Ug0IgOya/P//////ARAA"}
-{"expression":"timestamp_trunc(Constant(Timestamp {   seconds=1704067199,   nanoseconds=999999000, }), Constant(quarter))","result":"UggIgO3iqAYQAA=="}
-{"expression":"timestamp_trunc(Constant(Timestamp {   seconds=1609459200,   nanoseconds=0, }), Constant(quarter))","result":"UggIgMy5/wUQAA=="}
-{"expression":"timestamp_trunc(Constant(Timestamp {   seconds=-62135596800,   nanoseconds=0, }), Constant(quarter))","result":"Ug0IgJK4w5j+////ARAA"}
-{"expression":"timestamp_trunc(Constant(Timestamp {   seconds=951782400,   nanoseconds=0, }), Constant(quarter))","result":"UggIgIe1wwMQAA=="}
-{"expression":"timestamp_trunc(Constant(Timestamp {   seconds=1700000000,   nanoseconds=123456000, }), Constant(year))","result":"UggIgJrDnQYQAA=="}
-{"expression":"timestamp_trunc(Constant(Timestamp {   seconds=-1,   nanoseconds=999999000, }), Constant(year))","result":"Ug0IgJn78P//////ARAA"}
-{"expression":"timestamp_trunc(Constant(Timestamp {   seconds=1704067199,   nanoseconds=999999000, }), Constant(year))","result":"UggIgJrDnQYQAA=="}
-{"expression":"timestamp_trunc(Constant(Timestamp {   seconds=1609459200,   nanoseconds=0, }), Constant(year))","result":"UggIgMy5/wUQAA=="}
-{"expression":"timestamp_trunc(Constant(Timestamp {   seconds=-62135596800,   nanoseconds=0, }), Constant(year))","result":"Ug0IgJK4w5j+////ARAA"}
-{"expression":"timestamp_trunc(Constant(Timestamp {   seconds=951782400,   nanoseconds=0, }), Constant(year))","result":"UggIgIe1wwMQAA=="}
-{"expression":"timestamp_trunc(Constant(Timestamp {   seconds=1700000000,   nanoseconds=123456000, }), Constant(isoyear))","result":"UggIgL3InQYQAA=="}
-{"expression":"timestamp_trunc(Constant(Timestamp {   seconds=-1,   nanoseconds=999999000, }), Constant(isoyear))","result":"Ug0IgJfw////////ARAA"}
-{"expression":"timestamp_trunc(Constant(Timestamp {   seconds=1704067199,   nanoseconds=999999000, }), Constant(isoyear))","result":"UggIgL3InQYQAA=="}
-{"expression":"timestamp_trunc(Constant(Timestamp {   seconds=1609459200,   nanoseconds=0, }), Constant(isoyear))","result":"UggIgPyk8AUQAA=="}
-{"expression":"timestamp_trunc(Constant(Timestamp {   seconds=-62135596800,   nanoseconds=0, }), Constant(isoyear))","result":"Ug0IgJK4w5j+////ARAA"}
-{"expression":"timestamp_trunc(Constant(Timestamp {   seconds=951782400,   nanoseconds=0, }), Constant(isoyear))","result":"UggIgM2/wwMQAA=="}
-{"expression":"timestamp_extract(Constant(Timestamp {   seconds=1700000000,   nanoseconds=123456000, }), Constant(microsecond))","result":"EMDEBw=="}
-{"expression":"timestamp_extract(Constant(Timestamp {   seconds=-1,   nanoseconds=999999000, }), Constant(microsecond))","result":"EL+EPQ=="}
-{"expression":"timestamp_extract(Constant(Timestamp {   seconds=1704067199,   nanoseconds=999999000, }), Constant(microsecond))","result":"EL+EPQ=="}
-{"expression":"timestamp_extract(Constant(Timestamp {   seconds=1609459200,   nanoseconds=0, }), Constant(microsecond))","result":"EAA="}
-{"expression":"timestamp_extract(Constant(Timestamp {   seconds=-62135596800,   nanoseconds=0, }), Constant(microsecond))","result":"EAA="}
-{"expression":"timestamp_extract(Constant(Timestamp {   seconds=951782400,   nanoseconds=0, }), Constant(microsecond))","result":"EAA="}
-{"expression":"timestamp_extract(Constant(Timestamp {   seconds=1483228800,   nanoseconds=0, }), Constant(microsecond))","result":"EAA="}
-{"expression":"timestamp_extract(Constant(Timestamp {   seconds=253402300799,   nanoseconds=0, }), Constant(microsecond))","result":"EAA="}
-{"expression":"timestamp_extract(Constant(Timestamp {   seconds=1700000000,   nanoseconds=123456000, }), Constant(millisecond))","result":"EHs="}
-{"expression":"timestamp_extract(Constant(Timestamp {   seconds=-1,   nanoseconds=999999000, }), Constant(millisecond))","result":"EOcH"}
-{"expression":"timestamp_extract(Constant(Timestamp {   seconds=1704067199,   nanoseconds=999999000, }), Constant(millisecond))","result":"EOcH"}
-{"expression":"timestamp_extract(Constant(Timestamp {   seconds=1609459200,   nanoseconds=0, }), Constant(millisecond))","result":"EAA="}
-{"expression":"timestamp_extract(Constant(Timestamp {   seconds=-62135596800,   nanoseconds=0, }), Constant(millisecond))","result":"EAA="}
-{"expression":"timestamp_extract(Constant(Timestamp {   seconds=951782400,   nanoseconds=0, }), Constant(millisecond))","result":"EAA="}
-{"expression":"timestamp_extract(Constant(Timestamp {   seconds=1483228800,   nanoseconds=0, }), Constant(millisecond))","result":"EAA="}
-{"expression":"timestamp_extract(Constant(Timestamp {   seconds=253402300799,   nanoseconds=0, }), Constant(millisecond))","result":"EAA="}
-{"expression":"timestamp_extract(Constant(Timestamp {   seconds=1700000000,   nanoseconds=123456000, }), Constant(second))","result":"EBQ="}
-{"expression":"timestamp_extract(Constant(Timestamp {   seconds=-1,   nanoseconds=999999000, }), Constant(second))","result":"EDs="}
-{"expression":"timestamp_extract(Constant(Timestamp {   seconds=1704067199,   nanoseconds=999999000, }), Constant(second))","result":"EDs="}
-{"expression":"timestamp_extract(Constant(Timestamp {   seconds=1609459200,   nanoseconds=0, }), Constant(second))","result":"EAA="}
-{"expression":"timestamp_extract(Constant(Timestamp {   seconds=-62135596800,   nanoseconds=0, }), Constant(second))","result":"EAA="}
-{"expression":"timestamp_extract(Constant(Timestamp {   seconds=951782400,   nanoseconds=0, }), Constant(second))","result":"EAA="}
-{"expression":"timestamp_extract(Constant(Timestamp {   seconds=1483228800,   nanoseconds=0, }), Constant(second))","result":"EAA="}
-{"expression":"timestamp_extract(Constant(Timestamp {   seconds=253402300799,   nanoseconds=0, }), Constant(second))","result":"EDs="}
-{"expression":"timestamp_extract(Constant(Timestamp {   seconds=1700000000,   nanoseconds=123456000, }), Constant(minute))","result":"EA0="}
-{"expression":"timestamp_extract(Constant(Timestamp {   seconds=-1,   nanoseconds=999999000, }), Constant(minute))","result":"EDs="}
-{"expression":"timestamp_extract(Constant(Timestamp {   seconds=1704067199,   nanoseconds=999999000, }), Constant(minute))","result":"EDs="}
-{"expression":"timestamp_extract(Constant(Timestamp {   seconds=1609459200,   nanoseconds=0, }), Constant(minute))","result":"EAA="}
-{"expression":"timestamp_extract(Constant(Timestamp {   seconds=-62135596800,   nanoseconds=0, }), Constant(minute))","result":"EAA="}
-{"expression":"timestamp_extract(Constant(Timestamp {   seconds=951782400,   nanoseconds=0, }), Constant(minute))","result":"EAA="}
-{"expression":"timestamp_extract(Constant(Timestamp {   seconds=1483228800,   nanoseconds=0, }), Constant(minute))","result":"EAA="}
-{"expression":"timestamp_extract(Constant(Timestamp {   seconds=253402300799,   nanoseconds=0, }), Constant(minute))","result":"EDs="}
-{"expression":"timestamp_extract(Constant(Timestamp {   seconds=1700000000,   nanoseconds=123456000, }), Constant(hour))","result":"EBY="}
-{"expression":"timestamp_extract(Constant(Timestamp {   seconds=-1,   nanoseconds=999999000, }), Constant(hour))","result":"EBc="}
-{"expression":"timestamp_extract(Constant(Timestamp {   seconds=1704067199,   nanoseconds=999999000, }), Constant(hour))","result":"EBc="}
-{"expression":"timestamp_extract(Constant(Timestamp {   seconds=1609459200,   nanoseconds=0, }), Constant(hour))","result":"EAA="}
-{"expression":"timestamp_extract(Constant(Timestamp {   seconds=-62135596800,   nanoseconds=0, }), Constant(hour))","result":"EAA="}
-{"expression":"timestamp_extract(Constant(Timestamp {   seconds=951782400,   nanoseconds=0, }), Constant(hour))","result":"EAA="}
-{"expression":"timestamp_extract(Constant(Timestamp {   seconds=1483228800,   nanoseconds=0, }), Constant(hour))","result":"EAA="}
-{"expression":"timestamp_extract(Constant(Timestamp {   seconds=253402300799,   nanoseconds=0, }), Constant(hour))","result":"EBc="}
-{"expression":"timestamp_extract(Constant(Timestamp {   seconds=1700000000,   nanoseconds=123456000, }), Constant(day))","result":"EA4="}
-{"expression":"timestamp_extract(Constant(Timestamp {   seconds=-1,   nanoseconds=999999000, }), Constant(day))","result":"EB8="}
-{"expression":"timestamp_extract(Constant(Timestamp {   seconds=1704067199,   nanoseconds=999999000, }), Constant(day))","result":"EB8="}
-{"expression":"timestamp_extract(Constant(Timestamp {   seconds=1609459200,   nanoseconds=0, }), Constant(day))","result":"EAE="}
-{"expression":"timestamp_extract(Constant(Timestamp {   seconds=-62135596800,   nanoseconds=0, }), Constant(day))","result":"EAE="}
-{"expression":"timestamp_extract(Constant(Timestamp {   seconds=951782400,   nanoseconds=0, }), Constant(day))","result":"EB0="}
-{"expression":"timestamp_extract(Constant(Timestamp {   seconds=1483228800,   nanoseconds=0, }), Constant(day))","result":"EAE="}
-{"expression":"timestamp_extract(Constant(Timestamp {   seconds=253402300799,   nanoseconds=0, }), Constant(day))","result":"EB8="}
-{"expression":"timestamp_extract(Constant(Timestamp {   seconds=1700000000,   nanoseconds=123456000, }), Constant(dayofweek))","result":"EAM="}
-{"expression":"timestamp_extract(Constant(Timestamp {   seconds=-1,   nanoseconds=999999000, }), Constant(dayofweek))","result":"EAQ="}
-{"expression":"timestamp_extract(Constant(Timestamp {   seconds=1704067199,   nanoseconds=999999000, }), Constant(dayofweek))","result":"EAE="}
-{"expression":"timestamp_extract(Constant(Timestamp {   seconds=1609459200,   nanoseconds=0, }), Constant(dayofweek))","result":"EAY="}
-{"expression":"timestamp_extract(Constant(Timestamp {   seconds=-62135596800,   nanoseconds=0, }), Constant(dayofweek))","result":"EAI="}
-{"expression":"timestamp_extract(Constant(Timestamp {   seconds=951782400,   nanoseconds=0, }), Constant(dayofweek))","result":"EAM="}
-{"expression":"timestamp_extract(Constant(Timestamp {   seconds=1483228800,   nanoseconds=0, }), Constant(dayofweek))","result":"EAE="}
-{"expression":"timestamp_extract(Constant(Timestamp {   seconds=253402300799,   nanoseconds=0, }), Constant(dayofweek))","result":"EAY="}
-{"expression":"timestamp_extract(Constant(Timestamp {   seconds=1700000000,   nanoseconds=123456000, }), Constant(dayofyear))","result":"EL4C"}
-{"expression":"timestamp_extract(Constant(Timestamp {   seconds=-1,   nanoseconds=999999000, }), Constant(dayofyear))","result":"EO0C"}
-{"expression":"timestamp_extract(Constant(Timestamp {   seconds=1704067199,   nanoseconds=999999000, }), Constant(dayofyear))","result":"EO0C"}
-{"expression":"timestamp_extract(Constant(Timestamp {   seconds=1609459200,   nanoseconds=0, }), Constant(dayofyear))","result":"EAE="}
-{"expression":"timestamp_extract(Constant(Timestamp {   seconds=-62135596800,   nanoseconds=0, }), Constant(dayofyear))","result":"EAE="}
-{"expression":"timestamp_extract(Constant(Timestamp {   seconds=951782400,   nanoseconds=0, }), Constant(dayofyear))","result":"EDw="}
-{"expression":"timestamp_extract(Constant(Timestamp {   seconds=1483228800,   nanoseconds=0, }), Constant(dayofyear))","result":"EAE="}
-{"expression":"timestamp_extract(Constant(Timestamp {   seconds=253402300799,   nanoseconds=0, }), Constant(dayofyear))","result":"EO0C"}
-{"expression":"timestamp_extract(Constant(Timestamp {   seconds=1700000000,   nanoseconds=123456000, }), Constant(week))","result":"EC4="}
-{"expression":"timestamp_extract(Constant(Timestamp {   seconds=-1,   nanoseconds=999999000, }), Constant(week))","result":"EDQ="}
-{"expression":"timestamp_extract(Constant(Timestamp {   seconds=1704067199,   nanoseconds=999999000, }), Constant(week))","result":"EDU="}
-{"expression":"timestamp_extract(Constant(Timestamp {   seconds=1609459200,   nanoseconds=0, }), Constant(week))","result":"EAA="}
-{"expression":"timestamp_extract(Constant(Timestamp {   seconds=-62135596800,   nanoseconds=0, }), Constant(week))","result":"EAA="}
-{"expression":"timestamp_extract(Constant(Timestamp {   seconds=951782400,   nanoseconds=0, }), Constant(week))","result":"EAk="}
-{"expression":"timestamp_extract(Constant(Timestamp {   seconds=1483228800,   nanoseconds=0, }), Constant(week))","result":"EAE="}
-{"expression":"timestamp_extract(Constant(Timestamp {   seconds=253402300799,   nanoseconds=0, }), Constant(week))","result":"EDQ="}
-{"expression":"timestamp_extract(Constant(Timestamp {   seconds=1700000000,   nanoseconds=123456000, }), Constant(isoweek))","result":"EC4="}
-{"expression":"timestamp_extract(Constant(Timestamp {   seconds=-1,   nanoseconds=999999000, }), Constant(isoweek))","result":"EAE="}
-{"expression":"timestamp_extract(Constant(Timestamp {   seconds=1704067199,   nanoseconds=999999000, }), Constant(isoweek))","result":"EDQ="}
-{"expression":"timestamp_extract(Constant(Timestamp {   seconds=1609459200,   nanoseconds=0, }), Constant(isoweek))","result":"EDU="}
-{"expression":"timestamp_extract(Constant(Timestamp {   seconds=-62135596800,   nanoseconds=0, }), Constant(isoweek))","result":"EAE="}
-{"expression":"timestamp_extract(Constant(Timestamp {   seconds=951782400,   nanoseconds=0, }), Constant(isoweek))","result":"EAk="}
-{"expression":"timestamp_extract(Constant(Timestamp {   seconds=1483228800,   nanoseconds=0, }), Constant(isoweek))","result":"EDQ="}
-{"expression":"timestamp_extract(Constant(Timestamp {   seconds=253402300799,   nanoseconds=0, }), Constant(isoweek))","result":"EDQ="}
-{"expression":"timestamp_extract(Constant(Timestamp {   seconds=1700000000,   nanoseconds=123456000, }), Constant(month))","result":"EAs="}
-{"expression":"timestamp_extract(Constant(Timestamp {   seconds=-1,   nanoseconds=999999000, }), Constant(month))","result":"EAw="}
-{"expression":"timestamp_extract(Constant(Timestamp {   seconds=1704067199,   nanoseconds=999999000, }), Constant(month))","result":"EAw="}
-{"expression":"timestamp_extract(Constant(Timestamp {   seconds=1609459200,   nanoseconds=0, }), Constant(month))","result":"EAE="}
-{"expression":"timestamp_extract(Constant(Timestamp {   seconds=-62135596800,   nanoseconds=0, }), Constant(month))","result":"EAE="}
-{"expression":"timestamp_extract(Constant(Timestamp {   seconds=951782400,   nanoseconds=0, }), Constant(month))","result":"EAI="}
-{"expression":"timestamp_extract(Constant(Timestamp {   seconds=1483228800,   nanoseconds=0, }), Constant(month))","result":"EAE="}
-{"expression":"timestamp_extract(Constant(Timestamp {   seconds=253402300799,   nanoseconds=0, }), Constant(month))","result":"EAw="}
-{"expression":"timestamp_extract(Constant(Timestamp {   seconds=1700000000,   nanoseconds=123456000, }), Constant(quarter))","result":"EAQ="}
-{"expression":"timestamp_extract(Constant(Timestamp {   seconds=-1,   nanoseconds=999999000, }), Constant(quarter))","result":"EAQ="}
-{"expression":"timestamp_extract(Constant(Timestamp {   seconds=1704067199,   nanoseconds=999999000, }), Constant(quarter))","result":"EAQ="}
-{"expression":"timestamp_extract(Constant(Timestamp {   seconds=1609459200,   nanoseconds=0, }), Constant(quarter))","result":"EAE="}
-{"expression":"timestamp_extract(Constant(Timestamp {   seconds=-62135596800,   nanoseconds=0, }), Constant(quarter))","result":"EAE="}
-{"expression":"timestamp_extract(Constant(Timestamp {   seconds=951782400,   nanoseconds=0, }), Constant(quarter))","result":"EAE="}
-{"expression":"timestamp_extract(Constant(Timestamp {   seconds=1483228800,   nanoseconds=0, }), Constant(quarter))","result":"EAE="}
-{"expression":"timestamp_extract(Constant(Timestamp {   seconds=253402300799,   nanoseconds=0, }), Constant(quarter))","result":"EAQ="}
-{"expression":"timestamp_extract(Constant(Timestamp {   seconds=1700000000,   nanoseconds=123456000, }), Constant(year))","result":"EOcP"}
-{"expression":"timestamp_extract(Constant(Timestamp {   seconds=-1,   nanoseconds=999999000, }), Constant(year))","result":"ELEP"}
-{"expression":"timestamp_extract(Constant(Timestamp {   seconds=1704067199,   nanoseconds=999999000, }), Constant(year))","result":"EOcP"}
-{"expression":"timestamp_extract(Constant(Timestamp {   seconds=1609459200,   nanoseconds=0, }), Constant(year))","result":"EOUP"}
-{"expression":"timestamp_extract(Constant(Timestamp {   seconds=-62135596800,   nanoseconds=0, }), Constant(year))","result":"EAE="}
-{"expression":"timestamp_extract(Constant(Timestamp {   seconds=951782400,   nanoseconds=0, }), Constant(year))","result":"ENAP"}
-{"expression":"timestamp_extract(Constant(Timestamp {   seconds=1483228800,   nanoseconds=0, }), Constant(year))","result":"EOEP"}
-{"expression":"timestamp_extract(Constant(Timestamp {   seconds=253402300799,   nanoseconds=0, }), Constant(year))","result":"EI9O"}
-{"expression":"timestamp_extract(Constant(Timestamp {   seconds=1700000000,   nanoseconds=123456000, }), Constant(isoyear))","result":"EOcP"}
-{"expression":"timestamp_extract(Constant(Timestamp {   seconds=-1,   nanoseconds=999999000, }), Constant(isoyear))","result":"ELIP"}
-{"expression":"timestamp_extract(Constant(Timestamp {   seconds=1704067199,   nanoseconds=999999000, }), Constant(isoyear))","result":"EOcP"}
-{"expression":"timestamp_extract(Constant(Timestamp {   seconds=1609459200,   nanoseconds=0, }), Constant(isoyear))","result":"EOQP"}
-{"expression":"timestamp_extract(Constant(Timestamp {   seconds=-62135596800,   nanoseconds=0, }), Constant(isoyear))","result":"EAE="}
-{"expression":"timestamp_extract(Constant(Timestamp {   seconds=951782400,   nanoseconds=0, }), Constant(isoyear))","result":"ENAP"}
-{"expression":"timestamp_extract(Constant(Timestamp {   seconds=1483228800,   nanoseconds=0, }), Constant(isoyear))","result":"EOAP"}
-{"expression":"timestamp_extract(Constant(Timestamp {   seconds=253402300799,   nanoseconds=0, }), Constant(isoyear))","result":"EI9O"}
+{"expression":"timestamp_trunc(Constant(Timestamp(seconds=1700000000, nanoseconds=123456000)), Constant(microsecond))","result":"UgsIgOLPqgYQgJTvOg=="}
+{"expression":"timestamp_trunc(Constant(Timestamp(seconds=-1, nanoseconds=999999000)), Constant(microsecond))","result":"UhEI////////////ARCYjOvcAw=="}
+{"expression":"timestamp_trunc(Constant(Timestamp(seconds=1704067199, nanoseconds=999999000)), Constant(microsecond))","result":"UgwI/4DIrAYQmIzr3AM="}
+{"expression":"timestamp_trunc(Constant(Timestamp(seconds=1609459200, nanoseconds=0)), Constant(microsecond))","result":"UggIgMy5/wUQAA=="}
+{"expression":"timestamp_trunc(Constant(Timestamp(seconds=-62135596800, nanoseconds=0)), Constant(microsecond))","result":"Ug0IgJK4w5j+////ARAA"}
+{"expression":"timestamp_trunc(Constant(Timestamp(seconds=951782400, nanoseconds=0)), Constant(microsecond))","result":"UggIgJjsxQMQAA=="}
+{"expression":"timestamp_trunc(Constant(Timestamp(seconds=1700000000, nanoseconds=123456000)), Constant(millisecond))","result":"UgsIgOLPqgYQwKnTOg=="}
+{"expression":"timestamp_trunc(Constant(Timestamp(seconds=-1, nanoseconds=999999000)), Constant(millisecond))","result":"UhEI////////////ARDAj67cAw=="}
+{"expression":"timestamp_trunc(Constant(Timestamp(seconds=1704067199, nanoseconds=999999000)), Constant(millisecond))","result":"UgwI/4DIrAYQwI+u3AM="}
+{"expression":"timestamp_trunc(Constant(Timestamp(seconds=1609459200, nanoseconds=0)), Constant(millisecond))","result":"UggIgMy5/wUQAA=="}
+{"expression":"timestamp_trunc(Constant(Timestamp(seconds=-62135596800, nanoseconds=0)), Constant(millisecond))","result":"Ug0IgJK4w5j+////ARAA"}
+{"expression":"timestamp_trunc(Constant(Timestamp(seconds=951782400, nanoseconds=0)), Constant(millisecond))","result":"UggIgJjsxQMQAA=="}
+{"expression":"timestamp_trunc(Constant(Timestamp(seconds=1700000000, nanoseconds=123456000)), Constant(second))","result":"UggIgOLPqgYQAA=="}
+{"expression":"timestamp_trunc(Constant(Timestamp(seconds=-1, nanoseconds=999999000)), Constant(second))","result":"Ug0I////////////ARAA"}
+{"expression":"timestamp_trunc(Constant(Timestamp(seconds=1704067199, nanoseconds=999999000)), Constant(second))","result":"UggI/4DIrAYQAA=="}
+{"expression":"timestamp_trunc(Constant(Timestamp(seconds=1609459200, nanoseconds=0)), Constant(second))","result":"UggIgMy5/wUQAA=="}
+{"expression":"timestamp_trunc(Constant(Timestamp(seconds=-62135596800, nanoseconds=0)), Constant(second))","result":"Ug0IgJK4w5j+////ARAA"}
+{"expression":"timestamp_trunc(Constant(Timestamp(seconds=951782400, nanoseconds=0)), Constant(second))","result":"UggIgJjsxQMQAA=="}
+{"expression":"timestamp_trunc(Constant(Timestamp(seconds=1700000000, nanoseconds=123456000)), Constant(minute))","result":"UggI7OHPqgYQAA=="}
+{"expression":"timestamp_trunc(Constant(Timestamp(seconds=-1, nanoseconds=999999000)), Constant(minute))","result":"Ug0IxP//////////ARAA"}
+{"expression":"timestamp_trunc(Constant(Timestamp(seconds=1704067199, nanoseconds=999999000)), Constant(minute))","result":"UggIxIDIrAYQAA=="}
+{"expression":"timestamp_trunc(Constant(Timestamp(seconds=1609459200, nanoseconds=0)), Constant(minute))","result":"UggIgMy5/wUQAA=="}
+{"expression":"timestamp_trunc(Constant(Timestamp(seconds=-62135596800, nanoseconds=0)), Constant(minute))","result":"Ug0IgJK4w5j+////ARAA"}
+{"expression":"timestamp_trunc(Constant(Timestamp(seconds=951782400, nanoseconds=0)), Constant(minute))","result":"UggIgJjsxQMQAA=="}
+{"expression":"timestamp_trunc(Constant(Timestamp(seconds=1700000000, nanoseconds=123456000)), Constant(hour))","result":"UggI4NvPqgYQAA=="}
+{"expression":"timestamp_trunc(Constant(Timestamp(seconds=-1, nanoseconds=999999000)), Constant(hour))","result":"Ug0I8OP/////////ARAA"}
+{"expression":"timestamp_trunc(Constant(Timestamp(seconds=1704067199, nanoseconds=999999000)), Constant(hour))","result":"UggI8OTHrAYQAA=="}
+{"expression":"timestamp_trunc(Constant(Timestamp(seconds=1609459200, nanoseconds=0)), Constant(hour))","result":"UggIgMy5/wUQAA=="}
+{"expression":"timestamp_trunc(Constant(Timestamp(seconds=-62135596800, nanoseconds=0)), Constant(hour))","result":"Ug0IgJK4w5j+////ARAA"}
+{"expression":"timestamp_trunc(Constant(Timestamp(seconds=951782400, nanoseconds=0)), Constant(hour))","result":"UggIgJjsxQMQAA=="}
+{"expression":"timestamp_trunc(Constant(Timestamp(seconds=1700000000, nanoseconds=123456000)), Constant(day))","result":"UggIgPHKqgYQAA=="}
+{"expression":"timestamp_trunc(Constant(Timestamp(seconds=-1, nanoseconds=999999000)), Constant(day))","result":"Ug0IgN36////////ARAA"}
+{"expression":"timestamp_trunc(Constant(Timestamp(seconds=1704067199, nanoseconds=999999000)), Constant(day))","result":"UggIgN7CrAYQAA=="}
+{"expression":"timestamp_trunc(Constant(Timestamp(seconds=1609459200, nanoseconds=0)), Constant(day))","result":"UggIgMy5/wUQAA=="}
+{"expression":"timestamp_trunc(Constant(Timestamp(seconds=-62135596800, nanoseconds=0)), Constant(day))","result":"Ug0IgJK4w5j+////ARAA"}
+{"expression":"timestamp_trunc(Constant(Timestamp(seconds=951782400, nanoseconds=0)), Constant(day))","result":"UggIgJjsxQMQAA=="}
+{"expression":"timestamp_trunc(Constant(Timestamp(seconds=1700000000, nanoseconds=123456000)), Constant(week))","result":"UggIgKvAqgYQAA=="}
+{"expression":"timestamp_trunc(Constant(Timestamp(seconds=-1, nanoseconds=999999000)), Constant(week))","result":"Ug0IgPTq////////ARAA"}
+{"expression":"timestamp_trunc(Constant(Timestamp(seconds=1704067199, nanoseconds=999999000)), Constant(week))","result":"UggIgN7CrAYQAA=="}
+{"expression":"timestamp_trunc(Constant(Timestamp(seconds=1609459200, nanoseconds=0)), Constant(week))","result":"UggIgJ2f/wUQAA=="}
+{"expression":"timestamp_trunc(Constant(Timestamp(seconds=-62135596800, nanoseconds=0)), Constant(week))","result":"ERROR"}
+{"expression":"timestamp_trunc(Constant(Timestamp(seconds=951782400, nanoseconds=0)), Constant(week))","result":"UggIgNLhxQMQAA=="}
+{"expression":"timestamp_trunc(Constant(Timestamp(seconds=1700000000, nanoseconds=123456000)), Constant(isoweek))","result":"UggIgM7FqgYQAA=="}
+{"expression":"timestamp_trunc(Constant(Timestamp(seconds=-1, nanoseconds=999999000)), Constant(isoweek))","result":"Ug0IgJfw////////ARAA"}
+{"expression":"timestamp_trunc(Constant(Timestamp(seconds=1704067199, nanoseconds=999999000)), Constant(isoweek))","result":"UggIgIyjrAYQAA=="}
+{"expression":"timestamp_trunc(Constant(Timestamp(seconds=1609459200, nanoseconds=0)), Constant(isoweek))","result":"UggIgMCk/wUQAA=="}
+{"expression":"timestamp_trunc(Constant(Timestamp(seconds=-62135596800, nanoseconds=0)), Constant(isoweek))","result":"Ug0IgJK4w5j+////ARAA"}
+{"expression":"timestamp_trunc(Constant(Timestamp(seconds=951782400, nanoseconds=0)), Constant(isoweek))","result":"UggIgPXmxQMQAA=="}
+{"expression":"timestamp_trunc(Constant(Timestamp(seconds=1700000000, nanoseconds=123456000)), Constant(month))","result":"UggIgKqGqgYQAA=="}
+{"expression":"timestamp_trunc(Constant(Timestamp(seconds=-1, nanoseconds=999999000)), Constant(month))","result":"Ug0IgMPc/v//////ARAA"}
+{"expression":"timestamp_trunc(Constant(Timestamp(seconds=1704067199, nanoseconds=999999000)), Constant(month))","result":"UggIgMSkqwYQAA=="}
+{"expression":"timestamp_trunc(Constant(Timestamp(seconds=1609459200, nanoseconds=0)), Constant(month))","result":"UggIgMy5/wUQAA=="}
+{"expression":"timestamp_trunc(Constant(Timestamp(seconds=-62135596800, nanoseconds=0)), Constant(month))","result":"Ug0IgJK4w5j+////ARAA"}
+{"expression":"timestamp_trunc(Constant(Timestamp(seconds=951782400, nanoseconds=0)), Constant(month))","result":"UggIgMTYxAMQAA=="}
+{"expression":"timestamp_trunc(Constant(Timestamp(seconds=1700000000, nanoseconds=123456000)), Constant(quarter))","result":"UggIgO3iqAYQAA=="}
+{"expression":"timestamp_trunc(Constant(Timestamp(seconds=-1, nanoseconds=999999000)), Constant(quarter))","result":"Ug0IgOya/P//////ARAA"}
+{"expression":"timestamp_trunc(Constant(Timestamp(seconds=1704067199, nanoseconds=999999000)), Constant(quarter))","result":"UggIgO3iqAYQAA=="}
+{"expression":"timestamp_trunc(Constant(Timestamp(seconds=1609459200, nanoseconds=0)), Constant(quarter))","result":"UggIgMy5/wUQAA=="}
+{"expression":"timestamp_trunc(Constant(Timestamp(seconds=-62135596800, nanoseconds=0)), Constant(quarter))","result":"Ug0IgJK4w5j+////ARAA"}
+{"expression":"timestamp_trunc(Constant(Timestamp(seconds=951782400, nanoseconds=0)), Constant(quarter))","result":"UggIgIe1wwMQAA=="}
+{"expression":"timestamp_trunc(Constant(Timestamp(seconds=1700000000, nanoseconds=123456000)), Constant(year))","result":"UggIgJrDnQYQAA=="}
+{"expression":"timestamp_trunc(Constant(Timestamp(seconds=-1, nanoseconds=999999000)), Constant(year))","result":"Ug0IgJn78P//////ARAA"}
+{"expression":"timestamp_trunc(Constant(Timestamp(seconds=1704067199, nanoseconds=999999000)), Constant(year))","result":"UggIgJrDnQYQAA=="}
+{"expression":"timestamp_trunc(Constant(Timestamp(seconds=1609459200, nanoseconds=0)), Constant(year))","result":"UggIgMy5/wUQAA=="}
+{"expression":"timestamp_trunc(Constant(Timestamp(seconds=-62135596800, nanoseconds=0)), Constant(year))","result":"Ug0IgJK4w5j+////ARAA"}
+{"expression":"timestamp_trunc(Constant(Timestamp(seconds=951782400, nanoseconds=0)), Constant(year))","result":"UggIgIe1wwMQAA=="}
+{"expression":"timestamp_trunc(Constant(Timestamp(seconds=1700000000, nanoseconds=123456000)), Constant(isoyear))","result":"UggIgL3InQYQAA=="}
+{"expression":"timestamp_trunc(Constant(Timestamp(seconds=-1, nanoseconds=999999000)), Constant(isoyear))","result":"Ug0IgJfw////////ARAA"}
+{"expression":"timestamp_trunc(Constant(Timestamp(seconds=1704067199, nanoseconds=999999000)), Constant(isoyear))","result":"UggIgL3InQYQAA=="}
+{"expression":"timestamp_trunc(Constant(Timestamp(seconds=1609459200, nanoseconds=0)), Constant(isoyear))","result":"UggIgPyk8AUQAA=="}
+{"expression":"timestamp_trunc(Constant(Timestamp(seconds=-62135596800, nanoseconds=0)), Constant(isoyear))","result":"Ug0IgJK4w5j+////ARAA"}
+{"expression":"timestamp_trunc(Constant(Timestamp(seconds=951782400, nanoseconds=0)), Constant(isoyear))","result":"UggIgM2/wwMQAA=="}
+{"expression":"timestamp_extract(Constant(Timestamp(seconds=1700000000, nanoseconds=123456000)), Constant(microsecond))","result":"EMDEBw=="}
+{"expression":"timestamp_extract(Constant(Timestamp(seconds=-1, nanoseconds=999999000)), Constant(microsecond))","result":"EL+EPQ=="}
+{"expression":"timestamp_extract(Constant(Timestamp(seconds=1704067199, nanoseconds=999999000)), Constant(microsecond))","result":"EL+EPQ=="}
+{"expression":"timestamp_extract(Constant(Timestamp(seconds=1609459200, nanoseconds=0)), Constant(microsecond))","result":"EAA="}
+{"expression":"timestamp_extract(Constant(Timestamp(seconds=-62135596800, nanoseconds=0)), Constant(microsecond))","result":"EAA="}
+{"expression":"timestamp_extract(Constant(Timestamp(seconds=951782400, nanoseconds=0)), Constant(microsecond))","result":"EAA="}
+{"expression":"timestamp_extract(Constant(Timestamp(seconds=1483228800, nanoseconds=0)), Constant(microsecond))","result":"EAA="}
+{"expression":"timestamp_extract(Constant(Timestamp(seconds=253402300799, nanoseconds=0)), Constant(microsecond))","result":"EAA="}
+{"expression":"timestamp_extract(Constant(Timestamp(seconds=1700000000, nanoseconds=123456000)), Constant(millisecond))","result":"EHs="}
+{"expression":"timestamp_extract(Constant(Timestamp(seconds=-1, nanoseconds=999999000)), Constant(millisecond))","result":"EOcH"}
+{"expression":"timestamp_extract(Constant(Timestamp(seconds=1704067199, nanoseconds=999999000)), Constant(millisecond))","result":"EOcH"}
+{"expression":"timestamp_extract(Constant(Timestamp(seconds=1609459200, nanoseconds=0)), Constant(millisecond))","result":"EAA="}
+{"expression":"timestamp_extract(Constant(Timestamp(seconds=-62135596800, nanoseconds=0)), Constant(millisecond))","result":"EAA="}
+{"expression":"timestamp_extract(Constant(Timestamp(seconds=951782400, nanoseconds=0)), Constant(millisecond))","result":"EAA="}
+{"expression":"timestamp_extract(Constant(Timestamp(seconds=1483228800, nanoseconds=0)), Constant(millisecond))","result":"EAA="}
+{"expression":"timestamp_extract(Constant(Timestamp(seconds=253402300799, nanoseconds=0)), Constant(millisecond))","result":"EAA="}
+{"expression":"timestamp_extract(Constant(Timestamp(seconds=1700000000, nanoseconds=123456000)), Constant(second))","result":"EBQ="}
+{"expression":"timestamp_extract(Constant(Timestamp(seconds=-1, nanoseconds=999999000)), Constant(second))","result":"EDs="}
+{"expression":"timestamp_extract(Constant(Timestamp(seconds=1704067199, nanoseconds=999999000)), Constant(second))","result":"EDs="}
+{"expression":"timestamp_extract(Constant(Timestamp(seconds=1609459200, nanoseconds=0)), Constant(second))","result":"EAA="}
+{"expression":"timestamp_extract(Constant(Timestamp(seconds=-62135596800, nanoseconds=0)), Constant(second))","result":"EAA="}
+{"expression":"timestamp_extract(Constant(Timestamp(seconds=951782400, nanoseconds=0)), Constant(second))","result":"EAA="}
+{"expression":"timestamp_extract(Constant(Timestamp(seconds=1483228800, nanoseconds=0)), Constant(second))","result":"EAA="}
+{"expression":"timestamp_extract(Constant(Timestamp(seconds=253402300799, nanoseconds=0)), Constant(second))","result":"EDs="}
+{"expression":"timestamp_extract(Constant(Timestamp(seconds=1700000000, nanoseconds=123456000)), Constant(minute))","result":"EA0="}
+{"expression":"timestamp_extract(Constant(Timestamp(seconds=-1, nanoseconds=999999000)), Constant(minute))","result":"EDs="}
+{"expression":"timestamp_extract(Constant(Timestamp(seconds=1704067199, nanoseconds=999999000)), Constant(minute))","result":"EDs="}
+{"expression":"timestamp_extract(Constant(Timestamp(seconds=1609459200, nanoseconds=0)), Constant(minute))","result":"EAA="}
+{"expression":"timestamp_extract(Constant(Timestamp(seconds=-62135596800, nanoseconds=0)), Constant(minute))","result":"EAA="}
+{"expression":"timestamp_extract(Constant(Timestamp(seconds=951782400, nanoseconds=0)), Constant(minute))","result":"EAA="}
+{"expression":"timestamp_extract(Constant(Timestamp(seconds=1483228800, nanoseconds=0)), Constant(minute))","result":"EAA="}
+{"expression":"timestamp_extract(Constant(Timestamp(seconds=253402300799, nanoseconds=0)), Constant(minute))","result":"EDs="}
+{"expression":"timestamp_extract(Constant(Timestamp(seconds=1700000000, nanoseconds=123456000)), Constant(hour))","result":"EBY="}
+{"expression":"timestamp_extract(Constant(Timestamp(seconds=-1, nanoseconds=999999000)), Constant(hour))","result":"EBc="}
+{"expression":"timestamp_extract(Constant(Timestamp(seconds=1704067199, nanoseconds=999999000)), Constant(hour))","result":"EBc="}
+{"expression":"timestamp_extract(Constant(Timestamp(seconds=1609459200, nanoseconds=0)), Constant(hour))","result":"EAA="}
+{"expression":"timestamp_extract(Constant(Timestamp(seconds=-62135596800, nanoseconds=0)), Constant(hour))","result":"EAA="}
+{"expression":"timestamp_extract(Constant(Timestamp(seconds=951782400, nanoseconds=0)), Constant(hour))","result":"EAA="}
+{"expression":"timestamp_extract(Constant(Timestamp(seconds=1483228800, nanoseconds=0)), Constant(hour))","result":"EAA="}
+{"expression":"timestamp_extract(Constant(Timestamp(seconds=253402300799, nanoseconds=0)), Constant(hour))","result":"EBc="}
+{"expression":"timestamp_extract(Constant(Timestamp(seconds=1700000000, nanoseconds=123456000)), Constant(day))","result":"EA4="}
+{"expression":"timestamp_extract(Constant(Timestamp(seconds=-1, nanoseconds=999999000)), Constant(day))","result":"EB8="}
+{"expression":"timestamp_extract(Constant(Timestamp(seconds=1704067199, nanoseconds=999999000)), Constant(day))","result":"EB8="}
+{"expression":"timestamp_extract(Constant(Timestamp(seconds=1609459200, nanoseconds=0)), Constant(day))","result":"EAE="}
+{"expression":"timestamp_extract(Constant(Timestamp(seconds=-62135596800, nanoseconds=0)), Constant(day))","result":"EAE="}
+{"expression":"timestamp_extract(Constant(Timestamp(seconds=951782400, nanoseconds=0)), Constant(day))","result":"EB0="}
+{"expression":"timestamp_extract(Constant(Timestamp(seconds=1483228800, nanoseconds=0)), Constant(day))","result":"EAE="}
+{"expression":"timestamp_extract(Constant(Timestamp(seconds=253402300799, nanoseconds=0)), Constant(day))","result":"EB8="}
+{"expression":"timestamp_extract(Constant(Timestamp(seconds=1700000000, nanoseconds=123456000)), Constant(dayofweek))","result":"EAM="}
+{"expression":"timestamp_extract(Constant(Timestamp(seconds=-1, nanoseconds=999999000)), Constant(dayofweek))","result":"EAQ="}
+{"expression":"timestamp_extract(Constant(Timestamp(seconds=1704067199, nanoseconds=999999000)), Constant(dayofweek))","result":"EAE="}
+{"expression":"timestamp_extract(Constant(Timestamp(seconds=1609459200, nanoseconds=0)), Constant(dayofweek))","result":"EAY="}
+{"expression":"timestamp_extract(Constant(Timestamp(seconds=-62135596800, nanoseconds=0)), Constant(dayofweek))","result":"EAI="}
+{"expression":"timestamp_extract(Constant(Timestamp(seconds=951782400, nanoseconds=0)), Constant(dayofweek))","result":"EAM="}
+{"expression":"timestamp_extract(Constant(Timestamp(seconds=1483228800, nanoseconds=0)), Constant(dayofweek))","result":"EAE="}
+{"expression":"timestamp_extract(Constant(Timestamp(seconds=253402300799, nanoseconds=0)), Constant(dayofweek))","result":"EAY="}
+{"expression":"timestamp_extract(Constant(Timestamp(seconds=1700000000, nanoseconds=123456000)), Constant(dayofyear))","result":"EL4C"}
+{"expression":"timestamp_extract(Constant(Timestamp(seconds=-1, nanoseconds=999999000)), Constant(dayofyear))","result":"EO0C"}
+{"expression":"timestamp_extract(Constant(Timestamp(seconds=1704067199, nanoseconds=999999000)), Constant(dayofyear))","result":"EO0C"}
+{"expression":"timestamp_extract(Constant(Timestamp(seconds=1609459200, nanoseconds=0)), Constant(dayofyear))","result":"EAE="}
+{"expression":"timestamp_extract(Constant(Timestamp(seconds=-62135596800, nanoseconds=0)), Constant(dayofyear))","result":"EAE="}
+{"expression":"timestamp_extract(Constant(Timestamp(seconds=951782400, nanoseconds=0)), Constant(dayofyear))","result":"EDw="}
+{"expression":"timestamp_extract(Constant(Timestamp(seconds=1483228800, nanoseconds=0)), Constant(dayofyear))","result":"EAE="}
+{"expression":"timestamp_extract(Constant(Timestamp(seconds=253402300799, nanoseconds=0)), Constant(dayofyear))","result":"EO0C"}
+{"expression":"timestamp_extract(Constant(Timestamp(seconds=1700000000, nanoseconds=123456000)), Constant(week))","result":"EC4="}
+{"expression":"timestamp_extract(Constant(Timestamp(seconds=-1, nanoseconds=999999000)), Constant(week))","result":"EDQ="}
+{"expression":"timestamp_extract(Constant(Timestamp(seconds=1704067199, nanoseconds=999999000)), Constant(week))","result":"EDU="}
+{"expression":"timestamp_extract(Constant(Timestamp(seconds=1609459200, nanoseconds=0)), Constant(week))","result":"EAA="}
+{"expression":"timestamp_extract(Constant(Timestamp(seconds=-62135596800, nanoseconds=0)), Constant(week))","result":"EAA="}
+{"expression":"timestamp_extract(Constant(Timestamp(seconds=951782400, nanoseconds=0)), Constant(week))","result":"EAk="}
+{"expression":"timestamp_extract(Constant(Timestamp(seconds=1483228800, nanoseconds=0)), Constant(week))","result":"EAE="}
+{"expression":"timestamp_extract(Constant(Timestamp(seconds=253402300799, nanoseconds=0)), Constant(week))","result":"EDQ="}
+{"expression":"timestamp_extract(Constant(Timestamp(seconds=1700000000, nanoseconds=123456000)), Constant(isoweek))","result":"EC4="}
+{"expression":"timestamp_extract(Constant(Timestamp(seconds=-1, nanoseconds=999999000)), Constant(isoweek))","result":"EAE="}
+{"expression":"timestamp_extract(Constant(Timestamp(seconds=1704067199, nanoseconds=999999000)), Constant(isoweek))","result":"EDQ="}
+{"expression":"timestamp_extract(Constant(Timestamp(seconds=1609459200, nanoseconds=0)), Constant(isoweek))","result":"EDU="}
+{"expression":"timestamp_extract(Constant(Timestamp(seconds=-62135596800, nanoseconds=0)), Constant(isoweek))","result":"EAE="}
+{"expression":"timestamp_extract(Constant(Timestamp(seconds=951782400, nanoseconds=0)), Constant(isoweek))","result":"EAk="}
+{"expression":"timestamp_extract(Constant(Timestamp(seconds=1483228800, nanoseconds=0)), Constant(isoweek))","result":"EDQ="}
+{"expression":"timestamp_extract(Constant(Timestamp(seconds=253402300799, nanoseconds=0)), Constant(isoweek))","result":"EDQ="}
+{"expression":"timestamp_extract(Constant(Timestamp(seconds=1700000000, nanoseconds=123456000)), Constant(month))","result":"EAs="}
+{"expression":"timestamp_extract(Constant(Timestamp(seconds=-1, nanoseconds=999999000)), Constant(month))","result":"EAw="}
+{"expression":"timestamp_extract(Constant(Timestamp(seconds=1704067199, nanoseconds=999999000)), Constant(month))","result":"EAw="}
+{"expression":"timestamp_extract(Constant(Timestamp(seconds=1609459200, nanoseconds=0)), Constant(month))","result":"EAE="}
+{"expression":"timestamp_extract(Constant(Timestamp(seconds=-62135596800, nanoseconds=0)), Constant(month))","result":"EAE="}
+{"expression":"timestamp_extract(Constant(Timestamp(seconds=951782400, nanoseconds=0)), Constant(month))","result":"EAI="}
+{"expression":"timestamp_extract(Constant(Timestamp(seconds=1483228800, nanoseconds=0)), Constant(month))","result":"EAE="}
+{"expression":"timestamp_extract(Constant(Timestamp(seconds=253402300799, nanoseconds=0)), Constant(month))","result":"EAw="}
+{"expression":"timestamp_extract(Constant(Timestamp(seconds=1700000000, nanoseconds=123456000)), Constant(quarter))","result":"EAQ="}
+{"expression":"timestamp_extract(Constant(Timestamp(seconds=-1, nanoseconds=999999000)), Constant(quarter))","result":"EAQ="}
+{"expression":"timestamp_extract(Constant(Timestamp(seconds=1704067199, nanoseconds=999999000)), Constant(quarter))","result":"EAQ="}
+{"expression":"timestamp_extract(Constant(Timestamp(seconds=1609459200, nanoseconds=0)), Constant(quarter))","result":"EAE="}
+{"expression":"timestamp_extract(Constant(Timestamp(seconds=-62135596800, nanoseconds=0)), Constant(quarter))","result":"EAE="}
+{"expression":"timestamp_extract(Constant(Timestamp(seconds=951782400, nanoseconds=0)), Constant(quarter))","result":"EAE="}
+{"expression":"timestamp_extract(Constant(Timestamp(seconds=1483228800, nanoseconds=0)), Constant(quarter))","result":"EAE="}
+{"expression":"timestamp_extract(Constant(Timestamp(seconds=253402300799, nanoseconds=0)), Constant(quarter))","result":"EAQ="}
+{"expression":"timestamp_extract(Constant(Timestamp(seconds=1700000000, nanoseconds=123456000)), Constant(year))","result":"EOcP"}
+{"expression":"timestamp_extract(Constant(Timestamp(seconds=-1, nanoseconds=999999000)), Constant(year))","result":"ELEP"}
+{"expression":"timestamp_extract(Constant(Timestamp(seconds=1704067199, nanoseconds=999999000)), Constant(year))","result":"EOcP"}
+{"expression":"timestamp_extract(Constant(Timestamp(seconds=1609459200, nanoseconds=0)), Constant(year))","result":"EOUP"}
+{"expression":"timestamp_extract(Constant(Timestamp(seconds=-62135596800, nanoseconds=0)), Constant(year))","result":"EAE="}
+{"expression":"timestamp_extract(Constant(Timestamp(seconds=951782400, nanoseconds=0)), Constant(year))","result":"ENAP"}
+{"expression":"timestamp_extract(Constant(Timestamp(seconds=1483228800, nanoseconds=0)), Constant(year))","result":"EOEP"}
+{"expression":"timestamp_extract(Constant(Timestamp(seconds=253402300799, nanoseconds=0)), Constant(year))","result":"EI9O"}
+{"expression":"timestamp_extract(Constant(Timestamp(seconds=1700000000, nanoseconds=123456000)), Constant(isoyear))","result":"EOcP"}
+{"expression":"timestamp_extract(Constant(Timestamp(seconds=-1, nanoseconds=999999000)), Constant(isoyear))","result":"ELIP"}
+{"expression":"timestamp_extract(Constant(Timestamp(seconds=1704067199, nanoseconds=999999000)), Constant(isoyear))","result":"EOcP"}
+{"expression":"timestamp_extract(Constant(Timestamp(seconds=1609459200, nanoseconds=0)), Constant(isoyear))","result":"EOQP"}
+{"expression":"timestamp_extract(Constant(Timestamp(seconds=-62135596800, nanoseconds=0)), Constant(isoyear))","result":"EAE="}
+{"expression":"timestamp_extract(Constant(Timestamp(seconds=951782400, nanoseconds=0)), Constant(isoyear))","result":"ENAP"}
+{"expression":"timestamp_extract(Constant(Timestamp(seconds=1483228800, nanoseconds=0)), Constant(isoyear))","result":"EOAP"}
+{"expression":"timestamp_extract(Constant(Timestamp(seconds=253402300799, nanoseconds=0)), Constant(isoyear))","result":"EI9O"}
 {"expression":"timestamp_trunc(Field(ts), Constant(day), Constant(UTC))","result":"UggIgPHKqgYQAA=="}
 {"expression":"timestamp_extract(Field(ts), Constant(hour), Constant(UTC))","result":"EBY="}
 {"expression":"timestamp_trunc(Field(n), Constant(day))","result":"WAA="}
@@ -1599,9 +1599,9 @@
 {"expression":"timestamp_to_unix_millis(Field(ts))","result":"EPvQlf+8MQ=="}
 {"expression":"timestamp_to_unix_seconds(Field(ts))","result":"EIDiz6oG"}
 {"expression":"timestamp_to_unix_seconds(Field(s))","result":"ERROR"}
-{"expression":"timestamp_to_unix_millis(Constant(Timestamp {   seconds=-2,   nanoseconds=999999000, }))","result":"EJf4/////////wE="}
-{"expression":"timestamp_to_unix_micros(Constant(Timestamp {   seconds=-2,   nanoseconds=999999000, }))","result":"EL/7wv///////wE="}
-{"expression":"timestamp_to_unix_seconds(Constant(Timestamp {   seconds=-2,   nanoseconds=999999000, }))","result":"EP7//////////wE="}
+{"expression":"timestamp_to_unix_millis(Constant(Timestamp(seconds=-2, nanoseconds=999999000)))","result":"EJf4/////////wE="}
+{"expression":"timestamp_to_unix_micros(Constant(Timestamp(seconds=-2, nanoseconds=999999000)))","result":"EL/7wv///////wE="}
+{"expression":"timestamp_to_unix_seconds(Constant(Timestamp(seconds=-2, nanoseconds=999999000)))","result":"EP7//////////wE="}
 {"expression":"unix_micros_to_timestamp(Constant(-1))","result":"UhEI////////////ARCYjOvcAw=="}
 {"expression":"unix_millis_to_timestamp(Constant(1500))","result":"UggIARCAyrXuAQ=="}
 {"expression":"unix_millis_to_timestamp(Constant(-1500))","result":"UhEI/v//////////ARCAyrXuAQ=="}
@@ -3485,7 +3485,7 @@
 {"expression":"map_set(Constant({a: 1, b: x}), Constant(a), Constant(7), Constant(a), Constant(null))","result":"MhQKBwoBYRICWAAKCQoBYhIEigEBeA=="}
 {"expression":"map_set(Constant({a: 1, b: x}), Constant(a), Constant(7), Constant(a), Field(zz))","result":"MgsKCQoBYhIEigEBeA=="}
 {"expression":"map_set(Constant({a: 1, b: x}), Constant(a), Constant(7), Constant(a), divide(Constant(1), Constant(0)))","result":"ERROR"}
-{"expression":"timestamp_add(Constant(Timestamp {   seconds=1700000000,   nanoseconds=123456000, }), Constant(microsecond), Constant(7))","result":"UgsIgOLPqgYQ2MrvOg=="}
+{"expression":"timestamp_add(Constant(Timestamp(seconds=1700000000, nanoseconds=123456000)), Constant(microsecond), Constant(7))","result":"UgsIgOLPqgYQ2MrvOg=="}
 {"expression":"timestamp_add(Constant(null), Constant(microsecond), Constant(7))","result":"WAA="}
 {"expression":"timestamp_add(Constant(null), Constant(microsecond), Constant(null))","result":"WAA="}
 {"expression":"timestamp_add(Constant(null), Constant(microsecond), Field(zz))","result":"WAA="}
@@ -3505,11 +3505,11 @@
 {"expression":"timestamp_add(divide(Constant(1), Constant(0)), Constant(microsecond), Constant(null))","result":"ERROR"}
 {"expression":"timestamp_add(divide(Constant(1), Constant(0)), Constant(microsecond), Field(zz))","result":"ERROR"}
 {"expression":"timestamp_add(divide(Constant(1), Constant(0)), Constant(microsecond), Constant(x))","result":"ERROR"}
-{"expression":"timestamp_add(Constant(Timestamp {   seconds=1700000000,   nanoseconds=123456000, }), Constant(microsecond), Constant(null))","result":"WAA="}
-{"expression":"timestamp_add(Constant(Timestamp {   seconds=1700000000,   nanoseconds=123456000, }), Constant(microsecond), Field(zz))","result":"WAA="}
-{"expression":"timestamp_add(Constant(Timestamp {   seconds=1700000000,   nanoseconds=123456000, }), Constant(microsecond), Constant(x))","result":"ERROR"}
-{"expression":"timestamp_add(Constant(Timestamp {   seconds=1700000000,   nanoseconds=123456000, }), Constant(microsecond), divide(Constant(1), Constant(0)))","result":"ERROR"}
-{"expression":"timestamp_subtract(Constant(Timestamp {   seconds=1700000000,   nanoseconds=123456000, }), Constant(microsecond), Constant(7))","result":"UgsIgOLPqgYQqN3uOg=="}
+{"expression":"timestamp_add(Constant(Timestamp(seconds=1700000000, nanoseconds=123456000)), Constant(microsecond), Constant(null))","result":"WAA="}
+{"expression":"timestamp_add(Constant(Timestamp(seconds=1700000000, nanoseconds=123456000)), Constant(microsecond), Field(zz))","result":"WAA="}
+{"expression":"timestamp_add(Constant(Timestamp(seconds=1700000000, nanoseconds=123456000)), Constant(microsecond), Constant(x))","result":"ERROR"}
+{"expression":"timestamp_add(Constant(Timestamp(seconds=1700000000, nanoseconds=123456000)), Constant(microsecond), divide(Constant(1), Constant(0)))","result":"ERROR"}
+{"expression":"timestamp_subtract(Constant(Timestamp(seconds=1700000000, nanoseconds=123456000)), Constant(microsecond), Constant(7))","result":"UgsIgOLPqgYQqN3uOg=="}
 {"expression":"timestamp_subtract(Constant(null), Constant(microsecond), Constant(7))","result":"WAA="}
 {"expression":"timestamp_subtract(Constant(null), Constant(microsecond), Constant(null))","result":"WAA="}
 {"expression":"timestamp_subtract(Constant(null), Constant(microsecond), Field(zz))","result":"WAA="}
@@ -3529,55 +3529,55 @@
 {"expression":"timestamp_subtract(divide(Constant(1), Constant(0)), Constant(microsecond), Constant(null))","result":"ERROR"}
 {"expression":"timestamp_subtract(divide(Constant(1), Constant(0)), Constant(microsecond), Field(zz))","result":"ERROR"}
 {"expression":"timestamp_subtract(divide(Constant(1), Constant(0)), Constant(microsecond), Constant(x))","result":"ERROR"}
-{"expression":"timestamp_subtract(Constant(Timestamp {   seconds=1700000000,   nanoseconds=123456000, }), Constant(microsecond), Constant(null))","result":"WAA="}
-{"expression":"timestamp_subtract(Constant(Timestamp {   seconds=1700000000,   nanoseconds=123456000, }), Constant(microsecond), Field(zz))","result":"WAA="}
-{"expression":"timestamp_subtract(Constant(Timestamp {   seconds=1700000000,   nanoseconds=123456000, }), Constant(microsecond), Constant(x))","result":"ERROR"}
-{"expression":"timestamp_subtract(Constant(Timestamp {   seconds=1700000000,   nanoseconds=123456000, }), Constant(microsecond), divide(Constant(1), Constant(0)))","result":"ERROR"}
-{"expression":"timestamp_diff(Constant(Timestamp {   seconds=1700000000,   nanoseconds=123456000, }), Constant(Timestamp {   seconds=1700000000,   nanoseconds=123456000, }), Constant(microsecond))","result":"EAA="}
-{"expression":"timestamp_diff(Constant(null), Constant(Timestamp {   seconds=1700000000,   nanoseconds=123456000, }), Constant(microsecond))","result":"WAA="}
+{"expression":"timestamp_subtract(Constant(Timestamp(seconds=1700000000, nanoseconds=123456000)), Constant(microsecond), Constant(null))","result":"WAA="}
+{"expression":"timestamp_subtract(Constant(Timestamp(seconds=1700000000, nanoseconds=123456000)), Constant(microsecond), Field(zz))","result":"WAA="}
+{"expression":"timestamp_subtract(Constant(Timestamp(seconds=1700000000, nanoseconds=123456000)), Constant(microsecond), Constant(x))","result":"ERROR"}
+{"expression":"timestamp_subtract(Constant(Timestamp(seconds=1700000000, nanoseconds=123456000)), Constant(microsecond), divide(Constant(1), Constant(0)))","result":"ERROR"}
+{"expression":"timestamp_diff(Constant(Timestamp(seconds=1700000000, nanoseconds=123456000)), Constant(Timestamp(seconds=1700000000, nanoseconds=123456000)), Constant(microsecond))","result":"EAA="}
+{"expression":"timestamp_diff(Constant(null), Constant(Timestamp(seconds=1700000000, nanoseconds=123456000)), Constant(microsecond))","result":"WAA="}
 {"expression":"timestamp_diff(Constant(null), Constant(null), Constant(microsecond))","result":"WAA="}
 {"expression":"timestamp_diff(Constant(null), Field(zz), Constant(microsecond))","result":"WAA="}
 {"expression":"timestamp_diff(Constant(null), Constant(7), Constant(microsecond))","result":"ERROR"}
 {"expression":"timestamp_diff(Constant(null), divide(Constant(1), Constant(0)), Constant(microsecond))","result":"ERROR"}
-{"expression":"timestamp_diff(Field(zz), Constant(Timestamp {   seconds=1700000000,   nanoseconds=123456000, }), Constant(microsecond))","result":"WAA="}
+{"expression":"timestamp_diff(Field(zz), Constant(Timestamp(seconds=1700000000, nanoseconds=123456000)), Constant(microsecond))","result":"WAA="}
 {"expression":"timestamp_diff(Field(zz), Constant(null), Constant(microsecond))","result":"WAA="}
 {"expression":"timestamp_diff(Field(zz), Field(zz), Constant(microsecond))","result":"WAA="}
 {"expression":"timestamp_diff(Field(zz), Constant(7), Constant(microsecond))","result":"ERROR"}
 {"expression":"timestamp_diff(Field(zz), divide(Constant(1), Constant(0)), Constant(microsecond))","result":"ERROR"}
-{"expression":"timestamp_diff(Constant(7), Constant(Timestamp {   seconds=1700000000,   nanoseconds=123456000, }), Constant(microsecond))","result":"ERROR"}
+{"expression":"timestamp_diff(Constant(7), Constant(Timestamp(seconds=1700000000, nanoseconds=123456000)), Constant(microsecond))","result":"ERROR"}
 {"expression":"timestamp_diff(Constant(7), Constant(null), Constant(microsecond))","result":"ERROR"}
 {"expression":"timestamp_diff(Constant(7), Field(zz), Constant(microsecond))","result":"ERROR"}
 {"expression":"timestamp_diff(Constant(7), Constant(7), Constant(microsecond))","result":"ERROR"}
 {"expression":"timestamp_diff(Constant(7), divide(Constant(1), Constant(0)), Constant(microsecond))","result":"ERROR"}
-{"expression":"timestamp_diff(divide(Constant(1), Constant(0)), Constant(Timestamp {   seconds=1700000000,   nanoseconds=123456000, }), Constant(microsecond))","result":"ERROR"}
+{"expression":"timestamp_diff(divide(Constant(1), Constant(0)), Constant(Timestamp(seconds=1700000000, nanoseconds=123456000)), Constant(microsecond))","result":"ERROR"}
 {"expression":"timestamp_diff(divide(Constant(1), Constant(0)), Constant(null), Constant(microsecond))","result":"ERROR"}
 {"expression":"timestamp_diff(divide(Constant(1), Constant(0)), Field(zz), Constant(microsecond))","result":"ERROR"}
 {"expression":"timestamp_diff(divide(Constant(1), Constant(0)), Constant(7), Constant(microsecond))","result":"ERROR"}
-{"expression":"timestamp_diff(Constant(Timestamp {   seconds=1700000000,   nanoseconds=123456000, }), Constant(null), Constant(microsecond))","result":"WAA="}
-{"expression":"timestamp_diff(Constant(Timestamp {   seconds=1700000000,   nanoseconds=123456000, }), Field(zz), Constant(microsecond))","result":"WAA="}
-{"expression":"timestamp_diff(Constant(Timestamp {   seconds=1700000000,   nanoseconds=123456000, }), Constant(7), Constant(microsecond))","result":"ERROR"}
-{"expression":"timestamp_diff(Constant(Timestamp {   seconds=1700000000,   nanoseconds=123456000, }), divide(Constant(1), Constant(0)), Constant(microsecond))","result":"ERROR"}
-{"expression":"timestamp_trunc(Constant(Timestamp {   seconds=1700000000,   nanoseconds=123456000, }), Constant(microsecond))","result":"UgsIgOLPqgYQgJTvOg=="}
+{"expression":"timestamp_diff(Constant(Timestamp(seconds=1700000000, nanoseconds=123456000)), Constant(null), Constant(microsecond))","result":"WAA="}
+{"expression":"timestamp_diff(Constant(Timestamp(seconds=1700000000, nanoseconds=123456000)), Field(zz), Constant(microsecond))","result":"WAA="}
+{"expression":"timestamp_diff(Constant(Timestamp(seconds=1700000000, nanoseconds=123456000)), Constant(7), Constant(microsecond))","result":"ERROR"}
+{"expression":"timestamp_diff(Constant(Timestamp(seconds=1700000000, nanoseconds=123456000)), divide(Constant(1), Constant(0)), Constant(microsecond))","result":"ERROR"}
+{"expression":"timestamp_trunc(Constant(Timestamp(seconds=1700000000, nanoseconds=123456000)), Constant(microsecond))","result":"UgsIgOLPqgYQgJTvOg=="}
 {"expression":"timestamp_trunc(Constant(null), Constant(microsecond))","result":"WAA="}
 {"expression":"timestamp_trunc(Field(zz), Constant(microsecond))","result":"WAA="}
 {"expression":"timestamp_trunc(Constant(7), Constant(microsecond))","result":"ERROR"}
 {"expression":"timestamp_trunc(divide(Constant(1), Constant(0)), Constant(microsecond))","result":"ERROR"}
-{"expression":"timestamp_extract(Constant(Timestamp {   seconds=1700000000,   nanoseconds=123456000, }), Constant(microsecond))","result":"EMDEBw=="}
+{"expression":"timestamp_extract(Constant(Timestamp(seconds=1700000000, nanoseconds=123456000)), Constant(microsecond))","result":"EMDEBw=="}
 {"expression":"timestamp_extract(Constant(null), Constant(microsecond))","result":"WAA="}
 {"expression":"timestamp_extract(Field(zz), Constant(microsecond))","result":"WAA="}
 {"expression":"timestamp_extract(Constant(7), Constant(microsecond))","result":"ERROR"}
 {"expression":"timestamp_extract(divide(Constant(1), Constant(0)), Constant(microsecond))","result":"ERROR"}
-{"expression":"timestamp_to_unix_micros(Constant(Timestamp {   seconds=1700000000,   nanoseconds=123456000, }))","result":"EMDEgMHBxIID"}
+{"expression":"timestamp_to_unix_micros(Constant(Timestamp(seconds=1700000000, nanoseconds=123456000)))","result":"EMDEgMHBxIID"}
 {"expression":"timestamp_to_unix_micros(Constant(null))","result":"WAA="}
 {"expression":"timestamp_to_unix_micros(Field(zz))","result":"WAA="}
 {"expression":"timestamp_to_unix_micros(Constant(7))","result":"ERROR"}
 {"expression":"timestamp_to_unix_micros(divide(Constant(1), Constant(0)))","result":"ERROR"}
-{"expression":"timestamp_to_unix_millis(Constant(Timestamp {   seconds=1700000000,   nanoseconds=123456000, }))","result":"EPvQlf+8MQ=="}
+{"expression":"timestamp_to_unix_millis(Constant(Timestamp(seconds=1700000000, nanoseconds=123456000)))","result":"EPvQlf+8MQ=="}
 {"expression":"timestamp_to_unix_millis(Constant(null))","result":"WAA="}
 {"expression":"timestamp_to_unix_millis(Field(zz))","result":"WAA="}
 {"expression":"timestamp_to_unix_millis(Constant(7))","result":"ERROR"}
 {"expression":"timestamp_to_unix_millis(divide(Constant(1), Constant(0)))","result":"ERROR"}
-{"expression":"timestamp_to_unix_seconds(Constant(Timestamp {   seconds=1700000000,   nanoseconds=123456000, }))","result":"EIDiz6oG"}
+{"expression":"timestamp_to_unix_seconds(Constant(Timestamp(seconds=1700000000, nanoseconds=123456000)))","result":"EIDiz6oG"}
 {"expression":"timestamp_to_unix_seconds(Constant(null))","result":"WAA="}
 {"expression":"timestamp_to_unix_seconds(Field(zz))","result":"WAA="}
 {"expression":"timestamp_to_unix_seconds(Constant(7))","result":"ERROR"}

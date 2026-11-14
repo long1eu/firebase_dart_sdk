@@ -23,6 +23,9 @@ enum CompositeFilterOperator {
 
   final String _text;
 
+  /// The name of this operator in the canonical id of a query, which is stored in the cache.
+  String get canonicalName => _text;
+
   @override
   String toString() => _text;
 }
@@ -122,14 +125,15 @@ class CompositeFilter extends Filter {
     // canonical ID as the plain concatenation of its filters, so that
     // `where(a).where(b)` and `where(Filter.and([a, b]))` agree.
     if (isFlatConjunction) {
-      return filters.map((Filter filter) => filter.canonicalId).join();
+      return filters.map((Filter filter) => filter.canonicalId).join(',');
     }
 
-    return '$operator(${filters.map((Filter f) => f.canonicalId).join(',')})';
+    return '${operator.canonicalName}(${filters.map((Filter f) => f.canonicalId).join(',')})';
   }
 
   @override
-  String toString() => canonicalId;
+  // For messages (the JS `stringifyFilter`); the canonical id does not use it.
+  String toString() => '${operator.canonicalName} {${filters.join(', ')}}';
 
   @override
   bool operator ==(Object other) {

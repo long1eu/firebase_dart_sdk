@@ -208,8 +208,7 @@ class View {
         final DocumentKey newDocKey = newDoc.key;
         hardAssertLazy(
           key == newDocKey,
-          () =>
-              'Mismatching key in doc change ${key.path} != ${newDocKey.path}',
+          () => 'Mismatching key in doc change $key != $newDocKey',
         );
         if (!query.matches(newDoc)) {
           newDoc = null;
@@ -503,7 +502,7 @@ class View {
       for (DocumentKey documentKey in targetChange.modifiedDocuments) {
         hardAssertLazy(
           _syncedDocuments.contains(documentKey),
-          () => 'Modified document ${documentKey.path} not found in view.',
+          () => 'Modified document $documentKey not found in view.',
         );
       }
       for (DocumentKey documentKey in targetChange.removedDocuments) {

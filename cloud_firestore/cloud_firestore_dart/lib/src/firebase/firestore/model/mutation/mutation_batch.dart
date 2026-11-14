@@ -65,7 +65,7 @@ class MutationBatch {
       hardAssertLazy(
         maybeDoc.key == documentKey,
         () =>
-            'applyToRemoteDocument: key ${documentKey.path} doesn\'t match maybeDoc key ${maybeDoc?.key.path}',
+            'applyToRemoteDocument: key $documentKey doesn\'t match maybeDoc key ${maybeDoc?.key}',
       );
     }
 
@@ -96,7 +96,7 @@ class MutationBatch {
       hardAssertLazy(
         maybeDoc.key == documentKey,
         () =>
-            'applyToLocalView: key ${documentKey.path} doesn\'t match maybeDoc key ${maybeDoc?.key.path}',
+            'applyToLocalView: key $documentKey doesn\'t match maybeDoc key ${maybeDoc?.key}',
       );
     }
     // First, apply the base state. This allows us to apply non-idempotent transform against a
@@ -135,7 +135,7 @@ class MutationBatch {
       hardAssertLazy(
         maybeDoc.key == documentKey,
         () =>
-            'applyToLocalView: key ${documentKey.path} doesn\'t match maybeDoc key ${maybeDoc?.key.path}',
+            'applyToLocalView: key $documentKey doesn\'t match maybeDoc key ${maybeDoc?.key}',
       );
     }
     // First, apply the base state. This allows us to apply non-idempotent transform against a consistent set of

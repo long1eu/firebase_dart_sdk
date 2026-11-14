@@ -53,19 +53,19 @@ void main() {
       // the port wrote when Bound still had a `before` flag ('b:' is "before
       // the position", 'a:' is "after" it).
       final Query q = query('coll').orderBy(orderBy('a'));
-      const String prefix = 'coll|f:|ob:aasc__name__asc';
+      const String prefix = 'coll|f:|ob:aasc,__name__asc';
       // startAt
       expect(q.startAt(bound(true, <Object>[1, 'x'])).toTarget().canonicalId,
-          '$prefix|lb:b:1x');
+          '$prefix|lb:b:1,x');
       // startAfter
       expect(q.startAt(bound(false, <Object>[1, 'x'])).toTarget().canonicalId,
-          '$prefix|lb:a:1x');
+          '$prefix|lb:a:1,x');
       // endBefore
       expect(q.endAt(bound(false, <Object>[1, 'x'])).toTarget().canonicalId,
-          '$prefix|ub:b:1x');
+          '$prefix|ub:b:1,x');
       // endAt
       expect(q.endAt(bound(true, <Object>[1, 'x'])).toTarget().canonicalId,
-          '$prefix|ub:a:1x');
+          '$prefix|ub:a:1,x');
       // limitToLast swaps the cursors and keeps what they include.
       expect(
           q
@@ -74,7 +74,7 @@ void main() {
               .limitToLast(2)
               .toTarget()
               .canonicalId,
-          'coll|f:|ob:adesc__name__desc|l:2|lb:b:5|ub:a:1');
+          'coll|f:|ob:adesc,__name__desc|l:2|lb:b:5|ub:a:1');
       expect(
           q
               .startAt(bound(false, <Object>[1]))
@@ -82,8 +82,8 @@ void main() {
               .limitToLast(2)
               .toTarget()
               .canonicalId,
-          'coll|f:|ob:adesc__name__desc|l:2|lb:a:5|ub:b:1');
-      expect(bound(true, <Object>[1, 'x']).positionString(), '1x');
+          'coll|f:|ob:adesc,__name__desc|l:2|lb:a:5|ub:b:1');
+      expect(bound(true, <Object>[1, 'x']).positionString(), '1,x');
     });
 
     test('equality and hashCode', () {

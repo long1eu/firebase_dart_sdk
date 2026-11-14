@@ -100,7 +100,7 @@ void main() {
 
   test('composite filter canonical id', () {
     expect(andFilters(<Filter>[a, b]).canonicalId,
-        '${a.canonicalId}${b.canonicalId}');
+        '${a.canonicalId},${b.canonicalId}');
     expect(orFilters(<Filter>[a, b]).canonicalId,
         'or(${a.canonicalId},${b.canonicalId})');
     expect(

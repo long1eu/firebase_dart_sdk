@@ -378,20 +378,22 @@ class Target {
     }
 
     // Add filters.
-    builder.write('|f:');
-    for (Filter filter in filters) {
-      builder.write(filter.canonicalId);
-    }
-
-    // Add order by.
-    builder.write('|ob:');
-    for (OrderBy orderBy in orderBy) {
-      builder
-        ..write(orderBy.field.canonicalString)
-        ..write(
-          orderBy.direction == OrderByDirection.ascending ? 'asc' : 'desc',
-        );
-    }
+    builder
+      ..write('|f:')
+      ..write(filters.map((Filter filter) => filter.canonicalId).join(','))
+      // Add order by.
+      ..write('|ob:')
+      ..write(
+        orderBy
+            .map(
+              (OrderBy orderBy) =>
+                  orderBy.field.canonicalString +
+                  (orderBy.direction == OrderByDirection.ascending
+                      ? 'asc'
+                      : 'desc'),
+            )
+            .join(','),
+      );
 
     // Add limit.
     if (hasLimit) {

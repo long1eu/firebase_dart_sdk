@@ -166,13 +166,11 @@ class Timestamp implements Comparable<Timestamp> {
     );
   }
 
+  /// A string with the seconds and the nanoseconds of this timestamp, `Timestamp(seconds=1, nanoseconds=2)`, as in
+  /// the JS and Android SDKs. It is meant for logs and messages; use [seconds] and [nanoseconds], or [toDate], to
+  /// read the value.
   @override
-  String toString() {
-    return (ToStringHelper(runtimeType)
-          ..add('seconds', seconds)
-          ..add('nanoseconds', nanoseconds))
-        .toString();
-  }
+  String toString() => 'Timestamp(seconds=$seconds, nanoseconds=$nanoseconds)';
 
   @override
   bool operator ==(Object other) =>

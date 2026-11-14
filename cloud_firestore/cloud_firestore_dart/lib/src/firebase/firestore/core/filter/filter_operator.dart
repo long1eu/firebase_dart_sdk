@@ -47,6 +47,18 @@ class FilterOperator {
     NOT_IN,
   ];
 
+  /// The name of this operator in the canonical id of a query, which is stored in the cache: the name in the JS SDK.
+  String get canonicalName {
+    if (this == arrayContains) {
+      return 'array-contains';
+    } else if (this == arrayContainsAny) {
+      return 'array-contains-any';
+    } else if (this == NOT_IN) {
+      return 'not-in';
+    }
+    return _value;
+  }
+
   @override
   String toString() => _value;
 }

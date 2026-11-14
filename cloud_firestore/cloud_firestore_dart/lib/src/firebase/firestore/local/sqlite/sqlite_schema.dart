@@ -16,7 +16,7 @@ class SQLiteSchema {
   const SQLiteSchema(this.db);
 
   /// The version of the schema. Increase this by one for each migration added to [runMigrations] below.
-  static const int version = 18;
+  static const int version = 19;
 
   /// The batch size for data migrations on a large table. This is chosen to balance the memory usage of the rows read
   /// with the number of round trips.
@@ -146,6 +146,13 @@ class SQLiteSchema {
     // clients that are gone (see SQLiteMutationQueue). Existing rows keep a null client id: anyone sends them.
     if (fromVersion < 18 && toVersion >= 18) {
       await _addMutationClientId();
+    }
+
+    // Migration 19 has no counterpart in the other SDKs: the canonical ids of the targets are built as in the JS SDK
+    // from now on (see `canonifyValue`). Before, they contained the `toString()` of the values of a query. The ids of
+    // the stored targets are computed again, so that the cache finds them.
+    if (fromVersion < 19 && toVersion >= 19) {
+      await _rewriteTargetCanonicalIds();
     }
 
     // Adding a new migration? READ THIS FIRST!
@@ -848,6 +855,52 @@ class SQLiteSchema {
         'UPDATE targets SET target_proto = ? WHERE target_id = ?',
         <Object>[targetProto.writeToBuffer(), targetId],
       );
+    }
+  }
+
+  static final RegExp _databaseOfName = RegExp(
+    r'^projects/([^/]+)/databases/([^/]+)/documents(/|$)',
+  );
+
+  /// Computes the canonical id of every stored target again. A target that can not be decoded keeps its id: the
+  /// cache does not find it any more and it is collected as garbage.
+  Future<void> _rewriteTargetCanonicalIds() async {
+    final List<Map<String, dynamic>> rows = await db.query(
+      'SELECT target_id, canonical_id, target_proto FROM targets',
+    );
+    for (final Map<String, dynamic> row in rows) {
+      final int targetId = row['target_id'];
+      final String canonicalId;
+      try {
+        final proto.Target targetProto = proto.Target.fromBuffer(
+          row['target_proto'] as Uint8List,
+        );
+        // The names in the target say which database it belongs to.
+        final String name = targetProto.hasQuery()
+            ? targetProto.query.parent
+            : targetProto.documents.documents.first;
+        final RegExpMatch? database = _databaseOfName.firstMatch(name);
+        if (database == null) {
+          continue;
+        }
+        canonicalId = LocalSerializer(
+          RemoteSerializer(
+            DatabaseId.forDatabase(database.group(1)!, database.group(2)!),
+          ),
+        ).decodeQueryData(targetProto).target.canonicalId;
+      } catch (e) {
+        Log.w(
+          'SQLiteSchema',
+          'The canonical id of target $targetId was not migrated: $e',
+        );
+        continue;
+      }
+      if (canonicalId != row['canonical_id']) {
+        await db.execute(
+          'UPDATE targets SET canonical_id = ? WHERE target_id = ?',
+          <Object>[canonicalId, targetId],
+        );
+      }
     }
   }
 

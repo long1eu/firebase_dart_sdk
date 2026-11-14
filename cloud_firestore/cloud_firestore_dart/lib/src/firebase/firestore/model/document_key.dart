@@ -4,7 +4,6 @@
 import 'package:cloud_firestore_dart/src/database_collection/database_collection.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/resource_path.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/assert.dart';
-import 'package:firebase_app_dart/internal.dart';
 
 /// DocumentKey represents the location of a document in the Firestore database.
 class DocumentKey implements Comparable<DocumentKey> {
@@ -66,8 +65,7 @@ class DocumentKey implements Comparable<DocumentKey> {
   @override
   int get hashCode => path.hashCode;
 
+  /// The path of the document, as in the JS and Android SDKs.
   @override
-  String toString() {
-    return (ToStringHelper(runtimeType)..add('path', path)).toString();
-  }
+  String toString() => path.canonicalString;
 }

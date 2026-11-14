@@ -179,8 +179,30 @@ abstract class SharedClientState {
   void notifyBundleLoaded(Set<String> collectionGroups);
 }
 
+/// The names of the error codes in the state the clients share, indexed by the value of the code: the code strings
+/// of the JS SDK. They are stored, so they are spelled out here and do not come from `FirestoreErrorCode.toString()`.
+const List<String> _storedErrorCodes = <String>[
+  'ok',
+  'cancelled',
+  'unknown',
+  'invalid-argument',
+  'deadline-exceeded',
+  'not-found',
+  'already-exists',
+  'permission-denied',
+  'resource-exhausted',
+  'failed-precondition',
+  'aborted',
+  'out-of-range',
+  'unimplemented',
+  'internal',
+  'unavailable',
+  'data-loss',
+  'unauthenticated',
+];
+
 Map<String, String> _errorToJson(FirestoreError error) => <String, String>{
-  'code': error.code.toString(),
+  'code': _storedErrorCodes[error.code.value],
   'message': error.message,
 };
 
@@ -191,10 +213,12 @@ FirestoreError? _errorFromJson(Object? json) {
       json['message'] is! String) {
     return null;
   }
-  for (final FirestoreErrorCode code in FirestoreErrorCode.values) {
-    if (code.toString() == json['code']) {
-      return FirestoreError(json['message'] as String, code);
-    }
+  final int value = _storedErrorCodes.indexOf(json['code'] as String);
+  if (value != -1) {
+    return FirestoreError(
+      json['message'] as String,
+      FirestoreErrorCode.values[value],
+    );
   }
   return null;
 }

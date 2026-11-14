@@ -6,6 +6,7 @@ library filter;
 
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/document.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/field_path.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/model/value/canonical_value.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/value/field_value.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/assert.dart';
 import 'package:collection/collection.dart';

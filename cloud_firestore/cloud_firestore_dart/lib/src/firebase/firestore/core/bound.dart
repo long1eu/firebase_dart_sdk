@@ -5,6 +5,7 @@
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/document.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/document_key.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/field_path.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/model/value/canonical_value.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/value/field_value.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/assert.dart';
 import 'package:collection/collection.dart';
@@ -35,12 +36,8 @@ class Bound {
   ///
   /// PORTING NOTE: upstream separates the values with a comma. The port never
   /// did, and canonical ids are persisted with the targets, so it stays.
-  String positionString() {
-    // TODO(long1eu): Make this collision robust.
-    final StringBuffer builder = StringBuffer();
-    position.forEach(builder.write);
-    return builder.toString();
-  }
+  /// The position in the canonical id of a query: the canonical strings of the values, separated by commas (as JS).
+  String positionString() => position.map(canonifyValue).join(',');
 
   /// Returns true if a document sorts before a bound using the provided sort
   /// order.

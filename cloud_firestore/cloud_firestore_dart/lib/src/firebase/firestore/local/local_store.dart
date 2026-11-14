@@ -684,7 +684,7 @@ class LocalStore implements BundleCallback {
         } else {
           Log.d(
             'LocalStore',
-            'Ignoring outdated watch update for ${key.path}. Current version: ${existingDoc.version}  Watch version: '
+            'Ignoring outdated watch update for $key. Current version: ${existingDoc.version}  Watch version: '
                 '${doc.version}',
           );
         }
@@ -1173,7 +1173,7 @@ class LocalStore implements BundleCallback {
           hardAssertLazy(
             remoteDoc == null,
             () =>
-                'Mutation batch ${batch.batchId} applied to document ${docKey.path} resulted in null.',
+                'Mutation batch ${batch.batchId} applied to document $docKey resulted in null.',
           );
         } else {
           await _remoteDocuments.add(doc, batchResult.commitVersion);
@@ -1340,7 +1340,7 @@ class LocalStore implements BundleCallback {
       } else {
         Log.d(
           'LocalStore',
-          'Ignoring outdated bundle document for ${key.path}. Current version: ${existingDoc.version}  Bundle version: '
+          'Ignoring outdated bundle document for $key. Current version: ${existingDoc.version}  Bundle version: '
               '${doc.version}',
         );
       }

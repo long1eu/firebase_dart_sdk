@@ -647,10 +647,10 @@ void main() {
 
   test('testNotEqualAndNotInCanonicalIds', () {
     final Query base = Query(ResourcePath.fromString('collection'));
-    expect(base.filter(filter('a', '!=', 1)).canonicalId, contains('a != 1'));
+    expect(base.filter(filter('a', '!=', 1)).canonicalId, contains('a!=1'));
     expect(
       base.filter(filter('a', 'not-in', <dynamic>[1, 2])).canonicalId,
-      contains('a not_in [1, 2]'),
+      contains('anot-in[1,2]'),
     );
     expect(
       base.filter(filter('a', '!=', 1)).canonicalId,
@@ -1498,11 +1498,11 @@ void main() {
     expect(base.limit(5).toTarget().canonicalId, 'a|f:|ob:__name__asc|l:5');
     expect(
       base.limit(5).canonicalId,
-      'a|f:|ob:__name__asc|l:5|lt:LIMIT_TO_FIRST',
+      'a|f:|ob:__name__asc|l:5|lt:F',
     );
     expect(base.limit(5).canonicalId, isNot(base.limit(10).canonicalId));
     expect(base.toTarget().canonicalId, 'a|f:|ob:__name__asc');
-    expect(base.canonicalId, 'a|f:|ob:__name__asc|lt:LIMIT_TO_FIRST');
+    expect(base.canonicalId, 'a|f:|ob:__name__asc|lt:F');
   });
 
   group('limitToLast', () {
@@ -1612,7 +1612,7 @@ void main() {
       // ... but they are different queries.
       expect(limit, isNot(limitToLast));
       expect(limit.canonicalId, isNot(limitToLast.canonicalId));
-      expect(limitToLast.canonicalId, endsWith('|lt:LIMIT_TO_LAST'));
+      expect(limitToLast.canonicalId, endsWith('|lt:L'));
     });
 
     test('equality takes the limit type into account', () {
@@ -1629,11 +1629,11 @@ void main() {
       final Query q = base().orderBy(orderBy('foo', 'desc')).limitToLast(7);
       expect(
         q.toTarget().canonicalId,
-        'collection|f:|ob:fooasc__name__asc|l:7',
+        'collection|f:|ob:fooasc,__name__asc|l:7',
       );
       expect(
         q.canonicalId,
-        'collection|f:|ob:fooasc__name__asc|l:7|lt:LIMIT_TO_LAST',
+        'collection|f:|ob:fooasc,__name__asc|l:7|lt:L',
       );
     });
 
@@ -1841,7 +1841,7 @@ void main() {
       );
       expect(
         base().filter(orFilters(<Filter>[a, b])).toTarget().canonicalId,
-        'foo|f:or(a == 1,b == 2)|ob:__name__asc',
+        'foo|f:or(a==1,b==2)|ob:__name__asc',
       );
       expect(
         base()
@@ -1853,7 +1853,7 @@ void main() {
             )
             .toTarget()
             .canonicalId,
-        'foo|f:or(a == 1,b == 2c > 3)|ob:casc__name__asc',
+        'foo|f:or(a==1,b==2,c>3)|ob:casc,__name__asc',
       );
     });
 

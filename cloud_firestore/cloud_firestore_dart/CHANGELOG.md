@@ -1,5 +1,12 @@
 ## Unreleased
 
+- `Timestamp.toString()` is now `Timestamp(seconds=1, nanoseconds=2)`, as in the JS and Android SDKs. It used to
+  print the two fields over four lines.
+- The canonical ids of queries, which the SQLite cache stores to find the cached results of a query again, are now
+  the ids of the JS SDK (`rooms|f:at<=time(60,3000)|ob:atasc,__name__asc`). They were built from the `toString()`
+  of the values of a query, so they contained multi-line debug output and changed whenever such a `toString()`
+  changed. An existing cache keeps its cached queries: the ids of its stored targets are computed again when it is
+  opened (SQLite schema version 19).
 - Error messages no longer contain multi-line debug output. `FirestoreError.toString()` is now
   `FirestoreError: [code=<code>]: <message>` (the JS format; it used to end in the cause and the stack trace, or
   `null null`), and messages that name a document print its path, for example

@@ -395,7 +395,7 @@ class Query {
   /// Returns a canonical string representing this query. This should match the
   /// iOS and Android canonical ids for a query exactly.
   String get canonicalId =>
-      '${toTarget().canonicalId}|lt:${limitType == LimitType.limitToFirst ? 'LIMIT_TO_FIRST' : 'LIMIT_TO_LAST'}';
+      '${toTarget().canonicalId}|lt:${limitType == LimitType.limitToFirst ? 'F' : 'L'}';
 
   Query copyWith({
     List<Filter>? filters,

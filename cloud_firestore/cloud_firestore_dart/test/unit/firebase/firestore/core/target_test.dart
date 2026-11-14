@@ -30,7 +30,7 @@ void main() {
 
   test('target canonical id includes composite filters', () {
     expect(orTarget().canonicalId,
-        'coll|f:or(a == 1,b > 2c == 3)|ob:basc__name__asc');
+        'coll|f:or(a==1,b>2,c==3)|ob:basc,__name__asc');
   });
 
   test('targets with equal composite filters are equal', () {
@@ -67,6 +67,6 @@ void main() {
             .filter(orFilters(<Filter>[filter('b', '==', 2), filter('c', '==', 3)]))
             .toTarget()
             .toString(),
-        contains('where a == 1 and or(b == 2,c == 3)'));
+        contains('where a == 1 and or {b == 2, c == 3}'));
   });
 }

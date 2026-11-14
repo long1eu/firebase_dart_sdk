@@ -37,10 +37,10 @@ import '../test_util.dart' show firestore;
 /// (canonifyTarget, canonifyQuery, queryEquals).
 ///
 /// The persisted canonical-id format is pinned here on purpose: it is the key
-/// of the target cache and changing it is a pending decision. Differences with
-/// upstream are listed next to each case. The canonical id only has to be a
-/// good hash: the target cache and the sync engine compare targets with `==`
-/// after the lookup, so equality is what has to match upstream.
+/// of the target cache. The ids are the ones of the JS SDK. The canonical id
+/// only has to be a good hash: the target cache and the sync engine compare
+/// targets with `==` after the lookup, so equality is what has to match
+/// upstream.
 void main() {
   final Query base = query('collection');
 
@@ -55,40 +55,40 @@ void main() {
 
   group('BSON values', () {
     // Android QueryTest.testCanonicalIdsAreStable, "BSON types". The ids are
-    // the upstream ones apart from the spaces around the operator.
+    // the upstream ones.
     final Map<String, List<Object>> cases = <String, List<Object>>{
       'object id': <Object>[
         const BsonObjectId('foo'),
-        'collection|f:a <= {__oid__:foo}|ob:aasc__name__asc',
+        'collection|f:a<={__oid__:foo}|ob:aasc,__name__asc',
       ],
       'bson timestamp': <Object>[
         BsonTimestamp(1, 2),
-        'collection|f:a <= {__request_timestamp__:{increment:2,seconds:1}}|ob:aasc__name__asc',
+        'collection|f:a<={__request_timestamp__:{increment:2,seconds:1}}|ob:aasc,__name__asc',
       ],
       'regex': <Object>[
         const RegexValue('^foo', 'i'),
-        'collection|f:a <= {__regex__:{options:i,pattern:^foo}}|ob:aasc__name__asc',
+        'collection|f:a<={__regex__:{options:i,pattern:^foo}}|ob:aasc,__name__asc',
       ],
       'int32': <Object>[
         Int32Value(1),
-        'collection|f:a <= {__int__:1}|ob:aasc__name__asc',
+        'collection|f:a<={__int__:1}|ob:aasc,__name__asc',
       ],
       'decimal128': <Object>[
         Decimal128Value('1.2e3'),
-        'collection|f:a <= {__decimal128__:1.2e3}|ob:aasc__name__asc',
+        'collection|f:a<={__decimal128__:1.2e3}|ob:aasc,__name__asc',
       ],
       'min key': <Object>[
         MinKey.instance,
-        'collection|f:a <= {__min__:null}|ob:aasc__name__asc',
+        'collection|f:a<={__min__:null}|ob:aasc,__name__asc',
       ],
       'max key': <Object>[
         MaxKey.instance,
-        'collection|f:a <= {__max__:null}|ob:aasc__name__asc',
+        'collection|f:a<={__max__:null}|ob:aasc,__name__asc',
       ],
-      // Android: 'collection|f:a<={__binary__:01010203}|ob:aasc__name__asc'.
+      // Android: 'collection|f:a<={__binary__:01010203}|ob:aasc,__name__asc'.
       'bson binary': <Object>[
         Blob.bsonBinary(1, Uint8List.fromList(<int>[1, 2, 3])),
-        'collection|f:a <= Blob { bytes= 010203, subtype= 1 }|ob:aasc__name__asc',
+        'collection|f:a<={__binary__:AQECAw==}|ob:aasc,__name__asc',
       ],
     };
     for (final MapEntry<String, List<Object>> c in cases.entries) {
@@ -136,18 +136,20 @@ void main() {
 
     test('NaN equals NaN', () {
       expectSameQuery(eq(double.nan), eq(double.nan));
-      expect(targetId(eq(double.nan)), 'collection|f:a == NaN|ob:__name__asc');
+      expect(targetId(eq(double.nan)), 'collection|f:a==NaN|ob:__name__asc');
     });
 
     test('an integer and a double are different values', () {
       expect(eq(1), isNot(eq(1.0)));
-      expect(targetId(eq(1)), 'collection|f:a == 1|ob:__name__asc');
-      expect(targetId(eq(1.0)), 'collection|f:a == 1.0|ob:__name__asc');
+      expect(targetId(eq(1)), 'collection|f:a==1|ob:__name__asc');
+      // As in JS, where both are the number 1, they share the canonical id.
+      expect(targetId(eq(1.0)), 'collection|f:a==1|ob:__name__asc');
     });
 
     test('0.0 and -0.0 are different values', () {
       expect(eq(0.0), isNot(eq(-0.0)));
-      expect(eq(0.0).canonicalId, isNot(eq(-0.0).canonicalId));
+      // As in JS (`'' + -0` is '0'), they share the canonical id.
+      expect(eq(0.0).canonicalId, eq(-0.0).canonicalId);
     });
 
     test('int32 and decimal128 differ from an integer of the same value', () {
@@ -177,10 +179,10 @@ void main() {
     final Filter b = filter('b', '>', 2);
 
     test('canonical id', () {
-      // Android: 'collection|f:or(a==1,b>2)|ob:basc__name__asc'.
+      // Android: 'collection|f:or(a==1,b>2)|ob:basc,__name__asc'.
       expect(
         targetId(base.filter(orFilters(<Filter>[a, b]))),
-        'collection|f:or(a == 1,b > 2)|ob:basc__name__asc',
+        'collection|f:or(a==1,b>2)|ob:basc,__name__asc',
       );
     });
 
@@ -218,8 +220,8 @@ void main() {
         path(''),
         collectionGroup: 'cg',
       ).filter(filter('a', '==', 1));
-      expect(targetId(q), '|cg:cg|f:a == 1|ob:__name__asc');
-      expect(q.canonicalId, '|cg:cg|f:a == 1|ob:__name__asc|lt:LIMIT_TO_FIRST');
+      expect(targetId(q), '|cg:cg|f:a==1|ob:__name__asc');
+      expect(q.canonicalId, '|cg:cg|f:a==1|ob:__name__asc|lt:F');
     });
 
     test('differs from a collection query and from other groups', () {
@@ -249,10 +251,10 @@ void main() {
       // The target is the one of the mirrored limitToFirst query.
       expect(
         targetId(q),
-        'collection|f:|ob:adesc__name__desc|l:2|lb:a:e|ub:a:s',
+        'collection|f:|ob:adesc,__name__desc|l:2|lb:a:e|ub:a:s',
       );
-      // Android appends `|lt:LIMIT_TO_LAST`, JS `|lt:L`.
-      expect(q.canonicalId, '${targetId(q)}|lt:LIMIT_TO_LAST');
+      // JS appends `|lt:L` (Android `|lt:LIMIT_TO_LAST`).
+      expect(q.canonicalId, '${targetId(q)}|lt:L');
     });
 
     test('mirror queries share the target but are different queries', () {
@@ -266,18 +268,17 @@ void main() {
   });
 
   group('bounds', () {
-    test('positions are written without a separator', () {
-      // Android and JS separate the positions with a comma
-      // ('lb:b:foo,[1,2,3]'), so ['ab'] and ['a', 'b'] collide here.
+    test('positions are separated by a comma', () {
+      // As Android and JS ('lb:b:foo,[1,2,3]'): ['ab'] and ['a', 'b'] have
+      // different ids.
       final Query one = base
           .orderBy(orderBy('a'))
           .startAt(bound(true, <Object>['ab']));
       final Query two = base
           .orderBy(orderBy('a'))
           .startAt(bound(true, <Object>['a', 'b']));
-      expect(targetId(one), 'collection|f:|ob:aasc__name__asc|lb:b:ab');
-      expect(targetId(two), targetId(one));
-      // The collision is harmless: the targets are not equal.
+      expect(targetId(one), 'collection|f:|ob:aasc,__name__asc|lb:b:ab');
+      expect(targetId(two), 'collection|f:|ob:aasc,__name__asc|lb:b:a,b');
       expect(one.toTarget(), isNot(two.toTarget()));
       expect(one, isNot(two));
     });
@@ -354,7 +355,7 @@ void main() {
       final Query q = base.filter(filter('x', '>', 1)).orderBy(orderBy('y'));
       final Target target = q.toAggregateTarget();
       expect(target.orderBy, <Object>[orderBy('y')]);
-      expect(target.canonicalId, 'collection|f:x > 1|ob:yasc');
+      expect(target.canonicalId, 'collection|f:x>1|ob:yasc');
       expect(target, isNot(q.toTarget()));
     });
   });

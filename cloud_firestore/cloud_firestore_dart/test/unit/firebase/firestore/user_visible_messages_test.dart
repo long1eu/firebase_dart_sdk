@@ -33,6 +33,22 @@ void main() {
     );
   });
 
+  test('Timestamp.toString has the JS and Android format', () {
+    expect(
+      const Timestamp(1, 2).toString(),
+      'Timestamp(seconds=1, nanoseconds=2)',
+    );
+    expect(
+      const Timestamp(-62135596800, 999999999).toString(),
+      'Timestamp(seconds=-62135596800, nanoseconds=999999999)',
+    );
+  });
+
+  test('DocumentKey.toString is the path', () {
+    expect(key('rooms/eros').toString(), 'rooms/eros');
+    expect(key('rooms/eros/messages/1').toString(), 'rooms/eros/messages/1');
+  });
+
   test('SnapshotVersion.toString is on one line', () {
     // The Android wording.
     expect(

@@ -267,7 +267,7 @@ class SqliteIndexManager extends IndexManager {
     SplayTreeSet<IndexEntry> existingEntries,
     SplayTreeSet<IndexEntry> newEntries,
   ) async {
-    Log.d(_tag, 'Updating index entries for document \'${key.path}\'');
+    Log.d(_tag, 'Updating index entries for document \'$key\'');
     await diffCollections(
       existingEntries,
       newEntries,
