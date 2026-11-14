@@ -1,0 +1,33 @@
+name: server_shelf
+description: >-
+  An HTTP API on package:shelf that reads and writes Firestore and sends the
+  changes of a real-time listener to its clients as server-sent events.
+publish_to: none
+
+environment:
+  sdk: ^3.8.0
+
+dependencies:
+  cloud_firestore_dart:
+    path: ../../cloud_firestore/cloud_firestore_dart
+  firebase_app_dart:
+    path: ../../firebase_core/firebase_app_dart
+  firebase_auth_providers_dart:
+    path: ../../firebase_auth/firebase_auth_providers_dart
+  shelf: 1.4.3
+  shelf_router: 1.1.5
+
+dev_dependencies:
+  lints: 6.1.0
+  test: 1.33.0
+
+# The packages are not on pub.dev yet, and each declares the others as hosted
+# dependencies (^0.1.0): the overrides make every one of them come from this
+# repository. Remove this section once they are published.
+dependency_overrides:
+  cloud_firestore_dart:
+    path: ../../cloud_firestore/cloud_firestore_dart
+  firebase_app_dart:
+    path: ../../firebase_core/firebase_app_dart
+  firebase_auth_providers_dart:
+    path: ../../firebase_auth/firebase_auth_providers_dart

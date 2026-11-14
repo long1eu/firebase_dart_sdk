@@ -1,0 +1,35 @@
+name: cli
+description: >-
+  A command-line tool that imports a JSON file into a Firestore collection with
+  batched writes, exports a query to JSON, and watches a query.
+publish_to: none
+
+environment:
+  sdk: ^3.8.0
+
+executables:
+  firestore_cli:
+
+dependencies:
+  args: 2.7.0
+  cloud_firestore_dart:
+    path: ../../cloud_firestore/cloud_firestore_dart
+  firebase_app_dart:
+    path: ../../firebase_core/firebase_app_dart
+  firebase_auth_providers_dart:
+    path: ../../firebase_auth/firebase_auth_providers_dart
+
+dev_dependencies:
+  lints: 6.1.0
+  test: 1.33.0
+
+# The packages are not on pub.dev yet, and each declares the others as hosted
+# dependencies (^0.1.0): the overrides make every one of them come from this
+# repository. Remove this section once they are published.
+dependency_overrides:
+  cloud_firestore_dart:
+    path: ../../cloud_firestore/cloud_firestore_dart
+  firebase_app_dart:
+    path: ../../firebase_core/firebase_app_dart
+  firebase_auth_providers_dart:
+    path: ../../firebase_auth/firebase_auth_providers_dart

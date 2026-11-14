@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # Runs pub get, analyze (lib) and tests for the packages of the revival.
 # cloud_firestore_dart runs only test/unit (integration needs a live backend).
+# The example programs in examples/ are analyzed only (their tests need an emulator); select
+# them alone with the name "examples".
 # Exits non-zero if any step of any package fails.
 # Usage: tool/test_all.sh [package-name ...]
 #
@@ -31,13 +33,13 @@ for entry in "${PACKAGES[@]}"; do
   dart pub get --no-example >"$LOG/$name.pub" 2>&1 || { pub=FAIL; tail -5 "$LOG/$name.pub"; }
 
   dart analyze lib >"$LOG/$name.an" 2>&1
-  if grep -qE "^\s+(error|warning) -" "$LOG/$name.an"; then
-    analyze="FAIL ($(grep -cE '^\s+error -' "$LOG/$name.an") errors, $(grep -cE '^\s+warning -' "$LOG/$name.an") warnings)"
-    grep -E "^\s+(error|warning) -" "$LOG/$name.an" | head -10
+  if grep -qE "^\s*(error|warning) -" "$LOG/$name.an"; then
+    analyze="FAIL ($(grep -cE '^\s*error -' "$LOG/$name.an") errors, $(grep -cE '^\s*warning -' "$LOG/$name.an") warnings)"
+    grep -E "^\s*(error|warning) -" "$LOG/$name.an" | head -10
   elif [ $? -ne 0 ] && ! grep -qE "No issues|issues? found" "$LOG/$name.an"; then
     analyze="FAIL (analyzer crashed)"
   else
-    analyze="PASS ($(grep -cE '^\s+info -' "$LOG/$name.an") infos)"
+    analyze="PASS ($(grep -cE '^\s*info -' "$LOG/$name.an") infos)"
   fi
 
   target="${testpath:-test}"
@@ -57,6 +59,27 @@ for entry in "${PACKAGES[@]}"; do
   case "$pub$analyze$tests" in *FAIL*) failed=1;; esac
   summary+=("$name: pub get $pub | analyze $analyze | test $tests")
 done
+
+if [ $# -eq 0 ] || printf '%s\n' "$@" | grep -qx "examples"; then
+  for pubspec in "$ROOT"/examples/*/pubspec.yaml; do
+    [ -f "$pubspec" ] || continue
+    dir="$(dirname "$pubspec")"
+    name="examples/$(basename "$dir")"
+    log="$LOG/examples_$(basename "$dir")"
+    echo "=== $name ==="
+    pub=PASS analyze=PASS
+    (cd "$dir" && dart pub get >"$log.pub" 2>&1) || { pub=FAIL; tail -5 "$log.pub"; }
+    (cd "$dir" && dart analyze >"$log.an" 2>&1)
+    if grep -qE "^\s*(error|warning|info) -" "$log.an"; then
+      analyze="FAIL ($(grep -cE '^\s*(error|warning|info) -' "$log.an") issues)"
+      grep -E "^\s*(error|warning|info) -" "$log.an" | head -10
+    elif ! grep -q "No issues found" "$log.an"; then
+      analyze="FAIL (analyzer crashed)"
+    fi
+    case "$pub$analyze" in *FAIL*) failed=1;; esac
+    summary+=("$name: pub get $pub | analyze $analyze | test not run (needs an emulator)")
+  done
+fi
 
 echo
 echo "================ SUMMARY ================"

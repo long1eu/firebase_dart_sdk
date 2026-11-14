@@ -1,0 +1,15 @@
+# For `docker build -f examples/cloud_run_job/Dockerfile .` from the repository
+# root (BuildKit reads <Dockerfile>.dockerignore next to the Dockerfile).
+# Everything is left out except what the build needs.
+**
+
+!cloud_firestore/cloud_firestore_dart/pubspec.yaml
+!cloud_firestore/cloud_firestore_dart/lib/**
+!firebase_core/firebase_app_dart/pubspec.yaml
+!firebase_core/firebase_app_dart/lib/**
+!firebase_auth/firebase_auth_providers_dart/pubspec.yaml
+!firebase_auth/firebase_auth_providers_dart/lib/**
+!examples/cloud_run_job/pubspec.yaml
+!examples/cloud_run_job/pubspec.lock
+!examples/cloud_run_job/bin/**
+!examples/cloud_run_job/lib/**
