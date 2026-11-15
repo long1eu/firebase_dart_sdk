@@ -1,0 +1,10 @@
+body { font-family: system-ui, sans-serif; max-width: 40rem; margin: 2rem auto; padding: 0 1rem; }
+nav a { margin-right: 1rem; }
+dl { display: grid; grid-template-columns: max-content 1fr; gap: 0.25rem 1rem; }
+dt { font-weight: 600; }
+dd { margin: 0; }
+form { display: flex; gap: 0.5rem; margin: 1rem 0; }
+form input { flex: 1; }
+.online { color: #186a3b; }
+.offline { color: #a04000; }
+#error { color: #b03a2e; }

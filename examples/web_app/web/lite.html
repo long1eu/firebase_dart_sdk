@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Notes (Lite): cloud_firestore_dart</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <nav><a href="index.html">Main library</a><a href="lite.html">Firestore Lite</a></nav>
+  <h1>Notes (Lite)</h1>
+  <p>The same collection with <code>package:cloud_firestore_dart/lite.dart</code>: no cache and no
+    listener. The list changes when you press Refresh or add a note.</p>
+  <dl>
+    <dt>Backend</dt><dd id="backend"></dd>
+    <dt>Compiler</dt><dd id="compiler"></dd>
+    <dt>Last read</dt><dd id="sync">Reading...</dd>
+  </dl>
+  <form id="add">
+    <input id="text" placeholder="A new note" autocomplete="off">
+    <button type="submit">Add</button>
+  </form>
+  <p><button id="refresh" type="button">Refresh</button></p>
+  <p id="error"></p>
+  <ul id="notes"></ul>
+  <script src="bootstrap.js" data-app="lite"></script>
+</body>
+</html>

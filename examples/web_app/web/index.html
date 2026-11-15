@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Notes: cloud_firestore_dart</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <nav><a href="index.html">Main library</a><a href="lite.html">Firestore Lite</a></nav>
+  <h1>Notes</h1>
+  <p>A real-time listener on the collection <code>web_app_notes</code>, with the main library of
+    <code>cloud_firestore_dart</code> (experimental on the web).</p>
+  <dl>
+    <dt>Backend</dt><dd id="backend"></dd>
+    <dt>Compiler</dt><dd id="compiler"></dd>
+    <dt>Cache</dt>
+    <dd>
+      <select id="cache">
+        <option value="memory">Memory</option>
+        <option value="indexeddb">SQLite in IndexedDB</option>
+        <option value="opfs">SQLite in OPFS (worker)</option>
+      </select>
+      <div id="cache-status"></div>
+    </dd>
+    <dt>Sync</dt><dd id="sync">Starting...</dd>
+    <dt>Network</dt><dd><span id="browser"></span> <button id="network" type="button">Disable network</button></dd>
+  </dl>
+  <form id="add">
+    <input id="text" placeholder="A new note" autocomplete="off">
+    <button type="submit">Add</button>
+  </form>
+  <p id="error"></p>
+  <ul id="notes"></ul>
+  <script src="bootstrap.js" data-app="main"></script>
+</body>
+</html>
