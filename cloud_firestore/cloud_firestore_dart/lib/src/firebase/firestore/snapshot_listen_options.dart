@@ -19,8 +19,25 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/metadata_change.dart
 /// metadata-only changes trigger events and the source (server or cache) the
 /// listener retrieves data from.
 ///
+/// Pass them to `getSnapshotsWithOptions` of a `DocumentReference` or a `Query`. They are the
+/// options object of `onSnapshot` in the JS SDK (`includeMetadataChanges` and `source`).
+///
 /// PORTING NOTE: the Android `executor` and `activity` options have no
 /// equivalent here, a listener is a Dart [Stream].
+///
+/// ```dart
+/// firestore
+///     .doc('cities/SF')
+///     .getSnapshotsWithOptions(
+///       const SnapshotListenOptions(
+///         metadataChanges: MetadataChanges.include,
+///         source: ListenSource.cache,
+///       ),
+///     )
+///     .listen((DocumentSnapshot<Map<String, Object?>> snapshot) {
+///       print(snapshot.metadata);
+///     });
+/// ```
 class SnapshotListenOptions {
   /// Creates the options. By default metadata-only changes are excluded and the listener uses both
   /// the cache and the server.
@@ -29,10 +46,12 @@ class SnapshotListenOptions {
     this.source = ListenSource.defaultSource,
   });
 
-  /// Whether metadata-only changes should trigger snapshot events.
+  /// Whether metadata-only changes should trigger snapshot events, [MetadataChanges.exclude] by
+  /// default.
   final MetadataChanges metadataChanges;
 
-  /// The source the listener retrieves data from.
+  /// The source the listener retrieves data from, [ListenSource.defaultSource] (the cache and the
+  /// server) by default.
   final ListenSource source;
 
   @override

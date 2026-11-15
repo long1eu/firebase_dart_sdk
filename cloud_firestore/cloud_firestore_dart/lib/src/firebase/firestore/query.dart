@@ -47,8 +47,32 @@ enum Direction {
   descending,
 }
 
-/// A [Query] which you can read or listen to. You can also construct refined [Query] objects by adding filters and
-/// ordering.
+/// A query over the documents of a collection or a collection group, which you can read with [get] or listen to
+/// with [snapshots].
+///
+/// A [Query] is immutable: [where], [orderBy], [limit], [limitToLast] and the cursors ([startAt], [startAfter],
+/// [endAt], [endBefore] and their `Document` variants) each return a new query. Building a query does not contact the
+/// backend; invalid combinations throw an [ArgumentError] when the method is called, and the backend may still
+/// reject a query that needs an index it does not have.
+///
+/// Get a query from `Firestore.collection` (a [CollectionReference] is a query over its documents) or
+/// `Firestore.collectionGroup`. [T] is the type of the documents, `Map<String, Object?>` unless a converter was
+/// attached with [withConverter].
+///
+/// Queries work offline: [get] and [snapshots] answer from the local cache when the backend cannot be reached.
+///
+/// ```dart
+/// final Query<Map<String, Object?>> bigCities = firestore
+///     .collection('cities')
+///     .where('population', isGreaterThan: 1000000)
+///     .orderBy('population', Direction.descending)
+///     .limit(10);
+///
+/// final QuerySnapshot<Map<String, Object?>> snapshot = await bigCities.get();
+/// for (final QueryDocumentSnapshot<Map<String, Object?>> city in snapshot) {
+///   print('${city.id}: ${city['population']}');
+/// }
+/// ```
 ///
 /// **Subclassing Note**: Firestore classes are not meant to be subclassed except for use in test mocks. Subclassing is
 /// not supported in production code and new SDK releases may break code that does so.
@@ -63,6 +87,21 @@ class Query<T extends dynamic> {
   /// Returns a query that converts documents with [converter] (type [U]).
   /// Filters, ordering and limits are kept. Use [withoutConverter] to go
   /// back to raw maps.
+  ///
+  /// The filters still compare the raw stored fields, not the converted objects.
+  ///
+  /// ```dart
+  /// final Query<String> names = firestore
+  ///     .collection('cities')
+  ///     .withConverter<String>(
+  ///       FirestoreDataConverter<String>.from(
+  ///         fromFirestore: (snapshot, options) => snapshot['name'] as String,
+  ///         toFirestore: (name, options) => {'name': name},
+  ///       ),
+  ///     );
+  /// final QuerySnapshot<String> snapshot = await names.get();
+  /// print(snapshot.docs.map((doc) => doc.data).toList());
+  /// ```
   Query<U> withConverter<U extends Object?>(
     FirestoreDataConverter<U> converter,
   ) {
@@ -84,10 +123,21 @@ class Query<T extends dynamic> {
   /// Creates and returns a new Query with the additional filter that documents must contain the specified field and the
   /// value should be equal to the specified value.
   ///
-  /// [field] The name of the field to compare
+  /// [field] The name of the field to compare (dots separate nested fields; throws an [ArgumentError] for an invalid
+  /// path)
   /// [value] The value for comparison
   ///
   /// Returns the created [Query].
+  ///
+  /// The `whereXxx` methods follow the Android SDK. [where] with named arguments builds the same filters and is the
+  /// form that FlutterFire and Firestore Lite also have. These two lines build the same query:
+  ///
+  /// ```dart
+  /// final CollectionReference<Map<String, Object?>> cities = firestore
+  ///     .collection('cities');
+  /// final Query<Map<String, Object?>> a = cities.whereEqualTo('state', 'CA');
+  /// final Query<Map<String, Object?>> b = cities.where('state', isEqualTo: 'CA');
+  /// ```
   Query<T> whereEqualTo(String field, Object? value) {
     return _whereHelper(
       FieldPathInternal.fromArgument('where', field),
@@ -416,10 +466,22 @@ class Query<T extends dynamic> {
   /// Creates and returns a new [Query] that's additionally sorted by the specified field.
   /// Optionally in descending order instead of ascending.
   ///
-  /// [field] the field to sort by.
-  /// [direction] the direction to sort.
+  /// [field] the field to sort by (dots separate nested fields; throws an [ArgumentError] for an invalid path).
+  /// [direction] the direction to sort, [Direction.ascending] by default.
   ///
   /// Returns the created Query.
+  ///
+  /// Each call adds a sort key after the previous ones; documents that are equal on every key are ordered by their
+  /// id. A document that does not have [field] is not in the results. Call [orderBy] before the cursor methods
+  /// ([startAt] and the others): it throws an [ArgumentError] when the query already has a cursor.
+  ///
+  /// ```dart
+  /// final QuerySnapshot<Map<String, Object?>> snapshot = await firestore
+  ///     .collection('cities')
+  ///     .orderBy('state')
+  ///     .orderBy('population', Direction.descending)
+  ///     .get();
+  /// ```
   Query<T> orderBy(String field, [Direction direction = Direction.ascending]) {
     return orderByField(
       FieldPathInternal.fromArgument('orderBy', field),
@@ -430,10 +492,10 @@ class Query<T extends dynamic> {
   /// Creates and returns a new [Query] that's additionally sorted by the specified field, optionally in descending
   /// order instead of ascending.
   ///
-  /// [fieldPath] the field to sort by.
+  /// [fieldPath] the field to sort by; [FieldPath.documentIdField] sorts by document id.
   /// [direction] the direction to sort.
   ///
-  /// Returns the created Query.
+  /// Returns the created Query. Same rules as [orderBy].
   Query<T> orderByField(
     FieldPath fieldPath, [
     Direction direction = Direction.ascending,
@@ -452,9 +514,17 @@ class Query<T extends dynamic> {
   /// Creates and returns a new [Query] that's additionally limited to only return up to the specified number of
   /// documents. This overrides a previous [limitToLast].
   ///
-  /// [limit] the maximum number of items to return.
+  /// [limit] the maximum number of items to return. Throws an [ArgumentError] if it is not positive.
   ///
   /// Returns the created Query.
+  ///
+  /// ```dart
+  /// final QuerySnapshot<Map<String, Object?>> firstThree = await firestore
+  ///     .collection('cities')
+  ///     .orderBy('name')
+  ///     .limit(3)
+  ///     .get();
+  /// ```
   Query<T> limit(int limit) {
     return _withQuery(_builder.limit(query, limit));
   }
@@ -463,11 +533,21 @@ class Query<T extends dynamic> {
   /// overrides a previous [limit].
   ///
   /// You must specify at least one [orderBy] clause for limitToLast queries, otherwise a [StateError] is thrown when
-  /// the query is executed. The results are returned in the order of the query (not reversed).
+  /// the query is executed ([get] fails with it, [snapshots] throws it). The results are returned in the order of the
+  /// query (not reversed).
   ///
-  /// [limit] the maximum number of items to return.
+  /// [limit] the maximum number of items to return. Throws an [ArgumentError] if it is not positive.
   ///
   /// Returns the created Query.
+  ///
+  /// ```dart
+  /// // The three cities with the largest population, smallest first.
+  /// final QuerySnapshot<Map<String, Object?>> lastThree = await firestore
+  ///     .collection('cities')
+  ///     .orderBy('population')
+  ///     .limitToLast(3)
+  ///     .get();
+  /// ```
   Query<T> limitToLast(int limit) {
     return _withQuery(_builder.limitToLast(query, limit));
   }
@@ -479,6 +559,10 @@ class Query<T extends dynamic> {
   /// [snapshot] the snapshot of the document to start at.
   ///
   /// Returns the created Query.
+  ///
+  /// The position includes the document id, so the query starts exactly at that document even when others have the
+  /// same field values. Throws an [ArgumentError] if the document does not exist, if it lacks a field of the
+  /// ordering, or if such a field is a server timestamp that is not committed yet.
   Query<T> startAtDocument(DocumentSnapshot<Object?> snapshot) {
     checkNotNull<DocumentSnapshot<Object?>>(
       snapshot,
@@ -499,6 +583,20 @@ class Query<T extends dynamic> {
   /// [fieldValues] the field values to start this query at, in order of the query's order by.
   ///
   /// Returns the created Query.
+  ///
+  /// You can give fewer values than there are [orderBy] clauses; throws an [ArgumentError] if you give more. For an
+  /// ordering by [FieldPath.documentIdField] the value is a document id string. A later call of a start cursor
+  /// ([startAt], [startAfter] or their `Document` variants) replaces the earlier one.
+  ///
+  /// ```dart
+  /// // Cities whose name is between "B" and "D" (inclusive).
+  /// final QuerySnapshot<Map<String, Object?>> snapshot = await firestore
+  ///     .collection('cities')
+  ///     .orderBy('name')
+  ///     .startAt(['B'])
+  ///     .endAt(['D'])
+  ///     .get();
+  /// ```
   Query<T> startAt(List<Object?> fieldValues) {
     final Bound bound = _builder.boundFromFields(
       query,
@@ -516,6 +614,23 @@ class Query<T extends dynamic> {
   /// [snapshot] the snapshot of the document to start after.
   ///
   /// Returns the created Query.
+  ///
+  /// This is how you page through results: start the next page after the last document of the previous one. Throws
+  /// an [ArgumentError] in the cases described in [startAtDocument].
+  ///
+  /// ```dart
+  /// final Query<Map<String, Object?>> byName = firestore
+  ///     .collection('cities')
+  ///     .orderBy('name')
+  ///     .limit(25);
+  /// final QuerySnapshot<Map<String, Object?>> first = await byName.get();
+  /// if (first.isNotEmpty) {
+  ///   final QuerySnapshot<Map<String, Object?>> second = await byName
+  ///       .startAfterDocument(first.last)
+  ///       .get();
+  ///   print(second.length);
+  /// }
+  /// ```
   Query<T> startAfterDocument(DocumentSnapshot<Object?> snapshot) {
     checkNotNull<DocumentSnapshot<Object?>>(
       snapshot,
@@ -535,7 +650,15 @@ class Query<T extends dynamic> {
   ///
   /// [fieldValues] the field values to start this query after, in order of the query's order by.
   ///
-  /// Returns the created Query.
+  /// Returns the created Query. Throws an [ArgumentError] in the cases described in [startAt].
+  ///
+  /// ```dart
+  /// final QuerySnapshot<Map<String, Object?>> snapshot = await firestore
+  ///     .collection('cities')
+  ///     .orderBy('population')
+  ///     .startAfter([1000000])
+  ///     .get();
+  /// ```
   Query<T> startAfter(List<Object?> fieldValues) {
     final Bound bound = _builder.boundFromFields(
       query,
@@ -551,7 +674,7 @@ class Query<T extends dynamic> {
   ///
   /// [snapshot] the snapshot of the document to end before.
   ///
-  /// Returns the created Query.
+  /// Returns the created Query. Throws an [ArgumentError] in the cases described in [startAtDocument].
   Query<T> endBeforeDocument(DocumentSnapshot<Object?> snapshot) {
     checkNotNull<DocumentSnapshot<Object?>>(
       snapshot,
@@ -571,7 +694,17 @@ class Query<T extends dynamic> {
   ///
   /// [fieldValues] the field values to end this query before, in order of the query's order by.
   ///
-  /// Returns the created Query.
+  /// Returns the created Query. Throws an [ArgumentError] in the cases described in [startAt]. A later call of an end
+  /// cursor ([endAt], [endBefore] or their `Document` variants) replaces the earlier one.
+  ///
+  /// ```dart
+  /// // Cities whose name sorts before "M".
+  /// final QuerySnapshot<Map<String, Object?>> snapshot = await firestore
+  ///     .collection('cities')
+  ///     .orderBy('name')
+  ///     .endBefore(['M'])
+  ///     .get();
+  /// ```
   Query<T> endBefore(List<Object?> fieldValues) {
     final Bound bound = _builder.boundFromFields(
       query,
@@ -587,7 +720,7 @@ class Query<T extends dynamic> {
   ///
   /// [snapshot] the snapshot of the document to end at.
   ///
-  /// Returns the created Query.
+  /// Returns the created Query. Throws an [ArgumentError] in the cases described in [startAtDocument].
   Query<T> endAtDocument(DocumentSnapshot<Object?> snapshot) {
     checkNotNull<DocumentSnapshot<Object?>>(
       snapshot,
@@ -607,7 +740,8 @@ class Query<T extends dynamic> {
   ///
   /// [fieldValues] the field values to end this query at, in order of the query's order by.
   ///
-  /// Returns the created Query.
+  /// Returns the created Query. Throws an [ArgumentError] in the cases described in [startAt]; see there for an
+  /// example.
   Query<T> endAt(List<Object?> fieldValues) {
     final Bound bound = _builder.boundFromFields(
       query,
@@ -638,9 +772,30 @@ class Query<T extends dynamic> {
   /// may return cached data or fail if you are offline and the server cannot be reached. This behavior can be altered
   /// via the [Source] parameter.
   ///
-  /// [source] a value to configure the get behavior.
+  /// [source] a value to configure the get behavior:
   ///
-  /// Returns a Future that will be resolved with the results of the [Query].
+  /// * [Source.serverAndCache] (the default): waits for the backend; when the client is offline it answers from the
+  ///   cache, with `metadata.isFromCache` true.
+  /// * [Source.server]: fails with [FirestoreErrorCode.unavailable] when the backend cannot be reached.
+  /// * [Source.cache]: answers from the cache only, with the documents the cache has (possibly none).
+  ///
+  /// Returns a Future that will be resolved with the results of the [Query]. Writes that the backend has not
+  /// acknowledged yet are included in the results. This is the JS SDK `getDocs`, `getDocsFromServer` and
+  /// `getDocsFromCache`.
+  ///
+  /// ```dart
+  /// final QuerySnapshot<Map<String, Object?>> snapshot = await firestore
+  ///     .collection('cities')
+  ///     .where('state', isEqualTo: 'CA')
+  ///     .get();
+  /// for (final QueryDocumentSnapshot<Map<String, Object?>> city in snapshot.docs) {
+  ///   print('${city.id} => ${city.data}');
+  /// }
+  ///
+  /// final QuerySnapshot<Map<String, Object?>> cached = await firestore
+  ///     .collection('cities')
+  ///     .get(Source.cache);
+  /// ```
   Future<QuerySnapshot<T>> get([Source source = Source.defaultSource]) async {
     _validateHasExplicitOrderByForLimitToLast();
     if (source == Source.cache) {
@@ -685,6 +840,9 @@ class Query<T extends dynamic> {
   ///
   /// The search runs on the server only. The filters of this query narrow the
   /// candidates; its orderings are superseded by the distance ordering.
+  ///
+  /// This follows the Android SDK; the JS client SDK has vector search only as a pipeline stage. It needs a vector
+  /// index on the backend.
   VectorQuery findNearest(
     String vectorField,
     Object queryVector,
@@ -737,6 +895,15 @@ class Query<T extends dynamic> {
   /// this query, without downloading the documents.
   ///
   /// The count is computed on the server: it fails when the client is offline.
+  ///
+  /// ```dart
+  /// final AggregateQuerySnapshot snapshot = await firestore
+  ///     .collection('cities')
+  ///     .where('state', isEqualTo: 'CA')
+  ///     .count()
+  ///     .get();
+  /// print(snapshot.getCount());
+  /// ```
   AggregateQuery count() => AggregateQueryInternal.create(
     this,
     <AggregateField>[AggregateField.count()],
@@ -744,6 +911,23 @@ class Query<T extends dynamic> {
 
   /// Returns an [AggregateQuery] that calculates the given aggregations over the
   /// result set of this query without downloading the documents.
+  ///
+  /// Throws an [ArgumentError] if [aggregateFields] is empty. Like [count], the aggregation runs on the server and
+  /// fails when the client is offline.
+  ///
+  /// ```dart
+  /// final AggregateQuerySnapshot snapshot = await firestore
+  ///     .collection('cities')
+  ///     .aggregate([
+  ///       AggregateField.count(),
+  ///       AggregateField.sum('population'),
+  ///       AggregateField.average('population'),
+  ///     ])
+  ///     .get();
+  /// print(snapshot.getCount());
+  /// print(snapshot.get(AggregateField.sum('population')));
+  /// print(snapshot.getDouble(AggregateField.average('population')));
+  /// ```
   AggregateQuery aggregate(List<AggregateField> aggregateFields) {
     if (aggregateFields.isEmpty) {
       throw ArgumentError('At least one AggregateField is required.');
@@ -772,15 +956,58 @@ class Query<T extends dynamic> {
     return AggregateQueryInternal.withAliases(this, aggregates);
   }
 
-  /// Return cached results first and then queries the server with resume token
-  /// to ensure unnecessary reads are not made.
+  /// A stream of the results of this query: the current results first, then a new snapshot every time they change.
+  ///
+  /// The first snapshot can come from the local cache (with `metadata.isFromCache` true) before the backend answers;
+  /// when the cache knows the query, the backend is asked only for what changed since. Local writes raise a snapshot
+  /// at once, with
+  /// `metadata.hasPendingWrites` true. Snapshots in which only the metadata changed are not delivered; use
+  /// [getSnapshots] with [MetadataChanges.include] for those. [QuerySnapshot.docChanges] lists what changed since
+  /// the previous snapshot.
+  ///
+  /// The listener is registered when you listen to the stream and removed when you cancel the subscription: cancel
+  /// it when you no longer need it. Each access to this getter returns a new single-subscription stream. While the
+  /// client is offline the stream keeps delivering changes from the cache. An error (for example a query that the
+  /// security rules deny, or a missing index) is delivered on the stream, which then closes. Throws a [StateError]
+  /// for a [limitToLast] query without [orderBy].
+  ///
+  /// This is the JS SDK `onSnapshot`.
+  ///
+  /// ```dart
+  /// final StreamSubscription<QuerySnapshot<Map<String, Object?>>> subscription =
+  ///     firestore
+  ///         .collection('cities')
+  ///         .where('state', isEqualTo: 'CA')
+  ///         .snapshots
+  ///         .listen(
+  ///           (QuerySnapshot<Map<String, Object?>> snapshot) {
+  ///             for (final DocumentChange<Map<String, Object?>> change
+  ///                 in snapshot.docChanges) {
+  ///               print('${change.type.name}: ${change.document.id}');
+  ///             }
+  ///           },
+  ///           onError: (Object error) => print('listen failed: $error'),
+  ///         );
+  /// // ...
+  /// await subscription.cancel();
+  /// ```
   Stream<QuerySnapshot<T>> get snapshots {
     final ListenOptions options = _internalOptions(MetadataChanges.exclude);
     return _getSnapshotsInternal(options);
   }
 
-  /// Return cached results first and then queries the server with resume token
-  /// to ensure unnecessary reads are not made.
+  /// A stream of the results of this query, like [snapshots]. Pass [MetadataChanges.include] as [changes] to also get
+  /// a snapshot when only the [QuerySnapshot.metadata] changed (for example when the results stop being from the
+  /// cache, or when a local write is acknowledged).
+  ///
+  /// ```dart
+  /// firestore
+  ///     .collection('cities')
+  ///     .getSnapshots(MetadataChanges.include)
+  ///     .listen((QuerySnapshot<Map<String, Object?>> snapshot) {
+  ///       print('from cache: ${snapshot.metadata.isFromCache}');
+  ///     });
+  /// ```
   Stream<QuerySnapshot<T>> getSnapshots([MetadataChanges? changes]) {
     final ListenOptions options = _internalOptions(
       changes ?? MetadataChanges.exclude,
@@ -792,6 +1019,19 @@ class Query<T extends dynamic> {
   /// [ListenSource]: with [ListenSource.cache] the events are raised from the
   /// local cache only (local writes, cache updates) and the backend is not
   /// contacted for this listener.
+  ///
+  /// This is the JS SDK `onSnapshot` with `{source: 'cache'}` or `{includeMetadataChanges: true}`.
+  ///
+  /// ```dart
+  /// firestore
+  ///     .collection('cities')
+  ///     .getSnapshotsWithOptions(
+  ///       const SnapshotListenOptions(source: ListenSource.cache),
+  ///     )
+  ///     .listen((QuerySnapshot<Map<String, Object?>> snapshot) {
+  ///       print('${snapshot.length} cities in the cache');
+  ///     });
+  /// ```
   Stream<QuerySnapshot<T>> getSnapshotsWithOptions(
     SnapshotListenOptions options,
   ) {
@@ -860,8 +1100,33 @@ Future<T> _firstAndCancel<T>(Stream<T> stream) async {
 DocumentKey? _referenceKey(Object? value) =>
     value is DocumentReference ? value.key : null;
 
-/// A [CollectionReference] can be used for adding documents, getting document references, and
-/// querying for documents (using the methods inherited from [Query]).
+/// A reference to a collection, used to add documents, get references to documents, and query the documents
+/// (using the methods inherited from [Query]).
+///
+/// Get one from `Firestore.collection` or [DocumentReference.collection]. A collection exists as long as it has
+/// documents: creating a reference does not contact the backend, and a collection does not need to be created
+/// before you add a document to it.
+///
+/// ```dart
+/// final CollectionReference<Map<String, Object?>> cities = firestore
+///     .collection('cities');
+///
+/// // A new document with a generated id.
+/// final DocumentReference<Map<String, Object?>> tokyo = await cities.add({
+///   'name': 'Tokyo',
+///   'country': 'Japan',
+/// });
+/// print(tokyo.id);
+///
+/// // A document with a chosen id.
+/// await cities.doc('SF').set({'name': 'San Francisco'});
+///
+/// // A query over the collection.
+/// final QuerySnapshot<Map<String, Object?>> japanese = await cities
+///     .where('country', isEqualTo: 'Japan')
+///     .get();
+/// print(japanese.length);
+/// ```
 ///
 /// **Subclassing Note**: Firestore classes are not meant to be subclassed except for use in test
 /// mocks. Subclassing is not supported in production code and new SDK releases may break code that
@@ -884,7 +1149,7 @@ class CollectionReference<T extends dynamic> extends Query<T> {
     return path;
   }
 
-  /// Return The id of the collection.
+  /// The id of the collection: the last segment of its [path].
   String get id => query.path.last;
 
   /// Gets a [DocumentReference] to the document that contains this collection. Only subcollections
@@ -913,9 +1178,22 @@ class CollectionReference<T extends dynamic> extends Query<T> {
   /// Gets a [DocumentReference] instance that refers to the document at the specified path within
   /// this collection.
   ///
-  /// [documentPath] a slash-separated relative path to a document.
+  /// [documentPath] a slash-separated relative path to a document. Without it the document gets a new random id of
+  /// 20 characters, generated on the client (so this works offline).
   ///
-  /// Returns the [DocumentReference] instance.
+  /// Returns the [DocumentReference] instance, with the converter of this collection. Throws an [ArgumentError] if
+  /// [documentPath] is empty or the path it gives does not name a document (`doc('SF/landmarks')` names a
+  /// collection).
+  ///
+  /// ```dart
+  /// final CollectionReference<Map<String, Object?>> cities = firestore
+  ///     .collection('cities');
+  /// final DocumentReference<Map<String, Object?>> sf = cities.doc('SF');
+  ///
+  /// // An id chosen before the write, for example to store it elsewhere too.
+  /// final DocumentReference<Map<String, Object?>> created = cities.doc();
+  /// await created.set({'name': 'Lisbon', 'id': created.id});
+  /// ```
   DocumentReference<T> doc([String? documentPath]) => document(documentPath);
 
   /// Gets a [DocumentReference] instance that refers to the document at the specified path within
@@ -936,10 +1214,20 @@ class CollectionReference<T extends dynamic> extends Query<T> {
   /// Adds a new document to this collection with the specified data, assigning it a document ID
   /// automatically.
   ///
-  /// [data] a [Map] containing the data for the new document.
+  /// [data] the data of the new document: a `Map<String, Object?>`, or a [T] that the converter of this collection
+  /// turns into one. The future fails with an [ArgumentError] for a value Firestore cannot store.
   ///
   /// Returns a Future that will be resolved with the [DocumentReference] of the newly created
-  /// document.
+  /// document, once the backend has acknowledged the write. The write is applied to the local cache at once, so
+  /// listeners see the document immediately; while the client is offline the future does not complete. If you need
+  /// the reference without waiting, use `doc()` and [DocumentReference.set] instead.
+  ///
+  /// ```dart
+  /// final DocumentReference<Map<String, Object?>> ref = await firestore
+  ///     .collection('messages')
+  ///     .add({'text': 'hello', 'sent': FieldValue.serverTimestamp()});
+  /// print('added ${ref.id}');
+  /// ```
   Future<DocumentReference<T>> add(T data) async {
     checkNotNull<Object>(data, 'Provided data must not be null.');
     final DocumentReference<T> ref = document();
@@ -950,6 +1238,22 @@ class CollectionReference<T extends dynamic> extends Query<T> {
   /// Returns a collection reference to the same collection that converts data
   /// with [converter] (type [U]) when reading and writing. Use
   /// [withoutConverter] to go back to raw maps.
+  ///
+  /// The references returned by [doc] and [add] keep the converter.
+  ///
+  /// ```dart
+  /// final CollectionReference<String> names = firestore
+  ///     .collection('cities')
+  ///     .withConverter<String>(
+  ///       FirestoreDataConverter<String>.from(
+  ///         fromFirestore: (snapshot, options) => snapshot['name'] as String,
+  ///         toFirestore: (name, options) => {'name': name},
+  ///       ),
+  ///     );
+  /// await names.doc('LIS').set('Lisbon');
+  /// final DocumentSnapshot<String> lisbon = await names.doc('LIS').get();
+  /// print(lisbon.data); // Lisbon
+  /// ```
   @override
   CollectionReference<U> withConverter<U extends Object?>(
     FirestoreDataConverter<U> converter,

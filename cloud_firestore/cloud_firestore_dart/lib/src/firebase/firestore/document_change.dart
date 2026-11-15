@@ -20,13 +20,34 @@ enum DocumentChangeType {
   /// Indicates a document within the query was modified.
   modified,
 
-  /// Indicates a document within the query was removed (either deleted or no  longer matches the
-  /// query.
+  /// Indicates a document within the query was removed (either deleted or no longer matches the
+  /// query).
   removed,
 }
 
 /// A [DocumentChange] represents a change to the documents matching a query. It contains the
-/// document affected and a the type of change that occurred (added, modified, or removed).
+/// document affected and the type of change that occurred (added, modified, or removed).
+///
+/// You get the changes of a snapshot from `QuerySnapshot.docChanges`. Applying them in order to
+/// the documents of the previous snapshot gives the documents of the new one; [oldIndex] and
+/// [newIndex] say where each change applies, for example to update a list in a user interface.
+///
+/// ```dart
+/// final List<QueryDocumentSnapshot<Map<String, Object?>>> rows = [];
+/// firestore.collection('cities').orderBy('name').snapshots.listen((
+///   QuerySnapshot<Map<String, Object?>> snapshot,
+/// ) {
+///   for (final DocumentChange<Map<String, Object?>> change
+///       in snapshot.docChanges) {
+///     if (change.oldIndex != -1) {
+///       rows.removeAt(change.oldIndex);
+///     }
+///     if (change.newIndex != -1) {
+///       rows.insert(change.newIndex, change.document);
+///     }
+///   }
+/// });
+/// ```
 ///
 /// **Subclassing Note**: Firestore classes are not meant to be subclassed except for use in test
 /// mocks. Subclassing is not supported in production code and new SDK releases may break code that
@@ -35,7 +56,8 @@ class DocumentChange<T extends dynamic> {
   /// Implementation detail of the SDK; not part of the supported API.
   DocumentChange._(this.document, this.type, this.oldIndex, this.newIndex);
 
-  /// An enumeration of snapshot diff types.
+  /// The kind of change: [DocumentChangeType.added], [DocumentChangeType.modified] or
+  /// [DocumentChangeType.removed].
   final DocumentChangeType type;
 
   /// Returns the newly added or modified document if this [DocumentChange] is for an updated

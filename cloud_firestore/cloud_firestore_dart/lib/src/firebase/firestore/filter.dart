@@ -27,6 +27,28 @@ import 'package:meta/meta.dart';
 /// `Query.where` also accepts a field with FlutterFire-style named arguments
 /// (`where('age', isGreaterThan: 18)`), which builds the same filters.
 ///
+/// The factories that take a `String` field split it on dots (`'address.city'` is a nested
+/// field) and throw an [ArgumentError] for an invalid path; the `...Field` variants take a
+/// [FieldPath]. The value is checked when the filter is added to a query, which throws an
+/// [ArgumentError] for a value or a combination of filters that Firestore does not accept (for
+/// example an empty list for [inArray], or two [notInArray] filters).
+///
+/// ```dart
+/// // Cities in California with more than a million people, or any capital.
+/// final QuerySnapshot<Map<String, Object?>> snapshot = await firestore
+///     .collection('cities')
+///     .where(
+///       Filter.or([
+///         Filter.and([
+///           Filter.equalTo('state', 'CA'),
+///           Filter.greaterThan('population', 1000000),
+///         ]),
+///         Filter.equalTo('capital', true),
+///       ]),
+///     )
+///     .get();
+/// ```
+///
 /// **Subclassing Note**: Firestore classes are not meant to be subclassed.
 class Filter {
   const Filter._();
@@ -42,7 +64,7 @@ class Filter {
       UnaryFilter(fieldPath, core.FilterOperator.equal, value);
 
   /// Creates a new filter for checking that the given field is not equal to
-  /// the given value.
+  /// the given value. Documents without the field do not match.
   static Filter notEqualTo(String field, Object? value) =>
       notEqualToField(FieldPath.fromDotSeparatedPath(field), value);
 
@@ -114,7 +136,7 @@ class Filter {
   ) => UnaryFilter(fieldPath, core.FilterOperator.arrayContainsAny, values);
 
   /// Creates a new filter for checking that the given field equals any of the
-  /// given values.
+  /// given values. This is the `in` operator of the other SDKs.
   static Filter inArray(String field, List<Object?> values) =>
       inArrayField(FieldPath.fromDotSeparatedPath(field), values);
 
@@ -124,7 +146,8 @@ class Filter {
       UnaryFilter(fieldPath, core.FilterOperator.IN, values);
 
   /// Creates a new filter for checking that the given field does not equal any
-  /// of the given values.
+  /// of the given values. This is the `not-in` operator of the other SDKs; documents without the
+  /// field do not match.
   static Filter notInArray(String field, List<Object?> values) =>
       notInArrayField(FieldPath.fromDotSeparatedPath(field), values);
 
@@ -136,12 +159,15 @@ class Filter {
   /// Creates a new filter that is a disjunction of the given filters. A
   /// disjunction filter includes a document if it satisfies *any* of the given
   /// filters.
+  ///
+  /// An empty list adds no filter to the query. The backend limits the number of disjunctions
+  /// in a query and may need an index for it.
   static Filter or(List<Filter> filters) =>
       CompositeFilter._(filters, core.CompositeFilterOperator.or);
 
   /// Creates a new filter that is a conjunction of the given filters. A
   /// conjunction filter includes a document if it satisfies *all* of the given
-  /// filters.
+  /// filters. An empty list adds no filter to the query.
   static Filter and(List<Filter> filters) =>
       CompositeFilter._(filters, core.CompositeFilterOperator.and);
 }

@@ -15,6 +15,19 @@
 /// Configures the source of snapshot listeners on `DocumentReference` and
 /// `Query` (see `getSnapshotsWithOptions`). This controls how a listener
 /// retrieves data updates.
+///
+/// This is the `source` option of `onSnapshot` in the JS SDK (`'default'` or `'cache'`).
+///
+/// ```dart
+/// firestore
+///     .collection('cities')
+///     .getSnapshotsWithOptions(
+///       const SnapshotListenOptions(source: ListenSource.cache),
+///     )
+///     .listen((QuerySnapshot<Map<String, Object?>> snapshot) {
+///       print(snapshot.length);
+///     });
+/// ```
 enum ListenSource {
   /// The default behavior. The listener attempts to return the initial
   /// snapshot from the cache and retrieve up-to-date snapshots from the

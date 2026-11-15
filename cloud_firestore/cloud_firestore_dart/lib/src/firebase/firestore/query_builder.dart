@@ -34,7 +34,14 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/util/util.dart';
 
 /// Builds and validates the internal queries behind the public `Query`
 /// classes, for the database [databaseId].
+///
+/// Not part of the public API (no library exports it): the `Query` of the main library and the one
+/// of Firestore Lite call it and document the behaviour for users. Every method returns a new
+/// internal query and throws an [ArgumentError] for an invalid argument, with the message the
+/// public method shows.
 class QueryBuilder {
+  /// Creates a builder for [databaseId] that parses values with [dataConverter] and recognizes the
+  /// document references of its client with [referenceKey].
   const QueryBuilder(this.databaseId, this.dataConverter, this.referenceKey);
 
   /// The database of the queries.
@@ -47,7 +54,7 @@ class QueryBuilder {
   /// uses this builder, null for every other value.
   final DocumentKey? Function(Object? value) referenceKey;
 
-  /// Fails for a limit-to-last query without an ordering: it has no "last".
+  /// Fails for a limit-to-last query without an ordering: it has no "last". Throws a [StateError].
   static void validateHasExplicitOrderByForLimitToLast(core.Query query) {
     if (query.hasLimitToLast && query.explicitSortOrder.isEmpty) {
       throw StateError(
@@ -57,7 +64,9 @@ class QueryBuilder {
   }
 
   /// Returns [query] with the filters of `Query.where` added: see the
-  /// documentation there.
+  /// documentation there. Throws an [ArgumentError] if [fieldOrFilter] is neither a [Filter], a
+  /// `String` nor a [FieldPath], if named arguments come with a [Filter], or if none comes with a
+  /// field.
   core.Query where(
     core.Query query,
     Object fieldOrFilter, {
@@ -146,6 +155,10 @@ class QueryBuilder {
 
   /// Returns [query] with [filter] added, or [query] itself when [filter] is
   /// a composite filter without any filters.
+  ///
+  /// Throws an [ArgumentError] for an invalid value (for example an empty list for `in`, or a
+  /// document id filter with an invalid id) and for a filter that conflicts with one the query
+  /// already has (two `not-in` filters, `not-in` with `!=`, `in` or `array-contains-any`).
   core.Query whereFilter(core.Query query, Filter filter) {
     final core_filter.Filter parsedFilter = _parseFilter(query, filter);
     if (parsedFilter.filters.isEmpty) {
@@ -339,7 +352,8 @@ class QueryBuilder {
     return null;
   }
 
-  /// Returns [query] ordered by [fieldPath] as well.
+  /// Returns [query] ordered by [fieldPath] as well, after its other orderings. Throws an
+  /// [ArgumentError] if [query] already has a start or end cursor.
   core.Query orderBy(
     core.Query query,
     core.FieldPath fieldPath, {
@@ -361,7 +375,8 @@ class QueryBuilder {
     return query.orderBy(OrderBy.getInstance(dir, fieldPath));
   }
 
-  /// Returns [query] limited to its first [limit] documents.
+  /// Returns [query] limited to its first [limit] documents. Throws an [ArgumentError] if [limit] is
+  /// not positive.
   core.Query limit(core.Query query, int limit) {
     if (limit <= 0) {
       throw ArgumentError(
@@ -371,7 +386,8 @@ class QueryBuilder {
     return query.limitToFirst(limit);
   }
 
-  /// Returns [query] limited to its last [limit] documents.
+  /// Returns [query] limited to its last [limit] documents. Throws an [ArgumentError] if [limit] is
+  /// not positive.
   core.Query limitToLast(core.Query query, int limit) {
     if (limit <= 0) {
       throw ArgumentError(
@@ -384,6 +400,10 @@ class QueryBuilder {
   /// The bound of [query] at [document], the document of a snapshot (null
   /// when the document of the snapshot does not exist), for the cursor
   /// method [methodName].
+  ///
+  /// The bound uses every ordering of the query, including the implicit order by document key, so
+  /// the cursor is at exactly that document. Throws an [ArgumentError] if [document] is null, lacks
+  /// a field of the ordering, or holds a pending server timestamp in one.
   Bound boundFromDocument(
     core.Query query,
     String methodName,
@@ -426,7 +446,10 @@ class QueryBuilder {
   }
 
   /// The bound of [query] at the field [values], for the cursor method
-  /// [methodName].
+  /// [methodName], matched to the explicit orderings in order.
+  ///
+  /// Throws an [ArgumentError] if there are more values than orderings, or if a value for an
+  /// ordering by document id is not a valid document id for the query.
   Bound boundFromFields(
     core.Query query,
     String methodName,

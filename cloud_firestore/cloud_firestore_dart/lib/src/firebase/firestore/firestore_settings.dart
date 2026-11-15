@@ -7,9 +7,42 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/local_cache_settings
 import 'package:cloud_firestore_dart/src/firebase/firestore/long_polling_options.dart';
 import 'package:collection/collection.dart';
 
-/// Settings used to configure a FirebaseFirestore instance.
+/// The settings of a `Firestore` instance: the backend it talks to, its local cache and its transport options.
+///
+/// Pass them to `Firestore.instanceFor` when you create the instance; they cannot change while the instance runs
+/// (a later `instanceFor` call with different settings throws a [StateError]). The settings are immutable: derive
+/// new ones with [copyWith] and [withEmulator]. Every argument is checked in the constructor, which throws an
+/// [ArgumentError] for an invalid value.
+///
+/// The defaults talk to production Firestore ([defaultHost]) over TLS, with a 100 MB cache that is persistent when
+/// `instanceFor` gets an `openDatabase` function and in memory otherwise.
+///
+/// ```dart
+/// final Firestore firestore = Firestore.instanceFor(
+///   app: app,
+///   settings: FirestoreSettings(
+///     cacheSettings: PersistentCacheSettings(sizeBytes: 50 * 1024 * 1024),
+///   ),
+/// );
+///
+/// // Against the emulator.
+/// final FirestoreSettings emulator = FirestoreSettings().withEmulator(
+///   '127.0.0.1',
+///   8080,
+/// );
+/// ```
+///
+/// `Settings` is an alias of this class.
 class FirestoreSettings {
-  /// Constructs a FirebaseFirestoreSettings object
+  /// Creates settings; every argument has the default of the field of the same name.
+  ///
+  /// Throws an [ArgumentError] when [host] is not a plain host name or IP address (it must not contain a scheme,
+  /// user info or path), when [sslEnabled] is false with the production host, when [cacheSizeBytes] is below
+  /// [minimumCacheBytes] (and not [cacheSizeUnlimited]), when both long-polling options are turned on, and for the
+  /// invalid values described on [experimentalLongPollingOptions] and [grpcFlowControlWindow]. Throws a [StateError]
+  /// when [cacheSettings] is given together with a non-default [persistenceEnabled] or [cacheSizeBytes].
+  ///
+  /// To use the emulator, call [withEmulator] on the result rather than passing its host here.
   FirestoreSettings({
     String host = defaultHost,
     int port = defaultPort,
@@ -103,17 +136,25 @@ class FirestoreSettings {
   /// JS SDKs.
   static const int defaultGrpcFlowControlWindow = 256 * 1024;
 
-  /// The host of the Firestore backend.
+  /// The host of the Firestore backend, [defaultHost] by default.
+  ///
+  /// A host name or an IP address only, without scheme, user info or path. For the emulator use [withEmulator].
   final String host;
 
   /// The port of the Firestore backend. Defaults to 443.
   final int port;
 
   /// Enables or disables SSL for communication. The default is to use SSL.
+  ///
+  /// It can only be turned off for another host than [defaultHost], such as an emulator or a proxy: the requests
+  /// carry the auth token.
   final bool sslEnabled;
 
   /// Enables or disables local persistent storage. The default is to use local
   /// persistent storage.
+  ///
+  /// The cache is only persistent when `Firestore.instanceFor` also gets an `openDatabase` function; without one the
+  /// cache is in memory even when this is true.
   ///
   /// When [cacheSettings] is set this is derived from it: true for
   /// [PersistentCacheSettings], false for [MemoryCacheSettings].
@@ -137,6 +178,18 @@ class FirestoreSettings {
   /// [cacheSizeBytes]: passing it together with a non default value of either
   /// throws a [StateError]. When null, the cache is configured by those two
   /// settings.
+  ///
+  /// As with [persistenceEnabled], [PersistentCacheSettings] only give a persistent cache when
+  /// `Firestore.instanceFor` gets an `openDatabase` function.
+  ///
+  /// ```dart
+  /// // A memory cache that keeps up to 10 MB of recently used documents.
+  /// final FirestoreSettings settings = FirestoreSettings(
+  ///   cacheSettings: MemoryCacheSettings(
+  ///     gcSettings: MemoryLruGcSettings(sizeBytes: 10 * 1024 * 1024),
+  ///   ),
+  /// );
+  /// ```
   final LocalCacheSettings? cacheSettings;
 
   /// The token sent to the Firestore emulator to authenticate the requests,
@@ -384,6 +437,17 @@ class FirestoreSettings {
   ///
   /// Throws an [ArgumentError] when [host] is the production host
   /// ([defaultHost]).
+  ///
+  /// ```dart
+  /// final Firestore firestore = Firestore.instanceFor(
+  ///   app: app,
+  ///   settings: FirestoreSettings().withEmulator(
+  ///     '127.0.0.1',
+  ///     8080,
+  ///     mockUserToken: {'sub': 'alice'},
+  ///   ),
+  /// );
+  /// ```
   FirestoreSettings withEmulator(
     String host,
     int port, {
@@ -405,7 +469,19 @@ class FirestoreSettings {
     );
   }
 
-  /// A copy of these settings with the given values replaced.
+  /// Returns a copy of these settings with the given values replaced; a null argument keeps the current value.
+  ///
+  /// The values are checked as in the constructor. Turning one long-polling option on turns the other off unless
+  /// both are given. Settings made by [withEmulator] keep their [mockUserToken] while the host, the port and the SSL
+  /// setting stay those of the emulator; changing one of them on settings that have a token throws an
+  /// [ArgumentError].
+  ///
+  /// ```dart
+  /// final FirestoreSettings base = FirestoreSettings();
+  /// final FirestoreSettings memory = base.copyWith(
+  ///   cacheSettings: const MemoryCacheSettings(),
+  /// );
+  /// ```
   FirestoreSettings copyWith({
     String? host,
     int? port,

@@ -17,12 +17,36 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/firestore_settings.d
 /// Configures the local cache of a Firestore instance, see
 /// [FirestoreSettings.cacheSettings]. The implementations are
 /// [PersistentCacheSettings] and [MemoryCacheSettings].
+///
+/// The cache holds the documents that listeners and reads received and the writes that the backend has not
+/// acknowledged yet; reads and listeners use it while the client is offline. This is the `localCache` setting of
+/// the JS SDK (`persistentLocalCache()` and `memoryLocalCache()`).
+///
+/// ```dart
+/// final Firestore firestore = Firestore.instanceFor(
+///   app: app,
+///   openDatabase: openDatabase, // needed for a persistent cache
+///   settings: FirestoreSettings(cacheSettings: PersistentCacheSettings()),
+/// );
+/// ```
 sealed class LocalCacheSettings {
   const LocalCacheSettings();
 }
 
 /// Configures a cache stored on disk (the default). The on disk cache is
 /// garbage collected once it exceeds [sizeBytes].
+///
+/// The cache is stored in the SQLite database that the `openDatabase` function of `Firestore.instanceFor` opens
+/// (a file on the VM, IndexedDB or OPFS on the web). Without that function the instance falls back to a memory
+/// cache. The data and the pending writes survive a restart of the program.
+///
+/// ```dart
+/// final FirestoreSettings settings = FirestoreSettings(
+///   cacheSettings: PersistentCacheSettings(
+///     sizeBytes: FirestoreSettings.cacheSizeUnlimited,
+///   ),
+/// );
+/// ```
 final class PersistentCacheSettings extends LocalCacheSettings {
   /// [sizeBytes] is an approximate cache size threshold: if the cache grows
   /// beyond it, Firestore starts removing data that has not been recently used.
@@ -56,6 +80,14 @@ final class PersistentCacheSettings extends LocalCacheSettings {
 
 /// Configures an in memory cache, which is lost when the instance is shut
 /// down. The memory cache is garbage collected as configured by [gcSettings].
+///
+/// Writes that the backend has not acknowledged when the instance is terminated are lost with it.
+///
+/// ```dart
+/// final FirestoreSettings settings = FirestoreSettings(
+///   cacheSettings: const MemoryCacheSettings(),
+/// );
+/// ```
 final class MemoryCacheSettings extends LocalCacheSettings {
   /// Creates the settings, by default with eager garbage collection.
   const MemoryCacheSettings({this.gcSettings = const MemoryEagerGcSettings()});
@@ -75,7 +107,8 @@ final class MemoryCacheSettings extends LocalCacheSettings {
   String toString() => 'MemoryCacheSettings{gcSettings=$gcSettings}';
 }
 
-/// Configures the garbage collector of a [MemoryCacheSettings].
+/// Configures the garbage collector of a [MemoryCacheSettings]: [MemoryEagerGcSettings] (the default) or
+/// [MemoryLruGcSettings].
 sealed class MemoryGarbageCollectorSettings {
   const MemoryGarbageCollectorSettings();
 }
@@ -99,6 +132,17 @@ final class MemoryEagerGcSettings extends MemoryGarbageCollectorSettings {
 
 /// Least recently used garbage collection: the memory cache is collected once
 /// it exceeds [sizeBytes], starting with the least recently used data.
+///
+/// Unlike eager collection, documents stay in the cache after their last listener stopped, so a later read or
+/// listener can be answered from the cache while offline.
+///
+/// ```dart
+/// final FirestoreSettings settings = FirestoreSettings(
+///   cacheSettings: MemoryCacheSettings(
+///     gcSettings: MemoryLruGcSettings(sizeBytes: 10 * 1024 * 1024),
+///   ),
+/// );
+/// ```
 final class MemoryLruGcSettings extends MemoryGarbageCollectorSettings {
   /// [sizeBytes] is an approximate threshold, see
   /// [PersistentCacheSettings.sizeBytes] for the accepted values.

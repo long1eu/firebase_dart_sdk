@@ -8,8 +8,50 @@
 /// deliver updates in real time. Writes go through [DocumentReference.set],
 /// [DocumentReference.update], a [WriteBatch] or a [Transaction].
 ///
+/// ```dart
+/// import 'package:cloud_firestore_dart/cloud_firestore_dart.dart';
+/// import 'package:firebase_app_dart/firebase_app_dart.dart';
+///
+/// Future<void> main() async {
+///   final FirebaseApp app = FirebaseApp.withOptions(
+///     const FirebaseOptions(
+///       apiKey: 'my-api-key',
+///       applicationId: '1:1234567890:web:0123456789abcdef',
+///       projectId: 'my-project',
+///     ),
+///   );
+///   final Firestore firestore = Firestore.instanceFor(app: app);
+///
+///   final CollectionReference<Map<String, Object?>> cities = firestore
+///       .collection('cities');
+///   await cities.doc('SF').set({'name': 'San Francisco', 'state': 'CA'});
+///
+///   final QuerySnapshot<Map<String, Object?>> californian = await cities
+///       .where('state', isEqualTo: 'CA')
+///       .get();
+///   for (final QueryDocumentSnapshot<Map<String, Object?>> city
+///       in californian) {
+///     print('${city.id}: ${city.data}');
+///   }
+///
+///   await firestore.terminate();
+/// }
+/// ```
+///
 /// The offline cache is stored in SQLite when an [OpenDatabase] function is
-/// supplied, and in memory otherwise.
+/// supplied, and in memory otherwise. Reads and listeners work offline from
+/// the cache; writes made offline are applied to the cache at once and sent
+/// when the client is back online. Requests are authenticated with the token
+/// provider registered on the app (see `package:firebase_auth_providers_dart`),
+/// and sent without a user otherwise.
+///
+/// The API follows the Android SDK and FlutterFire in its names; listeners are
+/// Dart `Stream`s, and a [Source] argument replaces the JS SDK's
+/// `getDocFromCache` and `getDocFromServer`. The guides in the repository's
+/// `docs/guides` folder and `docs/parity.md` describe what is supported and how
+/// it differs from the JS SDK. Firestore Lite (one request per call, no cache)
+/// is `package:cloud_firestore_dart/lite.dart`; Pipelines (preview,
+/// Enterprise edition) are in `package:cloud_firestore_dart/pipelines.dart`.
 ///
 /// The value types shared with `package:cloud_firestore_dart/lite.dart` are
 /// documented here.

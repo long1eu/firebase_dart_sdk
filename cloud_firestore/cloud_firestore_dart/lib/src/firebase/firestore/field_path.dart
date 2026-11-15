@@ -9,6 +9,21 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/util/assert.dart';
 /// A [FieldPath] refers to a field in a document. The path may consist of a single field name
 /// (referring to a top level field in the document), or a list of field names (referring to a
 /// nested field in the document).
+///
+/// Methods that take a field name as a `String` split it on dots. Use a [FieldPath] when a field
+/// name itself contains a dot or another character that a dotted path cannot hold
+/// (`~ * / [ ]`), and [documentIdField] to filter or sort by the document id.
+///
+/// ```dart
+/// final FieldPath nested = FieldPath.of(['address', 'city']); // same as 'address.city'
+/// final FieldPath dotted = FieldPath.of(['version.1']); // one field named "version.1"
+///
+/// final QuerySnapshot<Map<String, Object?>> snapshot = await firestore
+///     .collection('cities')
+///     .where(nested, isEqualTo: 'San Francisco')
+///     .orderByField(dotted)
+///     .get();
+/// ```
 class FieldPath {
   /// Implementation detail of the SDK; not part of the supported API. Use [FieldPath.of] or
   /// [FieldPath.fromDotSeparatedPath].
@@ -25,7 +40,8 @@ class FieldPath {
   ///
   /// [fieldNames] a list of field names.
   ///
-  /// Return a FieldPath that points to a field location in a document.
+  /// Return a FieldPath that points to a field location in a document. Throws an [ArgumentError]
+  /// if [fieldNames] is empty or one of the names is empty.
   factory FieldPath.of(List<String> fieldNames) {
     checkArgument(
       fieldNames.isNotEmpty,
@@ -43,6 +59,9 @@ class FieldPath {
   }
 
   /// Parses a field path string into a [FieldPath], treating dots as separators.
+  ///
+  /// Throws an [ArgumentError] if [path] is empty, starts or ends with a dot, contains `..`, or
+  /// contains one of `~ * / [ ]`; use [FieldPath.of] for such names.
   factory FieldPath.fromDotSeparatedPath(String path) {
     checkNotNull(path, 'Provided field path must not be null.');
     checkArgument(
@@ -75,7 +94,17 @@ class FieldPath {
   static FieldPath documentId() => documentIdField;
 
   /// A special sentinel [FieldPath] to refer to the id of a document. It can be
-  /// used in queries to sort or filter by the document id.
+  /// used in queries to sort or filter by the document id. This is `documentId()` of the JS SDK.
+  ///
+  /// In a filter on a collection the value is a document id or a `DocumentReference`; on a
+  /// collection group it is a full document path.
+  ///
+  /// ```dart
+  /// final QuerySnapshot<Map<String, Object?>> snapshot = await firestore
+  ///     .collection('cities')
+  ///     .where(FieldPath.documentIdField, whereIn: ['SF', 'LA'])
+  ///     .get();
+  /// ```
   ///
   /// A getter named `documentId` (the official spelling) cannot exist next to
   /// the method [documentId] until that method is removed.

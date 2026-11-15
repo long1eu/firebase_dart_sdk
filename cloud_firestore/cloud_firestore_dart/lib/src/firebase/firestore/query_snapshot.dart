@@ -19,6 +19,22 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/snapshot_metadata.da
 
 /// A [QuerySnapshot] contains the results of a query. It can contain zero or more [DocumentSnapshot] objects.
 ///
+/// It is an `Iterable` of [QueryDocumentSnapshot]s in the order of the query, so you can loop over it directly;
+/// [docs] gives them as a list and [docChanges] lists what changed since the previous snapshot of the same listener.
+/// [metadata] tells whether the results came from the local cache and whether they include local writes that the
+/// backend has not acknowledged yet.
+///
+/// ```dart
+/// final QuerySnapshot<Map<String, Object?>> snapshot = await firestore
+///     .collection('cities')
+///     .where('state', isEqualTo: 'CA')
+///     .get();
+/// print('${snapshot.length} cities, from cache: ${snapshot.metadata.isFromCache}');
+/// for (final QueryDocumentSnapshot<Map<String, Object?>> city in snapshot) {
+///   print('${city.id}: ${city.data}');
+/// }
+/// ```
+///
 /// **Subclassing Note**: Firestore classes are not meant to be subclassed except for use in test mocks. Subclassing is
 /// not supported in production code and new SDK releases may break code that does so.
 class QuerySnapshot<T extends dynamic>
@@ -48,7 +64,9 @@ class QuerySnapshot<T extends dynamic>
   /// The query whose results this snapshot holds.
   final Query<T> query;
 
-  /// Returns the metadata for this document snapshot.
+  /// The metadata of this query snapshot: whether the results came from the cache
+  /// ([SnapshotMetadata.isFromCache]) and whether one of the documents has local writes that the backend has not
+  /// acknowledged yet ([SnapshotMetadata.hasPendingWrites]).
   final SnapshotMetadata metadata;
 
   final ViewSnapshot _snapshot;
@@ -66,8 +84,30 @@ class QuerySnapshot<T extends dynamic>
   @Deprecated('Use docChanges instead.')
   List<DocumentChange<T>> get documentChanges => docChanges;
 
+  /// The documents that changed since the previous snapshot of the same listener, in the order the changes apply. In
+  /// the first snapshot every document is a [DocumentChangeType.added] change. Changes to the metadata of a document
+  /// only are not included; use [getDocumentChanges] for those.
+  ///
   /// Same as [documentChanges]; this is the name used by the current official
   /// Firestore API.
+  ///
+  /// ```dart
+  /// firestore.collection('cities').snapshots.listen((
+  ///   QuerySnapshot<Map<String, Object?>> snapshot,
+  /// ) {
+  ///   for (final DocumentChange<Map<String, Object?>> change
+  ///       in snapshot.docChanges) {
+  ///     switch (change.type) {
+  ///       case DocumentChangeType.added:
+  ///         print('new city: ${change.document.data}');
+  ///       case DocumentChangeType.modified:
+  ///         print('modified city: ${change.document.data}');
+  ///       case DocumentChangeType.removed:
+  ///         print('removed city: ${change.document.id}');
+  ///     }
+  ///   }
+  /// });
+  /// ```
   List<DocumentChange<T>> get docChanges =>
       getDocumentChanges(MetadataChanges.exclude);
 
@@ -75,8 +115,11 @@ class QuerySnapshot<T extends dynamic>
   /// be in the list as added changes.
   ///
   /// [metadataChanges] Indicates whether metadata-only changes (i.e. only [QuerySnapshot.metadata] changed) should be included.
+  /// A metadata-only change of a document is reported as [DocumentChangeType.modified].
   ///
-  /// Returns the list of document changes since the last snapshot.
+  /// Returns the list of document changes since the last snapshot. Throws an [ArgumentError] when
+  /// [metadataChanges] is [MetadataChanges.include] but the listener that produced this snapshot was not started
+  /// with [MetadataChanges.include] (for example a snapshot from `Query.snapshots`).
   List<DocumentChange<T>> getDocumentChanges(MetadataChanges metadataChanges) {
     if (metadataChanges == MetadataChanges.include &&
         snapshot.excludesMetadataChanges) {
@@ -114,16 +157,25 @@ class QuerySnapshot<T extends dynamic>
   /// Returns the documents in this [QuerySnapshot] as a List in order of the
   /// query. Same as [documents] but typed as [QueryDocumentSnapshot]; this is
   /// the name used by the current official Firestore API.
+  ///
+  /// The list cannot be modified, and each access builds a new list.
+  ///
+  /// ```dart
+  /// final List<String> names = snapshot.docs
+  ///     .map((QueryDocumentSnapshot<Map<String, Object?>> doc) => doc.id)
+  ///     .toList();
+  /// ```
   List<QueryDocumentSnapshot<T>> get docs => toList(growable: false);
 
   /// Returns true if there are no documents in the QuerySnapshot.
   @override
   bool get isEmpty => snapshot.documents.isEmpty;
 
-  /// Returns the number of documents in the QuerySnapshot.
+  /// Returns the number of documents in the QuerySnapshot. This is the JS SDK `size`.
   @override
   int get length => snapshot.documents.length;
 
+  /// Iterates over the documents of this snapshot in the order of the query.
   @override
   Iterator<QueryDocumentSnapshot<T>> get iterator {
     return () sync* {

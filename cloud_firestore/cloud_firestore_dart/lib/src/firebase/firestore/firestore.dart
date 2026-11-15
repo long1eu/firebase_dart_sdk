@@ -48,7 +48,38 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/write_batch.dart';
 import 'package:firebase_app_dart/firebase_app_dart.dart';
 import 'package:firebase_app_dart/internal.dart';
 
-/// Represents a Firestore Database and is the entry point for all Firestore operations
+/// A Cloud Firestore database, and the entry point for every Firestore operation.
+///
+/// There is one instance per [FirebaseApp] and database. Get it with [instanceFor]; from there, [collection] and
+/// [doc] give references to read, write and listen to, [collectionGroup] queries every collection with a given id,
+/// and [batch] and [runTransaction] group writes atomically.
+///
+/// The instance keeps a local cache. It is in memory unless you pass an `openDatabase` function to [instanceFor]
+/// (SQLite on the VM, SQLite in WebAssembly on the web; see the offline persistence guide). Reads and listeners work
+/// offline from that cache, and writes made offline are applied to the cache at once and sent when the client is
+/// back online.
+///
+/// On the Dart VM the instance holds network connections and timers, so a command line program does not exit while
+/// it is alive: [terminate] it when you are done.
+///
+/// ```dart
+/// final FirebaseApp app = FirebaseApp.withOptions(
+///   const FirebaseOptions(
+///     apiKey: 'my-api-key',
+///     applicationId: '1:1234567890:web:0123456789abcdef',
+///     projectId: 'my-project',
+///   ),
+/// );
+/// final Firestore firestore = Firestore.instanceFor(app: app);
+///
+/// await firestore.doc('cities/SF').set({'name': 'San Francisco'});
+/// final DocumentSnapshot<Map<String, Object?>> sf = await firestore
+///     .doc('cities/SF')
+///     .get();
+/// print(sf.data);
+///
+/// await firestore.terminate();
+/// ```
 ///
 /// **Subclassing Note**: Firestore classes are not meant to be subclassed except for use in test mocks. Subclassing is
 /// not supported in production code and new SDK releases may break code that does so.
@@ -71,7 +102,7 @@ class Firestore {
 
   final DatabaseId _databaseId;
 
-  /// The id of the Google Cloud project this instance talks to.
+  /// The id of the Google Cloud project this instance talks to, from the `projectId` of the app's options.
   String get projectId => _databaseId.projectId;
 
   /// The id of the database inside the project: `(default)` unless another
@@ -94,9 +125,17 @@ class Firestore {
   final FirestoreClient? _clientOrNull;
   final TaskScheduler _scheduler;
 
-  /// The instance of the default [FirebaseApp] and the default database.
+  /// The existing instance of the default [FirebaseApp] and the default database.
   ///
-  /// Throws a [StateError] if that instance has not been created with [instanceFor] yet.
+  /// Unlike FlutterFire, this getter does not create the instance. Throws a [StateError] if it has not been created
+  /// with [instanceFor] yet (or was terminated since), and the error of [FirebaseApp.instance] if there is no default
+  /// app.
+  ///
+  /// ```dart
+  /// Firestore.instanceFor(app: FirebaseApp.instance);
+  /// // Later, anywhere in the program:
+  /// final Firestore firestore = Firestore.instance;
+  /// ```
   static Firestore get instance {
     final FirebaseApp app = FirebaseApp.instance;
 
@@ -125,15 +164,36 @@ class Firestore {
   /// Gets the instance for [app] and [database], creating it on the first call. Later calls return the same instance
   /// until it is terminated.
   ///
-  /// [settings] are those of the call that creates the instance. A later call without settings, or with equal
-  /// settings, returns the existing instance; a later call with different settings throws a [StateError], as the
-  /// other SDKs do (`initializeFirestore` called twice with different options in the JS SDK, settings changed after
-  /// the start on Android): [terminate] the instance first to get one with other settings. [openDatabase] only
-  /// applies to the call that creates the instance.
+  /// [database] is the id of the database in the project, `(default)` unless you use a named database.
+  ///
+  /// [settings] are those of the call that creates the instance (the defaults of [FirestoreSettings] when null). A
+  /// later call without settings, or with equal settings, returns the existing instance; a later call with different
+  /// settings throws a [StateError], as the other SDKs do (`initializeFirestore` called twice with different options
+  /// in the JS SDK, settings changed after the start on Android): [terminate] the instance first to get one with
+  /// other settings.
+  ///
+  /// [openDatabase] opens the SQLite database of the persistent cache. Without it the cache is in memory, whatever
+  /// the settings say, and is lost when the instance is terminated. It only applies to the call that creates the
+  /// instance.
   ///
   /// Returns at once, as the other SDKs do: the instance opens its cache and connects in the background, and every
   /// operation waits for that. If opening fails (for example [openDatabase] throws), the operations of the instance
-  /// fail with that error.
+  /// fail with that error. Throws an [ArgumentError] if the options of [app] have no `projectId`.
+  ///
+  /// The requests are authenticated with the token provider registered on [app] (for example by
+  /// `firebase_auth_providers_dart`), and are sent without a user otherwise.
+  ///
+  /// ```dart
+  /// // The default database, a memory cache, the production backend.
+  /// final Firestore firestore = Firestore.instanceFor(app: app);
+  ///
+  /// // A named database, against the emulator.
+  /// final Firestore other = Firestore.instanceFor(
+  ///   app: app,
+  ///   database: 'my-database',
+  ///   settings: FirestoreSettings().withEmulator('127.0.0.1', 8080),
+  /// );
+  /// ```
   static Firestore instanceFor({
     required FirebaseApp app,
     String database = DatabaseId.defaultDatabaseId,
@@ -263,8 +323,21 @@ class Firestore {
     return firestore;
   }
 
-  /// Gets a [CollectionReference] instance that refers to the collection at the specified path within the database.
-  /// [collectionPath] is a slash-separated path to a collection.
+  /// Returns a [CollectionReference] to the collection at [collectionPath].
+  ///
+  /// [collectionPath] is a slash-separated path from the root of the database with an odd number of segments, such
+  /// as `cities` or `cities/SF/landmarks`. Throws an [ArgumentError] if it is empty or names a document (an even
+  /// number of segments).
+  ///
+  /// Creating a reference does not contact the backend, and the collection does not need to exist. The reference
+  /// reads and writes `Map<String, Object?>` values; use [CollectionReference.withConverter] for your own type.
+  ///
+  /// ```dart
+  /// final CollectionReference<Map<String, Object?>> cities = firestore
+  ///     .collection('cities');
+  /// final QuerySnapshot<Map<String, Object?>> all = await cities.get();
+  /// print(all.length);
+  /// ```
   CollectionReference<Map<String, Object?>> collection(String collectionPath) {
     checkNotNull(collectionPath, 'Provided collection path must not be null.');
     checkNonEmptyPath('Firestore.collection', collectionPath);
@@ -275,13 +348,24 @@ class Firestore {
     );
   }
 
-  /// Gets a [DocumentReference] instance that refers to the document at the specified path within the database.
-  /// [documentPath] is a slash-separated path to a document.
+  /// Returns a [DocumentReference] to the document at [documentPath].
+  ///
+  /// [documentPath] is a slash-separated path from the root of the database with an even number of segments, such
+  /// as `cities/SF` or `cities/SF/landmarks/bridge`. Throws an [ArgumentError] if it is empty or names a collection
+  /// (an odd number of segments).
+  ///
+  /// Creating a reference does not contact the backend, and the document does not need to exist.
+  ///
+  /// ```dart
+  /// final DocumentReference<Map<String, Object?>> sf = firestore.doc(
+  ///   'cities/SF',
+  /// );
+  /// await sf.set({'name': 'San Francisco', 'population': 870000});
+  /// ```
   DocumentReference<Map<String, Object?>> doc(String documentPath) =>
       document(documentPath);
 
-  /// Gets a [DocumentReference] instance that refers to the document at the specified path within the database.
-  /// [documentPath] is a slash-separated path to a document.
+  /// Returns a [DocumentReference] to the document at [documentPath]. Same as [doc].
   @Deprecated('Use doc instead.')
   DocumentReference<Map<String, Object?>> document(String documentPath) {
     checkNotNull(documentPath, 'Provided document path must not be null.');
@@ -292,12 +376,23 @@ class Firestore {
     );
   }
 
-  /// Creates and returns a new [Query] that includes all documents in the
-  /// database that are contained in a collection or subcollection with the
-  /// given [collectionId].
+  /// Returns a [Query] over the documents of every collection or subcollection in the database whose id is
+  /// [collectionId].
   ///
-  /// Every collection or subcollection with this [collectionId] as the last
-  /// segment of its path will be included. Cannot contain a slash.
+  /// Every collection whose path ends with [collectionId] is included, at any depth. Throws an [ArgumentError] if
+  /// [collectionId] is empty or contains a slash. Filters and orderings on a collection group query may need a
+  /// collection group index on the backend; the backend answers with an error that links to its creation.
+  ///
+  /// ```dart
+  /// // Every landmark of every city.
+  /// final QuerySnapshot<Map<String, Object?>> landmarks = await firestore
+  ///     .collectionGroup('landmarks')
+  ///     .where('type', isEqualTo: 'museum')
+  ///     .get();
+  /// for (final QueryDocumentSnapshot<Map<String, Object?>> doc in landmarks) {
+  ///   print(doc.ref.path);
+  /// }
+  /// ```
   Query<Map<String, Object?>> collectionGroup(String collectionId) {
     checkNotNull(collectionId, 'Provided collection ID must not be null.');
     if (collectionId.isEmpty) {
@@ -319,20 +414,47 @@ class Firestore {
     );
   }
 
-  /// Executes the given [updateFunction] and then attempts to commit the
-  /// changes applied within the transaction. If any document read within the
-  /// transaction has changed, the [updateFunction] will be retried. If it fails
-  /// to commit after 5 attempts, the transaction will fail.
+  /// Runs [updateFunction] in a transaction and commits its writes atomically; completes with the value it returns.
+  ///
+  /// Transactions are optimistic: [Transaction.get] reads the current version of a document from the backend, and
+  /// the commit fails if a document that was read changed in the meantime. Then [updateFunction] runs again, up to
+  /// [TransactionOptions.maxAttempts] times (5 by default), after which the returned future fails with the last
+  /// error. So [updateFunction] can run more than once: it must not have side effects of its own, and it must do
+  /// all its reads before its writes. If [updateFunction] throws, nothing is committed and the future fails with
+  /// that error.
+  ///
+  /// The reads of a transaction go to the backend, never to the cache, so a transaction fails when the backend
+  /// cannot be reached. Writes made with [Transaction] are only sent at the commit and are not visible locally
+  /// before.
+  ///
+  /// With [options] you can change the number of attempts or run a read-only transaction
+  /// (`TransactionOptions(readOnly: true)`), which reads a consistent snapshot of the database and can also run
+  /// queries with [Transaction.getQuery] and aggregations with [Transaction.getAggregate]. The JS and Android client
+  /// SDKs have no read-only transactions.
+  ///
+  /// A commit whose answer is lost on the network can be applied twice, as in the other SDKs: make transactions
+  /// that must not run twice idempotent.
   ///
   /// There is no limit on the number of writes in a transaction, but its
   /// commit request must not exceed the maximum API request size of 10 MiB,
   /// and a single document takes at most 500 field transforms (such as
   /// [FieldValue.serverTimestamp] or [FieldValue.increment]).
   ///
-  /// [updateFunction] the function to execute within the transaction context.
-  /// [options] customizes the execution, for example the maximum number of
-  /// attempts (5 by default) after which the transaction fails, or whether it
-  /// is read-only.
+  /// ```dart
+  /// final DocumentReference<Map<String, Object?>> sf = firestore.doc(
+  ///   'cities/SF',
+  /// );
+  /// final int newPopulation = await firestore.runTransaction((
+  ///   Transaction transaction,
+  /// ) async {
+  ///   final DocumentSnapshot<Map<String, Object?>> snapshot = await transaction
+  ///       .get(sf);
+  ///   final int population = snapshot.getInt('population') ?? 0;
+  ///   transaction.update(sf, {'population': population + 1});
+  ///   return population + 1;
+  /// });
+  /// print(newPopulation);
+  /// ```
   Future<T> runTransaction<T>(
     TransactionCallback<T> updateFunction, {
     TransactionOptions options = TransactionOptions.defaultOptions,
@@ -357,22 +479,40 @@ class Firestore {
     );
   }
 
-  /// Creates a write batch, used for performing multiple writes as a single
-  /// atomic operation.
+  /// Returns a new [WriteBatch], which applies several writes as a single atomic operation.
+  ///
+  /// Add writes with [WriteBatch.set], [WriteBatch.update] and [WriteBatch.delete], then call [WriteBatch.commit]:
+  /// either all the writes are applied or none. Unlike a transaction a batch reads nothing, so it also works offline:
+  /// the writes are applied to the local cache at the commit and sent when the client is online, and the future of
+  /// [WriteBatch.commit] completes when the backend has acknowledged them.
   ///
   /// There is no limit on the number of writes in a batch, but its commit
   /// request must not exceed the maximum API request size of 10 MiB, and a
   /// single document takes at most 500 field transforms (such as
   /// [FieldValue.serverTimestamp] or [FieldValue.increment]).
   ///
-  /// Returns the created [WriteBatch] object.
+  /// ```dart
+  /// final WriteBatch batch = firestore.batch();
+  /// batch.set(firestore.doc('cities/NYC'), {'name': 'New York City'});
+  /// batch.update(firestore.doc('cities/SF'), {'population': 1000000});
+  /// batch.delete(firestore.doc('cities/LA'));
+  /// await batch.commit();
+  /// ```
   WriteBatch batch() {
     return WriteBatchInternal.create(this);
   }
 
-  /// Executes a [batchFunction] on a newly created [WriteBatch] and then
-  /// commits all of the writes made by the batchFunction as a single atomic
-  /// unit.
+  /// Runs [batchFunction] on a new [WriteBatch] and then commits the writes it added as a single atomic unit.
+  ///
+  /// The returned future completes when the commit completes (see [batch]). If [batchFunction] throws, nothing is
+  /// committed and the future fails with that error.
+  ///
+  /// ```dart
+  /// await firestore.runBatch((WriteBatch batch) async {
+  ///   batch.set(firestore.doc('cities/NYC'), {'name': 'New York City'});
+  ///   batch.delete(firestore.doc('cities/LA'));
+  /// });
+  /// ```
   Future<void> runBatch(BatchCallback batchFunction) async {
     final WriteBatch batch = this.batch();
     await batchFunction(batch);
@@ -385,6 +525,14 @@ class Firestore {
   /// If the user changes while waiting, the future fails with [FirestoreErrorCode.cancelled].
   ///
   /// The future does not complete while the network is disabled and writes are pending.
+  ///
+  /// Call it before [terminate] when the writes matter and the cache is in memory: writes that the backend has not
+  /// acknowledged are lost with a memory cache.
+  ///
+  /// ```dart
+  /// await firestore.waitForPendingWrites();
+  /// await firestore.terminate();
+  /// ```
   Future<void> waitForPendingWrites() {
     return client.waitForPendingWrites();
   }
@@ -395,6 +543,16 @@ class Firestore {
   /// It emits once when it is listened to, and then once after each round of snapshots (it emits once for several
   /// snapshots that are raised together, also when none of the queries changed but only their metadata). It does not
   /// emit for changes that no snapshot listener is interested in.
+  ///
+  /// This is the JS SDK `onSnapshotsInSync()`. On a terminated instance the stream fails with the [FirestoreError]
+  /// of a terminated instance and closes.
+  ///
+  /// ```dart
+  /// final StreamSubscription<void> subscription = firestore.snapshotsInSync
+  ///     .listen((_) => print('every listener is up to date'));
+  /// // ...
+  /// await subscription.cancel();
+  /// ```
   Stream<void> get snapshotsInSync {
     late final StreamController<void> controller;
     void listener() {
@@ -423,32 +581,29 @@ class Firestore {
   /// Terminates this [Firestore] instance, releasing all the resources it holds.
   ///
   /// After this the instance cannot be used anymore: to start again, create a new instance with [instanceFor].
-  ///
-  /// Termination does not cancel any pending writes and any tasks that are awaiting a response from the server will
-  /// not be resolved. The next time you start an instance, it will resume attempting to send these writes to the
-  /// server.
+  /// Listeners stop receiving events, and the connections and the local cache are closed.
   ///
   /// Every operation on a terminated instance fails with a [FirestoreError] with the code
   /// [FirestoreErrorCode.failedPrecondition], delivered through the returned future or stream. Calling [terminate]
   /// again does nothing.
   ///
-  /// Note: Under normal circumstances, calling [terminate] is not required. This method is useful only when you want
-  /// to force this instance to release all of its resources.
+  /// Termination does not cancel pending writes, but a write whose future has not completed when the instance is
+  /// terminated never completes (it neither succeeds nor fails). With a persistent cache the write stays in the cache
+  /// and the next instance on that cache sends it; with a memory cache it is lost. Call [waitForPendingWrites] first
+  /// when the writes matter. A transaction, an aggregation or a server read that is in flight fails.
+  ///
+  /// On the Dart VM a program does not exit while an instance is alive (it holds connections and timers), so a
+  /// command line program or a test terminates its instances when it is done. In a long-running app you rarely need
+  /// it, except to change the settings of an instance or to call [clearPersistence].
+  ///
+  /// ```dart
+  /// await firestore.waitForPendingWrites();
+  /// await firestore.terminate();
+  /// // Firestore.instanceFor(app: app) now creates a new instance.
+  /// ```
   Future<void> terminate() => shutdown();
 
-  /// Shuts down this [Firestore] instance.
-  ///
-  /// To restart after shutdown, simply create a new instance of Firestore with
-  /// [instanceFor].
-  ///
-  /// Shutdown does not cancel any pending writes and any tasks that are
-  /// awaiting a response from the server will not be resolved. The next time
-  /// you start this instance, it will resume attempting to send these writes to
-  /// the server.
-  ///
-  /// Note: Under normal circumstances, calling [shutdown] is not required. This
-  /// method is useful only when you want to force this instance to release all
-  /// of its resources.
+  /// Shuts down this [Firestore] instance. Same as [terminate].
   @Deprecated('Use terminate instead.')
   Future<void> shutdown() async {
     // The client must be initialized to ensure that all subsequent API usage
@@ -475,6 +630,14 @@ class Firestore {
   /// otherwise make cached data unrecoverable. For applications that are
   /// sensitive to the disclosure of cached data in between user sessions, we
   /// strongly recommend not enabling persistence at all.
+  ///
+  /// It also fails with [FirestoreErrorCode.failedPrecondition] when a newer instance of the same app and database
+  /// is already running on that cache.
+  ///
+  /// ```dart
+  /// await firestore.terminate();
+  /// await firestore.clearPersistence();
+  /// ```
   Future<void> clearPersistence() async {
     final FirebaseApp? app = firebaseApp;
     if (client.isTerminated &&
@@ -522,6 +685,10 @@ class Firestore {
   ///
   /// The getter never throws and keeps returning the same manager after [terminate]; the methods of that manager then
   /// fail with the [FirestoreError] of a terminated instance.
+  ///
+  /// ```dart
+  /// await firestore.persistentCacheIndexManager?.enableIndexAutoCreation();
+  /// ```
   PersistentCacheIndexManager? get persistentCacheIndexManager {
     if (!client.supportsFieldIndexes) {
       return null;
@@ -534,7 +701,8 @@ class Firestore {
 
   /// Re-enables network usage for this instance after a prior call to [disableNetwork].
   ///
-  /// Returns a [Future] that will be completed once networking is enabled.
+  /// Returns a [Future] that will be completed once networking is enabled. Listeners then catch up with the backend
+  /// and the queued writes are sent.
   Future<void> enableNetwork() {
     return client.enableNetwork();
   }
@@ -544,6 +712,21 @@ class Firestore {
   /// call to [enableNetwork].
   ///
   /// Returns a [Future] that will be completed once networking is disabled.
+  ///
+  /// While the network is disabled, a [DocumentReference.get] of a document that is not in the cache fails with
+  /// [FirestoreErrorCode.unavailable], the futures of writes do not complete, and transactions and aggregations
+  /// fail.
+  ///
+  /// ```dart
+  /// await firestore.disableNetwork();
+  /// // Answered from the cache; the write is sent later.
+  /// final DocumentSnapshot<Map<String, Object?>> cached = await firestore
+  ///     .doc('cities/SF')
+  ///     .get();
+  /// print(cached.metadata.isFromCache); // true
+  /// unawaited(firestore.doc('cities/SF').update({'visited': true}));
+  /// await firestore.enableNetwork();
+  /// ```
   Future<void> disableNetwork() {
     return client.disableNetwork();
   }
@@ -551,7 +734,17 @@ class Firestore {
   /// Loads a Firestore bundle into the local cache.
   ///
   /// [bundleData] holds the whole bundle. Returns a [LoadBundleTask], which notifies callers with progress updates, and
-  /// completion or error events.
+  /// completion or error events. To load a bundle held in a string, pass `utf8.encode(bundle)`; for a file or an
+  /// HTTP response that arrives in chunks use [loadBundleStream].
+  ///
+  /// The named queries of the bundle become available through [getNamedQuery].
+  ///
+  /// ```dart
+  /// final LoadBundleTaskProgress progress = await firestore
+  ///     .loadBundle(bundleBytes)
+  ///     .future;
+  /// print('${progress.documentsLoaded} documents loaded');
+  /// ```
   LoadBundleTask loadBundle(List<int> bundleData) {
     return loadBundleStream(
       Stream<List<int>>.fromIterable(<List<int>>[bundleData]),
@@ -578,6 +771,19 @@ class Firestore {
   /// The named queries are packaged into bundles on the server side (along with resulting documents) and loaded to
   /// local cache using [loadBundle]. Once in local cache, you can use this method to extract a query by name. Returns
   /// null if there is no query with this name.
+  ///
+  /// ```dart
+  /// await firestore.loadBundle(bundleBytes).future;
+  /// final Query<Map<String, Object?>>? latest = await firestore.getNamedQuery(
+  ///   'latest-stories',
+  /// );
+  /// if (latest != null) {
+  ///   final QuerySnapshot<Map<String, Object?>> stories = await latest.get(
+  ///     Source.cache,
+  ///   );
+  ///   print(stories.length);
+  /// }
+  /// ```
   Future<Query<Map<String, Object?>>?> getNamedQuery(String name) async {
     final core.Query? query = await client.getNamedQuery(name);
     return query == null ? null : QueryInternal.create(query, this);
@@ -613,6 +819,15 @@ class Firestore {
   /// stream.
   ///
   /// This is the JS SDK `onSnapshotResume()` for a `QuerySnapshot`.
+  ///
+  /// ```dart
+  /// // `json` was written by QuerySnapshot.toJson, for example on a server.
+  /// firestore.querySnapshotsFromJson<Map<String, Object?>>(json).listen((
+  ///   QuerySnapshot<Map<String, Object?>> snapshot,
+  /// ) {
+  ///   print(snapshot.length);
+  /// });
+  /// ```
   Stream<QuerySnapshot<T>> querySnapshotsFromJson<T>(
     Map<String, Object?> json, {
     SnapshotListenOptions options = const SnapshotListenOptions(),
@@ -642,6 +857,10 @@ class Firestore {
   ///
   /// The setting is global: it applies to every instance (and to the logs of
   /// the other Firebase packages of this SDK, which share the logger).
+  ///
+  /// ```dart
+  /// Firestore.setLogLevel(LogLevel.debug);
+  /// ```
   static void setLogLevel(LogLevel level) {
     applyLogLevel(level);
   }

@@ -6,11 +6,26 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/metadata_change.dart
 
 /// Metadata about a snapshot, describing the state of the snapshot.
 ///
+/// Every `DocumentSnapshot` and `QuerySnapshot` has one. By default a listener is not told when only
+/// the metadata changes; listen with [MetadataChanges.include] to get those snapshots too, for
+/// example to show whether a local write has reached the backend.
+///
+/// ```dart
+/// firestore.doc('cities/SF').getSnapshots(MetadataChanges.include).listen((
+///   DocumentSnapshot<Map<String, Object?>> snapshot,
+/// ) {
+///   final SnapshotMetadata metadata = snapshot.metadata;
+///   print('pending writes: ${metadata.hasPendingWrites}');
+///   print('from cache: ${metadata.isFromCache}');
+/// });
+/// ```
+///
 /// **Subclassing Note**: Firestore classes are not meant to be subclassed except for use in test
 /// mocks. Subclassing is not supported in production code and new SDK releases may break code that
 /// does so.
 class SnapshotMetadata {
-  /// Creates the metadata of a snapshot.
+  /// Creates the metadata of a snapshot. The SDK creates them; you only need this constructor in
+  /// tests.
   const SnapshotMetadata(this.hasPendingWrites, this.isFromCache);
 
   /// Returns true if the snapshot contains the result of local writes (e.g. set() or update()

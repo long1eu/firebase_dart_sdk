@@ -34,8 +34,28 @@ import 'package:firebase_app_dart/internal.dart';
 /// A [DocumentSnapshot] contains data read from a document in your [Firestore] database. The data can be extracted with
 /// the [data] or [get] methods.
 ///
-/// If the [DocumentSnapshot‘ points to a non-existing document, [data] and its corresponding methods will return null.
+/// If the [DocumentSnapshot] points to a non-existing document, [data] and its corresponding methods will return null.
 /// You can always explicitly check for a document's existence by calling [exists].
+///
+/// A snapshot is immutable: it holds the document as it was when it was read. [metadata] tells whether it came from
+/// the local cache and whether it includes local writes that the backend has not acknowledged yet. Values are
+/// returned as Dart types: numbers as `int` or `double`, timestamps as [Timestamp], references as
+/// [DocumentReference], bytes as [Blob], maps as `Map<String, Object?>` and arrays as `List<Object?>`.
+///
+/// Unlike the JS SDK, [data] is a getter, not a method. Snapshots come from [DocumentReference.get],
+/// [DocumentReference.snapshots], `Transaction.get` and, as [QueryDocumentSnapshot], from query results.
+///
+/// ```dart
+/// final DocumentSnapshot<Map<String, Object?>> snapshot = await firestore
+///     .doc('cities/SF')
+///     .get();
+/// if (snapshot.exists) {
+///   final Map<String, Object?> data = snapshot.data!;
+///   print(data['name']);
+///   print(snapshot['population']); // the same as snapshot.get('population')
+///   print(snapshot.getTimestamp('founded')?.toDate());
+/// }
+/// ```
 ///
 /// **Subclassing Note**: Firestore classes are not meant to be subclassed except for use in test mocks. Subclassing is
 /// not supported in production code and new SDK releases may break code that does so.
@@ -115,7 +135,9 @@ class DocumentSnapshot<T extends dynamic> {
   /// Is null if the document doesn't exist
   final Document? _document;
 
-  /// The metadata for this document snapshot.
+  /// The metadata for this document snapshot: whether it came from the cache
+  /// ([SnapshotMetadata.isFromCache]) and whether it has local writes that the backend has not acknowledged yet
+  /// ([SnapshotMetadata.hasPendingWrites]).
   final SnapshotMetadata metadata;
 
   /// The value of the `type` field written by [toJson].
@@ -128,6 +150,17 @@ class DocumentSnapshot<T extends dynamic> {
   /// [FirestoreError] (failed-precondition) if the snapshot has pending writes: await `waitForPendingWrites()` first.
   ///
   /// This is the JS SDK `DocumentSnapshot.toJSON()`; the JSON is interchangeable with the one of the JS SDK (Node).
+  /// One difference: for a document that does not exist the `bundle` is empty, which this SDK reads back as a missing
+  /// document and the JS SDK cannot read.
+  ///
+  /// ```dart
+  /// final Map<String, Object?> json = (await firestore.doc('cities/SF').get())
+  ///     .toJson();
+  /// // Later, possibly in another program:
+  /// final DocumentSnapshot<Map<String, Object?>> restored =
+  ///     DocumentSnapshot<Map<String, Object?>>.fromJson(firestore, json);
+  /// print(restored.data);
+  /// ```
   Map<String, Object?> toJson() => snapshot_json.documentSnapshotToJson(
     _firestore,
     _key,
@@ -135,7 +168,7 @@ class DocumentSnapshot<T extends dynamic> {
     metadata.hasPendingWrites,
   );
 
-  /// The id of the document.
+  /// The id of the document: the last segment of its path.
   String get id => _key.path.last;
 
   /// Returns true if the document existed in this snapshot.
@@ -144,7 +177,20 @@ class DocumentSnapshot<T extends dynamic> {
   /// Returns the fields of the document as a Map or null if the document doesn't exist. Field values will be converted
   /// to their native Dart representation.
   ///
-  /// Returns the fields of the document as a Map or null if the document doesn't exist.
+  /// Returns the fields of the document as a Map or null if the document doesn't exist. With a converter (see
+  /// [DocumentReference.withConverter]) it returns the converted [T] instead.
+  ///
+  /// A server timestamp (`FieldValue.serverTimestamp()`) that the backend has not set yet is null here; use
+  /// [getData] with [ServerTimestampBehavior.estimate] or [ServerTimestampBehavior.previous] to get a value for it.
+  /// This is the JS SDK `data()`, which is a method there.
+  ///
+  /// ```dart
+  /// final DocumentSnapshot<Map<String, Object?>> snapshot = await firestore
+  ///     .doc('cities/SF')
+  ///     .get();
+  /// final Map<String, Object?>? data = snapshot.data;
+  /// print(data?['name']);
+  /// ```
   T? get data => getData(ServerTimestampBehavior.none);
 
   /// Returns the fields of the document as a Map or null if the document doesn't exist. Field values will be converted
@@ -156,7 +202,16 @@ class DocumentSnapshot<T extends dynamic> {
   /// Returns the fields of the document as a Map or null if the document doesn't exist.
   ///
   /// If this snapshot comes from a reference or query with a converter (see
-  /// `withConverter`), the result is the converted value of type [T].
+  /// `withConverter`), the result is the converted value of type [T]; the converter gets
+  /// [serverTimestampBehavior] in its `SnapshotOptions`.
+  ///
+  /// ```dart
+  /// // Shows a local estimate until the backend sets the timestamp.
+  /// final Map<String, Object?>? data = snapshot.getData(
+  ///   ServerTimestampBehavior.estimate,
+  /// );
+  /// print(data?['updated']);
+  /// ```
   T? getData(ServerTimestampBehavior serverTimestampBehavior) {
     final Document? doc = document;
     if (doc == null) {
@@ -191,16 +246,16 @@ class DocumentSnapshot<T extends dynamic> {
 
   /// Returns whether or not the field exists in the document. Returns false if the document does not exist.
   ///
-  /// [field] the path to the field.
+  /// [field] the path to the field; dots separate nested fields. Throws an [ArgumentError] for an invalid path.
   ///
-  /// Returns true if the field exists.
+  /// Returns true if the field exists, also when its value is null.
   bool contains(String field) {
     return containsPath(
       FieldPathInternal.fromArgument('DocumentSnapshot.contains', field),
     );
   }
 
-  /// Returns whether or not the field exists in the document. Returns false if the document does  not exist.
+  /// Returns whether or not the field exists in the document. Returns false if the document does not exist.
   ///
   /// [fieldPath] the path to the field.
   ///
@@ -215,11 +270,17 @@ class DocumentSnapshot<T extends dynamic> {
 
   /// Returns the value at the field or null if the field doesn't exist.
   ///
-  /// [field] the path to the field
+  /// [field] the path to the field; dots separate nested fields (`'address.city'`). Throws an [ArgumentError] for
+  /// an invalid path; use [getField] with a [FieldPath] for a name that contains a dot.
   /// [serverTimestampBehavior] configures the behavior for server timestamps that have not yet been set to their final
-  /// value.
+  /// value ([ServerTimestampBehavior.none], which gives null, by default).
   ///
-  /// Returns the value at the given field or null.
+  /// Returns the value at the given field or null. The value is the raw stored value: a converter is not applied.
+  ///
+  /// ```dart
+  /// final Object? city = snapshot.get('address.city');
+  /// final Object? population = snapshot['population']; // same as get
+  /// ```
   Object? get(
     String field, [
     ServerTimestampBehavior? serverTimestampBehavior,
@@ -250,10 +311,11 @@ class DocumentSnapshot<T extends dynamic> {
     return _getInternal(fieldPath.internalPath, fieldValueOptions);
   }
 
-  /// Returns the value of the field as a bool. If the value is not a bool this will throw a state error.
+  /// Returns the value of the field as a bool, or null if the field does not exist.
   ///
   /// [field] the path to the field.
   ///
+  /// Throws [StateError] if the value is not a bool.
   /// Returns the value of the field
   bool? getBool(String field) => _getTypedValue<bool>(field);
 
@@ -268,7 +330,8 @@ class DocumentSnapshot<T extends dynamic> {
     return val?.toDouble();
   }
 
-  /// Returns the value of the field as a int.
+  /// Returns the value of the field as an int, or null if the field does not exist. A double is truncated (`1.9`
+  /// gives `1`).
   ///
   /// [field] the path to the field.
   ///
@@ -411,8 +474,12 @@ class DocumentSnapshot<T extends dynamic> {
   @Deprecated('Use ref instead.')
   DocumentReference<T> get reference => ref;
 
-  /// Gets the reference to the document. Same as [reference]; this is the name
+  /// Gets the reference to the document, with the converter of this snapshot. Same as [reference]; this is the name
   /// used by the current official Firestore API.
+  ///
+  /// ```dart
+  /// await snapshot.ref.update({'visited': true});
+  /// ```
   DocumentReference<T> get ref =>
       DocumentReferenceInternal.create<T>(_key, _firestore, _converter);
 
@@ -572,6 +639,18 @@ class _FieldValueOptions {
 /// contain only existing documents, the [exists] method will always return true and [data] will
 /// never be null.
 ///
+/// You get them by iterating a `QuerySnapshot` (or from its `docs`) and from `DocumentChange.document`.
+///
+/// ```dart
+/// final QuerySnapshot<Map<String, Object?>> snapshot = await firestore
+///     .collection('cities')
+///     .get();
+/// for (final QueryDocumentSnapshot<Map<String, Object?>> doc in snapshot) {
+///   final Map<String, Object?> data = doc.data; // never null
+///   print('${doc.id}: ${data['name']}');
+/// }
+/// ```
+///
 /// **Subclassing Note**: Firestore classes are not meant to be subclassed except for use in test
 /// mocks. Subclassing is not supported in production code and new SDK releases may break code that
 /// does so.
@@ -609,7 +688,7 @@ class QueryDocumentSnapshot<T extends dynamic> extends DocumentSnapshot<T> {
   /// Returns the fields of the document as a Map. Field values will be converted to their native
   /// Dart representation.
   ///
-  /// Returns the fields of the document as a Map.
+  /// Returns the fields of the document as a Map, or the converted [T] with a converter.
   @override
   T get data {
     // The document always exists here; a null can only be what a converter of a nullable [T] returned.
@@ -622,7 +701,8 @@ class QueryDocumentSnapshot<T extends dynamic> extends DocumentSnapshot<T> {
   /// [serverTimestampBehavior] configures the behavior for server timestamps that have not yet been
   /// set to their final value.
   ///
-  /// Returns the fields of the document as a Map or null if the document doesn't exist.
+  /// Returns the fields of the document as a Map (or the converted [T] with a converter); never null
+  /// for a raw map.
   @override
   T getData(ServerTimestampBehavior serverTimestampBehavior) {
     return super.getData(serverTimestampBehavior) as T;

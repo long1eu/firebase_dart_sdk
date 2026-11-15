@@ -34,6 +34,28 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/util/util.dart';
 /// listen to the location. There may or may not exist a document at the referenced location. A [DocumentReference] can
 /// also be used to create a [CollectionReference] to a subcollection.
 ///
+/// Get one from [Firestore.doc] or [CollectionReference.doc]. Creating a reference does not contact the backend.
+/// [T] is the type of the document data, `Map<String, Object?>` unless a converter was attached with
+/// [withConverter]. Two references are equal when they point to the same document of the same [Firestore] instance
+/// with the same converter.
+///
+/// Writes ([set], [update], [delete]) are applied to the local cache at once and their futures complete when the
+/// backend has acknowledged them; while the client is offline the futures do not complete, and the writes are sent
+/// when it is back online.
+///
+/// ```dart
+/// final DocumentReference<Map<String, Object?>> sf = firestore.doc(
+///   'cities/SF',
+/// );
+/// await sf.set({'name': 'San Francisco', 'population': 870000});
+/// await sf.update({'population': FieldValue.increment(1)});
+///
+/// final DocumentSnapshot<Map<String, Object?>> snapshot = await sf.get();
+/// print(snapshot['population']);
+///
+/// await sf.delete();
+/// ```
+///
 /// **Subclassing Note**: Firestore classes are not meant to be subclassed except for use in test mocks. Subclassing
 /// is not supported in production code and new SDK releases may break code that does so.
 class DocumentReference<T extends dynamic> {
@@ -111,7 +133,8 @@ class DocumentReference<T extends dynamic> {
     };
   }
 
-  /// Gets the Firestore instance associated with this document reference.
+  /// The Firestore instance this reference belongs to. A `WriteBatch` or a `Transaction` only accepts references of
+  /// its own instance.
   final Firestore firestore;
 
   /// The converter attached with [withConverter], or null for raw maps.
@@ -120,6 +143,21 @@ class DocumentReference<T extends dynamic> {
   /// Returns a reference to the same document that converts data with
   /// [converter] (type [U]) when reading and writing. Use [withoutConverter]
   /// to go back to raw maps.
+  ///
+  /// [set] then takes a [U], and snapshots return a [U] from `data`. [update] still takes a map of fields, as in the
+  /// other SDKs.
+  ///
+  /// ```dart
+  /// final DocumentReference<String> name = firestore
+  ///     .doc('cities/SF')
+  ///     .withConverter<String>(
+  ///       FirestoreDataConverter<String>.from(
+  ///         fromFirestore: (snapshot, options) => snapshot['name'] as String,
+  ///         toFirestore: (name, options) => {'name': name},
+  ///       ),
+  ///     );
+  /// await name.set('San Francisco');
+  /// ```
   DocumentReference<U> withConverter<U extends Object?>(
     FirestoreDataConverter<U> converter,
   ) {
@@ -138,7 +176,8 @@ class DocumentReference<T extends dynamic> {
 
   /// Gets a [CollectionReference] to the collection that contains this document.
   ///
-  /// Returns the [CollectionReference] that contains this document.
+  /// Returns the [CollectionReference] that contains this document. It reads raw maps: the converter of this
+  /// reference is not kept.
   CollectionReference<Map<String, Object?>> get parent {
     return CollectionReferenceInternal.create<Map<String, Object?>>(
       key.path.popLast(),
@@ -146,7 +185,8 @@ class DocumentReference<T extends dynamic> {
     );
   }
 
-  /// Gets the path of this document (relative to the root of the database) as a slash-separated  string.
+  /// Gets the path of this document (relative to the root of the database) as a slash-separated string, such as
+  /// `cities/SF`.
   ///
   /// Returns the path of this document.
   String get path => key.path.canonicalString;
@@ -154,9 +194,17 @@ class DocumentReference<T extends dynamic> {
   /// Gets a [CollectionReference] instance that refers to the subcollection at the specified path relative to this
   /// document.
   ///
-  /// [collectionPath] a slash-separated relative path to a subcollection.
+  /// [collectionPath] a slash-separated relative path to a subcollection. Throws an [ArgumentError] if it is empty
+  /// or names a document instead of a collection.
   ///
-  /// Returns the [CollectionReference] instance.
+  /// Returns the [CollectionReference] instance, which reads raw maps.
+  ///
+  /// ```dart
+  /// final CollectionReference<Map<String, Object?>> landmarks = firestore
+  ///     .doc('cities/SF')
+  ///     .collection('landmarks');
+  /// await landmarks.add({'name': 'Golden Gate Bridge'});
+  /// ```
   CollectionReference<Map<String, Object?>> collection(String collectionPath) {
     checkNotNull(collectionPath, 'Provided collection path must not be null.');
     checkNonEmptyPath('DocumentReference.collection', collectionPath);
@@ -169,10 +217,34 @@ class DocumentReference<T extends dynamic> {
   /// Writes to the document referred to by this DocumentReference. If the document does not yet exist, it will be
   /// created. If you pass [SetOptions], the provided data can be merged into an existing document.
   ///
-  /// [data] a map of the fields and values for the document.
-  /// [options] an object to configure the set behavior.
+  /// [data] a map of the fields and values for the document (or a [T] that the converter turns into one).
+  /// [options] an object to configure the set behavior. By default ([SetOptions.overwrite]) the document is replaced
+  /// with [data]; [SetOptions.mergeAllFields] only writes the fields in [data] and keeps the others, and
+  /// [SetOptions.mergeFields] only writes the listed fields.
   ///
-  /// Returns a Future that will be resolved when the write finishes.
+  /// Returns a Future that will be resolved when the write finishes, that is when the backend has acknowledged it.
+  /// The write is applied to the local cache at once, so reads and listeners see it immediately; while the client is
+  /// offline the future does not complete. The future fails with an [ArgumentError] when [data] holds a value
+  /// Firestore cannot store, and with a [FirestoreError] when the backend rejects the write (for example
+  /// [FirestoreErrorCode.permissionDenied]).
+  ///
+  /// Values can be `null`, `bool`, `int`, `double`, `String`, `Timestamp`, `DateTime`, `GeoPoint`, `Blob`,
+  /// [DocumentReference], `VectorValue`, lists and maps of those, and the sentinels of `FieldValue` such as
+  /// `FieldValue.serverTimestamp()`.
+  ///
+  /// ```dart
+  /// final DocumentReference<Map<String, Object?>> sf = firestore.doc(
+  ///   'cities/SF',
+  /// );
+  /// await sf.set({
+  ///   'name': 'San Francisco',
+  ///   'population': 870000,
+  ///   'updated': FieldValue.serverTimestamp(),
+  /// });
+  ///
+  /// // Change one field and keep the others.
+  /// await sf.set({'capital': false}, SetOptions.mergeAllFields);
+  /// ```
   Future<void> set(T data, [SetOptions? options]) =>
       _set(data, options, 'DocumentReference.set');
 
@@ -209,9 +281,17 @@ class DocumentReference<T extends dynamic> {
   /// [data] is a List of field/value pairs to be updated.
   ///
   /// The first item should be the field to update followed by the value. Repeat this pattern for any additional
-  /// field/value pairs.
+  /// field/value pairs. A field is a dot-separated `String` or a `FieldPath`; use a `FieldPath` for a field name that
+  /// contains a dot. This is the varargs form of `updateDoc` in the JS SDK.
   ///
-  /// Returns a Future that will be resolved when the write finishes.
+  /// Returns a Future that will be resolved when the write finishes. Errors and offline behaviour as in [update].
+  ///
+  /// ```dart
+  /// await firestore.doc('cities/SF').updateFromList([
+  ///   'population', 880000,
+  ///   FieldPath.of(['stats', 'last.year']), 870000,
+  /// ]);
+  /// ```
   Future<void> updateFromList(List<Object?> data) async {
     const String methodName = 'DocumentReference.updateFromList';
     final UserDataParsedUpdateData parsedData = firestore.dataConverter
@@ -231,9 +311,22 @@ class DocumentReference<T extends dynamic> {
   /// fail.
   ///
   /// [data] a map of field/value pairs to update. Fields can contain dots to reference nested fields within the
-  /// document.
+  /// document. The fields that are not in [data] keep their values. Use `FieldValue.delete()` as a value to remove a
+  /// field.
   ///
-  /// Returns a Future that will be resolved when the write finishes.
+  /// Returns a Future that will be resolved when the write finishes, that is when the backend has acknowledged it.
+  /// The update is applied to the local cache at once; while the client is offline the future does not complete.
+  /// When the document does not exist the backend rejects the update and the future fails with a [FirestoreError]
+  /// with the code [FirestoreErrorCode.notFound]. The future fails with an [ArgumentError] for an invalid field path
+  /// or value.
+  ///
+  /// ```dart
+  /// await firestore.doc('cities/SF').update({
+  ///   'population': FieldValue.increment(1000),
+  ///   'stats.visits': 12, // a nested field
+  ///   'nickname': FieldValue.delete(),
+  /// });
+  /// ```
   Future<void> update(Map<String, Object?> data) async {
     final UserDataParsedUpdateData parsedData = firestore.dataConverter
         .parseUpdateData(
@@ -250,7 +343,14 @@ class DocumentReference<T extends dynamic> {
 
   /// Deletes the document referred to by this [DocumentReference].
   ///
-  /// Returns a Future that will be resolved when the delete completes.
+  /// Returns a Future that will be resolved when the delete completes, that is when the backend has acknowledged
+  /// it. Deleting a document that does not exist succeeds. The subcollections of the document are not deleted. As
+  /// with [set], the delete is applied to the local cache at once and the future does not complete while the client
+  /// is offline.
+  ///
+  /// ```dart
+  /// await firestore.doc('cities/SF').delete();
+  /// ```
   Future<void> delete() {
     return voidErrorTransformer(
       () => firestore.client.write(<DeleteMutation>[
@@ -265,9 +365,32 @@ class DocumentReference<T extends dynamic> {
   /// may return cached data or fail if you are offline and the server cannot be reached. This behavior can be altered
   /// via the [Source] parameter.
   ///
-  /// [source] a value to configure the get behavior.
+  /// [source] a value to configure the get behavior:
   ///
-  /// Returns a Future that will be resolved with the contents of the [Document] at this [DocumentReference].
+  /// * [Source.serverAndCache] (the default): waits for the backend; when the client is offline it answers from the
+  ///   cache, and fails with [FirestoreErrorCode.unavailable] if the cache has no copy of the document.
+  /// * [Source.server]: fails with [FirestoreErrorCode.unavailable] when the backend cannot be reached.
+  /// * [Source.cache]: answers from the cache only; fails with [FirestoreErrorCode.unavailable] when the cache does
+  ///   not know the document. A document the cache knows to be missing gives a snapshot whose
+  ///   [DocumentSnapshot.exists] is false.
+  ///
+  /// Returns a Future that will be resolved with a [DocumentSnapshot] of the document at this
+  /// [DocumentReference]. A document that does not exist gives a snapshot whose [DocumentSnapshot.exists] is false;
+  /// it is not an error. Writes that the backend has not acknowledged yet are included. This is the JS SDK `getDoc`,
+  /// `getDocFromServer` and `getDocFromCache`.
+  ///
+  /// ```dart
+  /// final DocumentSnapshot<Map<String, Object?>> snapshot = await firestore
+  ///     .doc('cities/SF')
+  ///     .get();
+  /// if (snapshot.exists) {
+  ///   print(snapshot.data);
+  /// }
+  ///
+  /// final DocumentSnapshot<Map<String, Object?>> cached = await firestore
+  ///     .doc('cities/SF')
+  ///     .get(Source.cache);
+  /// ```
   Future<DocumentSnapshot<T>> get([Source? source]) async {
     source ??= Source.defaultSource;
 
@@ -323,6 +446,31 @@ class DocumentReference<T extends dynamic> {
   /// A stream of snapshots of this document: the current contents first, then a new snapshot every
   /// time the contents change. Metadata-only changes are not reported; use [getSnapshots] for
   /// those.
+  ///
+  /// The first snapshot can come from the local cache before the backend answers. A document that does not exist (or
+  /// is deleted) gives a snapshot whose [DocumentSnapshot.exists] is false. Local writes raise a snapshot at once,
+  /// with `metadata.hasPendingWrites` true. While the client is offline the stream keeps delivering changes from the
+  /// cache.
+  ///
+  /// The listener is registered when you listen to the stream and removed when you cancel the subscription. Each
+  /// access to this getter returns a new single-subscription stream. An error (for example
+  /// [FirestoreErrorCode.permissionDenied]) is delivered on the stream, which then closes. This is the JS SDK
+  /// `onSnapshot`.
+  ///
+  /// ```dart
+  /// final StreamSubscription<DocumentSnapshot<Map<String, Object?>>> subscription =
+  ///     firestore
+  ///         .doc('cities/SF')
+  ///         .snapshots
+  ///         .listen(
+  ///           (DocumentSnapshot<Map<String, Object?>> snapshot) {
+  ///             print(snapshot.exists ? snapshot.data : 'no such document');
+  ///           },
+  ///           onError: (Object error) => print('listen failed: $error'),
+  ///         );
+  /// // ...
+  /// await subscription.cancel();
+  /// ```
   Stream<DocumentSnapshot<T>> get snapshots {
     final ListenOptions options = _internalOptions(MetadataChanges.exclude);
     return _getSnapshotsInternal(options);
@@ -330,6 +478,15 @@ class DocumentReference<T extends dynamic> {
 
   /// A stream of snapshots of this document, like [snapshots]. Pass [MetadataChanges.include] as
   /// [changes] to also get a snapshot when only the [DocumentSnapshot.metadata] changed.
+  ///
+  /// ```dart
+  /// firestore.doc('cities/SF').getSnapshots(MetadataChanges.include).listen((
+  ///   DocumentSnapshot<Map<String, Object?>> snapshot,
+  /// ) {
+  ///   final bool saved = !snapshot.metadata.hasPendingWrites;
+  ///   print(saved ? 'saved on the server' : 'local change, not saved yet');
+  /// });
+  /// ```
   Stream<DocumentSnapshot<T>> getSnapshots([MetadataChanges? changes]) {
     final ListenOptions options = _internalOptions(
       changes ?? MetadataChanges.exclude,
@@ -341,6 +498,17 @@ class DocumentReference<T extends dynamic> {
   /// [ListenSource]: with [ListenSource.cache] the events are raised from the
   /// local cache only (local writes, cache updates) and the backend is not
   /// contacted for this listener.
+  ///
+  /// ```dart
+  /// firestore
+  ///     .doc('cities/SF')
+  ///     .getSnapshotsWithOptions(
+  ///       const SnapshotListenOptions(source: ListenSource.cache),
+  ///     )
+  ///     .listen((DocumentSnapshot<Map<String, Object?>> snapshot) {
+  ///       print(snapshot.data);
+  ///     });
+  /// ```
   Stream<DocumentSnapshot<T>> getSnapshotsWithOptions(
     SnapshotListenOptions options,
   ) {
