@@ -93,7 +93,7 @@ dependencies:
 ```
 
 There is no plugin to register, no `flutterfire configure` step, and nothing to add to the
-Android, iOS or macOS projects. For a persistent cache in a Flutter app, add `sqlite3` and
+Android, iOS or macOS projects. For a persistent cache in a Flutter app, add `sqlite3` (2.x) and
 `sqlite3_flutter_libs` (see below).
 
 ### The app: options instead of native configuration
@@ -138,7 +138,8 @@ Settings, field by field:
 | `persistenceEnabled`, `cacheSizeBytes`, `host`, `sslEnabled` | same names (or the newer `cacheSettings: PersistentCacheSettings(...)` / `MemoryCacheSettings(...)`) |
 | `Settings.CACHE_SIZE_UNLIMITED` | `FirestoreSettings.cacheSizeUnlimited` |
 | `webExperimentalForceLongPolling`, `webExperimentalAutoDetectLongPolling` | `experimentalForceLongPolling`, `experimentalAutoDetectLongPolling` (used by the web transport) |
-| `webExperimentalLongPollingOptions`, `webPersistentTabManager`, `ignoreUndefinedProperties` | not available |
+| `webExperimentalLongPollingOptions` | `experimentalLongPollingOptions` |
+| `webPersistentTabManager`, `ignoreUndefinedProperties` | not available |
 | none | `port`, `grpcFlowControlWindow`, `withEmulator(...)` |
 
 ### Persistence
@@ -146,7 +147,8 @@ Settings, field by field:
 The native SDKs behind FlutterFire keep a disk cache on mobile by default. Here the cache is
 **in memory unless you pass an `openDatabase`** function, whatever `persistenceEnabled` says.
 For a disk cache in a Flutter app, copy `example/sqlite_database.dart` from the package into the
-app, add `sqlite3` and `sqlite3_flutter_libs`, and pass a directory from `path_provider`:
+app, add `sqlite3: ^2.7.3` and `sqlite3_flutter_libs: ^0.5.0` (the opener does not work with
+`sqlite3` 3.x yet), and pass a directory from `path_provider`:
 
 ```dart
 import 'dart:io';

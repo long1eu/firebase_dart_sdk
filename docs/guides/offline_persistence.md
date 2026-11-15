@@ -50,8 +50,9 @@ final FirestoreSettings lru = FirestoreSettings(
 The package does not open SQLite files itself, so that you choose the binding. You pass a
 function that opens a database. A complete one for `package:sqlite3` is
 [`example/sqlite_database.dart`](../../cloud_firestore/cloud_firestore_dart/example/sqlite_database.dart):
-copy it into your app and add `sqlite3` to your dependencies (in a Flutter app also
-`sqlite3_flutter_libs`, which bundles the native library).
+copy it into your app and add `sqlite3: ^2.7.3` to your dependencies (in a Flutter app also
+`sqlite3_flutter_libs: ^0.5.0`, which bundles the native library). The opener uses
+`package:sqlite3/open.dart`, which `sqlite3` 3.x no longer has, so stay on 2.x for now.
 
 ```dart
 import 'dart:io';
@@ -156,7 +157,7 @@ if (!Platform.isWindows) {
 
 The cache is in memory by default. To keep it across page loads, copy
 [`example/sqlite_database_web.dart`](../../cloud_firestore/cloud_firestore_dart/example/sqlite_database_web.dart)
-into your app, add `sqlite3` and `web` to your dependencies, and serve the `sqlite3.wasm` file of
+into your app, add `sqlite3` (2.x, `^2.7.3`) and `web` to your dependencies, and serve the `sqlite3.wasm` file of
 the same `sqlite3` version next to your page (from the
 [sqlite3.dart releases](https://github.com/simolus3/sqlite3.dart/releases)):
 

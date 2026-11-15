@@ -114,7 +114,7 @@ happens to work in progress.
 Use the package as a plain Dart package: there is no plugin to register. Create the app and the
 instance once, for example in `main()` before `runApp`. To keep the cache across restarts, give
 the instance a SQLite opener and a directory from `path_provider` (see
-[Offline persistence](offline_persistence.md)); add `sqlite3_flutter_libs` so that the native
+[Offline persistence](offline_persistence.md)); add `sqlite3_flutter_libs` (`^0.5.0`, with `sqlite3` 2.x) so that the native
 SQLite library is bundled with the app.
 
 Two Flutter specifics:

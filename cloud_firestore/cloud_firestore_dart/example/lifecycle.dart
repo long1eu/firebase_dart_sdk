@@ -12,7 +12,7 @@ import 'common.dart';
 import 'sqlite_database.dart';
 
 Future<void> main() async {
-  // Log level: `error` (the default) prints warnings and errors, `debug`
+  // Log level: `warn` (the default) prints warnings and errors, `debug`
   // prints everything the SDK does, `silent` nothing. It applies to all
   // instances.
   Firestore.setLogLevel(LogLevel.silent);

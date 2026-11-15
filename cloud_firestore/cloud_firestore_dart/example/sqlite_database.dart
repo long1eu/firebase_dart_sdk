@@ -2,7 +2,7 @@
 //
 // cloud_firestore_dart does not depend on a SQLite binding: to keep the
 // offline cache on disk you pass it a function that opens a database. Copy
-// this file into your app, add `sqlite3` to your dependencies (and, in a
+// this file into your app, add `sqlite3` (2.x, `^2.7.3`) to your dependencies (and, in a
 // Flutter app, `sqlite3_flutter_libs` so that the native library is bundled),
 // and pass `sqliteOpener(directory)` to `Firestore.instanceFor`. See
 // offline_persistence.dart for the usage.

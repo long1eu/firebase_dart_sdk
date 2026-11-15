@@ -36,6 +36,27 @@ READMEs are short landing pages; the API reference is on pub.dev.
 15. [Coming from FlutterFire](migrating_from_flutterfire.md): when to use this package instead
     of the FlutterFire `cloud_firestore` plugin and when not to, the setup differences, the API
     side by side, and running both in one app.
+16. [Flutter](flutter.md): creating the client before `runApp`, `StreamBuilder` and snapshot
+    metadata, the SQLite cache per platform, connectivity, the app lifecycle, and what was tried on
+    which platform.
+17. [The web](web.md): using the client in a browser (experimental): transports, caches, the one-tab
+    limit, CORS, bundle size, dart2js and dart2wasm.
+18. [Servers, jobs and command-line tools](server.md): credentials per environment, the memory
+    cache, one instance per process, listeners and transactions in workers, graceful shutdown,
+    containers, and what this client is not compared with the Admin SDK.
+19. [Cookbook](cookbook.md): short recipes for common tasks (pagination, counters, aggregations,
+    imports and deletes, transactions, offline state, vector search, JSON export), each with a
+    runnable program.
+20. [Error handling](error_handling.md): the error types, every error code with its cause and
+    whether the client retries it, writes while offline, listener errors, transaction retries.
+21. [Troubleshooting](troubleshooting.md): symptoms, causes and fixes, turning on logging and
+    reading the log tags, and what to put in a bug report.
+22. [Performance and cache tuning](performance.md): how queries are answered from the cache, cache
+    indexes, cache size and garbage collection, listeners, batches, bundles, with measurements.
+23. [For AI coding agents](for_ai_agents.md): packages, imports, minimal programs, FlutterFire and
+    JS names mapped to this client, and the rules, on one page.
 
 Every Dart snippet in these guides is compiled against the current API by
-`cloud_firestore/cloud_firestore_dart/test/unit/api/readme_snippets_test.dart`.
+`cloud_firestore/cloud_firestore_dart/test/unit/api/readme_snippets_test.dart`, except the blocks
+marked `dart flutter`, which are taken from `examples/flutter_notes` and checked there by
+`flutter analyze`.

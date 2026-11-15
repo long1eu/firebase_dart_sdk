@@ -59,7 +59,9 @@ dart pub add cloud_firestore_dart firebase_app_dart
   what does not.
 - [Migrating from FlutterFire](docs/guides/migrating_from_flutterfire.md) (`cloud_firestore`).
 - [Example apps](examples/README.md): an HTTP server with a live change feed, a command-line
-  import, export and watch tool, and a Cloud Run job.
+  import, export and watch tool, a Cloud Run job, a worker queue, a Flutter app and a browser app.
+- [For AI coding agents](docs/guides/for_ai_agents.md), [llms.txt](llms.txt) and an
+  [Agent Skill](skills/README.md).
 - [API examples](cloud_firestore/cloud_firestore_dart/example/): short runnable programs, listed
   in [example/README.md](cloud_firestore/cloud_firestore_dart/example/README.md).
 - [How we test](docs/how_we_test.md): the suites, how to run them, and bugs they caught.
