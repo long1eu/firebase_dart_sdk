@@ -6,6 +6,27 @@
 ///   Application Default Credentials, for servers and command line tools. Bypasses security rules.
 ///
 /// This library does not import `dart:io` and works on the web.
+///
+/// ```dart
+/// import 'package:firebase_app_dart/firebase_app_dart.dart';
+/// import 'package:firebase_auth_providers_dart/firebase_auth_providers_dart.dart';
+///
+/// Future<void> main() async {
+///   final FirebaseApp app = FirebaseApp.withOptions(
+///     const FirebaseOptions(
+///       apiKey: '<the Web API key of the project>',
+///       applicationId: '1:1234567890:dart:example',
+///       projectId: 'my-project',
+///     ),
+///   );
+///   final FirebaseUserAuth auth = await FirebaseUserAuth.forApp(app);
+///   final AuthUser user = await auth.signInAnonymously();
+///   print(user.uid);
+/// }
+/// ```
+///
+/// The `example/` folder of the package has one program per task: each sign-in flow, a session kept in a file, a
+/// service account, Application Default Credentials, and the wiring into Firestore.
 library;
 
 // Imported for the references in the documentation above.

@@ -2,6 +2,23 @@ import 'auth_exception.dart';
 
 /// Where the link of an action email (password reset, email verification, ...) leads, like `ActionCodeSettings`
 /// of the JS SDK.
+///
+/// Pass it to `FirebaseUserAuth.sendPasswordResetEmail`, `FirebaseUserAuth.sendEmailVerification` or
+/// `FirebaseUserAuth.verifyBeforeUpdateEmail`. Without it the link opens the action page of the project. The
+/// iOS and Android fields of the JS SDK are flattened; `dynamicLinkDomain` is not supported. The values are checked
+/// when the email is requested ([toRequest]); the URL and the domains must also be authorized for the project.
+///
+/// ```dart
+/// await auth.sendPasswordResetEmail(
+///   'ada@example.com',
+///   actionCodeSettings: const ActionCodeSettings(
+///     url: 'https://my-project.web.app/signed-in',
+///     handleCodeInApp: true,
+///     androidPackageName: 'com.example.app',
+///     androidInstallApp: true,
+///   ),
+/// );
+/// ```
 class ActionCodeSettings {
   /// Creates the settings. [url] is the continue URL, passed to the action page (or the app) after the action.
   const ActionCodeSettings({
@@ -37,7 +54,13 @@ class ActionCodeSettings {
   /// The Firebase Hosting domain of the link. Must not be empty when set (`invalid-hosting-link-domain`).
   final String? linkDomain;
 
-  /// The fields of the request, checked like the JS SDK (`_setActionCodeSettingsOnRequest`).
+  /// The fields of the request, checked like the JS SDK (`_setActionCodeSettingsOnRequest`). Called by
+  /// `FirebaseUserAuth`; you do not need it.
+  ///
+  /// Throws a [FirebaseAuthProviderException] with the code `invalid-continue-uri` (empty [url]),
+  /// `invalid-hosting-link-domain` (empty [linkDomain]), `missing-ios-bundle-id` (empty [iOSBundleId]) or
+  /// `missing-android-pkg-name` (empty [androidPackageName]). [androidInstallApp] and [androidMinimumVersion] are
+  /// sent only with an [androidPackageName].
   Map<String, Object?> toRequest() {
     if (url.isEmpty) {
       throw const FirebaseAuthProviderException(
@@ -78,7 +101,16 @@ class ActionCodeSettings {
   }
 }
 
-/// What an action code is for (`ActionCodeOperation` of the JS SDK).
+/// What an action code is for (`ActionCodeOperation` of the JS SDK): [ActionCodeInfo.operation].
+///
+/// ```dart
+/// final ActionCodeInfo info = await auth.checkActionCode(code);
+/// if (info.operation == ActionCodeOperation.passwordReset) {
+///   await auth.confirmPasswordReset(code, newPassword);
+/// } else {
+///   await auth.applyActionCode(code);
+/// }
+/// ```
 enum ActionCodeOperation {
   /// A password reset.
   passwordReset('PASSWORD_RESET'),
@@ -104,13 +136,21 @@ enum ActionCodeOperation {
   final String serverName;
 }
 
-/// What an action code does, from `checkActionCode` (`ActionCodeInfo` of the JS SDK, without the multi-factor
-/// information).
+/// What an action code does, from `FirebaseUserAuth.checkActionCode` (`ActionCodeInfo` of the JS SDK, without the
+/// multi-factor information).
+///
+/// ```dart
+/// final ActionCodeInfo info = await auth.checkActionCode(code);
+/// print('${info.operation.name} for ${info.email}');
+/// ```
 class ActionCodeInfo {
-  /// Creates the information.
+  /// Creates the information. `FirebaseUserAuth.checkActionCode` creates them; you need this only for tests.
   const ActionCodeInfo(this.operation, {this.email, this.previousEmail});
 
   /// Reads the answer of `accounts:resetPassword` with only an `oobCode`, checked like the JS SDK.
+  ///
+  /// Throws a [FirebaseAuthProviderException] with the code `internal-error` when the operation is unknown or the
+  /// email address it needs is missing.
   factory ActionCodeInfo.fromResponse(Map<String, Object?> response) {
     const FirebaseAuthProviderException malformed =
         FirebaseAuthProviderException(

@@ -8,9 +8,24 @@ import 'package:collection/collection.dart';
 
 import 'util/to_string_helper.dart';
 
-/// Result object that contains a Firebase Auth ID Token.
+/// A token returned by `InternalTokenProvider.getAccessToken`, with the claims of its payload.
+///
+/// For a Firebase Auth ID token (a JWT) [claims] holds the payload, unverified. For a token that
+/// is not a JWT (an OAuth 2.0 access token, an emulator token) [claims] is empty and the
+/// timestamps are the epoch.
+///
+/// ```dart
+/// import 'package:firebase_app_dart/firebase_app_dart.dart';
+///
+/// void main() {
+///   final GetTokenResult result = GetTokenResult('an opaque access token');
+///   print(result.claims.isEmpty); // true
+///   print(result.signInProvider); // null
+/// }
+/// ```
 class GetTokenResult {
-  /// Creates a result from the JWT [token], reading the claims from its payload.
+  /// Creates a result for [token], reading the claims from its payload when it is a JWT. Never
+  /// throws: a token that cannot be parsed has no claims.
   factory GetTokenResult(String token) {
     final Map<String, dynamic> claims = _parseJwt(token);
     return GetTokenResult._(token, claims);
@@ -34,16 +49,16 @@ class GetTokenResult {
   /// on the backend and never trust this value on the client. Returns an empty map if no claims are present.
   final Map<String, dynamic> claims;
 
-  /// Returns the time at which this ID token will expire
+  /// The time at which this ID token expires (the `exp` claim), or the epoch when there is none.
   DateTime get expirationTimestamp =>
       _getTimeFromClaimsSafely(_expirationTimestamp);
 
-  /// Returns the authentication timestamp. This is the time the user authenticated (signed in) and not the time the
-  /// token was refreshed.
+  /// The time the user signed in (the `auth_time` claim), not the time the token was refreshed;
+  /// the epoch when there is none.
   DateTime get authTimestamp => _getTimeFromClaimsSafely(_authTimestamp);
 
-  /// Returns the issued at timestamp. This is the time the ID token was last refreshed and not the authentication
-  /// timestamp.
+  /// The time the token was issued (the `iat` claim), that is the time it was last refreshed; the
+  /// epoch when there is none.
   DateTime get issuedAtTimestamp =>
       _getTimeFromClaimsSafely(_issuedAtTimestamp);
 
@@ -62,7 +77,8 @@ class GetTokenResult {
     }
   }
 
-  /// The custom claims of the token, or an empty map when there are none.
+  /// The `extra_claims` claim of the token, or an empty map when there is none. Custom claims set
+  /// with the Admin SDK are top-level entries of [claims].
   Map<String, dynamic> get extraClaims {
     final Object? extra = claims[_extraClaims];
     return extra is Map

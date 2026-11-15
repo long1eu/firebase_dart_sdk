@@ -10,7 +10,16 @@ import 'auth_exception.dart';
 import 'firebase_user_auth.dart';
 import 'rs256.dart';
 
-/// An OAuth 2.0 access token and when it expires.
+/// An OAuth 2.0 access token and when it expires: what the `fetch` function of an [OAuthTokenProvider] returns.
+///
+/// [toString] does not show the token.
+///
+/// ```dart
+/// final OAuthTokenProvider provider = OAuthTokenProvider(() async {
+///   final String token = await myTokenSource();
+///   return OAuthAccessToken(token, DateTime.now().add(const Duration(hours: 1)));
+/// });
+/// ```
 class OAuthAccessToken {
   /// Creates a token that is valid until [expiry].
   const OAuthAccessToken(this.token, this.expiry);
@@ -36,17 +45,43 @@ class OAuthAccessToken {
 /// Use it by handing it to the app before the Firestore instance is created:
 ///
 /// ```dart
-/// final app = FirebaseApp.withOptions(options);
-/// app.authProvider = OAuthTokenProvider.serviceAccount(jsonDecode(keyFileContents));
-/// final firestore = await Firestore.instanceFor(app: app);
+/// import 'dart:convert';
+/// import 'dart:io';
+///
+/// import 'package:cloud_firestore_dart/cloud_firestore_dart.dart';
+/// import 'package:firebase_app_dart/firebase_app_dart.dart';
+/// import 'package:firebase_auth_providers_dart/firebase_auth_providers_dart.dart';
+///
+/// Future<void> main() async {
+///   final FirebaseApp app = FirebaseApp.withOptions(
+///     const FirebaseOptions(
+///       apiKey: '',
+///       applicationId: '1:1234567890:dart:server',
+///       projectId: 'my-project',
+///     ),
+///   );
+///   // Never commit the key file; pass its path at run time.
+///   final String keyFile = Platform.environment['FIREBASE_SERVICE_ACCOUNT_KEY_FILE']!;
+///   app.authProvider = OAuthTokenProvider.serviceAccount(
+///     jsonDecode(File(keyFile).readAsStringSync()),
+///   );
+///   final Firestore firestore = Firestore.instanceFor(app: app);
+///   await firestore.doc('status/server').set(<String, Object?>{'up': true});
+///   await firestore.terminate();
+/// }
 /// ```
+///
+/// A token is fetched when the first request needs it and reused until it is within [refreshBefore] of its expiry.
+/// Callers that ask while a token is being fetched share that request. An error of the fetch reaches the caller
+/// (Firestore then fails the request with `unauthenticated`), and the next request tries again.
 ///
 /// There is no user: [uid] is null, and [onTokenChanged] never emits (a new token is picked up by the next
 /// request; open streams keep the token they started with, as the backend allows).
 class OAuthTokenProvider implements InternalTokenProvider {
-  /// Creates a provider on top of [fetch], which obtains a new access token.
+  /// Creates a provider on top of [fetch], which obtains a new access token, for token sources of your own.
   ///
-  /// A token is reused until it is within [refreshBefore] of its expiry. [clock] is for tests.
+  /// A token is reused until it is within [refreshBefore] (default five minutes) of its expiry. [clock] is for
+  /// tests.
   OAuthTokenProvider(
     Future<OAuthAccessToken> Function() fetch, {
     this.refreshBefore = const Duration(minutes: 5),
@@ -181,7 +216,7 @@ class OAuthTokenProvider implements InternalTokenProvider {
     );
   }
 
-  /// The scopes Firestore needs.
+  /// The scopes Firestore needs: `https://www.googleapis.com/auth/datastore`, the default of the factories.
   static const List<String> datastoreScopes = <String>[
     'https://www.googleapis.com/auth/datastore',
   ];
@@ -189,7 +224,7 @@ class OAuthTokenProvider implements InternalTokenProvider {
   final Future<OAuthAccessToken> Function() _fetch;
   final DateTime Function() _clock;
 
-  /// How long before its expiry a token is replaced.
+  /// How long before its expiry a token is replaced. Default five minutes.
   final Duration refreshBefore;
 
   OAuthAccessToken? _current;
@@ -198,6 +233,12 @@ class OAuthTokenProvider implements InternalTokenProvider {
   bool _isFresh(OAuthAccessToken token) =>
       _clock().add(refreshBefore).isBefore(token.expiry);
 
+  /// Returns the current access token, or fetches a new one when there is none, when it is within
+  /// [refreshBefore] of its expiry, or when [forceRefresh] is set.
+  ///
+  /// The token is opaque: the [GetTokenResult] has no claims. Throws what the fetch throws: for
+  /// [OAuthTokenProvider.serviceAccount] a [FirebaseAuthProviderException], for `applicationDefaultCredentials()`
+  /// the error of `package:googleapis_auth`.
   @override
   Future<GetTokenResult> getAccessToken({required bool forceRefresh}) async {
     final OAuthAccessToken? current = _current;

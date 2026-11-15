@@ -15,7 +15,41 @@ import 'package:rxdart/rxdart.dart';
 /// services of one project.
 ///
 /// Create one with [FirebaseApp.withOptions]. The app created without a name is the default app,
-/// returned by [FirebaseApp.instance].
+/// returned by [FirebaseApp.instance]; apps created with a `name` are returned by [getInstance].
+/// Each name can be used by one app at a time: [delete] an app to free its name.
+///
+/// The app also connects the services to the platform they run on. It implements
+/// `PlatformDependencies`: every member ([onNetworkConnected], [storage], [authProvider],
+/// [appCheckProvider], ...) answers with the value of the `dependencies` passed to
+/// [FirebaseApp.withOptions], or with a default when there are none. A service reads them when it
+/// is created, so set [authProvider] and [appCheckProvider] before you create the Firestore
+/// instance of the app.
+///
+/// ```dart
+/// import 'package:firebase_app_dart/firebase_app_dart.dart';
+///
+/// void main() {
+///   final FirebaseApp app = FirebaseApp.withOptions(
+///     const FirebaseOptions(
+///       apiKey: '<YOUR_API_KEY>',
+///       applicationId: '1:1234567890:dart:example',
+///       projectId: 'my-project',
+///     ),
+///   );
+///   print(app.name); // [DEFAULT]
+///   print(identical(FirebaseApp.instance, app)); // true
+///
+///   final FirebaseApp other = FirebaseApp.withOptions(
+///     const FirebaseOptions(
+///       apiKey: '<YOUR_API_KEY>',
+///       applicationId: '1:1234567890:dart:other',
+///       projectId: 'other-project',
+///     ),
+///     name: 'other',
+///   );
+///   print(identical(FirebaseApp.getInstance('other'), other)); // true
+/// }
+/// ```
 class FirebaseApp with _PlatformDependenciesMixin {
   FirebaseApp._(
     this._name,
@@ -24,10 +58,19 @@ class FirebaseApp with _PlatformDependenciesMixin {
     this._dataCollectionDefaultEnabled,
   );
 
-  /// Initializes a [FirebaseApp] instance with [options] and [name].
+  /// Creates the app called [name] with [options] and registers it, so that [getInstance] (and,
+  /// for the default app, [instance]) returns it.
   ///
-  /// If the name is not provided the default app (named `[DEFAULT]`) will be created. It is an
-  /// error to initialize an app with an already existing name.
+  /// * [name] defaults to [defaultAppName], which makes this the default app. Leading and trailing
+  ///   white space is removed, so `' tool '` and `'tool'` are the same app.
+  /// * [dependencies] connect the app to its platform (storage, connectivity, token providers).
+  ///   Without them the app keeps its data in memory, reports the network as connected and the
+  ///   app as in the foreground, and has no token providers. They are read once, here.
+  /// * The value of [dataCollectionDefaultEnabled] is read from the storage of [dependencies]
+  ///   (default `true`).
+  ///
+  /// Throws an [ArgumentError] if `options.applicationId` is empty, and a [StateError] if an app
+  /// with this name exists (and was not deleted).
   factory FirebaseApp.withOptions(
     FirebaseOptions options, {
     PlatformDependencies? dependencies,
@@ -62,8 +105,9 @@ class FirebaseApp with _PlatformDependenciesMixin {
     return firebaseApp;
   }
 
-  /// Returns the default (first initialized) instance of the [FirebaseApp].
-  /// Throws StateError if the default app was not initialized.
+  /// The default app: the one created by [FirebaseApp.withOptions] without a name.
+  ///
+  /// Throws a [StateError] if there is none (it was not created, or it was deleted).
   static FirebaseApp get instance {
     final FirebaseApp? defaultApp = _instances[defaultAppName];
     if (defaultApp == null) {
@@ -75,10 +119,10 @@ class FirebaseApp with _PlatformDependenciesMixin {
     return defaultApp;
   }
 
-  /// Returns the instance identified by the unique name, or throws if it does
-  /// not exist.
+  /// The app called [name] (leading and trailing white space is ignored).
   ///
-  /// [name] represents the name of the [FirebaseApp] instance.
+  /// Throws a [StateError] that lists the names of the existing apps if there is no app with this
+  /// name (it was not created, or it was deleted).
   static FirebaseApp getInstance(String name) {
     final FirebaseApp? firebaseApp = _instances[_normalize(name)];
     if (firebaseApp != null) {
@@ -95,7 +139,7 @@ class FirebaseApp with _PlatformDependenciesMixin {
     );
   }
 
-  /// The name of the default app.
+  /// The name of the default app, `[DEFAULT]`.
   static const String defaultAppName = '[DEFAULT]';
 
   static final Map<String, FirebaseApp> _instances = <String, FirebaseApp>{};
@@ -116,31 +160,44 @@ class FirebaseApp with _PlatformDependenciesMixin {
   bool _deleted = false;
   bool _dataCollectionDefaultEnabled;
 
-  /// Emits the new value every time [setDataCollectionDefaultEnabled] changes it.
+  /// Emits the new value every time [setDataCollectionDefaultEnabled] changes it. A broadcast
+  /// stream; it does not emit the current value when you listen.
   Stream<bool> get onDataCollectionChange => _dataCollectionChangeSink.stream;
 
-  /// An event is emitted when [FirebaseApp.delete] is called.
+  /// Emits the [name] of this app when [delete] is called (once). A broadcast stream.
+  ///
+  /// `cloud_firestore_dart` listens to it and shuts down the Firestore instances of the app.
   Stream<String> get onDeleteApp => _deleteSink.stream;
 
-  /// Returns the unique name of this app.
+  /// The name of this app: [defaultAppName] for the default app.
+  ///
+  /// Throws a [StateError] after [delete].
   String get name {
     _checkNotDeleted();
     return _name;
   }
 
-  /// Returns the specified [FirebaseOptions].
+  /// The options this app was created with.
+  ///
+  /// Throws a [StateError] after [delete].
   FirebaseOptions get options {
     _checkNotDeleted();
     return _options;
   }
 
-  /// Returns a mutable list of all FirebaseApps.
+  /// The apps that exist now (created and not deleted), in the order they were created.
+  ///
+  /// The list is a copy: changing it does not create or delete apps.
   static List<FirebaseApp> get apps {
     return List<FirebaseApp>.from(_instances.values);
   }
 
   /// Deletes this app: it is removed from [apps], [onDeleteApp] emits its name, and reading its
   /// [name] or [options] afterwards throws a [StateError]. Deleting twice is a no-op.
+  ///
+  /// The name is free again: [FirebaseApp.withOptions] can create a new app with it.
+  /// `cloud_firestore_dart` shuts down the Firestore instances of a deleted app; it does not wait
+  /// for that, so call `terminate()` on them yourself when you need to know when they are done.
   void delete() {
     if (_deleted) {
       return;
@@ -151,9 +208,12 @@ class FirebaseApp with _PlatformDependenciesMixin {
     _deleteSink.add(_name);
   }
 
-  /// If set to true it indicates that Firebase should close database
-  /// connections automatically when the app is in the background.
-  /// Disabled by default.
+  /// Kept from the original project; no service of this repository reads it. Disabled by default.
+  ///
+  /// When the setting changes while [onBackgroundChanged] says the app is in the background,
+  /// [onBackgroundChanged] emits again (`true` when [enabled], `false` otherwise).
+  ///
+  /// Throws a [StateError] after [delete].
   void setAutomaticResourceManagementEnabled({required bool enabled}) {
     _checkNotDeleted();
 
@@ -169,21 +229,25 @@ class FirebaseApp with _PlatformDependenciesMixin {
     }
   }
 
-  /// Determine whether automatic data collection is enabled or disabled by
-  /// default in all SDKs. Returns true if automatic data collection is enabled
-  /// by default and false otherwise
+  /// Whether automatic data collection is enabled. Stored, not used: no service of this repository
+  /// collects data.
   ///
-  /// Note: this value is respected by all SDKs unless overridden by the
-  /// developer via SDK specific mechanisms.
+  /// The initial value is the one stored by [setDataCollectionDefaultEnabled] in the [storage] of
+  /// the platform dependencies, or `true`. It does not come from
+  /// [FirebaseOptions.dataCollectionEnabled].
+  ///
+  /// Throws a [StateError] after [delete].
   bool get dataCollectionDefaultEnabled {
     _checkNotDeleted();
     return _dataCollectionDefaultEnabled;
   }
 
-  /// Enable or disable automatic data collection across all SDKs.
+  /// Enables or disables automatic data collection (see [dataCollectionDefaultEnabled]).
   ///
-  /// Note: this value is respected by all SDKs unless overridden by the
-  /// developer via SDK specific mechanisms.
+  /// A change is written to [storage] under the key `firebase_data_collection_default_enabled`
+  /// and emitted by [onDataCollectionChange]; setting the current value does nothing.
+  ///
+  /// Throws a [StateError] after [delete].
   void setDataCollectionDefaultEnabled({required bool enabled}) {
     _checkNotDeleted();
     if (_dataCollectionDefaultEnabled != enabled) {
@@ -201,7 +265,10 @@ class FirebaseApp with _PlatformDependenciesMixin {
   @visibleForTesting
   bool get isDefaultApp => defaultAppName == name;
 
-  /// Use this key to store data per FirebaseApp.
+  /// A key derived from the [name] and the application id of this app, for data that a service
+  /// stores per app. Same as [getPersistenceKeyFor].
+  ///
+  /// Throws a [StateError] after [delete].
   String get persistenceKey {
     return getPersistenceKeyFor(name, options.applicationId);
   }
@@ -213,8 +280,8 @@ class FirebaseApp with _PlatformDependenciesMixin {
     _instances.clear();
   }
 
-  /// Returns persistence key. Exists to support getting [FirebaseApp]
-  /// persistence key after the app has been deleted.
+  /// The [persistenceKey] of the app called [name] with [applicationId]: both, base64url encoded
+  /// without padding, joined by `+`. Works for an app that was deleted.
   static String getPersistenceKeyFor(String name, String applicationId) {
     final String encodedName = base64Url
         .encode(utf8.encode(name))
@@ -288,35 +355,57 @@ mixin _PlatformDependenciesMixin
     _appCheckProvider = _dependencies?.appCheckProvider;
   }
 
-  /// This stream should emit true then the app enters in background and false otherwise
+  /// Emits `true` when the app goes to the background and `false` when it comes back.
+  ///
+  /// The subject of the platform dependencies, read once when the app was created; without
+  /// dependencies a subject of its own, seeded with `false`. No service of this repository reads
+  /// it.
   @override
   BehaviorSubject<bool> get onBackgroundChanged {
     return _onBackgroundChanged!;
   }
 
-  /// This stream should emit true when there is an internet connection and false otherwise
+  /// Emits `true` when the device has a network connection and `false` when it lost it.
+  ///
+  /// The subject of the platform dependencies, read once when the app was created; without
+  /// dependencies a subject of its own, seeded with `true`. `cloud_firestore_dart` listens to it
+  /// (skipping the current value): a `true` restarts failed streams at once instead of after their
+  /// backoff.
   @override
   BehaviorSubject<bool> get onNetworkConnected {
     return _onNetworkConnected!;
   }
 
+  /// The `headersBuilder` of the platform dependencies, or one that returns no headers. No
+  /// service of this repository calls it.
   @override
   // ignore: prefer_function_declarations_over_variables
   HeaderBuilder get headersBuilder {
     return _headersBuilder ?? () async => <String, String>{};
   }
 
+  /// The storage of the platform dependencies, or this app itself, which keeps the values in
+  /// memory ([get] and [set]).
   @override
   LocalStorage get storage {
     return _storage ?? this;
   }
 
+  /// Where Firestore gets the token it sends with each request: the provider set with the
+  /// [authProvider] setter or by the platform dependencies, else this app itself, which has no
+  /// user ([getAccessToken] throws). Firestore recognises the app and sends its requests without a
+  /// token.
   @override
   InternalTokenProvider get authProvider {
     return _authProvider ?? this;
   }
 
-  // FirebaseAuth can set it self to be the InternalTokenProvider if the user hasn't set one already
+  /// Replaces the token provider, for example with a `FirebaseUserAuth` or an
+  /// `OAuthTokenProvider` of `package:firebase_auth_providers_dart`.
+  ///
+  /// Set it before the Firestore instance of this app is created: Firestore reads it once. The
+  /// setter asks [provider] for a token right away (`forceRefresh: true`) to warm it up; an error
+  /// of that request is ignored here, and surfaces when a service asks for a token.
   set authProvider(InternalTokenProvider provider) {
     _authProvider = provider;
     // Warm up the token; a failing provider must not become an unhandled
@@ -326,21 +415,30 @@ mixin _PlatformDependenciesMixin
         .then<void>((GetTokenResult _) {}, onError: (Object _) {});
   }
 
-  /// The App Check token source, or null when the app has none.
+  /// The App Check token source, or null when the app has none (the default).
+  ///
+  /// Firestore sends its token in the `x-firebase-appcheck` header of every request, and
+  /// `FirebaseUserAuth` of `package:firebase_auth_providers_dart` in `X-Firebase-AppCheck`.
   @override
   InternalAppCheckTokenProvider? get appCheckProvider => _appCheckProvider;
 
+  /// Replaces the App Check token source; null removes it. Set it before the Firestore instance of
+  /// this app (and a `FirebaseUserAuth.forApp`) is created: they read it once.
   set appCheckProvider(InternalAppCheckTokenProvider? provider) {
     _appCheckProvider = provider;
   }
 
   // LocalStorage implementation
 
+  /// The value stored in memory under [key], or null. Used when the app has no platform
+  /// dependencies with a storage of their own; read [storage] instead of calling this.
   @override
   String? get(String key) {
     return _map[key];
   }
 
+  /// Stores [value] in memory under [key]; null removes it. Used when the app has no platform
+  /// dependencies with a storage of their own; use [storage] instead of calling this.
   @override
   Future<void> set(String key, String? value) async {
     if (value == null) {
@@ -352,15 +450,19 @@ mixin _PlatformDependenciesMixin
 
   // InternalTokenProvider implementation
 
+  /// Always throws a [StateError]: the app is the token provider of last resort, which has no
+  /// user. Call `authProvider.getAccessToken` instead.
   @override
   Future<GetTokenResult> getAccessToken({required bool forceRefresh}) async {
     throw StateError('No InternalTokenProvider has been set on this app.');
   }
 
+  /// Always throws a [StateError] (see [getAccessToken]). Read `authProvider.uid` instead.
   @override
   String get uid =>
       throw StateError('No InternalTokenProvider has been set on this app.');
 
+  /// An empty stream (see [getAccessToken]). Listen to `authProvider.onTokenChanged` instead.
   @override
   Stream<InternalTokenResult> get onTokenChanged =>
       const Stream<InternalTokenResult>.empty();

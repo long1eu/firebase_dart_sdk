@@ -18,6 +18,16 @@ import 'dart:async';
 ///
 /// Like the Android SDK, a failed request still carries a (placeholder) [token]
 /// together with the [error]; the backend rejects the placeholder.
+///
+/// ```dart
+/// import 'package:firebase_app_dart/firebase_app_dart.dart';
+///
+/// const AppCheckTokenResult ok = AppCheckTokenResult('<app check token>');
+/// final AppCheckTokenResult failed = AppCheckTokenResult(
+///   '',
+///   error: StateError('The attestation service is down.'),
+/// );
+/// ```
 class AppCheckTokenResult {
   /// Creates a result with a [token] and, for a failed request, the [error].
   const AppCheckTokenResult(this.token, {this.error});
@@ -32,6 +42,43 @@ class AppCheckTokenResult {
 /// Gives Firebase services access to App Check tokens. An implementation (for
 /// example one backed by a device attestation service) is registered on the
 /// FirebaseApp; services that find none simply send no App Check header.
+///
+/// Set it with `FirebaseApp.appCheckProvider` or
+/// `PlatformDependencies.appCheckProvider`, before the Firestore instance (and a
+/// `FirebaseUserAuth`) of the app is created. These packages do not attest a
+/// device: you supply the tokens, for example from your own backend.
+///
+/// ```dart
+/// import 'dart:async';
+///
+/// import 'package:firebase_app_dart/firebase_app_dart.dart';
+///
+/// class BackendAppCheck extends InternalAppCheckTokenProvider {
+///   BackendAppCheck(this.fetchToken);
+///
+///   /// Asks your backend for a token.
+///   final Future<String> Function() fetchToken;
+///
+///   final StreamController<AppCheckTokenResult> _changes =
+///       StreamController<AppCheckTokenResult>.broadcast();
+///
+///   @override
+///   Future<AppCheckTokenResult> getToken({required bool forceRefresh}) async {
+///     try {
+///       final AppCheckTokenResult result = AppCheckTokenResult(
+///         await fetchToken(),
+///       );
+///       _changes.add(result);
+///       return result;
+///     } on Object catch (e) {
+///       return AppCheckTokenResult('', error: e);
+///     }
+///   }
+///
+///   @override
+///   Stream<AppCheckTokenResult> get onTokenChanged => _changes.stream;
+/// }
+/// ```
 abstract class InternalAppCheckTokenProvider {
   /// Constructor for subclasses.
   InternalAppCheckTokenProvider();

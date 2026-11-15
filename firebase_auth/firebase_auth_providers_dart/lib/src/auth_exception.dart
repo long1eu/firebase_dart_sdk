@@ -1,6 +1,54 @@
-/// Thrown when a Firebase Auth request fails.
+/// Thrown when a Firebase Auth request, or a token request of an `OAuthTokenProvider`, fails.
+///
+/// Branch on [code]; [message] is for people, and [serverCode] and [httpStatus] are for logs. None of them
+/// contains a token, a password or the API key.
+///
+/// The codes are those of the Firebase JS SDK. The ones you are most likely to meet:
+///
+/// | Code | Meaning |
+/// | --- | --- |
+/// | `wrong-password`, `invalid-credential` | the email and password do not match (projects with email enumeration protection answer `invalid-credential` instead of `wrong-password` and `user-not-found`) |
+/// | `user-not-found` | no account has this email address |
+/// | `email-already-in-use` | sign-up with an address that has an account |
+/// | `weak-password`, `missing-password`, `invalid-email` | the input was refused |
+/// | `user-disabled` | the account is disabled |
+/// | `operation-not-allowed` | the sign-in method is not enabled for the project |
+/// | `admin-restricted-operation` | the project allows this operation to administrators only (for example sign-up) |
+/// | `invalid-custom-token`, `custom-token-mismatch` | the custom token is malformed or for another project |
+/// | `requires-recent-login` | sign in again (`FirebaseUserAuth.reauthenticateWithEmailAndPassword`) and retry |
+/// | `user-mismatch` | the reauthentication used the credentials of another account |
+/// | `user-token-expired`, `invalid-refresh-token` | the session ended (account deleted, refresh token revoked); the user is signed out |
+/// | `invalid-user-token` | the backend refused the ID token |
+/// | `expired-action-code`, `invalid-action-code` | the code of an email link is used up, expired or wrong |
+/// | `invalid-continue-uri`, `invalid-hosting-link-domain`, `missing-ios-bundle-id`, `missing-android-pkg-name` | an `ActionCodeSettings` value is empty |
+/// | `null-user` | the operation needs a signed-in user and nobody is signed in |
+/// | `cancelled` | a sign-in or a reauthentication was overtaken by another sign-in or a sign-out |
+/// | `too-many-requests` | the backend throttles this client; try again later |
+/// | `network-request-failed` | the request did not reach the backend |
+/// | `invalid-api-key` | the API key is not valid |
+/// | `internal-error` | the backend answered with something unexpected |
+///
+/// Any other code of the backend arrives in kebab case: `QUOTA_EXCEEDED` is `quota-exceeded`.
+/// `OAuthTokenProvider.serviceAccount` throws `invalid-credential` when the token endpoint refuses the key
+/// (`invalid_grant`), and `network-request-failed` or `internal-error` otherwise.
+///
+/// ```dart
+/// try {
+///   await auth.signInWithEmailAndPassword(email, password);
+/// } on FirebaseAuthProviderException catch (e) {
+///   switch (e.code) {
+///     case 'wrong-password' || 'invalid-credential' || 'user-not-found':
+///       print('The email address or the password is wrong.');
+///     case 'too-many-requests':
+///       print('Too many attempts. Try again later.');
+///     default:
+///       print('Sign-in failed: ${e.message}');
+///   }
+/// }
+/// ```
 class FirebaseAuthProviderException implements Exception {
-  /// Creates an exception with the SDK style [code] (for example `wrong-password`).
+  /// Creates an exception with the SDK style [code] (for example `wrong-password`) and a [message]. The
+  /// package creates them; you need this only for tests and token providers of your own.
   const FirebaseAuthProviderException(
     this.code,
     this.message, {
@@ -10,6 +58,17 @@ class FirebaseAuthProviderException implements Exception {
 
   /// Maps the error message of the Identity Toolkit or Secure Token API ([serverMessage], for example
   /// `EMAIL_EXISTS` or `WEAK_PASSWORD : Password should be at least 6 characters`) to an exception.
+  ///
+  /// The part before ` : ` becomes [serverCode] and, mapped like the JS SDK does, [code]; the part after it (or a
+  /// standard text) becomes [message].
+  ///
+  /// ```dart
+  /// final FirebaseAuthProviderException e = FirebaseAuthProviderException.fromServer(
+  ///   'EMAIL_EXISTS',
+  ///   httpStatus: 400,
+  /// );
+  /// print(e.code); // email-already-in-use
+  /// ```
   factory FirebaseAuthProviderException.fromServer(
     String serverMessage, {
     int? httpStatus,
@@ -38,7 +97,7 @@ class FirebaseAuthProviderException implements Exception {
   }
 
   /// The error code in the style of the Firebase SDKs: `wrong-password`, `email-already-in-use`,
-  /// `network-request-failed`, `internal-error`, ...
+  /// `network-request-failed`, `internal-error`, ... (see the table of [FirebaseAuthProviderException]).
   final String code;
 
   /// A description of the error. It never contains a token or a password.

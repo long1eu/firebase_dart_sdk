@@ -1,8 +1,18 @@
 import 'firebase_user_auth.dart';
 
-/// The signed-in user of a [FirebaseUserAuth].
+/// The signed-in user of a [FirebaseUserAuth]: [FirebaseUserAuth.currentUser], the result of a sign-in, and the
+/// events of [FirebaseUserAuth.userChanges].
+///
+/// An immutable snapshot: a change (a [FirebaseUserAuth.updateProfile], a [FirebaseUserAuth.reload]) produces a new
+/// object. Two users are equal when all their fields are. [toString] shows only [uid] and [isAnonymous].
+///
+/// ```dart
+/// final AuthUser user = await auth.signInAnonymously();
+/// print('${user.uid} anonymous: ${user.isAnonymous}'); // anonymous: true
+/// auth.userChanges.listen((AuthUser? user) => print(user?.email ?? 'signed out'));
+/// ```
 class AuthUser {
-  /// Creates a user.
+  /// Creates a user. [FirebaseUserAuth] creates them; you need this only for tests.
   const AuthUser({
     required this.uid,
     this.email,

@@ -11,20 +11,71 @@ or supported by Google or Firebase.
 > emulators only: nothing was run against the real Firebase Auth service or Google's token
 > endpoint.
 
-## Features
+## Install
+
+```shell
+dart pub add firebase_auth_providers_dart
+```
+
+Dart 3.8 or later. You also need `firebase_app_dart`, and `cloud_firestore_dart` for the
+requests the tokens are for.
+
+## Quick start
+
+```dart
+import 'package:cloud_firestore_dart/cloud_firestore_dart.dart';
+import 'package:firebase_app_dart/firebase_app_dart.dart';
+import 'package:firebase_auth_providers_dart/firebase_auth_providers_dart.dart';
+
+final FirebaseApp app = FirebaseApp.withOptions(
+  const FirebaseOptions(
+    apiKey: '<the Web API key of the project>',
+    applicationId: '1:1234567890:dart:example',
+    projectId: 'my-project',
+  ),
+);
+// Before the Firestore instance is created: it becomes the token provider of the app.
+final FirebaseUserAuth auth = await FirebaseUserAuth.forApp(app);
+final Firestore firestore = Firestore.instanceFor(app: app);
+
+await auth.signInWithEmailAndPassword('ada@example.com', password);
+await firestore.doc('users/${auth.uid}/notes/first').set({'text': 'hello'});
+await auth.signOut();
+```
+
+A server uses `app.authProvider = OAuthTokenProvider.serviceAccount(keyJson)` or
+`app.authProvider = applicationDefaultCredentials()` (from `adc.dart`) instead, also before the
+Firestore instance is created.
+
+## What it offers
 
 | Provider | For | Security rules | Status |
 | --- | --- | --- | --- |
-| `FirebaseUserAuth`: anonymous, email and password, and custom-token sign-in over REST; token refresh; sign-out; account management (password reset, email verification, email, password and profile updates, reauthentication, deletion); a session kept in your storage | apps with end users (VM, Flutter, web) | apply (`request.auth` is the user) | stable |
-| `OAuthTokenProvider.serviceAccount`: a service account key | servers | **bypassed** | stable |
+| `FirebaseUserAuth`: anonymous, email and password, and custom-token sign-in over REST; token refresh; sign-out; account management; a session kept in your `AuthStorage` | apps with end users (VM, Flutter, web) | apply (`request.auth` is the user) | stable, emulator only |
+| `OAuthTokenProvider.serviceAccount`: a service account key | servers | **bypassed** | stable, unit tests only |
 | `applicationDefaultCredentials()` (`adc.dart`, VM only) | servers, command line tools | **bypassed** | stable, not exercised by tests |
+
+One example per task, each runnable on its own (the header of each file says how):
+
+| Task | Example | Needs |
+| --- | --- | --- |
+| Anonymous sign-in, the token, `userChanges` | [`main.dart`](https://github.com/long1eu/firebase_dart_sdk/blob/main/firebase_auth/firebase_auth_providers_dart/example/main.dart) | Auth emulator |
+| Email and password: sign up, sign in, the errors of a sign-in form | [`email_password.dart`](https://github.com/long1eu/firebase_dart_sdk/blob/main/firebase_auth/firebase_auth_providers_dart/example/email_password.dart) | Auth emulator |
+| Email verification, profile, password reset, reauthentication, deletion | [`account_flows.dart`](https://github.com/long1eu/firebase_dart_sdk/blob/main/firebase_auth/firebase_auth_providers_dart/example/account_flows.dart) | Auth emulator |
+| Custom token sign-in and its claims | [`custom_token.dart`](https://github.com/long1eu/firebase_dart_sdk/blob/main/firebase_auth/firebase_auth_providers_dart/example/custom_token.dart) | Auth emulator |
+| Keeping the user signed in across restarts: a file-backed `AuthStorage` | [`persistent_session.dart`](https://github.com/long1eu/firebase_dart_sdk/blob/main/firebase_auth/firebase_auth_providers_dart/example/persistent_session.dart) | Auth emulator |
+| Wiring a provider into Firestore; the rules see the user | [`firestore_wiring.dart`](https://github.com/long1eu/firebase_dart_sdk/blob/main/firebase_auth/firebase_auth_providers_dart/example/firestore_wiring.dart) | Auth and Firestore emulators |
+| A service account key, its path in an environment variable | [`service_account.dart`](https://github.com/long1eu/firebase_dart_sdk/blob/main/firebase_auth/firebase_auth_providers_dart/example/service_account.dart) | a real project |
+| Application Default Credentials on a server | [`adc_server.dart`](https://github.com/long1eu/firebase_dart_sdk/blob/main/firebase_auth/firebase_auth_providers_dart/example/adc_server.dart) | a real project |
+
+[`example/README.md`](https://github.com/long1eu/firebase_dart_sdk/blob/main/firebase_auth/firebase_auth_providers_dart/example/README.md) explains how to start the emulators.
 
 This is **not** a port of the Firebase Auth SDK: it has the REST-backed operations of the JS SDK
 (see [What is supported](#what-is-supported)), and no federated providers (Google, Apple, ...),
 no popup or redirect flows, no phone sign-in, no email link sign-in and no multi-factor.
 
 **Platforms.** The Dart VM (servers, command line tools, Flutter) and the web; `adc.dart` is VM
-only. `FirebaseUserAuth` was run in Chrome against the Auth emulator. Dart 3.8 or later.
+only. `FirebaseUserAuth` was run in Chrome against the Auth emulator.
 
 ## What is supported
 
@@ -69,31 +120,6 @@ any other code of the backend in kebab case (`QUOTA_EXCEEDED` is `quota-exceeded
 the signed-in user throw `null-user` when nobody is signed in, and sign the user out when the
 backend answers `user-disabled` or `user-token-expired` (`_logoutIfInvalidated` of the JS SDK).
 
-## Install
-
-```shell
-dart pub add firebase_auth_providers_dart
-```
-
-## Quickstart
-
-```dart
-import 'package:cloud_firestore_dart/cloud_firestore_dart.dart';
-import 'package:firebase_app_dart/firebase_app_dart.dart';
-import 'package:firebase_auth_providers_dart/firebase_auth_providers_dart.dart';
-
-// Before the Firestore instance is created: it becomes the token provider of the app.
-final auth = await FirebaseUserAuth.forApp(app);
-final firestore = Firestore.instanceFor(app: app);
-
-await auth.signInWithEmailAndPassword('ada@example.com', password);
-await firestore.doc('users/${auth.uid}/notes/first').set({'text': 'hello'});
-await auth.signOut();
-```
-
-A server uses `app.authProvider = OAuthTokenProvider.serviceAccount(keyJson)` or
-`app.authProvider = applicationDefaultCredentials()` instead.
-
 ## Documentation
 
 - **Guide**: [authentication and App Check](https://github.com/long1eu/firebase_dart_sdk/blob/main/docs/guides/authentication.md):
@@ -101,16 +127,20 @@ A server uses `app.authProvider = OAuthTokenProvider.serviceAccount(keyJson)` or
   session safely), the Auth emulator, server credentials, and how the providers were tested.
   [All guides](https://github.com/long1eu/firebase_dart_sdk/blob/main/docs/guides/README.md).
 - **API reference**: [pub.dev/documentation/firebase_auth_providers_dart](https://pub.dev/documentation/firebase_auth_providers_dart/latest/).
-- **Examples**: [`example/main.dart`](https://github.com/long1eu/firebase_dart_sdk/blob/main/firebase_auth/firebase_auth_providers_dart/example/main.dart) (anonymous sign-in), [`example/account_flows.dart`](https://github.com/long1eu/firebase_dart_sdk/blob/main/firebase_auth/firebase_auth_providers_dart/example/account_flows.dart) (email verification, password reset, account deletion; Auth emulator).
 
-## Not done
+## Limits
 
+- Nothing was run against the real Firebase Auth service or Google's token endpoint: the
+  providers were tested with unit tests and against the Firebase emulators. Application Default
+  Credentials are delegated to `package:googleapis_auth` without a test of their own.
 - Federated sign-in, popup and redirect flows, phone sign-in, email link sign-in and
-  multi-factor (the table above lists the rest).
-- Persistent storage of the session: you supply an `AuthStorage` (the default keeps it in
-  memory).
-- Nothing was run against the real services, and Application Default Credentials are delegated
-  to `package:googleapis_auth` without a test of their own.
+  multi-factor are not there (the table above lists the rest).
+- The session is kept in memory unless you supply an `AuthStorage`. The stored value is a
+  credential: keep it where the platform keeps secrets.
+- `signOut()` forgets the session locally; it does not revoke the refresh token on the backend.
+- The token providers are read once, when the Firestore instance is created: set them first.
+- Service account and Application Default Credentials tokens bypass security rules: use them on
+  trusted machines only.
 
 ## License
 

@@ -22,18 +22,76 @@ import 'firebase_user_auth.dart';
 ///   `sessionStorage`, and keep a strict Content Security Policy.
 ///
 /// Delete the value ([write] with null) when the user signs out; [FirebaseUserAuth] does that itself.
+///
+/// [FirebaseUserAuth] calls [read] once, in [FirebaseUserAuth.restore], and [write] after every sign-in, sign-out
+/// and change of the user or of the refresh token, and waits for both. An exception they throw reaches the caller
+/// of the operation.
+///
+/// A file-backed storage for a command line tool (Dart VM; `example/persistent_session.dart` is the complete
+/// program):
+///
+/// ```dart
+/// import 'dart:convert';
+/// import 'dart:io';
+///
+/// import 'package:firebase_auth_providers_dart/firebase_auth_providers_dart.dart';
+///
+/// class FileAuthStorage implements AuthStorage {
+///   FileAuthStorage(this.file);
+///
+///   final File file;
+///
+///   Map<String, Object?> _all() => file.existsSync()
+///       ? jsonDecode(file.readAsStringSync()) as Map<String, Object?>
+///       : <String, Object?>{};
+///
+///   @override
+///   String? read(String key) => _all()[key] as String?;
+///
+///   @override
+///   Future<void> write(String key, String? value) async {
+///     final Map<String, Object?> all = _all();
+///     if (value == null) {
+///       all.remove(key);
+///     } else {
+///       all[key] = value;
+///     }
+///     if (!file.existsSync()) {
+///       await file.create(recursive: true);
+///       // Readable by its owner only, before anything is written to it.
+///       await Process.run('chmod', <String>['600', file.path]);
+///     }
+///     await file.writeAsString(jsonEncode(all));
+///   }
+/// }
+/// ```
 abstract class AuthStorage {
   /// Constructor for subclasses.
   AuthStorage();
 
-  /// Returns the value stored under [key], or null.
+  /// Returns the value stored under [key], or null when there is none.
   FutureOr<String?> read(String key);
 
-  /// Stores [value] under [key]; null removes it.
+  /// Stores [value] under [key]; null removes it. The value is a credential (see [AuthStorage]).
   FutureOr<void> write(String key, String? value);
 }
 
-/// An [AuthStorage] that lives as long as the object.
+/// An [AuthStorage] that lives as long as the object: the default of [FirebaseUserAuth]. The user has to sign in
+/// again after a restart.
+///
+/// One instance can be shared by several [FirebaseUserAuth]s in a process, so that a new instance restores the
+/// session of an earlier one:
+///
+/// ```dart
+/// final InMemoryAuthStorage storage = InMemoryAuthStorage();
+/// final FirebaseUserAuth first = FirebaseUserAuth(apiKey: apiKey, storage: storage);
+/// await first.signInAnonymously();
+/// await first.dispose();
+///
+/// final FirebaseUserAuth second = FirebaseUserAuth(apiKey: apiKey, storage: storage);
+/// await second.restore();
+/// print(second.uid == first.uid); // true
+/// ```
 class InMemoryAuthStorage implements AuthStorage {
   /// Creates an empty storage.
   InMemoryAuthStorage();

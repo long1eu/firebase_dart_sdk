@@ -37,5 +37,9 @@ dependencies:
   meta: ^1.11.0
 
 dev_dependencies:
+  # Only for example/firestore_wiring.dart and example/adc_server.dart. Local
+  # development resolves it from ../../cloud_firestore/cloud_firestore_dart
+  # through pubspec_overrides.yaml.
+  cloud_firestore_dart: ^0.1.0
   lints: ^6.1.0
   test: ^1.25.0
