@@ -1,0 +1,16 @@
+name: worker_queue
+description: >-
+  A worker that claims jobs from a Firestore collection with a transaction,
+  wakes up on a listener, and shuts down cleanly on SIGTERM.
+publish_to: none
+
+environment:
+  sdk: ^3.8.0
+
+dependencies:
+  cloud_firestore_dart: ^0.1.0
+  firebase_app_dart: ^0.1.0
+  firebase_auth_providers_dart: ^0.1.0
+
+dev_dependencies:
+  lints: ^6.0.0
