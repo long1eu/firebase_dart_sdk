@@ -1,4 +1,13 @@
 ## firebase_auth_dart
+
+> **Not maintained.** This is code from the original project (2019 to 2021). The 2026
+> revival did not update or test it, and its SDK constraint (`<3.0.0`) keeps it from
+> resolving on Dart 3. The maintained packages of this repository are `cloud_firestore_dart`,
+> `firebase_app_dart` and `firebase_auth_providers_dart`; see the [repository README](../../README.md).
+>
+> For Firestore tokens from Firebase Auth users, service accounts or Application Default
+> Credentials, use `firebase_auth_providers_dart`.
+
 This is a pure Dart implementation for [firebase_core](https://pub.dev/packages/firebase_core) intended for use with 
 Flutter. This package uses [firebase_core_vm](https://pub.dev/packages/firebase_core_vm) to provide the pure dart 
 implementation which does not and will not support Web apps. While this package will work on Android and iOS, this is 

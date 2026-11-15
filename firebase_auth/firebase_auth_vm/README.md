@@ -1,5 +1,13 @@
 # Firebase Auth Dart SDK - CLI example app
 
+> **Not maintained.** This is code from the original project (2019 to 2021). The 2026
+> revival did not update or test it, and its SDK constraint (`<3.0.0`) keeps it from
+> resolving on Dart 3. The maintained packages of this repository are `cloud_firestore_dart`,
+> `firebase_app_dart` and `firebase_auth_providers_dart`; see the [repository README](../../README.md).
+>
+> For Firestore tokens from Firebase Auth users, service accounts or Application Default
+> Credentials, use `firebase_auth_providers_dart`.
+
 ## Install
 All needed dependencies are provided by the [PlatformDependencies]. The current implementation uses hive to store the 
 current user and his tokens.
