@@ -19,10 +19,30 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/load_bundle_task_pro
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/assert.dart';
 
 /// A listener that is called periodically during execution of a [LoadBundleTask].
+///
+/// It receives each progress update, the final one included; see
+/// [LoadBundleTask.addOnProgressListener].
 typedef OnProgressListener = void Function(LoadBundleTaskProgress snapshot);
 
 /// Represents the task of loading a Firestore bundle. It provides progress of bundle loading, as well as task
 /// completion and error events.
+///
+/// [Firestore.loadBundle] and [Firestore.loadBundleStream] start the task and return it at once. Wait for [future],
+/// or follow [stream] to show progress:
+///
+/// ```dart
+/// final LoadBundleTask task = firestore.loadBundle(bundleBytes);
+/// task.stream.listen((LoadBundleTaskProgress progress) {
+///   print('${progress.documentsLoaded} of ${progress.totalDocuments} documents');
+/// });
+/// final LoadBundleTaskProgress result = await task.future;
+/// print('loaded ${result.documentsLoaded} documents');
+/// ```
+///
+/// Loading writes only to the local cache and needs no connection. A bundle that cannot be read fails the task with a
+/// [FirestoreError] (code `invalidArgument`). After a successful load the named queries of the bundle are available
+/// through [Firestore.getNamedQuery]. Loading a bundle again whose id was already loaded with the same or a later
+/// creation time completes at once without changing the cache.
 ///
 /// PORTING NOTE: the Android class extends `Task<LoadBundleTaskProgress>`. Here the task completion is exposed as
 /// [future] and the progress updates as [stream] / [addOnProgressListener].
@@ -48,6 +68,9 @@ class LoadBundleTask {
 
   /// Completes with the final progress (state [LoadBundleTaskState.success]) once the bundle is loaded, or with the
   /// error if loading failed.
+  ///
+  /// The error is reported only to those who listen to this future; a failed task that nobody waits for does not
+  /// cause an unhandled error.
   Future<LoadBundleTaskProgress> get future => _completion.future;
 
   /// The progress updates reported from now on. A final update with state [LoadBundleTaskState.success] or
@@ -68,6 +91,15 @@ class LoadBundleTask {
   Object? get exception => _snapshot.exception;
 
   /// Adds a listener that is called with every progress update, including the final one. Returns this task.
+  ///
+  /// The listener receives only the updates reported after this call, and cannot be removed; use [stream] when you
+  /// need to cancel.
+  ///
+  /// ```dart
+  /// firestore.loadBundle(bundleBytes).addOnProgressListener(
+  ///   (LoadBundleTaskProgress progress) => print(progress.taskState),
+  /// );
+  /// ```
   LoadBundleTask addOnProgressListener(OnProgressListener listener) {
     _progress.stream.listen(listener);
     return this;

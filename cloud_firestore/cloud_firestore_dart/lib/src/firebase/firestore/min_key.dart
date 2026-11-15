@@ -16,6 +16,15 @@
 /// every other value except null.
 ///
 /// Only databases of the Enterprise edition store this type.
+///
+/// Use the single [instance], for example as a field value or as a query
+/// bound:
+///
+/// ```dart
+/// await firestore.doc('ranges/a').set(<String, Object?>{
+///   'start': MinKey.instance,
+/// });
+/// ```
 class MinKey {
   const MinKey._();
 

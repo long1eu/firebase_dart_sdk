@@ -17,6 +17,21 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/util/exact_number.da
 /// Represents a 128-bit decimal type in Firestore documents.
 ///
 /// Only databases of the Enterprise edition store this type.
+///
+/// ```dart
+/// await firestore.doc('accounts/a').set(<String, Object?>{
+///   'balance': Decimal128Value('1234.5678'),
+/// });
+/// final DocumentSnapshot<Map<String, Object?>> snapshot =
+///     await firestore.doc('accounts/a').get();
+/// final Decimal128Value? balance = snapshot.getDecimal128Value('balance');
+/// ```
+///
+/// Differences from the JS SDK: the constructor accepts only values that
+/// decimal128 holds exactly (the JS SDK accepts any and rounds), and the sum
+/// and average of an aggregation over such values are a [Decimal128Value].
+/// In queries a decimal compares with the other numbers by its numeric
+/// value.
 class Decimal128Value {
   /// Creates a 128-bit decimal from its string representation, for example
   /// `1.5`, `-1.2e3`, `NaN`, `Infinity` or `-Infinity`.

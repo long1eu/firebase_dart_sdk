@@ -1,6 +1,34 @@
 import 'package:cloud_firestore_dart/src/firebase/timestamp.dart';
 
-/// Options to customize transaction behavior for `Firestore.runTransaction`.
+/// Options of a transaction: how often it is attempted, and whether it only
+/// reads. Pass them to `Firestore.runTransaction`.
+///
+/// ```dart
+/// // Give up after the first conflict.
+/// await firestore.runTransaction<void>(
+///   (Transaction transaction) async {
+///     final DocumentSnapshot<Map<String, Object?>> snapshot =
+///         await transaction.get(firestore.doc('cities/SF'));
+///     transaction.update(snapshot.ref, <String, Object?>{'checked': true});
+///   },
+///   options: TransactionOptions(maxAttempts: 1),
+/// );
+///
+/// // Read two documents as they were at the same moment.
+/// final int total = await firestore.runTransaction<int>(
+///   (Transaction transaction) async {
+///     final DocumentSnapshot<Map<String, Object?>> a =
+///         await transaction.get(firestore.doc('accounts/a'));
+///     final DocumentSnapshot<Map<String, Object?>> b =
+///         await transaction.get(firestore.doc('accounts/b'));
+///     return (a.data!['balance']! as int) + (b.data!['balance']! as int);
+///   },
+///   options: TransactionOptions(readOnly: true),
+/// );
+/// ```
+///
+/// [readOnly] and [readTime] are not in the JS client SDK; they follow the
+/// server SDKs. The same class is used by `package:cloud_firestore_dart/lite.dart`.
 class TransactionOptions {
   /// Creates the options. [maxAttempts] is the maximum number of times the
   /// transaction is attempted before it fails, it must be at least 1. Throws
@@ -42,20 +70,25 @@ class TransactionOptions {
 
   const TransactionOptions._(this.maxAttempts, this.readOnly, [this.readTime]);
 
-  /// The default maximum number of attempts, 5.
+  /// The default maximum number of attempts, 5 (as in the JS and Android
+  /// SDKs).
   static const int defaultMaxAttempts = 5;
 
-  /// The options used when none are given.
+  /// The options used when none are given: a read-write transaction with
+  /// [defaultMaxAttempts] attempts.
   static const TransactionOptions defaultOptions = TransactionOptions._(
     defaultMaxAttempts,
     false,
   );
 
-  /// The maximum number of attempts to commit, after which the transaction
-  /// fails.
+  /// The maximum number of times the transaction function runs. When the
+  /// last attempt fails with an error that would otherwise be retried, the
+  /// transaction fails with that error.
   final int maxAttempts;
 
-  /// Whether the transaction can only read (false by default).
+  /// Whether the transaction can only read (false by default). A read-only
+  /// transaction can also run queries and aggregations, and is retried only
+  /// for failures of the connection.
   final bool readOnly;
 
   /// The time whose state a read-only transaction reads, or null for the time

@@ -34,6 +34,31 @@ const int maxVectorQueryDimensions = 2048;
 /// Vector queries are always executed on the server: they fail with an
 /// `unavailable` error when the client is offline. Results are ordered by
 /// distance, nearest first.
+///
+/// ```dart
+/// final VectorQuerySnapshot nearest = await firestore
+///     .collection('items')
+///     .where('category', isEqualTo: 'shoes')
+///     .findNearest(
+///       'embedding',
+///       <double>[0.1, 0.2, 0.3],
+///       5,
+///       DistanceMeasure.cosine,
+///       distanceResultField: 'distance',
+///     )
+///     .get();
+/// for (final QueryDocumentSnapshot<Object?> doc in nearest) {
+///   print('${doc.id}: ${doc.get('distance')}');
+/// }
+/// ```
+///
+/// The filters of the query run first; documents without a vector in the
+/// field are skipped. The local cache is not used and not updated, and there
+/// is no listener for a vector query. On a real database the field needs a
+/// vector index, which you create with the Google Cloud tools.
+///
+/// The JS client SDK has no `findNearest` on a classic query (there it is a
+/// pipeline stage); this follows the Android SDK.
 class VectorQuery {
   /// Validates the arguments and creates the query.
   VectorQuery._(
@@ -74,29 +99,44 @@ class VectorQuery {
     }
   }
 
-  /// The query whose results are searched.
+  /// The query whose results are searched: its filters select the
+  /// candidates.
   final Query<Object?> query;
 
   /// The field holding the vectors to search.
   final core.FieldPath vectorField;
 
-  /// The vector to find the nearest neighbours of.
+  /// The vector to find the nearest neighbours of, with between 1 and 2048
+  /// dimensions.
   final VectorValue queryVector;
 
-  /// The maximum number of results, between 1 and [maxVectorQueryLimit].
+  /// The maximum number of results, between 1 and 1000.
   final int limit;
 
   /// How the distance between vectors is measured.
   final DistanceMeasure distanceMeasure;
 
-  /// If set, the computed distance is written to this field of each result.
+  /// If set, the computed distance is written to this field of each result
+  /// (only in the results, not in the stored documents). Read it with
+  /// `doc.get(field)`.
   final String? distanceResultField;
 
-  /// If set, only documents within this distance (or similarity, for
-  /// [DistanceMeasure.dotProduct] and [DistanceMeasure.cosine]) are returned.
+  /// If set, only documents within this distance of [queryVector] are
+  /// returned.
+  ///
+  /// For [DistanceMeasure.euclidean] and [DistanceMeasure.cosine] these are
+  /// documents whose distance is at most the threshold. For
+  /// [DistanceMeasure.dotProduct], a similarity where larger is closer, they
+  /// are documents whose value is at least the threshold.
   final double? distanceThreshold;
 
-  /// Executes the query on the server and returns the nearest documents.
+  /// Executes the query on the server and returns the nearest documents,
+  /// nearest first.
+  ///
+  /// The returned future fails with a [FirestoreError]: with code
+  /// `unavailable` when the client is offline, with `failedPrecondition` when
+  /// the instance was terminated, and with the code of any other error of the
+  /// backend. It is not retried.
   Future<VectorQuerySnapshot> get() async {
     final List<Document> docs = await query.firestore.client.runVectorQuery(
       query.query,

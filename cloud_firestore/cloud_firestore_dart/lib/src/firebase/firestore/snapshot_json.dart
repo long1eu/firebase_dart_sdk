@@ -17,6 +17,9 @@
 /// Port of the JS SDK `DocumentSnapshot.toJSON()`, `QuerySnapshot.toJSON()`, `documentSnapshotFromJSON()`,
 /// `querySnapshotFromJSON()` and `onSnapshotResume()`. The JSON object holds the snapshot as a Firestore bundle string
 /// (the format of `Firestore.loadBundle`), so it is interchangeable with the one of the JS SDK (Node).
+///
+/// This library is internal: apps use `DocumentSnapshot.toJson`, `QuerySnapshot.toJson`, their `fromJson`
+/// constructors, and `Firestore.documentSnapshotsFromJson` / `Firestore.querySnapshotsFromJson`, which call it.
 library;
 
 import 'dart:async';
@@ -55,6 +58,9 @@ const String _querySource = 'QuerySnapshot';
 const String _notSupported = 'NOT SUPPORTED';
 
 /// Returns the JSON of the snapshot of the document [key], which is [document] (null when missing).
+///
+/// A missing document is written with an empty bundle (the JS SDK cannot read that back; this library can). Throws a
+/// [FirestoreError] with [FirestoreErrorCode.failedPrecondition] if [hasPendingWrites] is true.
 Map<String, Object?> documentSnapshotToJson(
   Firestore firestore,
   DocumentKey key,
@@ -84,7 +90,10 @@ Map<String, Object?> documentSnapshotToJson(
   };
 }
 
-/// Returns the JSON of the query snapshot [snapshot].
+/// Returns the JSON of the query snapshot [snapshot]: a bundle with the documents and a named query whose name is
+/// the `bundleName` of the JSON.
+///
+/// Throws a [FirestoreError] with [FirestoreErrorCode.failedPrecondition] if [snapshot] has pending writes.
 Map<String, Object?> querySnapshotToJson(
   Firestore firestore,
   ViewSnapshot snapshot,
@@ -113,7 +122,11 @@ Map<String, Object?> querySnapshotToJson(
   };
 }
 
-/// Builds the [DocumentSnapshot] serialized in [json] by [DocumentSnapshot.toJson].
+/// Builds the [DocumentSnapshot] serialized in [json] by [DocumentSnapshot.toJson], typed with [converter].
+///
+/// The snapshot is not from the cache and has no pending writes; nothing is written to the cache. Throws a
+/// [FirestoreError] with [FirestoreErrorCode.invalidArgument] if [json] is not such an object or its bundle does not
+/// hold exactly the document it names.
 DocumentSnapshot<T> documentSnapshotFromJson<T>(
   Firestore firestore,
   Map<String, Object?> json,
@@ -160,7 +173,10 @@ DocumentSnapshot<T> documentSnapshotFromJson<T>(
   );
 }
 
-/// Builds the [QuerySnapshot] serialized in [json] by [QuerySnapshot.toJson].
+/// Builds the [QuerySnapshot] serialized in [json] by [QuerySnapshot.toJson], typed with [converter].
+///
+/// Nothing is written to the cache. Throws a [FirestoreError] with [FirestoreErrorCode.invalidArgument] if [json] is
+/// not such an object, its bundle does not hold exactly one query, or a document lacks a field the query orders by.
 QuerySnapshot<T> querySnapshotFromJson<T>(
   Firestore firestore,
   Map<String, Object?> json,
@@ -219,6 +235,10 @@ void _checkOrderByFields(core.Query query, Document document) {
 }
 
 /// Loads the bundle of a [DocumentSnapshot.toJson] result and listens to the document from there.
+///
+/// The bundle is loaded when the stream is listened to, so the first event can come from the cache. Throws a
+/// [FirestoreError] with [FirestoreErrorCode.invalidArgument] if [json] lacks a field; errors of loading the bundle
+/// are delivered on the stream.
 Stream<DocumentSnapshot<T>> documentSnapshotsFromJson<T>(
   Firestore firestore,
   Map<String, Object?> json,
@@ -242,6 +262,10 @@ Stream<DocumentSnapshot<T>> documentSnapshotsFromJson<T>(
 }
 
 /// Loads the bundle of a [QuerySnapshot.toJson] result and listens to its query from there.
+///
+/// The bundle is loaded when the stream is listened to. Throws a [FirestoreError] with
+/// [FirestoreErrorCode.invalidArgument] if [json] lacks a field or has an empty bundle; errors of loading the bundle,
+/// and a bundle without the named query, are delivered on the stream.
 Stream<QuerySnapshot<T>> querySnapshotsFromJson<T>(
   Firestore firestore,
   Map<String, Object?> json,

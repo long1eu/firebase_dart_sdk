@@ -13,11 +13,37 @@ import 'package:firebase_app_dart/internal.dart';
 /// and from RFC 3339 date strings.
 ///
 /// see [The reference timestamp definition](https://github.com/google/protobuf/blob/master/src/google/protobuf/timestamp.proto)
+///
+/// A snapshot returns a `Timestamp` for every timestamp field, also through
+/// `DocumentSnapshot.getTimestamp` (or `getDate` for a [DateTime]). You can
+/// write either a `Timestamp` or a [DateTime].
+///
+/// ```dart
+/// await firestore.doc('events/launch').set(<String, Object?>{
+///   'at': Timestamp.fromDate(DateTime.utc(2026, 11, 15, 9)),
+/// });
+/// final DocumentSnapshot<Map<String, Object?>> snapshot =
+///     await firestore.doc('events/launch').get();
+/// final DateTime? at = snapshot.getTimestamp('at')?.toDate();
+/// ```
+///
+/// The backend stores microseconds: a write drops the nanoseconds below one
+/// microsecond, and the local cache does the same at once, so a value read
+/// back can differ from the one written. Timestamps are ordered in time and
+/// are equal when [seconds] and [nanoseconds] are equal.
 class Timestamp implements Comparable<Timestamp> {
   /// Creates a timestamp from [seconds] since the Unix epoch (UTC) and a non-negative [nanoseconds]
   /// fraction below one second.
   ///
   /// The value must lie between 0001-01-01T00:00:00Z and 9999-12-31T23:59:59.999999999Z.
+  ///
+  /// The constructor is `const`, so it checks these ranges with asserts only,
+  /// which a release build skips. A timestamp out of range is still rejected
+  /// when it is written: the write fails with an [ArgumentError].
+  ///
+  /// ```dart
+  /// const Timestamp epochPlusHalfSecond = Timestamp(0, 500000000);
+  /// ```
   const Timestamp(this.seconds, this.nanoseconds)
     : assert(
         nanoseconds >= 0,
@@ -42,6 +68,13 @@ class Timestamp implements Comparable<Timestamp> {
   /// precision of [DateTime] on the Dart VM, and of the Firestore backend).
   ///
   /// Throws an [ArgumentError] if the result is outside the supported range.
+  ///
+  /// When compiled to JavaScript, a [DateTime] holds only milliseconds, and so
+  /// does the timestamp.
+  ///
+  /// ```dart
+  /// final Timestamp t = Timestamp.fromDate(DateTime.now());
+  /// ```
   factory Timestamp.fromDate(DateTime date) {
     final int microseconds = date.microsecondsSinceEpoch;
     // Floor division, so that negative values keep non-negative nanoseconds.
@@ -61,6 +94,10 @@ class Timestamp implements Comparable<Timestamp> {
   /// Unix epoch 1970-01-01T00:00:00Z.
   ///
   /// Throws an [ArgumentError] if the result is outside the supported range.
+  ///
+  /// ```dart
+  /// final Timestamp t = Timestamp.fromMillis(1700000000000);
+  /// ```
   factory Timestamp.fromMillis(int milliseconds) {
     // Floor division, so that negative values keep non-negative nanoseconds.
     int seconds = milliseconds ~/ 1000;
@@ -94,6 +131,9 @@ class Timestamp implements Comparable<Timestamp> {
   }
 
   /// Creates a new timestamp with the current date, with millisecond precision.
+  ///
+  /// The time comes from this device's clock. To store the time of the server
+  /// instead, write `FieldValue.serverTimestamp()`.
   factory Timestamp.now() {
     return Timestamp.fromMillis(DateTime.now().millisecondsSinceEpoch);
   }
@@ -111,6 +151,9 @@ class Timestamp implements Comparable<Timestamp> {
   /// Converts this timestamp to a [DateTime] in the local time zone, with
   /// microsecond precision. Sub-microsecond precision is truncated toward the
   /// earlier time.
+  ///
+  /// Call `toUtc()` on the result for a UTC [DateTime]. When compiled to
+  /// JavaScript, the microseconds are lost as well.
   DateTime toDate() {
     // Milliseconds first, then the remaining microseconds: seconds * 10^6 is
     // above 2^53 (not exact on the web) for dates after about the year 2255.

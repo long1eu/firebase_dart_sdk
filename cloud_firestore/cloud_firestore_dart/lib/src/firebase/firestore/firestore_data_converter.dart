@@ -19,6 +19,10 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/set_options.dart';
 /// Options that configure how data is retrieved from a [DocumentSnapshot], for
 /// example how pending server timestamps are returned. Passed to
 /// [FirestoreDataConverter.fromFirestore].
+///
+/// The SDK creates them from the [ServerTimestampBehavior] given to
+/// `DocumentSnapshot.getData` (`data` uses [ServerTimestampBehavior.none]).
+/// This is the JS SDK's `SnapshotOptions`.
 class SnapshotOptions {
   /// Creates the options; by default pending server timestamps are read as `null`.
   const SnapshotOptions({this.serverTimestamps = ServerTimestampBehavior.none});
@@ -40,7 +44,22 @@ class SnapshotOptions {
 ///   fromFirestore: (snapshot, options) => City.fromMap(snapshot.data!),
 ///   toFirestore: (city, options) => city.toMap(),
 /// );
+///
+/// final DocumentReference<City> sf =
+///     firestore.doc('cities/SF').withConverter<City>(converter);
+/// await sf.set(City('San Francisco'));
+/// final City? city = (await sf.get()).data;
 /// ```
+///
+/// The converter runs on the client only. [toFirestore] runs when you write
+/// with `set` or `add` (not with `update`, which always takes a map), and
+/// [fromFirestore] runs each time you read `data` (or `getData`) of a
+/// snapshot of an existing document. An error that either throws reaches the
+/// caller of that write or read.
+///
+/// `withoutConverter()` on a reference or query returns to raw maps. In
+/// `package:cloud_firestore_dart/lite.dart` the converter is a different
+/// class whose `fromFirestore` takes only the snapshot.
 abstract class FirestoreDataConverter<T> {
   /// Const constructor for subclasses.
   const FirestoreDataConverter();
@@ -48,6 +67,9 @@ abstract class FirestoreDataConverter<T> {
   /// Creates a converter from two functions. The returned converters compare
   /// equal when both functions are equal (top level functions, static methods
   /// and constructor tear-offs are canonical, so this works for them).
+  ///
+  /// Converters that compare equal make equal references and queries, so
+  /// prefer such functions over closures created at each call.
   const factory FirestoreDataConverter.from({
     required T Function(
       DocumentSnapshot<Map<String, Object?>> snapshot,
@@ -71,6 +93,9 @@ abstract class FirestoreDataConverter<T> {
   /// Called by the SDK to convert [value] into the map that is written.
   /// [options] are the [SetOptions] of the write, or null (for example for
   /// `add`).
+  ///
+  /// The map can hold any value Firestore stores, including [FieldValue]
+  /// sentinels. With a merge option you can return only the fields to merge.
   Map<String, Object?> toFirestore(T value, SetOptions? options);
 }
 

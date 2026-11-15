@@ -21,6 +21,23 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/util/exact_number.da
 import 'package:collection/collection.dart';
 
 /// The results of executing an [AggregateQuery].
+///
+/// Read each result with the [AggregateField] that asked for it:
+///
+/// ```dart
+/// final AggregateQuerySnapshot snapshot = await firestore
+///     .collection('orders')
+///     .aggregate(<AggregateField>[
+///       AggregateField.count(),
+///       AggregateField.average('total'),
+///     ])
+///     .get();
+/// final int count = snapshot.getCount();
+/// final double? average = snapshot.getDouble(AggregateField.average('total'));
+/// ```
+///
+/// The results come from the server at the time of the request; they do not
+/// include local writes that are still pending.
 class AggregateQuerySnapshot {
   /// Implementation detail of the SDK; not part of the supported API.
   AggregateQuerySnapshot._(this.query, Map<String, FieldValue> data)
@@ -56,6 +73,10 @@ class AggregateQuerySnapshot {
 
   /// The result of the count aggregation. Throws an [ArgumentError] when the
   /// query did not request [AggregateField.count] or the result is null.
+  ///
+  /// ```dart
+  /// final int n = (await firestore.collection('cities').count().get()).getCount();
+  /// ```
   int getCount() {
     final int? value = getInt(AggregateField.count());
     if (value == null) {
@@ -74,6 +95,10 @@ class AggregateQuerySnapshot {
   /// [getInt] convert it to the closest `double`.
   ///
   /// Throws an [ArgumentError] if [aggregateField] was not requested.
+  ///
+  /// ```dart
+  /// final Object? sum = snapshot.get(AggregateField.sum('total'));
+  /// ```
   Object? get(AggregateField aggregateField) {
     final FieldValue? value = _data[aggregateField.alias];
     if (value == null) {
@@ -86,6 +111,8 @@ class AggregateQuerySnapshot {
 
   /// The result of [aggregateField] as an `int` (doubles are truncated and saturated, NaN is 0), or
   /// null if the result is null.
+  ///
+  /// Throws an [ArgumentError] if [aggregateField] was not requested.
   int? getInt(AggregateField aggregateField) {
     final num? value = _getNumber(aggregateField);
     if (value == null || value is int) {
@@ -109,6 +136,8 @@ class AggregateQuerySnapshot {
 
   /// The result of [aggregateField] as a `double`, or null if the result is
   /// null.
+  ///
+  /// Throws an [ArgumentError] if [aggregateField] was not requested.
   double? getDouble(AggregateField aggregateField) {
     final num? value = _getNumber(aggregateField);
     return value?.toDouble();

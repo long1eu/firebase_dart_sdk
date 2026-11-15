@@ -15,6 +15,14 @@
 import 'package:cloud_firestore_dart/src/firebase/firestore/aggregate_query.dart';
 
 /// The sources from which an [AggregateQuery] can retrieve its results.
+///
+/// [server] is the only source and the default of [AggregateQuery.get]:
+///
+/// ```dart
+/// await firestore.collection('cities').count().get(AggregateSource.server);
+/// ```
+///
+/// As in the Android SDK; the JS SDK has `getAggregateFromServer` instead.
 enum AggregateSource {
   /// Causes the result to be computed on the server and fails if the server
   /// cannot be reached (for example when the client is offline). The local

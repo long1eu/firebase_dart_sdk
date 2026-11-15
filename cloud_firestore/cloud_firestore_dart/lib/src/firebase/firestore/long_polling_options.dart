@@ -22,8 +22,21 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/firestore_settings.d
 /// See [FirestoreSettings.experimentalAutoDetectLongPolling],
 /// [FirestoreSettings.experimentalForceLongPolling] and
 /// [FirestoreSettings.experimentalLongPollingOptions].
+///
+/// ```dart
+/// final FirestoreSettings settings = FirestoreSettings(
+///   experimentalForceLongPolling: true,
+///   experimentalLongPollingOptions: const ExperimentalLongPollingOptions(
+///     timeoutSeconds: 25,
+///   ),
+/// );
+/// ```
+///
+/// Only the web transport uses these options; the gRPC transport ignores
+/// them.
 class ExperimentalLongPollingOptions {
-  /// Creates long-polling options.
+  /// Creates long-polling options. Without [timeoutSeconds] the default
+  /// timeout of 30 seconds applies.
   const ExperimentalLongPollingOptions({this.timeoutSeconds});
 
   /// The longest time, in seconds, that the backend should hold a

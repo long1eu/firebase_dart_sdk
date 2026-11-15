@@ -4,6 +4,10 @@
 /// of every level after it.
 ///
 /// The default, before any call, is [warn].
+///
+/// ```dart
+/// Firestore.setLogLevel(LogLevel.debug);
+/// ```
 enum LogLevel {
   /// Everything, including the most detailed messages.
   verbose,

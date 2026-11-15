@@ -24,6 +24,20 @@ import 'package:collection/collection.dart';
 
 /// A query that calculates aggregations over the documents of a [Query]
 /// without downloading the documents themselves.
+///
+/// Create one with [Query.count], [Query.aggregate] or
+/// `Query.aggregateWithAliases`, then call [get].
+///
+/// ```dart
+/// final AggregateQuerySnapshot snapshot =
+///     await firestore.collection('cities').count().get();
+/// print(snapshot.getCount());
+/// ```
+///
+/// An aggregation is a single request to the server: the local cache is
+/// neither used nor updated, the result does not include writes that are
+/// still pending, and there is no listener for it. In a read-only
+/// transaction, run it with `Transaction.getAggregate`.
 class AggregateQuery {
   /// Implementation detail of the SDK; not part of the supported API. Use [Query.count] or
   /// [Query.aggregate].
@@ -54,7 +68,17 @@ class AggregateQuery {
   ///
   /// Aggregations are never computed from the local cache: when the client is
   /// offline the returned Future fails with a `FirestoreError` whose code is
-  /// `unavailable`.
+  /// `unavailable`. [source] can only be [AggregateSource.server], the
+  /// default. A failure is not retried; other errors of the backend (for
+  /// example `failedPrecondition` for a missing index, or `permissionDenied`)
+  /// fail the Future with their code.
+  ///
+  /// ```dart
+  /// final AggregateQuerySnapshot snapshot = await firestore
+  ///     .collection('cities')
+  ///     .aggregate(<AggregateField>[AggregateField.sum('population')])
+  ///     .get();
+  /// ```
   Future<AggregateQuerySnapshot> get([
     AggregateSource source = AggregateSource.server,
   ]) async {

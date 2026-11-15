@@ -14,7 +14,18 @@
 
 /// Represents a 32-bit integer type in Firestore documents.
 ///
-/// Only databases of the Enterprise edition store this type.
+/// Only databases of the Enterprise edition store this type. A plain Dart
+/// `int` is stored as a 64-bit integer; use this class when the field must
+/// be a 32-bit integer.
+///
+/// ```dart
+/// await firestore.doc('items/a').set(<String, Object?>{
+///   'quantity': Int32Value(3),
+/// });
+/// final DocumentSnapshot<Map<String, Object?>> snapshot =
+///     await firestore.doc('items/a').get();
+/// final int? quantity = snapshot.getInt32Value('quantity')?.value;
+/// ```
 class Int32Value {
   /// Creates a 32-bit integer value.
   ///

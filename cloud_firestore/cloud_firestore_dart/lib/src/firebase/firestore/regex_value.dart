@@ -14,7 +14,18 @@
 
 /// Represents a regular expression type in Firestore documents.
 ///
-/// Only databases of the Enterprise edition store this type.
+/// Only databases of the Enterprise edition store this type. It is a stored
+/// value, not a query filter: the client does not compile or check the
+/// pattern.
+///
+/// ```dart
+/// await firestore.doc('rules/a').set(<String, Object?>{
+///   'match': const RegexValue('^foo', 'i'),
+/// });
+/// final DocumentSnapshot<Map<String, Object?>> snapshot =
+///     await firestore.doc('rules/a').get();
+/// final RegexValue? match = snapshot.getRegexValue('match');
+/// ```
 class RegexValue {
   /// Creates a regular expression from its [pattern] and its [options], for
   /// example `RegexValue('^foo', 'i')`.

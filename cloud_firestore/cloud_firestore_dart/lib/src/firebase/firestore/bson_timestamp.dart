@@ -14,7 +14,18 @@
 
 /// Represents a BSON Timestamp type in Firestore documents.
 ///
-/// Only databases of the Enterprise edition store this type.
+/// Only databases of the Enterprise edition store this type. It is not a
+/// point in time with nanoseconds like `Timestamp`, but the BSON pair of a
+/// second and an operation counter; use `Timestamp` for dates.
+///
+/// ```dart
+/// await firestore.doc('ops/1').set(<String, Object?>{
+///   'at': BsonTimestamp(1700000000, 1),
+/// });
+/// final DocumentSnapshot<Map<String, Object?>> snapshot =
+///     await firestore.doc('ops/1').get();
+/// final BsonTimestamp? at = snapshot.getBsonTimestamp('at');
+/// ```
 class BsonTimestamp {
   /// Creates a BSON timestamp.
   ///

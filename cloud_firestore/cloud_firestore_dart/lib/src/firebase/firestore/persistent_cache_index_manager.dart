@@ -10,6 +10,17 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/core/firestore_clien
 ///
 /// To get an instance use `Firestore.persistentCacheIndexManager`. It is null
 /// when the instance does not use the persistent (SQLite) cache.
+///
+/// ```dart
+/// await firestore.persistentCacheIndexManager?.enableIndexAutoCreation();
+/// ```
+///
+/// Indexes are not used for queries with inequality filters on several
+/// fields; those scan the cache, as in the JS SDK. This is the JS SDK's
+/// `getPersistentCacheIndexManager` with
+/// `enablePersistentCacheIndexAutoCreation`,
+/// `disablePersistentCacheIndexAutoCreation` and
+/// `deleteAllPersistentCacheIndexes`.
 class PersistentCacheIndexManager {
   /// Implementation detail of the SDK; not part of the supported API. Use
   /// `Firestore.persistentCacheIndexManager`.
@@ -28,6 +39,10 @@ class PersistentCacheIndexManager {
   ///
   /// This feature is disabled by default. The setting is not persisted: call
   /// this every time the instance is created.
+  ///
+  /// The returned future fails with a [FirestoreError] with code
+  /// `failedPrecondition` if the instance was terminated; the same holds for
+  /// the other methods of this class.
   Future<void> enableIndexAutoCreation() {
     return _client.setIndexAutoCreationEnabled(enabled: true);
   }

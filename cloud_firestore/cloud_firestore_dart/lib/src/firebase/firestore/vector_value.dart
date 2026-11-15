@@ -14,11 +14,32 @@
 
 import 'package:collection/collection.dart';
 
-/// Represents a vector type in Firestore documents.
+/// A vector of doubles stored in a document field, for example an embedding
+/// for vector search.
 ///
-/// Create an instance with `FieldValue.vector`.
+/// Create one with `VectorValue(values)` or `FieldValue.vector(values)` and
+/// store it as a field value; a snapshot returns it for a vector field, also
+/// through `DocumentSnapshot.getVectorValue`. Find the documents with the
+/// nearest vectors with `Query.findNearest`.
+///
+/// ```dart
+/// await firestore.doc('items/a').set(<String, Object?>{
+///   'embedding': VectorValue(<double>[0.1, 0.2, 0.3]),
+/// });
+/// final DocumentSnapshot<Map<String, Object?>> snapshot =
+///     await firestore.doc('items/a').get();
+/// final List<double>? values = snapshot.getVectorValue('embedding')?.toArray();
+/// ```
+///
+/// On a real database, vector search needs a vector index on the field,
+/// which you create with the Google Cloud tools, not with this SDK.
+///
+/// A vector is not a list: it is a value of its own type and is not equal to
+/// a `List<double>` with the same numbers. In `orderBy`, vectors sort after
+/// arrays and before maps, by their length first and then by their values.
 class VectorValue {
-  /// Creates a vector holding a copy of [values].
+  /// Creates a vector holding a copy of [values]; later changes to [values]
+  /// do not affect the vector.
   VectorValue(List<double> values)
     : _values = List<double>.unmodifiable(values);
 
@@ -58,9 +79,14 @@ class VectorValue {
   }
 
   /// The number of dimensions of the vector.
+  ///
+  /// ```dart
+  /// VectorValue(<double>[0.1, 0.2]).length; // 2
+  /// ```
   int get length => _values.length;
 
-  /// Returns a copy of the vector as a list of doubles.
+  /// Returns a copy of the vector as a list of doubles; changing the list does
+  /// not change the vector.
   List<double> toArray() => List<double>.of(_values);
 
   @override

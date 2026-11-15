@@ -33,6 +33,18 @@ enum LoadBundleTaskState {
 }
 
 /// Represents a progress update or a final state from loading bundles.
+///
+/// A [LoadBundleTask] reports one of these after the bundle metadata is read (state
+/// [LoadBundleTaskState.running]), after each document, and at the end (state [LoadBundleTaskState.success] or
+/// [LoadBundleTaskState.error]).
+///
+/// ```dart
+/// firestore.loadBundle(bundleBytes).stream.listen((LoadBundleTaskProgress p) {
+///   if (p.taskState == LoadBundleTaskState.running && p.totalBytes > 0) {
+///     print('${(100 * p.bytesLoaded / p.totalBytes).round()} %');
+///   }
+/// });
+/// ```
 class LoadBundleTaskProgress {
   /// Creates a progress value. Instances are normally produced by a [LoadBundleTask].
   const LoadBundleTaskProgress(
@@ -45,6 +57,9 @@ class LoadBundleTaskProgress {
   );
 
   /// The progress a [LoadBundleTask] reports before the bundle metadata is known.
+  ///
+  /// All counts are 0 and, as in the Android SDK, the state is [LoadBundleTaskState.success]: check
+  /// [LoadBundleTask.isComplete] rather than this state to know whether the task has finished.
   static const LoadBundleTaskProgress initial = LoadBundleTaskProgress(
     0,
     0,

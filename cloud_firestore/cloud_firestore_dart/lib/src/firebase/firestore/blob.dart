@@ -13,14 +13,34 @@ import 'package:collection/collection.dart';
 ///
 /// Two blobs are equal when their bytes and their [subtype] are equal, and blobs are ordered by
 /// subtype and then byte by byte.
+///
+/// Store a `Blob` as a field value; a snapshot returns it for a `bytes`
+/// field, also through `DocumentSnapshot.getBlob`.
+///
+/// ```dart
+/// final Blob icon = Blob(Uint8List.fromList(<int>[0x89, 0x50, 0x4e, 0x47]));
+/// await firestore.doc('files/icon').set(<String, Object?>{'data': icon});
+/// final DocumentSnapshot<Map<String, Object?>> snapshot =
+///     await firestore.doc('files/icon').get();
+/// final Uint8List? bytes = snapshot.getBlob('data')?.bytes;
+/// ```
+///
+/// The blob counts toward the size limit of its document.
+/// This is `Bytes` in the JS SDK and `Blob` in the Android SDK.
 class Blob implements Comparable<Blob> {
-  /// Creates a blob holding a copy of [bytes].
+  /// Creates a blob holding a copy of [bytes]; later changes to [bytes] do
+  /// not affect the blob. Its [subtype] is 0.
   Blob(Uint8List bytes) : _bytes = Uint8List.fromList(bytes), subtype = 0;
 
   /// Creates BSON binary data, a blob with a [subtype].
   ///
   /// A [subtype] of 0 creates the same value as the default constructor. Only
-  /// databases of the Enterprise edition store blobs with another subtype.
+  /// databases of the Enterprise edition store blobs with another subtype
+  /// (BSON binary data).
+  ///
+  /// ```dart
+  /// final Blob uuid = Blob.bsonBinary(4, Uint8List(16));
+  /// ```
   ///
   /// Throws an [ArgumentError] if [subtype] is not in the range `[0, 255]`.
   Blob.bsonBinary(this.subtype, Uint8List bytes)
@@ -34,7 +54,11 @@ class Blob implements Comparable<Blob> {
     }
   }
 
-  /// Creates a blob from a base64-encoded string.
+  /// Creates a blob from a base64-encoded string, the inverse of [toBase64].
+  ///
+  /// ```dart
+  /// final Blob blob = Blob.fromBase64String('AQID'); // bytes 1, 2, 3
+  /// ```
   ///
   /// Throws a [FormatException] if [base64String] is not valid base64.
   factory Blob.fromBase64String(String base64String) {
@@ -68,6 +92,7 @@ class Blob implements Comparable<Blob> {
   final Uint8List _bytes;
 
   /// A copy of the bytes of this blob (a blob is immutable, as upstream).
+  /// Each call copies, so keep the result if you read it more than once.
   Uint8List get bytes => Uint8List.fromList(_bytes);
 
   /// The subtype of BSON binary data, 0 for a regular blob.

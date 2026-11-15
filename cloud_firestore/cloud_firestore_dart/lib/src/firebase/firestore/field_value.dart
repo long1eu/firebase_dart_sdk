@@ -5,76 +5,163 @@
 import 'package:cloud_firestore_dart/src/firebase/firestore/vector_value.dart';
 import 'package:collection/collection.dart';
 
-/// Sentinel values that can be used when writing document fields with `set()` or `update()`.
+/// Special values for writes: they tell the server how to change a field
+/// instead of giving its new value.
+///
+/// Use them as values in the data of `set` and `update` (on a
+/// `DocumentReference`, a `WriteBatch` or a `Transaction`). They cannot be
+/// used in queries, and not inside an array value: there the call fails
+/// with an [ArgumentError].
+///
+/// ```dart
+/// await firestore.doc('cities/SF').update(<String, Object?>{
+///   'population': FieldValue.increment(1),
+///   'tags': FieldValue.arrayUnion(<Object?>['coastal']),
+///   'updatedAt': FieldValue.serverTimestamp(),
+///   'obsolete': FieldValue.delete(),
+/// });
+/// ```
+///
+/// Outside a transaction, the client applies the transforms to its local
+/// cache at once, so listeners see an estimate before the server confirms the
+/// write
+/// (a pending server timestamp is read as `null` unless you choose another
+/// `ServerTimestampBehavior`). A document can hold at most 500 field
+/// transforms in one write.
+///
+/// [FieldValue.vector] is the exception: it creates a [VectorValue], a plain
+/// value and not a transform.
 abstract class FieldValue {
   const FieldValue._(this._elements);
 
-  /// Returns a sentinel for use with update() to mark a field for deletion.
+  /// Removes the field from the document.
+  ///
+  /// Allowed only at the top level of the data of `update`, or anywhere in the
+  /// data of a `set` with a merge option ([SetOptions.mergeAllFields],
+  /// [SetOptions.mergeFields] or [SetOptions.mergeFieldPaths]). Elsewhere,
+  /// including a plain `set`, the write fails with an [ArgumentError].
+  ///
+  /// ```dart
+  /// await firestore.doc('cities/SF').update(<String, Object?>{
+  ///   'capital': FieldValue.delete(),
+  /// });
+  /// ```
   factory FieldValue.delete() => _deleteInstance;
 
-  /// Returns a sentinel for use with set() or update() to include a server-generated timestamp in
-  /// the written data.
+  /// Sets the field to the time at which the server applies the write.
+  ///
+  /// Until the server confirms the write, a snapshot reads the field as `null`
+  /// by default; pass [ServerTimestampBehavior.estimate] or
+  /// [ServerTimestampBehavior.previous] to `getData`, `get` or `getTimestamp`
+  /// of the snapshot to read a local estimate or the previous value instead.
+  /// While the client is offline the field stays pending until the write
+  /// reaches the server.
+  ///
+  /// ```dart
+  /// await firestore.doc('posts/hello').set(<String, Object?>{
+  ///   'title': 'Hello',
+  ///   'createdAt': FieldValue.serverTimestamp(),
+  /// });
+  /// ```
   factory FieldValue.serverTimestamp() => _serverTimestampInstance;
 
-  /// Returns a special value that can be used with set() or update() that tells the server to union
-  /// the given elements with any array value that already exists on the server. Each specified
-  /// element that doesn't already exist in the array will be added to the end. If the field being
-  /// modified is not already an array it will be overwritten with an array containing exactly the
-  /// specified elements. The [elements] to union into the array. Returns the [FieldValue] sentinel
-  /// for use in a call to set() or update().
+  /// Adds each of [elements] to the end of the array in the field, unless the
+  /// array already contains an equal value.
+  ///
+  /// If the field is not an array (or does not exist), it is set to an array
+  /// of exactly [elements]. Values are compared as the backend compares them:
+  /// the integer `1` and the double `1.0` are equal (the JS SDK compares them
+  /// strictly). [elements] cannot contain other [FieldValue]s or arrays.
+  ///
+  /// ```dart
+  /// await firestore.doc('cities/SF').update(<String, Object?>{
+  ///   'regions': FieldValue.arrayUnion(<Object?>['west_coast', 'norcal']),
+  /// });
+  /// ```
   factory FieldValue.arrayUnion(List<Object?> elements) {
     return _ArrayUnionFieldValue._(elements);
   }
 
-  /// Returns a special value that can be used with set() or update() that tells the server to
-  /// remove the given elements from any array value that already exists on the server. All
-  /// instances of each element specified will be removed from the array. If the field being
-  /// modified is not already an array it will be overwritten with an empty array.
+  /// Removes every value equal to one of [elements] from the array in the
+  /// field.
   ///
-  /// The [elements] to remove from the array. Returns the [FieldValue] sentinel for use in a call
-  /// to set() or update().
+  /// If the field is not an array (or does not exist), it is set to an empty
+  /// array. Values are compared as in [FieldValue.arrayUnion]. [elements]
+  /// cannot contain other [FieldValue]s or arrays.
+  ///
+  /// ```dart
+  /// await firestore.doc('cities/SF').update(<String, Object?>{
+  ///   'regions': FieldValue.arrayRemove(<Object?>['norcal']),
+  /// });
+  /// ```
   factory FieldValue.arrayRemove(List<Object?> elements) {
     return _ArrayRemoveFieldValue._(elements);
   }
 
-  /// Returns a special value that can be used with set() or update() that tells
-  /// the server to increment the field's current value by the given value.
+  /// Adds [l] to the number in the field; use a negative [l] to subtract.
   ///
-  /// If the current value is an integer or a double, both the current and the
-  /// given value will be interpreted as doubles and all arithmetic will follow
-  /// IEEE 754 semantics. Otherwise, the transformation will set the field to
-  /// the given value.
+  /// If both the current value and [l] are integers, the result is an
+  /// integer, clamped to the range of a 64-bit signed integer instead of
+  /// overflowing. If either is a double, the result is a double (IEEE 754).
+  /// If the field is not a number (or does not exist), it is set to [l].
+  ///
+  /// ```dart
+  /// await firestore.doc('counters/visits').update(<String, Object?>{
+  ///   'value': FieldValue.increment(1),
+  /// });
+  /// ```
+  ///
+  /// When the answer to a commit is lost and the client sends the write
+  /// again, the increment can be applied twice; the JS and Android SDKs have
+  /// the same exposure.
   factory FieldValue.increment(num l) {
     return _NumericIncrementFieldValue(l);
   }
 
-  /// Returns a special value that can be used with set() or update() that tells
-  /// the server to set the field to the minimum of its current value and the
-  /// given value.
+  /// Sets the field to the smaller of its current value and [l].
   ///
   /// If the current value is not a number, the field is set to the given value.
   /// If both are numbers they are compared numerically (NaN wins over any other
   /// number); the field keeps the type (integer or double) of the smaller
   /// operand, and keeps its current value and type if they are equivalent.
+  ///
+  /// ```dart
+  /// await firestore.doc('stats/today').update(<String, Object?>{
+  ///   'lowest': FieldValue.minimum(12),
+  /// });
+  /// ```
   factory FieldValue.minimum(num l) {
     return _NumericMinimumFieldValue(l);
   }
 
-  /// Returns a special value that can be used with set() or update() that tells
-  /// the server to set the field to the maximum of its current value and the
-  /// given value.
+  /// Sets the field to the larger of its current value and [l].
   ///
   /// If the current value is not a number, the field is set to the given value.
   /// If both are numbers they are compared numerically (NaN wins over any other
   /// number); the field keeps the type (integer or double) of the larger
   /// operand, and keeps its current value and type if they are equivalent.
+  ///
+  /// ```dart
+  /// await firestore.doc('stats/today').update(<String, Object?>{
+  ///   'highest': FieldValue.maximum(31.5),
+  /// });
+  /// ```
   factory FieldValue.maximum(num l) {
     return _NumericMaximumFieldValue(l);
   }
 
-  /// Creates a new [VectorValue] constructed with a copy of the given list of doubles.
+  /// Creates a [VectorValue] holding a copy of [values], the same as
+  /// `VectorValue(values)`.
   ///
-  /// Unlike the other factories this is a plain value, not a sentinel.
+  /// Unlike the other factories this is a plain value, not a sentinel: it can
+  /// be stored anywhere a value can, and read back with `getVectorValue`.
+  /// Vector fields are what `Query.findNearest` searches.
+  ///
+  /// ```dart
+  /// await firestore.doc('items/a').set(<String, Object?>{
+  ///   'embedding': FieldValue.vector(<double>[0.1, 0.2, 0.3]),
+  /// });
+  /// ```
   static VectorValue vector(List<double> values) => VectorValue(values);
 
   final List<Object?> _elements;

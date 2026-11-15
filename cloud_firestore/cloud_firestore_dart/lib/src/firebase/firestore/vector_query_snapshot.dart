@@ -19,6 +19,18 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/vector_query.dart';
 ///
 /// Vector queries are always served by the backend, so a snapshot is never
 /// from the cache and never has pending writes.
+///
+/// The snapshot is an [Iterable] of its documents:
+///
+/// ```dart
+/// final VectorQuerySnapshot snapshot = await firestore
+///     .collection('items')
+///     .findNearest('embedding', <double>[0.1, 0.2], 3, DistanceMeasure.euclidean)
+///     .get();
+/// final List<String> ids = <String>[for (final doc in snapshot) doc.id];
+/// ```
+///
+/// The documents are untyped: a converter of the query is not applied.
 class VectorQuerySnapshot extends Iterable<QueryDocumentSnapshot> {
   /// Implementation detail of the SDK; not part of the supported API.
   VectorQuerySnapshot._(this.query, List<QueryDocumentSnapshot> docs)

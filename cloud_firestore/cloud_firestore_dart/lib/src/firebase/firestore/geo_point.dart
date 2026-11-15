@@ -2,12 +2,28 @@
 // Lung Razvan <long1eu>
 // on 17/09/2018
 
-/// Immutable class representing a GeoPoint in Firestore
+/// A geographic point, given by its latitude and longitude in degrees.
+///
+/// Store a `GeoPoint` as a field value; a snapshot returns it for a
+/// geographic point field, also through `DocumentSnapshot.getGeoPoint`.
+///
+/// ```dart
+/// await firestore.doc('cities/SF').set(<String, Object?>{
+///   'location': const GeoPoint(37.7749, -122.4194),
+/// });
+/// ```
+///
+/// Points are ordered by latitude, then by longitude, also in queries that
+/// order by or filter on such a field. Classic queries have no "near this
+/// point" filter.
 class GeoPoint implements Comparable<GeoPoint> {
-  /// Construct a new GeoPoint using the provided latitude and longitude values.
+  /// Creates a point at [latitude] (from -90 to 90) and [longitude] (from
+  /// -180 to 180), both in degrees.
   ///
-  /// The [latitude] of this GeoPoint in the range -90 to 90 and the [longitude] of this GeoPoint in
-  /// the range -180 to 180.
+  /// The constructor is `const`, so it checks the ranges (and rejects NaN and
+  /// the infinities) with asserts only, which a release build skips. A point
+  /// out of range is still rejected when it is written: the write fails with
+  /// an [ArgumentError].
   // NaN is detected with `x != x`, because `identical(x, double.nan)` never
   // matches a computed NaN (and `isNaN` is not usable in constant expressions).
   const GeoPoint(this.latitude, this.longitude)

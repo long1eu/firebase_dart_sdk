@@ -15,8 +15,22 @@
 /// Represents a BSON ObjectId type in Firestore documents.
 ///
 /// Only databases of the Enterprise edition store this type.
+///
+/// ```dart
+/// await firestore.doc('users/ada').set(<String, Object?>{
+///   'legacyId': const BsonObjectId('507f191e810c19729de860ea'),
+/// });
+/// final DocumentSnapshot<Map<String, Object?>> snapshot =
+///     await firestore.doc('users/ada').get();
+/// final BsonObjectId? id = snapshot.getBsonObjectId('legacyId');
+/// ```
+///
+/// ObjectIds sort by their string. Two are equal when their strings are
+/// equal.
 class BsonObjectId {
   /// Creates an ObjectId from its 24-character hex string representation.
+  ///
+  /// The client does not check the string.
   const BsonObjectId(this.value);
 
   /// The 24-character hex string representation of the ObjectId.

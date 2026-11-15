@@ -18,6 +18,28 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/field_path.dart';
 ///
 /// Create instances with [AggregateField.count], [AggregateField.sum] and
 /// [AggregateField.average] and pass them to `Query.aggregate`.
+///
+/// ```dart
+/// final Query<Map<String, Object?>> orders = firestore
+///     .collection('orders')
+///     .where('status', isEqualTo: 'paid');
+/// final AggregateQuerySnapshot result = await orders.aggregate(
+///   <AggregateField>[
+///     AggregateField.count(),
+///     AggregateField.sum('total'),
+///     AggregateField.average('total'),
+///   ],
+/// ).get();
+/// final int count = result.getCount();
+/// final double? sum = result.getDouble(AggregateField.sum('total'));
+/// final double? average = result.getDouble(AggregateField.average('total'));
+/// ```
+///
+/// Aggregations are computed by the server over the documents that match the
+/// query, without downloading them; they are not available offline. Two
+/// aggregate fields are equal when they have the same operator and field, so
+/// you can pass a new `AggregateField.sum('total')` to read a result.
+/// These are the JS SDK's `count()`, `sum()` and `average()`.
 abstract class AggregateField {
   AggregateField._(this._fieldPath, this.operator)
     : _alias = _fieldPath == null ? operator : '${operator}_$_fieldPath';
@@ -34,6 +56,9 @@ abstract class AggregateField {
   String get fieldPath => _fieldPath?.toString() ?? '';
 
   /// Creates an [AggregateField] that counts the documents in the result set.
+  ///
+  /// Read the result with `AggregateQuerySnapshot.getCount`. `Query.count()`
+  /// is a shortcut for an aggregation with only this field.
   static CountAggregateField count() => CountAggregateField._();
 
   /// Creates an [AggregateField] that sums the values of [field] over the
@@ -42,6 +67,17 @@ abstract class AggregateField {
   /// Non-numeric values are ignored. The result is an integer unless a double
   /// value takes part in the sum or the integer sum overflows, in which case it
   /// is a double.
+  ///
+  /// [field] is a dot-separated field path (`'price.net'` is `net` inside
+  /// `price`); it throws an [ArgumentError] if it is not a valid path.
+  ///
+  /// ```dart
+  /// final AggregateQuerySnapshot result = await firestore
+  ///     .collection('orders')
+  ///     .aggregate(<AggregateField>[AggregateField.sum('total')])
+  ///     .get();
+  /// final int? total = result.getInt(AggregateField.sum('total'));
+  /// ```
   static SumAggregateField sum(String field) =>
       SumAggregateField._(FieldPath.fromDotSeparatedPath(field));
 
@@ -52,6 +88,17 @@ abstract class AggregateField {
   /// Creates an [AggregateField] that averages the values of [field] over the
   /// documents in the result set. The result is a double, or null if no
   /// document has a numeric value for the field.
+  ///
+  /// [field] is a dot-separated field path; it throws an [ArgumentError] if it
+  /// is not a valid path.
+  ///
+  /// ```dart
+  /// final AggregateQuerySnapshot result = await firestore
+  ///     .collection('orders')
+  ///     .aggregate(<AggregateField>[AggregateField.average('total')])
+  ///     .get();
+  /// final double? average = result.getDouble(AggregateField.average('total'));
+  /// ```
   static AverageAggregateField average(String field) =>
       AverageAggregateField._(FieldPath.fromDotSeparatedPath(field));
 
