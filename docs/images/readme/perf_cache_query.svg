@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 270" role="img" aria-labelledby="title desc" font-family="system-ui, -apple-system, Segoe UI, Helvetica, Arial, sans-serif">
+  <title id="title">A query on the SQLite cache, by plan</title>
+  <desc id="desc">Bar chart. Time of one query on the SQLite cache: 1,000 of 10,000 documents from the previous result of the query, 11.5 ms; the same query by a scan of the collection, 25.8 ms; the whole collection of 10,000 documents, 42.9 ms. Measured once with local_store_bench.dart 100000 on 2026-11-15, local store only.</desc>
+  <rect x="0" y="0" width="900" height="270" rx="10" fill="#ffffff" stroke="#d0d7de"/>
+  <text x="20" y="30" font-size="14" fill="#1f2328" font-weight="600">A query on the SQLite cache, by plan (ms, shorter is faster)</text>
+  <line x1="330.0" y1="44" x2="330.0" y2="164" stroke="#d0d7de" stroke-width="1"/>
+  <text x="330.0" y="180" font-size="11" fill="#57606a" text-anchor="middle">0</text>
+  <line x1="432.0" y1="44" x2="432.0" y2="164" stroke="#d0d7de" stroke-width="1"/>
+  <text x="432.0" y="180" font-size="11" fill="#57606a" text-anchor="middle">10 ms</text>
+  <line x1="534.0" y1="44" x2="534.0" y2="164" stroke="#d0d7de" stroke-width="1"/>
+  <text x="534.0" y="180" font-size="11" fill="#57606a" text-anchor="middle">20 ms</text>
+  <line x1="636.0" y1="44" x2="636.0" y2="164" stroke="#d0d7de" stroke-width="1"/>
+  <text x="636.0" y="180" font-size="11" fill="#57606a" text-anchor="middle">30 ms</text>
+  <line x1="738.0" y1="44" x2="738.0" y2="164" stroke="#d0d7de" stroke-width="1"/>
+  <text x="738.0" y="180" font-size="11" fill="#57606a" text-anchor="middle">40 ms</text>
+  <line x1="840.0" y1="44" x2="840.0" y2="164" stroke="#d0d7de" stroke-width="1"/>
+  <text x="840.0" y="180" font-size="11" fill="#57606a" text-anchor="middle">50 ms</text>
+  <text x="318" y="62" font-size="12" fill="#1f2328" font-weight="600" text-anchor="end">previous result of the query</text>
+  <text x="318" y="77" font-size="11" fill="#57606a" text-anchor="end">1,000 of 10,000 documents</text>
+  <rect x="330" y="50" width="117.3" height="24" rx="3" fill="#0969da"/>
+  <text x="453.3" y="67" font-size="12" fill="#1f2328" font-weight="600">11.5 ms</text>
+  <text x="318" y="102" font-size="12" fill="#1f2328" font-weight="600" text-anchor="end">scan of the collection</text>
+  <text x="318" y="117" font-size="11" fill="#57606a" text-anchor="end">the same query</text>
+  <rect x="330" y="90" width="263.2" height="24" rx="3" fill="#8c959f"/>
+  <text x="599.2" y="107" font-size="12" fill="#1f2328" font-weight="600">25.8 ms</text>
+  <text x="318" y="142" font-size="12" fill="#1f2328" font-weight="600" text-anchor="end">scan of the collection</text>
+  <text x="318" y="157" font-size="11" fill="#57606a" text-anchor="end">the whole collection, 10,000 documents</text>
+  <rect x="330" y="130" width="437.6" height="24" rx="3" fill="#8c959f"/>
+  <text x="773.6" y="147" font-size="12" fill="#1f2328" font-weight="600">42.9 ms</text>
+  <text x="20" y="206" font-size="11" fill="#57606a">tool/bench/local_store_bench.dart 100000: 10 collections of 10,000 documents of a few fields, 54 MB file.</text>
+  <text x="20" y="224" font-size="11" fill="#57606a">One run on 2026-11-15, Apple M5, macOS 27.2, Dart 3.12.2 (JIT), SQLite with synchronous = OFF, local store</text>
+  <text x="20" y="242" font-size="11" fill="#57606a">only (no backend). One document by key took 21 us (average of 1,000 reads).</text>
+</svg>

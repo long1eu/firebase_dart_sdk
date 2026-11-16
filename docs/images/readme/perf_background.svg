@@ -1,0 +1,77 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 330" role="img" aria-labelledby="title desc" font-family="system-ui, -apple-system, Segoe UI, Helvetica, Arial, sans-serif">
+  <title id="title">Background work after an instance starts</title>
+  <desc id="desc">Timeline of the first twelve minutes after a Firestore instance with a SQLite cache starts. Index fill runs at about 15 seconds and then about once a minute, each run indexing at most 50 documents. Garbage collection checks run at about 1 minute and then about every 5 minutes, at 6 and 11 minutes; a check removes the least recently used 10 percent, at most 1,000, only when the file is larger than the threshold.</desc>
+  <rect x="0" y="0" width="900" height="330" rx="10" fill="#ffffff" stroke="#d0d7de"/>
+  <text x="20" y="30" font-size="14" fill="#1f2328" font-weight="600">Background work of a client with a SQLite cache (primary client only)</text>
+  <line x1="210" y1="214" x2="870" y2="214" stroke="#57606a" stroke-width="1.5"/>
+  <line x1="210.0" y1="214" x2="210.0" y2="219" stroke="#57606a"/>
+  <text x="210.0" y="233" font-size="11" fill="#57606a" text-anchor="middle">0 min</text>
+  <line x1="210.0" y1="56" x2="210.0" y2="214" stroke="#eaeef2"/>
+  <line x1="265.0" y1="214" x2="265.0" y2="219" stroke="#57606a"/>
+  <text x="265.0" y="233" font-size="11" fill="#57606a" text-anchor="middle">1 min</text>
+  <line x1="265.0" y1="56" x2="265.0" y2="214" stroke="#eaeef2"/>
+  <line x1="320.0" y1="214" x2="320.0" y2="219" stroke="#57606a"/>
+  <text x="320.0" y="233" font-size="11" fill="#57606a" text-anchor="middle">2</text>
+  <line x1="320.0" y1="56" x2="320.0" y2="214" stroke="#eaeef2"/>
+  <line x1="375.0" y1="214" x2="375.0" y2="219" stroke="#57606a"/>
+  <text x="375.0" y="233" font-size="11" fill="#57606a" text-anchor="middle">3</text>
+  <line x1="375.0" y1="56" x2="375.0" y2="214" stroke="#eaeef2"/>
+  <line x1="430.0" y1="214" x2="430.0" y2="219" stroke="#57606a"/>
+  <text x="430.0" y="233" font-size="11" fill="#57606a" text-anchor="middle">4</text>
+  <line x1="430.0" y1="56" x2="430.0" y2="214" stroke="#eaeef2"/>
+  <line x1="485.0" y1="214" x2="485.0" y2="219" stroke="#57606a"/>
+  <text x="485.0" y="233" font-size="11" fill="#57606a" text-anchor="middle">5</text>
+  <line x1="485.0" y1="56" x2="485.0" y2="214" stroke="#eaeef2"/>
+  <line x1="540.0" y1="214" x2="540.0" y2="219" stroke="#57606a"/>
+  <text x="540.0" y="233" font-size="11" fill="#57606a" text-anchor="middle">6 min</text>
+  <line x1="540.0" y1="56" x2="540.0" y2="214" stroke="#eaeef2"/>
+  <line x1="595.0" y1="214" x2="595.0" y2="219" stroke="#57606a"/>
+  <text x="595.0" y="233" font-size="11" fill="#57606a" text-anchor="middle">7</text>
+  <line x1="595.0" y1="56" x2="595.0" y2="214" stroke="#eaeef2"/>
+  <line x1="650.0" y1="214" x2="650.0" y2="219" stroke="#57606a"/>
+  <text x="650.0" y="233" font-size="11" fill="#57606a" text-anchor="middle">8</text>
+  <line x1="650.0" y1="56" x2="650.0" y2="214" stroke="#eaeef2"/>
+  <line x1="705.0" y1="214" x2="705.0" y2="219" stroke="#57606a"/>
+  <text x="705.0" y="233" font-size="11" fill="#57606a" text-anchor="middle">9</text>
+  <line x1="705.0" y1="56" x2="705.0" y2="214" stroke="#eaeef2"/>
+  <line x1="760.0" y1="214" x2="760.0" y2="219" stroke="#57606a"/>
+  <text x="760.0" y="233" font-size="11" fill="#57606a" text-anchor="middle">10</text>
+  <line x1="760.0" y1="56" x2="760.0" y2="214" stroke="#eaeef2"/>
+  <line x1="815.0" y1="214" x2="815.0" y2="219" stroke="#57606a"/>
+  <text x="815.0" y="233" font-size="11" fill="#57606a" text-anchor="middle">11 min</text>
+  <line x1="815.0" y1="56" x2="815.0" y2="214" stroke="#eaeef2"/>
+  <line x1="870.0" y1="214" x2="870.0" y2="219" stroke="#57606a"/>
+  <text x="870.0" y="233" font-size="11" fill="#57606a" text-anchor="middle">12 min</text>
+  <line x1="870.0" y1="56" x2="870.0" y2="214" stroke="#eaeef2"/>
+  <text x="20" y="84" font-size="13" fill="#1f2328" font-weight="600">Index fill</text>
+  <text x="20" y="100" font-size="11" fill="#57606a">only with cache indexes</text>
+  <text x="20" y="154" font-size="13" fill="#1f2328" font-weight="600">Garbage collection</text>
+  <text x="20" y="170" font-size="11" fill="#57606a">check of the file size</text>
+  <line x1="210" y1="80" x2="870" y2="80" stroke="#d0d7de"/>
+  <line x1="210" y1="150" x2="870" y2="150" stroke="#d0d7de"/>
+  <path d="M223.8,72 L231.8,80 L223.8,88 L215.8,80 z" fill="#0969da"/>
+  <path d="M278.8,72 L286.8,80 L278.8,88 L270.8,80 z" fill="#0969da"/>
+  <path d="M333.8,72 L341.8,80 L333.8,88 L325.8,80 z" fill="#0969da"/>
+  <path d="M388.8,72 L396.8,80 L388.8,88 L380.8,80 z" fill="#0969da"/>
+  <path d="M443.8,72 L451.8,80 L443.8,88 L435.8,80 z" fill="#0969da"/>
+  <path d="M498.8,72 L506.8,80 L498.8,88 L490.8,80 z" fill="#0969da"/>
+  <path d="M553.8,72 L561.8,80 L553.8,88 L545.8,80 z" fill="#0969da"/>
+  <path d="M608.8,72 L616.8,80 L608.8,88 L600.8,80 z" fill="#0969da"/>
+  <path d="M663.8,72 L671.8,80 L663.8,88 L655.8,80 z" fill="#0969da"/>
+  <path d="M718.8,72 L726.8,80 L718.8,88 L710.8,80 z" fill="#0969da"/>
+  <path d="M773.8,72 L781.8,80 L773.8,88 L765.8,80 z" fill="#0969da"/>
+  <path d="M828.8,72 L836.8,80 L828.8,88 L820.8,80 z" fill="#0969da"/>
+  <text x="223.8" y="66" font-size="11" fill="#1f2328" font-weight="600" text-anchor="middle">15 s</text>
+  <text x="361.2" y="106" font-size="11" fill="#57606a" text-anchor="middle">then about every minute, at most 50 documents per run</text>
+  <circle cx="265.0" cy="150" r="8" fill="#ffffff" stroke="#1f2328" stroke-width="2.5"/>
+  <circle cx="540.0" cy="150" r="8" fill="#ffffff" stroke="#1f2328" stroke-width="2.5"/>
+  <circle cx="815.0" cy="150" r="8" fill="#ffffff" stroke="#1f2328" stroke-width="2.5"/>
+  <text x="265.0" y="136" font-size="11" fill="#1f2328" font-weight="600" text-anchor="middle">1 min</text>
+  <text x="540.0" y="136" font-size="11" fill="#1f2328" font-weight="600" text-anchor="middle">+5 min</text>
+  <text x="815.0" y="136" font-size="11" fill="#1f2328" font-weight="600" text-anchor="middle">+5 min</text>
+  <text x="402.5" y="176" font-size="11" fill="#57606a" text-anchor="middle">over the threshold (100 MB by default): remove the least recently</text>
+  <text x="402.5" y="190" font-size="11" fill="#57606a" text-anchor="middle">used 10 % of queries and unheld documents, at most 1,000</text>
+  <text x="20" y="270" font-size="11" fill="#57606a">From local/index_backfiller.dart (first run after 15 s, then 1 min between runs) and local/lru_garbage_collector.dart</text>
+  <text x="20" y="288" font-size="11" fill="#57606a">(first check after 1 min, then 5 min). The delays are counted from the end of the previous run, so the times drift a</text>
+  <text x="20" y="306" font-size="11" fill="#57606a">little. A new index on 10,000 cached documents is complete after about 200 runs, about 200 minutes of running time.</text>
+</svg>
