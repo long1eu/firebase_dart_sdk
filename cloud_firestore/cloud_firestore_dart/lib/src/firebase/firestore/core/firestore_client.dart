@@ -74,7 +74,7 @@ class FirestoreClient implements RemoteStoreCallback {
 
   final DatabaseInfo databaseInfo;
   final CredentialsProvider credentialsProvider;
-  final AppCheckTokenProvider? appCheckProvider;
+  final FirebaseAppCheckTokenProvider? appCheckProvider;
 
   late StreamSubscription<User> onCredentialChangeSubscription;
   late Persistence persistence;
@@ -126,12 +126,12 @@ class FirestoreClient implements RemoteStoreCallback {
   /// Creates a client and starts it [initialize]s, then returns once that is done (or throws its error).
   static Future<FirestoreClient> initialize(
     DatabaseInfo databaseInfo,
-    FirestoreSettings settings,
+    Settings settings,
     CredentialsProvider credentialsProvider,
     OpenDatabase? openDatabase,
     BehaviorSubject<bool> onNetworkConnected,
     TaskScheduler scheduler, {
-    AppCheckTokenProvider? appCheckProvider,
+    FirebaseAppCheckTokenProvider? appCheckProvider,
     ConnectivityChangeDetector? connectivityDetector,
   }) async {
     final FirestoreClient client = start(
@@ -156,12 +156,12 @@ class FirestoreClient implements RemoteStoreCallback {
   /// When the initialization fails, every operation fails with its error.
   static FirestoreClient start(
     DatabaseInfo databaseInfo,
-    FirestoreSettings settings,
+    Settings settings,
     CredentialsProvider credentialsProvider,
     OpenDatabase? openDatabase,
     BehaviorSubject<bool> onNetworkConnected,
     TaskScheduler scheduler, {
-    AppCheckTokenProvider? appCheckProvider,
+    FirebaseAppCheckTokenProvider? appCheckProvider,
     ConnectivityChangeDetector? connectivityDetector,
     Future<void>? after,
   }) {
@@ -367,14 +367,15 @@ class FirestoreClient implements RemoteStoreCallback {
   /// Deletes the local persistence files of this client. Only allowed after
   /// [shutdown]; a no-op for memory persistence.
   ///
-  /// Throws a [FirestoreError] with [FirestoreErrorCode.failedPrecondition]
+  /// Throws a [FirestoreException] with [FirestoreErrorCode.failedPrecondition]
   /// while the client is running, and one with [FirestoreErrorCode.unknown]
   /// when a file can't be deleted (like upstream).
   Future<void> clearPersistence() async {
     if (!_isShutdown) {
-      throw FirestoreError(
-        'Persistence cannot be cleared while the firestore instance is running.',
-        FirestoreErrorCode.failedPrecondition,
+      throw FirestoreException(
+        message:
+            'Persistence cannot be cleared while the firestore instance is running.',
+        errorCode: FirestoreErrorCode.failedPrecondition,
       );
     }
     // The database has to be closed before its files go away.
@@ -428,24 +429,25 @@ class FirestoreClient implements RemoteStoreCallback {
     } else if (maybeDoc is NoDocument) {
       return null;
     } else {
-      throw FirestoreError(
-        'Failed to get document from cache. (However, this document may exist on the server. Run again without '
-        'setting source to CACHE to attempt to retrieve the document from the server.)',
-        FirestoreErrorCode.unavailable,
+      throw FirestoreException(
+        message:
+            'Failed to get document from cache. (However, this document may exist on the server. Run again without '
+            'setting source to CACHE to attempt to retrieve the document from the server.)',
+        errorCode: FirestoreErrorCode.unavailable,
       );
     }
   }
 
-  /// Fails with an `unavailable` [FirestoreError] when [future] fails because the persistence is not available (the JS
+  /// Fails with an `unavailable` [FirestoreException] when [future] fails because the persistence is not available (the JS
   /// `wrapInUserErrorIfRecoverable`).
   static Future<T> _userErrorIfRecoverable<T>(
     Future<T> future,
     String message,
   ) {
     return future.catchError(
-      (Object error) => throw FirestoreError(
-        '$message: $error',
-        FirestoreErrorCode.unavailable,
+      (Object error) => throw FirestoreException(
+        message: '$message: $error',
+        errorCode: FirestoreErrorCode.unavailable,
       ),
       test: isRecoverablePersistenceError,
     );
@@ -517,7 +519,7 @@ class FirestoreClient implements RemoteStoreCallback {
       }
       try {
         return await backfiller.backfill();
-      } on FirestoreError catch (e) {
+      } on FirestoreException catch (e) {
         // Only the primary client of the cache backfills.
         if (isPrimaryLeaseLoss(e)) {
           return 0;
@@ -773,14 +775,14 @@ class FirestoreClient implements RemoteStoreCallback {
   /// check something else before they reach the client.
   void verifyNotTerminated() => _verifyNotShutdown();
 
-  /// Throws the error every client call fails with once [shutdown] was called: a [FirestoreError] with
+  /// Throws the error every client call fails with once [shutdown] was called: a [FirestoreException] with
   /// [FirestoreErrorCode.failedPrecondition], as the JS SDK (Android throws an IllegalStateException with the same
   /// message). The methods that call it are `async`, so callers get it through the returned future.
   void _verifyNotShutdown() {
     if (_isShutdown) {
-      throw FirestoreError(
-        terminatedMessage,
-        FirestoreErrorCode.failedPrecondition,
+      throw FirestoreException(
+        message: terminatedMessage,
+        errorCode: FirestoreErrorCode.failedPrecondition,
       );
     }
   }

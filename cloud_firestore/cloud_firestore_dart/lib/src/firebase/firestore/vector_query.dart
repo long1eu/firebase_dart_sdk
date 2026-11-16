@@ -15,8 +15,7 @@
 import 'package:cloud_firestore_dart/src/firebase/firestore/distance_measure.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/firestore.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/document.dart';
-import 'package:cloud_firestore_dart/src/firebase/firestore/model/field_path.dart'
-    as core;
+import 'package:cloud_firestore_dart/src/firebase/firestore/field_path.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/query.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/query_document_snapshot.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/vector_query_snapshot.dart';
@@ -59,7 +58,7 @@ const int maxVectorQueryDimensions = 2048;
 ///
 /// The JS client SDK has no `findNearest` on a classic query (there it is a
 /// pipeline stage); this follows the Android SDK.
-class VectorQuery {
+class VectorQuery<T> {
   /// Validates the arguments and creates the query.
   VectorQuery._(
     this.query,
@@ -101,10 +100,10 @@ class VectorQuery {
 
   /// The query whose results are searched: its filters select the
   /// candidates.
-  final Query<Object?> query;
+  final Query<T> query;
 
   /// The field holding the vectors to search.
-  final core.FieldPath vectorField;
+  final FieldPath vectorField;
 
   /// The vector to find the nearest neighbours of, with between 1 and 2048
   /// dimensions.
@@ -133,24 +132,25 @@ class VectorQuery {
   /// Executes the query on the server and returns the nearest documents,
   /// nearest first.
   ///
-  /// The returned future fails with a [FirestoreError]: with code
+  /// The returned future fails with a [FirestoreException]: with code
   /// `unavailable` when the client is offline, with `failedPrecondition` when
   /// the instance was terminated, and with the code of any other error of the
   /// backend. It is not retried.
-  Future<VectorQuerySnapshot> get() async {
+  Future<VectorQuerySnapshot<T>> get() async {
     final List<Document> docs = await query.firestore.client.runVectorQuery(
       query.query,
       this,
     );
-    return VectorQuerySnapshotInternal.create(
+    return VectorQuerySnapshotInternal.create<T>(
       this,
       docs
           .map(
-            (Document doc) => QueryDocumentSnapshotInternal.fromDocument(
+            (Document doc) => QueryDocumentSnapshotInternal.fromDocument<T>(
               query.firestore,
               doc,
               fromCache: false,
               hasPendingWrites: false,
+              converter: query.converter,
             ),
           )
           .toList(growable: false),
@@ -182,17 +182,17 @@ class VectorQuery {
 }
 
 /// Members of [VectorQuery] for the SDK itself. Not exported by the public libraries.
-extension VectorQueryInternal on VectorQuery {
+extension VectorQueryInternal<T> on VectorQuery<T> {
   /// Validates the arguments and creates the query.
-  static VectorQuery create(
-    Query<Object?> query,
-    core.FieldPath vectorField,
+  static VectorQuery<T> create<T>(
+    Query<T> query,
+    FieldPath vectorField,
     VectorValue queryVector,
     int limit,
     DistanceMeasure distanceMeasure, {
     String? distanceResultField,
     double? distanceThreshold,
-  }) => VectorQuery._(
+  }) => VectorQuery<T>._(
     query,
     vectorField,
     queryVector,

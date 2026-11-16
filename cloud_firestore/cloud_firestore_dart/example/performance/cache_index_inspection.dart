@@ -64,7 +64,7 @@ Future<void> run() async {
   final Directory directory = Directory.systemTemp.createTempSync(
     'firestore_example_',
   );
-  final Firestore firestore = Firestore.instanceFor(
+  final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(
     app: exampleApp(),
     openDatabase: sqliteOpener(directory),
     settings: emulatorSettings(cacheSettings: PersistentCacheSettings()),
@@ -92,14 +92,14 @@ Future<void> run() async {
   }
   // Read the collection once so that the cache holds the documents as the
   // backend has them (an index is filled from those, not from pending writes).
-  await orders.get(Source.server);
+  await orders.get(GetOptions(source: Source.server));
 
-  Firestore.setLogLevel(LogLevel.debug);
+  FirebaseFirestore.setLogLevel(LogLevel.debug);
 
   Future<void> timed(String label, Query<Map<String, Object?>> query) async {
     final Stopwatch stopwatch = Stopwatch()..start();
     final QuerySnapshot<Map<String, Object?>> snapshot = await query.get(
-      Source.cache,
+      GetOptions(source: Source.cache),
     );
     stopwatch.stop();
     print(
@@ -135,13 +135,13 @@ Future<void> run() async {
   //    results" never holds and no index is created for it.
   await timed(
     'top 5 by total (orderBy + limit)',
-    orders.orderBy('total', Direction.descending).limit(5),
+    orders.orderBy('total', descending: true).limit(5),
   );
 
   // Such a query can get an index by configuration instead (deprecated API,
   // as in the other SDKs). It is filled by the same background runs.
   // ignore: deprecated_member_use
-  await firestore.setIndexConfiguration('''
+  await firestore.setIndexConfigurationFromJSON('''
 {
   "indexes": [
     {
@@ -154,10 +154,10 @@ Future<void> run() async {
 }''');
   await timed(
     'top 5 by total, configured index (not filled yet)',
-    orders.orderBy('total', Direction.descending).limit(5),
+    orders.orderBy('total', descending: true).limit(5),
   );
 
-  Firestore.setLogLevel(LogLevel.warn);
+  FirebaseFirestore.setLogLevel(LogLevel.warn);
   // Back to plain scans for every query of this instance.
   await indexes.deleteAllIndexes();
 

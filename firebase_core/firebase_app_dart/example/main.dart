@@ -10,7 +10,7 @@ void main() {
   final FirebaseApp app = FirebaseApp.withOptions(
     const FirebaseOptions(
       apiKey: '<YOUR_API_KEY>',
-      applicationId: '1:1234567890:dart:example',
+      appId: '1:1234567890:dart:example',
       projectId: 'my-project',
     ),
   );
@@ -19,13 +19,11 @@ void main() {
   final FirebaseApp secondary = FirebaseApp.withOptions(
     const FirebaseOptions(
       apiKey: '<YOUR_API_KEY>',
-      applicationId: '1:1234567890:dart:secondary',
+      appId: '1:1234567890:dart:secondary',
       projectId: 'other-project',
     ),
     name: 'secondary',
   );
   print('named app: ${secondary.name}');
-  print(
-    'lookup: ${identical(FirebaseApp.getInstance('secondary'), secondary)}',
-  );
+  print('lookup: ${identical(Firebase.app('secondary'), secondary)}');
 }

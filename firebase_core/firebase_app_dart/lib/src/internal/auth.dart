@@ -8,7 +8,7 @@ import 'package:collection/collection.dart';
 
 import 'util/to_string_helper.dart';
 
-/// A token returned by `InternalTokenProvider.getAccessToken`, with the claims of its payload.
+/// A token returned by `AuthTokenProvider.getAccessToken`, with the claims of its payload.
 ///
 /// For a Firebase Auth ID token (a JWT) [claims] holds the payload, unverified. For a token that
 /// is not a JWT (an OAuth 2.0 access token, an emulator token) [claims] is empty and the

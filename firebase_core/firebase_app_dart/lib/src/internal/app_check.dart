@@ -53,7 +53,7 @@ class AppCheckTokenResult {
 ///
 /// import 'package:firebase_app_dart/firebase_app_dart.dart';
 ///
-/// class BackendAppCheck extends InternalAppCheckTokenProvider {
+/// class BackendAppCheck extends AppCheckTokenProvider {
 ///   BackendAppCheck(this.fetchToken);
 ///
 ///   /// Asks your backend for a token.
@@ -79,9 +79,9 @@ class AppCheckTokenResult {
 ///   Stream<AppCheckTokenResult> get onTokenChanged => _changes.stream;
 /// }
 /// ```
-abstract class InternalAppCheckTokenProvider {
+abstract class AppCheckTokenProvider {
   /// Constructor for subclasses.
-  InternalAppCheckTokenProvider();
+  AppCheckTokenProvider();
 
   /// Fetches a token. [forceRefresh] must only be set when the cached token was
   /// invalidated out of band (for example the backend answered UNAUTHENTICATED).

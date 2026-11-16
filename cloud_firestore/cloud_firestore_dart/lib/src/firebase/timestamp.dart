@@ -24,7 +24,7 @@ import 'package:firebase_app_dart/internal.dart';
 /// });
 /// final DocumentSnapshot<Map<String, Object?>> snapshot =
 ///     await firestore.doc('events/launch').get();
-/// final DateTime? at = snapshot.getTimestamp('at')?.toDate();
+/// final DateTime? at = (snapshot.get('at') as Timestamp?)?.toDate();
 /// ```
 ///
 /// The backend stores microseconds: a write drops the nanoseconds below one
@@ -96,12 +96,28 @@ class Timestamp implements Comparable<Timestamp> {
   /// Throws an [ArgumentError] if the result is outside the supported range.
   ///
   /// ```dart
-  /// final Timestamp t = Timestamp.fromMillis(1700000000000);
+  /// final Timestamp t = Timestamp.fromMillisecondsSinceEpoch(1700000000000);
   /// ```
-  factory Timestamp.fromMillis(int milliseconds) {
+  factory Timestamp.fromMillisecondsSinceEpoch(int milliseconds) {
     // Floor division, so that negative values keep non-negative nanoseconds.
     int seconds = milliseconds ~/ 1000;
     int nanoseconds = milliseconds.remainder(1000) * 1000000;
+
+    if (nanoseconds < 0) {
+      seconds -= 1;
+      nanoseconds += 1000000000;
+    }
+
+    _validateRange(seconds, nanoseconds);
+    return Timestamp(seconds, nanoseconds);
+  }
+
+  /// Creates a timestamp from a number of microseconds since the epoch, 1970-01-01T00:00:00Z (negative for earlier
+  /// instants). Throws an [ArgumentError] outside the range of [Timestamp].
+  factory Timestamp.fromMicrosecondsSinceEpoch(int microseconds) {
+    // Floor division, so that negative values keep non-negative nanoseconds.
+    int seconds = microseconds ~/ 1000000;
+    int nanoseconds = microseconds.remainder(1000000) * 1000;
 
     if (nanoseconds < 0) {
       seconds -= 1;
@@ -135,7 +151,9 @@ class Timestamp implements Comparable<Timestamp> {
   /// The time comes from this device's clock. To store the time of the server
   /// instead, write `FieldValue.serverTimestamp()`.
   factory Timestamp.now() {
-    return Timestamp.fromMillis(DateTime.now().millisecondsSinceEpoch);
+    return Timestamp.fromMillisecondsSinceEpoch(
+      DateTime.now().millisecondsSinceEpoch,
+    );
   }
 
   /// Seconds of UTC time since the Unix epoch, 1970-01-01T00:00:00Z.
@@ -162,11 +180,13 @@ class Timestamp implements Comparable<Timestamp> {
     ).add(Duration(microseconds: (nanoseconds ~/ 1000) % 1000));
   }
 
-  /// The number of milliseconds since the Unix epoch 1970-01-01T00:00:00Z.
-  /// Sub-millisecond precision is truncated toward the earlier time.
-  int toMillis() {
-    return seconds * 1000 + nanoseconds ~/ 1000000;
-  }
+  /// The number of milliseconds since the epoch, 1970-01-01T00:00:00Z (the nanoseconds are truncated). The name of
+  /// [DateTime.millisecondsSinceEpoch] and FlutterFire.
+  int get millisecondsSinceEpoch => seconds * 1000 + nanoseconds ~/ 1000000;
+
+  /// The number of microseconds since the epoch, 1970-01-01T00:00:00Z (the nanoseconds are truncated). The name of
+  /// [DateTime.microsecondsSinceEpoch] and FlutterFire.
+  int get microsecondsSinceEpoch => seconds * 1000000 + nanoseconds ~/ 1000;
 
   /// A JSON-serializable representation of this timestamp, in the same shape
   /// as the JS SDK's `Timestamp.toJSON()`. Read it back with

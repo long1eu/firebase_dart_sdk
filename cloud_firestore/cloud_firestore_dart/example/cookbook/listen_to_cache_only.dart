@@ -19,13 +19,13 @@ import '../common.dart';
 
 Future<void> main() async {
   // Two clients: "other" stands in for another device.
-  final Firestore firestore = Firestore.instanceFor(
+  final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(
     app: exampleApp(),
     settings: emulatorSettings(
       cacheSettings: MemoryCacheSettings(gcSettings: MemoryLruGcSettings()),
     ),
   );
-  final Firestore other = connect('other');
+  final FirebaseFirestore other = connect('other');
   final String path = scratch('settings');
   final DocumentReference<Map<String, Object?>> theme = firestore
       .collection(path)
@@ -34,13 +34,11 @@ Future<void> main() async {
 
   final StreamController<String> seen = StreamController<String>();
   final StreamSubscription<DocumentSnapshot<Map<String, Object?>>>
-  subscription = theme
-      .getSnapshotsWithOptions(
-        const SnapshotListenOptions(source: ListenSource.cache),
-      )
-      .listen((DocumentSnapshot<Map<String, Object?>> snapshot) {
-        seen.add('${snapshot['mode']}');
-      });
+  subscription = theme.snapshots(source: ListenSource.cache).listen((
+    DocumentSnapshot<Map<String, Object?>> snapshot,
+  ) {
+    seen.add('${snapshot['mode']}');
+  });
   final StreamIterator<String> events = StreamIterator<String>(seen.stream);
 
   await events.moveNext();
@@ -52,7 +50,7 @@ Future<void> main() async {
   });
   // ...until something on this client reads it from the server.
   final DocumentSnapshot<Map<String, Object?>> fresh = await theme.get(
-    Source.server,
+    GetOptions(source: Source.server),
   );
   print('server read: ${fresh['mode']}');
   await events.moveNext();

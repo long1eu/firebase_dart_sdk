@@ -13,7 +13,7 @@ import 'package:firebase_app_dart/internal.dart';
 import 'package:grpc/grpc.dart';
 import 'package:test/test.dart';
 
-class FakeAppCheck implements InternalAppCheckTokenProvider {
+class FakeAppCheck implements AppCheckTokenProvider {
   final List<bool> forceRefreshArgs = <bool>[];
   final StreamController<AppCheckTokenResult> changes =
       StreamController<AppCheckTokenResult>.broadcast();
@@ -52,7 +52,7 @@ Future<Map<String, String>> _metadata(ChannelOptionsProvider provider) async {
   return metadata;
 }
 
-ChannelOptionsProvider _options(AppCheckTokenProvider? appCheck) =>
+ChannelOptionsProvider _options(FirebaseAppCheckTokenProvider? appCheck) =>
     ChannelOptionsProvider(
       databaseId: DatabaseId.forDatabase('p', 'd'),
       credentialsProvider: EmptyCredentialsProvider(),
@@ -63,7 +63,7 @@ void main() {
   test('header is present when a provider is set', () async {
     final FakeAppCheck fake = FakeAppCheck();
     final Map<String, String> m =
-        await _metadata(_options(AppCheckTokenProvider(fake)));
+        await _metadata(_options(FirebaseAppCheckTokenProvider(fake)));
     expect(m['x-firebase-appcheck'], 'token-1');
     expect(m['x-goog-api-client'], isNotEmpty);
   });
@@ -79,12 +79,12 @@ void main() {
     final FakeAppCheck fake = FakeAppCheck()
       ..result = const AppCheckTokenResult('');
     expect(
-        (await _metadata(_options(AppCheckTokenProvider(fake))))
+        (await _metadata(_options(FirebaseAppCheckTokenProvider(fake))))
             .containsKey('x-firebase-appcheck'),
         isFalse);
     // No interop provider registered on the app: ignored, not an error.
     expect(
-        (await _metadata(_options(AppCheckTokenProvider(null))))
+        (await _metadata(_options(FirebaseAppCheckTokenProvider(null))))
             .containsKey('x-firebase-appcheck'),
         isFalse);
   });
@@ -94,7 +94,7 @@ void main() {
     final FakeAppCheck fake = FakeAppCheck()
       ..result = AppCheckTokenResult('placeholder', error: StateError('x'));
     final Map<String, String> m =
-        await _metadata(_options(AppCheckTokenProvider(fake)));
+        await _metadata(_options(FirebaseAppCheckTokenProvider(fake)));
     expect(m['x-firebase-appcheck'], 'placeholder');
   });
 
@@ -105,7 +105,7 @@ void main() {
     final FakeAppCheck fake = FakeAppCheck()..throwError = StateError('boom');
     final List<String> printed = <String>[];
     final Map<String, String> m = await runZoned(
-      () => _metadata(_options(AppCheckTokenProvider(fake))),
+      () => _metadata(_options(FirebaseAppCheckTokenProvider(fake))),
       zoneSpecification: ZoneSpecification(
           print: (Zone self, ZoneDelegate parent, Zone zone, String line) =>
               printed.add(line)),
@@ -123,7 +123,7 @@ void main() {
     final ChannelOptionsProvider options = ChannelOptionsProvider(
       databaseId: DatabaseId.forDatabase('p', 'd'),
       credentialsProvider: _FailingCredentials(),
-      appCheckProvider: AppCheckTokenProvider(FakeAppCheck()),
+      appCheckProvider: FirebaseAppCheckTokenProvider(FakeAppCheck()),
     );
     await expectLater(
       _metadata(options),
@@ -135,7 +135,7 @@ void main() {
   test('invalidateToken forces a refresh on the next request only', () async {
     final FakeAppCheck fake = FakeAppCheck();
     final ChannelOptionsProvider options =
-        _options(AppCheckTokenProvider(fake));
+        _options(FirebaseAppCheckTokenProvider(fake));
     await _metadata(options);
     options.invalidateToken();
     await _metadata(options);
@@ -145,7 +145,7 @@ void main() {
 
   test('token changes are forwarded and stop after close', () async {
     final FakeAppCheck fake = FakeAppCheck();
-    final AppCheckTokenProvider provider = AppCheckTokenProvider(fake);
+    final FirebaseAppCheckTokenProvider provider = FirebaseAppCheckTokenProvider(fake);
     final List<String> seen = <String>[];
     provider.onChange.listen(seen.add);
 

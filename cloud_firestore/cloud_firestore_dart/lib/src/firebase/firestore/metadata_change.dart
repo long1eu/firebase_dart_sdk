@@ -14,7 +14,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/query_snapshot.dart'
 /// ```dart
 /// firestore
 ///     .collection('cities')
-///     .getSnapshots(MetadataChanges.include)
+///     .snapshots(includeMetadataChanges: true)
 ///     .listen((QuerySnapshot<Map<String, Object?>> snapshot) {
 ///       print('from cache: ${snapshot.metadata.isFromCache}');
 ///     });

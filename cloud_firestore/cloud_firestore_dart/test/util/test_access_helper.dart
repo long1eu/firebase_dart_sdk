@@ -8,7 +8,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/model/database_id.da
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/document_key.dart';
 
 // ignore: non_constant_identifier_names
-Firestore _NullFirestore() =>
+FirebaseFirestore _NullFirestore() =>
     FirestoreInternal.detached(DatabaseId.forProject('project'));
 
 class TestAccessHelper {

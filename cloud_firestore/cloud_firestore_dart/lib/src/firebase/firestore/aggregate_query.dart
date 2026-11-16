@@ -31,7 +31,7 @@ import 'package:collection/collection.dart';
 /// ```dart
 /// final AggregateQuerySnapshot snapshot =
 ///     await firestore.collection('cities').count().get();
-/// print(snapshot.getCount());
+/// print(snapshot.count);
 /// ```
 ///
 /// An aggregation is a single request to the server: the local cache is
@@ -67,7 +67,7 @@ class AggregateQuery {
   /// Executes the aggregation on the server and returns the results.
   ///
   /// Aggregations are never computed from the local cache: when the client is
-  /// offline the returned Future fails with a `FirestoreError` whose code is
+  /// offline the returned Future fails with a `FirestoreException` whose code is
   /// `unavailable`. [source] can only be [AggregateSource.server], the
   /// default. A failure is not retried; other errors of the backend (for
   /// example `failedPrecondition` for a missing index, or `permissionDenied`)
@@ -79,9 +79,9 @@ class AggregateQuery {
   ///     .aggregate(<AggregateField>[AggregateField.sum('population')])
   ///     .get();
   /// ```
-  Future<AggregateQuerySnapshot> get([
+  Future<AggregateQuerySnapshot> get({
     AggregateSource source = AggregateSource.server,
-  ]) async {
+  }) async {
     final Map<String, FieldValue> data = await query.firestore.client
         .runAggregateQuery(query.query, aggregateFields);
     return AggregateQuerySnapshotInternal.create(this, data);

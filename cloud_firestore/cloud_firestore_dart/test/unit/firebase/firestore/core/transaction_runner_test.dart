@@ -55,7 +55,7 @@ void main() {
     final String result = await runner(5, (Transaction transaction) async {
       attempts++;
       if (attempts < 3) {
-        throw FirestoreError('aborted', FirestoreErrorCode.aborted);
+        throw FirestoreException(message: 'aborted', errorCode: FirestoreErrorCode.aborted);
       }
       return 'done';
     }).run();
@@ -73,7 +73,7 @@ void main() {
       await runner(2, (Transaction transaction) async {
         attempts++;
         if (attempts == 1) {
-          throw FirestoreError('retry', code);
+          throw FirestoreException(message: 'retry', errorCode: code);
         }
         return 'done';
       }).run();
@@ -94,13 +94,13 @@ void main() {
         attempts++;
         // The client is terminated while the attempt runs: its calls fail with a retryable code.
         terminated = true;
-        throw FirestoreError('unavailable', FirestoreErrorCode.unavailable);
+        throw FirestoreException(message: 'unavailable', errorCode: FirestoreErrorCode.unavailable);
       },
     ).run();
 
     await expectLater(
         result,
-        throwsA(isA<FirestoreError>().having((FirestoreError e) => e.code,
+        throwsA(isA<FirestoreException>().having((FirestoreException e) => e.errorCode,
             'code', FirestoreErrorCode.unavailable)));
     expect(attempts, 1);
   });
@@ -109,13 +109,13 @@ void main() {
     int attempts = 0;
     final Future<String> result = runner(3, (Transaction transaction) async {
       attempts++;
-      throw FirestoreError('aborted', FirestoreErrorCode.aborted);
+      throw FirestoreException(message: 'aborted', errorCode: FirestoreErrorCode.aborted);
     }).run();
 
     await expectLater(
         result,
-        throwsA(isA<FirestoreError>().having(
-            (FirestoreError e) => e.code, 'code', FirestoreErrorCode.aborted)));
+        throwsA(isA<FirestoreException>().having(
+            (FirestoreException e) => e.errorCode, 'code', FirestoreErrorCode.aborted)));
     expect(attempts, 3);
   });
 
@@ -123,10 +123,10 @@ void main() {
     int attempts = 0;
     final Future<String> result = runner(5, (Transaction transaction) async {
       attempts++;
-      throw FirestoreError('invalid', FirestoreErrorCode.invalidArgument);
+      throw FirestoreException(message: 'invalid', errorCode: FirestoreErrorCode.invalidArgument);
     }).run();
 
-    await expectLater(result, throwsA(isA<FirestoreError>()));
+    await expectLater(result, throwsA(isA<FirestoreException>()));
     expect(attempts, 1);
   });
 
@@ -148,7 +148,7 @@ void main() {
     await runner(3, (Transaction transaction) async {
       attemptTimes.add(DateTime.now());
       if (attemptTimes.length < 3) {
-        throw FirestoreError('aborted', FirestoreErrorCode.aborted);
+        throw FirestoreException(message: 'aborted', errorCode: FirestoreErrorCode.aborted);
       }
       return 'done';
     }, initialDelay: initialDelay)

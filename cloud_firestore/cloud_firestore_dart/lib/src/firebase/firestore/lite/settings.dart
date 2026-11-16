@@ -18,16 +18,16 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/firestore_settings.d
 /// The settings of a Firestore Lite instance: where the backend is.
 ///
 /// There is nothing about a cache: Firestore Lite has none.
-class FirestoreSettings {
+class Settings {
   /// Settings for the backend at [host]:[port]. The defaults are those of
   /// the production service.
-  FirestoreSettings({
+  Settings({
     String host = defaultHost,
     int port = defaultPort,
     bool sslEnabled = true,
     int grpcFlowControlWindow = defaultGrpcFlowControlWindow,
   }) : this._(
-         full.FirestoreSettings(
+         full.Settings(
            host: host,
            port: port,
            sslEnabled: sslEnabled,
@@ -36,21 +36,21 @@ class FirestoreSettings {
          ),
        );
 
-  FirestoreSettings._(this._checked);
+  Settings._(this._checked);
 
   /// The host of the production service.
-  static const String defaultHost = full.FirestoreSettings.defaultHost;
+  static const String defaultHost = full.Settings.defaultHost;
 
   /// The port of the production service.
-  static const int defaultPort = full.FirestoreSettings.defaultPort;
+  static const int defaultPort = full.Settings.defaultPort;
 
   /// The default of [grpcFlowControlWindow], 256 KiB.
   static const int defaultGrpcFlowControlWindow =
-      full.FirestoreSettings.defaultGrpcFlowControlWindow;
+      full.Settings.defaultGrpcFlowControlWindow;
 
   // The settings of the main library check the host, the SSL flag and the
   // mock user token: the rules are the same.
-  final full.FirestoreSettings _checked;
+  final full.Settings _checked;
 
   /// The host of the Firestore backend.
   String get host => _checked.host;
@@ -78,26 +78,21 @@ class FirestoreSettings {
   /// instead of the user of Firebase Auth, so that security rules can be
   /// exercised: either a token string, or the claims of a Firebase ID token as
   /// a map with at least a `sub` (or `user_id`) entry.
-  FirestoreSettings withEmulator(
-    String host,
-    int port, {
-    Object? mockUserToken,
-  }) {
-    return FirestoreSettings._(
+  Settings withEmulator(String host, int port, {Object? mockUserToken}) {
+    return Settings._(
       _checked.withEmulator(host, port, mockUserToken: mockUserToken),
     );
   }
 
   @override
   bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is FirestoreSettings && _checked == other._checked;
+      identical(this, other) || other is Settings && _checked == other._checked;
 
   @override
   int get hashCode => _checked.hashCode;
 
   @override
   String toString() =>
-      'FirestoreSettings{host: $host, port: $port, sslEnabled: $sslEnabled, '
+      'Settings{host: $host, port: $port, sslEnabled: $sslEnabled, '
       'grpcFlowControlWindow: $grpcFlowControlWindow}';
 }

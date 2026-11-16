@@ -32,8 +32,8 @@ import 'package:collection/collection.dart';
 ///       AggregateField.average('total'),
 ///     ])
 ///     .get();
-/// final int count = snapshot.getCount();
-/// final double? average = snapshot.getDouble(AggregateField.average('total'));
+/// final int? count = snapshot.count;
+/// final double? average = snapshot.getAverage('total');
 /// ```
 ///
 /// The results come from the server at the time of the request; they do not
@@ -71,28 +71,38 @@ class AggregateQuerySnapshot {
     });
   }
 
-  /// The result of the count aggregation. Throws an [ArgumentError] when the
-  /// query did not request [AggregateField.count] or the result is null.
+  /// The result of the count aggregation (`count()` or [AggregateField.count]), or null when the query did not ask
+  /// for it.
   ///
   /// ```dart
-  /// final int n = (await firestore.collection('cities').count().get()).getCount();
+  /// final int? n = (await firestore.collection('cities').count().get()).count;
   /// ```
-  int getCount() {
-    final int? value = getInt(AggregateField.count());
-    if (value == null) {
-      throw ArgumentError(
-        'RunAggregationQueryResponse alias ${AggregateField.count().alias} is null',
-      );
-    }
-    return value;
+  int? get count {
+    final FieldValue? value = _data[AggregateField.count().alias];
+    final Object? count = value?.value;
+    return count is Int32Value ? count.value : (count as num?)?.toInt();
   }
+
+  /// The result of [AggregateField.sum] over [field] (a [String] or a [FieldPath]): an `int` for a sum of
+  /// integers that fits in 64 bits, a `double` otherwise, or null (for example a sum over no numeric value).
+  ///
+  /// A [Decimal128Value] result (Enterprise edition) is converted to the closest `double`. Throws an
+  /// [ArgumentError] if the query did not ask for this sum.
+  num? getSum(Object field) => _getNumber(AggregateField.sum(field));
+
+  /// The result of [AggregateField.average] over [field] (a [String] or a [FieldPath]), or null when no document
+  /// has a numeric value for the field.
+  ///
+  /// Throws an [ArgumentError] if the query did not ask for this average.
+  double? getAverage(Object field) =>
+      _getNumber(AggregateField.average(field))?.toDouble();
 
   /// The result of [aggregateField]: an `int`, a `double` or null (for
   /// example the average over no numeric values).
   ///
   /// On an Enterprise edition database the sum and the average over values
-  /// that include a [Decimal128Value] are a [Decimal128Value]. [getDouble] and
-  /// [getInt] convert it to the closest `double`.
+  /// that include a [Decimal128Value] are a [Decimal128Value]. [getSum] and
+  /// [getAverage] convert it to the closest `double`.
   ///
   /// Throws an [ArgumentError] if [aggregateField] was not requested.
   ///
@@ -107,40 +117,6 @@ class AggregateQuerySnapshot {
       );
     }
     return value.value;
-  }
-
-  /// The result of [aggregateField] as an `int` (doubles are truncated and saturated, NaN is 0), or
-  /// null if the result is null.
-  ///
-  /// Throws an [ArgumentError] if [aggregateField] was not requested.
-  int? getInt(AggregateField aggregateField) {
-    final num? value = _getNumber(aggregateField);
-    if (value == null || value is int) {
-      return value as int?;
-    }
-    // Saturating conversion (as Java's `double.longValue()`): NaN becomes 0 and
-    // the infinities become the extreme integers. Dart's `toInt()` would throw.
-    if (value.isNaN) {
-      return 0;
-    }
-    if (value.isInfinite) {
-      return value.isNegative ? _minInt : _maxInt;
-    }
-    return value.toInt();
-  }
-
-  // Not literals: they do not compile to JavaScript, where an `int` cannot
-  // hold them exactly (they are 2^63 and -2^63 there).
-  static final int _maxInt = int.parse('9223372036854775807');
-  static final int _minInt = int.parse('-9223372036854775808');
-
-  /// The result of [aggregateField] as a `double`, or null if the result is
-  /// null.
-  ///
-  /// Throws an [ArgumentError] if [aggregateField] was not requested.
-  double? getDouble(AggregateField aggregateField) {
-    final num? value = _getNumber(aggregateField);
-    return value?.toDouble();
   }
 
   num? _getNumber(AggregateField aggregateField) {

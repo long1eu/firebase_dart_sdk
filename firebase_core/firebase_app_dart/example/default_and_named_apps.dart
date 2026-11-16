@@ -15,7 +15,7 @@ void main() {
   final FirebaseApp app = FirebaseApp.withOptions(
     const FirebaseOptions(
       apiKey: '<YOUR_API_KEY>',
-      applicationId: '1:1234567890:dart:example',
+      appId: '1:1234567890:dart:example',
       projectId: 'my-project',
     ),
   );
@@ -26,31 +26,29 @@ void main() {
   final FirebaseApp reports = FirebaseApp.withOptions(
     const FirebaseOptions(
       apiKey: '<YOUR_API_KEY>',
-      applicationId: '1:1234567890:dart:reports',
+      appId: '1:1234567890:dart:reports',
       projectId: 'reports-project',
     ),
     name: 'reports',
   );
   print(
-    'getInstance finds it: '
-    '${identical(FirebaseApp.getInstance('reports'), reports)}',
+    'Firebase.app finds it: '
+    '${identical(Firebase.app('reports'), reports)}',
   );
   // Leading and trailing white space is not part of a name.
   print(
     'names are trimmed: '
-    '${identical(FirebaseApp.getInstance(' reports '), reports)}',
+    '${identical(Firebase.app(' reports '), reports)}',
   );
 
-  print(
-    'all apps: ${FirebaseApp.apps.map((FirebaseApp a) => a.name).join(', ')}',
-  );
+  print('all apps: ${Firebase.apps.map((FirebaseApp a) => a.name).join(', ')}');
 
   // A name can be used by one app at a time.
   try {
     FirebaseApp.withOptions(
       const FirebaseOptions(
         apiKey: '<YOUR_API_KEY>',
-        applicationId: '1:1234567890:dart:reports',
+        appId: '1:1234567890:dart:reports',
         projectId: 'reports-project',
       ),
       name: 'reports',
@@ -61,8 +59,8 @@ void main() {
 
   // An unknown name throws, and the message lists the names that exist.
   try {
-    FirebaseApp.getInstance('missing');
-  } on StateError catch (e) {
+    Firebase.app('missing');
+  } on FirebaseException catch (e) {
     print('an unknown name: ${e.message}');
   }
 }

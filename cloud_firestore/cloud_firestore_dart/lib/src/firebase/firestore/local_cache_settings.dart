@@ -15,7 +15,7 @@
 import 'package:cloud_firestore_dart/src/firebase/firestore/firestore_settings.dart';
 
 /// Configures the local cache of a Firestore instance, see
-/// [FirestoreSettings.cacheSettings]. The implementations are
+/// [Settings.cacheSettings]. The implementations are
 /// [PersistentCacheSettings] and [MemoryCacheSettings].
 ///
 /// The cache holds the documents that listeners and reads received and the writes that the backend has not
@@ -23,10 +23,10 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/firestore_settings.d
 /// the JS SDK (`persistentLocalCache()` and `memoryLocalCache()`).
 ///
 /// ```dart
-/// final Firestore firestore = Firestore.instanceFor(
+/// final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(
 ///   app: app,
 ///   openDatabase: openDatabase, // needed for a persistent cache
-///   settings: FirestoreSettings(cacheSettings: PersistentCacheSettings()),
+///   settings: Settings(cacheSettings: PersistentCacheSettings()),
 /// );
 /// ```
 sealed class LocalCacheSettings {
@@ -36,29 +36,27 @@ sealed class LocalCacheSettings {
 /// Configures a cache stored on disk (the default). The on disk cache is
 /// garbage collected once it exceeds [sizeBytes].
 ///
-/// The cache is stored in the SQLite database that the `openDatabase` function of `Firestore.instanceFor` opens
+/// The cache is stored in the SQLite database that the `openDatabase` function of `FirebaseFirestore.instanceFor` opens
 /// (a file on the VM, IndexedDB or OPFS on the web). Without that function the instance falls back to a memory
 /// cache. The data and the pending writes survive a restart of the program.
 ///
 /// ```dart
-/// final FirestoreSettings settings = FirestoreSettings(
+/// final Settings settings = Settings(
 ///   cacheSettings: PersistentCacheSettings(
-///     sizeBytes: FirestoreSettings.cacheSizeUnlimited,
+///     sizeBytes: Settings.cacheSizeUnlimited,
 ///   ),
 /// );
 /// ```
 final class PersistentCacheSettings extends LocalCacheSettings {
   /// [sizeBytes] is an approximate cache size threshold: if the cache grows
   /// beyond it, Firestore starts removing data that has not been recently used.
-  /// Use [FirestoreSettings.cacheSizeUnlimited] to disable the collection. The
+  /// Use [Settings.cacheSizeUnlimited] to disable the collection. The
   /// minimum is 1 MB, an [ArgumentError] is thrown otherwise.
-  PersistentCacheSettings({
-    this.sizeBytes = FirestoreSettings.defaultCacheSizeBytes,
-  }) {
-    if (sizeBytes != FirestoreSettings.cacheSizeUnlimited &&
-        sizeBytes < FirestoreSettings.minimumCacheBytes) {
+  PersistentCacheSettings({this.sizeBytes = Settings.defaultCacheSizeBytes}) {
+    if (sizeBytes != Settings.cacheSizeUnlimited &&
+        sizeBytes < Settings.minimumCacheBytes) {
       throw ArgumentError(
-        'Cache size must be set to at least ${FirestoreSettings.minimumCacheBytes} bytes',
+        'Cache size must be set to at least ${Settings.minimumCacheBytes} bytes',
       );
     }
   }
@@ -84,7 +82,7 @@ final class PersistentCacheSettings extends LocalCacheSettings {
 /// Writes that the backend has not acknowledged when the instance is terminated are lost with it.
 ///
 /// ```dart
-/// final FirestoreSettings settings = FirestoreSettings(
+/// final Settings settings = Settings(
 ///   cacheSettings: const MemoryCacheSettings(),
 /// );
 /// ```
@@ -137,7 +135,7 @@ final class MemoryEagerGcSettings extends MemoryGarbageCollectorSettings {
 /// listener can be answered from the cache while offline.
 ///
 /// ```dart
-/// final FirestoreSettings settings = FirestoreSettings(
+/// final Settings settings = Settings(
 ///   cacheSettings: MemoryCacheSettings(
 ///     gcSettings: MemoryLruGcSettings(sizeBytes: 10 * 1024 * 1024),
 ///   ),
@@ -146,13 +144,11 @@ final class MemoryEagerGcSettings extends MemoryGarbageCollectorSettings {
 final class MemoryLruGcSettings extends MemoryGarbageCollectorSettings {
   /// [sizeBytes] is an approximate threshold, see
   /// [PersistentCacheSettings.sizeBytes] for the accepted values.
-  MemoryLruGcSettings({
-    this.sizeBytes = FirestoreSettings.defaultCacheSizeBytes,
-  }) {
-    if (sizeBytes != FirestoreSettings.cacheSizeUnlimited &&
-        sizeBytes < FirestoreSettings.minimumCacheBytes) {
+  MemoryLruGcSettings({this.sizeBytes = Settings.defaultCacheSizeBytes}) {
+    if (sizeBytes != Settings.cacheSizeUnlimited &&
+        sizeBytes < Settings.minimumCacheBytes) {
       throw ArgumentError(
-        'Cache size must be set to at least ${FirestoreSettings.minimumCacheBytes} bytes',
+        'Cache size must be set to at least ${Settings.minimumCacheBytes} bytes',
       );
     }
   }

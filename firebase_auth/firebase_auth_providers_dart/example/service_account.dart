@@ -44,7 +44,7 @@ Future<void> main() async {
       // An empty API key is not sent with Firestore requests.
       apiKey: '',
       // Any non-empty id works outside of Android and iOS.
-      applicationId: '1:1234567890:dart:server',
+      appId: '1:1234567890:dart:server',
       // The project of the key.
       projectId: key['project_id'] as String?,
     ),
@@ -66,12 +66,12 @@ Future<void> main() async {
       '${token.token.isNotEmpty}',
     );
     print('a service account is not a user: uid ${provider.uid}');
-  } on FirebaseAuthProviderException catch (e) {
+  } on FirebaseAuthException catch (e) {
     // invalid-credential: the endpoint refused the key (deleted or disabled
     // key, wrong clock); network-request-failed; internal-error.
     print('token request failed: ${e.code}: ${e.message}');
     exitCode = 1;
   } finally {
-    app.delete();
+    await app.delete();
   }
 }

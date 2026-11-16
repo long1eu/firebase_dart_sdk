@@ -10,11 +10,32 @@ Two pages share one collection, `web_app_notes`:
 | `index.html` (`web/main.dart`) | The main library. A real-time listener on the 50 newest notes, a form that adds one, an online/offline indicator (`metadata.isFromCache`), a button that calls `disableNetwork()` / `enableNetwork()`, and a choice of cache: memory, SQLite in IndexedDB, or SQLite in OPFS. |
 | `lite.html` (`web/lite.dart`) | The same list and form with `package:cloud_firestore_dart/lite.dart`: no cache, no listener, a Refresh button. Compare the size of the two compiled programs below. |
 
+This is the main page in headless Chrome against a private emulator, after three notes were
+added. Look at the **Sync** line: the list comes from the backend.
+
+![The main page of web_app: backend emulator, compiler dart2js, cache Memory, Sync "Online: in sync with the backend", and three notes in the list](../../docs/images/examples/web_app_online.png)
+
+The pieces of the main page, and where each request goes:
+
+```mermaid
+flowchart LR
+  page["index.html and bootstrap.js"] --> program["web/main.dart, compiled to JS or Wasm"]
+  program --> firestore["Firestore instance"]
+  firestore -- "cache=memory" --> memory["memory cache"]
+  firestore -- "cache=indexeddb" --> idb["SQLite (sqlite3.wasm) in the page, file in IndexedDB"]
+  firestore -- "cache=opfs" --> worker["SQLite in sqlite_opfs_worker.js, file in OPFS"]
+  firestore -- "WebChannel over fetch: listen and write streams" --> backend["Firestore emulator or project"]
+  firestore -- "REST over fetch: one-shot calls" --> backend
+```
+
 What to try:
 
 - Add a note, press **Disable network**, add another: it shows at once, marked `[not sent yet]`,
   and the indicator says the list comes from the cache. Press **Enable network** and it is
-  sent.
+  sent. The page then looked like this, with the button already showing **Enable network**:
+
+  ![The same page offline: Sync "Offline: showing the cache", the button reads "Enable network", and the newest note "Water the plants" is marked "[not sent yet]"](../../docs/images/examples/web_app_offline.png)
+
 - Pick **SQLite in IndexedDB** or **SQLite in OPFS**, then reload: the notes are on the page
   before the backend answers, also with the emulator stopped. A note written offline is sent
   when the page is opened again with a connection.
@@ -126,6 +147,9 @@ has the numbers of a program without the opener.
   the backend unreachable (OPFS), a second tab falling back to the memory cache (IndexedDB and
   OPFS), and the Lite page.
 - Not run against a real Firebase project, and not in other browsers.
+- The two screenshots above: built with `dart compile js -O2` as described, served by
+  `bin/serve.dart`, opened in headless Chrome with `?emulator=127.0.0.1:8141` and driven over the
+  Chrome DevTools protocol (memory cache, Dart 3.12.2, Firestore emulator v1.22.0).
 
 ## A real project
 

@@ -1,0 +1,51 @@
+name: Playground on GitHub Pages
+
+# Builds examples/playground (static files, no backend) and publishes it to the GitHub Pages site
+# of this repository. Only started by hand, from the "Run workflow" button of the Actions tab: no
+# push, pull request or schedule runs it. It does nothing useful until Pages is turned on with
+# "GitHub Actions" as its source (Settings, Pages); before that the deploy job fails and nothing
+# is published. examples/playground/README.md ("Publishing") has the steps.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# One deployment at a time; a run that is already deploying is not cancelled.
+concurrency:
+  group: playground-pages
+  cancel-in-progress: false
+
+# Actions are pinned by commit; the comment names the release (see ci.yml).
+jobs:
+  build:
+    name: Build the playground
+    runs-on: ubuntu-26.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/dart
+        with:
+          sdk: stable
+      - name: Build with dart2js and dart2wasm
+        working-directory: examples/playground
+        run: ./build.sh
+      - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: examples/playground/build/web
+
+  deploy:
+    name: Deploy to GitHub Pages
+    needs: build
+    runs-on: ubuntu-26.04
+    timeout-minutes: 10
+    # What actions/deploy-pages needs, and only in this job.
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1

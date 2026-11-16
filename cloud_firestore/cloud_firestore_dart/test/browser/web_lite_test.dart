@@ -29,18 +29,18 @@ int _apps = 0;
 
 /// A new instance with an app of its own. It is terminated when the test
 /// ends, and its app is deleted.
-Firestore newFirestore({Object? mockUserToken}) {
+FirebaseFirestore newFirestore({Object? mockUserToken}) {
   final FirebaseApp app = FirebaseApp.withOptions(
     const FirebaseOptions(
       apiKey: 'demo-key',
-      applicationId: '1:1234567890:dart:browser',
+      appId: '1:1234567890:dart:browser',
       projectId: projectId,
     ),
     name: 'browser-lite-${_apps++}-${_random.nextInt(0x7fffffff)}',
   );
-  final Firestore firestore = Firestore.instanceFor(
+  final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(
     app: app,
-    settings: FirestoreSettings().withEmulator(
+    settings: Settings().withEmulator(
       emulatorHost,
       emulatorPort,
       mockUserToken: mockUserToken,
@@ -48,20 +48,20 @@ Firestore newFirestore({Object? mockUserToken}) {
   );
   addTearDown(() async {
     await firestore.terminate();
-    app.delete();
+    await app.delete();
   });
   return firestore;
 }
 
 CollectionReference<Map<String, Object?>> newCollection([
-  Firestore? firestore,
+  FirebaseFirestore? firestore,
 ]) => (firestore ?? newFirestore()).collection(
   'browser-lite-${DateTime.now().microsecondsSinceEpoch}-${_random.nextInt(0x7fffffff)}',
 );
 
 List<Object?> values(QuerySnapshot<Map<String, Object?>> snapshot) => <Object?>[
   for (final QueryDocumentSnapshot<Map<String, Object?>> doc in snapshot.docs)
-    doc.data['n'],
+    doc.data()['n'],
 ];
 
 void main() {
@@ -81,7 +81,7 @@ void main() {
       'timestamp': const Timestamp(1700000000, 123456000),
       'geo': const GeoPoint(1.5, -2.5),
       'bytes': Blob(Uint8List.fromList(<int>[0, 1, 2, 255])),
-      'vector': FieldValue.vector(<double>[1, 2.5]),
+      'vector': VectorValue(<double>[1, 2.5]),
       'ref': doc,
       'list': <Object?>[1, 'two', null],
       'map': <String, Object?>{
@@ -93,7 +93,7 @@ void main() {
     final DocumentSnapshot<Map<String, Object?>> snapshot = await doc.get();
     expect(snapshot.exists, isTrue);
     expect(snapshot.id, 'a');
-    expect(snapshot.data, data);
+    expect(snapshot.data(), data);
     expect(snapshot.get('map.nested.deep'), 'yes');
     expect(snapshot.get('ref'), isA<DocumentReference<Map<String, Object?>>>());
   });
@@ -113,9 +113,11 @@ void main() {
       'gone': FieldValue.delete(),
       'when': FieldValue.serverTimestamp(),
     });
-    await doc.set(<String, Object?>{'merged': true}, SetOptions.mergeAllFields);
+    await doc.set(<String, Object?>{
+      'merged': true,
+    }, const SetOptions(merge: true));
 
-    final Map<String, Object?> data = (await doc.get()).data!;
+    final Map<String, Object?> data = (await doc.get()).data()!;
     expect(data['count'], 3);
     expect(data['tags'], <Object?>['a', 'b']);
     expect(data.containsKey('gone'), isFalse);
@@ -130,8 +132,8 @@ void main() {
     await expectLater(
       newCollection().doc('missing').update(<String, Object?>{'a': 1}),
       throwsA(
-        isA<FirestoreError>().having(
-          (FirestoreError e) => e.code,
+        isA<FirestoreException>().having(
+          (FirestoreException e) => e.errorCode,
           'code',
           FirestoreErrorCode.notFound,
         ),
@@ -161,8 +163,8 @@ void main() {
         await collection
             .where(
               Filter.or(<Filter>[
-                Filter.equalTo('n', 1),
-                Filter.greaterThan('n', 4),
+                Filter('n', isEqualTo: 1),
+                Filter('n', isGreaterThan: 4),
               ]),
             )
             .orderBy('n')
@@ -174,7 +176,7 @@ void main() {
       values(
         await collection
             .where('n', whereIn: <Object?>[1, 3, 9])
-            .orderBy('n', Direction.descending)
+            .orderBy('n', descending: true)
             .get(),
       ),
       <int>[3, 1],
@@ -223,7 +225,7 @@ void main() {
     final Query<Map<String, Object?>> query = collection.firestore
         .collectionGroup(group);
     expect(values(await query.orderBy('n').get()), <int>[1, 4]);
-    expect((await query.count().get()).getCount(), 2);
+    expect((await query.count().get()).count, 2);
     expect(
       (await query.aggregateWithAliases(<String, AggregateField>{
         'total': AggregateField.sum('n'),
@@ -268,43 +270,38 @@ void main() {
       expect(values(await transaction.getQuery(collection)), <int>[1]);
       await collection.doc('b').set(<String, Object?>{'n': 2});
       expect(values(await transaction.getQuery(collection)), <int>[1]);
-      expect(
-        (await transaction.getAggregate(collection.count())).getCount(),
-        1,
-      );
+      expect((await transaction.getAggregate(collection.count())).count, 1);
       expect((await transaction.get(collection.doc('b'))).exists, isFalse);
-    }, options: TransactionOptions(readOnly: true));
-    expect((await collection.count().get()).getCount(), 2);
+    }, readOnly: true);
+    expect((await collection.count().get()).count, 2);
   });
 
   test('converters', () async {
     final CollectionReference<String> names = newCollection().withConverter(
-      FirestoreDataConverter<String>.from(
-        fromFirestore: (QueryDocumentSnapshot<Map<String, Object?>> snapshot) =>
-            snapshot.data['name']! as String,
-        toFirestore: (String name, SetOptions? options) => <String, Object?>{
-          'name': name,
-        },
-      ),
+      fromFirestore: (QueryDocumentSnapshot<Map<String, Object?>> snapshot) =>
+          snapshot.data()['name']! as String,
+      toFirestore: (String name, SetOptions? options) => <String, Object?>{
+        'name': name,
+      },
     );
     final DocumentReference<String> ada = await names.add('Ada');
-    expect((await ada.get()).data, 'Ada');
-    expect((await names.get()).docs.single.data, 'Ada');
+    expect((await ada.get()).data(), 'Ada');
+    expect((await names.get()).docs.single.data(), 'Ada');
   });
 
   test('requests with a mock user token succeed', () async {
-    final Firestore firestore = newFirestore(
+    final FirebaseFirestore firestore = newFirestore(
       mockUserToken: <String, Object?>{'sub': 'alice'},
     );
     final DocumentReference<Map<String, Object?>> doc = newCollection(
       firestore,
     ).doc('a');
     await doc.set(<String, Object?>{'a': 1});
-    expect((await doc.get()).data, <String, Object?>{'a': 1});
+    expect((await doc.get()).data(), <String, Object?>{'a': 1});
   });
 
   test('a terminated instance rejects calls; calls in flight finish', () async {
-    final Firestore firestore = newFirestore();
+    final FirebaseFirestore firestore = newFirestore();
     final CollectionReference<Map<String, Object?>> collection = newCollection(
       firestore,
     );
@@ -312,12 +309,12 @@ void main() {
 
     final Future<AggregateQuerySnapshot> inFlight = collection.count().get();
     await firestore.terminate();
-    expect((await inFlight).getCount(), 1);
+    expect((await inFlight).count, 1);
     await expectLater(
       collection.doc('a').get(),
       throwsA(
-        isA<FirestoreError>().having(
-          (FirestoreError e) => e.code,
+        isA<FirestoreException>().having(
+          (FirestoreException e) => e.errorCode,
           'code',
           FirestoreErrorCode.failedPrecondition,
         ),

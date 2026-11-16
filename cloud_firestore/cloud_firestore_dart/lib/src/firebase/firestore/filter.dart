@@ -24,14 +24,11 @@ import 'package:meta/meta.dart';
 /// Filters can be combined with [Filter.or] and [Filter.and] to build
 /// disjunctions (OR queries) and conjunctions.
 ///
-/// `Query.where` also accepts a field with FlutterFire-style named arguments
-/// (`where('age', isGreaterThan: 18)`), which builds the same filters.
-///
-/// The factories that take a `String` field split it on dots (`'address.city'` is a nested
-/// field) and throw an [ArgumentError] for an invalid path; the `...Field` variants take a
-/// [FieldPath]. The value is checked when the filter is added to a query, which throws an
-/// [ArgumentError] for a value or a combination of filters that Firestore does not accept (for
-/// example an empty list for [inArray], or two [notInArray] filters).
+/// [Filter.new] takes the same arguments as `Query.where` (`Filter('age', isGreaterThan: 18)`).
+/// A `String` field is split on dots (`'address.city'` is a nested field); a [FieldPath] names a
+/// field whose name contains a dot. The value is checked when the filter is added to a query,
+/// which throws an [ArgumentError] for a value or a combination of filters that Firestore does
+/// not accept (for example an empty list for `whereIn`, or two `whereNotIn` filters).
 ///
 /// ```dart
 /// // Cities in California with more than a million people, or any capital.
@@ -40,10 +37,10 @@ import 'package:meta/meta.dart';
 ///     .where(
 ///       Filter.or([
 ///         Filter.and([
-///           Filter.equalTo('state', 'CA'),
-///           Filter.greaterThan('population', 1000000),
+///           Filter('state', isEqualTo: 'CA'),
+///           Filter('population', isGreaterThan: 1000000),
 ///         ]),
-///         Filter.equalTo('capital', true),
+///         Filter('capital', isEqualTo: true),
 ///       ]),
 ///     )
 ///     .get();
@@ -53,108 +50,62 @@ import 'package:meta/meta.dart';
 class Filter {
   const Filter._();
 
-  /// Creates a new filter for checking that the given field is equal to the
-  /// given value.
-  static Filter equalTo(String field, Object? value) =>
-      equalToField(FieldPath.fromDotSeparatedPath(field), value);
-
-  /// Creates a new filter for checking that the given field path is equal to
-  /// the given value.
-  static Filter equalToField(FieldPath fieldPath, Object? value) =>
-      UnaryFilter(fieldPath, core.FilterOperator.equal, value);
-
-  /// Creates a new filter for checking that the given field is not equal to
-  /// the given value. Documents without the field do not match.
-  static Filter notEqualTo(String field, Object? value) =>
-      notEqualToField(FieldPath.fromDotSeparatedPath(field), value);
-
-  /// Creates a new filter for checking that the given field path is not equal
-  /// to the given value.
-  static Filter notEqualToField(FieldPath fieldPath, Object? value) =>
-      UnaryFilter(fieldPath, core.FilterOperator.notEqual, value);
-
-  /// Creates a new filter for checking that the given field is greater than
-  /// the given value.
-  static Filter greaterThan(String field, Object? value) =>
-      greaterThanField(FieldPath.fromDotSeparatedPath(field), value);
-
-  /// Creates a new filter for checking that the given field path is greater
-  /// than the given value.
-  static Filter greaterThanField(FieldPath fieldPath, Object? value) =>
-      UnaryFilter(fieldPath, core.FilterOperator.graterThan, value);
-
-  /// Creates a new filter for checking that the given field is greater than or
-  /// equal to the given value.
-  static Filter greaterThanOrEqualTo(String field, Object? value) =>
-      greaterThanOrEqualToField(FieldPath.fromDotSeparatedPath(field), value);
-
-  /// Creates a new filter for checking that the given field path is greater
-  /// than or equal to the given value.
-  static Filter greaterThanOrEqualToField(FieldPath fieldPath, Object? value) =>
-      UnaryFilter(fieldPath, core.FilterOperator.graterThanOrEqual, value);
-
-  /// Creates a new filter for checking that the given field is less than the
-  /// given value.
-  static Filter lessThan(String field, Object? value) =>
-      lessThanField(FieldPath.fromDotSeparatedPath(field), value);
-
-  /// Creates a new filter for checking that the given field path is less than
-  /// the given value.
-  static Filter lessThanField(FieldPath fieldPath, Object? value) =>
-      UnaryFilter(fieldPath, core.FilterOperator.lessThan, value);
-
-  /// Creates a new filter for checking that the given field is less than or
-  /// equal to the given value.
-  static Filter lessThanOrEqualTo(String field, Object? value) =>
-      lessThanOrEqualToField(FieldPath.fromDotSeparatedPath(field), value);
-
-  /// Creates a new filter for checking that the given field path is less than
-  /// or equal to the given value.
-  static Filter lessThanOrEqualToField(FieldPath fieldPath, Object? value) =>
-      UnaryFilter(fieldPath, core.FilterOperator.lessThanOrEqual, value);
-
-  /// Creates a new filter for checking that the given array field contains the
-  /// given value.
-  static Filter arrayContains(String field, Object? value) =>
-      arrayContainsField(FieldPath.fromDotSeparatedPath(field), value);
-
-  /// Creates a new filter for checking that the given array field path
-  /// contains the given value.
-  static Filter arrayContainsField(FieldPath fieldPath, Object? value) =>
-      UnaryFilter(fieldPath, core.FilterOperator.arrayContains, value);
-
-  /// Creates a new filter for checking that the given array field contains any
-  /// of the given values.
-  static Filter arrayContainsAny(String field, List<Object?> values) =>
-      arrayContainsAnyField(FieldPath.fromDotSeparatedPath(field), values);
-
-  /// Creates a new filter for checking that the given array field path
-  /// contains any of the given values.
-  static Filter arrayContainsAnyField(
-    FieldPath fieldPath,
-    List<Object?> values,
-  ) => UnaryFilter(fieldPath, core.FilterOperator.arrayContainsAny, values);
-
-  /// Creates a new filter for checking that the given field equals any of the
-  /// given values. This is the `in` operator of the other SDKs.
-  static Filter inArray(String field, List<Object?> values) =>
-      inArrayField(FieldPath.fromDotSeparatedPath(field), values);
-
-  /// Creates a new filter for checking that the given field path equals any of
-  /// the given values.
-  static Filter inArrayField(FieldPath fieldPath, List<Object?> values) =>
-      UnaryFilter(fieldPath, core.FilterOperator.IN, values);
-
-  /// Creates a new filter for checking that the given field does not equal any
-  /// of the given values. This is the `not-in` operator of the other SDKs; documents without the
-  /// field do not match.
-  static Filter notInArray(String field, List<Object?> values) =>
-      notInArrayField(FieldPath.fromDotSeparatedPath(field), values);
-
-  /// Creates a new filter for checking that the given field path does not
-  /// equal any of the given values.
-  static Filter notInArrayField(FieldPath fieldPath, List<Object?> values) =>
-      UnaryFilter(fieldPath, core.FilterOperator.NOT_IN, values);
+  /// A filter on [field], a [String] (dots separate nested fields) or a [FieldPath], with exactly one
+  /// of the named arguments: the same arguments as `Query.where`.
+  ///
+  /// [isNull] `true` keeps the documents whose field is null, `false` those whose field is not null;
+  /// a null value of another argument counts as not given, as in FlutterFire.
+  ///
+  /// Throws an [ArgumentError] if [field] is not a `String` or a `FieldPath`, if its path is invalid,
+  /// or if not exactly one of the named arguments is given.
+  factory Filter(
+    Object field, {
+    Object? isEqualTo,
+    Object? isNotEqualTo,
+    Object? isLessThan,
+    Object? isLessThanOrEqualTo,
+    Object? isGreaterThan,
+    Object? isGreaterThanOrEqualTo,
+    Object? arrayContains,
+    Iterable<Object?>? arrayContainsAny,
+    Iterable<Object?>? whereIn,
+    Iterable<Object?>? whereNotIn,
+    bool? isNull,
+  }) {
+    final FieldPath fieldPath;
+    if (field is FieldPath) {
+      fieldPath = field;
+    } else if (field is String) {
+      fieldPath = FieldPathInternal.fromArgument('Filter', field);
+    } else {
+      throw ArgumentError.value(
+        field,
+        'field',
+        'Filter() expects a String field or a FieldPath',
+      );
+    }
+    final List<UnaryFilter> filters = unaryFilters(
+      fieldPath,
+      isEqualTo: isEqualTo,
+      isNotEqualTo: isNotEqualTo,
+      isLessThan: isLessThan,
+      isLessThanOrEqualTo: isLessThanOrEqualTo,
+      isGreaterThan: isGreaterThan,
+      isGreaterThanOrEqualTo: isGreaterThanOrEqualTo,
+      arrayContains: arrayContains,
+      arrayContainsAny: arrayContainsAny,
+      whereIn: whereIn,
+      whereNotIn: whereNotIn,
+      isNull: isNull,
+    );
+    if (filters.length != 1) {
+      throw ArgumentError(
+        "Invalid filter. Filter('$fieldPath') needs exactly one non-null "
+        'named argument. Use isNull to compare with null.',
+      );
+    }
+    return filters.single;
+  }
 
   /// Creates a new filter that is a disjunction of the given filters. A
   /// disjunction filter includes a document if it satisfies *any* of the given
@@ -172,7 +123,52 @@ class Filter {
       CompositeFilter._(filters, core.CompositeFilterOperator.and);
 }
 
-/// A filter on a single field, as created by the [Filter] factories. The value
+/// The filters of the named arguments of `Query.where` and [Filter.new], in the order of the
+/// arguments; empty when none is given.
+@internal
+List<UnaryFilter> unaryFilters(
+  FieldPath fieldPath, {
+  Object? isEqualTo,
+  Object? isNotEqualTo,
+  Object? isLessThan,
+  Object? isLessThanOrEqualTo,
+  Object? isGreaterThan,
+  Object? isGreaterThanOrEqualTo,
+  Object? arrayContains,
+  Iterable<Object?>? arrayContainsAny,
+  Iterable<Object?>? whereIn,
+  Iterable<Object?>? whereNotIn,
+  bool? isNull,
+}) {
+  UnaryFilter filter(core.FilterOperator op, Object? value) =>
+      UnaryFilter(fieldPath, op, value);
+  return <UnaryFilter>[
+    if (isEqualTo != null) filter(core.FilterOperator.equal, isEqualTo),
+    if (isNotEqualTo != null)
+      filter(core.FilterOperator.notEqual, isNotEqualTo),
+    if (isLessThan != null) filter(core.FilterOperator.lessThan, isLessThan),
+    if (isLessThanOrEqualTo != null)
+      filter(core.FilterOperator.lessThanOrEqual, isLessThanOrEqualTo),
+    if (isGreaterThan != null)
+      filter(core.FilterOperator.graterThan, isGreaterThan),
+    if (isGreaterThanOrEqualTo != null)
+      filter(core.FilterOperator.graterThanOrEqual, isGreaterThanOrEqualTo),
+    if (arrayContains != null)
+      filter(core.FilterOperator.arrayContains, arrayContains),
+    if (arrayContainsAny != null)
+      filter(core.FilterOperator.arrayContainsAny, arrayContainsAny.toList()),
+    if (whereIn != null) filter(core.FilterOperator.IN, whereIn.toList()),
+    if (whereNotIn != null)
+      filter(core.FilterOperator.NOT_IN, whereNotIn.toList()),
+    if (isNull != null)
+      filter(
+        isNull ? core.FilterOperator.equal : core.FilterOperator.notEqual,
+        null,
+      ),
+  ];
+}
+
+/// A filter on a single field, as created by [Filter.new]. The value
 /// has not been parsed yet; this happens when the filter is added to a query.
 @internal
 class UnaryFilter extends Filter {

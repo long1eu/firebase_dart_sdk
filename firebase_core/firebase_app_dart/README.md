@@ -30,7 +30,7 @@ import 'package:firebase_app_dart/firebase_app_dart.dart';
 final FirebaseApp app = FirebaseApp.withOptions(
   const FirebaseOptions(
     apiKey: '<YOUR_API_KEY>',
-    applicationId: '1:1234567890:web:0123456789abcdef',
+    appId: '1:1234567890:web:0123456789abcdef',
     projectId: 'my-project',
   ),
 );
@@ -39,7 +39,7 @@ print(identical(FirebaseApp.instance, app)); // true
 // Set token providers on the app (app.authProvider = ...) here, before the service reads them.
 
 // Hand the app to a service.
-final Firestore firestore = Firestore.instanceFor(app: app);
+final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(app: app);
 await firestore.doc('greetings/first').set(<String, Object?>{'text': 'hello'});
 await firestore.terminate();
 ```
@@ -51,11 +51,15 @@ On desktop and servers, where Firebase registers no apps, any unique application
 
 | What | API | Example |
 | --- | --- | --- |
-| The default app and named apps, looked up by name | `FirebaseApp.withOptions`, `FirebaseApp.instance`, `FirebaseApp.getInstance`, `FirebaseApp.apps` | [`default_and_named_apps.dart`](https://github.com/long1eu/firebase_dart_sdk/blob/main/firebase_core/firebase_app_dart/example/default_and_named_apps.dart) |
+| The default app and named apps, looked up by name | `FirebaseApp.withOptions`, `FirebaseApp.instance`, `FirebaseApp.getInstance`, `Firebase.apps` | [`default_and_named_apps.dart`](https://github.com/long1eu/firebase_dart_sdk/blob/main/firebase_core/firebase_app_dart/example/default_and_named_apps.dart) |
 | Options in code or from a JSON map, and back | `FirebaseOptions`, `FirebaseOptions.fromJson`, `toJson` | [`options_from_json.dart`](https://github.com/long1eu/firebase_dart_sdk/blob/main/firebase_core/firebase_app_dart/example/options_from_json.dart) |
 | Connectivity events and storage from your platform | `PlatformDependencies` (`package:firebase_app_dart/platform_dependencies.dart`), `LocalStorage` | [`platform_dependencies.dart`](https://github.com/long1eu/firebase_dart_sdk/blob/main/firebase_core/firebase_app_dart/example/platform_dependencies.dart) |
 | Deleting an app, which shuts down its Firestore instances and frees its name | `FirebaseApp.delete`, `onDeleteApp` | [`app_deletion.dart`](https://github.com/long1eu/firebase_dart_sdk/blob/main/firebase_core/firebase_app_dart/example/app_deletion.dart) |
-| Token providers for Firestore requests | `app.authProvider`, `app.appCheckProvider`, `InternalTokenProvider`, `InternalAppCheckTokenProvider` | `firebase_auth_providers_dart` |
+| Token providers for Firestore requests | `app.authProvider`, `app.appCheckProvider`, `AuthTokenProvider`, `AppCheckTokenProvider` | `firebase_auth_providers_dart` |
+
+What you put into the app, and when Firestore reads it (once, when its instance is created):
+
+![A FirebaseApp holds the options from withOptions, an authProvider (set by FirebaseUserAuth.forApp, OAuthTokenProvider or your own; without one requests carry no token), an appCheckProvider and the platform dependencies (onNetworkConnected, storage). FirebaseFirestore.instanceFor(app: app) reads the options, both providers and the connectivity events once, when it is created. app.delete() terminates the app's Firestore instances.](https://raw.githubusercontent.com/long1eu/firebase_dart_sdk/main/docs/images/readme/firebase_app.svg)
 
 The shortest program is [`example/main.dart`](https://github.com/long1eu/firebase_dart_sdk/blob/main/firebase_core/firebase_app_dart/example/main.dart);
 [`example/README.md`](https://github.com/long1eu/firebase_dart_sdk/blob/main/firebase_core/firebase_app_dart/example/README.md)
@@ -82,8 +86,8 @@ has the details.
 
 - Only Firestore uses it. There is no Firebase Auth SDK, Storage or Realtime Database on top of
   it in this repository (tokens come from `firebase_auth_providers_dart` or your own provider).
-- No heartbeat or analytics: `dataCollectionEnabled`, `gaTrackingId`, `databaseUrl`,
-  `storageBucket` and `gcmSenderId` are stored, not used.
+- No heartbeat or analytics: `dataCollectionEnabled`, `trackingId`, `databaseURL`,
+  `storageBucket` and `messagingSenderId` are stored, not used.
 - `onBackgroundChanged`, `headersBuilder` and `setAutomaticResourceManagementEnabled` are kept
   from the original project; no service here reads them.
 - `FirebaseOptions.fromJson` reads its own key names (those of `toJson`), not

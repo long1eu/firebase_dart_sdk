@@ -9,12 +9,13 @@
 library;
 
 import 'package:cloud_firestore_dart/cloud_firestore_dart.dart'
-    show DistanceMeasure, FieldValue, Int32Value;
+    show DistanceMeasure, Int32Value;
 import 'package:cloud_firestore_dart/pipelines.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/value/field_value.dart'
     as model;
 import 'package:cloud_firestore_dart/src/firebase/firestore/pipeline/evaluation/expression_evaluator.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/pipeline/evaluation/pipeline_executor.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/vector_value.dart';
 import 'package:test/test.dart';
 
 import '../../../../../util/property_pipeline.dart';
@@ -32,7 +33,7 @@ final Map<String, Map<String, Object?>> documents =
         'g': 'g1',
         'arr': <Object?>[1, 2, 3],
         'm': <String, Object?>{'x': 1},
-        'v': FieldValue.vector(<double>[1, 0]),
+        'v': VectorValue(<double>[1, 0]),
       },
       'c/d02': <String, Object?>{
         'a': 1.0,
@@ -40,14 +41,14 @@ final Map<String, Map<String, Object?>> documents =
         'g': 'g1',
         'arr': <Object?>[],
         'm': <String, Object?>{'x': 2},
-        'v': FieldValue.vector(<double>[0, 1]),
+        'v': VectorValue(<double>[0, 1]),
       },
       'c/d03': <String, Object?>{
         'a': null,
         'g': 'g2',
         'arr': 'notarray',
         'm': 'notmap',
-        'v': FieldValue.vector(<double>[1, 1, 1]),
+        'v': VectorValue(<double>[1, 1, 1]),
       },
       'c/d04': <String, Object?>{
         'a': 's',
@@ -60,7 +61,7 @@ final Map<String, Map<String, Object?>> documents =
         'a': double.nan,
         'g': 'g2',
         'arr': <Object?>[null, 5],
-        'v': FieldValue.vector(<double>[-1, -1]),
+        'v': VectorValue(<double>[-1, -1]),
       },
       'c/d07': <String, Object?>{'a': -0.0, 'g': 1},
       'c/d08': <String, Object?>{'a': 0, 'g': 1.0},

@@ -7,9 +7,9 @@ import 'dart:async';
 import 'package:cloud_firestore_dart/src/firebase/firestore/document_reference.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/document_snapshot.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/field_value.dart';
-import 'package:cloud_firestore_dart/src/firebase/firestore/metadata_change.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/set_options.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/server_timestamp_behavior.dart';
+import 'package:cloud_firestore_dart/src/firebase/timestamp.dart';
 import 'package:test/test.dart';
 
 import '../../../util/event_accumulator.dart';
@@ -35,8 +35,7 @@ void main() {
   setUp(() async {
     docRef = await testDocument();
     accumulator = EventAccumulator<DocumentSnapshot>();
-    listenerRegistration = docRef
-        .getSnapshots(MetadataChanges.include)
+    listenerRegistration = docRef.snapshots(includeMetadataChanges: true)
         .listen(accumulator.onData, onError: accumulator.onError);
 
     // Wait for initial null snapshot to avoid potential races.
@@ -59,18 +58,18 @@ void main() {
   Future<void> _expectLocalAndRemoteValueDouble(double expectedSum) async {
     DocumentSnapshot snap = await accumulator.awaitLocalEvent();
 
-    expect(snap.getDouble('sum'),
+    expect((snap.get('sum') as num?)?.toDouble(),
         moreOrLessEquals(expectedSum, epsilon: doubleEpsilon));
     snap = await accumulator.awaitRemoteEvent();
-    expect(snap.getDouble('sum'),
+    expect((snap.get('sum') as num?)?.toDouble(),
         moreOrLessEquals(expectedSum, epsilon: doubleEpsilon));
   }
 
   Future<void> _expectLocalAndRemoteValueInt(int expectedSum) async {
     DocumentSnapshot snap = await accumulator.awaitLocalEvent();
-    expect(snap.getInt('sum'), expectedSum);
+    expect((snap.get('sum') as num?)?.toInt(), expectedSum);
     snap = await accumulator.awaitRemoteEvent();
-    expect(snap.getInt('sum'), expectedSum);
+    expect((snap.get('sum') as num?)?.toInt(), expectedSum);
   }
 
   test('createDocumentWithIncrement', () async {
@@ -80,7 +79,7 @@ void main() {
 
   test('mergeOnNonExistingDocumentWithIncrement', () async {
     await docRef.set(map(<dynamic>['sum', FieldValue.increment(1337)]),
-        SetOptions.mergeAllFields);
+        const SetOptions(merge: true));
     await _expectLocalAndRemoteValueInt(1337);
   });
 
@@ -133,13 +132,13 @@ void main() {
 
     DocumentSnapshot snap = await accumulator.awaitLocalEvent();
     expect(
-        snap.getDouble('sum'), moreOrLessEquals(0.1, epsilon: doubleEpsilon));
+        (snap.get('sum') as num?)?.toDouble(), moreOrLessEquals(0.1, epsilon: doubleEpsilon));
     snap = await accumulator.awaitLocalEvent();
     expect(
-        snap.getDouble('sum'), moreOrLessEquals(0.11, epsilon: doubleEpsilon));
+        (snap.get('sum') as num?)?.toDouble(), moreOrLessEquals(0.11, epsilon: doubleEpsilon));
     snap = await accumulator.awaitLocalEvent();
     expect(
-        snap.getDouble('sum'), moreOrLessEquals(0.111, epsilon: doubleEpsilon));
+        (snap.get('sum') as num?)?.toDouble(), moreOrLessEquals(0.111, epsilon: doubleEpsilon));
 
     await docRef.firestore.enableNetwork();
     snap = await accumulator.awaitRemoteEvent();
@@ -152,30 +151,28 @@ void main() {
     await docRef.set(map(<dynamic>['sum', 1]));
     await _expectLocalAndRemoteValueInt(1);
     await docRef.set(map(<dynamic>['sum', FieldValue.increment(1337)]),
-        SetOptions.mergeAllFields);
+        const SetOptions(merge: true));
     await _expectLocalAndRemoteValueInt(1338);
   });
 
   test('incrementTwiceInABatch', () async {
     await _writeInitialData(map(<dynamic>['sum', 'overwrite']));
-    await docRef.firestore.batch().updateFromList(docRef, <Object?>[
-      'sum',
+    await docRef.firestore.batch().update(docRef, <Object, Object?>{
+      'sum':
       FieldValue.increment(1)
-    ]).updateFromList(
-        docRef, <Object?>['sum', FieldValue.increment(1)]).commit();
+    }).update(docRef, <Object, Object?>{'sum': FieldValue.increment(1)}).commit();
     await _expectLocalAndRemoteValueInt(2);
   });
 
   test('incrementDeleteIncrementInABatch', () async {
     await _writeInitialData(map(<dynamic>['sum', 'overwrite']));
-    await docRef.firestore.batch().updateFromList(docRef, <Object?>[
-      'sum',
+    await docRef.firestore.batch().update(docRef, <Object, Object?>{
+      'sum':
       FieldValue.increment(1)
-    ]).updateFromList(docRef, <Object?>[
-      'sum',
+    }).update(docRef, <Object, Object?>{
+      'sum':
       FieldValue.delete()
-    ]).updateFromList(
-        docRef, <Object?>['sum', FieldValue.increment(3)]).commit();
+    }).update(docRef, <Object, Object?>{'sum': FieldValue.increment(3)}).commit();
     await _expectLocalAndRemoteValueInt(3);
   });
 
@@ -189,15 +186,15 @@ void main() {
 
     DocumentSnapshot snap = await accumulator.awaitLocalEvent();
     expect(
-        snap.getTimestamp('val', ServerTimestampBehavior.estimate), isNotNull);
+        snap.get('val', serverTimestamps: ServerTimestampBehavior.estimate) as Timestamp?, isNotNull);
 
     snap = await accumulator.awaitLocalEvent();
-    expect(snap.getInt('val'), 1);
+    expect((snap.get('val') as num?)?.toInt(), 1);
 
     await docRef.firestore.enableNetwork();
 
     snap = await accumulator.awaitRemoteEvent();
-    expect(snap.getInt('val'), 1);
+    expect((snap.get('val') as num?)?.toInt(), 1);
   });
 }
 

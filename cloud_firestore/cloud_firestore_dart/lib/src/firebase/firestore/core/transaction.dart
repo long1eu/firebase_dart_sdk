@@ -51,7 +51,7 @@ class Transaction {
 
   /// A deferred usage error that occurred previously in this transaction that will cause the
   /// transaction to fail once it actually commits.
-  FirestoreError? _lastWriteError;
+  FirestoreException? _lastWriteError;
 
   /// Set of documents that have been written in the transaction.
   ///
@@ -112,10 +112,11 @@ class Transaction {
     if (!readOnly) {
       // A read-write transaction is optimistic: it verifies the documents it read when it commits, and the result
       // of a query can't be verified that way.
-      throw FirestoreError(
-        '$what can only be run in a read-only transaction '
-        '(TransactionOptions(readOnly: true)).',
-        FirestoreErrorCode.invalidArgument,
+      throw FirestoreException(
+        message:
+            '$what can only be run in a read-only transaction '
+            '(TransactionOptions(readOnly: true)).',
+        errorCode: FirestoreErrorCode.invalidArgument,
       );
     }
   }
@@ -151,10 +152,11 @@ class Transaction {
       // As in the JS SDK, the error also fails the commit: a transaction that
       // tried to read after writing does not commit, even if the update
       // function caught the error.
-      final FirestoreError error = FirestoreError(
-        'Firestore transactions require all reads to be executed before all '
-        'writes.',
-        FirestoreErrorCode.invalidArgument,
+      final FirestoreException error = FirestoreException(
+        message:
+            'Firestore transactions require all reads to be executed before all '
+            'writes.',
+        errorCode: FirestoreErrorCode.invalidArgument,
       );
       _lastWriteError = error;
       return Future<List<MaybeDocument>>.error(error);
@@ -179,7 +181,7 @@ class Transaction {
     _ensureWritable();
     try {
       _write(<Mutation>[data.toMutation(key, _preconditionForUpdate(key))]);
-    } on FirestoreError catch (e) {
+    } on FirestoreException catch (e) {
       _lastWriteError = e;
     }
 
@@ -194,7 +196,7 @@ class Transaction {
 
   Future<void> commit() {
     _ensureCommitNotCalled();
-    final FirestoreError? lastWriteError = _lastWriteError;
+    final FirestoreException? lastWriteError = _lastWriteError;
     if (lastWriteError != null) {
       return Future<void>.error(lastWriteError);
     }
@@ -235,9 +237,9 @@ class Transaction {
       final SnapshotVersion? existingVersion = readVersions[doc.key];
       if (existingVersion != docVersion) {
         // This transaction will fail no matter what.
-        throw FirestoreError(
-          'Document version changed between two reads.',
-          FirestoreErrorCode.aborted,
+        throw FirestoreException(
+          message: 'Document version changed between two reads.',
+          errorCode: FirestoreErrorCode.aborted,
         );
       }
     } else {
@@ -279,9 +281,9 @@ class Transaction {
         //
         // Note: this can change once we can send separate verify writes in the
         // transaction.
-        throw FirestoreError(
-          "Can't update a document that doesn't exist.",
-          FirestoreErrorCode.invalidArgument,
+        throw FirestoreException(
+          message: "Can't update a document that doesn't exist.",
+          errorCode: FirestoreErrorCode.invalidArgument,
         );
       }
       // Document exists, base precondition on document update time.
@@ -295,9 +297,9 @@ class Transaction {
 
   void _ensureWritable() {
     if (readOnly) {
-      throw FirestoreError(
-        'Read-only transactions cannot write.',
-        FirestoreErrorCode.invalidArgument,
+      throw FirestoreException(
+        message: 'Read-only transactions cannot write.',
+        errorCode: FirestoreErrorCode.invalidArgument,
       );
     }
   }

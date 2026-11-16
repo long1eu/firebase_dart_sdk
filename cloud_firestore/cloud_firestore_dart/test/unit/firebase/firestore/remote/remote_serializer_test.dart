@@ -38,6 +38,7 @@ import 'package:cloud_firestore_dart/src/firebase/timestamp.dart';
 import 'package:cloud_firestore_dart/src/proto/google/firestore/v1/index.dart'
     as proto_;
 import 'package:cloud_firestore_dart/src/proto/index.dart' as proto;
+import 'package:cloud_firestore_dart/src/firebase/firestore/vector_value.dart';
 import 'package:fixnum/fixnum.dart';
 import 'package:grpc/grpc.dart';
 import 'package:test/test.dart';
@@ -395,7 +396,7 @@ void main() {
 
   test('testEncodesVectorValue', () {
     final FieldValue model =
-        wrap(firestore.FieldValue.vector(<double>[1, 2, 3]));
+        wrap(VectorValue(<double>[1, 2, 3]));
 
     final proto.ArrayValue array = proto.ArrayValue.create()
       ..values.add(valueBuilder()..doubleValue = 1)
@@ -1310,8 +1311,7 @@ void main() {
           .filter(orFilters(<Filter>[
             filter('a', '==', 1),
             filter('b', '==', 2),
-          ]))
-          .orderBy(orderBy('z'))
+          ])).orderBy(orderBy('z'))
           .limitToLast(3);
       // The target (which is what is sent) has flipped orderings.
       final proto.StructuredQuery structuredQuery =
@@ -1484,8 +1484,7 @@ void main() {
 
   test('testEncodesSortOrdersDescending', () {
     final Query q =
-        Query(ResourcePath.fromString('rooms/1/messages/10/attachments'))
-            .orderBy(orderBy('prop', 'desc'));
+        Query(ResourcePath.fromString('rooms/1/messages/10/attachments')).orderBy(orderBy('prop', 'desc'));
     final proto_.Target actual = serializer.encodeTarget(wrapQueryData(q));
 
     final proto.StructuredQuery structuredQueryBuilder =
@@ -1549,8 +1548,7 @@ void main() {
   });
 
   test('testEncodesLimitToLastWithFlippedOrderAndBounds', () {
-    final Query q = Query(ResourcePath.fromString('docs'))
-        .orderBy(orderBy('prop'))
+    final Query q = Query(ResourcePath.fromString('docs')).orderBy(orderBy('prop'))
         .startAt(Bound(position: <ReferenceValue>[
           ReferenceValue.valueOf(databaseId, key('foo/bar'))
         ], inclusive: true))
@@ -1603,11 +1601,9 @@ void main() {
   });
 
   test('testLimitToLastAndMirroringLimitQueryEncodeTheSameTarget', () {
-    final Query limit = Query(ResourcePath.fromString('docs'))
-        .orderBy(orderBy('prop'))
+    final Query limit = Query(ResourcePath.fromString('docs')).orderBy(orderBy('prop'))
         .limit(3);
-    final Query limitToLast = Query(ResourcePath.fromString('docs'))
-        .orderBy(orderBy('prop', 'desc'))
+    final Query limitToLast = Query(ResourcePath.fromString('docs')).orderBy(orderBy('prop', 'desc'))
         .limitToLast(3);
 
     expect(serializer.encodeTarget(wrapQueryData(limitToLast)),

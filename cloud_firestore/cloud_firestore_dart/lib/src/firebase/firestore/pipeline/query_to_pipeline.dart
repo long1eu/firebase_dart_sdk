@@ -165,7 +165,7 @@ BooleanExpression _cursorCondition(
 
 /// Converts a classic [query] to the equivalent pipeline.
 @internal
-Pipeline queryToPipeline(Firestore firestore, core.Query query) {
+Pipeline queryToPipeline(FirebaseFirestore firestore, core.Query query) {
   final PipelineSource source = PipelineSource(firestore);
   Pipeline pipeline;
   if (query.isCollectionGroupQuery) {

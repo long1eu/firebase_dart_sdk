@@ -26,7 +26,7 @@ Future<void> main() async {
   final FirebaseApp app = FirebaseApp.withOptions(
     const FirebaseOptions(
       apiKey: 'fake-api-key',
-      applicationId: '1:1234567890:dart:example',
+      appId: '1:1234567890:dart:example',
       projectId: 'demo-test',
     ),
   );
@@ -39,8 +39,8 @@ Future<void> main() async {
   final String email =
       'grace${DateTime.now().microsecondsSinceEpoch}@example.com';
   final AuthUser created = await auth.createUserWithEmailAndPassword(
-    email,
-    'correct horse battery',
+    email: email,
+    password: 'correct horse battery',
   );
   print(
     'signed up: anonymous ${created.isAnonymous}, '
@@ -51,8 +51,8 @@ Future<void> main() async {
   await auth.signOut();
   print('signed out: ${auth.currentUser == null}');
   final AuthUser signedIn = await auth.signInWithEmailAndPassword(
-    email,
-    'correct horse battery',
+    email: email,
+    password: 'correct horse battery',
   );
   print('signed in again, same user: ${signedIn.uid == created.uid}');
 
@@ -61,19 +61,31 @@ Future<void> main() async {
   // password and an unknown address.
   await _show(
     'wrong password',
-    () => auth.signInWithEmailAndPassword(email, 'wrong password'),
+    () => auth.signInWithEmailAndPassword(
+      email: email,
+      password: 'wrong password',
+    ),
   );
   await _show(
     'address taken',
-    () => auth.createUserWithEmailAndPassword(email, 'another password'),
+    () => auth.createUserWithEmailAndPassword(
+      email: email,
+      password: 'another password',
+    ),
   );
   await _show(
     'weak password',
-    () => auth.createUserWithEmailAndPassword('new-$email', '123'),
+    () => auth.createUserWithEmailAndPassword(
+      email: 'new-$email',
+      password: '123',
+    ),
   );
   await _show(
     'bad address',
-    () => auth.createUserWithEmailAndPassword('not an address', 'a password'),
+    () => auth.createUserWithEmailAndPassword(
+      email: 'not an address',
+      password: 'a password',
+    ),
   );
 
   // A failed sign-in leaves the signed-in user as it was.
@@ -81,15 +93,15 @@ Future<void> main() async {
 
   await auth.deleteCurrentUser();
   await auth.dispose();
-  app.delete();
+  await app.delete();
 }
 
-/// Runs [signIn] and prints the code of the [FirebaseAuthProviderException].
+/// Runs [signIn] and prints the code of the [FirebaseAuthException].
 Future<void> _show(String what, Future<AuthUser> Function() signIn) async {
   try {
     await signIn();
     print('$what: no error');
-  } on FirebaseAuthProviderException catch (e) {
+  } on FirebaseAuthException catch (e) {
     print('$what: ${e.code}');
   }
 }

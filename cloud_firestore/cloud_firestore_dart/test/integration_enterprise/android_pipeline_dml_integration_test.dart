@@ -69,14 +69,14 @@ final Map<String, Map<String, Object?>> testBookDocs =
 /// The code of the [FirestoreError] [body] fails with.
 Future<FirestoreErrorCode> errorCode(Future<Object?> Function() body) async {
   final Object error = await assertThrows(null, body);
-  expect(error, isA<FirestoreError>());
-  return (error as FirestoreError).code;
+  expect(error, isA<FirestoreException>());
+  return (error as FirestoreException).errorCode;
 }
 
 void main() {
   IntegrationTestUtil.currentDatabasePath =
       'integration_enterprise/android_pipeline_dml';
-  late Firestore db;
+  late FirebaseFirestore db;
   late CollectionReference<Map<String, Object?>> collRef;
 
   group(
@@ -95,7 +95,7 @@ void main() {
       Pipeline byId(String id) => db
           .pipeline()
           .collection(collRef.path)
-          .where(field(FieldPath.documentIdField).equal(collRef.document(id)));
+          .where(field(FieldPath.documentId).equal(collRef.doc(id)));
 
       // ---- Delete Stage ----
 
@@ -104,7 +104,7 @@ void main() {
           "book2",
         ).delete().execute();
         assertThat(snapshot).isNotNull();
-        final docSnap = await collRef.document("book2").get();
+        final docSnap = await collRef.doc("book2").get();
         assertThat(docSnap.exists).isFalse();
       });
 
@@ -116,8 +116,8 @@ void main() {
             .delete()
             .execute();
         assertThat(snapshot).isNotNull();
-        assertThat((await collRef.document("book1").get()).exists).isFalse();
-        assertThat((await collRef.document("book10").get()).exists).isFalse();
+        assertThat((await collRef.doc("book1").get()).exists).isFalse();
+        assertThat((await collRef.doc("book10").get()).exists).isFalse();
       });
 
       test('testDeleteNonExistingDocument', () async {
@@ -132,7 +132,7 @@ void main() {
           "book1",
         ).delete().execute(atomic: true);
         assertThat(snapshot).isNotNull();
-        assertThat((await collRef.document("book1").get()).exists).isFalse();
+        assertThat((await collRef.doc("book1").get()).exists).isFalse();
       });
 
       test('testDeleteWithAtomicFalse', () async {
@@ -140,18 +140,18 @@ void main() {
           "book3",
         ).delete().execute(atomic: false);
         assertThat(snapshot).isNotNull();
-        assertThat((await collRef.document("book3").get()).exists).isFalse();
+        assertThat((await collRef.doc("book3").get()).exists).isFalse();
       });
 
       // ---- Update Stage ----
 
       test('testUpdateSingleDocWithAddFields', () async {
         final PipelineSnapshot snapshot = await byId("book3")
-            .addFields([field(FieldPath.documentIdField).documentId().as("id")])
+            .addFields([field(FieldPath.documentId).documentId().as("id")])
             .update(transformedFields: [constant("baz").as("foo")])
             .execute();
         assertThat(snapshot).isNotNull();
-        final docSnap = await collRef.document("book3").get();
+        final docSnap = await collRef.doc("book3").get();
         assertThat(docSnap.get("foo")).isEqualTo("baz");
         assertThat(docSnap.get("id")).isEqualTo("book3");
       });
@@ -165,12 +165,12 @@ void main() {
             .update(transformedFields: [constant("Updated").as("status")])
             .execute();
         assertThat(snapshot).isNotNull();
-        final docSnap1 = await collRef.document("book1").get();
+        final docSnap1 = await collRef.doc("book1").get();
         assertThat(docSnap1.get("status")).isEqualTo("Updated");
-        assertThat(docSnap1.data!.containsKey("awards")).isFalse();
-        final docSnap10 = await collRef.document("book10").get();
+        assertThat(docSnap1.data()!.containsKey("awards")).isFalse();
+        final docSnap10 = await collRef.doc("book10").get();
         assertThat(docSnap10.get("status")).isEqualTo("Updated");
-        assertThat(docSnap10.data!.containsKey("awards")).isFalse();
+        assertThat(docSnap10.data()!.containsKey("awards")).isFalse();
       });
 
       test('testUpdateWithExpressions', () async {
@@ -182,7 +182,7 @@ void main() {
             )
             .execute();
         assertThat(snapshot).isNotNull();
-        final docSnap = await collRef.document("book1").get();
+        final docSnap = await collRef.doc("book1").get();
         assertThat(docSnap.get("rating")).isEqualTo(5.2);
       });
 
@@ -194,7 +194,7 @@ void main() {
             .execute();
         assertThat(snapshot).isNotNull();
         assertThat(
-          (await collRef.document("book1").get()).get("status"),
+          (await collRef.doc("book1").get()).get("status"),
         ).isEqualTo("UpdatedVariadic");
       });
 
@@ -208,7 +208,7 @@ void main() {
             )
             .execute();
         assertThat(snapshot).isNotNull();
-        final docSnap = await collRef.document("book1").get();
+        final docSnap = await collRef.doc("book1").get();
         assertThat(docSnap.get("status")).isEqualTo("UpdatedMulti");
         assertThat(docSnap.get("newField")).isEqualTo(99);
       });
@@ -226,7 +226,7 @@ void main() {
             .execute(atomic: true);
         assertThat(snapshot).isNotNull();
         assertThat(
-          (await collRef.document("book1").get()).get("status"),
+          (await collRef.doc("book1").get()).get("status"),
         ).isEqualTo("AtomicUpdate");
       });
 
@@ -251,7 +251,7 @@ void main() {
             )
             .execute(atomic: true);
         assertThat(snapshot).isNotNull();
-        final docSnap = await targetCol.document("my_custom_id_123").get();
+        final docSnap = await targetCol.doc("my_custom_id_123").get();
         assertThat(docSnap.exists).isTrue();
         assertThat(
           docSnap.get("title"),
@@ -289,7 +289,7 @@ void main() {
             )
             .execute(atomic: true);
         assertThat(snapshot).isNotNull();
-        final docSnap = await targetCol.document("book1_ref_copy").get();
+        final docSnap = await targetCol.doc("book1_ref_copy").get();
         assertThat(docSnap.exists).isTrue();
         assertThat(
           docSnap.get("title"),
@@ -303,7 +303,7 @@ void main() {
             "book1",
           ).insert(documentId: constant("book1_copy")).execute(atomic: true);
           assertThat(snapshot).isNotNull();
-          final docSnap = await collRef.document("book1_copy").get();
+          final docSnap = await collRef.doc("book1_copy").get();
           assertThat(docSnap.exists).isTrue();
           assertThat(
             docSnap.get("title"),
@@ -324,7 +324,7 @@ void main() {
             .pipeline()
             .literals([
               <String, Object?>{
-                "__name__": targetCol.document("named"),
+                "__name__": targetCol.doc("named"),
                 "name": "Named Literal",
               },
             ])
@@ -332,7 +332,7 @@ void main() {
             .insert()
             .execute(atomic: true);
         assertThat(snapshot).isNotNull();
-        final docSnap = await targetCol.document("named").get();
+        final docSnap = await targetCol.doc("named").get();
         assertThat(docSnap.exists).isTrue();
         assertThat(docSnap.get("name")).isEqualTo("Named Literal");
       });
@@ -365,7 +365,7 @@ void main() {
             )
             .execute(atomic: true);
         assertThat(snapshot).isNotNull();
-        final docSnap = await collRef.document("book1").get();
+        final docSnap = await collRef.doc("book1").get();
         assertThat(docSnap.get("genre")).isEqualTo("Comedy Sci-Fi");
         assertThat(docSnap.get("rating")).isEqualTo(4.7);
       });
@@ -380,7 +380,7 @@ void main() {
             .upsert(collection: collRef.path, documentId: constant(newDocId))
             .execute(atomic: true);
         assertThat(snapshot).isNotNull();
-        final docSnap = await collRef.document(newDocId).get();
+        final docSnap = await collRef.doc(newDocId).get();
         assertThat(docSnap.exists).isTrue();
         assertThat(docSnap.get("title")).isEqualTo("New Book Title");
         assertThat(docSnap.get("genre")).isEqualTo("Sci-Fi");
@@ -396,7 +396,7 @@ void main() {
             .upsert(collection: targetCol, documentId: constant("target_doc_1"))
             .execute(atomic: true);
         assertThat(snapshot).isNotNull();
-        final docSnap = await targetCol.document("target_doc_1").get();
+        final docSnap = await targetCol.doc("target_doc_1").get();
         assertThat(docSnap.exists).isTrue();
         assertThat(docSnap.get("title")).isEqualTo("Target Upsert Title");
         assertThat(docSnap.get("genre")).isEqualTo("Target Genre");
@@ -413,7 +413,7 @@ void main() {
               )
               .execute(atomic: true);
           assertThat(snapshot).isNotNull();
-          final docSnap = await targetCol.document("target_doc_2").get();
+          final docSnap = await targetCol.doc("target_doc_2").get();
           assertThat(docSnap.exists).isTrue();
           assertThat(
             docSnap.get("title"),
@@ -424,12 +424,12 @@ void main() {
       test('testUpsertWithoutTargetUsesLiteralName', () async {
         final targetCol = await testCollection();
         final emptyCol = await testCollection();
-        await targetCol.document("named").set(<String, Object?>{"old": true});
+        await targetCol.doc("named").set(<String, Object?>{"old": true});
         final PipelineSnapshot snapshot = await db
             .pipeline()
             .literals([
               <String, Object?>{
-                "__name__": targetCol.document("named"),
+                "__name__": targetCol.doc("named"),
                 "name": "Named Literal",
               },
             ])
@@ -437,8 +437,8 @@ void main() {
             .upsert()
             .execute(atomic: true);
         assertThat(snapshot).isNotNull();
-        final docSnap = await targetCol.document("named").get();
-        assertThat(docSnap.data).containsExactly(["name", "Named Literal"]);
+        final docSnap = await targetCol.doc("named").get();
+        assertThat(docSnap.data()).containsExactly(["name", "Named Literal"]);
       });
 
       test('testUpsertWithoutTargetFailsForLiteralWithoutName', () async {

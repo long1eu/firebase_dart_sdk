@@ -20,6 +20,28 @@ dart pub add cloud_firestore_dart firebase_app_dart
 know the project. For signed-in users or server credentials, also add
 [`firebase_auth_providers_dart`](../../firebase_auth/firebase_auth_providers_dart/README.md).
 
+How the three packages fit together: the token provider is set on the app, and the Firestore instance
+reads the app's options and token provider once, when it is created.
+
+```mermaid
+flowchart LR
+  accTitle: How the three packages fit together
+  accDescr: A token provider from firebase_auth_providers_dart is set as the authProvider of the FirebaseApp from firebase_app_dart. FirebaseFirestore.instanceFor of cloud_firestore_dart reads the app's options and token provider once and sends requests with the token to Cloud Firestore or the emulator.
+  subgraph authPkg["firebase_auth_providers_dart (optional)"]
+    provider["FirebaseUserAuth, OAuthTokenProvider<br/>or applicationDefaultCredentials()"]
+  end
+  subgraph appPkg["firebase_app_dart"]
+    app["FirebaseApp<br/>FirebaseOptions: projectId, apiKey, appId"]
+  end
+  subgraph firestorePkg["cloud_firestore_dart"]
+    firestore["FirebaseFirestore.instanceFor(app: app)"]
+  end
+  backend["Cloud Firestore or the emulator"]
+  provider -- "app.authProvider = ..." --> app
+  app -- "options and token provider, read once" --> firestore
+  firestore -- "requests, with the token if there is one" --> backend
+```
+
 ## Create the app and the Firestore instance
 
 ```dart
@@ -29,21 +51,21 @@ import 'package:firebase_app_dart/firebase_app_dart.dart';
 final FirebaseApp app = FirebaseApp.withOptions(
   const FirebaseOptions(
     apiKey: '<the Web API key of the project>',
-    applicationId: '1:1234567890:web:0123456789abcdef',
+    appId: '1:1234567890:web:0123456789abcdef',
     projectId: 'my-project',
   ),
 );
 
 // Returns at once: the client opens its cache and connects in the background,
 // and every operation waits for that.
-final Firestore firestore = Firestore.instanceFor(app: app);
+final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(app: app);
 ```
 
 - The options are those of a Firebase app of the project. The values of a web app (Firebase
   console, *Project settings*, *Your apps*) work on every platform. The
   [`firebase_app_dart` README](../../firebase_core/firebase_app_dart/README.md) explains how to
   make an application id for a desktop platform.
-- `Firestore.instanceFor` returns the same instance for the same app and database until that
+- `FirebaseFirestore.instanceFor` returns the same instance for the same app and database until that
   instance is terminated. The settings are those of the call that creates it: a later call
   without settings or with equal ones returns the instance, a later call with different settings
   throws a `StateError` (as the JS and Android SDKs refuse new settings once the instance exists).
@@ -51,6 +73,26 @@ final Firestore firestore = Firestore.instanceFor(app: app);
   database.
 - Without a token provider the requests are not authenticated, so the security rules see no
   user. See [Authentication](authentication.md).
+
+The path from `instanceFor` to a first read: the call returns before the client has started, and the
+first operation waits for it.
+
+```mermaid
+sequenceDiagram
+  accTitle: From instanceFor to a first read
+  accDescr: FirebaseFirestore.instanceFor returns the instance at once while the client opens its cache in the background. A get() waits until the client has started, listens to the document on the backend and returns the DocumentSnapshot.
+  participant code as Your code
+  participant fs as Firestore instance
+  participant be as Firestore backend
+  code->>fs: FirebaseFirestore.instanceFor(app: app)
+  fs-->>code: the instance, at once
+  Note over fs: opens the cache and starts the client in the background
+  code->>fs: cities.doc('SF').get()
+  Note over fs: waits until the client has started
+  fs->>be: listens to the document
+  be-->>fs: the document
+  fs-->>code: DocumentSnapshot
+```
 
 ## Read and write
 
@@ -64,23 +106,23 @@ final DocumentReference<Map<String, Object?>> added = await cities.add({'name': 
 
 // One read.
 final DocumentSnapshot<Map<String, Object?>> sf = await cities.doc('SF').get();
-print(sf.data);
+print(sf.data());
 
 // A query.
 final QuerySnapshot<Map<String, Object?>> californian = await cities
     .where('state', isEqualTo: 'CA')
-    .orderBy('population', Direction.descending)
+    .orderBy('population', descending: true)
     .limit(10)
     .get();
 for (final QueryDocumentSnapshot<Map<String, Object?>> city in californian.docs) {
-  print('${city.id}: ${city.data}');
+  print('${city.id}: ${city.data()}');
 }
 
 // Changes in real time, until the subscription is cancelled.
-final subscription = cities.where('state', isEqualTo: 'CA').snapshots.listen(
+final subscription = cities.where('state', isEqualTo: 'CA').snapshots().listen(
   (QuerySnapshot<Map<String, Object?>> snapshot) {
     for (final DocumentChange<Map<String, Object?>> change in snapshot.docChanges) {
-      print('${change.type}: ${change.document.id}');
+      print('${change.type}: ${change.doc.id}');
     }
   },
 );
@@ -105,7 +147,7 @@ await firestore.waitForPendingWrites();
 await firestore.terminate();
 ```
 
-After `terminate()` the instance cannot be used again; `Firestore.instanceFor` creates a new one.
+After `terminate()` the instance cannot be used again; `FirebaseFirestore.instanceFor` creates a new one.
 See [the lifecycle](transactions_and_lifecycle.md#lifecycle-terminate) for what
 happens to work in progress.
 
@@ -142,9 +184,9 @@ for one-shot calls, WebChannel for listeners and writes.
   long polling:
 
 ```dart
-final Firestore firestore = Firestore.instanceFor(
+final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(
   app: app,
-  settings: FirestoreSettings(experimentalForceLongPolling: true),
+  settings: Settings(webExperimentalForceLongPolling: true),
 );
 ```
 

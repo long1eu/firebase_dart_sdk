@@ -306,10 +306,10 @@ void main() {
 
     VectorQuery nearest(Query q, {int limit = 3, double? threshold}) =>
         apiQuery(q).findNearest(
-          'v',
-          <double>[1.0, 2.0],
-          limit,
-          DistanceMeasure.cosine,
+          vectorField: 'v',
+          queryVector: <double>[1.0, 2.0],
+          limit: limit,
+          distanceMeasure: DistanceMeasure.cosine,
           distanceThreshold: threshold,
         );
 
@@ -328,25 +328,34 @@ void main() {
       expect(
         a,
         isNot(
-          apiQuery(
-            base,
-          ).findNearest('v', <double>[1.0, 2.0], 3, DistanceMeasure.euclidean),
+          apiQuery(base).findNearest(
+            vectorField: 'v',
+            queryVector: <double>[1.0, 2.0],
+            limit: 3,
+            distanceMeasure: DistanceMeasure.euclidean,
+          ),
         ),
       );
       expect(
         a,
         isNot(
-          apiQuery(
-            base,
-          ).findNearest('w', <double>[1.0, 2.0], 3, DistanceMeasure.cosine),
+          apiQuery(base).findNearest(
+            vectorField: 'w',
+            queryVector: <double>[1.0, 2.0],
+            limit: 3,
+            distanceMeasure: DistanceMeasure.cosine,
+          ),
         ),
       );
       expect(
         a,
         isNot(
-          apiQuery(
-            base,
-          ).findNearest('v', <double>[1.0, 3.0], 3, DistanceMeasure.cosine),
+          apiQuery(base).findNearest(
+            vectorField: 'v',
+            queryVector: <double>[1.0, 3.0],
+            limit: 3,
+            distanceMeasure: DistanceMeasure.cosine,
+          ),
         ),
       );
     });

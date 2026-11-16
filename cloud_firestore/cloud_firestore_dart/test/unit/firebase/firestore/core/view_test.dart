@@ -1160,8 +1160,7 @@ void main() {
     });
 
     test('keeps the order of a descending limitToLast query', () {
-      final Query query = messageQuery()
-          .orderBy(orderBy('num', 'desc'))
+      final Query query = messageQuery().orderBy(orderBy('num', 'desc'))
           .limitToLast(2);
       final View view = View(query, DocumentKey.emptyKeySet);
 

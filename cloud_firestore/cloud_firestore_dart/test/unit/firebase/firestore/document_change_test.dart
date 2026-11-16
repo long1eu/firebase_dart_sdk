@@ -69,7 +69,7 @@ void main() {
     final List<Document> expected = updatedSnapshot.documents.toList();
     final List<Document> actual = initialSnapshot!.documents.toList();
 
-    final Firestore firestore = FirebaseFirestoreMock();
+    final FirebaseFirestore firestore = FirebaseFirestoreMock();
     final List<DocumentChange> changes = DocumentChangeInternal.changesFromSnapshot(
         firestore, MetadataChanges.exclude, updatedSnapshot);
 
@@ -79,7 +79,7 @@ void main() {
       }
 
       if (change.type != DocumentChangeType.removed) {
-        actual.insert(change.newIndex, change.document.document!);
+        actual.insert(change.newIndex, change.doc.document!);
       }
     }
 
@@ -193,7 +193,7 @@ void main() {
   });
 }
 
-/// A [Firestore] without a client.
+/// A [FirebaseFirestore] without a client.
 // ignore: non_constant_identifier_names
-Firestore FirebaseFirestoreMock() =>
+FirebaseFirestore FirebaseFirestoreMock() =>
     FirestoreInternal.detached(DatabaseId.forProject('project'));

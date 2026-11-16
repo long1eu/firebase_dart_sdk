@@ -30,14 +30,14 @@ class Syncer implements SharedClientStateSyncer {
   Future<void> applyBatchState(
     int batchId,
     MutationBatchState state,
-    FirestoreError? error,
+    FirestoreException? error,
   ) async => calls++;
 
   @override
   Future<void> applyTargetState(
     int targetId,
     QueryTargetState state,
-    FirestoreError? error,
+    FirestoreException? error,
   ) async => calls++;
 
   @override

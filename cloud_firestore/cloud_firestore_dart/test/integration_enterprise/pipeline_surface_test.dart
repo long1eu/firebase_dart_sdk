@@ -40,9 +40,7 @@ void main() {
       'integration_enterprise/pipeline_surface';
 
   final String? skip = IntegrationTestUtil.enterpriseEmulatorSkipReason;
-  final TransactionOptions readOnly = TransactionOptions(readOnly: true);
-
-  late Firestore firestore;
+  late FirebaseFirestore firestore;
   late CollectionReference<Map<String, Object?>> collection;
 
   List<Map<String, Object?>> rows(PipelineSnapshot snapshot) =>
@@ -51,10 +49,10 @@ void main() {
   Pipeline source() => firestore.pipeline().collection(collection);
 
   Matcher failsWith(FirestoreErrorCode code, [String? message]) => throwsA(
-    isA<FirestoreError>()
-        .having((FirestoreError e) => e.code, 'code', code)
+    isA<FirestoreException>()
+        .having((FirestoreException e) => e.errorCode, 'code', code)
         .having(
-          (FirestoreError e) => e.message,
+          (FirestoreException e) => e.message,
           'message',
           message == null ? anything : contains(message),
         ),
@@ -64,13 +62,13 @@ void main() {
     setUp(() async {
       firestore = await IntegrationTestUtil.testEnterpriseFirestore();
       collection = firestore.collection('surface_${autoId()}');
-      await collection.document('a').set(<String, Object?>{
+      await collection.doc('a').set(<String, Object?>{
         'n': 1,
         'region': 'eu',
         'scores': <int>[1, 5, 9],
         'm': <String, Object?>{'x': 1},
       });
-      await collection.document('b').set(<String, Object?>{
+      await collection.doc('b').set(<String, Object?>{
         'n': 2,
         'region': 'us',
         'scores': <int>[2],
@@ -97,8 +95,8 @@ void main() {
 
               final PipelineSnapshot before = await transaction.execute(sorted);
               // Another writer changes the collection meanwhile.
-              await collection.document('c').set(<String, Object?>{'n': 3});
-              await collection.document('a').delete();
+              await collection.doc('c').set(<String, Object?>{'n': 3});
+              await collection.doc('a').delete();
               final PipelineSnapshot after = await transaction.execute(sorted);
               final PipelineSnapshot count = await transaction.execute(
                 source().aggregate(<AliasedAggregate>[countAll().as('count')]),
@@ -106,7 +104,7 @@ void main() {
               expect(before.executionTime, isNotNull);
               expect(before.results.first.ref!.id, 'a');
               return <List<Object?>>[ns(before), ns(after), rows(count)];
-            }, options: readOnly);
+            }, readOnly: true);
 
         expect(seen, <List<Object?>>[
           <Object?>[1, 2],
@@ -127,22 +125,22 @@ void main() {
       test('mixes with document reads and queries', () async {
         await firestore.runTransaction<void>((Transaction transaction) async {
           final DocumentSnapshot<Map<String, Object?>> a = await transaction
-              .get(collection.document('a'));
+              .get(collection.doc('a'));
           final PipelineSnapshot snapshot = await transaction.execute(
             source().where(field('region').equal('eu')),
           );
-          expect(snapshot.results.single.data(), a.data);
+          expect(snapshot.results.single.data(), a.data());
           final QuerySnapshot<Map<String, Object?>> query = await transaction
               .getQuery(collection.where('region', isEqualTo: 'eu'));
           expect(query.docs.single.id, snapshot.results.single.id);
-        }, options: readOnly);
+        }, readOnly: true);
       }, skip: skip);
 
       test('write stages are rejected and nothing is written', () async {
         await expectLater(
           firestore.runTransaction<void>(
             (Transaction transaction) => transaction.execute(source().delete()),
-            options: readOnly,
+            readOnly: true,
           ),
           failsWith(FirestoreErrorCode.invalidArgument, 'delete'),
         );

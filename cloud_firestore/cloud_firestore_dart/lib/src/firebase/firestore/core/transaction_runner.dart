@@ -71,19 +71,19 @@ class TransactionRunner<TResult> {
     Object error, {
     required bool readOnly,
   }) {
-    if (error is FirestoreError && readOnly) {
+    if (error is FirestoreException && readOnly) {
       // A read-only transaction takes no locks and commits nothing: it has no conflicts to retry. Only failures of
       // the connection are worth another attempt.
-      return !Datastore.isPermanentError(error.code);
+      return !Datastore.isPermanentError(error.errorCode);
     }
-    if (error is FirestoreError) {
+    if (error is FirestoreException) {
       // In transactions, the backend will fail outdated reads with FAILED_PRECONDITION, non-matching document versions
       // with ABORTED, and attempts to create already exists with ALREADY_EXISTS. These errors should be retried.
-      final FirestoreErrorCode code = error.code;
+      final FirestoreErrorCode code = error.errorCode;
       return code == FirestoreErrorCode.aborted ||
           code == FirestoreErrorCode.alreadyExists ||
           code == FirestoreErrorCode.failedPrecondition ||
-          !Datastore.isPermanentError(error.code);
+          !Datastore.isPermanentError(error.errorCode);
     }
     return false;
   }

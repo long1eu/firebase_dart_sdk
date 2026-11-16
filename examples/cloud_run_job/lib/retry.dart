@@ -55,7 +55,8 @@ Future<T> withRetries<T>(
     } on Object catch (error) {
       final bool retryable =
           error is TimeoutException ||
-          (error is FirestoreError && retryableCodes.contains(error.code));
+          (error is FirestoreException &&
+              retryableCodes.contains(error.errorCode));
       if (!retryable) {
         rethrow;
       }

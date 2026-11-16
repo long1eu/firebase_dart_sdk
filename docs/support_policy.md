@@ -100,7 +100,7 @@ Behaviour is ported in Dart, not copied. Where the port deliberately differs fro
 Open an issue at <https://github.com/long1eu/firebase_dart_sdk/issues> (the issue tracker named
 in the packages' `pubspec.yaml`). Useful in a report: the package versions, the Dart SDK, the
 platform, whether it happens against the emulator or production, and a log with
-`Firestore.setLogLevel(LogLevel.debug)` if the problem is in syncing.
+`FirebaseFirestore.setLogLevel(LogLevel.debug)` if the problem is in syncing.
 
 - **DRAFT:** Security problems are reported privately, by the channel the maintainer names here:
   `<MAINTAINER: security contact>`.

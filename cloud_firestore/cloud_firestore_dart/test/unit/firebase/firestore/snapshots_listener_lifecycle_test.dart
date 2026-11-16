@@ -36,7 +36,7 @@ class _FakeClient extends Mock implements FirestoreClient {
 
 void main() {
   late _FakeClient client;
-  late Firestore firestore;
+  late FirebaseFirestore firestore;
 
   setUp(() {
     client = _FakeClient();
@@ -49,16 +49,16 @@ void main() {
 
   test('creating the stream registers nothing until it is listened to',
       () async {
-    firestore.collection('a').snapshots; // ignore: unnecessary_statements
-    firestore.doc('a/b').snapshots; // ignore: unnecessary_statements
-    firestore.collection('a').getSnapshots(MetadataChanges.include);
+    firestore.collection('a').snapshots(); // ignore: unnecessary_statements
+    firestore.doc('a/b').snapshots(); // ignore: unnecessary_statements
+    firestore.collection('a').snapshots(includeMetadataChanges: true);
     await settle();
     expect(client.registered, 0);
   });
 
   test('cancelling removes the listener', () async {
     final StreamSubscription<QuerySnapshot> sub =
-        firestore.collection('a').snapshots.listen((_) {});
+        firestore.collection('a').snapshots().listen((_) {});
     await settle();
     expect(client.registered, 1);
     await sub.cancel();
@@ -67,7 +67,7 @@ void main() {
 
   test('cancelling a document stream removes the listener', () async {
     final StreamSubscription<DocumentSnapshot> sub =
-        firestore.doc('a/b').snapshots.listen((_) {});
+        firestore.doc('a/b').snapshots().listen((_) {});
     await settle();
     await sub.cancel();
     expect(client.registered, 1);
@@ -78,7 +78,7 @@ void main() {
       () async {
     client.gate = Completer<void>();
     final StreamSubscription<QuerySnapshot> sub =
-        firestore.collection('a').snapshots.listen((_) {});
+        firestore.collection('a').snapshots().listen((_) {});
     await sub.cancel();
     expect(client.registered, 0);
 
@@ -92,12 +92,12 @@ void main() {
     final Completer<Object> error = Completer<Object>();
     final StreamSubscription<QuerySnapshot> sub = firestore
         .collection('a')
-        .snapshots
+        .snapshots()
         .listen((_) {}, onError: error.complete);
     await settle();
     client.streams.single
-        .onError(FirestoreError('boom', FirestoreErrorCode.unavailable));
-    expect(await error.future, isA<FirestoreError>());
+        .onError(FirestoreException(message: 'boom', errorCode: FirestoreErrorCode.unavailable));
+    expect(await error.future, isA<FirestoreException>());
     await sub.cancel();
   });
 }

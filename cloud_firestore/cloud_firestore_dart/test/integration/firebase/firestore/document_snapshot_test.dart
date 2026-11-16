@@ -23,7 +23,7 @@ void main() {
 
   test('snapshots of the same document are equal', () async {
     final DocumentReference documentReference =
-        (await testCollection('rooms')).document('eros');
+        (await testCollection('rooms')).doc('eros');
     final Map<String, Object?> initialValue = map(<dynamic>[
       'desc',
       'Description',
@@ -47,8 +47,8 @@ void main() {
     expect(snapshot1.reference, snapshot2.reference);
     expect(snapshot2.reference, snapshot3.reference);
 
-    expect(snapshot1.data, snapshot2.data);
-    expect(snapshot2.data, snapshot3.data);
+    expect(snapshot1.data(), snapshot2.data());
+    expect(snapshot2.data(), snapshot3.data());
 
     expect(snapshot1, snapshot2);
     expect(snapshot2, snapshot3);

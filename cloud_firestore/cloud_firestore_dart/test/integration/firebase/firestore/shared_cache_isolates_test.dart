@@ -64,9 +64,9 @@ OpenDatabase _openFixed(String dbName) {
   };
 }
 
-FirestoreSettings _settings(String emulator) {
+Settings _settings(String emulator) {
   final EmulatorAddress address = EmulatorAddress.parse(emulator);
-  return FirestoreSettings().withEmulator(address.host, address.port);
+  return Settings().withEmulator(address.host, address.port);
 }
 
 /// The entry point of a worker isolate: a Firestore instance on the shared cache that runs the commands it is sent.
@@ -77,13 +77,13 @@ Future<void> _workerMain(Map<String, Object?> args) async {
   final FirebaseApp app = FirebaseApp.withOptions(
     FirebaseOptions(
       apiKey: 'key',
-      applicationId: 'appId',
+      appId: 'appId',
       projectId: args['project']! as String,
     ),
     dependencies: null,
     name: args['name']! as String,
   );
-  final Firestore firestore = Firestore.instanceFor(
+  final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(
     app: app,
     settings: _settings(args['emulator']! as String),
     openDatabase: _openFixed(args['db']! as String),
@@ -104,7 +104,7 @@ Future<void> _workerMain(Map<String, Object?> args) async {
         // The write is stored once the local snapshot has it as a pending write.
         final Completer<void> stored = Completer<void>();
         final StreamSubscription<DocumentSnapshot<Map<String, Object?>>>
-        subscription = doc.getSnapshots(MetadataChanges.include).listen((
+        subscription = doc.snapshots(includeMetadataChanges: true).listen((
           DocumentSnapshot<Map<String, Object?>> snapshot,
         ) {
           if (snapshot.metadata.hasPendingWrites && !stored.isCompleted) {
@@ -128,7 +128,7 @@ Future<void> _workerMain(Map<String, Object?> args) async {
         replies.send(<Object?>['stored', path]);
       case 'terminate':
         await firestore.terminate();
-        app.delete();
+        await app.delete();
         replies.send(<Object?>['terminated']);
         commands.close();
     }
@@ -248,7 +248,7 @@ void main() {
 
   late String db;
   late String collection;
-  late Firestore observer;
+  late FirebaseFirestore observer;
   final List<_Worker> workers = <_Worker>[];
 
   setUp(() async {
@@ -263,13 +263,13 @@ void main() {
     final FirebaseApp app = FirebaseApp.withOptions(
       const FirebaseOptions(
         apiKey: 'key',
-        applicationId: 'appId',
+        appId: 'appId',
         projectId: FirestoreProvider.fallbackProjectId,
       ),
       dependencies: null,
       name: 'observer-${const Uuid().v4()}',
     );
-    observer = Firestore.instanceFor(
+    observer = FirebaseFirestore.instanceFor(
       app: app,
       settings: _settings(
         emulator!,
@@ -277,7 +277,7 @@ void main() {
     );
     addTearDown(() async {
       await observer.terminate();
-      app.delete();
+      await app.delete();
     });
   });
 
@@ -306,8 +306,8 @@ void main() {
   Future<int?> applied(String id) async {
     final DocumentSnapshot<Map<String, Object?>> snapshot = await observer
         .doc('$collection/$id')
-        .get(Source.server);
-    return snapshot.data?['n'] as int?;
+        .get(GetOptions(source: Source.server));
+    return snapshot.data()?['n'] as int?;
   }
 
   Future<void> eventually(

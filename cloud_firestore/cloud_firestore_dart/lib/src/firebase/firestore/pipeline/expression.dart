@@ -782,7 +782,7 @@ class Field extends Expression implements Selectable {
       if (nameOrPath == documentIdName) {
         return Field(model.FieldPath.keyPath);
       }
-      return Field(FieldPath.fromDotSeparatedPath(nameOrPath).internalPath);
+      return Field(FieldPath.fromString(nameOrPath).internalPath);
     }
     throw ArgumentError(
       'A field must be a String or a FieldPath, but got: $nameOrPath',

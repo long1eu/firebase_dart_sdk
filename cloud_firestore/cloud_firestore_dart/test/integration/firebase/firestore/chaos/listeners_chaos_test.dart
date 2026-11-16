@@ -30,7 +30,7 @@ void main() {
 
   group('listeners', () {
     test('across repeated cuts end with the state of the backend', () async {
-      final Firestore db = await env.newClient();
+      final FirebaseFirestore db = await env.newClient();
       final String name = uniqueName('listen');
       final CollectionReference<Map<String, Object?>> writer =
           env.oracle.collection(name);
@@ -44,8 +44,7 @@ void main() {
           RecordingListener(db.collection(name).orderBy('n'));
       final RecordingListener even = RecordingListener(db
           .collection(name)
-          .where('even', isEqualTo: true)
-          .orderBy('n', Direction.descending)
+          .where('even', isEqualTo: true).orderBy('n', descending: true)
           .limit(3));
       await all.synced();
 
@@ -60,7 +59,7 @@ void main() {
         await writer.doc('d${round % 5}').set(<String, Object?>{
           'n': FieldValue.increment(1000),
           'even': round.isOdd,
-        }, SetOptions.mergeAllFields);
+        }, const SetOptions(merge: true));
         if (round % 3 == 0) {
           await writer.doc('d${next - 2}').delete();
         }
@@ -131,7 +130,7 @@ void main() {
 
     test('report pending writes and the cache state across an outage',
         () async {
-      final Firestore db = await env.newClient();
+      final FirebaseFirestore db = await env.newClient();
       final String name = uniqueName('metadata');
       await env.oracle.collection(name).doc('a').set(<String, Object?>{'v': 0});
 
@@ -155,7 +154,7 @@ void main() {
           in listener.last.docs) {
         expect(doc.metadata.hasPendingWrites, isTrue, reason: doc.id);
       }
-      expect(listener.last.docs.first.data, <String, Object?>{'v': 1});
+      expect(listener.last.docs.first.data(), <String, Object?>{'v': 1});
 
       // A change made elsewhere during the outage.
       await env.oracle.collection(name).doc('c').set(<String, Object?>{'v': 3});
@@ -186,7 +185,7 @@ void main() {
     });
 
     test('resolve limbo documents while the connection is cut', () async {
-      final Firestore db = await env.newClient();
+      final FirebaseFirestore db = await env.newClient();
       final String name = uniqueName('limbo');
       final CollectionReference<Map<String, Object?>> writer =
           env.oracle.collection(name);
@@ -221,7 +220,7 @@ void main() {
     });
 
     test('catch up with deletes and updates after a long outage', () async {
-      final Firestore db = await env.newClient();
+      final FirebaseFirestore db = await env.newClient();
       final String name = uniqueName('outage');
       final CollectionReference<Map<String, Object?>> writer =
           env.oracle.collection(name);
@@ -282,7 +281,7 @@ void main() {
       }
       await batch.commit();
 
-      final Firestore db = await env.newClient();
+      final FirebaseFirestore db = await env.newClient();
       bool stalled = false;
       env.proxy.cutWhen = (ChaosDirection direction, Uint8List data) {
         if (!stalled &&

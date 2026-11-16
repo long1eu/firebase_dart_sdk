@@ -6,7 +6,7 @@ import 'package:shelf_router/shelf_router.dart';
 
 import 'change_feed.dart';
 
-/// The routes of the task API on one shared [Firestore] instance:
+/// The routes of the task API on one shared [FirebaseFirestore] instance:
 ///
 ///     GET    /tasks?done=true|false    list (all without `done`)
 ///     POST   /tasks {"title": "..."}   create; 201 {"id": "..."}
@@ -25,7 +25,7 @@ class TaskApi {
     _feed = ChangeFeed(_tasks);
   }
 
-  final Firestore _firestore;
+  final FirebaseFirestore _firestore;
   final CollectionReference<Map<String, Object?>> _tasks;
   late final ChangeFeed _feed;
 
@@ -58,12 +58,12 @@ class TaskApi {
       query = _tasks.where('done', isEqualTo: done == 'true');
     }
     final QuerySnapshot<Map<String, Object?>> snapshot = await query.get(
-      Source.server,
+      GetOptions(source: Source.server),
     );
     return _json(200, <Map<String, Object?>>[
       for (final QueryDocumentSnapshot<Map<String, Object?>> doc
           in snapshot.docs)
-        <String, Object?>{'id': doc.id, ...toJson(doc.data)},
+        <String, Object?>{'id': doc.id, ...toJson(doc.data())},
     ]);
   }
 
@@ -86,11 +86,11 @@ class TaskApi {
   Future<Response> _read(Request request, String id) async {
     final DocumentSnapshot<Map<String, Object?>> snapshot = await _tasks
         .doc(id)
-        .get(Source.server);
+        .get(GetOptions(source: Source.server));
     if (!snapshot.exists) {
       return _json(404, <String, Object?>{'error': 'no task $id'});
     }
-    return _json(200, <String, Object?>{'id': id, ...toJson(snapshot.data!)});
+    return _json(200, <String, Object?>{'id': id, ...toJson(snapshot.data()!)});
   }
 
   Future<Response> _update(Request request, String id) async {
@@ -135,8 +135,8 @@ class TaskApi {
     return (Request request) async {
       try {
         return await inner(request);
-      } on FirestoreError catch (e) {
-        final int status = switch (e.code) {
+      } on FirestoreException catch (e) {
+        final int status = switch (e.errorCode) {
           FirestoreErrorCode.notFound => 404,
           FirestoreErrorCode.invalidArgument => 400,
           FirestoreErrorCode.permissionDenied => 403,

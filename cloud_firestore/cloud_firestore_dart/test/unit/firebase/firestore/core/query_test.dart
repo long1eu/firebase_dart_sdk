@@ -1079,28 +1079,24 @@ void main() {
 
     // Explicit key ordering is respected
     expect(
-      baseQuery
-          .orderBy(orderBy(DocumentKey.keyFieldName, 'asc'))
+      baseQuery.orderBy(orderBy(DocumentKey.keyFieldName, 'asc'))
           .orderByConstraints,
       <OrderBy>[orderBy(DocumentKey.keyFieldName, 'asc')],
     );
     expect(
-      baseQuery
-          .orderBy(orderBy(DocumentKey.keyFieldName, 'desc'))
+      baseQuery.orderBy(orderBy(DocumentKey.keyFieldName, 'desc'))
           .orderByConstraints,
       <OrderBy>[orderBy(DocumentKey.keyFieldName, 'desc')],
     );
     expect(
       baseQuery
-          .orderBy(orderBy('foo'))
-          .orderBy(orderBy(DocumentKey.keyFieldName, 'asc'))
+          .orderBy(orderBy('foo')).orderBy(orderBy(DocumentKey.keyFieldName, 'asc'))
           .orderByConstraints,
       <OrderBy>[orderBy('foo'), orderBy(DocumentKey.keyFieldName, 'asc')],
     );
     expect(
       baseQuery
-          .orderBy(orderBy('foo'))
-          .orderBy(orderBy(DocumentKey.keyFieldName, 'desc'))
+          .orderBy(orderBy('foo')).orderBy(orderBy(DocumentKey.keyFieldName, 'desc'))
           .orderByConstraints,
       <OrderBy>[orderBy('foo'), orderBy(DocumentKey.keyFieldName, 'desc')],
     );
@@ -1121,8 +1117,7 @@ void main() {
     );
     expect(
       baseQuery
-          .orderBy(orderBy('foo', 'asc'))
-          .orderBy(orderBy('bar', 'desc'))
+          .orderBy(orderBy('foo', 'asc')).orderBy(orderBy('bar', 'desc'))
           .orderByConstraints,
       <OrderBy>[
         orderBy('foo', 'asc'),
@@ -1132,8 +1127,7 @@ void main() {
     );
     expect(
       baseQuery
-          .orderBy(orderBy('foo', 'desc'))
-          .orderBy(orderBy('bar', 'asc'))
+          .orderBy(orderBy('foo', 'desc')).orderBy(orderBy('bar', 'asc'))
           .orderByConstraints,
       <OrderBy>[
         orderBy('foo', 'desc'),
@@ -1221,8 +1215,7 @@ void main() {
         .orderBy(orderBy('b'))
         .orderBy(orderBy('c'))
         .orderBy(orderBy('d'))
-        .orderBy(orderBy('e'))
-        .orderBy(orderBy('f'));
+        .orderBy(orderBy('e')).orderBy(orderBy('f'));
 
     final List<OrderBy> orderByList = query.orderByConstraints;
 
@@ -1544,8 +1537,7 @@ void main() {
 
     test('toTarget of a limitToLast query flips the orderings', () {
       final Query query = base()
-          .orderBy(orderBy('foo', 'desc'))
-          .orderBy(orderBy('bar'))
+          .orderBy(orderBy('foo', 'desc')).orderBy(orderBy('bar'))
           .limitToLast(4);
       final Target target = query.toTarget();
       expect(target.orderBy, <OrderBy>[
@@ -1569,8 +1561,7 @@ void main() {
         inclusive: true,
       );
       final Bound end = Bound(position: <FieldValue>[wrap(9)], inclusive: true);
-      final Target target = base()
-          .orderBy(orderBy('foo'))
+      final Target target = base().orderBy(orderBy('foo'))
           .startAt(start)
           .endAt(end)
           .limitToLast(2)
@@ -1582,16 +1573,14 @@ void main() {
       expect(target.endAt!.inclusive, isTrue);
 
       // Without bounds nothing is invented.
-      final Target unbounded = base()
-          .orderBy(orderBy('foo'))
+      final Target unbounded = base().orderBy(orderBy('foo'))
           .limitToLast(2)
           .toTarget();
       expect(unbounded.startAt, isNull);
       expect(unbounded.endAt, isNull);
 
       // Only one bound.
-      final Target onlyStart = base()
-          .orderBy(orderBy('foo'))
+      final Target onlyStart = base().orderBy(orderBy('foo'))
           .startAt(start)
           .limitToLast(2)
           .toTarget();
@@ -1601,8 +1590,7 @@ void main() {
 
     test('mirror queries map to the same target', () {
       final Query limit = base().orderBy(orderBy('sort')).limit(2);
-      final Query limitToLast = base()
-          .orderBy(orderBy('sort', 'desc'))
+      final Query limitToLast = base().orderBy(orderBy('sort', 'desc'))
           .limitToLast(2);
 
       expect(limit.toTarget(), limitToLast.toTarget());
@@ -1761,8 +1749,7 @@ void main() {
         base()
             .filter(filter('b', '<', 5))
             .filter(filter('a', '<', 5))
-            .filter(filter('z', '<', 5))
-            .orderBy(orderBy('z'))
+            .filter(filter('z', '<', 5)).orderBy(orderBy('z'))
             .orderByConstraints,
         <OrderBy>[orderBy('z'), orderBy('a'), orderBy('b'), orderBy(key)],
       );
@@ -1771,8 +1758,7 @@ void main() {
       expect(
         base()
             .filter(filter('b', '<', 5))
-            .filter(filter('a', '<', 5))
-            .orderBy(orderBy('z', 'desc'))
+            .filter(filter('a', '<', 5)).orderBy(orderBy('z', 'desc'))
             .orderByConstraints,
         <OrderBy>[
           orderBy('z', 'desc'),
@@ -1786,8 +1772,7 @@ void main() {
         base()
             .filter(filter('b', '<', 5))
             .filter(filter('a', '<', 5))
-            .orderBy(orderBy('z', 'desc'))
-            .orderBy(orderBy('c'))
+            .orderBy(orderBy('z', 'desc')).orderBy(orderBy('c'))
             .orderByConstraints,
         <OrderBy>[
           orderBy('z', 'desc'),
@@ -2019,8 +2004,7 @@ void main() {
     test('limitToLast flips the implicit multiple inequality orderings', () {
       final Query q = base()
           .filter(filter('b', '>', 1))
-          .filter(filter('a', '>', 1))
-          .orderBy(orderBy('z'))
+          .filter(filter('a', '>', 1)).orderBy(orderBy('z'))
           .limitToLast(2);
       expect(q.toTarget().orderBy, <OrderBy>[
         orderBy('z', 'desc'),

@@ -15,6 +15,14 @@ verification kit (`tool/verify_production`) was run, on a Standard edition datab
 
 A call goes down through these layers, and a server event comes back up through them.
 
+The picture shows the main layers of one instance; look at how listens enter through the `EventManager`
+and writes through the `SyncEngine`, and at the dashed path of transactions, which skips the cache.
+
+![The layers of one Firestore instance: public API, FirestoreClient with its serial queue, EventManager
+and SyncEngine, then the LocalStore (mutation queue, overlays, remote document cache, target cache, bundles,
+cache indexes) on memory or SQLite persistence next to the RemoteStore (watch and write streams of the
+Datastore, gRPC or WebChannel transport), and the backend at the bottom](images/arch/client_layers.svg)
+
 | Layer | What it does | Dart | Upstream |
 |---|---|---|---|
 | Public API | `Firestore`, references, queries, snapshots, converters, value types. Parses user data into the model and converts results back. | `lib/firestore.dart`, `query.dart`, `document_reference.dart`, `document_snapshot.dart`, `user_data_converter.dart`, `snapshot_json.dart`; exported by `lib/cloud_firestore_dart.dart` | Android `FirebaseFirestore.java`, `Query.java`, `UserDataReader.java`, `UserDataWriter.java`; JS `api/snapshot.ts` for snapshot JSON |
@@ -73,6 +81,56 @@ guarantee: `FirestoreClient` enqueues every operation on a `SerialQueue` that it
 the `RemoteStore`, and a task that is already on the queue runs nested calls inline. Covered by
 `test/unit/firebase/firestore/core/serial_queue_test.dart`.
 
+### The path of a write and of a listen
+
+A write is applied to the cache and shown to listeners before it is sent; its future completes only on the
+acknowledgement. Follow the order of the calls in `SyncEngine.writeMutations` and
+`RemoteStore._handleWriteStreamMutationResults`:
+
+```mermaid
+sequenceDiagram
+    participant app as App
+    participant sync as SyncEngine
+    participant local as LocalStore
+    participant events as EventManager
+    participant remote as RemoteStore
+    participant backend as Backend
+    app->>sync: set() through FirestoreClient.write
+    sync->>local: writeLocally, into the mutation queue and an overlay
+    sync->>events: ViewSnapshots with hasPendingWrites true
+    events-->>app: snapshot with the change, before the backend has it
+    sync->>remote: fillWritePipeline
+    remote->>backend: the batch on the write stream
+    backend-->>remote: WriteResponse with the commit version
+    remote->>sync: handleSuccessfulWrite
+    sync->>local: acknowledgeBatch
+    sync-->>app: the future of set() completes
+```
+
+A listen first answers from the cache and then from the watch stream. Look at where the first snapshot
+comes from and when `isFromCache` turns false:
+
+```mermaid
+sequenceDiagram
+    participant app as App
+    participant events as EventManager
+    participant sync as SyncEngine
+    participant local as LocalStore
+    participant remote as RemoteStore
+    participant backend as Backend
+    app->>events: snapshots() through FirestoreClient.listen
+    events->>sync: listen(query)
+    sync->>local: allocateTarget and executeQuery
+    sync-->>app: first snapshot from the cache (if there is one to show)
+    sync->>remote: listen(target)
+    remote->>backend: ListenRequest on the watch stream
+    backend-->>remote: document changes, then CURRENT and a snapshot version
+    remote->>sync: RemoteEvent from the WatchChangeAggregator
+    sync->>local: applyRemoteEvent
+    sync->>events: the View applies the changes, new ViewSnapshot
+    events-->>app: snapshot with isFromCache false
+```
+
 ## Tests
 
 | Kind | Where | What it needs | Command (from the package directory unless noted) |
@@ -125,7 +183,7 @@ changes. `PORTING NOTE` comments in `lib/` mark these places in the code.
 | On the VM a cache in the default rollback-journal mode is switched to write-ahead logging when it is opened (`SQLitePersistence._useWriteAheadLog`); a journal mode the opener set is kept, and the web keeps its rollback journal. Android leaves the mode to the platform. | With a rollback journal several clients of one file (isolates, processes) block each other's reads and writes, and SQLite's busy handler only polls: under load a client waited out the 10-second busy timeout and failed with `database is locked` (4 of 40 rounds of 32 isolates opening a new cache at once; none in 160 rounds with WAL). | `test/unit/firebase/firestore/local/sqlite_concurrent_open_test.dart` (`OPEN_STRESS_ISOLATES`, `OPEN_STRESS_ROUNDS` for load runs), `sqlite_shared_clients_test.dart` |
 | Every transaction is `BEGIN IMMEDIATE` and starts by comparing `PRAGMA data_version`; when another connection committed, the target globals, the listen sequence, the batch id and stream token of the mutation queues and the memoized field indexes are read again, and a changed `user_version` fails the client. Schema migrations run in an exclusive transaction that reads the stored version itself. (Android caches all of this for the life of the process and migrates without a lock.) | Android owns the file exclusively; the port does not, so two clients on one file are possible and must not hand out the same ids or overwrite each other's metadata. | `test/unit/firebase/firestore/local/sqlite_shared_clients_test.dart`, `sqlite_shared_file_test.dart` |
 | The package does not open SQLite itself: the application passes an `OpenDatabase` function, and `clearPersistence` deletes the file that the opener opened (Android derives the path itself). | No native dependency in the package; any SQLite binding can be used. | `test/unit/firebase/firestore/clear_persistence_test.dart`; a complete opener is `example/sqlite_database.dart` |
-| The schema has its own numbering (version 18); Android's migrations are mapped onto it (`sqlite_schema.dart` says which). | The port branched off at schema 8 and took the later Android migrations in a different order. | `test/unit/firebase/firestore/local/sqlite_schema_test.dart`, `sqlite_schema_read_time_test.dart`, `legacy_cache_upgrade_test.dart` |
+| The schema has its own numbering (version 19); Android's migrations are mapped onto it (`sqlite_schema.dart` says which). | The port branched off at schema 8 and took the later Android migrations in a different order. | `test/unit/firebase/firestore/local/sqlite_schema_test.dart`, `sqlite_schema_read_time_test.dart`, `legacy_cache_upgrade_test.dart` |
 | The overlay migration rebuilds all overlays from the mutation queues (Android keeps existing rows). | Rows can be stale when an older version of the port, without overlays, changed the queue in between. | `test/unit/firebase/firestore/local/sqlite_overlay_migration_manager_test.dart` (`testRebuildsStaleOverlaysAfterDowngrade`) |
 | Recalculating overlays removes the overlay of a document whose mutations no longer apply (Android keeps it). | The kept overlay would still be applied on the next read. | no dedicated test was found; the code is in `local/local_documents_view.dart` |
 | When a remote event changes whether a document exists, the set overlay of a merge or update on a document without remote version is recalculated from the mutation queue; upstream recalculates only a missing or patch overlay. A set or delete overlay that comes from a set or delete among the pending writes of the document is applied as stored, as upstream. | Once the document arrives from the backend, upstream's stored set would hide the remote fields the merge does not touch. A real set determines the whole document; recalculating it would only rebase its server timestamps on the remote document and raise an extra `modified` event. | `test/unit/firebase/firestore/local/cases/local_store_test_case.dart` (memory and SQLite runners): `testDeviationSetOverlayOfMergeIsRecalculatedWhenDocumentArrives`, `testSetOverlayWithServerTimestampIsKeptWhenDocumentArrives`, `testViewSeesTwoEventsForSetWithServerTimestamp` |
@@ -169,15 +227,15 @@ changes. `PORTING NOTE` comments in `lib/` mark these places in the code.
 | The model keeps the typed `FieldValue` classes of the 2019 port (`lib/model/value/`) instead of proto `Value`s; the BSON types are classes too, detected by shape only when decoding. | Rewriting the model on protos was out of scope. | `test/unit/firebase/firestore/model/field_value_test.dart`, `model/bson_values_test.dart`, `bson_serialization_test.dart` |
 | `==` on numbers of different types is false while `compareTo` compares by value (as JS; Android's `Values.equals` compares by value). Filters do not use `==`: see the next row. | `==` drives document equality and change detection. | `test/unit/firebase/firestore/model/bson_values_test.dart` |
 | The local evaluation of filters and transforms follows the backend where the JS and Android SDKs do not: `in`, `not-in`, the array filters, `arrayUnion` and `arrayRemove` compare numbers by value whatever their type, and range filters do not match `null` and `NaN`. | Otherwise a cached document that only the client matches stays in limbo, and the cache differs from the stored document after an array transform. Found by the property tests. | `test/unit/property/`, `test/integration/firebase/firestore/property_query_test.dart`, `property_mutation_test.dart`, `test/unit/firebase/firestore/model/bson_values_test.dart` ("membership filters match numbers by value") |
-| A cached document that the client matches for a query but the backend does not return is dropped from that query's view once limbo resolution shows that it exists, the target is current without it on the current watch stream (not while it is resumed after a reconnect or filled again after an existence filter mismatch) and no pending write explains the difference (`core/view.dart`, `core/sync_engine.dart`). JS and Android keep it in limbo. | The listener would never leave `isFromCache` and `get(Source.server)` would not complete whenever local filter semantics disagree with the backend. The backend is trusted. | `test/unit/firebase/firestore/spec/limbo_mismatch_spec_test.dart`, `core/view_limbo_cache_test.dart`, `core/view_limbo_from_cache_test.dart`, `core/held_back_view_property_test.dart` |
-| A write that is acknowledged with the version the cached document already has (a re-sent write that changed nothing on the backend) is applied when the cached document is only the result of earlier acknowledgements. Upstream drops it. | After a lost acknowledgement `get(Source.cache)` returned the old value without a pending write. | `test/unit/firebase/firestore/local/local_store_ack_same_version_test.dart` |
+| A cached document that the client matches for a query but the backend does not return is dropped from that query's view once limbo resolution shows that it exists, the target is current without it on the current watch stream (not while it is resumed after a reconnect or filled again after an existence filter mismatch) and no pending write explains the difference (`core/view.dart`, `core/sync_engine.dart`). JS and Android keep it in limbo. | The listener would never leave `isFromCache` and `get(const GetOptions(source: Source.server))` would not complete whenever local filter semantics disagree with the backend. The backend is trusted. | `test/unit/firebase/firestore/spec/limbo_mismatch_spec_test.dart`, `core/view_limbo_cache_test.dart`, `core/view_limbo_from_cache_test.dart`, `core/held_back_view_property_test.dart` |
+| A write that is acknowledged with the version the cached document already has (a re-sent write that changed nothing on the backend) is applied when the cached document is only the result of earlier acknowledgements. Upstream drops it. | After a lost acknowledgement `get(const GetOptions(source: Source.cache))` returned the old value without a pending write. | `test/unit/firebase/firestore/local/local_store_ack_same_version_test.dart` |
 | `Decimal128Value` accepts only strings that decimal128 holds exactly (at most 34 significant digits, last digit not below `1e-6176`, not above `9.99...9e6144`) and throws a `FormatException` for the others; values are compared exactly (`util/exact_number.dart`, digits kept as a string). Upstream accepts any decimal string and converts it to a `Quadruple` (a binary float with a 128-bit mantissa from at most 59 significant digits). A stored value read from the backend, a bundle or the cache is not checked. | The backend rejects such values with `invalid-argument` (probed on the Enterprise emulator), so the client fails at once instead of at the write; for every value it accepts, the order is the same as upstream's. | `test/unit/firebase/firestore/bson_types_test.dart` ("a Decimal128Value is a value decimal128 holds exactly"), `bson_serialization_test.dart`, `model/value_util_ios_test.dart`, `test/integration_enterprise/bson_types_test.dart` |
 | A plain map with a reserved key (`{'__int__': 5}`) is rejected in document data, and read as the BSON value in a query value or an array transform element. | The backend does not tell the map from the BSON value; the cache must evaluate the query the same way. | `test/unit/firebase/firestore/bson_shaped_maps_test.dart` |
 | Bundles may contain `OR` composite filters (Android only reads `AND`). | The bundle inside `QuerySnapshot.toJson()` of an OR query must be readable. | `test/unit/firebase/firestore/bundle/bundle_serializer_test.dart`, `snapshot_json_test.dart` |
 | `fromJson` of a missing document accepts the empty bundle that `toJson` writes (the JS SDK fails to parse it). | A round trip of a missing document should work. | `test/unit/firebase/firestore/snapshot_json_test.dart` |
 | A query converted to a pipeline adds checks that JS and Android do not: `!=` / `not-in` exclude null, array filters skip non-array fields. | So that `createFrom(query)` returns what the query returns. | `test/unit/firebase/firestore/pipeline/query_to_pipeline_test.dart`, `test/integration_enterprise/pipeline_create_from_test.dart` |
-| `TransactionOptions(readOnly: true)` runs a read-only transaction of the backend (`BeginTransaction`, reads with its id, `Rollback`), with `Transaction.getQuery` / `getAggregate` and an optional `readTime`. Android and JS have no read-only transactions. | A consistent snapshot across documents and queries, as the server SDKs offer. | `test/integration/firebase/firestore/read_only_transaction_test.dart`, `test/unit/firebase/firestore/core/read_only_transaction_test.dart` |
-| Calls on a terminated instance fail with `FirestoreError` `failedPrecondition` through the returned `Future` or `Stream`, never synchronously (the JS behaviour). | One way to handle the error, whatever the call. | `test/integration/firebase/firestore/terminated_instance_test.dart` |
+| `readOnly: true` runs a read-only transaction of the backend (`BeginTransaction`, reads with its id, `Rollback`), with `Transaction.getQuery` / `getAggregate` and an optional `readTime`. Android and JS have no read-only transactions. | A consistent snapshot across documents and queries, as the server SDKs offer. | `test/integration/firebase/firestore/read_only_transaction_test.dart`, `test/unit/firebase/firestore/core/read_only_transaction_test.dart` |
+| Calls on a terminated instance fail with `FirestoreException` `failedPrecondition` through the returned `Future` or `Stream`, never synchronously (the JS behaviour). | One way to handle the error, whatever the call. | `test/integration/firebase/firestore/terminated_instance_test.dart` |
 | `Query.where('field')` with no non-null named argument throws an `ArgumentError` (FlutterFire returns the query unchanged). | A filter that silently does nothing hides mistakes. | `test/unit/firebase/firestore/query_where_test.dart` |
 | The public API is classes and methods with Java-style names plus Dart aliases, not the modular functions of the JS SDK. Internal members are library-private and reached through extensions that the public libraries do not export. | Dart tree-shakes methods. | `test/unit/api/public_api.golden.txt` is the exact surface |
 | Multi-client coordination (the JS SDK's primary lease, `SharedClientState` and `applyPrimaryState`) exists in the library and runs the multi-client specs on SQLite, but a `FirestoreClient` does not share state yet: the shared state lives on an in-process bus that only the spec runner uses (stage 3 of the plan, the SQLite-backed shared state for isolates and processes, is deferred until after 0.1.0). Two clients on one SQLite file elect a primary and keep the file consistent (see Persistence) but do not share listeners or pending writes. Each reads the other's documents and pending writes from the file, but only the client that made a write sends it, and only while it is primary: each batch records its client (schema 18), and the primary skips the batches of other live clients, because without shared state it could not tell them the result (the JS primary sends every batch and tells the client that made it through `SharedClientState`). A batch of a client that is gone (terminated, or no metadata refresh for 60 s, `SQLiteClientMetadata.maxBatchOwnerAgeMs`, separate from the 30-minute age after which the row of a client is removed) or one stored before schema 18 is sent by the primary, so on the VM a crashed or killed app's writes go out about a minute after it is relaunched (there is no cheap exact signal that a client of another isolate or process is gone: file locks are per process, not per isolate); a client stalled for more than 60 s can have a write sent by the primary without being told the result. A database whose opener holds an exclusive lock for as long as it is open (`ExclusiveDatabase`: the Web Lock of the web openers) proves that every other client is gone, so there the batches of the previous page are sent at once, as the JS SDK does after a reload. `waitForPendingWrites` waits for the highest batch this client sends, which includes the batches of clients that are gone. The spec runner, whose clients do share state, sends every batch as JS does. So a listener of the primary stays `isFromCache` while a pending write of the other client moves a document into its limit window. And when the isolate stalls for longer than the lease (5 s, refreshed every 4 s) while both clients have network, the lease can move to the other client and stay there; the writes of the client that lost it are then not sent until it is primary again. On the web a second tab is refused by a Web Lock. Android and iOS have no multi-client support. | A VM client usually has one process per cache. | `test/unit/firebase/firestore/local/sqlite_shared_clients_test.dart`, `local/sqlite_primary_lease_test.dart`, `local/storage_shared_client_state_test.dart`; the multi-client specs in `spec/sqlite_spec_test.dart`; `test/integration/firebase/firestore/property_query_cache_test.dart` (two clients on one cache) |

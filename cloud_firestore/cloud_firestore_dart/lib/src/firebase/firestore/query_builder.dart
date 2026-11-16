@@ -3,7 +3,7 @@
 // filters, orderings, limits and cursors, on the internal query. The two
 // public classes keep the documentation and wrap the results.
 //
-// This file must not depend on either client (no Firestore class, no
+// This file must not depend on either client (no FirebaseFirestore class, no
 // reference or snapshot class): Firestore Lite is compiled without the main
 // client.
 
@@ -19,7 +19,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/core/query.dart'
 import 'package:cloud_firestore_dart/src/firebase/firestore/field_path.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/filter.dart'
     as api
-    show CompositeFilter, UnaryFilter;
+    show CompositeFilter, UnaryFilter, unaryFilters;
 import 'package:cloud_firestore_dart/src/firebase/firestore/filter.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/database_id.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/document.dart';
@@ -116,28 +116,20 @@ class QueryBuilder {
           'where() expects a Filter, a String field or a FieldPath',
         );
       }
-      api.UnaryFilter filter(FilterOperator op, Object? value) =>
-          api.UnaryFilter(fieldPath, op, value);
-      filters = <Filter>[
-        if (isEqualTo != null) filter(FilterOperator.equal, isEqualTo),
-        if (isNotEqualTo != null) filter(FilterOperator.notEqual, isNotEqualTo),
-        if (isLessThan != null) filter(FilterOperator.lessThan, isLessThan),
-        if (isLessThanOrEqualTo != null)
-          filter(FilterOperator.lessThanOrEqual, isLessThanOrEqualTo),
-        if (isGreaterThan != null)
-          filter(FilterOperator.graterThan, isGreaterThan),
-        if (isGreaterThanOrEqualTo != null)
-          filter(FilterOperator.graterThanOrEqual, isGreaterThanOrEqualTo),
-        if (arrayContains != null)
-          filter(FilterOperator.arrayContains, arrayContains),
-        if (arrayContainsAny != null)
-          filter(FilterOperator.arrayContainsAny, arrayContainsAny.toList()),
-        if (whereIn != null) filter(FilterOperator.IN, whereIn.toList()),
-        if (whereNotIn != null)
-          filter(FilterOperator.NOT_IN, whereNotIn.toList()),
-        if (isNull != null)
-          filter(isNull ? FilterOperator.equal : FilterOperator.notEqual, null),
-      ];
+      filters = api.unaryFilters(
+        fieldPath,
+        isEqualTo: isEqualTo,
+        isNotEqualTo: isNotEqualTo,
+        isLessThan: isLessThan,
+        isLessThanOrEqualTo: isLessThanOrEqualTo,
+        isGreaterThan: isGreaterThan,
+        isGreaterThanOrEqualTo: isGreaterThanOrEqualTo,
+        arrayContains: arrayContains,
+        arrayContainsAny: arrayContainsAny,
+        whereIn: whereIn,
+        whereNotIn: whereNotIn,
+        isNull: isNull,
+      );
       if (filters.isEmpty) {
         throw ArgumentError(
           "Invalid query. where('$fieldPath') needs at least one non-null "
@@ -185,7 +177,7 @@ class QueryBuilder {
       if (op == FilterOperator.arrayContains ||
           op == FilterOperator.arrayContainsAny) {
         throw ArgumentError(
-          'Invalid query. You can\'t perform "$op" queries on FieldPath.documentId().',
+          'Invalid query. You can\'t perform "$op" queries on FieldPath.documentId.',
         );
       } else if (op == FilterOperator.IN || op == FilterOperator.NOT_IN) {
         _validateDisjunctiveFilterElements(value, op);
@@ -250,13 +242,13 @@ class QueryBuilder {
     if (value is String) {
       if (value.isEmpty) {
         throw ArgumentError(
-          'Invalid query. When querying with FieldPath.documentId() you must provide a valid document ID, but it was an empty string.',
+          'Invalid query. When querying with FieldPath.documentId you must provide a valid document ID, but it was an empty string.',
         );
       }
 
       if (!query.isCollectionGroupQuery && value.contains('/')) {
         throw ArgumentError(
-          'Invalid query. When querying a collection by FieldPath.documentId() you must provide a plain document ID, but "$value" contains a "/" character.',
+          'Invalid query. When querying a collection by FieldPath.documentId you must provide a plain document ID, but "$value" contains a "/" character.',
         );
       }
 
@@ -265,7 +257,7 @@ class QueryBuilder {
       );
       if (!DocumentKey.isDocumentKey(path)) {
         throw ArgumentError(
-          'Invalid query. When querying a collection group by FieldPath.documentId(), the value provided must result in a valid document path, but "$path" is not because it has an odd number of segments (${path.length}).',
+          'Invalid query. When querying a collection group by FieldPath.documentId, the value provided must result in a valid document path, but "$path" is not because it has an odd number of segments (${path.length}).',
         );
       }
       return ReferenceValue.valueOf(databaseId, DocumentKey.fromPath(path));
@@ -275,7 +267,7 @@ class QueryBuilder {
       return ReferenceValue.valueOf(databaseId, key);
     } else {
       throw ArgumentError(
-        'Invalid query. When querying with FieldPath.documentId() you must provide a valid String or '
+        'Invalid query. When querying with FieldPath.documentId you must provide a valid String or '
         'DocumentReference, but it was of type: ${typeName(value)}',
       );
     }
@@ -479,7 +471,7 @@ class QueryBuilder {
 
         if (!query.isCollectionGroupQuery && documentId.contains('/')) {
           throw ArgumentError(
-            'Invalid query. When querying a collection and ordering by FieldPath.documentId(), the value passed to $methodName() must be a plain document ID, but "$documentId" contains a slash.',
+            'Invalid query. When querying a collection and ordering by FieldPath.documentId, the value passed to $methodName() must be a plain document ID, but "$documentId" contains a slash.',
           );
         }
         final ResourcePath path = query.path.appendField(
@@ -487,7 +479,7 @@ class QueryBuilder {
         );
         if (!DocumentKey.isDocumentKey(path)) {
           throw ArgumentError(
-            'Invalid query. When querying a collection group and ordering by FieldPath.documentId(), the value passed to $methodName() must result in a valid document path, but "$path" is not because it contains an odd number of segments.',
+            'Invalid query. When querying a collection group and ordering by FieldPath.documentId, the value passed to $methodName() must result in a valid document path, but "$path" is not because it contains an odd number of segments.',
           );
         }
         final DocumentKey key = DocumentKey.fromPath(path);

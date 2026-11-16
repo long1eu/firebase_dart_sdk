@@ -30,7 +30,7 @@ void main() {
       AggregateField.count().alias: IntegerValue.valueOf(42),
     });
     expect(snapshot.query, same(query));
-    expect(snapshot.getCount(), 42);
+    expect(snapshot.count, 42);
   });
 
   test('testSourceMustNotBeNull',
@@ -105,7 +105,7 @@ void main() {
     expect(data.keys.toList(), spec.keys.toList());
     expect(() => data['n'] = 4, throwsUnsupportedError);
     // Typed access by field keeps working.
-    expect(snapshot.getCount(), 3);
+    expect(snapshot.count, 3);
     expect(snapshot.get(AggregateField.sum('pages')), 150);
   });
 

@@ -298,22 +298,18 @@ void main() {
       await expectLater(
         provider.getAccessToken(forceRefresh: false),
         throwsA(
-          isA<FirebaseAuthProviderException>()
+          isA<FirebaseAuthException>()
               .having(
-                (FirebaseAuthProviderException e) => e.code,
+                (FirebaseAuthException e) => e.code,
                 'code',
                 'invalid-credential',
               )
               .having(
-                (FirebaseAuthProviderException e) => e.message,
+                (FirebaseAuthException e) => e.message,
                 'message',
                 contains('Invalid JWT Signature'),
               )
-              .having(
-                (FirebaseAuthProviderException e) => e.httpStatus,
-                'status',
-                400,
-              ),
+              .having((FirebaseAuthException e) => e.httpStatus, 'status', 400),
         ),
       );
 
@@ -322,8 +318,8 @@ void main() {
       await expectLater(
         provider.getAccessToken(forceRefresh: false),
         throwsA(
-          isA<FirebaseAuthProviderException>().having(
-            (FirebaseAuthProviderException e) => e.code,
+          isA<FirebaseAuthException>().having(
+            (FirebaseAuthException e) => e.code,
             'code',
             'network-request-failed',
           ),

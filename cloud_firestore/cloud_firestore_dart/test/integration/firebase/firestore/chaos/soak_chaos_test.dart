@@ -92,7 +92,7 @@ void main() {
                 'http#$connection ${delivered ? 'handed on' : 'received'} $text');
           };
         }
-        final Firestore db = await env.newClient(proxy: proxy);
+        final FirebaseFirestore db = await env.newClient(proxy: proxy);
         clients.add(_SoakClient(
             i, db, proxy, db.collection(name), Random(seed * 31 + i), record));
       }
@@ -142,7 +142,7 @@ void main() {
         await fresh.cancel();
         // The cache alone, which the listeners kept up to date.
         final QuerySnapshot<Map<String, Object?>> cached =
-            await client.collection.get(Source.cache);
+            await client.collection.get(GetOptions(source: Source.cache));
         expect(docsById(cached), server,
             reason: 'cache of client ${client.id}');
         expect(cached.metadata.hasPendingWrites, isFalse);
@@ -287,7 +287,7 @@ class _SoakClient {
       : main = RecordingListener(collection);
 
   final int id;
-  final Firestore db;
+  final FirebaseFirestore db;
   final ChaosProxy proxy;
   final CollectionReference<Map<String, Object?>> collection;
   final Random random;
@@ -323,7 +323,7 @@ class _SoakClient {
     record('#$op $what');
     _outstanding++;
     pending.add(future.then((_) => record('#$op ok'), onError: (Object e) {
-      record('#$op failed: ${e is FirestoreError ? e.code : e.runtimeType}');
+      record('#$op failed: ${e is FirestoreException ? e.errorCode : e.runtimeType}');
     }).whenComplete(() => _outstanding--));
   }
 
@@ -360,7 +360,7 @@ class _SoakClient {
           doc.set(<String, Object?>{'v': value, 'by': id}));
     } else if (roll < 28) {
       _track('merge ${doc.id} v=$value',
-          doc.set(<String, Object?>{'v': value}, SetOptions.mergeAllFields));
+          doc.set(<String, Object?>{'v': value}, const SetOptions(merge: true)));
     } else if (roll < 38) {
       _track('update ${doc.id} v=$value',
           doc.update(<String, Object?>{'v': value}));
@@ -368,7 +368,7 @@ class _SoakClient {
       _track(
           'increment ${doc.id}',
           doc.set(<String, Object?>{'c': FieldValue.increment(1)},
-              SetOptions.mergeAllFields));
+              const SetOptions(merge: true)));
     } else if (roll < 54) {
       final int tag = random.nextInt(4);
       final bool add = random.nextBool();
@@ -378,7 +378,7 @@ class _SoakClient {
             'tags': add
                 ? FieldValue.arrayUnion(<Object?>[tag])
                 : FieldValue.arrayRemove(<Object?>[tag]),
-          }, SetOptions.mergeAllFields));
+          }, const SetOptions(merge: true)));
     } else if (roll < 62) {
       _track('delete ${doc.id}', doc.delete());
     } else if (roll < 68) {
@@ -395,7 +395,7 @@ class _SoakClient {
           db.runTransaction<void>((Transaction transaction) async {
             final DocumentSnapshot<Map<String, Object?>> snapshot =
                 await transaction.get(doc);
-            final Object? v = snapshot.data?['v'];
+            final Object? v = snapshot.data()?['v'];
             transaction.set(
                 doc, <String, Object?>{'v': (v is int ? v : 0) + 1, 'tx': id});
           }).timeout(const Duration(seconds: 30)));
@@ -404,8 +404,7 @@ class _SoakClient {
       if (random.nextBool()) {
         record('listen v>=$value limit 3');
         _transient = RecordingListener(collection
-            .where('v', isGreaterThanOrEqualTo: value)
-            .orderBy('v')
+            .where('v', isGreaterThanOrEqualTo: value).orderBy('v')
             .limit(3));
       } else {
         record('stop listening');

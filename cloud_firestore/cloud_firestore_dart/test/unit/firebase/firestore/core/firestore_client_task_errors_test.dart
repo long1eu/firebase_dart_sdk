@@ -75,9 +75,9 @@ class _FaultyDatabase implements Database {
 
 TransientDatabaseException _busy() => TransientDatabaseException('busy');
 
-TypeMatcher<FirestoreError> _unavailable(String messagePrefix) =>
+TypeMatcher<FirestoreException> _unavailable(String messagePrefix) =>
     firestoreErrorWithCode(FirestoreErrorCode.unavailable).having(
-      (FirestoreError e) => e.message,
+      (FirestoreException e) => e.message,
       'message',
       startsWith(messagePrefix),
     );
@@ -86,7 +86,7 @@ void main() {
   checkTestsLeaveNothingBehind();
 
   late _FaultyDatabase database;
-  late Firestore firestore;
+  late FirebaseFirestore firestore;
   late DocumentReference<Map<String, Object?>> doc;
 
   SerialQueue queue() => firestore.client.queue;
@@ -97,9 +97,10 @@ void main() {
     expect(queue().escapedErrors, 0);
     // ignore: unawaited_futures, the write stays pending: nothing listens on the port.
     doc.set(<String, Object?>{'works': true});
-    expect((await doc.get(Source.cache)).data, <String, Object?>{
-      'works': true,
-    });
+    expect(
+      (await doc.get(GetOptions(source: Source.cache))).data(),
+      <String, Object?>{'works': true},
+    );
     expect(queue().escapedErrors, 0);
   }
 
@@ -107,7 +108,7 @@ void main() {
     final String name = 'task-errors-${const Uuid().v4()}';
     final FirebaseApp app = newApp(name);
     addTearDown(app.delete);
-    firestore = Firestore.instanceFor(
+    firestore = FirebaseFirestore.instanceFor(
       app: app,
       settings: offlineSettings,
       openDatabase:
@@ -141,7 +142,9 @@ void main() {
     doc = firestore.doc('col/doc');
     if (openError == null) {
       // Opens the cache.
-      await doc.get(Source.cache).then((_) {}, onError: (Object _) {});
+      await doc
+          .get(GetOptions(source: Source.cache))
+          .then((_) {}, onError: (Object _) {});
     }
   }
 
@@ -150,11 +153,11 @@ void main() {
       await open();
       database.fail(r'\bremote_documents\b', _busy);
       await expectLater(
-        doc.get(Source.cache),
+        doc.get(GetOptions(source: Source.cache)),
         throwsA(
           // The path of the document, as the JS SDK prints it.
           _unavailable('Failed to get document ').having(
-            (FirestoreError e) => e.message,
+            (FirestoreException e) => e.message,
             'message',
             "Failed to get document 'col/doc' from cache: "
                 'TransientDatabaseException: busy',
@@ -168,7 +171,10 @@ void main() {
       await open();
       final StateError error = StateError('broken');
       database.fail(r'\bremote_documents\b', () => error);
-      await expectLater(doc.get(Source.cache), throwsA(same(error)));
+      await expectLater(
+        doc.get(GetOptions(source: Source.cache)),
+        throwsA(same(error)),
+      );
       await expectClientWorks();
     });
   });
@@ -178,7 +184,7 @@ void main() {
       await open();
       database.fail(r'\bremote_documents\b', _busy);
       await expectLater(
-        firestore.collection('col').get(Source.cache),
+        firestore.collection('col').get(GetOptions(source: Source.cache)),
         throwsA(_unavailable('Failed to execute query ')),
       );
       await expectClientWorks();
@@ -189,7 +195,7 @@ void main() {
       final StateError error = StateError('broken');
       database.fail(r'\bremote_documents\b', () => error);
       await expectLater(
-        firestore.collection('col').get(Source.cache),
+        firestore.collection('col').get(GetOptions(source: Source.cache)),
         throwsA(same(error)),
       );
       await expectClientWorks();
@@ -216,7 +222,7 @@ void main() {
         doc.set(<String, Object?>{'a': 1}),
         throwsA(
           firestoreErrorWithCode(FirestoreErrorCode.unknown).having(
-            (FirestoreError e) => e.message,
+            (FirestoreException e) => e.message,
             'message',
             'Bad state: broken',
           ),
@@ -231,10 +237,10 @@ void main() {
       await open();
       database.fail(r'\btargets\b', _busy);
       await expectLater(
-        doc.snapshots.first,
+        doc.snapshots().first,
         throwsA(
           _unavailable('Initialization of query ').having(
-            (FirestoreError e) => e.message,
+            (FirestoreException e) => e.message,
             'message',
             "Initialization of query 'Query(target=Query(col/doc order by "
                 "__name__);limitType=LIMIT_TO_FIRST)' failed: "
@@ -249,7 +255,7 @@ void main() {
       await open();
       final StateError error = StateError('broken');
       database.fail(r'\btargets\b', () => error);
-      await expectLater(doc.snapshots.first, throwsA(same(error)));
+      await expectLater(doc.snapshots().first, throwsA(same(error)));
       await expectClientWorks();
     });
   });
@@ -281,9 +287,9 @@ void main() {
   test(
     'every operation fails with the error of a failed initialization',
     () async {
-      final FirestoreError error = FirestoreError(
-        'The cache can not be opened',
-        FirestoreErrorCode.failedPrecondition,
+      final FirestoreException error = FirestoreException(
+        message: 'The cache can not be opened',
+        errorCode: FirestoreErrorCode.failedPrecondition,
       );
       await open(openError: () => error);
 
@@ -293,11 +299,11 @@ void main() {
         throwsA(same(error)),
       );
       await expectLater(
-        firestore.collection('col').get(Source.cache),
+        firestore.collection('col').get(GetOptions(source: Source.cache)),
         throwsA(same(error)),
       );
       await expectLater(firestore.waitForPendingWrites(), throwsA(same(error)));
-      await expectLater(doc.snapshots.first, throwsA(same(error)));
+      await expectLater(doc.snapshots().first, throwsA(same(error)));
       expect(queue().escapedErrors, 0);
     },
   );

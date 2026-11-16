@@ -93,7 +93,7 @@ Future<SQLitePersistence> createClient(
 
 /// Whether [error] is a clean failure of an operation on a damaged cache.
 bool isCleanFailure(Object error) =>
-    error is FirestoreError ||
+    error is FirestoreException ||
     error is SqliteException ||
     error is TransientDatabaseException;
 

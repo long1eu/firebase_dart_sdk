@@ -28,19 +28,19 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/remote/datastore/dat
 import 'package:cloud_firestore_dart/src/proto/index.dart' as proto;
 
 /// The [TransactionClient] of a Firestore Lite transaction: every request is
-/// a call of its own of [Firestore.run]. It forwards every method of
+/// a call of its own of [FirebaseFirestore.run]. It forwards every method of
 /// [TransactionClient] (a new one there fails to compile here until it is
 /// forwarded too).
 ///
 /// So, as in the JS SDK, a transaction in progress does not hold off
-/// [Firestore.terminate]: once the instance is terminated, the next read or
+/// [FirebaseFirestore.terminate]: once the instance is terminated, the next read or
 /// the commit of the transaction fails with `failedPrecondition`, and only
 /// the request on the wire at that moment is waited for.
 class LiteTransactionClient implements TransactionClient {
   /// A client that sends the requests of a transaction of [firestore].
   LiteTransactionClient(this._firestore);
 
-  final Firestore _firestore;
+  final FirebaseFirestore _firestore;
 
   @override
   Future<List<MutationResult>> commit(List<Mutation> mutations) =>

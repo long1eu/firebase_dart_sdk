@@ -21,8 +21,8 @@ Future<void> main() async {
   );
   final FirebaseApp app = exampleApp();
 
-  Firestore open() {
-    return Firestore.instanceFor(
+  FirebaseFirestore open() {
+    return FirebaseFirestore.instanceFor(
       app: app,
       // Without `openDatabase` the cache is in memory, whatever the settings.
       openDatabase: sqliteOpener(directory),
@@ -36,7 +36,7 @@ Future<void> main() async {
 
   // First run: write a document; it is stored in the cache and sent to the
   // backend.
-  Firestore firestore = open();
+  FirebaseFirestore firestore = open();
   await firestore.doc(path).set(<String, Object?>{'text': 'written online'});
   await firestore.terminate();
   print(
@@ -51,7 +51,7 @@ Future<void> main() async {
       .doc(path)
       .get();
   print(
-    'offline read: ${cached.data} '
+    'offline read: ${cached.data()} '
     '(from cache: ${cached.metadata.isFromCache})',
   );
 
@@ -63,9 +63,9 @@ Future<void> main() async {
   );
   final DocumentSnapshot<Map<String, Object?>> local = await firestore
       .doc(path)
-      .get(Source.cache);
+      .get(GetOptions(source: Source.cache));
   print(
-    'offline write: ${local.data} '
+    'offline write: ${local.data()} '
     '(pending: ${local.metadata.hasPendingWrites})',
   );
 
@@ -74,8 +74,8 @@ Future<void> main() async {
   await pendingWrite;
   final DocumentSnapshot<Map<String, Object?>> synced = await firestore
       .doc(path)
-      .get(Source.server);
-  print('after sync: ${synced.data}');
+      .get(GetOptions(source: Source.server));
+  print('after sync: ${synced.data()}');
 
   await firestore.terminate();
   directory.deleteSync(recursive: true);

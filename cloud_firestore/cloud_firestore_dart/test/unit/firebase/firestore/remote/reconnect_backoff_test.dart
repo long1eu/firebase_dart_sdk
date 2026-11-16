@@ -82,20 +82,17 @@ void main() {
         misbehavior,
       );
       addTearDown(server.close);
-      final Firestore db = await IntegrationTestUtil.testFirestoreInstance(
-        'reconnect-backoff',
-        InternalLogLevel.w,
-        FirestoreSettings(
-          host: server.host,
-          port: server.port,
-          sslEnabled: false,
-        ),
-        IntegrationTestUtil.currentDatabasePath,
-      );
+      final FirebaseFirestore db =
+          await IntegrationTestUtil.testFirestoreInstance(
+            'reconnect-backoff',
+            InternalLogLevel.w,
+            Settings(host: server.host, port: server.port, sslEnabled: false),
+            IntegrationTestUtil.currentDatabasePath,
+          );
       final StreamSubscription<QuerySnapshot<Map<String, Object?>>>
       subscription = db
           .collection('coll')
-          .snapshots
+          .snapshots()
           .listen((_) {}, onError: (Object _) {});
       addTearDown(subscription.cancel);
       // Both streams are in use.
@@ -332,20 +329,17 @@ void main() {
       Datastore.transportOverride =
           (DatabaseInfo databaseInfo, ChannelOptionsProvider options) =>
               WebChannelTransport(IoWebHttpClient(), databaseInfo, options);
-      final Firestore db = await IntegrationTestUtil.testFirestoreInstance(
-        'reconnect-backoff',
-        InternalLogLevel.w,
-        FirestoreSettings(
-          host: '127.0.0.1',
-          port: server.port,
-          sslEnabled: false,
-        ),
-        IntegrationTestUtil.currentDatabasePath,
-      );
+      final FirebaseFirestore db =
+          await IntegrationTestUtil.testFirestoreInstance(
+            'reconnect-backoff',
+            InternalLogLevel.w,
+            Settings(host: '127.0.0.1', port: server.port, sslEnabled: false),
+            IntegrationTestUtil.currentDatabasePath,
+          );
       final StreamSubscription<QuerySnapshot<Map<String, Object?>>>
       subscription = db
           .collection('coll')
-          .snapshots
+          .snapshots()
           .listen((_) {}, onError: (Object _) {});
       addTearDown(subscription.cancel);
       unawaited(

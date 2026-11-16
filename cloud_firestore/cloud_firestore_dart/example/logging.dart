@@ -90,9 +90,9 @@ Future<void> main() async {
     // The level is global (every instance, every package of this SDK) and per
     // isolate: set it again in a background isolate. The default is
     // LogLevel.warn: warnings and errors only.
-    Firestore.setLogLevel(LogLevel.debug);
+    FirebaseFirestore.setLogLevel(LogLevel.debug);
 
-    final Firestore firestore = connect();
+    final FirebaseFirestore firestore = connect();
     final DocumentReference<Map<String, Object?>> doc = firestore.doc(
       '${scratch('logs')}/hello',
     );
@@ -103,12 +103,12 @@ Future<void> main() async {
     // A warning of the SDK: loading a bundle that cannot be parsed.
     try {
       await firestore.loadBundle(<int>[1, 2, 3]).future;
-    } on FirestoreError {
+    } on FirestoreException {
       // Handled; the warning reached the logger.
     }
 
     // Back to the default.
-    Firestore.setLogLevel(LogLevel.warn);
+    FirebaseFirestore.setLogLevel(LogLevel.warn);
     await firestore.terminate();
   }, logger.call);
 

@@ -265,7 +265,7 @@ void main() {
 
     final sortOrders = [
       for (int i = 1; i <= numOfFields; i++) field('field_$i').ascending(),
-      Field.of(FieldPath.documentIdField).ascending(),
+      Field.of(FieldPath.documentId).ascending(),
     ];
 
     final pipeline = RealtimePipelineSource()

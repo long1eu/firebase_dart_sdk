@@ -180,7 +180,7 @@ class Field extends Expression
   static final documentIdName: String
   toProto(PipelineEncoder encoder): Value
   toString(): String
-FirestorePipelines.pipeline(Firestore #this): PipelineSource
+FirestorePipelines.pipeline(FirebaseFirestore #this): PipelineSource
 class FunctionExpression extends Expression
   final args: List<Expression>
   final name: String
@@ -208,12 +208,12 @@ class Pipeline
   delete({Map<String, Object> rawOptions}): Pipeline
   distinct(List<Object> groups, {Map<String, Object> rawOptions}): Pipeline
   execute({bool atomic, PipelineIndexMode indexMode, PipelineExplainOptions explainOptions, Map<String, Object> rawOptions}): Future<PipelineSnapshot>
-  final firestore: Firestore
+  final firestore: FirebaseFirestore
   final stages: List<Stage> @internal
   findNearest(Object field, Object vector, DistanceMeasure distanceMeasure, {int limit, String distanceField, Map<String, Object> rawOptions}): Pipeline
   insert({Object collection, Object documentId, Map<String, Object> rawOptions}): Pipeline
   limit(int limit, {Map<String, Object> rawOptions}): Pipeline
-  new Pipeline(Firestore firestore, List<Stage> stages) @internal
+  new Pipeline(FirebaseFirestore firestore, List<Stage> stages) @internal
   offset(int offset, {Map<String, Object> rawOptions}): Pipeline
   rawStage(String name, List<Object> args, {Map<String, Object> options}): Pipeline
   removeFields(List<Object> fields, {Map<String, Object> rawOptions}): Pipeline
@@ -268,7 +268,7 @@ class PipelineResult
   get id: String
   get ref: DocumentReference<Map<String, Object>>
   get(Object field): Object
-  new PipelineResult(Firestore _firestore, ObjectValue _fields, {DocumentKey key, Timestamp createTime, Timestamp updateTime}) @internal
+  new PipelineResult(FirebaseFirestore _firestore, ObjectValue _fields, {DocumentKey key, Timestamp createTime, Timestamp updateTime}) @internal
   toString(): String
 class PipelineSnapshot
   final executionTime: Timestamp
@@ -282,12 +282,12 @@ class PipelineSource
   collectionGroup(String collectionId, {String forceIndex, Map<String, Object> rawOptions}): Pipeline
   createFrom(Query<Object> query): Pipeline
   createFromAggregateQuery(AggregateQuery aggregateQuery): Pipeline
-  createFromVectorQuery(VectorQuery vectorQuery): Pipeline
+  createFromVectorQuery(VectorQuery<dynamic> vectorQuery): Pipeline
   database({Map<String, Object> rawOptions}): Pipeline
   documents(List<Object> documents, {Map<String, Object> rawOptions}): Pipeline
   literals(List<Map<String, Object>> documents, {Map<String, Object> rawOptions}): Pipeline
-  new PipelineSource(Firestore _firestore) @internal
-  static collectionPath(Firestore firestore, Object collection, String method): String @internal
+  new PipelineSource(FirebaseFirestore _firestore) @internal
+  static collectionPath(FirebaseFirestore firestore, Object collection, String method): String @internal
   subcollection(String path, {Map<String, Object> rawOptions}): Pipeline
 abstract class Selectable
   get alias: String

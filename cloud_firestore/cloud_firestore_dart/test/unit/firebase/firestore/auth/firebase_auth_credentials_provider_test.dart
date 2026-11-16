@@ -14,7 +14,7 @@ String _jwt(String id) {
       })}.sig';
 }
 
-class _FakeAuth extends InternalTokenProvider {
+class _FakeAuth extends AuthTokenProvider {
   final List<bool> forceRefreshArgs = <bool>[];
   int calls = 0;
 
@@ -36,8 +36,8 @@ class _FakeAuth extends InternalTokenProvider {
   String? get uid => 'uid';
 
   @override
-  Stream<InternalTokenResult> get onTokenChanged =>
-      const Stream<InternalTokenResult>.empty();
+  Stream<AuthTokenChange> get onTokenChanged =>
+      const Stream<AuthTokenChange>.empty();
 }
 
 void main() {
@@ -47,7 +47,7 @@ void main() {
     final FirebaseAuthCredentialsProvider provider =
         FirebaseAuthCredentialsProvider(auth);
     auth.duringFirstCall =
-        () => provider.tokenObserver(InternalTokenResult(_jwt('changed')));
+        () => provider.tokenObserver(AuthTokenChange(_jwt('changed')));
 
     final String? token = await provider.token;
 
@@ -96,10 +96,10 @@ void main() {
       final StreamSubscription<User> sub = provider.onChange.listen(users.add);
 
       auth.uid = 'u1';
-      auth.tokenChanges.add(InternalTokenResult(_jwt('t1')));
+      auth.tokenChanges.add(AuthTokenChange(_jwt('t1')));
       await Future<void>.delayed(Duration.zero);
       auth.uid = null;
-      auth.tokenChanges.add(InternalTokenResult(_jwt('t2')));
+      auth.tokenChanges.add(AuthTokenChange(_jwt('t2')));
       await Future<void>.delayed(Duration.zero);
       await sub.cancel();
 
@@ -109,7 +109,7 @@ void main() {
 
     test('a change before the first listener is not lost', () async {
       auth.uid = 'u1';
-      auth.tokenChanges.add(InternalTokenResult(_jwt('t1')));
+      auth.tokenChanges.add(AuthTokenChange(_jwt('t1')));
       await Future<void>.delayed(Duration.zero);
 
       expect(await provider.onChange.first, const User('u1'));
@@ -119,7 +119,7 @@ void main() {
       expect(await provider.token, _jwt('uid-none'));
 
       auth.uid = 'u1';
-      auth.tokenChanges.add(InternalTokenResult(_jwt('t1')));
+      auth.tokenChanges.add(AuthTokenChange(_jwt('t1')));
       await Future<void>.delayed(Duration.zero);
 
       expect(await provider.token, _jwt('uid-u1'));
@@ -146,7 +146,7 @@ void main() {
       expect(auth.tokenChanges.hasListener, isTrue);
 
       auth.uid = 'u2';
-      auth.tokenChanges.add(InternalTokenResult(_jwt('t2')));
+      auth.tokenChanges.add(AuthTokenChange(_jwt('t2')));
       await Future<void>.delayed(Duration.zero);
       await sub.cancel();
 
@@ -165,9 +165,9 @@ void main() {
 
 /// An auth provider whose user can change after the credentials provider was
 /// created.
-class _SignInAuth extends InternalTokenProvider {
-  final StreamController<InternalTokenResult> tokenChanges =
-      StreamController<InternalTokenResult>.broadcast();
+class _SignInAuth extends AuthTokenProvider {
+  final StreamController<AuthTokenChange> tokenChanges =
+      StreamController<AuthTokenChange>.broadcast();
 
   @override
   String? uid;
@@ -177,5 +177,5 @@ class _SignInAuth extends InternalTokenProvider {
       GetTokenResult(_jwt('uid-${uid ?? 'none'}'));
 
   @override
-  Stream<InternalTokenResult> get onTokenChanged => tokenChanges.stream;
+  Stream<AuthTokenChange> get onTokenChanged => tokenChanges.stream;
 }

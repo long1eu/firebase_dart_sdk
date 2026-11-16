@@ -38,7 +38,7 @@ void main() {
     await runZonedGuarded(() async {
       client = await FirestoreClient.initialize(
         IntegrationTestUtil.testEnvDatabaseInfo(),
-        FirestoreSettings(persistenceEnabled: false),
+        Settings(persistenceEnabled: false),
         _TwoUsersCredentialsProvider(),
         null,
         onNetworkConnected,
@@ -63,7 +63,7 @@ void main() {
     await runZonedGuarded(() async {
       final FirestoreClient client = await FirestoreClient.initialize(
         IntegrationTestUtil.testEnvDatabaseInfo(),
-        FirestoreSettings(persistenceEnabled: false),
+        Settings(persistenceEnabled: false),
         FirebaseAuthCredentialsProvider(auth),
         null,
         onNetworkConnected,
@@ -72,7 +72,7 @@ void main() {
       expect(auth.tokenChanges.hasListener, isTrue);
 
       auth.uid = 'signed-in';
-      auth.tokenChanges.add(const InternalTokenResult('token'));
+      auth.tokenChanges.add(const AuthTokenChange('token'));
       // Give the queued credential change time to run.
       await Future<void>.delayed(const Duration(milliseconds: 200));
 
@@ -86,9 +86,9 @@ void main() {
   });
 }
 
-class _Auth extends InternalTokenProvider {
-  final StreamController<InternalTokenResult> tokenChanges =
-      StreamController<InternalTokenResult>.broadcast();
+class _Auth extends AuthTokenProvider {
+  final StreamController<AuthTokenChange> tokenChanges =
+      StreamController<AuthTokenChange>.broadcast();
 
   @override
   String? uid;
@@ -98,5 +98,5 @@ class _Auth extends InternalTokenProvider {
       throw UnimplementedError();
 
   @override
-  Stream<InternalTokenResult> get onTokenChanged => tokenChanges.stream;
+  Stream<AuthTokenChange> get onTokenChanged => tokenChanges.stream;
 }

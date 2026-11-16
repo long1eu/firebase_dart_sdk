@@ -190,7 +190,7 @@ class LruGarbageCollectorParams {
   final int percentileToCollect;
   final int maximumSequenceNumbersToCollect;
 
-  static const int _collectionDisabled = FirestoreSettings.cacheSizeUnlimited;
+  static const int _collectionDisabled = Settings.cacheSizeUnlimited;
 
   static const int _defaultCacheSizeBytes = 100 * 1024 * 1024; // 100mb
   /// The following two constants are estimates for how we want to tune the garbage collector. If we encounter a large

@@ -6,32 +6,22 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/firestore_error.dart
 import 'package:cloud_firestore_dart/src/firebase/firestore/snapshot_json.dart'
     as snapshot_json;
 import 'package:cloud_firestore_dart/src/firebase/firestore/blob.dart';
-import 'package:cloud_firestore_dart/src/firebase/firestore/bson_object_id.dart';
-import 'package:cloud_firestore_dart/src/firebase/firestore/bson_timestamp.dart';
-import 'package:cloud_firestore_dart/src/firebase/firestore/decimal128_value.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/document_reference.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/field_path.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/firestore.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/firestore_data_converter.dart';
-import 'package:cloud_firestore_dart/src/firebase/firestore/geo_point.dart';
-import 'package:cloud_firestore_dart/src/firebase/firestore/int32_value.dart';
-import 'package:cloud_firestore_dart/src/firebase/firestore/max_key.dart';
-import 'package:cloud_firestore_dart/src/firebase/firestore/min_key.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/database_id.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/document.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/document_key.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/field_path.dart'
     as model;
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/value/field_value.dart';
-import 'package:cloud_firestore_dart/src/firebase/firestore/regex_value.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/server_timestamp_behavior.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/snapshot_metadata.dart';
-import 'package:cloud_firestore_dart/src/firebase/firestore/util/assert.dart';
-import 'package:cloud_firestore_dart/src/firebase/firestore/vector_value.dart';
 import 'package:cloud_firestore_dart/src/firebase/timestamp.dart';
 import 'package:firebase_app_dart/internal.dart';
 
-/// A [DocumentSnapshot] contains data read from a document in your [Firestore] database. The data can be extracted with
+/// A [DocumentSnapshot] contains data read from a document in your [FirebaseFirestore] database. The data can be extracted with
 /// the [data] or [get] methods.
 ///
 /// If the [DocumentSnapshot] points to a non-existing document, [data] and its corresponding methods will return null.
@@ -50,10 +40,10 @@ import 'package:firebase_app_dart/internal.dart';
 ///     .doc('cities/SF')
 ///     .get();
 /// if (snapshot.exists) {
-///   final Map<String, Object?> data = snapshot.data!;
+///   final Map<String, Object?> data = snapshot.data()!;
 ///   print(data['name']);
 ///   print(snapshot['population']); // the same as snapshot.get('population')
-///   print(snapshot.getTimestamp('founded')?.toDate());
+///   print((snapshot.get('founded') as Timestamp?)?.toDate());
 /// }
 /// ```
 ///
@@ -73,7 +63,7 @@ class DocumentSnapshot<T extends dynamic> {
 
   /// Implementation detail of the SDK; not part of the supported API.
   factory DocumentSnapshot._fromDocument(
-    Firestore firestore,
+    FirebaseFirestore firestore,
     Document doc, {
     required bool isFromCache,
     required bool hasPendingWrites,
@@ -91,7 +81,7 @@ class DocumentSnapshot<T extends dynamic> {
 
   /// Implementation detail of the SDK; not part of the supported API.
   factory DocumentSnapshot._fromNoDocument(
-    Firestore firestore,
+    FirebaseFirestore firestore,
     DocumentKey key, {
     required bool isFromCache,
     required bool hasPendingWrites,
@@ -110,12 +100,12 @@ class DocumentSnapshot<T extends dynamic> {
   /// Builds a [DocumentSnapshot] from the JSON object written by [toJson], for the [firestore] instance.
   ///
   /// The snapshot is not from cache and has no pending writes. Pass the [converter] of the original snapshot to get
-  /// typed data back. Throws a [FirestoreError] if [json] is not a valid document snapshot JSON object, for example
+  /// typed data back. Throws a [FirestoreException] if [json] is not a valid document snapshot JSON object, for example
   /// one of a different project or database.
   ///
   /// This is the JS SDK `documentSnapshotFromJSON()`.
   factory DocumentSnapshot.fromJson(
-    Firestore firestore,
+    FirebaseFirestore firestore,
     Map<String, Object?> json, {
     FirestoreDataConverter<T>? converter,
   }) {
@@ -126,7 +116,7 @@ class DocumentSnapshot<T extends dynamic> {
     );
   }
 
-  final Firestore _firestore;
+  final FirebaseFirestore _firestore;
 
   final FirestoreDataConverter<T>? _converter;
 
@@ -144,10 +134,10 @@ class DocumentSnapshot<T extends dynamic> {
   static const String jsonType = 'firestore/documentSnapshot/1.0';
 
   /// Returns a JSON-serializable representation of this snapshot, which [DocumentSnapshot.fromJson] reads back and
-  /// `Firestore.documentSnapshotsFromJson` listens from.
+  /// `FirebaseFirestore.documentSnapshotsFromJson` listens from.
   ///
   /// The `bundle` field holds the document as a Firestore bundle (empty when the document does not exist). Throws a
-  /// [FirestoreError] (failed-precondition) if the snapshot has pending writes: await `waitForPendingWrites()` first.
+  /// [FirestoreException] (failed-precondition) if the snapshot has pending writes: await `waitForPendingWrites()` first.
   ///
   /// This is the JS SDK `DocumentSnapshot.toJSON()`; the JSON is interchangeable with the one of the JS SDK (Node).
   /// One difference: for a document that does not exist the `bundle` is empty, which this SDK reads back as a missing
@@ -159,7 +149,7 @@ class DocumentSnapshot<T extends dynamic> {
   /// // Later, possibly in another program:
   /// final DocumentSnapshot<Map<String, Object?>> restored =
   ///     DocumentSnapshot<Map<String, Object?>>.fromJson(firestore, json);
-  /// print(restored.data);
+  /// print(restored.data());
   /// ```
   Map<String, Object?> toJson() => snapshot_json.documentSnapshotToJson(
     _firestore,
@@ -174,52 +164,37 @@ class DocumentSnapshot<T extends dynamic> {
   /// Returns true if the document existed in this snapshot.
   bool get exists => document != null;
 
-  /// Returns the fields of the document as a Map or null if the document doesn't exist. Field values will be converted
-  /// to their native Dart representation.
+  /// The fields of the document, or null if the document doesn't exist. Field values are converted to their
+  /// Dart representation. With a converter (see [DocumentReference.withConverter]) it returns the converted [T]
+  /// instead, and the converter gets [serverTimestamps] in its [SnapshotOptions].
   ///
-  /// Returns the fields of the document as a Map or null if the document doesn't exist. With a converter (see
-  /// [DocumentReference.withConverter]) it returns the converted [T] instead.
-  ///
-  /// A server timestamp (`FieldValue.serverTimestamp()`) that the backend has not set yet is null here; use
-  /// [getData] with [ServerTimestampBehavior.estimate] or [ServerTimestampBehavior.previous] to get a value for it.
-  /// This is the JS SDK `data()`, which is a method there.
+  /// A server timestamp (`FieldValue.serverTimestamp()`) that the backend has not set yet is null by default
+  /// ([ServerTimestampBehavior.none]); pass [ServerTimestampBehavior.estimate] or
+  /// [ServerTimestampBehavior.previous] as [serverTimestamps] to get a value for it.
   ///
   /// ```dart
   /// final DocumentSnapshot<Map<String, Object?>> snapshot = await firestore
   ///     .doc('cities/SF')
   ///     .get();
-  /// final Map<String, Object?>? data = snapshot.data;
+  /// final Map<String, Object?>? data = snapshot.data();
   /// print(data?['name']);
-  /// ```
-  T? get data => getData(ServerTimestampBehavior.none);
-
-  /// Returns the fields of the document as a Map or null if the document doesn't exist. Field values will be converted
-  /// to their native Dart representation.
   ///
-  /// [serverTimestampBehavior] Configures the behavior for server timestamps that have not yet been set to their final
-  /// value.
-  ///
-  /// Returns the fields of the document as a Map or null if the document doesn't exist.
-  ///
-  /// If this snapshot comes from a reference or query with a converter (see
-  /// `withConverter`), the result is the converted value of type [T]; the converter gets
-  /// [serverTimestampBehavior] in its `SnapshotOptions`.
-  ///
-  /// ```dart
   /// // Shows a local estimate until the backend sets the timestamp.
-  /// final Map<String, Object?>? data = snapshot.getData(
-  ///   ServerTimestampBehavior.estimate,
+  /// final Map<String, Object?>? estimated = snapshot.data(
+  ///   serverTimestamps: ServerTimestampBehavior.estimate,
   /// );
-  /// print(data?['updated']);
+  /// print(estimated?['updated']);
   /// ```
-  T? getData(ServerTimestampBehavior serverTimestampBehavior) {
+  T? data({
+    ServerTimestampBehavior serverTimestamps = ServerTimestampBehavior.none,
+  }) {
     final Document? doc = document;
     if (doc == null) {
       return null;
     }
     final FirestoreDataConverter<T>? converter = _converter;
     if (converter == null) {
-      return _rawData(doc, serverTimestampBehavior) as T;
+      return _rawData(doc, serverTimestamps) as T;
     }
     final QueryDocumentSnapshot<Map<String, Object?>> raw =
         QueryDocumentSnapshotInternal.fromDocument<Map<String, Object?>>(
@@ -230,7 +205,7 @@ class DocumentSnapshot<T extends dynamic> {
         );
     return converter.fromFirestore(
       raw,
-      SnapshotOptions(serverTimestamps: serverTimestampBehavior),
+      SnapshotOptions(serverTimestamps: serverTimestamps),
     );
   }
 
@@ -244,265 +219,67 @@ class DocumentSnapshot<T extends dynamic> {
     return _convertObject(doc.data, fieldValueOptions);
   }
 
-  /// Returns whether or not the field exists in the document. Returns false if the document does not exist.
+  /// Whether the field exists in the document, also when its value is null. False if the document does not
+  /// exist.
   ///
-  /// [field] the path to the field; dots separate nested fields. Throws an [ArgumentError] for an invalid path.
-  ///
-  /// Returns true if the field exists, also when its value is null.
-  bool contains(String field) {
-    return containsPath(
-      FieldPathInternal.fromArgument('DocumentSnapshot.contains', field),
+  /// [field] is a [String] (dots separate nested fields, `'address.city'`) or a [FieldPath]. Throws an
+  /// [ArgumentError] for an invalid path.
+  bool contains(Object field) {
+    final FieldPath fieldPath = _fieldPathOf(
+      'DocumentSnapshot.contains',
+      field,
     );
-  }
-
-  /// Returns whether or not the field exists in the document. Returns false if the document does not exist.
-  ///
-  /// [fieldPath] the path to the field.
-  ///
-  /// Returns true if the field exists.
-  bool containsPath(FieldPath fieldPath) {
-    checkNotNull(fieldPath, 'Provided field path must not be null.');
     return document?.getField(fieldPath.internalPath) != null;
   }
 
   /// The value of [field], or `null` if the field or the document does not exist. Same as [get].
-  Object? operator [](String field) => get(field);
+  Object? operator [](Object field) => get(field);
 
-  /// Returns the value at the field or null if the field doesn't exist.
+  /// The value of [field], or null if the field or the document doesn't exist.
   ///
-  /// [field] the path to the field; dots separate nested fields (`'address.city'`). Throws an [ArgumentError] for
-  /// an invalid path; use [getField] with a [FieldPath] for a name that contains a dot.
-  /// [serverTimestampBehavior] configures the behavior for server timestamps that have not yet been set to their final
-  /// value ([ServerTimestampBehavior.none], which gives null, by default).
+  /// [field] is a [String] (dots separate nested fields, `'address.city'`) or a [FieldPath] (for a name that
+  /// contains a dot). Throws an [ArgumentError] for an invalid path. [serverTimestamps] configures the value of
+  /// a server timestamp that has not been set yet ([ServerTimestampBehavior.none], which gives null, by default).
   ///
-  /// Returns the value at the given field or null. The value is the raw stored value: a converter is not applied.
+  /// The value is the raw stored value: a converter is not applied. Cast it to the type you expect.
   ///
   /// ```dart
-  /// final Object? city = snapshot.get('address.city');
+  /// final String? city = snapshot.get('address.city') as String?;
   /// final Object? population = snapshot['population']; // same as get
+  /// final DateTime? founded = (snapshot.get('founded') as Timestamp?)?.toDate();
   /// ```
   Object? get(
-    String field, [
-    ServerTimestampBehavior? serverTimestampBehavior,
-  ]) {
-    return getField(
-      FieldPathInternal.fromArgument('DocumentSnapshot.get', field),
-      serverTimestampBehavior ?? ServerTimestampBehavior.none,
-    );
-  }
-
-  /// Returns the value at the field or null if the field or document doesn't exist.
-  ///
-  /// [fieldPath] the path to the field
-  /// [serverTimestampBehavior] configures the behavior for server timestamps that have not yet been set to their final
-  /// value.
-  ///
-  /// Returns the value at the given field or null.
-  Object? getField(
-    FieldPath fieldPath, [
-    ServerTimestampBehavior? serverTimestampBehavior,
-  ]) {
-    checkNotNull(fieldPath, 'Provided field path must not be null.');
-
+    Object field, {
+    ServerTimestampBehavior serverTimestamps = ServerTimestampBehavior.none,
+  }) {
+    final FieldPath fieldPath = _fieldPathOf('DocumentSnapshot.get', field);
     final _FieldValueOptions fieldValueOptions = _FieldValueOptions(
-      serverTimestampBehavior:
-          serverTimestampBehavior ?? ServerTimestampBehavior.none,
+      serverTimestampBehavior: serverTimestamps,
     );
     return _getInternal(fieldPath.internalPath, fieldValueOptions);
   }
 
-  /// Returns the value of the field as a bool, or null if the field does not exist.
-  ///
-  /// [field] the path to the field.
-  ///
-  /// Throws [StateError] if the value is not a bool.
-  /// Returns the value of the field
-  bool? getBool(String field) => _getTypedValue<bool>(field);
-
-  /// Returns the value of the field as a double.
-  ///
-  /// [field] the path to the field.
-  ///
-  /// Throws [StateError] if the value is not a number.
-  /// Returns the value of the field
-  double? getDouble(String field) {
-    final num? val = _getTypedValue(field);
-    return val?.toDouble();
-  }
-
-  /// Returns the value of the field as an int, or null if the field does not exist. A double is truncated (`1.9`
-  /// gives `1`).
-  ///
-  /// [field] the path to the field.
-  ///
-  /// Throws [StateError] if the value is not a number.
-  /// Returns the value of the field
-  int? getInt(String field) {
-    final num? val = _getTypedValue(field);
-    return val?.toInt();
-  }
-
-  /// Returns the value of the field as a String.
-  ///
-  /// [field] the path to the field.
-  ///
-  /// Throws [StateError] if the value is not a String.
-  /// Returns the value of the field
-  String? getString(String field) => _getTypedValue(field);
-
-  /// Returns the value of the field as a [DateTime].
-  ///
-  /// [field] the path to the field.
-  /// [serverTimestampBehavior] configures the behavior for server timestamps that have not yet been set to their final
-  /// value.
-  ///
-  /// Throws [StateError] if the value is not a Date.
-  /// Returns the value of the field
-  DateTime? getDate(
-    String field, [
-    ServerTimestampBehavior? serverTimestampBehavior,
-  ]) {
-    checkNotNull(field, 'Provided field path must not be null.');
-    final Object? maybeDate = _getInternal(
-      FieldPathInternal.fromArgument(
-        'DocumentSnapshot.getDate',
-        field,
-      ).internalPath,
-      _FieldValueOptions(
-        serverTimestampBehavior:
-            serverTimestampBehavior ?? ServerTimestampBehavior.none,
-        timestampsInSnapshotsEnabled: false,
-      ),
+  static FieldPath _fieldPathOf(String methodName, Object field) {
+    if (field is FieldPath) {
+      return field;
+    }
+    if (field is String) {
+      return FieldPathInternal.fromArgument(methodName, field);
+    }
+    throw ArgumentError.value(
+      field,
+      'field',
+      'must be a String or a FieldPath',
     );
-    return _castTypedValue(maybeDate, field);
   }
 
-  /// Returns the value of the field as a [Timestamp].
-  ///
-  /// [field] the path to the field.
-  /// [serverTimestampBehavior] configures the behavior for server timestamps that have not yet been set to their final
-  /// value.
-  ///
-  /// Throws [StateError] if the value is not a timestamp field.
-  /// Returns the value of the field
-  Timestamp? getTimestamp(
-    String field, [
-    ServerTimestampBehavior? serverTimestampBehavior,
-  ]) {
-    checkNotNull(field, 'Provided field path must not be null.');
-    final Object? maybeTimestamp = _getInternal(
-      FieldPathInternal.fromArgument(
-        'DocumentSnapshot.getTimestamp',
-        field,
-      ).internalPath,
-      _FieldValueOptions(
-        serverTimestampBehavior:
-            serverTimestampBehavior ?? ServerTimestampBehavior.none,
-      ),
-    );
-    return _castTypedValue(maybeTimestamp, field);
-  }
-
-  /// Returns the value of the field as a [Blob].
-  ///
-  /// [field] the path to the field.
-  ///
-  /// Throws [StateError] if the value is not a Blob.
-  /// Returns the value of the field
-  Blob? getBlob(String field) => _getTypedValue(field);
-
-  /// Returns the value of the field as a [GeoPoint].
-  ///
-  /// [field] The path to the field.
-  ///
-  /// Throws [StateError] if the value is not a [GeoPoint].
-  /// Returns the value of the field
-  GeoPoint? getGeoPoint(String field) => _getTypedValue(field);
-
-  /// Returns the value of the field as a [VectorValue], or null if the field does not exist.
-  ///
-  /// Throws [StateError] if the value is not a [VectorValue].
-  VectorValue? getVectorValue(String field) => _getTypedValue(field);
-
-  /// Returns the value of the field as a [MinKey], or null if the field does not exist.
-  ///
-  /// Throws [StateError] if the value is not a [MinKey].
-  MinKey? getMinKey(String field) => _getTypedValue(field);
-
-  /// Returns the value of the field as a [MaxKey], or null if the field does not exist.
-  ///
-  /// Throws [StateError] if the value is not a [MaxKey].
-  MaxKey? getMaxKey(String field) => _getTypedValue(field);
-
-  /// Returns the value of the field as a [RegexValue], or null if the field does not exist.
-  ///
-  /// Throws [StateError] if the value is not a [RegexValue].
-  RegexValue? getRegexValue(String field) => _getTypedValue(field);
-
-  /// Returns the value of the field as an [Int32Value], or null if the field does not exist.
-  ///
-  /// Throws [StateError] if the value is not an [Int32Value].
-  Int32Value? getInt32Value(String field) => _getTypedValue(field);
-
-  /// Returns the value of the field as a [Decimal128Value], or null if the field does not exist.
-  ///
-  /// Throws [StateError] if the value is not a [Decimal128Value].
-  Decimal128Value? getDecimal128Value(String field) => _getTypedValue(field);
-
-  /// Returns the value of the field as a [BsonObjectId], or null if the field does not exist.
-  ///
-  /// Throws [StateError] if the value is not a [BsonObjectId].
-  BsonObjectId? getBsonObjectId(String field) => _getTypedValue(field);
-
-  /// Returns the value of the field as a [BsonTimestamp], or null if the field does not exist.
-  ///
-  /// Throws [StateError] if the value is not a [BsonTimestamp].
-  BsonTimestamp? getBsonTimestamp(String field) => _getTypedValue(field);
-
-  /// Returns the value of the field as a [DocumentReference].
-  ///
-  /// [field] the path to the field.
-  ///
-  /// Throws [StateError] if the value is not a [DocumentReference].
-  /// Returns the value of the field
-  DocumentReference<Map<String, Object?>>? getDocumentReference(String field) =>
-      _getTypedValue(field);
-
-  /// Gets the reference to the document.
-  ///
-  /// Returns the reference to the document.
-  @Deprecated('Use ref instead.')
-  DocumentReference<T> get reference => ref;
-
-  /// Gets the reference to the document, with the converter of this snapshot. Same as [reference]; this is the name
-  /// used by the current official Firestore API.
+  /// The reference to the document, with the converter of this snapshot.
   ///
   /// ```dart
-  /// await snapshot.ref.update({'visited': true});
+  /// await snapshot.reference.update({'visited': true});
   /// ```
-  DocumentReference<T> get ref =>
+  DocumentReference<T> get reference =>
       DocumentReferenceInternal.create<T>(_key, _firestore, _converter);
-
-  V? _getTypedValue<V>(String field) {
-    checkNotNull(field, 'Provided field must not be null.');
-    final Object? value = get(field, ServerTimestampBehavior.none);
-    return _castTypedValue<V>(value, field);
-  }
-
-  V? _castTypedValue<V>(Object? value, String field) {
-    if (value == null) {
-      return null;
-    }
-
-    try {
-      final V result = value as V;
-      return result;
-    } on TypeError catch (_) {
-      throw StateError(
-        'Field \'$field\' is not a $V, but it is ${value.runtimeType}',
-      );
-    }
-  }
 
   Object? _convertValue(FieldValue value, _FieldValueOptions options) {
     if (value is ObjectValue) {
@@ -536,12 +313,7 @@ class DocumentSnapshot<T extends dynamic> {
   }
 
   Object _convertTimestamp(TimestampValue value, _FieldValueOptions options) {
-    final Timestamp timestamp = value.value;
-    if (options.timestampsInSnapshotsEnabled) {
-      return timestamp;
-    } else {
-      return timestamp.toDate();
-    }
+    return value.value;
   }
 
   Object _convertReference(ReferenceValue value) {
@@ -624,11 +396,9 @@ class DocumentSnapshot<T extends dynamic> {
 class _FieldValueOptions {
   _FieldValueOptions({
     this.serverTimestampBehavior = ServerTimestampBehavior.none,
-    this.timestampsInSnapshotsEnabled = true,
   });
 
   final ServerTimestampBehavior serverTimestampBehavior;
-  final bool timestampsInSnapshotsEnabled;
 }
 
 /// A [QueryDocumentSnapshot] contains data read from a document in your Firestore database as part
@@ -646,7 +416,7 @@ class _FieldValueOptions {
 ///     .collection('cities')
 ///     .get();
 /// for (final QueryDocumentSnapshot<Map<String, Object?>> doc in snapshot) {
-///   final Map<String, Object?> data = doc.data; // never null
+///   final Map<String, Object?> data = doc.data(); // never null
 ///   print('${doc.id}: ${data['name']}');
 /// }
 /// ```
@@ -669,7 +439,7 @@ class QueryDocumentSnapshot<T extends dynamic> extends DocumentSnapshot<T> {
       );
 
   factory QueryDocumentSnapshot._fromDocument(
-    Firestore firestore,
+    FirebaseFirestore firestore,
     Document doc, {
     required bool fromCache,
     required bool hasPendingWrites,
@@ -685,27 +455,14 @@ class QueryDocumentSnapshot<T extends dynamic> extends DocumentSnapshot<T> {
     );
   }
 
-  /// Returns the fields of the document as a Map. Field values will be converted to their native
-  /// Dart representation.
-  ///
-  /// Returns the fields of the document as a Map, or the converted [T] with a converter.
+  /// The fields of the document, or the converted [T] with a converter. Unlike
+  /// [DocumentSnapshot.data()] it is never null for a snapshot without a converter: the document exists.
   @override
-  T get data {
+  T data({
+    ServerTimestampBehavior serverTimestamps = ServerTimestampBehavior.none,
+  }) {
     // The document always exists here; a null can only be what a converter of a nullable [T] returned.
-    return super.data as T;
-  }
-
-  /// Returns the fields of the document as a Map. Field values will be converted to their native
-  /// Dart representation.
-  ///
-  /// [serverTimestampBehavior] configures the behavior for server timestamps that have not yet been
-  /// set to their final value.
-  ///
-  /// Returns the fields of the document as a Map (or the converted [T] with a converter); never null
-  /// for a raw map.
-  @override
-  T getData(ServerTimestampBehavior serverTimestampBehavior) {
-    return super.getData(serverTimestampBehavior) as T;
+    return super.data(serverTimestamps: serverTimestamps) as T;
   }
 }
 
@@ -716,7 +473,7 @@ extension DocumentSnapshotInternal<T> on DocumentSnapshot<T> {
 
   /// A snapshot of the document with [key]: [document], or a missing document if it is null.
   static DocumentSnapshot<T> create<T extends dynamic>(
-    Firestore firestore,
+    FirebaseFirestore firestore,
     DocumentKey key,
     Document? document, {
     required bool isFromCache,
@@ -733,7 +490,7 @@ extension DocumentSnapshotInternal<T> on DocumentSnapshot<T> {
 
   /// A snapshot of the existing document [doc].
   static DocumentSnapshot<T> fromDocument<T extends dynamic>(
-    Firestore firestore,
+    FirebaseFirestore firestore,
     Document doc, {
     required bool isFromCache,
     required bool hasPendingWrites,
@@ -748,7 +505,7 @@ extension DocumentSnapshotInternal<T> on DocumentSnapshot<T> {
 
   /// A snapshot of the missing document with [key].
   static DocumentSnapshot<T> fromNoDocument<T extends dynamic>(
-    Firestore firestore,
+    FirebaseFirestore firestore,
     DocumentKey key, {
     required bool isFromCache,
     required bool hasPendingWrites,
@@ -766,7 +523,7 @@ extension DocumentSnapshotInternal<T> on DocumentSnapshot<T> {
 extension QueryDocumentSnapshotInternal<T> on QueryDocumentSnapshot<T> {
   /// A snapshot of the existing document [doc] in a query result.
   static QueryDocumentSnapshot<T> fromDocument<T extends dynamic>(
-    Firestore firestore,
+    FirebaseFirestore firestore,
     Document doc, {
     required bool fromCache,
     required bool hasPendingWrites,

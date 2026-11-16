@@ -30,7 +30,7 @@ import 'package:cloud_firestore_dart/cloud_firestore_dart.dart';
 import 'common.dart';
 
 Future<void> main() async {
-  final Firestore firestore = Firestore.instanceFor(
+  final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(
     app: exampleApp(),
     settings: emulatorSettings(
       cacheSettings: const MemoryCacheSettings(
@@ -69,14 +69,14 @@ Future<void> main() async {
 }
 
 /// The request handlers. Every handler runs against the one shared
-/// [Firestore] instance.
+/// [FirebaseFirestore] instance.
 class TaskApi {
-  TaskApi(Firestore firestore, String path)
+  TaskApi(FirebaseFirestore firestore, String path)
     : _tasks = firestore.collection(path),
       _stats = firestore.doc('$path-stats/counts'),
       _firestore = firestore;
 
-  final Firestore _firestore;
+  final FirebaseFirestore _firestore;
   final CollectionReference<Map<String, Object?>> _tasks;
   final DocumentReference<Map<String, Object?>> _stats;
 
@@ -100,12 +100,12 @@ class TaskApi {
         case ('POST', <String>['tasks', final String id, 'done']):
           body = await _complete(id);
         case ('GET', <String>['stats']):
-          body = (await _stats.get(Source.server)).data;
+          body = (await _stats.get(GetOptions(source: Source.server))).data();
         default:
           status = HttpStatus.notFound;
           body = <String, Object?>{'error': 'no route'};
       }
-    } on FirestoreError catch (e) {
+    } on FirestoreException catch (e) {
       status = HttpStatus.internalServerError;
       body = <String, Object?>{'error': e.message};
     }
@@ -127,7 +127,7 @@ class TaskApi {
           })
           ..set(_stats, <String, Object?>{
             'open': FieldValue.increment(1),
-          }, SetOptions.mergeAllFields))
+          }, const SetOptions(merge: true)))
         .commit();
     return <String, Object?>{'id': task.id};
   }
@@ -135,14 +135,14 @@ class TaskApi {
   Future<Map<String, Object?>?> _read(String id) async {
     final DocumentSnapshot<Map<String, Object?>> snapshot = await _tasks
         .doc(id)
-        .get(Source.server);
+        .get(GetOptions(source: Source.server));
     return snapshot.exists ? _toJson(snapshot) : null;
   }
 
   Future<List<Map<String, Object?>>> _list(bool done) async {
     final QuerySnapshot<Map<String, Object?>> snapshot = await _tasks
         .where('done', isEqualTo: done)
-        .get(Source.server);
+        .get(GetOptions(source: Source.server));
     return <Map<String, Object?>>[
       for (final QueryDocumentSnapshot<Map<String, Object?>> doc
           in snapshot.docs)
@@ -159,7 +159,7 @@ class TaskApi {
     ) async {
       final DocumentSnapshot<Map<String, Object?>> snapshot = await transaction
           .get(task);
-      if (!snapshot.exists || snapshot.data!['done'] == true) {
+      if (!snapshot.exists || snapshot.data()!['done'] == true) {
         return <String, Object?>{'changed': false};
       }
       transaction
@@ -175,7 +175,7 @@ class TaskApi {
   static Map<String, Object?> _toJson(
     DocumentSnapshot<Map<String, Object?>> doc,
   ) {
-    final Map<String, Object?> data = doc.data!;
+    final Map<String, Object?> data = doc.data()!;
     final Timestamp createdAt = data['createdAt']! as Timestamp;
     return <String, Object?>{
       'id': doc.id,

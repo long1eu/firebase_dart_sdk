@@ -50,18 +50,18 @@ List<int> buildBundle() {
 }
 
 Future<void> main() async {
-  final Firestore firestore = connect();
+  final FirebaseFirestore firestore = connect();
 
   // loadBundle takes the bytes; loadBundleStream takes a stream of chunks
   // (for example the body of an HTTP response).
   final LoadBundleTask task = firestore.loadBundle(buildBundle());
-  task.stream.listen((LoadBundleTaskProgress progress) {
+  task.stream.listen((LoadBundleTaskSnapshot progress) {
     print(
       'progress: ${progress.taskState.name} '
       '${progress.documentsLoaded}/${progress.totalDocuments} documents',
     );
   });
-  final LoadBundleTaskProgress result = await task.future;
+  final LoadBundleTaskSnapshot result = await task.future;
   print(
     'loaded ${result.documentsLoaded} documents, '
     '${result.bytesLoaded} bytes',
@@ -70,15 +70,15 @@ Future<void> main() async {
   // The documents are now in the cache.
   final QuerySnapshot<Map<String, Object?>> cached = await firestore
       .collection('bundled-stories')
-      .get(Source.cache);
+      .get(GetOptions(source: Source.cache));
   print('cached: ${<Object?>[for (final doc in cached.docs) doc['title']]}');
 
   // A named query is a query the server stored in the bundle with its result.
-  final Query<Map<String, Object?>>? latest = await firestore.getNamedQuery(
+  final Query<Map<String, Object?>>? latest = await firestore.namedQuery(
     'latest-stories',
   );
   final QuerySnapshot<Map<String, Object?>> latestStories = await latest!.get(
-    Source.cache,
+    GetOptions(source: Source.cache),
   );
   print('latest: ${latestStories.docs.single['title']}');
 

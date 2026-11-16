@@ -6,7 +6,7 @@
 import 'dart:async';
 
 import 'package:cloud_firestore_dart/cloud_firestore_dart.dart'
-    show Firestore, FirestoreSettings, MemoryCacheSettings;
+    show FirebaseFirestore, Settings, MemoryCacheSettings;
 import 'package:cloud_firestore_dart/lite.dart' as lite;
 import 'package:cloud_firestore_dart/src/firebase/firestore/auth/empty_credentials_provider.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/database_info.dart';
@@ -164,7 +164,7 @@ void main() {
       final FirebaseApp app = FirebaseApp.withOptions(
         const FirebaseOptions(
           apiKey: 'fake-api-key-x',
-          applicationId: 'appId',
+          appId: 'appId',
           projectId: 'test-project',
         ),
         name: name,
@@ -174,9 +174,9 @@ void main() {
     }
 
     test('reaches the database info of an instance', () async {
-      final Firestore firestore = Firestore.instanceFor(
+      final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(
         app: newApp('api-key-full'),
-        settings: FirestoreSettings(
+        settings: Settings(
           cacheSettings: const MemoryCacheSettings(),
         ).withEmulator('127.0.0.1', 1),
       );
@@ -195,10 +195,11 @@ void main() {
           };
       addTearDown(() => liteTransportOverride = null);
 
-      final lite.Firestore firestore = lite.Firestore.instanceFor(
-        app: newApp('api-key-lite'),
-        settings: lite.FirestoreSettings().withEmulator('127.0.0.1', 1),
-      );
+      final lite.FirebaseFirestore firestore =
+          lite.FirebaseFirestore.instanceFor(
+            app: newApp('api-key-lite'),
+            settings: lite.Settings().withEmulator('127.0.0.1', 1),
+          );
       addTearDown(firestore.terminate);
       await firestore
           .doc('a/b')

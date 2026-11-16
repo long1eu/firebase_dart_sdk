@@ -10,22 +10,22 @@ void main() {
 
   test('logging is quiet by default and setLoggingEnabled toggles debug', () {
     expect(internal.InternalLogLevel.w, original);
-    Firestore.setLoggingEnabled(loggingEnabled: true);
+    FirebaseFirestore.setLoggingEnabled(true);
     expect(internal.Log.isDebugEnabled, isTrue);
-    Firestore.setLoggingEnabled(loggingEnabled: false);
+    FirebaseFirestore.setLoggingEnabled(false);
     expect(internal.Log.isDebugEnabled, isFalse);
     expect(internal.Log.level, internal.InternalLogLevel.w);
   });
 
   group('setLogLevel', () {
     test('debug logs everything', () {
-      Firestore.setLogLevel(LogLevel.debug);
+      FirebaseFirestore.setLogLevel(LogLevel.debug);
       expect(internal.Log.level, internal.InternalLogLevel.d);
       expect(internal.Log.isDebugEnabled, isTrue);
     });
 
     test('error logs errors only', () {
-      Firestore.setLogLevel(LogLevel.error);
+      FirebaseFirestore.setLogLevel(LogLevel.error);
       expect(internal.Log.level, internal.InternalLogLevel.e);
       expect(internal.Log.isDebugEnabled, isFalse);
       expect(internal.Log.level <= internal.InternalLogLevel.w, isFalse);
@@ -33,14 +33,14 @@ void main() {
     });
 
     test('silent logs nothing', () {
-      Firestore.setLogLevel(LogLevel.silent);
+      FirebaseFirestore.setLogLevel(LogLevel.silent);
       expect(internal.Log.level, internal.InternalLogLevel.none);
       expect(internal.Log.level <= internal.InternalLogLevel.e, isFalse);
     });
 
     test('silent drops every message', () {
       final List<String> printed = <String>[];
-      Firestore.setLogLevel(LogLevel.silent);
+      FirebaseFirestore.setLogLevel(LogLevel.silent);
       Zone.root
           .fork(
         specification: ZoneSpecification(
@@ -55,7 +55,7 @@ void main() {
       });
       expect(printed, isEmpty);
 
-      Firestore.setLogLevel(LogLevel.error);
+      FirebaseFirestore.setLogLevel(LogLevel.error);
       Zone.root
           .fork(
         specification: ZoneSpecification(
@@ -71,11 +71,10 @@ void main() {
       expect(printed.single, contains('error'));
     });
 
-    test('the levels are the JS ones, from the most to the least verbose', () {
+    test('the levels are the JS ones without info, from the most to the least verbose', () {
       expect(LogLevel.values, <LogLevel>[
         LogLevel.verbose,
         LogLevel.debug,
-        LogLevel.info,
         LogLevel.warn,
         LogLevel.error,
         LogLevel.silent,
@@ -83,8 +82,8 @@ void main() {
     });
 
     test('warn is the default level', () {
-      Firestore.setLogLevel(LogLevel.debug);
-      Firestore.setLogLevel(LogLevel.warn);
+      FirebaseFirestore.setLogLevel(LogLevel.debug);
+      FirebaseFirestore.setLogLevel(LogLevel.warn);
       expect(internal.Log.level, internal.InternalLogLevel.w);
       expect(internal.Log.level, original);
     });
@@ -92,7 +91,7 @@ void main() {
     test('each level prints its messages and the more severe ones', () {
       List<String> printedAt(LogLevel level) {
         final List<String> printed = <String>[];
-        Firestore.setLogLevel(level);
+        FirebaseFirestore.setLogLevel(level);
         Zone.root
             .fork(
               specification: ZoneSpecification(
@@ -117,25 +116,14 @@ void main() {
         'error',
       ]);
       expect(printedAt(LogLevel.debug), <String>['debug', 'warn', 'error']);
-      // No message is logged at info level; info is between debug and warn.
-      expect(printedAt(LogLevel.info), <String>['warn', 'error']);
-      expect(
-        internal.InternalLogLevel.d <= internal.InternalLogLevel.info,
-        isTrue,
-      );
-      expect(
-        internal.InternalLogLevel.info <= internal.InternalLogLevel.w,
-        isTrue,
-      );
-      expect(internal.Log.level, internal.InternalLogLevel.info);
       expect(printedAt(LogLevel.warn), <String>['warn', 'error']);
       expect(printedAt(LogLevel.error), <String>['error']);
       expect(printedAt(LogLevel.silent), isEmpty);
     });
 
     test('setLoggingEnabled still works after setLogLevel', () {
-      Firestore.setLogLevel(LogLevel.silent);
-      Firestore.setLoggingEnabled(loggingEnabled: true);
+      FirebaseFirestore.setLogLevel(LogLevel.silent);
+      FirebaseFirestore.setLoggingEnabled(true);
       expect(internal.Log.level, internal.InternalLogLevel.d);
     });
   });

@@ -22,7 +22,7 @@ import 'package:cloud_firestore_dart/cloud_firestore_dart.dart';
 import 'package:firebase_app_dart/firebase_app_dart.dart';
 
 // Section 2. Dart 3.8 and null safety.
-Future<void> nullSafety(Firestore firestore) async {
+Future<void> nullSafety(FirebaseFirestore firestore) async {
   // Before:
   //   final DocumentSnapshot snapshot =
   //       await firestore.collection('users').document('ada').get();
@@ -31,13 +31,13 @@ Future<void> nullSafety(Firestore firestore) async {
       .collection('users')
       .doc('ada')
       .get();
-  final Map<String, Object?>? data = snapshot.data; // null: no document
+  final Map<String, Object?>? data = snapshot.data(); // null: no document
   final int? age = data?['age'] as int?;
 
   // Before: every option was a non-nullable String.
   const FirebaseOptions options = FirebaseOptions(
     apiKey: 'key', // required
-    applicationId: '1:1:dart:1', // required
+    appId: '1:1:dart:1', // required
     projectId: 'my-project',
   );
   final String? projectId = options.projectId; // nullable
@@ -45,9 +45,9 @@ Future<void> nullSafety(Firestore firestore) async {
 }
 
 // Section 3. Creating the app.
-void creatingTheApp(FirebaseApp app) {
+Future<void> creatingTheApp(FirebaseApp app) async {
   // Before: app.setDataCollectionDefaultEnabled(); // meant "disable"
-  app.setDataCollectionDefaultEnabled(enabled: false);
+  await app.setAutomaticDataCollectionEnabled(false);
 
   // URL-safe base64 without padding now; keys of 0.0.4 differ.
   final String key = app.persistenceKey;
@@ -58,16 +58,16 @@ void creatingTheInstance(FirebaseApp app) {
   // Before:
   //   final Firestore firestore = await Firestore.getInstance(app,
   //       settings: FirestoreSettings(persistenceEnabled: true));
-  final Firestore firestore = Firestore.instanceFor(
+  final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(
     app: app, // returns at once, no Future
-    settings: FirestoreSettings(cacheSettings: PersistentCacheSettings()),
+    settings: Settings(cacheSettings: PersistentCacheSettings()),
   );
 
   // Before: FirestoreSettings(host: '127.0.0.1:8080', sslEnabled: false)
-  final Firestore emulated = Firestore.instanceFor(
+  final FirebaseFirestore emulated = FirebaseFirestore.instanceFor(
     app: app,
-    database: 'other',
-    settings: FirestoreSettings().withEmulator('127.0.0.1', 8080),
+    databaseId: 'other',
+    settings: Settings().withEmulator('127.0.0.1', 8080),
   );
 }
 
@@ -102,11 +102,11 @@ class _MyDatabase implements Database {
 }
 
 // Section 6. Renamed members (the old names are deprecated and still work).
-Future<void> renamedMembers(Firestore firestore) async {
+Future<void> renamedMembers(FirebaseFirestore firestore) async {
   // Before:
   //   final QuerySnapshot result = await firestore
   //       .collection('users')
-  //       .whereEqualTo(FieldPath.documentId(), 'ada')
+  //       .whereEqualTo(FieldPath.documentId, 'ada')
   //       .get(Source.defaultSource);
   //   for (final DocumentSnapshot doc in result.documents) print(doc.reference.path);
   //   result.documentChanges;
@@ -114,10 +114,10 @@ Future<void> renamedMembers(Firestore firestore) async {
   //   await firestore.shutdown();
   final QuerySnapshot<Map<String, Object?>> result = await firestore
       .collection('users')
-      .where(FieldPath.documentIdField, isEqualTo: 'ada')
-      .get(Source.serverAndCache);
+      .where(FieldPath.documentId, isEqualTo: 'ada')
+      .get(GetOptions(source: Source.serverAndCache));
   for (final QueryDocumentSnapshot<Map<String, Object?>> doc in result.docs) {
-    print(doc.ref.path);
+    print(doc.reference.path);
   }
   final List<DocumentChange<Map<String, Object?>>> changes = result.docChanges;
   final DocumentReference<Map<String, Object?>> ada = firestore.doc(
@@ -127,7 +127,7 @@ Future<void> renamedMembers(Firestore firestore) async {
 }
 
 // Section 7. Generic references and snapshots.
-Future<void> generics(Firestore firestore) async {
+Future<void> generics(FirebaseFirestore firestore) async {
   // Before:
   //   final DocumentReference ref = firestore.collection('users').document('ada');
   //   final DocumentSnapshot snapshot = await ref.get();
@@ -138,32 +138,30 @@ Future<void> generics(Firestore firestore) async {
 
   // New: a typed view of the same document.
   final DocumentReference<String> names = ref.withConverter<String>(
-    FirestoreDataConverter<String>.from(
-      fromFirestore: (DocumentSnapshot<Map<String, Object?>> s, _) =>
-          s.data!['name']! as String,
-      toFirestore: (String name, _) => <String, Object?>{'name': name},
-    ),
+    fromFirestore: (DocumentSnapshot<Map<String, Object?>> s, _) =>
+        s.data()!['name']! as String,
+    toFirestore: (String name, _) => <String, Object?>{'name': name},
   );
 }
 
 // Section 8. Members that are no longer public.
-void noLongerPublic(Firestore firestore) {
+void noLongerPublic(FirebaseFirestore firestore) {
   // Before: firestore.databaseId.projectId, firestore.databaseId.databaseId
   final String projectId = firestore.projectId;
   final String database = firestore.databaseId; // a String now
 
   // Before: FieldPath(['a', 'b']), FieldPath.documentIdInstance
-  final FieldPath path = FieldPath.of(<String>['a', 'b']);
-  final FieldPath id = FieldPath.documentIdField;
+  final FieldPath path = FieldPath(<String>['a', 'b']);
+  final FieldPath id = FieldPath.documentId;
 
-  // Before: FirestoreErrorCode.fromValue(grpcError); now read FirestoreError.code.
+  // Before: FirestoreErrorCodeInternal.fromValue(grpcError); now read FirestoreError.code.
   // Before: Firestore.newInstance(...), firestore.client, query.query,
   //   snapshot.document, reference.key, fieldValue.isDelete, SetOptions.fieldMask,
   //   Timestamp.validateRange, ConflictAlgorithm: no replacement.
 }
 
 // Section 9. Behaviour changes without a compile error.
-Future<void> behaviour(Firestore firestore) async {
+Future<void> behaviour(FirebaseFirestore firestore) async {
   final DocumentReference<Map<String, Object?>> configRef = firestore.doc(
     'config/plans',
   );
@@ -178,8 +176,8 @@ Future<void> behaviour(Firestore firestore) async {
     final DocumentSnapshot<Map<String, Object?>> config = await tx.get(
       configRef,
     );
-    tx.update(userRef, <String, Object?>{'plan': config.data!['plan']});
-  }, options: TransactionOptions(maxAttempts: 6));
+    tx.update(userRef, <String, Object?>{'plan': config.data()!['plan']});
+  }, maxAttempts: 6);
 
   // A read after a write fails (invalidArgument) and now also fails the
   // commit when the error is caught; do all reads first.
@@ -192,8 +190,8 @@ Future<void> behaviour(Firestore firestore) async {
   await firestore.terminate();
   try {
     await userRef.get();
-  } on FirestoreError catch (e) {
-    print(e.code == FirestoreErrorCode.failedPrecondition);
+  } on FirestoreException catch (e) {
+    print(e.errorCode == FirestoreErrorCode.failedPrecondition);
   }
 
   // Microseconds are kept (0.0.7 truncated to milliseconds).

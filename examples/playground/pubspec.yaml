@@ -1,0 +1,18 @@
+name: playground
+description: >-
+  A browser playground for cloud_firestore_dart that needs no backend: the
+  client runs with its network disabled, on a memory cache, and the page shows
+  every snapshot event and the queue of writes that wait for a server.
+publish_to: none
+
+environment:
+  sdk: ^3.8.0
+
+dependencies:
+  cloud_firestore_dart: ^0.1.1
+  firebase_app_dart: ^0.1.1
+  web: ^1.1.0
+
+dev_dependencies:
+  lints: ^6.0.0
+  test: ^1.25.0

@@ -11,7 +11,7 @@ import 'package:cloud_firestore_dart/cloud_firestore_dart.dart';
 import '../common.dart';
 
 Future<void> main() async {
-  final Firestore firestore = connect();
+  final FirebaseFirestore firestore = connect();
   final CollectionReference<Map<String, Object?>> cities = firestore.collection(
     scratch('cities'),
   );
@@ -46,6 +46,6 @@ Future<void> main() async {
     print('written $written of ${rows.length}');
   }
 
-  print('count on the server: ${(await cities.count().get()).getCount()}');
+  print('count on the server: ${(await cities.count().get()).count}');
   await firestore.terminate();
 }

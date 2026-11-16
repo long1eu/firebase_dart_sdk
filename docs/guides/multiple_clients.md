@@ -54,6 +54,26 @@ The clients of one cache elect a primary client with the lease of the JS SDK:
   network;
 - a lone client is always primary, so a program with one client behaves as before.
 
+This is how the lease moves in `example/two_clients_one_cache.dart`, where a background isolate opens the
+cache of the main isolate. Follow which client is online at each step:
+
+```mermaid
+sequenceDiagram
+    participant main as Main isolate
+    participant file as Cache file
+    participant bg as Background isolate
+    participant backend as Backend
+    main->>file: holds the lease, refreshes it every 4 s
+    main->>backend: online
+    bg->>file: opens the cache and takes the lease
+    bg->>backend: online, primary now
+    main->>file: next refresh finds another primary
+    Note over main: secondary, isFromCache true, its write stays pending
+    bg->>file: terminate() gives the lease up
+    main->>file: next refresh takes the lease
+    main->>backend: online again, sends its pending write
+```
+
 Only the primary client uses the network, applies what the backend sends and acknowledges, and
 runs garbage collection and the index backfill. A client that is not primary (a *secondary*):
 
@@ -105,7 +125,7 @@ final Directory directory = Directory('/home/ada/.local/share/my_app');
 
 // In the background isolate: the same project, another app name, another cache file.
 final FirebaseApp worker = FirebaseApp.withOptions(app.options, name: 'background-sync');
-final Firestore workerFirestore = Firestore.instanceFor(
+final FirebaseFirestore workerFirestore = FirebaseFirestore.instanceFor(
   app: worker,
   openDatabase: sqliteOpener(directory),
 );

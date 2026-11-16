@@ -10,29 +10,41 @@ queries against it use what earlier listens returned. Where the cache lives is u
 | an `openDatabase` (SQLite on the VM) | in a SQLite file, kept across restarts |
 | the web `openDatabase` (web) | SQLite compiled to WebAssembly, stored in IndexedDB or OPFS |
 
+On the web the opener picks the storage itself; follow the branches to see which one you get:
+
+```mermaid
+flowchart TD
+    start["FirebaseFirestore.instanceFor"] --> hasOpener{"openDatabase passed?"}
+    hasOpener -->|no| memory["Memory: gone when the instance is terminated"]
+    hasOpener -->|"yes, on the Dart VM or in a Flutter app"| sqliteFile["SQLite file, kept across restarts"]
+    hasOpener -->|"yes, sqliteWebOpener in a browser"| hasWorker{"opfsWorker passed, and synchronous OPFS in workers?"}
+    hasWorker -->|yes| opfs["SQLite in a worker on a file in OPFS"]
+    hasWorker -->|no| indexedDb["SQLite in the page on an in-memory copy, stored in IndexedDB"]
+```
+
 ## Cache settings
 
-`FirestoreSettings.cacheSettings` chooses the kind of cache and its size:
+`Settings.cacheSettings` chooses the kind of cache and its size:
 
 ```dart
 // Persistent (needs an openDatabase): unused documents are removed once the
 // cache grows beyond about 100 MB, the default.
-final FirestoreSettings persistent = FirestoreSettings(
+final Settings persistent = Settings(
   cacheSettings: PersistentCacheSettings(sizeBytes: 100 * 1024 * 1024),
 );
 
 // Never removes anything.
-final FirestoreSettings unlimited = FirestoreSettings(
-  cacheSettings: PersistentCacheSettings(sizeBytes: FirestoreSettings.cacheSizeUnlimited),
+final Settings unlimited = Settings(
+  cacheSettings: PersistentCacheSettings(sizeBytes: Settings.cacheSizeUnlimited),
 );
 
 // In memory, dropping documents as soon as no listener needs them (the default
 // for a memory cache)...
-final FirestoreSettings eager = FirestoreSettings(cacheSettings: const MemoryCacheSettings());
+final Settings eager = Settings(cacheSettings: const MemoryCacheSettings());
 
 // ...or keeping them up to a size, so that a query that was listened to before
 // can be answered offline.
-final FirestoreSettings lru = FirestoreSettings(
+final Settings lru = Settings(
   cacheSettings: MemoryCacheSettings(gcSettings: MemoryLruGcSettings(sizeBytes: 40 * 1024 * 1024)),
 );
 ```
@@ -60,10 +72,10 @@ import 'dart:io';
 import 'sqlite_database.dart'; // copied from the package's example/ folder
 
 final Directory directory = Directory('/home/ada/.local/share/my_app');
-final Firestore firestore = Firestore.instanceFor(
+final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(
   app: app,
   openDatabase: sqliteOpener(directory),
-  settings: FirestoreSettings(cacheSettings: PersistentCacheSettings()),
+  settings: Settings(cacheSettings: PersistentCacheSettings()),
 );
 ```
 
@@ -106,7 +118,7 @@ instance with a persistent cache).
 ```dart
 // Only the cache, never the network.
 final DocumentSnapshot<Map<String, Object?>> cached =
-    await firestore.doc('cities/SF').get(Source.cache);
+    await firestore.doc('cities/SF').get(const GetOptions(source: Source.cache));
 print(cached.metadata.isFromCache); // true
 
 // A write made offline is in the cache at once; its future completes when the
@@ -114,7 +126,7 @@ print(cached.metadata.isFromCache); // true
 final Future<void> write = firestore.doc('cities/SF').update({'visited': true});
 
 // Listeners say whether a snapshot holds writes the backend has not seen.
-firestore.doc('cities/SF').getSnapshots(MetadataChanges.include).listen(
+firestore.doc('cities/SF').snapshots(includeMetadataChanges: true).listen(
   (DocumentSnapshot<Map<String, Object?>> snapshot) {
     print('pending: ${snapshot.metadata.hasPendingWrites}');
   },
@@ -124,6 +136,36 @@ firestore.doc('cities/SF').getSnapshots(MetadataChanges.include).listen(
 await firestore.disableNetwork();
 await firestore.enableNetwork();
 ```
+
+A write goes through these states; the table below gives what a listener with `includeMetadataChanges: true`
+sees in each, for a document with no other pending write. Note that the future completes before
+`hasPendingWrites` turns false.
+
+```mermaid
+stateDiagram-v2
+    direction LR
+    pending : Pending, in the cache only
+    sent : Sent on the write stream
+    acked : Acknowledged
+    synced : In sync with the backend
+    rejected : Rejected
+    [*] --> pending: write
+    pending --> sent: online, at once or when the network is back
+    sent --> pending: connection lost, sent again on the next stream
+    sent --> acked: WriteResponse
+    sent --> rejected: error from the backend
+    acked --> synced: watch delivers the new version
+    synced --> [*]
+    rejected --> [*]
+```
+
+| State | The write's future | `hasPendingWrites` | `isFromCache` |
+|---|---|---|---|
+| Pending, while offline | not completed | `true` | `true` |
+| Sent | not completed | `true` | `false` once the listener has caught up with the backend |
+| Acknowledged | completed | still `true`, until watch has sent the document at the commit version (skipped if it already has) | `false` |
+| In sync | completed | `false` | `false` |
+| Rejected | failed with the error | `false`: the change is removed from the cache | `false` |
 
 ### Protect the cache files
 
@@ -165,7 +207,7 @@ the same `sqlite3` version next to your page (from the
 import 'sqlite_database_web.dart'; // copied from the package's example/ folder
 
 // IndexedDB: SQLite runs in the page on a copy of the whole database in memory.
-final Firestore firestore = Firestore.instanceFor(
+final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(
   app: app,
   openDatabase: sqliteWebOpener(sqlite3Wasm: Uri.parse('sqlite3.wasm')),
 );
@@ -182,7 +224,7 @@ included.
 ```dart
 import 'sqlite_database_web.dart'; // copied from the package's example/ folder
 
-final Firestore firestore = Firestore.instanceFor(
+final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(
   app: app,
   openDatabase: sqliteWebOpener(
     sqlite3Wasm: Uri.parse('sqlite3.wasm'),
@@ -195,8 +237,8 @@ What to know (all measured in Chrome against the emulator; other browsers are un
 
 - **One tab at a time.** The database is guarded by a Web Lock. A second tab (or a second
   instance in the same page) that opens the same cache waits two seconds for the lock and then
-  fails: the operations of that instance fail with a `FirestoreError` whose code is
-  `failedPrecondition`. Such a tab should use a memory cache. `Firestore.instanceFor` returns
+  fails: the operations of that instance fail with a `FirestoreException` whose code is
+  `failedPrecondition`. Such a tab should use a memory cache. `FirebaseFirestore.instanceFor` returns
   at once and opens the cache in the background, so the error comes from the first operation:
   the `openWithMemoryFallback` helper of the example waits for a first operation that only
   reads the cache, and on `failedPrecondition` terminates that instance and creates one with a
@@ -218,7 +260,7 @@ What to know (all measured in Chrome against the emulator; other browsers are un
 ```dart
 await firestore.terminate();        // the cache must not be in use by this instance
 await firestore.clearPersistence(); // deletes the files (or the browser storage)
-final Firestore fresh = Firestore.instanceFor(app: app);
+final FirebaseFirestore fresh = FirebaseFirestore.instanceFor(app: app);
 ```
 
 `clearPersistence()` on an instance that is still running fails with `failedPrecondition`.
@@ -248,7 +290,7 @@ await indexes?.enableIndexAutoCreation();
   an index as far as it is filled and reads the rest, so results are complete at every moment.
 - `disableIndexAutoCreation()` stops creating indexes (existing ones stay in use);
   `deleteAllIndexes()` removes them all.
-- `Firestore.setIndexConfiguration(json)` (deprecated, as in the other SDKs) configures the
+- `Firestore.setIndexConfigurationFromJSON(json)` (deprecated, as in the other SDKs) configures the
   indexes from a definition in the format of `firestore.indexes.json`; `queryScope` and
   `fieldOverrides` are ignored. It replaces the previous configuration.
 - All query forms can be served: comparison operators, `in` / `not-in`, `array-contains(-any)`,

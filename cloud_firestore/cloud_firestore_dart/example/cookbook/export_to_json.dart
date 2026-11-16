@@ -13,7 +13,7 @@ import 'package:cloud_firestore_dart/cloud_firestore_dart.dart';
 import '../common.dart';
 
 Future<void> main() async {
-  final Firestore firestore = connect();
+  final FirebaseFirestore firestore = connect();
   final CollectionReference<Map<String, Object?>> events = firestore.collection(
     scratch('events'),
   );
@@ -44,7 +44,7 @@ Future<void> main() async {
       QuerySnapshot<Map<String, Object?>>.fromJson(firestore, json);
   for (final QueryDocumentSnapshot<Map<String, Object?>> doc in restored) {
     print(
-      '${doc.id}: ${doc['title']} at ${doc.getTimestamp('at')!.toDate().toUtc()}',
+      '${doc.id}: ${doc['title']} at ${(doc.get('at') as Timestamp?)!.toDate().toUtc()}',
     );
   }
   print('geo point kept: ${restored.docs.first['where'] is GeoPoint}');

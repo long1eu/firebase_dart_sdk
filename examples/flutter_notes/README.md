@@ -20,6 +20,25 @@ What it shows:
 The state is plain Flutter: `StatefulWidget`s and a `StreamBuilder`, no state management package.
 The notes are in the collection `notes`, as `{title, body, updatedAt}`.
 
+This is the app on macOS against a private emulator, with three notes. Look at the status line
+under the title:
+
+![The flutter_notes window on macOS: the status line says "Up to date" and three notes are listed, each with a delete button, and an add button at the bottom right](../../docs/images/examples/flutter_notes_online.png)
+
+How `main()` wires the pieces together before `runApp`, and what the widgets use afterwards:
+
+```mermaid
+flowchart TD
+  connectivity["connectivity_plus events"] --> deps["AppDependencies, onNetworkConnected"]
+  deps -- "dependencies:" --> app["FirebaseApp.withOptions, from --dart-define"]
+  app --> firestore["Firestore.instanceFor"]
+  sqlite["sqliteOpener: SQLite file in the application support directory"] -- "openDatabase:" --> firestore
+  settings["PersistentCacheSettings, withEmulator"] -- "settings:" --> firestore
+  firestore -- "gRPC" --> backend["Firestore emulator or project"]
+  firestore --> notesPage["NotesPage: StreamBuilder over getSnapshots"]
+  lifecycle["AppLifecycleListener"] -- "disableNetwork, enableNetwork, terminate" --> firestore
+```
+
 ## Run it against the Firestore emulator on macOS
 
 Needs Flutter (3.32 or later for Dart 3.8; built with 3.44.9), Xcode, and the Firebase CLI. From
@@ -40,6 +59,12 @@ flutter run -d macos --dart-define=EMULATOR_HOST=127.0.0.1 --dart-define=EMULATO
 
 To see the offline behaviour, stop the emulator while the app runs: the status line turns to
 "Offline: showing the saved notes", and a note you add or edit is shown at once with an upload mark.
+
+This is the same window about 20 seconds after the emulator was stopped. Look at the status line:
+the notes stay, served from the SQLite cache.
+
+![The flutter_notes window with the status line "Offline: showing the saved notes" on a tinted background with a crossed-out cloud icon, and the same three notes](../../docs/images/examples/flutter_notes_offline.png)
+
 Start the emulator again: within a few seconds (up to a minute, the client's backoff) the write
 is sent and the line says "Up to date". The emulator keeps its data in memory, so after a restart
 it has only what the app sent again. Quit with Cmd-Q and start the app with the emulator stopped:
@@ -71,6 +96,7 @@ project. To add sign-in, see [Authentication](../../docs/guides/authentication.m
 | Platform | Status |
 | --- | --- |
 | macOS | Built (`flutter build macos --debug`) and run against the emulator by hand: the listener, an edit offline, the sync when the emulator came back, the cache across a restart, and `terminate()` on Cmd-Q |
+| macOS, screenshots | `flutter build macos --debug --dart-define=EMULATOR_PORT=8141`, the built app run against a private emulator with three notes written through the emulator's REST API, captured with `screencapture -l` |
 | Android, iOS, Linux, Windows | Not built and not run. The platform folders are those of `flutter create` with the changes below |
 
 Changes to the generated platform projects:

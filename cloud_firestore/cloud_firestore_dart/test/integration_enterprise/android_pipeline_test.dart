@@ -45,7 +45,7 @@ final Map<String, Map<String, Object?>> bookDocs =
         "rating": 4.2,
         "tags": <Object?>["comedy", "space", "adventure"],
         "awards": <String, Object?>{"hugo": true, "nebula": false},
-        "embedding": FieldValue.vector(<double>[
+        "embedding": VectorValue(<double>[
           10.0,
           1.0,
           1.0,
@@ -68,7 +68,7 @@ final Map<String, Map<String, Object?>> bookDocs =
         "published": 1813,
         "rating": 4.5,
         "tags": <Object?>["classic", "social commentary", "love"],
-        "embedding": FieldValue.vector(<double>[
+        "embedding": VectorValue(<double>[
           1.0,
           10.0,
           1.0,
@@ -89,7 +89,7 @@ final Map<String, Map<String, Object?>> bookDocs =
         "published": 1967,
         "rating": 4.3,
         "tags": <Object?>["family", "history", "fantasy"],
-        "embedding": FieldValue.vector(<double>[
+        "embedding": VectorValue(<double>[
           1.0,
           1.0,
           10.0,
@@ -111,7 +111,7 @@ final Map<String, Map<String, Object?>> bookDocs =
         "rating": 4.7,
         "tags": <Object?>["adventure", "magic", "epic"],
         "sales": <Object?>[100, 200, 50],
-        "embedding": FieldValue.vector(<double>[
+        "embedding": VectorValue(<double>[
           1.0,
           1.0,
           1.0,
@@ -132,7 +132,7 @@ final Map<String, Map<String, Object?>> bookDocs =
         "published": 1985,
         "rating": 4.1,
         "tags": <Object?>["feminism", "totalitarianism", "resistance"],
-        "embedding": FieldValue.vector(<double>[
+        "embedding": VectorValue(<double>[
           1.0,
           1.0,
           1.0,
@@ -156,7 +156,7 @@ final Map<String, Map<String, Object?>> bookDocs =
         "published": 1866,
         "rating": 4.3,
         "tags": <Object?>["philosophy", "crime", "redemption"],
-        "embedding": FieldValue.vector(<double>[
+        "embedding": VectorValue(<double>[
           1.0,
           1.0,
           1.0,
@@ -177,7 +177,7 @@ final Map<String, Map<String, Object?>> bookDocs =
         "published": 1960,
         "rating": 4.2,
         "tags": <Object?>["racism", "injustice", "coming-of-age"],
-        "embedding": FieldValue.vector(<double>[
+        "embedding": VectorValue(<double>[
           1.0,
           1.0,
           1.0,
@@ -198,7 +198,7 @@ final Map<String, Map<String, Object?>> bookDocs =
         "published": 1949,
         "rating": 4.2,
         "tags": <Object?>["surveillance", "totalitarianism", "propaganda"],
-        "embedding": FieldValue.vector(<double>[
+        "embedding": VectorValue(<double>[
           1.0,
           1.0,
           1.0,
@@ -219,7 +219,7 @@ final Map<String, Map<String, Object?>> bookDocs =
         "published": 1925,
         "rating": 4.0,
         "tags": <Object?>["wealth", "american dream", "love"],
-        "embedding": FieldValue.vector(<double>[
+        "embedding": VectorValue(<double>[
           1.0,
           1.0,
           1.0,
@@ -240,7 +240,7 @@ final Map<String, Map<String, Object?>> bookDocs =
         "published": 1965,
         "rating": 4.6,
         "tags": <Object?>["politics", "desert", "ecology"],
-        "embedding": FieldValue.vector(<double>[
+        "embedding": VectorValue(<double>[
           1.0,
           1.0,
           1.0,
@@ -265,7 +265,7 @@ void main() {
   IntegrationTestUtil.currentDatabasePath =
       'integration_enterprise/android_pipeline';
   late CollectionReference<Map<String, Object?>> randomCol;
-  late Firestore firestore;
+  late FirebaseFirestore firestore;
 
   group('PipelineTest', skip: IntegrationTestUtil.enterpriseEmulatorSkipReason, () {
     setUp(() async {
@@ -1745,7 +1745,7 @@ void main() {
       Future<PipelineSnapshot> execute = firestore
           .pipeline()
           .collection(randomCol)
-          .sort([field(FieldPath.documentId()).ascending()])
+          .sort([field(FieldPath.documentId).ascending()])
           .limit(1)
           .addFields([
             ex(
@@ -1771,7 +1771,7 @@ void main() {
       Future<PipelineSnapshot> execute = firestore
           .pipeline()
           .collection(randomCol)
-          .sort([field(FieldPath.documentId()).ascending()])
+          .sort([field(FieldPath.documentId).ascending()])
           .limit(1)
           .addFields([
             ex(
@@ -2542,13 +2542,13 @@ void main() {
           .collection(randomCol)
           .select([
             ex(
-              constant(FieldValue.vector(sourceVector)),
+              constant(VectorValue(sourceVector)),
             ).cosineDistance(targetVector).as("cosineDistance"),
             ex(
-              constant(FieldValue.vector(sourceVector)),
+              constant(VectorValue(sourceVector)),
             ).dotProduct(targetVector).as("dotProductDistance"),
             ex(
-              constant(FieldValue.vector(sourceVector)),
+              constant(VectorValue(sourceVector)),
             ).euclideanDistance(targetVector).as("euclideanDistance"),
           ])
           .limit(1)
@@ -2720,9 +2720,7 @@ void main() {
         ).isLessThan(0);
       }
 
-      (await randomCol.document("book1").update(<String, Object?>{
-        "rating": 5.0,
-      }));
+      (await randomCol.doc("book1").update(<String, Object?>{"rating": 5.0}));
       snapshot = (await pipeline
           .where(ex("title").equal("The Hitchhiker's Guide to the Galaxy"))
           .execute());
@@ -2973,7 +2971,7 @@ void main() {
           .findNearest(
             "embedding",
             constant(
-              FieldValue.vector(<double>[
+              VectorValue(<double>[
                 10.0,
                 1.0,
                 2.0,
@@ -3987,7 +3985,7 @@ void main() {
       Future<PipelineSnapshot> execute = firestore
           .pipeline()
           .collection(randomCol.path)
-          .sort([field(FieldPath.documentId()).ascending()])
+          .sort([field(FieldPath.documentId).ascending()])
           .limit(1)
           .select([
             field("title").type().as("titleType"),
@@ -4018,7 +4016,7 @@ void main() {
       execute = firestore
           .pipeline()
           .collection(randomCol.path)
-          .sort([field(FieldPath.documentId()).ascending()])
+          .sort([field(FieldPath.documentId).ascending()])
           .limit(1)
           .select([
             ex("title").type().as("titleType"),
@@ -4062,8 +4060,8 @@ void main() {
               "geoPoint": GeoPoint(0.1, 0.2),
               "timestamp": Timestamp(123456, 0),
               "bytes": blobFromBytes(<int>[1, 2, 3]),
-              "docRef": randomCol.document("bar"),
-              "vector": FieldValue.vector(<double>[1.0, 2.0, 3.0]),
+              "docRef": randomCol.doc("bar"),
+              "vector": VectorValue(<double>[1.0, 2.0, 3.0]),
               "map": map(<String, Object?>{
                 "numberK": 1,
                 "stringK": "a string",
@@ -4131,7 +4129,7 @@ void main() {
           .limit(1)
           .select([
             ex(
-              constant(FieldValue.vector(<double>[1.0, 2.0, 3.0])),
+              constant(VectorValue(<double>[1.0, 2.0, 3.0])),
             ).vectorLength().as("vectorLength"),
           ])
           .execute();
@@ -4200,9 +4198,9 @@ void main() {
 
     test('testSupportsParent', () async {
       dynamic reviewRef = randomCol
-          .document("book4")
+          .doc("book4")
           .collection("reviews")
-          .document("review1");
+          .doc("review1");
 
       Future<PipelineSnapshot> execute = firestore
           .pipeline()
@@ -4230,19 +4228,19 @@ void main() {
 
     test('testDocumentsAsSource', () async {
       Future<PipelineSnapshot> execute = firestore.pipeline().documents([
-        randomCol.document("book1"),
-        randomCol.document("book2"),
-        randomCol.document("book3"),
+        randomCol.doc("book1"),
+        randomCol.doc("book2"),
+        randomCol.doc("book3"),
       ]).execute();
       assertThat((await execute).results).hasSize(3);
     });
 
     test('testCollectionGroupAsSource', () async {
-      dynamic subcollectionId = randomCol.document().id;
-      (await randomCol.document("book1").collection(subcollectionId).add(
+      dynamic subcollectionId = randomCol.doc().id;
+      (await randomCol.doc("book1").collection(subcollectionId).add(
         <String, Object?>{"order": 1},
       ));
-      (await randomCol.document("book2").collection(subcollectionId).add(
+      (await randomCol.doc("book2").collection(subcollectionId).add(
         <String, Object?>{"order": 2},
       ));
       Future<PipelineSnapshot> execute = firestore
@@ -4304,7 +4302,7 @@ void main() {
       dynamic values = <String, Object?>{};
       values["title"] = "Book With Null";
       values["optional_field"] = null;
-      (await randomCol.document("bookWithNull").set(values));
+      (await randomCol.doc("bookWithNull").set(values));
       execute = firestore
           .pipeline()
           .collection(randomCol)
@@ -4316,7 +4314,7 @@ void main() {
           ])
           .execute();
       assertThat((await execute).results[0].get("field_or_default")).isNull();
-      (await randomCol.document("bookWithNull").delete());
+      (await randomCol.doc("bookWithNull").delete());
 
       // Case 4: Test different overloads.
       // ifAbsent(String, Any)
@@ -4472,7 +4470,7 @@ void main() {
           .collection(firestore.collection("k"), forceIndex: "abcdef")
           .findNearest(
             "topicVectors",
-            constant(FieldValue.vector(vector)),
+            constant(VectorValue(vector)),
             DistanceMeasure.cosine,
             limit: 10,
             distanceField: "distance",

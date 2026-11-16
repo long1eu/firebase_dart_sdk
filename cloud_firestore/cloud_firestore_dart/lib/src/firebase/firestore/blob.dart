@@ -22,7 +22,7 @@ import 'package:collection/collection.dart';
 /// await firestore.doc('files/icon').set(<String, Object?>{'data': icon});
 /// final DocumentSnapshot<Map<String, Object?>> snapshot =
 ///     await firestore.doc('files/icon').get();
-/// final Uint8List? bytes = snapshot.getBlob('data')?.bytes;
+/// final Uint8List? bytes = (snapshot.get('data') as Blob?)?.bytes;
 /// ```
 ///
 /// The blob counts toward the size limit of its document.

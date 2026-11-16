@@ -29,7 +29,7 @@ int _apps = 0;
 /// The name of a persistent cache comes from [appName]: a later client with
 /// the same name (after this one was terminated with [shutDown]) opens the
 /// same cache.
-Future<Firestore> newClient({
+Future<FirebaseFirestore> newClient({
   OpenDatabase? openDatabase,
   bool forceLongPolling = false,
   String? appName,
@@ -38,25 +38,25 @@ Future<Firestore> newClient({
   final FirebaseApp app = FirebaseApp.withOptions(
     const FirebaseOptions(
       apiKey: 'demo-key',
-      applicationId: '1:1234567890:dart:browser',
+      appId: '1:1234567890:dart:browser',
       projectId: projectId,
     ),
     name: appName ?? 'browser-${_apps++}-${_random.nextInt(0x7fffffff)}',
   );
-  final Firestore firestore;
+  final FirebaseFirestore firestore;
   try {
-    firestore = Firestore.instanceFor(
+    firestore = FirebaseFirestore.instanceFor(
       app: app,
       openDatabase: openDatabase,
-      settings: FirestoreSettings(
-        experimentalForceLongPolling: forceLongPolling,
+      settings: Settings(
+        webExperimentalForceLongPolling: forceLongPolling,
         cacheSettings: openDatabase == null
             ? const MemoryCacheSettings()
             : null,
       ).withEmulator(emulatorHost, emulatorPort),
     );
   } catch (_) {
-    app.delete();
+    await app.delete();
     rethrow;
   }
   // instanceFor returns at once; the tests want a client whose cache is open (and the error if it can't be).
@@ -64,7 +64,7 @@ Future<Firestore> newClient({
     await firestore.initialized;
   } catch (_) {
     await firestore.terminate();
-    app.delete();
+    await app.delete();
     rethrow;
   }
   _appOf[firestore] = app;
@@ -72,13 +72,14 @@ Future<Firestore> newClient({
   return firestore;
 }
 
-final Map<Firestore, FirebaseApp> _appOf = <Firestore, FirebaseApp>{};
+final Map<FirebaseFirestore, FirebaseApp> _appOf =
+    <FirebaseFirestore, FirebaseApp>{};
 
 /// Terminates [firestore] and deletes its app, so that the name of the app
 /// can be used again. Does nothing the second time.
-Future<void> shutDown(Firestore firestore) async {
+Future<void> shutDown(FirebaseFirestore firestore) async {
   await firestore.terminate();
-  _appOf.remove(firestore)?.delete();
+  await _appOf.remove(firestore)?.delete();
 }
 
 /// A collection name no other test uses.

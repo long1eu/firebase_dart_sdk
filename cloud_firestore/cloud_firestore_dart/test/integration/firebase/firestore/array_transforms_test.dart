@@ -7,7 +7,6 @@ import 'dart:async';
 import 'package:cloud_firestore_dart/src/firebase/firestore/document_reference.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/document_snapshot.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/field_value.dart';
-import 'package:cloud_firestore_dart/src/firebase/firestore/metadata_change.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/set_options.dart';
 import 'package:test/test.dart';
 
@@ -36,7 +35,7 @@ void main() {
     docRef = await testDocument();
     accumulator = EventAccumulator<DocumentSnapshot>();
     listenerRegistration = docRef
-        .getSnapshots(MetadataChanges.include)
+        .snapshots(includeMetadataChanges: true)
         .listen(accumulator.onData, onError: accumulator.onError);
 
     // Wait for initial null snapshot to avoid potential races.
@@ -54,9 +53,9 @@ void main() {
     Map<String, Object?> expectedData,
   ) async {
     DocumentSnapshot snap = await accumulator.awaitLocalEvent();
-    expect(snap.data, expectedData);
+    expect(snap.data(), expectedData);
     snap = await accumulator.awaitRemoteEvent();
-    expect(snap.data, expectedData);
+    expect(snap.data(), expectedData);
   }
 
   /// Writes some initialData and consumes the events generated.
@@ -113,7 +112,7 @@ void main() {
         'array',
         FieldValue.arrayUnion(<int>[2, 1, 4]),
       ]),
-      SetOptions.mergeAllFields,
+      const SetOptions(merge: true),
     );
     await expectLocalAndRemoteEvent(
       map(<dynamic>[
@@ -186,7 +185,7 @@ void main() {
         'array',
         FieldValue.arrayRemove(<int>[1, 4]),
       ]),
-      SetOptions.mergeAllFields,
+      const SetOptions(merge: true),
     );
 
     await expectLocalAndRemoteEvent(

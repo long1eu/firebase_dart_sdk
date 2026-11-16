@@ -103,15 +103,13 @@ Future<void> eventually(FutureOr<bool> Function() condition, String what,
   }
 }
 
-final Matcher isPermissionDenied = isA<FirestoreError>().having(
-    (FirestoreError e) => e.code, 'code', FirestoreErrorCode.permissionDenied);
+final Matcher isPermissionDenied = isA<FirestoreException>().having(
+    (FirestoreException e) => e.errorCode, 'code', FirestoreErrorCode.permissionDenied);
 
 /// A listener that records its snapshots and its error.
 class Listening {
   Listening(Query<Map<String, Object?>> query) {
-    _sub = query
-        .getSnapshotsWithOptions(const SnapshotListenOptions(
-            metadataChanges: MetadataChanges.include))
+    _sub = query.snapshots(includeMetadataChanges: true)
         .listen(events.add, onError: errors.add);
   }
 
@@ -153,7 +151,7 @@ void main() {
     }
     cleanups.clear();
     for (final FirebaseApp app in apps) {
-      app.delete();
+      await app.delete();
     }
     apps.clear();
     Datastore.transportOverride = null;
@@ -166,7 +164,7 @@ void main() {
   FirebaseApp newApp() {
     final FirebaseApp app = FirebaseApp.withOptions(
       const FirebaseOptions(
-          apiKey: 'fake-api-key', applicationId: 'appId', projectId: projectId),
+          apiKey: 'fake-api-key', appId: 'appId', projectId: projectId),
       name: unique('auth-e2e-'),
     );
     apps.add(app);
@@ -181,7 +179,7 @@ void main() {
   }
 
   /// A Firestore instance of the full SDK for [app], over gRPC or over the web transport, with a memory cache.
-  Future<Firestore> newFirestore(FirebaseApp app, {required bool web}) async {
+  Future<FirebaseFirestore> newFirestore(FirebaseApp app, {required bool web}) async {
     // The transport is created with the client, on its first operation: the override stays in place until the
     // tear-down (resetting it right after instanceFor ran the "web transport" tests over gRPC).
     Datastore.transportOverride = web
@@ -192,9 +190,9 @@ void main() {
             return WebChannelTransport(http, databaseInfo, options);
           }
         : null;
-    final Firestore firestore = Firestore.instanceFor(
+    final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(
       app: app,
-      settings: FirestoreSettings(
+      settings: Settings(
         host: firestoreAddress!.host,
         port: firestoreAddress.port,
         sslEnabled: false,
@@ -212,11 +210,11 @@ void main() {
       test('the security rules see the signed-in user', () async {
         final FirebaseApp app = newApp();
         final FirebaseUserAuth auth = await newAuth(app);
-        final Firestore db = await newFirestore(app, web: web);
+        final FirebaseFirestore db = await newFirestore(app, web: web);
         final String run = unique('run');
 
         // Nobody is signed in: the request carries no token and the rules refuse it.
-        await expectLater(db.doc('signed_in/$run').get(Source.server),
+        await expectLater(db.doc('signed_in/$run').get(GetOptions(source: Source.server)),
             throwsA(isPermissionDenied));
         await expectLater(
             db.doc('signed_in/$run').set(<String, Object?>{'v': 1}),
@@ -226,13 +224,13 @@ void main() {
         final DocumentReference<Map<String, Object?>> own =
             db.doc('users/${user.uid}/notes/$run');
         await own.set(<String, Object?>{'text': 'mine'});
-        expect((await own.get(Source.server)).data,
+        expect((await own.get(GetOptions(source: Source.server))).data(),
             <String, Object?>{'text': 'mine'});
         expect(await admin.get('users/${user.uid}/notes/$run'), isNotNull);
 
         // request.auth.uid is the uid of the user: the documents of somebody else stay out of reach.
         await expectLater(
-            db.doc('users/somebody-else/notes/$run').get(Source.server),
+            db.doc('users/somebody-else/notes/$run').get(GetOptions(source: Source.server)),
             throwsA(isPermissionDenied));
         await expectLater(
             db
@@ -246,13 +244,13 @@ void main() {
           () async {
         final FirebaseApp app = newApp();
         final FirebaseUserAuth auth = await newAuth(app);
-        final Firestore db = await newFirestore(app, web: web);
+        final FirebaseFirestore db = await newFirestore(app, web: web);
         final String run = unique('run');
         final String emailA = '${unique('a')}@example.com';
         final String emailB = '${unique('b')}@example.com';
 
         final AuthUser a =
-            await auth.createUserWithEmailAndPassword(emailA, 'password-a');
+            await auth.createUserWithEmailAndPassword(email: emailA, password: 'password-a');
         await db
             .doc('users/${a.uid}/$run/doc')
             .set(<String, Object?>{'owner': 'a'});
@@ -265,7 +263,7 @@ void main() {
         // B signs in on the same app. The listener that is still open on the documents of A is restarted with
         // the identity of B, and the rules refuse it.
         final AuthUser b =
-            await auth.createUserWithEmailAndPassword(emailB, 'password-b');
+            await auth.createUserWithEmailAndPassword(email: emailB, password: 'password-b');
         expect(b.uid, isNot(a.uid));
         await eventually(() => asA.errors.isNotEmpty,
             'the listener of A to be refused for B',
@@ -283,7 +281,7 @@ void main() {
         expect(asB.ids, <String>['doc']);
 
         // Back to A: the listener of B is refused, a new listener of A works.
-        await auth.signInWithEmailAndPassword(emailA, 'password-a');
+        await auth.signInWithEmailAndPassword(email: emailA, password: 'password-a');
         expect(auth.uid, a.uid);
         await eventually(() => asB.errors.isNotEmpty,
             'the listener of B to be refused for A',
@@ -300,13 +298,13 @@ void main() {
       test('pending writes stay with the user who made them', () async {
         final FirebaseApp app = newApp();
         final FirebaseUserAuth auth = await newAuth(app);
-        final Firestore db = await newFirestore(app, web: web);
+        final FirebaseFirestore db = await newFirestore(app, web: web);
         final String run = unique('run');
         final String emailA = '${unique('a')}@example.com';
         final String emailB = '${unique('b')}@example.com';
 
         final AuthUser a =
-            await auth.createUserWithEmailAndPassword(emailA, 'password-a');
+            await auth.createUserWithEmailAndPassword(email: emailA, password: 'password-a');
         final String pendingPath = 'users/${a.uid}/$run/pending';
         await db.doc('users/${a.uid}/$run/sent').set(<String, Object?>{'n': 1});
 
@@ -318,35 +316,35 @@ void main() {
             .set(<String, Object?>{'text': 'written by a, offline'}).then((_) {
           acknowledged = true;
         }));
-        expect((await db.doc(pendingPath).get(Source.cache)).exists, isTrue);
+        expect((await db.doc(pendingPath).get(GetOptions(source: Source.cache))).exists, isTrue);
 
         // B signs in and the network comes back: the write of A is not sent with the token of B, and B does not
         // see it in the cache.
         final AuthUser b =
-            await auth.createUserWithEmailAndPassword(emailB, 'password-b');
+            await auth.createUserWithEmailAndPassword(email: emailB, password: 'password-b');
         await db.enableNetwork();
         await db.doc('users/${b.uid}/$run/own').set(<String, Object?>{'n': 2});
         await db.waitForPendingWrites();
         expect(await admin.get(pendingPath), isNull);
         expect(acknowledged, isFalse);
-        await expectLater(db.doc(pendingPath).get(Source.cache),
-            throwsA(isA<FirestoreError>()),
+        await expectLater(db.doc(pendingPath).get(GetOptions(source: Source.cache)),
+            throwsA(isA<FirestoreException>()),
             reason: 'B has no cached document of A');
 
         // A comes back: the write is sent with the token of A.
-        await auth.signInWithEmailAndPassword(emailA, 'password-a');
+        await auth.signInWithEmailAndPassword(email: emailA, password: 'password-a');
         await eventually(() async => await admin.get(pendingPath) != null,
             'the pending write of A to reach the backend');
         await db.waitForPendingWrites();
         expect(
-            (await db.doc(pendingPath).get(Source.server)).data,
+            (await db.doc(pendingPath).get(GetOptions(source: Source.server))).data(),
             <String, Object?>{'text': 'written by a, offline'});
       });
 
       test('a refreshed token keeps the listeners going', () async {
         final FirebaseApp app = newApp();
         final FirebaseUserAuth auth = await newAuth(app);
-        final Firestore db = await newFirestore(app, web: web);
+        final FirebaseFirestore db = await newFirestore(app, web: web);
         final String run = unique('run');
         final AuthUser user = await auth.signInAnonymously();
         final String first =
@@ -374,7 +372,7 @@ void main() {
       test('sign-out drops access', () async {
         final FirebaseApp app = newApp();
         final FirebaseUserAuth auth = await newAuth(app);
-        final Firestore db = await newFirestore(app, web: web);
+        final FirebaseFirestore db = await newFirestore(app, web: web);
         final String run = unique('run');
         final AuthUser user = await auth.signInAnonymously();
         final DocumentReference<Map<String, Object?>> ref =
@@ -391,7 +389,7 @@ void main() {
             describe: listening.describe);
         expect(listening.errors.single, isPermissionDenied);
         await listening.cancel();
-        await expectLater(ref.get(Source.server), throwsA(isPermissionDenied));
+        await expectLater(ref.get(GetOptions(source: Source.server)), throwsA(isPermissionDenied));
         await expectLater(
             ref.set(<String, Object?>{'v': 2}), throwsA(isPermissionDenied));
         expect((await admin.get('users/${user.uid}/$run/doc'))!['v'],
@@ -414,9 +412,9 @@ void main() {
               return RestTransport(httpClients.last, databaseInfo, options);
             }
           : null;
-      final lite.Firestore db = lite.Firestore.instanceFor(
+      final lite.FirebaseFirestore db = lite.FirebaseFirestore.instanceFor(
         app: app,
-        settings: lite.FirestoreSettings()
+        settings: lite.Settings()
             .withEmulator(firestoreAddress!.host, firestoreAddress.port),
       );
       cleanups.add(db.terminate);
@@ -429,18 +427,18 @@ void main() {
       final lite.DocumentReference<Map<String, Object?>> ofA =
           db.doc('users/${a.uid}/notes/$run');
       await ofA.set(<String, Object?>{'owner': 'a'});
-      expect((await ofA.get()).data, <String, Object?>{'owner': 'a'});
+      expect((await ofA.get()).data(), <String, Object?>{'owner': 'a'});
       await expectLater(db.doc('users/somebody-else/notes/$run').get(),
           throwsA(isPermissionDenied));
 
       // Another user: the next request carries the new token.
       final AuthUser b = await auth.createUserWithEmailAndPassword(
-          '${unique('lite')}@example.com', 'password');
+          email: '${unique('lite')}@example.com', password: 'password');
       await expectLater(ofA.get(), throwsA(isPermissionDenied));
       final lite.DocumentReference<Map<String, Object?>> ofB =
           db.doc('users/${b.uid}/notes/$run');
       await ofB.set(<String, Object?>{'owner': 'b'});
-      expect((await ofB.get()).data, <String, Object?>{'owner': 'b'});
+      expect((await ofB.get()).data(), <String, Object?>{'owner': 'b'});
 
       await auth.signOut();
       await expectLater(ofB.get(), throwsA(isPermissionDenied));

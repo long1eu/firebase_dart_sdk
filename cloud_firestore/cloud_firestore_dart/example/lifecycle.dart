@@ -15,14 +15,14 @@ Future<void> main() async {
   // Log level: `warn` (the default) prints warnings and errors, `debug`
   // prints everything the SDK does, `silent` nothing. It applies to all
   // instances.
-  Firestore.setLogLevel(LogLevel.silent);
+  FirebaseFirestore.setLogLevel(LogLevel.silent);
 
   final Directory directory = Directory.systemTemp.createTempSync(
     'firestore_example_',
   );
   final FirebaseApp app = exampleApp();
-  Firestore open() {
-    return Firestore.instanceFor(
+  FirebaseFirestore open() {
+    return FirebaseFirestore.instanceFor(
       app: app,
       openDatabase: sqliteOpener(directory),
       settings: emulatorSettings(cacheSettings: PersistentCacheSettings()),
@@ -31,7 +31,7 @@ Future<void> main() async {
 
   bool hasDatabaseFile() => directory.listSync().isNotEmpty;
 
-  Firestore firestore = open();
+  FirebaseFirestore firestore = open();
   final String path = '${scratch('settings')}/theme';
 
   // waitForPendingWrites completes when the backend has acknowledged every
@@ -46,8 +46,8 @@ Future<void> main() async {
   print('pending writes are on the backend');
 
   // snapshotsInSync fires when all listeners are in sync with each other.
-  final Future<void> inSync = firestore.snapshotsInSync.first;
-  final subscription = firestore.doc(path).snapshots.listen((_) {});
+  final Future<void> inSync = firestore.snapshotsInSync().first;
+  final subscription = firestore.doc(path).snapshots().listen((_) {});
   await inSync;
   await subscription.cancel();
   print('listeners are in sync');
@@ -58,8 +58,8 @@ Future<void> main() async {
   await firestore.terminate();
   try {
     await firestore.doc(path).get();
-  } on FirestoreError catch (e) {
-    print('after terminate: ${e.code} (${e.message})');
+  } on FirestoreException catch (e) {
+    print('after terminate: ${e.errorCode} (${e.message})');
   }
 
   // clearPersistence deletes the cache file of a terminated instance.
@@ -71,11 +71,13 @@ Future<void> main() async {
   // and the data is still on the backend.
   firestore = open();
   try {
-    await firestore.doc(path).get(Source.cache);
-  } on FirestoreError catch (e) {
-    print('cache after clear: ${e.code}');
+    await firestore.doc(path).get(GetOptions(source: Source.cache));
+  } on FirestoreException catch (e) {
+    print('cache after clear: ${e.errorCode}');
   }
-  print('server: ${(await firestore.doc(path).get(Source.server)).data}');
+  print(
+    'server: ${(await firestore.doc(path).get(GetOptions(source: Source.server))).data()}',
+  );
 
   await firestore.terminate();
   directory.deleteSync(recursive: true);

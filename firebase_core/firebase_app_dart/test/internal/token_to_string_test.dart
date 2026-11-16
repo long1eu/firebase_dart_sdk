@@ -33,10 +33,10 @@ void main() {
     expect(text, contains('GetTokenResult'));
   });
 
-  test('InternalTokenResult.toString() does not contain the token', () {
-    const InternalTokenResult result = InternalTokenResult('secret-token');
+  test('AuthTokenChange.toString() does not contain the token', () {
+    const AuthTokenChange result = AuthTokenChange('secret-token');
     expect(result.toString(), isNot(contains('secret-token')));
-    expect(result.toString(), contains('InternalTokenResult'));
+    expect(result.toString(), contains('AuthTokenChange'));
   });
 
   test('AppCheckTokenResult.toString() does not contain the token', () {
