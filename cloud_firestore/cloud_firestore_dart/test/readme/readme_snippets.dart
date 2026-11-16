@@ -85,8 +85,8 @@ class City {
   Map<String, Object?> toMap() => {'name': name, 'population': population};
 }
 
-// ../../README.md:31
-Future<void> rootReadmeLine31() async {
+// ../../README.md:37
+Future<void> rootReadmeLine37() async {
   final firestore = Firestore.instanceFor(app: app);
   await firestore.collection('users').doc('ada').set({'name': 'Ada', 'age': 36});
 
@@ -101,8 +101,8 @@ Future<void> rootReadmeLine31() async {
       .listen((snapshot) => print(snapshot.docs.length));
 }
 
-// README.md:50
-Future<void> firestoreReadmeLine50() async {
+// README.md:55
+Future<void> firestoreReadmeLine55() async {
   Future<void> main() async {
     final app = FirebaseApp.withOptions(const FirebaseOptions(
         apiKey: '<API key>', applicationId: '1:1234567890:web:abc', projectId: 'my-project'));
@@ -242,8 +242,8 @@ Future<void> migrationGuideLine402() async {
     }
 }
 
-// ../../docs/guides/authentication.md:26
-Future<void> authenticationGuideLine26() async {
+// ../../docs/guides/authentication.md:49
+Future<void> authenticationGuideLine49() async {
   // A signed-in Firebase Auth user: the security rules see request.auth.
   final auth = await FirebaseUserAuth.forApp(app);
   final firestore = Firestore.instanceFor(app: app);
@@ -254,8 +254,8 @@ Future<void> authenticationGuideLine26() async {
   //   app.authProvider = applicationDefaultCredentials();   // package:.../adc.dart
 }
 
-// ../../docs/guides/authentication.md:48
-Future<void> authenticationGuideLine48() async {
+// ../../docs/guides/authentication.md:71
+Future<void> authenticationGuideLine71() async {
   final app = FirebaseApp.withOptions(const FirebaseOptions(
     apiKey: '<the Web API key of the project>',
     applicationId: '1:1234567890:dart:example',
@@ -275,21 +275,21 @@ Future<void> authenticationGuideLine48() async {
   await auth.signOut();
 }
 
-// ../../docs/guides/authentication.md:102
-Future<void> authenticationGuideLine102() async {
+// ../../docs/guides/authentication.md:170
+Future<void> authenticationGuideLine170() async {
   final auth = await FirebaseUserAuth.forApp(app, storage: FileAuthStorage());
   // auth.currentUser is the user of the last run, if there was one.
 }
 
-// ../../docs/guides/authentication.md:132
-Future<void> authenticationGuideLine132() async {
+// ../../docs/guides/authentication.md:200
+Future<void> authenticationGuideLine200() async {
   final auth = await FirebaseUserAuth.forApp(app,
       emulatorHost: FirebaseUserAuth.emulatorHostFromEnvironment); // FIREBASE_AUTH_EMULATOR_HOST
   // or emulatorHost: '127.0.0.1:9099'
 }
 
-// ../../docs/guides/authentication.md:158
-Future<void> authenticationGuideLine158() async {
+// ../../docs/guides/authentication.md:226
+Future<void> authenticationGuideLine226() async {
   final app = FirebaseApp.withOptions(const FirebaseOptions(
     apiKey: '',                  // an empty key is not sent; any other key is, with each request
     applicationId: '1:1234567890:dart:server',
@@ -321,8 +321,8 @@ Future<void> cookbookGuideLine46() async {
   }
 }
 
-// ../../docs/guides/cookbook.md:69
-Future<void> cookbookGuideLine69() async {
+// ../../docs/guides/cookbook.md:73
+Future<void> cookbookGuideLine73() async {
   final ordered = firestore.collection('messages').orderBy('rank');
   final pages = <StreamSubscription<QuerySnapshot<Map<String, Object?>>>>[];
   DocumentSnapshot<Map<String, Object?>>? end;
@@ -344,8 +344,8 @@ Future<void> cookbookGuideLine69() async {
   }
 }
 
-// ../../docs/guides/cookbook.md:102
-Future<void> cookbookGuideLine102() async {
+// ../../docs/guides/cookbook.md:112
+Future<void> cookbookGuideLine112() async {
   final orders = firestore.collection('orders');
   final count = (await orders.count().get()).getCount();
 
@@ -358,8 +358,8 @@ Future<void> cookbookGuideLine102() async {
   print('${paid.getCount()} paid, ${paid.getInt(revenue)} in total, ${paid.getDouble(average)} each');
 }
 
-// ../../docs/guides/cookbook.md:124
-Future<void> cookbookGuideLine124() async {
+// ../../docs/guides/cookbook.md:134
+Future<void> cookbookGuideLine134() async {
   final page = firestore.collection('pages').doc('home');
   await page.update({'views': FieldValue.increment(1)});
 
@@ -372,15 +372,15 @@ Future<void> cookbookGuideLine124() async {
   final views = (await shards.aggregate([total]).get()).getInt(total);
 }
 
-// ../../docs/guides/cookbook.md:150
-Future<void> cookbookGuideLine150() async {
+// ../../docs/guides/cookbook.md:174
+Future<void> cookbookGuideLine174() async {
   final post = firestore.collection('posts').doc('hello');
   await post.update({'tags': FieldValue.arrayUnion(['news', 'firestore'])});
   await post.update({'tags': FieldValue.arrayRemove(['news'])});
 }
 
-// ../../docs/guides/cookbook.md:167
-Future<void> cookbookGuideLine167() async {
+// ../../docs/guides/cookbook.md:195
+Future<void> cookbookGuideLine195() async {
   final note = firestore.collection('notes').doc('n1');
   note.getSnapshots(MetadataChanges.include).listen((snapshot) {
     final Object? exact = snapshot['updatedAt']; // null while the write is pending
@@ -393,12 +393,12 @@ Future<void> cookbookGuideLine167() async {
   await note.update({'text': 'second', 'updatedAt': FieldValue.serverTimestamp()});
 }
 
-// ../../docs/guides/cookbook.md:189
-Future<void> cookbookGuideLine189() async {
+// ../../docs/guides/cookbook.md:217
+Future<void> cookbookGuideLine217() async {
 }
 
-// ../../docs/guides/cookbook.md:200
-Future<void> cookbookGuideLine200() async {
+// ../../docs/guides/cookbook.md:228
+Future<void> cookbookGuideLine228() async {
   final products = firestore.collection('products').withConverter<Product>(
         FirestoreDataConverter<Product>.from(
           fromFirestore: (snapshot, options) => Product.fromMap(snapshot.data!),
@@ -411,8 +411,8 @@ Future<void> cookbookGuideLine200() async {
   await products.doc('pen').update({'price': 2}); // update still takes a map
 }
 
-// ../../docs/guides/cookbook.md:221
-Future<void> cookbookGuideLine221() async {
+// ../../docs/guides/cookbook.md:249
+Future<void> cookbookGuideLine249() async {
   final byAda = await firestore
       .collectionGroup('reviews')
       .where('author', isEqualTo: 'ada')
@@ -422,8 +422,8 @@ Future<void> cookbookGuideLine221() async {
   }
 }
 
-// ../../docs/guides/cookbook.md:240
-Future<void> cookbookGuideLine240() async {
+// ../../docs/guides/cookbook.md:268
+Future<void> cookbookGuideLine268() async {
   final users = firestore.collection('users');
   final ids = <String>[/* the document ids you want */];
   final teams = await users.where('team', whereIn: ['team1', 'team2']).get();
@@ -439,8 +439,8 @@ Future<void> cookbookGuideLine240() async {
   }
 }
 
-// ../../docs/guides/cookbook.md:265
-Future<void> cookbookGuideLine265() async {
+// ../../docs/guides/cookbook.md:293
+Future<void> cookbookGuideLine293() async {
   final tasks = firestore.collection('tasks');
   final mineOrUrgent = await tasks
       .where(Filter.or([
@@ -459,8 +459,8 @@ Future<void> cookbookGuideLine265() async {
       .get();
 }
 
-// ../../docs/guides/cookbook.md:293
-Future<void> cookbookGuideLine293() async {
+// ../../docs/guides/cookbook.md:321
+Future<void> cookbookGuideLine321() async {
   final rows = <Map<String, Object?>>[/* from a file, an API, another database */];
   final cities = firestore.collection('cities');
   for (var start = 0; start < rows.length; start += 400) {
@@ -474,8 +474,8 @@ Future<void> cookbookGuideLine293() async {
   }
 }
 
-// ../../docs/guides/cookbook.md:316
-Future<void> cookbookGuideLine316() async {
+// ../../docs/guides/cookbook.md:344
+Future<void> cookbookGuideLine344() async {
   Future<int> moveStock(DocumentReference<Map<String, Object?>> from,
       DocumentReference<Map<String, Object?>> to, int amount) {
     return firestore.runTransaction<int>((transaction) async {
@@ -491,8 +491,8 @@ Future<void> cookbookGuideLine316() async {
   }
 }
 
-// ../../docs/guides/cookbook.md:342
-Future<void> cookbookGuideLine342() async {
+// ../../docs/guides/cookbook.md:390
+Future<void> cookbookGuideLine390() async {
   final accounts = firestore.collection('accounts');
   final orders = firestore.collection('orders');
   final report = await firestore.runTransaction((transaction) async {
@@ -505,8 +505,8 @@ Future<void> cookbookGuideLine342() async {
   }, options: TransactionOptions(readOnly: true));
 }
 
-// ../../docs/guides/cookbook.md:365
-Future<void> cookbookGuideLine365() async {
+// ../../docs/guides/cookbook.md:413
+Future<void> cookbookGuideLine413() async {
   Future<int> deleteCollection(CollectionReference<Map<String, Object?>> collection) async {
     var deleted = 0;
     while (true) {
@@ -522,8 +522,8 @@ Future<void> cookbookGuideLine365() async {
   }
 }
 
-// ../../docs/guides/cookbook.md:390
-Future<void> cookbookGuideLine390() async {
+// ../../docs/guides/cookbook.md:438
+Future<void> cookbookGuideLine438() async {
   final theme = firestore.collection('settings').doc('theme');
   theme
       .getSnapshotsWithOptions(const SnapshotListenOptions(source: ListenSource.cache))
@@ -533,8 +533,8 @@ Future<void> cookbookGuideLine390() async {
   final fresh = await theme.get(Source.server);
 }
 
-// ../../docs/guides/cookbook.md:411
-Future<void> cookbookGuideLine411() async {
+// ../../docs/guides/cookbook.md:459
+Future<void> cookbookGuideLine459() async {
   final todos = firestore.collection('todos');
   todos.getSnapshots(MetadataChanges.include).listen((snapshot) {
     final offline = snapshot.metadata.isFromCache; // offline, or not synced yet
@@ -552,8 +552,8 @@ Future<void> cookbookGuideLine411() async {
   await firestore.terminate();
 }
 
-// ../../docs/guides/cookbook.md:441
-Future<void> cookbookGuideLine441() async {
+// ../../docs/guides/cookbook.md:489
+Future<void> cookbookGuideLine489() async {
   final recipes = firestore.collection('recipes');
   await recipes.doc('pancakes').set({
     'meal': 'breakfast',
@@ -569,8 +569,8 @@ Future<void> cookbookGuideLine441() async {
   }
 }
 
-// ../../docs/guides/cookbook.md:466
-Future<void> cookbookGuideLine466() async {
+// ../../docs/guides/cookbook.md:514
+Future<void> cookbookGuideLine514() async {
   final snapshot = await firestore.collection('events').orderBy('at').get();
   await File('events.json').writeAsString(jsonEncode(snapshot.toJson()));
 
@@ -605,16 +605,16 @@ Future<void> emulatorAndTestingGuideLine39() async {
         );
 }
 
-// ../../docs/guides/emulator_and_testing.md:57
-Future<void> emulatorAndTestingGuideLine57() async {
+// ../../docs/guides/emulator_and_testing.md:77
+Future<void> emulatorAndTestingGuideLine77() async {
   final Firestore asAlice = Firestore.instanceFor(
     app: FirebaseApp.withOptions(app.options, name: 'alice'),
     settings: FirestoreSettings().withEmulator('127.0.0.1', 8080, mockUserToken: {'sub': 'alice'}),
   );
 }
 
-// ../../docs/guides/emulator_and_testing.md:70
-Future<void> emulatorAndTestingGuideLine70() async {
+// ../../docs/guides/emulator_and_testing.md:110
+Future<void> emulatorAndTestingGuideLine110() async {
   late Firestore db;
   int instances = 0;
 
@@ -661,8 +661,8 @@ Future<void> errorHandlingGuideLine32() async {
   }
 }
 
-// ../../docs/guides/error_handling.md:125
-Future<void> errorHandlingGuideLine125() async {
+// ../../docs/guides/error_handling.md:173
+Future<void> errorHandlingGuideLine173() async {
   // The change is in the cache now; the future completes when the backend has it.
   unawaited(
     firestore.doc('cities/SF').set({'name': 'San Francisco'}).catchError(
@@ -679,8 +679,8 @@ Future<void> errorHandlingGuideLine125() async {
   );
 }
 
-// ../../docs/guides/error_handling.md:169
-Future<void> errorHandlingGuideLine169() async {
+// ../../docs/guides/error_handling.md:217
+Future<void> errorHandlingGuideLine217() async {
   StreamSubscription<QuerySnapshot<Map<String, Object?>>> listen() {
     return users.snapshots.listen(
       (QuerySnapshot<Map<String, Object?>> snapshot) {
@@ -702,8 +702,8 @@ Future<void> errorHandlingGuideLine169() async {
   final StreamSubscription<QuerySnapshot<Map<String, Object?>>> subscription = listen();
 }
 
-// ../../docs/guides/error_handling.md:223
-Future<void> errorHandlingGuideLine223() async {
+// ../../docs/guides/error_handling.md:296
+Future<void> errorHandlingGuideLine296() async {
   final int total = await firestore.runTransaction(
     (Transaction transaction) async {
       final DocumentSnapshot<Map<String, Object?>> counter =
@@ -716,8 +716,8 @@ Future<void> errorHandlingGuideLine223() async {
   );
 }
 
-// ../../docs/guides/error_handling.md:247
-Future<void> errorHandlingGuideLine247() async {
+// ../../docs/guides/error_handling.md:320
+Future<void> errorHandlingGuideLine320() async {
   bool isRetryable(FirestoreError error) {
     switch (error.code) {
       case FirestoreErrorCode.unavailable:
@@ -778,8 +778,8 @@ Future<void> firebaseAppGuideLine9() async {
   print(identical(FirebaseApp.getInstance('secondary'), secondary)); // true
 }
 
-// ../../docs/guides/firebase_app.md:67
-Future<void> firebaseAppGuideLine67() async {
+// ../../docs/guides/firebase_app.md:93
+Future<void> firebaseAppGuideLine93() async {
   final AppDependencies dependencies = AppDependencies();
   final FirebaseApp connectedApp = FirebaseApp.withOptions(
     const FirebaseOptions(
@@ -917,8 +917,8 @@ Future<void> forAiAgentsGuideLine369() async {
   }
 }
 
-// ../../docs/guides/getting_started.md:25
-Future<void> gettingStartedGuideLine25() async {
+// ../../docs/guides/getting_started.md:47
+Future<void> gettingStartedGuideLine47() async {
   final FirebaseApp app = FirebaseApp.withOptions(
     const FirebaseOptions(
       apiKey: '<the Web API key of the project>',
@@ -932,8 +932,8 @@ Future<void> gettingStartedGuideLine25() async {
   final Firestore firestore = Firestore.instanceFor(app: app);
 }
 
-// ../../docs/guides/getting_started.md:57
-Future<void> gettingStartedGuideLine57() async {
+// ../../docs/guides/getting_started.md:99
+Future<void> gettingStartedGuideLine99() async {
   final CollectionReference<Map<String, Object?>> cities = firestore.collection('cities');
 
   // Writes complete when the backend has acknowledged them.
@@ -967,16 +967,16 @@ Future<void> gettingStartedGuideLine57() async {
   await added.delete();
 }
 
-// ../../docs/guides/getting_started.md:101
-Future<void> gettingStartedGuideLine101() async {
+// ../../docs/guides/getting_started.md:143
+Future<void> gettingStartedGuideLine143() async {
   // Writes that the backend has not acknowledged yet are kept in a persistent
   // cache and sent by the next instance; with a memory cache they are lost.
   await firestore.waitForPendingWrites();
   await firestore.terminate();
 }
 
-// ../../docs/guides/getting_started.md:144
-Future<void> gettingStartedGuideLine144() async {
+// ../../docs/guides/getting_started.md:186
+Future<void> gettingStartedGuideLine186() async {
   final Firestore firestore = Firestore.instanceFor(
     app: app,
     settings: FirestoreSettings(experimentalForceLongPolling: true),
@@ -1034,8 +1034,8 @@ Future<void> migratingFromFlutterfireGuideLine330() async {
   print('${totals.getCount()} users, ${totals.get(AggregateField.sum('age'))} years');
 }
 
-// ../../docs/guides/multiple_clients.md:99
-Future<void> multipleClientsGuideLine99() async {
+// ../../docs/guides/multiple_clients.md:119
+Future<void> multipleClientsGuideLine119() async {
   final Directory directory = Directory('/home/ada/.local/share/my_app');
 
   // In the background isolate: the same project, another app name, another cache file.
@@ -1046,14 +1046,14 @@ Future<void> multipleClientsGuideLine99() async {
   );
 }
 
-// ../../docs/guides/multiple_clients.md:125
-Future<void> multipleClientsGuideLine125() async {
+// ../../docs/guides/multiple_clients.md:145
+Future<void> multipleClientsGuideLine145() async {
   await firestore.terminate();
   await firestore.clearPersistence();
 }
 
-// ../../docs/guides/offline_persistence.md:17
-Future<void> offlinePersistenceGuideLine17() async {
+// ../../docs/guides/offline_persistence.md:29
+Future<void> offlinePersistenceGuideLine29() async {
   // Persistent (needs an openDatabase): unused documents are removed once the
   // cache grows beyond about 100 MB, the default.
   final FirestoreSettings persistent = FirestoreSettings(
@@ -1076,8 +1076,8 @@ Future<void> offlinePersistenceGuideLine17() async {
   );
 }
 
-// ../../docs/guides/offline_persistence.md:57
-Future<void> offlinePersistenceGuideLine57() async {
+// ../../docs/guides/offline_persistence.md:69
+Future<void> offlinePersistenceGuideLine69() async {
   final Directory directory = Directory('/home/ada/.local/share/my_app');
   final Firestore firestore = Firestore.instanceFor(
     app: app,
@@ -1086,14 +1086,14 @@ Future<void> offlinePersistenceGuideLine57() async {
   );
 }
 
-// ../../docs/guides/offline_persistence.md:87
-Future<void> offlinePersistenceGuideLine87() async {
+// ../../docs/guides/offline_persistence.md:99
+Future<void> offlinePersistenceGuideLine99() async {
   final Directory directory = Directory('/home/ada/.local/share/my_app');
   final OpenDatabase opener = sqliteOpener(directory, pageCacheMb: 32);
 }
 
-// ../../docs/guides/offline_persistence.md:106
-Future<void> offlinePersistenceGuideLine106() async {
+// ../../docs/guides/offline_persistence.md:118
+Future<void> offlinePersistenceGuideLine118() async {
   // Only the cache, never the network.
   final DocumentSnapshot<Map<String, Object?>> cached =
       await firestore.doc('cities/SF').get(Source.cache);
@@ -1115,8 +1115,8 @@ Future<void> offlinePersistenceGuideLine106() async {
   await firestore.enableNetwork();
 }
 
-// ../../docs/guides/offline_persistence.md:143
-Future<void> offlinePersistenceGuideLine143() async {
+// ../../docs/guides/offline_persistence.md:185
+Future<void> offlinePersistenceGuideLine185() async {
   final Directory directory = Directory('/home/ada/.local/share/my_app')
     ..createSync(recursive: true);
   if (!Platform.isWindows) {
@@ -1124,8 +1124,8 @@ Future<void> offlinePersistenceGuideLine143() async {
   }
 }
 
-// ../../docs/guides/offline_persistence.md:164
-Future<void> offlinePersistenceGuideLine164() async {
+// ../../docs/guides/offline_persistence.md:206
+Future<void> offlinePersistenceGuideLine206() async {
   // IndexedDB: SQLite runs in the page on a copy of the whole database in memory.
   final Firestore firestore = Firestore.instanceFor(
     app: app,
@@ -1133,8 +1133,8 @@ Future<void> offlinePersistenceGuideLine164() async {
   );
 }
 
-// ../../docs/guides/offline_persistence.md:182
-Future<void> offlinePersistenceGuideLine182() async {
+// ../../docs/guides/offline_persistence.md:224
+Future<void> offlinePersistenceGuideLine224() async {
   final Firestore firestore = Firestore.instanceFor(
     app: app,
     openDatabase: sqliteWebOpener(
@@ -1144,21 +1144,21 @@ Future<void> offlinePersistenceGuideLine182() async {
   );
 }
 
-// ../../docs/guides/offline_persistence.md:218
-Future<void> offlinePersistenceGuideLine218() async {
+// ../../docs/guides/offline_persistence.md:260
+Future<void> offlinePersistenceGuideLine260() async {
   await firestore.terminate();        // the cache must not be in use by this instance
   await firestore.clearPersistence(); // deletes the files (or the browser storage)
   final Firestore fresh = Firestore.instanceFor(app: app);
 }
 
-// ../../docs/guides/offline_persistence.md:237
-Future<void> offlinePersistenceGuideLine237() async {
+// ../../docs/guides/offline_persistence.md:279
+Future<void> offlinePersistenceGuideLine279() async {
   final indexes = firestore.persistentCacheIndexManager; // null with a memory cache
   await indexes?.enableIndexAutoCreation();
 }
 
-// ../../docs/guides/performance.md:148
-Future<void> performanceGuideLine148() async {
+// ../../docs/guides/performance.md:170
+Future<void> performanceGuideLine170() async {
   await firestore.persistentCacheIndexManager?.enableIndexAutoCreation();
 
   // An index for a query that automatic creation skips (deprecated API).
@@ -1176,22 +1176,22 @@ Future<void> performanceGuideLine148() async {
   }''');
 }
 
-// ../../docs/guides/performance.md:204
-Future<void> performanceGuideLine204() async {
+// ../../docs/guides/performance.md:226
+Future<void> performanceGuideLine226() async {
   final FirestoreSettings settings = FirestoreSettings(
     cacheSettings: PersistentCacheSettings(sizeBytes: 200 * 1024 * 1024),
   );
 }
 
-// ../../docs/guides/performance.md:256
-Future<void> performanceGuideLine256() async {
+// ../../docs/guides/performance.md:278
+Future<void> performanceGuideLine278() async {
   final Stream<QuerySnapshot<Map<String, Object?>>> local = users
       .where('online', isEqualTo: true)
       .getSnapshotsWithOptions(const SnapshotListenOptions(source: ListenSource.cache));
 }
 
-// ../../docs/guides/performance.md:271
-Future<void> performanceGuideLine271() async {
+// ../../docs/guides/performance.md:293
+Future<void> performanceGuideLine293() async {
   final QuerySnapshot<Map<String, Object?>> page1 =
       await users.orderBy('name').limit(25).get();
   final QuerySnapshot<Map<String, Object?>> page2 = await users
@@ -1201,21 +1201,21 @@ Future<void> performanceGuideLine271() async {
       .get();
 }
 
-// ../../docs/guides/performance.md:290
-Future<void> performanceGuideLine290() async {
+// ../../docs/guides/performance.md:312
+Future<void> performanceGuideLine312() async {
   final AggregateQuerySnapshot snapshot = await users.where('active', isEqualTo: true).count().get();
   print(snapshot.getCount());
 }
 
-// ../../docs/guides/performance.md:331
-Future<void> performanceGuideLine331() async {
+// ../../docs/guides/performance.md:353
+Future<void> performanceGuideLine353() async {
   final LoadBundleTaskProgress progress = await firestore.loadBundle(bundleBytes).future;
   final Query<Map<String, Object?>>? latest = await firestore.getNamedQuery('latest-stories');
   final QuerySnapshot<Map<String, Object?>> firstScreen = await latest!.get(Source.cache);
 }
 
-// ../../docs/guides/performance.md:350
-Future<void> performanceGuideLine350() async {
+// ../../docs/guides/performance.md:372
+Future<void> performanceGuideLine372() async {
   final DocumentSnapshot<Map<String, Object?>> cached = await users.doc('ada').get(Source.cache);
 }
 
@@ -1234,8 +1234,8 @@ Future<void> pipelinesGuideLine21() async {
   }
 }
 
-// ../../docs/guides/pipelines.md:55
-Future<void> pipelinesGuideLine55() async {
+// ../../docs/guides/pipelines.md:74
+Future<void> pipelinesGuideLine74() async {
   // Computed fields and grouped aggregations.
   await firestore
       .pipeline()
@@ -1262,8 +1262,8 @@ Future<void> pipelinesGuideLine55() async {
       .execute();
 }
 
-// ../../docs/guides/pipelines.md:112
-Future<void> pipelinesGuideLine112() async {
+// ../../docs/guides/pipelines.md:131
+Future<void> pipelinesGuideLine131() async {
   // A subquery: every author with the number of their books.
   await firestore
       .pipeline()
@@ -1289,8 +1289,8 @@ Future<void> pipelinesGuideLine112() async {
       .execute();
 }
 
-// ../../docs/guides/pipelines.md:152
-Future<void> pipelinesGuideLine152() async {
+// ../../docs/guides/pipelines.md:171
+Future<void> pipelinesGuideLine171() async {
   final PipelineSnapshot written = await firestore
       .pipeline()
       .collection('books')
@@ -1300,8 +1300,8 @@ Future<void> pipelinesGuideLine152() async {
   print(written.results.single.get('documents_modified'));
 }
 
-// ../../docs/guides/pipelines.md:173
-Future<void> pipelinesGuideLine173() async {
+// ../../docs/guides/pipelines.md:192
+Future<void> pipelinesGuideLine192() async {
   final PipelineSnapshot inSnapshot = await firestore.runTransaction(
     (Transaction transaction) => transaction.execute(
       firestore.pipeline().collection('books').where(field('genre').equal('Fantasy')),
@@ -1310,8 +1310,8 @@ Future<void> pipelinesGuideLine173() async {
   );
 }
 
-// ../../docs/guides/pipelines.md:189
-Future<void> pipelinesGuideLine189() async {
+// ../../docs/guides/pipelines.md:208
+Future<void> pipelinesGuideLine208() async {
   final PipelineSnapshot explained = await firestore
       .pipeline()
       .collection('books')
@@ -1329,8 +1329,8 @@ Future<void> queriesAndDataGuideLine10() async {
   final adults = await users.whereGreaterThanOrEqualTo('age', 18).get();
 }
 
-// ../../docs/guides/queries_and_data.md:30
-Future<void> queriesAndDataGuideLine30() async {
+// ../../docs/guides/queries_and_data.md:57
+Future<void> queriesAndDataGuideLine57() async {
   final count = await users.count().get();                 // AggregateQuerySnapshot
   final agg = await users.aggregate([
     AggregateField.sum('age'),
@@ -1349,8 +1349,8 @@ Future<void> queriesAndDataGuideLine30() async {
       .get();
 }
 
-// ../../docs/guides/queries_and_data.md:53
-Future<void> queriesAndDataGuideLine53() async {
+// ../../docs/guides/queries_and_data.md:80
+Future<void> queriesAndDataGuideLine80() async {
   final converter = FirestoreDataConverter<City>.from(
     fromFirestore: (snapshot, options) => City.fromMap(snapshot.data!),
     toFirestore: (city, options) => city.toMap(),
@@ -1364,8 +1364,8 @@ Future<void> queriesAndDataGuideLine53() async {
   final raw = cities.withoutConverter();                              // back to Map<String, Object?>
 }
 
-// ../../docs/guides/queries_and_data.md:87
-Future<void> queriesAndDataGuideLine87() async {
+// ../../docs/guides/queries_and_data.md:114
+Future<void> queriesAndDataGuideLine114() async {
   final settings = FirestoreSettings(
       cacheSettings: PersistentCacheSettings(sizeBytes: 100 * 1024 * 1024));
   final task = firestore.loadBundle(bundleBytes);          // LoadBundleTask
@@ -1418,8 +1418,8 @@ Future<void> serverGuideLine19() async {
   }
 }
 
-// ../../docs/guides/server.md:91
-Future<void> serverGuideLine91() async {
+// ../../docs/guides/server.md:110
+Future<void> serverGuideLine110() async {
   final String? emulator = Platform.environment['FIRESTORE_EMULATOR_HOST']; // host:port
   final FirebaseApp serverApp = FirebaseApp.withOptions(
     FirebaseOptions(
@@ -1442,8 +1442,8 @@ Future<void> serverGuideLine91() async {
   final Firestore db = Firestore.instanceFor(app: serverApp, settings: settings);
 }
 
-// ../../docs/guides/server.md:268
-Future<void> serverGuideLine268() async {
+// ../../docs/guides/server.md:311
+Future<void> serverGuideLine311() async {
   // Claim a job once, whichever process gets there first.
   final DocumentReference<Map<String, Object?>> job = firestore.doc('jobs/job-1');
   final bool claimed = await firestore.runTransaction<bool>((Transaction transaction) async {
@@ -1457,8 +1457,8 @@ Future<void> serverGuideLine268() async {
   print(claimed ? 'mine' : 'taken');
 }
 
-// ../../docs/guides/transactions_and_lifecycle.md:36
-Future<void> transactionsAndLifecycleGuideLine36() async {
+// ../../docs/guides/transactions_and_lifecycle.md:55
+Future<void> transactionsAndLifecycleGuideLine55() async {
   final total = await firestore.runTransaction((transaction) async {
     final account = await transaction.get(firestore.doc('accounts/a'));
     final orders = await transaction.getQuery(
@@ -1468,21 +1468,21 @@ Future<void> transactionsAndLifecycleGuideLine36() async {
   }, options: TransactionOptions(readOnly: true));
 }
 
-// ../../docs/guides/troubleshooting.md:12
-Future<void> troubleshootingGuideLine12() async {
+// ../../docs/guides/troubleshooting.md:59
+Future<void> troubleshootingGuideLine59() async {
   Firestore.setLogLevel(LogLevel.debug);
 }
 
-// ../../docs/guides/troubleshooting.md:233
-Future<void> troubleshootingGuideLine233() async {
+// ../../docs/guides/troubleshooting.md:280
+Future<void> troubleshootingGuideLine280() async {
   final FirestoreSettings settings = FirestoreSettings(
     experimentalForceLongPolling: true,
     experimentalLongPollingOptions: const ExperimentalLongPollingOptions(timeoutSeconds: 25),
   );
 }
 
-// ../../docs/guides/web.md:16
-Future<void> webGuideLine16() async {
+// ../../docs/guides/web.md:21
+Future<void> webGuideLine21() async {
   void main() {
     final FirebaseApp app = FirebaseApp.withOptions(
       const FirebaseOptions(
@@ -1508,16 +1508,16 @@ Future<void> webGuideLine16() async {
   }
 }
 
-// ../../docs/guides/web.md:102
-Future<void> webGuideLine102() async {
+// ../../docs/guides/web.md:118
+Future<void> webGuideLine118() async {
   final FirestoreSettings settings = FirestoreSettings(
     experimentalForceLongPolling: true,
     experimentalLongPollingOptions: const ExperimentalLongPollingOptions(timeoutSeconds: 25),
   );
 }
 
-// ../../docs/guides/web.md:134
-Future<void> webGuideLine134() async {
+// ../../docs/guides/web.md:163
+Future<void> webGuideLine163() async {
   final Firestore firestore = Firestore.instanceFor(
     app: app,
     openDatabase: sqliteWebOpener(
@@ -1528,8 +1528,8 @@ Future<void> webGuideLine134() async {
   );
 }
 
-// ../../docs/guides/web.md:167
-Future<void> webGuideLine167() async {
+// ../../docs/guides/web.md:196
+Future<void> webGuideLine196() async {
   final Firestore firestore = await openWithMemoryFallback(
     app: app,
     sqlite3Wasm: Uri.parse('sqlite3.wasm'),
@@ -1539,7 +1539,7 @@ Future<void> webGuideLine167() async {
   final bool persistent = firestore.persistentCacheIndexManager != null;
 }
 
-// ../../docs/guides/web.md:194
-Future<void> webGuideLine194() async {
+// ../../docs/guides/web.md:223
+Future<void> webGuideLine223() async {
   final FirestoreSettings settings = FirestoreSettings().withEmulator('127.0.0.1', 8080);
 }

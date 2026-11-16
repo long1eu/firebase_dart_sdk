@@ -6,7 +6,9 @@ not work in a browser yet.
 
 **Web support is experimental.** It was tested in Chrome only, against the Firestore emulator
 only, and it may change in any release. [`examples/web_app/`](../../examples/web_app/) is a
-complete app you can build and open in a browser. This is its main page in headless Chrome with
+complete app you can build and open in a browser.
+[`examples/playground/`](../../examples/playground/) runs the client with its network disabled on a
+memory cache, so you can try queries, writes and listeners in a page that needs no backend. This is its main page in headless Chrome with
 the network turned off: look at the **Sync** line and at the note marked `[not sent yet]`.
 
 ![The web_app example offline: Sync "Offline: showing the cache", an "Enable network" button, and the newest note marked "[not sent yet]" above three sent notes](../images/examples/web_app_offline.png)

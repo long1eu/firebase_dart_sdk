@@ -14,7 +14,7 @@ sync with the code.
 `cloud_firestore_dart` is an unofficial port of the Firebase Android SDK to pure Dart. It is not
 a Google product and Firebase support does not cover it. The project was archived for some years
 and has been revived towards a 0.1.0 release; the three packages (`cloud_firestore_dart`,
-`firebase_app_dart`, `firebase_auth_providers_dart`) are at 0.1.0, their first version on
+`firebase_app_dart`, `firebase_auth_providers_dart`) are at 0.1.1; 0.1.0 was their first version on
 pub.dev under these names.
 
 What the repository can show about its state (each number with where it comes from):
@@ -393,10 +393,12 @@ What to watch for:
 - **Two auth states.** Signing in with FlutterFire's `firebase_auth` does not sign this package's
   client in, and the reverse. Either sign the user in on both sides, or give this package a token
   provider that hands it the ID token of the FlutterFire user. Such a provider implements
-  `InternalTokenProvider` of `package:firebase_app_dart/internal.dart`, which
+  `InternalTokenProvider` of `package:firebase_app_dart/firebase_app_dart.dart`, which
   [Configuring the FirebaseApp](firebase_app.md) describes as not public API: it can change in a
   release, so pin the version if you write one. In both cases the security rules see the same
-  user id only if both sides are signed in as the same Firebase user.
+  user id only if both sides are signed in as the same Firebase user. The
+  `cloud_firestore_dart_flutterfire` package is such a provider, with the options mapping and a
+  one-call setup: see [Using cloud_firestore_dart with FlutterFire sign-in](flutterfire_bridge.md).
 - **Two connections.** Each client opens its own connection to the backend and runs its own
   listeners. Listening to the same query on both doubles the reads that are billed.
 - **One choice per platform.** The simplest structure is a small interface of your own for the

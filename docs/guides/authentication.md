@@ -245,8 +245,8 @@ app.authProvider = OAuthTokenProvider.serviceAccount(
 final firestore = Firestore.instanceFor(app: app);
 ```
 
-- The access token is fetched when it is first needed and replaced five minutes before it
-  expires. The private key never leaves the process: it signs a short-lived assertion that is
+- The access token is fetched as soon as the provider is assigned to `app.authProvider` and is
+  replaced five minutes before it expires. The private key never leaves the process: it signs a short-lived assertion that is
   exchanged for the token (JWT bearer flow).
 - The RS256 signature is computed in pure Dart (it also runs on the web); no vetted RSA library
   is in the dependency tree (`pointycastle` is not a dependency, and the signer of
