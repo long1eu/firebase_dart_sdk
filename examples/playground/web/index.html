@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- The page loads only its own files and never connects anywhere:
+       'wasm-unsafe-eval' lets the dart2wasm build compile its module. -->
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'none'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self'; connect-src 'self'; img-src 'self'; base-uri 'none'; form-action 'none'">
+  <meta name="color-scheme" content="light dark">
+  <title>Firestore playground: cloud_firestore_dart</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header>
+    <h1>Firestore playground</h1>
+    <p class="lead">Try <code>cloud_firestore_dart</code>, the pure-Dart Cloud Firestore client, and watch
+      what it does. Compiled with <span id="compiler">dart2js</span>.</p>
+    <p class="banner" role="note"><strong>Local cache only.</strong> The client runs with its network
+      disabled, on a memory cache. Nothing you type leaves this browser, and everything is gone when
+      you close or reload the tab.</p>
+    <p id="error" role="alert"></p>
+  </header>
+
+  <main>
+    <section id="query-panel" aria-labelledby="query-title">
+      <h2 id="query-title">Live query</h2>
+      <form id="query">
+        <div class="row">
+          <label for="q-collection">Collection</label>
+          <select id="q-collection"></select>
+        </div>
+        <fieldset>
+          <legend>Where</legend>
+          <div class="row three">
+            <label class="sr" for="q-field">Where field</label>
+            <input id="q-field" placeholder="field" autocomplete="off" spellcheck="false">
+            <label class="sr" for="q-op">Operator</label>
+            <select id="q-op"></select>
+            <label class="sr" for="q-value">Value</label>
+            <input id="q-value" placeholder="value (JSON or text)" autocomplete="off" spellcheck="false">
+          </div>
+        </fieldset>
+        <fieldset>
+          <legend>Order and limit</legend>
+          <div class="row three">
+            <label class="sr" for="q-order">Order by field</label>
+            <input id="q-order" placeholder="orderBy field" autocomplete="off" spellcheck="false">
+            <label class="sr" for="q-direction">Direction</label>
+            <select id="q-direction">
+              <option value="asc">ascending</option>
+              <option value="desc">descending</option>
+            </select>
+            <label class="sr" for="q-limit">Limit</label>
+            <input id="q-limit" type="number" min="1" max="100" placeholder="limit" inputmode="numeric">
+          </div>
+        </fieldset>
+        <div class="actions">
+          <button type="submit">Listen</button>
+        </div>
+      </form>
+      <p class="hint">A document without the orderBy or where field is left out, as on the server.</p>
+      <pre id="query-code" aria-label="The Dart code of this listener"></pre>
+      <p id="query-error" role="alert"></p>
+    </section>
+
+    <section id="docs-panel" aria-labelledby="docs-title">
+      <h2 id="docs-title">Documents in the result <span id="docs-count" class="count"></span></h2>
+      <p id="docs-meta" class="meta"></p>
+      <p class="hint"><code>updatedAt</code> is a server timestamp. Until a server sets it, the
+        snapshot reads it as a local estimate (<code>ServerTimestampBehavior.estimate</code>).</p>
+      <ul id="docs" class="cards"></ul>
+    </section>
+
+    <section id="write-panel" aria-labelledby="write-title">
+      <h2 id="write-title">Write a document</h2>
+      <form id="write">
+        <div class="row">
+          <label for="w-collection">Collection</label>
+          <select id="w-collection"></select>
+        </div>
+        <div class="row">
+          <label for="w-id">Document id</label>
+          <input id="w-id" placeholder="empty: a new random id" autocomplete="off" spellcheck="false">
+        </div>
+        <label for="w-data">Data (a JSON object)</label>
+        <textarea id="w-data" rows="6" spellcheck="false"></textarea>
+        <p class="hint">Saved with <code>set()</code>, plus <code>updatedAt: FieldValue.serverTimestamp()</code>.</p>
+        <div class="actions">
+          <button type="submit">Save</button>
+          <button type="button" id="sample">Add sample data</button>
+          <button type="button" id="reset" class="danger">Reset</button>
+        </div>
+      </form>
+    </section>
+
+    <section id="pending-panel" aria-labelledby="pending-title">
+      <h2 id="pending-title">Writes waiting for a server <span id="pending-count" class="count"></span></h2>
+      <p class="hint">Each write is applied to the cache at once, so the listener sees it, and then
+        waits for the backend to confirm it. There is no backend here, so every write stays in this
+        queue and its <code>Future</code> never completes. An app that is offline sees exactly this; with
+        a connection the queue empties as the server answers.</p>
+      <ol id="pending" class="queue"></ol>
+    </section>
+
+    <section id="events-panel" aria-labelledby="events-title">
+      <h2 id="events-title">Events</h2>
+      <h3 id="timeline-title">Timeline</h3>
+      <ol id="timeline" class="timeline" aria-labelledby="timeline-title"></ol>
+      <p class="hint">Oldest on the left. A square W is a write, a circle a snapshot with the number of
+        documents it changed (S: none changed), a dashed L a new listener.</p>
+      <h3>Snapshots and writes, newest first</h3>
+      <ol id="events" class="events" aria-live="polite"></ol>
+    </section>
+  </main>
+
+  <footer>
+    <p>Run it on the other compiler: <a id="other-compiler" href="./?compiler=wasm">dart2wasm</a>.
+      The source and how to build it are in <code>examples/playground/</code> of the repository.</p>
+  </footer>
+  <script src="bootstrap.js" data-app="main"></script>
+</body>
+</html>
