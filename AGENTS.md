@@ -15,6 +15,7 @@ Maintained, tested and published (version 0.2.0, Dart `^3.8.0`):
 | `cloud_firestore_dart_sqlite` (0.1.0) | `cloud_firestore/cloud_firestore_dart_sqlite` |
 | `cloud_firestore_dart_flutterfire` (0.1.0, Flutter) | `cloud_firestore/cloud_firestore_dart_flutterfire` |
 | `cloud_firestore_dart_platform` (0.1.0, Flutter) | `cloud_firestore/cloud_firestore_dart_platform` |
+| `firebase_admin_dart` (0.1.0; trusted code only, never ship a service account key) | `firebase_admin/firebase_admin_dart` |
 
 - `examples/`: complete example packages (`server_shelf`, `cli`, `cloud_run_job`).
 - `docs/`: guides (`docs/guides/`), parity, support policy, how we test, upstream sync records.

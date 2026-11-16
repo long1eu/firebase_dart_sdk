@@ -16,6 +16,7 @@ PACKAGES=(
   "firebase_auth_providers_dart|firebase_auth/firebase_auth_providers_dart|"
   "cloud_firestore_dart|cloud_firestore/cloud_firestore_dart|test/unit"
   "cloud_firestore_dart_sqlite|cloud_firestore/cloud_firestore_dart_sqlite|"
+  "firebase_admin_dart|firebase_admin/firebase_admin_dart|"
 )
 
 summary=()

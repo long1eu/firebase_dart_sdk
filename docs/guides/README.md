@@ -62,6 +62,8 @@ READMEs are short landing pages; the API reference is on pub.dev.
 25. [The official cloud_firestore API on cloud_firestore_dart](flutterfire_platform.md): keep
     FlutterFire's API (`FirebaseFirestore.instance`) and run it on `cloud_firestore_dart`,
     automatically on Linux or by `CloudFirestoreDart.use()` anywhere.
+26. [Admin calls](admin.md): `firebase_admin_dart` for custom tokens, users, claims and ID token
+    checks from trusted code, and when to use the official Admin SDK instead.
 
 Every Dart snippet in these guides is compiled against the current API by
 `cloud_firestore/cloud_firestore_dart/test/unit/api/readme_snippets_test.dart`, except the blocks
