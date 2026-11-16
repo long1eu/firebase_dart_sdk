@@ -4,6 +4,9 @@
   `CloudFirestoreDart.use()` replaced the native Firestore of `cloud_firestore` in
   `examples/flutterfire_on_windows`, whose integration tests passed, sum and average aggregations included. No
   code change.
+- README: the package was tried in a Flutter Linux desktop app (`examples/flutterfire_on_linux`, Debian 13 x86_64,
+  Flutter 3.44.9): automatic registration, `Firebase.initializeApp`, listeners, writes, batch, transaction, query and
+  the disk cache, against the emulator.
 
 ## 0.1.0
 
