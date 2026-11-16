@@ -67,6 +67,11 @@ if [ $# -eq 0 ] || printf '%s\n' "$@" | grep -qx "examples"; then
     name="examples/$(basename "$dir")"
     log="$LOG/examples_$(basename "$dir")"
     echo "=== $name ==="
+    # A Flutter example resolves only with the Flutter SDK, which CI does not install.
+    if grep -qE '^\s*sdk:\s*flutter\s*$' "$pubspec" && ! command -v flutter >/dev/null 2>&1; then
+      summary+=("$name: skipped (needs the Flutter SDK)")
+      continue
+    fi
     pub=PASS analyze=PASS
     (cd "$dir" && dart pub get >"$log.pub" 2>&1) || { pub=FAIL; tail -5 "$log.pub"; }
     (cd "$dir" && dart analyze >"$log.an" 2>&1)
