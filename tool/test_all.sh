@@ -15,6 +15,7 @@ PACKAGES=(
   "firebase_app_dart|firebase_core/firebase_app_dart|"
   "firebase_auth_providers_dart|firebase_auth/firebase_auth_providers_dart|"
   "cloud_firestore_dart|cloud_firestore/cloud_firestore_dart|test/unit"
+  "cloud_firestore_dart_sqlite|cloud_firestore/cloud_firestore_dart_sqlite|"
 )
 
 summary=()
@@ -91,6 +92,23 @@ if [ $# -eq 0 ] || printf '%s\n' "$@" | grep -qx "cloud_firestore_dart_flutterfi
   dir="$ROOT/cloud_firestore/cloud_firestore_dart_flutterfire"
   echo "=== $name ==="
   # A Flutter package: `dart test` cannot load flutter_test, and CI installs Dart only.
+  if ! command -v flutter >/dev/null 2>&1; then
+    summary+=("$name: skipped (needs the Flutter SDK)")
+  else
+    pub=PASS analyze=PASS tests=PASS
+    (cd "$dir" && flutter pub get >"$LOG/$name.pub" 2>&1) || { pub=FAIL; tail -5 "$LOG/$name.pub"; }
+    (cd "$dir" && flutter analyze >"$LOG/$name.an" 2>&1) || { analyze=FAIL; tail -10 "$LOG/$name.an"; }
+    (cd "$dir" && flutter test >"$LOG/$name.test" 2>&1) || { tests=FAIL; tail -20 "$LOG/$name.test"; }
+    case "$pub$analyze$tests" in *FAIL*) failed=1;; esac
+    summary+=("$name: pub get $pub | analyze $analyze | test $tests")
+  fi
+fi
+
+if [ $# -eq 0 ] || printf '%s\n' "$@" | grep -qx "cloud_firestore_dart_platform"; then
+  name=cloud_firestore_dart_platform
+  dir="$ROOT/cloud_firestore/cloud_firestore_dart_platform"
+  echo "=== $name ==="
+  # A Flutter package; its emulator tests run only when FIRESTORE_EMULATOR_HOST is set.
   if ! command -v flutter >/dev/null 2>&1; then
     summary+=("$name: skipped (needs the Flutter SDK)")
   else

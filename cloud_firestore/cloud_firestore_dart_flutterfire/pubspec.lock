@@ -47,7 +47,7 @@ packages:
       path: "../cloud_firestore_dart"
       relative: true
     source: path
-    version: "0.1.1"
+    version: "0.2.0"
   collection:
     dependency: transitive
     description:
@@ -78,7 +78,7 @@ packages:
       path: "../../firebase_core/firebase_app_dart"
       relative: true
     source: path
-    version: "0.1.1"
+    version: "0.2.0"
   firebase_auth:
     dependency: "direct main"
     description:

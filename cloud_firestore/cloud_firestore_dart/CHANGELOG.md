@@ -1,4 +1,4 @@
-## 0.2.0 (unreleased)
+## 0.2.0
 
 Breaking: the public API takes the names and shapes of FlutterFire's `cloud_firestore` and of
 Dart, instead of those of the Android SDK. The implementation did not change. Every change, with

@@ -30,10 +30,10 @@ flutter:
 dependencies:
   # Local development resolves cloud_firestore_dart and firebase_app_dart from
   # the sibling packages through pubspec_overrides.yaml (not published).
-  cloud_firestore_dart: ^0.1.1
+  cloud_firestore_dart: ^0.2.0
   cloud_firestore_platform_interface: ^8.1.0
   collection: ^1.18.0
-  firebase_app_dart: ^0.1.1
+  firebase_app_dart: ^0.2.0
   firebase_core: ^5.1.0
   firebase_core_platform_interface: ^8.1.1
   flutter:

@@ -12,7 +12,7 @@
 > WebChannel with long polling) against the Firestore emulator, and a short verification kit was
 > run against production Firestore ([how we test](docs/how_we_test.md)).
 >
-> **Status:** version 0.1.1 is on pub.dev. What is not done is listed openly in
+> **Status:** version 0.2.0 is on pub.dev. What is not done is listed openly in
 > [features and limits](docs/guides/features.md).
 >
 > **Issues:** <https://github.com/long1eu/firebase_dart_sdk/issues>.
@@ -63,7 +63,10 @@ dart pub add cloud_firestore_dart firebase_app_dart
 
 - [Parity with upstream Firestore](docs/parity.md): what matches the Android and JS SDKs, and
   what does not.
-- [Migrating from FlutterFire](docs/guides/migrating_from_flutterfire.md) (`cloud_firestore`).
+- [Migrating from FlutterFire](docs/guides/migrating_from_flutterfire.md) (`cloud_firestore`), and
+  [what changed in 0.2](docs/api_migration_0_2.md).
+- [Why this library](docs/why_this_library.md): where it is the better or the only choice, with the
+  evidence, and when not to use it.
 - [Example apps](examples/README.md): an HTTP server with a live change feed, a command-line
   import, export and watch tool, a Cloud Run job, a worker queue, a Flutter app and a browser app.
 - [`examples/playground/`](examples/playground/): try the client in a browser with no backend and no
@@ -128,7 +131,7 @@ public API follow the JS SDK.
   against production: the Enterprise edition features (BSON value types, Pipelines; tested
   against the emulator in Enterprise edition only), Firebase Auth user sign-in, the integration
   suite as a whole and long-running load. Test against your own project before relying on it.
-- Version 0.1.1 is published on pub.dev as `cloud_firestore_dart`, `firebase_app_dart` and
+- Version 0.2.0 is published on pub.dev as `cloud_firestore_dart`, `firebase_app_dart` and
   `firebase_auth_providers_dart`. `cloud_firestore_dart` 0.0.1 on pub.dev (2020) is an early
   release of the same package. They replace the packages published as
   `cloud_firestore_vm` and `firebase_core_vm` (and the internal `_firebase_internal_vm` and
@@ -161,7 +164,9 @@ the original project and are not part of the migrated, tested set.
 | `cloud_firestore_dart` | `cloud_firestore/cloud_firestore_dart` | The Firestore client (formerly `cloud_firestore_vm`) |
 | `firebase_app_dart` | `firebase_core/firebase_app_dart` | `FirebaseApp` and options (formerly `firebase_core_vm`) |
 | `firebase_auth_providers_dart` | `firebase_auth/firebase_auth_providers_dart` | Optional token providers: Firebase Auth users over REST, service accounts, Application Default Credentials |
-| `cloud_firestore_dart_flutterfire` | `cloud_firestore/cloud_firestore_dart_flutterfire` | Optional Flutter bridge: the FlutterFire app options and `firebase_auth` user for `cloud_firestore_dart` (0.1.0, not published) |
+| `cloud_firestore_dart_sqlite` | `cloud_firestore/cloud_firestore_dart_sqlite` | The SQLite offline cache for `cloud_firestore_dart` on the VM, in Flutter and in the browser (`sqliteOpener`) (0.1.0) |
+| `cloud_firestore_dart_flutterfire` | `cloud_firestore/cloud_firestore_dart_flutterfire` | Optional Flutter bridge: the FlutterFire app options and `firebase_auth` user for `cloud_firestore_dart` (0.1.0) |
+| `cloud_firestore_dart_platform` | `cloud_firestore/cloud_firestore_dart_platform` | Optional Flutter package: the official `cloud_firestore` API backed by `cloud_firestore_dart`, automatically on Linux or by one call elsewhere (0.1.0) |
 
 The former internal packages are folded in: `_firebase_database_collection_vm` into
 `cloud_firestore_dart` (`lib/src/database_collection`) and `_firebase_internal_vm` into
@@ -259,7 +264,8 @@ currently 3.8.0, the lowest supported one). Do not format
 
 ## License
 
-`cloud_firestore_dart`, `firebase_app_dart` and `firebase_auth_providers_dart` are licensed under
+`cloud_firestore_dart`, `firebase_app_dart`, `firebase_auth_providers_dart`, `cloud_firestore_dart_sqlite`,
+`cloud_firestore_dart_flutterfire` and `cloud_firestore_dart_platform` are licensed under
 the Apache License 2.0, as upstream; see the `LICENSE` and `NOTICE` files of each package. The
 `_vm` packages they replace were licensed under BSD-3-Clause. The packages of this repository
 that were not migrated keep their own `LICENSE` files.

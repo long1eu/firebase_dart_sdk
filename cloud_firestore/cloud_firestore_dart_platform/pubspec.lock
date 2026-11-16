@@ -55,7 +55,7 @@ packages:
       path: "../cloud_firestore_dart"
       relative: true
     source: path
-    version: "0.1.1"
+    version: "0.2.0"
   cloud_firestore_dart_flutterfire:
     dependency: "direct dev"
     description:
@@ -109,7 +109,7 @@ packages:
       path: "../../firebase_core/firebase_app_dart"
       relative: true
     source: path
-    version: "0.1.1"
+    version: "0.2.0"
   firebase_auth:
     dependency: transitive
     description:

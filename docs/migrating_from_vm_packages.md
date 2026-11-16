@@ -51,8 +51,8 @@ After:
 environment:
   sdk: ^3.8.0
 dependencies:
-  cloud_firestore_dart: ^0.1.0
-  firebase_app_dart: ^0.1.0
+  cloud_firestore_dart: ^0.2.0
+  firebase_app_dart: ^0.2.0
 ```
 
 Imports, before:

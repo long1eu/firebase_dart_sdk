@@ -1,0 +1,342 @@
+# Why use this library instead of the official ones
+
+A note for the maintainer, to decide where to aim the project. It answers one question: when would a developer
+pick `cloud_firestore_dart` over FlutterFire (`cloud_firestore`, `firebase_core`, `firebase_auth`) or, on a
+server, over the Dart Admin SDK (`firebase_admin_sdk` / `google_cloud_firestore`), `googleapis` or `firedart`?
+
+Every outside source below was checked on **2026-11-16** unless a line says otherwise. Statements about this
+repository come from `docs/parity.md`, `docs/guides/*.md` and `docs/support_policy.md` at `origin/main`
+(`eb33218a`). Nothing was built or run for this note; no Firebase service was contacted.
+
+## The answer
+
+Ranked by how strong the evidence is that this library is the better or the only choice today.
+
+1. **Flutter apps on Linux desktop and embedded Linux.** FlutterFire has no Linux implementation, and in July
+   2026 a maintainer closed a community PR that added it: "Linux support is not currently on the FlutterFire
+   roadmap" ([flutterfire#18461](https://github.com/firebase/flutterfire/pull/18461), closed 2026-07-23).
+   Here this library is the only Firestore client with listeners and an offline cache. Caveat: no Flutter
+   app has been built on Linux with it yet (`docs/guides/flutter.md`, "What was tried where").
+2. **Dart servers, workers and CLIs that need real-time listeners, an offline cache, or access as a Firebase
+   user under security rules.** The official Dart Admin SDK has no listeners: its own design note says "no
+   bidirectional `Listen` RPC, so realtime listeners are a transport limit and a gap"
+   ([rest-transport.md](https://github.com/firebase/firebase-admin-dart/blob/main/.agents/knowledge/firestore/rest-transport.md)).
+   `firedart` has no query operators, no cache and no retries ([README](https://github.com/cachapa/firedart)).
+   Caveat: draft PRs to add listeners to the Admin SDK were opened on 2026-11-09 (see Hypothesis 2), so the
+   listener part of this lead may last months, not years. The user-under-rules and offline-cache parts do not
+   depend on that.
+3. **Firestore listeners on a background isolate in a Flutter app.** FlutterFire's own tracking issue lists
+   `cloud_firestore` as "no support for subscribing to documents" on background isolates and was closed as not
+   planned ([flutterfire#10353](https://github.com/firebase/flutterfire/issues/10353), closed 2026-06-23). A
+   pure-Dart client runs in any isolate. Caveat: not tried in a Flutter app here; each isolate needs its own
+   app name or cache (`docs/guides/multiple_clients.md`).
+4. **Windows desktop in production.** Firebase says "Firebase on Windows is not intended for production use
+   cases, only local development workflows" ([Flutter setup](https://firebase.google.com/docs/flutter/setup)),
+   and the Windows plugin rejects sum and average aggregations, pipelines and the cache index manager
+   ([cloud_firestore_plugin.cpp](https://github.com/firebase/flutterfire/blob/main/packages/cloud_firestore/cloud_firestore/windows/cloud_firestore_plugin.cpp)).
+   The gap is well proven; that this library fills it is not: it has never been run on Windows.
+
+Two weaker reasons follow: testing real client code under `dart test` against the emulator (Hypothesis 3), and
+Firestore in a Dart web app that does not use Flutter, such as Jaspr (Hypothesis 7).
+
+Four reasons that were expected and **do not hold up** today: iOS build time (Firestore now ships precompiled
+through Swift Package Manager, the Flutter default since 3.44), dart2wasm (the FlutterFire web plugins are
+`is:wasm-ready`), web bundle size (about the same), and de-Googled Android (Firestore and Auth do not need
+Google Play services). Feature gaps are also not a reason: FlutterFire has pipelines, bundles, named databases
+and the cache index manager.
+
+## Hypothesis 1: platform gaps
+
+**What is true today.**
+
+- `cloud_firestore` 7.1.0 on pub.dev carries the tags android, ios, windows, macos, web. **No linux, and no
+  pure-Dart (`sdk:dart`) tag**: it needs Flutter
+  ([pub.dev API](https://pub.dev/api/packages/cloud_firestore/score)). Same for `firebase_core` and
+  `firebase_auth`. `cloud_firestore_dart` has all six platforms and `sdk:dart`.
+- The FlutterFire README marks Cloud Firestore as beta on macOS and "(\*) for development only. Production on
+  Windows is not supported"; it has no Linux column
+  ([README](https://github.com/firebase/flutterfire#readme)). The Firebase setup page says the same for
+  Windows and does not mention Linux ([Flutter setup](https://firebase.google.com/docs/flutter/setup)).
+- Linux: a community PR added Linux to core, auth, firestore, database, storage and others; it was closed
+  unmerged because Linux "is not currently on the FlutterFire roadmap"
+  ([#18461](https://github.com/firebase/flutterfire/pull/18461), 2026-07-23). The open request for Linux in
+  `firebase_auth` has 37 thumbs-up ([#17338](https://github.com/firebase/flutterfire/issues/17338), opened
+  2025-05-07). Invertase's `firebase_core_desktop` and `firebase_auth_desktop` (Linux and Windows, no
+  Firestore) were last published in August 2022.
+- Windows: the plugin wraps the Firebase C++ SDK. Missing on Windows in the current source: sum and average
+  ("not supported by the Firebase C++ SDK on Windows"), pipelines and the persistent cache index manager
+  ("Not implemented on Windows"). Open crash reports exist
+  ([#12987](https://github.com/firebase/flutterfire/issues/12987), app crashes getting a document, open since
+  2024-06), and a PR from 2026-11-10 fixes the Windows codec not forwarding `persistenceEnabled`
+  ([#18936](https://github.com/firebase/flutterfire/pull/18936), open).
+- Embedded Linux (flutter-pi, flutter-elinux and similar embedders): these use Linux plugins, so with no Linux
+  implementation there is no FlutterFire Firestore there. This is inferred from the above; no embedder's
+  plugin list was checked.
+- Non-Flutter Dart: no Google client SDK exists. The official Dart option is the Admin SDK (Hypothesis 2).
+
+**This library.** Linux is tested on the Dart VM (CI on Ubuntu x64, a Debian arm64 container). Windows is "not
+tested", with known notes (`sqlite3.dll`, `clearPersistence()` while the file is open). No Flutter app was built
+for Linux, Windows, Android or iOS; the example app ran on macOS only (`docs/guides/flutter.md`).
+
+**How sure.** High that the gaps exist. Medium that this library fills Linux (Dart VM tested, Flutter Linux not
+run). Low for Windows.
+
+**Unverified.** A Flutter Linux build of `examples/flutter_notes`; any Windows run; an embedded board.
+
+## Hypothesis 2: pure-Dart servers and CLIs
+
+**What the existing options give.**
+
+| | Dart Admin SDK (`firebase_admin_sdk` 0.5.6 / `google_cloud_firestore` 0.5.5) | `firedart` 0.9.8 | `googleapis` 19.0.0 (`FirestoreApi`) | this library |
+|---|---|---|---|---|
+| Publisher | firebase.google.com (repo `firebase/firebase-admin-dart`, built by Invertase) | cachapa.net | google.dev (generated REST client) | none (one person) |
+| Transport | REST (HTTP/2 pool) | gRPC | REST | gRPC on the VM, WebChannel on the web |
+| Real-time listeners | no (TODO in source; draft PRs) | yes, but "closed streams are not automatically recovered" | no (not checked in source) | yes, with resume and backoff |
+| Queries | full, plus pipelines, vector search, bulk writer, recursive delete, partitions | "collection queries (limit, sort, etc.) are currently not supported" | raw REST | full, plus pipelines (preview) |
+| Transactions | yes | no | raw REST | yes, read-write and read-only |
+| Offline cache, pending writes | no | "the data is not cached locally" | no | yes (memory or SQLite) |
+| Identity | service account / ADC, bypasses rules | Firebase user (REST sign-in), under rules | OAuth | service account / ADC (bypasses rules) or a Firebase user (under rules) |
+| Last release | 2026-09-21; repo active (2026-11-13) | 2024-03-15; last push 2024-07 | 2026-11-12 | 2026-11-16 |
+
+Sources: [firebase_admin_sdk](https://pub.dev/packages/firebase_admin_sdk),
+[google_cloud_firestore README](https://github.com/firebase/firebase-admin-dart/tree/main/packages/google_cloud_firestore),
+[rest-transport.md](https://github.com/firebase/firebase-admin-dart/blob/main/.agents/knowledge/firestore/rest-transport.md)
+(`// TODO onSnapshot` in `query.dart`, `// TODO snapshots` in `document_reference.dart`),
+[firedart README "Limitations"](https://github.com/cachapa/firedart#limitations),
+[googleapis](https://pub.dev/packages/googleapis), this repo's `docs/guides/server.md` and `docs/parity.md`.
+`dart_firebase_admin` (Invertase) is marked discontinued on pub.dev and replaced by `firebase_admin_sdk`.
+
+**The listener lead is closing.** Listener requests in the Admin SDK date from 2025-10-01
+([#95](https://github.com/firebase/firebase-admin-dart/issues/95)); a maintainer answered then that streaming
+"isn't supported yet ... It's being discussed with Google". On 2026-11-09 an Invertase engineer opened three
+draft PRs: generated protos ([#346](https://github.com/firebase/firebase-admin-dart/pull/346)), a Listen
+transport ([#350](https://github.com/firebase/firebase-admin-dart/pull/350)) and an internal watch "a draft
+proof of concept and isn't meant for release yet"
+([#352](https://github.com/firebase/firebase-admin-dart/pull/352)). Expect admin-side listeners in Dart within
+some months.
+
+**What stays different after that.** The Admin SDK is admin access. This library can also act as a signed-in
+Firebase user whose reads and writes are checked by security rules (email/password, anonymous or custom token,
+`docs/guides/server.md`), and it keeps an offline cache with pending writes that survive a restart. That fits a
+CLI on a laptop, a kiosk or field device, or an agent process that must not hold admin rights. It is the same
+engine as the mobile SDKs, not a server SDK: no bulk writer, no recursive delete, no partitioned queries, no
+user management.
+
+**How sure.** High for the current table (read from source and READMEs). Medium on timing of Admin listeners.
+
+**Unverified.** Whether `googleapis` exposes `listen` usefully (its generated REST client is said to buffer
+server streams, per the Admin note above; not checked in `googleapis` itself). Whether anyone needs
+"user under rules on a server" at scale: no issue or discussion asking for it was found.
+
+## Hypothesis 3: testing
+
+**Today with FlutterFire.** The plugins talk to native code over platform channels, so under `flutter test` they
+fail with `MissingPluginException` ([#3311](https://github.com/firebase/flutterfire/issues/3311)). Teams either
+use a fake or run `integration_test` on a device, simulator or desktop against the emulator. The fake is
+popular: `fake_cloud_firestore` has 344,284 downloads in 30 days and 148 likes
+([pub.dev](https://pub.dev/packages/fake_cloud_firestore)). It is a reimplementation, not the SDK: its README
+says security rules are checked only for operations on `DocumentReference`, not for batches, collections or
+queries, and timestamps are not supported in rules
+([README](https://github.com/atn832/fake_cloud_firestore#security-rules)).
+
+**This library.** The real client (sync engine, cache, listeners, pending writes, transactions) runs under
+`dart test` or `flutter test` against the emulator, with `mockUserToken` for rules as a user
+(`docs/guides/emulator_and_testing.md`). The repository's own 887 integration tests per transport run this way.
+
+**The catch.** This only helps code written against this library's API. A FlutterFire app gets it only through
+the drop-in platform implementation that is being built now. Even then, the test runs this engine, not the
+Android or iOS one that ships, so it tests the app logic and the rules, not the production SDK.
+
+**How sure.** High on the facts; medium on the value (demand for test tools is large, but the bridge to
+FlutterFire users does not exist yet).
+
+## Hypothesis 4: native build cost
+
+**What changed.** The famous problem was real: Firestore on iOS compiled about 500k lines of mostly C++;
+Invertase measured a clean Xcode build at about 240 s before and 45 s after switching to precompiled frameworks (Mac mini
+2018), 551 s and 174 s on a 2-core CI runner
+([flutterfire#2751](https://github.com/firebase/flutterfire/issues/2751), 2020;
+[#349](https://github.com/firebase/flutterfire/issues/349), 211 thumbs-up). But:
+
+- Firebase's Swift package ships `FirebaseFirestoreInternal` as a **binary target** by default (source only
+  with `FIREBASE_SOURCE_FIRESTORE`) ([Package.swift](https://github.com/firebase/firebase-ios-sdk/blob/main/Package.swift)).
+- `cloud_firestore` has a `Package.swift` for iOS that depends on that package
+  ([source](https://github.com/firebase/flutterfire/tree/main/packages/cloud_firestore/cloud_firestore/ios/cloud_firestore)).
+- "As of the 3.44 release, Flutter's Swift Package Manager (SwiftPM) support is on by default", and the
+  CocoaPods registry becomes read-only on 2026-12-02
+  ([Flutter docs](https://docs.flutter.dev/packages-and-plugins/swift-package-manager/for-app-developers)).
+- The precompiled-pods repo is now deprecated: "Firestore via SPM already ships as a precompiled binary"
+  ([firestore-ios-sdk-frameworks](https://github.com/invertase/firestore-ios-sdk-frameworks)).
+
+So the slow-compile argument is mostly gone for new projects. Android: no current measurement of what
+`firebase-firestore` adds to an APK or to the method count was found; Firebase's SDK metrics page now
+redirects to the GitHub repo. Native version conflicts (pods pinned to different Firebase versions) were a
+classic FlutterFire pain ([#4625](https://github.com/firebase/flutterfire/issues/4625), 98 thumbs-up, 2021)
+but no current data was collected.
+
+**This library is not free either.** It adds `sqlite3_flutter_libs` (a native SQLite build) for a persistent
+cache, and gRPC and protobuf compiled into the Dart AOT snapshot.
+
+**To claim anything we must measure:** a clean and an incremental iOS build of the same small app with
+`cloud_firestore` (SwiftPM, Flutter 3.44+) and with `cloud_firestore_dart` + `sqlite3_flutter_libs`; the
+thinned IPA size and the Android release APK/AAB size of both; three runs each on one named machine and one CI
+runner.
+
+**How sure.** High that iOS build time is no longer a strong reason. Size: unknown either way.
+
+## Hypothesis 5: background isolates
+
+FlutterFire's umbrella issue for background isolates
+([#10353](https://github.com/firebase/flutterfire/issues/10353)) lists `cloud_firestore` as "works but some
+errors when hot reloading, no support for subscribing to documents". The cause, per the maintainer, is that the
+plugins use event channels, and Flutter's background isolate channels only go from Dart to the host
+([flutter#119207](https://github.com/flutter/flutter/issues/119207), open since 2023-01, 65 thumbs-up). The
+FlutterFire issue was closed on 2026-06-23 "since it doesn't seem to be planned for Google to support this
+feature". The documentation request is still open
+([#9518](https://github.com/firebase/flutterfire/issues/9518)).
+
+This library has no platform channels: it runs in any isolate. Two clients on one SQLite file elect a primary
+and the secondary stays offline (`docs/parity.md`, known limitation 4), so a background isolate needs its own
+app name, database or memory cache.
+
+**How sure.** High on the FlutterFire limit. Medium on ours: `shared_cache_isolates_test.dart` covers isolates
+on the Dart VM, but no Flutter app ran a listener in a background isolate.
+
+## Hypothesis 6: web
+
+- dart2wasm: `cloud_firestore_web`, `firebase_core_web` and `firebase_auth_web` are all tagged
+  `is:wasm-ready` on pub.dev. **Not a differentiator.**
+- Bundle size: FlutterFire web loads the Firebase JS SDK from the gstatic CDN at run time, version 13.3.0
+  ([firebase_core_web](https://github.com/firebase/flutterfire/blob/main/packages/firebase_core/firebase_core_web/lib/src/firebase_core_web.dart)).
+  The same files from npm (`firebase@13.3.0` on unpkg, gzipped with `gzip -9`, measured for this note):
+  `firebase-app.js` 24 KB, `firebase-firestore.js` 187 KB, `firebase-firestore-lite.js` 44 KB,
+  `firebase-firestore-pipelines.js` 198 KB. This library: a small app with the main library and a memory cache
+  is 196 KB gzipped in total, with Lite 128 KB (`docs/guides/web.md`, dart2js `-O2`). That is roughly the same
+  as app + Firestore from the CDN, and bigger than JS Lite. Inside a Flutter web app (several MB of engine)
+  the difference is noise. **Not a differentiator.**
+- Maturity: the JS SDK is the reference; this library's web support is experimental, Chrome only, one tab per
+  persistent cache (`docs/guides/platforms.md`).
+- One real niche: Dart web apps without Flutter (Jaspr and similar) cannot use the FlutterFire web packages,
+  because the platform interfaces still declare the Flutter SDK
+  ([flutterfire#18645](https://github.com/firebase/flutterfire/issues/18645), open, 2 thumbs-up). They can
+  call the JS SDK through `dart:js_interop` themselves, or use this library.
+
+**How sure.** High. The web is the weakest place to aim.
+
+## Hypothesis 7: other reasons
+
+- **De-Googled Android: false.** Firebase lists Cloud Firestore and Authentication under "Google Play services
+  not required" ([Play services dependencies](https://firebase.google.com/docs/android/android-play-services)).
+  The native SDK runs on AOSP-style devices too. (Google and phone sign-in do need Play services; not checked
+  further.)
+- **Features: mostly a wash.** FlutterFire `cloud_firestore` has pipelines, `loadBundle` / `namedQueryGet`,
+  named databases (`databaseId`), the persistent cache index manager, `snapshotsInSync`, `ListenSource`, and
+  vector search as a pipeline stage (from `lib/src/` of
+  [cloud_firestore](https://github.com/firebase/flutterfire/tree/main/packages/cloud_firestore/cloud_firestore/lib/src)).
+  Extras here, from `docs/parity.md`: read-only transactions, `Query.findNearest` on a classic query, snapshot
+  JSON (`toJson` / `fromJson`, resume a listener from it), and fixes in the cache index over the JS and
+  Android SDKs. None of these is a reason to switch on its own.
+- **One behaviour on every platform: real but unproven as a draw.** FlutterFire runs four engines (Android,
+  iOS, JS, C++ on Windows) with different gaps; the Windows gaps above are an example. This library runs one
+  engine everywhere. No issue was found where users ask for this directly.
+- **Hackability:** the whole client is Dart, readable and debuggable in the IDE, patchable with a
+  `dependency_overrides`. Real for a small group; no demand signal measured.
+
+## Comparison table
+
+| Situation | Official option | This library | Who wins and why |
+|---|---|---|---|
+| Flutter app on Linux desktop or embedded Linux | none for Firestore | listeners, offline cache, email/anonymous/custom-token sign-in | this library: the only option (Flutter Linux build not yet tried) |
+| Flutter app on Windows, shipped to users | `cloud_firestore`, "development only", C++ SDK gaps | untested on Windows | unclear until tested; the official option is not supported in production |
+| Dart server reacting to changes | Admin SDK: no listeners (drafts in progress); polling | listeners with resume and backoff | this library today; may change in months |
+| Dart server or CLI acting as a user under rules, or working offline | none (Admin bypasses rules; `firedart` has no cache, no queries) | yes | this library |
+| Dart server doing admin jobs (bulk writes, user management, recursive delete) | Admin SDK | not built for it | Admin SDK |
+| Listener on a Flutter background isolate | not supported, not planned | runs in any isolate | this library (not tried in Flutter yet) |
+| Testing Firestore code without a device | fake (`fake_cloud_firestore`) or device tests | real client under `dart test` with the emulator | this library, but only for code on its API until the drop-in exists |
+| Flutter app on Android or iOS | `cloud_firestore`, Google-supported, native SDKs | works as plain Dart, never run on a device | official |
+| Flutter web | JS SDK via `cloud_firestore_web`, wasm-ready | experimental, Chrome only | official |
+| Dart web without Flutter (Jaspr) | none packaged; hand-written JS interop | experimental | this library, weakly |
+| iOS build time | precompiled via SwiftPM since Flutter 3.44 | not measured | no claim possible |
+
+## When not to use it
+
+- A Flutter app on Android, iOS or the web where FlutterFire works: you get Google's SDKs, Google's support,
+  and years of production use. This library has 58 downloads in 30 days, 0 likes, 80 GitHub stars and one
+  maintainer (499 of the 513 commits GitHub counts).
+- When you need federated sign-in (Google, Apple), phone or email-link sign-in, or multi-factor: not provided
+  (`docs/guides/authentication.md`).
+- When you need App Check with device attestation, Analytics, Crashlytics, Remote Config, Messaging or Storage:
+  not part of this project (see `appsup-dart/firebase_dart` for Auth, Realtime Database and Storage in pure
+  Dart).
+- Several browser tabs sharing one cache, or secondary isolates sharing listeners: not supported.
+- High load or long running time in production: only a 15-check verification kit ran against a real
+  database; the integration suite's real-project mode and long load have not (`docs/parity.md`, limitation 1).
+- Admin work on a server: use `firebase_admin_sdk`.
+- When you need a vendor to call: there is no SLA and no Google support; it is not affiliated with Google.
+
+## What would make the case stronger
+
+Ranked by expected effect on adoption.
+
+1. **The drop-in FlutterFire platform implementation, Linux first.** Most demand sits with people who already
+   wrote `cloud_firestore` code. A `cloud_firestore` platform implementation for Linux (and then Windows) lets
+   them add one dependency instead of rewriting. It also turns the testing reason into a real one for every
+   FlutterFire user. Needs `firebase_core` and at least email/anonymous auth with it.
+2. **A Flutter Linux desktop app that is built and run, and one on an embedded board** (for example a
+   Raspberry Pi with flutter-pi), with sign-in, a listener, an offline edit and a restart, written up with
+   screenshots. This is the one place where the library is the only answer; it must be shown working.
+3. **Production evidence.** Run the integration suite's real-project mode and a multi-day soak against a real
+   database, and publish the numbers. Every reason above is weakened by "tested against the emulator".
+4. **A server page that compares honestly with `firebase_admin_sdk`**, with one example that the Admin SDK
+   cannot do today: a worker that listens and acts as a restricted Firebase user. Do it before the Admin
+   listener PRs land, and keep the comparison current after.
+5. **A Windows CI job** (unit and integration on the Dart VM) and one Flutter Windows build. Cheap, and it turns
+   reason 4 from a gap into a claim. Build-time and size measurements (Hypothesis 4) come last: they are
+   needed only to avoid false claims, not to win users.
+
+## Positioning statements
+
+**The README can say today:**
+
+- "A pure-Dart Firestore client for places FlutterFire does not reach: Linux, Dart servers and command-line
+  tools, and background isolates."
+- "Real-time listeners and an offline cache on the Dart VM, as a Firebase user under security rules or with
+  service-account credentials."
+- "The same client engine on every platform: a port of the Firebase Android SDK, tested against the emulator
+  with about 5,900 unit and about 880 integration tests per transport."
+- "Test your Firestore code with `dart test` against the emulator, running the real client."
+- "Unofficial, maintained by one person, version 0.1."
+
+**It must not say yet:**
+
+- "Production ready", or anything that implies scale or reliability beyond the emulator and the 15-check kit.
+- "Works on Windows" or "works in Flutter apps on Linux / Android / iOS": not run there yet. Say "expected to
+  work" until it has been.
+- "Faster builds" or "smaller apps" than FlutterFire: not measured, and the iOS build argument is mostly
+  obsolete.
+- "Smaller web bundles" or "the wasm option": FlutterFire web is wasm-ready and about the same size.
+- "Works on devices without Google Play services, unlike FlutterFire": the native Firestore SDK does not need
+  them either.
+- "The only Dart server client with listeners": true today, but the Admin SDK has draft PRs; date the claim
+  or leave it out.
+- "Drop-in replacement for FlutterFire": not until the platform implementation ships.
+
+## Demand signals (pub.dev API and GitHub, 2026-11-16)
+
+| Package or issue | Signal |
+|---|---|
+| `cloud_firestore` | 1,744,022 downloads in 30 days, 3,783 likes |
+| `fake_cloud_firestore` | 344,284 downloads in 30 days, 148 likes |
+| `google_cloud_firestore` / `firebase_admin_sdk` | 24,833 / 21,547 downloads in 30 days (the first includes use through the second), 8 / 27 likes |
+| `dart_firebase_admin` (discontinued) | 18,908 downloads in 30 days, 61 likes |
+| `firebase_dart` (pure-Dart Auth, Realtime Database, Storage; no Firestore) | 18,650 downloads in 30 days, 130 likes |
+| `firedart` | 3,898 downloads in 30 days, 319 likes, no release since 2024-03 |
+| `cloud_firestore_dart` | 58 downloads in 30 days, 0 likes |
+| flutterfire#17338, Linux for `firebase_auth` | open since 2025-05, 37 thumbs-up |
+| flutter#119207, platform channel calls into background isolates | open since 2023-01, 65 thumbs-up |
+| firebase-admin-dart#95, `onSnapshot` on the server | open since 2025-10, 0 reactions, 7 comments |
+| flutterfire#18645, FlutterFire web without Flutter | open since 2026-09, 2 thumbs-up |
+
+Read: test tooling and server use have real numbers; Linux and background isolates have steady but small
+requests; nobody is asking loudly for a pure-Dart Firestore client as such. `firedart`'s 319 likes with an
+unmaintained, query-less client suggest there is room for a working one in desktop and CLI use.
