@@ -6,7 +6,10 @@ not work in a browser yet.
 
 **Web support is experimental.** It was tested in Chrome only, against the Firestore emulator
 only, and it may change in any release. [`examples/web_app/`](../../examples/web_app/) is a
-complete app you can build and open in a browser.
+complete app you can build and open in a browser. This is its main page in headless Chrome with
+the network turned off: look at the **Sync** line and at the note marked `[not sent yet]`.
+
+![The web_app example offline: Sync "Offline: showing the cache", an "Enable network" button, and the newest note marked "[not sent yet]" above three sent notes](../images/examples/web_app_offline.png)
 
 ## A first page
 
@@ -78,6 +81,17 @@ Browsers have no sockets, so the client talks to Firestore the way the JS SDK do
   HTTP requests: the client posts its messages, and reads the answers from a long-lived response
   (the back channel).
 
+Which call takes which path, for the main library and for Lite:
+
+```mermaid
+flowchart LR
+  mainLib["main library"] -- "listen and write streams" --> webChannel["WebChannel over fetch"]
+  mainLib -- "reads, transaction commit, aggregations, pipelines" --> rest["REST/JSON over fetch"]
+  liteLib["Firestore Lite"] -- "every call" --> rest
+  webChannel --> backend["Firestore backend or emulator"]
+  rest --> backend
+```
+
 The client picks this transport by itself when it is compiled for the web. It listens to the
 `online` and `offline` events of the browser, and restarts its streams at once when the network
 comes back instead of waiting for its backoff.
@@ -111,6 +125,19 @@ Dart VM, which uses gRPC, and by Firestore Lite, which has no streams. The auto 
 the spirit of the JS SDK's, not a port of it.
 
 ## Choosing a cache
+
+To pick a library and a cache, answer the questions from the top:
+
+```mermaid
+flowchart TD
+  needLive{"Listeners or offline writes?"}
+  needLive -- "no" --> lite["Firestore Lite: no cache"]
+  needLive -- "yes" --> needReload{"Data across reloads?"}
+  needReload -- "no" --> memory["Memory cache (default)"]
+  needReload -- "yes" --> cacheSize{"A large cache?"}
+  cacheSize -- "no" --> indexedDb["SQLite in IndexedDB"]
+  cacheSize -- "yes" --> opfs["SQLite in OPFS, in a worker"]
+```
 
 | Cache | How | When |
 | --- | --- | --- |
