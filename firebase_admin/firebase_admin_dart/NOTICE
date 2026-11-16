@@ -1,0 +1,12 @@
+firebase_admin_dart
+Copyright 2018 Razvan Lung (long1eu) and contributors.
+
+This package is an unofficial client of the Firebase Auth admin REST API
+(Identity Toolkit), of the IAM Service Account Credentials API and of Google's
+OAuth 2.0 token endpoint. It is not a port of a Firebase Admin SDK; its error
+codes and some behaviour follow the Firebase Admin SDK for Node.js.
+
+This package is not affiliated with, endorsed by or supported by Google LLC or
+Firebase. "Firebase" is a trademark of Google LLC.
+
+Licensed under the Apache License, Version 2.0; see the LICENSE file.
