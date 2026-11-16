@@ -34,8 +34,8 @@ OpenDatabase failingOpener(Completer<void> opening, Duration delay) {
     }
     await Future<void>.delayed(delay);
     throw FirestoreException(
-      'The cache is open in another tab.',
-      FirestoreErrorCode.failedPrecondition,
+      message: 'The cache is open in another tab.',
+      errorCode: FirestoreErrorCode.failedPrecondition,
     );
   };
 }
@@ -90,7 +90,7 @@ void main() {
       await persistent.namedQuery('openWithMemoryFallback');
       fail('the cache opened');
     } on FirestoreException catch (e) {
-      expect(e.code, FirestoreErrorCode.failedPrecondition);
+      expect(e.errorCode, FirestoreErrorCode.failedPrecondition);
       await persistent.terminate();
       firestore = FirebaseFirestore.instanceFor(
         app: app,

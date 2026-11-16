@@ -819,9 +819,10 @@ class Query<T extends dynamic> {
       _getSnapshotsInternal(options).map((QuerySnapshot<T> snapshot) {
         if (snapshot.metadata.isFromCache && source == Source.server) {
           throw FirestoreException(
-            'Failed to get documents from server. (However, these documents may exist in the local cache. Run again '
-            'without setting source to Source.server to retrieve the cached documents.)',
-            FirestoreErrorCode.unavailable,
+            message:
+                'Failed to get documents from server. (However, these documents may exist in the local cache. Run again '
+                'without setting source to Source.server to retrieve the cached documents.)',
+            errorCode: FirestoreErrorCode.unavailable,
           );
         } else {
           return snapshot;

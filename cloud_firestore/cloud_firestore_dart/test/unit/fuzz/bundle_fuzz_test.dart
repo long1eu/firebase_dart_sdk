@@ -458,7 +458,7 @@ void main() {
         try {
           await task.future;
         } on FirestoreException catch (error) {
-          expect(error.code, FirestoreErrorCode.invalidArgument);
+          expect(error.errorCode, FirestoreErrorCode.invalidArgument);
           final Object? cause = error.cause;
           if (cause != null &&
               !isCleanRejection(cause, error.stackTrace ?? StackTrace.empty)) {

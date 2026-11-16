@@ -116,13 +116,13 @@ Future<void> eventually(
 }
 
 final Matcher isPermissionDenied = isA<FirestoreException>().having(
-  (FirestoreException e) => e.code,
+  (FirestoreException e) => e.errorCode,
   'code',
   FirestoreErrorCode.permissionDenied,
 );
 
 final Matcher isUnauthenticated = isA<FirestoreException>().having(
-  (FirestoreException e) => e.code,
+  (FirestoreException e) => e.errorCode,
   'code',
   FirestoreErrorCode.unauthenticated,
 );
@@ -179,7 +179,7 @@ void main() {
     }
     cleanups.clear();
     for (final FirebaseApp app in apps) {
-      app.delete();
+      await app.delete();
     }
     apps.clear();
     Datastore.transportOverride = null;
@@ -924,8 +924,8 @@ void main() {
         );
 
         await auth.createUserWithEmailAndPassword(
-          '${unique('pw')}@example.com',
-          'password',
+          email: '${unique('pw')}@example.com',
+          password: 'password',
         );
         await db.doc(path).set(<String, Object?>{'v': 1});
         expect((await db.doc(path).get(Source.server)).data, <String, Object?>{

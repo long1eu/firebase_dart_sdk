@@ -65,7 +65,7 @@ Future<void> main() async {
   try {
     await doc.set(<String, Object?>{'step': 2});
   } on FirestoreException catch (e) {
-    if (e.code != FirestoreErrorCode.unavailable) {
+    if (e.errorCode != FirestoreErrorCode.unavailable) {
       rethrow;
     }
     print('write failed with unavailable, nothing was stored');

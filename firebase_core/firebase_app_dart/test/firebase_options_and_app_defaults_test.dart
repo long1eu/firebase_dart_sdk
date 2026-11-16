@@ -50,7 +50,7 @@ void main() {
         isTrue,
       );
       expect(identical(app.onNetworkConnected, app.onNetworkConnected), isTrue);
-      app.setAutomaticResourceManagementEnabled(enabled: true);
+      app.setAutomaticResourceManagementEnabled(true);
       app.onBackgroundChanged.add(true);
       expect(app.onBackgroundChanged.value, isTrue);
     });

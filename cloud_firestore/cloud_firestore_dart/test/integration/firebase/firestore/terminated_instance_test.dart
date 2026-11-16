@@ -450,7 +450,7 @@ Set<String> publicIoMembers() {
 
 bool isTerminatedError(Object? error) =>
     error is FirestoreException &&
-    error.code == FirestoreErrorCode.failedPrecondition &&
+    error.errorCode == FirestoreErrorCode.failedPrecondition &&
     error.message == terminatedMessage;
 
 final Matcher throwsTerminated = throwsA(
@@ -578,7 +578,7 @@ void main() {
         fixture.firestore.clearPersistence(),
         throwsA(
           isA<FirestoreException>().having(
-            (FirestoreException e) => e.code,
+            (FirestoreException e) => e.errorCode,
             'code',
             FirestoreErrorCode.failedPrecondition,
           ),

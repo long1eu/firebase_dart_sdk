@@ -1469,7 +1469,7 @@ class SpecClient implements RemoteStoreCallback {
     if (expected.containsKey('errorCode') &&
         expected['errorCode'] != StatusCode.ok) {
       expect(actual.error, isNotNull);
-      expect(actual.error!.code.value, expected['errorCode']);
+      expect(actual.error!.errorCode.value, expected['errorCode']);
     } else {
       final List<DocumentViewChange> expectedChanges = <DocumentViewChange>[];
       final List<dynamic>? removed = expected['removed'];

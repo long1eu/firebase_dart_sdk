@@ -313,7 +313,7 @@ class FirebaseUserAuth implements AuthTokenProvider {
   /// Emits the user after every sign-in and sign-out (null when signed out), and after a change of the data of the
   /// signed-in user ([updateProfile], [updateEmail], [reload], ...). It does not emit the current user when it is
   /// listened to: read [currentUser] for that.
-  Stream<AuthUser?> get userChanges => _userChanges.stream;
+  Stream<AuthUser?> userChanges() => _userChanges.stream;
 
   /// Emits the ID token after a sign-in, after every refresh, and an empty token after a sign-out.
   @override
@@ -374,12 +374,14 @@ class FirebaseUserAuth implements AuthTokenProvider {
   /// Throws a [FirebaseAuthException] with the code `wrong-password`, `user-not-found`,
   /// `invalid-credential` (projects with email enumeration protection), `invalid-email`, `user-disabled`,
   /// `operation-not-allowed` (email sign-in is not enabled), `too-many-requests`, `cancelled`, ...
-  Future<AuthUser> signInWithEmailAndPassword(String email, String password) =>
-      _signIn('accounts:signInWithPassword', <String, Object?>{
-        'email': email,
-        'password': password,
-        'returnSecureToken': true,
-      });
+  Future<AuthUser> signInWithEmailAndPassword({
+    required String email,
+    required String password,
+  }) => _signIn('accounts:signInWithPassword', <String, Object?>{
+    'email': email,
+    'password': password,
+    'returnSecureToken': true,
+  });
 
   /// Creates an account with an email address and a password and signs it in
   /// (`createUserWithEmailAndPassword`). The new user is not anonymous, and its email address is not verified:
@@ -387,10 +389,10 @@ class FirebaseUserAuth implements AuthTokenProvider {
   ///
   /// Throws a [FirebaseAuthException] with the code `email-already-in-use`, `weak-password`,
   /// `invalid-email`, `missing-password`, `operation-not-allowed`, `cancelled`, ...
-  Future<AuthUser> createUserWithEmailAndPassword(
-    String email,
-    String password,
-  ) => _signIn('accounts:signUp', <String, Object?>{
+  Future<AuthUser> createUserWithEmailAndPassword({
+    required String email,
+    required String password,
+  }) => _signIn('accounts:signUp', <String, Object?>{
     'email': email,
     'password': password,
     'returnSecureToken': true,
@@ -443,8 +445,8 @@ class FirebaseUserAuth implements AuthTokenProvider {
   ///
   /// Throws `user-not-found` (projects without email enumeration protection), `invalid-email`,
   /// `too-many-requests`, `invalid-continue-uri`, ...
-  Future<void> sendPasswordResetEmail(
-    String email, {
+  Future<void> sendPasswordResetEmail({
+    required String email,
     ActionCodeSettings? actionCodeSettings,
   }) async {
     _checkNotDisposed();
@@ -461,7 +463,10 @@ class FirebaseUserAuth implements AuthTokenProvider {
   /// Sets [newPassword] with the [code] of a password reset email (`confirmPasswordReset`).
   ///
   /// Throws `expired-action-code`, `invalid-action-code`, `weak-password`, `user-disabled`, ...
-  Future<void> confirmPasswordReset(String code, String newPassword) async {
+  Future<void> confirmPasswordReset({
+    required String code,
+    required String newPassword,
+  }) async {
     _checkNotDisposed();
     await _send(
       _identityToolkit('accounts:resetPassword'),
@@ -491,8 +496,8 @@ class FirebaseUserAuth implements AuthTokenProvider {
     final String? email = info.email;
     if (email == null) {
       throw const FirebaseAuthException(
-        'internal-error',
-        'The action code has no email address.',
+        code: 'internal-error',
+        message: 'The action code has no email address.',
       );
     }
     return email;
@@ -641,10 +646,10 @@ class FirebaseUserAuth implements AuthTokenProvider {
   ///
   /// Throws `user-mismatch` when the credentials are those of another account (or of none), `wrong-password`,
   /// `invalid-credential`, ...
-  Future<AuthUser> reauthenticateWithEmailAndPassword(
-    String email,
-    String password,
-  ) async {
+  Future<AuthUser> reauthenticateWithEmailAndPassword({
+    required String email,
+    required String password,
+  }) async {
     _checkNotDisposed();
     final _Session session = _requireSession();
     final int generation = _generation;
@@ -667,8 +672,8 @@ class FirebaseUserAuth implements AuthTokenProvider {
     final Object? idToken = response['idToken'];
     if (idToken is! String) {
       throw const FirebaseAuthException(
-        'internal-error',
-        'The authentication service did not return tokens.',
+        code: 'internal-error',
+        message: 'The authentication service did not return tokens.',
       );
     }
     final GetTokenResult token = GetTokenResult(idToken);
@@ -677,8 +682,9 @@ class FirebaseUserAuth implements AuthTokenProvider {
     }
     if (generation != _generation) {
       throw const FirebaseAuthException(
-        'cancelled',
-        'The reauthentication was overtaken by another sign-in or a sign-out.',
+        code: 'cancelled',
+        message:
+            'The reauthentication was overtaken by another sign-in or a sign-out.',
       );
     }
     await _updateSession(response, generation);
@@ -738,14 +744,18 @@ class FirebaseUserAuth implements AuthTokenProvider {
   // ---- implementation ----
 
   static const FirebaseAuthException _userMismatch = FirebaseAuthException(
-    'user-mismatch',
-    'The supplied credentials do not correspond to the signed-in user.',
+    code: 'user-mismatch',
+    message:
+        'The supplied credentials do not correspond to the signed-in user.',
   );
 
   _Session _requireSession() {
     final _Session? session = _session;
     if (session == null) {
-      throw const FirebaseAuthException('null-user', 'No user is signed in.');
+      throw const FirebaseAuthException(
+        code: 'null-user',
+        message: 'No user is signed in.',
+      );
     }
     return session;
   }
@@ -843,8 +853,8 @@ class FirebaseUserAuth implements AuthTokenProvider {
     if (account is! Map<String, Object?>) {
       // What the JS SDK does when the backend has no such user.
       throw const FirebaseAuthException(
-        'internal-error',
-        'The authentication service returned no account.',
+        code: 'internal-error',
+        message: 'The authentication service returned no account.',
       );
     }
     final AuthUser? user = _session?.user;
@@ -966,8 +976,9 @@ class FirebaseUserAuth implements AuthTokenProvider {
     } on Object catch (_) {
       // The error of the HTTP client may quote the URL, which holds the API key.
       throw const FirebaseAuthException(
-        'network-request-failed',
-        'The request to the authentication service failed (network error).',
+        code: 'network-request-failed',
+        message:
+            'The request to the authentication service failed (network error).',
       );
     }
     Object? body;
@@ -990,8 +1001,9 @@ class FirebaseUserAuth implements AuthTokenProvider {
       );
     }
     throw FirebaseAuthException(
-      'internal-error',
-      'The authentication service answered with HTTP ${response.statusCode}.',
+      code: 'internal-error',
+      message:
+          'The authentication service answered with HTTP ${response.statusCode}.',
       httpStatus: response.statusCode,
     );
   }
@@ -1007,15 +1019,15 @@ class FirebaseUserAuth implements AuthTokenProvider {
     final Object? refreshToken = response['refreshToken'];
     if (idToken is! String || refreshToken is! String) {
       throw const FirebaseAuthException(
-        'internal-error',
-        'The authentication service did not return tokens.',
+        code: 'internal-error',
+        message: 'The authentication service did not return tokens.',
       );
     }
     if (generation != _generation) {
       // Another sign-in or a sign-out happened meanwhile and wins.
       throw const FirebaseAuthException(
-        'cancelled',
-        'The sign-in was overtaken by another sign-in or a sign-out.',
+        code: 'cancelled',
+        message: 'The sign-in was overtaken by another sign-in or a sign-out.',
       );
     }
     final GetTokenResult token = GetTokenResult(idToken);
@@ -1025,8 +1037,9 @@ class FirebaseUserAuth implements AuthTokenProvider {
         : token.claims['user_id'] ?? token.claims['sub'];
     if (uid is! String) {
       throw const FirebaseAuthException(
-        'internal-error',
-        'The authentication service did not return the id of the user.',
+        code: 'internal-error',
+        message:
+            'The authentication service did not return the id of the user.',
       );
     }
     final Object? email = response['email'] ?? token.claims['email'];
@@ -1093,8 +1106,8 @@ class FirebaseUserAuth implements AuthTokenProvider {
     final Object? refreshToken = response['refresh_token'];
     if (idToken is! String) {
       throw const FirebaseAuthException(
-        'internal-error',
-        'The token service did not return an ID token.',
+        code: 'internal-error',
+        message: 'The token service did not return an ID token.',
       );
     }
     if (generation != _generation) {

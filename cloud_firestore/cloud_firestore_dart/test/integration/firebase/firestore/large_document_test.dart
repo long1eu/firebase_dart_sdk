@@ -176,7 +176,7 @@ void main() {
         docRef.set(<String, Object?>{
           'largeField': generateAsciiString(oversizedPayloadBytes)
         }),
-        throwsA(isA<FirestoreException>().having((FirestoreException e) => e.code,
+        throwsA(isA<FirestoreException>().having((FirestoreException e) => e.errorCode,
             'code', FirestoreErrorCode.invalidArgument)));
   }, skip: emulatorLimit, timeout: largeTimeout);
 

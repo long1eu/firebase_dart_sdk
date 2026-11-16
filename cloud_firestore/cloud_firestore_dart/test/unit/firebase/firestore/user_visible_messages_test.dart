@@ -17,17 +17,17 @@ void main() {
     // in this SDK.
     expect(
       FirestoreException(
-        'Missing permissions',
-        FirestoreErrorCode.permissionDenied,
+        message: 'Missing permissions',
+        errorCode: FirestoreErrorCode.permissionDenied,
       ).toString(),
       'FirestoreError: [code=permissionDenied]: Missing permissions',
     );
     expect(
       FirestoreException(
-        'Failed',
-        FirestoreErrorCode.unavailable,
-        StateError('cause'),
-        StackTrace.current,
+        message: 'Failed',
+        errorCode: FirestoreErrorCode.unavailable,
+        cause: StateError('cause'),
+        stackTrace: StackTrace.current,
       ).toString(),
       'FirestoreError: [code=unavailable]: Failed',
     );

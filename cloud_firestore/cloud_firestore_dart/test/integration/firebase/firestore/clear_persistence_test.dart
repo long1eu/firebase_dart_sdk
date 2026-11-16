@@ -29,7 +29,7 @@ void main() {
   }
 
   Matcher firestoreErrorWithCode(FirestoreErrorCode code) =>
-      isA<FirestoreException>().having((FirestoreException e) => e.code, 'code', code);
+      isA<FirestoreException>().having((FirestoreException e) => e.errorCode, 'code', code);
 
   test('testCanClearPersistenceAfterRestarting', () async {
     const String dbName = 'integration/clear_persistence_restart.db';

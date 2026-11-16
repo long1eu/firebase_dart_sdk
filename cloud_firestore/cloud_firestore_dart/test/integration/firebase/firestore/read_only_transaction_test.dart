@@ -10,7 +10,7 @@ import 'package:test/test.dart';
 import '../../../util/integration_test_util.dart';
 
 TypeMatcher<FirestoreException> firestoreError(FirestoreErrorCode code) =>
-    isA<FirestoreException>().having((FirestoreException e) => e.code, 'code', code);
+    isA<FirestoreException>().having((FirestoreException e) => e.errorCode, 'code', code);
 
 void main() {
   IntegrationTestUtil.currentDatabasePath = 'integration/read_only_transaction';

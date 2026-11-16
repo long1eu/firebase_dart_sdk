@@ -140,6 +140,6 @@ Future<String> _run(
     return await body(auth);
   } finally {
     await auth.dispose();
-    app.delete();
+    await app.delete();
   }
 }

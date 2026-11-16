@@ -48,7 +48,7 @@ FirebaseFirestore newFirestore({Object? mockUserToken}) {
   );
   addTearDown(() async {
     await firestore.terminate();
-    app.delete();
+    await app.delete();
   });
   return firestore;
 }
@@ -131,7 +131,7 @@ void main() {
       newCollection().doc('missing').update(<String, Object?>{'a': 1}),
       throwsA(
         isA<FirestoreException>().having(
-          (FirestoreException e) => e.code,
+          (FirestoreException e) => e.errorCode,
           'code',
           FirestoreErrorCode.notFound,
         ),
@@ -317,7 +317,7 @@ void main() {
       collection.doc('a').get(),
       throwsA(
         isA<FirestoreException>().having(
-          (FirestoreException e) => e.code,
+          (FirestoreException e) => e.errorCode,
           'code',
           FirestoreErrorCode.failedPrecondition,
         ),

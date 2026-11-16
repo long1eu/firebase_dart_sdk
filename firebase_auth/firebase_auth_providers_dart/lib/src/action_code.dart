@@ -64,26 +64,27 @@ class ActionCodeSettings {
   Map<String, Object?> toRequest() {
     if (url.isEmpty) {
       throw const FirebaseAuthException(
-        'invalid-continue-uri',
-        'The continue URL provided in the request is invalid.',
+        code: 'invalid-continue-uri',
+        message: 'The continue URL provided in the request is invalid.',
       );
     }
     if (linkDomain != null && linkDomain!.isEmpty) {
       throw const FirebaseAuthException(
-        'invalid-hosting-link-domain',
-        'The provided Hosting link domain is not configured for the project.',
+        code: 'invalid-hosting-link-domain',
+        message:
+            'The provided Hosting link domain is not configured for the project.',
       );
     }
     if (iOSBundleId != null && iOSBundleId!.isEmpty) {
       throw const FirebaseAuthException(
-        'missing-ios-bundle-id',
-        'An iOS bundle id must be provided.',
+        code: 'missing-ios-bundle-id',
+        message: 'An iOS bundle id must be provided.',
       );
     }
     if (androidPackageName != null && androidPackageName!.isEmpty) {
       throw const FirebaseAuthException(
-        'missing-android-pkg-name',
-        'An Android package name must be provided.',
+        code: 'missing-android-pkg-name',
+        message: 'An Android package name must be provided.',
       );
     }
     return <String, Object?>{
@@ -106,7 +107,7 @@ class ActionCodeSettings {
 /// ```dart
 /// final ActionCodeInfo info = await auth.checkActionCode(code);
 /// if (info.operation == ActionCodeOperation.passwordReset) {
-///   await auth.confirmPasswordReset(code, newPassword);
+///   await auth.confirmPasswordReset(code: code, newPassword: newPassword);
 /// } else {
 ///   await auth.applyActionCode(code);
 /// }
@@ -153,8 +154,8 @@ class ActionCodeInfo {
   /// email address it needs is missing.
   factory ActionCodeInfo.fromResponse(Map<String, Object?> response) {
     const FirebaseAuthException malformed = FirebaseAuthException(
-      'internal-error',
-      'The authentication service returned an incomplete action code.',
+      code: 'internal-error',
+      message: 'The authentication service returned an incomplete action code.',
     );
     final Object? requestType = response['requestType'];
     ActionCodeOperation? operation;

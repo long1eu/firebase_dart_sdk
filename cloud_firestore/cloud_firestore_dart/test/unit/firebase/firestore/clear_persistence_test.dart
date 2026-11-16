@@ -75,7 +75,7 @@ final Settings offlineSettings =
     Settings().withEmulator('127.0.0.1', 1);
 
 TypeMatcher<FirestoreException> firestoreErrorWithCode(FirestoreErrorCode code) =>
-    isA<FirestoreException>().having((FirestoreException e) => e.code, 'code', code);
+    isA<FirestoreException>().having((FirestoreException e) => e.errorCode, 'code', code);
 
 void main() {
   checkTestsLeaveNothingBehind();
@@ -126,7 +126,7 @@ void main() {
       expect(
         () => deleteSqliteDatabaseFiles(file.path),
         throwsA(isA<FirestoreException>()
-            .having((FirestoreException e) => e.code, 'code',
+            .having((FirestoreException e) => e.errorCode, 'code',
                 FirestoreErrorCode.unknown)
             .having((FirestoreException e) => e.message, 'message',
                 allOf(startsWith('Failed to clear persistence: '),

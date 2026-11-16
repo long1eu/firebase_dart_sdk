@@ -373,8 +373,9 @@ class FirestoreClient implements RemoteStoreCallback {
   Future<void> clearPersistence() async {
     if (!_isShutdown) {
       throw FirestoreException(
-        'Persistence cannot be cleared while the firestore instance is running.',
-        FirestoreErrorCode.failedPrecondition,
+        message:
+            'Persistence cannot be cleared while the firestore instance is running.',
+        errorCode: FirestoreErrorCode.failedPrecondition,
       );
     }
     // The database has to be closed before its files go away.
@@ -429,9 +430,10 @@ class FirestoreClient implements RemoteStoreCallback {
       return null;
     } else {
       throw FirestoreException(
-        'Failed to get document from cache. (However, this document may exist on the server. Run again without '
-        'setting source to CACHE to attempt to retrieve the document from the server.)',
-        FirestoreErrorCode.unavailable,
+        message:
+            'Failed to get document from cache. (However, this document may exist on the server. Run again without '
+            'setting source to CACHE to attempt to retrieve the document from the server.)',
+        errorCode: FirestoreErrorCode.unavailable,
       );
     }
   }
@@ -444,8 +446,8 @@ class FirestoreClient implements RemoteStoreCallback {
   ) {
     return future.catchError(
       (Object error) => throw FirestoreException(
-        '$message: $error',
-        FirestoreErrorCode.unavailable,
+        message: '$message: $error',
+        errorCode: FirestoreErrorCode.unavailable,
       ),
       test: isRecoverablePersistenceError,
     );
@@ -779,8 +781,8 @@ class FirestoreClient implements RemoteStoreCallback {
   void _verifyNotShutdown() {
     if (_isShutdown) {
       throw FirestoreException(
-        terminatedMessage,
-        FirestoreErrorCode.failedPrecondition,
+        message: terminatedMessage,
+        errorCode: FirestoreErrorCode.failedPrecondition,
       );
     }
   }

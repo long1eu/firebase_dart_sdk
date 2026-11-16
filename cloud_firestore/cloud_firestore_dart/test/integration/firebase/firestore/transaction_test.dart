@@ -48,7 +48,7 @@ void main() {
       }, options: TransactionOptions(readOnly: true)),
       throwsA(
         isA<FirestoreException>().having(
-          (FirestoreException e) => e.code,
+          (FirestoreException e) => e.errorCode,
           'code',
           FirestoreErrorCode.invalidArgument,
         ),
@@ -623,7 +623,7 @@ void main() {
       print(e);
 
       final FirestoreException error = e as FirestoreException;
-      expect(error.code, FirestoreErrorCode.invalidArgument);
+      expect(error.errorCode, FirestoreErrorCode.invalidArgument);
     }
   });
 
@@ -697,7 +697,7 @@ void main() {
 
     expect(error, isA<FirestoreException>());
     expect(
-      (error! as FirestoreException).code,
+      (error! as FirestoreException).errorCode,
       FirestoreErrorCode.failedPrecondition,
     );
     expect(count, TransactionOptions.defaultMaxAttempts);
@@ -722,7 +722,7 @@ void main() {
 
     expect(error, isA<FirestoreException>());
     expect(
-      (error! as FirestoreException).code,
+      (error! as FirestoreException).errorCode,
       FirestoreErrorCode.failedPrecondition,
     );
     expect(count, options.maxAttempts);
@@ -823,7 +823,7 @@ void main() {
         fail('Should have thrown exception');
       });
     } on FirestoreException catch (e) {
-      expect(e.code, FirestoreErrorCode.aborted);
+      expect(e.errorCode, FirestoreErrorCode.aborted);
     }
   });
 
@@ -860,7 +860,7 @@ void main() {
       // We currently require every document read to also be written.
       // TODO(long1eu): Add this check back once we drop that.
       // expect(snapshot.getString('foo'), 'bar');
-      expect(e.code, FirestoreErrorCode.invalidArgument);
+      expect(e.errorCode, FirestoreErrorCode.invalidArgument);
       expect(e.message, 'Can\'t update a document that doesn\'t exist.');
     }
   });
@@ -880,7 +880,7 @@ void main() {
         return null;
       });
     } on FirestoreException catch (e) {
-      expect(e.code, FirestoreErrorCode.invalidArgument);
+      expect(e.errorCode, FirestoreErrorCode.invalidArgument);
       expect(count, 1);
     }
   });
@@ -952,7 +952,7 @@ void main() {
     final Matcher readAfterWrite = throwsA(
       isA<FirestoreException>()
           .having(
-            (FirestoreException e) => e.code,
+            (FirestoreException e) => e.errorCode,
             'code',
             FirestoreErrorCode.invalidArgument,
           )
@@ -1124,7 +1124,7 @@ class TransactionTester {
         'Expected the sequence (${_listStages(_stages)}) to fail with the error $expected',
       );
     } on FirestoreException catch (e) {
-      expect(e.code, expected);
+      expect(e.errorCode, expected);
       _cleanupTester();
     } catch (e) {
       throw AssertionError(

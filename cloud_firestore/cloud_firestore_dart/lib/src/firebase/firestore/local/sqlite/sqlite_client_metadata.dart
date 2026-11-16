@@ -321,8 +321,8 @@ class SQLiteClientMetadata {
     Log.w(_tag, 'Failed to obtain the primary lease for action "$action".');
     _setPrimary(false);
     throw FirestoreException(
-      primaryLeaseLostErrorMessage,
-      FirestoreErrorCode.failedPrecondition,
+      message: primaryLeaseLostErrorMessage,
+      errorCode: FirestoreErrorCode.failedPrecondition,
     );
   }
 

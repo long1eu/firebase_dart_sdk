@@ -472,9 +472,9 @@ Future<void> checkQueriesAgainstBackend(
       ];
       await collection.get(Source.server);
     } on FirestoreException catch (e) {
-      if (e.code == FirestoreErrorCode.invalidArgument ||
-          e.code == FirestoreErrorCode.failedPrecondition ||
-          e.code == FirestoreErrorCode.unimplemented) {
+      if (e.errorCode == FirestoreErrorCode.invalidArgument ||
+          e.errorCode == FirestoreErrorCode.failedPrecondition ||
+          e.errorCode == FirestoreErrorCode.unimplemented) {
         if (size == defaultSize) {
           final String reason = e.message.split('\n').first;
           stats.rejectedByBackend[reason.length > 70

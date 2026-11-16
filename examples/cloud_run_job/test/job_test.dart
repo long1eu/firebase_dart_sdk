@@ -26,7 +26,10 @@ void main() {
         'op',
         () async {
           if (++calls < 5) {
-            throw FirestoreException('offline', FirestoreErrorCode.unavailable);
+            throw FirestoreException(
+              message: 'offline',
+              errorCode: FirestoreErrorCode.unavailable,
+            );
           }
           return 'done';
         },
@@ -51,7 +54,10 @@ void main() {
       await expectLater(
         withRetries('op', () async {
           calls++;
-          throw FirestoreException('no', FirestoreErrorCode.permissionDenied);
+          throw FirestoreException(
+            message: 'no',
+            errorCode: FirestoreErrorCode.permissionDenied,
+          );
         }, sleep: sleep),
         throwsA(isA<FirestoreException>()),
       );
@@ -67,8 +73,8 @@ void main() {
           () async {
             calls++;
             throw FirestoreException(
-              'busy',
-              FirestoreErrorCode.resourceExhausted,
+              message: 'busy',
+              errorCode: FirestoreErrorCode.resourceExhausted,
             );
           },
           maxAttempts: 3,

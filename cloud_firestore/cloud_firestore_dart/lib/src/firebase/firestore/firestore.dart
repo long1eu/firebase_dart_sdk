@@ -646,8 +646,9 @@ class FirebaseFirestore {
       // This instance was terminated and a newer one has the same cache open: deleting the files under it would
       // detach it from its cache without any error.
       throw FirestoreException(
-        'Persistence cannot be cleared while another firestore instance of the same app and database is running.',
-        FirestoreErrorCode.failedPrecondition,
+        message:
+            'Persistence cannot be cleared while another firestore instance of the same app and database is running.',
+        errorCode: FirestoreErrorCode.failedPrecondition,
       );
     }
     await client.clearPersistence();

@@ -32,7 +32,7 @@ Future<void> main() async {
     app,
     emulatorHost: emulator,
   );
-  auth.userChanges.listen(
+  auth.userChanges().listen(
     (AuthUser? user) => print('user changed: ${user?.uid ?? 'signed out'}'),
   );
 
@@ -45,5 +45,5 @@ Future<void> main() async {
 
   await auth.deleteCurrentUser();
   await auth.dispose();
-  app.delete();
+  await app.delete();
 }

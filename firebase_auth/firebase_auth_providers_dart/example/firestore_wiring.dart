@@ -70,7 +70,7 @@ Future<void> main() async {
     });
     print('signed out, write accepted');
   } on FirestoreException catch (e) {
-    print('signed out, write refused: ${e.code}');
+    print('signed out, write refused: ${e.errorCode}');
   }
 
   // Signed in, the user writes below users/<uid>. sign-in completes after
@@ -90,11 +90,11 @@ Future<void> main() async {
     await firestore.doc('users/somebody-else/notes/first').get(Source.server);
     print('read of another user accepted');
   } on FirestoreException catch (e) {
-    print('read of another user refused: ${e.code}');
+    print('read of another user refused: ${e.errorCode}');
   }
 
   await auth.deleteCurrentUser();
   await firestore.terminate();
   await auth.dispose();
-  app.delete();
+  await app.delete();
 }

@@ -45,9 +45,9 @@ Future<void> nullSafety(FirebaseFirestore firestore) async {
 }
 
 // Section 3. Creating the app.
-void creatingTheApp(FirebaseApp app) {
+Future<void> creatingTheApp(FirebaseApp app) async {
   // Before: app.setDataCollectionDefaultEnabled(); // meant "disable"
-  app.setDataCollectionDefaultEnabled(enabled: false);
+  await app.setAutomaticDataCollectionEnabled(false);
 
   // URL-safe base64 without padding now; keys of 0.0.4 differ.
   final String key = app.persistenceKey;
@@ -156,7 +156,7 @@ void noLongerPublic(FirebaseFirestore firestore) {
   final FieldPath path = FieldPath(<String>['a', 'b']);
   final FieldPath id = FieldPath.documentId;
 
-  // Before: FirestoreErrorCode.fromValue(grpcError); now read FirestoreError.code.
+  // Before: FirestoreErrorCodeInternal.fromValue(grpcError); now read FirestoreError.code.
   // Before: Firestore.newInstance(...), firestore.client, query.query,
   //   snapshot.document, reference.key, fieldValue.isDelete, SetOptions.fieldMask,
   //   Timestamp.validateRange, ConflictAlgorithm: no replacement.
@@ -193,7 +193,7 @@ Future<void> behaviour(FirebaseFirestore firestore) async {
   try {
     await userRef.get();
   } on FirestoreException catch (e) {
-    print(e.code == FirestoreErrorCode.failedPrecondition);
+    print(e.errorCode == FirestoreErrorCode.failedPrecondition);
   }
 
   // Microseconds are kept (0.0.7 truncated to milliseconds).

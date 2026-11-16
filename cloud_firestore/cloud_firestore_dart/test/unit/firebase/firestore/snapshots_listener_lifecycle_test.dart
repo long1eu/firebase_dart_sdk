@@ -96,7 +96,7 @@ void main() {
         .listen((_) {}, onError: error.complete);
     await settle();
     client.streams.single
-        .onError(FirestoreException('boom', FirestoreErrorCode.unavailable));
+        .onError(FirestoreException(message: 'boom', errorCode: FirestoreErrorCode.unavailable));
     expect(await error.future, isA<FirestoreException>());
     await sub.cancel();
   });

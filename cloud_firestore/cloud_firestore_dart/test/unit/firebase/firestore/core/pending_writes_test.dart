@@ -141,7 +141,7 @@ void main() {
     final Future<void> expectation = expectLater(
         outcome,
         throwsA(isA<FirestoreException>()
-            .having((FirestoreException e) => e.code, 'code',
+            .having((FirestoreException e) => e.errorCode, 'code',
                 FirestoreErrorCode.cancelled)
             .having((FirestoreException e) => e.message, 'message',
                 "'waitForPendingWrites' task is cancelled due to User change.")));

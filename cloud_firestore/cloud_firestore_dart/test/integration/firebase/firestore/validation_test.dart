@@ -203,7 +203,7 @@ void main() {
     try {
       await toRun(app);
     } finally {
-      app.delete();
+      await app.delete();
     }
   }
 

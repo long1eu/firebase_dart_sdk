@@ -52,7 +52,7 @@ void main() {
 
   Matcher failsWith(FirestoreErrorCode code, [String? message]) => throwsA(
     isA<FirestoreException>()
-        .having((FirestoreException e) => e.code, 'code', code)
+        .having((FirestoreException e) => e.errorCode, 'code', code)
         .having(
           (FirestoreException e) => e.message,
           'message',

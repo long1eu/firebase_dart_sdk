@@ -33,8 +33,8 @@ const String _persistencePrefix = 'firestore/[DEFAULT]/test-project';
 const User _authenticatedUser = User('test');
 const User _unauthenticatedUser = User.unauthenticated;
 final FirestoreException _testError = FirestoreException(
-  'Test Error',
-  FirestoreErrorCode.internal,
+  message: 'Test Error',
+  errorCode: FirestoreErrorCode.internal,
 );
 
 int _nextId = 0;
@@ -206,7 +206,7 @@ void main() {
       final List<String> expectedMembers = <String>['state', 'updateTimeMs'];
       if (mutationBatchState == 'rejected') {
         expectedMembers.add('error');
-        expect(actual['error']['code'], error!.code.toString());
+        expect(actual['error']['code'], error!.errorCode.toString());
         expect(actual['error']['message'], error.message);
       }
       expect(actual.keys, unorderedEquals(expectedMembers));
@@ -263,7 +263,7 @@ void main() {
         final List<String> expectedMembers = <String>['state', 'updateTimeMs'];
         if (queryTargetState == 'rejected') {
           expectedMembers.add('error');
-          expect(actual['error']['code'], error!.code.toString());
+          expect(actual['error']['code'], error!.errorCode.toString());
           expect(actual['error']['message'], error.message);
         }
         expect(actual.keys, unorderedEquals(expectedMembers));
@@ -561,7 +561,7 @@ void main() {
       expect(state.mutationState, hasLength(1));
       expect(state.mutationState[1]!.$1, MutationBatchState.rejected);
       final FirestoreException error = state.mutationState[1]!.$2!;
-      expect(error.code, FirestoreErrorCode.internal);
+      expect(error.errorCode, FirestoreErrorCode.internal);
       expect(error.message, 'Test Error');
     });
 
@@ -758,7 +758,7 @@ void main() {
       );
       final FirestoreException error =
           state.targetState[firstClientTargetId]!.$2!;
-      expect(error.code, FirestoreErrorCode.internal);
+      expect(error.errorCode, FirestoreErrorCode.internal);
       expect(error.message, 'Test Error');
     });
 

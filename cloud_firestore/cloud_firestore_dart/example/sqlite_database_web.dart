@@ -148,10 +148,11 @@ OpenDatabase sqliteWebOpener({
     );
     if (releaseLock == null) {
       throw FirestoreException(
-        'The offline cache "$name" is already open in another tab (or in this '
-        'one). It can only be used by one tab at a time: use a memory cache '
-        'in this tab.',
-        FirestoreErrorCode.failedPrecondition,
+        message:
+            'The offline cache "$name" is already open in another tab (or in this '
+            'one). It can only be used by one tab at a time: use a memory cache '
+            'in this tab.',
+        errorCode: FirestoreErrorCode.failedPrecondition,
       );
     }
 
@@ -303,7 +304,7 @@ Future<FirebaseFirestore> openWithMemoryFallback({
     await persistent.namedQuery('openWithMemoryFallback');
     return persistent;
   } on FirestoreException catch (e) {
-    if (e.code != FirestoreErrorCode.failedPrecondition) {
+    if (e.errorCode != FirestoreErrorCode.failedPrecondition) {
       rethrow;
     }
     await persistent.terminate();

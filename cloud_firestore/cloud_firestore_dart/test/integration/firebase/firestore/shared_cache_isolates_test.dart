@@ -128,7 +128,7 @@ Future<void> _workerMain(Map<String, Object?> args) async {
         replies.send(<Object?>['stored', path]);
       case 'terminate':
         await firestore.terminate();
-        app.delete();
+        await app.delete();
         replies.send(<Object?>['terminated']);
         commands.close();
     }
@@ -277,7 +277,7 @@ void main() {
     );
     addTearDown(() async {
       await observer.terminate();
-      app.delete();
+      await app.delete();
     });
   });
 

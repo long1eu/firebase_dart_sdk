@@ -136,7 +136,7 @@ class TaskApi {
       try {
         return await inner(request);
       } on FirestoreException catch (e) {
-        final int status = switch (e.code) {
+        final int status = switch (e.errorCode) {
           FirestoreErrorCode.notFound => 404,
           FirestoreErrorCode.invalidArgument => 400,
           FirestoreErrorCode.permissionDenied => 403,

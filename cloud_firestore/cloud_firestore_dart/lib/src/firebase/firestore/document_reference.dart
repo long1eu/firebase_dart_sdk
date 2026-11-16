@@ -425,16 +425,17 @@ class DocumentReference<T extends dynamic> {
           //    1. Cache the negative response from the server so we can deliver that even when you're offline.
           //    2. Actually set the Error of the Task if the document doesn't exist when you are offline.
           throw FirestoreException(
-            'Failed to get document because the client is offline.',
-            FirestoreErrorCode.unavailable,
+            message: 'Failed to get document because the client is offline.',
+            errorCode: FirestoreErrorCode.unavailable,
           );
         } else if (snapshot.exists &&
             snapshot.metadata.isFromCache &&
             source == Source.server) {
           throw FirestoreException(
-            'Failed to get document from server. (However, this document does exist in the local cache. Run again '
-            'without setting source to Source.SERVER to retrieve the cached document.)',
-            FirestoreErrorCode.unavailable,
+            message:
+                'Failed to get document from server. (However, this document does exist in the local cache. Run again '
+                'without setting source to Source.SERVER to retrieve the cached document.)',
+            errorCode: FirestoreErrorCode.unavailable,
           );
         } else {
           return snapshot;

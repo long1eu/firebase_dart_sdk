@@ -671,7 +671,7 @@ void main() {
               .where(FunctionExpression('no_such_fn', <Object?>[field('a')])
                   .asBoolean())
               .execute(),
-          throwsA(isA<FirestoreException>().having((FirestoreException e) => e.code,
+          throwsA(isA<FirestoreException>().having((FirestoreException e) => e.errorCode,
               'code', FirestoreErrorCode.invalidArgument)));
     });
 
@@ -679,7 +679,7 @@ void main() {
       await firestore.disableNetwork();
       await expectLater(
           source().execute(),
-          throwsA(isA<FirestoreException>().having((FirestoreException e) => e.code,
+          throwsA(isA<FirestoreException>().having((FirestoreException e) => e.errorCode,
               'code', FirestoreErrorCode.unavailable)));
       await firestore.enableNetwork();
       expect((await source().execute()).results, hasLength(6));

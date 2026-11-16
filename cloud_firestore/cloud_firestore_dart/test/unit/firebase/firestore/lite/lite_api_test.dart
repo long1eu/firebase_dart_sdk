@@ -212,7 +212,7 @@ void main() {
 
         final Matcher throwsTerminated = throwsA(
           isA<FirestoreException>().having(
-            (FirestoreException e) => e.code,
+            (FirestoreException e) => e.errorCode,
             'code',
             FirestoreErrorCode.failedPrecondition,
           ),
@@ -452,7 +452,7 @@ void main() {
         throwsA(
           isA<FirestoreException>()
               .having(
-                (FirestoreException e) => e.code,
+                (FirestoreException e) => e.errorCode,
                 'code',
                 FirestoreErrorCode.permissionDenied,
               )
@@ -1053,7 +1053,7 @@ void main() {
           }),
           throwsA(
             isA<FirestoreException>().having(
-              (FirestoreException e) => e.code,
+              (FirestoreException e) => e.errorCode,
               'code',
               FirestoreErrorCode.permissionDenied,
             ),
@@ -1073,7 +1073,7 @@ void main() {
           }, options: TransactionOptions(maxAttempts: 1)),
           throwsA(
             isA<FirestoreException>().having(
-              (FirestoreException e) => e.code,
+              (FirestoreException e) => e.errorCode,
               'code',
               FirestoreErrorCode.aborted,
             ),
@@ -1210,7 +1210,7 @@ void main() {
         ),
         throwsA(
           isA<FirestoreException>().having(
-            (FirestoreException e) => e.code,
+            (FirestoreException e) => e.errorCode,
             'code',
             FirestoreErrorCode.invalidArgument,
           ),
@@ -1263,7 +1263,7 @@ void main() {
         throwsA(
           isA<FirestoreException>()
               .having(
-                (FirestoreException e) => e.code,
+                (FirestoreException e) => e.errorCode,
                 'code',
                 FirestoreErrorCode.invalidArgument,
               )
@@ -1290,7 +1290,7 @@ void main() {
       final Matcher throwsTerminated = throwsA(
         isA<FirestoreException>()
             .having(
-              (FirestoreException e) => e.code,
+              (FirestoreException e) => e.errorCode,
               'code',
               FirestoreErrorCode.failedPrecondition,
             )

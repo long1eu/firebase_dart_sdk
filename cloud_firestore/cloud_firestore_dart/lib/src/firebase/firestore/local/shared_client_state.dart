@@ -202,7 +202,7 @@ const List<String> _storedErrorCodes = <String>[
 ];
 
 Map<String, String> _errorToJson(FirestoreException error) => <String, String>{
-  'code': _storedErrorCodes[error.code.value],
+  'code': _storedErrorCodes[error.errorCode.value],
   'message': error.message,
 };
 
@@ -216,8 +216,8 @@ FirestoreException? _errorFromJson(Object? json) {
   final int value = _storedErrorCodes.indexOf(json['code'] as String);
   if (value != -1) {
     return FirestoreException(
-      json['message'] as String,
-      FirestoreErrorCode.values[value],
+      message: json['message'] as String,
+      errorCode: FirestoreErrorCode.values[value],
     );
   }
   return null;

@@ -260,7 +260,7 @@ void main() {
         expect(task.isSuccessful, isFalse);
         expect(task.snapshot.taskState, LoadBundleTaskState.error);
         expect(task.exception, isA<FirestoreException>());
-        expect((task.exception! as FirestoreException).code,
+        expect((task.exception! as FirestoreException).errorCode,
             FirestoreErrorCode.invalidArgument);
         await expectLater(task.future, throwsA(isA<FirestoreException>()));
 

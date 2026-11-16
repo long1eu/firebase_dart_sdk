@@ -153,7 +153,7 @@ void main() {
               .findNearest(
                   'embedding', <double>[0.0, 0.0], 2, DistanceMeasure.cosine)
               .get(),
-          throwsA(isA<FirestoreException>().having((FirestoreException e) => e.code,
+          throwsA(isA<FirestoreException>().having((FirestoreException e) => e.errorCode,
               'code', FirestoreErrorCode.unavailable)));
       await c.firestore.enableNetwork();
     });

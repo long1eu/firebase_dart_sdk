@@ -47,7 +47,7 @@ class _RecordingClient extends Fake implements TransactionClient {
       {Uint8List? transaction}) async {
     calls.add('lookup in $transaction');
     if (lookupErrors.isNotEmpty) {
-      throw FirestoreException('lookup failed', lookupErrors.removeAt(0));
+      throw FirestoreException(message: 'lookup failed', errorCode: lookupErrors.removeAt(0));
     }
     return <MaybeDocument>[doc('foo/bar', 7, map(<String>['a', 'b']))];
   }
@@ -69,7 +69,7 @@ class _RecordingClient extends Fake implements TransactionClient {
   Future<void> rollback(Uint8List transaction) async {
     calls.add('rollback $transaction');
     if (rollbackFails) {
-      throw FirestoreException('gone', FirestoreErrorCode.unavailable);
+      throw FirestoreException(message: 'gone', errorCode: FirestoreErrorCode.unavailable);
     }
   }
 
@@ -163,7 +163,7 @@ void main() {
           UserDataConverter(DatabaseId.forProject('project'));
       final Transaction tx = Transaction(client, readOnly: true);
       Matcher invalid = throwsA(isA<FirestoreException>().having(
-          (FirestoreException e) => e.code,
+          (FirestoreException e) => e.errorCode,
           'code',
           FirestoreErrorCode.invalidArgument));
 
@@ -198,7 +198,7 @@ void main() {
       expect(client.calls, <String>['lookup in null']);
 
       Matcher invalid = throwsA(isA<FirestoreException>()
-          .having((FirestoreException e) => e.code, 'code',
+          .having((FirestoreException e) => e.errorCode, 'code',
               FirestoreErrorCode.invalidArgument)
           .having((FirestoreException e) => e.message, 'message',
               contains('read-only transaction')));
@@ -239,7 +239,7 @@ void main() {
               return 'done';
             }).run(),
             throwsA(isA<FirestoreException>()
-                .having((FirestoreException e) => e.code, 'code', code)));
+                .having((FirestoreException e) => e.errorCode, 'code', code)));
         expect(attempts, 1, reason: '$code');
         // The failed attempt was released.
         expect(client.calls.last, 'rollback [1]');

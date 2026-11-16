@@ -646,7 +646,7 @@ void main() {
     } on FirestoreException catch (e) {
       hadError = true;
       expect(e, isNotNull);
-      expect(e.code, FirestoreErrorCode.notFound);
+      expect(e.errorCode, FirestoreErrorCode.notFound);
     } catch (e) {
       assert(false, 'This should not happen.');
     }
@@ -1466,7 +1466,7 @@ void main() {
       docRef2.get(Source.cache),
       throwsA(
         isA<FirestoreException>().having(
-          (FirestoreException e) => e.code,
+          (FirestoreException e) => e.errorCode,
           'code',
           FirestoreErrorCode.unavailable,
         ),
@@ -1516,7 +1516,7 @@ void main() {
       doc.get(Source.cache),
       throwsA(
         isA<FirestoreException>().having(
-          (FirestoreException e) => e.code,
+          (FirestoreException e) => e.errorCode,
           'code',
           FirestoreErrorCode.unavailable,
         ),

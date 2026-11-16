@@ -287,7 +287,7 @@ void genericMutationTests(MutationTester op) {
             op.update(ref, <String, Object?>{'foo': 2, 'baz': 2}),
             throwsA(
               isA<FirestoreException>().having(
-                (FirestoreException e) => e.code,
+                (FirestoreException e) => e.errorCode,
                 'code',
                 FirestoreErrorCode.notFound,
               ),
@@ -340,7 +340,7 @@ void verifyResults(
 Matcher get throwsTerminated => throwsA(
   isA<FirestoreException>()
       .having(
-        (FirestoreException e) => e.code,
+        (FirestoreException e) => e.errorCode,
         'code',
         FirestoreErrorCode.failedPrecondition,
       )
@@ -506,7 +506,7 @@ void main() {
       final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(
         app: app,
       );
-      app.delete();
+      await app.delete();
       await pumpEventQueue();
       await expectLater(firestore.doc('coll/doc').get(), throwsTerminated);
     });
@@ -915,7 +915,7 @@ void main() {
         }, options: TransactionOptions(readOnly: true)),
         throwsA(
           isA<FirestoreException>().having(
-            (FirestoreException e) => e.code,
+            (FirestoreException e) => e.errorCode,
             'code',
             FirestoreErrorCode.invalidArgument,
           ),
@@ -979,7 +979,7 @@ void main() {
           }),
           throwsA(
             isA<FirestoreException>().having(
-              (FirestoreException e) => e.code,
+              (FirestoreException e) => e.errorCode,
               'code',
               FirestoreErrorCode.invalidArgument,
             ),
@@ -1019,7 +1019,7 @@ void main() {
         ),
         throwsA(
           isA<FirestoreException>().having(
-            (FirestoreException e) => e.code,
+            (FirestoreException e) => e.errorCode,
             'code',
             FirestoreErrorCode.invalidArgument,
           ),

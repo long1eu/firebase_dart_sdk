@@ -41,7 +41,7 @@ class ConfigurationError implements Exception {
 /// leave it out.
 FirebaseFirestore firestoreFromEnvironment({
   Map<String, String>? environment,
-  String appName = FirebaseApp.defaultAppName,
+  String appName = defaultFirebaseAppName,
 }) {
   final Map<String, String> env = environment ?? Platform.environment;
   final String? emulator = _nonEmpty(env['FIRESTORE_EMULATOR_HOST']);

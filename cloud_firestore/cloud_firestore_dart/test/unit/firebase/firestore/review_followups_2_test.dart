@@ -112,7 +112,7 @@ void main() {
       FirestoreMultiDbComponent.register(
           app, DatabaseId.defaultDatabaseId, firestore);
 
-      app.delete();
+      await app.delete();
       await Future<void>.delayed(const Duration(milliseconds: 50));
     }, (Object error, StackTrace stackTrace) => unhandled.add(error));
 

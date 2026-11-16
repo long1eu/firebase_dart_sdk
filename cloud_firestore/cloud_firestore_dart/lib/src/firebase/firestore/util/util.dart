@@ -59,8 +59,8 @@ int compareBools(bool b1, bool b2) {
 
 FirestoreException exceptionFromStatus(GrpcError error) {
   return FirestoreException(
-    error.message ?? '',
-    FirestoreErrorCode.fromValue(error),
+    message: error.message ?? '',
+    errorCode: FirestoreErrorCodeInternal.fromValue(error),
   );
 }
 
@@ -176,7 +176,10 @@ Future<void> voidErrorTransformer(Future<void> Function() operation) async {
       rethrow;
     } else {
       return Future<void>.error(
-        FirestoreException('$e', FirestoreErrorCode.unknown),
+        FirestoreException(
+          message: '$e',
+          errorCode: FirestoreErrorCode.unknown,
+        ),
         s,
       );
     }

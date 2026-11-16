@@ -69,9 +69,10 @@ extension TransactionPipelines on Transaction {
     for (final Stage stage in pipeline.stages) {
       if (_writeStages.contains(stage.name)) {
         throw FirestoreException(
-          'A pipeline with a ${stage.name} stage cannot run in a transaction: '
-          'read-only transactions cannot write.',
-          FirestoreErrorCode.invalidArgument,
+          message:
+              'A pipeline with a ${stage.name} stage cannot run in a transaction: '
+              'read-only transactions cannot write.',
+          errorCode: FirestoreErrorCode.invalidArgument,
         );
       }
     }

@@ -125,8 +125,8 @@ Future<bool> emulatorRejectsSearch(Future<PipelineSnapshot> execute) async {
     await execute;
     return false;
   } on FirestoreException catch (e) {
-    print('EMU_ANSWER ${e.code} ${e.message}');
-    if (e.code == FirestoreErrorCode.invalidArgument &&
+    print('EMU_ANSWER ${e.errorCode} ${e.message}');
+    if (e.errorCode == FirestoreErrorCode.invalidArgument &&
         RegExp(
           "The function '(document_matches|geo_distance)' does not exist",
         ).hasMatch(e.message)) {

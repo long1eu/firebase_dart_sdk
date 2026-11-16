@@ -558,10 +558,11 @@ class SQLitePersistence extends Persistence {
         (await _db.query('PRAGMA user_version')).first.values.first as int;
     if (schemaVersion != SQLiteSchema.version) {
       throw FirestoreException(
-        'The persistent cache was opened by a different version of the SDK while this client was using it '
-        '(its schema version is now $schemaVersion, this client uses ${SQLiteSchema.version}). Terminate this '
-        'instance; a new instance migrates the cache when it starts.',
-        FirestoreErrorCode.failedPrecondition,
+        message:
+            'The persistent cache was opened by a different version of the SDK while this client was using it '
+            '(its schema version is now $schemaVersion, this client uses ${SQLiteSchema.version}). Terminate this '
+            'instance; a new instance migrates the cache when it starts.',
+        errorCode: FirestoreErrorCode.failedPrecondition,
       );
     }
 
@@ -586,8 +587,9 @@ class SQLitePersistence extends Persistence {
   }
 
   FirestoreException _clearedError() => FirestoreException(
-    'The persistent cache was cleared by another client (Firestore.clearPersistence) while this client was using it.',
-    FirestoreErrorCode.failedPrecondition,
+    message:
+        'The persistent cache was cleared by another client (Firestore.clearPersistence) while this client was using it.',
+    errorCode: FirestoreErrorCode.failedPrecondition,
   );
 
   /// Deletes the database file and its journal, WAL and shared memory side
@@ -611,9 +613,9 @@ class SQLitePersistence extends Persistence {
           rethrow;
         } catch (e) {
           throw FirestoreException(
-            'Failed to clear persistence: $e',
-            FirestoreErrorCode.unknown,
-            e,
+            message: 'Failed to clear persistence: $e',
+            errorCode: FirestoreErrorCode.unknown,
+            cause: e,
           );
         }
       } else if (path != null) {

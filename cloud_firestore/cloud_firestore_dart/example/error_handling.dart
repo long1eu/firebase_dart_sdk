@@ -19,7 +19,7 @@ import 'common.dart';
 /// request itself (the rules, the data, a missing document or index), and
 /// sending it again gives the same answer.
 bool isRetryable(FirestoreException error) {
-  switch (error.code) {
+  switch (error.errorCode) {
     case FirestoreErrorCode.unavailable:
     case FirestoreErrorCode.deadlineExceeded:
     case FirestoreErrorCode.resourceExhausted:
@@ -80,7 +80,7 @@ Future<void> main() async {
     await cities.doc('nowhere').update(<String, Object?>{'visited': true});
   } on FirestoreException catch (e) {
     print(
-      'update of a missing document: ${e.code}, retryable: ${isRetryable(e)}',
+      'update of a missing document: ${e.errorCode}, retryable: ${isRetryable(e)}',
     );
   }
 
@@ -100,7 +100,7 @@ Future<void> main() async {
     () => cities.count().get(),
     initialDelay: const Duration(milliseconds: 200),
     onRetry: (FirestoreException error, Duration delay) {
-      print('count failed with ${error.code}, trying again');
+      print('count failed with ${error.errorCode}, trying again');
       unawaited(firestore.enableNetwork());
     },
   );
@@ -123,7 +123,7 @@ Future<void> main() async {
   try {
     await cities.doc('unknown').get();
   } on FirestoreException catch (e) {
-    print('get of an uncached document offline: ${e.code}');
+    print('get of an uncached document offline: ${e.errorCode}');
   }
   await firestore.enableNetwork();
   await write;
@@ -141,7 +141,7 @@ Future<void> main() async {
         },
         onError: (Object error) {
           if (error is FirestoreException &&
-              error.code == FirestoreErrorCode.permissionDenied) {
+              error.errorCode == FirestoreErrorCode.permissionDenied) {
             print('not allowed to listen; listen again after a sign-in');
           } else {
             print('listener failed: $error');
@@ -171,7 +171,7 @@ Future<void> main() async {
   } on FirestoreException catch (e) {
     // The code is the one of the last failed commit: the emulator answers
     // with failedPrecondition, the backend can also answer with aborted.
-    print('transaction gave up after $attempts attempts: ${e.code}');
+    print('transaction gave up after $attempts attempts: ${e.errorCode}');
   }
   await other.terminate();
 
@@ -180,7 +180,7 @@ Future<void> main() async {
   try {
     await firestore.loadBundle(utf8.encode('not a bundle')).future;
   } on FirestoreException catch (e) {
-    print('bad bundle: ${e.code}, cause: ${e.cause.runtimeType}');
+    print('bad bundle: ${e.errorCode}, cause: ${e.cause.runtimeType}');
   }
 
   // 8. Misuse of the API: different settings for an instance that exists
@@ -198,6 +198,6 @@ Future<void> main() async {
   try {
     await cities.doc('SF').get();
   } on FirestoreException catch (e) {
-    print('after terminate: ${e.code}');
+    print('after terminate: ${e.errorCode}');
   }
 }

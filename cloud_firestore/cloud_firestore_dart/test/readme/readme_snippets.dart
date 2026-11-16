@@ -147,7 +147,7 @@ Future<void> authProvidersReadmeLine25() async {
   final FirebaseUserAuth auth = await FirebaseUserAuth.forApp(app);
   final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(app: app);
 
-  await auth.signInWithEmailAndPassword('ada@example.com', password);
+  await auth.signInWithEmailAndPassword(email: 'ada@example.com', password: password);
   await firestore.doc('users/${auth.uid}/notes/first').set({'text': 'hello'});
   await auth.signOut();
 }
@@ -166,7 +166,7 @@ Future<void> migrationGuideLine93() async {
 
 // ../../docs/migrating_from_vm_packages.md:117
 Future<void> migrationGuideLine117() async {
-  app.setDataCollectionDefaultEnabled(enabled: false);
+  app.setAutomaticDataCollectionEnabled(false);
 }
 
 // ../../docs/migrating_from_vm_packages.md:142
@@ -238,7 +238,7 @@ Future<void> migrationGuideLine402() async {
     try {
       await users.doc('ada').get();
     } on FirestoreException catch (e) {
-      print(e.code == FirestoreErrorCode.failedPrecondition); // true
+      print(e.errorCode == FirestoreErrorCode.failedPrecondition); // true
     }
 }
 
@@ -247,7 +247,7 @@ Future<void> authenticationGuideLine26() async {
   // A signed-in Firebase Auth user: the security rules see request.auth.
   final auth = await FirebaseUserAuth.forApp(app);
   final firestore = FirebaseFirestore.instanceFor(app: app);
-  await auth.signInWithEmailAndPassword('ada@example.com', 'the password'); // or signInAnonymously(), ...
+  await auth.signInWithEmailAndPassword(email: 'ada@example.com', password: 'the password'); // or signInAnonymously(), ...
 
   // A server (bypasses security rules; access is decided by IAM):
   //   app.authProvider = OAuthTokenProvider.serviceAccount(serviceAccountJson);
@@ -266,8 +266,8 @@ Future<void> authenticationGuideLine48() async {
   final auth = await FirebaseUserAuth.forApp(app);
   final firestore = FirebaseFirestore.instanceFor(app: app);
 
-  await auth.signInWithEmailAndPassword('ada@example.com', password);
-  // or: auth.signInAnonymously(), auth.createUserWithEmailAndPassword(...),
+  await auth.signInWithEmailAndPassword(email: 'ada@example.com', password: password);
+  // or: auth.signInAnonymously(), auth.createUserWithEmailAndPassword(email: ...),
   //     auth.signInWithCustomToken(tokenFromYourServer)
 
   await firestore.doc('users/${auth.uid}/notes/first').set({'text': 'hello'});
@@ -653,7 +653,7 @@ Future<void> errorHandlingGuideLine32() async {
   try {
     await firestore.doc('cities/LA').update({'visited': true});
   } on FirestoreException catch (e) {
-    if (e.code == FirestoreErrorCode.notFound) {
+    if (e.errorCode == FirestoreErrorCode.notFound) {
       await firestore.doc('cities/LA').set({'visited': true});
     } else {
       rethrow;
@@ -688,7 +688,7 @@ Future<void> errorHandlingGuideLine169() async {
       },
       onError: (Object error) {
         if (error is FirestoreException &&
-            error.code == FirestoreErrorCode.permissionDenied) {
+            error.errorCode == FirestoreErrorCode.permissionDenied) {
           // The stream is closed. Listen again once the user may read the data,
           // for example after a sign-in.
           print('not allowed to read users');
@@ -719,7 +719,7 @@ Future<void> errorHandlingGuideLine223() async {
 // ../../docs/guides/error_handling.md:247
 Future<void> errorHandlingGuideLine247() async {
   bool isRetryable(FirestoreException error) {
-    switch (error.code) {
+    switch (error.errorCode) {
       case FirestoreErrorCode.unavailable:
       case FirestoreErrorCode.deadlineExceeded:
       case FirestoreErrorCode.resourceExhausted:
@@ -775,7 +775,7 @@ Future<void> firebaseAppGuideLine9() async {
     name: 'secondary',
   );
   print(identical(FirebaseApp.instance, defaultApp)); // true
-  print(identical(FirebaseApp.getInstance('secondary'), secondary)); // true
+  print(identical(Firebase.app('secondary'), secondary)); // true
 }
 
 // ../../docs/guides/firebase_app.md:67
@@ -836,7 +836,7 @@ Future<void> forAiAgentsGuideLine39() async {
         print('${doc.id} ${doc.data['name']}');
       }
     } on FirestoreException catch (e) {
-      stderr.writeln('Firestore failed: ${e.code} ${e.message}');
+      stderr.writeln('Firestore failed: ${e.errorCode} ${e.message}');
       exitCode = 1;
     } finally {
       // Without this the open gRPC channel keeps the process alive.
@@ -1011,7 +1011,7 @@ Future<void> migratingFromFlutterfireGuideLine153() async {
 Future<void> migratingFromFlutterfireGuideLine176() async {
   final FirebaseUserAuth auth = await FirebaseUserAuth.forApp(app);
   final FirebaseFirestore signedIn = FirebaseFirestore.instanceFor(app: app);
-  await auth.signInWithEmailAndPassword('ada@example.com', password);
+  await auth.signInWithEmailAndPassword(email: 'ada@example.com', password: password);
 }
 
 // ../../docs/guides/migrating_from_flutterfire.md:330

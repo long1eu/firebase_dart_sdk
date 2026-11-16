@@ -765,7 +765,7 @@ void main() {
         tx.execute(base()),
         throwsA(
           isA<FirestoreException>().having(
-            (FirestoreException e) => e.code,
+            (FirestoreException e) => e.errorCode,
             'code',
             FirestoreErrorCode.invalidArgument,
           ),
@@ -786,7 +786,7 @@ void main() {
           tx.execute(pipeline),
           throwsA(
             isA<FirestoreException>().having(
-              (FirestoreException e) => e.code,
+              (FirestoreException e) => e.errorCode,
               'code',
               FirestoreErrorCode.invalidArgument,
             ),

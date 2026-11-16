@@ -12,12 +12,12 @@ void main() {
   test('create and get', () {
     final FirebaseApp app = FirebaseApp.withOptions(_options);
     expect(FirebaseApp.instance, same(app));
-    expect(FirebaseApp.getInstance(FirebaseApp.defaultAppName), same(app));
+    expect(Firebase.app(defaultFirebaseAppName), same(app));
 
     final FirebaseApp other = FirebaseApp.withOptions(_options, name: ' x ');
     expect(other.name, 'x');
-    expect(FirebaseApp.getInstance('x'), same(other));
-    expect(FirebaseApp.apps, hasLength(2));
+    expect(Firebase.app('x'), same(other));
+    expect(Firebase.apps, hasLength(2));
   });
 
   test('creating the same name twice throws', () {
@@ -31,15 +31,15 @@ void main() {
   test('delete removes the app from the registry', () {
     final FirebaseApp app = FirebaseApp.withOptions(_options, name: 'x');
     app.delete();
-    expect(FirebaseApp.apps, isEmpty);
+    expect(Firebase.apps, isEmpty);
     expect(() => app.name, throwsA(isA<StateError>()));
   });
 
   test('delete is idempotent and emits once', () async {
     final FirebaseApp app = FirebaseApp.withOptions(_options, name: 'x');
     final Future<List<String>> events = app.onDeleteApp.take(1).toList();
-    app.delete();
-    app.delete();
+    await app.delete();
+    await app.delete();
     expect(await events, <String>['x']);
   });
 
@@ -51,7 +51,7 @@ void main() {
     final FirebaseApp second = FirebaseApp.withOptions(_options);
     expect(FirebaseApp.instance, same(second));
     expect(identical(first, second), isFalse);
-    expect(second.name, FirebaseApp.defaultAppName);
+    expect(second.name, defaultFirebaseAppName);
     expect(() => first.name, throwsA(isA<StateError>()));
   });
 
@@ -62,10 +62,10 @@ void main() {
       FirebaseApp.withOptions(_options, name: 'b').delete();
 
       expect(
-        () => FirebaseApp.getInstance('nope'),
+        () => Firebase.app('nope'),
         throwsA(
-          isA<StateError>().having(
-            (StateError e) => e.message,
+          isA<FirebaseException>().having(
+            (FirebaseException e) => e.message,
             'message',
             allOf(
               contains('exist'),
@@ -76,10 +76,10 @@ void main() {
         ),
       );
       expect(
-        () => FirebaseApp.getInstance('b'),
+        () => Firebase.app('b'),
         throwsA(
-          isA<StateError>().having(
-            (StateError e) => e.message,
+          isA<FirebaseException>().having(
+            (FirebaseException e) => e.message,
             'message',
             contains('exist'),
           ),

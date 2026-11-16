@@ -322,8 +322,8 @@ class FirebaseFirestore {
   void _checkNotTerminated() {
     if (_terminated) {
       throw FirestoreException(
-        _terminatedMessage,
-        FirestoreErrorCode.failedPrecondition,
+        message: _terminatedMessage,
+        errorCode: FirestoreErrorCode.failedPrecondition,
       );
     }
   }

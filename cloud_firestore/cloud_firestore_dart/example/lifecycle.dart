@@ -59,7 +59,7 @@ Future<void> main() async {
   try {
     await firestore.doc(path).get();
   } on FirestoreException catch (e) {
-    print('after terminate: ${e.code} (${e.message})');
+    print('after terminate: ${e.errorCode} (${e.message})');
   }
 
   // clearPersistence deletes the cache file of a terminated instance.
@@ -73,7 +73,7 @@ Future<void> main() async {
   try {
     await firestore.doc(path).get(Source.cache);
   } on FirestoreException catch (e) {
-    print('cache after clear: ${e.code}');
+    print('cache after clear: ${e.errorCode}');
   }
   print('server: ${(await firestore.doc(path).get(Source.server)).data}');
 

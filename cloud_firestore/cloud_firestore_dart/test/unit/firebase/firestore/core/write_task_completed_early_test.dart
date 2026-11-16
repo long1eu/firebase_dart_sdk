@@ -33,8 +33,8 @@ class _FailingFillRemoteStore extends Fake implements RemoteStore {
   @override
   Future<void> fillWritePipeline() async {
     throw FirestoreException(
-      'fill failed',
-      FirestoreErrorCode.failedPrecondition,
+      message: 'fill failed',
+      errorCode: FirestoreErrorCode.failedPrecondition,
     );
   }
 

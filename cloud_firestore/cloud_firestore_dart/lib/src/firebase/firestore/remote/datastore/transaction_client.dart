@@ -114,8 +114,8 @@ class TransactionClient {
       response = await _client.callReleaser.first(call, call.cancel);
     } on StateError {
       throw FirestoreException(
-        'No responses received',
-        FirestoreErrorCode.unimplemented,
+        message: 'No responses received',
+        errorCode: FirestoreErrorCode.unimplemented,
       );
     }
     return _serializer.decodeAggregationResult(

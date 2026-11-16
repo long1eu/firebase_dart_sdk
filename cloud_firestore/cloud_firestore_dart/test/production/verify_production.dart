@@ -492,7 +492,7 @@ class Kit {
       }
     }
     for (final FirebaseApp app in _liteApps) {
-      app.delete();
+      await app.delete();
     }
     for (final FirestoreTransport transport in _transports) {
       try {
@@ -522,7 +522,7 @@ Future<void> _eventually(FutureOr<bool> Function() condition, String what,
 
 String _describeError(Object error) {
   if (error is FirestoreException) {
-    return '${error.code}: ${error.message}';
+    return '${error.errorCode}: ${error.message}';
   }
   return '${error.runtimeType}: $error';
 }
@@ -685,7 +685,7 @@ Future<CheckResult> _queries(Kit kit) async {
         collection.where('a', isEqualTo: 1).orderBy('b', Direction.descending),
         <String>['d5', 'd3', 'd1']);
   } on FirestoreException catch (e) {
-    if (e.code == FirestoreErrorCode.failedPrecondition) {
+    if (e.errorCode == FirestoreErrorCode.failedPrecondition) {
       final String? link = _indexLink(e);
       return CheckResult(Status.inconclusive,
           'Single-field queries work; the composite query needs an index that does not exist yet.',
@@ -1739,7 +1739,7 @@ Future<CheckResult> _userToken(Kit kit) async {
       await kit.doc(db, 'vp_user_auth', 'doc').get(Source.server).timeout(_patience);
       outcome = 'served (the security rules allow this user to read the path)';
     } on FirestoreException catch (e) {
-      if (e.code == FirestoreErrorCode.permissionDenied) {
+      if (e.errorCode == FirestoreErrorCode.permissionDenied) {
         outcome =
             'accepted, and the security rules refuse this path for the user (PERMISSION_DENIED)';
       } else {
@@ -1949,8 +1949,8 @@ Future<KitRun> runKit(List<String> arguments,
         result = CheckResult(Status.inconclusive,
             'The check did not finish: ${e.message ?? 'timed out after ${e.duration}'}');
       } on FirestoreException catch (e) {
-        final bool permission = e.code == FirestoreErrorCode.permissionDenied ||
-            e.code == FirestoreErrorCode.unauthenticated;
+        final bool permission = e.errorCode == FirestoreErrorCode.permissionDenied ||
+            e.errorCode == FirestoreErrorCode.unauthenticated;
         result = CheckResult(
             permission ? Status.inconclusive : Status.fail,
             permission

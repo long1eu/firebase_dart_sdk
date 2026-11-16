@@ -27,8 +27,8 @@ class FirestoreClient {
   void _verifyNotTerminated() {
     if (_terminated) {
       throw FirestoreException(
-        'The client has already been terminated.',
-        FirestoreErrorCode.failedPrecondition,
+        message: 'The client has already been terminated.',
+        errorCode: FirestoreErrorCode.failedPrecondition,
       );
     }
   }
@@ -216,12 +216,12 @@ class FirestoreClient {
             (dynamic error, [StackTrace? stackTrace]) => Stream<R>.error(
               error is GrpcError
                   ? FirestoreException(
-                      error.message ?? '',
-                      FirestoreErrorCode.fromValue(error),
+                      message: error.message ?? '',
+                      errorCode: FirestoreErrorCodeInternal.fromValue(error),
                     )
                   : FirestoreException(
-                      error.toString(),
-                      FirestoreErrorCode.unknown,
+                      message: error.toString(),
+                      errorCode: FirestoreErrorCode.unknown,
                     ),
               stackTrace,
             ),

@@ -65,7 +65,7 @@ Future<void> main() async {
         .get(Source.server);
     print('31 values: accepted');
   } on FirestoreException catch (e) {
-    print('31 values: ${e.code}');
+    print('31 values: ${e.errorCode}');
   }
 
   await firestore.terminate();

@@ -18,9 +18,9 @@ void main() {
       () async {
     final FirebaseApp app = newApp('cacheTestApp');
     final FirebaseApp other = newApp('cacheTestOtherApp');
-    addTearDown(() {
-      app.delete();
-      other.delete();
+    addTearDown(() async {
+      await app.delete();
+      await other.delete();
     });
 
     // ignore: deprecated_member_use_from_same_package
@@ -57,7 +57,7 @@ void main() {
   test('deleting the app shuts its instances down', () async {
     final FirebaseApp app = newApp('cacheTestDeleteApp');
     final FirebaseFirestore first = FirebaseFirestore.getInstance(app);
-    app.delete();
+    await app.delete();
     await Future<void>.delayed(const Duration(milliseconds: 50));
     expect(() => first.collection('a').get(), throwsA(anything));
   });

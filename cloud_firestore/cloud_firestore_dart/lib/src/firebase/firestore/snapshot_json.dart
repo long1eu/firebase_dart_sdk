@@ -69,9 +69,10 @@ Map<String, Object?> documentSnapshotToJson(
 ) {
   if (hasPendingWrites) {
     throw FirestoreException(
-      'DocumentSnapshot.toJson() attempted to serialize a document with pending writes. '
-      'Await waitForPendingWrites() before invoking toJson().',
-      FirestoreErrorCode.failedPrecondition,
+      message:
+          'DocumentSnapshot.toJson() attempted to serialize a document with pending writes. '
+          'Await waitForPendingWrites() before invoking toJson().',
+      errorCode: FirestoreErrorCode.failedPrecondition,
     );
   }
   String bundle = '';
@@ -100,9 +101,10 @@ Map<String, Object?> querySnapshotToJson(
 ) {
   if (snapshot.hasPendingWrites) {
     throw FirestoreException(
-      'QuerySnapshot.toJson() attempted to serialize a document with pending writes. '
-      'Await waitForPendingWrites() before invoking toJson().',
-      FirestoreErrorCode.failedPrecondition,
+      message:
+          'QuerySnapshot.toJson() attempted to serialize a document with pending writes. '
+          'Await waitForPendingWrites() before invoking toJson().',
+      errorCode: FirestoreErrorCode.failedPrecondition,
     );
   }
   final String bundleName = autoId();
@@ -153,15 +155,17 @@ DocumentSnapshot<T> documentSnapshotFromJson<T>(
   final _ParsedBundle bundle = _ParsedBundle.parse(firestore, parsed.bundle);
   if (bundle.documents.length != 1) {
     throw FirestoreException(
-      'Expected bundle data to contain 1 document, but it contains ${bundle.documents.length} documents.',
-      FirestoreErrorCode.invalidArgument,
+      message:
+          'Expected bundle data to contain 1 document, but it contains ${bundle.documents.length} documents.',
+      errorCode: FirestoreErrorCode.invalidArgument,
     );
   }
   final Document document = bundle.documents.single;
   if (document.key != key) {
     throw FirestoreException(
-      'The bundle holds the document ${document.key.path}, but the snapshot is of ${key.path}.',
-      FirestoreErrorCode.invalidArgument,
+      message:
+          'The bundle holds the document ${document.key.path}, but the snapshot is of ${key.path}.',
+      errorCode: FirestoreErrorCode.invalidArgument,
     );
   }
   return DocumentSnapshotInternal.fromDocument<T>(
@@ -190,8 +194,9 @@ QuerySnapshot<T> querySnapshotFromJson<T>(
   final _ParsedBundle bundle = _ParsedBundle.parse(firestore, parsed.bundle);
   if (bundle.queries.length != 1) {
     throw FirestoreException(
-      'Snapshot data expected 1 query but found ${bundle.queries.length} queries.',
-      FirestoreErrorCode.invalidArgument,
+      message:
+          'Snapshot data expected 1 query but found ${bundle.queries.length} queries.',
+      errorCode: FirestoreErrorCode.invalidArgument,
     );
   }
   final NamedQuery namedQuery = bundle.queries.single;
@@ -226,9 +231,10 @@ void _checkOrderByFields(core.Query query, Document document) {
   for (final OrderBy orderBy in query.orderByConstraints) {
     if (!orderBy.field.isKeyField && document.getField(orderBy.field) == null) {
       throw FirestoreException(
-        'The bundle holds the document ${document.key.path}, which has no field ${orderBy.field} to order the '
-        'query by.',
-        FirestoreErrorCode.invalidArgument,
+        message:
+            'The bundle holds the document ${document.key.path}, which has no field ${orderBy.field} to order the '
+            'query by.',
+        errorCode: FirestoreErrorCode.invalidArgument,
       );
     }
   }
@@ -275,8 +281,8 @@ Stream<QuerySnapshot<T>> querySnapshotsFromJson<T>(
   final _SnapshotJson parsed = _SnapshotJson.forResume(json, _querySource);
   if (parsed.bundle.isEmpty) {
     throw FirestoreException(
-      "snapshotJson field 'bundle' cannot be an empty string.",
-      FirestoreErrorCode.invalidArgument,
+      message: "snapshotJson field 'bundle' cannot be an empty string.",
+      errorCode: FirestoreErrorCode.invalidArgument,
     );
   }
   return _resume<QuerySnapshot<T>>(firestore, parsed.bundle, () async {
@@ -285,8 +291,8 @@ Stream<QuerySnapshot<T>> querySnapshotsFromJson<T>(
     );
     if (namedQuery == null) {
       throw FirestoreException(
-        'The bundle does not contain the query ${parsed.bundleName}.',
-        FirestoreErrorCode.invalidArgument,
+        message: 'The bundle does not contain the query ${parsed.bundleName}.',
+        errorCode: FirestoreErrorCode.invalidArgument,
       );
     }
     return QueryInternal.create<T>(
@@ -353,15 +359,17 @@ DocumentKey _documentKey(String path) {
   } on ArgumentError catch (e) {
     // The JS ResourcePath.fromString() throws a FirestoreError (invalid-argument) itself.
     throw FirestoreException(
-      "The JSON field 'bundleName' must be a document path, but was '$path': ${e.message}",
-      FirestoreErrorCode.invalidArgument,
-      e,
+      message:
+          "The JSON field 'bundleName' must be a document path, but was '$path': ${e.message}",
+      errorCode: FirestoreErrorCode.invalidArgument,
+      cause: e,
     );
   }
   if (resourcePath.length == 0 || !DocumentKey.isDocumentKey(resourcePath)) {
     throw FirestoreException(
-      "The JSON field 'bundleName' must be a document path, but was '$path'.",
-      FirestoreErrorCode.invalidArgument,
+      message:
+          "The JSON field 'bundleName' must be a document path, but was '$path'.",
+      errorCode: FirestoreErrorCode.invalidArgument,
     );
   }
   return DocumentKey.fromPath(resourcePath);
@@ -386,29 +394,30 @@ class _SnapshotJson {
     for (final MapEntry<String, String?> field in schema.entries) {
       if (!json.containsKey(field.key)) {
         throw FirestoreException(
-          "JSON missing required field: '${field.key}'",
-          FirestoreErrorCode.invalidArgument,
+          message: "JSON missing required field: '${field.key}'",
+          errorCode: FirestoreErrorCode.invalidArgument,
         );
       }
       final Object? value = json[field.key];
       if (value is! String) {
         throw FirestoreException(
-          "JSON field '${field.key}' must be a string.",
-          FirestoreErrorCode.invalidArgument,
+          message: "JSON field '${field.key}' must be a string.",
+          errorCode: FirestoreErrorCode.invalidArgument,
         );
       }
       if (field.value != null && value != field.value) {
         throw FirestoreException(
-          "Expected '${field.key}' field to equal '${field.value}'",
-          FirestoreErrorCode.invalidArgument,
+          message: "Expected '${field.key}' field to equal '${field.value}'",
+          errorCode: FirestoreErrorCode.invalidArgument,
         );
       }
     }
     final String bundle = json['bundle']! as String;
     if (bundle == _notSupported) {
       throw FirestoreException(
-        'The provided JSON object was created in a client environment, which is not supported.',
-        FirestoreErrorCode.invalidArgument,
+        message:
+            'The provided JSON object was created in a client environment, which is not supported.',
+        errorCode: FirestoreErrorCode.invalidArgument,
       );
     }
     return _SnapshotJson(json['bundleName']! as String, bundle);
@@ -419,37 +428,39 @@ class _SnapshotJson {
     for (final String key in <String>['bundle', 'bundleName', 'bundleSource']) {
       if (!json.containsKey(key)) {
         throw FirestoreException(
-          'snapshotJson missing required field: $key',
-          FirestoreErrorCode.invalidArgument,
+          message: 'snapshotJson missing required field: $key',
+          errorCode: FirestoreErrorCode.invalidArgument,
         );
       }
       final Object? value = json[key];
       if (value is! String) {
         throw FirestoreException(
-          "snapshotJson field '$key' must be a string.",
-          FirestoreErrorCode.invalidArgument,
+          message: "snapshotJson field '$key' must be a string.",
+          errorCode: FirestoreErrorCode.invalidArgument,
         );
       }
       // PORTING NOTE: the JS SDK also rejects an empty 'bundle', which toJSON() writes for a missing document. The
       // port listens to that document directly instead; a query snapshot always has a bundle.
       if (value.isEmpty && key != 'bundle') {
         throw FirestoreException(
-          "snapshotJson field '$key' cannot be an empty string.",
-          FirestoreErrorCode.invalidArgument,
+          message: "snapshotJson field '$key' cannot be an empty string.",
+          errorCode: FirestoreErrorCode.invalidArgument,
         );
       }
     }
     if (json['bundleSource'] != source) {
       throw FirestoreException(
-        "Expected 'bundleSource' field to equal '$source', but was '${json['bundleSource']}'.",
-        FirestoreErrorCode.invalidArgument,
+        message:
+            "Expected 'bundleSource' field to equal '$source', but was '${json['bundleSource']}'.",
+        errorCode: FirestoreErrorCode.invalidArgument,
       );
     }
     final String bundle = json['bundle']! as String;
     if (bundle == _notSupported) {
       throw FirestoreException(
-        'The provided JSON object was created in a client environment, which is not supported.',
-        FirestoreErrorCode.invalidArgument,
+        message:
+            'The provided JSON object was created in a client environment, which is not supported.',
+        errorCode: FirestoreErrorCode.invalidArgument,
       );
     }
     return _SnapshotJson(json['bundleName']! as String, bundle);
@@ -551,10 +562,10 @@ class _ParsedBundle {
     } on Object catch (e, stackTrace) {
       // The error may repeat the input, which can be megabytes long.
       throw FirestoreException(
-        'Invalid snapshot bundle: ${_excerpt('$e')}',
-        FirestoreErrorCode.invalidArgument,
-        e,
-        stackTrace,
+        message: 'Invalid snapshot bundle: ${_excerpt('$e')}',
+        errorCode: FirestoreErrorCode.invalidArgument,
+        cause: e,
+        stackTrace: stackTrace,
       );
     }
     return _ParsedBundle(queries, documents);

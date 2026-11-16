@@ -92,7 +92,7 @@ void main() {
         throwsA(
           isA<FirestoreException>()
               .having(
-                (FirestoreException e) => e.code,
+                (FirestoreException e) => e.errorCode,
                 'code',
                 FirestoreErrorCode.unauthenticated,
               )
@@ -119,7 +119,7 @@ void main() {
           client.batchGetDocuments(proto.BatchGetDocumentsRequest()).toList(),
           throwsA(
             isA<FirestoreException>().having(
-              (FirestoreException e) => e.code,
+              (FirestoreException e) => e.errorCode,
               'code',
               FirestoreErrorCode.permissionDenied,
             ),
@@ -141,7 +141,7 @@ void main() {
         throwsA(
           isA<FirestoreException>()
               .having(
-                (FirestoreException e) => e.code,
+                (FirestoreException e) => e.errorCode,
                 'code',
                 FirestoreErrorCode.unknown,
               )

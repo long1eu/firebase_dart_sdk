@@ -91,9 +91,9 @@ void main() {
       await firestore.terminate();
     }
     opened.clear();
-    for (final FirebaseApp app in FirebaseApp.apps) {
+    for (final FirebaseApp app in Firebase.apps) {
       if (app.name == appName) {
-        app.delete();
+        await app.delete();
       }
     }
     directory.deleteSync(recursive: true);
@@ -131,7 +131,7 @@ void main() {
 
   bool isTerminated(Object? e) =>
       e is FirestoreException &&
-      e.code == FirestoreErrorCode.failedPrecondition &&
+      e.errorCode == FirestoreErrorCode.failedPrecondition &&
       e.message == 'The client has already been terminated.';
 
   test('a new app with the same name reopens the cache of a deleted app',
@@ -144,7 +144,7 @@ void main() {
 
     // delete() is synchronous; the instance is terminated in the background.
     // The new app is created right away, without waiting for anything.
-    app.delete();
+    await app.delete();
     final FirebaseApp sameName = newApp();
     final FirebaseFirestore second = await open(sameName);
 
@@ -182,7 +182,7 @@ void main() {
         <String, Object?>{'value': 'pending'}).catchError((Object _) {}));
     await first.doc(path).get(Source.cache);
 
-    app.delete();
+    await app.delete();
     final FirebaseFirestore second = await open(newApp());
     expect(log, <String>['open', 'close', 'open']);
 
@@ -205,7 +205,7 @@ void main() {
       await firestore
           .doc(path)
           .set(<String, Object?>{'generation': generation});
-      app.delete();
+      await app.delete();
       app = newApp();
       firestore = await open(app);
       expect((await firestore.doc(path).get(Source.cache)).data,

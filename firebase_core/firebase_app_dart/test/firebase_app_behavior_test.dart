@@ -45,25 +45,27 @@ void main() {
       expect(app.isDefaultApp, isTrue);
     });
 
-    test('getInstance lists the available names, sorted', () {
+    test('Firebase.app lists the available names, sorted', () {
       FirebaseApp.withOptions(_options, name: 'b');
       FirebaseApp.withOptions(_options, name: 'a');
       expect(
-          () => FirebaseApp.getInstance('c'),
-          throwsA(isA<StateError>().having((StateError e) => e.message,
-              'message', contains('Available app names: a, b.'))));
+          () => Firebase.app('c'),
+          throwsA(isA<FirebaseException>()
+              .having((FirebaseException e) => e.code, 'code', 'no-app')
+              .having((FirebaseException e) => e.message, 'message',
+                  contains('Available app names: a, b.'))));
     });
 
     test('names are trimmed', () {
       final FirebaseApp app = FirebaseApp.withOptions(_options, name: ' x ');
       expect(app.name, 'x');
-      expect(FirebaseApp.getInstance('x  '), same(app));
+      expect(Firebase.app('x  '), same(app));
       expect(app.isDefaultApp, isFalse);
     });
 
     test('equality is by name and toString names the app', () {
       final FirebaseApp app = FirebaseApp.withOptions(_options, name: 'n');
-      expect(app, equals(FirebaseApp.getInstance('n')));
+      expect(app, equals(Firebase.app('n')));
       expect(app.hashCode, 'n'.hashCode * 31);
       expect(app.toString(), contains('n'));
     });
@@ -80,9 +82,9 @@ void main() {
       final List<bool> changes = <bool>[];
       final StreamSubscription<bool> sub =
           app.onDataCollectionChange.listen(changes.add);
-      app.setDataCollectionDefaultEnabled(enabled: false);
+      await app.setAutomaticDataCollectionEnabled(false);
       // Setting the same value again is not a change.
-      app.setDataCollectionDefaultEnabled(enabled: false);
+      await app.setAutomaticDataCollectionEnabled(false);
       await Future<void>.delayed(Duration.zero);
       await sub.cancel();
 
@@ -91,7 +93,7 @@ void main() {
       expect(deps.get('firebase_data_collection_default_enabled'), 'false');
 
       // A new app over the same storage starts from the persisted value.
-      app.delete();
+      await app.delete();
       final FirebaseApp again =
           FirebaseApp.withOptions(_options, dependencies: deps);
       expect(again.isAutomaticDataCollectionEnabled, isFalse);
@@ -101,9 +103,9 @@ void main() {
       final FirebaseApp app = FirebaseApp.withOptions(_options);
       app.delete();
       expect(() => app.isAutomaticDataCollectionEnabled, throwsStateError);
-      expect(() => app.setDataCollectionDefaultEnabled(enabled: false),
+      expect(() => app.setAutomaticDataCollectionEnabled(false),
           throwsStateError);
-      expect(() => app.setAutomaticResourceManagementEnabled(enabled: true),
+      expect(() => app.setAutomaticResourceManagementEnabled(true),
           throwsStateError);
     });
   });
@@ -119,9 +121,9 @@ void main() {
       final List<bool> events = <bool>[];
       final StreamSubscription<bool> sub =
           app.onBackgroundChanged.skip(1).listen(events.add);
-      app.setAutomaticResourceManagementEnabled(enabled: true);
-      app.setAutomaticResourceManagementEnabled(enabled: true); // no change
-      app.setAutomaticResourceManagementEnabled(enabled: false);
+      await app.setAutomaticResourceManagementEnabled(true);
+      await app.setAutomaticResourceManagementEnabled(true); // no change
+      await app.setAutomaticResourceManagementEnabled(false);
       await Future<void>.delayed(Duration.zero);
       await sub.cancel();
 
@@ -135,8 +137,8 @@ void main() {
       final List<bool> events = <bool>[];
       final StreamSubscription<bool> sub =
           app.onBackgroundChanged.skip(1).listen(events.add);
-      app.setAutomaticResourceManagementEnabled(enabled: true);
-      app.setAutomaticResourceManagementEnabled(enabled: false);
+      await app.setAutomaticResourceManagementEnabled(true);
+      await app.setAutomaticResourceManagementEnabled(false);
       await Future<void>.delayed(Duration.zero);
       await sub.cancel();
       expect(events, isEmpty);

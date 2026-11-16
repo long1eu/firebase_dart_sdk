@@ -48,7 +48,7 @@ Future<void> main() async {
       transaction.update(accounts.doc('ada'), <String, Object?>{'credit': 0});
     }, options: TransactionOptions(readOnly: true));
   } on FirestoreException catch (e) {
-    print('write refused: ${e.code}');
+    print('write refused: ${e.errorCode}');
   }
 
   await firestore.terminate();

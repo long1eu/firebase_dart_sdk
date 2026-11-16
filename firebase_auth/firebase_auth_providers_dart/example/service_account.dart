@@ -72,6 +72,6 @@ Future<void> main() async {
     print('token request failed: ${e.code}: ${e.message}');
     exitCode = 1;
   } finally {
-    app.delete();
+    await app.delete();
   }
 }

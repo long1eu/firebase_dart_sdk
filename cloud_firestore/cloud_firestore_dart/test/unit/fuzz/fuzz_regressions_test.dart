@@ -246,7 +246,7 @@ void main() {
         throwsA(
           isA<FirestoreException>()
               .having(
-                (FirestoreException e) => e.code,
+                (FirestoreException e) => e.errorCode,
                 'code',
                 FirestoreErrorCode.invalidArgument,
               )

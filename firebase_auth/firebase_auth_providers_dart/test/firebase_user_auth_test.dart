@@ -122,8 +122,8 @@ void main() {
 
     test('email and password sign-in and sign-up', () async {
       final AuthUser user = await auth.signInWithEmailAndPassword(
-        'a@example.com',
-        'secret',
+        email: 'a@example.com',
+        password: 'secret',
       );
       expect(
         user,
@@ -140,7 +140,10 @@ void main() {
       });
 
       requests.clear();
-      await auth.createUserWithEmailAndPassword('b@example.com', 'secret2');
+      await auth.createUserWithEmailAndPassword(
+        email: 'b@example.com',
+        password: 'secret2',
+      );
       expect(requests.single.url.path, '/v1/accounts:signUp');
       expect(jsonDecode(requests.single.body), <String, Object?>{
         'email': 'b@example.com',
@@ -354,13 +357,16 @@ void main() {
       final List<AuthUser?> users = <AuthUser?>[];
       final StreamSubscription<AuthTokenChange> tokenSub = auth.onTokenChanged
           .listen((AuthTokenChange r) => tokens.add(r.token));
-      final StreamSubscription<AuthUser?> userSub = auth.userChanges.listen(
+      final StreamSubscription<AuthUser?> userSub = auth.userChanges().listen(
         users.add,
       );
 
       await auth.signInAnonymously();
       await auth.getAccessToken(forceRefresh: true);
-      await auth.signInWithEmailAndPassword('a@example.com', 'secret');
+      await auth.signInWithEmailAndPassword(
+        email: 'a@example.com',
+        password: 'secret',
+      );
       await auth.signOut();
       await pump();
 
@@ -395,7 +401,10 @@ void main() {
         forceRefresh: true,
       );
       await pump();
-      await auth.signInWithEmailAndPassword('a@example.com', 'secret');
+      await auth.signInWithEmailAndPassword(
+        email: 'a@example.com',
+        password: 'secret',
+      );
       release.complete();
       // The answer is the token of the user who is signed in now, never the one of the previous user.
       final GetTokenResult result = await pending;
@@ -413,8 +422,8 @@ void main() {
           return backend(request);
         };
         final Future<AuthUser> pending = auth.signInWithEmailAndPassword(
-          'a@example.com',
-          'secret',
+          email: 'a@example.com',
+          password: 'secret',
         );
         await pump();
         await auth.signOut();
@@ -529,7 +538,10 @@ void main() {
       for (final MapEntry<String, String> entry in expected.entries) {
         handler = (http.Request request) async => error(entry.key);
         final FirebaseAuthException e = await failure(
-          () => auth.signInWithEmailAndPassword('a@example.com', 'secret'),
+          () => auth.signInWithEmailAndPassword(
+            email: 'a@example.com',
+            password: 'secret',
+          ),
         );
         expect(e.code, entry.value, reason: entry.key);
         expect(e.httpStatus, 400);
@@ -540,7 +552,10 @@ void main() {
           error('WEAK_PASSWORD : Password should be at least 6 characters');
       expect(
         (await failure(
-          () => auth.createUserWithEmailAndPassword('a@example.com', '1'),
+          () => auth.createUserWithEmailAndPassword(
+            email: 'a@example.com',
+            password: '1',
+          ),
         )).message,
         'Password should be at least 6 characters',
       );
@@ -645,13 +660,16 @@ void main() {
           _ => json(<String, Object?>{}),
         };
       });
-      await auth.signInWithEmailAndPassword('a@example.com', 'secret');
+      await auth.signInWithEmailAndPassword(
+        email: 'a@example.com',
+        password: 'secret',
+      );
       final String idToken = (await auth.getAccessToken(
         forceRefresh: false,
       )).token;
 
       await auth.sendPasswordResetEmail(
-        'a@example.com',
+        email: 'a@example.com',
         actionCodeSettings: const ActionCodeSettings(
           url: 'https://example.com/done',
           handleCodeInApp: true,
@@ -662,7 +680,10 @@ void main() {
           linkDomain: 'example.page.link',
         ),
       );
-      await auth.confirmPasswordReset('code-1', 'new-password');
+      await auth.confirmPasswordReset(
+        code: 'code-1',
+        newPassword: 'new-password',
+      );
       await auth.applyActionCode('code-2');
       await auth.sendEmailVerification();
       await auth.updateProfile(displayName: 'Ada', photoUrl: '');
@@ -738,7 +759,7 @@ void main() {
           ]) {
         await expectLater(
           auth.sendPasswordResetEmail(
-            'a@example.com',
+            email: 'a@example.com',
             actionCodeSettings: settings,
           ),
           throwsA(
@@ -792,7 +813,10 @@ void main() {
           (String method, Map<String, Object?> body) async =>
               error('USER_DISABLED'),
         );
-        await auth.signInWithEmailAndPassword('a@example.com', 'secret');
+        await auth.signInWithEmailAndPassword(
+          email: 'a@example.com',
+          password: 'secret',
+        );
         await expectLater(
           auth.updateProfile(displayName: 'x'),
           throwsA(isA<FirebaseAuthException>()),
@@ -806,7 +830,10 @@ void main() {
         (String method, Map<String, Object?> body) async =>
             error('CREDENTIAL_TOO_OLD_LOGIN_AGAIN'),
       );
-      await auth.signInWithEmailAndPassword('a@example.com', 'secret');
+      await auth.signInWithEmailAndPassword(
+        email: 'a@example.com',
+        password: 'secret',
+      );
       await expectLater(
         auth.updatePassword('another'),
         throwsA(
@@ -821,9 +848,15 @@ void main() {
     });
 
     test('reauthentication as somebody else is a user-mismatch', () async {
-      await auth.signInWithEmailAndPassword('a@example.com', 'secret');
+      await auth.signInWithEmailAndPassword(
+        email: 'a@example.com',
+        password: 'secret',
+      );
       await expectLater(
-        auth.reauthenticateWithEmailAndPassword('b@example.com', 'secret'),
+        auth.reauthenticateWithEmailAndPassword(
+          email: 'b@example.com',
+          password: 'secret',
+        ),
         throwsA(
           isA<FirebaseAuthException>().having(
             (FirebaseAuthException e) => e.code,
@@ -843,7 +876,10 @@ void main() {
               'photoUrl': 'https://example.com/a.png',
             }),
       );
-      await auth.signInWithEmailAndPassword('a@example.com', 'secret');
+      await auth.signInWithEmailAndPassword(
+        email: 'a@example.com',
+        password: 'secret',
+      );
       await auth.updateProfile(
         displayName: 'Ada',
         photoUrl: 'https://example.com/a.png',
@@ -869,7 +905,10 @@ void main() {
     test(
       'the session is stored without the ID token, and removed on sign-out',
       () async {
-        await auth.signInWithEmailAndPassword('a@example.com', 'secret');
+        await auth.signInWithEmailAndPassword(
+          email: 'a@example.com',
+          password: 'secret',
+        );
         expect(jsonDecode(storage.read(key)!), <String, Object?>{
           'uid': 'uid-of-a@example.com',
           'email': 'a@example.com',
@@ -1226,7 +1265,10 @@ void main() {
   });
 
   test('nothing prints a token', () async {
-    await auth.signInWithEmailAndPassword('a@example.com', 'secret');
+    await auth.signInWithEmailAndPassword(
+      email: 'a@example.com',
+      password: 'secret',
+    );
     final GetTokenResult token = await auth.getAccessToken(forceRefresh: false);
     // The string form of the user has the uid, not the email address.
     expect(

@@ -181,8 +181,8 @@ class OAuthTokenProvider implements AuthTokenProvider {
       );
     } on Object catch (_) {
       throw const FirebaseAuthException(
-        'network-request-failed',
-        'The request to the token endpoint failed (network error).',
+        code: 'network-request-failed',
+        message: 'The request to the token endpoint failed (network error).',
       );
     }
     Object? body;
@@ -208,9 +208,10 @@ class OAuthTokenProvider implements AuthTokenProvider {
         ? body['error_description']
         : null;
     throw FirebaseAuthException(
-      error == 'invalid_grant' ? 'invalid-credential' : 'internal-error',
-      'The token endpoint refused the service account'
-      '${error is String ? ' ($error${description is String ? ': $description' : ''})' : ''}.',
+      code: error == 'invalid_grant' ? 'invalid-credential' : 'internal-error',
+      message:
+          'The token endpoint refused the service account'
+          '${error is String ? ' ($error${description is String ? ': $description' : ''})' : ''}.',
       serverCode: error is String ? error : null,
       httpStatus: response.statusCode,
     );

@@ -258,7 +258,7 @@ abstract class BaseStream<
       // FirestoreClient converts gRPC errors into FirestoreErrors, restore the
       // original status here so the stream can classify it.
       final Object err = error is FirestoreException
-          ? GrpcError.custom(error.code.value, error.message)
+          ? GrpcError.custom(error.errorCode.value, error.message)
           : error;
       if (err is GrpcError) {
         if (err.code == StatusCode.ok) {

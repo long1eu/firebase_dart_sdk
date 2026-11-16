@@ -112,7 +112,10 @@ void main() {
     );
     addTearDown(auth.dispose);
     await expectLater(
-      auth.createUserWithEmailAndPassword('not an email', 'password'),
+      auth.createUserWithEmailAndPassword(
+        email: 'not an email',
+        password: 'password',
+      ),
       throwsA(
         isA<FirebaseAuthException>().having(
           (FirebaseAuthException e) => e.code,
@@ -158,15 +161,21 @@ void main() {
     addTearDown(auth.dispose);
     final String email =
         'browser${DateTime.now().microsecondsSinceEpoch}@example.com';
-    await auth.createUserWithEmailAndPassword(email, 'password');
+    await auth.createUserWithEmailAndPassword(
+      email: email,
+      password: 'password',
+    );
     // The continue URI is the page of the test, like in the JS SDK.
     expect(await auth.fetchSignInMethodsForEmail(email), <String>['password']);
     await auth.updateProfile(displayName: 'Browser');
     expect(auth.currentUser!.displayName, 'Browser');
     await auth.sendEmailVerification();
-    await auth.sendPasswordResetEmail(email);
+    await auth.sendPasswordResetEmail(email: email);
     await auth.updatePassword('password-2');
-    await auth.reauthenticateWithEmailAndPassword(email, 'password-2');
+    await auth.reauthenticateWithEmailAndPassword(
+      email: email,
+      password: 'password-2',
+    );
     await auth.reload();
     expect(auth.currentUser!.displayName, 'Browser');
     await auth.deleteCurrentUser();

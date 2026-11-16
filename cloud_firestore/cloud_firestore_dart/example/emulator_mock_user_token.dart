@@ -60,7 +60,7 @@ Future<void> main() async {
     await anonymous.doc(profile.path).update(<String, Object?>{'hacked': true});
     print('anonymous write: allowed by the rules');
   } on FirestoreException catch (e) {
-    print('anonymous write: ${e.code}');
+    print('anonymous write: ${e.errorCode}');
   }
 
   await asAlice.terminate();

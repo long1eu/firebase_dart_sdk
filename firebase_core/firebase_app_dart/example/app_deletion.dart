@@ -20,15 +20,15 @@ Future<void> main() async {
 
   // onDeleteApp emits the name once, when the app is deleted.
   final Future<String> deleted = app.onDeleteApp.first;
-  app.delete();
+  await app.delete();
   print('onDeleteApp: ${await deleted}');
 
   // The app is gone from the registry.
-  print('still listed: ${FirebaseApp.apps.contains(app)}');
+  print('still listed: ${Firebase.apps.contains(app)}');
   try {
-    FirebaseApp.getInstance('session');
-  } on StateError {
-    print('getInstance: no such app');
+    Firebase.app('session');
+  } on FirebaseException catch (e) {
+    print('Firebase.app: ${e.code}');
   }
 
   // Its name and options can no longer be read.
@@ -39,7 +39,7 @@ Future<void> main() async {
   }
 
   // Deleting twice does nothing.
-  app.delete();
+  await app.delete();
 
   // The name is free: a new app can take it.
   final FirebaseApp again = FirebaseApp.withOptions(_options, name: 'session');

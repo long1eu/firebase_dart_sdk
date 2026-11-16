@@ -282,8 +282,8 @@ void main() {
     'every operation fails with the error of a failed initialization',
     () async {
       final FirestoreException error = FirestoreException(
-        'The cache can not be opened',
-        FirestoreErrorCode.failedPrecondition,
+        message: 'The cache can not be opened',
+        errorCode: FirestoreErrorCode.failedPrecondition,
       );
       await open(openError: () => error);
 

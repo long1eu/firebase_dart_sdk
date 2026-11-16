@@ -113,9 +113,10 @@ class Transaction {
       // A read-write transaction is optimistic: it verifies the documents it read when it commits, and the result
       // of a query can't be verified that way.
       throw FirestoreException(
-        '$what can only be run in a read-only transaction '
-        '(TransactionOptions(readOnly: true)).',
-        FirestoreErrorCode.invalidArgument,
+        message:
+            '$what can only be run in a read-only transaction '
+            '(TransactionOptions(readOnly: true)).',
+        errorCode: FirestoreErrorCode.invalidArgument,
       );
     }
   }
@@ -152,9 +153,10 @@ class Transaction {
       // tried to read after writing does not commit, even if the update
       // function caught the error.
       final FirestoreException error = FirestoreException(
-        'Firestore transactions require all reads to be executed before all '
-        'writes.',
-        FirestoreErrorCode.invalidArgument,
+        message:
+            'Firestore transactions require all reads to be executed before all '
+            'writes.',
+        errorCode: FirestoreErrorCode.invalidArgument,
       );
       _lastWriteError = error;
       return Future<List<MaybeDocument>>.error(error);
@@ -236,8 +238,8 @@ class Transaction {
       if (existingVersion != docVersion) {
         // This transaction will fail no matter what.
         throw FirestoreException(
-          'Document version changed between two reads.',
-          FirestoreErrorCode.aborted,
+          message: 'Document version changed between two reads.',
+          errorCode: FirestoreErrorCode.aborted,
         );
       }
     } else {
@@ -280,8 +282,8 @@ class Transaction {
         // Note: this can change once we can send separate verify writes in the
         // transaction.
         throw FirestoreException(
-          "Can't update a document that doesn't exist.",
-          FirestoreErrorCode.invalidArgument,
+          message: "Can't update a document that doesn't exist.",
+          errorCode: FirestoreErrorCode.invalidArgument,
         );
       }
       // Document exists, base precondition on document update time.
@@ -296,8 +298,8 @@ class Transaction {
   void _ensureWritable() {
     if (readOnly) {
       throw FirestoreException(
-        'Read-only transactions cannot write.',
-        FirestoreErrorCode.invalidArgument,
+        message: 'Read-only transactions cannot write.',
+        errorCode: FirestoreErrorCode.invalidArgument,
       );
     }
   }

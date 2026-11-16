@@ -402,8 +402,8 @@ class SyncEngine implements RemoteStoreCallback, SharedClientStateSyncer {
       Log.w(_tag, 'Failed to persist write: $e');
       userTask.completeError(
         FirestoreException(
-          'Failed to persist write: $e',
-          FirestoreErrorCode.unavailable,
+          message: 'Failed to persist write: $e',
+          errorCode: FirestoreErrorCode.unavailable,
         ),
       );
       return;
@@ -905,8 +905,9 @@ class SyncEngine implements RemoteStoreCallback, SharedClientStateSyncer {
       }
       userTask.completeError(
         FirestoreException(
-          'Initialization of waitForPendingWrites() operation failed: $e',
-          FirestoreErrorCode.unavailable,
+          message:
+              'Initialization of waitForPendingWrites() operation failed: $e',
+          errorCode: FirestoreErrorCode.unavailable,
         ),
       );
       return;
@@ -943,8 +944,9 @@ class SyncEngine implements RemoteStoreCallback, SharedClientStateSyncer {
     for (Completer<void> task in tasks) {
       task.completeError(
         FirestoreException(
-          '\'waitForPendingWrites\' task is cancelled due to User change.',
-          FirestoreErrorCode.cancelled,
+          message:
+              '\'waitForPendingWrites\' task is cancelled due to User change.',
+          errorCode: FirestoreErrorCode.cancelled,
         ),
       );
     }
@@ -1281,10 +1283,10 @@ class SyncEngine implements RemoteStoreCallback, SharedClientStateSyncer {
       Log.w('Firestore', 'Loading bundle failed : $e');
       resultTask.setException(
         FirestoreException(
-          'Bundle failed to load',
-          FirestoreErrorCode.invalidArgument,
-          e,
-          stackTrace,
+          message: 'Bundle failed to load',
+          errorCode: FirestoreErrorCode.invalidArgument,
+          cause: e,
+          stackTrace: stackTrace,
         ),
       );
     } finally {
@@ -1371,7 +1373,7 @@ class SyncEngine implements RemoteStoreCallback, SharedClientStateSyncer {
         );
         await _removeAndCleanupTarget(
           targetId,
-          GrpcError.custom(error!.code.value, error.message),
+          GrpcError.custom(error!.errorCode.value, error.message),
         );
         break;
     }

@@ -71,7 +71,7 @@ void main() {
     try {
       await docRef.get(Source.cache);
     } on FirestoreException catch (e) {
-      expect(e.code, FirestoreErrorCode.unavailable);
+      expect(e.errorCode, FirestoreErrorCode.unavailable);
     }
   });
 

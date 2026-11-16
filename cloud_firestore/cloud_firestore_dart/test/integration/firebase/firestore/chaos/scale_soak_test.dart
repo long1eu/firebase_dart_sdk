@@ -598,7 +598,7 @@ class _Client {
         .then(
           (_) => record('#$op ok'),
           onError: (Object e) {
-            record('#$op failed: ${e is FirestoreException ? e.code : e}');
+            record('#$op failed: ${e is FirestoreException ? e.errorCode : e}');
           },
         )
         .whenComplete(() {

@@ -1,4 +1,9 @@
+import 'package:firebase_app_dart/firebase_app_dart.dart';
+
 /// Thrown when a Firebase Auth request, or a token request of an `OAuthTokenProvider`, fails.
+///
+/// It extends [FirebaseException] with the [plugin] `firebase_auth`, like FlutterFire's
+/// `FirebaseAuthException`, so `on FirebaseException catch (e)` catches it too.
 ///
 /// Branch on [code]; [message] is for people, and [serverCode] and [httpStatus] are for logs. None of them
 /// contains a token, a password or the API key.
@@ -34,7 +39,7 @@
 ///
 /// ```dart
 /// try {
-///   await auth.signInWithEmailAndPassword(email, password);
+///   await auth.signInWithEmailAndPassword(email: email, password: password);
 /// } on FirebaseAuthProviderException catch (e) {
 ///   switch (e.code) {
 ///     case 'wrong-password' || 'invalid-credential' || 'user-not-found':
@@ -46,15 +51,15 @@
 ///   }
 /// }
 /// ```
-class FirebaseAuthException implements Exception {
+class FirebaseAuthException extends FirebaseException {
   /// Creates an exception with the SDK style [code] (for example `wrong-password`) and a [message]. The
   /// package creates them; you need this only for tests and token providers of your own.
-  const FirebaseAuthException(
-    this.code,
-    this.message, {
+  const FirebaseAuthException({
+    required String code,
+    required String message,
     this.serverCode,
     this.httpStatus,
-  });
+  }) : super(plugin: 'firebase_auth', code: code, message: message);
 
   /// Maps the error message of the Identity Toolkit or Secure Token API ([serverMessage], for example
   /// `EMAIL_EXISTS` or `WEAK_PASSWORD : Password should be at least 6 characters`) to an exception.
@@ -89,8 +94,8 @@ class FirebaseAuthException implements Exception {
             ? 'invalid-api-key'
             : serverCode.toLowerCase().replaceAll(RegExp(r'[_\s]+'), '-'));
     return FirebaseAuthException(
-      code,
-      detail ?? _messages[code] ?? serverMessage,
+      code: code,
+      message: detail ?? _messages[code] ?? serverMessage,
       serverCode: serverCode,
       httpStatus: httpStatus,
     );
@@ -98,10 +103,12 @@ class FirebaseAuthException implements Exception {
 
   /// The error code in the style of the Firebase SDKs: `wrong-password`, `email-already-in-use`,
   /// `network-request-failed`, `internal-error`, ... (see the table of [FirebaseAuthException]).
-  final String code;
+  @override
+  String get code => super.code;
 
   /// A description of the error. It never contains a token or a password.
-  final String message;
+  @override
+  String get message => super.message!;
 
   /// The code the backend returned (for example `INVALID_PASSWORD`), when the error came from the backend.
   final String? serverCode;
@@ -194,5 +201,5 @@ class FirebaseAuthException implements Exception {
   };
 
   @override
-  String toString() => 'FirebaseAuthProviderException($code): $message';
+  String toString() => 'FirebaseAuthException(code: $code): $message';
 }

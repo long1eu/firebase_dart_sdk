@@ -200,7 +200,7 @@ void main() {
                 .select(<Object>['name'])
                 .insert(collection: archive, documentId: 'name')
                 .execute(atomic: true),
-            throwsA(isA<FirestoreException>().having((FirestoreException e) => e.code,
+            throwsA(isA<FirestoreException>().having((FirestoreException e) => e.errorCode,
                 'code', FirestoreErrorCode.alreadyExists)));
 
         expect(await contents(archive), <String, Map<String, Object?>>{
@@ -269,7 +269,7 @@ void main() {
         final CollectionReference<Map<String, Object?>> archive =
             firestore.collection('archive_${autoId()}');
         final Matcher invalidArgument = throwsA(isA<FirestoreException>().having(
-            (FirestoreException e) => e.code,
+            (FirestoreException e) => e.errorCode,
             'code',
             FirestoreErrorCode.invalidArgument));
 

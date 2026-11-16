@@ -1160,8 +1160,8 @@ class RemoteStore implements TargetMetadataProvider {
     }
     return Future<Map<String, FieldValue>>.error(
       FirestoreException(
-        'Failed to get result from server.',
-        FirestoreErrorCode.unavailable,
+        message: 'Failed to get result from server.',
+        errorCode: FirestoreErrorCode.unavailable,
       ),
     );
   }
@@ -1175,8 +1175,8 @@ class RemoteStore implements TargetMetadataProvider {
     }
     return Future<List<Document>>.error(
       FirestoreException(
-        'Failed to get result from server.',
-        FirestoreErrorCode.unavailable,
+        message: 'Failed to get result from server.',
+        errorCode: FirestoreErrorCode.unavailable,
       ),
     );
   }
@@ -1192,8 +1192,8 @@ class RemoteStore implements TargetMetadataProvider {
     }
     return Future<List<proto.ExecutePipelineResponse>>.error(
       FirestoreException(
-        'Failed to get result from server.',
-        FirestoreErrorCode.unavailable,
+        message: 'Failed to get result from server.',
+        errorCode: FirestoreErrorCode.unavailable,
       ),
     );
   }

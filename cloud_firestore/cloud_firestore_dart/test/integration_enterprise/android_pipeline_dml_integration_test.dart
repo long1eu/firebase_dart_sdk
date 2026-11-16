@@ -70,7 +70,7 @@ final Map<String, Map<String, Object?>> testBookDocs =
 Future<FirestoreErrorCode> errorCode(Future<Object?> Function() body) async {
   final Object error = await assertThrows(null, body);
   expect(error, isA<FirestoreException>());
-  return (error as FirestoreException).code;
+  return (error as FirestoreException).errorCode;
 }
 
 void main() {

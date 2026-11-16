@@ -95,7 +95,7 @@ Future<void> expectEmulatorRejectsWindows(Future<Object?> execute) async {
   final Object error = await assertThrows(null, () => execute);
   expect(error, isA<FirestoreException>());
   expect(
-    (error as FirestoreException).code,
+    (error as FirestoreException).errorCode,
     FirestoreErrorCode.invalidArgument,
   );
   assertThat("$error").contains("add_window_fields");
@@ -109,7 +109,7 @@ Future<bool> emulatorRejectsWindows(Future<PipelineSnapshot> execute) async {
     await execute;
     return false;
   } on FirestoreException catch (e) {
-    if (e.code == FirestoreErrorCode.invalidArgument &&
+    if (e.errorCode == FirestoreErrorCode.invalidArgument &&
         "$e".contains("Unsupported stage: add_window_fields")) {
       return true;
     }

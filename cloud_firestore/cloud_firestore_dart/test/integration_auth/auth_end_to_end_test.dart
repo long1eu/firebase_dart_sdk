@@ -104,7 +104,7 @@ Future<void> eventually(FutureOr<bool> Function() condition, String what,
 }
 
 final Matcher isPermissionDenied = isA<FirestoreException>().having(
-    (FirestoreException e) => e.code, 'code', FirestoreErrorCode.permissionDenied);
+    (FirestoreException e) => e.errorCode, 'code', FirestoreErrorCode.permissionDenied);
 
 /// A listener that records its snapshots and its error.
 class Listening {
@@ -153,7 +153,7 @@ void main() {
     }
     cleanups.clear();
     for (final FirebaseApp app in apps) {
-      app.delete();
+      await app.delete();
     }
     apps.clear();
     Datastore.transportOverride = null;
@@ -252,7 +252,7 @@ void main() {
         final String emailB = '${unique('b')}@example.com';
 
         final AuthUser a =
-            await auth.createUserWithEmailAndPassword(emailA, 'password-a');
+            await auth.createUserWithEmailAndPassword(email: emailA, password: 'password-a');
         await db
             .doc('users/${a.uid}/$run/doc')
             .set(<String, Object?>{'owner': 'a'});
@@ -265,7 +265,7 @@ void main() {
         // B signs in on the same app. The listener that is still open on the documents of A is restarted with
         // the identity of B, and the rules refuse it.
         final AuthUser b =
-            await auth.createUserWithEmailAndPassword(emailB, 'password-b');
+            await auth.createUserWithEmailAndPassword(email: emailB, password: 'password-b');
         expect(b.uid, isNot(a.uid));
         await eventually(() => asA.errors.isNotEmpty,
             'the listener of A to be refused for B',
@@ -283,7 +283,7 @@ void main() {
         expect(asB.ids, <String>['doc']);
 
         // Back to A: the listener of B is refused, a new listener of A works.
-        await auth.signInWithEmailAndPassword(emailA, 'password-a');
+        await auth.signInWithEmailAndPassword(email: emailA, password: 'password-a');
         expect(auth.uid, a.uid);
         await eventually(() => asB.errors.isNotEmpty,
             'the listener of B to be refused for A',
@@ -306,7 +306,7 @@ void main() {
         final String emailB = '${unique('b')}@example.com';
 
         final AuthUser a =
-            await auth.createUserWithEmailAndPassword(emailA, 'password-a');
+            await auth.createUserWithEmailAndPassword(email: emailA, password: 'password-a');
         final String pendingPath = 'users/${a.uid}/$run/pending';
         await db.doc('users/${a.uid}/$run/sent').set(<String, Object?>{'n': 1});
 
@@ -323,7 +323,7 @@ void main() {
         // B signs in and the network comes back: the write of A is not sent with the token of B, and B does not
         // see it in the cache.
         final AuthUser b =
-            await auth.createUserWithEmailAndPassword(emailB, 'password-b');
+            await auth.createUserWithEmailAndPassword(email: emailB, password: 'password-b');
         await db.enableNetwork();
         await db.doc('users/${b.uid}/$run/own').set(<String, Object?>{'n': 2});
         await db.waitForPendingWrites();
@@ -334,7 +334,7 @@ void main() {
             reason: 'B has no cached document of A');
 
         // A comes back: the write is sent with the token of A.
-        await auth.signInWithEmailAndPassword(emailA, 'password-a');
+        await auth.signInWithEmailAndPassword(email: emailA, password: 'password-a');
         await eventually(() async => await admin.get(pendingPath) != null,
             'the pending write of A to reach the backend');
         await db.waitForPendingWrites();
@@ -435,7 +435,7 @@ void main() {
 
       // Another user: the next request carries the new token.
       final AuthUser b = await auth.createUserWithEmailAndPassword(
-          '${unique('lite')}@example.com', 'password');
+          email: '${unique('lite')}@example.com', password: 'password');
       await expectLater(ofA.get(), throwsA(isPermissionDenied));
       final lite.DocumentReference<Map<String, Object?>> ofB =
           db.doc('users/${b.uid}/notes/$run');

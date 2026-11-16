@@ -115,7 +115,7 @@ void main() {
 
   Matcher firestoreError(FirestoreErrorCode code, Matcher message) {
     return isA<FirestoreException>()
-        .having((FirestoreException e) => e.code, 'code', code)
+        .having((FirestoreException e) => e.errorCode, 'code', code)
         .having((FirestoreException e) => e.message, 'message', message);
   }
 

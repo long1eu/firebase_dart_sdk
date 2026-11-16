@@ -24,10 +24,10 @@ import 'package:firebase_app_dart/firebase_app_dart.dart';
 /// ```dart
 /// try {
 ///   await firestore.doc('cities/SF').update(<String, Object?>{'visits': 1});
-/// } on FirestoreError catch (e) {
-///   if (e.code == FirestoreErrorCode.notFound) {
+/// } on FirestoreException catch (e) {
+///   if (e.errorCode == FirestoreErrorCode.notFound) {
 ///     print('No such city');
-///   } else if (e.code == FirestoreErrorCode.permissionDenied) {
+///   } else if (e.errorCode == FirestoreErrorCode.permissionDenied) {
 ///     print('Not allowed: ${e.message}');
 ///   } else {
 ///     rethrow;
@@ -35,16 +35,11 @@ import 'package:firebase_app_dart/firebase_app_dart.dart';
 /// }
 /// ```
 ///
-/// The names follow the Android SDK in lowerCamelCase. The JS SDK uses the
-/// same codes as strings, for example `'permission-denied'`.
-class FirestoreErrorCode {
-  const FirestoreErrorCode._(this.value);
-
-  /// The numeric gRPC status code, for example 7 for [permissionDenied].
-  final int value;
-
+/// The names follow the Android SDK in lowerCamelCase; [code] is the string of
+/// FlutterFire and the JS SDK, for example `'permission-denied'`.
+enum FirestoreErrorCode {
   /// The operation completed successfully. Never the code of a thrown [FirestoreException].
-  static const FirestoreErrorCode ok = FirestoreErrorCode._(0);
+  ok(0, 'ok'),
 
   /// The operation was cancelled, typically by the caller.
   ///
@@ -52,7 +47,7 @@ class FirestoreErrorCode {
   /// `Firestore.waitForPendingWrites` future is waiting; the transport
   /// reports it for a call that was cancelled on the way. Retrying makes
   /// sense; for `waitForPendingWrites`, call it again for the new user.
-  static const FirestoreErrorCode cancelled = FirestoreErrorCode._(1);
+  cancelled(1, 'cancelled'),
 
   /// An unknown error, or an error from a different error domain.
   ///
@@ -62,7 +57,7 @@ class FirestoreErrorCode {
   /// of the cache (on Windows, for example, while another isolate or process
   /// has them open). The message holds the original error. A retry can help
   /// if the cause was temporary.
-  static const FirestoreErrorCode unknown = FirestoreErrorCode._(2);
+  unknown(2, 'unknown'),
 
   /// The client passed an invalid argument. Unlike [failedPrecondition], the argument is wrong
   /// regardless of the state of the system (for example a malformed field name).
@@ -78,7 +73,7 @@ class FirestoreErrorCode {
   /// before anything is sent (invalid data, field paths or query
   /// combinations) are reported as an [ArgumentError] instead. Retrying the
   /// same call does not help; fix the call.
-  static const FirestoreErrorCode invalidArgument = FirestoreErrorCode._(3);
+  invalidArgument(3, 'invalid-argument'),
 
   /// The deadline expired before the operation could complete. The operation may still have
   /// succeeded on the server.
@@ -86,7 +81,7 @@ class FirestoreErrorCode {
   /// Comes from the backend or the transport, never from the client itself.
   /// A retry makes sense, but a write may then be applied twice: make it
   /// idempotent or read before writing again.
-  static const FirestoreErrorCode deadlineExceeded = FirestoreErrorCode._(4);
+  deadlineExceeded(4, 'deadline-exceeded'),
 
   /// A requested document was not found.
   ///
@@ -95,7 +90,7 @@ class FirestoreErrorCode {
   /// A plain read of a missing document is not an error: its snapshot has
   /// `exists` false. Retrying does not help until the document exists; use
   /// `set` with a merge option to create or update it in one call.
-  static const FirestoreErrorCode notFound = FirestoreErrorCode._(5);
+  notFound(5, 'not-found'),
 
   /// The document the operation tried to create already exists.
   ///
@@ -103,7 +98,7 @@ class FirestoreErrorCode {
   /// for example in a transaction that read a document as missing and then
   /// wrote it while another client created it. Transactions retry on this
   /// code by themselves; elsewhere a retry of the same write fails again.
-  static const FirestoreErrorCode alreadyExists = FirestoreErrorCode._(6);
+  alreadyExists(6, 'already-exists'),
 
   /// The caller does not have permission to run the operation, for example because the security
   /// rules reject it.
@@ -111,13 +106,13 @@ class FirestoreErrorCode {
   /// The backend returns it. A rejected write is removed from the local cache
   /// again, and a rejected listen ends its stream with this error. Retrying
   /// does not help until the rules, the signed-in user or the data change.
-  static const FirestoreErrorCode permissionDenied = FirestoreErrorCode._(7);
+  permissionDenied(7, 'permission-denied'),
 
   /// A resource has been exhausted, such as a per-user quota or the storage of the project.
   ///
   /// The backend returns it. Retry later with a backoff; the client does so
   /// itself for listens and writes.
-  static const FirestoreErrorCode resourceExhausted = FirestoreErrorCode._(8);
+  resourceExhausted(8, 'resource-exhausted'),
 
   /// The operation was rejected because the system is not in the state it requires, for example a
   /// query that needs an index that does not exist.
@@ -135,7 +130,7 @@ class FirestoreErrorCode {
   /// another tab already has the cache open. Retrying the same call does not
   /// help: change the state first (create a new instance, create the index,
   /// wait for the pending writes).
-  static const FirestoreErrorCode failedPrecondition = FirestoreErrorCode._(9);
+  failedPrecondition(9, 'failed-precondition'),
 
   /// The operation was aborted, typically because of a concurrency problem such as a transaction
   /// conflict.
@@ -145,12 +140,12 @@ class FirestoreErrorCode {
   /// twice and gets two versions. Transactions and writes retry on this code
   /// by themselves, so you see it only when the attempts were used up. A
   /// retry of the whole transaction can then succeed.
-  static const FirestoreErrorCode aborted = FirestoreErrorCode._(10);
+  aborted(10, 'aborted'),
 
   /// The operation was attempted past the valid range.
   ///
   /// Comes from the backend only. Retrying the same call does not help.
-  static const FirestoreErrorCode outOfRange = FirestoreErrorCode._(11);
+  outOfRange(11, 'out-of-range'),
 
   /// The operation is not implemented or not supported.
   ///
@@ -158,13 +153,13 @@ class FirestoreErrorCode {
   /// support, for example one that needs the Enterprise edition. The client
   /// produces it when the backend answers an aggregation (also one in a
   /// transaction) without any response. Retrying does not help.
-  static const FirestoreErrorCode unimplemented = FirestoreErrorCode._(12);
+  unimplemented(12, 'unimplemented'),
 
   /// An internal error: an invariant expected by the underlying system was broken.
   ///
   /// Comes from the backend. The client retries listens and writes; for other
   /// calls a retry with a backoff can help.
-  static const FirestoreErrorCode internal = FirestoreErrorCode._(13);
+  internal(13, 'internal'),
 
   /// The service is currently unavailable. This is most likely transient and the operation can be
   /// retried with a backoff.
@@ -176,12 +171,12 @@ class FirestoreErrorCode {
   /// cache; and when the local cache cannot store a write or start a listen
   /// (for example a database that stays busy). Retry with a backoff, or read
   /// from the cache instead.
-  static const FirestoreErrorCode unavailable = FirestoreErrorCode._(14);
+  unavailable(14, 'unavailable'),
 
   /// Unrecoverable data loss or corruption.
   ///
   /// Comes from the backend only. Retrying does not help.
-  static const FirestoreErrorCode dataLoss = FirestoreErrorCode._(15);
+  dataLoss(15, 'data-loss'),
 
   /// The request does not carry valid authentication credentials for the operation.
   ///
@@ -189,104 +184,77 @@ class FirestoreErrorCode {
   /// client asks the token provider for a fresh token and retries listens and
   /// writes by itself. If you still see it, check how the app signs in (see
   /// `package:firebase_auth_providers_dart`).
-  static const FirestoreErrorCode unauthenticated = FirestoreErrorCode._(16);
+  unauthenticated(16, 'unauthenticated');
 
-  /// Implementation detail of the SDK; not part of the supported API.
-  @internal
-  static FirestoreErrorCode fromValue(GrpcError error) {
-    // Unknown (e.g. forward-compatible or custom) codes map to `unknown`.
-    return error.code >= 0 && error.code < values.length
-        ? values[error.code]
-        : unknown;
-  }
+  const FirestoreErrorCode(this.value, this.code);
 
-  /// All codes, indexed by their numeric [value].
-  static const List<FirestoreErrorCode> values = <FirestoreErrorCode>[
-    ok,
-    cancelled,
-    unknown,
-    invalidArgument,
-    deadlineExceeded,
-    notFound,
-    alreadyExists,
-    permissionDenied,
-    resourceExhausted,
-    failedPrecondition,
-    aborted,
-    outOfRange,
-    unimplemented,
-    internal,
-    unavailable,
-    dataLoss,
-    unauthenticated,
-  ];
+  /// The numeric gRPC status code, for example 7 for [permissionDenied]. [values] is in the order
+  /// of these numbers.
+  final int value;
 
-  static const List<String> _names = <String>[
-    'ok',
-    'cancelled',
-    'unknown',
-    'invalidArgument',
-    'deadlineExceeded',
-    'notFound',
-    'alreadyExists',
-    'permissionDenied',
-    'resourceExhausted',
-    'failedPrecondition',
-    'aborted',
-    'outOfRange',
-    'unimplemented',
-    'internal',
-    'unavailable',
-    'dataLoss',
-    'unauthenticated',
-  ];
+  /// The code in the form of FlutterFire and the JS SDK, for example `'permission-denied'`: the
+  /// [FirebaseException.code] of a [FirestoreException] with this code.
+  final String code;
 
   @override
-  String toString() => _names[value];
+  String toString() => name;
 }
 
-/// The error thrown by Firestore operations. [code] says what went wrong.
+/// Implementation details of [FirestoreErrorCode]; not part of the supported API.
+extension FirestoreErrorCodeInternal on FirestoreErrorCode {
+  /// The code of a gRPC error; codes this client does not know map to [FirestoreErrorCode.unknown].
+  static FirestoreErrorCode fromValue(GrpcError error) {
+    return error.code >= 0 && error.code < FirestoreErrorCode.values.length
+        ? FirestoreErrorCode.values[error.code]
+        : FirestoreErrorCode.unknown;
+  }
+}
+
+/// The exception thrown by Firestore operations. [errorCode] says what went wrong.
 ///
-/// Futures fail with it, and streams (`snapshots`) deliver it to `onError`,
-/// after which the stream is done. [FirestoreException.message] (from
-/// `FirebaseError`) describes the cause in words; it is meant for logs, not
-/// for program logic. Check [code] instead. Invalid arguments that the client
-/// detects before sending anything are reported as an [ArgumentError], not as
-/// a [FirestoreException].
+/// Futures fail with it, and streams (`snapshots()`) deliver it to `onError`,
+/// after which the stream is done. It extends [FirebaseException], like the
+/// exceptions of FlutterFire: [plugin] is `cloud_firestore` and [code] is the
+/// string form of [errorCode] (`'permission-denied'`). [message] describes the
+/// cause in words; it is meant for logs, not for program logic. Check
+/// [errorCode] (or [code]) instead. Invalid arguments that the client detects
+/// before sending anything are reported as an [ArgumentError], not as a
+/// [FirestoreException].
 ///
-/// Like `FirebaseError`, it implements [Error], not [Exception]: catch it with
-/// `on FirestoreError`, not `on Exception`.
+/// Note that [code] is a `String`: compare [errorCode] with the
+/// [FirestoreErrorCode] values.
 ///
 /// ```dart
-/// firestore.collection('cities').snapshots.listen(
-///   (QuerySnapshot<Map<String, Object?>> snapshot) => print(snapshot.length),
+/// firestore.collection('cities').snapshots().listen(
+///   (QuerySnapshot<Map<String, Object?>> snapshot) => print(snapshot.size),
 ///   onError: (Object error) {
-///     if (error is FirestoreError &&
-///         error.code == FirestoreErrorCode.permissionDenied) {
+///     if (error is FirestoreException &&
+///         error.errorCode == FirestoreErrorCode.permissionDenied) {
 ///       print('Listen rejected by the security rules');
 ///     }
 ///   },
 /// );
 /// ```
 class FirestoreException extends FirebaseException {
-  /// Creates an error with a [message] and a [code], optionally keeping the [cause] and a stack
-  /// trace.
+  /// Creates an exception with an [errorCode] and a [message], optionally keeping the [cause] and
+  /// a stack trace.
   ///
-  /// The SDK creates these errors; you need the constructor only for tests
+  /// The SDK creates these exceptions; you need the constructor only for tests
   /// and fakes.
-  FirestoreException(
-    String message,
-    this.code, [
+  FirestoreException({
+    required this.errorCode,
+    required String message,
     this.cause,
-    StackTrace? stackTrance,
-  ]) : super(message, stackTrance);
+    super.stackTrace,
+  }) : super(plugin: 'cloud_firestore', code: errorCode.code, message: message);
 
-  /// The status code of this error, the part to check in code.
-  final FirestoreErrorCode code;
+  /// The status code of this exception, the part to check in code.
+  final FirestoreErrorCode errorCode;
 
   /// The lower-level error that caused this one, if any.
   final Object? cause;
 
+  /// A description of what went wrong, for logs.
   @override
-  String toString() => '$runtimeType: [code=$code]: $message';
+  String get message => super.message!;
 }

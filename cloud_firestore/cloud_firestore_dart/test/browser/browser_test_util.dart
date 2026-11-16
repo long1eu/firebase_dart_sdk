@@ -56,7 +56,7 @@ Future<FirebaseFirestore> newClient({
       ).withEmulator(emulatorHost, emulatorPort),
     );
   } catch (_) {
-    app.delete();
+    await app.delete();
     rethrow;
   }
   // instanceFor returns at once; the tests want a client whose cache is open (and the error if it can't be).
@@ -64,7 +64,7 @@ Future<FirebaseFirestore> newClient({
     await firestore.initialized;
   } catch (_) {
     await firestore.terminate();
-    app.delete();
+    await app.delete();
     rethrow;
   }
   _appOf[firestore] = app;
@@ -79,7 +79,7 @@ final Map<FirebaseFirestore, FirebaseApp> _appOf =
 /// can be used again. Does nothing the second time.
 Future<void> shutDown(FirebaseFirestore firestore) async {
   await firestore.terminate();
-  _appOf.remove(firestore)?.delete();
+  await _appOf.remove(firestore)?.delete();
 }
 
 /// A collection name no other test uses.

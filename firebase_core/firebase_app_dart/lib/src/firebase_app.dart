@@ -11,11 +11,105 @@ import 'package:firebase_app_dart/src/platform_dependencies.dart';
 import 'package:meta/meta.dart';
 import 'package:rxdart/rxdart.dart';
 
+/// The name of the default app, `[DEFAULT]`.
+const String defaultFirebaseAppName = '[DEFAULT]';
+
+/// The FlutterFire entry point: creates and finds [FirebaseApp]s by name.
+///
+/// [initializeApp] is the asynchronous twin of [FirebaseApp.withOptions], with the shape of
+/// FlutterFire's `Firebase.initializeApp`; [app] and [apps] look the apps up.
+///
+/// ```dart
+/// import 'package:firebase_app_dart/firebase_app_dart.dart';
+///
+/// Future<void> main() async {
+///   final FirebaseApp app = await Firebase.initializeApp(
+///     options: const FirebaseOptions(
+///       apiKey: '<YOUR_API_KEY>',
+///       appId: '1:1234567890:dart:example',
+///       projectId: 'my-project',
+///     ),
+///   );
+///   print(identical(Firebase.app(), app)); // true
+/// }
+/// ```
+abstract final class Firebase {
+  /// Creates the app called [name] (default: the default app) with [options] and
+  /// [dependencies], like [FirebaseApp.withOptions].
+  ///
+  /// When an app with this name exists, it is returned if [options] is null or equal to its
+  /// options; otherwise this throws a [FirebaseException] with the code `duplicate-app`. A new app
+  /// needs [options]: without them this throws a [FirebaseException] with the code `no-options`
+  /// (FlutterFire reads them from the platform files there; these packages have no such files).
+  static Future<FirebaseApp> initializeApp({
+    String? name,
+    FirebaseOptions? options,
+    PlatformDependencies? dependencies,
+  }) async {
+    final String appName = FirebaseApp._normalize(
+      name ?? defaultFirebaseAppName,
+    );
+    final FirebaseApp? existing = FirebaseApp._instances[appName];
+    if (existing != null) {
+      if (options == null || options == existing.options) {
+        return existing;
+      }
+      throw FirebaseException(
+        plugin: 'core',
+        code: 'duplicate-app',
+        message:
+            'A Firebase App named "$appName" already exists with other options.',
+      );
+    }
+    if (options == null) {
+      throw FirebaseException(
+        plugin: 'core',
+        code: 'no-options',
+        message:
+            'Firebase.initializeApp needs options to create the app "$appName".',
+      );
+    }
+    return FirebaseApp.withOptions(
+      options,
+      name: appName,
+      dependencies: dependencies,
+    );
+  }
+
+  /// The app called [name] (leading and trailing white space is ignored); the default app when
+  /// [name] is omitted.
+  ///
+  /// Throws a [FirebaseException] with the code `no-app`, whose message lists the names of the
+  /// existing apps, if there is no app with this name (it was not created, or it was deleted).
+  static FirebaseApp app([String name = defaultFirebaseAppName]) {
+    final FirebaseApp? firebaseApp =
+        FirebaseApp._instances[FirebaseApp._normalize(name)];
+    if (firebaseApp != null) {
+      return firebaseApp;
+    }
+    final List<String> availableAppNames = FirebaseApp._getAllAppNames();
+    final String availableAppNamesMessage = availableAppNames.isNotEmpty
+        ? ' Available app names: ${availableAppNames.join(', ')}.'
+        : '';
+    throw FirebaseException(
+      plugin: 'core',
+      code: 'no-app',
+      message: 'No Firebase App named "$name" exists.$availableAppNamesMessage',
+    );
+  }
+
+  /// The apps that exist now (created and not deleted), in the order they were created.
+  ///
+  /// The list is a copy: changing it does not create or delete apps.
+  static List<FirebaseApp> get apps =>
+      List<FirebaseApp>.from(FirebaseApp._instances.values);
+}
+
 /// The entry point of the Firebase SDKs: a named set of [FirebaseOptions] shared by the Firebase
 /// services of one project.
 ///
 /// Create one with [FirebaseApp.withOptions]. The app created without a name is the default app,
-/// returned by [FirebaseApp.instance]; apps created with a `name` are returned by [getInstance].
+/// returned by [FirebaseApp.instance]; apps created with a `name` are returned by `Firebase.app`.
 /// Each name can be used by one app at a time: [delete] an app to free its name.
 ///
 /// The app also connects the services to the platform they run on. It implements
@@ -32,7 +126,7 @@ import 'package:rxdart/rxdart.dart';
 ///   final FirebaseApp app = FirebaseApp.withOptions(
 ///     const FirebaseOptions(
 ///       apiKey: '<YOUR_API_KEY>',
-///       applicationId: '1:1234567890:dart:example',
+///       appId: '1:1234567890:dart:example',
 ///       projectId: 'my-project',
 ///     ),
 ///   );
@@ -42,12 +136,12 @@ import 'package:rxdart/rxdart.dart';
 ///   final FirebaseApp other = FirebaseApp.withOptions(
 ///     const FirebaseOptions(
 ///       apiKey: '<YOUR_API_KEY>',
-///       applicationId: '1:1234567890:dart:other',
+///       appId: '1:1234567890:dart:other',
 ///       projectId: 'other-project',
 ///     ),
 ///     name: 'other',
 ///   );
-///   print(identical(FirebaseApp.getInstance('other'), other)); // true
+///   print(identical(Firebase.app('other'), other)); // true
 /// }
 /// ```
 class FirebaseApp with _PlatformDependenciesMixin {
@@ -58,10 +152,11 @@ class FirebaseApp with _PlatformDependenciesMixin {
     this._dataCollectionDefaultEnabled,
   );
 
-  /// Creates the app called [name] with [options] and registers it, so that [getInstance] (and,
-  /// for the default app, [instance]) returns it.
+  /// Creates the app called [name] with [options] and registers it, so that `Firebase.app` (and,
+  /// for the default app, [instance]) returns it. `Firebase.initializeApp` does the same, with the
+  /// shape of FlutterFire.
   ///
-  /// * [name] defaults to [defaultAppName], which makes this the default app. Leading and trailing
+  /// * [name] defaults to [defaultFirebaseAppName], which makes this the default app. Leading and trailing
   ///   white space is removed, so `' tool '` and `'tool'` are the same app.
   /// * [dependencies] connect the app to its platform (storage, connectivity, token providers).
   ///   Without them the app keeps its data in memory, reports the network as connected and the
@@ -69,12 +164,12 @@ class FirebaseApp with _PlatformDependenciesMixin {
   /// * The value of [isAutomaticDataCollectionEnabled] is read from the storage of [dependencies]
   ///   (default `true`).
   ///
-  /// Throws an [ArgumentError] if `options.applicationId` is empty, and a [StateError] if an app
+  /// Throws an [ArgumentError] if `options.appId` is empty, and a [StateError] if an app
   /// with this name exists (and was not deleted).
   factory FirebaseApp.withOptions(
     FirebaseOptions options, {
     PlatformDependencies? dependencies,
-    String name = defaultAppName,
+    String name = defaultFirebaseAppName,
   }) {
     final String normalizedName = _normalize(name);
 
@@ -83,8 +178,8 @@ class FirebaseApp with _PlatformDependenciesMixin {
     if (options.appId.isEmpty) {
       throw ArgumentError.value(
         options.appId,
-        'options.applicationId',
-        'ApplicationId must be set.',
+        'options.appId',
+        'appId must be set.',
       );
     }
     Preconditions.checkState(
@@ -109,38 +204,15 @@ class FirebaseApp with _PlatformDependenciesMixin {
   ///
   /// Throws a [StateError] if there is none (it was not created, or it was deleted).
   static FirebaseApp get instance {
-    final FirebaseApp? defaultApp = _instances[defaultAppName];
+    final FirebaseApp? defaultApp = _instances[defaultFirebaseAppName];
     if (defaultApp == null) {
       throw StateError(
-        'Default FirebaseApp is not initialized. Make sure to call [FirebaseApp()] or [FirebaseApp.withOptions()] first.',
+        'Default FirebaseApp is not initialized. Make sure to call Firebase.initializeApp() or FirebaseApp.withOptions() first.',
       );
     }
 
     return defaultApp;
   }
-
-  /// The app called [name] (leading and trailing white space is ignored).
-  ///
-  /// Throws a [StateError] that lists the names of the existing apps if there is no app with this
-  /// name (it was not created, or it was deleted).
-  static FirebaseApp getInstance(String name) {
-    final FirebaseApp? firebaseApp = _instances[_normalize(name)];
-    if (firebaseApp != null) {
-      return firebaseApp;
-    }
-
-    final List<String> availableAppNames = _getAllAppNames();
-    final String availableAppNamesMessage = availableAppNames.isNotEmpty
-        ? 'Available app names: ${availableAppNames.join(', ')}.'
-        : '';
-
-    throw StateError(
-      'FirebaseApp with name $name doesn\'t exist. $availableAppNamesMessage',
-    );
-  }
-
-  /// The name of the default app, `[DEFAULT]`.
-  static const String defaultAppName = '[DEFAULT]';
 
   static final Map<String, FirebaseApp> _instances = <String, FirebaseApp>{};
   static const String _dataCollectionDefaultEnabledPreferenceKey =
@@ -160,7 +232,7 @@ class FirebaseApp with _PlatformDependenciesMixin {
   bool _deleted = false;
   bool _dataCollectionDefaultEnabled;
 
-  /// Emits the new value every time [setDataCollectionDefaultEnabled] changes it. A broadcast
+  /// Emits the new value every time [setAutomaticDataCollectionEnabled] changes it. A broadcast
   /// stream; it does not emit the current value when you listen.
   Stream<bool> get onDataCollectionChange => _dataCollectionChangeSink.stream;
 
@@ -169,7 +241,7 @@ class FirebaseApp with _PlatformDependenciesMixin {
   /// `cloud_firestore_dart` listens to it and shuts down the Firestore instances of the app.
   Stream<String> get onDeleteApp => _deleteSink.stream;
 
-  /// The name of this app: [defaultAppName] for the default app.
+  /// The name of this app: [defaultFirebaseAppName] for the default app.
   ///
   /// Throws a [StateError] after [delete].
   String get name {
@@ -185,27 +257,21 @@ class FirebaseApp with _PlatformDependenciesMixin {
     return _options;
   }
 
-  /// The apps that exist now (created and not deleted), in the order they were created.
-  ///
-  /// The list is a copy: changing it does not create or delete apps.
-  static List<FirebaseApp> get apps {
-    return List<FirebaseApp>.from(_instances.values);
-  }
-
-  /// Deletes this app: it is removed from [apps], [onDeleteApp] emits its name, and reading its
+  /// Deletes this app: it is removed from `Firebase.apps`, [onDeleteApp] emits its name, and reading its
   /// [name] or [options] afterwards throws a [StateError]. Deleting twice is a no-op.
   ///
   /// The name is free again: [FirebaseApp.withOptions] can create a new app with it.
   /// `cloud_firestore_dart` shuts down the Firestore instances of a deleted app; it does not wait
   /// for that, so call `terminate()` on them yourself when you need to know when they are done.
-  void delete() {
-    if (_deleted) {
-      return;
+  ///
+  /// The app is deleted when the call returns; the future completes right away.
+  Future<void> delete() {
+    if (!_deleted) {
+      _deleted = true;
+      _instances.remove(_name);
+      _deleteSink.add(_name);
     }
-
-    _deleted = true;
-    _instances.remove(_name);
-    _deleteSink.add(_name);
+    return Future<void>.value();
   }
 
   /// Kept from the original project; no service of this repository reads it. Disabled by default.
@@ -213,8 +279,9 @@ class FirebaseApp with _PlatformDependenciesMixin {
   /// When the setting changes while [onBackgroundChanged] says the app is in the background,
   /// [onBackgroundChanged] emits again (`true` when [enabled], `false` otherwise).
   ///
-  /// Throws a [StateError] after [delete].
-  void setAutomaticResourceManagementEnabled({required bool enabled}) {
+  /// Throws a [StateError] after [delete]. The setting changes before the call returns; the future
+  /// completes right away.
+  Future<void> setAutomaticResourceManagementEnabled(bool enabled) {
     _checkNotDeleted();
 
     if (_automaticResourceManagementEnabled != enabled) {
@@ -227,12 +294,13 @@ class FirebaseApp with _PlatformDependenciesMixin {
         onBackgroundChanged.add(false);
       }
     }
+    return Future<void>.value();
   }
 
   /// Whether automatic data collection is enabled. Stored, not used: no service of this repository
   /// collects data.
   ///
-  /// The initial value is the one stored by [setDataCollectionDefaultEnabled] in the [storage] of
+  /// The initial value is the one stored by [setAutomaticDataCollectionEnabled] in the [storage] of
   /// the platform dependencies, or `true`. It does not come from
   /// [FirebaseOptions.dataCollectionEnabled].
   ///
@@ -247,23 +315,28 @@ class FirebaseApp with _PlatformDependenciesMixin {
   /// A change is written to [storage] under the key `firebase_data_collection_default_enabled`
   /// and emitted by [onDataCollectionChange]; setting the current value does nothing.
   ///
-  /// Throws a [StateError] after [delete].
-  void setDataCollectionDefaultEnabled({required bool enabled}) {
+  /// Throws a [StateError] after [delete]. The future completes when the value is stored.
+  Future<void> setAutomaticDataCollectionEnabled(bool enabled) {
     _checkNotDeleted();
     if (_dataCollectionDefaultEnabled != enabled) {
       _dataCollectionDefaultEnabled = enabled;
-      storage.set(_dataCollectionDefaultEnabledPreferenceKey, '$enabled');
+      final Future<void> stored = storage.set(
+        _dataCollectionDefaultEnabledPreferenceKey,
+        '$enabled',
+      );
       _dataCollectionChangeSink.add(enabled);
+      return stored;
     }
+    return Future<void>.value();
   }
 
   void _checkNotDeleted() {
     Preconditions.checkState(!_deleted, 'FirebaseApp was deleted');
   }
 
-  /// Whether this is the default app (its name is [defaultAppName]).
+  /// Whether this is the default app (its name is [defaultFirebaseAppName]).
   @visibleForTesting
-  bool get isDefaultApp => defaultAppName == name;
+  bool get isDefaultApp => defaultFirebaseAppName == name;
 
   /// A key derived from the [name] and the application id of this app, for data that a service
   /// stores per app. Same as [getPersistenceKeyFor].

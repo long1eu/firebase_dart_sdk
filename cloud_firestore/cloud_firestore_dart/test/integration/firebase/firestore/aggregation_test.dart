@@ -224,7 +224,7 @@ void main() {
         c.count().get(AggregateSource.server),
         throwsA(
           isA<FirestoreException>().having(
-            (FirestoreException e) => e.code,
+            (FirestoreException e) => e.errorCode,
             'code',
             FirestoreErrorCode.unavailable,
           ),
@@ -284,7 +284,7 @@ void main() {
           throwsA(
             isA<FirestoreException>()
                 .having(
-                  (FirestoreException e) => e.code,
+                  (FirestoreException e) => e.errorCode,
                   'code',
                   FirestoreErrorCode.invalidArgument,
                 )

@@ -221,7 +221,7 @@ void main() {
       error = e;
     }
     expect(error, isA<FirestoreException>());
-    expect((error! as FirestoreException).code, FirestoreErrorCode.notFound);
+    expect((error! as FirestoreException).errorCode, FirestoreErrorCode.notFound);
   });
 
   test('keeps 64 bit integers exact', () async {

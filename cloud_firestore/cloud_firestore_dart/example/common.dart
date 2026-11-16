@@ -19,7 +19,7 @@ const String projectId = 'demo-example';
 
 /// A new [FirebaseApp] for the demo project. The emulator accepts any API key
 /// and application id.
-FirebaseApp exampleApp([String name = FirebaseApp.defaultAppName]) {
+FirebaseApp exampleApp([String name = defaultFirebaseAppName]) {
   return FirebaseApp.withOptions(
     const FirebaseOptions(
       apiKey: 'demo-key',
@@ -48,7 +48,7 @@ Settings emulatorSettings({
 }
 
 /// A [FirebaseFirestore] instance with an in-memory cache, connected to the emulator.
-FirebaseFirestore connect([String appName = FirebaseApp.defaultAppName]) {
+FirebaseFirestore connect([String appName = defaultFirebaseAppName]) {
   return FirebaseFirestore.instanceFor(
     app: exampleApp(appName),
     settings: emulatorSettings(),

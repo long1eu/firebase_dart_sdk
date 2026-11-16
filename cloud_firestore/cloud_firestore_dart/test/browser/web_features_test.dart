@@ -322,7 +322,7 @@ void main() {
     // While the client runs clearing is refused.
     await expectLater(
         firestore.clearPersistence(),
-        throwsA(isA<FirestoreException>().having((FirestoreException e) => e.code,
+        throwsA(isA<FirestoreException>().having((FirestoreException e) => e.errorCode,
             'code', FirestoreErrorCode.failedPrecondition)));
 
     await firestore.terminate();

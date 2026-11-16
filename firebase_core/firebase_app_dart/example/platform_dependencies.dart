@@ -84,7 +84,7 @@ Future<void> main() async {
   await subscription.cancel();
 
   // The app writes its own settings to the storage you gave it.
-  app.setDataCollectionDefaultEnabled(enabled: false);
+  await app.setAutomaticDataCollectionEnabled(false);
   print('stored settings: ${dependencies.settings.values}');
 
   await dependencies.connectivity.close();

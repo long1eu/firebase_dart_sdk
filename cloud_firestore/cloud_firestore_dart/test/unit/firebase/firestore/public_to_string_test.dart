@@ -117,7 +117,10 @@ void main() {
 
     test('FirestoreError', () {
       expectString(
-        FirestoreException('Missing', FirestoreErrorCode.permissionDenied),
+        FirestoreException(
+          message: 'Missing',
+          errorCode: FirestoreErrorCode.permissionDenied,
+        ),
         'FirestoreError: [code=permissionDenied]: Missing',
       );
     });

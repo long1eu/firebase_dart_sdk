@@ -69,7 +69,7 @@ void main() {
         firestore.runTransaction((Transaction transaction) =>
             transaction.get(firestore.doc('mock-user-token/doc'))),
         throwsA(isA<FirestoreException>()
-            .having((FirestoreException e) => e.code, 'code',
+            .having((FirestoreException e) => e.errorCode, 'code',
                 FirestoreErrorCode.invalidArgument)
             .having((FirestoreException e) => e.message.toLowerCase(), 'message',
                 contains('jwt'))));

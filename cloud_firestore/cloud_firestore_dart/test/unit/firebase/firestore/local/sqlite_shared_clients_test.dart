@@ -461,7 +461,7 @@ void main() {
         Matcher skew(int version) => throwsA(
           isA<FirestoreException>()
               .having(
-                (FirestoreException e) => e.code,
+                (FirestoreException e) => e.errorCode,
                 'code',
                 FirestoreErrorCode.failedPrecondition,
               )

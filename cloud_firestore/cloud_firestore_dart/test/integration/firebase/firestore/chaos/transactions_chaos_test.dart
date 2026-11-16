@@ -64,7 +64,7 @@ void main() {
         attempts.add(attempt);
       } on FirestoreException catch (e) {
         // ignore: avoid_print
-        print('transaction $i failed after $attempt attempts: ${e.code}');
+        print('transaction $i failed after $attempt attempts: ${e.errorCode}');
         attempts.add(-attempt);
       }
     }

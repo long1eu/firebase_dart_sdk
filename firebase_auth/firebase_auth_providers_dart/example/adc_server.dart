@@ -58,11 +58,11 @@ Future<void> main(List<String> arguments) async {
   } on FirestoreException catch (e) {
     // unauthenticated: no credentials were found, or they were refused;
     // permission-denied: the account lacks the Cloud Datastore User role.
-    print('reading $path failed: ${e.code}: ${e.message}');
+    print('reading $path failed: ${e.errorCode}: ${e.message}');
     exitCode = 1;
   } finally {
     // Release the gRPC channel so that the process can exit.
     await firestore.terminate();
-    app.delete();
+    await app.delete();
   }
 }

@@ -38,7 +38,8 @@ export 'src/firebase/firestore/decimal128_value.dart'
 export 'src/firebase/firestore/field_path.dart' hide FieldPathInternal;
 export 'src/firebase/firestore/field_value.dart' hide FieldValueInternal;
 export 'src/firebase/firestore/filter.dart' show Filter;
-export 'src/firebase/firestore/firestore_error.dart';
+export 'src/firebase/firestore/firestore_error.dart'
+    hide FirestoreErrorCodeInternal;
 export 'src/firebase/firestore/geo_point.dart';
 export 'src/firebase/firestore/int32_value.dart';
 export 'src/firebase/firestore/lite/aggregate.dart';

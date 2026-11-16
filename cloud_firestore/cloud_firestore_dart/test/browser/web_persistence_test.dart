@@ -177,7 +177,7 @@ void main() {
     await expectLater(
         opener()(name, version: 1),
         throwsA(isA<FirestoreException>()
-            .having((FirestoreException e) => e.code, 'code',
+            .having((FirestoreException e) => e.errorCode, 'code',
                 FirestoreErrorCode.failedPrecondition)
             .having((FirestoreException e) => e.message, 'message',
                 contains('another tab'))));
@@ -231,7 +231,7 @@ void main() {
 
     await expectLater(
         newClient(openDatabase: opener(), appName: app),
-        throwsA(isA<FirestoreException>().having((FirestoreException e) => e.code,
+        throwsA(isA<FirestoreException>().having((FirestoreException e) => e.errorCode,
             'code', FirestoreErrorCode.failedPrecondition)));
 
     // The other "tab" goes away: the cache can be opened again, with its data.
@@ -252,7 +252,7 @@ void main() {
     // Refused while the client runs, as everywhere.
     await expectLater(
         firestore.clearPersistence(),
-        throwsA(isA<FirestoreException>().having((FirestoreException e) => e.code,
+        throwsA(isA<FirestoreException>().having((FirestoreException e) => e.errorCode,
             'code', FirestoreErrorCode.failedPrecondition)));
 
     await firestore.terminate();

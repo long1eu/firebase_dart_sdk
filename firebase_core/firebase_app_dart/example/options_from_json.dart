@@ -38,7 +38,7 @@ void main(List<String> arguments) {
   print('app created for ${app.options.projectId}');
 
   // 2. Back to JSON, for a file of your own. Unset values are null.
-  final Map<String, String?> json = options.toJson();
+  final Map<String, Object?> json = options.toJson();
   print('round trip equal: ${FirebaseOptions.fromJson(json) == options}');
 
   // 3. A missing required key throws an ArgumentError.

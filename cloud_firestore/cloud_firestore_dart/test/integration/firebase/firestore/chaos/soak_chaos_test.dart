@@ -323,7 +323,7 @@ class _SoakClient {
     record('#$op $what');
     _outstanding++;
     pending.add(future.then((_) => record('#$op ok'), onError: (Object e) {
-      record('#$op failed: ${e is FirestoreException ? e.code : e.runtimeType}');
+      record('#$op failed: ${e is FirestoreException ? e.errorCode : e.runtimeType}');
     }).whenComplete(() => _outstanding--));
   }
 

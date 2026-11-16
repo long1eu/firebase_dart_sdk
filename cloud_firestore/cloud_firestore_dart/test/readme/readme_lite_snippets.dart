@@ -52,7 +52,7 @@ Future<void> serverGuideLine297() async {
     } on FirestoreException catch (error) {
       request.response
         ..statusCode = HttpStatus.serviceUnavailable
-        ..write('${error.code}');
+        ..write('${error.errorCode}');
     }
     await request.response.close();
   }

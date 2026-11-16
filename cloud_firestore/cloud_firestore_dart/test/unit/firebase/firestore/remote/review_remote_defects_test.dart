@@ -77,14 +77,14 @@ class _FakeClient extends FirestoreClient {
 void main() {
   group('L2: unknown gRPC status codes', () {
     test('FirestoreErrorCode.fromValue clamps unknown codes to unknown', () {
-      expect(FirestoreErrorCode.fromValue(const GrpcError.custom(99, 'x')),
+      expect(FirestoreErrorCodeInternal.fromValue(const GrpcError.custom(99, 'x')),
           FirestoreErrorCode.unknown);
     });
 
     test('exceptionFromStatus does not throw for unknown codes', () {
       final FirestoreException error =
           exceptionFromStatus(const GrpcError.custom(99, 'forward compatible'));
-      expect(error.code, FirestoreErrorCode.unknown);
+      expect(error.errorCode, FirestoreErrorCode.unknown);
       expect(error.message, 'forward compatible');
     });
   });

@@ -107,7 +107,8 @@ export 'src/firebase/firestore/field_value.dart' hide FieldValueInternal;
 export 'src/firebase/firestore/filter.dart' show Filter;
 export 'src/firebase/firestore/firestore.dart' hide FirestoreInternal;
 export 'src/firebase/firestore/firestore_data_converter.dart';
-export 'src/firebase/firestore/firestore_error.dart';
+export 'src/firebase/firestore/firestore_error.dart'
+    hide FirestoreErrorCodeInternal;
 export 'src/firebase/firestore/firestore_settings.dart';
 export 'src/firebase/firestore/geo_point.dart';
 export 'src/firebase/firestore/int32_value.dart';

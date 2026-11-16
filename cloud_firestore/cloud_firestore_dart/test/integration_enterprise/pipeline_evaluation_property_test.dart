@@ -261,7 +261,7 @@ void main() {
                   ? EvaluateValue(local.toModel(data['r']))
                   : EvaluateResult.unset;
             } on FirestoreException catch (e) {
-              failure = e.code;
+              failure = e.errorCode;
               return EvaluateResult.error;
             }
           }
@@ -386,7 +386,7 @@ Future<List<PipelineResult>> _execute(Pipeline pipeline) async {
         const Duration(seconds: 30),
       )).results;
     } on FirestoreException catch (e) {
-      if (e.code == FirestoreErrorCode.invalidArgument || attempt == 4) {
+      if (e.errorCode == FirestoreErrorCode.invalidArgument || attempt == 4) {
         rethrow;
       }
     } on TimeoutException {
@@ -455,7 +455,7 @@ Future<Map<String, List<EvaluateResult?>>> _remote(
       } else {
         // A single failing expression is left as null: rejected
         // (INVALID_ARGUMENT), or the emulator failed running it.
-        failures?[indexes.single] = e.code;
+        failures?[indexes.single] = e.errorCode;
       }
     }
   }

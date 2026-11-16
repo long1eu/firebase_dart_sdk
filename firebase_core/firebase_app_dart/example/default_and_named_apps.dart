@@ -32,18 +32,16 @@ void main() {
     name: 'reports',
   );
   print(
-    'getInstance finds it: '
-    '${identical(FirebaseApp.getInstance('reports'), reports)}',
+    'Firebase.app finds it: '
+    '${identical(Firebase.app('reports'), reports)}',
   );
   // Leading and trailing white space is not part of a name.
   print(
     'names are trimmed: '
-    '${identical(FirebaseApp.getInstance(' reports '), reports)}',
+    '${identical(Firebase.app(' reports '), reports)}',
   );
 
-  print(
-    'all apps: ${FirebaseApp.apps.map((FirebaseApp a) => a.name).join(', ')}',
-  );
+  print('all apps: ${Firebase.apps.map((FirebaseApp a) => a.name).join(', ')}');
 
   // A name can be used by one app at a time.
   try {
@@ -61,8 +59,8 @@ void main() {
 
   // An unknown name throws, and the message lists the names that exist.
   try {
-    FirebaseApp.getInstance('missing');
-  } on StateError catch (e) {
+    Firebase.app('missing');
+  } on FirebaseException catch (e) {
     print('an unknown name: ${e.message}');
   }
 }

@@ -38,10 +38,10 @@ Future<List<PipelineResult>?> _remote(Pipeline pipeline) async {
         const Duration(seconds: 30),
       )).results;
     } on FirestoreException catch (e) {
-      if (e.code == FirestoreErrorCode.invalidArgument) {
+      if (e.errorCode == FirestoreErrorCode.invalidArgument) {
         return null;
       }
-      if (e.code == FirestoreErrorCode.internal) {
+      if (e.errorCode == FirestoreErrorCode.internal) {
         throw _EmulatorFailure();
       }
       if (attempt == 4) {

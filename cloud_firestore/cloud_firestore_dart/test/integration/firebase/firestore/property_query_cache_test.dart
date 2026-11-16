@@ -316,7 +316,7 @@ Future<void> _apply(
     onError: (Object error) {
       if (write.kind == 'update' &&
           error is FirestoreException &&
-          error.code == FirestoreErrorCode.notFound) {
+          error.errorCode == FirestoreErrorCode.notFound) {
         stats.writesRejected++;
         return;
       }
@@ -346,9 +346,9 @@ Future<List<String>?> _backendIds(
         doc.id,
     ];
   } on FirestoreException catch (e) {
-    if (e.code == FirestoreErrorCode.invalidArgument ||
-        e.code == FirestoreErrorCode.failedPrecondition ||
-        e.code == FirestoreErrorCode.unimplemented) {
+    if (e.errorCode == FirestoreErrorCode.invalidArgument ||
+        e.errorCode == FirestoreErrorCode.failedPrecondition ||
+        e.errorCode == FirestoreErrorCode.unimplemented) {
       stats.rejectedByBackend++;
       return null;
     }

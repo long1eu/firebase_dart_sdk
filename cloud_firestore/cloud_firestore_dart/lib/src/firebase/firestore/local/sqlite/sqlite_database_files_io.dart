@@ -44,9 +44,9 @@ void deleteSqliteDatabaseFiles(String path) {
   }
   if (failures.isNotEmpty) {
     throw FirestoreException(
-      'Failed to clear persistence: ${failures.join('; ')}',
-      FirestoreErrorCode.unknown,
-      failures.first,
+      message: 'Failed to clear persistence: ${failures.join('; ')}',
+      errorCode: FirestoreErrorCode.unknown,
+      cause: failures.first,
     );
   }
 }

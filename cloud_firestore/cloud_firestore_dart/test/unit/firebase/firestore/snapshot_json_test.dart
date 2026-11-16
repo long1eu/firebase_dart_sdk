@@ -101,7 +101,7 @@ QuerySnapshot<Map<String, Object?>> querySnapshot(
 
 Matcher throwsFirestoreError(FirestoreErrorCode code, [Object? message]) {
   Matcher matcher =
-      isA<FirestoreException>().having((FirestoreException e) => e.code, 'code', code);
+      isA<FirestoreException>().having((FirestoreException e) => e.errorCode, 'code', code);
   if (message != null) {
     matcher = allOf(
         matcher,

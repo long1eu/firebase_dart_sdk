@@ -139,7 +139,7 @@ Future<void> main() async {
     await cities.doc('SF').get();
   } on FirestoreException catch (e) {
     print(
-      'after terminate: ${e.code == FirestoreErrorCode.failedPrecondition}',
+      'after terminate: ${e.errorCode == FirestoreErrorCode.failedPrecondition}',
     );
   }
 }

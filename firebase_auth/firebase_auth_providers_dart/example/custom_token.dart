@@ -60,7 +60,7 @@ Future<void> main() async {
 
   await auth.deleteCurrentUser();
   await auth.dispose();
-  app.delete();
+  await app.delete();
 }
 
 /// A custom token without a signature, which only the emulator accepts.

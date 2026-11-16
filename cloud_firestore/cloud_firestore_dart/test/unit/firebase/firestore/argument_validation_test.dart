@@ -47,7 +47,7 @@ void main() {
     addTearDown(() async {
       await firestore.terminate();
       await liteFirestore.terminate();
-      app.delete();
+      await app.delete();
     });
   });
 
