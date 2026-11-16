@@ -19,6 +19,29 @@ CI) built with `cloud_firestore_dart` and compiled to a native binary:
 The job uses the memory cache and no listeners: nothing is written to disk, and the instance is
 terminated at the end so the process exits.
 
+Look at the two requests to the backend, and at the check that makes a second run of the same
+execution harmless:
+
+```mermaid
+sequenceDiagram
+  participant runner as Cloud Run, cron or CI
+  participant job as bin/job.dart
+  participant fs as Firestore
+  runner->>job: start (CLOUD_RUN_EXECUTION)
+  job->>fs: aggregate count, sum, average where status == paid (withRetries)
+  fs-->>job: one result row
+  job->>fs: runTransaction: get reports/orders (withRetries)
+  alt lastExecution is this execution
+    job-->>runner: prints already written, exit 0
+  else otherwise
+    job->>fs: set report (runs + 1, lastExecution) and commit
+    job-->>runner: prints written, exit 0
+  end
+```
+
+When a step still fails after `MAX_ATTEMPTS` attempts, or fails with an error that is not
+retried, the job exits with `1`.
+
 ## Run it against the Firestore emulator
 
 Needs the Dart SDK (3.8 or later) and a Firestore emulator. From this directory:
@@ -37,6 +60,27 @@ dart run bin/job.dart
 `CLOUD_RUN_EXECUTION=run-1 dart run bin/job.dart`, run twice, shows the second run finding the
 report already written. With `FIRESTORE_EMULATOR_HOST=127.0.0.1:9` (nothing listening) and
 `MAX_ATTEMPTS=3` it shows the retries and exits with `1`.
+
+This is a real session against a private emulator on port 8141 (Firestore emulator v1.22.0,
+Dart 3.12.2, macOS). The error lines of the last run are shortened (`...`); the waits are
+random (full jitter).
+
+```text
+$ dart run bin/seed.dart
+wrote 10 orders to orders (7 paid, revenue 280.00)
+$ CLOUD_RUN_EXECUTION=run-1 dart run bin/job.dart
+summary: 7 paid orders, revenue 280.00, average 40.00
+report reports/orders written for run-1
+$ CLOUD_RUN_EXECUTION=run-1 dart run bin/job.dart; echo "exit $?"
+summary: 7 paid orders, revenue 280.00, average 40.00
+report reports/orders was already written for run-1
+exit 0
+$ FIRESTORE_EMULATOR_HOST=127.0.0.1:9 MAX_ATTEMPTS=3 dart run bin/job.dart; echo "exit $?"
+aggregation: attempt 1 failed (FirestoreError: [code=unavailable]: Error connecting: SocketException: Connection refused ...); trying again in 827 ms
+aggregation: attempt 2 failed (FirestoreError: [code=unavailable]: Error connecting: SocketException: Connection refused ...); trying again in 1754 ms
+aggregation failed 3 times; the last error: FirestoreError: [code=unavailable]: Error connecting: SocketException: Connection refused ...
+exit 1
+```
 
 The tests cover the retry helper on its own, and run the seed and the job as programs against
 the emulator (skipped without it):
