@@ -172,6 +172,17 @@ void main() {
         values(await numbers.where('value', isGreaterThan: 4).get()),
         <int>[5, 6],
       );
+      expect(values(await numbers.where('value', isLessThan: 2).get()), <int>[
+        1,
+      ]);
+      expect(
+        values(await numbers.where('value', isGreaterThanOrEqualTo: 5).get()),
+        <int>[5, 6],
+      );
+      expect(
+        values(await numbers.where('value', isLessThanOrEqualTo: 2).get()),
+        <int>[1, 2],
+      );
       expect(values(await numbers.where('even', isEqualTo: true).get()), <int>[
         2,
         4,
