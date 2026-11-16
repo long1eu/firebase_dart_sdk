@@ -81,48 +81,49 @@ Stop the workers with Ctrl-C. For a long-running process, compile it:
 
 ## Two workers, twenty jobs
 
-This is the output of one run against a private emulator (Firestore emulator v1.22.0, Dart 3.12.2,
-macOS): two workers started first, then `enqueue.dart 20`, then `SIGTERM` to both once the queue
-was empty, then `report.dart`. The lines of the two workers are shown one after the other.
+This is the output of one run with version 0.2.0 of the packages against a private emulator
+(Firestore emulator v1.22.0, Dart 3.12.2, macOS): two workers started first, then
+`enqueue.dart 20`, then `SIGTERM` to both once the queue was empty, then `report.dart`. The
+lines of the two workers are shown one after the other.
 
 ```text
 enqueued 20 jobs
 worker-a: waiting for jobs
-worker-a: ran 71KEQnNaCVAyp1Ol2OWj -> {square: 121}
-worker-a: ran 7ojgsyQ04zLsoSSmTmWa -> {square: 4}
-worker-a: ran LK8aenuVuVqBfrLScImQ -> {square: 169}
-worker-a: ran Sy12fNX0APpPOUPXI8Ax -> {square: 100}
-worker-a: ran Ycpl4g1hpieXxVLu67N5 -> {square: 144}
-worker-a: ran dk4BmJUD0UuAy6wPQRSn -> {square: 1}
-worker-a: ran gzCWvJTZ3DqVt8nokVvz -> {square: 256}
-worker-a: ran hYGh8x2TsFmTisN51HVe -> {square: 289}
-worker-a: ran xPvbP54evk1NfOkBh6xH -> {square: 196}
-worker-a: stopped after 9 jobs (3 claims lost to another worker)
+worker-a: ran VQODfAnk1UgQaE8LjHiN -> {square: 36}
+worker-a: ran dEIIosYqAbYyW57IYys4 -> {square: 361}
+worker-a: ran gBX0J4tgdQQ4ep8MhzRq -> {square: 196}
+worker-a: ran m0fdpEcgaI1h7Ovhedd8 -> {square: 256}
+worker-a: ran o0r9TTt0Q3IEZrGA0NlB -> {square: 289}
+worker-a: ran sPwgywWXUXZ6WMaKh81t -> {square: 324}
+worker-a: ran thOMT4RAno4NhT8JKx07 -> {square: 81}
+worker-a: stopped after 7 jobs (6 claims lost to another worker)
 worker-b: waiting for jobs
-worker-b: ran 4JVF1DV99j4yEzBKQiIe -> {square: 36}
-worker-b: ran 55yDWZEyPmXWj5BGPLnE -> {square: 9}
-worker-b: ran 5TGOxQmV6Qb4umFD8oV4 -> {square: 225}
-worker-b: ran 7JTtNY9pJBM2gzuVOwYF -> {square: 16}
-worker-b: ran IeEKvGocVh2eqx27BrJE -> {square: 25}
-worker-b: ran R10g4VHCrwEscFehtLoS -> {square: 400}
-worker-b: ran TzCmkxZQu0l9leZf0xJZ -> {square: 361}
-worker-b: ran a3H6iDmnV1aKgC9UCmRL -> {square: 81}
-worker-b: ran dosfaMDeZ1BIlv6JIOWk -> {square: 64}
-worker-b: ran h8evCfrc5zYIftKZ4JRb -> {square: 324}
-worker-b: ran oi9nXpSwa2o3YLZaEXpI -> {square: 49}
-worker-b: stopped after 11 jobs (0 claims lost to another worker)
+worker-b: ran 769DMQX1iZWvOiLFJVpL -> {square: 400}
+worker-b: ran 8N9iAuBzU3wyIl3QkSqq -> {square: 144}
+worker-b: ran C7iNLqyK9vKXAr0vrDXj -> {square: 225}
+worker-b: ran FTykYO03FkJjAjo6hoiX -> {square: 4}
+worker-b: ran HqELmKCiNIMTcylTz3Ti -> {square: 64}
+worker-b: ran Il5zMgRfB4VWIB7CezuQ -> {square: 1}
+worker-b: ran WFm5LILNiMgoW1FG7f3S -> {square: 9}
+worker-b: ran dG47rnafZsNl3YD2iPEu -> {square: 100}
+worker-b: ran lWv9gkrsmpxZez4IG7fu -> {square: 25}
+worker-b: ran ntiXGcYZWBRyqPCWJ0MQ -> {square: 16}
+worker-b: ran rEkOS5Qn7RrAhvKwEfFS -> {square: 121}
+worker-b: ran ta3JiAA9E3MsFvTx0yCZ -> {square: 49}
+worker-b: ran wzRkcGpwhkuZbbHRDxgZ -> {square: 169}
+worker-b: stopped after 13 jobs (1 claims lost to another worker)
 
 $ dart run bin/report.dart
 jobs: 20 {done: 20}
-runs per worker: {worker-b: 11, worker-a: 9}
+runs per worker: {worker-b: 13, worker-a: 7}
 no job ran more than once
 ```
 
-The 9 and 11 jobs add up to 20, every job id appears once, and every job has one run record.
-Three of the claim transactions of `worker-a` found the job already taken by `worker-b`
-(`claims lost` counts them). A second run, with
-one worker and `SIGTERM` one second after the jobs were added, stopped after 6 jobs and left
-the queue at `{done: 6, pending: 14}`: no job was left `running`.
+The 7 and 13 jobs add up to 20, every job id appears once, and every job has one run record.
+Six of the claim transactions of `worker-a` and one of `worker-b` found the job already taken by
+the other worker (`claims lost` counts them). A second run, with
+one worker and `SIGTERM` one second after the jobs were added, stopped after 5 jobs and left
+the queue at `{done: 5, pending: 15}`: no job was left `running`.
 
 This shows the claim working for two workers on one emulator, in one run. It is not a load
 test, and it has not been run against a real project.
@@ -170,7 +171,7 @@ context. No image of this example has been built.
 
 ## Notes
 
-- `pubspec.yaml` depends on the versions on pub.dev (`^0.1.0`), unlike the other examples in
+- `pubspec.yaml` depends on the versions on pub.dev (`^0.2.0`), unlike the other examples in
   `examples/`, which use the packages of this repository by path. `pubspec.lock` records the
   versions it was run with.
 - `lib/firestore_from_env.dart` is the same file as in the other examples.

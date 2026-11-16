@@ -33,7 +33,7 @@ class JobWorker {
     void Function(String line)? log,
   }) : _log = log ?? print;
 
-  final Firestore firestore;
+  final FirebaseFirestore firestore;
 
   /// The name written into the jobs this worker claims.
   final String workerId;
@@ -75,7 +75,7 @@ class JobWorker {
     final Query<Map<String, Object?>> pending = _jobs
         .where('status', isEqualTo: 'pending')
         .limit(20);
-    _listener = pending.snapshots.listen(
+    _listener = pending.snapshots().listen(
       (QuerySnapshot<Map<String, Object?>> snapshot) {
         _pending = <String>[
           for (final QueryDocumentSnapshot<Map<String, Object?>> job
@@ -160,7 +160,7 @@ class JobWorker {
       ) async {
         final DocumentSnapshot<Object?> snapshot = await transaction.get(ref);
         final Map<String, Object?>? job =
-            snapshot.data as Map<String, Object?>?;
+            snapshot.data() as Map<String, Object?>?;
         if (job == null) {
           return null;
         }
@@ -181,7 +181,7 @@ class JobWorker {
         });
         return job;
       });
-    } on FirestoreError catch (error) {
+    } on FirestoreException catch (error) {
       // For example `unavailable` while the backend cannot be reached, or
       // `aborted` after too many conflicts. The job stays pending.
       _log('$workerId: could not claim ${ref.id}: ${error.code}');
