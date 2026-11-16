@@ -1,3 +1,11 @@
+## 0.1.1
+
+Documentation and examples only. No code change.
+
+- Doc comments with compiling samples across the public API.
+- A rewritten README, and one example per task in `example/`: default and named apps, options
+  from JSON, platform dependencies and app deletion.
+
 ## 0.1.0
 
 First release under the new name. This package continues `firebase_core_vm` 0.0.4 (March 2020),
