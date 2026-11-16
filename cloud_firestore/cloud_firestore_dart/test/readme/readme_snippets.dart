@@ -274,21 +274,21 @@ Future<void> authenticationGuideLine71() async {
   await auth.signOut();
 }
 
-// ../../docs/guides/authentication.md:170
-Future<void> authenticationGuideLine170() async {
+// ../../docs/guides/authentication.md:178
+Future<void> authenticationGuideLine178() async {
   final auth = await FirebaseUserAuth.forApp(app, storage: FileAuthStorage());
   // auth.currentUser is the user of the last run, if there was one.
 }
 
-// ../../docs/guides/authentication.md:200
-Future<void> authenticationGuideLine200() async {
+// ../../docs/guides/authentication.md:208
+Future<void> authenticationGuideLine208() async {
   final auth = await FirebaseUserAuth.forApp(app,
       emulatorHost: FirebaseUserAuth.emulatorHostFromEnvironment); // FIREBASE_AUTH_EMULATOR_HOST
   // or emulatorHost: '127.0.0.1:9099'
 }
 
-// ../../docs/guides/authentication.md:226
-Future<void> authenticationGuideLine226() async {
+// ../../docs/guides/authentication.md:234
+Future<void> authenticationGuideLine234() async {
   final app = FirebaseApp.withOptions(const FirebaseOptions(
     apiKey: '',                  // an empty key is not sent; any other key is, with each request
     appId: '1:1234567890:dart:server',

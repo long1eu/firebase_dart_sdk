@@ -140,6 +140,10 @@ backend answers `user-disabled` or `user-token-expired` (`_logoutIfInvalidated` 
   Credentials are delegated to `package:googleapis_auth` without a test of their own.
 - Federated sign-in, popup and redirect flows, phone sign-in, email link sign-in and
   multi-factor are not there (the table above lists the rest).
+- An account with a second factor cannot sign in: the sign-in and the reauthentication throw a
+  `FirebaseAuthMultiFactorException` (`multi-factor-auth-required`, like the JS SDK) whose `hints`
+  list the enrolled factors and whose `pendingCredential` lets your own code finish the sign-in
+  over REST (`v2/accounts/mfaSignIn:start` and `:finalize`).
 - The session is kept in memory unless you supply an `AuthStorage`. The stored value is a
   credential: keep it where the platform keeps secrets.
 - `signOut()` forgets the session locally; it does not revoke the refresh token on the backend.
