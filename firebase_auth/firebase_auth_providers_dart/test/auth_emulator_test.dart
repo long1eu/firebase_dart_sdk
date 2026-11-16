@@ -12,6 +12,7 @@ import 'dart:convert';
 
 import 'package:firebase_app_dart/firebase_app_dart.dart';
 import 'package:firebase_auth_providers_dart/firebase_auth_providers_dart.dart';
+import 'package:http/http.dart' as http;
 import 'package:test/test.dart';
 
 int _counter = 0;
@@ -213,6 +214,87 @@ void main() {
         ),
       );
       expect(auth.uid, isNull);
+    });
+
+    test('an account with a second factor gets multi-factor-auth-required', () async {
+      final String email = uniqueEmail();
+      final FirebaseUserAuth auth = create();
+      final AuthUser user = await auth.createUserWithEmailAndPassword(
+        email: email,
+        password: 'secret123',
+      );
+      // Enrol an SMS second factor directly. The emulator accepts `mfa.enrollments` from the user (the real
+      // service takes it from an administrator only; the user path is mfaEnrollment:start and :finalize), and
+      // its MFA is enabled with SMS (it has no TOTP).
+      final String idToken = (await auth.getAccessToken(
+        forceRefresh: false,
+      )).token;
+      final http.Response enrolled = await http.post(
+        Uri.parse(
+          '${FirebaseUserAuth.emulatorOrigin(host!)}'
+          '/identitytoolkit.googleapis.com/v1/accounts:update?key=fake-api-key',
+        ),
+        headers: <String, String>{'Content-Type': 'application/json'},
+        body: jsonEncode(<String, Object?>{
+          'idToken': idToken,
+          'mfa': <String, Object?>{
+            'enrollments': <Object?>[
+              <String, Object?>{
+                'mfaEnrollmentId': 'work-phone',
+                'displayName': 'Work phone',
+                'phoneInfo': '+15555550100',
+                'enrolledAt': '2026-01-02T03:04:05Z',
+              },
+            ],
+          },
+        }),
+      );
+      expect(enrolled.statusCode, 200, reason: enrolled.body);
+
+      final Matcher secondFactorRequired = throwsA(
+        isA<FirebaseAuthMultiFactorException>()
+            .having(
+              (FirebaseAuthMultiFactorException e) => e.code,
+              'code',
+              'multi-factor-auth-required',
+            )
+            .having(
+              (FirebaseAuthMultiFactorException e) => e.pendingCredential,
+              'pendingCredential',
+              isNotEmpty,
+            )
+            .having(
+              (FirebaseAuthMultiFactorException e) => e.hints,
+              'hints',
+              <MultiFactorInfo>[
+                MultiFactorInfo(
+                  uid: 'work-phone',
+                  factorId: MultiFactorInfo.phoneFactorId,
+                  displayName: 'Work phone',
+                  phoneNumber: '+*******0100',
+                  enrollmentTime: DateTime.utc(2026, 1, 2, 3, 4, 5),
+                ),
+              ],
+            ),
+      );
+
+      // Reauthentication: the user stays signed in.
+      await expectLater(
+        auth.reauthenticateWithEmailAndPassword(
+          email: email,
+          password: 'secret123',
+        ),
+        secondFactorRequired,
+      );
+      expect(auth.uid, user.uid);
+
+      // A new sign-in: nobody is signed in afterwards.
+      final FirebaseUserAuth other = create();
+      await expectLater(
+        other.signInWithEmailAndPassword(email: email, password: 'secret123'),
+        secondFactorRequired,
+      );
+      expect(other.uid, isNull);
     });
   }, skip: skip);
 }

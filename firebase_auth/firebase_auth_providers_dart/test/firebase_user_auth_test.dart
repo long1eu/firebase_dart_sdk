@@ -623,6 +623,256 @@ void main() {
     });
   });
 
+  group('multi-factor', () {
+    // The answer of a sign-in endpoint for an account with a second factor (HTTP 200, no tokens), with a phone
+    // and a TOTP factor, as the Identity Toolkit API lists them (`MfaEnrollment`).
+    final Map<String, Object?> secondFactorRequired = <String, Object?>{
+      'kind': 'identitytoolkit#VerifyPasswordResponse',
+      'localId': 'uid-of-a@example.com',
+      'email': 'a@example.com',
+      'registered': true,
+      'mfaPendingCredential': 'pending-credential',
+      'mfaInfo': <Object?>[
+        <String, Object?>{
+          'mfaEnrollmentId': 'phone-enrollment',
+          'displayName': 'Work phone',
+          'phoneInfo': '+*******1234',
+          'enrolledAt': '2026-03-04T05:06:07.123456Z',
+        },
+        <String, Object?>{
+          'mfaEnrollmentId': 'totp-enrollment',
+          'totpInfo': <String, Object?>{},
+          'enrolledAt': '2026-05-06T07:08:09Z',
+        },
+        // Not an enrolment: left out.
+        <String, Object?>{'displayName': 'no id'},
+        'garbage',
+      ],
+    };
+
+    final List<MultiFactorInfo> expectedHints = <MultiFactorInfo>[
+      MultiFactorInfo(
+        uid: 'phone-enrollment',
+        factorId: MultiFactorInfo.phoneFactorId,
+        displayName: 'Work phone',
+        phoneNumber: '+*******1234',
+        enrollmentTime: DateTime.utc(2026, 3, 4, 5, 6, 7, 123, 456),
+      ),
+      MultiFactorInfo(
+        uid: 'totp-enrollment',
+        factorId: MultiFactorInfo.totpFactorId,
+        enrollmentTime: DateTime.utc(2026, 5, 6, 7, 8, 9),
+      ),
+    ];
+
+    Matcher throwsSecondFactorRequired() => throwsA(
+      isA<FirebaseAuthMultiFactorException>()
+          .having(
+            (FirebaseAuthMultiFactorException e) => e.code,
+            'code',
+            'multi-factor-auth-required',
+          )
+          .having(
+            (FirebaseAuthMultiFactorException e) => e.pendingCredential,
+            'pendingCredential',
+            'pending-credential',
+          )
+          .having(
+            (FirebaseAuthMultiFactorException e) => e.hints,
+            'hints',
+            expectedHints,
+          )
+          .having(
+            (FirebaseAuthMultiFactorException e) => e.message,
+            'message',
+            contains('not supported by this package'),
+          )
+          .having(
+            (FirebaseAuthMultiFactorException e) => '$e',
+            'toString',
+            isNot(contains('pending-credential')),
+          ),
+    );
+
+    Matcher throwsAuthCode(String code) => throwsA(
+      isA<FirebaseAuthException>().having(
+        (FirebaseAuthException e) => e.code,
+        'code',
+        code,
+      ),
+    );
+
+    test(
+      'email and password sign-in throws multi-factor-auth-required',
+      () async {
+        handler = (http.Request request) async => json(secondFactorRequired);
+        await expectLater(
+          auth.signInWithEmailAndPassword(
+            email: 'a@example.com',
+            password: 'secret',
+          ),
+          throwsSecondFactorRequired(),
+        );
+        expect(auth.uid, isNull);
+        expect(storage.read('firebase_auth_providers_dart:$apiKey'), isNull);
+      },
+    );
+
+    test('custom token sign-in throws multi-factor-auth-required', () async {
+      handler = (http.Request request) async => json(secondFactorRequired);
+      await expectLater(
+        auth.signInWithCustomToken('a custom token'),
+        throwsSecondFactorRequired(),
+      );
+      expect(auth.uid, isNull);
+    });
+
+    test(
+      'the signed-in user stays when another sign-in needs a second factor',
+      () async {
+        await auth.signInAnonymously();
+        handler = (http.Request request) async => json(secondFactorRequired);
+        await expectLater(
+          auth.signInWithEmailAndPassword(
+            email: 'a@example.com',
+            password: 'secret',
+          ),
+          throwsSecondFactorRequired(),
+        );
+        expect(auth.uid, 'anon-user');
+      },
+    );
+
+    test(
+      'reauthentication throws multi-factor-auth-required and keeps the user',
+      () async {
+        await auth.signInWithEmailAndPassword(
+          email: 'a@example.com',
+          password: 'secret',
+        );
+        handler = (http.Request request) async => json(secondFactorRequired);
+        await expectLater(
+          auth.reauthenticateWithEmailAndPassword(
+            email: 'a@example.com',
+            password: 'secret',
+          ),
+          throwsSecondFactorRequired(),
+        );
+        expect(auth.uid, 'uid-of-a@example.com');
+      },
+    );
+
+    test('a normal answer still signs in', () async {
+      final AuthUser user = await auth.signInWithEmailAndPassword(
+        email: 'a@example.com',
+        password: 'secret',
+      );
+      expect(user.uid, 'uid-of-a@example.com');
+      // Reauthentication reads the account afterwards (accounts:lookup).
+      handler = (http.Request request) async =>
+          request.url.path.endsWith('accounts:lookup')
+          ? json(<String, Object?>{
+              'users': <Object?>[
+                <String, Object?>{
+                  'localId': 'uid-of-a@example.com',
+                  'email': 'a@example.com',
+                },
+              ],
+            })
+          : backend(request);
+      expect(
+        (await auth.reauthenticateWithEmailAndPassword(
+          email: 'a@example.com',
+          password: 'secret',
+        )).uid,
+        'uid-of-a@example.com',
+      );
+      expect((await auth.signInWithCustomToken('t')).uid, 'custom-user');
+    });
+
+    test(
+      'an answer without tokens and without a pending credential is still an internal-error',
+      () async {
+        for (final Map<String, Object?> body in <Map<String, Object?>>[
+          <String, Object?>{'localId': 'uid-of-a@example.com'},
+          // The fields of a second factor without a usable pending credential.
+          <String, Object?>{
+            'mfaPendingCredential': '',
+            'mfaInfo': secondFactorRequired['mfaInfo'],
+          },
+          <String, Object?>{'mfaPendingCredential': 42},
+        ]) {
+          handler = (http.Request request) async => json(body);
+          await expectLater(
+            auth.signInWithEmailAndPassword(
+              email: 'a@example.com',
+              password: 'secret',
+            ),
+            throwsAuthCode('internal-error'),
+            reason: '$body',
+          );
+          await expectLater(
+            auth.signInWithCustomToken('t'),
+            throwsAuthCode('internal-error'),
+            reason: '$body',
+          );
+        }
+        handler = backend;
+        await auth.signInWithEmailAndPassword(
+          email: 'a@example.com',
+          password: 'secret',
+        );
+        handler = (http.Request request) async =>
+            json(<String, Object?>{'localId': 'uid-of-a@example.com'});
+        await expectLater(
+          auth.reauthenticateWithEmailAndPassword(
+            email: 'a@example.com',
+            password: 'secret',
+          ),
+          throwsAuthCode('internal-error'),
+        );
+      },
+    );
+
+    test('MultiFactorInfo.fromResponse', () {
+      expect(MultiFactorInfo.fromResponse(null), isNull);
+      expect(MultiFactorInfo.fromResponse(<String, Object?>{}), isNull);
+      expect(
+        MultiFactorInfo.fromResponse(<String, Object?>{
+          'mfaEnrollmentId': 'e',
+          'enrolledAt': 1700000000000,
+        }),
+        MultiFactorInfo(
+          uid: 'e',
+          factorId: MultiFactorInfo.unknownFactorId,
+          enrollmentTime: DateTime.fromMillisecondsSinceEpoch(
+            1700000000000,
+            isUtc: true,
+          ),
+        ),
+      );
+      expect(
+        MultiFactorInfo.fromResponse(<String, Object?>{
+          'mfaEnrollmentId': 'e',
+          'phoneInfo': '+*******1234',
+          'enrolledAt': 'not a time',
+          'displayName': '',
+        }),
+        const MultiFactorInfo(
+          uid: 'e',
+          factorId: MultiFactorInfo.phoneFactorId,
+          phoneNumber: '+*******1234',
+        ),
+      );
+      expect(
+        FirebaseAuthMultiFactorException.fromResponse(<String, Object?>{
+          'mfaPendingCredential': 'p',
+        })?.hints,
+        isEmpty,
+      );
+    });
+  });
+
   group('account management', () {
     /// The backend of the group: sign-in as [backend], [answer] for the account operations.
     void answering(

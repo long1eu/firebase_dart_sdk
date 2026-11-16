@@ -75,6 +75,8 @@ import 'environment_stub.dart' if (dart.library.io) 'environment_io.dart';
 /// action codes, email, password and profile updates, reauthentication with a password, account deletion, and
 /// the sign-in methods of an email address. This is not a port of the whole Firebase Auth SDK: there are no
 /// federated providers or popup and redirect flows, no phone sign-in, no email link sign-in and no multi-factor.
+/// A sign-in or reauthentication of an account with a second factor throws a [FirebaseAuthMultiFactorException]
+/// (`multi-factor-auth-required`) with the enrolled factors and the pending credential.
 class FirebaseUserAuth implements AuthTokenProvider {
   /// Creates an instance for the project of [apiKey] (the Web API key of the Firebase project).
   ///
@@ -386,7 +388,8 @@ class FirebaseUserAuth implements AuthTokenProvider {
   ///
   /// Throws a [FirebaseAuthException] with the code `wrong-password`, `user-not-found`,
   /// `invalid-credential` (projects with email enumeration protection), `invalid-email`, `user-disabled`,
-  /// `operation-not-allowed` (email sign-in is not enabled), `too-many-requests`, `cancelled`, ...
+  /// `operation-not-allowed` (email sign-in is not enabled), `too-many-requests`, `cancelled`, ...; and a
+  /// [FirebaseAuthMultiFactorException] (`multi-factor-auth-required`) when the account has a second factor.
   Future<AuthUser> signInWithEmailAndPassword({
     required String email,
     required String password,
@@ -416,7 +419,8 @@ class FirebaseUserAuth implements AuthTokenProvider {
   /// in the claims of the ID token ([getAccessToken]) and in `request.auth.token` of the security rules.
   ///
   /// Throws a [FirebaseAuthException] with the code `invalid-custom-token`, `custom-token-mismatch` (a
-  /// token for another project), `user-disabled`, `cancelled`, ...
+  /// token for another project), `user-disabled`, `cancelled`, ...; and a [FirebaseAuthMultiFactorException]
+  /// (`multi-factor-auth-required`) if the backend asks for a second factor.
   Future<AuthUser> signInWithCustomToken(String token) => _signIn(
     'accounts:signInWithCustomToken',
     <String, Object?>{'token': token, 'returnSecureToken': true},
@@ -658,7 +662,8 @@ class FirebaseUserAuth implements AuthTokenProvider {
   /// when the last sign-in is too long ago.
   ///
   /// Throws `user-mismatch` when the credentials are those of another account (or of none), `wrong-password`,
-  /// `invalid-credential`, ...
+  /// `invalid-credential`, ...; and a [FirebaseAuthMultiFactorException] (`multi-factor-auth-required`) when the
+  /// account has a second factor (the signed-in user stays signed in).
   Future<AuthUser> reauthenticateWithEmailAndPassword({
     required String email,
     required String password,
@@ -682,6 +687,7 @@ class FirebaseUserAuth implements AuthTokenProvider {
       }
       rethrow;
     }
+    _throwIfSecondFactorRequired(response);
     final Object? idToken = response['idToken'];
     if (idToken is! String) {
       throw const FirebaseAuthException(
@@ -1028,6 +1034,7 @@ class FirebaseUserAuth implements AuthTokenProvider {
       _identityToolkit(method),
       json: request,
     );
+    _throwIfSecondFactorRequired(response);
     final Object? idToken = response['idToken'];
     final Object? refreshToken = response['refreshToken'];
     if (idToken is! String || refreshToken is! String) {
@@ -1079,6 +1086,19 @@ class FirebaseUserAuth implements AuthTokenProvider {
     _tokenChanges.add(AuthTokenChange(idToken));
     await _letListenersReact();
     return session.user;
+  }
+
+  /// Like `_performSignInRequest` of the JS SDK: a sign-in answer with an `mfaPendingCredential` (and no tokens)
+  /// means that the account has a second factor.
+  static void _throwIfSecondFactorRequired(Map<String, Object?> response) {
+    final FirebaseAuthMultiFactorException? error =
+        FirebaseAuthMultiFactorException.fromResponse(
+          response,
+          httpStatus: 200,
+        );
+    if (error != null) {
+      throw error;
+    }
   }
 
   /// The expiry of an ID token: its `exp` claim, or now plus the `expiresIn` seconds of the response.

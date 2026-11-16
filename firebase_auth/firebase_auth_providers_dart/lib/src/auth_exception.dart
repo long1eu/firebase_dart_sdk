@@ -22,6 +22,7 @@ import 'package:firebase_app_dart/firebase_app_dart.dart';
 /// | `invalid-custom-token`, `custom-token-mismatch` | the custom token is malformed or for another project |
 /// | `requires-recent-login` | sign in again (`FirebaseUserAuth.reauthenticateWithEmailAndPassword`) and retry |
 /// | `user-mismatch` | the reauthentication used the credentials of another account |
+/// | `multi-factor-auth-required` | the account has a second factor; this package cannot finish that sign-in (a [FirebaseAuthMultiFactorException]) |
 /// | `user-token-expired`, `invalid-refresh-token` | the session ended (account deleted, refresh token revoked); the user is signed out |
 /// | `invalid-user-token` | the backend refused the ID token |
 /// | `expired-action-code`, `invalid-action-code` | the code of an email link is used up, expired or wrong |
@@ -202,4 +203,172 @@ class FirebaseAuthException extends FirebaseException {
 
   @override
   String toString() => 'FirebaseAuthException(code: $code): $message';
+}
+
+/// Thrown by a sign-in or a reauthentication when the account has a second factor enrolled: the email address and
+/// the password (or another first factor) were right, and the backend asks for the second factor before it issues
+/// tokens. Its [code] is `multi-factor-auth-required`, like the JS SDK's `auth/multi-factor-auth-required`.
+///
+/// This package does not sign in with a second factor (there is no `MultiFactorResolver`): nobody is signed in
+/// after this error, and the previous user, if any, stays signed in. The exception tells an app what happened and
+/// which factors the account has ([hints]), and carries the [pendingCredential] for code that finishes the
+/// sign-in over the REST API itself (`v2/accounts/mfaSignIn:start` and `:finalize` of the Identity Toolkit API).
+///
+/// It is a [FirebaseAuthException], so `on FirebaseAuthException catch (e)` with `e.code` keeps working.
+///
+/// ```dart
+/// try {
+///   await auth.signInWithEmailAndPassword(email: email, password: password);
+/// } on FirebaseAuthMultiFactorException catch (e) {
+///   for (final MultiFactorInfo hint in e.hints) {
+///     print('${hint.factorId}: ${hint.displayName ?? hint.phoneNumber ?? hint.uid}');
+///   }
+/// }
+/// ```
+class FirebaseAuthMultiFactorException extends FirebaseAuthException {
+  /// Creates the exception. The package creates them (see [fromResponse]); you need this only for tests.
+  const FirebaseAuthMultiFactorException({
+    required this.pendingCredential,
+    required this.hints,
+    super.message = defaultMessage,
+    super.httpStatus,
+  }) : super(code: 'multi-factor-auth-required');
+
+  /// The [message] of the exceptions this package throws.
+  static const String defaultMessage =
+      'The account has a second factor (multi-factor authentication), and signing in with a second factor is '
+      'not supported by this package yet.';
+
+  /// The exception for an answer of a sign-in endpoint of the Identity Toolkit API (for example
+  /// `accounts:signInWithPassword`) that asks for a second factor, or null when [response] is not such an answer.
+  ///
+  /// Such an answer has HTTP status 200, no `idToken`, an `mfaPendingCredential` and the enrolled factors in
+  /// `mfaInfo` (see [MultiFactorInfo.fromResponse]); the JS SDK detects it the same way
+  /// (`_performSignInRequest`). Entries of `mfaInfo` without an `mfaEnrollmentId` are left out.
+  static FirebaseAuthMultiFactorException? fromResponse(
+    Map<String, Object?> response, {
+    int? httpStatus,
+  }) {
+    final Object? pending = response['mfaPendingCredential'];
+    if (pending is! String || pending.isEmpty) {
+      return null;
+    }
+    final Object? enrollments = response['mfaInfo'];
+    return FirebaseAuthMultiFactorException(
+      pendingCredential: pending,
+      hints: List<MultiFactorInfo>.unmodifiable(<MultiFactorInfo>[
+        if (enrollments is List)
+          for (final Object? enrollment in enrollments)
+            ?MultiFactorInfo.fromResponse(enrollment),
+      ]),
+      httpStatus: httpStatus,
+    );
+  }
+
+  /// The `mfaPendingCredential` of the backend: proof that the first factor was right, which
+  /// `v2/accounts/mfaSignIn:start` and `:finalize` take to finish the sign-in with a second factor. It expires
+  /// after a few minutes.
+  ///
+  /// It is a credential: do not log it or send it anywhere but to the Identity Toolkit API. [toString] and
+  /// [message] do not contain it.
+  final String pendingCredential;
+
+  /// The second factors enrolled on the account, as the backend lists them for the sign-in (`mfaInfo`); the
+  /// phone numbers are masked. Pass the [MultiFactorInfo.uid] of one of them as `mfaEnrollmentId` to
+  /// `mfaSignIn:start`.
+  final List<MultiFactorInfo> hints;
+}
+
+/// A second factor enrolled on an account, as listed by [FirebaseAuthMultiFactorException.hints] (`MultiFactorInfo`
+/// of the JS SDK and of FlutterFire, with the phone number of `PhoneMultiFactorInfo`).
+class MultiFactorInfo {
+  /// Creates the information. The package creates them; you need this only for tests.
+  const MultiFactorInfo({
+    required this.uid,
+    required this.factorId,
+    this.displayName,
+    this.phoneNumber,
+    this.enrollmentTime,
+  });
+
+  /// The [factorId] of an SMS second factor (`PhoneMultiFactorGenerator.FACTOR_ID` of the JS SDK).
+  static const String phoneFactorId = 'phone';
+
+  /// The [factorId] of a time-based one-time password (authenticator app) second factor
+  /// (`TotpMultiFactorGenerator.FACTOR_ID` of the JS SDK).
+  static const String totpFactorId = 'totp';
+
+  /// The [factorId] of a factor this package does not know (neither `phoneInfo` nor `totpInfo` in the answer).
+  static const String unknownFactorId = 'unknown';
+
+  /// Reads one entry of the `mfaInfo` list of the Identity Toolkit API (`MfaEnrollment`), or returns null when
+  /// [enrollment] is not an object with an `mfaEnrollmentId`.
+  ///
+  /// The factor is [phoneFactorId] when the entry has `phoneInfo`, [totpFactorId] when it has `totpInfo`, and
+  /// [unknownFactorId] otherwise (the JS SDK fails with `internal-error` there). `enrolledAt` is read as an
+  /// RFC 3339 timestamp (the REST API) or as milliseconds since the epoch.
+  static MultiFactorInfo? fromResponse(Object? enrollment) {
+    if (enrollment is! Map<String, Object?>) {
+      return null;
+    }
+    final Object? id = enrollment['mfaEnrollmentId'];
+    if (id is! String || id.isEmpty) {
+      return null;
+    }
+    final Object? displayName = enrollment['displayName'];
+    final Object? phone = enrollment['phoneInfo'];
+    final Object? enrolledAt = enrollment['enrolledAt'];
+    return MultiFactorInfo(
+      uid: id,
+      factorId: enrollment.containsKey('phoneInfo')
+          ? phoneFactorId
+          : enrollment.containsKey('totpInfo')
+          ? totpFactorId
+          : unknownFactorId,
+      displayName: displayName is String && displayName.isNotEmpty
+          ? displayName
+          : null,
+      phoneNumber: phone is String && phone.isNotEmpty ? phone : null,
+      enrollmentTime: switch (enrolledAt) {
+        final String text => DateTime.tryParse(text)?.toUtc(),
+        final num millis => DateTime.fromMillisecondsSinceEpoch(
+          millis.toInt(),
+          isUtc: true,
+        ),
+        _ => null,
+      },
+    );
+  }
+
+  /// The id of the enrolment (`mfaEnrollmentId` of the REST API).
+  final String uid;
+
+  /// The kind of factor: [phoneFactorId], [totpFactorId] or [unknownFactorId].
+  final String factorId;
+
+  /// The name the user gave the factor, if any.
+  final String? displayName;
+
+  /// For a [phoneFactorId] factor, the phone number as the backend shows it during a sign-in: masked, for example
+  /// `+*******1234`. Null for other factors.
+  final String? phoneNumber;
+
+  /// When the factor was enrolled (UTC), or null when the backend did not say.
+  final DateTime? enrollmentTime;
+
+  @override
+  bool operator ==(Object other) =>
+      other is MultiFactorInfo &&
+      other.uid == uid &&
+      other.factorId == factorId &&
+      other.displayName == displayName &&
+      other.phoneNumber == phoneNumber &&
+      other.enrollmentTime == enrollmentTime;
+
+  @override
+  int get hashCode =>
+      Object.hash(uid, factorId, displayName, phoneNumber, enrollmentTime);
+
+  @override
+  String toString() => 'MultiFactorInfo($factorId, $uid)';
 }
