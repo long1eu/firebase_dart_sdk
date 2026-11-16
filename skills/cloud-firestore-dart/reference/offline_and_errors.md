@@ -41,8 +41,8 @@ Firebase Android SDK.
 | `instanceFor` gets | Cache |
 |---|---|
 | no `openDatabase` | memory, gone on `terminate()` (whatever `persistenceEnabled` says) |
-| `openDatabase: sqliteOpener(dir)` (VM, Flutter) | SQLite file, kept across restarts |
-| the opener of `sqlite_database_web.dart` (web) | SQLite in WebAssembly, in IndexedDB or OPFS, one tab at a time |
+| `openDatabase: sqliteOpener(directory: dir)` (VM, Flutter; `cloud_firestore_dart_sqlite`) | SQLite file, kept across restarts |
+| `openDatabase: sqliteOpener()` (web) | SQLite in WebAssembly, in IndexedDB or OPFS, one tab at a time |
 
 ```dart
 final Settings persistent = Settings(

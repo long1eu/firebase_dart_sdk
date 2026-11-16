@@ -8,21 +8,21 @@ Complete programs for `cloud_firestore_dart` 0.1.x. Each one compiles as shown. 
 ```shell
 dart pub add cloud_firestore_dart firebase_app_dart
 dart pub add firebase_auth_providers_dart          # signed-in users or server credentials
-dart pub add 'sqlite3:^2.7.3'                      # only for a disk cache on the VM
+dart pub add cloud_firestore_dart_sqlite           # only for a disk cache
 ```
 
 In Flutter, for a disk cache:
 
 ```shell
-flutter pub add cloud_firestore_dart firebase_app_dart path_provider \
-  'sqlite3:^2.7.3' 'sqlite3_flutter_libs:^0.5.0'
+flutter pub add cloud_firestore_dart firebase_app_dart path_provider cloud_firestore_dart_sqlite
 ```
 
-`sqlite3` must stay on 2.x: the opener file below imports `package:sqlite3/open.dart`, which 3.x
-does not have. The opener is not part of the package; copy it into the app unchanged:
-<https://raw.githubusercontent.com/long1eu/firebase_dart_sdk/main/cloud_firestore/cloud_firestore_dart/example/sqlite_database.dart>
-(it defines `sqliteOpener(Directory directory, {int? pageCacheMb})`; uses `dart:ffi` and
-`dart:io`). For the web the opener is `example/sqlite_database_web.dart` in the same folder.
+The opener is `sqliteOpener({String? directory, int? pageCacheMb, Uri? sqlite3Wasm,
+Uri? opfsWorker, ...})` from
+`package:cloud_firestore_dart_sqlite/cloud_firestore_dart_sqlite.dart`; it compiles on the VM,
+in Flutter and on the web (no directory there). Do not copy opener files. With Dart older than
+3.10 (Flutter older than 3.38) pub resolves `sqlite3` 2.x: then a Flutter app also adds
+`sqlite3_flutter_libs: ^0.5.0`.
 
 ## The FirebaseApp
 
@@ -156,7 +156,7 @@ import 'package:firebase_app_dart/firebase_app_dart.dart';
 import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
 
-import 'sqlite_database.dart'; // the copied opener
+import 'package:cloud_firestore_dart_sqlite/cloud_firestore_dart_sqlite.dart';
 
 late final FirebaseFirestore firestore;
 
@@ -172,7 +172,7 @@ Future<void> main() async {
   final Directory directory = await getApplicationSupportDirectory();
   firestore = FirebaseFirestore.instanceFor(
     app: app,
-    openDatabase: sqliteOpener(directory),
+    openDatabase: sqliteOpener(directory: '${directory.path}/firestore'),
     settings: Settings(cacheSettings: PersistentCacheSettings()),
   );
   runApp(

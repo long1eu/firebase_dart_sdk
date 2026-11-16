@@ -31,6 +31,9 @@ its FlutterFire equivalent, is in
   includes metadata-only changes when the listen asked for them; the settings of an instance
   can be read back (`FirebaseFirestore.settings`); `LogLevel.info`, which logged like `warn`,
   is removed.
+- Docs: the SQLite openers are in the new companion package `cloud_firestore_dart_sqlite`
+  (`sqliteOpener`); the doc comment of `OpenDatabase` and `example/README.md` point there. The
+  copies in `example/` stay for the tests of this package.
 
 ## 0.1.1
 

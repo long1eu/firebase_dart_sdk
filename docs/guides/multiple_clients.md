@@ -117,17 +117,13 @@ primary has stored in the cache by then.
   one should not share its cache: give it its own app name (or database), and so its own file.
 
 ```dart
-import 'dart:io';
-
-import 'sqlite_database.dart'; // copied from the package's example/ folder
-
-final Directory directory = Directory('/home/ada/.local/share/my_app');
+import 'package:cloud_firestore_dart_sqlite/cloud_firestore_dart_sqlite.dart';
 
 // In the background isolate: the same project, another app name, another cache file.
 final FirebaseApp worker = FirebaseApp.withOptions(app.options, name: 'background-sync');
 final FirebaseFirestore workerFirestore = FirebaseFirestore.instanceFor(
   app: worker,
-  openDatabase: sqliteOpener(directory),
+  openDatabase: sqliteOpener(directory: '/home/ada/.local/share/my_app'),
 );
 ```
 

@@ -416,11 +416,12 @@ ENTRYPOINT ["/app/worker"]
 - **No key in the image.** Use the metadata server (the service account of the service or job)
   and pass the project and other settings as environment variables.
 - **SQLite only with a persistent cache.** With the memory cache the binary needs nothing
-  beyond `/runtime/`. A persistent cache needs the native `libsqlite3` in the image, which
-  `scratch` does not have: start from a distribution image that has it (on Debian, the
-  `libsqlite3-0` package). On Linux, `package:sqlite3` looks for `libsqlite3.so`; the example
-  opener (`example/sqlite_database.dart`) falls back to `libsqlite3.so.0`. This has not been
-  tried in a container.
+  beyond `/runtime/`. A persistent cache needs a native SQLite library. With
+  `cloud_firestore_dart_sqlite` and `sqlite3` 3.x, `dart build cli` puts the bundled
+  `libsqlite3.so` in `bundle/lib/` next to the program: copy the whole bundle into the image.
+  `dart compile exe` does not, and the program then needs the system library, which `scratch`
+  does not have (on Debian, the `libsqlite3-0` package; with `sqlite3` 2.x see the override in
+  the README of `cloud_firestore_dart_sqlite`). None of this has been tried in a container.
 - **Neither Dockerfile has been built.** The one in `examples/cloud_run_job` follows the
   documented use of the official `dart` image; the sketch above follows it too.
 

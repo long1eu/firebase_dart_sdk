@@ -209,8 +209,8 @@ class MyDatabase implements Database {
 }
 ```
 
-A complete implementation on top of `package:sqlite3` that you can copy is
-[`example/sqlite_database.dart`](../cloud_firestore/cloud_firestore_dart/example/sqlite_database.dart).
+A complete implementation on top of `package:sqlite3` is the companion package
+[`cloud_firestore_dart_sqlite`](../cloud_firestore/cloud_firestore_dart_sqlite/) (`sqliteOpener`).
 
 New and optional: your `Database` may throw `TransientDatabaseException` for an error after
 which the statement stored nothing and a retry can work (SQLite's busy, locked, I/O or full-disk

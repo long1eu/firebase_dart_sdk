@@ -144,31 +144,29 @@ flowchart TD
 | Cache | How | When |
 | --- | --- | --- |
 | Memory (the default) | No `openDatabase` | Pages that do not need data across reloads. Smallest download. |
-| SQLite in IndexedDB | `sqliteWebOpener(sqlite3Wasm: ...)` | Small caches. SQLite runs in the page on a copy of the whole database in memory. |
-| SQLite in OPFS | `sqliteWebOpener(sqlite3Wasm: ..., opfsWorker: ...)` | Larger caches. SQLite runs in a worker and reads the file as it needs; memory stays at a few MB. |
+| SQLite in IndexedDB | `sqliteOpener()` | Small caches. SQLite runs in the page on a copy of the whole database in memory. |
+| SQLite in OPFS | `sqliteOpener(opfsWorker: ...)` | Larger caches. SQLite runs in a worker and reads the file as it needs; memory stays at a few MB. |
 
-The persistent caches are not part of the package API: copy
-[`example/sqlite_database_web.dart`](../../cloud_firestore/cloud_firestore_dart/example/sqlite_database_web.dart)
-(and, for OPFS,
-[`example/sqlite_opfs_worker.dart`](../../cloud_firestore/cloud_firestore_dart/example/sqlite_opfs_worker.dart))
-into your app, add `sqlite3` to your dependencies, and serve the `sqlite3.wasm` file of the same
-`sqlite3` version next to your page (from the
-[sqlite3.dart releases](https://github.com/simolus3/sqlite3.dart/releases)). Compile the
-worker with `dart compile js`, also when the page itself uses dart2wasm:
+The persistent caches come from the companion package
+[`cloud_firestore_dart_sqlite`](../../cloud_firestore/cloud_firestore_dart_sqlite/). Add it, and
+let its setup command compile the OPFS worker into your web directory and print where to get the
+`sqlite3.wasm` file of the `sqlite3` version you resolve (from the
+[sqlite3.dart releases](https://github.com/simolus3/sqlite3.dart/releases)):
 
 ```sh
-dart compile js -O2 -o build/web/sqlite_opfs_worker.js web/sqlite_opfs_worker.dart
+dart pub add cloud_firestore_dart_sqlite
+dart run cloud_firestore_dart_sqlite:setup_web web
 ```
 
+The worker is JavaScript also when the page itself uses dart2wasm. Run the command again when
+`cloud_firestore_dart_sqlite` or `sqlite3` changes version.
+
 ```dart
-import 'sqlite_database_web.dart'; // copied from the package's example/ folder
+import 'package:cloud_firestore_dart_sqlite/cloud_firestore_dart_sqlite.dart';
 
 final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(
   app: app,
-  openDatabase: sqliteWebOpener(
-    sqlite3Wasm: Uri.parse('sqlite3.wasm'),
-    opfsWorker: Uri.parse('sqlite_opfs_worker.js'),
-  ),
+  openDatabase: sqliteOpener(opfsWorker: Uri.parse('sqlite_opfs_worker.js')),
   settings: Settings(cacheSettings: PersistentCacheSettings()),
 );
 ```
@@ -190,15 +188,16 @@ final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(
 A Web Lock guards each persistent cache. A second tab (or a second instance in the same page)
 that opens the same cache waits two seconds for the lock, then its operations fail with a
 `FirestoreException` whose code is `failedPrecondition`. `FirebaseFirestore.instanceFor` returns at once,
-so the error comes with the first operation. The example opener has a helper that waits for a
-first cache-only operation and falls back to a memory cache:
+so the error comes with the first operation. `openWithMemoryFallback` of
+`cloud_firestore_dart_sqlite` waits for a first cache-only operation and falls back to a memory
+cache:
 
 ```dart
-import 'sqlite_database_web.dart'; // copied from the package's example/ folder
+import 'package:cloud_firestore_dart_sqlite/cloud_firestore_dart_sqlite.dart';
 
 final FirebaseFirestore firestore = await openWithMemoryFallback(
   app: app,
-  sqlite3Wasm: Uri.parse('sqlite3.wasm'),
+  openDatabase: sqliteOpener(),
   settings: Settings(cacheSettings: PersistentCacheSettings()),
 );
 // Null with a memory cache: this tab did not get the persistent one.
@@ -279,8 +278,8 @@ Prefer dart2wasm when your data has large integers. Two things to know:
 - `dart compile wasm` writes a `.wasm` and an `.mjs` file, and your page has to load them; see
   `web/bootstrap.js` of the example. The OPFS worker stays JavaScript.
 - The `sqlite3` package calls its dart2wasm support experimental. The persistent caches pass
-  the browser tests with both compilers, and the example opener works around a slowness of
-  `sqlite3` 2.9.4 under dart2wasm (see [Platforms](platforms.md#the-web-experimental)); the
+  the browser tests with both compilers, and the opener works around a slowness of
+  `sqlite3` 2.9.4 under dart2wasm, fixed in `sqlite3` 3.8 (see [Platforms](platforms.md#the-web-experimental)); the
   crash test of the IndexedDB storage runs with dart2js only.
 
 ## Known gaps

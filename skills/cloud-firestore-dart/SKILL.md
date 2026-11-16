@@ -16,8 +16,9 @@ A name that is not in it does not exist.
 
 1. **Check the versions.** Read the project's `pubspec.yaml` (and `pubspec.lock`). Expect
    `cloud_firestore_dart`, `firebase_app_dart` and, for sign-in or server credentials,
-   `firebase_auth_providers_dart`, all `^0.1.0`, Dart SDK `^3.8.0`. For a disk cache: `sqlite3`
-   pinned to 2.x (`^2.7.3`) and, in Flutter, `sqlite3_flutter_libs: ^0.5.0`. If the project is on
+   `firebase_auth_providers_dart`, all `^0.1.0`, Dart SDK `^3.8.0`. For a disk cache:
+   `cloud_firestore_dart_sqlite` (it brings `sqlite3`; with `sqlite3` 2.x a Flutter app also
+   needs `sqlite3_flutter_libs: ^0.5.0`). If the project is on
    another version than 0.1.x, check names against the golden listing of that version's tag.
 2. **Fix the imports.** Only these:
    - `package:cloud_firestore_dart/cloud_firestore_dart.dart` (the client)
@@ -26,6 +27,8 @@ A name that is not in it does not exist.
      (`FirebaseUserAuth`, `OAuthTokenProvider.serviceAccount`)
    - `package:firebase_auth_providers_dart/adc.dart` (`applicationDefaultCredentials()`;
      needs `dart:io`)
+   - `package:cloud_firestore_dart_sqlite/cloud_firestore_dart_sqlite.dart` (`sqliteOpener`,
+     the disk cache)
    - `package:cloud_firestore_dart/lite.dart` instead of the main library for Firestore Lite
      (experimental); `package:cloud_firestore_dart/pipelines.dart` for Pipelines (preview,
      Enterprise edition only).
@@ -50,7 +53,7 @@ A name that is not in it does not exist.
 | `FirebaseFirestore.instance` / `getFirestore()` | the same; `FirebaseFirestore.instanceFor(app: app, settings: ...)` for settings or a disk cache |
 | `firestore.settings = Settings(...)` / `initializeFirestore` | `instanceFor(settings: Settings(...))` |
 | `useFirestoreEmulator(h, p)` / `connectFirestoreEmulator` | `Settings().withEmulator(h, p)` |
-| `persistenceEnabled: true` | `openDatabase: sqliteOpener(dir)` + `PersistentCacheSettings()` |
+| `persistenceEnabled: true` | `openDatabase: sqliteOpener(directory: dir)` + `PersistentCacheSettings()` |
 | `snapshot.data()` | `snapshot.data()` |
 | `ref.snapshots()` / `onSnapshot` | `ref.snapshots()`, `snapshots(includeMetadataChanges: true)` |
 | `get(GetOptions(source: Source.cache))` | `get(const GetOptions(source: Source.cache))` |
@@ -76,9 +79,9 @@ A name that is not in it does not exist.
    await it; listeners show the write at once. Attach an error handler.
 5. **`terminate()` on exit** (a VM process does not exit otherwise); `waitForPendingWrites()` first
    if unacknowledged writes matter.
-6. **Memory cache by default.** Without `openDatabase` nothing is on disk. The opener is a file
-   the app copies (`example/sqlite_database.dart`, or `sqlite_database_web.dart` for the web).
-7. **`dart:io` only where needed**: `adc.dart`, the SQLite opener, `Platform.environment`. The
+6. **Memory cache by default.** Without `openDatabase` nothing is on disk. The opener is
+   `sqliteOpener` of `cloud_firestore_dart_sqlite` (VM, Flutter and web); never copy opener files.
+7. **`dart:io` only where needed**: `adc.dart`, `Platform.environment`. The
    main libraries compile for the web (experimental, Chrome only).
 8. **Errors**: `FirestoreException` is an `Exception` (a `FirebaseException`); catch `on FirestoreException`.
 9. **Transactions rerun** their callback (keep it free of side effects); `getQuery` and
