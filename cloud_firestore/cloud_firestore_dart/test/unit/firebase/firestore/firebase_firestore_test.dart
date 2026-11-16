@@ -6,9 +6,9 @@
 //   test/integration/api/validation.test.ts (connectFirestoreEmulator() after
 //   use).
 //
-// Dart has no settings setter and no useEmulator(): the settings, emulator
-// included, are passed to Firestore.instanceFor, so "setting them again" is a
-// later instanceFor call with settings. A different value throws a
+// Settings passed to FirebaseFirestore.instanceFor start the instance at once,
+// so "setting them again" here is a later instanceFor call with settings (the
+// setter and useFirestoreEmulator are in settings_until_first_use_test.dart). A different value throws a
 // StateError, the same value returns the existing instance. The instances use
 // loopback settings, so nothing here reaches a network.
 

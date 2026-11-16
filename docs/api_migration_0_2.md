@@ -127,7 +127,9 @@ names (`FirebaseFirestore`).
 | --- | --- | --- |
 | `GetOptions({Source source})` | `GetOptions` | Argument of `get`. |
 | `FromFirestore<T>`, `ToFirestore<T>` typedefs | same | Arguments of `withConverter`. |
-| `FirebaseFirestore.settings` (getter) | `settings` | An app can read back the settings of an instance, for example its cache kind. There is no setter: give the settings to `instanceFor`. |
+| `FirebaseFirestore.settings` (getter and setter) | `settings` | Read the settings of an instance; set them before its first use. After the first use the setter throws a `FirestoreException` with `failed-precondition`. |
+| `FirebaseFirestore.useFirestoreEmulator(host, port, {sslEnabled = false})` | same | Before the first use only, like the setter. |
+| `runTransaction(..., {Duration timeout = 30 s})` | `timeout` | Fails with `deadline-exceeded` after the timeout and starts no new attempt. The attempt in flight is not cancelled: if it was committing, its writes may still take effect. |
 | `FirebaseFirestore.namedQueryGet(name, {GetOptions? options})` | `namedQueryGet` | Runs a named query of a loaded bundle; throws a `FirestoreException` with `not-found` when there is no such query. |
 | `QuerySnapshot.size` | `size` | FlutterFire name for the number of documents (`length` stays: `QuerySnapshot` is an `Iterable`). |
 | `FieldPath.components` | `components` | The field names of the path. |
@@ -206,6 +208,12 @@ operation as FlutterFire's `FirebaseAuth`, it now takes the same arguments.
 
 ## Behaviour changes
 
+- An instance starts (opens its cache, connects) at its first use, not when `instanceFor` returns, so the
+  `settings` setter and `useFirestoreEmulator` can still change it. `instanceFor(settings: ...)` still starts it
+  right away. A cache that cannot be opened now fails the first operation rather than `instanceFor`.
+- A new instance of an app name and database waits until a terminated instance of the same app name and database
+  has closed its cache, also when that instance was terminated by `await app.delete()` before the new one was
+  asked for.
 - `FirebaseFirestore.instance` creates the instance of the default app when there is none, instead of throwing.
 - `QuerySnapshot.docChanges` includes metadata-only changes when the listen asked for them
   (`snapshots(includeMetadataChanges: true)`); in 0.1 it never did.
@@ -226,16 +234,19 @@ operation as FlutterFire's `FirebaseAuth`, it now takes the same arguments.
 
 Places where these packages keep a shape of their own, on purpose:
 
-- `FirebaseFirestore.instanceFor` takes the `settings` (and an `openDatabase` function for the disk cache). There is
-  no `settings` setter and no `useFirestoreEmulator`: the settings are fixed when the instance is created. Use
-  `Settings(...).withEmulator(host, port)`.
-- `Settings.host` does not include the port: the port is `Settings.port`.
+- `FirebaseFirestore.instanceFor` also takes the `settings` (and an `openDatabase` function for the disk cache);
+  with settings it starts the instance at once, so the setter and `useFirestoreEmulator` then throw.
+- `Settings.host` does not include the port: the port is `Settings.port`. `Settings` is not `const`: it validates its
+  values when it is made.
+- `useFirestoreEmulator('localhost', ...)` does not become `10.0.2.2` on the Android emulator; pass that host
+  yourself.
 - Snapshot data is `Map<String, Object?>` and `get` returns `Object?`, where FlutterFire uses `dynamic`: cast the
   value (`snap.get('name') as String`).
 - `GetOptions` has no `serverTimestampBehavior`; pass `serverTimestamps:` to `data()` or `get()`.
 - `Query.aggregate` and `Filter.and` / `Filter.or` take a `List`, not up to 30 positional arguments, and the
   aggregate fields are `AggregateField.count()`, `AggregateField.sum(field)` and `AggregateField.average(field)`.
-- `runTransaction` has no `timeout`.
+- The `runTransaction` timeout cannot cancel an attempt that is committing: its writes may still take
+  effect after the returned future failed.
 - A filter that compares a field with null other than `==` and `!=` (`arrayContains: null`) cannot be written: a null
   named argument counts as not given, as in FlutterFire.
 - `persistentCacheIndexManager` is a getter, not a method.
@@ -245,3 +256,13 @@ Places where these packages keep a shape of their own, on purpose:
 - `firebase_auth_providers_dart` returns an `AuthUser` from the sign-in methods, not a `UserCredential`, and has no
   `authStateChanges()` or `idTokenChanges()`.
 - Pipelines follow the JS SDK, not FlutterFire's preview (for example `PipelineResult.ref`, `PipelineSnapshot.results`).
+
+## Not supported
+
+FlutterFire settings with no equivalent here:
+
+- `Settings.ignoreUndefinedProperties`: Dart has no `undefined`; a `null` value is written as null.
+- `Settings.cacheSizeBytes` as `Settings.CACHE_SIZE_UNLIMITED`: the Dart-style name is `Settings.cacheSizeUnlimited`
+  (the same value, `-1`).
+- `Settings.webPersistentTabManager` (multi-tab persistence on the web).
+- `FirebaseFirestore.enablePersistence` (the web call of FlutterFire): set `persistenceEnabled` or `cacheSettings`.

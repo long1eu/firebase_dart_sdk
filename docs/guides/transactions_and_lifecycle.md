@@ -80,7 +80,9 @@ final total = await firestore.runTransaction((transaction) async {
 
 ## Lifecycle: `terminate()`
 
-An instance starts as soon as it is created. Follow the arrows for the calls that move it between
+An instance starts at its first use (a read, write, listener or other call that needs the client), or at once
+when `instanceFor` got settings; until then `firestore.settings = ...` and `useFirestoreEmulator` can change it.
+Follow the arrows for the calls that move it between
 states; the table under the picture says which calls work in each state.
 
 ```mermaid

@@ -248,10 +248,10 @@ Right: the name in this client, or "not available".
 |---|---|
 | `import 'package:cloud_firestore/cloud_firestore.dart'`, `firebase_core` | `package:cloud_firestore_dart/cloud_firestore_dart.dart`, `package:firebase_app_dart/firebase_app_dart.dart` |
 | FF `await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform)`; JS `initializeApp(config)` | `await Firebase.initializeApp(options: const FirebaseOptions(apiKey: ..., appId: ..., projectId: ...))`, or the synchronous `FirebaseApp.withOptions(...)` |
-| FF `FirebaseFirestore.instance` (creates it); JS `getFirestore(app)` | `FirebaseFirestore.instanceFor(app: app)`. `FirebaseFirestore.instance` only returns an instance that `instanceFor` created, else throws `StateError` |
+| FF `FirebaseFirestore.instance` (creates it); JS `getFirestore(app)` | `FirebaseFirestore.instance` (creates the instance of the default app), or `FirebaseFirestore.instanceFor(app: app)` |
 | FF `instanceFor(app: app, databaseId: 'db')`; JS `getFirestore(app, 'db')` | `FirebaseFirestore.instanceFor(app: app, databaseId: 'db')` |
-| FF `firestore.settings = Settings(...)`; JS `initializeFirestore(app, {...})` | `FirebaseFirestore.instanceFor(app: app, settings: Settings(...))`; no setter |
-| FF `useFirestoreEmulator('localhost', 8080)`; JS `connectFirestoreEmulator(db, host, port)` | `settings: Settings().withEmulator('127.0.0.1', 8080)` |
+| FF `firestore.settings = Settings(...)`; JS `initializeFirestore(app, {...})` | `firestore.settings = Settings(...)` before the first use, or `FirebaseFirestore.instanceFor(app: app, settings: Settings(...))` |
+| FF `useFirestoreEmulator('localhost', 8080)`; JS `connectFirestoreEmulator(db, host, port)` | `firestore.useFirestoreEmulator('127.0.0.1', 8080)` before the first use, or `settings: Settings().withEmulator('127.0.0.1', 8080)` |
 | FF `Settings(persistenceEnabled: true)`; JS `persistentLocalCache()`, `enableIndexedDbPersistence` | `openDatabase: sqliteOpener(dir)` plus `PersistentCacheSettings()`; without `openDatabase` the cache is in memory |
 | JS `persistentMultipleTabManager()` | not available (one client per cache in a browser) |
 | FF `Settings.CACHE_SIZE_UNLIMITED`; JS `CACHE_SIZE_UNLIMITED` | `Settings.cacheSizeUnlimited` |

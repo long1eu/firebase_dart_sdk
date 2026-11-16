@@ -137,16 +137,18 @@ class FirebaseFirestore
   final app: FirebaseApp
   final dataConverter: UserDataConverter @internal
   final modelDatabaseId: DatabaseId @internal
-  final settings: Settings
   get databaseId: String
   get projectId: String
+  get settings: Settings
   new FirebaseFirestore.instanceFor({FirebaseApp app, String databaseId, Settings settings})
   run((.Datastore) -> dart.async.Future operation): Future<dynamic> @internal
-  runTransaction((.Transaction) -> dart.async.Future updateFunction, {int maxAttempts, bool readOnly, Timestamp readTime}): Future<dynamic>
+  runTransaction((.Transaction) -> dart.async.Future updateFunction, {Duration timeout, int maxAttempts, bool readOnly, Timestamp readTime}): Future<dynamic>
+  set settings=(Settings settings)
   static get instance: FirebaseFirestore
   static setLogLevel(LogLevel level): void
   terminate(): Future<void>
   toString(): String
+  useFirestoreEmulator(String host, int port, {bool sslEnabled}): void
   validateReference(DocumentReference<Object> docRef): void @internal
 typedef Firestore = FirebaseFirestore
 abstract class FirestoreDataConverter

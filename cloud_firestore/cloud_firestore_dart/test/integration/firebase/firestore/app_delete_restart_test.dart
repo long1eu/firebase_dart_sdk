@@ -93,7 +93,7 @@ void main() {
     opened.clear();
     for (final FirebaseApp app in Firebase.apps) {
       if (app.name == appName) {
-        unawaited(app.delete());
+        await app.delete();
       }
     }
     directory.deleteSync(recursive: true);
@@ -142,9 +142,9 @@ void main() {
     await first.doc(path).set(<String, Object?>{'generation': 1});
     expect(databaseFiles(), hasLength(1));
 
-    // delete() is synchronous; the instance is terminated in the background.
-    // The new app is created right away, without waiting for anything.
-    unawaited(app.delete());
+    // The instance is terminated in the background: delete() does not wait for
+    // the cache to close. The new app is created right away.
+    await app.delete();
     final FirebaseApp sameName = newApp();
     final FirebaseFirestore second = await open(sameName);
 
@@ -182,7 +182,7 @@ void main() {
         <String, Object?>{'value': 'pending'}).catchError((Object _) {}));
     await first.doc(path).get(GetOptions(source: Source.cache));
 
-    unawaited(app.delete());
+    await app.delete();
     final FirebaseFirestore second = await open(newApp());
     expect(log, <String>['open', 'close', 'open']);
 
@@ -205,7 +205,7 @@ void main() {
       await firestore
           .doc(path)
           .set(<String, Object?>{'generation': generation});
-      unawaited(app.delete());
+      await app.delete();
       app = newApp();
       firestore = await open(app);
       expect((await firestore.doc(path).get(GetOptions(source: Source.cache))).data(),

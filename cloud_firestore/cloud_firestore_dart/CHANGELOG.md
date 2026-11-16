@@ -21,6 +21,12 @@ its FlutterFire equivalent, is in
 - Errors are `FirestoreException`, which extends `FirebaseException` and implements
   `Exception`: `code` is FlutterFire's string (`'not-found'`), `errorCode` the
   `FirestoreErrorCode` enum.
+- As in FlutterFire, `firestore.settings = ...` and `useFirestoreEmulator(host, port)` work until
+  the first use of an instance: the instance starts at its first use, or at once when
+  `instanceFor` got settings. After that they throw a `FirestoreException` with
+  `failed-precondition`. `runTransaction` takes a `timeout` (30 seconds by default).
+- A new instance of an app name and database waits for a terminated instance of the same ones to
+  close its cache, also after `await app.delete()`.
 - Fixes: `VectorQuery.get` applies the converter of its query; `QuerySnapshot.docChanges`
   includes metadata-only changes when the listen asked for them; the settings of an instance
   can be read back (`FirebaseFirestore.settings`); `LogLevel.info`, which logged like `warn`,

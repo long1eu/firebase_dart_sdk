@@ -111,3 +111,13 @@ class TransactionOptions {
       'TransactionOptions{maxAttempts=$maxAttempts, readOnly=$readOnly'
       '${readTime == null ? '' : ', readTime=$readTime'}}';
 }
+
+/// Thrown into the transaction runner when an attempt would start after the timeout of `runTransaction`, to stop the
+/// retries. Not part of the public API.
+class TransactionTimedOut implements Exception {
+  /// Creates the marker.
+  const TransactionTimedOut();
+
+  @override
+  String toString() => 'TransactionTimedOut';
+}

@@ -141,7 +141,8 @@ Future<FirebaseFirestore> createFirestore(AppDependencies dependencies) async {
   FirebaseApp](firebase_app.md) explains each option.
 - On the Android emulator the host machine is `10.0.2.2`. Nothing maps `localhost` for you, as
   FlutterFire does: pass `--dart-define=EMULATOR_HOST=10.0.2.2`.
-- Settings belong to the `instanceFor` call that creates the instance; there is no setter.
+- Pass the settings to `instanceFor`, or set `firestore.settings` (or call `useFirestoreEmulator`) before the
+  first use of the instance; after it they throw.
 - For signed-in users, set `app.authProvider` before `FirebaseFirestore.instanceFor`; see
   [Authentication](authentication.md). The example does not sign in.
 - If the app signs users in with FlutterFire's `firebase_auth`, `FlutterFireBridge.firestore()` of

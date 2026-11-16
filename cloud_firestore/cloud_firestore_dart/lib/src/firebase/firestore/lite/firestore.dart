@@ -73,7 +73,7 @@ liteTransportOverride;
 ///     await firestore.doc('cities/SF').get();
 /// ```
 class FirebaseFirestore {
-  FirebaseFirestore._(this.app, this.modelDatabaseId, this.settings)
+  FirebaseFirestore._(this.app, this.modelDatabaseId, this._settings)
     : dataConverter = UserDataConverter(modelDatabaseId);
 
   /// Returns the instance of [app] for [databaseId], creating it at the first
@@ -146,8 +146,43 @@ class FirebaseFirestore {
   /// The app this instance belongs to.
   final FirebaseApp app;
 
-  /// The settings this instance was created with.
-  final Settings settings;
+  Settings _settings;
+
+  /// The settings of this instance.
+  Settings get settings => _settings;
+
+  /// Changes the settings of this instance, as in FlutterFire: allowed until the instance sends its first request,
+  /// not after (then it throws a [FirestoreException] with [FirestoreErrorCode.failedPrecondition]).
+  set settings(Settings settings) {
+    _checkNotStarted('settings');
+    _settings = settings;
+  }
+
+  /// Points this instance at the Firestore emulator on [host] and [port] until its first request, like the
+  /// [settings] setter: the same as `settings.withEmulator(host, port)`, with [sslEnabled] off by default.
+  void useFirestoreEmulator(String host, int port, {bool sslEnabled = false}) {
+    _checkNotStarted('useFirestoreEmulator');
+    final Settings emulated = _settings.withEmulator(host, port);
+    _settings = sslEnabled
+        ? Settings(
+            host: emulated.host,
+            port: emulated.port,
+            sslEnabled: true,
+            grpcFlowControlWindow: emulated.grpcFlowControlWindow,
+          )
+        : emulated;
+  }
+
+  void _checkNotStarted(String what) {
+    if (_datastore != null) {
+      throw FirestoreException(
+        errorCode: FirestoreErrorCode.failedPrecondition,
+        message:
+            'FirebaseFirestore has already been started and its $what can no longer be changed. Change them before '
+            'the first request of the instance, or terminate() it and get a new instance.',
+      );
+    }
+  }
 
   /// Implementation detail of the SDK; not part of the supported API.
   @internal
@@ -222,7 +257,9 @@ class FirebaseFirestore {
 
   /// Executes [updateFunction] and then attempts to commit the changes applied
   /// within the transaction. If any document read within the transaction has
-  /// changed, [updateFunction] is run again, up to [maxAttempts] times.
+  /// changed, [updateFunction] is run again, up to [maxAttempts] times. After [timeout] (30 seconds by default) the
+  /// returned future fails with [FirestoreErrorCode.deadlineExceeded] and no new attempt starts; an attempt that
+  /// was committing may still take effect.
   ///
   /// The transaction must read (with [Transaction.get]) before it writes.
   ///
@@ -239,10 +276,15 @@ class FirebaseFirestore {
   /// given without [readOnly].
   Future<T> runTransaction<T>(
     Future<T> Function(Transaction transaction) updateFunction, {
+    Duration timeout = const Duration(seconds: 30),
     int maxAttempts = 5,
     bool readOnly = false,
     Timestamp? readTime,
   }) async {
+    if (timeout <= Duration.zero) {
+      throw ArgumentError.value(timeout, 'timeout', 'must be positive');
+    }
+    bool timedOut = false;
     final TransactionOptions options = TransactionOptions(
       maxAttempts: maxAttempts,
       readOnly: readOnly,
@@ -267,10 +309,26 @@ class FirebaseFirestore {
         TaskScheduler('transaction'),
         TaskId.retryTransaction,
       ),
-      updateFunction: (core.Transaction transaction) =>
-          updateFunction(Transaction(transaction, this)),
+      updateFunction: (core.Transaction transaction) {
+        if (timedOut) {
+          // No new attempt after the timeout; this error is not retried.
+          throw const TransactionTimedOut();
+        }
+        return updateFunction(Transaction(transaction, this));
+      },
       isTerminated: () => _terminated,
-    ).run();
+    ).run().timeout(
+      timeout,
+      onTimeout: () {
+        timedOut = true;
+        throw FirestoreException(
+          errorCode: FirestoreErrorCode.deadlineExceeded,
+          message:
+              'The transaction did not complete within $timeout. An attempt that was committing may still take '
+              'effect.',
+        );
+      },
+    );
   }
 
   /// Terminates this instance: every later call on it, and on the references

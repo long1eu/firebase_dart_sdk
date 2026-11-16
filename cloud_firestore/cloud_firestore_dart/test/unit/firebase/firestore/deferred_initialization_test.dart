@@ -251,7 +251,7 @@ void main() {
       );
       await old.initialized;
 
-      unawaited(first.delete());
+      await first.delete();
       final FirebaseApp second = newApp(name);
       addTearDown(second.delete);
       final FirebaseFirestore current = FirebaseFirestore.instanceFor(
@@ -284,7 +284,7 @@ void main() {
       openDatabase: recording(openFixed(dbName), log),
     );
     // Not awaited: the old instance is still opening its cache.
-    unawaited(first.delete());
+    await first.delete();
     final FirebaseApp second = newApp(name);
     addTearDown(second.delete);
     final FirebaseFirestore current = FirebaseFirestore.instanceFor(

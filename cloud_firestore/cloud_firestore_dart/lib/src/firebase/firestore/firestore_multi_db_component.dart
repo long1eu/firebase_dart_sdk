@@ -61,7 +61,8 @@ class FirestoreMultiDbComponent {
 
   /// Forgets [firestore] (called when it is shut down), so the next
   /// `getInstance` builds a fresh one.
-  static void deregister(FirebaseFirestore firestore) {
+  /// Removes [firestore] from the registry and returns the keys it was registered under.
+  static List<String> deregister(FirebaseFirestore firestore) {
     final List<String> keys = instances.keys
         .where((String key) => identical(instances[key], firestore))
         .toList();
@@ -69,7 +70,35 @@ class FirestoreMultiDbComponent {
       instances.remove(key);
       _deleteSubscriptions.remove(key)?.cancel();
     }
+    return keys;
   }
+
+  /// The shutdowns in progress of terminated instances, by key: a new instance with the same key starts after it.
+  static final Map<String, Future<void>> _closing = <String, Future<void>>{};
+
+  /// Records that the instance registered under [keys] closes its cache when [shutdown] completes.
+  static void recordClosing(List<String> keys, Future<void> shutdown) {
+    final Future<void> done = shutdown.then<void>(
+      (_) {},
+      onError: (Object _) {},
+    );
+    for (final String key in keys) {
+      final Future<void>? previous = _closing[key];
+      final Future<void> both = previous == null
+          ? done
+          : Future.wait(<Future<void>>[previous, done]).then<void>((_) {});
+      _closing[key] = both;
+      both.then<void>((_) {
+        if (identical(_closing[key], both)) {
+          _closing.remove(key);
+        }
+      });
+    }
+  }
+
+  /// The shutdown in progress of a terminated instance of [appName] and [database], if any.
+  static Future<void>? closing(String appName, String database) =>
+      _closing[keyFor(appName, database)];
 
   final FirebaseApp app;
 

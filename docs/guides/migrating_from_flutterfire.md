@@ -127,7 +127,7 @@ make an application id for desktop and servers.
 |---|---|---|
 | Default instance | `FirebaseFirestore.instance` (creates it) | `FirebaseFirestore.instance` (creates it, with the default settings and a memory cache) |
 | Instance for an app | `FirebaseFirestore.instanceFor(app: app, databaseId: 'db')` | `FirebaseFirestore.instanceFor(app: app, databaseId: 'db', settings: ..., openDatabase: ...)` |
-| Settings | `FirebaseFirestore.instance.settings = Settings(...)` (a setter) | passed to the `instanceFor` call that creates the instance; there is no setter. A later `instanceFor` without settings or with equal ones returns the instance; with different settings it throws a `StateError` |
+| Settings | `FirebaseFirestore.instance.settings = Settings(...)` (a setter) | the same setter, before the first use of the instance (after it, a `FirestoreException` with `failed-precondition`), or `settings:` in the `instanceFor` call that creates the instance, which starts it at once. A later `instanceFor` without settings or with equal ones returns the instance; with different settings it throws a `StateError` |
 | Class name | `FirebaseFirestore` | `FirebaseFirestore` (`Firestore` is a deprecated alias) |
 | Settings class | `Settings` | `Settings` (`FirestoreSettings` is a deprecated alias); `firestore.settings` reads them back |
 
@@ -190,7 +190,7 @@ Credentials instead (these bypass the security rules).
 
 | FlutterFire 7.1.0 | `cloud_firestore_dart` |
 |---|---|
-| `FirebaseFirestore.instance.useFirestoreEmulator('localhost', 8080)` before the first use | `settings: Settings().withEmulator('127.0.0.1', 8080)` in the `instanceFor` call |
+| `FirebaseFirestore.instance.useFirestoreEmulator('localhost', 8080)` before the first use | the same call before the first use, or `settings: Settings().withEmulator('127.0.0.1', 8080)` in the `instanceFor` call |
 | maps `localhost` to `10.0.2.2` on the Android emulator (`automaticHostMapping`, on by default) | no mapping: on the Android emulator pass `10.0.2.2` yourself |
 | a mock user token for the rules: not in the plugin's API | `withEmulator(host, port, mockUserToken: {'sub': 'alice'})` |
 
@@ -259,7 +259,7 @@ The Auth emulator: `FirebaseUserAuth.forApp(app, emulatorHost: '127.0.0.1:9099')
 
 | What | FlutterFire 7.1.0 | `cloud_firestore_dart` | |
 |---|---|---|---|
-| Run | `runTransaction((tx) async {...}, timeout: ..., maxAttempts: 5)` | `runTransaction((tx) async {...}, maxAttempts: 5)`; no timeout | **different**: no `timeout` |
+| Run | `runTransaction((tx) async {...}, timeout: ..., maxAttempts: 5)` | the same (`timeout` 30 s by default); a timed-out attempt that was committing may still take effect | same |
 | Read-only, read time | none | `runTransaction(..., readOnly: true, readTime: ...)` | only here |
 | Reads | `tx.get(ref)` | `tx.get(ref)`, also `tx.getQuery(query)` and `tx.getAggregate(aggregateQuery)` | more here |
 | Writes | `tx.set`, `tx.update`, `tx.delete` | same | same |

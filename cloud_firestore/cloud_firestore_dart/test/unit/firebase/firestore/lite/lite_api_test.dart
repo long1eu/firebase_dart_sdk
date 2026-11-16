@@ -115,6 +115,30 @@ void main() {
       expect(transport().databaseInfo.sslEnabled, isTrue);
     });
 
+    test('takes settings and the emulator until the first call', () async {
+      final FirebaseFirestore firestore = newFirestore();
+      firestore.settings = Settings(grpcFlowControlWindow: 1024 * 1024);
+      firestore.useFirestoreEmulator('127.0.0.1', 8145);
+      expect(firestore.settings.host, '127.0.0.1');
+      expect(firestore.settings.grpcFlowControlWindow, 1024 * 1024);
+      await firestore.doc('coll/doc').get();
+      expect(transport().databaseInfo.host, '127.0.0.1');
+      expect(transport().databaseInfo.port, 8145);
+      expect(transport().databaseInfo.sslEnabled, isFalse);
+      expect(transport().databaseInfo.grpcFlowControlWindow, 1024 * 1024);
+
+      final Matcher started = throwsA(
+        isA<FirestoreException>().having(
+          (FirestoreException e) => e.errorCode,
+          'errorCode',
+          FirestoreErrorCode.failedPrecondition,
+        ),
+      );
+      expect(() => firestore.settings = Settings(), started);
+      expect(() => firestore.useFirestoreEmulator('127.0.0.1', 1), started);
+      expect(firestore.settings.port, 8145);
+    });
+
     test('passes the flow-control window of the settings', () async {
       final FirebaseFirestore firestore = newFirestore(
         settings: Settings(grpcFlowControlWindow: 1024 * 1024),

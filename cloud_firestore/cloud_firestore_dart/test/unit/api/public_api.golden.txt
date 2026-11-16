@@ -178,7 +178,8 @@ class FirebaseFirestore
   namedQueryGet(String name, {GetOptions options}): Future<QuerySnapshot<Map<String, Object>>>
   querySnapshotsFromJson(Map<String, Object> json, {bool includeMetadataChanges, ListenSource source, FirestoreDataConverter<dynamic> converter}): Stream<QuerySnapshot<dynamic>>
   runBatch((.WriteBatch) -> dart.async.Future batchFunction): Future<void>
-  runTransaction((.Transaction) -> dart.async.Future updateFunction, {int maxAttempts, bool readOnly, Timestamp readTime}): Future<dynamic>
+  runTransaction((.Transaction) -> dart.async.Future updateFunction, {Duration timeout, int maxAttempts, bool readOnly, Timestamp readTime}): Future<dynamic>
+  set settings=(Settings settings)
   setIndexConfigurationFromJSON(String json): Future<void> @deprecated
   snapshotsInSync(): Stream<void>
   static get instance: FirebaseFirestore
@@ -186,6 +187,7 @@ class FirebaseFirestore
   static setLogLevel(LogLevel level): void
   static setLoggingEnabled(bool enabled): void
   terminate(): Future<void>
+  useFirestoreEmulator(String host, int port, {bool sslEnabled}): void
   waitForPendingWrites(): Future<void>
 typedef Firestore = FirebaseFirestore
 abstract class FirestoreDataConverter
