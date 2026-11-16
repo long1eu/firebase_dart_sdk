@@ -15,6 +15,14 @@ verification kit (`tool/verify_production`) was run, on a Standard edition datab
 
 A call goes down through these layers, and a server event comes back up through them.
 
+The picture shows the main layers of one instance; look at how listens enter through the `EventManager`
+and writes through the `SyncEngine`, and at the dashed path of transactions, which skips the cache.
+
+![The layers of one Firestore instance: public API, FirestoreClient with its serial queue, EventManager
+and SyncEngine, then the LocalStore (mutation queue, overlays, remote document cache, target cache, bundles,
+cache indexes) on memory or SQLite persistence next to the RemoteStore (watch and write streams of the
+Datastore, gRPC or WebChannel transport), and the backend at the bottom](images/arch/client_layers.svg)
+
 | Layer | What it does | Dart | Upstream |
 |---|---|---|---|
 | Public API | `Firestore`, references, queries, snapshots, converters, value types. Parses user data into the model and converts results back. | `lib/firestore.dart`, `query.dart`, `document_reference.dart`, `document_snapshot.dart`, `user_data_converter.dart`, `snapshot_json.dart`; exported by `lib/cloud_firestore_dart.dart` | Android `FirebaseFirestore.java`, `Query.java`, `UserDataReader.java`, `UserDataWriter.java`; JS `api/snapshot.ts` for snapshot JSON |
@@ -72,6 +80,56 @@ asynchronous, so two of them could be in flight at once. `core/serial_queue.dart
 guarantee: `FirestoreClient` enqueues every operation on a `SerialQueue` that it shares with
 the `RemoteStore`, and a task that is already on the queue runs nested calls inline. Covered by
 `test/unit/firebase/firestore/core/serial_queue_test.dart`.
+
+### The path of a write and of a listen
+
+A write is applied to the cache and shown to listeners before it is sent; its future completes only on the
+acknowledgement. Follow the order of the calls in `SyncEngine.writeMutations` and
+`RemoteStore._handleWriteStreamMutationResults`:
+
+```mermaid
+sequenceDiagram
+    participant app as App
+    participant sync as SyncEngine
+    participant local as LocalStore
+    participant events as EventManager
+    participant remote as RemoteStore
+    participant backend as Backend
+    app->>sync: set() through FirestoreClient.write
+    sync->>local: writeLocally, into the mutation queue and an overlay
+    sync->>events: ViewSnapshots with hasPendingWrites true
+    events-->>app: snapshot with the change, before the backend has it
+    sync->>remote: fillWritePipeline
+    remote->>backend: the batch on the write stream
+    backend-->>remote: WriteResponse with the commit version
+    remote->>sync: handleSuccessfulWrite
+    sync->>local: acknowledgeBatch
+    sync-->>app: the future of set() completes
+```
+
+A listen first answers from the cache and then from the watch stream. Look at where the first snapshot
+comes from and when `isFromCache` turns false:
+
+```mermaid
+sequenceDiagram
+    participant app as App
+    participant events as EventManager
+    participant sync as SyncEngine
+    participant local as LocalStore
+    participant remote as RemoteStore
+    participant backend as Backend
+    app->>events: snapshots() through FirestoreClient.listen
+    events->>sync: listen(query)
+    sync->>local: allocateTarget and executeQuery
+    sync-->>app: first snapshot from the cache (if there is one to show)
+    sync->>remote: listen(target)
+    remote->>backend: ListenRequest on the watch stream
+    backend-->>remote: document changes, then CURRENT and a snapshot version
+    remote->>sync: RemoteEvent from the WatchChangeAggregator
+    sync->>local: applyRemoteEvent
+    sync->>events: the View applies the changes, new ViewSnapshot
+    events-->>app: snapshot with isFromCache false
+```
 
 ## Tests
 

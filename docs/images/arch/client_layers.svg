@@ -1,0 +1,144 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 990 800" role="img" aria-labelledby="title desc" font-family="system-ui, -apple-system, Segoe UI, Helvetica, Arial, sans-serif">
+  <title id="title">Layers of one Firestore instance in cloud_firestore_dart</title>
+  <desc id="desc">The public API calls FirestoreClient, which runs every operation on one serial queue. Listens go to the
+EventManager and writes to the SyncEngine. The SyncEngine stores and queries through the LocalStore (mutation queue,
+document overlays, remote document cache, target cache, bundle cache, cache indexes) on memory, SQLite file or SQLite
+in the browser persistence, and talks to the RemoteStore, which keeps the watch and write streams of the Datastore.
+The Datastore reaches the backend through GrpcTransport on the Dart VM or WebChannelTransport on the web. Transactions
+go from FirestoreClient straight to the Datastore's unary calls.</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#374151"/>
+    </marker>
+  </defs>
+  <rect x="0" y="0" width="990" height="800" fill="#ffffff"/>
+
+  <text x="40" y="34" font-size="20" font-weight="700" fill="#111827">Layers of one Firestore instance</text>
+  <text x="40" y="56" font-size="13" fill="#4b5563">Calls go down; server events and acknowledgements come back up. Paths are under lib/src/firebase/firestore/.</text>
+
+  <!-- Public API -->
+  <rect x="40" y="76" width="880" height="58" rx="8" fill="#dbeafe" stroke="#1d4ed8" stroke-width="1.5"/>
+  <text x="60" y="100" font-size="15" font-weight="700" fill="#111827">Public API</text>
+  <text x="60" y="122" font-size="12" fill="#1f2937">Firestore, DocumentReference, Query, WriteBatch, Transaction, snapshots, converters (firestore.dart, query.dart, ...)</text>
+
+  <line x1="480" y1="134" x2="480" y2="158" stroke="#374151" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- FirestoreClient -->
+  <rect x="40" y="160" width="880" height="54" rx="8" fill="#dbeafe" stroke="#1d4ed8" stroke-width="1.5"/>
+  <text x="60" y="183" font-size="15" font-weight="700" fill="#111827">FirestoreClient and SerialQueue</text>
+  <text x="60" y="203" font-size="12" fill="#1f2937">core/firestore_client.dart, core/serial_queue.dart: every operation, stream event and timer runs on one serial queue</text>
+
+  <line x1="175" y1="214" x2="175" y2="246" stroke="#374151" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <text x="183" y="235" font-size="11" fill="#374151">listen</text>
+  <line x1="600" y1="214" x2="600" y2="246" stroke="#374151" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <text x="608" y="235" font-size="11" fill="#374151">write</text>
+
+  <!-- EventManager and SyncEngine -->
+  <rect x="40" y="248" width="270" height="76" rx="8" fill="#ede9fe" stroke="#6d28d9" stroke-width="1.5"/>
+  <text x="56" y="272" font-size="15" font-weight="700" fill="#111827">EventManager</text>
+  <text x="56" y="292" font-size="12" fill="#1f2937">fans ViewSnapshots out to the</text>
+  <text x="56" y="310" font-size="12" fill="#1f2937">listeners (core/event_manager.dart)</text>
+
+  <rect x="410" y="248" width="510" height="76" rx="8" fill="#ede9fe" stroke="#6d28d9" stroke-width="1.5"/>
+  <text x="426" y="272" font-size="15" font-weight="700" fill="#111827">SyncEngine and views</text>
+  <text x="426" y="292" font-size="12" fill="#1f2937">a View per query turns document changes into a ViewSnapshot; limbo resolution,</text>
+  <text x="426" y="310" font-size="12" fill="#1f2937">write callbacks, bundles (core/sync_engine.dart, core/view.dart)</text>
+
+  <line x1="310" y1="278" x2="408" y2="278" stroke="#374151" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <text x="360" y="272" font-size="11" fill="#374151" text-anchor="middle">listen(query)</text>
+  <line x1="408" y1="302" x2="312" y2="302" stroke="#374151" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <text x="360" y="318" font-size="11" fill="#374151" text-anchor="middle">ViewSnapshots</text>
+
+  <!-- SyncEngine to LocalStore / RemoteStore -->
+  <line x1="440" y1="324" x2="440" y2="370" stroke="#374151" stroke-width="1.5" marker-start="url(#arrow)" marker-end="url(#arrow)"/>
+  <text x="432" y="352" font-size="11" fill="#374151" text-anchor="end">store writes and events, run queries</text>
+  <line x1="680" y1="324" x2="680" y2="370" stroke="#374151" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <text x="672" y="352" font-size="11" fill="#374151" text-anchor="end">listen, fill write pipeline</text>
+  <line x1="740" y1="370" x2="740" y2="326" stroke="#374151" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <text x="748" y="352" font-size="11" fill="#374151">remote events, write results</text>
+
+  <!-- LocalStore -->
+  <rect x="40" y="372" width="420" height="280" rx="8" fill="#dcfce7" stroke="#15803d" stroke-width="1.5"/>
+  <text x="56" y="396" font-size="15" font-weight="700" fill="#111827">LocalStore and QueryEngine (the cache)</text>
+  <text x="56" y="414" font-size="11" fill="#1f2937">local/local_store.dart, local/default_query_engine.dart</text>
+
+  <g font-size="12" fill="#111827" text-anchor="middle">
+    <rect x="56" y="426" width="190" height="32" rx="5" fill="#ffffff" stroke="#15803d"/>
+    <text x="151" y="446">mutation queue</text>
+    <rect x="254" y="426" width="190" height="32" rx="5" fill="#ffffff" stroke="#15803d"/>
+    <text x="349" y="446">document overlays</text>
+    <rect x="56" y="466" width="190" height="32" rx="5" fill="#ffffff" stroke="#15803d"/>
+    <text x="151" y="486">remote document cache</text>
+    <rect x="254" y="466" width="190" height="32" rx="5" fill="#ffffff" stroke="#15803d"/>
+    <text x="349" y="486">target cache</text>
+    <rect x="56" y="506" width="190" height="32" rx="5" fill="#ffffff" stroke="#15803d"/>
+    <text x="151" y="526">bundle cache</text>
+    <rect x="254" y="506" width="190" height="32" rx="5" fill="#ffffff" stroke="#15803d"/>
+    <text x="349" y="526">cache indexes (SQLite only)</text>
+  </g>
+
+  <text x="56" y="566" font-size="12" font-weight="700" fill="#111827">Persistence (one of)</text>
+  <g font-size="11" fill="#1f2937" text-anchor="middle">
+    <rect x="56" y="576" width="124" height="60" rx="5" fill="#f9fafb" stroke="#6b7280"/>
+    <text x="118" y="598" font-weight="700" font-size="12" fill="#111827">Memory</text>
+    <text x="118" y="616">the default</text>
+    <rect x="188" y="576" width="124" height="60" rx="5" fill="#f9fafb" stroke="#6b7280"/>
+    <text x="250" y="598" font-weight="700" font-size="12" fill="#111827">SQLite file</text>
+    <text x="250" y="616">Dart VM, Flutter</text>
+    <rect x="320" y="576" width="124" height="60" rx="5" fill="#f9fafb" stroke="#6b7280"/>
+    <text x="382" y="594" font-weight="700" font-size="12" fill="#111827">SQLite (wasm)</text>
+    <text x="382" y="610">web: IndexedDB</text>
+    <text x="382" y="626">or OPFS</text>
+  </g>
+
+  <!-- RemoteStore -->
+  <rect x="500" y="372" width="420" height="280" rx="8" fill="#ffedd5" stroke="#c2410c" stroke-width="1.5"/>
+  <text x="516" y="396" font-size="15" font-weight="700" fill="#111827">RemoteStore</text>
+  <text x="516" y="414" font-size="11" fill="#1f2937">remote/remote_store.dart: keeps the streams in step with the cache</text>
+
+  <g font-size="12" fill="#111827" text-anchor="middle">
+    <rect x="516" y="426" width="190" height="32" rx="5" fill="#ffffff" stroke="#c2410c"/>
+    <text x="611" y="446">WatchChangeAggregator</text>
+    <rect x="714" y="426" width="190" height="32" rx="5" fill="#ffffff" stroke="#c2410c"/>
+    <text x="809" y="446">OnlineStateTracker</text>
+  </g>
+
+  <text x="516" y="484" font-size="12" font-weight="700" fill="#111827">Datastore (remote/datastore/)</text>
+  <g font-size="12" fill="#111827" text-anchor="middle">
+    <rect x="516" y="494" width="124" height="32" rx="5" fill="#ffffff" stroke="#c2410c"/>
+    <text x="578" y="514">WatchStream</text>
+    <rect x="648" y="494" width="124" height="32" rx="5" fill="#ffffff" stroke="#c2410c"/>
+    <text x="710" y="514">WriteStream</text>
+    <rect x="780" y="494" width="124" height="32" rx="5" fill="#ffffff" stroke="#c2410c"/>
+    <text x="842" y="514">unary calls</text>
+  </g>
+
+  <text x="516" y="552" font-size="12" font-weight="700" fill="#111827">FirestoreTransport (picked by a conditional import)</text>
+  <g font-size="11" fill="#1f2937" text-anchor="middle">
+    <rect x="516" y="562" width="190" height="74" rx="5" fill="#f9fafb" stroke="#6b7280"/>
+    <text x="611" y="584" font-weight="700" font-size="12" fill="#111827">GrpcTransport</text>
+    <text x="611" y="602">Dart VM, Flutter mobile</text>
+    <text x="611" y="618">and desktop: gRPC</text>
+    <rect x="714" y="562" width="190" height="74" rx="5" fill="#f9fafb" stroke="#6b7280"/>
+    <text x="809" y="584" font-weight="700" font-size="12" fill="#111827">WebChannelTransport</text>
+    <text x="809" y="602">web: WebChannel streams,</text>
+    <text x="809" y="618">REST for unary calls</text>
+  </g>
+
+  <!-- Transactions path -->
+  <polyline points="920,187 952,187 952,510 906,510" fill="none" stroke="#374151" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#arrow)"/>
+  <text x="962" y="200" font-size="11" fill="#374151" transform="rotate(90 962 200)">transactions (TransactionRunner): unary calls, no cache</text>
+
+  <!-- Backend -->
+  <line x1="611" y1="636" x2="611" y2="698" stroke="#374151" stroke-width="1.5" marker-start="url(#arrow)" marker-end="url(#arrow)"/>
+  <text x="619" y="672" font-size="11" fill="#374151">HTTP/2</text>
+  <line x1="809" y1="636" x2="809" y2="698" stroke="#374151" stroke-width="1.5" marker-start="url(#arrow)" marker-end="url(#arrow)"/>
+  <text x="817" y="672" font-size="11" fill="#374151">HTTPS (fetch)</text>
+  <rect x="500" y="700" width="420" height="56" rx="8" fill="#e5e7eb" stroke="#374151" stroke-width="1.5"/>
+  <text x="710" y="733" font-size="15" font-weight="700" fill="#111827" text-anchor="middle">Cloud Firestore or the emulator</text>
+
+  <!-- Note -->
+  <text x="40" y="712" font-size="12" fill="#374151">Firestore Lite (lib/lite.dart) has no cache, no listeners</text>
+  <text x="40" y="730" font-size="12" fill="#374151">and no sync engine: its API calls the Datastore directly.</text>
+  <text x="40" y="756" font-size="12" fill="#374151">Dashed arrow: a path that skips the layers in between.</text>
+</svg>
