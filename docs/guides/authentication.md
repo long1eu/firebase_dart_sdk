@@ -136,6 +136,14 @@ sequenceDiagram
   `weak-password`, `invalid-email`, `user-disabled`, `too-many-requests`,
   `operation-not-allowed`, `invalid-custom-token`, `network-request-failed`, ...; `serverCode`
   has the code of the backend. Messages never contain a token, a password or the API key.
+- **Accounts with a second factor** cannot sign in with this package yet. When the email and
+  password (or the custom token) are right but the account has a second factor enrolled, the
+  backend answers without tokens, and `signIn...()` and `reauthenticateWithEmailAndPassword()`
+  throw a `FirebaseAuthMultiFactorException` with the code `multi-factor-auth-required` (like the
+  JS SDK). Nobody new is signed in. `hints` lists the enrolled factors (`MultiFactorInfo`: id,
+  name, `phone` or `totp`, masked phone number, enrolment time), so the app can tell the user what
+  is needed; `pendingCredential` is what the REST endpoints `v2/accounts/mfaSignIn:start` and
+  `:finalize` take, for code that finishes the sign-in itself.
 - **Listening:** `auth.userChanges()` emits the `AuthUser` after every sign-in and null after a
   sign-out; `auth.currentUser` and `auth.uid` are synchronous.
 

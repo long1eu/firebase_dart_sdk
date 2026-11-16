@@ -1,3 +1,12 @@
+## 0.2.1 (unreleased)
+
+- Fix: signing in (`signInWithEmailAndPassword`, `signInWithCustomToken`) or reauthenticating
+  (`reauthenticateWithEmailAndPassword`) with an account that has a second factor threw
+  `internal-error` ("did not return tokens"). It now throws a `FirebaseAuthMultiFactorException`
+  with the code `multi-factor-auth-required`, like the JS SDK, carrying the `pendingCredential` and
+  the enrolled factors (`hints`, a list of the new `MultiFactorInfo`). Signing in with a second
+  factor is still not supported. Additive; nothing changes for accounts without a second factor.
+
 ## 0.2.0
 
 Breaking: the calls that FlutterFire's `firebase_auth` also has take its arguments. Every change
