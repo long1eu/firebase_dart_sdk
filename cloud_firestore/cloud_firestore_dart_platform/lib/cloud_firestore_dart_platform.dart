@@ -63,7 +63,7 @@ abstract final class CloudFirestoreDart {
   /// `FirebaseFirestore` is used; calling it again changes the configuration.
   ///
   /// * [openDatabase] opens the SQLite database of the offline cache (see
-  ///   `Firestore.instanceFor` of `cloud_firestore_dart`). Without it the
+  ///   `FirebaseFirestore.instanceFor` of `cloud_firestore_dart`). Without it the
   ///   cache is in memory, whatever `Settings.persistenceEnabled` says.
   /// * [tokenProviderFor] returns the token provider for the requests of a
   ///   FlutterFire app, for example a `FlutterFireAuthTokenProvider` of

@@ -31,8 +31,8 @@ abstract final class ValueCodec {
         FieldValuePlatform.getDelegate(value),
       ),
       MethodChannelFieldValue() => _encodeFieldValue(value),
-      FieldPath() => fs.FieldPath.of(value.components),
-      FieldPathType.documentId => fs.FieldPath.documentIdField,
+      FieldPath() => fs.FieldPath(value.components),
+      FieldPathType.documentId => fs.FieldPath.documentId,
       Map<dynamic, dynamic>() => encodeMap(value),
       Iterable<dynamic>() => value.map(encode).toList(),
       // Our own value types pass through: an app may use them on purpose (the
@@ -66,25 +66,22 @@ abstract final class ValueCodec {
     };
   }
 
-  /// The alternating field and value list of `updateFromList` for an update
-  /// map keyed by [FieldPath].
-  static List<Object?> encodeUpdate(Map<FieldPath, dynamic> data) {
-    return <Object?>[
-      for (final MapEntry<FieldPath, dynamic> entry
-          in data.entries) ...<Object?>[
-        fs.FieldPath.of(entry.key.components),
-        encode(entry.value),
-      ],
-    ];
+  /// [encode] for an update map keyed by [FieldPath]: the same map keyed by
+  /// `cloud_firestore_dart` field paths.
+  static Map<Object, Object?> encodeUpdate(Map<FieldPath, dynamic> data) {
+    return <Object, Object?>{
+      for (final MapEntry<FieldPath, dynamic> entry in data.entries)
+        fs.FieldPath(entry.key.components): encode(entry.value),
+    };
   }
 
   /// [encode] for a field of a filter or an order: a [FieldPath], a
   /// [FieldPathType] or a dotted `String`.
   static fs.FieldPath encodeField(Object? field) {
     return switch (field) {
-      FieldPath() => fs.FieldPath.of(field.components),
-      FieldPathType.documentId => fs.FieldPath.documentIdField,
-      String() => fs.FieldPath.fromDotSeparatedPath(field),
+      FieldPath() => fs.FieldPath(field.components),
+      FieldPathType.documentId => fs.FieldPath.documentId,
+      String() => fs.FieldPath.fromString(field),
       fs.FieldPath() => field,
       _ => throw ArgumentError.value(
         field,

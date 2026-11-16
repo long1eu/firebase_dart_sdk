@@ -268,6 +268,13 @@ void main() {
         1,
       ]);
       expect(values(await ordered.endAtDocument(four).get()), <int>[6, 5, 4]);
+      expect(values(await ordered.startAtDocument(four).get()), <int>[
+        4,
+        3,
+        2,
+        1,
+      ]);
+      expect(values(await ordered.endBeforeDocument(four).get()), <int>[6, 5]);
 
       final QuerySnapshot<Map<String, dynamic>> group = await firestore
           .collectionGroup('numbers')
@@ -410,6 +417,38 @@ void main() {
         throwsStateError,
       );
       expect((await counter.get()).get('n'), 2);
+
+      // maxAttempts: every attempt sees its read document changed by a write
+      // outside the transaction, so it is retried until the attempts run out.
+      int attempts = 0;
+      await expectLater(
+        firestore.runTransaction<void>((Transaction transaction) async {
+          attempts++;
+          final DocumentSnapshot<Map<String, dynamic>> snapshot =
+              await transaction.get(counter);
+          await counter.set(<String, Object?>{'n': attempts + 100});
+          transaction.update(counter, <String, Object?>{
+            'n': (snapshot.get('n') as int) + 1,
+          });
+        }, maxAttempts: 2),
+        throwsA(isA<FirebaseException>()),
+      );
+      expect(attempts, 2);
+
+      // timeout: the handler takes longer than the timeout.
+      await expectLater(
+        firestore.runTransaction<void>((Transaction transaction) async {
+          await transaction.get(counter);
+          await Future<void>.delayed(const Duration(seconds: 2));
+        }, timeout: const Duration(milliseconds: 300)),
+        throwsA(
+          isA<FirebaseException>().having(
+            (FirebaseException e) => e.code,
+            'code',
+            'deadline-exceeded',
+          ),
+        ),
+      );
     });
 
     test('field values', () async {

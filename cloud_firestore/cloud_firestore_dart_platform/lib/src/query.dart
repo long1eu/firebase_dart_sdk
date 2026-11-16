@@ -47,7 +47,7 @@ class DartQuery extends QueryPlatform {
 
   /// The `cloud_firestore_dart` query that [parameters] describe.
   fs.Query<Map<String, Object?>> buildQuery() {
-    final fs.Firestore delegate = _firestore.delegate;
+    final fs.FirebaseFirestore delegate = _firestore.delegate;
     fs.Query<Map<String, Object?>> query = isCollectionGroupQuery
         ? delegate.collectionGroup(path)
         : delegate.collection(path);
@@ -65,9 +65,9 @@ class DartQuery extends QueryPlatform {
     final List<dynamic> orderBy = parameters['orderBy'] as List<dynamic>? ?? [];
     for (final dynamic order in orderBy) {
       final List<dynamic> parts = order as List<dynamic>;
-      query = query.orderByField(
+      query = query.orderBy(
         ValueCodec.encodeField(parts[0]),
-        parts[1] == true ? fs.Direction.descending : fs.Direction.ascending,
+        descending: parts[1] == true,
       );
     }
 
@@ -126,18 +126,31 @@ class DartQuery extends QueryPlatform {
   static fs.Filter _filter(Object? field, String operator, Object? value) {
     final fs.FieldPath path = ValueCodec.encodeField(field);
     final Object? encoded = ValueCodec.encode(value);
-    List<Object?> list() => encoded! as List<Object?>;
+    if (encoded == null) {
+      // A null argument of Filter counts as not given, as in FlutterFire,
+      // whose isNull: true and isNull: false arrive here as == and != null.
+      return switch (operator) {
+        '==' => fs.Filter(path, isNull: true),
+        '!=' => fs.Filter(path, isNull: false),
+        _ => throw ArgumentError.value(
+          value,
+          'value',
+          'A "$operator" filter cannot compare with null',
+        ),
+      };
+    }
+    Iterable<Object?> list() => encoded as Iterable<Object?>;
     return switch (operator) {
-      '==' => fs.Filter.equalToField(path, encoded),
-      '!=' => fs.Filter.notEqualToField(path, encoded),
-      '<' => fs.Filter.lessThanField(path, encoded),
-      '<=' => fs.Filter.lessThanOrEqualToField(path, encoded),
-      '>' => fs.Filter.greaterThanField(path, encoded),
-      '>=' => fs.Filter.greaterThanOrEqualToField(path, encoded),
-      'array-contains' => fs.Filter.arrayContainsField(path, encoded),
-      'array-contains-any' => fs.Filter.arrayContainsAnyField(path, list()),
-      'in' => fs.Filter.inArrayField(path, list()),
-      'not-in' => fs.Filter.notInArrayField(path, list()),
+      '==' => fs.Filter(path, isEqualTo: encoded),
+      '!=' => fs.Filter(path, isNotEqualTo: encoded),
+      '<' => fs.Filter(path, isLessThan: encoded),
+      '<=' => fs.Filter(path, isLessThanOrEqualTo: encoded),
+      '>' => fs.Filter(path, isGreaterThan: encoded),
+      '>=' => fs.Filter(path, isGreaterThanOrEqualTo: encoded),
+      'array-contains' => fs.Filter(path, arrayContains: encoded),
+      'array-contains-any' => fs.Filter(path, arrayContainsAny: list()),
+      'in' => fs.Filter(path, whereIn: list()),
+      'not-in' => fs.Filter(path, whereNotIn: list()),
       _ => throw ArgumentError.value(operator, 'operator', 'Unknown operator'),
     };
   }
@@ -177,7 +190,7 @@ class DartQuery extends QueryPlatform {
   Future<QuerySnapshotPlatform> get([GetOptions options = const GetOptions()]) {
     return guard(() async {
       final fs.QuerySnapshot<Map<String, Object?>> snapshot = await buildQuery()
-          .get(sourceOf(options.source));
+          .get(getOptionsOf(options));
       return querySnapshotOf(
         _firestore,
         snapshot,
@@ -203,19 +216,14 @@ class DartQuery extends QueryPlatform {
   }) {
     return guardStream(
       _firestore.lazyStream(
-        () => buildQuery().getSnapshotsWithOptions(
-          listenOptionsOf(
-            includeMetadataChanges: includeMetadataChanges,
-            listenSource: listenSource,
-          ),
+        () => buildQuery().snapshots(
+          includeMetadataChanges: includeMetadataChanges,
+          source: listenSourceOf(listenSource),
         ),
       ),
     ).map(
-      (fs.QuerySnapshot<Map<String, Object?>> snapshot) => querySnapshotOf(
-        _firestore,
-        snapshot,
-        includeMetadataChanges: includeMetadataChanges,
-      ),
+      (fs.QuerySnapshot<Map<String, Object?>> snapshot) =>
+          querySnapshotOf(_firestore, snapshot),
     );
   }
 
@@ -277,22 +285,22 @@ class DartQuery extends QueryPlatform {
 
   @override
   AggregateQueryPlatform count() {
-    return DartAggregateQuery(this, <fs.AggregateField>[
-      fs.AggregateField.count(),
+    return DartAggregateQuery(this, <Aggregation>[
+      (type: AggregateType.count, field: null),
     ]);
   }
 
   @override
   AggregateQueryPlatform sum(String field) {
-    return DartAggregateQuery(this, <fs.AggregateField>[
-      fs.AggregateField.sum(field),
+    return DartAggregateQuery(this, <Aggregation>[
+      (type: AggregateType.sum, field: field),
     ]);
   }
 
   @override
   AggregateQueryPlatform average(String field) {
-    return DartAggregateQuery(this, <fs.AggregateField>[
-      fs.AggregateField.average(field),
+    return DartAggregateQuery(this, <Aggregation>[
+      (type: AggregateType.average, field: field),
     ]);
   }
 
@@ -361,12 +369,12 @@ class DartQuery extends QueryPlatform {
       aggregateField29,
       aggregateField30,
     ].nonNulls.toList();
-    return DartAggregateQuery(this, <fs.AggregateField>[
+    return DartAggregateQuery(this, <Aggregation>[
       for (final pi.AggregateField field in fields)
         switch (field) {
-          pi.count() => fs.AggregateField.count(),
-          pi.sum() => fs.AggregateField.sum(field.field),
-          pi.average() => fs.AggregateField.average(field.field),
+          pi.count() => (type: AggregateType.count, field: null),
+          pi.sum() => (type: AggregateType.sum, field: field.field),
+          pi.average() => (type: AggregateType.average, field: field.field),
           _ => throw ArgumentError.value(
             field,
             'aggregateField',

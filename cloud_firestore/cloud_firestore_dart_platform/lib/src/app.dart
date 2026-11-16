@@ -6,26 +6,32 @@ import 'package:firebase_core/firebase_core.dart' as core;
 ///
 /// See `CloudFirestoreDart.use` for how it is called.
 typedef TokenProviderFactory =
-    dart_app.InternalTokenProvider? Function(core.FirebaseApp app);
+    dart_app.AuthTokenProvider? Function(core.FirebaseApp app);
 
 /// The `firebase_app_dart` options for the FlutterFire [options].
 ///
-/// `appId` becomes `applicationId`, `messagingSenderId` becomes `gcmSenderId`,
-/// `databaseURL` becomes `databaseUrl` and `trackingId` becomes
-/// `gaTrackingId`. The options that `firebase_app_dart` does not have
-/// (`authDomain`, `measurementId`, the client ids, ...) are dropped. An empty
-/// optional value becomes null.
+/// The two packages use the same field names. An empty optional value becomes
+/// null; `recaptchaSiteKey` has no counterpart and is dropped.
+/// `cloud_firestore_dart_flutterfire` maps the options the same way, so both
+/// packages agree on the `firebase_app_dart` app of a FlutterFire app.
 dart_app.FirebaseOptions dartOptionsOf(core.FirebaseOptions options) {
   String? optional(String? value) =>
       value == null || value.isEmpty ? null : value;
   return dart_app.FirebaseOptions(
     apiKey: options.apiKey,
-    applicationId: options.appId,
+    appId: options.appId,
+    messagingSenderId: optional(options.messagingSenderId),
     projectId: optional(options.projectId),
-    gcmSenderId: optional(options.messagingSenderId),
+    authDomain: optional(options.authDomain),
+    databaseURL: optional(options.databaseURL),
     storageBucket: optional(options.storageBucket),
-    databaseUrl: optional(options.databaseURL),
-    gaTrackingId: optional(options.trackingId),
+    measurementId: optional(options.measurementId),
+    trackingId: optional(options.trackingId),
+    deepLinkURLScheme: optional(options.deepLinkURLScheme),
+    androidClientId: optional(options.androidClientId),
+    iosClientId: optional(options.iosClientId),
+    iosBundleId: optional(options.iosBundleId),
+    appGroupId: optional(options.appGroupId),
   );
 }
 
@@ -41,22 +47,25 @@ dart_app.FirebaseApp dartAppFor(
   TokenProviderFactory? tokenProviderFor,
 ) {
   final dart_app.FirebaseOptions options = dartOptionsOf(app.options);
-  for (final dart_app.FirebaseApp existing in dart_app.FirebaseApp.apps) {
-    if (existing.name == app.name) {
-      if (existing.options != options) {
-        throw StateError(
-          'A firebase_app_dart app named "${app.name}" exists with other '
-          'options than the FlutterFire app.',
-        );
-      }
-      return existing;
+  // Firebase.app(name) of firebase_app_dart throws when there is no app, and
+  // Firebase.initializeApp is asynchronous: look the app up in the list.
+  final dart_app.FirebaseApp? existing = dart_app.Firebase.apps
+      .where((dart_app.FirebaseApp candidate) => candidate.name == app.name)
+      .firstOrNull;
+  if (existing != null) {
+    if (existing.options != options) {
+      throw StateError(
+        'A firebase_app_dart app named "${app.name}" exists with other '
+        'options than the FlutterFire app.',
+      );
     }
+    return existing;
   }
   final dart_app.FirebaseApp created = dart_app.FirebaseApp.withOptions(
     options,
     name: app.name,
   );
-  final dart_app.InternalTokenProvider? provider = tokenProviderFor?.call(app);
+  final dart_app.AuthTokenProvider? provider = tokenProviderFor?.call(app);
   if (provider != null) {
     created.authProvider = provider;
   }

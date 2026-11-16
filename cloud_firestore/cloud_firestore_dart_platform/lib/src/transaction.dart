@@ -53,12 +53,10 @@ class DartTransaction extends TransactionPlatform {
     Map<FieldPath, dynamic> data,
   ) {
     guardSync(
-      () => data.isEmpty
-          ? _transaction.update(_ref(documentPath), <String, Object?>{})
-          : _transaction.updateFromList(
-              _ref(documentPath),
-              ValueCodec.encodeUpdate(data),
-            ),
+      () => _transaction.update(
+        _ref(documentPath),
+        ValueCodec.encodeUpdate(data),
+      ),
     );
     return this;
   }

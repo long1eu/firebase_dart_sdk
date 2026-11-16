@@ -5,3 +5,5 @@ dependency_overrides:
     path: ../cloud_firestore_dart
   firebase_app_dart:
     path: ../../firebase_core/firebase_app_dart
+  cloud_firestore_dart_flutterfire:
+    path: ../cloud_firestore_dart_flutterfire

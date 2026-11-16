@@ -6,14 +6,14 @@
 ///
 /// ```dart
 /// await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-/// final Firestore firestore = await FlutterFireBridge.firestore();
+/// final FirebaseFirestore firestore = await FlutterFireBridge.firestore();
 /// ```
 ///
 /// [FlutterFireBridge] does the common case. The pieces, for wiring by hand: [firebaseOptionsFromFlutterFire] and [dartAppFor] for the app,
 /// [FlutterFireAuthTokenProvider] for the user, and [FlutterFireAppCheckProvider] for App Check tokens.
 ///
-/// `firebase_core` and `firebase_app_dart` both export `FirebaseApp` and `FirebaseOptions`: import one of them
-/// with a prefix.
+/// `firebase_core` and `firebase_app_dart` both export `Firebase`, `FirebaseApp`, `FirebaseOptions` and
+/// `FirebaseException`: import one of them with a prefix.
 library;
 
 import 'src/app_check_provider.dart';

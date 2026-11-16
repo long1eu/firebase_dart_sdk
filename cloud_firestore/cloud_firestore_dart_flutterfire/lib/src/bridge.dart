@@ -13,7 +13,7 @@ import 'options.dart';
 ///
 /// ```dart
 /// await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-/// final Firestore firestore = await FlutterFireBridge.firestore();
+/// final FirebaseFirestore firestore = await FlutterFireBridge.firestore();
 /// ```
 abstract final class FlutterFireBridge {
   /// The default timeout of [firestore] for the first event of `idTokenChanges()`.
@@ -29,7 +29,7 @@ abstract final class FlutterFireBridge {
     return dartAppFor(source.name, source.options, dependencies: dependencies);
   }
 
-  /// The `cloud_firestore_dart` instance of [database] for the FlutterFire [app] (default: `Firebase.app()`),
+  /// The `cloud_firestore_dart` instance of the database [databaseId] for the FlutterFire [app] (default: `Firebase.app()`),
   /// authenticated as the user of [auth] (default: the `FirebaseAuth` of [app]).
   ///
   /// On the first call for an app it creates the `firebase_app_dart` app with the same name and options
@@ -38,7 +38,7 @@ abstract final class FlutterFireBridge {
   /// to [readyTimeout], for the plugin to report its user, so that the instance starts with the restored user
   /// instead of switching to it a moment later.
   ///
-  /// Later calls return the same instance for the same [database], as `FirebaseFirestore.instanceFor` does; [settings]
+  /// Later calls return the same instance for the same [databaseId], as `FirebaseFirestore.instanceFor` does; [settings]
   /// and [openDatabase] follow the rules of `FirebaseFirestore.instanceFor`.
   ///
   /// Throws a [StateError] when a `firebase_app_dart` app of that name exists with other options, or with a
@@ -46,7 +46,7 @@ abstract final class FlutterFireBridge {
   static Future<FirebaseFirestore> firestore({
     flutterfire.FirebaseApp? app,
     flutterfire.FirebaseAuth? auth,
-    String database = '(default)',
+    String databaseId = '(default)',
     Settings? settings,
     OpenDatabase? openDatabase,
     PlatformDependencies? dependencies,
@@ -90,7 +90,7 @@ abstract final class FlutterFireBridge {
     }
     return FirebaseFirestore.instanceFor(
       app: dartApp,
-      databaseId: database,
+      databaseId: databaseId,
       settings: settings,
       openDatabase: openDatabase,
     );

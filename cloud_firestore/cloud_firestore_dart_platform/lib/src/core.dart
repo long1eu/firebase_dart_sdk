@@ -75,9 +75,9 @@ class DartFirebaseAppPlatform extends FirebaseAppPlatform {
       throw noDefaultAppDelete();
     }
     _core._apps.remove(name);
-    for (final dart_app.FirebaseApp app in dart_app.FirebaseApp.apps) {
+    for (final dart_app.FirebaseApp app in dart_app.Firebase.apps) {
       if (app.name == name) {
-        app.delete();
+        await app.delete();
       }
     }
   }

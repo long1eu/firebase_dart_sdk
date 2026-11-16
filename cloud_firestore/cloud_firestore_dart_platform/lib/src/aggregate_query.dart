@@ -4,19 +4,31 @@ import 'package:cloud_firestore_platform_interface/cloud_firestore_platform_inte
 import 'errors.dart';
 import 'query.dart';
 
+/// One aggregation that `cloud_firestore` asked for: its type and, for a sum or
+/// an average, the field as `cloud_firestore` named it.
+typedef Aggregation = ({AggregateType type, String? field});
+
 /// An [AggregateQueryPlatform] backed by `cloud_firestore_dart`.
 class DartAggregateQuery extends AggregateQueryPlatform {
-  /// The aggregation of [fields] over [query].
-  DartAggregateQuery(DartQuery super.query, this.fields);
+  /// The [aggregations] over [query].
+  DartAggregateQuery(DartQuery super.query, this.aggregations);
 
   /// The aggregations, in the order they were requested.
-  final List<fs.AggregateField> fields;
+  final List<Aggregation> aggregations;
 
-  DartAggregateQuery _with(fs.AggregateField field) {
-    return DartAggregateQuery(query as DartQuery, <fs.AggregateField>[
-      ...fields,
-      field,
+  DartAggregateQuery _with(Aggregation aggregation) {
+    return DartAggregateQuery(query as DartQuery, <Aggregation>[
+      ...aggregations,
+      aggregation,
     ]);
+  }
+
+  static fs.AggregateField _fieldOf(Aggregation aggregation) {
+    return switch (aggregation.type) {
+      AggregateType.count => fs.AggregateField.count(),
+      AggregateType.sum => fs.AggregateField.sum(aggregation.field!),
+      AggregateType.average => fs.AggregateField.average(aggregation.field!),
+    };
   }
 
   @override
@@ -24,41 +36,34 @@ class DartAggregateQuery extends AggregateQueryPlatform {
     required AggregateSource source,
   }) {
     return guard(() async {
+      final List<fs.AggregateField> fields = aggregations
+          .map(_fieldOf)
+          .toList();
       final fs.AggregateQuerySnapshot snapshot = await (query as DartQuery)
           .buildQuery()
           .aggregate(fields)
-          .get(switch (source) {
-            AggregateSource.server => fs.AggregateSource.server,
-          });
-      int? count;
+          .get(
+            source: switch (source) {
+              AggregateSource.server => fs.AggregateSource.server,
+            },
+          );
       final List<AggregateQueryResponse> sums = <AggregateQueryResponse>[];
       final List<AggregateQueryResponse> averages = <AggregateQueryResponse>[];
-      for (final fs.AggregateField field in fields) {
-        switch (field) {
-          case fs.CountAggregateField():
-            count = snapshot.getInt(field);
-          case fs.SumAggregateField():
-            sums.add(
-              AggregateQueryResponse(
-                type: AggregateType.sum,
-                field: field.fieldPath,
-                value: snapshot.getDouble(field),
-              ),
-            );
-          case fs.AverageAggregateField():
-            averages.add(
-              AggregateQueryResponse(
-                type: AggregateType.average,
-                field: field.fieldPath,
-                value: snapshot.getDouble(field),
-              ),
-            );
-          default:
-            throw StateError('Unknown aggregate field $field');
+      for (int i = 0; i < aggregations.length; i++) {
+        final Aggregation aggregation = aggregations[i];
+        if (aggregation.type == AggregateType.count) {
+          continue;
         }
+        final AggregateQueryResponse response = AggregateQueryResponse(
+          type: aggregation.type,
+          field: aggregation.field,
+          // FlutterFire reports sums and averages as doubles.
+          value: (snapshot.get(fields[i]) as num?)?.toDouble(),
+        );
+        (aggregation.type == AggregateType.sum ? sums : averages).add(response);
       }
       return AggregateQuerySnapshotPlatform(
-        count: count,
+        count: snapshot.count,
         sum: sums,
         average: averages,
       );
@@ -66,13 +71,14 @@ class DartAggregateQuery extends AggregateQueryPlatform {
   }
 
   @override
-  AggregateQueryPlatform count() => _with(fs.AggregateField.count());
+  AggregateQueryPlatform count() =>
+      _with((type: AggregateType.count, field: null));
 
   @override
   AggregateQueryPlatform sum(String field) =>
-      _with(fs.AggregateField.sum(field));
+      _with((type: AggregateType.sum, field: field));
 
   @override
   AggregateQueryPlatform average(String field) =>
-      _with(fs.AggregateField.average(field));
+      _with((type: AggregateType.average, field: field));
 }

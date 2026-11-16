@@ -43,7 +43,7 @@ abstract interface class IdTokenUser {
 /// final FlutterFireAuthTokenProvider provider =
 ///     FlutterFireAuthTokenProvider(FirebaseAuth.instance);
 /// dartApp.authProvider = provider;
-/// final Firestore firestore = FirebaseFirestore.instanceFor(app: dartApp);
+/// final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(app: dartApp);
 /// ```
 ///
 /// **How it follows the user.** The provider listens to `idTokenChanges()` of the plugin. When the uid changes

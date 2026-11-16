@@ -24,7 +24,7 @@ class DartFirestoreConfig {
   const DartFirestoreConfig({this.openDatabase, this.tokenProviderFor});
 
   /// Opens the SQLite database of the offline cache; see
-  /// `Firestore.instanceFor(openDatabase:)` of `cloud_firestore_dart`.
+  /// `FirebaseFirestore.instanceFor(openDatabase:)` of `cloud_firestore_dart`.
   final fs.OpenDatabase? openDatabase;
 
   /// The token provider of an app; see [TokenProviderFactory].
@@ -35,7 +35,9 @@ class DartFirestoreConfig {
 ///
 /// Each instance stands for one FlutterFire app and database. The
 /// `cloud_firestore_dart` instance behind it ([delegate]) is created on the
-/// first operation, with the [settings] set until then, as the native SDKs do.
+/// first operation: `cloud_firestore_dart` takes the opener of the disk cache
+/// when an instance is created, and whether to pass it depends on the
+/// [settings] the app sets before that.
 class DartFirebaseFirestore extends FirebaseFirestorePlatform {
   /// The instance for [app] and [databaseId]. Without [app] it is the factory
   /// that `FirebaseFirestorePlatform.instance` holds: `cloud_firestore` asks it
@@ -48,32 +50,37 @@ class DartFirebaseFirestore extends FirebaseFirestorePlatform {
 
   static final Map<String, DartFirebaseFirestore> _instances =
       <String, DartFirebaseFirestore>{};
-  static final Map<fs.Firestore, DartFirebaseFirestore> _byDelegate =
-      <fs.Firestore, DartFirebaseFirestore>{};
+  static final Map<fs.FirebaseFirestore, DartFirebaseFirestore> _byDelegate =
+      <fs.FirebaseFirestore, DartFirebaseFirestore>{};
 
   /// Whether any instance has created its `cloud_firestore_dart` instance.
   static bool get anyStarted => _byDelegate.isNotEmpty;
 
   /// The platform instance whose [delegate] is [firestore], if any.
-  static DartFirebaseFirestore? forDelegate(fs.Firestore firestore) =>
+  static DartFirebaseFirestore? forDelegate(fs.FirebaseFirestore firestore) =>
       _byDelegate[firestore];
 
   Settings _settings = const Settings();
-  fs.Firestore? _delegate;
-  fs.Firestore? _terminated;
+  fs.FirebaseFirestore? _delegate;
+  fs.FirebaseFirestore? _terminated;
 
   /// The `cloud_firestore_dart` instance, created on the first call.
-  fs.Firestore get delegate => _delegate ??= _start();
+  fs.FirebaseFirestore get delegate => _delegate ??= _start();
 
-  fs.Firestore _start() {
-    final fs.Firestore firestore = fs.Firestore.instanceFor(
+  fs.FirebaseFirestore _start() {
+    final fs.FirebaseFirestore firestore = fs.FirebaseFirestore.instanceFor(
       app: dartAppFor(app, config.tokenProviderFor),
-      database: databaseId,
-      settings: dartSettingsOf(_settings),
+      databaseId: databaseId,
       openDatabase: _settings.persistenceEnabled == false
           ? null
           : config.openDatabase,
     );
+    final fs.Settings settings = dartSettingsOf(_settings);
+    if (firestore.settings != settings) {
+      // Throws failed-precondition when another package started this
+      // instance already with other settings.
+      guardSync(() => firestore.settings = settings);
+    }
     _byDelegate[firestore] = this;
     return firestore;
   }
@@ -81,13 +88,14 @@ class DartFirebaseFirestore extends FirebaseFirestorePlatform {
   /// The `cloud_firestore_dart` settings for the FlutterFire [settings].
   ///
   /// `host` may carry a port (`'127.0.0.1:8080'`, as `useFirestoreEmulator`
-  /// sets it). `persistenceEnabled` is left to the instance: the disk cache is
-  /// used when an `openDatabase` function was configured. The web-only
-  /// settings are ignored.
+  /// of `cloud_firestore` sets it); `cloud_firestore_dart` keeps the port
+  /// apart. The disk cache is used when an `openDatabase` function was
+  /// configured and `persistenceEnabled` is not false. The web-only settings
+  /// are ignored.
   @visibleForTesting
-  static fs.FirestoreSettings dartSettingsOf(Settings settings) {
-    String host = fs.FirestoreSettings.defaultHost;
-    int port = fs.FirestoreSettings.defaultPort;
+  static fs.Settings dartSettingsOf(Settings settings) {
+    String host = fs.Settings.defaultHost;
+    int port = fs.Settings.defaultPort;
     final String? hostAndPort = settings.host;
     if (hostAndPort != null && hostAndPort.isNotEmpty) {
       final int colon = hostAndPort.lastIndexOf(':');
@@ -102,15 +110,13 @@ class DartFirebaseFirestore extends FirebaseFirestorePlatform {
       }
     }
     final int? cacheSizeBytes = settings.cacheSizeBytes;
-    return fs.FirestoreSettings(
+    return fs.Settings(
       host: host,
       port: port,
       sslEnabled: settings.sslEnabled ?? true,
-      cacheSizeBytes: cacheSizeBytes == null
-          ? fs.FirestoreSettings.defaultCacheSizeBytes
-          : cacheSizeBytes == Settings.CACHE_SIZE_UNLIMITED
-          ? fs.FirestoreSettings.cacheSizeUnlimited
-          : cacheSizeBytes,
+      persistenceEnabled: settings.persistenceEnabled ?? true,
+      // Both use -1 for an unlimited cache.
+      cacheSizeBytes: cacheSizeBytes ?? fs.Settings.defaultCacheSizeBytes,
     );
   }
 
@@ -186,7 +192,7 @@ class DartFirebaseFirestore extends FirebaseFirestorePlatform {
 
   @override
   Stream<void> snapshotsInSync() =>
-      guardStream(lazyStream(() => delegate.snapshotsInSync));
+      guardStream(lazyStream(() => delegate.snapshotsInSync()));
 
   @override
   LoadBundleTaskPlatform<LoadBundleTaskSnapshotPlatform> loadBundle(
@@ -200,32 +206,20 @@ class DartFirebaseFirestore extends FirebaseFirestorePlatform {
     String name, {
     GetOptions options = const GetOptions(),
   }) {
-    return guard(() async {
-      final fs.Query<Map<String, Object?>>? query = await delegate
-          .getNamedQuery(name);
-      if (query == null) {
-        throw FirebaseException(
-          plugin: firestorePlugin,
-          code: 'not-found',
-          message:
-              'Named query "$name" has not been found. Please check it has '
-              'been loaded properly via loadBundle().',
-        );
-      }
-      return querySnapshotOf(
+    return guard(
+      () async => querySnapshotOf(
         this,
-        await query.get(sourceOf(options.source)),
+        await delegate.namedQueryGet(name, options: getOptionsOf(options)),
         behavior: options.serverTimestampBehavior,
-      );
-    });
+      ),
+    );
   }
 
-  /// Runs [transactionHandler] in a `cloud_firestore_dart` transaction with
-  /// [maxAttempts] attempts.
+  /// Runs [transactionHandler] in a `cloud_firestore_dart` transaction.
   ///
   /// When [timeout] passes first, the returned future fails with a
-  /// `deadline-exceeded` [FirebaseException]; the attempt that is running is
-  /// not cancelled and may still commit.
+  /// `deadline-exceeded` [FirebaseException] and no new attempt starts; an
+  /// attempt that is committing is not cancelled and may still take effect.
   @override
   Future<T?> runTransaction<T>(
     TransactionHandler<T> transactionHandler, {
@@ -234,20 +228,13 @@ class DartFirebaseFirestore extends FirebaseFirestorePlatform {
   }) {
     return guard(() async {
       T? result;
-      await delegate
-          .runTransaction<void>((fs.Transaction transaction) async {
-            result = await transactionHandler(
-              DartTransaction(this, transaction),
-            );
-          }, options: fs.TransactionOptions(maxAttempts: maxAttempts))
-          .timeout(
-            timeout,
-            onTimeout: () => throw FirebaseException(
-              plugin: firestorePlugin,
-              code: 'deadline-exceeded',
-              message: 'The transaction did not finish within $timeout.',
-            ),
-          );
+      await delegate.runTransaction<void>(
+        (fs.Transaction transaction) async {
+          result = await transactionHandler(DartTransaction(this, transaction));
+        },
+        timeout: timeout,
+        maxAttempts: maxAttempts,
+      );
       return result;
     });
   }
@@ -255,19 +242,17 @@ class DartFirebaseFirestore extends FirebaseFirestorePlatform {
   @override
   Settings get settings => _settings;
 
-  /// Sets the settings used when the `cloud_firestore_dart` instance is
-  /// created. Throws a `failed-precondition` [FirebaseException] when it was
-  /// created already (after the first operation) and [settings] differ.
+  /// Sets the settings of the `cloud_firestore_dart` instance. Throws a
+  /// `failed-precondition` [FirebaseException] when it has started already
+  /// (after the first operation) and [settings] differ.
   @override
   set settings(Settings settings) {
-    if (_delegate != null && settings != _settings) {
-      throw FirebaseException(
-        plugin: firestorePlugin,
-        code: 'failed-precondition',
-        message:
-            'Firestore has already been started and its settings can no '
-            'longer be changed. Set the settings before any other call.',
-      );
+    if (settings == _settings) {
+      return;
+    }
+    final fs.FirebaseFirestore? running = _delegate;
+    if (running != null) {
+      guardSync(() => running.settings = dartSettingsOf(settings));
     }
     _settings = settings;
   }
@@ -277,7 +262,7 @@ class DartFirebaseFirestore extends FirebaseFirestorePlatform {
   /// clears the cache of the terminated one until then.
   @override
   Future<void> terminate() {
-    final fs.Firestore? running = _delegate;
+    final fs.FirebaseFirestore? running = _delegate;
     if (running == null) {
       return Future<void>.value();
     }
@@ -294,8 +279,10 @@ class DartFirebaseFirestore extends FirebaseFirestorePlatform {
   @override
   // ignore: deprecated_member_use
   Future<void> setIndexConfiguration(String indexConfiguration) {
-    // ignore: deprecated_member_use
-    return guard(() => delegate.setIndexConfiguration(indexConfiguration));
+    return guard(
+      // ignore: deprecated_member_use
+      () => delegate.setIndexConfigurationFromJSON(indexConfiguration),
+    );
   }
 
   @override
@@ -308,7 +295,7 @@ class DartFirebaseFirestore extends FirebaseFirestorePlatform {
 
   @override
   Future<void> setLoggingEnabled(bool enabled) async {
-    fs.Firestore.setLoggingEnabled(loggingEnabled: enabled);
+    fs.FirebaseFirestore.setLoggingEnabled(enabled);
   }
 
   @override

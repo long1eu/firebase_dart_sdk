@@ -122,42 +122,39 @@ void main() {
     test('maps the options to firebase_app_dart', () {
       final dart_app.FirebaseOptions options = dartOptionsOf(_options);
       expect(options.apiKey, 'test-api-key');
-      expect(options.applicationId, '1:1:web:1');
-      expect(options.gcmSenderId, '1');
+      expect(options.appId, '1:1:web:1');
+      expect(options.messagingSenderId, '1');
       expect(options.projectId, 'demo-unit');
-      expect(options.databaseUrl, isNull);
+      expect(options.databaseURL, isNull);
     });
   });
 
   group('settings', () {
     test('host with a port, as useFirestoreEmulator sets it', () {
-      final fs.FirestoreSettings settings =
-          DartFirebaseFirestore.dartSettingsOf(
-            const Settings(host: '127.0.0.1:8144', sslEnabled: false),
-          );
+      final fs.Settings settings = DartFirebaseFirestore.dartSettingsOf(
+        const Settings(host: '127.0.0.1:8144', sslEnabled: false),
+      );
       expect(settings.host, '127.0.0.1');
       expect(settings.port, 8144);
       expect(settings.sslEnabled, isFalse);
     });
 
     test('defaults and unlimited cache', () {
-      final fs.FirestoreSettings settings =
-          DartFirebaseFirestore.dartSettingsOf(
-            const Settings(cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED),
-          );
-      expect(settings.host, fs.FirestoreSettings.defaultHost);
-      expect(settings.port, fs.FirestoreSettings.defaultPort);
+      final fs.Settings settings = DartFirebaseFirestore.dartSettingsOf(
+        const Settings(cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED),
+      );
+      expect(settings.host, fs.Settings.defaultHost);
+      expect(settings.port, fs.Settings.defaultPort);
       expect(settings.sslEnabled, isTrue);
-      expect(settings.cacheSizeBytes, fs.FirestoreSettings.cacheSizeUnlimited);
+      expect(settings.cacheSizeBytes, fs.Settings.cacheSizeUnlimited);
     });
 
     test('a host without a port keeps the default port', () {
-      final fs.FirestoreSettings settings =
-          DartFirebaseFirestore.dartSettingsOf(
-            const Settings(host: 'firestore.example.com'),
-          );
+      final fs.Settings settings = DartFirebaseFirestore.dartSettingsOf(
+        const Settings(host: 'firestore.example.com'),
+      );
       expect(settings.host, 'firestore.example.com');
-      expect(settings.port, fs.FirestoreSettings.defaultPort);
+      expect(settings.port, fs.Settings.defaultPort);
     });
   });
 
@@ -210,21 +207,24 @@ void main() {
     test('field paths', () {
       expect(
         ValueCodec.encodeField(FieldPath(const <String>['a.b', 'c'])),
-        fs.FieldPath.of(<String>['a.b', 'c']),
+        fs.FieldPath(<String>['a.b', 'c']),
       );
       expect(
         ValueCodec.encodeField(FieldPath.documentId),
-        fs.FieldPath.documentIdField,
+        fs.FieldPath.documentId,
       );
     });
   });
 
   group('errors', () {
     test(
-      'FirestoreError becomes a FirebaseException with the FlutterFire code',
+      'FirestoreException becomes the FirebaseException of firebase_core',
       () {
         final Object converted = convertError(
-          fs.FirestoreError('gone', fs.FirestoreErrorCode.notFound),
+          fs.FirestoreException(
+            errorCode: fs.FirestoreErrorCode.notFound,
+            message: 'gone',
+          ),
         );
         expect(
           converted,
@@ -240,8 +240,14 @@ void main() {
       },
     );
 
-    test('every code is mapped', () {
-      expect(fs.FirestoreErrorCode.values.map(codeOf).toList(), <String>[
+    test('every code keeps the FlutterFire string', () {
+      for (final fs.FirestoreErrorCode code in fs.FirestoreErrorCode.values) {
+        final Object converted = convertError(
+          fs.FirestoreException(errorCode: code, message: 'm'),
+        );
+        expect((converted as FirebaseException).code, code.code);
+      }
+      expect(fs.FirestoreErrorCode.values.map((c) => c.code).toList(), <String>[
         'ok',
         'cancelled',
         'unknown',

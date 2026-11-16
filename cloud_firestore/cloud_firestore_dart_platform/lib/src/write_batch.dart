@@ -44,9 +44,7 @@ class DartWriteBatch extends WriteBatchPlatform {
     guardSync(() {
       final fs.DocumentReference<Map<String, Object?>> ref = _firestore.delegate
           .doc(documentPath);
-      return data.isEmpty
-          ? _batch.update(ref, <String, Object?>{})
-          : _batch.updateFromList(ref, ValueCodec.encodeUpdate(data));
+      return _batch.update(ref, ValueCodec.encodeUpdate(data));
     });
   }
 }

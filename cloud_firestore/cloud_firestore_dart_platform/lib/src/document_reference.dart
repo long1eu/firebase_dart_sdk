@@ -13,14 +13,15 @@ fs.SetOptions? setOptionsOf(SetOptions? options) {
     return null;
   }
   final List<FieldPath>? fields = options.mergeFields;
-  if (fields != null) {
-    return fs.SetOptions.mergeFieldPaths(<fs.FieldPath>[
-      for (final FieldPath field in fields) fs.FieldPath.of(field.components),
-    ]);
-  }
-  return options.merge ?? false
-      ? fs.SetOptions.mergeAllFields
-      : fs.SetOptions.overwrite;
+  return fs.SetOptions(
+    merge: options.merge ?? false,
+    mergeFields: fields == null
+        ? null
+        : <Object>[
+            for (final FieldPath field in fields)
+              fs.FieldPath(field.components),
+          ],
+  );
 }
 
 /// A [DocumentReferencePlatform] backed by `cloud_firestore_dart`.
@@ -42,7 +43,7 @@ class DartDocumentReference extends DocumentReferencePlatform {
   ]) {
     return guard(() async {
       final fs.DocumentSnapshot<Map<String, Object?>> snapshot = await _delegate
-          .get(sourceOf(options.source));
+          .get(getOptionsOf(options));
       return documentSnapshotOf(
         _firestore,
         snapshot,
@@ -58,11 +59,9 @@ class DartDocumentReference extends DocumentReferencePlatform {
   }) {
     return guardStream(
       _firestore.lazyStream(
-        () => _delegate.getSnapshotsWithOptions(
-          listenOptionsOf(
-            includeMetadataChanges: includeMetadataChanges,
-            listenSource: listenSource,
-          ),
+        () => _delegate.snapshots(
+          includeMetadataChanges: includeMetadataChanges,
+          source: listenSourceOf(listenSource),
         ),
       ),
     ).map(
@@ -84,12 +83,6 @@ class DartDocumentReference extends DocumentReferencePlatform {
 
   @override
   Future<void> update(Map<FieldPath, dynamic> data) {
-    return guard(() {
-      if (data.isEmpty) {
-        // updateFromList needs at least one field and value pair.
-        return _delegate.update(<String, Object?>{});
-      }
-      return _delegate.updateFromList(ValueCodec.encodeUpdate(data));
-    });
+    return guard(() => _delegate.update(ValueCodec.encodeUpdate(data)));
   }
 }

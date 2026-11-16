@@ -254,6 +254,7 @@ void main() {
           messagingSenderId: '1234567890',
           storageBucket: 'demo-bridge.appspot.com',
           databaseURL: 'https://demo-bridge.firebaseio.com',
+          authDomain: 'demo-bridge.firebaseapp.com',
         ),
       );
     });

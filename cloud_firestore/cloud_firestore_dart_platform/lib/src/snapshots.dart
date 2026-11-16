@@ -16,29 +16,25 @@ fs.ServerTimestampBehavior serverTimestampBehaviorOf(
   };
 }
 
-/// The `cloud_firestore_dart` source of a [Source] of the platform interface.
-fs.Source sourceOf(Source source) {
-  return switch (source) {
-    Source.serverAndCache => fs.Source.serverAndCache,
-    Source.server => fs.Source.server,
-    Source.cache => fs.Source.cache,
-  };
-}
-
-/// The `cloud_firestore_dart` listen options for the arguments of `snapshots`.
-fs.SnapshotListenOptions listenOptionsOf({
-  required bool includeMetadataChanges,
-  required ListenSource listenSource,
-}) {
-  return fs.SnapshotListenOptions(
-    metadataChanges: includeMetadataChanges
-        ? fs.MetadataChanges.include
-        : fs.MetadataChanges.exclude,
-    source: switch (listenSource) {
-      ListenSource.defaultSource => fs.ListenSource.defaultSource,
-      ListenSource.cache => fs.ListenSource.cache,
+/// The `cloud_firestore_dart` get options for [options] of the platform
+/// interface. The server timestamp behaviour is applied when the data is read
+/// (see [documentSnapshotOf]).
+fs.GetOptions getOptionsOf(GetOptions options) {
+  return fs.GetOptions(
+    source: switch (options.source) {
+      Source.serverAndCache => fs.Source.serverAndCache,
+      Source.server => fs.Source.server,
+      Source.cache => fs.Source.cache,
     },
   );
+}
+
+/// The `cloud_firestore_dart` listen source for [source].
+fs.ListenSource listenSourceOf(ListenSource source) {
+  return switch (source) {
+    ListenSource.defaultSource => fs.ListenSource.defaultSource,
+    ListenSource.cache => fs.ListenSource.cache,
+  };
 }
 
 /// A [DocumentSnapshotPlatform] for a `cloud_firestore_dart` snapshot.
@@ -50,12 +46,12 @@ DocumentSnapshotPlatform documentSnapshotOf(
   fs.DocumentSnapshot<Map<String, Object?>> snapshot, [
   ServerTimestampBehavior behavior = ServerTimestampBehavior.none,
 ]) {
-  final Map<String, Object?>? data = snapshot.getData(
-    serverTimestampBehaviorOf(behavior),
+  final Map<String, Object?>? data = snapshot.data(
+    serverTimestamps: serverTimestampBehaviorOf(behavior),
   );
   return DocumentSnapshotPlatform(
     firestore,
-    snapshot.ref.path,
+    snapshot.reference.path,
     data == null ? null : ValueCodec.decodeMap(data, firestore),
     InternalSnapshotMetadata(
       hasPendingWrites: snapshot.metadata.hasPendingWrites,
@@ -66,21 +62,20 @@ DocumentSnapshotPlatform documentSnapshotOf(
 
 /// A [QuerySnapshotPlatform] for a `cloud_firestore_dart` query snapshot.
 ///
-/// [includeMetadataChanges] selects the document changes: with it, documents
-/// whose only change is in their metadata are listed as `modified`, as the
-/// official plugin does for a listener with metadata changes.
+/// Its document changes follow the listen that produced it: with
+/// `includeMetadataChanges`, documents whose only change is in their metadata
+/// are listed as `modified`, as with the official plugin.
 QuerySnapshotPlatform querySnapshotOf(
   DartFirebaseFirestore firestore,
   fs.QuerySnapshot<Map<String, Object?>> snapshot, {
   ServerTimestampBehavior behavior = ServerTimestampBehavior.none,
-  bool includeMetadataChanges = false,
 }) {
   final Map<String, DocumentSnapshotPlatform> converted =
       <String, DocumentSnapshotPlatform>{};
   DocumentSnapshotPlatform convert(
     fs.DocumentSnapshot<Map<String, Object?>> document,
   ) {
-    return converted[document.ref.path] ??= documentSnapshotOf(
+    return converted[document.reference.path] ??= documentSnapshotOf(
       firestore,
       document,
       behavior,
@@ -94,11 +89,7 @@ QuerySnapshotPlatform querySnapshotOf(
   ];
   final List<DocumentChangePlatform> changes = <DocumentChangePlatform>[
     for (final fs.DocumentChange<Map<String, Object?>> change
-        in snapshot.getDocumentChanges(
-          includeMetadataChanges
-              ? fs.MetadataChanges.include
-              : fs.MetadataChanges.exclude,
-        ))
+        in snapshot.docChanges)
       DocumentChangePlatform(
         switch (change.type) {
           fs.DocumentChangeType.added => DocumentChangeType.added,
@@ -108,7 +99,7 @@ QuerySnapshotPlatform querySnapshotOf(
         change.oldIndex,
         change.newIndex,
         // A removed document is not in docs; convert it on its own.
-        convert(change.document),
+        convert(change.doc),
       ),
   ];
   return QuerySnapshotPlatform(

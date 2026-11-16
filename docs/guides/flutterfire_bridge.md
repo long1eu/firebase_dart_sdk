@@ -17,6 +17,11 @@ Firestore, for example to share Firestore code with a Dart backend or to keep th
 Firestore SDKs out of the build. It does not open new platforms: `firebase_auth` and the official
 `cloud_firestore` plugin support the same ones (Android, iOS, macOS, web, Windows).
 
+If you want to keep the official `cloud_firestore` API instead and only run it on
+`cloud_firestore_dart`, use `cloud_firestore_dart_platform`
+([The official cloud_firestore API on cloud_firestore_dart](flutterfire_platform.md)) and pass it
+a `FlutterFireAuthTokenProvider` from this package.
+
 Without the bridge you would copy the options into a `FirebaseOptions` of `firebase_app_dart` by
 hand and either sign the user in a second time with `FirebaseUserAuth` or write a token provider
 yourself, as [Coming from FlutterFire](migrating_from_flutterfire.md#using-both-in-one-app)
@@ -31,25 +36,25 @@ flutter pub add cloud_firestore_dart cloud_firestore_dart_flutterfire firebase_c
 
 ```dart flutter
 await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-final Firestore firestore = await FlutterFireBridge.firestore();
+final FirebaseFirestore firestore = await FlutterFireBridge.firestore();
 await FirebaseAuth.instance.signInAnonymously(); // any sign-in of firebase_auth
 ```
 
 `FlutterFireBridge.firestore()` does three things on its first call for an app:
 
 1. It creates a `firebase_app_dart` app with the name and the options of `Firebase.app()`
-   (`apiKey`, `appId`, `projectId`, `messagingSenderId`, `storageBucket`, `databaseURL`,
-   `trackingId`; the other FlutterFire options have no counterpart).
+   (every field, with the same names; only `recaptchaSiteKey` has no counterpart).
 2. It makes a `FlutterFireAuthTokenProvider` for `FirebaseAuth.instanceFor(app: ...)` the token
    provider of that app, and an App Check provider if you pass one.
 3. It waits up to five seconds for the plugin to report its user, then returns
-   `Firestore.instanceFor` the app, so the instance starts with a restored session instead of
+   `FirebaseFirestore.instanceFor` the app, so the instance starts with a restored session instead of
    switching to it a moment later.
 
-Later calls return the same instance. `app:`, `auth:`, `database:`, `settings:`,
+Later calls return the same instance. `app:`, `auth:`, `databaseId:`, `settings:`,
 `openDatabase:` (the SQLite cache of the [Flutter guide](flutter.md)) and `appCheckProvider:`
-change the defaults. `firebase_core` and `firebase_app_dart` both export `FirebaseApp` and
-`FirebaseOptions`: when a file needs both, import one with a prefix.
+change the defaults. `firebase_core` and `firebase_app_dart` both export `Firebase`,
+`FirebaseApp`, `FirebaseOptions` and `FirebaseException`: when a file needs both, import one with a
+prefix.
 
 ## How user changes reach Firestore
 
@@ -97,7 +102,7 @@ The rest of the contract follows `FirebaseUserAuth`:
 
 | Situation | What the provider does |
 | --- | --- |
-| Nobody signed in | `getAccessToken` throws `FirebaseNoSignedInUserError`; Firestore sends the request without a token |
+| Nobody signed in | `getAccessToken` throws `FirebaseNoSignedInUserException`; Firestore sends the request without a token |
 | Firestore asks for a forced refresh (after `unauthenticated`) | `User.getIdToken(true)` |
 | The user changes while a token is fetched | the token is dropped and the token of the current user is returned |
 | The plugin fails (`network-request-failed`, ...) | the error is passed on; Firestore fails the request with `unauthenticated` and its streams retry |
@@ -112,8 +117,9 @@ The pieces behind `FlutterFireBridge.firestore()` are public:
 final flutterfire.FirebaseApp source = flutterfire.Firebase.app();
 final FlutterFireAuthTokenProvider auth =
     FlutterFireAuthTokenProvider(FirebaseAuth.instanceFor(app: source));
-final app = dartAppFor(source.name, source.options, authProvider: auth);
-final Firestore firestore = Firestore.instanceFor(app: app);
+final FirebaseApp app =
+    dartAppFor(source.name, source.options, authProvider: auth);
+final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(app: app);
 ```
 
 `firebaseOptionsFromFlutterFire` maps the options alone. A provider given to `dartAppFor` is not
@@ -125,7 +131,7 @@ bridge does not depend on `firebase_app_check`, so apps without App Check do not
 
 ```dart flutter
 final FirebaseAppCheck appCheck = FirebaseAppCheck.instance;
-final Firestore firestore = await FlutterFireBridge.firestore(
+final FirebaseFirestore firestore = await FlutterFireBridge.firestore(
   appCheckProvider: FlutterFireAppCheckProvider(
     getToken: appCheck.getToken,
     onTokenChange: appCheck.onTokenChange,

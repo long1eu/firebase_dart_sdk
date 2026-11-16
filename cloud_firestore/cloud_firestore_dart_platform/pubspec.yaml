@@ -42,6 +42,10 @@ dependencies:
 dev_dependencies:
   # The app-facing package the tests drive, as an app would.
   cloud_firestore: ^7.1.0
+  # Its FlutterFireAuthTokenProvider is the documented provider on platforms
+  # with the official firebase_auth; test/auth_test.dart uses it. Resolved from
+  # the sibling directory through pubspec_overrides.yaml.
+  cloud_firestore_dart_flutterfire: ^0.1.0
   flutter_test:
     sdk: flutter
   lints: ^6.1.0

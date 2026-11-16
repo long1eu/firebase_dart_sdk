@@ -5,18 +5,12 @@ import 'package:rxdart/rxdart.dart';
 
 /// The `firebase_app_dart` options for the FlutterFire [options] (of `firebase_core`).
 ///
-/// | FlutterFire | `firebase_app_dart` |
-/// | --- | --- |
-/// | `apiKey` | `apiKey` |
-/// | `appId` | `applicationId` |
-/// | `projectId` | `projectId` |
-/// | `messagingSenderId` | `messagingSenderId` |
-/// | `storageBucket` | `storageBucket` |
-/// | `databaseURL` | `databaseURL` |
-/// | `trackingId` | `trackingId` |
-///
-/// The other FlutterFire options (`authDomain`, `measurementId`, the iOS and Android client ids, ...) have no
-/// counterpart and are dropped. An empty optional value becomes null.
+/// Both packages use the same field names, and every field is copied: `apiKey`, `appId`,
+/// `messagingSenderId`, `projectId`, `authDomain`, `databaseURL`, `storageBucket`, `measurementId`,
+/// `trackingId`, `deepLinkURLScheme`, `androidClientId`, `iosClientId`, `iosBundleId` and `appGroupId`.
+/// `recaptchaSiteKey` (newer `firebase_core` releases) has no counterpart and is dropped. An empty
+/// optional value becomes null. `cloud_firestore_dart_platform` maps the options the same way, so both
+/// packages agree on the `firebase_app_dart` app of a FlutterFire app.
 ///
 /// ```dart
 /// final FirebaseOptions options =
@@ -30,11 +24,18 @@ FirebaseOptions firebaseOptionsFromFlutterFire(
   return FirebaseOptions(
     apiKey: options.apiKey,
     appId: options.appId,
-    projectId: optional(options.projectId),
     messagingSenderId: optional(options.messagingSenderId),
-    storageBucket: optional(options.storageBucket),
+    projectId: optional(options.projectId),
+    authDomain: optional(options.authDomain),
     databaseURL: optional(options.databaseURL),
+    storageBucket: optional(options.storageBucket),
+    measurementId: optional(options.measurementId),
     trackingId: optional(options.trackingId),
+    deepLinkURLScheme: optional(options.deepLinkURLScheme),
+    androidClientId: optional(options.androidClientId),
+    iosClientId: optional(options.iosClientId),
+    iosBundleId: optional(options.iosBundleId),
+    appGroupId: optional(options.appGroupId),
   );
 }
 

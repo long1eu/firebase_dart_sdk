@@ -39,7 +39,7 @@ sequenceDiagram
     Platform->>Client: DocumentReference.set(data)
     Client->>Backend: Commit over gRPC
     Backend-->>Client: write result or error
-    Client-->>Platform: Future completes, or FirestoreError
+    Client-->>Platform: Future completes, or FirestoreException
     Platform-->>Official: Future completes, or FirebaseException
     Official-->>App: Future completes
 ```

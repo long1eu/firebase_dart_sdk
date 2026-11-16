@@ -121,3 +121,47 @@ it says `instanceFor` "still returns a `Future`", but `Firestore.instanceFor` is
 | 17 breaking clean-up | partly (deprecated names and `@internal` constructors remain) |
 | 18 bundles | done |
 | 19 golden surface tests, CI | done |
+
+## 9. Status in 0.2 (branch `wave/dart-api`)
+
+Checked against `docs/api_migration_0_2.md` and by porting `cloud_firestore_dart_platform` to the 0.2 API. "Done"
+means the adapter row became a direct call. Reasons for the declined rows are given only where the repository
+records one.
+
+| Rows | Status in 0.2 |
+| --- | --- |
+| 1.1, 1.2, 1.3, 1.6, 1.7, 1.8, 1.9, 1.10, 1.12, 1.15, 1.16 | done |
+| 1.4 `persistentCacheIndexManager` | declined: stays a getter; the migration guide lists it under "Differences from FlutterFire" |
+| 1.5 typed getters | done (removed; `get(Object field)` returns `Object?`, not generic) |
+| 1.11 deprecated names | done, except `Firestore` and `FirestoreSettings`, kept as deprecated aliases of `FirebaseFirestore` and `Settings`; the snapshot getter is now `reference` |
+| 1.13 named queries | done: `namedQuery(name)` and FlutterFire's `namedQueryGet(name, options:)` |
+| 1.14 `QuerySnapshot` | partly: `size` added; it is still an `Iterable` (declined; listed under "Differences from FlutterFire") |
+| 2.1 to 2.5 | done (`update(Map<Object, Object?>)` on references, batches and transactions; `SetOptions(merge:, mergeFields:)`; `FieldValue.vector` removed) |
+| 2.6 sealed `FieldValue` | declined |
+| 3.1, 3.2, 3.3, 3.5 | done (`GetOptions` carries only the source; the server timestamp behaviour is an argument of `data()` and `get()`) |
+| 3.4 | done for reads (`data(serverTimestamps:)`); `SnapshotOptions` remains for converters, as in FlutterFire |
+| 4.1 to 4.4 | done: `FirestoreException` extends the `FirebaseException` of `firebase_app_dart`, `code` is the FlutterFire string, `errorCode` the enum; `fromValue` removed |
+| 4.5 dead `checkNotNull` | declined |
+| 5.1 | done: `settings` setter and `useFirestoreEmulator` until the first use; `Settings.host` and `Settings.port` stay separate |
+| 5.2 opener in `PersistentCacheSettings` | declined: the opener stays an argument of `instanceFor`, so the adapter still creates the instance on the first operation, when the settings are known |
+| 5.3 | done: `runTransaction(timeout:, maxAttempts:)` (no new attempt after the timeout) |
+| 5.4 | done: `stream`, `future`, `snapshot`; the listener methods are gone. The stream still does not replay events to a late listener, so the adapter keeps its replay |
+| 5.5, 5.6, 5.8 | done (`AuthTokenProvider`, `AppCheckTokenProvider`, FlutterFire option names, `databaseId`) |
+| 5.7 | done (`Firebase.initializeApp`, `Firebase.app`, `Firebase.apps`); there is still no synchronous lookup that returns null, so the adapter filters `Firebase.apps` |
+| 5.9 | done: the message is `FirebaseOptions.projectId must be set to use Firestore` |
+| 6.1 to 6.4 | no change needed |
+
+What remains awkward for the adapter after 0.2:
+
+- Two `FirebaseException` classes: `firebase_app_dart`'s (pure Dart) and `firebase_core`'s (Flutter). The adapter
+  copies `plugin`, `code`, `message` and `stackTrace` from one to the other; nothing in our packages can remove this
+  without a Flutter dependency.
+- Same class names as FlutterFire (`FirebaseFirestore`, `Settings`, `FieldPath`, `Timestamp`, `GeoPoint`, `Blob`,
+  `VectorValue`, `Firebase`, `FirebaseApp`, `FirebaseOptions`) but different classes: a file that uses both needs a
+  prefix, and the value codec still converts each value type.
+- `Settings.host` without the port: `cloud_firestore` hands `'host:port'`, which the adapter splits.
+- The opener of the disk cache is an argument of `instanceFor` (row 5.2), so the instance is still created lazily by
+  the adapter.
+- No non-throwing synchronous app lookup (row 5.7). Proposal: `Firebase.appOrNull([String name])`.
+- `LoadBundleTask.stream` does not replay to late listeners. Proposal: make `stream` start with the current
+  `snapshot` when the listener comes late.

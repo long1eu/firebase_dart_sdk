@@ -51,7 +51,7 @@ class DartLoadBundleTask
     }
   }
 
-  void _onProgress(fs.LoadBundleTaskProgress progress) {
+  void _onProgress(fs.LoadBundleTaskSnapshot progress) {
     if (progress.taskState == fs.LoadBundleTaskState.error) {
       _onError(progress.exception ?? StateError('The bundle failed to load.'));
       return;

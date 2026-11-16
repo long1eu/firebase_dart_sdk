@@ -8,7 +8,7 @@ An unofficial implementation of the platform interface of the official
 
 It is not affiliated with or endorsed by Google or Firebase.
 
-> **Status: 0.1.0, not published.** Tested with `flutter test` against the Firestore emulator through the
+> **Status: 0.1.0, not published; built against the 0.2 API of `cloud_firestore_dart`.** Tested with `flutter test` against the Firestore emulator through the
 > classes of `cloud_firestore` 7.1.0. It has not run inside a Flutter app on a device or a desktop yet.
 
 ## When to use it
@@ -59,8 +59,8 @@ Firestore SDK of `cloud_firestore` is still built into the app, unused.
 
 | Argument | Default | What it does |
 | --- | --- | --- |
-| `openDatabase` | none: cache in memory | Opens the SQLite database of the offline cache (`Firestore.instanceFor(openDatabase:)` of `cloud_firestore_dart`; see its guides for an opener built on `sqlite3`). `Settings(persistenceEnabled: false)` turns it off for an instance. |
-| `tokenProviderFor` | none: requests without a user | Returns the token provider (`InternalTokenProvider` of `firebase_app_dart`) for the requests of a FlutterFire app. |
+| `openDatabase` | none: cache in memory | Opens the SQLite database of the offline cache (`FirebaseFirestore.instanceFor(openDatabase:)` of `cloud_firestore_dart`; see its guides for an opener built on `sqlite3`). `Settings(persistenceEnabled: false)` turns it off for an instance. |
+| `tokenProviderFor` | none: requests without a user | Returns the token provider (`AuthTokenProvider` of `firebase_app_dart`) for the requests of a FlutterFire app. |
 | `useDartCore` | Linux only, when `firebase_core` has no other implementation | Installs `DartFirebaseCore`. Pass `true` to force it (tests), `false` to never do it. |
 
 `use()` throws a `StateError` once a Firestore instance has started, because the configuration is read when an
@@ -70,23 +70,45 @@ registration on Linux).
 ### Signed-in users
 
 The package does not depend on `firebase_auth`. It asks `tokenProviderFor` once per app, when the app's first
-Firestore instance starts:
+Firestore instance starts. Without a provider, requests carry no user: enough for the emulator and for open rules.
 
-- With the official `firebase_auth` (Android, iOS, macOS, Windows, web): return a provider that reads the user and
-  the ID token from `FirebaseAuth`, such as `FlutterFireAuthTokenProvider` of the companion bridge package
-  (`cloud_firestore_dart_flutterfire`, in this repository, not released yet).
-- On Linux, where `firebase_auth` has no implementation: return a `FirebaseUserAuth` of
-  [`firebase_auth_providers_dart`](https://pub.dev/packages/firebase_auth_providers_dart).
-- If a `firebase_app_dart` app with the same name as the FlutterFire app already exists (because another package
-  set it up), it is used as it is, with its own token providers, and `tokenProviderFor` is not called.
-
-Without a provider, requests carry no user: enough for the emulator and for open rules.
+**Where the official `firebase_auth` works** (Android, iOS, macOS, Windows, web): take the user from it with
+`FlutterFireAuthTokenProvider` of `cloud_firestore_dart_flutterfire` (in this repository). Firestore then follows
+sign-in, sign-out and a switch of users, as with the official plugin:
 
 ```dart
+import 'package:cloud_firestore_dart_flutterfire/cloud_firestore_dart_flutterfire.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+
 CloudFirestoreDart.use(
-  tokenProviderFor: (FirebaseApp app) => myTokenProviderFor(app),
+  tokenProviderFor: (FirebaseApp app) =>
+      FlutterFireAuthTokenProvider(FirebaseAuth.instanceFor(app: app)),
 );
 ```
+
+The plugin reports a new user a moment after `signInWith...()` completes. When a write right after a sign-in
+must belong to the new user, keep a reference to the provider and `await provider.waitForCurrentUser()` first
+(see the bridge's README).
+
+**On Linux**, where `firebase_auth` has no implementation: sign in with `FirebaseUserAuth` of
+[`firebase_auth_providers_dart`](https://pub.dev/packages/firebase_auth_providers_dart), a pure-Dart client of
+Firebase Auth, and return it:
+
+```dart
+import 'package:firebase_auth_providers_dart/firebase_auth_providers_dart.dart';
+
+final FirebaseUserAuth auth = FirebaseUserAuth(
+  apiKey: DefaultFirebaseOptions.currentPlatform.apiKey,
+  appId: DefaultFirebaseOptions.currentPlatform.appId,
+);
+CloudFirestoreDart.use(tokenProviderFor: (FirebaseApp app) => auth);
+// later
+await auth.signInWithEmailAndPassword(email: email, password: password);
+```
+
+If a `firebase_app_dart` app with the same name as the FlutterFire app already exists (for example one that
+`FlutterFireBridge.firestore()` set up), it is used as it is, with its own token providers, and `tokenProviderFor`
+is not called. Both packages map the FlutterFire options the same way, so they agree on that app.
 
 ## How to enforce it in a project
 
@@ -118,15 +140,14 @@ What `cloud_firestore` can ask of a platform implementation, and what this one d
 | Documents: `get` (with `Source`), `set` (with `merge` and `mergeFields`), `update` (dotted strings and `FieldPath`s with dots), `delete`, `add` | implemented, tested |
 | Typed converters (`withConverter`) | implemented, tested |
 | Queries: `==`, `!=`, `<`, `<=`, `>`, `>=`, `array-contains`, `array-contains-any`, `in`, `not-in`, `isNull`, `FieldPath.documentId`, `Filter.or` / `Filter.and` | implemented, tested |
-| `orderBy` (with `descending`), `limit`, `limitToLast`, `startAt`, `startAfter`, `endAt`, `endBefore`, `startAfterDocument`, `endAtDocument`, `collectionGroup` | implemented, tested |
-| `startAtDocument`, `endBeforeDocument` | implemented, untested (same code path as the tested ones) |
+| `orderBy` (with `descending`), `limit`, `limitToLast`, `startAt`, `startAfter`, `endAt`, `endBefore`, `startAtDocument`, `startAfterDocument`, `endAtDocument`, `endBeforeDocument`, `collectionGroup` | implemented, tested |
 | Aggregations: `count()`, `aggregate(count(), sum(), average())` | implemented, tested |
 | Listeners: document and query `snapshots(includeMetadataChanges:)`, `docChanges` with `oldIndex` / `newIndex`, `ListenSource.cache` | implemented, tested |
 | Snapshot metadata (`hasPendingWrites`, `isFromCache`) | implemented, tested |
 | `GetOptions.serverTimestampBehavior` (`none`, `estimate`, `previous`) | implemented, tested |
 | Write batches | implemented, tested |
 | Transactions: `get`, `set`, `update`, `delete`, an error in the handler | implemented, tested |
-| Transaction `timeout` and `maxAttempts` | implemented, untested (see the differences) |
+| Transaction `timeout` and `maxAttempts` | implemented, tested |
 | Field values: `serverTimestamp`, `increment`, `arrayUnion`, `arrayRemove`, `delete`, `minimum`, `maximum` | implemented, tested |
 | Values: null, bool, int (64 bit), double, String, `Timestamp`, `DateTime` (stored as a `Timestamp`), `GeoPoint`, `Blob`, `DocumentReference`, `VectorValue`, nested maps and lists | implemented, tested (round trip) |
 | Errors: `FirebaseException` with `plugin: 'cloud_firestore'` and the official `code` strings (`not-found`, `failed-precondition`, ...) | implemented, tested for `not-found` and `failed-precondition`; all 17 codes unit-tested |
@@ -138,7 +159,7 @@ What `cloud_firestore` can ask of a platform implementation, and what this one d
 | Disk cache through `openDatabase` | implemented, untested in this package (tested in `cloud_firestore_dart`) |
 | Several databases (`instanceFor(databaseId:)`), several apps | implemented, untested (the emulator has one database) |
 | `FirebaseFirestore.setLoggingEnabled` | implemented (switches `cloud_firestore_dart` logging), untested |
-| Signed-in user through `tokenProviderFor` | implemented, tested that the provider is asked for a token; the emulator runs open rules, so the backend's view of the user is not checked |
+| Signed-in user through `tokenProviderFor`, with a hand-written provider and with `FlutterFireAuthTokenProvider` (fed by a fake user, not the plugin) | implemented, tested that the provider is asked for a token; the emulator runs open rules, so the backend's view of the user is not checked |
 | `firebase_core` on Linux (`DartFirebaseCore`): `initializeApp`, `app`, `apps`, `delete` | implemented, unit-tested |
 | Pipelines (`FirebaseFirestore.pipeline()`) | **not implemented**: throws `UnimplementedError`. Use `package:cloud_firestore_dart/pipelines.dart` directly |
 | `TransactionPlatform.commands` | **not implemented** (`UnimplementedError`); `cloud_firestore` does not read it |
@@ -149,8 +170,8 @@ What `cloud_firestore` can ask of a platform implementation, and what this one d
   `openDatabase` to `use()`.
 - **Settings after start.** Changing `settings` (or calling `useFirestoreEmulator`) after the first operation throws
   a `failed-precondition` `FirebaseException` at once. After `terminate()` they may change again.
-- **Transaction timeout.** When `timeout` passes, the future fails with `deadline-exceeded`, but the attempt that is
-  running is not cancelled and may still commit.
+- **Transaction timeout.** When `timeout` passes, the future fails with `deadline-exceeded` and no new attempt
+  starts, but an attempt that is committing is not cancelled and may still take effect.
 - **Error messages.** The `code` strings are the official ones; the `message` texts are those of
   `cloud_firestore_dart`. Two codes are this package's own: `no-options` (`Firebase.initializeApp` without options
   under `DartFirebaseCore`) and `load-bundle-error` (a bundle that fails with an error that is not a Firestore
