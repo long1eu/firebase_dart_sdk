@@ -86,6 +86,25 @@ gcloud credentials, then the metadata server (the lookup of `package:googleapis_
 same code runs on your machine and on Google Cloud; prefer it to a key file wherever the
 metadata server is available.
 
+The lookup of `applicationDefaultCredentials()`, in order; the first source found gives the token:
+
+```mermaid
+flowchart TD
+  accTitle: Where Application Default Credentials come from
+  accDescr: If GOOGLE_APPLICATION_CREDENTIALS is set, the key file it names is used, which fits a machine outside Google Cloud with a key file. Otherwise, if gcloud auth application-default login was run, its credentials are used, which fits your machine. Otherwise the metadata server gives the token of the service account of the service, job or VM on Cloud Run, Compute Engine or GKE.
+  lookup["applicationDefaultCredentials()<br/>looks for credentials"]
+  envVar{"GOOGLE_APPLICATION_CREDENTIALS<br/>set?"}
+  keyFile["The key file it names<br/>(elsewhere, with a key file)"]
+  gcloud{"gcloud auth application-default login<br/>run on this machine?"}
+  userCreds["Those credentials<br/>(your machine)"]
+  metadata["The metadata server: the service account<br/>of the service, job or VM<br/>(Cloud Run, Compute Engine, GKE)"]
+  lookup --> envVar
+  envVar -- yes --> keyFile
+  envVar -- no --> gcloud
+  gcloud -- yes --> userCreds
+  gcloud -- no --> metadata
+```
+
 One program for all three cases, switched by the environment:
 
 ```dart
@@ -141,6 +160,30 @@ the package):
 - `x-firebase-appcheck`: only when the app has an App Check provider.
 - `x-goog-api-client`, `google-cloud-resource-prefix` and `x-goog-request-params`: the client
   version and the database.
+
+The path of one request in a server process, with Application Default Credentials:
+
+```mermaid
+sequenceDiagram
+  accTitle: The path of a request in a server process
+  accDescr: A request handler calls get with Source.server on the Firestore instance. The instance asks the OAuthTokenProvider for a token. Only when there is none yet or it expires within five minutes does the provider get a new access token from the key file, gcloud or the metadata server. The instance sends the request over gRPC with the Authorization Bearer header, x-firebase-gmpid and x-goog-api-key when the API key is not empty. The backend checks IAM, the security rules are bypassed, and the snapshot returns to the handler.
+  participant handler as Your request handler
+  participant fs as Firestore instance
+  participant prov as OAuthTokenProvider
+  participant source as Credentials source
+  participant be as Firestore backend
+  handler->>fs: doc.get(Source.server)
+  fs->>prov: getAccessToken()
+  alt no token yet, or it expires within 5 minutes
+    prov->>source: key file, gcloud or metadata server
+    source-->>prov: an access token
+  end
+  prov-->>fs: the access token
+  fs->>be: gRPC request, Authorization Bearer, x-firebase-gmpid, x-goog-api-key if not empty
+  Note over be: IAM decides, security rules are bypassed
+  be-->>fs: the document
+  fs-->>handler: DocumentSnapshot
+```
 
 What the existing documentation establishes about the identity:
 
