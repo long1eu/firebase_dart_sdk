@@ -12,6 +12,21 @@ app and a browser app. Each directory is a package of its own with a `pubspec.ya
 | [`flutter_notes/`](flutter_notes/) | A Flutter notes app: a real-time list, offline edits in a SQLite cache, an offline indicator, connectivity events and a clean shutdown. Built and run on macOS only. |
 | [`web_app/`](web_app/) | A browser app in plain Dart (`package:web`): a real-time list, offline writes, a memory or SQLite (IndexedDB/OPFS) cache, and a Firestore Lite page to compare sizes. Experimental, tried in Chrome only. |
 
+To pick one, start from where your code runs and follow the arrows:
+
+```mermaid
+flowchart TD
+  start{"Where does your code run?"}
+  start -- "a server or a container" --> serverKind{"How does it run?"}
+  serverKind -- "answers HTTP requests" --> serverShelf["server_shelf"]
+  serverKind -- "runs once and exits" --> cloudRunJob["cloud_run_job"]
+  serverKind -- "runs until stopped, takes jobs" --> workerQueue["worker_queue"]
+  start -- "a terminal" --> cli["cli"]
+  start -- "a Flutter app" --> flutterNotes["flutter_notes"]
+  start -- "a browser, without Flutter" --> webApp["web_app"]
+  start -- "I want one API topic" --> apiExamples["cloud_firestore_dart/example/"]
+```
+
 For the API one topic at a time, see
 the programs in [`cloud_firestore/cloud_firestore_dart/example/`](../cloud_firestore/cloud_firestore_dart/example/README.md).
 
