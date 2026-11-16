@@ -18,14 +18,14 @@ Future<void> main() async {
   _text('#backend', config.backendLabel);
 
   final FirebaseApp app = FirebaseApp.withOptions(firebaseOptions);
-  FirestoreSettings settings = FirestoreSettings();
+  Settings settings = Settings();
   if (config.emulatorHost != null) {
     settings = settings.withEmulator(
       config.emulatorHost!,
       config.emulatorPort!,
     );
   }
-  final Firestore firestore = Firestore.instanceFor(
+  final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(
     app: app,
     settings: settings,
   );
@@ -46,14 +46,14 @@ Future<void> _load(CollectionReference<Map<String, Object?>> notes) async {
   final web.Element list = web.document.querySelector('#notes')!;
   try {
     final QuerySnapshot<Map<String, Object?>> snapshot = await notes
-        .orderBy('createdAt', Direction.descending)
+        .orderBy('createdAt', descending: true)
         .limit(50)
         .get();
     list.textContent = '';
     for (final QueryDocumentSnapshot<Map<String, Object?>> doc
         in snapshot.docs) {
       final web.Element item = web.document.createElement('li');
-      item.textContent = '${doc.data['text']}';
+      item.textContent = '${doc.data()['text']}';
       list.append(item);
     }
     if (snapshot.docs.isEmpty) {
@@ -63,7 +63,7 @@ Future<void> _load(CollectionReference<Map<String, Object?>> notes) async {
       '#sync',
       'Read ${snapshot.docs.length} notes at ${_time(DateTime.now())}',
     );
-  } on FirestoreError catch (e) {
+  } on FirestoreException catch (e) {
     // Without a connection a read fails (unavailable): there is no cache.
     _text('#sync', 'Read failed: ${e.code}: ${e.message}');
   }
@@ -90,7 +90,7 @@ void _setUpForm(CollectionReference<Map<String, Object?>> notes) {
       input.value = '';
       _text('#error', '');
       await _load(notes);
-    } on FirestoreError catch (e) {
+    } on FirestoreException catch (e) {
       _text('#error', 'Write failed: ${e.code}: ${e.message}');
     }
   });

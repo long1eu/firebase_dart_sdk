@@ -14,7 +14,7 @@ import 'package:firebase_app_dart/firebase_app_dart.dart';
 /// `?emulator=none`.
 const FirebaseOptions firebaseOptions = FirebaseOptions(
   apiKey: 'demo-key',
-  applicationId: '1:1234567890:web:example',
+  appId: '1:1234567890:web:example',
   projectId: 'demo-example',
 );
 

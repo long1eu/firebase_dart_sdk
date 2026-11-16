@@ -7,10 +7,10 @@
 import 'dart:async';
 
 import 'package:cloud_firestore_dart/cloud_firestore_dart.dart';
+import 'package:cloud_firestore_dart_sqlite/cloud_firestore_dart_sqlite.dart';
 import 'package:firebase_app_dart/firebase_app_dart.dart';
 import 'package:web/web.dart' as web;
 import 'package:web_app/app_config.dart';
-import 'package:web_app/sqlite_database_web.dart';
 
 Future<void> main() async {
   final AppConfig config = AppConfig.fromUri(Uri.base);
@@ -18,7 +18,7 @@ Future<void> main() async {
   _setUpCacheChoice(config.cache);
 
   final FirebaseApp app = FirebaseApp.withOptions(firebaseOptions);
-  FirestoreSettings settings = FirestoreSettings();
+  Settings settings = Settings();
   if (config.emulatorHost != null) {
     settings = settings.withEmulator(
       config.emulatorHost!,
@@ -26,7 +26,7 @@ Future<void> main() async {
     );
   }
 
-  final Firestore firestore;
+  final FirebaseFirestore firestore;
   try {
     firestore = await _open(app, settings, config.cache);
   } catch (e) {
@@ -44,9 +44,9 @@ Future<void> main() async {
 }
 
 /// Creates the instance with the cache the page was asked for.
-Future<Firestore> _open(
+Future<FirebaseFirestore> _open(
   FirebaseApp app,
-  FirestoreSettings settings,
+  Settings settings,
   CacheChoice cache,
 ) async {
   switch (cache) {
@@ -55,7 +55,7 @@ Future<Firestore> _open(
         '#cache-status',
         'Memory: the cache is gone when you close the page.',
       );
-      return Firestore.instanceFor(
+      return FirebaseFirestore.instanceFor(
         app: app,
         settings: settings.copyWith(cacheSettings: const MemoryCacheSettings()),
       );
@@ -65,12 +65,14 @@ Future<Firestore> _open(
       // A second tab cannot open the same persistent cache (a Web Lock guards
       // it): openWithMemoryFallback then returns an instance with a memory
       // cache.
-      final Firestore firestore = await openWithMemoryFallback(
+      final FirebaseFirestore firestore = await openWithMemoryFallback(
         app: app,
-        sqlite3Wasm: Uri.parse('sqlite3.wasm'),
-        opfsWorker: cache == CacheChoice.opfs
-            ? Uri.parse('sqlite_opfs_worker.js')
-            : null,
+        openDatabase: sqliteOpener(
+          sqlite3Wasm: Uri.parse('sqlite3.wasm'),
+          opfsWorker: cache == CacheChoice.opfs
+              ? Uri.parse('sqlite_opfs_worker.js')
+              : null,
+        ),
         settings: settings.copyWith(cacheSettings: PersistentCacheSettings()),
       );
       // The index manager exists only with a persistent cache.
@@ -101,11 +103,11 @@ Future<Firestore> _open(
 void _listen(CollectionReference<Map<String, Object?>> notes) {
   final web.Element list = web.document.querySelector('#notes')!;
   notes
-      .orderBy('createdAt', Direction.descending)
+      .orderBy('createdAt', descending: true)
       .limit(50)
-      // MetadataChanges.include: also a snapshot when only isFromCache or
+      // includeMetadataChanges: also a snapshot when only isFromCache or
       // hasPendingWrites changed, so that the indicator follows them.
-      .getSnapshots(MetadataChanges.include)
+      .snapshots(includeMetadataChanges: true)
       .listen(
         (QuerySnapshot<Map<String, Object?>> snapshot) {
           list.textContent = '';
@@ -113,8 +115,8 @@ void _listen(CollectionReference<Map<String, Object?>> notes) {
               in snapshot.docs) {
             // A server timestamp the backend has not set yet reads as null;
             // `estimate` gives the local time instead.
-            final Map<String, Object?> data = doc.getData(
-              ServerTimestampBehavior.estimate,
+            final Map<String, Object?> data = doc.data(
+              serverTimestamps: ServerTimestampBehavior.estimate,
             );
             final web.Element item = web.document.createElement('li');
             final Object? createdAt = data['createdAt'];
@@ -173,7 +175,7 @@ void _setUpForm(CollectionReference<Map<String, Object?>> notes) {
 
 /// Takes the client offline and back, to try offline writes without
 /// unplugging anything.
-void _setUpNetworkToggle(Firestore firestore) {
+void _setUpNetworkToggle(FirebaseFirestore firestore) {
   final web.HTMLButtonElement button =
       web.document.querySelector('#network') as web.HTMLButtonElement;
   bool enabled = true;

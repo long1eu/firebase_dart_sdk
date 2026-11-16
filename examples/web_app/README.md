@@ -58,8 +58,10 @@ dart pub get
 dart compile js -O2 -o build/web/main.dart.js web/main.dart
 dart compile js -O2 -o build/web/lite.dart.js web/lite.dart
 
-# The worker of the OPFS cache (always JavaScript, also for a dart2wasm page).
-dart compile js -O2 -o build/web/sqlite_opfs_worker.js web/sqlite_opfs_worker.dart
+# The worker of the OPFS cache (always JavaScript, also for a dart2wasm page). The tool of
+# cloud_firestore_dart_sqlite compiles it with this app's dependencies, and prints the URL of
+# the sqlite3.wasm that goes with the resolved sqlite3 version.
+dart run cloud_firestore_dart_sqlite:setup_web build/web
 
 # SQLite compiled to WebAssembly, of the exact sqlite3 version in pubspec.lock (2.9.4).
 curl -fL -o build/web/sqlite3.wasm \
@@ -99,12 +101,14 @@ special headers are needed (the OPFS cache does not need cross-origin isolation)
 | `web/index.html`, `web/lite.html`, `web/styles.css` | The pages. |
 | `web/bootstrap.js` | Starts `<app>.dart.js`, or `<app>.mjs` and `<app>.wasm` with `?compiler=wasm`. |
 | `lib/app_config.dart` | The `FirebaseOptions`, and the settings read from the address (`emulator`, `cache`). It imports neither Firestore library, so the Lite page stays small. |
-| `lib/sqlite_database_web.dart` | The web `OpenDatabase`, copied unchanged from `example/sqlite_database_web.dart` of `cloud_firestore_dart` 0.1.0. |
-| `web/sqlite_opfs_worker.dart` | The OPFS worker, copied unchanged from `example/sqlite_opfs_worker.dart` of the same version. |
 | `bin/serve.dart` | The static file server. |
 
-When you update `cloud_firestore_dart`, copy the two files again from the `example/` folder of
-the new version (in your pub cache, or the repository).
+The persistent caches come from the package
+[`cloud_firestore_dart_sqlite`](https://pub.dev/packages/cloud_firestore_dart_sqlite):
+`sqliteOpener(sqlite3Wasm: ..., opfsWorker: ...)` is the `openDatabase` of the instance, and
+`openWithMemoryFallback` gives a memory cache to a second tab. Its OPFS worker is compiled by
+`setup_web` into `build/web/sqlite_opfs_worker.js`; run that command again when the package or
+`sqlite3` changes version.
 
 ## `sqlite3.wasm`
 
@@ -112,7 +116,9 @@ The persistent caches load `sqlite3.wasm`: SQLite compiled to WebAssembly by the
 [`sqlite3`](https://pub.dev/packages/sqlite3) package, published as an asset of each release
 of [simolus3/sqlite3.dart](https://github.com/simolus3/sqlite3.dart/releases) (release
 `sqlite3-2.9.4` here). It must be the build of the `sqlite3` version that your app resolves,
-which is why `pubspec.yaml` pins `sqlite3: 2.9.4`. The checksum above is the one this
+which is why `pubspec.yaml` pins `sqlite3: 2.9.4`, the version the browser storage of
+`cloud_firestore_dart_sqlite` was tested with (its README advises against 3.4.0 to 3.5.2 in a
+browser). The checksum above is the one this
 repository's browser tests pin (`tool/build_web_test_assets.sh`).
 
 Licences: the `sqlite3` package, and the code it adds around SQLite in that file, are under the
@@ -124,15 +130,16 @@ never load it.
 
 ## Sizes
 
-Measured with Dart 3.12.2 and `-O2`; gzipped with `gzip -9`.
+Measured with Dart 3.12.2 and `-O2`, with `cloud_firestore_dart` 0.2.0 and
+`cloud_firestore_dart_sqlite` 0.1.0; gzipped with `gzip -9`.
 
 | File | Bytes | Gzipped |
 | --- | ---: | ---: |
-| `main.dart.js` (main library) | 919,170 | 272,225 |
-| `lite.dart.js` (Lite) | 394,232 | 121,721 |
-| `main.wasm` + `main.mjs` | 907,190 + 29,105 | 341,157 + 6,461 |
-| `lite.wasm` + `lite.mjs` | 335,130 + 15,890 | 134,917 + 4,165 |
-| `sqlite_opfs_worker.js` | 185,379 | 57,363 |
+| `main.dart.js` (main library) | 923,999 | 273,496 |
+| `lite.dart.js` (Lite) | 397,741 | 122,129 |
+| `main.wasm` + `main.mjs` | 914,774 + 29,105 | 342,322 + 6,438 |
+| `lite.wasm` + `lite.mjs` | 340,612 + 15,890 | 135,659 + 4,165 |
+| `sqlite_opfs_worker.js` | 185,379 | 57,400 |
 | `sqlite3.wasm` | 730,989 | 347,931 |
 
 The main page contains the SQLite opener whatever cache you pick, since it imports it. A page
@@ -146,8 +153,14 @@ has the numbers of a program without the opener.
   adding a note, an offline write sent after `enableNetwork()`, the three caches, a reload with
   the backend unreachable (OPFS), a second tab falling back to the memory cache (IndexedDB and
   OPFS), and the Lite page.
+- Run again the same way with version 0.2.0 of the packages and `cloud_firestore_dart_sqlite`
+  0.1.0 (Chrome 157, dart2js and dart2wasm, driven over the DevTools protocol): the same steps,
+  and a reload with the backend unreachable for IndexedDB as well as OPFS. On the Lite page with
+  the backend unreachable, the read and the write fail with
+  `unavailable: Request failed with error: TypeError: Failed to fetch`.
 - Not run against a real Firebase project, and not in other browsers.
-- The two screenshots above: built with `dart compile js -O2` as described, served by
+- The two screenshots above (taken with 0.1; the page did not change): built with
+  `dart compile js -O2` as described, served by
   `bin/serve.dart`, opened in headless Chrome with `?emulator=127.0.0.1:8141` and driven over the
   Chrome DevTools protocol (memory cache, Dart 3.12.2, Firestore emulator v1.22.0).
 
@@ -163,6 +176,6 @@ This has not been tried.
 
 | Package | Licence |
 | --- | --- |
-| `cloud_firestore_dart`, `firebase_app_dart` | Apache 2.0 |
+| `cloud_firestore_dart`, `firebase_app_dart`, `cloud_firestore_dart_sqlite` | Apache 2.0 |
 | `sqlite3` | MIT |
 | `web`, `path`, `lints` (dev) | BSD 3-Clause |

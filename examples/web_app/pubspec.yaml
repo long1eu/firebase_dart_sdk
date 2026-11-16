@@ -9,12 +9,14 @@ environment:
   sdk: ^3.8.0
 
 dependencies:
-  cloud_firestore_dart: ^0.1.0
-  firebase_app_dart: ^0.1.0
+  cloud_firestore_dart: ^0.2.0
+  # The SQLite cache in the browser (IndexedDB or OPFS).
+  cloud_firestore_dart_sqlite: ^0.1.0
+  firebase_app_dart: ^0.2.0
   path: ^1.9.0
   # Pinned: the sqlite3.wasm file next to the page must be the build of this
-  # exact version (see README.md). lib/sqlite_database_web.dart needs 2.7.3 or
-  # later and is written for the 2.x API.
+  # exact version (see README.md), and 2.9.4 is the version the browser cache
+  # of cloud_firestore_dart_sqlite was tested with.
   sqlite3: 2.9.4
   web: ^1.1.0
 
