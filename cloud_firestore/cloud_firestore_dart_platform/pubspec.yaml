@@ -1,0 +1,47 @@
+name: cloud_firestore_dart_platform
+description: >-
+  Unofficial pure-Dart implementation of the FlutterFire Cloud Firestore
+  platform interface, backed by cloud_firestore_dart: use the official
+  cloud_firestore API on Linux, or on any platform when you choose to.
+version: 0.1.0
+homepage: https://github.com/long1eu/firebase_dart_sdk
+repository: https://github.com/long1eu/firebase_dart_sdk/tree/main/cloud_firestore/cloud_firestore_dart_platform
+issue_tracker: https://github.com/long1eu/firebase_dart_sdk/issues
+topics:
+  - firebase
+  - firestore
+  - flutterfire
+
+environment:
+  sdk: ^3.8.0
+  flutter: '>=3.32.0'
+
+# Flutter registers the plugin class before main() only on the platforms listed
+# here. Linux is the only platform where neither cloud_firestore nor
+# firebase_core has an implementation of its own; elsewhere the app calls
+# CloudFirestoreDart.use() (see the README).
+flutter:
+  plugin:
+    implements: cloud_firestore
+    platforms:
+      linux:
+        dartPluginClass: CloudFirestoreDart
+
+dependencies:
+  # Local development resolves cloud_firestore_dart and firebase_app_dart from
+  # the sibling packages through pubspec_overrides.yaml (not published).
+  cloud_firestore_dart: ^0.1.1
+  cloud_firestore_platform_interface: ^8.1.0
+  collection: ^1.18.0
+  firebase_app_dart: ^0.1.1
+  firebase_core: ^5.1.0
+  firebase_core_platform_interface: ^8.1.1
+  flutter:
+    sdk: flutter
+
+dev_dependencies:
+  # The app-facing package the tests drive, as an app would.
+  cloud_firestore: ^7.1.0
+  flutter_test:
+    sdk: flutter
+  lints: ^6.1.0

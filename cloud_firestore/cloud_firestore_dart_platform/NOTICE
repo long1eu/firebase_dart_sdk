@@ -1,0 +1,15 @@
+cloud_firestore_dart_platform
+Copyright 2026 Razvan Lung (long1eu) and contributors.
+
+This package implements the platform interface of the FlutterFire
+cloud_firestore plugin (cloud_firestore_platform_interface, Copyright 2017 the
+Chromium project authors, BSD 3-Clause license) and the platform interface of
+firebase_core (firebase_core_platform_interface, BSD 3-Clause license). It
+depends on those packages; it does not copy their code. The work is done by
+cloud_firestore_dart, an unofficial Dart port of the Firebase Android SDK
+(Apache License, Version 2.0).
+
+This package is not affiliated with, endorsed by or supported by Google LLC or
+Firebase. "Firebase" and "Cloud Firestore" are trademarks of Google LLC.
+
+Licensed under the Apache License, Version 2.0; see the LICENSE file.
