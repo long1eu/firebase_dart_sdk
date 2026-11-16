@@ -29,15 +29,23 @@ packages:
     dependency: transitive
     description:
       name: clock
-      sha256: fddb70d9b5277016c77a80201021d40a2247104d9f4aa7bab7157b7e3f05b84b
+      sha256: e51d50bca3217c9a9fa2b41a30e4a38971133f5f9ec7a3d57bae095007f1d28e
       url: "https://pub.dev"
     source: hosted
-    version: "1.1.2"
+    version: "1.1.3"
   cloud_firestore_dart:
     dependency: "direct main"
     description:
       name: cloud_firestore_dart
-      sha256: "0ef460aa7d53c521c729324c9cfd138fd5202c4fc8da74cc2e5889873e212386"
+      sha256: "07998231bb03706a09ba1da2ba8fcb516e0f68f79f87eaca2913c397eefde853"
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.2.0"
+  cloud_firestore_dart_sqlite:
+    dependency: "direct main"
+    description:
+      name: cloud_firestore_dart_sqlite
+      sha256: "33efd5f9a88ab51aebf9ef2f53af83af21fe7fef0bae77dd9be982cff9d10518"
       url: "https://pub.dev"
     source: hosted
     version: "0.1.0"
@@ -97,14 +105,22 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.2.0"
+  file:
+    dependency: transitive
+    description:
+      name: file
+      sha256: a3b4f84adafef897088c160faf7dfffb7696046cb13ae90b508c2cbc95d3b8d4
+      url: "https://pub.dev"
+    source: hosted
+    version: "7.0.1"
   firebase_app_dart:
     dependency: "direct main"
     description:
       name: firebase_app_dart
-      sha256: "5eaf0e2767300861110816075c9b53291d3d84193bf2270f487114480e64709e"
+      sha256: "2e3dbe78660ab4d451c41b536c272314cce26551dc88c2205b9636f050c1df59"
       url: "https://pub.dev"
     source: hosted
-    version: "0.1.0"
+    version: "0.2.0"
   fixnum:
     dependency: transitive
     description:
@@ -131,6 +147,14 @@ packages:
     description: flutter
     source: sdk
     version: "0.0.0"
+  glob:
+    dependency: transitive
+    description:
+      name: glob
+      sha256: "218aeb56050c714f62a3182775320dfa04602b55074873e24e31bbd39bda96fb"
+      url: "https://pub.dev"
+    source: hosted
+    version: "2.2.0"
   google_cloud:
     dependency: transitive
     description:
@@ -251,6 +275,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.18.0"
+  native_toolchain_c:
+    dependency: transitive
+    description:
+      name: native_toolchain_c
+      sha256: f9c168717100ae6d9fee9ffb0be379bf1f8b26b0f6bcbd4fdddcd931993a6a72
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.19.2"
   nm:
     dependency: transitive
     description:
@@ -409,29 +441,21 @@ packages:
     source: hosted
     version: "1.10.2"
   sqlite3:
-    dependency: "direct main"
+    dependency: transitive
     description:
       name: sqlite3
-      sha256: "3145bd74dcdb4fd6f5c6dda4d4e4490a8087d7f286a14dee5d37087290f0f8a2"
+      sha256: "4c7fe79840389aaeaf05fd093f795b631b5a98e2bd28d54e555c100f4a9c7a1c"
       url: "https://pub.dev"
     source: hosted
-    version: "2.9.4"
-  sqlite3_flutter_libs:
-    dependency: "direct main"
-    description:
-      name: sqlite3_flutter_libs
-      sha256: eeb9e3a45207649076b808f8a5a74d68770d0b7f26ccef6d5f43106eee5375ad
-      url: "https://pub.dev"
-    source: hosted
-    version: "0.5.42"
+    version: "3.5.2"
   stack_trace:
     dependency: transitive
     description:
       name: stack_trace
-      sha256: "8b27215b45d22309b5cddda1aa2b19bdfec9df0e765f2de506401c071d38d1b1"
+      sha256: "277654b3034d17ac6f9f1cb5595db011b1d5d41e8806866db28e0abaa101c490"
       url: "https://pub.dev"
     source: hosted
-    version: "1.12.1"
+    version: "1.12.2"
   string_scanner:
     dependency: transitive
     description:

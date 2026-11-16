@@ -14,7 +14,7 @@ Future<void> main() async {
   // must exist before the app and the instance are created.
   WidgetsFlutterBinding.ensureInitialized();
   final AppDependencies dependencies = AppDependencies();
-  final Firestore firestore = await createFirestore(dependencies);
+  final FirebaseFirestore firestore = await createFirestore(dependencies);
   runApp(NotesApp(firestore: firestore, dependencies: dependencies));
 }
 
@@ -25,7 +25,7 @@ class NotesApp extends StatefulWidget {
     required this.dependencies,
   });
 
-  final Firestore firestore;
+  final FirebaseFirestore firestore;
   final AppDependencies dependencies;
 
   @override

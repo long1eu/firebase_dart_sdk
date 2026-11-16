@@ -2,13 +2,12 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:cloud_firestore_dart/cloud_firestore_dart.dart';
+import 'package:cloud_firestore_dart_sqlite/cloud_firestore_dart_sqlite.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:firebase_app_dart/firebase_app_dart.dart';
 import 'package:firebase_app_dart/platform_dependencies.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:rxdart/rxdart.dart';
-
-import 'sqlite_database.dart';
 
 // The backend, from --dart-define. By default the app talks to a Firestore
 // emulator on 127.0.0.1:8080 (on the Android emulator, pass
@@ -67,26 +66,24 @@ class AppDependencies extends PlatformDependencies {
 
 /// Creates the app and the Firestore instance, with the cache in a SQLite
 /// file in the application support directory.
-Future<Firestore> createFirestore(AppDependencies dependencies) async {
+Future<FirebaseFirestore> createFirestore(AppDependencies dependencies) async {
   final FirebaseApp app = FirebaseApp.withOptions(
     const FirebaseOptions(
       apiKey: apiKey,
-      applicationId: applicationId,
+      appId: applicationId,
       projectId: projectId,
     ),
     dependencies: dependencies,
   );
 
   final Directory directory = await getApplicationSupportDirectory();
-  FirestoreSettings settings = FirestoreSettings(
-    cacheSettings: PersistentCacheSettings(),
-  );
+  Settings settings = Settings(cacheSettings: PersistentCacheSettings());
   if (useEmulator) {
     settings = settings.withEmulator(emulatorHost, emulatorPort);
   }
-  return Firestore.instanceFor(
+  return FirebaseFirestore.instanceFor(
     app: app,
     settings: settings,
-    openDatabase: sqliteOpener(Directory('${directory.path}/firestore')),
+    openDatabase: sqliteOpener(directory: '${directory.path}/firestore'),
   );
 }

@@ -24,8 +24,8 @@ class NoteConverter extends FirestoreDataConverter<Note> {
   ) {
     // A note written on this device and not yet acknowledged has no server
     // timestamp yet: `estimate` gives the local time instead of null.
-    final Map<String, Object?> data = snapshot.getData(
-      ServerTimestampBehavior.estimate,
+    final Map<String, Object?> data = snapshot.data(
+      serverTimestamps: ServerTimestampBehavior.estimate,
     )!;
     return Note(
       title: data['title'] as String? ?? '',

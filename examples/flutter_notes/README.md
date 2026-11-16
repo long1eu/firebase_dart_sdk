@@ -8,13 +8,13 @@ What it shows:
 
 | What | Where |
 | --- | --- |
-| The `FirebaseApp` and the `Firestore` instance created in `main()` before `runApp`, from `--dart-define` values | `lib/firestore_setup.dart`, `lib/main.dart` |
-| The persistent cache: a SQLite file in the application support directory, opened with `package:sqlite3`; `sqlite3_flutter_libs` bundles the native library | `lib/sqlite_database.dart` (a copy of the package's `example/sqlite_database.dart`), `lib/firestore_setup.dart` |
+| The `FirebaseApp` and the `FirebaseFirestore` instance created in `main()` before `runApp`, from `--dart-define` values | `lib/firestore_setup.dart`, `lib/main.dart` |
+| The persistent cache: a SQLite file in the application support directory, opened by `sqliteOpener(directory: ...)` of `cloud_firestore_dart_sqlite`; the build hook of `sqlite3` 3.x bundles SQLite with the app | `lib/firestore_setup.dart` |
 | Connectivity events of `connectivity_plus` fed to `PlatformDependencies.onNetworkConnected` | `AppDependencies` in `lib/firestore_setup.dart` |
-| A real-time listener in a `StreamBuilder`, with `MetadataChanges.include` | `lib/notes_page.dart` |
+| A real-time listener in a `StreamBuilder`, with `snapshots(includeMetadataChanges: true)` | `lib/notes_page.dart` |
 | An offline indicator from `isFromCache` and `hasPendingWrites` of the snapshot metadata, and a mark on each note that is not on the server yet | `_StatusLine` and `_buildList` in `lib/notes_page.dart` |
 | Add, edit and delete without awaiting the write (the future completes only when the server acknowledged it) | `_write` in `lib/notes_page.dart` |
-| A typed model with a `FirestoreDataConverter` and a server timestamp | `lib/note.dart` |
+| A typed model with `withConverter` and a server timestamp | `lib/note.dart` |
 | The app lifecycle: `disableNetwork()` on pause and `enableNetwork()` on resume (Android, iOS), `terminate()` when a desktop app is asked to quit | `lib/main.dart` |
 
 The state is plain Flutter: `StatefulWidget`s and a `StreamBuilder`, no state management package.
@@ -31,11 +31,11 @@ How `main()` wires the pieces together before `runApp`, and what the widgets use
 flowchart TD
   connectivity["connectivity_plus events"] --> deps["AppDependencies, onNetworkConnected"]
   deps -- "dependencies:" --> app["FirebaseApp.withOptions, from --dart-define"]
-  app --> firestore["Firestore.instanceFor"]
+  app --> firestore["FirebaseFirestore.instanceFor"]
   sqlite["sqliteOpener: SQLite file in the application support directory"] -- "openDatabase:" --> firestore
   settings["PersistentCacheSettings, withEmulator"] -- "settings:" --> firestore
   firestore -- "gRPC" --> backend["Firestore emulator or project"]
-  firestore --> notesPage["NotesPage: StreamBuilder over getSnapshots"]
+  firestore --> notesPage["NotesPage: StreamBuilder over snapshots()"]
   lifecycle["AppLifecycleListener"] -- "disableNetwork, enableNetwork, terminate" --> firestore
 ```
 
@@ -95,8 +95,8 @@ project. To add sign-in, see [Authentication](../../docs/guides/authentication.m
 
 | Platform | Status |
 | --- | --- |
-| macOS | Built (`flutter build macos --debug`) and run against the emulator by hand: the listener, an edit offline, the sync when the emulator came back, the cache across a restart, and `terminate()` on Cmd-Q |
-| macOS, screenshots | `flutter build macos --debug --dart-define=EMULATOR_PORT=8141`, the built app run against a private emulator with three notes written through the emulator's REST API, captured with `screencapture -l` |
+| macOS | Built (`flutter build macos --debug`) and run against the emulator by hand: the listener, an edit offline, the sync when the emulator came back, the cache across a restart, and `terminate()` on Cmd-Q. Again with 0.2.0 and `cloud_firestore_dart_sqlite` 0.1.0 (`sqlite3` 3.5.2): the notes loaded, a note added and deleted in the app reached the emulator, the app quit from its menu, and started again with the emulator stopped it showed the notes from its SQLite file (a file first created by the 0.1 build with the copied opener) |
+| macOS, screenshots | Taken with the 0.1 build; the UI did not change in 0.2. `flutter build macos --debug --dart-define=EMULATOR_PORT=8141`, the built app run against a private emulator with three notes written through the emulator's REST API, captured with `screencapture -l` |
 | Android, iOS, Linux, Windows | Not built and not run. The platform folders are those of `flutter create` with the changes below |
 
 Changes to the generated platform projects:
@@ -109,10 +109,16 @@ Changes to the generated platform projects:
 
 ## Notes
 
-- `sqlite_database.dart` is written for `package:sqlite3` 2.x (`package:sqlite3/open.dart`), so
-  the app pins `sqlite3: ^2.7.3` and `sqlite3_flutter_libs: ^0.5.40`. `sqlite3` 3.x bundles the
-  library itself and `sqlite3_flutter_libs` 0.6 is an empty end-of-life release; the opener has
-  not been ported to 3.x.
+- `pubspec.yaml` depends on the versions on pub.dev (`cloud_firestore_dart` and
+  `firebase_app_dart` `^0.2.0`, `cloud_firestore_dart_sqlite` `^0.1.0`). `pubspec.lock` records
+  the versions it was run with.
+- The app has no `sqlite3` dependency of its own and no `sqlite3_flutter_libs`: with Flutter 3.44
+  pub picks `sqlite3` 3.x for `cloud_firestore_dart_sqlite` (3.5.2 here: 3.6.0 and later need
+  `meta` 1.19, and Flutter 3.44 pins 1.18), and its build hook downloads a SQLite build and
+  bundles it with the app (`sqlite3.framework` in the macOS app). The build needs network access
+  to GitHub for that download, unless `hooks: user_defines: sqlite3:` in `pubspec.yaml` points it
+  at another SQLite. On a Flutter older than 3.38 pub picks `sqlite3` 2.x; then add
+  `sqlite3_flutter_libs: ^0.5.40` (see the README of `cloud_firestore_dart_sqlite`).
 - `connectivity_plus` uses the packages `nm` and `dbus` on Linux, which are under the Mozilla
   Public License 2.0. Every other dependency is under MIT, BSD or Apache-2.0.
 - The guide [Flutter](../../docs/guides/flutter.md) explains the code of this app step by step.
