@@ -10,7 +10,7 @@ import 'package:worker_queue/job_worker.dart';
 
 Future<void> main() async {
   final Map<String, String> env = Platform.environment;
-  final Firestore firestore;
+  final FirebaseFirestore firestore;
   try {
     firestore = firestoreFromEnvironment();
   } on ConfigurationError catch (error) {

@@ -8,7 +8,7 @@ import 'package:cloud_firestore_dart/cloud_firestore_dart.dart';
 import 'package:worker_queue/firestore_from_env.dart';
 
 Future<void> main() async {
-  final Firestore firestore;
+  final FirebaseFirestore firestore;
   try {
     firestore = firestoreFromEnvironment();
   } on ConfigurationError catch (error) {
@@ -17,19 +17,19 @@ Future<void> main() async {
   }
   final QuerySnapshot<Map<String, Object?>> jobs = await firestore
       .collection(Platform.environment['JOBS_COLLECTION'] ?? 'jobs')
-      .get(Source.server);
+      .get(const GetOptions(source: Source.server));
 
   final Map<String, int> byStatus = <String, int>{};
   final Map<String, int> byWorker = <String, int>{};
   final List<String> twice = <String>[];
   for (final QueryDocumentSnapshot<Map<String, Object?>> job in jobs.docs) {
-    final String status = '${job.data['status']}';
+    final String status = '${job.data()['status']}';
     byStatus[status] = (byStatus[status] ?? 0) + 1;
-    final QuerySnapshot<Map<String, Object?>> runs = await job.ref
+    final QuerySnapshot<Map<String, Object?>> runs = await job.reference
         .collection('runs')
-        .get(Source.server);
+        .get(const GetOptions(source: Source.server));
     for (final QueryDocumentSnapshot<Map<String, Object?>> run in runs.docs) {
-      final String worker = '${run.data['worker']}';
+      final String worker = '${run.data()['worker']}';
       byWorker[worker] = (byWorker[worker] ?? 0) + 1;
     }
     if (runs.length > 1) {

@@ -39,9 +39,9 @@ class ConfigurationError implements Exception {
 /// The memory cache is used (no `openDatabase`): nothing is written to disk.
 /// [appName] names the `FirebaseApp`; a program that needs one instance can
 /// leave it out.
-Firestore firestoreFromEnvironment({
+FirebaseFirestore firestoreFromEnvironment({
   Map<String, String>? environment,
-  String appName = FirebaseApp.defaultAppName,
+  String appName = defaultFirebaseAppName,
 }) {
   final Map<String, String> env = environment ?? Platform.environment;
   final String? emulator = _nonEmpty(env['FIRESTORE_EMULATOR_HOST']);
@@ -58,13 +58,13 @@ Firestore firestoreFromEnvironment({
     FirebaseOptions(
       apiKey: env['FIREBASE_API_KEY'] ?? '',
       // Any non-empty id works outside of Android and iOS.
-      applicationId: '1:1234567890:dart:example',
+      appId: '1:1234567890:dart:example',
       projectId: projectId ?? 'demo-example',
     ),
     name: appName,
   );
 
-  FirestoreSettings settings = FirestoreSettings();
+  Settings settings = Settings();
   if (emulator != null) {
     final int colon = emulator.lastIndexOf(':');
     final int? port = colon < 0
@@ -81,9 +81,9 @@ Firestore firestoreFromEnvironment({
     app.authProvider = applicationDefaultCredentials();
   }
 
-  return Firestore.instanceFor(
+  return FirebaseFirestore.instanceFor(
     app: app,
-    database: _nonEmpty(env['FIRESTORE_DATABASE']) ?? '(default)',
+    databaseId: _nonEmpty(env['FIRESTORE_DATABASE']) ?? '(default)',
     settings: settings,
   );
 }

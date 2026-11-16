@@ -8,7 +8,7 @@ import 'package:worker_queue/firestore_from_env.dart';
 
 Future<void> main(List<String> arguments) async {
   final int count = arguments.isEmpty ? 20 : int.parse(arguments.first);
-  final Firestore firestore;
+  final FirebaseFirestore firestore;
   try {
     firestore = firestoreFromEnvironment();
   } on ConfigurationError catch (error) {
