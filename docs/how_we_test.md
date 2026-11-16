@@ -30,6 +30,15 @@ WebChannel endpoint.
 
 ## The suites
 
+Each suite runs a different part of the client. In the picture, look at where a bar stops: the spec tests
+and the view property tests run the sync engine, the cache and the remote store for real but replace the
+`Datastore` and the transport with `MockDatastore`, so only the suites with a full bar reach a transport.
+
+![Chart of the client layers each suite runs: spec tests and view property tests run EventManager, SyncEngine,
+LocalStore and RemoteStore against a MockDatastore with scripted or random backend messages; the integration
+suites over gRPC and WebChannel, the chaos tests, the Enterprise suite and the browser tests run the whole client
+against the Standard emulator, a TCP proxy in front of it, or the Enterprise emulator](images/arch/test_coverage.svg)
+
 ### Unit tests
 
 `./tool/test_all.sh` runs, for each of the three packages, `dart pub get`, `dart analyze lib` and
