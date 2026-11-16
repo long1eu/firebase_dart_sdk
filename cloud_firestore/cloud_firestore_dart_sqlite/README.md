@@ -9,7 +9,7 @@ endorsed by Google or Firebase.
 > **Status: 0.1.0.** The openers were the `example/` files of `cloud_firestore_dart` 0.1.1 that
 > apps had to copy; the code is the same. The browser storage is **experimental**. Run on macOS
 > (Dart VM, `sqlite3` 2.9.4 and 3.9.1) and in headless Chrome (dart2js and dart2wasm, `sqlite3`
-> 2.9.4), against the Firestore emulator. Not run on Linux, Windows, Android or iOS, or in
+> 2.9.4), against the FirebaseFirestore emulator. Not run on Linux, Windows, Android or iOS, or in
 > Safari or Firefox.
 
 ## Install
@@ -18,7 +18,7 @@ endorsed by Google or Firebase.
 dart pub add cloud_firestore_dart_sqlite
 ```
 
-Dart 3.8 or later. It brings `sqlite3` with it; see [Which `sqlite3`](#which-sqlite3) for what
+Dart 3.8 or later, with `cloud_firestore_dart` 0.2. It brings `sqlite3` with it; see [Which `sqlite3`](#which-sqlite3) for what
 else each platform needs.
 
 ## Use
@@ -33,7 +33,7 @@ import 'package:cloud_firestore_dart_sqlite/cloud_firestore_dart_sqlite.dart';
 **Dart VM** (a server, a command line tool): pass the directory of the SQLite files.
 
 ```dart
-final Firestore firestore = Firestore.instanceFor(
+final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(
   app: app,
   openDatabase: sqliteOpener(directory: '/var/lib/my_app/firestore'),
 );
@@ -43,7 +43,7 @@ final Firestore firestore = Firestore.instanceFor(
 
 ```dart
 final Directory support = await getApplicationSupportDirectory();
-final Firestore firestore = Firestore.instanceFor(
+final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(
   app: app,
   openDatabase: sqliteOpener(directory: '${support.path}/firestore'),
 );
@@ -52,7 +52,7 @@ final Firestore firestore = Firestore.instanceFor(
 **Browser**: no directory. The cache is in IndexedDB; `sqlite3.wasm` must be next to the page.
 
 ```dart
-final Firestore firestore = Firestore.instanceFor(
+final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(
   app: app,
   openDatabase: sqliteOpener(),
 );
@@ -78,7 +78,7 @@ Also exported: `openWithMemoryFallback`, which creates the instance with the per
 with a memory cache when another client (in a browser: another tab) has that cache:
 
 ```dart
-final Firestore firestore = await openWithMemoryFallback(
+final FirebaseFirestore firestore = await openWithMemoryFallback(
   app: app,
   openDatabase: sqliteOpener(opfsWorker: Uri.parse('sqlite_opfs_worker.js')),
 );
@@ -122,8 +122,8 @@ Which storage:
 Limits:
 
 - **One tab at a time.** A Web Lock guards each cache. A second tab (or a second instance in one
-  page) fails after `lockTimeout` with a `FirestoreError` with the code `failedPrecondition`; use
-  `openWithMemoryFallback` to get a memory cache there instead. The Web Locks API needs a secure
+  page) fails after `lockTimeout` with a `FirestoreException` with the code
+  `failed-precondition`; use `openWithMemoryFallback` to get a memory cache there instead. The Web Locks API needs a secure
   context (HTTPS or `localhost`).
 - **Crash safety** was tested with `sqlite3` 2.9.4 by killing a worker at random moments (2,700
   kills on IndexedDB, 1,500 on OPFS, in the repository of `cloud_firestore_dart`): the database
@@ -165,7 +165,7 @@ hashes in the package) and bundles it with the program or app. Nothing else is n
 
 This package does not override the 2.x lookup (the copied opener did, see the CHANGELOG). On a
 Linux machine with only the runtime package (`libsqlite3-0`, which has `libsqlite3.so.0`), run
-this once at the start of the program, before the first Firestore instance:
+this once at the start of the program, before the first FirebaseFirestore instance:
 
 ```dart
 import 'dart:ffi';
@@ -193,11 +193,11 @@ transaction as stored. The browser storage was only run with 2.9.4.
 ## Recovery and errors
 
 The VM opener reports SQLite's `BUSY`, `LOCKED`, `IOERR` and `FULL` as a
-`TransientDatabaseException`, after which Firestore goes offline and retries; every other error
+`TransientDatabaseException`, after which FirebaseFirestore goes offline and retries; every other error
 fails the operation. The OPFS worker does the same where nothing of the failed statement can have
 been stored, and the IndexedDB storage reports a copy to IndexedDB that failed the same way. To
 inject errors in tests, wrap the `Database` that the opener returns (the `database_recovery.dart`
-example of `cloud_firestore_dart` shows how). `Firestore.clearPersistence()` deletes the SQLite
+example of `cloud_firestore_dart` shows how). `FirebaseFirestore.clearPersistence()` deletes the SQLite
 file (and its journal), the IndexedDB database or the OPFS directory.
 
 ## Licence

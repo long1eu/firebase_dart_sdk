@@ -28,10 +28,11 @@ executables:
   setup_web:
 
 dependencies:
-  # Local development resolves these two from the sibling checkouts through
+  # The 0.2 API (FirebaseFirestore, Settings, FirestoreException). Local
+  # development resolves these two from the sibling checkouts through
   # pubspec_overrides.yaml (not published).
-  cloud_firestore_dart: ^0.1.0
-  firebase_app_dart: ^0.1.0
+  cloud_firestore_dart: ^0.2.0
+  firebase_app_dart: ^0.2.0
   # 2.7.3 is the first 2.x whose package:sqlite3/wasm.dart is not @experimental
   # and has IndexedDbFileSystem.open(vfsName:). 3.x loads the native library
   # with a build hook (Dart 3.10 or later); pub picks 2.x on older SDKs.

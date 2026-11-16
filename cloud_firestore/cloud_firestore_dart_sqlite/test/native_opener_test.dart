@@ -29,28 +29,28 @@ int _apps = 0;
 
 /// A new app and client on the cache in [directory]. [appName] picks the cache:
 /// the same name opens the same file again.
-Firestore client(String directory, String appName) {
+FirebaseFirestore client(String directory, String appName) {
   final List<String> hostPort = emulator!.split(':');
   final FirebaseApp app = FirebaseApp.withOptions(
     const FirebaseOptions(
       apiKey: 'demo-key',
-      applicationId: '1:1234567890:dart:sqlite',
+      appId: '1:1234567890:dart:sqlite',
       projectId: 'demo-test',
     ),
     name: appName,
   );
-  return Firestore.instanceFor(
+  return FirebaseFirestore.instanceFor(
     app: app,
     openDatabase: sqliteOpener(directory: directory),
-    settings: FirestoreSettings(
+    settings: Settings(
       cacheSettings: PersistentCacheSettings(),
     ).withEmulator(hostPort[0], int.parse(hostPort[1])),
   );
 }
 
-Future<void> shutDown(Firestore firestore) async {
+Future<void> shutDown(FirebaseFirestore firestore) async {
   await firestore.terminate();
-  firestore.app!.delete();
+  await firestore.app.delete();
 }
 
 void main() {
@@ -75,7 +75,7 @@ void main() {
           'sqlite-$pid-${DateTime.now().microsecondsSinceEpoch}-${_apps++}';
       final String collection = 'sqlite_package_${_apps++}_$pid';
 
-      Firestore firestore = client(directory.path, appName);
+      FirebaseFirestore firestore = client(directory.path, appName);
       await firestore.collection(collection).doc('synced').set(
         <String, Object?>{'n': 1},
       );
@@ -90,8 +90,8 @@ void main() {
         (await firestore
                 .collection(collection)
                 .doc('pending')
-                .get(Source.cache))
-            .data,
+                .get(const GetOptions(source: Source.cache)))
+            .data(),
         <String, Object?>{'n': 2},
       );
       await shutDown(firestore);
@@ -110,10 +110,10 @@ void main() {
       final QuerySnapshot<Json> cached = await firestore
           .collection(collection)
           .orderBy('n')
-          .get(Source.cache);
+          .get(const GetOptions(source: Source.cache));
       expect(cached.metadata.isFromCache, isTrue);
       expect(
-        cached.docs.map((QueryDocumentSnapshot<Json> d) => d.data).toList(),
+        cached.docs.map((QueryDocumentSnapshot<Json> d) => d.data()).toList(),
         <Json>[
           <String, Object?>{'n': 1},
           <String, Object?>{'n': 2},
@@ -122,7 +122,7 @@ void main() {
       final DocumentSnapshot<Json> pending = await firestore
           .collection(collection)
           .doc('pending')
-          .get(Source.cache);
+          .get(const GetOptions(source: Source.cache));
       expect(pending.metadata.hasPendingWrites, isTrue);
 
       // Back online, the pending write is sent.
@@ -133,10 +133,13 @@ void main() {
       // clearPersistence deletes the file of the terminated instance.
       firestore = client(directory.path, appName);
       // Any read waits until the cache is open.
-      await firestore.collection(collection).doc('synced').get(Source.cache);
+      await firestore
+          .collection(collection)
+          .doc('synced')
+          .get(const GetOptions(source: Source.cache));
       await firestore.terminate();
       await firestore.clearPersistence();
-      firestore.app!.delete();
+      await firestore.app.delete();
       expect(
         directory.listSync().where(
           (FileSystemEntity e) => e.path.endsWith('.db'),

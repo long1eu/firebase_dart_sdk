@@ -45,11 +45,11 @@
 // `transient` says that the error may go away on its own (BUSY, LOCKED,
 // IOERR, FULL) and that nothing of the failed statement, nor of its
 // transaction, can have been stored: the page then reports it as a
-// `TransientDatabaseException` and Firestore goes offline and retries. That
+// `TransientDatabaseException` and FirebaseFirestore goes offline and retries. That
 // is decided here, where the state of the connection is known:
 //
 //  * a statement inside a transaction, other than its COMMIT: SQLite rolled
-//    back the statement (or the whole transaction), and Firestore rolls the
+//    back the statement (or the whole transaction), and FirebaseFirestore rolls the
 //    transaction back;
 //  * a COMMIT after which the transaction is still open: it did not commit;
 //  * a COMMIT that ended the transaction, or a write outside a transaction

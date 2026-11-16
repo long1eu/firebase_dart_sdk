@@ -28,7 +28,7 @@
 //  * One tab at a time. The client has no way to share its cache between
 //    tabs, so the database is guarded with a Web Lock: opening it in a second
 //    tab (or twice in one page) fails, after two seconds of waiting for the
-//    lock, with a [FirestoreError] with the code `failedPrecondition`. Catch
+//    lock, with a [FirestoreException] with the code `failed-precondition`. Catch
 //    it and create the instance without `openDatabase` (a memory cache) for
 //    that tab, as `openWithMemoryFallback` does.
 //  * Crash safety. With IndexedDB, SQLite runs in memory and the IndexedDB
@@ -70,7 +70,7 @@
 //    open takes 45 to 170 ms. Reads by id take 0.1 to 0.2 ms with both. A
 //    query that scans 100,000 documents takes 1 to 2 s with both, and its
 //    snapshot of 100,000 documents needs about 0.45 GB with either storage.
-//  * `Firestore.clearPersistence()` deletes the IndexedDB database or the
+//  * `FirebaseFirestore.clearPersistence()` deletes the IndexedDB database or the
 //    OPFS directory (and an IndexedDB database of the same name left from
 //    before).
 
@@ -133,11 +133,12 @@ OpenDatabase sqliteWebOpener({
       lockTimeout,
     );
     if (releaseLock == null) {
-      throw FirestoreError(
-        'The offline cache "$name" is already open in another tab (or in this '
-        'one). It can only be used by one tab at a time: use a memory cache '
-        'in this tab.',
-        FirestoreErrorCode.failedPrecondition,
+      throw FirestoreException(
+        message:
+            'The offline cache "$name" is already open in another tab (or in this '
+            'one). It can only be used by one tab at a time: use a memory cache '
+            'in this tab.',
+        errorCode: FirestoreErrorCode.failedPrecondition,
       );
     }
 
@@ -420,7 +421,7 @@ web.LockManager? get _lockManager {
   return navigator.getProperty<web.LockManager?>('locks'.toJS);
 }
 
-/// One open SQLite database in IndexedDB. Firestore runs its own SQL through
+/// One open SQLite database in IndexedDB. FirebaseFirestore runs its own SQL through
 /// it.
 ///
 /// The Web Lock of the database is held from the open to the close, and lost
@@ -457,7 +458,7 @@ class SqliteWebDatabase implements ClearableDatabase, ExclusiveDatabase {
   /// transaction is open: its end is what makes the changes durable.
   ///
   /// The changes are already committed in memory when this waits, so a
-  /// failure here is not reported for this statement (Firestore would treat
+  /// failure here is not reported for this statement (FirebaseFirestore would treat
   /// the transaction as not applied and run it again). It is kept, and the
   /// next statement that starts outside a transaction (in practice the
   /// `BEGIN` of the next transaction) waits again and fails with a
@@ -556,7 +557,7 @@ class SqliteWebDatabase implements ClearableDatabase, ExclusiveDatabase {
     _closing[path] = pending;
   }
 
-  /// Deletes the IndexedDB database, for `Firestore.clearPersistence`.
+  /// Deletes the IndexedDB database, for `FirebaseFirestore.clearPersistence`.
   @override
   Future<void> clearStorage() async {
     close();
@@ -859,7 +860,7 @@ class _OpfsWorker {
 }
 
 /// One open SQLite database in OPFS, kept by its own dedicated worker.
-/// Firestore runs its own SQL through it. Like [SqliteWebDatabase] it holds
+/// FirebaseFirestore runs its own SQL through it. Like [SqliteWebDatabase] it holds
 /// the Web Lock of the database while it is open ([ExclusiveDatabase]).
 class SqliteOpfsDatabase implements ClearableDatabase, ExclusiveDatabase {
   SqliteOpfsDatabase._(this._worker, this.path, this._releaseLock);
@@ -960,7 +961,7 @@ class SqliteOpfsDatabase implements ClearableDatabase, ExclusiveDatabase {
   );
 
   /// Deletes the OPFS directory (and an IndexedDB database of the same name
-  /// that may be left from before), for `Firestore.clearPersistence`.
+  /// that may be left from before), for `FirebaseFirestore.clearPersistence`.
   @override
   Future<void> clearStorage() async {
     close();
@@ -1005,7 +1006,7 @@ Object? _decodeValue(JSAny? value) {
   } else if (value.isA<JSUint8Array>()) {
     final Uint8List view = (value as JSUint8Array).toDart;
     // Compiled with dart2wasm `toDart` is a view of the JavaScript array whose
-    // every element access is a call into JavaScript: Firestore decodes the
+    // every element access is a call into JavaScript: FirebaseFirestore decodes the
     // blob byte by byte, so it gets a copy of its own.
     return _isWasm ? Uint8List.fromList(view) : view;
   }

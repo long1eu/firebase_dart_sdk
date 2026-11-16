@@ -1,6 +1,7 @@
 ## 0.1.0
 
-First version. The SQLite openers that `cloud_firestore_dart` 0.1.1 kept in its `example/` folder
+First version, for `cloud_firestore_dart` 0.2 (`FirebaseFirestore`, `Settings`,
+`FirestoreException`). The SQLite openers that `cloud_firestore_dart` 0.1.1 kept in its `example/` folder
 for apps to copy (`sqlite_database.dart`, `sqlite_database_web.dart`, `sqlite_opfs_worker.dart`),
 moved into a package. Their logic is unchanged; what differs:
 

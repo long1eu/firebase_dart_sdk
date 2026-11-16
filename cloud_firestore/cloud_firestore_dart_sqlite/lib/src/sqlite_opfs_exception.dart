@@ -3,7 +3,7 @@
 /// The errors that may go away on their own, and after which nothing of the
 /// failed statement or its transaction can have been stored, come as a
 /// `TransientDatabaseException` with this as its cause instead (the worker
-/// decides): Firestore then goes offline and retries. An I/O error at a COMMIT
+/// decides): FirebaseFirestore then goes offline and retries. An I/O error at a COMMIT
 /// that may have stored the transaction stays a [SqliteOpfsException], fatal
 /// for the operation, because running it again would apply it twice.
 ///

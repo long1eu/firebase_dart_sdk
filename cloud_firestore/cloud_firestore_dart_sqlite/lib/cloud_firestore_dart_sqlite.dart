@@ -2,7 +2,7 @@
 /// the Dart VM, Flutter and the browser.
 ///
 /// ```dart
-/// final Firestore firestore = Firestore.instanceFor(
+/// final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(
 ///   app: app,
 ///   // The VM and Flutter: SQLite files in this directory.
 ///   openDatabase: sqliteOpener(directory: '/path/to/cache'),
@@ -21,7 +21,7 @@ export 'src/memory_fallback.dart' show openWithMemoryFallback;
 export 'src/sqlite_opfs_exception.dart' show SqliteOpfsException;
 
 /// Returns the [OpenDatabase] of this platform, for
-/// `Firestore.instanceFor(openDatabase: ...)`.
+/// `FirebaseFirestore.instanceFor(openDatabase: ...)`.
 ///
 /// The same call compiles everywhere; each platform reads its own arguments
 /// and ignores the others.
@@ -51,11 +51,11 @@ export 'src/sqlite_opfs_exception.dart' show SqliteOpfsException;
 ///   (`<prefix>/<database name>`) and the Web Locks.
 /// * [lockTimeout] is how long an open waits for a cache that is open
 ///   elsewhere: long enough for a page that was just reloaded to be gone,
-///   short for a second tab. After it the open fails with a `FirestoreError`
-///   with the code `failedPrecondition`: one tab at a time (see
+///   short for a second tab. After it the open fails with a `FirestoreException`
+///   with the code `failed-precondition`: one tab at a time (see
 ///   `openWithMemoryFallback`).
 ///
-/// Relative URLs are resolved against the page. `Firestore.clearPersistence`
+/// Relative URLs are resolved against the page. `FirebaseFirestore.clearPersistence`
 /// deletes the file, the IndexedDB database or the OPFS directory.
 OpenDatabase sqliteOpener({
   String? directory,

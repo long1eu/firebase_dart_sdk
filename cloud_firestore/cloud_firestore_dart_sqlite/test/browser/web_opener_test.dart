@@ -1,5 +1,5 @@
 // The opener in a browser, through the public API, against a private
-// Firestore emulator. It needs, next to this file (see test/browser/README.md):
+// FirebaseFirestore emulator. It needs, next to this file (see test/browser/README.md):
 //
 //   sqlite3.wasm             the build of the sqlite3 version in pubspec.lock
 //   sqlite_opfs_worker.js    dart run cloud_firestore_dart_sqlite:setup_web test/browser
@@ -47,26 +47,26 @@ int emulatorPort = 8090;
 FirebaseApp newApp(String name) => FirebaseApp.withOptions(
   const FirebaseOptions(
     apiKey: 'demo-key',
-    applicationId: '1:1234567890:dart:browser',
+    appId: '1:1234567890:dart:browser',
     projectId: 'demo-test',
   ),
   name: name,
 );
 
-FirestoreSettings settings() => FirestoreSettings(
+Settings settings() => Settings(
   cacheSettings: PersistentCacheSettings(),
 ).withEmulator('127.0.0.1', emulatorPort);
 
-Firestore client(String appName, OpenDatabase openDatabase) =>
-    Firestore.instanceFor(
+FirebaseFirestore client(String appName, OpenDatabase openDatabase) =>
+    FirebaseFirestore.instanceFor(
       app: newApp(appName),
       openDatabase: openDatabase,
       settings: settings(),
     );
 
-Future<void> shutDown(Firestore firestore) async {
+Future<void> shutDown(FirebaseFirestore firestore) async {
   await firestore.terminate();
-  firestore.app!.delete();
+  await firestore.app.delete();
 }
 
 /// Writes one document online and one offline, reopens the cache offline and
@@ -75,7 +75,7 @@ Future<void> writeReopenRead(OpenDatabase Function() opener) async {
   final String app = newName('sqlite-web');
   final String collection = newName('sqlite_web');
 
-  Firestore firestore = client(app, opener());
+  FirebaseFirestore firestore = client(app, opener());
   await firestore.collection(collection).doc('synced').set(<String, Object?>{
     'n': 1,
   });
@@ -86,8 +86,11 @@ Future<void> writeReopenRead(OpenDatabase Function() opener) async {
     }),
   );
   expect(
-    (await firestore.collection(collection).doc('pending').get(Source.cache))
-        .data,
+    (await firestore
+            .collection(collection)
+            .doc('pending')
+            .get(const GetOptions(source: Source.cache)))
+        .data(),
     <String, Object?>{'n': 2},
   );
   await shutDown(firestore);
@@ -97,10 +100,10 @@ Future<void> writeReopenRead(OpenDatabase Function() opener) async {
   final QuerySnapshot<Json> cached = await firestore
       .collection(collection)
       .orderBy('n')
-      .get(Source.cache);
+      .get(const GetOptions(source: Source.cache));
   expect(cached.metadata.isFromCache, isTrue);
   expect(
-    cached.docs.map((QueryDocumentSnapshot<Json> d) => d.data).toList(),
+    cached.docs.map((QueryDocumentSnapshot<Json> d) => d.data()).toList(),
     <Json>[
       <String, Object?>{'n': 1},
       <String, Object?>{'n': 2},
@@ -110,7 +113,7 @@ Future<void> writeReopenRead(OpenDatabase Function() opener) async {
   await firestore.waitForPendingWrites();
   await firestore.terminate();
   await firestore.clearPersistence();
-  firestore.app!.delete();
+  await firestore.app.delete();
 }
 
 void main() {
@@ -172,7 +175,7 @@ void main() {
       return;
     }
     final String app = newName('sqlite-tab');
-    final Firestore first = await openWithMemoryFallback(
+    final FirebaseFirestore first = await openWithMemoryFallback(
       app: newApp(app),
       openDatabase: sqliteOpener(),
       settings: settings(),
@@ -184,12 +187,12 @@ void main() {
     final FirebaseApp other = FirebaseApp.withOptions(
       const FirebaseOptions(
         apiKey: 'demo-key',
-        applicationId: '1:1234567890:dart:browser',
+        appId: '1:1234567890:dart:browser',
         projectId: 'demo-test',
       ),
       name: '$app-2',
     );
-    final Firestore second = await openWithMemoryFallback(
+    final FirebaseFirestore second = await openWithMemoryFallback(
       app: other,
       // The same storage name as the first one.
       openDatabase:
@@ -217,6 +220,6 @@ void main() {
     await shutDown(second);
     await first.terminate();
     await first.clearPersistence();
-    first.app!.delete();
+    await first.app.delete();
   });
 }

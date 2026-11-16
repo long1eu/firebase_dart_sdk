@@ -27,7 +27,7 @@ OpenDatabase nativeSqliteOpener(String directory, {int? pageCacheMb}) {
     OnVersionChange? onDowngrade,
     OnOpen? onOpen,
   }) async {
-    // Firestore passes a name that is unique per app and database, not a full
+    // FirebaseFirestore passes a name that is unique per app and database, not a full
     // path. Where the file lives is up to the opener.
     final File file = File('$directory/$name.db');
     final bool isNew = !file.existsSync();
@@ -69,14 +69,14 @@ OpenDatabase nativeSqliteOpener(String directory, {int? pageCacheMb}) {
   };
 }
 
-/// One open SQLite connection on the Dart VM. Firestore runs its own SQL
+/// One open SQLite connection on the Dart VM. FirebaseFirestore runs its own SQL
 /// through it.
 class SqliteDatabase implements Database {
   SqliteDatabase._(this._database, this.path);
 
   final sqlite.Database _database;
 
-  /// The path of the database file. `Firestore.clearPersistence` deletes this
+  /// The path of the database file. `FirebaseFirestore.clearPersistence` deletes this
   /// file (and its `-journal`, `-wal` and `-shm` side files).
   @override
   final String path;
@@ -110,7 +110,7 @@ class SqliteDatabase implements Database {
   /// [TransientDatabaseException]: another connection holds the lock (also
   /// after Firestore's busy timeout), an I/O error, a full disk. SQLite does
   /// not keep a statement or a transaction that failed with one of these
-  /// (Firestore rolls the transaction back), so Firestore can go offline and
+  /// (FirebaseFirestore rolls the transaction back), so FirebaseFirestore can go offline and
   /// try again later. Every other error is fatal for the operation.
   static T _run<T>(T Function() statement) {
     try {

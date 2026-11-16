@@ -1,4 +1,4 @@
-// A Firestore instance with its offline cache in SQLite, written, closed,
+// A FirebaseFirestore instance with its offline cache in SQLite, written, closed,
 // opened again and read back without a network.
 //
 //     firebase emulators:start --only firestore --project demo-example
@@ -23,43 +23,43 @@ import 'package:firebase_app_dart/firebase_app_dart.dart';
 Future<void> main() async {
   final Directory directory = Directory.systemTemp.createTempSync('cache_');
 
-  Firestore firestore = open(directory.path);
+  FirebaseFirestore firestore = open(directory.path);
   final DocumentReference<Map<String, Object?>> doc = firestore.doc(
     'examples/sqlite',
   );
   await doc.set(<String, Object?>{'saved': DateTime.now().toIso8601String()});
   await firestore.terminate();
-  firestore.app!.delete();
+  await firestore.app.delete();
 
   // The same app name opens the same SQLite file.
   firestore = open(directory.path);
   await firestore.disableNetwork();
   final DocumentSnapshot<Map<String, Object?>> cached = await firestore
       .doc('examples/sqlite')
-      .get(Source.cache);
-  print('from the cache on disk: ${cached.data}');
+      .get(const GetOptions(source: Source.cache));
+  print('from the cache on disk: ${cached.data()}');
 
   await firestore.terminate();
   await firestore.clearPersistence();
-  firestore.app!.delete();
+  await firestore.app.delete();
   directory.deleteSync(recursive: true);
 }
 
-Firestore open(String directory) {
+FirebaseFirestore open(String directory) {
   final List<String> emulator =
       (Platform.environment['FIRESTORE_EMULATOR_HOST'] ?? '127.0.0.1:8080')
           .split(':');
   final FirebaseApp app = FirebaseApp.withOptions(
     const FirebaseOptions(
       apiKey: 'demo-key',
-      applicationId: '1:1234567890:dart:example',
+      appId: '1:1234567890:dart:example',
       projectId: 'demo-example',
     ),
   );
-  return Firestore.instanceFor(
+  return FirebaseFirestore.instanceFor(
     app: app,
     openDatabase: sqliteOpener(directory: directory),
-    settings: FirestoreSettings(
+    settings: Settings(
       cacheSettings: PersistentCacheSettings(),
     ).withEmulator(emulator[0], int.parse(emulator[1])),
   );
