@@ -23,6 +23,33 @@ final adults = await users.whereGreaterThanOrEqualTo('age', 18).get();
 `example/` and, in the repository,
 [`test/integration/`](https://github.com/long1eu/firebase_dart_sdk/tree/main/cloud_firestore/cloud_firestore_dart/test/integration) for working calls of every feature below.)
 
+Paths alternate between collections and documents: a collection path has an odd number of segments, a
+document path an even one, and a document can hold subcollections. `firestore.collection` and
+`firestore.doc` take a whole path such as `'users/ada/notes'`, and `firestore.collectionGroup('notes')`
+queries every collection named `notes`, under any document.
+
+```mermaid
+flowchart LR
+  accTitle: Collections, documents, subcollections and a collection group
+  accDescr: The collection users holds the documents users/ada and users/bob. Each has a subcollection notes, users/ada/notes and users/bob/notes, which hold documents such as users/ada/notes/first. collectionGroup('notes') reads both notes collections.
+  users["collection<br/>users"]
+  ada["document<br/>users/ada"]
+  bob["document<br/>users/bob"]
+  adaNotes["subcollection<br/>users/ada/notes"]
+  bobNotes["subcollection<br/>users/bob/notes"]
+  adaFirst["document<br/>users/ada/notes/first"]
+  bobFirst["document<br/>users/bob/notes/first"]
+  group["collectionGroup('notes')"]
+  users --> ada
+  users --> bob
+  ada --> adaNotes
+  bob --> bobNotes
+  adaNotes --> adaFirst
+  bobNotes --> bobFirst
+  group -.-> adaNotes
+  group -.-> bobNotes
+```
+
 For the emulator, mock users and debug logging see [The emulator and testing](emulator_and_testing.md).
 
 ## Aggregations, OR queries and vector search
