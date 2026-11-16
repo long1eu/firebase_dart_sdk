@@ -1,0 +1,13 @@
+cloud_firestore_dart_flutterfire
+Copyright 2018 Razvan Lung (long1eu) and contributors.
+
+This package connects the FlutterFire plugins firebase_core and firebase_auth
+(https://github.com/firebase/flutterfire, Copyright Google LLC, licensed under
+the BSD 3-Clause License) to cloud_firestore_dart. It calls their public API and
+contains no code of them.
+
+This package is not affiliated with, endorsed by or supported by Google LLC or
+Firebase. "Firebase", "FlutterFire" and "Cloud Firestore" are trademarks of
+Google LLC.
+
+Licensed under the Apache License, Version 2.0; see the LICENSE file.
