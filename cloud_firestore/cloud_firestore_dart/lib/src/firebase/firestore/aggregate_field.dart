@@ -57,7 +57,7 @@ abstract class AggregateField {
 
   /// Creates an [AggregateField] that counts the documents in the result set.
   ///
-  /// Read the result with `AggregateQuerySnapshot.getCount`. `Query.count()`
+  /// Read the result with `AggregateQuerySnapshot.count`. `Query.count()`
   /// is a shortcut for an aggregation with only this field.
   static CountAggregateField count() => CountAggregateField._();
 

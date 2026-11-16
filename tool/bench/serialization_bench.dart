@@ -37,7 +37,7 @@ final DatabaseId databaseId = DatabaseId.forProject('bench');
 final RemoteSerializer remote = RemoteSerializer(databaseId);
 final LocalSerializer local = LocalSerializer(remote);
 final UserDataConverter reader = UserDataConverter(databaseId);
-final Firestore firestore = FirestoreInternal.detached(databaseId);
+final FirebaseFirestore firestore = FirestoreInternal.detached(databaseId);
 final DocumentKey docKey = DocumentKey.fromPathString('coll/doc');
 
 Map<String, Object?> leaf(int i) => <String, Object?>{

@@ -11,14 +11,14 @@ Future<void> main() async {
   final FirebaseApp app = FirebaseApp.withOptions(
     const FirebaseOptions(
       apiKey: 'key',
-      applicationId: 'appId',
+      appId: 'appId',
       projectId: 'demo-size',
     ),
     name: 'size',
   );
-  final Firestore firestore = Firestore.instanceFor(
+  final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(
     app: app,
-    settings: FirestoreSettings(
+    settings: Settings(
       cacheSettings: const MemoryCacheSettings(),
     ).withEmulator('127.0.0.1', 8080),
   );
@@ -32,14 +32,14 @@ Future<void> main() async {
   await cities.doc('SF').update(<String, Object?>{
     'visits': FieldValue.increment(1),
   });
-  print((await cities.doc('SF').get()).data);
+  print((await cities.doc('SF').get()).data());
   final QuerySnapshot<Map<String, Object?>> big = await cities
       .where('population', isGreaterThan: 100000)
       .orderBy('population')
       .limitToLast(2)
       .get();
   print(big.docs.length);
-  print((await cities.count().get()).getCount());
+  print((await cities.count().get()).count);
   await (firestore.batch()..delete(cities.doc('LA'))).commit();
   await firestore.runTransaction<void>((Transaction transaction) async {
     final DocumentSnapshot<Map<String, Object?>> snapshot = await transaction
