@@ -1,0 +1,59 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 360" role="img" aria-labelledby="title desc" font-family="system-ui, -apple-system, Segoe UI, Helvetica, Arial, sans-serif">
+  <title id="title">What works offline</title>
+  <desc id="desc">Two lists. Works offline, answered by the local cache: get() and listeners (from the cache, isFromCache true); get(Source.cache) and listeners with ListenSource.cache; set, update, delete and batches, which are in the cache at once and sent when the client is back online; pending writes kept across restarts with the SQLite cache; loadBundle and named queries. Needs the backend: transactions (read-write and read-only); count, sum and average; findNearest; Pipelines; get(Source.server); Firestore Lite, which has no cache. Write futures and waitForPendingWrites complete only when the backend has confirmed the writes. The cache answers only with what it holds.</desc>
+  <rect x="0" y="0" width="900" height="360" rx="10" fill="#ffffff" stroke="#d0d7de"/>
+
+  <!-- Left column: works offline -->
+  <rect x="20" y="20" width="420" height="250" rx="8" fill="#f6f8fa" stroke="#1a7f37"/>
+  <circle cx="46" cy="48" r="12" fill="#1a7f37"/>
+  <path d="M40,48 L45,53 L53,43" stroke="#ffffff" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="66" y="54" font-size="16" font-weight="700" fill="#1f2328">Works offline</text>
+  <text x="196" y="54" font-size="12" fill="#57606a">answered by the local cache</text>
+  <g font-size="13" fill="#1f2328">
+    <g stroke="#1a7f37" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M38,90 L42,94 L49,85"/>
+      <path d="M38,130 L42,134 L49,125"/>
+      <path d="M38,170 L42,174 L49,165"/>
+      <path d="M38,210 L42,214 L49,205"/>
+      <path d="M38,250 L42,254 L49,245"/>
+    </g>
+    <text x="60" y="94"><tspan font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="12">get()</tspan> and listeners: the cached result,</text>
+    <text x="60" y="110" fill="#57606a" font-size="12">marked isFromCache</text>
+    <text x="60" y="134"><tspan font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="12">get(Source.cache)</tspan>, listeners with</text>
+    <text x="60" y="150"><tspan font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="12">ListenSource.cache</tspan></text>
+    <text x="60" y="174">set, update, delete, batches: in the cache at once,</text>
+    <text x="60" y="190" fill="#57606a" font-size="12">sent when the client is back online</text>
+    <text x="60" y="214">pending writes kept across restarts</text>
+    <text x="60" y="230" fill="#57606a" font-size="12">with the SQLite cache</text>
+    <text x="60" y="254"><tspan font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="12">loadBundle</tspan> and named queries</text>
+  </g>
+
+  <!-- Right column: needs the backend -->
+  <rect x="460" y="20" width="420" height="250" rx="8" fill="#ffffff" stroke="#cf222e" stroke-dasharray="6 3"/>
+  <circle cx="486" cy="48" r="12" fill="#cf222e"/>
+  <path d="M481,43 L491,53 M491,43 L481,53" stroke="#ffffff" stroke-width="2.5" stroke-linecap="round"/>
+  <text x="506" y="54" font-size="16" font-weight="700" fill="#1f2328">Needs the backend</text>
+  <text x="694" y="54" font-size="12" fill="#57606a">fails while offline</text>
+  <g font-size="13" fill="#1f2328">
+    <g stroke="#cf222e" stroke-width="2" stroke-linecap="round">
+      <path d="M479,85 L487,93 M487,85 L479,93"/>
+      <path d="M479,115 L487,123 M487,115 L479,123"/>
+      <path d="M479,145 L487,153 M487,145 L479,153"/>
+      <path d="M479,175 L487,183 M487,175 L479,183"/>
+      <path d="M479,205 L487,213 M487,205 L479,213"/>
+      <path d="M479,235 L487,243 M487,235 L479,243"/>
+    </g>
+    <text x="500" y="94">transactions, read-write and read-only</text>
+    <text x="500" y="124"><tspan font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="12">count()</tspan>, <tspan font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="12">sum()</tspan>, <tspan font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="12">average()</tspan></text>
+    <text x="500" y="154"><tspan font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="12">findNearest</tspan> (vector search)</text>
+    <text x="500" y="184">Pipelines (preview)</text>
+    <text x="500" y="214"><tspan font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="12">get(Source.server)</tspan></text>
+    <text x="500" y="244">Firestore Lite: it has no cache</text>
+  </g>
+
+  <g font-size="12" fill="#57606a">
+    <text x="20" y="298">The cache answers only with what it holds: documents read before. With the default memory cache that is</text>
+    <text x="20" y="316">only what an active listener holds, and nothing survives a restart. A write's future and waitForPendingWrites()</text>
+    <text x="20" y="334">complete only when the backend has confirmed the writes, so do not wait for them to update the screen.</text>
+  </g>
+</svg>

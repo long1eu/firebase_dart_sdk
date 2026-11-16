@@ -28,6 +28,12 @@ It is an unofficial port of the open-source
 cache, listeners with local-write snapshots, transactions and retry logic. It is not affiliated
 with or endorsed by Google or Firebase.
 
+The picture shows where each package sits: your program creates a `FirebaseApp`, an optional token
+provider plugs into it, and `cloud_firestore_dart` talks to Firestore over gRPC on the Dart VM and
+in Flutter, or over REST and WebChannel in the browser.
+
+![Your Dart program, Flutter app or browser app uses three packages: firebase_auth_providers_dart sets the token provider of the FirebaseApp from firebase_app_dart, and cloud_firestore_dart is created from that app. cloud_firestore_dart reaches Cloud Firestore or the emulator over gRPC on the VM and in Flutter, and over REST and WebChannel in the browser.](https://raw.githubusercontent.com/long1eu/firebase_dart_sdk/main/docs/images/readme/overview.svg)
+
 ```dart
 import 'package:cloud_firestore_dart/cloud_firestore_dart.dart';
 
@@ -92,6 +98,11 @@ dart pub add cloud_firestore_dart firebase_app_dart
   `firebase_auth_providers_dart`.
 - Firestore Lite (experimental, `package:cloud_firestore_dart/lite.dart`): a client without
   cache and listeners where every call is one request.
+
+Without a connection, the client answers from its cache and queues writes; what needs the backend
+fails until it is reachable again:
+
+![Works offline: get() and listeners from the cache, Source.cache and ListenSource.cache, set, update, delete and batches queued and sent later, pending writes kept across restarts with the SQLite cache, loadBundle and named queries. Needs the backend: transactions, count, sum and average, findNearest, Pipelines, get(Source.server) and Firestore Lite.](https://raw.githubusercontent.com/long1eu/firebase_dart_sdk/main/docs/images/readme/offline.svg)
 
 ## Guides
 
