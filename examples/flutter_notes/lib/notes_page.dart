@@ -9,7 +9,7 @@ import 'note.dart';
 class NotesPage extends StatefulWidget {
   const NotesPage({super.key, required this.firestore});
 
-  final Firestore firestore;
+  final FirebaseFirestore firestore;
 
   @override
   State<NotesPage> createState() => _NotesPageState();
@@ -18,15 +18,18 @@ class NotesPage extends StatefulWidget {
 class _NotesPageState extends State<NotesPage> {
   late final CollectionReference<Note> _notes = widget.firestore
       .collection('notes')
-      .withConverter<Note>(const NoteConverter());
+      .withConverter<Note>(
+        fromFirestore: const NoteConverter().fromFirestore,
+        toFirestore: const NoteConverter().toFirestore,
+      );
 
-  // Created once, not in build(): each call to getSnapshots starts a new
-  // listener. MetadataChanges.include also delivers the snapshots in which
+  // Created once, not in build(): each call to snapshots starts a new
+  // listener. includeMetadataChanges: true also delivers the snapshots in which
   // only isFromCache or hasPendingWrites changed, so the status line and the
   // pending marks follow the connection and the acknowledgements.
   late final Stream<QuerySnapshot<Note>> _snapshots = _notes
-      .orderBy('updatedAt', Direction.descending)
-      .getSnapshots(MetadataChanges.include);
+      .orderBy('updatedAt', descending: true)
+      .snapshots(includeMetadataChanges: true);
 
   /// Starts a write without waiting for it. The listener shows the change at
   /// once; the future completes only when the server acknowledged it, which
@@ -46,13 +49,13 @@ class _NotesPageState extends State<NotesPage> {
   Future<void> _edit([DocumentSnapshot<Note>? existing]) async {
     final Note? note = await showDialog<Note>(
       context: context,
-      builder: (BuildContext context) => _NoteDialog(note: existing?.data),
+      builder: (BuildContext context) => _NoteDialog(note: existing?.data()),
     );
     if (note == null) {
       return;
     }
     // doc() makes the id on the device, so this works offline too.
-    final DocumentReference<Note> ref = existing?.ref ?? _notes.doc();
+    final DocumentReference<Note> ref = existing?.reference ?? _notes.doc();
     _write(ref.set(note));
   }
 
@@ -96,7 +99,7 @@ class _NotesPageState extends State<NotesPage> {
       itemCount: docs.length,
       itemBuilder: (BuildContext context, int index) {
         final DocumentSnapshot<Note> doc = docs[index];
-        final Note note = doc.data!;
+        final Note note = doc.data()!;
         return ListTile(
           title: Text(note.title),
           subtitle: note.body.isEmpty
@@ -114,7 +117,7 @@ class _NotesPageState extends State<NotesPage> {
               IconButton(
                 icon: const Icon(Icons.delete_outline),
                 tooltip: 'Delete',
-                onPressed: () => _write(doc.ref.delete()),
+                onPressed: () => _write(doc.reference.delete()),
               ),
             ],
           ),

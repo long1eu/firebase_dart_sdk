@@ -121,9 +121,7 @@ Future<FirebaseFirestore> createFirestore(AppDependencies dependencies) async {
   );
 
   final Directory directory = await getApplicationSupportDirectory();
-  Settings settings = Settings(
-    cacheSettings: PersistentCacheSettings(),
-  );
+  Settings settings = Settings(cacheSettings: PersistentCacheSettings());
   if (useEmulator) {
     settings = settings.withEmulator(emulatorHost, emulatorPort);
   }
@@ -155,7 +153,7 @@ Keep the one instance for the life of the app and hand it down: the example pass
 widgets through their constructors (`NotesApp(firestore: ...)`, `NotesPage(firestore: ...)`).
 An `InheritedWidget` or a top-level `final` work as well. Once `FirebaseFirestore.instanceFor(app: app)`
 has created the instance of the default app, `FirebaseFirestore.instance` returns it; before that it
-throws a `StateError`.
+creates one itself, with the default settings and a memory cache, so call `instanceFor` first.
 
 Do not create the instance in `build()` or in `initState()` of a widget that can be rebuilt or
 mounted twice: a second `instanceFor` with the same settings returns the same instance, but with
@@ -174,7 +172,10 @@ stream once, in the `State`, not in `build()`:
 class _NotesPageState extends State<NotesPage> {
   late final CollectionReference<Note> _notes = widget.firestore
       .collection('notes')
-      .withConverter<Note>(const NoteConverter());
+      .withConverter<Note>(
+        fromFirestore: const NoteConverter().fromFirestore,
+        toFirestore: const NoteConverter().toFirestore,
+      );
 
   // Created once, not in build(): each call to snapshots starts a new
   // listener. includeMetadataChanges: true also delivers the snapshots in which
@@ -195,7 +196,7 @@ StreamBuilder<QuerySnapshot<Note>>(
     if (state.hasError) {
       return Center(child: Text('Error: ${state.error}'));
     }
-    final QuerySnapshot<Note>? snapshot = state.data();
+    final QuerySnapshot<Note>? snapshot = state.data;
     if (snapshot == null) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -272,9 +273,10 @@ for the backend as well; `doc()` followed by `set()` gives you the id at once.
 
 ### A typed model
 
-A `FirestoreDataConverter` turns documents into your class and back. The example stores a server
-timestamp, and reads it with `ServerTimestampBehavior.estimate` so that a note written on this
-device has a time before the backend set one:
+A converter turns documents into your class and back: `withConverter` takes a `fromFirestore`
+and a `toFirestore` function, here the two methods of a `FirestoreDataConverter`. The example
+stores a server timestamp, and reads it with `ServerTimestampBehavior.estimate` so that a note
+written on this device has a time before the backend set one:
 
 ```dart flutter
 class NoteConverter extends FirestoreDataConverter<Note> {
@@ -335,13 +337,14 @@ Where the SQLite library comes from:
 | Windows | bundled by the build hook | `sqlite3.dll` bundled by `sqlite3_flutter_libs`; without it, `sqlite3.dll` on the `PATH`, then `winsqlite3.dll` of Windows (`sqlite3` 2.7.5 and later) |
 | Linux | bundled by the build hook | the copy that `sqlite3_flutter_libs` links into the app, else the system `libsqlite3.so`. (The copied opener of `cloud_firestore_dart` 0.1, `example/sqlite_database.dart`, overrides this lookup and always loads the system library.) |
 
-Only macOS was tried with this example, with `sqlite3` 2.x and the copied opener; no Flutter
-build was tried with `cloud_firestore_dart_sqlite` or `sqlite3` 3.x, and the Windows and Linux
-rows are what `sqlite3` documents, not tried. The application support directory is inside the
-app's container on macOS (`~/Library/Containers/<bundle id>/...`) and private to the app on
-Android and iOS. On Windows, `clearPersistence()` fails while another handle still has the file
-open ([Platforms](platforms.md)). [Offline persistence](offline_persistence.md) covers the cache
-size, protecting the files, and cache indexes.
+Only macOS was tried with this example: first with `sqlite3` 2.x and the copied opener of 0.1,
+then with `cloud_firestore_dart_sqlite` and `sqlite3` 3.x (3.5.2, the newest that Flutter 3.44
+resolves). The Android, iOS, Windows and Linux rows are what `sqlite3` documents, not tried.
+The application support directory is inside the app's container on macOS
+(`~/Library/Containers/<bundle id>/...`) and private to the app on Android and iOS. On Windows,
+`clearPersistence()` fails while another handle still has the file open
+([Platforms](platforms.md)). [Offline persistence](offline_persistence.md) covers the cache size,
+protecting the files, and cache indexes.
 
 ## Connectivity
 
