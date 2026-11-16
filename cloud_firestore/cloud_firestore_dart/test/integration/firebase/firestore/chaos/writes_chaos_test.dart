@@ -113,7 +113,7 @@ void main() {
         reason: 'the backend');
     // The cache of the client agrees, without pending writes.
     final QuerySnapshot<Map<String, Object?>> cached =
-        await collection.get(Source.cache);
+        await collection.get(GetOptions(source: Source.cache));
     expect(docsById(cached), expectedDocs, reason: 'the cache of the client');
     expect(cached.metadata.hasPendingWrites, isFalse);
   }
@@ -132,7 +132,7 @@ void main() {
       final List<Future<void>> writes = issueWrites(db, collection);
       // The writes are visible locally right away, as pending writes.
       final QuerySnapshot<Map<String, Object?>> pending =
-          await collection.get(Source.cache);
+          await collection.get(GetOptions(source: Source.cache));
       expect(docsById(pending), expectedDocs);
       expect(pending.metadata.hasPendingWrites, isTrue);
 
@@ -174,8 +174,8 @@ void main() {
       await pause(2500);
       expect((await env.serverDocs(doc.parent.path))['k'], <String, Object?>{'v': 2});
       final DocumentSnapshot<Map<String, Object?>> seen =
-          await doc.get(Source.server);
-      expect(seen.data, <String, Object?>{'v': 2});
+          await doc.get(GetOptions(source: Source.server));
+      expect(seen.data(), <String, Object?>{'v': 2});
     });
 
     test('issued before the first connection land exactly once', () async {
@@ -271,10 +271,10 @@ void main() {
       // The cache is an estimate until the documents are read from the backend again; then it agrees. (Before the
       // F1b fix it was regularly behind here for the re-sent writes that changed nothing on the backend.)
       final Map<String, Map<String, Object?>> staleCache =
-          docsById(await collection.get(Source.cache));
-      await collection.get(Source.server);
+          docsById(await collection.get(GetOptions(source: Source.cache)));
+      await collection.get(GetOptions(source: Source.server));
       final QuerySnapshot<Map<String, Object?>> cached =
-          await collection.get(Source.cache);
+          await collection.get(GetOptions(source: Source.cache));
       expect(docsById(cached), server,
           reason: 'the cache agrees with the backend');
       expect(cached.metadata.hasPendingWrites, isFalse);
@@ -337,13 +337,13 @@ void main() {
           (await env.serverDocs(collection.path))['a']!;
       expect(server, <String, Object?>{'n': 2, 'tag': 'second'});
       final DocumentSnapshot<Map<String, Object?>> cached =
-          await doc.get(Source.cache);
+          await doc.get(GetOptions(source: Source.cache));
       expect(cached.metadata.hasPendingWrites, isFalse);
-      expect(cached.data, server);
+      expect(cached.data(), server);
 
       // And it stays right after the document is read from the backend.
-      expect((await doc.get(Source.server)).data, server);
-      expect((await doc.get(Source.cache)).data, server);
+      expect((await doc.get(GetOptions(source: Source.server))).data(), server);
+      expect((await doc.get(GetOptions(source: Source.cache))).data(), server);
     },
         // Over WebChannel a write with an increment is never sent before the answers to the earlier writes arrived
         // (WriteSendAheadGate): while the answer to the first write is held back the second one is not sent, so the

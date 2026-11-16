@@ -31,7 +31,7 @@ class City {
 final FirestoreDataConverter<City> cityConverter =
     FirestoreDataConverter<City>.from(
   fromFirestore: (DocumentSnapshot<Json> snapshot, SnapshotOptions? options) =>
-      City.fromMap(snapshot.data!),
+      City.fromMap(snapshot.data()!),
   toFirestore: (City city, SetOptions? options) => city.toMap(),
 );
 
@@ -76,20 +76,20 @@ void main() {
         firestore.collection(newCollectionName()).doc('a');
     final EventLog<DocumentSnapshot<Json>> log =
         EventLog<DocumentSnapshot<Json>>(
-            doc.getSnapshots(MetadataChanges.include));
+            doc.snapshots(includeMetadataChanges: true));
 
     await log.waitFor((DocumentSnapshot<Json> s) => !s.exists);
     final Future<void> written = doc.set(<String, Object?>{'a': 1});
 
     final DocumentSnapshot<Json> pending = await log.waitFor(
         (DocumentSnapshot<Json> s) => s.exists && s.metadata.hasPendingWrites);
-    expect(pending.data, <String, Object?>{'a': 1});
+    expect(pending.data(), <String, Object?>{'a': 1});
     final DocumentSnapshot<Json> acknowledged = await log.waitFor(
         (DocumentSnapshot<Json> s) =>
             s.exists &&
             !s.metadata.hasPendingWrites &&
             !s.metadata.isFromCache);
-    expect(acknowledged.data, <String, Object?>{'a': 1});
+    expect(acknowledged.data(), <String, Object?>{'a': 1});
     await written;
   });
 
@@ -108,9 +108,9 @@ void main() {
 
     final FirebaseFirestore other = await newClient();
     final QuerySnapshot<Json> snapshot =
-        await other.collection(collection.id).get(Source.server);
+        await other.collection(collection.id).get(GetOptions(source: Source.server));
     expect(<String, Object?>{
-      for (final QueryDocumentSnapshot<Json> d in snapshot.docs) d.id: d.data
+      for (final QueryDocumentSnapshot<Json> d in snapshot.docs) d.id: d.data()
     }, <String, Object?>{
       'new': <String, Object?>{'n': 3},
       'update': <String, Object?>{'n': 2},
@@ -132,9 +132,9 @@ void main() {
 
     // The documents only exist in the bundle, so they come from the cache.
     final QuerySnapshot<Json> cached =
-        await firestore.collection(collection).get(Source.cache);
+        await firestore.collection(collection).get(GetOptions(source: Source.cache));
     expect(
-        cached.docs.map((QueryDocumentSnapshot<Json> d) => d.data).toList(),
+        cached.docs.map((QueryDocumentSnapshot<Json> d) => d.data()).toList(),
         <Json>[
           <String, Object?>{'bar': 1, 'k': 'a'},
           <String, Object?>{'bar': 2, 'k': '\u{1F60A}'},
@@ -143,9 +143,9 @@ void main() {
     final Query<Json>? named = await firestore.namedQuery('limit');
     expect(named, isNotNull);
     expect(
-        (await named!.get(Source.cache))
+        (await named!.get(GetOptions(source: Source.cache)))
             .docs
-            .map((QueryDocumentSnapshot<Json> d) => d.data)
+            .map((QueryDocumentSnapshot<Json> d) => d.data())
             .toList(),
         <Json>[
           <String, Object?>{'bar': 2, 'k': '\u{1F60A}'}
@@ -161,10 +161,10 @@ void main() {
     await doc.set(<String, Object?>{'a': 1});
     // Through text, as it would travel between a server and a page.
     final Json json =
-        jsonDecode(jsonEncode((await doc.get(Source.server)).toJson())) as Json;
+        jsonDecode(jsonEncode((await doc.get(GetOptions(source: Source.server))).toJson())) as Json;
 
     final FirebaseFirestore other = await newClient();
-    expect(DocumentSnapshot<Json>.fromJson(other, json).data,
+    expect(DocumentSnapshot<Json>.fromJson(other, json).data(),
         <String, Object?>{'a': 1});
 
     final EventLog<DocumentSnapshot<Json>> log =
@@ -172,12 +172,12 @@ void main() {
             other.documentSnapshotsFromJson<Json>(json));
     final DocumentSnapshot<Json> first =
         await log.waitFor((DocumentSnapshot<Json> s) => true);
-    expect(first.data, <String, Object?>{'a': 1});
+    expect(first.data(), <String, Object?>{'a': 1});
 
     await doc.set(<String, Object?>{'a': 2});
     final DocumentSnapshot<Json> updated = await log.waitFor(
         (DocumentSnapshot<Json> s) =>
-            s.data?['a'] == 2 && !s.metadata.isFromCache);
+            s.data()?['a'] == 2 && !s.metadata.isFromCache);
     expect(updated.exists, isTrue);
   });
 
@@ -186,23 +186,20 @@ void main() {
     final CollectionReference<Json> collection =
         firestore.collection(newCollectionName());
     await collection.doc('a').set(<String, Object?>{
-      'embedding': FieldValue.vector(<double>[1.0, 1.0])
+      'embedding': VectorValue(<double>[1.0, 1.0])
     });
     await collection.doc('b').set(<String, Object?>{
-      'embedding': FieldValue.vector(<double>[2.0, 2.0])
+      'embedding': VectorValue(<double>[2.0, 2.0])
     });
     await collection.doc('c').set(<String, Object?>{
-      'embedding': FieldValue.vector(<double>[9.0, 9.0])
+      'embedding': VectorValue(<double>[9.0, 9.0])
     });
 
-    final VectorQuerySnapshot snapshot = await collection
-        .findNearest(
-            'embedding', <double>[0.0, 0.0], 2, DistanceMeasure.euclidean,
-            distanceResultField: 'distance')
+    final VectorQuerySnapshot snapshot = await collection.findNearest(vectorField: 'embedding', queryVector: <double>[0.0, 0.0], limit: 2, distanceMeasure: DistanceMeasure.euclidean, distanceResultField: 'distance')
         .get();
     expect(snapshot.docs.map((DocumentSnapshot<Object?> d) => d.id).toList(),
         <String>['a', 'b']);
-    final Json nearest = snapshot.docs.first.data! as Json;
+    final Json nearest = snapshot.docs.first.data()! as Json;
     expect(nearest['embedding'], isA<VectorValue>());
     expect(nearest['distance'], closeTo(1.4142, 0.001));
   });
@@ -234,7 +231,7 @@ void main() {
     }
 
     Future<List<String>> ids(Query<Json> query) async =>
-        (await query.get(Source.server))
+        (await query.get(GetOptions(source: Source.server)))
             .docs
             .map((QueryDocumentSnapshot<Json> d) => d.id)
             .toList();
@@ -257,8 +254,7 @@ void main() {
     expect(await ids(collection.where('gone', isNull: true)), <String>['a']);
     expect(
         await ids(collection
-            .where('n', isGreaterThan: 1)
-            .orderBy('n', Direction.descending)
+            .where('n', isGreaterThan: 1).orderBy('n', descending: true)
             .limit(1)),
         <String>['c']);
   });
@@ -266,23 +262,21 @@ void main() {
   test('reads and writes through a converter', () async {
     final FirebaseFirestore firestore = await newClient();
     final CollectionReference<City> cities = firestore
-        .collection(newCollectionName())
-        .withConverter<City>(cityConverter);
+        .collection(newCollectionName()).withConverter<City>(fromFirestore: cityConverter.fromFirestore, toFirestore: cityConverter.toFirestore);
     await cities.doc('sf').set(const City('San Francisco', 870000));
     await cities.doc('la').set(const City('Los Angeles', 3900000));
 
-    final DocumentSnapshot<City> sf = await cities.doc('sf').get(Source.server);
-    expect(sf.data!.name, 'San Francisco');
+    final DocumentSnapshot<City> sf = await cities.doc('sf').get(GetOptions(source: Source.server));
+    expect(sf.data()!.name, 'San Francisco');
 
     final QuerySnapshot<City> big = await cities
-        .where('population', isGreaterThan: 1000000)
-        .get(Source.server);
-    expect(big.docs.single.data.name, 'Los Angeles');
+        .where('population', isGreaterThan: 1000000).get(GetOptions(source: Source.server));
+    expect(big.docs.single.data().name, 'Los Angeles');
 
     // Without the converter the same documents are plain maps.
     expect(
-        (await firestore.collection(cities.id).doc('sf').get(Source.server))
-            .data,
+        (await firestore.collection(cities.id).doc('sf').get(GetOptions(source: Source.server)))
+            .data(),
         <String, Object?>{'name': 'San Francisco', 'population': 870000});
   });
 
@@ -308,7 +302,7 @@ void main() {
     expect(waited, isTrue);
 
     final FirebaseFirestore other = await newClient();
-    expect((await other.doc(doc.path).get(Source.server)).data,
+    expect((await other.doc(doc.path).get(GetOptions(source: Source.server))).data(),
         <String, Object?>{'a': 1});
   });
 
@@ -334,7 +328,7 @@ void main() {
 
     // The write reached the backend before the client ended.
     final FirebaseFirestore other = await newClient();
-    expect((await other.doc(doc.path).get(Source.server)).data,
+    expect((await other.doc(doc.path).get(GetOptions(source: Source.server))).data(),
         <String, Object?>{'a': 1});
   });
 }

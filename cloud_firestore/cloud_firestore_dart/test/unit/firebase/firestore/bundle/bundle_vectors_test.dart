@@ -94,8 +94,7 @@ void main() {
         'bundled-query',
         BundledQuery(
           query('collection')
-              .filter(filter('value', '==', 'c'))
-              .orderBy(orderBy('__name__')),
+              .filter(filter('value', '==', 'c')).orderBy(orderBy('__name__')),
           BundledQueryLimitType.first,
         ),
         const SnapshotVersion(Timestamp(0, 560000)),

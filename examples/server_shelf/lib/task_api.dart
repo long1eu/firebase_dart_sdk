@@ -58,12 +58,12 @@ class TaskApi {
       query = _tasks.where('done', isEqualTo: done == 'true');
     }
     final QuerySnapshot<Map<String, Object?>> snapshot = await query.get(
-      Source.server,
+      GetOptions(source: Source.server),
     );
     return _json(200, <Map<String, Object?>>[
       for (final QueryDocumentSnapshot<Map<String, Object?>> doc
           in snapshot.docs)
-        <String, Object?>{'id': doc.id, ...toJson(doc.data)},
+        <String, Object?>{'id': doc.id, ...toJson(doc.data())},
     ]);
   }
 
@@ -86,11 +86,11 @@ class TaskApi {
   Future<Response> _read(Request request, String id) async {
     final DocumentSnapshot<Map<String, Object?>> snapshot = await _tasks
         .doc(id)
-        .get(Source.server);
+        .get(GetOptions(source: Source.server));
     if (!snapshot.exists) {
       return _json(404, <String, Object?>{'error': 'no task $id'});
     }
-    return _json(200, <String, Object?>{'id': id, ...toJson(snapshot.data!)});
+    return _json(200, <String, Object?>{'id': id, ...toJson(snapshot.data()!)});
   }
 
   Future<Response> _update(Request request, String id) async {

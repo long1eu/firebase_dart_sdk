@@ -19,7 +19,7 @@ import 'package:rxdart/rxdart.dart';
 /// | --- | --- | --- |
 /// | [onNetworkConnected] | always connected | Firestore: `true` restarts failed streams at once |
 /// | [onBackgroundChanged] | never in the background | nobody in this repository |
-/// | [storage] | this object, in memory | `FirebaseApp.setDataCollectionDefaultEnabled` |
+/// | [storage] | this object, in memory | `FirebaseApp.setAutomaticDataCollectionEnabled` |
 /// | [authProvider] | none: requests carry no token | Firestore |
 /// | [appCheckProvider] | none: no App Check header | Firestore, `FirebaseUserAuth` |
 /// | [headersBuilder] | none | nobody in this repository |
@@ -42,7 +42,7 @@ import 'package:rxdart/rxdart.dart';
 ///   FirebaseApp.withOptions(
 ///     const FirebaseOptions(
 ///       apiKey: '<YOUR_API_KEY>',
-///       applicationId: '1:1234567890:dart:example',
+///       appId: '1:1234567890:dart:example',
 ///       projectId: 'my-project',
 ///     ),
 ///     dependencies: dependencies,

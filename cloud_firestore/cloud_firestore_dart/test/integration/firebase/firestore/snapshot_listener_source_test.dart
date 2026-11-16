@@ -32,13 +32,6 @@ void main() {
     await IntegrationTestUtil.tearDown();
   });
 
-  const SnapshotListenOptions fromCache =
-      SnapshotListenOptions(source: ListenSource.cache);
-  const SnapshotListenOptions fromCacheWithMetadata = SnapshotListenOptions(
-    source: ListenSource.cache,
-    metadataChanges: MetadataChanges.include,
-  );
-
   final List<Map<String, Object?>> Function(QuerySnapshot) values =
       IntegrationTestUtil.querySnapshotToValues;
 
@@ -69,8 +62,7 @@ void main() {
 
     final EventAccumulator<QuerySnapshot> accumulator =
         EventAccumulator<QuerySnapshot>();
-    final StreamSubscription<QuerySnapshot> listener = collection
-        .getSnapshotsWithOptions(fromCache)
+    final StreamSubscription<QuerySnapshot> listener = collection.snapshots(source: ListenSource.cache)
         .listen(accumulator.onData, onError: accumulator.onError);
 
     final QuerySnapshot snapshot = await accumulator.wait();
@@ -91,12 +83,11 @@ void main() {
 
     final EventAccumulator<DocumentSnapshot> accumulator =
         EventAccumulator<DocumentSnapshot>();
-    final StreamSubscription<DocumentSnapshot> listener = docRef
-        .getSnapshotsWithOptions(fromCache)
+    final StreamSubscription<DocumentSnapshot> listener = docRef.snapshots(source: ListenSource.cache)
         .listen(accumulator.onData, onError: accumulator.onError);
 
     final DocumentSnapshot snapshot = await accumulator.wait();
-    expect(snapshot.data, <String, Object?>{'k': 'a'});
+    expect(snapshot.data(), <String, Object?>{'k': 'a'});
     expect(snapshot.metadata.isFromCache, isTrue);
 
     await accumulator.assertNoAdditionalEvents();
@@ -112,8 +103,7 @@ void main() {
 
     final EventAccumulator<QuerySnapshot> accumulator =
         EventAccumulator<QuerySnapshot>();
-    final StreamSubscription<QuerySnapshot> listener = collection
-        .getSnapshotsWithOptions(fromCacheWithMetadata)
+    final StreamSubscription<QuerySnapshot> listener = collection.snapshots(source: ListenSource.cache, includeMetadataChanges: true)
         .listen(accumulator.onData, onError: accumulator.onError);
 
     final QuerySnapshot snapshot = await accumulator.wait();
@@ -131,16 +121,14 @@ void main() {
 
   test('multipleListenersSourcedFromCacheCanWorkIndependently', () async {
     final CollectionReference collection = await collectionAB();
-    final Query query = collection.whereGreaterThan('sort', 0).orderBy('sort');
+    final Query query = collection.where('sort', isGreaterThan: 0).orderBy('sort');
     await collection.get(); // Populate the cache.
 
     final EventAccumulator<QuerySnapshot> accumulator =
         EventAccumulator<QuerySnapshot>();
-    final StreamSubscription<QuerySnapshot> listener1 = query
-        .getSnapshotsWithOptions(fromCache)
+    final StreamSubscription<QuerySnapshot> listener1 = query.snapshots(source: ListenSource.cache)
         .listen(accumulator.onData, onError: accumulator.onError);
-    final StreamSubscription<QuerySnapshot> listener2 = query
-        .getSnapshotsWithOptions(fromCache)
+    final StreamSubscription<QuerySnapshot> listener2 = query.snapshots(source: ListenSource.cache)
         .listen(accumulator.onData, onError: accumulator.onError);
 
     List<QuerySnapshot> snapshots = await accumulator.waitFor(2);
@@ -187,16 +175,14 @@ void main() {
     final Query limit = collection.limit(2).orderBy('sort');
     final EventAccumulator<QuerySnapshot> limitAccumulator =
         EventAccumulator<QuerySnapshot>();
-    StreamSubscription<QuerySnapshot> limitRegistration = limit
-        .getSnapshotsWithOptions(fromCache)
+    StreamSubscription<QuerySnapshot> limitRegistration = limit.snapshots(source: ListenSource.cache)
         .listen(limitAccumulator.onData, onError: limitAccumulator.onError);
 
     final Query limitToLast =
-        collection.limitToLast(2).orderBy('sort', Direction.descending);
+        collection.limitToLast(2).orderBy('sort', descending: true);
     final EventAccumulator<QuerySnapshot> limitToLastAccumulator =
         EventAccumulator<QuerySnapshot>();
-    StreamSubscription<QuerySnapshot> limitToLastRegistration = limitToLast
-        .getSnapshotsWithOptions(fromCache)
+    StreamSubscription<QuerySnapshot> limitToLastRegistration = limitToLast.snapshots(source: ListenSource.cache)
         .listen(limitToLastAccumulator.onData,
             onError: limitToLastAccumulator.onError);
 
@@ -207,8 +193,7 @@ void main() {
 
     // Un-listen then re-listen to the limit query.
     await limitRegistration.cancel();
-    limitRegistration = limit
-        .getSnapshotsWithOptions(fromCache)
+    limitRegistration = limit.snapshots(source: ListenSource.cache)
         .listen(limitAccumulator.onData, onError: limitAccumulator.onError);
 
     snapshot = await limitAccumulator.wait();
@@ -228,8 +213,7 @@ void main() {
     // Un-listen to limitToLast, update a doc, then re-listen to limitToLast.
     await limitToLastRegistration.cancel();
     await collection.doc('a').update(doc('a', -2));
-    limitToLastRegistration = limitToLast
-        .getSnapshotsWithOptions(fromCache)
+    limitToLastRegistration = limitToLast.snapshots(source: ListenSource.cache)
         .listen(limitToLastAccumulator.onData,
             onError: limitToLastAccumulator.onError);
 
@@ -250,13 +234,13 @@ void main() {
   test('canListenToDefaultSourceFirstAndThenCache', () async {
     final CollectionReference collection = await collectionAB();
     final Query query =
-        collection.whereGreaterThanOrEqualTo('sort', 1).orderBy('sort');
+        collection.where('sort', isGreaterThanOrEqualTo: 1).orderBy('sort');
 
     // Listen with the default options, which also populates the cache.
     final EventAccumulator<QuerySnapshot> defaultAccumulator =
         EventAccumulator<QuerySnapshot>();
     final StreamSubscription<QuerySnapshot> defaultRegistration = query
-        .snapshots
+        .snapshots()
         .listen(defaultAccumulator.onData, onError: defaultAccumulator.onError);
 
     QuerySnapshot snapshot = await defaultAccumulator.wait();
@@ -266,8 +250,7 @@ void main() {
     // Listen to the same query from the cache.
     final EventAccumulator<QuerySnapshot> cacheAccumulator =
         EventAccumulator<QuerySnapshot>();
-    final StreamSubscription<QuerySnapshot> cacheRegistration = query
-        .getSnapshotsWithOptions(fromCache)
+    final StreamSubscription<QuerySnapshot> cacheRegistration = query.snapshots(source: ListenSource.cache)
         .listen(cacheAccumulator.onData, onError: cacheAccumulator.onError);
 
     snapshot = await cacheAccumulator.wait();
@@ -283,12 +266,11 @@ void main() {
 
   test('canListenToCacheSourceFirstAndThenDefault', () async {
     final CollectionReference collection = await collectionAB();
-    final Query query = collection.whereNotEqualTo('sort', 0).orderBy('sort');
+    final Query query = collection.where('sort', isNotEqualTo: 0).orderBy('sort');
 
     final EventAccumulator<QuerySnapshot> cacheAccumulator =
         EventAccumulator<QuerySnapshot>();
-    final StreamSubscription<QuerySnapshot> cacheRegistration = query
-        .getSnapshotsWithOptions(fromCacheWithMetadata)
+    final StreamSubscription<QuerySnapshot> cacheRegistration = query.snapshots(source: ListenSource.cache, includeMetadataChanges: true)
         .listen(cacheAccumulator.onData, onError: cacheAccumulator.onError);
 
     QuerySnapshot snapshot = await cacheAccumulator.wait();
@@ -297,8 +279,7 @@ void main() {
 
     final EventAccumulator<QuerySnapshot> defaultAccumulator =
         EventAccumulator<QuerySnapshot>();
-    final StreamSubscription<QuerySnapshot> defaultRegistration = query
-        .getSnapshots(MetadataChanges.include)
+    final StreamSubscription<QuerySnapshot> defaultRegistration = query.snapshots(includeMetadataChanges: true)
         .listen(defaultAccumulator.onData, onError: defaultAccumulator.onError);
 
     snapshot = await defaultAccumulator.wait();
@@ -318,13 +299,12 @@ void main() {
 
   test('willNotGetMetadataOnlyUpdatesIfListeningToCacheOnly', () async {
     final CollectionReference collection = await collectionAB();
-    final Query query = collection.whereNotEqualTo('sort', 0).orderBy('sort');
+    final Query query = collection.where('sort', isNotEqualTo: 0).orderBy('sort');
     await collection.get(); // Populate the cache.
 
     final EventAccumulator<QuerySnapshot> accumulator =
         EventAccumulator<QuerySnapshot>();
-    final StreamSubscription<QuerySnapshot> listener = query
-        .getSnapshotsWithOptions(fromCacheWithMetadata)
+    final StreamSubscription<QuerySnapshot> listener = query.snapshots(source: ListenSource.cache, includeMetadataChanges: true)
         .listen(accumulator.onData, onError: accumulator.onError);
 
     QuerySnapshot snapshot = await accumulator.wait();
@@ -346,13 +326,12 @@ void main() {
   test('willHaveSyncedMetadataUpdatesWhenListeningToBothCacheAndDefaultSource',
       () async {
     final CollectionReference collection = await collectionAB();
-    final Query query = collection.whereNotEqualTo('sort', 0).orderBy('sort');
+    final Query query = collection.where('sort', isNotEqualTo: 0).orderBy('sort');
     await collection.get(); // Populate the cache.
 
     final EventAccumulator<QuerySnapshot> cacheAccumulator =
         EventAccumulator<QuerySnapshot>();
-    final StreamSubscription<QuerySnapshot> cacheRegistration = query
-        .getSnapshotsWithOptions(fromCacheWithMetadata)
+    final StreamSubscription<QuerySnapshot> cacheRegistration = query.snapshots(source: ListenSource.cache, includeMetadataChanges: true)
         .listen(cacheAccumulator.onData, onError: cacheAccumulator.onError);
 
     QuerySnapshot snapshot = await cacheAccumulator.wait();
@@ -362,8 +341,7 @@ void main() {
 
     final EventAccumulator<QuerySnapshot> defaultAccumulator =
         EventAccumulator<QuerySnapshot>();
-    final StreamSubscription<QuerySnapshot> defaultRegistration = query
-        .getSnapshots(MetadataChanges.include)
+    final StreamSubscription<QuerySnapshot> defaultRegistration = query.snapshots(includeMetadataChanges: true)
         .listen(defaultAccumulator.onData, onError: defaultAccumulator.onError);
 
     // The first snapshot is raised from the cache.
@@ -409,19 +387,18 @@ void main() {
 
   test('canUnlistenToDefaultSourceWhileStillListeningToCache', () async {
     final CollectionReference collection = await collectionAB();
-    final Query query = collection.whereNotEqualTo('sort', 0).orderBy('sort');
+    final Query query = collection.where('sort', isNotEqualTo: 0).orderBy('sort');
 
     final EventAccumulator<QuerySnapshot> defaultAccumulator =
         EventAccumulator<QuerySnapshot>();
     final StreamSubscription<QuerySnapshot> defaultRegistration = query
-        .snapshots
+        .snapshots()
         .listen(defaultAccumulator.onData, onError: defaultAccumulator.onError);
     await defaultAccumulator.wait();
 
     final EventAccumulator<QuerySnapshot> cacheAccumulator =
         EventAccumulator<QuerySnapshot>();
-    final StreamSubscription<QuerySnapshot> cacheRegistration = query
-        .getSnapshotsWithOptions(fromCache)
+    final StreamSubscription<QuerySnapshot> cacheRegistration = query.snapshots(source: ListenSource.cache)
         .listen(cacheAccumulator.onData, onError: cacheAccumulator.onError);
     await cacheAccumulator.wait();
 
@@ -440,19 +417,18 @@ void main() {
 
   test('canUnlistenToCacheSourceWhileStillListeningToServer', () async {
     final CollectionReference collection = await collectionAB();
-    final Query query = collection.whereNotEqualTo('sort', 0).orderBy('sort');
+    final Query query = collection.where('sort', isNotEqualTo: 0).orderBy('sort');
 
     final EventAccumulator<QuerySnapshot> defaultAccumulator =
         EventAccumulator<QuerySnapshot>();
     final StreamSubscription<QuerySnapshot> defaultRegistration = query
-        .snapshots
+        .snapshots()
         .listen(defaultAccumulator.onData, onError: defaultAccumulator.onError);
     await defaultAccumulator.wait();
 
     final EventAccumulator<QuerySnapshot> cacheAccumulator =
         EventAccumulator<QuerySnapshot>();
-    final StreamSubscription<QuerySnapshot> cacheRegistration = query
-        .getSnapshotsWithOptions(fromCache)
+    final StreamSubscription<QuerySnapshot> cacheRegistration = query.snapshots(source: ListenSource.cache)
         .listen(cacheAccumulator.onData, onError: cacheAccumulator.onError);
     await cacheAccumulator.wait();
 
@@ -471,12 +447,12 @@ void main() {
   test('canListenUnlistenRelistenToSameQueryWithDifferentSourceOptions',
       () async {
     final CollectionReference collection = await collectionAB();
-    final Query query = collection.whereGreaterThan('sort', 0).orderBy('sort');
+    final Query query = collection.where('sort', isGreaterThan: 0).orderBy('sort');
 
     // Default listener, which also populates the cache.
     final EventAccumulator<QuerySnapshot> defaultAccumulator =
         EventAccumulator<QuerySnapshot>();
-    StreamSubscription<QuerySnapshot> defaultRegistration = query.snapshots
+    StreamSubscription<QuerySnapshot> defaultRegistration = query.snapshots()
         .listen(defaultAccumulator.onData, onError: defaultAccumulator.onError);
 
     QuerySnapshot snapshot = await defaultAccumulator.wait();
@@ -486,8 +462,7 @@ void main() {
     // The same query from the cache.
     final EventAccumulator<QuerySnapshot> cacheAccumulator =
         EventAccumulator<QuerySnapshot>();
-    StreamSubscription<QuerySnapshot> cacheRegistration = query
-        .getSnapshotsWithOptions(fromCache)
+    StreamSubscription<QuerySnapshot> cacheRegistration = query.snapshots(source: ListenSource.cache)
         .listen(cacheAccumulator.onData, onError: cacheAccumulator.onError);
 
     snapshot = await cacheAccumulator.wait();
@@ -501,7 +476,7 @@ void main() {
     expected = <Map<String, Object?>>[doc('b', 1), doc('c', 2)];
     expect(values(snapshot), expected);
 
-    defaultRegistration = query.snapshots
+    defaultRegistration = query.snapshots()
         .listen(defaultAccumulator.onData, onError: defaultAccumulator.onError);
     snapshot = await defaultAccumulator.wait();
     expect(values(snapshot), expected);
@@ -514,8 +489,7 @@ void main() {
     expected = <Map<String, Object?>>[doc('c', 2), doc('b', 3)];
     expect(values(snapshot), expected);
 
-    cacheRegistration = query
-        .getSnapshotsWithOptions(fromCache)
+    cacheRegistration = query.snapshots(source: ListenSource.cache)
         .listen(cacheAccumulator.onData, onError: cacheAccumulator.onError);
     snapshot = await cacheAccumulator.wait();
     expect(values(snapshot), expected);
@@ -529,14 +503,12 @@ void main() {
   test('canListenToCompositeIndexQueriesFromCache', () async {
     final CollectionReference collection = await collectionAB();
     final Query query = collection
-        .whereLessThanOrEqualTo('k', 'a')
-        .whereGreaterThanOrEqualTo('sort', 0);
+        .where('k', isLessThanOrEqualTo: 'a').where('sort', isGreaterThanOrEqualTo: 0);
     await collection.get(); // Populate the cache.
 
     final EventAccumulator<QuerySnapshot> accumulator =
         EventAccumulator<QuerySnapshot>();
-    final StreamSubscription<QuerySnapshot> listener = query
-        .getSnapshotsWithOptions(fromCache)
+    final StreamSubscription<QuerySnapshot> listener = query.snapshots(source: ListenSource.cache)
         .listen(accumulator.onData, onError: accumulator.onError);
 
     final QuerySnapshot snapshot = await accumulator.wait();
@@ -556,8 +528,7 @@ void main() {
 
     final EventAccumulator<QuerySnapshot> accumulator =
         EventAccumulator<QuerySnapshot>();
-    final StreamSubscription<QuerySnapshot> listener = collection
-        .getSnapshotsWithOptions(fromCache)
+    final StreamSubscription<QuerySnapshot> listener = collection.snapshots(source: ListenSource.cache)
         .listen(accumulator.onData, onError: accumulator.onError);
 
     snapshot = await accumulator.wait();
@@ -574,8 +545,7 @@ void main() {
 
     final EventAccumulator<QuerySnapshot> accumulator =
         EventAccumulator<QuerySnapshot>();
-    final StreamSubscription<QuerySnapshot> listener = collection
-        .getSnapshotsWithOptions(fromCacheWithMetadata)
+    final StreamSubscription<QuerySnapshot> listener = collection.snapshots(source: ListenSource.cache, includeMetadataChanges: true)
         .listen(accumulator.onData, onError: accumulator.onError);
 
     final QuerySnapshot snapshot = await accumulator.wait();
@@ -591,12 +561,12 @@ void main() {
 
   test('shareServerSideUpdatesWhenListeningToBothCacheAndDefault', () async {
     final CollectionReference collection = await collectionAB();
-    final Query query = collection.whereGreaterThan('sort', 0).orderBy('sort');
+    final Query query = collection.where('sort', isGreaterThan: 0).orderBy('sort');
 
     final EventAccumulator<QuerySnapshot> defaultAccumulator =
         EventAccumulator<QuerySnapshot>();
     final StreamSubscription<QuerySnapshot> defaultRegistration = query
-        .snapshots
+        .snapshots()
         .listen(defaultAccumulator.onData, onError: defaultAccumulator.onError);
     QuerySnapshot snapshot = await defaultAccumulator.wait();
     List<Map<String, Object?>> expected = <Map<String, Object?>>[doc('b', 1)];
@@ -604,8 +574,7 @@ void main() {
 
     final EventAccumulator<QuerySnapshot> cacheAccumulator =
         EventAccumulator<QuerySnapshot>();
-    final StreamSubscription<QuerySnapshot> cacheRegistration = query
-        .getSnapshotsWithOptions(fromCache)
+    final StreamSubscription<QuerySnapshot> cacheRegistration = query.snapshots(source: ListenSource.cache)
         .listen(cacheAccumulator.onData, onError: cacheAccumulator.onError);
     snapshot = await cacheAccumulator.wait();
     expect(values(snapshot), expected);

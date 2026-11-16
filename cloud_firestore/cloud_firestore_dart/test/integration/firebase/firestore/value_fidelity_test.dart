@@ -51,9 +51,9 @@ void main() {
       await doc.set(data);
     }
     final DocumentSnapshot<Json> snapshot =
-        await reader.doc(doc.path).get(Source.server);
+        await reader.doc(doc.path).get(GetOptions(source: Source.server));
     expect(snapshot.metadata.isFromCache, isFalse);
-    return snapshot.data!;
+    return snapshot.data()!;
   }
 
   void expectNegativeZero(Object? value) {
@@ -165,7 +165,7 @@ void main() {
     await collection.doc('max').set(<String, Object?>{'v': maxInt});
 
     Future<List<String>> ids(Query<Json> query) async =>
-        (await query.get(Source.server))
+        (await query.get(GetOptions(source: Source.server)))
             .docs
             .map((QueryDocumentSnapshot<Json> d) => d.id)
             .toList();
@@ -184,8 +184,8 @@ void main() {
     await collection.doc('zero').update(<String, Object?>{
       'list': FieldValue.arrayUnion(<Object?>[1.5, Blob(Uint8List(0))]),
     });
-    final List<Object?> list = (await collection.doc('zero').get(Source.server))
-        .data!['list']! as List<Object?>;
+    final List<Object?> list = (await collection.doc('zero').get(GetOptions(source: Source.server)))
+        .data()!['list']! as List<Object?>;
     expect(list, hasLength(2));
     expect(list[0], 1.5);
     expect((list[1]! as Blob).bytes, isEmpty);

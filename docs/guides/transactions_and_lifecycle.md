@@ -8,7 +8,7 @@ work in progress.
 Transactions are optimistic, as in the Android and JS SDKs: `transaction.get` reads the current
 version of a document, and the commit sends every write with a precondition on the version that was
 read (documents that were only read are verified). When a precondition fails the whole callback is
-run again, up to `TransactionOptions.maxAttempts` times (5 by default), so the callback must not
+run again, up to `maxAttempts` times (5 by default), so the callback must not
 have side effects of its own.
 
 **A commit whose answer is lost can be applied twice.** A commit is retried when it fails with
@@ -30,7 +30,7 @@ a re-sent increment a second time after its acknowledgement was lost, as the emu
 
 ### Read-only transactions
 
-`TransactionOptions(readOnly: true)` runs a read-only transaction **of the backend** (the server
+`readOnly: true` runs a read-only transaction **of the backend** (the server
 SDKs have these; the Android and JS client SDKs do not):
 
 ```dart
@@ -39,8 +39,8 @@ final total = await firestore.runTransaction((transaction) async {
   final orders = await transaction.getQuery(
       firestore.collection('orders').where('account', isEqualTo: 'a'));
   final count = await transaction.getAggregate(firestore.collection('orders').count());
-  return (account.data, orders.docs.length, count.getCount());
-}, options: TransactionOptions(readOnly: true));
+  return (account.data(), orders.docs.length, count.count);
+}, readOnly: true);
 ```
 
 - Every read of the transaction sees the database as it was at one point in time: documents
@@ -48,7 +48,7 @@ final total = await firestore.runTransaction((transaction) async {
   also while other clients write. `getQuery` and `getAggregate` only exist for read-only
   transactions; in a read-write transaction they fail with `invalidArgument`, because such a
   transaction verifies its reads at commit and the result of a query cannot be verified.
-- `TransactionOptions(readOnly: true, readTime: timestamp)` reads the database as it was at
+- `readOnly: true, readTime: timestamp` reads the database as it was at
   `timestamp`. The backend keeps old versions for a limited time and rejects read times before that.
 - Writes in the transaction throw. Nothing is committed and no locks are taken, so there are no
   conflicts: the callback is not run again when documents change. It is only run again (up to
@@ -62,7 +62,7 @@ final total = await firestore.runTransaction((transaction) async {
 ## Lifecycle: `terminate()`
 
 `await firestore.terminate()` stops the instance: listeners stop receiving events, the streams and
-the local cache are closed, and `Firestore.instanceFor` returns a new instance from then on. What
+the local cache are closed, and `FirebaseFirestore.instanceFor` returns a new instance from then on. What
 happens to work that was in progress, as in the Android and JS SDKs:
 
 - A write whose future has not completed (it was not acknowledged by the backend yet) **never

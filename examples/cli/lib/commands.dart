@@ -171,7 +171,7 @@ mixin QueryOptions on FirestoreCommand {
       final bool descending = orderBy.endsWith(':desc');
       query = query.orderBy(
         descending ? orderBy.substring(0, orderBy.length - 5) : orderBy,
-        descending ? Direction.descending : Direction.ascending,
+        descending: descending,
       );
     }
     final String? limit = argResults!.option('limit');
@@ -204,16 +204,16 @@ mixin QueryOptions on FirestoreCommand {
         ? value
         : usageException('"$text": the value must be a JSON array.');
     return switch (match[2]) {
-      '==' => Filter.equalTo(field, value),
-      '!=' => Filter.notEqualTo(field, value),
-      '<' => Filter.lessThan(field, value),
-      '<=' => Filter.lessThanOrEqualTo(field, value),
-      '>' => Filter.greaterThan(field, value),
-      '>=' => Filter.greaterThanOrEqualTo(field, value),
-      'array-contains' => Filter.arrayContains(field, value),
-      'array-contains-any' => Filter.arrayContainsAny(field, list()),
-      'in' => Filter.inArray(field, list()),
-      _ => Filter.notInArray(field, list()),
+      '==' => Filter(field, isEqualTo: value),
+      '!=' => Filter(field, isNotEqualTo: value),
+      '<' => Filter(field, isLessThan: value),
+      '<=' => Filter(field, isLessThanOrEqualTo: value),
+      '>' => Filter(field, isGreaterThan: value),
+      '>=' => Filter(field, isGreaterThanOrEqualTo: value),
+      'array-contains' => Filter(field, arrayContains: value),
+      'array-contains-any' => Filter(field, arrayContainsAny: list()),
+      'in' => Filter(field, whereIn: list()),
+      _ => Filter(field, whereNotIn: list()),
     };
   }
 
@@ -231,7 +231,7 @@ mixin QueryOptions on FirestoreCommand {
     DocumentSnapshot<Map<String, Object?>> document,
   ) => <String, Object?>{
     idField: document.id,
-    ...toJsonValue(document.data)! as Map<String, Object?>,
+    ...toJsonValue(document.data())! as Map<String, Object?>,
   };
 }
 
@@ -261,7 +261,7 @@ class ExportCommand extends FirestoreCommand with QueryOptions {
     // connection it fails instead.
     final QuerySnapshot<Map<String, Object?>> snapshot = await buildQuery(
       firestore,
-    ).get(Source.server);
+    ).get(GetOptions(source: Source.server));
     final String json = const JsonEncoder.withIndent('  ')
         .convert(<Map<String, Object?>>[
           for (final QueryDocumentSnapshot<Map<String, Object?>> doc
@@ -316,14 +316,14 @@ class WatchCommand extends FirestoreCommand with QueryOptions {
 
     int changes = 0;
     final StreamSubscription<QuerySnapshot<Map<String, Object?>>> listener =
-        buildQuery(firestore).snapshots.listen((
+        buildQuery(firestore).snapshots().listen((
           QuerySnapshot<Map<String, Object?>> snapshot,
         ) {
           for (final DocumentChange<Map<String, Object?>> change
               in snapshot.docChanges) {
             print(
               '${change.type.name} ${change.doc.id} '
-              '${jsonEncode(toJsonValue(change.doc.data))}',
+              '${jsonEncode(toJsonValue(change.doc.data()))}',
             );
             changes++;
             if (exitAfter != null && changes >= exitAfter) {

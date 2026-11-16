@@ -105,7 +105,7 @@ final Directory directory = Directory('/home/ada/.local/share/my_app');
 
 // In the background isolate: the same project, another app name, another cache file.
 final FirebaseApp worker = FirebaseApp.withOptions(app.options, name: 'background-sync');
-final Firestore workerFirestore = Firestore.instanceFor(
+final FirebaseFirestore workerFirestore = FirebaseFirestore.instanceFor(
   app: worker,
   openDatabase: sqliteOpener(directory),
 );

@@ -13,6 +13,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/set_options.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/source.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/transaction.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/transaction_options.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/get_options.dart';
 import 'package:test/test.dart';
 
 import '../../../util/integration_test_util.dart';
@@ -37,15 +38,15 @@ void main() {
 
     final DocumentSnapshot snapshot = await firestore.runTransaction(
       (Transaction transaction) => transaction.get(doc),
-      options: TransactionOptions(readOnly: true),
+      readOnly: true,
     );
-    expect(snapshot.getDouble('foo'), 1);
+    expect((snapshot.get('foo') as num?)?.toDouble(), 1);
 
     await expectLater(
       firestore.runTransaction((Transaction transaction) async {
         await transaction.get(doc);
         transaction.set(doc, map(<dynamic>['foo', 2]));
-      }, options: TransactionOptions(readOnly: true)),
+      }, readOnly: true),
       throwsA(
         isA<FirestoreException>().having(
           (FirestoreException e) => e.errorCode,
@@ -71,11 +72,11 @@ void main() {
       final DocumentSnapshot snapshot = await transaction.get(doc);
       await doc.set(map(<dynamic>['foo', 2]));
       return snapshot.get('foo');
-    }, options: TransactionOptions(readOnly: true));
+    }, readOnly: true);
 
     expect(attempts, 1);
     expect(result, 1);
-    expect((await doc.get(Source.server)).get('foo'), 2);
+    expect((await doc.get(GetOptions(source: Source.server))).get('foo'), 2);
   });
 
   test('testRunsTransactionsAfterGettingExistingDoc', () async {
@@ -514,7 +515,7 @@ void main() {
     final DocumentSnapshot snapshot = await doc.get();
     expect(transactionCallbackCount, 2);
     expect(snapshot.exists, isTrue);
-    expect(snapshot.data, map(<String>['foo2', 'bar2']));
+    expect(snapshot.data(), map(<String>['foo2', 'bar2']));
   });
 
   test('testSetDocumentWithMerge', () async {
@@ -538,13 +539,13 @@ void main() {
               'nested',
               map<String>(<String>['c', 'd']),
             ]),
-            SetOptions.mergeAllFields,
+            const SetOptions(merge: true),
           );
       return Future<void>.value();
     });
     final DocumentSnapshot snapshot = await doc.get();
     expect(
-      snapshot.data,
+      snapshot.data(),
       map<dynamic>(<dynamic>[
         'a',
         'b',
@@ -584,7 +585,10 @@ void main() {
           await barrier.future;
           transaction.set(
             doc,
-            map(<dynamic>['count', snapshot.getDouble('count')! + 1.0]),
+            map(<dynamic>[
+              'count',
+              (snapshot.get('count') as num).toDouble() + 1.0,
+            ]),
           );
           return;
         }),
@@ -599,7 +603,7 @@ void main() {
     await Future.wait(transactionTasks);
     // Now all transaction should be completed, so check the result.
     final DocumentSnapshot snapshot = await doc.get();
-    expect(snapshot.getDouble('count')!.toInt(), 8);
+    expect((snapshot.get('count') as num?)?.toDouble().toInt(), 8);
   });
 
   test('testTransactionRaisesErrorsForInvalidUpdates', () async {
@@ -654,7 +658,10 @@ void main() {
 
           transaction.update(
             doc,
-            map(<dynamic>['count', snapshot.getDouble('count')! + 1.0]),
+            map(<dynamic>[
+              'count',
+              (snapshot.get('count') as num).toDouble() + 1.0,
+            ]),
           );
           return;
         }),
@@ -672,8 +679,8 @@ void main() {
     expect(counter, lessThanOrEqualTo(6));
     // Now all transaction should be completed, so check the result.
     final DocumentSnapshot snapshot = await doc.get();
-    expect(snapshot.getDouble('count')!.toInt(), 8);
-    expect(snapshot.getString('other'), 'yes');
+    expect((snapshot.get('count') as num?)?.toDouble().toInt(), 8);
+    expect(snapshot.get('other') as String?, 'yes');
   });
 
   test('testMakesDefaultMaxAttempts', () async {
@@ -704,7 +711,6 @@ void main() {
   });
 
   test('testMakesOptionSpecifiedMaxAttempts', () async {
-    final TransactionOptions options = TransactionOptions(maxAttempts: 1);
     final DocumentReference doc1 = firestore.collection('counters').doc();
     int count = 0;
     await doc1.set(map(<dynamic>['count', 15]));
@@ -715,7 +721,7 @@ void main() {
         await transaction.get(doc1);
         await doc1.set(map(<dynamic>['count', 1234 + ++count]));
         transaction.update(doc1, map(<dynamic>['count', 1]));
-      }, options: options);
+      }, maxAttempts: 1);
     } catch (e) {
       error = e;
     }
@@ -725,7 +731,7 @@ void main() {
       (error! as FirestoreException).errorCode,
       FirestoreErrorCode.failedPrecondition,
     );
-    expect(count, options.maxAttempts);
+    expect(count, 1);
   });
 
   test('testUpdateFieldsWithDotsTransactionally', () async {
@@ -734,20 +740,18 @@ void main() {
 
     await firestore.runTransaction<void>((Transaction transaction) {
       transaction
-        ..updateFromList(doc, <dynamic>[
-          FieldPath(<String>['a.b']),
-          'new',
-        ])
-        ..updateFromList(doc, <dynamic>[
-          FieldPath(<String>['c.d']),
-          'new',
-        ]);
+        ..update(doc, <Object, Object?>{
+          FieldPath(<String>['a.b']): 'new',
+        })
+        ..update(doc, <Object, Object?>{
+          FieldPath(<String>['c.d']): 'new',
+        });
       return Future<void>.value();
     });
 
     final DocumentSnapshot snapshot = await doc.get();
     expect(snapshot.exists, isTrue);
-    expect(snapshot.data, map<String>(<String>['a.b', 'new', 'c.d', 'new']));
+    expect(snapshot.data(), map<String>(<String>['a.b', 'new', 'c.d', 'new']));
   });
 
   test('testUpdateNestedFieldsTransactionally', () async {
@@ -763,7 +767,7 @@ void main() {
 
     await firestore.runTransaction<void>((Transaction transaction) {
       transaction
-        ..updateFromList(doc, <String>['a.b', 'new'])
+        ..update(doc, <Object, Object?>{'a.b': 'new'})
         ..update(doc, map<String>(<String>['c.d', 'new']));
       return Future<void>.value();
     });
@@ -771,7 +775,7 @@ void main() {
     final DocumentSnapshot snapshot = await doc.get();
     expect(snapshot.exists, isTrue);
     expect(
-      snapshot.data,
+      snapshot.data(),
       map<dynamic>(<dynamic>[
         'a',
         map<String>(<String>['b', 'new']),
@@ -801,7 +805,7 @@ void main() {
     final DocumentSnapshot snapshot = await doc1.get();
     expect(attempts, 2);
     expect(snapshot.exists, isTrue);
-    expect(snapshot.data!['count'], 1234);
+    expect(snapshot.data()!['count'], 1234);
   });
 
   test('testReadingADocTwiceWithDifferentVersions', () async {
@@ -938,7 +942,7 @@ void main() {
     });
     final DocumentSnapshot snapshot = await doc.get();
     expect(snapshot.exists, isTrue);
-    expect(snapshot.data, map<String>(<String>['foo', 'bar']));
+    expect(snapshot.data(), map<String>(<String>['foo', 'bar']));
   });
 
   test('testTransactionOptionsZeroMaxAttemptsThrows', () {
@@ -1093,7 +1097,7 @@ class TransactionTester {
       await _runTransaction();
       final DocumentSnapshot snapshot = await _docRef.get();
       expect(snapshot.exists, isTrue);
-      expect(snapshot.data, expected);
+      expect(snapshot.data(), expected);
     } catch (e) {
       fail(
         'Expected the sequence (${_listStages(_stages)}) to succeed, but got $e',

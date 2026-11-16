@@ -16,12 +16,12 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/query_snapshot.dart'
 /// // Only the server; fails with FirestoreErrorCode.unavailable when offline.
 /// final DocumentSnapshot<Map<String, Object?>> fresh = await firestore
 ///     .doc('cities/SF')
-///     .get(Source.server);
+///     .get(const GetOptions(source: Source.server));
 ///
 /// // Only the cache; never contacts the backend.
 /// final QuerySnapshot<Map<String, Object?>> cached = await firestore
 ///     .collection('cities')
-///     .get(Source.cache);
+///     .get(const GetOptions(source: Source.cache));
 /// ```
 enum Source {
   /// Causes Firestore to try to retrieve an up-to-date (server-retrieved) snapshot, but fall back

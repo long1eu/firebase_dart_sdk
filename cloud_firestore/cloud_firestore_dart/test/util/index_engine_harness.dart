@@ -76,7 +76,9 @@ Future<Map<String, List<String>>> _cacheResults(
 ) async {
   final Map<String, List<String>> results = <String, List<String>>{};
   for (final IndexedQuery query in queries) {
-    results[query.name] = _ids(await query.build(collection).get(Source.cache));
+    results[query.name] = _ids(
+      await query.build(collection).get(GetOptions(source: Source.cache)),
+    );
   }
   return results;
 }
@@ -105,7 +107,10 @@ Future<void> checkIndexedQueries({
     await collection.doc(doc.key).set(doc.value);
   }
   // Everything is in the cache as the backend has it.
-  expect(_ids(await collection.get(Source.server)), hasLength(docs.length));
+  expect(
+    _ids(await collection.get(GetOptions(source: Source.server))),
+    hasLength(docs.length),
+  );
 
   await firestore.setIndexConfigurationFromJSON(
     indexConfiguration(collection.id, indexes),
@@ -129,7 +134,7 @@ Future<void> checkIndexedQueries({
   );
   for (final IndexedQuery query in queries) {
     final List<String> fromServer = _ids(
-      await query.build(collection).get(Source.server),
+      await query.build(collection).get(GetOptions(source: Source.server)),
     );
     expect(fromIndex[query.name], fromServer, reason: query.name);
   }
@@ -140,7 +145,7 @@ Future<void> checkIndexedQueries({
   await firestore.disableNetwork();
   await pendingWrites(collection);
   // The writes are in the local store once a cache read went through the queue behind them.
-  await collection.get(Source.cache);
+  await collection.get(GetOptions(source: Source.cache));
 
   final Map<String, List<String>> beforeBackfill = await _cacheResults(
     collection,
@@ -180,7 +185,7 @@ Future<void> checkIndexedQueries({
   await firestore.waitForPendingWrites();
   for (final IndexedQuery query in queries) {
     final List<String> fromServer = _ids(
-      await query.build(collection).get(Source.server),
+      await query.build(collection).get(GetOptions(source: Source.server)),
     );
     expect(beforeBackfill[query.name], fromServer, reason: query.name);
   }

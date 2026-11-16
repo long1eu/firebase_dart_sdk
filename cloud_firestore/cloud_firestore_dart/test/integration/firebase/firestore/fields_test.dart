@@ -67,7 +67,7 @@ void main() {
     final DocumentReference docRef = (await testCollection()).doc();
     await docRef.set(data);
     final DocumentSnapshot result = await docRef.get();
-    expect(result.data, data);
+    expect(result.data(), data);
   });
 
   test('testNestedFieldsCanReadDirectly', () async {
@@ -92,8 +92,7 @@ void main() {
     final Map<String, Object?> data = nestedObject(1);
     final DocumentReference docRef = (await testCollection()).doc();
     await docRef.set(data);
-    await docRef.updateFromList(
-        <dynamic>['metadata.deep.field', 100.0, 'metadata.added', 200.0]);
+    await docRef.update(<Object, Object?>{'metadata.deep.field': 100.0, 'metadata.added': 200.0});
     final DocumentSnapshot result = await docRef.get();
     final Map<String, Object?> expectedData = map(<dynamic>[
       'name',
@@ -109,7 +108,7 @@ void main() {
       ])
     ]);
 
-    expect(result.data, expectedData);
+    expect(result.data(), expectedData);
   });
 
   test('testNestedFieldsCanBeUsedInQueryFilters', () async {
@@ -134,7 +133,7 @@ void main() {
 
     await Future.wait(tasks);
     final Query query =
-        collection.whereGreaterThanOrEqualTo('metadata.createdAt', 200);
+        collection.where('metadata.createdAt', isGreaterThanOrEqualTo: 200);
     final QuerySnapshot res = await query.get();
     expect(querySnapshotToValues(res), expected);
   });
@@ -170,7 +169,7 @@ void main() {
     final DocumentReference docRef = (await testCollection()).doc();
     await docRef.set(data);
     final DocumentSnapshot doc = await docRef.get();
-    expect(doc.data, data);
+    expect(doc.data(), data);
   });
 
   test('testFieldsWithSpecialCharsCanBeReadDirectly', () async {
@@ -180,7 +179,7 @@ void main() {
     final DocumentSnapshot doc = await docRef.get();
     expect(doc['field'], data['field']);
     expect(
-        doc.getField(FieldPath(<String>['field.dot'])), data['field.dot']);
+        doc.get(FieldPath(<String>['field.dot'])), data['field.dot']);
     expect(doc['field\\slash'], data['field\\slash']);
   });
 
@@ -188,16 +187,11 @@ void main() {
     final Map<String, Object?> data = dottedObject(1);
     final DocumentReference docRef = (await testCollection()).doc();
     await docRef.set(data);
-    await docRef.updateFromList(<dynamic>[
-      FieldPath(<String>['field.dot']),
-      100.0,
-      'field\\slash',
-      200.0
-    ]);
+    await docRef.update(<Object, Object?>{FieldPath(<String>['field.dot']): 100.0, 'field\\slash': 200.0});
 
     final DocumentSnapshot doc = await docRef.get();
     expect(
-        doc.data,
+        doc.data(),
         map<dynamic>(<dynamic>[
           'field',
           'field 1',
@@ -230,8 +224,7 @@ void main() {
 
     await Future.wait(tasks);
 
-    final Query query = collection.whereGreaterThanOrEqualToField(
-        FieldPath(<String>['field.dot']), 200);
+    final Query query = collection.where(FieldPath(<String>['field.dot']), isGreaterThanOrEqualTo: 200);
     final QuerySnapshot res = await query.get();
     expect(querySnapshotToValues(res), expected);
   });
@@ -259,7 +252,7 @@ void main() {
 
     await Future.wait(tasks);
 
-    Query query = collection.orderByField(FieldPath(<String>['field.dot']));
+    Query query = collection.orderBy(FieldPath(<String>['field.dot']));
     QuerySnapshot res = await query.get();
     expect(querySnapshotToValues(res), expected);
 
@@ -278,7 +271,7 @@ void main() {
     final DocumentReference docRef = (await testCollection()).doc();
     await docRef.set(objectWithTimestamp(originalTimestamp));
     final DocumentSnapshot snapshot = await docRef.get();
-    final Map<String, Object?> data = snapshot.data!;
+    final Map<String, Object?> data = snapshot.data()!;
 
     final Timestamp readTimestamp = snapshot['timestamp']! as Timestamp;
     expect(readTimestamp, truncatedTimestamp);

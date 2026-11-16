@@ -62,7 +62,7 @@ Future<void> main() async {
   try {
     await users
         .where(FieldPath.documentId, whereIn: wanted.sublist(0, 31))
-        .get(Source.server);
+        .get(GetOptions(source: Source.server));
     print('31 values: accepted');
   } on FirestoreException catch (e) {
     print('31 values: ${e.errorCode}');

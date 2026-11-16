@@ -167,10 +167,10 @@ void main() {
         assertThat(snapshot).isNotNull();
         final docSnap1 = await collRef.doc("book1").get();
         assertThat(docSnap1.get("status")).isEqualTo("Updated");
-        assertThat(docSnap1.data!.containsKey("awards")).isFalse();
+        assertThat(docSnap1.data()!.containsKey("awards")).isFalse();
         final docSnap10 = await collRef.doc("book10").get();
         assertThat(docSnap10.get("status")).isEqualTo("Updated");
-        assertThat(docSnap10.data!.containsKey("awards")).isFalse();
+        assertThat(docSnap10.data()!.containsKey("awards")).isFalse();
       });
 
       test('testUpdateWithExpressions', () async {
@@ -438,7 +438,7 @@ void main() {
             .execute(atomic: true);
         assertThat(snapshot).isNotNull();
         final docSnap = await targetCol.doc("named").get();
-        assertThat(docSnap.data).containsExactly(["name", "Named Literal"]);
+        assertThat(docSnap.data()).containsExactly(["name", "Named Literal"]);
       });
 
       test('testUpsertWithoutTargetFailsForLiteralWithoutName', () async {

@@ -50,7 +50,7 @@ void main() {
           }
           final DocumentSnapshot<Map<String, Object?>> snapshot =
               await transaction.get(counter);
-          final Map<String, Object?> data = snapshot.data!;
+          final Map<String, Object?> data = snapshot.data()!;
           if (attempt == 1) {
             await chaos(i, beforeLookup: false);
           }
@@ -79,7 +79,7 @@ void main() {
         .doc('counter')
         .set(<String, Object?>{'n': 0, 'log': <Object?>[]});
     // Open the connection.
-    await db.collection(name).doc('counter').get(Source.server);
+    await db.collection(name).doc('counter').get(GetOptions(source: Source.server));
     return db.collection(name);
   }
 
@@ -225,8 +225,8 @@ void main() {
             final DocumentSnapshot<Map<String, Object?>> snapshot =
                 await transaction.get(counter);
             transaction.update(counter,
-                <String, Object?>{'n': (snapshot.data!['n']! as int) + 1});
-          }, options: TransactionOptions(maxAttempts: 20)).timeout(
+                <String, Object?>{'n': (snapshot.data()!['n']! as int) + 1});
+          }, maxAttempts: 20).timeout(
               const Duration(seconds: 25));
           clientDone++;
         }
@@ -234,13 +234,12 @@ void main() {
 
       Future<void> oracleTransactions() async {
         for (int i = 0; i < 15; i++) {
-          await env.oracle.runTransaction<void>(
-              (Transaction transaction) async {
+          await env.oracle.runTransaction<void>((Transaction transaction) async {
             final DocumentSnapshot<Map<String, Object?>> snapshot =
                 await transaction.get(oracleCounter);
             transaction.update(oracleCounter,
-                <String, Object?>{'n': (snapshot.data!['n']! as int) + 1});
-          }, options: TransactionOptions(maxAttempts: 20));
+                <String, Object?>{'n': (snapshot.data()!['n']! as int) + 1});
+          }, maxAttempts: 20);
           await pause(20);
         }
       }

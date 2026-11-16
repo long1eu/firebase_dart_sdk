@@ -36,7 +36,7 @@ void main() {
           AggregateQuerySnapshotInternal.create(query, data(<String, Object?>{'count': 42}));
 
       expect(snapshot.query, same(query));
-      expect(snapshot.getCount(), 42);
+      expect(snapshot.count, 42);
     });
 
     test('equality and hashCode consider query and data', () {
@@ -61,20 +61,20 @@ void main() {
       final AggregateQuerySnapshot snapshot =
           AggregateQuerySnapshotInternal.create(countQuery('foo'), raw);
       raw['count'] = util.wrap(5);
-      expect(snapshot.getCount(), 1);
+      expect(snapshot.count, 1);
     });
 
-    test('getCount fails when the count alias is null', () {
+    test('count is null when the count alias is null', () {
       final AggregateQuerySnapshot snapshot = AggregateQuerySnapshotInternal.create(
           countQuery('foo'), data(<String, Object?>{'count': null}));
-      expect(snapshot.getCount, throwsArgumentError);
+      expect(snapshot.count, isNull);
     });
 
     test('reading a field that was not requested fails', () {
       final AggregateQuerySnapshot snapshot = AggregateQuerySnapshotInternal.create(
           countQuery('foo'), data(<String, Object?>{'count': 1}));
       expect(() => snapshot.get(AggregateField.sum('a')), throwsArgumentError);
-      expect(() => snapshot.getInt(AggregateField.average('a')),
+      expect(() => (snapshot.get(AggregateField.average('a')) as num?)?.toInt(),
           throwsArgumentError);
     });
 
@@ -89,40 +89,33 @@ void main() {
           'sum_c': 3,
         }),
       );
-      expect(snapshot.getInt(AggregateField.sum('a')), 5);
-      expect(snapshot.getDouble(AggregateField.sum('a')), 5.0);
-      expect(snapshot.getDouble(AggregateField.average('a')), 2.5);
+      expect((snapshot.get(AggregateField.sum('a')) as num?)?.toInt(), 5);
+      expect((snapshot.get(AggregateField.sum('a')) as num?)?.toDouble(), 5.0);
+      expect((snapshot.get(AggregateField.average('a')) as num?)?.toDouble(), 2.5);
       expect(snapshot.get(AggregateField.sum('b')), isNull);
-      expect(snapshot.getInt(AggregateField.sum('b')), isNull);
-      expect(snapshot.getDouble(AggregateField.sum('b')), isNull);
+      expect((snapshot.get(AggregateField.sum('b')) as num?)?.toInt(), isNull);
+      expect((snapshot.get(AggregateField.sum('b')) as num?)?.toDouble(), isNull);
       // Doubles are truncated when read as int.
-      expect(snapshot.getInt(AggregateField.average('b')), 3);
-      expect(snapshot.getDouble(AggregateField.sum('c')), 3.0);
+      expect((snapshot.get(AggregateField.average('b')) as num?)?.toInt(), 3);
+      expect((snapshot.get(AggregateField.sum('c')) as num?)?.toDouble(), 3.0);
     });
 
     test('non numeric values cannot be read as numbers', () {
       final AggregateQuerySnapshot snapshot = AggregateQuerySnapshotInternal.create(
           countQuery('foo'), data(<String, Object?>{'sum_a': 'text'}));
-      expect(() => snapshot.getInt(AggregateField.sum('a')), throwsStateError);
-      expect(
-          () => snapshot.getDouble(AggregateField.sum('a')), throwsStateError);
+      expect(() => snapshot.getSum('a'), throwsStateError);
     });
 
-    test('NaN and infinity are saturated when read as int', () {
+    test('NaN and infinity are kept by getAverage', () {
       final AggregateQuerySnapshot snapshot = AggregateQuerySnapshotInternal.create(
         countQuery('foo'),
         data(<String, Object?>{
           'average_nan': double.nan,
           'average_inf': double.infinity,
-          'average_ninf': double.negativeInfinity,
         }),
       );
-      expect(snapshot.getInt(AggregateField.average('nan')), 0);
-      expect(
-          snapshot.getInt(AggregateField.average('inf')), 9223372036854775807);
-      expect(snapshot.getInt(AggregateField.average('ninf')),
-          -9223372036854775808);
-      expect(snapshot.getDouble(AggregateField.average('nan')), isNaN);
+      expect(snapshot.getAverage('nan'), isNaN);
+      expect(snapshot.getAverage('inf'), double.infinity);
     });
   });
 
@@ -187,9 +180,9 @@ void main() {
     });
 
     test('field path variants match the string variants', () {
-      expect(AggregateField.sumField(FieldPath.fromString('a.b')),
+      expect(AggregateField.sum(FieldPath.fromString('a.b')),
           AggregateField.sum('a.b'));
-      expect(AggregateField.averageField(FieldPath.fromString('a.b')),
+      expect(AggregateField.average(FieldPath.fromString('a.b')),
           AggregateField.average('a.b'));
     });
 

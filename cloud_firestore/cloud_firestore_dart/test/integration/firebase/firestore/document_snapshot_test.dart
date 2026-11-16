@@ -47,8 +47,8 @@ void main() {
     expect(snapshot1.reference, snapshot2.reference);
     expect(snapshot2.reference, snapshot3.reference);
 
-    expect(snapshot1.data, snapshot2.data);
-    expect(snapshot2.data, snapshot3.data);
+    expect(snapshot1.data(), snapshot2.data());
+    expect(snapshot2.data(), snapshot3.data());
 
     expect(snapshot1, snapshot2);
     expect(snapshot2, snapshot3);

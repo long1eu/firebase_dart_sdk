@@ -38,7 +38,7 @@ class Post {
 final FirestoreDataConverter<Post> postConverter =
     FirestoreDataConverter<Post>.from(
       fromFirestore: (QueryDocumentSnapshot<Map<String, Object?>> snapshot) {
-        final Map<String, Object?> data = snapshot.data;
+        final Map<String, Object?> data = snapshot.data();
         return Post(data['title']! as String, data['author']! as String);
       },
       toFirestore: (Post post, SetOptions? options) => <String, Object?>{
@@ -54,7 +54,6 @@ class MutationTester {
     this.name,
     this.set,
     this.update,
-    this.updateFromList,
     this.delete, {
     this.mayUseBackoff = false,
   });
@@ -68,14 +67,9 @@ class MutationTester {
   set;
   final Future<void> Function(
     DocumentReference<Object?> ref,
-    Map<String, Object?> data,
+    Map<Object, Object?> data,
   )
   update;
-  final Future<void> Function(
-    DocumentReference<Object?> ref,
-    List<Object?> data,
-  )
-  updateFromList;
   final Future<void> Function(DocumentReference<Object?> ref) delete;
 
   /// The transaction runner retries failed preconditions with a backoff.
@@ -86,10 +80,8 @@ final MutationTester documentTester = MutationTester(
   'DocumentReference',
   <T>(DocumentReference<T> ref, T data, [SetOptions? options]) =>
       ref.set(data, options),
-  (DocumentReference<Object?> ref, Map<String, Object?> data) =>
+  (DocumentReference<Object?> ref, Map<Object, Object?> data) =>
       ref.update(data),
-  (DocumentReference<Object?> ref, List<Object?> data) =>
-      ref.updateFromList(data),
   (DocumentReference<Object?> ref) => ref.delete(),
 );
 
@@ -97,10 +89,8 @@ final MutationTester batchTester = MutationTester(
   'WriteBatch',
   <T>(DocumentReference<T> ref, T data, [SetOptions? options]) async =>
       (ref.firestore.batch()..set<T>(ref, data, options)).commit(),
-  (DocumentReference<Object?> ref, Map<String, Object?> data) async =>
+  (DocumentReference<Object?> ref, Map<Object, Object?> data) async =>
       (ref.firestore.batch()..update(ref, data)).commit(),
-  (DocumentReference<Object?> ref, List<Object?> data) async =>
-      (ref.firestore.batch()..updateFromList(ref, data)).commit(),
   (DocumentReference<Object?> ref) async =>
       (ref.firestore.batch()..delete(ref)).commit(),
 );
@@ -111,13 +101,9 @@ final MutationTester transactionTester = MutationTester(
       ref.firestore.runTransaction<void>((Transaction transaction) async {
         transaction.set<T>(ref, data, options);
       }),
-  (DocumentReference<Object?> ref, Map<String, Object?> data) =>
+  (DocumentReference<Object?> ref, Map<Object, Object?> data) =>
       ref.firestore.runTransaction<void>((Transaction transaction) async {
         transaction.update(ref, data);
-      }),
-  (DocumentReference<Object?> ref, List<Object?> data) =>
-      ref.firestore.runTransaction<void>((Transaction transaction) async {
-        transaction.updateFromList(ref, data);
       }),
   (DocumentReference<Object?> ref) =>
       ref.firestore.runTransaction<void>((Transaction transaction) async {
@@ -147,7 +133,7 @@ void genericMutationTests(MutationTester op) {
         final DocumentReference<Map<String, Object?>> ref =
             await newLiteTestDoc();
         await op.set(ref, <String, Object?>{'val': 1});
-        expect((await ref.get()).data, <String, Object?>{'val': 1});
+        expect((await ref.get()).data(), <String, Object?>{'val': 1});
       });
 
       test('can merge a document', () async {
@@ -155,8 +141,8 @@ void genericMutationTests(MutationTester op) {
             await newLiteTestDoc(<String, Object?>{'foo': 1});
         await op.set(ref, <String, Object?>{
           'bar': 2,
-        }, SetOptions.mergeAllFields);
-        expect((await ref.get()).data, <String, Object?>{'foo': 1, 'bar': 2});
+        }, const SetOptions(merge: true));
+        expect((await ref.get()).data(), <String, Object?>{'foo': 1, 'bar': 2});
       });
 
       test('can merge a document with mergeFields', () async {
@@ -169,12 +155,14 @@ void genericMutationTests(MutationTester op) {
             'bar': 2,
             'baz': <String, Object?>{'foobar': 3},
           },
-          SetOptions.mergeFieldPaths(<FieldPath>[
-            FieldPath(<String>['bar']),
-            FieldPath(<String>['baz', 'foobar']),
-          ]),
+          SetOptions(
+            mergeFields: <FieldPath>[
+              FieldPath(<String>['bar']),
+              FieldPath(<String>['baz', 'foobar']),
+            ],
+          ),
         );
-        expect((await ref.get()).data, <String, Object?>{
+        expect((await ref.get()).data(), <String, Object?>{
           'foo': 1,
           'bar': 2,
           'baz': <String, Object?>{'foobar': 3},
@@ -188,7 +176,7 @@ void genericMutationTests(MutationTester op) {
             FirestoreDataConverter<Map<String, Object?>>.from(
               fromFirestore:
                   (QueryDocumentSnapshot<Map<String, Object?>> snapshot) =>
-                      snapshot.data,
+                      snapshot.data(),
               toFirestore: (Map<String, Object?> post, SetOptions? options) {
                 if (options == null || !options.merge) {
                   expect(post.keys, containsAll(<String>['title', 'author']));
@@ -197,7 +185,12 @@ void genericMutationTests(MutationTester op) {
               },
             );
         final DocumentReference<Map<String, Object?>> ref =
-            newLiteTestCollection().doc('post').withConverter(mergeConverter);
+            newLiteTestCollection()
+                .doc('post')
+                .withConverter(
+                  fromFirestore: mergeConverter.fromFirestore,
+                  toFirestore: mergeConverter.toFirestore,
+                );
         await op.set(ref, <String, Object?>{
           'title': 'walnut',
           'author': 'author',
@@ -205,7 +198,7 @@ void genericMutationTests(MutationTester op) {
         await op.set(ref, <String, Object?>{
           'title': 'olive',
           'id': FieldValue.increment(2),
-        }, SetOptions.mergeAllFields);
+        }, const SetOptions(merge: true));
         final DocumentSnapshot<Map<String, Object?>> post = await ref.get();
         expect(post.get('title'), 'olive');
         expect(post.get('author'), 'author');
@@ -221,7 +214,7 @@ void genericMutationTests(MutationTester op) {
         });
         await op.set(ref, <String, Object?>{
           'title': 'olive',
-        }, SetOptions.mergeFields(<String>['title']));
+        }, SetOptions(mergeFields: <String>['title']));
         final DocumentSnapshot<Map<String, Object?>> post = await ref.get();
         expect(post.get('title'), 'olive');
         expect(post.get('author'), 'author');
@@ -255,23 +248,21 @@ void genericMutationTests(MutationTester op) {
         final DocumentReference<Map<String, Object?>> ref =
             await newLiteTestDoc(<String, Object?>{'foo': 1, 'bar': 1});
         await op.update(ref, <String, Object?>{'foo': 2, 'baz': 2});
-        expect((await ref.get()).data, <String, Object?>{
+        expect((await ref.get()).data(), <String, Object?>{
           'foo': 2,
           'bar': 1,
           'baz': 2,
         });
       });
 
-      test('can update a document (using varargs)', () async {
+      test('can update a document (with FieldPath keys)', () async {
         final DocumentReference<Map<String, Object?>> ref =
             await newLiteTestDoc(<String, Object?>{'foo': 1, 'bar': 1});
-        await op.updateFromList(ref, <Object?>[
-          'foo',
-          2,
-          FieldPath(<String>['baz']),
-          2,
-        ]);
-        expect((await ref.get()).data, <String, Object?>{
+        await op.update(ref, <Object, Object?>{
+          'foo': 2,
+          FieldPath(<String>['baz']): 2,
+        });
+        expect((await ref.get()).data(), <String, Object?>{
           'foo': 2,
           'bar': 1,
           'baz': 2,
@@ -331,7 +322,7 @@ void verifyResults(
   expect(actual.length, expected.length);
   expect(
     actual.docs
-        .map((QueryDocumentSnapshot<Map<String, Object?>> doc) => doc.data)
+        .map((QueryDocumentSnapshot<Map<String, Object?>> doc) => doc.data())
         .toList(),
     expected,
   );
@@ -710,9 +701,9 @@ void main() {
       final DocumentReference<Map<String, Object?>> ref = await newLiteTestDoc(
         <String, Object?>{'n': 1},
       );
-      expect((await ref.get()).data, <String, Object?>{'n': 1});
+      expect((await ref.get()).data(), <String, Object?>{'n': 1});
       expect((await ref.parent.where('n', isEqualTo: 1).get()).length, 1);
-      expect((await ref.parent.count().get()).getCount(), 1);
+      expect((await ref.parent.count().get()).count, 1);
 
       // One instance, one transport.
       expect(liteTestTransports, hasLength(transportsBefore + 1));
@@ -816,10 +807,9 @@ void main() {
       await doc.firestore.runTransaction<void>((Transaction transaction) async {
         final DocumentSnapshot<Map<String, Object?>> snap = await transaction
             .get(doc);
-        transaction.updateFromList(doc, <Object?>[
-          'counter',
-          (snap.get('counter')! as int) + 1,
-        ]);
+        transaction.update(doc, <Object, Object?>{
+          'counter': (snap.get('counter')! as int) + 1,
+        });
       });
       expect((await doc.get()).get('counter'), 2);
     });
@@ -893,7 +883,7 @@ void main() {
           await transaction.get(doc);
           await doc.update(<String, Object?>{'counter': attempts});
           transaction.update(doc, <String, Object?>{'counter': -1});
-        }, options: TransactionOptions(maxAttempts: 1)),
+        }, maxAttempts: 1),
         throwsA(isA<FirestoreException>()),
       );
       expect(attempts, 1);
@@ -906,13 +896,13 @@ void main() {
       final Object? value = await doc.firestore.runTransaction<Object?>(
         (Transaction transaction) async =>
             (await transaction.get(doc)).get('counter'),
-        options: TransactionOptions(readOnly: true),
+        readOnly: true,
       );
       expect(value, 7);
       await expectLater(
         doc.firestore.runTransaction<void>((Transaction transaction) async {
           transaction.set(doc, <String, Object?>{'counter': 8});
-        }, options: TransactionOptions(readOnly: true)),
+        }, readOnly: true),
         throwsA(
           isA<FirestoreException>().having(
             (FirestoreException e) => e.errorCode,
@@ -940,7 +930,7 @@ void main() {
             before.docs
                 .map(
                   (QueryDocumentSnapshot<Map<String, Object?>> doc) =>
-                      doc.data['n'],
+                      doc.data()['n'],
                 )
                 .toList(),
             <int>[2, 3],
@@ -958,8 +948,8 @@ void main() {
             }),
           );
           expect(totals.data(), <String, Object?>{'count': 3, 'sum': 6});
-        }, options: TransactionOptions(readOnly: true));
-        expect((await coll.count().get()).getCount(), 4);
+        }, readOnly: true);
+        expect((await coll.count().get()).count, 4);
       },
     );
 
@@ -1032,7 +1022,7 @@ void main() {
     test('can add a document', () async {
       final DocumentReference<Map<String, Object?>> ref =
           await newLiteTestCollection().add(<String, Object?>{'val': 1});
-      expect((await ref.get()).data, <String, Object?>{'val': 1});
+      expect((await ref.get()).data(), <String, Object?>{'val': 1});
     });
 
     test('throws when user input fails validation', () async {
@@ -1048,7 +1038,7 @@ void main() {
       final DocumentSnapshot<Map<String, Object?>> snap =
           await (await newLiteTestDoc()).get();
       expect(snap.exists, isFalse);
-      expect(snap.data, isNull);
+      expect(snap.data(), isNull);
       expect(snap.get('foo'), isNull);
     });
 
@@ -1056,7 +1046,7 @@ void main() {
       final DocumentSnapshot<Map<String, Object?>> snap =
           await (await newLiteTestDoc(<String, Object?>{'foo': 1})).get();
       expect(snap.exists, isTrue);
-      expect(snap.data, <String, Object?>{'foo': 1});
+      expect(snap.data(), <String, Object?>{'foo': 1});
     });
 
     test('can return single field', () async {
@@ -1067,7 +1057,7 @@ void main() {
           })).get();
       expect(snap.get('foo'), 1);
       expect(snap['foo'], 1);
-      expect(snap.getField(FieldPath(<String>['bar'])), 2);
+      expect(snap.get(FieldPath(<String>['bar'])), 2);
       expect(snap.contains('foo'), isTrue);
       expect(snap.contains('baz'), isFalse);
     });
@@ -1078,7 +1068,7 @@ void main() {
             'foo': <String, Object?>{'bar': 1},
           })).get();
       expect(snap.get('foo.bar'), 1);
-      expect(snap.getField(FieldPath(<String>['foo', 'bar'])), 1);
+      expect(snap.get(FieldPath(<String>['foo', 'bar'])), 1);
     });
 
     test('returns Bytes', () async {
@@ -1112,7 +1102,7 @@ void main() {
           'nested': <String, Object?>{'deep': true},
         },
       });
-      final Map<String, Object?> data = (await ref.get()).data!;
+      final Map<String, Object?> data = (await ref.get()).data()!;
       expect(data, <String, Object?>{
         'null': null,
         'bool': true,
@@ -1150,8 +1140,8 @@ void main() {
       final DocumentReference<Map<String, Object?>> ref = await newLiteTestDoc(
         initial,
       );
-      await ref.updateFromList(<Object?>['val', value]);
-      return (await ref.get()).data;
+      await ref.update(<Object, Object?>{'val': value});
+      return (await ref.get()).data();
     }
 
     test('can apply arrayUnion', () async {
@@ -1294,8 +1284,8 @@ void main() {
         await coll
             .where(
               Filter.or(<Filter>[
-                Filter.equalTo('foo', 1),
-                Filter.greaterThan('foo', 2),
+                Filter('foo', isEqualTo: 1),
+                Filter('foo', isGreaterThan: 2),
               ]),
             )
             .orderBy('foo')
@@ -1322,10 +1312,10 @@ void main() {
             foo(1),
             foo(2),
           ]);
-      verifyResults(
-        await coll.orderBy('foo', Direction.ascending).get(),
-        <Map<String, Object?>>[foo(1), foo(2)],
-      );
+      verifyResults(await coll.orderBy('foo').get(), <Map<String, Object?>>[
+        foo(1),
+        foo(2),
+      ]);
     });
 
     test('supports ordered query (with desc)', () async {
@@ -1335,7 +1325,7 @@ void main() {
             foo(2),
           ]);
       verifyResults(
-        await coll.orderBy('foo', Direction.descending).get(),
+        await coll.orderBy('foo', descending: true).get(),
         <Map<String, Object?>>[foo(2), foo(1)],
       );
     });
@@ -1386,7 +1376,7 @@ void main() {
         );
         verifyResults(
           await coll
-              .orderBy('foo', Direction.descending)
+              .orderBy('foo', descending: true)
               .startAfter(<Object?>[5])
               .limitToLast(2)
               .get(),
@@ -1526,7 +1516,7 @@ void main() {
         FirestoreDataConverter<Map<String, Object?>>.from(
           fromFirestore:
               (QueryDocumentSnapshot<Map<String, Object?>> snapshot) =>
-                  snapshot.data,
+                  snapshot.data(),
           toFirestore: (Map<String, Object?> data, SetOptions? options) => data,
         );
 
@@ -1543,7 +1533,14 @@ void main() {
       expect(coll1a, isNot(db.collection('c')));
       expect(
         coll1a,
-        isNot(db.collection('a').withConverter(identityConverter)),
+        isNot(
+          db
+              .collection('a')
+              .withConverter(
+                fromFirestore: identityConverter.fromFirestore,
+                toFirestore: identityConverter.toFirestore,
+              ),
+        ),
       );
       expect(coll1a, isNot(db.doc('a/b')));
     });
@@ -1557,7 +1554,17 @@ void main() {
       expect(doc1a, db.collection('a').doc('b'));
       expect(doc1a.hashCode, db.collection('a').doc('b').hashCode);
       expect(doc1a, isNot(db.doc('a/c')));
-      expect(doc1a, isNot(db.doc('a/b').withConverter(identityConverter)));
+      expect(
+        doc1a,
+        isNot(
+          db
+              .doc('a/b')
+              .withConverter(
+                fromFirestore: identityConverter.fromFirestore,
+                toFirestore: identityConverter.toFirestore,
+              ),
+        ),
+      );
       expect(doc1a, isNot(db.collection('a')));
     });
 
@@ -1570,8 +1577,8 @@ void main() {
         'coll',
       );
       final Query<Map<String, Object?>> query1a = coll.orderBy('foo');
-      expect(query1a, coll.orderBy('foo', Direction.ascending));
-      expect(query1a, isNot(coll.orderBy('foo', Direction.descending)));
+      expect(query1a, coll.orderBy('foo'));
+      expect(query1a, isNot(coll.orderBy('foo', descending: true)));
       expect(query1a, isNot(coll.doc('a').collection('b').orderBy('foo')));
     });
 
@@ -1620,9 +1627,12 @@ void main() {
   group('withConverter() support', () {
     test('for DocumentReference.withConverter()', () async {
       final DocumentReference<Post> ref = (await newLiteTestDoc())
-          .withConverter(postConverter);
+          .withConverter(
+            fromFirestore: postConverter.fromFirestore,
+            toFirestore: postConverter.toFirestore,
+          );
       await ref.set(Post('post', 'author'));
-      final Post? post = (await ref.get()).data;
+      final Post? post = (await ref.get()).data();
       expect(post!.byline(), 'post, by author');
     });
 
@@ -1631,10 +1641,13 @@ void main() {
       () async {
         final DocumentReference<Map<String, Object?>> ref =
             (await newLiteTestDoc())
-                .withConverter(postConverter)
+                .withConverter(
+                  fromFirestore: postConverter.fromFirestore,
+                  toFirestore: postConverter.toFirestore,
+                )
                 .withoutConverter();
         await ref.set(<String, Object?>{'title': 'post', 'author': 'author'});
-        expect((await ref.get()).data, <String, Object?>{
+        expect((await ref.get()).data(), <String, Object?>{
           'title': 'post',
           'author': 'author',
         });
@@ -1643,11 +1656,14 @@ void main() {
 
     test('for CollectionReference.withConverter()', () async {
       final CollectionReference<Post> coll = newLiteTestCollection()
-          .withConverter(postConverter);
+          .withConverter(
+            fromFirestore: postConverter.fromFirestore,
+            toFirestore: postConverter.toFirestore,
+          );
       final DocumentReference<Post> ref = await coll.add(
         Post('post', 'author'),
       );
-      final Post? post = (await ref.get()).data;
+      final Post? post = (await ref.get()).data();
       expect(post!.byline(), 'post, by author');
     });
 
@@ -1658,10 +1674,13 @@ void main() {
           ]);
       final QuerySnapshot<Post> result = await coll
           .where('title', isEqualTo: 'post')
-          .withConverter(postConverter)
+          .withConverter(
+            fromFirestore: postConverter.fromFirestore,
+            toFirestore: postConverter.toFirestore,
+          )
           .get();
-      expect(result.docs[0].data, isA<Post>());
-      expect(result.docs[0].data.byline(), 'post, by author');
+      expect(result.docs[0].data(), isA<Post>());
+      expect(result.docs[0].data().byline(), 'post, by author');
     });
 
     test('for Query.withoutConverter() applies no converter', () async {
@@ -1671,10 +1690,13 @@ void main() {
           ]);
       final QuerySnapshot<Map<String, Object?>> result = await coll
           .where('title', isEqualTo: 'post')
-          .withConverter(postConverter)
+          .withConverter(
+            fromFirestore: postConverter.fromFirestore,
+            toFirestore: postConverter.toFirestore,
+          )
           .withoutConverter()
           .get();
-      expect(result.docs[0].data, <String, Object?>{
+      expect(result.docs[0].data(), <String, Object?>{
         'title': 'post',
         'author': 'author',
       });
@@ -1682,13 +1704,16 @@ void main() {
 
     test('for Transaction.get() and Transaction.set()', () async {
       final DocumentReference<Post> ref = (await newLiteTestDoc())
-          .withConverter(postConverter);
+          .withConverter(
+            fromFirestore: postConverter.fromFirestore,
+            toFirestore: postConverter.toFirestore,
+          );
       await ref.set(Post('post', 'author'));
       await ref.firestore.runTransaction<void>((Transaction transaction) async {
-        final Post post = (await transaction.get(ref)).data!;
+        final Post post = (await transaction.get(ref)).data()!;
         transaction.set(ref, Post('${post.title}!', post.author));
       });
-      expect((await ref.get()).data!.byline(), 'post!, by author');
+      expect((await ref.get()).data()!.byline(), 'post!, by author');
     });
 
     test(
@@ -1697,8 +1722,19 @@ void main() {
         final FirebaseFirestore db = newLiteTestFirestore();
         final DocumentReference<Post> doc = db
             .doc('root/doc')
-            .withConverter(postConverter);
-        expect(doc.parent, db.collection('root').withConverter(postConverter));
+            .withConverter(
+              fromFirestore: postConverter.fromFirestore,
+              toFirestore: postConverter.toFirestore,
+            );
+        expect(
+          doc.parent,
+          db
+              .collection('root')
+              .withConverter(
+                fromFirestore: postConverter.fromFirestore,
+                toFirestore: postConverter.toFirestore,
+              ),
+        );
       },
     );
 
@@ -1708,7 +1744,10 @@ void main() {
         final FirebaseFirestore db = newLiteTestFirestore();
         final CollectionReference<Post> coll = db
             .collection('root/doc/parent')
-            .withConverter(postConverter);
+            .withConverter(
+              fromFirestore: postConverter.fromFirestore,
+              toFirestore: postConverter.toFirestore,
+            );
         expect(coll.parent, db.doc('root/doc'));
       },
     );
@@ -1722,12 +1761,36 @@ void main() {
         toFirestore: (Post post, SetOptions? options) => <String, Object?>{},
       );
       expect(
-        db.collection('users/user1/posts').withConverter(postConverter),
-        isNot(db.collection('users/user1/posts').withConverter(postConverter2)),
+        db
+            .collection('users/user1/posts')
+            .withConverter(
+              fromFirestore: postConverter.fromFirestore,
+              toFirestore: postConverter.toFirestore,
+            ),
+        isNot(
+          db
+              .collection('users/user1/posts')
+              .withConverter(
+                fromFirestore: postConverter2.fromFirestore,
+                toFirestore: postConverter2.toFirestore,
+              ),
+        ),
       );
       expect(
-        db.doc('some/doc').withConverter(postConverter),
-        isNot(db.doc('some/doc').withConverter(postConverter2)),
+        db
+            .doc('some/doc')
+            .withConverter(
+              fromFirestore: postConverter.fromFirestore,
+              toFirestore: postConverter.toFirestore,
+            ),
+        isNot(
+          db
+              .doc('some/doc')
+              .withConverter(
+                fromFirestore: postConverter2.fromFirestore,
+                toFirestore: postConverter2.toFirestore,
+              ),
+        ),
       );
     });
 
@@ -1736,7 +1799,7 @@ void main() {
           FirestoreDataConverter<int>.from(
             fromFirestore:
                 (QueryDocumentSnapshot<Map<String, Object?>> snapshot) =>
-                    snapshot.data['value']! as int,
+                    snapshot.data()['value']! as int,
             toFirestore: (int value, SetOptions? options) => <String, Object?>{
               'value': value,
             },
@@ -1745,7 +1808,7 @@ void main() {
           FirestoreDataConverter<List<int>>.from(
             fromFirestore:
                 (QueryDocumentSnapshot<Map<String, Object?>> snapshot) =>
-                    (snapshot.data['values']! as List<Object?>).cast<int>(),
+                    (snapshot.data()['values']! as List<Object?>).cast<int>(),
             toFirestore: (List<int> value, SetOptions? options) =>
                 <String, Object?>{'values': value},
           );
@@ -1753,15 +1816,21 @@ void main() {
           newLiteTestCollection();
       final DocumentReference<int> ref = coll
           .doc('number')
-          .withConverter(primitiveConverter);
+          .withConverter(
+            fromFirestore: primitiveConverter.fromFirestore,
+            toFirestore: primitiveConverter.toFirestore,
+          );
       await ref.set(3);
-      expect((await ref.get()).data, 3);
+      expect((await ref.get()).data(), 3);
 
       final DocumentReference<List<int>> ref2 = coll
           .doc('array')
-          .withConverter(arrayConverter);
+          .withConverter(
+            fromFirestore: arrayConverter.fromFirestore,
+            toFirestore: arrayConverter.toFirestore,
+          );
       await ref2.set(<int>[1, 2, 3]);
-      expect((await ref2.get()).data, <int>[1, 2, 3]);
+      expect((await ref2.get()).data(), <int>[1, 2, 3]);
     });
   }, skip: skip);
 
@@ -1791,19 +1860,19 @@ void main() {
             .collection(segments[1]);
         await sub.add(<String, Object?>{'foo': 'bar'});
         await sub.add(<String, Object?>{'foo': 'baz'});
-        expect((await sub.count().get()).getCount(), 2);
+        expect((await sub.count().get()).count, 2);
       });
     }
 
     test('run count query on empty collection', () async {
-      expect((await newLiteTestCollection().count().get()).getCount(), 0);
+      expect((await newLiteTestCollection().count().get()).count, 0);
     });
 
     test('run count query on collection with 3 docs', () async {
       final CollectionReference<Map<String, Object?>> coll =
           await newLiteTestCollectionWith(threeBooks);
       final AggregateQuerySnapshot snapshot = await coll.count().get();
-      expect(snapshot.getCount(), 3);
+      expect(snapshot.count, 3);
       expect(snapshot.data(), <String, Object?>{'count': 3});
     });
 
@@ -1819,8 +1888,7 @@ void main() {
       final CollectionReference<Map<String, Object?>> coll =
           await newLiteTestCollectionWith(threeBooks);
       expect(
-        (await coll.where('author', isEqualTo: 'authorA').count().get())
-            .getCount(),
+        (await coll.where('author', isEqualTo: 'authorA').count().get()).count,
         2,
       );
     });
@@ -1834,7 +1902,7 @@ void main() {
                 .limit(1)
                 .count()
                 .get())
-            .getCount(),
+            .count,
         1,
       );
     });
@@ -1848,7 +1916,7 @@ void main() {
                 .limit(3)
                 .count()
                 .get())
-            .getCount(),
+            .count,
         2,
       );
     });
@@ -1864,15 +1932,14 @@ void main() {
     test('count query supports order by', () async {
       final CollectionReference<Map<String, Object?>> coll =
           await newLiteTestCollectionWith(ids);
-      expect((await coll.orderBy('id').count().get()).getCount(), 4);
+      expect((await coll.orderBy('id').count().get()).count, 4);
     });
 
     test('count query supports order by and startAt', () async {
       final CollectionReference<Map<String, Object?>> coll =
           await newLiteTestCollectionWith(ids);
       expect(
-        (await coll.orderBy('id').startAt(<Object?>[2]).count().get())
-            .getCount(),
+        (await coll.orderBy('id').startAt(<Object?>[2]).count().get()).count,
         3,
       );
     });
@@ -1881,8 +1948,7 @@ void main() {
       final CollectionReference<Map<String, Object?>> coll =
           await newLiteTestCollectionWith(ids);
       expect(
-        (await coll.orderBy('id').startAfter(<Object?>[2]).count().get())
-            .getCount(),
+        (await coll.orderBy('id').startAfter(<Object?>[2]).count().get()).count,
         2,
       );
     });
@@ -1897,7 +1963,7 @@ void main() {
                 .endAt(<Object?>[2])
                 .count()
                 .get())
-            .getCount(),
+            .count,
         2,
       );
     });
@@ -1912,7 +1978,7 @@ void main() {
                 .endBefore(<Object?>[2])
                 .count()
                 .get())
-            .getCount(),
+            .count,
         1,
       );
     });
@@ -1931,10 +1997,13 @@ void main() {
       expect(
         (await coll
                 .where('author', isEqualTo: 'authorA')
-                .withConverter(throwingConverter)
+                .withConverter(
+                  fromFirestore: throwingConverter.fromFirestore,
+                  toFirestore: throwingConverter.toFirestore,
+                )
                 .count()
                 .get())
-            .getCount(),
+            .count,
         2,
       );
     });
@@ -1953,7 +2022,7 @@ void main() {
         batch.set(db.doc(path), <String, Object?>{'x': 1});
       }
       await batch.commit();
-      expect((await db.collectionGroup(group).count().get()).getCount(), 2);
+      expect((await db.collectionGroup(group).count().get()).count, 2);
     });
 
     test('aggregateQuerySnapshotEqual on same queries be truthy', () async {
@@ -2010,7 +2079,7 @@ void main() {
           await newLiteTestCollectionWith(threeBooks);
       final Future<AggregateQuerySnapshot> future = coll.count().get();
       await coll.firestore.terminate();
-      expect((await future).getCount(), 3);
+      expect((await future).count, 3);
     });
   }, skip: skip);
 
@@ -2123,7 +2192,10 @@ void main() {
           );
       final AggregateQuerySnapshot snapshot = await coll
           .where('author', isEqualTo: 'authorA')
-          .withConverter(throwingConverter)
+          .withConverter(
+            fromFirestore: throwingConverter.fromFirestore,
+            toFirestore: throwingConverter.toFirestore,
+          )
           .aggregateWithAliases(<String, AggregateField>{
             'myCount': AggregateField.count(),
           })
@@ -2347,8 +2419,11 @@ void main() {
             AggregateField.count(),
           ]).get();
       expect(snapshot.get(AggregateField.sum('pages')), 150);
-      expect(snapshot.getDouble(AggregateField.average('pages')), 75.0);
-      expect(snapshot.getCount(), 2);
+      expect(
+        (snapshot.get(AggregateField.average('pages')) as num?)?.toDouble(),
+        75.0,
+      );
+      expect(snapshot.count, 2);
       expect(
         () => snapshot.get(AggregateField.sum('other')),
         throwsArgumentError,
@@ -2412,24 +2487,24 @@ void main() {
           newLiteTestCollection();
       final DocumentReference<Map<String, Object?>> ref = await coll.add(
         <String, Object?>{
-          'vector0': FieldValue.vector(<double>[0.0]),
-          'vector1': FieldValue.vector(<double>[1, 2, 3.99]),
+          'vector0': VectorValue(<double>[0.0]),
+          'vector1': VectorValue(<double>[1, 2, 3.99]),
         },
       );
       await ref.set(<String, Object?>{
-        'vector0': FieldValue.vector(<double>[0.0]),
-        'vector1': FieldValue.vector(<double>[1, 2, 3.99]),
-        'vector2': FieldValue.vector(<double>[0, 0, 0]),
+        'vector0': VectorValue(<double>[0.0]),
+        'vector1': VectorValue(<double>[1, 2, 3.99]),
+        'vector2': VectorValue(<double>[0, 0, 0]),
       });
       await ref.update(<String, Object?>{
-        'vector3': FieldValue.vector(<double>[-1, -200, -999]),
+        'vector3': VectorValue(<double>[-1, -200, -999]),
       });
 
       final DocumentSnapshot<Map<String, Object?>> snap = await ref.get();
-      expect(snap.get('vector0'), FieldValue.vector(<double>[0.0]));
-      expect(snap.get('vector1'), FieldValue.vector(<double>[1, 2, 3.99]));
-      expect(snap.get('vector2'), FieldValue.vector(<double>[0, 0, 0]));
-      expect(snap.get('vector3'), FieldValue.vector(<double>[-1, -200, -999]));
+      expect(snap.get('vector0'), VectorValue(<double>[0.0]));
+      expect(snap.get('vector1'), VectorValue(<double>[1, 2, 3.99]));
+      expect(snap.get('vector2'), VectorValue(<double>[0, 0, 0]));
+      expect(snap.get('vector3'), VectorValue(<double>[-1, -200, -999]));
     });
   }, skip: skip);
 
@@ -2442,7 +2517,7 @@ void main() {
         db,
       ).doc();
       await ref.set(<String, Object?>{'a': 1});
-      expect((await ref.get()).data, <String, Object?>{'a': 1});
+      expect((await ref.get()).data(), <String, Object?>{'a': 1});
     });
 
     test('a malformed token reaches the emulator', () async {

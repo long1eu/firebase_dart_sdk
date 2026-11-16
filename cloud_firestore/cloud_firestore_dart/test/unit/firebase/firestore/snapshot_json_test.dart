@@ -189,7 +189,7 @@ void main() {
       expect(fromJson.exists, isTrue);
       expect(fromJson.id, 'bar');
       expect(fromJson.reference.path, 'foo/bar');
-      expect(fromJson.data, <String, Object?>{'a': 1});
+      expect(fromJson.data(), <String, Object?>{'a': 1});
       expect(fromJson.metadata.isFromCache, isFalse);
       expect(fromJson.metadata.hasPendingWrites, isFalse);
       expect(fromJson.document!.version, util.version(1000));
@@ -229,7 +229,7 @@ void main() {
 
       final Map<String, Object?> data =
           DocumentSnapshot<Map<String, Object?>>.fromJson(firestore, json)
-              .data!;
+              .data()!;
       expect(data['emptyBlob'], util.blob());
       expect((data['negativeZero']! as double).isNegative, isTrue);
       expect(data['zero'], isA<double>());
@@ -294,7 +294,7 @@ void main() {
             DocumentSnapshot<Map<String, Object?>>.fromJson(
                 firestore, documentSnapshot(path, data).toJson());
         expect(fromJson.reference.path, path);
-        expect(fromJson.data, data);
+        expect(fromJson.data(), data);
       });
     }
 
@@ -522,8 +522,7 @@ void main() {
 
     test('fromJson parses the toJson result', () {
       final core.Query query = util
-          .query('coll')
-          .orderBy(util.orderBy('sort'))
+          .query('coll').orderBy(util.orderBy('sort'))
           .filter(util.filter('sort', '>', 0));
       final QuerySnapshot<Map<String, Object?>> snapshot =
           querySnapshot(query, docs, readTime: util.version(5000));
@@ -535,14 +534,14 @@ void main() {
       expect(
           fromJson.docs.map((DocumentSnapshot<Map<String, Object?>> d) => d.id),
           <String>['b', 'a']);
-      expect(fromJson.docs[0].data, <String, Object?>{'bar': 2, 'sort': 1});
-      expect(fromJson.docs[1].data, <String, Object?>{'foo': 1, 'sort': 2});
+      expect(fromJson.docs[0].data(), <String, Object?>{'bar': 2, 'sort': 1});
+      expect(fromJson.docs[1].data(), <String, Object?>{'foo': 1, 'sort': 2});
       expect(fromJson.metadata.isFromCache, isFalse);
       expect(fromJson.metadata.hasPendingWrites, isFalse);
       expect(fromJson.snapshot.readTime, util.version(5000));
       expect(
           fromJson.docChanges
-              .map((dynamic c) => (c.document as DocumentSnapshot<Object?>).id),
+              .map((dynamic c) => (c.doc as DocumentSnapshot<Object?>).id),
           <String>['b', 'a']);
       // Serializing the result again keeps the read time.
       final QuerySnapshot<Map<String, Object?>> again =
@@ -559,8 +558,7 @@ void main() {
           .filter(util.orFilters(<Filter>[
             util.filter('n', '==', -0.0),
             util.filter('n', '==', 1),
-          ]))
-          .orderBy(util.orderBy('sort'))
+          ])).orderBy(util.orderBy('sort'))
           .startAt(
               Bound(position: <FieldValue>[util.wrap(-0.0)], inclusive: true))
           .endAt(Bound(
@@ -595,8 +593,7 @@ void main() {
               ]),
             ])),
         util
-            .query('coll')
-            .orderBy(util.orderBy('sort'))
+            .query('coll').orderBy(util.orderBy('sort'))
             .startAt(
                 Bound(position: <FieldValue>[util.wrap(1)], inclusive: true))
             .endAt(

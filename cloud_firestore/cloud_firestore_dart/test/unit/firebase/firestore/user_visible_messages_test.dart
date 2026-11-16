@@ -12,26 +12,28 @@ import 'package:test/test.dart';
 import '../../../util/test_util.dart';
 
 void main() {
-  test('FirestoreError.toString has the JS format on one line', () {
-    // JS: `${name}: [code=${code}]: ${message}`, with the name of the code
-    // in this SDK.
-    expect(
-      FirestoreException(
-        message: 'Missing permissions',
-        errorCode: FirestoreErrorCode.permissionDenied,
-      ).toString(),
-      'FirestoreError: [code=permissionDenied]: Missing permissions',
-    );
-    expect(
-      FirestoreException(
-        message: 'Failed',
-        errorCode: FirestoreErrorCode.unavailable,
-        cause: StateError('cause'),
-        stackTrace: StackTrace.current,
-      ).toString(),
-      'FirestoreError: [code=unavailable]: Failed',
-    );
-  });
+  test(
+    'FirestoreException.toString has the FlutterFire format on one line',
+    () {
+      // FlutterFire: `[${plugin}/${code}] ${message}`, without the stack trace.
+      expect(
+        FirestoreException(
+          message: 'Missing permissions',
+          errorCode: FirestoreErrorCode.permissionDenied,
+        ).toString(),
+        '[cloud_firestore/permission-denied] Missing permissions',
+      );
+      expect(
+        FirestoreException(
+          message: 'Failed',
+          errorCode: FirestoreErrorCode.unavailable,
+          cause: StateError('cause'),
+          stackTrace: StackTrace.current,
+        ).toString(),
+        '[cloud_firestore/unavailable] Failed',
+      );
+    },
+  );
 
   test('Timestamp.toString has the JS and Android format', () {
     expect(

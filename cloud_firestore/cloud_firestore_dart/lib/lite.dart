@@ -9,7 +9,7 @@
 /// ```dart
 /// import 'package:cloud_firestore_dart/lite.dart';
 ///
-/// final Firestore firestore = Firestore.instanceFor(app: app);
+/// final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(app: app);
 /// await firestore.doc('cities/SF').set({'name': 'San Francisco'});
 /// final QuerySnapshot<Map<String, Object?>> cities = await firestore
 ///     .collection('cities')
@@ -18,7 +18,7 @@
 /// ```
 ///
 /// Import this library *instead of* `cloud_firestore_dart.dart`: both declare
-/// `Firestore`, `DocumentReference`, `Query` and the snapshot classes (import
+/// `FirebaseFirestore`, `DocumentReference`, `Query` and the snapshot classes (import
 /// one of them with a prefix to use both in one file). The value types
 /// (`Timestamp`, `GeoPoint`, `Blob`, `FieldValue`, `FieldPath`, `Filter`, ...)
 /// are the same classes in both libraries.
@@ -55,9 +55,7 @@ export 'src/firebase/firestore/lite/write_batch.dart';
 export 'src/firebase/firestore/log_level.dart' show LogLevel;
 export 'src/firebase/firestore/max_key.dart';
 export 'src/firebase/firestore/min_key.dart';
-export 'src/firebase/firestore/query.dart' show Direction;
 export 'src/firebase/firestore/regex_value.dart';
 export 'src/firebase/firestore/set_options.dart' hide SetOptionsInternal;
-export 'src/firebase/firestore/transaction_options.dart';
 export 'src/firebase/firestore/vector_value.dart';
 export 'src/firebase/timestamp.dart' hide TimestampInternal;

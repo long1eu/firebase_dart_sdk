@@ -17,9 +17,9 @@ import 'package:firebase_app_dart/firebase_app_dart.dart';
 /// [resourceExhausted], [internal], [unavailable] or [unauthenticated] are
 /// sent again without an error reaching you (writes also on [aborted]), and
 /// transactions are attempted again as described on
-/// `Firestore.runTransaction`. An error you receive is usually one the client
+/// `FirebaseFirestore.runTransaction`. An error you receive is usually one the client
 /// gave up on, or one from a call that does not retry by itself, such as
-/// `get(Source.server)` or an aggregation.
+/// a `get` with `Source.server` or an aggregation.
 ///
 /// ```dart
 /// try {
@@ -44,7 +44,7 @@ enum FirestoreErrorCode {
   /// The operation was cancelled, typically by the caller.
   ///
   /// The client produces it when the signed-in user changes while a
-  /// `Firestore.waitForPendingWrites` future is waiting; the transport
+  /// `FirebaseFirestore.waitForPendingWrites` future is waiting; the transport
   /// reports it for a call that was cancelled on the way. Retrying makes
   /// sense; for `waitForPendingWrites`, call it again for the new user.
   cancelled(1, 'cancelled'),
@@ -53,7 +53,7 @@ enum FirestoreErrorCode {
   ///
   /// The client produces it when an error that is not a [FirestoreException]
   /// occurs below a write of a `DocumentReference` or in a call to the
-  /// backend, and when `Firestore.clearPersistence` cannot delete the files
+  /// backend, and when `FirebaseFirestore.clearPersistence` cannot delete the files
   /// of the cache (on Windows, for example, while another isolate or process
   /// has them open). The message holds the original error. A retry can help
   /// if the cause was temporary.
@@ -121,8 +121,8 @@ enum FirestoreErrorCode {
   /// message has a link that creates it), and a transaction fails with it
   /// when the documents it read kept changing until its attempts were used up.
   ///
-  /// The client produces it for any call on a terminated `Firestore`
-  /// instance; for `Firestore.clearPersistence` while the instance (or
+  /// The client produces it for any call on a terminated `FirebaseFirestore`
+  /// instance; for `FirebaseFirestore.clearPersistence` while the instance (or
   /// another one on the same cache) is running; for `toJson` of a snapshot
   /// with pending writes; and with a persistent cache, when the cache was
   /// opened by another version of the SDK or cleared by another client, when
@@ -166,8 +166,8 @@ enum FirestoreErrorCode {
   ///
   /// The backend or the transport returns it when the server cannot be
   /// reached. The client produces it when a call needs the server while the
-  /// client is offline: `get(Source.server)`, aggregations, vector queries
-  /// and pipelines; for `get(Source.cache)` of a document that is not in the
+  /// client is offline: a `get` with `Source.server`, aggregations, vector
+  /// queries and pipelines; for a `get` with `Source.cache` of a document that is not in the
   /// cache; and when the local cache cannot store a write or start a listen
   /// (for example a database that stays busy). Retry with a backoff, or read
   /// from the cache instead.
@@ -257,4 +257,8 @@ class FirestoreException extends FirebaseException {
   /// A description of what went wrong, for logs.
   @override
   String get message => super.message!;
+
+  /// `[cloud_firestore/<code>] <message>`, the format of FlutterFire, on one line: the stack trace is left out.
+  @override
+  String toString() => '[$plugin/$code] $message';
 }

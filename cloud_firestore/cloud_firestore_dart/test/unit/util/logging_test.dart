@@ -10,9 +10,9 @@ void main() {
 
   test('logging is quiet by default and setLoggingEnabled toggles debug', () {
     expect(internal.InternalLogLevel.w, original);
-    FirebaseFirestore.setLoggingEnabled(loggingEnabled: true);
+    FirebaseFirestore.setLoggingEnabled(true);
     expect(internal.Log.isDebugEnabled, isTrue);
-    FirebaseFirestore.setLoggingEnabled(loggingEnabled: false);
+    FirebaseFirestore.setLoggingEnabled(false);
     expect(internal.Log.isDebugEnabled, isFalse);
     expect(internal.Log.level, internal.InternalLogLevel.w);
   });
@@ -71,11 +71,10 @@ void main() {
       expect(printed.single, contains('error'));
     });
 
-    test('the levels are the JS ones, from the most to the least verbose', () {
+    test('the levels are the JS ones without info, from the most to the least verbose', () {
       expect(LogLevel.values, <LogLevel>[
         LogLevel.verbose,
         LogLevel.debug,
-        LogLevel.info,
         LogLevel.warn,
         LogLevel.error,
         LogLevel.silent,
@@ -117,17 +116,6 @@ void main() {
         'error',
       ]);
       expect(printedAt(LogLevel.debug), <String>['debug', 'warn', 'error']);
-      // No message is logged at info level; info is between debug and warn.
-      expect(printedAt(LogLevel.info), <String>['warn', 'error']);
-      expect(
-        internal.InternalLogLevel.d <= internal.InternalLogLevel.info,
-        isTrue,
-      );
-      expect(
-        internal.InternalLogLevel.info <= internal.InternalLogLevel.w,
-        isTrue,
-      );
-      expect(internal.Log.level, internal.InternalLogLevel.info);
       expect(printedAt(LogLevel.warn), <String>['warn', 'error']);
       expect(printedAt(LogLevel.error), <String>['error']);
       expect(printedAt(LogLevel.silent), isEmpty);
@@ -135,7 +123,7 @@ void main() {
 
     test('setLoggingEnabled still works after setLogLevel', () {
       FirebaseFirestore.setLogLevel(LogLevel.silent);
-      FirebaseFirestore.setLoggingEnabled(loggingEnabled: true);
+      FirebaseFirestore.setLoggingEnabled(true);
       expect(internal.Log.level, internal.InternalLogLevel.d);
     });
   });

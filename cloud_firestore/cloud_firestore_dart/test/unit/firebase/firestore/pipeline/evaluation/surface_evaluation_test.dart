@@ -14,7 +14,7 @@
 library;
 
 import 'package:cloud_firestore_dart/cloud_firestore_dart.dart'
-    show Decimal128Value, FieldValue, Int32Value;
+    show Decimal128Value, Int32Value;
 import 'package:cloud_firestore_dart/pipelines.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/database_id.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/field_path.dart';
@@ -22,6 +22,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/model/value/field_va
     as model;
 import 'package:cloud_firestore_dart/src/firebase/firestore/pipeline/evaluation/evaluate_result.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/pipeline/evaluation/expression_evaluator.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/vector_value.dart';
 import 'package:test/test.dart';
 
 import '../../../../../util/property_pipeline.dart';
@@ -115,7 +116,7 @@ void main() {
       }
       expect(
         evaluate(field('v').arraySum(), <String, Object?>{
-          'v': FieldValue.vector(<double>[1, 2]),
+          'v': VectorValue(<double>[1, 2]),
         }).isError,
         isTrue,
       );

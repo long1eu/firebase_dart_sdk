@@ -201,8 +201,7 @@ void main() {
     Query originalQuery = query('coll')
         .filter(filter('a', '==', 2))
         .filter(filter('b', '==', 2))
-        .filter(filter('c', '<', 5))
-        .orderBy(orderBy('c', 'asc'));
+        .filter(filter('c', '<', 5)).orderBy(orderBy('c', 'asc'));
     Query queryWithNonRestrictedBound = originalQuery
         .startAt(bound(false, <Object?>[1]))
         .endAt(bound(false, <Object?>[6]));
@@ -223,8 +222,7 @@ void main() {
     Query originalQuery = query('coll')
         .filter(filter('a', '==', 2))
         .filter(filter('b', '==', 2))
-        .filter(filter('c', '<', 5))
-        .orderBy(orderBy('c', 'desc'));
+        .filter(filter('c', '<', 5)).orderBy(orderBy('c', 'desc'));
     Query queryWithNonRestrictedBound = originalQuery
         .startAt(bound(false, <Object?>[6]))
         .endAt(bound(false, <Object?>[1]));
@@ -245,8 +243,7 @@ void main() {
     Query originalQuery = query('coll')
         .filter(filter('a', '==', 2))
         .filter(filter('b', '==', 2))
-        .filter(filter('c', '>', 2))
-        .orderBy(orderBy('c', 'asc'));
+        .filter(filter('c', '>', 2)).orderBy(orderBy('c', 'asc'));
     Query queryWithNonRestrictedBound = originalQuery
         .startAt(bound(false, <Object?>[2]))
         .endAt(bound(false, <Object?>[6]));
@@ -267,8 +264,7 @@ void main() {
     Query originalQuery = query('coll')
         .filter(filter('a', '==', 2))
         .filter(filter('b', '==', 2))
-        .filter(filter('c', '>', 2))
-        .orderBy(orderBy('c', 'desc'));
+        .filter(filter('c', '>', 2)).orderBy(orderBy('c', 'desc'));
     Query queryWithNonRestrictedBound = originalQuery
         .startAt(bound(false, <Object?>[6]))
         .endAt(bound(false, <Object?>[2]));
@@ -296,8 +292,7 @@ void main() {
     await addDoc('coll/val2', map(<dynamic>['count', 2]));
 
     Query qry = query('coll')
-        .filter(filter('count', '!=', 2))
-        .orderBy(orderBy('count'));
+        .filter(filter('count', '!=', 2)).orderBy(orderBy('count'));
     await verifyResults(qry, <String>['coll/val1']);
   });
 
@@ -401,8 +396,7 @@ void main() {
 
   test('testStartAtFilter', () async {
     await setUpSingleValueFilter();
-    Query qry = query('coll')
-        .orderBy(orderBy('count'))
+    Query qry = query('coll').orderBy(orderBy('count'))
         .startAt(bound(true, <Object?>[2]));
     await verifyResults(qry, <String>['coll/val2', 'coll/val3']);
   });
@@ -410,32 +404,28 @@ void main() {
   test('testAppliesStartAtFilterWithNotIn', () async {
     await setUpSingleValueFilter();
     Query qry = query('coll')
-        .filter(filter('count', '!=', 2))
-        .orderBy(orderBy('count'))
+        .filter(filter('count', '!=', 2)).orderBy(orderBy('count'))
         .startAt(bound(true, <Object?>[2]));
     await verifyResults(qry, <String>['coll/val3']);
   });
 
   test('testStartAfterFilter', () async {
     await setUpSingleValueFilter();
-    Query qry = query('coll')
-        .orderBy(orderBy('count'))
+    Query qry = query('coll').orderBy(orderBy('count'))
         .startAt(bound(false, <Object?>[2]));
     await verifyResults(qry, <String>['coll/val3']);
   });
 
   test('testEndAtFilter', () async {
     await setUpSingleValueFilter();
-    Query qry = query('coll')
-        .orderBy(orderBy('count'))
+    Query qry = query('coll').orderBy(orderBy('count'))
         .endAt(bound(true, <Object?>[2]));
     await verifyResults(qry, <String>['coll/val1', 'coll/val2']);
   });
 
   test('testEndBeforeFilter', () async {
     await setUpSingleValueFilter();
-    Query qry = query('coll')
-        .orderBy(orderBy('count'))
+    Query qry = query('coll').orderBy(orderBy('count'))
         .endAt(bound(false, <Object?>[2]));
     await verifyResults(qry, <String>['coll/val1']);
   });
@@ -444,8 +434,7 @@ void main() {
     await setUpSingleValueFilter();
     Query startAt = query('coll')
         .filter(filter('count', '>=', 1))
-        .filter(filter('count', '<=', 3))
-        .orderBy(orderBy('count'))
+        .filter(filter('count', '<=', 3)).orderBy(orderBy('count'))
         .startAt(bound(false, <Object?>[1]))
         .endAt(bound(true, <Object?>[2]));
     await verifyResults(startAt, <String>['coll/val2']);
@@ -734,8 +723,7 @@ void main() {
           <Object?>[2, 'foo']
         ]));
     Query qry = query('coll')
-        .filter(filter('value', 'array-contains', 'foo'))
-        .orderBy(orderBy('value'))
+        .filter(filter('value', 'array-contains', 'foo')).orderBy(orderBy('value'))
         .limitToFirst(2);
     await verifyResults(qry, <String>['coll/doc1', 'coll/doc3']);
   });
@@ -777,14 +765,12 @@ void main() {
     await addDoc('coll/val2', map(<dynamic>['a', 2, 'b', 2, 'c', 2]));
 
     Query qry = query('coll')
-        .filter(filter('c', '>', 2))
-        .orderBy(orderBy('c'))
+        .filter(filter('c', '>', 2)).orderBy(orderBy('c'))
         .startAt(bound(true, <Object?>[2]));
     await verifyResults(qry, <String>['coll/val1']);
 
     qry = query('coll')
-        .filter(filter('c', '<', 3))
-        .orderBy(orderBy('c', 'desc'))
+        .filter(filter('c', '<', 3)).orderBy(orderBy('c', 'desc'))
         .startAt(bound(true, <Object?>[3]));
     await verifyResults(qry, <String>['coll/val2']);
   });
@@ -816,22 +802,19 @@ void main() {
     qry = query('coll')
         .filter(filter('a', '>', 1))
         .filter(filter('a', '==', 2))
-        .orderBy(orderBy('a'))
-        .orderBy(orderBy(DocumentKey.keyFieldName));
+        .orderBy(orderBy('a')).orderBy(orderBy(DocumentKey.keyFieldName));
     await verifyResults(qry, <String>['coll/val2']);
 
     qry = query('coll')
         .filter(filter('a', '>', 1))
         .filter(filter('a', '==', 2))
-        .orderBy(orderBy('a'))
-        .orderBy(orderBy(DocumentKey.keyFieldName, 'desc'));
+        .orderBy(orderBy('a')).orderBy(orderBy(DocumentKey.keyFieldName, 'desc'));
     await verifyResults(qry, <String>['coll/val2']);
 
     qry = query('coll')
         .filter(filter('a', '>', 1))
         .filter(filter('a', '==', 3))
-        .orderBy(orderBy('a'))
-        .orderBy(orderBy('b'));
+        .orderBy(orderBy('a')).orderBy(orderBy('b'));
     await verifyResults(qry, <String>['coll/val3']);
   });
 
@@ -1053,8 +1036,7 @@ void main() {
           'coll/{array:foo}'
         ]);
     await verifyResults(
-        q
-            .orderBy(orderBy('array', 'desc'))
+        q.orderBy(orderBy('array', 'desc'))
             .startAt(bound(true, <Object?>[
               <Object?>[2]
             ]))
@@ -1075,8 +1057,7 @@ void main() {
           'coll/{array:foo}'
         ]);
     await verifyResults(
-        q
-            .orderBy(orderBy('array', 'desc'))
+        q.orderBy(orderBy('array', 'desc'))
             .startAt(bound(false, <Object?>[
               <Object?>[2]
             ]))
@@ -1097,8 +1078,7 @@ void main() {
           'coll/{array:foo}'
         ]);
     await verifyResults(
-        q
-            .orderBy(orderBy('array', 'desc'))
+        q.orderBy(orderBy('array', 'desc'))
             .startAt(bound(false, <Object?>[
               <Object?>[2, 'foo']
             ]))
@@ -1128,8 +1108,7 @@ void main() {
           'coll/{array:[1,foo],int:1}'
         ]);
     await verifyResults(
-        q
-            .orderBy(orderBy('array'))
+        q.orderBy(orderBy('array'))
             .endAt(bound(false, <Object?>[
               <Object?>[2]
             ]))
@@ -1150,8 +1129,7 @@ void main() {
           'coll/{array:[1,foo],int:1}'
         ]);
     await verifyResults(
-        q
-            .orderBy(orderBy('array'))
+        q.orderBy(orderBy('array'))
             .endAt(bound(false, <Object?>[
               <Object?>[2, 'foo']
             ]))
@@ -1173,8 +1151,7 @@ void main() {
         <String>['coll/{a:0,b:1}']);
     await verifyResults(
         q
-            .orderBy(orderBy('a', 'desc'))
-            .orderBy(orderBy('b', 'desc'))
+            .orderBy(orderBy('a', 'desc')).orderBy(orderBy('b', 'desc'))
             .limitToFirst(1),
         <String>['coll/{a:2,b:1}']);
     await verifyResults(
@@ -1401,34 +1378,29 @@ void main() {
 
     Query query9 = query('coll')
         .filter(filter('c', '==', 1))
-        .filter(filter('d', '==', 1))
-        .orderBy(orderBy('c'));
+        .filter(filter('d', '==', 1)).orderBy(orderBy('c'));
     validateIndexType(query9, IndexType.full);
 
     Query query10 = query('coll')
         .filter(filter('c', '==', 1))
-        .filter(filter('d', '==', 1))
-        .orderBy(orderBy('d'));
+        .filter(filter('d', '==', 1)).orderBy(orderBy('d'));
     validateIndexType(query10, IndexType.full);
 
     Query query11 = query('coll')
         .filter(filter('c', '==', 1))
         .filter(filter('d', '==', 1))
-        .orderBy(orderBy('c'))
-        .orderBy(orderBy('d'));
+        .orderBy(orderBy('c')).orderBy(orderBy('d'));
     validateIndexType(query11, IndexType.full);
 
     Query query12 = query('coll')
         .filter(filter('c', '==', 1))
         .filter(filter('d', '==', 1))
-        .orderBy(orderBy('d'))
-        .orderBy(orderBy('c'));
+        .orderBy(orderBy('d')).orderBy(orderBy('c'));
     validateIndexType(query12, IndexType.full);
 
     Query query13 = query('coll')
         .filter(filter('c', '==', 1))
-        .filter(filter('d', '==', 1))
-        .orderBy(orderBy('e'));
+        .filter(filter('d', '==', 1)).orderBy(orderBy('e'));
     validateIndexType(query13, IndexType.partial);
 
     Query query14 =
@@ -1437,8 +1409,7 @@ void main() {
 
     Query query15 = query('coll')
         .filter(filter('c', '==', 1))
-        .filter(filter('d', '>', 1))
-        .orderBy(orderBy('d'));
+        .filter(filter('d', '>', 1)).orderBy(orderBy('d'));
     validateIndexType(query15, IndexType.full);
   });
 
@@ -1464,8 +1435,7 @@ void main() {
 
     // OR qry with explicit orderBy without limit which has missing sub-target indexes.
     Query query2 = query('coll')
-        .filter(orFilters(<Filter>[filter('a', '==', 1), filter('c', '==', 1)]))
-        .orderBy(orderBy('c'));
+        .filter(orFilters(<Filter>[filter('a', '==', 1), filter('c', '==', 1)])).orderBy(orderBy('c'));
     validateIndexType(query2, IndexType.none);
 
     // OR qry with implicit orderBy without limit which has missing sub-target indexes.
@@ -1475,8 +1445,7 @@ void main() {
 
     // OR qry with explicit orderBy with limit which has missing sub-target indexes.
     Query query4 = query('coll')
-        .filter(orFilters(<Filter>[filter('a', '==', 1), filter('c', '==', 1)]))
-        .orderBy(orderBy('c'))
+        .filter(orFilters(<Filter>[filter('a', '==', 1), filter('c', '==', 1)])).orderBy(orderBy('c'))
         .limitToFirst(2);
     validateIndexType(query4, IndexType.none);
 
@@ -1493,8 +1462,7 @@ void main() {
 
     // OR qry with explicit orderBy without limit which has all sub-target indexes.
     Query query7 = query('coll')
-        .filter(orFilters(<Filter>[filter('a', '==', 1), filter('b', '==', 1)]))
-        .orderBy(orderBy('a'));
+        .filter(orFilters(<Filter>[filter('a', '==', 1), filter('b', '==', 1)])).orderBy(orderBy('a'));
     validateIndexType(query7, IndexType.full);
 
     // OR qry with implicit orderBy without limit which has all sub-target indexes.
@@ -1510,8 +1478,7 @@ void main() {
 
     // OR qry with explicit orderBy with limit which has all sub-target indexes.
     Query query10 = query('coll')
-        .filter(orFilters(<Filter>[filter('a', '==', 1), filter('b', '==', 1)]))
-        .orderBy(orderBy('a'))
+        .filter(orFilters(<Filter>[filter('a', '==', 1), filter('b', '==', 1)])).orderBy(orderBy('a'))
         .limitToFirst(2);
     validateIndexType(query10, IndexType.partial);
 

@@ -3,11 +3,9 @@ abstract class AggregateField
   final operator: String
   get fieldPath: String
   get hashCode: int
-  static average(String field): AverageAggregateField
-  static averageField(FieldPath fieldPath): AverageAggregateField
+  static average(Object field): AverageAggregateField
   static count(): CountAggregateField
-  static sum(String field): SumAggregateField
-  static sumField(FieldPath fieldPath): SumAggregateField
+  static sum(Object field): SumAggregateField
   toString(): String
 class AggregateQuery
   ==(Object other): bool
@@ -15,16 +13,16 @@ class AggregateQuery
   final aliases: Map<String, AggregateField>
   final query: Query<Object>
   get hashCode: int
-  get([AggregateSource source]): Future<AggregateQuerySnapshot>
+  get({AggregateSource source}): Future<AggregateQuerySnapshot>
 class AggregateQuerySnapshot
   ==(Object other): bool
   data(): Map<String, Object>
   final query: AggregateQuery
+  get count: int
   get hashCode: int
   get(AggregateField aggregateField): Object
-  getCount(): int
-  getDouble(AggregateField aggregateField): double
-  getInt(AggregateField aggregateField): int
+  getAverage(Object field): double
+  getSum(Object field): num
 enum AggregateSource
   new AggregateSource(int #index, String #name)
   static final server: AggregateSource
@@ -65,11 +63,10 @@ abstract class ClearableDatabase
 class CollectionReference extends Query<X0>
   add(X0 data): Future<DocumentReference<X0>>
   doc([String documentPath]): DocumentReference<X0>
-  document([String documentPath]): DocumentReference<X0> @deprecated
   get id: String
   get parent: DocumentReference<Map<String, Object>>
   get path: String
-  withConverter(FirestoreDataConverter<dynamic> converter): CollectionReference<dynamic>
+  withConverter({(.DocumentSnapshot, .SnapshotOptions) -> dynamic fromFirestore, (dynamic, .SetOptions) -> dart.core.Map toFirestore}): CollectionReference<dynamic>
   withoutConverter(): CollectionReference<Map<String, Object>>
 class CountAggregateField extends AggregateField
 abstract class Database
@@ -85,11 +82,6 @@ class Decimal128Value
   get hashCode: int
   new Decimal128Value(String stringValue)
   toString(): String
-enum Direction
-  new Direction(int #index, String #name)
-  static final ascending: Direction
-  static final descending: Direction
-  static final values: List<Direction>
 enum DistanceMeasure
   new DistanceMeasure(int #index, String #name)
   static final cosine: DistanceMeasure
@@ -98,7 +90,7 @@ enum DistanceMeasure
   static final values: List<DistanceMeasure>
 class DocumentChange
   ==(Object other): bool
-  final document: QueryDocumentSnapshot<X0>
+  final doc: QueryDocumentSnapshot<X0>
   final newIndex: int
   final oldIndex: int
   final type: DocumentChangeType
@@ -115,152 +107,96 @@ class DocumentReference
   collection(String collectionPath): CollectionReference<Map<String, Object>>
   delete(): Future<void>
   final converter: FirestoreDataConverter<X0>
-  final firestore: Firestore
+  final firestore: FirebaseFirestore
   get hashCode: int
   get id: String
-  get parent: CollectionReference<Map<String, Object>>
+  get parent: CollectionReference<X0>
   get path: String
-  get snapshots: Stream<DocumentSnapshot<X0>>
-  get([Source source]): Future<DocumentSnapshot<X0>>
-  getSnapshots([MetadataChanges changes]): Stream<DocumentSnapshot<X0>>
-  getSnapshotsWithOptions(SnapshotListenOptions options): Stream<DocumentSnapshot<X0>>
-  new DocumentReference.fromJson(Firestore firestore, Map<String, Object> json, {FirestoreDataConverter<dynamic> converter})
+  get([GetOptions options]): Future<DocumentSnapshot<X0>>
+  new DocumentReference.fromJson(FirebaseFirestore firestore, Map<String, Object> json, {FirestoreDataConverter<dynamic> converter})
   set(X0 data, [SetOptions options]): Future<void>
+  snapshots({bool includeMetadataChanges, ListenSource source}): Stream<DocumentSnapshot<X0>>
   static final jsonType: String
   toJson(): Map<String, Object>
-  update(Map<String, Object> data): Future<void>
-  updateFromList(List<Object> data): Future<void>
-  withConverter(FirestoreDataConverter<dynamic> converter): DocumentReference<dynamic>
+  update(Map<Object, Object> data): Future<void>
+  withConverter({(.DocumentSnapshot, .SnapshotOptions) -> dynamic fromFirestore, (dynamic, .SetOptions) -> dart.core.Map toFirestore}): DocumentReference<dynamic>
   withoutConverter(): DocumentReference<Map<String, Object>>
 class DocumentSnapshot
   ==(Object other): bool
-  [](String field): Object
-  contains(String field): bool
-  containsPath(FieldPath fieldPath): bool
+  [](Object field): Object
+  contains(Object field): bool
+  data({ServerTimestampBehavior serverTimestamps}): X0
   final metadata: SnapshotMetadata
-  get data: X0
   get exists: bool
   get hashCode: int
   get id: String
-  get ref: DocumentReference<X0>
-  get reference: DocumentReference<X0> @deprecated
-  get(String field, [ServerTimestampBehavior serverTimestampBehavior]): Object
-  getBlob(String field): Blob
-  getBool(String field): bool
-  getBsonObjectId(String field): BsonObjectId
-  getBsonTimestamp(String field): BsonTimestamp
-  getData(ServerTimestampBehavior serverTimestampBehavior): X0
-  getDate(String field, [ServerTimestampBehavior serverTimestampBehavior]): DateTime
-  getDecimal128Value(String field): Decimal128Value
-  getDocumentReference(String field): DocumentReference<Map<String, Object>>
-  getDouble(String field): double
-  getField(FieldPath fieldPath, [ServerTimestampBehavior serverTimestampBehavior]): Object
-  getGeoPoint(String field): GeoPoint
-  getInt(String field): int
-  getInt32Value(String field): Int32Value
-  getMaxKey(String field): MaxKey
-  getMinKey(String field): MinKey
-  getRegexValue(String field): RegexValue
-  getString(String field): String
-  getTimestamp(String field, [ServerTimestampBehavior serverTimestampBehavior]): Timestamp
-  getVectorValue(String field): VectorValue
-  new DocumentSnapshot.fromJson(Firestore firestore, Map<String, Object> json, {FirestoreDataConverter<dynamic> converter})
+  get reference: DocumentReference<X0>
+  get(Object field, {ServerTimestampBehavior serverTimestamps}): Object
+  new DocumentSnapshot.fromJson(FirebaseFirestore firestore, Map<String, Object> json, {FirestoreDataConverter<dynamic> converter})
   static final jsonType: String
   toJson(): Map<String, Object>
   toString(): String
 abstract class ExclusiveDatabase
   new ExclusiveDatabase()
-class ExperimentalLongPollingOptions
-  ==(Object other): bool
-  final timeoutSeconds: num
-  get hashCode: int
-  new ExperimentalLongPollingOptions({num timeoutSeconds})
-  toString(): String
 class FieldPath
   ==(Object other): bool
+  get components: List<String>
   get hashCode: int
-  new FieldPath.fromDotSeparatedPath(String path)
-  new FieldPath.fromSegments(List<String> segments)
-  new FieldPath.of(List<String> fieldNames)
-  static documentId(): FieldPath @deprecated
-  static get documentIdField: FieldPath
+  new FieldPath(List<String> fieldNames)
+  new FieldPath.fromString(String path)
+  static get documentId: FieldPath
   toString(): String
 abstract class FieldValue
   new FieldValue.arrayRemove(List<Object> elements)
   new FieldValue.arrayUnion(List<Object> elements)
   new FieldValue.delete()
-  new FieldValue.increment(num l)
-  new FieldValue.maximum(num l)
-  new FieldValue.minimum(num l)
+  new FieldValue.increment(num value)
+  new FieldValue.maximum(num value)
+  new FieldValue.minimum(num value)
   new FieldValue.serverTimestamp()
-  static vector(List<double> values): VectorValue
 class Filter
+  new Filter(Object field, {Object isEqualTo, Object isNotEqualTo, Object isLessThan, Object isLessThanOrEqualTo, Object isGreaterThan, Object isGreaterThanOrEqualTo, Object arrayContains, Iterable<Object> arrayContainsAny, Iterable<Object> whereIn, Iterable<Object> whereNotIn, bool isNull})
   static and(List<Filter> filters): Filter
-  static arrayContains(String field, Object value): Filter
-  static arrayContainsAny(String field, List<Object> values): Filter
-  static arrayContainsAnyField(FieldPath fieldPath, List<Object> values): Filter
-  static arrayContainsField(FieldPath fieldPath, Object value): Filter
-  static equalTo(String field, Object value): Filter
-  static equalToField(FieldPath fieldPath, Object value): Filter
-  static greaterThan(String field, Object value): Filter
-  static greaterThanField(FieldPath fieldPath, Object value): Filter
-  static greaterThanOrEqualTo(String field, Object value): Filter
-  static greaterThanOrEqualToField(FieldPath fieldPath, Object value): Filter
-  static inArray(String field, List<Object> values): Filter
-  static inArrayField(FieldPath fieldPath, List<Object> values): Filter
-  static lessThan(String field, Object value): Filter
-  static lessThanField(FieldPath fieldPath, Object value): Filter
-  static lessThanOrEqualTo(String field, Object value): Filter
-  static lessThanOrEqualToField(FieldPath fieldPath, Object value): Filter
-  static notEqualTo(String field, Object value): Filter
-  static notEqualToField(FieldPath fieldPath, Object value): Filter
-  static notInArray(String field, List<Object> values): Filter
-  static notInArrayField(FieldPath fieldPath, List<Object> values): Filter
   static or(List<Filter> filters): Filter
-typedef FirebaseFirestore = Firestore
-class Firestore
+class FirebaseFirestore
   batch(): WriteBatch
   clearPersistence(): Future<void>
   collection(String collectionPath): CollectionReference<Map<String, Object>>
   collectionGroup(String collectionId): Query<Map<String, Object>>
   disableNetwork(): Future<void>
   doc(String documentPath): DocumentReference<Map<String, Object>>
-  document(String documentPath): DocumentReference<Map<String, Object>> @deprecated
-  documentSnapshotsFromJson(Map<String, Object> json, {SnapshotListenOptions options, FirestoreDataConverter<dynamic> converter}): Stream<DocumentSnapshot<dynamic>>
+  documentSnapshotsFromJson(Map<String, Object> json, {bool includeMetadataChanges, ListenSource source, FirestoreDataConverter<dynamic> converter}): Stream<DocumentSnapshot<dynamic>>
   enableNetwork(): Future<void>
-  final firebaseApp: FirebaseApp
   get app: FirebaseApp
   get databaseId: String
   get persistentCacheIndexManager: PersistentCacheIndexManager
   get projectId: String
-  get snapshotsInSync: Stream<void>
-  getNamedQuery(String name): Future<Query<Map<String, Object>>>
+  get settings: Settings
   loadBundle(List<int> bundleData): LoadBundleTask
   loadBundleStream(Stream<List<int>> bundleData): LoadBundleTask
-  querySnapshotsFromJson(Map<String, Object> json, {SnapshotListenOptions options, FirestoreDataConverter<dynamic> converter}): Stream<QuerySnapshot<dynamic>>
+  namedQuery(String name): Future<Query<Map<String, Object>>>
+  namedQueryGet(String name, {GetOptions options}): Future<QuerySnapshot<Map<String, Object>>>
+  querySnapshotsFromJson(Map<String, Object> json, {bool includeMetadataChanges, ListenSource source, FirestoreDataConverter<dynamic> converter}): Stream<QuerySnapshot<dynamic>>
   runBatch((.WriteBatch) -> dart.async.Future batchFunction): Future<void>
-  runTransaction((.Transaction) -> dart.async.Future updateFunction, {TransactionOptions options}): Future<dynamic>
-  setIndexConfiguration(String json): Future<void> @deprecated
-  shutdown(): Future<void> @deprecated
-  static get instance: Firestore
-  static getInstance(FirebaseApp app, {String database, (dart.core.String, {onConfigure: dart.core.(.Database) -> dart.async.Future, onCreate: dart.core.(.Database, dart.core.int) -> dart.async.Future, onDowngrade: dart.core.(.Database, dart.core.int, dart.core.int) -> dart.async.Future, onOpen: dart.core.(.Database) -> dart.async.Future, onUpgrade: dart.core.(.Database, dart.core.int, dart.core.int) -> dart.async.Future, version: dart.core.int}) -> dart.async.Future openDatabase, FirestoreSettings settings}): Firestore @deprecated
-  static instanceFor({FirebaseApp app, String database, (dart.core.String, {onConfigure: dart.core.(.Database) -> dart.async.Future, onCreate: dart.core.(.Database, dart.core.int) -> dart.async.Future, onDowngrade: dart.core.(.Database, dart.core.int, dart.core.int) -> dart.async.Future, onOpen: dart.core.(.Database) -> dart.async.Future, onUpgrade: dart.core.(.Database, dart.core.int, dart.core.int) -> dart.async.Future, version: dart.core.int}) -> dart.async.Future openDatabase, FirestoreSettings settings}): Firestore
+  runTransaction((.Transaction) -> dart.async.Future updateFunction, {int maxAttempts, bool readOnly, Timestamp readTime}): Future<dynamic>
+  setIndexConfigurationFromJSON(String json): Future<void> @deprecated
+  snapshotsInSync(): Stream<void>
+  static get instance: FirebaseFirestore
+  static instanceFor({FirebaseApp app, String databaseId, (dart.core.String, {onConfigure: dart.core.(.Database) -> dart.async.Future, onCreate: dart.core.(.Database, dart.core.int) -> dart.async.Future, onDowngrade: dart.core.(.Database, dart.core.int, dart.core.int) -> dart.async.Future, onOpen: dart.core.(.Database) -> dart.async.Future, onUpgrade: dart.core.(.Database, dart.core.int, dart.core.int) -> dart.async.Future, version: dart.core.int}) -> dart.async.Future openDatabase, Settings settings}): FirebaseFirestore
   static setLogLevel(LogLevel level): void
-  static setLoggingEnabled({bool loggingEnabled}): void
+  static setLoggingEnabled(bool enabled): void
   terminate(): Future<void>
   waitForPendingWrites(): Future<void>
+typedef Firestore = FirebaseFirestore
 abstract class FirestoreDataConverter
   fromFirestore(DocumentSnapshot<Map<String, Object>> snapshot, SnapshotOptions options): X0
   new FirestoreDataConverter()
   new FirestoreDataConverter.from({(.DocumentSnapshot, .SnapshotOptions) -> dynamic fromFirestore, (dynamic, .SetOptions) -> dart.core.Map toFirestore})
   toFirestore(X0 value, SetOptions options): Map<String, Object>
-class FirestoreError extends FirebaseError
-  final cause: Object
-  final code: FirestoreErrorCode
-  new FirestoreError(String message, FirestoreErrorCode code, [Object cause, StackTrace stackTrance])
-  toString(): String
-class FirestoreErrorCode
+enum FirestoreErrorCode
+  final code: String
   final value: int
+  new FirestoreErrorCode(int #index, String #name, int value, String code)
   static final aborted: FirestoreErrorCode
   static final alreadyExists: FirestoreErrorCode
   static final cancelled: FirestoreErrorCode
@@ -279,32 +215,15 @@ class FirestoreErrorCode
   static final unimplemented: FirestoreErrorCode
   static final unknown: FirestoreErrorCode
   static final values: List<FirestoreErrorCode>
-  static fromValue(GrpcError error): FirestoreErrorCode
   toString(): String
-class FirestoreSettings
-  ==(Object other): bool
-  copyWith({String host, int port, bool sslEnabled, bool persistenceEnabled, int cacheSizeBytes, LocalCacheSettings cacheSettings, bool experimentalForceLongPolling, bool experimentalAutoDetectLongPolling, ExperimentalLongPollingOptions experimentalLongPollingOptions, int grpcFlowControlWindow}): FirestoreSettings
-  final cacheSettings: LocalCacheSettings
-  final cacheSizeBytes: int
-  final experimentalAutoDetectLongPolling: bool
-  final experimentalForceLongPolling: bool
-  final experimentalLongPollingOptions: ExperimentalLongPollingOptions
-  final grpcFlowControlWindow: int
-  final host: String
-  final mockUserToken: Object
-  final persistenceEnabled: bool
-  final port: int
-  final sslEnabled: bool
-  get hashCode: int
-  new FirestoreSettings({String host, int port, bool sslEnabled, bool persistenceEnabled, int cacheSizeBytes, LocalCacheSettings cacheSettings, bool experimentalForceLongPolling, bool experimentalAutoDetectLongPolling, ExperimentalLongPollingOptions experimentalLongPollingOptions, int grpcFlowControlWindow})
-  static final cacheSizeUnlimited: int
-  static final defaultCacheSizeBytes: int
-  static final defaultGrpcFlowControlWindow: int
-  static final defaultHost: String
-  static final defaultPort: int
-  static final minimumCacheBytes: int
+class FirestoreException extends FirebaseException
+  final cause: Object
+  final errorCode: FirestoreErrorCode
+  get message: String
+  new FirestoreException({FirestoreErrorCode errorCode, String message, Object cause, StackTrace stackTrace})
   toString(): String
-  withEmulator(String host, int port, {Object mockUserToken}): FirestoreSettings
+typedef FirestoreSettings = Settings
+typedef FromFirestore = T Function(DocumentSnapshot<Map<String, Object?>> snapshot, SnapshotOptions? options)
 class GeoPoint
   ==(Object other): bool
   compareTo(GeoPoint other): int
@@ -315,6 +234,12 @@ class GeoPoint
   new GeoPoint.fromJson(Map<String, Object> json)
   static final jsonType: String
   toJson(): Map<String, Object>
+  toString(): String
+class GetOptions
+  ==(Object other): bool
+  final source: Source
+  get hashCode: int
+  new GetOptions({Source source})
   toString(): String
 class Int32Value
   ==(Object other): bool
@@ -330,14 +255,10 @@ enum ListenSource
   static final defaultSource: ListenSource
   static final values: List<ListenSource>
 class LoadBundleTask
-  addOnProgressListener((.LoadBundleTaskProgress) -> void listener): LoadBundleTask
-  get exception: Object
-  get future: Future<LoadBundleTaskProgress>
-  get isComplete: bool
-  get isSuccessful: bool
-  get snapshot: LoadBundleTaskProgress
-  get stream: Stream<LoadBundleTaskProgress>
-class LoadBundleTaskProgress
+  get future: Future<LoadBundleTaskSnapshot>
+  get snapshot: LoadBundleTaskSnapshot
+  get stream: Stream<LoadBundleTaskSnapshot>
+class LoadBundleTaskSnapshot
   ==(Object other): bool
   final bytesLoaded: int
   final documentsLoaded: int
@@ -346,8 +267,6 @@ class LoadBundleTaskProgress
   final totalBytes: int
   final totalDocuments: int
   get hashCode: int
-  new LoadBundleTaskProgress(int documentsLoaded, int totalDocuments, int bytesLoaded, int totalBytes, Object exception, LoadBundleTaskState taskState)
-  static final initial: LoadBundleTaskProgress
   toString(): String
 enum LoadBundleTaskState
   new LoadBundleTaskState(int #index, String #name)
@@ -361,7 +280,6 @@ enum LogLevel
   new LogLevel(int #index, String #name)
   static final debug: LogLevel
   static final error: LogLevel
-  static final info: LogLevel
   static final silent: LogLevel
   static final values: List<LogLevel>
   static final verbose: LogLevel
@@ -388,18 +306,12 @@ class MemoryLruGcSettings extends MemoryGarbageCollectorSettings
   get hashCode: int
   new MemoryLruGcSettings({int sizeBytes})
   toString(): String
-enum MetadataChanges
-  new MetadataChanges(int #index, String #name)
-  static final exclude: MetadataChanges
-  static final include: MetadataChanges
-  static final values: List<MetadataChanges>
 class MinKey
   static final instance: MinKey
   toString(): String
 typedef OnConfigure = Future<void> Function(Database db)
 typedef OnCreate = Future<void> Function(Database db, int version)
 typedef OnOpen = Future<void> Function(Database db)
-typedef OnProgressListener = void Function(LoadBundleTaskProgress snapshot)
 typedef OnVersionChange = Future<void> Function(Database db, int oldVersion, int newVersion)
 typedef OpenDatabase = Future<Database> Function(String path, {int version, OnConfigure onConfigure, OnCreate onCreate, OnVersionChange onUpgrade, OnVersionChange onDowngrade, OnOpen onOpen})
 class PersistentCacheIndexManager
@@ -417,68 +329,41 @@ class Query
   aggregate(List<AggregateField> aggregateFields): AggregateQuery
   aggregateWithAliases(Map<String, AggregateField> aggregates): AggregateQuery
   count(): AggregateQuery
-  endAt(List<Object> fieldValues): Query<X0>
+  endAt(Iterable<Object> fieldValues): Query<X0>
   endAtDocument(DocumentSnapshot<Object> snapshot): Query<X0>
-  endBefore(List<Object> fieldValues): Query<X0>
+  endBefore(Iterable<Object> fieldValues): Query<X0>
   endBeforeDocument(DocumentSnapshot<Object> snapshot): Query<X0>
   final converter: FirestoreDataConverter<X0>
-  final firestore: Firestore
-  findNearest(String vectorField, Object queryVector, int limit, DistanceMeasure distanceMeasure, {String distanceResultField, double distanceThreshold}): VectorQuery
-  findNearestField(FieldPath vectorField, Object queryVector, int limit, DistanceMeasure distanceMeasure, {String distanceResultField, double distanceThreshold}): VectorQuery
+  final firestore: FirebaseFirestore
+  findNearest({Object vectorField, Object queryVector, int limit, DistanceMeasure distanceMeasure, String distanceResultField, double distanceThreshold}): VectorQuery<X0>
   get hashCode: int
-  get snapshots: Stream<QuerySnapshot<X0>>
-  get([Source source]): Future<QuerySnapshot<X0>>
-  getSnapshots([MetadataChanges changes]): Stream<QuerySnapshot<X0>>
-  getSnapshotsWithOptions(SnapshotListenOptions options): Stream<QuerySnapshot<X0>>
+  get([GetOptions options]): Future<QuerySnapshot<X0>>
   limit(int limit): Query<X0>
   limitToLast(int limit): Query<X0>
-  orderBy(String field, [Direction direction]): Query<X0>
-  orderByField(FieldPath fieldPath, [Direction direction]): Query<X0>
-  startAfter(List<Object> fieldValues): Query<X0>
+  orderBy(Object field, {bool descending}): Query<X0>
+  snapshots({bool includeMetadataChanges, ListenSource source}): Stream<QuerySnapshot<X0>>
+  startAfter(Iterable<Object> fieldValues): Query<X0>
   startAfterDocument(DocumentSnapshot<Object> snapshot): Query<X0>
-  startAt(List<Object> fieldValues): Query<X0>
+  startAt(Iterable<Object> fieldValues): Query<X0>
   startAtDocument(DocumentSnapshot<Object> snapshot): Query<X0>
   toString(): String
   where(Object fieldOrFilter, {Object isEqualTo, Object isNotEqualTo, Object isLessThan, Object isLessThanOrEqualTo, Object isGreaterThan, Object isGreaterThanOrEqualTo, Object arrayContains, Iterable<Object> arrayContainsAny, Iterable<Object> whereIn, Iterable<Object> whereNotIn, bool isNull}): Query<X0>
-  whereArrayContains(String field, Object value): Query<X0>
-  whereArrayContainsAny(String field, List<Object> value): Query<X0>
-  whereArrayContainsAnyField(FieldPath fieldPath, List<Object> value): Query<X0>
-  whereArrayContainsField(FieldPath fieldPath, Object value): Query<X0>
-  whereEqualTo(String field, Object value): Query<X0>
-  whereEqualToField(FieldPath fieldPath, Object value): Query<X0>
-  whereGreaterThan(String field, Object value): Query<X0>
-  whereGreaterThanField(FieldPath fieldPath, Object value): Query<X0>
-  whereGreaterThanOrEqualTo(String field, Object value): Query<X0>
-  whereGreaterThanOrEqualToField(FieldPath fieldPath, Object value): Query<X0>
-  whereIn(String field, List<Object> value): Query<X0>
-  whereInField(FieldPath fieldPath, List<Object> value): Query<X0>
-  whereLessThan(String field, Object value): Query<X0>
-  whereLessThanField(FieldPath fieldPath, Object value): Query<X0>
-  whereLessThanOrEqualTo(String field, Object value): Query<X0>
-  whereLessThanOrEqualToField(FieldPath fieldPath, Object value): Query<X0>
-  whereNotEqualTo(String field, Object value): Query<X0>
-  whereNotEqualToField(FieldPath fieldPath, Object value): Query<X0>
-  whereNotIn(String field, List<Object> value): Query<X0>
-  whereNotInField(FieldPath fieldPath, List<Object> value): Query<X0>
-  withConverter(FirestoreDataConverter<dynamic> converter): Query<dynamic>
+  withConverter({(.DocumentSnapshot, .SnapshotOptions) -> dynamic fromFirestore, (dynamic, .SetOptions) -> dart.core.Map toFirestore}): Query<dynamic>
   withoutConverter(): Query<Map<String, Object>>
 class QueryDocumentSnapshot extends DocumentSnapshot<X0>
-  get data: X0
-  getData(ServerTimestampBehavior serverTimestampBehavior): X0
+  data({ServerTimestampBehavior serverTimestamps}): X0
 class QuerySnapshot extends Iterable<QueryDocumentSnapshot<C1X0>>
   ==(Object other): bool
   final metadata: SnapshotMetadata
   final query: Query<C1X0>
   get docChanges: List<DocumentChange<C1X0>>
   get docs: List<QueryDocumentSnapshot<C1X0>>
-  get documentChanges: List<DocumentChange<C1X0>> @deprecated
-  get documents: List<DocumentSnapshot<C1X0>> @deprecated
   get hashCode: int
   get isEmpty: bool
   get iterator: Iterator<QueryDocumentSnapshot<C1X0>>
   get length: int
-  getDocumentChanges(MetadataChanges metadataChanges): List<DocumentChange<C1X0>>
-  new QuerySnapshot.fromJson(Firestore firestore, Map<String, Object> json, {FirestoreDataConverter<dynamic> converter})
+  get size: int
+  new QuerySnapshot.fromJson(FirebaseFirestore firestore, Map<String, Object> json, {FirestoreDataConverter<dynamic> converter})
   static final jsonType: String
   toJson(): Map<String, Object>
   toString(): String
@@ -496,19 +381,36 @@ enum ServerTimestampBehavior
   static final previous: ServerTimestampBehavior
   static final values: List<ServerTimestampBehavior>
 class SetOptions
-  final merge: bool
-  new SetOptions.mergeFieldPaths(List<FieldPath> fields)
-  new SetOptions.mergeFields(List<String> fields)
-  static final mergeAllFields: SetOptions
-  static final overwrite: SetOptions
-typedef Settings = FirestoreSettings
-class SnapshotListenOptions
   ==(Object other): bool
-  final metadataChanges: MetadataChanges
-  final source: ListenSource
   get hashCode: int
-  new SnapshotListenOptions({MetadataChanges metadataChanges, ListenSource source})
+  get merge: bool
+  get mergeFields: List<FieldPath>
+  new SetOptions({bool merge, List<Object> mergeFields})
   toString(): String
+class Settings
+  ==(Object other): bool
+  copyWith({String host, int port, bool sslEnabled, bool persistenceEnabled, int cacheSizeBytes, LocalCacheSettings cacheSettings, bool webExperimentalForceLongPolling, bool webExperimentalAutoDetectLongPolling, WebExperimentalLongPollingOptions webExperimentalLongPollingOptions, int grpcFlowControlWindow}): Settings
+  final cacheSettings: LocalCacheSettings
+  final cacheSizeBytes: int
+  final grpcFlowControlWindow: int
+  final host: String
+  final mockUserToken: Object
+  final persistenceEnabled: bool
+  final port: int
+  final sslEnabled: bool
+  final webExperimentalAutoDetectLongPolling: bool
+  final webExperimentalForceLongPolling: bool
+  final webExperimentalLongPollingOptions: WebExperimentalLongPollingOptions
+  get hashCode: int
+  new Settings({String host, int port, bool sslEnabled, bool persistenceEnabled, int cacheSizeBytes, LocalCacheSettings cacheSettings, bool webExperimentalForceLongPolling, bool webExperimentalAutoDetectLongPolling, WebExperimentalLongPollingOptions webExperimentalLongPollingOptions, int grpcFlowControlWindow})
+  static final cacheSizeUnlimited: int
+  static final defaultCacheSizeBytes: int
+  static final defaultGrpcFlowControlWindow: int
+  static final defaultHost: String
+  static final defaultPort: int
+  static final minimumCacheBytes: int
+  toString(): String
+  withEmulator(String host, int port, {Object mockUserToken}): Settings
 class SnapshotMetadata
   ==(Object other): bool
   final hasPendingWrites: bool
@@ -522,7 +424,6 @@ class SnapshotOptions
 enum Source
   new Source(int #index, String #name)
   static final cache: Source
-  static final defaultSource: Source @deprecated
   static final server: Source
   static final serverAndCache: Source
   static final values: List<Source>
@@ -533,35 +434,27 @@ class Timestamp
   final nanoseconds: int
   final seconds: int
   get hashCode: int
+  get microsecondsSinceEpoch: int
+  get millisecondsSinceEpoch: int
   new Timestamp(int seconds, int nanoseconds)
   new Timestamp.fromDate(DateTime date)
   new Timestamp.fromJson(Map<String, Object> json)
-  new Timestamp.fromMillis(int milliseconds)
+  new Timestamp.fromMicrosecondsSinceEpoch(int microseconds)
+  new Timestamp.fromMillisecondsSinceEpoch(int milliseconds)
   new Timestamp.now()
   static final jsonType: String
   toDate(): DateTime
   toJson(): Map<String, Object>
-  toMillis(): int
   toString(): String
+typedef ToFirestore = Map<String, Object?> Function(T value, SetOptions? options)
 class Transaction
   delete(DocumentReference<Object> documentRef): Transaction
   get(DocumentReference<dynamic> documentRef): Future<DocumentSnapshot<dynamic>>
   getAggregate(AggregateQuery aggregateQuery): Future<AggregateQuerySnapshot>
   getQuery(Query<dynamic> query): Future<QuerySnapshot<dynamic>>
   set(DocumentReference<dynamic> documentRef, dynamic data, [SetOptions options]): Transaction
-  update(DocumentReference<Object> documentRef, Map<String, Object> data): Transaction
-  updateFromList(DocumentReference<Object> documentRef, List<Object> data): Transaction
-typedef TransactionCallback = Future<T> Function(Transaction)
-class TransactionOptions
-  ==(Object other): bool
-  final maxAttempts: int
-  final readOnly: bool
-  final readTime: Timestamp
-  get hashCode: int
-  new TransactionOptions({int maxAttempts, bool readOnly, Timestamp readTime})
-  static final defaultMaxAttempts: int
-  static final defaultOptions: TransactionOptions
-  toString(): String
+  update(DocumentReference<Object> documentRef, Map<Object, Object> data): Transaction
+typedef TransactionHandler = Future<T> Function(Transaction)
 class TransientDatabaseException
   final cause: Object
   final message: String
@@ -573,15 +466,15 @@ class VectorQuery
   final distanceResultField: String
   final distanceThreshold: double
   final limit: int
-  final query: Query<Object>
+  final query: Query<X0>
   final queryVector: VectorValue
   final vectorField: FieldPath
   get hashCode: int
-  get(): Future<VectorQuerySnapshot>
-class VectorQuerySnapshot extends Iterable<QueryDocumentSnapshot<dynamic>>
-  final docs: List<QueryDocumentSnapshot<dynamic>>
-  final query: VectorQuery
-  get iterator: Iterator<QueryDocumentSnapshot<dynamic>>
+  get(): Future<VectorQuerySnapshot<X0>>
+class VectorQuerySnapshot extends Iterable<QueryDocumentSnapshot<C1X0>>
+  final docs: List<QueryDocumentSnapshot<C1X0>>
+  final query: VectorQuery<C1X0>
+  get iterator: Iterator<QueryDocumentSnapshot<C1X0>>
   get length: int
   get size: int
 class VectorValue
@@ -594,9 +487,14 @@ class VectorValue
   toArray(): List<double>
   toJson(): Map<String, Object>
   toString(): String
+class WebExperimentalLongPollingOptions
+  ==(Object other): bool
+  final timeoutDuration: Duration
+  get hashCode: int
+  new WebExperimentalLongPollingOptions({Duration timeoutDuration})
+  toString(): String
 class WriteBatch
   commit(): Future<void>
   delete(DocumentReference<Object> documentRef): WriteBatch
   set(DocumentReference<dynamic> documentRef, dynamic data, [SetOptions options]): WriteBatch
-  update(DocumentReference<Object> documentRef, Map<String, Object> data): WriteBatch
-  updateFromList(DocumentReference<Object> documentRef, List<Object> data): WriteBatch
+  update(DocumentReference<Object> documentRef, Map<Object, Object> data): WriteBatch

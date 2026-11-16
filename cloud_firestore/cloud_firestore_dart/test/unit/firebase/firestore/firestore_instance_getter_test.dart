@@ -13,26 +13,19 @@ void main() {
     expect(() => FirebaseFirestore.instance, throwsStateError);
   });
 
-  test('before instanceFor it names the call to make', () {
-    final FirebaseApp app = _defaultApp();
-    addTearDown(app.delete);
-    expect(
-      () => FirebaseFirestore.instance,
-      throwsA(
-        isA<StateError>()
-            .having(
-              (StateError e) => e.message,
-              'message',
-              contains('Firestore.instanceFor'),
-            )
-            .having(
-              (StateError e) => e.message,
-              'message',
-              isNot(contains('getInstance')),
-            ),
-      ),
-    );
-  });
+  test(
+    'before instanceFor it creates the instance, like FlutterFire',
+    () async {
+      final FirebaseApp app = _defaultApp();
+      addTearDown(app.delete);
+      final FirebaseFirestore created = FirebaseFirestore.instance;
+      addTearDown(created.terminate);
+      expect(created.app, same(app));
+      expect(created.databaseId, '(default)');
+      expect(FirebaseFirestore.instanceFor(app: app), same(created));
+      expect(FirebaseFirestore.instance, same(created));
+    },
+  );
 
   test('returns the default database instance of the default app', () async {
     final FirebaseApp app = _defaultApp();
@@ -59,7 +52,7 @@ void main() {
     expect(FirebaseFirestore.instance, same(firestore));
   });
 
-  test('a terminated default instance is no longer returned', () async {
+  test('after terminate a new default instance is created', () async {
     final FirebaseApp app = _defaultApp();
     addTearDown(app.delete);
     final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(
@@ -69,6 +62,8 @@ void main() {
       ),
     );
     await firestore.terminate();
-    expect(() => FirebaseFirestore.instance, throwsStateError);
+    final FirebaseFirestore next = FirebaseFirestore.instance;
+    addTearDown(next.terminate);
+    expect(next, isNot(same(firestore)));
   });
 }

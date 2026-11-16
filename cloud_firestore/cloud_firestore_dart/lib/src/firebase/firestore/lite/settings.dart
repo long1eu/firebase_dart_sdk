@@ -93,6 +93,6 @@ class Settings {
 
   @override
   String toString() =>
-      'FirestoreSettings{host: $host, port: $port, sslEnabled: $sslEnabled, '
+      'Settings{host: $host, port: $port, sslEnabled: $sslEnabled, '
       'grpcFlowControlWindow: $grpcFlowControlWindow}';
 }

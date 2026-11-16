@@ -14,7 +14,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/document_reference.d
 import 'package:cloud_firestore_dart/src/firebase/firestore/document_snapshot.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/firestore.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/firestore_settings.dart';
-import 'package:cloud_firestore_dart/src/firebase/firestore/metadata_change.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/get_options.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/database_id.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/query.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/query_snapshot.dart';
@@ -449,13 +449,13 @@ class IntegrationTestUtil {
   static Future<void> checkOnlineAndOfflineResultsMatch(
       Query collection, Query query, List<String> expectedDocs) async {
     // 1- Pre-populate the cache with the entire collection.
-    await collection.get(Source.server);
+    await collection.get(GetOptions(source: Source.server));
     // 2- Query the cache with a full collection scan.
-    final QuerySnapshot fromCacheFullScan = await query.get(Source.cache);
+    final QuerySnapshot fromCacheFullScan = await query.get(GetOptions(source: Source.cache));
     // 3- Query the backend.
-    final QuerySnapshot fromServer = await query.get(Source.server);
+    final QuerySnapshot fromServer = await query.get(GetOptions(source: Source.server));
     // 4- Query the cache using the remote keys of the query.
-    final QuerySnapshot fromCacheRemoteKeys = await query.get(Source.cache);
+    final QuerySnapshot fromCacheRemoteKeys = await query.get(GetOptions(source: Source.cache));
 
     expect(
         querySnapshotToIds(fromCacheFullScan), querySnapshotToIds(fromServer));
@@ -479,7 +479,7 @@ class IntegrationTestUtil {
     final List<QuerySnapshot> snapshots = <QuerySnapshot>[];
     final Completer<void> done = Completer<void>();
     final StreamSubscription<QuerySnapshot> registration =
-        query.getSnapshots(MetadataChanges.include).listen(
+        query.snapshots(includeMetadataChanges: true).listen(
       (QuerySnapshot snapshot) {
         snapshots.add(snapshot);
         if (snapshots.length == 2 && !done.isCompleted) {
@@ -497,7 +497,7 @@ class IntegrationTestUtil {
     void verifySnapshot(QuerySnapshot snapshot) {
       expect(querySnapshotToIds(snapshot), expectedDocIds);
       for (final DocumentSnapshot doc in snapshot) {
-        expect(doc.data, allData[doc.id]);
+        expect(doc.data(), allData[doc.id]);
       }
     }
 
@@ -508,8 +508,7 @@ class IntegrationTestUtil {
   }
 
   static Future<void> waitForOnlineSnapshot(DocumentReference doc) {
-    return doc
-        .getSnapshots(MetadataChanges.include)
+    return doc.snapshots(includeMetadataChanges: true)
         .where((DocumentSnapshot value) => !value.metadata.isFromCache)
         .first;
   }
@@ -518,7 +517,7 @@ class IntegrationTestUtil {
       QuerySnapshot querySnapshot) {
     final List<Map<String, Object?>> res = <Map<String, Object?>>[];
     for (DocumentSnapshot doc in querySnapshot) {
-      res.add(doc.data!);
+      res.add(doc.data()!);
     }
     return res;
   }
@@ -554,7 +553,7 @@ class IntegrationTestUtil {
   static Map<String, Object?> toDataMap(QuerySnapshot qrySnap) {
     final Map<String, Object?> result = <String, Object>{};
     for (DocumentSnapshot docSnap in qrySnap.docs) {
-      result[docSnap.id] = docSnap.data;
+      result[docSnap.id] = docSnap.data();
     }
     return result;
   }

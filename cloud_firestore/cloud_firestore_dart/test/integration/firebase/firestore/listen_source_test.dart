@@ -39,9 +39,6 @@ void main() {
     expect(events.length, greaterThanOrEqualTo(count));
   }
 
-  const SnapshotListenOptions cacheOptions =
-      SnapshotListenOptions(source: ListenSource.cache);
-
   test('cache listener on an empty cache raises an empty snapshot', () async {
     final CollectionReference collection =
         await IntegrationTestUtil.testCollection();
@@ -49,7 +46,7 @@ void main() {
 
     final List<QuerySnapshot> events = <QuerySnapshot>[];
     final StreamSubscription<QuerySnapshot> sub =
-        collection.getSnapshotsWithOptions(cacheOptions).listen(events.add);
+        collection.snapshots(source: ListenSource.cache).listen(events.add);
     await waitFor(events, 1);
 
     expect(events.first.docChanges, isEmpty);
@@ -71,7 +68,7 @@ void main() {
 
     final List<QuerySnapshot> events = <QuerySnapshot>[];
     final StreamSubscription<QuerySnapshot> sub =
-        collection.getSnapshotsWithOptions(cacheOptions).listen(events.add);
+        collection.snapshots(source: ListenSource.cache).listen(events.add);
     await waitFor(events, 1);
 
     expect(events.first.metadata.isFromCache, isTrue);
@@ -96,12 +93,12 @@ void main() {
 
     final List<DocumentSnapshot> events = <DocumentSnapshot>[];
     final StreamSubscription<DocumentSnapshot> sub =
-        doc.getSnapshotsWithOptions(cacheOptions).listen(events.add);
+        doc.snapshots(source: ListenSource.cache).listen(events.add);
     await waitFor(events, 1);
 
     expect(events.first.exists, isTrue);
     expect(events.first.metadata.isFromCache, isTrue);
-    expect(events.first.data, map(<String>['key', 'value']));
+    expect(events.first.data(), map(<String>['key', 'value']));
     await sub.cancel();
   });
 
@@ -115,12 +112,11 @@ void main() {
     final List<QuerySnapshot> cacheEvents = <QuerySnapshot>[];
     final List<QuerySnapshot> remoteEvents = <QuerySnapshot>[];
     // Cache first: the backend listen is started when the second one is added.
-    final StreamSubscription<QuerySnapshot> cacheSub = collection
-        .getSnapshotsWithOptions(cacheOptions)
+    final StreamSubscription<QuerySnapshot> cacheSub = collection.snapshots(source: ListenSource.cache)
         .listen(cacheEvents.add);
     await waitFor(cacheEvents, 1);
     final StreamSubscription<QuerySnapshot> remoteSub =
-        collection.snapshots.listen(remoteEvents.add);
+        collection.snapshots().listen(remoteEvents.add);
 
     // The default listener gets the server data.
     for (int i = 0;
@@ -154,6 +150,6 @@ void main() {
     ));
     final DocumentReference doc = firestore.collection('lru').doc();
     await doc.set(map(<String>['k', 'v']));
-    expect((await doc.get()).data, map(<String>['k', 'v']));
+    expect((await doc.get()).data(), map(<String>['k', 'v']));
   });
 }

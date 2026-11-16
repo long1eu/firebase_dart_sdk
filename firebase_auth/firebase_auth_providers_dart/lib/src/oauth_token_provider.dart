@@ -56,7 +56,7 @@ class OAuthAccessToken {
 ///   final FirebaseApp app = FirebaseApp.withOptions(
 ///     const FirebaseOptions(
 ///       apiKey: '',
-///       applicationId: '1:1234567890:dart:server',
+///       appId: '1:1234567890:dart:server',
 ///       projectId: 'my-project',
 ///     ),
 ///   );
@@ -65,7 +65,7 @@ class OAuthAccessToken {
 ///   app.authProvider = OAuthTokenProvider.serviceAccount(
 ///     jsonDecode(File(keyFile).readAsStringSync()),
 ///   );
-///   final Firestore firestore = Firestore.instanceFor(app: app);
+///   final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(app: app);
 ///   await firestore.doc('status/server').set(<String, Object?>{'up': true});
 ///   await firestore.terminate();
 /// }

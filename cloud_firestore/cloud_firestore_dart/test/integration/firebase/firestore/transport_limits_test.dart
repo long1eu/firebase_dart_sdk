@@ -91,7 +91,7 @@ void main() {
         };
     expect(byId.keys.toSet(), payloads.keys.toSet());
     for (final MapEntry<String, String> entry in payloads.entries) {
-      final Map<String, Object?> data = byId[entry.key]!.data!;
+      final Map<String, Object?> data = byId[entry.key]!.data()!;
       expect(data['id'], entry.key);
       // Not `expect(.., entry.value)`: a mismatch would print megabytes.
       expect(
@@ -106,14 +106,14 @@ void main() {
     'a query returns many documents near the size limit in one response',
     () async {
       final QuerySnapshot<Map<String, Object?>> snapshot = await collection.get(
-        Source.server,
+        GetOptions(source: Source.server),
       );
       expect(snapshot.metadata.isFromCache, isFalse);
       expectAllDocuments(snapshot.docs);
 
       // The cache holds them as well.
       final QuerySnapshot<Map<String, Object?>> cached = await collection.get(
-        Source.cache,
+        GetOptions(source: Source.cache),
       );
       expectAllDocuments(cached.docs);
     },
@@ -126,7 +126,7 @@ void main() {
     final CollectionReference<Map<String, Object?>> readerCollection = reader
         .collection(collection.path);
     final QuerySnapshot<Map<String, Object?>> snapshot = await readerCollection
-        .snapshots
+        .snapshots()
         .firstWhere(
           (QuerySnapshot<Map<String, Object?>> s) => !s.metadata.isFromCache,
         )
@@ -157,7 +157,7 @@ void main() {
       );
       final QuerySnapshot<Map<String, Object?>> snapshot = await reader
           .collection(collection.path)
-          .get(Source.server);
+          .get(GetOptions(source: Source.server));
       expectAllDocuments(snapshot.docs);
     }, timeout: timeout);
   }
@@ -167,7 +167,7 @@ void main() {
     final DocumentSnapshot<Map<String, Object?>> doc = await reader
         .collection(collection.path)
         .doc('doc03')
-        .get(Source.server);
+        .get(GetOptions(source: Source.server));
     expect(doc.get('chunk') == payloads['doc03'], isTrue);
   }, timeout: timeout);
 }

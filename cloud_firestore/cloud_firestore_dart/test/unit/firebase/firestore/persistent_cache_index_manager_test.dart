@@ -57,8 +57,8 @@ void main() {
   Future<List<String>> matchingIds(FirebaseFirestore firestore) async {
     final QuerySnapshot<Map<String, Object?>> snapshot = await firestore
         .collection('coll')
-        .whereEqualTo('match', true)
-        .get(Source.cache);
+        .where('match', isEqualTo: true)
+        .get(GetOptions(source: Source.cache));
     return snapshot.docs
         .map((QueryDocumentSnapshot<Map<String, Object?>> d) => d.id)
         .toList();
@@ -227,8 +227,8 @@ void main() {
       // Most documents match: reading them through an index would cost more than the scan.
       final QuerySnapshot<Map<String, Object?>> most = await firestore
           .collection('coll')
-          .whereGreaterThanOrEqualTo('n', 10)
-          .get(Source.cache);
+          .where('n', isGreaterThanOrEqualTo: 10)
+          .get(GetOptions(source: Source.cache));
       expect(most.docs, hasLength(110));
       expect(indexes(firestore), isEmpty);
 
@@ -244,8 +244,8 @@ void main() {
       });
       final QuerySnapshot<Map<String, Object?>> small = await firestore
           .collection('small')
-          .whereEqualTo('match', true)
-          .get(Source.cache);
+          .where('match', isEqualTo: true)
+          .get(GetOptions(source: Source.cache));
       expect(small.docs, hasLength(1));
       expect(indexes(firestore), isEmpty);
 

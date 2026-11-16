@@ -7,7 +7,6 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/core/query.dart'
     as core;
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/view_snapshot.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/document_change.dart';
-import 'package:cloud_firestore_dart/src/firebase/firestore/metadata_change.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/document.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/document_set.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/value/field_value.dart';
@@ -101,14 +100,15 @@ void main() {
 
     List<Map<String, Object?>?> docs = <Map<String, Object?>?>[
       for (final QueryDocumentSnapshot<dynamic> doc in foo.docs)
-        doc.data as Map<String, Object?>?,
+        doc.data() as Map<String, Object?>?,
     ];
     expect(docs, hasLength(1));
     expect(docs[0]!['timestamp'], isNull);
 
     docs = <Map<String, Object?>?>[
       for (final QueryDocumentSnapshot<dynamic> doc in foo.docs)
-        doc.getData(ServerTimestampBehavior.estimate) as Map<String, Object?>?,
+        doc.data(serverTimestamps: ServerTimestampBehavior.estimate)
+            as Map<String, Object?>?,
     ];
     expect(docs, hasLength(1));
     expect(docs[0]!['timestamp'], isNotNull);
@@ -188,17 +188,9 @@ void main() {
           hasPendingWrites: false,
         );
 
-    expect(snapshot.docChanges.length, 1);
-    final List<DocumentChange> changesWithoutMetadata = <DocumentChange>[
-      DocumentChangeInternal.create(
-        doc2Snap,
-        DocumentChangeType.modified,
-        1 /*oldIndex*/,
-        1 /*newIndex*/,
-      ),
-    ];
-    expect(snapshot.docChanges, changesWithoutMetadata);
-
+    // The snapshot comes from a listen that includes metadata changes
+    // (excludesMetadataChanges: false), so docChanges lists the document whose
+    // metadata only changed too.
     final List<DocumentChange> changesWithMetadata = <DocumentChange>[
       DocumentChangeInternal.create(
         doc1Snap,
@@ -213,9 +205,6 @@ void main() {
         1 /*newIndex*/,
       ),
     ];
-    expect(
-      snapshot.getDocumentChanges(MetadataChanges.include),
-      changesWithMetadata,
-    );
+    expect(snapshot.docChanges, changesWithMetadata);
   });
 }

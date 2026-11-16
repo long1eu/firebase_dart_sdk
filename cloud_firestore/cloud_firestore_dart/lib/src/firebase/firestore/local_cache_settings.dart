@@ -23,10 +23,10 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/firestore_settings.d
 /// the JS SDK (`persistentLocalCache()` and `memoryLocalCache()`).
 ///
 /// ```dart
-/// final Firestore firestore = Firestore.instanceFor(
+/// final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(
 ///   app: app,
 ///   openDatabase: openDatabase, // needed for a persistent cache
-///   settings: FirestoreSettings(cacheSettings: PersistentCacheSettings()),
+///   settings: Settings(cacheSettings: PersistentCacheSettings()),
 /// );
 /// ```
 sealed class LocalCacheSettings {
@@ -36,14 +36,14 @@ sealed class LocalCacheSettings {
 /// Configures a cache stored on disk (the default). The on disk cache is
 /// garbage collected once it exceeds [sizeBytes].
 ///
-/// The cache is stored in the SQLite database that the `openDatabase` function of `Firestore.instanceFor` opens
+/// The cache is stored in the SQLite database that the `openDatabase` function of `FirebaseFirestore.instanceFor` opens
 /// (a file on the VM, IndexedDB or OPFS on the web). Without that function the instance falls back to a memory
 /// cache. The data and the pending writes survive a restart of the program.
 ///
 /// ```dart
-/// final FirestoreSettings settings = FirestoreSettings(
+/// final Settings settings = Settings(
 ///   cacheSettings: PersistentCacheSettings(
-///     sizeBytes: FirestoreSettings.cacheSizeUnlimited,
+///     sizeBytes: Settings.cacheSizeUnlimited,
 ///   ),
 /// );
 /// ```
@@ -82,7 +82,7 @@ final class PersistentCacheSettings extends LocalCacheSettings {
 /// Writes that the backend has not acknowledged when the instance is terminated are lost with it.
 ///
 /// ```dart
-/// final FirestoreSettings settings = FirestoreSettings(
+/// final Settings settings = Settings(
 ///   cacheSettings: const MemoryCacheSettings(),
 /// );
 /// ```
@@ -135,7 +135,7 @@ final class MemoryEagerGcSettings extends MemoryGarbageCollectorSettings {
 /// listener can be answered from the cache while offline.
 ///
 /// ```dart
-/// final FirestoreSettings settings = FirestoreSettings(
+/// final Settings settings = Settings(
 ///   cacheSettings: MemoryCacheSettings(
 ///     gcSettings: MemoryLruGcSettings(sizeBytes: 10 * 1024 * 1024),
 ///   ),

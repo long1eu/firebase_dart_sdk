@@ -240,16 +240,14 @@ void main() {
       expect(
           query('c')
               .filter(filter('a', 'array-contains', 1))
-              .orderBy(orderBy('a'))
-              .orderBy(orderBy('b', 'desc'))
+              .orderBy(orderBy('a')).orderBy(orderBy('b', 'desc'))
               .toTarget()
               .segmentCount,
           3);
       // The document key is not a segment.
       expect(
           query('c')
-              .filter(filter('__name__', '==', ref('c/doc')))
-              .orderBy(orderBy('__name__'))
+              .filter(filter('__name__', '==', ref('c/doc'))).orderBy(orderBy('__name__'))
               .toTarget()
               .segmentCount,
           0);
@@ -271,8 +269,7 @@ void main() {
           OrderByDirection.descending);
       expect(
           query('c')
-              .orderBy(orderBy('a', 'desc'))
-              .orderBy(orderBy('__name__'))
+              .orderBy(orderBy('a', 'desc')).orderBy(orderBy('__name__'))
               .toTarget()
               .keyOrder,
           OrderByDirection.ascending);

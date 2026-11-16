@@ -27,7 +27,9 @@ Future<void> main() async {
     for (int i = 0; i < 5; i++)
       home.update(<String, Object?>{'views': FieldValue.increment(1)}),
   ]);
-  print('simple counter: ${(await home.get()).getInt('views')}');
+  print(
+    'simple counter: ${((await home.get()).get('views') as num?)?.toInt()}',
+  );
 
   // Distributed counter: each write goes to one of the shards at random.
   const int shardCount = 4;
@@ -53,7 +55,7 @@ Future<void> main() async {
   final AggregateQuerySnapshot sum = await shards.aggregate(<AggregateField>[
     total,
   ]).get();
-  print('distributed counter: ${sum.getInt(total)}');
+  print('distributed counter: ${(sum.get(total) as num?)?.toInt()}');
 
   await firestore.terminate();
 }

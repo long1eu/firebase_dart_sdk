@@ -48,7 +48,7 @@ void main() {
           source().createFromAggregateQuery(query().aggregate(<AggregateField>[
         AggregateField.count(),
         AggregateField.sum('total'),
-        AggregateField.averageField(FieldPath(<String>['a', 'b.c'])),
+        AggregateField.average(FieldPath(<String>['a', 'b.c'])),
       ])));
       expect(
           stages.last,
@@ -98,8 +98,7 @@ void main() {
 
     test('findNearest with a limit', () {
       final List<pb.Pipeline_Stage> stages = stagesOf(source()
-          .createFromVectorQuery(query().findNearest(
-              'embedding', <double>[1, 2], 5, DistanceMeasure.cosine)));
+          .createFromVectorQuery(query().findNearest(vectorField: 'embedding', queryVector: <double>[1, 2], limit: 5, distanceMeasure: DistanceMeasure.cosine)));
       expect(stages, hasLength(queryStages + 1));
       expect(
           stages.last,
@@ -111,9 +110,7 @@ void main() {
 
     test('distanceResultField', () {
       final List<pb.Pipeline_Stage> stages = stagesOf(source()
-          .createFromVectorQuery(query().findNearest(
-              'embedding', <double>[1, 2], 5, DistanceMeasure.euclidean,
-              distanceResultField: 'distance')));
+          .createFromVectorQuery(query().findNearest(vectorField: 'embedding', queryVector: <double>[1, 2], limit: 5, distanceMeasure: DistanceMeasure.euclidean, distanceResultField: 'distance')));
       expect(stages.last.options, <String, pb.Value>{
         'limit': integer(5),
         'distance_field': fieldRef('distance'),
@@ -122,9 +119,7 @@ void main() {
 
     test('distanceThreshold filters on the distance', () {
       final List<pb.Pipeline_Stage> stages = stagesOf(source()
-          .createFromVectorQuery(query().findNearest(
-              'embedding', <double>[1, 2], 5, DistanceMeasure.euclidean,
-              distanceResultField: 'distance', distanceThreshold: 0.5)));
+          .createFromVectorQuery(query().findNearest(vectorField: 'embedding', queryVector: <double>[1, 2], limit: 5, distanceMeasure: DistanceMeasure.euclidean, distanceResultField: 'distance', distanceThreshold: 0.5)));
       expect(stages, hasLength(queryStages + 2));
       expect(
           stages.last,
@@ -139,9 +134,7 @@ void main() {
 
     test('the threshold of a dot product is a lower bound', () {
       pb.Value condition(DistanceMeasure measure) =>
-          stagesOf(source().createFromVectorQuery(query().findNearest(
-                  'embedding', <double>[1, 2], 5, measure,
-                  distanceThreshold: 0.5)))
+          stagesOf(source().createFromVectorQuery(query().findNearest(vectorField: 'embedding', queryVector: <double>[1, 2], limit: 5, distanceMeasure: measure, distanceThreshold: 0.5)))
               .last
               .args
               .single;

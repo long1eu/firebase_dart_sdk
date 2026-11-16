@@ -33,7 +33,7 @@ class City {
 
 City _cityFromFirestore(
         DocumentSnapshot<Map<String, Object?>> snapshot, SnapshotOptions? o) =>
-    City.fromMap(snapshot.data!);
+    City.fromMap(snapshot.data()!);
 
 Map<String, Object?> _cityToFirestore(City city, SetOptions? options) =>
     city.toMap();
@@ -60,7 +60,7 @@ class _RecordingConverter extends FirestoreDataConverter<City> {
   @override
   City fromFirestore(DocumentSnapshot<Map<String, Object?>> snapshot,
           SnapshotOptions? o) =>
-      City.fromMap(snapshot.data!);
+      City.fromMap(snapshot.data()!);
 
   @override
   Map<String, Object?> toFirestore(City value, SetOptions? options) {
@@ -86,72 +86,76 @@ void main() {
   group('references', () {
     test('withConverter returns typed references and keeps the path', () {
       final CollectionReference<City> cities =
-          db.collection('cities').withConverter<City>(cityConverter);
+          db.collection('cities').withConverter<City>(fromFirestore: cityConverter.fromFirestore, toFirestore: cityConverter.toFirestore);
       expect(cities.path, 'cities');
-      expect(cities.converter, same(cityConverter));
+      expect(cities.converter, isNotNull);
+      expect(cities.converter, cities.withConverter<City>(fromFirestore: cityConverter.fromFirestore, toFirestore: cityConverter.toFirestore).converter);
 
       final DocumentReference<City> sf = cities.doc('sf');
       expect(sf.path, 'cities/sf');
-      expect(sf.converter, same(cityConverter));
-      expect(db.doc('cities/sf').withConverter<City>(cityConverter).path,
+      expect(sf.converter, same(cities.converter));
+      expect(db.doc('cities/sf').withConverter<City>(fromFirestore: cityConverter.fromFirestore, toFirestore: cityConverter.toFirestore).path,
           'cities/sf');
     });
 
     test('withoutConverter resets to raw maps', () {
       final CollectionReference<City> cities =
-          db.collection('cities').withConverter<City>(cityConverter);
+          db.collection('cities').withConverter<City>(fromFirestore: cityConverter.fromFirestore, toFirestore: cityConverter.toFirestore);
       final CollectionReference<Map<String, Object?>> raw =
           cities.withoutConverter();
       expect(raw.converter, isNull);
       expect(raw, db.collection('cities'));
       expect(cities.doc('a').withoutConverter(), db.doc('cities/a'));
-      expect(cities.whereEqualTo('a', 1).withoutConverter().converter, isNull);
+      expect(cities.where('a', isEqualTo: 1).withoutConverter().converter, isNull);
     });
 
     test('parent and collection() are untyped', () {
       final DocumentReference<City> sf =
-          db.doc('cities/sf').withConverter<City>(cityConverter);
+          db.doc('cities/sf').withConverter<City>(fromFirestore: cityConverter.fromFirestore, toFirestore: cityConverter.toFirestore);
       final CollectionReference<Map<String, Object?>> sub =
           sf.collection('landmarks');
       expect(sub.converter, isNull);
-      final CollectionReference<Map<String, Object?>> parent = sf.parent;
-      expect(parent.converter, isNull);
+      // The parent keeps the converter, as in FlutterFire.
+      final CollectionReference<City> parent = sf.parent;
+      expect(parent.converter, isNotNull);
     });
 
     test('equality considers the converter', () {
       final DocumentReference<City> a =
-          db.doc('cities/sf').withConverter<City>(cityConverter);
+          db.doc('cities/sf').withConverter<City>(fromFirestore: cityConverter.fromFirestore, toFirestore: cityConverter.toFirestore);
       final DocumentReference<City> b =
-          db.doc('cities/sf').withConverter<City>(cityConverter);
+          db.doc('cities/sf').withConverter<City>(fromFirestore: cityConverter.fromFirestore, toFirestore: cityConverter.toFirestore);
       // Two converters built from the same canonical functions are equal.
       expect(a, b);
       expect(a.hashCode, b.hashCode);
 
       final DocumentReference<City> other =
-          db.doc('cities/sf').withConverter<City>(_RecordingConverter());
+          db.doc('cities/sf').withConverter<City>(fromFirestore: _RecordingConverter().fromFirestore, toFirestore: _RecordingConverter().toFirestore);
       expect(a, isNot(other));
       expect(a, isNot(db.doc('cities/sf')));
 
-      expect(db.collection('cities').withConverter<City>(cityConverter),
-          db.collection('cities').withConverter<City>(cityConverter));
-      expect(db.collection('cities').withConverter<City>(cityConverter),
+      expect(db.collection('cities').withConverter<City>(fromFirestore: cityConverter.fromFirestore, toFirestore: cityConverter.toFirestore),
+          db.collection('cities').withConverter<City>(fromFirestore: cityConverter.fromFirestore, toFirestore: cityConverter.toFirestore));
+      expect(db.collection('cities').withConverter<City>(fromFirestore: cityConverter.fromFirestore, toFirestore: cityConverter.toFirestore),
           isNot(db.collection('cities')));
     });
 
     test('queries keep the converter when refined', () {
       final Query<City> q = db
           .collection('cities')
-          .withConverter<City>(cityConverter)
-          .whereEqualTo('population', 1)
+          .withConverter<City>(fromFirestore: cityConverter.fromFirestore, toFirestore: cityConverter.toFirestore).where('population', isEqualTo: 1)
           .limit(3);
-      expect(q.converter, same(cityConverter));
+      expect(
+        q.converter,
+        db.collection('cities').withConverter<City>(fromFirestore: cityConverter.fromFirestore, toFirestore: cityConverter.toFirestore).converter,
+      );
     });
   });
 
   group('writes', () {
     test('set converts through toFirestore', () async {
       final DocumentReference<City> sf =
-          db.doc('cities/sf').withConverter<City>(cityConverter);
+          db.doc('cities/sf').withConverter<City>(fromFirestore: cityConverter.fromFirestore, toFirestore: cityConverter.toFirestore);
       await sf.set(const City('SF', 10));
       final SetMutation m = client.written.single as SetMutation;
       expect(m.key, DocumentKey.fromPathString('cities/sf'));
@@ -162,9 +166,9 @@ void main() {
     test('set passes SetOptions to the converter; merge is applied', () async {
       final _RecordingConverter converter = _RecordingConverter();
       final DocumentReference<City> sf =
-          db.doc('cities/sf').withConverter<City>(converter);
-      await sf.set(const City('SF', 10), SetOptions.mergeAllFields);
-      expect(converter.lastOptions, same(SetOptions.mergeAllFields));
+          db.doc('cities/sf').withConverter<City>(fromFirestore: converter.fromFirestore, toFirestore: converter.toFirestore);
+      await sf.set(const City('SF', 10), const SetOptions(merge: true));
+      expect(converter.lastOptions, same(const SetOptions(merge: true)));
       expect(client.written.single, isA<PatchMutation>());
 
       await sf.set(const City('SF', 11));
@@ -174,9 +178,9 @@ void main() {
 
     test('add converts and returns a typed reference', () async {
       final CollectionReference<City> cities =
-          db.collection('cities').withConverter<City>(cityConverter);
+          db.collection('cities').withConverter<City>(fromFirestore: cityConverter.fromFirestore, toFirestore: cityConverter.toFirestore);
       final DocumentReference<City> ref = await cities.add(const City('LA', 4));
-      expect(ref.converter, same(cityConverter));
+      expect(ref.converter, cities.converter);
       expect(ref.parent.path, 'cities');
       expect((client.written.single as SetMutation).value,
           util.wrapMap(<String, Object?>{'name': 'LA', 'population': 4}));
@@ -184,7 +188,7 @@ void main() {
 
     test('WriteBatch.set converts, update stays raw', () async {
       final DocumentReference<City> sf =
-          db.doc('cities/sf').withConverter<City>(cityConverter);
+          db.doc('cities/sf').withConverter<City>(fromFirestore: cityConverter.fromFirestore, toFirestore: cityConverter.toFirestore);
       final WriteBatch batch = db.batch()
         ..set(sf, const City('SF', 1))
         ..update(sf, <String, Object?>{'population': 2})
@@ -211,9 +215,9 @@ void main() {
         converter: cityConverter,
       );
       expect(snap.exists, isTrue);
-      expect(snap.data!.name, 'SF');
-      expect(snap.data!.population, 10);
-      expect(snap.getData(ServerTimestampBehavior.none)!.name, 'SF');
+      expect(snap.data()!.name, 'SF');
+      expect(snap.data()!.population, 10);
+      expect(snap.data(serverTimestamps: ServerTimestampBehavior.none)!.name, 'SF');
       expect(snap.reference.converter, same(cityConverter));
       expect(snap.reference.path, 'cities/sf');
       // Field access stays raw.
@@ -228,7 +232,7 @@ void main() {
         converter: cityConverter,
       );
       expect(missing.exists, isFalse);
-      expect(missing.data, isNull);
+      expect(missing.data(), isNull);
     });
 
     test('the converter receives an untyped QueryDocumentSnapshot', () {
@@ -239,7 +243,7 @@ void main() {
             (DocumentSnapshot<Map<String, Object?>> s, SnapshotOptions? o) {
           seen = s;
           seenOptions = o;
-          return s.data!['population']! as int;
+          return s.data()!['population']! as int;
         },
         toFirestore: (int v, SetOptions? o) =>
             <String, Object?>{'population': v},
@@ -251,7 +255,7 @@ void main() {
         hasPendingWrites: false,
         converter: c,
       );
-      expect(snap.getData(ServerTimestampBehavior.estimate), 10);
+      expect(snap.data(serverTimestamps: ServerTimestampBehavior.estimate), 10);
       expect(seen, isA<QueryDocumentSnapshot<Map<String, Object?>>>());
       expect(seen!.metadata.isFromCache, isTrue);
       expect(seenOptions!.serverTimestamps, ServerTimestampBehavior.estimate);
@@ -282,11 +286,11 @@ void main() {
 
       expect(snapshot.length, 2);
       final List<QueryDocumentSnapshot<City>> list = snapshot.docs;
-      expect(list.map((QueryDocumentSnapshot<City> s) => s.data.name),
+      expect(list.map((QueryDocumentSnapshot<City> s) => s.data().name),
           <String>['A', 'B']);
       expect(
           snapshot.docChanges
-              .map((DocumentChange<City> c) => c.doc.data.population),
+              .map((DocumentChange<City> c) => c.doc.data().population),
           <int>[1, 2]);
       expect(snapshot.query.converter, same(cityConverter));
     });
@@ -299,7 +303,7 @@ void main() {
         isFromCache: false,
         hasPendingWrites: false,
       );
-      expect(snap.data, <String, Object?>{'name': 'SF', 'population': 10});
+      expect(snap.data(), <String, Object?>{'name': 'SF', 'population': 10});
     });
   });
 }

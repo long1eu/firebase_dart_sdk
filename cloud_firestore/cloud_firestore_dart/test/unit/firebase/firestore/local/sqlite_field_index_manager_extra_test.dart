@@ -92,8 +92,7 @@ void main() {
             'x/z'
           ]) {
             final Query query = Query(path('coll'))
-                .filter(filter('r', op, ref(target)))
-                .orderBy(orderBy('r', dir));
+                .filter(filter('r', op, ref(target))).orderBy(orderBy('r', dir));
             expect(await idsFromIndex(indexManager, query), idsFromScan(query),
                 reason: 'r $op $target');
           }
@@ -172,8 +171,7 @@ void main() {
         for (final String op in <String>['<', '<=', '==', '>=', '>', '!=']) {
           for (final BsonTimestamp value in values) {
             final Query query = Query(path('coll'))
-                .filter(filter('t', op, value))
-                .orderBy(orderBy('t', dir));
+                .filter(filter('t', op, value)).orderBy(orderBy('t', dir));
             expect(await idsFromIndex(indexManager, query), idsFromScan(query),
                 reason: 't $op (${value.seconds}, ${value.increment})');
           }

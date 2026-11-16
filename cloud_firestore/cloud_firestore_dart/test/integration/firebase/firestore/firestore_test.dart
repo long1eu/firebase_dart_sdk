@@ -13,7 +13,6 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/firestore.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/firestore_error.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/firestore_settings.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local_cache_settings.dart';
-import 'package:cloud_firestore_dart/src/firebase/firestore/metadata_change.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/query.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/query_snapshot.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/set_options.dart';
@@ -23,6 +22,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/util/timer_task.dart
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/util.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/write_batch.dart';
 import 'package:cloud_firestore_dart/src/firebase/timestamp.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/get_options.dart';
 import 'package:firebase_app_dart/firebase_app_dart.dart';
 import 'package:firebase_app_dart/internal.dart' show InternalLogLevel;
 import 'package:test/test.dart';
@@ -60,14 +60,12 @@ void main() {
       map<String>(<dynamic>['name', 'Jonny', 'email', 'new@xyz.com']),
     ]);
     await documentReference.set(initialValue);
-    await documentReference.updateFromList(<dynamic>[
-      'desc',
-      'NewDescription',
-      'owner.email',
-      'new@xyz.com',
-    ]);
+    await documentReference.update(<Object, Object?>{
+      'desc': 'NewDescription',
+      'owner.email': 'new@xyz.com',
+    });
     final DocumentSnapshot doc = await documentReference.get();
-    expect(doc.data, finalData);
+    expect(doc.data(), finalData);
   });
 
   test('testCanUpdateAnUnknownDocument', () async {
@@ -80,11 +78,13 @@ void main() {
 
     await writerRef.set(map(<String>['a', 'a']));
     await readerRef.update(map(<String>['b', 'b']));
-    DocumentSnapshot writerSnap = await writerRef.get(Source.cache);
+    DocumentSnapshot writerSnap = await writerRef.get(
+      GetOptions(source: Source.cache),
+    );
     expect(writerSnap.exists, isTrue);
 
     await expectLater(
-      () => readerRef.get(Source.cache),
+      () => readerRef.get(GetOptions(source: Source.cache)),
       throwsA(isA<FirestoreException>()),
     );
     /*try {
@@ -95,9 +95,9 @@ void main() {
     }*/
 
     writerSnap = await writerRef.get();
-    expect(writerSnap.data, map<String>(<String>['a', 'a', 'b', 'b']));
+    expect(writerSnap.data(), map<String>(<String>['a', 'a', 'b', 'b']));
     final DocumentSnapshot readerSnap = await readerRef.get();
-    expect(readerSnap.data, map<String>(<String>['a', 'a', 'b', 'b']));
+    expect(readerSnap.data(), map<String>(<String>['a', 'a', 'b', 'b']));
   });
 
   test('testCanMergeDataWithAnExistingDocumentUsingSet', () async {
@@ -126,9 +126,9 @@ void main() {
     ]);
 
     await documentReference.set(initialValue);
-    await documentReference.set(mergeData, SetOptions.mergeAllFields);
+    await documentReference.set(mergeData, const SetOptions(merge: true));
     final DocumentSnapshot doc = await documentReference.get();
-    expect(doc.data, finalData);
+    expect(doc.data(), finalData);
   });
 
   test('testCanMergeServerTimestamps', () async {
@@ -143,10 +143,10 @@ void main() {
       map<dynamic>(<dynamic>['time', FieldValue.serverTimestamp()]),
     ]);
     await documentReference.set(initialValue);
-    await documentReference.set(mergeData, SetOptions.mergeAllFields);
+    await documentReference.set(mergeData, const SetOptions(merge: true));
     final DocumentSnapshot doc = await documentReference.get();
 
-    expect(doc.getBool('untouched'), isTrue);
+    expect(doc.get('untouched') as bool?, isTrue);
     expect(doc.get('time'), const TypeMatcher<Timestamp>());
     expect(doc.get('nested.time'), const TypeMatcher<Timestamp>());
   });
@@ -156,28 +156,28 @@ void main() {
     final EventAccumulator<DocumentSnapshot> eventAccumulator =
         EventAccumulator<DocumentSnapshot>();
     final StreamSubscription<DocumentSnapshot> subscription = documentReference
-        .snapshots
+        .snapshots()
         .listen(eventAccumulator.onData, onError: eventAccumulator.onError);
     await eventAccumulator.wait();
 
     unawaited(documentReference.set(<String, dynamic>{}));
     DocumentSnapshot snapshot = await eventAccumulator.wait();
-    expect(snapshot.data, isEmpty);
+    expect(snapshot.data(), isEmpty);
 
     await documentReference.set(
       map(<dynamic>['a', <String, dynamic>{}]),
-      SetOptions.mergeFields(<String>['a']),
+      SetOptions(mergeFields: <String>['a']),
     );
     snapshot = await eventAccumulator.wait();
-    expect(snapshot.data, map<dynamic>(<dynamic>['a', <String, dynamic>{}]));
+    expect(snapshot.data(), map<dynamic>(<dynamic>['a', <String, dynamic>{}]));
 
     await documentReference.set(
       map(<dynamic>['b', <String, dynamic>{}]),
-      SetOptions.mergeAllFields,
+      const SetOptions(merge: true),
     );
     snapshot = await eventAccumulator.wait();
     expect(
-      snapshot.data,
+      snapshot.data(),
       map<dynamic>(<dynamic>[
         'a',
         <String, dynamic>{},
@@ -186,9 +186,9 @@ void main() {
       ]),
     );
 
-    snapshot = await documentReference.get(Source.server);
+    snapshot = await documentReference.get(GetOptions(source: Source.server));
     expect(
-      snapshot.data,
+      snapshot.data(),
       map<dynamic>(<dynamic>[
         'a',
         <String, dynamic>{},
@@ -215,8 +215,8 @@ void main() {
     await documentReference.set(initialValue);
     DocumentSnapshot doc = await documentReference.get();
 
-    expect(doc.getBool('untouched'), isTrue);
-    expect(doc.getBool('nested.untouched'), isTrue);
+    expect(doc.get('untouched') as bool?, isTrue);
+    expect(doc.get('nested.untouched') as bool?, isTrue);
     expect(doc.contains('foo'), isTrue);
     expect(doc.contains('nested.foo'), isTrue);
 
@@ -226,11 +226,11 @@ void main() {
       'nested',
       map<dynamic>(<dynamic>['foo', FieldValue.delete()]),
     ]);
-    await documentReference.set(mergeData, SetOptions.mergeAllFields);
+    await documentReference.set(mergeData, const SetOptions(merge: true));
 
     doc = await documentReference.get();
-    expect(doc.getBool('untouched'), isTrue);
-    expect(doc.getBool('nested.untouched'), isTrue);
+    expect(doc.get('untouched') as bool?, isTrue);
+    expect(doc.get('nested.untouched') as bool?, isTrue);
     expect(doc.contains('foo'), isFalse);
     expect(doc.contains('nested.foo'), isFalse);
   });
@@ -276,11 +276,11 @@ void main() {
     await documentReference.set(initialValue);
     await documentReference.set(
       mergeData,
-      SetOptions.mergeFields(<String>['foo', 'inner', 'nested.foo']),
+      SetOptions(mergeFields: <String>['foo', 'inner', 'nested.foo']),
     );
 
     final DocumentSnapshot doc = await documentReference.get();
-    expect(doc.data, finalData);
+    expect(doc.data(), finalData);
   });
 
   test('testCanSetServerTimestampsUsingMergeFields', () async {
@@ -308,7 +308,7 @@ void main() {
 
     await documentReference.set(
       mergeData,
-      SetOptions.mergeFields(<String>['foo', 'inner', 'nested.foo']),
+      SetOptions(mergeFields: <String>['foo', 'inner', 'nested.foo']),
     );
 
     final DocumentSnapshot doc = await documentReference.get();
@@ -358,9 +358,9 @@ void main() {
     ]);
 
     await documentReference.set(initialValue);
-    await documentReference.set(mergeData, SetOptions.mergeAllFields);
+    await documentReference.set(mergeData, const SetOptions(merge: true));
     final DocumentSnapshot doc = await documentReference.get();
-    expect(doc.data, finalData);
+    expect(doc.data(), finalData);
   });
 
   test('testCanDeepMergeDataWithAnExistingDocumentUsingSet', () async {
@@ -385,13 +385,15 @@ void main() {
         'owner.data',
         map<String>(<String>['name', 'Sebastian', 'email', 'new@xyz.com']),
       ]),
-      SetOptions.mergeFieldPaths(<FieldPath>[
-        FieldPath(<String>['desc']),
-        FieldPath(<String>['owner.data', 'name']),
-      ]),
+      SetOptions(
+        mergeFields: <FieldPath>[
+          FieldPath(<String>['desc']),
+          FieldPath(<String>['owner.data', 'name']),
+        ],
+      ),
     );
     final DocumentSnapshot doc = await documentReference.get();
-    expect(doc.data, finalData);
+    expect(doc.data(), finalData);
   });
 
   test('testFieldMaskCannotContainMissingFields', () async {
@@ -403,7 +405,7 @@ void main() {
     try {
       await documentReference.set(
         map(<String>['desc', 'NewDescription']),
-        SetOptions.mergeFields(<String>['desc', 'owner']),
+        SetOptions(mergeFields: <String>['desc', 'owner']),
       );
     } on ArgumentError catch (e) {
       hadError = true;
@@ -438,10 +440,10 @@ void main() {
     await documentReference.set(initialValue);
     await documentReference.set(
       map(<dynamic>['desc', 'NewDescription', 'owner', 'Sebastian']),
-      SetOptions.mergeFields(<String>['desc']),
+      SetOptions(mergeFields: <String>['desc']),
     );
     final DocumentSnapshot doc = await documentReference.get();
-    expect(doc.data, finalData);
+    expect(doc.data(), finalData);
   });
 
   test('testFieldDeletesNotInFieldMaskAreIgnored', () async {
@@ -463,10 +465,10 @@ void main() {
     await documentReference.set(initialValue);
     await documentReference.set(
       map(<dynamic>['desc', 'NewDescription', 'owner', FieldValue.delete()]),
-      SetOptions.mergeFields(<String>['desc']),
+      SetOptions(mergeFields: <String>['desc']),
     );
     final DocumentSnapshot doc = await documentReference.get();
-    expect(doc.data, finalData);
+    expect(doc.data(), finalData);
   });
 
   test('testFieldTransformsNotInFieldMaskAreIgnored', () async {
@@ -493,10 +495,10 @@ void main() {
         'owner',
         FieldValue.serverTimestamp(),
       ]),
-      SetOptions.mergeFields(<String>['desc']),
+      SetOptions(mergeFields: <String>['desc']),
     );
     final DocumentSnapshot doc = await documentReference.get();
-    expect(doc.data, finalData);
+    expect(doc.data(), finalData);
   });
 
   test('testFieldMaskEmpty', () async {
@@ -513,10 +515,10 @@ void main() {
     await documentReference.set(initialValue);
     await documentReference.set(
       map(<String>['desc', 'NewDescription']),
-      SetOptions.mergeFields(<String>[]),
+      SetOptions(mergeFields: <String>[]),
     );
     final DocumentSnapshot doc = await documentReference.get();
-    expect(doc.data, finalData);
+    expect(doc.data(), finalData);
   });
 
   test('testFieldInFieldMaskMultipleTimes', () async {
@@ -544,10 +546,10 @@ void main() {
         'owner',
         map<String>(<String>['name', 'Sebastian', 'email', 'new@new.com']),
       ]),
-      SetOptions.mergeFields(<String>['owner.name', 'owner', 'owner']),
+      SetOptions(mergeFields: <String>['owner.name', 'owner', 'owner']),
     );
     final DocumentSnapshot doc = await documentReference.get();
-    expect(doc.data, finalData);
+    expect(doc.data(), finalData);
   });
 
   test('testCanDeleteAFieldWithAnUpdate', () async {
@@ -567,12 +569,11 @@ void main() {
       map<String>(<String>['name', 'Jonny']),
     ]);
     await documentReference.set(initialValue);
-    await documentReference.updateFromList(<dynamic>[
-      'owner.email',
-      FieldValue.delete(),
-    ]);
+    await documentReference.update(<Object, Object?>{
+      'owner.email': FieldValue.delete(),
+    });
     final DocumentSnapshot doc = await documentReference.get();
-    expect(doc.data, finalData);
+    expect(doc.data(), finalData);
   });
 
   test('testCanUpdateFieldsWithDots', () async {
@@ -581,17 +582,15 @@ void main() {
     )).doc('eros');
     await documentReference.set(map(<String>['a.b', 'old', 'c.d', 'old']));
 
-    await documentReference.updateFromList(<dynamic>[
-      FieldPath(<String>['a.b']),
-      'new',
-    ]);
-    await documentReference.updateFromList(<dynamic>[
-      FieldPath(<String>['c.d']),
-      'new',
-    ]);
+    await documentReference.update(<Object, Object?>{
+      FieldPath(<String>['a.b']): 'new',
+    });
+    await documentReference.update(<Object, Object?>{
+      FieldPath(<String>['c.d']): 'new',
+    });
 
     final DocumentSnapshot doc = await documentReference.get();
-    expect(doc.data, map<String>(<String>['a.b', 'new', 'c.d', 'new']));
+    expect(doc.data(), map<String>(<String>['a.b', 'new', 'c.d', 'new']));
   });
 
   test('testCanUpdateNestedFields', () async {
@@ -607,12 +606,12 @@ void main() {
       ]),
     );
 
-    await documentReference.updateFromList(<String>['a.b', 'new']);
+    await documentReference.update(<Object, Object?>{'a.b': 'new'});
     await documentReference.update(map(<String>['c.d', 'new']));
 
     final DocumentSnapshot doc = await documentReference.get();
     expect(
-      doc.data,
+      doc.data(),
       map<dynamic>(<dynamic>[
         'a',
         map<String>(<String>['b', 'new']),
@@ -629,7 +628,7 @@ void main() {
     final Map<String, Object?> data = map(<String>['value', 'bar']);
     await documentReference.set(data);
     DocumentSnapshot doc = await documentReference.get();
-    expect(doc.data, data);
+    expect(doc.data(), data);
     await documentReference.delete();
     doc = await documentReference.get();
     expect(doc.exists, isFalse);
@@ -660,17 +659,17 @@ void main() {
     )).doc();
     final DocumentSnapshot documentSnapshot = await documentReference.get();
     expect(documentSnapshot.exists, isFalse);
-    expect(documentSnapshot.data, isNull);
+    expect(documentSnapshot.data(), isNull);
 
     final Completer<void> barrier = Completer<void>();
 
     late StreamSubscription<DocumentSnapshot> listenerRegistration;
     try {
-      listenerRegistration = documentReference.snapshots.listen((
+      listenerRegistration = documentReference.snapshots().listen((
         DocumentSnapshot value,
       ) {
         expect(documentSnapshot.exists, isFalse);
-        expect(documentSnapshot.data, isNull);
+        expect(documentSnapshot.data(), isNull);
         barrier.complete(null);
       }, onError: (dynamic error) {});
 
@@ -686,40 +685,40 @@ void main() {
       'rooms',
     )).add(data);
     final DocumentSnapshot document = await documentReference.get();
-    expect(document.data, data);
+    expect(document.data(), data);
   });
 
   test('testQueriesAreValidatedOnClient', () async {
     // NOTE: Failure cases are validated in ValidationTest.
     final CollectionReference collection = await testCollection();
-    final Query query = collection.whereGreaterThanOrEqualTo('x', 32)
+    final Query query = collection.where('x', isGreaterThanOrEqualTo: 32)
       // Same inequality field works.
-      ..whereLessThanOrEqualTo('x', 'cat')
+      ..where('x', isLessThanOrEqualTo: 'cat')
       // Equality on different field works.
-      ..whereEqualTo('y', 'cat')
+      ..where('y', isEqualTo: 'cat')
       // Array contains on different field works.
-      ..whereArrayContains('y', 'cat')
+      ..where('y', arrayContains: 'cat')
       // Array contains any on different field works.
-      ..whereArrayContainsAny('y', <String>['cat'])
+      ..where('y', arrayContainsAny: <String>['cat'])
       // In on different field works.
-      ..whereIn('y', <String>['cat'])
+      ..where('y', whereIn: <String>['cat'])
       // Ordering by inequality field succeeds.
       ..orderBy('x');
-    collection.orderBy('x').whereGreaterThanOrEqualTo('x', 32);
+    collection.orderBy('x').where('x', isGreaterThanOrEqualTo: 32);
 
     // Inequality same as first order by works
     query.orderBy('x').orderBy('y');
-    collection.orderBy('x').orderBy('y').whereGreaterThanOrEqualTo('x', 32);
-    collection.orderBy('x', Direction.descending).whereEqualTo('y', 'true');
+    collection.orderBy('x').orderBy('y').where('x', isGreaterThanOrEqualTo: 32);
+    collection.orderBy('x', descending: true).where('y', isEqualTo: 'true');
 
     // Equality different than orderBy works.
-    collection.orderBy('x').whereEqualTo('y', 'cat');
+    collection.orderBy('x').where('y', isEqualTo: 'cat');
     // Array contains different than orderBy works.
-    collection.orderBy('x').whereArrayContains('y', 'cat');
+    collection.orderBy('x').where('y', arrayContains: 'cat');
     // Array contains any different than orderBy works.
-    collection.orderBy('x').whereArrayContainsAny('y', <String>['cat']);
+    collection.orderBy('x').where('y', arrayContainsAny: <String>['cat']);
     // In different than orderBy works.
-    collection.orderBy('x').whereIn('y', <String>['cat']);
+    collection.orderBy('x').where('y', whereIn: <String>['cat']);
   });
 
   test('testDocumentSnapshotEventsNonExistent', () async {
@@ -727,7 +726,7 @@ void main() {
 
     final Completer<void> completer = Completer<dynamic>();
     final StreamSubscription<DocumentSnapshot> listener = docRef
-        .getSnapshots(MetadataChanges.include)
+        .snapshots(includeMetadataChanges: true)
         .listen(
           (DocumentSnapshot doc) {
             expect(doc, isNotNull);
@@ -751,7 +750,7 @@ void main() {
     final AwaitHelper<void> emptyLatch = AwaitHelper<void>(1);
 
     final StreamSubscription<DocumentSnapshot> listener = docRef
-        .getSnapshots(MetadataChanges.include)
+        .snapshots(includeMetadataChanges: true)
         .listen((DocumentSnapshot doc) {
           if (emptyLatch.isNotEmpty) {
             dataLatch.completeNext();
@@ -766,10 +765,10 @@ void main() {
 
           dataLatch.completeNext();
           if (count == 2) {
-            expect(doc.data, map<dynamic>(<dynamic>['a', 1.0]));
+            expect(doc.data(), map<dynamic>(<dynamic>['a', 1.0]));
             expect(doc.metadata.hasPendingWrites, isTrue);
           } else if (count == 1) {
-            expect(doc.data, map<dynamic>(<dynamic>['a', 1.0]));
+            expect(doc.data(), map<dynamic>(<dynamic>['a', 1.0]));
             expect(doc.metadata.hasPendingWrites, isFalse);
           }
         });
@@ -792,24 +791,24 @@ void main() {
     final AwaitHelper<void> latch = AwaitHelper<void>(3);
 
     final StreamSubscription<DocumentSnapshot> listener = docRef
-        .getSnapshots(MetadataChanges.include)
+        .snapshots(includeMetadataChanges: true)
         .listen((DocumentSnapshot doc) {
           final int latchCount = latch.length;
           latch.completeNext();
           switch (latchCount) {
             case 3:
-              expect(doc.data, initialData);
+              expect(doc.data(), initialData);
               expect(doc.metadata.hasPendingWrites, isFalse);
               expect(doc.metadata.isFromCache, isFalse);
               initialLatch.completeNext();
               break;
             case 2:
-              expect(doc.data, updateData);
+              expect(doc.data(), updateData);
               expect(doc.metadata.hasPendingWrites, isTrue);
               expect(doc.metadata.isFromCache, isFalse);
               break;
             case 1:
-              expect(doc.data, updateData);
+              expect(doc.data(), updateData);
               expect(doc.metadata.hasPendingWrites, isFalse);
               expect(doc.metadata.isFromCache, isFalse);
               break;
@@ -833,14 +832,14 @@ void main() {
     final AwaitHelper<void> latch = AwaitHelper<void>(2);
 
     final StreamSubscription<DocumentSnapshot> listener = docRef
-        .getSnapshots(MetadataChanges.include)
+        .snapshots(includeMetadataChanges: true)
         .listen((DocumentSnapshot doc) {
           final int count = latch.length;
           latch.completeNext();
           switch (count) {
             case 2:
               expect(doc.exists, isTrue);
-              expect(doc.data, initialData);
+              expect(doc.data(), initialData);
               expect(doc.metadata.hasPendingWrites, isFalse);
               initialLatch.completeNext();
               break;
@@ -866,7 +865,7 @@ void main() {
     final AwaitHelper<void> dataLatch = AwaitHelper<void>(3);
 
     final StreamSubscription<QuerySnapshot> listener = collection
-        .getSnapshots(MetadataChanges.include)
+        .snapshots(includeMetadataChanges: true)
         .listen((QuerySnapshot snapshot) {
           final int count = dataLatch.length;
           dataLatch.completeNext();
@@ -879,13 +878,13 @@ void main() {
             case 2:
               expect(snapshot.length, 1);
               final DocumentSnapshot doc = snapshot.docs[0];
-              expect(doc.data, data);
+              expect(doc.data(), data);
               expect(doc.metadata.hasPendingWrites, isTrue);
               break;
             case 1:
               expect(snapshot.length, 1);
               final DocumentSnapshot doc2 = snapshot.docs[0];
-              expect(doc2.data, data);
+              expect(doc2.data(), data);
               expect(doc2.metadata.hasPendingWrites, isFalse);
               break;
             default:
@@ -912,7 +911,7 @@ void main() {
     final AwaitHelper<void> dataLatch = AwaitHelper<void>(3);
 
     final StreamSubscription<QuerySnapshot> listener = collection
-        .getSnapshots(MetadataChanges.include)
+        .snapshots(includeMetadataChanges: true)
         .listen((QuerySnapshot snapshot) {
           final int count = dataLatch.length;
           dataLatch.completeNext();
@@ -921,7 +920,7 @@ void main() {
             case 3:
               expect(snapshot.length, 1);
               final DocumentSnapshot document = snapshot.docs[0];
-              expect(document.data, initialData);
+              expect(document.data(), initialData);
               expect(document.metadata.hasPendingWrites, isFalse);
               expect(document.metadata.isFromCache, isFalse);
               initialLatch.completeNext();
@@ -929,14 +928,14 @@ void main() {
             case 2:
               expect(snapshot.length, 1);
               final DocumentSnapshot document3 = snapshot.docs[0];
-              expect(document3.data, updateData);
+              expect(document3.data(), updateData);
               expect(document3.metadata.hasPendingWrites, isTrue);
               expect(document3.metadata.isFromCache, isFalse);
               break;
             case 1:
               expect(snapshot.length, 1);
               final DocumentSnapshot document4 = snapshot.docs[0];
-              expect(document4.data, updateData);
+              expect(document4.data(), updateData);
               expect(document4.metadata.hasPendingWrites, isFalse);
               expect(document4.metadata.isFromCache, isFalse);
               break;
@@ -962,7 +961,7 @@ void main() {
     final AwaitHelper<void> dataLatch = AwaitHelper<void>(2);
 
     final StreamSubscription<QuerySnapshot> listener = collection
-        .getSnapshots(MetadataChanges.include)
+        .snapshots(includeMetadataChanges: true)
         .listen((QuerySnapshot snapshot) {
           final int count = dataLatch.length;
           dataLatch.completeNext();
@@ -971,7 +970,7 @@ void main() {
               initialLatch.completeNext();
               expect(snapshot.length, 1);
               final DocumentSnapshot document = snapshot.docs[0];
-              expect(document.data, map<double>(<dynamic>['a', 1.0]));
+              expect(document.data(), map<double>(<dynamic>['a', 1.0]));
               expect(document.metadata.hasPendingWrites, isFalse);
               break;
             case 1:
@@ -995,17 +994,18 @@ void main() {
     final Map<String, Object?> updateData = map(<dynamic>['b', 1.0]);
 
     final AwaitHelper<void> dataLatch = AwaitHelper<void>(2);
-    final StreamSubscription<DocumentSnapshot> listener = docRef.snapshots
+    final StreamSubscription<DocumentSnapshot> listener = docRef
+        .snapshots()
         .listen((DocumentSnapshot snapshot) {
           final int count = dataLatch.length;
 
           dataLatch.completeNext();
           switch (count) {
             case 2:
-              expect(snapshot.data, map<double>(<dynamic>['a', 1.0]));
+              expect(snapshot.data(), map<double>(<dynamic>['a', 1.0]));
               break;
             case 1:
-              expect(snapshot.data, map<double>(<dynamic>['b', 1.0]));
+              expect(snapshot.data(), map<double>(<dynamic>['b', 1.0]));
               break;
             default:
               fail('unexpected event $snapshot');
@@ -1045,24 +1045,24 @@ void main() {
     final Query query = firestore
         .collection('foo')
         .orderBy('bar')
-        .whereEqualTo('baz', 42);
+        .where('baz', isEqualTo: 42);
     final Query query2 = firestore
         .collection('foo')
         .orderBy('bar')
-        .whereEqualTo('baz', 42);
+        .where('baz', isEqualTo: 42);
     expect(query2, query);
 
     final Query query3 = firestore
         .collection('foo')
         .orderBy('BAR')
-        .whereEqualTo('baz', 42);
+        .where('baz', isEqualTo: 42);
     expect(query, isNot(query3));
 
     final FirebaseFirestore otherFirestore = await testFirestore();
     final Query query4 = otherFirestore
         .collection('foo')
         .orderBy('bar')
-        .whereEqualTo('baz', 42);
+        .where('baz', isEqualTo: 42);
     expect(query4, isNot(query));
   });
 
@@ -1117,7 +1117,7 @@ void main() {
 
     // Assert
     final DocumentSnapshot doc = await documentReference.get();
-    expect(doc.data, data);
+    expect(doc.data(), data);
     expect(doc.metadata.isFromCache, isFalse);
   });
 
@@ -1141,14 +1141,14 @@ void main() {
 
     // The network is offline and we return a cached result.
     DocumentSnapshot doc = await documentReference.get();
-    expect(doc.data, data);
+    expect(doc.data(), data);
     expect(doc.metadata.isFromCache, isTrue);
 
     // Enable the network and fetch the document again.
     await firestore.enableNetwork();
     await pendingWrite;
     doc = await documentReference.get();
-    expect(doc.data, data);
+    expect(doc.data(), data);
     expect(doc.metadata.isFromCache, isFalse);
   });
 
@@ -1261,7 +1261,7 @@ void main() {
     final FirebaseFirestore firestore = await testFirestore();
     final StreamSubscription<QuerySnapshot> subscription = firestore
         .collection('abc')
-        .snapshots
+        .snapshots()
         .listen((_) {});
     await Future<void>.delayed(const Duration(milliseconds: 100));
 
@@ -1279,7 +1279,7 @@ void main() {
     final Completer<void> done = Completer<void>();
 
     final StreamSubscription<DocumentSnapshot> docSubscription =
-        documentReference.snapshots.listen((DocumentSnapshot value) {
+        documentReference.snapshots().listen((DocumentSnapshot value) {
           events.add('doc');
           if (!gotInitialSnapshot.isCompleted) {
             gotInitialSnapshot.complete();
@@ -1289,7 +1289,7 @@ void main() {
     events.clear();
 
     final StreamSubscription<void>
-    inSyncSubscription = documentReference.firestore.snapshotsInSync.listen((
+    inSyncSubscription = documentReference.firestore.snapshotsInSync().listen((
       _,
     ) {
       events.add('snapshots-in-sync');
@@ -1326,7 +1326,7 @@ void main() {
 
     await documentReference.update(<String, Object?>{'a': <String, Object?>{}});
     final DocumentSnapshot snapshot = await documentReference.get();
-    expect(snapshot.data, <String, Object?>{'a': <String, Object?>{}});
+    expect(snapshot.data(), <String, Object?>{'a': <String, Object?>{}});
   });
 
   test('testMergeWithEmptyObjectReplacesAllFields', () async {
@@ -1335,9 +1335,9 @@ void main() {
 
     await documentReference.set(<String, Object?>{
       'a': <String, Object?>{},
-    }, SetOptions.mergeAllFields);
+    }, const SetOptions(merge: true));
     final DocumentSnapshot snapshot = await documentReference.get();
-    expect(snapshot.data, <String, Object?>{'a': <String, Object?>{}});
+    expect(snapshot.data(), <String, Object?>{'a': <String, Object?>{}});
   });
 
   test('testMaintainsPersistenceAfterRestarting', () async {
@@ -1368,9 +1368,9 @@ void main() {
         );
     final DocumentSnapshot doc = await firestore2
         .doc(docRef.path)
-        .get(Source.cache);
+        .get(GetOptions(source: Source.cache));
     expect(doc.exists, isTrue);
-    expect(doc.data, <String, Object?>{'foo': 'bar'});
+    expect(doc.data(), <String, Object?>{'foo': 'bar'});
   });
 
   // The message of errors that are wrapped into a FirestoreError by the document operations is prefixed with the type
@@ -1457,13 +1457,16 @@ void main() {
 
     final DocumentReference docRef = db1.collection('col1').doc(autoId());
     await docRef.set(<String, Object?>{'foo': 'bar'});
-    expect((await docRef.get(Source.server)).get('foo'), 'bar');
+    expect(
+      (await docRef.get(GetOptions(source: Source.server))).get('foo'),
+      'bar',
+    );
 
     final DocumentReference docRef2 = db2.doc(docRef.path);
 
     // db2 never saw the document: it is neither in its cache nor on the server (a different named database).
     await expectLater(
-      docRef2.get(Source.cache),
+      docRef2.get(GetOptions(source: Source.cache)),
       throwsA(
         isA<FirestoreException>().having(
           (FirestoreException e) => e.errorCode,
@@ -1472,7 +1475,10 @@ void main() {
         ),
       ),
     );
-    expect((await docRef2.get(Source.server)).exists, isFalse);
+    expect(
+      (await docRef2.get(GetOptions(source: Source.server))).exists,
+      isFalse,
+    );
     expect((await docRef2.get()).exists, isFalse);
   });
 
@@ -1490,10 +1496,12 @@ void main() {
     final DocumentReference doc = db.collection('abc').doc('123');
     await doc.set(<String, Object?>{'key': 'value'});
 
-    final DocumentSnapshot snapshot = await doc.get(Source.cache);
+    final DocumentSnapshot snapshot = await doc.get(
+      GetOptions(source: Source.cache),
+    );
     expect(snapshot.exists, isTrue);
     expect(snapshot.metadata.isFromCache, isTrue);
-    expect(snapshot.data, <String, Object?>{'key': 'value'});
+    expect(snapshot.data(), <String, Object?>{'key': 'value'});
   });
 
   test('testCannotGetDocumentWithMemoryEagerGcEnabled', () async {
@@ -1513,7 +1521,7 @@ void main() {
     await doc.set(<String, Object?>{'key': 'value'});
 
     await expectLater(
-      doc.get(Source.cache),
+      doc.get(GetOptions(source: Source.cache)),
       throwsA(
         isA<FirestoreException>().having(
           (FirestoreException e) => e.errorCode,
@@ -1593,7 +1601,7 @@ void main() {
       final CollectionReference colRef = await testCollectionWithDocs(idDocs);
       await IntegrationTestUtil.assertSDKQueryResultsConsistentWithBackend(
         colRef,
-        colRef.orderByField(FieldPath.documentId),
+        colRef.orderBy(FieldPath.documentId),
         idDocs,
         idsInOrder,
       );
@@ -1604,9 +1612,9 @@ void main() {
       () async {
         final CollectionReference colRef = await testCollectionWithDocs(idDocs);
         final Query filtered = colRef
-            .whereGreaterThanField(FieldPath.documentId, '__id7__')
-            .whereLessThanOrEqualToField(FieldPath.documentId, 'A')
-            .orderByField(FieldPath.documentId);
+            .where(FieldPath.documentId, isGreaterThan: '__id7__')
+            .where(FieldPath.documentId, isLessThanOrEqualTo: 'A')
+            .orderBy(FieldPath.documentId);
         await IntegrationTestUtil.assertSDKQueryResultsConsistentWithBackend(
           colRef,
           filtered,
@@ -1620,7 +1628,7 @@ void main() {
       final CollectionReference colRef = await testCollectionWithDocs(idDocs);
       await IntegrationTestUtil.checkOnlineAndOfflineResultsMatch(
         colRef,
-        colRef.orderByField(FieldPath.documentId),
+        colRef.orderBy(FieldPath.documentId),
         idsInOrder,
       );
     });
@@ -1699,7 +1707,7 @@ void main() {
       final CollectionReference colRef = await testCollectionWithDocs(docs);
       await IntegrationTestUtil.assertSDKQueryResultsConsistentWithBackend(
         colRef,
-        colRef.orderByField(FieldPath.documentId),
+        colRef.orderBy(FieldPath.documentId),
         docs,
         <String>[
           'Sierpiński',
@@ -1855,7 +1863,7 @@ void main() {
       await doc.set(<String, Object?>{'foo': 'bar'});
 
       await expectLater(
-        doc.get(Source.cache),
+        doc.get(GetOptions(source: Source.cache)),
         throwsA(isA<FirestoreException>()),
       );
     });
@@ -1873,8 +1881,10 @@ void main() {
       final DocumentReference doc = instance.doc('coll/${autoId()}');
       await doc.set(<String, Object?>{'foo': 'bar'});
 
-      final DocumentSnapshot snap = await doc.get(Source.cache);
-      expect(snap.data, <String, Object?>{'foo': 'bar'});
+      final DocumentSnapshot snap = await doc.get(
+        GetOptions(source: Source.cache),
+      );
+      expect(snap.data(), <String, Object?>{'foo': 'bar'});
     });
 
     test('testNewCacheConfigForMemoryCache', () async {
@@ -1885,7 +1895,7 @@ void main() {
       await doc.set(<String, Object?>{'foo': 'bar'});
 
       await expectLater(
-        doc.get(Source.cache),
+        doc.get(GetOptions(source: Source.cache)),
         throwsA(isA<FirestoreException>()),
       );
     });
@@ -1897,8 +1907,10 @@ void main() {
       final DocumentReference doc = instance.doc('coll/${autoId()}');
       await doc.set(<String, Object?>{'foo': 'bar'});
 
-      final DocumentSnapshot snap = await doc.get(Source.cache);
-      expect(snap.data, <String, Object?>{'foo': 'bar'});
+      final DocumentSnapshot snap = await doc.get(
+        GetOptions(source: Source.cache),
+      );
+      expect(snap.data(), <String, Object?>{'foo': 'bar'});
     });
 
     test('testGetPersistentCacheIndexManager', () async {
@@ -1965,10 +1977,12 @@ void main() {
       final DocumentReference doc = await testDocument();
       await doc.set(<String, Object?>{'key': 'value'});
 
-      final DocumentSnapshot snapshot = await doc.get(Source.cache);
+      final DocumentSnapshot snapshot = await doc.get(
+        GetOptions(source: Source.cache),
+      );
       expect(snapshot.exists, isTrue);
       expect(snapshot.metadata.isFromCache, isTrue);
-      expect(snapshot.data, <String, Object?>{'key': 'value'});
+      expect(snapshot.data(), <String, Object?>{'key': 'value'});
     });
 
     test('can keep docs separate with multi-db when online', () async {
@@ -1993,23 +2007,23 @@ void main() {
       await ref1.set(data);
       final DocumentSnapshot snapshot1 = await ref1.get();
       expect(snapshot1.exists, isTrue);
-      expect(snapshot1.data, data);
+      expect(snapshot1.data(), data);
 
       final DocumentReference ref2 = db2.collection('users').doc(id);
-      final DocumentSnapshot snapshot2 = await ref2.get(Source.server);
+      final DocumentSnapshot snapshot2 = await ref2.get(
+        GetOptions(source: Source.server),
+      );
       expect(snapshot2.exists, isFalse);
     });
 
     test('can specify updated field multiple times', () async {
       final DocumentReference doc = await testDocument();
       await doc.set(<String, Object?>{});
-      await doc.updateFromList(<Object?>[
-        'field',
-        100,
-        FieldPath(<String>['field']),
-        200,
-      ]);
-      expect((await doc.get()).data, <String, Object?>{'field': 200});
+      await doc.update(<Object, Object?>{
+        'field': 100,
+        FieldPath(<String>['field']): 200,
+      });
+      expect((await doc.get()).data(), <String, Object?>{'field': 200});
     });
 
     test('listen can be called multiple times', () async {
@@ -2020,11 +2034,11 @@ void main() {
       final List<StreamSubscription<DocumentSnapshot>> subscriptions =
           <StreamSubscription<DocumentSnapshot>>[];
       subscriptions.add(
-        doc.snapshots.listen((_) {
+        doc.snapshots().listen((_) {
           if (!first.isCompleted) {
             first.complete();
             subscriptions.add(
-              doc.snapshots.listen((_) {
+              doc.snapshots().listen((_) {
                 if (!second.isCompleted) {
                   second.complete();
                 }
@@ -2049,7 +2063,7 @@ void main() {
 
       Future<Object> listenError(Query query) {
         final Completer<Object> error = Completer<Object>();
-        query.snapshots.listen(
+        query.snapshots().listen(
           (_) {},
           onError: (Object e) {
             if (!error.isCompleted) {
@@ -2098,13 +2112,13 @@ void main() {
         final FirebaseFirestore firestore = await testFirestore();
         final Query query1 = firestore
             .collection('foo')
-            .whereGreaterThanOrEqualTo('x', 42)
-            .whereNotEqualTo('y', 42)
+            .where('x', isGreaterThanOrEqualTo: 42)
+            .where('y', isNotEqualTo: 42)
             .orderBy('z');
         final Query query2 = firestore
             .collection('foo')
-            .whereGreaterThanOrEqualTo('x', 42)
-            .whereNotEqualTo('y', 42)
+            .where('x', isGreaterThanOrEqualTo: 42)
+            .where('y', isNotEqualTo: 42)
             .orderBy('z');
         expect(query1, query2);
         expect(query1.hashCode, query2.hashCode);
@@ -2112,8 +2126,8 @@ void main() {
         // The inequality fields in a different order.
         final Query query3 = firestore
             .collection('foo')
-            .whereNotEqualTo('y', 42)
-            .whereGreaterThanOrEqualTo('x', 42)
+            .where('y', isNotEqualTo: 42)
+            .where('x', isGreaterThanOrEqualTo: 42)
             .orderBy('z');
         expect(query1, isNot(query3));
       },

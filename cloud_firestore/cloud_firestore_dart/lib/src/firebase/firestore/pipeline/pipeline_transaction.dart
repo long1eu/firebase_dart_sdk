@@ -36,12 +36,12 @@ const Set<String> _writeStages = <String>{
 /// in any release and needs a Firestore Enterprise edition database.
 extension TransactionPipelines on Transaction {
   /// Executes [pipeline] on the server inside this transaction. Only in a
-  /// read-only transaction (`TransactionOptions(readOnly: true)`): the
+  /// read-only transaction (`runTransaction(..., readOnly: true)`): the
   /// pipeline reads the snapshot of the database that every read of the
   /// transaction sees.
   ///
   /// In a read-write transaction the returned Future fails with a
-  /// `FirestoreError` with code `invalidArgument`, as for
+  /// `FirestoreException` with code `invalidArgument`, as for
   /// `Transaction.getQuery`: such a transaction verifies at commit that the
   /// documents it read did not change, which is not possible for the results
   /// of a pipeline. A pipeline with a write stage (`delete`, `update`,

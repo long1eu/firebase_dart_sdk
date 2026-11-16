@@ -103,7 +103,9 @@ void main() {
         ];
 
         final Map<String, Map<String, Object?>> server = docsById(
-          await oracle.collection(config.collection).get(Source.server),
+          await oracle
+              .collection(config.collection)
+              .get(GetOptions(source: Source.server)),
         );
         // ignore: avoid_print
         print('scale soak: backend has ${server.length} documents');
@@ -576,7 +578,7 @@ class _Client {
       case 2:
         final int limit = 1 + random.nextInt(4);
         return _QueryListener(
-          collection.orderBy('v', Direction.descending).limit(limit),
+          collection.orderBy('v', descending: true).limit(limit),
           _Expectation.top(limit),
         );
       default:
@@ -633,7 +635,7 @@ class _Client {
     } else if (roll < 24) {
       _track(
         'merge ${doc.id} v=$value',
-        doc.set(<String, Object?>{'v': value}, SetOptions.mergeAllFields),
+        doc.set(<String, Object?>{'v': value}, const SetOptions(merge: true)),
       );
     } else if (roll < 32) {
       _track(
@@ -645,7 +647,7 @@ class _Client {
         'increment ${doc.id}',
         doc.set(<String, Object?>{
           'c': FieldValue.increment(1),
-        }, SetOptions.mergeAllFields),
+        }, const SetOptions(merge: true)),
       );
     } else if (roll < 46) {
       final int tag = random.nextInt(4);
@@ -656,7 +658,7 @@ class _Client {
           'tags': add
               ? FieldValue.arrayUnion(<Object?>[tag])
               : FieldValue.arrayRemove(<Object?>[tag]),
-        }, SetOptions.mergeAllFields),
+        }, const SetOptions(merge: true)),
       );
     } else if (roll < 52) {
       _track('delete ${doc.id}', doc.delete());
@@ -669,7 +671,7 @@ class _Client {
               ..set(doc, <String, Object?>{'v': value, 'batch': id})
               ..set(second, <String, Object?>{
                 'b': FieldValue.increment(1),
-              }, SetOptions.mergeAllFields)
+              }, const SetOptions(merge: true))
               ..delete(third))
             .commit(),
       );
@@ -713,8 +715,8 @@ class _Client {
                 .get(first);
             final DocumentSnapshot<Map<String, Object?>> b = await transaction
                 .get(second);
-            final Object? va = a.data?['v'];
-            final Object? vb = b.data?['v'];
+            final Object? va = a.data()?['v'];
+            final Object? vb = b.data()?['v'];
             transaction.set(first, <String, Object?>{
               'v': (va is int ? va : 0) + 1,
               'tx': id,
@@ -723,7 +725,7 @@ class _Client {
               transaction.set(second, <String, Object?>{
                 'v': (vb is int ? vb : 0) + 1,
                 'tx': id,
-              }, SetOptions.mergeAllFields);
+              }, const SetOptions(merge: true));
             }
           })
           .timeout(const Duration(seconds: 60)),
@@ -856,7 +858,7 @@ class _Client {
       found.addAll(listeners[i].problems('$id listener $i'));
     }
     final QuerySnapshot<Map<String, Object?>> cached = await collection.get(
-      Source.cache,
+      GetOptions(source: Source.cache),
     );
     final String cache = _describe(docsById(cached));
     if (cache != _describe(server)) {
@@ -1015,7 +1017,7 @@ class _QueryListener implements _Listener {
           RecordingListener.idsOf(last).join(',') == ids.join(',') &&
           last.docs.every(
             (QueryDocumentSnapshot<Map<String, Object?>> doc) =>
-                _describe(<String, Map<String, Object?>>{doc.id: doc.data}) ==
+                _describe(<String, Map<String, Object?>>{doc.id: doc.data()}) ==
                 _describe(<String, Map<String, Object?>>{
                   doc.id: server[doc.id]!,
                 }),
@@ -1036,9 +1038,7 @@ class _QueryListener implements _Listener {
 class _DocListener implements _Listener {
   _DocListener(this.doc) {
     _subscription = doc
-        .getSnapshotsWithOptions(
-          const SnapshotListenOptions(metadataChanges: MetadataChanges.include),
-        )
+        .snapshots(includeMetadataChanges: true)
         .listen(_events.add, onError: _errors.add);
   }
 
@@ -1072,7 +1072,7 @@ class _DocListener implements _Listener {
           !last.metadata.hasPendingWrites &&
           last.exists == (expected != null) &&
           (expected == null ||
-              _describe(<String, Map<String, Object?>>{doc.id: last.data!}) ==
+              _describe(<String, Map<String, Object?>>{doc.id: last.data()!}) ==
                   _describe(<String, Map<String, Object?>>{doc.id: expected}));
     }
 
@@ -1080,7 +1080,7 @@ class _DocListener implements _Listener {
       settled,
       () =>
           'expected $expected, events: ${_events.reversed.take(4).map((DocumentSnapshot<Map<String, Object?>> s) => 'fromCache=${s.metadata.isFromCache} '
-              'pending=${s.metadata.hasPendingWrites} ${s.data}').join(' | ')}',
+              'pending=${s.metadata.hasPendingWrites} ${s.data()}').join(' | ')}',
       timeout,
     );
   }

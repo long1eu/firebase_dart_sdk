@@ -18,7 +18,7 @@ import 'util/to_string_helper.dart';
 ///
 /// * it calls [getAccessToken] before each request and stream; `forceRefresh` is `true` after the
 ///   backend answered `unauthenticated`;
-/// * when [getAccessToken] throws `FirebaseNoSignedInUserError` or `FirebaseApiNotAvailableError`,
+/// * when [getAccessToken] throws `FirebaseNoSignedInUserException` or `FirebaseApiNotAvailableException`,
 ///   the request goes out without a token; any other error fails it with `unauthenticated`;
 /// * it reads [uid] to keep the cache and the pending writes of each user apart, and restarts its
 ///   streams when [onTokenChanged] emits a token of another user.
@@ -29,7 +29,7 @@ import 'util/to_string_helper.dart';
 /// import 'package:firebase_app_dart/firebase_app_dart.dart';
 ///
 /// /// A provider for tokens that your program gets elsewhere.
-/// class StaticTokenProvider extends InternalTokenProvider {
+/// class StaticTokenProvider extends AuthTokenProvider {
 ///   StaticTokenProvider(this.token, this.uid);
 ///
 ///   final String? token;
@@ -41,14 +41,14 @@ import 'util/to_string_helper.dart';
 ///   Future<GetTokenResult> getAccessToken({required bool forceRefresh}) async {
 ///     final String? value = token;
 ///     if (value == null) {
-///       throw FirebaseNoSignedInUserError('No user is signed in.');
+///       throw FirebaseNoSignedInUserException('No user is signed in.');
 ///     }
 ///     return GetTokenResult(value);
 ///   }
 ///
 ///   @override
-///   Stream<InternalTokenResult> get onTokenChanged =>
-///       const Stream<InternalTokenResult>.empty();
+///   Stream<AuthTokenChange> get onTokenChanged =>
+///       const Stream<AuthTokenChange>.empty();
 /// }
 /// ```
 abstract class AuthTokenProvider {
@@ -58,7 +58,7 @@ abstract class AuthTokenProvider {
   /// Returns a valid token.
   ///
   /// [forceRefresh] asks for a new token even when the current one has not expired; callers set it
-  /// only when the token was invalidated out of band. Throw `FirebaseNoSignedInUserError` when
+  /// only when the token was invalidated out of band. Throw `FirebaseNoSignedInUserException` when
   /// there is no user.
   Future<GetTokenResult> getAccessToken({required bool forceRefresh});
 
@@ -71,14 +71,14 @@ abstract class AuthTokenProvider {
   Stream<AuthTokenChange> get onTokenChanged;
 }
 
-/// An event of `InternalTokenProvider.onTokenChanged`: the new token, empty after a sign-out.
+/// An event of `AuthTokenProvider.onTokenChanged`: the new token, empty after a sign-out.
 ///
 /// [toString] does not show the token.
 ///
 /// ```dart
 /// import 'package:firebase_app_dart/firebase_app_dart.dart';
 ///
-/// const InternalTokenResult signedOut = InternalTokenResult('');
+/// const AuthTokenChange signedOut = AuthTokenChange('');
 /// ```
 class AuthTokenChange {
   /// Creates a result holding [token].

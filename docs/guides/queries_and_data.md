@@ -12,10 +12,10 @@ import 'package:cloud_firestore_dart/cloud_firestore_dart.dart';
 import 'package:firebase_app_dart/firebase_app_dart.dart';
 
 // `app` is a FirebaseApp created with firebase_app_dart.
-final firestore = Firestore.instanceFor(app: app);
+final firestore = FirebaseFirestore.instanceFor(app: app);
 final users = firestore.collection('users');
 await users.doc('ada').set({'name': 'Ada', 'age': 36});
-final adults = await users.whereGreaterThanOrEqualTo('age', 18).get();
+final adults = await users.where('age', isGreaterThanOrEqualTo: 18).get();
 ```
 
 (Filters are the Java-style `whereEqualTo`, `whereGreaterThan`, ... family, plus
@@ -35,14 +35,14 @@ final agg = await users.aggregate([
 ]).get();
 final either = await users
     .where(Filter.or([
-      Filter.equalTo('city', 'Paris'),
-      Filter.equalTo('city', 'Rome'),
+      Filter('city', isEqualTo: 'Paris'),
+      Filter('city', isEqualTo: 'Rome'),
     ]))
     .get();
 final last3 = await users.orderBy('age').limitToLast(3).get();
 final near = await users
-    .findNearest('embedding', FieldValue.vector([0.1, 0.2, 0.3]), 5,
-        DistanceMeasure.cosine)
+    .findNearest(vectorField: 'embedding', queryVector: VectorValue([0.1, 0.2, 0.3]), limit: 5,
+        distanceMeasure: DistanceMeasure.cosine)
     .get();
 ```
 
@@ -61,20 +61,20 @@ class City {
 }
 
 final converter = FirestoreDataConverter<City>.from(
-  fromFirestore: (snapshot, options) => City.fromMap(snapshot.data!),
+  fromFirestore: (snapshot, options) => City.fromMap(snapshot.data()!),
   toFirestore: (city, options) => city.toMap(),
 );
 
-final cities = firestore.collection('cities').withConverter<City>(converter);
+final cities = firestore.collection('cities').withConverter<City>(fromFirestore: converter.fromFirestore, toFirestore: converter.toFirestore);
 await cities.doc('sf').set(const City('San Francisco', 870000));   // CollectionReference<City>
-final City sf = (await cities.doc('sf').get()).data!;               // DocumentSnapshot<City>
-final big = await cities.whereGreaterThan('population', 500000).get();
-final names = [for (final c in big.docs) c.data.name];              // QueryDocumentSnapshot<City>
+final City sf = (await cities.doc('sf').get()).data()!;               // DocumentSnapshot<City>
+final big = await cities.where('population', isGreaterThan: 500000).get();
+final names = [for (final c in big.docs) c.data().name];              // QueryDocumentSnapshot<City>
 final raw = cities.withoutConverter();                              // back to Map<String, Object?>
 ```
 
-`withConverter` exists on `DocumentReference`, `CollectionReference` and `Query`; `update` and
-`updateFromList` always take raw field maps. A bare `DocumentSnapshot` or `Query` annotation (no
+`withConverter` exists on `DocumentReference`, `CollectionReference` and `Query`; `update`
+always takes raw field maps. A bare `DocumentSnapshot` or `Query` annotation (no
 type argument) means `dynamic` data, so annotate as `DocumentSnapshot<Map<String, Object?>>`
 when you want static typing for raw maps (values returned by `firestore.collection(...)` etc. are
 already `Map<String, Object?>`).
@@ -85,31 +85,31 @@ See [Offline persistence](offline_persistence.md) for the cache settings and
 [Transactions and the lifecycle](transactions_and_lifecycle.md) for `terminate()`.
 
 ```dart
-final settings = FirestoreSettings(
+final settings = Settings(
     cacheSettings: PersistentCacheSettings(sizeBytes: 100 * 1024 * 1024));
 final task = firestore.loadBundle(bundleBytes);          // LoadBundleTask
 final json = (await query.get()).toJson();               // e.g. sent from a server to a client
 final snapshot = QuerySnapshot.fromJson(firestore, json);
 firestore.querySnapshotsFromJson(json).listen((_) {});   // resumes listening from that snapshot
 await firestore.waitForPendingWrites();
-firestore.snapshotsInSync.listen((_) {});
+firestore.snapshotsInSync().listen((_) {});
 await firestore.terminate();
 ```
 
 ## Coming from FlutterFire or the JS SDK
 
 The API follows the Android SDK, with FlutterFire's spelling where the two differ only in name
-(`Firestore.instanceFor`, `doc`, `docs`, `docChanges`, `where(field, isEqualTo: ...)`,
+(`FirebaseFirestore.instanceFor`, `doc`, `docs`, `docChanges`, `where(field, isEqualTo: ...)`,
 `databaseId`). Where the shapes differ, there is one way, not both:
 
 | FlutterFire / JS | This package |
 |---|---|
-| `ref.get(const GetOptions(source: Source.cache))` | `ref.get(Source.cache)` (same `Source` values) |
-| `GetOptions(serverTimestampBehavior: ...)` / JS `data({serverTimestamps: ...})` | `snapshot.getData(ServerTimestampBehavior.estimate)`, or `get(field, behavior)` per field |
-| JS `getDocFromCache(ref)` / `getDocFromServer(ref)` | `ref.get(Source.cache)` / `ref.get(Source.server)` |
-| `snapshot.data()` | `snapshot.data` (a getter) |
-| `SetOptions(merge: true)` | `SetOptions.mergeAllFields` |
-| `SetOptions(mergeFields: ['a', FieldPath(...)])` | `SetOptions.mergeFields(['a'])` / `SetOptions.mergeFieldPaths([...])` |
+| `ref.get(const GetOptions(source: Source.cache))` | `ref.get(const GetOptions(source: Source.cache))` (same `Source` values) |
+| `GetOptions(serverTimestampBehavior: ...)` / JS `data({serverTimestamps: ...})` | `snapshot.data(serverTimestamps: ServerTimestampBehavior.estimate)`, or `get(field, behavior)` per field |
+| JS `getDocFromCache(ref)` / `getDocFromServer(ref)` | `ref.get(const GetOptions(source: Source.cache))` / `ref.get(const GetOptions(source: Source.server))` |
+| `snapshot.data()` | `snapshot.data()` (a getter) |
+| `SetOptions(merge: true)` | `const SetOptions(merge: true)` |
+| `SetOptions(mergeFields: ['a', FieldPath(...)])` | `SetOptions(mergeFields: ['a'])` / `SetOptions(mergeFields: [...])` |
 
 A `GetOptions` class would only add the server timestamp default of FlutterFire, which is a
 property of reading the data rather than of fetching it; `SnapshotOptions` (with

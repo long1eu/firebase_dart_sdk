@@ -199,25 +199,25 @@ void main() {
     test('estimate returns the local write time as a Timestamp', () {
       final DocumentSnapshot snap =
           snapshotWith(ServerTimestampValue(const Timestamp(100, 0), null));
-      expect(snap.get('ts', ServerTimestampBehavior.estimate),
+      expect(snap.get('ts', serverTimestamps: ServerTimestampBehavior.estimate),
           const Timestamp(100, 0));
-      expect(snap.getTimestamp('ts', ServerTimestampBehavior.estimate),
+      expect(snap.get('ts', serverTimestamps: ServerTimestampBehavior.estimate) as Timestamp?,
           const Timestamp(100, 0));
     });
 
     test('estimate can be read as a DateTime', () {
       final DocumentSnapshot snap =
           snapshotWith(ServerTimestampValue(const Timestamp(100, 0), null));
-      expect(snap.getDate('ts', ServerTimestampBehavior.estimate),
+      expect((snap.get('ts', serverTimestamps: ServerTimestampBehavior.estimate) as Timestamp?)?.toDate(),
           DateTime.fromMillisecondsSinceEpoch(100 * 1000));
     });
 
     test('previous returns the previous Timestamp value as a DateTime', () {
       final DocumentSnapshot snap = snapshotWith(ServerTimestampValue(
           const Timestamp(100, 0), util.wrap(const Timestamp(50, 0))));
-      expect(snap.getDate('ts', ServerTimestampBehavior.previous),
+      expect((snap.get('ts', serverTimestamps: ServerTimestampBehavior.previous) as Timestamp?)?.toDate(),
           DateTime.fromMillisecondsSinceEpoch(50 * 1000));
-      expect(snap.getTimestamp('ts', ServerTimestampBehavior.previous),
+      expect(snap.get('ts', serverTimestamps: ServerTimestampBehavior.previous) as Timestamp?,
           const Timestamp(50, 0));
     });
 
@@ -225,14 +225,14 @@ void main() {
       final DocumentSnapshot snap = snapshotWith(ServerTimestampValue(
           const Timestamp(100, 0),
           util.wrap(<String, Object>{'a': const Timestamp(50, 0)})));
-      expect(snap.get('ts', ServerTimestampBehavior.previous),
+      expect(snap.get('ts', serverTimestamps: ServerTimestampBehavior.previous),
           <String, Object>{'a': const Timestamp(50, 0)});
     });
 
     test('none returns null', () {
       final DocumentSnapshot snap =
           snapshotWith(ServerTimestampValue(const Timestamp(100, 0), null));
-      expect(snap.get('ts', ServerTimestampBehavior.none), isNull);
+      expect(snap.get('ts', serverTimestamps: ServerTimestampBehavior.none), isNull);
       expect(snap.get('ts'), isNull);
     });
   });

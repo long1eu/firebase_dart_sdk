@@ -1,3 +1,31 @@
+## 0.2.0 (unreleased)
+
+Breaking: the public API takes the names and shapes of FlutterFire's `cloud_firestore` and of
+Dart, instead of those of the Android SDK. The implementation did not change. Every change, with
+its FlutterFire equivalent, is in
+[docs/api_migration_0_2.md](https://github.com/long1eu/firebase_dart_sdk/blob/main/docs/api_migration_0_2.md).
+
+- `Firestore` is `FirebaseFirestore` and `FirestoreSettings` is `Settings` (the old names stay as
+  deprecated aliases); `instanceFor(databaseId: ...)`; `FirebaseFirestore.instance` creates the
+  default instance when there is none.
+- `snapshots()`, `snapshotsInSync()` and `data()` are methods; `get([GetOptions])`;
+  `snapshots({includeMetadataChanges, source})` replaces `getSnapshots` and
+  `getSnapshotsWithOptions`.
+- One `where`, `orderBy(field, descending: ...)`, `Filter(field, isEqualTo: ...)`,
+  `update(Map<Object, Object?>)` with `String` or `FieldPath` keys, `SetOptions(merge: ...,
+  mergeFields: ...)`, `withConverter(fromFirestore: ..., toFirestore: ...)` and
+  `findNearest` with named arguments replace the Java-style overloads and options objects.
+- `DocumentSnapshot.get(field)` takes a `String` or a `FieldPath`; the typed getters
+  (`getString`, `getInt`, ...) are gone. `DocumentSnapshot.reference`, `DocumentChange.doc`,
+  `QuerySnapshot.size`, `FieldPath(...)`, `FieldPath.fromString`, `FieldPath.documentId`.
+- Errors are `FirestoreException`, which extends `FirebaseException` and implements
+  `Exception`: `code` is FlutterFire's string (`'not-found'`), `errorCode` the
+  `FirestoreErrorCode` enum.
+- Fixes: `VectorQuery.get` applies the converter of its query; `QuerySnapshot.docChanges`
+  includes metadata-only changes when the listen asked for them; the settings of an instance
+  can be read back (`FirebaseFirestore.settings`); `LogLevel.info`, which logged like `warn`,
+  is removed.
+
 ## 0.1.1
 
 Documentation and examples only. The library behaves exactly as in 0.1.0; the only code

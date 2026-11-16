@@ -31,19 +31,19 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/vector_query.dart';
 /// ```
 ///
 /// The documents are untyped: a converter of the query is not applied.
-class VectorQuerySnapshot extends Iterable<QueryDocumentSnapshot> {
+class VectorQuerySnapshot<T> extends Iterable<QueryDocumentSnapshot<T>> {
   /// Implementation detail of the SDK; not part of the supported API.
-  VectorQuerySnapshot._(this.query, List<QueryDocumentSnapshot> docs)
-    : docs = List<QueryDocumentSnapshot>.unmodifiable(docs);
+  VectorQuerySnapshot._(this.query, List<QueryDocumentSnapshot<T>> docs)
+    : docs = List<QueryDocumentSnapshot<T>>.unmodifiable(docs);
 
   /// The query that produced this snapshot.
-  final VectorQuery query;
+  final VectorQuery<T> query;
 
   /// The documents, ordered by distance (nearest first).
-  final List<QueryDocumentSnapshot> docs;
+  final List<QueryDocumentSnapshot<T>> docs;
 
   @override
-  Iterator<QueryDocumentSnapshot> get iterator => docs.iterator;
+  Iterator<QueryDocumentSnapshot<T>> get iterator => docs.iterator;
 
   @override
   int get length => docs.length;
@@ -53,10 +53,10 @@ class VectorQuerySnapshot extends Iterable<QueryDocumentSnapshot> {
 }
 
 /// Members of [VectorQuerySnapshot] for the SDK itself. Not exported by the public libraries.
-extension VectorQuerySnapshotInternal on VectorQuerySnapshot {
+extension VectorQuerySnapshotInternal<T> on VectorQuerySnapshot<T> {
   /// The snapshot of [query] with the documents [docs], nearest first.
-  static VectorQuerySnapshot create(
-    VectorQuery query,
-    List<QueryDocumentSnapshot> docs,
-  ) => VectorQuerySnapshot._(query, docs);
+  static VectorQuerySnapshot<T> create<T>(
+    VectorQuery<T> query,
+    List<QueryDocumentSnapshot<T>> docs,
+  ) => VectorQuerySnapshot<T>._(query, docs);
 }

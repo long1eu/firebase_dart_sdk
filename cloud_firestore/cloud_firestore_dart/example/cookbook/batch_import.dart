@@ -46,6 +46,6 @@ Future<void> main() async {
     print('written $written of ${rows.length}');
   }
 
-  print('count on the server: ${(await cities.count().get()).getCount()}');
+  print('count on the server: ${(await cities.count().get()).count}');
   await firestore.terminate();
 }

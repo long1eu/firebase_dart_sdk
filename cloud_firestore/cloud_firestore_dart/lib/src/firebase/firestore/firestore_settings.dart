@@ -7,9 +7,9 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/local_cache_settings
 import 'package:cloud_firestore_dart/src/firebase/firestore/long_polling_options.dart';
 import 'package:collection/collection.dart';
 
-/// The settings of a `Firestore` instance: the backend it talks to, its local cache and its transport options.
+/// The settings of a `FirebaseFirestore` instance: the backend it talks to, its local cache and its transport options.
 ///
-/// Pass them to `Firestore.instanceFor` when you create the instance; they cannot change while the instance runs
+/// Pass them to `FirebaseFirestore.instanceFor` when you create the instance; they cannot change while the instance runs
 /// (a later `instanceFor` call with different settings throws a [StateError]). The settings are immutable: derive
 /// new ones with [copyWith] and [withEmulator]. Every argument is checked in the constructor, which throws an
 /// [ArgumentError] for an invalid value.
@@ -18,15 +18,15 @@ import 'package:collection/collection.dart';
 /// `instanceFor` gets an `openDatabase` function and in memory otherwise.
 ///
 /// ```dart
-/// final Firestore firestore = Firestore.instanceFor(
+/// final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(
 ///   app: app,
-///   settings: FirestoreSettings(
+///   settings: Settings(
 ///     cacheSettings: PersistentCacheSettings(sizeBytes: 50 * 1024 * 1024),
 ///   ),
 /// );
 ///
 /// // Against the emulator.
-/// final FirestoreSettings emulator = FirestoreSettings().withEmulator(
+/// final Settings emulator = Settings().withEmulator(
 ///   '127.0.0.1',
 ///   8080,
 /// );
@@ -154,7 +154,7 @@ class Settings {
   /// Enables or disables local persistent storage. The default is to use local
   /// persistent storage.
   ///
-  /// The cache is only persistent when `Firestore.instanceFor` also gets an `openDatabase` function; without one the
+  /// The cache is only persistent when `FirebaseFirestore.instanceFor` also gets an `openDatabase` function; without one the
   /// cache is in memory even when this is true.
   ///
   /// When [cacheSettings] is set this is derived from it: true for
@@ -181,11 +181,11 @@ class Settings {
   /// settings.
   ///
   /// As with [persistenceEnabled], [PersistentCacheSettings] only give a persistent cache when
-  /// `Firestore.instanceFor` gets an `openDatabase` function.
+  /// `FirebaseFirestore.instanceFor` gets an `openDatabase` function.
   ///
   /// ```dart
   /// // A memory cache that keeps up to 10 MB of recently used documents.
-  /// final FirestoreSettings settings = FirestoreSettings(
+  /// final Settings settings = Settings(
   ///   cacheSettings: MemoryCacheSettings(
   ///     gcSettings: MemoryLruGcSettings(sizeBytes: 10 * 1024 * 1024),
   ///   ),
@@ -210,7 +210,7 @@ class Settings {
   /// for the listen and write streams, instead of a streamed HTTP response.
   /// For networks with a proxy or an antivirus that buffers responses, which
   /// otherwise shows as listeners and writes that never complete. Less
-  /// efficient. Same as `experimentalForceLongPolling` of the JS SDK. Cannot be
+  /// efficient. Same as `webExperimentalForceLongPolling` of the JS SDK. Cannot be
   /// combined with [webExperimentalAutoDetectLongPolling].
   final bool webExperimentalForceLongPolling;
 
@@ -222,9 +222,9 @@ class Settings {
   final bool webExperimentalAutoDetectLongPolling;
 
   /// Web only: options of long polling, see [WebExperimentalLongPollingOptions].
-  /// Same as `experimentalLongPollingOptions` of the JS SDK. Throws an
-  /// [ArgumentError] when [WebExperimentalLongPollingOptions.timeoutSeconds] is
-  /// NaN or not between 5 and 30.
+  /// Same as `webExperimentalLongPollingOptions` of the JS SDK. Throws an
+  /// [ArgumentError] when [WebExperimentalLongPollingOptions.timeoutDuration] is
+  /// not between 5 and 30 seconds.
   final WebExperimentalLongPollingOptions webExperimentalLongPollingOptions;
 
   /// The minimum long-polling timeout is hard-coded on the server, which
@@ -241,11 +241,6 @@ class Settings {
   ) {
     final num? timeoutSeconds = options.timeoutSeconds;
     if (timeoutSeconds != null) {
-      if (timeoutSeconds.isNaN) {
-        throw ArgumentError(
-          'invalid long polling timeout: $timeoutSeconds (must not be NaN)',
-        );
-      }
       if (timeoutSeconds < _minLongPollingTimeoutSeconds) {
         throw ArgumentError(
           'invalid long polling timeout: $timeoutSeconds '
@@ -295,7 +290,7 @@ class Settings {
   static bool _resolveAutoDetectLongPolling(bool force, bool? autoDetect) {
     if (force && autoDetect == true) {
       throw ArgumentError(
-        'experimentalForceLongPolling and experimentalAutoDetectLongPolling '
+        'webExperimentalForceLongPolling and webExperimentalAutoDetectLongPolling '
         'cannot be used together.',
       );
     }
@@ -440,9 +435,9 @@ class Settings {
   /// ([defaultHost]).
   ///
   /// ```dart
-  /// final Firestore firestore = Firestore.instanceFor(
+  /// final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(
   ///   app: app,
-  ///   settings: FirestoreSettings().withEmulator(
+  ///   settings: Settings().withEmulator(
   ///     '127.0.0.1',
   ///     8080,
   ///     mockUserToken: {'sub': 'alice'},
@@ -474,8 +469,8 @@ class Settings {
   /// [ArgumentError].
   ///
   /// ```dart
-  /// final FirestoreSettings base = FirestoreSettings();
-  /// final FirestoreSettings memory = base.copyWith(
+  /// final Settings base = Settings();
+  /// final Settings memory = base.copyWith(
   ///   cacheSettings: const MemoryCacheSettings(),
   /// );
   /// ```
@@ -605,12 +600,12 @@ class Settings {
 
   @override
   String toString() =>
-      'FirestoreSettings{host=$host, port=$port, sslEnabled=$sslEnabled, '
+      'Settings{host=$host, port=$port, sslEnabled=$sslEnabled, '
       'persistenceEnabled=$persistenceEnabled, cacheSizeBytes=$cacheSizeBytes, '
       'grpcFlowControlWindow=$grpcFlowControlWindow, cacheSettings=$cacheSettings, '
-      'experimentalForceLongPolling=$webExperimentalForceLongPolling, '
-      'experimentalAutoDetectLongPolling=$webExperimentalAutoDetectLongPolling, '
-      'experimentalLongPollingOptions=$webExperimentalLongPollingOptions, '
+      'webExperimentalForceLongPolling=$webExperimentalForceLongPolling, '
+      'webExperimentalAutoDetectLongPolling=$webExperimentalAutoDetectLongPolling, '
+      'webExperimentalLongPollingOptions=$webExperimentalLongPollingOptions, '
       // The token is a credential: only whether there is one.
       'mockUserToken=${mockUserToken == null ? null : '<set>'}}';
 }

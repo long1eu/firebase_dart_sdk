@@ -5,11 +5,11 @@
 import 'package:cloud_firestore_dart/src/firebase/firestore/document_snapshot.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/field_path.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/filter.dart';
-import 'package:cloud_firestore_dart/src/firebase/firestore/firestore_data_converter.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/query.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/query_snapshot.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/set_options.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/source.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/get_options.dart';
 import 'package:test/test.dart';
 
 import '../../../util/integration_test_util.dart';
@@ -19,7 +19,7 @@ const testCollectionWithDocs = IntegrationTestUtil.testCollectionWithDocs;
 
 String _nameFromFirestore(
         DocumentSnapshot<Map<String, Object?>> snapshot, Object? _) =>
-    snapshot.data!['name']! as String;
+    snapshot.data()!['name']! as String;
 
 Map<String, Object?> _nameToFirestore(String value, SetOptions? _) =>
     <String, Object?>{'name': value};
@@ -63,8 +63,8 @@ void main() {
     List<String> sorted(QuerySnapshot<Object?> snapshot) =>
         snapshot.docs.map((DocumentSnapshot<Object?> doc) => doc.id).toList()
           ..sort();
-    final List<String> server = sorted(await query.get(Source.server));
-    expect(sorted(await query.get(Source.cache)), server, reason: 'cache');
+    final List<String> server = sorted(await query.get(GetOptions(source: Source.server)));
+    expect(sorted(await query.get(GetOptions(source: Source.cache))), server, reason: 'cache');
     return server;
   }
 
@@ -113,9 +113,9 @@ void main() {
     expect(
         await ids(c
             .where(Filter.or(<Filter>[
-              Filter.equalTo('name', 'Ana'),
-              Filter.equalTo('name', 'Bob'),
-              Filter.equalTo('name', 'Cat'),
+              Filter('name', isEqualTo: 'Ana'),
+              Filter('name', isEqualTo: 'Bob'),
+              Filter('name', isEqualTo: 'Cat'),
             ]))
             .where('age', isGreaterThan: 17)),
         <String>['bob', 'cat']);
@@ -123,14 +123,12 @@ void main() {
 
   test('works on a query with a converter', () async {
     final CollectionReference c = await testCollectionWithDocs(people);
-    final Query<String> names = c.withConverter<String>(
-        const FirestoreDataConverter<String>.from(
-            fromFirestore: _nameFromFirestore, toFirestore: _nameToFirestore));
+    final Query<String> names = c.withConverter<String>(fromFirestore: _nameFromFirestore, toFirestore: _nameToFirestore);
 
     final QuerySnapshot<String> snapshot =
-        await names.where('age', isGreaterThan: 30).get(Source.server);
+        await names.where('age', isGreaterThan: 30).get(GetOptions(source: Source.server));
     expect(
-        snapshot.docs.map((DocumentSnapshot<String> d) => d.data).toList()
+        snapshot.docs.map((DocumentSnapshot<String> d) => d.data()).toList()
           ..sort(),
         <String>['Cat', 'Dan']);
   });

@@ -60,7 +60,7 @@ Future<void> main() async {
     page.subscription = ordered
         .startAtDocument(first.docs.first)
         .endAtDocument(first.docs.last)
-        .snapshots
+        .snapshots()
         .listen((QuerySnapshot<Map<String, Object?>> snapshot) {
           page.ids = <String>[for (final d in snapshot) d.id];
           changes.add(null);

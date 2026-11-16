@@ -138,7 +138,7 @@ Future<void> main() async {
   // An existing query can be converted; it returns the same documents.
   final Query<Map<String, Object?>> query = books
       .where('genre', isEqualTo: 'Science Fiction')
-      .orderBy('published', Direction.descending);
+      .orderBy('published', descending: true);
   snapshot = await firestore.pipeline().createFrom(query).execute();
   print(
     'query: ${[for (final doc in (await query.get()).docs) doc.id]}, '

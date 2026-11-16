@@ -967,7 +967,7 @@ void main() {
           forceLongPolling: true,
           autoDetectLongPolling: false,
           longPollingOptions:
-              const WebExperimentalLongPollingOptions(timeoutSeconds: 12.3456),
+              const WebExperimentalLongPollingOptions(timeoutDuration: Duration(milliseconds: 12346)),
         ),
         ChannelOptionsProvider(
           databaseId: databaseId,

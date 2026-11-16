@@ -22,22 +22,22 @@ void main() {
   final FirebaseApp app = FirebaseApp.withOptions(
     const FirebaseOptions(
       apiKey: 'demo-key',
-      applicationId: '1:1234567890:web:example',
+      appId: '1:1234567890:web:example',
       projectId: 'demo-example',
     ),
   );
-  final Firestore firestore = Firestore.instanceFor(
+  final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(
     app: app,
-    settings: FirestoreSettings().withEmulator('127.0.0.1', 8080),
+    settings: Settings().withEmulator('127.0.0.1', 8080),
   );
 
   final web.Element list = web.document.querySelector('#notes')!;
-  firestore.collection('notes').snapshots.listen((
+  firestore.collection('notes').snapshots().listen((
     QuerySnapshot<Map<String, Object?>> snapshot,
   ) {
     list.textContent = '';
     for (final QueryDocumentSnapshot<Map<String, Object?>> doc in snapshot.docs) {
-      list.append(web.document.createElement('li')..textContent = '${doc.data['text']}');
+      list.append(web.document.createElement('li')..textContent = '${doc.data()['text']}');
     }
   });
 }
@@ -89,20 +89,20 @@ response until it is complete; listeners and writes then never complete. Long po
 this: each back channel request returns as soon as it has data, or after a timeout, and the
 client sends the next one.
 
-- `experimentalAutoDetectLongPolling` is on by default. When the first back channel response of
+- `webExperimentalAutoDetectLongPolling` is on by default. When the first back channel response of
   a stream stays silent for 10 seconds, that stream switches to long polling. Every new stream
   detects again.
-- `experimentalForceLongPolling: true` uses long polling from the start. Use it when you know
+- `webExperimentalForceLongPolling: true` uses long polling from the start. Use it when you know
   the network needs it; it costs more requests. It cannot be combined with
-  `experimentalAutoDetectLongPolling: true` (an `ArgumentError`).
-- `experimentalLongPollingOptions` sets how long the backend may hold a long-polling request
+  `webExperimentalAutoDetectLongPolling: true` (an `ArgumentError`).
+- `webExperimentalLongPollingOptions` sets how long the backend may hold a long-polling request
   open. The default is the backend's, 30 seconds. If a proxy cuts requests sooner, ask for less
   (5 to 30 seconds; other values throw an `ArgumentError`):
 
 ```dart
-final FirestoreSettings settings = FirestoreSettings(
-  experimentalForceLongPolling: true,
-  experimentalLongPollingOptions: const ExperimentalLongPollingOptions(timeoutSeconds: 25),
+final Settings settings = Settings(
+  webExperimentalForceLongPolling: true,
+  webExperimentalLongPollingOptions: const WebExperimentalLongPollingOptions(timeoutDuration: Duration(seconds: 25)),
 );
 ```
 
@@ -134,13 +134,13 @@ dart compile js -O2 -o build/web/sqlite_opfs_worker.js web/sqlite_opfs_worker.da
 ```dart
 import 'sqlite_database_web.dart'; // copied from the package's example/ folder
 
-final Firestore firestore = Firestore.instanceFor(
+final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(
   app: app,
   openDatabase: sqliteWebOpener(
     sqlite3Wasm: Uri.parse('sqlite3.wasm'),
     opfsWorker: Uri.parse('sqlite_opfs_worker.js'),
   ),
-  settings: FirestoreSettings(cacheSettings: PersistentCacheSettings()),
+  settings: Settings(cacheSettings: PersistentCacheSettings()),
 );
 ```
 
@@ -160,17 +160,17 @@ final Firestore firestore = Firestore.instanceFor(
 
 A Web Lock guards each persistent cache. A second tab (or a second instance in the same page)
 that opens the same cache waits two seconds for the lock, then its operations fail with a
-`FirestoreError` whose code is `failedPrecondition`. `Firestore.instanceFor` returns at once,
+`FirestoreException` whose code is `failedPrecondition`. `FirebaseFirestore.instanceFor` returns at once,
 so the error comes with the first operation. The example opener has a helper that waits for a
 first cache-only operation and falls back to a memory cache:
 
 ```dart
 import 'sqlite_database_web.dart'; // copied from the package's example/ folder
 
-final Firestore firestore = await openWithMemoryFallback(
+final FirebaseFirestore firestore = await openWithMemoryFallback(
   app: app,
   sqlite3Wasm: Uri.parse('sqlite3.wasm'),
-  settings: FirestoreSettings(cacheSettings: PersistentCacheSettings()),
+  settings: Settings(cacheSettings: PersistentCacheSettings()),
 );
 // Null with a memory cache: this tab did not get the persistent one.
 final bool persistent = firestore.persistentCacheIndexManager != null;
@@ -192,7 +192,7 @@ origin, as those of the JS SDK do; this was not tried with this client.
 Connect to the emulator with `withEmulator`, which also turns TLS off:
 
 ```dart
-final FirestoreSettings settings = FirestoreSettings().withEmulator('127.0.0.1', 8080);
+final Settings settings = Settings().withEmulator('127.0.0.1', 8080);
 ```
 
 Two things about the emulator that only show in a browser:
@@ -225,7 +225,7 @@ Use Lite when a page only reads and writes:
 ```dart lite
 import 'package:cloud_firestore_dart/lite.dart';
 
-final Firestore firestore = Firestore.instanceFor(app: app);
+final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(app: app);
 final QuerySnapshot<Map<String, Object?>> notes =
     await firestore.collection('notes').limit(20).get();
 ```

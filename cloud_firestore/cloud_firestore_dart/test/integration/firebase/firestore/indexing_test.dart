@@ -82,7 +82,7 @@ void main() {
     await db
         .collection('a')
         .doc('b')
-        .get(Source.cache)
+        .get(GetOptions(source: Source.cache))
         .then<void>(
           (_) {},
           onError: (Object e) => expect(e, isA<FirestoreException>()),
@@ -124,13 +124,13 @@ void main() {
     final PersistentCacheIndexManager manager = db.persistentCacheIndexManager!;
 
     await manager.enableIndexAutoCreation();
-    expect((await query.get(Source.cache)).length, 1);
+    expect((await query.get(GetOptions(source: Source.cache))).length, 1);
 
     await manager.disableIndexAutoCreation();
-    expect((await query.get(Source.cache)).length, 1);
+    expect((await query.get(GetOptions(source: Source.cache))).length, 1);
 
     await manager.deleteAllIndexes();
-    expect((await query.get(Source.cache)).length, 1);
+    expect((await query.get(GetOptions(source: Source.cache))).length, 1);
   }
 
   test('testAutoIndexCreationSetSuccessfully', () async {
@@ -197,13 +197,13 @@ void main() {
       // A query that matches one of the documents: it makes the SDK create an
       // index.
       final Query query = collection.where('match', isEqualTo: true);
-      expect((await query.get(Source.cache)).length, 1);
+      expect((await query.get(GetOptions(source: Source.cache))).length, 1);
 
       await manager.deleteAllIndexes();
 
       // Still the one document (the public API does not tell whether an index
       // is used).
-      expect((await query.get(Source.cache)).length, 1);
+      expect((await query.get(GetOptions(source: Source.cache))).length, 1);
     },
   );
 }

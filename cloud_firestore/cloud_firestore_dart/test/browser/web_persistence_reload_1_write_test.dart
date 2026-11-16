@@ -82,7 +82,7 @@ void main() {
     // answers, the writes are in the mutation queue (and their transaction is
     // stored).
     final DocumentSnapshot<Json> pending =
-        await firestore.collection(collection).doc('pending').get(Source.cache);
+        await firestore.collection(collection).doc('pending').get(GetOptions(source: Source.cache));
     expect(pending.metadata.hasPendingWrites, isTrue);
 
     web.window.localStorage.setItem(reloadStorageKey, collection);

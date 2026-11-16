@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import 'package:cloud_firestore_dart/src/firebase/firestore/field_path.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/aggregate_field.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/aggregate_query.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/user_data.dart'
@@ -308,7 +309,7 @@ class PipelineSource {
   /// A `distanceThreshold` becomes a filter that computes the distance again
   /// with the matching distance function.
   Pipeline createFromVectorQuery(VectorQuery vectorQuery) {
-    final Field vectorField = Field(vectorQuery.vectorField);
+    final Field vectorField = Field(vectorQuery.vectorField.internalPath);
     Pipeline pipeline = createFrom(vectorQuery.query).findNearest(
       vectorField,
       vectorQuery.queryVector,

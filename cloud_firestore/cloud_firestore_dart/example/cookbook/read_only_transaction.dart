@@ -37,16 +37,16 @@ Future<void> main() async {
         spent,
       ]),
     );
-    return 'credit ${account.getInt('credit')}, '
-        '${list.length} orders, spent ${sum.getInt(spent)}';
-  }, options: TransactionOptions(readOnly: true));
+    return 'credit ${(account.get('credit') as num?)?.toInt()}, '
+        '${list.length} orders, spent ${(sum.get(spent) as num?)?.toInt()}';
+  }, readOnly: true);
   print(report);
 
   // Writes in a read-only transaction throw.
   try {
     await firestore.runTransaction<void>((Transaction transaction) async {
       transaction.update(accounts.doc('ada'), <String, Object?>{'credit': 0});
-    }, options: TransactionOptions(readOnly: true));
+    }, readOnly: true);
   } on FirestoreException catch (e) {
     print('write refused: ${e.errorCode}');
   }

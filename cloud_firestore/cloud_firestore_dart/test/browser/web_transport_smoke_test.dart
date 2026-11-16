@@ -85,7 +85,7 @@ void main() {
         firestore.collection(newCollection());
     final Completer<void> listened = Completer<void>();
     final StreamSubscription<QuerySnapshot<Map<String, dynamic>>> sub =
-        collection.snapshots.listen((QuerySnapshot<Map<String, dynamic>> s) {
+        collection.snapshots().listen((QuerySnapshot<Map<String, dynamic>> s) {
       if (s.docs.length == 1 && !listened.isCompleted) {
         listened.complete();
       }
@@ -94,9 +94,9 @@ void main() {
     await listened.future.timeout(const Duration(seconds: 20));
     await sub.cancel();
 
-    expect((await collection.doc('ada').get(Source.server)).data,
+    expect((await collection.doc('ada').get(GetOptions(source: Source.server))).data(),
         <String, dynamic>{'name': 'Ada'});
-    expect((await collection.count().get()).getCount(), 1);
+    expect((await collection.count().get()).count, 1);
   });
 
   test('writes a document and reads it back from the server', () async {
@@ -119,10 +119,10 @@ void main() {
     // comes from the cache.
     final FirebaseFirestore other = await newFirestore();
     final DocumentSnapshot<Map<String, dynamic>> snapshot =
-        await other.doc(doc.path).get(Source.server);
+        await other.doc(doc.path).get(GetOptions(source: Source.server));
     expect(snapshot.exists, isTrue);
     expect(snapshot.metadata.isFromCache, isFalse);
-    expect(snapshot.data, <String, dynamic>{
+    expect(snapshot.data(), <String, dynamic>{
       'text': 'héllo \u{1F600} 日本',
       'int': 42,
       'double': 1.5,
@@ -146,13 +146,12 @@ void main() {
     final Completer<void> sawBoth = Completer<void>();
     final StreamSubscription<QuerySnapshot<Map<String, dynamic>>> sub =
         firestore
-            .collection(collection)
-            .orderBy('n')
-            .snapshots
+            .collection(collection).orderBy('n')
+            .snapshots()
             .listen((QuerySnapshot<Map<String, dynamic>> snapshot) {
       seen.add(snapshot.docs
           .map((QueryDocumentSnapshot<Map<String, dynamic>> d) =>
-              d.data['n'] as int)
+              d.data()['n'] as int)
           .toList());
       if (snapshot.docs.length == 2 && !sawBoth.isCompleted) {
         sawBoth.complete();
@@ -174,7 +173,7 @@ void main() {
     }
 
     final QuerySnapshot<Map<String, dynamic>> snapshot =
-        await collection.where('n', isGreaterThan: 2).get(Source.server);
+        await collection.where('n', isGreaterThan: 2).get(GetOptions(source: Source.server));
     expect(
         snapshot.docs
             .map((QueryDocumentSnapshot<Map<String, dynamic>> d) => d.id)
@@ -195,15 +194,15 @@ void main() {
       final DocumentSnapshot<Map<String, dynamic>> snapshot =
           await transaction.get(counter);
       transaction.update(counter,
-          <String, dynamic>{'count': (snapshot.data!['count'] as int) + 1});
+          <String, dynamic>{'count': (snapshot.data()!['count'] as int) + 1});
     });
     expect(
-        (await counter.get(Source.server)).data, <String, dynamic>{'count': 2});
+        (await counter.get(GetOptions(source: Source.server))).data(), <String, dynamic>{'count': 2});
 
     // RunAggregationQuery.
     await collection.doc('other').set(<String, dynamic>{'count': 10});
     final AggregateQuerySnapshot aggregate = await collection.count().get();
-    expect(aggregate.getCount(), 2);
+    expect(aggregate.count, 2);
   });
 
   test('reports a server error with its code (REST)', () async {
@@ -234,7 +233,7 @@ void main() {
 
     final FirebaseFirestore other = await newFirestore();
     final Object? read =
-        (await other.doc(doc.path).get(Source.server)).data!['big'];
+        (await other.doc(doc.path).get(GetOptions(source: Source.server))).data()!['big'];
     expect(read, big);
     expect('$read', '9007199254740993');
   },

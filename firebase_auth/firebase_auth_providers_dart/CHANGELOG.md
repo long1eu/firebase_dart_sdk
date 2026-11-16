@@ -1,3 +1,15 @@
+## 0.2.0 (unreleased)
+
+Breaking: the calls that FlutterFire's `firebase_auth` also has take its arguments. Every change
+is in [docs/api_migration_0_2.md](https://github.com/long1eu/firebase_dart_sdk/blob/main/docs/api_migration_0_2.md).
+
+- `FirebaseAuthException` (was `FirebaseAuthProviderException`) extends `FirebaseException`.
+- `signInWithEmailAndPassword`, `createUserWithEmailAndPassword`,
+  `reauthenticateWithEmailAndPassword`, `sendPasswordResetEmail` and `confirmPasswordReset`
+  take named arguments; `userChanges()` is a method.
+- Token providers implement `AuthTokenProvider` (was `InternalTokenProvider`) of
+  `firebase_app_dart` 0.2.
+
 ## 0.1.1
 
 Documentation and examples only. The library behaves exactly as in 0.1.0; the only code

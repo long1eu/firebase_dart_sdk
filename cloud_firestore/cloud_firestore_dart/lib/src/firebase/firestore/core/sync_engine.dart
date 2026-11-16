@@ -1239,13 +1239,13 @@ class SyncEngine implements RemoteStoreCallback, SharedClientStateSyncer {
       );
       if (hasNewerBundle) {
         resultTask.setResult(
-          LoadBundleTaskProgressInternal.forSuccess(bundleMetadata),
+          LoadBundleTaskSnapshotInternal.forSuccess(bundleMetadata),
         );
         return;
       }
 
       LoadBundleTaskSnapshot? progress =
-          LoadBundleTaskProgressInternal.forInitial(bundleMetadata);
+          LoadBundleTaskSnapshotInternal.forInitial(bundleMetadata);
       resultTask.updateProgress(progress);
 
       final BundleLoader bundleLoader = BundleLoader(
@@ -1277,7 +1277,7 @@ class SyncEngine implements RemoteStoreCallback, SharedClientStateSyncer {
       await _emitNewSnapsAndNotifyLocalStore(changes, /*remoteEvent:*/ null);
 
       resultTask.setResult(
-        LoadBundleTaskProgressInternal.forSuccess(bundleMetadata),
+        LoadBundleTaskSnapshotInternal.forSuccess(bundleMetadata),
       );
     } catch (e, stackTrace) {
       Log.w('Firestore', 'Loading bundle failed : $e');

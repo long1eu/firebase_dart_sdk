@@ -258,14 +258,14 @@ void main() {
       expect(Settings(cacheSizeBytes: 1024 * 1024).cacheSizeBytes, 1024 * 1024);
     });
 
-    test('an app needs an application id', () {
+    test('an app needs an app id', () {
       expect(
         () => FirebaseApp.withOptions(
           _OptionsWithoutApplicationId(),
           dependencies: null,
           name: 'argumentValidationNoAppId',
         ),
-        throwsArgumentErrorWith('ApplicationId must be set.'),
+        throwsArgumentErrorWith('appId must be set.'),
       );
     });
 

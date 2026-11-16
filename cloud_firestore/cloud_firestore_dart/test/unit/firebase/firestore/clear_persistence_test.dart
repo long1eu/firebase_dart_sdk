@@ -290,7 +290,7 @@ void main() {
           firestore.doc('col/doc');
       // Never acknowledged (no backend), but applied to the local cache.
       doc.set(<String, Object?>{'a': 1}).ignore();
-      expect((await doc.get(Source.cache)).data, <String, Object?>{'a': 1});
+      expect((await doc.get(GetOptions(source: Source.cache))).data(), <String, Object?>{'a': 1});
 
       await firestore.terminate();
       await firestore.clearPersistence();
@@ -301,7 +301,7 @@ void main() {
       final FirebaseFirestore restarted = FirebaseFirestore.instanceFor(
           app: app, settings: offlineSettings, openDatabase: openFixed(dbName));
       addTearDown(restarted.terminate);
-      await expectLater(restarted.doc('col/doc').get(Source.cache),
+      await expectLater(restarted.doc('col/doc').get(GetOptions(source: Source.cache)),
           throwsA(firestoreErrorWithCode(FirestoreErrorCode.unavailable)));
     });
 
@@ -316,13 +316,13 @@ void main() {
       final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(
           app: app, settings: offlineSettings, openDatabase: openFixed(dbName));
       firestore.doc('col/doc').set(<String, Object?>{'a': 1}).ignore();
-      await firestore.doc('col/doc').get(Source.cache);
+      await firestore.doc('col/doc').get(GetOptions(source: Source.cache));
       await firestore.terminate();
 
       final FirebaseFirestore restarted = FirebaseFirestore.instanceFor(
           app: app, settings: offlineSettings, openDatabase: openFixed(dbName));
       addTearDown(restarted.terminate);
-      expect((await restarted.doc('col/doc').get(Source.cache)).data,
+      expect((await restarted.doc('col/doc').get(GetOptions(source: Source.cache))).data(),
           <String, Object?>{'a': 1});
     });
   });

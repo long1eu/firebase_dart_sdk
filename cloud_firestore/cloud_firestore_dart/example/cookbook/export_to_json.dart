@@ -44,7 +44,7 @@ Future<void> main() async {
       QuerySnapshot<Map<String, Object?>>.fromJson(firestore, json);
   for (final QueryDocumentSnapshot<Map<String, Object?>> doc in restored) {
     print(
-      '${doc.id}: ${doc['title']} at ${doc.getTimestamp('at')!.toDate().toUtc()}',
+      '${doc.id}: ${doc['title']} at ${(doc.get('at') as Timestamp?)!.toDate().toUtc()}',
     );
   }
   print('geo point kept: ${restored.docs.first['where'] is GeoPoint}');

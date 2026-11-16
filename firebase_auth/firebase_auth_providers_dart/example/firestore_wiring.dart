@@ -81,13 +81,15 @@ Future<void> main() async {
   );
   await note.set(<String, Object?>{'text': 'hello'});
   final DocumentSnapshot<Map<String, Object?>> snapshot = await note.get(
-    Source.server,
+    GetOptions(source: Source.server),
   );
-  print('signed in, read back: ${snapshot.data?['text']}');
+  print('signed in, read back: ${snapshot.data()?['text']}');
 
   // Another user's documents stay closed.
   try {
-    await firestore.doc('users/somebody-else/notes/first').get(Source.server);
+    await firestore
+        .doc('users/somebody-else/notes/first')
+        .get(GetOptions(source: Source.server));
     print('read of another user accepted');
   } on FirestoreException catch (e) {
     print('read of another user refused: ${e.errorCode}');

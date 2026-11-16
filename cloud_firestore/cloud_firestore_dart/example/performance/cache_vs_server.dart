@@ -69,17 +69,17 @@ Future<void> main() async {
 
     // The first call also opens the connection (and the SQLite file): run it
     // once before measuring.
-    await cheap.limit(1).get(Source.server);
+    await cheap.limit(1).get(GetOptions(source: Source.server));
 
     final Stopwatch server = Stopwatch()..start();
     final QuerySnapshot<Map<String, Object?>> fromServer = await cheap.get(
-      Source.server,
+      GetOptions(source: Source.server),
     );
     server.stop();
 
     final Stopwatch cache = Stopwatch()..start();
     final QuerySnapshot<Map<String, Object?>> fromCache = await cheap.get(
-      Source.cache,
+      GetOptions(source: Source.cache),
     );
     cache.stop();
 
@@ -103,7 +103,7 @@ Future<void> main() async {
   final Stopwatch first = Stopwatch()..start();
   final Completer<void> firstSynced = Completer<void>();
   final StreamSubscription<QuerySnapshot<Map<String, Object?>>> one = query
-      .snapshots
+      .snapshots()
       .listen((QuerySnapshot<Map<String, Object?>> snapshot) {
         if (!snapshot.metadata.isFromCache && !firstSynced.isCompleted) {
           first.stop();
@@ -116,7 +116,7 @@ Future<void> main() async {
   final Completer<QuerySnapshot<Map<String, Object?>>> secondFirst =
       Completer<QuerySnapshot<Map<String, Object?>>>();
   final StreamSubscription<QuerySnapshot<Map<String, Object?>>> two = query
-      .snapshots
+      .snapshots()
       .listen((QuerySnapshot<Map<String, Object?>> snapshot) {
         if (!secondFirst.isCompleted) {
           second.stop();

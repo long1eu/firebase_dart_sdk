@@ -40,7 +40,7 @@ Future<void> main() async {
   final StreamController<bool> online = StreamController<bool>();
   final StreamSubscription<QuerySnapshot<Map<String, Object?>>> listener =
       collection
-          .getSnapshots(MetadataChanges.include)
+          .snapshots(includeMetadataChanges: true)
           .listen(
             (QuerySnapshot<Map<String, Object?>> snapshot) =>
                 online.add(!snapshot.metadata.isFromCache),
@@ -72,8 +72,8 @@ Future<void> main() async {
   // What the primary stored is in the file, so the secondary reads it.
   final DocumentSnapshot<Map<String, Object?>> written = await collection
       .doc('background')
-      .get(Source.cache);
-  print('main isolate: reads ${written.data} from the cache');
+      .get(GetOptions(source: Source.cache));
+  print('main isolate: reads ${written.data()} from the cache');
 
   // A write of a secondary is stored, but not sent while it is secondary.
   bool acknowledged = false;

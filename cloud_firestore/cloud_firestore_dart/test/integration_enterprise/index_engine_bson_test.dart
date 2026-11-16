@@ -106,7 +106,7 @@ void main() {
           IndexedQuery('order by v', (c) => c.orderBy('v')),
           IndexedQuery(
             'order by v desc',
-            (c) => c.orderBy('v', Direction.descending),
+            (c) => c.orderBy('v', descending: true),
           ),
           IndexedQuery('order by v, limit 5', (c) => c.orderBy('v').limit(5)),
           IndexedQuery(
@@ -116,154 +116,173 @@ void main() {
           // Numbers of every type compare by value.
           IndexedQuery(
             'v == Int32(2)',
-            (c) => c.whereEqualTo('v', Int32Value(2)),
+            (c) => c.where('v', isEqualTo: Int32Value(2)),
           ),
           IndexedQuery(
             'v > Int32(1)',
-            (c) => c.whereGreaterThan('v', Int32Value(1)),
+            (c) => c.where('v', isGreaterThan: Int32Value(1)),
           ),
           IndexedQuery(
             'v <= Decimal128(2.5)',
-            (c) => c.whereLessThanOrEqualTo('v', Decimal128Value('2.5')),
+            (c) => c.where('v', isLessThanOrEqualTo: Decimal128Value('2.5')),
           ),
           IndexedQuery(
             'v < Decimal128(2.5)',
-            (c) => c.whereLessThan('v', Decimal128Value('2.5')),
+            (c) => c.where('v', isLessThan: Decimal128Value('2.5')),
           ),
           IndexedQuery(
             'v >= 2, order by v desc',
             (c) => c
-                .whereGreaterThanOrEqualTo('v', 2)
-                .orderBy('v', Direction.descending),
+                .where('v', isGreaterThanOrEqualTo: 2)
+                .orderBy('v', descending: true),
           ),
           // BSON timestamps, on both sides of 2^31 seconds.
           IndexedQuery(
             'v == BsonTimestamp(1, 2)',
-            (c) => c.whereEqualTo('v', BsonTimestamp(1, 2)),
+            (c) => c.where('v', isEqualTo: BsonTimestamp(1, 2)),
           ),
           IndexedQuery(
             'v > BsonTimestamp(1, 2)',
-            (c) => c.whereGreaterThan('v', BsonTimestamp(1, 2)),
+            (c) => c.where('v', isGreaterThan: BsonTimestamp(1, 2)),
           ),
           IndexedQuery(
             'v >= BsonTimestamp(2^31, 0)',
-            (c) =>
-                c.whereGreaterThanOrEqualTo('v', BsonTimestamp(2147483648, 0)),
+            (c) => c.where(
+              'v',
+              isGreaterThanOrEqualTo: BsonTimestamp(2147483648, 0),
+            ),
           ),
           IndexedQuery(
             'v < BsonTimestamp(2^31, 0)',
-            (c) => c.whereLessThan('v', BsonTimestamp(2147483648, 0)),
+            (c) => c.where('v', isLessThan: BsonTimestamp(2147483648, 0)),
           ),
           IndexedQuery(
             'v <= BsonTimestamp(max)',
-            (c) => c.whereLessThanOrEqualTo(
+            (c) => c.where(
               'v',
-              BsonTimestamp(4294967295, 4294967295),
+              isLessThanOrEqualTo: BsonTimestamp(4294967295, 4294967295),
             ),
           ),
           // Object ids.
           IndexedQuery(
             'v == ObjectId(a)',
-            (c) => c.whereEqualTo(
+            (c) => c.where(
               'v',
-              const BsonObjectId('507f191e810c19729de860ea'),
+              isEqualTo: const BsonObjectId('507f191e810c19729de860ea'),
             ),
           ),
           IndexedQuery(
             'v > ObjectId(a)',
-            (c) => c.whereGreaterThan(
+            (c) => c.where(
               'v',
-              const BsonObjectId('507f191e810c19729de860ea'),
+              isGreaterThan: const BsonObjectId('507f191e810c19729de860ea'),
             ),
           ),
           IndexedQuery(
             'v <= ObjectId(b)',
-            (c) => c.whereLessThanOrEqualTo(
+            (c) => c.where(
               'v',
-              const BsonObjectId('507f191e810c19729de860eb'),
+              isLessThanOrEqualTo: const BsonObjectId(
+                '507f191e810c19729de860eb',
+              ),
             ),
           ),
           // Binary data: subtype 0 is a plain blob, the other subtypes sort after it.
           IndexedQuery(
             'v >= Blob',
-            (c) => c.whereGreaterThanOrEqualTo('v', _binary(0, <int>[1, 2, 3])),
+            (c) => c.where(
+              'v',
+              isGreaterThanOrEqualTo: _binary(0, <int>[1, 2, 3]),
+            ),
           ),
           IndexedQuery(
             'v > Binary(1)',
-            (c) => c.whereGreaterThan('v', _binary(1, <int>[1, 2, 3])),
+            (c) => c.where('v', isGreaterThan: _binary(1, <int>[1, 2, 3])),
           ),
           IndexedQuery(
             'v < Binary(128)',
-            (c) => c.whereLessThan('v', _binary(128, <int>[0])),
+            (c) => c.where('v', isLessThan: _binary(128, <int>[0])),
           ),
           // Regular expressions.
           IndexedQuery(
             'v == Regex(^foo, i)',
-            (c) => c.whereEqualTo('v', const RegexValue('^foo', 'i')),
+            (c) => c.where('v', isEqualTo: const RegexValue('^foo', 'i')),
           ),
           IndexedQuery(
             'v > Regex(^foo, i)',
-            (c) => c.whereGreaterThan('v', const RegexValue('^foo', 'i')),
+            (c) => c.where('v', isGreaterThan: const RegexValue('^foo', 'i')),
           ),
           // Min and max key.
           IndexedQuery(
             'v == MinKey',
-            (c) => c.whereEqualTo('v', MinKey.instance),
+            (c) => c.where('v', isEqualTo: MinKey.instance),
           ),
           IndexedQuery(
             'v == MaxKey',
-            (c) => c.whereEqualTo('v', MaxKey.instance),
+            (c) => c.where('v', isEqualTo: MaxKey.instance),
           ),
           IndexedQuery(
             'v >= MinKey',
-            (c) => c.whereGreaterThanOrEqualTo('v', MinKey.instance),
+            (c) => c.where('v', isGreaterThanOrEqualTo: MinKey.instance),
           ),
           IndexedQuery(
             'v <= MaxKey',
-            (c) => c.whereLessThanOrEqualTo('v', MaxKey.instance),
+            (c) => c.where('v', isLessThanOrEqualTo: MaxKey.instance),
           ),
           // Membership.
           IndexedQuery(
             'v in [Int32(1), ObjectId(b), BsonTimestamp(2^31, 0), MaxKey]',
-            (c) => c.whereIn('v', <Object?>[
-              Int32Value(1),
-              const BsonObjectId('507f191e810c19729de860eb'),
-              BsonTimestamp(2147483648, 0),
-              MaxKey.instance,
-            ]),
+            (c) => c.where(
+              'v',
+              whereIn: <Object?>[
+                Int32Value(1),
+                const BsonObjectId('507f191e810c19729de860eb'),
+                BsonTimestamp(2147483648, 0),
+                MaxKey.instance,
+              ],
+            ),
           ),
           IndexedQuery(
             'v not-in [Int32(1), Regex(^foo, i), MinKey]',
-            (c) => c.whereNotIn('v', <Object?>[
-              Int32Value(1),
-              const RegexValue('^foo', 'i'),
-              MinKey.instance,
-            ]),
+            (c) => c.where(
+              'v',
+              whereNotIn: <Object?>[
+                Int32Value(1),
+                const RegexValue('^foo', 'i'),
+                MinKey.instance,
+              ],
+            ),
           ),
           IndexedQuery(
             'v != Int32(2)',
-            (c) => c.whereNotEqualTo('v', Int32Value(2)),
+            (c) => c.where('v', isNotEqualTo: Int32Value(2)),
           ),
           IndexedQuery(
             'v array-contains ObjectId(a)',
-            (c) => c.whereArrayContains(
+            (c) => c.where(
               'v',
-              const BsonObjectId('507f191e810c19729de860ea'),
+              arrayContains: const BsonObjectId('507f191e810c19729de860ea'),
             ),
           ),
           IndexedQuery(
             'v array-contains-any [Int32(1), Regex]',
-            (c) => c.whereArrayContainsAny('v', <Object?>[
-              Int32Value(1),
-              const RegexValue('x', ''),
-            ]),
+            (c) => c.where(
+              'v',
+              arrayContainsAny: <Object?>[
+                Int32Value(1),
+                const RegexValue('x', ''),
+              ],
+            ),
           ),
           IndexedQuery(
             'v == Int32(1) or v >= BsonTimestamp(2^31, 0)',
             (c) => c.where(
               Filter.or(<Filter>[
-                Filter.equalTo('v', Int32Value(1)),
-                Filter.greaterThanOrEqualTo('v', BsonTimestamp(2147483648, 0)),
+                Filter('v', isEqualTo: Int32Value(1)),
+                Filter(
+                  'v',
+                  isGreaterThanOrEqualTo: BsonTimestamp(2147483648, 0),
+                ),
               ]),
             ),
           ),
@@ -284,7 +303,7 @@ void main() {
           IndexedQuery(
             'order by v desc, startAt MaxKey, endBefore Decimal128(2.5)',
             (c) => c
-                .orderBy('v', Direction.descending)
+                .orderBy('v', descending: true)
                 .startAt(<Object?>[MaxKey.instance])
                 .endBefore(<Object?>[Decimal128Value('2.5')]),
           ),

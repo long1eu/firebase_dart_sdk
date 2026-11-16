@@ -15,6 +15,14 @@
 import 'package:cloud_firestore_dart/src/firebase/firestore/lite/snapshot.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/set_options.dart';
 
+/// Reads a [T] from a document: the `fromFirestore` argument of `withConverter`.
+typedef FromFirestore<T> =
+    T Function(QueryDocumentSnapshot<Map<String, Object?>> snapshot);
+
+/// Turns a [T] into the data written for a document: the `toFirestore` argument of `withConverter`.
+typedef ToFirestore<T> =
+    Map<String, Object?> Function(T value, SetOptions? options);
+
 /// Converts between the objects of an application and the maps Firestore
 /// stores, for references and queries made with `withConverter`.
 ///
@@ -26,10 +34,8 @@ abstract class FirestoreDataConverter<T> {
 
   /// A converter made of two functions.
   const factory FirestoreDataConverter.from({
-    required T Function(QueryDocumentSnapshot<Map<String, Object?>> snapshot)
-    fromFirestore,
-    required Map<String, Object?> Function(T value, SetOptions? options)
-    toFirestore,
+    required FromFirestore<T> fromFirestore,
+    required ToFirestore<T> toFirestore,
   }) = _FunctionDataConverter<T>;
 
   /// Converts the data of [snapshot] (an existing document) to a [T].

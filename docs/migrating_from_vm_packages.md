@@ -93,7 +93,7 @@ After:
 ```dart
 final DocumentSnapshot<Map<String, Object?>> snapshot =
     await users.doc('ada').get();
-final Map<String, Object?>? data = snapshot.data; // null if it does not exist
+final Map<String, Object?>? data = snapshot.data(); // null if it does not exist
 final int? age = data?['age'] as int?;
 ```
 
@@ -115,7 +115,7 @@ app.setDataCollectionDefaultEnabled();              // meant "disable"
 After:
 
 ```dart
-app.setDataCollectionDefaultEnabled(enabled: false);
+app.setAutomaticDataCollectionEnabled(false);
 ```
 
 ## 4. Creating the Firestore instance
@@ -140,9 +140,9 @@ final Firestore firestore = await Firestore.getInstance(
 After:
 
 ```dart
-final Firestore firestore = Firestore.instanceFor(
+final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(
   app: app,
-  settings: FirestoreSettings(cacheSettings: PersistentCacheSettings()),
+  settings: Settings(cacheSettings: PersistentCacheSettings()),
   // openDatabase: yourOpener, see section 5
 );
 ```
@@ -155,9 +155,9 @@ For the emulator, build the settings with `withEmulator` instead of setting `hos
 `sslEnabled` by hand:
 
 ```dart
-final Firestore emulated = Firestore.instanceFor(
+final FirebaseFirestore emulated = FirebaseFirestore.instanceFor(
   app: app,
-  settings: FirestoreSettings().withEmulator('127.0.0.1', 8080),
+  settings: Settings().withEmulator('127.0.0.1', 8080),
 );
 ```
 
@@ -274,10 +274,10 @@ After:
 ```dart
 final QuerySnapshot<Map<String, Object?>> result = await firestore
     .collection('users')
-    .where(FieldPath.documentIdField, isEqualTo: 'ada')
-    .get(Source.serverAndCache);
+    .where(FieldPath.documentId, isEqualTo: 'ada')
+    .get(const GetOptions(source: Source.serverAndCache));
 for (final QueryDocumentSnapshot<Map<String, Object?>> doc in result.docs) {
-  print(doc.ref.path);
+  print(doc.reference.path);
 }
 await firestore.terminate();
 ```
@@ -365,7 +365,7 @@ print('${firestore.projectId} / ${firestore.databaseId}');
   final userRef = users.doc('ada');
   await firestore.runTransaction<void>((Transaction tx) async {
     final config = await tx.get(configRef);
-    tx.update(userRef, <String, Object?>{'plan': config.data!['plan']});
+    tx.update(userRef, <String, Object?>{'plan': config.data()!['plan']});
   });
   ```
 
@@ -374,12 +374,12 @@ print('${firestore.projectId} / ${firestore.databaseId}');
   was "Transactions lookups are invalid after writes."). As in the JS SDK the transaction then
   fails to commit even if the update function caught the error, so do every read first.
 - **Transaction attempts.** The default went from 6 to 5
-  (`TransactionOptions.defaultMaxAttempts`). To keep 6:
+  (`maxAttempts`). To keep 6:
 
   ```dart
   await firestore.runTransaction<void>(
     (Transaction tx) async {},
-    options: TransactionOptions(maxAttempts: 6),
+    maxAttempts: 6,
   );
   ```
 
@@ -403,7 +403,7 @@ print('${firestore.projectId} / ${firestore.databaseId}');
   await firestore.terminate();
   try {
     await users.doc('ada').get();
-  } on FirestoreError catch (e) {
+  } on FirestoreException catch (e) {
     print(e.code == FirestoreErrorCode.failedPrecondition); // true
   }
   ```

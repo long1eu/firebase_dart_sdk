@@ -84,9 +84,9 @@ names (`FirebaseFirestore`).
 | `AggregateField.sum(String)`, `sumField(FieldPath)`, `average(String)`, `averageField(FieldPath)` | `AggregateField.sum(Object field)`, `AggregateField.average(Object field)` | `sum(field)`, `average(field)` | One method per aggregation; `field` is a `String` or a `FieldPath`. |
 | `AggregateQuery.get([AggregateSource])` | `get({AggregateSource source = AggregateSource.server})` | same | FlutterFire shape. |
 | `AggregateQuerySnapshot.getCount()`, `getInt(field)`, `getDouble(field)` | `int? get count`, `num? getSum(Object field)`, `double? getAverage(Object field)`; `get(AggregateField)` and `data()` are unchanged | `count`, `getSum`, `getAverage` | FlutterFire names. `count` is null when the query did not ask for it. `getSum` returns an `int` for a sum of integers (FlutterFire always returns a `double`). |
-| `FirestoreError(String message, FirestoreErrorCode code, [Object? cause, StackTrace? stackTrance])`, `code` a `FirestoreErrorCode` | `FirestoreException({required FirestoreErrorCode errorCode, String? message, Object? cause, StackTrace? stackTrace})`; it extends `FirebaseException`: `code` is the FlutterFire string (`'not-found'`), `plugin` is `'cloud_firestore'`, `errorCode` is the enum | `FirebaseException` with `code: 'not-found'` | FlutterFire convention, so `on FirebaseException catch (e) { if (e.code == 'not-found') ... }` works. **Watch out:** `e.code == FirestoreErrorCode.notFound` still compiles but is always false: compare `e.errorCode` instead. |
+| `FirestoreError(String message, FirestoreErrorCode code, [Object? cause, StackTrace? stackTrance])`, `code` a `FirestoreErrorCode`; `toString()` was `FirestoreError: [code=notFound]: ...` | `FirestoreException({required FirestoreErrorCode errorCode, required String message, Object? cause, StackTrace? stackTrace})`; it extends `FirebaseException`: `code` is the FlutterFire string (`'not-found'`), `plugin` is `'cloud_firestore'`, `errorCode` is the enum; `toString()` is `[cloud_firestore/not-found] ...` | `FirebaseException` with `code: 'not-found'` | FlutterFire convention, so `on FirebaseException catch (e) { if (e.code == 'not-found') ... }` works. **Watch out:** `e.code == FirestoreErrorCode.notFound` still compiles but is always false: compare `e.errorCode` instead. |
 | `FirestoreErrorCode` (a class with constants) | an `enum` with the same values, plus `code` (`'not-found'`) and `value` (the gRPC number) | none | A plain Dart enum: `switch` is exhaustive. |
-| `LoadBundleTask`: `addOnProgressListener(listener)`, `snapshot`, `isComplete`, `isSuccessful`, `exception`, `future`, `stream` | `stream` and `future` | `stream` | A `Stream` instead of a listener registration and Android task getters. |
+| `LoadBundleTask`: `addOnProgressListener(listener)`, `isComplete`, `isSuccessful`, `exception`, `snapshot`, `future`, `stream` | `stream`, `future` and `snapshot` (`snapshot.taskState`, `snapshot.exception`) | `stream` | A `Stream` instead of a listener registration and Android task getters. |
 | `Firestore.setLoggingEnabled({bool loggingEnabled = false})` | `FirebaseFirestore.setLoggingEnabled(bool enabled)` | `setLoggingEnabled(bool enabled)` | FlutterFire shape. |
 | `ExperimentalLongPollingOptions({num timeoutSeconds})` | `WebExperimentalLongPollingOptions({Duration? timeoutDuration})` | same | A `Duration` instead of a number of seconds. |
 | `FirebaseFirestore.app` was nullable | `FirebaseApp get app` | `FirebaseApp app` | Every instance a program can get has an app. |
@@ -105,12 +105,11 @@ names (`FirebaseFirestore`).
 | `DocumentSnapshot.getString`, `getInt`, `getBool`, `getDouble`, `getDate`, `getTimestamp`, `getBlob`, `getGeoPoint`, `getDocumentReference`, `getVectorValue`, `getInt32Value`, `getDecimal128Value`, `getBsonObjectId`, `getBsonTimestamp`, `getRegexValue`, `getMinKey`, `getMaxKey` | `get(field) as String?` and so on; `(get(field) as num?)?.toInt()` for `getInt`, `(get(field) as num?)?.toDouble()` for `getDouble`, `(get(field) as Timestamp?)?.toDate()` for `getDate` | `get(field)` | Android typed getters; a cast says the same in Dart. A wrong type now throws a `TypeError` instead of a `StateError`. |
 | `QuerySnapshot.documents`, `documentChanges` (deprecated) | `docs`, `docChanges` | same | Duplicates. |
 | `QuerySnapshot.getDocumentChanges(MetadataChanges)` | `docChanges` (see shape changes) | `docChanges` | Java shape. |
-| `Query.whereEqualTo`, `whereNotEqualTo`, `whereLessThan`, `whereLessThanOrEqualTo`, `whereGreaterThan`, `whereGreaterThanOrEqualTo`, `whereArrayContains`, `whereArrayContainsAny`, `whereIn`, `whereNotIn` and their `...Field(FieldPath, ...)` twins (20 methods) | `where(field, isEqualTo: v)` and the other named arguments | `where` | Java overloads; `where` takes a `String` or a `FieldPath`. |
+| `Query.whereEqualTo`, `whereNotEqualTo`, `whereLessThan`, `whereLessThanOrEqualTo`, `whereGreaterThan`, `whereGreaterThanOrEqualTo`, `whereArrayContains`, `whereArrayContainsAny`, `whereIn`, `whereNotIn` and their `...Field(FieldPath, ...)` twins (20 methods) | `where(field, isEqualTo: v)` and the other named arguments | `where` | Java overloads; `where` takes a `String` or a `FieldPath`. A null named argument counts as not given, as in FlutterFire: `whereEqualTo(f, null)` is `where(f, isNull: true)`, `whereNotEqualTo(f, null)` is `where(f, isNull: false)`, and a comparison of another kind with null (`whereArrayContains(f, null)`) has no equivalent. |
 | `Query.orderByField` | `orderBy(fieldPath)` | `orderBy` | Java overload. |
 | `Direction` | `orderBy(field, descending: true)` | none | Only used by the old `orderBy`. |
 | `Query.findNearestField` | `findNearest(vectorField: fieldPath, ...)` | none | Java overload. |
 | `MetadataChanges`, `SnapshotListenOptions` | `snapshots(includeMetadataChanges: true, source: ...)` | none | Only used by the removed methods. |
-| `TransactionOptions` | named arguments of `runTransaction` | none | Options object. |
 | `Source.defaultSource` (deprecated) | `Source.serverAndCache` | same | Duplicate. |
 | `FieldPath.fromSegments(segments)` | `FieldPath(segments)` | `FieldPath(components)` | Duplicate of the constructor (without its checks). |
 | `FieldPath.documentId()` (deprecated method) | `FieldPath.documentId` (getter) | same | |
@@ -120,6 +119,7 @@ names (`FirebaseFirestore`).
 | `LoadBundleTaskProgress(...)` constructor and `LoadBundleTaskProgress.initial` | none | none | Only the SDK creates progress values. |
 | `FirestoreErrorCode.fromValue(GrpcError)` | none | none | Internal; it named an internal type. |
 | `LogLevel.info` | `LogLevel.warn` | none | It behaved exactly like `warn`: the SDK writes no message at that level. |
+| `TransactionOptions` (also in Firestore Lite) | the named arguments of `runTransaction` | none | Options object. |
 
 ### Additions
 
@@ -214,6 +214,13 @@ operation as FlutterFire's `FirebaseAuth`, it now takes the same arguments.
 - Errors of failed operations are `FirestoreException`, `FirebaseAuthException` and `FirebaseException`, which
   implement `Exception`: `on Exception catch` now catches them, `on Error catch` no longer does.
 - `DocumentSnapshot.get(field) as T` throws a `TypeError` where the removed typed getters threw a `StateError`.
+- `where(field, isEqualTo: null)` throws an `ArgumentError` (no non-null argument), where `whereEqualTo(field, null)`
+  compared with null: use `isNull: true`.
+- `Firebase.app(name)` throws a `FirebaseException` with the code `no-app`, where `FirebaseApp.getInstance` threw a
+  `StateError`.
+- The texts of some errors and of `toString()` changed with the names: `FirestoreException`, `Settings`,
+  `WebExperimentalLongPollingOptions`, `LoadBundleTaskSnapshot`, `FirebaseOptions`, and the messages that named
+  `Firestore.instanceFor`, `FieldPath.of`, `SetOptions.merge()`, `Source.SERVER` or `updateFromList`.
 
 ## Differences from FlutterFire
 
@@ -229,6 +236,8 @@ Places where these packages keep a shape of their own, on purpose:
 - `Query.aggregate` and `Filter.and` / `Filter.or` take a `List`, not up to 30 positional arguments, and the
   aggregate fields are `AggregateField.count()`, `AggregateField.sum(field)` and `AggregateField.average(field)`.
 - `runTransaction` has no `timeout`.
+- A filter that compares a field with null other than `==` and `!=` (`arrayContains: null`) cannot be written: a null
+  named argument counts as not given, as in FlutterFire.
 - `persistentCacheIndexManager` is a getter, not a method.
 - `QuerySnapshot` is an `Iterable` of its documents (`for (final doc in snapshot)`).
 - `LoadBundleTask` reports a failure as a last event with `taskState == LoadBundleTaskState.error` and an

@@ -203,7 +203,7 @@ Future<Map<String, Object?>> read() async {
   watch.reset();
   final DocumentSnapshot<Map<String, Object?>> first = await bench
       .doc('d0')
-      .get(Source.cache);
+      .get(GetOptions(source: Source.cache));
   final int firstReadMs = watch.elapsedMilliseconds;
   if (!first.exists) {
     throw StateError('d0 is not in the cache');
@@ -216,7 +216,7 @@ Future<Map<String, Object?>> read() async {
     watch.reset();
     final DocumentSnapshot<Map<String, Object?>> doc = await bench
         .doc('d${random.nextInt(docs)}')
-        .get(Source.cache);
+        .get(GetOptions(source: Source.cache));
     pointMs.add(watch.elapsedMicroseconds / 1000);
     if (!doc.exists) {
       throw StateError('${doc.id} is not in the cache');
@@ -227,8 +227,8 @@ Future<Map<String, Object?>> read() async {
   // A query that the cache answers by scanning the collection.
   watch.reset();
   QuerySnapshot<Map<String, Object?>>? some = await bench
-      .whereEqualTo('n', docs ~/ 2)
-      .get(Source.cache);
+      .where('n', isEqualTo: docs ~/ 2)
+      .get(GetOptions(source: Source.cache));
   final int filteredMs = watch.elapsedMilliseconds;
   if (some.docs.length != 1) {
     throw StateError('the filtered query found ${some.docs.length}');
@@ -236,7 +236,9 @@ Future<Map<String, Object?>> read() async {
   some = null;
 
   watch.reset();
-  QuerySnapshot<Map<String, Object?>>? all = await bench.get(Source.cache);
+  QuerySnapshot<Map<String, Object?>>? all = await bench.get(
+    GetOptions(source: Source.cache),
+  );
   final int scanMs = watch.elapsedMilliseconds;
   if (all.docs.length != docs) {
     throw StateError('the scan found ${all.docs.length} of $docs');

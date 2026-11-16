@@ -307,7 +307,7 @@ Future<void> _apply(
       _rebind(write.data, collection.firestore) as Map<String, Object?>?;
   final Future<void> result = switch (write.kind) {
     'set' => doc.set(data!),
-    'merge' => doc.set(data!, SetOptions.mergeAllFields),
+    'merge' => doc.set(data!, const SetOptions(merge: true)),
     'update' => doc.update(data!),
     _ => doc.delete(),
   };
@@ -367,7 +367,7 @@ Future<Map<String, Object?>> _backendData(
   return <String, Object?>{
     for (final lite.QueryDocumentSnapshot<Map<String, Object?>> doc
         in snapshot.docs)
-      doc.id: doc.data,
+      doc.id: doc.data(),
   };
 }
 
@@ -383,7 +383,7 @@ _listenUntilSynced(Query<Map<String, Object?>> query) async {
   final List<String> seen = <String>[];
   final StreamSubscription<QuerySnapshot<Map<String, Object?>>> subscription =
       query
-          .getSnapshots(MetadataChanges.include)
+          .snapshots(includeMetadataChanges: true)
           .listen(
             (QuerySnapshot<Map<String, Object?>> snapshot) {
               seen.add(_describeSnapshot(snapshot));
@@ -434,7 +434,7 @@ _listenUntilSyncedOrSettled(
   bool settled = false;
   final StreamSubscription<QuerySnapshot<Map<String, Object?>>> subscription =
       query
-          .getSnapshots(MetadataChanges.include)
+          .snapshots(includeMetadataChanges: true)
           .listen(
             (QuerySnapshot<Map<String, Object?>> snapshot) {
               seen.add(_describeSnapshot(snapshot));
@@ -481,7 +481,7 @@ _listenUntilSyncedOrSettled(
 
 /// The first snapshot of a listener of [query] (offline: from the cache).
 Future<List<String>> _firstSnapshot(Query<Map<String, Object?>> query) async =>
-    _ids(await query.getSnapshots().first.timeout(syncTimeout));
+    _ids(await query.snapshots().first.timeout(syncTimeout));
 
 /// Compares [results] (source name to ids) with [expected] and records a
 /// failure that shows all of them.
@@ -594,7 +594,7 @@ Future<void> _checkCase(
       final List<String> cached = _ids(
         await step(
           'query #$q from the cache',
-          generated.query.get(Source.cache),
+          generated.query.get(GetOptions(source: Source.cache)),
         ),
       );
       await step('stop listening to query #$q', subscription.cancel());
@@ -609,7 +609,7 @@ Future<void> _checkCase(
             'cache after the listener was removed': _ids(
               await step(
                 'query #$q from the cache after the listener',
-                generated.query.get(Source.cache),
+                generated.query.get(GetOptions(source: Source.cache)),
               ),
             ),
         },
@@ -648,7 +648,7 @@ Future<void> _checkCase(
           'cache without a target': _ids(
             await step(
               'query #$q from the cache',
-              generated.query.get(Source.cache),
+              generated.query.get(GetOptions(source: Source.cache)),
             ),
           ),
         },
@@ -671,7 +671,7 @@ Future<void> _checkCase(
         'cache with pending writes': _ids(
           await step(
             'query #$q from the cache with pending writes',
-            generated.query.get(Source.cache),
+            generated.query.get(GetOptions(source: Source.cache)),
           ),
         ),
         'listener with pending writes': await step(
@@ -941,7 +941,7 @@ Future<void> _checkSharedCacheCase(
         final List<String> cachedA = _ids(
           await step(
             'A reads query #$q from the cache',
-            forA.query.get(Source.cache),
+            forA.query.get(GetOptions(source: Source.cache)),
           ),
         );
         await step('A stops listening to query #$q', subscription.cancel());
@@ -952,7 +952,7 @@ Future<void> _checkSharedCacheCase(
         final List<String> cachedB = _ids(
           await step(
             'B reads query #$q from the cache',
-            forB.query.get(Source.cache),
+            forB.query.get(GetOptions(source: Source.cache)),
           ),
         );
         _compare(
@@ -1024,14 +1024,14 @@ Future<void> _checkSharedCacheCase(
         final List<String> cachedB = _ids(
           await step(
             'B reads query #$q from the cache',
-            forB.query.get(Source.cache),
+            forB.query.get(GetOptions(source: Source.cache)),
           ),
         );
         await step('B stops listening to query #$q', subscription.cancel());
         final List<String> cachedA = _ids(
           await step(
             'A reads query #$q from the cache',
-            forA.query.get(Source.cache),
+            forA.query.get(GetOptions(source: Source.cache)),
           ),
         );
         answers[q] = (

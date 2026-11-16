@@ -63,8 +63,7 @@ void main() {
     query('collId').orderBy(orderBy('a', 'asc')),
     query('collId').orderBy(orderBy('a')).orderBy(orderBy('__name__')),
     query('collId')
-        .filter(filter('a', 'array-contains', 'a'))
-        .orderBy(orderBy('b'))
+        .filter(filter('a', 'array-contains', 'a')).orderBy(orderBy('b'))
   ];
 
   test('canUseMergeJoin', () {
@@ -76,8 +75,7 @@ void main() {
 
     q = query('collId')
         .filter(filter('a', '==', 1))
-        .filter(filter('b', '==', 2))
-        .orderBy(orderBy('__name__', 'desc'));
+        .filter(filter('b', '==', 2)).orderBy(orderBy('__name__', 'desc'));
     validateServesTarget(q, <Object>[
       'a',
       SegmentKind.ascending,
@@ -104,8 +102,7 @@ void main() {
 
   test('cannotUsePartialIndexWithMissingArrayContains', () {
     Query q = query('collId')
-        .filter(filter('a', 'array-contains', 'a'))
-        .orderBy(orderBy('b'));
+        .filter(filter('a', 'array-contains', 'a')).orderBy(orderBy('b'));
     validateServesTarget(
         q, <Object>['a', SegmentKind.contains, 'b', SegmentKind.ascending]);
 
@@ -164,8 +161,7 @@ void main() {
 
   test('testArrayContainsIsIndependent', () {
     Query q = query('collId')
-        .filter(filter('value', 'array-contains', 'foo'))
-        .orderBy(orderBy('value'));
+        .filter(filter('value', 'array-contains', 'foo')).orderBy(orderBy('value'));
     validateServesTarget(q, <Object>[
       'value',
       SegmentKind.contains,
@@ -183,16 +179,14 @@ void main() {
   test('withArrayContainsAndOrderBy', () {
     Query queriesMultipleFilters = query('collId')
         .filter(filter('a', 'array-contains', 'a'))
-        .filter(filter('a', '>', 'b'))
-        .orderBy(orderBy('a', 'asc'));
+        .filter(filter('a', '>', 'b')).orderBy(orderBy('a', 'asc'));
     validateServesTarget(queriesMultipleFilters,
         <Object>['a', SegmentKind.contains, 'a', SegmentKind.ascending]);
   });
 
   test('withEqualityAndDescendingOrder', () {
     Query q = query('collId')
-        .filter(filter('a', '==', 1))
-        .orderBy(orderBy('__name__', 'desc'));
+        .filter(filter('a', '==', 1)).orderBy(orderBy('__name__', 'desc'));
     validateServesTarget(q, <Object>[
       'a',
       SegmentKind.ascending,
@@ -309,8 +303,7 @@ void main() {
 
     q = query('collId')
         .filter(filter('a', '!=', 1))
-        .orderBy(orderBy('a'))
-        .orderBy(orderBy('b'));
+        .orderBy(orderBy('a')).orderBy(orderBy('b'));
     validateServesTarget(
         q, <Object>['a', SegmentKind.ascending, 'b', SegmentKind.ascending]);
   });
@@ -339,8 +332,7 @@ void main() {
   test('withMultipleFiltersAndOrderBy', () {
     Query queriesMultipleFilters = query('collId')
         .filter(filter('a1', '==', 'a'))
-        .filter(filter('a2', '>', 'b'))
-        .orderBy(orderBy('a2', 'asc'));
+        .filter(filter('a2', '>', 'b')).orderBy(orderBy('a2', 'asc'));
     validateServesTarget(queriesMultipleFilters,
         <Object>['a1', SegmentKind.ascending, 'a2', SegmentKind.ascending]);
   });
@@ -363,8 +355,7 @@ void main() {
   test('withMultipleOrderBys', () {
     Query q = query('collId')
         .orderBy(orderBy('fff'))
-        .orderBy(orderBy('bar', 'desc'))
-        .orderBy(orderBy('__name__'));
+        .orderBy(orderBy('bar', 'desc')).orderBy(orderBy('__name__'));
     validateServesTarget(q, <Object>[
       'fff',
       SegmentKind.ascending,
@@ -384,8 +375,7 @@ void main() {
 
     q = query('collId')
         .orderBy(orderBy('foo'))
-        .orderBy(orderBy('bar'))
-        .orderBy(orderBy('__name__', 'desc'));
+        .orderBy(orderBy('bar')).orderBy(orderBy('__name__', 'desc'));
     validateServesTarget(q, <Object>[
       'foo',
       SegmentKind.ascending,
@@ -420,8 +410,7 @@ void main() {
   test('withEqualityAndDifferentOrderBy', () {
     Query q = query('collId')
         .filter(filter('foo', '==', ''))
-        .filter(filter('bar', '==', ''))
-        .orderBy(orderBy('qux'));
+        .filter(filter('bar', '==', '')).orderBy(orderBy('qux'));
     validateServesTarget(q, <Object>[
       'foo',
       SegmentKind.ascending,
@@ -435,8 +424,7 @@ void main() {
         .filter(filter('aaa', '==', ''))
         .filter(filter('qqq', '==', ''))
         .filter(filter('ccc', '==', ''))
-        .orderBy(orderBy('fff', 'desc'))
-        .orderBy(orderBy('bbb'));
+        .orderBy(orderBy('fff', 'desc')).orderBy(orderBy('bbb'));
     validateServesTarget(q, <Object>[
       'aaa',
       SegmentKind.ascending,
@@ -460,16 +448,14 @@ void main() {
   test('withInAndOrderBy', () {
     Query q = query('collId')
         .filter(filter('a', 'not-in', <Object>[1, 2, 3]))
-        .orderBy(orderBy('a'))
-        .orderBy(orderBy('b'));
+        .orderBy(orderBy('a')).orderBy(orderBy('b'));
     validateServesTarget(
         q, <Object>['a', SegmentKind.ascending, 'b', SegmentKind.ascending]);
   });
 
   test('withInAndOrderBySameField', () {
     Query q = query('collId')
-        .filter(filter('a', 'in', <Object>[1, 2, 3]))
-        .orderBy(orderBy('a'));
+        .filter(filter('a', 'in', <Object>[1, 2, 3])).orderBy(orderBy('a'));
     validateServesTarget(q, <Object>['a', SegmentKind.ascending]);
   });
 
@@ -483,40 +469,35 @@ void main() {
     validateServesTarget(
         query('collId')
             .filter(filter('a', '>=', 5))
-            .filter(filter('a', '==', 0))
-            .orderBy(orderBy('a')),
+            .filter(filter('a', '==', 0)).orderBy(orderBy('a')),
         <Object>['a', SegmentKind.ascending]);
 
     validateServesTarget(
         query('collId')
             .filter(filter('a', '>=', 5))
             .filter(filter('a', '==', 0))
-            .orderBy(orderBy('a'))
-            .orderBy(orderBy(DocumentKey.keyFieldName)),
+            .orderBy(orderBy('a')).orderBy(orderBy(DocumentKey.keyFieldName)),
         <Object>['a', SegmentKind.ascending]);
 
     validateServesTarget(
         query('collId')
             .filter(filter('a', '>=', 5))
             .filter(filter('a', '==', 0))
-            .orderBy(orderBy('a'))
-            .orderBy(orderBy(DocumentKey.keyFieldName, 'desc')),
+            .orderBy(orderBy('a')).orderBy(orderBy(DocumentKey.keyFieldName, 'desc')),
         <Object>['a', SegmentKind.ascending]);
 
     validateServesTarget(
         query('collId')
             .filter(filter('a', '>=', 5))
             .filter(filter('a', '==', 0))
-            .orderBy(orderBy('a', 'asc'))
-            .orderBy(orderBy('b', 'asc')),
+            .orderBy(orderBy('a', 'asc')).orderBy(orderBy('b', 'asc')),
         <Object>['a', SegmentKind.ascending, 'b', SegmentKind.ascending]);
 
     validateServesTarget(
         query('collId')
             .filter(filter('a', '>=', 5))
             .filter(filter('a', '==', 0))
-            .orderBy(orderBy('a', 'desc'))
-            .orderBy(orderBy(DocumentKey.keyFieldName, 'desc')),
+            .orderBy(orderBy('a', 'desc')).orderBy(orderBy(DocumentKey.keyFieldName, 'desc')),
         <Object>['a', SegmentKind.descending]);
   });
 
@@ -559,15 +540,13 @@ void main() {
   test('testBuildTargetIndexWithArrayContainsAndOrderBy', () {
     Query q = query('collId')
         .filter(filter('a', 'array-contains', 'a'))
-        .filter(filter('a', '>', 'b'))
-        .orderBy(orderBy('a', 'asc'));
+        .filter(filter('a', '>', 'b')).orderBy(orderBy('a', 'asc'));
     validateBuildTargetIndexCreateFullMatchIndex(q);
   });
 
   test('testBuildTargetIndexWithEqualityAndDescendingOrder', () {
     Query q = query('collId')
-        .filter(filter('a', '==', 1))
-        .orderBy(orderBy('__name__', 'desc'));
+        .filter(filter('a', '==', 1)).orderBy(orderBy('__name__', 'desc'));
     validateBuildTargetIndexCreateFullMatchIndex(q);
   });
 
@@ -598,8 +577,7 @@ void main() {
     validateBuildTargetIndexCreateFullMatchIndex(q);
     q = query('collId')
         .filter(filter('a1', '==', 'a'))
-        .filter(filter('a2', '>', 'b'))
-        .orderBy(orderBy('a2', 'asc'));
+        .filter(filter('a2', '>', 'b')).orderBy(orderBy('a2', 'asc'));
     validateBuildTargetIndexCreateFullMatchIndex(q);
     q = query('collId')
         .filter(filter('a', '>=', 1))
@@ -615,13 +593,11 @@ void main() {
   test('testBuildTargetIndexWithMultipleOrderBys', () {
     Query q = query('collId')
         .orderBy(orderBy('fff'))
-        .orderBy(orderBy('bar', 'desc'))
-        .orderBy(orderBy('__name__'));
+        .orderBy(orderBy('bar', 'desc')).orderBy(orderBy('__name__'));
     validateBuildTargetIndexCreateFullMatchIndex(q);
     q = query('collId')
         .orderBy(orderBy('foo'))
-        .orderBy(orderBy('bar'))
-        .orderBy(orderBy('__name__', 'desc'));
+        .orderBy(orderBy('bar')).orderBy(orderBy('__name__', 'desc'));
     validateBuildTargetIndexCreateFullMatchIndex(q);
   });
 
@@ -635,15 +611,13 @@ void main() {
   test('testBuildTargetIndexWithEqualityAndDifferentOrderBy', () {
     Query q = query('collId')
         .filter(filter('foo', '==', ''))
-        .filter(filter('bar', '==', ''))
-        .orderBy(orderBy('qux'));
+        .filter(filter('bar', '==', '')).orderBy(orderBy('qux'));
     validateBuildTargetIndexCreateFullMatchIndex(q);
     q = query('collId')
         .filter(filter('aaa', '==', ''))
         .filter(filter('qqq', '==', ''))
         .filter(filter('ccc', '==', ''))
-        .orderBy(orderBy('fff', 'desc'))
-        .orderBy(orderBy('bbb'));
+        .orderBy(orderBy('fff', 'desc')).orderBy(orderBy('bbb'));
     validateBuildTargetIndexCreateFullMatchIndex(q);
   });
 
@@ -657,15 +631,13 @@ void main() {
   test('testBuildTargetIndexWithInAndOrderBy', () {
     Query q = query('collId')
         .filter(filter('a', 'not-in', <Object>[1, 2, 3]))
-        .orderBy(orderBy('a'))
-        .orderBy(orderBy('b'));
+        .orderBy(orderBy('a')).orderBy(orderBy('b'));
     validateBuildTargetIndexCreateFullMatchIndex(q);
   });
 
   test('testBuildTargetIndexWithInAndOrderBySameField', () {
     Query q = query('collId')
-        .filter(filter('a', 'in', <Object>[1, 2, 3]))
-        .orderBy(orderBy('a'));
+        .filter(filter('a', 'in', <Object>[1, 2, 3])).orderBy(orderBy('a'));
     validateBuildTargetIndexCreateFullMatchIndex(q);
   });
 

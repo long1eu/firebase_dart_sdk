@@ -13,7 +13,7 @@ import 'package:cloud_firestore_dart/lite.dart';
 import 'package:firebase_app_dart/firebase_app_dart.dart';
 
 late FirebaseApp app;
-late FirebaseFirestore firestore;
+late Firestore firestore;
 
 // ../../docs/guides/lite.md:23
 Future<void> liteGuideLine23() async {
@@ -33,7 +33,7 @@ Future<void> liteGuideLine23() async {
   await batch.commit();
 
   final AggregateQuerySnapshot count = await cities.count().get();
-  print(count.getCount());
+  print(count.count);
 
   await firestore.terminate();
 }
@@ -48,11 +48,11 @@ Future<void> serverGuideLine297() async {
           await firestore.collection('tasks').doc(id.isEmpty ? 'none' : id).get();
       request.response
         ..statusCode = task.exists ? HttpStatus.ok : HttpStatus.notFound
-        ..write(jsonEncode(task.data ?? <String, Object?>{}));
+        ..write(jsonEncode(task.data() ?? <String, Object?>{}));
     } on FirestoreException catch (error) {
       request.response
         ..statusCode = HttpStatus.serviceUnavailable
-        ..write('${error.errorCode}');
+        ..write('${error.code}');
     }
     await request.response.close();
   }

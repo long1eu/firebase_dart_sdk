@@ -25,6 +25,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/load_bundle_task_pro
 import 'package:cloud_firestore_dart/src/firebase/firestore/query.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/query_snapshot.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/source.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/get_options.dart';
 import 'package:test/test.dart';
 
 import '../../../util/integration_test_util.dart';
@@ -92,9 +93,11 @@ void main() {
   }
 
   Future<List<Map<String, Object?>>> cachedValues(Query query) async {
-    final QuerySnapshot snapshot = await query.get(Source.cache);
+    final QuerySnapshot snapshot = await query.get(
+      GetOptions(source: Source.cache),
+    );
     return snapshot.docs
-        .map((DocumentSnapshot d) => d.data as Map<String, Object?>)
+        .map((DocumentSnapshot d) => d.data() as Map<String, Object?>)
         .toList();
   }
 
@@ -232,7 +235,7 @@ void main() {
     expect(progressEvents[1].documentsLoaded, 0);
 
     // Firestore still functions, despite having loaded a problematic bundle.
-    await db.collection('coll-1').get(Source.cache);
+    await db.collection('coll-1').get(GetOptions(source: Source.cache));
   });
   test('testLoadedDocumentsShouldNotBeGarbageCollectedRightAway', () async {
     // Only meaningful with memory persistence (SQLite only ever deletes lazily): use a memory cache with eager GC.
@@ -252,7 +255,7 @@ void main() {
     verifySuccessProgress(result);
 
     // Read a different collection. This triggers GC.
-    await db.collection('coll-other').get(Source.cache);
+    await db.collection('coll-other').get(GetOptions(source: Source.cache));
 
     // The loaded documents must still be in the cache: with eager GC they would be collected if the "umbrella" target
     // of the bundle did not hold their keys (see LocalStore).

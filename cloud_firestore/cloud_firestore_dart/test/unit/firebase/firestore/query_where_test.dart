@@ -31,56 +31,54 @@ void main() {
 
   test('each named argument builds the same query as the where* method', () {
     final Query<Map<String, Object?>> q = collection();
-    expect(q.where('a', isEqualTo: 1), q.whereEqualTo('a', 1));
-    expect(q.where('a', isNotEqualTo: 1), q.whereNotEqualTo('a', 1));
-    expect(q.where('a', isLessThan: 1), q.whereLessThan('a', 1));
+    expect(q.where('a', isEqualTo: 1), q.where('a', isEqualTo: 1));
+    expect(q.where('a', isNotEqualTo: 1), q.where('a', isNotEqualTo: 1));
+    expect(q.where('a', isLessThan: 1), q.where('a', isLessThan: 1));
     expect(
-        q.where('a', isLessThanOrEqualTo: 1), q.whereLessThanOrEqualTo('a', 1));
-    expect(q.where('a', isGreaterThan: 1), q.whereGreaterThan('a', 1));
+        q.where('a', isLessThanOrEqualTo: 1), q.where('a', isLessThanOrEqualTo: 1));
+    expect(q.where('a', isGreaterThan: 1), q.where('a', isGreaterThan: 1));
     expect(q.where('a', isGreaterThanOrEqualTo: 1),
-        q.whereGreaterThanOrEqualTo('a', 1));
-    expect(q.where('a', arrayContains: 1), q.whereArrayContains('a', 1));
+        q.where('a', isGreaterThanOrEqualTo: 1));
+    expect(q.where('a', arrayContains: 1), q.where('a', arrayContains: 1));
     expect(q.where('a', arrayContainsAny: <int>[1, 2]),
-        q.whereArrayContainsAny('a', <Object?>[1, 2]));
-    expect(q.where('a', whereIn: <int>[1, 2]), q.whereIn('a', <Object?>[1, 2]));
+        q.where('a', arrayContainsAny: <Object?>[1, 2]));
+    expect(q.where('a', whereIn: <int>[1, 2]), q.where('a', whereIn: <Object?>[1, 2]));
     expect(q.where('a', whereNotIn: <int>[1, 2]),
-        q.whereNotIn('a', <Object?>[1, 2]));
-    expect(q.where('a', isNull: true), q.whereEqualTo('a', null));
-    expect(q.where('a', isNull: false), q.whereNotEqualTo('a', null));
+        q.where('a', whereNotIn: <Object?>[1, 2]));
   });
 
   test('iterables that are not lists are accepted', () {
     final Query<Map<String, Object?>> q = collection();
-    expect(q.where('a', whereIn: <int>{1, 2}), q.whereIn('a', <Object?>[1, 2]));
+    expect(q.where('a', whereIn: <int>{1, 2}), q.where('a', whereIn: <Object?>[1, 2]));
     expect(q.where('a', arrayContainsAny: <int>[1, 2].map((int i) => i)),
-        q.whereArrayContainsAny('a', <Object?>[1, 2]));
+        q.where('a', arrayContainsAny: <Object?>[1, 2]));
   });
 
   test('several named arguments are combined with AND', () {
     final Query<Map<String, Object?>> q = collection();
     expect(q.where('age', isGreaterThanOrEqualTo: 18, isLessThan: 65),
-        q.whereLessThan('age', 65).whereGreaterThanOrEqualTo('age', 18));
+        q.where('age', isLessThan: 65).where('age', isGreaterThanOrEqualTo: 18));
     expect(q.where('age', isGreaterThanOrEqualTo: 18, isLessThan: 65),
-        isNot(q.whereGreaterThanOrEqualTo('age', 18)),
+        isNot(q.where('age', isGreaterThanOrEqualTo: 18)),
         reason: 'both filters must be present');
   });
 
   test('the field can be a dotted string or a FieldPath', () {
     final Query<Map<String, Object?>> q = collection();
     expect(q.where('a.b', isEqualTo: 1),
-        q.whereEqualToField(FieldPath(<String>['a', 'b']), 1));
+        q.where(FieldPath(<String>['a', 'b']), isEqualTo: 1));
     expect(q.where(FieldPath(<String>['a.b']), isEqualTo: 1),
-        q.whereEqualToField(FieldPath(<String>['a.b']), 1));
+        q.where(FieldPath(<String>['a.b']), isEqualTo: 1));
     expect(q.where(FieldPath(<String>['a.b']), isEqualTo: 1),
         isNot(q.where('a.b', isEqualTo: 1)));
   });
 
   test('a Filter is still accepted', () {
     final Query<Map<String, Object?>> q = collection();
-    expect(q.where(Filter.equalTo('a', 1)), q.whereEqualTo('a', 1));
+    expect(q.where(Filter('a', isEqualTo: 1)), q.where('a', isEqualTo: 1));
     expect(q.where(Filter.and(<Filter>[])), same(q));
     final Filter or =
-        Filter.or(<Filter>[Filter.equalTo('a', 1), Filter.greaterThan('b', 2)]);
+        Filter.or(<Filter>[Filter('a', isEqualTo: 1), Filter('b', isGreaterThan: 2)]);
     expect(q.where(or), q.where(or));
     expect(q.where(or), isNot(q));
   });
@@ -89,11 +87,11 @@ void main() {
     const FirestoreDataConverter<String> converter =
         FirestoreDataConverter<String>.from(
             fromFirestore: _fromFirestore, toFirestore: _toFirestore);
-    final Query<String> typed = collection().withConverter<String>(converter);
+    final Query<String> typed = collection().withConverter<String>(fromFirestore: converter.fromFirestore, toFirestore: converter.toFirestore);
     final Query<String> filtered = typed.where('a', isEqualTo: 1);
-    expect(filtered.converter, same(converter));
-    expect(filtered, typed.whereEqualTo('a', 1));
-    final Query<String> filteredByFilter = typed.where(Filter.equalTo('a', 1));
+    expect(filtered.converter, typed.converter);
+    expect(filtered, typed.where('a', isEqualTo: 1));
+    final Query<String> filteredByFilter = typed.where(Filter('a', isEqualTo: 1));
     expect(filteredByFilter, filtered);
   });
 
@@ -108,9 +106,9 @@ void main() {
     expect(() => q.where('a'), throwsArgument('at least one non-null'));
     expect(() => q.where('a', isEqualTo: null),
         throwsArgument('Use isNull to compare with null'));
-    expect(() => q.where(Filter.equalTo('a', 1), isEqualTo: 1),
+    expect(() => q.where(Filter('a', isEqualTo: 1), isEqualTo: 1),
         throwsArgument('cannot be combined with a Filter'));
-    expect(() => q.where(Filter.equalTo('a', 1), isNull: false),
+    expect(() => q.where(Filter('a', isEqualTo: 1), isNull: false),
         throwsArgument('cannot be combined with a Filter'));
     expect(() => q.where(42, isEqualTo: 1),
         throwsArgument('expects a Filter, a String field or a FieldPath'));

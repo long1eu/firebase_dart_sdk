@@ -144,8 +144,8 @@ void main() {
       unawaited(firestore.doc('rooms/eros').set(<String, Object?>{'a': 1}));
       final DocumentSnapshot<Map<String, Object?>> read = await firestore
           .doc('rooms/eros')
-          .get(Source.cache);
-      expect(read.data, <String, Object?>{'a': 1});
+          .get(GetOptions(source: Source.cache));
+      expect(read.data(), <String, Object?>{'a': 1});
       expect(log, <String>['open']);
     },
   );
@@ -251,7 +251,7 @@ void main() {
       );
       await old.initialized;
 
-      await first.delete();
+      unawaited(first.delete());
       final FirebaseApp second = newApp(name);
       addTearDown(second.delete);
       final FirebaseFirestore current = FirebaseFirestore.instanceFor(
@@ -284,7 +284,7 @@ void main() {
       openDatabase: recording(openFixed(dbName), log),
     );
     // Not awaited: the old instance is still opening its cache.
-    await first.delete();
+    unawaited(first.delete());
     final FirebaseApp second = newApp(name);
     addTearDown(second.delete);
     final FirebaseFirestore current = FirebaseFirestore.instanceFor(
@@ -312,7 +312,7 @@ void main() {
     // Throws if the instance was terminated.
     final QuerySnapshot<Map<String, Object?>> cached = await current
         .collection('coll')
-        .get(Source.cache);
+        .get(GetOptions(source: Source.cache));
     expect(cached.docs, isEmpty);
     expect(log, <String>['open', 'close', 'open']);
   });

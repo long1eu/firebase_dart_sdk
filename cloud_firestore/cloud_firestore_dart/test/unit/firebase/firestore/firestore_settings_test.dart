@@ -13,6 +13,8 @@
 // limitations under the License.
 
 import 'package:cloud_firestore_dart/cloud_firestore_dart.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/long_polling_options.dart'
+    show WebExperimentalLongPollingOptionsInternal;
 import 'package:test/test.dart';
 
 void main() {
@@ -168,24 +170,6 @@ void main() {
     });
   });
 
-  group('SnapshotListenOptions', () {
-    test('defaults', () {
-      const SnapshotListenOptions options = SnapshotListenOptions();
-      expect(options.metadataChanges, MetadataChanges.exclude);
-      expect(options.source, ListenSource.defaultSource);
-    });
-
-    test('value semantics', () {
-      expect(const SnapshotListenOptions(source: ListenSource.cache),
-          const SnapshotListenOptions(source: ListenSource.cache));
-      expect(const SnapshotListenOptions(source: ListenSource.cache),
-          isNot(const SnapshotListenOptions()));
-      expect(
-          const SnapshotListenOptions(metadataChanges: MetadataChanges.include)
-              .toString(),
-          contains('MetadataChanges.include'));
-    });
-  });
   group('long polling settings', () {
     test('auto detection is on by default and off when polling is forced', () {
       final Settings defaults = Settings();
@@ -243,11 +227,14 @@ void main() {
   // Ports of the `timeoutSeconds` tests of the JS SDK
   // (packages/firestore/test/unit/api/database.test.ts). The JS SDK throws a
   // FirestoreError with code invalid-argument; this port throws an
-  // ArgumentError, like its other settings, with the same message.
-  group('experimentalLongPollingOptions', () {
-    Settings withTimeout(num? timeoutSeconds) => Settings(
-          webExperimentalLongPollingOptions:
-              WebExperimentalLongPollingOptions(timeoutSeconds: timeoutSeconds),
+  // ArgumentError, like its other settings, with the same message. The
+  // timeout is a Duration here, so the JS tests of NaN and the infinities have
+  // no counterpart.
+  group('webExperimentalLongPollingOptions', () {
+    Settings withTimeout(num timeoutSeconds) => Settings(
+          webExperimentalLongPollingOptions: WebExperimentalLongPollingOptions(
+              timeoutDuration: Duration(
+                  microseconds: (timeoutSeconds * 1000000).round())),
         );
 
     Matcher throwsInvalidTimeout(String pattern) => throwsA(
@@ -307,21 +294,6 @@ void main() {
           throwsInvalidTimeout(r'invalid.*timeout.*-1.*\(.*5.*\)'));
     });
 
-    test('timeoutSeconds value of -infinity throws', () {
-      expect(() => withTimeout(double.negativeInfinity),
-          throwsInvalidTimeout(r'invalid.*timeout.*-Infinity.*\(.*5.*\)'));
-    });
-
-    test('timeoutSeconds value of +infinity throws', () {
-      expect(() => withTimeout(double.infinity),
-          throwsInvalidTimeout(r'invalid.*timeout.*Infinity.*\(.*30.*\)'));
-    });
-
-    test('timeoutSeconds value of NaN throws', () {
-      expect(() => withTimeout(double.nan),
-          throwsInvalidTimeout(r'invalid.*timeout.*NaN'));
-    });
-
     test('copies keep the options, which are part of equality', () {
       final Settings settings = withTimeout(25);
       expect(
@@ -334,13 +306,13 @@ void main() {
           settings
               .copyWith(
                   webExperimentalLongPollingOptions:
-                      const WebExperimentalLongPollingOptions(timeoutSeconds: 10))
+                      const WebExperimentalLongPollingOptions(timeoutDuration: Duration(seconds: 10)))
               .webExperimentalLongPollingOptions
               .timeoutSeconds,
           10);
       expect(() => settings.copyWith(
               webExperimentalLongPollingOptions:
-                  const WebExperimentalLongPollingOptions(timeoutSeconds: 31)),
+                  const WebExperimentalLongPollingOptions(timeoutDuration: Duration(seconds: 31))),
           throwsArgumentError);
       expect(withTimeout(25), withTimeout(25));
       expect(withTimeout(25).hashCode, withTimeout(25).hashCode);

@@ -20,6 +20,7 @@ public API of the main library is the golden listing linked below.
 - [Repository README](https://raw.githubusercontent.com/long1eu/firebase_dart_sdk/main/README.md): what the client does, its status, the packages
 - [Coming from FlutterFire](https://raw.githubusercontent.com/long1eu/firebase_dart_sdk/main/docs/guides/migrating_from_flutterfire.md): when to use this client instead of `cloud_firestore`, setup differences, the API side by side
 - [Features and limits](https://raw.githubusercontent.com/long1eu/firebase_dart_sdk/main/docs/guides/features.md): what is done, what is not, known gaps
+- [Migrating from 0.1 to 0.2](https://raw.githubusercontent.com/long1eu/firebase_dart_sdk/main/docs/api_migration_0_2.md): every renamed, reshaped, removed and added member, with its FlutterFire equivalent
 
 ## Guides
 

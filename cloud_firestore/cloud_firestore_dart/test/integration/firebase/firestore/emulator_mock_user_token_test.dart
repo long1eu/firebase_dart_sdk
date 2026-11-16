@@ -43,8 +43,8 @@ void main() {
         firestore.collection('mock-user-token').doc(const Uuid().v4());
     await doc.set(<String, Object?>{'a': 1});
     final DocumentSnapshot<Map<String, Object?>> snapshot =
-        await doc.get(Source.server);
-    expect(snapshot.data, <String, Object?>{'a': 1});
+        await doc.get(GetOptions(source: Source.server));
+    expect(snapshot.data(), <String, Object?>{'a': 1});
   }
 
   test('requests with a mock user token from claims succeed', () async {

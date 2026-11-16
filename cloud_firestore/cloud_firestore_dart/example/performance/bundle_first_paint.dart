@@ -37,10 +37,7 @@ Future<void> main() async {
   }
   await batch.commit();
   final Map<String, Object?> json =
-      (await articles
-              .orderBy('published', Direction.descending)
-              .limit(20)
-              .get())
+      (await articles.orderBy('published', descending: true).limit(20).get())
           .toJson();
   final String bundle = json['bundle']! as String;
   final String bundleName = json['bundleName']! as String;
@@ -64,7 +61,7 @@ Future<void> main() async {
     bundleName,
   ))!;
   final QuerySnapshot<Map<String, Object?>> cached = await latest.get(
-    Source.cache,
+    GetOptions(source: Source.cache),
   );
   firstPaint.stop();
   print(
@@ -84,7 +81,7 @@ Future<void> main() async {
   final Stopwatch inSync = Stopwatch()..start();
   final Completer<void> synced = Completer<void>();
   final StreamSubscription<QuerySnapshot<Map<String, Object?>>> subscription =
-      latest.snapshots.listen((QuerySnapshot<Map<String, Object?>> snapshot) {
+      latest.snapshots().listen((QuerySnapshot<Map<String, Object?>> snapshot) {
         print(
           'listener: ${snapshot.length} articles, first is '
           '"${snapshot.docs.first['title']}", from cache: '

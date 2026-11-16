@@ -47,7 +47,7 @@ void main() {
         throwsArgumentErrorWith(error('DocumentReference.set')),
       );
       await expectLater(
-        () => doc.set(data, SetOptions.mergeAllFields),
+        () => doc.set(data, const SetOptions(merge: true)),
         throwsArgumentErrorWith(error('DocumentReference.set')),
       );
       await expectLater(
@@ -55,8 +55,10 @@ void main() {
         throwsArgumentErrorWith(error('DocumentReference.update')),
       );
       await expectLater(
-        () => doc.updateFromList(<Object?>['a', data['a']]),
-        throwsArgumentErrorWith(error('DocumentReference.updateFromList')),
+        () => doc.update(<Object, Object?>{
+          FieldPath(<String>['a']): data['a'],
+        }),
+        throwsArgumentErrorWith(error('DocumentReference.update')),
       );
       expect(
         () => db.batch().set(doc, data),
@@ -90,10 +92,8 @@ void main() {
 
     test('says when the data comes from a converter', () async {
       final DocumentReference<int> typed = doc.withConverter<int>(
-        FirestoreDataConverter<int>.from(
-          fromFirestore: (_, _) => 1,
-          toFirestore: (int value, _) => <String, Object?>{'a': _Foo()},
-        ),
+        fromFirestore: (_, _) => 1,
+        toFirestore: (int value, _) => <String, Object?>{'a': _Foo()},
       );
       await expectLater(
         () => typed.set(1),
@@ -158,9 +158,11 @@ void main() {
       await expectLater(
         () => doc.set(
           <String, Object?>{'a': 1},
-          SetOptions.mergeFieldPaths(<FieldPath>[
-            FieldPath(<String>['b']),
-          ]),
+          SetOptions(
+            mergeFields: <FieldPath>[
+              FieldPath(<String>['b']),
+            ],
+          ),
         ),
         throwsArgumentErrorWith(
           "Field 'b' is specified in your field mask but missing from your "
@@ -180,22 +182,12 @@ void main() {
       );
     });
 
-    test('updateFromList arguments', () async {
+    test('update keys', () async {
       await expectLater(
-        () => doc.updateFromList(<Object?>['a']),
+        () => doc.update(<Object, Object?>{1: 2}),
         throwsArgumentErrorWith(
-          'Function DocumentReference.updateFromList() needs to be called with '
-          'an even number of arguments that alternate between field names and '
-          'values.',
-        ),
-      );
-      await expectLater(
-        () => doc.updateFromList(<Object?>[1, 2]),
-        throwsArgumentErrorWith(
-          'Function DocumentReference.updateFromList() called with invalid '
-          'data. Expected a field name (a String or a FieldPath) at argument '
-          'position 2, but got 1. The arguments should alternate between '
-          'field names and values.',
+          'Function DocumentReference.update() called with invalid data. The '
+          'key 1 is neither a String field path nor a FieldPath.',
         ),
       );
     });
@@ -211,9 +203,10 @@ void main() {
         ),
       );
       expect(
-        () => coll.whereEqualTo('a', <String, Object?>{
-          'b': FieldValue.increment(1),
-        }),
+        () => coll.where(
+          'a',
+          isEqualTo: <String, Object?>{'b': FieldValue.increment(1)},
+        ),
         throwsArgumentErrorWith(
           'Function where() called with invalid data. FieldValue.increment() '
           'can only be used with set() and update() (found in field b)',
@@ -234,7 +227,7 @@ void main() {
     test('field paths name the method', () {
       const String reserved =
           'Invalid field path (a~b). Paths must not '
-          "contain '~', '*', '/', '[', or ']'. Use FieldPath.of() for field "
+          "contain '~', '*', '/', '[', or ']'. Use FieldPath() for field "
           'names that contain them.';
       expect(
         () => coll.where('a~b', isEqualTo: 1),
@@ -243,7 +236,7 @@ void main() {
         ),
       );
       expect(
-        () => coll.whereLessThan('a~b', 1),
+        () => coll.where('a~b', isLessThan: 1),
         throwsArgumentErrorWith(
           'Function where() called with invalid data. $reserved',
         ),

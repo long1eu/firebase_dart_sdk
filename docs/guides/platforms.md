@@ -42,7 +42,7 @@ listen and write streams, over `fetch`. What to know:
     OPFS, pending writes included.
 
   One tab at a time with either: a second tab that opens the same cache gets a
-  `FirestoreError` with `failedPrecondition` (a Web Lock guards the database) and should use a
+  `FirestoreException` with `failedPrecondition` (a Web Lock guards the database) and should use a
   memory cache; `openWithMemoryFallback` in that file does this. `clearPersistence()` deletes
   the IndexedDB database or the OPFS directory. Cost, measured for a small app compiled with
   `dart compile js -O2`: 588 KB (180 KB gzipped) with a memory cache, 807 KB (239 KB gzipped)
@@ -93,11 +93,11 @@ listen and write streams, over `fetch`. What to know:
   production backend are untested.
 - Prefer dart2wasm. Compiled to JavaScript, integers above 2^53 lose precision.
 - If listeners or writes never complete on some network (a proxy or antivirus that buffers
-  streamed responses), set `FirestoreSettings(experimentalForceLongPolling: true)`. The
-  client also tries to detect this by itself (`experimentalAutoDetectLongPolling`, on by
+  streamed responses), set `Settings(webExperimentalForceLongPolling: true)`. The
+  client also tries to detect this by itself (`webExperimentalAutoDetectLongPolling`, on by
   default). If such a proxy cuts long-polling requests before the 30 seconds the backend holds
   them, ask for a shorter timeout:
-  `experimentalLongPollingOptions: ExperimentalLongPollingOptions(timeoutSeconds: 25)`
+  `webExperimentalLongPollingOptions: WebExperimentalLongPollingOptions(timeoutDuration: Duration(seconds: 25))`
   (5 to 30 seconds, as in the JS SDK).
 - Do not compile with `-Dprotobuf.omit_field_names=true` or `-Dprotobuf.omit_enum_names=true`:
   the web transport needs those names, and refuses to start without them.

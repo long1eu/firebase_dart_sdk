@@ -101,7 +101,7 @@ class ChaosEnv {
   Future<Map<String, Map<String, Object?>>> serverDocs(
       String collectionPath) async {
     final QuerySnapshot<Map<String, Object?>> snapshot =
-        await oracle.collection(collectionPath).get(Source.server);
+        await oracle.collection(collectionPath).get(GetOptions(source: Source.server));
     return docsById(snapshot);
   }
 
@@ -123,7 +123,7 @@ Map<String, Map<String, Object?>> docsById(
     QuerySnapshot<Map<String, Object?>> snapshot) {
   return <String, Map<String, Object?>>{
     for (final QueryDocumentSnapshot<Map<String, Object?>> doc in snapshot.docs)
-      doc.id: doc.data,
+      doc.id: doc.data(),
   };
 }
 
@@ -159,9 +159,7 @@ Future<void> pause(int milliseconds) =>
 /// duplicate documents, and the document changes lead from the previous snapshot to this one.
 class RecordingListener {
   RecordingListener(this.query) {
-    _subscription = query
-        .getSnapshotsWithOptions(const SnapshotListenOptions(
-            metadataChanges: MetadataChanges.include))
+    _subscription = query.snapshots(includeMetadataChanges: true)
         .listen(_onSnapshot, onError: errors.add);
   }
 
@@ -195,7 +193,7 @@ class RecordingListener {
     final List<String> replayed = List<String>.of(_replayed);
     try {
       for (final DocumentChange<Map<String, Object?>> change
-          in snapshot.getDocumentChanges(MetadataChanges.include)) {
+          in snapshot.docChanges) {
         if (change.type != DocumentChangeType.added) {
           if (replayed[change.oldIndex] != change.doc.id) {
             violations.add('event $index: change of ${change.doc.id} has '
@@ -247,7 +245,7 @@ class RecordingListener {
       final Map<String, String> now = <String, String>{
         for (final QueryDocumentSnapshot<Map<String, Object?>> doc
             in event.docs)
-          doc.id: '${doc.data}${doc.metadata.hasPendingWrites ? ' pending' : ''}'
+          doc.id: '${doc.data()}${doc.metadata.hasPendingWrites ? ' pending' : ''}'
               '${doc.metadata.isFromCache ? '' : ' synced'}',
       };
       final List<String> changes = <String>[
@@ -296,7 +294,7 @@ class RecordingListener {
     expect(settled(), isTrue,
         reason: 'the listener moved away:\n${describe()}');
     for (final QueryDocumentSnapshot<Map<String, Object?>> doc in last.docs) {
-      expect(doc.data, server[doc.id], reason: doc.id);
+      expect(doc.data(), server[doc.id], reason: doc.id);
     }
     expect(errors, isEmpty);
     expect(violations, isEmpty);

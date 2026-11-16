@@ -44,8 +44,7 @@ void main() {
           RecordingListener(db.collection(name).orderBy('n'));
       final RecordingListener even = RecordingListener(db
           .collection(name)
-          .where('even', isEqualTo: true)
-          .orderBy('n', Direction.descending)
+          .where('even', isEqualTo: true).orderBy('n', descending: true)
           .limit(3));
       await all.synced();
 
@@ -60,7 +59,7 @@ void main() {
         await writer.doc('d${round % 5}').set(<String, Object?>{
           'n': FieldValue.increment(1000),
           'even': round.isOdd,
-        }, SetOptions.mergeAllFields);
+        }, const SetOptions(merge: true));
         if (round % 3 == 0) {
           await writer.doc('d${next - 2}').delete();
         }
@@ -155,7 +154,7 @@ void main() {
           in listener.last.docs) {
         expect(doc.metadata.hasPendingWrites, isTrue, reason: doc.id);
       }
-      expect(listener.last.docs.first.data, <String, Object?>{'v': 1});
+      expect(listener.last.docs.first.data(), <String, Object?>{'v': 1});
 
       // A change made elsewhere during the outage.
       await env.oracle.collection(name).doc('c').set(<String, Object?>{'v': 3});

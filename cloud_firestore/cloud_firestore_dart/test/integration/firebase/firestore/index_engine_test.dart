@@ -96,68 +96,67 @@ void main() {
       indexes: indexes,
       queries: <IndexedQuery>[
         // Comparison operators.
-        IndexedQuery('a == 2', (c) => c.whereEqualTo('a', 2)),
-        IndexedQuery('a != 2', (c) => c.whereNotEqualTo('a', 2)),
-        IndexedQuery('a < 3', (c) => c.whereLessThan('a', 3)),
-        IndexedQuery('a <= 3', (c) => c.whereLessThanOrEqualTo('a', 3)),
-        IndexedQuery('a > 2', (c) => c.whereGreaterThan('a', 2)),
-        IndexedQuery('a >= 2', (c) => c.whereGreaterThanOrEqualTo('a', 2)),
+        IndexedQuery('a == 2', (c) => c.where('a', isEqualTo: 2)),
+        IndexedQuery('a != 2', (c) => c.where('a', isNotEqualTo: 2)),
+        IndexedQuery('a < 3', (c) => c.where('a', isLessThan: 3)),
+        IndexedQuery('a <= 3', (c) => c.where('a', isLessThanOrEqualTo: 3)),
+        IndexedQuery('a > 2', (c) => c.where('a', isGreaterThan: 2)),
+        IndexedQuery('a >= 2', (c) => c.where('a', isGreaterThanOrEqualTo: 2)),
         IndexedQuery(
           '2 <= a < 4',
-          (c) => c.whereGreaterThanOrEqualTo('a', 2).whereLessThan('a', 4),
+          (c) => c.where('a', isGreaterThanOrEqualTo: 2).where('a', isLessThan: 4),
         ),
-        IndexedQuery('a == null', (c) => c.whereEqualTo('a', null)),
-        IndexedQuery('a != null', (c) => c.whereNotEqualTo('a', null)),
-        IndexedQuery('b >= "y"', (c) => c.whereGreaterThanOrEqualTo('b', 'y')),
+        IndexedQuery('a == null', (c) => c.where('a', isNull: true)),
+        IndexedQuery('a != null', (c) => c.where('a', isNull: false)),
+        IndexedQuery('b >= "y"', (c) => c.where('b', isGreaterThanOrEqualTo: 'y')),
         // IN and NOT IN.
         IndexedQuery(
           'a in [1, 3, 5]',
-          (c) => c.whereIn('a', <Object?>[1, 3, 5]),
+          (c) => c.where('a', whereIn: <Object?>[1, 3, 5]),
         ),
         IndexedQuery(
           'a not-in [2, 3]',
-          (c) => c.whereNotIn('a', <Object?>[2, 3]),
+          (c) => c.where('a', whereNotIn: <Object?>[2, 3]),
         ),
         IndexedQuery(
           'b in [x, z], a desc',
           (c) => c
-              .whereIn('b', <Object?>['x', 'z'])
-              .orderBy('a', Direction.descending),
+              .where('b', whereIn: <Object?>['x', 'z']).orderBy('a', descending: true),
           // An IN is one sub target per value, sorted and limited in memory.
         ),
         // Array membership.
         IndexedQuery(
           'tags array-contains red',
-          (c) => c.whereArrayContains('tags', 'red'),
+          (c) => c.where('tags', arrayContains: 'red'),
         ),
         IndexedQuery(
           'tags array-contains-any [blue, 1]',
-          (c) => c.whereArrayContainsAny('tags', <Object?>['blue', 1]),
+          (c) => c.where('tags', arrayContainsAny: <Object?>['blue', 1]),
         ),
         IndexedQuery(
           'tags array-contains red, a > 0',
-          (c) => c.whereArrayContains('tags', 'red').whereGreaterThan('a', 0),
+          (c) => c.where('tags', arrayContains: 'red').where('a', isGreaterThan: 0),
         ),
         // Several fields.
         IndexedQuery(
           'a == 2 and b == x',
-          (c) => c.whereEqualTo('a', 2).whereEqualTo('b', 'x'),
+          (c) => c.where('a', isEqualTo: 2).where('b', isEqualTo: 'x'),
         ),
         IndexedQuery(
           'b == x, order by a desc',
-          (c) => c.whereEqualTo('b', 'x').orderBy('a', Direction.descending),
+          (c) => c.where('b', isEqualTo: 'x').orderBy('a', descending: true),
         ),
         IndexedQuery(
           'a >= 2 order by a, b',
-          (c) => c.whereGreaterThanOrEqualTo('a', 2).orderBy('a').orderBy('b'),
+          (c) => c.where('a', isGreaterThanOrEqualTo: 2).orderBy('a').orderBy('b'),
         ),
         // OR.
         IndexedQuery(
           'a == 1 or b == y',
           (c) => c.where(
             Filter.or(<Filter>[
-              Filter.equalTo('a', 1),
-              Filter.equalTo('b', 'y'),
+              Filter('a', isEqualTo: 1),
+              Filter('b', isEqualTo: 'y'),
             ]),
           ),
         ),
@@ -165,8 +164,8 @@ void main() {
           'a > 3 or tags array-contains blue',
           (c) => c.where(
             Filter.or(<Filter>[
-              Filter.greaterThan('a', 3),
-              Filter.arrayContains('tags', 'blue'),
+              Filter('a', isGreaterThan: 3),
+              Filter('tags', arrayContains: 'blue'),
             ]),
           ),
         ),
@@ -175,12 +174,12 @@ void main() {
           (c) => c.where(
             Filter.or(<Filter>[
               Filter.and(<Filter>[
-                Filter.equalTo('a', 2),
-                Filter.equalTo('b', 'x'),
+                Filter('a', isEqualTo: 2),
+                Filter('b', isEqualTo: 'x'),
               ]),
               Filter.and(<Filter>[
-                Filter.inArray('a', <Object?>[3, 4]),
-                Filter.equalTo('b', 'z'),
+                Filter('a', whereIn: <Object?>[3, 4]),
+                Filter('b', isEqualTo: 'z'),
               ]),
             ]),
           ),
@@ -191,8 +190,8 @@ void main() {
           (c) => c
               .where(
                 Filter.or(<Filter>[
-                  Filter.equalTo('a', 2),
-                  Filter.equalTo('b', 'z'),
+                  Filter('a', isEqualTo: 2),
+                  Filter('b', isEqualTo: 'z'),
                 ]),
               )
               .limit(2),
@@ -202,7 +201,7 @@ void main() {
         IndexedQuery('order by a', (c) => c.orderBy('a')),
         IndexedQuery(
           'order by a desc',
-          (c) => c.orderBy('a', Direction.descending),
+          (c) => c.orderBy('a', descending: true),
         ),
         IndexedQuery(
           'order by a, startAt 2',
@@ -222,21 +221,20 @@ void main() {
         ),
         IndexedQuery(
           'order by a desc, startAfter 3, endAt 1',
-          (c) => c
-              .orderBy('a', Direction.descending)
+          (c) => c.orderBy('a', descending: true)
               .startAfter(<Object?>[3])
               .endAt(<Object?>[1]),
         ),
         IndexedQuery(
           'order by b, a desc, startAt [x, 2]',
-          (c) => c.orderBy('b').orderBy('a', Direction.descending).startAt(
+          (c) => c.orderBy('b').orderBy('a', descending: true).startAt(
             <Object?>['x', 2],
           ),
         ),
         IndexedQuery('order by a, limit 3', (c) => c.orderBy('a').limit(3)),
         IndexedQuery(
           'a >= 2, limit 2',
-          (c) => c.whereGreaterThanOrEqualTo('a', 2).limit(2),
+          (c) => c.where('a', isGreaterThanOrEqualTo: 2).limit(2),
         ),
         IndexedQuery(
           'order by a, limitToLast 3',
@@ -244,25 +242,24 @@ void main() {
         ),
         IndexedQuery(
           'b == x, order by a, limitToLast 2',
-          (c) => c.whereEqualTo('b', 'x').orderBy('a').limitToLast(2),
+          (c) => c.where('b', isEqualTo: 'x').orderBy('a').limitToLast(2),
         ),
         IndexedQuery(
           'order by a desc, startAt 4, limitToLast 2',
-          (c) => c
-              .orderBy('a', Direction.descending)
+          (c) => c.orderBy('a', descending: true)
               .startAt(<Object?>[4])
               .limitToLast(2),
         ),
         // Only part of the query is covered by an index: `b` has one, `c` does not exist in any.
         IndexedQuery(
           'b == x and c == 1 (partial index)',
-          (c) => c.whereEqualTo('b', 'x').whereEqualTo('c', 1),
+          (c) => c.where('b', isEqualTo: 'x').where('c', isEqualTo: 1),
           index: IndexType.partial,
         ),
         // No index at all: scanned.
         IndexedQuery(
           'c == 1 (no index)',
-          (c) => c.whereEqualTo('c', 1),
+          (c) => c.where('c', isEqualTo: 1),
           index: IndexType.none,
         ),
       ],
@@ -313,11 +310,10 @@ void main() {
       });
     }
     await batch.commit();
-    await cities.get(Source.server);
+    await cities.get(GetOptions(source: Source.server));
 
     final Query<Map<String, Object?>> romanian = cities
-        .whereEqualTo('country', 'RO')
-        .orderBy('population');
+        .where('country', isEqualTo: 'RO').orderBy('population');
     IndexType indexType() => localStore.indexManagerForCurrentUser.getIndexType(
       romanian.query.toTarget(),
     );
@@ -331,16 +327,16 @@ void main() {
     expect(indexType(), IndexType.none);
 
     // The first run scans, and creates the index.
-    expect(ids(await romanian.get(Source.cache)), expected);
+    expect(ids(await romanian.get(GetOptions(source: Source.cache))), expected);
     expect(localStore.getFieldIndexes(), hasLength(1));
     expect(indexType(), IndexType.full);
 
     // Before the backfill, halfway, and when the index is complete.
-    expect(ids(await romanian.get(Source.cache)), expected);
+    expect(ids(await romanian.get(GetOptions(source: Source.cache))), expected);
     expect(await firestore.client.backfillIndexes(), 50);
-    expect(ids(await romanian.get(Source.cache)), expected);
+    expect(ids(await romanian.get(GetOptions(source: Source.cache))), expected);
     expect(await backfillAllIndexes(firestore), 100);
-    expect(ids(await romanian.get(Source.cache)), expected);
+    expect(ids(await romanian.get(GetOptions(source: Source.cache))), expected);
 
     await indexes.disableIndexAutoCreation();
     expect(localStore.getFieldIndexes(), hasLength(1));
@@ -348,6 +344,6 @@ void main() {
     await indexes.deleteAllIndexes();
     expect(localStore.getFieldIndexes(), isEmpty);
     expect(indexType(), IndexType.none);
-    expect(ids(await romanian.get(Source.cache)), expected);
+    expect(ids(await romanian.get(GetOptions(source: Source.cache))), expected);
   });
 }

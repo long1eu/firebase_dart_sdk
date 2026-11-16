@@ -13,15 +13,13 @@
 // loopback settings, so nothing here reaches a network.
 
 import 'package:cloud_firestore_dart/cloud_firestore_dart.dart';
-import 'package:cloud_firestore_dart/src/firebase/firestore/firestore.dart'
-    show FirestoreInternal;
 import 'package:firebase_app_dart/firebase_app_dart.dart';
 import 'package:test/test.dart';
 
 import '../../../util/test_hygiene.dart';
 
 const String _alreadyStarted =
-    'Firestore.instanceFor() has already been called with different settings '
+    'FirebaseFirestore.instanceFor() has already been called with different settings '
     'for this app and database. Call it without settings to get the existing '
     'instance, or terminate() that instance first.';
 
@@ -71,7 +69,7 @@ void main() {
   /// Uses [firestore] without a backend, like the first call that starts an
   /// instance upstream.
   Future<void> use(FirebaseFirestore firestore) async {
-    await firestore.collection('foo').get(Source.cache);
+    await firestore.collection('foo').get(GetOptions(source: Source.cache));
   }
 
   group('FirebaseFirestoreTest', () {

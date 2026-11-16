@@ -23,13 +23,13 @@ The settings must be passed to the call that creates the instance:
 final FirebaseApp app = FirebaseApp.withOptions(
   const FirebaseOptions(
     apiKey: 'demo-key', // the emulator accepts any key and application id
-    applicationId: '1:1234567890:dart:demo',
+    appId: '1:1234567890:dart:demo',
     projectId: 'demo-my-app',
   ),
 );
-final Firestore firestore = Firestore.instanceFor(
+final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(
   app: app,
-  settings: FirestoreSettings().withEmulator('127.0.0.1', 8080),
+  settings: Settings().withEmulator('127.0.0.1', 8080),
 );
 ```
 
@@ -40,9 +40,9 @@ want the same switch:
 import 'dart:io';
 
 final String? emulator = Platform.environment['FIRESTORE_EMULATOR_HOST']; // host:port
-final FirestoreSettings settings = emulator == null
-    ? FirestoreSettings()
-    : FirestoreSettings().withEmulator(
+final Settings settings = emulator == null
+    ? Settings()
+    : Settings().withEmulator(
         emulator.substring(0, emulator.lastIndexOf(':')),
         int.parse(emulator.substring(emulator.lastIndexOf(':') + 1)),
       );
@@ -55,9 +55,9 @@ token: the claims of a Firebase ID token, which the client encodes as an unsigne
 `connectFirestoreEmulator` does in the JS SDK), or a token string.
 
 ```dart
-final Firestore asAlice = Firestore.instanceFor(
+final FirebaseFirestore asAlice = FirebaseFirestore.instanceFor(
   app: FirebaseApp.withOptions(app.options, name: 'alice'),
-  settings: FirestoreSettings().withEmulator('127.0.0.1', 8080, mockUserToken: {'sub': 'alice'}),
+  settings: Settings().withEmulator('127.0.0.1', 8080, mockUserToken: {'sub': 'alice'}),
 );
 ```
 
@@ -70,7 +70,7 @@ host. To test real sign-in flows, use the Auth emulator with
 ```dart
 import 'package:test/test.dart';
 
-late Firestore db;
+late FirebaseFirestore db;
 int instances = 0;
 
 setUp(() {
@@ -78,14 +78,14 @@ setUp(() {
   final FirebaseApp testApp = FirebaseApp.withOptions(
     const FirebaseOptions(
       apiKey: 'demo-key',
-      applicationId: '1:1234567890:dart:test',
+      appId: '1:1234567890:dart:test',
       projectId: 'demo-my-app',
     ),
     name: 'test-${instances++}',
   );
-  db = Firestore.instanceFor(
+  db = FirebaseFirestore.instanceFor(
     app: testApp,
-    settings: FirestoreSettings().withEmulator('127.0.0.1', 8080),
+    settings: Settings().withEmulator('127.0.0.1', 8080),
   );
 });
 
@@ -99,7 +99,7 @@ test('writes and reads a document', () async {
   final DocumentReference<Map<String, Object?>> doc =
       db.collection('test-${DateTime.now().microsecondsSinceEpoch}').doc('a');
   await doc.set({'n': 1});
-  expect((await doc.get()).data, {'n': 1});
+  expect((await doc.get()).data(), {'n': 1});
 });
 ```
 
@@ -109,7 +109,7 @@ test('writes and reads a document', () async {
 - `clearPersistence()` after `terminate()` deletes a persistent cache between tests.
 - To reset the data of the emulator, call its REST endpoint
   `DELETE http://127.0.0.1:8080/emulator/v1/projects/<project>/databases/(default)/documents`.
-- `Firestore.setLogLevel(LogLevel.debug)` prints what the client does.
+- `FirebaseFirestore.setLogLevel(LogLevel.debug)` prints what the client does.
 - To test offline behaviour, use `disableNetwork()` and `enableNetwork()`.
 
 ## Differences between the emulator and production
@@ -135,7 +135,7 @@ Enterprise database.
   of such a query, although the backend does not return it. Once the backend has confirmed
   that the document exists and that it is not a result, the client takes it out of the result
   of that query: a listener reports it with `isFromCache: true` and then its removal with
-  `isFromCache: false`, and `get(Source.server)` returns what the backend returns. (The JS and
+  `isFromCache: false`, and `get(const GetOptions(source: Source.server))` returns what the backend returns. (The JS and
   Android SDKs keep such a document in limbo: the listener never leaves `isFromCache` and a get
   from the server does not complete.) The same mechanism covers any other query on which the
   client and the backend disagree about a cached document.

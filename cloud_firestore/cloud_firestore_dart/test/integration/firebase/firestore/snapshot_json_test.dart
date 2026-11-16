@@ -65,7 +65,7 @@ void main() {
         DocumentSnapshot<Map<String, Object?>>.fromJson(other, json);
     expect(fromJson.exists, isTrue);
     expect(fromJson.reference.path, docRef.path);
-    expect(fromJson.data, snapshot.data);
+    expect(fromJson.data(), snapshot.data());
   });
 
   test('DocumentSnapshot events for a snapshot created by a bundle', () async {
@@ -87,13 +87,13 @@ void main() {
       (DocumentSnapshot<Map<String, Object?>> s) => true,
     );
     expect(first.exists, isTrue);
-    expect(first.data, <String, Object?>{'a': 1});
+    expect(first.data(), <String, Object?>{'a': 1});
 
     await docRef.set(<String, Object?>{'a': 2});
     final DocumentSnapshot<Map<String, Object?>> updated = await waitFor(
       events,
       (DocumentSnapshot<Map<String, Object?>> s) =>
-          s.data?['a'] == 2 && !s.metadata.isFromCache,
+          s.data()?['a'] == 2 && !s.metadata.isFromCache,
     );
     expect(updated.exists, isTrue);
     await sub.cancel();
@@ -128,7 +128,7 @@ void main() {
       await docRef.set(<String, Object?>{'a': 1});
       await waitFor(
         events,
-        (DocumentSnapshot<Map<String, Object?>> s) => s.data?['a'] == 1,
+        (DocumentSnapshot<Map<String, Object?>> s) => s.data()?['a'] == 1,
       );
       await sub.cancel();
     },
@@ -141,7 +141,7 @@ void main() {
           'a': <String, Object?>{'foo': 1},
           'b': <String, Object?>{'bar': 2},
         });
-    final Query<Map<String, Object?>> query = collection.orderByField(
+    final Query<Map<String, Object?>> query = collection.orderBy(
       FieldPath.documentId,
     );
     final QuerySnapshot<Map<String, Object?>> snapshot = await query.get();
@@ -168,7 +168,7 @@ void main() {
               QuerySnapshot<Map<String, Object?>>.fromJson(other, json);
           expect(
             fromJson.docs.map(
-              (QueryDocumentSnapshot<Map<String, Object?>> d) => d.data,
+              (QueryDocumentSnapshot<Map<String, Object?>> d) => d.data(),
             ),
             <Map<String, Object?>>[
               <String, Object?>{'foo': 1},
@@ -226,7 +226,8 @@ void main() {
     await collection.doc('a').update(<String, Object?>{'foo': 5});
     final QuerySnapshot<Map<String, Object?>> updated = await waitFor(
       events,
-      (QuerySnapshot<Map<String, Object?>> s) => s.docs.first.data['foo'] == 5,
+      (QuerySnapshot<Map<String, Object?>> s) =>
+          s.docs.first.data()['foo'] == 5,
     );
     expect(
       updated.docs.map((QueryDocumentSnapshot<Object?> d) => d.id),
@@ -247,13 +248,20 @@ void main() {
               (
                 DocumentSnapshot<Map<String, Object?>> snapshot,
                 SnapshotOptions? options,
-              ) => snapshot.data!['n']! as int,
+              ) => snapshot.data()!['n']! as int,
           toFirestore: (int value, SetOptions? options) => <String, Object?>{
             'n': value,
           },
         );
     final Map<String, Object?> json = transfer(
-      (await collection.orderBy('n').withConverter(converter).get()).toJson(),
+      (await collection
+              .orderBy('n')
+              .withConverter(
+                fromFirestore: converter.fromFirestore,
+                toFirestore: converter.toFirestore,
+              )
+              .get())
+          .toJson(),
     );
 
     final FirebaseFirestore other = await IntegrationTestUtil.testFirestore();
@@ -262,7 +270,7 @@ void main() {
         other,
         json,
         converter: converter,
-      ).docs.map((QueryDocumentSnapshot<int> d) => d.data),
+      ).docs.map((QueryDocumentSnapshot<int> d) => d.data()),
       <int>[1, 2],
     );
 
@@ -274,7 +282,7 @@ void main() {
       events,
       (QuerySnapshot<int> s) => true,
     );
-    expect(first.docs.map((QueryDocumentSnapshot<int> d) => d.data), <int>[
+    expect(first.docs.map((QueryDocumentSnapshot<int> d) => d.data()), <int>[
       1,
       2,
     ]);
@@ -363,9 +371,9 @@ void main() {
       await other.loadBundle(utf8.encode(bundle)).future;
       final DocumentSnapshot<Map<String, Object?>> fromCache = await other
           .doc(path)
-          .get(Source.cache);
+          .get(GetOptions(source: Source.cache));
       expect(fromCache.exists, isTrue);
-      expect(fromCache.data, docs['a']);
+      expect(fromCache.data(), docs['a']);
     },
   );
 }

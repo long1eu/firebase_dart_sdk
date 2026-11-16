@@ -104,7 +104,7 @@ Future<void> _workerMain(Map<String, Object?> args) async {
         // The write is stored once the local snapshot has it as a pending write.
         final Completer<void> stored = Completer<void>();
         final StreamSubscription<DocumentSnapshot<Map<String, Object?>>>
-        subscription = doc.getSnapshots(MetadataChanges.include).listen((
+        subscription = doc.snapshots(includeMetadataChanges: true).listen((
           DocumentSnapshot<Map<String, Object?>> snapshot,
         ) {
           if (snapshot.metadata.hasPendingWrites && !stored.isCompleted) {
@@ -306,8 +306,8 @@ void main() {
   Future<int?> applied(String id) async {
     final DocumentSnapshot<Map<String, Object?>> snapshot = await observer
         .doc('$collection/$id')
-        .get(Source.server);
-    return snapshot.data?['n'] as int?;
+        .get(GetOptions(source: Source.server));
+    return snapshot.data()?['n'] as int?;
   }
 
   Future<void> eventually(

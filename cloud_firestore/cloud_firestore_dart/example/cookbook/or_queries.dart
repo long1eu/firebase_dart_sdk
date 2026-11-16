@@ -30,8 +30,8 @@ Future<void> main() async {
   final QuerySnapshot<Map<String, Object?>> mineOrUrgent = await tasks
       .where(
         Filter.or(<Filter>[
-          Filter.equalTo('owner', 'ada'),
-          Filter.greaterThanOrEqualTo('priority', 3),
+          Filter('owner', isEqualTo: 'ada'),
+          Filter('priority', isGreaterThanOrEqualTo: 3),
         ]),
       )
       .get();
@@ -43,10 +43,10 @@ Future<void> main() async {
       .where(
         Filter.and(<Filter>[
           Filter.or(<Filter>[
-            Filter.equalTo('owner', 'ada'),
-            Filter.greaterThanOrEqualTo('priority', 3),
+            Filter('owner', isEqualTo: 'ada'),
+            Filter('priority', isGreaterThanOrEqualTo: 3),
           ]),
-          Filter.equalTo('done', false),
+          Filter('done', isEqualTo: false),
         ]),
       )
       .get();

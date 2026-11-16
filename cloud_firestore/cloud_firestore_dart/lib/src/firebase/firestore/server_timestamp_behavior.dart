@@ -18,10 +18,13 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/field_value.dart';
 ///   'createdAt': FieldValue.serverTimestamp(),
 /// });
 /// final DocumentSnapshot<Map<String, Object?>> local = await post.get(
-///   Source.cache,
+///   const GetOptions(source: Source.cache),
 /// );
-/// local.getTimestamp('createdAt'); // null
-/// local.getTimestamp('createdAt', ServerTimestampBehavior.estimate); // now
+/// local.get('createdAt'); // null
+/// local.get(
+///   'createdAt',
+///   serverTimestamps: ServerTimestampBehavior.estimate,
+/// ); // now
 /// await written;
 /// ```
 ///

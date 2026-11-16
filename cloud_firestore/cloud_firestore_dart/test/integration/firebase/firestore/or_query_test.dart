@@ -20,6 +20,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/firestore.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/query.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/query_snapshot.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/source.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/get_options.dart';
 import 'package:test/test.dart';
 
 import '../../../util/integration_test_util.dart';
@@ -54,9 +55,13 @@ void main() {
     Query query,
     List<String> expected,
   ) async {
-    final QuerySnapshot server = await query.get(Source.server);
+    final QuerySnapshot server = await query.get(
+      GetOptions(source: Source.server),
+    );
     expect(querySnapshotToIds(server), expected, reason: 'server');
-    final QuerySnapshot cache = await query.get(Source.cache);
+    final QuerySnapshot cache = await query.get(
+      GetOptions(source: Source.cache),
+    );
     expect(querySnapshotToIds(cache), expected, reason: 'cache');
   }
 
@@ -74,7 +79,10 @@ void main() {
     // Two equalities: a==1 || b==1.
     await checkOnlineAndOfflineResultsMatch(
       collection.where(
-        Filter.or(<Filter>[Filter.equalTo('a', 1), Filter.equalTo('b', 1)]),
+        Filter.or(<Filter>[
+          Filter('a', isEqualTo: 1),
+          Filter('b', isEqualTo: 1),
+        ]),
       ),
       <String>['doc1', 'doc2', 'doc4', 'doc5'],
     );
@@ -83,8 +91,14 @@ void main() {
     await checkOnlineAndOfflineResultsMatch(
       collection.where(
         Filter.or(<Filter>[
-          Filter.and(<Filter>[Filter.equalTo('a', 1), Filter.equalTo('b', 0)]),
-          Filter.and(<Filter>[Filter.equalTo('a', 3), Filter.equalTo('b', 2)]),
+          Filter.and(<Filter>[
+            Filter('a', isEqualTo: 1),
+            Filter('b', isEqualTo: 0),
+          ]),
+          Filter.and(<Filter>[
+            Filter('a', isEqualTo: 3),
+            Filter('b', isEqualTo: 2),
+          ]),
         ]),
       ),
       <String>['doc1', 'doc3'],
@@ -94,8 +108,11 @@ void main() {
     await checkOnlineAndOfflineResultsMatch(
       collection.where(
         Filter.and(<Filter>[
-          Filter.equalTo('a', 1),
-          Filter.or(<Filter>[Filter.equalTo('b', 0), Filter.equalTo('b', 3)]),
+          Filter('a', isEqualTo: 1),
+          Filter.or(<Filter>[
+            Filter('b', isEqualTo: 0),
+            Filter('b', isEqualTo: 3),
+          ]),
         ]),
       ),
       <String>['doc1', 'doc4'],
@@ -105,8 +122,14 @@ void main() {
     await checkOnlineAndOfflineResultsMatch(
       collection.where(
         Filter.and(<Filter>[
-          Filter.or(<Filter>[Filter.equalTo('a', 2), Filter.equalTo('b', 2)]),
-          Filter.or(<Filter>[Filter.equalTo('a', 3), Filter.equalTo('b', 3)]),
+          Filter.or(<Filter>[
+            Filter('a', isEqualTo: 2),
+            Filter('b', isEqualTo: 2),
+          ]),
+          Filter.or(<Filter>[
+            Filter('a', isEqualTo: 3),
+            Filter('b', isEqualTo: 3),
+          ]),
         ]),
       ),
       <String>['doc3'],
@@ -116,7 +139,10 @@ void main() {
     await checkOnlineAndOfflineResultsMatch(
       collection
           .where(
-            Filter.or(<Filter>[Filter.equalTo('a', 2), Filter.equalTo('b', 1)]),
+            Filter.or(<Filter>[
+              Filter('a', isEqualTo: 2),
+              Filter('b', isEqualTo: 1),
+            ]),
           )
           .limit(1),
       <String>['doc2'],
@@ -139,8 +165,8 @@ void main() {
     await checkOnlineAndOfflineResultsMatch(
       collection.where(
         Filter.or(<Filter>[
-          Filter.equalTo('a', 2),
-          Filter.inArray('b', <int>[2, 3]),
+          Filter('a', isEqualTo: 2),
+          Filter('b', whereIn: <int>[2, 3]),
         ]),
       ),
       <String>['doc3', 'doc4', 'doc6'],
@@ -174,8 +200,8 @@ void main() {
     await checkOnlineAndOfflineResultsMatch(
       collection.where(
         Filter.or(<Filter>[
-          Filter.equalTo('a', 2),
-          Filter.arrayContains('b', 7),
+          Filter('a', isEqualTo: 2),
+          Filter('b', arrayContains: 7),
         ]),
       ),
       <String>['doc3', 'doc4', 'doc6'],
@@ -185,8 +211,8 @@ void main() {
     await checkOnlineAndOfflineResultsMatch(
       collection.where(
         Filter.or(<Filter>[
-          Filter.equalTo('a', 2),
-          Filter.arrayContainsAny('b', <int>[0, 3]),
+          Filter('a', isEqualTo: 2),
+          Filter('b', arrayContainsAny: <int>[0, 3]),
         ]),
       ),
       <String>['doc1', 'doc4', 'doc6'],
@@ -209,8 +235,8 @@ void main() {
     await checkOnlineAndOfflineResultsMatch(
       collection.where(
         Filter.or(<Filter>[
-          Filter.inArray('a', <int>[2, 3]),
-          Filter.inArray('b', <int>[0, 2]),
+          Filter('a', whereIn: <int>[2, 3]),
+          Filter('b', whereIn: <int>[0, 2]),
         ]),
       ),
       <String>['doc1', 'doc3', 'doc6'],
@@ -221,8 +247,8 @@ void main() {
     await checkOnlineAndOfflineResultsMatch(
       collection.where(
         Filter.or(<Filter>[
-          Filter.inArray('a', <int>[0, 3]),
-          Filter.inArray('a', <int>[0, 2]),
+          Filter('a', whereIn: <int>[0, 3]),
+          Filter('a', whereIn: <int>[0, 2]),
         ]),
       ),
       <String>['doc3', 'doc6'],
@@ -230,7 +256,9 @@ void main() {
 
     // Two IN operations in a conjunction (not an OR query).
     await checkOnlineAndOfflineResultsMatch(
-      collection.whereIn('a', <int>[1, 3]).whereIn('b', <int>[0, 2]),
+      collection
+          .where('a', whereIn: <int>[1, 3])
+          .where('b', whereIn: <int>[0, 2]),
       <String>['doc1', 'doc3'],
     );
   });
@@ -262,8 +290,8 @@ void main() {
     await checkOnlineAndOfflineResultsMatch(
       collection.where(
         Filter.or(<Filter>[
-          Filter.inArray('a', <int>[2, 3]),
-          Filter.arrayContainsAny('b', <int>[0, 7]),
+          Filter('a', whereIn: <int>[2, 3]),
+          Filter('b', arrayContainsAny: <int>[0, 7]),
         ]),
       ),
       <String>['doc1', 'doc3', 'doc4', 'doc6'],
@@ -273,10 +301,10 @@ void main() {
       collection.where(
         Filter.or(<Filter>[
           Filter.and(<Filter>[
-            Filter.inArray('a', <int>[2, 3]),
-            Filter.equalTo('c', 10),
+            Filter('a', whereIn: <int>[2, 3]),
+            Filter('c', isEqualTo: 10),
           ]),
-          Filter.arrayContainsAny('b', <int>[0, 7]),
+          Filter('b', arrayContainsAny: <int>[0, 7]),
         ]),
       ),
       <String>['doc1', 'doc3', 'doc4'],
@@ -309,8 +337,8 @@ void main() {
     await checkOnlineAndOfflineResultsMatch(
       collection.where(
         Filter.or(<Filter>[
-          Filter.inArray('a', <int>[2, 3]),
-          Filter.arrayContains('b', 3),
+          Filter('a', whereIn: <int>[2, 3]),
+          Filter('b', arrayContains: 3),
         ]),
       ),
       <String>['doc3', 'doc4', 'doc6'],
@@ -319,8 +347,8 @@ void main() {
     await checkOnlineAndOfflineResultsMatch(
       collection.where(
         Filter.and(<Filter>[
-          Filter.inArray('a', <int>[2, 3]),
-          Filter.arrayContains('b', 7),
+          Filter('a', whereIn: <int>[2, 3]),
+          Filter('b', arrayContains: 7),
         ]),
       ),
       <String>['doc3'],
@@ -329,10 +357,10 @@ void main() {
     await checkOnlineAndOfflineResultsMatch(
       collection.where(
         Filter.or(<Filter>[
-          Filter.inArray('a', <int>[2, 3]),
+          Filter('a', whereIn: <int>[2, 3]),
           Filter.and(<Filter>[
-            Filter.arrayContains('b', 3),
-            Filter.equalTo('a', 1),
+            Filter('b', arrayContains: 3),
+            Filter('a', isEqualTo: 1),
           ]),
         ]),
       ),
@@ -342,10 +370,10 @@ void main() {
     await checkOnlineAndOfflineResultsMatch(
       collection.where(
         Filter.and(<Filter>[
-          Filter.inArray('a', <int>[2, 3]),
+          Filter('a', whereIn: <int>[2, 3]),
           Filter.or(<Filter>[
-            Filter.arrayContains('b', 7),
-            Filter.equalTo('a', 1),
+            Filter('b', arrayContains: 7),
+            Filter('a', isEqualTo: 1),
           ]),
         ]),
       ),
@@ -378,12 +406,12 @@ void main() {
     );
 
     await checkOnlineAndOfflineResultsMatch(
-      collection.where(Filter.equalTo('a', 1)).orderBy('a'),
+      collection.where(Filter('a', isEqualTo: 1)).orderBy('a'),
       <String>['doc1', 'doc4', 'doc5'],
     );
 
     await checkOnlineAndOfflineResultsMatch(
-      collection.where(Filter.inArray('a', <int>[2, 3])).orderBy('a'),
+      collection.where(Filter('a', whereIn: <int>[2, 3])).orderBy('a'),
       <String>['doc6', 'doc3'],
     );
   });
@@ -405,8 +433,8 @@ void main() {
       await checkOnlineAndOfflineResultsMatch(
         collection.where(
           Filter.or(<Filter>[
-            Filter.greaterThan('a', 1),
-            Filter.equalTo('b', 1),
+            Filter('a', isGreaterThan: 1),
+            Filter('b', isEqualTo: 1),
           ]),
         ),
         <String>['doc2', 'doc3'],
@@ -422,11 +450,11 @@ void main() {
       },
     );
     final Query query = collection.where(
-      Filter.or(<Filter>[Filter.equalTo('a', 1), Filter.equalTo('a', 3)]),
+      Filter.or(<Filter>[Filter('a', isEqualTo: 1), Filter('a', isEqualTo: 3)]),
     );
 
     final StreamIterator<QuerySnapshot> snapshots =
-        StreamIterator<QuerySnapshot>(query.getSnapshots());
+        StreamIterator<QuerySnapshot>(query.snapshots());
 
     Future<void> waitForIds(List<String> ids) async {
       while (await snapshots.moveNext()) {
@@ -453,11 +481,14 @@ void main() {
     );
     final AggregateQuerySnapshot count = await collection
         .where(
-          Filter.or(<Filter>[Filter.equalTo('a', 1), Filter.equalTo('b', 2)]),
+          Filter.or(<Filter>[
+            Filter('a', isEqualTo: 1),
+            Filter('b', isEqualTo: 2),
+          ]),
         )
         .count()
         .get();
-    expect(count.getCount(), 2);
+    expect(count.count, 2);
   });
 
   // ---------------------------------------------------------------------------
@@ -484,19 +515,19 @@ void main() {
     // composite index in production.
     await checkOnlineAndOfflineResultsMatch(
       collection
-          .whereGreaterThan('key', 'a')
-          .whereGreaterThanOrEqualTo('sort', 1)
-          .whereLessThan('v', 5),
+          .where('key', isGreaterThan: 'a')
+          .where('sort', isGreaterThanOrEqualTo: 1)
+          .where('v', isLessThan: 5),
       <String>['doc2', 'doc5', 'doc4', 'doc3'],
     );
 
     // Explicit orderBy: sort DESC first, then the implicit key and v.
     await checkOnlineAndOfflineResultsMatch(
       collection
-          .whereGreaterThan('key', 'a')
-          .whereGreaterThanOrEqualTo('sort', 1)
-          .whereLessThan('v', 5)
-          .orderBy('sort', Direction.descending),
+          .where('key', isGreaterThan: 'a')
+          .where('sort', isGreaterThanOrEqualTo: 1)
+          .where('v', isLessThan: 5)
+          .orderBy('sort', descending: true),
       <String>['doc2', 'doc3', 'doc4', 'doc5'],
     );
   });
@@ -509,12 +540,12 @@ void main() {
     final Query query = collection.where(
       Filter.or(<Filter>[
         Filter.and(<Filter>[
-          Filter.equalTo('key', 'b'),
-          Filter.lessThanOrEqualTo('sort', 2),
+          Filter('key', isEqualTo: 'b'),
+          Filter('sort', isLessThanOrEqualTo: 2),
         ]),
         Filter.and(<Filter>[
-          Filter.notEqualTo('key', 'b'),
-          Filter.greaterThan('v', 4),
+          Filter('key', isNotEqualTo: 'b'),
+          Filter('v', isGreaterThan: 4),
         ]),
       ]),
     );
@@ -528,7 +559,7 @@ void main() {
 
     // Ordered by: sort desc, key asc, v asc, __name__ asc.
     await checkOnlineAndOfflineResultsMatch(
-      query.orderBy('sort', Direction.descending).orderBy('key'),
+      query.orderBy('sort', descending: true).orderBy('key'),
       <String>['doc5', 'doc4', 'doc1', 'doc6'],
     );
   });
@@ -548,9 +579,9 @@ void main() {
       // Implicitly ordered by: a asc, b asc, c asc, __name__ asc.
       await checkOnlineAndOfflineResultsMatch(
         collection
-            .whereGreaterThan('c', 2)
-            .whereGreaterThan('b', 2)
-            .whereLessThan('a', 3),
+            .where('c', isGreaterThan: 2)
+            .where('b', isGreaterThan: 2)
+            .where('a', isLessThan: 3),
         <String>['doc1', 'doc2', 'doc3'],
       );
     },
@@ -563,9 +594,9 @@ void main() {
     final FirebaseFirestore firestore = collection.firestore;
 
     final Query query = collection
-        .whereNotEqualTo('key', 'a')
-        .whereLessThanOrEqualTo('sort', 3)
-        .whereGreaterThan('v', 0);
+        .where('key', isNotEqualTo: 'a')
+        .where('sort', isLessThanOrEqualTo: 3)
+        .where('v', isGreaterThan: 0);
     final QuerySnapshot server = await query.get();
     final List<String> onlineIds = querySnapshotToIds(server);
 
@@ -590,27 +621,30 @@ void main() {
 
     // a == 1
     await checkOnlineAndOfflineResultsMatch(
-      collection.whereEqualTo('a', 1),
+      collection.where('a', isEqualTo: 1),
       <String>['doc1', 'doc4', 'doc5'],
     );
 
     // Implicit AND: a == 1 && b == 3
     await checkOnlineAndOfflineResultsMatch(
-      collection.whereEqualTo('a', 1).whereEqualTo('b', 3),
+      collection.where('a', isEqualTo: 1).where('b', isEqualTo: 3),
       <String>['doc4'],
     );
 
     // Explicit AND: a == 1 && b == 3
     await checkOnlineAndOfflineResultsMatch(
       collection.where(
-        Filter.and(<Filter>[Filter.equalTo('a', 1), Filter.equalTo('b', 3)]),
+        Filter.and(<Filter>[
+          Filter('a', isEqualTo: 1),
+          Filter('b', isEqualTo: 3),
+        ]),
       ),
       <String>['doc4'],
     );
 
     // a == 1, limit 2
     await checkOnlineAndOfflineResultsMatch(
-      collection.whereEqualTo('a', 1).limit(2),
+      collection.where('a', isEqualTo: 1).limit(2),
       <String>['doc1', 'doc4'],
     );
 
@@ -618,7 +652,10 @@ void main() {
     await checkOnlineAndOfflineResultsMatch(
       collection
           .where(
-            Filter.or(<Filter>[Filter.equalTo('a', 1), Filter.equalTo('b', 1)]),
+            Filter.or(<Filter>[
+              Filter('a', isEqualTo: 1),
+              Filter('b', isEqualTo: 1),
+            ]),
           )
           .limit(2),
       <String>['doc1', 'doc2'],
@@ -632,7 +669,7 @@ void main() {
 
     // Limit 2 and order by b desc
     await checkOnlineAndOfflineResultsMatch(
-      collection.limit(2).orderBy('b', Direction.descending),
+      collection.limit(2).orderBy('b', descending: true),
       <String>['doc4', 'doc3'],
     );
   });

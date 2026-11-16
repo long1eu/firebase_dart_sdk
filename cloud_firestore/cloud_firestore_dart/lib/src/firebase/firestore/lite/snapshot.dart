@@ -64,7 +64,7 @@ class DocumentSnapshot<T extends dynamic> {
   /// The data of the document (converted with the converter of the reference
   /// or query it was read through, if any), or null if the document does not
   /// exist.
-  T? get data {
+  T? data() {
     final Document? doc = document;
     if (doc == null) {
       return null;
@@ -78,36 +78,43 @@ class DocumentSnapshot<T extends dynamic> {
     );
   }
 
-  /// Whether the document has the field at the dot-separated path [field].
-  bool contains(String field) {
-    return containsPath(
-      FieldPathInternal.fromArgument('DocumentSnapshot.contains', field),
+  /// Whether the document has [field], also when its value is null. [field] is a [String] (dots separate
+  /// nested fields) or a [FieldPath].
+  bool contains(Object field) {
+    final FieldPath fieldPath = _fieldPathOf(
+      'DocumentSnapshot.contains',
+      field,
     );
-  }
-
-  /// Whether the document has the field at [fieldPath].
-  bool containsPath(FieldPath fieldPath) {
     return document?.getField(fieldPath.internalPath) != null;
   }
 
-  /// The value of the field at the dot-separated path [field], or null if
-  /// there is no such field or document. Never converted.
-  Object? operator [](String field) => get(field);
+  /// The value of [field], or null if there is no such field or document. Never converted. Same as [get].
+  Object? operator [](Object field) => get(field);
 
-  /// The value of the field at the dot-separated path [field], or null if
-  /// there is no such field or document. Never converted.
-  Object? get(String field) {
-    return getField(
-      FieldPathInternal.fromArgument('DocumentSnapshot.get', field),
-    );
-  }
-
-  /// The value of the field at [fieldPath], or null if there is no such field
-  /// or document. Never converted.
-  Object? getField(FieldPath fieldPath) {
-    final model.FieldPath path = fieldPath.internalPath;
+  /// The value of [field], or null if there is no such field or document. Never converted.
+  ///
+  /// [field] is a [String] (dots separate nested fields) or a [FieldPath].
+  Object? get(Object field) {
+    final model.FieldPath path = _fieldPathOf(
+      'DocumentSnapshot.get',
+      field,
+    ).internalPath;
     final FieldValue? value = document?.getField(path);
     return value == null ? null : _convertValue(value);
+  }
+
+  static FieldPath _fieldPathOf(String methodName, Object field) {
+    if (field is FieldPath) {
+      return field;
+    }
+    if (field is String) {
+      return FieldPathInternal.fromArgument(methodName, field);
+    }
+    throw ArgumentError.value(
+      field,
+      'field',
+      'must be a String or a FieldPath',
+    );
   }
 
   Object? _convertValue(FieldValue value) {
@@ -172,7 +179,7 @@ class QueryDocumentSnapshot<T extends dynamic> extends DocumentSnapshot<T> {
   ]) : super(firestore, document.key, document, converter);
 
   @override
-  T get data => super.data as T;
+  T data() => super.data() as T;
 }
 
 /// A [QuerySnapshot] contains the results of a query: zero or more
@@ -196,6 +203,9 @@ class QuerySnapshot<T extends dynamic> {
 
   /// The number of documents.
   int get length => docs.length;
+
+  /// The number of documents: the FlutterFire and JS SDK name of [length].
+  int get size => docs.length;
 
   /// Whether the query matched no document.
   bool get isEmpty => docs.isEmpty;

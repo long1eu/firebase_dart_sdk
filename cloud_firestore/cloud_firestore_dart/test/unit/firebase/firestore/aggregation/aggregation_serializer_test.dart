@@ -53,7 +53,7 @@ void main() {
       expect(AggregateField.count(), AggregateField.count());
       expect(AggregateField.sum('a'), AggregateField.sum('a'));
       expect(AggregateField.sum('a'),
-          AggregateField.sumField(api.FieldPath(<String>['a'])));
+          AggregateField.sum(api.FieldPath(<String>['a'])));
       expect(AggregateField.sum('a'), isNot(AggregateField.sum('b')));
       expect(AggregateField.sum('a'), isNot(AggregateField.average('a')));
       expect(AggregateField.count(), isNot(AggregateField.sum('a')));
@@ -82,7 +82,7 @@ void main() {
           <AggregateField>[
             AggregateField.sum('a.b'),
             AggregateField.average('c'),
-            AggregateField.sumField(api.FieldPath(<String>['d.e', 'f g'])),
+            AggregateField.sum(api.FieldPath(<String>['d.e', 'f g'])),
           ],
           aliases);
 
@@ -121,8 +121,7 @@ void main() {
 
     test('sends filters, explicit orderBy and limit but no implicit order', () {
       final Query q = query('coll')
-          .filter(filter('a', '==', 1))
-          .orderBy(orderBy('b', 'desc'))
+          .filter(filter('a', '==', 1)).orderBy(orderBy('b', 'desc'))
           .limit(5);
       final proto.StructuredAggregationQuery result = encode(
           q, <AggregateField>[AggregateField.count()], <String, String>{});

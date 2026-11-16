@@ -147,8 +147,8 @@ void main() {
           '$resent applied without an acknowledgement');
       expect(count, index + resent);
       final DocumentSnapshot<Map<String, Object?>> cached =
-          await collection.doc('log').get(Source.server);
-      expect(cached.data, log);
+          await collection.doc('log').get(GetOptions(source: Source.server));
+      expect(cached.data(), log);
     });
   }, skip: chaosSkipReason);
 
@@ -206,7 +206,7 @@ void main() {
       // Restart while still offline: the writes are in the cache, as pending writes.
       db = await env.newClient(fixedDbName: dbName);
       final QuerySnapshot<Map<String, Object?>> cached =
-          await db.collection(name).get(Source.cache);
+          await db.collection(name).get(GetOptions(source: Source.cache));
       expect(docsById(cached), expectedDocs(12));
       expect(cached.metadata.hasPendingWrites, isTrue);
       await pause(300);
@@ -218,7 +218,7 @@ void main() {
       await db.waitForPendingWrites().timeout(const Duration(seconds: 15));
       expect(await env.serverDocs(name), expectedDocs(12));
       final QuerySnapshot<Map<String, Object?>> after =
-          await db.collection(name).get(Source.cache);
+          await db.collection(name).get(GetOptions(source: Source.cache));
       expect(docsById(after), expectedDocs(12));
       expect(after.metadata.hasPendingWrites, isFalse);
 
@@ -226,7 +226,7 @@ void main() {
       await db.terminate();
       db = await env.newClient(fixedDbName: dbName);
       await db.waitForPendingWrites().timeout(const Duration(seconds: 15));
-      await db.collection(name).doc('kept').get(Source.server);
+      await db.collection(name).doc('kept').get(GetOptions(source: Source.server));
       expect(await env.serverDocs(name), expectedDocs(12));
     });
 
@@ -355,20 +355,20 @@ void main() {
       // filtered query are exactly the ones of the full query that match.
       final List<String> disagreements = <String>[];
       int inSyncEvents = 0;
-      final StreamSubscription<void> inSync = db.snapshotsInSync.listen((_) {
+      final StreamSubscription<void> inSync = db.snapshotsInSync().listen((_) {
         inSyncEvents++;
         if (all.events.isEmpty || big.events.isEmpty) {
           return;
         }
         final List<String> fromAll = all.last.docs
             .where((QueryDocumentSnapshot<Map<String, Object?>> d) =>
-                d.data['big'] == true)
+                d.data()['big'] == true)
             .map((QueryDocumentSnapshot<Map<String, Object?>> d) =>
-                '${d.id}=${d.data['n']}')
+                '${d.id}=${d.data()['n']}')
             .toList();
         final List<String> fromBig = big.last.docs
             .map((QueryDocumentSnapshot<Map<String, Object?>> d) =>
-                '${d.id}=${d.data['n']}')
+                '${d.id}=${d.data()['n']}')
             .toList();
         if (fromAll.join(',') != fromBig.join(',')) {
           disagreements.add('in-sync event $inSyncEvents: all has $fromAll, '
@@ -395,7 +395,7 @@ void main() {
           'big': round.isOdd,
         });
         await writer.doc('d${(round + 2) % 4}').set(
-            <String, Object?>{'big': round % 4 < 2}, SetOptions.mergeAllFields);
+            <String, Object?>{'big': round % 4 < 2}, const SetOptions(merge: true));
         await pause(200);
         env.proxy.restore();
         await pause(200);

@@ -31,7 +31,7 @@ Future<void> nullSafety(FirebaseFirestore firestore) async {
       .collection('users')
       .doc('ada')
       .get();
-  final Map<String, Object?>? data = snapshot.data; // null: no document
+  final Map<String, Object?>? data = snapshot.data(); // null: no document
   final int? age = data?['age'] as int?;
 
   // Before: every option was a non-nullable String.
@@ -115,7 +115,7 @@ Future<void> renamedMembers(FirebaseFirestore firestore) async {
   final QuerySnapshot<Map<String, Object?>> result = await firestore
       .collection('users')
       .where(FieldPath.documentId, isEqualTo: 'ada')
-      .get(Source.serverAndCache);
+      .get(GetOptions(source: Source.serverAndCache));
   for (final QueryDocumentSnapshot<Map<String, Object?>> doc in result.docs) {
     print(doc.reference.path);
   }
@@ -138,11 +138,9 @@ Future<void> generics(FirebaseFirestore firestore) async {
 
   // New: a typed view of the same document.
   final DocumentReference<String> names = ref.withConverter<String>(
-    FirestoreDataConverter<String>.from(
-      fromFirestore: (DocumentSnapshot<Map<String, Object?>> s, _) =>
-          s.data!['name']! as String,
-      toFirestore: (String name, _) => <String, Object?>{'name': name},
-    ),
+    fromFirestore: (DocumentSnapshot<Map<String, Object?>> s, _) =>
+        s.data()!['name']! as String,
+    toFirestore: (String name, _) => <String, Object?>{'name': name},
   );
 }
 
@@ -178,8 +176,8 @@ Future<void> behaviour(FirebaseFirestore firestore) async {
     final DocumentSnapshot<Map<String, Object?>> config = await tx.get(
       configRef,
     );
-    tx.update(userRef, <String, Object?>{'plan': config.data!['plan']});
-  }, options: TransactionOptions(maxAttempts: 6));
+    tx.update(userRef, <String, Object?>{'plan': config.data()!['plan']});
+  }, maxAttempts: 6);
 
   // A read after a write fails (invalidArgument) and now also fails the
   // commit when the error is caught; do all reads first.

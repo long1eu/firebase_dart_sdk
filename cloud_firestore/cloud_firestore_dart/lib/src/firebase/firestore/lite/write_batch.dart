@@ -23,7 +23,6 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/preco
 import 'package:cloud_firestore_dart/src/firebase/firestore/remote/datastore/datastore.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/set_options.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/assert.dart';
-import 'package:cloud_firestore_dart/src/firebase/firestore/util/util.dart';
 import 'package:meta/meta.dart';
 
 /// A write batch, used to perform multiple writes as a single atomic unit.
@@ -49,7 +48,7 @@ class WriteBatch {
     T data, [
     SetOptions? options,
   ]) {
-    final SetOptions setOptions = options ?? SetOptions.overwrite;
+    final SetOptions setOptions = options ?? const SetOptions();
     _firestore.validateReference(documentRef);
     checkNotNull<Object>(data, 'Provided data must not be null.');
     _verifyNotCommitted();
@@ -76,38 +75,16 @@ class WriteBatch {
     return this;
   }
 
-  /// Updates the fields in [data] (dot-separated field paths to values) of the
-  /// document referred to by [documentRef]. The batch fails if the document
-  /// does not exist.
+  /// Updates the fields in [data] of the document referred to by [documentRef]. Each key is a field path: a
+  /// `String` (dots separate nested fields) or a `FieldPath`. The batch fails if the document does not exist.
   WriteBatch update(
     DocumentReference<Object?> documentRef,
-    Map<String, Object?> data,
+    Map<Object, Object?> data,
   ) {
     final UserDataParsedUpdateData parsed = _firestore.dataConverter
-        .parseUpdateData(
+        .parseUpdateMap(
           data,
           methodName: 'WriteBatch.update',
-          targetDoc: documentRef.key,
-        );
-    _firestore.validateReference(documentRef);
-    _verifyNotCommitted();
-    _mutations.add(
-      parsed.toMutation(documentRef.key, Precondition(exists: true)),
-    );
-    return this;
-  }
-
-  /// Updates fields of the document referred to by [documentRef]. [data]
-  /// alternates fields (a `String` or a `FieldPath`) and values.
-  WriteBatch updateFromList(
-    DocumentReference<Object?> documentRef,
-    List<Object?> data,
-  ) {
-    const String methodName = 'WriteBatch.updateFromList';
-    final UserDataParsedUpdateData parsed = _firestore.dataConverter
-        .parseUpdateDataFromList(
-          collectUpdateArguments(1, data, methodName: methodName),
-          methodName: methodName,
           targetDoc: documentRef.key,
         );
     _firestore.validateReference(documentRef);

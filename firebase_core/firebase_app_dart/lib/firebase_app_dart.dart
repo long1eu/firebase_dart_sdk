@@ -14,7 +14,7 @@
 ///   final FirebaseApp app = FirebaseApp.withOptions(
 ///     const FirebaseOptions(
 ///       apiKey: '<YOUR_API_KEY>',
-///       applicationId: '1:1234567890:dart:example',
+///       appId: '1:1234567890:dart:example',
 ///       projectId: 'my-project',
 ///     ),
 ///   );

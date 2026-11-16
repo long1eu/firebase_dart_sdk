@@ -287,14 +287,14 @@ void main() {
         final DocumentReference<Map<String, Object?>> doc =
             collection.doc('a');
         final Future<DocumentSnapshot<Map<String, Object?>>> changed = doc
-            .snapshots
+            .snapshots()
             .firstWhere((DocumentSnapshot<Map<String, Object?>> s) =>
-                s.exists && s.data!['seen'] == true);
+                s.exists && s.data()!['seen'] == true);
         await source().where(field('name').equal('a')).update(
             transformedFields: <Selectable>[
               constant(true).as('seen')
             ]).execute();
-        expect((await changed).data!['n'], 1);
+        expect((await changed).data()!['n'], 1);
       },
           skip: 'The emulator (v1.22.0) does not report the writes of a '
               'pipeline to Listen streams: listeners and get(Source.server) '

@@ -1,9 +1,9 @@
 /// A pure-Dart Cloud Firestore client for the Dart VM and Flutter, with
 /// experimental web support (REST and WebChannel over `fetch`).
 ///
-/// Start from [Firestore.instanceFor] with a `FirebaseApp` created with
-/// `package:firebase_app_dart`, then use [Firestore.collection] and
-/// [Firestore.doc] to get a [CollectionReference] or a [DocumentReference].
+/// Start from [FirebaseFirestore.instanceFor] with a `FirebaseApp` created with
+/// `package:firebase_app_dart`, then use [FirebaseFirestore.collection] and
+/// [FirebaseFirestore.doc] to get a [CollectionReference] or a [DocumentReference].
 /// Reads return a [DocumentSnapshot] or a [QuerySnapshot]; `snapshots` streams
 /// deliver updates in real time. Writes go through [DocumentReference.set],
 /// [DocumentReference.update], a [WriteBatch] or a [Transaction].
@@ -16,11 +16,11 @@
 ///   final FirebaseApp app = FirebaseApp.withOptions(
 ///     const FirebaseOptions(
 ///       apiKey: 'my-api-key',
-///       applicationId: '1:1234567890:web:0123456789abcdef',
+///       appId: '1:1234567890:web:0123456789abcdef',
 ///       projectId: 'my-project',
 ///     ),
 ///   );
-///   final Firestore firestore = Firestore.instanceFor(app: app);
+///   final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(app: app);
 ///
 ///   final CollectionReference<Map<String, Object?>> cities = firestore
 ///       .collection('cities');
@@ -31,7 +31,7 @@
 ///       .get();
 ///   for (final QueryDocumentSnapshot<Map<String, Object?>> city
 ///       in californian) {
-///     print('${city.id}: ${city.data}');
+///     print('${city.id}: ${city.data()}');
 ///   }
 ///
 ///   await firestore.terminate();
@@ -67,18 +67,16 @@
 /// {@canonicalFor field_path.FieldPath}
 /// {@canonicalFor field_value.FieldValue}
 /// {@canonicalFor filter.Filter}
-/// {@canonicalFor firestore_error.FirestoreError}
+/// {@canonicalFor firestore_error.FirestoreException}
 /// {@canonicalFor firestore_error.FirestoreErrorCode}
 /// {@canonicalFor geo_point.GeoPoint}
 /// {@canonicalFor int32_value.Int32Value}
 /// {@canonicalFor log_level.LogLevel}
 /// {@canonicalFor max_key.MaxKey}
 /// {@canonicalFor min_key.MinKey}
-/// {@canonicalFor query.Direction}
 /// {@canonicalFor regex_value.RegexValue}
 /// {@canonicalFor set_options.SetOptions}
 /// {@canonicalFor timestamp.Timestamp}
-/// {@canonicalFor transaction_options.TransactionOptions}
 /// {@canonicalFor vector_value.VectorValue}
 library;
 
@@ -111,17 +109,18 @@ export 'src/firebase/firestore/firestore_error.dart'
     hide FirestoreErrorCodeInternal;
 export 'src/firebase/firestore/firestore_settings.dart';
 export 'src/firebase/firestore/geo_point.dart';
+export 'src/firebase/firestore/get_options.dart';
 export 'src/firebase/firestore/int32_value.dart';
 export 'src/firebase/firestore/listen_source.dart';
 export 'src/firebase/firestore/load_bundle_task.dart'
     hide LoadBundleTaskInternal;
 export 'src/firebase/firestore/load_bundle_task_progress.dart'
-    hide LoadBundleTaskProgressInternal;
+    hide LoadBundleTaskSnapshotInternal;
 export 'src/firebase/firestore/log_level.dart' show LogLevel;
 export 'src/firebase/firestore/local_cache_settings.dart';
-export 'src/firebase/firestore/long_polling_options.dart';
+export 'src/firebase/firestore/long_polling_options.dart'
+    hide WebExperimentalLongPollingOptionsInternal;
 export 'src/firebase/firestore/max_key.dart';
-export 'src/firebase/firestore/metadata_change.dart';
 export 'src/firebase/firestore/min_key.dart';
 export 'src/firebase/firestore/persistent_cache_index_manager.dart'
     hide PersistentCacheIndexManagerInternal;
@@ -131,11 +130,9 @@ export 'src/firebase/firestore/query_snapshot.dart' hide QuerySnapshotInternal;
 export 'src/firebase/firestore/regex_value.dart';
 export 'src/firebase/firestore/server_timestamp_behavior.dart';
 export 'src/firebase/firestore/set_options.dart' hide SetOptionsInternal;
-export 'src/firebase/firestore/snapshot_listen_options.dart';
 export 'src/firebase/firestore/snapshot_metadata.dart';
 export 'src/firebase/firestore/source.dart';
 export 'src/firebase/firestore/transaction.dart' hide TransactionInternal;
-export 'src/firebase/firestore/transaction_options.dart';
 export 'src/firebase/firestore/util/database.dart'
     show
         ClearableDatabase,

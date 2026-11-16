@@ -32,9 +32,13 @@ void main() {
     test('longPollingOptionsEqual() should return true if both objects have '
         'the same timeoutSeconds', () {
       const WebExperimentalLongPollingOptions options1 =
-          WebExperimentalLongPollingOptions(timeoutSeconds: 123);
+          WebExperimentalLongPollingOptions(
+            timeoutDuration: Duration(seconds: 123),
+          );
       const WebExperimentalLongPollingOptions options2 =
-          WebExperimentalLongPollingOptions(timeoutSeconds: 123);
+          WebExperimentalLongPollingOptions(
+            timeoutDuration: Duration(seconds: 123),
+          );
       expect(options1, options2);
       expect(options1.hashCode, options2.hashCode);
     });
@@ -42,9 +46,13 @@ void main() {
     test('longPollingOptionsEqual() should return false if the objects have '
         'different timeoutSeconds', () {
       const WebExperimentalLongPollingOptions options1 =
-          WebExperimentalLongPollingOptions(timeoutSeconds: 123);
+          WebExperimentalLongPollingOptions(
+            timeoutDuration: Duration(seconds: 123),
+          );
       const WebExperimentalLongPollingOptions options2 =
-          WebExperimentalLongPollingOptions(timeoutSeconds: 321);
+          WebExperimentalLongPollingOptions(
+            timeoutDuration: Duration(seconds: 321),
+          );
       expect(options1, isNot(options2));
       expect(options1, isNot(const WebExperimentalLongPollingOptions()));
     });

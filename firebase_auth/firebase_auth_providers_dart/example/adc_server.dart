@@ -53,7 +53,7 @@ Future<void> main(List<String> arguments) async {
   try {
     final DocumentSnapshot<Map<String, Object?>> snapshot = await firestore
         .doc(path)
-        .get(Source.server);
+        .get(GetOptions(source: Source.server));
     print('$path exists: ${snapshot.exists}');
   } on FirestoreException catch (e) {
     // unauthenticated: no credentials were found, or they were refused;

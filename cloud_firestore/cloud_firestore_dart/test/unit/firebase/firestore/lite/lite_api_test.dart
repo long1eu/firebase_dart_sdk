@@ -262,7 +262,7 @@ void main() {
       expect(transport().isShutDown, isFalse);
 
       release.complete();
-      expect((await inFlight).data, <String, Object?>{'a': 1});
+      expect((await inFlight).data(), <String, Object?>{'a': 1});
       await termination;
       expect(transport().isShutDown, isTrue);
     });
@@ -351,7 +351,7 @@ void main() {
       expect(snapshot.exists, isTrue);
       expect(snapshot.id, 'doc');
       expect(snapshot.reference, firestore.doc('coll/doc'));
-      expect(snapshot.data, <String, Object?>{
+      expect(snapshot.data(), <String, Object?>{
         'a': 1,
         'ref': firestore.doc('other/target'),
       });
@@ -363,7 +363,7 @@ void main() {
           .doc('coll/doc')
           .get();
       expect(snapshot.exists, isFalse);
-      expect(snapshot.data, isNull);
+      expect(snapshot.data(), isNull);
       expect(snapshot.reference.path, 'coll/doc');
     });
 
@@ -386,7 +386,7 @@ void main() {
       await firestore.doc('coll/doc').set(<String, Object?>{
         'a': 1,
         'when': FieldValue.serverTimestamp(),
-      }, SetOptions.mergeAllFields);
+      }, const SetOptions(merge: true));
       final proto.Write write = transport()
           .requests<proto.CommitRequest>('Commit')
           .single
@@ -398,10 +398,9 @@ void main() {
     test('update() requires the document to exist', () async {
       final FirebaseFirestore firestore = newFirestore();
       await firestore.doc('coll/doc').update(<String, Object?>{'a.b': 1});
-      await firestore.doc('coll/doc').updateFromList(<Object?>[
-        'c',
-        FieldValue.delete(),
-      ]);
+      await firestore.doc('coll/doc').update(<Object, Object?>{
+        'c': FieldValue.delete(),
+      });
       final List<proto.CommitRequest> requests = transport()
           .requests<proto.CommitRequest>('Commit');
       expect(requests[0].writes.single.updateMask.fieldPaths, <String>['a.b']);
@@ -477,7 +476,7 @@ void main() {
         throwsArgumentError,
       );
       await expectLater(
-        firestore.doc('coll/doc').updateFromList(<Object?>['a']),
+        firestore.doc('coll/doc').update(<Object, Object?>{1: 'a'}),
         throwsArgumentError,
       );
       expect(transports, isEmpty);
@@ -557,7 +556,7 @@ void main() {
       final WriteBatch batch = firestore.batch()
         ..set(firestore.doc('coll/a'), <String, Object?>{'a': 1})
         ..update(firestore.doc('coll/b'), <String, Object?>{'b': 2})
-        ..updateFromList(firestore.doc('coll/c'), <Object?>['c', 3])
+        ..update(firestore.doc('coll/c'), <Object, Object?>{'c': 3})
         ..delete(firestore.doc('coll/d'));
       await batch.commit();
       final List<proto.Write> writes = transport()
@@ -662,7 +661,7 @@ void main() {
               .toList(),
           <String>['doc1', 'doc2'],
         );
-        expect(snapshot.docs.first.data, <String, Object?>{'a': 1});
+        expect(snapshot.docs.first.data(), <String, Object?>{'a': 1});
         expect(snapshot.docs.first.reference, firestore.doc('coll/doc1'));
       },
     );
@@ -705,7 +704,7 @@ void main() {
           snapshot.docs
               .map(
                 (QueryDocumentSnapshot<Map<String, Object?>> doc) =>
-                    doc.data['a'],
+                    doc.data()['a'],
               )
               .toList(),
           <int>[4, 5],
@@ -762,7 +761,7 @@ void main() {
       expect(() => coll.where('a'), throwsArgumentError);
       expect(() => coll.where(42, isEqualTo: 1), throwsArgumentError);
       expect(
-        () => coll.where(Filter.equalTo('a', 1), isEqualTo: 1),
+        () => coll.where(Filter('a', isEqualTo: 1), isEqualTo: 1),
         throwsArgumentError,
       );
       expect(() => coll.where('a', whereIn: <Object?>[]), throwsArgumentError);
@@ -837,16 +836,15 @@ void main() {
       final QuerySnapshot<int> snapshot = await firestore
           .collection('coll')
           .withConverter(
-            FirestoreDataConverter<int>.from(
-              fromFirestore:
-                  (QueryDocumentSnapshot<Map<String, Object?>> snapshot) =>
-                      snapshot.data['a']! as int,
-              toFirestore: (int value, SetOptions? options) =>
-                  <String, Object?>{'a': value},
-            ),
+            fromFirestore:
+                (QueryDocumentSnapshot<Map<String, Object?>> snapshot) =>
+                    snapshot.data()['a']! as int,
+            toFirestore: (int value, SetOptions? options) => <String, Object?>{
+              'a': value,
+            },
           )
           .get();
-      expect(snapshot.docs.single.data, 7);
+      expect(snapshot.docs.single.data(), 7);
       // The fields are read unconverted.
       expect(snapshot.docs.single.get('a'), 7);
     });
@@ -894,7 +892,7 @@ void main() {
             .fieldPath,
         'a',
       );
-      expect(snapshot.getCount(), 3);
+      expect(snapshot.count, 3);
       expect(snapshot.data(), <String, Object?>{'count': 3});
     });
 
@@ -942,8 +940,11 @@ void main() {
         'total': 150,
         'mean': 75.0,
       });
-      expect(snapshot.getInt(AggregateField.sum('pages')), 150);
-      expect(snapshot.getDouble(AggregateField.average('pages')), 75.0);
+      expect((snapshot.get(AggregateField.sum('pages')) as num?)?.toInt(), 150);
+      expect(
+        (snapshot.get(AggregateField.average('pages')) as num?)?.toDouble(),
+        75.0,
+      );
     });
 
     test('an aggregation needs at least one field', () {
@@ -990,7 +991,7 @@ void main() {
             .get(firestore.doc('coll/missing'));
         final DocumentSnapshot<Map<String, Object?>> onlyRead =
             await transaction.get(firestore.doc('coll/existing'));
-        expect(existing.data, <String, Object?>{'a': 1});
+        expect(existing.data(), <String, Object?>{'a': 1});
         expect(missing.exists, isFalse);
         expect(onlyRead.exists, isTrue);
         transaction
@@ -1070,7 +1071,7 @@ void main() {
             transaction.set(firestore.doc('coll/doc'), <String, Object?>{
               'a': 1,
             });
-          }, options: TransactionOptions(maxAttempts: 1)),
+          }, maxAttempts: 1),
           throwsA(
             isA<FirestoreException>().having(
               (FirestoreException e) => e.errorCode,
@@ -1145,22 +1146,20 @@ void main() {
             last.docs
                 .map(
                   (QueryDocumentSnapshot<Map<String, Object?>> doc) =>
-                      doc.data['a'],
+                      doc.data()['a'],
                 )
                 .toList(),
             <int>[4, 5],
             reason: 'the flipped query was sent and its result reversed',
           );
-          expect((await transaction.getAggregate(coll.count())).getCount(), 2);
+          expect((await transaction.getAggregate(coll.count())).count, 2);
           expect(
             () => transaction.set(coll.doc('a'), <String, Object?>{}),
             throwsA(isA<FirestoreException>()),
           );
         },
-        options: TransactionOptions(
-          readOnly: true,
-          readTime: const Timestamp(100, 0),
-        ),
+        readOnly: true,
+        readTime: const Timestamp(100, 0),
       );
 
       final proto.BeginTransactionRequest begin = transport()
@@ -1220,7 +1219,7 @@ void main() {
         firestore.runTransaction<void>(
           (Transaction transaction) =>
               transaction.getQuery(other.collection('coll')),
-          options: TransactionOptions(readOnly: true),
+          readOnly: true,
         ),
         throwsArgumentError,
       );
@@ -1228,7 +1227,7 @@ void main() {
         firestore.runTransaction<void>(
           (Transaction transaction) =>
               transaction.getQuery(firestore.collection('coll').limitToLast(1)),
-          options: TransactionOptions(readOnly: true),
+          readOnly: true,
         ),
         throwsStateError,
       );
@@ -1375,7 +1374,7 @@ void main() {
         ) async {
           final DocumentSnapshot<Map<String, Object?>> snapshot =
               await transaction.get(firestore.doc('coll/a'));
-          return snapshot.data!['a']! as int;
+          return snapshot.data()!['a']! as int;
         });
         await lookupStarted.future;
         bool terminated = false;

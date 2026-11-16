@@ -54,7 +54,7 @@ void main() {
         'both': rooms
             .where('owner', isEqualTo: db.doc('users/eros'))
             .where('at', isGreaterThan: const Timestamp(10, 0))
-            .orderBy('at', Direction.descending)
+            .orderBy('at', descending: true)
             .limit(5),
       };
     }
@@ -68,7 +68,7 @@ void main() {
     Future<QuerySnapshot<Map<String, Object?>>> firstSynced(
       Query<Map<String, Object?>> query,
     ) => query
-        .getSnapshots(MetadataChanges.include)
+        .snapshots(includeMetadataChanges: true)
         .firstWhere(
           (QuerySnapshot<Map<String, Object?>> s) => !s.metadata.isFromCache,
         )
@@ -153,7 +153,7 @@ void main() {
           Completer<QuerySnapshot<Map<String, Object?>>>();
       final StreamSubscription<QuerySnapshot<Map<String, Object?>>> sub = entry
           .value
-          .getSnapshots(MetadataChanges.include)
+          .snapshots(includeMetadataChanges: true)
           .listen((QuerySnapshot<Map<String, Object?>> snapshot) {
             if (!first.isCompleted) {
               first.complete(snapshot);

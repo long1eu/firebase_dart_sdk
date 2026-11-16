@@ -109,9 +109,7 @@ final Matcher isPermissionDenied = isA<FirestoreException>().having(
 /// A listener that records its snapshots and its error.
 class Listening {
   Listening(Query<Map<String, Object?>> query) {
-    _sub = query
-        .getSnapshotsWithOptions(const SnapshotListenOptions(
-            metadataChanges: MetadataChanges.include))
+    _sub = query.snapshots(includeMetadataChanges: true)
         .listen(events.add, onError: errors.add);
   }
 
@@ -216,7 +214,7 @@ void main() {
         final String run = unique('run');
 
         // Nobody is signed in: the request carries no token and the rules refuse it.
-        await expectLater(db.doc('signed_in/$run').get(Source.server),
+        await expectLater(db.doc('signed_in/$run').get(GetOptions(source: Source.server)),
             throwsA(isPermissionDenied));
         await expectLater(
             db.doc('signed_in/$run').set(<String, Object?>{'v': 1}),
@@ -226,13 +224,13 @@ void main() {
         final DocumentReference<Map<String, Object?>> own =
             db.doc('users/${user.uid}/notes/$run');
         await own.set(<String, Object?>{'text': 'mine'});
-        expect((await own.get(Source.server)).data,
+        expect((await own.get(GetOptions(source: Source.server))).data(),
             <String, Object?>{'text': 'mine'});
         expect(await admin.get('users/${user.uid}/notes/$run'), isNotNull);
 
         // request.auth.uid is the uid of the user: the documents of somebody else stay out of reach.
         await expectLater(
-            db.doc('users/somebody-else/notes/$run').get(Source.server),
+            db.doc('users/somebody-else/notes/$run').get(GetOptions(source: Source.server)),
             throwsA(isPermissionDenied));
         await expectLater(
             db
@@ -318,7 +316,7 @@ void main() {
             .set(<String, Object?>{'text': 'written by a, offline'}).then((_) {
           acknowledged = true;
         }));
-        expect((await db.doc(pendingPath).get(Source.cache)).exists, isTrue);
+        expect((await db.doc(pendingPath).get(GetOptions(source: Source.cache))).exists, isTrue);
 
         // B signs in and the network comes back: the write of A is not sent with the token of B, and B does not
         // see it in the cache.
@@ -329,7 +327,7 @@ void main() {
         await db.waitForPendingWrites();
         expect(await admin.get(pendingPath), isNull);
         expect(acknowledged, isFalse);
-        await expectLater(db.doc(pendingPath).get(Source.cache),
+        await expectLater(db.doc(pendingPath).get(GetOptions(source: Source.cache)),
             throwsA(isA<FirestoreException>()),
             reason: 'B has no cached document of A');
 
@@ -339,7 +337,7 @@ void main() {
             'the pending write of A to reach the backend');
         await db.waitForPendingWrites();
         expect(
-            (await db.doc(pendingPath).get(Source.server)).data,
+            (await db.doc(pendingPath).get(GetOptions(source: Source.server))).data(),
             <String, Object?>{'text': 'written by a, offline'});
       });
 
@@ -391,7 +389,7 @@ void main() {
             describe: listening.describe);
         expect(listening.errors.single, isPermissionDenied);
         await listening.cancel();
-        await expectLater(ref.get(Source.server), throwsA(isPermissionDenied));
+        await expectLater(ref.get(GetOptions(source: Source.server)), throwsA(isPermissionDenied));
         await expectLater(
             ref.set(<String, Object?>{'v': 2}), throwsA(isPermissionDenied));
         expect((await admin.get('users/${user.uid}/$run/doc'))!['v'],
@@ -429,7 +427,7 @@ void main() {
       final lite.DocumentReference<Map<String, Object?>> ofA =
           db.doc('users/${a.uid}/notes/$run');
       await ofA.set(<String, Object?>{'owner': 'a'});
-      expect((await ofA.get()).data, <String, Object?>{'owner': 'a'});
+      expect((await ofA.get()).data(), <String, Object?>{'owner': 'a'});
       await expectLater(db.doc('users/somebody-else/notes/$run').get(),
           throwsA(isPermissionDenied));
 
@@ -440,7 +438,7 @@ void main() {
       final lite.DocumentReference<Map<String, Object?>> ofB =
           db.doc('users/${b.uid}/notes/$run');
       await ofB.set(<String, Object?>{'owner': 'b'});
-      expect((await ofB.get()).data, <String, Object?>{'owner': 'b'});
+      expect((await ofB.get()).data(), <String, Object?>{'owner': 'b'});
 
       await auth.signOut();
       await expectLater(ofB.get(), throwsA(isPermissionDenied));

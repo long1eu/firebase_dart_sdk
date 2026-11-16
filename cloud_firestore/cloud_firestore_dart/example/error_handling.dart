@@ -104,7 +104,7 @@ Future<void> main() async {
       unawaited(firestore.enableNetwork());
     },
   );
-  print('count after a retry: ${count.getCount()}');
+  print('count after a retry: ${count.count}');
 
   // 4. A write made offline does not fail: it is in the cache at once and
   //    its future completes when the backend acknowledges it. Do not wait for
@@ -117,8 +117,10 @@ Future<void> main() async {
       .catchError((Object e) => print('the backend rejected the write: $e'));
   final DocumentSnapshot<Map<String, Object?>> cached = await cities
       .doc('LA')
-      .get(Source.cache);
-  print('offline: ${cached.data} pending: ${cached.metadata.hasPendingWrites}');
+      .get(GetOptions(source: Source.cache));
+  print(
+    'offline: ${cached.data()} pending: ${cached.metadata.hasPendingWrites}',
+  );
   // A document that is not in the cache cannot be read while offline.
   try {
     await cities.doc('unknown').get();
@@ -133,7 +135,7 @@ Future<void> main() async {
   //    its stream, which then closes. Always pass onError.
   final Completer<void> first = Completer<void>();
   final StreamSubscription<QuerySnapshot<Map<String, Object?>>> subscription =
-      cities.snapshots.listen(
+      cities.snapshots().listen(
         (QuerySnapshot<Map<String, Object?>> snapshot) {
           if (!first.isCompleted) {
             first.complete();
@@ -167,7 +169,7 @@ Future<void> main() async {
       transaction.update(cities.doc('SF'), <String, Object?>{
         'visits': FieldValue.increment(1),
       });
-    }, options: TransactionOptions(maxAttempts: 2));
+    }, maxAttempts: 2);
   } on FirestoreException catch (e) {
     // The code is the one of the last failed commit: the emulator answers
     // with failedPrecondition, the backend can also answer with aborted.

@@ -30,9 +30,9 @@ Future<OrderSummary> summarizePaidOrders(
       .aggregate(<AggregateField>[count, revenue, average])
       .get();
   return OrderSummary(
-    result.getCount(),
-    result.getDouble(revenue) ?? 0,
-    result.getDouble(average),
+    result.count ?? 0,
+    (result.get(revenue) as num?)?.toDouble() ?? 0,
+    (result.get(average) as num?)?.toDouble(),
   );
 }
 
@@ -56,7 +56,7 @@ Future<ReportOutcome> writeReport(
   ) async {
     final DocumentSnapshot<Map<String, Object?>> current = await transaction
         .get(report);
-    final Map<String, Object?> data = current.data ?? <String, Object?>{};
+    final Map<String, Object?> data = current.data() ?? <String, Object?>{};
     if (data['lastExecution'] == executionId) {
       return ReportOutcome.alreadyWritten;
     }

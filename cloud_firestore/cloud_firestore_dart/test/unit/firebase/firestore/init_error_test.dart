@@ -59,8 +59,8 @@ void main() {
     // Queued behind the initialization, which is still opening the cache.
     final List<Future<Object?>> operations = <Future<Object?>>[
       firestore.namedQuery('none'),
-      firestore.doc('col/doc').get(Source.cache),
-      firestore.collection('col').get(Source.cache),
+      firestore.doc('col/doc').get(GetOptions(source: Source.cache)),
+      firestore.collection('col').get(GetOptions(source: Source.cache)),
       firestore.namedQuery('none'),
     ];
     for (final Future<Object?> operation in operations) {

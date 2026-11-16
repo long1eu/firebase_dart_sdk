@@ -16,10 +16,10 @@
 ///
 /// Port of the JS SDK `DocumentSnapshot.toJSON()`, `QuerySnapshot.toJSON()`, `documentSnapshotFromJSON()`,
 /// `querySnapshotFromJSON()` and `onSnapshotResume()`. The JSON object holds the snapshot as a Firestore bundle string
-/// (the format of `Firestore.loadBundle`), so it is interchangeable with the one of the JS SDK (Node).
+/// (the format of `FirebaseFirestore.loadBundle`), so it is interchangeable with the one of the JS SDK (Node).
 ///
 /// This library is internal: apps use `DocumentSnapshot.toJson`, `QuerySnapshot.toJson`, their `fromJson`
-/// constructors, and `Firestore.documentSnapshotsFromJson` / `Firestore.querySnapshotsFromJson`, which call it.
+/// constructors, and `FirebaseFirestore.documentSnapshotsFromJson` / `FirebaseFirestore.querySnapshotsFromJson`, which call it.
 library;
 
 import 'dart:async';
@@ -48,7 +48,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/model/value/field_va
 import 'package:cloud_firestore_dart/src/firebase/firestore/query.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/query_snapshot.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/remote/remote_serializer.dart';
-import 'package:cloud_firestore_dart/src/firebase/firestore/snapshot_listen_options.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/listen_source.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/util.dart';
 
 const String _documentSource = 'DocumentSnapshot';
@@ -247,10 +247,11 @@ void _checkOrderByFields(core.Query query, Document document) {
 /// are delivered on the stream.
 Stream<DocumentSnapshot<T>> documentSnapshotsFromJson<T>(
   FirebaseFirestore firestore,
-  Map<String, Object?> json,
-  SnapshotListenOptions options,
+  Map<String, Object?> json, {
+  required bool includeMetadataChanges,
+  required ListenSource source,
   FirestoreDataConverter<T>? converter,
-) {
+}) {
   final _SnapshotJson parsed = _SnapshotJson.forResume(json, _documentSource);
   final DocumentKey key = _documentKey(parsed.bundleName);
   final DocumentReference<T> reference = DocumentReferenceInternal.create<T>(
@@ -260,10 +261,16 @@ Stream<DocumentSnapshot<T>> documentSnapshotsFromJson<T>(
   );
   if (parsed.bundle.isEmpty) {
     // The document was missing: there is nothing to load.
-    return reference.getSnapshotsWithOptions(options);
+    return reference.snapshots(
+      includeMetadataChanges: includeMetadataChanges,
+      source: source,
+    );
   }
   return _resume<DocumentSnapshot<T>>(firestore, parsed.bundle, () async {
-    return reference.getSnapshotsWithOptions(options);
+    return reference.snapshots(
+      includeMetadataChanges: includeMetadataChanges,
+      source: source,
+    );
   });
 }
 
@@ -274,10 +281,11 @@ Stream<DocumentSnapshot<T>> documentSnapshotsFromJson<T>(
 /// and a bundle without the named query, are delivered on the stream.
 Stream<QuerySnapshot<T>> querySnapshotsFromJson<T>(
   FirebaseFirestore firestore,
-  Map<String, Object?> json,
-  SnapshotListenOptions options,
+  Map<String, Object?> json, {
+  required bool includeMetadataChanges,
+  required ListenSource source,
   FirestoreDataConverter<T>? converter,
-) {
+}) {
   final _SnapshotJson parsed = _SnapshotJson.forResume(json, _querySource);
   if (parsed.bundle.isEmpty) {
     throw FirestoreException(
@@ -299,7 +307,7 @@ Stream<QuerySnapshot<T>> querySnapshotsFromJson<T>(
       namedQuery.query,
       firestore,
       converter,
-    ).getSnapshotsWithOptions(options);
+    ).snapshots(includeMetadataChanges: includeMetadataChanges, source: source);
   });
 }
 

@@ -51,7 +51,7 @@ Future<void> main() async {
       .doc(path)
       .get();
   print(
-    'offline read: ${cached.data} '
+    'offline read: ${cached.data()} '
     '(from cache: ${cached.metadata.isFromCache})',
   );
 
@@ -63,9 +63,9 @@ Future<void> main() async {
   );
   final DocumentSnapshot<Map<String, Object?>> local = await firestore
       .doc(path)
-      .get(Source.cache);
+      .get(GetOptions(source: Source.cache));
   print(
-    'offline write: ${local.data} '
+    'offline write: ${local.data()} '
     '(pending: ${local.metadata.hasPendingWrites})',
   );
 
@@ -74,8 +74,8 @@ Future<void> main() async {
   await pendingWrite;
   final DocumentSnapshot<Map<String, Object?>> synced = await firestore
       .doc(path)
-      .get(Source.server);
-  print('after sync: ${synced.data}');
+      .get(GetOptions(source: Source.server));
+  print('after sync: ${synced.data()}');
 
   await firestore.terminate();
   directory.deleteSync(recursive: true);

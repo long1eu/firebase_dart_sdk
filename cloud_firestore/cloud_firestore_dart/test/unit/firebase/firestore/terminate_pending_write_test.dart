@@ -38,7 +38,7 @@ void main() {
         (_) => outcome = 'completed',
         onError: (Object error) => outcome = 'failed: $error'));
     // The write is in the local cache.
-    expect((await doc.get(Source.cache)).data, <String, Object?>{'a': 1});
+    expect((await doc.get(GetOptions(source: Source.cache))).data(), <String, Object?>{'a': 1});
 
     await firestore.terminate();
     await Future<void>.delayed(const Duration(milliseconds: 300));

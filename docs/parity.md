@@ -108,9 +108,9 @@ for a real project that has not been run yet; see [Known limitations](#known-lim
 
 | JS feature | Status | Dart API or gap |
 |---|---|---|
-| `runTransaction` with retries and backoff, `maxAttempts` | supported | `firestore.runTransaction(fn, options: TransactionOptions(maxAttempts: 5))`; `test/integration/firebase/firestore/transaction_test.dart` |
+| `runTransaction` with retries and backoff, `maxAttempts` | supported | `firestore.runTransaction(fn, maxAttempts: 5)`; `test/integration/firebase/firestore/transaction_test.dart` |
 | `writeBatch` | supported | `firestore.batch()`, `runBatch(fn)`; `test/integration/firebase/firestore/write_batch_test.dart` |
-| Read-only transactions | supported (extra) | `TransactionOptions(readOnly: true, readTime: ...)` with `getQuery` and `getAggregate`. Not in the JS client SDK (the server SDKs have it); `test/integration/firebase/firestore/read_only_transaction_test.dart` |
+| Read-only transactions | supported (extra) | `readOnly: true, readTime: ...` with `getQuery` and `getAggregate`. Not in the JS client SDK (the server SDKs have it); `test/integration/firebase/firestore/read_only_transaction_test.dart` |
 | `waitForPendingWrites` | supported | `firestore.waitForPendingWrites()` |
 | `terminate` | supported | `firestore.terminate()`; `test/integration/firebase/firestore/terminate_in_flight_test.dart`, `terminated_instance_test.dart` |
 
@@ -133,7 +133,7 @@ for a real project that has not been run yet; see [Known limitations](#known-lim
 |---|---|---|
 | `getPersistentCacheIndexManager` | supported | `firestore.persistentCacheIndexManager` (null with a memory cache, as in JS) |
 | `enablePersistentCacheIndexAutoCreation`, `disable...`, `deleteAllPersistentCacheIndexes` | supported | `enableIndexAutoCreation()`, `disableIndexAutoCreation()`, `deleteAllIndexes()`; `test/integration/firebase/firestore/index_engine_test.dart`, `test/unit/firebase/firestore/persistent_cache_index_manager_test.dart` |
-| `setIndexConfiguration` (deprecated in JS) | supported | `firestore.setIndexConfiguration(json)` (deprecated here too); `test/integration/firebase/firestore/indexing_test.dart` |
+| `setIndexConfiguration` (deprecated in JS) | supported | `firestore.setIndexConfigurationFromJSON(json)` (deprecated here too); `test/integration/firebase/firestore/indexing_test.dart` |
 | Indexes for queries with inequalities on several fields | not supported | Scanned instead, as in the JS SDK |
 | Queries served by a persistent cache index | supported, with fixes over JS | Two gaps that the JS and Android SDKs have are fixed here: after one of the client's own writes the index no longer misses documents that watch sends later at an older or equal version, and a limit query refills its window when the document at its edge arrived late from a lagging target. A query served by an index also no longer returns documents that do not match it. Compared with a scan of the cache by `test/unit/firebase/firestore/core/view_listeners_property_test.dart` ("with and without field indexes"); one remaining gap in [Known limitations](#known-limitations) |
 
@@ -281,7 +281,7 @@ Every gap and behaviour difference we know of, the ones you are most likely to m
     (scanned, as in JS) and do not exist for a memory cache (as in JS). The stored index entries
     are not byte-compatible with the Android SDK's (they are never exchanged).
 15. **A query served by a persistent cache index can miss a document.** Only with field indexes
-    (`setIndexConfiguration` or automatic index creation, SQLite cache). If watch sends a document
+    (`setIndexConfigurationFromJSON` or automatic index creation, SQLite cache). If watch sends a document
     in a later snapshot that has the same version as an earlier one (the client accepts this; it
     could happen for a query that starts listening while nothing changed on the server, but we
     have not seen it against the emulator or production), and the index was already brought up
@@ -302,7 +302,7 @@ Every gap and behaviour difference we know of, the ones you are most likely to m
     `libsqlite3.so` (the example opener falls back to `libsqlite3.so.0`).
 18. **Not ported:** the console-only `_customHeaders` setting of the JS SDK.
 19. **Behaviour that is not a gap but differs from JS by design:** listeners are Dart `Stream`s,
-    `snapshot.data` is a getter, `Source` replaces `getDocFromCache` / `getDocFromServer`, and the
+    `Source` (in `GetOptions`) replaces `getDocFromCache` / `getDocFromServer`, and the
     API spelling follows the Android SDK and FlutterFire (see
     [Coming from FlutterFire or the JS SDK](guides/queries_and_data.md#coming-from-flutterfire-or-the-js-sdk)).
     Extras over the JS client SDK: `Query.findNearest`, read-only transactions (also with

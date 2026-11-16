@@ -84,7 +84,7 @@ class BundleLoader {
     _bytesLoaded += byteSize;
 
     return beforeDocumentCount != _documents.length
-        ? LoadBundleTaskSnapshot(
+        ? LoadBundleTaskSnapshotInternal.create(
             _documents.length,
             _bundleMetadata.totalDocuments,
             _bytesLoaded,

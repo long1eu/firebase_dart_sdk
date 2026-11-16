@@ -9,7 +9,6 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/document_snapshot.da
 import 'package:cloud_firestore_dart/src/firebase/firestore/field_path.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/field_value.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/firestore_error.dart';
-import 'package:cloud_firestore_dart/src/firebase/firestore/metadata_change.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/server_timestamp_behavior.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/transaction.dart';
 import 'package:cloud_firestore_dart/src/firebase/timestamp.dart';
@@ -55,8 +54,7 @@ void main() {
   setUp(() async {
     docRef = await testDocument();
     accumulator = EventAccumulator<DocumentSnapshot>();
-    listenerRegistration = docRef
-        .getSnapshots(MetadataChanges.include)
+    listenerRegistration = docRef.snapshots(includeMetadataChanges: true)
         .listen(accumulator.onData, onError: accumulator.onError);
 
     // Wait for initial null snapshot to avoid potential races.
@@ -86,21 +84,21 @@ void main() {
   Future<void> writeInitialData() async {
     await docRef.set(initialData);
     DocumentSnapshot initialDataSnap = await accumulator.wait();
-    expect(initialDataSnap.data, initialData);
+    expect(initialDataSnap.data(), initialData);
     initialDataSnap = await accumulator.wait();
-    expect(initialDataSnap.data, initialData);
+    expect(initialDataSnap.data(), initialData);
   }
 
   /// Verifies a snapshot containing setData but with null for the timestamps.
   void verifyTimestampsAreNull(DocumentSnapshot snapshot) {
-    expect(snapshot.data, expectedDataWithTimestamp(null));
+    expect(snapshot.data(), expectedDataWithTimestamp(null));
   }
 
   /// Verifies a snapshot containing setData but with resolved server
   /// timestamps.
   void verifyTimestampsAreResolved(DocumentSnapshot snapshot) {
     expect(snapshot.exists, isTrue);
-    final Timestamp when = snapshot.getTimestamp('when')!;
+    final Timestamp when = (snapshot.get('when') as Timestamp?)!;
     expect(when, isNotNull);
     // Tolerate up to 48*60*60 seconds of clock skew between client and server.
     // This should be more than enough to compensate for timezone issues (even
@@ -114,7 +112,7 @@ void main() {
             '($now)');
 
     // Validate the rest of the document.
-    expect(snapshot.data, expectedDataWithTimestamp(when));
+    expect(snapshot.data(), expectedDataWithTimestamp(when));
   }
 
   /// Verifies a snapshot containing setData but with local estimates for server
@@ -122,9 +120,9 @@ void main() {
   void verifyTimestampsAreEstimates(DocumentSnapshot snapshot) {
     expect(snapshot.exists, isTrue);
     final Timestamp when =
-        snapshot.getTimestamp('when', ServerTimestampBehavior.estimate)!;
+        (snapshot.get('when', serverTimestamps: ServerTimestampBehavior.estimate) as Timestamp?)!;
     expect(when, isNotNull);
-    expect(snapshot.getData(ServerTimestampBehavior.estimate),
+    expect(snapshot.data(serverTimestamps: ServerTimestampBehavior.estimate),
         expectedDataWithTimestamp(when));
   }
 
@@ -134,12 +132,12 @@ void main() {
       DocumentSnapshot current, DocumentSnapshot? previous) {
     expect(current.exists, isTrue);
     if (previous != null) {
-      final Timestamp when = previous.getTimestamp('when')!;
+      final Timestamp when = (previous.get('when') as Timestamp?)!;
       expect(when, isNotNull);
-      expect(current.getData(ServerTimestampBehavior.previous),
+      expect(current.data(serverTimestamps: ServerTimestampBehavior.previous),
           expectedDataWithTimestamp(when));
     } else {
-      expect(current.getData(ServerTimestampBehavior.previous),
+      expect(current.data(serverTimestamps: ServerTimestampBehavior.previous),
           expectedDataWithTimestamp(null));
     }
   }
@@ -181,20 +179,20 @@ void main() {
 
   test('testServerTimestampsCanReturnPreviousValueOfDifferentType', () async {
     await writeInitialData();
-    await docRef.updateFromList(<dynamic>['a', FieldValue.serverTimestamp()]);
+    await docRef.update(<Object, Object?>{'a': FieldValue.serverTimestamp()});
 
     final DocumentSnapshot localSnapshot = await accumulator.awaitLocalEvent();
     expect(localSnapshot.get('a'), isNull);
-    expect(localSnapshot.get('a', ServerTimestampBehavior.estimate),
+    expect(localSnapshot.get('a', serverTimestamps: ServerTimestampBehavior.estimate),
         const TypeMatcher<Timestamp>());
-    expect(localSnapshot.get('a', ServerTimestampBehavior.previous), 42);
+    expect(localSnapshot.get('a', serverTimestamps: ServerTimestampBehavior.previous), 42);
 
     final DocumentSnapshot remoteSnapshot =
         await accumulator.awaitRemoteEvent();
     expect(remoteSnapshot.get('a'), const TypeMatcher<Timestamp>());
-    expect(remoteSnapshot.get('a', ServerTimestampBehavior.estimate),
+    expect(remoteSnapshot.get('a', serverTimestamps: ServerTimestampBehavior.estimate),
         const TypeMatcher<Timestamp>());
-    expect(remoteSnapshot.get('a', ServerTimestampBehavior.previous),
+    expect(remoteSnapshot.get('a', serverTimestamps: ServerTimestampBehavior.previous),
         const TypeMatcher<Timestamp>());
   });
 
@@ -204,14 +202,14 @@ void main() {
     await docRef.firestore.client.disableNetwork();
     await accumulator.awaitRemoteEvent();
 
-    unawaited(docRef.updateFromList(<dynamic>['a', FieldValue.serverTimestamp()]));
+    unawaited(docRef.update(<Object, Object?>{'a': FieldValue.serverTimestamp()}));
     DocumentSnapshot localSnapshot = await accumulator.awaitLocalEvent();
-    expect(localSnapshot.get('a', ServerTimestampBehavior.previous), 42);
+    expect(localSnapshot.get('a', serverTimestamps: ServerTimestampBehavior.previous), 42);
 
     // include b=1 to ensure there's a change resulting in a new snapshot.
-    unawaited(docRef.updateFromList(<dynamic>['a', FieldValue.serverTimestamp(), 'b', 1]));
+    unawaited(docRef.update(<Object, Object?>{'a': FieldValue.serverTimestamp(), 'b': 1}));
     localSnapshot = await accumulator.awaitLocalEvent();
-    expect(localSnapshot.get('a', ServerTimestampBehavior.previous), 42);
+    expect(localSnapshot.get('a', serverTimestamps: ServerTimestampBehavior.previous), 42);
 
     await docRef.firestore.client.enableNetwork();
 
@@ -225,16 +223,16 @@ void main() {
     await docRef.firestore.client.disableNetwork();
     await accumulator.awaitRemoteEvent();
 
-    unawaited(docRef.updateFromList(<dynamic>['a', FieldValue.serverTimestamp()]));
+    unawaited(docRef.update(<Object, Object?>{'a': FieldValue.serverTimestamp()}));
     DocumentSnapshot localSnapshot = await accumulator.awaitLocalEvent();
-    expect(localSnapshot.get('a', ServerTimestampBehavior.previous), 42);
+    expect(localSnapshot.get('a', serverTimestamps: ServerTimestampBehavior.previous), 42);
 
-    unawaited(docRef.updateFromList(<dynamic>['a', 1337]));
+    unawaited(docRef.update(<Object, Object?>{'a': 1337}));
     await accumulator.awaitLocalEvent();
 
-    unawaited(docRef.updateFromList(<dynamic>['a', FieldValue.serverTimestamp()]));
+    unawaited(docRef.update(<Object, Object?>{'a': FieldValue.serverTimestamp()}));
     localSnapshot = await accumulator.awaitLocalEvent();
-    expect(localSnapshot.get('a', ServerTimestampBehavior.previous), 1337);
+    expect(localSnapshot.get('a', serverTimestamps: ServerTimestampBehavior.previous), 1337);
 
     await docRef.firestore.client.enableNetwork();
 
@@ -301,18 +299,17 @@ void main() {
 
     // The default behavior returns a null timestamp (via any accessor).
     expect(snap.get('when'), isNull);
-    expect(snap.getField(FieldPath(<String>['when'])), isNull);
+    expect(snap.get(FieldPath(<String>['when'])), isNull);
     expect(snap['when'], isNull);
-    expect(snap.getTimestamp('when'), isNull);
+    expect(snap.get('when') as Timestamp?, isNull);
 
     // Estimate returns a Timestamp (via any accessor).
     expect(
-        snap.get('when', ServerTimestampBehavior.estimate), isA<Timestamp>());
+        snap.get('when', serverTimestamps: ServerTimestampBehavior.estimate), isA<Timestamp>());
     expect(
-        snap.getField(
-            FieldPath(<String>['when']), ServerTimestampBehavior.estimate),
+        snap.get(FieldPath(<String>['when']), serverTimestamps: ServerTimestampBehavior.estimate),
         isA<Timestamp>());
-    expect(snap.getTimestamp('when', ServerTimestampBehavior.estimate),
+    expect(snap.get('when', serverTimestamps: ServerTimestampBehavior.estimate) as Timestamp?,
         isA<Timestamp>());
   });
 }

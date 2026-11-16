@@ -24,7 +24,7 @@ Future<void> main() async {
 
   final Completer<void> confirmed = Completer<void>();
   final StreamSubscription<DocumentSnapshot<Map<String, Object?>>>
-  subscription = note.getSnapshots(MetadataChanges.include).listen((
+  subscription = note.snapshots(includeMetadataChanges: true).listen((
     DocumentSnapshot<Map<String, Object?>> snapshot,
   ) {
     if (snapshot['text'] != 'second') {
@@ -34,11 +34,11 @@ Future<void> main() async {
       // The local write, before the server has answered.
       print('pending, none:     ${snapshot['updatedAt']}');
       print(
-        'pending, estimate: ${snapshot.get('updatedAt', ServerTimestampBehavior.estimate) is Timestamp}',
+        'pending, estimate: ${snapshot.get('updatedAt', serverTimestamps: ServerTimestampBehavior.estimate) is Timestamp}',
       );
       final Object? previous = snapshot.get(
         'updatedAt',
-        ServerTimestampBehavior.previous,
+        serverTimestamps: ServerTimestampBehavior.previous,
       );
       print('pending, previous: ${previous is Timestamp}');
     } else {

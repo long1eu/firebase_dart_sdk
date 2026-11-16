@@ -26,7 +26,7 @@ void main() {
         firestore.collection(newCollectionName());
 
     final EventLog<QuerySnapshot<Json>> log =
-        EventLog<QuerySnapshot<Json>>(collection.orderBy('n').snapshots);
+        EventLog<QuerySnapshot<Json>>(collection.orderBy('n').snapshots());
     await log.waitFor((QuerySnapshot<Json> s) => s.docs.isEmpty);
 
     // Several rounds: in this mode every batch of data ends a response and
@@ -39,11 +39,11 @@ void main() {
     }
     expect(
         log.events.last.docs
-            .map((QueryDocumentSnapshot<Json> d) => d.data['n'])
+            .map((QueryDocumentSnapshot<Json> d) => d.data()['n'])
             .toList(),
         <int>[1, 2, 3, 4]);
     expect(log.errors, isEmpty);
-    expect((await collection.count().get()).getCount(), 4);
+    expect((await collection.count().get()).count, 4);
   });
 
   test('the online and offline events of the browser reach the client',
@@ -77,7 +77,7 @@ void main() {
     final CollectionReference<Json> collection =
         firestore.collection(newCollectionName());
     final EventLog<QuerySnapshot<Json>> log =
-        EventLog<QuerySnapshot<Json>>(collection.snapshots);
+        EventLog<QuerySnapshot<Json>>(collection.snapshots());
     await log.waitFor((QuerySnapshot<Json> s) => s.docs.isEmpty);
 
     // The client restarts its streams on "online" (after a short debounce).

@@ -23,7 +23,7 @@ Future<void> main() async {
   // changes only the metadata, not the documents.
   final StreamController<String> screen = StreamController<String>();
   final StreamSubscription<QuerySnapshot<Map<String, Object?>>>
-  subscription = todos.getSnapshots(MetadataChanges.include).listen((
+  subscription = todos.snapshots(includeMetadataChanges: true).listen((
     QuerySnapshot<Map<String, Object?>> snapshot,
   ) {
     final String status = snapshot.metadata.isFromCache

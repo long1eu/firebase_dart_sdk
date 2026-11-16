@@ -19,9 +19,15 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/query.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/query_snapshot.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/source.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/util.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/get_options.dart';
 import 'package:test/test.dart';
 
 import '../util/integration_test_util.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/core/filter/filter.dart'
+    show FilterOperator;
+import 'package:cloud_firestore_dart/src/firebase/firestore/field_path.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/filter.dart'
+    show Filter, UnaryFilter;
 
 const int maxLong = 9223372036854775807;
 
@@ -47,7 +53,7 @@ void main() {
   }
 
   Future<List<String>> ids(Query query) async {
-    final QuerySnapshot snapshot = await query.get(Source.server);
+    final QuerySnapshot snapshot = await query.get(GetOptions(source: Source.server));
     return IntegrationTestUtil.querySnapshotToIds(snapshot)..sort();
   }
 
@@ -69,20 +75,20 @@ void main() {
     });
 
     // The Standard edition returns no document for any of these.
-    expect(await ids(collection.whereArrayContains('array', null)),
+    expect(await ids(collection.where(_arrayContainsNull('array'))),
         <String>['null']);
-    expect(await ids(collection.whereArrayContains('array', double.nan)),
+    expect(await ids(collection.where('array', arrayContains: double.nan)),
         <String>['nan']);
     expect(
-        await ids(collection.whereArrayContainsAny('array', <Object?>[null])),
+        await ids(collection.where('array', arrayContainsAny: <Object?>[null])),
         <String>['null']);
     expect(
         await ids(
-            collection.whereArrayContainsAny('array', <Object?>[double.nan])),
+            collection.where('array', arrayContainsAny: <Object?>[double.nan])),
         <String>['nan']);
-    expect(await ids(collection.whereIn('value', <Object?>[null])),
+    expect(await ids(collection.where('value', whereIn: <Object?>[null])),
         <String>['null']);
-    expect(await ids(collection.whereIn('value', <Object?>[double.nan])),
+    expect(await ids(collection.where('value', whereIn: <Object?>[double.nan])),
         <String>['nan']);
   });
 
@@ -98,7 +104,7 @@ void main() {
       'count': AggregateField.count(),
       'sum': AggregateField.sum('pages'),
       'average': AggregateField.average('pages'),
-    }).get(AggregateSource.server);
+    }).get(source: AggregateSource.server);
 
     // The Standard edition returns 0 for the sum.
     expect(snapshot.data(),
@@ -119,7 +125,7 @@ void main() {
       'count': AggregateField.count(),
       'totalPages': AggregateField.sum('pages'),
       'averageYear': AggregateField.average('year'),
-    }).get(AggregateSource.server);
+    }).get(source: AggregateSource.server);
 
     // The Standard edition only aggregates over the documents that have
     // every aggregated field ('a' and 'b'): count 2, totalPages 150.
@@ -148,7 +154,7 @@ void main() {
       'sumC': AggregateField.sum('c'),
       'averageA': AggregateField.average('a'),
       'averageB': AggregateField.average('b'),
-    }).get(AggregateSource.server);
+    }).get(source: AggregateSource.server);
 
     expect(snapshot.data(), <String, Object?>{
       'count': 2,
@@ -171,8 +177,7 @@ void main() {
     // The Standard edition returns the double 1.8446744073709552e19.
     await expectLater(
         collection
-            .aggregate(<AggregateField>[AggregateField.sum('rating')]).get(
-                AggregateSource.server),
+            .aggregate(<AggregateField>[AggregateField.sum('rating')]).get(source: AggregateSource.server),
         throwsA(isA<FirestoreException>()
             .having((FirestoreException e) => e.errorCode, 'code',
                 FirestoreErrorCode.invalidArgument)
@@ -180,3 +185,8 @@ void main() {
                 contains('Long overflow'))));
   });
 }
+
+/// `array-contains null`, which the named arguments of `where` cannot express
+/// (a null argument counts as not given).
+Filter _arrayContainsNull(String field) =>
+    UnaryFilter(FieldPath.fromString(field), FilterOperator.arrayContains, null);

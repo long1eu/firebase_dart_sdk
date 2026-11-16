@@ -70,7 +70,7 @@ void main() {
         "d": <String, Object?>{"k": "d", "sort": 2},
       });
 
-      var query = collection.limit(2).orderBy("sort", Direction.descending);
+      var query = collection.limit(2).orderBy("sort", descending: true);
       var db = collection.firestore;
       var set = (await db.pipeline().createFrom(query).execute());
 
@@ -221,7 +221,7 @@ void main() {
 
       var query = collection
           .where("foo", isGreaterThan: 21.0)
-          .orderBy("foo", Direction.descending);
+          .orderBy("foo", descending: true);
       var db = collection.firestore;
       var result = (await db.pipeline().createFrom(query).execute());
       assertEquals(<Object?>[
@@ -286,7 +286,7 @@ void main() {
       // the default, but that requires an extra index
       var docs = (await db
           .pipeline()
-          .createFrom(collection.orderByField(FieldPath.documentId))
+          .createFrom(collection.orderBy(FieldPath.documentId))
           .execute());
       assertEquals(<Object?>[
         testDocs["a"],
@@ -370,9 +370,7 @@ void main() {
       (await collection.add(<String, Object?>{}));
       Future<PipelineSnapshot> query1 = db
           .pipeline()
-          .createFrom(
-            collection.orderByField(FieldPath.documentId, Direction.ascending),
-          )
+          .createFrom(collection.orderBy(FieldPath.documentId))
           .execute();
       Future<PipelineSnapshot> query2 = db
           .pipeline()
@@ -1038,7 +1036,7 @@ void main() {
             .createFrom(
               db
                   .collectionGroup(collectionGroup)
-                  .orderByField(FieldPath.documentId)
+                  .orderBy(FieldPath.documentId)
                   .startAt(["a/b"])
                   .endAt(["a/b0"]),
             )
@@ -1054,7 +1052,7 @@ void main() {
             .createFrom(
               db
                   .collectionGroup(collectionGroup)
-                  .orderByField(FieldPath.documentId)
+                  .orderBy(FieldPath.documentId)
                   .startAfter(["a/b"])
                   .endBefore(["a/b/" + collectionGroup + "/cg-doc3"]),
             )
@@ -1133,7 +1131,7 @@ void main() {
       // Two equalities: a==1 || b==1.
       await checkQueryAndPipelineResultsMatch(
         collection.where(
-          Filter.or([Filter.equalTo("a", 1), Filter.equalTo("b", 1)]),
+          Filter.or([Filter("a", isEqualTo: 1), Filter("b", isEqualTo: 1)]),
         ),
         ["doc1", "doc2", "doc4", "doc5"],
       );
@@ -1142,8 +1140,8 @@ void main() {
       await checkQueryAndPipelineResultsMatch(
         collection.where(
           Filter.or([
-            Filter.and([Filter.equalTo("a", 1), Filter.equalTo("b", 0)]),
-            Filter.and([Filter.equalTo("a", 3), Filter.equalTo("b", 2)]),
+            Filter.and([Filter("a", isEqualTo: 1), Filter("b", isEqualTo: 0)]),
+            Filter.and([Filter("a", isEqualTo: 3), Filter("b", isEqualTo: 2)]),
           ]),
         ),
         ["doc1", "doc3"],
@@ -1153,8 +1151,8 @@ void main() {
       await checkQueryAndPipelineResultsMatch(
         collection.where(
           Filter.and([
-            Filter.equalTo("a", 1),
-            Filter.or([Filter.equalTo("b", 0), Filter.equalTo("b", 3)]),
+            Filter("a", isEqualTo: 1),
+            Filter.or([Filter("b", isEqualTo: 0), Filter("b", isEqualTo: 3)]),
           ]),
         ),
         ["doc1", "doc4"],
@@ -1164,8 +1162,8 @@ void main() {
       await checkQueryAndPipelineResultsMatch(
         collection.where(
           Filter.and([
-            Filter.or([Filter.equalTo("a", 2), Filter.equalTo("b", 2)]),
-            Filter.or([Filter.equalTo("a", 3), Filter.equalTo("b", 3)]),
+            Filter.or([Filter("a", isEqualTo: 2), Filter("b", isEqualTo: 2)]),
+            Filter.or([Filter("a", isEqualTo: 3), Filter("b", isEqualTo: 3)]),
           ]),
         ),
         ["doc3"],
@@ -1174,7 +1172,9 @@ void main() {
       // Test with limits without orderBy (the __name__ ordering is the tie breaker).
       await checkQueryAndPipelineResultsMatch(
         collection
-            .where(Filter.or([Filter.equalTo("a", 2), Filter.equalTo("b", 1)]))
+            .where(
+              Filter.or([Filter("a", isEqualTo: 2), Filter("b", isEqualTo: 1)]),
+            )
             .limit(1),
         ["doc2"],
       );
@@ -1195,8 +1195,8 @@ void main() {
       await checkQueryAndPipelineResultsMatch(
         collection.where(
           Filter.or([
-            Filter.equalTo("a", 2),
-            Filter.inArray("b", <Object?>[2, 3]),
+            Filter("a", isEqualTo: 2),
+            Filter("b", whereIn: <Object?>[2, 3]),
           ]),
         ),
         ["doc3", "doc4", "doc6"],
@@ -1228,7 +1228,7 @@ void main() {
       // a==2 || b array-contains 7
       await checkQueryAndPipelineResultsMatch(
         collection.where(
-          Filter.or([Filter.equalTo("a", 2), Filter.arrayContains("b", 7)]),
+          Filter.or([Filter("a", isEqualTo: 2), Filter("b", arrayContains: 7)]),
         ),
         ["doc3", "doc4", "doc6"],
       );
@@ -1237,8 +1237,8 @@ void main() {
       await checkQueryAndPipelineResultsMatch(
         collection.where(
           Filter.or([
-            Filter.equalTo("a", 2),
-            Filter.arrayContainsAny("b", <Object?>[0, 3]),
+            Filter("a", isEqualTo: 2),
+            Filter("b", arrayContainsAny: <Object?>[0, 3]),
           ]),
         ),
         ["doc1", "doc4", "doc6"],
@@ -1259,8 +1259,8 @@ void main() {
       // Two IN operations on different fields with disjunction.
       var query1 = collection.where(
         Filter.or([
-          Filter.inArray("a", <Object?>[2, 3]),
-          Filter.inArray("b", <Object?>[0, 2]),
+          Filter("a", whereIn: <Object?>[2, 3]),
+          Filter("b", whereIn: <Object?>[0, 2]),
         ]),
       );
       await checkQueryAndPipelineResultsMatch(query1, ["doc1", "doc3", "doc6"]);
@@ -1269,8 +1269,8 @@ void main() {
       // a IN [0,3] || a IN [0,2] should union them (similar to: a IN [0,2,3]).
       var query2 = collection.where(
         Filter.or([
-          Filter.inArray("a", <Object?>[0, 3]),
-          Filter.inArray("a", <Object?>[0, 2]),
+          Filter("a", whereIn: <Object?>[0, 3]),
+          Filter("a", whereIn: <Object?>[0, 2]),
         ]),
       );
       await checkQueryAndPipelineResultsMatch(query2, ["doc3", "doc6"]);
@@ -1301,8 +1301,8 @@ void main() {
 
       var query1 = collection.where(
         Filter.or([
-          Filter.inArray("a", <Object?>[2, 3]),
-          Filter.arrayContainsAny("b", <Object?>[0, 7]),
+          Filter("a", whereIn: <Object?>[2, 3]),
+          Filter("b", arrayContainsAny: <Object?>[0, 7]),
         ]),
       );
       await checkQueryAndPipelineResultsMatch(query1, [
@@ -1315,10 +1315,10 @@ void main() {
       var query2 = collection.where(
         Filter.or([
           Filter.and([
-            Filter.inArray("a", <Object?>[2, 3]),
-            Filter.equalTo("c", 10),
+            Filter("a", whereIn: <Object?>[2, 3]),
+            Filter("c", isEqualTo: 10),
           ]),
-          Filter.arrayContainsAny("b", <Object?>[0, 7]),
+          Filter("b", arrayContainsAny: <Object?>[0, 7]),
         ]),
       );
       await checkQueryAndPipelineResultsMatch(query2, ["doc1", "doc3", "doc4"]);
@@ -1348,32 +1348,35 @@ void main() {
 
       var query1 = collection.where(
         Filter.or([
-          Filter.inArray("a", <Object?>[2, 3]),
-          Filter.arrayContains("b", 3),
+          Filter("a", whereIn: <Object?>[2, 3]),
+          Filter("b", arrayContains: 3),
         ]),
       );
       await checkQueryAndPipelineResultsMatch(query1, ["doc3", "doc4", "doc6"]);
 
       var query2 = collection.where(
         Filter.and([
-          Filter.inArray("a", <Object?>[2, 3]),
-          Filter.arrayContains("b", 7),
+          Filter("a", whereIn: <Object?>[2, 3]),
+          Filter("b", arrayContains: 7),
         ]),
       );
       await checkQueryAndPipelineResultsMatch(query2, ["doc3"]);
 
       var query3 = collection.where(
         Filter.or([
-          Filter.inArray("a", <Object?>[2, 3]),
-          Filter.and([Filter.arrayContains("b", 3), Filter.equalTo("a", 1)]),
+          Filter("a", whereIn: <Object?>[2, 3]),
+          Filter.and([
+            Filter("b", arrayContains: 3),
+            Filter("a", isEqualTo: 1),
+          ]),
         ]),
       );
       await checkQueryAndPipelineResultsMatch(query3, ["doc3", "doc4", "doc6"]);
 
       var query4 = collection.where(
         Filter.and([
-          Filter.inArray("a", <Object?>[2, 3]),
-          Filter.or([Filter.arrayContains("b", 7), Filter.equalTo("a", 1)]),
+          Filter("a", whereIn: <Object?>[2, 3]),
+          Filter.or([Filter("b", arrayContains: 7), Filter("a", isEqualTo: 1)]),
         ]),
       );
       await checkQueryAndPipelineResultsMatch(query4, ["doc3"]);
@@ -1402,11 +1405,11 @@ void main() {
       };
       var collection = await testCollectionWithDocs(testDocs);
 
-      var query1 = collection.where(Filter.equalTo("a", 1)).orderBy("a");
+      var query1 = collection.where(Filter("a", isEqualTo: 1)).orderBy("a");
       await checkQueryAndPipelineResultsMatch(query1, ["doc1", "doc4", "doc5"]);
 
       var query2 = collection
-          .where(Filter.inArray("a", <Object?>[2, 3]))
+          .where(Filter("a", whereIn: <Object?>[2, 3]))
           .orderBy("a");
       await checkQueryAndPipelineResultsMatch(query2, ["doc6", "doc3"]);
     });

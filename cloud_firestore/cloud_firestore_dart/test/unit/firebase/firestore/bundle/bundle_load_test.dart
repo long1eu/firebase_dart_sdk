@@ -146,7 +146,7 @@ void main() {
         final LoadBundleTask task = await load(bundle, chunkSize: 100);
 
         expect(task.isComplete, isTrue);
-        expect(task.isSuccessful, isTrue);
+        expect(task.snapshot.taskState, LoadBundleTaskState.success);
         final LoadBundleTaskSnapshot result = await task.future;
         expect(result.taskState, LoadBundleTaskState.success);
         expect(result.documentsLoaded, 2);
@@ -216,7 +216,7 @@ void main() {
 
       test('skips a bundle that was already loaded', () async {
         final LoadBundleTask first = await load(bundleWithQueryAndDocuments());
-        expect(first.isSuccessful, isTrue);
+        expect(first.snapshot.taskState, LoadBundleTaskState.success);
 
         // Same id and the same (or older) create time.
         final LoadBundleTask task = LoadBundleTaskInternal.create();
@@ -245,7 +245,7 @@ void main() {
         final LoadBundleTask task =
             await load(builder.build('bundle-1', 7000000, 1));
 
-        expect(task.isSuccessful, isTrue);
+        expect(task.snapshot.taskState, LoadBundleTaskState.success);
         expect(await localStore.readDocument(key('coll/doc1')),
             doc('coll/doc1', 7000000, <String, Object?>{'foo': 'value2'}));
       });
@@ -257,17 +257,17 @@ void main() {
             await load(bundle.substring(0, bundle.length - 20));
 
         expect(task.isComplete, isTrue);
-        expect(task.isSuccessful, isFalse);
         expect(task.snapshot.taskState, LoadBundleTaskState.error);
-        expect(task.exception, isA<FirestoreException>());
-        expect((task.exception! as FirestoreException).errorCode,
+        expect(task.snapshot.taskState, LoadBundleTaskState.error);
+        expect(task.snapshot.exception, isA<FirestoreException>());
+        expect((task.snapshot.exception! as FirestoreException).errorCode,
             FirestoreErrorCode.invalidArgument);
         await expectLater(task.future, throwsA(isA<FirestoreException>()));
 
         // Nothing was applied: the bundle is not marked as loaded and its documents are not in the cache.
         expect(await localStore.readDocument(key('coll/doc1')), isNull);
         final LoadBundleTask retry = await load(bundleWithQueryAndDocuments());
-        expect(retry.isSuccessful, isTrue);
+        expect(retry.snapshot.taskState, LoadBundleTaskState.success);
       });
 
       test('fails when the number of documents does not match the metadata',

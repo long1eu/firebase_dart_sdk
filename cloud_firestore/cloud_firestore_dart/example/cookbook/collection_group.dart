@@ -48,7 +48,7 @@ Future<void> main() async {
   // Aggregations work on collection groups too.
   print(
     'five-star reviews: '
-    '${(await firestore.collectionGroup(reviews).where('stars', isEqualTo: 5).count().get()).getCount()}',
+    '${(await firestore.collectionGroup(reviews).where('stars', isEqualTo: 5).count().get()).count}',
   );
 
   await firestore.terminate();

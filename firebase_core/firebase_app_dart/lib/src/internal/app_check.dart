@@ -53,7 +53,7 @@ class AppCheckTokenResult {
 ///
 /// import 'package:firebase_app_dart/firebase_app_dart.dart';
 ///
-/// class BackendAppCheck extends InternalAppCheckTokenProvider {
+/// class BackendAppCheck extends AppCheckTokenProvider {
 ///   BackendAppCheck(this.fetchToken);
 ///
 ///   /// Asks your backend for a token.

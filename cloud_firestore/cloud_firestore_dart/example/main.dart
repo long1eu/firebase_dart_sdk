@@ -35,13 +35,13 @@ Future<void> main() async {
   final DocumentSnapshot<Map<String, Object?>> ada = await users
       .doc('ada')
       .get();
-  print('ada: ${ada.data}');
+  print('ada: ${ada.data()}');
 
   final QuerySnapshot<Map<String, Object?>> older = await users
       .where('age', isGreaterThan: 40)
       .get();
   for (final QueryDocumentSnapshot<Map<String, Object?>> doc in older.docs) {
-    print('older than 40: ${doc.data['name']}');
+    print('older than 40: ${doc.data()['name']}');
   }
 
   // Listen: the first event is the current result, every later one a change.
@@ -50,7 +50,7 @@ Future<void> main() async {
   // wait for each event in turn. Cancelling it stops the listener.
   final StreamIterator<QuerySnapshot<Map<String, Object?>>> listener =
       StreamIterator<QuerySnapshot<Map<String, Object?>>>(
-        users.orderBy('name').snapshots,
+        users.orderBy('name').snapshots(),
       );
   await listener.moveNext();
   print('listener: ${_names(listener.current)}');
@@ -70,7 +70,7 @@ Future<void> main() async {
   ) async {
     final DocumentSnapshot<Map<String, Object?>> snapshot = await transaction
         .get(alan);
-    final int age = snapshot.data!['age']! as int;
+    final int age = snapshot.data()!['age']! as int;
     transaction.update(alan, <String, Object?>{'age': age + 1});
     return age + 1;
   });
@@ -79,7 +79,7 @@ Future<void> main() async {
   await listener.cancel();
 
   final AggregateQuerySnapshot count = await users.count().get();
-  print('count: ${count.getCount()}');
+  print('count: ${count.count}');
 
   // Release the gRPC channel and the timers so that the process can exit.
   await firestore.terminate();
@@ -87,5 +87,5 @@ Future<void> main() async {
 
 List<Object?> _names(QuerySnapshot<Map<String, Object?>> snapshot) => <Object?>[
   for (final QueryDocumentSnapshot<Map<String, Object?>> doc in snapshot.docs)
-    doc.data['name'],
+    doc.data()['name'],
 ];

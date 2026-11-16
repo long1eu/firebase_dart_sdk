@@ -291,7 +291,7 @@ void main() {
           settings:
               settings.copyWith(cacheSettings: const MemoryCacheSettings()));
       addTearDown(firestore.terminate);
-      await expectLater(firestore.doc('col/doc').get(Source.server),
+      await expectLater(firestore.doc('col/doc').get(GetOptions(source: Source.server)),
           throwsA(isA<FirestoreException>()));
     }
 

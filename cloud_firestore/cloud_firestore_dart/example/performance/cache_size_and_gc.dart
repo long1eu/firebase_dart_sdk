@@ -92,10 +92,11 @@ Future<void> run() async {
   }
   final StreamSubscription<QuerySnapshot<Map<String, Object?>>> active = notes
       .where('i', isGreaterThanOrEqualTo: 500)
-      .snapshots
+      .snapshots()
       .listen((_) {});
 
-  Future<int> cached() async => (await notes.get(Source.cache)).length;
+  Future<int> cached() async =>
+      (await notes.get(GetOptions(source: Source.cache))).length;
   print(
     'before: ${await cached()} documents in the cache, files ${filesSize(directory)}',
   );

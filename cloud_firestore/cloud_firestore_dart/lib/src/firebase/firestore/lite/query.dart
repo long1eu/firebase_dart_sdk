@@ -27,8 +27,6 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/lite/snapshot.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/document.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/document_key.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/resource_path.dart';
-import 'package:cloud_firestore_dart/src/firebase/firestore/query.dart'
-    show Direction;
 import 'package:cloud_firestore_dart/src/firebase/firestore/query_builder.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/remote/datastore/datastore.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/assert.dart';
@@ -53,11 +51,19 @@ class Query<T extends dynamic> {
   final FirestoreDataConverter<T>? converter;
 
   /// Returns the same query, returning objects of type [U] made by
-  /// [converter].
-  Query<U> withConverter<U extends Object?>(
-    FirestoreDataConverter<U> converter,
-  ) {
-    return Query<U>(query, firestore, converter);
+  /// [fromFirestore] (and written with [toFirestore]).
+  Query<U> withConverter<U extends Object?>({
+    required FromFirestore<U> fromFirestore,
+    required ToFirestore<U> toFirestore,
+  }) {
+    return Query<U>(
+      query,
+      firestore,
+      FirestoreDataConverter<U>.from(
+        fromFirestore: fromFirestore,
+        toFirestore: toFirestore,
+      ),
+    );
   }
 
   /// Returns the same query without a converter.
@@ -79,9 +85,9 @@ class Query<T extends dynamic> {
   /// arguments, in the FlutterFire style:
   ///
   /// ```dart
-  /// query.where(Filter.or([Filter.equalTo('a', 1), Filter.equalTo('b', 2)]));
+  /// query.where(Filter.or([Filter('a', isEqualTo: 1), Filter('b', isEqualTo: 2)]));
   /// query.where('age', isGreaterThanOrEqualTo: 18, isLessThan: 65);
-  /// query.where(FieldPath.documentIdField, whereIn: ['a', 'b']);
+  /// query.where(FieldPath.documentId, whereIn: ['a', 'b']);
   /// ```
   ///
   /// A [Filter] can be a single field filter created with the [Filter]
@@ -132,39 +138,23 @@ class Query<T extends dynamic> {
     );
   }
 
-  /// Creates and returns a new [Query] that's additionally sorted by the specified field.
-  /// Optionally in descending order instead of ascending.
-  ///
-  /// [field] the field to sort by.
-  /// [direction] the direction to sort.
-  ///
-  /// Returns the created Query.
-  Query<T> orderBy(String field, [Direction direction = Direction.ascending]) {
-    return orderByField(
-      FieldPathInternal.fromArgument('orderBy', field),
-      direction,
-    );
-  }
-
-  /// Creates and returns a new [Query] that's additionally sorted by the specified field, optionally in descending
-  /// order instead of ascending.
-  ///
-  /// [fieldPath] the field to sort by.
-  /// [direction] the direction to sort.
-  ///
-  /// Returns the created Query.
-  Query<T> orderByField(
-    FieldPath fieldPath, [
-    Direction direction = Direction.ascending,
-  ]) {
-    checkNotNull(fieldPath, 'Provided field path must not be null.');
-    checkNotNull(direction, 'Provided direction must not be null.');
+  /// Creates and returns a new [Query] that's additionally sorted by [field], a [String] (dots separate nested
+  /// fields) or a [FieldPath], in ascending order or, with [descending], in descending order.
+  Query<T> orderBy(Object field, {bool descending = false}) {
+    final FieldPath fieldPath;
+    if (field is FieldPath) {
+      fieldPath = field;
+    } else if (field is String) {
+      fieldPath = FieldPathInternal.fromArgument('orderBy', field);
+    } else {
+      throw ArgumentError.value(
+        field,
+        'field',
+        'orderBy() expects a String field or a FieldPath',
+      );
+    }
     return _withQuery(
-      _builder.orderBy(
-        query,
-        fieldPath.internalPath,
-        descending: direction != Direction.ascending,
-      ),
+      _builder.orderBy(query, fieldPath.internalPath, descending: descending),
     );
   }
 
@@ -218,11 +208,11 @@ class Query<T extends dynamic> {
   /// [fieldValues] the field values to start this query at, in order of the query's order by.
   ///
   /// Returns the created Query.
-  Query<T> startAt(List<Object?> fieldValues) {
+  Query<T> startAt(Iterable<Object?> fieldValues) {
     final Bound bound = _builder.boundFromFields(
       query,
       'startAt',
-      fieldValues,
+      fieldValues.toList(),
       inclusive: true,
     );
     return _withQuery(query.startAt(bound));
@@ -255,11 +245,11 @@ class Query<T extends dynamic> {
   /// [fieldValues] the field values to start this query after, in order of the query's order by.
   ///
   /// Returns the created Query.
-  Query<T> startAfter(List<Object?> fieldValues) {
+  Query<T> startAfter(Iterable<Object?> fieldValues) {
     final Bound bound = _builder.boundFromFields(
       query,
       'startAfter',
-      fieldValues,
+      fieldValues.toList(),
       inclusive: false,
     );
     return _withQuery(query.startAt(bound));
@@ -291,11 +281,11 @@ class Query<T extends dynamic> {
   /// [fieldValues] the field values to end this query before, in order of the query's order by.
   ///
   /// Returns the created Query.
-  Query<T> endBefore(List<Object?> fieldValues) {
+  Query<T> endBefore(Iterable<Object?> fieldValues) {
     final Bound bound = _builder.boundFromFields(
       query,
       'endBefore',
-      fieldValues,
+      fieldValues.toList(),
       inclusive: false,
     );
     return _withQuery(query.endAt(bound));
@@ -327,11 +317,11 @@ class Query<T extends dynamic> {
   /// [fieldValues] the field values to end this query at, in order of the query's order by.
   ///
   /// Returns the created Query.
-  Query<T> endAt(List<Object?> fieldValues) {
+  Query<T> endAt(Iterable<Object?> fieldValues) {
     final Bound bound = _builder.boundFromFields(
       query,
       'endAt',
-      fieldValues,
+      fieldValues.toList(),
       inclusive: true,
     );
     return _withQuery(query.endAt(bound));
@@ -489,10 +479,18 @@ class CollectionReference<T extends dynamic> extends Query<T> {
   }
 
   @override
-  CollectionReference<U> withConverter<U extends Object?>(
-    FirestoreDataConverter<U> converter,
-  ) {
-    return CollectionReference<U>(query.path, firestore, converter);
+  CollectionReference<U> withConverter<U extends Object?>({
+    required FromFirestore<U> fromFirestore,
+    required ToFirestore<U> toFirestore,
+  }) {
+    return CollectionReference<U>(
+      query.path,
+      firestore,
+      FirestoreDataConverter<U>.from(
+        fromFirestore: fromFirestore,
+        toFirestore: toFirestore,
+      ),
+    );
   }
 
   @override

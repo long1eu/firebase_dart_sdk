@@ -116,7 +116,7 @@ void main() {
             QuerySnapshot<Map<String, Object?>>.fromJson(modelFirestore, json);
         for (final DocumentSnapshot<Map<String, Object?>> document
             in snapshot.docs) {
-          expect(document.data, isA<Map<String, Object?>>());
+          expect(document.data(), isA<Map<String, Object?>>());
         }
       },
     );
@@ -145,7 +145,7 @@ void main() {
             for (final DocumentSnapshot<Map<String, Object?>> document
                 in snapshot.docs) {
               acceptOrReject(
-                () => document.data,
+                () => document.data(),
                 () => document.reference.path,
               );
             }
@@ -161,7 +161,7 @@ void main() {
               );
           if (snapshot != null) {
             acceptOrReject(
-              () => snapshot.data,
+              () => snapshot.data(),
               () => snapshot.reference.path,
             );
           }

@@ -100,7 +100,7 @@ final PipelineSnapshot same = await firestore
 `createFrom(query)` converts a `Query` (filters with named arguments or
 `Filter.or` / `Filter.and`, orderings, cursors, `limit`, `limitToLast`, collection groups, BSON
 operands), `createFromAggregateQuery` an `AggregateQuery` and `createFromVectorQuery` a
-`findNearest` query. The integration tests compare each shape with `query.get(Source.server)`.
+`findNearest` query. The integration tests compare each shape with `query.get(const GetOptions(source: Source.server))`.
 Known difference: a cursor (`startAt`, `endBefore`, ...) on a field that holds values of
 several types only returns the documents whose value has the type of the cursor value; a
 classic cursor is a position in the order of all types. The converter of a query is ignored:
@@ -165,7 +165,7 @@ With `execute(atomic: true)` the pipeline runs in a transaction that is committe
 server demands that for `insert` and `upsert` of documents read from a collection, and after
 an aggregation, `unnest`, `union` or a subquery. These writes bypass the local cache and the
 write queue: they fail while offline, and cached copies are stale until the server reports the
-change. The emulator (v1.22.0) never reports it: listeners and `get(Source.server)` return the
+change. The emulator (v1.22.0) never reports it: listeners and `get(const GetOptions(source: Source.server))` return the
 old version until a regular write touches the document, while pipelines read the new one.
 
 ## In a transaction
@@ -177,7 +177,7 @@ final PipelineSnapshot inSnapshot = await firestore.runTransaction(
   (Transaction transaction) => transaction.execute(
     firestore.pipeline().collection('books').where(field('genre').equal('Fantasy')),
   ),
-  options: TransactionOptions(readOnly: true),
+  readOnly: true,
 );
 ```
 

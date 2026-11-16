@@ -34,7 +34,7 @@ enum DocumentChangeType {
 ///
 /// ```dart
 /// final List<QueryDocumentSnapshot<Map<String, Object?>>> rows = [];
-/// firestore.collection('cities').orderBy('name').snapshots.listen((
+/// firestore.collection('cities').orderBy('name').snapshots().listen((
 ///   QuerySnapshot<Map<String, Object?>> snapshot,
 /// ) {
 ///   for (final DocumentChange<Map<String, Object?>> change
@@ -43,7 +43,7 @@ enum DocumentChangeType {
 ///       rows.removeAt(change.oldIndex);
 ///     }
 ///     if (change.newIndex != -1) {
-///       rows.insert(change.newIndex, change.document);
+///       rows.insert(change.newIndex, change.doc);
 ///     }
 ///   }
 /// });

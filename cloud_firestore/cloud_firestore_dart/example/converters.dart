@@ -32,7 +32,7 @@ class CityConverter extends FirestoreDataConverter<City> {
   City fromFirestore(
     DocumentSnapshot<Map<String, Object?>> snapshot,
     SnapshotOptions? options,
-  ) => City.fromMap(snapshot.data!);
+  ) => City.fromMap(snapshot.data()!);
 
   @override
   Map<String, Object?> toFirestore(City value, SetOptions? options) =>
@@ -45,25 +45,28 @@ Future<void> main() async {
   // From two functions...
   final FirestoreDataConverter<City> converter =
       FirestoreDataConverter<City>.from(
-        fromFirestore: (snapshot, options) => City.fromMap(snapshot.data!),
+        fromFirestore: (snapshot, options) => City.fromMap(snapshot.data()!),
         toFirestore: (city, options) => city.toMap(),
       );
 
   final CollectionReference<City> cities = firestore
       .collection(scratch('cities'))
-      .withConverter<City>(converter);
+      .withConverter<City>(
+        fromFirestore: converter.fromFirestore,
+        toFirestore: converter.toFirestore,
+      );
 
   await cities.doc('sf').set(const City('San Francisco', 870000));
   await cities.doc('la').set(const City('Los Angeles', 3900000));
 
   final DocumentSnapshot<City> sf = await cities.doc('sf').get();
-  print('document: ${sf.data}');
+  print('document: ${sf.data()}');
 
   // Queries keep the converter: filters still name the stored fields.
   final QuerySnapshot<City> big = await cities
       .where('population', isGreaterThan: 1000000)
       .get();
-  print('query: ${<City>[for (final doc in big.docs) doc.data]}');
+  print('query: ${<City>[for (final doc in big.docs) doc.data()]}');
 
   // `update` always takes raw field values.
   await cities.doc('sf').update(<String, Object?>{'population': 880000});
@@ -71,12 +74,15 @@ Future<void> main() async {
   // ...or from a class; and back to maps with withoutConverter().
   final DocumentReference<City> typed = firestore
       .doc(cities.doc('sf').path)
-      .withConverter<City>(const CityConverter());
-  print('class converter: ${(await typed.get()).data}');
+      .withConverter<City>(
+        fromFirestore: (const CityConverter()).fromFirestore,
+        toFirestore: (const CityConverter()).toFirestore,
+      );
+  print('class converter: ${(await typed.get()).data()}');
   final DocumentSnapshot<Map<String, Object?>> raw = await typed
       .withoutConverter()
       .get();
-  print('raw: ${raw.data}');
+  print('raw: ${raw.data()}');
 
   await firestore.terminate();
 }

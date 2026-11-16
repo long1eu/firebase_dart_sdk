@@ -2,7 +2,6 @@
 // Lung Razvan <long1eu>
 // on 20/09/2018
 
-import 'package:cloud_firestore_dart/src/firebase/firestore/vector_value.dart';
 import 'package:collection/collection.dart';
 
 /// Special values for writes: they tell the server how to change a field
@@ -28,17 +27,14 @@ import 'package:collection/collection.dart';
 /// (a pending server timestamp is read as `null` unless you choose another
 /// `ServerTimestampBehavior`). A document can hold at most 500 field
 /// transforms in one write.
-///
-/// [FieldValue.vector] is the exception: it creates a [VectorValue], a plain
-/// value and not a transform.
 abstract class FieldValue {
   const FieldValue._(this._elements);
 
   /// Removes the field from the document.
   ///
   /// Allowed only at the top level of the data of `update`, or anywhere in the
-  /// data of a `set` with a merge option ([SetOptions.mergeAllFields],
-  /// [SetOptions.mergeFields] or [SetOptions.mergeFieldPaths]). Elsewhere,
+  /// data of a `set` with a merge option (`SetOptions(merge: true)`,
+  /// [SetOptions.mergeFields]). Elsewhere,
   /// including a plain `set`, the write fails with an [ArgumentError].
   ///
   /// ```dart
@@ -149,20 +145,6 @@ abstract class FieldValue {
   factory FieldValue.maximum(num value) {
     return _NumericMaximumFieldValue(value);
   }
-
-  /// Creates a [VectorValue] holding a copy of [values], the same as
-  /// `VectorValue(values)`.
-  ///
-  /// Unlike the other factories this is a plain value, not a sentinel: it can
-  /// be stored anywhere a value can, and read back with `getVectorValue`.
-  /// Vector fields are what `Query.findNearest` searches.
-  ///
-  /// ```dart
-  /// await firestore.doc('items/a').set(<String, Object?>{
-  ///   'embedding': FieldValue.vector(<double>[0.1, 0.2, 0.3]),
-  /// });
-  /// ```
-  static VectorValue vector(List<double> values) => VectorValue(values);
 
   final List<Object?> _elements;
 

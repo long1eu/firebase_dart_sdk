@@ -6,7 +6,6 @@ import 'dart:async';
 
 import 'package:cloud_firestore_dart/src/firebase/firestore/document_reference.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/document_snapshot.dart';
-import 'package:cloud_firestore_dart/src/firebase/firestore/metadata_change.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/query.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/query_snapshot.dart';
 import 'package:test/test.dart';
@@ -38,7 +37,7 @@ void main() {
 
     final DocumentReference newRef = await collection.add(testData);
     final DocumentSnapshot result = await newRef.get();
-    expect(result.data, testData);
+    expect(result.data(), testData);
   });
 
   test('testObservesExistingDocument', () async {
@@ -49,11 +48,10 @@ void main() {
     await writerRef.set(testData);
     final EventAccumulator<DocumentSnapshot> accumulator =
         EventAccumulator<DocumentSnapshot>();
-    final StreamSubscription<DocumentSnapshot> listener = readerRef
-        .getSnapshots(MetadataChanges.include)
+    final StreamSubscription<DocumentSnapshot> listener = readerRef.snapshots(includeMetadataChanges: true)
         .listen(accumulator.onData, onError: accumulator.onError);
     final DocumentSnapshot doc = await accumulator.wait();
-    expect(doc.data, testData);
+    expect(doc.data(), testData);
     await listener.cancel();
   });
 
@@ -63,18 +61,17 @@ void main() {
     final DocumentReference readerRef = collection.doc(writerRef.id);
     final EventAccumulator<DocumentSnapshot> accumulator =
         EventAccumulator<DocumentSnapshot>();
-    final StreamSubscription<DocumentSnapshot> listener = readerRef
-        .getSnapshots(MetadataChanges.include)
+    final StreamSubscription<DocumentSnapshot> listener = readerRef.snapshots(includeMetadataChanges: true)
         .listen(accumulator.onData, onError: accumulator.onError);
     DocumentSnapshot doc = await accumulator.wait();
     expect(doc.exists, isFalse);
     final Map<String, Object?> testData = map(<String>['foo', 'bar']);
     await writerRef.set(testData);
     doc = await accumulator.wait();
-    expect(doc.data, testData);
+    expect(doc.data(), testData);
     expect(doc.metadata.hasPendingWrites, isTrue);
     doc = await accumulator.wait();
-    expect(doc.data, testData);
+    expect(doc.data(), testData);
     expect(doc.metadata.hasPendingWrites, isFalse);
     await listener.cancel();
   });
@@ -84,8 +81,7 @@ void main() {
         await testCollection('empty-collection');
     final EventAccumulator<QuerySnapshot> accumulator =
         EventAccumulator<QuerySnapshot>();
-    final StreamSubscription<QuerySnapshot> listener = collection
-        .getSnapshots(MetadataChanges.include)
+    final StreamSubscription<QuerySnapshot> listener = collection.snapshots(includeMetadataChanges: true)
         .listen(accumulator.onData, onError: accumulator.onError);
     final QuerySnapshot querySnap = await accumulator.wait();
     expect(querySnap.length, 0);
@@ -113,9 +109,9 @@ void main() {
     final List<DocumentSnapshot> documents = set.docs;
     expect(set, isNotEmpty);
     expect(documents, hasLength(3));
-    expect(documents[0].data, testData['1']);
-    expect(documents[1].data, testData['2']);
-    expect(documents[2].data, testData['3']);
+    expect(documents[0].data(), testData['1']);
+    expect(documents[1].data(), testData['2']);
+    expect(documents[2].data(), testData['3']);
   });
 
   test(
@@ -138,15 +134,14 @@ void main() {
       }
       await Future.wait(tasks);
       final Query query = collection
-          .whereEqualTo('filter', true)
-          .orderBy('sort', Direction.descending);
+          .where('filter', isEqualTo: true).orderBy('sort', descending: true);
 
       final QuerySnapshot set = await query.get();
       final List<DocumentSnapshot> documents = set.docs;
       expect(documents, hasLength(3));
-      expect(documents[0].data, testData['2']);
-      expect(documents[1].data, testData['3']);
-      expect(documents[2].data, testData['1']);
+      expect(documents[0].data(), testData['2']);
+      expect(documents[1].data(), testData['3']);
+      expect(documents[2].data(), testData['1']);
     },
     skip: 'This broken because it requires a composite index on filter,sort.',
   );

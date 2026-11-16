@@ -105,7 +105,7 @@ void main() {
 
     final List<String> logs = <String>[];
     runZoned(
-      () => snapshot.data,
+      () => snapshot.data(),
       zoneSpecification: ZoneSpecification(
         print: (_, _, _, String line) => logs.add(line),
       ),

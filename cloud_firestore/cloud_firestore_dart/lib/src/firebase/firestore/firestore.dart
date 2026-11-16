@@ -5,7 +5,6 @@
 import 'dart:async';
 
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/snapshot_version.dart';
-import 'package:cloud_firestore_dart/src/firebase/firestore/snapshot_listen_options.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/query_snapshot.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/document_snapshot.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/firestore_data_converter.dart';
@@ -27,6 +26,9 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/field_value.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/firestore_error.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/firestore_multi_db_component.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/firestore_settings.dart';
+import 'package:cloud_firestore_dart/src/firebase/timestamp.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/listen_source.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/get_options.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/index/index_configuration.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/load_bundle_task.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/log_level.dart';
@@ -66,17 +68,17 @@ import 'package:firebase_app_dart/internal.dart';
 /// final FirebaseApp app = FirebaseApp.withOptions(
 ///   const FirebaseOptions(
 ///     apiKey: 'my-api-key',
-///     applicationId: '1:1234567890:web:0123456789abcdef',
+///     appId: '1:1234567890:web:0123456789abcdef',
 ///     projectId: 'my-project',
 ///   ),
 /// );
-/// final Firestore firestore = Firestore.instanceFor(app: app);
+/// final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(app: app);
 ///
 /// await firestore.doc('cities/SF').set({'name': 'San Francisco'});
 /// final DocumentSnapshot<Map<String, Object?>> sf = await firestore
 ///     .doc('cities/SF')
 ///     .get();
-/// print(sf.data);
+/// print(sf.data());
 ///
 /// await firestore.terminate();
 /// ```
@@ -87,7 +89,7 @@ class FirebaseFirestore {
   /// Implementation detail of the SDK; not part of the supported API. Use [instanceFor].
   FirebaseFirestore._(
     this._databaseId,
-    this.firebaseApp,
+    this._app,
     FirestoreClient? client,
     this._scheduler, {
     Settings? settings,
@@ -111,12 +113,17 @@ class FirebaseFirestore {
   /// [instanceFor].
   String get databaseId => _databaseId.databaseId;
 
-  /// The [FirebaseApp] this instance belongs to.
-  final FirebaseApp? firebaseApp;
+  final FirebaseApp? _app;
 
-  /// The app this instance belongs to: the same as [firebaseApp], under the
-  /// name the JS SDK, FlutterFire and Firestore Lite use.
-  FirebaseApp? get app => firebaseApp;
+  /// The [FirebaseApp] this instance belongs to.
+  FirebaseApp get app =>
+      _app ?? (throw StateError('This FirebaseFirestore instance has no app.'));
+
+  /// The settings this instance was created with (the defaults of [Settings] when [instanceFor] got none), for
+  /// example to check whether its cache is persistent ([Settings.persistenceEnabled], [Settings.cacheSettings]).
+  ///
+  /// There is no setter: give the settings to [instanceFor].
+  Settings get settings => _settings;
 
   final UserDataConverter _dataConverter;
 
@@ -125,40 +132,19 @@ class FirebaseFirestore {
   final FirestoreClient? _clientOrNull;
   final TaskScheduler _scheduler;
 
-  /// The existing instance of the default [FirebaseApp] and the default database.
+  /// The instance of the default [FirebaseApp] and the default database.
   ///
-  /// Unlike FlutterFire, this getter does not create the instance. Throws a [StateError] if it has not been created
-  /// with [instanceFor] yet (or was terminated since), and the error of [FirebaseApp.instance] if there is no default
-  /// app.
+  /// Like FlutterFire, it creates the instance on first use, with the default [Settings] and a memory cache, when
+  /// [instanceFor] has not created it yet. Call [instanceFor] first to give it settings or a persistent cache.
+  /// Throws the error of [FirebaseApp.instance] if there is no default app.
   ///
   /// ```dart
-  /// Firestore.instanceFor(app: FirebaseApp.instance);
+  /// await Firebase.initializeApp(options: options);
   /// // Later, anywhere in the program:
-  /// final Firestore firestore = Firestore.instance;
+  /// final FirebaseFirestore firestore = FirebaseFirestore.instance;
   /// ```
   static FirebaseFirestore get instance {
-    final FirebaseApp app = FirebaseApp.instance;
-
-    final FirebaseFirestore? firestore =
-        FirestoreMultiDbComponent.instances[FirestoreMultiDbComponent.keyFor(
-          app.name,
-          DatabaseId.defaultDatabaseId,
-        )];
-    if (firestore == null) {
-      throw StateError(
-        'Firestore.instance has no default instance yet: call '
-        'Firestore.instanceFor(app: FirebaseApp.instance) first.',
-      );
-    }
-
-    if (app == app.authProvider) {
-      Log.w(
-        _tag,
-        'In case you are using FirebaseAuth make sure to first call [FirebaseAuth.instance] to register the auth provider with other Firebase Services.',
-      );
-    }
-
-    return firestore;
+    return instanceFor(app: FirebaseApp.instance);
   }
 
   /// Gets the instance for [app] and [databaseId], creating it on the first call. Later calls return the same instance
@@ -185,13 +171,13 @@ class FirebaseFirestore {
   ///
   /// ```dart
   /// // The default database, a memory cache, the production backend.
-  /// final Firestore firestore = Firestore.instanceFor(app: app);
+  /// final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(app: app);
   ///
   /// // A named database, against the emulator.
-  /// final Firestore other = Firestore.instanceFor(
+  /// final FirebaseFirestore other = FirebaseFirestore.instanceFor(
   ///   app: app,
-  ///   database: 'my-database',
-  ///   settings: FirestoreSettings().withEmulator('127.0.0.1', 8080),
+  ///   databaseId: 'my-database',
+  ///   settings: Settings().withEmulator('127.0.0.1', 8080),
   /// );
   /// ```
   static FirebaseFirestore instanceFor({
@@ -200,32 +186,12 @@ class FirebaseFirestore {
     OpenDatabase? openDatabase,
     Settings? settings,
   }) {
-    return getInstance(
-      app,
-      databaseId: databaseId,
-      openDatabase: openDatabase,
-      settings: settings,
-    );
-  }
-
-  /// Gets the instance for [app] and [databaseId], creating it on the first call. Same as [instanceFor].
-  @Deprecated('Use instanceFor instead.')
-  static FirebaseFirestore getInstance(
-    FirebaseApp app, {
-    String databaseId = DatabaseId.defaultDatabaseId,
-    OpenDatabase? openDatabase,
-    Settings? settings,
-  }) {
-    checkNotNull(app, 'Provided FirebaseApp must not be null.');
-
     final FirestoreMultiDbComponent component = FirestoreMultiDbComponent(
       app,
       app.authProvider,
       settings,
       appCheckProvider: app.appCheckProvider,
     );
-    checkNotNull(component, 'Firestore component is not present.');
-
     return component.get(databaseId, openDatabase);
   }
 
@@ -362,12 +328,7 @@ class FirebaseFirestore {
   /// );
   /// await sf.set({'name': 'San Francisco', 'population': 870000});
   /// ```
-  DocumentReference<Map<String, Object?>> doc(String documentPath) =>
-      doc(documentPath);
-
-  /// Returns a [DocumentReference] to the document at [documentPath]. Same as [doc].
-  @Deprecated('Use doc instead.')
-  DocumentReference<Map<String, Object?>> document(String documentPath) {
+  DocumentReference<Map<String, Object?>> doc(String documentPath) {
     checkNotNull(documentPath, 'Provided document path must not be null.');
     checkNonEmptyPath('Firestore.doc', documentPath);
     return DocumentReferenceInternal.forPath(
@@ -390,7 +351,7 @@ class FirebaseFirestore {
   ///     .where('type', isEqualTo: 'museum')
   ///     .get();
   /// for (final QueryDocumentSnapshot<Map<String, Object?>> doc in landmarks) {
-  ///   print(doc.ref.path);
+  ///   print(doc.reference.path);
   /// }
   /// ```
   Query<Map<String, Object?>> collectionGroup(String collectionId) {
@@ -418,7 +379,7 @@ class FirebaseFirestore {
   ///
   /// Transactions are optimistic: [Transaction.get] reads the current version of a document from the backend, and
   /// the commit fails if a document that was read changed in the meantime. Then [updateFunction] runs again, up to
-  /// [TransactionOptions.maxAttempts] times (5 by default), after which the returned future fails with the last
+  /// [maxAttempts] times (5 by default), after which the returned future fails with the last
   /// error. So [updateFunction] can run more than once: it must not have side effects of its own, and it must do
   /// all its reads before its writes. If [updateFunction] throws, nothing is committed and the future fails with
   /// that error.
@@ -427,8 +388,7 @@ class FirebaseFirestore {
   /// cannot be reached. Writes made with [Transaction] are only sent at the commit and are not visible locally
   /// before.
   ///
-  /// With [options] you can change the number of attempts or run a read-only transaction
-  /// (`TransactionOptions(readOnly: true)`), which reads a consistent snapshot of the database and can also run
+  /// [maxAttempts] must be at least 1. With [readOnly] it is a read-only transaction, which reads a consistent snapshot of the database and can also run
   /// queries with [Transaction.getQuery] and aggregations with [Transaction.getAggregate]. The JS and Android client
   /// SDKs have no read-only transactions.
   ///
@@ -449,7 +409,7 @@ class FirebaseFirestore {
   /// ) async {
   ///   final DocumentSnapshot<Map<String, Object?>> snapshot = await transaction
   ///       .get(sf);
-  ///   final int population = snapshot.getInt('population') ?? 0;
+  ///   final int population = snapshot.get('population') as int? ?? 0;
   ///   transaction.update(sf, {'population': population + 1});
   ///   return population + 1;
   /// });
@@ -457,8 +417,15 @@ class FirebaseFirestore {
   /// ```
   Future<T> runTransaction<T>(
     TransactionHandler<T> updateFunction, {
-    TransactionOptions options = TransactionOptions.defaultOptions,
+    int maxAttempts = 5,
+    bool readOnly = false,
+    Timestamp? readTime,
   }) {
+    final TransactionOptions options = TransactionOptions(
+      maxAttempts: maxAttempts,
+      readOnly: readOnly,
+      readTime: readTime,
+    );
     // We wrap the function they provide in order to
     // 1. Use internal implementation classes for Transaction,
     // 2. Convert exceptions they throw into Futures, and
@@ -548,12 +515,12 @@ class FirebaseFirestore {
   /// of a terminated instance and closes.
   ///
   /// ```dart
-  /// final StreamSubscription<void> subscription = firestore.snapshotsInSync
+  /// final StreamSubscription<void> subscription = firestore.snapshotsInSync()
   ///     .listen((_) => print('every listener is up to date'));
   /// // ...
   /// await subscription.cancel();
   /// ```
-  Stream<void> get snapshotsInSync {
+  Stream<void> snapshotsInSync() {
     late final StreamController<void> controller;
     void listener() {
       if (!controller.isClosed) {
@@ -599,13 +566,9 @@ class FirebaseFirestore {
   /// ```dart
   /// await firestore.waitForPendingWrites();
   /// await firestore.terminate();
-  /// // Firestore.instanceFor(app: app) now creates a new instance.
+  /// // FirebaseFirestore.instanceFor(app: app) now creates a new instance.
   /// ```
-  Future<void> terminate() => terminate();
-
-  /// Shuts down this [FirebaseFirestore] instance. Same as [terminate].
-  @Deprecated('Use terminate instead.')
-  Future<void> shutdown() async {
+  Future<void> terminate() async {
     // The client must be initialized to ensure that all subsequent API usage
     // throws an exception.
     // Forget the instance first (as Android and JS do), so that a caller that asks for an instance while this one
@@ -639,7 +602,7 @@ class FirebaseFirestore {
   /// await firestore.clearPersistence();
   /// ```
   Future<void> clearPersistence() async {
-    final FirebaseApp? app = firebaseApp;
+    final FirebaseApp? app = _app;
     if (client.isTerminated &&
         app != null &&
         FirestoreMultiDbComponent.hasInstance(app.name, databaseId)) {
@@ -741,7 +704,7 @@ class FirebaseFirestore {
   /// The named queries of the bundle become available through [namedQuery].
   ///
   /// ```dart
-  /// final LoadBundleTaskProgress progress = await firestore
+  /// final LoadBundleTaskSnapshot progress = await firestore
   ///     .loadBundle(bundleBytes)
   ///     .future;
   /// print('${progress.documentsLoaded} documents loaded');
@@ -775,19 +738,46 @@ class FirebaseFirestore {
   ///
   /// ```dart
   /// await firestore.loadBundle(bundleBytes).future;
-  /// final Query<Map<String, Object?>>? latest = await firestore.getNamedQuery(
+  /// final Query<Map<String, Object?>>? latest = await firestore.namedQuery(
   ///   'latest-stories',
   /// );
   /// if (latest != null) {
   ///   final QuerySnapshot<Map<String, Object?>> stories = await latest.get(
-  ///     Source.cache,
+  ///     const GetOptions(source: Source.cache),
   ///   );
-  ///   print(stories.length);
+  ///   print(stories.size);
   /// }
   /// ```
   Future<Query<Map<String, Object?>>?> namedQuery(String name) async {
     final core.Query? query = await client.getNamedQuery(name);
     return query == null ? null : QueryInternal.create(query, this);
+  }
+
+  /// Runs the named query [name] of a loaded bundle (see [namedQuery]) and returns its results: FlutterFire's
+  /// `namedQueryGet`.
+  ///
+  /// The future fails with a [FirestoreException] with [FirestoreErrorCode.notFound] when the cache has no query
+  /// with this name.
+  ///
+  /// ```dart
+  /// final QuerySnapshot<Map<String, Object?>> stories = await firestore
+  ///     .namedQueryGet(
+  ///       'latest-stories',
+  ///       options: const GetOptions(source: Source.cache),
+  ///     );
+  /// ```
+  Future<QuerySnapshot<Map<String, Object?>>> namedQueryGet(
+    String name, {
+    GetOptions options = const GetOptions(),
+  }) async {
+    final Query<Map<String, Object?>>? query = await namedQuery(name);
+    if (query == null) {
+      throw FirestoreException(
+        errorCode: FirestoreErrorCode.notFound,
+        message: 'Named query "$name" not found.',
+      );
+    }
+    return query.get(options);
   }
 
   /// Listens to the document of a [DocumentSnapshot.toJson] result, starting from that snapshot.
@@ -800,14 +790,16 @@ class FirebaseFirestore {
   /// This is the JS SDK `onSnapshotResume()` for a `DocumentSnapshot`.
   Stream<DocumentSnapshot<T>> documentSnapshotsFromJson<T>(
     Map<String, Object?> json, {
-    SnapshotListenOptions options = const SnapshotListenOptions(),
+    bool includeMetadataChanges = false,
+    ListenSource source = ListenSource.defaultSource,
     FirestoreDataConverter<T>? converter,
   }) {
     return snapshot_json.documentSnapshotsFromJson<T>(
       this,
       json,
-      options,
-      converter,
+      includeMetadataChanges: includeMetadataChanges,
+      source: source,
+      converter: converter,
     );
   }
 
@@ -831,14 +823,16 @@ class FirebaseFirestore {
   /// ```
   Stream<QuerySnapshot<T>> querySnapshotsFromJson<T>(
     Map<String, Object?> json, {
-    SnapshotListenOptions options = const SnapshotListenOptions(),
+    bool includeMetadataChanges = false,
+    ListenSource source = ListenSource.defaultSource,
     FirestoreDataConverter<T>? converter,
   }) {
     return snapshot_json.querySnapshotsFromJson<T>(
       this,
       json,
-      options,
-      converter,
+      includeMetadataChanges: includeMetadataChanges,
+      source: source,
+      converter: converter,
     );
   }
 
@@ -847,20 +841,20 @@ class FirebaseFirestore {
   /// Enabled is [LogLevel.debug]; disabled goes back to the default,
   /// [LogLevel.warn] (warnings and errors). [setLogLevel] gives finer
   /// control.
-  static void setLoggingEnabled({bool loggingEnabled = false}) {
-    applyLoggingEnabled(loggingEnabled);
+  static void setLoggingEnabled(bool enabled) {
+    applyLoggingEnabled(enabled);
   }
 
   /// Sets the verbosity of the Cloud Firestore logs: from [LogLevel.verbose]
   /// (everything) and [LogLevel.debug] through [LogLevel.warn] (the default)
   /// to [LogLevel.error] (errors only) and [LogLevel.silent] (nothing). The
-  /// levels of `setLogLevel` of the JS SDK.
+  /// levels of `setLogLevel` of the JS SDK, without `info`.
   ///
   /// The setting is global: it applies to every instance (and to the logs of
   /// the other Firebase packages of this SDK, which share the logger).
   ///
   /// ```dart
-  /// Firestore.setLogLevel(LogLevel.debug);
+  /// FirebaseFirestore.setLogLevel(LogLevel.debug);
   /// ```
   static void setLogLevel(LogLevel level) {
     applyLogLevel(level);
@@ -893,9 +887,6 @@ extension FirestoreInternal on FirebaseFirestore {
   /// The scheduler of the timers of this instance.
   TaskScheduler get scheduler => _scheduler;
 
-  /// The settings this instance was created with.
-  Settings get settings => _settings;
-
   /// Throws an [ArgumentError] unless [docRef] belongs to this instance. Used by `WriteBatch` and `Transaction`.
   void validateReference(DocumentReference<Object?> docRef) =>
       _validateReference(docRef);
@@ -903,10 +894,10 @@ extension FirestoreInternal on FirebaseFirestore {
   /// An instance over an existing [client].
   static FirebaseFirestore create(
     DatabaseId databaseId,
-    FirebaseApp? firebaseApp,
+    FirebaseApp? app,
     FirestoreClient client,
     TaskScheduler scheduler,
-  ) => FirebaseFirestore._(databaseId, firebaseApp, client, scheduler);
+  ) => FirebaseFirestore._(databaseId, app, client, scheduler);
 
   /// An instance for [databaseId] without a client: references, queries and snapshots can be built for it, every
   /// operation that needs the backend or the cache throws. For unit tests.
@@ -914,7 +905,7 @@ extension FirestoreInternal on FirebaseFirestore {
       FirebaseFirestore._(databaseId, null, null, TaskScheduler('detached'));
 
   /// Creates a new instance for [app] and [database] and registers it as the instance of that app and database. Use
-  /// `Firestore.instanceFor`. The instance initializes in the background, after [after] (the shutdown of an instance
+  /// `FirebaseFirestore.instanceFor`. The instance initializes in the background, after [after] (the shutdown of an instance
   /// that has the same persistence open) completed; [initialized] completes when it is ready.
   static FirebaseFirestore newInstance(
     FirebaseApp app,

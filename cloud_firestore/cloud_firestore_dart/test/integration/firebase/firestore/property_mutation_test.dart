@@ -184,7 +184,7 @@ Scenario scenario(Gen gen) {
         result.writes.add(
           (DocumentReference<Map<String, Object?>> doc) => Write(
             'set merge',
-            () => doc.set(data, SetOptions.mergeAllFields),
+            () => doc.set(data, const SetOptions(merge: true)),
             doc.firestore.dataConverter
                 .parseMergeData(data, null)
                 .toMutation(doc.key, Precondition.none),
@@ -325,7 +325,7 @@ void main() {
     if (scenario.base != null) {
       await doc.set(scenario.base!);
     }
-    final Document? base = (await doc.get(Source.server)).document;
+    final Document? base = (await doc.get(GetOptions(source: Source.server))).document;
 
     await firestore.disableNetwork();
     final List<Future<void>> pending = <Future<void>>[];
@@ -340,7 +340,7 @@ void main() {
     }
 
     // (A) The local view, from the overlay.
-    final Document? viaOverlay = (await doc.get(Source.cache)).document;
+    final Document? viaOverlay = (await doc.get(GetOptions(source: Source.cache))).document;
 
     // (B) One mutation at a time.
     MaybeDocument? current = base;
@@ -379,8 +379,8 @@ void main() {
     // (D) The cached document after the acknowledgements: the client
     // computes it from the results of the writes, before anything is read
     // back.
-    final Document? acknowledged = (await doc.get(Source.cache)).document;
-    final Document? onServer = (await doc.get(Source.server)).document;
+    final Document? acknowledged = (await doc.get(GetOptions(source: Source.cache))).document;
+    final Document? onServer = (await doc.get(GetOptions(source: Source.server))).document;
     expect(
       acknowledged == null,
       onServer == null,
@@ -429,20 +429,20 @@ void main() {
           .collection('property_mutation')
           .doc(autoId());
       await doc.set(<String, Object?>{'count': 5, 'other': 1});
-      await doc.get(Source.server);
+      await doc.get(GetOptions(source: Source.server));
 
       await firestore.disableNetwork();
       final Future<void> write = doc.set(<String, Object?>{
         'count': FieldValue.increment(1),
       });
-      expect((await doc.get(Source.cache)).data, <String, Object?>{'count': 6});
+      expect((await doc.get(GetOptions(source: Source.cache))).data(), <String, Object?>{'count': 6});
 
       await firestore.enableNetwork();
       await write;
-      expect((await doc.get(Source.server)).data, <String, Object?>{
+      expect((await doc.get(GetOptions(source: Source.server))).data(), <String, Object?>{
         'count': 1,
       });
-      expect((await doc.get(Source.cache)).data, <String, Object?>{'count': 1});
+      expect((await doc.get(GetOptions(source: Source.cache))).data(), <String, Object?>{'count': 1});
     },
   );
 

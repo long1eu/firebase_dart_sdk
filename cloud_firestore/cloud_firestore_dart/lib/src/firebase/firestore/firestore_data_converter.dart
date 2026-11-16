@@ -21,7 +21,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/set_options.dart';
 /// [FirestoreDataConverter.fromFirestore].
 ///
 /// The SDK creates them from the [ServerTimestampBehavior] given to
-/// `DocumentSnapshot.getData` (`data` uses [ServerTimestampBehavior.none]).
+/// `DocumentSnapshot.data` (default [ServerTimestampBehavior.none]).
 /// This is the JS SDK's `SnapshotOptions`.
 class SnapshotOptions {
   /// Creates the options; by default pending server timestamps are read as `null`.
@@ -31,30 +31,42 @@ class SnapshotOptions {
   final ServerTimestampBehavior serverTimestamps;
 }
 
+/// Reads a [T] from the raw data of a document: the `fromFirestore` argument of `withConverter`.
+typedef FromFirestore<T> =
+    T Function(
+      DocumentSnapshot<Map<String, Object?>> snapshot,
+      SnapshotOptions? options,
+    );
+
+/// Turns a [T] into the data written for a document: the `toFirestore` argument of `withConverter`.
+/// [options] are those of the `set` call, if any.
+typedef ToFirestore<T> =
+    Map<String, Object?> Function(T value, SetOptions? options);
+
 /// Converts between your own model class [T] and the raw field map stored in
 /// Firestore.
 ///
-/// Attach a converter with `withConverter` on a `DocumentReference`,
-/// `CollectionReference` or `Query`. Implement this class, or build one from two
-/// functions (for example constructor tear-offs) with
-/// [FirestoreDataConverter.from]:
+/// `withConverter` on a `DocumentReference`, `CollectionReference` or `Query`
+/// takes the two functions ([FromFirestore] and [ToFirestore]) and keeps them
+/// as a converter, which the `converter` property of the reference or query
+/// returns. Implement this class, or build one from two functions with
+/// [FirestoreDataConverter.from], to pass a converter to `fromJson`:
 ///
 /// ```dart
-/// final FirestoreDataConverter<City> converter = FirestoreDataConverter<City>.from(
-///   fromFirestore: (snapshot, options) => City.fromMap(snapshot.data!),
-///   toFirestore: (city, options) => city.toMap(),
-/// );
-///
-/// final DocumentReference<City> sf =
-///     firestore.doc('cities/SF').withConverter<City>(converter);
+/// final DocumentReference<City> sf = firestore
+///     .doc('cities/SF')
+///     .withConverter<City>(
+///       fromFirestore: (snapshot, options) => City.fromMap(snapshot.data()!),
+///       toFirestore: (city, options) => city.toMap(),
+///     );
 /// await sf.set(City('San Francisco'));
-/// final City? city = (await sf.get()).data;
+/// final City? city = (await sf.get()).data();
 /// ```
 ///
 /// The converter runs on the client only. [toFirestore] runs when you write
 /// with `set` or `add` (not with `update`, which always takes a map), and
-/// [fromFirestore] runs each time you read `data` (or `getData`) of a
-/// snapshot of an existing document. An error that either throws reaches the
+/// [fromFirestore] runs each time you read `data()` of a snapshot of an
+/// existing document. An error that either throws reaches the
 /// caller of that write or read.
 ///
 /// `withoutConverter()` on a reference or query returns to raw maps. In
@@ -71,19 +83,14 @@ abstract class FirestoreDataConverter<T> {
   /// Converters that compare equal make equal references and queries, so
   /// prefer such functions over closures created at each call.
   const factory FirestoreDataConverter.from({
-    required T Function(
-      DocumentSnapshot<Map<String, Object?>> snapshot,
-      SnapshotOptions? options,
-    )
-    fromFirestore,
-    required Map<String, Object?> Function(T value, SetOptions? options)
-    toFirestore,
+    required FromFirestore<T> fromFirestore,
+    required ToFirestore<T> toFirestore,
   }) = _FunctionDataConverter<T>;
 
   /// Called by the SDK to convert a snapshot of an existing document into
   /// [T]. [snapshot] is an untyped snapshot (at runtime a
-  /// `QueryDocumentSnapshot`, so `snapshot.data` is never null). Use
-  /// `snapshot.getData(options?.serverTimestamps ?? ServerTimestampBehavior.none)`
+  /// `QueryDocumentSnapshot`, so `snapshot.data()` is never null). Use
+  /// `snapshot.data(serverTimestamps: options?.serverTimestamps ?? ServerTimestampBehavior.none)`
   /// to honour the requested server timestamp behavior.
   T fromFirestore(
     DocumentSnapshot<Map<String, Object?>> snapshot,

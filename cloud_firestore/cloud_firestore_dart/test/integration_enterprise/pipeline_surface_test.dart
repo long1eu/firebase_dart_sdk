@@ -40,8 +40,6 @@ void main() {
       'integration_enterprise/pipeline_surface';
 
   final String? skip = IntegrationTestUtil.enterpriseEmulatorSkipReason;
-  final TransactionOptions readOnly = TransactionOptions(readOnly: true);
-
   late FirebaseFirestore firestore;
   late CollectionReference<Map<String, Object?>> collection;
 
@@ -106,7 +104,7 @@ void main() {
               expect(before.executionTime, isNotNull);
               expect(before.results.first.ref!.id, 'a');
               return <List<Object?>>[ns(before), ns(after), rows(count)];
-            }, options: readOnly);
+            }, readOnly: true);
 
         expect(seen, <List<Object?>>[
           <Object?>[1, 2],
@@ -131,18 +129,18 @@ void main() {
           final PipelineSnapshot snapshot = await transaction.execute(
             source().where(field('region').equal('eu')),
           );
-          expect(snapshot.results.single.data(), a.data);
+          expect(snapshot.results.single.data(), a.data());
           final QuerySnapshot<Map<String, Object?>> query = await transaction
               .getQuery(collection.where('region', isEqualTo: 'eu'));
           expect(query.docs.single.id, snapshot.results.single.id);
-        }, options: readOnly);
+        }, readOnly: true);
       }, skip: skip);
 
       test('write stages are rejected and nothing is written', () async {
         await expectLater(
           firestore.runTransaction<void>(
             (Transaction transaction) => transaction.execute(source().delete()),
-            options: readOnly,
+            readOnly: true,
           ),
           failsWith(FirestoreErrorCode.invalidArgument, 'delete'),
         );

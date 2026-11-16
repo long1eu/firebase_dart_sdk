@@ -44,31 +44,28 @@ Future<void> main() async {
   final CollectionReference<Product> products = firestore
       .collection(scratch('products'))
       .withConverter<Product>(
-        FirestoreDataConverter<Product>.from(
-          fromFirestore:
-              (
-                DocumentSnapshot<Map<String, Object?>> snapshot,
-                SnapshotOptions? options,
-              ) => Product.fromMap(snapshot.data!),
-          toFirestore: (Product product, SetOptions? options) =>
-              product.toMap(),
-        ),
+        fromFirestore:
+            (
+              DocumentSnapshot<Map<String, Object?>> snapshot,
+              SnapshotOptions? options,
+            ) => Product.fromMap(snapshot.data()!),
+        toFirestore: (Product product, SetOptions? options) => product.toMap(),
       );
 
   await products.doc('pen').set(const Product(name: 'Pen', price: 1.5));
   await products.add(const Product(name: 'Desk', price: 120, tags: ['office']));
 
   // Reads are typed.
-  final Product pen = (await products.doc('pen').get()).data!;
+  final Product pen = (await products.doc('pen').get()).data()!;
   print('pen costs ${pen.price}');
   final QuerySnapshot<Product> expensive = await products
       .where('price', isGreaterThan: 10)
       .get();
-  print('expensive: ${<String>[for (final d in expensive) d.data.name]}');
+  print('expensive: ${<String>[for (final d in expensive) d.data().name]}');
 
   // update takes field maps, not the class.
   await products.doc('pen').update(<String, Object?>{'price': 2});
-  print('pen now costs ${(await products.doc('pen').get()).data!.price}');
+  print('pen now costs ${(await products.doc('pen').get()).data()!.price}');
 
   await firestore.terminate();
 }

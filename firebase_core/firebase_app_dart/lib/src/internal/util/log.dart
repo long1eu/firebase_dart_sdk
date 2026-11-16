@@ -12,7 +12,7 @@ class Log {
   static bool get isDebugEnabled => level <= InternalLogLevel.d;
 
   /// Messages below this level are dropped. Quiet by default (warnings and
-  /// errors only), like the Java SDK; `Firestore.setLoggingEnabled(true)`
+  /// errors only), like the Java SDK; `FirebaseFirestore.setLoggingEnabled(true)`
   /// turns debug output on.
   static InternalLogLevel level = InternalLogLevel.w;
 

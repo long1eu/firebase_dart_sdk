@@ -30,7 +30,7 @@ does not have. The opener is not part of the package; copy it into the app uncha
 final FirebaseApp app = FirebaseApp.withOptions(
   const FirebaseOptions(
     apiKey: '<the Web API key of the project>',
-    applicationId: '1:1234567890:web:0123456789abcdef',
+    appId: '1:1234567890:web:0123456789abcdef',
     projectId: 'my-project',
   ),
 );
@@ -55,15 +55,15 @@ Future<void> main() async {
   final FirebaseApp app = FirebaseApp.withOptions(
     const FirebaseOptions(
       apiKey: 'demo-key',
-      applicationId: '1:1234567890:dart:demo',
+      appId: '1:1234567890:dart:demo',
       projectId: 'demo-my-app', // a demo- project never reaches a real one
     ),
   );
   final String emulator = Platform.environment['FIRESTORE_EMULATOR_HOST'] ?? '127.0.0.1:8080';
   final int colon = emulator.lastIndexOf(':');
-  final Firestore firestore = Firestore.instanceFor(
+  final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(
     app: app,
-    settings: FirestoreSettings().withEmulator(
+    settings: Settings().withEmulator(
       emulator.substring(0, colon),
       int.parse(emulator.substring(colon + 1)),
     ),
@@ -71,8 +71,8 @@ Future<void> main() async {
   try {
     final DocumentReference<Map<String, Object?>> ada = firestore.doc('users/ada');
     await ada.set(<String, Object?>{'name': 'Ada', 'age': 36});
-    print((await ada.get()).data);
-  } on FirestoreError catch (e) {
+    print((await ada.get()).data());
+  } on FirestoreException catch (e) {
     stderr.writeln('${e.code}: ${e.message}');
     exitCode = 1;
   } finally {
@@ -94,22 +94,22 @@ Future<void> main() async {
   final FirebaseApp app = FirebaseApp.withOptions(
     FirebaseOptions(
       apiKey: '', // an empty key is not sent
-      applicationId: '1:1234567890:dart:server',
+      appId: '1:1234567890:dart:server',
       projectId: Platform.environment['FIREBASE_PROJECT_ID'] ?? 'my-project',
     ),
   );
   // Before instanceFor. Bypasses security rules; IAM decides (role Cloud Datastore User).
   app.authProvider = applicationDefaultCredentials();
-  final Firestore firestore = Firestore.instanceFor(
+  final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(
     app: app,
-    settings: FirestoreSettings(
+    settings: Settings(
       cacheSettings: const MemoryCacheSettings(gcSettings: MemoryEagerGcSettings()),
     ),
   );
   final DocumentSnapshot<Map<String, Object?>> config = await firestore
       .doc('config/app')
-      .get(Source.server); // never answer a request from a stale cache
-  print(config.exists ? config.data : 'no config');
+      .get(const GetOptions(source: Source.server)); // never answer a request from a stale cache
+  print(config.exists ? config.data() : 'no config');
   await firestore.terminate();
 }
 ```
@@ -130,7 +130,7 @@ import 'package:firebase_auth_providers_dart/firebase_auth_providers_dart.dart';
 Future<void> signedIn(FirebaseApp app, String email, String password) async {
   // Before instanceFor: it becomes the token provider of the app.
   final FirebaseUserAuth auth = await FirebaseUserAuth.forApp(app);
-  final Firestore firestore = Firestore.instanceFor(app: app);
+  final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(app: app);
   await auth.signInWithEmailAndPassword(email, password); // or signInAnonymously()
   await firestore.doc('users/${auth.uid}/notes/first').set(<String, Object?>{'text': 'hi'});
   await auth.signOut();
@@ -140,8 +140,8 @@ Future<void> signedIn(FirebaseApp app, String email, String password) async {
 - Covers anonymous, email/password and custom-token sign-in, token refresh, sign-out and the
   REST account operations. No Google, Apple or other federated sign-in, no phone, no email link,
   no multi-factor.
-- `auth.userChanges` (stream), `auth.currentUser`, `auth.uid`. Errors are
-  `FirebaseAuthProviderException` with codes such as `wrong-password`.
+- `auth.userChanges()` (stream), `auth.currentUser`, `auth.uid`. Errors are
+  `FirebaseAuthException` with codes such as `wrong-password`.
 - The session is forgotten when the process ends unless you pass `storage:` (an `AuthStorage`);
   it stores the refresh token, a credential: keep it in secure storage.
 - Auth emulator: `FirebaseUserAuth.forApp(app, emulatorHost: '127.0.0.1:9099')`.
@@ -158,29 +158,29 @@ import 'package:path_provider/path_provider.dart';
 
 import 'sqlite_database.dart'; // the copied opener
 
-late final Firestore firestore;
+late final FirebaseFirestore firestore;
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   final FirebaseApp app = FirebaseApp.withOptions(
     const FirebaseOptions(
       apiKey: '<the Web API key of the project>',
-      applicationId: '1:1234567890:web:0123456789abcdef',
+      appId: '1:1234567890:web:0123456789abcdef',
       projectId: 'my-project',
     ),
   );
   final Directory directory = await getApplicationSupportDirectory();
-  firestore = Firestore.instanceFor(
+  firestore = FirebaseFirestore.instanceFor(
     app: app,
     openDatabase: sqliteOpener(directory),
-    settings: FirestoreSettings(cacheSettings: PersistentCacheSettings()),
+    settings: Settings(cacheSettings: PersistentCacheSettings()),
   );
   runApp(
     MaterialApp(
       home: StreamBuilder<QuerySnapshot<Map<String, Object?>>>(
         stream: firestore.collection('notes').snapshots, // a getter
         builder: (BuildContext context, AsyncSnapshot<QuerySnapshot<Map<String, Object?>>> s) =>
-            Text('${s.data?.length ?? 0} notes'),
+            Text('${s.data()?.length ?? 0} notes'),
       ),
     ),
   );
@@ -201,21 +201,21 @@ import 'package:firebase_app_dart/firebase_app_dart.dart';
 import 'package:test/test.dart';
 
 void main() {
-  late Firestore db;
+  late FirebaseFirestore db;
   int instances = 0;
 
   setUp(() {
     final FirebaseApp app = FirebaseApp.withOptions(
       const FirebaseOptions(
         apiKey: 'demo-key',
-        applicationId: '1:1234567890:dart:test',
+        appId: '1:1234567890:dart:test',
         projectId: 'demo-my-app',
       ),
       name: 'test-${instances++}', // own instance and cache per test
     );
-    db = Firestore.instanceFor(
+    db = FirebaseFirestore.instanceFor(
       app: app,
-      settings: FirestoreSettings().withEmulator('127.0.0.1', 8080),
+      settings: Settings().withEmulator('127.0.0.1', 8080),
     );
   });
 
@@ -229,7 +229,7 @@ void main() {
         .collection('test-${DateTime.now().microsecondsSinceEpoch}')
         .doc('a');
     await doc.set(<String, Object?>{'n': 1});
-    expect((await doc.get()).data, <String, Object?>{'n': 1});
+    expect((await doc.get()).data(), <String, Object?>{'n': 1});
   });
 }
 ```

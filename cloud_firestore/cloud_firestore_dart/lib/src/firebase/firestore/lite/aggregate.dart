@@ -114,17 +114,31 @@ class AggregateQuerySnapshot {
     });
   }
 
-  /// The number of documents in the result set. Throws an [ArgumentError] if
-  /// the query did not ask for the count.
-  int getCount() {
-    final int? value = getInt(AggregateField.count());
-    if (value == null) {
-      throw ArgumentError(
-        'RunAggregationQueryResponse alias ${AggregateField.count().alias} is null',
-      );
-    }
-    return value;
+  /// The result of the count aggregation (`count()` or [AggregateField.count]), or null when the query did not ask
+  /// for it.
+  ///
+  /// ```dart
+  /// final int? n = (await firestore.collection('cities').count().get()).count;
+  /// ```
+  int? get count {
+    final FieldValue? value = _data[AggregateField.count().alias];
+    final Object? count = value?.value;
+    return count is Int32Value ? count.value : (count as num?)?.toInt();
   }
+
+  /// The result of [AggregateField.sum] over [field] (a [String] or a [FieldPath]): an `int` for a sum of
+  /// integers that fits in 64 bits, a `double` otherwise, or null (for example a sum over no numeric value).
+  ///
+  /// A [Decimal128Value] result (Enterprise edition) is converted to the closest `double`. Throws an
+  /// [ArgumentError] if the query did not ask for this sum.
+  num? getSum(Object field) => _getNumber(AggregateField.sum(field));
+
+  /// The result of [AggregateField.average] over [field] (a [String] or a [FieldPath]), or null when no document
+  /// has a numeric value for the field.
+  ///
+  /// Throws an [ArgumentError] if the query did not ask for this average.
+  double? getAverage(Object field) =>
+      _getNumber(AggregateField.average(field))?.toDouble();
 
   /// The result of [aggregateField]. Throws an [ArgumentError] if the query
   /// did not ask for it.
@@ -136,34 +150,6 @@ class AggregateQuerySnapshot {
       );
     }
     return value.value;
-  }
-
-  /// The result of [aggregateField] as an integer (a fractional result is
-  /// truncated).
-  int? getInt(AggregateField aggregateField) {
-    final num? value = _getNumber(aggregateField);
-    if (value == null || value is int) {
-      return value as int?;
-    }
-    // Saturating conversion: NaN becomes 0 and the infinities become the
-    // extreme integers. Dart's `toInt()` would throw.
-    if (value.isNaN) {
-      return 0;
-    }
-    if (value.isInfinite) {
-      return value.isNegative ? _minInt : _maxInt;
-    }
-    return value.toInt();
-  }
-
-  // Not literals: they do not compile to JavaScript, where an `int` cannot
-  // hold them exactly.
-  static final int _maxInt = int.parse('9223372036854775807');
-  static final int _minInt = int.parse('-9223372036854775808');
-
-  /// The result of [aggregateField] as a double.
-  double? getDouble(AggregateField aggregateField) {
-    return _getNumber(aggregateField)?.toDouble();
   }
 
   num? _getNumber(AggregateField aggregateField) {

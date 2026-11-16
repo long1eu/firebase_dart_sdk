@@ -92,7 +92,7 @@ void main() {
       final StreamSubscription<QuerySnapshot<Map<String, Object?>>>
       subscription = db
           .collection('coll')
-          .snapshots
+          .snapshots()
           .listen((_) {}, onError: (Object _) {});
       addTearDown(subscription.cancel);
       // Both streams are in use.
@@ -339,7 +339,7 @@ void main() {
       final StreamSubscription<QuerySnapshot<Map<String, Object?>>>
       subscription = db
           .collection('coll')
-          .snapshots
+          .snapshots()
           .listen((_) {}, onError: (Object _) {});
       addTearDown(subscription.cancel);
       unawaited(

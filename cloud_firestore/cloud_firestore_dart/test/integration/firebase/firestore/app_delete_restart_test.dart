@@ -157,11 +157,11 @@ void main() {
     // The old instance is unusable, the new one has the cache and works.
     await expectLater(first.doc(path).get(), throwsA(predicate(isTerminated)));
     final DocumentSnapshot<Map<String, Object?>> cached =
-        await second.doc(path).get(Source.cache);
-    expect(cached.data, <String, Object?>{'generation': 1});
+        await second.doc(path).get(GetOptions(source: Source.cache));
+    expect(cached.data(), <String, Object?>{'generation': 1});
 
     await second.doc(path).set(<String, Object?>{'generation': 2});
-    expect((await second.doc(path).get(Source.server)).data,
+    expect((await second.doc(path).get(GetOptions(source: Source.server))).data(),
         <String, Object?>{'generation': 2});
   }, skip: skip);
 
@@ -174,13 +174,13 @@ void main() {
     final List<Object> listenerErrors = <Object>[];
     final StreamSubscription<DocumentSnapshot<Map<String, Object?>>>
         subscription =
-        first.doc(path).snapshots.listen((_) {}, onError: listenerErrors.add);
+        first.doc(path).snapshots().listen((_) {}, onError: listenerErrors.add);
 
     // A write that cannot reach the backend stays in the mutation queue.
     await first.disableNetwork();
     unawaited(first.doc(path).update(
         <String, Object?>{'value': 'pending'}).catchError((Object _) {}));
-    await first.doc(path).get(Source.cache);
+    await first.doc(path).get(GetOptions(source: Source.cache));
 
     await app.delete();
     final FirebaseFirestore second = await open(newApp());
@@ -188,10 +188,10 @@ void main() {
 
     // The pending write was persisted and is sent by the new instance.
     final DocumentSnapshot<Map<String, Object?>> local =
-        await second.doc(path).get(Source.cache);
-    expect(local.data, <String, Object?>{'value': 'pending'});
+        await second.doc(path).get(GetOptions(source: Source.cache));
+    expect(local.data(), <String, Object?>{'value': 'pending'});
     await second.waitForPendingWrites();
-    expect((await second.doc(path).get(Source.server)).data,
+    expect((await second.doc(path).get(GetOptions(source: Source.server))).data(),
         <String, Object?>{'value': 'pending'});
 
     await subscription.cancel();
@@ -208,7 +208,7 @@ void main() {
       await app.delete();
       app = newApp();
       firestore = await open(app);
-      expect((await firestore.doc(path).get(Source.cache)).data,
+      expect((await firestore.doc(path).get(GetOptions(source: Source.cache))).data(),
           <String, Object?>{'generation': generation});
     }
     expect(log, <String>[

@@ -43,7 +43,7 @@ final Map<String, Object?> evaluationCaseDocument = <String, Object?>{
   'ts': const Timestamp(1700000000, 123456000),
   'b': Blob(Uint8List.fromList(<int>[1, 2, 65, 255])),
   'g': const GeoPoint(1.5, 2.5),
-  'v': FieldValue.vector(<double>[1, 2, 3]),
+  'v': VectorValue(<double>[1, 2, 3]),
   'i32': Int32Value(5),
   'd128': Decimal128Value('1.5'),
   'big': 9223372036854775807,

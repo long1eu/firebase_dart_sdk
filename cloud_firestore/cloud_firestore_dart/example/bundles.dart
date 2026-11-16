@@ -70,7 +70,7 @@ Future<void> main() async {
   // The documents are now in the cache.
   final QuerySnapshot<Map<String, Object?>> cached = await firestore
       .collection('bundled-stories')
-      .get(Source.cache);
+      .get(GetOptions(source: Source.cache));
   print('cached: ${<Object?>[for (final doc in cached.docs) doc['title']]}');
 
   // A named query is a query the server stored in the bundle with its result.
@@ -78,7 +78,7 @@ Future<void> main() async {
     'latest-stories',
   );
   final QuerySnapshot<Map<String, Object?>> latestStories = await latest!.get(
-    Source.cache,
+    GetOptions(source: Source.cache),
   );
   print('latest: ${latestStories.docs.single['title']}');
 

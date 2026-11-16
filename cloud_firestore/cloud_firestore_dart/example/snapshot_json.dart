@@ -25,7 +25,7 @@ Future<void> main() async {
   // "Server": query, and send the snapshot as a JSON string.
   final Query<Map<String, Object?>> query = scores.orderBy(
     'points',
-    Direction.descending,
+    descending: true,
   );
   final String wire = jsonEncode((await query.get()).toJson());
   print('JSON: ${wire.length} characters');
@@ -66,7 +66,7 @@ Future<void> main() async {
         client,
         jsonDecode(jsonEncode(ada.toJson())) as Map<String, Object?>,
       );
-  print('document: ${adaOnClient.id} ${adaOnClient.data}');
+  print('document: ${adaOnClient.id} ${adaOnClient.data()}');
   final DocumentReference<Map<String, Object?>> reference =
       DocumentReference<Map<String, Object?>>.fromJson(
         client,

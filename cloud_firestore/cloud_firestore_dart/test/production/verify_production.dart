@@ -51,6 +51,10 @@ import '../util/chaos_proxy.dart';
 import '../util/integration_test_util.dart';
 import '../util/io_web_http_client.dart';
 import '../util/test_backend.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/core/filter/filter.dart'
+    show FilterOperator;
+import 'package:cloud_firestore_dart/src/firebase/firestore/filter.dart'
+    show UnaryFilter;
 
 /// The outcome of a check.
 enum Status {
@@ -551,23 +555,23 @@ Future<CheckResult> _crud(Kit kit) async {
     'when': FieldValue.serverTimestamp(),
   });
   DocumentSnapshot<Map<String, Object?>> snapshot =
-      await ref.get(Source.server);
+      await ref.get(GetOptions(source: Source.server));
   if (!snapshot.exists ||
-      snapshot.data!['n'] != 1 ||
-      snapshot.data!['when'] is! Timestamp) {
-    return CheckResult(Status.fail, 'The document read back is not what was written: ${snapshot.data}');
+      snapshot.data()!['n'] != 1 ||
+      snapshot.data()!['when'] is! Timestamp) {
+    return CheckResult(Status.fail, 'The document read back is not what was written: ${snapshot.data()}');
   }
   await ref.update(<String, Object?>{
     'n': FieldValue.increment(2),
     'nested.list': FieldValue.arrayUnion(<Object?>['three']),
   });
-  snapshot = await ref.get(Source.server);
-  final Object? list = (snapshot.data!['nested']! as Map<String, Object?>)['list'];
-  if (snapshot.data!['n'] != 3 || '$list' != '[1, two, null, three]') {
-    return CheckResult(Status.fail, 'The update was not applied as expected: ${snapshot.data}');
+  snapshot = await ref.get(GetOptions(source: Source.server));
+  final Object? list = (snapshot.data()!['nested']! as Map<String, Object?>)['list'];
+  if (snapshot.data()!['n'] != 3 || '$list' != '[1, two, null, three]') {
+    return CheckResult(Status.fail, 'The update was not applied as expected: ${snapshot.data()}');
   }
   await ref.delete();
-  snapshot = await ref.get(Source.server);
+  snapshot = await ref.get(GetOptions(source: Source.server));
   if (snapshot.exists) {
     return CheckResult(Status.fail, 'The document still exists after the delete.');
   }
@@ -586,10 +590,10 @@ Future<CheckResult> _listeners(Kit kit) async {
       <QuerySnapshot<Map<String, Object?>>>[];
   final List<Object> errors = <Object>[];
   final StreamSubscription<Object?> docSub =
-      a.snapshots.listen(docEvents.add, onError: errors.add);
+      a.snapshots().listen(docEvents.add, onError: errors.add);
   final StreamSubscription<Object?> querySub = listener
       .collection(kit.collectionPath('vp_listen'))
-      .snapshots
+      .snapshots()
       .listen(queryEvents.add, onError: errors.add);
   try {
     await _eventually(
@@ -601,7 +605,7 @@ Future<CheckResult> _listeners(Kit kit) async {
     await _eventually(
         () =>
             errors.isNotEmpty ||
-            (docEvents.last.data?['v'] == 1 &&
+            (docEvents.last.data()?['v'] == 1 &&
                 _ids(queryEvents.last).join(',') == 'a,b'),
         'the added documents');
     await kit.doc(writer, 'vp_listen', 'a').update(<String, Object?>{'v': 3});
@@ -609,7 +613,7 @@ Future<CheckResult> _listeners(Kit kit) async {
     await _eventually(
         () =>
             errors.isNotEmpty ||
-            (docEvents.last.data?['v'] == 3 &&
+            (docEvents.last.data()?['v'] == 3 &&
                 _ids(queryEvents.last).join(',') == 'a'),
         'the update and the delete');
     if (errors.isNotEmpty) {
@@ -647,7 +651,7 @@ Future<CheckResult> _queries(Kit kit) async {
   final List<String> problems = <String>[];
   Future<void> expectIds(String what, Query<Map<String, Object?>> query,
       List<String> expected) async {
-    final List<String> actual = _ids(await query.get(Source.server));
+    final List<String> actual = _ids(await query.get(GetOptions(source: Source.server)));
     if (actual.join(',') != expected.join(',')) {
       problems.add('$what: expected $expected, got $actual');
     }
@@ -656,7 +660,7 @@ Future<CheckResult> _queries(Kit kit) async {
   await expectIds('equality filter', collection.where('a', isEqualTo: 1),
       <String>['d1', 'd3', 'd5']);
   await expectIds('order and limit',
-      collection.orderBy('b', Direction.descending).limit(2), <String>['d5', 'd4']);
+      collection.orderBy('b', descending: true).limit(2), <String>['d5', 'd4']);
   await expectIds('range filter', collection.where('b', isGreaterThan: 3),
       <String>['d4', 'd5']);
   await expectIds('array-contains',
@@ -664,12 +668,12 @@ Future<CheckResult> _queries(Kit kit) async {
   await expectIds(
       'or filter',
       collection.where(Filter.or(<Filter>[
-        Filter.equalTo('b', 0),
-        Filter.equalTo('b', 5),
+        Filter('b', isEqualTo: 0),
+        Filter('b', isEqualTo: 5),
       ])),
       <String>['d0', 'd5']);
   final int count =
-      (await collection.where('a', isEqualTo: 0).count().get()).getCount();
+      (await collection.where('a', isEqualTo: 0).count().get()).count!;
   if (count != 3) {
     problems.add('count aggregation: expected 3, got $count');
   }
@@ -682,7 +686,7 @@ Future<CheckResult> _queries(Kit kit) async {
   try {
     await expectIds(
         'composite index query',
-        collection.where('a', isEqualTo: 1).orderBy('b', Direction.descending),
+        collection.where('a', isEqualTo: 1).orderBy('b', descending: true),
         <String>['d5', 'd3', 'd1']);
   } on FirestoreException catch (e) {
     if (e.errorCode == FirestoreErrorCode.failedPrecondition) {
@@ -739,7 +743,7 @@ Future<CheckResult> _lostAcknowledgement(Kit kit) async {
   try {
     await _eventually(() async {
       final Map<String, Object?>? data =
-          (await oracleRef.get(Source.server)).data;
+          (await oracleRef.get(GetOptions(source: Source.server))).data();
       return data != null && data['tag'] == 'second';
     }, 'the backend to apply the writes whose answers are held back');
   } on TimeoutException {
@@ -748,30 +752,30 @@ Future<CheckResult> _lostAcknowledgement(Kit kit) async {
         'The writes did not reach the backend while its answers were held back, so no acknowledgement could be lost.');
   }
   final int beforeCut =
-      ((await oracleRef.get(Source.server)).data!['n']! as num).toInt();
+      ((await oracleRef.get(GetOptions(source: Source.server))).data()!['n']! as num).toInt();
   proxy
     ..cut()
     ..mode = ChaosMode.forward;
   await Future.wait(writes).timeout(const Duration(seconds: 60));
 
   final Map<String, Object?> server =
-      (await oracleRef.get(Source.server)).data!;
+      (await oracleRef.get(GetOptions(source: Source.server))).data()!;
   final DocumentSnapshot<Map<String, Object?>> cached =
-      await ref.get(Source.cache);
+      await ref.get(GetOptions(source: Source.cache));
   final int n = (server['n']! as num).toInt();
   final Map<String, Object?> observed = <String, Object?>{
     'incrementCountedBeforeCut': beforeCut,
     'incrementCounted': n,
-    'cacheAgrees': '${cached.data}' == '$server',
+    'cacheAgrees': '${cached.data()}' == '$server',
     'cachePendingWrites': cached.metadata.hasPendingWrites,
   };
   if (n < 1 || server['tag'] != 'second') {
     return CheckResult(Status.fail, 'A write was lost: the backend has $server.',
         observed: observed);
   }
-  if ('${cached.data}' != '$server' || cached.metadata.hasPendingWrites) {
+  if ('${cached.data()}' != '$server' || cached.metadata.hasPendingWrites) {
     return CheckResult(Status.fail,
-        'After the re-sent writes the cache (${cached.data}, pending writes: '
+        'After the re-sent writes the cache (${cached.data()}, pending writes: '
         '${cached.metadata.hasPendingWrites}) differs from the backend ($server).',
         observed: observed);
   }
@@ -808,7 +812,7 @@ Future<CheckResult> _lostCommitAnswer(Kit kit) async {
       .doc(oracle, 'vp_lost_commit', 'counter')
       .set(<String, Object?>{'n': 0});
   try {
-    await counter.get(Source.server).timeout(_patience);
+    await counter.get(GetOptions(source: Source.server)).timeout(_patience);
   } on Object catch (e) {
     return CheckResult(Status.inconclusive,
         'The client could not read through the TCP proxy: ${_describeError(e)}');
@@ -824,7 +828,7 @@ Future<CheckResult> _lostCommitAnswer(Kit kit) async {
           await transaction.get(counter);
       transaction
         ..update(counter,
-            <String, Object?>{'n': (snapshot.data!['n']! as num).toInt() + 1})
+            <String, Object?>{'n': (snapshot.data()!['n']! as num).toInt() + 1})
         ..set(marker, <String, Object?>{'attempt': attempts});
       if (attempts == 1) {
         // From now on the answers of the backend are held back. Once the backend has applied the commit, the
@@ -833,7 +837,7 @@ Future<CheckResult> _lostCommitAnswer(Kit kit) async {
         unawaited(() async {
           try {
             await _eventually(
-                () async => (await oracleMarker.get(Source.server)).exists,
+                () async => (await oracleMarker.get(GetOptions(source: Source.server))).exists,
                 'the backend to apply the commit');
             answerLost = true;
           } on TimeoutException {
@@ -854,9 +858,8 @@ Future<CheckResult> _lostCommitAnswer(Kit kit) async {
         'The commit did not reach the backend while its answers were held back, so no answer could be lost.');
   }
   final int n = ((await kit
-              .doc(oracle, 'vp_lost_commit', 'counter')
-              .get(Source.server))
-          .data!['n']! as num)
+              .doc(oracle, 'vp_lost_commit', 'counter').get(GetOptions(source: Source.server)))
+          .data()!['n']! as num)
       .toInt();
   final Map<String, Object?> observed = <String, Object?>{
     'attempts': attempts,
@@ -929,7 +932,7 @@ Future<CheckResult> _resumeOldReadTime(Kit kit) async {
       .collection(kit.collectionPath(name))
       .where('k', isEqualTo: 'match');
   // The snapshot of the (still empty) query, as an application would have serialized it some time ago.
-  final Map<String, Object?> fresh = (await query.get(Source.server)).toJson();
+  final Map<String, Object?> fresh = (await query.get(GetOptions(source: Source.server))).toJson();
   kit.spend(1);
   await kit.doc(writer, name, 'later').set(<String, Object?>{'k': 'match'});
 
@@ -950,10 +953,7 @@ Future<CheckResult> _resumeOldReadTime(Kit kit) async {
     final List<QuerySnapshot<Map<String, Object?>>> events =
         <QuerySnapshot<Map<String, Object?>>>[];
     final List<Object> errors = <Object>[];
-    final StreamSubscription<Object?> sub = db
-        .querySnapshotsFromJson<Map<String, Object?>>(json,
-            options: const SnapshotListenOptions(
-                metadataChanges: MetadataChanges.include))
+    final StreamSubscription<Object?> sub = db.querySnapshotsFromJson<Map<String, Object?>>(json, includeMetadataChanges: true)
         .listen(events.add, onError: errors.add);
     String outcome;
     try {
@@ -1197,14 +1197,14 @@ Future<CheckResult> _editionFilters(Kit kit) async {
       db.collection(kit.collectionPath(name));
   final Map<String, Query<Map<String, Object?>>> queries =
       <String, Query<Map<String, Object?>>>{
-    'array-contains null': collection.whereArrayContains('array', null),
-    'array-contains NaN': collection.whereArrayContains('array', double.nan),
+    'array-contains null': collection.where(_arrayContainsNull('array')),
+    'array-contains NaN': collection.where('array', arrayContains: double.nan),
     'array-contains-any [null]':
-        collection.whereArrayContainsAny('array', <Object?>[null]),
+        collection.where('array', arrayContainsAny: <Object?>[null]),
     'array-contains-any [NaN]':
-        collection.whereArrayContainsAny('array', <Object?>[double.nan]),
-    'in [null]': collection.whereIn('value', <Object?>[null]),
-    'in [NaN]': collection.whereIn('value', <Object?>[double.nan]),
+        collection.where('array', arrayContainsAny: <Object?>[double.nan]),
+    'in [null]': collection.where('value', whereIn: <Object?>[null]),
+    'in [NaN]': collection.where('value', whereIn: <Object?>[double.nan]),
   };
   const Map<String, String> enterprise = <String, String>{
     'array-contains null': 'null',
@@ -1220,21 +1220,20 @@ Future<CheckResult> _editionFilters(Kit kit) async {
   final FirebaseFirestore cold = await kit.client();
   for (final String key in queries.keys) {
     final Query<Map<String, Object?>> query = _rebase(cold, queries[key]!);
-    server[key] = _ids(await query.get(Source.server)).join(',');
+    server[key] = _ids(await query.get(GetOptions(source: Source.server))).join(',');
   }
   // Then with the documents in the cache: what the SDK alone evaluates, and whether a server read still completes
   // (a cached document that only the SDK matches would stay in limbo).
   final List<String> stuck = <String>[];
-  await collection.get(Source.server);
+  await collection.get(GetOptions(source: Source.server));
   for (final String key in queries.keys) {
-    local[key] = _ids(await queries[key]!.get(Source.cache)).join(',');
+    local[key] = _ids(await queries[key]!.get(GetOptions(source: Source.cache))).join(',');
   }
   await Future.wait(<Future<void>>[
     for (final String key in queries.keys)
       () async {
         try {
-          final String warm = _ids(await queries[key]!
-                  .get(Source.server)
+          final String warm = _ids(await queries[key]!.get(GetOptions(source: Source.server))
                   .timeout(const Duration(seconds: 15)))
               .join(',');
           if (warm != server[key]) {
@@ -1313,10 +1312,10 @@ Future<CheckResult> _bsonIncrement(Kit kit) async {
   kit.spend(4);
   await ref.set(<String, Object?>{'val': Decimal128Value('10.5')});
   await ref.update(<String, Object?>{'val': FieldValue.increment(5.0)});
-  final Object? decimal = (await ref.get(Source.server)).data!['val'];
+  final Object? decimal = (await ref.get(GetOptions(source: Source.server))).data()!['val'];
   await ref.set(<String, Object?>{'val': Int32Value(10)});
   await ref.update(<String, Object?>{'val': FieldValue.increment(5)});
-  final Object? int32 = (await ref.get(Source.server)).data!['val'];
+  final Object? int32 = (await ref.get(GetOptions(source: Source.server))).data()!['val'];
   final Map<String, Object?> observed = <String, Object?>{
     'decimal128': '$decimal',
     'int32': '$int32',
@@ -1358,8 +1357,8 @@ Future<CheckResult> _negativeZeroAndEmptyBytes(Kit kit) async {
   for (final String writer in <String>['by_grpc', 'by_web']) {
     for (final MapEntry<String, FirebaseFirestore> reader in readers.entries) {
       final Map<String, Object?>? read =
-          (await kit.doc(reader.value, 'vp_values', writer).get(Source.server))
-              .data;
+          (await kit.doc(reader.value, 'vp_values', writer).get(GetOptions(source: Source.server)))
+              .data();
       final String who = 'written $writer, read over ${reader.key}';
       if (read == null) {
         problems.add('$who: the document is missing');
@@ -1425,14 +1424,13 @@ Future<CheckResult> _tokens(Kit kit) async {
       kit.doc(db, 'vp_tokens', 'doc');
   kit.spend(1);
   await ref.set(<String, Object?>{'v': 1});
-  final bool authenticatedRead = (await ref.get(Source.server)).exists;
+  final bool authenticatedRead = (await ref.get(GetOptions(source: Source.server))).exists;
   // The same read without a token, to see that the token is what grants access.
   final FirebaseFirestore anonymous = await kit.client(authenticated: false);
   String anonymousOutcome;
   try {
     final DocumentSnapshot<Map<String, Object?>> snapshot = await kit
-        .doc(anonymous, 'vp_tokens', 'doc')
-        .get(Source.server)
+        .doc(anonymous, 'vp_tokens', 'doc').get(GetOptions(source: Source.server))
         .timeout(_patience);
     anonymousOutcome = snapshot.exists
         ? 'allowed (the security rules of the database let anyone read this path)'
@@ -1474,7 +1472,7 @@ Future<CheckResult> _webTransport(Kit kit) async {
   final List<Object> errors = <Object>[];
   final StreamSubscription<Object?> sub = web
       .collection(kit.collectionPath(name))
-      .snapshots
+      .snapshots()
       .listen(events.add, onError: errors.add);
   try {
     await _eventually(
@@ -1484,11 +1482,11 @@ Future<CheckResult> _webTransport(Kit kit) async {
       final DocumentSnapshot<Map<String, Object?>> snapshot =
           await transaction.get(ref);
       transaction.update(ref,
-          <String, Object?>{'n': (snapshot.data!['n']! as num).toInt() + 1});
+          <String, Object?>{'n': (snapshot.data()!['n']! as num).toInt() + 1});
     });
     final int count =
-        (await web.collection(kit.collectionPath(name)).count().get()).getCount();
-    final Object? n = (await ref.get(Source.server)).data?['n'];
+        (await web.collection(kit.collectionPath(name)).count().get()).count!;
+    final Object? n = (await ref.get(GetOptions(source: Source.server))).data()?['n'];
     // A change made by another client arrives on the WebChannel stream.
     await kit.doc(writer, name, 'b').set(<String, Object?>{'n': 10});
     await _eventually(
@@ -1552,16 +1550,16 @@ Future<String?> _liteOver(Kit kit, Transport transport) async {
   // CRUD.
   await a.set(<String, Object?>{'n': 1, 's': 'text é \u{1F60A}'});
   lite.DocumentSnapshot<Map<String, Object?>> snapshot = await a.get();
-  if (!snapshot.exists || snapshot.data!['n'] != 1) {
-    return 'the document read back is not what was written: ${snapshot.data}';
+  if (!snapshot.exists || snapshot.data()!['n'] != 1) {
+    return 'the document read back is not what was written: ${snapshot.data()}';
   }
   await a.update(<String, Object?>{
     'n': FieldValue.increment(2),
     'tags': FieldValue.arrayUnion(<Object>['x']),
   });
   snapshot = await a.get();
-  if (snapshot.data!['n'] != 3 || '${snapshot.data!['tags']}' != '[x]') {
-    return 'the update was not applied as expected: ${snapshot.data}';
+  if (snapshot.data()!['n'] != 3 || '${snapshot.data()!['tags']}' != '[x]') {
+    return 'the update was not applied as expected: ${snapshot.data()}';
   }
   await (db.batch()
         ..set(b, <String, Object?>{'n': 10})
@@ -1581,8 +1579,7 @@ Future<String?> _liteOver(Kit kit, Transport transport) async {
   final String page = ids(await collection
           .orderBy('n')
           .startAfter(<Object?>[3])
-          .limit(1)
-          .get())
+          .limit(1).get())
       .join(',');
   if (filtered != 'b,c' || last != 'b,c' || page != 'b') {
     return 'queries returned filter=[$filtered] (expected b,c), limitToLast=[$last] (expected b,c) and '
@@ -1603,18 +1600,15 @@ Future<String?> _liteOver(Kit kit, Transport transport) async {
     final lite.DocumentSnapshot<Map<String, Object?>> read =
         await transaction.get(a);
     transaction
-        .update(a, <String, Object?>{'n': (read.data!['n']! as num).toInt() + 1});
+        .update(a, <String, Object?>{'n': (read.data()!['n']! as num).toInt() + 1});
   });
-  final int inSnapshot = await db.runTransaction<int>(
-    (lite.Transaction transaction) async {
+  final int inSnapshot = await db.runTransaction<int>((lite.Transaction transaction) async {
       final lite.DocumentSnapshot<Map<String, Object?>> read =
           await transaction.get(a);
       final lite.QuerySnapshot<Map<String, Object?>> all =
           await transaction.getQuery(collection.orderBy('n'));
-      return (read.data!['n']! as num).toInt() * 100 + all.length;
-    },
-    options: TransactionOptions(readOnly: true),
-  );
+      return (read.data()!['n']! as num).toInt() * 100 + all.length;
+    }, readOnly: true);
   if (inSnapshot != 403) {
     return 'the transactions left n and the document count at $inSnapshot (expected 403: n=4, 3 documents)';
   }
@@ -1736,7 +1730,7 @@ Future<CheckResult> _userToken(Kit kit) async {
     String outcome;
     Status status = Status.pass;
     try {
-      await kit.doc(db, 'vp_user_auth', 'doc').get(Source.server).timeout(_patience);
+      await kit.doc(db, 'vp_user_auth', 'doc').get(GetOptions(source: Source.server)).timeout(_patience);
       outcome = 'served (the security rules allow this user to read the path)';
     } on FirestoreException catch (e) {
       if (e.errorCode == FirestoreErrorCode.permissionDenied) {
@@ -2004,3 +1998,8 @@ Future<void> main(List<String> arguments) async {
   await stdout.flush();
   exit(run.exitCode);
 }
+
+/// `array-contains null`, which the named arguments of `where` cannot express
+/// (a null argument counts as not given).
+Filter _arrayContainsNull(String field) =>
+    UnaryFilter(FieldPath.fromString(field), FilterOperator.arrayContains, null);

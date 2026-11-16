@@ -33,7 +33,7 @@ import 'package:cloud_firestore_dart/src/proto/index.dart' as proto;
 /// forwarded too).
 ///
 /// So, as in the JS SDK, a transaction in progress does not hold off
-/// [Firestore.terminate]: once the instance is terminated, the next read or
+/// [FirebaseFirestore.terminate]: once the instance is terminated, the next read or
 /// the commit of the transaction fails with `failedPrecondition`, and only
 /// the request on the wire at that moment is waited for.
 class LiteTransactionClient implements TransactionClient {

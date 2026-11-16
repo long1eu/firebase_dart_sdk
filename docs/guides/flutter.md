@@ -58,7 +58,7 @@ Future<void> main() async {
   // must exist before the app and the instance are created.
   WidgetsFlutterBinding.ensureInitialized();
   final AppDependencies dependencies = AppDependencies();
-  final Firestore firestore = await createFirestore(dependencies);
+  final FirebaseFirestore firestore = await createFirestore(dependencies);
   runApp(NotesApp(firestore: firestore, dependencies: dependencies));
 }
 ```
@@ -92,24 +92,24 @@ const String applicationId = String.fromEnvironment(
   defaultValue: '1:1234567890:web:0123456789abcdef',
 );
 
-Future<Firestore> createFirestore(AppDependencies dependencies) async {
+Future<FirebaseFirestore> createFirestore(AppDependencies dependencies) async {
   final FirebaseApp app = FirebaseApp.withOptions(
     const FirebaseOptions(
       apiKey: apiKey,
-      applicationId: applicationId,
+      appId: applicationId,
       projectId: projectId,
     ),
     dependencies: dependencies,
   );
 
   final Directory directory = await getApplicationSupportDirectory();
-  FirestoreSettings settings = FirestoreSettings(
+  Settings settings = Settings(
     cacheSettings: PersistentCacheSettings(),
   );
   if (useEmulator) {
     settings = settings.withEmulator(emulatorHost, emulatorPort);
   }
-  return Firestore.instanceFor(
+  return FirebaseFirestore.instanceFor(
     app: app,
     settings: settings,
     openDatabase: sqliteOpener(Directory('${directory.path}/firestore')),
@@ -124,15 +124,15 @@ Future<Firestore> createFirestore(AppDependencies dependencies) async {
 - On the Android emulator the host machine is `10.0.2.2`. Nothing maps `localhost` for you, as
   FlutterFire does: pass `--dart-define=EMULATOR_HOST=10.0.2.2`.
 - Settings belong to the `instanceFor` call that creates the instance; there is no setter.
-- For signed-in users, set `app.authProvider` before `Firestore.instanceFor`; see
+- For signed-in users, set `app.authProvider` before `FirebaseFirestore.instanceFor`; see
   [Authentication](authentication.md). The example does not sign in.
 
 ## Where to keep the instance
 
 Keep the one instance for the life of the app and hand it down: the example passes it to its
 widgets through their constructors (`NotesApp(firestore: ...)`, `NotesPage(firestore: ...)`).
-An `InheritedWidget` or a top-level `final` work as well. Once `Firestore.instanceFor(app: app)`
-has created the instance of the default app, `Firestore.instance` returns it; before that it
+An `InheritedWidget` or a top-level `final` work as well. Once `FirebaseFirestore.instanceFor(app: app)`
+has created the instance of the default app, `FirebaseFirestore.instance` returns it; before that it
 throws a `StateError`.
 
 Do not create the instance in `build()` or in `initState()` of a widget that can be rebuilt or
@@ -145,7 +145,7 @@ from you ([Several clients on one cache](multiple_clients.md)).
 
 ## Show a query with `StreamBuilder`
 
-`snapshots` and `getSnapshots(...)` start a new listener each time they are called. Create the
+`snapshots()` and `snapshots(...)` start a new listener each time they are called. Create the
 stream once, in the `State`, not in `build()`:
 
 ```dart flutter
@@ -154,13 +154,13 @@ class _NotesPageState extends State<NotesPage> {
       .collection('notes')
       .withConverter<Note>(const NoteConverter());
 
-  // Created once, not in build(): each call to getSnapshots starts a new
-  // listener. MetadataChanges.include also delivers the snapshots in which
+  // Created once, not in build(): each call to snapshots starts a new
+  // listener. includeMetadataChanges: true also delivers the snapshots in which
   // only isFromCache or hasPendingWrites changed, so the status line and the
   // pending marks follow the connection and the acknowledgements.
   late final Stream<QuerySnapshot<Note>> _snapshots = _notes
-      .orderBy('updatedAt', Direction.descending)
-      .getSnapshots(MetadataChanges.include);
+      .orderBy('updatedAt', descending: true)
+      .snapshots(includeMetadataChanges: true);
 ```
 
 Then build from the latest snapshot. The listener is cancelled when the `StreamBuilder` leaves
@@ -173,7 +173,7 @@ StreamBuilder<QuerySnapshot<Note>>(
     if (state.hasError) {
       return Center(child: Text('Error: ${state.error}'));
     }
-    final QuerySnapshot<Note>? snapshot = state.data;
+    final QuerySnapshot<Note>? snapshot = state.data();
     if (snapshot == null) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -212,7 +212,7 @@ final (IconData icon, String text) = switch ((
 };
 ```
 
-Without `MetadataChanges.include` the listener only fires when the documents change, so the
+Without `includeMetadataChanges: true` the listener only fires when the documents change, so the
 line would stay on "Offline" after the connection is back until a document changes.
 
 ### Writes: do not await them in the UI
@@ -237,12 +237,12 @@ void _write(Future<void> write) {
 
 ```dart flutter
 // doc() makes the id on the device, so this works offline too.
-final DocumentReference<Note> ref = existing?.ref ?? _notes.doc();
+final DocumentReference<Note> ref = existing?.reference ?? _notes.doc();
 _write(ref.set(note));
 ```
 
 ```dart flutter
-onPressed: () => _write(doc.ref.delete()),
+onPressed: () => _write(doc.reference.delete()),
 ```
 
 `collection.add(data)` also works offline, but its future, which gives you the reference, waits
@@ -400,15 +400,15 @@ Future<AppExitResponse> _shutdown() async {
 - Android and iOS end apps without asking (`onExitRequested` is not called when the system
   kills the process). The cache file stays consistent: SQLite applies each change in a
   transaction, and pending writes are sent on the next start.
-- Calls on the instance after `terminate()` fail. `Firestore.instanceFor` then makes a new
+- Calls on the instance after `terminate()` fail. `FirebaseFirestore.instanceFor` then makes a new
   instance.
 
 ## Coming from FlutterFire
 
 If your app uses FlutterFire's `cloud_firestore` today, the differences in the setup (options
 instead of native configuration, settings in `instanceFor`, the cache in memory unless you pass
-`openDatabase`, no `localhost` mapping on Android) and in the API (`snapshots` is a getter,
-`getSnapshots(MetadataChanges.include)`, `change.document`, converters, error codes) are listed
+`openDatabase`, no `localhost` mapping on Android) and in the API (aggregations,
+converters, transactions and error codes) are listed
 in [Coming from FlutterFire](migrating_from_flutterfire.md), with when to stay on FlutterFire and
 how to run both in one app.
 

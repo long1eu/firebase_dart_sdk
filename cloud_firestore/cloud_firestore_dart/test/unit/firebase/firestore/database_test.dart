@@ -531,7 +531,7 @@ void main() {
             firestore,
             docSnap.toJson(),
           );
-      final Map<String, Object?>? data = docSnapFromJSON.data;
+      final Map<String, Object?>? data = docSnapFromJSON.data();
       expect(data, isNotNull);
       expect(data!['a'], 1);
     });
@@ -556,7 +556,7 @@ void main() {
               docSnap.toJson(),
             );
         expect(docSnapFromJSON.reference.path, path);
-        expect(docSnapFromJSON.data, <String, Object?>{
+        expect(docSnapFromJSON.data(), <String, Object?>{
           'v': value,
           'nested': <String, Object?>{
             'k$value': <Object?>[value],
@@ -985,8 +985,8 @@ void main() {
       final List<QueryDocumentSnapshot<Map<String, Object?>>> docs =
           querySnap.docs;
       expect(docs, hasLength(2));
-      expect(docs[0].data['a'], 1);
-      expect(docs[1].data['bar'], 2);
+      expect(docs[0].data()['a'], 1);
+      expect(docs[1].data()['bar'], 2);
     });
 
     test('fromJSON respects query sort order', () {
@@ -1005,7 +1005,7 @@ void main() {
       final List<Object?> titles = <Object?>[
         for (final QueryDocumentSnapshot<Map<String, Object?>> d
             in querySnap.docs)
-          d.data['title'],
+          d.data()['title'],
       ];
       expect(titles, <Object?>['A', 'B', 'C']);
     });
@@ -1040,11 +1040,11 @@ void main() {
           ],
           <String>['$collectionPath/a$value', '$collectionPath/b$value'],
         );
-        expect(querySnap.docs[0].data, <String, Object?>{
+        expect(querySnap.docs[0].data(), <String, Object?>{
           'v': value,
           'k$value': 'key',
         });
-        expect(querySnap.docs[1].data, <String, Object?>{
+        expect(querySnap.docs[1].data(), <String, Object?>{
           'v': '$value-$value',
           'n': 2,
         });
@@ -1171,7 +1171,7 @@ void main() {
           isA<ArgumentError>().having(
             (ArgumentError e) => e.message,
             'message',
-            'experimentalForceLongPolling and experimentalAutoDetectLongPolling '
+            'webExperimentalForceLongPolling and webExperimentalAutoDetectLongPolling '
                 'cannot be used together.',
           ),
         ),

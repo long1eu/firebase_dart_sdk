@@ -7,7 +7,7 @@ import 'dart:async';
 import 'package:meta/meta.dart';
 
 /// Opens (creating it if needed) the SQLite database called [path] for the
-/// offline cache. Pass one to `Firestore.instanceFor(openDatabase: ...)`; this
+/// offline cache. Pass one to `FirebaseFirestore.instanceFor(openDatabase: ...)`; this
 /// package does not depend on a SQLite binding itself. Without it the cache is
 /// kept in memory only.
 ///

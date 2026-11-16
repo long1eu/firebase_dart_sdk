@@ -31,7 +31,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/snapshot_metadata.da
 ///     .get();
 /// print('${snapshot.length} cities, from cache: ${snapshot.metadata.isFromCache}');
 /// for (final QueryDocumentSnapshot<Map<String, Object?>> city in snapshot) {
-///   print('${city.id}: ${city.data}');
+///   print('${city.id}: ${city.data()}');
 /// }
 /// ```
 ///
@@ -73,85 +73,40 @@ class QuerySnapshot<T extends dynamic>
   final FirebaseFirestore _firestore;
 
   List<DocumentChange<T>>? _cachedChanges;
-  MetadataChanges? _cachedChangesMetadataState;
-
-  /// Returns the list of documents that changed since the last snapshot. If it's the first snapshot all documents will
-  /// be in the list as added changes.
-  ///
-  /// Documents with changes only to their metadata will not be included.
-  ///
-  /// Returns the list of document changes since the last snapshot.
-  @Deprecated('Use docChanges instead.')
-  List<DocumentChange<T>> get documentChanges => docChanges;
 
   /// The documents that changed since the previous snapshot of the same listener, in the order the changes apply. In
-  /// the first snapshot every document is a [DocumentChangeType.added] change. Changes to the metadata of a document
-  /// only are not included; use [getDocumentChanges] for those.
+  /// the first snapshot every document is a [DocumentChangeType.added] change.
   ///
-  /// Same as [docChanges]; this is the name used by the current official
-  /// Firestore API.
+  /// When the listener was started with `snapshots(includeMetadataChanges: true)`, a document whose metadata only
+  /// changed is in the list too, as a [DocumentChangeType.modified] change; otherwise such documents are not
+  /// included.
   ///
   /// ```dart
-  /// firestore.collection('cities').snapshots.listen((
+  /// firestore.collection('cities').snapshots().listen((
   ///   QuerySnapshot<Map<String, Object?>> snapshot,
   /// ) {
   ///   for (final DocumentChange<Map<String, Object?>> change
   ///       in snapshot.docChanges) {
   ///     switch (change.type) {
   ///       case DocumentChangeType.added:
-  ///         print('new city: ${change.document.data}');
+  ///         print('new city: ${change.doc.data()}');
   ///       case DocumentChangeType.modified:
-  ///         print('modified city: ${change.document.data}');
+  ///         print('modified city: ${change.doc.data()}');
   ///       case DocumentChangeType.removed:
-  ///         print('removed city: ${change.document.id}');
+  ///         print('removed city: ${change.doc.id}');
   ///     }
   ///   }
   /// });
   /// ```
-  List<DocumentChange<T>> get docChanges =>
-      getDocumentChanges(MetadataChanges.exclude);
-
-  /// Returns the list of documents that changed since the last snapshot. If it's the first snapshot all documents will
-  /// be in the list as added changes.
-  ///
-  /// [metadataChanges] Indicates whether metadata-only changes (i.e. only [QuerySnapshot.metadata] changed) should be included.
-  /// A metadata-only change of a document is reported as [DocumentChangeType.modified].
-  ///
-  /// Returns the list of document changes since the last snapshot. Throws an [ArgumentError] when
-  /// [metadataChanges] is [MetadataChanges.include] but the listener that produced this snapshot was not started
-  /// with [MetadataChanges.include] (for example a snapshot from `Query.snapshots`).
-  List<DocumentChange<T>> getDocumentChanges(MetadataChanges metadataChanges) {
-    if (metadataChanges == MetadataChanges.include &&
-        snapshot.excludesMetadataChanges) {
-      throw ArgumentError(
-        'To include metadata changes with your document changes, you must also pass '
-        'MetadataChanges.include to getSnapshots().',
-      );
-    }
-
-    List<DocumentChange<T>>? cachedChanges = _cachedChanges;
-    if (cachedChanges == null ||
-        _cachedChangesMetadataState != metadataChanges) {
-      cachedChanges = DocumentChangeInternal.changesFromSnapshot<T>(
-        _firestore,
-        metadataChanges,
-        snapshot,
-        query.converter,
-      ).toList(growable: false);
-      _cachedChanges = cachedChanges;
-      _cachedChangesMetadataState = metadataChanges;
-    }
-    return cachedChanges;
-  }
-
-  /// Returns the documents in this [QuerySnapshot] as a List in order of the query.
-  ///
-  /// Returns the list of documents.
-  @Deprecated('Use docs instead.')
-  List<DocumentSnapshot<T>> get documents {
-    return <DocumentSnapshot<T>>[
-      for (core.Document doc in snapshot.documents) _convertDocument(doc),
-    ];
+  List<DocumentChange<T>> get docChanges {
+    return _cachedChanges ??= DocumentChangeInternal.changesFromSnapshot<T>(
+      _firestore,
+      snapshot.excludesMetadataChanges
+          ? MetadataChanges.exclude
+          : MetadataChanges.include,
+      snapshot,
+      query.converter,
+    ).toList(growable: false);
   }
 
   /// Returns the documents in this [QuerySnapshot] as a List in order of the
@@ -171,9 +126,12 @@ class QuerySnapshot<T extends dynamic>
   @override
   bool get isEmpty => snapshot.documents.isEmpty;
 
-  /// Returns the number of documents in the QuerySnapshot. This is the JS SDK `size`.
+  /// The number of documents in the QuerySnapshot. Same as [size].
   @override
   int get length => snapshot.documents.length;
+
+  /// The number of documents in the QuerySnapshot: the FlutterFire and JS SDK name of [length].
+  int get size => snapshot.documents.length;
 
   /// Iterates over the documents of this snapshot in the order of the query.
   @override
@@ -190,7 +148,7 @@ class QuerySnapshot<T extends dynamic>
   static const String jsonType = 'firestore/querySnapshot/1.0';
 
   /// Returns a JSON-serializable representation of this snapshot, which [QuerySnapshot.fromJson] reads back and
-  /// `Firestore.querySnapshotsFromJson` listens from.
+  /// `FirebaseFirestore.querySnapshotsFromJson` listens from.
   ///
   /// The `bundle` field holds the query and its documents as a Firestore bundle, with the query under the name in
   /// `bundleName`. Throws a [FirestoreException] (failed-precondition) if the snapshot has pending writes: await

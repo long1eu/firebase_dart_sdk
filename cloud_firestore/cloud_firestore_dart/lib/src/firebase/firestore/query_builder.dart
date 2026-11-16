@@ -3,7 +3,7 @@
 // filters, orderings, limits and cursors, on the internal query. The two
 // public classes keep the documentation and wrap the results.
 //
-// This file must not depend on either client (no Firestore class, no
+// This file must not depend on either client (no FirebaseFirestore class, no
 // reference or snapshot class): Firestore Lite is compiled without the main
 // client.
 
@@ -19,7 +19,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/core/query.dart'
 import 'package:cloud_firestore_dart/src/firebase/firestore/field_path.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/filter.dart'
     as api
-    show CompositeFilter, UnaryFilter;
+    show CompositeFilter, UnaryFilter, unaryFilters;
 import 'package:cloud_firestore_dart/src/firebase/firestore/filter.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/database_id.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/document.dart';
@@ -116,28 +116,20 @@ class QueryBuilder {
           'where() expects a Filter, a String field or a FieldPath',
         );
       }
-      api.UnaryFilter filter(FilterOperator op, Object? value) =>
-          api.UnaryFilter(fieldPath, op, value);
-      filters = <Filter>[
-        if (isEqualTo != null) filter(FilterOperator.equal, isEqualTo),
-        if (isNotEqualTo != null) filter(FilterOperator.notEqual, isNotEqualTo),
-        if (isLessThan != null) filter(FilterOperator.lessThan, isLessThan),
-        if (isLessThanOrEqualTo != null)
-          filter(FilterOperator.lessThanOrEqual, isLessThanOrEqualTo),
-        if (isGreaterThan != null)
-          filter(FilterOperator.graterThan, isGreaterThan),
-        if (isGreaterThanOrEqualTo != null)
-          filter(FilterOperator.graterThanOrEqual, isGreaterThanOrEqualTo),
-        if (arrayContains != null)
-          filter(FilterOperator.arrayContains, arrayContains),
-        if (arrayContainsAny != null)
-          filter(FilterOperator.arrayContainsAny, arrayContainsAny.toList()),
-        if (whereIn != null) filter(FilterOperator.IN, whereIn.toList()),
-        if (whereNotIn != null)
-          filter(FilterOperator.NOT_IN, whereNotIn.toList()),
-        if (isNull != null)
-          filter(isNull ? FilterOperator.equal : FilterOperator.notEqual, null),
-      ];
+      filters = api.unaryFilters(
+        fieldPath,
+        isEqualTo: isEqualTo,
+        isNotEqualTo: isNotEqualTo,
+        isLessThan: isLessThan,
+        isLessThanOrEqualTo: isLessThanOrEqualTo,
+        isGreaterThan: isGreaterThan,
+        isGreaterThanOrEqualTo: isGreaterThanOrEqualTo,
+        arrayContains: arrayContains,
+        arrayContainsAny: arrayContainsAny,
+        whereIn: whereIn,
+        whereNotIn: whereNotIn,
+        isNull: isNull,
+      );
       if (filters.isEmpty) {
         throw ArgumentError(
           "Invalid query. where('$fieldPath') needs at least one non-null "

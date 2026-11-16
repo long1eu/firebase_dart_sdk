@@ -1,14 +1,14 @@
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/firestore_client.dart';
 
 /// Controls the creation and the lifecycle of the persistent cache indexes of
-/// a `Firestore` instance.
+/// a `FirebaseFirestore` instance.
 ///
 /// A persistent cache index speeds up queries that are executed against the
 /// local cache (`Source.cache`, offline, and the first results of a
 /// listener). It is not the same as a Cloud Firestore index: it only exists
 /// inside the SDK, on this device, and does not change what a query returns.
 ///
-/// To get an instance use `Firestore.persistentCacheIndexManager`. It is null
+/// To get an instance use `FirebaseFirestore.persistentCacheIndexManager`. It is null
 /// when the instance does not use the persistent (SQLite) cache.
 ///
 /// ```dart
@@ -23,7 +23,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/core/firestore_clien
 /// `deleteAllPersistentCacheIndexes`.
 class PersistentCacheIndexManager {
   /// Implementation detail of the SDK; not part of the supported API. Use
-  /// `Firestore.persistentCacheIndexManager`.
+  /// `FirebaseFirestore.persistentCacheIndexManager`.
   PersistentCacheIndexManager._(this._client);
 
   final FirestoreClient _client;
@@ -40,7 +40,7 @@ class PersistentCacheIndexManager {
   /// This feature is disabled by default. The setting is not persisted: call
   /// this every time the instance is created.
   ///
-  /// The returned future fails with a [FirestoreError] with code
+  /// The returned future fails with a [FirestoreException] with code
   /// `failedPrecondition` if the instance was terminated; the same holds for
   /// the other methods of this class.
   Future<void> enableIndexAutoCreation() {
@@ -54,7 +54,7 @@ class PersistentCacheIndexManager {
   }
 
   /// Removes all persistent cache indexes. This also deletes the indexes that
-  /// were configured with the deprecated `Firestore.setIndexConfiguration`.
+  /// were configured with the deprecated `FirebaseFirestore.setIndexConfiguration`.
   Future<void> deleteAllIndexes() {
     return _client.deleteAllFieldIndexes();
   }

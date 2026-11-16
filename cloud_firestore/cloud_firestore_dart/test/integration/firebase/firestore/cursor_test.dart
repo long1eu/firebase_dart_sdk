@@ -154,7 +154,7 @@ void main() {
         (await testFirestore()).collection(writer.path);
 
     final QuerySnapshot snapshot = await reader
-        .orderByField(FieldPath.documentId)
+        .orderBy(FieldPath.documentId)
         .startAt(<String>['b']).endBefore(<String>['d']).get();
 
     expect(querySnapshotToValues(snapshot), <dynamic>[
@@ -195,7 +195,7 @@ void main() {
 
     final List<String> results = <String>[];
     for (DocumentSnapshot doc in snapshot) {
-      results.add(doc.getString('k')!);
+      results.add((doc.get('k') as String?)!);
     }
     expect(results, <String>['1b', '2a', '2b']);
   });
@@ -213,8 +213,7 @@ void main() {
     ]));
 
     final Query query = testCollection
-        .orderBy('sort', Direction.descending)
-        .orderByField(FieldPath.documentId, Direction.descending);
+        .orderBy('sort', descending: true).orderBy(FieldPath.documentId, descending: true);
 
     QuerySnapshot snapshot = await query.startAt(<double>[2.0]).get();
 
@@ -272,9 +271,8 @@ void main() {
     ]));
 
     final QuerySnapshot snapshot = await testCollection
-        .whereGreaterThanOrEqualTo('timestamp', timestamp(100, 5))
-        .whereLessThan('timestamp', timestamp(100, 8))
-        .get();
+        .where('timestamp', isGreaterThanOrEqualTo: timestamp(100, 5))
+        .where('timestamp', isLessThan: timestamp(100, 8)).get();
     expect(querySnapshotToIds(snapshot), <String>['d', 'e', 'a']);
   });
 
@@ -289,16 +287,16 @@ void main() {
     ]));
 
     QuerySnapshot snapshot =
-        await testCollection.whereEqualTo('timestamp', nanos).get();
+        await testCollection.where('timestamp', isEqualTo: nanos).get();
     expect(querySnapshotToValues(snapshot), hasLength(1));
     // Because Timestamp should have been truncated to microseconds, the
     // microsecond timestamp should be considered equal to the nanosecond one.
-    snapshot = await testCollection.whereEqualTo('timestamp', micros).get();
+    snapshot = await testCollection.where('timestamp', isEqualTo: micros).get();
     expect(querySnapshotToValues(snapshot), hasLength(1));
     // The truncation is just to the microseconds, however, so the millisecond
     // timestamp should be treated as different and thus the query should return
     // no results.
-    snapshot = await testCollection.whereEqualTo('timestamp', millis).get();
+    snapshot = await testCollection.where('timestamp', isEqualTo: millis).get();
     expect(querySnapshotToValues(snapshot), isEmpty);
   });
 }

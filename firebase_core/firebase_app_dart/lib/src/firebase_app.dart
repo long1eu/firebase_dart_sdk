@@ -353,14 +353,14 @@ class FirebaseApp with _PlatformDependenciesMixin {
     _instances.clear();
   }
 
-  /// The [persistenceKey] of the app called [name] with [applicationId]: both, base64url encoded
+  /// The [persistenceKey] of the app called [name] with [appId]: both, base64url encoded
   /// without padding, joined by `+`. Works for an app that was deleted.
-  static String getPersistenceKeyFor(String name, String applicationId) {
+  static String getPersistenceKeyFor(String name, String appId) {
     final String encodedName = base64Url
         .encode(utf8.encode(name))
         .replaceAll('=', '');
     final String encodedApplicationId = base64Url
-        .encode(utf8.encode(applicationId))
+        .encode(utf8.encode(appId))
         .replaceAll('=', '');
 
     return '$encodedName+$encodedApplicationId';
@@ -521,19 +521,19 @@ mixin _PlatformDependenciesMixin
     }
   }
 
-  // InternalTokenProvider implementation
+  // AuthTokenProvider implementation
 
   /// Always throws a [StateError]: the app is the token provider of last resort, which has no
   /// user. Call `authProvider.getAccessToken` instead.
   @override
   Future<GetTokenResult> getAccessToken({required bool forceRefresh}) async {
-    throw StateError('No InternalTokenProvider has been set on this app.');
+    throw StateError('No AuthTokenProvider has been set on this app.');
   }
 
   /// Always throws a [StateError] (see [getAccessToken]). Read `authProvider.uid` instead.
   @override
   String get uid =>
-      throw StateError('No InternalTokenProvider has been set on this app.');
+      throw StateError('No AuthTokenProvider has been set on this app.');
 
   /// An empty stream (see [getAccessToken]). Listen to `authProvider.onTokenChanged` instead.
   @override

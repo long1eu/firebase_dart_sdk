@@ -22,7 +22,7 @@ class _Client extends Mock implements FirestoreClient {}
 
 String? _nickname(
         DocumentSnapshot<Map<String, Object?>> snapshot, SnapshotOptions? o) =>
-    snapshot.data!['nickname'] as String?;
+    snapshot.data()!['nickname'] as String?;
 
 Map<String, Object?> _nicknameToFirestore(String? value, SetOptions? o) =>
     <String, Object?>{'nickname': value};
@@ -35,7 +35,7 @@ const FirestoreDataConverter<String?> nicknameConverter =
 
 String? _upperNickname(
         DocumentSnapshot<Map<String, Object?>> snapshot, SnapshotOptions? o) =>
-    (snapshot.data!['nickname'] as String?)?.toUpperCase();
+    (snapshot.data()!['nickname'] as String?)?.toUpperCase();
 
 const FirestoreDataConverter<String?> upperNicknameConverter =
     FirestoreDataConverter<String?>.from(
@@ -67,8 +67,8 @@ void main() {
         converter: nicknameConverter,
       );
 
-      expect(snapshot.data, isNull);
-      expect(snapshot.getData(ServerTimestampBehavior.estimate), isNull);
+      expect(snapshot.data(), isNull);
+      expect(snapshot.data(serverTimestamps: ServerTimestampBehavior.estimate), isNull);
     });
 
     test('snapshots with different converters are not equal', () {

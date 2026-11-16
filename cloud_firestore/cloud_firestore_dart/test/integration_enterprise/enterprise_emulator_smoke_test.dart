@@ -14,6 +14,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/firestore.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/query_snapshot.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/source.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/util.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/get_options.dart';
 import 'package:test/test.dart';
 
 import '../util/integration_test_util.dart';
@@ -39,13 +40,13 @@ void main() {
     await doc.set(<String, Object?>{'value': 1, 'name': 'enterprise'});
     await collection.doc('b').set(<String, Object?>{'value': 2});
 
-    final DocumentSnapshot snapshot = await doc.get(Source.server);
+    final DocumentSnapshot snapshot = await doc.get(GetOptions(source: Source.server));
     expect(snapshot.exists, isTrue);
-    expect(snapshot.data, <String, Object?>{'value': 1, 'name': 'enterprise'});
+    expect(snapshot.data(), <String, Object?>{'value': 1, 'name': 'enterprise'});
     expect(snapshot.metadata.isFromCache, isFalse);
 
     final QuerySnapshot query =
-        await collection.where('value', isGreaterThan: 1).get(Source.server);
+        await collection.where('value', isGreaterThan: 1).get(GetOptions(source: Source.server));
     expect(query.docs.map((DocumentSnapshot d) => d.id), <String>['b']);
   });
 
@@ -64,7 +65,7 @@ void main() {
 
     final FirebaseFirestore standard = await IntegrationTestUtil.testFirestore();
     final DocumentSnapshot snapshot =
-        await standard.doc(path).get(Source.server);
+        await standard.doc(path).get(GetOptions(source: Source.server));
     expect(snapshot.exists, isFalse);
   });
 }

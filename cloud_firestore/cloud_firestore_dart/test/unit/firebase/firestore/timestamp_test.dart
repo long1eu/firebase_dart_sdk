@@ -77,7 +77,10 @@ void main() {
     expect(Timestamp.fromMillisecondsSinceEpoch(-1000), const Timestamp(-1, 0));
     expect(Timestamp.fromMillisecondsSinceEpoch(0), const Timestamp(0, 0));
     for (final int millis in <int>[0, 1, -1, 22501, -1250, 1700000000123]) {
-      expect(Timestamp.fromMillisecondsSinceEpoch(millis).toMillis(), millis);
+      expect(
+        Timestamp.fromMillisecondsSinceEpoch(millis).millisecondsSinceEpoch,
+        millis,
+      );
     }
     expect(
       Timestamp.fromMillisecondsSinceEpoch(1700000000123),
@@ -86,8 +89,8 @@ void main() {
   });
 
   test('toMillis truncates sub-millisecond precision toward the past', () {
-    expect(const Timestamp(1, 999999).toMillis(), 1000);
-    expect(const Timestamp(-1, 999999).toMillis(), -1000);
+    expect(const Timestamp(1, 999999).millisecondsSinceEpoch, 1000);
+    expect(const Timestamp(-1, 999999).millisecondsSinceEpoch, -1000);
     // toDate keeps the microseconds (it used to truncate to milliseconds).
     expect(
       const Timestamp(-1, 999999).toDate(),
@@ -204,7 +207,7 @@ void main() {
         Timestamp.fromMillisecondsSinceEpoch(millis),
       );
       expect(Timestamp.fromMillisecondsSinceEpoch(millis).toDate(), date);
-      expect(Timestamp.fromDate(date).toMillis(), millis);
+      expect(Timestamp.fromDate(date).millisecondsSinceEpoch, millis);
     }
   });
 

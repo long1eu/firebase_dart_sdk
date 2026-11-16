@@ -5,6 +5,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/firestore.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/firestore_error.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local_cache_settings.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/source.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/get_options.dart';
 import 'package:test/test.dart';
 
 import '../../../unit/firebase/firestore/local/mock/database_mock.dart';
@@ -41,20 +42,20 @@ void main() {
     await docRef.set(<String, Object?>{'foo': 'bar'});
     // The write is in the local cache before the instance goes away.
     expect(
-        (await docRef.get(Source.cache)).data, <String, Object?>{'foo': 'bar'});
+        (await docRef.get(GetOptions(source: Source.cache))).data(), <String, Object?>{'foo': 'bar'});
     await firestore.terminate();
     await firestore.clearPersistence();
     expect(DatabaseMock.pathForName(dbName).existsSync(), isFalse);
 
     // Same database file: the cleared cache must not have the document.
     final FirebaseFirestore firestore2 = await restartable(dbName);
-    await expectLater(firestore2.doc(docRef.path).get(Source.cache),
+    await expectLater(firestore2.doc(docRef.path).get(GetOptions(source: Source.cache)),
         throwsA(firestoreErrorWithCode(FirestoreErrorCode.unavailable)));
 
     // The document is still on the backend, only the cache was cleared.
     final DocumentSnapshot<Map<String, Object?>> fromServer =
-        await firestore2.doc(docRef.path).get(Source.server);
-    expect(fromServer.data, <String, Object?>{'foo': 'bar'});
+        await firestore2.doc(docRef.path).get(GetOptions(source: Source.server));
+    expect(fromServer.data(), <String, Object?>{'foo': 'bar'});
   });
 
   test('without clearPersistence a restarted instance keeps its cache',
@@ -71,8 +72,8 @@ void main() {
 
     final FirebaseFirestore firestore2 = await restartable(dbName);
     final DocumentSnapshot<Map<String, Object?>> doc =
-        await firestore2.doc(docRef.path).get(Source.cache);
-    expect(doc.data, <String, Object?>{'foo': 'bar'});
+        await firestore2.doc(docRef.path).get(GetOptions(source: Source.cache));
+    expect(doc.data(), <String, Object?>{'foo': 'bar'});
   });
 
   test('testClearPersistenceWhileRunningFails', () async {

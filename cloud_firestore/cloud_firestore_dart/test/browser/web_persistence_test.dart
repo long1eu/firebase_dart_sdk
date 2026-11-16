@@ -82,8 +82,8 @@ void main() {
         firestore.collection(newCollectionName()).doc('a');
     await doc.set(<String, Object?>{'a': 1, 'text': 'héllo \u{1F600}'});
 
-    final DocumentSnapshot<Json> cached = await doc.get(Source.cache);
-    expect(cached.data, <String, Object?>{'a': 1, 'text': 'héllo \u{1F600}'});
+    final DocumentSnapshot<Json> cached = await doc.get(GetOptions(source: Source.cache));
+    expect(cached.data(), <String, Object?>{'a': 1, 'text': 'héllo \u{1F600}'});
     expect(cached.metadata.hasPendingWrites, isFalse);
   });
 
@@ -98,7 +98,7 @@ void main() {
       });
     }
     // Read through a listener too, so that the query has a cached target.
-    await firestore.collection(collection).get(Source.server);
+    await firestore.collection(collection).get(GetOptions(source: Source.server));
     await shutDown(firestore);
     expect(await storedDatabases(app), hasLength(1));
 
@@ -107,10 +107,10 @@ void main() {
     firestore = await newClient(openDatabase: opener(), appName: app);
     await firestore.disableNetwork();
     final QuerySnapshot<Json> cached =
-        await firestore.collection(collection).orderBy('n').get(Source.cache);
+        await firestore.collection(collection).orderBy('n').get(GetOptions(source: Source.cache));
     expect(cached.metadata.isFromCache, isTrue);
     expect(
-        cached.docs.map((QueryDocumentSnapshot<Json> d) => d.data).toList(),
+        cached.docs.map((QueryDocumentSnapshot<Json> d) => d.data()).toList(),
         <Json>[
           <String, Object?>{'n': 0},
           <String, Object?>{'n': 1},
@@ -137,7 +137,7 @@ void main() {
     ));
     // The writes are in the cache once a cache read sees them.
     expect(
-        (await firestore.collection(collection).doc('pending').get(Source.cache))
+        (await firestore.collection(collection).doc('pending').get(GetOptions(source: Source.cache)))
             .metadata
             .hasPendingWrites,
         isTrue);
@@ -146,12 +146,12 @@ void main() {
     firestore = await newClient(openDatabase: opener(), appName: app);
     await firestore.disableNetwork();
     final DocumentSnapshot<Json> pending =
-        await firestore.collection(collection).doc('pending').get(Source.cache);
-    expect(pending.data, <String, Object?>{'v': 2});
+        await firestore.collection(collection).doc('pending').get(GetOptions(source: Source.cache));
+    expect(pending.data(), <String, Object?>{'v': 2});
     expect(pending.metadata.hasPendingWrites, isTrue);
     final DocumentSnapshot<Json> synced =
-        await firestore.collection(collection).doc('synced').get(Source.cache);
-    expect(synced.data, <String, Object?>{'v': 11});
+        await firestore.collection(collection).doc('synced').get(GetOptions(source: Source.cache));
+    expect(synced.data(), <String, Object?>{'v': 11});
     expect(synced.metadata.hasPendingWrites, isTrue);
 
     // Back online the queue is sent, once.
@@ -159,9 +159,9 @@ void main() {
     await firestore.waitForPendingWrites().timeout(const Duration(seconds: 20));
     final FirebaseFirestore other = await newClient();
     final QuerySnapshot<Json> server =
-        await other.collection(collection).get(Source.server);
+        await other.collection(collection).get(GetOptions(source: Source.server));
     expect(<String, Object?>{
-      for (final QueryDocumentSnapshot<Json> d in server.docs) d.id: d.data,
+      for (final QueryDocumentSnapshot<Json> d in server.docs) d.id: d.data(),
     }, <String, Object?>{
       'pending': <String, Object?>{'v': 2},
       'synced': <String, Object?>{'v': 11},
@@ -239,7 +239,7 @@ void main() {
     await Future<void>.delayed(const Duration(milliseconds: 100));
     firestore = await newClient(openDatabase: opener(), appName: app);
     await firestore.disableNetwork();
-    expect((await firestore.collection(collection).doc('a').get(Source.cache)).data,
+    expect((await firestore.collection(collection).doc('a').get(GetOptions(source: Source.cache))).data(),
         <String, Object?>{'a': 1});
   });
 
@@ -265,7 +265,7 @@ void main() {
     firestore = await newClient(openDatabase: opener(), appName: app);
     await firestore.disableNetwork();
     final QuerySnapshot<Json> cached =
-        await firestore.collection(collection).get(Source.cache);
+        await firestore.collection(collection).get(GetOptions(source: Source.cache));
     expect(cached.docs, isEmpty);
   });
 
@@ -287,10 +287,10 @@ void main() {
       });
     }
     await batch.commit();
-    await cities.get(Source.server);
+    await cities.get(GetOptions(source: Source.server));
 
     final Query<Json> romanian =
-        cities.whereEqualTo('country', 'RO').orderBy('population');
+        cities.where('country', isEqualTo: 'RO').orderBy('population');
     IndexType indexType() => localStore.indexManagerForCurrentUser
         .getIndexType(romanian.query.toTarget());
     final List<String> expected = <String>[
@@ -304,13 +304,13 @@ void main() {
     expect(indexType(), IndexType.none);
 
     // The first run scans, and creates the index.
-    expect(ids(await romanian.get(Source.cache)), expected);
+    expect(ids(await romanian.get(GetOptions(source: Source.cache))), expected);
     expect(localStore.getFieldIndexes(), hasLength(1));
     expect(indexType(), IndexType.full);
 
     // Before the backfill, halfway, and when the index is complete.
     expect(await firestore.client.backfillIndexes(), 50);
-    expect(ids(await romanian.get(Source.cache)), expected);
+    expect(ids(await romanian.get(GetOptions(source: Source.cache))), expected);
     int filled = 50;
     for (int n = await firestore.client.backfillIndexes();
         n > 0;
@@ -318,11 +318,11 @@ void main() {
       filled += n;
     }
     expect(filled, 150);
-    expect(ids(await romanian.get(Source.cache)), expected);
+    expect(ids(await romanian.get(GetOptions(source: Source.cache))), expected);
 
     await indexes.deleteAllIndexes();
     expect(localStore.getFieldIndexes(), isEmpty);
-    expect(ids(await romanian.get(Source.cache)), expected);
+    expect(ids(await romanian.get(GetOptions(source: Source.cache))), expected);
   });
 
   persistenceTest(

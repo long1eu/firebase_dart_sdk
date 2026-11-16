@@ -89,11 +89,11 @@ class FirestoreMultiDbComponent {
   FirebaseFirestore get(String databaseName, OpenDatabase? openDatabase) {
     final String key = keyFor(app.name, databaseName);
     final FirebaseFirestore? existing = instances[key];
-    if (existing != null && identical(existing.firebaseApp, app)) {
+    if (existing != null && identical(existing.app, app)) {
       final Settings? requested = settings;
       if (requested != null && requested != existing.settings) {
         throw StateError(
-          'Firestore.instanceFor() has already been called with different '
+          'FirebaseFirestore.instanceFor() has already been called with different '
           'settings for this app and database. Call it without settings to '
           'get the existing instance, or terminate() that instance first.',
         );

@@ -10,6 +10,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/document_snapshot.da
 import 'package:cloud_firestore_dart/src/firebase/firestore/query_snapshot.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/set_options.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/source.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/get_options.dart';
 import 'package:test/test.dart';
 
 import '../../../util/integration_test_util.dart';
@@ -34,7 +35,7 @@ void main() {
     expect(doc.exists, isTrue);
     expect(doc.metadata.isFromCache, isFalse);
     expect(doc.metadata.hasPendingWrites, isFalse);
-    expect(doc.data, initialData);
+    expect(doc.data(), initialData);
   });
 
   test('getCollectionWhileOnlineWithDefaultGetOptions', () async {
@@ -68,7 +69,7 @@ void main() {
     expect(doc.exists, isTrue);
     expect(doc.metadata.isFromCache, isTrue);
     expect(doc.metadata.hasPendingWrites, isFalse);
-    expect(doc.data, initialData);
+    expect(doc.data(), initialData);
   });
 
   test('getCollectionWhileOfflineWithDefaultGetOptions', () async {
@@ -89,7 +90,7 @@ void main() {
     // Since we're offline, the returned promises won't complete
     unawaited(colRef
         .doc('doc2')
-        .set(map(<String>['key2b', 'value2b']), SetOptions.mergeAllFields));
+        .set(map(<String>['key2b', 'value2b']), const SetOptions(merge: true)));
     unawaited(colRef.doc('doc3').set(map(<String>['key3b', 'value3b'])));
     unawaited(colRef.doc('doc4').set(map(<String>['key4', 'value4'])));
 
@@ -117,12 +118,12 @@ void main() {
 
     await docRef.get();
 
-    final DocumentSnapshot doc = await docRef.get(Source.cache);
+    final DocumentSnapshot doc = await docRef.get(GetOptions(source: Source.cache));
 
     expect(doc.exists, isTrue);
     expect(doc.metadata.isFromCache, isTrue);
     expect(doc.metadata.hasPendingWrites, isFalse);
-    expect(doc.data, initialData);
+    expect(doc.data(), initialData);
   });
 
   test('getCollectionWhileOnlineWithSourceEqualToCache', () async {
@@ -139,7 +140,7 @@ void main() {
 
     await colRef.get();
 
-    final QuerySnapshot qrySnap = await colRef.get(Source.cache);
+    final QuerySnapshot qrySnap = await colRef.get(GetOptions(source: Source.cache));
     expect(qrySnap.metadata.isFromCache, isTrue);
     expect(qrySnap.metadata.hasPendingWrites, isFalse);
     expect(qrySnap.docChanges.length, 3);
@@ -153,11 +154,11 @@ void main() {
     await docRef.get();
     await docRef.firestore.disableNetwork();
 
-    final DocumentSnapshot doc = await docRef.get(Source.cache);
+    final DocumentSnapshot doc = await docRef.get(GetOptions(source: Source.cache));
     expect(doc.exists, isTrue);
     expect(doc.metadata.isFromCache, isTrue);
     expect(doc.metadata.hasPendingWrites, isFalse);
-    expect(doc.data, initialData);
+    expect(doc.data(), initialData);
   });
 
   test('getCollectionWhileOfflineWithSourceEqualToCache', () async {
@@ -178,11 +179,11 @@ void main() {
     // Since we're offline, the returned promises won't complete
     unawaited(colRef
         .doc('doc2')
-        .set(map(<String>['key2b', 'value2b']), SetOptions.mergeAllFields));
+        .set(map(<String>['key2b', 'value2b']), const SetOptions(merge: true)));
     unawaited(colRef.doc('doc3').set(map(<String>['key3b', 'value3b'])));
     unawaited(colRef.doc('doc4').set(map(<String>['key4', 'value4'])));
 
-    final QuerySnapshot qrySnap = await colRef.get(Source.cache);
+    final QuerySnapshot qrySnap = await colRef.get(GetOptions(source: Source.cache));
     expect(qrySnap.metadata.isFromCache, isTrue);
     expect(qrySnap.metadata.hasPendingWrites, isTrue);
     expect(qrySnap.docChanges.length, 4);
@@ -204,11 +205,11 @@ void main() {
     final Map<String, Object?> initialData = map(<String>['key', 'value']);
     final DocumentReference docRef = await testDocumentWithData(initialData);
 
-    final DocumentSnapshot doc = await docRef.get(Source.server);
+    final DocumentSnapshot doc = await docRef.get(GetOptions(source: Source.server));
     expect(doc.exists, isTrue);
     expect(doc.metadata.isFromCache, isFalse);
     expect(doc.metadata.hasPendingWrites, isFalse);
-    expect(doc.data, initialData);
+    expect(doc.data(), initialData);
   });
 
   test('getCollectionWhileOnlineWithSourceEqualToServer', () async {
@@ -224,7 +225,7 @@ void main() {
     final CollectionReference colRef =
         await testCollectionWithDocs(initialDocs);
 
-    final QuerySnapshot qrySnap = await colRef.get(Source.server);
+    final QuerySnapshot qrySnap = await colRef.get(GetOptions(source: Source.server));
     expect(qrySnap.metadata.isFromCache, isFalse);
     expect(qrySnap.metadata.hasPendingWrites, isFalse);
     expect(qrySnap.docChanges.length, 3);
@@ -238,7 +239,7 @@ void main() {
     await docRef.get();
     await docRef.firestore.disableNetwork();
 
-    expect(() => docRef.get(Source.server), throwsA(anything));
+    expect(() => docRef.get(GetOptions(source: Source.server)), throwsA(anything));
   });
 
   test('getCollectionWhileOfflineWithSourceEqualToServer', () async {
@@ -256,7 +257,7 @@ void main() {
     await colRef.get();
     await colRef.firestore.disableNetwork();
 
-    expect(() => colRef.get(Source.server), throwsA(anything));
+    expect(() => colRef.get(GetOptions(source: Source.server)), throwsA(anything));
   });
 
   test('getDocumentWhileOfflineWithDifferentGetOptions', () async {
@@ -270,7 +271,7 @@ void main() {
     // below) and wait for// the listener to deliver its initial snapshot before
     // continuing.
     final Completer<void> source = Completer<void>();
-    docRef.snapshots.listen(
+    docRef.snapshots().listen(
       (DocumentSnapshot docSnap) {
         source.complete(null);
       },
@@ -278,19 +279,19 @@ void main() {
     );
     await source.future;
 
-    DocumentSnapshot doc = await docRef.get(Source.cache);
+    DocumentSnapshot doc = await docRef.get(GetOptions(source: Source.cache));
     expect(doc.exists, isTrue);
     expect(doc.metadata.isFromCache, isTrue);
     expect(doc.metadata.hasPendingWrites, isFalse);
-    expect(doc.data, initialData);
+    expect(doc.data(), initialData);
 
     doc = await docRef.get();
     expect(doc.exists, isTrue);
     expect(doc.metadata.isFromCache, isTrue);
     expect(doc.metadata.hasPendingWrites, isFalse);
-    expect(doc.data, initialData);
+    expect(doc.data(), initialData);
 
-    expect(() => docRef.get(Source.server), throwsA(anything));
+    expect(() => docRef.get(GetOptions(source: Source.server)), throwsA(anything));
   });
 
   test('getCollectionWhileOfflineWithDifferentGetOptions', () async {
@@ -311,7 +312,7 @@ void main() {
     // since we're offline, the returned promises won't complete
     unawaited(colRef
         .doc('doc2')
-        .set(map(<String>['key2b', 'value2b']), SetOptions.mergeAllFields));
+        .set(map(<String>['key2b', 'value2b']), const SetOptions(merge: true)));
     unawaited(colRef.doc('doc3').set(map(<String>['key3b', 'value3b'])));
     unawaited(colRef.doc('doc4').set(map(<String>['key4', 'value4'])));
 
@@ -319,7 +320,7 @@ void main() {
     // below) and wait for the listener to deliver its initial snapshot before
     // continuing.
     final Completer<void> source = Completer<void>();
-    colRef.snapshots.listen(
+    colRef.snapshots().listen(
       (QuerySnapshot qrySnap) {
         source.complete(null);
       },
@@ -327,7 +328,7 @@ void main() {
     );
     await source.future;
 
-    QuerySnapshot qrySnap = await colRef.get(Source.cache);
+    QuerySnapshot qrySnap = await colRef.get(GetOptions(source: Source.cache));
     expect(qrySnap.metadata.isFromCache, isTrue);
     expect(qrySnap.metadata.hasPendingWrites, isTrue);
     expect(qrySnap.docChanges.length, 4);
@@ -361,7 +362,7 @@ void main() {
           map<String>(<String>['key4', 'value4'])
         ]));
 
-    expect(() => colRef.get(Source.server), throwsA(anything));
+    expect(() => colRef.get(GetOptions(source: Source.server)), throwsA(anything));
   });
 
   test('getNonExistingDocWhileOnlineWithDefaultGetOptions', () async {
@@ -400,7 +401,7 @@ void main() {
 
       final DocumentSnapshot doc = await docRef.get();
       expect(doc.exists, isFalse);
-      expect(doc.data, isNull);
+      expect(doc.data(), isNull);
       expect(doc.metadata.isFromCache, isTrue);
       expect(doc.metadata.hasPendingWrites, isFalse);
     },
@@ -425,13 +426,13 @@ void main() {
     final DocumentReference docRef = await testDocument();
 
     // Attempt to get doc. This will fail since there's nothing in cache.
-    expect(() => docRef.get(Source.cache), throwsA(anything));
+    expect(() => docRef.get(GetOptions(source: Source.cache)), throwsA(anything));
   });
 
   test('getNonExistingCollectionWhileOnlineWithSourceEqualToCache', () async {
     final CollectionReference colRef = await testCollection();
 
-    final QuerySnapshot qrySnap = await colRef.get(Source.cache);
+    final QuerySnapshot qrySnap = await colRef.get(GetOptions(source: Source.cache));
     expect(qrySnap, isEmpty);
     expect(qrySnap.docChanges.length, 0);
     expect(qrySnap.metadata.isFromCache, isTrue);
@@ -444,7 +445,7 @@ void main() {
     await docRef.firestore.disableNetwork();
 
     // Attempt to get doc. This will fail since there's nothing in cache.
-    expect(() => docRef.get(Source.cache), throwsA(anything));
+    expect(() => docRef.get(GetOptions(source: Source.cache)), throwsA(anything));
   });
 
   test('getDeletedDocWhileOfflineWithSourceEqualToCache', () async {
@@ -453,9 +454,9 @@ void main() {
 
     await docRef.firestore.disableNetwork();
 
-    final DocumentSnapshot doc = await docRef.get(Source.cache);
+    final DocumentSnapshot doc = await docRef.get(GetOptions(source: Source.cache));
     expect(doc.exists, isFalse);
-    expect(doc.data, isNull);
+    expect(doc.data(), isNull);
     expect(doc.metadata.isFromCache, isTrue);
     expect(doc.metadata.hasPendingWrites, isFalse);
   });
@@ -465,7 +466,7 @@ void main() {
 
     await colRef.firestore.disableNetwork();
 
-    final QuerySnapshot qrySnap = await colRef.get(Source.cache);
+    final QuerySnapshot qrySnap = await colRef.get(GetOptions(source: Source.cache));
     expect(qrySnap, isEmpty);
     expect(qrySnap.docChanges.length, 0);
     expect(qrySnap.metadata.isFromCache, isTrue);
@@ -475,7 +476,7 @@ void main() {
   test('getNonExistingDocWhileOnlineWithSourceEqualToServer', () async {
     final DocumentReference docRef = await testDocument();
 
-    final DocumentSnapshot doc = await docRef.get(Source.server);
+    final DocumentSnapshot doc = await docRef.get(GetOptions(source: Source.server));
     expect(doc.exists, isFalse);
     expect(doc.metadata.isFromCache, isFalse);
     expect(doc.metadata.hasPendingWrites, isFalse);
@@ -484,7 +485,7 @@ void main() {
   test('getNonExistingCollectionWhileOnlineWithSourceEqualToServer', () async {
     final CollectionReference colRef = await testCollection();
 
-    final QuerySnapshot qrySnap = await colRef.get(Source.server);
+    final QuerySnapshot qrySnap = await colRef.get(GetOptions(source: Source.server));
     expect(qrySnap, isEmpty);
     expect(qrySnap.docChanges.length, 0);
     expect(qrySnap.metadata.isFromCache, isFalse);
@@ -496,14 +497,14 @@ void main() {
 
     await docRef.firestore.disableNetwork();
 
-    expect(() => docRef.get(Source.server), throwsA(anything));
+    expect(() => docRef.get(GetOptions(source: Source.server)), throwsA(anything));
   });
 
   test('getNonExistingCollectionWhileOfflineWithSourceEqualToServer', () async {
     final CollectionReference colRef = await testCollection();
 
     await colRef.firestore.disableNetwork();
-    expect(() => colRef.get(Source.server), throwsA(anything));
+    expect(() => colRef.get(GetOptions(source: Source.server)), throwsA(anything));
   });
 }
 

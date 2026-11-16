@@ -46,8 +46,8 @@ Future<void> main() async {
   print('pending writes are on the backend');
 
   // snapshotsInSync fires when all listeners are in sync with each other.
-  final Future<void> inSync = firestore.snapshotsInSync.first;
-  final subscription = firestore.doc(path).snapshots.listen((_) {});
+  final Future<void> inSync = firestore.snapshotsInSync().first;
+  final subscription = firestore.doc(path).snapshots().listen((_) {});
   await inSync;
   await subscription.cancel();
   print('listeners are in sync');
@@ -71,11 +71,13 @@ Future<void> main() async {
   // and the data is still on the backend.
   firestore = open();
   try {
-    await firestore.doc(path).get(Source.cache);
+    await firestore.doc(path).get(GetOptions(source: Source.cache));
   } on FirestoreException catch (e) {
     print('cache after clear: ${e.errorCode}');
   }
-  print('server: ${(await firestore.doc(path).get(Source.server)).data}');
+  print(
+    'server: ${(await firestore.doc(path).get(GetOptions(source: Source.server))).data()}',
+  );
 
   await firestore.terminate();
   directory.deleteSync(recursive: true);

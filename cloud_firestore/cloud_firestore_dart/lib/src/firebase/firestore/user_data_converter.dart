@@ -60,7 +60,7 @@ class UserDataConverter {
     return accumulator.toSetData(updateData);
   }
 
-  /// Parse document data from a set() call with SetOptions.merge() set.
+  /// Parse document data from a set() call with SetOptions(merge: true) or mergeFields.
   UserDataParsedSetData parseMergeData(
     Map<String, Object?> input,
     FieldMask? fieldMask, {
@@ -133,6 +133,40 @@ class UserDataConverter {
     }
 
     return accumulator.toUpdateData(updateData);
+  }
+
+  /// Parses the data of an `update` call: each key of [data] is a dot-separated `String` field path or a
+  /// `FieldPath`. Throws an [ArgumentError] for any other key.
+  UserDataParsedUpdateData parseUpdateMap(
+    Map<Object, Object?> data, {
+    required String methodName,
+    DocumentKey? targetDoc,
+  }) {
+    if (data.keys.every((Object key) => key is String)) {
+      return parseUpdateData(
+        Map<String, Object?>.from(data),
+        methodName: methodName,
+        targetDoc: targetDoc,
+      );
+    }
+    final List<Object?> fieldsAndValues = <Object?>[];
+    for (final MapEntry<Object, Object?> entry in data.entries) {
+      final Object key = entry.key;
+      if (key is! String && key is! firestore.FieldPath) {
+        throw ArgumentError(
+          'Function $methodName() called with invalid data. The key $key is '
+          'neither a String field path nor a FieldPath.',
+        );
+      }
+      fieldsAndValues
+        ..add(key)
+        ..add(entry.value);
+    }
+    return parseUpdateDataFromList(
+      fieldsAndValues,
+      methodName: methodName,
+      targetDoc: targetDoc,
+    );
   }
 
   /// Parses the update data from the update(field, value, field, value...) varargs call, accepting both strings and
@@ -354,7 +388,7 @@ class UserDataConverter {
       } else {
         // We shouldn't encounter delete sentinels for queries or non-merge [set()] calls.
         throw context.createError(
-          'FieldValue.delete() can only be used with update() and set() with SetOptions.merge()',
+          'FieldValue.delete() can only be used with update() and set() with SetOptions(merge: true) or mergeFields',
         );
       }
     } else if (value.isServerTimestamp) {

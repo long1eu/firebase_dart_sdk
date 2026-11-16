@@ -32,12 +32,12 @@ void main() {
 
     final DocumentSnapshot fromA = await refA.get();
     final DocumentSnapshot fromB = await refB.get();
-    expect(fromA.data, <String, Object?>{'who': 'a'});
-    expect(fromB.data, <String, Object?>{'who': 'b'});
+    expect(fromA.data(), <String, Object?>{'who': 'a'});
+    expect(fromB.data(), <String, Object?>{'who': 'b'});
 
     // Shutting one instance down leaves the other fully usable.
     await a.terminate();
     await refB.set(<String, Object?>{'who': 'b2'});
-    expect((await refB.get()).data, <String, Object?>{'who': 'b2'});
+    expect((await refB.get()).data(), <String, Object?>{'who': 'b2'});
   });
 }

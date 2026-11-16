@@ -100,13 +100,13 @@ final List<Entry> entries = <Entry>[
     'DocumentReference.get(Source.cache)',
     <String>{},
     After.futureFails,
-    (Fixture f) => f.doc.get(Source.cache),
+    (Fixture f) => f.doc.get(GetOptions(source: Source.cache)),
   ),
   Entry(
     'DocumentReference.get(Source.server)',
     <String>{},
     After.futureFails,
-    (Fixture f) => f.doc.get(Source.server),
+    (Fixture f) => f.doc.get(GetOptions(source: Source.server)),
   ),
   Entry(
     'DocumentReference.set',
@@ -121,10 +121,12 @@ final List<Entry> entries = <Entry>[
     (Fixture f) => f.doc.update(_data),
   ),
   Entry(
-    'DocumentReference.updateFromList',
-    <String>{'DocumentReference.updateFromList'},
+    'DocumentReference.update(FieldPath)',
+    <String>{},
     After.futureFails,
-    (Fixture f) => f.doc.updateFromList(<Object?>['a', 2]),
+    (Fixture f) => f.doc.update(<Object, Object?>{
+      FieldPath(<String>['a']): 2,
+    }),
   ),
   Entry(
     'DocumentReference.delete',
@@ -144,21 +146,19 @@ final List<Entry> entries = <Entry>[
     'DocumentReference.snapshots',
     <String>{'DocumentReference.snapshots'},
     After.streamFails,
-    (Fixture f) => f.doc.snapshots,
+    (Fixture f) => f.doc.snapshots(),
   ),
   Entry(
-    'DocumentReference.getSnapshots',
-    <String>{'DocumentReference.getSnapshots'},
+    'DocumentReference.snapshots(includeMetadataChanges)',
+    <String>{},
     After.streamFails,
-    (Fixture f) => f.doc.getSnapshots(MetadataChanges.include),
+    (Fixture f) => f.doc.snapshots(includeMetadataChanges: true),
   ),
   Entry(
-    'DocumentReference.getSnapshotsWithOptions',
-    <String>{'DocumentReference.getSnapshotsWithOptions'},
+    'DocumentReference.snapshots(source)',
+    <String>{},
     After.streamFails,
-    (Fixture f) => f.doc.getSnapshotsWithOptions(
-      const SnapshotListenOptions(source: ListenSource.cache),
-    ),
+    (Fixture f) => f.doc.snapshots(source: ListenSource.cache),
   ),
 
   // Queries.
@@ -172,32 +172,31 @@ final List<Entry> entries = <Entry>[
     'Query.get(Source.cache)',
     <String>{},
     After.futureFails,
-    (Fixture f) => f.collection.get(Source.cache),
+    (Fixture f) => f.collection.get(GetOptions(source: Source.cache)),
   ),
   Entry(
     'Query.get(Source.server)',
     <String>{},
     After.futureFails,
-    (Fixture f) => f.collection.get(Source.server),
+    (Fixture f) => f.collection.get(GetOptions(source: Source.server)),
   ),
   Entry(
     'Query.snapshots',
     <String>{'Query.snapshots'},
     After.streamFails,
-    (Fixture f) => f.collection.snapshots,
+    (Fixture f) => f.collection.snapshots(),
   ),
   Entry(
-    'Query.getSnapshots',
-    <String>{'Query.getSnapshots'},
+    'Query.snapshots(limit)',
+    <String>{},
     After.streamFails,
-    (Fixture f) => f.collection.limit(1).getSnapshots(),
+    (Fixture f) => f.collection.limit(1).snapshots(),
   ),
   Entry(
-    'Query.getSnapshotsWithOptions',
-    <String>{'Query.getSnapshotsWithOptions'},
+    'Query.snapshots(source)',
+    <String>{},
     After.streamFails,
-    (Fixture f) =>
-        f.collection.getSnapshotsWithOptions(const SnapshotListenOptions()),
+    (Fixture f) => f.collection.snapshots(source: ListenSource.cache),
   ),
   Entry(
     'AggregateQuery.get',
@@ -211,10 +210,10 @@ final List<Entry> entries = <Entry>[
     After.futureFails,
     (Fixture f) => f.collection
         .findNearest(
-          'embedding',
-          FieldValue.vector(<double>[1, 2]),
-          1,
-          DistanceMeasure.euclidean,
+          vectorField: 'embedding',
+          queryVector: VectorValue(<double>[1, 2]),
+          limit: 1,
+          distanceMeasure: DistanceMeasure.euclidean,
         )
         .get(),
   ),
@@ -244,16 +243,16 @@ final List<Entry> entries = <Entry>[
     (Fixture f) => f.firestore.batch().commit(),
   ),
   Entry(
-    'Firestore.runBatch',
-    <String>{'Firestore.runBatch'},
+    'FirebaseFirestore.runBatch',
+    <String>{'FirebaseFirestore.runBatch'},
     After.futureFails,
     (Fixture f) => f.firestore.runBatch(
       (WriteBatch batch) async => batch.set(f.doc, _data),
     ),
   ),
   Entry(
-    'Firestore.runTransaction',
-    <String>{'Firestore.runTransaction', 'Transaction.get'},
+    'FirebaseFirestore.runTransaction',
+    <String>{'FirebaseFirestore.runTransaction', 'Transaction.get'},
     After.futureFails,
     (Fixture f) =>
         f.firestore.runTransaction<void>((Transaction transaction) async {
@@ -262,7 +261,7 @@ final List<Entry> entries = <Entry>[
         }),
   ),
   Entry(
-    'Firestore.runTransaction (read-only)',
+    'FirebaseFirestore.runTransaction (read-only)',
     <String>{'Transaction.getQuery', 'Transaction.getAggregate'},
     After.futureFails,
     (Fixture f) =>
@@ -270,14 +269,14 @@ final List<Entry> entries = <Entry>[
           await transaction.get(f.doc);
           await transaction.getQuery(f.doc.parent);
           await transaction.getAggregate(f.doc.parent.count());
-        }, options: TransactionOptions(readOnly: true)),
+        }, readOnly: true),
   ),
 
   // Bundles and snapshot JSON.
   Entry(
-    'Firestore.loadBundle',
+    'FirebaseFirestore.loadBundle',
     <String>{
-      'Firestore.loadBundle',
+      'FirebaseFirestore.loadBundle',
       'LoadBundleTask.future',
       'LoadBundleTask.stream',
     },
@@ -285,29 +284,35 @@ final List<Entry> entries = <Entry>[
     (Fixture f) => f.firestore.loadBundle(_emptyBundle()),
   ),
   Entry(
-    'Firestore.loadBundleStream',
-    <String>{'Firestore.loadBundleStream'},
+    'FirebaseFirestore.loadBundleStream',
+    <String>{'FirebaseFirestore.loadBundleStream'},
     After.taskFails,
     (Fixture f) => f.firestore.loadBundleStream(
       Stream<List<int>>.fromIterable(<List<int>>[_emptyBundle()]),
     ),
   ),
   Entry(
-    'Firestore.getNamedQuery',
-    <String>{'Firestore.getNamedQuery'},
+    'FirebaseFirestore.namedQuery',
+    <String>{'FirebaseFirestore.namedQuery'},
     After.futureFails,
     (Fixture f) => f.firestore.namedQuery('missing'),
   ),
   Entry(
-    'Firestore.documentSnapshotsFromJson',
-    <String>{'Firestore.documentSnapshotsFromJson'},
+    'FirebaseFirestore.namedQueryGet',
+    <String>{'FirebaseFirestore.namedQueryGet'},
+    After.futureFails,
+    (Fixture f) => f.firestore.namedQueryGet('missing'),
+  ),
+  Entry(
+    'FirebaseFirestore.documentSnapshotsFromJson',
+    <String>{'FirebaseFirestore.documentSnapshotsFromJson'},
     After.streamFails,
     (Fixture f) =>
         f.firestore.documentSnapshotsFromJson<Map<String, Object?>>(f.docJson),
   ),
   Entry(
-    'Firestore.querySnapshotsFromJson',
-    <String>{'Firestore.querySnapshotsFromJson'},
+    'FirebaseFirestore.querySnapshotsFromJson',
+    <String>{'FirebaseFirestore.querySnapshotsFromJson'},
     After.streamFails,
     (Fixture f) =>
         f.firestore.querySnapshotsFromJson<Map<String, Object?>>(f.queryJson),
@@ -315,26 +320,26 @@ final List<Entry> entries = <Entry>[
 
   // Instance.
   Entry(
-    'Firestore.waitForPendingWrites',
-    <String>{'Firestore.waitForPendingWrites'},
+    'FirebaseFirestore.waitForPendingWrites',
+    <String>{'FirebaseFirestore.waitForPendingWrites'},
     After.futureFails,
     (Fixture f) => f.firestore.waitForPendingWrites(),
   ),
   Entry(
-    'Firestore.snapshotsInSync',
-    <String>{'Firestore.snapshotsInSync'},
+    'FirebaseFirestore.snapshotsInSync',
+    <String>{'FirebaseFirestore.snapshotsInSync'},
     After.streamFails,
-    (Fixture f) => f.firestore.snapshotsInSync,
+    (Fixture f) => f.firestore.snapshotsInSync(),
   ),
   Entry(
-    'Firestore.disableNetwork',
-    <String>{'Firestore.disableNetwork'},
+    'FirebaseFirestore.disableNetwork',
+    <String>{'FirebaseFirestore.disableNetwork'},
     After.futureFails,
     (Fixture f) => f.firestore.disableNetwork(),
   ),
   Entry(
-    'Firestore.enableNetwork',
-    <String>{'Firestore.enableNetwork'},
+    'FirebaseFirestore.enableNetwork',
+    <String>{'FirebaseFirestore.enableNetwork'},
     After.futureFails,
     (Fixture f) => f.firestore.enableNetwork(),
   ),
@@ -342,8 +347,8 @@ final List<Entry> entries = <Entry>[
   // Persistent cache indexes. The getter of the manager keeps working after
   // terminate (see the test below); its methods fail.
   Entry(
-    'Firestore.setIndexConfiguration',
-    <String>{'Firestore.setIndexConfiguration'},
+    'FirebaseFirestore.setIndexConfigurationFromJSON',
+    <String>{'FirebaseFirestore.setIndexConfigurationFromJSON'},
     After.futureFails,
     // ignore: deprecated_member_use_from_same_package
     (Fixture f) =>
@@ -374,11 +379,9 @@ final List<Entry> entries = <Entry>[
 /// Public members that return a Future, Stream or LoadBundleTask and are not
 /// in [entries], with the reason.
 const Map<String, String> exempt = <String, String>{
-  'Firestore.terminate': 'tested below: completes, also when repeated',
-  'Firestore.shutdown': 'deprecated alias of terminate, tested below',
-  'Firestore.clearPersistence':
+  'FirebaseFirestore.terminate': 'tested below: completes, also when repeated',
+  'FirebaseFirestore.clearPersistence':
       'tested below: fails while running, completes after terminate',
-  'LoadBundleTask.addOnProgressListener': 'returns the task itself, no I/O',
   'Database.execute': 'implemented by the user of the package',
   'Database.query': 'implemented by the user of the package',
   'Database.delete': 'implemented by the user of the package',
@@ -616,7 +619,7 @@ void main() {
     test('a stream closes after the error', () async {
       final List<Object> errors = <Object>[];
       final Completer<void> done = Completer<void>();
-      fixture.doc.snapshots.listen(
+      fixture.doc.snapshots().listen(
         (_) {},
         onError: (Object e) => errors.add(e),
         onDone: done.complete,
@@ -629,9 +632,8 @@ void main() {
     test('a bundle task reports the error to its listeners', () async {
       final LoadBundleTask task = fixture.firestore.loadBundle(_emptyBundle());
       await expectLater(task.future, throwsTerminated);
-      expect(task.isComplete, isTrue);
-      expect(task.isSuccessful, isFalse);
-      expect(isTerminatedError(task.exception), isTrue);
+      expect(task.snapshot.taskState, LoadBundleTaskState.error);
+      expect(isTerminatedError(task.snapshot.exception), isTrue);
     });
 
     test('terminate and shutdown can be repeated', () async {

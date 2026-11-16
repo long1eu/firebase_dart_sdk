@@ -351,7 +351,9 @@ void main() {
           await ref.set(<String, Object?>{'v': 1});
           final Completer<void> synced = Completer<void>();
           final StreamSubscription<DocumentSnapshot<Map<String, Object?>>> sub =
-              ref.snapshots.listen((DocumentSnapshot<Map<String, Object?>> s) {
+              ref.snapshots().listen((
+                DocumentSnapshot<Map<String, Object?>> s,
+              ) {
                 if (!s.metadata.isFromCache && !synced.isCompleted) {
                   synced.complete();
                 }
@@ -362,7 +364,7 @@ void main() {
               .collection('users/${user.uid}/$run')
               .count()
               .get();
-          expect(count.getCount(), 1);
+          expect(count.count, 1);
 
           final List<RecordedRequest> seen = requests();
           expect(
@@ -417,7 +419,7 @@ void main() {
         await collection.doc('a').set(<String, Object?>{'v': 1});
         expect(
           await collection.count().get().then(
-            (AggregateQuerySnapshot s) => s.getCount(),
+            (AggregateQuerySnapshot s) => s.count,
           ),
           1,
         );
@@ -428,7 +430,7 @@ void main() {
         appCheck.change('app-check-2');
         expect(
           await collection.count().get().then(
-            (AggregateQuerySnapshot s) => s.getCount(),
+            (AggregateQuerySnapshot s) => s.count,
           ),
           1,
         );
@@ -496,8 +498,8 @@ void main() {
         // A listener works with the refreshed token too.
         final DocumentSnapshot<Map<String, Object?>> snapshot = await db
             .doc(path)
-            .get(Source.server);
-        expect(snapshot.data, <String, Object?>{'v': 1});
+            .get(GetOptions(source: Source.server));
+        expect(snapshot.data(), <String, Object?>{'v': 1});
         expect(requests().last.rejected, isFalse);
       });
 
@@ -560,7 +562,7 @@ void main() {
           );
           // The rules saw the refreshed token of the same user.
           expect(
-            (await db.doc(path).get(Source.server)).data,
+            (await db.doc(path).get(GetOptions(source: Source.server))).data(),
             <String, Object?>{'v': 1},
           );
         },
@@ -586,7 +588,7 @@ void main() {
           final String path = 'users/${user.uid}/${unique('run')}/doc';
           await db.doc(path).set(<String, Object?>{'v': 1});
           expect(
-            (await db.doc(path).get(Source.server)).data,
+            (await db.doc(path).get(GetOptions(source: Source.server))).data(),
             <String, Object?>{'v': 1},
           );
           expect(requests(), isNotEmpty);
@@ -602,7 +604,7 @@ void main() {
                 .collection('users/${user.uid}/${unique('run')}')
                 .count()
                 .get()
-                .then((AggregateQuerySnapshot s) => s.getCount()),
+                .then((AggregateQuerySnapshot s) => s.count),
             isNotNull,
           );
           expect(requests().last.method, 'RunAggregationQuery');
@@ -641,7 +643,7 @@ void main() {
               .set(<String, Object?>{'v': 1})
               .timeout(const Duration(seconds: 20));
           expect(
-            (await db.doc(path).get(Source.server)).data,
+            (await db.doc(path).get(GetOptions(source: Source.server))).data(),
             <String, Object?>{'v': 1},
           );
           expect(requests(), isNotEmpty);
@@ -680,7 +682,9 @@ void main() {
           transport,
         );
         await expectLater(
-          db.doc('signed_in/${unique('x')}').get(Source.server),
+          db
+              .doc('signed_in/${unique('x')}')
+              .get(GetOptions(source: Source.server)),
           throwsA(isPermissionDenied),
         );
         expect(requests(), isNotEmpty);
@@ -721,10 +725,10 @@ void main() {
             'users/${user.uid}/${unique('run')}/doc',
           );
           await ref.set(<String, Object?>{'v': 1});
-          expect((await ref.get()).data, <String, Object?>{'v': 1});
+          expect((await ref.get()).data(), <String, Object?>{'v': 1});
 
           appCheck.change('app-check-2');
-          expect((await ref.get()).data, <String, Object?>{'v': 1});
+          expect((await ref.get()).data(), <String, Object?>{'v': 1});
 
           final List<RecordedRequest> seen = requests();
           expect(seen, hasLength(3), reason: describe(seen));
@@ -821,7 +825,7 @@ void main() {
           'Bearer $first',
           'Bearer $second',
         ]);
-        expect((await ref.get()).data, <String, Object?>{'v': 1});
+        expect((await ref.get()).data(), <String, Object?>{'v': 1});
       });
 
       test(
@@ -846,7 +850,7 @@ void main() {
               'users/${user.uid}/${unique('run')}/doc',
             );
             await ref.set(<String, Object?>{'v': 1});
-            expect((await ref.get()).data, <String, Object?>{'v': 1});
+            expect((await ref.get()).data(), <String, Object?>{'v': 1});
             expect(requests(), hasLength(2));
             expect(
               requests().map(
@@ -904,9 +908,10 @@ void main() {
         customToken(unique('tester-'), <String, Object?>{'role': 'tester'}),
       );
       await db.doc(path).set(<String, Object?>{'v': 1});
-      expect((await db.doc(path).get(Source.server)).data, <String, Object?>{
-        'v': 1,
-      });
+      expect(
+        (await db.doc(path).get(GetOptions(source: Source.server))).data(),
+        <String, Object?>{'v': 1},
+      );
     });
 
     test(
@@ -928,9 +933,10 @@ void main() {
           password: 'password',
         );
         await db.doc(path).set(<String, Object?>{'v': 1});
-        expect((await db.doc(path).get(Source.server)).data, <String, Object?>{
-          'v': 1,
-        });
+        expect(
+          (await db.doc(path).get(GetOptions(source: Source.server))).data(),
+          <String, Object?>{'v': 1},
+        );
       },
     );
   }, skip: skipReason);

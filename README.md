@@ -31,17 +31,17 @@ with or endorsed by Google or Firebase.
 ```dart
 import 'package:cloud_firestore_dart/cloud_firestore_dart.dart';
 
-final firestore = Firestore.instanceFor(app: app);
+final firestore = FirebaseFirestore.instanceFor(app: app);
 await firestore.collection('users').doc('ada').set({'name': 'Ada', 'age': 36});
 
 firestore
     .collection('users')
     .where(Filter.or([
-      Filter.equalTo('role', 'admin'),
-      Filter.greaterThan('age', 40),
+      Filter('role', isEqualTo: 'admin'),
+      Filter('age', isGreaterThan: 40),
     ]))
     .limit(10)
-    .snapshots
+    .snapshots()
     .listen((snapshot) => print(snapshot.docs.length));
 ```
 
@@ -75,13 +75,13 @@ dart pub add cloud_firestore_dart firebase_app_dart
   with `!=`, `not-in`, OR / AND filters, `limitToLast`, cursors and aggregations (count, sum,
   average).
 - Real-time listeners, offline persistence in SQLite (index-free queries, document overlays),
-  write queue with pending-write snapshots, `waitForPendingWrites`, `snapshotsInSync`,
+  write queue with pending-write snapshots, `waitForPendingWrites`, `snapshotsInSync()`,
   `terminate`, `clearPersistence`.
 - Transactions (read-write and read-only) with retry and backoff, write batches, field transforms
   (server timestamp, increment, min/max, array union/remove).
 - Data bundles and named queries, snapshots as JSON (in the format of the JS SDK), vector values
   with `findNearest`, App Check token plumbing, emulator support with a mock user token.
-- Persistent cache indexes (`persistentCacheIndexManager`, `setIndexConfiguration`), and a
+- Persistent cache indexes (`persistentCacheIndexManager`, `setIndexConfigurationFromJSON`), and a
   built-in detector of connectivity changes on the VM.
 - For Enterprise edition databases: the BSON value types, and Pipelines as a preview library
   (executed by the server).

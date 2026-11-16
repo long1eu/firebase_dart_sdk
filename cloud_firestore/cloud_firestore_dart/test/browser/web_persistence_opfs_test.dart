@@ -170,8 +170,13 @@ void main() {
           .doc('a');
       await doc.set(<String, Object?>{'a': 1, 'text': 'héllo \u{1F600}'});
 
-      final DocumentSnapshot<Json> cached = await doc.get(Source.cache);
-      expect(cached.data, <String, Object?>{'a': 1, 'text': 'héllo \u{1F600}'});
+      final DocumentSnapshot<Json> cached = await doc.get(
+        GetOptions(source: Source.cache),
+      );
+      expect(cached.data(), <String, Object?>{
+        'a': 1,
+        'text': 'héllo \u{1F600}',
+      });
       expect(cached.metadata.hasPendingWrites, isFalse);
       expect(await opfsDirectories(app), hasLength(1));
       expect(await indexedDbDatabases(app), isEmpty);
@@ -192,7 +197,9 @@ void main() {
           'n': i,
         });
       }
-      await firestore.collection(collection).get(Source.server);
+      await firestore
+          .collection(collection)
+          .get(GetOptions(source: Source.server));
       await firestore.disableNetwork();
       unawaited(
         firestore.collection(collection).doc('pending').set(<String, Object?>{
@@ -203,7 +210,7 @@ void main() {
         (await firestore
                 .collection(collection)
                 .doc('pending')
-                .get(Source.cache))
+                .get(GetOptions(source: Source.cache)))
             .metadata
             .hasPendingWrites,
         isTrue,
@@ -216,9 +223,9 @@ void main() {
       final QuerySnapshot<Json> cached = await firestore
           .collection(collection)
           .orderBy('n')
-          .get(Source.cache);
+          .get(GetOptions(source: Source.cache));
       expect(
-        cached.docs.map((QueryDocumentSnapshot<Json> d) => d.data).toList(),
+        cached.docs.map((QueryDocumentSnapshot<Json> d) => d.data()).toList(),
         <Json>[
           <String, Object?>{'n': 0},
           <String, Object?>{'n': 1},
@@ -234,8 +241,11 @@ void main() {
       );
       final FirebaseFirestore other = await newClient();
       expect(
-        (await other.collection(collection).doc('pending').get(Source.server))
-            .data,
+        (await other
+                .collection(collection)
+                .doc('pending')
+                .get(GetOptions(source: Source.server)))
+            .data(),
         <String, Object?>{'n': 9},
       );
     },
@@ -413,7 +423,10 @@ void main() {
     firestore = await newClient(openDatabase: opener(), appName: app);
     await firestore.disableNetwork();
     expect(
-      (await firestore.collection(collection).get(Source.cache)).docs,
+      (await firestore
+              .collection(collection)
+              .get(GetOptions(source: Source.cache)))
+          .docs,
       isEmpty,
     );
   });
@@ -440,7 +453,7 @@ void main() {
         (await firestore
                 .collection(collection)
                 .doc('pending')
-                .get(Source.cache))
+                .get(GetOptions(source: Source.cache)))
             .metadata
             .hasPendingWrites,
         isTrue,
@@ -460,12 +473,15 @@ void main() {
       final DocumentSnapshot<Json> pending = await firestore
           .collection(collection)
           .doc('pending')
-          .get(Source.cache);
-      expect(pending.data, <String, Object?>{'v': 2});
+          .get(GetOptions(source: Source.cache));
+      expect(pending.data(), <String, Object?>{'v': 2});
       expect(pending.metadata.hasPendingWrites, isTrue);
       expect(
-        (await firestore.collection(collection).doc('synced').get(Source.cache))
-            .data,
+        (await firestore
+                .collection(collection)
+                .doc('synced')
+                .get(GetOptions(source: Source.cache)))
+            .data(),
         <String, Object?>{'v': 1},
       );
 
@@ -475,8 +491,11 @@ void main() {
       );
       final FirebaseFirestore other = await newClient();
       expect(
-        (await other.collection(collection).doc('pending').get(Source.server))
-            .data,
+        (await other
+                .collection(collection)
+                .doc('pending')
+                .get(GetOptions(source: Source.server)))
+            .data(),
         <String, Object?>{'v': 2},
       );
     },

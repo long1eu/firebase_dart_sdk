@@ -12,7 +12,7 @@ import 'package:firebase_app_dart/firebase_app_dart.dart';
 final FirebaseApp defaultApp = FirebaseApp.withOptions(
   const FirebaseOptions(
     apiKey: '<YOUR_API_KEY>',
-    applicationId: '1:1234567890:web:0123456789abcdef',
+    appId: '1:1234567890:web:0123456789abcdef',
     projectId: 'my-project',
   ),
 );
@@ -21,13 +21,13 @@ final FirebaseApp defaultApp = FirebaseApp.withOptions(
 final FirebaseApp secondary = FirebaseApp.withOptions(
   const FirebaseOptions(
     apiKey: '<YOUR_API_KEY>',
-    applicationId: '1:1234567890:dart:secondary',
+    appId: '1:1234567890:dart:secondary',
     projectId: 'other-project',
   ),
   name: 'secondary',
 );
 print(identical(FirebaseApp.instance, defaultApp)); // true
-print(identical(FirebaseApp.getInstance('secondary'), secondary)); // true
+print(identical(Firebase.app('secondary'), secondary)); // true
 ```
 
 - An app without a name is the default app, `FirebaseApp.instance`. Creating two apps with the
@@ -79,7 +79,7 @@ final AppDependencies dependencies = AppDependencies();
 final FirebaseApp connectedApp = FirebaseApp.withOptions(
   const FirebaseOptions(
     apiKey: '<YOUR_API_KEY>',
-    applicationId: '1:1234567890:dart:example',
+    appId: '1:1234567890:dart:example',
     projectId: 'my-project',
   ),
   name: 'connected',

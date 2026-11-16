@@ -29,13 +29,13 @@ import 'environment_stub.dart' if (dart.library.io) 'environment_io.dart';
 ///   final FirebaseApp app = FirebaseApp.withOptions(
 ///     const FirebaseOptions(
 ///       apiKey: '<the Web API key of the project>',
-///       applicationId: '1:1234567890:dart:example',
+///       appId: '1:1234567890:dart:example',
 ///       projectId: 'my-project',
 ///     ),
 ///   );
-///   // Before Firestore.instanceFor: it becomes the token provider of the app.
+///   // Before FirebaseFirestore.instanceFor: it becomes the token provider of the app.
 ///   final FirebaseUserAuth auth = await FirebaseUserAuth.forApp(app);
-///   final Firestore firestore = Firestore.instanceFor(app: app);
+///   final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(app: app);
 ///
 ///   final AuthUser user = await auth.signInAnonymously();
 ///   await firestore.doc('users/${user.uid}').set(<String, Object?>{'seen': true});
@@ -51,7 +51,7 @@ import 'environment_stub.dart' if (dart.library.io) 'environment_io.dart';
 ///
 /// **Token refresh.** The ID token lives for an hour. It is refreshed with the refresh token when it is within
 /// five minutes ([refreshBefore]) of its expiry: on demand when a token is requested ([getAccessToken]), and
-/// ahead of time while somebody listens to [onTokenChanged] (Firestore does). A failed refresh ahead of time is
+/// ahead of time while somebody listens to [onTokenChanged] (FirebaseFirestore does). A failed refresh ahead of time is
 /// retried after 30 seconds, then 1, 2, 4, 8 and 16 minutes. A refresh that the backend refuses because the
 /// session ended (the account was deleted or disabled, the refresh token revoked) signs the user out.
 ///
@@ -90,7 +90,7 @@ class FirebaseUserAuth implements AuthTokenProvider {
   ///   never an emulator. An emulator that is not on the loopback interface gets a warning in the log, like the
   ///   JS SDK warns for every emulator: passwords and tokens travel unencrypted to it. See
   ///   [emulatorHostFromEnvironment].
-  /// * [appId] (the `applicationId` of the app's options) is sent as `X-Firebase-gmpid`, and the token of [appCheck]
+  /// * [appId] (the `appId` of the app's options) is sent as `X-Firebase-gmpid`, and the token of [appCheck]
   ///   as `X-Firebase-AppCheck`, with every request, like the JS SDK does. [forApp] takes both from the app.
   /// * [httpClient] is used for all requests and is not closed by [dispose]; without it one is created and closed.
   /// * [clock] and [createTimer] are for tests.
@@ -114,7 +114,7 @@ class FirebaseUserAuth implements AuthTokenProvider {
        _ownsHttp = httpClient == null,
        _clock = clock ?? DateTime.now,
        _createTimer = createTimer ?? Timer.new {
-    // Synchronous: a listener (Firestore) hears about a new user before the sign-in call returns.
+    // Synchronous: a listener (FirebaseFirestore) hears about a new user before the sign-in call returns.
     _tokenChanges = StreamController<AuthTokenChange>.broadcast(
       sync: true,
       onListen: _scheduleProactiveRefresh,

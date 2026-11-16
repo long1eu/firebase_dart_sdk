@@ -51,16 +51,16 @@ Future<void> main() async {
   await batch.commit();
   // Read the collection once so that the documents are in the cache as the
   // backend has them.
-  await cities.get(Source.server);
+  await cities.get(GetOptions(source: Source.server));
 
   final Query<Map<String, Object?>> romanian = cities
-      .whereEqualTo('country', 'RO')
+      .where('country', isEqualTo: 'RO')
       .orderBy('population');
 
   // The first cache query scans the 150 cached documents; the SDK notices
   // that an index would help and creates one.
   QuerySnapshot<Map<String, Object?>> snapshot = await romanian.get(
-    Source.cache,
+    GetOptions(source: Source.cache),
   );
   print('first run: ${snapshot.docs.length} cities (collection scan)');
 
@@ -68,7 +68,7 @@ Future<void> main() async {
   // 15 seconds after the instance started, then one per minute. Queries use
   // the index as far as it is filled and read the rest of the collection, so
   // the result is the same at every moment.
-  snapshot = await romanian.get(Source.cache);
+  snapshot = await romanian.get(GetOptions(source: Source.cache));
   print(
     'second run: ${snapshot.docs.length} cities '
     '(index, plus the documents that are not indexed yet)',
@@ -79,7 +79,7 @@ Future<void> main() async {
 
   // Remove all cache indexes. Queries go back to scanning.
   await indexes.deleteAllIndexes();
-  snapshot = await romanian.get(Source.cache);
+  snapshot = await romanian.get(GetOptions(source: Source.cache));
   print('after deleteAllIndexes: ${snapshot.docs.length} cities');
 
   await firestore.terminate();

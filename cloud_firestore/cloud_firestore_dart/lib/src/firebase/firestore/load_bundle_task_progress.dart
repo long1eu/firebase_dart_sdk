@@ -20,7 +20,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/load_bundle_task.dar
 /// Both [success] and [error] are final states: the task will abort or complete and there will be no more updates after
 /// they are reported.
 ///
-/// PORTING NOTE: nested in `LoadBundleTaskProgress` as `TaskState` in the Android SDK.
+/// PORTING NOTE: nested in `LoadBundleTaskSnapshot` as `TaskState` in the Android SDK.
 enum LoadBundleTaskState {
   /// Loading failed; see [LoadBundleTaskSnapshot.exception].
   error,
@@ -39,7 +39,7 @@ enum LoadBundleTaskState {
 /// [LoadBundleTaskState.error]).
 ///
 /// ```dart
-/// firestore.loadBundle(bundleBytes).stream.listen((LoadBundleTaskProgress p) {
+/// firestore.loadBundle(bundleBytes).stream.listen((LoadBundleTaskSnapshot p) {
 ///   if (p.taskState == LoadBundleTaskState.running && p.totalBytes > 0) {
 ///     print('${(100 * p.bytesLoaded / p.totalBytes).round()} %');
 ///   }
@@ -47,7 +47,7 @@ enum LoadBundleTaskState {
 /// ```
 class LoadBundleTaskSnapshot {
   /// Creates a progress value. Instances are normally produced by a [LoadBundleTask].
-  const LoadBundleTaskSnapshot(
+  const LoadBundleTaskSnapshot._(
     this.documentsLoaded,
     this.totalDocuments,
     this.bytesLoaded,
@@ -58,9 +58,9 @@ class LoadBundleTaskSnapshot {
 
   /// The progress a [LoadBundleTask] reports before the bundle metadata is known.
   ///
-  /// All counts are 0 and, as in the Android SDK, the state is [LoadBundleTaskState.success]: check
-  /// [LoadBundleTask.isComplete] rather than this state to know whether the task has finished.
-  static const LoadBundleTaskSnapshot initial = LoadBundleTaskSnapshot(
+  /// All counts are 0 and, as in the Android SDK, the state is [LoadBundleTaskState.success]: wait for
+  /// [LoadBundleTask.future] rather than check this state to know whether the task has finished.
+  static const LoadBundleTaskSnapshot _initial = LoadBundleTaskSnapshot._(
     0,
     0,
     0,
@@ -110,15 +110,35 @@ class LoadBundleTaskSnapshot {
 
   @override
   String toString() =>
-      'LoadBundleTaskProgress{documentsLoaded: $documentsLoaded, totalDocuments: $totalDocuments, '
+      'LoadBundleTaskSnapshot{documentsLoaded: $documentsLoaded, totalDocuments: $totalDocuments, '
       'bytesLoaded: $bytesLoaded, totalBytes: $totalBytes, taskState: $taskState, exception: $exception}';
 }
 
 /// Members of [LoadBundleTaskSnapshot] for the SDK itself. Not exported by the public libraries.
-extension LoadBundleTaskProgressInternal on LoadBundleTaskSnapshot {
+extension LoadBundleTaskSnapshotInternal on LoadBundleTaskSnapshot {
+  /// The progress before the first update: all counts zero.
+  static LoadBundleTaskSnapshot get initial => LoadBundleTaskSnapshot._initial;
+
+  /// A progress update with these values.
+  static LoadBundleTaskSnapshot create(
+    int documentsLoaded,
+    int totalDocuments,
+    int bytesLoaded,
+    int totalBytes,
+    Object? exception,
+    LoadBundleTaskState taskState,
+  ) => LoadBundleTaskSnapshot._(
+    documentsLoaded,
+    totalDocuments,
+    bytesLoaded,
+    totalBytes,
+    exception,
+    taskState,
+  );
+
   /// Creates an 'initial' status update from a bundle's metadata. The initial status sets all loading indicators to 0.
   static LoadBundleTaskSnapshot forInitial(BundleMetadata bundleMetadata) {
-    return LoadBundleTaskSnapshot(
+    return LoadBundleTaskSnapshot._(
       0,
       bundleMetadata.totalDocuments,
       0,
@@ -131,7 +151,7 @@ extension LoadBundleTaskProgressInternal on LoadBundleTaskSnapshot {
   /// Creates a 'success' status update from a bundle's metadata. The success status sets all loading indicators to
   /// their maximum values.
   static LoadBundleTaskSnapshot forSuccess(BundleMetadata bundleMetadata) {
-    return LoadBundleTaskSnapshot(
+    return LoadBundleTaskSnapshot._(
       bundleMetadata.totalDocuments,
       bundleMetadata.totalDocuments,
       bundleMetadata.totalBytes,

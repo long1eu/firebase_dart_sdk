@@ -119,11 +119,12 @@ void main() {
     // Both keep working on the cache, as before stage 1.
     first.doc('col/a').set(<String, Object?>{'by': 'first'}).ignore();
     second.doc('col/b').set(<String, Object?>{'by': 'second'}).ignore();
-    expect((await first.doc('col/a').get(Source.cache)).data, <String, Object?>{
-      'by': 'first',
-    });
     expect(
-      (await second.doc('col/b').get(Source.cache)).data,
+      (await first.doc('col/a').get(GetOptions(source: Source.cache))).data(),
+      <String, Object?>{'by': 'first'},
+    );
+    expect(
+      (await second.doc('col/b').get(GetOptions(source: Source.cache))).data(),
       <String, Object?>{'by': 'second'},
     );
 
@@ -155,7 +156,7 @@ void main() {
     );
     final QuerySnapshot<Map<String, Object?>> listened = await first
         .collection('col')
-        .snapshots
+        .snapshots()
         .first;
     expect(listened.docs, hasLength(1));
     // The listener is gone (first): unlistening on a secondary releases the target in memory only.
@@ -216,7 +217,7 @@ void main() {
     final FirebaseFirestore first = await open('first');
     final FirebaseFirestore other = await open('other');
     first.doc('col/a').set(<String, Object?>{'v': 1}).ignore();
-    await first.doc('col/a').get(Source.cache);
+    await first.doc('col/a').get(GetOptions(source: Source.cache));
 
     await first.terminate();
     await first.clearPersistence();
@@ -230,7 +231,7 @@ void main() {
     }
     expect(other.client.isTerminated, isTrue);
     await expectLater(
-      other.doc('col/a').get(Source.cache),
+      other.doc('col/a').get(GetOptions(source: Source.cache)),
       throwsA(firestoreErrorWithCode(FirestoreErrorCode.failedPrecondition)),
     );
 
@@ -238,7 +239,7 @@ void main() {
     final FirebaseFirestore again = await open('again');
     expect(again.client.isPrimaryClient, isTrue);
     await expectLater(
-      again.doc('col/a').get(Source.cache),
+      again.doc('col/a').get(GetOptions(source: Source.cache)),
       throwsA(firestoreErrorWithCode(FirestoreErrorCode.unavailable)),
     );
   });

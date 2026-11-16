@@ -43,7 +43,9 @@ Future<void> main() async {
     '${scratch('profiles')}/alice',
   );
   await profile.set(<String, Object?>{'displayName': 'Alice'});
-  print('alice wrote: ${(await profile.get(Source.server)).data}');
+  print(
+    'alice wrote: ${(await profile.get(GetOptions(source: Source.server))).data()}',
+  );
 
   // Without a token the requests are unauthenticated. Whether they are
   // allowed depends on the rules loaded into the emulator; a rule such as

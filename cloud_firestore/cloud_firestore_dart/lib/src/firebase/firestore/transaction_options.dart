@@ -1,7 +1,7 @@
 import 'package:cloud_firestore_dart/src/firebase/timestamp.dart';
 
 /// Options of a transaction: how often it is attempted, and whether it only
-/// reads. Pass them to `Firestore.runTransaction`.
+/// reads. Pass them to `FirebaseFirestore.runTransaction`.
 ///
 /// ```dart
 /// // Give up after the first conflict.
@@ -9,7 +9,7 @@ import 'package:cloud_firestore_dart/src/firebase/timestamp.dart';
 ///   (Transaction transaction) async {
 ///     final DocumentSnapshot<Map<String, Object?>> snapshot =
 ///         await transaction.get(firestore.doc('cities/SF'));
-///     transaction.update(snapshot.ref, <String, Object?>{'checked': true});
+///     transaction.update(snapshot.reference, <String, Object?>{'checked': true});
 ///   },
 ///   options: TransactionOptions(maxAttempts: 1),
 /// );
@@ -21,7 +21,7 @@ import 'package:cloud_firestore_dart/src/firebase/timestamp.dart';
 ///         await transaction.get(firestore.doc('accounts/a'));
 ///     final DocumentSnapshot<Map<String, Object?>> b =
 ///         await transaction.get(firestore.doc('accounts/b'));
-///     return (a.data!['balance']! as int) + (b.data!['balance']! as int);
+///     return (a.data()!['balance']! as int) + (b.data()!['balance']! as int);
 ///   },
 ///   options: TransactionOptions(readOnly: true),
 /// );

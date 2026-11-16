@@ -97,9 +97,10 @@ void main() {
     expect(queue().escapedErrors, 0);
     // ignore: unawaited_futures, the write stays pending: nothing listens on the port.
     doc.set(<String, Object?>{'works': true});
-    expect((await doc.get(Source.cache)).data, <String, Object?>{
-      'works': true,
-    });
+    expect(
+      (await doc.get(GetOptions(source: Source.cache))).data(),
+      <String, Object?>{'works': true},
+    );
     expect(queue().escapedErrors, 0);
   }
 
@@ -141,7 +142,9 @@ void main() {
     doc = firestore.doc('col/doc');
     if (openError == null) {
       // Opens the cache.
-      await doc.get(Source.cache).then((_) {}, onError: (Object _) {});
+      await doc
+          .get(GetOptions(source: Source.cache))
+          .then((_) {}, onError: (Object _) {});
     }
   }
 
@@ -150,7 +153,7 @@ void main() {
       await open();
       database.fail(r'\bremote_documents\b', _busy);
       await expectLater(
-        doc.get(Source.cache),
+        doc.get(GetOptions(source: Source.cache)),
         throwsA(
           // The path of the document, as the JS SDK prints it.
           _unavailable('Failed to get document ').having(
@@ -168,7 +171,10 @@ void main() {
       await open();
       final StateError error = StateError('broken');
       database.fail(r'\bremote_documents\b', () => error);
-      await expectLater(doc.get(Source.cache), throwsA(same(error)));
+      await expectLater(
+        doc.get(GetOptions(source: Source.cache)),
+        throwsA(same(error)),
+      );
       await expectClientWorks();
     });
   });
@@ -178,7 +184,7 @@ void main() {
       await open();
       database.fail(r'\bremote_documents\b', _busy);
       await expectLater(
-        firestore.collection('col').get(Source.cache),
+        firestore.collection('col').get(GetOptions(source: Source.cache)),
         throwsA(_unavailable('Failed to execute query ')),
       );
       await expectClientWorks();
@@ -189,7 +195,7 @@ void main() {
       final StateError error = StateError('broken');
       database.fail(r'\bremote_documents\b', () => error);
       await expectLater(
-        firestore.collection('col').get(Source.cache),
+        firestore.collection('col').get(GetOptions(source: Source.cache)),
         throwsA(same(error)),
       );
       await expectClientWorks();
@@ -231,7 +237,7 @@ void main() {
       await open();
       database.fail(r'\btargets\b', _busy);
       await expectLater(
-        doc.snapshots.first,
+        doc.snapshots().first,
         throwsA(
           _unavailable('Initialization of query ').having(
             (FirestoreException e) => e.message,
@@ -249,7 +255,7 @@ void main() {
       await open();
       final StateError error = StateError('broken');
       database.fail(r'\btargets\b', () => error);
-      await expectLater(doc.snapshots.first, throwsA(same(error)));
+      await expectLater(doc.snapshots().first, throwsA(same(error)));
       await expectClientWorks();
     });
   });
@@ -293,11 +299,11 @@ void main() {
         throwsA(same(error)),
       );
       await expectLater(
-        firestore.collection('col').get(Source.cache),
+        firestore.collection('col').get(GetOptions(source: Source.cache)),
         throwsA(same(error)),
       );
       await expectLater(firestore.waitForPendingWrites(), throwsA(same(error)));
-      await expectLater(doc.snapshots.first, throwsA(same(error)));
+      await expectLater(doc.snapshots().first, throwsA(same(error)));
       expect(queue().escapedErrors, 0);
     },
   );

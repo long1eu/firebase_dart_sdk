@@ -189,7 +189,7 @@ Future<void> checkQueryAndPipelineResultsMatch(
   List<String>? expectedDocs,
 ]) async {
   final QuerySnapshot<Map<String, Object?>> fromQuery = await query.get(
-    Source.server,
+    GetOptions(source: Source.server),
   );
   final PipelineSnapshot fromPipeline = await query.firestore
       .pipeline()

@@ -46,6 +46,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/util/log_level_util.
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/timer_task.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/util.dart'
     show checkNonEmptyPath;
+import 'package:cloud_firestore_dart/src/firebase/timestamp.dart';
 import 'package:firebase_app_dart/firebase_app_dart.dart';
 import 'package:firebase_app_dart/internal.dart';
 import 'package:meta/meta.dart';
@@ -67,7 +68,7 @@ liteTransportOverride;
 /// **Experimental**: this API may change in any release.
 ///
 /// ```dart
-/// final Firestore firestore = Firestore.instanceFor(app: app);
+/// final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(app: app);
 /// final DocumentSnapshot<Map<String, Object?>> city =
 ///     await firestore.doc('cities/SF').get();
 /// ```
@@ -95,7 +96,7 @@ class FirebaseFirestore {
     if (existing != null && identical(existing.app, app)) {
       if (settings != null && settings != existing.settings) {
         throw StateError(
-          'Firestore.instanceFor() has already been called with different '
+          'FirebaseFirestore.instanceFor() has already been called with different '
           'settings for this app and database. Call it without settings to '
           'get the existing instance, or terminate() that instance first.',
         );
@@ -219,12 +220,11 @@ class FirebaseFirestore {
 
   /// Executes [updateFunction] and then attempts to commit the changes applied
   /// within the transaction. If any document read within the transaction has
-  /// changed, [updateFunction] is run again, up to
-  /// [TransactionOptions.maxAttempts] times.
+  /// changed, [updateFunction] is run again, up to [maxAttempts] times.
   ///
   /// The transaction must read (with [Transaction.get]) before it writes.
   ///
-  /// With `TransactionOptions(readOnly: true)` it is a read-only transaction
+  /// With [readOnly] it is a read-only transaction
   /// of the backend: all its reads, also of queries ([Transaction.getQuery])
   /// and aggregations ([Transaction.getAggregate]), see the database at one
   /// point in time.
@@ -232,10 +232,20 @@ class FirebaseFirestore {
   /// If this instance is [terminate]d while the transaction runs, its next
   /// read or its commit fails with [FirestoreErrorCode.failedPrecondition]
   /// and it is not retried.
+  /// [readTime] (only with [readOnly]) reads the database as it was at that time.
+  /// Throws an [ArgumentError] if [maxAttempts] is less than 1 or [readTime] is
+  /// given without [readOnly].
   Future<T> runTransaction<T>(
     Future<T> Function(Transaction transaction) updateFunction, {
-    TransactionOptions options = TransactionOptions.defaultOptions,
+    int maxAttempts = 5,
+    bool readOnly = false,
+    Timestamp? readTime,
   }) async {
+    final TransactionOptions options = TransactionOptions(
+      maxAttempts: maxAttempts,
+      readOnly: readOnly,
+      readTime: readTime,
+    );
     _checkNotTerminated();
     // Every request of the transaction is a call of its own (as in the JS
     // SDK): a transaction does not hold off terminate().

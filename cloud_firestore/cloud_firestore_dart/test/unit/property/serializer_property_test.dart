@@ -264,14 +264,14 @@ void main() {
   // again.
   test('Filter.or / Filter.and of a single filter round-trip', () {
     for (final api.Filter filter in <api.Filter>[
-      api.Filter.or(<api.Filter>[api.Filter.equalTo('a', 1)]),
-      api.Filter.and(<api.Filter>[api.Filter.equalTo('a', 1)]),
+      api.Filter.or(<api.Filter>[api.Filter('a', isEqualTo: 1)]),
+      api.Filter.and(<api.Filter>[api.Filter('a', isEqualTo: 1)]),
       api.Filter.or(<api.Filter>[
-        api.Filter.and(<api.Filter>[api.Filter.greaterThan('a', 1)]),
+        api.Filter.and(<api.Filter>[api.Filter('a', isGreaterThan: 1)]),
       ]),
       api.Filter.and(<api.Filter>[
-        api.Filter.or(<api.Filter>[api.Filter.equalTo('a', 1)]),
-        api.Filter.equalTo('b', 2),
+        api.Filter.or(<api.Filter>[api.Filter('a', isEqualTo: 1)]),
+        api.Filter('b', isEqualTo: 2),
       ]),
     ]) {
       final Target target = QueryInternal.create<Map<String, Object?>>(

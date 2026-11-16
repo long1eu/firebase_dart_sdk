@@ -40,7 +40,7 @@ import 'package:firebase_app_dart/firebase_app_dart.dart';
 /// ```dart
 /// try {
 ///   await auth.signInWithEmailAndPassword(email: email, password: password);
-/// } on FirebaseAuthProviderException catch (e) {
+/// } on FirebaseAuthException catch (e) {
 ///   switch (e.code) {
 ///     case 'wrong-password' || 'invalid-credential' || 'user-not-found':
 ///       print('The email address or the password is wrong.');
@@ -68,7 +68,7 @@ class FirebaseAuthException extends FirebaseException {
   /// standard text) becomes [message].
   ///
   /// ```dart
-  /// final FirebaseAuthProviderException e = FirebaseAuthProviderException.fromServer(
+  /// final FirebaseAuthException e = FirebaseAuthException.fromServer(
   ///   'EMAIL_EXISTS',
   ///   httpStatus: 400,
   /// );

@@ -8,6 +8,8 @@ import 'dart:typed_data';
 import 'package:cloud_firestore_dart/cloud_firestore_dart.dart';
 import 'package:cloud_firestore_dart/lite.dart' as lite;
 import 'package:cloud_firestore_dart/pipelines.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/load_bundle_task_progress.dart'
+    show LoadBundleTaskSnapshotInternal;
 import 'package:firebase_app_dart/firebase_app_dart.dart';
 import 'package:test/test.dart';
 import 'package:uuid/uuid.dart';
@@ -115,13 +117,13 @@ void main() {
       expectString(FirestoreErrorCode.resourceExhausted, 'resourceExhausted');
     });
 
-    test('FirestoreError', () {
+    test('FirestoreException', () {
       expectString(
         FirestoreException(
           message: 'Missing',
           errorCode: FirestoreErrorCode.permissionDenied,
         ),
-        'FirestoreError: [code=permissionDenied]: Missing',
+        '[cloud_firestore/permission-denied] Missing',
       );
     });
 
@@ -134,28 +136,30 @@ void main() {
   });
 
   group('settings and options', () {
-    test('FirestoreSettings', () {
+    test('Settings', () {
       expectString(
         Settings(),
-        'FirestoreSettings{host=firestore.googleapis.com, port=443, '
+        'Settings{host=firestore.googleapis.com, port=443, '
         'sslEnabled=true, persistenceEnabled=true, cacheSizeBytes=104857600, '
         'grpcFlowControlWindow=262144, cacheSettings=null, '
-        'experimentalForceLongPolling=false, '
-        'experimentalAutoDetectLongPolling=true, '
-        'experimentalLongPollingOptions='
-        'ExperimentalLongPollingOptions{timeoutSeconds=null}, '
+        'webExperimentalForceLongPolling=false, '
+        'webExperimentalAutoDetectLongPolling=true, '
+        'webExperimentalLongPollingOptions='
+        'WebExperimentalLongPollingOptions{timeoutDuration=null}, '
         'mockUserToken=null}',
       );
     });
 
-    test('ExperimentalLongPollingOptions', () {
+    test('WebExperimentalLongPollingOptions', () {
       expectString(
-        const WebExperimentalLongPollingOptions(timeoutSeconds: 25),
-        'ExperimentalLongPollingOptions{timeoutSeconds=25}',
+        const WebExperimentalLongPollingOptions(
+          timeoutDuration: Duration(seconds: 25),
+        ),
+        'WebExperimentalLongPollingOptions{timeoutDuration=0:00:25.000000}',
       );
     });
 
-    test('FirestoreSettings does not print the mock user token', () {
+    test('Settings does not print the mock user token', () {
       final String text = Settings()
           .withEmulator(
             '127.0.0.1',
@@ -192,30 +196,10 @@ void main() {
       );
     });
 
-    test('SnapshotListenOptions', () {
+    test('LoadBundleTaskSnapshot', () {
       expectString(
-        const SnapshotListenOptions(),
-        'SnapshotListenOptions{metadataChanges=MetadataChanges.exclude, '
-        'source=ListenSource.defaultSource}',
-      );
-    });
-
-    test('TransactionOptions', () {
-      expectString(
-        TransactionOptions(),
-        'TransactionOptions{maxAttempts=5, readOnly=false}',
-      );
-      expectString(
-        TransactionOptions(readOnly: true, readTime: const Timestamp(5, 0)),
-        'TransactionOptions{maxAttempts=5, readOnly=true, '
-        'readTime=Timestamp(seconds=5, nanoseconds=0)}',
-      );
-    });
-
-    test('LoadBundleTaskProgress', () {
-      expectString(
-        LoadBundleTaskSnapshot.initial,
-        'LoadBundleTaskProgress{documentsLoaded: 0, totalDocuments: 0, '
+        LoadBundleTaskSnapshotInternal.initial,
+        'LoadBundleTaskSnapshot{documentsLoaded: 0, totalDocuments: 0, '
         'bytesLoaded: 0, totalBytes: 0, '
         'taskState: LoadBundleTaskState.success, exception: null}',
       );
@@ -265,11 +249,14 @@ void main() {
           'value=ObjectValue{internalValue='
           '{at:time(1,2000),n:5,owner:users/a}}}}';
 
-      expectString(await rooms.doc('eros').get(Source.cache), document);
+      expectString(
+        await rooms.doc('eros').get(GetOptions(source: Source.cache)),
+        document,
+      );
 
       final QuerySnapshot<Map<String, Object?>> snapshot = await rooms
           .where('n', isGreaterThan: 1)
-          .get(Source.cache);
+          .get(GetOptions(source: Source.cache));
       // The number of documents, not the documents.
       expectString(
         snapshot,
@@ -347,7 +334,7 @@ void main() {
       );
       expectString(
         lite.Settings(),
-        'FirestoreSettings{host: firestore.googleapis.com, port: 443, '
+        'Settings{host: firestore.googleapis.com, port: 443, '
         'sslEnabled: true, grpcFlowControlWindow: 262144}',
       );
     });

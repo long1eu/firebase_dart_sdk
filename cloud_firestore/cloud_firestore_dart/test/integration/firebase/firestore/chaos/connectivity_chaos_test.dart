@@ -86,10 +86,10 @@ void main() {
     final Completer<void> first = Completer<void>();
     final Completer<void> recovered = Completer<void>();
     final StreamSubscription<DocumentSnapshot<Map<String, Object?>>>
-    subscription = db.collection(name).doc('doc').snapshots.listen((
+    subscription = db.collection(name).doc('doc').snapshots().listen((
       DocumentSnapshot<Map<String, Object?>> snapshot,
     ) {
-      final int? n = snapshot.data?['n'] as int?;
+      final int? n = snapshot.data()?['n'] as int?;
       if (n == null) {
         return;
       }
