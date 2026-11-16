@@ -17,7 +17,7 @@ class ChannelOptionsProvider {
   const ChannelOptionsProvider({
     required DatabaseId databaseId,
     required CredentialsProvider credentialsProvider,
-    AppCheckTokenProvider? appCheckProvider,
+    FirebaseAppCheckTokenProvider? appCheckProvider,
     String? apiKey,
     String? appId,
   }) : _databaseId = databaseId,
@@ -34,7 +34,7 @@ class ChannelOptionsProvider {
 
   final DatabaseId _databaseId;
   final CredentialsProvider _credentialsProvider;
-  final AppCheckTokenProvider? _appCheckProvider;
+  final FirebaseAppCheckTokenProvider? _appCheckProvider;
   final String? _apiKey;
   final String? _appId;
 

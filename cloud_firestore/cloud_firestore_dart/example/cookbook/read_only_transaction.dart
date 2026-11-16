@@ -11,7 +11,7 @@ import 'package:cloud_firestore_dart/cloud_firestore_dart.dart';
 import '../common.dart';
 
 Future<void> main() async {
-  final Firestore firestore = connect();
+  final FirebaseFirestore firestore = connect();
   final CollectionReference<Map<String, Object?>> accounts = firestore
       .collection(scratch('accounts'));
   final CollectionReference<Map<String, Object?>> orders = firestore.collection(
@@ -37,18 +37,18 @@ Future<void> main() async {
         spent,
       ]),
     );
-    return 'credit ${account.getInt('credit')}, '
-        '${list.length} orders, spent ${sum.getInt(spent)}';
-  }, options: TransactionOptions(readOnly: true));
+    return 'credit ${(account.get('credit') as num?)?.toInt()}, '
+        '${list.length} orders, spent ${(sum.get(spent) as num?)?.toInt()}';
+  }, readOnly: true);
   print(report);
 
   // Writes in a read-only transaction throw.
   try {
     await firestore.runTransaction<void>((Transaction transaction) async {
       transaction.update(accounts.doc('ada'), <String, Object?>{'credit': 0});
-    }, options: TransactionOptions(readOnly: true));
-  } on FirestoreError catch (e) {
-    print('write refused: ${e.code}');
+    }, readOnly: true);
+  } on FirestoreException catch (e) {
+    print('write refused: ${e.errorCode}');
   }
 
   await firestore.terminate();

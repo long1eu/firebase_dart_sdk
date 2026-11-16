@@ -27,7 +27,7 @@ Future<void> main() async {
   );
   late FlakyDatabase database;
   final OpenDatabase sqlite = sqliteOpener(directory);
-  final Firestore firestore = Firestore.instanceFor(
+  final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(
     app: exampleApp(),
     openDatabase:
         (
@@ -64,33 +64,35 @@ Future<void> main() async {
   database.failNextWrites('mutations', 1);
   try {
     await doc.set(<String, Object?>{'step': 2});
-  } on FirestoreError catch (e) {
-    if (e.code != FirestoreErrorCode.unavailable) {
+  } on FirestoreException catch (e) {
+    if (e.errorCode != FirestoreErrorCode.unavailable) {
       rethrow;
     }
     print('write failed with unavailable, nothing was stored');
   }
   await doc.set(<String, Object?>{'step': 2});
-  print('write tried again: ${(await doc.get(Source.cache)).data}');
+  print(
+    'write tried again: ${(await doc.get(GetOptions(source: Source.cache))).data()}',
+  );
 
   // A change from the backend is stored in remote_documents before the
   // listener sees it. While that fails, the client goes offline and tries
   // again with a backoff; the listener gets the change once it is stored.
   final StreamIterator<DocumentSnapshot<Map<String, Object?>>> listener =
-      StreamIterator<DocumentSnapshot<Map<String, Object?>>>(doc.snapshots);
+      StreamIterator<DocumentSnapshot<Map<String, Object?>>>(doc.snapshots());
   await listener.moveNext();
-  print('listener: ${listener.current.data}');
+  print('listener: ${listener.current.data()}');
 
   database.failNextWrites('remote_documents', 3);
   // Another client changes the document on the backend.
-  final Firestore other = connect('other-client');
+  final FirebaseFirestore other = connect('other-client');
   await other.doc(doc.path).set(<String, Object?>{'step': 3});
   do {
     await listener.moveNext();
-  } while (listener.current.data!['step'] != 3);
+  } while (listener.current.data()!['step'] != 3);
   print(
     'listener after ${database.failures} failed attempts to store the '
-    'change: ${listener.current.data}',
+    'change: ${listener.current.data()}',
   );
 
   await listener.cancel();

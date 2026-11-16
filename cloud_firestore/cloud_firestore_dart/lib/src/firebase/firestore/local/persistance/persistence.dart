@@ -32,8 +32,8 @@ const String primaryLeaseLostErrorMessage =
 
 /// Whether [error] is the error of a primary-only transaction of a client that lost the primary lease.
 bool isPrimaryLeaseLoss(Object error) =>
-    error is FirestoreError &&
-    error.code == FirestoreErrorCode.failedPrecondition &&
+    error is FirestoreException &&
+    error.errorCode == FirestoreErrorCode.failedPrecondition &&
     error.message == primaryLeaseLostErrorMessage;
 
 /// Persistence is the lowest-level shared interface to persistent storage in
@@ -149,7 +149,7 @@ abstract class Persistence {
   /// target, garbage collection and index backfill.
   ///
   /// The client verifies that it holds the primary lease, or takes it if it may, before [operation] runs, and extends
-  /// the lease afterwards. Otherwise the transaction fails with a [FirestoreError] with
+  /// the lease afterwards. Otherwise the transaction fails with a [FirestoreException] with
   /// [FirestoreErrorCode.failedPrecondition] and [primaryLeaseLostErrorMessage] (see [isPrimaryLeaseLoss]) and the
   /// primary state listener is told that this client is not primary.
   ///

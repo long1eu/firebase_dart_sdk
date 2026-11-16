@@ -15,13 +15,13 @@ void main() {
   checkTestsLeaveNothingBehind();
 
   // Nothing listens on port 1: writes are applied locally and stay pending.
-  final FirestoreSettings offline = FirestoreSettings()
+  final Settings offline = Settings()
       .withEmulator('127.0.0.1', 1)
       .copyWith(cacheSettings: const MemoryCacheSettings());
 
   FirebaseApp newApp(String name) => FirebaseApp.withOptions(
         const FirebaseOptions(
-            apiKey: 'key', applicationId: 'appId', projectId: 'projectId'),
+            apiKey: 'key', appId: 'appId', projectId: 'projectId'),
         dependencies: null,
         name: name,
       );
@@ -29,8 +29,8 @@ void main() {
   test('a write that is pending at terminate never completes', () async {
     final FirebaseApp app = newApp('terminatePendingWrite');
     addTearDown(app.delete);
-    final Firestore firestore =
-        Firestore.instanceFor(app: app, settings: offline);
+    final FirebaseFirestore firestore =
+        FirebaseFirestore.instanceFor(app: app, settings: offline);
     final DocumentReference<Map<String, Object?>> doc = firestore.doc('a/b');
 
     String outcome = 'pending';
@@ -38,7 +38,7 @@ void main() {
         (_) => outcome = 'completed',
         onError: (Object error) => outcome = 'failed: $error'));
     // The write is in the local cache.
-    expect((await doc.get(Source.cache)).data, <String, Object?>{'a': 1});
+    expect((await doc.get(GetOptions(source: Source.cache))).data(), <String, Object?>{'a': 1});
 
     await firestore.terminate();
     await Future<void>.delayed(const Duration(milliseconds: 300));
@@ -48,8 +48,8 @@ void main() {
   test('operations started after terminate fail', () async {
     final FirebaseApp app = newApp('terminateThenUse');
     addTearDown(app.delete);
-    final Firestore firestore =
-        Firestore.instanceFor(app: app, settings: offline);
+    final FirebaseFirestore firestore =
+        FirebaseFirestore.instanceFor(app: app, settings: offline);
     await firestore.terminate();
 
     expect(() => firestore.doc('a/b').set(<String, Object?>{'a': 1}),

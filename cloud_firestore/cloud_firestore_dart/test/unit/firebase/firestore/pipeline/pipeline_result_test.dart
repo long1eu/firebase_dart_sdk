@@ -135,7 +135,7 @@ void main() {
     expect(result.get('missing'), isNull);
     expect(result.get('list'), <Object?>[1, 'a']);
     expect(result.get('map.inner.x'), isTrue);
-    expect(result.get(FieldPath.of(<String>['map', 'inner'])),
+    expect(result.get(FieldPath(<String>['map', 'inner'])),
         <String, Object?>{'x': true});
     expect(result.get(field('map.inner.x')), isTrue);
     expect(result.get('when'), const Timestamp(5, 0));

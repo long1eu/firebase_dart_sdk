@@ -177,7 +177,7 @@ void main() {
     final pipeline = RealtimePipelineSource()
         .collection('/users')
         .where(field('a.b.c.d.e.f.g.h.i.j.k').greaterThanOrEqual(constant(0)))
-        .sort([Field.of(FieldPath.documentIdField).ascending()]);
+        .sort([Field.of(FieldPath.documentId).ascending()]);
 
     final result = runPipeline(pipeline, documents);
     assertThat(result).containsExactly([doc1, doc3]).inOrder();
@@ -639,7 +639,7 @@ void main() {
         .collection('/users')
         .where(
           Field.of(
-            FieldPath.of(<String>['address.city']),
+            FieldPath(<String>['address.city']),
           ).equal(constant('San Francisco')),
         );
 

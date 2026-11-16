@@ -17,7 +17,7 @@ Future<void> main() async {
   }
   final String ordersPath =
       Platform.environment['ORDERS_COLLECTION'] ?? 'orders';
-  final Firestore firestore = firestoreFromEnvironment();
+  final FirebaseFirestore firestore = firestoreFromEnvironment();
   final WriteBatch batch = firestore.batch();
   for (int i = 0; i < 10; i++) {
     batch.set(

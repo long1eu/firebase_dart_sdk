@@ -47,7 +47,7 @@ class _RecordingClient extends Fake implements TransactionClient {
       {Uint8List? transaction}) async {
     calls.add('lookup in $transaction');
     if (lookupErrors.isNotEmpty) {
-      throw FirestoreError('lookup failed', lookupErrors.removeAt(0));
+      throw FirestoreException(message: 'lookup failed', errorCode: lookupErrors.removeAt(0));
     }
     return <MaybeDocument>[doc('foo/bar', 7, map(<String>['a', 'b']))];
   }
@@ -69,7 +69,7 @@ class _RecordingClient extends Fake implements TransactionClient {
   Future<void> rollback(Uint8List transaction) async {
     calls.add('rollback $transaction');
     if (rollbackFails) {
-      throw FirestoreError('gone', FirestoreErrorCode.unavailable);
+      throw FirestoreException(message: 'gone', errorCode: FirestoreErrorCode.unavailable);
     }
   }
 
@@ -162,8 +162,8 @@ void main() {
       final UserDataConverter converter =
           UserDataConverter(DatabaseId.forProject('project'));
       final Transaction tx = Transaction(client, readOnly: true);
-      Matcher invalid = throwsA(isA<FirestoreError>().having(
-          (FirestoreError e) => e.code,
+      Matcher invalid = throwsA(isA<FirestoreException>().having(
+          (FirestoreException e) => e.errorCode,
           'code',
           FirestoreErrorCode.invalidArgument));
 
@@ -197,10 +197,10 @@ void main() {
       await tx.lookup(<DocumentKey>[docKey]);
       expect(client.calls, <String>['lookup in null']);
 
-      Matcher invalid = throwsA(isA<FirestoreError>()
-          .having((FirestoreError e) => e.code, 'code',
+      Matcher invalid = throwsA(isA<FirestoreException>()
+          .having((FirestoreException e) => e.errorCode, 'code',
               FirestoreErrorCode.invalidArgument)
-          .having((FirestoreError e) => e.message, 'message',
+          .having((FirestoreException e) => e.message, 'message',
               contains('read-only transaction')));
       await expectLater(tx.runQuery(foo), invalid);
       await expectLater(
@@ -238,8 +238,8 @@ void main() {
               await tx.lookup(<DocumentKey>[docKey]);
               return 'done';
             }).run(),
-            throwsA(isA<FirestoreError>()
-                .having((FirestoreError e) => e.code, 'code', code)));
+            throwsA(isA<FirestoreException>()
+                .having((FirestoreException e) => e.errorCode, 'code', code)));
         expect(attempts, 1, reason: '$code');
         // The failed attempt was released.
         expect(client.calls.last, 'rollback [1]');

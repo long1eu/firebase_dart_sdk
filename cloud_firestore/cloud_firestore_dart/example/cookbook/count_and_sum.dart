@@ -10,7 +10,7 @@ import 'package:cloud_firestore_dart/cloud_firestore_dart.dart';
 import '../common.dart';
 
 Future<void> main() async {
-  final Firestore firestore = connect();
+  final FirebaseFirestore firestore = connect();
   final CollectionReference<Map<String, Object?>> orders = firestore.collection(
     scratch('orders'),
   );
@@ -31,7 +31,7 @@ Future<void> main() async {
 
   // Only a count.
   final AggregateQuerySnapshot all = await orders.count().get();
-  print('orders: ${all.getCount()}');
+  print('orders: ${all.count}');
 
   // A count, a sum and an average of the same query in one request.
   final AggregateField revenue = AggregateField.sum('total');
@@ -41,8 +41,8 @@ Future<void> main() async {
       .aggregate(<AggregateField>[AggregateField.count(), revenue, average])
       .get();
   print(
-    'paid: ${paid.getCount()} orders, revenue ${paid.getInt(revenue)}, '
-    'average ${paid.getDouble(average)}',
+    'paid: ${paid.count} orders, revenue ${(paid.get(revenue) as num?)?.toInt()}, '
+    'average ${(paid.get(average) as num?)?.toDouble()}',
   );
 
   await firestore.terminate();

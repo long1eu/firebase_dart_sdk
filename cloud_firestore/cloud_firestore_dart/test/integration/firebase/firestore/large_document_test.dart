@@ -23,6 +23,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/firestore_error.dart
 import 'package:cloud_firestore_dart/src/firebase/firestore/query.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/query_snapshot.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/source.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/get_options.dart';
 import 'package:test/test.dart';
 
 import '../../../util/integration_test_util.dart';
@@ -64,7 +65,7 @@ void main() {
   late String seedCollection;
   late String unicodePayload;
   late String asciiPayload;
-  late Firestore db;
+  late FirebaseFirestore db;
 
   setUpAll(() async {
     if (emulatorLimit != null) {
@@ -76,7 +77,7 @@ void main() {
     asciiPayload = generateAsciiString(targetBytes);
 
     final CollectionReference col = db.collection(seedCollection);
-    await col.document('doc_15_9MB_unicode').set(<String, Object?>{
+    await col.doc('doc_15_9MB_unicode').set(<String, Object?>{
       'chunk': unicodePayload,
       'tag': 'unicode_large_doc',
     });
@@ -84,8 +85,8 @@ void main() {
       'chunk': asciiPayload,
       'tag': 'ascii_large_doc',
     };
-    await col.document('doc_a').set(dataAscii);
-    await col.document('doc_b').set(dataAscii);
+    await col.doc('doc_a').set(dataAscii);
+    await col.doc('doc_b').set(dataAscii);
   });
 
   tearDownAll(() async {
@@ -95,7 +96,7 @@ void main() {
     final CollectionReference col = db.collection(seedCollection);
     for (final String id in <String>['doc_15_9MB_unicode', 'doc_a', 'doc_b']) {
       try {
-        await col.document(id).delete();
+        await col.doc(id).delete();
       } catch (_) {
         // Suppress cleanup exceptions.
       }
@@ -105,40 +106,40 @@ void main() {
 
   test('testReadAndCacheLargeUnicodeDocument', () async {
     final DocumentReference docRef =
-        db.collection(seedCollection).document('doc_15_9MB_unicode');
+        db.collection(seedCollection).doc('doc_15_9MB_unicode');
 
-    final DocumentSnapshot serverSnapshot = await docRef.get(Source.server);
+    final DocumentSnapshot serverSnapshot = await docRef.get(GetOptions(source: Source.server));
     expect(serverSnapshot.exists, isTrue);
 
     await db.disableNetwork();
-    final DocumentSnapshot cacheSnapshot = await docRef.get(Source.cache);
+    final DocumentSnapshot cacheSnapshot = await docRef.get(GetOptions(source: Source.cache));
     expect(cacheSnapshot.exists, isTrue);
-    expect(cacheSnapshot.data, serverSnapshot.data);
+    expect(cacheSnapshot.data(), serverSnapshot.data());
     await db.enableNetwork();
   }, skip: emulatorLimit, timeout: largeTimeout);
 
   test('testCacheIntegrityWithMultipleLargeDocuments', () async {
     final CollectionReference colRef = db.collection(seedCollection);
-    final DocumentReference docA = colRef.document('doc_a');
-    final DocumentReference docB = colRef.document('doc_b');
+    final DocumentReference docA = colRef.doc('doc_a');
+    final DocumentReference docB = colRef.doc('doc_b');
 
-    await docA.get(Source.server);
-    await docB.get(Source.server);
+    await docA.get(GetOptions(source: Source.server));
+    await docB.get(GetOptions(source: Source.server));
 
     await db.disableNetwork();
-    final DocumentSnapshot cacheA = await docA.get(Source.cache);
-    final DocumentSnapshot cacheB = await docB.get(Source.cache);
+    final DocumentSnapshot cacheA = await docA.get(GetOptions(source: Source.cache));
+    final DocumentSnapshot cacheB = await docB.get(GetOptions(source: Source.cache));
 
     expect(cacheA.exists, isTrue, reason: 'docA should exist in cache');
     expect(cacheB.exists, isTrue, reason: 'docB should exist in cache');
-    expect(cacheA.getString('chunk'), asciiPayload);
-    expect(cacheB.getString('chunk'), asciiPayload);
+    expect(cacheA.get('chunk') as String?, asciiPayload);
+    expect(cacheB.get('chunk') as String?, asciiPayload);
     await db.enableNetwork();
   }, skip: emulatorLimit, timeout: largeTimeout);
 
   test('testWatchStreamInitializationAndDiff', () async {
     final DocumentReference docRef =
-        db.collection(seedCollection).document('doc_15_9MB_unicode');
+        db.collection(seedCollection).doc('doc_15_9MB_unicode');
     final String expectedValue =
         'updated_val_${DateTime.now().millisecondsSinceEpoch}';
 
@@ -146,16 +147,16 @@ void main() {
     // delivered.
     final Completer<void> updated = Completer<void>();
     final StreamSubscription<DocumentSnapshot> registration =
-        docRef.snapshots.listen((DocumentSnapshot snapshot) {
+        docRef.snapshots().listen((DocumentSnapshot snapshot) {
       if (snapshot.exists &&
-          snapshot.getString('differential_field') == expectedValue &&
+          (snapshot.get('differential_field') as String?) == expectedValue &&
           !updated.isCompleted) {
         updated.complete();
       }
     });
 
     try {
-      final DocumentSnapshot first = await docRef.get(Source.server);
+      final DocumentSnapshot first = await docRef.get(GetOptions(source: Source.server));
       expect(first.exists, isTrue);
 
       await docRef
@@ -168,7 +169,7 @@ void main() {
 
   test('testOversizedPayloadRejection', () async {
     final DocumentReference docRef =
-        db.collection(seedCollection).document('temp_oversized_doc');
+        db.collection(seedCollection).doc('temp_oversized_doc');
     // 16.1 MB payload.
     final int oversizedPayloadBytes = 16 * 1024 * 1024 + 102400;
 
@@ -176,20 +177,20 @@ void main() {
         docRef.set(<String, Object?>{
           'largeField': generateAsciiString(oversizedPayloadBytes)
         }),
-        throwsA(isA<FirestoreError>().having((FirestoreError e) => e.code,
+        throwsA(isA<FirestoreException>().having((FirestoreException e) => e.errorCode,
             'code', FirestoreErrorCode.invalidArgument)));
   }, skip: emulatorLimit, timeout: largeTimeout);
 
   test('testWriteValidLargeDocument', () async {
-    final DocumentReference docRef = db.collection(seedCollection).document(
+    final DocumentReference docRef = db.collection(seedCollection).doc(
         'temp_valid_large_doc_${DateTime.now().millisecondsSinceEpoch}');
     try {
       final String largePayload = generateAsciiString(targetBytes);
       await docRef.set(<String, Object?>{'chunk': largePayload});
 
-      final DocumentSnapshot snapshot = await docRef.get(Source.server);
+      final DocumentSnapshot snapshot = await docRef.get(GetOptions(source: Source.server));
       expect(snapshot.exists, isTrue);
-      expect(snapshot.getString('chunk'), largePayload);
+      expect(snapshot.get('chunk') as String?, largePayload);
     } finally {
       try {
         await docRef.delete();
@@ -201,7 +202,7 @@ void main() {
 
   test('testTransactionReadModifyWrite', () async {
     final DocumentReference docRef =
-        db.collection(seedCollection).document('doc_15_9MB_unicode');
+        db.collection(seedCollection).doc('doc_15_9MB_unicode');
     final int timestamp = DateTime.now().millisecondsSinceEpoch;
 
     await db.runTransaction<void>((transaction) async {
@@ -211,30 +212,29 @@ void main() {
           docRef, <String, Object?>{'transaction_timestamp': timestamp});
     });
 
-    final DocumentSnapshot updated = await docRef.get(Source.server);
+    final DocumentSnapshot updated = await docRef.get(GetOptions(source: Source.server));
     expect(updated.exists, isTrue);
-    expect(updated.getInt('transaction_timestamp'), timestamp);
-    expect(updated.getString('chunk'), unicodePayload);
+    expect((updated.get('transaction_timestamp') as num?)?.toInt(), timestamp);
+    expect(updated.get('chunk') as String?, unicodePayload);
   }, skip: emulatorLimit, timeout: largeTimeout);
 
   test('testQueryLargeDocuments', () async {
     final CollectionReference colRef = db.collection(seedCollection);
-    final Query query = colRef
-        .whereInField(FieldPath.documentId(), <Object?>['doc_a', 'doc_b']);
+    final Query query = colRef.where(FieldPath.documentId, whereIn: <Object?>['doc_a', 'doc_b']);
 
-    final QuerySnapshot serverSnapshot = await query.get(Source.server);
-    expect(serverSnapshot.documents.length, 2,
+    final QuerySnapshot serverSnapshot = await query.get(GetOptions(source: Source.server));
+    expect(serverSnapshot.docs.length, 2,
         reason: 'Query should return exactly 2 large documents from server');
 
     await db.disableNetwork();
-    final QuerySnapshot cacheSnapshot = await query.get(Source.cache);
-    expect(cacheSnapshot.documents.length, 2,
+    final QuerySnapshot cacheSnapshot = await query.get(GetOptions(source: Source.cache));
+    expect(cacheSnapshot.docs.length, 2,
         reason: 'Query should return exactly 2 large documents from cache');
 
-    for (final DocumentSnapshot serverDoc in serverSnapshot.documents) {
-      final DocumentSnapshot cacheDoc = cacheSnapshot.documents
+    for (final DocumentSnapshot serverDoc in serverSnapshot.docs) {
+      final DocumentSnapshot cacheDoc = cacheSnapshot.docs
           .firstWhere((DocumentSnapshot d) => d.id == serverDoc.id);
-      expect(cacheDoc.data, serverDoc.data,
+      expect(cacheDoc.data(), serverDoc.data(),
           reason: 'Payload for ${serverDoc.id} in cache should match server');
     }
     await db.enableNetwork();
@@ -242,24 +242,23 @@ void main() {
 
   test('testQueryLargeDocumentsForcesLocalScan', () async {
     final CollectionReference colRef = db.collection(seedCollection);
-    await colRef.document('doc_a').get(Source.server);
-    await colRef.document('doc_b').get(Source.server);
+    await colRef.doc('doc_a').get(GetOptions(source: Source.server));
+    await colRef.doc('doc_b').get(GetOptions(source: Source.server));
 
     await db.disableNetwork();
 
     final Query query = colRef
-        .whereEqualTo('tag', 'ascii_large_doc')
-        .orderByField(FieldPath.documentId())
+        .where('tag', isEqualTo: 'ascii_large_doc').orderBy(FieldPath.documentId)
         .limit(2);
-    final QuerySnapshot cacheSnapshot = await query.get(Source.cache);
+    final QuerySnapshot cacheSnapshot = await query.get(GetOptions(source: Source.cache));
 
-    expect(cacheSnapshot.documents.length, 2,
+    expect(cacheSnapshot.docs.length, 2,
         reason: 'Query should find and return exactly 2 large documents');
-    final List<DocumentSnapshot> docs = cacheSnapshot.documents;
+    final List<DocumentSnapshot> docs = cacheSnapshot.docs;
     expect(docs[0].id, 'doc_a');
     expect(docs[1].id, 'doc_b');
-    expect(docs[0].getString('chunk'), asciiPayload);
-    expect(docs[1].getString('chunk'), asciiPayload);
+    expect(docs[0].get('chunk') as String?, asciiPayload);
+    expect(docs[1].get('chunk') as String?, asciiPayload);
     await db.enableNetwork();
   }, skip: emulatorLimit, timeout: largeTimeout);
 }

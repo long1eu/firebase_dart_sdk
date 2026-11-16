@@ -1,0 +1,34 @@
+name: cloud_firestore_dart_flutterfire
+description: >-
+  Unofficial bridge from the FlutterFire plugins (firebase_core, firebase_auth)
+  to cloud_firestore_dart: reuse the FlutterFire app options and signed-in
+  user in the pure-Dart Firestore client.
+version: 0.1.0
+homepage: https://github.com/long1eu/firebase_dart_sdk
+repository: https://github.com/long1eu/firebase_dart_sdk/tree/main/cloud_firestore/cloud_firestore_dart_flutterfire
+issue_tracker: https://github.com/long1eu/firebase_dart_sdk/issues
+topics:
+  - firebase
+  - firestore
+  - flutterfire
+  - authentication
+
+environment:
+  sdk: ^3.8.0
+  flutter: '>=3.32.0'
+
+dependencies:
+  # Local development resolves these from the sibling packages through
+  # pubspec_overrides.yaml (not published).
+  cloud_firestore_dart: ^0.1.1
+  firebase_app_dart: ^0.1.1
+  firebase_auth: '>=5.0.0 <8.0.0'
+  firebase_core: '>=3.0.0 <6.0.0'
+  flutter:
+    sdk: flutter
+  rxdart: ^0.28.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  lints: ^6.1.0

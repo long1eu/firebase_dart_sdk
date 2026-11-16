@@ -8,137 +8,128 @@ import 'package:test/test.dart';
 
 void main() {
   test('equalTo', () {
-    final Filter filter = Filter.equalTo('x', 'v');
+    final Filter filter = Filter('x', isEqualTo: 'v');
     expect(filter, filter);
-    expect(filter, Filter.equalToField(FieldPath.of(<String>['x']), 'v'));
-    expect(filter, isNot(Filter.equalTo('x', 'z')));
-    expect(filter, isNot(Filter.equalTo('y', 'v')));
-    expect(filter, isNot(Filter.notEqualTo('x', 'v')));
+    expect(filter, Filter(FieldPath(<String>['x']), isEqualTo: 'v'));
+    expect(filter, isNot(Filter('x', isEqualTo: 'z')));
+    expect(filter, isNot(Filter('y', isEqualTo: 'v')));
+    expect(filter, isNot(Filter('x', isNotEqualTo: 'v')));
   });
 
   test('notEqualTo', () {
-    final Filter filter = Filter.notEqualTo('x', 'v');
+    final Filter filter = Filter('x', isNotEqualTo: 'v');
     expect(filter, filter);
-    expect(filter, Filter.notEqualToField(FieldPath.of(<String>['x']), 'v'));
-    expect(filter, isNot(Filter.notEqualTo('x', 'z')));
-    expect(filter, isNot(Filter.notEqualTo('y', 'v')));
-    expect(filter, isNot(Filter.equalTo('x', 'v')));
+    expect(filter, Filter(FieldPath(<String>['x']), isNotEqualTo: 'v'));
+    expect(filter, isNot(Filter('x', isNotEqualTo: 'z')));
+    expect(filter, isNot(Filter('y', isNotEqualTo: 'v')));
+    expect(filter, isNot(Filter('x', isEqualTo: 'v')));
   });
 
   test('greaterThan', () {
-    final Filter filter = Filter.greaterThan('x', 'v');
+    final Filter filter = Filter('x', isGreaterThan: 'v');
     expect(filter, filter);
-    expect(filter, Filter.greaterThanField(FieldPath.of(<String>['x']), 'v'));
-    expect(filter, isNot(Filter.greaterThan('x', 'z')));
-    expect(filter, isNot(Filter.greaterThan('y', 'v')));
-    expect(filter, isNot(Filter.lessThan('x', 'v')));
+    expect(filter, Filter(FieldPath(<String>['x']), isGreaterThan: 'v'));
+    expect(filter, isNot(Filter('x', isGreaterThan: 'z')));
+    expect(filter, isNot(Filter('y', isGreaterThan: 'v')));
+    expect(filter, isNot(Filter('x', isLessThan: 'v')));
   });
 
   test('greaterThanOrEqualTo', () {
-    final Filter filter = Filter.greaterThanOrEqualTo('x', 'v');
+    final Filter filter = Filter('x', isGreaterThanOrEqualTo: 'v');
     expect(filter, filter);
     expect(
       filter,
-      Filter.greaterThanOrEqualToField(FieldPath.of(<String>['x']), 'v'),
+      Filter(FieldPath(<String>['x']), isGreaterThanOrEqualTo: 'v'),
     );
-    expect(filter, isNot(Filter.greaterThanOrEqualTo('x', 'z')));
-    expect(filter, isNot(Filter.greaterThanOrEqualTo('y', 'v')));
-    expect(filter, isNot(Filter.lessThanOrEqualTo('x', 'v')));
+    expect(filter, isNot(Filter('x', isGreaterThanOrEqualTo: 'z')));
+    expect(filter, isNot(Filter('y', isGreaterThanOrEqualTo: 'v')));
+    expect(filter, isNot(Filter('x', isLessThanOrEqualTo: 'v')));
   });
 
   test('lessThan', () {
-    final Filter filter = Filter.lessThan('x', 'v');
+    final Filter filter = Filter('x', isLessThan: 'v');
     expect(filter, filter);
-    expect(filter, Filter.lessThanField(FieldPath.of(<String>['x']), 'v'));
-    expect(filter, isNot(Filter.lessThan('x', 'z')));
-    expect(filter, isNot(Filter.lessThan('y', 'v')));
-    expect(filter, isNot(Filter.greaterThan('x', 'v')));
+    expect(filter, Filter(FieldPath(<String>['x']), isLessThan: 'v'));
+    expect(filter, isNot(Filter('x', isLessThan: 'z')));
+    expect(filter, isNot(Filter('y', isLessThan: 'v')));
+    expect(filter, isNot(Filter('x', isGreaterThan: 'v')));
   });
 
   test('lessThanOrEqualTo', () {
-    final Filter filter = Filter.lessThanOrEqualTo('x', 'v');
+    final Filter filter = Filter('x', isLessThanOrEqualTo: 'v');
     expect(filter, filter);
-    expect(
-      filter,
-      Filter.lessThanOrEqualToField(FieldPath.of(<String>['x']), 'v'),
-    );
-    expect(filter, isNot(Filter.lessThanOrEqualTo('x', 'z')));
-    expect(filter, isNot(Filter.lessThanOrEqualTo('y', 'v')));
-    expect(filter, isNot(Filter.greaterThanOrEqualTo('x', 'v')));
+    expect(filter, Filter(FieldPath(<String>['x']), isLessThanOrEqualTo: 'v'));
+    expect(filter, isNot(Filter('x', isLessThanOrEqualTo: 'z')));
+    expect(filter, isNot(Filter('y', isLessThanOrEqualTo: 'v')));
+    expect(filter, isNot(Filter('x', isGreaterThanOrEqualTo: 'v')));
   });
 
   test('arrayContains', () {
-    final Filter filter = Filter.arrayContains('x', 'v');
+    final Filter filter = Filter('x', arrayContains: 'v');
     expect(filter, filter);
-    expect(filter, Filter.arrayContainsField(FieldPath.of(<String>['x']), 'v'));
-    expect(filter, isNot(Filter.arrayContains('x', 'z')));
-    expect(filter, isNot(Filter.arrayContains('y', 'v')));
-    expect(filter, isNot(Filter.equalTo('x', 'v')));
+    expect(filter, Filter(FieldPath(<String>['x']), arrayContains: 'v'));
+    expect(filter, isNot(Filter('x', arrayContains: 'z')));
+    expect(filter, isNot(Filter('y', arrayContains: 'v')));
+    expect(filter, isNot(Filter('x', isEqualTo: 'v')));
   });
 
   test('arrayContainsAny', () {
-    final Filter filter = Filter.arrayContainsAny('x', <Object?>['v1', 'v2']);
+    final Filter filter = Filter('x', arrayContainsAny: <Object?>['v1', 'v2']);
     expect(filter, filter);
     expect(
       filter,
-      Filter.arrayContainsAnyField(FieldPath.of(<String>['x']), <Object?>[
-        'v1',
-        'v2',
-      ]),
+      Filter(FieldPath(<String>['x']), arrayContainsAny: <Object?>['v1', 'v2']),
     );
-    expect(filter, isNot(Filter.arrayContainsAny('x', <Object?>['v2', 'v1'])));
-    expect(filter, isNot(Filter.arrayContainsAny('x', <Object?>['v2', 'v3'])));
-    expect(filter, isNot(Filter.arrayContainsAny('y', <Object?>['v1', 'v2'])));
-    expect(filter, isNot(Filter.equalTo('x', 'v')));
+    expect(filter, isNot(Filter('x', arrayContainsAny: <Object?>['v2', 'v1'])));
+    expect(filter, isNot(Filter('x', arrayContainsAny: <Object?>['v2', 'v3'])));
+    expect(filter, isNot(Filter('y', arrayContainsAny: <Object?>['v1', 'v2'])));
+    expect(filter, isNot(Filter('x', isEqualTo: 'v')));
   });
 
   test('inArray', () {
-    final Filter filter = Filter.inArray('x', <Object?>['v1', 'v2']);
+    final Filter filter = Filter('x', whereIn: <Object?>['v1', 'v2']);
     expect(filter, filter);
     expect(
       filter,
-      Filter.inArrayField(FieldPath.of(<String>['x']), <Object?>['v1', 'v2']),
+      Filter(FieldPath(<String>['x']), whereIn: <Object?>['v1', 'v2']),
     );
-    expect(filter, isNot(Filter.inArray('x', <Object?>['v2', 'v1'])));
-    expect(filter, isNot(Filter.inArray('x', <Object?>['v2', 'v3'])));
-    expect(filter, isNot(Filter.inArray('y', <Object?>['v1', 'v2'])));
-    expect(filter, isNot(Filter.notInArray('x', <Object?>['v1', 'v2'])));
+    expect(filter, isNot(Filter('x', whereIn: <Object?>['v2', 'v1'])));
+    expect(filter, isNot(Filter('x', whereIn: <Object?>['v2', 'v3'])));
+    expect(filter, isNot(Filter('y', whereIn: <Object?>['v1', 'v2'])));
+    expect(filter, isNot(Filter('x', whereNotIn: <Object?>['v1', 'v2'])));
   });
 
   test('notInArray', () {
-    final Filter filter = Filter.notInArray('x', <Object?>['v1', 'v2']);
+    final Filter filter = Filter('x', whereNotIn: <Object?>['v1', 'v2']);
     expect(filter, filter);
     expect(
       filter,
-      Filter.notInArrayField(FieldPath.of(<String>['x']), <Object?>[
-        'v1',
-        'v2',
-      ]),
+      Filter(FieldPath(<String>['x']), whereNotIn: <Object?>['v1', 'v2']),
     );
-    expect(filter, isNot(Filter.notInArray('x', <Object?>['v2', 'v1'])));
-    expect(filter, isNot(Filter.notInArray('x', <Object?>['v2', 'v3'])));
-    expect(filter, isNot(Filter.notInArray('y', <Object?>['v1', 'v2'])));
-    expect(filter, isNot(Filter.inArray('x', <Object?>['v1', 'v2'])));
+    expect(filter, isNot(Filter('x', whereNotIn: <Object?>['v2', 'v1'])));
+    expect(filter, isNot(Filter('x', whereNotIn: <Object?>['v2', 'v3'])));
+    expect(filter, isNot(Filter('y', whereNotIn: <Object?>['v1', 'v2'])));
+    expect(filter, isNot(Filter('x', whereIn: <Object?>['v1', 'v2'])));
   });
 
   test('or', () {
     final Filter filter = Filter.or(<Filter>[
-      Filter.inArray('x', <Object?>['v1', 'v2']),
-      Filter.inArray('y', <Object?>['v3', 'v4']),
+      Filter('x', whereIn: <Object?>['v1', 'v2']),
+      Filter('y', whereIn: <Object?>['v3', 'v4']),
     ]);
     expect(
       filter,
       Filter.or(<Filter>[
-        Filter.inArrayField(FieldPath.of(<String>['x']), <Object?>['v1', 'v2']),
-        Filter.inArrayField(FieldPath.of(<String>['y']), <Object?>['v3', 'v4']),
+        Filter(FieldPath(<String>['x']), whereIn: <Object?>['v1', 'v2']),
+        Filter(FieldPath(<String>['y']), whereIn: <Object?>['v3', 'v4']),
       ]),
     );
     expect(
       filter,
       isNot(
         Filter.and(<Filter>[
-          Filter.inArray('x', <Object?>['v1', 'v2']),
-          Filter.inArray('y', <Object?>['v3', 'v4']),
+          Filter('x', whereIn: <Object?>['v1', 'v2']),
+          Filter('y', whereIn: <Object?>['v3', 'v4']),
         ]),
       ),
     );
@@ -146,8 +137,8 @@ void main() {
       filter,
       isNot(
         Filter.or(<Filter>[
-          Filter.inArray('y', <Object?>['v3', 'v4']),
-          Filter.inArray('x', <Object?>['v1', 'v2']),
+          Filter('y', whereIn: <Object?>['v3', 'v4']),
+          Filter('x', whereIn: <Object?>['v1', 'v2']),
         ]),
       ),
     );
@@ -155,22 +146,22 @@ void main() {
 
   test('and', () {
     final Filter filter = Filter.and(<Filter>[
-      Filter.inArray('x', <Object?>['v1', 'v2']),
-      Filter.inArray('y', <Object?>['v3', 'v4']),
+      Filter('x', whereIn: <Object?>['v1', 'v2']),
+      Filter('y', whereIn: <Object?>['v3', 'v4']),
     ]);
     expect(
       filter,
       Filter.and(<Filter>[
-        Filter.inArrayField(FieldPath.of(<String>['x']), <Object?>['v1', 'v2']),
-        Filter.inArrayField(FieldPath.of(<String>['y']), <Object?>['v3', 'v4']),
+        Filter(FieldPath(<String>['x']), whereIn: <Object?>['v1', 'v2']),
+        Filter(FieldPath(<String>['y']), whereIn: <Object?>['v3', 'v4']),
       ]),
     );
     expect(
       filter,
       isNot(
         Filter.or(<Filter>[
-          Filter.inArray('x', <Object?>['v1', 'v2']),
-          Filter.inArray('y', <Object?>['v3', 'v4']),
+          Filter('x', whereIn: <Object?>['v1', 'v2']),
+          Filter('y', whereIn: <Object?>['v3', 'v4']),
         ]),
       ),
     );
@@ -178,8 +169,8 @@ void main() {
       filter,
       isNot(
         Filter.and(<Filter>[
-          Filter.inArray('y', <Object?>['v3', 'v4']),
-          Filter.inArray('x', <Object?>['v1', 'v2']),
+          Filter('y', whereIn: <Object?>['v3', 'v4']),
+          Filter('x', whereIn: <Object?>['v1', 'v2']),
         ]),
       ),
     );

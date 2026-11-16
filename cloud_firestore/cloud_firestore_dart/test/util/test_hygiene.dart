@@ -11,7 +11,7 @@ import 'package:test/test.dart';
 /// as `app/database` keys.
 List<String> runningFirestoreInstances() {
   return <String>[
-    for (final MapEntry<String, Firestore> entry
+    for (final MapEntry<String, FirebaseFirestore> entry
         in FirestoreMultiDbComponent.instances.entries)
       if (!entry.value.client.isTerminated) entry.key
   ];
@@ -25,13 +25,13 @@ List<String> runningFirestoreInstances() {
 /// operation the test did not wait for is reported for this test (the test
 /// runner fails a test for an unhandled error) and not for a later one.
 Future<void> expectTestLeftNothingBehind(
-    {Iterable<Firestore> instances = const <Firestore>[]}) async {
+    {Iterable<FirebaseFirestore> instances = const <FirebaseFirestore>[]}) async {
   await pumpEventQueue();
   expect(runningFirestoreInstances(), isEmpty,
       reason: 'The test left Firestore instances running: terminate() them, '
           'for example with addTearDown(firestore.terminate)');
   expect(
-      instances.where((Firestore firestore) => !firestore.client.isTerminated),
+      instances.where((FirebaseFirestore firestore) => !firestore.client.isTerminated),
       isEmpty,
       reason: 'The test left Firestore instances running');
 }

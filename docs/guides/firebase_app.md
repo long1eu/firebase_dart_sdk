@@ -12,7 +12,7 @@ import 'package:firebase_app_dart/firebase_app_dart.dart';
 final FirebaseApp defaultApp = FirebaseApp.withOptions(
   const FirebaseOptions(
     apiKey: '<YOUR_API_KEY>',
-    applicationId: '1:1234567890:web:0123456789abcdef',
+    appId: '1:1234567890:web:0123456789abcdef',
     projectId: 'my-project',
   ),
 );
@@ -21,20 +21,46 @@ final FirebaseApp defaultApp = FirebaseApp.withOptions(
 final FirebaseApp secondary = FirebaseApp.withOptions(
   const FirebaseOptions(
     apiKey: '<YOUR_API_KEY>',
-    applicationId: '1:1234567890:dart:secondary',
+    appId: '1:1234567890:dart:secondary',
     projectId: 'other-project',
   ),
   name: 'secondary',
 );
 print(identical(FirebaseApp.instance, defaultApp)); // true
-print(identical(FirebaseApp.getInstance('secondary'), secondary)); // true
+print(identical(Firebase.app('secondary'), secondary)); // true
 ```
 
 - An app without a name is the default app, `FirebaseApp.instance`. Creating two apps with the
   same name is an error; `app.delete()` frees the name.
-- Firestore uses `projectId`. The `apiKey` and `applicationId` are sent with Firebase Auth
-  requests and identify the app (`applicationId` is also sent as `X-Firebase-gmpid`).
+- Firestore uses `projectId`. The `apiKey` and `appId` are sent with Firebase Auth
+  requests and identify the app (`appId` is also sent as `X-Firebase-gmpid`).
 - `FirebaseOptions.fromJson` reads the options from a map.
+
+What hangs off each app: its own options and token providers, and one Firestore instance per database
+(`FirebaseFirestore.instanceFor` keys its instances by app name and database, and the persistent cache is named
+after the app, the project and the database). Deleting an app shuts its Firestore instances down.
+
+```mermaid
+flowchart LR
+  accTitle: Default and named apps and what belongs to each
+  accDescr: The default app and an app named secondary each have their own FirebaseOptions, their own authProvider and appCheckProvider, and their own Firestore instances, one per database. The default app here has two, for the databases (default) and my-database, each with its own cache. app.delete() shuts down the Firestore instances of that app.
+  defaultApp["Default app<br/>FirebaseApp.instance"]
+  defaultOptions["FirebaseOptions<br/>projectId: my-project"]
+  defaultProviders["authProvider, appCheckProvider"]
+  defaultDb["Firestore, database (default)<br/>its own cache"]
+  namedDb["Firestore, database 'my-database'<br/>its own cache"]
+  secondaryApp["App 'secondary'<br/>Firebase.app('secondary')"]
+  secondaryOptions["FirebaseOptions<br/>projectId: other-project"]
+  secondaryProviders["authProvider, appCheckProvider"]
+  secondaryDb["Firestore, database (default)<br/>its own cache"]
+  defaultApp --> defaultOptions
+  defaultApp --> defaultProviders
+  defaultApp --> defaultDb
+  defaultApp --> namedDb
+  secondaryApp --> secondaryOptions
+  secondaryApp --> secondaryProviders
+  secondaryApp --> secondaryDb
+```
 
 Where the values come from:
 
@@ -79,7 +105,7 @@ final AppDependencies dependencies = AppDependencies();
 final FirebaseApp connectedApp = FirebaseApp.withOptions(
   const FirebaseOptions(
     apiKey: '<YOUR_API_KEY>',
-    applicationId: '1:1234567890:dart:example',
+    appId: '1:1234567890:dart:example',
     projectId: 'my-project',
   ),
   name: 'connected',

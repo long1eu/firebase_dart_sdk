@@ -25,22 +25,21 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/model/maybe_document
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/no_document.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/set_options.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/assert.dart';
-import 'package:cloud_firestore_dart/src/firebase/firestore/util/util.dart';
 
-/// The function that [Firestore.runTransaction] runs inside a transaction,
+/// The function that [FirebaseFirestore.runTransaction] runs inside a transaction,
 /// and runs again for each retry.
 ///
 /// It receives the [Transaction] to read and write with. The value its
-/// future completes with is what [Firestore.runTransaction] returns. If it
+/// future completes with is what [FirebaseFirestore.runTransaction] returns. If it
 /// throws, the transaction is not committed.
-typedef TransactionCallback<T> = Future<T> Function(Transaction);
+typedef TransactionHandler<T> = Future<T> Function(Transaction);
 
 /// Reads and writes documents inside a transaction started with
-/// [Firestore.runTransaction].
+/// [FirebaseFirestore.runTransaction].
 ///
-/// You never create a transaction yourself: [Firestore.runTransaction] passes
+/// You never create a transaction yourself: [FirebaseFirestore.runTransaction] passes
 /// one to your function. A read-write transaction (the default) reads
-/// documents with [get], then writes with [set], [update], [updateFromList]
+/// documents with [get], then writes with [set], [update], [update]
 /// and [delete]. When the function completes, the writes are committed
 /// together, and only if none of the documents the function read has changed
 /// on the server since it read them.
@@ -53,7 +52,7 @@ typedef TransactionCallback<T> = Future<T> Function(Transaction);
 /// ) async {
 ///   final DocumentSnapshot<Map<String, Object?>> snapshot =
 ///       await transaction.get(counter);
-///   final int value = (snapshot.data?['value'] as int?) ?? 0;
+///   final int value = (snapshot.data()?['value'] as int?) ?? 0;
 ///   transaction.set(counter, <String, Object?>{'value': value + 1});
 ///   return value + 1;
 /// });
@@ -65,7 +64,7 @@ typedef TransactionCallback<T> = Future<T> Function(Transaction);
 ///   [FirestoreErrorCode.invalidArgument], and so does the commit.
 /// * The function can run several times. When a document it read changed
 ///   before the commit, the client runs it again after a backoff (about one
-///   second at first, then longer), up to [TransactionOptions.maxAttempts]
+///   second at first, then longer), up to the `maxAttempts`
 ///   attempts (5 by default). Keep side effects, such as changing your app's
 ///   state, out of the function, or make them safe to repeat.
 /// * Errors with the codes [FirestoreErrorCode.aborted],
@@ -73,8 +72,8 @@ typedef TransactionCallback<T> = Future<T> Function(Transaction);
 ///   [FirestoreErrorCode.failedPrecondition], and errors that a new attempt
 ///   can fix (such as [FirestoreErrorCode.unavailable]), cause a retry, also
 ///   when your function throws them. Any other error, and any error that is
-///   not a [FirestoreError], ends the transaction: nothing is written and the
-///   future of [Firestore.runTransaction] fails with that error. When the
+///   not a [FirestoreException], ends the transaction: nothing is written and the
+///   future of [FirebaseFirestore.runTransaction] fails with that error. When the
 ///   attempts are used up it fails with the last error, for example
 ///   [FirestoreErrorCode.failedPrecondition] after repeated conflicts.
 /// * Do not keep the transaction after the function has completed.
@@ -87,7 +86,7 @@ typedef TransactionCallback<T> = Future<T> Function(Transaction);
 /// are not applied to the local cache as pending writes: listeners see them
 /// only once the server reports the change.
 ///
-/// A read-only transaction (`TransactionOptions(readOnly: true)`) reads a
+/// A read-only transaction (`runTransaction(..., readOnly: true)`) reads a
 /// consistent snapshot of the database and can also run queries with
 /// [getQuery] and aggregations with [getAggregate]; it cannot write. Read-only
 /// transactions, [getQuery] and [getAggregate] are not in the JS client SDK;
@@ -103,19 +102,19 @@ typedef TransactionCallback<T> = Future<T> Function(Transaction);
 /// does so.
 class Transaction {
   /// Implementation detail of the SDK; not part of the supported API. Use
-  /// [Firestore.runTransaction].
+  /// [FirebaseFirestore.runTransaction].
   Transaction._(this._transaction, this._firestore);
 
   final core.Transaction _transaction;
 
-  final Firestore _firestore;
+  final FirebaseFirestore _firestore;
 
   /// Writes [data] to the document [documentRef] when the transaction
   /// commits: the document is created if it does not exist, and replaced if
   /// it does.
   ///
-  /// With [options] set to [SetOptions.mergeAllFields],
-  /// [SetOptions.mergeFields] or [SetOptions.mergeFieldPaths], [data] is
+  /// With [options] set to `SetOptions(merge: true)`,
+  /// [SetOptions.mergeFields], [data] is
   /// merged into the existing document instead. When [documentRef] has a
   /// converter, [data] is a [T] and is converted with
   /// `FirestoreDataConverter.toFirestore`.
@@ -127,13 +126,13 @@ class Transaction {
   /// transaction.set(
   ///   firestore.doc('cities/SF'),
   ///   <String, Object?>{'visited': true},
-  ///   SetOptions.mergeAllFields,
+  ///   const SetOptions(merge: true),
   /// );
   /// ```
   ///
   /// Throws an [ArgumentError] if [data] holds a value Firestore cannot store,
-  /// or if [documentRef] belongs to another [Firestore] instance. Throws a
-  /// [FirestoreError] with [FirestoreErrorCode.invalidArgument] in a
+  /// or if [documentRef] belongs to another [FirebaseFirestore] instance. Throws a
+  /// [FirestoreException] with [FirestoreErrorCode.invalidArgument] in a
   /// read-only transaction.
   ///
   /// Returns this transaction, so that calls can be chained.
@@ -143,7 +142,7 @@ class Transaction {
     SetOptions? options,
   ]) {
     final SetOptions? userOptions = options;
-    options ??= SetOptions.overwrite;
+    options ??= const SetOptions();
     _firestore.validateReference(documentRef);
     checkNotNull<Object>(data, 'Provided data must not be null.');
     final Map<String, Object?> rawData = toRawData<T>(
@@ -169,40 +168,12 @@ class Transaction {
     return this;
   }
 
-  /// Updates some fields of the existing document [documentRef] when the
-  /// transaction commits. [data] alternates fields (a dot-separated `String`
-  /// or a [FieldPath]) and their values.
-  ///
-  /// ```dart
-  /// transaction.updateFromList(firestore.doc('cities/SF'), <Object?>[
-  ///   'population', 870000,
-  ///   FieldPath.of(<String>['stats.v2', 'visits']), FieldValue.increment(1),
-  /// ]);
-  /// ```
-  ///
-  /// Behaves as [update] otherwise; use this form when a field name contains
-  /// a dot.
-  ///
-  /// Returns this transaction, so that calls can be chained.
-  Transaction updateFromList(
-    DocumentReference<Object?> documentRef,
-    List<Object?> data,
-  ) {
-    const String methodName = 'Transaction.updateFromList';
-    final UserDataParsedUpdateData parsedData = _firestore.dataConverter
-        .parseUpdateDataFromList(
-          collectUpdateArguments(1, data, methodName: methodName),
-          methodName: methodName,
-          targetDoc: documentRef.key,
-        );
-    return _update(documentRef, parsedData);
-  }
-
   /// Updates the fields in [data] of the existing document [documentRef] when
   /// the transaction commits. Fields that are not in [data] keep their
   /// values.
   ///
-  /// The keys of [data] are field paths: `'address.city'` changes only `city`
+  /// The keys of [data] are field paths, a `String` or a [FieldPath]:
+  /// `'address.city'` changes only `city`
   /// inside the map `address`. A converter of [documentRef] is not used.
   ///
   /// ```dart
@@ -217,17 +188,17 @@ class Transaction {
   /// [FirestoreErrorCode.notFound]. Neither is retried.
   ///
   /// Throws an [ArgumentError] if [data] holds an invalid field path or value,
-  /// or if [documentRef] belongs to another [Firestore] instance. Throws a
-  /// [FirestoreError] with [FirestoreErrorCode.invalidArgument] in a
+  /// or if [documentRef] belongs to another [FirebaseFirestore] instance. Throws a
+  /// [FirestoreException] with [FirestoreErrorCode.invalidArgument] in a
   /// read-only transaction.
   ///
   /// Returns this transaction, so that calls can be chained.
   Transaction update(
     DocumentReference<Object?> documentRef,
-    Map<String, Object?> data,
+    Map<Object, Object?> data,
   ) {
     final UserDataParsedUpdateData parsedData = _firestore.dataConverter
-        .parseUpdateData(
+        .parseUpdateMap(
           data,
           methodName: 'Transaction.update',
           targetDoc: documentRef.key,
@@ -254,7 +225,7 @@ class Transaction {
   /// ```
   ///
   /// Throws an [ArgumentError] if [documentRef] belongs to another
-  /// [Firestore] instance, and a [FirestoreError] with
+  /// [FirebaseFirestore] instance, and a [FirestoreException] with
   /// [FirestoreErrorCode.invalidArgument] in a read-only transaction.
   ///
   /// Returns this transaction, so that calls can be chained.
@@ -266,7 +237,7 @@ class Transaction {
 
   /// Runs [query] on the server inside this transaction and returns its
   /// results. Only in a read-only transaction
-  /// (`TransactionOptions(readOnly: true)`): the documents are those of the
+  /// (`runTransaction(..., readOnly: true)`): the documents are those of the
   /// snapshot of the database that every read of the transaction sees.
   ///
   /// ```dart
@@ -275,15 +246,15 @@ class Transaction {
   ///       (Transaction transaction) => transaction.getQuery(
   ///         firestore.collection('cities').where('capital', isEqualTo: true),
   ///       ),
-  ///       options: TransactionOptions(readOnly: true),
+  ///       readOnly: true,
   ///     );
   /// ```
   ///
   /// In a read-write transaction the returned Future fails with a
-  /// [FirestoreError] with code `invalidArgument`: such a transaction verifies
+  /// [FirestoreException] with code `invalidArgument`: such a transaction verifies
   /// at commit that the documents it read did not change, which is not possible
   /// for the result of a query. It fails with an [ArgumentError] if [query]
-  /// belongs to another [Firestore] instance.
+  /// belongs to another [FirebaseFirestore] instance.
   ///
   /// The snapshot never comes from the cache and has no pending writes; local
   /// writes that the server has not seen are not part of it.
@@ -319,14 +290,14 @@ class Transaction {
   /// final AggregateQuerySnapshot result = await firestore.runTransaction(
   ///   (Transaction transaction) =>
   ///       transaction.getAggregate(firestore.collection('cities').count()),
-  ///   options: TransactionOptions(readOnly: true),
+  ///   readOnly: true,
   /// );
-  /// print(result.getCount());
+  /// print(result.count);
   /// ```
   ///
   /// In a read-write transaction the returned Future fails with a
-  /// [FirestoreError] with code `invalidArgument`. It fails with an
-  /// [ArgumentError] if the query belongs to another [Firestore] instance.
+  /// [FirestoreException] with code `invalidArgument`. It fails with an
+  /// [ArgumentError] if the query belongs to another [FirebaseFirestore] instance.
   Future<AggregateQuerySnapshot> getAggregate(
     AggregateQuery aggregateQuery,
   ) async {
@@ -366,7 +337,7 @@ class Transaction {
   /// ```
   ///
   /// The future fails with an [ArgumentError] if [documentRef] belongs to
-  /// another [Firestore] instance, and with a [FirestoreError] when the server
+  /// another [FirebaseFirestore] instance, and with a [FirestoreException] when the server
   /// cannot be reached or rejects the read (for example
   /// [FirestoreErrorCode.permissionDenied]).
   Future<DocumentSnapshot<T>> get<T extends Object?>(
@@ -412,12 +383,12 @@ extension TransactionInternal on Transaction {
   /// Wraps the core [transaction] of [firestore].
   static Transaction create(
     core.Transaction transaction,
-    Firestore firestore,
+    FirebaseFirestore firestore,
   ) => Transaction._(transaction, firestore);
 
   /// The core transaction this transaction wraps.
   core.Transaction get coreTransaction => _transaction;
 
   /// The database this transaction runs against.
-  Firestore get firestore => _firestore;
+  FirebaseFirestore get firestore => _firestore;
 }

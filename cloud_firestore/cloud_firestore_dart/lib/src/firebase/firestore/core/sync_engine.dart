@@ -401,9 +401,9 @@ class SyncEngine implements RemoteStoreCallback, SharedClientStateSyncer {
       }
       Log.w(_tag, 'Failed to persist write: $e');
       userTask.completeError(
-        FirestoreError(
-          'Failed to persist write: $e',
-          FirestoreErrorCode.unavailable,
+        FirestoreException(
+          message: 'Failed to persist write: $e',
+          errorCode: FirestoreErrorCode.unavailable,
         ),
       );
       return;
@@ -630,7 +630,7 @@ class SyncEngine implements RemoteStoreCallback, SharedClientStateSyncer {
     final ImmutableSortedMap<DocumentKey, MaybeDocument> changes;
     try {
       changes = await _localStore.applyRemoteEvent(event);
-    } on FirestoreError catch (e) {
+    } on FirestoreException catch (e) {
       if (!isPrimaryLeaseLoss(e)) {
         rethrow;
       }
@@ -812,7 +812,7 @@ class SyncEngine implements RemoteStoreCallback, SharedClientStateSyncer {
     final ImmutableSortedMap<DocumentKey, MaybeDocument> changes;
     try {
       changes = await _localStore.acknowledgeBatch(mutationBatchResult);
-    } on FirestoreError catch (e) {
+    } on FirestoreException catch (e) {
       if (!isPrimaryLeaseLoss(e)) {
         rethrow;
       }
@@ -853,7 +853,7 @@ class SyncEngine implements RemoteStoreCallback, SharedClientStateSyncer {
     final ImmutableSortedMap<DocumentKey, MaybeDocument> changes;
     try {
       changes = await _localStore.rejectBatch(batchId);
-    } on FirestoreError catch (e) {
+    } on FirestoreException catch (e) {
       // As in the JS SDK the user is not told: the batch stays in the queue for the primary client.
       if (!isPrimaryLeaseLoss(e)) {
         rethrow;
@@ -869,7 +869,7 @@ class SyncEngine implements RemoteStoreCallback, SharedClientStateSyncer {
     // The local store may or may not be able to apply the write result and raise events immediately (depending on
     // whether the watcher is caught up), so we raise user callbacks first so that they consistently happen before
     // listen events.
-    final FirestoreError error = exceptionFromStatus(status);
+    final FirestoreException error = exceptionFromStatus(status);
     _notifyUser(batchId, error);
 
     _resolvePendingWriteTasks(batchId);
@@ -904,9 +904,10 @@ class SyncEngine implements RemoteStoreCallback, SharedClientStateSyncer {
         return;
       }
       userTask.completeError(
-        FirestoreError(
-          'Initialization of waitForPendingWrites() operation failed: $e',
-          FirestoreErrorCode.unavailable,
+        FirestoreException(
+          message:
+              'Initialization of waitForPendingWrites() operation failed: $e',
+          errorCode: FirestoreErrorCode.unavailable,
         ),
       );
       return;
@@ -942,16 +943,17 @@ class SyncEngine implements RemoteStoreCallback, SharedClientStateSyncer {
     _pendingWritesCallbacks.clear();
     for (Completer<void> task in tasks) {
       task.completeError(
-        FirestoreError(
-          '\'waitForPendingWrites\' task is cancelled due to User change.',
-          FirestoreErrorCode.cancelled,
+        FirestoreException(
+          message:
+              '\'waitForPendingWrites\' task is cancelled due to User change.',
+          errorCode: FirestoreErrorCode.cancelled,
         ),
       );
     }
   }
 
   /// Resolves the task corresponding to this write result.
-  void _notifyUser(int batchId, FirestoreError? error) {
+  void _notifyUser(int batchId, FirestoreException? error) {
     final Map<int, Completer<void>>? userTasks =
         _mutationUserCallbacks[_currentUser];
 
@@ -1237,13 +1239,13 @@ class SyncEngine implements RemoteStoreCallback, SharedClientStateSyncer {
       );
       if (hasNewerBundle) {
         resultTask.setResult(
-          LoadBundleTaskProgressInternal.forSuccess(bundleMetadata),
+          LoadBundleTaskSnapshotInternal.forSuccess(bundleMetadata),
         );
         return;
       }
 
-      LoadBundleTaskProgress? progress =
-          LoadBundleTaskProgressInternal.forInitial(bundleMetadata);
+      LoadBundleTaskSnapshot? progress =
+          LoadBundleTaskSnapshotInternal.forInitial(bundleMetadata);
       resultTask.updateProgress(progress);
 
       final BundleLoader bundleLoader = BundleLoader(
@@ -1275,16 +1277,16 @@ class SyncEngine implements RemoteStoreCallback, SharedClientStateSyncer {
       await _emitNewSnapsAndNotifyLocalStore(changes, /*remoteEvent:*/ null);
 
       resultTask.setResult(
-        LoadBundleTaskProgressInternal.forSuccess(bundleMetadata),
+        LoadBundleTaskSnapshotInternal.forSuccess(bundleMetadata),
       );
     } catch (e, stackTrace) {
       Log.w('Firestore', 'Loading bundle failed : $e');
       resultTask.setException(
-        FirestoreError(
-          'Bundle failed to load',
-          FirestoreErrorCode.invalidArgument,
-          e,
-          stackTrace,
+        FirestoreException(
+          message: 'Bundle failed to load',
+          errorCode: FirestoreErrorCode.invalidArgument,
+          cause: e,
+          stackTrace: stackTrace,
         ),
       );
     } finally {
@@ -1303,7 +1305,7 @@ class SyncEngine implements RemoteStoreCallback, SharedClientStateSyncer {
   Future<void> applyBatchState(
     int batchId,
     MutationBatchState state,
-    FirestoreError? error,
+    FirestoreException? error,
   ) async {
     final ImmutableSortedMap<DocumentKey, MaybeDocument>? documents =
         await _localStore.lookupMutationDocuments(batchId);
@@ -1332,7 +1334,7 @@ class SyncEngine implements RemoteStoreCallback, SharedClientStateSyncer {
   Future<void> applyTargetState(
     int targetId,
     QueryTargetState state,
-    FirestoreError? error,
+    FirestoreException? error,
   ) async {
     if (_isPrimary) {
       // A primary client gets the state of the targets from the backend.
@@ -1371,7 +1373,7 @@ class SyncEngine implements RemoteStoreCallback, SharedClientStateSyncer {
         );
         await _removeAndCleanupTarget(
           targetId,
-          GrpcError.custom(error!.code.value, error.message),
+          GrpcError.custom(error!.errorCode.value, error.message),
         );
         break;
     }

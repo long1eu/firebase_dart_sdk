@@ -8,8 +8,27 @@ work in progress.
 Transactions are optimistic, as in the Android and JS SDKs: `transaction.get` reads the current
 version of a document, and the commit sends every write with a precondition on the version that was
 read (documents that were only read are verified). When a precondition fails the whole callback is
-run again, up to `TransactionOptions.maxAttempts` times (5 by default), so the callback must not
+run again, up to `maxAttempts` times (5 by default), so the callback must not
 have side effects of its own.
+
+The loop of `TransactionRunner`; look at which errors lead back to the top:
+
+```mermaid
+flowchart TD
+    start["runTransaction"] --> wait["Wait for the backoff: none before the first attempt, then about 1 s, growing"]
+    wait --> run["Run the callback: transaction.get reads from the backend"]
+    run --> commit["Commit every write with a precondition on the version read"]
+    commit -->|success| done["Return the result of the callback"]
+    run -->|error| retry{"Attempts left, instance not terminated, and a retryable error?"}
+    commit -->|error| retry
+    retry -->|yes| wait
+    retry -->|no| fail["Fail with the error"]
+```
+
+Retryable are `aborted`, `failedPrecondition`, `alreadyExists`, and the errors that are not permanent
+(`Datastore.isPermanentError`: the connection-level errors listed below, and `unauthenticated`). A
+read-only transaction retries only the errors that are not permanent, and an error that is not a
+`FirestoreException` (one your callback throws) is never retried.
 
 **A commit whose answer is lost can be applied twice.** A commit is retried when it fails with
 `aborted`, `failedPrecondition` or `alreadyExists`, which the backend only returns when nothing was
@@ -30,7 +49,7 @@ a re-sent increment a second time after its acknowledgement was lost, as the emu
 
 ### Read-only transactions
 
-`TransactionOptions(readOnly: true)` runs a read-only transaction **of the backend** (the server
+`readOnly: true` runs a read-only transaction **of the backend** (the server
 SDKs have these; the Android and JS client SDKs do not):
 
 ```dart
@@ -39,8 +58,8 @@ final total = await firestore.runTransaction((transaction) async {
   final orders = await transaction.getQuery(
       firestore.collection('orders').where('account', isEqualTo: 'a'));
   final count = await transaction.getAggregate(firestore.collection('orders').count());
-  return (account.data, orders.docs.length, count.getCount());
-}, options: TransactionOptions(readOnly: true));
+  return (account.data(), orders.docs.length, count.count);
+}, readOnly: true);
 ```
 
 - Every read of the transaction sees the database as it was at one point in time: documents
@@ -48,7 +67,7 @@ final total = await firestore.runTransaction((transaction) async {
   also while other clients write. `getQuery` and `getAggregate` only exist for read-only
   transactions; in a read-write transaction they fail with `invalidArgument`, because such a
   transaction verifies its reads at commit and the result of a query cannot be verified.
-- `TransactionOptions(readOnly: true, readTime: timestamp)` reads the database as it was at
+- `readOnly: true, readTime: timestamp` reads the database as it was at
   `timestamp`. The backend keeps old versions for a limited time and rejects read times before that.
 - Writes in the transaction throw. Nothing is committed and no locks are taken, so there are no
   conflicts: the callback is not run again when documents change. It is only run again (up to
@@ -61,8 +80,39 @@ final total = await firestore.runTransaction((transaction) async {
 
 ## Lifecycle: `terminate()`
 
+An instance starts at its first use (a read, write, listener or other call that needs the client), or at once
+when `instanceFor` got settings; until then `firestore.settings = ...` and `useFirestoreEmulator` can change it.
+Follow the arrows for the calls that move it between
+states; the table under the picture says which calls work in each state.
+
+```mermaid
+stateDiagram-v2
+    direction LR
+    running : Running
+    networkDisabled : Network disabled
+    terminated : Terminated
+    [*] --> running: FirebaseFirestore.instanceFor
+    running --> networkDisabled: disableNetwork()
+    networkDisabled --> running: enableNetwork()
+    running --> terminated: terminate()
+    networkDisabled --> terminated: terminate()
+    terminated --> terminated: terminate() again does nothing
+```
+
+| Call | Running | Network disabled | Terminated |
+|---|---|---|---|
+| Listeners, `get()` | from the cache and the backend | from the cache; `get()` of a document that is not cached fails with `unavailable` | fail with `failedPrecondition` |
+| Writes | stored and sent; the future completes on the acknowledgement | stored; sent, and the future completes, after `enableNetwork()` | fail with `failedPrecondition` |
+| Aggregations, `get(const GetOptions(source: Source.server))` | work | fail | fail with `failedPrecondition` |
+| Transactions | work | not blocked by the client (see below) | fail with `failedPrecondition` |
+| `clearPersistence()` | fails with `failedPrecondition` | fails with `failedPrecondition` | works, unless a newer instance has the same cache open |
+| `terminate()` | terminates | terminates | does nothing |
+
+After `terminate()`, `FirebaseFirestore.instanceFor` creates a new instance. A transaction reads and commits
+over unary calls, not the streams, and the client does not check the network state before it starts one.
+
 `await firestore.terminate()` stops the instance: listeners stop receiving events, the streams and
-the local cache are closed, and `Firestore.instanceFor` returns a new instance from then on. What
+the local cache are closed, and `FirebaseFirestore.instanceFor` returns a new instance from then on. What
 happens to work that was in progress, as in the Android and JS SDKs:
 
 - A write whose future has not completed (it was not acknowledged by the backend yet) **never

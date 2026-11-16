@@ -55,7 +55,7 @@ pb.Pipeline_Stage stageAt(Pipeline pipeline, int index) =>
 pb.Value mapOf(Map<String, pb.Value> fields) => mapValue(fields);
 
 CollectionReference<Map<String, Object?>> collectionOf(
-  Firestore firestore,
+  FirebaseFirestore firestore,
   String path,
 ) => CollectionReferenceInternal.create<Map<String, Object?>>(
   ResourcePath.fromString(path),
@@ -76,7 +76,7 @@ String argumentErrorMessage(void Function() body) {
 }
 
 void main() {
-  final Firestore firestore = fakeFirestore;
+  final FirebaseFirestore firestore = fakeFirestore;
 
   group('execute(Pipeline|PipelineOptions)', () {
     test(
@@ -369,7 +369,7 @@ void main() {
       test(
         'throws on CollectionReference from a different database in insert and upsert stages',
         () {
-          final Firestore otherFirestore = FakeFirestore(
+          final FirebaseFirestore otherFirestore = FakeFirestore(
             DatabaseId.forDatabase('project2', '(default)'),
           );
           final CollectionReference<Map<String, Object?>> otherCollection =

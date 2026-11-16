@@ -12,7 +12,7 @@ List<String> ids(QuerySnapshot<Map<String, Object?>> snapshot) => <String>[
 ];
 
 Future<void> main() async {
-  final Firestore firestore = connect();
+  final FirebaseFirestore firestore = connect();
   final CollectionReference<Map<String, Object?>> cities = firestore.collection(
     scratch('cities'),
   );
@@ -63,15 +63,17 @@ Future<void> main() async {
   );
 
   // The same filters exist as methods named like in the Android SDK.
-  print('not IT: ${ids(await cities.whereNotEqualTo('country', 'IT').get())}');
+  print(
+    'not IT: ${ids(await cities.where('country', isNotEqualTo: 'IT').get())}',
+  );
 
   // OR queries are built with Filter.or / Filter.and.
   final Query<Map<String, Object?>> either = cities.where(
     Filter.or(<Filter>[
-      Filter.equalTo('country', 'PT'),
+      Filter('country', isEqualTo: 'PT'),
       Filter.and(<Filter>[
-        Filter.equalTo('country', 'IT'),
-        Filter.greaterThan('population', 2000000),
+        Filter('country', isEqualTo: 'IT'),
+        Filter('population', isGreaterThan: 2000000),
       ]),
     ]),
   );
@@ -83,7 +85,7 @@ Future<void> main() async {
   print('2 smallest: ${ids(await byPopulation.limit(2).get())}');
   print('2 largest: ${ids(await byPopulation.limitToLast(2).get())}');
   print(
-    'descending: ${ids(await cities.orderBy('population', Direction.descending).limit(2).get())}',
+    'descending: ${ids(await cities.orderBy('population', descending: true).limit(2).get())}',
   );
 
   // Cursors: by field values, or by a document snapshot (the usual way to
@@ -102,7 +104,7 @@ Future<void> main() async {
 
   // The document id is a field too.
   print(
-    'ids up to m: ${ids(await cities.where(FieldPath.documentIdField, isLessThan: cities.doc('m')).get())}',
+    'ids up to m: ${ids(await cities.where(FieldPath.documentId, isLessThan: cities.doc('m')).get())}',
   );
 
   await firestore.terminate();

@@ -43,7 +43,7 @@ class FakeFirestoreService extends FirestoreServiceBase {
 
 FirebaseApp newApp(String name) => FirebaseApp.withOptions(
       const FirebaseOptions(
-          apiKey: 'key', applicationId: 'appId', projectId: 'my-project'),
+          apiKey: 'key', appId: 'appId', projectId: 'my-project'),
       dependencies: null,
       name: name,
     );
@@ -161,7 +161,7 @@ void main() {
 
   group('FirestoreSettings.mockUserToken', () {
     test('withEmulator sets it', () {
-      final FirestoreSettings settings = FirestoreSettings()
+      final Settings settings = Settings()
           .withEmulator('127.0.0.1', 8080, mockUserToken: 'my-token');
       expect(settings.host, '127.0.0.1');
       expect(settings.port, 8080);
@@ -170,7 +170,7 @@ void main() {
     });
 
     test('withEmulator without a token clears it, copyWith keeps it', () {
-      final FirestoreSettings settings = FirestoreSettings()
+      final Settings settings = Settings()
           .withEmulator('127.0.0.1', 8080, mockUserToken: 'my-token');
       expect(settings.withEmulator('127.0.0.1', 8080).mockUserToken, isNull);
       expect(
@@ -181,41 +181,41 @@ void main() {
     });
 
     test('equality compares the claims', () {
-      FirestoreSettings withClaims() =>
-          FirestoreSettings().withEmulator('127.0.0.1', 8080,
+      Settings withClaims() =>
+          Settings().withEmulator('127.0.0.1', 8080,
               mockUserToken: <String, Object?>{'sub': 'alice'});
       expect(withClaims(), withClaims());
       expect(withClaims().hashCode, withClaims().hashCode);
       expect(
           withClaims(),
-          isNot(FirestoreSettings().withEmulator('127.0.0.1', 8080,
+          isNot(Settings().withEmulator('127.0.0.1', 8080,
               mockUserToken: <String, Object?>{'sub': 'bob'})));
       expect(withClaims(),
-          isNot(FirestoreSettings().withEmulator('127.0.0.1', 8080)));
+          isNot(Settings().withEmulator('127.0.0.1', 8080)));
     });
 
     test('rejects invalid tokens when the settings are created', () {
       expect(
-          () => FirestoreSettings().withEmulator('127.0.0.1', 8080,
+          () => Settings().withEmulator('127.0.0.1', 8080,
               mockUserToken: <String, Object?>{'uid': 'alice'}),
           throwsArgumentError);
       expect(
-          () => FirestoreSettings().withEmulator('127.0.0.1', 8080,
+          () => Settings().withEmulator('127.0.0.1', 8080,
               mockUserToken: <String, Object?>{'email': 'a@b.c'}),
           throwsArgumentError);
       expect(
-          () => FirestoreSettings()
+          () => Settings()
               .withEmulator('127.0.0.1', 8080, mockUserToken: 42),
           throwsArgumentError);
     });
 
     test('is rejected when the settings stop pointing at the emulator', () {
       // The unsigned token must never reach a production host.
-      final FirestoreSettings settings = FirestoreSettings()
+      final Settings settings = Settings()
           .withEmulator('127.0.0.1', 8080, mockUserToken: 'my-token');
       expect(
           () => settings.copyWith(
-              host: FirestoreSettings.defaultHost, port: 443, sslEnabled: true),
+              host: Settings.defaultHost, port: 443, sslEnabled: true),
           throwsArgumentError);
       expect(() => settings.copyWith(host: 'example.com'), throwsArgumentError);
       expect(() => settings.copyWith(port: 9090), throwsArgumentError);
@@ -230,32 +230,32 @@ void main() {
 
     test('withEmulator rejects the production host', () {
       expect(
-          () => FirestoreSettings().withEmulator(
-              FirestoreSettings.defaultHost, 443,
+          () => Settings().withEmulator(
+              Settings.defaultHost, 443,
               mockUserToken: 'my-token'),
           throwsArgumentError);
       expect(
-          () => FirestoreSettings()
-              .withEmulator(FirestoreSettings.defaultHost, 443),
+          () => Settings()
+              .withEmulator(Settings.defaultHost, 443),
           throwsArgumentError);
     });
 
     test('settings without withEmulator never have a token', () {
-      expect(FirestoreSettings().mockUserToken, isNull);
+      expect(Settings().mockUserToken, isNull);
       expect(
-          FirestoreSettings(host: '127.0.0.1', port: 8080, sslEnabled: false)
+          Settings(host: '127.0.0.1', port: 8080, sslEnabled: false)
               .mockUserToken,
           isNull);
       // Emulator settings that moved to another host are plain settings again.
-      final FirestoreSettings moved = FirestoreSettings()
+      final Settings moved = Settings()
           .withEmulator('127.0.0.1', 8080)
           .copyWith(host: 'example.com', port: 443, sslEnabled: true);
       expect(moved.mockUserToken, isNull);
-      expect(moved, FirestoreSettings(host: 'example.com'));
+      expect(moved, Settings(host: 'example.com'));
     });
 
     test('toString does not print the token', () {
-      final FirestoreSettings settings = FirestoreSettings()
+      final Settings settings = Settings()
           .withEmulator('127.0.0.1', 8080, mockUserToken: 'secret-token');
       expect(settings.toString(), isNot(contains('secret-token')));
     });
@@ -283,21 +283,21 @@ void main() {
     tearDown(() => server.shutdown());
 
     Future<void> getFromServer(
-        FirestoreSettings settings, String appName) async {
+        Settings settings, String appName) async {
       final FirebaseApp app = newApp(appName);
       addTearDown(app.delete);
-      final Firestore firestore = Firestore.instanceFor(
+      final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(
           app: app,
           settings:
               settings.copyWith(cacheSettings: const MemoryCacheSettings()));
       addTearDown(firestore.terminate);
-      await expectLater(firestore.doc('col/doc').get(Source.server),
-          throwsA(isA<FirestoreError>()));
+      await expectLater(firestore.doc('col/doc').get(GetOptions(source: Source.server)),
+          throwsA(isA<FirestoreException>()));
     }
 
     test('send the mock user token as the bearer token', () async {
       await getFromServer(
-          FirestoreSettings().withEmulator('127.0.0.1', server.port!,
+          Settings().withEmulator('127.0.0.1', server.port!,
               mockUserToken: <String, Object?>{'sub': 'alice'}),
           'mockUserTokenClaims');
 
@@ -311,7 +311,7 @@ void main() {
 
     test('send no authorization header without a mock user token', () async {
       await getFromServer(
-          FirestoreSettings().withEmulator('127.0.0.1', server.port!),
+          Settings().withEmulator('127.0.0.1', server.port!),
           'mockUserTokenNone');
 
       expect(calls, isNotEmpty);

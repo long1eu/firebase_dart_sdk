@@ -50,7 +50,7 @@ class PipelineResult {
     this.updateTime,
   }) : _key = key;
 
-  final Firestore _firestore;
+  final FirebaseFirestore _firestore;
   final ObjectValue _fields;
   final DocumentKey? _key;
 
@@ -88,7 +88,7 @@ class PipelineResult {
     } else if (field is FieldPath) {
       path = field.internalPath;
     } else if (field is String) {
-      path = FieldPath.fromDotSeparatedPath(field).internalPath;
+      path = FieldPath.fromString(field).internalPath;
     } else {
       throw ArgumentError(
         'A field must be a String, a FieldPath or a Field, but got: $field',
@@ -125,7 +125,7 @@ class PipelineResult {
 }
 
 /// Whether [left] and [right] are the same row: the same document (or both
-/// not documents) of the same [Firestore] instance, with equal data. The read
+/// not documents) of the same [FirebaseFirestore] instance, with equal data. The read
 /// times are not compared.
 bool pipelineResultEqual(PipelineResult left, PipelineResult right) {
   if (identical(left, right)) {
@@ -216,7 +216,7 @@ class PipelineExplainStats {
 @internal
 PipelineSnapshot decodePipelineResponses(
   Pipeline pipeline,
-  Firestore firestore,
+  FirebaseFirestore firestore,
   RemoteSerializer serializer,
   List<proto.ExecutePipelineResponse> responses,
 ) {

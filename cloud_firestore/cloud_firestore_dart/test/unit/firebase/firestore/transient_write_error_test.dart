@@ -70,7 +70,7 @@ void main() {
     final FirebaseApp app = newApp(name);
     addTearDown(app.delete);
     late _BusyMutationsDatabase database;
-    final Firestore firestore = Firestore.instanceFor(
+    final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(
       app: app,
       settings: offlineSettings,
       openDatabase:
@@ -101,7 +101,9 @@ void main() {
       'col/doc',
     );
     // Opens the cache.
-    await doc.get(Source.cache).then((_) {}, onError: (Object _) {});
+    await doc
+        .get(GetOptions(source: Source.cache))
+        .then((_) {}, onError: (Object _) {});
 
     database.failures = 1;
     await expectLater(
@@ -112,11 +114,14 @@ void main() {
     // Nothing was stored (a cache read of a document that is not in the cache
     // fails), and the next write is.
     await expectLater(
-      doc.get(Source.cache),
+      doc.get(GetOptions(source: Source.cache)),
       throwsA(firestoreErrorWithCode(FirestoreErrorCode.unavailable)),
     );
     // ignore: unawaited_futures, the write stays pending: nothing listens on the port.
     doc.set(<String, Object?>{'a': 2});
-    expect((await doc.get(Source.cache)).data, <String, Object?>{'a': 2});
+    expect(
+      (await doc.get(GetOptions(source: Source.cache))).data(),
+      <String, Object?>{'a': 2},
+    );
   });
 }

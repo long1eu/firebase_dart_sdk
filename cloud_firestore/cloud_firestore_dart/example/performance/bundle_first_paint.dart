@@ -24,7 +24,7 @@ Future<void> main() async {
   final String path = scratch('articles');
 
   // --- Server: write some data, read the query, keep the bundle. ---
-  final Firestore server = connect('server');
+  final FirebaseFirestore server = connect('server');
   final CollectionReference<Map<String, Object?>> articles = server.collection(
     path,
   );
@@ -37,10 +37,7 @@ Future<void> main() async {
   }
   await batch.commit();
   final Map<String, Object?> json =
-      (await articles
-              .orderBy('published', Direction.descending)
-              .limit(20)
-              .get())
+      (await articles.orderBy('published', descending: true).limit(20).get())
           .toJson();
   final String bundle = json['bundle']! as String;
   final String bundleName = json['bundleName']! as String;
@@ -50,7 +47,7 @@ Future<void> main() async {
   final Directory directory = Directory.systemTemp.createTempSync(
     'firestore_example_',
   );
-  final Firestore client = Firestore.instanceFor(
+  final FirebaseFirestore client = FirebaseFirestore.instanceFor(
     app: exampleApp('client'),
     openDatabase: sqliteOpener(directory),
     settings: emulatorSettings(cacheSettings: PersistentCacheSettings()),
@@ -60,11 +57,11 @@ Future<void> main() async {
   // In an app the bundle would come from your server or a CDN, or be shipped
   // as an asset; loadBundleStream takes the body of an HTTP response.
   await client.loadBundle(utf8.encode(bundle)).future;
-  final Query<Map<String, Object?>> latest = (await client.getNamedQuery(
+  final Query<Map<String, Object?>> latest = (await client.namedQuery(
     bundleName,
   ))!;
   final QuerySnapshot<Map<String, Object?>> cached = await latest.get(
-    Source.cache,
+    GetOptions(source: Source.cache),
   );
   firstPaint.stop();
   print(
@@ -84,7 +81,7 @@ Future<void> main() async {
   final Stopwatch inSync = Stopwatch()..start();
   final Completer<void> synced = Completer<void>();
   final StreamSubscription<QuerySnapshot<Map<String, Object?>>> subscription =
-      latest.snapshots.listen((QuerySnapshot<Map<String, Object?>> snapshot) {
+      latest.snapshots().listen((QuerySnapshot<Map<String, Object?>> snapshot) {
         print(
           'listener: ${snapshot.length} articles, first is '
           '"${snapshot.docs.first['title']}", from cache: '

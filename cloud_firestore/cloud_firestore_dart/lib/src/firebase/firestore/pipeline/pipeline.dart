@@ -76,7 +76,7 @@ class Pipeline {
     : stages = List<Stage>.unmodifiable(stages);
 
   /// The database this pipeline runs against.
-  final Firestore firestore;
+  final FirebaseFirestore firestore;
 
   /// The stages of this pipeline, in the order they run.
   @internal

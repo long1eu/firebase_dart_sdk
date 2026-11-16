@@ -15,10 +15,10 @@
 import 'dart:async';
 
 import 'package:cloud_firestore_dart/src/firebase/firestore/document_reference.dart';
-import 'package:cloud_firestore_dart/src/firebase/firestore/metadata_change.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/query.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/query_snapshot.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/source.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/get_options.dart';
 import 'package:test/test.dart';
 
 import '../../../util/event_accumulator.dart';
@@ -69,9 +69,8 @@ void main() {
 
     // The results are in the order of the query, not reversed.
     snapshot = await collection
-        .orderBy('sort', Direction.descending)
-        .limitToLast(2)
-        .get();
+        .orderBy('sort', descending: true)
+        .limitToLast(2).get();
     expect(querySnapshotToValues(snapshot), <Map<String, Object?>>[
       value('b', 1),
       value('a', 0),
@@ -97,9 +96,9 @@ void main() {
     final Query query = collection.limitToLast(2);
     await expectError(query.get,
         'limitToLast() queries require specifying at least one orderBy() clause');
-    await expectError(() => query.get(Source.cache),
+    await expectError(() => query.get(GetOptions(source: Source.cache)),
         'limitToLast() queries require specifying at least one orderBy() clause');
-    await expectError(() => query.snapshots.first,
+    await expectError(() => query.snapshots().first,
         'limitToLast() queries require specifying at least one orderBy() clause');
   });
 
@@ -137,7 +136,7 @@ void main() {
     ]));
 
     List<Object?> keys(QuerySnapshot snapshot) =>
-        snapshot.documents.map((dynamic d) => d.get('k') as Object?).toList();
+        snapshot.docs.map((dynamic d) => d.get('k') as Object?).toList();
 
     final Query base = collection.orderBy('k');
 
@@ -153,12 +152,11 @@ void main() {
         keys(await base
             .startAt(<Object?>['b'])
             .endBefore(<Object?>['e'])
-            .limitToLast(2)
-            .get()),
+            .limitToLast(2).get()),
         <String>['c', 'd']);
 
     // Cursors that are given in the query order, with a descending ordering.
-    final Query descending = collection.orderBy('k', Direction.descending);
+    final Query descending = collection.orderBy('k', descending: true);
     expect(keys(await descending.startAt(<Object?>['d']).limitToLast(2).get()),
         <String>['b', 'a']);
   });
@@ -170,7 +168,7 @@ void main() {
     // Populate the cache.
     await query.get();
 
-    final QuerySnapshot snapshot = await query.get(Source.cache);
+    final QuerySnapshot snapshot = await query.get(GetOptions(source: Source.cache));
     expect(querySnapshotToValues(snapshot), <Map<String, Object?>>[
       value('c', 1),
       value('d', 2),
@@ -183,8 +181,7 @@ void main() {
 
     final EventAccumulator<QuerySnapshot> accumulator =
         EventAccumulator<QuerySnapshot>();
-    final StreamSubscription<QuerySnapshot> subscription = query
-        .getSnapshots(MetadataChanges.include)
+    final StreamSubscription<QuerySnapshot> subscription = query.snapshots(includeMetadataChanges: true)
         .listen(accumulator.onData, onError: accumulator.onError);
 
     QuerySnapshot snapshot = await accumulator.wait();
@@ -225,17 +222,15 @@ void main() {
     final Query limit = collection.limit(2).orderBy('sort');
     final EventAccumulator<QuerySnapshot> limitAccumulator =
         EventAccumulator<QuerySnapshot>();
-    StreamSubscription<QuerySnapshot> limitSubscription = limit
-        .getSnapshots(MetadataChanges.include)
+    StreamSubscription<QuerySnapshot> limitSubscription = limit.snapshots(includeMetadataChanges: true)
         .listen(limitAccumulator.onData, onError: limitAccumulator.onError);
 
     // Setup mirroring `limitToLast` query.
     final Query limitToLast =
-        collection.limitToLast(2).orderBy('sort', Direction.descending);
+        collection.limitToLast(2).orderBy('sort', descending: true);
     final EventAccumulator<QuerySnapshot> limitToLastAccumulator =
         EventAccumulator<QuerySnapshot>();
-    StreamSubscription<QuerySnapshot> limitToLastSubscription = limitToLast
-        .getSnapshots(MetadataChanges.include)
+    StreamSubscription<QuerySnapshot> limitToLastSubscription = limitToLast.snapshots(includeMetadataChanges: true)
         .listen(limitToLastAccumulator.onData,
             onError: limitToLastAccumulator.onError);
 
@@ -248,8 +243,7 @@ void main() {
 
     // Unlisten then re-listen limit query.
     await limitSubscription.cancel();
-    limitSubscription = limit
-        .getSnapshots(MetadataChanges.include)
+    limitSubscription = limit.snapshots(includeMetadataChanges: true)
         .listen(limitAccumulator.onData, onError: limitAccumulator.onError);
 
     // Verify `limit` query still works.
@@ -268,9 +262,8 @@ void main() {
 
     // Unlisten to limitToLast, update a doc, then relisten to limitToLast.
     await limitToLastSubscription.cancel();
-    await collection.document('a').update(value('a', -2));
-    limitToLastSubscription = limitToLast
-        .getSnapshots(MetadataChanges.include)
+    await collection.doc('a').update(value('a', -2));
+    limitToLastSubscription = limitToLast.snapshots(includeMetadataChanges: true)
         .listen(limitToLastAccumulator.onData,
             onError: limitToLastAccumulator.onError);
 

@@ -37,12 +37,12 @@ Future<void> main() async {
 
   // Firestore logs every refused request as a warning; this program provokes
   // two on purpose.
-  Firestore.setLogLevel(LogLevel.error);
+  FirebaseFirestore.setLogLevel(LogLevel.error);
 
   final FirebaseApp app = FirebaseApp.withOptions(
     const FirebaseOptions(
       apiKey: 'fake-api-key',
-      applicationId: '1:1234567890:dart:example',
+      appId: '1:1234567890:dart:example',
       projectId: 'demo-test',
     ),
   );
@@ -55,9 +55,9 @@ Future<void> main() async {
 
   // 2. Then the Firestore instance, which picks it up.
   final int colon = firestoreEmulator.lastIndexOf(':');
-  final Firestore firestore = Firestore.instanceFor(
+  final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(
     app: app,
-    settings: FirestoreSettings().withEmulator(
+    settings: Settings().withEmulator(
       firestoreEmulator.substring(0, colon),
       int.parse(firestoreEmulator.substring(colon + 1)),
     ),
@@ -69,8 +69,8 @@ Future<void> main() async {
       'text': 'hello',
     });
     print('signed out, write accepted');
-  } on FirestoreError catch (e) {
-    print('signed out, write refused: ${e.code}');
+  } on FirestoreException catch (e) {
+    print('signed out, write refused: ${e.errorCode}');
   }
 
   // Signed in, the user writes below users/<uid>. sign-in completes after
@@ -81,20 +81,22 @@ Future<void> main() async {
   );
   await note.set(<String, Object?>{'text': 'hello'});
   final DocumentSnapshot<Map<String, Object?>> snapshot = await note.get(
-    Source.server,
+    GetOptions(source: Source.server),
   );
-  print('signed in, read back: ${snapshot.data?['text']}');
+  print('signed in, read back: ${snapshot.data()?['text']}');
 
   // Another user's documents stay closed.
   try {
-    await firestore.doc('users/somebody-else/notes/first').get(Source.server);
+    await firestore
+        .doc('users/somebody-else/notes/first')
+        .get(GetOptions(source: Source.server));
     print('read of another user accepted');
-  } on FirestoreError catch (e) {
-    print('read of another user refused: ${e.code}');
+  } on FirestoreException catch (e) {
+    print('read of another user refused: ${e.errorCode}');
   }
 
   await auth.deleteCurrentUser();
   await firestore.terminate();
   await auth.dispose();
-  app.delete();
+  await app.delete();
 }

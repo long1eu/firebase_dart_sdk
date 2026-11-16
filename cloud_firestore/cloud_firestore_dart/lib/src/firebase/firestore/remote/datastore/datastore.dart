@@ -71,7 +71,7 @@ class Datastore {
     TaskScheduler scheduler,
     DatabaseInfo databaseInfo,
     CredentialsProvider credentialsProvider, {
-    AppCheckTokenProvider? appCheckProvider,
+    FirebaseAppCheckTokenProvider? appCheckProvider,
     FirestoreTransport Function(ChannelOptionsProvider options)?
     transportFactory,
   }) {
@@ -159,7 +159,7 @@ class Datastore {
   ///
   /// See [isPermanentWriteError] for classifying write errors.
   static bool isPermanentGrpcError(GrpcError status) {
-    return isPermanentError(FirestoreErrorCode.fromValue(status));
+    return isPermanentError(FirestoreErrorCodeInternal.fromValue(status));
   }
 
   /// Determines whether the given error code represents a permanent error when
@@ -194,8 +194,6 @@ class Datastore {
       case FirestoreErrorCode.unimplemented:
       case FirestoreErrorCode.dataLoss:
         return true;
-      default:
-        throw ArgumentError('Unknown gRPC status code: $code');
     }
   }
 

@@ -58,6 +58,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/util/assert.dart'
     as asserts;
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/retryable_operation_queue.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/timer_task.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/load_bundle_task_progress.dart';
 import 'package:cloud_firestore_dart/src/proto/google/firestore/v1/index.dart'
     as proto;
 import 'package:firebase_app_dart/internal.dart';
@@ -766,7 +767,7 @@ class SpecClient implements RemoteStoreCallback {
         },
         onError: (dynamic error) {
           asserts.hardAssert(
-            error is FirestoreError,
+            error is FirestoreException,
             'The recived error is not a FirebaseFirestoreError it is ${error.runtimeType}.',
           );
           _events.add(QueryEvent(query: query, error: error));
@@ -1304,8 +1305,8 @@ class SpecClient implements RemoteStoreCallback {
     await _syncEngine.loadBundle(bundleReader, bundleTask);
     // Let the resulting snapshots be delivered to the listeners.
     await Future<void>.delayed(_delayDuration);
-    expect(bundleTask.isSuccessful, isTrue,
-        reason: 'Loading bundle failed with ${bundleTask.exception}');
+    expect(bundleTask.snapshot.taskState, LoadBundleTaskState.success,
+        reason: 'Loading bundle failed with ${bundleTask.snapshot.exception}');
   }
 
   Future<void> _doTriggerLruGc(int cacheThreshold) async {
@@ -1469,7 +1470,7 @@ class SpecClient implements RemoteStoreCallback {
     if (expected.containsKey('errorCode') &&
         expected['errorCode'] != StatusCode.ok) {
       expect(actual.error, isNotNull);
-      expect(actual.error!.code.value, expected['errorCode']);
+      expect(actual.error!.errorCode.value, expected['errorCode']);
     } else {
       final List<DocumentViewChange> expectedChanges = <DocumentViewChange>[];
       final List<dynamic>? removed = expected['removed'];

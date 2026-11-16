@@ -26,9 +26,9 @@ class FirestoreClient {
   /// Fails a request made after [shutdown], like `DatastoreImpl.verifyInitialized()` of the JS SDK.
   void _verifyNotTerminated() {
     if (_terminated) {
-      throw FirestoreError(
-        'The client has already been terminated.',
-        FirestoreErrorCode.failedPrecondition,
+      throw FirestoreException(
+        message: 'The client has already been terminated.',
+        errorCode: FirestoreErrorCode.failedPrecondition,
       );
     }
   }
@@ -215,13 +215,13 @@ class FirestoreClient {
           OnErrorResumeStreamTransformer<R>(
             (dynamic error, [StackTrace? stackTrace]) => Stream<R>.error(
               error is GrpcError
-                  ? FirestoreError(
-                      error.message ?? '',
-                      FirestoreErrorCode.fromValue(error),
+                  ? FirestoreException(
+                      message: error.message ?? '',
+                      errorCode: FirestoreErrorCodeInternal.fromValue(error),
                     )
-                  : FirestoreError(
-                      error.toString(),
-                      FirestoreErrorCode.unknown,
+                  : FirestoreException(
+                      message: error.toString(),
+                      errorCode: FirestoreErrorCode.unknown,
                     ),
               stackTrace,
             ),

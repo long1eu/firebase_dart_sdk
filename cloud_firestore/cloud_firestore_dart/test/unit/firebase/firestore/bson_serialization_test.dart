@@ -381,23 +381,23 @@ void main() {
   test('DocumentSnapshot returns the public types', () {
     final DocumentSnapshot<dynamic> snapshot =
         documentSnapshot('docs/1', allTypes, false);
-    expect(snapshot.data, allTypes);
-    expect(snapshot.getMinKey('minKey'), MinKey.instance);
-    expect(snapshot.getMaxKey('maxKey'), MaxKey.instance);
-    expect(snapshot.getInt32Value('int32'), Int32Value(-7));
-    expect(snapshot.getDecimal128Value('decimal128'), Decimal128Value('1200'));
-    expect(snapshot.getBsonObjectId('oid'),
+    expect(snapshot.data(), allTypes);
+    expect(snapshot.get('minKey') as MinKey?, MinKey.instance);
+    expect(snapshot.get('maxKey') as MaxKey?, MaxKey.instance);
+    expect(snapshot.get('int32') as Int32Value?, Int32Value(-7));
+    expect(snapshot.get('decimal128') as Decimal128Value?, Decimal128Value('1200'));
+    expect(snapshot.get('oid') as BsonObjectId?,
         BsonObjectId('507f191e810c19729de860ea'));
-    expect(snapshot.getBsonTimestamp('timestamp'), BsonTimestamp(1, 2));
-    expect(snapshot.getRegexValue('regex'), const RegexValue('^foo', 'i'));
-    expect(snapshot.getBlob('binary'), _binary(128, <int>[1, 2, 3]));
-    expect(snapshot.getBlob('binary')!.subtype, 128);
+    expect(snapshot.get('timestamp') as BsonTimestamp?, BsonTimestamp(1, 2));
+    expect(snapshot.get('regex') as RegexValue?, const RegexValue('^foo', 'i'));
+    expect(snapshot.get('binary') as Blob?, _binary(128, <int>[1, 2, 3]));
+    expect((snapshot.get('binary') as Blob?)!.subtype, 128);
     expect(snapshot.get('nested.array'),
         <Object?>[Int32Value(1), MaxKey.instance]);
 
-    expect(snapshot.getMinKey('missing'), isNull);
-    expect(snapshot.getInt32Value('missing'), isNull);
-    expect(() => snapshot.getInt32Value('minKey'), throwsStateError);
-    expect(() => snapshot.getMaxKey('minKey'), throwsStateError);
+    expect(snapshot.get('missing') as MinKey?, isNull);
+    expect(snapshot.get('missing') as Int32Value?, isNull);
+    expect(() => snapshot.get('minKey') as Int32Value?, throwsA(isA<TypeError>()));
+    expect(() => snapshot.get('minKey') as MaxKey?, throwsA(isA<TypeError>()));
   });
 }

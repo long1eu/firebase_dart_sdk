@@ -17,8 +17,8 @@ class DatabaseInfo {
     this.port = 443,
     this.forceLongPolling = false,
     this.autoDetectLongPolling = true,
-    this.longPollingOptions = const ExperimentalLongPollingOptions(),
-    this.grpcFlowControlWindow = FirestoreSettings.defaultGrpcFlowControlWindow,
+    this.longPollingOptions = const WebExperimentalLongPollingOptions(),
+    this.grpcFlowControlWindow = Settings.defaultGrpcFlowControlWindow,
     this.apiKey,
     this.appId,
   });
@@ -37,7 +37,7 @@ class DatabaseInfo {
   final bool autoDetectLongPolling;
 
   /// Web transport only: the options of long polling.
-  final ExperimentalLongPollingOptions longPollingOptions;
+  final WebExperimentalLongPollingOptions longPollingOptions;
 
   /// gRPC transport only: the HTTP/2 flow-control window, in bytes.
   final int grpcFlowControlWindow;

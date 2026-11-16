@@ -8,7 +8,7 @@ import 'package:cloud_firestore_dart/cloud_firestore_dart.dart';
 import 'common.dart';
 
 Future<void> main() async {
-  final Firestore firestore = connect();
+  final FirebaseFirestore firestore = connect();
   final CollectionReference<Map<String, Object?>> orders = firestore.collection(
     scratch('orders'),
   );
@@ -28,7 +28,7 @@ Future<void> main() async {
 
   // Count.
   final AggregateQuerySnapshot count = await orders.count().get();
-  print('orders: ${count.getCount()}');
+  print('orders: ${count.count}');
 
   // Several aggregations in one request; read each one back with the same
   // AggregateField.
@@ -39,8 +39,8 @@ Future<void> main() async {
       .aggregate(<AggregateField>[AggregateField.count(), sum, average])
       .get();
   print(
-    'ada: ${totals.getCount()} orders, sum ${totals.getInt(sum)}, '
-    'average ${totals.getDouble(average)}',
+    'ada: ${totals.count} orders, sum ${(totals.get(sum) as num?)?.toInt()}, '
+    'average ${(totals.get(average) as num?)?.toDouble()}',
   );
 
   // With aliases the result is a map keyed by the names you chose.

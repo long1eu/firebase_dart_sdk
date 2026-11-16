@@ -32,22 +32,21 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/model/value/field_va
 import 'package:cloud_firestore_dart/src/firebase/firestore/query_builder.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/set_options.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/assert.dart';
-import 'package:cloud_firestore_dart/src/firebase/firestore/util/util.dart';
 import 'package:meta/meta.dart';
 
 /// A [Transaction] is passed to the function given to
-/// [Firestore.runTransaction], to read and write documents within the
+/// [FirebaseFirestore.runTransaction], to read and write documents within the
 /// transaction.
 ///
 /// All the reads must come before the first write.
 class Transaction {
   /// Implementation detail of the SDK; not part of the supported API. Use
-  /// [Firestore.runTransaction].
+  /// [FirebaseFirestore.runTransaction].
   @internal
   Transaction(this._transaction, this._firestore);
 
   final core.Transaction _transaction;
-  final Firestore _firestore;
+  final FirebaseFirestore _firestore;
 
   /// Reads the document referred to by [documentRef].
   Future<DocumentSnapshot<T>> get<T extends Object?>(
@@ -70,12 +69,12 @@ class Transaction {
   }
 
   /// Runs [query] on the backend inside this transaction. Only in a read-only
-  /// transaction (`TransactionOptions(readOnly: true)`): the documents are
+  /// transaction (`runTransaction(..., readOnly: true)`): the documents are
   /// those of the snapshot of the database that every read of the transaction
   /// sees.
   ///
   /// In a read-write transaction the returned future fails with a
-  /// [FirestoreError] with code `invalidArgument`: such a transaction verifies
+  /// [FirestoreException] with code `invalidArgument`: such a transaction verifies
   /// at commit that the documents it read did not change, which is not possible
   /// for the result of a query.
   Future<QuerySnapshot<T>> getQuery<T extends Object?>(Query<T> query) async {
@@ -119,7 +118,7 @@ class Transaction {
     T data, [
     SetOptions? options,
   ]) {
-    final SetOptions setOptions = options ?? SetOptions.overwrite;
+    final SetOptions setOptions = options ?? const SetOptions();
     _firestore.validateReference(documentRef);
     checkNotNull<Object>(data, 'Provided data must not be null.');
     final Map<String, Object?> rawData = toRawData<T>(
@@ -145,41 +144,19 @@ class Transaction {
     return this;
   }
 
-  /// Updates the fields in [data] (dot-separated field paths to values) of the
-  /// document referred to by [documentRef]. The transaction fails if the
-  /// document does not exist.
+  /// Updates the fields in [data] of the document referred to by [documentRef]. Each key is a field path: a
+  /// `String` (dots separate nested fields) or a `FieldPath`. The transaction fails if the document does not
+  /// exist.
   Transaction update(
     DocumentReference<Object?> documentRef,
-    Map<String, Object?> data,
+    Map<Object, Object?> data,
   ) {
     _firestore.validateReference(documentRef);
     _transaction.update(
       documentRef.key,
-      _firestore.dataConverter.parseUpdateData(
+      _firestore.dataConverter.parseUpdateMap(
         data,
         methodName: 'Transaction.update',
-        targetDoc: documentRef.key,
-      ),
-    );
-    return this;
-  }
-
-  /// Updates fields of the document referred to by [documentRef]. [data]
-  /// alternates fields (a `String` or a `FieldPath`) and values.
-  Transaction updateFromList(
-    DocumentReference<Object?> documentRef,
-    List<Object?> data,
-  ) {
-    _firestore.validateReference(documentRef);
-    _transaction.update(
-      documentRef.key,
-      _firestore.dataConverter.parseUpdateDataFromList(
-        collectUpdateArguments(
-          1,
-          data,
-          methodName: 'Transaction.updateFromList',
-        ),
-        methodName: 'Transaction.updateFromList',
         targetDoc: documentRef.key,
       ),
     );

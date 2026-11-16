@@ -14,6 +14,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/firestore.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/query_snapshot.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/source.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/util.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/get_options.dart';
 import 'package:test/test.dart';
 
 import '../util/integration_test_util.dart';
@@ -30,22 +31,22 @@ void main() {
 
   test('writes and reads documents on the enterprise emulator',
       skip: skipReason, () async {
-    final Firestore firestore =
+    final FirebaseFirestore firestore =
         await IntegrationTestUtil.testEnterpriseFirestore();
     final CollectionReference collection =
         firestore.collection('enterprise-smoke-${autoId()}');
-    final DocumentReference doc = collection.document('a');
+    final DocumentReference doc = collection.doc('a');
 
     await doc.set(<String, Object?>{'value': 1, 'name': 'enterprise'});
-    await collection.document('b').set(<String, Object?>{'value': 2});
+    await collection.doc('b').set(<String, Object?>{'value': 2});
 
-    final DocumentSnapshot snapshot = await doc.get(Source.server);
+    final DocumentSnapshot snapshot = await doc.get(GetOptions(source: Source.server));
     expect(snapshot.exists, isTrue);
-    expect(snapshot.data, <String, Object?>{'value': 1, 'name': 'enterprise'});
+    expect(snapshot.data(), <String, Object?>{'value': 1, 'name': 'enterprise'});
     expect(snapshot.metadata.isFromCache, isFalse);
 
     final QuerySnapshot query =
-        await collection.where('value', isGreaterThan: 1).get(Source.server);
+        await collection.where('value', isGreaterThan: 1).get(GetOptions(source: Source.server));
     expect(query.docs.map((DocumentSnapshot d) => d.id), <String>['b']);
   });
 
@@ -58,13 +59,13 @@ void main() {
                   ? 'both variables name the same emulator: needs both emulators'
                   : null), () async {
     final String path = 'enterprise-smoke-${autoId()}/doc';
-    final Firestore enterprise =
+    final FirebaseFirestore enterprise =
         await IntegrationTestUtil.testEnterpriseFirestore();
-    await enterprise.document(path).set(<String, Object?>{'value': 1});
+    await enterprise.doc(path).set(<String, Object?>{'value': 1});
 
-    final Firestore standard = await IntegrationTestUtil.testFirestore();
+    final FirebaseFirestore standard = await IntegrationTestUtil.testFirestore();
     final DocumentSnapshot snapshot =
-        await standard.document(path).get(Source.server);
+        await standard.doc(path).get(GetOptions(source: Source.server));
     expect(snapshot.exists, isFalse);
   });
 }

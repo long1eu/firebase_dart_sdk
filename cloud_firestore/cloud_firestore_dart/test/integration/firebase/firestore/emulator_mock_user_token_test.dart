@@ -17,18 +17,18 @@ import '../../../util/test_hygiene.dart';
 void main() {
   checkTestsLeaveNothingBehind();
 
-  Future<Firestore> instanceWith(Object mockUserToken) async {
-    final FirestoreSettings base = IntegrationTestUtil.newTestSettings();
+  Future<FirebaseFirestore> instanceWith(Object mockUserToken) async {
+    final Settings base = IntegrationTestUtil.newTestSettings();
     final FirebaseApp app = FirebaseApp.withOptions(
       FirebaseOptions(
           apiKey: 'key',
-          applicationId: 'appId',
+          appId: 'appId',
           projectId: IntegrationTestUtil.provider.projectId),
       dependencies: null,
       name: 'mockUserToken-${const Uuid().v4()}',
     );
     addTearDown(app.delete);
-    final Firestore firestore = Firestore.instanceFor(
+    final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(
       app: app,
       settings: base
           .withEmulator(base.host, base.port, mockUserToken: mockUserToken)
@@ -38,13 +38,13 @@ void main() {
     return firestore;
   }
 
-  Future<void> writeAndRead(Firestore firestore) async {
+  Future<void> writeAndRead(FirebaseFirestore firestore) async {
     final DocumentReference<Map<String, Object?>> doc =
         firestore.collection('mock-user-token').doc(const Uuid().v4());
     await doc.set(<String, Object?>{'a': 1});
     final DocumentSnapshot<Map<String, Object?>> snapshot =
-        await doc.get(Source.server);
-    expect(snapshot.data, <String, Object?>{'a': 1});
+        await doc.get(GetOptions(source: Source.server));
+    expect(snapshot.data(), <String, Object?>{'a': 1});
   }
 
   test('requests with a mock user token from claims succeed', () async {
@@ -64,14 +64,14 @@ void main() {
       () async {
     // The rules allow everything, so the only way to see that the emulator got the token is to send one it can't
     // parse. A transaction surfaces the error of the request (a listen or a write would retry).
-    final Firestore firestore = await instanceWith('not-a-jwt');
+    final FirebaseFirestore firestore = await instanceWith('not-a-jwt');
     await expectLater(
         firestore.runTransaction((Transaction transaction) =>
             transaction.get(firestore.doc('mock-user-token/doc'))),
-        throwsA(isA<FirestoreError>()
-            .having((FirestoreError e) => e.code, 'code',
+        throwsA(isA<FirestoreException>()
+            .having((FirestoreException e) => e.errorCode, 'code',
                 FirestoreErrorCode.invalidArgument)
-            .having((FirestoreError e) => e.message.toLowerCase(), 'message',
+            .having((FirestoreException e) => e.message.toLowerCase(), 'message',
                 contains('jwt'))));
   });
 }

@@ -11,6 +11,22 @@ app and a browser app. Each directory is a package of its own with a `pubspec.ya
 | [`worker_queue/`](worker_queue/) | A long-running worker: a listener to wake up, a transaction that claims each job once, results in a batch, a clean stop on `SIGTERM`. |
 | [`flutter_notes/`](flutter_notes/) | A Flutter notes app: a real-time list, offline edits in a SQLite cache, an offline indicator, connectivity events and a clean shutdown. Built and run on macOS only. |
 | [`web_app/`](web_app/) | A browser app in plain Dart (`package:web`): a real-time list, offline writes, a memory or SQLite (IndexedDB/OPFS) cache, and a Firestore Lite page to compare sizes. Experimental, tried in Chrome only. |
+| [`playground/`](playground/) | A browser playground with no backend: the client runs with its network disabled on a memory cache, and the page shows each snapshot event, the writes waiting for a server and a timeline. Static files only, ready for any static host. Experimental, tried in Chrome only. |
+
+To pick one, start from where your code runs and follow the arrows:
+
+```mermaid
+flowchart TD
+  start{"Where does your code run?"}
+  start -- "a server or a container" --> serverKind{"How does it run?"}
+  serverKind -- "answers HTTP requests" --> serverShelf["server_shelf"]
+  serverKind -- "runs once and exits" --> cloudRunJob["cloud_run_job"]
+  serverKind -- "runs until stopped, takes jobs" --> workerQueue["worker_queue"]
+  start -- "a terminal" --> cli["cli"]
+  start -- "a Flutter app" --> flutterNotes["flutter_notes"]
+  start -- "a browser, without Flutter" --> webApp["web_app"]
+  start -- "I want one API topic" --> apiExamples["cloud_firestore_dart/example/"]
+```
 
 For the API one topic at a time, see
 the programs in [`cloud_firestore/cloud_firestore_dart/example/`](../cloud_firestore/cloud_firestore_dart/example/README.md).
@@ -44,7 +60,8 @@ FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 dart test
 - `server_shelf`, `cli` and `cloud_run_job` take the three packages from this repository, with
   path dependencies and `dependency_overrides` in their `pubspec.yaml`, so they run against the
   code next to them. To use one outside the repository, replace both with the versions on pub.dev
-  (`^0.1.0`). `worker_queue`, `flutter_notes` and `web_app` depend on the versions on pub.dev and
-  can be copied out as they are; they have no tests.
+  (`^0.1.0`). `worker_queue`, `flutter_notes`, `web_app` and `playground` depend on the versions on
+  pub.dev and can be copied out as they are; they have no tests, except `playground`, which has a
+  smoke test that needs no emulator.
 - `firestore_from_env.dart` is copied, not shared, so that each directory can be copied out on
   its own.

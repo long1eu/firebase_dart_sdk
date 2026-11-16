@@ -19,13 +19,13 @@ import 'package:firebase_app_dart/firebase_app_dart.dart';
 import 'package:firebase_app_dart/internal.dart';
 import 'package:rxdart/rxdart.dart';
 
-/// Uses an [InternalAppCheckTokenProvider] to get App Check tokens for the
+/// Uses an [AppCheckTokenProvider] to get App Check tokens for the
 /// `x-firebase-appcheck` header.
 ///
 /// When constructed without an interop provider, [token] fails with
-/// [FirebaseApiNotAvailableError] (which callers ignore).
-class AppCheckTokenProvider {
-  AppCheckTokenProvider(this._interop) {
+/// [FirebaseApiNotAvailableException] (which callers ignore).
+class FirebaseAppCheckTokenProvider {
+  FirebaseAppCheckTokenProvider(this._interop) {
     // Like upstream, keep listening to token changes for as long as the
     // provider lives. The new token is picked up by the next request; streams
     // are deliberately not restarted (upstream reverted that, 62d868a).
@@ -34,7 +34,7 @@ class AppCheckTokenProvider {
 
   static const String _tag = 'AppCheckTokenProvider';
 
-  final InternalAppCheckTokenProvider? _interop;
+  final AppCheckTokenProvider? _interop;
   final PublishSubject<String> _onChange = PublishSubject<String>();
   StreamSubscription<AppCheckTokenResult>? _subscription;
   bool _forceRefresh = false;
@@ -52,12 +52,12 @@ class AppCheckTokenProvider {
     _onChange.add(result.token);
   }
 
-  /// The current token. Throws [FirebaseApiNotAvailableError] when there is no
+  /// The current token. Throws [FirebaseApiNotAvailableException] when there is no
   /// App Check source, and rethrows failures of the source.
   Future<String> get token async {
-    final InternalAppCheckTokenProvider? interop = _interop;
+    final AppCheckTokenProvider? interop = _interop;
     if (interop == null) {
-      throw const FirebaseApiNotAvailableError('AppCheck is not available');
+      throw const FirebaseApiNotAvailableException('AppCheck is not available');
     }
     final bool forceRefresh = _forceRefresh;
     _forceRefresh = false;

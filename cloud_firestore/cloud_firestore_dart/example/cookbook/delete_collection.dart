@@ -21,13 +21,13 @@ Future<int> deleteCollection(
     // Ask the server, not the cache: the cache may not hold every document.
     final QuerySnapshot<Map<String, Object?>> page = await collection
         .limit(pageSize)
-        .get(Source.server);
+        .get(GetOptions(source: Source.server));
     if (page.isEmpty) {
       return deleted;
     }
     final WriteBatch batch = collection.firestore.batch();
     for (final QueryDocumentSnapshot<Map<String, Object?>> doc in page) {
-      batch.delete(doc.ref);
+      batch.delete(doc.reference);
     }
     await batch.commit();
     deleted += page.length;
@@ -35,7 +35,7 @@ Future<int> deleteCollection(
 }
 
 Future<void> main() async {
-  final Firestore firestore = connect();
+  final FirebaseFirestore firestore = connect();
   final CollectionReference<Map<String, Object?>> logs = firestore.collection(
     scratch('logs'),
   );
@@ -47,7 +47,7 @@ Future<void> main() async {
   await batch.commit();
 
   print('deleted: ${await deleteCollection(logs)}');
-  print('left: ${(await logs.count().get()).getCount()}');
+  print('left: ${(await logs.count().get()).count}');
 
   await firestore.terminate();
 }

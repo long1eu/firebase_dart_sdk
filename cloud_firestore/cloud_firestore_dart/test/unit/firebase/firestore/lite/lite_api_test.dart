@@ -46,12 +46,12 @@ void main() {
 
   FakeLiteTransport transport() => transports.single;
 
-  Firestore newFirestore({FirestoreSettings? settings, String? databaseName}) {
-    final Firestore firestore = databaseName == null
-        ? Firestore.instanceFor(app: app, settings: settings)
-        : Firestore.instanceFor(
+  FirebaseFirestore newFirestore({Settings? settings, String? databaseName}) {
+    final FirebaseFirestore firestore = databaseName == null
+        ? FirebaseFirestore.instanceFor(app: app, settings: settings)
+        : FirebaseFirestore.instanceFor(
             app: app,
-            database: databaseName,
+            databaseId: databaseName,
             settings: settings,
           );
     addTearDown(firestore.terminate);
@@ -73,7 +73,7 @@ void main() {
     app = FirebaseApp.withOptions(
       const FirebaseOptions(
         apiKey: 'key',
-        applicationId: 'appId',
+        appId: 'appId',
         projectId: 'lite-project',
       ),
       dependencies: null,
@@ -84,7 +84,7 @@ void main() {
 
   group('instance', () {
     test('opens no transport until the first call', () async {
-      final Firestore firestore = newFirestore();
+      final FirebaseFirestore firestore = newFirestore();
       firestore.collection('coll').where('a', isEqualTo: 1).orderBy('a');
       firestore.batch().set(firestore.doc('coll/doc'), <String, Object?>{});
       expect(transports, isEmpty);
@@ -96,12 +96,8 @@ void main() {
     });
 
     test('talks to the host of the settings', () async {
-      final Firestore firestore = newFirestore(
-        settings: FirestoreSettings(
-          host: 'example.test',
-          port: 8443,
-          sslEnabled: false,
-        ),
+      final FirebaseFirestore firestore = newFirestore(
+        settings: Settings(host: 'example.test', port: 8443, sslEnabled: false),
       );
       await firestore.doc('coll/doc').get();
       expect(transport().databaseInfo.host, 'example.test');
@@ -110,7 +106,7 @@ void main() {
     });
 
     test('defaults to the production service', () async {
-      final Firestore firestore = newFirestore();
+      final FirebaseFirestore firestore = newFirestore();
       expect(firestore.projectId, 'lite-project');
       expect(firestore.databaseId, '(default)');
       await firestore.doc('coll/doc').get();
@@ -119,9 +115,33 @@ void main() {
       expect(transport().databaseInfo.sslEnabled, isTrue);
     });
 
+    test('takes settings and the emulator until the first call', () async {
+      final FirebaseFirestore firestore = newFirestore();
+      firestore.settings = Settings(grpcFlowControlWindow: 1024 * 1024);
+      firestore.useFirestoreEmulator('127.0.0.1', 8145);
+      expect(firestore.settings.host, '127.0.0.1');
+      expect(firestore.settings.grpcFlowControlWindow, 1024 * 1024);
+      await firestore.doc('coll/doc').get();
+      expect(transport().databaseInfo.host, '127.0.0.1');
+      expect(transport().databaseInfo.port, 8145);
+      expect(transport().databaseInfo.sslEnabled, isFalse);
+      expect(transport().databaseInfo.grpcFlowControlWindow, 1024 * 1024);
+
+      final Matcher started = throwsA(
+        isA<FirestoreException>().having(
+          (FirestoreException e) => e.errorCode,
+          'errorCode',
+          FirestoreErrorCode.failedPrecondition,
+        ),
+      );
+      expect(() => firestore.settings = Settings(), started);
+      expect(() => firestore.useFirestoreEmulator('127.0.0.1', 1), started);
+      expect(firestore.settings.port, 8145);
+    });
+
     test('passes the flow-control window of the settings', () async {
-      final Firestore firestore = newFirestore(
-        settings: FirestoreSettings(grpcFlowControlWindow: 1024 * 1024),
+      final FirebaseFirestore firestore = newFirestore(
+        settings: Settings(grpcFlowControlWindow: 1024 * 1024),
       );
       expect(firestore.settings.grpcFlowControlWindow, 1024 * 1024);
       await firestore.doc('coll/doc').get();
@@ -129,17 +149,14 @@ void main() {
     });
 
     test('uses a flow-control window of 256 KiB by default', () async {
-      final Firestore firestore = newFirestore();
+      final FirebaseFirestore firestore = newFirestore();
       await firestore.doc('coll/doc').get();
       expect(transport().databaseInfo.grpcFlowControlWindow, 256 * 1024);
-      expect(
-        () => FirestoreSettings(grpcFlowControlWindow: 0),
-        throwsArgumentError,
-      );
+      expect(() => Settings(grpcFlowControlWindow: 0), throwsArgumentError);
     });
 
     test('addresses a named database', () async {
-      final Firestore firestore = newFirestore(databaseName: 'other');
+      final FirebaseFirestore firestore = newFirestore(databaseName: 'other');
       await firestore.doc('coll/doc').get();
       expect(
         transport()
@@ -151,7 +168,7 @@ void main() {
     });
 
     test('sends the routing headers and no credentials without auth', () async {
-      final Firestore firestore = newFirestore();
+      final FirebaseFirestore firestore = newFirestore();
       await firestore.doc('coll/doc').get();
       final Map<String, String> headers = await transport().headers();
       expect(headers['x-goog-request-params'], database);
@@ -164,8 +181,8 @@ void main() {
     });
 
     test('sends the mock user token of the emulator settings', () async {
-      final Firestore firestore = newFirestore(
-        settings: FirestoreSettings().withEmulator(
+      final FirebaseFirestore firestore = newFirestore(
+        settings: Settings().withEmulator(
           '127.0.0.1',
           8080,
           mockUserToken: 'owner-token',
@@ -192,7 +209,7 @@ void main() {
       app
         ..authProvider = auth
         ..appCheckProvider = appCheck;
-      final Firestore firestore = newFirestore();
+      final FirebaseFirestore firestore = newFirestore();
       await firestore.doc('coll/doc').get();
 
       final Map<String, String> headers = await transport().headers();
@@ -212,14 +229,14 @@ void main() {
     test(
       'terminate() shuts the transport down and rejects later calls',
       () async {
-        final Firestore firestore = newFirestore();
+        final FirebaseFirestore firestore = newFirestore();
         await firestore.doc('coll/doc').get();
         await firestore.terminate();
         expect(transport().isShutDown, isTrue);
 
         final Matcher throwsTerminated = throwsA(
-          isA<FirestoreError>().having(
-            (FirestoreError e) => e.code,
+          isA<FirestoreException>().having(
+            (FirestoreException e) => e.errorCode,
             'code',
             FirestoreErrorCode.failedPrecondition,
           ),
@@ -245,7 +262,7 @@ void main() {
     );
 
     test('terminate() lets the calls in flight finish first', () async {
-      final Firestore firestore = newFirestore();
+      final FirebaseFirestore firestore = newFirestore();
       final Completer<void> release = Completer<void>();
       await firestore.doc('coll/warmup').get();
       transport().handlers['BatchGetDocuments'] =
@@ -269,13 +286,13 @@ void main() {
       expect(transport().isShutDown, isFalse);
 
       release.complete();
-      expect((await inFlight).data, <String, Object?>{'a': 1});
+      expect((await inFlight).data(), <String, Object?>{'a': 1});
       await termination;
       expect(transport().isShutDown, isTrue);
     });
 
     test('terminate() before any call opens no transport', () async {
-      final Firestore firestore = newFirestore();
+      final FirebaseFirestore firestore = newFirestore();
       await firestore.terminate();
       expect(transports, isEmpty);
     });
@@ -283,52 +300,43 @@ void main() {
 
   group('settings', () {
     test('are compared by value', () {
-      expect(FirestoreSettings(), FirestoreSettings());
-      expect(FirestoreSettings().hashCode, FirestoreSettings().hashCode);
+      expect(Settings(), Settings());
+      expect(Settings().hashCode, Settings().hashCode);
+      expect(Settings(host: 'a.test'), isNot(Settings(host: 'b.test')));
       expect(
-        FirestoreSettings(host: 'a.test'),
-        isNot(FirestoreSettings(host: 'b.test')),
-      );
-      expect(
-        FirestoreSettings().withEmulator(
+        Settings().withEmulator(
           'localhost',
           8080,
           mockUserToken: <String, Object?>{'sub': 'alice'},
         ),
-        FirestoreSettings().withEmulator(
+        Settings().withEmulator(
           'localhost',
           8080,
           mockUserToken: <String, Object?>{'sub': 'alice'},
         ),
       );
       expect(
-        FirestoreSettings().withEmulator(
+        Settings().withEmulator(
           'localhost',
           8080,
           mockUserToken: <String, Object?>{'sub': 'alice'},
         ),
-        isNot(FirestoreSettings().withEmulator('localhost', 8080)),
+        isNot(Settings().withEmulator('localhost', 8080)),
       );
     });
 
     test('reject a host that is not a host and plain text to production', () {
+      expect(() => Settings(host: 'http://example.test'), throwsArgumentError);
+      expect(() => Settings(sslEnabled: false), throwsArgumentError);
       expect(
-        () => FirestoreSettings(host: 'http://example.test'),
-        throwsArgumentError,
-      );
-      expect(() => FirestoreSettings(sslEnabled: false), throwsArgumentError);
-      expect(
-        () => FirestoreSettings().withEmulator(
-          FirestoreSettings.defaultHost,
-          443,
-        ),
+        () => Settings().withEmulator(Settings.defaultHost, 443),
         throwsArgumentError,
       );
     });
 
     test('reject a mock user token without a user id', () {
       expect(
-        () => FirestoreSettings().withEmulator(
+        () => Settings().withEmulator(
           'localhost',
           8080,
           mockUserToken: <String, Object?>{'email': 'a@example.com'},
@@ -336,11 +344,7 @@ void main() {
         throwsArgumentError,
       );
       expect(
-        () => FirestoreSettings().withEmulator(
-          'localhost',
-          8080,
-          mockUserToken: 42,
-        ),
+        () => Settings().withEmulator('localhost', 8080, mockUserToken: 42),
         throwsArgumentError,
       );
     });
@@ -348,7 +352,7 @@ void main() {
 
   group('documents', () {
     test('get() asks for the document and decodes it', () async {
-      final Firestore firestore = newFirestore();
+      final FirebaseFirestore firestore = newFirestore();
       await firestore.doc('coll/warmup').get();
       transport().handlers['BatchGetDocuments'] = (GeneratedMessage request) =>
           <GeneratedMessage>[
@@ -370,25 +374,25 @@ void main() {
       );
       expect(snapshot.exists, isTrue);
       expect(snapshot.id, 'doc');
-      expect(snapshot.ref, firestore.doc('coll/doc'));
-      expect(snapshot.data, <String, Object?>{
+      expect(snapshot.reference, firestore.doc('coll/doc'));
+      expect(snapshot.data(), <String, Object?>{
         'a': 1,
         'ref': firestore.doc('other/target'),
       });
     });
 
     test('get() of a missing document', () async {
-      final Firestore firestore = newFirestore();
+      final FirebaseFirestore firestore = newFirestore();
       final DocumentSnapshot<Map<String, Object?>> snapshot = await firestore
           .doc('coll/doc')
           .get();
       expect(snapshot.exists, isFalse);
-      expect(snapshot.data, isNull);
-      expect(snapshot.ref.path, 'coll/doc');
+      expect(snapshot.data(), isNull);
+      expect(snapshot.reference.path, 'coll/doc');
     });
 
     test('set() commits one write without a precondition', () async {
-      final Firestore firestore = newFirestore();
+      final FirebaseFirestore firestore = newFirestore();
       await firestore.doc('coll/doc').set(<String, Object?>{'a': 1});
       final proto.CommitRequest request = transport()
           .requests<proto.CommitRequest>('Commit')
@@ -402,11 +406,11 @@ void main() {
     });
 
     test('set() with merge sends the field mask and the transforms', () async {
-      final Firestore firestore = newFirestore();
+      final FirebaseFirestore firestore = newFirestore();
       await firestore.doc('coll/doc').set(<String, Object?>{
         'a': 1,
         'when': FieldValue.serverTimestamp(),
-      }, SetOptions.mergeAllFields);
+      }, const SetOptions(merge: true));
       final proto.Write write = transport()
           .requests<proto.CommitRequest>('Commit')
           .single
@@ -416,12 +420,11 @@ void main() {
     });
 
     test('update() requires the document to exist', () async {
-      final Firestore firestore = newFirestore();
+      final FirebaseFirestore firestore = newFirestore();
       await firestore.doc('coll/doc').update(<String, Object?>{'a.b': 1});
-      await firestore.doc('coll/doc').updateFromList(<Object?>[
-        'c',
-        FieldValue.delete(),
-      ]);
+      await firestore.doc('coll/doc').update(<Object, Object?>{
+        'c': FieldValue.delete(),
+      });
       final List<proto.CommitRequest> requests = transport()
           .requests<proto.CommitRequest>('Commit');
       expect(requests[0].writes.single.updateMask.fieldPaths, <String>['a.b']);
@@ -431,7 +434,7 @@ void main() {
     });
 
     test('delete() commits a delete', () async {
-      final Firestore firestore = newFirestore();
+      final FirebaseFirestore firestore = newFirestore();
       await firestore.doc('coll/doc').delete();
       expect(
         transport()
@@ -445,7 +448,7 @@ void main() {
     });
 
     test('add() writes a document with an auto id', () async {
-      final Firestore firestore = newFirestore();
+      final FirebaseFirestore firestore = newFirestore();
       final DocumentReference<Map<String, Object?>> ref = await firestore
           .collection('coll')
           .add(<String, Object?>{'a': 1});
@@ -463,20 +466,20 @@ void main() {
     });
 
     test('a backend error is a FirestoreError with its code', () async {
-      final Firestore firestore = newFirestore();
+      final FirebaseFirestore firestore = newFirestore();
       await firestore.doc('coll/warmup').get();
       transport().handlers['Commit'] = (GeneratedMessage request) =>
           throw const GrpcError.permissionDenied('no');
       await expectLater(
         firestore.doc('coll/doc').set(<String, Object?>{'a': 1}),
         throwsA(
-          isA<FirestoreError>()
+          isA<FirestoreException>()
               .having(
-                (FirestoreError e) => e.code,
+                (FirestoreException e) => e.errorCode,
                 'code',
                 FirestoreErrorCode.permissionDenied,
               )
-              .having((FirestoreError e) => e.message, 'message', 'no'),
+              .having((FirestoreException e) => e.message, 'message', 'no'),
         ),
       );
       expect(
@@ -487,7 +490,7 @@ void main() {
     });
 
     test('invalid data fails the future and sends nothing', () async {
-      final Firestore firestore = newFirestore();
+      final FirebaseFirestore firestore = newFirestore();
       await expectLater(
         firestore.doc('coll/doc').set(<String, Object?>{'a': Object()}),
         throwsArgumentError,
@@ -497,15 +500,15 @@ void main() {
         throwsArgumentError,
       );
       await expectLater(
-        firestore.doc('coll/doc').updateFromList(<Object?>['a']),
+        firestore.doc('coll/doc').update(<Object, Object?>{1: 'a'}),
         throwsArgumentError,
       );
       expect(transports, isEmpty);
     });
 
     test('a reference of another database is rejected in data', () async {
-      final Firestore firestore = newFirestore();
-      final Firestore other = newFirestore(databaseName: 'other');
+      final FirebaseFirestore firestore = newFirestore();
+      final FirebaseFirestore other = newFirestore(databaseName: 'other');
       await expectLater(
         firestore.doc('coll/doc').set(<String, Object?>{
           'ref': other.doc('coll/doc'),
@@ -527,7 +530,7 @@ void main() {
     test(
       'a reference of the same database is written as a reference',
       () async {
-        final Firestore firestore = newFirestore();
+        final FirebaseFirestore firestore = newFirestore();
         await firestore.doc('coll/doc').set(<String, Object?>{
           'ref': firestore.doc('other/target'),
         });
@@ -546,7 +549,7 @@ void main() {
     );
 
     test('toJson() and fromJson() round trip', () {
-      final Firestore firestore = newFirestore();
+      final FirebaseFirestore firestore = newFirestore();
       final DocumentReference<Map<String, Object?>> ref = firestore.doc(
         'coll/doc',
       );
@@ -573,11 +576,11 @@ void main() {
 
   group('write batch', () {
     test('commits all the writes in one request', () async {
-      final Firestore firestore = newFirestore();
+      final FirebaseFirestore firestore = newFirestore();
       final WriteBatch batch = firestore.batch()
         ..set(firestore.doc('coll/a'), <String, Object?>{'a': 1})
         ..update(firestore.doc('coll/b'), <String, Object?>{'b': 2})
-        ..updateFromList(firestore.doc('coll/c'), <Object?>['c', 3])
+        ..update(firestore.doc('coll/c'), <Object, Object?>{'c': 3})
         ..delete(firestore.doc('coll/d'));
       await batch.commit();
       final List<proto.Write> writes = transport()
@@ -593,14 +596,14 @@ void main() {
     });
 
     test('an empty batch sends nothing', () async {
-      final Firestore firestore = newFirestore();
+      final FirebaseFirestore firestore = newFirestore();
       await firestore.batch().commit();
       expect(transport().calls, isEmpty);
     });
 
     test('rejects a reference of another instance', () {
-      final Firestore firestore = newFirestore();
-      final Firestore other = newFirestore(databaseName: 'other');
+      final FirebaseFirestore firestore = newFirestore();
+      final FirebaseFirestore other = newFirestore(databaseName: 'other');
       final WriteBatch batch = firestore.batch();
       expect(
         () => batch.set(other.doc('coll/doc'), <String, Object?>{}),
@@ -614,7 +617,7 @@ void main() {
     });
 
     test('cannot be used after commit()', () async {
-      final Firestore firestore = newFirestore();
+      final FirebaseFirestore firestore = newFirestore();
       final WriteBatch batch = firestore.batch();
       await batch.commit();
       expect(() => batch.delete(firestore.doc('coll/doc')), throwsStateError);
@@ -635,7 +638,7 @@ void main() {
     test(
       'get() sends the structured query and returns the documents in order',
       () async {
-        final Firestore firestore = newFirestore();
+        final FirebaseFirestore firestore = newFirestore();
         await firestore.doc('coll/warmup').get();
         transport().handlers['RunQuery'] = (GeneratedMessage request) =>
             results(<int>[1, 2]);
@@ -682,15 +685,15 @@ void main() {
               .toList(),
           <String>['doc1', 'doc2'],
         );
-        expect(snapshot.docs.first.data, <String, Object?>{'a': 1});
-        expect(snapshot.docs.first.ref, firestore.doc('coll/doc1'));
+        expect(snapshot.docs.first.data(), <String, Object?>{'a': 1});
+        expect(snapshot.docs.first.reference, firestore.doc('coll/doc1'));
       },
     );
 
     test(
       'limitToLast() sends the flipped query and reverses the result',
       () async {
-        final Firestore firestore = newFirestore();
+        final FirebaseFirestore firestore = newFirestore();
         await firestore.doc('coll/warmup').get();
         // The backend answers the flipped query: largest first.
         transport().handlers['RunQuery'] = (GeneratedMessage request) =>
@@ -725,7 +728,7 @@ void main() {
           snapshot.docs
               .map(
                 (QueryDocumentSnapshot<Map<String, Object?>> doc) =>
-                    doc.data['a'],
+                    doc.data()['a'],
               )
               .toList(),
           <int>[4, 5],
@@ -734,7 +737,7 @@ void main() {
     );
 
     test('limitToLast() without orderBy() fails and sends nothing', () async {
-      final Firestore firestore = newFirestore();
+      final FirebaseFirestore firestore = newFirestore();
       await expectLater(
         firestore.collection('coll').limitToLast(2).get(),
         throwsStateError,
@@ -743,7 +746,7 @@ void main() {
     });
 
     test('a collection group query asks for all descendants', () async {
-      final Firestore firestore = newFirestore();
+      final FirebaseFirestore firestore = newFirestore();
       await firestore.collectionGroup('coll').get();
       final proto.RunQueryRequest request = transport()
           .requests<proto.RunQueryRequest>('RunQuery')
@@ -754,7 +757,7 @@ void main() {
     });
 
     test('a cursor from a snapshot continues after that document', () async {
-      final Firestore firestore = newFirestore();
+      final FirebaseFirestore firestore = newFirestore();
       await firestore.doc('coll/warmup').get();
       transport().handlers['RunQuery'] = (GeneratedMessage request) =>
           results(<int>[1]);
@@ -776,13 +779,13 @@ void main() {
     });
 
     test('validates the query like the main library', () {
-      final Firestore firestore = newFirestore();
+      final FirebaseFirestore firestore = newFirestore();
       final CollectionReference<Map<String, Object?>> coll = firestore
           .collection('coll');
       expect(() => coll.where('a'), throwsArgumentError);
       expect(() => coll.where(42, isEqualTo: 1), throwsArgumentError);
       expect(
-        () => coll.where(Filter.equalTo('a', 1), isEqualTo: 1),
+        () => coll.where(Filter('a', isEqualTo: 1), isEqualTo: 1),
         throwsArgumentError,
       );
       expect(() => coll.where('a', whereIn: <Object?>[]), throwsArgumentError);
@@ -803,22 +806,22 @@ void main() {
         throwsArgumentError,
       );
       expect(
-        () => coll.where(FieldPath.documentIdField, isEqualTo: 'a/b'),
+        () => coll.where(FieldPath.documentId, isEqualTo: 'a/b'),
         throwsArgumentError,
       );
       expect(
-        () => coll.where(FieldPath.documentIdField, arrayContains: 'a'),
+        () => coll.where(FieldPath.documentId, arrayContains: 'a'),
         throwsArgumentError,
       );
       expect(transports, isEmpty);
     });
 
     test('filters on the document id accept ids and references', () async {
-      final Firestore firestore = newFirestore();
+      final FirebaseFirestore firestore = newFirestore();
       await firestore
           .collection('coll')
           .where(
-            FieldPath.documentIdField,
+            FieldPath.documentId,
             whereIn: <Object?>['a', firestore.doc('coll/b')],
           )
           .get();
@@ -837,7 +840,7 @@ void main() {
     });
 
     test('isNull compares with null', () async {
-      final Firestore firestore = newFirestore();
+      final FirebaseFirestore firestore = newFirestore();
       await firestore.collection('coll').where('a', isNull: true).get();
       final proto.StructuredQuery where = transport()
           .requests<proto.RunQueryRequest>('RunQuery')
@@ -850,23 +853,22 @@ void main() {
     });
 
     test('a converter is applied to the results', () async {
-      final Firestore firestore = newFirestore();
+      final FirebaseFirestore firestore = newFirestore();
       await firestore.doc('coll/warmup').get();
       transport().handlers['RunQuery'] = (GeneratedMessage request) =>
           results(<int>[7]);
       final QuerySnapshot<int> snapshot = await firestore
           .collection('coll')
           .withConverter(
-            FirestoreDataConverter<int>.from(
-              fromFirestore:
-                  (QueryDocumentSnapshot<Map<String, Object?>> snapshot) =>
-                      snapshot.data['a']! as int,
-              toFirestore: (int value, SetOptions? options) =>
-                  <String, Object?>{'a': value},
-            ),
+            fromFirestore:
+                (QueryDocumentSnapshot<Map<String, Object?>> snapshot) =>
+                    snapshot.data()['a']! as int,
+            toFirestore: (int value, SetOptions? options) => <String, Object?>{
+              'a': value,
+            },
           )
           .get();
-      expect(snapshot.docs.single.data, 7);
+      expect(snapshot.docs.single.data(), 7);
       // The fields are read unconverted.
       expect(snapshot.docs.single.get('a'), 7);
     });
@@ -874,7 +876,7 @@ void main() {
 
   group('aggregations', () {
     test('count() sends one aggregation and reads it back', () async {
-      final Firestore firestore = newFirestore();
+      final FirebaseFirestore firestore = newFirestore();
       await firestore.doc('coll/warmup').get();
       transport().handlers['RunAggregationQuery'] = (GeneratedMessage message) {
         final proto.RunAggregationQueryRequest request =
@@ -914,12 +916,12 @@ void main() {
             .fieldPath,
         'a',
       );
-      expect(snapshot.getCount(), 3);
+      expect(snapshot.count, 3);
       expect(snapshot.data(), <String, Object?>{'count': 3});
     });
 
     test('aliases name the results and duplicates are sent once', () async {
-      final Firestore firestore = newFirestore();
+      final FirebaseFirestore firestore = newFirestore();
       await firestore.doc('coll/warmup').get();
       transport().handlers['RunAggregationQuery'] = (GeneratedMessage message) {
         final proto.RunAggregationQueryRequest request =
@@ -962,12 +964,15 @@ void main() {
         'total': 150,
         'mean': 75.0,
       });
-      expect(snapshot.getInt(AggregateField.sum('pages')), 150);
-      expect(snapshot.getDouble(AggregateField.average('pages')), 75.0);
+      expect((snapshot.get(AggregateField.sum('pages')) as num?)?.toInt(), 150);
+      expect(
+        (snapshot.get(AggregateField.average('pages')) as num?)?.toDouble(),
+        75.0,
+      );
     });
 
     test('an aggregation needs at least one field', () {
-      final Firestore firestore = newFirestore();
+      final FirebaseFirestore firestore = newFirestore();
       expect(
         () => firestore.collection('coll').aggregate(<AggregateField>[]),
         throwsArgumentError,
@@ -983,7 +988,7 @@ void main() {
 
   group('transactions', () {
     test('commit the writes with the versions that were read', () async {
-      final Firestore firestore = newFirestore();
+      final FirebaseFirestore firestore = newFirestore();
       await firestore.doc('coll/warmup').get();
       transport().handlers['BatchGetDocuments'] = (GeneratedMessage message) {
         final proto.BatchGetDocumentsRequest request =
@@ -1010,7 +1015,7 @@ void main() {
             .get(firestore.doc('coll/missing'));
         final DocumentSnapshot<Map<String, Object?>> onlyRead =
             await transaction.get(firestore.doc('coll/existing'));
-        expect(existing.data, <String, Object?>{'a': 1});
+        expect(existing.data(), <String, Object?>{'a': 1});
         expect(missing.exists, isFalse);
         expect(onlyRead.exists, isTrue);
         transaction
@@ -1034,7 +1039,7 @@ void main() {
     });
 
     test('are retried when the commit is aborted', () async {
-      final Firestore firestore = newFirestore();
+      final FirebaseFirestore firestore = newFirestore();
       await firestore.doc('coll/warmup').get();
       int commits = 0;
       transport().handlers['Commit'] = (GeneratedMessage request) {
@@ -1059,7 +1064,7 @@ void main() {
     test(
       'are not retried after a permanent error or beyond maxAttempts',
       () async {
-        final Firestore firestore = newFirestore();
+        final FirebaseFirestore firestore = newFirestore();
         await firestore.doc('coll/warmup').get();
         transport().handlers['Commit'] = (GeneratedMessage request) =>
             throw const GrpcError.permissionDenied('no');
@@ -1072,8 +1077,8 @@ void main() {
             });
           }),
           throwsA(
-            isA<FirestoreError>().having(
-              (FirestoreError e) => e.code,
+            isA<FirestoreException>().having(
+              (FirestoreException e) => e.errorCode,
               'code',
               FirestoreErrorCode.permissionDenied,
             ),
@@ -1090,10 +1095,10 @@ void main() {
             transaction.set(firestore.doc('coll/doc'), <String, Object?>{
               'a': 1,
             });
-          }, options: TransactionOptions(maxAttempts: 1)),
+          }, maxAttempts: 1),
           throwsA(
-            isA<FirestoreError>().having(
-              (FirestoreError e) => e.code,
+            isA<FirestoreException>().having(
+              (FirestoreException e) => e.errorCode,
               'code',
               FirestoreErrorCode.aborted,
             ),
@@ -1106,7 +1111,7 @@ void main() {
     test(
       'an error of the update function fails the transaction as it is',
       () async {
-        final Firestore firestore = newFirestore();
+        final FirebaseFirestore firestore = newFirestore();
         await expectLater(
           firestore.runTransaction<void>(
             (Transaction transaction) async => throw StateError('mine'),
@@ -1130,7 +1135,7 @@ void main() {
     );
 
     test('a read-only transaction reads in one backend transaction', () async {
-      final Firestore firestore = newFirestore();
+      final FirebaseFirestore firestore = newFirestore();
       await firestore.doc('coll/warmup').get();
       transport().handlers['RunQuery'] = (GeneratedMessage request) =>
           <GeneratedMessage>[
@@ -1165,22 +1170,20 @@ void main() {
             last.docs
                 .map(
                   (QueryDocumentSnapshot<Map<String, Object?>> doc) =>
-                      doc.data['a'],
+                      doc.data()['a'],
                 )
                 .toList(),
             <int>[4, 5],
             reason: 'the flipped query was sent and its result reversed',
           );
-          expect((await transaction.getAggregate(coll.count())).getCount(), 2);
+          expect((await transaction.getAggregate(coll.count())).count, 2);
           expect(
             () => transaction.set(coll.doc('a'), <String, Object?>{}),
-            throwsA(isA<FirestoreError>()),
+            throwsA(isA<FirestoreException>()),
           );
         },
-        options: TransactionOptions(
-          readOnly: true,
-          readTime: const Timestamp(100, 0),
-        ),
+        readOnly: true,
+        readTime: const Timestamp(100, 0),
       );
 
       final proto.BeginTransactionRequest begin = transport()
@@ -1221,16 +1224,16 @@ void main() {
     });
 
     test('queries need a read-only transaction', () async {
-      final Firestore firestore = newFirestore();
-      final Firestore other = newFirestore(databaseName: 'other');
+      final FirebaseFirestore firestore = newFirestore();
+      final FirebaseFirestore other = newFirestore(databaseName: 'other');
       await expectLater(
         firestore.runTransaction<void>(
           (Transaction transaction) =>
               transaction.getQuery(firestore.collection('coll')),
         ),
         throwsA(
-          isA<FirestoreError>().having(
-            (FirestoreError e) => e.code,
+          isA<FirestoreException>().having(
+            (FirestoreException e) => e.errorCode,
             'code',
             FirestoreErrorCode.invalidArgument,
           ),
@@ -1240,7 +1243,7 @@ void main() {
         firestore.runTransaction<void>(
           (Transaction transaction) =>
               transaction.getQuery(other.collection('coll')),
-          options: TransactionOptions(readOnly: true),
+          readOnly: true,
         ),
         throwsArgumentError,
       );
@@ -1248,15 +1251,15 @@ void main() {
         firestore.runTransaction<void>(
           (Transaction transaction) =>
               transaction.getQuery(firestore.collection('coll').limitToLast(1)),
-          options: TransactionOptions(readOnly: true),
+          readOnly: true,
         ),
         throwsStateError,
       );
     });
 
     test('reject a reference of another instance', () async {
-      final Firestore firestore = newFirestore();
-      final Firestore other = newFirestore(databaseName: 'other');
+      final FirebaseFirestore firestore = newFirestore();
+      final FirebaseFirestore other = newFirestore(databaseName: 'other');
       await expectLater(
         firestore.runTransaction<void>((Transaction transaction) async {
           transaction.set(other.doc('coll/doc'), <String, Object?>{});
@@ -1267,7 +1270,7 @@ void main() {
 
     test('a read after a write fails the transaction, even when caught '
         '(as in the JS SDK)', () async {
-      final Firestore firestore = newFirestore();
+      final FirebaseFirestore firestore = newFirestore();
       int attempts = 0;
       Object? readError;
       await expectLater(
@@ -1276,26 +1279,26 @@ void main() {
           transaction.set(firestore.doc('coll/a'), <String, Object?>{'a': 1});
           try {
             await transaction.get(firestore.doc('coll/b'));
-          } on FirestoreError catch (e) {
+          } on FirestoreException catch (e) {
             readError = e;
           }
         }),
         throwsA(
-          isA<FirestoreError>()
+          isA<FirestoreException>()
               .having(
-                (FirestoreError e) => e.code,
+                (FirestoreException e) => e.errorCode,
                 'code',
                 FirestoreErrorCode.invalidArgument,
               )
               .having(
-                (FirestoreError e) => e.message,
+                (FirestoreException e) => e.message,
                 'message',
                 'Firestore transactions require all reads to be executed '
                     'before all writes.',
               ),
         ),
       );
-      expect(readError, isA<FirestoreError>());
+      expect(readError, isA<FirestoreException>());
       expect(attempts, 1);
       // No transport may have been opened: look at all of them.
       expect(
@@ -1308,21 +1311,21 @@ void main() {
 
     group('and terminate()', () {
       final Matcher throwsTerminated = throwsA(
-        isA<FirestoreError>()
+        isA<FirestoreException>()
             .having(
-              (FirestoreError e) => e.code,
+              (FirestoreException e) => e.errorCode,
               'code',
               FirestoreErrorCode.failedPrecondition,
             )
             .having(
-              (FirestoreError e) => e.message,
+              (FirestoreException e) => e.message,
               'message',
               'The client has already been terminated.',
             ),
       );
 
       test('a transaction on a terminated instance fails at once', () async {
-        final Firestore firestore = newFirestore();
+        final FirebaseFirestore firestore = newFirestore();
         await firestore.terminate();
         int attempts = 0;
         await expectLater(
@@ -1336,7 +1339,7 @@ void main() {
 
       test('terminate() inside a transaction does not wait for it, and its '
           'next read fails without a retry', () async {
-        final Firestore firestore = newFirestore();
+        final FirebaseFirestore firestore = newFirestore();
         int attempts = 0;
         await expectLater(
           firestore.runTransaction<void>((Transaction transaction) async {
@@ -1360,7 +1363,7 @@ void main() {
 
       test('the writes of a transaction are not committed after '
           'terminate()', () async {
-        final Firestore firestore = newFirestore();
+        final FirebaseFirestore firestore = newFirestore();
         int attempts = 0;
         await expectLater(
           firestore.runTransaction<void>((Transaction transaction) async {
@@ -1377,7 +1380,7 @@ void main() {
 
       test('terminate() waits for the request of a transaction on the '
           'wire', () async {
-        final Firestore firestore = newFirestore();
+        final FirebaseFirestore firestore = newFirestore();
         await firestore.doc('coll/warmup').get();
         final Completer<void> release = Completer<void>();
         final Completer<void> lookupStarted = Completer<void>();
@@ -1395,7 +1398,7 @@ void main() {
         ) async {
           final DocumentSnapshot<Map<String, Object?>> snapshot =
               await transaction.get(firestore.doc('coll/a'));
-          return snapshot.data!['a']! as int;
+          return snapshot.data()!['a']! as int;
         });
         await lookupStarted.future;
         bool terminated = false;
@@ -1501,11 +1504,11 @@ void main() {
   });
 }
 
-class _Auth extends InternalTokenProvider {
+class _Auth extends AuthTokenProvider {
   // Closed by the test.
   // ignore: close_sinks
-  final StreamController<InternalTokenResult> tokenChanges =
-      StreamController<InternalTokenResult>.broadcast();
+  final StreamController<AuthTokenChange> tokenChanges =
+      StreamController<AuthTokenChange>.broadcast();
 
   /// An unsigned JWT for the user `alice`.
   final String token = <String>[
@@ -1522,10 +1525,10 @@ class _Auth extends InternalTokenProvider {
       GetTokenResult(token);
 
   @override
-  Stream<InternalTokenResult> get onTokenChanged => tokenChanges.stream;
+  Stream<AuthTokenChange> get onTokenChanged => tokenChanges.stream;
 }
 
-class _AppCheck implements InternalAppCheckTokenProvider {
+class _AppCheck implements AppCheckTokenProvider {
   // Closed by the test.
   // ignore: close_sinks
   final StreamController<AppCheckTokenResult> changes =

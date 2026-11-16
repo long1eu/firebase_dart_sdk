@@ -31,8 +31,9 @@ final FirestoreDataConverter<City> cityConverter =
             DocumentSnapshot<Map<String, Object?>> snapshot,
             SnapshotOptions? options,
           ) => City.fromMap(
-            snapshot.getData(
-              options?.serverTimestamps ?? ServerTimestampBehavior.none,
+            snapshot.data(
+              serverTimestamps:
+                  options?.serverTimestamps ?? ServerTimestampBehavior.none,
             )!,
           ),
       toFirestore: (City city, SetOptions? options) => city.toMap(),
@@ -40,7 +41,7 @@ final FirestoreDataConverter<City> cityConverter =
 
 void main() {
   IntegrationTestUtil.currentDatabasePath = 'integration/converter_test';
-  late Firestore firestore;
+  late FirebaseFirestore firestore;
 
   setUp(() async {
     firestore = await IntegrationTestUtil.testFirestore();
@@ -53,7 +54,10 @@ void main() {
 
   CollectionReference<City> cities() => firestore
       .collection('cities${autoId()}')
-      .withConverter<City>(cityConverter);
+      .withConverter<City>(
+        fromFirestore: cityConverter.fromFirestore,
+        toFirestore: cityConverter.toFirestore,
+      );
 
   test('set and get round trip through the converter', () async {
     final DocumentReference<City> ref = cities().doc('sf');
@@ -61,7 +65,7 @@ void main() {
 
     final DocumentSnapshot<City> snapshot = await ref.get();
     expect(snapshot.exists, isTrue);
-    final City city = snapshot.data!;
+    final City city = snapshot.data()!;
     expect(city.name, 'San Francisco');
     expect(city.population, 870000);
 
@@ -69,7 +73,7 @@ void main() {
     final DocumentSnapshot<Map<String, Object?>> raw = await ref
         .withoutConverter()
         .get();
-    expect(raw.data, <String, Object?>{
+    expect(raw.data(), <String, Object?>{
       'name': 'San Francisco',
       'population': 870000,
     });
@@ -78,7 +82,7 @@ void main() {
   test('missing document yields null data', () async {
     final DocumentSnapshot<City> snapshot = await cities().doc('nope').get();
     expect(snapshot.exists, isFalse);
-    expect(snapshot.data, isNull);
+    expect(snapshot.data(), isNull);
   });
 
   test('add returns a typed reference', () async {
@@ -86,7 +90,7 @@ void main() {
     final DocumentReference<City> ref = await col.add(
       const City('Los Angeles', 4000000),
     );
-    final City city = (await ref.get()).data!;
+    final City city = (await ref.get()).data()!;
     expect(city.name, 'Los Angeles');
   });
 
@@ -99,28 +103,31 @@ void main() {
       await col.doc('c').set(const City('C', 3));
 
       final Query<City> query = col
-          .whereGreaterThan('population', 1)
+          .where('population', isGreaterThan: 1)
           .orderBy('population');
       final QuerySnapshot<City> snapshot = await query.get();
       expect(
-        snapshot.docs.map((QueryDocumentSnapshot<City> d) => d.data.name),
+        snapshot.docs.map((QueryDocumentSnapshot<City> d) => d.data().name),
         <String>['B', 'C'],
       );
-      expect(snapshot.docs.first.ref.converter, same(cityConverter));
+      expect(snapshot.docs.first.reference.converter, same(query.converter));
 
       final QuerySnapshot<Map<String, Object?>> rawSnapshot = await query
           .withoutConverter()
           .get();
-      expect(rawSnapshot.docs.first.data['name'], 'B');
+      expect(rawSnapshot.docs.first.data()['name'], 'B');
 
       // Query.withConverter on a raw query.
       final QuerySnapshot<City> viaQuery = await firestore
           .collection(col.id)
           .orderBy('population')
           .limit(1)
-          .withConverter<City>(cityConverter)
+          .withConverter<City>(
+            fromFirestore: cityConverter.fromFirestore,
+            toFirestore: cityConverter.toFirestore,
+          )
           .get();
-      expect(viaQuery.docs.single.data.name, 'A');
+      expect(viaQuery.docs.single.data().name, 'A');
     },
   );
 
@@ -128,11 +135,11 @@ void main() {
     final CollectionReference<City> col = cities();
     await col.doc('a').set(const City('A', 1));
 
-    final QuerySnapshot<City> first = await col.snapshots.first;
-    expect(first.docChanges.single.document.data.name, 'A');
+    final QuerySnapshot<City> first = await col.snapshots().first;
+    expect(first.docChanges.single.doc.data().name, 'A');
 
-    final DocumentSnapshot<City> docSnap = await col.doc('a').snapshots.first;
-    expect(docSnap.data!.population, 1);
+    final DocumentSnapshot<City> docSnap = await col.doc('a').snapshots().first;
+    expect(docSnap.data()!.population, 1);
   });
 
   test('merge set passes SetOptions to toFirestore', () async {
@@ -141,7 +148,7 @@ void main() {
         FirestoreDataConverter<City>.from(
           fromFirestore:
               (DocumentSnapshot<Map<String, Object?>> s, SnapshotOptions? o) =>
-                  City.fromMap(s.data!),
+                  City.fromMap(s.data()!),
           toFirestore: (City c, SetOptions? o) {
             seen.add(o);
             return <String, Object?>{'population': c.population};
@@ -152,10 +159,13 @@ void main() {
         .doc('x');
     await raw.set(<String, Object?>{'name': 'X', 'population': 1});
     await raw
-        .withConverter<City>(recording)
-        .set(const City('ignored', 9), SetOptions.mergeAllFields);
-    expect(seen.single, same(SetOptions.mergeAllFields));
-    expect((await raw.get()).data, <String, Object?>{
+        .withConverter<City>(
+          fromFirestore: recording.fromFirestore,
+          toFirestore: recording.toFirestore,
+        )
+        .set(const City('ignored', 9), const SetOptions(merge: true));
+    expect(seen.single, same(const SetOptions(merge: true)));
+    expect((await raw.get()).data(), <String, Object?>{
       'name': 'X',
       'population': 9,
     });
@@ -165,13 +175,13 @@ void main() {
     final DocumentReference<City> ref = cities().doc('u');
     await ref.set(const City('U', 1));
     await ref.update(<String, Object?>{'population': 5});
-    expect((await ref.get()).data!.population, 5);
+    expect((await ref.get()).data()!.population, 5);
   });
 
   test('server timestamps go through SnapshotOptions', () async {
     final DocumentReference<City> ref = cities().doc('t');
     await ref.set(City('T', 1, FieldValue.serverTimestamp()));
-    final City city = (await ref.get()).data!;
+    final City city = (await ref.get()).data()!;
     expect(city.updated, isA<Timestamp>());
   });
 
@@ -181,7 +191,7 @@ void main() {
     final DocumentReference<City> t = col.doc('t');
 
     await (firestore.batch()..set(b, const City('B', 2))).commit();
-    expect((await b.get()).data!.name, 'B');
+    expect((await b.get()).data()!.name, 'B');
 
     final String name = await firestore.runTransaction<String>((
       Transaction transaction,
@@ -189,19 +199,25 @@ void main() {
       final DocumentSnapshot<City> snap = await transaction.get(b);
       // The port requires every document read to also be written.
       transaction
-        ..set(b, snap.data!)
-        ..set(t, City('${snap.data!.name}!', 3));
-      return snap.data!.name;
+        ..set(b, snap.data()!)
+        ..set(t, City('${snap.data()!.name}!', 3));
+      return snap.data()!.name;
     });
     expect(name, 'B');
-    expect((await t.get()).data!.name, 'B!');
+    expect((await t.get()).data()!.name, 'B!');
   });
 
   test('converter identity participates in equality', () {
     final CollectionReference<City> a = cities();
     expect(a.withoutConverter().doc('z'), isNot(a.doc('z')));
     expect(
-      a.doc('z').withoutConverter().withConverter<City>(cityConverter),
+      a
+          .doc('z')
+          .withoutConverter()
+          .withConverter<City>(
+            fromFirestore: cityConverter.fromFirestore,
+            toFirestore: cityConverter.toFirestore,
+          ),
       a.doc('z'),
     );
   });
@@ -220,7 +236,7 @@ void main() {
                 SnapshotOptions? options,
               ) {
                 seen.add(snapshot);
-                return City.fromMap(snapshot.data!);
+                return City.fromMap(snapshot.data()!);
               },
           toFirestore: (City city, SetOptions? options) => city.toMap(),
         );
@@ -242,10 +258,11 @@ void main() {
             .collection('models${autoId()}')
             .doc();
         final DocumentReference<City> ref = untyped.withConverter<City>(
-          recording,
+          fromFirestore: recording.fromFirestore,
+          toFirestore: recording.toFirestore,
         );
         await ref.set(const City('post', 1));
-        expect((await ref.get()).data!.name, 'post');
+        expect((await ref.get()).data()!.name, 'post');
         expectSnapshotOf(untyped);
       },
     );
@@ -258,14 +275,20 @@ void main() {
         final DocumentReference<Map<String, Object?>> untyped =
             untypedCollection.doc();
         await untypedCollection
-            .withConverter<City>(recording)
+            .withConverter<City>(
+              fromFirestore: recording.fromFirestore,
+              toFirestore: recording.toFirestore,
+            )
             .doc(untyped.id)
             .set(const City('post', 1));
         final QuerySnapshot<City> snapshot = await untypedCollection
-            .withConverter<City>(recording)
+            .withConverter<City>(
+              fromFirestore: recording.fromFirestore,
+              toFirestore: recording.toFirestore,
+            )
             .get();
         expect(snapshot.length, 1);
-        expect(snapshot.docs.single.data.name, 'post');
+        expect(snapshot.docs.single.data().name, 'post');
         expectSnapshotOf(untyped);
       },
     );
@@ -277,13 +300,21 @@ void main() {
             firestore.collection('models${autoId()}');
         final DocumentReference<Map<String, Object?>> untyped =
             untypedCollection.doc();
-        await untyped.withConverter<City>(recording).set(const City('post', 1));
+        await untyped
+            .withConverter<City>(
+              fromFirestore: recording.fromFirestore,
+              toFirestore: recording.toFirestore,
+            )
+            .set(const City('post', 1));
         final QuerySnapshot<City> snapshot = await untypedCollection
-            .where(FieldPath.documentId(), isEqualTo: untyped.id)
-            .withConverter<City>(recording)
+            .where(FieldPath.documentId, isEqualTo: untyped.id)
+            .withConverter<City>(
+              fromFirestore: recording.fromFirestore,
+              toFirestore: recording.toFirestore,
+            )
             .get();
         expect(snapshot.length, 1);
-        expect(snapshot.docs.single.data.name, 'post');
+        expect(snapshot.docs.single.data().name, 'post');
         expectSnapshotOf(untyped);
       },
     );

@@ -27,13 +27,12 @@ Future<void> main() async {
     return;
   }
   final int colon = emulator.lastIndexOf(':');
-  final Firestore firestore = Firestore.instanceFor(
+  final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(
     app: exampleApp(),
-    settings: FirestoreSettings(cacheSettings: const MemoryCacheSettings())
-        .withEmulator(
-          emulator.substring(0, colon),
-          int.parse(emulator.substring(colon + 1)),
-        ),
+    settings: Settings(cacheSettings: const MemoryCacheSettings()).withEmulator(
+      emulator.substring(0, colon),
+      int.parse(emulator.substring(colon + 1)),
+    ),
   );
 
   final CollectionReference<Map<String, Object?>> books = firestore.collection(
@@ -139,7 +138,7 @@ Future<void> main() async {
   // An existing query can be converted; it returns the same documents.
   final Query<Map<String, Object?>> query = books
       .where('genre', isEqualTo: 'Science Fiction')
-      .orderBy('published', Direction.descending);
+      .orderBy('published', descending: true);
   snapshot = await firestore.pipeline().createFrom(query).execute();
   print(
     'query: ${[for (final doc in (await query.get()).docs) doc.id]}, '

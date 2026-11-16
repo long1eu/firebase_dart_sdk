@@ -50,7 +50,7 @@ Future<void> writeAll(
 /// documents. On a failure the message shows the seed and the first pair of
 /// neighbours that the two sides order differently.
 Future<void> checkValueOrderAgainstBackend(
-  Firestore firestore, {
+  FirebaseFirestore firestore, {
   required int seed,
   required int count,
   required bool bson,
@@ -71,10 +71,10 @@ Future<void> checkValueOrderAgainstBackend(
       entry.key: <String, Object?>{'v': entry.value},
   });
 
-  for (final Direction direction in Direction.values) {
+  for (final bool descending in <bool>[false, true]) {
     final QuerySnapshot<Map<String, Object?>> snapshot = await collection
-        .orderBy('v', direction)
-        .get(Source.server);
+        .orderBy('v', descending: descending)
+        .get(const GetOptions(source: Source.server));
     expect(
       snapshot.docs,
       hasLength(count),
@@ -87,13 +87,13 @@ Future<void> checkValueOrderAgainstBackend(
         doc.document!,
     ];
     model.FieldValue valueOf(Document doc) =>
-        doc.getField(FieldPath.fromDotSeparatedPath('v').internalPath)!;
+        doc.getField(FieldPath.fromString('v').internalPath)!;
     int compare(Document a, Document b) {
       int result = valueOf(a).compareTo(valueOf(b));
       if (result == 0) {
         result = a.key.compareTo(b.key);
       }
-      return direction == Direction.ascending ? result : -result;
+      return descending ? -result : result;
     }
 
     for (int i = 0; i + 1 < server.length; i++) {
@@ -103,7 +103,7 @@ Future<void> checkValueOrderAgainstBackend(
         fail(
           'Property "backend value order" failed.\n'
           '  seed: $seed, count: $count, bson: $bson, '
-          'direction: ${direction.name} '
+          'descending: $descending '
           '(rerun with PROPERTY_SEED=$seed)\n'
           '  the backend returns $a before $b, the SDK sorts $b first:\n'
           '    $a = ${describe(values[a])}\n'
@@ -188,43 +188,46 @@ GeneratedQuery? generateQuery(
     switch (gen.below(12)) {
       case 0:
         final Object? v = scalar();
-        return (Filter.notEqualTo(field, v), '$field != ${describe(v)}');
+        return (Filter(field, isNotEqualTo: v), '$field != ${describe(v)}');
       case 1:
         final Object? v = scalar();
-        return (Filter.lessThan(field, v), '$field < ${describe(v)}');
+        return (Filter(field, isLessThan: v), '$field < ${describe(v)}');
       case 2:
         final Object? v = bound();
-        return (Filter.lessThanOrEqualTo(field, v), '$field <= ${describe(v)}');
+        return (
+          Filter(field, isLessThanOrEqualTo: v),
+          '$field <= ${describe(v)}',
+        );
       case 3:
         final Object? v = scalar();
-        return (Filter.greaterThan(field, v), '$field > ${describe(v)}');
+        return (Filter(field, isGreaterThan: v), '$field > ${describe(v)}');
       case 4:
         final Object? v = bound();
         return (
-          Filter.greaterThanOrEqualTo(field, v),
+          Filter(field, isGreaterThanOrEqualTo: v),
           '$field >= ${describe(v)}',
         );
       case 5:
         final Object? v = gen.pick(members);
         return (
-          Filter.arrayContains(field, v),
+          Filter(field, arrayContains: v),
           '$field array-contains ${describe(v)}',
         );
       case 6:
         final List<Object?> v = operands();
         return (
-          Filter.arrayContainsAny(field, v),
+          Filter(field, arrayContainsAny: v),
           '$field array-contains-any ${describe(v)}',
         );
       case 7:
         final List<Object?> v = operands();
-        return (Filter.inArray(field, v), '$field in ${describe(v)}');
+        return (Filter(field, whereIn: v), '$field in ${describe(v)}');
       case 8:
         final List<Object?> v = operands();
-        return (Filter.notInArray(field, v), '$field not-in ${describe(v)}');
+        return (Filter(field, whereNotIn: v), '$field not-in ${describe(v)}');
       default:
         final Object? v = scalar();
-        return (Filter.equalTo(field, v), '$field == ${describe(v)}');
+        return (Filter(field, isEqualTo: v), '$field == ${describe(v)}');
     }
   }
 
@@ -259,11 +262,11 @@ GeneratedQuery? generateQuery(
         continue;
       }
       ordered.add(field);
-      final Direction direction = gen.chance(50)
-          ? Direction.ascending
-          : Direction.descending;
-      query = query.orderBy(field, direction);
-      text.write('\n      .orderBy($field, ${direction.name})');
+      final bool descending = !gen.chance(50);
+      query = query.orderBy(field, descending: descending);
+      text.write(
+        '\n      .orderBy($field${descending ? ', descending: true' : ''})',
+      );
     }
 
     List<Object?> cursor() => <Object?>[
@@ -375,7 +378,7 @@ class QueryPropertyStats {
 ///    (null and missing fields), which the SDK drops from the result. With a
 ///    limit the backend counts them, so the page comes back short.
 Future<void> checkQueriesAgainstBackend(
-  Future<Firestore> Function() newFirestore, {
+  Future<FirebaseFirestore> Function() newFirestore, {
   required int seed,
   required int documentCount,
   required int queryCount,
@@ -395,7 +398,7 @@ Future<void> checkQueriesAgainstBackend(
   await writeAll(collection, data);
   final List<Document> all = <Document>[
     for (final QueryDocumentSnapshot<Map<String, Object?>> doc
-        in (await collection.get(Source.server)).docs)
+        in (await collection.get(GetOptions(source: Source.server))).docs)
       doc.document!,
   ];
   expect(all, hasLength(documentCount));
@@ -425,7 +428,7 @@ Future<void> checkQueriesAgainstBackend(
     final Stopwatch getTime = Stopwatch()..start();
     final Future<QuerySnapshot<Map<String, Object?>>> serverGet = generated
         .query
-        .get(Source.server);
+        .get(GetOptions(source: Source.server));
     try {
       QuerySnapshot<Map<String, Object?>> snapshot;
       try {
@@ -454,7 +457,7 @@ Future<void> checkQueriesAgainstBackend(
       note =
           '  get(Source.server) did not complete within 40 seconds while '
           'the documents were cached.\n';
-      final Firestore fresh = await newFirestore();
+      final FirebaseFirestore fresh = await newFirestore();
       collection = fresh.collection(collection.path);
       actual = <String>[
         for (final QueryDocumentSnapshot<Map<String, Object?>> doc
@@ -465,16 +468,16 @@ Future<void> checkQueriesAgainstBackend(
                       limits: limits,
                       nullAndNaNOperands: nullAndNaNOperands,
                     )!.query
-                    .get(Source.server)
+                    .get(GetOptions(source: Source.server))
                     .timeout(const Duration(seconds: 20)))
                 .docs)
           doc.id,
       ];
-      await collection.get(Source.server);
-    } on FirestoreError catch (e) {
-      if (e.code == FirestoreErrorCode.invalidArgument ||
-          e.code == FirestoreErrorCode.failedPrecondition ||
-          e.code == FirestoreErrorCode.unimplemented) {
+      await collection.get(GetOptions(source: Source.server));
+    } on FirestoreException catch (e) {
+      if (e.errorCode == FirestoreErrorCode.invalidArgument ||
+          e.errorCode == FirestoreErrorCode.failedPrecondition ||
+          e.errorCode == FirestoreErrorCode.unimplemented) {
         if (size == defaultSize) {
           final String reason = e.message.split('\n').first;
           stats.rejectedByBackend[reason.length > 70
@@ -504,7 +507,7 @@ Future<void> checkQueriesAgainstBackend(
                       limits: limits,
                       nullAndNaNOperands: nullAndNaNOperands,
                     )!.query
-                    .get(Source.server)
+                    .get(GetOptions(source: Source.server))
                     .timeout(const Duration(seconds: 20)))
                 .docs)
           doc.id,

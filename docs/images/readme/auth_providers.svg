@@ -1,0 +1,88 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 400" role="img" aria-labelledby="title desc" font-family="system-ui, -apple-system, Segoe UI, Helvetica, Arial, sans-serif">
+  <title id="title">Which token provider to use</title>
+  <desc id="desc">Choose by who makes the requests. A person signed in to your app (VM, Flutter or web): FirebaseUserAuth.forApp(app), with email and password, anonymous or custom-token sign-in; security rules apply. A server or tool on Google Cloud, or a machine with gcloud credentials: applicationDefaultCredentials() from adc.dart, VM only; security rules are bypassed. A server or tool with a service account key file: OAuthTokenProvider.serviceAccount(key); rules are bypassed. A token source of your own: OAuthTokenProvider(fetch); rules are bypassed. Set the provider before the Firestore instance is created.</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#57606a"/>
+    </marker>
+    <g id="ok">
+      <circle cx="0" cy="0" r="8" fill="#1a7f37"/>
+      <path d="M-4,0 L-1,3 L4,-3" stroke="#ffffff" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+    </g>
+    <g id="warn">
+      <path d="M0,-9 L9,7 L-9,7 z" fill="#9a6700"/>
+      <rect x="-1" y="-4" width="2" height="6" fill="#ffffff"/>
+      <rect x="-1" y="3.5" width="2" height="2" fill="#ffffff"/>
+    </g>
+  </defs>
+  <rect x="0" y="0" width="900" height="400" rx="10" fill="#ffffff" stroke="#d0d7de"/>
+
+  <rect x="20" y="146" width="160" height="64" rx="8" fill="#ddf4ff" stroke="#0969da"/>
+  <text x="100" y="173" font-size="14" font-weight="700" fill="#1f2328" text-anchor="middle">Who makes</text>
+  <text x="100" y="192" font-size="14" font-weight="700" fill="#1f2328" text-anchor="middle">the requests?</text>
+
+  <g stroke="#57606a" stroke-width="1.5" fill="none" marker-end="url(#arrow)">
+    <path d="M180,178 L200,178 L200,56 L227,56"/>
+    <path d="M200,178 L200,136 L227,136"/>
+    <path d="M200,178 L200,216 L227,216"/>
+    <path d="M200,178 L200,296 L227,296"/>
+  </g>
+
+  <!-- Middle column: situations -->
+  <g font-size="13" fill="#1f2328">
+    <rect x="230" y="24" width="270" height="64" rx="8" fill="#f6f8fa" stroke="#1f2328"/>
+    <text x="244" y="51" font-weight="600">A person signed in to your app</text>
+    <text x="244" y="70" font-size="12" fill="#57606a">VM, Flutter or web</text>
+
+    <rect x="230" y="104" width="270" height="64" rx="8" fill="#f6f8fa" stroke="#1f2328"/>
+    <text x="244" y="131" font-weight="600">A server or tool on Google Cloud,</text>
+    <text x="244" y="150" font-size="12" fill="#57606a">or a machine with gcloud credentials</text>
+
+    <rect x="230" y="184" width="270" height="64" rx="8" fill="#f6f8fa" stroke="#1f2328"/>
+    <text x="244" y="211" font-weight="600">A server or tool with a</text>
+    <text x="244" y="230" font-size="12" fill="#57606a">service account key file</text>
+
+    <rect x="230" y="264" width="270" height="64" rx="8" fill="#f6f8fa" stroke="#1f2328" stroke-dasharray="5 3"/>
+    <text x="244" y="291" font-weight="600">Access tokens you get yourself</text>
+    <text x="244" y="310" font-size="12" fill="#57606a">a token source of your own</text>
+  </g>
+
+  <g stroke="#57606a" stroke-width="1.5" marker-end="url(#arrow)">
+    <line x1="500" y1="56" x2="527" y2="56"/>
+    <line x1="500" y1="136" x2="527" y2="136"/>
+    <line x1="500" y1="216" x2="527" y2="216"/>
+    <line x1="500" y1="296" x2="527" y2="296"/>
+  </g>
+
+  <!-- Right column: providers -->
+  <g font-size="12" fill="#1f2328">
+    <rect x="530" y="24" width="350" height="64" rx="8" fill="#ffffff" stroke="#1a7f37" stroke-width="2"/>
+    <text x="544" y="47" font-size="13" font-weight="700" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">FirebaseUserAuth.forApp(app)</text>
+    <text x="544" y="64" fill="#57606a">email and password, anonymous, custom token</text>
+    <use href="#ok" x="552" y="76"/>
+    <text x="566" y="80" font-weight="600">security rules apply (request.auth is the user)</text>
+
+    <rect x="530" y="104" width="350" height="64" rx="8" fill="#ffffff" stroke="#9a6700"/>
+    <text x="544" y="127" font-size="13" font-weight="700" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">applicationDefaultCredentials()</text>
+    <text x="544" y="144" fill="#57606a">from adc.dart; VM only</text>
+    <use href="#warn" x="552" y="156"/>
+    <text x="566" y="161" font-weight="600">security rules bypassed</text>
+
+    <rect x="530" y="184" width="350" height="64" rx="8" fill="#ffffff" stroke="#9a6700"/>
+    <text x="544" y="207" font-size="13" font-weight="700" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">OAuthTokenProvider.serviceAccount(key)</text>
+    <text x="544" y="224" fill="#57606a">the decoded key JSON; keep the file out of git</text>
+    <use href="#warn" x="552" y="236"/>
+    <text x="566" y="241" font-weight="600">security rules bypassed</text>
+
+    <rect x="530" y="264" width="350" height="64" rx="8" fill="#ffffff" stroke="#9a6700" stroke-dasharray="5 3"/>
+    <text x="544" y="287" font-size="13" font-weight="700" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">OAuthTokenProvider(fetch)</text>
+    <text x="544" y="304" fill="#57606a">fetch returns an OAuth access token</text>
+    <use href="#warn" x="552" y="316"/>
+    <text x="566" y="321" font-weight="600">security rules bypassed</text>
+  </g>
+
+  <g font-size="12" fill="#57606a">
+    <text x="20" y="356">Set the provider before FirebaseFirestore.instanceFor(app: app): FirebaseUserAuth.forApp does it for you; for the others,</text>
+    <text x="20" y="374">assign app.authProvider. Bypassed rules: use those three on trusted machines only.</text>
+  </g>
+</svg>

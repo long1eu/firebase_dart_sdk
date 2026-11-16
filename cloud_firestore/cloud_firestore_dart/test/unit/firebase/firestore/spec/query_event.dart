@@ -14,12 +14,12 @@ class QueryEvent {
 
   final Query query;
   final ViewSnapshot? view;
-  final FirestoreError? error;
+  final FirestoreException? error;
 
   QueryEvent copyWith({
     Query? query,
     ViewSnapshot? view,
-    FirestoreError? error,
+    FirestoreException? error,
   }) {
     return QueryEvent(
       query: query ?? this.query,

@@ -42,16 +42,16 @@ import 'package:meta/meta.dart';
 /// request to the backend. There are no listeners.
 class DocumentReference<T extends dynamic> implements KeyedDocumentReference {
   /// Implementation detail of the SDK; not part of the supported API. Use
-  /// [Firestore.doc] or [CollectionReference.doc].
+  /// [FirebaseFirestore.doc] or [CollectionReference.doc].
   @internal
   DocumentReference(this.key, this.firestore, [this.converter]);
 
   /// Implementation detail of the SDK; not part of the supported API. Use
-  /// [Firestore.doc] or [CollectionReference.doc].
+  /// [FirebaseFirestore.doc] or [CollectionReference.doc].
   @internal
   factory DocumentReference.forPath(
     ResourcePath path,
-    Firestore firestore, [
+    FirebaseFirestore firestore, [
     FirestoreDataConverter<T>? converter,
   ]) {
     if (path.isEmpty) {
@@ -74,7 +74,7 @@ class DocumentReference<T extends dynamic> implements KeyedDocumentReference {
 
   /// Creates the reference [toJson] wrote, for [firestore].
   factory DocumentReference.fromJson(
-    Firestore firestore,
+    FirebaseFirestore firestore,
     Map<String, Object?> json, {
     FirestoreDataConverter<T>? converter,
   }) {
@@ -121,18 +121,26 @@ class DocumentReference<T extends dynamic> implements KeyedDocumentReference {
   DatabaseId get databaseId => firestore.modelDatabaseId;
 
   /// The Firestore instance of this reference.
-  final Firestore firestore;
+  final FirebaseFirestore firestore;
 
   /// The converter applied to the data read and written through this
   /// reference, if any.
   final FirestoreDataConverter<T>? converter;
 
   /// Returns a reference to the same document that reads and writes objects
-  /// of type [U] through [converter].
-  DocumentReference<U> withConverter<U extends Object?>(
-    FirestoreDataConverter<U> converter,
-  ) {
-    return DocumentReference<U>(key, firestore, converter);
+  /// of type [U] through [fromFirestore] and [toFirestore].
+  DocumentReference<U> withConverter<U extends Object?>({
+    required FromFirestore<U> fromFirestore,
+    required ToFirestore<U> toFirestore,
+  }) {
+    return DocumentReference<U>(
+      key,
+      firestore,
+      FirestoreDataConverter<U>.from(
+        fromFirestore: fromFirestore,
+        toFirestore: toFirestore,
+      ),
+    );
   }
 
   /// Returns a reference to the same document without a converter.
@@ -196,7 +204,7 @@ class DocumentReference<T extends dynamic> implements KeyedDocumentReference {
 
   /// [set] for the public method [methodName], which the errors name.
   Future<void> _set(T data, SetOptions? options, String methodName) async {
-    final SetOptions setOptions = options ?? SetOptions.overwrite;
+    final SetOptions setOptions = options ?? const SetOptions();
     checkNotNull<Object>(data, 'Provided data must not be null.');
     final Map<String, Object?> rawData = toRawData<T>(data, converter, options);
     final UserDataParsedSetData parsed = setOptions.merge
@@ -216,28 +224,13 @@ class DocumentReference<T extends dynamic> implements KeyedDocumentReference {
     return _commit(parsed.toMutation(key, Precondition.none));
   }
 
-  /// Updates the fields in [data] (dot-separated field paths to values) of
-  /// the document. Fails with [FirestoreErrorCode.notFound] if the document
-  /// does not exist.
-  Future<void> update(Map<String, Object?> data) async {
+  /// Updates the fields in [data] of the document. Each key is a field path: a `String` (dots separate nested
+  /// fields) or a `FieldPath`. Fails with [FirestoreErrorCode.notFound] if the document does not exist.
+  Future<void> update(Map<Object, Object?> data) async {
     final UserDataParsedUpdateData parsed = firestore.dataConverter
-        .parseUpdateData(
+        .parseUpdateMap(
           data,
           methodName: 'DocumentReference.update',
-          targetDoc: key,
-        );
-    return _commit(parsed.toMutation(key, Precondition(exists: true)));
-  }
-
-  /// Updates fields of the document. [data] alternates fields (a `String`
-  /// or a `FieldPath`) and values. Fails with [FirestoreErrorCode.notFound]
-  /// if the document does not exist.
-  Future<void> updateFromList(List<Object?> data) async {
-    const String methodName = 'DocumentReference.updateFromList';
-    final UserDataParsedUpdateData parsed = firestore.dataConverter
-        .parseUpdateDataFromList(
-          collectUpdateArguments(1, data, methodName: methodName),
-          methodName: methodName,
           targetDoc: key,
         );
     return _commit(parsed.toMutation(key, Precondition(exists: true)));

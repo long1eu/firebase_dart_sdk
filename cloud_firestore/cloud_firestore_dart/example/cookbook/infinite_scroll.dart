@@ -1,7 +1,9 @@
 // Recipe: an infinite list that stays live. Each page is fetched once to find
 // its first and last document, then gets its own listener bounded by those two
-// documents. A document added inside a page shows up in that page; pages never
-// overlap and no document falls between two pages.
+// documents. A document added inside a page shows up in that page, and pages
+// never overlap. A document added later that sorts between the last document of
+// one page and the first of the next is in neither listener until the pages are
+// read again.
 //
 // Run from cloud_firestore/cloud_firestore_dart against the emulator:
 //
@@ -27,7 +29,7 @@ class Page {
 }
 
 Future<void> main() async {
-  final Firestore firestore = connect();
+  final FirebaseFirestore firestore = connect();
   final CollectionReference<Map<String, Object?>> messages = firestore
       .collection(scratch('messages'));
 
@@ -60,7 +62,7 @@ Future<void> main() async {
     page.subscription = ordered
         .startAtDocument(first.docs.first)
         .endAtDocument(first.docs.last)
-        .snapshots
+        .snapshots()
         .listen((QuerySnapshot<Map<String, Object?>> snapshot) {
           page.ids = <String>[for (final d in snapshot) d.id];
           changes.add(null);

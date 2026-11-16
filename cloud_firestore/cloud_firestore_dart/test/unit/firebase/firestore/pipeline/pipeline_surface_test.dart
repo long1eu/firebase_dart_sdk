@@ -764,8 +764,8 @@ void main() {
       await expectLater(
         tx.execute(base()),
         throwsA(
-          isA<FirestoreError>().having(
-            (FirestoreError e) => e.code,
+          isA<FirestoreException>().having(
+            (FirestoreException e) => e.errorCode,
             'code',
             FirestoreErrorCode.invalidArgument,
           ),
@@ -785,8 +785,8 @@ void main() {
         await expectLater(
           tx.execute(pipeline),
           throwsA(
-            isA<FirestoreError>().having(
-              (FirestoreError e) => e.code,
+            isA<FirestoreException>().having(
+              (FirestoreException e) => e.errorCode,
               'code',
               FirestoreErrorCode.invalidArgument,
             ),

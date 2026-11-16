@@ -35,7 +35,7 @@ Future<void> main() async {
   final FirebaseApp app = FirebaseApp.withOptions(
     FirebaseOptions(
       apiKey: 'fake-api-key',
-      applicationId: '1:1234567890:dart:example',
+      appId: '1:1234567890:dart:example',
       projectId: project,
     ),
   );
@@ -48,8 +48,8 @@ Future<void> main() async {
   final String email =
       'ada${DateTime.now().microsecondsSinceEpoch}@example.com';
   final AuthUser user = await auth.createUserWithEmailAndPassword(
-    email,
-    'first password',
+    email: email,
+    password: 'first password',
   );
   print('signed up, email verified: ${user.emailVerified}');
 
@@ -65,33 +65,42 @@ Future<void> main() async {
 
   // Reset a forgotten password: the user is signed out and asks for an email.
   await auth.signOut();
-  await auth.sendPasswordResetEmail(email);
+  await auth.sendPasswordResetEmail(email: email);
   final String resetCode = await inbox.code(email, 'PASSWORD_RESET');
   // The page that handles the link can show whose password it resets.
   print(
     'reset code is for this address: '
     '${await auth.verifyPasswordResetCode(resetCode) == email}',
   );
-  await auth.confirmPasswordReset(resetCode, 'second password');
+  await auth.confirmPasswordReset(
+    code: resetCode,
+    newPassword: 'second password',
+  );
   try {
-    await auth.signInWithEmailAndPassword(email, 'first password');
-  } on FirebaseAuthProviderException catch (e) {
+    await auth.signInWithEmailAndPassword(
+      email: email,
+      password: 'first password',
+    );
+  } on FirebaseAuthException catch (e) {
     print('old password refused: ${e.code}');
   }
   final AuthUser again = await auth.signInWithEmailAndPassword(
-    email,
-    'second password',
+    email: email,
+    password: 'second password',
   );
   print('signed in with the new password, same user: ${again.uid == user.uid}');
 
   // Deleting an account needs a recent sign-in, as do password and email
   // changes; reauthenticate when the backend answers requires-recent-login.
-  await auth.reauthenticateWithEmailAndPassword(email, 'second password');
+  await auth.reauthenticateWithEmailAndPassword(
+    email: email,
+    password: 'second password',
+  );
   await auth.deleteCurrentUser();
   print('account deleted, signed in: ${auth.currentUser != null}');
 
   await auth.dispose();
-  app.delete();
+  await app.delete();
 }
 
 /// Reads the action codes the emulator would have sent by email.

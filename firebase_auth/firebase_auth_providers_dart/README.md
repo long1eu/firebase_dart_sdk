@@ -30,15 +30,15 @@ import 'package:firebase_auth_providers_dart/firebase_auth_providers_dart.dart';
 final FirebaseApp app = FirebaseApp.withOptions(
   const FirebaseOptions(
     apiKey: '<the Web API key of the project>',
-    applicationId: '1:1234567890:dart:example',
+    appId: '1:1234567890:dart:example',
     projectId: 'my-project',
   ),
 );
 // Before the Firestore instance is created: it becomes the token provider of the app.
 final FirebaseUserAuth auth = await FirebaseUserAuth.forApp(app);
-final Firestore firestore = Firestore.instanceFor(app: app);
+final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(app: app);
 
-await auth.signInWithEmailAndPassword('ada@example.com', password);
+await auth.signInWithEmailAndPassword(email: 'ada@example.com', password: password);
 await firestore.doc('users/${auth.uid}/notes/first').set({'text': 'hello'});
 await auth.signOut();
 ```
@@ -54,6 +54,11 @@ Firestore instance is created.
 | `FirebaseUserAuth`: anonymous, email and password, and custom-token sign-in over REST; token refresh; sign-out; account management; a session kept in your `AuthStorage` | apps with end users (VM, Flutter, web) | apply (`request.auth` is the user) | stable, emulator only |
 | `OAuthTokenProvider.serviceAccount`: a service account key | servers | **bypassed** | stable, unit tests only |
 | `applicationDefaultCredentials()` (`adc.dart`, VM only) | servers, command line tools | **bypassed** | stable, not exercised by tests |
+
+Pick the provider by who makes the requests; of the providers here, only `FirebaseUserAuth` keeps
+security rules in force:
+
+![Who makes the requests? A person signed in to your app: FirebaseUserAuth.forApp(app), security rules apply. A server or tool on Google Cloud or with gcloud credentials: applicationDefaultCredentials(), VM only, rules bypassed. A server or tool with a service account key file: OAuthTokenProvider.serviceAccount(key), rules bypassed. Access tokens from a source of your own: OAuthTokenProvider(fetch), rules bypassed.](https://raw.githubusercontent.com/long1eu/firebase_dart_sdk/main/docs/images/readme/auth_providers.svg)
 
 One example per task, each runnable on its own (the header of each file says how):
 

@@ -45,7 +45,7 @@ class BundleLoader {
   /// Adds an element from the bundle to the loader.
   ///
   /// Returns a new progress if adding the element leads to a new progress, otherwise returns null.
-  LoadBundleTaskProgress? addElement(
+  LoadBundleTaskSnapshot? addElement(
     BundleElement bundleElement,
     int byteSize,
   ) {
@@ -84,7 +84,7 @@ class BundleLoader {
     _bytesLoaded += byteSize;
 
     return beforeDocumentCount != _documents.length
-        ? LoadBundleTaskProgress(
+        ? LoadBundleTaskSnapshotInternal.create(
             _documents.length,
             _bundleMetadata.totalDocuments,
             _bytesLoaded,

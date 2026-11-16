@@ -9,6 +9,20 @@ Run as many copies as you like: a job is claimed by one of them.
 | `bin/enqueue.dart [count]` | Adds `count` jobs (default 20) in one batch: `{status: 'pending', n: <i>, createdAt: <server time>}`. |
 | `bin/report.dart` | Counts the jobs by status and the runs by worker, and exits with `1` if a job ran more than once. |
 
+All three programs talk to the same collection; the workers never talk to each other. Look at
+the arrows into `jobs`: the claim is a transaction, so two workers can race for a job and only
+one wins.
+
+```mermaid
+flowchart LR
+  enqueue["bin/enqueue.dart"] -- "one batch of pending jobs" --> jobs["jobs collection"]
+  jobs -- "listener: status == pending, limit 20" --> workerA["worker-a"]
+  jobs -- "listener: status == pending, limit 20" --> workerB["worker-b"]
+  workerA -- "transaction: claim, then batch: result and runs record" --> jobs
+  workerB -- "transaction: claim, then batch: result and runs record" --> jobs
+  report["bin/report.dart"] -- "reads jobs and runs" --> jobs
+```
+
 A job moves from `pending` to `running` to `done` (or `failed`):
 
 1. **A listener wakes the worker up.** The worker listens to
@@ -28,6 +42,20 @@ A job moves from `pending` to `running` to `done` (or `failed`):
    worker takes no new job, lets the job in progress finish, cancels the listener, calls
    `waitForPendingWrites()` (with a 5 s timeout, since it does not complete while the backend is
    unreachable) and `terminate()`, and exits with `0`.
+
+The states of one job, and which step moves it on. Note that nothing leads out of `running`
+except the result batch: see [What it does not do](#what-it-does-not-do) for a worker that dies
+there.
+
+```mermaid
+stateDiagram-v2
+  [*] --> pending: enqueue.dart, batch
+  pending --> running: claim transaction (one worker wins)
+  running --> done: result batch
+  running --> failed: result batch with the error
+  done --> [*]
+  failed --> [*]
+```
 
 The worker uses the default memory cache: nothing is written to disk. Exit codes: `0` after a
 clean stop, `1` when the listener failed (for example `permission-denied`) or writes were still

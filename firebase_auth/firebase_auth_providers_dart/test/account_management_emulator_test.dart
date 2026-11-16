@@ -24,8 +24,8 @@ String uniqueEmail([String prefix = 'user']) =>
     '$prefix${DateTime.now().microsecondsSinceEpoch}x${_counter++}@example.com';
 
 Matcher throwsAuth(Object code) => throwsA(
-  isA<FirebaseAuthProviderException>().having(
-    (FirebaseAuthProviderException e) => e.code,
+  isA<FirebaseAuthException>().having(
+    (FirebaseAuthException e) => e.code,
     'code',
     code,
   ),
@@ -88,10 +88,13 @@ void main() {
     test('password reset: send, check, confirm', () async {
       final FirebaseUserAuth auth = create();
       final String email = uniqueEmail('reset');
-      await auth.createUserWithEmailAndPassword(email, 'old-password');
+      await auth.createUserWithEmailAndPassword(
+        email: email,
+        password: 'old-password',
+      );
       await auth.signOut();
 
-      await auth.sendPasswordResetEmail(email);
+      await auth.sendPasswordResetEmail(email: email);
       final String code = await oobCode(email, 'PASSWORD_RESET');
       expect(await auth.verifyPasswordResetCode(code), email);
       final ActionCodeInfo info = await auth.checkActionCode(code);
@@ -99,26 +102,29 @@ void main() {
       expect(info.email, email);
 
       await expectLater(
-        auth.confirmPasswordReset(code, '1'),
+        auth.confirmPasswordReset(code: code, newPassword: '1'),
         throwsAuth('weak-password'),
       );
-      await auth.confirmPasswordReset(code, 'new-password');
+      await auth.confirmPasswordReset(code: code, newPassword: 'new-password');
       await expectLater(
-        auth.confirmPasswordReset(code, 'another-password'),
+        auth.confirmPasswordReset(code: code, newPassword: 'another-password'),
         throwsAuth('invalid-action-code'),
       );
       await expectLater(
-        auth.signInWithEmailAndPassword(email, 'old-password'),
+        auth.signInWithEmailAndPassword(email: email, password: 'old-password'),
         throwsAuth(anyOf('wrong-password', 'invalid-credential')),
       );
       expect(
-        (await auth.signInWithEmailAndPassword(email, 'new-password')).email,
+        (await auth.signInWithEmailAndPassword(
+          email: email,
+          password: 'new-password',
+        )).email,
         email,
       );
 
       // With action code settings, and the errors.
       await auth.sendPasswordResetEmail(
-        email,
+        email: email,
         actionCodeSettings: const ActionCodeSettings(
           url: 'https://example.com/after-reset',
           handleCodeInApp: false,
@@ -126,13 +132,13 @@ void main() {
       );
       await expectLater(
         auth.sendPasswordResetEmail(
-          email,
+          email: email,
           actionCodeSettings: const ActionCodeSettings(url: ''),
         ),
         throwsAuth('invalid-continue-uri'),
       );
       await expectLater(
-        auth.sendPasswordResetEmail(uniqueEmail('nobody')),
+        auth.sendPasswordResetEmail(email: uniqueEmail('nobody')),
         throwsAuth('user-not-found'),
       );
       await expectLater(
@@ -144,10 +150,13 @@ void main() {
     test('email verification: send, apply, reload', () async {
       final FirebaseUserAuth auth = create();
       final String email = uniqueEmail('verify');
-      await auth.createUserWithEmailAndPassword(email, 'password');
+      await auth.createUserWithEmailAndPassword(
+        email: email,
+        password: 'password',
+      );
       expect(auth.currentUser!.emailVerified, isFalse);
       final List<AuthUser?> changes = <AuthUser?>[];
-      final StreamSubscription<AuthUser?> sub = auth.userChanges.listen(
+      final StreamSubscription<AuthUser?> sub = auth.userChanges().listen(
         changes.add,
       );
       addTearDown(sub.cancel);
@@ -182,12 +191,12 @@ void main() {
       final FirebaseUserAuth auth = create();
       final String email = uniqueEmail('before');
       final AuthUser user = await auth.createUserWithEmailAndPassword(
-        email,
-        'password-1',
+        email: email,
+        password: 'password-1',
       );
       final List<String> tokens = <String>[];
-      final StreamSubscription<InternalTokenResult> sub = auth.onTokenChanged
-          .listen((InternalTokenResult r) => tokens.add(r.token));
+      final StreamSubscription<AuthTokenChange> sub = auth.onTokenChanged
+          .listen((AuthTokenChange r) => tokens.add(r.token));
       addTearDown(sub.cancel);
 
       final String newEmail = uniqueEmail('after');
@@ -211,7 +220,10 @@ void main() {
         throwsAuth('invalid-email'),
       );
       final String taken = uniqueEmail('taken');
-      await create().createUserWithEmailAndPassword(taken, 'password');
+      await create().createUserWithEmailAndPassword(
+        email: taken,
+        password: 'password',
+      );
       await expectLater(
         auth.updateEmail(taken),
         throwsAuth('email-already-in-use'),
@@ -219,11 +231,14 @@ void main() {
 
       await auth.signOut();
       await expectLater(
-        auth.signInWithEmailAndPassword(email, 'password-1'),
+        auth.signInWithEmailAndPassword(email: email, password: 'password-1'),
         throwsAuth(anyOf('user-not-found', 'invalid-credential')),
       );
       expect(
-        (await auth.signInWithEmailAndPassword(newEmail, 'password-2')).uid,
+        (await auth.signInWithEmailAndPassword(
+          email: newEmail,
+          password: 'password-2',
+        )).uid,
         user.uid,
       );
     });
@@ -231,7 +246,10 @@ void main() {
     test('verifyBeforeUpdateEmail changes the email when applied', () async {
       final FirebaseUserAuth auth = create();
       final String email = uniqueEmail('old');
-      await auth.createUserWithEmailAndPassword(email, 'password');
+      await auth.createUserWithEmailAndPassword(
+        email: email,
+        password: 'password',
+      );
       final String newEmail = uniqueEmail('new');
       await auth.verifyBeforeUpdateEmail(newEmail);
       expect(auth.currentUser!.email, email);
@@ -247,7 +265,10 @@ void main() {
       expect(auth.currentUser!.emailVerified, isTrue);
       await auth.signOut();
       expect(
-        (await auth.signInWithEmailAndPassword(newEmail, 'password')).email,
+        (await auth.signInWithEmailAndPassword(
+          email: newEmail,
+          password: 'password',
+        )).email,
         newEmail,
       );
     });
@@ -255,8 +276,8 @@ void main() {
     test('updateProfile sets and removes the name and the photo', () async {
       final FirebaseUserAuth auth = create();
       await auth.createUserWithEmailAndPassword(
-        uniqueEmail('profile'),
-        'pw1234',
+        email: uniqueEmail('profile'),
+        password: 'pw1234',
       );
       await auth.updateProfile(
         displayName: 'Ada Lovelace',
@@ -285,15 +306,18 @@ void main() {
       final FirebaseUserAuth auth = create();
       final String email = uniqueEmail('reauth');
       final AuthUser user = await auth.createUserWithEmailAndPassword(
-        email,
-        'password',
+        email: email,
+        password: 'password',
       );
       final String before = (await auth.getAccessToken(
         forceRefresh: false,
       )).token;
       await Future<void>.delayed(const Duration(milliseconds: 1100));
       expect(
-        (await auth.reauthenticateWithEmailAndPassword(email, 'password')).uid,
+        (await auth.reauthenticateWithEmailAndPassword(
+          email: email,
+          password: 'password',
+        )).uid,
         user.uid,
       );
       expect(
@@ -302,17 +326,29 @@ void main() {
       );
 
       await expectLater(
-        auth.reauthenticateWithEmailAndPassword(email, 'wrong'),
+        auth.reauthenticateWithEmailAndPassword(
+          email: email,
+          password: 'wrong',
+        ),
         throwsAuth(anyOf('wrong-password', 'invalid-credential')),
       );
       final String other = uniqueEmail('other');
-      await create().createUserWithEmailAndPassword(other, 'password');
+      await create().createUserWithEmailAndPassword(
+        email: other,
+        password: 'password',
+      );
       await expectLater(
-        auth.reauthenticateWithEmailAndPassword(other, 'password'),
+        auth.reauthenticateWithEmailAndPassword(
+          email: other,
+          password: 'password',
+        ),
         throwsAuth('user-mismatch'),
       );
       await expectLater(
-        auth.reauthenticateWithEmailAndPassword(uniqueEmail('none'), 'x'),
+        auth.reauthenticateWithEmailAndPassword(
+          email: uniqueEmail('none'),
+          password: 'x',
+        ),
         throwsAuth(anyOf('user-mismatch', 'invalid-credential')),
       );
       expect(auth.uid, user.uid);
@@ -321,11 +357,14 @@ void main() {
     test('delete, and the operations without a user', () async {
       final FirebaseUserAuth auth = create();
       final String email = uniqueEmail('delete');
-      await auth.createUserWithEmailAndPassword(email, 'password');
+      await auth.createUserWithEmailAndPassword(
+        email: email,
+        password: 'password',
+      );
       await auth.deleteCurrentUser();
       expect(auth.uid, isNull);
       await expectLater(
-        auth.signInWithEmailAndPassword(email, 'password'),
+        auth.signInWithEmailAndPassword(email: email, password: 'password'),
         throwsAuth(anyOf('user-not-found', 'invalid-credential')),
       );
       await expectLater(auth.reload(), throwsAuth('null-user'));
@@ -339,9 +378,15 @@ void main() {
     test('an account deleted elsewhere signs the user out on reload', () async {
       final FirebaseUserAuth auth = create();
       final String email = uniqueEmail('gone');
-      await auth.createUserWithEmailAndPassword(email, 'password');
+      await auth.createUserWithEmailAndPassword(
+        email: email,
+        password: 'password',
+      );
       final FirebaseUserAuth other = create();
-      await other.signInWithEmailAndPassword(email, 'password');
+      await other.signInWithEmailAndPassword(
+        email: email,
+        password: 'password',
+      );
       await other.deleteCurrentUser();
 
       await expectLater(auth.reload(), throwsAuth('user-token-expired'));
@@ -351,7 +396,10 @@ void main() {
     test('fetchSignInMethodsForEmail', () async {
       final FirebaseUserAuth auth = create();
       final String email = uniqueEmail('methods');
-      await auth.createUserWithEmailAndPassword(email, 'password');
+      await auth.createUserWithEmailAndPassword(
+        email: email,
+        password: 'password',
+      );
       expect(await auth.fetchSignInMethodsForEmail(email), <String>[
         'password',
       ]);
@@ -378,7 +426,10 @@ void main() {
       expect(auth.uid, user.uid);
       await auth.signOut();
       expect(
-        (await auth.signInWithEmailAndPassword(email, 'password')).uid,
+        (await auth.signInWithEmailAndPassword(
+          email: email,
+          password: 'password',
+        )).uid,
         user.uid,
       );
     });

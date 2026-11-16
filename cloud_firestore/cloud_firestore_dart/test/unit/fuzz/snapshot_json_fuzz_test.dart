@@ -116,7 +116,7 @@ void main() {
             QuerySnapshot<Map<String, Object?>>.fromJson(modelFirestore, json);
         for (final DocumentSnapshot<Map<String, Object?>> document
             in snapshot.docs) {
-          expect(document.data, isA<Map<String, Object?>>());
+          expect(document.data(), isA<Map<String, Object?>>());
         }
       },
     );
@@ -145,7 +145,7 @@ void main() {
             for (final DocumentSnapshot<Map<String, Object?>> document
                 in snapshot.docs) {
               acceptOrReject(
-                () => document.data,
+                () => document.data(),
                 () => document.reference.path,
               );
             }
@@ -161,7 +161,7 @@ void main() {
               );
           if (snapshot != null) {
             acceptOrReject(
-              () => snapshot.data,
+              () => snapshot.data(),
               () => snapshot.reference.path,
             );
           }
@@ -173,11 +173,11 @@ void main() {
 }
 
 /// [acceptOrReject] for the public API: the only clean rejection is a
-/// [FirestoreError].
+/// [FirestoreException].
 T? acceptOrRejectFirestore<T>(T Function() body, String Function() input) {
   try {
     return body();
-  } on FirestoreError catch (error) {
+  } on FirestoreException catch (error) {
     final Object? cause = error.cause;
     if (cause != null &&
         !isCleanRejection(cause, error.stackTrace ?? StackTrace.empty)) {

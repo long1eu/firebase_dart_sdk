@@ -142,7 +142,7 @@ String doubleToString(double v) {
 }
 
 /// Builds the Dart value to write for [spec].
-Object? build(Firestore db, Map<String, Object?> spec) {
+Object? build(FirebaseFirestore db, Map<String, Object?> spec) {
   switch (spec['t']) {
     case 'null':
       return null;
@@ -277,9 +277,6 @@ void main() {
   final String? skip = skipReason;
 
   // With metadata changes, so that the event of the listener getting in sync is raised when no document changed.
-  const SnapshotListenOptions metadata =
-      SnapshotListenOptions(metadataChanges: MetadataChanges.include);
-
   tearDown(() async {
     await Future<void>.delayed(const Duration(milliseconds: 100));
     await IntegrationTestUtil.tearDown();
@@ -310,12 +307,11 @@ void main() {
 
   /// The ids of the documents of a query snapshot that the listener of [json] raises once in sync.
   Future<List<String>> resumeQuery(
-      Firestore db, Map<String, Object?> json) async {
+      FirebaseFirestore db, Map<String, Object?> json) async {
     final List<QuerySnapshot<Map<String, Object?>>> events =
         <QuerySnapshot<Map<String, Object?>>>[];
     final List<Object> errors = <Object>[];
-    final StreamSubscription<QuerySnapshot<Map<String, Object?>>> sub = db
-        .querySnapshotsFromJson<Map<String, Object?>>(json, options: metadata)
+    final StreamSubscription<QuerySnapshot<Map<String, Object?>>> sub = db.querySnapshotsFromJson<Map<String, Object?>>(json, includeMetadataChanges: true)
         .listen(events.add, onError: errors.add);
     try {
       return ids(await waitFor<QuerySnapshot<Map<String, Object?>>>(
@@ -336,7 +332,7 @@ void main() {
       final String name = uniqueName('jsSnapshots');
       final Map<String, Object?> snapshots = await runHarness(
           'write-snapshots', <String, Object?>{'collection': name});
-      final Firestore db = await IntegrationTestUtil.testFirestore();
+      final FirebaseFirestore db = await IntegrationTestUtil.testFirestore();
       final CollectionReference<Map<String, Object?>> collection =
           db.collection(name);
 
@@ -346,23 +342,21 @@ void main() {
           DocumentSnapshot<Map<String, Object?>>.fromJson(db, documentJson);
       expect(document.exists, isTrue);
       expect(document.reference.path, '$name/a');
-      expect(document.data, docA);
+      expect(document.data(), docA);
 
       final List<DocumentSnapshot<Map<String, Object?>>> documentEvents =
           <DocumentSnapshot<Map<String, Object?>>>[];
-      final StreamSubscription<DocumentSnapshot<Map<String, Object?>>> sub = db
-          .documentSnapshotsFromJson<Map<String, Object?>>(documentJson,
-              options: metadata)
+      final StreamSubscription<DocumentSnapshot<Map<String, Object?>>> sub = db.documentSnapshotsFromJson<Map<String, Object?>>(documentJson, includeMetadataChanges: true)
           .listen(documentEvents.add);
       expect(documentEvents, isEmpty);
       final DocumentSnapshot<Map<String, Object?>> first = await waitFor(
           documentEvents, (DocumentSnapshot<Map<String, Object?>> s) => true);
-      expect(first.data, docA);
+      expect(first.data(), docA);
       await collection.doc('a').set(<String, Object?>{'n': 1, 's': 'uno'});
       await waitFor(
           documentEvents,
           (DocumentSnapshot<Map<String, Object?>> s) =>
-              s.data?['s'] == 'uno' && !s.metadata.isFromCache);
+              s.data()?['s'] == 'uno' && !s.metadata.isFromCache);
       await sub.cancel();
       await collection.doc('a').set(docA);
 
@@ -397,19 +391,18 @@ void main() {
       final QuerySnapshot<Map<String, Object?>> all = await check(
           'query', <String>['a', 'b', 'c'],
           expectedQuery: collection.orderBy('n'));
-      expect(all.docs[0].data, docA);
-      expect(all.docs[2].data, <String, Object?>{'n': 3, 's': threeText});
+      expect(all.docs[0].data(), docA);
+      expect(all.docs[2].data(), <String, Object?>{'n': 3, 's': threeText});
 
       await check('limit', <String>['a', 'b'],
           expectedQuery: collection.orderBy('n').limit(2));
       await check('filter', <String>['c', 'b'],
           expectedQuery: collection
-              .where('n', isGreaterThanOrEqualTo: 2)
-              .orderBy('n', Direction.descending));
+              .where('n', isGreaterThanOrEqualTo: 2).orderBy('n', descending: true));
       await check('or', <String>['a', 'c'],
           expectedQuery: collection.where(Filter.or(<Filter>[
-            Filter.equalTo('n', 1),
-            Filter.equalTo('n', 3),
+            Filter('n', isEqualTo: 1),
+            Filter('n', isEqualTo: 3),
           ])));
       await check('collectionGroup', <String>['x', 'y'],
           expectedQuery: db.collectionGroup('sub-$name').orderBy('n'));
@@ -421,7 +414,7 @@ void main() {
       // and the resumed listener are in the inverted order. querySnapshotFromJSON() of the JS SDK reads the same.
       await check('limitToLast', <String>['c', 'b'],
           expectedQuery:
-              collection.orderBy('n', Direction.descending).limit(2));
+              collection.orderBy('n', descending: true).limit(2));
 
       // JS SDK bug: toJSON() of a subcollection query writes the database root as the parent, so the query read
       // back is the one of a root collection with the same id. The snapshot still holds the documents, but the
@@ -433,7 +426,7 @@ void main() {
 
     test('written by toJson is read by the JS SDK and resumed', () async {
       final String name = uniqueName('dartSnapshots');
-      final Firestore db = await IntegrationTestUtil.testFirestore();
+      final FirebaseFirestore db = await IntegrationTestUtil.testFirestore();
       final CollectionReference<Map<String, Object?>> collection =
           db.collection(name);
       await collection.doc('a').set(docA);
@@ -450,11 +443,10 @@ void main() {
         'limit': collection.orderBy('n').limit(2),
         'limitToLast': collection.orderBy('n').limitToLast(2),
         'filter': collection
-            .where('n', isGreaterThanOrEqualTo: 2)
-            .orderBy('n', Direction.descending),
+            .where('n', isGreaterThanOrEqualTo: 2).orderBy('n', descending: true),
         'or': collection.where(Filter.or(<Filter>[
-          Filter.equalTo('n', 1),
-          Filter.equalTo('n', 3),
+          Filter('n', isEqualTo: 1),
+          Filter('n', isEqualTo: 3),
         ])),
         'subcollection': sub.orderBy('n'),
         'collectionGroup': db.collectionGroup('sub-$name').orderBy('n'),
@@ -534,7 +526,7 @@ void main() {
 
   group('value JSON', () {
     test('toJSON of the JS SDK is read by fromJson, and the reverse', () async {
-      final Firestore db = await IntegrationTestUtil.testFirestore();
+      final FirebaseFirestore db = await IntegrationTestUtil.testFirestore();
       final Map<String, Object?> js = await runHarness('values-to-json');
 
       const Timestamp timestamp = Timestamp(1234567890, 123456789);
@@ -617,9 +609,9 @@ void main() {
       final Uint8List bundle = result['bundleBytes']! as Uint8List;
       expect(bundle.length, result['bytes']);
 
-      final Firestore db = await IntegrationTestUtil.testFirestore();
+      final FirebaseFirestore db = await IntegrationTestUtil.testFirestore();
       await db.disableNetwork();
-      final LoadBundleTaskProgress progress =
+      final LoadBundleTaskSnapshot progress =
           await db.loadBundle(bundle).future;
       expect(progress.taskState, LoadBundleTaskState.success);
       // a, b, c and the missing document.
@@ -632,16 +624,16 @@ void main() {
       Future<QuerySnapshot<Map<String, Object?>>> named(
           String queryName) async {
         final Query<Map<String, Object?>>? query =
-            await db.getNamedQuery(queryName);
+            await db.namedQuery(queryName);
         expect(query, isNotNull, reason: queryName);
-        return query!.get(Source.cache);
+        return query!.get(GetOptions(source: Source.cache));
       }
 
       final QuerySnapshot<Map<String, Object?>> all = await named('all');
       expect(all.query, collection.orderBy('n'));
       expect(ids(all), <String>['a', 'b', 'c']);
       expect(
-          describe(all.docs[0].data),
+          describe(all.docs[0].data()),
           describe(<String, Object?>{
             'n': 1,
             's': 'one',
@@ -649,14 +641,14 @@ void main() {
             'when': const Timestamp(100, 5000),
           }));
       expect(
-          describe(all.docs[1].data),
+          describe(all.docs[1].data()),
           describe(<String, Object?>{
             'n': 2,
             's': 'two \u{1F60A}',
             'where': const GeoPoint(1, 2),
           }));
       expect(
-          describe(all.docs[2].data),
+          describe(all.docs[2].data()),
           describe(<String, Object?>{
             'n': 3,
             'ref': collection.doc('a'),
@@ -672,18 +664,18 @@ void main() {
       final QuerySnapshot<Map<String, Object?>> firstOne =
           await named('first-one');
       expect(firstOne.query,
-          collection.orderBy('n', Direction.descending).limit(1));
+          collection.orderBy('n', descending: true).limit(1));
       expect(ids(firstOne), <String>['c']);
 
-      expect((await collection.doc('a').get(Source.cache)).data?['s'], 'one');
+      expect((await collection.doc('a').get(GetOptions(source: Source.cache))).data()?['s'], 'one');
       // The missing document is known to be missing.
       expect(
-          (await collection.doc('missing').get(Source.cache)).exists, isFalse);
+          (await collection.doc('missing').get(GetOptions(source: Source.cache))).exists, isFalse);
 
       // Back online, a bundled query is listened to and in sync with the backend.
       await db.enableNetwork();
       final QuerySnapshot<Map<String, Object?>> server =
-          await (await db.getNamedQuery('last-two'))!.get(Source.server);
+          await (await db.namedQuery('last-two'))!.get(GetOptions(source: Source.server));
       expect(ids(server), <String>['b', 'c']);
     });
   }, skip: skip);
@@ -770,7 +762,7 @@ void main() {
 
     test('written by the Dart SDK is read by the JS SDK', () async {
       final String name = uniqueName('dartData');
-      final Firestore db = await IntegrationTestUtil.testFirestore();
+      final FirebaseFirestore db = await IntegrationTestUtil.testFirestore();
       final Map<String, Object?> spec =
           mapSpec(allTypes('$name/other', jsWritable: false));
       await db
@@ -830,11 +822,11 @@ void main() {
         'documents': <String, Object?>{'all': spec},
       });
 
-      final Firestore db = await IntegrationTestUtil.testFirestore();
+      final FirebaseFirestore db = await IntegrationTestUtil.testFirestore();
       final DocumentSnapshot<Map<String, Object?>> snapshot =
           await db.collection(name).doc('all').get();
       final Map<String, Object?> data = asMap(
-          asMap(normalize(describe(snapshot.data), jsNumbers: false))['v']);
+          asMap(normalize(describe(snapshot.data()), jsNumbers: false))['v']);
       // The JS SDK writes a double that is a safe integer (but not -0) as an integer.
       final Map<String, Object?> expected =
           asMap(asMap(normalize(afterJsWrite(spec), jsNumbers: false))['v']);
@@ -852,7 +844,7 @@ void main() {
           DocumentSnapshot<Map<String, Object?>>.fromJson(
               db, asMap(asMap(written['snapshots'])['all']));
       final Map<String, Object?> jsonData = asMap(
-          asMap(normalize(describe(fromJson.data), jsNumbers: false))['v']);
+          asMap(normalize(describe(fromJson.data()), jsNumbers: false))['v']);
       expect(jsonData.keys.toSet(), expected.keys.toSet());
       for (final String key in expected.keys) {
         expect(jsonData[key], expected[key], reason: 'toJSON: $key');
@@ -861,7 +853,7 @@ void main() {
 
     test('both SDKs order a mixed-type field the same way', () async {
       final String name = uniqueName('mixedOrder');
-      final Firestore db = await IntegrationTestUtil.testFirestore();
+      final FirebaseFirestore db = await IntegrationTestUtil.testFirestore();
       final CollectionReference<Map<String, Object?>> collection =
           db.collection(name);
 
@@ -962,7 +954,7 @@ void main() {
 
       // Also with the documents only in the cache, where the Dart SDK alone orders and filters them.
       final List<String> cached =
-          ids(await collection.orderBy('v').get(Source.cache));
+          ids(await collection.orderBy('v').get(GetOptions(source: Source.cache)));
       expect(cached, expected, reason: 'Dart SDK order from cache');
     });
   }, skip: skip);

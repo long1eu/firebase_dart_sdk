@@ -19,7 +19,7 @@ Google or Firebase.
 | --- | --- |
 | Documents, collections, collection groups, set / update / delete, write batches, field transforms | stable |
 | Queries: filters, `Filter.or` / `Filter.and`, `orderBy`, cursors, `limit`, `limitToLast` | stable |
-| Real-time listeners, snapshot metadata, `snapshotsInSync` | stable |
+| Real-time listeners, snapshot metadata, `snapshotsInSync()` | stable |
 | Aggregations (`count`, `sum`, `average`), vector search (`findNearest`, server only) | stable |
 | Transactions, read-only transactions with point-in-time reads | stable |
 | Typed converters (`withConverter`), snapshots as JSON, data bundles | stable |
@@ -39,6 +39,11 @@ tokens can be supplied through the app.
 Windows is expected to work but is not tested. Flutter on Android, iOS and desktop, as a plain
 Dart package. The web, experimentally: tested in Chrome only. Dart 3.8 or later.
 
+Inside the package, every call goes through one queue to the local cache and to the network; the
+transport depends on the platform, and Firestore Lite skips the cache:
+
+![Layers of cloud_firestore_dart: the public API; the client with its event manager and sync engine on one serial queue; the local store (memory or SQLite cache) next to the network layer (listen stream, write stream, one-shot calls); the transport, gRPC on the VM and in Flutter or REST and WebChannel in the browser; then Cloud Firestore or the emulator. Firestore Lite sends one request per call without cache or listeners.](https://raw.githubusercontent.com/long1eu/firebase_dart_sdk/main/docs/images/readme/firestore_layers.svg)
+
 ## Install
 
 ```shell
@@ -53,11 +58,11 @@ import 'package:firebase_app_dart/firebase_app_dart.dart';
 
 Future<void> main() async {
   final app = FirebaseApp.withOptions(const FirebaseOptions(
-      apiKey: '<API key>', applicationId: '1:1234567890:web:abc', projectId: 'my-project'));
-  final firestore = Firestore.instanceFor(app: app);
+      apiKey: '<API key>', appId: '1:1234567890:web:abc', projectId: 'my-project'));
+  final firestore = FirebaseFirestore.instanceFor(app: app);
   await firestore.doc('cities/SF').set({'name': 'San Francisco', 'state': 'CA'});
   final cities = await firestore.collection('cities').where('state', isEqualTo: 'CA').get();
-  print(cities.docs.map((city) => city.data));
+  print(cities.docs.map((city) => city.data()));
   await firestore.terminate(); // a VM program exits once its instances are terminated
 }
 ```

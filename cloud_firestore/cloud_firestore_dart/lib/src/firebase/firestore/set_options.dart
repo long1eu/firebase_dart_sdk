@@ -3,29 +3,27 @@
 // on 26/09/2018
 
 import 'package:cloud_firestore_dart/src/firebase/firestore/field_path.dart';
-import 'package:cloud_firestore_dart/src/firebase/firestore/model/field_path.dart'
-    as model;
+import 'package:collection/collection.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/field_mask.dart';
 
 /// Chooses whether a `set` call replaces the whole document or merges the
 /// data into it.
 ///
 /// Pass one to `set` of `DocumentReference`, `WriteBatch` or `Transaction`.
-/// Without options, `set` replaces the document ([overwrite]). With
-/// [mergeAllFields] it changes only the fields present in the data, and with
-/// [SetOptions.mergeFields] or [SetOptions.mergeFieldPaths] only the fields
-/// you name. A merge creates the document if it does not exist.
+/// Without options, `set` replaces the document. With [merge] it changes only
+/// the fields present in the data, and with [mergeFields] only the fields you
+/// name. A merge creates the document if it does not exist.
 ///
 /// ```dart
 /// final DocumentReference<Map<String, Object?>> sf = firestore.doc('cities/SF');
 ///
 /// // Keeps every other field of the document.
-/// await sf.set(<String, Object?>{'capital': false}, SetOptions.mergeAllFields);
+/// await sf.set(<String, Object?>{'capital': false}, const SetOptions(merge: true));
 ///
 /// // Writes only `population`, even though `name` is in the data too.
 /// await sf.set(
 ///   <String, Object?>{'name': 'San Francisco', 'population': 870000},
-///   SetOptions.mergeFields(<String>['population']),
+///   const SetOptions(mergeFields: <String>['population']),
 /// );
 /// ```
 ///
@@ -36,93 +34,98 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/field
 ///
 /// When the reference has a converter, `FirestoreDataConverter.toFirestore`
 /// receives these options. In the JS SDK these are the `{merge: true}` and
-/// `{mergeFields: [...]}` objects.
+/// `{mergeFields: [...]}` objects; this is FlutterFire's `SetOptions`.
 class SetOptions {
-  const SetOptions._(this.merge, this._fieldMask)
-    : assert(
-        _fieldMask != null && merge,
-        'Cannot specify a fieldMask for non-merge sets()',
-      );
-
-  const SetOptions._overwrite() : merge = false, _fieldMask = null;
-
-  const SetOptions._mergeAll() : merge = true, _fieldMask = null;
-
-  /// Merges only the fields named in [fields]; every other field of the data
-  /// is ignored, and every other field of the document is kept.
+  /// Options for a `set` call: [merge] merges the data into the document, and
+  /// [mergeFields] merges only the fields it names. Give at most one of them;
+  /// with neither, `set` replaces the whole document.
   ///
-  /// Each entry of [fields] is a dot-separated field path, so `'address.city'`
-  /// names `city` inside the map `address`. Use [SetOptions.mergeFieldPaths]
-  /// when a field name contains a dot.
-  ///
-  /// ```dart
-  /// await firestore.doc('cities/SF').set(
-  ///   <String, Object?>{'name': 'San Francisco', 'population': 870000},
-  ///   SetOptions.mergeFields(<String>['population']),
-  /// );
-  /// ```
-  ///
-  /// Throws an [ArgumentError] if an entry of [fields] is not a valid field
-  /// path. The `set` call throws an [ArgumentError] if the data has no value
-  /// for one of [fields].
-  factory SetOptions.mergeFields(List<String> fields) {
-    final Set<model.FieldPath> fieldPaths = fields
-        .map(
-          (String field) => FieldPath.fromDotSeparatedPath(field).internalPath,
-        )
-        .toSet();
-    return SetOptions._(true, FieldMask(fieldPaths));
-  }
-
-  /// Merges only the fields named in [fields], given as [FieldPath]s; every
-  /// other field of the data is ignored, and every other field of the
-  /// document is kept.
+  /// Each entry of [mergeFields] is a [String] (a dot-separated field path, so
+  /// `'address.city'` names `city` inside the map `address`) or a [FieldPath]
+  /// (for a field name that contains a dot). The `set` call throws an
+  /// [ArgumentError] if an entry is not a valid field path or if the data has
+  /// no value for one of the fields.
   ///
   /// ```dart
   /// await firestore.doc('cities/SF').set(
   ///   <String, Object?>{
   ///     'stats.v2': <String, Object?>{'visits': 10},
   ///   },
-  ///   SetOptions.mergeFieldPaths(<FieldPath>[
-  ///     FieldPath.of(<String>['stats.v2', 'visits']),
+  ///   SetOptions(mergeFields: <Object>[
+  ///     FieldPath(<String>['stats.v2', 'visits']),
   ///   ]),
   /// );
   /// ```
-  ///
-  /// The `set` call throws an [ArgumentError] if the data has no value for one
-  /// of [fields].
-  factory SetOptions.mergeFieldPaths(List<FieldPath> fields) {
-    final Set<model.FieldPath> fieldPaths = fields
-        .map((FieldPath field) => field.internalPath)
-        .toSet();
-    return SetOptions._(true, FieldMask(fieldPaths));
-  }
+  const SetOptions({bool merge = false, List<Object>? mergeFields})
+    : assert(
+        !(merge && mergeFields != null),
+        "SetOptions cannot have both 'merge' and 'mergeFields'.",
+      ),
+      _merge = merge,
+      _mergeFields = mergeFields;
 
-  /// Replaces the whole document with the data: fields that are not in the
-  /// data are removed. The default when no options are given.
-  static const SetOptions overwrite = SetOptions._overwrite();
-
-  /// Merges the data into the document: only the fields present in the data
-  /// are written, nested maps are merged, and the other fields of the
-  /// document are kept. The JS SDK's `{merge: true}`.
-  ///
-  /// ```dart
-  /// await firestore
-  ///     .doc('cities/SF')
-  ///     .set(<String, Object?>{'capital': false}, SetOptions.mergeAllFields);
-  /// ```
-  static const SetOptions mergeAllFields = SetOptions._mergeAll();
+  final bool _merge;
+  final List<Object>? _mergeFields;
 
   /// Whether the data is merged into the existing document instead of
-  /// replacing it: false only for [overwrite].
-  final bool merge;
+  /// replacing it: true with `merge: true` and with [mergeFields].
+  bool get merge => _merge || _mergeFields != null;
 
-  final FieldMask? _fieldMask;
+  /// The fields to merge, or null to merge every field of the data (with
+  /// [merge]) or to replace the document.
+  ///
+  /// Throws an [ArgumentError] if an entry is not a [String] or a [FieldPath],
+  /// or is not a valid field path.
+  List<FieldPath>? get mergeFields {
+    final List<Object>? fields = _mergeFields;
+    if (fields == null) {
+      return null;
+    }
+    return List<FieldPath>.unmodifiable(<FieldPath>[
+      for (final Object field in fields)
+        if (field is FieldPath)
+          field
+        else if (field is String)
+          FieldPath.fromString(field)
+        else
+          throw ArgumentError.value(
+            field,
+            'mergeFields',
+            'must contain String or FieldPath values',
+          ),
+    ]);
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is SetOptions &&
+          merge == other.merge &&
+          const ListEquality<FieldPath>().equals(
+            mergeFields,
+            other.mergeFields,
+          );
+
+  @override
+  int get hashCode =>
+      Object.hash(merge, const ListEquality<FieldPath>().hash(mergeFields));
+
+  @override
+  String toString() =>
+      'SetOptions(merge: $merge, mergeFields: ${mergeFields?.join(', ')})';
 }
 
 /// Members of [SetOptions] for the SDK itself. Not exported by the public libraries.
 extension SetOptionsInternal on SetOptions {
   /// The fields to merge, or null to merge every field of the data (or none,
   /// for an overwrite).
-  FieldMask? get fieldMask => _fieldMask;
+  FieldMask? get fieldMask {
+    final List<FieldPath>? fields = mergeFields;
+    if (fields == null) {
+      return null;
+    }
+    return FieldMask(
+      fields.map((FieldPath field) => field.internalPath).toSet(),
+    );
+  }
 }

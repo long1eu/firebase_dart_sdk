@@ -64,15 +64,15 @@ void main() {
 
   test('testNestedFieldsCanBeWrittenWithSet', () async {
     final Map<String, Object?> data = nestedObject(1);
-    final DocumentReference docRef = (await testCollection()).document();
+    final DocumentReference docRef = (await testCollection()).doc();
     await docRef.set(data);
     final DocumentSnapshot result = await docRef.get();
-    expect(result.data, data);
+    expect(result.data(), data);
   });
 
   test('testNestedFieldsCanReadDirectly', () async {
     final Map<String, Object?> data = nestedObject(1);
-    final DocumentReference docRef = (await testCollection()).document();
+    final DocumentReference docRef = (await testCollection()).doc();
     await docRef.set(data);
 
     final DocumentSnapshot result = await docRef.get();
@@ -90,10 +90,9 @@ void main() {
 
   test('testNestedFieldCanBeUpdated', () async {
     final Map<String, Object?> data = nestedObject(1);
-    final DocumentReference docRef = (await testCollection()).document();
+    final DocumentReference docRef = (await testCollection()).doc();
     await docRef.set(data);
-    await docRef.updateFromList(
-        <dynamic>['metadata.deep.field', 100.0, 'metadata.added', 200.0]);
+    await docRef.update(<Object, Object?>{'metadata.deep.field': 100.0, 'metadata.added': 200.0});
     final DocumentSnapshot result = await docRef.get();
     final Map<String, Object?> expectedData = map(<dynamic>[
       'name',
@@ -109,7 +108,7 @@ void main() {
       ])
     ]);
 
-    expect(result.data, expectedData);
+    expect(result.data(), expectedData);
   });
 
   test('testNestedFieldsCanBeUsedInQueryFilters', () async {
@@ -129,12 +128,12 @@ void main() {
     final CollectionReference collection = await testCollection();
     final List<Future<void>> tasks = <Future<void>>[];
     for (MapEntry<String, Map<String, Object?>> entry in docs.entries) {
-      tasks.add(collection.document(entry.key).set(entry.value));
+      tasks.add(collection.doc(entry.key).set(entry.value));
     }
 
     await Future.wait(tasks);
     final Query query =
-        collection.whereGreaterThanOrEqualTo('metadata.createdAt', 200);
+        collection.where('metadata.createdAt', isGreaterThanOrEqualTo: 200);
     final QuerySnapshot res = await query.get();
     expect(querySnapshotToValues(res), expected);
   });
@@ -156,7 +155,7 @@ void main() {
     final CollectionReference collection = await testCollection();
     final List<Future<void>> tasks = <Future<void>>[];
     for (MapEntry<String, Map<String, Object?>> entry in docs.entries) {
-      tasks.add(collection.document(entry.key).set(entry.value));
+      tasks.add(collection.doc(entry.key).set(entry.value));
     }
 
     await Future.wait(tasks);
@@ -167,37 +166,32 @@ void main() {
 
   test('testFieldsWithSpecialCharsCanBeWrittenWithSet', () async {
     final Map<String, Object?> data = dottedObject(1);
-    final DocumentReference docRef = (await testCollection()).document();
+    final DocumentReference docRef = (await testCollection()).doc();
     await docRef.set(data);
     final DocumentSnapshot doc = await docRef.get();
-    expect(doc.data, data);
+    expect(doc.data(), data);
   });
 
   test('testFieldsWithSpecialCharsCanBeReadDirectly', () async {
     final Map<String, Object?> data = dottedObject(1);
-    final DocumentReference docRef = (await testCollection()).document();
+    final DocumentReference docRef = (await testCollection()).doc();
     await docRef.set(data);
     final DocumentSnapshot doc = await docRef.get();
     expect(doc['field'], data['field']);
     expect(
-        doc.getField(FieldPath.of(<String>['field.dot'])), data['field.dot']);
+        doc.get(FieldPath(<String>['field.dot'])), data['field.dot']);
     expect(doc['field\\slash'], data['field\\slash']);
   });
 
   test('testFieldsWithSpecialCharsCanBeUpdated', () async {
     final Map<String, Object?> data = dottedObject(1);
-    final DocumentReference docRef = (await testCollection()).document();
+    final DocumentReference docRef = (await testCollection()).doc();
     await docRef.set(data);
-    await docRef.updateFromList(<dynamic>[
-      FieldPath.of(<String>['field.dot']),
-      100.0,
-      'field\\slash',
-      200.0
-    ]);
+    await docRef.update(<Object, Object?>{FieldPath(<String>['field.dot']): 100.0, 'field\\slash': 200.0});
 
     final DocumentSnapshot doc = await docRef.get();
     expect(
-        doc.data,
+        doc.data(),
         map<dynamic>(<dynamic>[
           'field',
           'field 1',
@@ -225,13 +219,12 @@ void main() {
     final CollectionReference collection = await testCollection();
     final List<Future<void>> tasks = <Future<void>>[];
     for (MapEntry<String, Map<String, Object?>> entry in docs.entries) {
-      tasks.add(collection.document(entry.key).set(entry.value));
+      tasks.add(collection.doc(entry.key).set(entry.value));
     }
 
     await Future.wait(tasks);
 
-    final Query query = collection.whereGreaterThanOrEqualToField(
-        FieldPath.of(<String>['field.dot']), 200);
+    final Query query = collection.where(FieldPath(<String>['field.dot']), isGreaterThanOrEqualTo: 200);
     final QuerySnapshot res = await query.get();
     expect(querySnapshotToValues(res), expected);
   });
@@ -254,12 +247,12 @@ void main() {
     final CollectionReference collection = await testCollection();
     final List<Future<void>> tasks = <Future<void>>[];
     for (MapEntry<String, Map<String, Object?>> entry in docs.entries) {
-      tasks.add(collection.document(entry.key).set(entry.value));
+      tasks.add(collection.doc(entry.key).set(entry.value));
     }
 
     await Future.wait(tasks);
 
-    Query query = collection.orderByField(FieldPath.of(<String>['field.dot']));
+    Query query = collection.orderBy(FieldPath(<String>['field.dot']));
     QuerySnapshot res = await query.get();
     expect(querySnapshotToValues(res), expected);
 
@@ -275,10 +268,10 @@ void main() {
     final Timestamp truncatedTimestamp = Timestamp(originalTimestamp.seconds,
         originalTimestamp.nanoseconds ~/ 1000 * 1000);
 
-    final DocumentReference docRef = (await testCollection()).document();
+    final DocumentReference docRef = (await testCollection()).doc();
     await docRef.set(objectWithTimestamp(originalTimestamp));
     final DocumentSnapshot snapshot = await docRef.get();
-    final Map<String, Object?> data = snapshot.data!;
+    final Map<String, Object?> data = snapshot.data()!;
 
     final Timestamp readTimestamp = snapshot['timestamp']! as Timestamp;
     expect(readTimestamp, truncatedTimestamp);

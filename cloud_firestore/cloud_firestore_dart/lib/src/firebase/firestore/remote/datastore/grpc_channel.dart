@@ -53,7 +53,7 @@ ClientChannelBase createGrpcChannel({
   required bool sslEnabled,
   Duration keepAlivePingInterval = defaultKeepAlivePingInterval,
   Duration keepAliveTimeout = defaultKeepAliveTimeout,
-  int flowControlWindow = FirestoreSettings.defaultGrpcFlowControlWindow,
+  int flowControlWindow = Settings.defaultGrpcFlowControlWindow,
 }) {
   final ChannelOptions options = grpcChannelOptions(sslEnabled: sslEnabled);
   return ClientTransportConnectorChannel(

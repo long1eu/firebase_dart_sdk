@@ -56,7 +56,7 @@ class OAuthAccessToken {
 ///   final FirebaseApp app = FirebaseApp.withOptions(
 ///     const FirebaseOptions(
 ///       apiKey: '',
-///       applicationId: '1:1234567890:dart:server',
+///       appId: '1:1234567890:dart:server',
 ///       projectId: 'my-project',
 ///     ),
 ///   );
@@ -65,7 +65,7 @@ class OAuthAccessToken {
 ///   app.authProvider = OAuthTokenProvider.serviceAccount(
 ///     jsonDecode(File(keyFile).readAsStringSync()),
 ///   );
-///   final Firestore firestore = Firestore.instanceFor(app: app);
+///   final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(app: app);
 ///   await firestore.doc('status/server').set(<String, Object?>{'up': true});
 ///   await firestore.terminate();
 /// }
@@ -77,7 +77,7 @@ class OAuthAccessToken {
 ///
 /// There is no user: [uid] is null, and [onTokenChanged] never emits (a new token is picked up by the next
 /// request; open streams keep the token they started with, as the backend allows).
-class OAuthTokenProvider implements InternalTokenProvider {
+class OAuthTokenProvider implements AuthTokenProvider {
   /// Creates a provider on top of [fetch], which obtains a new access token, for token sources of your own.
   ///
   /// A token is reused until it is within [refreshBefore] (default five minutes) of its expiry. [clock] is for
@@ -180,9 +180,9 @@ class OAuthTokenProvider implements InternalTokenProvider {
         },
       );
     } on Object catch (_) {
-      throw const FirebaseAuthProviderException(
-        'network-request-failed',
-        'The request to the token endpoint failed (network error).',
+      throw const FirebaseAuthException(
+        code: 'network-request-failed',
+        message: 'The request to the token endpoint failed (network error).',
       );
     }
     Object? body;
@@ -207,10 +207,11 @@ class OAuthTokenProvider implements InternalTokenProvider {
     final Object? description = body is Map<String, Object?>
         ? body['error_description']
         : null;
-    throw FirebaseAuthProviderException(
-      error == 'invalid_grant' ? 'invalid-credential' : 'internal-error',
-      'The token endpoint refused the service account'
-      '${error is String ? ' ($error${description is String ? ': $description' : ''})' : ''}.',
+    throw FirebaseAuthException(
+      code: error == 'invalid_grant' ? 'invalid-credential' : 'internal-error',
+      message:
+          'The token endpoint refused the service account'
+          '${error is String ? ' ($error${description is String ? ': $description' : ''})' : ''}.',
       serverCode: error is String ? error : null,
       httpStatus: response.statusCode,
     );
@@ -237,7 +238,7 @@ class OAuthTokenProvider implements InternalTokenProvider {
   /// [refreshBefore] of its expiry, or when [forceRefresh] is set.
   ///
   /// The token is opaque: the [GetTokenResult] has no claims. Throws what the fetch throws: for
-  /// [OAuthTokenProvider.serviceAccount] a [FirebaseAuthProviderException], for `applicationDefaultCredentials()`
+  /// [OAuthTokenProvider.serviceAccount] a [FirebaseAuthException], for `applicationDefaultCredentials()`
   /// the error of `package:googleapis_auth`.
   @override
   Future<GetTokenResult> getAccessToken({required bool forceRefresh}) async {
@@ -261,6 +262,6 @@ class OAuthTokenProvider implements InternalTokenProvider {
 
   /// Never emits (see the class comment).
   @override
-  Stream<InternalTokenResult> get onTokenChanged =>
-      const Stream<InternalTokenResult>.empty();
+  Stream<AuthTokenChange> get onTokenChanged =>
+      const Stream<AuthTokenChange>.empty();
 }

@@ -20,7 +20,6 @@ import 'dart:async';
 import 'package:cloud_firestore_dart/src/firebase/firestore/distance_measure.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/document_reference.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/document_snapshot.dart';
-import 'package:cloud_firestore_dart/src/firebase/firestore/field_value.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/firestore_error.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/query.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/query_snapshot.dart';
@@ -28,6 +27,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/source.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/util.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/vector_query_snapshot.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/vector_value.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/get_options.dart';
 import 'package:test/test.dart';
 
 import '../../../util/event_accumulator.dart';
@@ -51,12 +51,12 @@ void main() {
       final CollectionReference c =
           await testCollectionWithDocs(<String, Map<String, Object?>>{
         'a': <String, Object?>{
-          'embedding': FieldValue.vector(<double>[1.0, 2.0, 3.0]),
+          'embedding': VectorValue(<double>[1.0, 2.0, 3.0]),
         },
       });
-      final DocumentSnapshot snap = await c.document('a').get();
-      expect(snap.getVectorValue('embedding'),
-          FieldValue.vector(<double>[1.0, 2.0, 3.0]));
+      final DocumentSnapshot snap = await c.doc('a').get();
+      expect(snap.get('embedding') as VectorValue?,
+          VectorValue(<double>[1.0, 2.0, 3.0]));
       expect(snap.get('embedding'), isA<VectorValue>());
     });
 
@@ -64,13 +64,13 @@ void main() {
       final CollectionReference c =
           await testCollectionWithDocs(<String, Map<String, Object?>>{
         'long': <String, Object?>{
-          'v': FieldValue.vector(<double>[1.0, 1.0, 1.0])
+          'v': VectorValue(<double>[1.0, 1.0, 1.0])
         },
         'b': <String, Object?>{
-          'v': FieldValue.vector(<double>[2.0, 0.0])
+          'v': VectorValue(<double>[2.0, 0.0])
         },
         'a': <String, Object?>{
-          'v': FieldValue.vector(<double>[1.0, 5.0])
+          'v': VectorValue(<double>[1.0, 5.0])
         },
         'array': <String, Object?>{
           'v': <Object>[1]
@@ -91,46 +91,38 @@ void main() {
         <String, Map<String, Object?>>{
       'a': <String, Object?>{
         'group': 'x',
-        'embedding': FieldValue.vector(<double>[1.0, 1.0])
+        'embedding': VectorValue(<double>[1.0, 1.0])
       },
       'b': <String, Object?>{
         'group': 'x',
-        'embedding': FieldValue.vector(<double>[2.0, 2.0])
+        'embedding': VectorValue(<double>[2.0, 2.0])
       },
       'c': <String, Object?>{
         'group': 'y',
-        'embedding': FieldValue.vector(<double>[10.0, 10.0])
+        'embedding': VectorValue(<double>[10.0, 10.0])
       },
       'noVector': <String, Object?>{'group': 'x'},
     };
 
     test('returns the nearest documents ordered by distance', () async {
       final CollectionReference c = await testCollectionWithDocs(docs);
-      final VectorQuerySnapshot s = await c
-          .findNearest(
-              'embedding', <double>[0.0, 0.0], 2, DistanceMeasure.euclidean)
+      final VectorQuerySnapshot s = await c.findNearest(vectorField: 'embedding', queryVector: <double>[0.0, 0.0], limit: 2, distanceMeasure: DistanceMeasure.euclidean)
           .get();
       expect(s.docs.map((DocumentSnapshot d) => d.id), <String>['a', 'b']);
     });
 
     test('writes the distance to distanceResultField', () async {
       final CollectionReference c = await testCollectionWithDocs(docs);
-      final VectorQuerySnapshot s = await c
-          .findNearest('embedding', FieldValue.vector(<double>[1.0, 1.0]), 1,
-              DistanceMeasure.euclidean,
-              distanceResultField: 'dist')
+      final VectorQuerySnapshot s = await c.findNearest(vectorField: 'embedding', queryVector: VectorValue(<double>[1.0, 1.0]), limit: 1, distanceMeasure: DistanceMeasure.euclidean, distanceResultField: 'dist')
           .get();
       expect(s.size, 1);
       expect(s.docs.single.id, 'a');
-      expect(s.docs.single.getDouble('dist'), 0.0);
+      expect((s.docs.single.get('dist') as num?)?.toDouble(), 0.0);
     });
 
     test('respects distanceThreshold', () async {
       final CollectionReference c = await testCollectionWithDocs(docs);
-      final VectorQuerySnapshot s = await c
-          .findNearest(
-              'embedding', <double>[0.0, 0.0], 10, DistanceMeasure.euclidean,
-              distanceThreshold: 5.0)
+      final VectorQuerySnapshot s = await c.findNearest(vectorField: 'embedding', queryVector: <double>[0.0, 0.0], limit: 10, distanceMeasure: DistanceMeasure.euclidean, distanceThreshold: 5.0)
           .get();
       expect(s.docs.map((DocumentSnapshot d) => d.id), <String>['a', 'b']);
     });
@@ -138,9 +130,7 @@ void main() {
     test('applies the filters of the base query', () async {
       final CollectionReference c = await testCollectionWithDocs(docs);
       final VectorQuerySnapshot s = await c
-          .whereEqualTo('group', 'y')
-          .findNearest(
-              'embedding', <double>[0.0, 0.0], 10, DistanceMeasure.euclidean)
+          .where('group', isEqualTo: 'y').findNearest(vectorField: 'embedding', queryVector: <double>[0.0, 0.0], limit: 10, distanceMeasure: DistanceMeasure.euclidean)
           .get();
       expect(s.docs.map((DocumentSnapshot d) => d.id), <String>['c']);
     });
@@ -149,11 +139,9 @@ void main() {
       final CollectionReference c = await testCollectionWithDocs(docs);
       await c.firestore.disableNetwork();
       await expectLater(
-          c
-              .findNearest(
-                  'embedding', <double>[0.0, 0.0], 2, DistanceMeasure.cosine)
+          c.findNearest(vectorField: 'embedding', queryVector: <double>[0.0, 0.0], limit: 2, distanceMeasure: DistanceMeasure.cosine)
               .get(),
-          throwsA(isA<FirestoreError>().having((FirestoreError e) => e.code,
+          throwsA(isA<FirestoreException>().having((FirestoreException e) => e.errorCode,
               'code', FirestoreErrorCode.unavailable)));
       await c.firestore.enableNetwork();
     });
@@ -169,37 +157,37 @@ void main() {
         'embedding': <int>[100],
       },
       <String, Object?>{
-        'embedding': FieldValue.vector(<double>[double.negativeInfinity]),
+        'embedding': VectorValue(<double>[double.negativeInfinity]),
       },
       <String, Object?>{
-        'embedding': FieldValue.vector(<double>[-100]),
+        'embedding': VectorValue(<double>[-100]),
       },
       <String, Object?>{
-        'embedding': FieldValue.vector(<double>[100]),
+        'embedding': VectorValue(<double>[100]),
       },
       <String, Object?>{
-        'embedding': FieldValue.vector(<double>[double.infinity]),
+        'embedding': VectorValue(<double>[double.infinity]),
       },
       <String, Object?>{
-        'embedding': FieldValue.vector(<double>[1, 2]),
+        'embedding': VectorValue(<double>[1, 2]),
       },
       <String, Object?>{
-        'embedding': FieldValue.vector(<double>[2, 2]),
+        'embedding': VectorValue(<double>[2, 2]),
       },
       <String, Object?>{
-        'embedding': FieldValue.vector(<double>[1, 2, 3]),
+        'embedding': VectorValue(<double>[1, 2, 3]),
       },
       <String, Object?>{
-        'embedding': FieldValue.vector(<double>[1, 2, 3, 4]),
+        'embedding': VectorValue(<double>[1, 2, 3, 4]),
       },
       <String, Object?>{
-        'embedding': FieldValue.vector(<double>[1, 2, 3, 4, 5]),
+        'embedding': VectorValue(<double>[1, 2, 3, 4, 5]),
       },
       <String, Object?>{
-        'embedding': FieldValue.vector(<double>[1, 2, 100, 4, 4]),
+        'embedding': VectorValue(<double>[1, 2, 100, 4, 4]),
       },
       <String, Object?>{
-        'embedding': FieldValue.vector(<double>[100, 2, 3, 4, 5]),
+        'embedding': VectorValue(<double>[100, 2, 3, 4, 5]),
       },
       <String, Object?>{'embedding': <String, Object?>{}},
       <String, Object?>{
@@ -220,27 +208,27 @@ void main() {
 
     Future<void> checkOnlineAndOfflineResultsMatch(
         Query query, List<String> expectedIds) async {
-      final QuerySnapshot fromServer = await query.get(Source.server);
-      final QuerySnapshot fromCache = await query.get(Source.cache);
+      final QuerySnapshot fromServer = await query.get(GetOptions(source: Source.server));
+      final QuerySnapshot fromCache = await query.get(GetOptions(source: Source.cache));
       expect(IntegrationTestUtil.querySnapshotToIds(fromServer), expectedIds);
       expect(IntegrationTestUtil.querySnapshotToIds(fromCache), expectedIds);
     }
 
     test('writeAndReadVectorEmbeddings', () async {
       final DocumentReference doc =
-          (await testFirestore()).collection('vec').document();
+          (await testFirestore()).collection('vec').doc();
 
       await doc.set(<String, Object?>{
-        'vector0': FieldValue.vector(<double>[0.0]),
-        'vector1': FieldValue.vector(<double>[1, 2, 3.99]),
+        'vector0': VectorValue(<double>[0.0]),
+        'vector1': VectorValue(<double>[1, 2, 3.99]),
       });
       await doc.set(<String, Object?>{
-        'vector0': FieldValue.vector(<double>[0.0]),
-        'vector1': FieldValue.vector(<double>[1, 2, 3.99]),
-        'vector2': FieldValue.vector(<double>[0, 0, 0]),
+        'vector0': VectorValue(<double>[0.0]),
+        'vector1': VectorValue(<double>[1, 2, 3.99]),
+        'vector2': VectorValue(<double>[0, 0, 0]),
       });
       await doc.update(<String, Object?>{
-        'vector3': FieldValue.vector(<double>[-1, -200, -9999]),
+        'vector3': VectorValue(<double>[-1, -200, -9999]),
       });
 
       final Map<String, List<double>> expected = <String, List<double>>{
@@ -252,19 +240,18 @@ void main() {
       final DocumentSnapshot actual = await doc.get();
       for (final MapEntry<String, List<double>> entry in expected.entries) {
         expect(actual.get(entry.key), isA<VectorValue>());
-        expect(actual.getVectorValue(entry.key)!.toArray(), entry.value);
+        expect((actual.get(entry.key) as VectorValue?)!.toArray(), entry.value);
       }
     });
 
     test('listenToDocumentsWithVectors', () async {
       final CollectionReference collection =
           (await testFirestore()).collection('vec-listen-${autoId()}');
-      final DocumentReference ref = collection.document();
+      final DocumentReference ref = collection.doc();
       final EventAccumulator<QuerySnapshot> accumulator =
           EventAccumulator<QuerySnapshot>();
-      final StreamSubscription<QuerySnapshot> registration = collection
-          .whereEqualTo('purpose', 'vector tests')
-          .snapshots
+      final StreamSubscription<QuerySnapshot> registration = collection.where('purpose', isEqualTo: 'vector tests')
+          .snapshots()
           .listen(accumulator.onData, onError: accumulator.onError);
 
       try {
@@ -273,38 +260,38 @@ void main() {
 
         await ref.set(<String, Object?>{
           'purpose': 'vector tests',
-          'vector0': FieldValue.vector(<double>[0.0]),
-          'vector1': FieldValue.vector(<double>[1, 2, 3.99]),
+          'vector0': VectorValue(<double>[0.0]),
+          'vector1': VectorValue(<double>[1, 2, 3.99]),
         });
         snap = await accumulator.wait();
-        DocumentSnapshot doc = snap.documents.first;
-        expect(doc.getVectorValue('vector0'), FieldValue.vector(<double>[0.0]));
-        expect(doc.getVectorValue('vector1'),
-            FieldValue.vector(<double>[1, 2, 3.99]));
+        DocumentSnapshot doc = snap.docs.first;
+        expect(doc.get('vector0') as VectorValue?, VectorValue(<double>[0.0]));
+        expect(doc.get('vector1') as VectorValue?,
+            VectorValue(<double>[1, 2, 3.99]));
 
         await ref.set(<String, Object?>{
           'purpose': 'vector tests',
-          'vector0': FieldValue.vector(<double>[0.0]),
-          'vector1': FieldValue.vector(<double>[1, 2, 3.99]),
-          'vector2': FieldValue.vector(<double>[0, 0, 0]),
+          'vector0': VectorValue(<double>[0.0]),
+          'vector1': VectorValue(<double>[1, 2, 3.99]),
+          'vector2': VectorValue(<double>[0, 0, 0]),
         });
         snap = await accumulator.wait();
-        doc = snap.documents.first;
-        expect(doc.getVectorValue('vector2'),
-            FieldValue.vector(<double>[0, 0, 0]));
+        doc = snap.docs.first;
+        expect(doc.get('vector2') as VectorValue?,
+            VectorValue(<double>[0, 0, 0]));
 
         await ref.update(<String, Object?>{
-          'vector3': FieldValue.vector(<double>[-1, -200, -999]),
+          'vector3': VectorValue(<double>[-1, -200, -999]),
         });
         snap = await accumulator.wait();
-        doc = snap.documents.first;
-        expect(doc.getVectorValue('vector0'), FieldValue.vector(<double>[0.0]));
-        expect(doc.getVectorValue('vector1'),
-            FieldValue.vector(<double>[1, 2, 3.99]));
-        expect(doc.getVectorValue('vector2'),
-            FieldValue.vector(<double>[0, 0, 0]));
-        expect(doc.getVectorValue('vector3'),
-            FieldValue.vector(<double>[-1, -200, -999]));
+        doc = snap.docs.first;
+        expect(doc.get('vector0') as VectorValue?, VectorValue(<double>[0.0]));
+        expect(doc.get('vector1') as VectorValue?,
+            VectorValue(<double>[1, 2, 3.99]));
+        expect(doc.get('vector2') as VectorValue?,
+            VectorValue(<double>[0, 0, 0]));
+        expect(doc.get('vector3') as VectorValue?,
+            VectorValue(<double>[-1, -200, -999]));
 
         await ref.delete();
         snap = await accumulator.wait();
@@ -326,7 +313,7 @@ void main() {
       final EventAccumulator<QuerySnapshot> accumulator =
           EventAccumulator<QuerySnapshot>();
       final StreamSubscription<QuerySnapshot> registration = orderedQuery
-          .snapshots
+          .snapshots()
           .listen(accumulator.onData, onError: accumulator.onError);
       List<String> watchIds;
       try {
@@ -337,7 +324,7 @@ void main() {
       }
 
       final List<String> getIds = IntegrationTestUtil.querySnapshotToIds(
-          await orderedQuery.get(Source.server));
+          await orderedQuery.get(GetOptions(source: Source.server)));
 
       expect(getIds, docIds);
       expect(watchIds, docIds);
@@ -357,13 +344,11 @@ void main() {
       final List<String> docIds = await addDocs(collection);
 
       await checkOnlineAndOfflineResultsMatch(
-          collection.orderBy('embedding').whereLessThan(
-              'embedding', FieldValue.vector(<double>[1, 2, 100, 4, 4])),
+          collection.orderBy('embedding').where('embedding', isLessThan: VectorValue(<double>[1, 2, 100, 4, 4])),
           docIds.sublist(2, 11));
 
       await checkOnlineAndOfflineResultsMatch(
-          collection.orderBy('embedding').whereGreaterThan(
-              'embedding', FieldValue.vector(<double>[1, 2, 100, 4, 4])),
+          collection.orderBy('embedding').where('embedding', isGreaterThan: VectorValue(<double>[1, 2, 100, 4, 4])),
           docIds.sublist(12, 13));
     });
   });

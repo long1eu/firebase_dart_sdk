@@ -147,11 +147,12 @@ OpenDatabase sqliteWebOpener({
       lockTimeout,
     );
     if (releaseLock == null) {
-      throw FirestoreError(
-        'The offline cache "$name" is already open in another tab (or in this '
-        'one). It can only be used by one tab at a time: use a memory cache '
-        'in this tab.',
-        FirestoreErrorCode.failedPrecondition,
+      throw FirestoreException(
+        message:
+            'The offline cache "$name" is already open in another tab (or in this '
+            'one). It can only be used by one tab at a time: use a memory cache '
+            'in this tab.',
+        errorCode: FirestoreErrorCode.failedPrecondition,
       );
     }
 
@@ -285,13 +286,13 @@ OpenDatabase sqliteWebOpener({
 /// that only reads the cache (looking up a named query that does not exist),
 /// and on `failedPrecondition` terminates that instance (which frees the app
 /// for a new one) and creates one with a memory cache.
-Future<Firestore> openWithMemoryFallback({
+Future<FirebaseFirestore> openWithMemoryFallback({
   required FirebaseApp app,
   required Uri sqlite3Wasm,
   Uri? opfsWorker,
-  FirestoreSettings? settings,
+  Settings? settings,
 }) async {
-  final Firestore persistent = Firestore.instanceFor(
+  final FirebaseFirestore persistent = FirebaseFirestore.instanceFor(
     app: app,
     openDatabase: sqliteWebOpener(
       sqlite3Wasm: sqlite3Wasm,
@@ -300,16 +301,16 @@ Future<Firestore> openWithMemoryFallback({
     settings: settings,
   );
   try {
-    await persistent.getNamedQuery('openWithMemoryFallback');
+    await persistent.namedQuery('openWithMemoryFallback');
     return persistent;
-  } on FirestoreError catch (e) {
-    if (e.code != FirestoreErrorCode.failedPrecondition) {
+  } on FirestoreException catch (e) {
+    if (e.errorCode != FirestoreErrorCode.failedPrecondition) {
       rethrow;
     }
     await persistent.terminate();
-    return Firestore.instanceFor(
+    return FirebaseFirestore.instanceFor(
       app: app,
-      settings: (settings ?? FirestoreSettings()).copyWith(
+      settings: (settings ?? Settings()).copyWith(
         cacheSettings: const MemoryCacheSettings(),
       ),
     );

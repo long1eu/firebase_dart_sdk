@@ -19,7 +19,6 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/aggregate_query.dart
 import 'package:cloud_firestore_dart/src/firebase/firestore/aggregate_query_snapshot.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/aggregate_source.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/firestore.dart';
-import 'package:cloud_firestore_dart/src/firebase/firestore/firestore_data_converter.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/firestore_error.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/query.dart';
 import 'package:test/test.dart';
@@ -69,15 +68,13 @@ void main() {
   Future<AggregateQuerySnapshot> run(
     CollectionReference c,
     List<AggregateField> fields,
-  ) => c.aggregate(fields).get(AggregateSource.server);
+  ) => c.aggregate(fields).get(source: AggregateSource.server);
 
   group('count', () {
     test('testCanRunCount', () async {
       final CollectionReference c = await testCollectionWithDocs(books);
-      final AggregateQuerySnapshot s = await c.count().get(
-        AggregateSource.server,
-      );
-      expect(s.getCount(), 2);
+      final AggregateQuerySnapshot s = await c.count().get(source: AggregateSource.server);
+      expect(s.count, 2);
       expect(s.query, c.count());
     });
 
@@ -89,9 +86,9 @@ void main() {
           'c': <String, Object?>{'k': 'b'},
         },
       );
-      expect((await c.whereEqualTo('k', 'b').count().get()).getCount(), 2);
-      expect((await c.whereEqualTo('k', 'a').count().get()).getCount(), 1);
-      expect((await c.whereGreaterThan('k', 'a').count().get()).getCount(), 2);
+      expect((await c.where('k', isEqualTo: 'b').count().get()).count, 2);
+      expect((await c.where('k', isEqualTo: 'a').count().get()).count, 1);
+      expect((await c.where('k', isGreaterThan: 'a').count().get()).count, 2);
     });
 
     test('testCanRunCountWithOrderBy', () async {
@@ -103,8 +100,8 @@ void main() {
         },
       );
       // The orderBy excludes the document that lacks the field.
-      expect((await c.orderBy('k').count().get()).getCount(), 2);
-      expect((await c.count().get()).getCount(), 3);
+      expect((await c.orderBy('k').count().get()).count, 2);
+      expect((await c.count().get()).count, 3);
     });
 
     test('testCanRunCountAggregateWithFiltersAndLimits', () async {
@@ -117,11 +114,11 @@ void main() {
         },
       );
       expect(
-        (await c.whereEqualTo('k', 'a').limit(2).count().get()).getCount(),
+        (await c.where('k', isEqualTo: 'a').limit(2).count().get()).count,
         2,
       );
       expect(
-        (await c.whereEqualTo('k', 'd').limit(1000).count().get()).getCount(),
+        (await c.where('k', isEqualTo: 'd').limit(1000).count().get()).count,
         1,
       );
     });
@@ -135,26 +132,25 @@ void main() {
           'd': <String, Object?>{'k': 'd'},
         },
       );
-      expect((await c.orderBy('k').limitToLast(2).count().get()).getCount(), 2);
+      expect((await c.orderBy('k').limitToLast(2).count().get()).count, 2);
       expect(
-        (await c.orderBy('k').limitToLast(1000).count().get()).getCount(),
+        (await c.orderBy('k').limitToLast(1000).count().get()).count,
         4,
       );
       expect(
         (await c
-                .whereGreaterThan('k', 'a')
+                .where('k', isGreaterThan: 'a')
                 .orderBy('k')
                 .limitToLast(2)
-                .count()
-                .get())
-            .getCount(),
+                .count().get())
+            .count,
         2,
       );
     });
 
     test('testCanRunCountCollectionGroupQuery', () async {
-      final Firestore db = await testFirestore();
-      final String group = 'b${db.collection('foo').document().id}';
+      final FirebaseFirestore db = await testFirestore();
+      final String group = 'b${db.collection('foo').doc().id}';
       final List<String> paths = <String>[
         'abc/123/$group/cg-doc1',
         'abc/123/$group/cg-doc2',
@@ -170,15 +166,14 @@ void main() {
       ];
       final batch = db.batch();
       for (final String path in paths) {
-        batch.set(db.document(path), <String, Object?>{'x': 1});
+        batch.set(db.doc(path), <String, Object?>{'x': 1});
       }
       await batch.commit();
 
       final AggregateQuerySnapshot s = await db
           .collectionGroup(group)
-          .count()
-          .get();
-      expect(s.getCount(), 5);
+          .count().get();
+      expect(s.count, 5);
     });
 
     // Port of the JS SDK test 'can run count query getCountFromServer with
@@ -192,14 +187,12 @@ void main() {
         final CollectionReference coll = await testCollection();
         final List<String> segments = documentPath.split('/');
         final CollectionReference sub = coll
-            .document(segments[0])
+            .doc(segments[0])
             .collection(segments[1]);
         await sub.add(<String, Object?>{'foo': 'bar'});
         await sub.add(<String, Object?>{'foo': 'baz'});
-        final AggregateQuerySnapshot snapshot = await sub.count().get(
-          AggregateSource.server,
-        );
-        expect(snapshot.getCount(), 2);
+        final AggregateQuerySnapshot snapshot = await sub.count().get(source: AggregateSource.server);
+        expect(snapshot.count, 2);
       });
     }
 
@@ -207,8 +200,8 @@ void main() {
       final CollectionReference c = (await testFirestore()).collection(
         'random-coll',
       );
-      expect((await c.count().get()).getCount(), 0);
-      expect((await c.whereEqualTo('k', 100).count().get()).getCount(), 0);
+      expect((await c.count().get()).count, 0);
+      expect((await c.where('k', isEqualTo: 100).count().get()).count, 0);
     });
 
     test('testCountFailWithoutNetwork', () async {
@@ -221,10 +214,10 @@ void main() {
       );
       await c.firestore.disableNetwork();
       await expectLater(
-        c.count().get(AggregateSource.server),
+        c.count().get(source: AggregateSource.server),
         throwsA(
-          isA<FirestoreError>().having(
-            (FirestoreError e) => e.code,
+          isA<FirestoreException>().having(
+            (FirestoreException e) => e.errorCode,
             'code',
             FirestoreErrorCode.unavailable,
           ),
@@ -232,7 +225,7 @@ void main() {
       );
 
       await c.firestore.enableNetwork();
-      expect((await c.count().get()).getCount(), 3);
+      expect((await c.count().get()).count, 3);
     });
   });
 
@@ -248,9 +241,9 @@ void main() {
       expect(s.get(AggregateField.sum('pages')), 150);
       expect(s.get(AggregateField.average('pages')), 75.0);
       expect(s.get(AggregateField.sum('rating')), 9.0);
-      expect(s.getCount(), 2);
-      expect(s.getInt(AggregateField.average('pages')), 75);
-      expect(s.getDouble(AggregateField.sum('pages')), 150.0);
+      expect(s.count, 2);
+      expect((s.get(AggregateField.average('pages')) as num?)?.toInt(), 75);
+      expect((s.get(AggregateField.sum('pages')) as num?)?.toDouble(), 150.0);
     });
 
     test('testCanGetDuplicateAggregations', () async {
@@ -262,7 +255,7 @@ void main() {
         AggregateField.count(),
       ]);
       expect(s.get(AggregateField.sum('pages')), 150);
-      expect(s.getCount(), 2);
+      expect(s.count, 2);
     });
 
     test(
@@ -282,14 +275,14 @@ void main() {
             AggregateField.sum('baz'),
           ]),
           throwsA(
-            isA<FirestoreError>()
+            isA<FirestoreException>()
                 .having(
-                  (FirestoreError e) => e.code,
+                  (FirestoreException e) => e.errorCode,
                   'code',
                   FirestoreErrorCode.invalidArgument,
                 )
                 .having(
-                  (FirestoreError e) => e.message,
+                  (FirestoreException e) => e.message,
                   'message',
                   contains('maximum number of aggregations'),
                 ),
@@ -340,16 +333,15 @@ void main() {
         },
       );
       final AggregateQuerySnapshot s = await c
-          .whereIn('year', <Object>[1980, 2020])
+          .where('year', whereIn: <Object>[1980, 2020])
           .aggregate(<AggregateField>[
             AggregateField.sum('pages'),
             AggregateField.average('pages'),
             AggregateField.count(),
-          ])
-          .get();
+          ]).get();
       expect(s.get(AggregateField.sum('pages')), 150);
       expect(s.get(AggregateField.average('pages')), 75.0);
-      expect(s.getCount(), 2);
+      expect(s.count, 2);
     });
 
     test('testSumTypes', () async {
@@ -430,15 +422,13 @@ void main() {
         AggregateField.sum('rating'),
       ]);
       expect(s.get(AggregateField.sum('rating')), double.infinity);
-      expect(s.getDouble(AggregateField.sum('rating')), double.infinity);
-      expect(s.getInt(AggregateField.sum('rating')), maxLong);
+      expect((s.get(AggregateField.sum('rating')) as num?)?.toDouble(), double.infinity);
 
       final CollectionReference neg = await testCollectionWithDocs(
         ratings(<Object?>[-double.maxFinite, -double.maxFinite]),
       );
       s = await run(neg, <AggregateField>[AggregateField.sum('rating')]);
       expect(s.get(AggregateField.sum('rating')), double.negativeInfinity);
-      expect(s.getInt(AggregateField.sum('rating')), -maxLong - 1);
     });
 
     test('testPerformsAggregationsWhenNaNExists', () async {
@@ -451,7 +441,6 @@ void main() {
       ]);
       expect(s.get(AggregateField.sum('rating')), isNaN);
       expect(s.get(AggregateField.average('rating')), isNaN);
-      expect(s.getInt(AggregateField.average('rating')), 0);
     });
 
     test('testPerformsSumOfMinIEEE754', () async {
@@ -472,16 +461,15 @@ void main() {
       () async {
         final CollectionReference c = await testCollectionWithDocs(books);
         final AggregateQuerySnapshot s = await c
-            .whereGreaterThan('pages', 200)
+            .where('pages', isGreaterThan: 200)
             .aggregate(<AggregateField>[
               AggregateField.sum('pages'),
               AggregateField.average('pages'),
-            ])
-            .get();
+            ]).get();
         expect(s.get(AggregateField.sum('pages')), 0);
         expect(s.get(AggregateField.average('pages')), isNull);
-        expect(s.getDouble(AggregateField.average('pages')), isNull);
-        expect(s.getInt(AggregateField.average('pages')), isNull);
+        expect((s.get(AggregateField.average('pages')) as num?)?.toDouble(), isNull);
+        expect((s.get(AggregateField.average('pages')) as num?)?.toInt(), isNull);
       },
     );
 
@@ -496,7 +484,7 @@ void main() {
       ]);
       expect(s.get(AggregateField.sum('rating')), 15);
       expect(s.get(AggregateField.average('rating')), 5.0);
-      expect(s.getCount(), 4);
+      expect(s.count, 4);
     });
 
     test('testPerformsAverageResults', () async {
@@ -561,7 +549,7 @@ void main() {
           AggregateField.average('b'),
         ]),
       );
-      expect(c.count(), isNot(c.whereEqualTo('a', 1).count()));
+      expect(c.count(), isNot(c.where('a', isEqualTo: 1).count()));
       expect(
         c.aggregate(<AggregateField>[AggregateField.sum('a')]),
         isNot(c.aggregate(<AggregateField>[AggregateField.average('a')])),
@@ -610,16 +598,14 @@ void main() {
       final AggregateQuery query1 = coll1.count();
       final AggregateQuery query1Same = coll1Same.count();
       AggregateQuery query2() => coll1
-          .document('bar')
-          .collection('baz')
-          .whereEqualTo('a', 1)
+          .doc('bar')
+          .collection('baz').where('a', isEqualTo: 1)
           .limit(100)
           .count();
       AggregateQuery query3() => coll1
-          .document('bar')
+          .doc('bar')
           .collection('baz')
-          .whereEqualTo('b', 1)
-          .orderBy('c')
+          .where('b', isEqualTo: 1).orderBy('c')
           .count();
 
       expect(query1, query1Same);
@@ -656,9 +642,8 @@ void main() {
       expect(query3.hashCode, isNot(query1.hashCode));
 
       final Query base = coll
-          .document('bar')
-          .collection('baz')
-          .whereEqualTo('a', 1)
+          .doc('bar')
+          .collection('baz').where('a', isEqualTo: 1)
           .limit(100);
       final AggregateQuery query4 = base.aggregate(<AggregateField>[
         AggregateField.count(),
@@ -687,27 +672,23 @@ void main() {
       );
 
       final AggregateQuerySnapshot snapshot1 = await collection
-          .whereEqualTo('k', 'b')
-          .count()
-          .get(AggregateSource.server);
+          .where('k', isEqualTo: 'b')
+          .count().get(source: AggregateSource.server);
       final AggregateQuerySnapshot snapshot1Same = await collection
-          .whereEqualTo('k', 'b')
-          .count()
-          .get(AggregateSource.server);
+          .where('k', isEqualTo: 'b')
+          .count().get(source: AggregateSource.server);
 
       final AggregateQuerySnapshot snapshot2 = await collection
-          .whereEqualTo('k', 'a')
-          .count()
-          .get(AggregateSource.server);
-      await collection.document('d').set(<String, Object?>{'k': 'a'});
+          .where('k', isEqualTo: 'a')
+          .count().get(source: AggregateSource.server);
+      await collection.doc('d').set(<String, Object?>{'k': 'a'});
       final AggregateQuerySnapshot snapshot2Different = await collection
-          .whereEqualTo('k', 'a')
-          .count()
-          .get(AggregateSource.server);
+          .where('k', isEqualTo: 'a')
+          .count().get(source: AggregateSource.server);
 
       expect(snapshot1, snapshot1Same);
       expect(snapshot1.hashCode, snapshot1Same.hashCode);
-      expect(snapshot1.query, collection.whereEqualTo('k', 'b').count());
+      expect(snapshot1.query, collection.where('k', isEqualTo: 'b').count());
 
       expect(snapshot1, isNot('string'));
       expect(snapshot1, isNot(snapshot2));
@@ -729,8 +710,7 @@ void main() {
       unawaited(
         collection
             .orderBy('k')
-            .count()
-            .get(AggregateSource.server)
+            .count().get(source: AggregateSource.server)
             .then<void>((_) {}, onError: (Object _) {}),
       );
       await collection.firestore.terminate();
@@ -747,8 +727,7 @@ void main() {
               AggregateField.count(),
               AggregateField.sum('pages'),
               AggregateField.average('pages'),
-            ])
-            .get(AggregateSource.server)
+            ]).get(source: AggregateSource.server)
             .then<void>((_) {}, onError: (Object _) {}),
       );
       await collection.firestore.terminate();
@@ -760,8 +739,7 @@ void main() {
       );
 
       final AggregateQuerySnapshot snapshot = await collection
-          .aggregate(<AggregateField>[AggregateField.average('pages')])
-          .get(AggregateSource.server);
+          .aggregate(<AggregateField>[AggregateField.average('pages')]).get(source: AggregateSource.server);
 
       expect(snapshot.get(AggregateField.average('pages')), isA<double>());
     });
@@ -779,9 +757,7 @@ void main() {
             'baz': AggregateField.average('pages'),
             'pagesAgain': AggregateField.sum('pages'),
           });
-      final AggregateQuerySnapshot snapshot = await query.get(
-        AggregateSource.server,
-      );
+      final AggregateQuerySnapshot snapshot = await query.get(source: AggregateSource.server);
       expect(snapshot.data(), <String, Object?>{
         'foo': 2,
         'bar': 150,
@@ -789,7 +765,7 @@ void main() {
         'pagesAgain': 150,
       });
       expect(snapshot.query, query);
-      expect(snapshot.getCount(), 2);
+      expect(snapshot.count, 2);
       expect(snapshot.get(AggregateField.sum('pages')), 150);
     });
 
@@ -800,8 +776,7 @@ void main() {
           .aggregateWithAliases(<String, AggregateField>{
             'n': AggregateField.count(),
             'avg': AggregateField.average('pages'),
-          })
-          .get(AggregateSource.server);
+          }).get(source: AggregateSource.server);
       expect(snapshot.data(), <String, Object?>{'n': 0, 'avg': null});
     });
 
@@ -817,8 +792,7 @@ void main() {
               r'with\backshash\es': AggregateField.sum('year'),
               longAlias: AggregateField.average('rating'),
               '': AggregateField.count(),
-            })
-            .get(AggregateSource.server);
+            }).get(source: AggregateSource.server);
         expect(snapshot.data(), <String, Object?>{
           'with-un/su+pp[or]ted': 2,
           'with `backticks`': 150,
@@ -839,26 +813,19 @@ void main() {
         AggregateField.count(),
       ]);
       expect(s.get(AggregateField.count()), 2);
-      expect(s.getCount(), 2);
+      expect(s.count, 2);
     });
 
     test('aggregate query does not use the converter', () async {
       final CollectionReference c = await testCollectionWithDocs(books);
       final Query<Object> converted = c
-          .where('author', isEqualTo: 'authorA')
-          .withConverter<Object>(
-            FirestoreDataConverter<Object>.from(
-              fromFirestore: (_, _) =>
-                  throw StateError('should never be called'),
-              toFirestore: (_, _) =>
-                  throw StateError('should never be called'),
-            ),
-          );
+          .where('author', isEqualTo: 'authorA').withConverter<Object>(fromFirestore: (_, _) =>
+                  throw StateError('should never be called'), toFirestore: (_, _) =>
+                  throw StateError('should never be called'));
       final AggregateQuerySnapshot s = await converted
           .aggregateWithAliases(<String, AggregateField>{
             'count': AggregateField.count(),
-          })
-          .get(AggregateSource.server);
+          }).get(source: AggregateSource.server);
       expect(s.data()['count'], 1);
     });
 
@@ -870,8 +837,8 @@ void main() {
         AggregateField.sum('rating'),
       ]);
       expect(s.get(AggregateField.sum('rating')), 13);
-      expect(s.getInt(AggregateField.sum('rating')), 13);
-      expect(s.getDouble(AggregateField.sum('rating')), 13.0);
+      expect((s.get(AggregateField.sum('rating')) as num?)?.toInt(), 13);
+      expect((s.get(AggregateField.sum('rating')) as num?)?.toDouble(), 13.0);
     });
 
     test(
@@ -903,8 +870,8 @@ void main() {
         AggregateField.average('rating'),
       ]);
       expect(s.get(AggregateField.average('rating')), 10.0);
-      expect(s.getInt(AggregateField.average('rating')), 10);
-      expect(s.getDouble(AggregateField.average('rating')), 10.0);
+      expect((s.get(AggregateField.average('rating')) as num?)?.toInt(), 10);
+      expect((s.get(AggregateField.average('rating')) as num?)?.toDouble(), 10.0);
     });
 
     test('testPerformsAverageOfFloatsThatResultsInAFloat', () async {
@@ -915,8 +882,8 @@ void main() {
         AggregateField.average('rating'),
       ]);
       expect(s.get(AggregateField.average('rating')), 4.5);
-      expect(s.getInt(AggregateField.average('rating')), 4);
-      expect(s.getDouble(AggregateField.average('rating')), 4.5);
+      expect((s.get(AggregateField.average('rating')) as num?)?.toInt(), 4);
+      expect((s.get(AggregateField.average('rating')) as num?)?.toDouble(), 4.5);
     });
 
     test('testPerformsAverageOfFloatsAndIntsThatResultsInAFloat', () async {
@@ -931,10 +898,10 @@ void main() {
         moreOrLessEquals(9.2, epsilon: 1e-14),
       );
       expect(
-        s.getDouble(AggregateField.average('rating')),
+        (s.get(AggregateField.average('rating')) as num?)?.toDouble(),
         moreOrLessEquals(9.2, epsilon: 1e-14),
       );
-      expect(s.getInt(AggregateField.average('rating')), 9);
+      expect((s.get(AggregateField.average('rating')) as num?)?.toInt(), 9);
     });
 
     test('testPerformsAverageCausingUnderflow', () async {
@@ -945,8 +912,7 @@ void main() {
         AggregateField.average('rating'),
       ]);
       expect(s.get(AggregateField.average('rating')), 0.0);
-      expect(s.getDouble(AggregateField.average('rating')), 0.0);
-      expect(s.getInt(AggregateField.average('rating')), 0);
+      expect((s.get(AggregateField.average('rating')) as num?)?.toDouble(), 0.0);
     });
   });
 }

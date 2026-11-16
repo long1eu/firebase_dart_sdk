@@ -25,16 +25,16 @@ void main() {
 
     await runZonedGuarded(() async {
       for (int round = 0; round < 15; round++) {
-        final Firestore firestore = await IntegrationTestUtil.testFirestore();
+        final FirebaseFirestore firestore = await IntegrationTestUtil.testFirestore();
         final CollectionReference collection =
             firestore.collection('terminate${DateTime.now().microsecondsSinceEpoch}');
-        final DocumentReference doc = collection.document();
+        final DocumentReference doc = collection.doc();
         await doc.set(map(<dynamic>['count', 1]));
 
         // A listener (listen stream open) that is cancelled right before the
         // shutdown, so its stream is closing.
         final StreamSubscription<QuerySnapshot> listener =
-            collection.snapshots.listen((QuerySnapshot _) {}, onError: (Object _) {});
+            collection.snapshots().listen((QuerySnapshot _) {}, onError: (Object _) {});
         await Future<void>.delayed(Duration(milliseconds: round * 3));
 
         // Operations of every kind, in flight at shutdown. Their callers
@@ -46,8 +46,7 @@ void main() {
             transaction.set(doc, map(<dynamic>['count', 3]));
           }),
           collection
-              .aggregate(<AggregateField>[AggregateField.count()])
-              .get(AggregateSource.server),
+              .aggregate(<AggregateField>[AggregateField.count()]).get(source: AggregateSource.server),
         ].map((Future<void> operation) {
           return operation.catchError((Object _) {
             failedOperations++;

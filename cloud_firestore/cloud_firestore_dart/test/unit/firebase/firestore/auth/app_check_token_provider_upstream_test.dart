@@ -22,7 +22,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/auth/app_check_token
 import 'package:firebase_app_dart/firebase_app_dart.dart';
 import 'package:test/test.dart';
 
-class _MockAppCheck implements InternalAppCheckTokenProvider {
+class _MockAppCheck implements AppCheckTokenProvider {
   final StreamController<AppCheckTokenResult> changes =
       StreamController<AppCheckTokenResult>.broadcast();
   final List<bool> getTokenCalls = <bool>[];
@@ -48,7 +48,7 @@ void main() {
   tearDown(() => interop.changes.close());
 
   test('setChangeListenerShouldBeCalledWhenIdTokenChanges', () async {
-    final AppCheckTokenProvider provider = AppCheckTokenProvider(interop);
+    final FirebaseAppCheckTokenProvider provider = FirebaseAppCheckTokenProvider(interop);
     String? receivedToken;
     final StreamSubscription<String> sub =
         provider.onChange.listen((String t) => receivedToken = t);
@@ -66,7 +66,7 @@ void main() {
   });
 
   test('removeChangeListenerShouldStopNotifyingTheListener', () async {
-    final AppCheckTokenProvider provider = AppCheckTokenProvider(interop);
+    final FirebaseAppCheckTokenProvider provider = FirebaseAppCheckTokenProvider(interop);
     final StreamSubscription<String> sub =
         provider.onChange.listen((String _) {});
     expect(interop.changes.hasListener, isTrue);
@@ -78,12 +78,12 @@ void main() {
   });
 
   test('removeChangeListenerShouldNotThrowIfProviderIsNotAvailable', () async {
-    final AppCheckTokenProvider provider = AppCheckTokenProvider(null);
+    final FirebaseAppCheckTokenProvider provider = FirebaseAppCheckTokenProvider(null);
     await provider.close();
   });
 
   test('removeChangeListenerShouldUnregisterTheIdTokenListener', () async {
-    final AppCheckTokenProvider provider = AppCheckTokenProvider(interop);
+    final FirebaseAppCheckTokenProvider provider = FirebaseAppCheckTokenProvider(interop);
     expect(interop.changes.hasListener, isTrue);
 
     await provider.close();
@@ -92,16 +92,16 @@ void main() {
   });
 
   test('getTokenShouldReturnAFailedTaskIfProviderIsNotAvailable', () async {
-    final AppCheckTokenProvider provider = AppCheckTokenProvider(null);
+    final FirebaseAppCheckTokenProvider provider = FirebaseAppCheckTokenProvider(null);
 
     await expectLater(
-        provider.token, throwsA(isA<FirebaseApiNotAvailableError>()));
+        provider.token, throwsA(isA<FirebaseApiNotAvailableException>()));
   });
 
   test('getTokenShouldReturnAFailedTaskIfAppCheckGetTokenFails', () async {
     final Exception getTokenException = Exception();
     interop.onGetToken = () => Future<AppCheckTokenResult>.error(getTokenException);
-    final AppCheckTokenProvider provider = AppCheckTokenProvider(interop);
+    final FirebaseAppCheckTokenProvider provider = FirebaseAppCheckTokenProvider(interop);
 
     await expectLater(provider.token, throwsA(same(getTokenException)));
     await provider.close();
@@ -109,7 +109,7 @@ void main() {
 
   test('getTokenShouldReturnASuccessfulTaskIfAppCheckGetTokenSucceeds',
       () async {
-    final AppCheckTokenProvider provider = AppCheckTokenProvider(interop);
+    final FirebaseAppCheckTokenProvider provider = FirebaseAppCheckTokenProvider(interop);
 
     expect(await provider.token, 'TestToken');
     await provider.close();
@@ -117,7 +117,7 @@ void main() {
 
   test('getTokenShouldNotForceRefreshTheTokenIfInvalidateTokenIsNotCalled',
       () async {
-    final AppCheckTokenProvider provider = AppCheckTokenProvider(interop);
+    final FirebaseAppCheckTokenProvider provider = FirebaseAppCheckTokenProvider(interop);
 
     await provider.token;
 
@@ -126,7 +126,7 @@ void main() {
   });
 
   test('invalidateTokenShouldCauseGetTokenToForceRefresh', () async {
-    final AppCheckTokenProvider provider = AppCheckTokenProvider(interop);
+    final FirebaseAppCheckTokenProvider provider = FirebaseAppCheckTokenProvider(interop);
 
     provider.invalidateToken();
     await provider.token;
@@ -138,7 +138,7 @@ void main() {
   test(
       'invalidateTokenShouldOnlyForceRefreshOnTheImmediatelyFollowingGetTokenInvocation',
       () async {
-    final AppCheckTokenProvider provider = AppCheckTokenProvider(interop);
+    final FirebaseAppCheckTokenProvider provider = FirebaseAppCheckTokenProvider(interop);
 
     provider.invalidateToken();
     await provider.token;

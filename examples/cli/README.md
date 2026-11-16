@@ -9,6 +9,19 @@
 | `export -c <collection> [filters]` | Runs a query on the backend and prints the documents as a JSON array, or writes them to `-o <file>`. The output is what `import` reads. |
 | `watch -c <collection> [filters]` | Prints the documents of a query, then one line per change (`added`, `modified`, `removed`, the id and the fields as JSON) until Ctrl-C (or `--exit-after <n>` changes). |
 
+Each command opens one `Firestore` instance from the environment, talks to the backend over gRPC,
+and terminates the instance when it is done. Look at which call each command makes:
+
+```mermaid
+flowchart LR
+  jsonIn["JSON array (file or stdin)"] --> importCmd["import"]
+  importCmd -- "WriteBatch, up to 500 writes each" --> backend["Firestore emulator or project"]
+  exportCmd["export"] -- "get(GetOptions(source: Source.server))" --> backend
+  exportCmd --> jsonOut["JSON array (stdout or -o file)"]
+  watchCmd["watch"] -- "snapshots listener" --> backend
+  watchCmd --> lines["one line per change"]
+```
+
 Filters for `export` and `watch`: `-w 'age>=18'`, `-w 'city==Paris'`, `-w 'tags array-contains red'`,
 `-w 'role in ["admin","owner"]'` (repeatable; the value is read as JSON when it is valid JSON,
 else as a string), `--order-by age:desc`, `--limit 10`. The id is not a field of the document,
@@ -30,9 +43,9 @@ What it shows:
 - Batched writes (`firestore.batch()`, `commit()`): each batch is atomic. The batches are
   committed one after the other, so after a failure the tool has written exactly the batches it
   printed as committed.
-- `get(Source.server)` for `export`: an export never comes from a stale cache; without a
+- `get(const GetOptions(source: Source.server))` for `export`: an export never comes from a stale cache; without a
   connection it fails.
-- A listener (`snapshots`) and `docChanges` for `watch`; Ctrl-C cancels it and terminates the
+- A listener (`snapshots()`) and `docChanges` for `watch`; Ctrl-C cancels it and terminates the
   instance so the process exits.
 - Exit codes: `64` for usage errors, `65` for invalid JSON, `66` for a missing file, `78` when no
   backend is configured, `1` for a Firestore error.
@@ -50,6 +63,38 @@ echo '[{"id": "ada", "age": 36}, {"id": "alan", "age": 41}]' > people.json
 dart run bin/firestore_cli.dart import people.json -c people
 dart run bin/firestore_cli.dart export -c people -w 'age>40'
 dart run bin/firestore_cli.dart watch -c people --order-by age
+```
+
+This is a real session against a private emulator on port 8141 (Firestore emulator v1.22.0,
+Dart 3.12.2, macOS). `watch` ran in a second terminal with `--exit-after 4` while a second file
+was imported: it printed the two existing documents as `added`, then the new `grace` as `added`
+and the changed `ada` as `modified`.
+
+```text
+$ dart run bin/firestore_cli.dart import people.json -c people
+committed 2/2
+imported 2 documents into people
+$ dart run bin/firestore_cli.dart export -c people -w 'age>40'
+[
+  {
+    "id": "alan",
+    "age": 41
+  }
+]
+
+# second terminal
+$ dart run bin/firestore_cli.dart watch -c people --order-by age --exit-after 4
+
+# first terminal; more.json is [{"id": "grace", "age": 45}, {"id": "ada", "age": 37}]
+$ dart run bin/firestore_cli.dart import more.json -c people
+committed 2/2
+imported 2 documents into people
+
+# second terminal, which then exits
+added ada {"age":36}
+added alan {"age":41}
+added grace {"age":45}
+modified ada {"age":37}
 ```
 
 For repeated use, compile it: `dart compile exe bin/firestore_cli.dart -o firestore_cli`.

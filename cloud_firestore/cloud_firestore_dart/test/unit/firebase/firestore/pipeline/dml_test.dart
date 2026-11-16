@@ -41,13 +41,13 @@ import 'package:test/test.dart';
 
 import 'pipeline_test_util.dart';
 
-final Firestore db = fakeFirestore;
-final Firestore otherDb = FakeFirestore(
+final FirebaseFirestore db = fakeFirestore;
+final FirebaseFirestore otherDb = FakeFirestore(
   DatabaseId.forDatabase('otherProject', 'otherDb'),
 );
 
 CollectionReference<Map<String, Object?>> collectionOf(
-  Firestore firestore,
+  FirebaseFirestore firestore,
   String path,
 ) => CollectionReferenceInternal.create<Map<String, Object?>>(
   ResourcePath.fromString(path),

@@ -47,7 +47,7 @@ class _FailingCredentials implements CredentialsProvider {
   Stream<User> get onChange => Stream<User>.value(User.unauthenticated);
 }
 
-class _FailingAppCheck implements InternalAppCheckTokenProvider {
+class _FailingAppCheck implements AppCheckTokenProvider {
   @override
   Future<AppCheckTokenResult> getToken({required bool forceRefresh}) =>
       Future<AppCheckTokenResult>.error(
@@ -144,7 +144,7 @@ void main() {
     () async {
       final FirestoreCallCredentials credentials = FirestoreCallCredentials(
         EmptyCredentialsProvider(),
-        appCheckProvider: AppCheckTokenProvider(_FailingAppCheck()),
+        appCheckProvider: FirebaseAppCheckTokenProvider(_FailingAppCheck()),
       );
       final Map<String, String> metadata = <String, String>{};
       final List<String> printed = await _printed(

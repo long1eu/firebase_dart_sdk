@@ -456,7 +456,7 @@ void expectReadable(MaybeDocument document) {
         document,
         isFromCache: false,
         hasPendingWrites: false,
-      ).data;
+      ).data();
   expect(user, isA<Map<String, Object?>>());
 }
 

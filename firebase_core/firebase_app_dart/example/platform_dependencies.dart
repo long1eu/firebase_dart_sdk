@@ -58,7 +58,7 @@ Future<void> main() async {
   final FirebaseApp app = FirebaseApp.withOptions(
     const FirebaseOptions(
       apiKey: '<YOUR_API_KEY>',
-      applicationId: '1:1234567890:dart:example',
+      appId: '1:1234567890:dart:example',
       projectId: 'my-project',
     ),
     dependencies: dependencies,
@@ -84,7 +84,7 @@ Future<void> main() async {
   await subscription.cancel();
 
   // The app writes its own settings to the storage you gave it.
-  app.setDataCollectionDefaultEnabled(enabled: false);
+  await app.setAutomaticDataCollectionEnabled(false);
   print('stored settings: ${dependencies.settings.values}');
 
   await dependencies.connectivity.close();

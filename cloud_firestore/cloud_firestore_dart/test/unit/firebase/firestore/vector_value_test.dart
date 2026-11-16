@@ -33,7 +33,7 @@ void main() {
   group('VectorValue', () {
     test('copies its input and exposes length / toArray', () {
       final List<double> input = <double>[1.0, 2.0, 3.0];
-      final VectorValue v = FieldValue.vector(input);
+      final VectorValue v = VectorValue(input);
       input[0] = 99.0;
       expect(v.toArray(), <double>[1.0, 2.0, 3.0]);
       expect(v.length, 3);
@@ -42,30 +42,27 @@ void main() {
     });
 
     test('equality and hashCode', () {
+      expect(VectorValue(<double>[1.0, 2.0]), VectorValue(<double>[1.0, 2.0]));
       expect(
-        FieldValue.vector(<double>[1.0, 2.0]),
-        FieldValue.vector(<double>[1.0, 2.0]),
+        VectorValue(<double>[1.0, 2.0]).hashCode,
+        VectorValue(<double>[1.0, 2.0]).hashCode,
       );
       expect(
-        FieldValue.vector(<double>[1.0, 2.0]).hashCode,
-        FieldValue.vector(<double>[1.0, 2.0]).hashCode,
+        VectorValue(<double>[1.0, 2.0]),
+        isNot(VectorValue(<double>[1.0, 3.0])),
       );
       expect(
-        FieldValue.vector(<double>[1.0, 2.0]),
-        isNot(FieldValue.vector(<double>[1.0, 3.0])),
+        VectorValue(<double>[1.0]),
+        isNot(VectorValue(<double>[1.0, 0.0])),
       );
-      expect(
-        FieldValue.vector(<double>[1.0]),
-        isNot(FieldValue.vector(<double>[1.0, 0.0])),
-      );
-      expect(FieldValue.vector(<double>[]), FieldValue.vector(<double>[]));
+      expect(VectorValue(<double>[]), VectorValue(<double>[]));
     });
   });
 
   group('model ordering', () {
     test('type order is between arrays and maps', () {
       final model.FieldValue array = wrap(<Object>[1]);
-      final model.FieldValue vector = wrap(FieldValue.vector(<double>[1.0]));
+      final model.FieldValue vector = wrap(VectorValue(<double>[1.0]));
       final model.FieldValue map = wrap(<String, Object>{'a': 1});
       expect(vector, isA<model.VectorFieldValue>());
       expect(array.compareTo(vector), lessThan(0));
@@ -76,12 +73,12 @@ void main() {
 
     test('vectors compare by length first, then by values', () {
       final List<model.FieldValue> ordered = <model.FieldValue>[
-        wrap(FieldValue.vector(<double>[])),
-        wrap(FieldValue.vector(<double>[100.0])),
-        wrap(FieldValue.vector(<double>[1.0, 2.0])),
-        wrap(FieldValue.vector(<double>[1.0, 3.0])),
-        wrap(FieldValue.vector(<double>[2.0, 0.0])),
-        wrap(FieldValue.vector(<double>[1.0, 2.0, 0.0])),
+        wrap(VectorValue(<double>[])),
+        wrap(VectorValue(<double>[100.0])),
+        wrap(VectorValue(<double>[1.0, 2.0])),
+        wrap(VectorValue(<double>[1.0, 3.0])),
+        wrap(VectorValue(<double>[2.0, 0.0])),
+        wrap(VectorValue(<double>[1.0, 2.0, 0.0])),
       ];
       for (int i = 0; i < ordered.length; i++) {
         for (int j = 0; j < ordered.length; j++) {
@@ -93,8 +90,8 @@ void main() {
         }
       }
       expect(
-        wrap(FieldValue.vector(<double>[1.0])),
-        wrap(FieldValue.vector(<double>[1.0])),
+        wrap(VectorValue(<double>[1.0])),
+        wrap(VectorValue(<double>[1.0])),
       );
     });
   });
@@ -102,7 +99,7 @@ void main() {
   group('serializer', () {
     test('encodes a vector as a reserved-key map', () {
       final proto_.Value encoded = serializer.encodeValue(
-        wrap(FieldValue.vector(<double>[1.0, 2.5])),
+        wrap(VectorValue(<double>[1.0, 2.5])),
       );
       expect(encoded.hasMapValue(), isTrue);
       final Map<String, proto_.Value> fields = encoded.mapValue.fields;
@@ -117,7 +114,7 @@ void main() {
     });
 
     test('round trips', () {
-      final model.FieldValue v = wrap(FieldValue.vector(<double>[1.0, -2.5]));
+      final model.FieldValue v = wrap(VectorValue(<double>[1.0, -2.5]));
       expect(serializer.decodeValue(serializer.encodeValue(v)), v);
     });
 
@@ -132,7 +129,7 @@ void main() {
 
     test('vectors nested in documents round trip', () {
       final model.FieldValue doc = wrap(<String, Object>{
-        'embedding': FieldValue.vector(<double>[0.5, 1.5]),
+        'embedding': VectorValue(<double>[0.5, 1.5]),
       });
       final model.FieldValue decoded = serializer.decodeValue(
         serializer.encodeValue(doc),
@@ -140,7 +137,7 @@ void main() {
       expect(decoded, doc);
       expect(
         (decoded as model.ObjectValue).value['embedding'],
-        FieldValue.vector(<double>[0.5, 1.5]),
+        VectorValue(<double>[0.5, 1.5]),
       );
     });
   });

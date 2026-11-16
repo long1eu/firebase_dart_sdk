@@ -164,7 +164,7 @@ void main() {
       expect(() => base().insert(collection: 'a/b'), throwsArgumentError);
       expect(() => base().insert(collection: 1), throwsArgumentError);
 
-      final Firestore other =
+      final FirebaseFirestore other =
           FakeFirestore(DatabaseId.forDatabase('other-project', '(default)'));
       final CollectionReference<Map<String, Object?>> foreign =
           CollectionReferenceInternal.create<Map<String, Object?>>(

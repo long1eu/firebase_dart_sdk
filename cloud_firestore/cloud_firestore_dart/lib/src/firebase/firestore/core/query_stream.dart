@@ -93,7 +93,7 @@ class QueryStream extends Stream<ViewSnapshot> {
     return raisedEvent;
   }
 
-  void onError(FirestoreError error) {
+  void onError(FirestoreException error) {
     _sink.addError(error);
     // An error is terminal: the event manager already dropped this listener, so close the stream instead of leaving
     // the subscriber waiting forever.

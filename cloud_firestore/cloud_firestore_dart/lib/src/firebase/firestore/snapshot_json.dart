@@ -16,10 +16,10 @@
 ///
 /// Port of the JS SDK `DocumentSnapshot.toJSON()`, `QuerySnapshot.toJSON()`, `documentSnapshotFromJSON()`,
 /// `querySnapshotFromJSON()` and `onSnapshotResume()`. The JSON object holds the snapshot as a Firestore bundle string
-/// (the format of `Firestore.loadBundle`), so it is interchangeable with the one of the JS SDK (Node).
+/// (the format of `FirebaseFirestore.loadBundle`), so it is interchangeable with the one of the JS SDK (Node).
 ///
 /// This library is internal: apps use `DocumentSnapshot.toJson`, `QuerySnapshot.toJson`, their `fromJson`
-/// constructors, and `Firestore.documentSnapshotsFromJson` / `Firestore.querySnapshotsFromJson`, which call it.
+/// constructors, and `FirebaseFirestore.documentSnapshotsFromJson` / `FirebaseFirestore.querySnapshotsFromJson`, which call it.
 library;
 
 import 'dart:async';
@@ -48,7 +48,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/model/value/field_va
 import 'package:cloud_firestore_dart/src/firebase/firestore/query.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/query_snapshot.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/remote/remote_serializer.dart';
-import 'package:cloud_firestore_dart/src/firebase/firestore/snapshot_listen_options.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/listen_source.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/util.dart';
 
 const String _documentSource = 'DocumentSnapshot';
@@ -60,18 +60,19 @@ const String _notSupported = 'NOT SUPPORTED';
 /// Returns the JSON of the snapshot of the document [key], which is [document] (null when missing).
 ///
 /// A missing document is written with an empty bundle (the JS SDK cannot read that back; this library can). Throws a
-/// [FirestoreError] with [FirestoreErrorCode.failedPrecondition] if [hasPendingWrites] is true.
+/// [FirestoreException] with [FirestoreErrorCode.failedPrecondition] if [hasPendingWrites] is true.
 Map<String, Object?> documentSnapshotToJson(
-  Firestore firestore,
+  FirebaseFirestore firestore,
   DocumentKey key,
   Document? document,
   bool hasPendingWrites,
 ) {
   if (hasPendingWrites) {
-    throw FirestoreError(
-      'DocumentSnapshot.toJson() attempted to serialize a document with pending writes. '
-      'Await waitForPendingWrites() before invoking toJson().',
-      FirestoreErrorCode.failedPrecondition,
+    throw FirestoreException(
+      message:
+          'DocumentSnapshot.toJson() attempted to serialize a document with pending writes. '
+          'Await waitForPendingWrites() before invoking toJson().',
+      errorCode: FirestoreErrorCode.failedPrecondition,
     );
   }
   String bundle = '';
@@ -93,16 +94,17 @@ Map<String, Object?> documentSnapshotToJson(
 /// Returns the JSON of the query snapshot [snapshot]: a bundle with the documents and a named query whose name is
 /// the `bundleName` of the JSON.
 ///
-/// Throws a [FirestoreError] with [FirestoreErrorCode.failedPrecondition] if [snapshot] has pending writes.
+/// Throws a [FirestoreException] with [FirestoreErrorCode.failedPrecondition] if [snapshot] has pending writes.
 Map<String, Object?> querySnapshotToJson(
-  Firestore firestore,
+  FirebaseFirestore firestore,
   ViewSnapshot snapshot,
 ) {
   if (snapshot.hasPendingWrites) {
-    throw FirestoreError(
-      'QuerySnapshot.toJson() attempted to serialize a document with pending writes. '
-      'Await waitForPendingWrites() before invoking toJson().',
-      FirestoreErrorCode.failedPrecondition,
+    throw FirestoreException(
+      message:
+          'QuerySnapshot.toJson() attempted to serialize a document with pending writes. '
+          'Await waitForPendingWrites() before invoking toJson().',
+      errorCode: FirestoreErrorCode.failedPrecondition,
     );
   }
   final String bundleName = autoId();
@@ -125,10 +127,10 @@ Map<String, Object?> querySnapshotToJson(
 /// Builds the [DocumentSnapshot] serialized in [json] by [DocumentSnapshot.toJson], typed with [converter].
 ///
 /// The snapshot is not from the cache and has no pending writes; nothing is written to the cache. Throws a
-/// [FirestoreError] with [FirestoreErrorCode.invalidArgument] if [json] is not such an object or its bundle does not
+/// [FirestoreException] with [FirestoreErrorCode.invalidArgument] if [json] is not such an object or its bundle does not
 /// hold exactly the document it names.
 DocumentSnapshot<T> documentSnapshotFromJson<T>(
-  Firestore firestore,
+  FirebaseFirestore firestore,
   Map<String, Object?> json,
   FirestoreDataConverter<T>? converter,
 ) {
@@ -152,16 +154,18 @@ DocumentSnapshot<T> documentSnapshotFromJson<T>(
 
   final _ParsedBundle bundle = _ParsedBundle.parse(firestore, parsed.bundle);
   if (bundle.documents.length != 1) {
-    throw FirestoreError(
-      'Expected bundle data to contain 1 document, but it contains ${bundle.documents.length} documents.',
-      FirestoreErrorCode.invalidArgument,
+    throw FirestoreException(
+      message:
+          'Expected bundle data to contain 1 document, but it contains ${bundle.documents.length} documents.',
+      errorCode: FirestoreErrorCode.invalidArgument,
     );
   }
   final Document document = bundle.documents.single;
   if (document.key != key) {
-    throw FirestoreError(
-      'The bundle holds the document ${document.key.path}, but the snapshot is of ${key.path}.',
-      FirestoreErrorCode.invalidArgument,
+    throw FirestoreException(
+      message:
+          'The bundle holds the document ${document.key.path}, but the snapshot is of ${key.path}.',
+      errorCode: FirestoreErrorCode.invalidArgument,
     );
   }
   return DocumentSnapshotInternal.fromDocument<T>(
@@ -175,10 +179,10 @@ DocumentSnapshot<T> documentSnapshotFromJson<T>(
 
 /// Builds the [QuerySnapshot] serialized in [json] by [QuerySnapshot.toJson], typed with [converter].
 ///
-/// Nothing is written to the cache. Throws a [FirestoreError] with [FirestoreErrorCode.invalidArgument] if [json] is
+/// Nothing is written to the cache. Throws a [FirestoreException] with [FirestoreErrorCode.invalidArgument] if [json] is
 /// not such an object, its bundle does not hold exactly one query, or a document lacks a field the query orders by.
 QuerySnapshot<T> querySnapshotFromJson<T>(
-  Firestore firestore,
+  FirebaseFirestore firestore,
   Map<String, Object?> json,
   FirestoreDataConverter<T>? converter,
 ) {
@@ -189,9 +193,10 @@ QuerySnapshot<T> querySnapshotFromJson<T>(
   );
   final _ParsedBundle bundle = _ParsedBundle.parse(firestore, parsed.bundle);
   if (bundle.queries.length != 1) {
-    throw FirestoreError(
-      'Snapshot data expected 1 query but found ${bundle.queries.length} queries.',
-      FirestoreErrorCode.invalidArgument,
+    throw FirestoreException(
+      message:
+          'Snapshot data expected 1 query but found ${bundle.queries.length} queries.',
+      errorCode: FirestoreErrorCode.invalidArgument,
     );
   }
   final NamedQuery namedQuery = bundle.queries.single;
@@ -221,14 +226,15 @@ QuerySnapshot<T> querySnapshotFromJson<T>(
   );
 }
 
-/// Throws a [FirestoreError] if [document] lacks a field that [query] orders by: it cannot be among the results.
+/// Throws a [FirestoreException] if [document] lacks a field that [query] orders by: it cannot be among the results.
 void _checkOrderByFields(core.Query query, Document document) {
   for (final OrderBy orderBy in query.orderByConstraints) {
     if (!orderBy.field.isKeyField && document.getField(orderBy.field) == null) {
-      throw FirestoreError(
-        'The bundle holds the document ${document.key.path}, which has no field ${orderBy.field} to order the '
-        'query by.',
-        FirestoreErrorCode.invalidArgument,
+      throw FirestoreException(
+        message:
+            'The bundle holds the document ${document.key.path}, which has no field ${orderBy.field} to order the '
+            'query by.',
+        errorCode: FirestoreErrorCode.invalidArgument,
       );
     }
   }
@@ -237,14 +243,15 @@ void _checkOrderByFields(core.Query query, Document document) {
 /// Loads the bundle of a [DocumentSnapshot.toJson] result and listens to the document from there.
 ///
 /// The bundle is loaded when the stream is listened to, so the first event can come from the cache. Throws a
-/// [FirestoreError] with [FirestoreErrorCode.invalidArgument] if [json] lacks a field; errors of loading the bundle
+/// [FirestoreException] with [FirestoreErrorCode.invalidArgument] if [json] lacks a field; errors of loading the bundle
 /// are delivered on the stream.
 Stream<DocumentSnapshot<T>> documentSnapshotsFromJson<T>(
-  Firestore firestore,
-  Map<String, Object?> json,
-  SnapshotListenOptions options,
+  FirebaseFirestore firestore,
+  Map<String, Object?> json, {
+  required bool includeMetadataChanges,
+  required ListenSource source,
   FirestoreDataConverter<T>? converter,
-) {
+}) {
   final _SnapshotJson parsed = _SnapshotJson.forResume(json, _documentSource);
   final DocumentKey key = _documentKey(parsed.bundleName);
   final DocumentReference<T> reference = DocumentReferenceInternal.create<T>(
@@ -254,52 +261,60 @@ Stream<DocumentSnapshot<T>> documentSnapshotsFromJson<T>(
   );
   if (parsed.bundle.isEmpty) {
     // The document was missing: there is nothing to load.
-    return reference.getSnapshotsWithOptions(options);
+    return reference.snapshots(
+      includeMetadataChanges: includeMetadataChanges,
+      source: source,
+    );
   }
   return _resume<DocumentSnapshot<T>>(firestore, parsed.bundle, () async {
-    return reference.getSnapshotsWithOptions(options);
+    return reference.snapshots(
+      includeMetadataChanges: includeMetadataChanges,
+      source: source,
+    );
   });
 }
 
 /// Loads the bundle of a [QuerySnapshot.toJson] result and listens to its query from there.
 ///
-/// The bundle is loaded when the stream is listened to. Throws a [FirestoreError] with
+/// The bundle is loaded when the stream is listened to. Throws a [FirestoreException] with
 /// [FirestoreErrorCode.invalidArgument] if [json] lacks a field or has an empty bundle; errors of loading the bundle,
 /// and a bundle without the named query, are delivered on the stream.
 Stream<QuerySnapshot<T>> querySnapshotsFromJson<T>(
-  Firestore firestore,
-  Map<String, Object?> json,
-  SnapshotListenOptions options,
+  FirebaseFirestore firestore,
+  Map<String, Object?> json, {
+  required bool includeMetadataChanges,
+  required ListenSource source,
   FirestoreDataConverter<T>? converter,
-) {
+}) {
   final _SnapshotJson parsed = _SnapshotJson.forResume(json, _querySource);
   if (parsed.bundle.isEmpty) {
-    throw FirestoreError(
-      "snapshotJson field 'bundle' cannot be an empty string.",
-      FirestoreErrorCode.invalidArgument,
+    throw FirestoreException(
+      message: "snapshotJson field 'bundle' cannot be an empty string.",
+      errorCode: FirestoreErrorCode.invalidArgument,
     );
   }
   return _resume<QuerySnapshot<T>>(firestore, parsed.bundle, () async {
-    final Query<Map<String, Object?>>? namedQuery = await firestore
-        .getNamedQuery(parsed.bundleName);
+    final Query<Map<String, Object?>>? namedQuery = await firestore.namedQuery(
+      parsed.bundleName,
+    );
     if (namedQuery == null) {
-      throw FirestoreError(
-        'The bundle does not contain the query ${parsed.bundleName}.',
-        FirestoreErrorCode.invalidArgument,
+      throw FirestoreException(
+        message: 'The bundle does not contain the query ${parsed.bundleName}.',
+        errorCode: FirestoreErrorCode.invalidArgument,
       );
     }
     return QueryInternal.create<T>(
       namedQuery.query,
       firestore,
       converter,
-    ).getSnapshotsWithOptions(options);
+    ).snapshots(includeMetadataChanges: includeMetadataChanges, source: source);
   });
 }
 
 /// Returns a stream that loads [bundle] into the cache when listened to, and then forwards the events of the stream
 /// returned by [listen].
 Stream<S> _resume<S>(
-  Firestore firestore,
+  FirebaseFirestore firestore,
   String bundle,
   Future<Stream<S>> Function() listen,
 ) {
@@ -351,16 +366,18 @@ DocumentKey _documentKey(String path) {
     resourcePath = ResourcePath.fromString(path);
   } on ArgumentError catch (e) {
     // The JS ResourcePath.fromString() throws a FirestoreError (invalid-argument) itself.
-    throw FirestoreError(
-      "The JSON field 'bundleName' must be a document path, but was '$path': ${e.message}",
-      FirestoreErrorCode.invalidArgument,
-      e,
+    throw FirestoreException(
+      message:
+          "The JSON field 'bundleName' must be a document path, but was '$path': ${e.message}",
+      errorCode: FirestoreErrorCode.invalidArgument,
+      cause: e,
     );
   }
   if (resourcePath.length == 0 || !DocumentKey.isDocumentKey(resourcePath)) {
-    throw FirestoreError(
-      "The JSON field 'bundleName' must be a document path, but was '$path'.",
-      FirestoreErrorCode.invalidArgument,
+    throw FirestoreException(
+      message:
+          "The JSON field 'bundleName' must be a document path, but was '$path'.",
+      errorCode: FirestoreErrorCode.invalidArgument,
     );
   }
   return DocumentKey.fromPath(resourcePath);
@@ -384,30 +401,31 @@ class _SnapshotJson {
     };
     for (final MapEntry<String, String?> field in schema.entries) {
       if (!json.containsKey(field.key)) {
-        throw FirestoreError(
-          "JSON missing required field: '${field.key}'",
-          FirestoreErrorCode.invalidArgument,
+        throw FirestoreException(
+          message: "JSON missing required field: '${field.key}'",
+          errorCode: FirestoreErrorCode.invalidArgument,
         );
       }
       final Object? value = json[field.key];
       if (value is! String) {
-        throw FirestoreError(
-          "JSON field '${field.key}' must be a string.",
-          FirestoreErrorCode.invalidArgument,
+        throw FirestoreException(
+          message: "JSON field '${field.key}' must be a string.",
+          errorCode: FirestoreErrorCode.invalidArgument,
         );
       }
       if (field.value != null && value != field.value) {
-        throw FirestoreError(
-          "Expected '${field.key}' field to equal '${field.value}'",
-          FirestoreErrorCode.invalidArgument,
+        throw FirestoreException(
+          message: "Expected '${field.key}' field to equal '${field.value}'",
+          errorCode: FirestoreErrorCode.invalidArgument,
         );
       }
     }
     final String bundle = json['bundle']! as String;
     if (bundle == _notSupported) {
-      throw FirestoreError(
-        'The provided JSON object was created in a client environment, which is not supported.',
-        FirestoreErrorCode.invalidArgument,
+      throw FirestoreException(
+        message:
+            'The provided JSON object was created in a client environment, which is not supported.',
+        errorCode: FirestoreErrorCode.invalidArgument,
       );
     }
     return _SnapshotJson(json['bundleName']! as String, bundle);
@@ -417,38 +435,40 @@ class _SnapshotJson {
   factory _SnapshotJson.forResume(Map<String, Object?> json, String source) {
     for (final String key in <String>['bundle', 'bundleName', 'bundleSource']) {
       if (!json.containsKey(key)) {
-        throw FirestoreError(
-          'snapshotJson missing required field: $key',
-          FirestoreErrorCode.invalidArgument,
+        throw FirestoreException(
+          message: 'snapshotJson missing required field: $key',
+          errorCode: FirestoreErrorCode.invalidArgument,
         );
       }
       final Object? value = json[key];
       if (value is! String) {
-        throw FirestoreError(
-          "snapshotJson field '$key' must be a string.",
-          FirestoreErrorCode.invalidArgument,
+        throw FirestoreException(
+          message: "snapshotJson field '$key' must be a string.",
+          errorCode: FirestoreErrorCode.invalidArgument,
         );
       }
       // PORTING NOTE: the JS SDK also rejects an empty 'bundle', which toJSON() writes for a missing document. The
       // port listens to that document directly instead; a query snapshot always has a bundle.
       if (value.isEmpty && key != 'bundle') {
-        throw FirestoreError(
-          "snapshotJson field '$key' cannot be an empty string.",
-          FirestoreErrorCode.invalidArgument,
+        throw FirestoreException(
+          message: "snapshotJson field '$key' cannot be an empty string.",
+          errorCode: FirestoreErrorCode.invalidArgument,
         );
       }
     }
     if (json['bundleSource'] != source) {
-      throw FirestoreError(
-        "Expected 'bundleSource' field to equal '$source', but was '${json['bundleSource']}'.",
-        FirestoreErrorCode.invalidArgument,
+      throw FirestoreException(
+        message:
+            "Expected 'bundleSource' field to equal '$source', but was '${json['bundleSource']}'.",
+        errorCode: FirestoreErrorCode.invalidArgument,
       );
     }
     final String bundle = json['bundle']! as String;
     if (bundle == _notSupported) {
-      throw FirestoreError(
-        'The provided JSON object was created in a client environment, which is not supported.',
-        FirestoreErrorCode.invalidArgument,
+      throw FirestoreException(
+        message:
+            'The provided JSON object was created in a client environment, which is not supported.',
+        errorCode: FirestoreErrorCode.invalidArgument,
       );
     }
     return _SnapshotJson(json['bundleName']! as String, bundle);
@@ -462,7 +482,7 @@ class _SnapshotJson {
 class _ParsedBundle {
   _ParsedBundle(this.queries, this.documents);
 
-  factory _ParsedBundle.parse(Firestore firestore, String bundle) {
+  factory _ParsedBundle.parse(FirebaseFirestore firestore, String bundle) {
     final BundleSerializer serializer = BundleSerializer(
       RemoteSerializer(firestore.modelDatabaseId),
     );
@@ -545,15 +565,15 @@ class _ParsedBundle {
           'Expected first element in bundle to be a metadata object',
         );
       }
-    } on FirestoreError {
+    } on FirestoreException {
       rethrow;
     } on Object catch (e, stackTrace) {
       // The error may repeat the input, which can be megabytes long.
-      throw FirestoreError(
-        'Invalid snapshot bundle: ${_excerpt('$e')}',
-        FirestoreErrorCode.invalidArgument,
-        e,
-        stackTrace,
+      throw FirestoreException(
+        message: 'Invalid snapshot bundle: ${_excerpt('$e')}',
+        errorCode: FirestoreErrorCode.invalidArgument,
+        cause: e,
+        stackTrace: stackTrace,
       );
     }
     return _ParsedBundle(queries, documents);

@@ -28,13 +28,13 @@ import 'emulator_port.dart';
 const String projectId =
     String.fromEnvironment('FIRESTORE_PROJECT_ID', defaultValue: 'demo-test');
 
-final List<Firestore> _instances = <Firestore>[];
+final List<FirebaseFirestore> _instances = <FirebaseFirestore>[];
 final Random _random = Random();
 
 /// A new client with its own (memory) cache.
-Future<Firestore> newFirestore() async {
+Future<FirebaseFirestore> newFirestore() async {
   final DatabaseId databaseId = DatabaseId.forProject(projectId);
-  final FirestoreSettings settings = FirestoreSettings(
+  final Settings settings = Settings(
       host: emulatorHost, port: emulatorPort, sslEnabled: false);
   final TaskScheduler scheduler = TaskScheduler('');
   final FirestoreClient client = await FirestoreClient.initialize(
@@ -48,7 +48,7 @@ Future<Firestore> newFirestore() async {
     scheduler,
   );
   // ignore: invalid_use_of_internal_member
-  final Firestore firestore = FirestoreInternal.create(databaseId, null, client, scheduler);
+  final FirebaseFirestore firestore = FirestoreInternal.create(databaseId, null, client, scheduler);
   _instances.add(firestore);
   return firestore;
 }
@@ -59,7 +59,7 @@ String newCollection() =>
 void main() {
   setUpAll(loadEmulatorPort);
   tearDown(() async {
-    for (final Firestore firestore in _instances) {
+    for (final FirebaseFirestore firestore in _instances) {
       await firestore.terminate();
     }
     _instances.clear();
@@ -70,13 +70,13 @@ void main() {
     final FirebaseApp app = FirebaseApp.withOptions(
       const FirebaseOptions(
         apiKey: 'demo-key',
-        applicationId: '1:1234567890:dart:browser',
+        appId: '1:1234567890:dart:browser',
         projectId: projectId,
       ),
     );
-    final Firestore firestore = Firestore.instanceFor(
+    final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(
       app: app,
-      settings: FirestoreSettings(cacheSettings: const MemoryCacheSettings())
+      settings: Settings(cacheSettings: const MemoryCacheSettings())
           .withEmulator(emulatorHost, emulatorPort),
     );
     addTearDown(firestore.terminate);
@@ -85,7 +85,7 @@ void main() {
         firestore.collection(newCollection());
     final Completer<void> listened = Completer<void>();
     final StreamSubscription<QuerySnapshot<Map<String, dynamic>>> sub =
-        collection.snapshots.listen((QuerySnapshot<Map<String, dynamic>> s) {
+        collection.snapshots().listen((QuerySnapshot<Map<String, dynamic>> s) {
       if (s.docs.length == 1 && !listened.isCompleted) {
         listened.complete();
       }
@@ -94,13 +94,13 @@ void main() {
     await listened.future.timeout(const Duration(seconds: 20));
     await sub.cancel();
 
-    expect((await collection.doc('ada').get(Source.server)).data,
+    expect((await collection.doc('ada').get(GetOptions(source: Source.server))).data(),
         <String, dynamic>{'name': 'Ada'});
-    expect((await collection.count().get()).getCount(), 1);
+    expect((await collection.count().get()).count, 1);
   });
 
   test('writes a document and reads it back from the server', () async {
-    final Firestore firestore = await newFirestore();
+    final FirebaseFirestore firestore = await newFirestore();
     final DocumentReference<Map<String, dynamic>> doc =
         firestore.collection(newCollection()).doc('a');
 
@@ -117,12 +117,12 @@ void main() {
 
     // The Listen stream (WebChannel), with another client so that nothing
     // comes from the cache.
-    final Firestore other = await newFirestore();
+    final FirebaseFirestore other = await newFirestore();
     final DocumentSnapshot<Map<String, dynamic>> snapshot =
-        await other.doc(doc.path).get(Source.server);
+        await other.doc(doc.path).get(GetOptions(source: Source.server));
     expect(snapshot.exists, isTrue);
     expect(snapshot.metadata.isFromCache, isFalse);
-    expect(snapshot.data, <String, dynamic>{
+    expect(snapshot.data(), <String, dynamic>{
       'text': 'héllo \u{1F600} 日本',
       'int': 42,
       'double': 1.5,
@@ -134,8 +134,8 @@ void main() {
   });
 
   test('a listener receives a change another client makes', () async {
-    final Firestore firestore = await newFirestore();
-    final Firestore other = await newFirestore();
+    final FirebaseFirestore firestore = await newFirestore();
+    final FirebaseFirestore other = await newFirestore();
     final String collection = newCollection();
     await firestore
         .collection(collection)
@@ -146,13 +146,12 @@ void main() {
     final Completer<void> sawBoth = Completer<void>();
     final StreamSubscription<QuerySnapshot<Map<String, dynamic>>> sub =
         firestore
-            .collection(collection)
-            .orderBy('n')
-            .snapshots
+            .collection(collection).orderBy('n')
+            .snapshots()
             .listen((QuerySnapshot<Map<String, dynamic>> snapshot) {
       seen.add(snapshot.docs
           .map((QueryDocumentSnapshot<Map<String, dynamic>> d) =>
-              d.data['n'] as int)
+              d.data()['n'] as int)
           .toList());
       if (snapshot.docs.length == 2 && !sawBoth.isCompleted) {
         sawBoth.complete();
@@ -166,7 +165,7 @@ void main() {
   });
 
   test('queries with a filter', () async {
-    final Firestore firestore = await newFirestore();
+    final FirebaseFirestore firestore = await newFirestore();
     final CollectionReference<Map<String, dynamic>> collection =
         firestore.collection(newCollection());
     for (int i = 0; i < 5; i++) {
@@ -174,7 +173,7 @@ void main() {
     }
 
     final QuerySnapshot<Map<String, dynamic>> snapshot =
-        await collection.where('n', isGreaterThan: 2).get(Source.server);
+        await collection.where('n', isGreaterThan: 2).get(GetOptions(source: Source.server));
     expect(
         snapshot.docs
             .map((QueryDocumentSnapshot<Map<String, dynamic>> d) => d.id)
@@ -183,7 +182,7 @@ void main() {
   });
 
   test('runs a transaction and an aggregation (REST)', () async {
-    final Firestore firestore = await newFirestore();
+    final FirebaseFirestore firestore = await newFirestore();
     final CollectionReference<Map<String, dynamic>> collection =
         firestore.collection(newCollection());
     final DocumentReference<Map<String, dynamic>> counter =
@@ -195,19 +194,19 @@ void main() {
       final DocumentSnapshot<Map<String, dynamic>> snapshot =
           await transaction.get(counter);
       transaction.update(counter,
-          <String, dynamic>{'count': (snapshot.data!['count'] as int) + 1});
+          <String, dynamic>{'count': (snapshot.data()!['count'] as int) + 1});
     });
     expect(
-        (await counter.get(Source.server)).data, <String, dynamic>{'count': 2});
+        (await counter.get(GetOptions(source: Source.server))).data(), <String, dynamic>{'count': 2});
 
     // RunAggregationQuery.
     await collection.doc('other').set(<String, dynamic>{'count': 10});
     final AggregateQuerySnapshot aggregate = await collection.count().get();
-    expect(aggregate.getCount(), 2);
+    expect(aggregate.count, 2);
   });
 
   test('reports a server error with its code (REST)', () async {
-    final Firestore firestore = await newFirestore();
+    final FirebaseFirestore firestore = await newFirestore();
     final DocumentReference<Map<String, dynamic>> doc =
         firestore.collection(newCollection()).doc('missing');
 
@@ -220,21 +219,21 @@ void main() {
     } catch (e) {
       error = e;
     }
-    expect(error, isA<FirestoreError>());
-    expect((error! as FirestoreError).code, FirestoreErrorCode.notFound);
+    expect(error, isA<FirestoreException>());
+    expect((error! as FirestoreException).errorCode, FirestoreErrorCode.notFound);
   });
 
   test('keeps 64 bit integers exact', () async {
-    final Firestore firestore = await newFirestore();
+    final FirebaseFirestore firestore = await newFirestore();
     final DocumentReference<Map<String, dynamic>> doc =
         firestore.collection(newCollection()).doc('a');
     // 2^53 + 1, which a JavaScript number cannot hold.
     final int big = int.parse('9007199254740993');
     await doc.set(<String, dynamic>{'big': big});
 
-    final Firestore other = await newFirestore();
+    final FirebaseFirestore other = await newFirestore();
     final Object? read =
-        (await other.doc(doc.path).get(Source.server)).data!['big'];
+        (await other.doc(doc.path).get(GetOptions(source: Source.server))).data()!['big'];
     expect(read, big);
     expect('$read', '9007199254740993');
   },

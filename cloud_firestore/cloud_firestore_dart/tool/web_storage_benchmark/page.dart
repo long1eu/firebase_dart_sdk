@@ -72,25 +72,25 @@ Future<void> report(String kind, Map<String, Object?> body) async {
       .toDart;
 }
 
-Firestore newClient() {
+FirebaseFirestore newClient() {
   final FirebaseApp app = FirebaseApp.withOptions(
     const FirebaseOptions(
       apiKey: 'demo-key',
-      applicationId: '1:1234567890:dart:bench',
+      appId: '1:1234567890:dart:bench',
       projectId: projectId,
     ),
     name: 'bench',
   );
-  return Firestore.instanceFor(
+  return FirebaseFirestore.instanceFor(
     app: app,
     openDatabase: sqliteWebOpener(
       sqlite3Wasm: Uri.parse('sqlite3.wasm'),
       opfsWorker: storage == 'opfs' ? Uri.parse('sqlite_opfs_worker.js') : null,
     ),
-    settings: FirestoreSettings(
+    settings: Settings(
       // No eviction: every document stays in the cache.
       cacheSettings: PersistentCacheSettings(
-        sizeBytes: FirestoreSettings.cacheSizeUnlimited,
+        sizeBytes: Settings.cacheSizeUnlimited,
       ),
     ).withEmulator('127.0.0.1', 9),
   );
@@ -144,10 +144,10 @@ Stream<List<int>> bundle() async* {
 
 Future<Map<String, Object?>> fill() async {
   final Stopwatch watch = Stopwatch()..start();
-  final Firestore firestore = newClient();
+  final FirebaseFirestore firestore = newClient();
   await firestore.initialized;
   await firestore.disableNetwork();
-  final LoadBundleTaskProgress progress = await firestore
+  final LoadBundleTaskSnapshot progress = await firestore
       .loadBundleStream(bundle())
       .future;
   final int loaded = progress.documentsLoaded;
@@ -192,7 +192,7 @@ double median(List<double> values) {
 Future<Map<String, Object?>> read() async {
   final Map<String, int> before = await memory();
   final Stopwatch watch = Stopwatch()..start();
-  final Firestore firestore = newClient();
+  final FirebaseFirestore firestore = newClient();
   await firestore.initialized;
   await firestore.disableNetwork();
   final int openMs = watch.elapsedMilliseconds;
@@ -203,7 +203,7 @@ Future<Map<String, Object?>> read() async {
   watch.reset();
   final DocumentSnapshot<Map<String, Object?>> first = await bench
       .doc('d0')
-      .get(Source.cache);
+      .get(GetOptions(source: Source.cache));
   final int firstReadMs = watch.elapsedMilliseconds;
   if (!first.exists) {
     throw StateError('d0 is not in the cache');
@@ -216,7 +216,7 @@ Future<Map<String, Object?>> read() async {
     watch.reset();
     final DocumentSnapshot<Map<String, Object?>> doc = await bench
         .doc('d${random.nextInt(docs)}')
-        .get(Source.cache);
+        .get(GetOptions(source: Source.cache));
     pointMs.add(watch.elapsedMicroseconds / 1000);
     if (!doc.exists) {
       throw StateError('${doc.id} is not in the cache');
@@ -227,8 +227,8 @@ Future<Map<String, Object?>> read() async {
   // A query that the cache answers by scanning the collection.
   watch.reset();
   QuerySnapshot<Map<String, Object?>>? some = await bench
-      .whereEqualTo('n', docs ~/ 2)
-      .get(Source.cache);
+      .where('n', isEqualTo: docs ~/ 2)
+      .get(GetOptions(source: Source.cache));
   final int filteredMs = watch.elapsedMilliseconds;
   if (some.docs.length != 1) {
     throw StateError('the filtered query found ${some.docs.length}');
@@ -236,7 +236,9 @@ Future<Map<String, Object?>> read() async {
   some = null;
 
   watch.reset();
-  QuerySnapshot<Map<String, Object?>>? all = await bench.get(Source.cache);
+  QuerySnapshot<Map<String, Object?>>? all = await bench.get(
+    GetOptions(source: Source.cache),
+  );
   final int scanMs = watch.elapsedMilliseconds;
   if (all.docs.length != docs) {
     throw StateError('the scan found ${all.docs.length} of $docs');

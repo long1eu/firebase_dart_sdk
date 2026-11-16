@@ -244,14 +244,14 @@ void main() {
                 json,
               ),
         throwsA(
-          isA<FirestoreError>()
+          isA<FirestoreException>()
               .having(
-                (FirestoreError e) => e.code,
+                (FirestoreException e) => e.errorCode,
                 'code',
                 FirestoreErrorCode.invalidArgument,
               )
               .having(
-                (FirestoreError e) => e.cause,
+                (FirestoreException e) => e.cause,
                 'cause',
                 anyOf(
                   isNull,
@@ -320,14 +320,14 @@ void main() {
           snapshotJson('${element(metadata)}${element(deep)}'),
         ),
         throwsA(
-          isA<FirestoreError>()
+          isA<FirestoreException>()
               .having(
-                (FirestoreError e) => e.message.length,
+                (FirestoreException e) => e.message.length,
                 'message length',
                 lessThan(300),
               )
               .having(
-                (FirestoreError e) => e.cause,
+                (FirestoreException e) => e.cause,
                 'cause',
                 isFormatException,
               ),

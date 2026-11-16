@@ -1,13 +1,12 @@
-// Names used by the Android SDK and the current official Firestore API, kept as
-// aliases of the existing classes so both spellings are the same type.
+// Names of 0.1, kept as deprecated aliases so that 0.1 code keeps compiling.
 
 import 'package:cloud_firestore_dart/src/firebase/firestore/firestore.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/firestore_settings.dart';
 
-/// Alias of [Firestore]: the name used by the Android SDK and by the official
-/// Flutter plugin. Constructors, static members and subclassing work through
-/// the alias because both names denote the same class.
-typedef FirebaseFirestore = Firestore;
+/// The 0.1 name of [FirebaseFirestore].
+@Deprecated('Use FirebaseFirestore instead.')
+typedef Firestore = FirebaseFirestore;
 
-/// Alias of [FirestoreSettings] (official name: `Settings`).
-typedef Settings = FirestoreSettings;
+/// The 0.1 name of [Settings].
+@Deprecated('Use Settings instead.')
+typedef FirestoreSettings = Settings;

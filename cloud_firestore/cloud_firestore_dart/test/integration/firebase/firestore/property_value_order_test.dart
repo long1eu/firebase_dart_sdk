@@ -28,7 +28,8 @@ void main() {
     'orderBy on the backend agrees with the local order of values',
     skip: needsEmulator,
     () async {
-      final Firestore firestore = await IntegrationTestUtil.testFirestore();
+      final FirebaseFirestore firestore =
+          await IntegrationTestUtil.testFirestore();
       for (int i = 0; i < cases(3); i++) {
         await checkValueOrderAgainstBackend(
           firestore,

@@ -22,7 +22,7 @@ class FirestoreCallCredentials {
   static const String _appCheckHeader = 'x-firebase-appcheck';
 
   final CredentialsProvider credentialsProvider;
-  final AppCheckTokenProvider? appCheckProvider;
+  final FirebaseAppCheckTokenProvider? appCheckProvider;
 
   Future<void> getRequestMetadata(
     Map<String, String> metadata,
@@ -37,7 +37,7 @@ class FirestoreCallCredentials {
   }
 
   Future<void> _applyAppCheck(Map<String, String> metadata) async {
-    final AppCheckTokenProvider? provider = appCheckProvider;
+    final FirebaseAppCheckTokenProvider? provider = appCheckProvider;
     if (provider == null) {
       return;
     }
@@ -47,7 +47,7 @@ class FirestoreCallCredentials {
         Log.d(tag, 'Successfully fetched AppCheck token.');
         metadata[_appCheckHeader] = token;
       }
-    } on FirebaseApiNotAvailableError catch (_) {
+    } on FirebaseApiNotAvailableException catch (_) {
       Log.d(tag, 'Firebase AppCheck API not available.');
     } catch (e) {
       // The App Check SDKs never fail a token request: they report the
@@ -72,9 +72,9 @@ class FirestoreCallCredentials {
         Log.d(tag, 'Successfully fetched token.');
         metadata[_authorizationHeader] = 'Bearer $token';
       }
-    } on FirebaseApiNotAvailableError catch (_) {
+    } on FirebaseApiNotAvailableException catch (_) {
       Log.d(tag, 'Firebase Auth API not available, not using authentication.');
-    } on FirebaseNoSignedInUserError catch (_) {
+    } on FirebaseNoSignedInUserException catch (_) {
       Log.d(tag, 'No user signed in, not using authentication.');
     } catch (e, stackTrace) {
       // The text of the provider's error is logged and passed on with anything that looks like a token removed

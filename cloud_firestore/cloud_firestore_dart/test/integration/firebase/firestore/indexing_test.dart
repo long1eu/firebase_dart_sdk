@@ -60,37 +60,40 @@ void main() {
       };
 
   Matcher throwsTerminated() => throwsA(
-    isA<FirestoreError>().having(
-      (FirestoreError e) => e.message,
+    isA<FirestoreException>().having(
+      (FirestoreException e) => e.message,
       'message',
       contains('The client has already been terminated'),
     ),
   );
 
   test('testCanConfigureIndexes', () async {
-    final Firestore db = await IntegrationTestUtil.testFirestore();
-    await db.setIndexConfiguration(_validConfiguration);
+    final FirebaseFirestore db = await IntegrationTestUtil.testFirestore();
+    await db.setIndexConfigurationFromJSON(_validConfiguration);
   });
 
   test('testBadJsonDoesNotCrashClient', () async {
-    final Firestore db = await IntegrationTestUtil.testFirestore();
-    await expectLater(db.setIndexConfiguration('{,'), throwsArgumentError);
+    final FirebaseFirestore db = await IntegrationTestUtil.testFirestore();
+    await expectLater(
+      db.setIndexConfigurationFromJSON('{,'),
+      throwsArgumentError,
+    );
     // The client still works.
     await db
         .collection('a')
         .doc('b')
-        .get(Source.cache)
+        .get(GetOptions(source: Source.cache))
         .then<void>(
           (_) {},
-          onError: (Object e) => expect(e, isA<FirestoreError>()),
+          onError: (Object e) => expect(e, isA<FirestoreException>()),
         );
-    await db.setIndexConfiguration(_validConfiguration);
+    await db.setIndexConfigurationFromJSON(_validConfiguration);
   });
 
   test('testBadIndexDoesNotCrashClient', () async {
-    final Firestore db = await IntegrationTestUtil.testFirestore();
+    final FirebaseFirestore db = await IntegrationTestUtil.testFirestore();
     await expectLater(
-      db.setIndexConfiguration('''
+      db.setIndexConfigurationFromJSON('''
 {
   "indexes": [
     {
@@ -109,10 +112,10 @@ void main() {
       throwsArgumentError,
     );
     // The client still works.
-    await db.setIndexConfiguration(_validConfiguration);
+    await db.setIndexConfigurationFromJSON(_validConfiguration);
   });
 
-  Future<void> checkAutoIndexCreation(Firestore db) async {
+  Future<void> checkAutoIndexCreation(FirebaseFirestore db) async {
     final CollectionReference collection = db.collection('coll${autoId()}');
     await IntegrationTestUtil.writeAllDocs(collection, matchDocs);
     final Query query = collection.where('match', isEqualTo: true);
@@ -121,20 +124,20 @@ void main() {
     final PersistentCacheIndexManager manager = db.persistentCacheIndexManager!;
 
     await manager.enableIndexAutoCreation();
-    expect((await query.get(Source.cache)).length, 1);
+    expect((await query.get(GetOptions(source: Source.cache))).length, 1);
 
     await manager.disableIndexAutoCreation();
-    expect((await query.get(Source.cache)).length, 1);
+    expect((await query.get(GetOptions(source: Source.cache))).length, 1);
 
     await manager.deleteAllIndexes();
-    expect((await query.get(Source.cache)).length, 1);
+    expect((await query.get(GetOptions(source: Source.cache))).length, 1);
   }
 
   test('testAutoIndexCreationSetSuccessfully', () async {
     // Persistent cache (explicit).
-    final FirestoreSettings base = IntegrationTestUtil.newTestSettings();
-    final Firestore db = await IntegrationTestUtil.testFirestore(
-      FirestoreSettings(
+    final Settings base = IntegrationTestUtil.newTestSettings();
+    final FirebaseFirestore db = await IntegrationTestUtil.testFirestore(
+      Settings(
         host: base.host,
         port: base.port,
         sslEnabled: base.sslEnabled,
@@ -146,12 +149,12 @@ void main() {
 
   test('testAutoIndexCreationSetSuccessfullyUsingDefault', () async {
     // Persistent cache (default).
-    final Firestore db = await IntegrationTestUtil.testFirestore();
+    final FirebaseFirestore db = await IntegrationTestUtil.testFirestore();
     await checkAutoIndexCreation(db);
   });
 
   test('enable or disable twice succeeds', () async {
-    final Firestore db = await IntegrationTestUtil.testFirestore();
+    final FirebaseFirestore db = await IntegrationTestUtil.testFirestore();
     final PersistentCacheIndexManager manager = db.persistentCacheIndexManager!;
     await manager.enableIndexAutoCreation();
     await manager.enableIndexAutoCreation();
@@ -162,7 +165,7 @@ void main() {
   });
 
   test('testAutoIndexCreationAfterFailsTermination', () async {
-    final Firestore db = await IntegrationTestUtil.testFirestore();
+    final FirebaseFirestore db = await IntegrationTestUtil.testFirestore();
     final PersistentCacheIndexManager manager = db.persistentCacheIndexManager!;
     await db.terminate();
 
@@ -174,7 +177,7 @@ void main() {
   test(
     'query results stay correct after the auto-created indexes are deleted',
     () async {
-      final Firestore db = await IntegrationTestUtil.testFirestore();
+      final FirebaseFirestore db = await IntegrationTestUtil.testFirestore();
       final CollectionReference collection = db.collection('coll${autoId()}');
       await IntegrationTestUtil.writeAllDocs(
         collection,
@@ -194,13 +197,13 @@ void main() {
       // A query that matches one of the documents: it makes the SDK create an
       // index.
       final Query query = collection.where('match', isEqualTo: true);
-      expect((await query.get(Source.cache)).length, 1);
+      expect((await query.get(GetOptions(source: Source.cache))).length, 1);
 
       await manager.deleteAllIndexes();
 
       // Still the one document (the public API does not tell whether an index
       // is used).
-      expect((await query.get(Source.cache)).length, 1);
+      expect((await query.get(GetOptions(source: Source.cache))).length, 1);
     },
   );
 }

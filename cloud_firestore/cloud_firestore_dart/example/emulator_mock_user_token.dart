@@ -22,18 +22,17 @@ Future<void> main() async {
   // The claims of the ID token the emulator should see. `sub` (or `user_id`)
   // is the uid that `request.auth.uid` has in the security rules; the other
   // claims are available as `request.auth.token`.
-  final Firestore asAlice = Firestore.instanceFor(
+  final FirebaseFirestore asAlice = FirebaseFirestore.instanceFor(
     app: exampleApp('alice'),
-    settings: FirestoreSettings(cacheSettings: const MemoryCacheSettings())
-        .withEmulator(
-          host,
-          port,
-          mockUserToken: <String, Object?>{
-            'sub': 'alice',
-            'email': 'alice@example.com',
-            'admin': true,
-          },
-        ),
+    settings: Settings(cacheSettings: const MemoryCacheSettings()).withEmulator(
+      host,
+      port,
+      mockUserToken: <String, Object?>{
+        'sub': 'alice',
+        'email': 'alice@example.com',
+        'admin': true,
+      },
+    ),
   );
   print(
     'connected to ${asAlice.projectId} / ${asAlice.databaseId} '
@@ -44,7 +43,9 @@ Future<void> main() async {
     '${scratch('profiles')}/alice',
   );
   await profile.set(<String, Object?>{'displayName': 'Alice'});
-  print('alice wrote: ${(await profile.get(Source.server)).data}');
+  print(
+    'alice wrote: ${(await profile.get(GetOptions(source: Source.server))).data()}',
+  );
 
   // Without a token the requests are unauthenticated. Whether they are
   // allowed depends on the rules loaded into the emulator; a rule such as
@@ -53,15 +54,15 @@ Future<void> main() async {
   //
   // rejects the write below with `permissionDenied`, while open rules (the
   // emulator's default without a rules file) accept it.
-  final Firestore anonymous = Firestore.instanceFor(
+  final FirebaseFirestore anonymous = FirebaseFirestore.instanceFor(
     app: exampleApp('anonymous'),
     settings: emulatorSettings(),
   );
   try {
     await anonymous.doc(profile.path).update(<String, Object?>{'hacked': true});
     print('anonymous write: allowed by the rules');
-  } on FirestoreError catch (e) {
-    print('anonymous write: ${e.code}');
+  } on FirestoreException catch (e) {
+    print('anonymous write: ${e.errorCode}');
   }
 
   await asAlice.terminate();

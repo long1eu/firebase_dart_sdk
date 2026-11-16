@@ -17,7 +17,7 @@ Future<void> main(List<String> arguments) async {
   } on ConfigurationError catch (e) {
     stderr.writeln(e);
     exitCode = 78;
-  } on FirestoreError catch (e) {
+  } on FirestoreException catch (e) {
     stderr.writeln('Firestore: ${e.message}');
     exitCode = 1;
   } on FileSystemException catch (e) {

@@ -64,7 +64,7 @@ void main() {
   IntegrationTestUtil.currentDatabasePath =
       'integration_enterprise/android_pipeline_bson_type';
   late CollectionReference<Map<String, Object?>> collection;
-  late Firestore firestore;
+  late FirebaseFirestore firestore;
 
   group(
     'PipelineBsonTypeTest',

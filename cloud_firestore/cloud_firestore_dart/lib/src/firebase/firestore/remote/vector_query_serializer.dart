@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import 'package:cloud_firestore_dart/src/firebase/firestore/field_path.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/query.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/distance_measure.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/document.dart';
@@ -41,7 +42,7 @@ extension VectorQuerySerializer on RemoteSerializer {
     final proto.StructuredQuery_FindNearest findNearest =
         proto.StructuredQuery_FindNearest()
           ..vectorField = (proto.StructuredQuery_FieldReference()
-            ..fieldPath = vectorQuery.vectorField.canonicalString)
+            ..fieldPath = vectorQuery.vectorField.internalPath.canonicalString)
           ..queryVector = encodeValue(
             VectorFieldValue.fromList(vectorQuery.queryVector.toArray()),
           )

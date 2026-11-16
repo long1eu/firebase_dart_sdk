@@ -30,6 +30,19 @@ What it shows:
 
 [sse]: https://html.spec.whatwg.org/multipage/server-sent-events.html
 
+Look at the two paths into the one `Firestore` instance: the routes call it per request, and
+the event streams all hang off one listener in `ChangeFeed`:
+
+```mermaid
+flowchart LR
+  httpClients["HTTP clients"] -- "GET, POST, PATCH, DELETE /tasks" --> taskApi["TaskApi (shelf Router)"]
+  sseClients["SSE clients"] -- "GET /events" --> changeFeed["ChangeFeed"]
+  taskApi -- "reads with Source.server, awaited writes" --> firestore["Firestore instance, memory cache"]
+  changeFeed -- "one snapshots listener" --> firestore
+  firestore -- "gRPC" --> backend["Firestore emulator or project"]
+  signals["SIGINT or SIGTERM"] --> shutdown["close server, end streams, terminate()"]
+```
+
 ## Run it against the Firestore emulator
 
 Needs the Dart SDK (3.8 or later) and a Firestore emulator. From this directory:
@@ -53,6 +66,41 @@ curl localhost:8000/tasks
 curl -X PATCH -d '{"done":true}' localhost:8000/tasks/<id>
 curl -X DELETE localhost:8000/tasks/<id>
 ```
+
+This is a real session, with the emulator on port 8141 and the server on `PORT=8142` (Firestore
+emulator v1.22.0, Dart 3.12.2, macOS). In the event stream, look at the `added` event: it
+carries the local estimate of `createdAt`, and the `modified` event right after it carries the
+time the backend set.
+
+```text
+$ curl -X POST -d '{"title":"Write the docs"}' localhost:8142/tasks
+{"id":"CbDxzMFV7zXwDFjs55Po"}
+$ curl localhost:8142/tasks
+[{"id":"CbDxzMFV7zXwDFjs55Po","createdAt":"2026-11-16T01:18:40.222Z","done":false,"title":"Write the docs"}]
+$ curl -i -X PATCH -d '{"done":true}' localhost:8142/tasks/CbDxzMFV7zXwDFjs55Po
+HTTP/1.1 200 OK
+$ curl -i -X DELETE localhost:8142/tasks/CbDxzMFV7zXwDFjs55Po
+HTTP/1.1 204 No Content
+
+$ curl -N localhost:8142/events      # started before the POST
+event: snapshot
+data: {"documents":[]}
+
+event: added
+data: {"id":"CbDxzMFV7zXwDFjs55Po","createdAt":"2026-11-16T01:18:40.204Z","done":false,"title":"Write the docs"}
+
+event: modified
+data: {"id":"CbDxzMFV7zXwDFjs55Po","createdAt":"2026-11-16T01:18:40.222Z","done":false,"title":"Write the docs"}
+
+event: modified
+data: {"id":"CbDxzMFV7zXwDFjs55Po","createdAt":"2026-11-16T01:18:40.222Z","done":true,"title":"Write the docs"}
+
+event: removed
+data: {"id":"CbDxzMFV7zXwDFjs55Po","createdAt":"2026-11-16T01:18:40.222Z","done":true,"title":"Write the docs"}
+```
+
+The headers of the `PATCH` and `DELETE` answers are trimmed to the status line. The server
+logged one line per request and printed `Stopped` on `SIGTERM`.
 
 The tests run the same API in-process against the emulator (skipped without it):
 

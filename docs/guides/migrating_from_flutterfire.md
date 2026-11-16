@@ -14,7 +14,7 @@ sync with the code.
 `cloud_firestore_dart` is an unofficial port of the Firebase Android SDK to pure Dart. It is not
 a Google product and Firebase support does not cover it. The project was archived for some years
 and has been revived towards a 0.1.0 release; the three packages (`cloud_firestore_dart`,
-`firebase_app_dart`, `firebase_auth_providers_dart`) are at 0.1.0, their first version on
+`firebase_app_dart`, `firebase_auth_providers_dart`) are at 0.1.1; 0.1.0 was their first version on
 pub.dev under these names.
 
 What the repository can show about its state (each number with where it comes from):
@@ -107,11 +107,11 @@ import 'package:firebase_app_dart/firebase_app_dart.dart';
 
 // The values of a web app of the project (Firebase console, Project settings,
 // Your apps) work on every platform. From a generated firebase_options.dart:
-// apiKey -> apiKey, appId -> applicationId, projectId -> projectId.
+// the same names: apiKey, appId, projectId.
 final FirebaseApp firebaseApp = FirebaseApp.withOptions(
   const FirebaseOptions(
     apiKey: '<the apiKey of DefaultFirebaseOptions.web>',
-    applicationId: '<the appId of DefaultFirebaseOptions.web>',
+    appId: '<the appId of DefaultFirebaseOptions.web>',
     projectId: '<the projectId>',
   ),
 );
@@ -125,20 +125,20 @@ make an application id for desktop and servers.
 
 | | FlutterFire 7.1.0 | `cloud_firestore_dart` |
 |---|---|---|
-| Default instance | `FirebaseFirestore.instance` (creates it) | `Firestore.instance` returns the default app's instance **only after** `Firestore.instanceFor(app: ...)` created it; before that it throws a `StateError` |
-| Instance for an app | `FirebaseFirestore.instanceFor(app: app, databaseId: 'db')` | `Firestore.instanceFor(app: app, database: 'db', settings: ..., openDatabase: ...)` |
-| Settings | `FirebaseFirestore.instance.settings = Settings(...)` (a setter) | passed to the `instanceFor` call that creates the instance; there is no setter. A later `instanceFor` without settings or with equal ones returns the instance; with different settings it throws a `StateError` |
-| Class name | `FirebaseFirestore` | `Firestore`; `FirebaseFirestore` is a typedef of it |
-| Settings class | `Settings` | `FirestoreSettings`; `Settings` is a typedef of it |
+| Default instance | `FirebaseFirestore.instance` (creates it) | `FirebaseFirestore.instance` (creates it, with the default settings and a memory cache) |
+| Instance for an app | `FirebaseFirestore.instanceFor(app: app, databaseId: 'db')` | `FirebaseFirestore.instanceFor(app: app, databaseId: 'db', settings: ..., openDatabase: ...)` |
+| Settings | `FirebaseFirestore.instance.settings = Settings(...)` (a setter) | the same setter, before the first use of the instance (after it, a `FirestoreException` with `failed-precondition`), or `settings:` in the `instanceFor` call that creates the instance, which starts it at once. A later `instanceFor` without settings or with equal ones returns the instance; with different settings it throws a `StateError` |
+| Class name | `FirebaseFirestore` | `FirebaseFirestore` (`Firestore` is a deprecated alias) |
+| Settings class | `Settings` | `Settings` (`FirestoreSettings` is a deprecated alias); `firestore.settings` reads them back |
 
 Settings, field by field:
 
-| FlutterFire `Settings` | `FirestoreSettings` |
+| FlutterFire `Settings` | `Settings` |
 |---|---|
 | `persistenceEnabled`, `cacheSizeBytes`, `host`, `sslEnabled` | same names (or the newer `cacheSettings: PersistentCacheSettings(...)` / `MemoryCacheSettings(...)`) |
-| `Settings.CACHE_SIZE_UNLIMITED` | `FirestoreSettings.cacheSizeUnlimited` |
-| `webExperimentalForceLongPolling`, `webExperimentalAutoDetectLongPolling` | `experimentalForceLongPolling`, `experimentalAutoDetectLongPolling` (used by the web transport) |
-| `webExperimentalLongPollingOptions` | `experimentalLongPollingOptions` |
+| `Settings.CACHE_SIZE_UNLIMITED` | `Settings.cacheSizeUnlimited` |
+| `webExperimentalForceLongPolling`, `webExperimentalAutoDetectLongPolling` | same names (used by the web transport) |
+| `webExperimentalLongPollingOptions` | same name, `WebExperimentalLongPollingOptions(timeoutDuration: ...)` |
 | `webPersistentTabManager`, `ignoreUndefinedProperties` | not available |
 | none | `port`, `grpcFlowControlWindow`, `withEmulator(...)` |
 
@@ -156,10 +156,10 @@ import 'dart:io';
 import 'sqlite_database.dart'; // copied from the package's example/ folder
 
 final Directory cacheDirectory = Directory('<the application support directory>');
-final Firestore persistent = Firestore.instanceFor(
+final FirebaseFirestore persistent = FirebaseFirestore.instanceFor(
   app: app,
   openDatabase: sqliteOpener(cacheDirectory),
-  settings: FirestoreSettings(cacheSettings: PersistentCacheSettings()),
+  settings: Settings(cacheSettings: PersistentCacheSettings()),
 );
 ```
 
@@ -177,8 +177,8 @@ over the Firebase Auth REST API:
 import 'package:firebase_auth_providers_dart/firebase_auth_providers_dart.dart';
 
 final FirebaseUserAuth auth = await FirebaseUserAuth.forApp(app);
-final Firestore signedIn = Firestore.instanceFor(app: app);
-await auth.signInWithEmailAndPassword('ada@example.com', password);
+final FirebaseFirestore signedIn = FirebaseFirestore.instanceFor(app: app);
+await auth.signInWithEmailAndPassword(email: 'ada@example.com', password: password);
 ```
 
 It covers anonymous, email/password and custom-token sign-in, the token refresh and the account
@@ -190,7 +190,7 @@ Credentials instead (these bypass the security rules).
 
 | FlutterFire 7.1.0 | `cloud_firestore_dart` |
 |---|---|
-| `FirebaseFirestore.instance.useFirestoreEmulator('localhost', 8080)` before the first use | `settings: FirestoreSettings().withEmulator('127.0.0.1', 8080)` in the `instanceFor` call |
+| `FirebaseFirestore.instance.useFirestoreEmulator('localhost', 8080)` before the first use | the same call before the first use, or `settings: Settings().withEmulator('127.0.0.1', 8080)` in the `instanceFor` call |
 | maps `localhost` to `10.0.2.2` on the Android emulator (`automaticHostMapping`, on by default) | no mapping: on the Android emulator pass `10.0.2.2` yourself |
 | a mock user token for the rules: not in the plugin's API | `withEmulator(host, port, mockUserToken: {'sub': 'alice'})` |
 
@@ -208,61 +208,61 @@ The Auth emulator: `FirebaseUserAuth.forApp(app, emulatorHost: '127.0.0.1:9099')
 | Collection, document, group | `collection(path)`, `doc(path)`, `collectionGroup(id)` | same | same |
 | New document id | `collection.doc()` | `collection.doc()` | same |
 | Add | `collection.add(data)` | `collection.add(data)` | same |
-| Read once | `ref.get([GetOptions(source: Source.cache)])` | `ref.get([Source.cache])` | **different**: no `GetOptions`, the `Source` is positional |
-| Set | `ref.set(data, [SetOptions(merge: true)])` | `ref.set(data, [SetOptions.mergeAllFields])` | **different** `SetOptions` |
-| Merge some fields | `SetOptions(mergeFields: ['a', FieldPath(...)])` | `SetOptions.mergeFields(['a'])`, `SetOptions.mergeFieldPaths([FieldPath.of([...])])` | **different** |
-| Update | `ref.update(Map<Object, Object?>)` (keys `String` or `FieldPath`) | `ref.update(Map<String, Object?>)`; with `FieldPath` keys `ref.updateFromList([FieldPath.of([...]), value, ...])` | **different** for `FieldPath` keys |
+| Read once | `ref.get([GetOptions(source: Source.cache)])` | same | same; `GetOptions` has only `source` |
+| Set | `ref.set(data, [SetOptions(merge: true)])` | same | same |
+| Merge some fields | `SetOptions(mergeFields: ['a', FieldPath(...)])` | same | same |
+| Update | `ref.update(Map<Object, Object?>)` (keys `String` or `FieldPath`) | same | same |
 | Delete | `ref.delete()` | `ref.delete()` | same |
 | Reference fields | `id`, `path`, `parent`, `firestore` | same | same |
-| Snapshot data | `snapshot.data()` (method) | `snapshot.data` (getter) | **different** |
-| Server timestamps not yet set | `GetOptions(serverTimestampBehavior: ...)` | `snapshot.getData(ServerTimestampBehavior.estimate)`, or `get(field, behavior)` | **different** |
-| One field | `snapshot.get('a.b')`, `snapshot['a.b']`, also with a `FieldPath` | `snapshot.get('a.b')`, `snapshot['a.b']`; with a `FieldPath`: `getField(FieldPath.of([...]))` | **different** for `FieldPath` |
-| Typed field getters | none | `getString`, `getInt`, `getDouble`, `getBool`, `getTimestamp`, `getDate`, `getGeoPoint`, `getBlob`, ... | only here |
-| Snapshot fields | `exists`, `id`, `metadata`, `reference` | `exists`, `id`, `metadata`, `ref` (`reference` is deprecated) | **different** name |
+| Snapshot data | `snapshot.data()` (method) | same; a `Map<String, Object?>` rather than `Map<String, dynamic>` | same |
+| Server timestamps not yet set | `GetOptions(serverTimestampBehavior: ...)` | `snapshot.data(serverTimestamps: ServerTimestampBehavior.estimate)`, or `get(field, serverTimestamps: ...)` | **different** |
+| One field | `snapshot.get('a.b')`, `snapshot['a.b']`, also with a `FieldPath` | same; returns `Object?` rather than `dynamic`, so cast it | same |
+| Typed field getters | none | none (removed in 0.2): cast the result of `get` | same |
+| Snapshot fields | `exists`, `id`, `metadata`, `reference` | same | same |
 
 ### Queries and filters
 
 | What | FlutterFire 7.1.0 | `cloud_firestore_dart` | |
 |---|---|---|---|
 | Filter with named arguments | `where('age', isGreaterThanOrEqualTo: 18)` (also `isEqualTo`, `isNotEqualTo`, `isLessThan`, `arrayContains`, `arrayContainsAny`, `whereIn`, `whereNotIn`, `isNull`) | `where('age', isGreaterThanOrEqualTo: 18)` with the same named arguments | same |
-| One method per operator | none | `whereEqualTo`, `whereGreaterThan`, `whereIn`, ... and `...Field(FieldPath, ...)` variants | only here |
-| `Filter` objects | `Filter('age', isGreaterThan: 18)` | `Filter.greaterThan('age', 18)`, `Filter.equalTo(...)`, `Filter.inArray(...)`, ... | **different** |
+| One method per operator | none | none (removed in 0.2) | same |
+| `Filter` objects | `Filter('age', isGreaterThan: 18)` | same | same |
 | OR / AND | `Filter.or(f1, f2, ...)`, `Filter.and(...)` (up to 30 arguments) | `Filter.or([f1, f2])`, `Filter.and([...])` (a list) | **different** |
-| Order | `orderBy('age', descending: true)`, also with a `FieldPath` | `orderBy('age', Direction.descending)`; with a `FieldPath`: `orderByField(...)` | **different** |
+| Order | `orderBy('age', descending: true)`, also with a `FieldPath` | same | same |
 | Limits | `limit(n)`, `limitToLast(n)` | same | same |
-| Cursors | `startAt`, `startAfter`, `endAt`, `endBefore` (an `Iterable`), `startAtDocument`, ... | same names (a `List`) | same |
-| Field paths | `FieldPath(['a', 'b'])`, `FieldPath.fromString('a.b')`, `FieldPath.documentId` | `FieldPath.of(['a', 'b'])`, `FieldPath.fromDotSeparatedPath('a.b')`, `FieldPath.documentIdField` | **different** |
-| Vector search | not in the API reference | `findNearest(field, vector, limit, DistanceMeasure.cosine)` | only here |
+| Cursors | `startAt`, `startAfter`, `endAt`, `endBefore` (an `Iterable`), `startAtDocument`, ... | same | same |
+| Field paths | `FieldPath(['a', 'b'])`, `FieldPath.fromString('a.b')`, `FieldPath.documentId` | same | same |
+| Vector search | not in the API reference | `findNearest(vectorField: 'v', queryVector: vector, limit: 5, distanceMeasure: DistanceMeasure.cosine)` | only here |
 
 ### Snapshots, listeners and metadata
 
 | What | FlutterFire 7.1.0 | `cloud_firestore_dart` | |
 |---|---|---|---|
-| Listen | `ref.snapshots()` (a method) | `ref.snapshots` (a getter) | **different** |
-| With metadata changes | `snapshots(includeMetadataChanges: true)` | `getSnapshots(MetadataChanges.include)` | **different** |
-| From the cache only | `snapshots(source: ListenSource.cache)` | `getSnapshotsWithOptions(SnapshotListenOptions(source: ListenSource.cache))` | **different** |
-| Query snapshot | `docs`, `docChanges`, `size`, `metadata` | `docs`, `docChanges`, `length` (it is an `Iterable` of documents), `metadata` | **different**: `length` for `size` |
-| Document change | `change.doc`, `type`, `oldIndex`, `newIndex` | `change.document`, `type`, `oldIndex`, `newIndex` | **different**: `document` for `doc` |
+| Listen | `ref.snapshots()` (a method) | same | same |
+| With metadata changes | `snapshots(includeMetadataChanges: true)` | same | same |
+| From the cache only | `snapshots(source: ListenSource.cache)` | same | same |
+| Query snapshot | `docs`, `docChanges`, `size`, `metadata` | same; it is also an `Iterable` of documents | same |
+| Document change | `change.doc`, `type`, `oldIndex`, `newIndex` | same | same |
 | Metadata | `metadata.isFromCache`, `metadata.hasPendingWrites` | same | same |
-| All listeners in sync | `snapshotsInSync()` (a method) | `snapshotsInSync` (a getter) | **different** |
+| All listeners in sync | `snapshotsInSync()` (a method) | same | same |
 
 ### Aggregations
 
 | What | FlutterFire 7.1.0 | `cloud_firestore_dart` | |
 |---|---|---|---|
-| Count | `query.count().get()` then `.count` | `query.count().get()` then `.getCount()` | **different** reader |
-| Sum, average | `query.aggregate(sum('age'), average('age'))`, then `getSum('age')`, `getAverage('age')` | `query.aggregate([AggregateField.sum('age'), AggregateField.average('age')])`, then `get(AggregateField.sum('age'))`, `getDouble(...)`, `getInt(...)` or `data()` | **different** |
+| Count | `query.count().get()` then `.count` | same | same |
+| Sum, average | `query.aggregate(sum('age'), average('age'))`, then `getSum('age')`, `getAverage('age')` | `query.aggregate([AggregateField.sum('age'), AggregateField.average('age')])`, then `getSum('age')`, `getAverage('age')`, `get(...)` or `data()` | **different** (a list, `AggregateField`) |
 | Aliases | none | `aggregateWithAliases({'total': AggregateField.sum('age')})` | only here |
-| Source | `get(source: AggregateSource.server)` | `get(AggregateSource.server)` (positional) | **different** |
+| Source | `get(source: AggregateSource.server)` | same | same |
 
 ### Transactions and batches
 
 | What | FlutterFire 7.1.0 | `cloud_firestore_dart` | |
 |---|---|---|---|
-| Run | `runTransaction((tx) async {...}, timeout: ..., maxAttempts: 5)` | `runTransaction((tx) async {...}, options: TransactionOptions(maxAttempts: 5))`; no timeout | **different** |
-| Read-only, read time | none | `TransactionOptions(readOnly: true, readTime: ...)` | only here |
+| Run | `runTransaction((tx) async {...}, timeout: ..., maxAttempts: 5)` | the same (`timeout` 30 s by default); a timed-out attempt that was committing may still take effect | same |
+| Read-only, read time | none | `runTransaction(..., readOnly: true, readTime: ...)` | only here |
 | Reads | `tx.get(ref)` | `tx.get(ref)`, also `tx.getQuery(query)` and `tx.getAggregate(aggregateQuery)` | more here |
-| Writes | `tx.set`, `tx.update`, `tx.delete` | same, plus `tx.updateFromList` | same |
+| Writes | `tx.set`, `tx.update`, `tx.delete` | same | same |
 | Batch | `batch()`, `set`, `update`, `delete` (return `void`), `commit()` | same names; the writes return the batch, so they chain; also `runBatch((batch) async {...})` | small difference |
 
 ### Values
@@ -270,8 +270,8 @@ The Auth emulator: `FirebaseUserAuth.forApp(app, emulatorHost: '127.0.0.1:9099')
 | What | FlutterFire 7.1.0 | `cloud_firestore_dart` | |
 |---|---|---|---|
 | Sentinels | `FieldValue.serverTimestamp()`, `delete()`, `increment(n)`, `arrayUnion(list)`, `arrayRemove(list)`, `minimum(n)`, `maximum(n)` | same names | same |
-| Vectors | `VectorValue([...])` | `VectorValue([...])` or `FieldValue.vector([...])` | same, plus a shortcut |
-| Timestamp | `Timestamp(seconds, nanoseconds)`, `fromDate`, `fromMillisecondsSinceEpoch`, `now`, `toDate`, `millisecondsSinceEpoch` | `Timestamp(seconds, nanoseconds)`, `fromDate`, `fromMillis`, `now`, `toDate`, `toMillis()` | **different** millisecond names |
+| Vectors | `VectorValue([...])` | same | same |
+| Timestamp | `Timestamp(seconds, nanoseconds)`, `fromDate`, `fromMillisecondsSinceEpoch`, `now`, `toDate`, `millisecondsSinceEpoch` | same, plus the microsecond twins | same |
 | GeoPoint | `GeoPoint(latitude, longitude)` | same | same |
 | Bytes | `Blob(Uint8List)`, `bytes` | `Blob(Uint8List)`, `bytes`; also `Blob.fromBase64String`, `toBase64()` | same |
 | BSON types (Enterprise) | not in the API reference | `MinKey`, `MaxKey`, `Int32Value`, `Decimal128Value`, `BsonObjectId`, `BsonTimestamp`, `RegexValue`, `Blob.bsonBinary` | only here |
@@ -280,8 +280,8 @@ The Auth emulator: `FirebaseUserAuth.forApp(app, emulatorHost: '127.0.0.1:9099')
 
 | FlutterFire 7.1.0 | `cloud_firestore_dart` |
 |---|---|
-| `ref.withConverter<City>(fromFirestore: (snapshot, options) => ..., toFirestore: (city, options) => ...)` | `ref.withConverter<City>(FirestoreDataConverter<City>.from(fromFirestore: (snapshot, options) => ..., toFirestore: (city, options) => ...))`, or a subclass of `FirestoreDataConverter<City>` |
-| in `fromFirestore`: `snapshot.data()!` | `snapshot.data!` |
+| `ref.withConverter<City>(fromFirestore: (snapshot, options) => ..., toFirestore: (city, options) => ...)` | same |
+| in `fromFirestore`: `snapshot.data()!` | same |
 | none | `withoutConverter()` returns to `Map<String, Object?>` |
 
 `withConverter` exists on `DocumentReference`, `CollectionReference` and `Query` in both.
@@ -295,16 +295,16 @@ The Auth emulator: `FirebaseUserAuth.forApp(app, emulatorHost: '127.0.0.1:9099')
 | Pending writes | `waitForPendingWrites()` | same | same |
 | End, clear the cache | `terminate()`, `clearPersistence()` | same | same |
 | Bundles | `loadBundle(Uint8List)` with `.stream` | `loadBundle(List<int>)` with `.stream` and `.future`; `loadBundleStream(Stream<List<int>>)` | more here |
-| Named queries | `namedQueryGet(name)` | `(await getNamedQuery(name))?.get()` | **different** |
-| Cache indexes | `persistentCacheIndexManager()` (a method), `setIndexConfigurationFromJSON(json)` | `persistentCacheIndexManager` (a getter), `setIndexConfiguration(json)` (deprecated) | **different** |
-| Logging | `FirebaseFirestore.setLoggingEnabled(true)` | `Firestore.setLoggingEnabled(loggingEnabled: true)`, `Firestore.setLogLevel(LogLevel.debug)` | **different** |
+| Named queries | `namedQueryGet(name)` | same; also `namedQuery(name)` for the `Query` | same |
+| Cache indexes | `persistentCacheIndexManager()` (a method), `setIndexConfigurationFromJSON(json)` | `persistentCacheIndexManager` (a getter), `setIndexConfigurationFromJSON(json)` (deprecated) | **different**: a getter |
+| Logging | `FirebaseFirestore.setLoggingEnabled(true)` | same, plus `FirebaseFirestore.setLogLevel(LogLevel.debug)` | same |
 | Pipelines | `firestore.pipeline()` | `firestore.pipeline()` from `package:cloud_firestore_dart/pipelines.dart` (preview, Enterprise edition) | same name |
 
 ### Errors
 
 FlutterFire reports a `FirebaseException` whose `code` is a string such as `'permission-denied'`.
-Here a failed operation reports a `FirestoreError` whose `code` is a `FirestoreErrorCode`
-(`FirestoreErrorCode.permissionDenied`, ...). Invalid arguments throw an `ArgumentError` whose
+Here a failed operation reports a `FirestoreException`, which extends `FirebaseException`: the same
+string `code`, plus `errorCode`, a `FirestoreErrorCode` (`FirestoreErrorCode.permissionDenied`, ...). Invalid arguments throw an `ArgumentError` whose
 message is worded after the JS SDK's (for example `Function DocumentReference.set() called with
 invalid data. ...`).
 
@@ -331,19 +331,19 @@ The same with this package:
 final QuerySnapshot<Map<String, Object?>> page = await firestore
     .collection('users')
     .where('age', isGreaterThanOrEqualTo: 18)
-    .orderBy('age', Direction.descending)
+    .orderBy('age', descending: true)
     .limit(20)
-    .get(Source.cache);
+    .get(const GetOptions(source: Source.cache));
 print(page.length);
 for (final DocumentChange<Map<String, Object?>> change in page.docChanges) {
-  print(change.document.id);
+  print(change.doc.id);
 }
 
 final AggregateQuerySnapshot totals = await users.aggregate(<AggregateField>[
   AggregateField.count(),
   AggregateField.sum('age'),
 ]).get();
-print('${totals.getCount()} users, ${totals.get(AggregateField.sum('age'))} years');
+print('${totals.count} users, ${totals.get(AggregateField.sum('age'))} years');
 ```
 
 ## Using both in one app
@@ -351,6 +351,32 @@ print('${totals.getCount()} users, ${totals.get(AggregateField.sum('age'))} year
 A Flutter app can use FlutterFire on the platforms it supports and this package elsewhere (for
 example Linux desktop), or FlutterFire in the app and this package in a Dart backend of the same
 project. Both talk to the same database, and the security rules apply to both in the same way.
+The picture shows what each side keeps for itself; only the database is shared.
+
+```mermaid
+flowchart LR
+  accTitle: FlutterFire and cloud_firestore_dart in one app
+  accDescr: The FlutterFire side has the FirebaseApp of firebase_core, a user signed in with firebase_auth and cloud_firestore with its own cache. The cloud_firestore_dart side has the FirebaseApp of firebase_app_dart, a FirebaseUserAuth or your own AuthTokenProvider, and cloud_firestore_dart with its own cache file. Each side has its own connection and listeners to the same Firestore database and security rules. Values and pending writes do not cross between the two sides.
+  subgraph flutterFireSide["FlutterFire"]
+    ffApp["FirebaseApp of firebase_core"]
+    ffAuth["firebase_auth: its own signed-in user"]
+    ffStore["cloud_firestore: native SDK, its own cache"]
+  end
+  subgraph dartSide["cloud_firestore_dart"]
+    dartApp["FirebaseApp of firebase_app_dart"]
+    dartAuth["FirebaseUserAuth or your AuthTokenProvider:<br/>its own signed-in user"]
+    dartStore["cloud_firestore_dart: its own cache file"]
+  end
+  database["The same Firestore database<br/>and the same security rules"]
+  ffApp --> ffStore
+  ffAuth --> ffStore
+  dartAuth -- "app.authProvider" --> dartApp
+  dartApp --> dartStore
+  ffStore -- "own connection, own listeners" --> database
+  dartStore -- "own connection, own listeners" --> database
+  ffStore -.-|"values and pending writes do not cross"| dartStore
+```
+
 What to watch for:
 
 - **Name clashes.** Both libraries export `FirebaseFirestore`, `Settings`, `Query`,
@@ -367,10 +393,12 @@ What to watch for:
 - **Two auth states.** Signing in with FlutterFire's `firebase_auth` does not sign this package's
   client in, and the reverse. Either sign the user in on both sides, or give this package a token
   provider that hands it the ID token of the FlutterFire user. Such a provider implements
-  `InternalTokenProvider` of `package:firebase_app_dart/internal.dart`, which
+  `AuthTokenProvider` of `package:firebase_app_dart/firebase_app_dart.dart`, which
   [Configuring the FirebaseApp](firebase_app.md) describes as not public API: it can change in a
   release, so pin the version if you write one. In both cases the security rules see the same
-  user id only if both sides are signed in as the same Firebase user.
+  user id only if both sides are signed in as the same Firebase user. The
+  `cloud_firestore_dart_flutterfire` package is such a provider, with the options mapping and a
+  one-call setup: see [Using cloud_firestore_dart with FlutterFire sign-in](flutterfire_bridge.md).
 - **Two connections.** Each client opens its own connection to the backend and runs its own
   listeners. Listening to the same query on both doubles the reads that are billed.
 - **One choice per platform.** The simplest structure is a small interface of your own for the

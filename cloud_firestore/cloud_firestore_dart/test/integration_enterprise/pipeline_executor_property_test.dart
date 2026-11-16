@@ -37,11 +37,11 @@ Future<List<PipelineResult>?> _remote(Pipeline pipeline) async {
       return (await pipeline.execute().timeout(
         const Duration(seconds: 30),
       )).results;
-    } on FirestoreError catch (e) {
-      if (e.code == FirestoreErrorCode.invalidArgument) {
+    } on FirestoreException catch (e) {
+      if (e.errorCode == FirestoreErrorCode.invalidArgument) {
         return null;
       }
-      if (e.code == FirestoreErrorCode.internal) {
+      if (e.errorCode == FirestoreErrorCode.internal) {
         throw _EmulatorFailure();
       }
       if (attempt == 4) {
@@ -69,7 +69,8 @@ void main() {
     'pipelines run locally as execute() on the emulator',
     skip: IntegrationTestUtil.enterpriseEmulatorSkipReason,
     () async {
-      final Firestore db = await IntegrationTestUtil.testEnterpriseFirestore();
+      final FirebaseFirestore db =
+          await IntegrationTestUtil.testEnterpriseFirestore();
       final LocalPipelines local = LocalPipelines(db.modelDatabaseId);
       int compared = 0;
       int bothFailed = 0;
