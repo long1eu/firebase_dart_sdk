@@ -11,6 +11,11 @@ native projects except network access. It talks gRPC on Android, iOS, macOS, Lin
 as on a server. The tests of this repository do not run any Flutter app; the example app was
 built and run on macOS only (see [What was tried where](#what-was-tried-where)).
 
+This is the example app on macOS against the emulator. The status line under the title comes
+from the snapshot metadata ([An offline indicator from the metadata](#an-offline-indicator-from-the-metadata)):
+
+![The flutter_notes window on macOS: the status line says "Up to date" and three notes are listed, each with a delete button](../images/examples/flutter_notes_online.png)
+
 The Dart blocks of this guide are fenced as `dart flutter`: they import Flutter or plugins, so
 the snippet test of the package, which compiles the other guides, skips them. They are checked
 by `flutter analyze` in `examples/flutter_notes`.
@@ -50,7 +55,20 @@ Two changes to the projects that `flutter create` makes:
 
 Create the `FirebaseApp` and the `Firestore` instance once, in `main()`.
 `WidgetsFlutterBinding.ensureInitialized()` comes first, because `path_provider` and
-`connectivity_plus` call the platform:
+`connectivity_plus` call the platform. The code below builds this; look at what goes into
+`Firestore.instanceFor` and what uses the instance afterwards:
+
+```mermaid
+flowchart TD
+  connectivity["connectivity_plus events"] --> deps["AppDependencies, onNetworkConnected"]
+  deps -- "dependencies:" --> app["FirebaseApp.withOptions, from --dart-define"]
+  app --> firestore["Firestore.instanceFor"]
+  sqlite["sqliteOpener: SQLite file in the application support directory"] -- "openDatabase:" --> firestore
+  settings["PersistentCacheSettings, withEmulator"] -- "settings:" --> firestore
+  firestore -- "gRPC" --> backend["Firestore emulator or project"]
+  firestore --> notesPage["NotesPage: StreamBuilder over getSnapshots"]
+  lifecycle["AppLifecycleListener"] -- "disableNetwork, enableNetwork, terminate" --> firestore
+```
 
 ```dart flutter
 Future<void> main() async {
@@ -292,8 +310,19 @@ class NoteConverter extends FirestoreDataConverter<Note> {
 
 Without `openDatabase` the cache is in memory and gone when the app stops. With the copied
 `sqliteOpener` it is one SQLite file per app name, project and database, in the directory you
-pass (the example uses `getApplicationSupportDirectory()` plus `/firestore`). Where the SQLite
-library comes from:
+pass (the example uses `getApplicationSupportDirectory()` plus `/firestore`). The choices on a
+native platform, cache and transport together:
+
+```mermaid
+flowchart LR
+  appCode["Your Flutter app"] --> firestore["Firestore instance"]
+  firestore -- "no openDatabase" --> memory["Memory cache, gone when the app stops"]
+  firestore -- "openDatabase: sqliteOpener" --> sqliteFile["SQLite file, package:sqlite3 2.x"]
+  sqliteFile --> nativeLib["native SQLite library, see the table"]
+  firestore -- "gRPC on Android, iOS, macOS, Linux, Windows" --> backend["Firestore backend or emulator"]
+```
+
+Where the SQLite library comes from:
 
 | Platform | Library that `package:sqlite3` 2.x loads |
 | --- | --- |
