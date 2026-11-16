@@ -243,8 +243,8 @@ Measured with Dart 3.12.2 and `dart compile js -O2`, gzipped:
 | --- | ---: | ---: |
 | A small app with [Firestore Lite](lite.md) | 416 KB | 128 KB |
 | The same app with the main library, memory cache | 641 KB | 196 KB |
-| [`examples/web_app`](../../examples/web_app/), Lite page | 394 KB | 122 KB |
-| [`examples/web_app`](../../examples/web_app/), main page with the SQLite opener | 919 KB | 272 KB |
+| [`examples/web_app`](../../examples/web_app/), Lite page | 398 KB | 122 KB |
+| [`examples/web_app`](../../examples/web_app/), main page with the SQLite opener | 924 KB | 273 KB |
 | `sqlite_opfs_worker.js` | 185 KB | 57 KB |
 | `sqlite3.wasm` (loaded only when a persistent cache opens) | 731 KB | 348 KB |
 
@@ -270,8 +270,8 @@ classes with the same names; import one of them with a prefix if a file needs bo
 | Integers | 53 bits: larger integers lose precision | 64 bits |
 | Browsers | Every current browser | Needs WebAssembly garbage collection (recent Chrome, Firefox, Safari) |
 | Tested | Chrome, 53 browser tests pass, 1 skipped (64-bit integers) | Chrome, 53 pass, 1 skipped (a crash test of the IndexedDB cache) |
-| Example app, main page | 919 KB (272 KB gzipped) | 907 KB `.wasm` + 29 KB `.mjs` (341 KB + 6 KB gzipped) |
-| Example app, Lite page | 394 KB (122 KB gzipped) | 335 KB `.wasm` + 16 KB `.mjs` (135 KB + 4 KB gzipped) |
+| Example app, main page | 924 KB (273 KB gzipped) | 915 KB `.wasm` + 29 KB `.mjs` (342 KB + 6 KB gzipped) |
+| Example app, Lite page | 398 KB (122 KB gzipped) | 341 KB `.wasm` + 16 KB `.mjs` (136 KB + 4 KB gzipped) |
 
 Prefer dart2wasm when your data has large integers. Two things to know:
 
@@ -289,7 +289,8 @@ Prefer dart2wasm when your data has large integers. Two things to know:
   a shared worker.
 - A crash of the browser itself or a power cut is not covered by the crash tests of the
   persistent caches (a tab that dies is).
-- The persistent caches are example code you copy, not part of the package API.
+- The persistent caches are in the separate package `cloud_firestore_dart_sqlite` (0.1), not in
+  `cloud_firestore_dart`.
 - Against the emulator: queries of more than about 10,000 documents fail, and the six-connection
   limit of HTTP/1.1 applies.
 - dart2js: integers above 2^53 lose precision.
