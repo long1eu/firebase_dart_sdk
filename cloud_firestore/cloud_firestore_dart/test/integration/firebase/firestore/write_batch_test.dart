@@ -255,7 +255,7 @@ void main() {
 
     expect(err, isNotNull);
     expect(err, const TypeMatcher<FirestoreException>());
-    expect(err.code, FirestoreErrorCode.notFound);
+    expect(err.errorCode, FirestoreErrorCode.notFound);
   });
 
   test('testWriteTheSameServerTimestampAcrossWrites', () async {

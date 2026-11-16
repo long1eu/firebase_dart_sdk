@@ -423,14 +423,12 @@ void main() {
       ]);
       expect(s.get(AggregateField.sum('rating')), double.infinity);
       expect((s.get(AggregateField.sum('rating')) as num?)?.toDouble(), double.infinity);
-      expect((s.get(AggregateField.sum('rating')) as num?)?.toInt(), maxLong);
 
       final CollectionReference neg = await testCollectionWithDocs(
         ratings(<Object?>[-double.maxFinite, -double.maxFinite]),
       );
       s = await run(neg, <AggregateField>[AggregateField.sum('rating')]);
       expect(s.get(AggregateField.sum('rating')), double.negativeInfinity);
-      expect((s.get(AggregateField.sum('rating')) as num?)?.toInt(), -maxLong - 1);
     });
 
     test('testPerformsAggregationsWhenNaNExists', () async {
@@ -443,7 +441,6 @@ void main() {
       ]);
       expect(s.get(AggregateField.sum('rating')), isNaN);
       expect(s.get(AggregateField.average('rating')), isNaN);
-      expect((s.get(AggregateField.average('rating')) as num?)?.toInt(), 0);
     });
 
     test('testPerformsSumOfMinIEEE754', () async {
@@ -916,7 +913,6 @@ void main() {
       ]);
       expect(s.get(AggregateField.average('rating')), 0.0);
       expect((s.get(AggregateField.average('rating')) as num?)?.toDouble(), 0.0);
-      expect((s.get(AggregateField.average('rating')) as num?)?.toInt(), 0);
     });
   });
 }

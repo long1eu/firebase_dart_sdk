@@ -179,7 +179,7 @@ void main() {
         sdk: <String>['array'],
       );
       await expectConvergence(
-        collection.where(Filter('v', isLessThanOrEqualTo: null)),
+        collection.where(_nullFilter('v', FilterOperator.lessThanOrEqual)),
         backend: <String>[],
         sdk: <String>['null'],
       );
@@ -258,3 +258,8 @@ Filter _arrayContainsNull(String field) => UnaryFilter(
   FilterOperator.arrayContains,
   null,
 );
+
+/// A comparison with null other than `==` and `!=`, which the named arguments
+/// of `where` cannot express either.
+Filter _nullFilter(String field, FilterOperator op) =>
+    UnaryFilter(FieldPath.fromString(field), op, null);

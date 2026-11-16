@@ -91,7 +91,7 @@ void main() {
       await readerRef.get(Source.cache);
       fail('Should have thrown exception');
     } on FirebaseFirestoreError catch (e) {
-      expect(e.code, FirestoreErrorCode.unavailable);
+      expect(e.errorCode, FirestoreErrorCode.unavailable);
     }*/
 
     writerSnap = await writerRef.get();

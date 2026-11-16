@@ -301,7 +301,17 @@ final List<Entry> entries = <Entry>[
     'FirebaseFirestore.namedQueryGet',
     <String>{'FirebaseFirestore.namedQueryGet'},
     After.futureFails,
-    (Fixture f) => f.firestore.namedQueryGet('missing'),
+    // On a running instance the query is missing: that error is not the one
+    // under test.
+    (Fixture f) => f.firestore.namedQueryGet('missing').then<void>(
+      (_) {},
+      onError: (Object e, StackTrace stackTrace) {
+        if (e is! FirestoreException ||
+            e.errorCode != FirestoreErrorCode.notFound) {
+          Error.throwWithStackTrace(e, stackTrace);
+        }
+      },
+    ),
   ),
   Entry(
     'FirebaseFirestore.documentSnapshotsFromJson',

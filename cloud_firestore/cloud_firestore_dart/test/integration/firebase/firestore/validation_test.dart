@@ -397,7 +397,7 @@ void main() {
       invalidData(
         'DocumentReference.set',
         'FieldValue.delete() can only be used with update() and set() with '
-            'SetOptions.merge() (found in field foo)',
+            'SetOptions(merge: true) or mergeFields (found in field foo)',
         documentPath: ref.path,
       ),
     );
