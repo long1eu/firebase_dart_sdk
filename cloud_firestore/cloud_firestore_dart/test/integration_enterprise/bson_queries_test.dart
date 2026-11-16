@@ -328,9 +328,8 @@ void main() {
       expect(snapshot.get(sum), Decimal128Value('3.3'));
       expect(snapshot.get(average), Decimal128Value('1.65'));
       // The typed getters convert to the closest number.
-      expect((snapshot.get(sum) as num?)?.toDouble(), 3.3);
-      expect((snapshot.get(average) as num?)?.toDouble(), 1.65);
-      expect((snapshot.get(sum) as num?)?.toInt(), 3);
+      expect(snapshot.getSum('v'), 3.3);
+      expect(snapshot.getAverage('v'), 1.65);
       expect(snapshot.data(), <String, Object?>{
         'sum_v': Decimal128Value('3.3'),
         'average_v': Decimal128Value('1.65'),
@@ -341,13 +340,12 @@ void main() {
           <Object?>[Int32Value(1), 2, 2.5, Decimal128Value('0.5')]);
       expect(snapshot.get(sum), Decimal128Value('6'));
       expect(snapshot.get(average), Decimal128Value('1.5'));
-      expect((snapshot.get(sum) as num?)?.toInt(), 6);
-      expect((snapshot.get(average) as num?)?.toDouble(), 1.5);
+      expect(snapshot.getSum('v'), 6);
+      expect(snapshot.getAverage('v'), 1.5);
 
       snapshot = await aggregate(<Object?>[Decimal128Value('NaN'), 1]);
       expect(snapshot.get(sum), Decimal128Value('NaN'));
-      expect((snapshot.get(sum) as num?)?.toDouble(), isNaN);
-      expect((snapshot.get(sum) as num?)?.toInt(), 0);
+      expect(snapshot.getSum('v'), isNaN);
     });
 
     test('the other BSON types are not numbers', () async {
