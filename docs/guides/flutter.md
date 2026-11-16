@@ -56,17 +56,17 @@ Two changes to the projects that `flutter create` makes:
 Create the `FirebaseApp` and the `Firestore` instance once, in `main()`.
 `WidgetsFlutterBinding.ensureInitialized()` comes first, because `path_provider` and
 `connectivity_plus` call the platform. The code below builds this; look at what goes into
-`Firestore.instanceFor` and what uses the instance afterwards:
+`FirebaseFirestore.instanceFor` and what uses the instance afterwards:
 
 ```mermaid
 flowchart TD
   connectivity["connectivity_plus events"] --> deps["AppDependencies, onNetworkConnected"]
   deps -- "dependencies:" --> app["FirebaseApp.withOptions, from --dart-define"]
-  app --> firestore["Firestore.instanceFor"]
+  app --> firestore["FirebaseFirestore.instanceFor"]
   sqlite["sqliteOpener: SQLite file in the application support directory"] -- "openDatabase:" --> firestore
   settings["PersistentCacheSettings, withEmulator"] -- "settings:" --> firestore
   firestore -- "gRPC" --> backend["Firestore emulator or project"]
-  firestore --> notesPage["NotesPage: StreamBuilder over getSnapshots"]
+  firestore --> notesPage["NotesPage: StreamBuilder over snapshots()"]
   lifecycle["AppLifecycleListener"] -- "disableNetwork, enableNetwork, terminate" --> firestore
 ```
 

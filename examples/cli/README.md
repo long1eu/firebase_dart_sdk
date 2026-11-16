@@ -16,7 +16,7 @@ and terminates the instance when it is done. Look at which call each command mak
 flowchart LR
   jsonIn["JSON array (file or stdin)"] --> importCmd["import"]
   importCmd -- "WriteBatch, up to 500 writes each" --> backend["Firestore emulator or project"]
-  exportCmd["export"] -- "get(Source.server)" --> backend
+  exportCmd["export"] -- "get(GetOptions(source: Source.server))" --> backend
   exportCmd --> jsonOut["JSON array (stdout or -o file)"]
   watchCmd["watch"] -- "snapshots listener" --> backend
   watchCmd --> lines["one line per change"]

@@ -28,7 +28,7 @@ flowchart TD
 Retryable are `aborted`, `failedPrecondition`, `alreadyExists`, and the errors that are not permanent
 (`Datastore.isPermanentError`: the connection-level errors listed below, and `unauthenticated`). A
 read-only transaction retries only the errors that are not permanent, and an error that is not a
-`FirestoreError` (one your callback throws) is never retried.
+`FirestoreException` (one your callback throws) is never retried.
 
 **A commit whose answer is lost can be applied twice.** A commit is retried when it fails with
 `aborted`, `failedPrecondition` or `alreadyExists`, which the backend only returns when nothing was
@@ -89,7 +89,7 @@ stateDiagram-v2
     running : Running
     networkDisabled : Network disabled
     terminated : Terminated
-    [*] --> running: Firestore.instanceFor
+    [*] --> running: FirebaseFirestore.instanceFor
     running --> networkDisabled: disableNetwork()
     networkDisabled --> running: enableNetwork()
     running --> terminated: terminate()
@@ -101,12 +101,12 @@ stateDiagram-v2
 |---|---|---|---|
 | Listeners, `get()` | from the cache and the backend | from the cache; `get()` of a document that is not cached fails with `unavailable` | fail with `failedPrecondition` |
 | Writes | stored and sent; the future completes on the acknowledgement | stored; sent, and the future completes, after `enableNetwork()` | fail with `failedPrecondition` |
-| Aggregations, `get(Source.server)` | work | fail | fail with `failedPrecondition` |
+| Aggregations, `get(const GetOptions(source: Source.server))` | work | fail | fail with `failedPrecondition` |
 | Transactions | work | not blocked by the client (see below) | fail with `failedPrecondition` |
 | `clearPersistence()` | fails with `failedPrecondition` | fails with `failedPrecondition` | works, unless a newer instance has the same cache open |
 | `terminate()` | terminates | terminates | does nothing |
 
-After `terminate()`, `Firestore.instanceFor` creates a new instance. A transaction reads and commits
+After `terminate()`, `FirebaseFirestore.instanceFor` creates a new instance. A transaction reads and commits
 over unary calls, not the streams, and the client does not check the network state before it starts one.
 
 `await firestore.terminate()` stops the instance: listeners stop receiving events, the streams and

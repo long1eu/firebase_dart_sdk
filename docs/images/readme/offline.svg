@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 360" role="img" aria-labelledby="title desc" font-family="system-ui, -apple-system, Segoe UI, Helvetica, Arial, sans-serif">
   <title id="title">What works offline</title>
-  <desc id="desc">Two lists. Works offline, answered by the local cache: get() and listeners (from the cache, isFromCache true); get(Source.cache) and listeners with ListenSource.cache; set, update, delete and batches, which are in the cache at once and sent when the client is back online; pending writes kept across restarts with the SQLite cache; loadBundle and named queries. Needs the backend: transactions (read-write and read-only); count, sum and average; findNearest; Pipelines; get(Source.server); Firestore Lite, which has no cache. Write futures and waitForPendingWrites complete only when the backend has confirmed the writes. The cache answers only with what it holds.</desc>
+  <desc id="desc">Two lists. Works offline, answered by the local cache: get() and listeners (from the cache, isFromCache true); get(GetOptions(source: Source.cache)) and listeners with ListenSource.cache; set, update, delete and batches, which are in the cache at once and sent when the client is back online; pending writes kept across restarts with the SQLite cache; loadBundle and named queries. Needs the backend: transactions (read-write and read-only); count, sum and average; findNearest; Pipelines; get(GetOptions(source: Source.server)); Firestore Lite, which has no cache. Write futures and waitForPendingWrites complete only when the backend has confirmed the writes. The cache answers only with what it holds.</desc>
   <rect x="0" y="0" width="900" height="360" rx="10" fill="#ffffff" stroke="#d0d7de"/>
 
   <!-- Left column: works offline -->
@@ -19,7 +19,7 @@
     </g>
     <text x="60" y="94"><tspan font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="12">get()</tspan> and listeners: the cached result,</text>
     <text x="60" y="110" fill="#57606a" font-size="12">marked isFromCache</text>
-    <text x="60" y="134"><tspan font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="12">get(Source.cache)</tspan>, listeners with</text>
+    <text x="60" y="134"><tspan font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="12">get(GetOptions(source: Source.cache))</tspan>, listeners with</text>
     <text x="60" y="150"><tspan font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="12">ListenSource.cache</tspan></text>
     <text x="60" y="174">set, update, delete, batches: in the cache at once,</text>
     <text x="60" y="190" fill="#57606a" font-size="12">sent when the client is back online</text>
@@ -47,7 +47,7 @@
     <text x="500" y="124"><tspan font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="12">count()</tspan>, <tspan font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="12">sum()</tspan>, <tspan font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="12">average()</tspan></text>
     <text x="500" y="154"><tspan font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="12">findNearest</tspan> (vector search)</text>
     <text x="500" y="184">Pipelines (preview)</text>
-    <text x="500" y="214"><tspan font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="12">get(Source.server)</tspan></text>
+    <text x="500" y="214"><tspan font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="12">get(GetOptions(source: Source.server))</tspan></text>
     <text x="500" y="244">Firestore Lite: it has no cache</text>
   </g>
 

@@ -92,7 +92,7 @@ provider of the app.
 flowchart TD
   accTitle: Which token a Firestore instance sends
   accDescr: When the emulator settings have a mockUserToken, the instance sends that token, claims encoded as an unsigned JWT or a string as is, and the rules see that user. Otherwise, when the app has a token provider, it sends the provider's token. Otherwise it sends no token and the rules see no user.
-  create["Firestore.instanceFor creates the instance"]
+  create["FirebaseFirestore.instanceFor creates the instance"]
   mock{"mockUserToken in the<br/>emulator settings?"}
   mockToken["The mock token: claims as an unsigned JWT,<br/>or the string as is. The rules see that user"]
   provider{"app.authProvider set?"}

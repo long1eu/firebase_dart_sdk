@@ -26,15 +26,15 @@ reads the app's options and token provider once, when it is created.
 ```mermaid
 flowchart LR
   accTitle: How the three packages fit together
-  accDescr: A token provider from firebase_auth_providers_dart is set as the authProvider of the FirebaseApp from firebase_app_dart. Firestore.instanceFor of cloud_firestore_dart reads the app's options and token provider once and sends requests with the token to Cloud Firestore or the emulator.
+  accDescr: A token provider from firebase_auth_providers_dart is set as the authProvider of the FirebaseApp from firebase_app_dart. FirebaseFirestore.instanceFor of cloud_firestore_dart reads the app's options and token provider once and sends requests with the token to Cloud Firestore or the emulator.
   subgraph authPkg["firebase_auth_providers_dart (optional)"]
     provider["FirebaseUserAuth, OAuthTokenProvider<br/>or applicationDefaultCredentials()"]
   end
   subgraph appPkg["firebase_app_dart"]
-    app["FirebaseApp<br/>FirebaseOptions: projectId, apiKey, applicationId"]
+    app["FirebaseApp<br/>FirebaseOptions: projectId, apiKey, appId"]
   end
   subgraph firestorePkg["cloud_firestore_dart"]
-    firestore["Firestore.instanceFor(app: app)"]
+    firestore["FirebaseFirestore.instanceFor(app: app)"]
   end
   backend["Cloud Firestore or the emulator"]
   provider -- "app.authProvider = ..." --> app
@@ -80,11 +80,11 @@ first operation waits for it.
 ```mermaid
 sequenceDiagram
   accTitle: From instanceFor to a first read
-  accDescr: Firestore.instanceFor returns the instance at once while the client opens its cache in the background. A get() waits until the client has started, listens to the document on the backend and returns the DocumentSnapshot.
+  accDescr: FirebaseFirestore.instanceFor returns the instance at once while the client opens its cache in the background. A get() waits until the client has started, listens to the document on the backend and returns the DocumentSnapshot.
   participant code as Your code
   participant fs as Firestore instance
   participant be as Firestore backend
-  code->>fs: Firestore.instanceFor(app: app)
+  code->>fs: FirebaseFirestore.instanceFor(app: app)
   fs-->>code: the instance, at once
   Note over fs: opens the cache and starts the client in the background
   code->>fs: cities.doc('SF').get()

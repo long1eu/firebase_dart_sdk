@@ -123,7 +123,7 @@ app.setAutomaticDataCollectionEnabled(false);
 
 ## 4. Creating the Firestore instance
 
-`Firestore.getInstance` still works but is deprecated; use `Firestore.instanceFor`, where the
+`Firestore.getInstance` still works but is deprecated; use `FirebaseFirestore.instanceFor`, where the
 app is a named argument. Both now return the instance at once instead of a `Future`, as the
 other Firebase SDKs do: the cache is opened in the background and every operation waits for it.
 An `await` in front of the call still compiles (the analyzer suggests removing it). If opening

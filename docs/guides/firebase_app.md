@@ -37,7 +37,7 @@ print(identical(Firebase.app('secondary'), secondary)); // true
 - `FirebaseOptions.fromJson` reads the options from a map.
 
 What hangs off each app: its own options and token providers, and one Firestore instance per database
-(`Firestore.instanceFor` keys its instances by app name and database, and the persistent cache is named
+(`FirebaseFirestore.instanceFor` keys its instances by app name and database, and the persistent cache is named
 after the app, the project and the database). Deleting an app shuts its Firestore instances down.
 
 ```mermaid
@@ -49,7 +49,7 @@ flowchart LR
   defaultProviders["authProvider, appCheckProvider"]
   defaultDb["Firestore, database (default)<br/>its own cache"]
   namedDb["Firestore, database 'my-database'<br/>its own cache"]
-  secondaryApp["App 'secondary'<br/>FirebaseApp.getInstance('secondary')"]
+  secondaryApp["App 'secondary'<br/>Firebase.app('secondary')"]
   secondaryOptions["FirebaseOptions<br/>projectId: other-project"]
   secondaryProviders["authProvider, appCheckProvider"]
   secondaryDb["Firestore, database (default)<br/>its own cache"]

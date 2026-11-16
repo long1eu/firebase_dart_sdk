@@ -10,10 +10,10 @@ import 'package:rxdart/rxdart.dart';
 /// | `apiKey` | `apiKey` |
 /// | `appId` | `applicationId` |
 /// | `projectId` | `projectId` |
-/// | `messagingSenderId` | `gcmSenderId` |
+/// | `messagingSenderId` | `messagingSenderId` |
 /// | `storageBucket` | `storageBucket` |
-/// | `databaseURL` | `databaseUrl` |
-/// | `trackingId` | `gaTrackingId` |
+/// | `databaseURL` | `databaseURL` |
+/// | `trackingId` | `trackingId` |
 ///
 /// The other FlutterFire options (`authDomain`, `measurementId`, the iOS and Android client ids, ...) have no
 /// counterpart and are dropped. An empty optional value becomes null.
@@ -29,12 +29,12 @@ FirebaseOptions firebaseOptionsFromFlutterFire(
       value == null || value.isEmpty ? null : value;
   return FirebaseOptions(
     apiKey: options.apiKey,
-    applicationId: options.appId,
+    appId: options.appId,
     projectId: optional(options.projectId),
-    gcmSenderId: optional(options.messagingSenderId),
+    messagingSenderId: optional(options.messagingSenderId),
     storageBucket: optional(options.storageBucket),
-    databaseUrl: optional(options.databaseURL),
-    gaTrackingId: optional(options.trackingId),
+    databaseURL: optional(options.databaseURL),
+    trackingId: optional(options.trackingId),
   );
 }
 
@@ -51,8 +51,8 @@ FirebaseApp dartAppFor(
   String name,
   flutterfire.FirebaseOptions options, {
   PlatformDependencies? dependencies,
-  InternalTokenProvider? authProvider,
-  InternalAppCheckTokenProvider? appCheckProvider,
+  AuthTokenProvider? authProvider,
+  AppCheckTokenProvider? appCheckProvider,
 }) {
   final FirebaseOptions mapped = firebaseOptionsFromFlutterFire(options);
   final FirebaseApp? existing = existingDartApp(name);
@@ -76,7 +76,7 @@ FirebaseApp dartAppFor(
 /// The `firebase_app_dart` app called [name], or null when there is none.
 FirebaseApp? existingDartApp(String name) {
   final String trimmed = name.trim();
-  for (final FirebaseApp app in FirebaseApp.apps) {
+  for (final FirebaseApp app in Firebase.apps) {
     if (app.name == trimmed) {
       return app;
     }
@@ -89,14 +89,14 @@ class _BridgeDependencies extends PlatformDependencies {
   _BridgeDependencies(this._inner, this._auth, this._appCheck);
 
   final PlatformDependencies? _inner;
-  final InternalTokenProvider? _auth;
-  final InternalAppCheckTokenProvider? _appCheck;
+  final AuthTokenProvider? _auth;
+  final AppCheckTokenProvider? _appCheck;
 
   @override
-  InternalTokenProvider? get authProvider => _auth ?? _inner?.authProvider;
+  AuthTokenProvider? get authProvider => _auth ?? _inner?.authProvider;
 
   @override
-  InternalAppCheckTokenProvider? get appCheckProvider =>
+  AppCheckTokenProvider? get appCheckProvider =>
       _appCheck ?? _inner?.appCheckProvider;
 
   @override

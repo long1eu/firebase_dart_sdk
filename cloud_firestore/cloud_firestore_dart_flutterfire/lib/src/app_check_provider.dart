@@ -19,7 +19,7 @@ import 'package:firebase_app_dart/firebase_app_dart.dart';
 /// Firestore sends the token in the `x-firebase-appcheck` header. Like the App Check SDKs, the provider never
 /// fails a request: when the plugin throws or returns no token, [getToken] reports the error in the result with an
 /// empty token, and Firestore sends the request without the header and logs a warning.
-class FlutterFireAppCheckProvider extends InternalAppCheckTokenProvider {
+class FlutterFireAppCheckProvider extends AppCheckTokenProvider {
   /// Creates the provider. [getToken] is called with `forceRefresh`; [onTokenChange] emits the new token (null
   /// when there is none).
   FlutterFireAppCheckProvider({

@@ -38,19 +38,19 @@ abstract final class FlutterFireBridge {
   /// to [readyTimeout], for the plugin to report its user, so that the instance starts with the restored user
   /// instead of switching to it a moment later.
   ///
-  /// Later calls return the same instance for the same [database], as `Firestore.instanceFor` does; [settings]
-  /// and [openDatabase] follow the rules of `Firestore.instanceFor`.
+  /// Later calls return the same instance for the same [database], as `FirebaseFirestore.instanceFor` does; [settings]
+  /// and [openDatabase] follow the rules of `FirebaseFirestore.instanceFor`.
   ///
   /// Throws a [StateError] when a `firebase_app_dart` app of that name exists with other options, or with a
   /// token provider that is not a [FlutterFireAuthTokenProvider].
-  static Future<Firestore> firestore({
+  static Future<FirebaseFirestore> firestore({
     flutterfire.FirebaseApp? app,
     flutterfire.FirebaseAuth? auth,
     String database = '(default)',
-    FirestoreSettings? settings,
+    Settings? settings,
     OpenDatabase? openDatabase,
     PlatformDependencies? dependencies,
-    InternalAppCheckTokenProvider? appCheckProvider,
+    AppCheckTokenProvider? appCheckProvider,
     Duration readyTimeout = defaultReadyTimeout,
   }) async {
     final flutterfire.FirebaseApp source = app ?? flutterfire.Firebase.app();
@@ -70,7 +70,7 @@ abstract final class FlutterFireBridge {
       );
     } else {
       dartApp = dartAppFor(source.name, source.options);
-      final InternalTokenProvider current = dartApp.authProvider;
+      final AuthTokenProvider current = dartApp.authProvider;
       if (identical(current, dartApp)) {
         // The app has no token provider yet.
         dartApp.appCheckProvider ??= appCheckProvider;
@@ -88,9 +88,9 @@ abstract final class FlutterFireBridge {
     if (created != null) {
       await created.ready.timeout(readyTimeout, onTimeout: () {});
     }
-    return Firestore.instanceFor(
+    return FirebaseFirestore.instanceFor(
       app: dartApp,
-      database: database,
+      databaseId: database,
       settings: settings,
       openDatabase: openDatabase,
     );
@@ -109,7 +109,7 @@ abstract final class FlutterFireBridge {
   /// [TimeoutException] when the plugin does not report the user in time.
   static Future<void> waitForCurrentUser({flutterfire.FirebaseApp? app}) {
     final String name = (app ?? flutterfire.Firebase.app()).name;
-    final InternalTokenProvider? provider = existingDartApp(name)?.authProvider;
+    final AuthTokenProvider? provider = existingDartApp(name)?.authProvider;
     if (provider is! FlutterFireAuthTokenProvider) {
       throw StateError(
         'The firebase_app_dart app "$name" has no FlutterFireAuthTokenProvider: create it with '

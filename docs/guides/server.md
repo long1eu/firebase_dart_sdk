@@ -172,7 +172,7 @@ sequenceDiagram
   participant prov as OAuthTokenProvider
   participant source as Credentials source
   participant be as Firestore backend
-  handler->>fs: doc.get(Source.server)
+  handler->>fs: doc.get(GetOptions(source: Source.server))
   fs->>prov: getAccessToken()
   alt no token yet, or it expires within 5 minutes
     prov->>source: key file, gcloud or metadata server

@@ -66,7 +66,7 @@ void main() {
         final FlutterFireAuthTokenProvider provider = auth.provider();
         final List<String?> seen = <String?>[];
         final List<String> tokens = <String>[];
-        provider.onTokenChanged.listen((InternalTokenResult result) {
+        provider.onTokenChanged.listen((AuthTokenChange result) {
           seen.add(provider.uid);
           tokens.add(result.token);
         });
@@ -95,7 +95,7 @@ void main() {
         final FakeUser alice = FakeUser('alice');
         final FakeAuth auth = FakeAuth(alice);
         final FlutterFireAuthTokenProvider provider = auth.provider();
-        final List<InternalTokenResult> events = <InternalTokenResult>[];
+        final List<AuthTokenChange> events = <AuthTokenChange>[];
         provider.onTokenChanged.listen(events.add);
 
         auth.changes.add(alice); // replay
@@ -124,7 +124,7 @@ void main() {
       await provider.dispose();
     });
 
-    test('throws FirebaseNoSignedInUserError when signed out', () async {
+    test('throws FirebaseNoSignedInUserException when signed out', () async {
       final FakeAuth auth = FakeAuth(FakeUser('alice'));
       final FlutterFireAuthTokenProvider provider = auth.provider();
       auth.switchTo(null);
@@ -132,7 +132,7 @@ void main() {
       expect(provider.uid, isNull);
       await expectLater(
         provider.getAccessToken(forceRefresh: false),
-        throwsA(isA<FirebaseNoSignedInUserError>()),
+        throwsA(isA<FirebaseNoSignedInUserException>()),
       );
       await provider.dispose();
     });
@@ -249,11 +249,11 @@ void main() {
         firebaseOptionsFromFlutterFire(options),
         const FirebaseOptions(
           apiKey: 'test-api-key',
-          applicationId: '1:1234567890:web:0123456789abcdef',
+          appId: '1:1234567890:web:0123456789abcdef',
           projectId: 'demo-bridge',
-          gcmSenderId: '1234567890',
+          messagingSenderId: '1234567890',
           storageBucket: 'demo-bridge.appspot.com',
-          databaseUrl: 'https://demo-bridge.firebaseio.com',
+          databaseURL: 'https://demo-bridge.firebaseio.com',
         ),
       );
     });

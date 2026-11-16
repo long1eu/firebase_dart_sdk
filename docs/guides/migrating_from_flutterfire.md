@@ -356,7 +356,7 @@ The picture shows what each side keeps for itself; only the database is shared.
 ```mermaid
 flowchart LR
   accTitle: FlutterFire and cloud_firestore_dart in one app
-  accDescr: The FlutterFire side has the FirebaseApp of firebase_core, a user signed in with firebase_auth and cloud_firestore with its own cache. The cloud_firestore_dart side has the FirebaseApp of firebase_app_dart, a FirebaseUserAuth or your own InternalTokenProvider, and cloud_firestore_dart with its own cache file. Each side has its own connection and listeners to the same Firestore database and security rules. Values and pending writes do not cross between the two sides.
+  accDescr: The FlutterFire side has the FirebaseApp of firebase_core, a user signed in with firebase_auth and cloud_firestore with its own cache. The cloud_firestore_dart side has the FirebaseApp of firebase_app_dart, a FirebaseUserAuth or your own AuthTokenProvider, and cloud_firestore_dart with its own cache file. Each side has its own connection and listeners to the same Firestore database and security rules. Values and pending writes do not cross between the two sides.
   subgraph flutterFireSide["FlutterFire"]
     ffApp["FirebaseApp of firebase_core"]
     ffAuth["firebase_auth: its own signed-in user"]
@@ -364,7 +364,7 @@ flowchart LR
   end
   subgraph dartSide["cloud_firestore_dart"]
     dartApp["FirebaseApp of firebase_app_dart"]
-    dartAuth["FirebaseUserAuth or your InternalTokenProvider:<br/>its own signed-in user"]
+    dartAuth["FirebaseUserAuth or your AuthTokenProvider:<br/>its own signed-in user"]
     dartStore["cloud_firestore_dart: its own cache file"]
   end
   database["The same Firestore database<br/>and the same security rules"]

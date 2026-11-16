@@ -14,7 +14,7 @@ On the web the opener picks the storage itself; follow the branches to see which
 
 ```mermaid
 flowchart TD
-    start["Firestore.instanceFor"] --> hasOpener{"openDatabase passed?"}
+    start["FirebaseFirestore.instanceFor"] --> hasOpener{"openDatabase passed?"}
     hasOpener -->|no| memory["Memory: gone when the instance is terminated"]
     hasOpener -->|"yes, on the Dart VM or in a Flutter app"| sqliteFile["SQLite file, kept across restarts"]
     hasOpener -->|"yes, sqliteWebOpener in a browser"| hasWorker{"opfsWorker passed, and synchronous OPFS in workers?"}
@@ -137,7 +137,7 @@ await firestore.disableNetwork();
 await firestore.enableNetwork();
 ```
 
-A write goes through these states; the table below gives what a listener with `MetadataChanges.include`
+A write goes through these states; the table below gives what a listener with `includeMetadataChanges: true`
 sees in each, for a document with no other pending write. Note that the future completes before
 `hasPendingWrites` turns false.
 

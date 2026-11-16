@@ -23,7 +23,7 @@ Future<void> main() async {
   );
 
   // The firebase_app_dart app, the token provider and the instance, in one call.
-  final Firestore firestore = await FlutterFireBridge.firestore();
+  final FirebaseFirestore firestore = await FlutterFireBridge.firestore();
   runApp(VisitsApp(firestore: firestore));
 }
 
@@ -34,7 +34,7 @@ class VisitsApp extends StatelessWidget {
   const VisitsApp({super.key, required this.firestore});
 
   /// The instance made by [FlutterFireBridge.firestore].
-  final Firestore firestore;
+  final FirebaseFirestore firestore;
 
   Future<void> _visit() async {
     final FirebaseAuth auth = FirebaseAuth.instance;
@@ -44,7 +44,7 @@ class VisitsApp extends StatelessWidget {
     await FlutterFireBridge.waitForCurrentUser();
     await firestore.doc('visits/${user.uid}').set(<String, Object?>{
       'count': FieldValue.increment(1),
-    }, SetOptions.mergeAllFields);
+    }, const SetOptions(merge: true));
   }
 
   @override
@@ -60,7 +60,7 @@ class VisitsApp extends StatelessWidget {
               return const Center(child: Text('Not signed in'));
             }
             return StreamBuilder<DocumentSnapshot<Map<String, Object?>>>(
-              stream: firestore.doc('visits/${user.uid}').snapshots,
+              stream: firestore.doc('visits/${user.uid}').snapshots(),
               builder:
                   (
                     BuildContext context,

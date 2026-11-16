@@ -59,7 +59,7 @@ On desktop and servers, where Firebase registers no apps, any unique application
 
 What you put into the app, and when Firestore reads it (once, when its instance is created):
 
-![A FirebaseApp holds the options from withOptions, an authProvider (set by FirebaseUserAuth.forApp, OAuthTokenProvider or your own; without one requests carry no token), an appCheckProvider and the platform dependencies (onNetworkConnected, storage). Firestore.instanceFor(app: app) reads the options, both providers and the connectivity events once, when it is created. app.delete() terminates the app's Firestore instances.](https://raw.githubusercontent.com/long1eu/firebase_dart_sdk/main/docs/images/readme/firebase_app.svg)
+![A FirebaseApp holds the options from withOptions, an authProvider (set by FirebaseUserAuth.forApp, OAuthTokenProvider or your own; without one requests carry no token), an appCheckProvider and the platform dependencies (onNetworkConnected, storage). FirebaseFirestore.instanceFor(app: app) reads the options, both providers and the connectivity events once, when it is created. app.delete() terminates the app's Firestore instances.](https://raw.githubusercontent.com/long1eu/firebase_dart_sdk/main/docs/images/readme/firebase_app.svg)
 
 The shortest program is [`example/main.dart`](https://github.com/long1eu/firebase_dart_sdk/blob/main/firebase_core/firebase_app_dart/example/main.dart);
 [`example/README.md`](https://github.com/long1eu/firebase_dart_sdk/blob/main/firebase_core/firebase_app_dart/example/README.md)

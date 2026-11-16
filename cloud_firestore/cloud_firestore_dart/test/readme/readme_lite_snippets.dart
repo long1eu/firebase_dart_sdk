@@ -18,7 +18,7 @@ late Firestore firestore;
 // ../../docs/guides/lite.md:33
 Future<void> liteGuideLine33() async {
   // Synchronous, and nothing is sent until the first call.
-  final Firestore firestore = Firestore.instanceFor(app: app);
+  final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(app: app);
 
   final CollectionReference<Map<String, Object?>> cities = firestore.collection('cities');
   await cities.doc('LA').set({'name': 'Los Angeles', 'state': 'CA', 'population': 3900000});
@@ -33,7 +33,7 @@ Future<void> liteGuideLine33() async {
   await batch.commit();
 
   final AggregateQuerySnapshot count = await cities.count().get();
-  print(count.getCount());
+  print(count.count);
 
   await firestore.terminate();
 }
@@ -48,8 +48,8 @@ Future<void> serverGuideLine340() async {
           await firestore.collection('tasks').doc(id.isEmpty ? 'none' : id).get();
       request.response
         ..statusCode = task.exists ? HttpStatus.ok : HttpStatus.notFound
-        ..write(jsonEncode(task.data ?? <String, Object?>{}));
-    } on FirestoreError catch (error) {
+        ..write(jsonEncode(task.data() ?? <String, Object?>{}));
+    } on FirestoreException catch (error) {
       request.response
         ..statusCode = HttpStatus.serviceUnavailable
         ..write('${error.code}');
@@ -60,7 +60,7 @@ Future<void> serverGuideLine340() async {
 
 // ../../docs/guides/web.md:254
 Future<void> webGuideLine254() async {
-  final Firestore firestore = Firestore.instanceFor(app: app);
+  final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(app: app);
   final QuerySnapshot<Map<String, Object?>> notes =
       await firestore.collection('notes').limit(20).get();
 }

@@ -77,7 +77,7 @@ for a real project that has not been run yet; see [Known limitations](#known-lim
 
 | JS feature | Status | Dart API or gap |
 |---|---|---|
-| `where` with `==`, `<`, `<=`, `>`, `>=`, `array-contains`, `in`, `array-contains-any` | supported | `where('f', isEqualTo: ...)` named arguments or `Filter.equalTo(...)` objects |
+| `where` with `==`, `<`, `<=`, `>`, `>=`, `array-contains`, `in`, `array-contains-any` | supported | `where('f', isEqualTo: ...)` named arguments or `Filter(...)` objects |
 | `!=` and `not-in` | supported | `isNotEqualTo`, `whereNotIn`; `test/integration/firebase/firestore/query_test.dart` (`testSDKUsesNotEqualFiltersSameAsServer`, `testSDKUsesNotInFiltersSameAsServer`) |
 | `or()` / `and()` composite filters | supported | `Filter.or([...])`, `Filter.and([...])`; `test/integration/firebase/firestore/or_query_test.dart` |
 | Range and inequality filters on several fields | supported | `test/integration/firebase/firestore/composite_index_query_test.dart` |

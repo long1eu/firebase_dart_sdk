@@ -270,7 +270,7 @@ One attempt and what decides whether another one follows:
 ```mermaid
 flowchart TD
   accTitle: How runTransaction decides to retry
-  accDescr: Each attempt runs the callback and commits. On success the future completes with the result. An exception from the callback that is not a FirestoreError fails the future at once. For a FirestoreError the client checks whether the code is retryable, aborted, alreadyExists, failedPrecondition or a temporary code for read-write transactions and only a temporary code for read-only ones, and whether attempts are left and the instance is not terminated. If so it waits with backoff and runs another attempt, otherwise the future fails with the error.
+  accDescr: Each attempt runs the callback and commits. On success the future completes with the result. An exception from the callback that is not a FirestoreException fails the future at once. For a FirestoreError the client checks whether the code is retryable, aborted, alreadyExists, failedPrecondition or a temporary code for read-write transactions and only a temporary code for read-only ones, and whether attempts are left and the instance is not terminated. If so it waits with backoff and runs another attempt, otherwise the future fails with the error.
   attempt["Attempt: run the callback, then commit"]
   outcome{"Result?"}
   success["The future completes<br/>with the callback's result"]
@@ -281,8 +281,8 @@ flowchart TD
   failed["The future fails<br/>with this error"]
   attempt --> outcome
   outcome -- "it succeeded" --> success
-  outcome -- "your callback threw, not a FirestoreError" --> thrown
-  outcome -- "a FirestoreError" --> retryable
+  outcome -- "your callback threw, not a FirestoreException" --> thrown
+  outcome -- "a FirestoreException" --> retryable
   retryable -- no --> failed
   retryable -- yes --> left
   left -- no --> failed

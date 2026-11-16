@@ -285,7 +285,7 @@ Right: the name in this client, or "not available".
 | FF `Timestamp.millisecondsSinceEpoch`, `fromMillisecondsSinceEpoch` | the same |
 | JS `Bytes` | `Blob` |
 | FF `withConverter(fromFirestore: ..., toFirestore: ...)`; JS `withConverter(converter)` | `withConverter<T>(fromFirestore: ..., toFirestore: ...)`; `withoutConverter()` |
-| FF `FirebaseException` with `e.code == 'permission-denied'`; JS `FirestoreError.code` string | `FirestoreException` (a `FirebaseException`) with `e.code == 'permission-denied'`, or `e.errorCode == FirestoreErrorCode.permissionDenied` |
+| FF `FirebaseException` with `e.code == 'permission-denied'`; JS `FirestoreException.code` string | `FirestoreException` (a `FirebaseException`) with `e.code == 'permission-denied'`, or `e.errorCode == FirestoreErrorCode.permissionDenied` |
 | FF `snapshotsInSync()`; JS `onSnapshotsInSync` | `firestore.snapshotsInSync()` (a stream) |
 | FF `namedQueryGet(name)`; JS `namedQuery(db, name)` | `firestore.namedQueryGet(name)`, or `firestore.namedQuery(name)` for the `Query` |
 | FF `loadBundle(Uint8List)` | `loadBundle(List<int>)`, `loadBundleStream(stream)` |

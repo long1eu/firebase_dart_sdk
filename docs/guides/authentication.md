@@ -98,14 +98,14 @@ write issued right after it belongs to that user.
 ```mermaid
 sequenceDiagram
   accTitle: Sign-in of a user and what Firestore does with it
-  accDescr: FirebaseUserAuth.forApp makes the provider the app's authProvider before Firestore.instanceFor. signInWithEmailAndPassword calls the Firebase Auth REST API, which returns an ID token and a refresh token. The provider announces the new user on onTokenChanged, Firestore restarts its streams as that user, then the sign-in call completes and requests carry the ID token.
+  accDescr: FirebaseUserAuth.forApp makes the provider the app's authProvider before FirebaseFirestore.instanceFor. signInWithEmailAndPassword calls the Firebase Auth REST API, which returns an ID token and a refresh token. The provider announces the new user on onTokenChanged, Firestore restarts its streams as that user, then the sign-in call completes and requests carry the ID token.
   participant code as Your code
   participant auth as FirebaseUserAuth
   participant rest as Firebase Auth REST API
   participant fs as Firestore instance
   participant be as Firestore backend
   code->>auth: FirebaseUserAuth.forApp(app), becomes app.authProvider
-  code->>fs: Firestore.instanceFor(app: app)
+  code->>fs: FirebaseFirestore.instanceFor(app: app)
   code->>auth: signInWithEmailAndPassword(email, password)
   auth->>rest: accounts:signInWithPassword
   rest-->>auth: ID token (about 1 hour) and refresh token
