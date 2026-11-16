@@ -1,3 +1,20 @@
+## 0.1.1
+
+Documentation and examples only. The library behaves exactly as in 0.1.0; the only code
+change is the version it reports (`Version.sdkVersion`).
+
+- **API reference:** doc comments with compiling samples across the public API: `Firestore`,
+  references, queries, snapshots, writes, transactions, batches, field values, error codes and
+  the value types.
+- **New examples** in `example/`: `cookbook/` (18 task-shaped programs), `performance/`
+  (four programs on indexes, cache size and bundles), `error_handling.dart` and `logging.dart`.
+- **README:** links to the new guides in the
+  [repository](https://github.com/long1eu/firebase_dart_sdk/tree/main/docs/guides): Flutter,
+  web, servers, cookbook, error handling, troubleshooting, performance and a guide for AI
+  coding agents.
+- **Corrections:** `example/sqlite_database.dart` says that it needs `sqlite3` 2.x (it does not
+  compile with 3.x), and `example/lifecycle.dart` names the right default log level (`warn`).
+
 ## 0.1.0
 
 First release under the new name. This package was published as `cloud_firestore_vm` (last

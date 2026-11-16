@@ -5,7 +5,7 @@ packages, read [docs/guides/for_ai_agents.md](docs/guides/for_ai_agents.md) inst
 
 ## Layout
 
-Maintained, tested and published (version 0.1.0, Dart `^3.8.0`):
+Maintained, tested and published (version 0.1.1, Dart `^3.8.0`):
 
 | Package | Path |
 |---|---|

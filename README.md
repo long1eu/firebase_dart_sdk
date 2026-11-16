@@ -12,7 +12,7 @@
 > WebChannel with long polling) against the Firestore emulator, and a short verification kit was
 > run against production Firestore ([how we test](docs/how_we_test.md)).
 >
-> **Status:** version 0.1.0 is on pub.dev. What is not done is listed openly in
+> **Status:** version 0.1.1 is on pub.dev. What is not done is listed openly in
 > [features and limits](docs/guides/features.md).
 >
 > **Issues:** <https://github.com/long1eu/firebase_dart_sdk/issues>.
@@ -115,7 +115,7 @@ public API follow the JS SDK.
   against production: the Enterprise edition features (BSON value types, Pipelines; tested
   against the emulator in Enterprise edition only), Firebase Auth user sign-in, the integration
   suite as a whole and long-running load. Test against your own project before relying on it.
-- Version 0.1.0 is published on pub.dev as `cloud_firestore_dart`, `firebase_app_dart` and
+- Version 0.1.1 is published on pub.dev as `cloud_firestore_dart`, `firebase_app_dart` and
   `firebase_auth_providers_dart`. `cloud_firestore_dart` 0.0.1 on pub.dev (2020) is an early
   release of the same package. They replace the packages published as
   `cloud_firestore_vm` and `firebase_core_vm` (and the internal `_firebase_internal_vm` and

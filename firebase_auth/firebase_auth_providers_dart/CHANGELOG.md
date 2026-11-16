@@ -1,3 +1,13 @@
+## 0.1.1
+
+Documentation and examples only. The library behaves exactly as in 0.1.0; the only code
+change is the version in `FirebaseUserAuth.clientVersion`.
+
+- Doc comments with compiling samples across the public API.
+- A rewritten README, and one example per task in `example/`: email and password, account
+  flows, custom tokens, a persistent session, a service account, Application Default
+  Credentials and wiring into `cloud_firestore_dart`.
+
 ## 0.1.0
 
 First version.
