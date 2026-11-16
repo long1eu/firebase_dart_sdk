@@ -32,7 +32,7 @@ void main() {
   ///
   /// Returns the number of attempts of each transaction; a transaction that failed has a negative number.
   Future<List<int>> runTransactions(
-    Firestore db,
+    FirebaseFirestore db,
     CollectionReference<Map<String, Object?>> collection,
     int count,
     FutureOr<void> Function(int index, {required bool beforeLookup}) chaos,
@@ -50,7 +50,7 @@ void main() {
           }
           final DocumentSnapshot<Map<String, Object?>> snapshot =
               await transaction.get(counter);
-          final Map<String, Object?> data = snapshot.data!;
+          final Map<String, Object?> data = snapshot.data()!;
           if (attempt == 1) {
             await chaos(i, beforeLookup: false);
           }
@@ -62,9 +62,9 @@ void main() {
             ..set(collection.doc('marker$i'), <String, Object?>{'i': i});
         }).timeout(const Duration(seconds: 20));
         attempts.add(attempt);
-      } on FirestoreError catch (e) {
+      } on FirestoreException catch (e) {
         // ignore: avoid_print
-        print('transaction $i failed after $attempt attempts: ${e.code}');
+        print('transaction $i failed after $attempt attempts: ${e.errorCode}');
         attempts.add(-attempt);
       }
     }
@@ -72,14 +72,14 @@ void main() {
   }
 
   Future<CollectionReference<Map<String, Object?>>> prepare(
-      Firestore db) async {
+      FirebaseFirestore db) async {
     final String name = uniqueName('tx');
     await env.oracle
         .collection(name)
         .doc('counter')
         .set(<String, Object?>{'n': 0, 'log': <Object?>[]});
     // Open the connection.
-    await db.collection(name).doc('counter').get(Source.server);
+    await db.collection(name).doc('counter').get(GetOptions(source: Source.server));
     return db.collection(name);
   }
 
@@ -99,7 +99,7 @@ void main() {
 
   group('transactions', () {
     test('retry a lookup whose request or response is lost', () async {
-      final Firestore db = await env.newClient();
+      final FirebaseFirestore db = await env.newClient();
       final CollectionReference<Map<String, Object?>> collection =
           await prepare(db);
 
@@ -133,7 +133,7 @@ void main() {
     });
 
     test('retry a commit whose request is lost, exactly once', () async {
-      final Firestore db = await env.newClient();
+      final FirebaseFirestore db = await env.newClient();
       final CollectionReference<Map<String, Object?>> collection =
           await prepare(db);
 
@@ -158,7 +158,7 @@ void main() {
 
     test('a commit whose response is lost is never lost, and reported',
         () async {
-      final Firestore db = await env.newClient();
+      final FirebaseFirestore db = await env.newClient();
       final CollectionReference<Map<String, Object?>> collection =
           await prepare(db);
 
@@ -203,7 +203,7 @@ void main() {
 
     test('concurrent transactions of two clients under cuts lose no update',
         () async {
-      final Firestore db = await env.newClient();
+      final FirebaseFirestore db = await env.newClient();
       final CollectionReference<Map<String, Object?>> collection =
           await prepare(db);
       final DocumentReference<Map<String, Object?>> counter =
@@ -225,8 +225,8 @@ void main() {
             final DocumentSnapshot<Map<String, Object?>> snapshot =
                 await transaction.get(counter);
             transaction.update(counter,
-                <String, Object?>{'n': (snapshot.data!['n']! as int) + 1});
-          }, options: TransactionOptions(maxAttempts: 20)).timeout(
+                <String, Object?>{'n': (snapshot.data()!['n']! as int) + 1});
+          }, maxAttempts: 20).timeout(
               const Duration(seconds: 25));
           clientDone++;
         }
@@ -234,13 +234,12 @@ void main() {
 
       Future<void> oracleTransactions() async {
         for (int i = 0; i < 15; i++) {
-          await env.oracle.runTransaction<void>(
-              (Transaction transaction) async {
+          await env.oracle.runTransaction<void>((Transaction transaction) async {
             final DocumentSnapshot<Map<String, Object?>> snapshot =
                 await transaction.get(oracleCounter);
             transaction.update(oracleCounter,
-                <String, Object?>{'n': (snapshot.data!['n']! as int) + 1});
-          }, options: TransactionOptions(maxAttempts: 20));
+                <String, Object?>{'n': (snapshot.data()!['n']! as int) + 1});
+          }, maxAttempts: 20);
           await pause(20);
         }
       }

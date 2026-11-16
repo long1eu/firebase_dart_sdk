@@ -26,7 +26,7 @@ Datastore newUnaryDatastore(
   CredentialsProvider credentialsProvider,
   FirestoreTransport Function(DatabaseInfo, ChannelOptionsProvider)
   createTransport, {
-  AppCheckTokenProvider? appCheckProvider,
+  FirebaseAppCheckTokenProvider? appCheckProvider,
 }) {
   final ChannelOptionsProvider optionsProvider = ChannelOptionsProvider(
     databaseId: databaseInfo.databaseId,

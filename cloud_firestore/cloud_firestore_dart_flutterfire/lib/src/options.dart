@@ -5,18 +5,12 @@ import 'package:rxdart/rxdart.dart';
 
 /// The `firebase_app_dart` options for the FlutterFire [options] (of `firebase_core`).
 ///
-/// | FlutterFire | `firebase_app_dart` |
-/// | --- | --- |
-/// | `apiKey` | `apiKey` |
-/// | `appId` | `applicationId` |
-/// | `projectId` | `projectId` |
-/// | `messagingSenderId` | `gcmSenderId` |
-/// | `storageBucket` | `storageBucket` |
-/// | `databaseURL` | `databaseUrl` |
-/// | `trackingId` | `gaTrackingId` |
-///
-/// The other FlutterFire options (`authDomain`, `measurementId`, the iOS and Android client ids, ...) have no
-/// counterpart and are dropped. An empty optional value becomes null.
+/// Both packages use the same field names, and every field is copied: `apiKey`, `appId`,
+/// `messagingSenderId`, `projectId`, `authDomain`, `databaseURL`, `storageBucket`, `measurementId`,
+/// `trackingId`, `deepLinkURLScheme`, `androidClientId`, `iosClientId`, `iosBundleId` and `appGroupId`.
+/// `recaptchaSiteKey` (newer `firebase_core` releases) has no counterpart and is dropped. An empty
+/// optional value becomes null. `cloud_firestore_dart_platform` maps the options the same way, so both
+/// packages agree on the `firebase_app_dart` app of a FlutterFire app.
 ///
 /// ```dart
 /// final FirebaseOptions options =
@@ -29,12 +23,19 @@ FirebaseOptions firebaseOptionsFromFlutterFire(
       value == null || value.isEmpty ? null : value;
   return FirebaseOptions(
     apiKey: options.apiKey,
-    applicationId: options.appId,
+    appId: options.appId,
+    messagingSenderId: optional(options.messagingSenderId),
     projectId: optional(options.projectId),
-    gcmSenderId: optional(options.messagingSenderId),
+    authDomain: optional(options.authDomain),
+    databaseURL: optional(options.databaseURL),
     storageBucket: optional(options.storageBucket),
-    databaseUrl: optional(options.databaseURL),
-    gaTrackingId: optional(options.trackingId),
+    measurementId: optional(options.measurementId),
+    trackingId: optional(options.trackingId),
+    deepLinkURLScheme: optional(options.deepLinkURLScheme),
+    androidClientId: optional(options.androidClientId),
+    iosClientId: optional(options.iosClientId),
+    iosBundleId: optional(options.iosBundleId),
+    appGroupId: optional(options.appGroupId),
   );
 }
 
@@ -51,8 +52,8 @@ FirebaseApp dartAppFor(
   String name,
   flutterfire.FirebaseOptions options, {
   PlatformDependencies? dependencies,
-  InternalTokenProvider? authProvider,
-  InternalAppCheckTokenProvider? appCheckProvider,
+  AuthTokenProvider? authProvider,
+  AppCheckTokenProvider? appCheckProvider,
 }) {
   final FirebaseOptions mapped = firebaseOptionsFromFlutterFire(options);
   final FirebaseApp? existing = existingDartApp(name);
@@ -76,7 +77,7 @@ FirebaseApp dartAppFor(
 /// The `firebase_app_dart` app called [name], or null when there is none.
 FirebaseApp? existingDartApp(String name) {
   final String trimmed = name.trim();
-  for (final FirebaseApp app in FirebaseApp.apps) {
+  for (final FirebaseApp app in Firebase.apps) {
     if (app.name == trimmed) {
       return app;
     }
@@ -89,14 +90,14 @@ class _BridgeDependencies extends PlatformDependencies {
   _BridgeDependencies(this._inner, this._auth, this._appCheck);
 
   final PlatformDependencies? _inner;
-  final InternalTokenProvider? _auth;
-  final InternalAppCheckTokenProvider? _appCheck;
+  final AuthTokenProvider? _auth;
+  final AppCheckTokenProvider? _appCheck;
 
   @override
-  InternalTokenProvider? get authProvider => _auth ?? _inner?.authProvider;
+  AuthTokenProvider? get authProvider => _auth ?? _inner?.authProvider;
 
   @override
-  InternalAppCheckTokenProvider? get appCheckProvider =>
+  AppCheckTokenProvider? get appCheckProvider =>
       _appCheck ?? _inner?.appCheckProvider;
 
   @override

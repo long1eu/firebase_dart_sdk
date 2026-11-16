@@ -15,7 +15,7 @@
 ///   final FirebaseApp app = FirebaseApp.withOptions(
 ///     const FirebaseOptions(
 ///       apiKey: '<the Web API key of the project>',
-///       applicationId: '1:1234567890:dart:example',
+///       appId: '1:1234567890:dart:example',
 ///       projectId: 'my-project',
 ///     ),
 ///   );
@@ -39,3 +39,4 @@ export 'src/auth_storage.dart';
 export 'src/auth_user.dart';
 export 'src/firebase_user_auth.dart';
 export 'src/oauth_token_provider.dart';
+export 'src/service_account_key.dart';

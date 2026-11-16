@@ -78,7 +78,7 @@ void main() {
   late Directory directory;
   late List<String> log;
   late String appName;
-  final List<Firestore> opened = <Firestore>[];
+  final List<FirebaseFirestore> opened = <FirebaseFirestore>[];
 
   setUp(() {
     directory = Directory.systemTemp.createTempSync('firestore_app_delete_');
@@ -87,13 +87,13 @@ void main() {
   });
 
   tearDown(() async {
-    for (final Firestore firestore in opened) {
+    for (final FirebaseFirestore firestore in opened) {
       await firestore.terminate();
     }
     opened.clear();
-    for (final FirebaseApp app in FirebaseApp.apps) {
+    for (final FirebaseApp app in Firebase.apps) {
       if (app.name == appName) {
-        app.delete();
+        await app.delete();
       }
     }
     directory.deleteSync(recursive: true);
@@ -103,19 +103,19 @@ void main() {
     return FirebaseApp.withOptions(
       FirebaseOptions(
         apiKey: 'key',
-        applicationId: 'appId',
+        appId: 'appId',
         projectId: IntegrationTestUtil.provider.projectId,
       ),
       name: appName,
     );
   }
 
-  Future<Firestore> open(FirebaseApp app) async {
-    final FirestoreSettings base = IntegrationTestUtil.newTestSettings();
-    final Firestore firestore = Firestore.instanceFor(
+  Future<FirebaseFirestore> open(FirebaseApp app) async {
+    final Settings base = IntegrationTestUtil.newTestSettings();
+    final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(
       app: app,
       openDatabase: recording(sqliteOpener(directory), log),
-      settings: FirestoreSettings(cacheSettings: PersistentCacheSettings())
+      settings: Settings(cacheSettings: PersistentCacheSettings())
           .withEmulator(base.host, base.port),
     );
     opened.add(firestore);
@@ -130,23 +130,23 @@ void main() {
       ];
 
   bool isTerminated(Object? e) =>
-      e is FirestoreError &&
-      e.code == FirestoreErrorCode.failedPrecondition &&
+      e is FirestoreException &&
+      e.errorCode == FirestoreErrorCode.failedPrecondition &&
       e.message == 'The client has already been terminated.';
 
   test('a new app with the same name reopens the cache of a deleted app',
       () async {
     final FirebaseApp app = newApp();
-    final Firestore first = await open(app);
+    final FirebaseFirestore first = await open(app);
     final String path = 'app-delete/$appName';
     await first.doc(path).set(<String, Object?>{'generation': 1});
     expect(databaseFiles(), hasLength(1));
 
-    // delete() is synchronous; the instance is terminated in the background.
-    // The new app is created right away, without waiting for anything.
-    app.delete();
+    // The instance is terminated in the background: delete() does not wait for
+    // the cache to close. The new app is created right away.
+    await app.delete();
     final FirebaseApp sameName = newApp();
-    final Firestore second = await open(sameName);
+    final FirebaseFirestore second = await open(sameName);
 
     expect(identical(first, second), isFalse);
     // The first connection was closed before the second one was opened, on
@@ -157,41 +157,41 @@ void main() {
     // The old instance is unusable, the new one has the cache and works.
     await expectLater(first.doc(path).get(), throwsA(predicate(isTerminated)));
     final DocumentSnapshot<Map<String, Object?>> cached =
-        await second.doc(path).get(Source.cache);
-    expect(cached.data, <String, Object?>{'generation': 1});
+        await second.doc(path).get(GetOptions(source: Source.cache));
+    expect(cached.data(), <String, Object?>{'generation': 1});
 
     await second.doc(path).set(<String, Object?>{'generation': 2});
-    expect((await second.doc(path).get(Source.server)).data,
+    expect((await second.doc(path).get(GetOptions(source: Source.server))).data(),
         <String, Object?>{'generation': 2});
   }, skip: skip);
 
   test('deleting the app with a listener and a pending write', () async {
     final FirebaseApp app = newApp();
-    final Firestore first = await open(app);
+    final FirebaseFirestore first = await open(app);
     final String path = 'app-delete/$appName-pending';
     await first.doc(path).set(<String, Object?>{'value': 'acknowledged'});
 
     final List<Object> listenerErrors = <Object>[];
     final StreamSubscription<DocumentSnapshot<Map<String, Object?>>>
         subscription =
-        first.doc(path).snapshots.listen((_) {}, onError: listenerErrors.add);
+        first.doc(path).snapshots().listen((_) {}, onError: listenerErrors.add);
 
     // A write that cannot reach the backend stays in the mutation queue.
     await first.disableNetwork();
     unawaited(first.doc(path).update(
         <String, Object?>{'value': 'pending'}).catchError((Object _) {}));
-    await first.doc(path).get(Source.cache);
+    await first.doc(path).get(GetOptions(source: Source.cache));
 
-    app.delete();
-    final Firestore second = await open(newApp());
+    await app.delete();
+    final FirebaseFirestore second = await open(newApp());
     expect(log, <String>['open', 'close', 'open']);
 
     // The pending write was persisted and is sent by the new instance.
     final DocumentSnapshot<Map<String, Object?>> local =
-        await second.doc(path).get(Source.cache);
-    expect(local.data, <String, Object?>{'value': 'pending'});
+        await second.doc(path).get(GetOptions(source: Source.cache));
+    expect(local.data(), <String, Object?>{'value': 'pending'});
     await second.waitForPendingWrites();
-    expect((await second.doc(path).get(Source.server)).data,
+    expect((await second.doc(path).get(GetOptions(source: Source.server))).data(),
         <String, Object?>{'value': 'pending'});
 
     await subscription.cancel();
@@ -200,15 +200,15 @@ void main() {
   test('the cycle can be repeated and the cache cleared at the end', () async {
     final String path = 'app-delete/$appName-cycle';
     FirebaseApp app = newApp();
-    Firestore firestore = await open(app);
+    FirebaseFirestore firestore = await open(app);
     for (int generation = 1; generation <= 3; generation++) {
       await firestore
           .doc(path)
           .set(<String, Object?>{'generation': generation});
-      app.delete();
+      await app.delete();
       app = newApp();
       firestore = await open(app);
-      expect((await firestore.doc(path).get(Source.cache)).data,
+      expect((await firestore.doc(path).get(GetOptions(source: Source.cache))).data(),
           <String, Object?>{'generation': generation});
     }
     expect(log, <String>[

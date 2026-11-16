@@ -35,7 +35,7 @@ class _OwnerCredentialsProvider extends EmptyCredentialsProvider {
 }
 
 /// Hands out a fixed App Check token, the JS `AppCheckToken(...)`.
-class _FixedAppCheckTokenProvider extends AppCheckTokenProvider {
+class _FixedAppCheckTokenProvider extends FirebaseAppCheckTokenProvider {
   _FixedAppCheckTokenProvider(this._token) : super(null);
 
   final String _token;
@@ -67,7 +67,7 @@ void main() {
 
   ChannelOptionsProvider options({
     EmptyCredentialsProvider? credentials,
-    AppCheckTokenProvider? appCheck,
+    FirebaseAppCheckTokenProvider? appCheck,
     String? apiKey = 'rest-connection-test-api-key',
   }) {
     return ChannelOptionsProvider(

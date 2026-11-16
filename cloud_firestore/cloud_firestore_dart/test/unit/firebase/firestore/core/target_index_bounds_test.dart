@@ -150,8 +150,7 @@ void main() {
 
   test('filterWithOrderByQueryBound', () {
     final Target target = query('c')
-        .filter(filter('foo', '>', 'bar'))
-        .orderBy(orderBy('foo'))
+        .filter(filter('foo', '>', 'bar')).orderBy(orderBy('foo'))
         .toTarget();
     final FieldIndex index =
         fieldIndex('c', fieldsAndKinds: <Object>['foo', SegmentKind.ascending]);
@@ -164,8 +163,7 @@ void main() {
   });
 
   test('startAtQueryBound', () {
-    final Target target = query('c')
-        .orderBy(orderBy('foo'))
+    final Target target = query('c').orderBy(orderBy('foo'))
         .startAt(bound(true, <Object>['bar']))
         .toTarget();
     final FieldIndex index =
@@ -185,8 +183,7 @@ void main() {
     final Target target = query('c')
         .filter(filter('a', '>=', 'a1'))
         .filter(filter('b', '==', 'b1'))
-        .orderBy(orderBy('a'))
-        .orderBy(orderBy('b'))
+        .orderBy(orderBy('a')).orderBy(orderBy('b'))
         .startAt(bound(true, <Object>['a1', 'b1']))
         .toTarget();
     final FieldIndex index = fieldIndex('c', fieldsAndKinds: <Object>[
@@ -207,8 +204,7 @@ void main() {
     final Target target = query('c')
         .filter(filter('a', '>=', 'a1'))
         .filter(filter('b', '==', 'b1'))
-        .orderBy(orderBy('a'))
-        .orderBy(orderBy('b'))
+        .orderBy(orderBy('a')).orderBy(orderBy('b'))
         .startAt(bound(false, <Object>['a2', 'b1']))
         .toTarget();
     final FieldIndex index = fieldIndex('c', fieldsAndKinds: <Object>[
@@ -229,8 +225,7 @@ void main() {
     final Target target = query('c')
         .filter(filter('a', '>=', 'a2'))
         .filter(filter('b', '==', 'b2'))
-        .orderBy(orderBy('a'))
-        .orderBy(orderBy('b'))
+        .orderBy(orderBy('a')).orderBy(orderBy('b'))
         .startAt(bound(false, <Object>['a1', 'b1']))
         .toTarget();
     final FieldIndex index = fieldIndex('c', fieldsAndKinds: <Object>[
@@ -248,8 +243,7 @@ void main() {
   });
 
   test('endAtQueryBound', () {
-    final Target target = query('c')
-        .orderBy(orderBy('foo'))
+    final Target target = query('c').orderBy(orderBy('foo'))
         .endAt(bound(true, <Object>['bar']))
         .toTarget();
     final FieldIndex index =
@@ -269,8 +263,7 @@ void main() {
     final Target target = query('c')
         .filter(filter('a', '<=', 'a2'))
         .filter(filter('b', '==', 'b2'))
-        .orderBy(orderBy('a'))
-        .orderBy(orderBy('b'))
+        .orderBy(orderBy('a')).orderBy(orderBy('b'))
         .endAt(bound(true, <Object>['a1', 'b1']))
         .toTarget();
     final FieldIndex index = fieldIndex('c', fieldsAndKinds: <Object>[
@@ -291,8 +284,7 @@ void main() {
     final Target target = query('c')
         .filter(filter('a', '<=', 'a2'))
         .filter(filter('b', '==', 'b2'))
-        .orderBy(orderBy('a'))
-        .orderBy(orderBy('b'))
+        .orderBy(orderBy('a')).orderBy(orderBy('b'))
         .endAt(bound(false, <Object>['a1', 'b1']))
         .toTarget();
     final FieldIndex index = fieldIndex('c', fieldsAndKinds: <Object>[
@@ -313,8 +305,7 @@ void main() {
     final Target target = query('c')
         .filter(filter('a', '<=', 'a1'))
         .filter(filter('b', '==', 'b1'))
-        .orderBy(orderBy('a'))
-        .orderBy(orderBy('b'))
+        .orderBy(orderBy('a')).orderBy(orderBy('b'))
         .endAt(bound(false, <Object>['a2', 'b2']))
         .toTarget();
     final FieldIndex index = fieldIndex('c', fieldsAndKinds: <Object>[

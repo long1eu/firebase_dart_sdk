@@ -30,9 +30,9 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/field_path.dart';
 ///     AggregateField.average('total'),
 ///   ],
 /// ).get();
-/// final int count = result.getCount();
-/// final double? sum = result.getDouble(AggregateField.sum('total'));
-/// final double? average = result.getDouble(AggregateField.average('total'));
+/// final int? count = result.count;
+/// final num? sum = result.getSum('total');
+/// final double? average = result.getAverage('total');
 /// ```
 ///
 /// Aggregations are computed by the server over the documents that match the
@@ -57,7 +57,7 @@ abstract class AggregateField {
 
   /// Creates an [AggregateField] that counts the documents in the result set.
   ///
-  /// Read the result with `AggregateQuerySnapshot.getCount`. `Query.count()`
+  /// Read the result with `AggregateQuerySnapshot.count`. `Query.count()`
   /// is a shortcut for an aggregation with only this field.
   static CountAggregateField count() => CountAggregateField._();
 
@@ -68,43 +68,50 @@ abstract class AggregateField {
   /// value takes part in the sum or the integer sum overflows, in which case it
   /// is a double.
   ///
-  /// [field] is a dot-separated field path (`'price.net'` is `net` inside
-  /// `price`); it throws an [ArgumentError] if it is not a valid path.
+  /// [field] is a [String], a dot-separated field path (`'price.net'` is `net`
+  /// inside `price`), or a [FieldPath]; it throws an [ArgumentError] if it is
+  /// not a valid path.
   ///
   /// ```dart
   /// final AggregateQuerySnapshot result = await firestore
   ///     .collection('orders')
   ///     .aggregate(<AggregateField>[AggregateField.sum('total')])
   ///     .get();
-  /// final int? total = result.getInt(AggregateField.sum('total'));
+  /// final num? total = result.getSum('total');
   /// ```
-  static SumAggregateField sum(String field) =>
-      SumAggregateField._(FieldPath.fromDotSeparatedPath(field));
-
-  /// Same as [sum] but takes a [FieldPath].
-  static SumAggregateField sumField(FieldPath fieldPath) =>
-      SumAggregateField._(fieldPath);
+  static SumAggregateField sum(Object field) =>
+      SumAggregateField._(_fieldPathOf('sum', field));
 
   /// Creates an [AggregateField] that averages the values of [field] over the
   /// documents in the result set. The result is a double, or null if no
   /// document has a numeric value for the field.
   ///
-  /// [field] is a dot-separated field path; it throws an [ArgumentError] if it
-  /// is not a valid path.
+  /// [field] is a [String], a dot-separated field path, or a [FieldPath]; it
+  /// throws an [ArgumentError] if it is not a valid path.
   ///
   /// ```dart
   /// final AggregateQuerySnapshot result = await firestore
   ///     .collection('orders')
   ///     .aggregate(<AggregateField>[AggregateField.average('total')])
   ///     .get();
-  /// final double? average = result.getDouble(AggregateField.average('total'));
+  /// final double? average = result.getAverage('total');
   /// ```
-  static AverageAggregateField average(String field) =>
-      AverageAggregateField._(FieldPath.fromDotSeparatedPath(field));
+  static AverageAggregateField average(Object field) =>
+      AverageAggregateField._(_fieldPathOf('average', field));
 
-  /// Same as [average] but takes a [FieldPath].
-  static AverageAggregateField averageField(FieldPath fieldPath) =>
-      AverageAggregateField._(fieldPath);
+  static FieldPath _fieldPathOf(String methodName, Object field) {
+    if (field is FieldPath) {
+      return field;
+    }
+    if (field is String) {
+      return FieldPath.fromString(field);
+    }
+    throw ArgumentError.value(
+      field,
+      'field',
+      'AggregateField.$methodName() expects a String field or a FieldPath',
+    );
+  }
 
   @override
   bool operator ==(Object other) {

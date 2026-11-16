@@ -1,19 +1,19 @@
 ## 0.1.0
 
-First version.
+First version, built against the 0.2 API of `cloud_firestore_dart` and `firebase_app_dart`.
 
-- `FlutterFireBridge.firestore()`: a `cloud_firestore_dart` instance for a FlutterFire app
+- `FlutterFireBridge.firestore()`: a `cloud_firestore_dart` `FirebaseFirestore` instance for a FlutterFire app
   (default `Firebase.app()`) and the user of its `FirebaseAuth`, in one call.
   `FlutterFireBridge.app()` returns the `firebase_app_dart` app alone, and
   `FlutterFireBridge.waitForCurrentUser()` waits until Firestore follows the plugin's current
   user after a sign-in or a sign-out.
-- `firebaseOptionsFromFlutterFire` and `dartAppFor`: the `firebase_app_dart` options and app
-  for the options and the name of a FlutterFire app.
-- `FlutterFireAuthTokenProvider`: the token provider of `firebase_app_dart`, backed by
+- `firebaseOptionsFromFlutterFire` and `dartAppFor`: the `firebase_app_dart` options (every field
+  but `recaptchaSiteKey`) and app for the options and the name of a FlutterFire app.
+- `FlutterFireAuthTokenProvider`: an `AuthTokenProvider` of `firebase_app_dart`, backed by
   `firebase_auth`. It follows `idTokenChanges()` (sign-in, sign-out, user switch, token refresh),
-  forwards `forceRefresh` to `User.getIdToken`, throws `FirebaseNoSignedInUserError` when
+  forwards `forceRefresh` to `User.getIdToken`, throws `FirebaseNoSignedInUserException` when
   nobody is signed in, and drops a token fetched for a user that was replaced meanwhile.
-- `FlutterFireAppCheckProvider`: the App Check token provider of `firebase_app_dart`, from the
+- `FlutterFireAppCheckProvider`: an `AppCheckTokenProvider` of `firebase_app_dart`, from the
   `getToken` and `onTokenChange` of `firebase_app_check` (passed in; this package does not
   depend on `firebase_app_check`).
 - Requires Dart 3.8 and Flutter 3.32 or later; `firebase_core` 3 to 5 and `firebase_auth` 5 to 7.

@@ -5,7 +5,6 @@
 import 'dart:async';
 
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/snapshot_version.dart';
-import 'package:cloud_firestore_dart/src/firebase/firestore/snapshot_listen_options.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/query_snapshot.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/document_snapshot.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/firestore_data_converter.dart';
@@ -27,6 +26,9 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/field_value.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/firestore_error.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/firestore_multi_db_component.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/firestore_settings.dart';
+import 'package:cloud_firestore_dart/src/firebase/timestamp.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/listen_source.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/get_options.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/index/index_configuration.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/load_bundle_task.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/log_level.dart';
@@ -66,37 +68,39 @@ import 'package:firebase_app_dart/internal.dart';
 /// final FirebaseApp app = FirebaseApp.withOptions(
 ///   const FirebaseOptions(
 ///     apiKey: 'my-api-key',
-///     applicationId: '1:1234567890:web:0123456789abcdef',
+///     appId: '1:1234567890:web:0123456789abcdef',
 ///     projectId: 'my-project',
 ///   ),
 /// );
-/// final Firestore firestore = Firestore.instanceFor(app: app);
+/// final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(app: app);
 ///
 /// await firestore.doc('cities/SF').set({'name': 'San Francisco'});
 /// final DocumentSnapshot<Map<String, Object?>> sf = await firestore
 ///     .doc('cities/SF')
 ///     .get();
-/// print(sf.data);
+/// print(sf.data());
 ///
 /// await firestore.terminate();
 /// ```
 ///
 /// **Subclassing Note**: Firestore classes are not meant to be subclassed except for use in test mocks. Subclassing is
 /// not supported in production code and new SDK releases may break code that does so.
-class Firestore {
+class FirebaseFirestore {
   /// Implementation detail of the SDK; not part of the supported API. Use [instanceFor].
-  Firestore._(
+  FirebaseFirestore._(
     this._databaseId,
-    this.firebaseApp,
+    this._app,
     FirestoreClient? client,
     this._scheduler, {
-    FirestoreSettings? settings,
+    Settings? settings,
+    FirestoreClient Function(Settings settings)? start,
   }) : _clientOrNull = client,
-       _settings = settings ?? FirestoreSettings(),
+       _start = start,
+       _settings = settings ?? Settings(),
        _dataConverter = UserDataConverter(_databaseId);
 
-  /// The settings this instance was created with.
-  final FirestoreSettings _settings;
+  /// The settings of this instance; they can change until the client starts.
+  Settings _settings;
 
   static const String _tag = 'FirebaseFirestore';
 
@@ -111,62 +115,94 @@ class Firestore {
   /// [instanceFor].
   String get databaseId => _databaseId.databaseId;
 
-  /// The [FirebaseApp] this instance belongs to.
-  final FirebaseApp? firebaseApp;
+  final FirebaseApp? _app;
 
-  /// The app this instance belongs to: the same as [firebaseApp], under the
-  /// name the JS SDK, FlutterFire and Firestore Lite use.
-  FirebaseApp? get app => firebaseApp;
+  /// The [FirebaseApp] this instance belongs to.
+  FirebaseApp get app =>
+      _app ?? (throw StateError('This FirebaseFirestore instance has no app.'));
+
+  /// The settings of this instance (the defaults of [Settings] when [instanceFor] got none and nothing set them),
+  /// for example to check whether its cache is persistent ([Settings.persistenceEnabled], [Settings.cacheSettings]).
+  Settings get settings => _settings;
+
+  /// Changes the settings of this instance, as in FlutterFire: allowed until the instance is first used (any read,
+  /// write, listener or other call that needs the client), not after.
+  ///
+  /// ```dart
+  /// final FirebaseFirestore firestore = FirebaseFirestore.instance;
+  /// firestore.settings = Settings(persistenceEnabled: false);
+  /// ```
+  ///
+  /// Throws a [FirestoreException] with [FirestoreErrorCode.failedPrecondition] once the instance was used (then
+  /// [terminate] it and get a new one), and an [ArgumentError] or [StateError] for settings that are invalid, as
+  /// the constructor of [Settings] does.
+  set settings(Settings settings) {
+    _checkNotStarted('settings');
+    _settings = settings;
+  }
+
+  /// Points this instance at the Firestore emulator on [host] and [port], as in FlutterFire: allowed until the
+  /// instance is first used, like the [settings] setter. The same as setting
+  /// `settings.withEmulator(host, port)`, with [sslEnabled] off by default. Unlike FlutterFire, `localhost` is not
+  /// mapped to `10.0.2.2` on the Android emulator: pass `10.0.2.2` yourself there.
+  ///
+  /// ```dart
+  /// FirebaseFirestore.instance.useFirestoreEmulator('127.0.0.1', 8080);
+  /// ```
+  ///
+  /// Throws a [FirestoreException] with [FirestoreErrorCode.failedPrecondition] once the instance was used, and an
+  /// [ArgumentError] for the production host.
+  void useFirestoreEmulator(String host, int port, {bool sslEnabled = false}) {
+    _checkNotStarted('useFirestoreEmulator');
+    final Settings emulated = _settings.withEmulator(host, port);
+    _settings = sslEnabled ? emulated.copyWith(sslEnabled: true) : emulated;
+  }
+
+  void _checkNotStarted(String what) {
+    if (_clientOrNull != null || _terminatedBeforeStart) {
+      throw FirestoreException(
+        errorCode: FirestoreErrorCode.failedPrecondition,
+        message:
+            'FirebaseFirestore has already been started and its $what can no longer be changed. Change them before '
+            'the first use of the instance, or terminate() it and get a new instance.',
+      );
+    }
+  }
 
   final UserDataConverter _dataConverter;
 
-  /// Null only for an instance made by `FirestoreInternal.detached` (unit tests of code that needs a [Firestore]
-  /// but never talks to a backend).
-  final FirestoreClient? _clientOrNull;
+  /// Null until the first use of the instance starts the client with [_start], and always for an instance made by
+  /// `FirestoreInternal.detached` (unit tests of code that needs a [FirebaseFirestore] but never talks to a backend).
+  FirestoreClient? _clientOrNull;
+
+  /// Starts the client with the settings at the time of the first use; null for a detached instance.
+  final FirestoreClient Function(Settings settings)? _start;
+
+  /// Whether [terminate] was called before the first use.
+  bool _terminatedBeforeStart = false;
   final TaskScheduler _scheduler;
 
-  /// The existing instance of the default [FirebaseApp] and the default database.
+  /// The instance of the default [FirebaseApp] and the default database.
   ///
-  /// Unlike FlutterFire, this getter does not create the instance. Throws a [StateError] if it has not been created
-  /// with [instanceFor] yet (or was terminated since), and the error of [FirebaseApp.instance] if there is no default
-  /// app.
+  /// Like FlutterFire, it creates the instance on first use, with the default [Settings] and a memory cache, when
+  /// [instanceFor] has not created it yet. Call [instanceFor] first to give it settings or a persistent cache.
+  /// Throws the error of [FirebaseApp.instance] if there is no default app.
   ///
   /// ```dart
-  /// Firestore.instanceFor(app: FirebaseApp.instance);
+  /// await Firebase.initializeApp(options: options);
   /// // Later, anywhere in the program:
-  /// final Firestore firestore = Firestore.instance;
+  /// final FirebaseFirestore firestore = FirebaseFirestore.instance;
   /// ```
-  static Firestore get instance {
-    final FirebaseApp app = FirebaseApp.instance;
-
-    final Firestore? firestore =
-        FirestoreMultiDbComponent.instances[FirestoreMultiDbComponent.keyFor(
-          app.name,
-          DatabaseId.defaultDatabaseId,
-        )];
-    if (firestore == null) {
-      throw StateError(
-        'Firestore.instance has no default instance yet: call '
-        'Firestore.instanceFor(app: FirebaseApp.instance) first.',
-      );
-    }
-
-    if (app == app.authProvider) {
-      Log.w(
-        _tag,
-        'In case you are using FirebaseAuth make sure to first call [FirebaseAuth.instance] to register the auth provider with other Firebase Services.',
-      );
-    }
-
-    return firestore;
+  static FirebaseFirestore get instance {
+    return instanceFor(app: FirebaseApp.instance);
   }
 
-  /// Gets the instance for [app] and [database], creating it on the first call. Later calls return the same instance
+  /// Gets the instance for [app] and [databaseId], creating it on the first call. Later calls return the same instance
   /// until it is terminated.
   ///
-  /// [database] is the id of the database in the project, `(default)` unless you use a named database.
+  /// [databaseId] is the id of the database in the project, `(default)` unless you use a named database.
   ///
-  /// [settings] are those of the call that creates the instance (the defaults of [FirestoreSettings] when null). A
+  /// [settings] are those of the call that creates the instance (the defaults of [Settings] when null). A
   /// later call without settings, or with equal settings, returns the existing instance; a later call with different
   /// settings throws a [StateError], as the other SDKs do (`initializeFirestore` called twice with different options
   /// in the JS SDK, settings changed after the start on Android): [terminate] the instance first to get one with
@@ -185,98 +221,57 @@ class Firestore {
   ///
   /// ```dart
   /// // The default database, a memory cache, the production backend.
-  /// final Firestore firestore = Firestore.instanceFor(app: app);
+  /// final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(app: app);
   ///
   /// // A named database, against the emulator.
-  /// final Firestore other = Firestore.instanceFor(
+  /// final FirebaseFirestore other = FirebaseFirestore.instanceFor(
   ///   app: app,
-  ///   database: 'my-database',
-  ///   settings: FirestoreSettings().withEmulator('127.0.0.1', 8080),
+  ///   databaseId: 'my-database',
+  ///   settings: Settings().withEmulator('127.0.0.1', 8080),
   /// );
   /// ```
-  static Firestore instanceFor({
+  static FirebaseFirestore instanceFor({
     required FirebaseApp app,
-    String database = DatabaseId.defaultDatabaseId,
+    String databaseId = DatabaseId.defaultDatabaseId,
     OpenDatabase? openDatabase,
-    FirestoreSettings? settings,
+    Settings? settings,
   }) {
-    return getInstance(
-      app,
-      database: database,
-      openDatabase: openDatabase,
-      settings: settings,
-    );
-  }
-
-  /// Gets the instance for [app] and [database], creating it on the first call. Same as [instanceFor].
-  @Deprecated('Use instanceFor instead.')
-  static Firestore getInstance(
-    FirebaseApp app, {
-    String database = DatabaseId.defaultDatabaseId,
-    OpenDatabase? openDatabase,
-    FirestoreSettings? settings,
-  }) {
-    checkNotNull(app, 'Provided FirebaseApp must not be null.');
-
     final FirestoreMultiDbComponent component = FirestoreMultiDbComponent(
       app,
       app.authProvider,
       settings,
       appCheckProvider: app.appCheckProvider,
     );
-    checkNotNull(component, 'Firestore component is not present.');
-
-    return component.get(database, openDatabase);
+    return component.get(databaseId, openDatabase);
   }
 
   /// Implementation detail of the SDK; not part of the supported API. Use [instanceFor].
-  static Firestore _newInstance(
+  static FirebaseFirestore _newInstance(
     FirebaseApp app,
     String database, {
-    InternalTokenProvider? authProvider,
-    InternalAppCheckTokenProvider? appCheckProvider,
+    AuthTokenProvider? authProvider,
+    AppCheckTokenProvider? appCheckProvider,
     OpenDatabase? openDatabase,
-    FirestoreSettings? settings,
+    Settings? settings,
     Future<void>? after,
   }) {
     final String? projectId = app.options.projectId;
     if (projectId == null) {
-      throw ArgumentError('FirebaseOptions.getProjectId() cannot be null');
+      throw ArgumentError(
+        'FirebaseOptions.projectId must be set to use Firestore',
+      );
     }
     final DatabaseId databaseId = DatabaseId.forDatabase(projectId, database);
 
-    final FirestoreSettings firestoreSettings = settings ?? FirestoreSettings();
-
-    final CredentialsProvider provider;
-    final Object? mockUserToken = firestoreSettings.mockUserToken;
-    if (mockUserToken != null) {
-      Log.d(_tag, 'Using the mockUserToken of the emulator settings.');
-      provider = EmulatorCredentialsProvider.forMockUserToken(
-        mockUserToken,
-        projectId,
-      );
-    } else if (authProvider != null && authProvider != app) {
-      provider = FirebaseAuthCredentialsProvider(authProvider);
-    } else if (app.authProvider != app) {
-      Log.d(
-        _tag,
-        'Using ${app.authProvider.runtimeType} as the auth provider.',
-      );
-      provider = FirebaseAuthCredentialsProvider(app.authProvider);
-    } else {
-      Log.d(
-        _tag,
-        'Firebase Auth not available, falling back to unauthenticated usage.',
-      );
-      provider = EmptyCredentialsProvider();
-    }
-
+    // The token providers are taken now, as before; everything that depends on the settings is made when the
+    // client starts, at the first use of the instance, so that the settings can still change until then.
+    final AuthTokenProvider? authSource =
+        authProvider != null && authProvider != app
+        ? authProvider
+        : (app.authProvider != app ? app.authProvider : null);
     // No provider on the call and none on the app: no App Check header at all.
-    final InternalAppCheckTokenProvider? appCheckSource =
+    final AppCheckTokenProvider? appCheckSource =
         appCheckProvider ?? app.appCheckProvider;
-    final AppCheckTokenProvider? appCheck = appCheckSource == null
-        ? null
-        : AppCheckTokenProvider(appCheckSource);
 
     // Firestore uses a different database for each app name. Note that we
     // don't use app.getPersistenceKey() here because it includes the
@@ -284,41 +279,71 @@ class Firestore {
     // project ID when resolving the database, so there is no need to include it
     // in the persistence key.
     final String persistenceKey = app.name;
-
-    final DatabaseInfo databaseInfo = DatabaseInfo(
-      databaseId,
-      persistenceKey,
-      firestoreSettings.host,
-      port: firestoreSettings.port,
-      sslEnabled: firestoreSettings.sslEnabled,
-      forceLongPolling: firestoreSettings.experimentalForceLongPolling,
-      autoDetectLongPolling:
-          firestoreSettings.experimentalAutoDetectLongPolling,
-      longPollingOptions: firestoreSettings.experimentalLongPollingOptions,
-      grpcFlowControlWindow: firestoreSettings.grpcFlowControlWindow,
-      apiKey: app.options.apiKey,
-      appId: app.options.applicationId,
-    );
-
     final TaskScheduler scheduler = TaskScheduler(app.name);
-    final FirestoreClient firestoreClient = FirestoreClient.start(
-      databaseInfo,
-      firestoreSettings,
-      provider,
-      openDatabase,
-      withPlatformConnectivity(app.onNetworkConnected),
-      scheduler,
-      appCheckProvider: appCheck,
-      connectivityDetector: createConnectivityChangeDetector(),
-      after: after,
-    );
-    final Firestore firestore = Firestore._(
+
+    FirestoreClient start(Settings firestoreSettings) {
+      final CredentialsProvider provider;
+      final Object? mockUserToken = firestoreSettings.mockUserToken;
+      if (mockUserToken != null) {
+        Log.d(_tag, 'Using the mockUserToken of the emulator settings.');
+        provider = EmulatorCredentialsProvider.forMockUserToken(
+          mockUserToken,
+          projectId,
+        );
+      } else if (authSource != null) {
+        Log.d(_tag, 'Using ${authSource.runtimeType} as the auth provider.');
+        provider = FirebaseAuthCredentialsProvider(authSource);
+      } else {
+        Log.d(
+          _tag,
+          'Firebase Auth not available, falling back to unauthenticated usage.',
+        );
+        provider = EmptyCredentialsProvider();
+      }
+      final FirebaseAppCheckTokenProvider? appCheck = appCheckSource == null
+          ? null
+          : FirebaseAppCheckTokenProvider(appCheckSource);
+
+      final DatabaseInfo databaseInfo = DatabaseInfo(
+        databaseId,
+        persistenceKey,
+        firestoreSettings.host,
+        port: firestoreSettings.port,
+        sslEnabled: firestoreSettings.sslEnabled,
+        forceLongPolling: firestoreSettings.webExperimentalForceLongPolling,
+        autoDetectLongPolling:
+            firestoreSettings.webExperimentalAutoDetectLongPolling,
+        longPollingOptions: firestoreSettings.webExperimentalLongPollingOptions,
+        grpcFlowControlWindow: firestoreSettings.grpcFlowControlWindow,
+        apiKey: app.options.apiKey,
+        appId: app.options.appId,
+      );
+      return FirestoreClient.start(
+        databaseInfo,
+        firestoreSettings,
+        provider,
+        openDatabase,
+        withPlatformConnectivity(app.onNetworkConnected),
+        scheduler,
+        appCheckProvider: appCheck,
+        connectivityDetector: createConnectivityChangeDetector(),
+        // The shutdown of the previous instance on the same cache, if any (see FirestoreMultiDbComponent.get).
+        after: after ?? FirestoreMultiDbComponent.closing(app.name, database),
+      );
+    }
+
+    final FirebaseFirestore firestore = FirebaseFirestore._(
       databaseId,
       app,
-      firestoreClient,
+      null,
       scheduler,
-      settings: firestoreSettings,
+      settings: settings ?? Settings(),
+      start: start,
     );
+    if (settings != null) {
+      // Settings given up front: start right away, as before; the settings can no longer change.
+      firestore.client;
+    }
     FirestoreMultiDbComponent.register(app, database, firestore);
     return firestore;
   }
@@ -362,12 +387,7 @@ class Firestore {
   /// );
   /// await sf.set({'name': 'San Francisco', 'population': 870000});
   /// ```
-  DocumentReference<Map<String, Object?>> doc(String documentPath) =>
-      document(documentPath);
-
-  /// Returns a [DocumentReference] to the document at [documentPath]. Same as [doc].
-  @Deprecated('Use doc instead.')
-  DocumentReference<Map<String, Object?>> document(String documentPath) {
+  DocumentReference<Map<String, Object?>> doc(String documentPath) {
     checkNotNull(documentPath, 'Provided document path must not be null.');
     checkNonEmptyPath('Firestore.doc', documentPath);
     return DocumentReferenceInternal.forPath(
@@ -390,7 +410,7 @@ class Firestore {
   ///     .where('type', isEqualTo: 'museum')
   ///     .get();
   /// for (final QueryDocumentSnapshot<Map<String, Object?>> doc in landmarks) {
-  ///   print(doc.ref.path);
+  ///   print(doc.reference.path);
   /// }
   /// ```
   Query<Map<String, Object?>> collectionGroup(String collectionId) {
@@ -418,7 +438,7 @@ class Firestore {
   ///
   /// Transactions are optimistic: [Transaction.get] reads the current version of a document from the backend, and
   /// the commit fails if a document that was read changed in the meantime. Then [updateFunction] runs again, up to
-  /// [TransactionOptions.maxAttempts] times (5 by default), after which the returned future fails with the last
+  /// [maxAttempts] times (5 by default), after which the returned future fails with the last
   /// error. So [updateFunction] can run more than once: it must not have side effects of its own, and it must do
   /// all its reads before its writes. If [updateFunction] throws, nothing is committed and the future fails with
   /// that error.
@@ -427,8 +447,11 @@ class Firestore {
   /// cannot be reached. Writes made with [Transaction] are only sent at the commit and are not visible locally
   /// before.
   ///
-  /// With [options] you can change the number of attempts or run a read-only transaction
-  /// (`TransactionOptions(readOnly: true)`), which reads a consistent snapshot of the database and can also run
+  /// After [timeout] (30 seconds by default, as in FlutterFire) the returned future fails with a [FirestoreException]
+  /// with [FirestoreErrorCode.deadlineExceeded] and no new attempt starts. The attempt that runs at that moment is
+  /// not cancelled: if it was committing, its writes may still take effect.
+  ///
+  /// [maxAttempts] must be at least 1. With [readOnly] it is a read-only transaction, which reads a consistent snapshot of the database and can also run
   /// queries with [Transaction.getQuery] and aggregations with [Transaction.getAggregate]. The JS and Android client
   /// SDKs have no read-only transactions.
   ///
@@ -449,34 +472,63 @@ class Firestore {
   /// ) async {
   ///   final DocumentSnapshot<Map<String, Object?>> snapshot = await transaction
   ///       .get(sf);
-  ///   final int population = snapshot.getInt('population') ?? 0;
+  ///   final int population = snapshot.get('population') as int? ?? 0;
   ///   transaction.update(sf, {'population': population + 1});
   ///   return population + 1;
   /// });
   /// print(newPopulation);
   /// ```
   Future<T> runTransaction<T>(
-    TransactionCallback<T> updateFunction, {
-    TransactionOptions options = TransactionOptions.defaultOptions,
+    TransactionHandler<T> updateFunction, {
+    Duration timeout = const Duration(seconds: 30),
+    int maxAttempts = 5,
+    bool readOnly = false,
+    Timestamp? readTime,
   }) {
+    if (timeout <= Duration.zero) {
+      throw ArgumentError.value(timeout, 'timeout', 'must be positive');
+    }
+    final TransactionOptions options = TransactionOptions(
+      maxAttempts: maxAttempts,
+      readOnly: readOnly,
+      readTime: readTime,
+    );
+    bool timedOut = false;
     // We wrap the function they provide in order to
     // 1. Use internal implementation classes for Transaction,
     // 2. Convert exceptions they throw into Futures, and
     // 3. Run the user callback on the user queue.
     Future<T> wrappedUpdateFunction(core.Transaction internalTransaction) {
+      if (timedOut) {
+        // No new attempt after the timeout. An error that is not a FirestoreException is not retried.
+        throw const TransactionTimedOut();
+      }
       return updateFunction(
         TransactionInternal.create(internalTransaction, this),
       );
     }
 
-    return client.transaction(
-      wrappedUpdateFunction,
-      options.maxAttempts,
-      readOnly: options.readOnly,
-      readTime: options.readTime == null
-          ? null
-          : SnapshotVersion(options.readTime!),
-    );
+    return client
+        .transaction(
+          wrappedUpdateFunction,
+          options.maxAttempts,
+          readOnly: options.readOnly,
+          readTime: options.readTime == null
+              ? null
+              : SnapshotVersion(options.readTime!),
+        )
+        .timeout(
+          timeout,
+          onTimeout: () {
+            timedOut = true;
+            throw FirestoreException(
+              errorCode: FirestoreErrorCode.deadlineExceeded,
+              message:
+                  'The transaction did not complete within $timeout. An attempt that was committing may still '
+                  'take effect.',
+            );
+          },
+        );
   }
 
   /// Returns a new [WriteBatch], which applies several writes as a single atomic operation.
@@ -544,16 +596,16 @@ class Firestore {
   /// snapshots that are raised together, also when none of the queries changed but only their metadata). It does not
   /// emit for changes that no snapshot listener is interested in.
   ///
-  /// This is the JS SDK `onSnapshotsInSync()`. On a terminated instance the stream fails with the [FirestoreError]
+  /// This is the JS SDK `onSnapshotsInSync()`. On a terminated instance the stream fails with the [FirestoreException]
   /// of a terminated instance and closes.
   ///
   /// ```dart
-  /// final StreamSubscription<void> subscription = firestore.snapshotsInSync
+  /// final StreamSubscription<void> subscription = firestore.snapshotsInSync()
   ///     .listen((_) => print('every listener is up to date'));
   /// // ...
   /// await subscription.cancel();
   /// ```
-  Stream<void> get snapshotsInSync {
+  Stream<void> snapshotsInSync() {
     late final StreamController<void> controller;
     void listener() {
       if (!controller.isClosed) {
@@ -578,12 +630,12 @@ class Firestore {
     return controller.stream;
   }
 
-  /// Terminates this [Firestore] instance, releasing all the resources it holds.
+  /// Terminates this [FirebaseFirestore] instance, releasing all the resources it holds.
   ///
   /// After this the instance cannot be used anymore: to start again, create a new instance with [instanceFor].
   /// Listeners stop receiving events, and the connections and the local cache are closed.
   ///
-  /// Every operation on a terminated instance fails with a [FirestoreError] with the code
+  /// Every operation on a terminated instance fails with a [FirestoreException] with the code
   /// [FirestoreErrorCode.failedPrecondition], delivered through the returned future or stream. Calling [terminate]
   /// again does nothing.
   ///
@@ -599,28 +651,32 @@ class Firestore {
   /// ```dart
   /// await firestore.waitForPendingWrites();
   /// await firestore.terminate();
-  /// // Firestore.instanceFor(app: app) now creates a new instance.
+  /// // FirebaseFirestore.instanceFor(app: app) now creates a new instance.
   /// ```
-  Future<void> terminate() => shutdown();
-
-  /// Shuts down this [Firestore] instance. Same as [terminate].
-  @Deprecated('Use terminate instead.')
-  Future<void> shutdown() async {
+  Future<void> terminate() async {
     // The client must be initialized to ensure that all subsequent API usage
     // throws an exception.
     // Forget the instance first (as Android and JS do), so that a caller that asks for an instance while this one
     // shuts down gets a new one rather than this one.
-    FirestoreMultiDbComponent.deregister(this);
-    await client.shutdown();
+    final List<String> keys = FirestoreMultiDbComponent.deregister(this);
+    if (_clientOrNull == null && _start != null) {
+      // Never used: nothing to close, and nothing is started just to be closed.
+      _terminatedBeforeStart = true;
+      return;
+    }
+    final Future<void> shutdown = client.shutdown();
+    // A new instance of the same app name and database opens the cache only after this one closed it, also when it
+    // is created after this instance left the registry (for example after `await app.delete()`).
+    FirestoreMultiDbComponent.recordClosing(keys, shutdown);
+    await shutdown;
   }
 
   /// Clears the persistent storage of this instance: the local SQLite database
   /// with the cached documents and the pending writes. Does nothing when the
   /// instance uses memory persistence.
   ///
-  /// Must be called after [terminate] (an instance of this SDK starts as soon
-  /// as it is created). While the instance is running the returned future
-  /// fails with a [FirestoreError] with code
+  /// Must be called after [terminate]. While the instance is running the returned future
+  /// fails with a [FirestoreException] with code
   /// [FirestoreErrorCode.failedPrecondition]. Create a new instance with the
   /// same app and database to start again with an empty cache.
   ///
@@ -639,15 +695,21 @@ class Firestore {
   /// await firestore.clearPersistence();
   /// ```
   Future<void> clearPersistence() async {
-    final FirebaseApp? app = firebaseApp;
+    if (_terminatedBeforeStart && _clientOrNull == null) {
+      // Terminated before its first use: start a client only to find and delete the cache files.
+      final FirestoreClient started = _clientOrNull = _start!(_settings);
+      await started.shutdown();
+    }
+    final FirebaseApp? app = _app;
     if (client.isTerminated &&
         app != null &&
         FirestoreMultiDbComponent.hasInstance(app.name, databaseId)) {
       // This instance was terminated and a newer one has the same cache open: deleting the files under it would
       // detach it from its cache without any error.
-      throw FirestoreError(
-        'Persistence cannot be cleared while another firestore instance of the same app and database is running.',
-        FirestoreErrorCode.failedPrecondition,
+      throw FirestoreException(
+        message:
+            'Persistence cannot be cleared while another firestore instance of the same app and database is running.',
+        errorCode: FirestoreErrorCode.failedPrecondition,
       );
     }
     await client.clearPersistence();
@@ -664,13 +726,13 @@ class Firestore {
   ///
   /// The future fails with an [ArgumentError] when [json] is not a valid index definition and with a [StateError] when
   /// this instance does not use the persistent (SQLite) cache. On a terminated instance it fails with the same
-  /// [FirestoreError] as every other operation, whatever the cache.
+  /// [FirestoreException] as every other operation, whatever the cache.
   @Deprecated(
     'Instead of creating cache indexes manually, consider using '
     'persistentCacheIndexManager.enableIndexAutoCreation() to let the SDK '
     'decide whether to create cache indexes for queries running locally.',
   )
-  Future<void> setIndexConfiguration(String json) async {
+  Future<void> setIndexConfigurationFromJSON(String json) async {
     client.verifyNotTerminated();
     if (!client.supportsFieldIndexes) {
       throw StateError('Cannot enable indexes when persistence is disabled');
@@ -684,7 +746,7 @@ class Firestore {
   /// they are not the same as Cloud Firestore indexes.
   ///
   /// The getter never throws and keeps returning the same manager after [terminate]; the methods of that manager then
-  /// fail with the [FirestoreError] of a terminated instance.
+  /// fail with the [FirestoreException] of a terminated instance.
   ///
   /// ```dart
   /// await firestore.persistentCacheIndexManager?.enableIndexAutoCreation();
@@ -737,10 +799,10 @@ class Firestore {
   /// completion or error events. To load a bundle held in a string, pass `utf8.encode(bundle)`; for a file or an
   /// HTTP response that arrives in chunks use [loadBundleStream].
   ///
-  /// The named queries of the bundle become available through [getNamedQuery].
+  /// The named queries of the bundle become available through [namedQuery].
   ///
   /// ```dart
-  /// final LoadBundleTaskProgress progress = await firestore
+  /// final LoadBundleTaskSnapshot progress = await firestore
   ///     .loadBundle(bundleBytes)
   ///     .future;
   /// print('${progress.documentsLoaded} documents loaded');
@@ -774,39 +836,68 @@ class Firestore {
   ///
   /// ```dart
   /// await firestore.loadBundle(bundleBytes).future;
-  /// final Query<Map<String, Object?>>? latest = await firestore.getNamedQuery(
+  /// final Query<Map<String, Object?>>? latest = await firestore.namedQuery(
   ///   'latest-stories',
   /// );
   /// if (latest != null) {
   ///   final QuerySnapshot<Map<String, Object?>> stories = await latest.get(
-  ///     Source.cache,
+  ///     const GetOptions(source: Source.cache),
   ///   );
-  ///   print(stories.length);
+  ///   print(stories.size);
   /// }
   /// ```
-  Future<Query<Map<String, Object?>>?> getNamedQuery(String name) async {
+  Future<Query<Map<String, Object?>>?> namedQuery(String name) async {
     final core.Query? query = await client.getNamedQuery(name);
     return query == null ? null : QueryInternal.create(query, this);
+  }
+
+  /// Runs the named query [name] of a loaded bundle (see [namedQuery]) and returns its results: FlutterFire's
+  /// `namedQueryGet`.
+  ///
+  /// The future fails with a [FirestoreException] with [FirestoreErrorCode.notFound] when the cache has no query
+  /// with this name.
+  ///
+  /// ```dart
+  /// final QuerySnapshot<Map<String, Object?>> stories = await firestore
+  ///     .namedQueryGet(
+  ///       'latest-stories',
+  ///       options: const GetOptions(source: Source.cache),
+  ///     );
+  /// ```
+  Future<QuerySnapshot<Map<String, Object?>>> namedQueryGet(
+    String name, {
+    GetOptions options = const GetOptions(),
+  }) async {
+    final Query<Map<String, Object?>>? query = await namedQuery(name);
+    if (query == null) {
+      throw FirestoreException(
+        errorCode: FirestoreErrorCode.notFound,
+        message: 'Named query "$name" not found.',
+      );
+    }
+    return query.get(options);
   }
 
   /// Listens to the document of a [DocumentSnapshot.toJson] result, starting from that snapshot.
   ///
   /// The document in [json] is loaded into the local cache (as with [loadBundle]) and the document is then listened
   /// to with [options], so the first event can be raised from the cache. Pass the [converter] of the original
-  /// reference to get typed snapshots. Throws a [FirestoreError] if [json] is not a document snapshot JSON object;
+  /// reference to get typed snapshots. Throws a [FirestoreException] if [json] is not a document snapshot JSON object;
   /// errors loading the bundle are delivered on the stream.
   ///
   /// This is the JS SDK `onSnapshotResume()` for a `DocumentSnapshot`.
   Stream<DocumentSnapshot<T>> documentSnapshotsFromJson<T>(
     Map<String, Object?> json, {
-    SnapshotListenOptions options = const SnapshotListenOptions(),
+    bool includeMetadataChanges = false,
+    ListenSource source = ListenSource.defaultSource,
     FirestoreDataConverter<T>? converter,
   }) {
     return snapshot_json.documentSnapshotsFromJson<T>(
       this,
       json,
-      options,
-      converter,
+      includeMetadataChanges: includeMetadataChanges,
+      source: source,
+      converter: converter,
     );
   }
 
@@ -815,7 +906,7 @@ class Firestore {
   /// The query and documents in [json] are loaded into the local cache (as with [loadBundle]) and the query is then
   /// listened to with [options]. The listen is resumed from the read time of the snapshot, so the backend only sends
   /// what changed since then. Pass the [converter] of the original query to get typed snapshots. Throws a
-  /// [FirestoreError] if [json] is not a query snapshot JSON object; errors loading the bundle are delivered on the
+  /// [FirestoreException] if [json] is not a query snapshot JSON object; errors loading the bundle are delivered on the
   /// stream.
   ///
   /// This is the JS SDK `onSnapshotResume()` for a `QuerySnapshot`.
@@ -830,14 +921,16 @@ class Firestore {
   /// ```
   Stream<QuerySnapshot<T>> querySnapshotsFromJson<T>(
     Map<String, Object?> json, {
-    SnapshotListenOptions options = const SnapshotListenOptions(),
+    bool includeMetadataChanges = false,
+    ListenSource source = ListenSource.defaultSource,
     FirestoreDataConverter<T>? converter,
   }) {
     return snapshot_json.querySnapshotsFromJson<T>(
       this,
       json,
-      options,
-      converter,
+      includeMetadataChanges: includeMetadataChanges,
+      source: source,
+      converter: converter,
     );
   }
 
@@ -846,20 +939,20 @@ class Firestore {
   /// Enabled is [LogLevel.debug]; disabled goes back to the default,
   /// [LogLevel.warn] (warnings and errors). [setLogLevel] gives finer
   /// control.
-  static void setLoggingEnabled({bool loggingEnabled = false}) {
-    applyLoggingEnabled(loggingEnabled);
+  static void setLoggingEnabled(bool enabled) {
+    applyLoggingEnabled(enabled);
   }
 
   /// Sets the verbosity of the Cloud Firestore logs: from [LogLevel.verbose]
   /// (everything) and [LogLevel.debug] through [LogLevel.warn] (the default)
   /// to [LogLevel.error] (errors only) and [LogLevel.silent] (nothing). The
-  /// levels of `setLogLevel` of the JS SDK.
+  /// levels of `setLogLevel` of the JS SDK, without `info`.
   ///
   /// The setting is global: it applies to every instance (and to the logs of
   /// the other Firebase packages of this SDK, which share the logger).
   ///
   /// ```dart
-  /// Firestore.setLogLevel(LogLevel.debug);
+  /// FirebaseFirestore.setLogLevel(LogLevel.debug);
   /// ```
   static void setLogLevel(LogLevel level) {
     applyLogLevel(level);
@@ -876,8 +969,8 @@ class Firestore {
   }
 }
 
-/// Members of [Firestore] for the SDK itself. Not exported by the public libraries.
-extension FirestoreInternal on Firestore {
+/// Members of [FirebaseFirestore] for the SDK itself. Not exported by the public libraries.
+extension FirestoreInternal on FirebaseFirestore {
   /// The project and database this instance talks to.
   DatabaseId get modelDatabaseId => _databaseId;
 
@@ -885,45 +978,61 @@ extension FirestoreInternal on Firestore {
   UserDataConverter get dataConverter => _dataConverter;
 
   /// The client that runs the operations of this instance.
-  FirestoreClient get client =>
-      _clientOrNull ??
-      (throw StateError('This Firestore instance has no client.'));
+  /// The client that runs the operations of this instance, started on the first access with the settings of that
+  /// moment.
+  FirestoreClient get client {
+    final FirestoreClient? started = _clientOrNull;
+    if (started != null) {
+      return started;
+    }
+    final FirestoreClient Function(Settings settings)? start = _start;
+    if (start == null) {
+      throw StateError('This Firestore instance has no client.');
+    }
+    if (_terminatedBeforeStart) {
+      throw FirestoreException(
+        errorCode: FirestoreErrorCode.failedPrecondition,
+        message: 'The client has already been terminated.',
+      );
+    }
+    return _clientOrNull = start(_settings);
+  }
+
+  /// Whether the client was started: the instance was used.
+  bool get isStarted => _clientOrNull != null;
 
   /// The scheduler of the timers of this instance.
   TaskScheduler get scheduler => _scheduler;
-
-  /// The settings this instance was created with.
-  FirestoreSettings get settings => _settings;
 
   /// Throws an [ArgumentError] unless [docRef] belongs to this instance. Used by `WriteBatch` and `Transaction`.
   void validateReference(DocumentReference<Object?> docRef) =>
       _validateReference(docRef);
 
   /// An instance over an existing [client].
-  static Firestore create(
+  static FirebaseFirestore create(
     DatabaseId databaseId,
-    FirebaseApp? firebaseApp,
+    FirebaseApp? app,
     FirestoreClient client,
     TaskScheduler scheduler,
-  ) => Firestore._(databaseId, firebaseApp, client, scheduler);
+  ) => FirebaseFirestore._(databaseId, app, client, scheduler);
 
   /// An instance for [databaseId] without a client: references, queries and snapshots can be built for it, every
   /// operation that needs the backend or the cache throws. For unit tests.
-  static Firestore detached(DatabaseId databaseId) =>
-      Firestore._(databaseId, null, null, TaskScheduler('detached'));
+  static FirebaseFirestore detached(DatabaseId databaseId) =>
+      FirebaseFirestore._(databaseId, null, null, TaskScheduler('detached'));
 
   /// Creates a new instance for [app] and [database] and registers it as the instance of that app and database. Use
-  /// `Firestore.instanceFor`. The instance initializes in the background, after [after] (the shutdown of an instance
+  /// `FirebaseFirestore.instanceFor`. The instance initializes in the background, after [after] (the shutdown of an instance
   /// that has the same persistence open) completed; [initialized] completes when it is ready.
-  static Firestore newInstance(
+  static FirebaseFirestore newInstance(
     FirebaseApp app,
     String database, {
-    InternalTokenProvider? authProvider,
-    InternalAppCheckTokenProvider? appCheckProvider,
+    AuthTokenProvider? authProvider,
+    AppCheckTokenProvider? appCheckProvider,
     OpenDatabase? openDatabase,
-    FirestoreSettings? settings,
+    Settings? settings,
     Future<void>? after,
-  }) => Firestore._newInstance(
+  }) => FirebaseFirestore._newInstance(
     app,
     database,
     authProvider: authProvider,

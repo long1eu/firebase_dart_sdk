@@ -32,7 +32,7 @@ export 'package:cloud_firestore_dart/src/firebase/firestore/firestore.dart'
 export 'package:cloud_firestore_dart/src/firebase/firestore/load_bundle_task.dart'
     show LoadBundleTaskInternal;
 export 'package:cloud_firestore_dart/src/firebase/firestore/load_bundle_task_progress.dart'
-    show LoadBundleTaskProgressInternal;
+    show LoadBundleTaskSnapshotInternal;
 export 'package:cloud_firestore_dart/src/firebase/firestore/persistent_cache_index_manager.dart'
     show PersistentCacheIndexManagerInternal;
 export 'package:cloud_firestore_dart/src/firebase/firestore/query.dart'

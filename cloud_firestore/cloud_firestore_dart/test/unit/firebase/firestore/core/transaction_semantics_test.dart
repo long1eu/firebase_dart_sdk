@@ -64,10 +64,10 @@ void main() {
   final DocumentKey docKey = key('foo/bar');
 
   Matcher firestoreError(FirestoreErrorCode code, [String? text]) =>
-      isA<FirestoreError>()
-          .having((FirestoreError e) => e.code, 'code', code)
+      isA<FirestoreException>()
+          .having((FirestoreException e) => e.errorCode, 'code', code)
           .having(
-            (FirestoreError e) => e.message,
+            (FirestoreException e) => e.message,
             'message',
             text == null ? isNotNull : contains(text),
           );

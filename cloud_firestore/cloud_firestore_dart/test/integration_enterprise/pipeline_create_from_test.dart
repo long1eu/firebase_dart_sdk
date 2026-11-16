@@ -76,7 +76,7 @@ void main() {
 
   final String? skip = IntegrationTestUtil.enterpriseEmulatorSkipReason;
 
-  late Firestore firestore;
+  late FirebaseFirestore firestore;
   late CollectionReference<Map<String, Object?>> collection;
 
   /// Runs [query] on the server and as a pipeline and expects the same
@@ -87,7 +87,7 @@ void main() {
       {bool allowEmpty = false, String? reason}) async {
     final List<String> expected = <String>[
       for (final QueryDocumentSnapshot<Map<String, Object?>> doc
-          in (await query.get(Source.server)).docs)
+          in (await query.get(GetOptions(source: Source.server))).docs)
         doc.id
     ];
     final PipelineSnapshot snapshot =
@@ -154,9 +154,9 @@ void main() {
 
     test('nested fields', () async {
       await check(collection.where('geo.continent', isEqualTo: 'AS'));
-      await check(collection.where(FieldPath.of(<String>['geo', 'elevation']),
+      await check(collection.where(FieldPath(<String>['geo', 'elevation']),
           isGreaterThan: 50));
-      await check(collection.orderBy('geo.elevation', Direction.descending));
+      await check(collection.orderBy('geo.elevation', descending: true));
     });
 
     test('null and NaN', () async {
@@ -176,49 +176,48 @@ void main() {
     });
 
     test('the method style filters', () async {
-      await check(collection.whereEqualTo('country', 'PT'));
-      await check(collection.whereNotEqualTo('country', 'PT'));
-      await check(collection.whereGreaterThan('population', 2000000));
-      await check(collection.whereArrayContains('tags', 'port'));
-      await check(collection.whereIn('country', <String>['FR', 'JP']));
+      await check(collection.where('country', isEqualTo: 'PT'));
+      await check(collection.where('country', isNotEqualTo: 'PT'));
+      await check(collection.where('population', isGreaterThan: 2000000));
+      await check(collection.where('tags', arrayContains: 'port'));
+      await check(collection.where('country', whereIn: <String>['FR', 'JP']));
     });
 
     test('OR and AND filters', () async {
       await check(collection.where(Filter.or(<Filter>[
-        Filter.equalTo('country', 'PT'),
-        Filter.greaterThan('population', 5000000),
+        Filter('country', isEqualTo: 'PT'),
+        Filter('population', isGreaterThan: 5000000),
       ])));
       await check(collection.where(Filter.or(<Filter>[
-        Filter.equalTo('country', 'PT'),
+        Filter('country', isEqualTo: 'PT'),
         Filter.and(<Filter>[
-          Filter.equalTo('country', 'IT'),
-          Filter.greaterThan('population', 2000000),
+          Filter('country', isEqualTo: 'IT'),
+          Filter('population', isGreaterThan: 2000000),
         ]),
       ])));
       await check(collection.where(Filter.and(<Filter>[
         Filter.or(<Filter>[
-          Filter.equalTo('country', 'IT'),
-          Filter.equalTo('country', 'FR'),
+          Filter('country', isEqualTo: 'IT'),
+          Filter('country', isEqualTo: 'FR'),
         ]),
-        Filter.arrayContains('tags', 'capital'),
+        Filter('tags', arrayContains: 'capital'),
       ])));
       await check(collection
           .where(Filter.or(<Filter>[
-            Filter.equalTo('country', 'JP'),
-            Filter.lessThan('population', 600000),
-          ]))
-          .orderBy('population', Direction.descending)
+            Filter('country', isEqualTo: 'JP'),
+            Filter('population', isLessThan: 600000),
+          ])).orderBy('population', descending: true)
           .limit(2));
     });
 
     test('filters on the document id', () async {
-      await check(collection.where(FieldPath.documentIdField,
+      await check(collection.where(FieldPath.documentId,
           isEqualTo: collection.doc('paris')));
-      await check(collection.where(FieldPath.documentIdField,
+      await check(collection.where(FieldPath.documentId,
           isGreaterThan: collection.doc('m')));
-      await check(collection.where(FieldPath.documentIdField,
+      await check(collection.where(FieldPath.documentId,
           whereIn: <Object>[collection.doc('rome'), collection.doc('porto')]));
-      await check(collection.orderByField(FieldPath.documentIdField));
+      await check(collection.orderBy(FieldPath.documentId));
       // Not compared with a descending order by document id: the Enterprise
       // edition emulator rejects that classic query ("does not support
       // descending key scans"), while the pipeline runs.
@@ -226,38 +225,33 @@ void main() {
 
     test('orderings', () async {
       await check(collection.orderBy('population'));
-      await check(collection.orderBy('population', Direction.descending));
+      await check(collection.orderBy('population', descending: true));
       await check(collection
-          .orderBy('country')
-          .orderBy('population', Direction.descending));
+          .orderBy('country').orderBy('population', descending: true));
       await check(collection
-          .orderBy('country', Direction.descending)
-          .orderBy('population'));
+          .orderBy('country', descending: true).orderBy('population'));
       // Only documents that have the field, nulls first.
       expect(await check(collection.orderBy('founded')),
           <String>['lisbon', 'rome']);
       // An inequality adds an implicit ordering.
       await check(collection.where('population', isGreaterThan: 500000));
       await check(collection
-          .where('population', isGreaterThan: 500000)
-          .orderBy('country', Direction.descending));
+          .where('population', isGreaterThan: 500000).orderBy('country', descending: true));
     });
 
     test('limit and limitToLast', () async {
       await check(collection.orderBy('population').limit(2));
       await check(collection.limit(3));
       await check(
-          collection.orderBy('population', Direction.descending).limit(2));
+          collection.orderBy('population', descending: true).limit(2));
       expect(await check(collection.orderBy('population').limitToLast(2)),
           <String>['rome', 'tokyo']);
       expect(
-          await check(collection
-              .orderBy('population', Direction.descending)
+          await check(collection.orderBy('population', descending: true)
               .limitToLast(2)),
           <String>['lisbon', 'porto']);
       await check(collection
-          .where('country', whereIn: <String>['IT', 'PT'])
-          .orderBy('population')
+          .where('country', whereIn: <String>['IT', 'PT']).orderBy('population')
           .limitToLast(3));
     });
 
@@ -282,7 +276,7 @@ void main() {
 
     test('cursors with a descending ordering', () async {
       final Query<Map<String, Object?>> descending =
-          collection.orderBy('population', Direction.descending);
+          collection.orderBy('population', descending: true);
       expect(await check(descending.startAt(<Object?>[1370000])),
           <String>['milan', 'lisbon', 'porto']);
       expect(await check(descending.startAfter(<Object?>[1370000])),
@@ -295,8 +289,7 @@ void main() {
 
     test('cursors over several orderings', () async {
       final Query<Map<String, Object?>> query = collection
-          .orderBy('country')
-          .orderBy('population', Direction.descending);
+          .orderBy('country').orderBy('population', descending: true);
       await check(query.startAt(<Object?>['IT', 2800000]));
       await check(query.startAfter(<Object?>['IT', 2800000]));
       await check(query.endAt(<Object?>['IT', 1370000]));
@@ -317,9 +310,9 @@ void main() {
           in <Query<Map<String, Object?>>>[
         collection,
         collection.orderBy('population'),
-        collection.orderBy('population', Direction.descending),
+        collection.orderBy('population', descending: true),
         collection.orderBy('country').orderBy('population'),
-        collection.orderBy('country', Direction.descending),
+        collection.orderBy('country', descending: true),
       ]) {
         await check(query.startAtDocument(milan));
         await check(query.startAfterDocument(milan));
@@ -347,8 +340,7 @@ void main() {
           await check(ascending.startAt(<Object?>[545000]).endAt(
               <Object?>[2800000]).limitToLast(2)),
           <String>['paris', 'rome']);
-      await check(collection
-          .orderBy('population', Direction.descending)
+      await check(collection.orderBy('population', descending: true)
           .startAfter(<Object?>[14000000]).limitToLast(2));
     });
 
@@ -368,7 +360,7 @@ void main() {
           firestore.collectionGroup(groupId);
       expect(await check(group), hasLength(4));
       await check(group.where('size', isGreaterThan: 4));
-      await check(group.orderBy('size', Direction.descending).limit(2));
+      await check(group.orderBy('size', descending: true).limit(2));
       await check(
           group.orderBy('size').startAfter(<Object?>[3]).limitToLast(2));
       await check(group
@@ -377,14 +369,10 @@ void main() {
 
     test('a query with a converter', () async {
       final Query<String> names = collection
-          .where('country', isEqualTo: 'PT')
-          .withConverter<String>(FirestoreDataConverter<String>.from(
-            fromFirestore: (DocumentSnapshot<Map<String, Object?>> snapshot,
+          .where('country', isEqualTo: 'PT').withConverter<String>(fromFirestore: (DocumentSnapshot<Map<String, Object?>> snapshot,
                     SnapshotOptions? options) =>
-                snapshot.id,
-            toFirestore: (String value, SetOptions? options) =>
-                <String, Object?>{},
-          ));
+                snapshot.id, toFirestore: (String value, SetOptions? options) =>
+                <String, Object?>{});
       final PipelineSnapshot snapshot =
           await firestore.pipeline().createFrom(names).execute();
       expect(<String?>[for (final PipelineResult r in snapshot.results) r.id],
@@ -417,7 +405,7 @@ void main() {
           check(query, allowEmpty: allowEmpty);
 
       expect(await checkBson(bson.orderBy('v')), hasLength(values.length));
-      await checkBson(bson.orderBy('v', Direction.descending));
+      await checkBson(bson.orderBy('v', descending: true));
       await checkBson(bson.where('v', isEqualTo: Int32Value(7)));
       await checkBson(bson.where('v', isGreaterThan: Int32Value(1)));
       await checkBson(
@@ -437,12 +425,10 @@ void main() {
           .where('v', whereNotIn: <Object?>[Int32Value(1), MinKey.instance]));
       // Cursors inside one type.
       await checkBson(bson
-          .where('v', isGreaterThanOrEqualTo: Int32Value(1))
-          .orderBy('v')
+          .where('v', isGreaterThanOrEqualTo: Int32Value(1)).orderBy('v')
           .startAfter(<Object?>[Int32Value(1)]));
       await checkBson(bson
-          .where('v', isGreaterThanOrEqualTo: BsonTimestamp(0, 0))
-          .orderBy('v', Direction.descending)
+          .where('v', isGreaterThanOrEqualTo: BsonTimestamp(0, 0)).orderBy('v', descending: true)
           .startAfter(<Object?>[BsonTimestamp(1, 2)]));
     });
 
@@ -489,8 +475,8 @@ void main() {
           <String>['array']);
       expect(
           await check(mixed.where(Filter.or(<Filter>[
-            Filter.arrayContains('v', 1),
-            Filter.equalTo('v', 'x'),
+            Filter('v', arrayContains: 1),
+            Filter('v', isEqualTo: 'x'),
           ]))),
           <String>['array', 'string']);
     });
@@ -523,7 +509,7 @@ void main() {
               Query<Map<String, Object?>> query) async =>
           <String>[
             for (final QueryDocumentSnapshot<Map<String, Object?>> d
-                in (await query.get(Source.server)).docs)
+                in (await query.get(GetOptions(source: Source.server))).docs)
               d.id
           ];
 
@@ -569,7 +555,7 @@ void main() {
       final AggregateQuery query =
           collection.where('country', isEqualTo: 'IT').count();
       expect(await run(query), <String, Object?>{'count': 2});
-      expect((await query.get()).getCount(), 2);
+      expect((await query.get()).count, 2);
     });
 
     test('count, sum and average', () async {
@@ -585,9 +571,9 @@ void main() {
           row.keys,
           unorderedEquals(
               <String>['count', 'sum_population', 'average_geo.elevation']));
-      expect(row['count'], classic.getCount());
-      expect(row['sum_population'], classic.getInt(sum));
-      expect(row['average_geo.elevation'], classic.getDouble(average));
+      expect(row['count'], classic.count);
+      expect(row['sum_population'], (classic.get(sum) as num?)?.toInt());
+      expect(row['average_geo.elevation'], (classic.get(average) as num?)?.toDouble());
     });
 
     test('aliases', () async {
@@ -672,7 +658,7 @@ void main() {
       expect(expected, isNotEmpty);
       for (int i = 0; i < expected.length; i++) {
         final Map<String, Object?> classicData =
-            classic.docs[i].data! as Map<String, Object?>;
+            classic.docs[i].data()! as Map<String, Object?>;
         expect(
             snapshot.results[i].data().keys, unorderedEquals(classicData.keys));
         if (distanceField != null) {
@@ -686,36 +672,29 @@ void main() {
     test('every distance measure', () async {
       for (final DistanceMeasure measure in DistanceMeasure.values) {
         await checkVector(
-            vectors.findNearest('embedding', <double>[1, 0], 3, measure));
+            vectors.findNearest(vectorField: 'embedding', queryVector: <double>[1, 0], limit: 3, distanceMeasure: measure));
       }
     });
 
     test('over a filtered query', () async {
       expect(
-          await checkVector(vectors.where('kind', isEqualTo: 'y').findNearest(
-              'embedding', <double>[1, 0], 5, DistanceMeasure.euclidean)),
+          await checkVector(vectors.where('kind', isEqualTo: 'y').findNearest(vectorField: 'embedding', queryVector: <double>[1, 0], limit: 5, distanceMeasure: DistanceMeasure.euclidean)),
           <String>['c', 'd']);
     });
 
     test('distanceResultField', () async {
       await checkVector(
-          vectors.findNearest(
-              'embedding', <double>[1, 0], 4, DistanceMeasure.euclidean,
-              distanceResultField: 'distance'),
+          vectors.findNearest(vectorField: 'embedding', queryVector: <double>[1, 0], limit: 4, distanceMeasure: DistanceMeasure.euclidean, distanceResultField: 'distance'),
           distanceField: 'distance');
     });
 
     test('distanceThreshold', () async {
       expect(
-          await checkVector(vectors.findNearest(
-              'embedding', <double>[1, 0], 4, DistanceMeasure.euclidean,
-              distanceThreshold: 1)),
+          await checkVector(vectors.findNearest(vectorField: 'embedding', queryVector: <double>[1, 0], limit: 4, distanceMeasure: DistanceMeasure.euclidean, distanceThreshold: 1)),
           <String>['a', 'b']);
       expect(
           await checkVector(
-              vectors.findNearest(
-                  'embedding', <double>[1, 0], 4, DistanceMeasure.dotProduct,
-                  distanceResultField: 'similarity', distanceThreshold: 0.9),
+              vectors.findNearest(vectorField: 'embedding', queryVector: <double>[1, 0], limit: 4, distanceMeasure: DistanceMeasure.dotProduct, distanceResultField: 'similarity', distanceThreshold: 0.9),
               distanceField: 'similarity'),
           <String>['d', 'a']);
     });

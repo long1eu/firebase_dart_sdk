@@ -19,7 +19,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/model/database_id.da
 
 import '../../../util/test_util.dart' as util;
 
-final Firestore firestore = FirebaseFirestoreMock();
+final FirebaseFirestore firestore = FirebaseFirestoreMock();
 
 CollectionReference collectionReference(String path) {
   return CollectionReferenceInternal.create(ResourcePath.fromString(path), firestore);
@@ -116,7 +116,7 @@ QuerySnapshot querySnapshot(
   return QuerySnapshotInternal.create(query(path), viewSnapshot, firestore);
 }
 
-/// A [Firestore] without a client.
+/// A [FirebaseFirestore] without a client.
 // ignore: non_constant_identifier_names
-Firestore FirebaseFirestoreMock() =>
+FirebaseFirestore FirebaseFirestoreMock() =>
     FirestoreInternal.detached(DatabaseId.forProject('project'));

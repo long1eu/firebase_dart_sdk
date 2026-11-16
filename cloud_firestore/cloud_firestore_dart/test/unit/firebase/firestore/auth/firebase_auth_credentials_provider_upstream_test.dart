@@ -33,9 +33,9 @@ String _jwt(String id) {
       })}.sig';
 }
 
-class _MockAuthProvider implements InternalTokenProvider {
-  final StreamController<InternalTokenResult> tokenChanges =
-      StreamController<InternalTokenResult>.broadcast();
+class _MockAuthProvider implements AuthTokenProvider {
+  final StreamController<AuthTokenChange> tokenChanges =
+      StreamController<AuthTokenChange>.broadcast();
   final List<bool> getAccessTokenCalls = <bool>[];
 
   /// Called for every getAccessToken; defaults to a completed result.
@@ -52,7 +52,7 @@ class _MockAuthProvider implements InternalTokenProvider {
   }
 
   @override
-  Stream<InternalTokenResult> get onTokenChanged => tokenChanges.stream;
+  Stream<AuthTokenChange> get onTokenChanged => tokenChanges.stream;
 }
 
 Future<void> _flush() => Future<void>.delayed(Duration.zero);
@@ -116,7 +116,7 @@ void main() {
     expect(users, <User>[const User('TestUID1')]);
 
     auth.uid = 'TestUID2';
-    auth.tokenChanges.add(InternalTokenResult(_jwt('changed')));
+    auth.tokenChanges.add(AuthTokenChange(_jwt('changed')));
     await _flush();
     await sub.cancel();
 
@@ -135,7 +135,7 @@ void main() {
 
     await sub.cancel();
     auth.uid = 'TestUID';
-    auth.tokenChanges.add(InternalTokenResult(_jwt('changed')));
+    auth.tokenChanges.add(AuthTokenChange(_jwt('changed')));
     await _flush();
 
     expect(users, <User>[User.unauthenticated]);
@@ -205,7 +205,7 @@ void main() {
     final Future<String?> result = provider.token;
     expect(auth.getAccessTokenCalls.length, 1);
 
-    auth.tokenChanges.add(InternalTokenResult(_jwt('changed')));
+    auth.tokenChanges.add(AuthTokenChange(_jwt('changed')));
     await _flush();
     auth.onGetAccessToken = () async => GetTokenResult(_jwt('TestToken2'));
     first.complete(GetTokenResult(_jwt('TestToken')));

@@ -7,7 +7,7 @@ a token with its requests. For apps whose users sign in with Firebase Auth, and 
 tools that use a service account or Application Default Credentials. It is not affiliated with
 or supported by Google or Firebase.
 
-> **Status: 0.1.1.** Verified with unit tests and against the Firebase
+> **Status: 0.2.0.** Verified with unit tests and against the Firebase
 > emulators only: nothing was run against the real Firebase Auth service or Google's token
 > endpoint.
 
@@ -30,15 +30,15 @@ import 'package:firebase_auth_providers_dart/firebase_auth_providers_dart.dart';
 final FirebaseApp app = FirebaseApp.withOptions(
   const FirebaseOptions(
     apiKey: '<the Web API key of the project>',
-    applicationId: '1:1234567890:dart:example',
+    appId: '1:1234567890:dart:example',
     projectId: 'my-project',
   ),
 );
 // Before the Firestore instance is created: it becomes the token provider of the app.
 final FirebaseUserAuth auth = await FirebaseUserAuth.forApp(app);
-final Firestore firestore = Firestore.instanceFor(app: app);
+final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(app: app);
 
-await auth.signInWithEmailAndPassword('ada@example.com', password);
+await auth.signInWithEmailAndPassword(email: 'ada@example.com', password: password);
 await firestore.doc('users/${auth.uid}/notes/first').set({'text': 'hello'});
 await auth.signOut();
 ```

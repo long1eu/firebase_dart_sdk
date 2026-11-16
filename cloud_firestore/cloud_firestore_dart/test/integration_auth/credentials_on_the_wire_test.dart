@@ -57,7 +57,7 @@ String unique(String prefix) =>
 const String appCheckHeader = 'x-firebase-appcheck';
 
 /// An App Check provider under the control of the test.
-class FakeAppCheck implements InternalAppCheckTokenProvider {
+class FakeAppCheck implements AppCheckTokenProvider {
   FakeAppCheck(this.token);
 
   /// The token [getToken] returns.
@@ -115,14 +115,14 @@ Future<void> eventually(
   }
 }
 
-final Matcher isPermissionDenied = isA<FirestoreError>().having(
-  (FirestoreError e) => e.code,
+final Matcher isPermissionDenied = isA<FirestoreException>().having(
+  (FirestoreException e) => e.errorCode,
   'code',
   FirestoreErrorCode.permissionDenied,
 );
 
-final Matcher isUnauthenticated = isA<FirestoreError>().having(
-  (FirestoreError e) => e.code,
+final Matcher isUnauthenticated = isA<FirestoreException>().having(
+  (FirestoreException e) => e.errorCode,
   'code',
   FirestoreErrorCode.unauthenticated,
 );
@@ -179,18 +179,18 @@ void main() {
     }
     cleanups.clear();
     for (final FirebaseApp app in apps) {
-      app.delete();
+      await app.delete();
     }
     apps.clear();
     Datastore.transportOverride = null;
     liteTransportOverride = null;
   });
 
-  FirebaseApp newApp({InternalAppCheckTokenProvider? appCheck}) {
+  FirebaseApp newApp({AppCheckTokenProvider? appCheck}) {
     final FirebaseApp app = FirebaseApp.withOptions(
       const FirebaseOptions(
         apiKey: 'fake-api-key',
-        applicationId: 'appId',
+        appId: 'appId',
         projectId: projectId,
       ),
       name: unique('wire-'),
@@ -237,7 +237,7 @@ void main() {
   /// The full SDK over [transport], through a new proxy (returned with the instance).
   Future<
     (
-      Firestore,
+      FirebaseFirestore,
       List<RecordedRequest> Function(),
       void Function(CredentialsCheck?),
     )
@@ -262,9 +262,9 @@ void main() {
           (DatabaseInfo databaseInfo, ChannelOptionsProvider options) =>
               WebChannelTransport(IoWebHttpClient(), databaseInfo, options);
     }
-    final Firestore firestore = Firestore.instanceFor(
+    final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(
       app: app,
-      settings: FirestoreSettings(
+      settings: Settings(
         host: host,
         port: port,
         sslEnabled: false,
@@ -280,7 +280,7 @@ void main() {
   /// Firestore Lite over [transport], through a new proxy.
   Future<
     (
-      lite.Firestore,
+      lite.FirebaseFirestore,
       List<RecordedRequest> Function(),
       void Function(CredentialsCheck?),
     )
@@ -305,9 +305,9 @@ void main() {
           (DatabaseInfo databaseInfo, ChannelOptionsProvider options) =>
               RestTransport(IoWebHttpClient(), databaseInfo, options);
     }
-    final lite.Firestore db = lite.Firestore.instanceFor(
+    final lite.FirebaseFirestore db = lite.FirebaseFirestore.instanceFor(
       app: app,
-      settings: lite.FirestoreSettings().withEmulator(host, port),
+      settings: lite.Settings().withEmulator(host, port),
     );
     cleanups.add(db.terminate);
     return (db, requests, setCheck);
@@ -330,8 +330,14 @@ void main() {
           final FakeAppCheck appCheck = FakeAppCheck('app-check-1');
           final FirebaseApp app = newApp(appCheck: appCheck);
           final FirebaseUserAuth auth = await newAuth(app);
-          final (Firestore db, List<RecordedRequest> Function() requests, _) =
-              await newFirestore(app, transport);
+          final (
+            FirebaseFirestore db,
+            List<RecordedRequest> Function() requests,
+            _,
+          ) = await newFirestore(
+            app,
+            transport,
+          );
           final AuthUser user = await auth.signInAnonymously();
           final String idToken = (await auth.getAccessToken(
             forceRefresh: false,
@@ -345,7 +351,9 @@ void main() {
           await ref.set(<String, Object?>{'v': 1});
           final Completer<void> synced = Completer<void>();
           final StreamSubscription<DocumentSnapshot<Map<String, Object?>>> sub =
-              ref.snapshots.listen((DocumentSnapshot<Map<String, Object?>> s) {
+              ref.snapshots().listen((
+                DocumentSnapshot<Map<String, Object?>> s,
+              ) {
                 if (!s.metadata.isFromCache && !synced.isCompleted) {
                   synced.complete();
                 }
@@ -356,7 +364,7 @@ void main() {
               .collection('users/${user.uid}/$run')
               .count()
               .get();
-          expect(count.getCount(), 1);
+          expect(count.count, 1);
 
           final List<RecordedRequest> seen = requests();
           expect(
@@ -397,15 +405,21 @@ void main() {
         final FakeAppCheck appCheck = FakeAppCheck('app-check-1');
         final FirebaseApp app = newApp(appCheck: appCheck);
         final FirebaseUserAuth auth = await newAuth(app);
-        final (Firestore db, List<RecordedRequest> Function() requests, _) =
-            await newFirestore(app, transport);
+        final (
+          FirebaseFirestore db,
+          List<RecordedRequest> Function() requests,
+          _,
+        ) = await newFirestore(
+          app,
+          transport,
+        );
         final AuthUser user = await auth.signInAnonymously();
         final CollectionReference<Map<String, Object?>> collection = db
             .collection('users/${user.uid}/${unique('run')}');
         await collection.doc('a').set(<String, Object?>{'v': 1});
         expect(
           await collection.count().get().then(
-            (AggregateQuerySnapshot s) => s.getCount(),
+            (AggregateQuerySnapshot s) => s.count,
           ),
           1,
         );
@@ -416,7 +430,7 @@ void main() {
         appCheck.change('app-check-2');
         expect(
           await collection.count().get().then(
-            (AggregateQuerySnapshot s) => s.getCount(),
+            (AggregateQuerySnapshot s) => s.count,
           ),
           1,
         );
@@ -440,7 +454,7 @@ void main() {
         final FirebaseApp app = newApp(appCheck: appCheck);
         final FirebaseUserAuth auth = await newAuth(app);
         final (
-          Firestore db,
+          FirebaseFirestore db,
           List<RecordedRequest> Function() requests,
           void Function(CredentialsCheck?) setCheck,
         ) = await newFirestore(
@@ -484,8 +498,8 @@ void main() {
         // A listener works with the refreshed token too.
         final DocumentSnapshot<Map<String, Object?>> snapshot = await db
             .doc(path)
-            .get(Source.server);
-        expect(snapshot.data, <String, Object?>{'v': 1});
+            .get(GetOptions(source: Source.server));
+        expect(snapshot.data(), <String, Object?>{'v': 1});
         expect(requests().last.rejected, isFalse);
       });
 
@@ -495,7 +509,7 @@ void main() {
           final FirebaseApp app = newApp();
           final FirebaseUserAuth auth = await newAuth(app);
           final (
-            Firestore db,
+            FirebaseFirestore db,
             List<RecordedRequest> Function() requests,
             void Function(CredentialsCheck?) setCheck,
           ) = await newFirestore(
@@ -548,7 +562,7 @@ void main() {
           );
           // The rules saw the refreshed token of the same user.
           expect(
-            (await db.doc(path).get(Source.server)).data,
+            (await db.doc(path).get(GetOptions(source: Source.server))).data(),
             <String, Object?>{'v': 1},
           );
         },
@@ -562,13 +576,19 @@ void main() {
             ..error = StateError('attestation failed');
           final FirebaseApp app = newApp(appCheck: appCheck);
           final FirebaseUserAuth auth = await newAuth(app);
-          final (Firestore db, List<RecordedRequest> Function() requests, _) =
-              await newFirestore(app, transport);
+          final (
+            FirebaseFirestore db,
+            List<RecordedRequest> Function() requests,
+            _,
+          ) = await newFirestore(
+            app,
+            transport,
+          );
           final AuthUser user = await auth.signInAnonymously();
           final String path = 'users/${user.uid}/${unique('run')}/doc';
           await db.doc(path).set(<String, Object?>{'v': 1});
           expect(
-            (await db.doc(path).get(Source.server)).data,
+            (await db.doc(path).get(GetOptions(source: Source.server))).data(),
             <String, Object?>{'v': 1},
           );
           expect(requests(), isNotEmpty);
@@ -584,7 +604,7 @@ void main() {
                 .collection('users/${user.uid}/${unique('run')}')
                 .count()
                 .get()
-                .then((AggregateQuerySnapshot s) => s.getCount()),
+                .then((AggregateQuerySnapshot s) => s.count),
             isNotNull,
           );
           expect(requests().last.method, 'RunAggregationQuery');
@@ -608,8 +628,14 @@ void main() {
             ..throwError = StateError('no attestation provider');
           final FirebaseApp app = newApp(appCheck: appCheck);
           final FirebaseUserAuth auth = await newAuth(app);
-          final (Firestore db, List<RecordedRequest> Function() requests, _) =
-              await newFirestore(app, transport);
+          final (
+            FirebaseFirestore db,
+            List<RecordedRequest> Function() requests,
+            _,
+          ) = await newFirestore(
+            app,
+            transport,
+          );
           final AuthUser user = await auth.signInAnonymously();
           final String path = 'users/${user.uid}/${unique('run')}/doc';
           await db
@@ -617,7 +643,7 @@ void main() {
               .set(<String, Object?>{'v': 1})
               .timeout(const Duration(seconds: 20));
           expect(
-            (await db.doc(path).get(Source.server)).data,
+            (await db.doc(path).get(GetOptions(source: Source.server))).data(),
             <String, Object?>{'v': 1},
           );
           expect(requests(), isNotEmpty);
@@ -647,10 +673,18 @@ void main() {
 
       test('no App Check provider: no header', () async {
         final FirebaseApp app = newApp();
-        final (Firestore db, List<RecordedRequest> Function() requests, _) =
-            await newFirestore(app, transport);
+        final (
+          FirebaseFirestore db,
+          List<RecordedRequest> Function() requests,
+          _,
+        ) = await newFirestore(
+          app,
+          transport,
+        );
         await expectLater(
-          db.doc('signed_in/${unique('x')}').get(Source.server),
+          db
+              .doc('signed_in/${unique('x')}')
+              .get(GetOptions(source: Source.server)),
           throwsA(isPermissionDenied),
         );
         expect(requests(), isNotEmpty);
@@ -676,7 +710,7 @@ void main() {
           final FirebaseApp app = newApp(appCheck: appCheck);
           final FirebaseUserAuth auth = await newAuth(app);
           final (
-            lite.Firestore db,
+            lite.FirebaseFirestore db,
             List<RecordedRequest> Function() requests,
             _,
           ) = await newLite(
@@ -691,10 +725,10 @@ void main() {
             'users/${user.uid}/${unique('run')}/doc',
           );
           await ref.set(<String, Object?>{'v': 1});
-          expect((await ref.get()).data, <String, Object?>{'v': 1});
+          expect((await ref.get()).data(), <String, Object?>{'v': 1});
 
           appCheck.change('app-check-2');
-          expect((await ref.get()).data, <String, Object?>{'v': 1});
+          expect((await ref.get()).data(), <String, Object?>{'v': 1});
 
           final List<RecordedRequest> seen = requests();
           expect(seen, hasLength(3), reason: describe(seen));
@@ -721,7 +755,7 @@ void main() {
           ..refresh = () => 'fresh-${++refreshes}';
         final FirebaseApp app = newApp(appCheck: appCheck);
         final (
-          lite.Firestore db,
+          lite.FirebaseFirestore db,
           List<RecordedRequest> Function() requests,
           void Function(CredentialsCheck?) setCheck,
         ) = await newLite(
@@ -756,7 +790,7 @@ void main() {
         final FirebaseApp app = newApp();
         final FirebaseUserAuth auth = await newAuth(app);
         final (
-          lite.Firestore db,
+          lite.FirebaseFirestore db,
           List<RecordedRequest> Function() requests,
           void Function(CredentialsCheck?) setCheck,
         ) = await newLite(
@@ -791,7 +825,7 @@ void main() {
           'Bearer $first',
           'Bearer $second',
         ]);
-        expect((await ref.get()).data, <String, Object?>{'v': 1});
+        expect((await ref.get()).data(), <String, Object?>{'v': 1});
       });
 
       test(
@@ -804,7 +838,7 @@ void main() {
             final FirebaseApp app = newApp(appCheck: appCheck);
             final FirebaseUserAuth auth = await newAuth(app);
             final (
-              lite.Firestore db,
+              lite.FirebaseFirestore db,
               List<RecordedRequest> Function() requests,
               _,
             ) = await newLite(
@@ -816,7 +850,7 @@ void main() {
               'users/${user.uid}/${unique('run')}/doc',
             );
             await ref.set(<String, Object?>{'v': 1});
-            expect((await ref.get()).data, <String, Object?>{'v': 1});
+            expect((await ref.get()).data(), <String, Object?>{'v': 1});
             expect(requests(), hasLength(2));
             expect(
               requests().map(
@@ -832,11 +866,11 @@ void main() {
   }
 
   group('Security rules and the claims of the ID token', () {
-    Future<Firestore> direct(FirebaseApp app) async {
+    Future<FirebaseFirestore> direct(FirebaseApp app) async {
       final (String host, int port) = upstream();
-      final Firestore firestore = Firestore.instanceFor(
+      final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(
         app: app,
-        settings: FirestoreSettings(
+        settings: Settings(
           host: host,
           port: port,
           sslEnabled: false,
@@ -859,7 +893,7 @@ void main() {
     test('request.auth.token carries the custom claims', () async {
       final FirebaseApp app = newApp();
       final FirebaseUserAuth auth = await newAuth(app);
-      final Firestore db = await direct(app);
+      final FirebaseFirestore db = await direct(app);
       final String path = 'testers/${unique('doc')}';
 
       await auth.signInWithCustomToken(
@@ -874,9 +908,10 @@ void main() {
         customToken(unique('tester-'), <String, Object?>{'role': 'tester'}),
       );
       await db.doc(path).set(<String, Object?>{'v': 1});
-      expect((await db.doc(path).get(Source.server)).data, <String, Object?>{
-        'v': 1,
-      });
+      expect(
+        (await db.doc(path).get(GetOptions(source: Source.server))).data(),
+        <String, Object?>{'v': 1},
+      );
     });
 
     test(
@@ -884,7 +919,7 @@ void main() {
       () async {
         final FirebaseApp app = newApp();
         final FirebaseUserAuth auth = await newAuth(app);
-        final Firestore db = await direct(app);
+        final FirebaseFirestore db = await direct(app);
         final String path = 'password_users/${unique('doc')}';
 
         await auth.signInAnonymously();
@@ -894,13 +929,14 @@ void main() {
         );
 
         await auth.createUserWithEmailAndPassword(
-          '${unique('pw')}@example.com',
-          'password',
+          email: '${unique('pw')}@example.com',
+          password: 'password',
         );
         await db.doc(path).set(<String, Object?>{'v': 1});
-        expect((await db.doc(path).get(Source.server)).data, <String, Object?>{
-          'v': 1,
-        });
+        expect(
+          (await db.doc(path).get(GetOptions(source: Source.server))).data(),
+          <String, Object?>{'v': 1},
+        );
       },
     );
   }, skip: skipReason);

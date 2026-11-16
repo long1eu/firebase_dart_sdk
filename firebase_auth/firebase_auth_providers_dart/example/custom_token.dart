@@ -29,7 +29,7 @@ Future<void> main() async {
   final FirebaseApp app = FirebaseApp.withOptions(
     const FirebaseOptions(
       apiKey: 'fake-api-key',
-      applicationId: '1:1234567890:dart:example',
+      appId: '1:1234567890:dart:example',
       projectId: 'demo-test',
     ),
   );
@@ -54,13 +54,13 @@ Future<void> main() async {
   // A token that is not a custom token is refused.
   try {
     await auth.signInWithCustomToken('not a token');
-  } on FirebaseAuthProviderException catch (e) {
+  } on FirebaseAuthException catch (e) {
     print('a malformed token: ${e.code}');
   }
 
   await auth.deleteCurrentUser();
   await auth.dispose();
-  app.delete();
+  await app.delete();
 }
 
 /// A custom token without a signature, which only the emulator accepts.

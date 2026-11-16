@@ -14,37 +14,37 @@ On the web the opener picks the storage itself; follow the branches to see which
 
 ```mermaid
 flowchart TD
-    start["Firestore.instanceFor"] --> hasOpener{"openDatabase passed?"}
+    start["FirebaseFirestore.instanceFor"] --> hasOpener{"openDatabase passed?"}
     hasOpener -->|no| memory["Memory: gone when the instance is terminated"]
     hasOpener -->|"yes, on the Dart VM or in a Flutter app"| sqliteFile["SQLite file, kept across restarts"]
-    hasOpener -->|"yes, sqliteWebOpener in a browser"| hasWorker{"opfsWorker passed, and synchronous OPFS in workers?"}
+    hasOpener -->|"yes, sqliteOpener in a browser"| hasWorker{"opfsWorker passed, and synchronous OPFS in workers?"}
     hasWorker -->|yes| opfs["SQLite in a worker on a file in OPFS"]
     hasWorker -->|no| indexedDb["SQLite in the page on an in-memory copy, stored in IndexedDB"]
 ```
 
 ## Cache settings
 
-`FirestoreSettings.cacheSettings` chooses the kind of cache and its size:
+`Settings.cacheSettings` chooses the kind of cache and its size:
 
 ```dart
 // Persistent (needs an openDatabase): unused documents are removed once the
 // cache grows beyond about 100 MB, the default.
-final FirestoreSettings persistent = FirestoreSettings(
+final Settings persistent = Settings(
   cacheSettings: PersistentCacheSettings(sizeBytes: 100 * 1024 * 1024),
 );
 
 // Never removes anything.
-final FirestoreSettings unlimited = FirestoreSettings(
-  cacheSettings: PersistentCacheSettings(sizeBytes: FirestoreSettings.cacheSizeUnlimited),
+final Settings unlimited = Settings(
+  cacheSettings: PersistentCacheSettings(sizeBytes: Settings.cacheSizeUnlimited),
 );
 
 // In memory, dropping documents as soon as no listener needs them (the default
 // for a memory cache)...
-final FirestoreSettings eager = FirestoreSettings(cacheSettings: const MemoryCacheSettings());
+final Settings eager = Settings(cacheSettings: const MemoryCacheSettings());
 
 // ...or keeping them up to a size, so that a query that was listened to before
 // can be answered offline.
-final FirestoreSettings lru = FirestoreSettings(
+final Settings lru = Settings(
   cacheSettings: MemoryCacheSettings(gcSettings: MemoryLruGcSettings(sizeBytes: 40 * 1024 * 1024)),
 );
 ```
@@ -60,31 +60,34 @@ final FirestoreSettings lru = FirestoreSettings(
 ## SQLite on the Dart VM
 
 The package does not open SQLite files itself, so that you choose the binding. You pass a
-function that opens a database. A complete one for `package:sqlite3` is
-[`example/sqlite_database.dart`](../../cloud_firestore/cloud_firestore_dart/example/sqlite_database.dart):
-copy it into your app and add `sqlite3: ^2.7.3` to your dependencies (in a Flutter app also
-`sqlite3_flutter_libs: ^0.5.0`, which bundles the native library). The opener uses
-`package:sqlite3/open.dart`, which `sqlite3` 3.x no longer has, so stay on 2.x for now.
+function that opens a database. The companion package
+[`cloud_firestore_dart_sqlite`](../../cloud_firestore/cloud_firestore_dart_sqlite/) has one on top
+of `package:sqlite3`, for the VM, Flutter and the browser:
+
+```shell
+dart pub add cloud_firestore_dart_sqlite
+```
 
 ```dart
-import 'dart:io';
+import 'package:cloud_firestore_dart_sqlite/cloud_firestore_dart_sqlite.dart';
 
-import 'sqlite_database.dart'; // copied from the package's example/ folder
-
-final Directory directory = Directory('/home/ada/.local/share/my_app');
-final Firestore firestore = Firestore.instanceFor(
+final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(
   app: app,
-  openDatabase: sqliteOpener(directory),
-  settings: FirestoreSettings(cacheSettings: PersistentCacheSettings()),
+  openDatabase: sqliteOpener(directory: '/home/ada/.local/share/my_app'),
+  settings: Settings(cacheSettings: PersistentCacheSettings()),
 );
 ```
+
+It works with `sqlite3` 2.7.3 to 3.x. With 3.x (Dart 3.10 and later) `sqlite3` bundles SQLite
+itself and nothing else is needed; with 2.x a Flutter app adds `sqlite3_flutter_libs: ^0.5.0`
+and a Linux server needs `libsqlite3.so`. Its README has the details per platform.
 
 The opener receives a name that is unique per app name, project and database (for example
 `firestore.[DEFAULT].my-project.(default)`) and decides where the file goes. If you write your
 own opener over another binding, implement `Database` (`execute`, `query`, `delete`, `close`,
-`path`) and call the callbacks in the order the example does: `onConfigure`, then `onCreate` for
-a new file or `onUpgrade` / `onDowngrade` when the stored version differs, store the version,
-then `onOpen`. The doc comment of `OpenDatabase` has the details.
+`path`) and call the callbacks in the order the opener of `cloud_firestore_dart_sqlite` does:
+`onConfigure`, then `onCreate` for a new file or `onUpgrade` / `onDowngrade` when the stored
+version differs, store the version, then `onOpen`. The doc comment of `OpenDatabase` has the details.
 
 `example/offline_persistence.dart` is a runnable program: it writes online, restarts on the same
 file, reads offline and writes offline.
@@ -93,12 +96,14 @@ file, reads offline and writes offline.
 
 The client sets no page cache size, like the Android SDK (which sets none either; IndexedDB in
 the JS SDK has nothing to set): the connection keeps SQLite's default, 2 MB in SQLite's own build
-(`sqlite3_flutter_libs`) and 2000 pages (8 MB) in the library of macOS. The example opener takes
-`pageCacheMb` to change it:
+(`sqlite3` 3.x and `sqlite3_flutter_libs`) and 2000 pages (8 MB) in the library of macOS.
+`sqliteOpener` takes `pageCacheMb` to change it:
 
 ```dart
-final Directory directory = Directory('/home/ada/.local/share/my_app');
-final OpenDatabase opener = sqliteOpener(directory, pageCacheMb: 32);
+final OpenDatabase opener = sqliteOpener(
+  directory: '/home/ada/.local/share/my_app',
+  pageCacheMb: 32,
+);
 ```
 
 Measured on a Mac with plenty of memory (`tool/bench/index_bench.dart` and
@@ -118,7 +123,7 @@ instance with a persistent cache).
 ```dart
 // Only the cache, never the network.
 final DocumentSnapshot<Map<String, Object?>> cached =
-    await firestore.doc('cities/SF').get(Source.cache);
+    await firestore.doc('cities/SF').get(const GetOptions(source: Source.cache));
 print(cached.metadata.isFromCache); // true
 
 // A write made offline is in the cache at once; its future completes when the
@@ -126,7 +131,7 @@ print(cached.metadata.isFromCache); // true
 final Future<void> write = firestore.doc('cities/SF').update({'visited': true});
 
 // Listeners say whether a snapshot holds writes the backend has not seen.
-firestore.doc('cities/SF').getSnapshots(MetadataChanges.include).listen(
+firestore.doc('cities/SF').snapshots(includeMetadataChanges: true).listen(
   (DocumentSnapshot<Map<String, Object?>> snapshot) {
     print('pending: ${snapshot.metadata.hasPendingWrites}');
   },
@@ -137,7 +142,7 @@ await firestore.disableNetwork();
 await firestore.enableNetwork();
 ```
 
-A write goes through these states; the table below gives what a listener with `MetadataChanges.include`
+A write goes through these states; the table below gives what a listener with `includeMetadataChanges: true`
 sees in each, for a document with no other pending write. Note that the future completes before
 `hasPendingWrites` turns false.
 
@@ -197,39 +202,39 @@ if (!Platform.isWindows) {
 
 ## On the web
 
-The cache is in memory by default. To keep it across page loads, copy
-[`example/sqlite_database_web.dart`](../../cloud_firestore/cloud_firestore_dart/example/sqlite_database_web.dart)
-into your app, add `sqlite3` (2.x, `^2.7.3`) and `web` to your dependencies, and serve the `sqlite3.wasm` file of
-the same `sqlite3` version next to your page (from the
-[sqlite3.dart releases](https://github.com/simolus3/sqlite3.dart/releases)):
+The cache is in memory by default. To keep it across page loads, use the same
+`cloud_firestore_dart_sqlite` package and serve the `sqlite3.wasm` file of the `sqlite3` version
+your app resolves next to your page (from the
+[sqlite3.dart releases](https://github.com/simolus3/sqlite3.dart/releases)). One command prints
+which file and from where:
+
+```shell
+dart run cloud_firestore_dart_sqlite:setup_web web
+```
 
 ```dart
-import 'sqlite_database_web.dart'; // copied from the package's example/ folder
+import 'package:cloud_firestore_dart_sqlite/cloud_firestore_dart_sqlite.dart';
 
 // IndexedDB: SQLite runs in the page on a copy of the whole database in memory.
-final Firestore firestore = Firestore.instanceFor(
+final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(
   app: app,
-  openDatabase: sqliteWebOpener(sqlite3Wasm: Uri.parse('sqlite3.wasm')),
+  openDatabase: sqliteOpener(), // loads sqlite3.wasm next to the page
 );
 ```
 
-To keep the database out of memory, also copy
-[`example/sqlite_opfs_worker.dart`](../../cloud_firestore/cloud_firestore_dart/example/sqlite_opfs_worker.dart),
-compile it with `dart compile js` and pass its URL. SQLite then runs in that dedicated worker on a
-file in the origin private file system (OPFS) and reads what it needs. No cross-origin isolation
+To keep the database out of memory, pass the URL of the OPFS worker, which the same command
+compiled to `web/sqlite_opfs_worker.js`. SQLite then runs in that dedicated worker on a file in
+the origin private file system (OPFS) and reads what it needs. No cross-origin isolation
 headers are needed; a browser without synchronous OPFS access in workers falls back to
 IndexedDB, and the first OPFS open of a cache that is in IndexedDB moves it, pending writes
 included.
 
 ```dart
-import 'sqlite_database_web.dart'; // copied from the package's example/ folder
+import 'package:cloud_firestore_dart_sqlite/cloud_firestore_dart_sqlite.dart';
 
-final Firestore firestore = Firestore.instanceFor(
+final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(
   app: app,
-  openDatabase: sqliteWebOpener(
-    sqlite3Wasm: Uri.parse('sqlite3.wasm'),
-    opfsWorker: Uri.parse('sqlite_opfs_worker.js'),
-  ),
+  openDatabase: sqliteOpener(opfsWorker: Uri.parse('sqlite_opfs_worker.js')),
 );
 ```
 
@@ -237,10 +242,10 @@ What to know (all measured in Chrome against the emulator; other browsers are un
 
 - **One tab at a time.** The database is guarded by a Web Lock. A second tab (or a second
   instance in the same page) that opens the same cache waits two seconds for the lock and then
-  fails: the operations of that instance fail with a `FirestoreError` whose code is
-  `failedPrecondition`. Such a tab should use a memory cache. `Firestore.instanceFor` returns
+  fails: the operations of that instance fail with a `FirestoreException` whose code is
+  `failedPrecondition`. Such a tab should use a memory cache. `FirebaseFirestore.instanceFor` returns
   at once and opens the cache in the background, so the error comes from the first operation:
-  the `openWithMemoryFallback` helper of the example waits for a first operation that only
+  `openWithMemoryFallback` of `cloud_firestore_dart_sqlite` waits for a first operation that only
   reads the cache, and on `failedPrecondition` terminates that instance and creates one with a
   memory cache.
 - **Crash safety.** What a write future acknowledged is stored. A tab that dies in the middle
@@ -260,7 +265,7 @@ What to know (all measured in Chrome against the emulator; other browsers are un
 ```dart
 await firestore.terminate();        // the cache must not be in use by this instance
 await firestore.clearPersistence(); // deletes the files (or the browser storage)
-final Firestore fresh = Firestore.instanceFor(app: app);
+final FirebaseFirestore fresh = FirebaseFirestore.instanceFor(app: app);
 ```
 
 `clearPersistence()` on an instance that is still running fails with `failedPrecondition`.
@@ -290,7 +295,7 @@ await indexes?.enableIndexAutoCreation();
   an index as far as it is filled and reads the rest, so results are complete at every moment.
 - `disableIndexAutoCreation()` stops creating indexes (existing ones stay in use);
   `deleteAllIndexes()` removes them all.
-- `Firestore.setIndexConfiguration(json)` (deprecated, as in the other SDKs) configures the
+- `Firestore.setIndexConfigurationFromJSON(json)` (deprecated, as in the other SDKs) configures the
   indexes from a definition in the format of `firestore.indexes.json`; `queryScope` and
   `fieldOverrides` are ignored. It replaces the previous configuration.
 - All query forms can be served: comparison operators, `in` / `not-in`, `array-contains(-any)`,

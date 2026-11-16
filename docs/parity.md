@@ -54,20 +54,20 @@ for a real project that has not been run yet; see [Known limitations](#known-lim
 | JS feature | Status | Dart API or gap |
 |---|---|---|
 | `doc`, `collection`, `collectionGroup`, references and paths | supported | `firestore.doc`, `collection`, `collectionGroup`; `DocumentReference.id/path/parent` |
-| `getDoc`, `getDocFromCache`, `getDocFromServer` | supported | `ref.get()`, `ref.get(Source.cache)`, `ref.get(Source.server)`; `test/integration/firebase/firestore/source_test.dart` |
-| `setDoc`, `setDoc(..., {merge})`, `{mergeFields}` | supported | `set(data, SetOptions.mergeAllFields)`, `SetOptions.mergeFields([...])` / `mergeFieldPaths` |
-| `updateDoc` (map and varargs forms) | supported | `update(map)`, `updateFromList([field, value, ...])` |
+| `getDoc`, `getDocFromCache`, `getDocFromServer` | supported | `ref.get()`, `ref.get(const GetOptions(source: Source.cache))`, `... Source.server`; `test/integration/firebase/firestore/source_test.dart` |
+| `setDoc`, `setDoc(..., {merge})`, `{mergeFields}` | supported | `set(data, const SetOptions(merge: true))`, `SetOptions(mergeFields: [...])` |
+| `updateDoc` (map and varargs forms) | supported | `update(map)`, with `String` or `FieldPath` keys |
 | `deleteDoc`, `addDoc` | supported | `delete()`, `CollectionReference.add` |
 | `serverTimestamp`, `increment`, `arrayUnion`, `arrayRemove`, `deleteField` | supported | `FieldValue.serverTimestamp()`, `.increment`, `.arrayUnion`, `.arrayRemove`, `.delete()`; `numeric_transformas_test.dart`, `array_transforms_test.dart`, `server_timestamp_test.dart` (all under `test/integration/firebase/firestore/`) |
 | `minimum` / `maximum` field transforms | supported | `FieldValue.minimum` / `.maximum`; `test/integration/firebase/firestore/min_max_transforms_test.dart` |
 | Value types: `Timestamp`, `GeoPoint`, `Bytes`, `DocumentReference`, maps, arrays | supported | `Timestamp`, `GeoPoint`, `Blob`, `DocumentReference`; `test/integration/firebase/firestore/type_test.dart`, `value_fidelity_test.dart` |
-| `vector()` / `VectorValue` | supported | `FieldValue.vector`, `VectorValue`; `test/integration/firebase/firestore/vector_test.dart` |
+| `vector()` / `VectorValue` | supported | `VectorValue`; `test/integration/firebase/firestore/vector_test.dart` |
 | BSON types (`MinKey`, `MaxKey`, `Int32Value`, `Decimal128Value`, `BsonObjectId`, `BsonTimestamp`, `RegexValue`, BSON binary) | supported (Enterprise edition) | Same class names, `Blob.bsonBinary`; `test/integration_enterprise/bson_types_test.dart`. Differences in [Known limitations](#known-limitations) |
 | `withConverter`, `FirestoreDataConverter`, `withConverter(null)` | supported | `withConverter<T>(...)`, `withoutConverter()`; `test/integration/firebase/firestore/converter_test.dart` |
-| `SnapshotOptions.serverTimestamps` (`'estimate'`, `'previous'`) | supported | `snapshot.getData(ServerTimestampBehavior.estimate)` or per field; `server_timestamp_test.dart` |
+| `SnapshotOptions.serverTimestamps` (`'estimate'`, `'previous'`) | supported | `snapshot.data(serverTimestamps: ServerTimestampBehavior.estimate)` or per field; `server_timestamp_test.dart` |
 | `refEqual`, `queryEqual`, `snapshotEqual` | supported | `==` on references, queries and snapshots |
 | `toJSON` / `fromJSON` on `Timestamp`, `GeoPoint`, `Bytes`, `VectorValue`, `DocumentReference` | supported | `toJson()` / `.fromJson(...)` in the JSON format of the JS SDK; `test/unit/firebase/firestore/snapshot_json_test.dart`. A cross-SDK test against the real JS SDK exists (`test/integration/firebase/firestore/js_interop_test.dart`) but is skipped unless Node.js and its harness are installed |
-| Named databases (`getFirestore(app, 'db')`) | supported | `Firestore.instanceFor(app: app, database: 'db')`; `test/integration/firebase/firestore/firestore_test.dart` |
+| Named databases (`getFirestore(app, 'db')`) | supported | `FirebaseFirestore.instanceFor(app: app, databaseId: 'db')`; `test/integration/firebase/firestore/firestore_test.dart` |
 | Documents up to 16 MB | partial | Not verified: the gRPC transport sets no message size limit, but `test/integration/firebase/firestore/large_document_test.dart` needs a production database (the emulator rejects documents over 1 MiB) and has not been run |
 | `UpdateData<T>` / `WithFieldValue<T>` typing | not applicable | TypeScript typing; `update` takes `Map<String, Object?>` |
 | `ignoreUndefinedProperties` | not applicable | Dart has no `undefined` |
@@ -77,14 +77,14 @@ for a real project that has not been run yet; see [Known limitations](#known-lim
 
 | JS feature | Status | Dart API or gap |
 |---|---|---|
-| `where` with `==`, `<`, `<=`, `>`, `>=`, `array-contains`, `in`, `array-contains-any` | supported | `where('f', isEqualTo: ...)` named arguments, `whereEqualTo(...)` style methods or `Filter.equalTo(...)` objects |
+| `where` with `==`, `<`, `<=`, `>`, `>=`, `array-contains`, `in`, `array-contains-any` | supported | `where('f', isEqualTo: ...)` named arguments or `Filter(...)` objects |
 | `!=` and `not-in` | supported | `isNotEqualTo`, `whereNotIn`; `test/integration/firebase/firestore/query_test.dart` (`testSDKUsesNotEqualFiltersSameAsServer`, `testSDKUsesNotInFiltersSameAsServer`) |
 | `or()` / `and()` composite filters | supported | `Filter.or([...])`, `Filter.and([...])`; `test/integration/firebase/firestore/or_query_test.dart` |
 | Range and inequality filters on several fields | supported | `test/integration/firebase/firestore/composite_index_query_test.dart` |
 | `orderBy`, `limit`, `limitToLast` | supported | `orderBy`, `limit`, `limitToLast`; `test/integration/firebase/firestore/limit_to_last_test.dart` |
 | Cursors `startAt`, `startAfter`, `endAt`, `endBefore` (values or snapshot) | supported | `startAt([...])`, `startAtDocument(snapshot)`, ...; `test/integration/firebase/firestore/cursor_test.dart` |
-| `documentId()` | supported | `FieldPath.documentIdField`; `test/integration/firebase/firestore/query_where_test.dart` |
-| `getDocs`, `getDocsFromCache`, `getDocsFromServer` | supported | `query.get()`, `get(Source.cache)`, `get(Source.server)` |
+| `documentId()` | supported | `FieldPath.documentId`; `test/integration/firebase/firestore/query_where_test.dart` |
+| `getDocs`, `getDocsFromCache`, `getDocsFromServer` | supported | `query.get()`, `get(const GetOptions(source: Source.cache))`, `... Source.server` |
 | Vector search `findNearest` on a classic query | supported (extra) | `Query.findNearest(...)`, server only. Not in the JS client SDK (there it is a pipeline stage); follows the Android SDK. `test/integration/firebase/firestore/vector_test.dart` |
 
 ## Aggregations
@@ -99,12 +99,12 @@ for a real project that has not been run yet; see [Known limitations](#known-lim
 
 | JS feature | Status | Dart API or gap |
 |---|---|---|
-| `onSnapshot` on documents and queries | supported | `ref.snapshots`, `query.snapshots` (a `Stream`); cancel the subscription to stop |
-| `includeMetadataChanges` | supported | `getSnapshots(MetadataChanges.include)` |
-| `source: 'cache'` (listen to the cache only) | supported | `getSnapshotsWithOptions(SnapshotListenOptions(source: ListenSource.cache))`; `test/integration/firebase/firestore/listen_source_test.dart`, `snapshot_listener_source_test.dart` |
+| `onSnapshot` on documents and queries | supported | `ref.snapshots()`, `query.snapshots()` (a `Stream`); cancel the subscription to stop |
+| `includeMetadataChanges` | supported | `snapshots(includeMetadataChanges: true)` |
+| `source: 'cache'` (listen to the cache only) | supported | `snapshots(source: ListenSource.cache)`; `test/integration/firebase/firestore/listen_source_test.dart`, `snapshot_listener_source_test.dart` |
 | `docChanges()` and change types | supported | `snapshot.docChanges`, `DocumentChangeType` |
 | `SnapshotMetadata` (`hasPendingWrites`, `fromCache`) | supported | `snapshot.metadata.hasPendingWrites`, `.isFromCache` |
-| `onSnapshotsInSync` | supported | `firestore.snapshotsInSync` stream; `test/integration/firebase/firestore/firestore_test.dart` |
+| `onSnapshotsInSync` | supported | `firestore.snapshotsInSync()` stream; `test/integration/firebase/firestore/firestore_test.dart` |
 | `QuerySnapshot.toJSON`, `DocumentSnapshot.toJSON`, `querySnapshotFromJSON`, `documentSnapshotFromJSON` | supported | `toJson()`, `QuerySnapshot.fromJson`, `DocumentSnapshot.fromJson`; `test/integration/firebase/firestore/snapshot_json_test.dart` |
 | `onSnapshotResume` (listen from a serialized snapshot) | supported | `firestore.querySnapshotsFromJson(json)`, `documentSnapshotsFromJson(json)`; `snapshot_json_test.dart` |
 | Error callback of `onSnapshot` | supported | The stream's `onError` |
@@ -113,9 +113,9 @@ for a real project that has not been run yet; see [Known limitations](#known-lim
 
 | JS feature | Status | Dart API or gap |
 |---|---|---|
-| `runTransaction` with retries and backoff, `maxAttempts` | supported | `firestore.runTransaction(fn, options: TransactionOptions(maxAttempts: 5))`; `test/integration/firebase/firestore/transaction_test.dart` |
+| `runTransaction` with retries and backoff, `maxAttempts` | supported | `firestore.runTransaction(fn, maxAttempts: 5)`; `test/integration/firebase/firestore/transaction_test.dart` |
 | `writeBatch` | supported | `firestore.batch()`, `runBatch(fn)`; `test/integration/firebase/firestore/write_batch_test.dart` |
-| Read-only transactions | supported (extra) | `TransactionOptions(readOnly: true, readTime: ...)` with `getQuery` and `getAggregate`. Not in the JS client SDK (the server SDKs have it); `test/integration/firebase/firestore/read_only_transaction_test.dart` |
+| Read-only transactions | supported (extra) | `readOnly: true, readTime: ...` with `getQuery` and `getAggregate`. Not in the JS client SDK (the server SDKs have it); `test/integration/firebase/firestore/read_only_transaction_test.dart` |
 | `waitForPendingWrites` | supported | `firestore.waitForPendingWrites()` |
 | `terminate` | supported | `firestore.terminate()`; `test/integration/firebase/firestore/terminate_in_flight_test.dart`, `terminated_instance_test.dart` |
 
@@ -124,7 +124,7 @@ for a real project that has not been run yet; see [Known limitations](#known-lim
 | JS feature | Status | Dart API or gap |
 |---|---|---|
 | Memory cache, eager and LRU garbage collection | supported | `MemoryCacheSettings()`, `MemoryCacheSettings(gcSettings: MemoryLruGcSettings(sizeBytes: ...))` |
-| Persistent cache (`persistentLocalCache`) with `cacheSizeBytes`, `CACHE_SIZE_UNLIMITED` | supported | `PersistentCacheSettings(sizeBytes: ...)`, `FirestoreSettings.cacheSizeUnlimited`; you pass an `OpenDatabase` (SQLite on the VM, SQLite in WebAssembly on the web). See [Offline persistence](guides/offline_persistence.md) |
+| Persistent cache (`persistentLocalCache`) with `cacheSizeBytes`, `CACHE_SIZE_UNLIMITED` | supported | `PersistentCacheSettings(sizeBytes: ...)`, `Settings.cacheSizeUnlimited`; you pass an `OpenDatabase` (SQLite on the VM, SQLite in WebAssembly on the web). See [Offline persistence](guides/offline_persistence.md) |
 | IndexedDB as the storage | not applicable | SQLite file on the VM; on the web SQLite (WebAssembly) stored in IndexedDB or OPFS. `test/browser/web_persistence_test.dart`, `web_persistence_opfs_test.dart` |
 | `enableIndexedDbPersistence`, `enableMultiTabIndexedDbPersistence` (deprecated in JS) | not applicable | Use `cacheSettings` |
 | `clearIndexedDbPersistence` | supported | `firestore.clearPersistence()` after `terminate()`; `test/integration/firebase/firestore/clear_persistence_test.dart` |
@@ -138,7 +138,7 @@ for a real project that has not been run yet; see [Known limitations](#known-lim
 |---|---|---|
 | `getPersistentCacheIndexManager` | supported | `firestore.persistentCacheIndexManager` (null with a memory cache, as in JS) |
 | `enablePersistentCacheIndexAutoCreation`, `disable...`, `deleteAllPersistentCacheIndexes` | supported | `enableIndexAutoCreation()`, `disableIndexAutoCreation()`, `deleteAllIndexes()`; `test/integration/firebase/firestore/index_engine_test.dart`, `test/unit/firebase/firestore/persistent_cache_index_manager_test.dart` |
-| `setIndexConfiguration` (deprecated in JS) | supported | `firestore.setIndexConfiguration(json)` (deprecated here too); `test/integration/firebase/firestore/indexing_test.dart` |
+| `setIndexConfiguration` (deprecated in JS) | supported | `firestore.setIndexConfigurationFromJSON(json)` (deprecated here too); `test/integration/firebase/firestore/indexing_test.dart` |
 | Indexes for queries with inequalities on several fields | not supported | Scanned instead, as in the JS SDK |
 | Queries served by a persistent cache index | supported, with fixes over JS | Two gaps that the JS and Android SDKs have are fixed here: after one of the client's own writes the index no longer misses documents that watch sends later at an older or equal version, and a limit query refills its window when the document at its edge arrived late from a lagging target. A query served by an index also no longer returns documents that do not match it. Compared with a scan of the cache by `test/unit/firebase/firestore/core/view_listeners_property_test.dart` ("with and without field indexes"); one remaining gap in [Known limitations](#known-limitations) |
 
@@ -146,8 +146,8 @@ for a real project that has not been run yet; see [Known limitations](#known-lim
 
 | JS feature | Status | Dart API or gap |
 |---|---|---|
-| `loadBundle` (bytes, string, stream) with progress | supported | `loadBundle(bytes)`, `loadBundleStream(stream)` (encode a string with `utf8.encode`), `LoadBundleTask.stream` / `addOnProgressListener`; `test/integration/firebase/firestore/bundle_test.dart` |
-| `namedQuery` | supported | `firestore.getNamedQuery(name)`; `bundle_test.dart` |
+| `loadBundle` (bytes, string, stream) with progress | supported | `loadBundle(bytes)`, `loadBundleStream(stream)` (encode a string with `utf8.encode`), `LoadBundleTask.stream` / `future`; `test/integration/firebase/firestore/bundle_test.dart` |
+| `namedQuery` | supported | `firestore.namedQuery(name)`, `namedQueryGet(name)`; `bundle_test.dart` |
 
 ## Lite
 
@@ -155,7 +155,7 @@ for a real project that has not been run yet; see [Known limitations](#known-lim
 |---|---|---|
 | `firebase/firestore/lite` entry point | supported (experimental) | `package:cloud_firestore_dart/lite.dart`; `test/integration/firebase/firestore/lite_test.dart`, browser `test/browser/web_lite_test.dart`. See [Firestore Lite](guides/lite.md) |
 | Reads, writes, batches, transactions, queries, aggregations, converters | supported | Same as the main library, every call one request |
-| `where` with named arguments / `Filter` | supported | The `whereEqualTo(...)`-style methods of the main library are not in Lite |
+| `where` with named arguments / `Filter` | supported | The same `where` and `Filter` as the main library |
 | Small web build | supported | `tool/check_size.sh` checks that the Lite program contains no sync engine, cache or WebChannel |
 
 ## Pipelines
@@ -188,14 +188,14 @@ Preview, Enterprise edition only, as in the JS SDK. See [Pipelines](guides/pipel
 
 | JS feature | Status | Dart API or gap |
 |---|---|---|
-| App Check token on every request | supported | An `InternalAppCheckTokenProvider` on the `FirebaseApp` adds `x-firebase-appcheck` over gRPC, WebChannel, REST and Lite; `test/integration_auth/credentials_on_the_wire_test.dart`, `test/unit/firebase/firestore/auth/app_check_token_provider_test.dart`. Enforcement was never tested: the emulator does not enforce App Check |
+| App Check token on every request | supported | An `AppCheckTokenProvider` on the `FirebaseApp` adds `x-firebase-appcheck` over gRPC, WebChannel, REST and Lite; `test/integration_auth/credentials_on_the_wire_test.dart`, `test/unit/firebase/firestore/auth/app_check_token_provider_test.dart`. Enforcement was never tested: the emulator does not enforce App Check |
 | Device attestation (`initializeAppCheck` with reCAPTCHA and similar providers) | not supported | You supply the provider, for example one that gets tokens from your backend |
 
 ## Emulator
 
 | JS feature | Status | Dart API or gap |
 |---|---|---|
-| `connectFirestoreEmulator(db, host, port)` | supported | `FirestoreSettings().withEmulator(host, port)` |
+| `connectFirestoreEmulator(db, host, port)` | supported | `Settings().withEmulator(host, port)` |
 | `mockUserToken` | supported | `withEmulator(host, port, mockUserToken: ...)`; `test/integration/firebase/firestore/emulator_mock_user_token_test.dart` |
 | Emulator UI banner | not applicable | Browser UI of the JS SDK |
 
@@ -205,10 +205,10 @@ Preview, Enterprise edition only, as in the JS SDK. See [Pipelines](guides/pipel
 |---|---|---|
 | WebChannel streams for listen and write | supported (experimental) | Used automatically on the web; the integration suite runs over it on the VM (see the numbers above) and `test/browser/web_transport_smoke_test.dart` in Chrome |
 | REST for one-shot calls (fetch) | supported | `test/unit/firebase/firestore/remote/web/rest_transport_test.dart` |
-| `experimentalForceLongPolling`, `experimentalAutoDetectLongPolling` | supported | Same names on `FirestoreSettings`; long polling has its own integration run (above) and `test/browser/web_robustness_test.dart` |
-| `experimentalLongPollingOptions.timeoutSeconds` | supported | `FirestoreSettings(experimentalLongPollingOptions: ExperimentalLongPollingOptions(timeoutSeconds: 25))`, validated as in JS (5 to 30 seconds), sent as the `TO` parameter of long-polling requests; `test/unit/firebase/firestore/firestore_settings_test.dart`, `long_polling_options_test.dart`, `test/unit/firebase/firestore/remote/web/web_channel_test.dart` |
+| `experimentalForceLongPolling`, `experimentalAutoDetectLongPolling` | supported | `webExperimentalForceLongPolling`, `webExperimentalAutoDetectLongPolling` on `Settings`; long polling has its own integration run (above) and `test/browser/web_robustness_test.dart` |
+| `experimentalLongPollingOptions.timeoutSeconds` | supported | `Settings(webExperimentalLongPollingOptions: WebExperimentalLongPollingOptions(timeoutDuration: Duration(seconds: 25)))`, validated as in JS (5 to 30 seconds), sent as the `TO` parameter of long-polling requests; `test/unit/firebase/firestore/firestore_settings_test.dart`, `long_polling_options_test.dart`, `test/unit/firebase/firestore/remote/web/web_channel_test.dart` |
 | `useFetchStreams` | not applicable | The web transport always uses `fetch` |
-| HTTP/2 flow control window (`grpcFlowControlWindow`, Node) | supported | `FirestoreSettings.grpcFlowControlWindow` on the gRPC transport; `test/integration/firebase/firestore/transport_limits_test.dart` |
+| HTTP/2 flow control window (`grpcFlowControlWindow`, Node) | supported | `Settings.grpcFlowControlWindow` on the gRPC transport; `test/integration/firebase/firestore/transport_limits_test.dart` |
 | WebChannel drops duplicate server messages, closes on terminate | supported | `test/unit/firebase/firestore/remote/web/web_channel_test.dart`, `web_channel_transport_test.dart` |
 | Online state as soon as the stream connects (JS 4.6.1) | supported | The client is online once the WebChannel handshake succeeds (gRPC: at the first message, as JS on Node), not only at the first watch change; `test/unit/firebase/firestore/remote/stream_unit_test.dart`, `remote_store_test.dart`, `web/web_channel_transport_test.dart`, `test/integration/firebase/firestore/remote/stream_test.dart` |
 
@@ -279,21 +279,20 @@ Every gap and behaviour difference we know of, the ones you are most likely to m
     numbers could not be compared with a backend (the emulator replaces the value); a plain `Map`
     with a reserved key such as `{'__int__': 5}` is rejected as document data and read as the
     BSON value in a query.
-13. **Lite differences.** No `whereEqualTo(...)`-style query methods (use `where`);
-    `FirestoreDataConverter.fromFirestore` takes only the snapshot; `DocumentReference.parent`
-    keeps the converter; `firestore.doc('')` throws.
+13. **Lite differences.** `FirestoreDataConverter.fromFirestore` takes only the snapshot;
+    `firestore.doc('')` throws.
 14. **Persistent cache indexes** are not used for queries with inequalities on several fields
     (scanned, as in JS) and do not exist for a memory cache (as in JS). The stored index entries
     are not byte-compatible with the Android SDK's (they are never exchanged).
 15. **A query served by a persistent cache index can miss a document.** Only with field indexes
-    (`setIndexConfiguration` or automatic index creation, SQLite cache). If watch sends a document
+    (`setIndexConfigurationFromJSON` or automatic index creation, SQLite cache). If watch sends a document
     in a later snapshot that has the same version as an earlier one (the client accepts this; it
     could happen for a query that starts listening while nothing changed on the server, but we
     have not seen it against the emulator or production), and the index was already brought up
     to date for that version, the document is not added to the index when its id sorts before the
     documents indexed last. A query that the index serves, such as
     `where('v', isGreaterThan: 8)` or an `orderBy` with a `limit`, then leaves that document out
-    of `get(Source.cache)`, of the first snapshot of a new listener and of a limit window that is
+    of a `get` from the cache, of the first snapshot of a new listener and of a limit window that is
     refilled from the cache, until the document changes again. Queries that no index serves are
     not affected. The JS and Android SDKs have the same gap. Reproduced by the skipped test "the
     index backfill indexes a document that watch delivers in a later event at the snapshot version
@@ -307,7 +306,7 @@ Every gap and behaviour difference we know of, the ones you are most likely to m
     `libsqlite3.so` (the example opener falls back to `libsqlite3.so.0`).
 18. **Not ported:** the console-only `_customHeaders` setting of the JS SDK.
 19. **Behaviour that is not a gap but differs from JS by design:** listeners are Dart `Stream`s,
-    `snapshot.data` is a getter, `Source` replaces `getDocFromCache` / `getDocFromServer`, and the
+    `Source` (in `GetOptions`) replaces `getDocFromCache` / `getDocFromServer`, and the
     API spelling follows the Android SDK and FlutterFire (see
     [Coming from FlutterFire or the JS SDK](guides/queries_and_data.md#coming-from-flutterfire-or-the-js-sdk)).
     Extras over the JS client SDK: `Query.findNearest`, read-only transactions (also with

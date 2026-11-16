@@ -12,7 +12,7 @@ import '../common.dart';
 /// Moves [amount] units of stock from [from] to [to]. Returns the stock that
 /// is left in [from].
 Future<int> moveStock(
-  Firestore firestore,
+  FirebaseFirestore firestore,
   DocumentReference<Map<String, Object?>> from,
   DocumentReference<Map<String, Object?>> to,
   int amount,
@@ -21,7 +21,7 @@ Future<int> moveStock(
     // All reads first, then the writes.
     final DocumentSnapshot<Object?> source = await transaction.get(from);
     final DocumentSnapshot<Object?> target = await transaction.get(to);
-    final int available = source.getInt('stock') ?? 0;
+    final int available = (source.get('stock') as num?)?.toInt() ?? 0;
     if (available < amount) {
       // Throwing ends the transaction without writing anything.
       throw StateError('only $available left in ${from.id}');
@@ -29,14 +29,14 @@ Future<int> moveStock(
     transaction
       ..update(from, <String, Object?>{'stock': available - amount})
       ..set(to, <String, Object?>{
-        'stock': (target.getInt('stock') ?? 0) + amount,
-      }, SetOptions.mergeAllFields);
+        'stock': ((target.get('stock') as num?)?.toInt() ?? 0) + amount,
+      }, const SetOptions(merge: true));
     return available - amount;
   });
 }
 
 Future<void> main() async {
-  final Firestore firestore = connect();
+  final FirebaseFirestore firestore = connect();
   final CollectionReference<Map<String, Object?>> warehouses = firestore
       .collection(scratch('warehouses'));
   final DocumentReference<Map<String, Object?>> north = warehouses.doc('north');
@@ -56,8 +56,8 @@ Future<void> main() async {
     print('refused: ${e.message}');
   }
 
-  final int n = (await north.get()).getInt('stock')!;
-  final int s = (await south.get()).getInt('stock')!;
+  final int n = ((await north.get()).get('stock') as num).toInt();
+  final int s = ((await south.get()).get('stock') as num).toInt();
   print('north $n, south $s, total ${n + s}');
 
   await firestore.terminate();

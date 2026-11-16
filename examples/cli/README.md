@@ -16,7 +16,7 @@ and terminates the instance when it is done. Look at which call each command mak
 flowchart LR
   jsonIn["JSON array (file or stdin)"] --> importCmd["import"]
   importCmd -- "WriteBatch, up to 500 writes each" --> backend["Firestore emulator or project"]
-  exportCmd["export"] -- "get(Source.server)" --> backend
+  exportCmd["export"] -- "get(GetOptions(source: Source.server))" --> backend
   exportCmd --> jsonOut["JSON array (stdout or -o file)"]
   watchCmd["watch"] -- "snapshots listener" --> backend
   watchCmd --> lines["one line per change"]
@@ -43,9 +43,9 @@ What it shows:
 - Batched writes (`firestore.batch()`, `commit()`): each batch is atomic. The batches are
   committed one after the other, so after a failure the tool has written exactly the batches it
   printed as committed.
-- `get(Source.server)` for `export`: an export never comes from a stale cache; without a
+- `get(const GetOptions(source: Source.server))` for `export`: an export never comes from a stale cache; without a
   connection it fails.
-- A listener (`snapshots`) and `docChanges` for `watch`; Ctrl-C cancels it and terminates the
+- A listener (`snapshots()`) and `docChanges` for `watch`; Ctrl-C cancels it and terminates the
   instance so the process exits.
 - Exit codes: `64` for usage errors, `65` for invalid JSON, `66` for a missing file, `78` when no
   backend is configured, `1` for a Firestore error.

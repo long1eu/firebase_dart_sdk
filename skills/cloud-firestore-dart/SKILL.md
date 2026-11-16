@@ -16,8 +16,9 @@ A name that is not in it does not exist.
 
 1. **Check the versions.** Read the project's `pubspec.yaml` (and `pubspec.lock`). Expect
    `cloud_firestore_dart`, `firebase_app_dart` and, for sign-in or server credentials,
-   `firebase_auth_providers_dart`, all `^0.1.0`, Dart SDK `^3.8.0`. For a disk cache: `sqlite3`
-   pinned to 2.x (`^2.7.3`) and, in Flutter, `sqlite3_flutter_libs: ^0.5.0`. If the project is on
+   `firebase_auth_providers_dart`, all `^0.1.0`, Dart SDK `^3.8.0`. For a disk cache:
+   `cloud_firestore_dart_sqlite` (it brings `sqlite3`; with `sqlite3` 2.x a Flutter app also
+   needs `sqlite3_flutter_libs: ^0.5.0`). If the project is on
    another version than 0.1.x, check names against the golden listing of that version's tag.
 2. **Fix the imports.** Only these:
    - `package:cloud_firestore_dart/cloud_firestore_dart.dart` (the client)
@@ -26,13 +27,15 @@ A name that is not in it does not exist.
      (`FirebaseUserAuth`, `OAuthTokenProvider.serviceAccount`)
    - `package:firebase_auth_providers_dart/adc.dart` (`applicationDefaultCredentials()`;
      needs `dart:io`)
+   - `package:cloud_firestore_dart_sqlite/cloud_firestore_dart_sqlite.dart` (`sqliteOpener`,
+     the disk cache)
    - `package:cloud_firestore_dart/lite.dart` instead of the main library for Firestore Lite
      (experimental); `package:cloud_firestore_dart/pipelines.dart` for Pipelines (preview,
      Enterprise edition only).
    Remove `package:cloud_firestore/...`, `package:firebase_core/...`, `package:firebase_auth/...`
    from code that targets this client.
 3. **Write the setup** in this order: `FirebaseApp.withOptions(...)` (synchronous), then the token
-   provider if any, then `Firestore.instanceFor(app: app, settings: ..., openDatabase: ...)` once.
+   provider if any, then `FirebaseFirestore.instanceFor(app: app, settings: ..., openDatabase: ...)` once.
    Templates: [reference/setup.md](reference/setup.md).
 4. **Translate remembered names** with the table below; the full table is
    [reference/api_map.md](reference/api_map.md).
@@ -46,24 +49,24 @@ A name that is not in it does not exist.
 
 | Remembered (FlutterFire / JS) | Here |
 |---|---|
-| `Firebase.initializeApp(options: ...)` / `initializeApp(config)` | `FirebaseApp.withOptions(const FirebaseOptions(apiKey:, applicationId:, projectId:))` |
-| `FirebaseFirestore.instance` / `getFirestore()` | `Firestore.instanceFor(app: app)`; `Firestore.instance` throws until that ran |
-| `firestore.settings = Settings(...)` / `initializeFirestore` | `instanceFor(settings: FirestoreSettings(...))` |
-| `useFirestoreEmulator(h, p)` / `connectFirestoreEmulator` | `FirestoreSettings().withEmulator(h, p)` |
-| `persistenceEnabled: true` | `openDatabase: sqliteOpener(dir)` + `PersistentCacheSettings()` |
-| `snapshot.data()` | `snapshot.data` |
-| `ref.snapshots()` / `onSnapshot` | `ref.snapshots` (getter), `getSnapshots(MetadataChanges.include)` |
-| `get(GetOptions(source: Source.cache))` | `get(Source.cache)` |
-| `SetOptions(merge: true)` | `SetOptions.mergeAllFields` |
-| `orderBy('a', descending: true)` | `orderBy('a', Direction.descending)` |
-| `Filter('a', isEqualTo: 1)`, `Filter.or(a, b)` | `Filter.equalTo('a', 1)`, `Filter.or([a, b])` |
-| `FieldPath(['a'])`, `FieldPath.documentId` | `FieldPath.of(['a'])`, `FieldPath.documentIdField` |
-| `querySnapshot.size`, `change.doc` | `querySnapshot.length`, `change.document` |
-| `count().get()` then `.count` | `count().get()` then `.getCount()` |
-| `Timestamp.millisecondsSinceEpoch` | `toMillis()` |
-| `FirebaseException`, `e.code == 'permission-denied'` | `FirestoreError`, `e.code == FirestoreErrorCode.permissionDenied` |
-| `runTransaction(fn, timeout: ...)` | `runTransaction(fn, options: TransactionOptions(maxAttempts: 5))` |
-| `FirebaseAuth.instance.signIn...` | `await FirebaseUserAuth.forApp(app)` then `auth.signInWithEmailAndPassword(email, password)` |
+| `Firebase.initializeApp(options: ...)` / `initializeApp(config)` | `Firebase.initializeApp(options: const FirebaseOptions(apiKey:, appId:, projectId:))`, or `FirebaseApp.withOptions(...)` |
+| `FirebaseFirestore.instance` / `getFirestore()` | the same; `FirebaseFirestore.instanceFor(app: app, settings: ...)` for settings or a disk cache |
+| `firestore.settings = Settings(...)` / `initializeFirestore` | `instanceFor(settings: Settings(...))` |
+| `useFirestoreEmulator(h, p)` / `connectFirestoreEmulator` | `Settings().withEmulator(h, p)` |
+| `persistenceEnabled: true` | `openDatabase: sqliteOpener(directory: dir)` + `PersistentCacheSettings()` |
+| `snapshot.data()` | `snapshot.data()` |
+| `ref.snapshots()` / `onSnapshot` | `ref.snapshots()`, `snapshots(includeMetadataChanges: true)` |
+| `get(GetOptions(source: Source.cache))` | `get(const GetOptions(source: Source.cache))` |
+| `SetOptions(merge: true)` | `const SetOptions(merge: true)` |
+| `orderBy('a', descending: true)` | `orderBy('a', descending: true)` |
+| `Filter('a', isEqualTo: 1)`, `Filter.or(a, b)` | `Filter('a', isEqualTo: 1)`, `Filter.or([a, b])` |
+| `FieldPath(['a'])`, `FieldPath.documentId` | `FieldPath(['a'])`, `FieldPath.documentId` |
+| `querySnapshot.size`, `change.doc` | `querySnapshot.size`, `change.doc` |
+| `count().get()` then `.count` | `count().get()` then `.count` |
+| `Timestamp.millisecondsSinceEpoch` | `Timestamp.millisecondsSinceEpoch` |
+| `FirebaseException`, `e.code == 'permission-denied'` | the same (`FirestoreException` extends it); `e.errorCode == FirestoreErrorCode.permissionDenied` |
+| `runTransaction(fn, timeout: ...)` | `runTransaction(fn, maxAttempts: 5)` |
+| `FirebaseAuth.instance.signIn...` | `await FirebaseUserAuth.forApp(app)` then `auth.signInWithEmailAndPassword(email: email, password: password)` |
 | Google/Apple/phone sign-in, Storage, Messaging | not available |
 
 ## Rules
@@ -76,13 +79,13 @@ A name that is not in it does not exist.
    await it; listeners show the write at once. Attach an error handler.
 5. **`terminate()` on exit** (a VM process does not exit otherwise); `waitForPendingWrites()` first
    if unacknowledged writes matter.
-6. **Memory cache by default.** Without `openDatabase` nothing is on disk. The opener is a file
-   the app copies (`example/sqlite_database.dart`, or `sqlite_database_web.dart` for the web).
-7. **`dart:io` only where needed**: `adc.dart`, the SQLite opener, `Platform.environment`. The
+6. **Memory cache by default.** Without `openDatabase` nothing is on disk. The opener is
+   `sqliteOpener` of `cloud_firestore_dart_sqlite` (VM, Flutter and web); never copy opener files.
+7. **`dart:io` only where needed**: `adc.dart`, `Platform.environment`. The
    main libraries compile for the web (experimental, Chrome only).
-8. **Errors**: `FirestoreError` is an `Error`, not an `Exception`; catch `on FirestoreError`.
+8. **Errors**: `FirestoreException` is an `Exception` (a `FirebaseException`); catch `on FirestoreException`.
 9. **Transactions rerun** their callback (keep it free of side effects); `getQuery` and
-   `getAggregate` need `TransactionOptions(readOnly: true)`.
+   `getAggregate` need `readOnly: true`.
 10. **Server credentials bypass security rules.** ADC and service accounts only on machines you
     control; end-user apps use `FirebaseUserAuth`. No key files in the repository.
 11. **Experimental or preview**: the web, Lite, Pipelines. Say so in code comments or reviews when

@@ -43,7 +43,7 @@ abstract interface class IdTokenUser {
 /// final FlutterFireAuthTokenProvider provider =
 ///     FlutterFireAuthTokenProvider(FirebaseAuth.instance);
 /// dartApp.authProvider = provider;
-/// final Firestore firestore = Firestore.instanceFor(app: dartApp);
+/// final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(app: dartApp);
 /// ```
 ///
 /// **How it follows the user.** The provider listens to `idTokenChanges()` of the plugin. When the uid changes
@@ -56,7 +56,7 @@ abstract interface class IdTokenUser {
 /// out the token of the new user in that gap: it waits for the event, which switches Firestore first. A write
 /// that you issue right after `await signIn...()` is still recorded for the previous user; call
 /// [waitForCurrentUser] first.
-class FlutterFireAuthTokenProvider implements InternalTokenProvider {
+class FlutterFireAuthTokenProvider implements AuthTokenProvider {
   /// Creates the provider for [auth], for example `FirebaseAuth.instance`.
   ///
   /// It starts listening to `auth.idTokenChanges()` at once and stops in [dispose].
@@ -91,7 +91,7 @@ class FlutterFireAuthTokenProvider implements InternalTokenProvider {
     );
   }
 
-  /// The text of the [InternalTokenResult] that [onTokenChanged] emits for a signed-in user.
+  /// The text of the [AuthTokenChange] that [onTokenChanged] emits for a signed-in user.
   ///
   /// `firebase_auth` reports a change of the token without the token itself, and the event must be emitted
   /// right away (see the class documentation), so the event does not carry the ID token: call [getAccessToken]
@@ -106,8 +106,8 @@ class FlutterFireAuthTokenProvider implements InternalTokenProvider {
 
   /// Synchronous, like the stream of `FirebaseUserAuth`: Firestore hears about a new user in the call that
   /// changed [_user].
-  final StreamController<InternalTokenResult> _tokenChanges =
-      StreamController<InternalTokenResult>.broadcast(sync: true);
+  final StreamController<AuthTokenChange> _tokenChanges =
+      StreamController<AuthTokenChange>.broadcast(sync: true);
   final Completer<void> _firstEvent = Completer<void>();
   final List<Completer<void>> _userWaiters = <Completer<void>>[];
   late final StreamSubscription<IdTokenUser?> _subscription;
@@ -130,7 +130,7 @@ class FlutterFireAuthTokenProvider implements InternalTokenProvider {
   /// Emits after a sign-in, a sign-out (an empty token), a switch of users and a refresh of the token. The token
   /// of a signed-in user is [changedTokenMarker], not the ID token.
   @override
-  Stream<InternalTokenResult> get onTokenChanged => _tokenChanges.stream;
+  Stream<AuthTokenChange> get onTokenChanged => _tokenChanges.stream;
 
   /// Completes when the plugin has reported its user once (the first event of `idTokenChanges()`). On the web the
   /// plugin restores a stored session only then.
@@ -138,7 +138,7 @@ class FlutterFireAuthTokenProvider implements InternalTokenProvider {
 
   /// Returns the ID token of the user Firestore works for ([uid]), refreshed when [forceRefresh] is set.
   ///
-  /// * Throws a [FirebaseNoSignedInUserError] when nobody is signed in: Firestore then sends the request without a
+  /// * Throws a [FirebaseNoSignedInUserException] when nobody is signed in: Firestore then sends the request without a
   ///   token.
   /// * When the plugin has another user than [uid] (its event is on its way), it waits for that event, up to
   ///   [userChangeTimeout], and answers for the user of the event. It throws a [TimeoutException] when the event
@@ -152,7 +152,7 @@ class FlutterFireAuthTokenProvider implements InternalTokenProvider {
   Future<GetTokenResult> getAccessToken({required bool forceRefresh}) async {
     final IdTokenUser? user = _user;
     if (user == null) {
-      throw FirebaseNoSignedInUserError('No user is signed in.');
+      throw FirebaseNoSignedInUserException('No user is signed in.');
     }
     if (_currentUser()?.uid != user.uid) {
       await _nextUserChange();
@@ -245,7 +245,7 @@ class FlutterFireAuthTokenProvider implements InternalTokenProvider {
 
   void _emit(String token) {
     if (!_tokenChanges.isClosed) {
-      _tokenChanges.add(InternalTokenResult(token));
+      _tokenChanges.add(AuthTokenChange(token));
     }
   }
 

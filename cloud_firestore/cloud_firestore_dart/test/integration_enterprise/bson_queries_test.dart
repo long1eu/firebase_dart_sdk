@@ -17,7 +17,7 @@ void main() {
 
   final String? skip = IntegrationTestUtil.enterpriseEmulatorSkipReason;
 
-  late Firestore firestore;
+  late FirebaseFirestore firestore;
 
   setUp(() async {
     firestore = await IntegrationTestUtil.testEnterpriseFirestore();
@@ -32,7 +32,7 @@ void main() {
     final CollectionReference collection =
         firestore.collection('bson_queries_${autoId()}');
     for (int i = 0; i < values.length; i++) {
-      await collection.document('d$i').set(<String, Object?>{'v': values[i]});
+      await collection.doc('d$i').set(<String, Object?>{'v': values[i]});
     }
     return collection;
   }
@@ -55,7 +55,7 @@ void main() {
     test('results return the BSON value classes', () async {
       final CollectionReference collection =
           firestore.collection('bson_queries_${autoId()}');
-      await collection.document('doc').set(allTypes);
+      await collection.doc('doc').set(allTypes);
 
       final PipelineSnapshot snapshot =
           await firestore.pipeline().collection(collection.path).execute();
@@ -71,14 +71,14 @@ void main() {
 
       // The same document read with a get() has the same data.
       final DocumentSnapshot document =
-          await collection.document('doc').get(Source.server);
-      expect(result.data(), document.data);
+          await collection.doc('doc').get(GetOptions(source: Source.server));
+      expect(result.data(), document.data());
     });
 
     test('selected and computed fields keep their BSON type', () async {
       final CollectionReference collection =
           firestore.collection('bson_queries_${autoId()}');
-      await collection.document('doc').set(allTypes);
+      await collection.doc('doc').set(allTypes);
 
       final PipelineSnapshot snapshot = await firestore
           .pipeline()
@@ -237,17 +237,17 @@ void main() {
       // listener.
       await IntegrationTestUtil.assertSDKQueryResultsConsistentWithBackend(
           collection,
-          collection.whereEqualTo('v', <String, Object?>{'__int__': 5}),
+          collection.where('v', isEqualTo: <String, Object?>{'__int__': 5}),
           docs,
           <String>['d0', 'd1']);
       await IntegrationTestUtil.assertSDKQueryResultsConsistentWithBackend(
           collection,
-          collection.whereGreaterThan('v', <String, Object?>{'__int__': 5}),
+          collection.where('v', isGreaterThan: <String, Object?>{'__int__': 5}),
           docs,
           <String>['d2']);
       await IntegrationTestUtil.assertSDKQueryResultsConsistentWithBackend(
           collection,
-          collection.whereIn('v', <Object?>[
+          collection.where('v', whereIn: <Object?>[
             <String, Object?>{'__oid__': '507f191e810c19729de860ea'},
             <String, Object?>{'__int__': 6},
           ]),
@@ -257,18 +257,18 @@ void main() {
 
     test('are rejected in document data', () async {
       final DocumentReference document =
-          firestore.collection('bson_queries_${autoId()}').document('doc');
+          firestore.collection('bson_queries_${autoId()}').doc('doc');
       expect(
           () => document.set(<String, Object?>{
                 'v': <String, Object?>{'__int__': 5}
               }),
           throwsArgumentError);
-      expect((await document.get(Source.server)).exists, isFalse);
+      expect((await document.get(GetOptions(source: Source.server))).exists, isFalse);
     });
 
     test('are that BSON value in an array transform', () async {
       final DocumentReference document =
-          firestore.collection('bson_queries_${autoId()}').document('doc');
+          firestore.collection('bson_queries_${autoId()}').doc('doc');
       await document.set(<String, Object?>{
         'l': <Object?>[Int32Value(5)]
       });
@@ -280,8 +280,8 @@ void main() {
       });
       // The local view and the backend hold the same values.
       final List<Object?> expected = <Object?>[Int32Value(5), Int32Value(6)];
-      expect((await document.get(Source.cache)).get('l'), expected);
-      expect((await document.get(Source.server)).get('l'), expected);
+      expect((await document.get(GetOptions(source: Source.cache))).get('l'), expected);
+      expect((await document.get(GetOptions(source: Source.server))).get('l'), expected);
     });
   }, skip: skip);
 
@@ -295,7 +295,7 @@ void main() {
         sum,
         average,
         AggregateField.count()
-      ]).get(AggregateSource.server);
+      ]).get(source: AggregateSource.server);
     }
 
     test('sum and average of 32-bit integers are an int and a double',
@@ -304,8 +304,8 @@ void main() {
           <Object?>[Int32Value(1), Int32Value(2), Int32Value(4)]);
       expect(snapshot.get(sum), 7);
       expect(snapshot.get(average), closeTo(7 / 3, 1e-12));
-      expect(snapshot.getInt(sum), 7);
-      expect(snapshot.getCount(), 3);
+      expect((snapshot.get(sum) as num?)?.toInt(), 7);
+      expect(snapshot.count, 3);
 
       // The sum does not overflow at 32 bits.
       snapshot = await aggregate(
@@ -328,9 +328,8 @@ void main() {
       expect(snapshot.get(sum), Decimal128Value('3.3'));
       expect(snapshot.get(average), Decimal128Value('1.65'));
       // The typed getters convert to the closest number.
-      expect(snapshot.getDouble(sum), 3.3);
-      expect(snapshot.getDouble(average), 1.65);
-      expect(snapshot.getInt(sum), 3);
+      expect(snapshot.getSum('v'), 3.3);
+      expect(snapshot.getAverage('v'), 1.65);
       expect(snapshot.data(), <String, Object?>{
         'sum_v': Decimal128Value('3.3'),
         'average_v': Decimal128Value('1.65'),
@@ -341,13 +340,12 @@ void main() {
           <Object?>[Int32Value(1), 2, 2.5, Decimal128Value('0.5')]);
       expect(snapshot.get(sum), Decimal128Value('6'));
       expect(snapshot.get(average), Decimal128Value('1.5'));
-      expect(snapshot.getInt(sum), 6);
-      expect(snapshot.getDouble(average), 1.5);
+      expect(snapshot.getSum('v'), 6);
+      expect(snapshot.getAverage('v'), 1.5);
 
       snapshot = await aggregate(<Object?>[Decimal128Value('NaN'), 1]);
       expect(snapshot.get(sum), Decimal128Value('NaN'));
-      expect(snapshot.getDouble(sum), isNaN);
-      expect(snapshot.getInt(sum), 0);
+      expect(snapshot.getSum('v'), isNaN);
     });
 
     test('the other BSON types are not numbers', () async {
@@ -359,7 +357,7 @@ void main() {
         Blob.bsonBinary(3, Uint8List.fromList(<int>[1])),
         MaxKey.instance,
       ]);
-      expect(snapshot.getCount(), 6);
+      expect(snapshot.count, 6);
       expect(snapshot.get(average), isNull);
       // PORTING NOTE: the emulator (v1.22.0) answers null here, the sum over
       // no numbers of a Standard edition database is 0.

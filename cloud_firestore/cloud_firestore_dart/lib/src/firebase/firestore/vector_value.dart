@@ -17,7 +17,7 @@ import 'package:collection/collection.dart';
 /// A vector of doubles stored in a document field, for example an embedding
 /// for vector search.
 ///
-/// Create one with `VectorValue(values)` or `FieldValue.vector(values)` and
+/// Create one with `VectorValue(values)` or `VectorValue(values)` and
 /// store it as a field value; a snapshot returns it for a vector field, also
 /// through `DocumentSnapshot.getVectorValue`. Find the documents with the
 /// nearest vectors with `Query.findNearest`.
@@ -28,7 +28,8 @@ import 'package:collection/collection.dart';
 /// });
 /// final DocumentSnapshot<Map<String, Object?>> snapshot =
 ///     await firestore.doc('items/a').get();
-/// final List<double>? values = snapshot.getVectorValue('embedding')?.toArray();
+/// final List<double>? values = (snapshot.get('embedding') as VectorValue?)
+///     ?.toArray();
 /// ```
 ///
 /// On a real database, vector search needs a vector index on the field,

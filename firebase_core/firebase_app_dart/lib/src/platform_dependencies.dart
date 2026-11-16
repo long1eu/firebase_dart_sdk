@@ -19,7 +19,7 @@ import 'package:rxdart/rxdart.dart';
 /// | --- | --- | --- |
 /// | [onNetworkConnected] | always connected | Firestore: `true` restarts failed streams at once |
 /// | [onBackgroundChanged] | never in the background | nobody in this repository |
-/// | [storage] | this object, in memory | `FirebaseApp.setDataCollectionDefaultEnabled` |
+/// | [storage] | this object, in memory | `FirebaseApp.setAutomaticDataCollectionEnabled` |
 /// | [authProvider] | none: requests carry no token | Firestore |
 /// | [appCheckProvider] | none: no App Check header | Firestore, `FirebaseUserAuth` |
 /// | [headersBuilder] | none | nobody in this repository |
@@ -42,7 +42,7 @@ import 'package:rxdart/rxdart.dart';
 ///   FirebaseApp.withOptions(
 ///     const FirebaseOptions(
 ///       apiKey: '<YOUR_API_KEY>',
-///       applicationId: '1:1234567890:dart:example',
+///       appId: '1:1234567890:dart:example',
 ///       projectId: 'my-project',
 ///     ),
 ///     dependencies: dependencies,
@@ -93,11 +93,11 @@ class PlatformDependencies extends LocalStorage {
   /// You can also leave it null and set `FirebaseApp.authProvider` later, before the Firestore
   /// instance is created; `FirebaseUserAuth.forApp` of `package:firebase_auth_providers_dart` does
   /// that.
-  InternalTokenProvider? get authProvider => null;
+  AuthTokenProvider? get authProvider => null;
 
   /// Firestore sends the token of this provider in the `x-firebase-appcheck` header of every
   /// request. Default null: no App Check header is sent.
-  InternalAppCheckTokenProvider? get appCheckProvider => null;
+  AppCheckTokenProvider? get appCheckProvider => null;
 
   /// The value stored in memory under [key], or null.
   @override

@@ -82,7 +82,7 @@
   </g>
 
   <g font-size="12" fill="#57606a">
-    <text x="20" y="356">Set the provider before Firestore.instanceFor(app: app): FirebaseUserAuth.forApp does it for you; for the others,</text>
+    <text x="20" y="356">Set the provider before FirebaseFirestore.instanceFor(app: app): FirebaseUserAuth.forApp does it for you; for the others,</text>
     <text x="20" y="374">assign app.authProvider. Bypassed rules: use those three on trusted machines only.</text>
   </g>
 </svg>

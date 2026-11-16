@@ -7,7 +7,7 @@ import 'dart:async';
 import 'package:meta/meta.dart';
 
 /// Opens (creating it if needed) the SQLite database called [path] for the
-/// offline cache. Pass one to `Firestore.instanceFor(openDatabase: ...)`; this
+/// offline cache. Pass one to `FirebaseFirestore.instanceFor(openDatabase: ...)`; this
 /// package does not depend on a SQLite binding itself. Without it the cache is
 /// kept in memory only.
 ///
@@ -27,8 +27,8 @@ import 'package:meta/meta.dart';
 /// version it finds there: another client may have migrated the same file
 /// since the opener looked.
 ///
-/// See `example/sqlite_database.dart` in this package for a complete
-/// implementation on top of `package:sqlite3`.
+/// `package:cloud_firestore_dart_sqlite` has a complete implementation on top
+/// of `package:sqlite3` for the VM, Flutter and the web (`sqliteOpener`).
 typedef OpenDatabase =
     Future<Database> Function(
       String path, {

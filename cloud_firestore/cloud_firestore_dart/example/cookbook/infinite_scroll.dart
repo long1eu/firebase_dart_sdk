@@ -29,7 +29,7 @@ class Page {
 }
 
 Future<void> main() async {
-  final Firestore firestore = connect();
+  final FirebaseFirestore firestore = connect();
   final CollectionReference<Map<String, Object?>> messages = firestore
       .collection(scratch('messages'));
 
@@ -62,7 +62,7 @@ Future<void> main() async {
     page.subscription = ordered
         .startAtDocument(first.docs.first)
         .endAtDocument(first.docs.last)
-        .snapshots
+        .snapshots()
         .listen((QuerySnapshot<Map<String, Object?>> snapshot) {
           page.ids = <String>[for (final d in snapshot) d.id];
           changes.add(null);

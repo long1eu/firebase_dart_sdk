@@ -115,7 +115,7 @@ void main() {
     });
 
     test('rejects references of another database', () {
-      final Firestore other =
+      final FirebaseFirestore other =
           FakeFirestore(DatabaseId.forDatabase('other-project', '(default)'));
       expect(
           () => source().collection(CollectionReferenceInternal.create<Map<String, Object?>>(

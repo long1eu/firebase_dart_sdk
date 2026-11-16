@@ -91,7 +91,7 @@ void main() {
 
   final String? skip = IntegrationTestUtil.enterpriseEmulatorSkipReason;
 
-  late Firestore firestore;
+  late FirebaseFirestore firestore;
   late CollectionReference<Map<String, Object?>> collection;
 
   List<String?> ids(PipelineSnapshot snapshot) =>
@@ -105,7 +105,7 @@ void main() {
       firestore = await IntegrationTestUtil.testEnterpriseFirestore();
       collection = firestore.collection('books_${autoId()}');
       for (final MapEntry<String, Map<String, Object?>> book in books.entries) {
-        await collection.document(book.key).set(book.value);
+        await collection.doc(book.key).set(book.value);
       }
     });
 
@@ -393,7 +393,7 @@ void main() {
     test('documents', () async {
       final PipelineSnapshot snapshot =
           await firestore.pipeline().documents(<Object>[
-        collection.document('book2'),
+        collection.doc('book2'),
         '${collection.path}/book5',
       ]).sort(<Ordering>[field('__name__').ascending()]).execute();
       expect(ids(snapshot), <String>['book2', 'book5']);
@@ -403,11 +403,11 @@ void main() {
       final String groupId = 'group_${autoId()}';
       await firestore
           .collection('a/b/$groupId')
-          .document('x')
+          .doc('x')
           .set(<String, Object?>{'n': 1});
       await firestore
           .collection('c/d/$groupId')
-          .document('y')
+          .doc('y')
           .set(<String, Object?>{'n': 2});
 
       final PipelineSnapshot snapshot = await firestore
@@ -440,13 +440,13 @@ void main() {
     test('findNearest', () async {
       final CollectionReference<Map<String, Object?>> vectors =
           firestore.collection('vectors_${autoId()}');
-      await vectors.document('near').set(<String, Object?>{
-        'embedding': FieldValue.vector(<double>[1, 1])
+      await vectors.doc('near').set(<String, Object?>{
+        'embedding': VectorValue(<double>[1, 1])
       });
-      await vectors.document('far').set(<String, Object?>{
-        'embedding': FieldValue.vector(<double>[10, 10])
+      await vectors.doc('far').set(<String, Object?>{
+        'embedding': VectorValue(<double>[10, 10])
       });
-      await vectors.document('none').set(<String, Object?>{'other': 1});
+      await vectors.doc('none').set(<String, Object?>{'other': 1});
 
       final PipelineSnapshot snapshot = await firestore
           .pipeline()
@@ -462,7 +462,7 @@ void main() {
 
     test('constants of every type round trip', () async {
       final DocumentReference<Map<String, Object?>> reference =
-          collection.document('book1');
+          collection.doc('book1');
       final Map<String, Object?> values = <String, Object?>{
         'null': null,
         'bool': true,
@@ -671,7 +671,7 @@ void main() {
               .where(FunctionExpression('no_such_fn', <Object?>[field('a')])
                   .asBoolean())
               .execute(),
-          throwsA(isA<FirestoreError>().having((FirestoreError e) => e.code,
+          throwsA(isA<FirestoreException>().having((FirestoreException e) => e.errorCode,
               'code', FirestoreErrorCode.invalidArgument)));
     });
 
@@ -679,7 +679,7 @@ void main() {
       await firestore.disableNetwork();
       await expectLater(
           source().execute(),
-          throwsA(isA<FirestoreError>().having((FirestoreError e) => e.code,
+          throwsA(isA<FirestoreException>().having((FirestoreException e) => e.errorCode,
               'code', FirestoreErrorCode.unavailable)));
       await firestore.enableNetwork();
       expect((await source().execute()).results, hasLength(6));
@@ -689,7 +689,7 @@ void main() {
       await firestore.disableNetwork();
       // Not awaited: the write stays pending while offline.
       final Future<void> write = collection
-          .document('book7')
+          .doc('book7')
           .set(<String, Object?>{'title': 'Pending'});
       await firestore.enableNetwork();
       await write;
@@ -698,7 +698,7 @@ void main() {
 
     group('createFrom(query) returns what the query returns', () {
       Future<void> check(Query<Map<String, Object?>> query) async {
-        final List<String> expected = (await query.get(Source.server))
+        final List<String> expected = (await query.get(GetOptions(source: Source.server)))
             .docs
             .map((QueryDocumentSnapshot<Map<String, Object?>> d) => d.id)
             .toList();
@@ -711,37 +711,36 @@ void main() {
       test('whole collection', () => check(collection));
 
       test('filters', () async {
-        await check(collection.whereEqualTo('genre', 'Science Fiction'));
-        await check(collection.whereNotEqualTo('genre', 'Science Fiction'));
-        await check(collection.whereGreaterThan('rating', 4.3));
-        await check(collection.whereLessThanOrEqualTo('published', 1965));
-        await check(collection.whereArrayContains('tags', 'adventure'));
+        await check(collection.where('genre', isEqualTo: 'Science Fiction'));
+        await check(collection.where('genre', isNotEqualTo: 'Science Fiction'));
+        await check(collection.where('rating', isGreaterThan: 4.3));
+        await check(collection.where('published', isLessThanOrEqualTo: 1965));
+        await check(collection.where('tags', arrayContains: 'adventure'));
         await check(
-            collection.whereArrayContainsAny('tags', <String>['love', 'epic']));
+            collection.where('tags', arrayContainsAny: <String>['love', 'epic']));
         await check(
-            collection.whereIn('genre', <String>['Romance', 'Fantasy']));
-        await check(collection.whereIn('genre', <String>['Romance']));
+            collection.where('genre', whereIn: <String>['Romance', 'Fantasy']));
+        await check(collection.where('genre', whereIn: <String>['Romance']));
         await check(
-            collection.whereNotIn('genre', <String>['Romance', 'Fantasy']));
-        await check(collection.whereEqualTo('awards.hugo', true));
+            collection.where('genre', whereNotIn: <String>['Romance', 'Fantasy']));
+        await check(collection.where('awards.hugo', isEqualTo: true));
       });
 
       test('composite filters', () async {
         await check(collection.where(Filter.or(<Filter>[
-          Filter.equalTo('genre', 'Romance'),
+          Filter('genre', isEqualTo: 'Romance'),
           Filter.and(<Filter>[
-            Filter.greaterThan('rating', 4.5),
-            Filter.lessThan('published', 1960),
+            Filter('rating', isGreaterThan: 4.5),
+            Filter('published', isLessThan: 1960),
           ]),
         ])));
       });
 
       test('orderings', () async {
         await check(collection.orderBy('published'));
-        await check(collection.orderBy('published', Direction.descending));
+        await check(collection.orderBy('published', descending: true));
         await check(collection
-            .orderBy('genre')
-            .orderBy('rating', Direction.descending));
+            .orderBy('genre').orderBy('rating', descending: true));
         // Only documents that have the field are returned.
         await check(collection.orderBy('awards.hugo'));
       });
@@ -749,10 +748,9 @@ void main() {
       test('limits', () async {
         await check(collection.orderBy('published').limit(2));
         await check(
-            collection.orderBy('published', Direction.descending).limit(2));
+            collection.orderBy('published', descending: true).limit(2));
         await check(collection.orderBy('published').limitToLast(2));
-        await check(collection
-            .orderBy('published', Direction.descending)
+        await check(collection.orderBy('published', descending: true)
             .limitToLast(2));
       });
 
@@ -769,7 +767,7 @@ void main() {
 
       test('cursors with a descending ordering', () async {
         final Query<Map<String, Object?>> descending =
-            collection.orderBy('published', Direction.descending);
+            collection.orderBy('published', descending: true);
         await check(descending.startAt(<Object?>[1965]));
         await check(descending.startAfter(<Object?>[1965]));
         await check(descending.endAt(<Object?>[1965]));
@@ -778,27 +776,22 @@ void main() {
 
       test('document cursors and several orderings', () async {
         final DocumentSnapshot<Map<String, Object?>> middle =
-            await collection.document('book3').get();
+            await collection.doc('book3').get();
         await check(collection.orderBy('genre').startAtDocument(middle));
         await check(collection.orderBy('genre').startAfterDocument(middle));
-        await check(collection
-            .orderBy('genre', Direction.descending)
+        await check(collection.orderBy('genre', descending: true)
             .startAtDocument(middle));
-        await check(collection
-            .orderBy('genre', Direction.descending)
+        await check(collection.orderBy('genre', descending: true)
             .endAtDocument(middle));
         await check(collection
-            .orderBy('genre')
-            .orderBy('rating', Direction.descending)
+            .orderBy('genre').orderBy('rating', descending: true)
             .startAfter(<Object?>['Science Fiction', 4.6]));
       });
 
       test('cursors with limitToLast', () async {
-        await check(collection
-            .orderBy('published')
+        await check(collection.orderBy('published')
             .endBefore(<Object?>[1985]).limitToLast(2));
-        await check(collection
-            .orderBy('published', Direction.descending)
+        await check(collection.orderBy('published', descending: true)
             .startAfter(<Object?>[1985]).limitToLast(2));
       });
     });

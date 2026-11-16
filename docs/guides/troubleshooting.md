@@ -57,7 +57,7 @@ flowchart TD
 ## Turn on logging
 
 ```dart
-Firestore.setLogLevel(LogLevel.debug);
+FirebaseFirestore.setLogLevel(LogLevel.debug);
 ```
 
 - The level is global: it applies to every instance, and to the other packages of this SDK
@@ -66,9 +66,9 @@ Firestore.setLogLevel(LogLevel.debug);
 - The levels are those of the JS SDK: `verbose`, `debug`, `info`, `warn` (the default), `error`,
   `silent`. Today the SDK only writes debug, warning and error lines, so `verbose` shows the same as
   `debug`, and `info` the same as `warn`.
-- `Firestore.setLoggingEnabled(loggingEnabled: true)` is the older switch: `debug` when true, the
+- `FirebaseFirestore.setLoggingEnabled(true)` is the older switch: `debug` when true, the
   default when false.
-- Firestore Lite has the same `Firestore.setLogLevel`.
+- Firestore Lite has the same `FirebaseFirestore.setLogLevel`.
 
 Each line is written with `print`, on standard output (the browser console on the web):
 
@@ -117,7 +117,7 @@ then `OnlineStateTracker ... Could not reach Cloud Firestore backend. ...` and
 **Causes and fixes.**
 
 - **The settings do not name the emulator.** The client does not read `FIRESTORE_EMULATOR_HOST`;
-  pass `FirestoreSettings().withEmulator(host, port)` to the `instanceFor` call that creates the
+  pass `Settings().withEmulator(host, port)` to the `instanceFor` call that creates the
   instance (see [The emulator and testing](emulator_and_testing.md)). Settings given to a later
   `instanceFor` call throw a `StateError`.
 - **Wrong host or port.** The Firebase CLI prints the host and port of the Firestore emulator
@@ -201,23 +201,27 @@ instance.
 
 **Symptom.** `W:FirestoreClient ... Initializing the client failed: Invalid argument(s): Failed to
 load dynamic library 'libsqlite3.so' ...` (or `'sqlite3.dll'`). Reads and listeners then fail with
-that `ArgumentError`, and writes with a `FirestoreError` with code `unknown` that quotes it.
+that `ArgumentError`, and writes with a `FirestoreException` with code `unknown` that quotes it.
 
-**Cause.** The `OpenDatabase` of `package:sqlite3` loads the system SQLite library, and it is not
-there under that name:
+**Cause.** With `sqlite3` 2.x the opener loads the system SQLite library, and it is not there under
+that name (with 3.x, a program built with `dart compile exe` instead of `dart build cli` does the
+same):
 
 - **Linux:** `package:sqlite3` 2.x loads `libsqlite3.so`, which only the development package
   installs (`libsqlite3-dev` on Debian and Ubuntu). The runtime package (`libsqlite3-0`) has
   `libsqlite3.so.0`.
-- **Windows:** Windows does not ship `sqlite3.dll`.
+- **Windows:** Windows does not ship `sqlite3.dll`; `sqlite3` 2.7.5 and later fall back to
+  `winsqlite3.dll`, which it does ship (not tried here).
 
-**Fix.** Use the opener of `example/sqlite_database.dart`, which falls back to `libsqlite3.so.0` on
-Linux, or install `libsqlite3-dev`. On Windows put `sqlite3.dll` next to the executable or on the
-`PATH`; in a Flutter app, `sqlite3_flutter_libs` bundles it. See [Platforms](platforms.md).
+**Fix.** Use `cloud_firestore_dart_sqlite` with `sqlite3` 3.x (Dart 3.10 and later), which bundles
+SQLite, and build programs with `dart build cli`. With 2.x install `libsqlite3-dev`, or use the
+override in the README of `cloud_firestore_dart_sqlite`, which falls back to `libsqlite3.so.0`; on
+Windows put `sqlite3.dll` next to the executable or on the `PATH`; in a Flutter app,
+`sqlite3_flutter_libs` bundles it. See [Platforms](platforms.md).
 
 ## A second browser tab cannot use the cache
 
-**Symptom.** On the web, with the persistent cache of `example/sqlite_database_web.dart`, the first
+**Symptom.** On the web, with the persistent cache of `cloud_firestore_dart_sqlite`, the first
 operations of a second tab fail after two seconds with `failedPrecondition`: `The offline cache
 "<name>" is already open in another tab (or in this one). It can only be used by one tab at a time:
 use a memory cache in this tab.`
@@ -225,8 +229,8 @@ use a memory cache in this tab.`
 **Cause.** The cache can be open in one tab at a time; a Web Lock guards it. Sharing it between tabs
 is not done yet.
 
-**Fix.** Create such tabs with a memory cache. `openWithMemoryFallback` in
-`example/sqlite_database_web.dart` tries the persistent cache and falls back to a memory cache on
+**Fix.** Create such tabs with a memory cache. `openWithMemoryFallback` of
+`cloud_firestore_dart_sqlite` tries the persistent cache and falls back to a memory cache on
 this error. See [Offline persistence on the web](offline_persistence.md#on-the-web).
 
 ## A query fails because an index is missing
@@ -238,7 +242,7 @@ The listener's stream emits the error and closes, and the client logs it:
 **Cause.** Production needs a composite index for queries that filter or order on several fields.
 The emulator does not require indexes, so it does not show this. The backend's message says that
 the query requires an index; the Firebase SDKs show a link in it that creates the index in the
-Firebase console. This client passes that message through unchanged in `FirestoreError.message` and
+Firebase console. This client passes that message through unchanged in `FirestoreException.message` and
 in the log line. (This path was not run against production in this repository.)
 
 **Fix.** Open the link from the message, or add the index to `firestore.indexes.json` and deploy it
@@ -256,7 +260,7 @@ The token providers decide when a token is too old with the local clock:
   gets a new token. With a clock that is ahead, every request refreshes the token.
 - **`OAuthTokenProvider.serviceAccount`** signs a token request dated 20 seconds in the past, for
   clocks slightly ahead of Google's. A clock that is further off makes Google refuse it
-  (`invalid_grant`): a `FirebaseAuthProviderException` with code `invalid-credential`, and
+  (`invalid_grant`): a `FirebaseAuthException` with code `invalid-credential`, and
   Firestore logs `W:FirestoreCallCredentials ... Failed to get token: ...` and fails the requests
   with `unauthenticated`.
 - **A shared persistent cache** stores lease times; after the clock is set back, the client logs
@@ -272,20 +276,20 @@ writes never complete, while the same app works elsewhere.
 
 **Cause.** A proxy or an antivirus that buffers streamed HTTP responses. The listen and write
 streams of the web transport use a streamed response; the client tries to detect a buffering proxy
-by itself (`experimentalAutoDetectLongPolling`, on by default) and then switches to long polling.
+by itself (`webExperimentalAutoDetectLongPolling`, on by default) and then switches to long polling.
 
 **Fix.** Force long polling, and if the proxy also cuts long requests, shorten them (5 to 30 seconds;
 the backend holds a request for 30 seconds by default):
 
 ```dart
-final FirestoreSettings settings = FirestoreSettings(
-  experimentalForceLongPolling: true,
-  experimentalLongPollingOptions: const ExperimentalLongPollingOptions(timeoutSeconds: 25),
+final Settings settings = Settings(
+  webExperimentalForceLongPolling: true,
+  webExperimentalLongPollingOptions: const WebExperimentalLongPollingOptions(timeoutDuration: Duration(seconds: 25)),
 );
 ```
 
 These settings only apply on the web; on the VM the client uses gRPC and ignores them.
-`experimentalForceLongPolling` and `experimentalAutoDetectLongPolling: true` together throw an
+`webExperimentalForceLongPolling` and `webExperimentalAutoDetectLongPolling: true` together throw an
 `ArgumentError`.
 
 Against the emulator, a web query that returns more than about 10,000 documents fails with
@@ -320,7 +324,7 @@ size limit reasonable so that unused documents are removed. Show the cached resu
 ## "database is locked"
 
 **Symptom.** With several clients (isolates, processes) on one cache, operations fail with an error
-that quotes SQLite's `database is locked`. With the opener of `example/sqlite_database.dart`, which
+that quotes SQLite's `database is locked`. With the opener of `cloud_firestore_dart_sqlite`, which
 reports SQLite's busy errors as `TransientDatabaseException`, a write or a listen fails with
 `unavailable` and can be tried again.
 
@@ -344,10 +348,10 @@ Issues: <https://github.com/long1eu/firebase_dart_sdk/issues>. Include:
   the compiler (dart2js or dart2wasm);
 - the backend: the emulator (its version, Standard or Enterprise edition) or production (the
   edition, a named database or `(default)`);
-- your `FirestoreSettings` and cache: memory or persistent, which `OpenDatabase` (the example's or
+- your `Settings` and cache: memory or persistent, which `OpenDatabase` (the example's or
   your own), IndexedDB or OPFS on the web, long polling;
-- the full error: `FirestoreError` code and message, and the stack trace;
-- a debug log of the run (`Firestore.setLogLevel(LogLevel.debug)`), with document data you
+- the full error: `FirestoreException` code and message, and the stack trace;
+- a debug log of the run (`FirebaseFirestore.setLogLevel(LogLevel.debug)`), with document data you
   cannot share removed;
 - the smallest program that shows the problem, ideally against the emulator. The programs in the
   package's `example/` folder are a good starting point;

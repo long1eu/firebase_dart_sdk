@@ -89,6 +89,13 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.1.3"
+  cloud_firestore_dart_sqlite:
+    dependency: "direct dev"
+    description:
+      path: "../cloud_firestore_dart_sqlite"
+      relative: true
+    source: path
+    version: "0.1.0"
   code_builder:
     dependency: transitive
     description:
@@ -167,14 +174,14 @@ packages:
       path: "../../firebase_core/firebase_app_dart"
       relative: true
     source: path
-    version: "0.1.1"
+    version: "0.2.0"
   firebase_auth_providers_dart:
     dependency: "direct dev"
     description:
       path: "../../firebase_auth/firebase_auth_providers_dart"
       relative: true
     source: path
-    version: "0.1.1"
+    version: "0.2.0"
   fixnum:
     dependency: "direct main"
     description:

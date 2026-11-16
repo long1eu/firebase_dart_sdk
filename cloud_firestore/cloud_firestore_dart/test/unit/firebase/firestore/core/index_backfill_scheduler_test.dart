@@ -17,6 +17,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/model/document_key.d
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/field_index.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/database.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/timer_task.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/get_options.dart';
 import 'package:test/test.dart';
 import 'package:uuid/uuid.dart';
 
@@ -26,7 +27,7 @@ import '../../../../util/test_util.dart' show filter, key, path;
 import '../local/mock/database_mock.dart';
 
 /// A client on an unreachable host: writes stay pending, queries are served from the cache.
-Future<Firestore> open(FirestoreSettings settings, TaskScheduler scheduler,
+Future<FirebaseFirestore> open(Settings settings, TaskScheduler scheduler,
     {MockCredentialsProvider? credentials}) {
   final String dbPath =
       '${Directory.systemTemp.path}/index_backfill_${const Uuid().v4()}.db';
@@ -57,8 +58,8 @@ Future<Firestore> open(FirestoreSettings settings, TaskScheduler scheduler,
   );
 }
 
-final FirestoreSettings offline =
-    FirestoreSettings().withEmulator('127.0.0.1', 1);
+final Settings offline =
+    Settings().withEmulator('127.0.0.1', 1);
 
 /// Runs the scheduled backfill now and waits until it rescheduled itself (which it does when the run is over).
 Future<void> runBackfill(TaskScheduler scheduler) async {
@@ -78,7 +79,7 @@ Future<void> runBackfill(TaskScheduler scheduler) async {
 void main() {
   test('the index backfill is scheduled with SQLite persistence', () async {
     final TaskScheduler scheduler = TaskScheduler('');
-    final Firestore firestore = await open(offline, scheduler);
+    final FirebaseFirestore firestore = await open(offline, scheduler);
     expect(scheduler.getTask(TaskId.indexBackfill), isNotNull);
     await firestore.terminate();
     expect(scheduler.getTask(TaskId.indexBackfill), isNull);
@@ -86,7 +87,7 @@ void main() {
 
   test('the index backfill is not scheduled with memory persistence', () async {
     final TaskScheduler scheduler = TaskScheduler('');
-    final Firestore firestore = await open(
+    final FirebaseFirestore firestore = await open(
         offline.copyWith(cacheSettings: const MemoryCacheSettings()),
         scheduler);
     expect(scheduler.getTask(TaskId.indexBackfill), isNull);
@@ -97,7 +98,7 @@ void main() {
       'a scheduled run fills the configured indexes and the next one is scheduled',
       () async {
     final TaskScheduler scheduler = TaskScheduler('');
-    final Firestore firestore = await open(offline, scheduler);
+    final FirebaseFirestore firestore = await open(offline, scheduler);
     addTearDown(firestore.terminate);
     final LocalStore localStore = firestore.client.localStore;
 
@@ -109,7 +110,7 @@ void main() {
     firestore.doc('coll/other').set(<String, Object?>{'b': 2}).ignore();
     // The writes are in the local store once a cache read sees them.
     final DocumentSnapshot<Map<String, Object?>> written =
-        await firestore.doc('coll/other').get(Source.cache);
+        await firestore.doc('coll/other').get(GetOptions(source: Source.cache));
     expect(written.exists, isTrue);
 
     final IndexManager indexManager = localStore.indexManagerForCurrentUser;
@@ -133,8 +134,7 @@ void main() {
     // The public API returns the same documents, now through the index.
     final QuerySnapshot<Map<String, Object?>> snapshot = await firestore
         .collection('coll')
-        .whereGreaterThanOrEqualTo('a', 1)
-        .get(Source.cache);
+        .where('a', isGreaterThanOrEqualTo: 1).get(GetOptions(source: Source.cache));
     expect(snapshot.docs.map((DocumentSnapshot<Object?> d) => d.id).toList(),
         <String>['one', 'two']);
 
@@ -142,8 +142,7 @@ void main() {
     firestore.doc('coll/three').set(<String, Object?>{'a': 3}).ignore();
     final QuerySnapshot<Map<String, Object?>> withNew = await firestore
         .collection('coll')
-        .whereGreaterThanOrEqualTo('a', 1)
-        .get(Source.cache);
+        .where('a', isGreaterThanOrEqualTo: 1).get(GetOptions(source: Source.cache));
     expect(withNew.docs.map((DocumentSnapshot<Object?> d) => d.id).toList(),
         <String>['one', 'two', 'three']);
 
@@ -154,7 +153,7 @@ void main() {
 
   test('a run with nothing to do reschedules itself', () async {
     final TaskScheduler scheduler = TaskScheduler('');
-    final Firestore firestore = await open(offline, scheduler);
+    final FirebaseFirestore firestore = await open(offline, scheduler);
     addTearDown(firestore.terminate);
 
     // No index is configured.
@@ -189,7 +188,7 @@ void main() {
   test('index state and entries follow the user', () async {
     final TaskScheduler scheduler = TaskScheduler('');
     final MockCredentialsProvider credentials = MockCredentialsProvider();
-    final Firestore firestore =
+    final FirebaseFirestore firestore =
         await open(offline, scheduler, credentials: credentials);
     addTearDown(firestore.terminate);
     final LocalStore localStore = firestore.client.localStore;
@@ -198,7 +197,7 @@ void main() {
       fieldIndex('coll', fieldsAndKinds: <Object>['a', SegmentKind.ascending])
     ]);
     firestore.doc('coll/anonymous').set(<String, Object?>{'a': 1}).ignore();
-    await firestore.doc('coll/anonymous').get(Source.cache);
+    await firestore.doc('coll/anonymous').get(GetOptions(source: Source.cache));
     await runBackfill(scheduler);
 
     final IndexManager anonymousManager = localStore.indexManagerForCurrentUser;
@@ -217,8 +216,7 @@ void main() {
     }
     QuerySnapshot<Map<String, Object?>> snapshot = await firestore
         .collection('coll')
-        .whereGreaterThanOrEqualTo('a', 1)
-        .get(Source.cache);
+        .where('a', isGreaterThanOrEqualTo: 1).get(GetOptions(source: Source.cache));
     // The pending write of the other user is not visible to alice.
     expect(snapshot.docs, isEmpty);
 
@@ -231,15 +229,14 @@ void main() {
         isEmpty);
 
     firestore.doc('coll/alice').set(<String, Object?>{'a': 5}).ignore();
-    await firestore.doc('coll/alice').get(Source.cache);
+    await firestore.doc('coll/alice').get(GetOptions(source: Source.cache));
     await runBackfill(scheduler);
     expect(await aliceManager.getDocumentsMatchingTarget(query.toTarget()),
         <DocumentKey>[key('coll/alice')]);
 
     snapshot = await firestore
         .collection('coll')
-        .whereGreaterThanOrEqualTo('a', 1)
-        .get(Source.cache);
+        .where('a', isGreaterThanOrEqualTo: 1).get(GetOptions(source: Source.cache));
     expect(snapshot.docs.map((DocumentSnapshot<Object?> d) => d.id).toList(),
         <String>['alice']);
   });

@@ -10,7 +10,7 @@ import 'package:cloud_firestore_dart/cloud_firestore_dart.dart';
 import '../common.dart';
 
 Future<void> main() async {
-  final Firestore firestore = connect();
+  final FirebaseFirestore firestore = connect();
   final CollectionReference<Map<String, Object?>> tasks = firestore.collection(
     scratch('tasks'),
   );
@@ -30,8 +30,8 @@ Future<void> main() async {
   final QuerySnapshot<Map<String, Object?>> mineOrUrgent = await tasks
       .where(
         Filter.or(<Filter>[
-          Filter.equalTo('owner', 'ada'),
-          Filter.greaterThanOrEqualTo('priority', 3),
+          Filter('owner', isEqualTo: 'ada'),
+          Filter('priority', isGreaterThanOrEqualTo: 3),
         ]),
       )
       .get();
@@ -43,10 +43,10 @@ Future<void> main() async {
       .where(
         Filter.and(<Filter>[
           Filter.or(<Filter>[
-            Filter.equalTo('owner', 'ada'),
-            Filter.greaterThanOrEqualTo('priority', 3),
+            Filter('owner', isEqualTo: 'ada'),
+            Filter('priority', isGreaterThanOrEqualTo: 3),
           ]),
-          Filter.equalTo('done', false),
+          Filter('done', isEqualTo: false),
         ]),
       )
       .get();

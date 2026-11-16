@@ -1,0 +1,134 @@
+name: Publish to pub.dev
+
+# Publishes ONE package to pub.dev when its tag is pushed:
+#
+#   <package>-v<version>       for example cloud_firestore_dart-v0.2.0
+#
+# The tag must point at a commit in which the package's pubspec.yaml is at <version> and its
+# CHANGELOG.md has a `## <version>` heading; the job checks both, then runs a dry run, then
+# publishes. Push the tags in dependency order and wait for each run, because a package cannot be
+# published before the versions it depends on are on pub.dev:
+#
+#   firebase_app_dart, firebase_auth_providers_dart, cloud_firestore_dart, then
+#   cloud_firestore_dart_sqlite, cloud_firestore_dart_flutterfire, cloud_firestore_dart_platform
+#
+# How it is allowed to publish (there is no stored secret):
+# - pub.dev trusts a short-lived OpenID Connect token that GitHub issues to this job. For that,
+#   each package's admin page on pub.dev has "Automated publishing" enabled for this repository,
+#   with the tag pattern `<package>-v{{version}}` and the environment `pub.dev` required.
+# - The job runs in the GitHub environment `pub.dev`. Give that environment a required reviewer
+#   (Settings > Environments), so that every publish waits for the maintainer's approval.
+# - pub.dev only allows automated publishing for a package that already exists, so the FIRST
+#   version of a new package is published by hand (`dart pub publish` in its folder).
+#
+# The repository-wide tag `v<version>` publishes nothing: `release.yml` only validates it.
+on:
+  push:
+    tags:
+      - '*-v[0-9]*'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publish-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Publish ${{ github.ref_name }}
+    runs-on: ubuntu-26.04
+    timeout-minutes: 20
+    environment: pub.dev
+    permissions:
+      contents: read
+      # Lets the job ask GitHub for the OpenID Connect token that pub.dev checks.
+      id-token: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Find the package of the tag
+        id: package
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -eu
+          name="${TAG%-v*}"
+          version="${TAG##*-v}"
+          dir=""
+          # Only the maintained packages can be published from here.
+          for candidate in \
+            firebase_core/firebase_app_dart \
+            firebase_auth/firebase_auth_providers_dart \
+            cloud_firestore/cloud_firestore_dart \
+            cloud_firestore/cloud_firestore_dart_sqlite \
+            cloud_firestore/cloud_firestore_dart_flutterfire \
+            cloud_firestore/cloud_firestore_dart_platform; do
+            if [ "$(basename "$candidate")" = "$name" ]; then dir="$candidate"; fi
+          done
+          if [ -z "$dir" ]; then
+            echo "::error::No publishable package is named $name"
+            exit 1
+          fi
+          actual="$(sed -n 's/^version: *//p' "$dir/pubspec.yaml" | head -1)"
+          if [ "$actual" != "$version" ]; then
+            echo "::error file=$dir/pubspec.yaml::$name is at version $actual, the tag says $version"
+            exit 1
+          fi
+          if ! grep -Eq "^## \\[?${version//./\\.}\\]?( |$)" "$dir/CHANGELOG.md"; then
+            echo "::error file=$dir/CHANGELOG.md::No '## $version' heading in the changelog of $name"
+            exit 1
+          fi
+          if grep -Eq '^\s*sdk:\s*flutter\s*$' "$dir/pubspec.yaml"; then flutter=true; else flutter=false; fi
+          {
+            echo "name=$name"
+            echo "version=$version"
+            echo "dir=$dir"
+            echo "flutter=$flutter"
+          } >> "$GITHUB_OUTPUT"
+          echo "Publishing $name $version from $dir (Flutter package: $flutter)"
+
+      - name: Set up Dart
+        if: steps.package.outputs.flutter == 'false'
+        uses: ./.github/actions/dart
+        with:
+          sdk: stable
+
+      - name: Set up Flutter
+        if: steps.package.outputs.flutter == 'true'
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          channel: stable
+
+      - name: Dry run
+        working-directory: ${{ steps.package.outputs.dir }}
+        env:
+          FLUTTER: ${{ steps.package.outputs.flutter }}
+        run: |
+          set -eu
+          if [ "$FLUTTER" = true ]; then
+            flutter pub get
+            flutter pub publish --dry-run
+          else
+            dart pub get
+            dart pub publish --dry-run
+          fi
+
+      # Asks GitHub for the OpenID Connect token and hands it to pub. It is done last, right
+      # before publishing, because the token is short-lived.
+      - name: Get the pub.dev token
+        uses: dart-lang/setup-dart@2286a0c042b44434fe26d292bbce8d34f7ec662b # v1.8.2
+        with:
+          sdk: stable
+
+      - name: Publish
+        working-directory: ${{ steps.package.outputs.dir }}
+        env:
+          FLUTTER: ${{ steps.package.outputs.flutter }}
+        run: |
+          set -eu
+          if [ "$FLUTTER" = true ]; then
+            flutter pub publish --force
+          else
+            dart pub publish --force
+          fi

@@ -8,7 +8,6 @@ import 'dart:async';
 import 'package:cloud_firestore_dart/src/firebase/firestore/document_reference.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/document_snapshot.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/field_value.dart';
-import 'package:cloud_firestore_dart/src/firebase/firestore/metadata_change.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/set_options.dart';
 import 'package:test/test.dart';
 
@@ -36,7 +35,7 @@ void main() {
     docRef = await testDocument();
     accumulator = EventAccumulator<DocumentSnapshot>();
     listenerRegistration = docRef
-        .getSnapshots(MetadataChanges.include)
+        .snapshots(includeMetadataChanges: true)
         .listen(accumulator.onData, onError: accumulator.onError);
 
     // Wait for initial null snapshot to avoid potential races.
@@ -61,13 +60,13 @@ void main() {
 
     expect(snap.get('sum'), isA<double>());
     expect(
-      snap.getDouble('sum'),
+      (snap.get('sum') as num?)?.toDouble(),
       moreOrLessEquals(expectedSum, epsilon: doubleEpsilon),
     );
     snap = await accumulator.awaitRemoteEvent();
     expect(snap.get('sum'), isA<double>());
     expect(
-      snap.getDouble('sum'),
+      (snap.get('sum') as num?)?.toDouble(),
       moreOrLessEquals(expectedSum, epsilon: doubleEpsilon),
     );
   }
@@ -75,19 +74,19 @@ void main() {
   Future<void> _expectLocalAndRemoteValueInt(int expectedSum) async {
     DocumentSnapshot snap = await accumulator.awaitLocalEvent();
     expect(snap.get('sum'), isA<int>());
-    expect(snap.getInt('sum'), expectedSum);
+    expect((snap.get('sum') as num?)?.toInt(), expectedSum);
     snap = await accumulator.awaitRemoteEvent();
     expect(snap.get('sum'), isA<int>());
-    expect(snap.getInt('sum'), expectedSum);
+    expect((snap.get('sum') as num?)?.toInt(), expectedSum);
   }
 
   Future<void> _expectLocalAndRemoteNaN() async {
     DocumentSnapshot snap = await accumulator.awaitLocalEvent();
     expect(snap.get('sum'), isA<double>());
-    expect(snap.getDouble('sum')!.isNaN, isTrue);
+    expect((snap.get('sum') as num?)?.toDouble().isNaN, isTrue);
     snap = await accumulator.awaitRemoteEvent();
     expect(snap.get('sum'), isA<double>());
-    expect(snap.getDouble('sum')!.isNaN, isTrue);
+    expect((snap.get('sum') as num?)?.toDouble().isNaN, isTrue);
   }
 
   test('createDocumentWithMinimum', () async {
@@ -221,7 +220,7 @@ void main() {
   test('mergeOnNonExistingDocumentWithMaximum', () async {
     await docRef.set(
       map(<dynamic>['sum', FieldValue.maximum(1337)]),
-      SetOptions.mergeAllFields,
+      const SetOptions(merge: true),
     );
     await _expectLocalAndRemoteValueInt(1337);
   });

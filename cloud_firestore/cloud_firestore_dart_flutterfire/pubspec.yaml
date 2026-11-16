@@ -20,8 +20,8 @@ environment:
 dependencies:
   # Local development resolves these from the sibling packages through
   # pubspec_overrides.yaml (not published).
-  cloud_firestore_dart: ^0.1.1
-  firebase_app_dart: ^0.1.1
+  cloud_firestore_dart: ^0.2.0
+  firebase_app_dart: ^0.2.0
   firebase_auth: '>=5.0.0 <8.0.0'
   firebase_core: '>=3.0.0 <6.0.0'
   flutter:

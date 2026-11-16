@@ -27,7 +27,7 @@ tool/stop_auth_emulators.sh                 # from the repository root
 | `account_flows.dart` | Email verification, `updateProfile`, a password reset with its action code, reauthentication and account deletion. Reads the action codes from the emulator in place of an inbox. |
 | `custom_token.dart` | `signInWithCustomToken` and the custom claims in the ID token. The emulator accepts an unsigned token; a real one comes from your server. |
 | `persistent_session.dart` | A file-backed `AuthStorage` (owner-only file on macOS and Linux): a second run finds the user signed in. |
-| `firestore_wiring.dart` | `FirebaseUserAuth.forApp` before `Firestore.instanceFor`: a write refused while signed out, accepted for the signed-in user, and a read of another user's document refused. |
+| `firestore_wiring.dart` | `FirebaseUserAuth.forApp` before `FirebaseFirestore.instanceFor`: a write refused while signed out, accepted for the signed-in user, and a read of another user's document refused. |
 
 ## With a real project
 

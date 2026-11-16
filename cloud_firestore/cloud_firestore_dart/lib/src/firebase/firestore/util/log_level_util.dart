@@ -6,7 +6,6 @@ void applyLogLevel(LogLevel level) {
   internal.Log.level = switch (level) {
     LogLevel.verbose => internal.InternalLogLevel.i,
     LogLevel.debug => internal.InternalLogLevel.d,
-    LogLevel.info => internal.InternalLogLevel.info,
     LogLevel.warn => internal.InternalLogLevel.w,
     LogLevel.error => internal.InternalLogLevel.e,
     LogLevel.silent => internal.InternalLogLevel.none,

@@ -8,6 +8,8 @@ import 'dart:typed_data';
 import 'package:cloud_firestore_dart/cloud_firestore_dart.dart';
 import 'package:cloud_firestore_dart/lite.dart' as lite;
 import 'package:cloud_firestore_dart/pipelines.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/load_bundle_task_progress.dart'
+    show LoadBundleTaskSnapshotInternal;
 import 'package:firebase_app_dart/firebase_app_dart.dart';
 import 'package:test/test.dart';
 import 'package:uuid/uuid.dart';
@@ -73,8 +75,8 @@ void main() {
     });
 
     test('FieldPath', () {
-      expectString(FieldPath.of(<String>['a', 'b.c']), 'a.`b.c`');
-      expectString(FieldPath.documentId(), '__name__');
+      expectString(FieldPath(<String>['a', 'b.c']), 'a.`b.c`');
+      expectString(FieldPath.documentId, '__name__');
     });
 
     test('AggregateField', () {
@@ -115,10 +117,13 @@ void main() {
       expectString(FirestoreErrorCode.resourceExhausted, 'resourceExhausted');
     });
 
-    test('FirestoreError', () {
+    test('FirestoreException', () {
       expectString(
-        FirestoreError('Missing', FirestoreErrorCode.permissionDenied),
-        'FirestoreError: [code=permissionDenied]: Missing',
+        FirestoreException(
+          message: 'Missing',
+          errorCode: FirestoreErrorCode.permissionDenied,
+        ),
+        '[cloud_firestore/permission-denied] Missing',
       );
     });
 
@@ -131,29 +136,31 @@ void main() {
   });
 
   group('settings and options', () {
-    test('FirestoreSettings', () {
+    test('Settings', () {
       expectString(
-        FirestoreSettings(),
-        'FirestoreSettings{host=firestore.googleapis.com, port=443, '
+        Settings(),
+        'Settings{host=firestore.googleapis.com, port=443, '
         'sslEnabled=true, persistenceEnabled=true, cacheSizeBytes=104857600, '
         'grpcFlowControlWindow=262144, cacheSettings=null, '
-        'experimentalForceLongPolling=false, '
-        'experimentalAutoDetectLongPolling=true, '
-        'experimentalLongPollingOptions='
-        'ExperimentalLongPollingOptions{timeoutSeconds=null}, '
+        'webExperimentalForceLongPolling=false, '
+        'webExperimentalAutoDetectLongPolling=true, '
+        'webExperimentalLongPollingOptions='
+        'WebExperimentalLongPollingOptions{timeoutDuration=null}, '
         'mockUserToken=null}',
       );
     });
 
-    test('ExperimentalLongPollingOptions', () {
+    test('WebExperimentalLongPollingOptions', () {
       expectString(
-        const ExperimentalLongPollingOptions(timeoutSeconds: 25),
-        'ExperimentalLongPollingOptions{timeoutSeconds=25}',
+        const WebExperimentalLongPollingOptions(
+          timeoutDuration: Duration(seconds: 25),
+        ),
+        'WebExperimentalLongPollingOptions{timeoutDuration=0:00:25.000000}',
       );
     });
 
-    test('FirestoreSettings does not print the mock user token', () {
-      final String text = FirestoreSettings()
+    test('Settings does not print the mock user token', () {
+      final String text = Settings()
           .withEmulator(
             '127.0.0.1',
             8080,
@@ -189,30 +196,10 @@ void main() {
       );
     });
 
-    test('SnapshotListenOptions', () {
+    test('LoadBundleTaskSnapshot', () {
       expectString(
-        const SnapshotListenOptions(),
-        'SnapshotListenOptions{metadataChanges=MetadataChanges.exclude, '
-        'source=ListenSource.defaultSource}',
-      );
-    });
-
-    test('TransactionOptions', () {
-      expectString(
-        TransactionOptions(),
-        'TransactionOptions{maxAttempts=5, readOnly=false}',
-      );
-      expectString(
-        TransactionOptions(readOnly: true, readTime: const Timestamp(5, 0)),
-        'TransactionOptions{maxAttempts=5, readOnly=true, '
-        'readTime=Timestamp(seconds=5, nanoseconds=0)}',
-      );
-    });
-
-    test('LoadBundleTaskProgress', () {
-      expectString(
-        LoadBundleTaskProgress.initial,
-        'LoadBundleTaskProgress{documentsLoaded: 0, totalDocuments: 0, '
+        LoadBundleTaskSnapshotInternal.initial,
+        'LoadBundleTaskSnapshot{documentsLoaded: 0, totalDocuments: 0, '
         'bytesLoaded: 0, totalBytes: 0, '
         'taskState: LoadBundleTaskState.success, exception: null}',
       );
@@ -220,13 +207,13 @@ void main() {
   });
 
   group('references and snapshots', () {
-    late Firestore db;
+    late FirebaseFirestore db;
     late CollectionReference<Map<String, Object?>> rooms;
 
     setUp(() {
       final FirebaseApp app = newApp('to-string-${const Uuid().v4()}');
       addTearDown(app.delete);
-      db = Firestore.instanceFor(app: app, settings: offlineSettings);
+      db = FirebaseFirestore.instanceFor(app: app, settings: offlineSettings);
       addTearDown(db.terminate);
       rooms = db.collection('rooms');
     });
@@ -262,11 +249,14 @@ void main() {
           'value=ObjectValue{internalValue='
           '{at:time(1,2000),n:5,owner:users/a}}}}';
 
-      expectString(await rooms.doc('eros').get(Source.cache), document);
+      expectString(
+        await rooms.doc('eros').get(GetOptions(source: Source.cache)),
+        document,
+      );
 
       final QuerySnapshot<Map<String, Object?>> snapshot = await rooms
           .where('n', isGreaterThan: 1)
-          .get(Source.cache);
+          .get(GetOptions(source: Source.cache));
       // The number of documents, not the documents.
       expectString(
         snapshot,
@@ -311,7 +301,7 @@ void main() {
     test('Pipeline', () {
       final FirebaseApp app = newApp('to-string-${const Uuid().v4()}');
       addTearDown(app.delete);
-      final Firestore db = Firestore.instanceFor(
+      final FirebaseFirestore db = FirebaseFirestore.instanceFor(
         app: app,
         settings: offlineSettings,
       );
@@ -331,7 +321,9 @@ void main() {
     test('Firestore, references, Query and FirestoreSettings', () {
       final FirebaseApp app = newApp('to-string-lite');
       addTearDown(app.delete);
-      final lite.Firestore db = lite.Firestore.instanceFor(app: app);
+      final lite.FirebaseFirestore db = lite.FirebaseFirestore.instanceFor(
+        app: app,
+      );
       expectString(db, 'Firestore{app: to-string-lite, database: (default)}');
       expectString(db.collection('rooms'), 'CollectionReference{path: rooms}');
       expectString(db.doc('rooms/eros'), 'DocumentReference{path: rooms/eros}');
@@ -341,8 +333,8 @@ void main() {
         '__name__);limitType=LIMIT_TO_FIRST)}',
       );
       expectString(
-        lite.FirestoreSettings(),
-        'FirestoreSettings{host: firestore.googleapis.com, port: 443, '
+        lite.Settings(),
+        'Settings{host: firestore.googleapis.com, port: 443, '
         'sslEnabled: true, grpcFlowControlWindow: 262144}',
       );
     });

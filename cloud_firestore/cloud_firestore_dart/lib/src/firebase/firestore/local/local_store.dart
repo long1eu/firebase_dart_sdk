@@ -849,7 +849,7 @@ class LocalStore implements BundleCallback {
           }
         },
       );
-    } on FirestoreError catch (e) {
+    } on FirestoreException catch (e) {
       if (!isPrimaryLeaseLoss(e)) {
         rethrow;
       }
@@ -997,7 +997,7 @@ class LocalStore implements BundleCallback {
           'Release target',
           () => _releaseTarget(targetId, keepPersistedTargetData: false),
         );
-      } on FirestoreError catch (e) {
+      } on FirestoreException catch (e) {
         if (!isPrimaryLeaseLoss(e)) {
           rethrow;
         }

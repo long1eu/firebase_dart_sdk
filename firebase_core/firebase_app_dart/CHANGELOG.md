@@ -1,3 +1,20 @@
+## 0.2.0
+
+Breaking: the API takes the names and shapes of FlutterFire's `firebase_core`. Every change is in
+[docs/api_migration_0_2.md](https://github.com/long1eu/firebase_dart_sdk/blob/main/docs/api_migration_0_2.md).
+
+- `Firebase.initializeApp`, `Firebase.app` and `Firebase.apps`; `FirebaseApp.getInstance` and
+  `FirebaseApp.apps` are removed. `defaultFirebaseAppName`.
+- `FirebaseOptions` uses FlutterFire's field names (`appId`, `messagingSenderId`, `databaseURL`,
+  `trackingId`) and accepts its other fields, so a generated options file compiles; `copyWith`.
+- `FirebaseException` (plugin, code, message) implements `Exception` and replaces
+  `FirebaseError`; the unused Android error classes are removed.
+- `delete`, `setAutomaticDataCollectionEnabled` and `setAutomaticResourceManagementEnabled`
+  return futures and take the value positionally; `isAutomaticDataCollectionEnabled`.
+- The token provider interfaces are `AuthTokenProvider`, `AuthTokenChange` and
+  `AppCheckTokenProvider`.
+- Fix: `FirebaseOptions.toJson` and `fromJson` keep `dataCollectionEnabled`.
+
 ## 0.1.1
 
 Documentation and examples only. No code change.

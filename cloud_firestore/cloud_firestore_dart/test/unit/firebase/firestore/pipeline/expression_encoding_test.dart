@@ -43,7 +43,7 @@ void main() {
   group('fields and constants', () {
     test('field', () {
       expect(encode(field('a.b')), fieldRef('a.b'));
-      expect(encode(field(FieldPath.of(<String>['a', 'b.c']))),
+      expect(encode(field(FieldPath(<String>['a', 'b.c']))),
           fieldRef('a.`b.c`'));
       expect(encode(field('__name__')), fieldRef('__name__'));
       expect(field('a.b').fieldName, 'a.b');

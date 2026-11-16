@@ -13,6 +13,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/set_options.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/source.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/transaction.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/transaction_options.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/get_options.dart';
 import 'package:test/test.dart';
 
 import '../../../util/integration_test_util.dart';
@@ -20,7 +21,7 @@ import '../../../util/test_util.dart';
 
 void main() {
   IntegrationTestUtil.currentDatabasePath = 'integration/transaction';
-  late Firestore firestore;
+  late FirebaseFirestore firestore;
 
   setUp(() async {
     firestore = await testFirestore();
@@ -32,23 +33,23 @@ void main() {
   });
 
   test('testReadOnlyTransactionReadsWithoutWriting', () async {
-    final DocumentReference doc = firestore.collection('spaces').document();
+    final DocumentReference doc = firestore.collection('spaces').doc();
     await doc.set(map(<dynamic>['foo', 1]));
 
     final DocumentSnapshot snapshot = await firestore.runTransaction(
       (Transaction transaction) => transaction.get(doc),
-      options: TransactionOptions(readOnly: true),
+      readOnly: true,
     );
-    expect(snapshot.getDouble('foo'), 1);
+    expect((snapshot.get('foo') as num?)?.toDouble(), 1);
 
     await expectLater(
       firestore.runTransaction((Transaction transaction) async {
         await transaction.get(doc);
         transaction.set(doc, map(<dynamic>['foo', 2]));
-      }, options: TransactionOptions(readOnly: true)),
+      }, readOnly: true),
       throwsA(
-        isA<FirestoreError>().having(
-          (FirestoreError e) => e.code,
+        isA<FirestoreException>().having(
+          (FirestoreException e) => e.errorCode,
           'code',
           FirestoreErrorCode.invalidArgument,
         ),
@@ -60,7 +61,7 @@ void main() {
     // A read-only transaction reads one snapshot of the backend and commits
     // nothing: a concurrent write is no conflict (it used to verify its reads
     // at the end and run again).
-    final DocumentReference doc = firestore.collection('spaces').document();
+    final DocumentReference doc = firestore.collection('spaces').doc();
     await doc.set(map(<dynamic>['foo', 1]));
 
     int attempts = 0;
@@ -71,15 +72,15 @@ void main() {
       final DocumentSnapshot snapshot = await transaction.get(doc);
       await doc.set(map(<dynamic>['foo', 2]));
       return snapshot.get('foo');
-    }, options: TransactionOptions(readOnly: true));
+    }, readOnly: true);
 
     expect(attempts, 1);
     expect(result, 1);
-    expect((await doc.get(Source.server)).get('foo'), 2);
+    expect((await doc.get(GetOptions(source: Source.server))).get('foo'), 2);
   });
 
   test('testRunsTransactionsAfterGettingExistingDoc', () async {
-    final Firestore firestore = await testFirestore();
+    final FirebaseFirestore firestore = await testFirestore();
     final TransactionTester tt = TransactionTester._(firestore);
 
     await tt.withExistingDoc().run(<TransactionStage>[
@@ -150,7 +151,7 @@ void main() {
   });
 
   test('testRunsTransactionsAfterGettingNonexistentDoc', () async {
-    final Firestore firestore = await testFirestore();
+    final FirebaseFirestore firestore = await testFirestore();
     final TransactionTester tt = TransactionTester._(firestore);
 
     await tt.withNonexistentDoc().run(<TransactionStage>[
@@ -224,7 +225,7 @@ void main() {
   });
 
   test('testRunsTransactionsOnExistingDoc', () async {
-    final Firestore firestore = await testFirestore();
+    final FirebaseFirestore firestore = await testFirestore();
     final TransactionTester tt = TransactionTester._(firestore);
 
     await tt.withExistingDoc().run(<TransactionStage>[
@@ -283,7 +284,7 @@ void main() {
   });
 
   test('testRunsTransactionsOnNonexistentDoc', () async {
-    final Firestore firestore = await testFirestore();
+    final FirebaseFirestore firestore = await testFirestore();
     final TransactionTester tt = TransactionTester._(firestore);
 
     await tt.withNonexistentDoc().run(<TransactionStage>[
@@ -349,7 +350,7 @@ void main() {
   // incorrectly fail with FAILED_PRECONDITION when operations were performed on a deleted document (rather than a
   // non-existent document).
   test('testRunsTransactionsAfterGettingDeletedDoc', () async {
-    final Firestore firestore = await testFirestore();
+    final FirebaseFirestore firestore = await testFirestore();
     final TransactionTester tt = TransactionTester._(firestore);
 
     await tt.withDeletedDoc().run(<TransactionStage>[
@@ -429,7 +430,7 @@ void main() {
   });
 
   test('testRunsTransactionsOnDeletedDoc', () async {
-    final Firestore firestore = await testFirestore();
+    final FirebaseFirestore firestore = await testFirestore();
     final TransactionTester tt = TransactionTester._(firestore);
 
     await tt.withDeletedDoc().run(<TransactionStage>[
@@ -497,8 +498,8 @@ void main() {
   });
 
   test('testRetryOnAlreadyExistsError', () async {
-    final Firestore firestore = await testFirestore();
-    final DocumentReference doc = firestore.collection('foo').document();
+    final FirebaseFirestore firestore = await testFirestore();
+    final DocumentReference doc = firestore.collection('foo').doc();
     int transactionCallbackCount = 0;
     await firestore.runTransaction<void>((Transaction transaction) async {
       transactionCallbackCount++;
@@ -514,11 +515,11 @@ void main() {
     final DocumentSnapshot snapshot = await doc.get();
     expect(transactionCallbackCount, 2);
     expect(snapshot.exists, isTrue);
-    expect(snapshot.data, map(<String>['foo2', 'bar2']));
+    expect(snapshot.data(), map(<String>['foo2', 'bar2']));
   });
 
   test('testSetDocumentWithMerge', () async {
-    final DocumentReference doc = firestore.collection('towns').document();
+    final DocumentReference doc = firestore.collection('towns').doc();
     await firestore.runTransaction<void>((Transaction transaction) {
       transaction
           .set(
@@ -538,13 +539,13 @@ void main() {
               'nested',
               map<String>(<String>['c', 'd']),
             ]),
-            SetOptions.mergeAllFields,
+            const SetOptions(merge: true),
           );
       return Future<void>.value();
     });
     final DocumentSnapshot snapshot = await doc.get();
     expect(
-      snapshot.data,
+      snapshot.data(),
       map<dynamic>(<dynamic>[
         'a',
         'b',
@@ -564,7 +565,7 @@ void main() {
     final Completer<void> barrier = Completer<void>();
     int started = 0;
 
-    final DocumentReference doc = firestore.collection('counters').document();
+    final DocumentReference doc = firestore.collection('counters').doc();
     await doc.set(map(<dynamic>['count', 5.0]));
 
     // Make 3 transactions that will all increment.
@@ -584,7 +585,10 @@ void main() {
           await barrier.future;
           transaction.set(
             doc,
-            map(<dynamic>['count', snapshot.getDouble('count')! + 1.0]),
+            map(<dynamic>[
+              'count',
+              (snapshot.get('count') as num).toDouble() + 1.0,
+            ]),
           );
           return;
         }),
@@ -599,7 +603,7 @@ void main() {
     await Future.wait(transactionTasks);
     // Now all transaction should be completed, so check the result.
     final DocumentSnapshot snapshot = await doc.get();
-    expect(snapshot.getDouble('count')!.toInt(), 8);
+    expect((snapshot.get('count') as num?)?.toDouble().toInt(), 8);
   });
 
   test('testTransactionRaisesErrorsForInvalidUpdates', () async {
@@ -609,7 +613,7 @@ void main() {
     ) async {
       // Try to read / write a document with an invalid path.
       final DocumentSnapshot doc = await transaction.get(
-        firestore.collection('nonexistent').document('__badpath__'),
+        firestore.collection('nonexistent').doc('__badpath__'),
       );
       transaction.set(doc.reference, map(<String>['foo', 'value']));
       return;
@@ -619,11 +623,11 @@ void main() {
       // Let all of the transactions fetch the old value and stop once.
       await transactionTask;
     } catch (e) {
-      expect(e, const TypeMatcher<FirestoreError>());
+      expect(e, const TypeMatcher<FirestoreException>());
       print(e);
 
-      final FirestoreError error = e as FirestoreError;
-      expect(error.code, FirestoreErrorCode.invalidArgument);
+      final FirestoreException error = e as FirestoreException;
+      expect(error.errorCode, FirestoreErrorCode.invalidArgument);
     }
   });
 
@@ -635,7 +639,7 @@ void main() {
     final Completer<void> barrier = Completer<void>();
     int counter = 0;
 
-    final DocumentReference doc = firestore.collection('counters').document();
+    final DocumentReference doc = firestore.collection('counters').doc();
     await doc.set(map(<dynamic>['count', 5.0, 'other', 'yes']));
 
     // Make 3 transactions that will all increment.
@@ -654,7 +658,10 @@ void main() {
 
           transaction.update(
             doc,
-            map(<dynamic>['count', snapshot.getDouble('count')! + 1.0]),
+            map(<dynamic>[
+              'count',
+              (snapshot.get('count') as num).toDouble() + 1.0,
+            ]),
           );
           return;
         }),
@@ -672,12 +679,12 @@ void main() {
     expect(counter, lessThanOrEqualTo(6));
     // Now all transaction should be completed, so check the result.
     final DocumentSnapshot snapshot = await doc.get();
-    expect(snapshot.getDouble('count')!.toInt(), 8);
-    expect(snapshot.getString('other'), 'yes');
+    expect((snapshot.get('count') as num?)?.toDouble().toInt(), 8);
+    expect(snapshot.get('other') as String?, 'yes');
   });
 
   test('testMakesDefaultMaxAttempts', () async {
-    final DocumentReference doc1 = firestore.collection('counters').document();
+    final DocumentReference doc1 = firestore.collection('counters').doc();
     int count = 0;
     await doc1.set(map(<dynamic>['count', 15]));
 
@@ -695,17 +702,16 @@ void main() {
       error = e;
     }
 
-    expect(error, isA<FirestoreError>());
+    expect(error, isA<FirestoreException>());
     expect(
-      (error! as FirestoreError).code,
+      (error! as FirestoreException).errorCode,
       FirestoreErrorCode.failedPrecondition,
     );
     expect(count, TransactionOptions.defaultMaxAttempts);
   });
 
   test('testMakesOptionSpecifiedMaxAttempts', () async {
-    final TransactionOptions options = TransactionOptions(maxAttempts: 1);
-    final DocumentReference doc1 = firestore.collection('counters').document();
+    final DocumentReference doc1 = firestore.collection('counters').doc();
     int count = 0;
     await doc1.set(map(<dynamic>['count', 15]));
 
@@ -715,43 +721,41 @@ void main() {
         await transaction.get(doc1);
         await doc1.set(map(<dynamic>['count', 1234 + ++count]));
         transaction.update(doc1, map(<dynamic>['count', 1]));
-      }, options: options);
+      }, maxAttempts: 1);
     } catch (e) {
       error = e;
     }
 
-    expect(error, isA<FirestoreError>());
+    expect(error, isA<FirestoreException>());
     expect(
-      (error! as FirestoreError).code,
+      (error! as FirestoreException).errorCode,
       FirestoreErrorCode.failedPrecondition,
     );
-    expect(count, options.maxAttempts);
+    expect(count, 1);
   });
 
   test('testUpdateFieldsWithDotsTransactionally', () async {
-    final DocumentReference doc = firestore.collection('fieldnames').document();
+    final DocumentReference doc = firestore.collection('fieldnames').doc();
     await doc.set(map(<String>['a.b', 'old', 'c.d', 'old']));
 
     await firestore.runTransaction<void>((Transaction transaction) {
       transaction
-        ..updateFromList(doc, <dynamic>[
-          FieldPath.of(<String>['a.b']),
-          'new',
-        ])
-        ..updateFromList(doc, <dynamic>[
-          FieldPath.of(<String>['c.d']),
-          'new',
-        ]);
+        ..update(doc, <Object, Object?>{
+          FieldPath(<String>['a.b']): 'new',
+        })
+        ..update(doc, <Object, Object?>{
+          FieldPath(<String>['c.d']): 'new',
+        });
       return Future<void>.value();
     });
 
     final DocumentSnapshot snapshot = await doc.get();
     expect(snapshot.exists, isTrue);
-    expect(snapshot.data, map<String>(<String>['a.b', 'new', 'c.d', 'new']));
+    expect(snapshot.data(), map<String>(<String>['a.b', 'new', 'c.d', 'new']));
   });
 
   test('testUpdateNestedFieldsTransactionally', () async {
-    final DocumentReference doc = firestore.collection('fieldnames').document();
+    final DocumentReference doc = firestore.collection('fieldnames').doc();
     await doc.set(
       map(<dynamic>[
         'a',
@@ -763,7 +767,7 @@ void main() {
 
     await firestore.runTransaction<void>((Transaction transaction) {
       transaction
-        ..updateFromList(doc, <String>['a.b', 'new'])
+        ..update(doc, <Object, Object?>{'a.b': 'new'})
         ..update(doc, map<String>(<String>['c.d', 'new']));
       return Future<void>.value();
     });
@@ -771,7 +775,7 @@ void main() {
     final DocumentSnapshot snapshot = await doc.get();
     expect(snapshot.exists, isTrue);
     expect(
-      snapshot.data,
+      snapshot.data(),
       map<dynamic>(<dynamic>[
         'a',
         map<String>(<String>['b', 'new']),
@@ -782,8 +786,8 @@ void main() {
   });
 
   test('testRetriesWhenDocumentThatWasReadWithoutBeingWrittenChanges', () async {
-    final DocumentReference doc1 = firestore.collection('counters').document();
-    final DocumentReference doc2 = firestore.collection('counters').document();
+    final DocumentReference doc1 = firestore.collection('counters').doc();
+    final DocumentReference doc2 = firestore.collection('counters').doc();
     int attempts = 0;
     await doc1.set(map(<dynamic>['count', 15]));
 
@@ -801,11 +805,11 @@ void main() {
     final DocumentSnapshot snapshot = await doc1.get();
     expect(attempts, 2);
     expect(snapshot.exists, isTrue);
-    expect(snapshot.data!['count'], 1234);
+    expect(snapshot.data()!['count'], 1234);
   });
 
   test('testReadingADocTwiceWithDifferentVersions', () async {
-    final DocumentReference doc = firestore.collection('counters').document();
+    final DocumentReference doc = firestore.collection('counters').doc();
     await doc.set(map(<dynamic>['count', 15.0]));
     int counter = 0;
 
@@ -822,13 +826,13 @@ void main() {
         // The get itself will fail, because we already read an earlier version of this document.
         fail('Should have thrown exception');
       });
-    } on FirestoreError catch (e) {
-      expect(e.code, FirestoreErrorCode.aborted);
+    } on FirestoreException catch (e) {
+      expect(e.errorCode, FirestoreErrorCode.aborted);
     }
   });
 
   test('testCannotReadAfterWriting', () async {
-    final DocumentReference doc = firestore.collection('anything').document();
+    final DocumentReference doc = firestore.collection('anything').doc();
 
     try {
       await firestore.runTransaction<void>((Transaction transaction) {
@@ -841,14 +845,12 @@ void main() {
   });
 
   test('testReadAndUpdateNonExistentDocumentWithExternalWrite', () async {
-    final Firestore firestore = await testFirestore();
+    final FirebaseFirestore firestore = await testFirestore();
 
     try {
       await firestore.runTransaction<void>((Transaction transaction) async {
         // Get and update a document that doesn't exist so that the transaction fails.
-        final DocumentReference doc = firestore
-            .collection('nonexistent')
-            .document();
+        final DocumentReference doc = firestore.collection('nonexistent').doc();
         await transaction.get(doc);
         // Do a write outside of the transaction.
         await doc.set(map(<dynamic>['count', 1234]));
@@ -858,17 +860,17 @@ void main() {
         transaction.update(doc, <String, int>{'count': 16});
         return;
       });
-    } on FirestoreError catch (e) {
+    } on FirestoreException catch (e) {
       // We currently require every document read to also be written.
       // TODO(long1eu): Add this check back once we drop that.
       // expect(snapshot.getString('foo'), 'bar');
-      expect(e.code, FirestoreErrorCode.invalidArgument);
+      expect(e.errorCode, FirestoreErrorCode.invalidArgument);
       expect(e.message, 'Can\'t update a document that doesn\'t exist.');
     }
   });
 
   test('testDoesNotRetryOnPermanentError', () async {
-    final Firestore firestore = await testFirestore();
+    final FirebaseFirestore firestore = await testFirestore();
     int count = 0;
     try {
       // Make a transaction that should fail with a permanent error
@@ -876,13 +878,13 @@ void main() {
         count++;
         // Get and update a document that doesn't exist so that the transaction fails
         final DocumentSnapshot doc = await transaction.get(
-          firestore.collection('nonexistent').document(),
+          firestore.collection('nonexistent').doc(),
         );
         transaction.update(doc.reference, <String, String>{'foo': 'bar'});
         return null;
       });
-    } on FirestoreError catch (e) {
-      expect(e.code, FirestoreErrorCode.invalidArgument);
+    } on FirestoreException catch (e) {
+      expect(e.errorCode, FirestoreErrorCode.invalidArgument);
       expect(count, 1);
     }
   });
@@ -894,7 +896,7 @@ void main() {
   });
 
   test('testCancellationOnThrow', () async {
-    final DocumentReference doc = firestore.collection('towns').document();
+    final DocumentReference doc = firestore.collection('towns').doc();
     int count = 0;
 
     try {
@@ -929,8 +931,8 @@ void main() {
   });
 
   test('testCanHaveGetsWithoutMutations', () async {
-    final DocumentReference doc = firestore.collection('foo').document();
-    final DocumentReference doc2 = firestore.collection('foo').document();
+    final DocumentReference doc = firestore.collection('foo').doc();
+    final DocumentReference doc2 = firestore.collection('foo').doc();
     await doc.set(map<String>(<String>['foo', 'bar']));
     await firestore.runTransaction<DocumentSnapshot>((
       Transaction transaction,
@@ -940,7 +942,7 @@ void main() {
     });
     final DocumentSnapshot snapshot = await doc.get();
     expect(snapshot.exists, isTrue);
-    expect(snapshot.data, map<String>(<String>['foo', 'bar']));
+    expect(snapshot.data(), map<String>(<String>['foo', 'bar']));
   });
 
   test('testTransactionOptionsZeroMaxAttemptsThrows', () {
@@ -952,14 +954,14 @@ void main() {
   // not await the read.
   group('reads after writes', () {
     final Matcher readAfterWrite = throwsA(
-      isA<FirestoreError>()
+      isA<FirestoreException>()
           .having(
-            (FirestoreError e) => e.code,
+            (FirestoreException e) => e.errorCode,
             'code',
             FirestoreErrorCode.invalidArgument,
           )
           .having(
-            (FirestoreError e) => e.message,
+            (FirestoreException e) => e.message,
             'message',
             contains('Firestore transactions require all reads to be executed'),
           ),
@@ -968,7 +970,7 @@ void main() {
     test('cannot read after writing and does not commit', () async {
       final DocumentReference doc = firestore
           .collection('00000-anything')
-          .document();
+          .doc();
       await doc.set(map<String>(<String>['foo', 'baz']));
 
       await expectLater(
@@ -987,7 +989,7 @@ void main() {
       () async {
         final DocumentReference doc = firestore
             .collection('00000-anything')
-            .document();
+            .doc();
         await doc.set(map<String>(<String>['foo', 'baz']));
 
         await expectLater(
@@ -1064,7 +1066,7 @@ class TransactionTester {
     await transaction.get(docRef);
   }
 
-  final Firestore _db;
+  final FirebaseFirestore _db;
   late DocumentReference _docRef;
   _FromDocumentType _fromDocumentType = _FromDocumentType.nonExistent;
   List<TransactionStage> _stages = <TransactionStage>[];
@@ -1095,7 +1097,7 @@ class TransactionTester {
       await _runTransaction();
       final DocumentSnapshot snapshot = await _docRef.get();
       expect(snapshot.exists, isTrue);
-      expect(snapshot.data, expected);
+      expect(snapshot.data(), expected);
     } catch (e) {
       fail(
         'Expected the sequence (${_listStages(_stages)}) to succeed, but got $e',
@@ -1125,8 +1127,8 @@ class TransactionTester {
       throw AssertionError(
         'Expected the sequence (${_listStages(_stages)}) to fail with the error $expected',
       );
-    } on FirestoreError catch (e) {
-      expect(e.code, expected);
+    } on FirestoreException catch (e) {
+      expect(e.errorCode, expected);
       _cleanupTester();
     } catch (e) {
       throw AssertionError(
@@ -1136,7 +1138,7 @@ class TransactionTester {
   }
 
   Future<void> _prepareDoc() async {
-    _docRef = _db.collection('tester-docref').document();
+    _docRef = _db.collection('tester-docref').doc();
     switch (_fromDocumentType) {
       case _FromDocumentType.existing:
         await _docRef.set(map(<String>['foo', 'bar0']));
@@ -1165,7 +1167,7 @@ class TransactionTester {
   void _cleanupTester() {
     _stages = <TransactionStage>[];
     // Set the docRef to something else to lose the original reference.
-    _docRef = _db.collection('reset').document();
+    _docRef = _db.collection('reset').doc();
   }
 
   static String _listStages(List<TransactionStage> stages) {

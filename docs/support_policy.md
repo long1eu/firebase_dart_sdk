@@ -2,7 +2,7 @@
 
 What this repository supports today, how it follows upstream Firestore, and how versions are
 numbered. The packages are `cloud_firestore_dart`, `firebase_app_dart` and
-`firebase_auth_providers_dart`; the current version is 0.1.1.
+`firebase_auth_providers_dart`; the current version is 0.2.0.
 
 Lines marked **DRAFT** are proposals that the maintainer has not confirmed. Until they are
 confirmed they are not commitments.
@@ -74,10 +74,13 @@ Behaviour is ported in Dart, not copied. Where the port deliberately differs fro
 
 ## Versions and breaking changes
 
-- The three packages are versioned together so far (0.1.0 and 0.1.1). A release tag `v<version>` checks that
+- The three packages are versioned together so far (0.1.0, 0.1.1 and 0.2.0). A release tag `v<version>` checks that
   all three are at that version; a tag `<package>-v<version>` checks one package
   (`.github/workflows/release.yml`, which validates and never publishes).
-- Publishing to pub.dev is a manual step of the maintainer. CI has no pub.dev credentials.
+- Publishing to pub.dev is done by the `Publish to pub.dev` workflow (`.github/workflows/publish.yml`),
+  one package per tag `<package>-v<version>`. It stores no secret: pub.dev trusts a short-lived
+  token that GitHub issues to that one job, and each run waits for the maintainer's approval. The
+  first version of a new package is published by hand.
 - Each package has a `CHANGELOG.md` with a heading for every version.
 - **DRAFT:** Versions follow [semantic versioning](https://semver.org/) as pub applies it before
   1.0: while the version is 0.x, a breaking change increments the minor version (0.1.x to
@@ -100,7 +103,7 @@ Behaviour is ported in Dart, not copied. Where the port deliberately differs fro
 Open an issue at <https://github.com/long1eu/firebase_dart_sdk/issues> (the issue tracker named
 in the packages' `pubspec.yaml`). Useful in a report: the package versions, the Dart SDK, the
 platform, whether it happens against the emulator or production, and a log with
-`Firestore.setLogLevel(LogLevel.debug)` if the problem is in syncing.
+`FirebaseFirestore.setLogLevel(LogLevel.debug)` if the problem is in syncing.
 
 - **DRAFT:** Security problems are reported privately, by the channel the maintainer names here:
   `<MAINTAINER: security contact>`.

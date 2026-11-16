@@ -9,7 +9,7 @@ import 'package:cloud_firestore_dart/cloud_firestore_dart.dart';
 import 'common.dart';
 
 Future<void> main() async {
-  final Firestore firestore = connect();
+  final FirebaseFirestore firestore = connect();
   final CollectionReference<Map<String, Object?>> cities = firestore.collection(
     scratch('cities'),
   );
@@ -17,10 +17,10 @@ Future<void> main() async {
   // A listener gets the current result first and then every change. Local
   // writes are delivered immediately with `hasPendingWrites: true`.
   final StreamSubscription<QuerySnapshot<Map<String, Object?>>> subscription =
-      cities.snapshots.listen((QuerySnapshot<Map<String, Object?>> snapshot) {
+      cities.snapshots().listen((QuerySnapshot<Map<String, Object?>> snapshot) {
         for (final DocumentChange<Map<String, Object?>> change
             in snapshot.docChanges) {
-          print('listener: ${change.type.name} ${change.document.id}');
+          print('listener: ${change.type.name} ${change.doc.id}');
         }
       });
 
@@ -40,7 +40,7 @@ Future<void> main() async {
   // Read.
   final DocumentSnapshot<Map<String, Object?>> snapshot = await rome.get();
   print(
-    'exists: ${snapshot.exists}, name: ${snapshot.getString('name')}, '
+    'exists: ${snapshot.exists}, name: ${snapshot.get('name') as String?}, '
     'population: ${snapshot['population']}',
   );
 
@@ -53,13 +53,13 @@ Future<void> main() async {
   // `set` with merge creates the document or merges into the existing one.
   await rome.set(<String, Object?>{
     'geo': const GeoPoint(41.9, 12.5),
-  }, SetOptions.mergeAllFields);
-  print('after update: ${(await rome.get()).data?['tags']}');
+  }, const SetOptions(merge: true));
+  print('after update: ${(await rome.get()).data()?['tags']}');
 
   // Listen to one document, including metadata-only changes.
   final Completer<void> sawServerData = Completer<void>();
   final StreamSubscription<DocumentSnapshot<Map<String, Object?>>>
-  documentSubscription = rome.getSnapshots(MetadataChanges.include).listen((
+  documentSubscription = rome.snapshots(includeMetadataChanges: true).listen((
     DocumentSnapshot<Map<String, Object?>> doc,
   ) {
     if (!doc.metadata.hasPendingWrites &&

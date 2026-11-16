@@ -36,10 +36,8 @@ void main() {
 
   group('Query.findNearest validation', () {
     test('accepts a VectorValue or a List<double>', () {
-      final VectorQuery a = query('coll').findNearest(
-          'v', VectorValue(<double>[1.0]), 5, DistanceMeasure.cosine);
-      final VectorQuery b = query('coll')
-          .findNearest('v', <double>[1.0], 5, DistanceMeasure.cosine);
+      final VectorQuery a = query('coll').findNearest(vectorField: 'v', queryVector: VectorValue(<double>[1.0]), limit: 5, distanceMeasure: DistanceMeasure.cosine);
+      final VectorQuery b = query('coll').findNearest(vectorField: 'v', queryVector: <double>[1.0], limit: 5, distanceMeasure: DistanceMeasure.cosine);
       expect(a, b);
       expect(a.hashCode, b.hashCode);
       expect(a.limit, 5);
@@ -48,47 +46,37 @@ void main() {
 
     test('rejects other vector types', () {
       expect(
-          () => query('coll')
-              .findNearest('v', <int>[1, 2], 5, DistanceMeasure.cosine),
+          () => query('coll').findNearest(vectorField: 'v', queryVector: <int>[1, 2], limit: 5, distanceMeasure: DistanceMeasure.cosine),
           throwsArgumentError);
     });
 
     test('limit must be between 1 and 1000', () {
       for (final int limit in <int>[0, -1, 1001]) {
         expect(
-            () => query('coll')
-                .findNearest('v', <double>[1.0], limit, DistanceMeasure.cosine),
+            () => query('coll').findNearest(vectorField: 'v', queryVector: <double>[1.0], limit: limit, distanceMeasure: DistanceMeasure.cosine),
             throwsArgumentError,
             reason: 'limit $limit');
       }
-      query('coll').findNearest('v', <double>[1.0], 1, DistanceMeasure.cosine);
-      query('coll')
-          .findNearest('v', <double>[1.0], 1000, DistanceMeasure.cosine);
+      query('coll').findNearest(vectorField: 'v', queryVector: <double>[1.0], limit: 1, distanceMeasure: DistanceMeasure.cosine);
+      query('coll').findNearest(vectorField: 'v', queryVector: <double>[1.0], limit: 1000, distanceMeasure: DistanceMeasure.cosine);
     });
 
     test('query vector must be non-empty and at most 2048 dimensions', () {
       expect(
-          () => query('coll')
-              .findNearest('v', <double>[], 5, DistanceMeasure.euclidean),
+          () => query('coll').findNearest(vectorField: 'v', queryVector: <double>[], limit: 5, distanceMeasure: DistanceMeasure.euclidean),
           throwsArgumentError);
       expect(
-          () => query('coll').findNearest('v', List<double>.filled(2049, 1.0),
-              5, DistanceMeasure.euclidean),
+          () => query('coll').findNearest(vectorField: 'v', queryVector: List<double>.filled(2049, 1.0), limit: 5, distanceMeasure: DistanceMeasure.euclidean),
           throwsArgumentError);
-      query('coll').findNearest(
-          'v', List<double>.filled(2048, 1.0), 5, DistanceMeasure.euclidean);
+      query('coll').findNearest(vectorField: 'v', queryVector: List<double>.filled(2048, 1.0), limit: 5, distanceMeasure: DistanceMeasure.euclidean);
     });
 
     test('distance result field and threshold are validated', () {
       expect(
-          () => query('coll').findNearest(
-              'v', <double>[1.0], 5, DistanceMeasure.euclidean,
-              distanceResultField: ''),
+          () => query('coll').findNearest(vectorField: 'v', queryVector: <double>[1.0], limit: 5, distanceMeasure: DistanceMeasure.euclidean, distanceResultField: ''),
           throwsArgumentError);
       expect(
-          () => query('coll').findNearest(
-              'v', <double>[1.0], 5, DistanceMeasure.euclidean,
-              distanceThreshold: double.nan),
+          () => query('coll').findNearest(vectorField: 'v', queryVector: <double>[1.0], limit: 5, distanceMeasure: DistanceMeasure.euclidean, distanceThreshold: double.nan),
           throwsArgumentError);
     });
   });
@@ -96,10 +84,7 @@ void main() {
   group('encodeVectorQueryTarget', () {
     test('encodes all find_nearest options', () {
       final VectorQuery vq =
-          QueryInternal.create(util.query('coll').filter(util.filter('a', '==', 1)), firestore)
-              .findNearestField(FieldPath.of(<String>['x', 'y']),
-                  <double>[1.0, 2.0], 7, DistanceMeasure.dotProduct,
-                  distanceResultField: 'dist', distanceThreshold: 0.5);
+          QueryInternal.create(util.query('coll').filter(util.filter('a', '==', 1)), firestore).findNearest(vectorField: FieldPath(<String>['x', 'y']), queryVector: <double>[1.0, 2.0], limit: 7, distanceMeasure: DistanceMeasure.dotProduct, distanceResultField: 'dist', distanceThreshold: 0.5);
       final proto.Target_QueryTarget target =
           serializer.encodeVectorQueryTarget(vq.query.query, vq);
       final proto.StructuredQuery_FindNearest fn =
@@ -126,8 +111,7 @@ void main() {
                 util.filter('a', '==', 1),
                 util.filter('b', '>', 2),
               ])),
-              firestore)
-          .findNearest('v', <double>[1.0], 3, DistanceMeasure.euclidean);
+              firestore).findNearest(vectorField: 'v', queryVector: <double>[1.0], limit: 3, distanceMeasure: DistanceMeasure.euclidean);
       final proto.Target_QueryTarget target =
           serializer.encodeVectorQueryTarget(vq.query.query, vq);
       expect(target.structuredQuery.where.compositeFilter.op,
@@ -145,7 +129,7 @@ void main() {
             .filter(util.filter('b', '>', 1))
             .orderBy(util.orderBy('a', 'desc')),
         firestore,
-      ).findNearest('v', <double>[1.0], 3, DistanceMeasure.euclidean);
+      ).findNearest(vectorField: 'v', queryVector: <double>[1.0], limit: 3, distanceMeasure: DistanceMeasure.euclidean);
       final proto.StructuredQuery sq = serializer
           .encodeVectorQueryTarget(vq.query.query, vq)
           .structuredQuery;
@@ -161,15 +145,14 @@ void main() {
     test('encodes the base query as its aggregate target', () {
       final core.Query base = util
           .query('coll')
-          .filter(util.filter('b', '>', 1))
-          .orderBy(util.orderBy('a'))
+          .filter(util.filter('b', '>', 1)).orderBy(util.orderBy('a'))
           .limitToLast(4)
           .startAt(bound(true, <Object>[1]))
           .endAt(bound(false, <Object>[9]));
       final VectorQuery vq = QueryInternal.create(
         base,
         firestore,
-      ).findNearest('v', <double>[1.0], 3, DistanceMeasure.euclidean);
+      ).findNearest(vectorField: 'v', queryVector: <double>[1.0], limit: 3, distanceMeasure: DistanceMeasure.euclidean);
       final proto.StructuredQuery sq =
           serializer
               .encodeVectorQueryTarget(vq.query.query, vq)
@@ -191,8 +174,7 @@ void main() {
     });
 
     test('omits optional fields and implicit orderings', () {
-      final VectorQuery vq = query('coll')
-          .findNearest('v', <double>[1.0], 3, DistanceMeasure.euclidean);
+      final VectorQuery vq = query('coll').findNearest(vectorField: 'v', queryVector: <double>[1.0], limit: 3, distanceMeasure: DistanceMeasure.euclidean);
       final proto.StructuredQuery sq = serializer
           .encodeVectorQueryTarget(vq.query.query, vq)
           .structuredQuery;

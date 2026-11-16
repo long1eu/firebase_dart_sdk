@@ -27,12 +27,11 @@ Firebase Android SDK.
 
 ## Reads and listeners
 
-- `ref.get()` asks the backend and falls back to the cache when offline; `get(Source.cache)` only
-  the cache (fails with `unavailable` if the document is not cached); `get(Source.server)` only the
+- `ref.get()` asks the backend and falls back to the cache when offline; `get(const GetOptions(source: Source.cache))` only
+  the cache (fails with `unavailable` if the document is not cached); `get(const GetOptions(source: Source.server))` only the
   backend (fails offline).
-- Listeners are streams: `ref.snapshots`, `query.snapshots`, `getSnapshots(MetadataChanges.include)`
-  for metadata-only changes, `getSnapshotsWithOptions(SnapshotListenOptions(source:
-  ListenSource.cache))` for the cache only. Cancel the `StreamSubscription` to stop. Errors (for
+- Listeners are streams: `ref.snapshots()`, `query.snapshots()`, `snapshots(includeMetadataChanges: true)`
+  for metadata-only changes, `snapshots(source: ListenSource.cache)` for the cache only. Cancel the `StreamSubscription` to stop. Errors (for
   example `permissionDenied`) arrive on the stream's `onError`.
 - `snapshot.metadata.isFromCache` and `hasPendingWrites` tell where a snapshot came from.
 - `disableNetwork()` / `enableNetwork()` take the client offline and back on purpose.
@@ -42,17 +41,17 @@ Firebase Android SDK.
 | `instanceFor` gets | Cache |
 |---|---|
 | no `openDatabase` | memory, gone on `terminate()` (whatever `persistenceEnabled` says) |
-| `openDatabase: sqliteOpener(dir)` (VM, Flutter) | SQLite file, kept across restarts |
-| the opener of `sqlite_database_web.dart` (web) | SQLite in WebAssembly, in IndexedDB or OPFS, one tab at a time |
+| `openDatabase: sqliteOpener(directory: dir)` (VM, Flutter; `cloud_firestore_dart_sqlite`) | SQLite file, kept across restarts |
+| `openDatabase: sqliteOpener()` (web) | SQLite in WebAssembly, in IndexedDB or OPFS, one tab at a time |
 
 ```dart
-final FirestoreSettings persistent = FirestoreSettings(
+final Settings persistent = Settings(
   cacheSettings: PersistentCacheSettings(sizeBytes: 100 * 1024 * 1024), // the default size
 );
-final FirestoreSettings eager = FirestoreSettings(
+final Settings eager = Settings(
   cacheSettings: const MemoryCacheSettings(), // eager GC: drops what no listener needs
 );
-final FirestoreSettings lru = FirestoreSettings(
+final Settings lru = Settings(
   cacheSettings: MemoryCacheSettings(
     gcSettings: MemoryLruGcSettings(sizeBytes: 40 * 1024 * 1024),
   ),
@@ -60,7 +59,7 @@ final FirestoreSettings lru = FirestoreSettings(
 ```
 
 - The size is a garbage collection threshold, minimum 1 MB (smaller throws `ArgumentError`);
-  `FirestoreSettings.cacheSizeUnlimited` never collects. Pending writes are never collected.
+  `Settings.cacheSizeUnlimited` never collects. Pending writes are never collected.
 - Settings are fixed at creation: a later `instanceFor` with different settings throws
   `StateError`.
 - The cache files hold every document read, in clear text. Put them in a per-user application
@@ -75,7 +74,7 @@ final FirestoreSettings lru = FirestoreSettings(
   not exit while an instance is open.
 - After `terminate()`: write futures that were not acknowledged never complete (with a memory
   cache those writes are lost; a persistent cache sends them from the next instance); calls fail
-  with `failedPrecondition`; `Firestore.instanceFor` creates a new instance.
+  with `failedPrecondition`; `FirebaseFirestore.instanceFor` creates a new instance.
 - Call `waitForPendingWrites()` before `terminate()` when the writes matter; it completes when
   the backend has acknowledged them, so offline it waits.
 - `clearPersistence()` deletes the persistent cache of a terminated instance; on a running
@@ -87,11 +86,11 @@ final FirestoreSettings lru = FirestoreSettings(
 
 ```dart
 try {
-  await firestore.doc('private/x').get(Source.server);
-} on FirestoreError catch (e) {
-  if (e.code == FirestoreErrorCode.permissionDenied) {
+  await firestore.doc('private/x').get(const GetOptions(source: Source.server));
+} on FirestoreException catch (e) {
+  if (e.errorCode == FirestoreErrorCode.permissionDenied) {
     print('not allowed: ${e.message}');
-  } else if (e.code == FirestoreErrorCode.unavailable) {
+  } else if (e.errorCode == FirestoreErrorCode.unavailable) {
     print('offline or backend unreachable');
   } else {
     rethrow;
@@ -99,18 +98,18 @@ try {
 }
 ```
 
-- A failed operation reports `FirestoreError` with `code` (a `FirestoreErrorCode`: `cancelled`,
+- A failed operation reports `FirestoreException` with `errorCode` (a `FirestoreErrorCode`: `cancelled`,
   `unknown`, `invalidArgument`, `deadlineExceeded`, `notFound`, `alreadyExists`,
   `permissionDenied`, `resourceExhausted`, `failedPrecondition`, `aborted`, `outOfRange`,
-  `unimplemented`, `internal`, `unavailable`, `dataLoss`, `unauthenticated`) and `message`.
-- `FirestoreError` is an `Error`, not an `Exception`: `on Exception catch` does not catch it.
+  `unimplemented`, `internal`, `unavailable`, `dataLoss`, `unauthenticated`), `code` (the same as
+  FlutterFire's string, `'permission-denied'`) and `message`.
+- `FirestoreException` extends `FirebaseException` and implements `Exception`.
 - Invalid data (unsupported values, field names that begin and end with `__`) and invalid
   arguments throw `ArgumentError`.
-- `Firestore.instance` before any `instanceFor`, or `instanceFor` with changed settings, throws
-  `StateError`.
-- `firebase_auth_providers_dart` reports `FirebaseAuthProviderException` with string codes such
+- `instanceFor` with changed settings throws `StateError`.
+- `firebase_auth_providers_dart` reports `FirebaseAuthException` with string codes such
   as `wrong-password`, `user-not-found`, `network-request-failed`.
-- `Firestore.setLogLevel(LogLevel.debug)` logs what the client does.
+- `FirebaseFirestore.setLogLevel(LogLevel.debug)` logs what the client does.
 
 ## Transactions
 
@@ -118,16 +117,16 @@ try {
 final int next = await firestore.runTransaction<int>((Transaction transaction) async {
   final DocumentReference<Map<String, Object?>> ref = firestore.doc('counters/a');
   final DocumentSnapshot<Map<String, Object?>> snapshot = await transaction.get(ref);
-  final int value = (snapshot.data?['n'] as int?) ?? 0;
+  final int value = (snapshot.data()?['n'] as int?) ?? 0;
   transaction.set(ref, <String, Object?>{'n': value + 1});
   return value + 1;
-}, options: TransactionOptions(maxAttempts: 5));
+}, maxAttempts: 5);
 ```
 
 - Reads before writes. The callback runs again when a document it read changed (up to
   `maxAttempts`, 5 by default), so it must not have side effects of its own.
 - A commit whose answer was lost can be applied twice; make such transactions idempotent.
-- `TransactionOptions(readOnly: true)` (optionally `readTime:`) reads a consistent snapshot of
+- `readOnly: true` (optionally `readTime:`) reads a consistent snapshot of
   the backend and allows `transaction.getQuery(query)` and `transaction.getAggregate(...)`; in a
   read-write transaction those fail with `invalidArgument`. Read-only transactions fail offline.
 - No `timeout` parameter.

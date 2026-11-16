@@ -75,14 +75,14 @@ abstract class SharedClientStateSyncer {
   Future<void> applyBatchState(
     int batchId,
     MutationBatchState state,
-    FirestoreError? error,
+    FirestoreException? error,
   );
 
   /// Applies a query target change from a different client.
   Future<void> applyTargetState(
     int targetId,
     QueryTargetState state,
-    FirestoreError? error,
+    FirestoreException? error,
   );
 
   /// Adds or removes Watch targets for queries from different clients.
@@ -121,7 +121,7 @@ abstract class SharedClientState {
   void updateMutationState(
     int batchId,
     MutationBatchState state, [
-    FirestoreError? error,
+    FirestoreException? error,
   ]);
 
   /// Associates a target id with the local client and returns the state of the target (which can be
@@ -145,7 +145,7 @@ abstract class SharedClientState {
   void updateQueryState(
     int targetId,
     QueryTargetState state, [
-    FirestoreError? error,
+    FirestoreException? error,
   ]);
 
   /// Removes the metadata entry of the target. Called by the primary client when all clients stopped listening to it.
@@ -201,13 +201,13 @@ const List<String> _storedErrorCodes = <String>[
   'unauthenticated',
 ];
 
-Map<String, String> _errorToJson(FirestoreError error) => <String, String>{
-  'code': _storedErrorCodes[error.code.value],
+Map<String, String> _errorToJson(FirestoreException error) => <String, String>{
+  'code': _storedErrorCodes[error.errorCode.value],
   'message': error.message,
 };
 
 /// Parses `{code, message}`; returns null if the data is not valid.
-FirestoreError? _errorFromJson(Object? json) {
+FirestoreException? _errorFromJson(Object? json) {
   if (json is! Map<String, dynamic> ||
       json['code'] is! String ||
       json['message'] is! String) {
@@ -215,9 +215,9 @@ FirestoreError? _errorFromJson(Object? json) {
   }
   final int value = _storedErrorCodes.indexOf(json['code'] as String);
   if (value != -1) {
-    return FirestoreError(
-      json['message'] as String,
-      FirestoreErrorCode.values[value],
+    return FirestoreException(
+      message: json['message'] as String,
+      errorCode: FirestoreErrorCode.values[value],
     );
   }
   return null;
@@ -243,7 +243,7 @@ class MutationMetadata {
   final User user;
   final int batchId;
   final MutationBatchState state;
-  final FirestoreError? error;
+  final FirestoreException? error;
 
   /// Parses the stored form. Logs and returns null if the data is not valid.
   static MutationMetadata? fromStorageEntry(
@@ -253,7 +253,7 @@ class MutationMetadata {
   ) {
     final Object? json = _tryDecode(value);
     MutationBatchState? state;
-    FirestoreError? error;
+    FirestoreException? error;
     bool validData = json is Map<String, dynamic>;
     if (json is Map<String, dynamic>) {
       state = MutationBatchState.fromJsonName(json['state']);
@@ -297,13 +297,13 @@ class QueryTargetMetadata {
 
   final int targetId;
   final QueryTargetState state;
-  final FirestoreError? error;
+  final FirestoreException? error;
 
   /// Parses the stored form. Logs and returns null if the data is not valid.
   static QueryTargetMetadata? fromStorageEntry(int targetId, String value) {
     final Object? json = _tryDecode(value);
     QueryTargetState? state;
-    FirestoreError? error;
+    FirestoreException? error;
     bool validData = json is Map<String, dynamic>;
     if (json is Map<String, dynamic>) {
       state = QueryTargetState.fromJsonName(json['state']);
@@ -583,7 +583,7 @@ class StorageSharedClientState extends SharedClientState {
   void updateMutationState(
     int batchId,
     MutationBatchState state, [
-    FirestoreError? error,
+    FirestoreException? error,
   ]) {
     _persistMutationState(batchId, state, error);
 
@@ -641,7 +641,7 @@ class StorageSharedClientState extends SharedClientState {
   void updateQueryState(
     int targetId,
     QueryTargetState state, [
-    FirestoreError? error,
+    FirestoreException? error,
   ]) {
     _setItem(
       queryTargetKey(_persistenceKey, targetId),
@@ -805,7 +805,7 @@ class StorageSharedClientState extends SharedClientState {
   void _persistMutationState(
     int batchId,
     MutationBatchState state, [
-    FirestoreError? error,
+    FirestoreException? error,
   ]) {
     _setItem(
       mutationBatchKey(_persistenceKey, _currentUser, batchId),
@@ -915,7 +915,7 @@ class MemorySharedClientState extends SharedClientState {
   void updateMutationState(
     int batchId,
     MutationBatchState state, [
-    FirestoreError? error,
+    FirestoreException? error,
   ]) {}
 
   @override
@@ -933,7 +933,7 @@ class MemorySharedClientState extends SharedClientState {
   void updateQueryState(
     int targetId,
     QueryTargetState state, [
-    FirestoreError? error,
+    FirestoreException? error,
   ]) {
     _queryState[targetId] = state;
   }

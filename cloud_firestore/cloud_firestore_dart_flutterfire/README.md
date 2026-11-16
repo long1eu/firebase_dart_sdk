@@ -26,13 +26,13 @@ Dart 3.8 and Flutter 3.32 or later. Tested with `firebase_core` 3.4 to 5.1 and `
 
 ```dart
 await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-final Firestore firestore = await FlutterFireBridge.firestore();
+final FirebaseFirestore firestore = await FlutterFireBridge.firestore();
 await FirebaseAuth.instance.signInAnonymously(); // or any sign-in of firebase_auth
 ```
 
 `FlutterFireBridge.firestore()` creates a `firebase_app_dart` app with the name and the options
 of `Firebase.app()`, makes a `FlutterFireAuthTokenProvider` for `FirebaseAuth.instance` its token
-provider, and returns `Firestore.instanceFor` that app. Pass `app:`, `auth:`, `database:`,
+provider, and returns `FirebaseFirestore.instanceFor` that app. Pass `app:`, `auth:`, `databaseId:`,
 `settings:`, `openDatabase:` (a SQLite cache, see the Flutter guide) and `appCheckProvider:` for
 anything other than the defaults. Later calls return the same instance.
 
@@ -61,20 +61,37 @@ final flutterfire.FirebaseApp source = flutterfire.Firebase.app();
 final FlutterFireAuthTokenProvider auth =
     FlutterFireAuthTokenProvider(FirebaseAuth.instanceFor(app: source));
 // The firebase_app_dart app, with the same name and options, and the provider.
-final app = dartAppFor(source.name, source.options, authProvider: auth);
-final Firestore firestore = Firestore.instanceFor(app: app);
+final FirebaseApp app =
+    dartAppFor(source.name, source.options, authProvider: auth);
+final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(app: app);
 ```
 
-- `firebaseOptionsFromFlutterFire(options)` maps the options alone: `apiKey`, `appId` (to
-  `applicationId`), `projectId`, `messagingSenderId` (to `gcmSenderId`), `storageBucket`,
-  `databaseURL` and `trackingId`. The others have no counterpart.
+- `firebaseOptionsFromFlutterFire(options)` maps the options alone. The two packages use the same
+  field names and every field is copied, except `recaptchaSiteKey`, which `firebase_app_dart` does
+  not have.
 - `dartAppFor(name, options, ...)` creates the app on the first call and returns it afterwards;
   it throws a `StateError` when an app with that name exists with other options.
 - `FlutterFireAuthTokenProvider.fromSource(currentUser: ..., idTokenChanges: ...)` takes any
   user source; the tests drive it with fakes.
 
-`firebase_core` and `firebase_app_dart` both export `FirebaseApp` and `FirebaseOptions`; import
-one of them with a prefix, as above.
+`firebase_core` and `firebase_app_dart` both export `Firebase`, `FirebaseApp`, `FirebaseOptions`
+and `FirebaseException`; import one of them with a prefix, as above.
+
+## With the official `cloud_firestore` API
+
+If the app should keep the official `cloud_firestore` API (`FirebaseFirestore.instance...` of
+FlutterFire) and only run it on `cloud_firestore_dart`, use `cloud_firestore_dart_platform` from
+the same repository, and give it the bridge's provider for the signed-in user:
+
+```dart
+CloudFirestoreDart.use(
+  tokenProviderFor: (flutterfire.FirebaseApp app) =>
+      FlutterFireAuthTokenProvider(FirebaseAuth.instanceFor(app: app)),
+);
+```
+
+Both packages map the FlutterFire options the same way, so they share the `firebase_app_dart` app
+of a FlutterFire app when an app uses both.
 
 ## App Check
 
@@ -83,7 +100,7 @@ the plugin and its native SDKs. If you use it, pass its two members:
 
 ```dart
 final FirebaseAppCheck appCheck = FirebaseAppCheck.instance;
-final Firestore firestore = await FlutterFireBridge.firestore(
+final FirebaseFirestore firestore = await FlutterFireBridge.firestore(
   appCheckProvider: FlutterFireAppCheckProvider(
     getToken: appCheck.getToken,
     onTokenChange: appCheck.onTokenChange,
@@ -104,8 +121,8 @@ and a warning is logged, as with the App Check SDKs.
 - The `onTokenChanged` events of the provider carry a marker instead of the ID token for a
   signed-in user (`firebase_auth` reports the change without the token); call `getAccessToken`
   for the token. Firestore only reads the user id.
-- It reads `InternalTokenProvider` and `InternalAppCheckTokenProvider` of `firebase_app_dart`,
-  which can change in a minor release of that package; this package pins a compatible range.
+- It implements `AuthTokenProvider` and `AppCheckTokenProvider` of `firebase_app_dart`; this
+  package declares the range of that package it was built against.
 
 ## Platforms
 

@@ -35,6 +35,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/local/query_data.dar
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/document.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/remote/remote_serializer.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/remote/remote_store.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/load_bundle_task_progress.dart';
 import 'package:grpc/grpc.dart';
 import 'package:mockito/mockito.dart' show Fake;
 import 'package:test/test.dart';
@@ -338,7 +339,7 @@ void expectUsable(BundleElement element) {
         document,
         isFromCache: false,
         hasPendingWrites: false,
-      ).data,
+      ).data(),
       () => '$document',
     );
     if (data != null) {
@@ -452,13 +453,13 @@ void main() {
                   throw TimeoutException('Loading the bundle hangs: $c'),
             );
         expect(task.isComplete, isTrue);
-        if (task.isSuccessful) {
+        if (task.snapshot.taskState == LoadBundleTaskState.success) {
           return;
         }
         try {
           await task.future;
-        } on FirestoreError catch (error) {
-          expect(error.code, FirestoreErrorCode.invalidArgument);
+        } on FirestoreException catch (error) {
+          expect(error.errorCode, FirestoreErrorCode.invalidArgument);
           final Object? cause = error.cause;
           if (cause != null &&
               !isCleanRejection(cause, error.stackTrace ?? StackTrace.empty)) {

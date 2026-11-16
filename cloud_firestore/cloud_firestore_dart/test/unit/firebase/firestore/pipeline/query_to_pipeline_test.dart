@@ -215,8 +215,7 @@ void main() {
   test('orderings include the implicit ones and require the fields', () {
     final List<pb.Pipeline_Stage> stages = convert(util
         .query('coll')
-        .filter(util.filter('b', '>', 1))
-        .orderBy(util.orderBy('a', 'desc')));
+        .filter(util.filter('b', '>', 1)).orderBy(util.orderBy('a', 'desc')));
     expect(stages.sublist(2), <pb.Pipeline_Stage>[
       stage('where', <pb.Value>[
         and(<pb.Value>[exists('a'), exists('b'), exists('__name__')])
@@ -305,8 +304,7 @@ void main() {
     });
 
     test('cursors over several fields compare lexicographically', () {
-      final core.Query query = base()
-          .orderBy(util.orderBy('b', 'desc'))
+      final core.Query query = base().orderBy(util.orderBy('b', 'desc'))
           .startAt(bound(<Object?>[1, 2], inclusive: false));
       expect(
           cursorStage(query),
@@ -354,7 +352,7 @@ void main() {
   });
 
   test('createFrom rejects a query of another database', () {
-    final Firestore other = FakeFirestore(util.dbId('other'));
+    final FirebaseFirestore other = FakeFirestore(util.dbId('other'));
     expect(() => source().createFrom(QueryInternal.create<Object?>(util.query('coll'), other)),
         throwsArgumentError);
     expect(

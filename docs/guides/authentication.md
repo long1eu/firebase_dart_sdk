@@ -51,8 +51,8 @@ import 'package:firebase_auth_providers_dart/firebase_auth_providers_dart.dart';
 
 // A signed-in Firebase Auth user: the security rules see request.auth.
 final auth = await FirebaseUserAuth.forApp(app);
-final firestore = Firestore.instanceFor(app: app);
-await auth.signInWithEmailAndPassword('ada@example.com', 'the password'); // or signInAnonymously(), ...
+final firestore = FirebaseFirestore.instanceFor(app: app);
+await auth.signInWithEmailAndPassword(email: 'ada@example.com', password: 'the password'); // or signInAnonymously(), ...
 
 // A server (bypasses security rules; access is decided by IAM):
 //   app.authProvider = OAuthTokenProvider.serviceAccount(serviceAccountJson);
@@ -63,7 +63,7 @@ A sign-in, a sign-out or a switch of users restarts the streams with the new ide
 pending writes of a user stay in the queue of that user, as in the official SDKs. This works the
 same over gRPC, over the web transport and in Firestore Lite (`test/integration_auth`, against
 the Firebase Auth emulator and a Firestore emulator whose rules require a user; nothing was run
-against the real services). You can also implement `InternalTokenProvider` yourself and assign
+against the real services). You can also implement `AuthTokenProvider` yourself and assign
 it to `app.authProvider`.
 
 ## A signed-in user
@@ -75,15 +75,15 @@ import 'package:firebase_auth_providers_dart/firebase_auth_providers_dart.dart';
 
 final app = FirebaseApp.withOptions(const FirebaseOptions(
   apiKey: '<the Web API key of the project>',
-  applicationId: '1:1234567890:dart:example',
+  appId: '1:1234567890:dart:example',
   projectId: 'my-project',
 ));
 
 // Before the Firestore instance is created: it becomes the token provider of the app.
 final auth = await FirebaseUserAuth.forApp(app);
-final firestore = Firestore.instanceFor(app: app);
+final firestore = FirebaseFirestore.instanceFor(app: app);
 
-await auth.signInWithEmailAndPassword('ada@example.com', password);
+await auth.signInWithEmailAndPassword(email: 'ada@example.com', password: password);
 // or: auth.signInAnonymously(), auth.createUserWithEmailAndPassword(...),
 //     auth.signInWithCustomToken(tokenFromYourServer)
 
@@ -98,14 +98,14 @@ write issued right after it belongs to that user.
 ```mermaid
 sequenceDiagram
   accTitle: Sign-in of a user and what Firestore does with it
-  accDescr: FirebaseUserAuth.forApp makes the provider the app's authProvider before Firestore.instanceFor. signInWithEmailAndPassword calls the Firebase Auth REST API, which returns an ID token and a refresh token. The provider announces the new user on onTokenChanged, Firestore restarts its streams as that user, then the sign-in call completes and requests carry the ID token.
+  accDescr: FirebaseUserAuth.forApp makes the provider the app's authProvider before FirebaseFirestore.instanceFor. signInWithEmailAndPassword calls the Firebase Auth REST API, which returns an ID token and a refresh token. The provider announces the new user on onTokenChanged, Firestore restarts its streams as that user, then the sign-in call completes and requests carry the ID token.
   participant code as Your code
   participant auth as FirebaseUserAuth
   participant rest as Firebase Auth REST API
   participant fs as Firestore instance
   participant be as Firestore backend
   code->>auth: FirebaseUserAuth.forApp(app), becomes app.authProvider
-  code->>fs: Firestore.instanceFor(app: app)
+  code->>fs: FirebaseFirestore.instanceFor(app: app)
   code->>auth: signInWithEmailAndPassword(email, password)
   auth->>rest: accounts:signInWithPassword
   rest-->>auth: ID token (about 1 hour) and refresh token
@@ -131,12 +131,12 @@ sequenceDiagram
   app) and `X-Firebase-AppCheck` (the token of the app's App Check provider; a failed App Check
   request is logged and the request goes out anyway). Not sent: `X-Firebase-Client` (there is no
   heartbeat service) and `X-Firebase-Locale` (there is no language setting).
-- **Errors** are `FirebaseAuthProviderException`s with the codes of the Firebase SDKs:
+- **Errors** are `FirebaseAuthException`s with the codes of the Firebase SDKs:
   `wrong-password`, `user-not-found`, `invalid-credential`, `email-already-in-use`,
   `weak-password`, `invalid-email`, `user-disabled`, `too-many-requests`,
   `operation-not-allowed`, `invalid-custom-token`, `network-request-failed`, ...; `serverCode`
   has the code of the backend. Messages never contain a token, a password or the API key.
-- **Listening:** `auth.userChanges` emits the `AuthUser` after every sign-in and null after a
+- **Listening:** `auth.userChanges()` emits the `AuthUser` after every sign-in and null after a
   sign-out; `auth.currentUser` and `auth.uid` are synchronous.
 
 The two ways a refresh starts, and what follows; both end in the same request to the token service.
@@ -231,7 +231,7 @@ import 'package:firebase_auth_providers_dart/adc.dart'; // needs dart:io
 
 final app = FirebaseApp.withOptions(const FirebaseOptions(
   apiKey: '',                  // an empty key is not sent; any other key is, with each request
-  applicationId: '1:1234567890:dart:server',
+  appId: '1:1234567890:dart:server',
   projectId: 'my-project',
 ));
 
@@ -242,7 +242,7 @@ app.authProvider = applicationDefaultCredentials();
 app.authProvider = OAuthTokenProvider.serviceAccount(
     jsonDecode(File(keyFilePath).readAsStringSync()));
 
-final firestore = Firestore.instanceFor(app: app);
+final firestore = FirebaseFirestore.instanceFor(app: app);
 ```
 
 - The access token is fetched as soon as the provider is assigned to `app.authProvider` and is
@@ -290,7 +290,7 @@ sequenceDiagram
 
 ## App Check
 
-An `InternalAppCheckTokenProvider` set on the `FirebaseApp` (`app.appCheckProvider`, or
+An `AppCheckTokenProvider` set on the `FirebaseApp` (`app.appCheckProvider`, or
 `PlatformDependencies.appCheckProvider`) makes every Firestore request carry the
 `x-firebase-appcheck` header, over gRPC, WebChannel, REST and Firestore Lite. These packages do
 not attest a device: you supply the provider, for example one that gets tokens from your own

@@ -28,10 +28,10 @@ import 'package:test/test.dart';
 
 import '../../../util/test_util.dart' as util;
 
-Firestore _testFirestore(DatabaseId databaseId) =>
+FirebaseFirestore _testFirestore(DatabaseId databaseId) =>
     FirestoreInternal.detached(databaseId);
 
-final Firestore firestore = _testFirestore(DatabaseId.forProject('project'));
+final FirebaseFirestore firestore = _testFirestore(DatabaseId.forProject('project'));
 
 Map<String, Object?> allTypes() {
   return <String, Object?>{
@@ -99,11 +99,11 @@ void main() {
     final DocumentSnapshot<Map<String, Object?>> fromJson =
         DocumentSnapshot<Map<String, Object?>>.fromJson(firestore, json);
     expect(fromJson.document!.data, document.data);
-    expect(fromJson.data, allTypes());
-    expect(fromJson.getInt32Value('int32'), Int32Value(-7));
-    expect(fromJson.getDecimal128Value('decimal128')!.stringValue,
+    expect(fromJson.data(), allTypes());
+    expect(fromJson.get('int32') as Int32Value?, Int32Value(-7));
+    expect((fromJson.get('decimal128') as Decimal128Value?)!.stringValue,
         '1.000000000000000000000000000000001');
-    expect(fromJson.getBlob('binary')!.subtype, 128);
+    expect((fromJson.get('binary') as Blob?)!.subtype, 128);
     expect(fromJson.get('notInt32'), <String, Object?>{'__int__': 'a'});
 
     // The bundle of the snapshot is what loadBundle() reads.

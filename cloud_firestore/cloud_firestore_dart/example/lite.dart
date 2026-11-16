@@ -23,8 +23,8 @@ final FirestoreDataConverter<City> cityConverter =
     FirestoreDataConverter<City>.from(
       fromFirestore: (QueryDocumentSnapshot<Map<String, Object?>> snapshot) =>
           City(
-            snapshot.data['name']! as String,
-            snapshot.data['population']! as int,
+            snapshot.data()['name']! as String,
+            snapshot.data()['population']! as int,
           ),
       toFirestore: (City city, SetOptions? options) => <String, Object?>{
         'name': city.name,
@@ -40,16 +40,16 @@ Future<void> main() async {
   final FirebaseApp app = FirebaseApp.withOptions(
     const FirebaseOptions(
       apiKey: 'demo-key',
-      applicationId: '1:1234567890:dart:example',
+      appId: '1:1234567890:dart:example',
       // A `demo-` project id keeps the emulator from talking to a real project.
       projectId: 'demo-example',
     ),
   );
   // Synchronous: there is no cache to open. Nothing is sent until the first
   // call.
-  final Firestore firestore = Firestore.instanceFor(
+  final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(
     app: app,
-    settings: FirestoreSettings().withEmulator(
+    settings: Settings().withEmulator(
       emulator.substring(0, colon),
       int.parse(emulator.substring(colon + 1)),
     ),
@@ -74,12 +74,12 @@ Future<void> main() async {
   final DocumentSnapshot<Map<String, Object?>> sf = await cities
       .doc('SF')
       .get();
-  print('SF: ${sf.data}');
+  print('SF: ${sf.data()}');
 
   // Queries: the same builder as the main library.
   final QuerySnapshot<Map<String, Object?>> big = await cities
       .where('population', isGreaterThan: 800000)
-      .orderBy('population', Direction.descending)
+      .orderBy('population', descending: true)
       .get();
   print('big: ${big.docs.map((doc) => doc.id).toList()}');
 
@@ -110,11 +110,14 @@ Future<void> main() async {
 
   // Converters.
   final QuerySnapshot<City> typed = await cities
-      .withConverter(cityConverter)
+      .withConverter(
+        fromFirestore: cityConverter.fromFirestore,
+        toFirestore: cityConverter.toFirestore,
+      )
       .orderBy('name')
       .limit(1)
       .get();
-  print('first by name: ${typed.docs.single.data.name}');
+  print('first by name: ${typed.docs.single.data().name}');
 
   // A transaction: reads first, then writes. It is run again when a document
   // it read changed before the commit.
@@ -137,9 +140,9 @@ Future<void> main() async {
   await firestore.terminate();
   try {
     await cities.doc('SF').get();
-  } on FirestoreError catch (e) {
+  } on FirestoreException catch (e) {
     print(
-      'after terminate: ${e.code == FirestoreErrorCode.failedPrecondition}',
+      'after terminate: ${e.errorCode == FirestoreErrorCode.failedPrecondition}',
     );
   }
 }

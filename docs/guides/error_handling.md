@@ -11,29 +11,30 @@ future while offline, a listener without `onError`).
 
 | Type | Thrown for |
 |---|---|
-| `FirestoreError` | everything that comes from the backend, the connection or the local cache, and a few state checks (a terminated instance, a cache in use elsewhere) |
+| `FirestoreException` | everything that comes from the backend, the connection or the local cache, and a few state checks (a terminated instance, a cache in use elsewhere) |
 | `ArgumentError` | invalid arguments: paths, document data, field names, query values, settings |
 | `StateError` | misuse of the API, see [Misuse of the API](#misuse-of-the-api) |
-| `FirebaseAuthProviderException` | failed sign-in and token requests of `firebase_auth_providers_dart` |
+| `FirebaseAuthException` | failed sign-in and token requests of `firebase_auth_providers_dart` |
 | the error of your own code | an `openDatabase` that throws, an exception in a transaction callback |
 
-`FirestoreError` has three fields:
+`FirestoreException` (a `FirebaseException`, as in FlutterFire) has these fields:
 
-- `code`: a `FirestoreErrorCode`, one of the canonical gRPC status codes (`unavailable`,
-  `permissionDenied`, ...). Compare it with the constants: `e.code == FirestoreErrorCode.notFound`.
-  `code.value` is the numeric gRPC code.
+- `errorCode`: a `FirestoreErrorCode`, one of the canonical gRPC status codes (`unavailable`,
+  `permissionDenied`, ...). Compare it with the constants: `e.errorCode == FirestoreErrorCode.notFound`.
+  `errorCode.value` is the numeric gRPC code. `code` is the same as a string, as in FlutterFire
+  (`'not-found'`).
 - `message`: the text of the backend or of the client. It is meant for logs, not for matching:
   the emulator and the production backend word their messages differently.
 - `cause`: the lower-level error, when there is one (for example the parse error of a bundle).
 
-`toString()` is `FirestoreError: [code=<code>]: <message>`. `FirestoreError` extends
-`FirebaseError` of `firebase_app_dart`.
+`toString()` is `[cloud_firestore/<code>] <message>`. `FirestoreException` extends
+`FirebaseException` of `firebase_app_dart`.
 
 ```dart
 try {
   await firestore.doc('cities/LA').update({'visited': true});
-} on FirestoreError catch (e) {
-  if (e.code == FirestoreErrorCode.notFound) {
+} on FirestoreException catch (e) {
+  if (e.errorCode == FirestoreErrorCode.notFound) {
     await firestore.doc('cities/LA').set({'visited': true});
   } else {
     rethrow;
@@ -74,22 +75,22 @@ flowchart LR
 |---|---|
 | `set`, `update`, `delete`, `WriteBatch.commit`, `runBatch` | the future fails when the backend **rejects** the write. It does not fail while the client is offline: it waits. See [Writes while offline](#writes-while-offline). |
 | `DocumentReference.get()`, `Query.get()` | the future fails; with the default source only when the backend rejects the read, or for a document that is neither on the backend nor in the cache while offline |
-| `get(Source.server)` | fails with `unavailable` when the client is offline |
-| `get(Source.cache)` | a document that is not in the cache fails with `unavailable` |
-| `snapshots`, `getSnapshots(...)` | the stream emits the error and then closes. See [Permission denied on a listener](#permission-denied-on-a-listener). |
+| `get(const GetOptions(source: Source.server))` | fails with `unavailable` when the client is offline |
+| `get(const GetOptions(source: Source.cache))` | a document that is not in the cache fails with `unavailable` |
+| `snapshots()`, `snapshots(...)` | the stream emits the error and then closes. See [Permission denied on a listener](#permission-denied-on-a-listener). |
 | `count().get()`, `aggregate(...).get()`, `findNearest`, pipelines | one request to the backend: fails with the error of that request (`unavailable` when the connection fails), and with `unavailable` at once while the network is disabled |
 | `runTransaction` | the future fails with the error of the last attempt, see [Transactions](#transactions-retries-and-the-attempt-limit) |
 | `loadBundle(...)` | `task.future` fails with `invalidArgument`; the last progress event has the state `LoadBundleTaskState.error` and the `exception`, and `cause` has the parse error |
 | `waitForPendingWrites()` | completes when the writes are acknowledged **or rejected**; fails with `cancelled` when the user changes while it waits |
-| `snapshotsInSync` | the stream emits the error of a terminated instance |
-| the first operations of an instance whose cache cannot be opened | fail with the error your `openDatabase` threw; `set`, `update` and `delete` turn it into a `FirestoreError` with code `unknown` that quotes it |
+| `snapshotsInSync()` | the stream emits the error of a terminated instance |
+| the first operations of an instance whose cache cannot be opened | fail with the error your `openDatabase` threw; `set`, `update` and `delete` turn it into a `FirestoreException` with code `unknown` that quotes it |
 
-`Firestore.instanceFor` returns before the cache is open, so an error of `openDatabase` comes from
+`FirebaseFirestore.instanceFor` returns before the cache is open, so an error of `openDatabase` comes from
 the first operation, not from `instanceFor`.
 
 ### The token providers
 
-The providers of `firebase_auth_providers_dart` throw a `FirebaseAuthProviderException` from their
+The providers of `firebase_auth_providers_dart` throw a `FirebaseAuthException` from their
 own calls (`signInWithEmailAndPassword`, `OAuthTokenProvider.getAccessToken`, ...). Its `code` is
 the code of the Firebase SDKs (`wrong-password`, `network-request-failed`, `too-many-requests`,
 ...), `serverCode` the code of the backend and `httpStatus` the HTTP status. `invalidatesSession`
@@ -100,7 +101,7 @@ Firestore itself never throws these. When the token provider of the app throws w
 it for a token, the client logs `W:FirestoreCallCredentials ... Failed to get token: <message>`
 (with anything that looks like a token replaced by `<redacted>`) and the request fails with
 `unauthenticated`: the listen and write streams try again with their backoff, a one-shot call
-(an aggregation, a transaction attempt) fails. A provider that throws `FirebaseNoSignedInUserError`
+(an aggregation, a transaction attempt) fails. A provider that throws `FirebaseNoSignedInUserException`
 means nobody is signed in: the request is sent without a token, and the security rules then see an
 unauthenticated user. An App Check provider that throws does not fail the request: it is sent
 without the App Check header and a warning is logged.
@@ -127,7 +128,7 @@ that at random, up to 1 minute) on every error and never give up while they are 
 | `outOfRange` | the backend (a value outside the range it accepts) | no | fix the request |
 | `unimplemented` | the backend does not support the request | no | do not use the feature on this backend |
 | `internal` | an error inside the backend | streams: yes; transactions: yes; one-shot calls: no | retry with a backoff; report it if it stays |
-| `unavailable` | no connection or the backend is down; `get(Source.server)` or a one-shot call while offline; a document that is neither in the cache nor reachable ("Failed to get document because the client is offline."); `get(Source.cache)` of a document that is not in the cache; a write or a listen that could not be stored because the cache was busy for a moment (`TransientDatabaseException`); a client that is not the primary client of a shared cache runs an aggregation | streams: yes; transactions: yes; one-shot calls and cache errors: no | retry with a backoff, or read from the cache |
+| `unavailable` | no connection or the backend is down; `get(const GetOptions(source: Source.server))` or a one-shot call while offline; a document that is neither in the cache nor reachable ("Failed to get document because the client is offline."); `get(const GetOptions(source: Source.cache))` of a document that is not in the cache; a write or a listen that could not be stored because the cache was busy for a moment (`TransientDatabaseException`); a client that is not the primary client of a shared cache runs an aggregation | streams: yes; transactions: yes; one-shot calls and cache errors: no | retry with a backoff, or read from the cache |
 | `dataLoss` | the backend | no | report it |
 | `unauthenticated` | the backend rejected the token, or the token provider threw | streams: yes (a stream that fails before it was healthy gets a new token first); transactions: yes; one-shot calls: no (the next call gets a new token) | check the sign-in; retry once the provider has a valid token |
 
@@ -162,7 +163,7 @@ flowchart TD
 ## Writes while offline
 
 A write is applied to the local cache at once: listeners show it with
-`metadata.hasPendingWrites == true`, and a later `get(Source.cache)` sees it (the operations of an
+`metadata.hasPendingWrites == true`, and a later `get(const GetOptions(source: Source.cache))` sees it (the operations of an
 instance run in the order they were called). Its future completes only when the backend has
 **acknowledged** it. While the client is offline, the future does not complete and does not fail;
 the client keeps the write and sends it when it is online again, for as long as the instance lives
@@ -181,7 +182,7 @@ unawaited(
 );
 
 // Listeners say which snapshots hold writes that the backend has not seen yet.
-firestore.doc('cities/SF').getSnapshots(MetadataChanges.include).listen(
+firestore.doc('cities/SF').snapshots(includeMetadataChanges: true).listen(
   (DocumentSnapshot<Map<String, Object?>> snapshot) {
     print('pending: ${snapshot.metadata.hasPendingWrites}');
   },
@@ -209,7 +210,7 @@ firestore.doc('cities/SF').getSnapshots(MetadataChanges.include).listen(
 ## Permission denied on a listener
 
 When the backend refuses a listen (the security rules reject it, or the query needs an index), the
-stream emits a `FirestoreError` with `permissionDenied` or `failedPrecondition` and then **closes**:
+stream emits a `FirestoreException` with `permissionDenied` or `failedPrecondition` and then **closes**:
 the client has dropped the listener. The client also logs the error as a warning
 (`W:Firestore ... Listen for <query> failed: ...`). Without `onError`, the error is an uncaught
 error of the zone.
@@ -218,13 +219,13 @@ error of the zone.
 import 'dart:async';
 
 StreamSubscription<QuerySnapshot<Map<String, Object?>>> listen() {
-  return users.snapshots.listen(
+  return users.snapshots().listen(
     (QuerySnapshot<Map<String, Object?>> snapshot) {
       print('${snapshot.docs.length} users');
     },
     onError: (Object error) {
-      if (error is FirestoreError &&
-          error.code == FirestoreErrorCode.permissionDenied) {
+      if (error is FirestoreException &&
+          error.errorCode == FirestoreErrorCode.permissionDenied) {
         // The stream is closed. Listen again once the user may read the data,
         // for example after a sign-in.
         print('not allowed to read users');
@@ -246,17 +247,17 @@ never reach the listener; turn on logging to see them (see [Troubleshooting](tro
 
 `runTransaction` runs your callback, commits its writes and, when the attempt fails with an error
 that another attempt can fix, waits (1 second at first, then 1.5 times longer, give or take half)
-and runs the callback again, up to `TransactionOptions.maxAttempts` attempts in all (5 by default,
+and runs the callback again, up to `maxAttempts` attempts in all (5 by default,
 at least 1). The rule is in `core/transaction_runner.dart`:
 
 - A read-write transaction is retried for `aborted`, `alreadyExists` and `failedPrecondition`
   (the backend's answers to a document that changed after it was read) and for every temporary
   code (`unavailable`, `unknown`, `cancelled`, `deadlineExceeded`, `internal`,
   `resourceExhausted`, `unauthenticated`).
-- A read-only transaction (`TransactionOptions(readOnly: true)`) has no conflicts: it is only
+- A read-only transaction (`readOnly: true`) has no conflicts: it is only
   retried for the temporary codes.
-- An exception that your callback throws, and that is not a `FirestoreError`, ends the transaction
-  at once with that exception. A `FirestoreError` with one of the codes above starts a new
+- An exception that your callback throws, and that is not a `FirestoreException`, ends the transaction
+  at once with that exception. A `FirestoreException` with one of the codes above starts a new
   attempt.
 - A transaction is not retried once its instance is terminated.
 - Transactions talk to the backend directly: `disableNetwork()` does not stop them. Without a
@@ -269,7 +270,7 @@ One attempt and what decides whether another one follows:
 ```mermaid
 flowchart TD
   accTitle: How runTransaction decides to retry
-  accDescr: Each attempt runs the callback and commits. On success the future completes with the result. An exception from the callback that is not a FirestoreError fails the future at once. For a FirestoreError the client checks whether the code is retryable, aborted, alreadyExists, failedPrecondition or a temporary code for read-write transactions and only a temporary code for read-only ones, and whether attempts are left and the instance is not terminated. If so it waits with backoff and runs another attempt, otherwise the future fails with the error.
+  accDescr: Each attempt runs the callback and commits. On success the future completes with the result. An exception from the callback that is not a FirestoreException fails the future at once. For a FirestoreError the client checks whether the code is retryable, aborted, alreadyExists, failedPrecondition or a temporary code for read-write transactions and only a temporary code for read-only ones, and whether attempts are left and the instance is not terminated. If so it waits with backoff and runs another attempt, otherwise the future fails with the error.
   attempt["Attempt: run the callback, then commit"]
   outcome{"Result?"}
   success["The future completes<br/>with the callback's result"]
@@ -280,8 +281,8 @@ flowchart TD
   failed["The future fails<br/>with this error"]
   attempt --> outcome
   outcome -- "it succeeded" --> success
-  outcome -- "your callback threw, not a FirestoreError" --> thrown
-  outcome -- "a FirestoreError" --> retryable
+  outcome -- "your callback threw, not a FirestoreException" --> thrown
+  outcome -- "a FirestoreException" --> retryable
   retryable -- no --> failed
   retryable -- yes --> left
   left -- no --> failed
@@ -298,11 +299,11 @@ final int total = await firestore.runTransaction(
   (Transaction transaction) async {
     final DocumentSnapshot<Map<String, Object?>> counter =
         await transaction.get(firestore.doc('counters/visits'));
-    final int value = ((counter.data?['value'] as int?) ?? 0) + 1;
+    final int value = ((counter.data()?['value'] as int?) ?? 0) + 1;
     transaction.set(firestore.doc('counters/visits'), {'value': value});
     return value;
   },
-  options: TransactionOptions(maxAttempts: 10),
+  maxAttempts: 10,
 );
 ```
 
@@ -313,15 +314,15 @@ writes outside the transaction). A commit whose answer is lost can be applied tw
 ## Retrying calls yourself
 
 The client already retries listeners, writes and transactions. The calls it does not retry are the
-ones answered by one request: `get(Source.server)`, a document `get()` while offline, aggregations,
+ones answered by one request: `get(const GetOptions(source: Source.server))`, a document `get()` while offline, aggregations,
 `findNearest`, pipelines, and a transaction that ran out of attempts. For those, a small helper that
 retries the temporary codes with a backoff is enough:
 
 ```dart
 import 'dart:math';
 
-bool isRetryable(FirestoreError error) {
-  switch (error.code) {
+bool isRetryable(FirestoreException error) {
+  switch (error.errorCode) {
     case FirestoreErrorCode.unavailable:
     case FirestoreErrorCode.deadlineExceeded:
     case FirestoreErrorCode.resourceExhausted:
@@ -343,7 +344,7 @@ Future<T> withRetry<T>(
   for (int attempt = 1; ; attempt++) {
     try {
       return await operation();
-    } on FirestoreError catch (error) {
+    } on FirestoreException catch (error) {
       if (attempt >= maxAttempts || !isRetryable(error)) {
         rethrow;
       }
@@ -354,7 +355,7 @@ Future<T> withRetry<T>(
 }
 
 final AggregateQuerySnapshot count = await withRetry(() => users.count().get());
-print(count.getCount());
+print(count.count);
 ```
 
 - Do not wrap writes in it: a write future does not fail while offline, it waits.
@@ -371,15 +372,15 @@ These are programming errors. Fix the code rather than catching them.
 
 | Error | When |
 |---|---|
-| `StateError` | `Firestore.instanceFor` with settings that differ from those of the instance that exists for the app and database (`terminate()` it first, or call `instanceFor` without settings) |
-| `StateError` | `Firestore.instance` before the default instance was created with `instanceFor` |
+| `StateError` | `FirebaseFirestore.instanceFor` with settings that differ from those of the instance that exists for the app and database (`terminate()` it first, or call `instanceFor` without settings) |
+| `StateError` | `FirebaseFirestore.instance` before the default app exists |
 | `StateError` | settings that mix `cacheSettings` with `persistenceEnabled` or `cacheSizeBytes` |
 | `StateError` | a `WriteBatch` used after `commit()`; a `Transaction` used after its attempt completed (for example a write in a callback that was not awaited) |
-| `StateError` | `limitToLast` without an `orderBy`; a typed getter of a snapshot (`getString`, `getInt`, `getBool`, ...) when the field has another type |
-| `StateError` | `setIndexConfiguration` (deprecated) without a persistent cache |
-| `FirestoreError` `failedPrecondition` | any call on a terminated instance ("The client has already been terminated."); calling `terminate()` again is allowed |
-| `FirestoreError` `failedPrecondition` | `clearPersistence()` before `terminate()`, or while a newer instance of the same app and database runs |
-| `FirestoreError` `invalidArgument` | the transaction rules above: reads after writes, `getQuery` in a read-write transaction, writes in a read-only one |
+| `StateError` | `limitToLast` without an `orderBy` |
+| `StateError` | `setIndexConfigurationFromJSON` (deprecated) without a persistent cache |
+| `FirestoreException` `failedPrecondition` | any call on a terminated instance ("The client has already been terminated."); calling `terminate()` again is allowed |
+| `FirestoreException` `failedPrecondition` | `clearPersistence()` before `terminate()`, or while a newer instance of the same app and database runs |
+| `FirestoreException` `invalidArgument` | the transaction rules above: reads after writes, `getQuery` in a read-write transaction, writes in a read-only one |
 | `ArgumentError` | an empty or malformed path, a collection path with an even number of segments, field names that begin and end with `__`, unsupported values in document data, a cache size under 1 MB, `withEmulator` with the production host, `maxAttempts` below 1, a `readTime` without `readOnly: true` |
 
 ## Firestore Lite

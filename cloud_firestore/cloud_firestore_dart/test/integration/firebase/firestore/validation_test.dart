@@ -136,16 +136,16 @@ void main() {
     // whereLessThan(), etc. omitted for brevity since the code path is
     // trivially shared.
     await expectError(
-      () => coll.whereEqualTo(path, 1),
+      () => coll.where(path, isEqualTo: 1),
       invalidData('where', reason),
     );
     await expectError(() => coll.orderBy(path), invalidData('orderBy', reason));
 
     // update() paths.
     await expectError(
-      () => docRef.updateFromList(<dynamic>[path, 1]),
+      () => docRef.update(<Object, Object?>{path: 1}),
       invalidData(
-        'DocumentReference.updateFromList',
+        'DocumentReference.update',
         reason,
         documentPath: docRef.path,
       ),
@@ -164,14 +164,14 @@ void main() {
     // Null is rejected statically by the null-safe API; a dynamic null
     // fails the argument type check at runtime.
     expect(
-      () => FirestoreSettings(host: null as dynamic),
+      () => Settings(host: null as dynamic),
       throwsA(isA<TypeError>()),
     );
   });
 
   test('disableSslWithoutSettingHostFails', () async {
     await expectError(
-      () => FirestoreSettings(sslEnabled: false),
+      () => Settings(sslEnabled: false),
       'You can\'t set the \'sslEnabled\' setting unless you also set a '
       'non-default \'host\'.',
     );
@@ -181,7 +181,7 @@ void main() {
     // Null is rejected statically by the null-safe API; a dynamic null
     // fails the argument type check at runtime.
     expect(
-      () => Firestore.getInstance(null as dynamic),
+      () => FirebaseFirestore.instanceFor(app: null as dynamic),
       throwsA(isA<TypeError>()),
     );
   });
@@ -193,7 +193,7 @@ void main() {
     final FirebaseApp app = FirebaseApp.withOptions(
       const FirebaseOptions(
         apiKey: 'key',
-        applicationId: 'appId',
+        appId: 'appId',
         projectId: 'projectId',
       ),
       dependencies: null,
@@ -203,22 +203,22 @@ void main() {
     try {
       await toRun(app);
     } finally {
-      app.delete();
+      await app.delete();
     }
   }
 
   test('firestoreGetInstanceWithNonNullAppReturnsNonNullInstance', () async {
     await withApp('firestoreTestApp', (FirebaseApp app) async {
       expect(
-        Firestore.getInstance(app, openDatabase: DatabaseMock.create),
+        FirebaseFirestore.instanceFor(app: app, openDatabase: DatabaseMock.create),
         isNotNull,
       );
     });
   });
 
   test('collectionPathsMustBeOddLength', () async {
-    final Firestore firestore = await testFirestore();
-    final DocumentReference baseDocRef = firestore.document('foo/bar');
+    final FirebaseFirestore firestore = await testFirestore();
+    final DocumentReference baseDocRef = firestore.doc('foo/bar');
     final List<String> badAbsolutePaths = <String>[
       'foo/bar',
       'foo/bar/baz/quu',
@@ -240,7 +240,7 @@ void main() {
   });
 
   test('pathsMustNotHaveEmptySegments', () async {
-    final Firestore firestore = await testFirestore()
+    final FirebaseFirestore firestore = await testFirestore()
       // NOTE: leading / trailing slashes are okay.
       ..collection('/foo/')
       ..collection('/foo')
@@ -250,20 +250,20 @@ void main() {
     final CollectionReference collection = firestore.collection(
       'test-collection',
     );
-    final DocumentReference doc = collection.document('test-document');
+    final DocumentReference doc = collection.doc('test-document');
     for (String path in badPaths) {
       final String reason =
           'Invalid path ($path). Paths must not contain // in them.';
 
       await expectError(() => firestore.collection(path), reason);
-      await expectError(() => firestore.document(path), reason);
-      await expectError(() => collection.document(path), reason);
+      await expectError(() => firestore.doc(path), reason);
+      await expectError(() => collection.doc(path), reason);
       await expectError(() => doc.collection(path), reason);
     }
   });
 
   test('documentPathsMustBeEvenLength', () async {
-    final Firestore firestore = await testFirestore();
+    final FirebaseFirestore firestore = await testFirestore();
     final CollectionReference baseCollectionRef = firestore.collection('foo');
     final List<String> badAbsolutePaths = <String>['foo', 'foo/bar/baz'];
     final List<String> badRelativePaths = <String>['/', 'bar/baz'];
@@ -275,8 +275,8 @@ void main() {
       final String error =
           'Invalid document reference. Document references must have an even'
           ' number of segments, but $path has ${badPathLengths[i]}';
-      await expectError(() => firestore.document(path), error);
-      await expectError(() => baseCollectionRef.document(relativePath), error);
+      await expectError(() => firestore.doc(path), error);
+      await expectError(() => baseCollectionRef.doc(relativePath), error);
     }
   });
 
@@ -306,8 +306,8 @@ void main() {
     ]);
 
     final CollectionReference collection = await testCollection();
-    final DocumentReference ref = collection.document();
-    final DocumentReference ref2 = collection.document();
+    final DocumentReference ref = collection.doc();
+    final DocumentReference ref2 = collection.doc();
 
     await ref.set(data);
     await ref.firestore.batch().set(ref, data).commit();
@@ -325,8 +325,8 @@ void main() {
   });
 
   test('writesMustNotContainReferencesToADifferentDatabase', () async {
-    final Firestore firestore2 = await testAlternateFirestore();
-    final DocumentReference ref = firestore2.document('baz/quu');
+    final FirebaseFirestore firestore2 = await testAlternateFirestore();
+    final DocumentReference ref = firestore2.doc('baz/quu');
     final Map<String, Object?> data = map<dynamic>(<dynamic>['foo', ref]);
 
     await expectWriteError(
@@ -397,7 +397,7 @@ void main() {
       invalidData(
         'DocumentReference.set',
         'FieldValue.delete() can only be used with update() and set() with '
-            'SetOptions.merge() (found in field foo)',
+            'SetOptions(merge: true) or mergeFields (found in field foo)',
         documentPath: ref.path,
       ),
     );
@@ -422,7 +422,7 @@ void main() {
   });
 
   test('batchWritesRequireCorrectDocumentReferences', () async {
-    final DocumentReference badRef = (await testAlternateFirestore()).document(
+    final DocumentReference badRef = (await testAlternateFirestore()).doc(
       'foo/bar',
     );
     const String reason =
@@ -435,7 +435,7 @@ void main() {
   });
 
   test('transactionsRequireCorrectDocumentReferences', () async {
-    final DocumentReference badRef = (await testAlternateFirestore()).document(
+    final DocumentReference badRef = (await testAlternateFirestore()).doc(
       'foo/bar',
     );
     const String reason =
@@ -450,7 +450,7 @@ void main() {
         // to try/catch it.
         try {
           await transaction.get(badRef);
-        } on FirestoreError catch (e) {
+        } on FirestoreException catch (e) {
           fail('transaction.get() triggered wrong exception: $e');
         }
       }, reason);
@@ -484,7 +484,7 @@ void main() {
     for (String fieldPath in badFieldPaths) {
       final String reason =
           'Invalid field path ($fieldPath). Paths must not contain '
-          "'~', '*', '/', '[', or ']'. Use FieldPath.of() for field names "
+          "'~', '*', '/', '[', or ']'. Use FieldPath() for field names "
           'that contain them.';
       await verifyFieldPathThrows(fieldPath, reason);
     }
@@ -493,7 +493,7 @@ void main() {
   test('fieldNamesMustNotBeEmpty', () async {
     String reason =
         'Invalid field path. Provided path must not be null or empty.';
-    await expectError(() => FieldPath.of(<String>[]), reason);
+    await expectError(() => FieldPath(<String>[]), reason);
 
     reason =
         'Invalid field name at argument 1. Field names must not be null or '
@@ -501,19 +501,19 @@ void main() {
     // Null is rejected statically by the null-safe API; a dynamic null
     // fails the argument type check at runtime.
     expect(
-      () => FieldPath.of(<dynamic>[null] as dynamic),
+      () => FieldPath(<dynamic>[null] as dynamic),
       throwsA(isA<TypeError>()),
     );
-    await expectError(() => FieldPath.of(<String>['']), reason);
+    await expectError(() => FieldPath(<String>['']), reason);
 
     reason =
         'Invalid field name at argument 2. Field names must not be null or '
         'empty.';
-    await expectError(() => FieldPath.of(<String>['foo', '']), reason);
+    await expectError(() => FieldPath(<String>['foo', '']), reason);
     // Null is rejected statically by the null-safe API; a dynamic null
     // fails the argument type check at runtime.
     expect(
-      () => FieldPath.of(<dynamic>['foo', null] as dynamic),
+      () => FieldPath(<dynamic>['foo', null] as dynamic),
       throwsA(isA<TypeError>()),
     );
   });
@@ -526,13 +526,10 @@ void main() {
           '(found in field test)',
     );
     await expectError(
-      () => collection.whereEqualTo(
-        'test',
-        map<dynamic>(<dynamic>[
+      () => collection.where('test', isEqualTo: map<dynamic>(<dynamic>[
           'test',
           FieldValue.arrayUnion(<dynamic>[1]),
-        ]),
-      ),
+        ])),
       reason,
     );
 
@@ -542,13 +539,10 @@ void main() {
           '(found in field test)',
     );
     await expectError(
-      () => collection.whereEqualTo(
-        'test',
-        map<dynamic>(<dynamic>[
+      () => collection.where('test', isEqualTo: map<dynamic>(<dynamic>[
           'test',
           FieldValue.arrayRemove(<dynamic>[1]),
-        ]),
-      ),
+        ])),
       reason,
     );
   });
@@ -644,9 +638,9 @@ void main() {
     );
 
     final Query query = collection.orderBy('sort');
-    final DocumentSnapshot snapshot = await collection.document('f').get();
+    final DocumentSnapshot snapshot = await collection.doc('f').get();
 
-    expect(snapshot.data, map<dynamic>(<dynamic>['k', 'f', 'nosort', 1.0]));
+    expect(snapshot.data(), map<dynamic>(<dynamic>['k', 'f', 'nosort', 1.0]));
 
     const String reason =
         'Invalid query. You are trying to start or end a query using a '
@@ -668,7 +662,7 @@ void main() {
     final Completer<void> offlineCallbackDone = Completer<void>();
     final Completer<void> onlineCallbackDone = Completer<void>();
 
-    collection.snapshots.listen((QuerySnapshot snapshot) {
+    collection.snapshots().listen((QuerySnapshot snapshot) {
       expect(snapshot, isNotNull);
 
       // Skip the initial empty snapshot.
@@ -676,17 +670,16 @@ void main() {
         return;
       }
 
-      expect(snapshot.documents.length, 1);
-      final DocumentSnapshot docSnap = snapshot.documents[0];
+      expect(snapshot.docs.length, 1);
+      final DocumentSnapshot docSnap = snapshot.docs[0];
 
       if (snapshot.metadata.hasPendingWrites) {
         // Offline snapshot. Since the server timestamp is uncommitted, we shouldn't be able to
         // query by it.
         expect(
-          () => collection
-              .orderBy('timestamp')
+          () => collection.orderBy('timestamp')
               .endAtDocument(docSnap)
-              .snapshots
+              .snapshots()
               .listen(null),
           throwsArgumentError,
         );
@@ -698,10 +691,9 @@ void main() {
       } else {
         // Online snapshot. Since the server timestamp is committed, we should be able to query
         // by it.
-        collection
-            .orderBy('timestamp')
+        collection.orderBy('timestamp')
             .endAtDocument(docSnap)
-            .snapshots
+            .snapshots()
             .listen(null);
         if (!onlineCallbackDone.isCompleted) {
           onlineCallbackDone.complete(null);
@@ -709,7 +701,7 @@ void main() {
       }
     });
 
-    final DocumentReference document = collection.document();
+    final DocumentReference document = collection.doc();
     // The write only completes once the network is enabled again, so it must
     // not be awaited before that.
     final Future<void> write = document.set(
@@ -738,11 +730,9 @@ void main() {
 
   test('queryOrderByKeyBoundsMustBeStringsWithoutSlashes', () async {
     final Query query = (await testFirestore())
-        .collection('collection')
-        .orderByField(FieldPath.documentId());
+        .collection('collection').orderBy(FieldPath.documentId);
     final Query cgQuery = (await testFirestore())
-        .collectionGroup('collection')
-        .orderByField(FieldPath.documentId());
+        .collectionGroup('collection').orderBy(FieldPath.documentId);
 
     await expectError(
       () => query.startAt(<int>[1]),
@@ -751,12 +741,12 @@ void main() {
     );
     await expectError(
       () => query.startAt(<String>['foo/bar']),
-      'Invalid query. When querying a collection and ordering by FieldPath.documentId(), the value passed to startAt() must be a plain document ID, but "foo/bar" contains a slash.',
+      'Invalid query. When querying a collection and ordering by FieldPath.documentId, the value passed to startAt() must be a plain document ID, but "foo/bar" contains a slash.',
     );
     await expectError(
       () async => cgQuery.startAt(<String>['foo']),
       'Invalid query. When querying a collection group and ordering by '
-      'FieldPath.documentId(), the value passed to startAt() must result in '
+      'FieldPath.documentId, the value passed to startAt() must result in '
       'a valid document path, but "foo" is not because it contains an odd '
       'number of segments.',
     );
@@ -766,16 +756,15 @@ void main() {
   // they need a composite index in production).
   test('queriesWithDifferentInequalityFieldsAreAllowed', () async {
     final CollectionReference collection = await testCollection();
-    collection.whereGreaterThan('x', 32).whereLessThan('y', 'cat');
-    collection.whereNotEqualTo('x', 32).whereGreaterThan('y', 33);
-    collection.whereNotIn('foo', <int>[1, 2]).whereGreaterThan('bar', 1);
+    collection.where('x', isGreaterThan: 32).where('y', isLessThan: 'cat');
+    collection.where('x', isNotEqualTo: 32).where('y', isGreaterThan: 33);
+    collection.where('foo', whereNotIn: <int>[1, 2]).where('bar', isGreaterThan: 1);
   });
 
   test('queriesWithMultipleNotEqualAndInequalitiesFail', () async {
     await expectError(
       () async => (await testCollection())
-          .whereNotEqualTo('x', 32)
-          .whereNotEqualTo('x', 33),
+          .where('x', isNotEqualTo: 32).where('x', isNotEqualTo: 33),
       'Invalid query. You cannot use more than one \'!=\' filter.',
     );
   });
@@ -783,16 +772,12 @@ void main() {
   test('queriesWithNotEqualAndNotInFiltersFail', () async {
     await expectError(
       () async => (await testCollection())
-          .whereNotIn('foo', <int>[1, 2])
-          .whereNotEqualTo('foo', 1),
+          .where('foo', whereNotIn: <int>[1, 2]).where('foo', isNotEqualTo: 1),
       'Invalid query. You cannot use \'!=\' filters with \'not-in\' filters.',
     );
 
     await expectError(
-      () async => (await testCollection()).whereNotEqualTo('foo', 1).whereNotIn(
-        'foo',
-        <int>[1, 2],
-      ),
+      () async => (await testCollection()).where('foo', isNotEqualTo: 1).where('foo', whereNotIn: <int>[1, 2]),
       'Invalid query. You cannot use \'not-in\' filters with \'!=\' filters.',
     );
   });
@@ -800,70 +785,66 @@ void main() {
   test('queriesWithMultipleDisjunctiveFiltersFail', () async {
     await expectError(
       () async => (await testCollection())
-          .whereNotIn('foo', <int>[1, 2])
-          .whereNotIn('bar', <int>[1, 2]),
+          .where('foo', whereNotIn: <int>[1, 2]).where('bar', whereNotIn: <int>[1, 2]),
       'Invalid query. You cannot use more than one \'not-in\' filter.',
     );
 
     await expectError(
       () async => (await testCollection())
-          .whereNotIn('bar', <int>[1, 2])
-          .whereArrayContainsAny('foo', <int>[1, 2]),
+          .where('bar', whereNotIn: <int>[1, 2]).where('foo', arrayContainsAny: <int>[1, 2]),
       'Invalid query. You cannot use \'array-contains-any\' filters with \'not-in\' filters.',
     );
 
     await expectError(
       () async => (await testCollection())
-          .whereNotIn('bar', <int>[1, 2])
-          .whereIn('foo', <int>[1, 2]),
+          .where('bar', whereNotIn: <int>[1, 2]).where('foo', whereIn: <int>[1, 2]),
       'Invalid query. You cannot use \'in\' filters with \'not-in\' filters.',
     );
 
     await expectError(
       () async => (await testCollection())
-          .whereIn('bar', <int>[1, 2])
-          .whereNotIn('foo', <int>[1, 2]),
+          .where('bar', whereIn: <int>[1, 2]).where('foo', whereNotIn: <int>[1, 2]),
       'Invalid query. You cannot use \'not-in\' filters with \'in\' filters.',
     );
   });
 
   test('queriesCanUseNotEqualAndNotInWithEqualityAndOrderBy', () async {
     final CollectionReference collection = await testCollection();
-    collection.whereEqualTo('a', 1).whereNotEqualTo('b', 2);
-    collection.whereEqualTo('a', 1).whereNotIn('b', <int>[2, 3]);
-    collection.whereNotEqualTo('b', 2).orderBy('b');
-    collection.whereNotIn('b', <int>[2, 3]).orderBy('b');
-    collection.whereNotEqualTo('b', null);
-    collection.whereNotEqualTo('b', double.nan);
+    collection.where('a', isEqualTo: 1).where('b', isNotEqualTo: 2);
+    collection.where('a', isEqualTo: 1).where('b', whereNotIn: <int>[2, 3]);
+    collection.where('b', isNotEqualTo: 2).orderBy('b');
+    collection.where('b', whereNotIn: <int>[2, 3]).orderBy('b');
+    collection.where('b', isNull: false);
+    collection.where('b', isNotEqualTo: double.nan);
     // The first orderBy does not have to match the inequality field anymore.
-    collection.whereNotEqualTo('b', 2).orderBy('c');
-    collection.orderBy('c').whereNotIn('b', <int>[2, 3]);
+    collection.where('b', isNotEqualTo: 2).orderBy('c');
+    collection.orderBy('c').where('b', whereNotIn: <int>[2, 3]);
   });
 
   test('queriesInAndArrayContainsAnyArrayRules', () async {
     await expectError(
-      () async => (await testCollection()).whereIn('bar', <dynamic>[]),
+      () async => (await testCollection()).where('bar', whereIn: <dynamic>[]),
       'Invalid Query. A non-empty array is required for "in" filters.',
     );
 
     await expectError(
-      () async => (await testCollection()).whereNotIn('bar', <dynamic>[]),
+      () async => (await testCollection()).where('bar', whereNotIn: <dynamic>[]),
       'Invalid Query. A non-empty array is required for "not-in" filters.',
     );
 
     await expectError(
       () async =>
-          (await testCollection()).whereArrayContainsAny('bar', <dynamic>[]),
+          (await testCollection()).where('bar', arrayContainsAny: <dynamic>[]),
       'Invalid Query. A non-empty array is required for "array-contains-any" filters.',
     );
   });
 
   test('queriesCanCombineArrayAndDisjunctiveFilters', () async {
     final CollectionReference collection = await testCollection();
-    collection.whereArrayContains('foo', 1).whereArrayContains('foo', 2);
-    collection.whereArrayContains('foo', 1).whereIn('bar', <int>[1, 2]);
-    collection.whereIn('bar', <int>[1, 2]).whereIn('baz', <int>[1, 2]);
-    collection.whereIn('bar', <int>[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]);
+    collection.where('foo', arrayContains: 1).where('foo', arrayContains: 2);
+    collection.where('foo', arrayContains: 1).where('bar', whereIn: <int>[1, 2]);
+    collection.where('bar', whereIn: <int>[1, 2]).where('baz', whereIn: <int>[1, 2]);
+    collection.where('bar', whereIn: <int>[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]);
   });
 
   test('testConflictingOperatorsInCompositeFilters', () async {
@@ -876,24 +857,24 @@ void main() {
           .where(
             Filter.or(<Filter>[
               Filter.and(<Filter>[
-                Filter.lessThan('a', 'b'),
-                Filter.inArray('c', <String>['d', 'e']),
+                Filter('a', isLessThan: 'b'),
+                Filter('c', whereIn: <String>['d', 'e']),
               ]),
               Filter.and(<Filter>[
-                Filter.equalTo('e', 'f'),
-                Filter.notEqualTo('g', 'h'),
+                Filter('e', isEqualTo: 'f'),
+                Filter('g', isNotEqualTo: 'h'),
               ]),
             ]),
           )
           .where(
             Filter.or(<Filter>[
               Filter.and(<Filter>[
-                Filter.greaterThan('i', 'j'),
-                Filter.greaterThan('k', 'l'),
+                Filter('i', isGreaterThan: 'j'),
+                Filter('k', isGreaterThan: 'l'),
               ]),
               Filter.and(<Filter>[
-                Filter.notEqualTo('o', 'p'),
-                Filter.lessThan('q', 'r'),
+                Filter('o', isNotEqualTo: 'p'),
+                Filter('q', isLessThan: 'r'),
               ]),
             ]),
           ),
@@ -906,24 +887,24 @@ void main() {
           .where(
             Filter.or(<Filter>[
               Filter.and(<Filter>[
-                Filter.lessThan('a', 'b'),
-                Filter.notInArray('c', <String>['d', 'e']),
+                Filter('a', isLessThan: 'b'),
+                Filter('c', whereNotIn: <String>['d', 'e']),
               ]),
               Filter.and(<Filter>[
-                Filter.equalTo('e', 'f'),
-                Filter.lessThan('g', 'j'),
+                Filter('e', isEqualTo: 'f'),
+                Filter('g', isLessThan: 'j'),
               ]),
             ]),
           )
           .where(
             Filter.or(<Filter>[
               Filter.and(<Filter>[
-                Filter.greaterThan('i', 'j'),
-                Filter.greaterThan('k', 'l'),
+                Filter('i', isGreaterThan: 'j'),
+                Filter('k', isGreaterThan: 'l'),
               ]),
               Filter.and(<Filter>[
-                Filter.notInArray('o', <String>['p', 'q']),
-                Filter.lessThan('q', 'r'),
+                Filter('o', whereNotIn: <String>['p', 'q']),
+                Filter('q', isLessThan: 'r'),
               ]),
             ]),
           ),
@@ -937,24 +918,24 @@ void main() {
           .where(
             Filter.or(<Filter>[
               Filter.and(<Filter>[
-                Filter.lessThan('a', 'b'),
-                Filter.greaterThan('c', 'd'),
+                Filter('a', isLessThan: 'b'),
+                Filter('c', isGreaterThan: 'd'),
               ]),
               Filter.and(<Filter>[
-                Filter.equalTo('e', 'f'),
-                Filter.notEqualTo('g', 'h'),
+                Filter('e', isEqualTo: 'f'),
+                Filter('g', isNotEqualTo: 'h'),
               ]),
             ]),
           )
           .where(
             Filter.or(<Filter>[
               Filter.and(<Filter>[
-                Filter.greaterThan('i', 'j'),
-                Filter.greaterThan('k', 'l'),
+                Filter('i', isGreaterThan: 'j'),
+                Filter('k', isGreaterThan: 'l'),
               ]),
               Filter.and(<Filter>[
-                Filter.notInArray('o', <String>['p', 'q']),
-                Filter.lessThan('q', 'r'),
+                Filter('o', whereNotIn: <String>['p', 'q']),
+                Filter('q', isLessThan: 'r'),
               ]),
             ]),
           ),
@@ -968,24 +949,24 @@ void main() {
           .where(
             Filter.or(<Filter>[
               Filter.and(<Filter>[
-                Filter.lessThan('a', 'b'),
-                Filter.inArray('c', <String>['d', 'e']),
+                Filter('a', isLessThan: 'b'),
+                Filter('c', whereIn: <String>['d', 'e']),
               ]),
               Filter.and(<Filter>[
-                Filter.equalTo('e', 'f'),
-                Filter.lessThan('g', 'j'),
+                Filter('e', isEqualTo: 'f'),
+                Filter('g', isLessThan: 'j'),
               ]),
             ]),
           )
           .where(
             Filter.or(<Filter>[
               Filter.and(<Filter>[
-                Filter.greaterThan('i', 'j'),
-                Filter.greaterThan('k', 'l'),
+                Filter('i', isGreaterThan: 'j'),
+                Filter('k', isGreaterThan: 'l'),
               ]),
               Filter.and(<Filter>[
-                Filter.notInArray('o', <String>['p', 'q']),
-                Filter.lessThan('q', 'r'),
+                Filter('o', whereNotIn: <String>['p', 'q']),
+                Filter('q', isLessThan: 'r'),
               ]),
             ]),
           ),
@@ -1002,12 +983,12 @@ void main() {
       () => collection.where(
         Filter.or(<Filter>[
           Filter.and(<Filter>[
-            Filter.equalTo('a', 'b'),
-            Filter.inArray('c', <String>['d', 'e']),
+            Filter('a', isEqualTo: 'b'),
+            Filter('c', whereIn: <String>['d', 'e']),
           ]),
           Filter.and(<Filter>[
-            Filter.equalTo('e', 'f'),
-            Filter.notInArray('c', <String>['f', 'g']),
+            Filter('e', isEqualTo: 'f'),
+            Filter('c', whereNotIn: <String>['f', 'g']),
           ]),
         ]),
       ),
@@ -1022,16 +1003,16 @@ void main() {
           .where(
             Filter.or(<Filter>[
               Filter.and(<Filter>[
-                Filter.equalTo('a', 'b'),
-                Filter.inArray('c', <String>['d', 'e']),
+                Filter('a', isEqualTo: 'b'),
+                Filter('c', whereIn: <String>['d', 'e']),
               ]),
               Filter.and(<Filter>[
-                Filter.equalTo('e', 'f'),
-                Filter.equalTo('g', 'h'),
+                Filter('e', isEqualTo: 'f'),
+                Filter('g', isEqualTo: 'h'),
               ]),
             ]),
           )
-          .where(Filter.notInArray('i', <String>['j', 'k'])),
+          .where(Filter('i', whereNotIn: <String>['j', 'k'])),
       reason,
     );
 
@@ -1043,24 +1024,24 @@ void main() {
           .where(
             Filter.or(<Filter>[
               Filter.and(<Filter>[
-                Filter.equalTo('a', 'b'),
-                Filter.inArray('c', <String>['d', 'e']),
+                Filter('a', isEqualTo: 'b'),
+                Filter('c', whereIn: <String>['d', 'e']),
               ]),
               Filter.and(<Filter>[
-                Filter.equalTo('e', 'f'),
-                Filter.equalTo('g', 'h'),
+                Filter('e', isEqualTo: 'f'),
+                Filter('g', isEqualTo: 'h'),
               ]),
             ]),
           )
           .where(
             Filter.or(<Filter>[
               Filter.and(<Filter>[
-                Filter.equalTo('i', 'j'),
-                Filter.notInArray('l', <String>['m', 'n']),
+                Filter('i', isEqualTo: 'j'),
+                Filter('l', whereNotIn: <String>['m', 'n']),
               ]),
               Filter.and(<Filter>[
-                Filter.equalTo('o', 'p'),
-                Filter.equalTo('q', 'r'),
+                Filter('o', isEqualTo: 'p'),
+                Filter('q', isEqualTo: 'r'),
               ]),
             ]),
           ),
@@ -1086,57 +1067,53 @@ void main() {
   test('queriesFilteredByDocumentIDMustUseStringsOrDocumentReferences', () async {
     final CollectionReference collection = await testCollection();
     String reason =
-        'Invalid query. When querying with FieldPath.documentId() you must '
+        'Invalid query. When querying with FieldPath.documentId you must '
         'provide a valid document ID, but it was an empty string.';
     await expectError(
       () =>
-          collection.whereGreaterThanOrEqualToField(FieldPath.documentId(), ''),
+          collection.where(FieldPath.documentId, isGreaterThanOrEqualTo: ''),
       reason,
     );
 
     reason =
-        'Invalid query. When querying a collection by FieldPath.documentId() '
+        'Invalid query. When querying a collection by FieldPath.documentId '
         'you must provide a plain document ID, but "foo/bar/baz" contains a '
         '"/" character.';
     await expectError(
-      () => collection.whereGreaterThanOrEqualToField(
-        FieldPath.documentId(),
-        'foo/bar/baz',
-      ),
+      () => collection.where(FieldPath.documentId, isGreaterThanOrEqualTo: 'foo/bar/baz'),
       reason,
     );
 
     reason =
-        'Invalid query. When querying with FieldPath.documentId() you must '
+        'Invalid query. When querying with FieldPath.documentId you must '
         'provide a valid String or DocumentReference, but it was of type: int';
     await expectError(
       () =>
-          collection.whereGreaterThanOrEqualToField(FieldPath.documentId(), 1),
+          collection.where(FieldPath.documentId, isGreaterThanOrEqualTo: 1),
       reason,
     );
 
     reason =
-        'Invalid query. When querying a collection group by FieldPath.documentId(), the value '
+        'Invalid query. When querying a collection group by FieldPath.documentId, the value '
         'provided must result in a valid document path, but "foo" is not because it has '
         'an odd number of segments (1).';
     await expectError(
       () async => (await testFirestore())
-          .collectionGroup('collection')
-          .whereGreaterThanOrEqualToField(FieldPath.documentId(), 'foo'),
+          .collectionGroup('collection').where(FieldPath.documentId, isGreaterThanOrEqualTo: 'foo'),
       reason,
     );
 
     reason =
-        "Invalid query. You can't perform \"array-contains\" queries on FieldPath.documentId().";
+        "Invalid query. You can't perform \"array-contains\" queries on FieldPath.documentId.";
     await expectError(
-      () => collection.whereArrayContainsField(FieldPath.documentId(), 1),
+      () => collection.where(FieldPath.documentId, arrayContains: 1),
       reason,
     );
 
     reason =
-        "Invalid query. You can't perform \"array-contains-any\" queries on FieldPath.documentId().";
+        "Invalid query. You can't perform \"array-contains-any\" queries on FieldPath.documentId.";
     await expectError(
-      () => collection.whereArrayContainsAnyField(FieldPath.documentId(), <int>[
+      () => collection.where(FieldPath.documentId, arrayContainsAny: <int>[
         1,
         2,
       ]),
@@ -1146,37 +1123,36 @@ void main() {
 
   test('queriesUsingInAndDocumentIdMustHaveProperDocumentReferencesInArray', () async {
     final CollectionReference collection = await testCollection();
-    collection.whereInField(FieldPath.documentId(), <String>[collection.path]);
+    collection.where(FieldPath.documentId, whereIn: <String>[collection.path]);
 
     String reason =
-        'Invalid query. When querying with FieldPath.documentId() you must provide a valid document ID, but it was an empty string.';
+        'Invalid query. When querying with FieldPath.documentId you must provide a valid document ID, but it was an empty string.';
     await expectError(
-      () async => collection.whereInField(FieldPath.documentId(), <String>['']),
+      () async => collection.where(FieldPath.documentId, whereIn: <String>['']),
       reason,
     );
 
     reason =
-        'Invalid query. When querying a collection by FieldPath.documentId() you must provide a plain document ID, but "foo/bar/baz" contains a "/" character.';
+        'Invalid query. When querying a collection by FieldPath.documentId you must provide a plain document ID, but "foo/bar/baz" contains a "/" character.';
     await expectError(
-      () async => collection.whereInField(FieldPath.documentId(), <String>[
+      () async => collection.where(FieldPath.documentId, whereIn: <String>[
         'foo/bar/baz',
       ]),
       reason,
     );
 
     reason =
-        'Invalid query. When querying with FieldPath.documentId() you must provide a valid String or DocumentReference, but it was of type: int';
+        'Invalid query. When querying with FieldPath.documentId you must provide a valid String or DocumentReference, but it was of type: int';
     await expectError(
-      () async => collection.whereInField(FieldPath.documentId(), <int>[1, 2]),
+      () async => collection.where(FieldPath.documentId, whereIn: <int>[1, 2]),
       reason,
     );
 
     reason =
-        'Invalid query. When querying a collection group by FieldPath.documentId(), the value provided must result in a valid document path, but "foo" is not because it has an odd number of segments (1).';
+        'Invalid query. When querying a collection group by FieldPath.documentId, the value provided must result in a valid document path, but "foo" is not because it has an odd number of segments (1).';
     await expectError(
       () async => (await testFirestore())
-          .collectionGroup('collection')
-          .whereInField(FieldPath.documentId(), <String>['foo']),
+          .collectionGroup('collection').where(FieldPath.documentId, whereIn: <String>['foo']),
       reason,
     );
   });
@@ -1193,21 +1169,21 @@ void main() {
 
     test('enforces minimum cache size', () {
       expect(
-        () => FirestoreSettings(cacheSizeBytes: 1),
+        () => Settings(cacheSizeBytes: 1),
         throwsWith('Cache size must be set to at least 1048576 bytes'),
       );
     });
 
     test('garbage collection can be disabled', () {
       // Does not throw.
-      final FirestoreSettings settings = FirestoreSettings(
-        cacheSizeBytes: FirestoreSettings.cacheSizeUnlimited,
+      final Settings settings = Settings(
+        cacheSizeBytes: Settings.cacheSizeUnlimited,
       );
-      expect(settings.cacheSizeBytes, FirestoreSettings.cacheSizeUnlimited);
+      expect(settings.cacheSizeBytes, Settings.cacheSizeUnlimited);
     });
 
     test('the emulator settings can set host and port', () {
-      final FirestoreSettings settings = FirestoreSettings().withEmulator(
+      final Settings settings = Settings().withEmulator(
         '127.0.0.1',
         9000,
       );
@@ -1218,7 +1194,7 @@ void main() {
 
     test('throws if sub / user_id is missing in mockUserToken', () {
       expect(
-        () => FirestoreSettings().withEmulator(
+        () => Settings().withEmulator(
           '127.0.0.1',
           9000,
           mockUserToken: <String, Object?>{},
@@ -1228,7 +1204,7 @@ void main() {
     });
 
     test('collection paths must be non-empty strings', () async {
-      final Firestore db = await testFirestore();
+      final FirebaseFirestore db = await testFirestore();
       expect(
         () => db.collection(''),
         throwsWith(
@@ -1239,7 +1215,7 @@ void main() {
     });
 
     test('document paths must be non-empty strings', () async {
-      final Firestore db = await testFirestore();
+      final FirebaseFirestore db = await testFirestore();
       expect(
         () => db.doc(''),
         throwsWith(
@@ -1290,7 +1266,7 @@ void main() {
     test('numeric transforms fail in queries', () async {
       final CollectionReference coll = await testCollection();
       expect(
-        () => coll.whereEqualTo('test', <String, Object?>{
+        () => coll.where('test', isEqualTo: <String, Object?>{
           'test': FieldValue.increment(1),
         }),
         throwsWith(
@@ -1310,73 +1286,62 @@ void main() {
       final Map<String, Query Function(CollectionReference)>
       cases = <String, Query Function(CollectionReference)>{
         'same inequality fields works': (CollectionReference c) => c
-            .whereGreaterThanOrEqualTo('x', 32)
-            .whereLessThanOrEqualTo('x', 'cat'),
+            .where('x', isGreaterThanOrEqualTo: 32).where('x', isLessThanOrEqualTo: 'cat'),
         'inequality and equality on different fields works':
             (CollectionReference c) =>
-                c.whereGreaterThanOrEqualTo('x', 32).whereEqualTo('y', 'cat'),
+                c.where('x', isGreaterThanOrEqualTo: 32).where('y', isEqualTo: 'cat'),
         'inequality on multiple fields works': (CollectionReference c) =>
-            c.whereGreaterThanOrEqualTo('x', 32).whereNotEqualTo('y', 'cat'),
+            c.where('x', isGreaterThanOrEqualTo: 32).where('y', isNotEqualTo: 'cat'),
         'inequality with key fields works': (CollectionReference c) => c
-            .whereGreaterThanOrEqualToField(FieldPath.documentId(), 'aa')
-            .whereGreaterThanOrEqualTo('x', 32),
+            .where(FieldPath.documentId, isGreaterThanOrEqualTo: 'aa').where('x', isGreaterThanOrEqualTo: 32),
         'inequality and array-contains on different fields works':
             (CollectionReference c) => c
-                .whereGreaterThanOrEqualTo('x', 32)
-                .whereArrayContains('y', 'cat'),
+                .where('x', isGreaterThanOrEqualTo: 32).where('y', arrayContains: 'cat'),
         'inequality and array-contains-any on different fields works':
             (CollectionReference c) => c
-                .whereGreaterThanOrEqualTo('x', 32)
-                .whereArrayContainsAny('y', <Object?>[1, 2]),
+                .where('x', isGreaterThanOrEqualTo: 32).where('y', arrayContainsAny: <Object?>[1, 2]),
         'multiple inequality and array-contains on different fields works':
             (CollectionReference c) => c
-                .whereGreaterThanOrEqualTo('x', 32)
-                .whereArrayContains('y', 'cat')
-                .whereLessThanOrEqualTo('z', 42),
+                .where('x', isGreaterThanOrEqualTo: 32)
+                .where('y', arrayContains: 'cat').where('z', isLessThanOrEqualTo: 42),
         'multiple inequality and array-contains-any on different fields works':
             (CollectionReference c) => c
-                .whereGreaterThanOrEqualTo('x', 32)
-                .whereArrayContainsAny('y', <Object?>[1, 2])
-                .whereLessThanOrEqualTo('z', 42),
+                .where('x', isGreaterThanOrEqualTo: 32)
+                .where('y', arrayContainsAny: <Object?>[1, 2]).where('z', isLessThanOrEqualTo: 42),
         'inequality and IN on different fields works':
             (CollectionReference c) => c
-                .whereGreaterThanOrEqualTo('x', 32)
-                .whereIn('y', <Object?>[1, 2]),
+                .where('x', isGreaterThanOrEqualTo: 32).where('y', whereIn: <Object?>[1, 2]),
         'multiple inequality and IN on different fields works':
             (CollectionReference c) => c
-                .whereGreaterThanOrEqualTo('x', 32)
-                .whereIn('y', <Object?>[1, 2])
-                .whereLessThanOrEqualTo('z', 42),
+                .where('x', isGreaterThanOrEqualTo: 32)
+                .where('y', whereIn: <Object?>[1, 2]).where('z', isLessThanOrEqualTo: 42),
         'inequality and NOT IN on different fields works':
             (CollectionReference c) => c
-                .whereGreaterThanOrEqualTo('x', 32)
-                .whereNotIn('y', <Object?>[1, 2]),
+                .where('x', isGreaterThanOrEqualTo: 32).where('y', whereNotIn: <Object?>[1, 2]),
         'multiple inequality and NOT IN on different fields works':
             (CollectionReference c) => c
-                .whereGreaterThanOrEqualTo('x', 32)
-                .whereNotIn('y', <Object?>[1, 2])
-                .whereLessThanOrEqualTo('z', 42),
+                .where('x', isGreaterThanOrEqualTo: 32)
+                .where('y', whereNotIn: <Object?>[1, 2]).where('z', isLessThanOrEqualTo: 42),
         'inequality same as orderBy works.': (CollectionReference c) =>
-            c.whereGreaterThan('x', 32).orderBy('x'),
+            c.where('x', isGreaterThan: 32).orderBy('x'),
         '!= same as orderBy works.': (CollectionReference c) =>
-            c.whereNotEqualTo('x', 32).orderBy('x'),
+            c.where('x', isNotEqualTo: 32).orderBy('x'),
         'equality different than orderBy works': (CollectionReference c) =>
-            c.whereEqualTo('x', 32).orderBy('y'),
+            c.where('x', isEqualTo: 32).orderBy('y'),
         'inequality different than orderBy works.': (CollectionReference c) =>
-            c.whereGreaterThan('x', 32).orderBy('y'),
+            c.where('x', isGreaterThan: 32).orderBy('y'),
         'multiple inequality different from orderBy works.':
             (CollectionReference c) => c
-                .whereGreaterThan('x', 32)
-                .whereNotEqualTo('y', 'cat')
-                .orderBy('z'),
+                .where('x', isGreaterThan: 32)
+                .where('y', isNotEqualTo: 'cat').orderBy('z'),
         'array-contains different than orderBy works':
             (CollectionReference c) =>
-                c.whereArrayContains('x', 32).orderBy('y'),
+                c.where('x', arrayContains: 32).orderBy('y'),
         'IN different than orderBy works': (CollectionReference c) =>
-            c.whereIn('x', <Object?>[32]).orderBy('y'),
+            c.where('x', whereIn: <Object?>[32]).orderBy('y'),
         'array-contains-any different than orderBy works':
             (CollectionReference c) =>
-                c.whereArrayContainsAny('x', <Object?>[32]).orderBy('y'),
+                c.where('x', arrayContainsAny: <Object?>[32]).orderBy('y'),
       };
       cases.forEach((String name, Query Function(CollectionReference) build) {
         test(name, () {

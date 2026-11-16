@@ -13,7 +13,6 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/firestore.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/firestore_error.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/firestore_settings.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local_cache_settings.dart';
-import 'package:cloud_firestore_dart/src/firebase/firestore/metadata_change.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/query.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/query_snapshot.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/set_options.dart';
@@ -23,6 +22,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/util/timer_task.dart
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/util.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/write_batch.dart';
 import 'package:cloud_firestore_dart/src/firebase/timestamp.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/get_options.dart';
 import 'package:firebase_app_dart/firebase_app_dart.dart';
 import 'package:firebase_app_dart/internal.dart' show InternalLogLevel;
 import 'package:test/test.dart';
@@ -46,7 +46,7 @@ void main() {
   test('testCanUpdateAnExistingDocument', () async {
     final DocumentReference documentReference = (await testCollection(
       'rooms',
-    )).document('eros');
+    )).doc('eros');
     final Map<String, Object?> initialValue = map(<dynamic>[
       'desc',
       'Description',
@@ -60,50 +60,50 @@ void main() {
       map<String>(<dynamic>['name', 'Jonny', 'email', 'new@xyz.com']),
     ]);
     await documentReference.set(initialValue);
-    await documentReference.updateFromList(<dynamic>[
-      'desc',
-      'NewDescription',
-      'owner.email',
-      'new@xyz.com',
-    ]);
+    await documentReference.update(<Object, Object?>{
+      'desc': 'NewDescription',
+      'owner.email': 'new@xyz.com',
+    });
     final DocumentSnapshot doc = await documentReference.get();
-    expect(doc.data, finalData);
+    expect(doc.data(), finalData);
   });
 
   test('testCanUpdateAnUnknownDocument', () async {
     final DocumentReference writerRef = (await testFirestore())
         .collection('collection')
-        .document();
+        .doc();
     final DocumentReference readerRef = (await testFirestore())
         .collection('collection')
-        .document(writerRef.id);
+        .doc(writerRef.id);
 
     await writerRef.set(map(<String>['a', 'a']));
     await readerRef.update(map(<String>['b', 'b']));
-    DocumentSnapshot writerSnap = await writerRef.get(Source.cache);
+    DocumentSnapshot writerSnap = await writerRef.get(
+      GetOptions(source: Source.cache),
+    );
     expect(writerSnap.exists, isTrue);
 
     await expectLater(
-      () => readerRef.get(Source.cache),
-      throwsA(isA<FirestoreError>()),
+      () => readerRef.get(GetOptions(source: Source.cache)),
+      throwsA(isA<FirestoreException>()),
     );
     /*try {
       await readerRef.get(Source.cache);
       fail('Should have thrown exception');
     } on FirebaseFirestoreError catch (e) {
-      expect(e.code, FirestoreErrorCode.unavailable);
+      expect(e.errorCode, FirestoreErrorCode.unavailable);
     }*/
 
     writerSnap = await writerRef.get();
-    expect(writerSnap.data, map<String>(<String>['a', 'a', 'b', 'b']));
+    expect(writerSnap.data(), map<String>(<String>['a', 'a', 'b', 'b']));
     final DocumentSnapshot readerSnap = await readerRef.get();
-    expect(readerSnap.data, map<String>(<String>['a', 'a', 'b', 'b']));
+    expect(readerSnap.data(), map<String>(<String>['a', 'a', 'b', 'b']));
   });
 
   test('testCanMergeDataWithAnExistingDocumentUsingSet', () async {
     final DocumentReference documentReference = (await testCollection(
       'rooms',
-    )).document('eros');
+    )).doc('eros');
     final Map<String, Object?> initialValue = map(<dynamic>[
       'desc',
       'Description',
@@ -126,15 +126,15 @@ void main() {
     ]);
 
     await documentReference.set(initialValue);
-    await documentReference.set(mergeData, SetOptions.mergeAllFields);
+    await documentReference.set(mergeData, const SetOptions(merge: true));
     final DocumentSnapshot doc = await documentReference.get();
-    expect(doc.data, finalData);
+    expect(doc.data(), finalData);
   });
 
   test('testCanMergeServerTimestamps', () async {
     final DocumentReference documentReference = (await testCollection(
       'rooms',
-    )).document('eros');
+    )).doc('eros');
     final Map<String, Object?> initialValue = map(<dynamic>['untouched', true]);
     final Map<String, Object?> mergeData = map(<dynamic>[
       'time',
@@ -143,10 +143,10 @@ void main() {
       map<dynamic>(<dynamic>['time', FieldValue.serverTimestamp()]),
     ]);
     await documentReference.set(initialValue);
-    await documentReference.set(mergeData, SetOptions.mergeAllFields);
+    await documentReference.set(mergeData, const SetOptions(merge: true));
     final DocumentSnapshot doc = await documentReference.get();
 
-    expect(doc.getBool('untouched'), isTrue);
+    expect(doc.get('untouched') as bool?, isTrue);
     expect(doc.get('time'), const TypeMatcher<Timestamp>());
     expect(doc.get('nested.time'), const TypeMatcher<Timestamp>());
   });
@@ -156,28 +156,28 @@ void main() {
     final EventAccumulator<DocumentSnapshot> eventAccumulator =
         EventAccumulator<DocumentSnapshot>();
     final StreamSubscription<DocumentSnapshot> subscription = documentReference
-        .snapshots
+        .snapshots()
         .listen(eventAccumulator.onData, onError: eventAccumulator.onError);
     await eventAccumulator.wait();
 
     unawaited(documentReference.set(<String, dynamic>{}));
     DocumentSnapshot snapshot = await eventAccumulator.wait();
-    expect(snapshot.data, isEmpty);
+    expect(snapshot.data(), isEmpty);
 
     await documentReference.set(
       map(<dynamic>['a', <String, dynamic>{}]),
-      SetOptions.mergeFields(<String>['a']),
+      SetOptions(mergeFields: <String>['a']),
     );
     snapshot = await eventAccumulator.wait();
-    expect(snapshot.data, map<dynamic>(<dynamic>['a', <String, dynamic>{}]));
+    expect(snapshot.data(), map<dynamic>(<dynamic>['a', <String, dynamic>{}]));
 
     await documentReference.set(
       map(<dynamic>['b', <String, dynamic>{}]),
-      SetOptions.mergeAllFields,
+      const SetOptions(merge: true),
     );
     snapshot = await eventAccumulator.wait();
     expect(
-      snapshot.data,
+      snapshot.data(),
       map<dynamic>(<dynamic>[
         'a',
         <String, dynamic>{},
@@ -186,9 +186,9 @@ void main() {
       ]),
     );
 
-    snapshot = await documentReference.get(Source.server);
+    snapshot = await documentReference.get(GetOptions(source: Source.server));
     expect(
-      snapshot.data,
+      snapshot.data(),
       map<dynamic>(<dynamic>[
         'a',
         <String, dynamic>{},
@@ -202,7 +202,7 @@ void main() {
   test('testCanDeleteFieldUsingMerge', () async {
     final DocumentReference documentReference = (await testCollection(
       'rooms',
-    )).document('eros');
+    )).doc('eros');
 
     final Map<String, Object?> initialValue = map(<dynamic>[
       'untouched',
@@ -215,8 +215,8 @@ void main() {
     await documentReference.set(initialValue);
     DocumentSnapshot doc = await documentReference.get();
 
-    expect(doc.getBool('untouched'), isTrue);
-    expect(doc.getBool('nested.untouched'), isTrue);
+    expect(doc.get('untouched') as bool?, isTrue);
+    expect(doc.get('nested.untouched') as bool?, isTrue);
     expect(doc.contains('foo'), isTrue);
     expect(doc.contains('nested.foo'), isTrue);
 
@@ -226,11 +226,11 @@ void main() {
       'nested',
       map<dynamic>(<dynamic>['foo', FieldValue.delete()]),
     ]);
-    await documentReference.set(mergeData, SetOptions.mergeAllFields);
+    await documentReference.set(mergeData, const SetOptions(merge: true));
 
     doc = await documentReference.get();
-    expect(doc.getBool('untouched'), isTrue);
-    expect(doc.getBool('nested.untouched'), isTrue);
+    expect(doc.get('untouched') as bool?, isTrue);
+    expect(doc.get('nested.untouched') as bool?, isTrue);
     expect(doc.contains('foo'), isFalse);
     expect(doc.contains('nested.foo'), isFalse);
   });
@@ -238,7 +238,7 @@ void main() {
   test('testCanDeleteFieldUsingMergeFields', () async {
     final DocumentReference documentReference = (await testCollection(
       'rooms',
-    )).document('eros');
+    )).doc('eros');
 
     final Map<String, Object?> initialValue = map(<dynamic>[
       'untouched',
@@ -276,17 +276,17 @@ void main() {
     await documentReference.set(initialValue);
     await documentReference.set(
       mergeData,
-      SetOptions.mergeFields(<String>['foo', 'inner', 'nested.foo']),
+      SetOptions(mergeFields: <String>['foo', 'inner', 'nested.foo']),
     );
 
     final DocumentSnapshot doc = await documentReference.get();
-    expect(doc.data, finalData);
+    expect(doc.data(), finalData);
   });
 
   test('testCanSetServerTimestampsUsingMergeFields', () async {
     final DocumentReference documentReference = (await testCollection(
       'rooms',
-    )).document('eros');
+    )).doc('eros');
 
     final Map<String, Object?> initialValue = map(<dynamic>[
       'untouched',
@@ -308,7 +308,7 @@ void main() {
 
     await documentReference.set(
       mergeData,
-      SetOptions.mergeFields(<String>['foo', 'inner', 'nested.foo']),
+      SetOptions(mergeFields: <String>['foo', 'inner', 'nested.foo']),
     );
 
     final DocumentSnapshot doc = await documentReference.get();
@@ -321,7 +321,7 @@ void main() {
   test('testMergeReplacesArrays', () async {
     final DocumentReference documentReference = (await testCollection(
       'rooms',
-    )).document('eros');
+    )).doc('eros');
     final Map<String, Object?> initialValue = map(<dynamic>[
       'untouched',
       true,
@@ -358,15 +358,15 @@ void main() {
     ]);
 
     await documentReference.set(initialValue);
-    await documentReference.set(mergeData, SetOptions.mergeAllFields);
+    await documentReference.set(mergeData, const SetOptions(merge: true));
     final DocumentSnapshot doc = await documentReference.get();
-    expect(doc.data, finalData);
+    expect(doc.data(), finalData);
   });
 
   test('testCanDeepMergeDataWithAnExistingDocumentUsingSet', () async {
     final DocumentReference documentReference = (await testCollection(
       'rooms',
-    )).document('eros');
+    )).doc('eros');
     final Map<String, Object?> initialValue = map(<dynamic>[
       'owner.data',
       map<dynamic>(<dynamic>['name', 'Jonny', 'email', 'old@xyz.com']),
@@ -385,25 +385,27 @@ void main() {
         'owner.data',
         map<String>(<String>['name', 'Sebastian', 'email', 'new@xyz.com']),
       ]),
-      SetOptions.mergeFieldPaths(<FieldPath>[
-        FieldPath.of(<String>['desc']),
-        FieldPath.of(<String>['owner.data', 'name']),
-      ]),
+      SetOptions(
+        mergeFields: <FieldPath>[
+          FieldPath(<String>['desc']),
+          FieldPath(<String>['owner.data', 'name']),
+        ],
+      ),
     );
     final DocumentSnapshot doc = await documentReference.get();
-    expect(doc.data, finalData);
+    expect(doc.data(), finalData);
   });
 
   test('testFieldMaskCannotContainMissingFields', () async {
     final DocumentReference documentReference = (await testCollection(
       'rooms',
-    )).document('eros');
+    )).doc('eros');
 
     bool hadError = false;
     try {
       await documentReference.set(
         map(<String>['desc', 'NewDescription']),
-        SetOptions.mergeFields(<String>['desc', 'owner']),
+        SetOptions(mergeFields: <String>['desc', 'owner']),
       );
     } on ArgumentError catch (e) {
       hadError = true;
@@ -422,7 +424,7 @@ void main() {
   test('testFieldsNotInFieldMaskAreIgnored', () async {
     final DocumentReference documentReference = (await testCollection(
       'rooms',
-    )).document('eros');
+    )).doc('eros');
     final Map<String, Object?> initialValue = map(<dynamic>[
       'desc',
       'Description',
@@ -438,16 +440,16 @@ void main() {
     await documentReference.set(initialValue);
     await documentReference.set(
       map(<dynamic>['desc', 'NewDescription', 'owner', 'Sebastian']),
-      SetOptions.mergeFields(<String>['desc']),
+      SetOptions(mergeFields: <String>['desc']),
     );
     final DocumentSnapshot doc = await documentReference.get();
-    expect(doc.data, finalData);
+    expect(doc.data(), finalData);
   });
 
   test('testFieldDeletesNotInFieldMaskAreIgnored', () async {
     final DocumentReference documentReference = (await testCollection(
       'rooms',
-    )).document('eros');
+    )).doc('eros');
     final Map<String, Object?> initialValue = map(<dynamic>[
       'desc',
       'Description',
@@ -463,16 +465,16 @@ void main() {
     await documentReference.set(initialValue);
     await documentReference.set(
       map(<dynamic>['desc', 'NewDescription', 'owner', FieldValue.delete()]),
-      SetOptions.mergeFields(<String>['desc']),
+      SetOptions(mergeFields: <String>['desc']),
     );
     final DocumentSnapshot doc = await documentReference.get();
-    expect(doc.data, finalData);
+    expect(doc.data(), finalData);
   });
 
   test('testFieldTransformsNotInFieldMaskAreIgnored', () async {
     final DocumentReference documentReference = (await testCollection(
       'rooms',
-    )).document('eros');
+    )).doc('eros');
     final Map<String, Object?> initialValue = map(<dynamic>[
       'desc',
       'Description',
@@ -493,16 +495,16 @@ void main() {
         'owner',
         FieldValue.serverTimestamp(),
       ]),
-      SetOptions.mergeFields(<String>['desc']),
+      SetOptions(mergeFields: <String>['desc']),
     );
     final DocumentSnapshot doc = await documentReference.get();
-    expect(doc.data, finalData);
+    expect(doc.data(), finalData);
   });
 
   test('testFieldMaskEmpty', () async {
     final DocumentReference documentReference = (await testCollection(
       'rooms',
-    )).document('eros');
+    )).doc('eros');
     final Map<String, Object?> initialValue = map(<dynamic>[
       'desc',
       'Description',
@@ -513,16 +515,16 @@ void main() {
     await documentReference.set(initialValue);
     await documentReference.set(
       map(<String>['desc', 'NewDescription']),
-      SetOptions.mergeFields(<String>[]),
+      SetOptions(mergeFields: <String>[]),
     );
     final DocumentSnapshot doc = await documentReference.get();
-    expect(doc.data, finalData);
+    expect(doc.data(), finalData);
   });
 
   test('testFieldInFieldMaskMultipleTimes', () async {
     final DocumentReference documentReference = (await testCollection(
       'rooms',
-    )).document('eros');
+    )).doc('eros');
     final Map<String, Object?> initialValue = map(<dynamic>[
       'desc',
       'Description',
@@ -544,16 +546,16 @@ void main() {
         'owner',
         map<String>(<String>['name', 'Sebastian', 'email', 'new@new.com']),
       ]),
-      SetOptions.mergeFields(<String>['owner.name', 'owner', 'owner']),
+      SetOptions(mergeFields: <String>['owner.name', 'owner', 'owner']),
     );
     final DocumentSnapshot doc = await documentReference.get();
-    expect(doc.data, finalData);
+    expect(doc.data(), finalData);
   });
 
   test('testCanDeleteAFieldWithAnUpdate', () async {
     final DocumentReference documentReference = (await testCollection(
       'rooms',
-    )).document('eros');
+    )).doc('eros');
     final Map<String, Object?> initialValue = map(<dynamic>[
       'desc',
       'Description',
@@ -567,37 +569,34 @@ void main() {
       map<String>(<String>['name', 'Jonny']),
     ]);
     await documentReference.set(initialValue);
-    await documentReference.updateFromList(<dynamic>[
-      'owner.email',
-      FieldValue.delete(),
-    ]);
+    await documentReference.update(<Object, Object?>{
+      'owner.email': FieldValue.delete(),
+    });
     final DocumentSnapshot doc = await documentReference.get();
-    expect(doc.data, finalData);
+    expect(doc.data(), finalData);
   });
 
   test('testCanUpdateFieldsWithDots', () async {
     final DocumentReference documentReference = (await testCollection(
       'rooms',
-    )).document('eros');
+    )).doc('eros');
     await documentReference.set(map(<String>['a.b', 'old', 'c.d', 'old']));
 
-    await documentReference.updateFromList(<dynamic>[
-      FieldPath.of(<String>['a.b']),
-      'new',
-    ]);
-    await documentReference.updateFromList(<dynamic>[
-      FieldPath.of(<String>['c.d']),
-      'new',
-    ]);
+    await documentReference.update(<Object, Object?>{
+      FieldPath(<String>['a.b']): 'new',
+    });
+    await documentReference.update(<Object, Object?>{
+      FieldPath(<String>['c.d']): 'new',
+    });
 
     final DocumentSnapshot doc = await documentReference.get();
-    expect(doc.data, map<String>(<String>['a.b', 'new', 'c.d', 'new']));
+    expect(doc.data(), map<String>(<String>['a.b', 'new', 'c.d', 'new']));
   });
 
   test('testCanUpdateNestedFields', () async {
     final DocumentReference documentReference = (await testCollection(
       'rooms',
-    )).document('eros');
+    )).doc('eros');
     await documentReference.set(
       map(<dynamic>[
         'a',
@@ -607,12 +606,12 @@ void main() {
       ]),
     );
 
-    await documentReference.updateFromList(<String>['a.b', 'new']);
+    await documentReference.update(<Object, Object?>{'a.b': 'new'});
     await documentReference.update(map(<String>['c.d', 'new']));
 
     final DocumentSnapshot doc = await documentReference.get();
     expect(
-      doc.data,
+      doc.data(),
       map<dynamic>(<dynamic>[
         'a',
         map<String>(<String>['b', 'new']),
@@ -625,11 +624,11 @@ void main() {
   test('testDeleteDocument', () async {
     final DocumentReference documentReference = (await testCollection(
       'rooms',
-    )).document('eros');
+    )).doc('eros');
     final Map<String, Object?> data = map(<String>['value', 'bar']);
     await documentReference.set(data);
     DocumentSnapshot doc = await documentReference.get();
-    expect(doc.data, data);
+    expect(doc.data(), data);
     await documentReference.delete();
     doc = await documentReference.get();
     expect(doc.exists, isFalse);
@@ -638,15 +637,15 @@ void main() {
   test('testCannotUpdateNonexistentDocument', () async {
     final DocumentReference documentReference = (await testCollection(
       'rooms',
-    )).document();
+    )).doc();
 
     bool hadError = false;
     try {
       await documentReference.update(map(<String>['owner', 'abc']));
-    } on FirestoreError catch (e) {
+    } on FirestoreException catch (e) {
       hadError = true;
       expect(e, isNotNull);
-      expect(e.code, FirestoreErrorCode.notFound);
+      expect(e.errorCode, FirestoreErrorCode.notFound);
     } catch (e) {
       assert(false, 'This should not happen.');
     }
@@ -657,20 +656,20 @@ void main() {
   test('testCanRetrieveNonexistentDocument', () async {
     final DocumentReference documentReference = (await testCollection(
       'rooms',
-    )).document();
+    )).doc();
     final DocumentSnapshot documentSnapshot = await documentReference.get();
     expect(documentSnapshot.exists, isFalse);
-    expect(documentSnapshot.data, isNull);
+    expect(documentSnapshot.data(), isNull);
 
     final Completer<void> barrier = Completer<void>();
 
     late StreamSubscription<DocumentSnapshot> listenerRegistration;
     try {
-      listenerRegistration = documentReference.snapshots.listen((
+      listenerRegistration = documentReference.snapshots().listen((
         DocumentSnapshot value,
       ) {
         expect(documentSnapshot.exists, isFalse);
-        expect(documentSnapshot.data, isNull);
+        expect(documentSnapshot.data(), isNull);
         barrier.complete(null);
       }, onError: (dynamic error) {});
 
@@ -686,48 +685,48 @@ void main() {
       'rooms',
     )).add(data);
     final DocumentSnapshot document = await documentReference.get();
-    expect(document.data, data);
+    expect(document.data(), data);
   });
 
   test('testQueriesAreValidatedOnClient', () async {
     // NOTE: Failure cases are validated in ValidationTest.
     final CollectionReference collection = await testCollection();
-    final Query query = collection.whereGreaterThanOrEqualTo('x', 32)
+    final Query query = collection.where('x', isGreaterThanOrEqualTo: 32)
       // Same inequality field works.
-      ..whereLessThanOrEqualTo('x', 'cat')
+      ..where('x', isLessThanOrEqualTo: 'cat')
       // Equality on different field works.
-      ..whereEqualTo('y', 'cat')
+      ..where('y', isEqualTo: 'cat')
       // Array contains on different field works.
-      ..whereArrayContains('y', 'cat')
+      ..where('y', arrayContains: 'cat')
       // Array contains any on different field works.
-      ..whereArrayContainsAny('y', <String>['cat'])
+      ..where('y', arrayContainsAny: <String>['cat'])
       // In on different field works.
-      ..whereIn('y', <String>['cat'])
+      ..where('y', whereIn: <String>['cat'])
       // Ordering by inequality field succeeds.
       ..orderBy('x');
-    collection.orderBy('x').whereGreaterThanOrEqualTo('x', 32);
+    collection.orderBy('x').where('x', isGreaterThanOrEqualTo: 32);
 
     // Inequality same as first order by works
     query.orderBy('x').orderBy('y');
-    collection.orderBy('x').orderBy('y').whereGreaterThanOrEqualTo('x', 32);
-    collection.orderBy('x', Direction.descending).whereEqualTo('y', 'true');
+    collection.orderBy('x').orderBy('y').where('x', isGreaterThanOrEqualTo: 32);
+    collection.orderBy('x', descending: true).where('y', isEqualTo: 'true');
 
     // Equality different than orderBy works.
-    collection.orderBy('x').whereEqualTo('y', 'cat');
+    collection.orderBy('x').where('y', isEqualTo: 'cat');
     // Array contains different than orderBy works.
-    collection.orderBy('x').whereArrayContains('y', 'cat');
+    collection.orderBy('x').where('y', arrayContains: 'cat');
     // Array contains any different than orderBy works.
-    collection.orderBy('x').whereArrayContainsAny('y', <String>['cat']);
+    collection.orderBy('x').where('y', arrayContainsAny: <String>['cat']);
     // In different than orderBy works.
-    collection.orderBy('x').whereIn('y', <String>['cat']);
+    collection.orderBy('x').where('y', whereIn: <String>['cat']);
   });
 
   test('testDocumentSnapshotEventsNonExistent', () async {
-    final DocumentReference docRef = (await testCollection('rooms')).document();
+    final DocumentReference docRef = (await testCollection('rooms')).doc();
 
     final Completer<void> completer = Completer<dynamic>();
     final StreamSubscription<DocumentSnapshot> listener = docRef
-        .getSnapshots(MetadataChanges.include)
+        .snapshots(includeMetadataChanges: true)
         .listen(
           (DocumentSnapshot doc) {
             expect(doc, isNotNull);
@@ -745,13 +744,13 @@ void main() {
   });
 
   test('testDocumentSnapshotEventsForAdd', () async {
-    final DocumentReference docRef = (await testCollection('rooms')).document();
+    final DocumentReference docRef = (await testCollection('rooms')).doc();
 
     final AwaitHelper<void> dataLatch = AwaitHelper<void>(3);
     final AwaitHelper<void> emptyLatch = AwaitHelper<void>(1);
 
     final StreamSubscription<DocumentSnapshot> listener = docRef
-        .getSnapshots(MetadataChanges.include)
+        .snapshots(includeMetadataChanges: true)
         .listen((DocumentSnapshot doc) {
           if (emptyLatch.isNotEmpty) {
             dataLatch.completeNext();
@@ -766,10 +765,10 @@ void main() {
 
           dataLatch.completeNext();
           if (count == 2) {
-            expect(doc.data, map<dynamic>(<dynamic>['a', 1.0]));
+            expect(doc.data(), map<dynamic>(<dynamic>['a', 1.0]));
             expect(doc.metadata.hasPendingWrites, isTrue);
           } else if (count == 1) {
-            expect(doc.data, map<dynamic>(<dynamic>['a', 1.0]));
+            expect(doc.data(), map<dynamic>(<dynamic>['a', 1.0]));
             expect(doc.metadata.hasPendingWrites, isFalse);
           }
         });
@@ -787,29 +786,29 @@ void main() {
       map<Map<String, Object?>>(<dynamic>['doc', initialData]),
     );
 
-    final DocumentReference docRef = testCollection.document('doc');
+    final DocumentReference docRef = testCollection.doc('doc');
     final AwaitHelper<void> initialLatch = AwaitHelper<void>(1);
     final AwaitHelper<void> latch = AwaitHelper<void>(3);
 
     final StreamSubscription<DocumentSnapshot> listener = docRef
-        .getSnapshots(MetadataChanges.include)
+        .snapshots(includeMetadataChanges: true)
         .listen((DocumentSnapshot doc) {
           final int latchCount = latch.length;
           latch.completeNext();
           switch (latchCount) {
             case 3:
-              expect(doc.data, initialData);
+              expect(doc.data(), initialData);
               expect(doc.metadata.hasPendingWrites, isFalse);
               expect(doc.metadata.isFromCache, isFalse);
               initialLatch.completeNext();
               break;
             case 2:
-              expect(doc.data, updateData);
+              expect(doc.data(), updateData);
               expect(doc.metadata.hasPendingWrites, isTrue);
               expect(doc.metadata.isFromCache, isFalse);
               break;
             case 1:
-              expect(doc.data, updateData);
+              expect(doc.data(), updateData);
               expect(doc.metadata.hasPendingWrites, isFalse);
               expect(doc.metadata.isFromCache, isFalse);
               break;
@@ -828,19 +827,19 @@ void main() {
     final Map<String, Object?> initialData = map(<dynamic>['a', 1.0]);
     final DocumentReference docRef = (await testCollectionWithDocs(
       map(<dynamic>['doc', initialData]),
-    )).document('doc');
+    )).doc('doc');
     final AwaitHelper<void> initialLatch = AwaitHelper<void>(1);
     final AwaitHelper<void> latch = AwaitHelper<void>(2);
 
     final StreamSubscription<DocumentSnapshot> listener = docRef
-        .getSnapshots(MetadataChanges.include)
+        .snapshots(includeMetadataChanges: true)
         .listen((DocumentSnapshot doc) {
           final int count = latch.length;
           latch.completeNext();
           switch (count) {
             case 2:
               expect(doc.exists, isTrue);
-              expect(doc.data, initialData);
+              expect(doc.data(), initialData);
               expect(doc.metadata.hasPendingWrites, isFalse);
               initialLatch.completeNext();
               break;
@@ -860,13 +859,13 @@ void main() {
 
   test('testQuerySnapshotEventsForAdd', () async {
     final CollectionReference collection = await testCollection();
-    final DocumentReference docRef = collection.document();
+    final DocumentReference docRef = collection.doc();
     final Map<String, Object?> data = map(<dynamic>['a', 1.0]);
     final AwaitHelper<void> emptyLatch = AwaitHelper<void>(1);
     final AwaitHelper<void> dataLatch = AwaitHelper<void>(3);
 
     final StreamSubscription<QuerySnapshot> listener = collection
-        .getSnapshots(MetadataChanges.include)
+        .snapshots(includeMetadataChanges: true)
         .listen((QuerySnapshot snapshot) {
           final int count = dataLatch.length;
           dataLatch.completeNext();
@@ -878,14 +877,14 @@ void main() {
               break;
             case 2:
               expect(snapshot.length, 1);
-              final DocumentSnapshot doc = snapshot.documents[0];
-              expect(doc.data, data);
+              final DocumentSnapshot doc = snapshot.docs[0];
+              expect(doc.data(), data);
               expect(doc.metadata.hasPendingWrites, isTrue);
               break;
             case 1:
               expect(snapshot.length, 1);
-              final DocumentSnapshot doc2 = snapshot.documents[0];
-              expect(doc2.data, data);
+              final DocumentSnapshot doc2 = snapshot.docs[0];
+              expect(doc2.data(), data);
               expect(doc2.metadata.hasPendingWrites, isFalse);
               break;
             default:
@@ -906,13 +905,13 @@ void main() {
     final CollectionReference collection = await testCollectionWithDocs(
       map(<dynamic>['doc', initialData]),
     );
-    final DocumentReference docRef = collection.document('doc');
+    final DocumentReference docRef = collection.doc('doc');
 
     final AwaitHelper<void> initialLatch = AwaitHelper<void>(1);
     final AwaitHelper<void> dataLatch = AwaitHelper<void>(3);
 
     final StreamSubscription<QuerySnapshot> listener = collection
-        .getSnapshots(MetadataChanges.include)
+        .snapshots(includeMetadataChanges: true)
         .listen((QuerySnapshot snapshot) {
           final int count = dataLatch.length;
           dataLatch.completeNext();
@@ -920,23 +919,23 @@ void main() {
           switch (count) {
             case 3:
               expect(snapshot.length, 1);
-              final DocumentSnapshot document = snapshot.documents[0];
-              expect(document.data, initialData);
+              final DocumentSnapshot document = snapshot.docs[0];
+              expect(document.data(), initialData);
               expect(document.metadata.hasPendingWrites, isFalse);
               expect(document.metadata.isFromCache, isFalse);
               initialLatch.completeNext();
               break;
             case 2:
               expect(snapshot.length, 1);
-              final DocumentSnapshot document3 = snapshot.documents[0];
-              expect(document3.data, updateData);
+              final DocumentSnapshot document3 = snapshot.docs[0];
+              expect(document3.data(), updateData);
               expect(document3.metadata.hasPendingWrites, isTrue);
               expect(document3.metadata.isFromCache, isFalse);
               break;
             case 1:
               expect(snapshot.length, 1);
-              final DocumentSnapshot document4 = snapshot.documents[0];
-              expect(document4.data, updateData);
+              final DocumentSnapshot document4 = snapshot.docs[0];
+              expect(document4.data(), updateData);
               expect(document4.metadata.hasPendingWrites, isFalse);
               expect(document4.metadata.isFromCache, isFalse);
               break;
@@ -956,13 +955,13 @@ void main() {
     final CollectionReference collection = await testCollectionWithDocs(
       map(<dynamic>['doc', initialData]),
     );
-    final DocumentReference docRef = collection.document('doc');
+    final DocumentReference docRef = collection.doc('doc');
 
     final AwaitHelper<void> initialLatch = AwaitHelper<void>(1);
     final AwaitHelper<void> dataLatch = AwaitHelper<void>(2);
 
     final StreamSubscription<QuerySnapshot> listener = collection
-        .getSnapshots(MetadataChanges.include)
+        .snapshots(includeMetadataChanges: true)
         .listen((QuerySnapshot snapshot) {
           final int count = dataLatch.length;
           dataLatch.completeNext();
@@ -970,8 +969,8 @@ void main() {
             case 2:
               initialLatch.completeNext();
               expect(snapshot.length, 1);
-              final DocumentSnapshot document = snapshot.documents[0];
-              expect(document.data, map<double>(<dynamic>['a', 1.0]));
+              final DocumentSnapshot document = snapshot.docs[0];
+              expect(document.data(), map<double>(<dynamic>['a', 1.0]));
               expect(document.metadata.hasPendingWrites, isFalse);
               break;
             case 1:
@@ -989,23 +988,24 @@ void main() {
   });
 
   test('testMetadataOnlyChangesAreNotFiredWhenNoOptionsProvided', () async {
-    final DocumentReference docRef = (await testCollection()).document();
+    final DocumentReference docRef = (await testCollection()).doc();
 
     final Map<String, Object?> initialData = map(<dynamic>['a', 1.0]);
     final Map<String, Object?> updateData = map(<dynamic>['b', 1.0]);
 
     final AwaitHelper<void> dataLatch = AwaitHelper<void>(2);
-    final StreamSubscription<DocumentSnapshot> listener = docRef.snapshots
+    final StreamSubscription<DocumentSnapshot> listener = docRef
+        .snapshots()
         .listen((DocumentSnapshot snapshot) {
           final int count = dataLatch.length;
 
           dataLatch.completeNext();
           switch (count) {
             case 2:
-              expect(snapshot.data, map<double>(<dynamic>['a', 1.0]));
+              expect(snapshot.data(), map<double>(<dynamic>['a', 1.0]));
               break;
             case 1:
-              expect(snapshot.data, map<double>(<dynamic>['b', 1.0]));
+              expect(snapshot.data(), map<double>(<dynamic>['b', 1.0]));
               break;
             default:
               fail('unexpected event $snapshot');
@@ -1019,71 +1019,68 @@ void main() {
   });
 
   test('testDocumentReferenceExposesFirestore', () async {
-    final Firestore firestore = await testFirestore();
-    expect(
-      identical(firestore.document('foo/bar').firestore, firestore),
-      isTrue,
-    );
+    final FirebaseFirestore firestore = await testFirestore();
+    expect(identical(firestore.doc('foo/bar').firestore, firestore), isTrue);
   });
 
   test('testCollectionReferenceExposesFirestore', () async {
-    final Firestore firestore = await testFirestore();
+    final FirebaseFirestore firestore = await testFirestore();
     expect(identical(firestore.collection('foo').firestore, firestore), isTrue);
   });
 
   test('testDocumentReferenceEquality', () async {
-    final Firestore firestore = await testFirestore();
-    final DocumentReference docRef = firestore.document('foo/bar');
-    expect(firestore.document('foo/bar'), docRef);
+    final FirebaseFirestore firestore = await testFirestore();
+    final DocumentReference docRef = firestore.doc('foo/bar');
+    expect(firestore.doc('foo/bar'), docRef);
     expect(docRef, docRef.collection('blah').parent);
 
-    expect(docRef, isNot(firestore.document('foo/BAR')));
+    expect(docRef, isNot(firestore.doc('foo/BAR')));
 
-    final Firestore otherFirestore = await testFirestore();
-    expect(docRef, isNot(otherFirestore.document('foo/bar')));
+    final FirebaseFirestore otherFirestore = await testFirestore();
+    expect(docRef, isNot(otherFirestore.doc('foo/bar')));
   });
 
   test('testQueryReferenceEquality', () async {
-    final Firestore firestore = await testFirestore();
+    final FirebaseFirestore firestore = await testFirestore();
     final Query query = firestore
         .collection('foo')
         .orderBy('bar')
-        .whereEqualTo('baz', 42);
+        .where('baz', isEqualTo: 42);
     final Query query2 = firestore
         .collection('foo')
         .orderBy('bar')
-        .whereEqualTo('baz', 42);
+        .where('baz', isEqualTo: 42);
     expect(query2, query);
 
     final Query query3 = firestore
         .collection('foo')
         .orderBy('BAR')
-        .whereEqualTo('baz', 42);
+        .where('baz', isEqualTo: 42);
     expect(query, isNot(query3));
 
-    final Firestore otherFirestore = await testFirestore();
+    final FirebaseFirestore otherFirestore = await testFirestore();
     final Query query4 = otherFirestore
         .collection('foo')
         .orderBy('bar')
-        .whereEqualTo('baz', 42);
+        .where('baz', isEqualTo: 42);
     expect(query4, isNot(query));
   });
 
   test('testCanTraverseCollectionsAndDocuments', () async {
-    final Firestore firestore = await testFirestore();
+    final FirebaseFirestore firestore = await testFirestore();
     const String expected = 'a/b/c/d';
     // doc path from root Firestore.
-    expect(firestore.document('a/b/c/d').path, expected);
+    expect(firestore.doc('a/b/c/d').path, expected);
     // collection path from root Firestore.
-    expect(firestore.collection('a/b/c').document('d').path, expected);
+    expect(firestore.collection('a/b/c').doc('d').path, expected);
     // doc path from CollectionReference.
-    expect(firestore.collection('a').document('b/c/d').path, expected);
+    expect(firestore.collection('a').doc('b/c/d').path, expected);
     // collection path from DocumentReference.
-    expect('$expected/e', firestore.document('a/b').collection('c/d/e').path);
+    expect('$expected/e', firestore.doc('a/b').collection('c/d/e').path);
   });
 
   test('testCanTraverseCollectionAndDocumentParents', () async {
-    final Firestore firestore = await testFirestore();
+    final FirebaseFirestore firestore = await testFirestore();
     CollectionReference collection = firestore.collection('a/b/c');
     expect(collection.path, 'a/b/c');
 
@@ -1101,8 +1098,8 @@ void main() {
     // Arrange
     final DocumentReference documentReference = (await testCollection(
       'rooms',
-    )).document('eros');
-    final Firestore firestore = documentReference.firestore;
+    )).doc('eros');
+    final FirebaseFirestore firestore = documentReference.firestore;
 
     final Map<String, Object?> data = map(<dynamic>[
       'desc',
@@ -1120,15 +1117,15 @@ void main() {
 
     // Assert
     final DocumentSnapshot doc = await documentReference.get();
-    expect(doc.data, data);
+    expect(doc.data(), data);
     expect(doc.metadata.isFromCache, isFalse);
   });
 
   test('testCantGetDocumentsWhileOffline', () async {
     final DocumentReference documentReference = (await testCollection(
       'rooms',
-    )).document();
-    final Firestore firestore = documentReference.firestore;
+    )).doc();
+    final FirebaseFirestore firestore = documentReference.firestore;
     await firestore.disableNetwork();
 
     expect(documentReference.get, throwsA(anything));
@@ -1144,20 +1141,20 @@ void main() {
 
     // The network is offline and we return a cached result.
     DocumentSnapshot doc = await documentReference.get();
-    expect(doc.data, data);
+    expect(doc.data(), data);
     expect(doc.metadata.isFromCache, isTrue);
 
     // Enable the network and fetch the document again.
     await firestore.enableNetwork();
     await pendingWrite;
     doc = await documentReference.get();
-    expect(doc.data, data);
+    expect(doc.data(), data);
     expect(doc.metadata.isFromCache, isFalse);
   });
 
   test('testWriteStreamReconnectsAfterIdle', () async {
     final DocumentReference doc = await testDocument();
-    final Firestore firestore = doc.firestore;
+    final FirebaseFirestore firestore = doc.firestore;
     final TaskScheduler scheduler = firestore.scheduler;
 
     await doc.set(map(<String>['foo', 'bar']));
@@ -1169,7 +1166,7 @@ void main() {
 
   test('testWatchStreamReconnectsAfterIdle', () async {
     final DocumentReference doc = await testDocument();
-    final Firestore firestore = doc.firestore;
+    final FirebaseFirestore firestore = doc.firestore;
     final TaskScheduler scheduler = firestore.scheduler;
 
     await waitForOnlineSnapshot(doc);
@@ -1181,7 +1178,7 @@ void main() {
   test('testCanDisableAndEnableNetworking', () async {
     // There's not currently a way to check if networking is in fact disabled,
     // so for now just test that the method is well-behaved and doesn't throw.
-    final Firestore firestore = await testFirestore();
+    final FirebaseFirestore firestore = await testFirestore();
     await firestore.enableNetwork();
     await firestore.enableNetwork();
     await firestore.disableNetwork();
@@ -1192,8 +1189,8 @@ void main() {
   test('testWaitForPendingWritesResolves', () async {
     final DocumentReference documentReference = (await testCollection(
       'abc',
-    )).document('123');
-    final Firestore firestore = documentReference.firestore;
+    )).doc('123');
+    final FirebaseFirestore firestore = documentReference.firestore;
     final Map<String, Object?> data = map(<String>['foo', 'bar']);
 
     await firestore.disableNetwork();
@@ -1222,8 +1219,8 @@ void main() {
   test('testWaitForPendingWritesFailsWhenUserChanges', () async {
     final DocumentReference documentReference = (await testCollection(
       'abc',
-    )).document('123');
-    final Firestore firestore = documentReference.firestore;
+    )).doc('123');
+    final FirebaseFirestore firestore = documentReference.firestore;
     final Map<String, Object?> data = map(<String>['foo', 'bar']);
 
     // Prevent pending writes receiving acknowledgement.
@@ -1237,8 +1234,8 @@ void main() {
     final Future<void> expectation = expectLater(
       awaitsPendingWrites,
       throwsA(
-        isA<FirestoreError>().having(
-          (FirestoreError e) => e.message,
+        isA<FirestoreException>().having(
+          (FirestoreException e) => e.message,
           'message',
           "'waitForPendingWrites' task is cancelled due to User change.",
         ),
@@ -1253,18 +1250,18 @@ void main() {
   test('testPendingWriteTaskResolveWhenOfflineIfThereIsNoPending', () async {
     final DocumentReference documentReference = (await testCollection(
       'abc',
-    )).document('123');
-    final Firestore firestore = documentReference.firestore;
+    )).doc('123');
+    final FirebaseFirestore firestore = documentReference.firestore;
 
     await firestore.disableNetwork();
     await firestore.waitForPendingWrites();
   });
 
   test('testCancellingAListenerAfterTerminateDoesNotFail', () async {
-    final Firestore firestore = await testFirestore();
+    final FirebaseFirestore firestore = await testFirestore();
     final StreamSubscription<QuerySnapshot> subscription = firestore
         .collection('abc')
-        .snapshots
+        .snapshots()
         .listen((_) {});
     await Future<void>.delayed(const Duration(milliseconds: 100));
 
@@ -1282,7 +1279,7 @@ void main() {
     final Completer<void> done = Completer<void>();
 
     final StreamSubscription<DocumentSnapshot> docSubscription =
-        documentReference.snapshots.listen((DocumentSnapshot value) {
+        documentReference.snapshots().listen((DocumentSnapshot value) {
           events.add('doc');
           if (!gotInitialSnapshot.isCompleted) {
             gotInitialSnapshot.complete();
@@ -1292,7 +1289,7 @@ void main() {
     events.clear();
 
     final StreamSubscription<void>
-    inSyncSubscription = documentReference.firestore.snapshotsInSync.listen((
+    inSyncSubscription = documentReference.firestore.snapshotsInSync().listen((
       _,
     ) {
       events.add('snapshots-in-sync');
@@ -1315,8 +1312,8 @@ void main() {
   });
 
   test('testClientCallsAfterShutdownFails', () async {
-    final Firestore firestore = await testFirestore();
-    await firestore.shutdown();
+    final FirebaseFirestore firestore = await testFirestore();
+    await firestore.terminate();
     await expectError(
       firestore.disableNetwork,
       'The client has already been terminated.',
@@ -1329,7 +1326,7 @@ void main() {
 
     await documentReference.update(<String, Object?>{'a': <String, Object?>{}});
     final DocumentSnapshot snapshot = await documentReference.get();
-    expect(snapshot.data, <String, Object?>{'a': <String, Object?>{}});
+    expect(snapshot.data(), <String, Object?>{'a': <String, Object?>{}});
   });
 
   test('testMergeWithEmptyObjectReplacesAllFields', () async {
@@ -1338,9 +1335,9 @@ void main() {
 
     await documentReference.set(<String, Object?>{
       'a': <String, Object?>{},
-    }, SetOptions.mergeAllFields);
+    }, const SetOptions(merge: true));
     final DocumentSnapshot snapshot = await documentReference.get();
-    expect(snapshot.data, <String, Object?>{'a': <String, Object?>{}});
+    expect(snapshot.data(), <String, Object?>{'a': <String, Object?>{}});
   });
 
   test('testMaintainsPersistenceAfterRestarting', () async {
@@ -1348,21 +1345,20 @@ void main() {
     const String dbName = 'integration/firestore_restart_persistence.db';
     DatabaseMock.deleteDatabaseFiles(dbName);
 
-    final Firestore firestore = await IntegrationTestUtil.testFirestoreInstance(
-      IntegrationTestUtil.provider.projectId,
-      InternalLogLevel.w,
-      IntegrationTestUtil.newTestSettings(),
-      'integration/firestore',
-      fixedDbName: dbName,
-    );
-    final DocumentReference docRef = firestore
-        .collection('col1')
-        .document('doc1');
+    final FirebaseFirestore firestore =
+        await IntegrationTestUtil.testFirestoreInstance(
+          IntegrationTestUtil.provider.projectId,
+          InternalLogLevel.w,
+          IntegrationTestUtil.newTestSettings(),
+          'integration/firestore',
+          fixedDbName: dbName,
+        );
+    final DocumentReference docRef = firestore.collection('col1').doc('doc1');
     await docRef.set(<String, Object?>{'foo': 'bar'});
     await firestore.terminate();
 
     // Restart with the same database file to check that the persisted data is still there.
-    final Firestore firestore2 =
+    final FirebaseFirestore firestore2 =
         await IntegrationTestUtil.testFirestoreInstance(
           IntegrationTestUtil.provider.projectId,
           InternalLogLevel.w,
@@ -1371,10 +1367,10 @@ void main() {
           fixedDbName: dbName,
         );
     final DocumentSnapshot doc = await firestore2
-        .document(docRef.path)
-        .get(Source.cache);
+        .doc(docRef.path)
+        .get(GetOptions(source: Source.cache));
     expect(doc.exists, isTrue);
-    expect(doc.data, <String, Object?>{'foo': 'bar'});
+    expect(doc.data(), <String, Object?>{'foo': 'bar'});
   });
 
   // The message of errors that are wrapped into a FirestoreError by the document operations is prefixed with the type
@@ -1394,8 +1390,8 @@ void main() {
   }
 
   test('testNewOperationThrowsAfterFirestoreTerminate', () async {
-    final Firestore instance = await testFirestore();
-    final DocumentReference reference = instance.document('abc/123');
+    final FirebaseFirestore instance = await testFirestore();
+    final DocumentReference reference = instance.doc('abc/123');
     await reference.set(<String, Object?>{'Field': 100});
 
     await instance.terminate();
@@ -1425,8 +1421,8 @@ void main() {
   });
 
   test('testTerminateCalledMultipleTimes', () async {
-    final Firestore instance = await testFirestore();
-    final DocumentReference reference = instance.document('abc/123');
+    final FirebaseFirestore instance = await testFirestore();
+    final DocumentReference reference = instance.doc('abc/123');
     await reference.set(<String, Object?>{'Field': 100});
 
     await instance.terminate();
@@ -1442,46 +1438,54 @@ void main() {
 
   test('testNamedDbHaveDifferentPersistence', () async {
     final String projectId = IntegrationTestUtil.provider.projectId;
-    final Firestore db1 = await IntegrationTestUtil.testFirestoreInstance(
-      projectId,
-      InternalLogLevel.w,
-      IntegrationTestUtil.newTestSettings(),
-      'integration/firestore',
-      databaseName: 'db1',
-    );
-    final Firestore db2 = await IntegrationTestUtil.testFirestoreInstance(
-      projectId,
-      InternalLogLevel.w,
-      IntegrationTestUtil.newTestSettings(),
-      'integration/firestore',
-      databaseName: 'db2',
-    );
+    final FirebaseFirestore db1 =
+        await IntegrationTestUtil.testFirestoreInstance(
+          projectId,
+          InternalLogLevel.w,
+          IntegrationTestUtil.newTestSettings(),
+          'integration/firestore',
+          databaseName: 'db1',
+        );
+    final FirebaseFirestore db2 =
+        await IntegrationTestUtil.testFirestoreInstance(
+          projectId,
+          InternalLogLevel.w,
+          IntegrationTestUtil.newTestSettings(),
+          'integration/firestore',
+          databaseName: 'db2',
+        );
 
-    final DocumentReference docRef = db1.collection('col1').document(autoId());
+    final DocumentReference docRef = db1.collection('col1').doc(autoId());
     await docRef.set(<String, Object?>{'foo': 'bar'});
-    expect((await docRef.get(Source.server)).get('foo'), 'bar');
+    expect(
+      (await docRef.get(GetOptions(source: Source.server))).get('foo'),
+      'bar',
+    );
 
-    final DocumentReference docRef2 = db2.document(docRef.path);
+    final DocumentReference docRef2 = db2.doc(docRef.path);
 
     // db2 never saw the document: it is neither in its cache nor on the server (a different named database).
     await expectLater(
-      docRef2.get(Source.cache),
+      docRef2.get(GetOptions(source: Source.cache)),
       throwsA(
-        isA<FirestoreError>().having(
-          (FirestoreError e) => e.code,
+        isA<FirestoreException>().having(
+          (FirestoreException e) => e.errorCode,
           'code',
           FirestoreErrorCode.unavailable,
         ),
       ),
     );
-    expect((await docRef2.get(Source.server)).exists, isFalse);
+    expect(
+      (await docRef2.get(GetOptions(source: Source.server))).exists,
+      isFalse,
+    );
     expect((await docRef2.get()).exists, isFalse);
   });
 
   test('testCanGetDocumentWithMemoryLruGCEnabled', () async {
-    final FirestoreSettings base = IntegrationTestUtil.newTestSettings();
-    final Firestore db = await testFirestore(
-      FirestoreSettings(
+    final Settings base = IntegrationTestUtil.newTestSettings();
+    final FirebaseFirestore db = await testFirestore(
+      Settings(
         host: base.host,
         port: base.port,
         sslEnabled: base.sslEnabled,
@@ -1489,19 +1493,21 @@ void main() {
       ),
     );
 
-    final DocumentReference doc = db.collection('abc').document('123');
+    final DocumentReference doc = db.collection('abc').doc('123');
     await doc.set(<String, Object?>{'key': 'value'});
 
-    final DocumentSnapshot snapshot = await doc.get(Source.cache);
+    final DocumentSnapshot snapshot = await doc.get(
+      GetOptions(source: Source.cache),
+    );
     expect(snapshot.exists, isTrue);
     expect(snapshot.metadata.isFromCache, isTrue);
-    expect(snapshot.data, <String, Object?>{'key': 'value'});
+    expect(snapshot.data(), <String, Object?>{'key': 'value'});
   });
 
   test('testCannotGetDocumentWithMemoryEagerGcEnabled', () async {
-    final FirestoreSettings base = IntegrationTestUtil.newTestSettings();
-    final Firestore db = await testFirestore(
-      FirestoreSettings(
+    final Settings base = IntegrationTestUtil.newTestSettings();
+    final FirebaseFirestore db = await testFirestore(
+      Settings(
         host: base.host,
         port: base.port,
         sslEnabled: base.sslEnabled,
@@ -1511,14 +1517,14 @@ void main() {
       ),
     );
 
-    final DocumentReference doc = db.collection('abc').document('123');
+    final DocumentReference doc = db.collection('abc').doc('123');
     await doc.set(<String, Object?>{'key': 'value'});
 
     await expectLater(
-      doc.get(Source.cache),
+      doc.get(GetOptions(source: Source.cache)),
       throwsA(
-        isA<FirestoreError>().having(
-          (FirestoreError e) => e.code,
+        isA<FirestoreException>().having(
+          (FirestoreException e) => e.errorCode,
           'code',
           FirestoreErrorCode.unavailable,
         ),
@@ -1595,7 +1601,7 @@ void main() {
       final CollectionReference colRef = await testCollectionWithDocs(idDocs);
       await IntegrationTestUtil.assertSDKQueryResultsConsistentWithBackend(
         colRef,
-        colRef.orderByField(FieldPath.documentId()),
+        colRef.orderBy(FieldPath.documentId),
         idDocs,
         idsInOrder,
       );
@@ -1606,9 +1612,9 @@ void main() {
       () async {
         final CollectionReference colRef = await testCollectionWithDocs(idDocs);
         final Query filtered = colRef
-            .whereGreaterThanField(FieldPath.documentId(), '__id7__')
-            .whereLessThanOrEqualToField(FieldPath.documentId(), 'A')
-            .orderByField(FieldPath.documentId());
+            .where(FieldPath.documentId, isGreaterThan: '__id7__')
+            .where(FieldPath.documentId, isLessThanOrEqualTo: 'A')
+            .orderBy(FieldPath.documentId);
         await IntegrationTestUtil.assertSDKQueryResultsConsistentWithBackend(
           colRef,
           filtered,
@@ -1622,7 +1628,7 @@ void main() {
       final CollectionReference colRef = await testCollectionWithDocs(idDocs);
       await IntegrationTestUtil.checkOnlineAndOfflineResultsMatch(
         colRef,
-        colRef.orderByField(FieldPath.documentId()),
+        colRef.orderBy(FieldPath.documentId),
         idsInOrder,
       );
     });
@@ -1701,7 +1707,7 @@ void main() {
       final CollectionReference colRef = await testCollectionWithDocs(docs);
       await IntegrationTestUtil.assertSDKQueryResultsConsistentWithBackend(
         colRef,
-        colRef.orderByField(FieldPath.documentId()),
+        colRef.orderBy(FieldPath.documentId),
         docs,
         <String>[
           'Sierpiński',
@@ -1757,9 +1763,9 @@ void main() {
   // provider.test.ts that the tests above do not cover (see
   // notes/parity/integration_test_map.md).
   group('upstream parity', () {
-    FirestoreSettings emulatorSettings({LocalCacheSettings? cacheSettings}) {
-      final FirestoreSettings base = IntegrationTestUtil.newTestSettings();
-      return FirestoreSettings(
+    Settings emulatorSettings({LocalCacheSettings? cacheSettings}) {
+      final Settings base = IntegrationTestUtil.newTestSettings();
+      return Settings(
         host: base.host,
         port: base.port,
         sslEnabled: base.sslEnabled,
@@ -1773,7 +1779,7 @@ void main() {
       final FirebaseApp app = FirebaseApp.withOptions(
         FirebaseOptions(
           apiKey: 'fake-api-key',
-          applicationId: 'appId',
+          appId: 'appId',
           projectId: IntegrationTestUtil.provider.projectId,
         ),
       );
@@ -1781,10 +1787,10 @@ void main() {
       return app;
     }
 
-    Firestore instanceFor(FirebaseApp app, [String? database]) {
-      final Firestore firestore = Firestore.instanceFor(
+    FirebaseFirestore instanceFor(FirebaseApp app, [String? database]) {
+      final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(
         app: app,
-        database: database ?? '(default)',
+        databaseId: database ?? '(default)',
         settings: emulatorSettings(),
       );
       addTearDown(firestore.terminate);
@@ -1793,10 +1799,10 @@ void main() {
 
     test('testDefaultNamedDbIsSame', () {
       final FirebaseApp app = defaultApp();
-      final Firestore db1 = instanceFor(FirebaseApp.instance);
-      final Firestore db2 = Firestore.instance;
-      final Firestore db3 = instanceFor(app, '(default)');
-      final Firestore db4 = instanceFor(app);
+      final FirebaseFirestore db1 = instanceFor(FirebaseApp.instance);
+      final FirebaseFirestore db2 = FirebaseFirestore.instance;
+      final FirebaseFirestore db3 = instanceFor(app, '(default)');
+      final FirebaseFirestore db4 = instanceFor(app);
 
       expect(db2, same(db1));
       expect(db3, same(db1));
@@ -1805,8 +1811,8 @@ void main() {
 
     test('testSameNamedDbIsSame', () {
       final FirebaseApp app = defaultApp();
-      final Firestore db1 = instanceFor(app, 'myDb');
-      final Firestore db2 = instanceFor(FirebaseApp.instance, 'myDb');
+      final FirebaseFirestore db1 = instanceFor(app, 'myDb');
+      final FirebaseFirestore db2 = instanceFor(FirebaseApp.instance, 'myDb');
 
       expect(db2, same(db1));
       expect(db1.databaseId, 'myDb');
@@ -1814,9 +1820,9 @@ void main() {
 
     test('testDifferentDbNamesAreDifferent', () {
       final FirebaseApp app = defaultApp();
-      final Firestore db1 = instanceFor(app);
-      final Firestore db2 = instanceFor(app, 'db1');
-      final Firestore db3 = instanceFor(app, 'db2');
+      final FirebaseFirestore db1 = instanceFor(app);
+      final FirebaseFirestore db2 = instanceFor(app, 'db1');
+      final FirebaseFirestore db3 = instanceFor(app, 'db2');
 
       expect(db1, isNot(same(db2)));
       expect(db1, isNot(same(db3)));
@@ -1825,99 +1831,109 @@ void main() {
 
     test('testRestartFirestoreLeadsToNewInstance', () async {
       final FirebaseApp app = defaultApp();
-      final Firestore instance = instanceFor(app);
-      final Firestore sameInstance = instanceFor(app);
+      final FirebaseFirestore instance = instanceFor(app);
+      final FirebaseFirestore sameInstance = instanceFor(app);
       expect(sameInstance, same(instance));
 
       final String path = 'abc/${autoId()}';
-      await instance.document(path).set(<String, Object?>{'field': 100});
+      await instance.doc(path).set(<String, Object?>{'field': 100});
       await instance.terminate();
 
-      final Firestore newInstance = instanceFor(app);
+      final FirebaseFirestore newInstance = instanceFor(app);
       // The new instance works.
-      final DocumentSnapshot doc = await newInstance.document(path).get();
+      final DocumentSnapshot doc = await newInstance.doc(path).get();
       expect(doc.get('field'), 100);
-      await newInstance.document(path).delete();
+      await newInstance.doc(path).delete();
 
       // It is a different instance.
       expect(newInstance, isNot(same(instance)));
     });
 
     test('testLegacyCacheConfigForMemoryCache', () async {
-      final FirestoreSettings base = IntegrationTestUtil.newTestSettings();
-      final Firestore instance = await testFirestore(
-        FirestoreSettings(
+      final Settings base = IntegrationTestUtil.newTestSettings();
+      final FirebaseFirestore instance = await testFirestore(
+        Settings(
           host: base.host,
           port: base.port,
           sslEnabled: base.sslEnabled,
           persistenceEnabled: false,
         ),
       );
-      final DocumentReference doc = instance.document('coll/${autoId()}');
+      final DocumentReference doc = instance.doc('coll/${autoId()}');
       await doc.set(<String, Object?>{'foo': 'bar'});
 
-      await expectLater(doc.get(Source.cache), throwsA(isA<FirestoreError>()));
+      await expectLater(
+        doc.get(GetOptions(source: Source.cache)),
+        throwsA(isA<FirestoreException>()),
+      );
     });
 
     test('testLegacyCacheConfigForPersistentCache', () async {
-      final FirestoreSettings base = IntegrationTestUtil.newTestSettings();
-      final Firestore instance = await testFirestore(
-        FirestoreSettings(
+      final Settings base = IntegrationTestUtil.newTestSettings();
+      final FirebaseFirestore instance = await testFirestore(
+        Settings(
           host: base.host,
           port: base.port,
           sslEnabled: base.sslEnabled,
           persistenceEnabled: true,
         ),
       );
-      final DocumentReference doc = instance.document('coll/${autoId()}');
+      final DocumentReference doc = instance.doc('coll/${autoId()}');
       await doc.set(<String, Object?>{'foo': 'bar'});
 
-      final DocumentSnapshot snap = await doc.get(Source.cache);
-      expect(snap.data, <String, Object?>{'foo': 'bar'});
+      final DocumentSnapshot snap = await doc.get(
+        GetOptions(source: Source.cache),
+      );
+      expect(snap.data(), <String, Object?>{'foo': 'bar'});
     });
 
     test('testNewCacheConfigForMemoryCache', () async {
-      final Firestore instance = await testFirestore(
+      final FirebaseFirestore instance = await testFirestore(
         emulatorSettings(cacheSettings: const MemoryCacheSettings()),
       );
-      final DocumentReference doc = instance.document('coll/${autoId()}');
+      final DocumentReference doc = instance.doc('coll/${autoId()}');
       await doc.set(<String, Object?>{'foo': 'bar'});
 
-      await expectLater(doc.get(Source.cache), throwsA(isA<FirestoreError>()));
+      await expectLater(
+        doc.get(GetOptions(source: Source.cache)),
+        throwsA(isA<FirestoreException>()),
+      );
     });
 
     test('testNewCacheConfigForPersistentCache', () async {
-      final Firestore instance = await testFirestore(
+      final FirebaseFirestore instance = await testFirestore(
         emulatorSettings(cacheSettings: PersistentCacheSettings()),
       );
-      final DocumentReference doc = instance.document('coll/${autoId()}');
+      final DocumentReference doc = instance.doc('coll/${autoId()}');
       await doc.set(<String, Object?>{'foo': 'bar'});
 
-      final DocumentSnapshot snap = await doc.get(Source.cache);
-      expect(snap.data, <String, Object?>{'foo': 'bar'});
+      final DocumentSnapshot snap = await doc.get(
+        GetOptions(source: Source.cache),
+      );
+      expect(snap.data(), <String, Object?>{'foo': 'bar'});
     });
 
     test('testGetPersistentCacheIndexManager', () async {
       // Persistent cache (explicit).
-      final Firestore db1 = await testFirestore(
+      final FirebaseFirestore db1 = await testFirestore(
         emulatorSettings(cacheSettings: PersistentCacheSettings()),
       );
       expect(db1.persistentCacheIndexManager, isNotNull);
 
       // Persistent cache (default).
-      final Firestore db2 = await testFirestore();
+      final FirebaseFirestore db2 = await testFirestore();
       expect(db2.persistentCacheIndexManager, isNotNull);
 
       // Memory cache.
-      final Firestore db3 = await testFirestore(
+      final FirebaseFirestore db3 = await testFirestore(
         emulatorSettings(cacheSettings: const MemoryCacheSettings()),
       );
       expect(db3.persistentCacheIndexManager, isNull);
 
       // Persistence disabled with the legacy setting.
-      final FirestoreSettings base = IntegrationTestUtil.newTestSettings();
-      final Firestore db4 = await testFirestore(
-        FirestoreSettings(
+      final Settings base = IntegrationTestUtil.newTestSettings();
+      final FirebaseFirestore db4 = await testFirestore(
+        Settings(
           host: base.host,
           port: base.port,
           sslEnabled: base.sslEnabled,
@@ -1928,7 +1944,7 @@ void main() {
     });
 
     test('testCanGetSameOrDifferentPersistentCacheIndexManager', () async {
-      final Firestore db1 = await testFirestore(
+      final FirebaseFirestore db1 = await testFirestore(
         emulatorSettings(cacheSettings: PersistentCacheSettings()),
       );
       final Object? indexManager1 = db1.persistentCacheIndexManager;
@@ -1936,21 +1952,21 @@ void main() {
       expect(indexManager1, isNotNull);
       expect(indexManager2, same(indexManager1));
 
-      final Firestore db2 = await testFirestore();
+      final FirebaseFirestore db2 = await testFirestore();
       final Object? indexManager3 = db2.persistentCacheIndexManager;
       final Object? indexManager4 = db2.persistentCacheIndexManager;
       expect(indexManager3, isNotNull);
       expect(indexManager4, same(indexManager3));
       expect(indexManager3, isNot(same(indexManager1)));
 
-      final Firestore db3 = await testFirestore(
+      final FirebaseFirestore db3 = await testFirestore(
         emulatorSettings(cacheSettings: PersistentCacheSettings()),
       );
       final Object? indexManager5 = db3.persistentCacheIndexManager;
       expect(indexManager5, isNot(same(indexManager1)));
       expect(indexManager5, isNot(same(indexManager3)));
 
-      final Firestore db4 = await testFirestore();
+      final FirebaseFirestore db4 = await testFirestore();
       final Object? indexManager6 = db4.persistentCacheIndexManager;
       expect(indexManager6, isNot(same(indexManager1)));
       expect(indexManager6, isNot(same(indexManager3)));
@@ -1961,15 +1977,17 @@ void main() {
       final DocumentReference doc = await testDocument();
       await doc.set(<String, Object?>{'key': 'value'});
 
-      final DocumentSnapshot snapshot = await doc.get(Source.cache);
+      final DocumentSnapshot snapshot = await doc.get(
+        GetOptions(source: Source.cache),
+      );
       expect(snapshot.exists, isTrue);
       expect(snapshot.metadata.isFromCache, isTrue);
-      expect(snapshot.data, <String, Object?>{'key': 'value'});
+      expect(snapshot.data(), <String, Object?>{'key': 'value'});
     });
 
     test('can keep docs separate with multi-db when online', () async {
       final String projectId = IntegrationTestUtil.provider.projectId;
-      Future<Firestore> named(String name) =>
+      Future<FirebaseFirestore> named(String name) =>
           IntegrationTestUtil.testFirestoreInstance(
             projectId,
             InternalLogLevel.w,
@@ -1977,50 +1995,50 @@ void main() {
             'integration/firestore',
             databaseName: name,
           );
-      final Firestore db1 = await named('db1');
-      final Firestore db2 = await named('db2');
+      final FirebaseFirestore db1 = await named('db1');
+      final FirebaseFirestore db2 = await named('db2');
       final String id = autoId();
       final Map<String, Object?> data = <String, Object?>{
         'name': 'Rafi',
         'email': 'abc@xyz.com',
       };
 
-      final DocumentReference ref1 = db1.collection('users').document(id);
+      final DocumentReference ref1 = db1.collection('users').doc(id);
       await ref1.set(data);
       final DocumentSnapshot snapshot1 = await ref1.get();
       expect(snapshot1.exists, isTrue);
-      expect(snapshot1.data, data);
+      expect(snapshot1.data(), data);
 
-      final DocumentReference ref2 = db2.collection('users').document(id);
-      final DocumentSnapshot snapshot2 = await ref2.get(Source.server);
+      final DocumentReference ref2 = db2.collection('users').doc(id);
+      final DocumentSnapshot snapshot2 = await ref2.get(
+        GetOptions(source: Source.server),
+      );
       expect(snapshot2.exists, isFalse);
     });
 
     test('can specify updated field multiple times', () async {
       final DocumentReference doc = await testDocument();
       await doc.set(<String, Object?>{});
-      await doc.updateFromList(<Object?>[
-        'field',
-        100,
-        FieldPath.of(<String>['field']),
-        200,
-      ]);
-      expect((await doc.get()).data, <String, Object?>{'field': 200});
+      await doc.update(<Object, Object?>{
+        'field': 100,
+        FieldPath(<String>['field']): 200,
+      });
+      expect((await doc.get()).data(), <String, Object?>{'field': 200});
     });
 
     test('listen can be called multiple times', () async {
-      final DocumentReference doc = (await testCollection()).document();
+      final DocumentReference doc = (await testCollection()).doc();
       await doc.set(<String, Object?>{'foo': 'bar'});
       final Completer<void> first = Completer<void>();
       final Completer<void> second = Completer<void>();
       final List<StreamSubscription<DocumentSnapshot>> subscriptions =
           <StreamSubscription<DocumentSnapshot>>[];
       subscriptions.add(
-        doc.snapshots.listen((_) {
+        doc.snapshots().listen((_) {
           if (!first.isCompleted) {
             first.complete();
             subscriptions.add(
-              doc.snapshots.listen((_) {
+              doc.snapshots().listen((_) {
                 if (!second.isCompleted) {
                   second.complete();
                 }
@@ -2040,11 +2058,12 @@ void main() {
 
     group('rejected listens and gets', () {
       // A path with a reserved id, that the backend rejects.
-      Query rejectedQuery(Firestore db) => db.collection('a/__badpath__/b');
+      Query rejectedQuery(FirebaseFirestore db) =>
+          db.collection('a/__badpath__/b');
 
       Future<Object> listenError(Query query) {
         final Completer<Object> error = Completer<Object>();
-        query.snapshots.listen(
+        query.snapshots().listen(
           (_) {},
           onError: (Object e) {
             if (!error.isCompleted) {
@@ -2056,33 +2075,33 @@ void main() {
       }
 
       test('will reject listens', () async {
-        final Firestore db = await testFirestore();
-        expect(await listenError(rejectedQuery(db)), isA<FirestoreError>());
+        final FirebaseFirestore db = await testFirestore();
+        expect(await listenError(rejectedQuery(db)), isA<FirestoreException>());
       });
 
       test('will reject same listens twice in a row', () async {
-        final Firestore db = await testFirestore();
-        expect(await listenError(rejectedQuery(db)), isA<FirestoreError>());
-        expect(await listenError(rejectedQuery(db)), isA<FirestoreError>());
+        final FirebaseFirestore db = await testFirestore();
+        expect(await listenError(rejectedQuery(db)), isA<FirestoreException>());
+        expect(await listenError(rejectedQuery(db)), isA<FirestoreException>());
       });
 
       test('will reject gets', () async {
-        final Firestore db = await testFirestore();
+        final FirebaseFirestore db = await testFirestore();
         await expectLater(
           rejectedQuery(db).get(),
-          throwsA(isA<FirestoreError>()),
+          throwsA(isA<FirestoreException>()),
         );
       });
 
       test('will reject gets twice in a row', () async {
-        final Firestore db = await testFirestore();
+        final FirebaseFirestore db = await testFirestore();
         await expectLater(
           rejectedQuery(db).get(),
-          throwsA(isA<FirestoreError>()),
+          throwsA(isA<FirestoreException>()),
         );
         await expectLater(
           rejectedQuery(db).get(),
-          throwsA(isA<FirestoreError>()),
+          throwsA(isA<FirestoreException>()),
         );
       });
     });
@@ -2090,16 +2109,16 @@ void main() {
     test(
       'can compare multiple inequality Query instances with equality',
       () async {
-        final Firestore firestore = await testFirestore();
+        final FirebaseFirestore firestore = await testFirestore();
         final Query query1 = firestore
             .collection('foo')
-            .whereGreaterThanOrEqualTo('x', 42)
-            .whereNotEqualTo('y', 42)
+            .where('x', isGreaterThanOrEqualTo: 42)
+            .where('y', isNotEqualTo: 42)
             .orderBy('z');
         final Query query2 = firestore
             .collection('foo')
-            .whereGreaterThanOrEqualTo('x', 42)
-            .whereNotEqualTo('y', 42)
+            .where('x', isGreaterThanOrEqualTo: 42)
+            .where('y', isNotEqualTo: 42)
             .orderBy('z');
         expect(query1, query2);
         expect(query1.hashCode, query2.hashCode);
@@ -2107,8 +2126,8 @@ void main() {
         // The inequality fields in a different order.
         final Query query3 = firestore
             .collection('foo')
-            .whereNotEqualTo('y', 42)
-            .whereGreaterThanOrEqualTo('x', 42)
+            .where('y', isNotEqualTo: 42)
+            .where('x', isGreaterThanOrEqualTo: 42)
             .orderBy('z');
         expect(query1, isNot(query3));
       },

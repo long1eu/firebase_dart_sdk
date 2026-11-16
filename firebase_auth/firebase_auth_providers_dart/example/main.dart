@@ -24,7 +24,7 @@ Future<void> main() async {
   final FirebaseApp app = FirebaseApp.withOptions(
     const FirebaseOptions(
       apiKey: 'fake-api-key',
-      applicationId: '1:1234567890:dart:example',
+      appId: '1:1234567890:dart:example',
       projectId: 'demo-test',
     ),
   );
@@ -32,7 +32,7 @@ Future<void> main() async {
     app,
     emulatorHost: emulator,
   );
-  auth.userChanges.listen(
+  auth.userChanges().listen(
     (AuthUser? user) => print('user changed: ${user?.uid ?? 'signed out'}'),
   );
 
@@ -45,5 +45,5 @@ Future<void> main() async {
 
   await auth.deleteCurrentUser();
   await auth.dispose();
-  app.delete();
+  await app.delete();
 }

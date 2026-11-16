@@ -10,7 +10,6 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/document_snapshot.da
 import 'package:cloud_firestore_dart/src/firebase/firestore/field_path.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/field_value.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/firestore_error.dart';
-import 'package:cloud_firestore_dart/src/firebase/firestore/metadata_change.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/query_snapshot.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/set_options.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/util.dart';
@@ -44,7 +43,7 @@ void main() {
         .commit();
     final DocumentSnapshot snapshot = await doc.get();
     expect(snapshot.exists, isTrue);
-    expect(snapshot.data, map<String>(<String>['foo', 'bar']));
+    expect(snapshot.data(), map<String>(<String>['foo', 'bar']));
   });
 
   test('testSetDocumentsWithMerge', () async {
@@ -59,7 +58,7 @@ void main() {
               'nested',
               map<String>(<String>['a', 'remove'])
             ]),
-            SetOptions.mergeAllFields)
+            const SetOptions(merge: true))
         .commit();
 
     await doc.firestore
@@ -74,7 +73,7 @@ void main() {
               'nested',
               map<String>(<String>['c', 'd'])
             ]),
-            SetOptions.mergeFields(<String>['c', 'nested']))
+            SetOptions(mergeFields: <String>['c', 'nested']))
         .commit();
 
     await doc.firestore
@@ -87,16 +86,16 @@ void main() {
               'nested',
               map<dynamic>(<dynamic>['e', 'f', 'ignore', true])
             ]),
-            SetOptions.mergeFieldPaths(<FieldPath>[
-              FieldPath.of(<String>['e']),
-              FieldPath.of(<String>['nested', 'e'])
+            SetOptions(mergeFields: <FieldPath>[
+              FieldPath(<String>['e']),
+              FieldPath(<String>['nested', 'e'])
             ]))
         .commit();
 
     final DocumentSnapshot snapshot = await doc.get();
     expect(snapshot.exists, isTrue);
     expect(
-        snapshot.data,
+        snapshot.data(),
         map<dynamic>(<dynamic>[
           'a',
           'b',
@@ -115,25 +114,19 @@ void main() {
     await doc.firestore.batch().update(doc, map(<dynamic>['baz', 42])).commit();
     final DocumentSnapshot snapshot = await doc.get();
     expect(snapshot.exists, isTrue);
-    expect(snapshot.data, map<dynamic>(<dynamic>['foo', 'bar', 'baz', 42]));
+    expect(snapshot.data(), map<dynamic>(<dynamic>['foo', 'bar', 'baz', 42]));
   });
 
   test('testUpdateFieldsWithDots', () async {
     final DocumentReference doc = await testDocument();
     await doc.set(map(<String>['a.b', 'old', 'c.d', 'old']));
 
-    await doc.firestore.batch().updateFromList(doc, <dynamic>[
-      FieldPath.of(<String>['a.b']),
-      'new'
-    ]).commit();
-    await doc.firestore.batch().updateFromList(doc, <dynamic>[
-      FieldPath.of(<String>['c.d']),
-      'new'
-    ]).commit();
+    await doc.firestore.batch().update(doc, <Object, Object?>{FieldPath(<String>['a.b']): 'new'}).commit();
+    await doc.firestore.batch().update(doc, <Object, Object?>{FieldPath(<String>['c.d']): 'new'}).commit();
 
     final DocumentSnapshot snapshot = await doc.get();
     expect(snapshot.exists, isTrue);
-    expect(snapshot.data, map<String>(<String>['a.b', 'new', 'c.d', 'new']));
+    expect(snapshot.data(), map<String>(<String>['a.b', 'new', 'c.d', 'new']));
   });
 
   test('testUpdateNestedFields', () async {
@@ -146,8 +139,7 @@ void main() {
     ]));
 
     await doc.firestore
-        .batch()
-        .updateFromList(doc, <String>['a.b', 'new']).commit();
+        .batch().update(doc, <Object, Object?>{'a.b': 'new'}).commit();
     await doc.firestore
         .batch()
         .update(doc, map(<String>['c.d', 'new']))
@@ -156,7 +148,7 @@ void main() {
     final DocumentSnapshot snapshot = await doc.get();
     expect(snapshot.exists, isTrue);
     expect(
-        snapshot.data,
+        snapshot.data(),
         map<dynamic>(<dynamic>[
           'a',
           map<String>(<String>['b', 'new']),
@@ -178,12 +170,11 @@ void main() {
 
   test('testBatchesCommitAtomicallyRaisingCorrectEvents', () async {
     final CollectionReference collection = await testCollection();
-    final DocumentReference docA = collection.document('a');
-    final DocumentReference docB = collection.document('b');
+    final DocumentReference docA = collection.doc('a');
+    final DocumentReference docB = collection.doc('b');
     final EventAccumulator<QuerySnapshot> accumulator =
         EventAccumulator<QuerySnapshot>();
-    collection
-        .getSnapshots(MetadataChanges.include)
+    collection.snapshots(includeMetadataChanges: true)
         .listen(accumulator.onData, onError: accumulator.onError);
     final QuerySnapshot initialSnap = await accumulator.wait();
     expect(initialSnap.length, 0);
@@ -212,12 +203,11 @@ void main() {
 
   test('testBatchesFailAtomicallyRaisingCorrectEvents', () async {
     final CollectionReference collection = await testCollection();
-    final DocumentReference docA = collection.document('a');
-    final DocumentReference docB = collection.document('b');
+    final DocumentReference docA = collection.doc('a');
+    final DocumentReference docB = collection.doc('b');
     final EventAccumulator<QuerySnapshot> accumulator =
         EventAccumulator<QuerySnapshot>();
-    collection
-        .getSnapshots(MetadataChanges.include)
+    collection.snapshots(includeMetadataChanges: true)
         .listen(accumulator.onData, onError: accumulator.onError);
 
     final QuerySnapshot initialSnap = await accumulator.wait();
@@ -264,18 +254,17 @@ void main() {
     expect(serverSnap.length, 0);
 
     expect(err, isNotNull);
-    expect(err, const TypeMatcher<FirestoreError>());
-    expect(err.code, FirestoreErrorCode.notFound);
+    expect(err, const TypeMatcher<FirestoreException>());
+    expect(err.errorCode, FirestoreErrorCode.notFound);
   });
 
   test('testWriteTheSameServerTimestampAcrossWrites', () async {
     final CollectionReference collection = await testCollection();
-    final DocumentReference docA = collection.document('a');
-    final DocumentReference docB = collection.document('b');
+    final DocumentReference docA = collection.doc('a');
+    final DocumentReference docB = collection.doc('b');
     final EventAccumulator<QuerySnapshot> accumulator =
         EventAccumulator<QuerySnapshot>();
-    collection
-        .getSnapshots(MetadataChanges.include)
+    collection.snapshots(includeMetadataChanges: true)
         .listen(accumulator.onData, onError: accumulator.onError);
     final QuerySnapshot initialSnap = await accumulator.wait();
     expect(initialSnap.length, 0);
@@ -304,7 +293,7 @@ void main() {
     }
     expect(serverSnap.metadata.hasPendingWrites, isFalse);
     expect(serverSnap.length, 2);
-    final Timestamp when = serverSnap.documents[0].getTimestamp('when')!;
+    final Timestamp when = (serverSnap.docs[0].get('when') as Timestamp?)!;
     expect(when, isNotNull);
     expect(querySnapshotToValues(serverSnap), <dynamic>[
       map<dynamic>(<dynamic>['when', when]),
@@ -316,8 +305,7 @@ void main() {
     final DocumentReference doc = await testDocument();
     final EventAccumulator<DocumentSnapshot> accumulator =
         EventAccumulator<DocumentSnapshot>();
-    doc
-        .getSnapshots(MetadataChanges.include)
+    doc.snapshots(includeMetadataChanges: true)
         .listen(accumulator.onData, onError: accumulator.onError);
     final DocumentSnapshot initialSnap = await accumulator.wait();
     expect(initialSnap.exists, isFalse);
@@ -333,14 +321,14 @@ void main() {
     final DocumentSnapshot localSnap = await accumulator.wait();
     expect(localSnap.metadata.hasPendingWrites, isTrue);
     expect(
-        localSnap.data, map<dynamic>(<dynamic>['a', 1, 'b', 2, 'when', null]));
+        localSnap.data(), map<dynamic>(<dynamic>['a', 1, 'b', 2, 'when', null]));
 
     final DocumentSnapshot serverSnap = await accumulator.wait();
     expect(serverSnap.metadata.hasPendingWrites, isFalse);
-    final Timestamp when = serverSnap.getTimestamp('when')!;
+    final Timestamp when = (serverSnap.get('when') as Timestamp?)!;
     expect(when, isNotNull);
     expect(
-        serverSnap.data, map<dynamic>(<dynamic>['a', 1, 'b', 2, 'when', when]));
+        serverSnap.data(), map<dynamic>(<dynamic>['a', 1, 'b', 2, 'when', when]));
   });
   test('testCanWriteVeryLargeBatches', () async {
     // Create a map containing nearly 1 MB of data (1024 would make the document larger than 1 MB, which the backend
@@ -361,7 +349,7 @@ void main() {
 
     await batch.commit();
     final DocumentSnapshot snap = await doc.get();
-    expect(snap.data, values);
+    expect(snap.data(), values);
   });
 
   test('testRunBatch', () async {
@@ -372,7 +360,7 @@ void main() {
     });
     final DocumentSnapshot snapshot = await doc.get();
     expect(snapshot.exists, isTrue);
-    expect(snapshot.data, map<dynamic>(<dynamic>['foo', 'bar', 'baz', 42]));
+    expect(snapshot.data(), map<dynamic>(<dynamic>['foo', 'bar', 'baz', 42]));
   });
 }
 

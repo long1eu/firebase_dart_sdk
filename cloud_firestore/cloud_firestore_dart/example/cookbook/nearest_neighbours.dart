@@ -13,7 +13,7 @@ import 'package:cloud_firestore_dart/cloud_firestore_dart.dart';
 import '../common.dart';
 
 Future<void> main() async {
-  final Firestore firestore = connect();
+  final FirebaseFirestore firestore = connect();
   final CollectionReference<Map<String, Object?>> recipes = firestore
       .collection(scratch('recipes'));
 
@@ -28,7 +28,7 @@ Future<void> main() async {
     batch.set(recipes.doc(id), <String, Object?>{
       'meal': value.$1,
       // Store the embedding as a vector, not as a plain array.
-      'embedding': FieldValue.vector(value.$2),
+      'embedding': VectorValue(value.$2),
     });
   });
   await batch.commit();
@@ -38,21 +38,28 @@ Future<void> main() async {
   // The two nearest documents, with their distance in a field of the result.
   final VectorQuerySnapshot nearest = await recipes
       .findNearest(
-        'embedding',
-        query,
-        2,
-        DistanceMeasure.cosine,
+        vectorField: 'embedding',
+        queryVector: query,
+        limit: 2,
+        distanceMeasure: DistanceMeasure.cosine,
         distanceResultField: 'distance',
       )
       .get();
   for (final QueryDocumentSnapshot<Object?> doc in nearest) {
-    print('${doc.id}: ${doc.getDouble('distance')!.toStringAsFixed(3)}');
+    print(
+      '${doc.id}: ${(doc.get('distance') as num?)?.toDouble().toStringAsFixed(3)}',
+    );
   }
 
   // Filters of the base query apply before the search.
   final VectorQuerySnapshot dinner = await recipes
       .where('meal', isEqualTo: 'dinner')
-      .findNearest('embedding', query, 2, DistanceMeasure.euclidean)
+      .findNearest(
+        vectorField: 'embedding',
+        queryVector: query,
+        limit: 2,
+        distanceMeasure: DistanceMeasure.euclidean,
+      )
       .get();
   print('nearest dinner: ${<String>[for (final d in dinner) d.id]}');
 

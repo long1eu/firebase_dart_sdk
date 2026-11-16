@@ -373,8 +373,7 @@ void main() {
       final Map<int, Query> queries = <int, Query>{
         2: query('rooms'),
         4: query('rooms')
-            .filter(filter('members', '>', 5))
-            .orderBy(orderBy('members', 'desc'))
+            .filter(filter('members', '>', 5)).orderBy(orderBy('members', 'desc'))
             .limitToFirst(10),
         6: query('rooms/eros'),
         8: Query(path(''), collectionGroup: 'messages'),

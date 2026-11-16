@@ -8,7 +8,7 @@ import 'package:rxdart/rxdart.dart';
 import 'package:test/test.dart';
 
 const FirebaseOptions _options =
-    FirebaseOptions(apiKey: 'k', applicationId: 'app');
+    FirebaseOptions(apiKey: 'k', appId: 'app');
 
 class _Deps extends PlatformDependencies {
   final BehaviorSubject<bool> background = BehaviorSubject<bool>.seeded(false);
@@ -17,7 +17,7 @@ class _Deps extends PlatformDependencies {
   BehaviorSubject<bool> get onBackgroundChanged => background;
 }
 
-class _FailingTokenProvider implements InternalTokenProvider {
+class _FailingTokenProvider implements AuthTokenProvider {
   int calls = 0;
 
   @override
@@ -27,8 +27,8 @@ class _FailingTokenProvider implements InternalTokenProvider {
   }
 
   @override
-  Stream<InternalTokenResult> get onTokenChanged =>
-      const Stream<InternalTokenResult>.empty();
+  Stream<AuthTokenChange> get onTokenChanged =>
+      const Stream<AuthTokenChange>.empty();
 
   @override
   String? get uid => null;
@@ -45,25 +45,27 @@ void main() {
       expect(app.isDefaultApp, isTrue);
     });
 
-    test('getInstance lists the available names, sorted', () {
+    test('Firebase.app lists the available names, sorted', () {
       FirebaseApp.withOptions(_options, name: 'b');
       FirebaseApp.withOptions(_options, name: 'a');
       expect(
-          () => FirebaseApp.getInstance('c'),
-          throwsA(isA<StateError>().having((StateError e) => e.message,
-              'message', contains('Available app names: a, b.'))));
+          () => Firebase.app('c'),
+          throwsA(isA<FirebaseException>()
+              .having((FirebaseException e) => e.code, 'code', 'no-app')
+              .having((FirebaseException e) => e.message, 'message',
+                  contains('Available app names: a, b.'))));
     });
 
     test('names are trimmed', () {
       final FirebaseApp app = FirebaseApp.withOptions(_options, name: ' x ');
       expect(app.name, 'x');
-      expect(FirebaseApp.getInstance('x  '), same(app));
+      expect(Firebase.app('x  '), same(app));
       expect(app.isDefaultApp, isFalse);
     });
 
     test('equality is by name and toString names the app', () {
       final FirebaseApp app = FirebaseApp.withOptions(_options, name: 'n');
-      expect(app, equals(FirebaseApp.getInstance('n')));
+      expect(app, equals(Firebase.app('n')));
       expect(app.hashCode, 'n'.hashCode * 31);
       expect(app.toString(), contains('n'));
     });
@@ -75,35 +77,35 @@ void main() {
       final _Deps deps = _Deps();
       final FirebaseApp app =
           FirebaseApp.withOptions(_options, dependencies: deps);
-      expect(app.dataCollectionDefaultEnabled, isTrue);
+      expect(app.isAutomaticDataCollectionEnabled, isTrue);
 
       final List<bool> changes = <bool>[];
       final StreamSubscription<bool> sub =
           app.onDataCollectionChange.listen(changes.add);
-      app.setDataCollectionDefaultEnabled(enabled: false);
+      await app.setAutomaticDataCollectionEnabled(false);
       // Setting the same value again is not a change.
-      app.setDataCollectionDefaultEnabled(enabled: false);
+      await app.setAutomaticDataCollectionEnabled(false);
       await Future<void>.delayed(Duration.zero);
       await sub.cancel();
 
       expect(changes, <bool>[false]);
-      expect(app.dataCollectionDefaultEnabled, isFalse);
+      expect(app.isAutomaticDataCollectionEnabled, isFalse);
       expect(deps.get('firebase_data_collection_default_enabled'), 'false');
 
       // A new app over the same storage starts from the persisted value.
-      app.delete();
+      await app.delete();
       final FirebaseApp again =
           FirebaseApp.withOptions(_options, dependencies: deps);
-      expect(again.dataCollectionDefaultEnabled, isFalse);
+      expect(again.isAutomaticDataCollectionEnabled, isFalse);
     });
 
     test('a deleted app refuses data collection calls', () {
       final FirebaseApp app = FirebaseApp.withOptions(_options);
       app.delete();
-      expect(() => app.dataCollectionDefaultEnabled, throwsStateError);
-      expect(() => app.setDataCollectionDefaultEnabled(enabled: false),
+      expect(() => app.isAutomaticDataCollectionEnabled, throwsStateError);
+      expect(() => app.setAutomaticDataCollectionEnabled(false),
           throwsStateError);
-      expect(() => app.setAutomaticResourceManagementEnabled(enabled: true),
+      expect(() => app.setAutomaticResourceManagementEnabled(true),
           throwsStateError);
     });
   });
@@ -119,9 +121,9 @@ void main() {
       final List<bool> events = <bool>[];
       final StreamSubscription<bool> sub =
           app.onBackgroundChanged.skip(1).listen(events.add);
-      app.setAutomaticResourceManagementEnabled(enabled: true);
-      app.setAutomaticResourceManagementEnabled(enabled: true); // no change
-      app.setAutomaticResourceManagementEnabled(enabled: false);
+      await app.setAutomaticResourceManagementEnabled(true);
+      await app.setAutomaticResourceManagementEnabled(true); // no change
+      await app.setAutomaticResourceManagementEnabled(false);
       await Future<void>.delayed(Duration.zero);
       await sub.cancel();
 
@@ -135,8 +137,8 @@ void main() {
       final List<bool> events = <bool>[];
       final StreamSubscription<bool> sub =
           app.onBackgroundChanged.skip(1).listen(events.add);
-      app.setAutomaticResourceManagementEnabled(enabled: true);
-      app.setAutomaticResourceManagementEnabled(enabled: false);
+      await app.setAutomaticResourceManagementEnabled(true);
+      await app.setAutomaticResourceManagementEnabled(false);
       await Future<void>.delayed(Duration.zero);
       await sub.cancel();
       expect(events, isEmpty);

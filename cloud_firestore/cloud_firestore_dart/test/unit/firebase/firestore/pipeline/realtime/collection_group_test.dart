@@ -126,7 +126,7 @@ void main() {
         .collectionGroup('users')
         .where(
           equalAny(
-            Field.of(FieldPath.documentIdField),
+            Field.of(FieldPath.documentId),
             array(
               constant(ref(doc1.key.path.canonicalString)),
               constant(ref(doc2.key.path.canonicalString)),
@@ -210,7 +210,7 @@ void main() {
 
   test('different parents stable ordering on path', () {
     final pipeline = RealtimePipelineSource().collectionGroup('games').sort([
-      Field.of(FieldPath.documentIdField).ascending(),
+      Field.of(FieldPath.documentId).ascending(),
     ]);
 
     final doc1 = doc('users/bob/games/1', 1000, <String, Object?>{'score': 90});
@@ -247,7 +247,7 @@ void main() {
   test('different parents stable ordering on key', () {
     // This test is identical to DifferentParentsStableOrderingOnPath
     final pipeline = RealtimePipelineSource().collectionGroup('games').sort([
-      Field.of(FieldPath.documentIdField).ascending(),
+      Field.of(FieldPath.documentId).ascending(),
     ]);
 
     final doc1 = doc('users/bob/games/1', 1000, <String, Object?>{'score': 90});
@@ -412,7 +412,7 @@ void main() {
 
   test('sort on path', () {
     final pipeline = RealtimePipelineSource().collectionGroup('users').sort([
-      Field.of(FieldPath.documentIdField).ascending(),
+      Field.of(FieldPath.documentId).ascending(),
     ]);
 
     final doc1 = doc('users/bob', 1000, <String, Object?>{'score': 90});
@@ -436,7 +436,7 @@ void main() {
   test('limit', () {
     final pipeline = RealtimePipelineSource()
         .collectionGroup('users')
-        .sort([Field.of(FieldPath.documentIdField).ascending()])
+        .sort([Field.of(FieldPath.documentId).ascending()])
         .limit(2);
 
     final doc1 = doc('users/bob', 1000, <String, Object?>{'score': 90});

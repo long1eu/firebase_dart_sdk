@@ -59,7 +59,7 @@ List<String> _ids(QuerySnapshot<Object?> snapshot) =>
 
 /// Runs index backfills until there is nothing left to index. This is the hook for tests: the scheduled backfill
 /// first runs 15 seconds after the client started.
-Future<int> backfillAllIndexes(Firestore firestore) async {
+Future<int> backfillAllIndexes(FirebaseFirestore firestore) async {
   int total = 0;
   while (true) {
     final int processed = await firestore.client.backfillIndexes();
@@ -76,7 +76,9 @@ Future<Map<String, List<String>>> _cacheResults(
 ) async {
   final Map<String, List<String>> results = <String, List<String>>{};
   for (final IndexedQuery query in queries) {
-    results[query.name] = _ids(await query.build(collection).get(Source.cache));
+    results[query.name] = _ids(
+      await query.build(collection).get(GetOptions(source: Source.cache)),
+    );
   }
   return results;
 }
@@ -89,7 +91,7 @@ Future<Map<String, List<String>>> _cacheResults(
 /// they must differ from the results without the writes for [affectedByPendingWrites]; and once the writes are
 /// committed the server must agree with them.
 Future<void> checkIndexedQueries({
-  required Firestore firestore,
+  required FirebaseFirestore firestore,
   required CollectionReference<Map<String, Object?>> collection,
   required Docs docs,
   required List<List<String>> indexes,
@@ -105,9 +107,12 @@ Future<void> checkIndexedQueries({
     await collection.doc(doc.key).set(doc.value);
   }
   // Everything is in the cache as the backend has it.
-  expect(_ids(await collection.get(Source.server)), hasLength(docs.length));
+  expect(
+    _ids(await collection.get(GetOptions(source: Source.server))),
+    hasLength(docs.length),
+  );
 
-  await firestore.setIndexConfiguration(
+  await firestore.setIndexConfigurationFromJSON(
     indexConfiguration(collection.id, indexes),
   );
   expect(localStore.getFieldIndexes(), hasLength(indexes.length));
@@ -129,7 +134,7 @@ Future<void> checkIndexedQueries({
   );
   for (final IndexedQuery query in queries) {
     final List<String> fromServer = _ids(
-      await query.build(collection).get(Source.server),
+      await query.build(collection).get(GetOptions(source: Source.server)),
     );
     expect(fromIndex[query.name], fromServer, reason: query.name);
   }
@@ -140,7 +145,7 @@ Future<void> checkIndexedQueries({
   await firestore.disableNetwork();
   await pendingWrites(collection);
   // The writes are in the local store once a cache read went through the queue behind them.
-  await collection.get(Source.cache);
+  await collection.get(GetOptions(source: Source.cache));
 
   final Map<String, List<String>> beforeBackfill = await _cacheResults(
     collection,
@@ -180,7 +185,7 @@ Future<void> checkIndexedQueries({
   await firestore.waitForPendingWrites();
   for (final IndexedQuery query in queries) {
     final List<String> fromServer = _ids(
-      await query.build(collection).get(Source.server),
+      await query.build(collection).get(GetOptions(source: Source.server)),
     );
     expect(beforeBackfill[query.name], fromServer, reason: query.name);
   }

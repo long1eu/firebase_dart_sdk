@@ -9,7 +9,7 @@ It is a port of the open-source Firebase Android SDK, kept close to its current 
 parts of the API following the JS SDK and FlutterFire. It is not affiliated with or endorsed by
 Google or Firebase.
 
-> **Status: 0.1.1.** Most of it was verified against the Firestore emulator
+> **Status: 0.2.0.** Most of it was verified against the Firestore emulator
 > only. Against production Firestore, a short verification kit was run on a Standard edition
 > database (see [Not done](#not-done)). Test against your own project before relying on it.
 
@@ -19,7 +19,7 @@ Google or Firebase.
 | --- | --- |
 | Documents, collections, collection groups, set / update / delete, write batches, field transforms | stable |
 | Queries: filters, `Filter.or` / `Filter.and`, `orderBy`, cursors, `limit`, `limitToLast` | stable |
-| Real-time listeners, snapshot metadata, `snapshotsInSync` | stable |
+| Real-time listeners, snapshot metadata, `snapshotsInSync()` | stable |
 | Aggregations (`count`, `sum`, `average`), vector search (`findNearest`, server only) | stable |
 | Transactions, read-only transactions with point-in-time reads | stable |
 | Typed converters (`withConverter`), snapshots as JSON, data bundles | stable |
@@ -58,11 +58,11 @@ import 'package:firebase_app_dart/firebase_app_dart.dart';
 
 Future<void> main() async {
   final app = FirebaseApp.withOptions(const FirebaseOptions(
-      apiKey: '<API key>', applicationId: '1:1234567890:web:abc', projectId: 'my-project'));
-  final firestore = Firestore.instanceFor(app: app);
+      apiKey: '<API key>', appId: '1:1234567890:web:abc', projectId: 'my-project'));
+  final firestore = FirebaseFirestore.instanceFor(app: app);
   await firestore.doc('cities/SF').set({'name': 'San Francisco', 'state': 'CA'});
   final cities = await firestore.collection('cities').where('state', isEqualTo: 'CA').get();
-  print(cities.docs.map((city) => city.data));
+  print(cities.docs.map((city) => city.data()));
   await firestore.terminate(); // a VM program exits once its instances are terminated
 }
 ```

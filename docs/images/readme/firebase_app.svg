@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 400" role="img" aria-labelledby="title desc" font-family="system-ui, -apple-system, Segoe UI, Helvetica, Arial, sans-serif">
   <title id="title">What a FirebaseApp holds and who reads it</title>
-  <desc id="desc">A FirebaseApp holds its name, its FirebaseOptions, a token provider (authProvider), an App Check token provider (appCheckProvider) and the platform dependencies (connectivity events and storage). The token provider is set by FirebaseUserAuth.forApp or assigned from OAuthTokenProvider or your own provider; without one, requests carry no token. The App Check provider is yours. The platform dependencies are passed to FirebaseApp.withOptions. Firestore.instanceFor(app: app) reads the options, both providers and the connectivity events once, when the instance is created, and app.delete() terminates the Firestore instances of the app.</desc>
+  <desc id="desc">A FirebaseApp holds its name, its FirebaseOptions, a token provider (authProvider), an App Check token provider (appCheckProvider) and the platform dependencies (connectivity events and storage). The token provider is set by FirebaseUserAuth.forApp or assigned from OAuthTokenProvider or your own provider; without one, requests carry no token. The App Check provider is yours. The platform dependencies are passed to FirebaseApp.withOptions. FirebaseFirestore.instanceFor(app: app) reads the options, both providers and the connectivity events once, when the instance is created, and app.delete() terminates the Firestore instances of the app.</desc>
   <defs>
     <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
       <path d="M0,0 L10,5 L0,10 z" fill="#57606a"/>
@@ -37,7 +37,7 @@
   <g font-size="12" fill="#1f2328">
     <rect x="346" y="60" width="228" height="40" rx="6" fill="#ffffff" stroke="#57606a"/>
     <text x="358" y="78" font-weight="600">options</text>
-    <text x="358" y="93" fill="#57606a">apiKey, applicationId, projectId</text>
+    <text x="358" y="93" fill="#57606a">apiKey, appId, projectId</text>
     <rect x="346" y="126" width="228" height="62" rx="6" fill="#ffffff" stroke="#57606a"/>
     <text x="358" y="148" font-weight="600">authProvider</text>
     <text x="358" y="166" fill="#57606a">none set: requests carry</text>
@@ -59,7 +59,7 @@
 
   <!-- Reader, right -->
   <rect x="660" y="96" width="220" height="126" rx="8" fill="#ffffff" stroke="#1f2328"/>
-  <text x="770" y="124" font-size="13" font-weight="700" fill="#1f2328" text-anchor="middle">Firestore.instanceFor</text>
+  <text x="770" y="124" font-size="13" font-weight="700" fill="#1f2328" text-anchor="middle">FirebaseFirestore.instanceFor</text>
   <text x="770" y="141" font-size="13" font-weight="700" fill="#1f2328" text-anchor="middle">(app: app)</text>
   <g font-size="12" fill="#1f2328">
     <text x="672" y="164">reads options, both providers</text>

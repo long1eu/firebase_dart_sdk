@@ -34,7 +34,7 @@ Import it *instead of* `cloud_firestore_dart.dart`:
 import 'package:cloud_firestore_dart/lite.dart';
 
 // Synchronous, and nothing is sent until the first call.
-final Firestore firestore = Firestore.instanceFor(app: app);
+final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(app: app);
 
 final CollectionReference<Map<String, Object?>> cities = firestore.collection('cities');
 await cities.doc('LA').set({'name': 'Los Angeles', 'state': 'CA', 'population': 3900000});
@@ -49,16 +49,16 @@ final WriteBatch batch = firestore.batch()
 await batch.commit();
 
 final AggregateQuerySnapshot count = await cities.count().get();
-print(count.getCount());
+print(count.count);
 
 await firestore.terminate();
 ```
 
 Both libraries declare `Firestore`, `DocumentReference`, `CollectionReference`, `Query`, the
-snapshot classes, `WriteBatch`, `Transaction`, `FirestoreDataConverter` and `FirestoreSettings`;
+snapshot classes, `WriteBatch`, `Transaction`, `FirestoreDataConverter` and `Settings`;
 to use both in one file, import one with a prefix. The value types (`Timestamp`, `GeoPoint`,
 `Blob`, `FieldValue`, `FieldPath`, `Filter`, `SetOptions`, `AggregateField`, the BSON classes,
-`FirestoreError`, ...) are the same classes in both.
+`FirestoreException`, ...) are the same classes in both.
 
 ## Behaviour to know
 
@@ -77,8 +77,8 @@ to use both in one file, import one with a prefix. The value types (`Timestamp`,
 
 ## What it has and what it does not
 
-- **What it has:** `ref.get()`, `set` / `update` / `updateFromList` / `delete`,
-  `collection.add`, `firestore.batch()`, `runTransaction` (with `TransactionOptions`; read-only
+- **What it has:** `ref.get()`, `set` / `update` / `delete`,
+  `collection.add`, `firestore.batch()`, `runTransaction` (with `maxAttempts` and `readOnly`; read-only
   transactions with `Transaction.getQuery` and `getAggregate`), queries
   with `where` (named arguments or `Filter`), `orderBy`, `limit`, `limitToLast`, cursors and
   collection groups, `count()` / `aggregate` / `aggregateWithAliases`, `withConverter`,
@@ -86,11 +86,10 @@ to use both in one file, import one with a prefix. The value types (`Timestamp`,
   `mockUserToken`, Firebase Auth and App Check tokens of the `FirebaseApp`.
 - **What it does not have:** snapshot streams, `Source`, snapshot metadata
   (`hasPendingWrites`, `isFromCache`), persistence and cache settings, bundles, offline
-  behaviour of any kind, vector queries (`findNearest`), pipelines, and the
-  `whereEqualTo(...)`-style query methods (use `where`).
+  behaviour of any kind, vector queries (`findNearest`) and pipelines.
 
 Differences from the main library that are not just missing features:
-`Firestore.instanceFor` is synchronous; `FirestoreDataConverter.fromFirestore` takes only the
+`FirebaseFirestore.instanceFor` is synchronous; `FirestoreDataConverter.fromFirestore` takes only the
 snapshot (a `QueryDocumentSnapshot`, there are no snapshot options); `DocumentReference.parent`
 keeps the converter of the reference, as in the JS SDK; `firestore.doc('')` throws; two
 `AggregateQuerySnapshot`s are equal when they hold the same results under the same names, in

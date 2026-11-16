@@ -70,7 +70,7 @@ void main() {
   BundleMetadata createMetadata(int documents) =>
       BundleMetadata('bundle-1', 1, createTime, documents, 10);
 
-  void assertProgress(LoadBundleTaskProgress? progress, int documentsLoaded,
+  void assertProgress(LoadBundleTaskSnapshot? progress, int documentsLoaded,
       int totalDocuments, int bytesLoaded, int totalBytes) {
     expect(progress, isNotNull);
     expect(progress!.documentsLoaded, documentsLoaded);
@@ -88,7 +88,7 @@ void main() {
     final BundleLoader bundleLoader =
         BundleLoader(bundleCallback, createMetadata(2));
 
-    LoadBundleTaskProgress? progress = bundleLoader.addElement(
+    LoadBundleTaskSnapshot? progress = bundleLoader.addElement(
         BundledDocumentMetadata(
             key('coll/doc1'), createTime, true, const <String>[]),
         1);
@@ -113,7 +113,7 @@ void main() {
     final BundleLoader bundleLoader =
         BundleLoader(bundleCallback, createMetadata(1));
 
-    final LoadBundleTaskProgress? progress = bundleLoader.addElement(
+    final LoadBundleTaskSnapshot? progress = bundleLoader.addElement(
         BundledDocumentMetadata(
             key('coll/doc1'), createTime, false, const <String>[]),
         10);

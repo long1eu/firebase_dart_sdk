@@ -9,6 +9,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/field_value.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/firestore_error.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/set_options.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/source.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/get_options.dart';
 import 'package:test/test.dart';
 
 import '../../../util/integration_test_util.dart';
@@ -42,9 +43,9 @@ void main() {
       'array',
       FieldValue.arrayUnion(<int>[1, 2])
     ]));
-    final DocumentSnapshot snapshot = await docRef.get(Source.cache);
+    final DocumentSnapshot snapshot = await docRef.get(GetOptions(source: Source.cache));
     expect(
-        snapshot.data,
+        snapshot.data(),
         map<List<int>>(<dynamic>[
           'array',
           <int>[1, 2]
@@ -56,7 +57,7 @@ void main() {
     // stored in our cache.
     await (await testFirestore(newTestSettings(),
             'integration/array_transforms_updateWithNoCachedBaseDoc.db'))
-        .document(docRef.path)
+        .doc(docRef.path)
         .set(map(<dynamic>[
           'array',
           <int>[42]
@@ -69,9 +70,9 @@ void main() {
 
     // Nothing should be cached since it was an update and we had no base doc.
     try {
-      await docRef.get(Source.cache);
-    } on FirestoreError catch (e) {
-      expect(e.code, FirestoreErrorCode.unavailable);
+      await docRef.get(GetOptions(source: Source.cache));
+    } on FirestoreException catch (e) {
+      expect(e.errorCode, FirestoreErrorCode.unavailable);
     }
   });
 
@@ -80,7 +81,7 @@ void main() {
     // stored in our cache.
     await (await testFirestore(newTestSettings(),
             'integration/array_transforms_mergeSetWithNoCachedBaseDoc.db'))
-        .document(docRef.path)
+        .doc(docRef.path)
         .set(map(<dynamic>[
           'array',
           <int>[42]
@@ -91,12 +92,12 @@ void main() {
           'array',
           FieldValue.arrayUnion(<int>[1, 2])
         ]),
-        SetOptions.mergeAllFields);
+        const SetOptions(merge: true));
 
     // Document will be cached but we'll be missing 42.
-    final DocumentSnapshot snapshot = await docRef.get(Source.cache);
+    final DocumentSnapshot snapshot = await docRef.get(GetOptions(source: Source.cache));
     expect(
-        snapshot.data,
+        snapshot.data(),
         map<List<int>>(<dynamic>[
           'array',
           <int>[1, 2]
@@ -112,9 +113,9 @@ void main() {
       'array',
       FieldValue.arrayUnion(<int>[1, 2])
     ]));
-    final DocumentSnapshot snapshot = await docRef.get(Source.cache);
+    final DocumentSnapshot snapshot = await docRef.get(GetOptions(source: Source.cache));
     expect(
-        snapshot.data,
+        snapshot.data(),
         map<List<int>>(<dynamic>[
           'array',
           <int>[42, 1, 2]
@@ -131,9 +132,9 @@ void main() {
       FieldValue.arrayRemove(<int>[1, 2])
     ]));
 
-    final DocumentSnapshot snapshot = await docRef.get(Source.cache);
+    final DocumentSnapshot snapshot = await docRef.get(GetOptions(source: Source.cache));
     expect(
-        snapshot.data,
+        snapshot.data(),
         map<List<int>>(<dynamic>[
           'array',
           <int>[42]

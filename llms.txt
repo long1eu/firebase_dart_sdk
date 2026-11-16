@@ -20,6 +20,7 @@ public API of the main library is the golden listing linked below.
 - [Repository README](https://raw.githubusercontent.com/long1eu/firebase_dart_sdk/main/README.md): what the client does, its status, the packages
 - [Coming from FlutterFire](https://raw.githubusercontent.com/long1eu/firebase_dart_sdk/main/docs/guides/migrating_from_flutterfire.md): when to use this client instead of `cloud_firestore`, setup differences, the API side by side
 - [Features and limits](https://raw.githubusercontent.com/long1eu/firebase_dart_sdk/main/docs/guides/features.md): what is done, what is not, known gaps
+- [Migrating from 0.1 to 0.2](https://raw.githubusercontent.com/long1eu/firebase_dart_sdk/main/docs/api_migration_0_2.md): every renamed, reshaped, removed and added member, with its FlutterFire equivalent
 
 ## Guides
 
@@ -42,6 +43,9 @@ public API of the main library is the golden listing linked below.
 - [cloud_firestore_dart README](https://raw.githubusercontent.com/long1eu/firebase_dart_sdk/main/cloud_firestore/cloud_firestore_dart/README.md): the Firestore client
 - [firebase_app_dart README](https://raw.githubusercontent.com/long1eu/firebase_dart_sdk/main/firebase_core/firebase_app_dart/README.md): `FirebaseApp` and `FirebaseOptions`
 - [firebase_auth_providers_dart README](https://raw.githubusercontent.com/long1eu/firebase_dart_sdk/main/firebase_auth/firebase_auth_providers_dart/README.md): Firebase Auth sign-in over REST, service accounts, Application Default Credentials
+- [cloud_firestore_dart_sqlite README](https://raw.githubusercontent.com/long1eu/firebase_dart_sdk/main/cloud_firestore/cloud_firestore_dart_sqlite/README.md): the SQLite offline cache (`sqliteOpener`) for the VM, Flutter and the browser
+- [cloud_firestore_dart_platform README](https://raw.githubusercontent.com/long1eu/firebase_dart_sdk/main/cloud_firestore/cloud_firestore_dart_platform/README.md): the official `cloud_firestore` API with `cloud_firestore_dart` underneath
+- [cloud_firestore_dart_flutterfire README](https://raw.githubusercontent.com/long1eu/firebase_dart_sdk/main/cloud_firestore/cloud_firestore_dart_flutterfire/README.md): the FlutterFire app options and `firebase_auth` user for `cloud_firestore_dart`
 
 ## Examples
 
@@ -54,7 +58,7 @@ public API of the main library is the golden listing linked below.
 - [converters.dart](https://raw.githubusercontent.com/long1eu/firebase_dart_sdk/main/cloud_firestore/cloud_firestore_dart/example/converters.dart): typed data with `withConverter`
 - [transactions_and_batches.dart](https://raw.githubusercontent.com/long1eu/firebase_dart_sdk/main/cloud_firestore/cloud_firestore_dart/example/transactions_and_batches.dart): batches, read-write and read-only transactions
 - [offline_persistence.dart](https://raw.githubusercontent.com/long1eu/firebase_dart_sdk/main/cloud_firestore/cloud_firestore_dart/example/offline_persistence.dart): a SQLite cache on disk, offline reads and writes
-- [sqlite_database.dart](https://raw.githubusercontent.com/long1eu/firebase_dart_sdk/main/cloud_firestore/cloud_firestore_dart/example/sqlite_database.dart): the SQLite opener to copy into an app (VM and Flutter; needs `sqlite3` 2.x)
+- [cloud_firestore_dart_sqlite example](https://raw.githubusercontent.com/long1eu/firebase_dart_sdk/main/cloud_firestore/cloud_firestore_dart_sqlite/example/main.dart): a SQLite cache on disk, written, reopened and read offline
 - [lifecycle.dart](https://raw.githubusercontent.com/long1eu/firebase_dart_sdk/main/cloud_firestore/cloud_firestore_dart/example/lifecycle.dart): log level, `waitForPendingWrites`, `terminate`, `clearPersistence`
 - [Example apps](https://raw.githubusercontent.com/long1eu/firebase_dart_sdk/main/examples/README.md): a `shelf` HTTP server, a command line tool and a Cloud Run job, each a complete package
 - [firestore_from_env.dart](https://raw.githubusercontent.com/long1eu/firebase_dart_sdk/main/examples/cli/lib/firestore_from_env.dart): one instance from the environment, the emulator or Application Default Credentials

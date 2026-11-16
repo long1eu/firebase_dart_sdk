@@ -66,22 +66,31 @@ void main() {
   });
 
   test('fromMillis and toMillis round trip, including negative values', () {
-    expect(Timestamp.fromMillis(22501), const Timestamp(22, 501000000));
-    expect(Timestamp.fromMillis(-1250), const Timestamp(-2, 750000000));
-    expect(Timestamp.fromMillis(-1000), const Timestamp(-1, 0));
-    expect(Timestamp.fromMillis(0), const Timestamp(0, 0));
+    expect(
+      Timestamp.fromMillisecondsSinceEpoch(22501),
+      const Timestamp(22, 501000000),
+    );
+    expect(
+      Timestamp.fromMillisecondsSinceEpoch(-1250),
+      const Timestamp(-2, 750000000),
+    );
+    expect(Timestamp.fromMillisecondsSinceEpoch(-1000), const Timestamp(-1, 0));
+    expect(Timestamp.fromMillisecondsSinceEpoch(0), const Timestamp(0, 0));
     for (final int millis in <int>[0, 1, -1, 22501, -1250, 1700000000123]) {
-      expect(Timestamp.fromMillis(millis).toMillis(), millis);
+      expect(
+        Timestamp.fromMillisecondsSinceEpoch(millis).millisecondsSinceEpoch,
+        millis,
+      );
     }
     expect(
-      Timestamp.fromMillis(1700000000123),
+      Timestamp.fromMillisecondsSinceEpoch(1700000000123),
       Timestamp.fromDate(DateTime.fromMillisecondsSinceEpoch(1700000000123)),
     );
   });
 
   test('toMillis truncates sub-millisecond precision toward the past', () {
-    expect(const Timestamp(1, 999999).toMillis(), 1000);
-    expect(const Timestamp(-1, 999999).toMillis(), -1000);
+    expect(const Timestamp(1, 999999).millisecondsSinceEpoch, 1000);
+    expect(const Timestamp(-1, 999999).millisecondsSinceEpoch, -1000);
     // toDate keeps the microseconds (it used to truncate to milliseconds).
     expect(
       const Timestamp(-1, 999999).toDate(),
@@ -92,11 +101,11 @@ void main() {
 
   test('fromMillis rejects out-of-range values', () {
     expect(
-      () => Timestamp.fromMillis(-70000000000000),
+      () => Timestamp.fromMillisecondsSinceEpoch(-70000000000000),
       throwsA(isA<ArgumentError>()),
     );
     expect(
-      () => Timestamp.fromMillis(300000000000000),
+      () => Timestamp.fromMillisecondsSinceEpoch(300000000000000),
       throwsA(isA<ArgumentError>()),
     );
   });
@@ -193,9 +202,12 @@ void main() {
   test('fromDate and toDate are unchanged for millisecond inputs', () {
     for (final int millis in <int>[0, 1, -1, 22501, -1250, 1700000000123]) {
       final DateTime date = DateTime.fromMillisecondsSinceEpoch(millis);
-      expect(Timestamp.fromDate(date), Timestamp.fromMillis(millis));
-      expect(Timestamp.fromMillis(millis).toDate(), date);
-      expect(Timestamp.fromDate(date).toMillis(), millis);
+      expect(
+        Timestamp.fromDate(date),
+        Timestamp.fromMillisecondsSinceEpoch(millis),
+      );
+      expect(Timestamp.fromMillisecondsSinceEpoch(millis).toDate(), date);
+      expect(Timestamp.fromDate(date).millisecondsSinceEpoch, millis);
     }
   });
 

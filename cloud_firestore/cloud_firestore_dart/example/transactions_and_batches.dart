@@ -7,7 +7,7 @@ import 'package:cloud_firestore_dart/cloud_firestore_dart.dart';
 import 'common.dart';
 
 Future<void> main() async {
-  final Firestore firestore = connect();
+  final FirebaseFirestore firestore = connect();
   final CollectionReference<Map<String, Object?>> accounts = firestore
       .collection(scratch('accounts'));
   final DocumentReference<Map<String, Object?>> ada = accounts.doc('ada');
@@ -38,8 +38,8 @@ Future<void> main() async {
     final DocumentSnapshot<Map<String, Object?>> to = await transaction.get(
       alan,
     );
-    final int fromBalance = from.data!['balance']! as int;
-    final int toBalance = to.data!['balance']! as int;
+    final int fromBalance = from.data()!['balance']! as int;
+    final int toBalance = to.data()!['balance']! as int;
     const int amount = 30;
     if (fromBalance < amount) {
       // Throwing aborts the transaction; nothing is written.
@@ -57,7 +57,7 @@ Future<void> main() async {
     await firestore.runTransaction<void>((Transaction transaction) async {
       await transaction.get(ada);
       throw StateError('Changed my mind');
-    }, options: TransactionOptions(maxAttempts: 1));
+    }, maxAttempts: 1);
   } on StateError catch (e) {
     print('aborted: ${e.message}');
   }
@@ -67,10 +67,10 @@ Future<void> main() async {
   final int total = await firestore.runTransaction<int>((
     Transaction transaction,
   ) async {
-    final int a = (await transaction.get(ada)).data!['balance']! as int;
-    final int b = (await transaction.get(alan)).data!['balance']! as int;
+    final int a = (await transaction.get(ada)).data()!['balance']! as int;
+    final int b = (await transaction.get(alan)).data()!['balance']! as int;
     return a + b;
-  }, options: TransactionOptions(readOnly: true));
+  }, readOnly: true);
   print('total: $total');
 
   await firestore.terminate();

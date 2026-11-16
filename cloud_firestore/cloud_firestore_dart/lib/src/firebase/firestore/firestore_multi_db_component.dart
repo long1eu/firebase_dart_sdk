@@ -19,8 +19,9 @@ class FirestoreMultiDbComponent {
     this.appCheckProvider,
   });
 
-  /// A static map from instance key (see [keyFor]) to [Firestore] instances.
-  static final Map<String, Firestore> instances = <String, Firestore>{};
+  /// A static map from instance key (see [keyFor]) to [FirebaseFirestore] instances.
+  static final Map<String, FirebaseFirestore> instances =
+      <String, FirebaseFirestore>{};
 
   /// Deleting a [FirebaseApp] shuts down the instances created for it.
   static final Map<String, StreamSubscription<String>> _deleteSubscriptions =
@@ -31,14 +32,18 @@ class FirestoreMultiDbComponent {
 
   /// Makes [firestore] the instance returned for [app] and [database], and
   /// releases it again when [app] is deleted.
-  static void register(FirebaseApp app, String database, Firestore firestore) {
+  static void register(
+    FirebaseApp app,
+    String database,
+    FirebaseFirestore firestore,
+  ) {
     final String key = keyFor(app.name, database);
     instances[key] = firestore;
     _deleteSubscriptions.remove(key)?.cancel();
     _deleteSubscriptions[key] = app.onDeleteApp.listen((_) {
       if (identical(instances[key], firestore)) {
         // Nobody awaits this: report a failure instead of raising an unhandled error.
-        firestore.shutdown().catchError((Object e) {
+        firestore.terminate().catchError((Object e) {
           Log.w(
             'FirebaseFirestore',
             'Shutting down the instance of the deleted app failed: $e',
@@ -56,7 +61,8 @@ class FirestoreMultiDbComponent {
 
   /// Forgets [firestore] (called when it is shut down), so the next
   /// `getInstance` builds a fresh one.
-  static void deregister(Firestore firestore) {
+  /// Removes [firestore] from the registry and returns the keys it was registered under.
+  static List<String> deregister(FirebaseFirestore firestore) {
     final List<String> keys = instances.keys
         .where((String key) => identical(instances[key], firestore))
         .toList();
@@ -64,16 +70,44 @@ class FirestoreMultiDbComponent {
       instances.remove(key);
       _deleteSubscriptions.remove(key)?.cancel();
     }
+    return keys;
   }
+
+  /// The shutdowns in progress of terminated instances, by key: a new instance with the same key starts after it.
+  static final Map<String, Future<void>> _closing = <String, Future<void>>{};
+
+  /// Records that the instance registered under [keys] closes its cache when [shutdown] completes.
+  static void recordClosing(List<String> keys, Future<void> shutdown) {
+    final Future<void> done = shutdown.then<void>(
+      (_) {},
+      onError: (Object _) {},
+    );
+    for (final String key in keys) {
+      final Future<void>? previous = _closing[key];
+      final Future<void> both = previous == null
+          ? done
+          : Future.wait(<Future<void>>[previous, done]).then<void>((_) {});
+      _closing[key] = both;
+      both.then<void>((_) {
+        if (identical(_closing[key], both)) {
+          _closing.remove(key);
+        }
+      });
+    }
+  }
+
+  /// The shutdown in progress of a terminated instance of [appName] and [database], if any.
+  static Future<void>? closing(String appName, String database) =>
+      _closing[keyFor(appName, database)];
 
   final FirebaseApp app;
 
-  final InternalTokenProvider authProvider;
+  final AuthTokenProvider authProvider;
 
-  final FirestoreSettings? settings;
+  final Settings? settings;
 
   /// Source of App Check tokens; null sends no App Check header.
-  final InternalAppCheckTokenProvider? appCheckProvider;
+  final AppCheckTokenProvider? appCheckProvider;
 
   /// Provides the instance of Firestore for the given database name, creating
   /// it on first use. Later calls return the same instance until it is shut
@@ -81,14 +115,14 @@ class FirestoreMultiDbComponent {
   /// like `initializeFirestore` with different options in the JS SDK and
   /// `setFirestoreSettings` after the start on Android. [openDatabase] only
   /// applies to the first call.
-  Firestore get(String databaseName, OpenDatabase? openDatabase) {
+  FirebaseFirestore get(String databaseName, OpenDatabase? openDatabase) {
     final String key = keyFor(app.name, databaseName);
-    final Firestore? existing = instances[key];
-    if (existing != null && identical(existing.firebaseApp, app)) {
-      final FirestoreSettings? requested = settings;
+    final FirebaseFirestore? existing = instances[key];
+    if (existing != null && identical(existing.app, app)) {
+      final Settings? requested = settings;
       if (requested != null && requested != existing.settings) {
         throw StateError(
-          'Firestore.instanceFor() has already been called with different '
+          'FirebaseFirestore.instanceFor() has already been called with different '
           'settings for this app and database. Call it without settings to '
           'get the existing instance, or terminate() that instance first.',
         );

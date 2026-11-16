@@ -32,7 +32,10 @@ class _FailingFillRemoteStore extends Fake implements RemoteStore {
 
   @override
   Future<void> fillWritePipeline() async {
-    throw FirestoreError('fill failed', FirestoreErrorCode.failedPrecondition);
+    throw FirestoreException(
+      message: 'fill failed',
+      errorCode: FirestoreErrorCode.failedPrecondition,
+    );
   }
 
   @override
@@ -94,7 +97,7 @@ void main() {
     () async {
       final Completer<void> task = await write();
       expect(task.isCompleted, isTrue);
-      await expectLater(task.future, throwsA(isA<FirestoreError>()));
+      await expectLater(task.future, throwsA(isA<FirestoreException>()));
 
       final MutationBatch batch = await nextBatch();
       await syncEngine.handleSuccessfulWrite(

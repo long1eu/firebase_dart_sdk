@@ -28,19 +28,19 @@ Future<void> main() async {
   final FirebaseApp app = FirebaseApp.withOptions(
     const FirebaseOptions(
       apiKey: '', // an empty key is not sent
-      applicationId: '1:1234567890:dart:server',
+      appId: '1:1234567890:dart:server',
       projectId: 'my-project',
     ),
   );
   // Before the instance is created: the instance reads the provider of the app once.
   app.authProvider = applicationDefaultCredentials();
   // No openDatabase: the cache is in memory.
-  final Firestore firestore = Firestore.instanceFor(app: app);
+  final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(app: app);
 
   final StreamSubscription<QuerySnapshot<Map<String, Object?>>> listener = firestore
       .collection('jobs')
       .where('status', isEqualTo: 'pending')
-      .snapshots
+      .snapshots()
       .listen((QuerySnapshot<Map<String, Object?>> snapshot) {
         print('${snapshot.length} pending jobs');
       });
@@ -67,7 +67,7 @@ The rest of this page explains each choice.
 
 ## Credentials
 
-The token provider belongs to the `FirebaseApp` and must be set before `Firestore.instanceFor`.
+The token provider belongs to the `FirebaseApp` and must be set before `FirebaseFirestore.instanceFor`.
 The providers are in
 [`firebase_auth_providers_dart`](../../firebase_auth/firebase_auth_providers_dart/README.md);
 [Authentication and App Check](authentication.md) explains how each one works. Which one to use
@@ -75,7 +75,7 @@ where:
 
 | Where the program runs | Use | How it gets a token |
 | --- | --- | --- |
-| Against the Firestore emulator | no provider, `FirestoreSettings().withEmulator(host, port)` | none: the requests carry no credentials |
+| Against the Firestore emulator | no provider, `Settings().withEmulator(host, port)` | none: the requests carry no credentials |
 | Your machine | `applicationDefaultCredentials()` | the credentials of `gcloud auth application-default login` |
 | Cloud Run, Compute Engine, GKE | `applicationDefaultCredentials()` | the metadata server, as the service account of the service, job or VM |
 | Elsewhere, with a key file | `applicationDefaultCredentials()` with `GOOGLE_APPLICATION_CREDENTIALS=/path/key.json`, or `OAuthTokenProvider.serviceAccount(json)` | the key signs a short-lived assertion that is exchanged for an access token |
@@ -116,12 +116,12 @@ final String? emulator = Platform.environment['FIRESTORE_EMULATOR_HOST']; // hos
 final FirebaseApp serverApp = FirebaseApp.withOptions(
   FirebaseOptions(
     apiKey: '',
-    applicationId: '1:1234567890:dart:server',
+    appId: '1:1234567890:dart:server',
     projectId: emulator == null ? 'my-project' : 'demo-my-project',
   ),
   name: 'server',
 );
-FirestoreSettings settings = FirestoreSettings();
+Settings settings = Settings();
 if (emulator != null) {
   final int colon = emulator.lastIndexOf(':');
   settings = settings.withEmulator(
@@ -131,7 +131,7 @@ if (emulator != null) {
 } else {
   serverApp.authProvider = applicationDefaultCredentials();
 }
-final Firestore db = Firestore.instanceFor(app: serverApp, settings: settings);
+final FirebaseFirestore db = FirebaseFirestore.instanceFor(app: serverApp, settings: settings);
 ```
 
 The package does not read `FIRESTORE_EMULATOR_HOST` by itself. The examples carry a fuller
@@ -156,7 +156,7 @@ the package):
 - `Authorization: Bearer <token>`: the OAuth 2.0 access token of the provider. Without a
   provider, or when the provider has no token, there is no `Authorization` header.
 - `x-goog-api-key`: the `apiKey` of the `FirebaseOptions`, only when it is not empty.
-- `x-firebase-gmpid`: the `applicationId` of the `FirebaseOptions`.
+- `x-firebase-gmpid`: the `appId` of the `FirebaseOptions`.
 - `x-firebase-appcheck`: only when the app has an App Check provider.
 - `x-goog-api-client`, `google-cloud-resource-prefix` and `x-goog-request-params`: the client
   version and the database.
@@ -172,7 +172,7 @@ sequenceDiagram
   participant prov as OAuthTokenProvider
   participant source as Credentials source
   participant be as Firestore backend
-  handler->>fs: doc.get(Source.server)
+  handler->>fs: doc.get(GetOptions(source: Source.server))
   fs->>prov: getAccessToken()
   alt no token yet, or it expires within 5 minutes
     prov->>source: key file, gcloud or metadata server
@@ -208,7 +208,7 @@ What the existing documentation establishes about the identity:
 
 Create the `Firestore` instance once, at startup, and pass it to the code that needs it:
 
-- `Firestore.instanceFor` returns the same instance for the same app name and database until
+- `FirebaseFirestore.instanceFor` returns the same instance for the same app name and database until
   it is terminated. A second call with different settings throws a `StateError`.
 - `instanceFor` returns at once; the instance opens its cache and connects in the background,
   and every operation waits for that. Creating it at startup moves that work out of the first
@@ -245,7 +245,7 @@ Without an `openDatabase` the cache is in memory. On a server it is usually the 
   loads the system's `libsqlite3`) and one process per file. Several replicas of a service, or
   several workers on one host, must not share a cache file.
 - **Fresher reads.** A server should usually answer from the backend. Read with
-  `get(Source.server)` when a response must not come from the cache;
+  `get(const GetOptions(source: Source.server))` when a response must not come from the cache;
   [`examples/server_shelf`](../../examples/server_shelf/) does that for every read.
 
 What you give up: writes that were not acknowledged when the process ends are lost (see
@@ -256,7 +256,7 @@ work offline, or a long-lived process on one machine with a disk of its own; see
 
 ## Listeners in a long-running worker
 
-A listener (`snapshots` on a query or a document) is a change stream: it delivers the current
+A listener (`snapshots()` on a query or a document) is a change stream: it delivers the current
 result, then a new snapshot whenever the result changes, and `docChanges` says what changed.
 In a worker that reacts to new documents, a listener replaces polling.
 
@@ -281,14 +281,14 @@ In a worker that reacts to new documents, a listener replaces polling.
 - **An error ends the listener.** `permission-denied`, a query that needs an index you have not
   created (`failed-precondition`) and similar errors arrive on the stream's `onError`, and the
   stream is done. Log the error and decide: stop the process, or listen again after a delay.
-- **Metadata changes.** `snapshots` does not emit a snapshot when only the metadata changes
+- **Metadata changes.** `snapshots()` does not emit a snapshot when only the metadata changes
   (for example `isFromCache` going from `true` to `false`). Use
-  `getSnapshots(MetadataChanges.include)` to see those.
+  `snapshots(includeMetadataChanges: true)` to see those.
 
 ## Transactions on the server
 
 Transactions work as in the client SDKs (optimistic, run again on conflict, up to
-`TransactionOptions.maxAttempts`, 5 by default); [Transactions and the
+`maxAttempts`, 5 by default); [Transactions and the
 lifecycle](transactions_and_lifecycle.md) has the details. On a server, three points matter
 more:
 
@@ -300,7 +300,7 @@ more:
   from a failed commit and runs the callback again. Make the transaction idempotent: write a
   value that identifies the attempt (an operation id) and check for it in the callback. The
   worker example writes a random claim id and, when it finds its own id, keeps the job.
-- **Read-only transactions** (`TransactionOptions(readOnly: true)`) read several documents,
+- **Read-only transactions** (`readOnly: true`) read several documents,
   queries (`getQuery`) and aggregations (`getAggregate`) at one point in time, with no locks and
   no conflicts, and can read the database as it was at an earlier time (`readTime`). They suit
   reports and exports that must be consistent. They always go to the backend.
@@ -349,8 +349,8 @@ await for (final HttpRequest request in server) {
         await firestore.collection('tasks').doc(id.isEmpty ? 'none' : id).get();
     request.response
       ..statusCode = task.exists ? HttpStatus.ok : HttpStatus.notFound
-      ..write(jsonEncode(task.data ?? <String, Object?>{}));
-  } on FirestoreError catch (error) {
+      ..write(jsonEncode(task.data() ?? <String, Object?>{}));
+  } on FirestoreException catch (error) {
     request.response
       ..statusCode = HttpStatus.serviceUnavailable
       ..write('${error.code}');
@@ -416,11 +416,12 @@ ENTRYPOINT ["/app/worker"]
 - **No key in the image.** Use the metadata server (the service account of the service or job)
   and pass the project and other settings as environment variables.
 - **SQLite only with a persistent cache.** With the memory cache the binary needs nothing
-  beyond `/runtime/`. A persistent cache needs the native `libsqlite3` in the image, which
-  `scratch` does not have: start from a distribution image that has it (on Debian, the
-  `libsqlite3-0` package). On Linux, `package:sqlite3` looks for `libsqlite3.so`; the example
-  opener (`example/sqlite_database.dart`) falls back to `libsqlite3.so.0`. This has not been
-  tried in a container.
+  beyond `/runtime/`. A persistent cache needs a native SQLite library. With
+  `cloud_firestore_dart_sqlite` and `sqlite3` 3.x, `dart build cli` puts the bundled
+  `libsqlite3.so` in `bundle/lib/` next to the program: copy the whole bundle into the image.
+  `dart compile exe` does not, and the program then needs the system library, which `scratch`
+  does not have (on Debian, the `libsqlite3-0` package; with `sqlite3` 2.x see the override in
+  the README of `cloud_firestore_dart_sqlite`). None of this has been tried in a container.
 - **Neither Dockerfile has been built.** The one in `examples/cloud_run_job` follows the
   documented use of the official `dart` image; the sketch above follows it too.
 
@@ -430,7 +431,7 @@ What the first request of a new process pays for, and what helps:
 
 - **Starting the program.** A binary from `dart compile exe` starts without compiling;
   `dart run` compiles the program first.
-- **The instance.** `Firestore.instanceFor` returns at once and opens the cache and the
+- **The instance.** `FirebaseFirestore.instanceFor` returns at once and opens the cache and the
   connection in the background. Create it at startup, before the first request arrives.
 - **The first token.** `applicationDefaultCredentials()` looks up the credentials; the first access
   token is fetched when the provider is assigned to `app.authProvider` (on Cloud Run, from the

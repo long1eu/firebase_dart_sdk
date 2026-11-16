@@ -5,13 +5,16 @@ packages, read [docs/guides/for_ai_agents.md](docs/guides/for_ai_agents.md) inst
 
 ## Layout
 
-Maintained, tested and published (version 0.1.1, Dart `^3.8.0`):
+Maintained, tested and published (version 0.2.0, Dart `^3.8.0`):
 
 | Package | Path |
 |---|---|
 | `cloud_firestore_dart` | `cloud_firestore/cloud_firestore_dart` |
 | `firebase_app_dart` | `firebase_core/firebase_app_dart` |
 | `firebase_auth_providers_dart` | `firebase_auth/firebase_auth_providers_dart` |
+| `cloud_firestore_dart_sqlite` (0.1.0) | `cloud_firestore/cloud_firestore_dart_sqlite` |
+| `cloud_firestore_dart_flutterfire` (0.1.0, Flutter) | `cloud_firestore/cloud_firestore_dart_flutterfire` |
+| `cloud_firestore_dart_platform` (0.1.0, Flutter) | `cloud_firestore/cloud_firestore_dart_platform` |
 
 - `examples/`: complete example packages (`server_shelf`, `cli`, `cloud_run_job`).
 - `docs/`: guides (`docs/guides/`), parity, support policy, how we test, upstream sync records.

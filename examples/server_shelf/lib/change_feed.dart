@@ -12,7 +12,7 @@ import 'package:cloud_firestore_dart/cloud_firestore_dart.dart';
 /// clients.
 class ChangeFeed {
   ChangeFeed(Query<Map<String, Object?>> query) {
-    _subscription = query.snapshots.listen(
+    _subscription = query.snapshots().listen(
       _onSnapshot,
       onError: (Object error) {
         // The listener ended (for example permission-denied): the subscribers
@@ -72,12 +72,12 @@ class ChangeFeed {
   void _onSnapshot(QuerySnapshot<Map<String, Object?>> snapshot) {
     for (final DocumentChange<Map<String, Object?>> change
         in snapshot.docChanges) {
-      final String id = change.document.id;
+      final String id = change.doc.id;
       // A server timestamp that the backend has not filled in yet (a write of
       // this server, before its acknowledgement) is sent as the local
       // estimate; a `modified` event with the real value follows.
       final Map<String, Object?> data = toJson(
-        change.document.getData(ServerTimestampBehavior.estimate),
+        change.doc.data(serverTimestamps: ServerTimestampBehavior.estimate),
       );
       if (change.type == DocumentChangeType.removed) {
         _current.remove(id);

@@ -33,9 +33,9 @@ OpenDatabase failingOpener(Completer<void> opening, Duration delay) {
       opening.complete();
     }
     await Future<void>.delayed(delay);
-    throw FirestoreError(
-      'The cache is open in another tab.',
-      FirestoreErrorCode.failedPrecondition,
+    throw FirestoreException(
+      message: 'The cache is open in another tab.',
+      errorCode: FirestoreErrorCode.failedPrecondition,
     );
   };
 }
@@ -48,7 +48,7 @@ void main() {
     final FirebaseApp app = newApp('init-error-${const Uuid().v4()}');
     addTearDown(app.delete);
     final Completer<void> opening = Completer<void>();
-    final Firestore firestore = Firestore.instanceFor(
+    final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(
       app: app,
       settings: offlineSettings,
       openDatabase: failingOpener(opening, const Duration(milliseconds: 100)),
@@ -58,10 +58,10 @@ void main() {
 
     // Queued behind the initialization, which is still opening the cache.
     final List<Future<Object?>> operations = <Future<Object?>>[
-      firestore.getNamedQuery('none'),
-      firestore.doc('col/doc').get(Source.cache),
-      firestore.collection('col').get(Source.cache),
-      firestore.getNamedQuery('none'),
+      firestore.namedQuery('none'),
+      firestore.doc('col/doc').get(GetOptions(source: Source.cache)),
+      firestore.collection('col').get(GetOptions(source: Source.cache)),
+      firestore.namedQuery('none'),
     ];
     for (final Future<Object?> operation in operations) {
       await expectLater(
@@ -71,7 +71,7 @@ void main() {
     }
     // And the operations requested afterwards.
     await expectLater(
-      firestore.getNamedQuery('none'),
+      firestore.namedQuery('none'),
       throwsA(firestoreErrorWithCode(FirestoreErrorCode.failedPrecondition)),
     );
   });
@@ -80,19 +80,19 @@ void main() {
       'terminate, create again', () async {
     final FirebaseApp app = newApp('fallback-${const Uuid().v4()}');
     addTearDown(app.delete);
-    final Firestore persistent = Firestore.instanceFor(
+    final FirebaseFirestore persistent = FirebaseFirestore.instanceFor(
       app: app,
       settings: offlineSettings,
       openDatabase: failingOpener(Completer<void>(), Duration.zero),
     );
-    Firestore firestore;
+    FirebaseFirestore firestore;
     try {
-      await persistent.getNamedQuery('openWithMemoryFallback');
+      await persistent.namedQuery('openWithMemoryFallback');
       fail('the cache opened');
-    } on FirestoreError catch (e) {
-      expect(e.code, FirestoreErrorCode.failedPrecondition);
+    } on FirestoreException catch (e) {
+      expect(e.errorCode, FirestoreErrorCode.failedPrecondition);
       await persistent.terminate();
-      firestore = Firestore.instanceFor(
+      firestore = FirebaseFirestore.instanceFor(
         app: app,
         settings: offlineSettings.copyWith(
           cacheSettings: const MemoryCacheSettings(),
@@ -101,6 +101,6 @@ void main() {
     }
     addTearDown(firestore.terminate);
     expect(firestore, isNot(same(persistent)));
-    expect(await firestore.getNamedQuery('none'), isNull);
+    expect(await firestore.namedQuery('none'), isNull);
   });
 }

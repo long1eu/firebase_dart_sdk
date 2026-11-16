@@ -10,9 +10,9 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/collection_reference
 import 'package:cloud_firestore_dart/src/firebase/firestore/document_reference.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/document_snapshot.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/field_path.dart';
-import 'package:cloud_firestore_dart/src/firebase/firestore/field_value.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/geo_point.dart';
 import 'package:cloud_firestore_dart/src/firebase/timestamp.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/vector_value.dart';
 import 'package:test/test.dart';
 
 import '../../../util/integration_test_util.dart';
@@ -34,11 +34,11 @@ void main() {
   ) async {
     await documentReference.set(data);
     final DocumentSnapshot doc = await documentReference.get();
-    expect(doc.data, data);
+    expect(doc.data(), data);
   }
 
   Future<DocumentReference> testDoc() async {
-    return (await testCollection()).document();
+    return (await testCollection()).doc();
   }
 
   test('testCanReadAndWriteNullFields', () async {
@@ -58,7 +58,7 @@ void main() {
     // NaN != NaN, so it is checked on its own.
     final DocumentReference doc = await testDoc();
     await doc.set(<String, Object?>{'b': double.nan});
-    expect((await doc.get()).getDouble('b')!.isNaN, isTrue);
+    expect(((await doc.get()).get('b') as num?)?.toDouble().isNaN, isTrue);
   });
 
   test('testCanReadAndWriteListFields', () async {
@@ -143,27 +143,27 @@ void main() {
     await doc.set(data);
     final DocumentSnapshot snapshot = await doc.get();
     expect(snapshot['null'], data['null']);
+    expect(snapshot.get(FieldPath.fromString('null')), data['null']);
+    expect(snapshot.get('boolean') as bool?, data['boolean']);
+    expect(snapshot.get('string') as String?, data['string']);
+    expect((snapshot.get('double') as num?)?.toDouble(), data['double']);
+    expect((snapshot.get('int') as num?)?.toDouble(), 1.0);
+    expect(snapshot.get('geoPoint') as GeoPoint?, data['geoPoint']);
+    expect(snapshot.get('blob') as Blob?, data['blob']);
     expect(
-      snapshot.getField(FieldPath.fromDotSeparatedPath('null')),
-      data['null'],
-    );
-    expect(snapshot.getBool('boolean'), data['boolean']);
-    expect(snapshot.getString('string'), data['string']);
-    expect(snapshot.getDouble('double'), data['double']);
-    expect(snapshot.getDouble('int'), 1.0);
-    expect(snapshot.getGeoPoint('geoPoint'), data['geoPoint']);
-    expect(snapshot.getBlob('blob'), data['blob']);
-    expect(
-      snapshot.getDate('date')!.millisecondsSinceEpoch,
+      (snapshot.get('date') as Timestamp?)?.toDate().millisecondsSinceEpoch,
       (data['date'] as DateTime).millisecondsSinceEpoch,
     );
     expect(
-      snapshot.getTimestamp('date'),
+      snapshot.get('date') as Timestamp?,
       Timestamp.fromDate(data['date'] as DateTime),
     );
-    expect(snapshot.getTimestamp('timestamp'), data['timestamp']);
+    expect(snapshot.get('timestamp') as Timestamp?, data['timestamp']);
     final Timestamp timestamp = data['timestamp']! as Timestamp;
-    expect(snapshot.getDate('timestamp'), timestamp.toDate());
+    expect(
+      (snapshot.get('timestamp') as Timestamp?)?.toDate(),
+      timestamp.toDate(),
+    );
     expect(data['reference'], const TypeMatcher<DocumentReference>());
     expect(doc.path, (data['reference'] as DocumentReference).path);
   });
@@ -175,15 +175,18 @@ void main() {
     await doc.set(data);
     final DocumentSnapshot snapshot = await doc.get();
     expect(snapshot['missing'], isNull);
-    expect(snapshot.getBool('missing'), isNull);
-    expect(snapshot.getString('missing'), isNull);
-    expect(snapshot.getDouble('missing'), isNull);
-    expect(snapshot.getDouble('missing'), isNull);
-    expect(snapshot.getGeoPoint('missing'), isNull);
-    expect(snapshot.getBlob('missing'), isNull);
-    expect(snapshot.getDate('missing'), isNull);
-    expect(snapshot.getTimestamp('missing'), isNull);
-    expect(snapshot.getDocumentReference('missing'), isNull);
+    expect(snapshot.get('missing') as bool?, isNull);
+    expect(snapshot.get('missing') as String?, isNull);
+    expect((snapshot.get('missing') as num?)?.toDouble(), isNull);
+    expect((snapshot.get('missing') as num?)?.toDouble(), isNull);
+    expect(snapshot.get('missing') as GeoPoint?, isNull);
+    expect(snapshot.get('missing') as Blob?, isNull);
+    expect((snapshot.get('missing') as Timestamp?)?.toDate(), isNull);
+    expect(snapshot.get('missing') as Timestamp?, isNull);
+    expect(
+      snapshot.get('missing') as DocumentReference<Map<String, Object?>>?,
+      isNull,
+    );
   });
 
   test('testCanReadAndWriteDocumentReferences', () async {
@@ -204,7 +207,7 @@ void main() {
   test('snapshotListenerSortsDifferentTypesSameAsServer', () async {
     final CollectionReference colRef = await testCollection();
     // The reference is created first to make sure it uses the same Firestore instance.
-    final DocumentReference docRef = colRef.document('testDocRef');
+    final DocumentReference docRef = colRef.doc('testDocRef');
 
     final Map<String, Map<String, Object?>> testDocs =
         <String, Map<String, Object?>>{
@@ -231,7 +234,7 @@ void main() {
             ],
           },
           'vector': <String, Object?>{
-            'value': FieldValue.vector(<double>[1, 2, 3]),
+            'value': VectorValue(<double>[1, 2, 3]),
           },
           'map': <String, Object?>{
             'value': <String, Object?>{'key': true},

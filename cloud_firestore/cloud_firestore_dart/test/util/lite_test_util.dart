@@ -66,11 +66,11 @@ bool useLiteWebTransportIfRequested() {
 }
 
 /// The settings for the emulator of FIRESTORE_EMULATOR_HOST.
-FirestoreSettings liteEmulatorSettings({Object? mockUserToken}) {
+Settings liteEmulatorSettings({Object? mockUserToken}) {
   final EmulatorAddress address = EmulatorAddress.parse(
     TestBackend().emulatorHost!,
   );
-  return FirestoreSettings().withEmulator(
+  return Settings().withEmulator(
     address.host,
     address.port,
     mockUserToken: mockUserToken,
@@ -82,7 +82,7 @@ FirebaseApp newLiteTestApp({String? projectId}) {
   final FirebaseApp app = FirebaseApp.withOptions(
     FirebaseOptions(
       apiKey: 'fake-api-key',
-      applicationId: 'appId',
+      appId: 'appId',
       projectId: projectId ?? FirestoreProvider().projectId,
     ),
     dependencies: null,
@@ -94,9 +94,9 @@ FirebaseApp newLiteTestApp({String? projectId}) {
 
 /// A new Firestore Lite instance with an app of its own, talking to the
 /// emulator. It is terminated when the test ends.
-Firestore newLiteTestFirestore({Object? mockUserToken}) {
+FirebaseFirestore newLiteTestFirestore({Object? mockUserToken}) {
   useLiteWebTransportIfRequested();
-  final Firestore firestore = Firestore.instanceFor(
+  final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(
     app: newLiteTestApp(),
     settings: liteEmulatorSettings(mockUserToken: mockUserToken),
   );
@@ -106,7 +106,7 @@ Firestore newLiteTestFirestore({Object? mockUserToken}) {
 
 /// A reference to a collection no other test uses.
 CollectionReference<Map<String, Object?>> newLiteTestCollection([
-  Firestore? firestore,
+  FirebaseFirestore? firestore,
 ]) {
   return (firestore ?? newLiteTestFirestore()).collection(
     'lite-${const Uuid().v4()}',

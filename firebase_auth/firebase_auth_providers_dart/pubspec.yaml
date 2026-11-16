@@ -3,7 +3,7 @@ description: >-
   Unofficial pure-Dart token providers for firebase_app_dart and
   cloud_firestore_dart: service accounts, Application Default Credentials and
   Firebase Auth user sign-in over REST.
-version: 0.1.1
+version: 0.2.0
 homepage: https://github.com/long1eu/firebase_dart_sdk
 repository: https://github.com/long1eu/firebase_dart_sdk/tree/main/firebase_auth/firebase_auth_providers_dart
 issue_tracker: https://github.com/long1eu/firebase_dart_sdk/issues
@@ -28,7 +28,7 @@ dependencies:
   crypto: ^3.0.3
   # Local development resolves this from ../../firebase_core/firebase_app_dart
   # through pubspec_overrides.yaml (not published).
-  firebase_app_dart: ^0.1.0
+  firebase_app_dart: ^0.2.0
   # Service account keys and Application Default Credentials. Already part of
   # the dependency graph of cloud_firestore_dart (through package:grpc), like
   # crypto and http.
@@ -40,6 +40,6 @@ dev_dependencies:
   # Only for example/firestore_wiring.dart and example/adc_server.dart. Local
   # development resolves it from ../../cloud_firestore/cloud_firestore_dart
   # through pubspec_overrides.yaml.
-  cloud_firestore_dart: ^0.1.0
+  cloud_firestore_dart: ^0.2.0
   lints: ^6.1.0
   test: ^1.25.0

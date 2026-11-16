@@ -140,10 +140,10 @@ void main() {
     final Future<void> outcome = task.future;
     final Future<void> expectation = expectLater(
         outcome,
-        throwsA(isA<FirestoreError>()
-            .having((FirestoreError e) => e.code, 'code',
+        throwsA(isA<FirestoreException>()
+            .having((FirestoreException e) => e.errorCode, 'code',
                 FirestoreErrorCode.cancelled)
-            .having((FirestoreError e) => e.message, 'message',
+            .having((FirestoreException e) => e.message, 'message',
                 "'waitForPendingWrites' task is cancelled due to User change.")));
 
     await syncEngine.handleCredentialChange(const User('new user'));

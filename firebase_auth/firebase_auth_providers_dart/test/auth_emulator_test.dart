@@ -19,8 +19,8 @@ String uniqueEmail() =>
     'user${DateTime.now().microsecondsSinceEpoch}x${_counter++}@example.com';
 
 Matcher throwsAuth(Object code) => throwsA(
-  isA<FirebaseAuthProviderException>().having(
-    (FirebaseAuthProviderException e) => e.code,
+  isA<FirebaseAuthException>().having(
+    (FirebaseAuthException e) => e.code,
     'code',
     code,
   ),
@@ -80,7 +80,7 @@ void main() {
       expect(auth.uid, isNull);
       await expectLater(
         auth.getAccessToken(forceRefresh: false),
-        throwsA(isA<FirebaseNoSignedInUserError>()),
+        throwsA(isA<FirebaseNoSignedInUserException>()),
       );
     });
 
@@ -90,16 +90,16 @@ void main() {
         final FirebaseUserAuth auth = create();
         final String email = uniqueEmail();
         final AuthUser createdUser = await auth.createUserWithEmailAndPassword(
-          email,
-          'correct horse',
+          email: email,
+          password: 'correct horse',
         );
         expect(createdUser.email, email);
         expect(createdUser.isAnonymous, isFalse);
         await auth.signOut();
 
         final AuthUser signedIn = await auth.signInWithEmailAndPassword(
-          email,
-          'correct horse',
+          email: email,
+          password: 'correct horse',
         );
         expect(signedIn.uid, createdUser.uid);
         expect(
@@ -109,23 +109,35 @@ void main() {
         await auth.signOut();
 
         await expectLater(
-          auth.signInWithEmailAndPassword(email, 'wrong'),
+          auth.signInWithEmailAndPassword(email: email, password: 'wrong'),
           throwsAuth(anyOf('wrong-password', 'invalid-credential')),
         );
         await expectLater(
-          auth.signInWithEmailAndPassword(uniqueEmail(), 'whatever'),
+          auth.signInWithEmailAndPassword(
+            email: uniqueEmail(),
+            password: 'whatever',
+          ),
           throwsAuth(anyOf('user-not-found', 'invalid-credential')),
         );
         await expectLater(
-          auth.createUserWithEmailAndPassword(email, 'another password'),
+          auth.createUserWithEmailAndPassword(
+            email: email,
+            password: 'another password',
+          ),
           throwsAuth('email-already-in-use'),
         );
         await expectLater(
-          auth.createUserWithEmailAndPassword(uniqueEmail(), '1'),
+          auth.createUserWithEmailAndPassword(
+            email: uniqueEmail(),
+            password: '1',
+          ),
           throwsAuth('weak-password'),
         );
         await expectLater(
-          auth.createUserWithEmailAndPassword('not an email', 'password'),
+          auth.createUserWithEmailAndPassword(
+            email: 'not an email',
+            password: 'password',
+          ),
           throwsAuth('invalid-email'),
         );
         expect(auth.uid, isNull);
@@ -193,8 +205,8 @@ void main() {
       await expectLater(
         auth.getAccessToken(forceRefresh: true),
         throwsA(
-          isA<FirebaseAuthProviderException>().having(
-            (FirebaseAuthProviderException e) => e.invalidatesSession,
+          isA<FirebaseAuthException>().having(
+            (FirebaseAuthException e) => e.invalidatesSession,
             'invalidatesSession',
             isTrue,
           ),

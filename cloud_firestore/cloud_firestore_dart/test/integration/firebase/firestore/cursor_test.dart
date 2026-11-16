@@ -49,7 +49,7 @@ void main() {
       map<String>(<String>['v', 'b'])
     ]);
 
-    DocumentSnapshot lastDoc = snapshot.documents[1];
+    DocumentSnapshot lastDoc = snapshot.docs[1];
     snapshot = await testCollection.limit(3).startAfterDocument(lastDoc).get();
 
     expect(querySnapshotToValues(snapshot), <Map<String, String>>[
@@ -58,13 +58,13 @@ void main() {
       map<String>(<String>['v', 'e'])
     ]);
 
-    lastDoc = snapshot.documents[2];
+    lastDoc = snapshot.docs[2];
     snapshot = await testCollection.limit(1).startAfterDocument(lastDoc).get();
     expect(querySnapshotToValues(snapshot), <Map<String, String>>[
       map<String>(<String>['v', 'f'])
     ]);
 
-    lastDoc = snapshot.documents[0];
+    lastDoc = snapshot.docs[0];
     snapshot = await testCollection.limit(3).startAfterDocument(lastDoc).get();
     expect(querySnapshotToValues(snapshot), <Map<String, String>>[]);
   });
@@ -82,7 +82,7 @@ void main() {
     ]));
 
     final Query query = testCollection.orderBy('sort');
-    final DocumentSnapshot snapshot = await testCollection.document('c').get();
+    final DocumentSnapshot snapshot = await testCollection.doc('c').get();
 
     expect(snapshot.exists, isTrue);
 
@@ -146,7 +146,7 @@ void main() {
     final CollectionReference writer = (await testFirestore(newTestSettings(),
             'integration/cursor_canBeCreatedUsingDocumentId.db'))
         .collection('parent-collection')
-        .document()
+        .doc()
         .collection('sub-collection');
     await writeAllDocs(writer, testDocs);
 
@@ -154,7 +154,7 @@ void main() {
         (await testFirestore()).collection(writer.path);
 
     final QuerySnapshot snapshot = await reader
-        .orderByField(FieldPath.documentId())
+        .orderBy(FieldPath.documentId)
         .startAt(<String>['b']).endBefore(<String>['d']).get();
 
     expect(querySnapshotToValues(snapshot), <dynamic>[
@@ -164,23 +164,23 @@ void main() {
   });
 
   test('canBeUsedWithReferenceValues', () async {
-    final Firestore firestore = await testFirestore();
+    final FirebaseFirestore firestore = await testFirestore();
     final Map<String, Map<String, Object?>> testDocs = map(<dynamic>[
       'a',
       map<dynamic>(
-          <dynamic>['k', '1a', 'ref', firestore.collection('1').document('a')]),
+          <dynamic>['k', '1a', 'ref', firestore.collection('1').doc('a')]),
       'b',
       map<dynamic>(
-          <dynamic>['k', '1b', 'ref', firestore.collection('1').document('b')]),
+          <dynamic>['k', '1b', 'ref', firestore.collection('1').doc('b')]),
       'c',
       map<dynamic>(
-          <dynamic>['k', '2a', 'ref', firestore.collection('2').document('a')]),
+          <dynamic>['k', '2a', 'ref', firestore.collection('2').doc('a')]),
       'd',
       map<dynamic>(
-          <dynamic>['k', '2b', 'ref', firestore.collection('2').document('b')]),
+          <dynamic>['k', '2b', 'ref', firestore.collection('2').doc('b')]),
       'e',
       map<dynamic>(
-          <dynamic>['k', '3a', 'ref', firestore.collection('3').document('a')])
+          <dynamic>['k', '3a', 'ref', firestore.collection('3').doc('a')])
     ]);
 
     final CollectionReference testCollection =
@@ -189,13 +189,13 @@ void main() {
     final QuerySnapshot snapshot = await testCollection
         .orderBy('ref')
         .startAfter(<DocumentReference>[
-      firestore.collection('1').document('a')
+      firestore.collection('1').doc('a')
     ]).endAt(
-            <DocumentReference>[firestore.collection('2').document('b')]).get();
+            <DocumentReference>[firestore.collection('2').doc('b')]).get();
 
     final List<String> results = <String>[];
     for (DocumentSnapshot doc in snapshot) {
-      results.add(doc.getString('k')!);
+      results.add((doc.get('k') as String?)!);
     }
     expect(results, <String>['1b', '2a', '2b']);
   });
@@ -213,8 +213,7 @@ void main() {
     ]));
 
     final Query query = testCollection
-        .orderBy('sort', Direction.descending)
-        .orderByField(FieldPath.documentId(), Direction.descending);
+        .orderBy('sort', descending: true).orderBy(FieldPath.documentId, descending: true);
 
     QuerySnapshot snapshot = await query.startAt(<double>[2.0]).get();
 
@@ -272,9 +271,8 @@ void main() {
     ]));
 
     final QuerySnapshot snapshot = await testCollection
-        .whereGreaterThanOrEqualTo('timestamp', timestamp(100, 5))
-        .whereLessThan('timestamp', timestamp(100, 8))
-        .get();
+        .where('timestamp', isGreaterThanOrEqualTo: timestamp(100, 5))
+        .where('timestamp', isLessThan: timestamp(100, 8)).get();
     expect(querySnapshotToIds(snapshot), <String>['d', 'e', 'a']);
   });
 
@@ -289,16 +287,16 @@ void main() {
     ]));
 
     QuerySnapshot snapshot =
-        await testCollection.whereEqualTo('timestamp', nanos).get();
+        await testCollection.where('timestamp', isEqualTo: nanos).get();
     expect(querySnapshotToValues(snapshot), hasLength(1));
     // Because Timestamp should have been truncated to microseconds, the
     // microsecond timestamp should be considered equal to the nanosecond one.
-    snapshot = await testCollection.whereEqualTo('timestamp', micros).get();
+    snapshot = await testCollection.where('timestamp', isEqualTo: micros).get();
     expect(querySnapshotToValues(snapshot), hasLength(1));
     // The truncation is just to the microseconds, however, so the millisecond
     // timestamp should be treated as different and thus the query should return
     // no results.
-    snapshot = await testCollection.whereEqualTo('timestamp', millis).get();
+    snapshot = await testCollection.where('timestamp', isEqualTo: millis).get();
     expect(querySnapshotToValues(snapshot), isEmpty);
   });
 }

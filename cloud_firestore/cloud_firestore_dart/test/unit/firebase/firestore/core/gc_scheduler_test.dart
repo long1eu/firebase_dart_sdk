@@ -12,7 +12,7 @@ import 'package:uuid/uuid.dart';
 import '../../../../util/integration_test_util.dart';
 import '../local/mock/database_mock.dart';
 
-Future<Firestore> open(FirestoreSettings settings, TaskScheduler scheduler) {
+Future<FirebaseFirestore> open(Settings settings, TaskScheduler scheduler) {
   final String path =
       '${Directory.systemTemp.path}/gc_scheduler_${const Uuid().v4()}.db';
   return IntegrationTestUtil.forTests(
@@ -44,18 +44,18 @@ Future<Firestore> open(FirestoreSettings settings, TaskScheduler scheduler) {
 void main() {
   test('the LRU GC is scheduled with the default cache size', () async {
     final TaskScheduler scheduler = TaskScheduler('');
-    final Firestore firestore = await open(FirestoreSettings(), scheduler);
+    final FirebaseFirestore firestore = await open(Settings(), scheduler);
     expect(scheduler.getTask(TaskId.garbageCollection), isNotNull);
-    await firestore.shutdown();
+    await firestore.terminate();
   });
 
   test('the LRU GC is not scheduled when the cache size is unlimited',
       () async {
     final TaskScheduler scheduler = TaskScheduler('');
-    final Firestore firestore = await open(
-        FirestoreSettings(cacheSizeBytes: FirestoreSettings.cacheSizeUnlimited),
+    final FirebaseFirestore firestore = await open(
+        Settings(cacheSizeBytes: Settings.cacheSizeUnlimited),
         scheduler);
     expect(scheduler.getTask(TaskId.garbageCollection), isNull);
-    await firestore.shutdown();
+    await firestore.terminate();
   });
 }

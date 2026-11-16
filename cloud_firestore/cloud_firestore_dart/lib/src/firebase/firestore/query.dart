@@ -8,8 +8,6 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/aggregate_field.dart
 import 'package:cloud_firestore_dart/src/firebase/firestore/aggregate_query.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/bound.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/event_manager.dart';
-import 'package:cloud_firestore_dart/src/firebase/firestore/core/filter/filter.dart'
-    hide Filter, CompositeFilter;
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/listen_to_query.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/query.dart'
     as core;
@@ -18,34 +16,21 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/distance_measure.dar
 import 'package:cloud_firestore_dart/src/firebase/firestore/document_reference.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/document_snapshot.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/field_path.dart';
-import 'package:cloud_firestore_dart/src/firebase/firestore/filter.dart'
-    as api
-    show UnaryFilter;
 import 'package:cloud_firestore_dart/src/firebase/firestore/filter.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/firestore.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/firestore_data_converter.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/firestore_error.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/get_options.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/listen_source.dart';
-import 'package:cloud_firestore_dart/src/firebase/firestore/metadata_change.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/document_key.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/query_builder.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/query_snapshot.dart';
-import 'package:cloud_firestore_dart/src/firebase/firestore/snapshot_listen_options.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/source.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/assert.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/resource_path.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/util.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/vector_query.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/vector_value.dart';
-
-/// An enum for the direction of a sort.
-enum Direction {
-  /// Smallest values first.
-  ascending,
-
-  /// Largest values first.
-  descending,
-}
 
 /// A query over the documents of a collection or a collection group, which you can read with [get] or listen to
 /// with [snapshots].
@@ -55,8 +40,8 @@ enum Direction {
 /// backend; invalid combinations throw an [ArgumentError] when the method is called, and the backend may still
 /// reject a query that needs an index it does not have.
 ///
-/// Get a query from `Firestore.collection` (a [CollectionReference] is a query over its documents) or
-/// `Firestore.collectionGroup`. [T] is the type of the documents, `Map<String, Object?>` unless a converter was
+/// Get a query from `FirebaseFirestore.collection` (a [CollectionReference] is a query over its documents) or
+/// `FirebaseFirestore.collectionGroup`. [T] is the type of the documents, `Map<String, Object?>` unless a converter was
 /// attached with [withConverter].
 ///
 /// Queries work offline: [get] and [snapshots] answer from the local cache when the backend cannot be reached.
@@ -65,7 +50,7 @@ enum Direction {
 /// final Query<Map<String, Object?>> bigCities = firestore
 ///     .collection('cities')
 ///     .where('population', isGreaterThan: 1000000)
-///     .orderBy('population', Direction.descending)
+///     .orderBy('population', descending: true)
 ///     .limit(10);
 ///
 /// final QuerySnapshot<Map<String, Object?>> snapshot = await bigCities.get();
@@ -77,16 +62,16 @@ enum Direction {
 /// **Subclassing Note**: Firestore classes are not meant to be subclassed except for use in test mocks. Subclassing is
 /// not supported in production code and new SDK releases may break code that does so.
 class Query<T extends dynamic> {
-  /// Implementation detail of the SDK; not part of the supported API. Use [Firestore.collection] or
-  /// [Firestore.collectionGroup].
+  /// Implementation detail of the SDK; not part of the supported API. Use [FirebaseFirestore.collection] or
+  /// [FirebaseFirestore.collectionGroup].
   const Query._(this._query, this.firestore, [this.converter]);
 
   /// The converter attached with [withConverter], or null for raw maps.
   final FirestoreDataConverter<T>? converter;
 
-  /// Returns a query that converts documents with [converter] (type [U]).
-  /// Filters, ordering and limits are kept. Use [withoutConverter] to go
-  /// back to raw maps.
+  /// Returns a query that converts documents with [fromFirestore] and
+  /// [toFirestore] (type [U]). Filters, ordering and limits are kept. Use
+  /// [withoutConverter] to go back to raw maps.
   ///
   /// The filters still compare the raw stored fields, not the converted objects.
   ///
@@ -94,18 +79,24 @@ class Query<T extends dynamic> {
   /// final Query<String> names = firestore
   ///     .collection('cities')
   ///     .withConverter<String>(
-  ///       FirestoreDataConverter<String>.from(
-  ///         fromFirestore: (snapshot, options) => snapshot['name'] as String,
-  ///         toFirestore: (name, options) => {'name': name},
-  ///       ),
+  ///       fromFirestore: (snapshot, options) => snapshot['name'] as String,
+  ///       toFirestore: (name, options) => {'name': name},
   ///     );
   /// final QuerySnapshot<String> snapshot = await names.get();
-  /// print(snapshot.docs.map((doc) => doc.data).toList());
+  /// print(snapshot.docs.map((doc) => doc.data()).toList());
   /// ```
-  Query<U> withConverter<U extends Object?>(
-    FirestoreDataConverter<U> converter,
-  ) {
-    return Query<U>._(query, firestore, converter);
+  Query<U> withConverter<U extends Object?>({
+    required FromFirestore<U> fromFirestore,
+    required ToFirestore<U> toFirestore,
+  }) {
+    return Query<U>._(
+      query,
+      firestore,
+      FirestoreDataConverter<U>.from(
+        fromFirestore: fromFirestore,
+        toFirestore: toFirestore,
+      ),
+    );
   }
 
   /// Returns a query over the same documents that yields raw
@@ -117,282 +108,8 @@ class Query<T extends dynamic> {
 
   final core.Query _query;
 
-  /// The [Firestore] instance this query belongs to.
-  final Firestore firestore;
-
-  /// Creates and returns a new Query with the additional filter that documents must contain the specified field and the
-  /// value should be equal to the specified value.
-  ///
-  /// [field] The name of the field to compare (dots separate nested fields; throws an [ArgumentError] for an invalid
-  /// path)
-  /// [value] The value for comparison
-  ///
-  /// Returns the created [Query].
-  ///
-  /// The `whereXxx` methods follow the Android SDK. [where] with named arguments builds the same filters and is the
-  /// form that FlutterFire and Firestore Lite also have. These two lines build the same query:
-  ///
-  /// ```dart
-  /// final CollectionReference<Map<String, Object?>> cities = firestore
-  ///     .collection('cities');
-  /// final Query<Map<String, Object?>> a = cities.whereEqualTo('state', 'CA');
-  /// final Query<Map<String, Object?>> b = cities.where('state', isEqualTo: 'CA');
-  /// ```
-  Query<T> whereEqualTo(String field, Object? value) {
-    return _whereHelper(
-      FieldPathInternal.fromArgument('where', field),
-      FilterOperator.equal,
-      value,
-    );
-  }
-
-  /// Creates and returns a new [Query] with the additional filter that documents must contain the specified field and
-  /// the value should be equal to the specified value.
-  ///
-  /// [fieldPath] The path of the field to compare
-  /// [value] The value for comparison
-  ///
-  /// Returns the created [Query].
-  Query<T> whereEqualToField(FieldPath fieldPath, Object? value) {
-    return _whereHelper(fieldPath, FilterOperator.equal, value);
-  }
-
-  /// Creates and returns a new Query with the additional filter that documents must contain the specified field and the
-  /// value does not equal the specified value.
-  ///
-  /// A Query can have only one [whereNotEqualTo] filter, and it cannot be combined with [whereNotIn]
-  /// (this client check also applies inside [Filter.or] / [Filter.and]).
-  ///
-  /// [field] The name of the field to compare
-  /// [value] The value for comparison
-  ///
-  /// Returns the created [Query].
-  Query<T> whereNotEqualTo(String field, Object? value) {
-    return _whereHelper(
-      FieldPathInternal.fromArgument('where', field),
-      FilterOperator.notEqual,
-      value,
-    );
-  }
-
-  /// Creates and returns a new [Query] with the additional filter that documents must contain the specified field and
-  /// the value does not equal the specified value.
-  ///
-  /// A Query can have only one [whereNotEqualToField] filter, and it cannot be combined with
-  /// [whereNotInField].
-  ///
-  /// [fieldPath] The path of the field to compare
-  /// [value] The value for comparison
-  ///
-  /// Returns the created [Query].
-  Query<T> whereNotEqualToField(FieldPath fieldPath, Object? value) {
-    return _whereHelper(fieldPath, FilterOperator.notEqual, value);
-  }
-
-  /// Creates and returns a new [Query] with the additional filter that documents must contain the specified field and
-  /// the value should be less than the specified value.
-  ///
-  /// [field] The name of the field to compare
-  /// [value] The value for comparison
-  ///
-  /// Returns the created [Query].
-  Query<T> whereLessThan(String field, Object? value) {
-    return _whereHelper(
-      FieldPathInternal.fromArgument('where', field),
-      FilterOperator.lessThan,
-      value,
-    );
-  }
-
-  /// Creates and returns a new [Query] with the additional filter that documents must contain the specified field and
-  /// the value should be less than the specified value.
-  ///
-  /// [fieldPath] The path of the field to compare
-  /// [value] The value for comparison
-  ///
-  /// Returns the created [Query].
-  Query<T> whereLessThanField(FieldPath fieldPath, Object? value) {
-    return _whereHelper(fieldPath, FilterOperator.lessThan, value);
-  }
-
-  /// Creates and returns a new [Query] with the additional filter that documents must contain the specified field and
-  /// the value should be less than or equal to the specified value.
-  ///
-  /// [field] The name of the field to compare
-  /// [value] The value for comparison
-  ///
-  /// Returns the created [Query].
-  Query<T> whereLessThanOrEqualTo(String field, Object? value) {
-    return _whereHelper(
-      FieldPathInternal.fromArgument('where', field),
-      FilterOperator.lessThanOrEqual,
-      value,
-    );
-  }
-
-  /// Creates and returns a new [Query] with the additional filter that documents must contain the specified field and
-  /// the value should be less than or equal to the specified value.
-  ///
-  /// [fieldPath] The path of the field to compare
-  /// [value] The value for comparison
-  ///
-  /// Returns the created [Query].
-  Query<T> whereLessThanOrEqualToField(FieldPath fieldPath, Object? value) {
-    return _whereHelper(fieldPath, FilterOperator.lessThanOrEqual, value);
-  }
-
-  /// Creates and returns a new [Query] with the additional filter that documents must contain the specified field and
-  /// the value should be greater than the specified value.
-  ///
-  /// [field] The name of the field to compare
-  /// [value] The value for comparison
-  ///
-  /// Returns the created [Query].
-  Query<T> whereGreaterThan(String field, Object? value) {
-    return _whereHelper(
-      FieldPathInternal.fromArgument('where', field),
-      FilterOperator.graterThan,
-      value,
-    );
-  }
-
-  /// Creates and returns a new [Query] with the additional filter that documents must contain the specified field and
-  /// the value should be greater than the specified value.
-  ///
-  /// [fieldPath] The path of the field to compare
-  /// [value] The value for comparison
-  ///
-  /// Returns the created [Query].
-  Query<T> whereGreaterThanField(FieldPath fieldPath, Object? value) {
-    return _whereHelper(fieldPath, FilterOperator.graterThan, value);
-  }
-
-  /// Creates and returns a new [Query] with the additional filter that documents must contain the specified field and
-  /// the value should be greater than or equal to the specified value.
-  ///
-  /// [field] The name of the field to compare
-  /// [value] The value for comparison
-  ///
-  /// Returns the created [Query].
-  Query<T> whereGreaterThanOrEqualTo(String field, Object? value) {
-    return _whereHelper(
-      FieldPathInternal.fromArgument('where', field),
-      FilterOperator.graterThanOrEqual,
-      value,
-    );
-  }
-
-  /// Creates and returns a new [Query] with the additional filter that documents must contain the specified field and
-  /// the value should be greater than or equal to the specified value.
-  ///
-  /// [fieldPath] The path of the field to compare
-  /// [value] The value for comparison
-  ///
-  /// Returns the created [Query].
-  Query<T> whereGreaterThanOrEqualToField(FieldPath fieldPath, Object? value) {
-    return _whereHelper(fieldPath, FilterOperator.graterThanOrEqual, value);
-  }
-
-  /// Creates and returns a new [Query] with the additional filter that documents must contain the specified field, the
-  /// value must be an array, and that the array must contain the provided value.
-  ///
-  /// Several array-contains filters can be combined; the backend validates the combination.
-  ///
-  /// [field] The name of the field containing an array to search
-  /// [value] The value that must be contained in the array
-  ///
-  /// Returns the created [Query].
-  Query<T> whereArrayContains(String field, Object? value) {
-    return _whereHelper(
-      FieldPathInternal.fromArgument('where', field),
-      FilterOperator.arrayContains,
-      value,
-    );
-  }
-
-  /// Creates and returns a new [Query] with the additional filter that documents must contain the specified field, the
-  /// value must be an array, and that the array must contain the provided value.
-  ///
-  /// Several array-contains filters can be combined; the backend validates the combination.
-  ///
-  /// [fieldPath] The path of the field containing an array to search
-  /// [value] The value that must be contained in the array
-  ///
-  /// Returns the created [Query].
-  Query<T> whereArrayContainsField(FieldPath fieldPath, Object? value) {
-    return _whereHelper(fieldPath, FilterOperator.arrayContains, value);
-  }
-
-  /// Creates and returns a new Query with the additional filter that documents
-  /// must contain the specified field, the value must be a list, and that the
-  /// list must contain at least one value from the provided array.
-  ///
-  /// It cannot be combined with [whereNotIn]; the backend validates other combinations.
-  Query<T> whereArrayContainsAny(String field, List<Object?> value) {
-    return _whereHelper(
-      FieldPathInternal.fromArgument('where', field),
-      FilterOperator.arrayContainsAny,
-      value,
-    );
-  }
-
-  /// Creates and returns a new Query with the additional filter that documents
-  /// must contain the specified field, the value must be an array, and that the
-  /// array must contain at least one value from the provided array.
-  ///
-  /// It cannot be combined with [whereNotIn]; the backend validates other combinations.
-  Query<T> whereArrayContainsAnyField(
-    FieldPath fieldPath,
-    List<Object?> value,
-  ) {
-    return _whereHelper(fieldPath, FilterOperator.arrayContainsAny, value);
-  }
-
-  /// Creates and returns a new Query with the additional filter that documents
-  /// must contain the specified field and the value must equal one of the
-  /// values from the provided array.
-  ///
-  /// It cannot be combined with [whereNotIn]; the backend validates other combinations.
-  Query<T> whereIn(String field, List<Object?> value) {
-    return _whereHelper(
-      FieldPathInternal.fromArgument('where', field),
-      FilterOperator.IN,
-      value,
-    );
-  }
-
-  /// Creates and returns a new Query with the additional filter that documents
-  /// must contain the specified field and the value must equal one of the
-  /// values from the provided array.
-  ///
-  /// It cannot be combined with [whereNotIn]; the backend validates other combinations.
-  Query<T> whereInField(FieldPath fieldPath, List<Object?> value) {
-    return _whereHelper(fieldPath, FilterOperator.IN, value);
-  }
-
-  /// Creates and returns a new Query with the additional filter that documents
-  /// must contain the specified field and the value must not equal any of the
-  /// values from the provided array.
-  ///
-  /// A Query can have only one [whereNotIn] filter, and it cannot be combined
-  /// with [whereArrayContainsAny], [whereIn] or [whereNotEqualTo].
-  Query<T> whereNotIn(String field, List<Object?> value) {
-    return _whereHelper(
-      FieldPathInternal.fromArgument('where', field),
-      FilterOperator.NOT_IN,
-      value,
-    );
-  }
-
-  /// Creates and returns a new Query with the additional filter that documents
-  /// must contain the specified field and the value must not equal any of the
-  /// values from the provided array.
-  ///
-  /// A Query can have only one [whereNotInField] filter, and it cannot be
-  /// combined with [whereArrayContainsAny], [whereIn] or [whereNotEqualToField].
-  Query<T> whereNotInField(FieldPath fieldPath, List<Object?> value) {
-    return _whereHelper(fieldPath, FilterOperator.NOT_IN, value);
-  }
+  /// The [FirebaseFirestore] instance this query belongs to.
+  final FirebaseFirestore firestore;
 
   /// Creates and returns a new [Query] with additional filters.
   ///
@@ -401,9 +118,9 @@ class Query<T extends dynamic> {
   /// arguments, in the FlutterFire style:
   ///
   /// ```dart
-  /// query.where(Filter.or([Filter.equalTo('a', 1), Filter.equalTo('b', 2)]));
+  /// query.where(Filter.or([Filter('a', isEqualTo: 1), Filter('b', isEqualTo: 2)]));
   /// query.where('age', isGreaterThanOrEqualTo: 18, isLessThan: 65);
-  /// query.where(FieldPath.documentIdField, whereIn: ['a', 'b']);
+  /// query.where(FieldPath.documentId, whereIn: ['a', 'b']);
   /// ```
   ///
   /// A [Filter] can be a single field filter created with the [Filter]
@@ -454,22 +171,9 @@ class Query<T extends dynamic> {
     );
   }
 
-  /// Creates and returns a new [Query] with the additional filter that
-  /// documents must contain the specified field and the value should satisfy
-  /// the relation constraint provided.
-  Query<T> _whereHelper(FieldPath fieldPath, FilterOperator op, Object? value) {
-    return _withQuery(
-      _builder.whereFilter(query, api.UnaryFilter(fieldPath, op, value)),
-    );
-  }
-
-  /// Creates and returns a new [Query] that's additionally sorted by the specified field.
-  /// Optionally in descending order instead of ascending.
-  ///
-  /// [field] the field to sort by (dots separate nested fields; throws an [ArgumentError] for an invalid path).
-  /// [direction] the direction to sort, [Direction.ascending] by default.
-  ///
-  /// Returns the created Query.
+  /// Creates and returns a new [Query] that's additionally sorted by [field], a [String] (dots separate nested
+  /// fields; throws an [ArgumentError] for an invalid path) or a [FieldPath] ([FieldPath.documentId] sorts by
+  /// document id), in ascending order or, with [descending], in descending order.
   ///
   /// Each call adds a sort key after the previous ones; documents that are equal on every key are ordered by their
   /// id. A document that does not have [field] is not in the results. Call [orderBy] before the cursor methods
@@ -479,35 +183,27 @@ class Query<T extends dynamic> {
   /// final QuerySnapshot<Map<String, Object?>> snapshot = await firestore
   ///     .collection('cities')
   ///     .orderBy('state')
-  ///     .orderBy('population', Direction.descending)
+  ///     .orderBy('population', descending: true)
   ///     .get();
   /// ```
-  Query<T> orderBy(String field, [Direction direction = Direction.ascending]) {
-    return orderByField(
-      FieldPathInternal.fromArgument('orderBy', field),
-      direction,
+  Query<T> orderBy(Object field, {bool descending = false}) {
+    final FieldPath fieldPath = _fieldPathOf('orderBy', field);
+    return _withQuery(
+      _builder.orderBy(query, fieldPath.internalPath, descending: descending),
     );
   }
 
-  /// Creates and returns a new [Query] that's additionally sorted by the specified field, optionally in descending
-  /// order instead of ascending.
-  ///
-  /// [fieldPath] the field to sort by; [FieldPath.documentIdField] sorts by document id.
-  /// [direction] the direction to sort.
-  ///
-  /// Returns the created Query. Same rules as [orderBy].
-  Query<T> orderByField(
-    FieldPath fieldPath, [
-    Direction direction = Direction.ascending,
-  ]) {
-    checkNotNull(fieldPath, 'Provided field path must not be null.');
-    checkNotNull(direction, 'Provided direction must not be null.');
-    return _withQuery(
-      _builder.orderBy(
-        query,
-        fieldPath.internalPath,
-        descending: direction != Direction.ascending,
-      ),
+  static FieldPath _fieldPathOf(String methodName, Object field) {
+    if (field is FieldPath) {
+      return field;
+    }
+    if (field is String) {
+      return FieldPathInternal.fromArgument(methodName, field);
+    }
+    throw ArgumentError.value(
+      field,
+      'field',
+      '$methodName() expects a String field or a FieldPath',
     );
   }
 
@@ -585,7 +281,7 @@ class Query<T extends dynamic> {
   /// Returns the created Query.
   ///
   /// You can give fewer values than there are [orderBy] clauses; throws an [ArgumentError] if you give more. For an
-  /// ordering by [FieldPath.documentIdField] the value is a document id string. A later call of a start cursor
+  /// ordering by [FieldPath.documentId] the value is a document id string. A later call of a start cursor
   /// ([startAt], [startAfter] or their `Document` variants) replaces the earlier one.
   ///
   /// ```dart
@@ -597,11 +293,11 @@ class Query<T extends dynamic> {
   ///     .endAt(['D'])
   ///     .get();
   /// ```
-  Query<T> startAt(List<Object?> fieldValues) {
+  Query<T> startAt(Iterable<Object?> fieldValues) {
     final Bound bound = _builder.boundFromFields(
       query,
       'startAt',
-      fieldValues,
+      fieldValues.toList(),
       inclusive: true,
     );
     return _withQuery(query.startAt(bound));
@@ -659,11 +355,11 @@ class Query<T extends dynamic> {
   ///     .startAfter([1000000])
   ///     .get();
   /// ```
-  Query<T> startAfter(List<Object?> fieldValues) {
+  Query<T> startAfter(Iterable<Object?> fieldValues) {
     final Bound bound = _builder.boundFromFields(
       query,
       'startAfter',
-      fieldValues,
+      fieldValues.toList(),
       inclusive: false,
     );
     return _withQuery(query.startAt(bound));
@@ -705,11 +401,11 @@ class Query<T extends dynamic> {
   ///     .endBefore(['M'])
   ///     .get();
   /// ```
-  Query<T> endBefore(List<Object?> fieldValues) {
+  Query<T> endBefore(Iterable<Object?> fieldValues) {
     final Bound bound = _builder.boundFromFields(
       query,
       'endBefore',
-      fieldValues,
+      fieldValues.toList(),
       inclusive: false,
     );
     return _withQuery(query.endAt(bound));
@@ -742,11 +438,11 @@ class Query<T extends dynamic> {
   ///
   /// Returns the created Query. Throws an [ArgumentError] in the cases described in [startAt]; see there for an
   /// example.
-  Query<T> endAt(List<Object?> fieldValues) {
+  Query<T> endAt(Iterable<Object?> fieldValues) {
     final Bound bound = _builder.boundFromFields(
       query,
       'endAt',
-      fieldValues,
+      fieldValues.toList(),
       inclusive: true,
     );
     return _withQuery(query.endAt(bound));
@@ -789,14 +485,15 @@ class Query<T extends dynamic> {
   ///     .where('state', isEqualTo: 'CA')
   ///     .get();
   /// for (final QueryDocumentSnapshot<Map<String, Object?>> city in snapshot.docs) {
-  ///   print('${city.id} => ${city.data}');
+  ///   print('${city.id} => ${city.data()}');
   /// }
   ///
   /// final QuerySnapshot<Map<String, Object?>> cached = await firestore
   ///     .collection('cities')
-  ///     .get(Source.cache);
+  ///     .get(const GetOptions(source: Source.cache));
   /// ```
-  Future<QuerySnapshot<T>> get([Source source = Source.defaultSource]) async {
+  Future<QuerySnapshot<T>> get([GetOptions? options]) async {
+    final Source source = options?.source ?? Source.serverAndCache;
     _validateHasExplicitOrderByForLimitToLast();
     if (source == Source.cache) {
       final ViewSnapshot viewSnap = await firestore.client
@@ -818,10 +515,11 @@ class Query<T extends dynamic> {
     return _firstAndCancel(
       _getSnapshotsInternal(options).map((QuerySnapshot<T> snapshot) {
         if (snapshot.metadata.isFromCache && source == Source.server) {
-          throw FirestoreError(
-            'Failed to get documents from server. (However, these documents may exist in the local cache. Run again '
-            'without setting source to Source.server to retrieve the cached documents.)',
-            FirestoreErrorCode.unavailable,
+          throw FirestoreException(
+            message:
+                'Failed to get documents from server. (However, these documents may exist in the local cache. Run again '
+                'without setting source to Source.server to retrieve the cached documents.)',
+            errorCode: FirestoreErrorCode.unavailable,
           );
         } else {
           return snapshot;
@@ -831,7 +529,8 @@ class Query<T extends dynamic> {
   }
 
   /// Returns a [VectorQuery] that finds the [limit] documents whose
-  /// [vectorField] is nearest to [queryVector] according to [distanceMeasure].
+  /// [vectorField] (a [String] or a [FieldPath]) is nearest to [queryVector]
+  /// according to [distanceMeasure].
   ///
   /// [queryVector] is a [VectorValue] or a `List<double>`. If
   /// [distanceResultField] is set, the computed distance is stored in that
@@ -839,37 +538,32 @@ class Query<T extends dynamic> {
   /// documents within that threshold are returned.
   ///
   /// The search runs on the server only. The filters of this query narrow the
-  /// candidates; its orderings are superseded by the distance ordering.
+  /// candidates; its orderings are superseded by the distance ordering. The
+  /// documents are read through the converter of this query.
   ///
   /// This follows the Android SDK; the JS client SDK has vector search only as a pipeline stage. It needs a vector
   /// index on the backend.
-  VectorQuery findNearest(
-    String vectorField,
-    Object queryVector,
-    int limit,
-    DistanceMeasure distanceMeasure, {
+  ///
+  /// ```dart
+  /// final VectorQuerySnapshot<Map<String, Object?>> nearest = await firestore
+  ///     .collection('coffee-beans')
+  ///     .findNearest(
+  ///       vectorField: 'embedding',
+  ///       queryVector: VectorValue(<double>[0.1, 0.2, 0.3]),
+  ///       limit: 5,
+  ///       distanceMeasure: DistanceMeasure.cosine,
+  ///     )
+  ///     .get();
+  /// ```
+  VectorQuery<T> findNearest({
+    required Object vectorField,
+    required Object queryVector,
+    required int limit,
+    required DistanceMeasure distanceMeasure,
     String? distanceResultField,
     double? distanceThreshold,
   }) {
-    return findNearestField(
-      FieldPath.fromDotSeparatedPath(vectorField),
-      queryVector,
-      limit,
-      distanceMeasure,
-      distanceResultField: distanceResultField,
-      distanceThreshold: distanceThreshold,
-    );
-  }
-
-  /// Same as [findNearest] but takes the vector field as a [FieldPath].
-  VectorQuery findNearestField(
-    FieldPath vectorField,
-    Object queryVector,
-    int limit,
-    DistanceMeasure distanceMeasure, {
-    String? distanceResultField,
-    double? distanceThreshold,
-  }) {
+    final FieldPath fieldPath = _fieldPathOf('findNearest', vectorField);
     final VectorValue vector;
     if (queryVector is VectorValue) {
       vector = queryVector;
@@ -880,9 +574,9 @@ class Query<T extends dynamic> {
         'Invalid vector query: the query vector must be a VectorValue or a List<double>, but was ${queryVector.runtimeType}.',
       );
     }
-    return VectorQueryInternal.create(
+    return VectorQueryInternal.create<T>(
       this,
-      vectorField.internalPath,
+      fieldPath,
       vector,
       limit,
       distanceMeasure,
@@ -902,7 +596,7 @@ class Query<T extends dynamic> {
   ///     .where('state', isEqualTo: 'CA')
   ///     .count()
   ///     .get();
-  /// print(snapshot.getCount());
+  /// print(snapshot.count);
   /// ```
   AggregateQuery count() => AggregateQueryInternal.create(
     this,
@@ -924,9 +618,9 @@ class Query<T extends dynamic> {
   ///       AggregateField.average('population'),
   ///     ])
   ///     .get();
-  /// print(snapshot.getCount());
+  /// print(snapshot.count);
   /// print(snapshot.get(AggregateField.sum('population')));
-  /// print(snapshot.getDouble(AggregateField.average('population')));
+  /// print(snapshot.getAverage('population'));
   /// ```
   AggregateQuery aggregate(List<AggregateField> aggregateFields) {
     if (aggregateFields.isEmpty) {
@@ -956,20 +650,18 @@ class Query<T extends dynamic> {
     return AggregateQueryInternal.withAliases(this, aggregates);
   }
 
-  /// A stream of the results of this query: the current results first, then a new snapshot every time they change.
+  /// A stream of the results of this query: one [QuerySnapshot] now, and another each time the results change.
   ///
-  /// The first snapshot can come from the local cache (with `metadata.isFromCache` true) before the backend answers;
-  /// when the cache knows the query, the backend is asked only for what changed since. Local writes raise a snapshot
-  /// at once, with
-  /// `metadata.hasPendingWrites` true. Snapshots in which only the metadata changed are not delivered; use
-  /// [getSnapshots] with [MetadataChanges.include] for those. [QuerySnapshot.docChanges] lists what changed since
-  /// the previous snapshot.
+  /// The stream listens to the backend while it has a subscriber; cancel the subscription to stop, and always cancel
+  /// it when you no longer need it. Each call returns a new single-subscription stream. While the client is offline
+  /// the stream keeps delivering changes from the cache. An error (for example a query that the security rules
+  /// deny, or a missing index) is delivered on the stream, which then closes. Throws a [StateError] for a
+  /// [limitToLast] query without [orderBy].
   ///
-  /// The listener is registered when you listen to the stream and removed when you cancel the subscription: cancel
-  /// it when you no longer need it. Each access to this getter returns a new single-subscription stream. While the
-  /// client is offline the stream keeps delivering changes from the cache. An error (for example a query that the
-  /// security rules deny, or a missing index) is delivered on the stream, which then closes. Throws a [StateError]
-  /// for a [limitToLast] query without [orderBy].
+  /// With [includeMetadataChanges] a snapshot also arrives when only the [QuerySnapshot.metadata] changed (for
+  /// example when the results stop being from the cache, or when a local write is acknowledged), and
+  /// [QuerySnapshot.docChanges] lists those documents too. With [ListenSource.cache] as [source] the events come
+  /// from the local cache only (local writes, cache updates) and the backend is not contacted for this listener.
   ///
   /// This is the JS SDK `onSnapshot`.
   ///
@@ -978,12 +670,12 @@ class Query<T extends dynamic> {
   ///     firestore
   ///         .collection('cities')
   ///         .where('state', isEqualTo: 'CA')
-  ///         .snapshots
+  ///         .snapshots()
   ///         .listen(
   ///           (QuerySnapshot<Map<String, Object?>> snapshot) {
   ///             for (final DocumentChange<Map<String, Object?>> change
   ///                 in snapshot.docChanges) {
-  ///               print('${change.type.name}: ${change.document.id}');
+  ///               print('${change.type.name}: ${change.doc.id}');
   ///             }
   ///           },
   ///           onError: (Object error) => print('listen failed: $error'),
@@ -991,52 +683,12 @@ class Query<T extends dynamic> {
   /// // ...
   /// await subscription.cancel();
   /// ```
-  Stream<QuerySnapshot<T>> get snapshots {
-    final ListenOptions options = _internalOptions(MetadataChanges.exclude);
-    return _getSnapshotsInternal(options);
-  }
-
-  /// A stream of the results of this query, like [snapshots]. Pass [MetadataChanges.include] as [changes] to also get
-  /// a snapshot when only the [QuerySnapshot.metadata] changed (for example when the results stop being from the
-  /// cache, or when a local write is acknowledged).
-  ///
-  /// ```dart
-  /// firestore
-  ///     .collection('cities')
-  ///     .getSnapshots(MetadataChanges.include)
-  ///     .listen((QuerySnapshot<Map<String, Object?>> snapshot) {
-  ///       print('from cache: ${snapshot.metadata.isFromCache}');
-  ///     });
-  /// ```
-  Stream<QuerySnapshot<T>> getSnapshots([MetadataChanges? changes]) {
-    final ListenOptions options = _internalOptions(
-      changes ?? MetadataChanges.exclude,
-    );
-    return _getSnapshotsInternal(options);
-  }
-
-  /// Starts listening with the given [options], which also select the
-  /// [ListenSource]: with [ListenSource.cache] the events are raised from the
-  /// local cache only (local writes, cache updates) and the backend is not
-  /// contacted for this listener.
-  ///
-  /// This is the JS SDK `onSnapshot` with `{source: 'cache'}` or `{includeMetadataChanges: true}`.
-  ///
-  /// ```dart
-  /// firestore
-  ///     .collection('cities')
-  ///     .getSnapshotsWithOptions(
-  ///       const SnapshotListenOptions(source: ListenSource.cache),
-  ///     )
-  ///     .listen((QuerySnapshot<Map<String, Object?>> snapshot) {
-  ///       print('${snapshot.length} cities in the cache');
-  ///     });
-  /// ```
-  Stream<QuerySnapshot<T>> getSnapshotsWithOptions(
-    SnapshotListenOptions options,
-  ) {
+  Stream<QuerySnapshot<T>> snapshots({
+    bool includeMetadataChanges = false,
+    ListenSource source = ListenSource.defaultSource,
+  }) {
     return _getSnapshotsInternal(
-      _internalOptions(options.metadataChanges, options.source),
+      _internalOptions(includeMetadataChanges, source),
     );
   }
 
@@ -1054,14 +706,13 @@ class Query<T extends dynamic> {
 
   /// Converts the  API options object to the internal options object.
   static ListenOptions _internalOptions(
-    MetadataChanges metadataChanges, [
+    bool includeMetadataChanges, [
     ListenSource source = ListenSource.defaultSource,
   ]) {
     return ListenOptions(
       source: source,
-      includeDocumentMetadataChanges:
-          metadataChanges == MetadataChanges.include,
-      includeQueryMetadataChanges: metadataChanges == MetadataChanges.include,
+      includeDocumentMetadataChanges: includeMetadataChanges,
+      includeQueryMetadataChanges: includeMetadataChanges,
     );
   }
 
@@ -1103,7 +754,7 @@ DocumentKey? _referenceKey(Object? value) =>
 /// A reference to a collection, used to add documents, get references to documents, and query the documents
 /// (using the methods inherited from [Query]).
 ///
-/// Get one from `Firestore.collection` or [DocumentReference.collection]. A collection exists as long as it has
+/// Get one from `FirebaseFirestore.collection` or [DocumentReference.collection]. A collection exists as long as it has
 /// documents: creating a reference does not contact the backend, and a collection does not need to be created
 /// before you add a document to it.
 ///
@@ -1134,7 +785,7 @@ DocumentKey? _referenceKey(Object? value) =>
 class CollectionReference<T extends dynamic> extends Query<T> {
   CollectionReference._(
     ResourcePath path,
-    Firestore firestore, [
+    FirebaseFirestore firestore, [
     FirestoreDataConverter<T>? converter,
   ]) : super._(core.Query(_checkPath(path)), firestore, converter);
 
@@ -1194,12 +845,7 @@ class CollectionReference<T extends dynamic> extends Query<T> {
   /// final DocumentReference<Map<String, Object?>> created = cities.doc();
   /// await created.set({'name': 'Lisbon', 'id': created.id});
   /// ```
-  DocumentReference<T> doc([String? documentPath]) => document(documentPath);
-
-  /// Gets a [DocumentReference] instance that refers to the document at the specified path within
-  /// this collection. Same as [doc].
-  @Deprecated('Use doc instead.')
-  DocumentReference<T> document([String? documentPath]) {
+  DocumentReference<T> doc([String? documentPath]) {
     if (documentPath != null) {
       checkNonEmptyPath('CollectionReference.doc', documentPath);
     }
@@ -1230,13 +876,13 @@ class CollectionReference<T extends dynamic> extends Query<T> {
   /// ```
   Future<DocumentReference<T>> add(T data) async {
     checkNotNull<Object>(data, 'Provided data must not be null.');
-    final DocumentReference<T> ref = document();
+    final DocumentReference<T> ref = doc();
     await ref.setFor('CollectionReference.add', data);
     return ref;
   }
 
   /// Returns a collection reference to the same collection that converts data
-  /// with [converter] (type [U]) when reading and writing. Use
+  /// with [fromFirestore] and [toFirestore] (type [U]) when reading and writing. Use
   /// [withoutConverter] to go back to raw maps.
   ///
   /// The references returned by [doc] and [add] keep the converter.
@@ -1245,20 +891,26 @@ class CollectionReference<T extends dynamic> extends Query<T> {
   /// final CollectionReference<String> names = firestore
   ///     .collection('cities')
   ///     .withConverter<String>(
-  ///       FirestoreDataConverter<String>.from(
-  ///         fromFirestore: (snapshot, options) => snapshot['name'] as String,
-  ///         toFirestore: (name, options) => {'name': name},
-  ///       ),
+  ///       fromFirestore: (snapshot, options) => snapshot['name'] as String,
+  ///       toFirestore: (name, options) => {'name': name},
   ///     );
   /// await names.doc('LIS').set('Lisbon');
   /// final DocumentSnapshot<String> lisbon = await names.doc('LIS').get();
-  /// print(lisbon.data); // Lisbon
+  /// print(lisbon.data()); // Lisbon
   /// ```
   @override
-  CollectionReference<U> withConverter<U extends Object?>(
-    FirestoreDataConverter<U> converter,
-  ) {
-    return CollectionReference<U>._(query.path, firestore, converter);
+  CollectionReference<U> withConverter<U extends Object?>({
+    required FromFirestore<U> fromFirestore,
+    required ToFirestore<U> toFirestore,
+  }) {
+    return CollectionReference<U>._(
+      query.path,
+      firestore,
+      FirestoreDataConverter<U>.from(
+        fromFirestore: fromFirestore,
+        toFirestore: toFirestore,
+      ),
+    );
   }
 
   /// Returns a collection reference to the same collection that reads and
@@ -1277,7 +929,7 @@ extension QueryInternal<T> on Query<T> {
   /// Wraps the core [query] of [firestore].
   static Query<T> create<T extends dynamic>(
     core.Query query,
-    Firestore firestore, [
+    FirebaseFirestore firestore, [
     FirestoreDataConverter<T>? converter,
   ]) => Query<T>._(query, firestore, converter);
 }
@@ -1288,7 +940,7 @@ extension CollectionReferenceInternal<T> on CollectionReference<T> {
   /// collection path.
   static CollectionReference<T> create<T extends dynamic>(
     ResourcePath path,
-    Firestore firestore, [
+    FirebaseFirestore firestore, [
     FirestoreDataConverter<T>? converter,
   ]) => CollectionReference<T>._(path, firestore, converter);
 }

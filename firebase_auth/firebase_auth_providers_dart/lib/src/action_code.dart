@@ -57,33 +57,34 @@ class ActionCodeSettings {
   /// The fields of the request, checked like the JS SDK (`_setActionCodeSettingsOnRequest`). Called by
   /// `FirebaseUserAuth`; you do not need it.
   ///
-  /// Throws a [FirebaseAuthProviderException] with the code `invalid-continue-uri` (empty [url]),
+  /// Throws a [FirebaseAuthException] with the code `invalid-continue-uri` (empty [url]),
   /// `invalid-hosting-link-domain` (empty [linkDomain]), `missing-ios-bundle-id` (empty [iOSBundleId]) or
   /// `missing-android-pkg-name` (empty [androidPackageName]). [androidInstallApp] and [androidMinimumVersion] are
   /// sent only with an [androidPackageName].
   Map<String, Object?> toRequest() {
     if (url.isEmpty) {
-      throw const FirebaseAuthProviderException(
-        'invalid-continue-uri',
-        'The continue URL provided in the request is invalid.',
+      throw const FirebaseAuthException(
+        code: 'invalid-continue-uri',
+        message: 'The continue URL provided in the request is invalid.',
       );
     }
     if (linkDomain != null && linkDomain!.isEmpty) {
-      throw const FirebaseAuthProviderException(
-        'invalid-hosting-link-domain',
-        'The provided Hosting link domain is not configured for the project.',
+      throw const FirebaseAuthException(
+        code: 'invalid-hosting-link-domain',
+        message:
+            'The provided Hosting link domain is not configured for the project.',
       );
     }
     if (iOSBundleId != null && iOSBundleId!.isEmpty) {
-      throw const FirebaseAuthProviderException(
-        'missing-ios-bundle-id',
-        'An iOS bundle id must be provided.',
+      throw const FirebaseAuthException(
+        code: 'missing-ios-bundle-id',
+        message: 'An iOS bundle id must be provided.',
       );
     }
     if (androidPackageName != null && androidPackageName!.isEmpty) {
-      throw const FirebaseAuthProviderException(
-        'missing-android-pkg-name',
-        'An Android package name must be provided.',
+      throw const FirebaseAuthException(
+        code: 'missing-android-pkg-name',
+        message: 'An Android package name must be provided.',
       );
     }
     return <String, Object?>{
@@ -106,7 +107,7 @@ class ActionCodeSettings {
 /// ```dart
 /// final ActionCodeInfo info = await auth.checkActionCode(code);
 /// if (info.operation == ActionCodeOperation.passwordReset) {
-///   await auth.confirmPasswordReset(code, newPassword);
+///   await auth.confirmPasswordReset(code: code, newPassword: newPassword);
 /// } else {
 ///   await auth.applyActionCode(code);
 /// }
@@ -149,14 +150,13 @@ class ActionCodeInfo {
 
   /// Reads the answer of `accounts:resetPassword` with only an `oobCode`, checked like the JS SDK.
   ///
-  /// Throws a [FirebaseAuthProviderException] with the code `internal-error` when the operation is unknown or the
+  /// Throws a [FirebaseAuthException] with the code `internal-error` when the operation is unknown or the
   /// email address it needs is missing.
   factory ActionCodeInfo.fromResponse(Map<String, Object?> response) {
-    const FirebaseAuthProviderException malformed =
-        FirebaseAuthProviderException(
-          'internal-error',
-          'The authentication service returned an incomplete action code.',
-        );
+    const FirebaseAuthException malformed = FirebaseAuthException(
+      code: 'internal-error',
+      message: 'The authentication service returned an incomplete action code.',
+    );
     final Object? requestType = response['requestType'];
     ActionCodeOperation? operation;
     for (final ActionCodeOperation value in ActionCodeOperation.values) {

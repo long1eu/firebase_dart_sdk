@@ -13,21 +13,20 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/mutat
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/precondition.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/set_options.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/assert.dart';
-import 'package:cloud_firestore_dart/src/firebase/firestore/util/util.dart';
 
-/// The function that [Firestore.runBatch] calls with a new [WriteBatch].
+/// The function that [FirebaseFirestore.runBatch] calls with a new [WriteBatch].
 ///
-/// Add writes to the batch in the function; [Firestore.runBatch] commits them
+/// Add writes to the batch in the function; [FirebaseFirestore.runBatch] commits them
 /// when the returned future completes.
 typedef BatchCallback = Future<void> Function(WriteBatch);
 
 /// A set of writes that Firestore applies together, as a single atomic unit:
 /// either all of them or none.
 ///
-/// Get a batch from [Firestore.batch], add writes with [set], [update],
-/// [updateFromList] and [delete], then call [commit]. None of the writes is
+/// Get a batch from [FirebaseFirestore.batch], add writes with [set], [update],
+/// [update] and [delete], then call [commit]. None of the writes is
 /// applied, not even to the local cache, until [commit] is called.
-/// [Firestore.runBatch] does the same and commits for you.
+/// [FirebaseFirestore.runBatch] does the same and commits for you.
 ///
 /// ```dart
 /// final DocumentReference<Map<String, Object?>> sf = firestore.doc('cities/SF');
@@ -41,7 +40,7 @@ typedef BatchCallback = Future<void> Function(WriteBatch);
 /// ```
 ///
 /// A batch does not read, so it cannot make a write depend on the current
-/// value of a document; use [Firestore.runTransaction] for that. In return a
+/// value of a document; use [FirebaseFirestore.runTransaction] for that. In return a
 /// batch works offline: [commit] applies the writes to the local cache at
 /// once and sends them when the client is online again, while a transaction
 /// needs the backend.
@@ -52,17 +51,17 @@ typedef BatchCallback = Future<void> Function(WriteBatch);
 /// document. Unlike in earlier versions of the Firebase SDKs, there is no
 /// limit of 500 writes per batch.
 ///
-/// A batch belongs to the [Firestore] instance that created it: every
+/// A batch belongs to the [FirebaseFirestore] instance that created it: every
 /// [DocumentReference] passed to it must come from the same instance.
 ///
 /// **Subclassing Note**: Firestore classes are not meant to be subclassed except for use in test
 /// mocks. Subclassing is not supported in production code and new SDK releases may break code that
 /// does so.
 class WriteBatch {
-  /// Implementation detail of the SDK; not part of the supported API. Use [Firestore.batch].
+  /// Implementation detail of the SDK; not part of the supported API. Use [FirebaseFirestore.batch].
   WriteBatch._(this._firestore);
 
-  final Firestore _firestore;
+  final FirebaseFirestore _firestore;
   final List<Mutation> _mutations = <Mutation>[];
 
   bool _committed = false;
@@ -70,10 +69,10 @@ class WriteBatch {
   /// Adds a write of [data] to the document [documentRef]: the document is
   /// created if it does not exist, and replaced if it does.
   ///
-  /// With [options] set to [SetOptions.mergeAllFields],
-  /// [SetOptions.mergeFields] or [SetOptions.mergeFieldPaths], [data] is
+  /// With [options] set to `SetOptions(merge: true)`,
+  /// [SetOptions.mergeFields], [data] is
   /// merged into the existing document instead of replacing it. Without
-  /// [options] the document is overwritten ([SetOptions.overwrite]).
+  /// [options] the document is overwritten (`SetOptions()`).
   ///
   /// When [documentRef] has a converter (`withConverter`), [data] is a [T]
   /// and is converted with `FirestoreDataConverter.toFirestore`; otherwise
@@ -83,14 +82,14 @@ class WriteBatch {
   /// batch.set(
   ///   firestore.doc('cities/SF'),
   ///   <String, Object?>{'capital': false},
-  ///   SetOptions.mergeAllFields,
+  ///   const SetOptions(merge: true),
   /// );
   /// ```
   ///
   /// Throws an [ArgumentError] if [data] holds a value Firestore cannot store
   /// or a [FieldValue] where it is not allowed (for example
   /// [FieldValue.delete] without a merge), or if [documentRef] belongs to
-  /// another [Firestore] instance. Throws a [StateError] if the batch was
+  /// another [FirebaseFirestore] instance. Throws a [StateError] if the batch was
   /// already committed.
   ///
   /// Returns this batch, so that calls can be chained.
@@ -100,7 +99,7 @@ class WriteBatch {
     SetOptions? options,
   ]) {
     final SetOptions? userOptions = options;
-    options ??= SetOptions.overwrite;
+    options ??= const SetOptions();
     _firestore.validateReference(documentRef);
     checkNotNull<Object>(data, 'Provided data must not be null.');
     _verifyNotCommitted();
@@ -127,54 +126,11 @@ class WriteBatch {
     return this;
   }
 
-  /// Adds an update of some fields of the existing document [documentRef],
-  /// given as a flat list of alternating fields and values.
-  ///
-  /// [data] holds a field (a `String` with dot-separated segments, or a
-  /// [FieldPath]) followed by its value, then the next field and value, and
-  /// so on. Use it instead of [update] when a field name contains a dot.
-  ///
-  /// ```dart
-  /// batch.updateFromList(firestore.doc('cities/SF'), <Object?>[
-  ///   'population', 870000,
-  ///   FieldPath.of(<String>['stats.v2', 'visits']), FieldValue.increment(1),
-  /// ]);
-  /// ```
-  ///
-  /// The document must exist when the batch is committed. If it does not,
-  /// [commit] fails with [FirestoreErrorCode.notFound] and none of the
-  /// writes of the batch is applied.
-  ///
-  /// Throws an [ArgumentError] if [data] does not alternate fields and values
-  /// or holds an invalid value, or if [documentRef] belongs to another
-  /// [Firestore] instance. Throws a [StateError] if the batch was already
-  /// committed.
-  ///
-  /// Returns this batch, so that calls can be chained.
-  WriteBatch updateFromList(
-    DocumentReference<Object?> documentRef,
-    List<Object?> data,
-  ) {
-    const String methodName = 'WriteBatch.updateFromList';
-    final UserDataParsedUpdateData parsedData = _firestore.dataConverter
-        .parseUpdateDataFromList(
-          collectUpdateArguments(1, data, methodName: methodName),
-          methodName: methodName,
-          targetDoc: documentRef.key,
-        );
-
-    _firestore.validateReference(documentRef);
-    _verifyNotCommitted();
-    _mutations.add(
-      parsedData.toMutation(documentRef.key, Precondition(exists: true)),
-    );
-    return this;
-  }
-
   /// Adds an update of the fields in [data] of the existing document
   /// [documentRef]. Fields that are not in [data] keep their values.
   ///
-  /// The keys of [data] are field paths: a dot reaches into a nested map, so
+  /// The keys of [data] are field paths, a `String` or a [FieldPath]: in a
+  /// `String` a dot reaches into a nested map, so
   /// `'address.city'` changes only `city` inside `address`. The values can
   /// be [FieldValue] sentinels, for example [FieldValue.delete] to remove a
   /// field. A converter of [documentRef] is not used: [data] is always a
@@ -192,16 +148,16 @@ class WriteBatch {
   /// writes of the batch is applied.
   ///
   /// Throws an [ArgumentError] if [data] holds an invalid field path or
-  /// value, or if [documentRef] belongs to another [Firestore] instance.
+  /// value, or if [documentRef] belongs to another [FirebaseFirestore] instance.
   /// Throws a [StateError] if the batch was already committed.
   ///
   /// Returns this batch, so that calls can be chained.
   WriteBatch update(
     DocumentReference<Object?> documentRef,
-    Map<String, Object?> data,
+    Map<Object, Object?> data,
   ) {
     final UserDataParsedUpdateData parsedData = _firestore.dataConverter
-        .parseUpdateData(
+        .parseUpdateMap(
           data,
           methodName: 'WriteBatch.update',
           targetDoc: documentRef.key,
@@ -225,7 +181,7 @@ class WriteBatch {
   /// ```
   ///
   /// Throws an [ArgumentError] if [documentRef] belongs to another
-  /// [Firestore] instance and a [StateError] if the batch was already
+  /// [FirebaseFirestore] instance and a [StateError] if the batch was already
   /// committed.
   ///
   /// Returns this batch, so that calls can be chained.
@@ -250,7 +206,7 @@ class WriteBatch {
   /// If the backend rejects the batch, for example with
   /// [FirestoreErrorCode.permissionDenied] from the security rules or
   /// [FirestoreErrorCode.notFound] for an [update] of a missing document,
-  /// the future fails with that [FirestoreError] and the writes are removed
+  /// the future fails with that [FirestoreException] and the writes are removed
   /// from the local cache again. Errors that a retry can fix (such as
   /// [FirestoreErrorCode.unavailable]) are retried by the client and are
   /// not reported.
@@ -262,7 +218,7 @@ class WriteBatch {
   /// ```
   ///
   /// A batch can be committed once; afterwards every call on it throws a
-  /// [StateError]. If the [Firestore] instance was terminated, the future
+  /// [StateError]. If the [FirebaseFirestore] instance was terminated, the future
   /// fails with [FirestoreErrorCode.failedPrecondition]; an empty batch
   /// completes at once without any check.
   Future<void> commit() async {
@@ -285,5 +241,6 @@ class WriteBatch {
 /// Members of [WriteBatch] for the SDK itself. Not exported by the public libraries.
 extension WriteBatchInternal on WriteBatch {
   /// A new, empty batch of [firestore].
-  static WriteBatch create(Firestore firestore) => WriteBatch._(firestore);
+  static WriteBatch create(FirebaseFirestore firestore) =>
+      WriteBatch._(firestore);
 }

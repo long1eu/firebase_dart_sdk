@@ -8,28 +8,27 @@ What `cloud_firestore_dart` does, what it does not do yet, and the known gaps. T
 - Documents, collections, collection groups, set/update/delete, `SetOptions` merge.
 - Typed data converters: `withConverter<T>` on references and queries, generic snapshots.
 - Queries: `where` filters including `!=` and `not-in`, `arrayContains(Any)`, `in`, as
-  `whereEqualTo(...)`-style methods, `where('age', isGreaterThan: 18)` named arguments or
-  `Filter` objects; composite `Filter.or` / `Filter.and` (OR queries, multiple inequality
+  `where('age', isGreaterThan: 18)` named arguments or `Filter` objects; composite `Filter.or` / `Filter.and` (OR queries, multiple inequality
   filters); `orderBy`, cursors, `limit` and `limitToLast`.
 - Real-time listeners with `MetadataChanges`, and `ListenSource.cache` to listen to the local
   cache only.
 - Aggregations: `Query.count()`, `Query.aggregate([...])` with `AggregateField.count/sum/average`,
   `Query.aggregateWithAliases({...})`.
-- Vector values (`FieldValue.vector`) and `Query.findNearest` (server only; no local evaluation).
+- Vector values (`VectorValue`) and `Query.findNearest` (server only; no local evaluation).
 - BSON value types of Enterprise edition databases: `MinKey`, `MaxKey`, `Int32Value`,
   `Decimal128Value`, `BsonObjectId`, `BsonTimestamp`, `RegexValue` and `Blob.bsonBinary`.
 - Pipelines (**preview**, Enterprise edition databases, server only): see
   [Pipelines](pipelines.md).
 - Firestore Lite (**experimental**): a second entry point without cache, listeners and sync
   engine, where every call is one request. See [Firestore Lite](lite.md).
-- Transactions with `TransactionOptions(maxAttempts)` and retry with exponential backoff,
-  read-only transactions (`TransactionOptions(readOnly: true)`); write batches.
+- Transactions with `maxAttempts` and retry with exponential backoff,
+  read-only transactions (`readOnly: true`); write batches.
 - Field transforms: server timestamp, increment, `FieldValue.maximum` / `minimum`, array union
   and remove. Transforms are folded into set/patch writes (the old `TransformMutation` is gone).
-- Data bundles: `loadBundle`, `loadBundleStream`, `getNamedQuery`.
+- Data bundles: `loadBundle`, `loadBundleStream`, `namedQuery`.
 - Snapshots and references as JSON (`toJson` / `fromJson`, in the format of the JS SDK), and
   listeners resumed from a serialized snapshot.
-- Offline cache in SQLite with LRU garbage collection; `FirestoreSettings.cacheSettings`
+- Offline cache in SQLite with LRU garbage collection; `Settings.cacheSettings`
   (`PersistentCacheSettings`, `MemoryCacheSettings` with eager or LRU GC). Queries against the
   cache use the results of earlier listens instead of scanning the collection (index-free
   queries), and pending writes are kept as per-document overlays.
@@ -37,13 +36,13 @@ What `cloud_firestore_dart` does, what it does not do yet, and the known gaps. T
   indexes for cache queries on its own (`enableIndexAutoCreation`), and the deprecated
   `Firestore.setIndexConfiguration` takes a `firestore.indexes.json` definition. See
   [Persistent cache indexes](offline_persistence.md#persistent-cache-indexes).
-- `Firestore.waitForPendingWrites()`, `terminate()`, `clearPersistence()`, `snapshotsInSync`
+- `Firestore.waitForPendingWrites()`, `terminate()`, `clearPersistence()`, `snapshotsInSync()`
   stream, `enableNetwork` / `disableNetwork`.
-- Emulator support with a mock user token; `Firestore.setLogLevel`.
+- Emulator support with a mock user token; `FirebaseFirestore.setLogLevel`.
 - Bloom-filter existence-filter handling on reconnect (server `expected_count`).
 - gRPC keepalive, connect timeout, backoff reset on connectivity change, streams closed after
   one minute idle.
-- App Check token plumbing: an `InternalAppCheckTokenProvider` set on the `FirebaseApp` makes
+- App Check token plumbing: an `AppCheckTokenProvider` set on the `FirebaseApp` makes
   every RPC carry the `x-firebase-appcheck` header (see `docs/app_check_design.md` in the repository). This
   package does not attest a device; you supply the provider.
 

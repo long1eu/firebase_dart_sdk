@@ -35,7 +35,10 @@ class _ExplicitConverter extends FirestoreDataConverter<MyModelType> {
   @override
   MyModelType fromFirestore(
     QueryDocumentSnapshot<Map<String, Object?>> snapshot,
-  ) => MyModelType(snapshot.data['a']! as String, snapshot.data['b']! as num);
+  ) => MyModelType(
+    snapshot.data()['a']! as String,
+    snapshot.data()['b']! as num,
+  );
 }
 
 /// The JS test body shared by the converter cases.
@@ -44,12 +47,13 @@ Future<void> _useConverter(
   FirestoreDataConverter<MyModelType> converter,
 ) async {
   final DocumentReference<MyModelType> newDocRef = docRef.withConverter(
-    converter,
+    fromFirestore: converter.fromFirestore,
+    toFirestore: converter.toFirestore,
   );
   await newDocRef.set(const MyModelType('foo', 42));
   await newDocRef.update(<String, Object?>{'a': 'newFoo', 'b': 43});
   final DocumentSnapshot<MyModelType> snapshot = await newDocRef.get();
-  final MyModelType data = snapshot.data!;
+  final MyModelType data = snapshot.data()!;
   expect(data.stringProperty, 'newFoo');
   expect(data.numberProperty, 43);
 }
@@ -70,8 +74,8 @@ void main() {
             fromFirestore:
                 (QueryDocumentSnapshot<Map<String, Object?>> snapshot) =>
                     MyModelType(
-                      snapshot.data['a']! as String,
-                      snapshot.data['b']! as num,
+                      snapshot.data()['a']! as String,
+                      snapshot.data()['b']! as num,
                     ),
           );
       neverCall((DocumentReference<Map<String, Object?>> docRef) {
@@ -91,8 +95,8 @@ void main() {
             fromFirestore:
                 (QueryDocumentSnapshot<Map<String, Object?>> snapshot) {
                   return MyModelType(
-                    snapshot.data['a']! as String,
-                    snapshot.data['b']! as num,
+                    snapshot.data()['a']! as String,
+                    snapshot.data()['b']! as num,
                   );
                 },
           );
@@ -117,8 +121,8 @@ void main() {
             fromFirestore:
                 (QueryDocumentSnapshot<Map<String, Object?>> snapshot) =>
                     MyModelType(
-                      snapshot.data['a']! as String,
-                      snapshot.data['b']! as num,
+                      snapshot.data()['a']! as String,
+                      snapshot.data()['b']! as num,
                     ),
           );
       neverCall((DocumentReference<Map<String, Object?>> docRef) {
@@ -138,7 +142,10 @@ void main() {
         'missing properties', () {
       neverCall((DocumentReference<Map<String, Object?>> docRef) async {
         final DocumentReference<MyModelType> docRefWithConverter = docRef
-            .withConverter(const _ExplicitConverter());
+            .withConverter(
+              fromFirestore: (const _ExplicitConverter()).fromFirestore,
+              toFirestore: (const _ExplicitConverter()).toFirestore,
+            );
         await docRefWithConverter.update(<String, Object?>{});
       });
     });
@@ -148,10 +155,13 @@ void main() {
         DocumentReference<Map<String, Object?>> docRef,
       ) async {
         final DocumentReference<MyModelType> docRefWithConverter = docRef
-            .withConverter(const _ExplicitConverter());
+            .withConverter(
+              fromFirestore: (const _ExplicitConverter()).fromFirestore,
+              toFirestore: (const _ExplicitConverter()).toFirestore,
+            );
         final DocumentSnapshot<MyModelType> snapshot = await docRefWithConverter
             .get();
-        return snapshot.data!;
+        return snapshot.data()!;
       });
     });
   });

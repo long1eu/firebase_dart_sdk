@@ -15,6 +15,10 @@ import 'package:test/test.dart';
 import '../../../util/integration_test_util.dart';
 import '../../../util/property.dart';
 import '../../../util/property_backend.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/core/filter/filter.dart'
+    show FilterOperator;
+import 'package:cloud_firestore_dart/src/firebase/firestore/filter.dart'
+    show UnaryFilter;
 
 /// Property tests write many documents and compare with the emulator: they
 /// never run against a real project.
@@ -86,7 +90,8 @@ void main() {
           'an Enterprise edition database matches null and NaN like the SDK',
         ),
     () async {
-      final Firestore firestore = await IntegrationTestUtil.testFirestore();
+      final FirebaseFirestore firestore =
+          await IntegrationTestUtil.testFirestore();
       final CollectionReference<Map<String, Object?>> collection = firestore
           .collection('property_query_${autoId()}');
       await collection.doc('null').set(<String, Object?>{'v': null});
@@ -98,7 +103,7 @@ void main() {
       // All documents are in the cache of this client.
       final Map<String, Document> documents = <String, Document>{
         for (final QueryDocumentSnapshot<Map<String, Object?>> doc
-            in (await collection.get(Source.server)).docs)
+            in (await collection.get(GetOptions(source: Source.server))).docs)
           doc.id: doc.document!,
       };
 
@@ -114,13 +119,13 @@ void main() {
         ], unorderedEquals(sdk));
         expect(<String>[
           for (final QueryDocumentSnapshot<Map<String, Object?>> doc
-              in (await query.get(Source.cache)).docs)
+              in (await query.get(GetOptions(source: Source.cache))).docs)
             doc.id,
         ], unorderedEquals(sdk));
 
         // A get from the server completes with the answer of the backend.
         final QuerySnapshot<Map<String, Object?>> snapshot = await query
-            .get(Source.server)
+            .get(GetOptions(source: Source.server))
             .timeout(const Duration(seconds: 20));
         expect(<String>[
           for (final QueryDocumentSnapshot<Map<String, Object?>> doc
@@ -135,7 +140,7 @@ void main() {
             <QuerySnapshot<Map<String, Object?>>>[];
         final StreamSubscription<QuerySnapshot<Map<String, Object?>>>
         subscription = query
-            .getSnapshots(MetadataChanges.include)
+            .snapshots(includeMetadataChanges: true)
             .listen(events.add);
         await Future<void>.delayed(const Duration(seconds: 2));
         await subscription.cancel();
@@ -164,7 +169,7 @@ void main() {
         sdk: <String>['nan'],
       );
       await expectConvergence(
-        collection.where(Filter.arrayContains('v', null)),
+        collection.where(_arrayContainsNull('v')),
         backend: <String>[],
         sdk: <String>['array'],
       );
@@ -174,7 +179,7 @@ void main() {
         sdk: <String>['array'],
       );
       await expectConvergence(
-        collection.where(Filter.lessThanOrEqualTo('v', null)),
+        collection.where(_nullFilter('v', FilterOperator.lessThanOrEqual)),
         backend: <String>[],
         sdk: <String>['null'],
       );
@@ -198,7 +203,10 @@ void main() {
 
       // The documents are still in the cache and still results of other
       // queries.
-      expect((await collection.get(Source.server)).docs, hasLength(4));
+      expect(
+        (await collection.get(GetOptions(source: Source.server))).docs,
+        hasLength(4),
+      );
     },
     timeout: const Timeout(Duration(minutes: 3)),
   );
@@ -242,3 +250,16 @@ void main() {
     timeout: const Timeout(Duration(minutes: 5)),
   );
 }
+
+/// `array-contains null`, which the named arguments of `where` cannot express
+/// (a null argument counts as not given).
+Filter _arrayContainsNull(String field) => UnaryFilter(
+  FieldPath.fromString(field),
+  FilterOperator.arrayContains,
+  null,
+);
+
+/// A comparison with null other than `==` and `!=`, which the named arguments
+/// of `where` cannot express either.
+Filter _nullFilter(String field, FilterOperator op) =>
+    UnaryFilter(FieldPath.fromString(field), op, null);

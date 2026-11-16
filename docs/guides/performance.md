@@ -35,7 +35,7 @@ and measure your own app before you tune it.
 ## How a query is answered from the cache
 
 Every query that the client answers locally goes through the query engine (`local/default_query_engine.dart`):
-`get(Source.cache)`, any `get()` while the client is offline, and the first snapshot of every listener before
+`get(const GetOptions(source: Source.cache))`, any `get()` while the client is offline, and the first snapshot of every listener before
 the backend has answered. It tries three plans, in this order, and the result is the same with each:
 
 1. **A persistent cache index** (SQLite cache only), if one covers the query. See the next section.
@@ -111,9 +111,9 @@ What the client does:
   `enableIndexAutoCreation()`. After a cache query was answered by a scan, the client creates an index for it
   when the scan read at least 100 documents and more than twice as many documents as it returned.
 - Because a scan returns every match before the limit is applied, a limit query without selective filters
-  (for example `orderBy('total', Direction.descending).limit(5)` on a large collection) returns as many documents
+  (for example `orderBy('total', descending: true).limit(5)` on a large collection) returns as many documents
   as it read, and never gets an index automatically. Configure one with the deprecated
-  `setIndexConfiguration` instead.
+  `setIndexConfigurationFromJSON` instead.
 - **Filling** (`local/index_backfiller.dart`) runs in the background, on the client's queue: the first run 15
   seconds after the instance was created, then one run per minute, each run indexing at most **50 documents**
   across all collections. A new index on a collection of 10,000 cached documents is therefore complete after
@@ -152,7 +152,7 @@ The table as a chart, on one scale; the index bars are the short ones next to ea
 [Parity, known limitations](../parity.md#known-limitations) (item 15): watch sends a document in a later
 snapshot at the same version as an earlier one, after the index was already brought up to date for that
 version, and the document's id sorts before the documents indexed last. The document is then missing from
-`get(Source.cache)`, the first snapshot of a new listener and a refilled limit window, until it changes
+`get(const GetOptions(source: Source.cache))`, the first snapshot of a new listener and a refilled limit window, until it changes
 again. It has not been seen against the emulator or production, the JS and Android SDKs have the same gap, and
 queries that no index serves are not affected.
 
@@ -162,7 +162,7 @@ queries that no index serves are not affected.
   with `Source.cache`, and the cache lives across many app starts (a persistent cache on a phone or a
   desktop). The index pays off only once it is filled, which takes minutes to hours of running time.
 - For `orderBy` + `limit` queries on large collections, configure an index for the ordered field with
-  `setIndexConfiguration` (deprecated, as in the other SDKs; it replaces the whole configuration).
+  `setIndexConfigurationFromJSON` (deprecated, as in the other SDKs; it replaces the whole configuration).
 - Do not turn it on for short-lived processes or for small collections (under a few thousand documents a scan
   takes a few milliseconds, see above).
 - `deleteAllIndexes()` removes them all, for example if the file has grown too large.
@@ -172,7 +172,7 @@ await firestore.persistentCacheIndexManager?.enableIndexAutoCreation();
 
 // An index for a query that automatic creation skips (deprecated API).
 // ignore: deprecated_member_use
-await firestore.setIndexConfiguration('''
+await firestore.setIndexConfigurationFromJSON('''
 {
   "indexes": [
     {
@@ -194,7 +194,7 @@ SDK creates an index, and 16 seconds later the first fill run has indexed 50 doc
 What the client does (`local/lru_garbage_collector.dart`):
 
 - The threshold is `PersistentCacheSettings(sizeBytes: ...)` (or `MemoryLruGcSettings(sizeBytes: ...)` for a
-  memory cache): **100 MB** by default, at least 1 MB, or `FirestoreSettings.cacheSizeUnlimited` to never
+  memory cache): **100 MB** by default, at least 1 MB, or `Settings.cacheSizeUnlimited` to never
   collect.
 - The first check runs **one minute** after the instance starts, then every **five minutes**, on the primary
   client only (see [Several clients on one cache](multiple_clients.md)). There is no call that runs it.
@@ -224,7 +224,7 @@ parameters removed 1,000 documents in 46 ms; removing the other 49,000 in one ru
   also a memory budget there (see [Offline persistence on the web](offline_persistence.md#on-the-web)).
 
 ```dart
-final FirestoreSettings settings = FirestoreSettings(
+final Settings settings = Settings(
   cacheSettings: PersistentCacheSettings(sizeBytes: 200 * 1024 * 1024),
 );
 ```
@@ -237,7 +237,7 @@ listener: the first run removes 5 queries and their 50 documents, and the files 
 | | Memory, eager GC (default without an `openDatabase`) | Memory, LRU GC | SQLite |
 |---|---|---|---|
 | Survives a restart | no | no | yes |
-| `get(Source.cache)` after a `get()` | finds nothing (the documents left with the listener) | finds the documents | finds the documents |
+| `get(const GetOptions(source: Source.cache))` after a `get()` | finds nothing (the documents left with the listener) | finds the documents | finds the documents |
 | Offline answers for queries listened to before | only while a listener holds them | yes, up to the threshold | yes, up to the threshold |
 | Cache indexes | no | no | yes |
 | Cost | memory per document | memory, plus a full serialization every five minutes | a disk write per change, file on disk |
@@ -259,7 +259,7 @@ What the client does (`core/event_manager.dart`):
 - Listeners on **equal queries** (same path, filters, orders, limits and cursors, even from different
   `Query` objects) share that target and view. A second listener gets its first snapshot from the existing
   view, without a request (`cache_vs_server.dart`: 0 ms, not from cache).
-- `MetadataChanges.include` does not add work on the network or in the view; it delivers more events to your
+- `includeMetadataChanges: true` does not add work on the network or in the view; it delivers more events to your
   code (every change of `hasPendingWrites` and `isFromCache`).
 - A listener with `ListenSource.cache` has no target on the backend: it sees local writes and what other
   listeners bring into the cache.
@@ -272,13 +272,13 @@ What the client does (`core/event_manager.dart`):
   management object) instead of building a listener per widget; if you cannot, build equal queries, which
   share a target anyway.
 - Cancel listeners you no longer show. Each active target costs backend reads for every change it receives.
-- Use `MetadataChanges.include` only where you show pending or offline state.
+- Use `includeMetadataChanges: true` only where you show pending or offline state.
 - For views derived from data that another listener already follows, listen with `ListenSource.cache`:
 
 ```dart
 final Stream<QuerySnapshot<Map<String, Object?>>> local = users
     .where('online', isEqualTo: true)
-    .getSnapshotsWithOptions(const SnapshotListenOptions(source: ListenSource.cache));
+    .snapshots(source: ListenSource.cache);
 ```
 
 ## Limits and pagination
@@ -311,7 +311,7 @@ them anyway, or when the number must work offline (count `snapshot.length` of a 
 
 ```dart
 final AggregateQuerySnapshot snapshot = await users.where('active', isEqualTo: true).count().get();
-print(snapshot.getCount());
+print(snapshot.count);
 ```
 
 ## Writes and batches
@@ -351,9 +351,9 @@ named query from the cache took 50 to 75 ms (including opening the file), and th
 result at once and the backend's update 36 to 41 ms later (emulator).
 
 ```dart
-final LoadBundleTaskProgress progress = await firestore.loadBundle(bundleBytes).future;
-final Query<Map<String, Object?>>? latest = await firestore.getNamedQuery('latest-stories');
-final QuerySnapshot<Map<String, Object?>> firstScreen = await latest!.get(Source.cache);
+final LoadBundleTaskSnapshot progress = await firestore.loadBundle(bundleBytes).future;
+final Query<Map<String, Object?>>? latest = await firestore.namedQuery('latest-stories');
+final QuerySnapshot<Map<String, Object?>> firstScreen = await latest!.get(const GetOptions(source: Source.cache));
 ```
 
 **What to do.** Use a bundle for data that many users read on their first start (a catalogue, the front page)
@@ -361,16 +361,16 @@ and serve it from a CDN. Not worth it for per-user data, or for apps whose cache
 
 ## Reading from the cache only
 
-`get(Source.cache)` never contacts the backend: a document read is a lookup by key (21 us above), a query goes
+`get(const GetOptions(source: Source.cache))` never contacts the backend: a document read is a lookup by key (21 us above), a query goes
 through the plans of the first section. A document that is not in the cache fails with `unavailable`; a
-document the cache knows to be missing returns a snapshot with `exists == false`. `get(Source.server)` still
+document the cache knows to be missing returns a snapshot with `exists == false`. `get(const GetOptions(source: Source.server))` still
 listens (one target), and fails with `unavailable` when the result could only come from the cache.
 
 **What to do.** Use `Source.cache` for data you know a listener keeps current, or to show something at once
 while the normal `get()` runs.
 
 ```dart
-final DocumentSnapshot<Map<String, Object?>> cached = await users.doc('ada').get(Source.cache);
+final DocumentSnapshot<Map<String, Object?>> cached = await users.doc('ada').get(const GetOptions(source: Source.cache));
 ```
 
 ## Transport
@@ -383,16 +383,16 @@ On the Dart VM and in Flutter the client uses gRPC over HTTP/2 (`remote/datastor
   answer within 20 seconds, so a half-dead connection is replaced; no pings while idle;
 - a connection attempt times out after 15 seconds;
 - the listen and write streams are closed after one minute without targets or writes;
-- `FirestoreSettings.grpcFlowControlWindow`, 256 KiB by default (as in the Android and JS SDKs): a larger
+- `Settings.grpcFlowControlWindow`, 256 KiB by default (as in the Android and JS SDKs): a larger
   window helps large reads on a connection with a long round trip, at the cost of one round trip before the
   first request of a new connection.
 
 In the browser the client uses WebChannel for the listen and write streams and REST for one-shot calls
 ([Platforms](platforms.md#the-web-experimental)). It switches a stream to long polling when the first response
-does not arrive within 10 seconds (`experimentalAutoDetectLongPolling`, on by default), which is how a
+does not arrive within 10 seconds (`webExperimentalAutoDetectLongPolling`, on by default), which is how a
 buffering proxy shows. Long polling works on every network but makes a new request for every batch of changes.
 
-**What to do.** Keep the defaults. Set `experimentalForceLongPolling: true` only for users behind a proxy that
+**What to do.** Keep the defaults. Set `webExperimentalForceLongPolling: true` only for users behind a proxy that
 breaks streaming, since it skips the 10 second detection; there is nothing to tune for gRPC keepalive.
 
 ## Startup with a large cache

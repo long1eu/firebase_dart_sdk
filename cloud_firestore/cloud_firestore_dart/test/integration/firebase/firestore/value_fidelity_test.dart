@@ -38,8 +38,8 @@ void main() {
   /// Writes [data] with one client and reads it from the backend with another, so that nothing comes from a cache.
   Future<Json> throughBackend(Json data,
       {bool viaTransaction = false}) async {
-    final Firestore writer = await IntegrationTestUtil.testFirestore();
-    final Firestore reader = await IntegrationTestUtil.testFirestore();
+    final FirebaseFirestore writer = await IntegrationTestUtil.testFirestore();
+    final FirebaseFirestore reader = await IntegrationTestUtil.testFirestore();
     final DocumentReference<Json> doc =
         writer.collection('fidelity${autoId()}').doc('values');
     if (viaTransaction) {
@@ -51,9 +51,9 @@ void main() {
       await doc.set(data);
     }
     final DocumentSnapshot<Json> snapshot =
-        await reader.doc(doc.path).get(Source.server);
+        await reader.doc(doc.path).get(GetOptions(source: Source.server));
     expect(snapshot.metadata.isFromCache, isFalse);
-    return snapshot.data!;
+    return snapshot.data()!;
   }
 
   void expectNegativeZero(Object? value) {
@@ -155,7 +155,7 @@ void main() {
   }
 
   test('these values work as query bounds and in transforms', () async {
-    final Firestore firestore = await IntegrationTestUtil.testFirestore();
+    final FirebaseFirestore firestore = await IntegrationTestUtil.testFirestore();
     final CollectionReference<Json> collection =
         firestore.collection('fidelity${autoId()}');
     await collection.doc('nan').set(<String, Object?>{'v': double.nan});
@@ -165,7 +165,7 @@ void main() {
     await collection.doc('max').set(<String, Object?>{'v': maxInt});
 
     Future<List<String>> ids(Query<Json> query) async =>
-        (await query.get(Source.server))
+        (await query.get(GetOptions(source: Source.server)))
             .docs
             .map((QueryDocumentSnapshot<Json> d) => d.id)
             .toList();
@@ -184,8 +184,8 @@ void main() {
     await collection.doc('zero').update(<String, Object?>{
       'list': FieldValue.arrayUnion(<Object?>[1.5, Blob(Uint8List(0))]),
     });
-    final List<Object?> list = (await collection.doc('zero').get(Source.server))
-        .data!['list']! as List<Object?>;
+    final List<Object?> list = (await collection.doc('zero').get(GetOptions(source: Source.server)))
+        .data()!['list']! as List<Object?>;
     expect(list, hasLength(2));
     expect(list[0], 1.5);
     expect((list[1]! as Blob).bytes, isEmpty);

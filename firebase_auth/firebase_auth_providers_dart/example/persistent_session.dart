@@ -75,7 +75,7 @@ class FileAuthStorage implements AuthStorage {
 
 const FirebaseOptions _options = FirebaseOptions(
   apiKey: 'fake-api-key',
-  applicationId: '1:1234567890:dart:example',
+  appId: '1:1234567890:dart:example',
   projectId: 'demo-test',
 );
 
@@ -140,6 +140,6 @@ Future<String> _run(
     return await body(auth);
   } finally {
     await auth.dispose();
-    app.delete();
+    await app.delete();
   }
 }

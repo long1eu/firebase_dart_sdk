@@ -25,7 +25,7 @@ Object? toJsonValue(Object? value) => switch (value) {
 
 /// The Firestore value of a JSON [value]: the tagged maps written by
 /// [toJsonValue] become their types again, everything else stays as it is.
-Object? fromJsonValue(Firestore firestore, Object? value) {
+Object? fromJsonValue(FirebaseFirestore firestore, Object? value) {
   switch (value) {
     case final List<Object?> list:
       return <Object?>[

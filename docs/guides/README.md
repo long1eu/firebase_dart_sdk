@@ -1,7 +1,8 @@
 # Guides
 
 Guides for `cloud_firestore_dart`, the unofficial pure-Dart Cloud Firestore client, its app layer
-`firebase_app_dart` and the token providers of `firebase_auth_providers_dart`. The package
+`firebase_app_dart`, the token providers of `firebase_auth_providers_dart` and the SQLite cache of
+`cloud_firestore_dart_sqlite`. The package
 READMEs are short landing pages; the API reference is on pub.dev.
 
 1. [Getting started](getting_started.md): install, create the app and the instance, read and
@@ -58,6 +59,9 @@ READMEs are short landing pages; the API reference is on pub.dev.
 24. [Using cloud_firestore_dart with FlutterFire sign-in](flutterfire_bridge.md): the
     `cloud_firestore_dart_flutterfire` bridge, which reuses the options and the signed-in user of
     `firebase_core` and `firebase_auth`, how user changes reach Firestore, and its limits.
+25. [The official cloud_firestore API on cloud_firestore_dart](flutterfire_platform.md): keep
+    FlutterFire's API (`FirebaseFirestore.instance`) and run it on `cloud_firestore_dart`,
+    automatically on Linux or by `CloudFirestoreDart.use()` anywhere.
 
 Every Dart snippet in these guides is compiled against the current API by
 `cloud_firestore/cloud_firestore_dart/test/unit/api/readme_snippets_test.dart`, except the blocks
