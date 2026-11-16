@@ -11,6 +11,25 @@ read (documents that were only read are verified). When a precondition fails the
 run again, up to `TransactionOptions.maxAttempts` times (5 by default), so the callback must not
 have side effects of its own.
 
+The loop of `TransactionRunner`; look at which errors lead back to the top:
+
+```mermaid
+flowchart TD
+    start["runTransaction"] --> wait["Wait for the backoff: none before the first attempt, then about 1 s, growing"]
+    wait --> run["Run the callback: transaction.get reads from the backend"]
+    run --> commit["Commit every write with a precondition on the version read"]
+    commit -->|success| done["Return the result of the callback"]
+    run -->|error| retry{"Attempts left, instance not terminated, and a retryable error?"}
+    commit -->|error| retry
+    retry -->|yes| wait
+    retry -->|no| fail["Fail with the error"]
+```
+
+Retryable are `aborted`, `failedPrecondition`, `alreadyExists`, and the errors that are not permanent
+(`Datastore.isPermanentError`: the connection-level errors listed below, and `unauthenticated`). A
+read-only transaction retries only the errors that are not permanent, and an error that is not a
+`FirestoreError` (one your callback throws) is never retried.
+
 **A commit whose answer is lost can be applied twice.** A commit is retried when it fails with
 `aborted`, `failedPrecondition` or `alreadyExists`, which the backend only returns when nothing was
 applied, but also on connection-level errors (`unavailable`, `unknown`, `cancelled`,
@@ -60,6 +79,35 @@ final total = await firestore.runTransaction((transaction) async {
   again now sees the snapshot instead.
 
 ## Lifecycle: `terminate()`
+
+An instance starts as soon as it is created. Follow the arrows for the calls that move it between
+states; the table under the picture says which calls work in each state.
+
+```mermaid
+stateDiagram-v2
+    direction LR
+    running : Running
+    networkDisabled : Network disabled
+    terminated : Terminated
+    [*] --> running: Firestore.instanceFor
+    running --> networkDisabled: disableNetwork()
+    networkDisabled --> running: enableNetwork()
+    running --> terminated: terminate()
+    networkDisabled --> terminated: terminate()
+    terminated --> terminated: terminate() again does nothing
+```
+
+| Call | Running | Network disabled | Terminated |
+|---|---|---|---|
+| Listeners, `get()` | from the cache and the backend | from the cache; `get()` of a document that is not cached fails with `unavailable` | fail with `failedPrecondition` |
+| Writes | stored and sent; the future completes on the acknowledgement | stored; sent, and the future completes, after `enableNetwork()` | fail with `failedPrecondition` |
+| Aggregations, `get(Source.server)` | work | fail | fail with `failedPrecondition` |
+| Transactions | work | not blocked by the client (see below) | fail with `failedPrecondition` |
+| `clearPersistence()` | fails with `failedPrecondition` | fails with `failedPrecondition` | works, unless a newer instance has the same cache open |
+| `terminate()` | terminates | terminates | does nothing |
+
+After `terminate()`, `Firestore.instanceFor` creates a new instance. A transaction reads and commits
+over unary calls, not the streams, and the client does not check the network state before it starts one.
 
 `await firestore.terminate()` stops the instance: listeners stop receiving events, the streams and
 the local cache are closed, and `Firestore.instanceFor` returns a new instance from then on. What
