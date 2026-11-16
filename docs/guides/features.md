@@ -8,8 +8,7 @@ What `cloud_firestore_dart` does, what it does not do yet, and the known gaps. T
 - Documents, collections, collection groups, set/update/delete, `SetOptions` merge.
 - Typed data converters: `withConverter<T>` on references and queries, generic snapshots.
 - Queries: `where` filters including `!=` and `not-in`, `arrayContains(Any)`, `in`, as
-  `whereEqualTo(...)`-style methods, `where('age', isGreaterThan: 18)` named arguments or
-  `Filter` objects; composite `Filter.or` / `Filter.and` (OR queries, multiple inequality
+  `where('age', isGreaterThan: 18)` named arguments or `Filter` objects; composite `Filter.or` / `Filter.and` (OR queries, multiple inequality
   filters); `orderBy`, cursors, `limit` and `limitToLast`.
 - Real-time listeners with `MetadataChanges`, and `ListenSource.cache` to listen to the local
   cache only.

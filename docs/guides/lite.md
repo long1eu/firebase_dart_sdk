@@ -76,8 +76,7 @@ to use both in one file, import one with a prefix. The value types (`Timestamp`,
   `mockUserToken`, Firebase Auth and App Check tokens of the `FirebaseApp`.
 - **What it does not have:** snapshot streams, `Source`, snapshot metadata
   (`hasPendingWrites`, `isFromCache`), persistence and cache settings, bundles, offline
-  behaviour of any kind, vector queries (`findNearest`), pipelines, and the
-  `whereEqualTo(...)`-style query methods (use `where`).
+  behaviour of any kind, vector queries (`findNearest`) and pipelines.
 
 Differences from the main library that are not just missing features:
 `FirebaseFirestore.instanceFor` is synchronous; `FirestoreDataConverter.fromFirestore` takes only the

@@ -1,5 +1,8 @@
 # Migrating from `cloud_firestore_vm` / `firebase_core_vm`
 
+> The names on the "after" side are those of 0.2. Going on to 0.2 removed the names this guide calls
+> deprecated; [Migrating from 0.1 to 0.2](api_migration_0_2.md) lists them.
+
 `cloud_firestore_vm` 0.0.7 (April 2020) and `firebase_core_vm` 0.0.4 (March 2020) continue as
 `cloud_firestore_dart` 0.1.0 and `firebase_app_dart` 0.1.0. It is the same code base, moved to
 Dart 3 with null safety and synced with newer versions of the official SDKs. (`firebase_core_vm`
@@ -75,10 +78,10 @@ moved with the package name; most of what was reachable that way is now internal
 `cloud_firestore_dart` and `firebase_app_dart` need Dart `^3.8.0` (the minimum of `grpc` 5, and the lowest SDK the CI runs); both are null safe. Values that could always be missing are now
 typed as nullable:
 
-- `DocumentSnapshot.data` is `null` for a document that does not exist, and field values are
+- `DocumentSnapshot.data()` is `null` for a document that does not exist, and field values are
   `Object?`.
-- `FirebaseOptions.projectId`, `databaseUrl`, `storageBucket`, `gcmSenderId`, `gaTrackingId`
-  are nullable; `apiKey` and `applicationId` are required.
+- `FirebaseOptions.projectId`, `databaseURL`, `storageBucket`, `messagingSenderId`, `trackingId`
+  are nullable; `apiKey` and `appId` are required.
 
 Before:
 
@@ -247,12 +250,12 @@ is not supported.
 
 | Before | After |
 |---|---|
-| `Firestore.getInstance(app, ...)` | `Firestore.instanceFor(app: app, ...)` |
+| `Firestore.getInstance(app, ...)` | `FirebaseFirestore.instanceFor(app: app, ...)` |
 | `firestore.document(path)`, `collection.document(id)` | `firestore.doc(path)`, `collection.doc(id)` |
-| `snapshot.reference` | `snapshot.ref` |
+| `snapshot.reference` | `snapshot.reference` |
 | `querySnapshot.documents` | `querySnapshot.docs` |
 | `querySnapshot.documentChanges` | `querySnapshot.docChanges` |
-| `FieldPath.documentId()` | `FieldPath.documentIdField` |
+| `FieldPath.documentId()` | `FieldPath.documentId` |
 | `Source.defaultSource` | `Source.serverAndCache` |
 | `firestore.shutdown()` | `firestore.terminate()` |
 
@@ -318,14 +321,14 @@ library any more. The classes of the API have no public constructor either: inst
 |---|---|
 | `firestore.databaseId.projectId` | `firestore.projectId` |
 | `firestore.databaseId.databaseId` | `firestore.databaseId` (now the database name as a `String`) |
-| `Firestore.newInstance(...)`, `Firestore(...)` | `Firestore.instanceFor(...)`; an auth or App Check provider comes from the `FirebaseApp` (`PlatformDependencies.authProvider` / `appCheckProvider`) |
+| `Firestore.newInstance(...)`, `Firestore(...)` | `FirebaseFirestore.instanceFor(...)`; an auth or App Check provider comes from the `FirebaseApp` (`PlatformDependencies.authProvider` / `appCheckProvider`) |
 | `firestore.client`, `scheduler`, `dataConverter`, `validateReference` | no replacement (implementation) |
 | `query.query`, `querySnapshot.snapshot`, `snapshot.document`, `reference.key` | no replacement (core model types); use `path`, `id`, `data`, `metadata` |
-| `FieldPath(...)` unnamed constructor, `internalPath`, `documentIdInstance` | `FieldPath.of([...])`, `FieldPath.fromDotSeparatedPath('a.b')`, `FieldPath.documentIdField` |
+| `FieldPath(...)` unnamed constructor, `internalPath`, `documentIdInstance` | `FieldPath([...])`, `FieldPath.fromString('a.b')`, `FieldPath.documentId` |
 | `fieldValue.isDelete`, `isServerTimestamp`, ..., `elements`, `methodName` | no replacement (implementation) |
 | `SetOptions.fieldMask` | no replacement; `SetOptions.merge` stays |
 | `LoadBundleTask()` constructor, `setResult`, `setException`, `updateProgress` | tasks come from `firestore.loadBundle(...)` |
-| `FirestoreErrorCode.fromValue(grpcError)` | no replacement; `FirestoreError.code` |
+| `FirestoreErrorCode.fromValue(grpcError)` | no replacement; `FirestoreException.errorCode` |
 | `Timestamp.validateRange` | no replacement |
 | `maxVectorQueryLimit`, `maxVectorQueryDimensions`, `ConflictAlgorithm` | not exported |
 
@@ -394,17 +397,17 @@ print('${firestore.projectId} / ${firestore.databaseId}');
   converted when they are loaded.
 - **Locally changed documents** have no version until the backend acknowledges the write. This
   is not visible through the public API.
-- **Using an instance after `terminate()`** fails with a `FirestoreError` with the code
+- **Using an instance after `terminate()`** fails with a `FirestoreException` with the code
   `failedPrecondition` ("The client has already been terminated."), delivered through the
   returned `Future` or `Stream`. 0.0.7 threw an `ArgumentError` ("The client has already been
-  shutdown"). Code that caught `ArgumentError` for this has to catch `FirestoreError`:
+  shutdown"). Code that caught `ArgumentError` for this has to catch `FirestoreException`:
 
   ```dart
   await firestore.terminate();
   try {
     await users.doc('ada').get();
   } on FirestoreException catch (e) {
-    print(e.code == FirestoreErrorCode.failedPrecondition); // true
+    print(e.errorCode == FirestoreErrorCode.failedPrecondition); // true
   }
   ```
 

@@ -89,7 +89,9 @@ class FirebaseFirestore {
   }) {
     final String? projectId = app.options.projectId;
     if (projectId == null) {
-      throw ArgumentError('FirebaseOptions.getProjectId() cannot be null');
+      throw ArgumentError(
+        'FirebaseOptions.projectId must be set to use Firestore',
+      );
     }
     final String key = _keyFor(app.name, databaseId);
     final FirebaseFirestore? existing = _instances[key];

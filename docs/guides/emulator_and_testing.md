@@ -126,8 +126,8 @@ skipped there with a reason, and `test/integration_enterprise/edition_difference
 pins the Enterprise behaviour. These were observed with the emulator only, not with a production
 Enterprise database.
 
-- **`null` and `NaN` in equality filters.** `whereIn`, `whereArrayContains` and
-  `whereArrayContainsAny` match fields (or array elements) that are `null` or `NaN` when the
+- **`null` and `NaN` in equality filters.** `whereIn`, `arrayContains` and
+  `arrayContainsAny` match fields (or array elements) that are `null` or `NaN` when the
   filter value is `null` or `NaN`. On Standard they never match.
   The client evaluates these filters like Enterprise (as the JS and Android SDKs do: null is
   null, NaN is NaN; the same holds for `<=` and `>=` with a `null` or `NaN` operand). On

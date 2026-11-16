@@ -31,8 +31,7 @@ Firebase Android SDK.
   the cache (fails with `unavailable` if the document is not cached); `get(const GetOptions(source: Source.server))` only the
   backend (fails offline).
 - Listeners are streams: `ref.snapshots()`, `query.snapshots()`, `snapshots(includeMetadataChanges: true)`
-  for metadata-only changes, `getSnapshotsWithOptions(SnapshotListenOptions(source:
-  ListenSource.cache))` for the cache only. Cancel the `StreamSubscription` to stop. Errors (for
+  for metadata-only changes, `snapshots(source: ListenSource.cache)` for the cache only. Cancel the `StreamSubscription` to stop. Errors (for
   example `permissionDenied`) arrive on the stream's `onError`.
 - `snapshot.metadata.isFromCache` and `hasPendingWrites` tell where a snapshot came from.
 - `disableNetwork()` / `enableNetwork()` take the client offline and back on purpose.
@@ -89,9 +88,9 @@ final Settings lru = Settings(
 try {
   await firestore.doc('private/x').get(const GetOptions(source: Source.server));
 } on FirestoreException catch (e) {
-  if (e.code == FirestoreErrorCode.permissionDenied) {
+  if (e.errorCode == FirestoreErrorCode.permissionDenied) {
     print('not allowed: ${e.message}');
-  } else if (e.code == FirestoreErrorCode.unavailable) {
+  } else if (e.errorCode == FirestoreErrorCode.unavailable) {
     print('offline or backend unreachable');
   } else {
     rethrow;
@@ -99,15 +98,15 @@ try {
 }
 ```
 
-- A failed operation reports `FirestoreException` with `code` (a `FirestoreErrorCode`: `cancelled`,
+- A failed operation reports `FirestoreException` with `errorCode` (a `FirestoreErrorCode`: `cancelled`,
   `unknown`, `invalidArgument`, `deadlineExceeded`, `notFound`, `alreadyExists`,
   `permissionDenied`, `resourceExhausted`, `failedPrecondition`, `aborted`, `outOfRange`,
-  `unimplemented`, `internal`, `unavailable`, `dataLoss`, `unauthenticated`) and `message`.
-- `FirestoreException` is an `Error`, not an `Exception`: `on Exception catch` does not catch it.
+  `unimplemented`, `internal`, `unavailable`, `dataLoss`, `unauthenticated`), `code` (the same as
+  FlutterFire's string, `'permission-denied'`) and `message`.
+- `FirestoreException` extends `FirebaseException` and implements `Exception`.
 - Invalid data (unsupported values, field names that begin and end with `__`) and invalid
   arguments throw `ArgumentError`.
-- `FirebaseFirestore.instance` before any `instanceFor`, or `instanceFor` with changed settings, throws
-  `StateError`.
+- `instanceFor` with changed settings throws `StateError`.
 - `firebase_auth_providers_dart` reports `FirebaseAuthException` with string codes such
   as `wrong-password`, `user-not-found`, `network-request-failed`.
 - `FirebaseFirestore.setLogLevel(LogLevel.debug)` logs what the client does.

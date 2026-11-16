@@ -107,7 +107,7 @@ import 'package:firebase_app_dart/firebase_app_dart.dart';
 
 // The values of a web app of the project (Firebase console, Project settings,
 // Your apps) work on every platform. From a generated firebase_options.dart:
-// apiKey -> apiKey, appId -> applicationId, projectId -> projectId.
+// the same names: apiKey, appId, projectId.
 final FirebaseApp firebaseApp = FirebaseApp.withOptions(
   const FirebaseOptions(
     apiKey: '<the apiKey of DefaultFirebaseOptions.web>',
@@ -367,7 +367,7 @@ What to watch for:
 - **Two auth states.** Signing in with FlutterFire's `firebase_auth` does not sign this package's
   client in, and the reverse. Either sign the user in on both sides, or give this package a token
   provider that hands it the ID token of the FlutterFire user. Such a provider implements
-  `InternalTokenProvider` of `package:firebase_app_dart/internal.dart`, which
+  `AuthTokenProvider` of `package:firebase_app_dart/internal.dart`, which
   [Configuring the FirebaseApp](firebase_app.md) describes as not public API: it can change in a
   release, so pin the version if you write one. In both cases the security rules see the same
   user id only if both sides are signed in as the same Firebase user.

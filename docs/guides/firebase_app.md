@@ -32,8 +32,8 @@ print(identical(Firebase.app('secondary'), secondary)); // true
 
 - An app without a name is the default app, `FirebaseApp.instance`. Creating two apps with the
   same name is an error; `app.delete()` frees the name.
-- Firestore uses `projectId`. The `apiKey` and `applicationId` are sent with Firebase Auth
-  requests and identify the app (`applicationId` is also sent as `X-Firebase-gmpid`).
+- Firestore uses `projectId`. The `apiKey` and `appId` are sent with Firebase Auth
+  requests and identify the app (`appId` is also sent as `X-Firebase-gmpid`).
 - `FirebaseOptions.fromJson` reads the options from a map.
 
 Where the values come from:

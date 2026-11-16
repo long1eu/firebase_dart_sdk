@@ -17,23 +17,24 @@ future while offline, a listener without `onError`).
 | `FirebaseAuthException` | failed sign-in and token requests of `firebase_auth_providers_dart` |
 | the error of your own code | an `openDatabase` that throws, an exception in a transaction callback |
 
-`FirestoreException` has three fields:
+`FirestoreException` (a `FirebaseException`, as in FlutterFire) has these fields:
 
-- `code`: a `FirestoreErrorCode`, one of the canonical gRPC status codes (`unavailable`,
-  `permissionDenied`, ...). Compare it with the constants: `e.code == FirestoreErrorCode.notFound`.
-  `code.value` is the numeric gRPC code.
+- `errorCode`: a `FirestoreErrorCode`, one of the canonical gRPC status codes (`unavailable`,
+  `permissionDenied`, ...). Compare it with the constants: `e.errorCode == FirestoreErrorCode.notFound`.
+  `errorCode.value` is the numeric gRPC code. `code` is the same as a string, as in FlutterFire
+  (`'not-found'`).
 - `message`: the text of the backend or of the client. It is meant for logs, not for matching:
   the emulator and the production backend word their messages differently.
 - `cause`: the lower-level error, when there is one (for example the parse error of a bundle).
 
-`toString()` is `FirestoreException: [code=<code>]: <message>`. `FirestoreException` extends
+`toString()` is `[cloud_firestore/<code>] <message>`. `FirestoreException` extends
 `FirebaseException` of `firebase_app_dart`.
 
 ```dart
 try {
   await firestore.doc('cities/LA').update({'visited': true});
 } on FirestoreException catch (e) {
-  if (e.code == FirestoreErrorCode.notFound) {
+  if (e.errorCode == FirestoreErrorCode.notFound) {
     await firestore.doc('cities/LA').set({'visited': true});
   } else {
     rethrow;
@@ -176,7 +177,7 @@ StreamSubscription<QuerySnapshot<Map<String, Object?>>> listen() {
     },
     onError: (Object error) {
       if (error is FirestoreException &&
-          error.code == FirestoreErrorCode.permissionDenied) {
+          error.errorCode == FirestoreErrorCode.permissionDenied) {
         // The stream is closed. Listen again once the user may read the data,
         // for example after a sign-in.
         print('not allowed to read users');
@@ -299,10 +300,10 @@ These are programming errors. Fix the code rather than catching them.
 | Error | When |
 |---|---|
 | `StateError` | `FirebaseFirestore.instanceFor` with settings that differ from those of the instance that exists for the app and database (`terminate()` it first, or call `instanceFor` without settings) |
-| `StateError` | `FirebaseFirestore.instance` before the default instance was created with `instanceFor` |
+| `StateError` | `FirebaseFirestore.instance` before the default app exists |
 | `StateError` | settings that mix `cacheSettings` with `persistenceEnabled` or `cacheSizeBytes` |
 | `StateError` | a `WriteBatch` used after `commit()`; a `Transaction` used after its attempt completed (for example a write in a callback that was not awaited) |
-| `StateError` | `limitToLast` without an `orderBy`; a typed getter of a snapshot (`getString`, `getInt`, `getBool`, ...) when the field has another type |
+| `StateError` | `limitToLast` without an `orderBy` |
 | `StateError` | `setIndexConfigurationFromJSON` (deprecated) without a persistent cache |
 | `FirestoreException` `failedPrecondition` | any call on a terminated instance ("The client has already been terminated."); calling `terminate()` again is allowed |
 | `FirestoreException` `failedPrecondition` | `clearPersistence()` before `terminate()`, or while a newer instance of the same app and database runs |

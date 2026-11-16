@@ -39,9 +39,9 @@ final FirebaseApp app = FirebaseApp.withOptions(
 - Synchronous. An app without `name:` is the default app (`FirebaseApp.instance`); a second app
   with the same name throws. Other apps: `FirebaseApp.withOptions(options, name: 'other')`.
 - The values of a web app of the project (Firebase console, Project settings, Your apps) work on
-  every platform. From a FlutterFire `firebase_options.dart`: `appId` becomes `applicationId`.
+  every platform. A FlutterFire `firebase_options.dart` compiles once its import is changed.
 - On desktops and servers any unique id of the form `1:<project number>:<platform>:<suffix>`
-  works as `applicationId`. Against the emulator any key and id work.
+  works as `appId`. Against the emulator any key and id work.
 
 ## CLI or server against the emulator
 
@@ -178,7 +178,7 @@ Future<void> main() async {
   runApp(
     MaterialApp(
       home: StreamBuilder<QuerySnapshot<Map<String, Object?>>>(
-        stream: firestore.collection('notes').snapshots, // a getter
+        stream: firestore.collection('notes').snapshots(),
         builder: (BuildContext context, AsyncSnapshot<QuerySnapshot<Map<String, Object?>>> s) =>
             Text('${s.data()?.length ?? 0} notes'),
       ),

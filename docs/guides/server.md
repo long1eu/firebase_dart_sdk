@@ -137,7 +137,7 @@ the package):
 - `Authorization: Bearer <token>`: the OAuth 2.0 access token of the provider. Without a
   provider, or when the provider has no token, there is no `Authorization` header.
 - `x-goog-api-key`: the `apiKey` of the `FirebaseOptions`, only when it is not empty.
-- `x-firebase-gmpid`: the `applicationId` of the `FirebaseOptions`.
+- `x-firebase-gmpid`: the `appId` of the `FirebaseOptions`.
 - `x-firebase-appcheck`: only when the app has an App Check provider.
 - `x-goog-api-client`, `google-cloud-resource-prefix` and `x-goog-request-params`: the client
   version and the database.

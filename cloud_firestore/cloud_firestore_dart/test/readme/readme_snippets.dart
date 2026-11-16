@@ -152,25 +152,25 @@ Future<void> authProvidersReadmeLine25() async {
   await auth.signOut();
 }
 
-// ../../docs/migrating_from_vm_packages.md:64
-Future<void> migrationGuideLine64() async {
+// ../../docs/migrating_from_vm_packages.md:67
+Future<void> migrationGuideLine67() async {
 }
 
-// ../../docs/migrating_from_vm_packages.md:93
-Future<void> migrationGuideLine93() async {
+// ../../docs/migrating_from_vm_packages.md:96
+Future<void> migrationGuideLine96() async {
   final DocumentSnapshot<Map<String, Object?>> snapshot =
       await users.doc('ada').get();
   final Map<String, Object?>? data = snapshot.data(); // null if it does not exist
   final int? age = data?['age'] as int?;
 }
 
-// ../../docs/migrating_from_vm_packages.md:117
-Future<void> migrationGuideLine117() async {
+// ../../docs/migrating_from_vm_packages.md:120
+Future<void> migrationGuideLine120() async {
   app.setAutomaticDataCollectionEnabled(false);
 }
 
-// ../../docs/migrating_from_vm_packages.md:142
-Future<void> migrationGuideLine142() async {
+// ../../docs/migrating_from_vm_packages.md:145
+Future<void> migrationGuideLine145() async {
   final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(
     app: app,
     settings: Settings(cacheSettings: PersistentCacheSettings()),
@@ -178,20 +178,20 @@ Future<void> migrationGuideLine142() async {
   );
 }
 
-// ../../docs/migrating_from_vm_packages.md:157
-Future<void> migrationGuideLine157() async {
+// ../../docs/migrating_from_vm_packages.md:160
+Future<void> migrationGuideLine160() async {
   final FirebaseFirestore emulated = FirebaseFirestore.instanceFor(
     app: app,
     settings: Settings().withEmulator('127.0.0.1', 8080),
   );
 }
 
-// ../../docs/migrating_from_vm_packages.md:186
-Future<void> migrationGuideLine186() async {
+// ../../docs/migrating_from_vm_packages.md:189
+Future<void> migrationGuideLine189() async {
 }
 
-// ../../docs/migrating_from_vm_packages.md:274
-Future<void> migrationGuideLine274() async {
+// ../../docs/migrating_from_vm_packages.md:277
+Future<void> migrationGuideLine277() async {
   final QuerySnapshot<Map<String, Object?>> result = await firestore
       .collection('users')
       .where(FieldPath.documentId, isEqualTo: 'ada')
@@ -202,20 +202,20 @@ Future<void> migrationGuideLine274() async {
   await firestore.terminate();
 }
 
-// ../../docs/migrating_from_vm_packages.md:305
-Future<void> migrationGuideLine305() async {
+// ../../docs/migrating_from_vm_packages.md:308
+Future<void> migrationGuideLine308() async {
   final DocumentReference<Map<String, Object?>> ref =
       firestore.collection('users').doc('ada');
   final DocumentSnapshot<Map<String, Object?>> snapshot = await ref.get();
 }
 
-// ../../docs/migrating_from_vm_packages.md:340
-Future<void> migrationGuideLine340() async {
+// ../../docs/migrating_from_vm_packages.md:343
+Future<void> migrationGuideLine343() async {
   print('${firestore.projectId} / ${firestore.databaseId}');
 }
 
-// ../../docs/migrating_from_vm_packages.md:363
-Future<void> migrationGuideLine363() async {
+// ../../docs/migrating_from_vm_packages.md:366
+Future<void> migrationGuideLine366() async {
     final configRef = firestore.doc('config/plans');
     final userRef = users.doc('ada');
     await firestore.runTransaction<void>((Transaction tx) async {
@@ -224,21 +224,21 @@ Future<void> migrationGuideLine363() async {
     });
 }
 
-// ../../docs/migrating_from_vm_packages.md:379
-Future<void> migrationGuideLine379() async {
+// ../../docs/migrating_from_vm_packages.md:382
+Future<void> migrationGuideLine382() async {
     await firestore.runTransaction<void>(
       (Transaction tx) async {},
       maxAttempts: 6,
     );
 }
 
-// ../../docs/migrating_from_vm_packages.md:402
-Future<void> migrationGuideLine402() async {
+// ../../docs/migrating_from_vm_packages.md:405
+Future<void> migrationGuideLine405() async {
     await firestore.terminate();
     try {
       await users.doc('ada').get();
     } on FirestoreException catch (e) {
-      print(e.code == FirestoreErrorCode.failedPrecondition); // true
+      print(e.errorCode == FirestoreErrorCode.failedPrecondition); // true
     }
 }
 
@@ -646,12 +646,12 @@ Future<void> emulatorAndTestingGuideLine70() async {
   });
 }
 
-// ../../docs/guides/error_handling.md:32
-Future<void> errorHandlingGuideLine32() async {
+// ../../docs/guides/error_handling.md:33
+Future<void> errorHandlingGuideLine33() async {
   try {
     await firestore.doc('cities/LA').update({'visited': true});
   } on FirestoreException catch (e) {
-    if (e.code == FirestoreErrorCode.notFound) {
+    if (e.errorCode == FirestoreErrorCode.notFound) {
       await firestore.doc('cities/LA').set({'visited': true});
     } else {
       rethrow;
@@ -659,8 +659,8 @@ Future<void> errorHandlingGuideLine32() async {
   }
 }
 
-// ../../docs/guides/error_handling.md:125
-Future<void> errorHandlingGuideLine125() async {
+// ../../docs/guides/error_handling.md:126
+Future<void> errorHandlingGuideLine126() async {
   // The change is in the cache now; the future completes when the backend has it.
   unawaited(
     firestore.doc('cities/SF').set({'name': 'San Francisco'}).catchError(
@@ -677,8 +677,8 @@ Future<void> errorHandlingGuideLine125() async {
   );
 }
 
-// ../../docs/guides/error_handling.md:169
-Future<void> errorHandlingGuideLine169() async {
+// ../../docs/guides/error_handling.md:170
+Future<void> errorHandlingGuideLine170() async {
   StreamSubscription<QuerySnapshot<Map<String, Object?>>> listen() {
     return users.snapshots().listen(
       (QuerySnapshot<Map<String, Object?>> snapshot) {
@@ -686,7 +686,7 @@ Future<void> errorHandlingGuideLine169() async {
       },
       onError: (Object error) {
         if (error is FirestoreException &&
-            error.code == FirestoreErrorCode.permissionDenied) {
+            error.errorCode == FirestoreErrorCode.permissionDenied) {
           // The stream is closed. Listen again once the user may read the data,
           // for example after a sign-in.
           print('not allowed to read users');
@@ -700,8 +700,8 @@ Future<void> errorHandlingGuideLine169() async {
   final StreamSubscription<QuerySnapshot<Map<String, Object?>>> subscription = listen();
 }
 
-// ../../docs/guides/error_handling.md:223
-Future<void> errorHandlingGuideLine223() async {
+// ../../docs/guides/error_handling.md:224
+Future<void> errorHandlingGuideLine224() async {
   final int total = await firestore.runTransaction(
     (Transaction transaction) async {
       final DocumentSnapshot<Map<String, Object?>> counter =
@@ -714,8 +714,8 @@ Future<void> errorHandlingGuideLine223() async {
   );
 }
 
-// ../../docs/guides/error_handling.md:247
-Future<void> errorHandlingGuideLine247() async {
+// ../../docs/guides/error_handling.md:248
+Future<void> errorHandlingGuideLine248() async {
   bool isRetryable(FirestoreException error) {
     switch (error.errorCode) {
       case FirestoreErrorCode.unavailable:
@@ -878,8 +878,8 @@ Future<void> forAiAgentsGuideLine98() async {
   }
 }
 
-// ../../docs/guides/for_ai_agents.md:369
-Future<void> forAiAgentsGuideLine369() async {
+// ../../docs/guides/for_ai_agents.md:370
+Future<void> forAiAgentsGuideLine370() async {
   void main() {
     late FirebaseFirestore db;
     int instances = 0;
@@ -985,7 +985,7 @@ Future<void> gettingStartedGuideLine144() async {
 Future<void> migratingFromFlutterfireGuideLine105() async {
   // The values of a web app of the project (Firebase console, Project settings,
   // Your apps) work on every platform. From a generated firebase_options.dart:
-  // apiKey -> apiKey, appId -> applicationId, projectId -> projectId.
+  // the same names: apiKey, appId, projectId.
   final FirebaseApp firebaseApp = FirebaseApp.withOptions(
     const FirebaseOptions(
       apiKey: '<the apiKey of DefaultFirebaseOptions.web>',

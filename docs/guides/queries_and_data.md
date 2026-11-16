@@ -18,8 +18,8 @@ await users.doc('ada').set({'name': 'Ada', 'age': 36});
 final adults = await users.where('age', isGreaterThanOrEqualTo: 18).get();
 ```
 
-(Filters are the Java-style `whereEqualTo`, `whereGreaterThan`, ... family, plus
-`where('age', isGreaterThanOrEqualTo: 18)` with named arguments and `where(Filter)`. See
+(Filters are `where('age', isGreaterThanOrEqualTo: 18)` with named arguments and
+`where(Filter)`. See
 `example/` and, in the repository,
 [`test/integration/`](https://github.com/long1eu/firebase_dart_sdk/tree/main/cloud_firestore/cloud_firestore_dart/test/integration) for working calls of every feature below.)
 
