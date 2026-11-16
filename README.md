@@ -167,6 +167,7 @@ the original project and are not part of the migrated, tested set.
 | `cloud_firestore_dart_sqlite` | `cloud_firestore/cloud_firestore_dart_sqlite` | The SQLite offline cache for `cloud_firestore_dart` on the VM, in Flutter and in the browser (`sqliteOpener`) (0.1.0) |
 | `cloud_firestore_dart_flutterfire` | `cloud_firestore/cloud_firestore_dart_flutterfire` | Optional Flutter bridge: the FlutterFire app options and `firebase_auth` user for `cloud_firestore_dart` (0.1.0) |
 | `cloud_firestore_dart_platform` | `cloud_firestore/cloud_firestore_dart_platform` | Optional Flutter package: the official `cloud_firestore` API backed by `cloud_firestore_dart`, automatically on Linux or by one call elsewhere (0.1.0) |
+| `firebase_admin_dart` | `firebase_admin/firebase_admin_dart` | Light, pure-Dart admin calls for servers, command-line tools and tests: Firebase Auth custom tokens, users, claims and ID token verification (0.1.0, not published) |
 
 The former internal packages are folded in: `_firebase_database_collection_vm` into
 `cloud_firestore_dart` (`lib/src/database_collection`) and `_firebase_internal_vm` into
@@ -265,7 +266,7 @@ currently 3.8.0, the lowest supported one). Do not format
 ## License
 
 `cloud_firestore_dart`, `firebase_app_dart`, `firebase_auth_providers_dart`, `cloud_firestore_dart_sqlite`,
-`cloud_firestore_dart_flutterfire` and `cloud_firestore_dart_platform` are licensed under
+`cloud_firestore_dart_flutterfire`, `cloud_firestore_dart_platform` and `firebase_admin_dart` are licensed under
 the Apache License 2.0, as upstream; see the `LICENSE` and `NOTICE` files of each package. The
 `_vm` packages they replace were licensed under BSD-3-Clause. The packages of this repository
 that were not migrated keep their own `LICENSE` files.

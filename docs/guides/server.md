@@ -202,7 +202,7 @@ What the existing documentation establishes about the identity:
   mock user token: see [Security rules as a user](emulator_and_testing.md#security-rules-as-a-user).
 - **A server that should be subject to the rules** has to act as a Firebase Auth user:
   `FirebaseUserAuth` (email and password, anonymous, or a custom token) works on the Dart VM.
-  This package cannot create custom tokens; that needs the Admin SDK or your own signer.
+  This package cannot create custom tokens; `firebase_admin_dart` can: see [Admin calls](admin.md).
 
 ## One instance per process
 
@@ -458,8 +458,9 @@ With a service account its access is decided by IAM, as theirs is, but:
   public API (`test/unit/api/public_api.golden.txt`).
 - **It is not Firebase Auth admin.** `firebase_auth_providers_dart` gets tokens: it signs users
   in and gets service account and Application Default Credentials access tokens. It does not
-  verify ID tokens, create custom tokens or manage user accounts; for those use a Firebase Admin
-  SDK. See [Authentication](authentication.md).
+  verify ID tokens, create custom tokens or manage user accounts; for those see
+  [Admin calls](admin.md) (`firebase_admin_dart`, or a Firebase Admin SDK). See also
+  [Authentication](authentication.md).
 - **It keeps the client behaviour.** Writes go through a local cache and a write queue, listeners
   report local writes before the backend has them, and transactions are optimistic, as in the
   client SDKs. Read-only transactions and `findNearest` are extras over the JS client SDK.
