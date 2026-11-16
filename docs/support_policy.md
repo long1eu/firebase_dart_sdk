@@ -77,7 +77,10 @@ Behaviour is ported in Dart, not copied. Where the port deliberately differs fro
 - The three packages are versioned together so far (0.1.0, 0.1.1 and 0.2.0). A release tag `v<version>` checks that
   all three are at that version; a tag `<package>-v<version>` checks one package
   (`.github/workflows/release.yml`, which validates and never publishes).
-- Publishing to pub.dev is a manual step of the maintainer. CI has no pub.dev credentials.
+- Publishing to pub.dev is done by the `Publish to pub.dev` workflow (`.github/workflows/publish.yml`),
+  one package per tag `<package>-v<version>`. It stores no secret: pub.dev trusts a short-lived
+  token that GitHub issues to that one job, and each run waits for the maintainer's approval. The
+  first version of a new package is published by hand.
 - Each package has a `CHANGELOG.md` with a heading for every version.
 - **DRAFT:** Versions follow [semantic versioning](https://semver.org/) as pub applies it before
   1.0: while the version is 0.x, a breaking change increments the minor version (0.1.x to
