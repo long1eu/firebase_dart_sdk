@@ -164,6 +164,19 @@ class FirebaseUserAuth implements AuthTokenProvider {
   static String? get emulatorHostFromEnvironment =>
       environmentVariable('FIREBASE_AUTH_EMULATOR_HOST');
 
+  /// Checks [emulatorHost] the way the constructor does and returns the origin requests to the Auth emulator go
+  /// to: `http://host:port`, or `https://host:port` when given with that scheme.
+  ///
+  /// For other clients of the Auth emulator (for example `firebase_admin_dart`), so that they accept the
+  /// same values. Throws an [ArgumentError] for user info, a path, a query, a bad port or a Google host, and logs
+  /// a warning for a host off the loopback interface.
+  ///
+  /// ```dart
+  /// print(FirebaseUserAuth.emulatorOrigin('127.0.0.1:9099')); // http://127.0.0.1:9099
+  /// ```
+  static String emulatorOrigin(String emulatorHost) =>
+      _emulatorOriginOf(emulatorHost);
+
   /// How long before its expiry an ID token is refreshed.
   static const Duration refreshBefore = Duration(minutes: 5);
 

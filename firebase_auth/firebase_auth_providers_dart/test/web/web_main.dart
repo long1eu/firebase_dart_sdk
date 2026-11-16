@@ -12,5 +12,7 @@ void main() {
     InMemoryAuthStorage(),
     const FirebaseAuthException(code: 'code', message: 'message'),
     OAuthTokenProvider.serviceAccount,
+    ServiceAccountKey.fromJson,
+    FirebaseUserAuth.emulatorOrigin,
   ]);
 }

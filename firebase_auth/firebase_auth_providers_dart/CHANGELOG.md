@@ -9,6 +9,9 @@ is in [docs/api_migration_0_2.md](https://github.com/long1eu/firebase_dart_sdk/b
   take named arguments; `userChanges()` is a method.
 - Token providers implement `AuthTokenProvider` (was `InternalTokenProvider`) of
   `firebase_app_dart` 0.2.
+- New, additive: `ServiceAccountKey` (parses a key file and signs with RS256, the signer of
+  `OAuthTokenProvider.serviceAccount`) and `FirebaseUserAuth.emulatorOrigin` (the emulator host
+  check of the constructor), for `firebase_admin_dart`. Nothing else changes.
 
 ## 0.1.1
 
