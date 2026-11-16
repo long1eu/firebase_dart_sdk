@@ -7,6 +7,53 @@ section says what to put in a bug report.
 For the error codes and which of them the client retries by itself, see
 [Error handling](error_handling.md).
 
+To find the section for what you see, start from the symptom; each end box is the title of a section
+below (or of a section of Error handling). The first tree covers the connection and the backend:
+
+```mermaid
+flowchart TD
+  accTitle: From a connection or backend symptom to its section
+  accDescr: Listeners that stay isFromCache and writes that never complete lead to the section on proxies when it happens in a browser on some networks only, and to Cannot connect to the emulator otherwise. An await on set that never returns leads to A write never completes. get failing because the client is offline leads to its own section. failedPrecondition in production only leads to A query fails because an index is missing. permissionDenied leads to Permission denied on a listener in Error handling. unauthenticated leads to Clock skew and tokens. Slow first queries after a long time offline lead to their own section.
+  symptom{"What do you see?"}
+  browser{"In a browser, and only<br/>on some networks?"}
+  proxy["Listeners or writes never<br/>complete on the web (proxies)"]
+  emulator["Cannot connect to the emulator"]
+  write["A write never completes"]
+  offline["get() fails with 'the client is offline'<br/>or takes about 10 seconds"]
+  index["A query fails because<br/>an index is missing"]
+  denied["Error handling:<br/>Permission denied on a listener"]
+  clock["Clock skew and tokens"]
+  slow["The first queries are slow<br/>after a long time offline"]
+  symptom -- "only isFromCache snapshots, writes never complete" --> browser
+  browser -- yes --> proxy
+  browser -- no --> emulator
+  symptom -- "await set(...) never returns" --> write
+  symptom -- "get() fails with unavailable" --> offline
+  symptom -- "failedPrecondition, works in the emulator" --> index
+  symptom -- permissionDenied --> denied
+  symptom -- unauthenticated --> clock
+  symptom -- "slow after a long time offline" --> slow
+```
+
+The second tree covers the process and the persistent cache:
+
+```mermaid
+flowchart TD
+  accTitle: From a process or cache symptom to its section
+  accDescr: A program that does not exit leads to The program does not exit. The warning Another client is using the persistent cache leads to the section of that name. database is locked leads to its section. Failed to load dynamic library libsqlite3 or sqlite3.dll leads to SQLite library not found. A second browser tab failing with already open in another tab leads to A second browser tab cannot use the cache.
+  symptom{"What do you see?"}
+  exit["The program does not exit"]
+  another["'Another client is using<br/>the persistent cache'"]
+  locked["'database is locked'"]
+  library["SQLite library not found<br/>(Linux, Windows)"]
+  tab["A second browser tab<br/>cannot use the cache"]
+  symptom -- "the process keeps running" --> exit
+  symptom -- "a PrimaryLease warning at start" --> another
+  symptom -- "errors that quote database is locked" --> locked
+  symptom -- "Failed to load dynamic library" --> library
+  symptom -- "a second tab: already open in another tab" --> tab
+```
+
 ## Turn on logging
 
 ```dart

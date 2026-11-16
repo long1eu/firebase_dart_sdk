@@ -86,6 +86,23 @@ if [ $# -eq 0 ] || printf '%s\n' "$@" | grep -qx "examples"; then
   done
 fi
 
+if [ $# -eq 0 ] || printf '%s\n' "$@" | grep -qx "cloud_firestore_dart_flutterfire"; then
+  name=cloud_firestore_dart_flutterfire
+  dir="$ROOT/cloud_firestore/cloud_firestore_dart_flutterfire"
+  echo "=== $name ==="
+  # A Flutter package: `dart test` cannot load flutter_test, and CI installs Dart only.
+  if ! command -v flutter >/dev/null 2>&1; then
+    summary+=("$name: skipped (needs the Flutter SDK)")
+  else
+    pub=PASS analyze=PASS tests=PASS
+    (cd "$dir" && flutter pub get >"$LOG/$name.pub" 2>&1) || { pub=FAIL; tail -5 "$LOG/$name.pub"; }
+    (cd "$dir" && flutter analyze >"$LOG/$name.an" 2>&1) || { analyze=FAIL; tail -10 "$LOG/$name.an"; }
+    (cd "$dir" && flutter test >"$LOG/$name.test" 2>&1) || { tests=FAIL; tail -20 "$LOG/$name.test"; }
+    case "$pub$analyze$tests" in *FAIL*) failed=1;; esac
+    summary+=("$name: pub get $pub | analyze $analyze | test $tests")
+  fi
+fi
+
 echo
 echo "================ SUMMARY ================"
 printf '%s\n' "${summary[@]}"

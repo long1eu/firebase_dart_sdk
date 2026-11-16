@@ -16,6 +16,16 @@ and one response. It is the counterpart of `firebase/firestore/lite` of the JS S
 Use the main library when you need listeners, offline behaviour, a cache, bundles, vector
 queries or pipelines.
 
+The two libraries side by side, layer by layer: Lite keeps the public API, the unary calls and the
+transport, and leaves out the five layers in between that hold the cache and the listeners.
+
+![Two stacks of layers. The main library has the public API, the client and serial queue, the event manager
+and views, the sync engine, the local store and persistence, the remote store, a datastore with streams and
+unary calls, and a transport of gRPC or REST and WebChannel. Firestore Lite has only the public API, a
+datastore with unary calls and transactions, and a transport of gRPC or REST. The same small web app is
+641,418 characters of JavaScript with the main library and 415,850 with
+Lite.](../images/flows/lite_vs_main.svg)
+
 ## Usage
 
 Import it *instead of* `cloud_firestore_dart.dart`:

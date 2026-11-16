@@ -10,6 +10,18 @@ queries against it use what earlier listens returned. Where the cache lives is u
 | an `openDatabase` (SQLite on the VM) | in a SQLite file, kept across restarts |
 | the web `openDatabase` (web) | SQLite compiled to WebAssembly, stored in IndexedDB or OPFS |
 
+On the web the opener picks the storage itself; follow the branches to see which one you get:
+
+```mermaid
+flowchart TD
+    start["Firestore.instanceFor"] --> hasOpener{"openDatabase passed?"}
+    hasOpener -->|no| memory["Memory: gone when the instance is terminated"]
+    hasOpener -->|"yes, on the Dart VM or in a Flutter app"| sqliteFile["SQLite file, kept across restarts"]
+    hasOpener -->|"yes, sqliteWebOpener in a browser"| hasWorker{"opfsWorker passed, and synchronous OPFS in workers?"}
+    hasWorker -->|yes| opfs["SQLite in a worker on a file in OPFS"]
+    hasWorker -->|no| indexedDb["SQLite in the page on an in-memory copy, stored in IndexedDB"]
+```
+
 ## Cache settings
 
 `Settings.cacheSettings` chooses the kind of cache and its size:
@@ -124,6 +136,36 @@ firestore.doc('cities/SF').snapshots(includeMetadataChanges: true).listen(
 await firestore.disableNetwork();
 await firestore.enableNetwork();
 ```
+
+A write goes through these states; the table below gives what a listener with `MetadataChanges.include`
+sees in each, for a document with no other pending write. Note that the future completes before
+`hasPendingWrites` turns false.
+
+```mermaid
+stateDiagram-v2
+    direction LR
+    pending : Pending, in the cache only
+    sent : Sent on the write stream
+    acked : Acknowledged
+    synced : In sync with the backend
+    rejected : Rejected
+    [*] --> pending: write
+    pending --> sent: online, at once or when the network is back
+    sent --> pending: connection lost, sent again on the next stream
+    sent --> acked: WriteResponse
+    sent --> rejected: error from the backend
+    acked --> synced: watch delivers the new version
+    synced --> [*]
+    rejected --> [*]
+```
+
+| State | The write's future | `hasPendingWrites` | `isFromCache` |
+|---|---|---|---|
+| Pending, while offline | not completed | `true` | `true` |
+| Sent | not completed | `true` | `false` once the listener has caught up with the backend |
+| Acknowledged | completed | still `true`, until watch has sent the document at the commit version (skipped if it already has) | `false` |
+| In sync | completed | `false` | `false` |
+| Rejected | failed with the error | `false`: the change is removed from the cache | `false` |
 
 ### Protect the cache files
 

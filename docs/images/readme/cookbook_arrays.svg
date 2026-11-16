@@ -1,0 +1,70 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 318" role="img" aria-labelledby="title desc" font-family="system-ui, -apple-system, Segoe UI, Helvetica, Arial, sans-serif">
+  <title id="title">arrayUnion and arrayRemove on a tags array</title>
+  <desc id="desc">Three examples. tags dart, news with arrayUnion news, firestore becomes dart, news, firestore: news is already there and is not added again, firestore is appended. Then arrayRemove news gives dart, firestore. tags news, dart, news with arrayRemove news gives dart: every copy is removed. An array 1, 2 with arrayUnion 1.0 stays 1, 2: 1 and 1.0 are the same element.</desc>
+  <defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#57606a"/></marker></defs>
+  <rect x="0" y="0" width="900" height="318" rx="10" fill="#ffffff" stroke="#d0d7de"/>
+  <text x="20" y="44" font-size="18" fill="#57606a">[</text>
+  <rect x="32.0" y="24" width="63.2" height="28" rx="14" fill="#f6f8fa" stroke="#57606a" stroke-width="1"/>
+  <text x="63.6" y="43" font-size="13" fill="#1f2328" font-weight="600" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">'dart'</text>
+  <rect x="101.2" y="24" width="63.2" height="28" rx="14" fill="#f6f8fa" stroke="#57606a" stroke-width="1"/>
+  <text x="132.8" y="43" font-size="13" fill="#1f2328" font-weight="600" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">'news'</text>
+  <text x="170.39999999999998" y="44" font-size="18" fill="#57606a">]</text>
+  <line x1="300" y1="38" x2="550" y2="38" stroke="#57606a" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <text x="425" y="30" font-size="12" fill="#1f2328" font-weight="600" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">arrayUnion(['news', 'firestore'])</text>
+  <text x="425" y="56" font-size="11" fill="#57606a" text-anchor="middle">'news' is there already: not added again</text>
+  <text x="580" y="44" font-size="18" fill="#57606a">[</text>
+  <rect x="592.0" y="24" width="63.2" height="28" rx="14" fill="#f6f8fa" stroke="#57606a" stroke-width="1"/>
+  <text x="623.6" y="43" font-size="13" fill="#1f2328" font-weight="600" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">'dart'</text>
+  <rect x="661.2" y="24" width="63.2" height="28" rx="14" fill="#f6f8fa" stroke="#57606a" stroke-width="1"/>
+  <text x="692.8" y="43" font-size="13" fill="#1f2328" font-weight="600" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">'news'</text>
+  <rect x="730.4" y="24" width="104.2" height="28" rx="14" fill="#f6f8fa" stroke="#1a7f37" stroke-width="2.5"/>
+  <text x="782.5" y="43" font-size="13" fill="#1f2328" font-weight="600" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">'firestore'</text>
+  <text x="782.5" y="68" font-size="11" fill="#1a7f37" font-weight="700" text-anchor="middle">appended</text>
+  <text x="840.6000000000001" y="44" font-size="18" fill="#57606a">]</text>
+  <text x="20" y="116" font-size="18" fill="#57606a">[</text>
+  <rect x="32.0" y="96" width="63.2" height="28" rx="14" fill="#f6f8fa" stroke="#57606a" stroke-width="1"/>
+  <text x="63.6" y="115" font-size="13" fill="#1f2328" font-weight="600" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">'dart'</text>
+  <rect x="101.2" y="96" width="63.2" height="28" rx="14" fill="#f6f8fa" stroke="#57606a" stroke-width="1"/>
+  <text x="132.8" y="115" font-size="13" fill="#1f2328" font-weight="600" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">'news'</text>
+  <rect x="170.4" y="96" width="104.2" height="28" rx="14" fill="#f6f8fa" stroke="#57606a" stroke-width="1"/>
+  <text x="222.5" y="115" font-size="13" fill="#1f2328" font-weight="600" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">'firestore'</text>
+  <text x="280.59999999999997" y="116" font-size="18" fill="#57606a">]</text>
+  <line x1="300" y1="110" x2="550" y2="110" stroke="#57606a" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <text x="425" y="102" font-size="12" fill="#1f2328" font-weight="600" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">arrayRemove(['news'])</text>
+  <text x="580" y="116" font-size="18" fill="#57606a">[</text>
+  <rect x="592.0" y="96" width="63.2" height="28" rx="14" fill="#f6f8fa" stroke="#57606a" stroke-width="1"/>
+  <text x="623.6" y="115" font-size="13" fill="#1f2328" font-weight="600" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">'dart'</text>
+  <rect x="661.2" y="96" width="104.2" height="28" rx="14" fill="#f6f8fa" stroke="#57606a" stroke-width="1"/>
+  <text x="713.3" y="115" font-size="13" fill="#1f2328" font-weight="600" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">'firestore'</text>
+  <text x="771.4000000000001" y="116" font-size="18" fill="#57606a">]</text>
+  <text x="20" y="188" font-size="18" fill="#57606a">[</text>
+  <rect x="32.0" y="168" width="63.2" height="28" rx="14" fill="#f6f8fa" stroke="#57606a" stroke-width="1"/>
+  <text x="63.6" y="187" font-size="13" fill="#1f2328" font-weight="600" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">'news'</text>
+  <rect x="101.2" y="168" width="63.2" height="28" rx="14" fill="#f6f8fa" stroke="#57606a" stroke-width="1"/>
+  <text x="132.8" y="187" font-size="13" fill="#1f2328" font-weight="600" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">'dart'</text>
+  <rect x="170.4" y="168" width="63.2" height="28" rx="14" fill="#f6f8fa" stroke="#57606a" stroke-width="1"/>
+  <text x="202.0" y="187" font-size="13" fill="#1f2328" font-weight="600" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">'news'</text>
+  <text x="239.59999999999997" y="188" font-size="18" fill="#57606a">]</text>
+  <line x1="300" y1="182" x2="550" y2="182" stroke="#57606a" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <text x="425" y="174" font-size="12" fill="#1f2328" font-weight="600" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">arrayRemove(['news'])</text>
+  <text x="425" y="200" font-size="11" fill="#57606a" text-anchor="middle">every copy is removed</text>
+  <text x="580" y="188" font-size="18" fill="#57606a">[</text>
+  <rect x="592.0" y="168" width="63.2" height="28" rx="14" fill="#f6f8fa" stroke="#57606a" stroke-width="1"/>
+  <text x="623.6" y="187" font-size="13" fill="#1f2328" font-weight="600" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">'dart'</text>
+  <text x="661.2" y="188" font-size="18" fill="#57606a">]</text>
+  <text x="20" y="260" font-size="18" fill="#57606a">[</text>
+  <rect x="32.0" y="240" width="22.2" height="28" rx="14" fill="#f6f8fa" stroke="#57606a" stroke-width="1"/>
+  <text x="43.1" y="259" font-size="13" fill="#1f2328" font-weight="600" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">1</text>
+  <rect x="60.2" y="240" width="22.2" height="28" rx="14" fill="#f6f8fa" stroke="#57606a" stroke-width="1"/>
+  <text x="71.3" y="259" font-size="13" fill="#1f2328" font-weight="600" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">2</text>
+  <text x="88.4" y="260" font-size="18" fill="#57606a">]</text>
+  <line x1="300" y1="254" x2="550" y2="254" stroke="#57606a" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <text x="425" y="246" font-size="12" fill="#1f2328" font-weight="600" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">arrayUnion([1.0])</text>
+  <text x="425" y="272" font-size="11" fill="#57606a" text-anchor="middle">1 and 1.0 are the same element</text>
+  <text x="580" y="260" font-size="18" fill="#57606a">[</text>
+  <rect x="592.0" y="240" width="22.2" height="28" rx="14" fill="#f6f8fa" stroke="#57606a" stroke-width="1"/>
+  <text x="603.1" y="259" font-size="13" fill="#1f2328" font-weight="600" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">1</text>
+  <rect x="620.2" y="240" width="22.2" height="28" rx="14" fill="#f6f8fa" stroke="#57606a" stroke-width="1"/>
+  <text x="631.3" y="259" font-size="13" fill="#1f2328" font-weight="600" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">2</text>
+  <text x="648.4000000000001" y="260" font-size="18" fill="#57606a">]</text>
+</svg>

@@ -62,6 +62,10 @@ again (an offset would). A document cursor also holds the document id, so docume
 `day` are neither skipped nor repeated at a page boundary. Keep the snapshot of the last document,
 not only its values.
 
+Pages of four over documents ordered by `day`; look at the boundary between `d` and `e`, which share a day:
+
+![Eleven documents ordered by day. Page 1, orderBy('day').limit(4): a, b, c, d. Page 2 starts after document d: e, f, g, h. Page 3 starts after document h and has only i, j, k, so it is the last. d and e both have day 3; the cursor holds the id of d, so e is in page 2, neither skipped nor repeated.](../images/readme/cookbook_pagination.svg)
+
 ## An infinite list that stays live
 
 You want a list that loads more as the user scrolls, and every loaded page keeps updating.
@@ -91,9 +95,15 @@ Future<void> loadNextPage() async {
 ```
 
 Each page is read once to find its first and last document; its listener is then bounded by those
-documents, not by a limit. A document added inside a page appears in that page, and no document
-falls between two pages. A page can grow past 20; that is the price of the fixed bounds. Cancel the
+documents, not by a limit. A document added inside a page appears in that page, and pages never
+overlap. A document added later that sorts between the last document of one page and the first of
+the next is in neither listener until the pages are read again. A page can grow past 20; that is the price of the fixed bounds. Cancel the
 subscriptions when the list goes away.
+
+The run of `infinite_scroll.dart` (three per page): each listener covers the documents from the first
+to the last of its page, so a new document inside that range joins that page:
+
+![Messages m10 to m80, three per page. Page 1 listens from m10 to m30, page 2 from m40 to m60, page 3 from m70 to m80. After m45 is added, it is inside the bounds of page 2, which now has four documents.](../images/readme/cookbook_infinite_scroll.svg)
 
 ## Count and add up without downloading
 
@@ -143,6 +153,20 @@ increment whose acknowledgement is lost can be applied twice when
 the client sends it again; see
 [Transactions and the lifecycle](transactions_and_lifecycle.md#transactions).
 
+The distributed counter: each write goes to one shard picked at random, and the total is a sum over the
+shards:
+
+```mermaid
+flowchart LR
+  clientA["Client A"] -->|"increment(1)"| shard2["shards/2"]
+  clientB["Client B"] -->|"increment(1)"| shard0["shards/0"]
+  clientC["Client C"] -->|"increment(1)"| shard2
+  shard0 --> total["aggregate sum('count')<br/>over the shards = views"]
+  shard1["shards/1"] --> total
+  shard2 --> total
+  shard3["shards/3"] --> total
+```
+
 ## Add to and remove from an array
 
 You want to add a tag or remove one without reading the document first.
@@ -158,6 +182,10 @@ copy. Elements are compared whole: a map in an array is only removed by an equal
 of it. Numbers compare as the backend compares them, so `1` and `1.0` are the same element. Use an
 array as a set; for an ordered list with duplicates, read and write the whole array in a
 transaction.
+
+What each call does to the array, step by step:
+
+![arrayUnion(['news', 'firestore']) on ['dart', 'news'] gives ['dart', 'news', 'firestore']: news is already there, firestore is appended. arrayRemove(['news']) then gives ['dart', 'firestore']. arrayRemove(['news']) on ['news', 'dart', 'news'] gives ['dart']: every copy is removed. arrayUnion([1.0]) on [1, 2] leaves [1, 2]: 1 and 1.0 are the same element.](../images/readme/cookbook_arrays.svg)
 
 ## Server timestamps before the server answers
 
@@ -332,6 +360,26 @@ new values (up to 5 attempts by default), so it must not have side effects of it
 from the callback ends the transaction without writing. A commit whose answer is lost can be
 applied twice; [Transactions](transactions_and_lifecycle.md#transactions) shows how to make it
 safe to repeat.
+
+One attempt of `moveStock`, and what happens when another client wrote in between:
+
+```mermaid
+sequenceDiagram
+  participant callback as Your callback
+  participant client as Client
+  participant backend as Backend
+  callback->>client: transaction.get(from), transaction.get(to)
+  client->>backend: read both documents
+  backend-->>client: the documents and their versions
+  callback->>client: update(from), set(to), then return
+  client->>backend: commit, each write checks the version that was read
+  alt neither document changed
+    backend-->>client: committed
+  else another client changed one of them
+    backend-->>client: rejected, nothing written
+    client->>callback: run the callback again (up to 5 attempts)
+  end
+```
 
 ## A consistent report
 

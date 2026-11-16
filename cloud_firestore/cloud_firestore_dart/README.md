@@ -39,6 +39,11 @@ tokens can be supplied through the app.
 Windows is expected to work but is not tested. Flutter on Android, iOS and desktop, as a plain
 Dart package. The web, experimentally: tested in Chrome only. Dart 3.8 or later.
 
+Inside the package, every call goes through one queue to the local cache and to the network; the
+transport depends on the platform, and Firestore Lite skips the cache:
+
+![Layers of cloud_firestore_dart: the public API; the client with its event manager and sync engine on one serial queue; the local store (memory or SQLite cache) next to the network layer (listen stream, write stream, one-shot calls); the transport, gRPC on the VM and in Flutter or REST and WebChannel in the browser; then Cloud Firestore or the emulator. Firestore Lite sends one request per call without cache or listeners.](https://raw.githubusercontent.com/long1eu/firebase_dart_sdk/main/docs/images/readme/firestore_layers.svg)
+
 ## Install
 
 ```shell

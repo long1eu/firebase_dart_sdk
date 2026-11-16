@@ -38,6 +38,25 @@ for (final PipelineResult result in snapshot.results) {
 A pipeline is immutable: every stage method returns a new pipeline. `execute()` sends it to the
 server with one `ExecutePipeline` request.
 
+The pipeline above, read left to right: the stages are only built in Dart, and the server runs them in
+order on the documents that come out of the previous stage.
+
+```mermaid
+flowchart LR
+  accTitle: The stages of the first pipeline
+  accDescr: In Dart, firestore.pipeline() starts a pipeline, collection('books') is the source, then the stages where with rating greater than 4, sort by rating descending and limit 10 each return a new pipeline. execute sends one ExecutePipeline request, the server runs the stages in that order and returns a PipelineSnapshot whose results are documents.
+  subgraph built["Built in Dart, each step returns a new Pipeline"]
+    source["collection('books')<br/>source"]
+    filter["where(field('rating').greaterThan(4))"]
+    order["sort([field('rating').descending()])"]
+    limitStage["limit(10)"]
+  end
+  request["execute()<br/>one ExecutePipeline request"]
+  server["The server runs the stages<br/>in this order"]
+  results["PipelineSnapshot<br/>results: documents"]
+  source --> filter --> order --> limitStage --> request --> server --> results
+```
+
 ## What is different from queries
 
 - **Server only.** A pipeline does not read or update the local cache, does not see pending

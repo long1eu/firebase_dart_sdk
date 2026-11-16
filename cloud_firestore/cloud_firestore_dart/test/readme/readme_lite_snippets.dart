@@ -15,10 +15,10 @@ import 'package:firebase_app_dart/firebase_app_dart.dart';
 late FirebaseApp app;
 late Firestore firestore;
 
-// ../../docs/guides/lite.md:23
-Future<void> liteGuideLine23() async {
+// ../../docs/guides/lite.md:33
+Future<void> liteGuideLine33() async {
   // Synchronous, and nothing is sent until the first call.
-  final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(app: app);
+  final Firestore firestore = Firestore.instanceFor(app: app);
 
   final CollectionReference<Map<String, Object?>> cities = firestore.collection('cities');
   await cities.doc('LA').set({'name': 'Los Angeles', 'state': 'CA', 'population': 3900000});
@@ -33,13 +33,13 @@ Future<void> liteGuideLine23() async {
   await batch.commit();
 
   final AggregateQuerySnapshot count = await cities.count().get();
-  print(count.count);
+  print(count.getCount());
 
   await firestore.terminate();
 }
 
-// ../../docs/guides/server.md:297
-Future<void> serverGuideLine297() async {
+// ../../docs/guides/server.md:340
+Future<void> serverGuideLine340() async {
   final HttpServer server = await HttpServer.bind(InternetAddress.anyIPv4, 8080);
   await for (final HttpRequest request in server) {
     final String id = request.uri.pathSegments.isEmpty ? '' : request.uri.pathSegments.last;
@@ -48,8 +48,8 @@ Future<void> serverGuideLine297() async {
           await firestore.collection('tasks').doc(id.isEmpty ? 'none' : id).get();
       request.response
         ..statusCode = task.exists ? HttpStatus.ok : HttpStatus.notFound
-        ..write(jsonEncode(task.data() ?? <String, Object?>{}));
-    } on FirestoreException catch (error) {
+        ..write(jsonEncode(task.data ?? <String, Object?>{}));
+    } on FirestoreError catch (error) {
       request.response
         ..statusCode = HttpStatus.serviceUnavailable
         ..write('${error.code}');
@@ -58,9 +58,9 @@ Future<void> serverGuideLine297() async {
   }
 }
 
-// ../../docs/guides/web.md:225
-Future<void> webGuideLine225() async {
-  final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(app: app);
+// ../../docs/guides/web.md:254
+Future<void> webGuideLine254() async {
+  final Firestore firestore = Firestore.instanceFor(app: app);
   final QuerySnapshot<Map<String, Object?>> notes =
       await firestore.collection('notes').limit(20).get();
 }

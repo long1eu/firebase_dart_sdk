@@ -52,6 +52,20 @@ the backend has answered. It tries three plans, in this order, and the result is
 Queries that match the whole collection (no filters, no limit, no cursors, no ordering other than by
 document id) always scan; there is nothing to save.
 
+The same order as a decision, from the first plan to the last:
+
+```mermaid
+flowchart TD
+  query["A query answered from the cache"] --> hasIndex{"Does a persistent cache index cover it?"}
+  hasIndex -->|"yes (SQLite only)"| useIndex["Read the index, plus the documents<br/>that changed after its position"]
+  hasIndex -->|no| inSync{"Was it in sync with the backend before,<br/>and does it not match the whole collection?"}
+  inSync -->|yes| usePrevious["Read the previous result and the<br/>documents changed since; match again"]
+  inSync -->|no| scan["Scan every cached document<br/>of the collection"]
+  usePrevious -.->|"limit query whose edge changed"| scan
+  scan --> autoIndex{"Automatic creation on, at least 100 read<br/>and more than twice the result?"}
+  autoIndex -->|yes| createIndex["Create an index for the next time"]
+```
+
 When the cache is trusted and when the backend is asked:
 
 - `get()` (the default source) listens to the query, and when the client is online waits for the backend's
@@ -73,6 +87,10 @@ Measured (`local_store_bench.dart 100000`: 10 collections of 10,000 documents of
 | the same query, scan of the collection | 25.8 ms |
 | the whole collection (10,000 documents) | 42.9 ms |
 | one document by key (`readDocument`, average of 1,000) | 21 us |
+
+The same three queries as bars; the previous result reads only the documents it needs:
+
+![Bar chart: 1,000 of 10,000 documents from the previous result 11.5 ms, the same query by a scan of the collection 25.8 ms, the whole collection of 10,000 documents 42.9 ms. One run of local_store_bench.dart 100000.](../images/readme/perf_cache_query.svg)
 
 **What to do.** Keep the queries your screens open stable, so that they have a previous result to start
 from. Query narrow collections: a cache scan reads the whole collection, so one collection of 100,000
@@ -125,6 +143,10 @@ in a loop, not at the rate of the scheduler):
 
 Four indexes (five entries per document) took 51.5 us per document to fill and grew the file from 22.8 MB to
 51.9 MB. With automatic creation, the `orderBy` + `limit` query got no index.
+
+The table as a chart, on one scale; the index bars are the short ones next to each scan:
+
+![Grouped bar chart on 50,000 cached documents: a == 7, scan 149.8 ms and index 3.9 ms; r in a range, scan 151.9 ms and index 4.3 ms; array-contains, scan 157.4 ms and index 6.6 ms; orderBy descending with limit 10, scan 305.3 ms with 234 MB more memory and index 0.35 ms; a == 7 with 10 % of the documents not yet indexed, index 26.5 ms.](../images/readme/perf_index_vs_scan.svg)
 
 **The known gap.** A query served by an index can leave out a document in one rare case, described in
 [Parity, known limitations](../parity.md#known-limitations) (item 15): watch sends a document in a later
@@ -382,6 +404,10 @@ them. Measured with `local_store_bench.dart 100000` (54 MB file, 501 pending wri
 snapshot of each listener then costs one cache query (first section).
 
 Background work starts later: the index fill after 15 seconds, garbage collection after one minute.
+
+The first twelve minutes of an instance, with the two kinds of background work on one time line:
+
+![Timeline: the index fill runs at 15 seconds and then about once a minute, at most 50 documents per run; the garbage collection check runs at 1 minute and then every 5 minutes, at 6 and 11 minutes, and removes the least recently used 10 percent, at most 1,000, only when the file is over the threshold.](../images/readme/perf_background.svg)
 
 On the web, the IndexedDB storage reads the whole database into memory when it opens (about 1 second for
 100,000 documents); the OPFS storage opens in well under 0.2 seconds at any size

@@ -1,0 +1,106 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 560" role="img" aria-labelledby="title desc" font-family="system-ui, -apple-system, Segoe UI, Helvetica, Arial, sans-serif">
+  <title id="title">How the three packages fit together</title>
+  <desc id="desc">Your Dart program, Flutter app or browser app depends on three packages. firebase_auth_providers_dart (optional) sets the token provider of the FirebaseApp from firebase_app_dart; cloud_firestore_dart is created from that app with Firestore.instanceFor. cloud_firestore_dart talks to Cloud Firestore or the Firestore emulator over gRPC on the Dart VM and in Flutter, and over REST and WebChannel in the browser. The token providers get their tokens from Firebase Auth or Google's token endpoint.</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#57606a"/>
+    </marker>
+  </defs>
+  <rect x="0" y="0" width="900" height="560" rx="10" fill="#ffffff" stroke="#d0d7de"/>
+
+  <!-- Row 1: your code -->
+  <text x="30" y="34" font-size="13" font-weight="600" fill="#57606a">YOUR CODE</text>
+  <g font-size="14" fill="#1f2328" text-anchor="middle">
+    <rect x="30" y="46" width="260" height="58" rx="8" fill="#ddf4ff" stroke="#0969da"/>
+    <text x="160" y="70" font-weight="600">Dart VM program</text>
+    <text x="160" y="90" font-size="12" fill="#57606a">server, command line tool, job</text>
+    <rect x="320" y="46" width="260" height="58" rx="8" fill="#ddf4ff" stroke="#0969da"/>
+    <text x="450" y="70" font-weight="600">Flutter app</text>
+    <text x="450" y="90" font-size="12" fill="#57606a">Android, iOS, desktop</text>
+    <rect x="610" y="46" width="260" height="58" rx="8" fill="#ddf4ff" stroke="#0969da" stroke-dasharray="5 3"/>
+    <text x="740" y="70" font-weight="600">Browser app</text>
+    <text x="740" y="90" font-size="12" fill="#57606a">web, experimental (Chrome)</text>
+  </g>
+  <g stroke="#57606a" stroke-width="1.5" marker-end="url(#arrow)">
+    <line x1="160" y1="104" x2="160" y2="140"/>
+    <line x1="450" y1="104" x2="450" y2="140"/>
+    <line x1="740" y1="104" x2="740" y2="140"/>
+  </g>
+
+  <!-- Row 2: the packages -->
+  <rect x="20" y="144" width="860" height="176" rx="10" fill="#f6f8fa" stroke="#d0d7de"/>
+  <text x="34" y="166" font-size="13" font-weight="600" fill="#57606a">THE PACKAGES (pure Dart, from pub.dev)</text>
+
+  <rect x="29" y="178" width="224" height="128" rx="8" fill="#ffffff" stroke="#57606a" stroke-dasharray="5 3"/>
+  <text x="141" y="200" font-size="13" font-weight="700" fill="#1f2328" text-anchor="middle">firebase_auth_providers_dart</text>
+  <text x="141" y="217" font-size="11" fill="#57606a" text-anchor="middle">optional</text>
+  <g font-size="12" fill="#1f2328">
+    <text x="46" y="236">FirebaseUserAuth: users sign in</text>
+    <text x="46" y="250">over REST</text>
+    <text x="46" y="268">OAuthTokenProvider</text>
+    <text x="56" y="282">.serviceAccount(key)</text>
+    <text x="46" y="298">applicationDefaultCredentials()</text>
+  </g>
+
+  <rect x="342" y="178" width="186" height="128" rx="8" fill="#ffffff" stroke="#1f2328"/>
+  <text x="435" y="200" font-size="13" font-weight="700" fill="#1f2328" text-anchor="middle">firebase_app_dart</text>
+  <g font-size="12" fill="#1f2328">
+    <text x="354" y="226">FirebaseApp</text>
+    <text x="354" y="244">FirebaseOptions</text>
+    <text x="354" y="262">authProvider,</text>
+    <text x="354" y="278">appCheckProvider</text>
+    <text x="354" y="296">onNetworkConnected</text>
+  </g>
+
+  <rect x="622" y="178" width="244" height="128" rx="8" fill="#ffffff" stroke="#0969da" stroke-width="2"/>
+  <text x="744" y="200" font-size="13" font-weight="700" fill="#1f2328" text-anchor="middle">cloud_firestore_dart</text>
+  <g font-size="12" fill="#1f2328">
+    <text x="634" y="226">documents, queries, listeners,</text>
+    <text x="634" y="242">transactions, batches, bundles</text>
+    <text x="634" y="262">local cache: in memory, or SQLite</text>
+    <text x="634" y="278">through the opener you pass</text>
+    <text x="634" y="296">Lite: no cache, one request per call</text>
+  </g>
+
+  <g stroke="#57606a" stroke-width="1.5" marker-end="url(#arrow)">
+    <line x1="255" y1="262" x2="339" y2="262"/>
+    <line x1="530" y1="262" x2="619" y2="262"/>
+  </g>
+  <g font-size="11" fill="#57606a" text-anchor="middle">
+    <text x="295" y="234">sets</text>
+    <text x="295" y="250">authProvider</text>
+    <text x="575" y="234">instanceFor</text>
+    <text x="575" y="250">(app: app)</text>
+  </g>
+
+  <!-- Row 3: transports -->
+  <text x="326" y="390" font-size="13" font-weight="600" fill="#57606a" text-anchor="end">TRANSPORT</text>
+  <text x="326" y="408" font-size="11" fill="#57606a" text-anchor="end">chosen by the platform</text>
+  <g stroke="#57606a" stroke-width="1.5" marker-end="url(#arrow)">
+    <path d="M700,306 L700,330 L470,330 L470,362" fill="none"/>
+    <path d="M790,306 L790,362" fill="none"/>
+  </g>
+  <rect x="342" y="366" width="256" height="58" rx="8" fill="#ffffff" stroke="#1f2328"/>
+  <text x="470" y="390" font-size="13" font-weight="600" fill="#1f2328" text-anchor="middle">gRPC over HTTP/2</text>
+  <text x="470" y="410" font-size="12" fill="#57606a" text-anchor="middle">Dart VM and Flutter (dart:io)</text>
+  <rect x="622" y="366" width="244" height="58" rx="8" fill="#ffffff" stroke="#1f2328" stroke-dasharray="5 3"/>
+  <text x="744" y="390" font-size="13" font-weight="600" fill="#1f2328" text-anchor="middle">REST and WebChannel</text>
+  <text x="744" y="410" font-size="12" fill="#57606a" text-anchor="middle">browser, over fetch</text>
+
+  <!-- Row 4: backends -->
+  <g stroke="#57606a" stroke-width="1.5" marker-end="url(#arrow)">
+    <line x1="470" y1="424" x2="470" y2="466"/>
+    <line x1="744" y1="424" x2="744" y2="466"/>
+  </g>
+  <rect x="342" y="470" width="524" height="62" rx="8" fill="#f6f8fa" stroke="#1f2328"/>
+  <text x="604" y="496" font-size="14" font-weight="600" fill="#1f2328" text-anchor="middle">Cloud Firestore or the Firestore emulator</text>
+  <text x="604" y="516" font-size="12" fill="#57606a" text-anchor="middle">Standard or Enterprise edition</text>
+
+  <path d="M141,306 L141,466" stroke="#57606a" stroke-width="1.5" stroke-dasharray="4 3" fill="none" marker-end="url(#arrow)"/>
+  <text x="150" y="336" font-size="11" fill="#57606a">tokens</text>
+  <rect x="34" y="470" width="214" height="62" rx="8" fill="#f6f8fa" stroke="#57606a" stroke-dasharray="5 3"/>
+  <text x="141" y="496" font-size="13" font-weight="600" fill="#1f2328" text-anchor="middle">Firebase Auth (REST)</text>
+  <text x="141" y="516" font-size="12" fill="#57606a" text-anchor="middle">or Google's token endpoint</text>
+
+  <text x="30" y="552" font-size="11" fill="#57606a">Dashed outline: optional or experimental.</text>
+</svg>

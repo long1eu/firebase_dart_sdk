@@ -28,6 +28,12 @@ It is an unofficial port of the open-source
 cache, listeners with local-write snapshots, transactions and retry logic. It is not affiliated
 with or endorsed by Google or Firebase.
 
+The picture shows where each package sits: your program creates a `FirebaseApp`, an optional token
+provider plugs into it, and `cloud_firestore_dart` talks to Firestore over gRPC on the Dart VM and
+in Flutter, or over REST and WebChannel in the browser.
+
+![Your Dart program, Flutter app or browser app uses three packages: firebase_auth_providers_dart sets the token provider of the FirebaseApp from firebase_app_dart, and cloud_firestore_dart is created from that app. cloud_firestore_dart reaches Cloud Firestore or the emulator over gRPC on the VM and in Flutter, and over REST and WebChannel in the browser.](https://raw.githubusercontent.com/long1eu/firebase_dart_sdk/main/docs/images/readme/overview.svg)
+
 ```dart
 import 'package:cloud_firestore_dart/cloud_firestore_dart.dart';
 
@@ -60,6 +66,8 @@ dart pub add cloud_firestore_dart firebase_app_dart
 - [Migrating from FlutterFire](docs/guides/migrating_from_flutterfire.md) (`cloud_firestore`).
 - [Example apps](examples/README.md): an HTTP server with a live change feed, a command-line
   import, export and watch tool, a Cloud Run job, a worker queue, a Flutter app and a browser app.
+- [`examples/playground/`](examples/playground/): try the client in a browser with no backend and no
+  Firebase project, and see its snapshot events and pending writes.
 - [For AI coding agents](docs/guides/for_ai_agents.md), [llms.txt](llms.txt) and an
   [Agent Skill](skills/README.md).
 - [API examples](cloud_firestore/cloud_firestore_dart/example/): short runnable programs, listed
@@ -92,6 +100,11 @@ dart pub add cloud_firestore_dart firebase_app_dart
   `firebase_auth_providers_dart`.
 - Firestore Lite (experimental, `package:cloud_firestore_dart/lite.dart`): a client without
   cache and listeners where every call is one request.
+
+Without a connection, the client answers from its cache and queues writes; what needs the backend
+fails until it is reachable again:
+
+![Works offline: get() and listeners from the cache, Source.cache and ListenSource.cache, set, update, delete and batches queued and sent later, pending writes kept across restarts with the SQLite cache, loadBundle and named queries. Needs the backend: transactions, count, sum and average, findNearest, Pipelines, get(Source.server) and Firestore Lite.](https://raw.githubusercontent.com/long1eu/firebase_dart_sdk/main/docs/images/readme/offline.svg)
 
 ## Guides
 
@@ -148,6 +161,7 @@ the original project and are not part of the migrated, tested set.
 | `cloud_firestore_dart` | `cloud_firestore/cloud_firestore_dart` | The Firestore client (formerly `cloud_firestore_vm`) |
 | `firebase_app_dart` | `firebase_core/firebase_app_dart` | `FirebaseApp` and options (formerly `firebase_core_vm`) |
 | `firebase_auth_providers_dart` | `firebase_auth/firebase_auth_providers_dart` | Optional token providers: Firebase Auth users over REST, service accounts, Application Default Credentials |
+| `cloud_firestore_dart_flutterfire` | `cloud_firestore/cloud_firestore_dart_flutterfire` | Optional Flutter bridge: the FlutterFire app options and `firebase_auth` user for `cloud_firestore_dart` (0.1.0, not published) |
 
 The former internal packages are folded in: `_firebase_database_collection_vm` into
 `cloud_firestore_dart` (`lib/src/database_collection`) and `_firebase_internal_vm` into

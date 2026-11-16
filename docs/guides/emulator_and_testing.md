@@ -48,6 +48,26 @@ final Settings settings = emulator == null
       );
 ```
 
+The settings of the creating call decide where the requests go. Compare the two paths and what each
+backend checks:
+
+```mermaid
+flowchart LR
+  accTitle: A test against the emulator compared with production
+  accDescr: The settings of the instanceFor call decide. With withEmulator(host, port) the client opens a plain connection without TLS to that host and port, and the Firestore emulator accepts any API key, uses the demo- project id and does not require composite indexes. Without it the client connects with TLS to firestore.googleapis.com, where security rules, composite indexes, quotas and App Check are enforced.
+  code["Your test or program"]
+  settings{"Settings of the call that<br/>creates the instance"}
+  plain["Plain connection, no TLS,<br/>to host:port"]
+  emulator["Firestore emulator<br/>project demo-my-app, any API key,<br/>no composite indexes needed"]
+  tls["TLS connection to<br/>firestore.googleapis.com"]
+  production["Cloud Firestore<br/>rules, composite indexes,<br/>quotas, App Check"]
+  code --> settings
+  settings -- "withEmulator(host, port)" --> plain
+  plain --> emulator
+  settings -- "default settings" --> tls
+  tls --> production
+```
+
 ## Security rules as a user
 
 To test the security rules as a signed-in user without the Auth emulator, pass a mock user
@@ -64,6 +84,26 @@ final FirebaseFirestore asAlice = FirebaseFirestore.instanceFor(
 A mock token is only accepted together with `withEmulator`, so it is never sent to a production
 host. To test real sign-in flows, use the Auth emulator with
 [`firebase_auth_providers_dart`](../../firebase_auth/firebase_auth_providers_dart/README.md).
+
+Which token the instance sends, decided once when it is created: a mock user token wins over the token
+provider of the app.
+
+```mermaid
+flowchart TD
+  accTitle: Which token a Firestore instance sends
+  accDescr: When the emulator settings have a mockUserToken, the instance sends that token, claims encoded as an unsigned JWT or a string as is, and the rules see that user. Otherwise, when the app has a token provider, it sends the provider's token. Otherwise it sends no token and the rules see no user.
+  create["Firestore.instanceFor creates the instance"]
+  mock{"mockUserToken in the<br/>emulator settings?"}
+  mockToken["The mock token: claims as an unsigned JWT,<br/>or the string as is. The rules see that user"]
+  provider{"app.authProvider set?"}
+  providerToken["The provider's token<br/>(FirebaseUserAuth, OAuthTokenProvider, ...)"]
+  none["No token: the rules see no user"]
+  create --> mock
+  mock -- yes --> mockToken
+  mock -- no --> provider
+  provider -- yes --> providerToken
+  provider -- no --> none
+```
 
 ## Tests with package:test
 

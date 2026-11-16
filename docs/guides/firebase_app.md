@@ -36,6 +36,32 @@ print(identical(Firebase.app('secondary'), secondary)); // true
   requests and identify the app (`appId` is also sent as `X-Firebase-gmpid`).
 - `FirebaseOptions.fromJson` reads the options from a map.
 
+What hangs off each app: its own options and token providers, and one Firestore instance per database
+(`Firestore.instanceFor` keys its instances by app name and database, and the persistent cache is named
+after the app, the project and the database). Deleting an app shuts its Firestore instances down.
+
+```mermaid
+flowchart LR
+  accTitle: Default and named apps and what belongs to each
+  accDescr: The default app and an app named secondary each have their own FirebaseOptions, their own authProvider and appCheckProvider, and their own Firestore instances, one per database. The default app here has two, for the databases (default) and my-database, each with its own cache. app.delete() shuts down the Firestore instances of that app.
+  defaultApp["Default app<br/>FirebaseApp.instance"]
+  defaultOptions["FirebaseOptions<br/>projectId: my-project"]
+  defaultProviders["authProvider, appCheckProvider"]
+  defaultDb["Firestore, database (default)<br/>its own cache"]
+  namedDb["Firestore, database 'my-database'<br/>its own cache"]
+  secondaryApp["App 'secondary'<br/>FirebaseApp.getInstance('secondary')"]
+  secondaryOptions["FirebaseOptions<br/>projectId: other-project"]
+  secondaryProviders["authProvider, appCheckProvider"]
+  secondaryDb["Firestore, database (default)<br/>its own cache"]
+  defaultApp --> defaultOptions
+  defaultApp --> defaultProviders
+  defaultApp --> defaultDb
+  defaultApp --> namedDb
+  secondaryApp --> secondaryOptions
+  secondaryApp --> secondaryProviders
+  secondaryApp --> secondaryDb
+```
+
 Where the values come from:
 
 - **The Firebase console**, *Project settings*: the project id; under *Your apps*, the API key

@@ -15,6 +15,14 @@ verification kit (`tool/verify_production`) was run, on a Standard edition datab
 
 A call goes down through these layers, and a server event comes back up through them.
 
+The picture shows the main layers of one instance; look at how listens enter through the `EventManager`
+and writes through the `SyncEngine`, and at the dashed path of transactions, which skips the cache.
+
+![The layers of one Firestore instance: public API, FirestoreClient with its serial queue, EventManager
+and SyncEngine, then the LocalStore (mutation queue, overlays, remote document cache, target cache, bundles,
+cache indexes) on memory or SQLite persistence next to the RemoteStore (watch and write streams of the
+Datastore, gRPC or WebChannel transport), and the backend at the bottom](images/arch/client_layers.svg)
+
 | Layer | What it does | Dart | Upstream |
 |---|---|---|---|
 | Public API | `Firestore`, references, queries, snapshots, converters, value types. Parses user data into the model and converts results back. | `lib/firestore.dart`, `query.dart`, `document_reference.dart`, `document_snapshot.dart`, `user_data_converter.dart`, `snapshot_json.dart`; exported by `lib/cloud_firestore_dart.dart` | Android `FirebaseFirestore.java`, `Query.java`, `UserDataReader.java`, `UserDataWriter.java`; JS `api/snapshot.ts` for snapshot JSON |
@@ -73,6 +81,56 @@ guarantee: `FirestoreClient` enqueues every operation on a `SerialQueue` that it
 the `RemoteStore`, and a task that is already on the queue runs nested calls inline. Covered by
 `test/unit/firebase/firestore/core/serial_queue_test.dart`.
 
+### The path of a write and of a listen
+
+A write is applied to the cache and shown to listeners before it is sent; its future completes only on the
+acknowledgement. Follow the order of the calls in `SyncEngine.writeMutations` and
+`RemoteStore._handleWriteStreamMutationResults`:
+
+```mermaid
+sequenceDiagram
+    participant app as App
+    participant sync as SyncEngine
+    participant local as LocalStore
+    participant events as EventManager
+    participant remote as RemoteStore
+    participant backend as Backend
+    app->>sync: set() through FirestoreClient.write
+    sync->>local: writeLocally, into the mutation queue and an overlay
+    sync->>events: ViewSnapshots with hasPendingWrites true
+    events-->>app: snapshot with the change, before the backend has it
+    sync->>remote: fillWritePipeline
+    remote->>backend: the batch on the write stream
+    backend-->>remote: WriteResponse with the commit version
+    remote->>sync: handleSuccessfulWrite
+    sync->>local: acknowledgeBatch
+    sync-->>app: the future of set() completes
+```
+
+A listen first answers from the cache and then from the watch stream. Look at where the first snapshot
+comes from and when `isFromCache` turns false:
+
+```mermaid
+sequenceDiagram
+    participant app as App
+    participant events as EventManager
+    participant sync as SyncEngine
+    participant local as LocalStore
+    participant remote as RemoteStore
+    participant backend as Backend
+    app->>events: snapshots() through FirestoreClient.listen
+    events->>sync: listen(query)
+    sync->>local: allocateTarget and executeQuery
+    sync-->>app: first snapshot from the cache (if there is one to show)
+    sync->>remote: listen(target)
+    remote->>backend: ListenRequest on the watch stream
+    backend-->>remote: document changes, then CURRENT and a snapshot version
+    remote->>sync: RemoteEvent from the WatchChangeAggregator
+    sync->>local: applyRemoteEvent
+    sync->>events: the View applies the changes, new ViewSnapshot
+    events-->>app: snapshot with isFromCache false
+```
+
 ## Tests
 
 | Kind | Where | What it needs | Command (from the package directory unless noted) |
@@ -125,7 +183,7 @@ changes. `PORTING NOTE` comments in `lib/` mark these places in the code.
 | On the VM a cache in the default rollback-journal mode is switched to write-ahead logging when it is opened (`SQLitePersistence._useWriteAheadLog`); a journal mode the opener set is kept, and the web keeps its rollback journal. Android leaves the mode to the platform. | With a rollback journal several clients of one file (isolates, processes) block each other's reads and writes, and SQLite's busy handler only polls: under load a client waited out the 10-second busy timeout and failed with `database is locked` (4 of 40 rounds of 32 isolates opening a new cache at once; none in 160 rounds with WAL). | `test/unit/firebase/firestore/local/sqlite_concurrent_open_test.dart` (`OPEN_STRESS_ISOLATES`, `OPEN_STRESS_ROUNDS` for load runs), `sqlite_shared_clients_test.dart` |
 | Every transaction is `BEGIN IMMEDIATE` and starts by comparing `PRAGMA data_version`; when another connection committed, the target globals, the listen sequence, the batch id and stream token of the mutation queues and the memoized field indexes are read again, and a changed `user_version` fails the client. Schema migrations run in an exclusive transaction that reads the stored version itself. (Android caches all of this for the life of the process and migrates without a lock.) | Android owns the file exclusively; the port does not, so two clients on one file are possible and must not hand out the same ids or overwrite each other's metadata. | `test/unit/firebase/firestore/local/sqlite_shared_clients_test.dart`, `sqlite_shared_file_test.dart` |
 | The package does not open SQLite itself: the application passes an `OpenDatabase` function, and `clearPersistence` deletes the file that the opener opened (Android derives the path itself). | No native dependency in the package; any SQLite binding can be used. | `test/unit/firebase/firestore/clear_persistence_test.dart`; a complete opener is `example/sqlite_database.dart` |
-| The schema has its own numbering (version 18); Android's migrations are mapped onto it (`sqlite_schema.dart` says which). | The port branched off at schema 8 and took the later Android migrations in a different order. | `test/unit/firebase/firestore/local/sqlite_schema_test.dart`, `sqlite_schema_read_time_test.dart`, `legacy_cache_upgrade_test.dart` |
+| The schema has its own numbering (version 19); Android's migrations are mapped onto it (`sqlite_schema.dart` says which). | The port branched off at schema 8 and took the later Android migrations in a different order. | `test/unit/firebase/firestore/local/sqlite_schema_test.dart`, `sqlite_schema_read_time_test.dart`, `legacy_cache_upgrade_test.dart` |
 | The overlay migration rebuilds all overlays from the mutation queues (Android keeps existing rows). | Rows can be stale when an older version of the port, without overlays, changed the queue in between. | `test/unit/firebase/firestore/local/sqlite_overlay_migration_manager_test.dart` (`testRebuildsStaleOverlaysAfterDowngrade`) |
 | Recalculating overlays removes the overlay of a document whose mutations no longer apply (Android keeps it). | The kept overlay would still be applied on the next read. | no dedicated test was found; the code is in `local/local_documents_view.dart` |
 | When a remote event changes whether a document exists, the set overlay of a merge or update on a document without remote version is recalculated from the mutation queue; upstream recalculates only a missing or patch overlay. A set or delete overlay that comes from a set or delete among the pending writes of the document is applied as stored, as upstream. | Once the document arrives from the backend, upstream's stored set would hide the remote fields the merge does not touch. A real set determines the whole document; recalculating it would only rebase its server timestamps on the remote document and raise an extra `modified` event. | `test/unit/firebase/firestore/local/cases/local_store_test_case.dart` (memory and SQLite runners): `testDeviationSetOverlayOfMergeIsRecalculatedWhenDocumentArrives`, `testSetOverlayWithServerTimestampIsKeptWhenDocumentArrives`, `testViewSeesTwoEventsForSetWithServerTimestamp` |

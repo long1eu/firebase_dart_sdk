@@ -4,6 +4,15 @@
 on Android, iOS and desktop) it talks gRPC; in the browser it uses the transport of the JS SDK.
 This page has what is known about each platform, and how far each was tested.
 
+In short, read across a row for the transport and the caches of a platform:
+
+| Platform | Transport | Cache without an `openDatabase` | Persistent cache | Tested |
+|---|---|---|---|---|
+| Dart VM (servers, command line) | gRPC | memory | SQLite file (`example/sqlite_database.dart`) | macOS, Linux; Windows not tested |
+| Flutter on Android, iOS, desktop | gRPC | memory | SQLite file, with `sqlite3_flutter_libs` | not on devices |
+| Web, dart2wasm | REST and WebChannel over `fetch` | memory | SQLite in WebAssembly, in IndexedDB or OPFS (`example/sqlite_database_web.dart`) | Chrome, against the emulator |
+| Web, dart2js | REST and WebChannel over `fetch` | memory | the same as dart2wasm | Chrome, against the emulator; integers above 2^53 lose precision |
+
 ## The Dart VM and Flutter
 
 Pure Dart on the VM (`dart:io`, `package:grpc`, SQLite through an `OpenDatabase` function you
