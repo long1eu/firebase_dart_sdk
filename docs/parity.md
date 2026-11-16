@@ -21,6 +21,11 @@ signatures are in `test/unit/api/public_api.golden.txt`.
 | not supported | The JS SDK has it and this port does not. |
 | not applicable | The feature is tied to the browser, IndexedDB, TypeScript or the JS build, or Dart has it by other means. |
 
+The area tables below at a glance, one mark per row; most gaps are in Pipelines, multi-client and
+the platforms:
+
+![One mark per feature row, by area. Documents and writes: 15 supported, 1 partial, 3 not applicable. Queries and filters: 9 supported. Aggregations: 3 supported. Listeners: 9 supported. Transactions and batches: 5 supported. Offline persistence: 6 supported, 2 not applicable. Indexes: 4 supported, 1 not supported. Bundles: 2 supported. Lite: 4 supported. Pipelines: 6 supported, 3 partial, 1 not supported. Multi-tab or multi-client: 1 supported, 1 partial, 2 not supported. App Check: 1 supported, 1 not supported. Emulator: 2 supported, 1 not applicable. Web transports: 7 supported, 1 not applicable. Platforms: 1 supported, 3 partial, 2 not applicable. In all: 75 supported, 8 partial, 5 not supported, 9 not applicable.](images/readme/parity_summary.svg)
+
 ## How it is tested
 
 These are the numbers behind the statements below. Each one says where it comes from.
