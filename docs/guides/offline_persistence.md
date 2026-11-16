@@ -17,7 +17,7 @@ flowchart TD
     start["FirebaseFirestore.instanceFor"] --> hasOpener{"openDatabase passed?"}
     hasOpener -->|no| memory["Memory: gone when the instance is terminated"]
     hasOpener -->|"yes, on the Dart VM or in a Flutter app"| sqliteFile["SQLite file, kept across restarts"]
-    hasOpener -->|"yes, sqliteWebOpener in a browser"| hasWorker{"opfsWorker passed, and synchronous OPFS in workers?"}
+    hasOpener -->|"yes, sqliteOpener in a browser"| hasWorker{"opfsWorker passed, and synchronous OPFS in workers?"}
     hasWorker -->|yes| opfs["SQLite in a worker on a file in OPFS"]
     hasWorker -->|no| indexedDb["SQLite in the page on an in-memory copy, stored in IndexedDB"]
 ```
@@ -60,31 +60,34 @@ final Settings lru = Settings(
 ## SQLite on the Dart VM
 
 The package does not open SQLite files itself, so that you choose the binding. You pass a
-function that opens a database. A complete one for `package:sqlite3` is
-[`example/sqlite_database.dart`](../../cloud_firestore/cloud_firestore_dart/example/sqlite_database.dart):
-copy it into your app and add `sqlite3: ^2.7.3` to your dependencies (in a Flutter app also
-`sqlite3_flutter_libs: ^0.5.0`, which bundles the native library). The opener uses
-`package:sqlite3/open.dart`, which `sqlite3` 3.x no longer has, so stay on 2.x for now.
+function that opens a database. The companion package
+[`cloud_firestore_dart_sqlite`](../../cloud_firestore/cloud_firestore_dart_sqlite/) has one on top
+of `package:sqlite3`, for the VM, Flutter and the browser:
+
+```shell
+dart pub add cloud_firestore_dart_sqlite
+```
 
 ```dart
-import 'dart:io';
+import 'package:cloud_firestore_dart_sqlite/cloud_firestore_dart_sqlite.dart';
 
-import 'sqlite_database.dart'; // copied from the package's example/ folder
-
-final Directory directory = Directory('/home/ada/.local/share/my_app');
 final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(
   app: app,
-  openDatabase: sqliteOpener(directory),
+  openDatabase: sqliteOpener(directory: '/home/ada/.local/share/my_app'),
   settings: Settings(cacheSettings: PersistentCacheSettings()),
 );
 ```
 
+It works with `sqlite3` 2.7.3 to 3.x. With 3.x (Dart 3.10 and later) `sqlite3` bundles SQLite
+itself and nothing else is needed; with 2.x a Flutter app adds `sqlite3_flutter_libs: ^0.5.0`
+and a Linux server needs `libsqlite3.so`. Its README has the details per platform.
+
 The opener receives a name that is unique per app name, project and database (for example
 `firestore.[DEFAULT].my-project.(default)`) and decides where the file goes. If you write your
 own opener over another binding, implement `Database` (`execute`, `query`, `delete`, `close`,
-`path`) and call the callbacks in the order the example does: `onConfigure`, then `onCreate` for
-a new file or `onUpgrade` / `onDowngrade` when the stored version differs, store the version,
-then `onOpen`. The doc comment of `OpenDatabase` has the details.
+`path`) and call the callbacks in the order the opener of `cloud_firestore_dart_sqlite` does:
+`onConfigure`, then `onCreate` for a new file or `onUpgrade` / `onDowngrade` when the stored
+version differs, store the version, then `onOpen`. The doc comment of `OpenDatabase` has the details.
 
 `example/offline_persistence.dart` is a runnable program: it writes online, restarts on the same
 file, reads offline and writes offline.
@@ -93,12 +96,14 @@ file, reads offline and writes offline.
 
 The client sets no page cache size, like the Android SDK (which sets none either; IndexedDB in
 the JS SDK has nothing to set): the connection keeps SQLite's default, 2 MB in SQLite's own build
-(`sqlite3_flutter_libs`) and 2000 pages (8 MB) in the library of macOS. The example opener takes
-`pageCacheMb` to change it:
+(`sqlite3` 3.x and `sqlite3_flutter_libs`) and 2000 pages (8 MB) in the library of macOS.
+`sqliteOpener` takes `pageCacheMb` to change it:
 
 ```dart
-final Directory directory = Directory('/home/ada/.local/share/my_app');
-final OpenDatabase opener = sqliteOpener(directory, pageCacheMb: 32);
+final OpenDatabase opener = sqliteOpener(
+  directory: '/home/ada/.local/share/my_app',
+  pageCacheMb: 32,
+);
 ```
 
 Measured on a Mac with plenty of memory (`tool/bench/index_bench.dart` and
@@ -197,39 +202,39 @@ if (!Platform.isWindows) {
 
 ## On the web
 
-The cache is in memory by default. To keep it across page loads, copy
-[`example/sqlite_database_web.dart`](../../cloud_firestore/cloud_firestore_dart/example/sqlite_database_web.dart)
-into your app, add `sqlite3` (2.x, `^2.7.3`) and `web` to your dependencies, and serve the `sqlite3.wasm` file of
-the same `sqlite3` version next to your page (from the
-[sqlite3.dart releases](https://github.com/simolus3/sqlite3.dart/releases)):
+The cache is in memory by default. To keep it across page loads, use the same
+`cloud_firestore_dart_sqlite` package and serve the `sqlite3.wasm` file of the `sqlite3` version
+your app resolves next to your page (from the
+[sqlite3.dart releases](https://github.com/simolus3/sqlite3.dart/releases)). One command prints
+which file and from where:
+
+```shell
+dart run cloud_firestore_dart_sqlite:setup_web web
+```
 
 ```dart
-import 'sqlite_database_web.dart'; // copied from the package's example/ folder
+import 'package:cloud_firestore_dart_sqlite/cloud_firestore_dart_sqlite.dart';
 
 // IndexedDB: SQLite runs in the page on a copy of the whole database in memory.
 final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(
   app: app,
-  openDatabase: sqliteWebOpener(sqlite3Wasm: Uri.parse('sqlite3.wasm')),
+  openDatabase: sqliteOpener(), // loads sqlite3.wasm next to the page
 );
 ```
 
-To keep the database out of memory, also copy
-[`example/sqlite_opfs_worker.dart`](../../cloud_firestore/cloud_firestore_dart/example/sqlite_opfs_worker.dart),
-compile it with `dart compile js` and pass its URL. SQLite then runs in that dedicated worker on a
-file in the origin private file system (OPFS) and reads what it needs. No cross-origin isolation
+To keep the database out of memory, pass the URL of the OPFS worker, which the same command
+compiled to `web/sqlite_opfs_worker.js`. SQLite then runs in that dedicated worker on a file in
+the origin private file system (OPFS) and reads what it needs. No cross-origin isolation
 headers are needed; a browser without synchronous OPFS access in workers falls back to
 IndexedDB, and the first OPFS open of a cache that is in IndexedDB moves it, pending writes
 included.
 
 ```dart
-import 'sqlite_database_web.dart'; // copied from the package's example/ folder
+import 'package:cloud_firestore_dart_sqlite/cloud_firestore_dart_sqlite.dart';
 
 final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(
   app: app,
-  openDatabase: sqliteWebOpener(
-    sqlite3Wasm: Uri.parse('sqlite3.wasm'),
-    opfsWorker: Uri.parse('sqlite_opfs_worker.js'),
-  ),
+  openDatabase: sqliteOpener(opfsWorker: Uri.parse('sqlite_opfs_worker.js')),
 );
 ```
 
@@ -240,7 +245,7 @@ What to know (all measured in Chrome against the emulator; other browsers are un
   fails: the operations of that instance fail with a `FirestoreException` whose code is
   `failedPrecondition`. Such a tab should use a memory cache. `FirebaseFirestore.instanceFor` returns
   at once and opens the cache in the background, so the error comes from the first operation:
-  the `openWithMemoryFallback` helper of the example waits for a first operation that only
+  `openWithMemoryFallback` of `cloud_firestore_dart_sqlite` waits for a first operation that only
   reads the cache, and on `failedPrecondition` terminates that instance and creates one with a
   memory cache.
 - **Crash safety.** What a write future acknowledged is stored. A tab that dies in the middle

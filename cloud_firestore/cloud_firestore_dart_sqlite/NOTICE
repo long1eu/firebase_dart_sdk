@@ -1,0 +1,12 @@
+cloud_firestore_dart_sqlite
+Copyright 2018 Razvan Lung (long1eu) and contributors.
+
+This package holds the SQLite openers of cloud_firestore_dart, moved out of the
+example/ folder of that package. It uses package:sqlite3 (MIT licence,
+Copyright (c) 2020 Simon Binder) and does not include SQLite itself or its
+WebAssembly build.
+
+This package is not affiliated with, endorsed by or supported by Google LLC or
+Firebase. "Firebase" and "Cloud Firestore" are trademarks of Google LLC.
+
+Licensed under the Apache License, Version 2.0; see the LICENSE file.

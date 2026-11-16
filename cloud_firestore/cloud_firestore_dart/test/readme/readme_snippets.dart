@@ -7,14 +7,13 @@
 // ignore_for_file: type=lint, unused_local_variable, unused_import
 // ignore_for_file: unused_element
 
-import '../../example/sqlite_database.dart';
-import '../../example/sqlite_database_web.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
 import 'package:cloud_firestore_dart/cloud_firestore_dart.dart';
 import 'package:cloud_firestore_dart/pipelines.dart';
+import 'package:cloud_firestore_dart_sqlite/cloud_firestore_dart_sqlite.dart';
 import 'package:firebase_app_dart/firebase_app_dart.dart';
 import 'package:firebase_app_dart/platform_dependencies.dart';
 import 'package:firebase_auth_providers_dart/adc.dart'; // needs dart:io
@@ -973,8 +972,8 @@ Future<void> gettingStartedGuideLine143() async {
   await firestore.terminate();
 }
 
-// ../../docs/guides/getting_started.md:186
-Future<void> gettingStartedGuideLine186() async {
+// ../../docs/guides/getting_started.md:187
+Future<void> gettingStartedGuideLine187() async {
   final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(
     app: app,
     settings: Settings(webExperimentalForceLongPolling: true),
@@ -997,23 +996,23 @@ Future<void> migratingFromFlutterfireGuideLine105() async {
 
 // ../../docs/guides/migrating_from_flutterfire.md:153
 Future<void> migratingFromFlutterfireGuideLine153() async {
-  final Directory cacheDirectory = Directory('<the application support directory>');
+  final String cacheDirectory = '<the application support directory>';
   final FirebaseFirestore persistent = FirebaseFirestore.instanceFor(
     app: app,
-    openDatabase: sqliteOpener(cacheDirectory),
+    openDatabase: sqliteOpener(directory: cacheDirectory),
     settings: Settings(cacheSettings: PersistentCacheSettings()),
   );
 }
 
-// ../../docs/guides/migrating_from_flutterfire.md:176
-Future<void> migratingFromFlutterfireGuideLine176() async {
+// ../../docs/guides/migrating_from_flutterfire.md:174
+Future<void> migratingFromFlutterfireGuideLine174() async {
   final FirebaseUserAuth auth = await FirebaseUserAuth.forApp(app);
   final FirebaseFirestore signedIn = FirebaseFirestore.instanceFor(app: app);
   await auth.signInWithEmailAndPassword(email: 'ada@example.com', password: password);
 }
 
-// ../../docs/guides/migrating_from_flutterfire.md:330
-Future<void> migratingFromFlutterfireGuideLine330() async {
+// ../../docs/guides/migrating_from_flutterfire.md:328
+Future<void> migratingFromFlutterfireGuideLine328() async {
   final QuerySnapshot<Map<String, Object?>> page = await firestore
       .collection('users')
       .where('age', isGreaterThanOrEqualTo: 18)
@@ -1034,18 +1033,16 @@ Future<void> migratingFromFlutterfireGuideLine330() async {
 
 // ../../docs/guides/multiple_clients.md:119
 Future<void> multipleClientsGuideLine119() async {
-  final Directory directory = Directory('/home/ada/.local/share/my_app');
-
   // In the background isolate: the same project, another app name, another cache file.
   final FirebaseApp worker = FirebaseApp.withOptions(app.options, name: 'background-sync');
   final FirebaseFirestore workerFirestore = FirebaseFirestore.instanceFor(
     app: worker,
-    openDatabase: sqliteOpener(directory),
+    openDatabase: sqliteOpener(directory: '/home/ada/.local/share/my_app'),
   );
 }
 
-// ../../docs/guides/multiple_clients.md:145
-Future<void> multipleClientsGuideLine145() async {
+// ../../docs/guides/multiple_clients.md:141
+Future<void> multipleClientsGuideLine141() async {
   await firestore.terminate();
   await firestore.clearPersistence();
 }
@@ -1074,24 +1071,25 @@ Future<void> offlinePersistenceGuideLine29() async {
   );
 }
 
-// ../../docs/guides/offline_persistence.md:69
-Future<void> offlinePersistenceGuideLine69() async {
-  final Directory directory = Directory('/home/ada/.local/share/my_app');
+// ../../docs/guides/offline_persistence.md:71
+Future<void> offlinePersistenceGuideLine71() async {
   final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(
     app: app,
-    openDatabase: sqliteOpener(directory),
+    openDatabase: sqliteOpener(directory: '/home/ada/.local/share/my_app'),
     settings: Settings(cacheSettings: PersistentCacheSettings()),
   );
 }
 
-// ../../docs/guides/offline_persistence.md:99
-Future<void> offlinePersistenceGuideLine99() async {
-  final Directory directory = Directory('/home/ada/.local/share/my_app');
-  final OpenDatabase opener = sqliteOpener(directory, pageCacheMb: 32);
+// ../../docs/guides/offline_persistence.md:102
+Future<void> offlinePersistenceGuideLine102() async {
+  final OpenDatabase opener = sqliteOpener(
+    directory: '/home/ada/.local/share/my_app',
+    pageCacheMb: 32,
+  );
 }
 
-// ../../docs/guides/offline_persistence.md:118
-Future<void> offlinePersistenceGuideLine118() async {
+// ../../docs/guides/offline_persistence.md:123
+Future<void> offlinePersistenceGuideLine123() async {
   // Only the cache, never the network.
   final DocumentSnapshot<Map<String, Object?>> cached =
       await firestore.doc('cities/SF').get(const GetOptions(source: Source.cache));
@@ -1113,8 +1111,8 @@ Future<void> offlinePersistenceGuideLine118() async {
   await firestore.enableNetwork();
 }
 
-// ../../docs/guides/offline_persistence.md:185
-Future<void> offlinePersistenceGuideLine185() async {
+// ../../docs/guides/offline_persistence.md:190
+Future<void> offlinePersistenceGuideLine190() async {
   final Directory directory = Directory('/home/ada/.local/share/my_app')
     ..createSync(recursive: true);
   if (!Platform.isWindows) {
@@ -1122,35 +1120,32 @@ Future<void> offlinePersistenceGuideLine185() async {
   }
 }
 
-// ../../docs/guides/offline_persistence.md:206
-Future<void> offlinePersistenceGuideLine206() async {
+// ../../docs/guides/offline_persistence.md:215
+Future<void> offlinePersistenceGuideLine215() async {
   // IndexedDB: SQLite runs in the page on a copy of the whole database in memory.
   final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(
     app: app,
-    openDatabase: sqliteWebOpener(sqlite3Wasm: Uri.parse('sqlite3.wasm')),
+    openDatabase: sqliteOpener(), // loads sqlite3.wasm next to the page
   );
 }
 
-// ../../docs/guides/offline_persistence.md:224
-Future<void> offlinePersistenceGuideLine224() async {
+// ../../docs/guides/offline_persistence.md:232
+Future<void> offlinePersistenceGuideLine232() async {
   final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(
     app: app,
-    openDatabase: sqliteWebOpener(
-      sqlite3Wasm: Uri.parse('sqlite3.wasm'),
-      opfsWorker: Uri.parse('sqlite_opfs_worker.js'),
-    ),
+    openDatabase: sqliteOpener(opfsWorker: Uri.parse('sqlite_opfs_worker.js')),
   );
 }
 
-// ../../docs/guides/offline_persistence.md:260
-Future<void> offlinePersistenceGuideLine260() async {
+// ../../docs/guides/offline_persistence.md:265
+Future<void> offlinePersistenceGuideLine265() async {
   await firestore.terminate();        // the cache must not be in use by this instance
   await firestore.clearPersistence(); // deletes the files (or the browser storage)
   final FirebaseFirestore fresh = FirebaseFirestore.instanceFor(app: app);
 }
 
-// ../../docs/guides/offline_persistence.md:279
-Future<void> offlinePersistenceGuideLine279() async {
+// ../../docs/guides/offline_persistence.md:284
+Future<void> offlinePersistenceGuideLine284() async {
   final indexes = firestore.persistentCacheIndexManager; // null with a memory cache
   await indexes?.enableIndexAutoCreation();
 }
@@ -1471,8 +1466,8 @@ Future<void> troubleshootingGuideLine59() async {
   FirebaseFirestore.setLogLevel(LogLevel.debug);
 }
 
-// ../../docs/guides/troubleshooting.md:280
-Future<void> troubleshootingGuideLine280() async {
+// ../../docs/guides/troubleshooting.md:284
+Future<void> troubleshootingGuideLine284() async {
   final Settings settings = Settings(
     webExperimentalForceLongPolling: true,
     webExperimentalLongPollingOptions: const WebExperimentalLongPollingOptions(timeoutDuration: Duration(seconds: 25)),
@@ -1514,30 +1509,27 @@ Future<void> webGuideLine118() async {
   );
 }
 
-// ../../docs/guides/web.md:163
-Future<void> webGuideLine163() async {
+// ../../docs/guides/web.md:164
+Future<void> webGuideLine164() async {
   final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(
     app: app,
-    openDatabase: sqliteWebOpener(
-      sqlite3Wasm: Uri.parse('sqlite3.wasm'),
-      opfsWorker: Uri.parse('sqlite_opfs_worker.js'),
-    ),
+    openDatabase: sqliteOpener(opfsWorker: Uri.parse('sqlite_opfs_worker.js')),
     settings: Settings(cacheSettings: PersistentCacheSettings()),
   );
 }
 
-// ../../docs/guides/web.md:196
-Future<void> webGuideLine196() async {
+// ../../docs/guides/web.md:195
+Future<void> webGuideLine195() async {
   final FirebaseFirestore firestore = await openWithMemoryFallback(
     app: app,
-    sqlite3Wasm: Uri.parse('sqlite3.wasm'),
+    openDatabase: sqliteOpener(),
     settings: Settings(cacheSettings: PersistentCacheSettings()),
   );
   // Null with a memory cache: this tab did not get the persistent one.
   final bool persistent = firestore.persistentCacheIndexManager != null;
 }
 
-// ../../docs/guides/web.md:223
-Future<void> webGuideLine223() async {
+// ../../docs/guides/web.md:222
+Future<void> webGuideLine222() async {
   final Settings settings = Settings().withEmulator('127.0.0.1', 8080);
 }

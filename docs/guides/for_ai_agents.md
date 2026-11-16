@@ -21,7 +21,7 @@ when in doubt, search it.
 | The `FirebaseApp` (always) | `firebase_app_dart: ^0.1.0` | `package:firebase_app_dart/firebase_app_dart.dart` |
 | End users signed in (email/password, anonymous, custom token) or a service account key | `firebase_auth_providers_dart: ^0.1.0` | `package:firebase_auth_providers_dart/firebase_auth_providers_dart.dart` |
 | Application Default Credentials (servers, CLIs; needs `dart:io`) | `firebase_auth_providers_dart: ^0.1.0` | `package:firebase_auth_providers_dart/adc.dart` |
-| A disk cache on the VM or in Flutter | `sqlite3: ^2.7.3` (and `sqlite3_flutter_libs: ^0.5.0` in Flutter) | copy `example/sqlite_database.dart` of `cloud_firestore_dart` into the app |
+| A disk cache (VM, Flutter, web) | `cloud_firestore_dart_sqlite: ^0.1.0` | `package:cloud_firestore_dart_sqlite/cloud_firestore_dart_sqlite.dart` |
 | Firestore Lite, no cache and no listeners (experimental) | `cloud_firestore_dart` | `package:cloud_firestore_dart/lite.dart` instead of the main library |
 | Pipelines (preview, Enterprise edition databases only) | `cloud_firestore_dart` | `package:cloud_firestore_dart/pipelines.dart` in addition to the main library |
 
@@ -143,14 +143,12 @@ or ADC in an app that end users run; use `FirebaseUserAuth` there.
 ## A Flutter app with the SQLite cache
 
 ```shell
-flutter pub add cloud_firestore_dart firebase_app_dart path_provider \
-  'sqlite3:^2.7.3' 'sqlite3_flutter_libs:^0.5.0'
+flutter pub add cloud_firestore_dart firebase_app_dart path_provider cloud_firestore_dart_sqlite
 ```
 
-Pin `sqlite3` to 2.x: a plain `pub add sqlite3` picks 3.x, where the `package:sqlite3/open.dart`
-that the opener uses does not exist. Copy
-[`example/sqlite_database.dart`](../../cloud_firestore/cloud_firestore_dart/example/sqlite_database.dart)
-into `lib/` unchanged (it uses `dart:ffi` and `dart:io`, so this program is not for the web).
+`cloud_firestore_dart_sqlite` brings `sqlite3`; on Flutter 3.38 or later that is 3.x, which
+bundles SQLite itself. On an older Flutter add `sqlite3_flutter_libs: ^0.5.0` too. Do not copy
+any opener file. This program uses `dart:io` (`Directory`), so it is not for the web.
 
 ```dart flutter
 import 'dart:io';
@@ -160,7 +158,7 @@ import 'package:firebase_app_dart/firebase_app_dart.dart';
 import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
 
-import 'sqlite_database.dart'; // copied from cloud_firestore_dart's example/ folder
+import 'package:cloud_firestore_dart_sqlite/cloud_firestore_dart_sqlite.dart';
 
 late final FirebaseFirestore firestore;
 
@@ -179,7 +177,7 @@ Future<void> main() async {
   // Once, before runApp. Without openDatabase the cache would be in memory.
   firestore = FirebaseFirestore.instanceFor(
     app: app,
-    openDatabase: sqliteOpener(directory),
+    openDatabase: sqliteOpener(directory: '${directory.path}/firestore'),
     settings: Settings(cacheSettings: PersistentCacheSettings()),
   );
   runApp(const NotesApp());
@@ -235,7 +233,8 @@ class NotesApp extends StatelessWidget {
 ```
 
 On the Android emulator the host machine is `10.0.2.2`; nothing maps `localhost` for you. For
-the web, use a memory cache or the opener in `example/sqlite_database_web.dart` (see
+the web, use a memory cache or `sqliteOpener()` without a directory, with `sqlite3.wasm` next to
+the page (see
 [Offline persistence](offline_persistence.md#on-the-web)). No test in this repository runs a
 Flutter app on a device.
 
@@ -252,7 +251,7 @@ Right: the name in this client, or "not available".
 | FF `instanceFor(app: app, databaseId: 'db')`; JS `getFirestore(app, 'db')` | `FirebaseFirestore.instanceFor(app: app, databaseId: 'db')` |
 | FF `firestore.settings = Settings(...)`; JS `initializeFirestore(app, {...})` | `firestore.settings = Settings(...)` before the first use, or `FirebaseFirestore.instanceFor(app: app, settings: Settings(...))` |
 | FF `useFirestoreEmulator('localhost', 8080)`; JS `connectFirestoreEmulator(db, host, port)` | `firestore.useFirestoreEmulator('127.0.0.1', 8080)` before the first use, or `settings: Settings().withEmulator('127.0.0.1', 8080)` |
-| FF `Settings(persistenceEnabled: true)`; JS `persistentLocalCache()`, `enableIndexedDbPersistence` | `openDatabase: sqliteOpener(dir)` plus `PersistentCacheSettings()`; without `openDatabase` the cache is in memory |
+| FF `Settings(persistenceEnabled: true)`; JS `persistentLocalCache()`, `enableIndexedDbPersistence` | `openDatabase: sqliteOpener(directory: dir)` (`cloud_firestore_dart_sqlite`) plus `PersistentCacheSettings()`; without `openDatabase` the cache is in memory |
 | JS `persistentMultipleTabManager()` | not available (one client per cache in a browser) |
 | FF `Settings.CACHE_SIZE_UNLIMITED`; JS `CACHE_SIZE_UNLIMITED` | `Settings.cacheSizeUnlimited` |
 | JS `doc(db, 'a/b')`, `collection(db, 'a')` | `firestore.doc('a/b')`, `firestore.collection('a')` |
@@ -327,10 +326,11 @@ Names that are the same here: `collection`, `doc`, `collectionGroup`, `add`, `de
    futures never complete, and with a memory cache they are lost. A terminated instance cannot
    be used again; `instanceFor` then creates a new one.
 6. **Memory cache by default.** Without `openDatabase` the cache is in memory, whatever
-   `persistenceEnabled` says. The package has no SQLite binding of its own: copy
-   `example/sqlite_database.dart` (VM, Flutter) or `example/sqlite_database_web.dart` (web).
-7. **What needs `dart:io`.** `package:firebase_auth_providers_dart/adc.dart`, the copied
-   `sqlite_database.dart` (also `dart:ffi`), and any `Platform.environment` you read. The main
+   `persistenceEnabled` says. The SQLite opener is in the companion package
+   `cloud_firestore_dart_sqlite` (`sqliteOpener`, VM, Flutter and web); do not copy the old
+   `example/sqlite_database*.dart` files.
+7. **What needs `dart:io`.** `package:firebase_auth_providers_dart/adc.dart` and any
+   `Platform.environment` you read. `cloud_firestore_dart_sqlite` compiles everywhere. The main
    libraries of the three packages also compile for the web.
 8. **Experimental or preview.** The web (tested in Chrome against the emulator only), Firestore
    Lite (`lite.dart`) and Pipelines (`pipelines.dart`, Enterprise edition only). These, and
@@ -449,8 +449,8 @@ by task:
 | `count`, `sum`, `average`, aliases | `aggregations.dart` |
 | Typed data with `withConverter` | `converters.dart` |
 | Batches and transactions | `transactions_and_batches.dart` |
-| A disk cache, offline reads and writes | `offline_persistence.dart`, `sqlite_database.dart` |
-| The web cache | `sqlite_database_web.dart` |
+| A disk cache, offline reads and writes | `offline_persistence.dart`; the opener: `cloud_firestore_dart_sqlite` |
+| The web cache | the README of `cloud_firestore_dart_sqlite` |
 | Log level, pending writes, `terminate`, `clearPersistence` | `lifecycle.dart` |
 | Mock users on the emulator | `emulator_mock_user_token.dart` |
 | Bundles, snapshot JSON | `bundles.dart`, `snapshot_json.dart` |

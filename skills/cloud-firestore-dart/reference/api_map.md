@@ -18,7 +18,7 @@ Right: the name in this client, or "not available".
 | FF `instanceFor(app: app, databaseId: 'db')`; JS `getFirestore(app, 'db')` | `FirebaseFirestore.instanceFor(app: app, databaseId: 'db')` |
 | FF `firestore.settings = Settings(...)`; JS `initializeFirestore(app, {...})` | `FirebaseFirestore.instanceFor(app: app, settings: Settings(...))`; no setter |
 | FF `useFirestoreEmulator('localhost', 8080)`; JS `connectFirestoreEmulator(db, host, port)` | `settings: Settings().withEmulator('127.0.0.1', 8080)` |
-| FF `Settings(persistenceEnabled: true)`; JS `persistentLocalCache()`, `enableIndexedDbPersistence` | `openDatabase: sqliteOpener(dir)` plus `PersistentCacheSettings()`; without `openDatabase` the cache is in memory |
+| FF `Settings(persistenceEnabled: true)`; JS `persistentLocalCache()`, `enableIndexedDbPersistence` | `openDatabase: sqliteOpener(directory: dir)` (`cloud_firestore_dart_sqlite`) plus `PersistentCacheSettings()`; without `openDatabase` the cache is in memory |
 | JS `persistentMultipleTabManager()` | not available (one client per cache in a browser) |
 | FF `Settings.CACHE_SIZE_UNLIMITED`; JS `CACHE_SIZE_UNLIMITED` | `Settings.cacheSizeUnlimited` |
 | JS `doc(db, 'a/b')`, `collection(db, 'a')` | `firestore.doc('a/b')`, `firestore.collection('a')` |

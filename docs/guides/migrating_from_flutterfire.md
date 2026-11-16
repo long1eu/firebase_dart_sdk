@@ -93,8 +93,8 @@ dependencies:
 ```
 
 There is no plugin to register, no `flutterfire configure` step, and nothing to add to the
-Android, iOS or macOS projects. For a persistent cache in a Flutter app, add `sqlite3` (2.x) and
-`sqlite3_flutter_libs` (see below).
+Android, iOS or macOS projects. For a persistent cache in a Flutter app, add
+`cloud_firestore_dart_sqlite` (see below).
 
 ### The app: options instead of native configuration
 
@@ -146,19 +146,17 @@ Settings, field by field:
 
 The native SDKs behind FlutterFire keep a disk cache on mobile by default. Here the cache is
 **in memory unless you pass an `openDatabase`** function, whatever `persistenceEnabled` says.
-For a disk cache in a Flutter app, copy `example/sqlite_database.dart` from the package into the
-app, add `sqlite3: ^2.7.3` and `sqlite3_flutter_libs: ^0.5.0` (the opener does not work with
-`sqlite3` 3.x yet), and pass a directory from `path_provider`:
+For a disk cache in a Flutter app, add `cloud_firestore_dart_sqlite` and pass a directory from
+`path_provider` (on Flutter 3.38 and later nothing else; on older ones also
+`sqlite3_flutter_libs: ^0.5.0`):
 
 ```dart
-import 'dart:io';
+import 'package:cloud_firestore_dart_sqlite/cloud_firestore_dart_sqlite.dart';
 
-import 'sqlite_database.dart'; // copied from the package's example/ folder
-
-final Directory cacheDirectory = Directory('<the application support directory>');
+final String cacheDirectory = '<the application support directory>';
 final FirebaseFirestore persistent = FirebaseFirestore.instanceFor(
   app: app,
-  openDatabase: sqliteOpener(cacheDirectory),
+  openDatabase: sqliteOpener(directory: cacheDirectory),
   settings: Settings(cacheSettings: PersistentCacheSettings()),
 );
 ```

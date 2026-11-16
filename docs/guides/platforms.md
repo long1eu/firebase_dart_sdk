@@ -8,9 +8,9 @@ In short, read across a row for the transport and the caches of a platform:
 
 | Platform | Transport | Cache without an `openDatabase` | Persistent cache | Tested |
 |---|---|---|---|---|
-| Dart VM (servers, command line) | gRPC | memory | SQLite file (`example/sqlite_database.dart`) | macOS, Linux; Windows not tested |
-| Flutter on Android, iOS, desktop | gRPC | memory | SQLite file, with `sqlite3_flutter_libs` | not on devices |
-| Web, dart2wasm | REST and WebChannel over `fetch` | memory | SQLite in WebAssembly, in IndexedDB or OPFS (`example/sqlite_database_web.dart`) | Chrome, against the emulator |
+| Dart VM (servers, command line) | gRPC | memory | SQLite file (`cloud_firestore_dart_sqlite`) | macOS, Linux; Windows not tested |
+| Flutter on Android, iOS, desktop | gRPC | memory | SQLite file (`cloud_firestore_dart_sqlite`) | not on devices |
+| Web, dart2wasm | REST and WebChannel over `fetch` | memory | SQLite in WebAssembly, in IndexedDB or OPFS (`cloud_firestore_dart_sqlite`) | Chrome, against the emulator |
 | Web, dart2js | REST and WebChannel over `fetch` | memory | the same as dart2wasm | Chrome, against the emulator; integers above 2^53 lose precision |
 
 ## The Dart VM and Flutter
@@ -21,11 +21,15 @@ macOS. On Linux the unit tests and the standard integration suite (against the e
 container (`tool/linux/run_in_container.sh`), and CI runs them on Ubuntu x64. Windows is
 expected to work but is not tested. Flutter apps (Android, iOS, desktop) can use it as a plain Dart package.
 
-- Linux: `package:sqlite3` 2.x loads `libsqlite3.so`, which only the development package installs (`libsqlite3-dev`
-  on Debian and Ubuntu); with just the runtime package (`libsqlite3-0`) it fails with "Failed to load dynamic library
-  'libsqlite3.so'". The opener in `example/sqlite_database.dart` falls back to `libsqlite3.so.0`.
-- Windows: `package:sqlite3` loads `sqlite3.dll`, which Windows does not ship: put it next to the executable or on
-  the `PATH` (`sqlite3_flutter_libs` bundles it in a Flutter app). SQLite locks files with `LockFileEx` there, so
+- Linux: with `sqlite3` 3.x (Dart 3.10 and later) the opener of `cloud_firestore_dart_sqlite` uses the SQLite that
+  the build hook of `sqlite3` bundles; `dart build cli` puts it next to the program, `dart compile exe` does not and
+  the program then needs the system library (seen on macOS; the 3.x path was not tried on Linux). `sqlite3` 2.x
+  loads `libsqlite3.so`, which only the development package installs (`libsqlite3-dev` on Debian and Ubuntu); with
+  just the runtime package (`libsqlite3-0`) it fails with "Failed to load dynamic library 'libsqlite3.so'". The
+  README of `cloud_firestore_dart_sqlite` has an override that falls back to `libsqlite3.so.0`.
+- Windows: `sqlite3` 3.x bundles SQLite. `sqlite3` 2.x loads `sqlite3.dll` from next to the executable or the
+  `PATH` (`sqlite3_flutter_libs` bundles it in a Flutter app) and, from 2.7.5 on, falls back to `winsqlite3.dll`,
+  which Windows ships; neither was tried here. SQLite locks files with `LockFileEx` there, so
   two clients on one file behave as on Linux and macOS, but `Firestore.clearPersistence()` fails with `unknown` while
   any other handle (another isolate or process) still has the file open, where Linux and macOS delete it anyway.
 
@@ -35,15 +39,14 @@ Web support is experimental. Browsers have no sockets, so there the client talks
 Firestore the way the JS SDK does: REST/JSON for the one-shot calls and WebChannel for the
 listen and write streams, over `fetch`. What to know:
 
-- The cache is in memory by default. To keep it across page loads, pass the `OpenDatabase` of
-  [`example/sqlite_database_web.dart`](../../cloud_firestore/cloud_firestore_dart/example/sqlite_database_web.dart) (copy the file into
-  your app): SQLite compiled to WebAssembly by `package:sqlite3`. It needs the `sqlite3.wasm`
-  file of that package next to your page. It stores the database in one of two places:
+- The cache is in memory by default. To keep it across page loads, pass `sqliteOpener()` of
+  [`cloud_firestore_dart_sqlite`](../../cloud_firestore/cloud_firestore_dart_sqlite/): SQLite
+  compiled to WebAssembly by `package:sqlite3`. It needs the `sqlite3.wasm` file of that package
+  next to your page. It stores the database in one of two places:
   - **IndexedDB** (the default): SQLite runs in the page on a copy of the whole database in
     memory, and the opener waits for IndexedDB at the end of every transaction.
-  - **OPFS** (the origin private file system), when you also copy
-    [`example/sqlite_opfs_worker.dart`](../../cloud_firestore/cloud_firestore_dart/example/sqlite_opfs_worker.dart), compile it with
-    `dart compile js` and pass its URL as `opfsWorker`. SQLite then runs in that dedicated
+  - **OPFS** (the origin private file system), when you pass the URL of the worker that
+    `dart run cloud_firestore_dart_sqlite:setup_web web` compiles as `opfsWorker`. SQLite then runs in that dedicated
     worker on a file it reads as it needs (synchronous access handles, `SimpleOpfsFileSystem`
     of `package:sqlite3`), so the database is not held in memory. No cross-origin isolation
     headers are needed. In a browser without synchronous OPFS access in workers the opener
@@ -52,7 +55,7 @@ listen and write streams, over `fetch`. What to know:
 
   One tab at a time with either: a second tab that opens the same cache gets a
   `FirestoreException` with `failedPrecondition` (a Web Lock guards the database) and should use a
-  memory cache; `openWithMemoryFallback` in that file does this. `clearPersistence()` deletes
+  memory cache; `openWithMemoryFallback` of the package does this. `clearPersistence()` deletes
   the IndexedDB database or the OPFS directory. Cost, measured for a small app compiled with
   `dart compile js -O2`: 588 KB (180 KB gzipped) with a memory cache, 807 KB (239 KB gzipped)
   with the persistent cache, plus `sqlite3.wasm`, 731 KB (349 KB gzipped); the OPFS worker is
@@ -88,8 +91,8 @@ listen and write streams, over `fetch`. What to know:
     The default cache size limit of 100 MB starts evicting unused documents before 100,000.
   - The opener works around a slowness of `sqlite3` 2.9.4 compiled with dart2wasm, where
     every read of the IndexedDB database cost a copy of the whole file (0.7 s to open and
-    2.4 s to scan 1,000 documents, and worse with the size). Use the opener as it is in
-    `example/`; an older copy without `_ReadCopyFileSystem` is that slow.
+    2.4 s to scan 1,000 documents, and worse with the size). `cloud_firestore_dart_sqlite`
+    keeps that workaround (`_ReadCopyFileSystem`); `sqlite3` 3.8 fixed the slowness itself.
 - Against the emulator, a query that returns more than about 10,000 documents fails on the
   web with `unavailable` (the emulator's WebChannel endpoint drops the stream; over gRPC the
   same query works). Read such collections in pages there. Whether the production backend

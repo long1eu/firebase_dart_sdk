@@ -24,15 +24,15 @@ by `flutter analyze` in `examples/flutter_notes`.
 
 ```shell
 flutter pub add cloud_firestore_dart firebase_app_dart path_provider rxdart
-flutter pub add sqlite3:^2.7.3 sqlite3_flutter_libs:^0.5.40   # the cache on disk
+flutter pub add cloud_firestore_dart_sqlite                    # the cache on disk
 flutter pub add connectivity_plus                              # optional, see Connectivity
 ```
 
-Copy [`example/sqlite_database.dart`](../../cloud_firestore/cloud_firestore_dart/example/sqlite_database.dart)
-of the package into your `lib/`. It is written for `package:sqlite3` 2.x, so keep `sqlite3` on
-2.x and `sqlite3_flutter_libs` on 0.5.x, which bundles the native SQLite library with the app.
-`sqlite3` 3.x bundles the library itself and has a different loading API; the opener has not
-been ported to it.
+[`cloud_firestore_dart_sqlite`](../../cloud_firestore/cloud_firestore_dart_sqlite/) brings
+`sqlite3`. On Flutter 3.38 or later pub picks `sqlite3` 3.x, which bundles SQLite with the app
+through a build hook: add nothing else, and remove `sqlite3_flutter_libs` if you had it. On an
+older Flutter pub picks `sqlite3` 2.x; then also add `sqlite3_flutter_libs: ^0.5.40`, which
+bundles the native library.
 
 Two changes to the projects that `flutter create` makes:
 
@@ -130,7 +130,7 @@ Future<FirebaseFirestore> createFirestore(AppDependencies dependencies) async {
   return FirebaseFirestore.instanceFor(
     app: app,
     settings: settings,
-    openDatabase: sqliteOpener(Directory('${directory.path}/firestore')),
+    openDatabase: sqliteOpener(directory: '${directory.path}/firestore'),
   );
 }
 ```
@@ -312,8 +312,8 @@ class NoteConverter extends FirestoreDataConverter<Note> {
 
 ## The SQLite cache on each platform
 
-Without `openDatabase` the cache is in memory and gone when the app stops. With the copied
-`sqliteOpener` it is one SQLite file per app name, project and database, in the directory you
+Without `openDatabase` the cache is in memory and gone when the app stops. With `sqliteOpener` of
+`cloud_firestore_dart_sqlite` it is one SQLite file per app name, project and database, in the directory you
 pass (the example uses `getApplicationSupportDirectory()` plus `/firestore`). The choices on a
 native platform, cache and transport together:
 
@@ -321,21 +321,23 @@ native platform, cache and transport together:
 flowchart LR
   appCode["Your Flutter app"] --> firestore["Firestore instance"]
   firestore -- "no openDatabase" --> memory["Memory cache, gone when the app stops"]
-  firestore -- "openDatabase: sqliteOpener" --> sqliteFile["SQLite file, package:sqlite3 2.x"]
+  firestore -- "openDatabase: sqliteOpener" --> sqliteFile["SQLite file, package:sqlite3"]
   sqliteFile --> nativeLib["native SQLite library, see the table"]
   firestore -- "gRPC on Android, iOS, macOS, Linux, Windows" --> backend["Firestore backend or emulator"]
 ```
 
 Where the SQLite library comes from:
 
-| Platform | Library that `package:sqlite3` 2.x loads |
-| --- | --- |
-| Android | `libsqlite3.so` bundled by `sqlite3_flutter_libs` |
-| iOS, macOS | the framework bundled by `sqlite3_flutter_libs`; the system library if it is missing |
-| Windows | `sqlite3.dll` bundled by `sqlite3_flutter_libs` |
-| Linux | the system library: `sqliteOpener` sets `open.overrideFor(OperatingSystem.linux, ...)` to `libsqlite3.so`, then `libsqlite3.so.0`. This replaces the default of `sqlite3` 2.x, which would use the copy that `sqlite3_flutter_libs` links into the app. A desktop with SQLite installed has `libsqlite3.so.0` |
+| Platform | `sqlite3` 3.x (Flutter 3.38 and later) | `sqlite3` 2.x |
+| --- | --- | --- |
+| Android | bundled by the build hook of `sqlite3` | `libsqlite3.so` bundled by `sqlite3_flutter_libs` |
+| iOS, macOS | bundled by the build hook | the framework bundled by `sqlite3_flutter_libs`; the system library if it is missing |
+| Windows | bundled by the build hook | `sqlite3.dll` bundled by `sqlite3_flutter_libs`; without it, `sqlite3.dll` on the `PATH`, then `winsqlite3.dll` of Windows (`sqlite3` 2.7.5 and later) |
+| Linux | bundled by the build hook | the copy that `sqlite3_flutter_libs` links into the app, else the system `libsqlite3.so`. (The copied opener of `cloud_firestore_dart` 0.1, `example/sqlite_database.dart`, overrides this lookup and always loads the system library.) |
 
-Only the macOS row was tried with this example. The application support directory is inside the
+Only macOS was tried with this example, with `sqlite3` 2.x and the copied opener; no Flutter
+build was tried with `cloud_firestore_dart_sqlite` or `sqlite3` 3.x, and the Windows and Linux
+rows are what `sqlite3` documents, not tried. The application support directory is inside the
 app's container on macOS (`~/Library/Containers/<bundle id>/...`) and private to the app on
 Android and iOS. On Windows, `clearPersistence()` fails while another handle still has the file
 open ([Platforms](platforms.md)). [Offline persistence](offline_persistence.md) covers the cache
@@ -453,8 +455,8 @@ From [Platforms](platforms.md) and the example app:
 | --- | --- |
 | macOS | The package: developed and tested on the Dart VM. The example app: built with Flutter 3.44.9 and run against the emulator by hand (the listener, an edit offline and its sync, the cache across a restart, `terminate()` on Cmd-Q) |
 | Linux | The package: unit and integration suites pass in CI (Ubuntu x64) and in a Debian arm64 container, on the Dart VM. A Flutter app: not built or run |
-| Windows | Not tested, not built. `sqlite3.dll` must ship with the app (`sqlite3_flutter_libs` does that); `clearPersistence()` fails while another handle has the file open |
+| Windows | Not tested, not built. `sqlite3` 3.x bundles SQLite (with 2.x, `sqlite3_flutter_libs` does); `clearPersistence()` fails while another handle has the file open |
 | Android, iOS | No tests run on devices or emulators, and the example was not built for them. The client runs on the Dart VM there as on a server, so they are expected to work |
-| Web | Not a target of the example. The package's web support is experimental and tested in Chrome with `dart test`, not in a Flutter web app. `sqlite_database.dart` uses `dart:ffi` and does not compile for the web; use `example/sqlite_database_web.dart` there ([Offline persistence on the web](offline_persistence.md#on-the-web)) |
+| Web | Not a target of the example. The package's web support is experimental and tested in Chrome with `dart test`, not in a Flutter web app. `sqliteOpener` of `cloud_firestore_dart_sqlite` compiles for the web too and keeps the cache in IndexedDB or OPFS there; pass no directory on the web (`directory: kIsWeb ? null : ...`) and see [Offline persistence on the web](offline_persistence.md#on-the-web) |
 
 Nothing in this guide was tried against a real Firebase project.

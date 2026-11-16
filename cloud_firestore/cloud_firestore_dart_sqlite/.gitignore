@@ -1,0 +1,6 @@
+# What the browser tests load at run time (see test/browser/README.md): not in the repository.
+test/browser/sqlite3.wasm
+test/browser/sqlite_opfs_worker.js
+test/browser/sqlite_opfs_worker.js.deps
+test/browser/sqlite_opfs_worker.js.map
+test/browser/emulator_port.txt
