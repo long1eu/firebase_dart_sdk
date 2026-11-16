@@ -1,0 +1,8 @@
+# Local development only: use the sibling cloud_firestore_dart and
+# firebase_app_dart checkouts instead of the hosted packages. Excluded from the
+# published archive by .pubignore.
+dependency_overrides:
+  cloud_firestore_dart:
+    path: ../cloud_firestore_dart
+  firebase_app_dart:
+    path: ../../firebase_core/firebase_app_dart
