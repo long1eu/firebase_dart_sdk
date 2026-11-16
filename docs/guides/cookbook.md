@@ -95,8 +95,9 @@ Future<void> loadNextPage() async {
 ```
 
 Each page is read once to find its first and last document; its listener is then bounded by those
-documents, not by a limit. A document added inside a page appears in that page, and no document
-falls between two pages. A page can grow past 20; that is the price of the fixed bounds. Cancel the
+documents, not by a limit. A document added inside a page appears in that page, and pages never
+overlap. A document added later that sorts between the last document of one page and the first of
+the next is in neither listener until the pages are read again. A page can grow past 20; that is the price of the fixed bounds. Cancel the
 subscriptions when the list goes away.
 
 The run of `infinite_scroll.dart` (three per page): each listener covers the documents from the first

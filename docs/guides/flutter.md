@@ -144,6 +144,9 @@ Future<Firestore> createFirestore(AppDependencies dependencies) async {
 - Settings belong to the `instanceFor` call that creates the instance; there is no setter.
 - For signed-in users, set `app.authProvider` before `Firestore.instanceFor`; see
   [Authentication](authentication.md). The example does not sign in.
+- If the app signs users in with FlutterFire's `firebase_auth`, `FlutterFireBridge.firestore()` of
+  `cloud_firestore_dart_flutterfire` creates the app and the instance with that user; see
+  [Using cloud_firestore_dart with FlutterFire sign-in](flutterfire_bridge.md).
 
 ## Where to keep the instance
 

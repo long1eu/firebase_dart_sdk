@@ -432,8 +432,9 @@ What the first request of a new process pays for, and what helps:
   `dart run` compiles the program first.
 - **The instance.** `Firestore.instanceFor` returns at once and opens the cache and the
   connection in the background. Create it at startup, before the first request arrives.
-- **The first token.** `applicationDefaultCredentials()` looks up the credentials and fetches an
-  access token when the first request needs one (on Cloud Run, from the metadata server). The
+- **The first token.** `applicationDefaultCredentials()` looks up the credentials; the first access
+  token is fetched when the provider is assigned to `app.authProvider` (on Cloud Run, from the
+  metadata server). The
   token is reused until five minutes before it expires.
 - **The connection.** The first call opens a gRPC connection (TLS, HTTP/2) to
   `firestore.googleapis.com`; later calls reuse it. Streams that are idle for a minute are

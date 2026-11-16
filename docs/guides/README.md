@@ -55,6 +55,9 @@ READMEs are short landing pages; the API reference is on pub.dev.
     indexes, cache size and garbage collection, listeners, batches, bundles, with measurements.
 23. [For AI coding agents](for_ai_agents.md): packages, imports, minimal programs, FlutterFire and
     JS names mapped to this client, and the rules, on one page.
+24. [Using cloud_firestore_dart with FlutterFire sign-in](flutterfire_bridge.md): the
+    `cloud_firestore_dart_flutterfire` bridge, which reuses the options and the signed-in user of
+    `firebase_core` and `firebase_auth`, how user changes reach Firestore, and its limits.
 
 Every Dart snippet in these guides is compiled against the current API by
 `cloud_firestore/cloud_firestore_dart/test/unit/api/readme_snippets_test.dart`, except the blocks
