@@ -60,8 +60,9 @@ FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 dart test
 - `server_shelf`, `cli` and `cloud_run_job` take the three packages from this repository, with
   path dependencies and `dependency_overrides` in their `pubspec.yaml`, so they run against the
   code next to them. To use one outside the repository, replace both with the versions on pub.dev
-  (`^0.1.0`). `worker_queue`, `flutter_notes`, `web_app` and `playground` depend on the versions on
-  pub.dev and can be copied out as they are; they have no tests, except `playground`, which has a
-  smoke test that needs no emulator.
+  (`^0.2.0`). `worker_queue`, `flutter_notes`, `web_app` and `playground` depend on the versions on
+  pub.dev (`^0.2.0`, and `cloud_firestore_dart_sqlite` `^0.1.0` for the SQLite cache of
+  `flutter_notes` and `web_app`) and can be copied out as they are; they have no tests, except
+  `playground`, which has a smoke test that needs no emulator.
 - `firestore_from_env.dart` is copied, not shared, so that each directory can be copied out on
   its own.
