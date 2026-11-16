@@ -69,10 +69,10 @@ packages:
     dependency: "direct main"
     description:
       name: cloud_firestore_dart
-      sha256: "86279ccdc26ef612c9dfb81caa8cabbddd15473b48d94d746e8c60abe009d826"
+      sha256: "07998231bb03706a09ba1da2ba8fcb516e0f68f79f87eaca2913c397eefde853"
       url: "https://pub.dev"
     source: hosted
-    version: "0.1.1"
+    version: "0.2.0"
   collection:
     dependency: transitive
     description:
@@ -125,10 +125,10 @@ packages:
     dependency: "direct main"
     description:
       name: firebase_app_dart
-      sha256: "57659470ccb66ad83efddec661d1732d8a13c18bc695ec5eea8a5bef62aa6d83"
+      sha256: "2e3dbe78660ab4d451c41b536c272314cce26551dc88c2205b9636f050c1df59"
       url: "https://pub.dev"
     source: hosted
-    version: "0.1.1"
+    version: "0.2.0"
   fixnum:
     dependency: transitive
     description:

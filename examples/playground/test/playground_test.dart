@@ -12,7 +12,7 @@ import 'package:test/test.dart';
 void main() {
   test('a write shows in the listener at once and stays pending', () async {
     final FirebaseApp app = FirebaseApp.withOptions(playgroundOptions);
-    final Firestore firestore = await openOffline(app);
+    final FirebaseFirestore firestore = await openOffline(app);
     addTearDown(firestore.terminate);
 
     const QuerySpec spec = QuerySpec(
@@ -26,7 +26,7 @@ void main() {
     );
     final StreamIterator<QuerySnapshot<Map<String, Object?>>> snapshots =
         StreamIterator<QuerySnapshot<Map<String, Object?>>>(
-          spec.build(firestore).getSnapshots(MetadataChanges.include),
+          spec.build(firestore).snapshots(includeMetadataChanges: true),
         );
     addTearDown(snapshots.cancel);
 
@@ -44,10 +44,7 @@ void main() {
       <String>['tokyo'],
     );
     expect(snapshot.metadata.hasPendingWrites, isTrue);
-    expect(
-      snapshot.getDocumentChanges(MetadataChanges.include).single.type,
-      DocumentChangeType.added,
-    );
+    expect(snapshot.docChanges.single.type, DocumentChangeType.added);
 
     // No backend: the write is never acknowledged.
     bool done = false;
@@ -69,7 +66,19 @@ void main() {
     expect(
       spec.toDart(),
       "firestore\n    .collection('tasks')\n    .where('priority', isLessThan: 3)"
-      '\n    .limit(5)\n    .getSnapshots(MetadataChanges.include)\n    .listen(...);',
+      '\n    .limit(5)\n    .snapshots(includeMetadataChanges: true)\n    .listen(...);',
+    );
+    // where(field, isEqualTo: null) is not a filter in 0.2: null is isNull.
+    const QuerySpec nulls = QuerySpec(
+      collection: 'tasks',
+      whereField: 'done',
+      op: WhereOp.isEqualTo,
+      whereValue: 'null',
+    );
+    expect(
+      nulls.toDart(),
+      "firestore\n    .collection('tasks')\n    .where('done', isNull: true)"
+      '\n    .snapshots(includeMetadataChanges: true)\n    .listen(...);',
     );
     expect(parseValue('Paris'), 'Paris');
     expect(parseValue('"Paris"'), 'Paris');
