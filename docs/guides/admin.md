@@ -63,7 +63,7 @@ sequenceDiagram
 
 In code, against the Auth emulator:
 
-```dart
+```dart admin
 import 'package:firebase_admin_dart/auth.dart';
 import 'package:firebase_auth_providers_dart/firebase_auth_providers_dart.dart';
 
@@ -100,7 +100,7 @@ Future<void> main() async {
 
 With a real project only the app changes:
 
-```dart
+```dart admin
 final FirebaseAdminApp app = FirebaseAdminApp(
   projectId: 'my-project',
   credential: AdminCredential.serviceAccount(keyJson), // a key file you loaded
