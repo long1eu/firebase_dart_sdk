@@ -92,7 +92,7 @@ void main() {
                 'http#$connection ${delivered ? 'handed on' : 'received'} $text');
           };
         }
-        final Firestore db = await env.newClient(proxy: proxy);
+        final FirebaseFirestore db = await env.newClient(proxy: proxy);
         clients.add(_SoakClient(
             i, db, proxy, db.collection(name), Random(seed * 31 + i), record));
       }
@@ -287,7 +287,7 @@ class _SoakClient {
       : main = RecordingListener(collection);
 
   final int id;
-  final Firestore db;
+  final FirebaseFirestore db;
   final ChaosProxy proxy;
   final CollectionReference<Map<String, Object?>> collection;
   final Random random;
@@ -323,7 +323,7 @@ class _SoakClient {
     record('#$op $what');
     _outstanding++;
     pending.add(future.then((_) => record('#$op ok'), onError: (Object e) {
-      record('#$op failed: ${e is FirestoreError ? e.code : e.runtimeType}');
+      record('#$op failed: ${e is FirestoreException ? e.code : e.runtimeType}');
     }).whenComplete(() => _outstanding--));
   }
 

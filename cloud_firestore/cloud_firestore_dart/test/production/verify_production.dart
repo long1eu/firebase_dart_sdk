@@ -214,12 +214,12 @@ class Kit {
   String get rootPath => '$rootCollection/$runId';
 
   final ApplicationDefaultTokenSource _tokens = ApplicationDefaultTokenSource();
-  final List<Firestore> _clients = <Firestore>[];
+  final List<FirebaseFirestore> _clients = <FirebaseFirestore>[];
   final List<ChaosProxy> _proxies = <ChaosProxy>[];
   final List<FirestoreTransport> _transports = <FirestoreTransport>[];
   final Set<String> _touched = <String>{};
   int _clientIndex = 0;
-  Firestore? _direct;
+  FirebaseFirestore? _direct;
 
   /// The writes spent so far (deletes of the clean-up not included).
   int writes = 0;
@@ -230,7 +230,7 @@ class Kit {
   /// The recorder of the last web client that was created.
   RecordingWebHttpClient? lastWebRecorder;
 
-  final List<lite.Firestore> _liteClients = <lite.Firestore>[];
+  final List<lite.FirebaseFirestore> _liteClients = <lite.FirebaseFirestore>[];
   final List<FirebaseApp> _liteApps = <FirebaseApp>[];
 
   /// The transport the last Firestore Lite client was given, once it made its first call.
@@ -271,12 +271,12 @@ class Kit {
   /// A new client with an empty in-memory cache.
   ///
   /// With [via] the gRPC connection goes through that proxy. With `authenticated: false` the client sends no token.
-  Future<Firestore> client(
+  Future<FirebaseFirestore> client(
       {Transport transport = Transport.grpc,
       ChaosProxy? via,
       bool authenticated = true,
       CredentialsProvider? credentials}) async {
-    final FirestoreSettings settings = FirestoreSettings(
+    final Settings settings = Settings(
       host: backend.host,
       port: backend.port,
       sslEnabled: backend.ssl,
@@ -297,7 +297,7 @@ class Kit {
       return _grpcTransport(options, via);
     };
     try {
-      final Firestore firestore = await IntegrationTestUtil.forTests(
+      final FirebaseFirestore firestore = await IntegrationTestUtil.forTests(
         databaseId,
         'verify-production-$_clientIndex',
         credentials ?? _credentials(authenticated: authenticated),
@@ -333,11 +333,11 @@ class Kit {
   ///
   /// The lite library takes its credentials from the app; the kit has none there, so the transport is given the
   /// credentials of the kit instead.
-  lite.Firestore liteClient({required Transport transport}) {
+  lite.FirebaseFirestore liteClient({required Transport transport}) {
     final FirebaseApp app = FirebaseApp.withOptions(
       FirebaseOptions(
           apiKey: 'verify-production',
-          applicationId: 'verify-production',
+          appId: 'verify-production',
           projectId: backend.projectId),
       dependencies: null,
       name: 'verify-production-lite-$runId-${_clientIndex++}',
@@ -360,10 +360,10 @@ class Kit {
       }
       return lastLiteTransport = _grpcTransport(options, null);
     };
-    final lite.Firestore firestore = lite.Firestore.instanceFor(
+    final lite.FirebaseFirestore firestore = lite.FirebaseFirestore.instanceFor(
       app: app,
-      database: backend.databaseId,
-      settings: lite.FirestoreSettings(
+      databaseId: backend.databaseId,
+      settings: lite.Settings(
           host: backend.host, port: backend.port, sslEnabled: backend.ssl),
     );
     _liteClients.add(firestore);
@@ -371,7 +371,7 @@ class Kit {
   }
 
   /// The client that talks to the backend directly over gRPC, shared by the checks (the oracle of the chaos checks).
-  Future<Firestore> get direct async => _direct ??= await client();
+  Future<FirebaseFirestore> get direct async => _direct ??= await client();
 
   /// A raw gRPC transport, for the checks that speak the protocol themselves.
   FirestoreTransport rawTransport() {
@@ -395,7 +395,7 @@ class Kit {
 
   /// A document of the run. Every document the kit writes comes from here, so that the clean-up can delete it.
   DocumentReference<Map<String, Object?>> doc(
-      Firestore db, String collection, String id) {
+      FirebaseFirestore db, String collection, String id) {
     final String path = '${collectionPath(collection)}/$id';
     _touched.add(path);
     return db.doc(path);
@@ -432,7 +432,7 @@ class Kit {
     }
   }
 
-  /// The path of a document of the run, for a client that is not a [Firestore] of the main library. Like [doc], it
+  /// The path of a document of the run, for a client that is not a [FirebaseFirestore] of the main library. Like [doc], it
   /// registers the document for the clean-up.
   String documentPath(String collection, String id) {
     final String path = '${collectionPath(collection)}/$id';
@@ -460,7 +460,7 @@ class Kit {
     if (_touched.isEmpty) {
       return 0;
     }
-    final Firestore db = await direct;
+    final FirebaseFirestore db = await direct;
     final List<String> paths = _touched.toList()..sort();
     for (int i = 0; i < paths.length; i += 100) {
       final WriteBatch batch = db.batch();
@@ -476,7 +476,7 @@ class Kit {
     for (final ChaosProxy proxy in _proxies) {
       proxy.restore();
     }
-    for (final Firestore client in _clients) {
+    for (final FirebaseFirestore client in _clients) {
       try {
         await client.terminate().timeout(const Duration(seconds: 20));
       } catch (_) {
@@ -484,7 +484,7 @@ class Kit {
       }
     }
     liteTransportOverride = null;
-    for (final lite.Firestore client in _liteClients) {
+    for (final lite.FirebaseFirestore client in _liteClients) {
       try {
         await client.terminate().timeout(const Duration(seconds: 20));
       } catch (_) {
@@ -521,7 +521,7 @@ Future<void> _eventually(FutureOr<bool> Function() condition, String what,
 }
 
 String _describeError(Object error) {
-  if (error is FirestoreError) {
+  if (error is FirestoreException) {
     return '${error.code}: ${error.message}';
   }
   return '${error.runtimeType}: $error';
@@ -540,7 +540,7 @@ List<String> _ids(QuerySnapshot<Object?> snapshot) =>
 // ---- the checks ----
 
 Future<CheckResult> _crud(Kit kit) async {
-  final Firestore db = await kit.direct;
+  final FirebaseFirestore db = await kit.direct;
   final DocumentReference<Map<String, Object?>> ref =
       kit.doc(db, 'vp_crud', 'doc');
   kit.spend(3);
@@ -576,8 +576,8 @@ Future<CheckResult> _crud(Kit kit) async {
 }
 
 Future<CheckResult> _listeners(Kit kit) async {
-  final Firestore writer = await kit.direct;
-  final Firestore listener = await kit.client();
+  final FirebaseFirestore writer = await kit.direct;
+  final FirebaseFirestore listener = await kit.client();
   final DocumentReference<Map<String, Object?>> a =
       kit.doc(listener, 'vp_listen', 'a');
   final List<DocumentSnapshot<Map<String, Object?>>> docEvents =
@@ -628,7 +628,7 @@ Future<CheckResult> _listeners(Kit kit) async {
 }
 
 Future<CheckResult> _queries(Kit kit) async {
-  final Firestore db = await kit.direct;
+  final FirebaseFirestore db = await kit.direct;
   // A fixed collection id: a composite index created for it once serves every run.
   const String name = 'vp_queries';
   kit.spend(6);
@@ -684,7 +684,7 @@ Future<CheckResult> _queries(Kit kit) async {
         'composite index query',
         collection.where('a', isEqualTo: 1).orderBy('b', Direction.descending),
         <String>['d5', 'd3', 'd1']);
-  } on FirestoreError catch (e) {
+  } on FirestoreException catch (e) {
     if (e.code == FirestoreErrorCode.failedPrecondition) {
       final String? link = _indexLink(e);
       return CheckResult(Status.inconclusive,
@@ -711,9 +711,9 @@ Future<CheckResult> _queries(Kit kit) async {
 }
 
 Future<CheckResult> _lostAcknowledgement(Kit kit) async {
-  final Firestore oracle = await kit.direct;
+  final FirebaseFirestore oracle = await kit.direct;
   final ChaosProxy proxy = await kit.proxy();
-  final Firestore db = await kit.client(via: proxy);
+  final FirebaseFirestore db = await kit.client(via: proxy);
   final DocumentReference<Map<String, Object?>> ref =
       kit.doc(db, 'vp_lost_ack', 'counter');
   final DocumentReference<Map<String, Object?>> oracleRef =
@@ -793,9 +793,9 @@ Future<CheckResult> _lostAcknowledgement(Kit kit) async {
 }
 
 Future<CheckResult> _lostCommitAnswer(Kit kit) async {
-  final Firestore oracle = await kit.direct;
+  final FirebaseFirestore oracle = await kit.direct;
   final ChaosProxy proxy = await kit.proxy();
-  final Firestore db = await kit.client(via: proxy);
+  final FirebaseFirestore db = await kit.client(via: proxy);
   final DocumentReference<Map<String, Object?>> counter =
       kit.doc(db, 'vp_lost_commit', 'counter');
   final DocumentReference<Map<String, Object?>> marker =
@@ -923,7 +923,7 @@ Map<String, Object?> _withReadTime(Map<String, Object?> json, DateTime readTime)
 }
 
 Future<CheckResult> _resumeOldReadTime(Kit kit) async {
-  final Firestore writer = await kit.direct;
+  final FirebaseFirestore writer = await kit.direct;
   const String name = 'vp_resume';
   final Query<Map<String, Object?>> query = writer
       .collection(kit.collectionPath(name))
@@ -946,7 +946,7 @@ Future<CheckResult> _resumeOldReadTime(Kit kit) async {
     final Map<String, Object?> json = age.value == Duration.zero
         ? fresh
         : _withReadTime(fresh, now.subtract(age.value));
-    final Firestore db = await kit.client();
+    final FirebaseFirestore db = await kit.client();
     final List<QuerySnapshot<Map<String, Object?>>> events =
         <QuerySnapshot<Map<String, Object?>>>[];
     final List<Object> errors = <Object>[];
@@ -1168,7 +1168,7 @@ Future<CheckResult> _halfClose(Kit kit) async {
 
 /// The same query on another client.
 Query<Map<String, Object?>> _rebase(
-    Firestore db, Query<Map<String, Object?>> query) {
+    FirebaseFirestore db, Query<Map<String, Object?>> query) {
   // ignore: invalid_use_of_internal_member
   return QueryInternal.create<Map<String, Object?>>(query.query, db);
 }
@@ -1176,7 +1176,7 @@ Query<Map<String, Object?>> _rebase(
 /// Null and NaN in equality filters. The Standard edition never matches them; the Enterprise edition does (as
 /// pinned with the emulators in test/integration_enterprise/edition_differences_test.dart).
 Future<CheckResult> _editionFilters(Kit kit) async {
-  final Firestore db = await kit.direct;
+  final FirebaseFirestore db = await kit.direct;
   const String name = 'vp_edition';
   kit.spend(3);
   final WriteBatch batch = db.batch()
@@ -1217,7 +1217,7 @@ Future<CheckResult> _editionFilters(Kit kit) async {
   final Map<String, String> server = <String, String>{};
   final Map<String, String> local = <String, String>{};
   // First with a client that has nothing cached: what the backend returns.
-  final Firestore cold = await kit.client();
+  final FirebaseFirestore cold = await kit.client();
   for (final String key in queries.keys) {
     final Query<Map<String, Object?>> query = _rebase(cold, queries[key]!);
     server[key] = _ids(await query.get(Source.server)).join(',');
@@ -1307,7 +1307,7 @@ Future<CheckResult> _bsonIncrement(Kit kit) async {
     return CheckResult(Status.skipped,
         'The database behaves like the Standard edition (check 6): BSON types need an Enterprise edition database.');
   }
-  final Firestore db = await kit.direct;
+  final FirebaseFirestore db = await kit.direct;
   final DocumentReference<Map<String, Object?>> ref =
       kit.doc(db, 'vp_bson', 'doc');
   kit.spend(4);
@@ -1338,8 +1338,8 @@ Future<CheckResult> _bsonIncrement(Kit kit) async {
 }
 
 Future<CheckResult> _negativeZeroAndEmptyBytes(Kit kit) async {
-  final Firestore grpc = await kit.direct;
-  final Firestore web = await kit.client(transport: Transport.web);
+  final FirebaseFirestore grpc = await kit.direct;
+  final FirebaseFirestore web = await kit.client(transport: Transport.web);
   final Map<String, Object?> data = <String, Object?>{
     'negativeZero': -0.0,
     'zero': 0.0,
@@ -1351,12 +1351,12 @@ Future<CheckResult> _negativeZeroAndEmptyBytes(Kit kit) async {
   await kit.doc(web, 'vp_values', 'by_web').set(data);
 
   final List<String> problems = <String>[];
-  final Map<String, Firestore> readers = <String, Firestore>{
+  final Map<String, FirebaseFirestore> readers = <String, FirebaseFirestore>{
     'gRPC': grpc,
     'web': web,
   };
   for (final String writer in <String>['by_grpc', 'by_web']) {
-    for (final MapEntry<String, Firestore> reader in readers.entries) {
+    for (final MapEntry<String, FirebaseFirestore> reader in readers.entries) {
       final Map<String, Object?>? read =
           (await kit.doc(reader.value, 'vp_values', writer).get(Source.server))
               .data;
@@ -1420,14 +1420,14 @@ Future<CheckResult> _tokens(Kit kit) async {
     return CheckResult(Status.skipped,
         'The emulator needs no token; nothing to verify.');
   }
-  final Firestore db = await kit.direct;
+  final FirebaseFirestore db = await kit.direct;
   final DocumentReference<Map<String, Object?>> ref =
       kit.doc(db, 'vp_tokens', 'doc');
   kit.spend(1);
   await ref.set(<String, Object?>{'v': 1});
   final bool authenticatedRead = (await ref.get(Source.server)).exists;
   // The same read without a token, to see that the token is what grants access.
-  final Firestore anonymous = await kit.client(authenticated: false);
+  final FirebaseFirestore anonymous = await kit.client(authenticated: false);
   String anonymousOutcome;
   try {
     final DocumentSnapshot<Map<String, Object?>> snapshot = await kit
@@ -1460,8 +1460,8 @@ Future<CheckResult> _tokens(Kit kit) async {
 }
 
 Future<CheckResult> _webTransport(Kit kit) async {
-  final Firestore writer = await kit.direct;
-  final Firestore web = await kit.client(transport: Transport.web);
+  final FirebaseFirestore writer = await kit.direct;
+  final FirebaseFirestore web = await kit.client(transport: Transport.web);
   final RecordingWebHttpClient recorder = kit.lastWebRecorder!;
   const String name = 'vp_web';
   final DocumentReference<Map<String, Object?>> ref = kit.doc(web, name, 'a');
@@ -1538,7 +1538,7 @@ Future<CheckResult> _webTransport(Kit kit) async {
 /// went wrong.
 Future<String?> _liteOver(Kit kit, Transport transport) async {
   final String name = transport == Transport.web ? 'vp_lite_rest' : 'vp_lite_grpc';
-  final lite.Firestore db = kit.liteClient(transport: transport);
+  final lite.FirebaseFirestore db = kit.liteClient(transport: transport);
   final lite.CollectionReference<Map<String, Object?>> collection =
       db.collection(kit.collectionPath(name));
   final lite.DocumentReference<Map<String, Object?>> a =
@@ -1721,7 +1721,7 @@ Future<CheckResult> _userToken(Kit kit) async {
     final AuthUser user;
     try {
       user = await auth.signInAnonymously();
-    } on FirebaseAuthProviderException catch (e) {
+    } on FirebaseAuthException catch (e) {
       return CheckResult(Status.inconclusive,
           'Anonymous sign-in failed: ${e.code} (${e.message})',
           details: <String>[
@@ -1731,14 +1731,14 @@ Future<CheckResult> _userToken(Kit kit) async {
           observed: <String, Object?>{'signIn': e.code});
     }
     final GetTokenResult token = await auth.getAccessToken(forceRefresh: false);
-    final Firestore db =
+    final FirebaseFirestore db =
         await kit.client(credentials: FirebaseAuthCredentialsProvider(auth));
     String outcome;
     Status status = Status.pass;
     try {
       await kit.doc(db, 'vp_user_auth', 'doc').get(Source.server).timeout(_patience);
       outcome = 'served (the security rules allow this user to read the path)';
-    } on FirestoreError catch (e) {
+    } on FirestoreException catch (e) {
       if (e.code == FirestoreErrorCode.permissionDenied) {
         outcome =
             'accepted, and the security rules refuse this path for the user (PERMISSION_DENIED)';
@@ -1753,7 +1753,7 @@ Future<CheckResult> _userToken(Kit kit) async {
       cleanUp = 'The anonymous account was deleted again.';
     } on Object catch (e) {
       cleanUp = 'The anonymous account ${user.uid} could not be deleted '
-          '(${e is FirebaseAuthProviderException ? e.code : e.runtimeType}): delete it in the console.';
+          '(${e is FirebaseAuthException ? e.code : e.runtimeType}): delete it in the console.';
     }
     final Map<String, Object?> observed = <String, Object?>{
       'signInProvider': token.signInProvider,
@@ -1948,7 +1948,7 @@ Future<KitRun> runKit(List<String> arguments,
       } on TimeoutException catch (e) {
         result = CheckResult(Status.inconclusive,
             'The check did not finish: ${e.message ?? 'timed out after ${e.duration}'}');
-      } on FirestoreError catch (e) {
+      } on FirestoreException catch (e) {
         final bool permission = e.code == FirestoreErrorCode.permissionDenied ||
             e.code == FirestoreErrorCode.unauthenticated;
         result = CheckResult(

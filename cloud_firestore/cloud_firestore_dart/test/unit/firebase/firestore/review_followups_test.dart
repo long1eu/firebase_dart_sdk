@@ -47,7 +47,7 @@ void main() {
   checkTestsLeaveNothingBehind();
 
   group('converters', () {
-    late Firestore db;
+    late FirebaseFirestore db;
 
     setUp(() {
       db = FirestoreInternal.create(
@@ -98,22 +98,22 @@ void main() {
         () async {
       final FirebaseApp app = newApp('reviewTerminateRace');
       addTearDown(app.delete);
-      final FirestoreSettings memory = offlineSettings.copyWith(
+      final Settings memory = offlineSettings.copyWith(
           cacheSettings: const MemoryCacheSettings());
 
-      final Firestore first =
-          Firestore.instanceFor(app: app, settings: memory);
+      final FirebaseFirestore first =
+          FirebaseFirestore.instanceFor(app: app, settings: memory);
       final Future<void> terminating = first.terminate();
       // terminate() was called: from now on the app has no usable instance.
-      final Firestore second =
-          Firestore.instanceFor(app: app, settings: memory);
+      final FirebaseFirestore second =
+          FirebaseFirestore.instanceFor(app: app, settings: memory);
       addTearDown(second.terminate);
       await terminating;
 
       expect(second, isNot(same(first)));
       expect(second.client.isTerminated, isFalse);
       // The new instance stays registered after the old one finished.
-      expect(Firestore.instanceFor(app: app, settings: memory),
+      expect(FirebaseFirestore.instanceFor(app: app, settings: memory),
           same(second));
     });
 
@@ -125,11 +125,11 @@ void main() {
       final FirebaseApp app = newApp('reviewClearWhileRestarted');
       addTearDown(app.delete);
 
-      final Firestore first = Firestore.instanceFor(
+      final FirebaseFirestore first = FirebaseFirestore.instanceFor(
           app: app, settings: offlineSettings, openDatabase: openFixed(dbName));
       await first.terminate();
 
-      final Firestore second = Firestore.instanceFor(
+      final FirebaseFirestore second = FirebaseFirestore.instanceFor(
           app: app, settings: offlineSettings, openDatabase: openFixed(dbName));
 
       // The file is open in [second]: deleting it would silently detach the

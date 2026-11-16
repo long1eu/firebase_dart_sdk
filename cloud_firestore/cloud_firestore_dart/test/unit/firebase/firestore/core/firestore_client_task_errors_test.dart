@@ -75,9 +75,9 @@ class _FaultyDatabase implements Database {
 
 TransientDatabaseException _busy() => TransientDatabaseException('busy');
 
-TypeMatcher<FirestoreError> _unavailable(String messagePrefix) =>
+TypeMatcher<FirestoreException> _unavailable(String messagePrefix) =>
     firestoreErrorWithCode(FirestoreErrorCode.unavailable).having(
-      (FirestoreError e) => e.message,
+      (FirestoreException e) => e.message,
       'message',
       startsWith(messagePrefix),
     );
@@ -86,7 +86,7 @@ void main() {
   checkTestsLeaveNothingBehind();
 
   late _FaultyDatabase database;
-  late Firestore firestore;
+  late FirebaseFirestore firestore;
   late DocumentReference<Map<String, Object?>> doc;
 
   SerialQueue queue() => firestore.client.queue;
@@ -107,7 +107,7 @@ void main() {
     final String name = 'task-errors-${const Uuid().v4()}';
     final FirebaseApp app = newApp(name);
     addTearDown(app.delete);
-    firestore = Firestore.instanceFor(
+    firestore = FirebaseFirestore.instanceFor(
       app: app,
       settings: offlineSettings,
       openDatabase:
@@ -154,7 +154,7 @@ void main() {
         throwsA(
           // The path of the document, as the JS SDK prints it.
           _unavailable('Failed to get document ').having(
-            (FirestoreError e) => e.message,
+            (FirestoreException e) => e.message,
             'message',
             "Failed to get document 'col/doc' from cache: "
                 'TransientDatabaseException: busy',
@@ -216,7 +216,7 @@ void main() {
         doc.set(<String, Object?>{'a': 1}),
         throwsA(
           firestoreErrorWithCode(FirestoreErrorCode.unknown).having(
-            (FirestoreError e) => e.message,
+            (FirestoreException e) => e.message,
             'message',
             'Bad state: broken',
           ),
@@ -234,7 +234,7 @@ void main() {
         doc.snapshots.first,
         throwsA(
           _unavailable('Initialization of query ').having(
-            (FirestoreError e) => e.message,
+            (FirestoreException e) => e.message,
             'message',
             "Initialization of query 'Query(target=Query(col/doc order by "
                 "__name__);limitType=LIMIT_TO_FIRST)' failed: "
@@ -281,7 +281,7 @@ void main() {
   test(
     'every operation fails with the error of a failed initialization',
     () async {
-      final FirestoreError error = FirestoreError(
+      final FirestoreException error = FirestoreException(
         'The cache can not be opened',
         FirestoreErrorCode.failedPrecondition,
       );

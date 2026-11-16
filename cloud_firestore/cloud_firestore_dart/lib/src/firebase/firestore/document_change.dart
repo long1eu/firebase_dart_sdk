@@ -54,7 +54,7 @@ enum DocumentChangeType {
 /// does so.
 class DocumentChange<T extends dynamic> {
   /// Implementation detail of the SDK; not part of the supported API.
-  DocumentChange._(this.document, this.type, this.oldIndex, this.newIndex);
+  DocumentChange._(this.doc, this.type, this.oldIndex, this.newIndex);
 
   /// The kind of change: [DocumentChangeType.added], [DocumentChangeType.modified] or
   /// [DocumentChangeType.removed].
@@ -65,7 +65,7 @@ class DocumentChange<T extends dynamic> {
   ///
   /// Returns a snapshot of the new data (for [DocumentChangeType.added] or
   /// [DocumentChangeType.modified]) or the removed data (for [DocumentChangeType.removed]).
-  final QueryDocumentSnapshot<T> document;
+  final QueryDocumentSnapshot<T> doc;
 
   /// The index of the changed document in the result set immediately prior to this [DocumentChange]
   /// (i.e. supposing that all prior [DocumentChange] objects have been applied). Returns -1 for
@@ -83,7 +83,7 @@ class DocumentChange<T extends dynamic> {
 
   /// Creates the list of DocumentChanges from a ViewSnapshot.
   static List<DocumentChange<T>> _changesFromSnapshot<T extends Object?>(
-    Firestore firestore,
+    FirebaseFirestore firestore,
     MetadataChanges metadataChanges,
     ViewSnapshot snapshot, [
     FirestoreDataConverter<T>? converter,
@@ -185,17 +185,17 @@ class DocumentChange<T extends dynamic> {
       other is DocumentChange &&
           runtimeType == other.runtimeType &&
           type == other.type &&
-          document == other.document &&
+          doc == other.doc &&
           oldIndex == other.oldIndex &&
           newIndex == other.newIndex;
 
   @override
   int get hashCode =>
-      type.hashCode ^ document.hashCode ^ oldIndex.hashCode ^ newIndex.hashCode;
+      type.hashCode ^ doc.hashCode ^ oldIndex.hashCode ^ newIndex.hashCode;
 
   @override
   String toString() =>
-      'DocumentChange(type: ${type.name}, document: ${document.reference.path}, oldIndex: $oldIndex, newIndex: $newIndex)';
+      'DocumentChange(type: ${type.name}, document: ${doc.reference.path}, oldIndex: $oldIndex, newIndex: $newIndex)';
 }
 
 /// Members of [DocumentChange] for the SDK itself. Not exported by the public libraries.
@@ -210,7 +210,7 @@ extension DocumentChangeInternal<T> on DocumentChange<T> {
 
   /// Creates the list of DocumentChanges from a ViewSnapshot.
   static List<DocumentChange<T>> changesFromSnapshot<T extends dynamic>(
-    Firestore firestore,
+    FirebaseFirestore firestore,
     MetadataChanges metadataChanges,
     ViewSnapshot snapshot, [
     FirestoreDataConverter<T>? converter,

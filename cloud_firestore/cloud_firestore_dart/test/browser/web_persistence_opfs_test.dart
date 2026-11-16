@@ -160,7 +160,7 @@ void main() {
     'the cache is in OPFS and holds what was read and written',
     () async {
       final String app = newAppName();
-      final Firestore firestore = await newClient(
+      final FirebaseFirestore firestore = await newClient(
         openDatabase: opener(),
         appName: app,
       );
@@ -183,7 +183,7 @@ void main() {
     () async {
       final String app = newAppName();
       final String collection = newCollectionName();
-      Firestore firestore = await newClient(
+      FirebaseFirestore firestore = await newClient(
         openDatabase: opener(),
         appName: app,
       );
@@ -232,7 +232,7 @@ void main() {
       await firestore.waitForPendingWrites().timeout(
         const Duration(seconds: 20),
       );
-      final Firestore other = await newClient();
+      final FirebaseFirestore other = await newClient();
       expect(
         (await other.collection(collection).doc('pending').get(Source.server))
             .data,
@@ -304,14 +304,14 @@ void main() {
     await expectLater(
       opener()(name, version: 1),
       throwsA(
-        isA<FirestoreError>()
+        isA<FirestoreException>()
             .having(
-              (FirestoreError e) => e.code,
+              (FirestoreException e) => e.code,
               'code',
               FirestoreErrorCode.failedPrecondition,
             )
             .having(
-              (FirestoreError e) => e.message,
+              (FirestoreException e) => e.message,
               'message',
               contains('another tab'),
             ),
@@ -324,7 +324,7 @@ void main() {
     for (int i = 0; i < 50 && again == null; i++) {
       try {
         again = await opener()(name, version: 1);
-      } on FirestoreError {
+      } on FirestoreException {
         await Future<void>.delayed(const Duration(milliseconds: 20));
       }
     }
@@ -397,7 +397,10 @@ void main() {
   opfsTest('clearPersistence deletes the OPFS directory', () async {
     final String app = newAppName();
     final String collection = newCollectionName();
-    Firestore firestore = await newClient(openDatabase: opener(), appName: app);
+    FirebaseFirestore firestore = await newClient(
+      openDatabase: opener(),
+      appName: app,
+    );
     await firestore.collection(collection).doc('a').set(<String, Object?>{
       'a': 1,
     });
@@ -420,7 +423,7 @@ void main() {
     () async {
       final String app = newAppName();
       final String collection = newCollectionName();
-      Firestore firestore = await newClient(
+      FirebaseFirestore firestore = await newClient(
         openDatabase: indexedDbOpener(),
         appName: app,
       );
@@ -470,7 +473,7 @@ void main() {
       await firestore.waitForPendingWrites().timeout(
         const Duration(seconds: 20),
       );
-      final Firestore other = await newClient();
+      final FirebaseFirestore other = await newClient();
       expect(
         (await other.collection(collection).doc('pending').get(Source.server))
             .data,
@@ -695,7 +698,7 @@ void main() {
       return;
     }
     final String app = newAppName();
-    final Firestore firestore = await newClient(
+    final FirebaseFirestore firestore = await newClient(
       openDatabase: sqliteWebOpener(
         sqlite3Wasm: sqlite3Wasm,
         opfsWorker: noOpfsWorker,

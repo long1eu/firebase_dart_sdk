@@ -38,7 +38,7 @@ void main() {
 
   Future<CollectionReference> collectionWithDocs(
       Map<String, Map<String, Object?>> docs) async {
-    final Firestore firestore =
+    final FirebaseFirestore firestore =
         await IntegrationTestUtil.testEnterpriseFirestore();
     final CollectionReference collection =
         firestore.collection('edition-differences-${autoId()}');
@@ -173,10 +173,10 @@ void main() {
         collection
             .aggregate(<AggregateField>[AggregateField.sum('rating')]).get(
                 AggregateSource.server),
-        throwsA(isA<FirestoreError>()
-            .having((FirestoreError e) => e.code, 'code',
+        throwsA(isA<FirestoreException>()
+            .having((FirestoreException e) => e.code, 'code',
                 FirestoreErrorCode.invalidArgument)
-            .having((FirestoreError e) => e.message, 'message',
+            .having((FirestoreException e) => e.message, 'message',
                 contains('Long overflow'))));
   });
 }

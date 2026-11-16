@@ -79,9 +79,9 @@ class AppCheckTokenResult {
 ///   Stream<AppCheckTokenResult> get onTokenChanged => _changes.stream;
 /// }
 /// ```
-abstract class InternalAppCheckTokenProvider {
+abstract class AppCheckTokenProvider {
   /// Constructor for subclasses.
-  InternalAppCheckTokenProvider();
+  AppCheckTokenProvider();
 
   /// Fetches a token. [forceRefresh] must only be set when the cached token was
   /// invalidated out of band (for example the backend answered UNAUTHENTICATED).

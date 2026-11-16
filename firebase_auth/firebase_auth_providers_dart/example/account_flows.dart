@@ -35,7 +35,7 @@ Future<void> main() async {
   final FirebaseApp app = FirebaseApp.withOptions(
     FirebaseOptions(
       apiKey: 'fake-api-key',
-      applicationId: '1:1234567890:dart:example',
+      appId: '1:1234567890:dart:example',
       projectId: project,
     ),
   );
@@ -75,7 +75,7 @@ Future<void> main() async {
   await auth.confirmPasswordReset(resetCode, 'second password');
   try {
     await auth.signInWithEmailAndPassword(email, 'first password');
-  } on FirebaseAuthProviderException catch (e) {
+  } on FirebaseAuthException catch (e) {
     print('old password refused: ${e.code}');
   }
   final AuthUser again = await auth.signInWithEmailAndPassword(

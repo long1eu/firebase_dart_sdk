@@ -15,7 +15,7 @@ void main() {
   final FirebaseApp app = FirebaseApp.withOptions(
     const FirebaseOptions(
       apiKey: '<YOUR_API_KEY>',
-      applicationId: '1:1234567890:dart:example',
+      appId: '1:1234567890:dart:example',
       projectId: 'my-project',
     ),
   );
@@ -26,7 +26,7 @@ void main() {
   final FirebaseApp reports = FirebaseApp.withOptions(
     const FirebaseOptions(
       apiKey: '<YOUR_API_KEY>',
-      applicationId: '1:1234567890:dart:reports',
+      appId: '1:1234567890:dart:reports',
       projectId: 'reports-project',
     ),
     name: 'reports',
@@ -50,7 +50,7 @@ void main() {
     FirebaseApp.withOptions(
       const FirebaseOptions(
         apiKey: '<YOUR_API_KEY>',
-        applicationId: '1:1234567890:dart:reports',
+        appId: '1:1234567890:dart:reports',
         projectId: 'reports-project',
       ),
       name: 'reports',

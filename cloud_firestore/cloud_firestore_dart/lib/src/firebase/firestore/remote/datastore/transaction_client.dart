@@ -113,7 +113,7 @@ class TransactionClient {
       // The first response carries the whole result; the call is not cancelled, see [CallReleaser].
       response = await _client.callReleaser.first(call, call.cancel);
     } on StateError {
-      throw FirestoreError(
+      throw FirestoreException(
         'No responses received',
         FirestoreErrorCode.unimplemented,
       );

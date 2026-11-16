@@ -25,10 +25,10 @@ void main() {
 
     await runZonedGuarded(() async {
       for (int round = 0; round < 15; round++) {
-        final Firestore firestore = await IntegrationTestUtil.testFirestore();
+        final FirebaseFirestore firestore = await IntegrationTestUtil.testFirestore();
         final CollectionReference collection =
             firestore.collection('terminate${DateTime.now().microsecondsSinceEpoch}');
-        final DocumentReference doc = collection.document();
+        final DocumentReference doc = collection.doc();
         await doc.set(map(<dynamic>['count', 1]));
 
         // A listener (listen stream open) that is cancelled right before the

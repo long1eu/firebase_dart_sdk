@@ -24,29 +24,29 @@ void main() {
   group('long_polling_options', () {
     test('longPollingOptionsEqual() should return true for empty objects', () {
       expect(
-        const ExperimentalLongPollingOptions(),
-        const ExperimentalLongPollingOptions(),
+        const WebExperimentalLongPollingOptions(),
+        const WebExperimentalLongPollingOptions(),
       );
     });
 
     test('longPollingOptionsEqual() should return true if both objects have '
         'the same timeoutSeconds', () {
-      const ExperimentalLongPollingOptions options1 =
-          ExperimentalLongPollingOptions(timeoutSeconds: 123);
-      const ExperimentalLongPollingOptions options2 =
-          ExperimentalLongPollingOptions(timeoutSeconds: 123);
+      const WebExperimentalLongPollingOptions options1 =
+          WebExperimentalLongPollingOptions(timeoutSeconds: 123);
+      const WebExperimentalLongPollingOptions options2 =
+          WebExperimentalLongPollingOptions(timeoutSeconds: 123);
       expect(options1, options2);
       expect(options1.hashCode, options2.hashCode);
     });
 
     test('longPollingOptionsEqual() should return false if the objects have '
         'different timeoutSeconds', () {
-      const ExperimentalLongPollingOptions options1 =
-          ExperimentalLongPollingOptions(timeoutSeconds: 123);
-      const ExperimentalLongPollingOptions options2 =
-          ExperimentalLongPollingOptions(timeoutSeconds: 321);
+      const WebExperimentalLongPollingOptions options1 =
+          WebExperimentalLongPollingOptions(timeoutSeconds: 123);
+      const WebExperimentalLongPollingOptions options2 =
+          WebExperimentalLongPollingOptions(timeoutSeconds: 321);
       expect(options1, isNot(options2));
-      expect(options1, isNot(const ExperimentalLongPollingOptions()));
+      expect(options1, isNot(const WebExperimentalLongPollingOptions()));
     });
   });
 }

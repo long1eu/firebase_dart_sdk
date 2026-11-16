@@ -24,8 +24,8 @@ String uniqueEmail([String prefix = 'user']) =>
     '$prefix${DateTime.now().microsecondsSinceEpoch}x${_counter++}@example.com';
 
 Matcher throwsAuth(Object code) => throwsA(
-  isA<FirebaseAuthProviderException>().having(
-    (FirebaseAuthProviderException e) => e.code,
+  isA<FirebaseAuthException>().having(
+    (FirebaseAuthException e) => e.code,
     'code',
     code,
   ),
@@ -186,8 +186,8 @@ void main() {
         'password-1',
       );
       final List<String> tokens = <String>[];
-      final StreamSubscription<InternalTokenResult> sub = auth.onTokenChanged
-          .listen((InternalTokenResult r) => tokens.add(r.token));
+      final StreamSubscription<AuthTokenChange> sub = auth.onTokenChanged
+          .listen((AuthTokenChange r) => tokens.add(r.token));
       addTearDown(sub.cancel);
 
       final String newEmail = uniqueEmail('after');

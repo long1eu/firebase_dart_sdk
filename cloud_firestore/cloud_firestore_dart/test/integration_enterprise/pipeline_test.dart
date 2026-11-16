@@ -91,7 +91,7 @@ void main() {
 
   final String? skip = IntegrationTestUtil.enterpriseEmulatorSkipReason;
 
-  late Firestore firestore;
+  late FirebaseFirestore firestore;
   late CollectionReference<Map<String, Object?>> collection;
 
   List<String?> ids(PipelineSnapshot snapshot) =>
@@ -105,7 +105,7 @@ void main() {
       firestore = await IntegrationTestUtil.testEnterpriseFirestore();
       collection = firestore.collection('books_${autoId()}');
       for (final MapEntry<String, Map<String, Object?>> book in books.entries) {
-        await collection.document(book.key).set(book.value);
+        await collection.doc(book.key).set(book.value);
       }
     });
 
@@ -393,7 +393,7 @@ void main() {
     test('documents', () async {
       final PipelineSnapshot snapshot =
           await firestore.pipeline().documents(<Object>[
-        collection.document('book2'),
+        collection.doc('book2'),
         '${collection.path}/book5',
       ]).sort(<Ordering>[field('__name__').ascending()]).execute();
       expect(ids(snapshot), <String>['book2', 'book5']);
@@ -403,11 +403,11 @@ void main() {
       final String groupId = 'group_${autoId()}';
       await firestore
           .collection('a/b/$groupId')
-          .document('x')
+          .doc('x')
           .set(<String, Object?>{'n': 1});
       await firestore
           .collection('c/d/$groupId')
-          .document('y')
+          .doc('y')
           .set(<String, Object?>{'n': 2});
 
       final PipelineSnapshot snapshot = await firestore
@@ -440,13 +440,13 @@ void main() {
     test('findNearest', () async {
       final CollectionReference<Map<String, Object?>> vectors =
           firestore.collection('vectors_${autoId()}');
-      await vectors.document('near').set(<String, Object?>{
+      await vectors.doc('near').set(<String, Object?>{
         'embedding': FieldValue.vector(<double>[1, 1])
       });
-      await vectors.document('far').set(<String, Object?>{
+      await vectors.doc('far').set(<String, Object?>{
         'embedding': FieldValue.vector(<double>[10, 10])
       });
-      await vectors.document('none').set(<String, Object?>{'other': 1});
+      await vectors.doc('none').set(<String, Object?>{'other': 1});
 
       final PipelineSnapshot snapshot = await firestore
           .pipeline()
@@ -462,7 +462,7 @@ void main() {
 
     test('constants of every type round trip', () async {
       final DocumentReference<Map<String, Object?>> reference =
-          collection.document('book1');
+          collection.doc('book1');
       final Map<String, Object?> values = <String, Object?>{
         'null': null,
         'bool': true,
@@ -671,7 +671,7 @@ void main() {
               .where(FunctionExpression('no_such_fn', <Object?>[field('a')])
                   .asBoolean())
               .execute(),
-          throwsA(isA<FirestoreError>().having((FirestoreError e) => e.code,
+          throwsA(isA<FirestoreException>().having((FirestoreException e) => e.code,
               'code', FirestoreErrorCode.invalidArgument)));
     });
 
@@ -679,7 +679,7 @@ void main() {
       await firestore.disableNetwork();
       await expectLater(
           source().execute(),
-          throwsA(isA<FirestoreError>().having((FirestoreError e) => e.code,
+          throwsA(isA<FirestoreException>().having((FirestoreException e) => e.code,
               'code', FirestoreErrorCode.unavailable)));
       await firestore.enableNetwork();
       expect((await source().execute()).results, hasLength(6));
@@ -689,7 +689,7 @@ void main() {
       await firestore.disableNetwork();
       // Not awaited: the write stays pending while offline.
       final Future<void> write = collection
-          .document('book7')
+          .doc('book7')
           .set(<String, Object?>{'title': 'Pending'});
       await firestore.enableNetwork();
       await write;
@@ -778,7 +778,7 @@ void main() {
 
       test('document cursors and several orderings', () async {
         final DocumentSnapshot<Map<String, Object?>> middle =
-            await collection.document('book3').get();
+            await collection.doc('book3').get();
         await check(collection.orderBy('genre').startAtDocument(middle));
         await check(collection.orderBy('genre').startAfterDocument(middle));
         await check(collection

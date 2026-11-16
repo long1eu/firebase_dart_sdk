@@ -48,7 +48,7 @@ void main() {
           source().createFromAggregateQuery(query().aggregate(<AggregateField>[
         AggregateField.count(),
         AggregateField.sum('total'),
-        AggregateField.averageField(FieldPath.of(<String>['a', 'b.c'])),
+        AggregateField.averageField(FieldPath(<String>['a', 'b.c'])),
       ])));
       expect(
           stages.last,
@@ -82,7 +82,7 @@ void main() {
     });
 
     test('rejects a query of another database', () {
-      final Firestore other = FakeFirestore(util.dbId('other'));
+      final FirebaseFirestore other = FakeFirestore(util.dbId('other'));
       expect(
           () => source().createFromAggregateQuery(
               QueryInternal.create<Object?>(util.query('coll'), other).count()),

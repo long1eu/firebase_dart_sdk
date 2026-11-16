@@ -36,7 +36,7 @@ void main() {
 
   final String? skip = IntegrationTestUtil.enterpriseEmulatorSkipReason;
 
-  late Firestore firestore;
+  late FirebaseFirestore firestore;
   late CollectionReference<Map<String, Object?>> collection;
 
   List<Map<String, Object?>> rows(PipelineSnapshot snapshot) =>
@@ -60,17 +60,17 @@ void main() {
     setUp(() async {
       firestore = await IntegrationTestUtil.testEnterpriseFirestore();
       collection = firestore.collection('phase2_${autoId()}');
-      await collection.document('a').set(<String, Object?>{
+      await collection.doc('a').set(<String, Object?>{
         'name': 'a',
         'n': 1,
         'scores': <int>[1, 5, 9],
       });
-      await collection.document('b').set(<String, Object?>{
+      await collection.doc('b').set(<String, Object?>{
         'name': 'b',
         'n': 2,
         'scores': <int>[2, 6],
       });
-      await collection.document('c').set(<String, Object?>{
+      await collection.doc('c').set(<String, Object?>{
         'name': 'c',
         'n': 3,
         'scores': <int>[],
@@ -192,7 +192,7 @@ void main() {
           'an atomic pipeline then writes nothing', () async {
         final CollectionReference<Map<String, Object?>> archive =
             firestore.collection('archive_${autoId()}');
-        await archive.document('b').set(<String, Object?>{'old': true});
+        await archive.doc('b').set(<String, Object?>{'old': true});
 
         await expectLater(
             source()
@@ -200,7 +200,7 @@ void main() {
                 .select(<Object>['name'])
                 .insert(collection: archive, documentId: 'name')
                 .execute(atomic: true),
-            throwsA(isA<FirestoreError>().having((FirestoreError e) => e.code,
+            throwsA(isA<FirestoreException>().having((FirestoreException e) => e.code,
                 'code', FirestoreErrorCode.alreadyExists)));
 
         expect(await contents(archive), <String, Map<String, Object?>>{
@@ -211,7 +211,7 @@ void main() {
       test('upsert creates and replaces documents', () async {
         final CollectionReference<Map<String, Object?>> archive =
             firestore.collection('archive_${autoId()}');
-        await archive.document('b').set(<String, Object?>{'old': true});
+        await archive.doc('b').set(<String, Object?>{'old': true});
 
         final PipelineSnapshot snapshot = await source()
             .where(field('n').lessThan(3))
@@ -268,8 +268,8 @@ void main() {
           () async {
         final CollectionReference<Map<String, Object?>> archive =
             firestore.collection('archive_${autoId()}');
-        final Matcher invalidArgument = throwsA(isA<FirestoreError>().having(
-            (FirestoreError e) => e.code,
+        final Matcher invalidArgument = throwsA(isA<FirestoreException>().having(
+            (FirestoreException e) => e.code,
             'code',
             FirestoreErrorCode.invalidArgument));
 
@@ -285,7 +285,7 @@ void main() {
 
       test('a listener sees the writes of a pipeline', () async {
         final DocumentReference<Map<String, Object?>> doc =
-            collection.document('a');
+            collection.doc('a');
         final Future<DocumentSnapshot<Map<String, Object?>>> changed = doc
             .snapshots
             .firstWhere((DocumentSnapshot<Map<String, Object?>> s) =>
@@ -339,14 +339,14 @@ void main() {
 
       test('an array subquery over a subcollection', () async {
         await collection
-            .document('a')
+            .doc('a')
             .collection('reviews')
-            .document('r1')
+            .doc('r1')
             .set(<String, Object?>{'stars': 4});
         await collection
-            .document('a')
+            .doc('a')
             .collection('reviews')
-            .document('r2')
+            .doc('r2')
             .set(<String, Object?>{'stars': 5});
 
         final PipelineSnapshot snapshot = await source()
@@ -450,7 +450,7 @@ void main() {
       const Timestamp when = Timestamp(86400 * 3 + 3661, 0);
 
       setUp(() async {
-        doc = collection.document('functions');
+        doc = collection.doc('functions');
         await doc.set(<String, Object?>{
           'title': 'Dune',
           'tags': <String>['a', 'b', 'a', 'c'],

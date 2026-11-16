@@ -30,7 +30,7 @@ void main() {
   group('network cycles', () {
     test('disableNetwork/enableNetwork mixed with writes and listens',
         () async {
-      final Firestore db = await env.newClient();
+      final FirebaseFirestore db = await env.newClient();
       final String name = uniqueName('cycles');
       final CollectionReference<Map<String, Object?>> collection =
           db.collection(name);
@@ -94,7 +94,7 @@ void main() {
     });
 
     test('disableNetwork with writes in flight loses no write', () async {
-      final Firestore db = await env.newClient();
+      final FirebaseFirestore db = await env.newClient();
       final String name = uniqueName('inflight');
       final CollectionReference<Map<String, Object?>> collection =
           db.collection(name);
@@ -193,7 +193,7 @@ void main() {
         () async {
       final String dbName = env.newDatabaseName();
       final String name = uniqueName('restart');
-      Firestore db = await env.newClient(fixedDbName: dbName);
+      FirebaseFirestore db = await env.newClient(fixedDbName: dbName);
       await db.collection(name).doc('warmup').set(<String, Object?>{});
       await db.collection(name).doc('warmup').delete();
 
@@ -234,7 +234,7 @@ void main() {
         () async {
       final String dbName = env.newDatabaseName();
       final String name = uniqueName('inflight-restart');
-      Firestore db = await env.newClient(fixedDbName: dbName);
+      FirebaseFirestore db = await env.newClient(fixedDbName: dbName);
       await db.collection(name).doc('warmup').set(<String, Object?>{});
       await db.collection(name).doc('warmup').delete();
 
@@ -255,7 +255,7 @@ void main() {
     test('terminate in the middle of the writes loses none of them', () async {
       final String dbName = env.newDatabaseName();
       final String name = uniqueName('midflight-restart');
-      Firestore db = await env.newClient(fixedDbName: dbName);
+      FirebaseFirestore db = await env.newClient(fixedDbName: dbName);
       await db.collection(name).doc('warmup').set(<String, Object?>{});
       await db.collection(name).doc('warmup').delete();
 
@@ -293,7 +293,7 @@ void main() {
   group('waitForPendingWrites and snapshotsInSync', () {
     test('waitForPendingWrites completes only when the writes landed',
         () async {
-      final Firestore db = await env.newClient();
+      final FirebaseFirestore db = await env.newClient();
       final String name = uniqueName('wait');
       final CollectionReference<Map<String, Object?>> collection =
           db.collection(name);
@@ -337,7 +337,7 @@ void main() {
     });
 
     test('snapshotsInSync only fires when the listeners agree', () async {
-      final Firestore db = await env.newClient();
+      final FirebaseFirestore db = await env.newClient();
       final String name = uniqueName('insync');
       final CollectionReference<Map<String, Object?>> writer =
           env.oracle.collection(name);

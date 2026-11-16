@@ -64,18 +64,18 @@ OpenDatabase openSelfClearing(String dbName, List<String> calls,
 
 FirebaseApp newApp(String name) => FirebaseApp.withOptions(
       const FirebaseOptions(
-          apiKey: 'key', applicationId: 'appId', projectId: 'projectId'),
+          apiKey: 'key', appId: 'appId', projectId: 'projectId'),
       dependencies: null,
       name: name,
     );
 
 /// Points at a port nothing listens on: writes stay pending, nothing reaches a
 /// backend.
-final FirestoreSettings offlineSettings =
-    FirestoreSettings().withEmulator('127.0.0.1', 1);
+final Settings offlineSettings =
+    Settings().withEmulator('127.0.0.1', 1);
 
-TypeMatcher<FirestoreError> firestoreErrorWithCode(FirestoreErrorCode code) =>
-    isA<FirestoreError>().having((FirestoreError e) => e.code, 'code', code);
+TypeMatcher<FirestoreException> firestoreErrorWithCode(FirestoreErrorCode code) =>
+    isA<FirestoreException>().having((FirestoreException e) => e.code, 'code', code);
 
 void main() {
   checkTestsLeaveNothingBehind();
@@ -125,10 +125,10 @@ void main() {
 
       expect(
         () => deleteSqliteDatabaseFiles(file.path),
-        throwsA(isA<FirestoreError>()
-            .having((FirestoreError e) => e.code, 'code',
+        throwsA(isA<FirestoreException>()
+            .having((FirestoreException e) => e.code, 'code',
                 FirestoreErrorCode.unknown)
-            .having((FirestoreError e) => e.message, 'message',
+            .having((FirestoreException e) => e.message, 'message',
                 allOf(startsWith('Failed to clear persistence: '),
                     contains('-journal')))),
       );
@@ -253,15 +253,15 @@ void main() {
         () async {
       final FirebaseApp app = newApp('clearPersistenceRunning');
       addTearDown(app.delete);
-      final Firestore firestore =
-          Firestore.instanceFor(app: app, settings: offlineSettings);
+      final FirebaseFirestore firestore =
+          FirebaseFirestore.instanceFor(app: app, settings: offlineSettings);
       addTearDown(firestore.terminate);
 
       await expectLater(
           firestore.clearPersistence(),
           throwsA(firestoreErrorWithCode(FirestoreErrorCode.failedPrecondition)
               .having(
-                  (FirestoreError e) => e.message,
+                  (FirestoreException e) => e.message,
                   'message',
                   'Persistence cannot be cleared while the firestore instance '
                       'is running.')));
@@ -270,7 +270,7 @@ void main() {
     test('is a no-op for memory persistence after terminate', () async {
       final FirebaseApp app = newApp('clearPersistenceMemory');
       addTearDown(app.delete);
-      final Firestore firestore = Firestore.instanceFor(
+      final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(
           app: app,
           settings: offlineSettings.copyWith(
               cacheSettings: const MemoryCacheSettings()));
@@ -284,7 +284,7 @@ void main() {
       final FirebaseApp app = newApp('clearPersistenceSqlite');
       addTearDown(app.delete);
 
-      final Firestore firestore = Firestore.instanceFor(
+      final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(
           app: app, settings: offlineSettings, openDatabase: openFixed(dbName));
       final DocumentReference<Map<String, Object?>> doc =
           firestore.doc('col/doc');
@@ -298,7 +298,7 @@ void main() {
       // Calling it again is fine.
       await firestore.clearPersistence();
 
-      final Firestore restarted = Firestore.instanceFor(
+      final FirebaseFirestore restarted = FirebaseFirestore.instanceFor(
           app: app, settings: offlineSettings, openDatabase: openFixed(dbName));
       addTearDown(restarted.terminate);
       await expectLater(restarted.doc('col/doc').get(Source.cache),
@@ -313,13 +313,13 @@ void main() {
       final FirebaseApp app = newApp('clearPersistenceControl');
       addTearDown(app.delete);
 
-      final Firestore firestore = Firestore.instanceFor(
+      final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(
           app: app, settings: offlineSettings, openDatabase: openFixed(dbName));
       firestore.doc('col/doc').set(<String, Object?>{'a': 1}).ignore();
       await firestore.doc('col/doc').get(Source.cache);
       await firestore.terminate();
 
-      final Firestore restarted = Firestore.instanceFor(
+      final FirebaseFirestore restarted = FirebaseFirestore.instanceFor(
           app: app, settings: offlineSettings, openDatabase: openFixed(dbName));
       addTearDown(restarted.terminate);
       expect((await restarted.doc('col/doc').get(Source.cache)).data,

@@ -438,7 +438,7 @@ void main() {
     }
 
     await waitForIds(<String>['doc1']);
-    await collection.document('doc2').set(<String, Object?>{'a': 3});
+    await collection.doc('doc2').set(<String, Object?>{'a': 3});
     await waitForIds(<String>['doc1', 'doc2']);
     await snapshots.cancel();
   });
@@ -560,7 +560,7 @@ void main() {
     final CollectionReference collection = await testCollectionWithDocs(
       multiInequalityDocs(),
     );
-    final Firestore firestore = collection.firestore;
+    final FirebaseFirestore firestore = collection.firestore;
 
     final Query query = collection
         .whereNotEqualTo('key', 'a')

@@ -12,7 +12,7 @@ import '../common.dart';
 /// Moves [amount] units of stock from [from] to [to]. Returns the stock that
 /// is left in [from].
 Future<int> moveStock(
-  Firestore firestore,
+  FirebaseFirestore firestore,
   DocumentReference<Map<String, Object?>> from,
   DocumentReference<Map<String, Object?>> to,
   int amount,
@@ -36,7 +36,7 @@ Future<int> moveStock(
 }
 
 Future<void> main() async {
-  final Firestore firestore = connect();
+  final FirebaseFirestore firestore = connect();
   final CollectionReference<Map<String, Object?>> warehouses = firestore
       .collection(scratch('warehouses'));
   final DocumentReference<Map<String, Object?>> north = warehouses.doc('north');

@@ -40,7 +40,7 @@ final FirestoreDataConverter<City> cityConverter =
 
 void main() {
   IntegrationTestUtil.currentDatabasePath = 'integration/converter_test';
-  late Firestore firestore;
+  late FirebaseFirestore firestore;
 
   setUp(() async {
     firestore = await IntegrationTestUtil.testFirestore();
@@ -106,7 +106,7 @@ void main() {
         snapshot.docs.map((QueryDocumentSnapshot<City> d) => d.data.name),
         <String>['B', 'C'],
       );
-      expect(snapshot.docs.first.ref.converter, same(cityConverter));
+      expect(snapshot.docs.first.reference.converter, same(cityConverter));
 
       final QuerySnapshot<Map<String, Object?>> rawSnapshot = await query
           .withoutConverter()
@@ -129,7 +129,7 @@ void main() {
     await col.doc('a').set(const City('A', 1));
 
     final QuerySnapshot<City> first = await col.snapshots.first;
-    expect(first.docChanges.single.document.data.name, 'A');
+    expect(first.docChanges.single.doc.data.name, 'A');
 
     final DocumentSnapshot<City> docSnap = await col.doc('a').snapshots.first;
     expect(docSnap.data!.population, 1);
@@ -279,7 +279,7 @@ void main() {
             untypedCollection.doc();
         await untyped.withConverter<City>(recording).set(const City('post', 1));
         final QuerySnapshot<City> snapshot = await untypedCollection
-            .where(FieldPath.documentId(), isEqualTo: untyped.id)
+            .where(FieldPath.documentId, isEqualTo: untyped.id)
             .withConverter<City>(recording)
             .get();
         expect(snapshot.length, 1);

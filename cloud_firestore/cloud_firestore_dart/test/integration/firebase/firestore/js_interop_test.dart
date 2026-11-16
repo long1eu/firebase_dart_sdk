@@ -142,7 +142,7 @@ String doubleToString(double v) {
 }
 
 /// Builds the Dart value to write for [spec].
-Object? build(Firestore db, Map<String, Object?> spec) {
+Object? build(FirebaseFirestore db, Map<String, Object?> spec) {
   switch (spec['t']) {
     case 'null':
       return null;
@@ -310,7 +310,7 @@ void main() {
 
   /// The ids of the documents of a query snapshot that the listener of [json] raises once in sync.
   Future<List<String>> resumeQuery(
-      Firestore db, Map<String, Object?> json) async {
+      FirebaseFirestore db, Map<String, Object?> json) async {
     final List<QuerySnapshot<Map<String, Object?>>> events =
         <QuerySnapshot<Map<String, Object?>>>[];
     final List<Object> errors = <Object>[];
@@ -336,7 +336,7 @@ void main() {
       final String name = uniqueName('jsSnapshots');
       final Map<String, Object?> snapshots = await runHarness(
           'write-snapshots', <String, Object?>{'collection': name});
-      final Firestore db = await IntegrationTestUtil.testFirestore();
+      final FirebaseFirestore db = await IntegrationTestUtil.testFirestore();
       final CollectionReference<Map<String, Object?>> collection =
           db.collection(name);
 
@@ -433,7 +433,7 @@ void main() {
 
     test('written by toJson is read by the JS SDK and resumed', () async {
       final String name = uniqueName('dartSnapshots');
-      final Firestore db = await IntegrationTestUtil.testFirestore();
+      final FirebaseFirestore db = await IntegrationTestUtil.testFirestore();
       final CollectionReference<Map<String, Object?>> collection =
           db.collection(name);
       await collection.doc('a').set(docA);
@@ -534,7 +534,7 @@ void main() {
 
   group('value JSON', () {
     test('toJSON of the JS SDK is read by fromJson, and the reverse', () async {
-      final Firestore db = await IntegrationTestUtil.testFirestore();
+      final FirebaseFirestore db = await IntegrationTestUtil.testFirestore();
       final Map<String, Object?> js = await runHarness('values-to-json');
 
       const Timestamp timestamp = Timestamp(1234567890, 123456789);
@@ -617,9 +617,9 @@ void main() {
       final Uint8List bundle = result['bundleBytes']! as Uint8List;
       expect(bundle.length, result['bytes']);
 
-      final Firestore db = await IntegrationTestUtil.testFirestore();
+      final FirebaseFirestore db = await IntegrationTestUtil.testFirestore();
       await db.disableNetwork();
-      final LoadBundleTaskProgress progress =
+      final LoadBundleTaskSnapshot progress =
           await db.loadBundle(bundle).future;
       expect(progress.taskState, LoadBundleTaskState.success);
       // a, b, c and the missing document.
@@ -632,7 +632,7 @@ void main() {
       Future<QuerySnapshot<Map<String, Object?>>> named(
           String queryName) async {
         final Query<Map<String, Object?>>? query =
-            await db.getNamedQuery(queryName);
+            await db.namedQuery(queryName);
         expect(query, isNotNull, reason: queryName);
         return query!.get(Source.cache);
       }
@@ -683,7 +683,7 @@ void main() {
       // Back online, a bundled query is listened to and in sync with the backend.
       await db.enableNetwork();
       final QuerySnapshot<Map<String, Object?>> server =
-          await (await db.getNamedQuery('last-two'))!.get(Source.server);
+          await (await db.namedQuery('last-two'))!.get(Source.server);
       expect(ids(server), <String>['b', 'c']);
     });
   }, skip: skip);
@@ -770,7 +770,7 @@ void main() {
 
     test('written by the Dart SDK is read by the JS SDK', () async {
       final String name = uniqueName('dartData');
-      final Firestore db = await IntegrationTestUtil.testFirestore();
+      final FirebaseFirestore db = await IntegrationTestUtil.testFirestore();
       final Map<String, Object?> spec =
           mapSpec(allTypes('$name/other', jsWritable: false));
       await db
@@ -830,7 +830,7 @@ void main() {
         'documents': <String, Object?>{'all': spec},
       });
 
-      final Firestore db = await IntegrationTestUtil.testFirestore();
+      final FirebaseFirestore db = await IntegrationTestUtil.testFirestore();
       final DocumentSnapshot<Map<String, Object?>> snapshot =
           await db.collection(name).doc('all').get();
       final Map<String, Object?> data = asMap(
@@ -861,7 +861,7 @@ void main() {
 
     test('both SDKs order a mixed-type field the same way', () async {
       final String name = uniqueName('mixedOrder');
-      final Firestore db = await IntegrationTestUtil.testFirestore();
+      final FirebaseFirestore db = await IntegrationTestUtil.testFirestore();
       final CollectionReference<Map<String, Object?>> collection =
           db.collection(name);
 

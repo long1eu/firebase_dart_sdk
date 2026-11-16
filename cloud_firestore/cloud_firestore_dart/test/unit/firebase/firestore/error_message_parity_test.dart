@@ -22,8 +22,10 @@ Matcher throwsArgumentErrorWith(String message) => throwsA(
 );
 
 void main() {
-  final Firestore db = FirestoreInternal.detached(DatabaseId.forProject('p'));
-  final Firestore otherDb = FirestoreInternal.detached(
+  final FirebaseFirestore db = FirestoreInternal.detached(
+    DatabaseId.forProject('p'),
+  );
+  final FirebaseFirestore otherDb = FirestoreInternal.detached(
     DatabaseId.forProject('q'),
   );
   final DocumentReference<Map<String, Object?>> doc = db.doc('c/d');
@@ -157,7 +159,7 @@ void main() {
         () => doc.set(
           <String, Object?>{'a': 1},
           SetOptions.mergeFieldPaths(<FieldPath>[
-            FieldPath.of(<String>['b']),
+            FieldPath(<String>['b']),
           ]),
         ),
         throwsArgumentErrorWith(
@@ -255,7 +257,7 @@ void main() {
         ),
       );
       expect(
-        () => FieldPath.fromDotSeparatedPath('a~b'),
+        () => FieldPath.fromString('a~b'),
         throwsArgumentErrorWith(reserved),
       );
     });

@@ -28,10 +28,10 @@ import 'package:test/test.dart';
 
 import '../../../util/test_util.dart' as util;
 
-Firestore _testFirestore(DatabaseId databaseId) =>
+FirebaseFirestore _testFirestore(DatabaseId databaseId) =>
     FirestoreInternal.detached(databaseId);
 
-final Firestore firestore = _testFirestore(DatabaseId.forProject('project'));
+final FirebaseFirestore firestore = _testFirestore(DatabaseId.forProject('project'));
 
 Map<String, Object?> allTypes() {
   return <String, Object?>{

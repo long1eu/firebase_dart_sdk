@@ -50,7 +50,7 @@ Future<void> writeAll(
 /// documents. On a failure the message shows the seed and the first pair of
 /// neighbours that the two sides order differently.
 Future<void> checkValueOrderAgainstBackend(
-  Firestore firestore, {
+  FirebaseFirestore firestore, {
   required int seed,
   required int count,
   required bool bson,
@@ -87,7 +87,7 @@ Future<void> checkValueOrderAgainstBackend(
         doc.document!,
     ];
     model.FieldValue valueOf(Document doc) =>
-        doc.getField(FieldPath.fromDotSeparatedPath('v').internalPath)!;
+        doc.getField(FieldPath.fromString('v').internalPath)!;
     int compare(Document a, Document b) {
       int result = valueOf(a).compareTo(valueOf(b));
       if (result == 0) {
@@ -375,7 +375,7 @@ class QueryPropertyStats {
 ///    (null and missing fields), which the SDK drops from the result. With a
 ///    limit the backend counts them, so the page comes back short.
 Future<void> checkQueriesAgainstBackend(
-  Future<Firestore> Function() newFirestore, {
+  Future<FirebaseFirestore> Function() newFirestore, {
   required int seed,
   required int documentCount,
   required int queryCount,
@@ -454,7 +454,7 @@ Future<void> checkQueriesAgainstBackend(
       note =
           '  get(Source.server) did not complete within 40 seconds while '
           'the documents were cached.\n';
-      final Firestore fresh = await newFirestore();
+      final FirebaseFirestore fresh = await newFirestore();
       collection = fresh.collection(collection.path);
       actual = <String>[
         for (final QueryDocumentSnapshot<Map<String, Object?>> doc
@@ -471,7 +471,7 @@ Future<void> checkQueriesAgainstBackend(
           doc.id,
       ];
       await collection.get(Source.server);
-    } on FirestoreError catch (e) {
+    } on FirestoreException catch (e) {
       if (e.code == FirestoreErrorCode.invalidArgument ||
           e.code == FirestoreErrorCode.failedPrecondition ||
           e.code == FirestoreErrorCode.unimplemented) {

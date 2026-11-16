@@ -137,7 +137,7 @@ void main() {
       );
 
     const GrpcError status = GrpcError.alreadyExists('test error');
-    final FirestoreError error = exceptionFromStatus(status);
+    final FirestoreException error = exceptionFromStatus(status);
     listener.onError(error);
     await Future<void>.delayed(
       const Duration(milliseconds: 100),

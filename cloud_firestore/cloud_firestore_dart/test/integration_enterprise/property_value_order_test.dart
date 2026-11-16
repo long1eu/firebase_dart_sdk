@@ -23,7 +23,7 @@ void main() {
 
   test('orderBy on the backend agrees with the local order of BSON values',
       skip: IntegrationTestUtil.enterpriseEmulatorSkipReason, () async {
-    final Firestore firestore =
+    final FirebaseFirestore firestore =
         await IntegrationTestUtil.testEnterpriseFirestore();
     for (int i = 0; i < cases(3); i++) {
       await checkValueOrderAgainstBackend(firestore,

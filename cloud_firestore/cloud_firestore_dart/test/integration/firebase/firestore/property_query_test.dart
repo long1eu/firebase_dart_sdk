@@ -86,7 +86,8 @@ void main() {
           'an Enterprise edition database matches null and NaN like the SDK',
         ),
     () async {
-      final Firestore firestore = await IntegrationTestUtil.testFirestore();
+      final FirebaseFirestore firestore =
+          await IntegrationTestUtil.testFirestore();
       final CollectionReference<Map<String, Object?>> collection = firestore
           .collection('property_query_${autoId()}');
       await collection.doc('null').set(<String, Object?>{'v': null});

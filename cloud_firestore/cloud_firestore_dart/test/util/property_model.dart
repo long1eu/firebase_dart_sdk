@@ -43,7 +43,7 @@ final DatabaseId modelDatabaseId = DatabaseId.forProject('project');
 
 /// A Firestore that only knows its database id: enough to create references
 /// and snapshots in unit tests.
-final api.Firestore modelFirestore =
+final api.FirebaseFirestore modelFirestore =
     FirestoreInternal.detached(modelDatabaseId);
 
 final UserDataConverter _converter = modelFirestore.dataConverter;

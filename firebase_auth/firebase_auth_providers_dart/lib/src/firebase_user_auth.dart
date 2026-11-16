@@ -61,7 +61,7 @@ import 'environment_stub.dart' if (dart.library.io) 'environment_io.dart';
 /// **Session.** The session (the refresh token) is kept in an [AuthStorage]; the default, [InMemoryAuthStorage],
 /// forgets it when the process ends. [restore] (called by [forApp]) loads a stored session.
 ///
-/// **Errors.** Requests fail with a [FirebaseAuthProviderException]; its [FirebaseAuthProviderException.code] lists
+/// **Errors.** Requests fail with a [FirebaseAuthException]; its [FirebaseAuthException.code] lists
 /// the codes. Any request can fail with `network-request-failed`, `too-many-requests`, `invalid-api-key` or
 /// `internal-error`. The operations of the signed-in user throw `null-user` when nobody is signed in, and sign the
 /// user out when the backend answers `user-disabled` or `user-token-expired`. After [dispose] the operations
@@ -75,7 +75,7 @@ import 'environment_stub.dart' if (dart.library.io) 'environment_io.dart';
 /// action codes, email, password and profile updates, reauthentication with a password, account deletion, and
 /// the sign-in methods of an email address. This is not a port of the whole Firebase Auth SDK: there are no
 /// federated providers or popup and redirect flows, no phone sign-in, no email link sign-in and no multi-factor.
-class FirebaseUserAuth implements InternalTokenProvider {
+class FirebaseUserAuth implements AuthTokenProvider {
   /// Creates an instance for the project of [apiKey] (the Web API key of the Firebase project).
   ///
   /// Call [restore] before using it to pick up a stored session. [forApp] does both and registers the instance
@@ -97,7 +97,7 @@ class FirebaseUserAuth implements InternalTokenProvider {
   FirebaseUserAuth({
     required this.apiKey,
     this.appId,
-    InternalAppCheckTokenProvider? appCheck,
+    AppCheckTokenProvider? appCheck,
     AuthStorage? storage,
     String? storageKey,
     this.emulatorHost,
@@ -115,7 +115,7 @@ class FirebaseUserAuth implements InternalTokenProvider {
        _clock = clock ?? DateTime.now,
        _createTimer = createTimer ?? Timer.new {
     // Synchronous: a listener (Firestore) hears about a new user before the sign-in call returns.
-    _tokenChanges = StreamController<InternalTokenResult>.broadcast(
+    _tokenChanges = StreamController<AuthTokenChange>.broadcast(
       sync: true,
       onListen: _scheduleProactiveRefresh,
       onCancel: _cancelProactiveRefresh,
@@ -146,7 +146,7 @@ class FirebaseUserAuth implements InternalTokenProvider {
   }) async {
     final FirebaseUserAuth auth = FirebaseUserAuth(
       apiKey: app.options.apiKey,
-      appId: app.options.applicationId,
+      appId: app.options.appId,
       appCheck: app.appCheckProvider,
       storage: storage,
       storageKey:
@@ -177,7 +177,7 @@ class FirebaseUserAuth implements InternalTokenProvider {
   /// The id of the Firebase app, sent as `X-Firebase-gmpid`; null sends none.
   final String? appId;
 
-  final InternalAppCheckTokenProvider? _appCheck;
+  final AppCheckTokenProvider? _appCheck;
 
   /// The value of `X-Client-Version`, in the format of the JS SDK (`Chrome/JsCore/<version>/FirebaseCore-web`):
   /// platform, implementation, version of the package, framework.
@@ -288,7 +288,7 @@ class FirebaseUserAuth implements InternalTokenProvider {
   final DateTime Function() _clock;
   final Timer Function(Duration delay, void Function() callback) _createTimer;
 
-  late final StreamController<InternalTokenResult> _tokenChanges;
+  late final StreamController<AuthTokenChange> _tokenChanges;
   final StreamController<AuthUser?> _userChanges =
       StreamController<AuthUser?>.broadcast();
 
@@ -317,7 +317,7 @@ class FirebaseUserAuth implements InternalTokenProvider {
 
   /// Emits the ID token after a sign-in, after every refresh, and an empty token after a sign-out.
   @override
-  Stream<InternalTokenResult> get onTokenChanged => _tokenChanges.stream;
+  Stream<AuthTokenChange> get onTokenChanged => _tokenChanges.stream;
 
   /// Loads the session that an earlier instance stored. The ID token is fetched when it is first needed.
   ///
@@ -363,7 +363,7 @@ class FirebaseUserAuth implements InternalTokenProvider {
 
   /// Signs in a new anonymous user, a new account every time (`signInAnonymously`).
   ///
-  /// Throws a [FirebaseAuthProviderException] with the code `operation-not-allowed` (anonymous sign-in is not
+  /// Throws a [FirebaseAuthException] with the code `operation-not-allowed` (anonymous sign-in is not
   /// enabled for the project), `admin-restricted-operation`, `cancelled` (overtaken by another sign-in or a
   /// sign-out), ...
   Future<AuthUser> signInAnonymously() =>
@@ -371,7 +371,7 @@ class FirebaseUserAuth implements InternalTokenProvider {
 
   /// Signs in with an email address and a password (`signInWithEmailAndPassword`).
   ///
-  /// Throws a [FirebaseAuthProviderException] with the code `wrong-password`, `user-not-found`,
+  /// Throws a [FirebaseAuthException] with the code `wrong-password`, `user-not-found`,
   /// `invalid-credential` (projects with email enumeration protection), `invalid-email`, `user-disabled`,
   /// `operation-not-allowed` (email sign-in is not enabled), `too-many-requests`, `cancelled`, ...
   Future<AuthUser> signInWithEmailAndPassword(String email, String password) =>
@@ -385,7 +385,7 @@ class FirebaseUserAuth implements InternalTokenProvider {
   /// (`createUserWithEmailAndPassword`). The new user is not anonymous, and its email address is not verified:
   /// see [sendEmailVerification].
   ///
-  /// Throws a [FirebaseAuthProviderException] with the code `email-already-in-use`, `weak-password`,
+  /// Throws a [FirebaseAuthException] with the code `email-already-in-use`, `weak-password`,
   /// `invalid-email`, `missing-password`, `operation-not-allowed`, `cancelled`, ...
   Future<AuthUser> createUserWithEmailAndPassword(
     String email,
@@ -400,7 +400,7 @@ class FirebaseUserAuth implements InternalTokenProvider {
   /// for users that your own backend authenticates (`signInWithCustomToken`). The custom claims of the token are
   /// in the claims of the ID token ([getAccessToken]) and in `request.auth.token` of the security rules.
   ///
-  /// Throws a [FirebaseAuthProviderException] with the code `invalid-custom-token`, `custom-token-mismatch` (a
+  /// Throws a [FirebaseAuthException] with the code `invalid-custom-token`, `custom-token-mismatch` (a
   /// token for another project), `user-disabled`, `cancelled`, ...
   Future<AuthUser> signInWithCustomToken(String token) => _signIn(
     'accounts:signInWithCustomToken',
@@ -422,7 +422,7 @@ class FirebaseUserAuth implements InternalTokenProvider {
   /// Deletes the account of the signed-in user and signs out (`user.delete()` of the JS SDK). The backend refuses
   /// it with `requires-recent-login` when the sign-in is too long ago: reauthenticate first.
   ///
-  /// Throws a [FirebaseAuthProviderException] with the code `null-user` (nobody is signed in),
+  /// Throws a [FirebaseAuthException] with the code `null-user` (nobody is signed in),
   /// `requires-recent-login`, `user-token-expired`, ...
   Future<void> deleteCurrentUser() async {
     await _forUser((String idToken, int generation) async {
@@ -490,7 +490,7 @@ class FirebaseUserAuth implements InternalTokenProvider {
     final ActionCodeInfo info = await checkActionCode(code);
     final String? email = info.email;
     if (email == null) {
-      throw const FirebaseAuthProviderException(
+      throw const FirebaseAuthException(
         'internal-error',
         'The action code has no email address.',
       );
@@ -658,7 +658,7 @@ class FirebaseUserAuth implements InternalTokenProvider {
           'returnSecureToken': true,
         },
       );
-    } on FirebaseAuthProviderException catch (e) {
+    } on FirebaseAuthException catch (e) {
       if (e.code == 'user-not-found') {
         throw _userMismatch;
       }
@@ -666,7 +666,7 @@ class FirebaseUserAuth implements InternalTokenProvider {
     }
     final Object? idToken = response['idToken'];
     if (idToken is! String) {
-      throw const FirebaseAuthProviderException(
+      throw const FirebaseAuthException(
         'internal-error',
         'The authentication service did not return tokens.',
       );
@@ -676,7 +676,7 @@ class FirebaseUserAuth implements InternalTokenProvider {
       throw _userMismatch;
     }
     if (generation != _generation) {
-      throw const FirebaseAuthProviderException(
+      throw const FirebaseAuthException(
         'cancelled',
         'The reauthentication was overtaken by another sign-in or a sign-out.',
       );
@@ -697,15 +697,15 @@ class FirebaseUserAuth implements InternalTokenProvider {
   /// Returns the ID token of the signed-in user, refreshing it when it expires within five minutes or when
   /// [forceRefresh] is set.
   ///
-  /// Throws a [FirebaseNoSignedInUserError] when nobody is signed in (Firestore then sends the request without
-  /// a token), and a [FirebaseAuthProviderException] when the refresh fails. When the refresh fails because the
+  /// Throws a [FirebaseNoSignedInUserException] when nobody is signed in (Firestore then sends the request without
+  /// a token), and a [FirebaseAuthException] when the refresh fails. When the refresh fails because the
   /// session is no longer valid (the account was deleted or disabled, the refresh token revoked), the user is
   /// signed out.
   @override
   Future<GetTokenResult> getAccessToken({required bool forceRefresh}) async {
     final _Session? session = _session;
     if (session == null) {
-      throw FirebaseNoSignedInUserError('No user is signed in.');
+      throw FirebaseNoSignedInUserException('No user is signed in.');
     }
     final String? idToken = session.idToken;
     if (!forceRefresh && idToken != null && _isFresh(session)) {
@@ -737,19 +737,15 @@ class FirebaseUserAuth implements InternalTokenProvider {
 
   // ---- implementation ----
 
-  static const FirebaseAuthProviderException _userMismatch =
-      FirebaseAuthProviderException(
-        'user-mismatch',
-        'The supplied credentials do not correspond to the signed-in user.',
-      );
+  static const FirebaseAuthException _userMismatch = FirebaseAuthException(
+    'user-mismatch',
+    'The supplied credentials do not correspond to the signed-in user.',
+  );
 
   _Session _requireSession() {
     final _Session? session = _session;
     if (session == null) {
-      throw const FirebaseAuthProviderException(
-        'null-user',
-        'No user is signed in.',
-      );
+      throw const FirebaseAuthException('null-user', 'No user is signed in.');
     }
     return session;
   }
@@ -765,7 +761,7 @@ class FirebaseUserAuth implements InternalTokenProvider {
     final String idToken = (await getAccessToken(forceRefresh: false)).token;
     try {
       return await operation(idToken, generation);
-    } on FirebaseAuthProviderException catch (e) {
+    } on FirebaseAuthException catch (e) {
       if ((e.code == 'user-disabled' || e.code == 'user-token-expired') &&
           generation == _generation &&
           _session != null) {
@@ -823,7 +819,7 @@ class FirebaseUserAuth implements InternalTokenProvider {
           newUser != session.user,
     );
     if (idToken is String && !_tokenChanges.isClosed) {
-      _tokenChanges.add(InternalTokenResult(idToken));
+      _tokenChanges.add(AuthTokenChange(idToken));
     }
     if (newUser != session.user && !_userChanges.isClosed) {
       _userChanges.add(newUser);
@@ -846,7 +842,7 @@ class FirebaseUserAuth implements InternalTokenProvider {
         : null;
     if (account is! Map<String, Object?>) {
       // What the JS SDK does when the backend has no such user.
-      throw const FirebaseAuthProviderException(
+      throw const FirebaseAuthException(
         'internal-error',
         'The authentication service returned no account.',
       );
@@ -919,7 +915,7 @@ class FirebaseUserAuth implements InternalTokenProvider {
     if (id != null && id.isNotEmpty) {
       headers['X-Firebase-gmpid'] = id;
     }
-    final InternalAppCheckTokenProvider? appCheck = _appCheck;
+    final AppCheckTokenProvider? appCheck = _appCheck;
     if (appCheck != null) {
       try {
         final AppCheckTokenResult result = await appCheck.getToken(
@@ -969,7 +965,7 @@ class FirebaseUserAuth implements InternalTokenProvider {
             );
     } on Object catch (_) {
       // The error of the HTTP client may quote the URL, which holds the API key.
-      throw const FirebaseAuthProviderException(
+      throw const FirebaseAuthException(
         'network-request-failed',
         'The request to the authentication service failed (network error).',
       );
@@ -988,12 +984,12 @@ class FirebaseUserAuth implements InternalTokenProvider {
         ? error['message']
         : null;
     if (message is String) {
-      throw FirebaseAuthProviderException.fromServer(
+      throw FirebaseAuthException.fromServer(
         message,
         httpStatus: response.statusCode,
       );
     }
-    throw FirebaseAuthProviderException(
+    throw FirebaseAuthException(
       'internal-error',
       'The authentication service answered with HTTP ${response.statusCode}.',
       httpStatus: response.statusCode,
@@ -1010,14 +1006,14 @@ class FirebaseUserAuth implements InternalTokenProvider {
     final Object? idToken = response['idToken'];
     final Object? refreshToken = response['refreshToken'];
     if (idToken is! String || refreshToken is! String) {
-      throw const FirebaseAuthProviderException(
+      throw const FirebaseAuthException(
         'internal-error',
         'The authentication service did not return tokens.',
       );
     }
     if (generation != _generation) {
       // Another sign-in or a sign-out happened meanwhile and wins.
-      throw const FirebaseAuthProviderException(
+      throw const FirebaseAuthException(
         'cancelled',
         'The sign-in was overtaken by another sign-in or a sign-out.',
       );
@@ -1028,7 +1024,7 @@ class FirebaseUserAuth implements InternalTokenProvider {
         ? localId
         : token.claims['user_id'] ?? token.claims['sub'];
     if (uid is! String) {
-      throw const FirebaseAuthProviderException(
+      throw const FirebaseAuthException(
         'internal-error',
         'The authentication service did not return the id of the user.',
       );
@@ -1054,7 +1050,7 @@ class FirebaseUserAuth implements InternalTokenProvider {
     );
     await _setSession(session, persist: true);
     _userChanges.add(session.user);
-    _tokenChanges.add(InternalTokenResult(idToken));
+    _tokenChanges.add(AuthTokenChange(idToken));
     await _letListenersReact();
     return session.user;
   }
@@ -1087,7 +1083,7 @@ class FirebaseUserAuth implements InternalTokenProvider {
           'refresh_token': session.refreshToken,
         },
       );
-    } on FirebaseAuthProviderException catch (e) {
+    } on FirebaseAuthException catch (e) {
       if (e.invalidatesSession && generation == _generation) {
         await _clearSession();
       }
@@ -1096,7 +1092,7 @@ class FirebaseUserAuth implements InternalTokenProvider {
     final Object? idToken = response['id_token'];
     final Object? refreshToken = response['refresh_token'];
     if (idToken is! String) {
-      throw const FirebaseAuthProviderException(
+      throw const FirebaseAuthException(
         'internal-error',
         'The token service did not return an ID token.',
       );
@@ -1117,7 +1113,7 @@ class FirebaseUserAuth implements InternalTokenProvider {
     );
     _refreshFailures = 0;
     if (!_tokenChanges.isClosed) {
-      _tokenChanges.add(InternalTokenResult(idToken));
+      _tokenChanges.add(AuthTokenChange(idToken));
     }
     return idToken;
   }
@@ -1152,7 +1148,7 @@ class FirebaseUserAuth implements InternalTokenProvider {
       _userChanges.add(null);
     }
     if (!_tokenChanges.isClosed) {
-      _tokenChanges.add(const InternalTokenResult(''));
+      _tokenChanges.add(const AuthTokenChange(''));
     }
     await _letListenersReact();
   }
@@ -1193,7 +1189,7 @@ class FirebaseUserAuth implements InternalTokenProvider {
       _refresh().then<void>(
         (String? _) {},
         onError: (Object error) {
-          if (error is FirebaseAuthProviderException &&
+          if (error is FirebaseAuthException &&
               !error.invalidatesSession &&
               _session != null &&
               _tokenChanges.hasListener) {

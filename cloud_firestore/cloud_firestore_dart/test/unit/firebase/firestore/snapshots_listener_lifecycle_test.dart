@@ -36,7 +36,7 @@ class _FakeClient extends Mock implements FirestoreClient {
 
 void main() {
   late _FakeClient client;
-  late Firestore firestore;
+  late FirebaseFirestore firestore;
 
   setUp(() {
     client = _FakeClient();
@@ -96,8 +96,8 @@ void main() {
         .listen((_) {}, onError: error.complete);
     await settle();
     client.streams.single
-        .onError(FirestoreError('boom', FirestoreErrorCode.unavailable));
-    expect(await error.future, isA<FirestoreError>());
+        .onError(FirestoreException('boom', FirestoreErrorCode.unavailable));
+    expect(await error.future, isA<FirestoreException>());
     await sub.cancel();
   });
 }

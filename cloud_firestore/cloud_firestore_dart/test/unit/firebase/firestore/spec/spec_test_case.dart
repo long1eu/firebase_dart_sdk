@@ -766,7 +766,7 @@ class SpecClient implements RemoteStoreCallback {
         },
         onError: (dynamic error) {
           asserts.hardAssert(
-            error is FirestoreError,
+            error is FirestoreException,
             'The recived error is not a FirebaseFirestoreError it is ${error.runtimeType}.',
           );
           _events.add(QueryEvent(query: query, error: error));

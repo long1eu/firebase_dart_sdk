@@ -13,8 +13,8 @@ import 'common.dart';
 
 Future<void> main() async {
   // Two instances stand in for the two processes.
-  final Firestore server = connect('server');
-  final Firestore client = connect('client');
+  final FirebaseFirestore server = connect('server');
+  final FirebaseFirestore client = connect('client');
 
   final CollectionReference<Map<String, Object?>> scores = server.collection(
     scratch('scores'),
@@ -72,7 +72,7 @@ Future<void> main() async {
         client,
         scores.doc('ada').toJson(),
       );
-  print('reference: ${reference.path == ada.ref.path}');
+  print('reference: ${reference.path == ada.reference.path}');
 
   await server.terminate();
   await client.terminate();

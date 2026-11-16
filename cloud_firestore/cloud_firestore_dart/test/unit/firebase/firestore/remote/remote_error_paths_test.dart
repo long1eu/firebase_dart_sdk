@@ -90,13 +90,17 @@ void main() {
       await expectLater(
         client.runQuery(proto.RunQueryRequest()).toList(),
         throwsA(
-          isA<FirestoreError>()
+          isA<FirestoreException>()
               .having(
-                (FirestoreError e) => e.code,
+                (FirestoreException e) => e.code,
                 'code',
                 FirestoreErrorCode.unauthenticated,
               )
-              .having((FirestoreError e) => e.message, 'message', 'expired'),
+              .having(
+                (FirestoreException e) => e.message,
+                'message',
+                'expired',
+              ),
         ),
       );
       expect(credentials.invalidations, 1);
@@ -114,8 +118,8 @@ void main() {
         await expectLater(
           client.batchGetDocuments(proto.BatchGetDocumentsRequest()).toList(),
           throwsA(
-            isA<FirestoreError>().having(
-              (FirestoreError e) => e.code,
+            isA<FirestoreException>().having(
+              (FirestoreException e) => e.code,
               'code',
               FirestoreErrorCode.permissionDenied,
             ),
@@ -135,14 +139,14 @@ void main() {
       await expectLater(
         client.runQuery(proto.RunQueryRequest()).toList(),
         throwsA(
-          isA<FirestoreError>()
+          isA<FirestoreException>()
               .having(
-                (FirestoreError e) => e.code,
+                (FirestoreException e) => e.code,
                 'code',
                 FirestoreErrorCode.unknown,
               )
               .having(
-                (FirestoreError e) => e.message,
+                (FirestoreException e) => e.message,
                 'message',
                 contains('socket went away'),
               ),

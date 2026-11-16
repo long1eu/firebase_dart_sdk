@@ -40,16 +40,16 @@ Future<void> main() async {
   final FirebaseApp app = FirebaseApp.withOptions(
     const FirebaseOptions(
       apiKey: 'demo-key',
-      applicationId: '1:1234567890:dart:example',
+      appId: '1:1234567890:dart:example',
       // A `demo-` project id keeps the emulator from talking to a real project.
       projectId: 'demo-example',
     ),
   );
   // Synchronous: there is no cache to open. Nothing is sent until the first
   // call.
-  final Firestore firestore = Firestore.instanceFor(
+  final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(
     app: app,
-    settings: FirestoreSettings().withEmulator(
+    settings: Settings().withEmulator(
       emulator.substring(0, colon),
       int.parse(emulator.substring(colon + 1)),
     ),
@@ -137,7 +137,7 @@ Future<void> main() async {
   await firestore.terminate();
   try {
     await cities.doc('SF').get();
-  } on FirestoreError catch (e) {
+  } on FirestoreException catch (e) {
     print(
       'after terminate: ${e.code == FirestoreErrorCode.failedPrecondition}',
     );

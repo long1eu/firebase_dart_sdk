@@ -42,16 +42,16 @@ import 'package:meta/meta.dart';
 /// request to the backend. There are no listeners.
 class DocumentReference<T extends dynamic> implements KeyedDocumentReference {
   /// Implementation detail of the SDK; not part of the supported API. Use
-  /// [Firestore.doc] or [CollectionReference.doc].
+  /// [FirebaseFirestore.doc] or [CollectionReference.doc].
   @internal
   DocumentReference(this.key, this.firestore, [this.converter]);
 
   /// Implementation detail of the SDK; not part of the supported API. Use
-  /// [Firestore.doc] or [CollectionReference.doc].
+  /// [FirebaseFirestore.doc] or [CollectionReference.doc].
   @internal
   factory DocumentReference.forPath(
     ResourcePath path,
-    Firestore firestore, [
+    FirebaseFirestore firestore, [
     FirestoreDataConverter<T>? converter,
   ]) {
     if (path.isEmpty) {
@@ -74,7 +74,7 @@ class DocumentReference<T extends dynamic> implements KeyedDocumentReference {
 
   /// Creates the reference [toJson] wrote, for [firestore].
   factory DocumentReference.fromJson(
-    Firestore firestore,
+    FirebaseFirestore firestore,
     Map<String, Object?> json, {
     FirestoreDataConverter<T>? converter,
   }) {
@@ -121,7 +121,7 @@ class DocumentReference<T extends dynamic> implements KeyedDocumentReference {
   DatabaseId get databaseId => firestore.modelDatabaseId;
 
   /// The Firestore instance of this reference.
-  final Firestore firestore;
+  final FirebaseFirestore firestore;
 
   /// The converter applied to the data read and written through this
   /// reference, if any.

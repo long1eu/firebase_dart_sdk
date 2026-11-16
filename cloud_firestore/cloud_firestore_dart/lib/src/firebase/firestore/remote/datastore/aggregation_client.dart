@@ -42,7 +42,7 @@ extension DatastoreAggregation on Datastore {
       // [CallReleaser].
       response = await _client.callReleaser.first(call, call.cancel);
     } on StateError {
-      throw FirestoreError(
+      throw FirestoreException(
         'No responses received',
         FirestoreErrorCode.unimplemented,
       );

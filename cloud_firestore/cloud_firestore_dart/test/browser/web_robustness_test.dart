@@ -20,8 +20,8 @@ typedef Json = Map<String, Object?>;
 
 void main() {
   test('listens and writes with forced long polling', () async {
-    final Firestore firestore = await newClient(forceLongPolling: true);
-    final Firestore other = await newClient(forceLongPolling: true);
+    final FirebaseFirestore firestore = await newClient(forceLongPolling: true);
+    final FirebaseFirestore other = await newClient(forceLongPolling: true);
     final CollectionReference<Json> collection =
         firestore.collection(newCollectionName());
 
@@ -72,8 +72,8 @@ void main() {
 
   test('a listener keeps working after the browser reports online again',
       () async {
-    final Firestore firestore = await newClient();
-    final Firestore other = await newClient();
+    final FirebaseFirestore firestore = await newClient();
+    final FirebaseFirestore other = await newClient();
     final CollectionReference<Json> collection =
         firestore.collection(newCollectionName());
     final EventLog<QuerySnapshot<Json>> log =

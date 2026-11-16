@@ -114,8 +114,8 @@ void main() {
     await expectLater(
       auth.createUserWithEmailAndPassword('not an email', 'password'),
       throwsA(
-        isA<FirebaseAuthProviderException>().having(
-          (FirebaseAuthProviderException e) => e.code,
+        isA<FirebaseAuthException>().having(
+          (FirebaseAuthException e) => e.code,
           'code',
           'invalid-email',
         ),
@@ -214,7 +214,7 @@ void main() {
     addTearDown(auth.dispose);
     await expectLater(
       auth.signInAnonymously(),
-      throwsA(isA<FirebaseAuthProviderException>()),
+      throwsA(isA<FirebaseAuthException>()),
     );
     expect(
       urls.single.toString(),
@@ -223,7 +223,7 @@ void main() {
   });
 }
 
-class _AppCheck implements InternalAppCheckTokenProvider {
+class _AppCheck implements AppCheckTokenProvider {
   @override
   Future<AppCheckTokenResult> getToken({required bool forceRefresh}) async =>
       const AppCheckTokenResult('app-check-token');

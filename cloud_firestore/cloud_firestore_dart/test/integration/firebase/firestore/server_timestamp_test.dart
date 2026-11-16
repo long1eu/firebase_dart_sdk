@@ -266,7 +266,7 @@ void main() {
     bool hadError = false;
     try {
       await docRef.update(updateData);
-    } on FirestoreError catch (e) {
+    } on FirestoreException catch (e) {
       hadError = true;
       expect(e, isNotNull);
       expect(e.code, FirestoreErrorCode.notFound);
@@ -284,7 +284,7 @@ void main() {
         transaction.update(docRef, updateData);
         return Future<void>.value();
       });
-    } on FirestoreError catch (e) {
+    } on FirestoreException catch (e) {
       hadError = true;
       expect(e, isNotNull);
       expect(e.code, FirestoreErrorCode.notFound);
@@ -301,7 +301,7 @@ void main() {
 
     // The default behavior returns a null timestamp (via any accessor).
     expect(snap.get('when'), isNull);
-    expect(snap.getField(FieldPath.of(<String>['when'])), isNull);
+    expect(snap.getField(FieldPath(<String>['when'])), isNull);
     expect(snap['when'], isNull);
     expect(snap.getTimestamp('when'), isNull);
 
@@ -310,7 +310,7 @@ void main() {
         snap.get('when', ServerTimestampBehavior.estimate), isA<Timestamp>());
     expect(
         snap.getField(
-            FieldPath.of(<String>['when']), ServerTimestampBehavior.estimate),
+            FieldPath(<String>['when']), ServerTimestampBehavior.estimate),
         isA<Timestamp>());
     expect(snap.getTimestamp('when', ServerTimestampBehavior.estimate),
         isA<Timestamp>());

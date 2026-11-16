@@ -19,17 +19,17 @@ void main() {
   const int oneMb = 1024 * 1024;
 
   test('settings with no modifications are the defaults', () {
-    final FirestoreSettings settings = FirestoreSettings();
+    final Settings settings = Settings();
     expect(settings.host, 'firestore.googleapis.com');
     expect(settings.port, 443);
     expect(settings.sslEnabled, isTrue);
     expect(settings.persistenceEnabled, isTrue);
     expect(settings.cacheSizeBytes, 100 * oneMb);
-    expect(FirestoreSettings.defaultCacheSizeBytes, 100 * oneMb);
+    expect(Settings.defaultCacheSizeBytes, 100 * oneMb);
   });
 
   test('settings with all values customized keep those values', () {
-    final FirestoreSettings settings = FirestoreSettings(
+    final Settings settings = Settings(
       host: 'a.b.c',
       port: 8080,
       sslEnabled: false,
@@ -44,7 +44,7 @@ void main() {
   });
 
   test('copyWith copies all values and replaces the given ones', () {
-    final FirestoreSettings original = FirestoreSettings(
+    final Settings original = Settings(
       host: 'a.b.c',
       port: 8080,
       sslEnabled: false,
@@ -54,7 +54,7 @@ void main() {
     expect(original.copyWith(), original);
     expect(original.copyWith().hashCode, original.hashCode);
 
-    final FirestoreSettings changed = original.copyWith(
+    final Settings changed = original.copyWith(
         host: 'x.y.z',
         port: 1,
         sslEnabled: true,
@@ -69,44 +69,44 @@ void main() {
   });
 
   test('equality considers every property', () {
-    final FirestoreSettings base = FirestoreSettings(host: 'a.b');
-    expect(FirestoreSettings(host: 'a.b'), base);
-    expect(FirestoreSettings(host: 'a.b', port: 1), isNot(base));
-    expect(FirestoreSettings(host: 'a.c'), isNot(base));
-    expect(FirestoreSettings(host: 'a.b', sslEnabled: false), isNot(base));
+    final Settings base = Settings(host: 'a.b');
+    expect(Settings(host: 'a.b'), base);
+    expect(Settings(host: 'a.b', port: 1), isNot(base));
+    expect(Settings(host: 'a.c'), isNot(base));
+    expect(Settings(host: 'a.b', sslEnabled: false), isNot(base));
     expect(
-        FirestoreSettings(host: 'a.b', persistenceEnabled: false), isNot(base));
+        Settings(host: 'a.b', persistenceEnabled: false), isNot(base));
     expect(
-        FirestoreSettings(host: 'a.b', cacheSizeBytes: 2 * oneMb), isNot(base));
+        Settings(host: 'a.b', cacheSizeBytes: 2 * oneMb), isNot(base));
   });
 
   test('toString lists the properties', () {
-    final String text = FirestoreSettings(host: 'a.b').toString();
+    final String text = Settings(host: 'a.b').toString();
     expect(text, contains('a.b'));
     expect(text, contains('443'));
   });
 
   group('validation (Java throws unconditionally)', () {
     test('ssl cannot be disabled for the default host', () {
-      expect(() => FirestoreSettings(sslEnabled: false), throwsA(anything));
+      expect(() => Settings(sslEnabled: false), throwsA(anything));
     });
 
     test('unlimited cache size is accepted', () {
       expect(
-          FirestoreSettings(
-                  cacheSizeBytes: FirestoreSettings.cacheSizeUnlimited)
+          Settings(
+                  cacheSizeBytes: Settings.cacheSizeUnlimited)
               .cacheSizeBytes,
-          FirestoreSettings.cacheSizeUnlimited);
+          Settings.cacheSizeUnlimited);
     });
 
     test('a cache size below the 1 MB minimum is rejected', () {
-      expect(() => FirestoreSettings(cacheSizeBytes: oneMb - 1),
+      expect(() => Settings(cacheSizeBytes: oneMb - 1),
           throwsA(anything));
     });
 
     test('a cache size of exactly 1 MB is accepted (Java rejects only < 1 MB)',
         () {
-      expect(FirestoreSettings(cacheSizeBytes: oneMb).cacheSizeBytes, oneMb);
+      expect(Settings(cacheSizeBytes: oneMb).cacheSizeBytes, oneMb);
     });
   });
 }

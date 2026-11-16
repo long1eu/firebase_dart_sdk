@@ -105,9 +105,9 @@ void main() {
         <String>['bob']);
     expect(
         await ids(c
-            .where(FieldPath.documentIdField, whereIn: <String>['ana', 'dan'])),
+            .where(FieldPath.documentId, whereIn: <String>['ana', 'dan'])),
         <String>['ana', 'dan']);
-    expect(await ids(c.where(FieldPath.of(<String>['name']), isEqualTo: 'Cat')),
+    expect(await ids(c.where(FieldPath(<String>['name']), isEqualTo: 'Cat')),
         <String>['cat']);
     // The Filter form keeps working and can be mixed with the sugar.
     expect(

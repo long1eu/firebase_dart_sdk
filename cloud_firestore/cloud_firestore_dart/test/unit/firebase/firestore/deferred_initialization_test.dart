@@ -102,8 +102,8 @@ class _OpenFailed implements Exception {
   String toString() => 'the database could not be opened';
 }
 
-/// The error of the opener: [Firestore.initialized] fails with it as is; the operations report it as is or wrapped
-/// in a [FirestoreError] that names it, as they do for any unexpected error.
+/// The error of the opener: [FirebaseFirestore.initialized] fails with it as is; the operations report it as is or wrapped
+/// in a [FirestoreException] that names it, as they do for any unexpected error.
 final Matcher throwsOpenFailed = throwsA(
   predicate<Object>(
     (Object e) => '$e'.contains('could not be opened'),
@@ -125,7 +125,7 @@ void main() {
       addTearDown(() => DatabaseMock.deleteDatabaseFiles(dbName));
       final List<String> log = <String>[];
 
-      final Firestore firestore = Firestore.instanceFor(
+      final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(
         app: app,
         settings: offlineSettings,
         openDatabase: recording(openFixed(dbName), log),
@@ -134,7 +134,10 @@ void main() {
 
       // Synchronous: nothing has been opened yet.
       expect(log, isEmpty);
-      expect(identical(Firestore.instanceFor(app: app), firestore), isTrue);
+      expect(
+        identical(FirebaseFirestore.instanceFor(app: app), firestore),
+        isTrue,
+      );
       expect(firestore.persistentCacheIndexManager, isNotNull);
 
       // A write and a cache read issued right away run after the initialization.
@@ -157,7 +160,7 @@ void main() {
 
     final FirestoreClient client = FirestoreClient.start(
       IntegrationTestUtil.testEnvDatabaseInfo(),
-      FirestoreSettings(),
+      Settings(),
       credentials,
       recording(openFixed(dbName), log),
       network,
@@ -177,7 +180,7 @@ void main() {
     final FirebaseApp app = newApp(uniqueApp());
     addTearDown(app.delete);
 
-    final Firestore firestore = Firestore.instanceFor(
+    final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(
       app: app,
       settings: offlineSettings,
       openDatabase:
@@ -217,7 +220,7 @@ void main() {
       addTearDown(() => DatabaseMock.deleteDatabaseFiles(dbName));
       final List<String> log = <String>[];
 
-      final Firestore firestore = Firestore.instanceFor(
+      final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(
         app: app,
         settings: offlineSettings,
         openDatabase: recording(openFixed(dbName), log),
@@ -241,7 +244,7 @@ void main() {
       final List<String> log = <String>[];
 
       final FirebaseApp first = newApp(name);
-      final Firestore old = Firestore.instanceFor(
+      final FirebaseFirestore old = FirebaseFirestore.instanceFor(
         app: first,
         settings: offlineSettings,
         openDatabase: recording(openFixed(dbName), log),
@@ -251,7 +254,7 @@ void main() {
       first.delete();
       final FirebaseApp second = newApp(name);
       addTearDown(second.delete);
-      final Firestore current = Firestore.instanceFor(
+      final FirebaseFirestore current = FirebaseFirestore.instanceFor(
         app: second,
         settings: offlineSettings,
         openDatabase: recording(openFixed(dbName), log),
@@ -275,7 +278,7 @@ void main() {
     final List<String> log = <String>[];
 
     final FirebaseApp first = newApp(name);
-    final Firestore old = Firestore.instanceFor(
+    final FirebaseFirestore old = FirebaseFirestore.instanceFor(
       app: first,
       settings: offlineSettings,
       openDatabase: recording(openFixed(dbName), log),
@@ -284,7 +287,7 @@ void main() {
     first.delete();
     final FirebaseApp second = newApp(name);
     addTearDown(second.delete);
-    final Firestore current = Firestore.instanceFor(
+    final FirebaseFirestore current = FirebaseFirestore.instanceFor(
       app: second,
       settings: offlineSettings,
       openDatabase: recording(openFixed(dbName), log),
@@ -293,13 +296,19 @@ void main() {
 
     expect(identical(current, old), isFalse);
     expect(identical(current.app, second), isTrue);
-    expect(identical(Firestore.instanceFor(app: second), current), isTrue);
+    expect(
+      identical(FirebaseFirestore.instanceFor(app: second), current),
+      isTrue,
+    );
 
     // The delete event of the first app (delivered asynchronously) must not
     // shut down the instance of the second one.
     await current.initialized;
     await Future<void>.delayed(Duration.zero);
-    expect(identical(Firestore.instanceFor(app: second), current), isTrue);
+    expect(
+      identical(FirebaseFirestore.instanceFor(app: second), current),
+      isTrue,
+    );
     // Throws if the instance was terminated.
     final QuerySnapshot<Map<String, Object?>> cached = await current
         .collection('coll')

@@ -77,7 +77,7 @@ class OAuthAccessToken {
 ///
 /// There is no user: [uid] is null, and [onTokenChanged] never emits (a new token is picked up by the next
 /// request; open streams keep the token they started with, as the backend allows).
-class OAuthTokenProvider implements InternalTokenProvider {
+class OAuthTokenProvider implements AuthTokenProvider {
   /// Creates a provider on top of [fetch], which obtains a new access token, for token sources of your own.
   ///
   /// A token is reused until it is within [refreshBefore] (default five minutes) of its expiry. [clock] is for
@@ -180,7 +180,7 @@ class OAuthTokenProvider implements InternalTokenProvider {
         },
       );
     } on Object catch (_) {
-      throw const FirebaseAuthProviderException(
+      throw const FirebaseAuthException(
         'network-request-failed',
         'The request to the token endpoint failed (network error).',
       );
@@ -207,7 +207,7 @@ class OAuthTokenProvider implements InternalTokenProvider {
     final Object? description = body is Map<String, Object?>
         ? body['error_description']
         : null;
-    throw FirebaseAuthProviderException(
+    throw FirebaseAuthException(
       error == 'invalid_grant' ? 'invalid-credential' : 'internal-error',
       'The token endpoint refused the service account'
       '${error is String ? ' ($error${description is String ? ': $description' : ''})' : ''}.',
@@ -237,7 +237,7 @@ class OAuthTokenProvider implements InternalTokenProvider {
   /// [refreshBefore] of its expiry, or when [forceRefresh] is set.
   ///
   /// The token is opaque: the [GetTokenResult] has no claims. Throws what the fetch throws: for
-  /// [OAuthTokenProvider.serviceAccount] a [FirebaseAuthProviderException], for `applicationDefaultCredentials()`
+  /// [OAuthTokenProvider.serviceAccount] a [FirebaseAuthException], for `applicationDefaultCredentials()`
   /// the error of `package:googleapis_auth`.
   @override
   Future<GetTokenResult> getAccessToken({required bool forceRefresh}) async {
@@ -261,6 +261,6 @@ class OAuthTokenProvider implements InternalTokenProvider {
 
   /// Never emits (see the class comment).
   @override
-  Stream<InternalTokenResult> get onTokenChanged =>
-      const Stream<InternalTokenResult>.empty();
+  Stream<AuthTokenChange> get onTokenChanged =>
+      const Stream<AuthTokenChange>.empty();
 }

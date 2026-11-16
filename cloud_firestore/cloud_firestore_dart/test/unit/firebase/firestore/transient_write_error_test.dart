@@ -70,7 +70,7 @@ void main() {
     final FirebaseApp app = newApp(name);
     addTearDown(app.delete);
     late _BusyMutationsDatabase database;
-    final Firestore firestore = Firestore.instanceFor(
+    final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(
       app: app,
       settings: offlineSettings,
       openDatabase:

@@ -98,12 +98,12 @@ abstract class FieldValue {
     return _ArrayRemoveFieldValue._(elements);
   }
 
-  /// Adds [l] to the number in the field; use a negative [l] to subtract.
+  /// Adds [value] to the number in the field; use a negative [value] to subtract.
   ///
-  /// If both the current value and [l] are integers, the result is an
+  /// If both the current value and [value] are integers, the result is an
   /// integer, clamped to the range of a 64-bit signed integer instead of
   /// overflowing. If either is a double, the result is a double (IEEE 754).
-  /// If the field is not a number (or does not exist), it is set to [l].
+  /// If the field is not a number (or does not exist), it is set to [value].
   ///
   /// ```dart
   /// await firestore.doc('counters/visits').update(<String, Object?>{
@@ -114,11 +114,11 @@ abstract class FieldValue {
   /// When the answer to a commit is lost and the client sends the write
   /// again, the increment can be applied twice; the JS and Android SDKs have
   /// the same exposure.
-  factory FieldValue.increment(num l) {
-    return _NumericIncrementFieldValue(l);
+  factory FieldValue.increment(num value) {
+    return _NumericIncrementFieldValue(value);
   }
 
-  /// Sets the field to the smaller of its current value and [l].
+  /// Sets the field to the smaller of its current value and [value].
   ///
   /// If the current value is not a number, the field is set to the given value.
   /// If both are numbers they are compared numerically (NaN wins over any other
@@ -130,11 +130,11 @@ abstract class FieldValue {
   ///   'lowest': FieldValue.minimum(12),
   /// });
   /// ```
-  factory FieldValue.minimum(num l) {
-    return _NumericMinimumFieldValue(l);
+  factory FieldValue.minimum(num value) {
+    return _NumericMinimumFieldValue(value);
   }
 
-  /// Sets the field to the larger of its current value and [l].
+  /// Sets the field to the larger of its current value and [value].
   ///
   /// If the current value is not a number, the field is set to the given value.
   /// If both are numbers they are compared numerically (NaN wins over any other
@@ -146,8 +146,8 @@ abstract class FieldValue {
   ///   'highest': FieldValue.maximum(31.5),
   /// });
   /// ```
-  factory FieldValue.maximum(num l) {
-    return _NumericMaximumFieldValue(l);
+  factory FieldValue.maximum(num value) {
+    return _NumericMaximumFieldValue(value);
   }
 
   /// Creates a [VectorValue] holding a copy of [values], the same as

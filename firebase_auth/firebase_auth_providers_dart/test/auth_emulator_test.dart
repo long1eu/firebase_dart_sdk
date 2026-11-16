@@ -19,8 +19,8 @@ String uniqueEmail() =>
     'user${DateTime.now().microsecondsSinceEpoch}x${_counter++}@example.com';
 
 Matcher throwsAuth(Object code) => throwsA(
-  isA<FirebaseAuthProviderException>().having(
-    (FirebaseAuthProviderException e) => e.code,
+  isA<FirebaseAuthException>().having(
+    (FirebaseAuthException e) => e.code,
     'code',
     code,
   ),
@@ -80,7 +80,7 @@ void main() {
       expect(auth.uid, isNull);
       await expectLater(
         auth.getAccessToken(forceRefresh: false),
-        throwsA(isA<FirebaseNoSignedInUserError>()),
+        throwsA(isA<FirebaseNoSignedInUserException>()),
       );
     });
 
@@ -193,8 +193,8 @@ void main() {
       await expectLater(
         auth.getAccessToken(forceRefresh: true),
         throwsA(
-          isA<FirebaseAuthProviderException>().having(
-            (FirebaseAuthProviderException e) => e.invalidatesSession,
+          isA<FirebaseAuthException>().having(
+            (FirebaseAuthException e) => e.invalidatesSession,
             'invalidatesSession',
             isTrue,
           ),

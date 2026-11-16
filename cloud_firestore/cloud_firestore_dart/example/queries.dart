@@ -12,7 +12,7 @@ List<String> ids(QuerySnapshot<Map<String, Object?>> snapshot) => <String>[
 ];
 
 Future<void> main() async {
-  final Firestore firestore = connect();
+  final FirebaseFirestore firestore = connect();
   final CollectionReference<Map<String, Object?>> cities = firestore.collection(
     scratch('cities'),
   );
@@ -102,7 +102,7 @@ Future<void> main() async {
 
   // The document id is a field too.
   print(
-    'ids up to m: ${ids(await cities.where(FieldPath.documentIdField, isLessThan: cities.doc('m')).get())}',
+    'ids up to m: ${ids(await cities.where(FieldPath.documentId, isLessThan: cities.doc('m')).get())}',
   );
 
   await firestore.terminate();

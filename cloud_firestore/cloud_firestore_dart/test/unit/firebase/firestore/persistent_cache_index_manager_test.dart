@@ -20,12 +20,12 @@ import 'local/mock/database_mock.dart';
 void main() {
   int appCounter = 0;
 
-  Future<Firestore> open({bool persistent = true}) async {
+  Future<FirebaseFirestore> open({bool persistent = true}) async {
     final FirebaseApp app = newApp('persistentCacheIndex${appCounter++}');
     addTearDown(app.delete);
     final String dbName = 'cache-index-${const Uuid().v4()}.db';
     addTearDown(() => DatabaseMock.deleteDatabaseFiles(dbName));
-    final Firestore firestore = Firestore.instanceFor(
+    final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(
       app: app,
       settings: offlineSettings,
       openDatabase: persistent ? openFixed(dbName) : null,
@@ -39,7 +39,7 @@ void main() {
   /// Puts [count] documents of `coll` into the cache as if the backend had sent them (the instance is offline); the
   /// first [matching] have `match: true`. The automatic index creation only looks at cached documents of the
   /// backend, not at pending writes.
-  Future<void> writeDocs(Firestore firestore, int count, int matching) {
+  Future<void> writeDocs(FirebaseFirestore firestore, int count, int matching) {
     final Persistence persistence = firestore.client.persistence;
     return persistence.runTransaction('seed the cache', () async {
       for (int i = 0; i < count; i++) {
@@ -54,7 +54,7 @@ void main() {
     });
   }
 
-  Future<List<String>> matchingIds(Firestore firestore) async {
+  Future<List<String>> matchingIds(FirebaseFirestore firestore) async {
     final QuerySnapshot<Map<String, Object?>> snapshot = await firestore
         .collection('coll')
         .whereEqualTo('match', true)
@@ -64,12 +64,12 @@ void main() {
         .toList();
   }
 
-  List<FieldIndex> indexes(Firestore firestore) =>
+  List<FieldIndex> indexes(FirebaseFirestore firestore) =>
       firestore.client.localStore.getFieldIndexes();
 
   final Matcher throwsTerminated = throwsA(
-    isA<FirestoreError>().having(
-      (FirestoreError e) => e.code,
+    isA<FirestoreException>().having(
+      (FirestoreException e) => e.code,
       'code',
       FirestoreErrorCode.failedPrecondition,
     ),
@@ -85,7 +85,7 @@ void main() {
     });
 
     test('always returns the same object', () async {
-      final Firestore firestore = await open();
+      final FirebaseFirestore firestore = await open();
       expect(
         identical(
           firestore.persistentCacheIndexManager,
@@ -98,8 +98,8 @@ void main() {
     // JS: "getPersistentCacheIndexManager() should return distinct instances for distinct Firestore objects";
     // Android: testCanGetSameOrDifferentPersistentCacheIndexManager.
     test('returns distinct instances for distinct Firestore objects', () async {
-      final Firestore firestore1 = await open();
-      final Firestore firestore2 = await open();
+      final FirebaseFirestore firestore1 = await open();
+      final FirebaseFirestore firestore2 = await open();
       expect(firestore1.persistentCacheIndexManager, isNotNull);
       expect(
         identical(
@@ -114,7 +114,7 @@ void main() {
     // (testAutoIndexCreationAfterFailsTermination calls the getter after terminate()): the getter returns the
     // manager, whose methods fail.
     test('first asked for after terminate(), its methods fail', () async {
-      final Firestore firestore = await open();
+      final FirebaseFirestore firestore = await open();
       await firestore.terminate();
       final PersistentCacheIndexManager? manager =
           firestore.persistentCacheIndexManager;
@@ -152,7 +152,7 @@ void main() {
 
     // testAutoIndexCreationAfterFailsTermination (Android)
     test('enabling, disabling and deleting after terminate() fail', () async {
-      final Firestore firestore = await open();
+      final FirebaseFirestore firestore = await open();
       final PersistentCacheIndexManager manager =
           firestore.persistentCacheIndexManager!;
       await firestore.terminate();
@@ -166,7 +166,7 @@ void main() {
     test(
       'query results are the same in every state of auto creation',
       () async {
-        final Firestore firestore = await open();
+        final FirebaseFirestore firestore = await open();
         final PersistentCacheIndexManager manager =
             firestore.persistentCacheIndexManager!;
         await writeDocs(firestore, 3, 1);
@@ -184,7 +184,7 @@ void main() {
     );
 
     test('query returns correct results when index is auto-created', () async {
-      final Firestore firestore = await open();
+      final FirebaseFirestore firestore = await open();
       await firestore.persistentCacheIndexManager!.enableIndexAutoCreation();
       // More than the 100 documents below which no index is considered, and few enough matches (less than half).
       await writeDocs(firestore, 120, 3);
@@ -214,7 +214,7 @@ void main() {
 
     test('no index is created for a small collection, a query that matches '
         'most documents, or when auto creation is off', () async {
-      final Firestore firestore = await open();
+      final FirebaseFirestore firestore = await open();
       final PersistentCacheIndexManager manager =
           firestore.persistentCacheIndexManager!;
 
@@ -256,7 +256,7 @@ void main() {
     });
 
     test('pending writes do not count as scanned documents', () async {
-      final Firestore firestore = await open();
+      final FirebaseFirestore firestore = await open();
       await firestore.persistentCacheIndexManager!.enableIndexAutoCreation();
       for (int i = 0; i < 120; i++) {
         firestore.doc('coll/doc$i').set(<String, Object?>{
@@ -270,7 +270,7 @@ void main() {
 
     test('an index created automatically keeps being used after auto '
         'creation is turned off', () async {
-      final Firestore firestore = await open();
+      final FirebaseFirestore firestore = await open();
       final PersistentCacheIndexManager manager =
           firestore.persistentCacheIndexManager!;
       await manager.enableIndexAutoCreation();
@@ -313,7 +313,7 @@ void main() {
 
     test('query returns correct results when auto-created index has been '
         'deleted', () async {
-      final Firestore firestore = await open();
+      final FirebaseFirestore firestore = await open();
       final PersistentCacheIndexManager manager =
           firestore.persistentCacheIndexManager!;
       await manager.enableIndexAutoCreation();
@@ -332,8 +332,8 @@ void main() {
     });
 
     test('also deletes the indexes of setIndexConfiguration', () async {
-      final Firestore firestore = await open();
-      await firestore.setIndexConfiguration(
+      final FirebaseFirestore firestore = await open();
+      await firestore.setIndexConfigurationFromJSON(
         '{"indexes": [{"collectionGroup": "coll", "fields": '
         '[{"fieldPath": "match", "order": "ASCENDING"}]}]}',
       );
@@ -368,8 +368,8 @@ void main() {
 
     // testCanConfigureIndexes (Android)
     test('configures the indexes of the definition', () async {
-      final Firestore firestore = await open();
-      await firestore.setIndexConfiguration(restaurants);
+      final FirebaseFirestore firestore = await open();
+      await firestore.setIndexConfigurationFromJSON(restaurants);
 
       final List<FieldIndex> configured = indexes(firestore)
         ..sort(FieldIndex.semanticCompare);
@@ -404,13 +404,13 @@ void main() {
     test(
       'replaces the configuration and keeps the indexes that stay',
       () async {
-        final Firestore firestore = await open();
-        await firestore.setIndexConfiguration(restaurants);
+        final FirebaseFirestore firestore = await open();
+        await firestore.setIndexConfigurationFromJSON(restaurants);
         final Set<int> before = indexes(
           firestore,
         ).map((FieldIndex i) => i.indexId).toSet();
 
-        await firestore.setIndexConfiguration(
+        await firestore.setIndexConfigurationFromJSON(
           '{"indexes": [{"collectionGroup": "restaurants", "fields": '
           '[{"fieldPath": "price", "order": "ASCENDING"}]}, '
           '{"collectionGroup": "cities", "fields": '
@@ -428,50 +428,50 @@ void main() {
         );
         expect(before, contains(price.indexId));
 
-        await firestore.setIndexConfiguration('{"indexes": []}');
+        await firestore.setIndexConfigurationFromJSON('{"indexes": []}');
         expect(indexes(firestore), isEmpty);
       },
     );
 
     // testBadJsonDoesNotCrashClient / testBadIndexDoesNotCrashClient (Android)
     test('a bad definition fails and does not break the instance', () async {
-      final Firestore firestore = await open();
+      final FirebaseFirestore firestore = await open();
       await expectLater(
-        firestore.setIndexConfiguration('{,'),
+        firestore.setIndexConfigurationFromJSON('{,'),
         throwsArgumentError,
       );
       await expectLater(
-        firestore.setIndexConfiguration(
+        firestore.setIndexConfigurationFromJSON(
           '{"indexes": [{"collectionGroup": "restaurants", "fields": '
           '[{"fieldPath": "price", "order": "INVALID" ,]}]}',
         ),
         throwsArgumentError,
       );
       expect(indexes(firestore), isEmpty);
-      await firestore.setIndexConfiguration(restaurants);
+      await firestore.setIndexConfigurationFromJSON(restaurants);
       expect(indexes(firestore), hasLength(2));
     });
 
     test('fails without the persistent cache', () async {
-      final Firestore firestore = await open(persistent: false);
+      final FirebaseFirestore firestore = await open(persistent: false);
       await expectLater(
-        firestore.setIndexConfiguration(restaurants),
+        firestore.setIndexConfigurationFromJSON(restaurants),
         throwsStateError,
       );
     });
 
     test('fails after terminate()', () async {
-      final Firestore firestore = await open();
+      final FirebaseFirestore firestore = await open();
       await firestore.terminate();
       await expectLater(
-        firestore.setIndexConfiguration(restaurants),
+        firestore.setIndexConfigurationFromJSON(restaurants),
         throwsTerminated,
       );
     });
 
     test('a configured index serves cache queries once it is filled', () async {
-      final Firestore firestore = await open();
-      await firestore.setIndexConfiguration(
+      final FirebaseFirestore firestore = await open();
+      await firestore.setIndexConfigurationFromJSON(
         '{"indexes": [{"collectionGroup": "coll", "fields": '
         '[{"fieldPath": "match", "order": "ASCENDING"}]}]}',
       );

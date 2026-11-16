@@ -30,7 +30,7 @@ void main() {
 
   group('listeners', () {
     test('across repeated cuts end with the state of the backend', () async {
-      final Firestore db = await env.newClient();
+      final FirebaseFirestore db = await env.newClient();
       final String name = uniqueName('listen');
       final CollectionReference<Map<String, Object?>> writer =
           env.oracle.collection(name);
@@ -131,7 +131,7 @@ void main() {
 
     test('report pending writes and the cache state across an outage',
         () async {
-      final Firestore db = await env.newClient();
+      final FirebaseFirestore db = await env.newClient();
       final String name = uniqueName('metadata');
       await env.oracle.collection(name).doc('a').set(<String, Object?>{'v': 0});
 
@@ -186,7 +186,7 @@ void main() {
     });
 
     test('resolve limbo documents while the connection is cut', () async {
-      final Firestore db = await env.newClient();
+      final FirebaseFirestore db = await env.newClient();
       final String name = uniqueName('limbo');
       final CollectionReference<Map<String, Object?>> writer =
           env.oracle.collection(name);
@@ -221,7 +221,7 @@ void main() {
     });
 
     test('catch up with deletes and updates after a long outage', () async {
-      final Firestore db = await env.newClient();
+      final FirebaseFirestore db = await env.newClient();
       final String name = uniqueName('outage');
       final CollectionReference<Map<String, Object?>> writer =
           env.oracle.collection(name);
@@ -282,7 +282,7 @@ void main() {
       }
       await batch.commit();
 
-      final Firestore db = await env.newClient();
+      final FirebaseFirestore db = await env.newClient();
       bool stalled = false;
       env.proxy.cutWhen = (ChaosDirection direction, Uint8List data) {
         if (!stalled &&

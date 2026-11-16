@@ -72,7 +72,7 @@ class _MockAuthCredentialsProvider extends EmptyCredentialsProvider {
   }
 }
 
-class _MockAppCheckTokenProvider extends AppCheckTokenProvider {
+class _MockAppCheckTokenProvider extends FirebaseAppCheckTokenProvider {
   _MockAppCheckTokenProvider() : super(null);
 
   bool invalidateTokenInvoked = false;
@@ -114,9 +114,9 @@ void main() {
   }
 
   Matcher firestoreError(FirestoreErrorCode code, Matcher message) {
-    return isA<FirestoreError>()
-        .having((FirestoreError e) => e.code, 'code', code)
-        .having((FirestoreError e) => e.message, 'message', message);
+    return isA<FirestoreException>()
+        .having((FirestoreException e) => e.code, 'code', code)
+        .having((FirestoreException e) => e.message, 'message', message);
   }
 
   test('newDatastore() returns an an instance of Datastore', () {

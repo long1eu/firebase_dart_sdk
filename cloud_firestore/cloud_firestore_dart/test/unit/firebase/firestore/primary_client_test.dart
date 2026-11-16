@@ -29,10 +29,10 @@ void main() {
     addTearDown(() => DatabaseMock.deleteDatabaseFiles(dbName));
   });
 
-  Future<Firestore> open(String appName) async {
+  Future<FirebaseFirestore> open(String appName) async {
     final FirebaseApp app = newApp('$appName-${const Uuid().v4()}');
     addTearDown(app.delete);
-    final Firestore firestore = Firestore.instanceFor(
+    final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(
       app: app,
       settings: offlineSettings,
       openDatabase: openFixed(dbName),
@@ -45,18 +45,18 @@ void main() {
 
   /// Runs the metadata refresh of [firestore] now and waits for it, and for the change of the primary state that it
   /// queued.
-  Future<void> refresh(Firestore firestore) async {
+  Future<void> refresh(FirebaseFirestore firestore) async {
     firestore.scheduler.runUntil(TaskId.clientMetadataRefresh);
     // Anything that goes through the queue of the client after the refresh (not waitForPendingWrites: the writes
     // of these tests are never acknowledged). Twice: the refresh queues the change of the primary state behind the
     // first one.
-    await firestore.getNamedQuery('none');
-    await firestore.getNamedQuery('none');
+    await firestore.namedQuery('none');
+    await firestore.namedQuery('none');
   }
 
   /// Whether [firestore] acts as the primary client: it uses the network and schedules the garbage collection and
   /// the index backfill.
-  bool actsAsPrimary(Firestore firestore) {
+  bool actsAsPrimary(FirebaseFirestore firestore) {
     final bool network = firestore.client.remoteStore.canUseNetwork;
     final bool gc =
         firestore.scheduler.getTask(TaskId.garbageCollection) != null;
@@ -76,7 +76,7 @@ void main() {
   }
 
   test('the refresh timer is scheduled and stops with the instance', () async {
-    final Firestore firestore = await open('timer');
+    final FirebaseFirestore firestore = await open('timer');
     final TimerTask? task = firestore.scheduler.getTask(
       TaskId.clientMetadataRefresh,
     );
@@ -94,7 +94,7 @@ void main() {
   test('a memory cache is always primary', () async {
     final FirebaseApp app = newApp('memory-${const Uuid().v4()}');
     addTearDown(app.delete);
-    final Firestore firestore = Firestore.instanceFor(
+    final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(
       app: app,
       settings: offlineSettings.copyWith(
         cacheSettings: const MemoryCacheSettings(),
@@ -108,10 +108,10 @@ void main() {
 
   test('two instances on one cache: the newer one is primary, both work, '
       'the lease comes back when it terminates', () async {
-    final Firestore first = await open('first');
+    final FirebaseFirestore first = await open('first');
     expect(first.client.isPrimaryClient, isTrue);
 
-    final Firestore second = await open('second');
+    final FirebaseFirestore second = await open('second');
     expect(second.client.isPrimaryClient, isTrue);
     await refresh(first);
     expect(first.client.isPrimaryClient, isFalse);
@@ -134,10 +134,10 @@ void main() {
 
   test('only the primary uses the network, collects garbage and backfills '
       'indexes', () async {
-    final Firestore first = await open('first');
+    final FirebaseFirestore first = await open('first');
     expect(actsAsPrimary(first), isTrue);
 
-    final Firestore second = await open('second');
+    final FirebaseFirestore second = await open('second');
     await refresh(first);
     expect(first.client.isPrimaryClient, isFalse);
     expect(actsAsPrimary(first), isFalse);
@@ -171,13 +171,13 @@ void main() {
   test(
     'becoming primary does not enable a network that the user disabled',
     () async {
-      final Firestore first = await open('first');
+      final FirebaseFirestore first = await open('first');
       await first.disableNetwork();
       // Without another client, a client without network stays primary.
       await refresh(first);
       expect(first.client.isPrimaryClient, isTrue);
 
-      final Firestore second = await open('second');
+      final FirebaseFirestore second = await open('second');
       await refresh(first);
       expect(first.client.isPrimaryClient, isFalse);
       await second.terminate();
@@ -194,8 +194,8 @@ void main() {
   test(
     'disabling the network gives the lease to an instance with network',
     () async {
-      final Firestore first = await open('first');
-      final Firestore second = await open('second');
+      final FirebaseFirestore first = await open('first');
+      final FirebaseFirestore second = await open('second');
       await refresh(first);
       expect(first.client.isPrimaryClient, isFalse);
 
@@ -213,8 +213,8 @@ void main() {
 
   test('clearPersistence with another instance alive empties the cache in '
       'place, and the other instance terminates', () async {
-    final Firestore first = await open('first');
-    final Firestore other = await open('other');
+    final FirebaseFirestore first = await open('first');
+    final FirebaseFirestore other = await open('other');
     first.doc('col/a').set(<String, Object?>{'v': 1}).ignore();
     await first.doc('col/a').get(Source.cache);
 
@@ -235,7 +235,7 @@ void main() {
     );
 
     // A new instance starts on the emptied cache.
-    final Firestore again = await open('again');
+    final FirebaseFirestore again = await open('again');
     expect(again.client.isPrimaryClient, isTrue);
     await expectLater(
       again.doc('col/a').get(Source.cache),
@@ -244,15 +244,15 @@ void main() {
   });
 
   test('clearPersistence without another instance deletes the file', () async {
-    final Firestore first = await open('first');
+    final FirebaseFirestore first = await open('first');
     await first.terminate();
     await first.clearPersistence();
     expect(DatabaseMock.pathForName(dbName).existsSync(), isFalse);
   });
 
   test('the client id is unique per instance', () async {
-    final Firestore first = await open('first');
-    final Firestore second = await open('second');
+    final FirebaseFirestore first = await open('first');
+    final FirebaseFirestore second = await open('second');
     final List<Map<String, dynamic>> rows =
         await (first.client.persistence as SQLitePersistence).query(
           'SELECT client_id FROM clients',

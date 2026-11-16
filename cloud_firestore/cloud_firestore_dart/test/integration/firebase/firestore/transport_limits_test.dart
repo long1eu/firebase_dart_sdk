@@ -53,7 +53,7 @@ void main() {
   IntegrationTestUtil.currentDatabasePath = 'integration/transport_limits';
   const Timeout timeout = Timeout(Duration(minutes: 3));
 
-  late Firestore firestore;
+  late FirebaseFirestore firestore;
   late CollectionReference<Map<String, Object?>> collection;
   late Map<String, String> payloads;
 
@@ -122,7 +122,7 @@ void main() {
 
   test('a listener gets many documents near the size limit', () async {
     // A new instance, so that the documents come from the watch stream and not from the cache of the writes.
-    final Firestore reader = await IntegrationTestUtil.testFirestore();
+    final FirebaseFirestore reader = await IntegrationTestUtil.testFirestore();
     final CollectionReference<Map<String, Object?>> readerCollection = reader
         .collection(collection.path);
     final QuerySnapshot<Map<String, Object?>> snapshot = await readerCollection
@@ -135,7 +135,7 @@ void main() {
   }, timeout: timeout);
 
   test('a transaction reads many documents near the size limit', () async {
-    final Firestore reader = await IntegrationTestUtil.testFirestore();
+    final FirebaseFirestore reader = await IntegrationTestUtil.testFirestore();
     final List<DocumentSnapshot<Map<String, Object?>>> docs = await reader
         .runTransaction(
           (Transaction transaction) =>
@@ -150,7 +150,7 @@ void main() {
   for (final int window in <int>[65535, 1024 * 1024]) {
     test('a query with a flow-control window of $window bytes', () async {
       // The gRPC transport only; the web transport ignores the setting.
-      final Firestore reader = await IntegrationTestUtil.testFirestore(
+      final FirebaseFirestore reader = await IntegrationTestUtil.testFirestore(
         IntegrationTestUtil.newTestSettings().copyWith(
           grpcFlowControlWindow: window,
         ),
@@ -163,7 +163,7 @@ void main() {
   }
 
   test('a lookup of one document near the size limit', () async {
-    final Firestore reader = await IntegrationTestUtil.testFirestore();
+    final FirebaseFirestore reader = await IntegrationTestUtil.testFirestore();
     final DocumentSnapshot<Map<String, Object?>> doc = await reader
         .collection(collection.path)
         .doc('doc03')

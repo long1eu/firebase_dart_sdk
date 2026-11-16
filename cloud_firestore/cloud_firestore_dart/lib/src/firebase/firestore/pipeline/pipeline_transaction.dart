@@ -68,7 +68,7 @@ extension TransactionPipelines on Transaction {
     pipeline.checkExecutable();
     for (final Stage stage in pipeline.stages) {
       if (_writeStages.contains(stage.name)) {
-        throw FirestoreError(
+        throw FirestoreException(
           'A pipeline with a ${stage.name} stage cannot run in a transaction: '
           'read-only transactions cannot write.',
           FirestoreErrorCode.invalidArgument,

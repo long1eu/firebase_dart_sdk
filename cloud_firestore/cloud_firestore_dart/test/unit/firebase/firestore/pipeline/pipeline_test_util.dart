@@ -24,12 +24,12 @@ import 'package:fixnum/fixnum.dart';
 final DatabaseId testDatabaseId =
     DatabaseId.forDatabase('new-project', '(default)');
 
-/// A [Firestore] without a client, for [databaseId] (by default [testDatabaseId]).
+/// A [FirebaseFirestore] without a client, for [databaseId] (by default [testDatabaseId]).
 // ignore: non_constant_identifier_names
-Firestore FakeFirestore([DatabaseId? databaseId]) =>
+FirebaseFirestore FakeFirestore([DatabaseId? databaseId]) =>
     FirestoreInternal.detached(databaseId ?? testDatabaseId);
 
-final Firestore fakeFirestore = FakeFirestore();
+final FirebaseFirestore fakeFirestore = FakeFirestore();
 
 PipelineSource source() => PipelineSource(fakeFirestore);
 

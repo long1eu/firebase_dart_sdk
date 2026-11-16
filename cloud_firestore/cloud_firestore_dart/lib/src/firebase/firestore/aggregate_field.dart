@@ -79,7 +79,7 @@ abstract class AggregateField {
   /// final int? total = result.getInt(AggregateField.sum('total'));
   /// ```
   static SumAggregateField sum(String field) =>
-      SumAggregateField._(FieldPath.fromDotSeparatedPath(field));
+      SumAggregateField._(FieldPath.fromString(field));
 
   /// Same as [sum] but takes a [FieldPath].
   static SumAggregateField sumField(FieldPath fieldPath) =>
@@ -100,7 +100,7 @@ abstract class AggregateField {
   /// final double? average = result.getDouble(AggregateField.average('total'));
   /// ```
   static AverageAggregateField average(String field) =>
-      AverageAggregateField._(FieldPath.fromDotSeparatedPath(field));
+      AverageAggregateField._(FieldPath.fromString(field));
 
   /// Same as [average] but takes a [FieldPath].
   static AverageAggregateField averageField(FieldPath fieldPath) =>

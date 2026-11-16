@@ -15,14 +15,14 @@ Future<void> main() async {
   // Log level: `warn` (the default) prints warnings and errors, `debug`
   // prints everything the SDK does, `silent` nothing. It applies to all
   // instances.
-  Firestore.setLogLevel(LogLevel.silent);
+  FirebaseFirestore.setLogLevel(LogLevel.silent);
 
   final Directory directory = Directory.systemTemp.createTempSync(
     'firestore_example_',
   );
   final FirebaseApp app = exampleApp();
-  Firestore open() {
-    return Firestore.instanceFor(
+  FirebaseFirestore open() {
+    return FirebaseFirestore.instanceFor(
       app: app,
       openDatabase: sqliteOpener(directory),
       settings: emulatorSettings(cacheSettings: PersistentCacheSettings()),
@@ -31,7 +31,7 @@ Future<void> main() async {
 
   bool hasDatabaseFile() => directory.listSync().isNotEmpty;
 
-  Firestore firestore = open();
+  FirebaseFirestore firestore = open();
   final String path = '${scratch('settings')}/theme';
 
   // waitForPendingWrites completes when the backend has acknowledged every
@@ -58,7 +58,7 @@ Future<void> main() async {
   await firestore.terminate();
   try {
     await firestore.doc(path).get();
-  } on FirestoreError catch (e) {
+  } on FirestoreException catch (e) {
     print('after terminate: ${e.code} (${e.message})');
   }
 
@@ -72,7 +72,7 @@ Future<void> main() async {
   firestore = open();
   try {
     await firestore.doc(path).get(Source.cache);
-  } on FirestoreError catch (e) {
+  } on FirestoreException catch (e) {
     print('cache after clear: ${e.code}');
   }
   print('server: ${(await firestore.doc(path).get(Source.server)).data}');

@@ -51,9 +51,9 @@ import 'util/to_string_helper.dart';
 ///       const Stream<InternalTokenResult>.empty();
 /// }
 /// ```
-abstract class InternalTokenProvider {
+abstract class AuthTokenProvider {
   /// Constructor for subclasses.
-  InternalTokenProvider();
+  AuthTokenProvider();
 
   /// Returns a valid token.
   ///
@@ -68,7 +68,7 @@ abstract class InternalTokenProvider {
 
   /// Emits after a sign-in, a sign-out (an empty token) and a refresh of the token. A provider
   /// without users can return an empty stream.
-  Stream<InternalTokenResult> get onTokenChanged;
+  Stream<AuthTokenChange> get onTokenChanged;
 }
 
 /// An event of `InternalTokenProvider.onTokenChanged`: the new token, empty after a sign-out.
@@ -80,9 +80,9 @@ abstract class InternalTokenProvider {
 ///
 /// const InternalTokenResult signedOut = InternalTokenResult('');
 /// ```
-class InternalTokenResult {
+class AuthTokenChange {
   /// Creates a result holding [token].
-  const InternalTokenResult(this.token);
+  const AuthTokenChange(this.token);
 
   /// The raw token.
   final String token;
@@ -90,7 +90,7 @@ class InternalTokenResult {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is InternalTokenResult &&
+      other is AuthTokenChange &&
           runtimeType == other.runtimeType &&
           token == other.token;
 

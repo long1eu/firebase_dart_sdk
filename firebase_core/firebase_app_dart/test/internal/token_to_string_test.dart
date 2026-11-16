@@ -34,7 +34,7 @@ void main() {
   });
 
   test('InternalTokenResult.toString() does not contain the token', () {
-    const InternalTokenResult result = InternalTokenResult('secret-token');
+    const AuthTokenChange result = AuthTokenChange('secret-token');
     expect(result.toString(), isNot(contains('secret-token')));
     expect(result.toString(), contains('InternalTokenResult'));
   });

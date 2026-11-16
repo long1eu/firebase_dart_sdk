@@ -40,7 +40,7 @@ class Product {
 }
 
 Future<void> main() async {
-  final Firestore firestore = connect();
+  final FirebaseFirestore firestore = connect();
   final CollectionReference<Product> products = firestore
       .collection(scratch('products'))
       .withConverter<Product>(

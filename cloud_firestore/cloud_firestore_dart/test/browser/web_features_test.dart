@@ -71,7 +71,7 @@ List<int> createBundle(String collection) {
 void main() {
   test('a listener with metadata changes sees the write being acknowledged',
       () async {
-    final Firestore firestore = await newClient();
+    final FirebaseFirestore firestore = await newClient();
     final DocumentReference<Json> doc =
         firestore.collection(newCollectionName()).doc('a');
     final EventLog<DocumentSnapshot<Json>> log =
@@ -94,7 +94,7 @@ void main() {
   });
 
   test('a write batch is applied as a whole', () async {
-    final Firestore firestore = await newClient();
+    final FirebaseFirestore firestore = await newClient();
     final CollectionReference<Json> collection =
         firestore.collection(newCollectionName());
     await collection.doc('update').set(<String, Object?>{'n': 1});
@@ -106,7 +106,7 @@ void main() {
       ..delete(collection.doc('delete'));
     await batch.commit();
 
-    final Firestore other = await newClient();
+    final FirebaseFirestore other = await newClient();
     final QuerySnapshot<Json> snapshot =
         await other.collection(collection.id).get(Source.server);
     expect(<String, Object?>{
@@ -118,13 +118,13 @@ void main() {
   });
 
   test('loads a bundle with a named query into the cache', () async {
-    final Firestore firestore = await newClient();
+    final FirebaseFirestore firestore = await newClient();
     final String collection = newCollectionName();
 
     final LoadBundleTask task = firestore.loadBundle(createBundle(collection));
-    final List<LoadBundleTaskProgress> progress = <LoadBundleTaskProgress>[];
+    final List<LoadBundleTaskSnapshot> progress = <LoadBundleTaskSnapshot>[];
     final Future<void> streamed = task.stream.forEach(progress.add);
-    final LoadBundleTaskProgress result = await task.future;
+    final LoadBundleTaskSnapshot result = await task.future;
     await streamed;
     expect(result.taskState, LoadBundleTaskState.success);
     expect(result.documentsLoaded, 2);
@@ -140,7 +140,7 @@ void main() {
           <String, Object?>{'bar': 2, 'k': '\u{1F60A}'},
         ]);
 
-    final Query<Json>? named = await firestore.getNamedQuery('limit');
+    final Query<Json>? named = await firestore.namedQuery('limit');
     expect(named, isNotNull);
     expect(
         (await named!.get(Source.cache))
@@ -150,12 +150,12 @@ void main() {
         <Json>[
           <String, Object?>{'bar': 2, 'k': '\u{1F60A}'}
         ]);
-    expect(await firestore.getNamedQuery('does-not-exist'), isNull);
+    expect(await firestore.namedQuery('does-not-exist'), isNull);
   });
 
   test('a snapshot goes through JSON and is resumed in another client',
       () async {
-    final Firestore firestore = await newClient();
+    final FirebaseFirestore firestore = await newClient();
     final DocumentReference<Json> doc =
         firestore.collection(newCollectionName()).doc('a');
     await doc.set(<String, Object?>{'a': 1});
@@ -163,7 +163,7 @@ void main() {
     final Json json =
         jsonDecode(jsonEncode((await doc.get(Source.server)).toJson())) as Json;
 
-    final Firestore other = await newClient();
+    final FirebaseFirestore other = await newClient();
     expect(DocumentSnapshot<Json>.fromJson(other, json).data,
         <String, Object?>{'a': 1});
 
@@ -182,7 +182,7 @@ void main() {
   });
 
   test('finds the nearest vectors', () async {
-    final Firestore firestore = await newClient();
+    final FirebaseFirestore firestore = await newClient();
     final CollectionReference<Json> collection =
         firestore.collection(newCollectionName());
     await collection.doc('a').set(<String, Object?>{
@@ -208,7 +208,7 @@ void main() {
   });
 
   test('filters with the named arguments of where', () async {
-    final Firestore firestore = await newClient();
+    final FirebaseFirestore firestore = await newClient();
     final CollectionReference<Json> collection =
         firestore.collection(newCollectionName());
     final Map<String, Json> docs = <String, Json>{
@@ -264,7 +264,7 @@ void main() {
   });
 
   test('reads and writes through a converter', () async {
-    final Firestore firestore = await newClient();
+    final FirebaseFirestore firestore = await newClient();
     final CollectionReference<City> cities = firestore
         .collection(newCollectionName())
         .withConverter<City>(cityConverter);
@@ -288,7 +288,7 @@ void main() {
 
   test('waitForPendingWrites completes once the writes are acknowledged',
       () async {
-    final Firestore firestore = await newClient();
+    final FirebaseFirestore firestore = await newClient();
     final DocumentReference<Json> doc =
         firestore.collection(newCollectionName()).doc('a');
 
@@ -307,14 +307,14 @@ void main() {
     await waiting.timeout(const Duration(seconds: 20));
     expect(waited, isTrue);
 
-    final Firestore other = await newClient();
+    final FirebaseFirestore other = await newClient();
     expect((await other.doc(doc.path).get(Source.server)).data,
         <String, Object?>{'a': 1});
   });
 
   test('terminate ends the client; clearPersistence has nothing to delete',
       () async {
-    final Firestore firestore = await newClient();
+    final FirebaseFirestore firestore = await newClient();
     final DocumentReference<Json> doc =
         firestore.collection(newCollectionName()).doc('a');
     await doc.set(<String, Object?>{'a': 1});
@@ -322,7 +322,7 @@ void main() {
     // While the client runs clearing is refused.
     await expectLater(
         firestore.clearPersistence(),
-        throwsA(isA<FirestoreError>().having((FirestoreError e) => e.code,
+        throwsA(isA<FirestoreException>().having((FirestoreException e) => e.code,
             'code', FirestoreErrorCode.failedPrecondition)));
 
     await firestore.terminate();
@@ -333,7 +333,7 @@ void main() {
     await expectLater(doc.get(), throwsA(anything));
 
     // The write reached the backend before the client ended.
-    final Firestore other = await newClient();
+    final FirebaseFirestore other = await newClient();
     expect((await other.doc(doc.path).get(Source.server)).data,
         <String, Object?>{'a': 1});
   });

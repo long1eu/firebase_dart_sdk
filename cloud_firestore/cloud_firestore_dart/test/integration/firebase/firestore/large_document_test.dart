@@ -64,7 +64,7 @@ void main() {
   late String seedCollection;
   late String unicodePayload;
   late String asciiPayload;
-  late Firestore db;
+  late FirebaseFirestore db;
 
   setUpAll(() async {
     if (emulatorLimit != null) {
@@ -76,7 +76,7 @@ void main() {
     asciiPayload = generateAsciiString(targetBytes);
 
     final CollectionReference col = db.collection(seedCollection);
-    await col.document('doc_15_9MB_unicode').set(<String, Object?>{
+    await col.doc('doc_15_9MB_unicode').set(<String, Object?>{
       'chunk': unicodePayload,
       'tag': 'unicode_large_doc',
     });
@@ -84,8 +84,8 @@ void main() {
       'chunk': asciiPayload,
       'tag': 'ascii_large_doc',
     };
-    await col.document('doc_a').set(dataAscii);
-    await col.document('doc_b').set(dataAscii);
+    await col.doc('doc_a').set(dataAscii);
+    await col.doc('doc_b').set(dataAscii);
   });
 
   tearDownAll(() async {
@@ -95,7 +95,7 @@ void main() {
     final CollectionReference col = db.collection(seedCollection);
     for (final String id in <String>['doc_15_9MB_unicode', 'doc_a', 'doc_b']) {
       try {
-        await col.document(id).delete();
+        await col.doc(id).delete();
       } catch (_) {
         // Suppress cleanup exceptions.
       }
@@ -105,7 +105,7 @@ void main() {
 
   test('testReadAndCacheLargeUnicodeDocument', () async {
     final DocumentReference docRef =
-        db.collection(seedCollection).document('doc_15_9MB_unicode');
+        db.collection(seedCollection).doc('doc_15_9MB_unicode');
 
     final DocumentSnapshot serverSnapshot = await docRef.get(Source.server);
     expect(serverSnapshot.exists, isTrue);
@@ -119,8 +119,8 @@ void main() {
 
   test('testCacheIntegrityWithMultipleLargeDocuments', () async {
     final CollectionReference colRef = db.collection(seedCollection);
-    final DocumentReference docA = colRef.document('doc_a');
-    final DocumentReference docB = colRef.document('doc_b');
+    final DocumentReference docA = colRef.doc('doc_a');
+    final DocumentReference docB = colRef.doc('doc_b');
 
     await docA.get(Source.server);
     await docB.get(Source.server);
@@ -138,7 +138,7 @@ void main() {
 
   test('testWatchStreamInitializationAndDiff', () async {
     final DocumentReference docRef =
-        db.collection(seedCollection).document('doc_15_9MB_unicode');
+        db.collection(seedCollection).doc('doc_15_9MB_unicode');
     final String expectedValue =
         'updated_val_${DateTime.now().millisecondsSinceEpoch}';
 
@@ -168,7 +168,7 @@ void main() {
 
   test('testOversizedPayloadRejection', () async {
     final DocumentReference docRef =
-        db.collection(seedCollection).document('temp_oversized_doc');
+        db.collection(seedCollection).doc('temp_oversized_doc');
     // 16.1 MB payload.
     final int oversizedPayloadBytes = 16 * 1024 * 1024 + 102400;
 
@@ -176,12 +176,12 @@ void main() {
         docRef.set(<String, Object?>{
           'largeField': generateAsciiString(oversizedPayloadBytes)
         }),
-        throwsA(isA<FirestoreError>().having((FirestoreError e) => e.code,
+        throwsA(isA<FirestoreException>().having((FirestoreException e) => e.code,
             'code', FirestoreErrorCode.invalidArgument)));
   }, skip: emulatorLimit, timeout: largeTimeout);
 
   test('testWriteValidLargeDocument', () async {
-    final DocumentReference docRef = db.collection(seedCollection).document(
+    final DocumentReference docRef = db.collection(seedCollection).doc(
         'temp_valid_large_doc_${DateTime.now().millisecondsSinceEpoch}');
     try {
       final String largePayload = generateAsciiString(targetBytes);
@@ -201,7 +201,7 @@ void main() {
 
   test('testTransactionReadModifyWrite', () async {
     final DocumentReference docRef =
-        db.collection(seedCollection).document('doc_15_9MB_unicode');
+        db.collection(seedCollection).doc('doc_15_9MB_unicode');
     final int timestamp = DateTime.now().millisecondsSinceEpoch;
 
     await db.runTransaction<void>((transaction) async {
@@ -220,19 +220,19 @@ void main() {
   test('testQueryLargeDocuments', () async {
     final CollectionReference colRef = db.collection(seedCollection);
     final Query query = colRef
-        .whereInField(FieldPath.documentId(), <Object?>['doc_a', 'doc_b']);
+        .whereInField(FieldPath.documentId, <Object?>['doc_a', 'doc_b']);
 
     final QuerySnapshot serverSnapshot = await query.get(Source.server);
-    expect(serverSnapshot.documents.length, 2,
+    expect(serverSnapshot.docs.length, 2,
         reason: 'Query should return exactly 2 large documents from server');
 
     await db.disableNetwork();
     final QuerySnapshot cacheSnapshot = await query.get(Source.cache);
-    expect(cacheSnapshot.documents.length, 2,
+    expect(cacheSnapshot.docs.length, 2,
         reason: 'Query should return exactly 2 large documents from cache');
 
-    for (final DocumentSnapshot serverDoc in serverSnapshot.documents) {
-      final DocumentSnapshot cacheDoc = cacheSnapshot.documents
+    for (final DocumentSnapshot serverDoc in serverSnapshot.docs) {
+      final DocumentSnapshot cacheDoc = cacheSnapshot.docs
           .firstWhere((DocumentSnapshot d) => d.id == serverDoc.id);
       expect(cacheDoc.data, serverDoc.data,
           reason: 'Payload for ${serverDoc.id} in cache should match server');
@@ -242,20 +242,20 @@ void main() {
 
   test('testQueryLargeDocumentsForcesLocalScan', () async {
     final CollectionReference colRef = db.collection(seedCollection);
-    await colRef.document('doc_a').get(Source.server);
-    await colRef.document('doc_b').get(Source.server);
+    await colRef.doc('doc_a').get(Source.server);
+    await colRef.doc('doc_b').get(Source.server);
 
     await db.disableNetwork();
 
     final Query query = colRef
         .whereEqualTo('tag', 'ascii_large_doc')
-        .orderByField(FieldPath.documentId())
+        .orderByField(FieldPath.documentId)
         .limit(2);
     final QuerySnapshot cacheSnapshot = await query.get(Source.cache);
 
-    expect(cacheSnapshot.documents.length, 2,
+    expect(cacheSnapshot.docs.length, 2,
         reason: 'Query should find and return exactly 2 large documents');
-    final List<DocumentSnapshot> docs = cacheSnapshot.documents;
+    final List<DocumentSnapshot> docs = cacheSnapshot.docs;
     expect(docs[0].id, 'doc_a');
     expect(docs[1].id, 'doc_b');
     expect(docs[0].getString('chunk'), asciiPayload);

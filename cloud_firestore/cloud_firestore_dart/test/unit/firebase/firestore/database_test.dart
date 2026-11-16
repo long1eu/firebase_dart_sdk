@@ -155,13 +155,13 @@ ImmutableSortedSet<DocumentKey> keys([List<String> paths = const <String>[]]) {
 }
 
 Matcher throwsInvalidArgument(String message) => throwsA(
-  isA<FirestoreError>()
+  isA<FirestoreException>()
       .having(
-        (FirestoreError e) => e.code,
+        (FirestoreException e) => e.code,
         'code',
         FirestoreErrorCode.invalidArgument,
       )
-      .having((FirestoreError e) => e.message, 'message', message),
+      .having((FirestoreException e) => e.message, 'message', message),
 );
 
 void main() {
@@ -170,7 +170,7 @@ void main() {
       final FirebaseApp app = FirebaseApp.withOptions(
         const FirebaseOptions(
           apiKey: 'key',
-          applicationId: 'appId',
+          appId: 'appId',
           projectId: 'projectId',
         ),
         dependencies: null,
@@ -178,9 +178,9 @@ void main() {
       );
       addTearDown(app.delete);
       // Points at a port nothing listens on, nothing reaches a backend.
-      final Firestore db = Firestore.instanceFor(
+      final FirebaseFirestore db = FirebaseFirestore.instanceFor(
         app: app,
-        settings: FirestoreSettings().withEmulator('127.0.0.1', 1),
+        settings: Settings().withEmulator('127.0.0.1', 1),
       );
       addTearDown(db.terminate);
 
@@ -480,8 +480,8 @@ void main() {
           /*hasPendingWrites=*/ true,
         ).toJson(),
         throwsA(
-          isA<FirestoreError>().having(
-            (FirestoreError e) => e.message,
+          isA<FirestoreException>().having(
+            (FirestoreException e) => e.message,
             'message',
             'DocumentSnapshot.toJson() attempted to serialize a document with '
                 'pending writes. Await waitForPendingWrites() before invoking '
@@ -501,7 +501,7 @@ void main() {
       ).toJson()..['bundle'] = 'NOT SUPPORTED';
       expect(
         () => DocumentSnapshot<Map<String, Object?>>.fromJson(firestore, json),
-        throwsA(isA<FirestoreError>()),
+        throwsA(isA<FirestoreException>()),
       );
     });
 
@@ -790,8 +790,8 @@ void main() {
           false,
         ).toJson(),
         throwsA(
-          isA<FirestoreError>().having(
-            (FirestoreError e) => e.message,
+          isA<FirestoreException>().having(
+            (FirestoreException e) => e.message,
             'message',
             'QuerySnapshot.toJson() attempted to serialize a document with '
                 'pending writes. Await waitForPendingWrites() before invoking '
@@ -1064,7 +1064,7 @@ void main() {
       ).toJson()..['bundle'] = 'NOT SUPPORTED';
       expect(
         () => QuerySnapshot<Map<String, Object?>>.fromJson(firestore, json),
-        throwsA(isA<FirestoreError>()),
+        throwsA(isA<FirestoreException>()),
       );
     });
   });
@@ -1163,9 +1163,9 @@ void main() {
   group('Settings', () {
     test('cannot use mutually exclusive settings together', () {
       expect(
-        () => FirestoreSettings(
-          experimentalForceLongPolling: true,
-          experimentalAutoDetectLongPolling: true,
+        () => Settings(
+          webExperimentalForceLongPolling: true,
+          webExperimentalAutoDetectLongPolling: true,
         ),
         throwsA(
           isA<ArgumentError>().having(
@@ -1179,21 +1179,21 @@ void main() {
     });
 
     void expectLongPolling(
-      FirestoreSettings settings, {
+      Settings settings, {
       required bool autoDetect,
       required bool force,
     }) {
-      expect(settings.experimentalAutoDetectLongPolling, autoDetect);
-      expect(settings.experimentalForceLongPolling, force);
+      expect(settings.webExperimentalAutoDetectLongPolling, autoDetect);
+      expect(settings.webExperimentalForceLongPolling, force);
     }
 
     test('long polling should be in auto-detect mode by default', () {
-      expectLongPolling(FirestoreSettings(), autoDetect: true, force: false);
+      expectLongPolling(Settings(), autoDetect: true, force: false);
     });
 
     test('long polling should be in force mode if force=true', () {
       expectLongPolling(
-        FirestoreSettings(experimentalForceLongPolling: true),
+        Settings(webExperimentalForceLongPolling: true),
         autoDetect: false,
         force: true,
       );
@@ -1201,7 +1201,7 @@ void main() {
 
     test('long polling should be in auto-detect mode if autoDetect=true', () {
       expectLongPolling(
-        FirestoreSettings(experimentalAutoDetectLongPolling: true),
+        Settings(webExperimentalAutoDetectLongPolling: true),
         autoDetect: true,
         force: false,
       );
@@ -1209,7 +1209,7 @@ void main() {
 
     test('long polling should be in auto-detect mode if force=false', () {
       expectLongPolling(
-        FirestoreSettings(experimentalForceLongPolling: false),
+        Settings(webExperimentalForceLongPolling: false),
         autoDetect: true,
         force: false,
       );
@@ -1217,7 +1217,7 @@ void main() {
 
     test('long polling should be disabled if autoDetect=false', () {
       expectLongPolling(
-        FirestoreSettings(experimentalAutoDetectLongPolling: false),
+        Settings(webExperimentalAutoDetectLongPolling: false),
         autoDetect: false,
         force: false,
       );
@@ -1226,9 +1226,9 @@ void main() {
     test('long polling should be in auto-detect mode if autoDetect=true and '
         'force=false', () {
       expectLongPolling(
-        FirestoreSettings(
-          experimentalAutoDetectLongPolling: true,
-          experimentalForceLongPolling: false,
+        Settings(
+          webExperimentalAutoDetectLongPolling: true,
+          webExperimentalForceLongPolling: false,
         ),
         autoDetect: true,
         force: false,
@@ -1238,9 +1238,9 @@ void main() {
     test('long polling should be in force mode if autoDetect=false and '
         'force=true', () {
       expectLongPolling(
-        FirestoreSettings(
-          experimentalAutoDetectLongPolling: false,
-          experimentalForceLongPolling: true,
+        Settings(
+          webExperimentalAutoDetectLongPolling: false,
+          webExperimentalForceLongPolling: true,
         ),
         autoDetect: false,
         force: true,
@@ -1251,9 +1251,9 @@ void main() {
       'long polling should be disabled if autoDetect=false and force=false',
       () {
         expectLongPolling(
-          FirestoreSettings(
-            experimentalAutoDetectLongPolling: false,
-            experimentalForceLongPolling: false,
+          Settings(
+            webExperimentalAutoDetectLongPolling: false,
+            webExperimentalForceLongPolling: false,
           ),
           autoDetect: false,
           force: false,
@@ -1262,17 +1262,14 @@ void main() {
     );
 
     test('gets settings from useEmulator', () {
-      final FirestoreSettings settings = FirestoreSettings().withEmulator(
-        '127.0.0.1',
-        9000,
-      );
+      final Settings settings = Settings().withEmulator('127.0.0.1', 9000);
 
       expect('${settings.host}:${settings.port}', '127.0.0.1:9000');
       expect(settings.sslEnabled, isFalse);
     });
 
     test('gets privateSettings from useEmulator', () {
-      final FirestoreSettings settings = FirestoreSettings().withEmulator(
+      final Settings settings = Settings().withEmulator(
         '127.0.0.1',
         9000,
         mockUserToken: 'test',
@@ -1284,7 +1281,7 @@ void main() {
     });
 
     test('prefers host from useEmulator to host from settings', () {
-      final FirestoreSettings settings = FirestoreSettings(
+      final Settings settings = Settings(
         host: 'other.host',
       ).withEmulator('127.0.0.1', 9000);
 

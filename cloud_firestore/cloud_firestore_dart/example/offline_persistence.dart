@@ -21,8 +21,8 @@ Future<void> main() async {
   );
   final FirebaseApp app = exampleApp();
 
-  Firestore open() {
-    return Firestore.instanceFor(
+  FirebaseFirestore open() {
+    return FirebaseFirestore.instanceFor(
       app: app,
       // Without `openDatabase` the cache is in memory, whatever the settings.
       openDatabase: sqliteOpener(directory),
@@ -36,7 +36,7 @@ Future<void> main() async {
 
   // First run: write a document; it is stored in the cache and sent to the
   // backend.
-  Firestore firestore = open();
+  FirebaseFirestore firestore = open();
   await firestore.doc(path).set(<String, Object?>{'text': 'written online'});
   await firestore.terminate();
   print(

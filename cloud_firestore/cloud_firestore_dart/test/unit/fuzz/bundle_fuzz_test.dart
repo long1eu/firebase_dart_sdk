@@ -457,7 +457,7 @@ void main() {
         }
         try {
           await task.future;
-        } on FirestoreError catch (error) {
+        } on FirestoreException catch (error) {
           expect(error.code, FirestoreErrorCode.invalidArgument);
           final Object? cause = error.cause;
           if (cause != null &&

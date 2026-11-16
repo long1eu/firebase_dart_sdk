@@ -49,12 +49,12 @@ class QuerySnapshot<T extends dynamic>
   /// Builds a [QuerySnapshot] from the JSON object written by [toJson], for the [firestore] instance.
   ///
   /// The snapshot is not from cache and has no pending writes; its [query] is the one of the original snapshot. Pass
-  /// the [converter] of the original query to get typed data back. Throws a [FirestoreError] if [json] is not a valid
+  /// the [converter] of the original query to get typed data back. Throws a [FirestoreException] if [json] is not a valid
   /// query snapshot JSON object, for example one of a different project or database.
   ///
   /// This is the JS SDK `querySnapshotFromJSON()`.
   factory QuerySnapshot.fromJson(
-    Firestore firestore,
+    FirebaseFirestore firestore,
     Map<String, Object?> json, {
     FirestoreDataConverter<T>? converter,
   }) {
@@ -70,7 +70,7 @@ class QuerySnapshot<T extends dynamic>
   final SnapshotMetadata metadata;
 
   final ViewSnapshot _snapshot;
-  final Firestore _firestore;
+  final FirebaseFirestore _firestore;
 
   List<DocumentChange<T>>? _cachedChanges;
   MetadataChanges? _cachedChangesMetadataState;
@@ -88,7 +88,7 @@ class QuerySnapshot<T extends dynamic>
   /// the first snapshot every document is a [DocumentChangeType.added] change. Changes to the metadata of a document
   /// only are not included; use [getDocumentChanges] for those.
   ///
-  /// Same as [documentChanges]; this is the name used by the current official
+  /// Same as [docChanges]; this is the name used by the current official
   /// Firestore API.
   ///
   /// ```dart
@@ -155,7 +155,7 @@ class QuerySnapshot<T extends dynamic>
   }
 
   /// Returns the documents in this [QuerySnapshot] as a List in order of the
-  /// query. Same as [documents] but typed as [QueryDocumentSnapshot]; this is
+  /// query. Same as [docs] but typed as [QueryDocumentSnapshot]; this is
   /// the name used by the current official Firestore API.
   ///
   /// The list cannot be modified, and each access builds a new list.
@@ -193,7 +193,7 @@ class QuerySnapshot<T extends dynamic>
   /// `Firestore.querySnapshotsFromJson` listens from.
   ///
   /// The `bundle` field holds the query and its documents as a Firestore bundle, with the query under the name in
-  /// `bundleName`. Throws a [FirestoreError] (failed-precondition) if the snapshot has pending writes: await
+  /// `bundleName`. Throws a [FirestoreException] (failed-precondition) if the snapshot has pending writes: await
   /// `waitForPendingWrites()` first.
   ///
   /// This is the JS SDK `QuerySnapshot.toJSON()`; the JSON is interchangeable with the one of the JS SDK (Node).
@@ -242,6 +242,6 @@ extension QuerySnapshotInternal<T> on QuerySnapshot<T> {
   static QuerySnapshot<T> create<T extends dynamic>(
     Query<T> query,
     ViewSnapshot snapshot,
-    Firestore firestore,
+    FirebaseFirestore firestore,
   ) => QuerySnapshot<T>._(query, snapshot, firestore);
 }

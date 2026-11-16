@@ -25,25 +25,25 @@ void main() {
   checkTestsLeaveNothingBehind();
 
   late FirebaseApp app;
-  late Firestore firestore;
-  late lite.Firestore liteFirestore;
+  late FirebaseFirestore firestore;
+  late lite.FirebaseFirestore liteFirestore;
   int apps = 0;
 
   setUp(() async {
     app = FirebaseApp.withOptions(
       const FirebaseOptions(
         apiKey: 'key',
-        applicationId: 'appId',
+        appId: 'appId',
         projectId: 'projectId',
       ),
       dependencies: null,
       name: 'argumentValidation${apps++}',
     );
-    firestore = Firestore.instanceFor(
+    firestore = FirebaseFirestore.instanceFor(
       app: app,
-      settings: FirestoreSettings(cacheSettings: const MemoryCacheSettings()),
+      settings: Settings(cacheSettings: const MemoryCacheSettings()),
     );
-    liteFirestore = lite.Firestore.instanceFor(app: app);
+    liteFirestore = lite.FirebaseFirestore.instanceFor(app: app);
     addTearDown(() async {
       await firestore.terminate();
       await liteFirestore.terminate();
@@ -63,7 +63,7 @@ void main() {
       );
       expect(
         // ignore: deprecated_member_use_from_same_package
-        () => firestore.document(''),
+        () => firestore.doc(''),
         throwsArgumentErrorWith(emptyPath('Firestore.doc')),
       );
       expect(
@@ -234,33 +234,28 @@ void main() {
   group('settings and values', () {
     test('a cache size below the minimum is rejected', () {
       expect(
-        () => FirestoreSettings(cacheSizeBytes: 1000),
+        () => Settings(cacheSizeBytes: 1000),
         throwsArgumentErrorWith(
           'Cache size must be set to at least 1048576 bytes',
         ),
       );
       expect(
-        () => FirestoreSettings().copyWith(cacheSizeBytes: 1000),
+        () => Settings().copyWith(cacheSizeBytes: 1000),
         throwsArgumentError,
       );
       // No minimum without persistence, and "unlimited" is always accepted.
       expect(
-        FirestoreSettings(
+        Settings(
           persistenceEnabled: false,
           cacheSizeBytes: 1000,
         ).cacheSizeBytes,
         1000,
       );
       expect(
-        FirestoreSettings(
-          cacheSizeBytes: FirestoreSettings.cacheSizeUnlimited,
-        ).cacheSizeBytes,
-        FirestoreSettings.cacheSizeUnlimited,
+        Settings(cacheSizeBytes: Settings.cacheSizeUnlimited).cacheSizeBytes,
+        Settings.cacheSizeUnlimited,
       );
-      expect(
-        FirestoreSettings(cacheSizeBytes: 1024 * 1024).cacheSizeBytes,
-        1024 * 1024,
-      );
+      expect(Settings(cacheSizeBytes: 1024 * 1024).cacheSizeBytes, 1024 * 1024);
     });
 
     test('an app needs an application id', () {
@@ -429,7 +424,7 @@ class _OutOfRangeGeoPoint implements GeoPoint {
 // ignore: avoid_implementing_value_types
 class _OptionsWithoutApplicationId implements FirebaseOptions {
   @override
-  String get applicationId => '';
+  String get appId => '';
 
   @override
   String get apiKey => 'key';

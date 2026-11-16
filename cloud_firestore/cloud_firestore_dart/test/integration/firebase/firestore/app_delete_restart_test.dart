@@ -78,7 +78,7 @@ void main() {
   late Directory directory;
   late List<String> log;
   late String appName;
-  final List<Firestore> opened = <Firestore>[];
+  final List<FirebaseFirestore> opened = <FirebaseFirestore>[];
 
   setUp(() {
     directory = Directory.systemTemp.createTempSync('firestore_app_delete_');
@@ -87,7 +87,7 @@ void main() {
   });
 
   tearDown(() async {
-    for (final Firestore firestore in opened) {
+    for (final FirebaseFirestore firestore in opened) {
       await firestore.terminate();
     }
     opened.clear();
@@ -103,19 +103,19 @@ void main() {
     return FirebaseApp.withOptions(
       FirebaseOptions(
         apiKey: 'key',
-        applicationId: 'appId',
+        appId: 'appId',
         projectId: IntegrationTestUtil.provider.projectId,
       ),
       name: appName,
     );
   }
 
-  Future<Firestore> open(FirebaseApp app) async {
-    final FirestoreSettings base = IntegrationTestUtil.newTestSettings();
-    final Firestore firestore = Firestore.instanceFor(
+  Future<FirebaseFirestore> open(FirebaseApp app) async {
+    final Settings base = IntegrationTestUtil.newTestSettings();
+    final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(
       app: app,
       openDatabase: recording(sqliteOpener(directory), log),
-      settings: FirestoreSettings(cacheSettings: PersistentCacheSettings())
+      settings: Settings(cacheSettings: PersistentCacheSettings())
           .withEmulator(base.host, base.port),
     );
     opened.add(firestore);
@@ -130,14 +130,14 @@ void main() {
       ];
 
   bool isTerminated(Object? e) =>
-      e is FirestoreError &&
+      e is FirestoreException &&
       e.code == FirestoreErrorCode.failedPrecondition &&
       e.message == 'The client has already been terminated.';
 
   test('a new app with the same name reopens the cache of a deleted app',
       () async {
     final FirebaseApp app = newApp();
-    final Firestore first = await open(app);
+    final FirebaseFirestore first = await open(app);
     final String path = 'app-delete/$appName';
     await first.doc(path).set(<String, Object?>{'generation': 1});
     expect(databaseFiles(), hasLength(1));
@@ -146,7 +146,7 @@ void main() {
     // The new app is created right away, without waiting for anything.
     app.delete();
     final FirebaseApp sameName = newApp();
-    final Firestore second = await open(sameName);
+    final FirebaseFirestore second = await open(sameName);
 
     expect(identical(first, second), isFalse);
     // The first connection was closed before the second one was opened, on
@@ -167,7 +167,7 @@ void main() {
 
   test('deleting the app with a listener and a pending write', () async {
     final FirebaseApp app = newApp();
-    final Firestore first = await open(app);
+    final FirebaseFirestore first = await open(app);
     final String path = 'app-delete/$appName-pending';
     await first.doc(path).set(<String, Object?>{'value': 'acknowledged'});
 
@@ -183,7 +183,7 @@ void main() {
     await first.doc(path).get(Source.cache);
 
     app.delete();
-    final Firestore second = await open(newApp());
+    final FirebaseFirestore second = await open(newApp());
     expect(log, <String>['open', 'close', 'open']);
 
     // The pending write was persisted and is sent by the new instance.
@@ -200,7 +200,7 @@ void main() {
   test('the cycle can be repeated and the cache cleared at the end', () async {
     final String path = 'app-delete/$appName-cycle';
     FirebaseApp app = newApp();
-    Firestore firestore = await open(app);
+    FirebaseFirestore firestore = await open(app);
     for (int generation = 1; generation <= 3; generation++) {
       await firestore
           .doc(path)

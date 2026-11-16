@@ -129,7 +129,7 @@ void main() {
         .whereEqualTo('nan', double.nan)
         .get();
     expect(results.length, 1);
-    final DocumentSnapshot result = results.documents.first;
+    final DocumentSnapshot result = results.docs.first;
     // Can't use assertEquals() since NaN != NaN.
     expect(result.get('null'), isNull);
     expect(result.get('nan'), isNaN);
@@ -157,8 +157,8 @@ void main() {
 
   test('testWillNotGetMetadataOnlyUpdates', () async {
     final CollectionReference collection = await testCollection();
-    await collection.document('a').set(map<dynamic>(<dynamic>['v', 'a']));
-    await collection.document('b').set(map<dynamic>(<dynamic>['v', 'b']));
+    await collection.doc('a').set(map<dynamic>(<dynamic>['v', 'a']));
+    await collection.doc('b').set(map<dynamic>(<dynamic>['v', 'b']));
 
     final List<QuerySnapshot> snapshots = <QuerySnapshot>[];
 
@@ -182,7 +182,7 @@ void main() {
       map<String>(<String>['v', 'a']),
       map<String>(<String>['v', 'b']),
     ]);
-    await collection.document('a').set(map<String>(<String>['v', 'a1']));
+    await collection.doc('a').set(map<String>(<String>['v', 'a1']));
 
     await completer.future;
 
@@ -197,8 +197,8 @@ void main() {
 
   test('testCanListenForTheSameQueryWithDifferentOptions', () async {
     final CollectionReference collection = await testCollection();
-    await collection.document('a').set(map<String>(<String>['v', 'a']));
-    await collection.document('b').set(map<String>(<String>['v', 'b']));
+    await collection.doc('a').set(map<String>(<String>['v', 'a']));
+    await collection.doc('b').set(map<String>(<String>['v', 'b']));
 
     final List<QuerySnapshot> snapshots = <QuerySnapshot>[];
     final List<QuerySnapshot> snapshotsFull = <QuerySnapshot>[];
@@ -251,7 +251,7 @@ void main() {
     expect(snapshotsFull[0].metadata.isFromCache, isTrue);
     expect(snapshotsFull[1].metadata.isFromCache, isFalse);
 
-    unawaited(collection.document('a').set(map<String>(<String>['v', 'a1'])));
+    unawaited(collection.doc('a').set(map<String>(<String>['v', 'a1'])));
 
     // Only one event without options
     await testCounter.next;
@@ -278,7 +278,7 @@ void main() {
       map<String>(<String>['v', 'b']),
     ]);
 
-    await collection.document('b').set(map<String>(<String>['v', 'b1']));
+    await collection.doc('b').set(map<String>(<String>['v', 'b1']));
     await Future<void>.delayed(const Duration(seconds: 1));
 
     expect(snapshotsFull.length, 6);
@@ -387,7 +387,7 @@ void main() {
     // Ideally this would be descending to validate it's different than
     // the default, but that requires an extra index
     final QuerySnapshot docs = await collection
-        .orderByField(FieldPath.documentId())
+        .orderByField(FieldPath.documentId)
         .get();
 
     expect(querySnapshotToValues(docs), <Map<String, Object?>>[
@@ -413,15 +413,15 @@ void main() {
       testDocs,
     );
     QuerySnapshot docs = await collection
-        .whereEqualToField(FieldPath.documentId(), 'ab')
+        .whereEqualToField(FieldPath.documentId, 'ab')
         .get();
     expect(querySnapshotToValues(docs), <Map<String, Object?>>[
       testDocs['ab']!,
     ]);
 
     docs = await collection
-        .whereGreaterThanField(FieldPath.documentId(), 'aa')
-        .whereLessThanOrEqualToField(FieldPath.documentId(), 'ba')
+        .whereGreaterThanField(FieldPath.documentId, 'aa')
+        .whereLessThanOrEqualToField(FieldPath.documentId, 'ba')
         .get();
     expect(querySnapshotToValues(docs), <Map<String, Object?>>[
       testDocs['ab']!,
@@ -444,21 +444,15 @@ void main() {
       testDocs,
     );
     QuerySnapshot docs = await collection
-        .whereEqualToField(FieldPath.documentId(), collection.document('ab'))
+        .whereEqualToField(FieldPath.documentId, collection.doc('ab'))
         .get();
     expect(querySnapshotToValues(docs), <Map<String, Object?>>[
       testDocs['ab']!,
     ]);
 
     docs = await collection
-        .whereGreaterThanField(
-          FieldPath.documentId(),
-          collection.document('aa'),
-        )
-        .whereLessThanOrEqualToField(
-          FieldPath.documentId(),
-          collection.document('ba'),
-        )
+        .whereGreaterThanField(FieldPath.documentId, collection.doc('aa'))
+        .whereLessThanOrEqualToField(FieldPath.documentId, collection.doc('ba'))
         .get();
     expect(querySnapshotToValues(docs), <Map<String, Object?>>[
       testDocs['ab']!,
@@ -470,7 +464,7 @@ void main() {
     final CollectionReference collection = await testCollection();
     unawaited(collection.add(map()));
     final Future<QuerySnapshot> query1 = collection
-        .orderByField(FieldPath.documentId(), Direction.ascending)
+        .orderByField(FieldPath.documentId, Direction.ascending)
         .get();
     final Future<QuerySnapshot> query2 = collection.get();
 
@@ -482,7 +476,7 @@ void main() {
 
   test('watchSurvivesNetworkDisconnect', () async {
     final CollectionReference collectionReference = await testCollection();
-    final Firestore firestore = collectionReference.firestore;
+    final FirebaseFirestore firestore = collectionReference.firestore;
     final AwaitHelper<void> receivedDocument = AwaitHelper<void>(1);
 
     collectionReference.getSnapshots(MetadataChanges.include).listen((
@@ -578,7 +572,7 @@ void main() {
       ]);
 
       // Delete the document, make cached result empty.
-      final DocumentReference docRef = collectionReference.document('a');
+      final DocumentReference docRef = collectionReference.doc('a');
       await docRef.delete();
 
       // Add a snapshot listener whose first event should be raised from cache.
@@ -857,7 +851,7 @@ void main() {
         ]),
       );
       final QuerySnapshot docs = await collection
-          .whereNotEqualToField(FieldPath.documentId(), 'aa')
+          .whereNotEqualToField(FieldPath.documentId, 'aa')
           .get();
       expect(querySnapshotToValues(docs), <dynamic>[docB, docC, docD]);
     },
@@ -935,7 +929,7 @@ void main() {
         ]),
       );
       final QuerySnapshot docs = await collection.whereNotInField(
-        FieldPath.documentId(),
+        FieldPath.documentId,
         <Object?>['aa', 'ab'],
       ).get();
       expect(querySnapshotToValues(docs), <dynamic>[docC, docD]);
@@ -1145,14 +1139,14 @@ void main() {
   /// Writes a document with `{x: 1}` for each of [docPaths] (with `${collectionGroup}` replaced) and returns the
   /// collection group name, which starts with 'b' for a predictable ordering.
   Future<String> writeCollectionGroupDocs(
-    Firestore db,
+    FirebaseFirestore db,
     List<String> docPaths,
   ) async {
-    final String collectionGroup = 'b${db.collection('foo').document().id}';
+    final String collectionGroup = 'b${db.collection('foo').doc().id}';
     final WriteBatch batch = db.batch();
     for (final String path in docPaths) {
       batch.set(
-        db.document(path.replaceAll(r'${collectionGroup}', collectionGroup)),
+        db.doc(path.replaceAll(r'${collectionGroup}', collectionGroup)),
         <String, Object?>{'x': 1},
       );
     }
@@ -1161,7 +1155,7 @@ void main() {
   }
 
   test('testCollectionGroupQueries', () async {
-    final Firestore db = await testFirestore();
+    final FirebaseFirestore db = await testFirestore();
     final String group = await writeCollectionGroupDocs(db, <String>[
       r'abc/123/${collectionGroup}/cg-doc1',
       r'abc/123/${collectionGroup}/cg-doc2',
@@ -1189,7 +1183,7 @@ void main() {
   test(
     'testCollectionGroupQueriesWithStartAtEndAtWithArbitraryDocumentIds',
     () async {
-      final Firestore db = await testFirestore();
+      final FirebaseFirestore db = await testFirestore();
       final String group = await writeCollectionGroupDocs(db, <String>[
         r'a/a/${collectionGroup}/cg-doc1',
         r'a/b/a/b/${collectionGroup}/cg-doc2',
@@ -1202,7 +1196,7 @@ void main() {
 
       QuerySnapshot querySnapshot = await db
           .collectionGroup(group)
-          .orderByField(FieldPath.documentId())
+          .orderByField(FieldPath.documentId)
           .startAt(<Object?>['a/b'])
           .endAt(<Object?>['a/b0'])
           .get();
@@ -1214,7 +1208,7 @@ void main() {
 
       querySnapshot = await db
           .collectionGroup(group)
-          .orderByField(FieldPath.documentId())
+          .orderByField(FieldPath.documentId)
           .startAfter(<Object?>['a/b'])
           .endBefore(<Object?>['a/b/$group/cg-doc3'])
           .get();
@@ -1227,7 +1221,7 @@ void main() {
   test(
     'testCollectionGroupQueriesWithWhereFiltersOnArbitraryDocumentIds',
     () async {
-      final Firestore db = await testFirestore();
+      final FirebaseFirestore db = await testFirestore();
       final String group = await writeCollectionGroupDocs(db, <String>[
         r'a/a/${collectionGroup}/cg-doc1',
         r'a/b/a/b/${collectionGroup}/cg-doc2',
@@ -1240,8 +1234,8 @@ void main() {
 
       QuerySnapshot querySnapshot = await db
           .collectionGroup(group)
-          .whereGreaterThanOrEqualToField(FieldPath.documentId(), 'a/b')
-          .whereLessThanOrEqualToField(FieldPath.documentId(), 'a/b0')
+          .whereGreaterThanOrEqualToField(FieldPath.documentId, 'a/b')
+          .whereLessThanOrEqualToField(FieldPath.documentId, 'a/b0')
           .get();
       expect(IntegrationTestUtil.querySnapshotToIds(querySnapshot), <String>[
         'cg-doc2',
@@ -1251,8 +1245,8 @@ void main() {
 
       querySnapshot = await db
           .collectionGroup(group)
-          .whereGreaterThanField(FieldPath.documentId(), 'a/b')
-          .whereLessThanField(FieldPath.documentId(), 'a/b/$group/cg-doc3')
+          .whereGreaterThanField(FieldPath.documentId, 'a/b')
+          .whereLessThanField(FieldPath.documentId, 'a/b/$group/cg-doc3')
           .get();
       expect(IntegrationTestUtil.querySnapshotToIds(querySnapshot), <String>[
         'cg-doc2',
@@ -1271,7 +1265,7 @@ void main() {
     expect(querySnapshotToValues(snapshot1), <Map<String, Object?>>[
       <String, Object?>{'foo': 'zzyzx', 'bar': '1'},
     ]);
-    final DocumentReference doc = snapshot1.documents.first.reference;
+    final DocumentReference doc = snapshot1.docs.first.reference;
 
     unawaited(doc.update(<String, Object?>{'bar': '2'}));
 
@@ -1285,7 +1279,7 @@ void main() {
     final CollectionReference collection = await testCollection();
     await collection.firestore.disableNetwork();
 
-    final DocumentReference doc = collection.document();
+    final DocumentReference doc = collection.doc();
     unawaited(
       doc.set(<String, Object?>{
         'foo': 'zzyzx',
@@ -1343,7 +1337,7 @@ void main() {
         },
       );
       final QuerySnapshot docs = await collection.whereInField(
-        FieldPath.documentId(),
+        FieldPath.documentId,
         <Object?>['aa', 'ab'],
       ).get();
       expect(querySnapshotToValues(docs), <Map<String, Object?>>[docA, docB]);
@@ -1371,7 +1365,7 @@ void main() {
         int newIndex,
         DocumentChangeType type,
       ) {
-        expect(change.document.id, id);
+        expect(change.doc.id, id);
         expect(change.type, type);
         expect(change.oldIndex, oldIndex);
         expect(change.newIndex, newIndex);
@@ -1384,12 +1378,12 @@ void main() {
       verify(changes[1], 'b', -1, 1, DocumentChangeType.added);
       verify(changes[2], 'c', -1, 2, DocumentChangeType.added);
 
-      await collection.document('b').set(<String, Object?>{'order': 4});
+      await collection.doc('b').set(<String, Object?>{'order': 4});
       changes = (await accumulator.wait()).docChanges;
       expect(changes, hasLength(1));
       verify(changes[0], 'b', 1, 2, DocumentChangeType.modified);
 
-      await collection.document('c').delete();
+      await collection.doc('c').delete();
       changes = (await accumulator.wait()).docChanges;
       expect(changes, hasLength(1));
       verify(changes[0], 'c', 1, -1, DocumentChangeType.removed);
@@ -1451,7 +1445,7 @@ void main() {
         <Map<String, Object?>>[initialDoc],
       );
 
-      unawaited(collection.document('foo').set(modifiedDoc));
+      unawaited(collection.doc('foo').set(modifiedDoc));
 
       final List<QuerySnapshot> events = await accumulator.waitFor(2);
       List<Map<String, Object?>> changeData(
@@ -1460,7 +1454,7 @@ void main() {
       ) => <Map<String, Object?>>[
         for (final DocumentChange<Object?> change
             in snapshot.getDocumentChanges(metadataChanges))
-          change.document.data! as Map<String, Object?>,
+          change.doc.data! as Map<String, Object?>,
       ];
 
       expect(querySnapshotToValues(events[0]), <Map<String, Object?>>[
@@ -1485,14 +1479,14 @@ void main() {
 
     test('can query custom types', () async {
       final CollectionReference collection = await testCollection();
-      final Firestore db = collection.firestore;
+      final FirebaseFirestore db = collection.firestore;
       final Map<String, Object?> data = <String, Object?>{
-        'ref': db.document('f/c'),
+        'ref': db.doc('f/c'),
         'geoPoint': const GeoPoint(0, 0),
         'buffer': Blob.fromBase64String('Zm9v'),
         'time': Timestamp.now(),
         'array': <Object?>[
-          db.document('f/c'),
+          db.doc('f/c'),
           const GeoPoint(0, 0),
           Blob.fromBase64String('Zm9v'),
           Timestamp.now(),

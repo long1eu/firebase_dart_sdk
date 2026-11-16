@@ -71,27 +71,27 @@ liteTransportOverride;
 /// final DocumentSnapshot<Map<String, Object?>> city =
 ///     await firestore.doc('cities/SF').get();
 /// ```
-class Firestore {
-  Firestore._(this.app, this.modelDatabaseId, this.settings)
+class FirebaseFirestore {
+  FirebaseFirestore._(this.app, this.modelDatabaseId, this.settings)
     : dataConverter = UserDataConverter(modelDatabaseId);
 
-  /// Returns the instance of [app] for [database], creating it at the first
+  /// Returns the instance of [app] for [databaseId], creating it at the first
   /// call. Nothing is sent or opened until the instance is used.
   ///
   /// [settings] apply when the instance is created. Asking again for the same
   /// instance with different settings throws a [StateError]: [terminate] the
   /// instance first to get one with other settings.
-  factory Firestore.instanceFor({
+  factory FirebaseFirestore.instanceFor({
     required FirebaseApp app,
-    String database = DatabaseId.defaultDatabaseId,
-    FirestoreSettings? settings,
+    String databaseId = DatabaseId.defaultDatabaseId,
+    Settings? settings,
   }) {
     final String? projectId = app.options.projectId;
     if (projectId == null) {
       throw ArgumentError('FirebaseOptions.getProjectId() cannot be null');
     }
-    final String key = _keyFor(app.name, database);
-    final Firestore? existing = _instances[key];
+    final String key = _keyFor(app.name, databaseId);
+    final FirebaseFirestore? existing = _instances[key];
     if (existing != null && identical(existing.app, app)) {
       if (settings != null && settings != existing.settings) {
         throw StateError(
@@ -107,10 +107,10 @@ class Firestore {
     // which is delivered asynchronously, has not terminated the instance yet.
     existing?._terminateQuietly();
 
-    final Firestore firestore = Firestore._(
+    final FirebaseFirestore firestore = FirebaseFirestore._(
       app,
-      DatabaseId.forDatabase(projectId, database),
-      settings ?? FirestoreSettings(),
+      DatabaseId.forDatabase(projectId, databaseId),
+      settings ?? Settings(),
     );
     _instances[key] = firestore;
     firestore._deleteSubscription = app.onDeleteApp.listen(
@@ -125,15 +125,16 @@ class Firestore {
   static const String _terminatedMessage =
       'The client has already been terminated.';
 
-  static final Map<String, Firestore> _instances = <String, Firestore>{};
+  static final Map<String, FirebaseFirestore> _instances =
+      <String, FirebaseFirestore>{};
 
   static String _keyFor(String appName, String database) =>
       '$appName/$database';
 
   /// The instance of the default [FirebaseApp] for its default database.
   // ignore: prefer_constructors_over_static_methods
-  static Firestore get instance =>
-      Firestore.instanceFor(app: FirebaseApp.instance);
+  static FirebaseFirestore get instance =>
+      FirebaseFirestore.instanceFor(app: FirebaseApp.instance);
 
   /// Sets the verbosity of the Cloud Firestore logs (shared with the main
   /// library).
@@ -143,7 +144,7 @@ class Firestore {
   final FirebaseApp app;
 
   /// The settings this instance was created with.
-  final FirestoreSettings settings;
+  final Settings settings;
 
   /// Implementation detail of the SDK; not part of the supported API.
   @internal
@@ -163,7 +164,7 @@ class Firestore {
   StreamSubscription<String>? _deleteSubscription;
   Datastore? _datastore;
   CredentialsProvider? _credentials;
-  AppCheckTokenProvider? _appCheck;
+  FirebaseAppCheckTokenProvider? _appCheck;
   bool _terminated = false;
   Future<void>? _termination;
 
@@ -267,7 +268,7 @@ class Firestore {
   /// connection is closed. A transaction in progress is not waited for: its
   /// next read or its commit fails (see [runTransaction]).
   ///
-  /// [Firestore.instanceFor] returns a new instance afterwards. Calling this again does
+  /// [FirebaseFirestore.instanceFor] returns a new instance afterwards. Calling this again does
   /// nothing.
   Future<void> terminate() {
     return _termination ??= _terminate();
@@ -320,7 +321,7 @@ class Firestore {
 
   void _checkNotTerminated() {
     if (_terminated) {
-      throw FirestoreError(
+      throw FirestoreException(
         _terminatedMessage,
         FirestoreErrorCode.failedPrecondition,
       );
@@ -351,10 +352,10 @@ class Firestore {
     }
 
     // No provider on the app: no App Check header at all.
-    final InternalAppCheckTokenProvider? appCheckSource = app.appCheckProvider;
-    final AppCheckTokenProvider? appCheck = appCheckSource == null
+    final AppCheckTokenProvider? appCheckSource = app.appCheckProvider;
+    final FirebaseAppCheckTokenProvider? appCheck = appCheckSource == null
         ? null
-        : AppCheckTokenProvider(appCheckSource);
+        : FirebaseAppCheckTokenProvider(appCheckSource);
     _credentials = credentials;
     _appCheck = appCheck;
 
@@ -368,7 +369,7 @@ class Firestore {
         sslEnabled: settings.sslEnabled,
         grpcFlowControlWindow: settings.grpcFlowControlWindow,
         apiKey: app.options.apiKey,
-        appId: app.options.applicationId,
+        appId: app.options.appId,
       ),
       credentials,
       liteTransportOverride ?? createLiteTransport,

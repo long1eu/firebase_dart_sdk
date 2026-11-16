@@ -82,7 +82,8 @@ void main() {
         '${config.describeEnv()}). The last line of each client in $logs '
         'shows where it stopped.',
       );
-      final Firestore oracle = await IntegrationTestUtil.testFirestore();
+      final FirebaseFirestore oracle =
+          await IntegrationTestUtil.testFirestore();
       final List<_Worker> workers = <_Worker>[
         for (int i = 0; i < config.isolates; i++)
           await _Worker.spawn(i, config),
@@ -509,7 +510,7 @@ class _Client {
   final Random random;
   final void Function(String message) _record;
 
-  late Firestore db;
+  late FirebaseFirestore db;
   late CollectionReference<Map<String, Object?>> collection;
   final List<_Listener> listeners = <_Listener>[];
 
@@ -540,7 +541,7 @@ class _Client {
     db = await IntegrationTestUtil.testFirestoreInstance(
       IntegrationTestUtil.provider.projectId,
       InternalLogLevel.e,
-      FirestoreSettings(host: proxy.host, port: proxy.port, sslEnabled: false),
+      Settings(host: proxy.host, port: proxy.port, sslEnabled: false),
       IntegrationTestUtil.currentDatabasePath,
       fixedDbName: dbName,
     );
@@ -597,7 +598,7 @@ class _Client {
         .then(
           (_) => record('#$op ok'),
           onError: (Object e) {
-            record('#$op failed: ${e is FirestoreError ? e.code : e}');
+            record('#$op failed: ${e is FirestoreException ? e.code : e}');
           },
         )
         .whenComplete(() {

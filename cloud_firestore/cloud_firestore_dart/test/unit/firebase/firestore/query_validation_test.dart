@@ -25,13 +25,13 @@ import '../../../util/test_util.dart' as util;
 import 'test_util.dart' as unit;
 
 // ignore: non_constant_identifier_names
-Firestore _TestFirestore() =>
+FirebaseFirestore _TestFirestore() =>
     FirestoreInternal.detached(DatabaseId.forProject('project'));
 
 /// Backend-free port of the query related cases of upstream ValidationTest
 /// (which the Dart port only has as an emulator integration test).
 void main() {
-  final Firestore db = _TestFirestore();
+  final FirebaseFirestore db = _TestFirestore();
   Query collection() => QueryInternal.create(util.query('collection'), db);
 
   Matcher throwsInvalidQuery([Pattern? message]) => throwsA(
@@ -161,33 +161,33 @@ void main() {
     test('array-contains cannot be used on the document id', () {
       expect(
           () => collection()
-              .whereArrayContainsField(FieldPath.documentIdField, 'x'),
+              .whereArrayContainsField(FieldPath.documentId, 'x'),
           throwsInvalidQuery(
-              'You can\'t perform "array-contains" queries on FieldPath.documentId()'));
+              'You can\'t perform "array-contains" queries on FieldPath.documentId'));
       expect(
           () => collection().whereArrayContainsAnyField(
-              FieldPath.documentIdField, <String>['x']),
+              FieldPath.documentId, <String>['x']),
           throwsInvalidQuery(
-              'You can\'t perform "array-contains-any" queries on FieldPath.documentId()'));
+              'You can\'t perform "array-contains-any" queries on FieldPath.documentId'));
     });
 
     test('document id values must be plain ids in a collection query', () {
       expect(
-          () => collection().whereEqualToField(FieldPath.documentIdField, ''),
+          () => collection().whereEqualToField(FieldPath.documentId, ''),
           throwsInvalidQuery('but it was an empty string'));
       expect(
           () =>
-              collection().whereEqualToField(FieldPath.documentIdField, 'a/b'),
+              collection().whereEqualToField(FieldPath.documentId, 'a/b'),
           throwsInvalidQuery('contains a "/" character'));
       expect(
-          () => collection().whereEqualToField(FieldPath.documentIdField, 1),
+          () => collection().whereEqualToField(FieldPath.documentId, 1),
           throwsInvalidQuery(
               'you must provide a valid String or DocumentReference'));
       expect(
-          () => collection().whereInField(FieldPath.documentIdField, <int>[1]),
+          () => collection().whereInField(FieldPath.documentId, <int>[1]),
           throwsInvalidQuery(
               'you must provide a valid String or DocumentReference'));
-      expect(collection().whereEqualToField(FieldPath.documentIdField, 'abc'),
+      expect(collection().whereEqualToField(FieldPath.documentId, 'abc'),
           isA<Query>());
     });
 
@@ -213,7 +213,7 @@ void main() {
     });
 
     test('document id bounds must be strings without slashes', () {
-      final Query q = collection().orderByField(FieldPath.documentIdField);
+      final Query q = collection().orderByField(FieldPath.documentId);
       expect(() => q.startAt(<Object>[1]),
           throwsInvalidQuery('Expected a string for document ID in startAt()'));
       expect(() => q.endAt(<Object>['a/b']),
@@ -298,7 +298,7 @@ void main() {
     });
 
     test('the FieldPath variants build the same filters', () {
-      final FieldPath path = FieldPath.fromDotSeparatedPath('a.b');
+      final FieldPath path = FieldPath.fromString('a.b');
       expect(Filter.equalToField(path, 1), Filter.equalTo('a.b', 1));
       expect(Filter.notEqualToField(path, 1), Filter.notEqualTo('a.b', 1));
       expect(Filter.greaterThanField(path, 1), Filter.greaterThan('a.b', 1));
@@ -380,12 +380,12 @@ void main() {
       expect(
           () => collection().where(Filter.or(<Filter>[
                 Filter.equalTo('a', 1),
-                Filter.arrayContainsField(FieldPath.documentIdField, 1),
+                Filter.arrayContainsField(FieldPath.documentId, 1),
               ])),
           throwsInvalidQuery('You can\'t perform "array-contains" queries'));
       expect(
           () => collection().where(Filter.or(<Filter>[
-                Filter.equalToField(FieldPath.documentIdField, 'a/b'),
+                Filter.equalToField(FieldPath.documentId, 'a/b'),
                 Filter.equalTo('a', 1),
               ])),
           throwsInvalidQuery('contains a "/" character'));
@@ -448,8 +448,8 @@ void main() {
     expect(
         collection().whereEqualTo('a.b', 1),
         collection()
-            .whereEqualToField(FieldPath.fromDotSeparatedPath('a.b'), 1));
+            .whereEqualToField(FieldPath.fromString('a.b'), 1));
     expect(collection().orderBy('a.b'),
-        collection().orderByField(FieldPath.fromDotSeparatedPath('a.b')));
+        collection().orderByField(FieldPath.fromString('a.b')));
   });
 }

@@ -93,8 +93,11 @@ Future<CollectionReference<Map<String, Object?>>> windowTestCollection() =>
 /// The emulator's answer to a pipeline with add_window_fields.
 Future<void> expectEmulatorRejectsWindows(Future<Object?> execute) async {
   final Object error = await assertThrows(null, () => execute);
-  expect(error, isA<FirestoreError>());
-  expect((error as FirestoreError).code, FirestoreErrorCode.invalidArgument);
+  expect(error, isA<FirestoreException>());
+  expect(
+    (error as FirestoreException).code,
+    FirestoreErrorCode.invalidArgument,
+  );
   assertThat("$error").contains("add_window_fields");
 }
 
@@ -105,7 +108,7 @@ Future<bool> emulatorRejectsWindows(Future<PipelineSnapshot> execute) async {
   try {
     await execute;
     return false;
-  } on FirestoreError catch (e) {
+  } on FirestoreException catch (e) {
     if (e.code == FirestoreErrorCode.invalidArgument &&
         "$e".contains("Unsupported stage: add_window_fields")) {
       return true;
@@ -134,7 +137,7 @@ Future<void> expectWindowResults(
 void main() {
   IntegrationTestUtil.currentDatabasePath =
       'integration_enterprise/android_pipeline_window';
-  late Firestore firestore;
+  late FirebaseFirestore firestore;
 
   group('PipelineWindowTest', skip: IntegrationTestUtil.enterpriseEmulatorSkipReason, () {
     setUp(() async {

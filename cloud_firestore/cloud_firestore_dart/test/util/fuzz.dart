@@ -17,7 +17,7 @@ import 'package:protobuf/protobuf.dart';
 import 'property.dart';
 
 /// Whether [error] is a deliberate rejection of malformed input, as opposed to
-/// a crash: a [FirestoreError], an [ArgumentError] (but not a [RangeError],
+/// a crash: a [FirestoreException], an [ArgumentError] (but not a [RangeError],
 /// which is an index out of bounds), a [FormatException], an
 /// [InvalidProtocolBufferException], or an internal assertion of the SDK
 /// (`hardAssert` or `fail` of util/assert.dart, the upstream
@@ -29,7 +29,7 @@ bool isCleanRejection(Object error, StackTrace stackTrace) {
   if (error is RangeError) {
     return false;
   }
-  if (error is FirestoreError ||
+  if (error is FirestoreException ||
       error is ArgumentError ||
       error is FormatException ||
       error is InvalidProtocolBufferException) {

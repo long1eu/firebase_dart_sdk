@@ -44,8 +44,8 @@ void main() {
   test('testObservesExistingDocument', () async {
     final Map<String, Object?> testData = map(<String>['foo', 'bar']);
     final CollectionReference collection = await testCollection();
-    final DocumentReference writerRef = collection.document();
-    final DocumentReference readerRef = collection.document(writerRef.id);
+    final DocumentReference writerRef = collection.doc();
+    final DocumentReference readerRef = collection.doc(writerRef.id);
     await writerRef.set(testData);
     final EventAccumulator<DocumentSnapshot> accumulator =
         EventAccumulator<DocumentSnapshot>();
@@ -59,8 +59,8 @@ void main() {
 
   test('testObservesNewDocument', () async {
     final CollectionReference collection = await testCollection();
-    final DocumentReference writerRef = collection.document();
-    final DocumentReference readerRef = collection.document(writerRef.id);
+    final DocumentReference writerRef = collection.doc();
+    final DocumentReference readerRef = collection.doc(writerRef.id);
     final EventAccumulator<DocumentSnapshot> accumulator =
         EventAccumulator<DocumentSnapshot>();
     final StreamSubscription<DocumentSnapshot> listener = readerRef
@@ -105,12 +105,12 @@ void main() {
     final CollectionReference collection = await testCollection();
     final List<Future<void>> tasks = <Future<void>>[];
     for (MapEntry<String, Map<String, Object?>> entry in testData.entries) {
-      tasks.add(collection.document(entry.key).set(entry.value));
+      tasks.add(collection.doc(entry.key).set(entry.value));
     }
     await Future.wait(tasks);
 
     final QuerySnapshot set = await collection.get();
-    final List<DocumentSnapshot> documents = set.documents;
+    final List<DocumentSnapshot> documents = set.docs;
     expect(set, isNotEmpty);
     expect(documents, hasLength(3));
     expect(documents[0].data, testData['1']);
@@ -134,7 +134,7 @@ void main() {
       final CollectionReference collection = await testCollection();
       final List<Future<void>> tasks = <Future<void>>[];
       for (MapEntry<String, Map<String, Object?>> entry in testData.entries) {
-        tasks.add(collection.document(entry.key).set(entry.value));
+        tasks.add(collection.doc(entry.key).set(entry.value));
       }
       await Future.wait(tasks);
       final Query query = collection
@@ -142,7 +142,7 @@ void main() {
           .orderBy('sort', Direction.descending);
 
       final QuerySnapshot set = await query.get();
-      final List<DocumentSnapshot> documents = set.documents;
+      final List<DocumentSnapshot> documents = set.docs;
       expect(documents, hasLength(3));
       expect(documents[0].data, testData['2']);
       expect(documents[1].data, testData['3']);

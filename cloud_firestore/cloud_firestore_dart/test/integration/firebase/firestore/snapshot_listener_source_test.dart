@@ -227,7 +227,7 @@ void main() {
 
     // Un-listen to limitToLast, update a doc, then re-listen to limitToLast.
     await limitToLastRegistration.cancel();
-    await collection.document('a').update(doc('a', -2));
+    await collection.doc('a').update(doc('a', -2));
     limitToLastRegistration = limitToLast
         .getSnapshotsWithOptions(fromCache)
         .listen(limitToLastAccumulator.onData,
@@ -508,7 +508,7 @@ void main() {
 
     // Un-listen the cache listener, update a doc and re-listen to the cache.
     await cacheRegistration.cancel();
-    await collection.document('b').update(doc('b', 3));
+    await collection.doc('b').update(doc('b', 3));
 
     snapshot = await defaultAccumulator.wait();
     expected = <Map<String, Object?>>[doc('c', 2), doc('b', 3)];
@@ -583,7 +583,7 @@ void main() {
 
     // A transaction writes without raising any local event.
     await writeWithTransaction(
-        collection.document(), <String, Object?>{'k': 'a'});
+        collection.doc(), <String, Object?>{'k': 'a'});
 
     await accumulator.assertNoAdditionalEvents();
     await listener.cancel();
@@ -611,7 +611,7 @@ void main() {
     expect(values(snapshot), expected);
 
     // A transaction mocks a server side update.
-    await writeWithTransaction(collection.document(), doc('c', 2));
+    await writeWithTransaction(collection.doc(), doc('c', 2));
 
     snapshot = await defaultAccumulator.wait();
     expected = <Map<String, Object?>>[doc('b', 1), doc('c', 2)];

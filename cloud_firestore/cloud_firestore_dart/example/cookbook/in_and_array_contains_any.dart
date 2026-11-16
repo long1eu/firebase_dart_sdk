@@ -11,7 +11,7 @@ import 'package:cloud_firestore_dart/cloud_firestore_dart.dart';
 import '../common.dart';
 
 Future<void> main() async {
-  final Firestore firestore = connect();
+  final FirebaseFirestore firestore = connect();
   final CollectionReference<Map<String, Object?>> users = firestore.collection(
     scratch('users'),
   );
@@ -50,7 +50,7 @@ Future<void> main() async {
       start + 30 > wanted.length ? wanted.length : start + 30,
     );
     final QuerySnapshot<Map<String, Object?>> part = await users
-        .where(FieldPath.documentIdField, whereIn: chunk)
+        .where(FieldPath.documentId, whereIn: chunk)
         .get();
     for (final QueryDocumentSnapshot<Map<String, Object?>> doc in part) {
       found[doc.id] = doc;
@@ -61,10 +61,10 @@ Future<void> main() async {
   // With 31 values the request fails on the backend, not in the client.
   try {
     await users
-        .where(FieldPath.documentIdField, whereIn: wanted.sublist(0, 31))
+        .where(FieldPath.documentId, whereIn: wanted.sublist(0, 31))
         .get(Source.server);
     print('31 values: accepted');
-  } on FirestoreError catch (e) {
+  } on FirestoreException catch (e) {
     print('31 values: ${e.code}');
   }
 

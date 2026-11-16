@@ -12,7 +12,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/util/assert.dart';
 ///
 /// Methods that take a field name as a `String` split it on dots. Use a [FieldPath] when a field
 /// name itself contains a dot or another character that a dotted path cannot hold
-/// (`~ * / [ ]`), and [documentIdField] to filter or sort by the document id.
+/// (`~ * / [ ]`), and [documentId] to filter or sort by the document id.
 ///
 /// ```dart
 /// final FieldPath nested = FieldPath.of(['address', 'city']); // same as 'address.city'
@@ -42,7 +42,7 @@ class FieldPath {
   ///
   /// Return a FieldPath that points to a field location in a document. Throws an [ArgumentError]
   /// if [fieldNames] is empty or one of the names is empty.
-  factory FieldPath.of(List<String> fieldNames) {
+  factory FieldPath(List<String> fieldNames) {
     checkArgument(
       fieldNames.isNotEmpty,
       'Invalid field path. Provided path must not be null or empty.',
@@ -62,7 +62,7 @@ class FieldPath {
   ///
   /// Throws an [ArgumentError] if [path] is empty, starts or ends with a dot, contains `..`, or
   /// contains one of `~ * / [ ]`; use [FieldPath.of] for such names.
-  factory FieldPath.fromDotSeparatedPath(String path) {
+  factory FieldPath.fromString(String path) {
     checkNotNull(path, 'Provided field path must not be null.');
     checkArgument(
       !_reserved.hasMatch(path),
@@ -70,7 +70,7 @@ class FieldPath {
       "or ']'. Use FieldPath.of() for field names that contain them.",
     );
     try {
-      return FieldPath.of(path.split('.'));
+      return FieldPath(path.split('.'));
     } on ArgumentError catch (_) {
       throw ArgumentError(
         'Invalid field path ($path). Paths must not be empty, begin with \'.\', end with \'.\', '
@@ -88,11 +88,6 @@ class FieldPath {
     model.FieldPath.keyPath,
   );
 
-  /// Returns a special sentinel [FieldPath] to refer to the id of a document. It can be used in
-  /// queries to sort or filter by the document id.
-  @Deprecated('Use documentIdField instead.')
-  static FieldPath documentId() => documentIdField;
-
   /// A special sentinel [FieldPath] to refer to the id of a document. It can be
   /// used in queries to sort or filter by the document id. This is `documentId()` of the JS SDK.
   ///
@@ -108,7 +103,7 @@ class FieldPath {
   ///
   /// A getter named `documentId` (the official spelling) cannot exist next to
   /// the method [documentId] until that method is removed.
-  static FieldPath get documentIdField => _documentIdInstance;
+  static FieldPath get documentId => _documentIdInstance;
 
   @override
   String toString() {
@@ -137,7 +132,7 @@ extension FieldPathInternal on FieldPath {
   /// Matches any characters in a field path string that are reserved.
   static RegExp get reserved => FieldPath._reserved;
 
-  /// The path of the document id, as [FieldPath.documentIdField].
+  /// The path of the document id, as [FieldPath.documentId].
   static FieldPath get documentIdInstance => FieldPath._documentIdInstance;
 
   /// [FieldPath.fromDotSeparatedPath] for the [path] argument of the public
@@ -150,7 +145,7 @@ extension FieldPathInternal on FieldPath {
     String? documentPath,
   }) {
     try {
-      return FieldPath.fromDotSeparatedPath(path);
+      return FieldPath.fromString(path);
     } on ArgumentError catch (e) {
       final String found = documentPath == null
           ? ''

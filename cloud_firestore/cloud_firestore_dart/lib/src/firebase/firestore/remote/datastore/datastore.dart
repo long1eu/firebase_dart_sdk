@@ -71,7 +71,7 @@ class Datastore {
     TaskScheduler scheduler,
     DatabaseInfo databaseInfo,
     CredentialsProvider credentialsProvider, {
-    AppCheckTokenProvider? appCheckProvider,
+    FirebaseAppCheckTokenProvider? appCheckProvider,
     FirestoreTransport Function(ChannelOptionsProvider options)?
     transportFactory,
   }) {

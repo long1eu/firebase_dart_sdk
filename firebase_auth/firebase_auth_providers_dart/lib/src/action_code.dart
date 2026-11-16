@@ -57,31 +57,31 @@ class ActionCodeSettings {
   /// The fields of the request, checked like the JS SDK (`_setActionCodeSettingsOnRequest`). Called by
   /// `FirebaseUserAuth`; you do not need it.
   ///
-  /// Throws a [FirebaseAuthProviderException] with the code `invalid-continue-uri` (empty [url]),
+  /// Throws a [FirebaseAuthException] with the code `invalid-continue-uri` (empty [url]),
   /// `invalid-hosting-link-domain` (empty [linkDomain]), `missing-ios-bundle-id` (empty [iOSBundleId]) or
   /// `missing-android-pkg-name` (empty [androidPackageName]). [androidInstallApp] and [androidMinimumVersion] are
   /// sent only with an [androidPackageName].
   Map<String, Object?> toRequest() {
     if (url.isEmpty) {
-      throw const FirebaseAuthProviderException(
+      throw const FirebaseAuthException(
         'invalid-continue-uri',
         'The continue URL provided in the request is invalid.',
       );
     }
     if (linkDomain != null && linkDomain!.isEmpty) {
-      throw const FirebaseAuthProviderException(
+      throw const FirebaseAuthException(
         'invalid-hosting-link-domain',
         'The provided Hosting link domain is not configured for the project.',
       );
     }
     if (iOSBundleId != null && iOSBundleId!.isEmpty) {
-      throw const FirebaseAuthProviderException(
+      throw const FirebaseAuthException(
         'missing-ios-bundle-id',
         'An iOS bundle id must be provided.',
       );
     }
     if (androidPackageName != null && androidPackageName!.isEmpty) {
-      throw const FirebaseAuthProviderException(
+      throw const FirebaseAuthException(
         'missing-android-pkg-name',
         'An Android package name must be provided.',
       );
@@ -149,14 +149,13 @@ class ActionCodeInfo {
 
   /// Reads the answer of `accounts:resetPassword` with only an `oobCode`, checked like the JS SDK.
   ///
-  /// Throws a [FirebaseAuthProviderException] with the code `internal-error` when the operation is unknown or the
+  /// Throws a [FirebaseAuthException] with the code `internal-error` when the operation is unknown or the
   /// email address it needs is missing.
   factory ActionCodeInfo.fromResponse(Map<String, Object?> response) {
-    const FirebaseAuthProviderException malformed =
-        FirebaseAuthProviderException(
-          'internal-error',
-          'The authentication service returned an incomplete action code.',
-        );
+    const FirebaseAuthException malformed = FirebaseAuthException(
+      'internal-error',
+      'The authentication service returned an incomplete action code.',
+    );
     final Object? requestType = response['requestType'];
     ActionCodeOperation? operation;
     for (final ActionCodeOperation value in ActionCodeOperation.values) {

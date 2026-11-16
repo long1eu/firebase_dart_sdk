@@ -14,7 +14,7 @@ import '../../../util/integration_test_util.dart';
 void main() {
   IntegrationTestUtil.currentDatabasePath = 'integration/index_engine';
 
-  late Firestore firestore;
+  late FirebaseFirestore firestore;
   int collectionIndex = 0;
 
   setUp(() async {

@@ -98,7 +98,7 @@ class Timestamp implements Comparable<Timestamp> {
   /// ```dart
   /// final Timestamp t = Timestamp.fromMillis(1700000000000);
   /// ```
-  factory Timestamp.fromMillis(int milliseconds) {
+  factory Timestamp.fromMillisecondsSinceEpoch(int milliseconds) {
     // Floor division, so that negative values keep non-negative nanoseconds.
     int seconds = milliseconds ~/ 1000;
     int nanoseconds = milliseconds.remainder(1000) * 1000000;
@@ -135,7 +135,9 @@ class Timestamp implements Comparable<Timestamp> {
   /// The time comes from this device's clock. To store the time of the server
   /// instead, write `FieldValue.serverTimestamp()`.
   factory Timestamp.now() {
-    return Timestamp.fromMillis(DateTime.now().millisecondsSinceEpoch);
+    return Timestamp.fromMillisecondsSinceEpoch(
+      DateTime.now().millisecondsSinceEpoch,
+    );
   }
 
   /// Seconds of UTC time since the Unix epoch, 1970-01-01T00:00:00Z.

@@ -144,8 +144,8 @@ void main() {
   });
 
   test('testCanRunAggregateCollectionGroupQuery', () async {
-    final Firestore db = await IntegrationTestUtil.testFirestore();
-    final String group = 'b${db.collection('foo').document().id}';
+    final FirebaseFirestore db = await IntegrationTestUtil.testFirestore();
+    final String group = 'b${db.collection('foo').doc().id}';
     final List<String> docPaths = <String>[
       r'abc/123/${collectionGroup}/cg-doc1',
       r'abc/123/${collectionGroup}/cg-doc2',
@@ -162,7 +162,7 @@ void main() {
     final WriteBatch batch = db.batch();
     for (final String path in docPaths) {
       batch.set(
-        db.document(path.replaceAll(r'${collectionGroup}', group)),
+        db.doc(path.replaceAll(r'${collectionGroup}', group)),
         <String, Object?>{'a': 2},
       );
     }
@@ -483,7 +483,7 @@ void main() {
 
       snapshot = await collection
           .whereGreaterThanOrEqualTo('field', 'field 100')
-          .whereNotEqualToField(FieldPath.of(<String>['field.dot']), 300)
+          .whereNotEqualToField(FieldPath(<String>['field.dot']), 300)
           .whereLessThan(r'field\slash', 400)
           .orderBy('name', Direction.descending)
           .get();
@@ -671,14 +671,14 @@ void main() {
       QuerySnapshot snapshot = await collection
           .whereGreaterThan('sort', 1)
           .whereNotEqualTo('key', 'a')
-          .whereLessThanField(FieldPath.documentId(), 'doc5')
+          .whereLessThanField(FieldPath.documentId, 'doc5')
           .get();
       // The document key in an inequality is implicitly ordered last.
       // Implicitly ordered by: 'key' asc, 'sort' asc, __name__ asc.
       expectIds(snapshot, <String>['doc2', 'doc4', 'doc3']);
 
       snapshot = await collection
-          .whereLessThanField(FieldPath.documentId(), 'doc5')
+          .whereLessThanField(FieldPath.documentId, 'doc5')
           .whereGreaterThan('sort', 1)
           .whereNotEqualTo('key', 'a')
           .get();
@@ -686,7 +686,7 @@ void main() {
       expectIds(snapshot, <String>['doc2', 'doc4', 'doc3']);
 
       snapshot = await collection
-          .whereLessThanField(FieldPath.documentId(), 'doc5')
+          .whereLessThanField(FieldPath.documentId, 'doc5')
           .whereGreaterThan('sort', 1)
           .whereNotEqualTo('key', 'a')
           .orderBy('sort', Direction.descending)
@@ -711,13 +711,13 @@ void main() {
 
       // Populate the cache.
       final QuerySnapshot snapshot1 = await query.get();
-      expect(snapshot1.documents.length, 2);
+      expect(snapshot1.docs.length, 2);
       expect(snapshot1.metadata.isFromCache, isFalse);
 
       await collection.firestore.disableNetwork();
 
       final QuerySnapshot snapshot2 = await query.get();
-      expect(snapshot2.documents.length, 2);
+      expect(snapshot2.docs.length, 2);
       expect(snapshot2.metadata.isFromCache, isTrue);
       // Implicitly ordered by: 'key' asc, 'sort' asc, __name__ asc.
       expectIds(snapshot2, <String>['doc4', 'doc3']);
@@ -801,12 +801,12 @@ void main() {
         // Implicitly ordered by: __name__ asc, 'key' asc.
         final Query query = collection
             .whereNotEqualTo('key', 42)
-            .orderByField(FieldPath.documentId());
+            .orderByField(FieldPath.documentId);
         await expectLater(
           query.get(),
           throwsA(
-            isA<FirestoreError>().having(
-              (FirestoreError e) => e.message.toLowerCase(),
+            isA<FirestoreException>().having(
+              (FirestoreException e) => e.message.toLowerCase(),
               'message',
               contains(
                 'order by clause cannot contain more fields after the key',
@@ -828,12 +828,12 @@ void main() {
 
         final Query query = collection
             .whereNotEqualTo('key', 42)
-            .whereEqualToField(FieldPath.documentId(), 'doc1');
+            .whereEqualToField(FieldPath.documentId, 'doc1');
         await expectLater(
           query.get(),
           throwsA(
-            isA<FirestoreError>().having(
-              (FirestoreError e) => e.message,
+            isA<FirestoreException>().having(
+              (FirestoreException e) => e.message,
               'message',
               contains(
                 'Equality on key is not allowed if there are other inequality fields and key does not appear in inequalities.',

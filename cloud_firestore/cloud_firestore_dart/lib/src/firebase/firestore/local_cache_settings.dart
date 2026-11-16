@@ -15,7 +15,7 @@
 import 'package:cloud_firestore_dart/src/firebase/firestore/firestore_settings.dart';
 
 /// Configures the local cache of a Firestore instance, see
-/// [FirestoreSettings.cacheSettings]. The implementations are
+/// [Settings.cacheSettings]. The implementations are
 /// [PersistentCacheSettings] and [MemoryCacheSettings].
 ///
 /// The cache holds the documents that listeners and reads received and the writes that the backend has not
@@ -50,15 +50,13 @@ sealed class LocalCacheSettings {
 final class PersistentCacheSettings extends LocalCacheSettings {
   /// [sizeBytes] is an approximate cache size threshold: if the cache grows
   /// beyond it, Firestore starts removing data that has not been recently used.
-  /// Use [FirestoreSettings.cacheSizeUnlimited] to disable the collection. The
+  /// Use [Settings.cacheSizeUnlimited] to disable the collection. The
   /// minimum is 1 MB, an [ArgumentError] is thrown otherwise.
-  PersistentCacheSettings({
-    this.sizeBytes = FirestoreSettings.defaultCacheSizeBytes,
-  }) {
-    if (sizeBytes != FirestoreSettings.cacheSizeUnlimited &&
-        sizeBytes < FirestoreSettings.minimumCacheBytes) {
+  PersistentCacheSettings({this.sizeBytes = Settings.defaultCacheSizeBytes}) {
+    if (sizeBytes != Settings.cacheSizeUnlimited &&
+        sizeBytes < Settings.minimumCacheBytes) {
       throw ArgumentError(
-        'Cache size must be set to at least ${FirestoreSettings.minimumCacheBytes} bytes',
+        'Cache size must be set to at least ${Settings.minimumCacheBytes} bytes',
       );
     }
   }
@@ -146,13 +144,11 @@ final class MemoryEagerGcSettings extends MemoryGarbageCollectorSettings {
 final class MemoryLruGcSettings extends MemoryGarbageCollectorSettings {
   /// [sizeBytes] is an approximate threshold, see
   /// [PersistentCacheSettings.sizeBytes] for the accepted values.
-  MemoryLruGcSettings({
-    this.sizeBytes = FirestoreSettings.defaultCacheSizeBytes,
-  }) {
-    if (sizeBytes != FirestoreSettings.cacheSizeUnlimited &&
-        sizeBytes < FirestoreSettings.minimumCacheBytes) {
+  MemoryLruGcSettings({this.sizeBytes = Settings.defaultCacheSizeBytes}) {
+    if (sizeBytes != Settings.cacheSizeUnlimited &&
+        sizeBytes < Settings.minimumCacheBytes) {
       throw ArgumentError(
-        'Cache size must be set to at least ${FirestoreSettings.minimumCacheBytes} bytes',
+        'Cache size must be set to at least ${Settings.minimumCacheBytes} bytes',
       );
     }
   }

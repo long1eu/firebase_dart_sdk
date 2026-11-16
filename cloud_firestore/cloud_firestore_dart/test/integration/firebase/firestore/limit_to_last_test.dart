@@ -137,7 +137,7 @@ void main() {
     ]));
 
     List<Object?> keys(QuerySnapshot snapshot) =>
-        snapshot.documents.map((dynamic d) => d.get('k') as Object?).toList();
+        snapshot.docs.map((dynamic d) => d.get('k') as Object?).toList();
 
     final Query base = collection.orderBy('k');
 
@@ -268,7 +268,7 @@ void main() {
 
     // Unlisten to limitToLast, update a doc, then relisten to limitToLast.
     await limitToLastSubscription.cancel();
-    await collection.document('a').update(value('a', -2));
+    await collection.doc('a').update(value('a', -2));
     limitToLastSubscription = limitToLast
         .getSnapshots(MetadataChanges.include)
         .listen(limitToLastAccumulator.onData,

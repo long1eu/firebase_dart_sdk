@@ -21,7 +21,7 @@ Future<void> main() async {
       env['CLOUD_RUN_EXECUTION'] ??
       'local-${DateTime.now().toUtc().toIso8601String()}';
 
-  final Firestore firestore;
+  final FirebaseFirestore firestore;
   try {
     firestore = firestoreFromEnvironment();
   } on ConfigurationError catch (e) {
@@ -58,7 +58,7 @@ Future<void> main() async {
   } on RetriesExhausted catch (e) {
     stderr.writeln(e);
     exitCode = 1;
-  } on FirestoreError catch (e) {
+  } on FirestoreException catch (e) {
     stderr.writeln('Firestore: ${e.message}');
     exitCode = 1;
   } finally {

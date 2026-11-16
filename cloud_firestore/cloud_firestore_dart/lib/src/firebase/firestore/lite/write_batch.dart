@@ -28,15 +28,15 @@ import 'package:meta/meta.dart';
 
 /// A write batch, used to perform multiple writes as a single atomic unit.
 ///
-/// Get one with [Firestore.batch]. None of the writes are sent until
+/// Get one with [FirebaseFirestore.batch]. None of the writes are sent until
 /// [commit] is called.
 class WriteBatch {
   /// Implementation detail of the SDK; not part of the supported API. Use
-  /// [Firestore.batch].
+  /// [FirebaseFirestore.batch].
   @internal
   WriteBatch(this._firestore);
 
-  final Firestore _firestore;
+  final FirebaseFirestore _firestore;
   final List<Mutation> _mutations = <Mutation>[];
 
   bool _committed = false;

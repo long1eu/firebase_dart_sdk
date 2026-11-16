@@ -97,7 +97,7 @@ void main() {
     test('encodes all find_nearest options', () {
       final VectorQuery vq =
           QueryInternal.create(util.query('coll').filter(util.filter('a', '==', 1)), firestore)
-              .findNearestField(FieldPath.of(<String>['x', 'y']),
+              .findNearestField(FieldPath(<String>['x', 'y']),
                   <double>[1.0, 2.0], 7, DistanceMeasure.dotProduct,
                   distanceResultField: 'dist', distanceThreshold: 0.5);
       final proto.Target_QueryTarget target =

@@ -18,7 +18,7 @@ import 'common.dart';
 /// the backend failed, or the backend was busy. The other codes come from the
 /// request itself (the rules, the data, a missing document or index), and
 /// sending it again gives the same answer.
-bool isRetryable(FirestoreError error) {
+bool isRetryable(FirestoreException error) {
   switch (error.code) {
     case FirestoreErrorCode.unavailable:
     case FirestoreErrorCode.deadlineExceeded:
@@ -32,7 +32,7 @@ bool isRetryable(FirestoreError error) {
 }
 
 /// Runs [operation] and runs it again, up to [maxAttempts] times in all,
-/// while it fails with a [FirestoreError] that [isRetryable] accepts. Waits
+/// while it fails with a [FirestoreException] that [isRetryable] accepts. Waits
 /// [initialDelay] before the second attempt and 1.5 times longer before each
 /// one after it, give or take half of that at random, as the SDK does for its
 /// own retries. Every other error is passed on at once.
@@ -48,14 +48,14 @@ Future<T> withRetry<T>(
   Future<T> Function() operation, {
   int maxAttempts = 5,
   Duration initialDelay = const Duration(seconds: 1),
-  void Function(FirestoreError error, Duration delay)? onRetry,
+  void Function(FirestoreException error, Duration delay)? onRetry,
 }) async {
   final Random random = Random();
   Duration delay = initialDelay;
   for (int attempt = 1; ; attempt++) {
     try {
       return await operation();
-    } on FirestoreError catch (error) {
+    } on FirestoreException catch (error) {
       if (attempt >= maxAttempts || !isRetryable(error)) {
         rethrow;
       }
@@ -68,7 +68,7 @@ Future<T> withRetry<T>(
 }
 
 Future<void> main() async {
-  final Firestore firestore = connect();
+  final FirebaseFirestore firestore = connect();
   final CollectionReference<Map<String, Object?>> cities = firestore.collection(
     scratch('cities'),
   );
@@ -78,7 +78,7 @@ Future<void> main() async {
   //    backend. `update` needs an existing document: `notFound`.
   try {
     await cities.doc('nowhere').update(<String, Object?>{'visited': true});
-  } on FirestoreError catch (e) {
+  } on FirestoreException catch (e) {
     print(
       'update of a missing document: ${e.code}, retryable: ${isRetryable(e)}',
     );
@@ -99,7 +99,7 @@ Future<void> main() async {
   final AggregateQuerySnapshot count = await withRetry(
     () => cities.count().get(),
     initialDelay: const Duration(milliseconds: 200),
-    onRetry: (FirestoreError error, Duration delay) {
+    onRetry: (FirestoreException error, Duration delay) {
       print('count failed with ${error.code}, trying again');
       unawaited(firestore.enableNetwork());
     },
@@ -122,7 +122,7 @@ Future<void> main() async {
   // A document that is not in the cache cannot be read while offline.
   try {
     await cities.doc('unknown').get();
-  } on FirestoreError catch (e) {
+  } on FirestoreException catch (e) {
     print('get of an uncached document offline: ${e.code}');
   }
   await firestore.enableNetwork();
@@ -140,7 +140,7 @@ Future<void> main() async {
           }
         },
         onError: (Object error) {
-          if (error is FirestoreError &&
+          if (error is FirestoreException &&
               error.code == FirestoreErrorCode.permissionDenied) {
             print('not allowed to listen; listen again after a sign-in');
           } else {
@@ -155,7 +155,7 @@ Future<void> main() async {
   // 6. A transaction is run again by the client when the documents it read
   //    changed before its commit, up to `maxAttempts` times. Here another
   //    client changes the document at every attempt, so it gives up.
-  final Firestore other = connect('other');
+  final FirebaseFirestore other = connect('other');
   int attempts = 0;
   try {
     await firestore.runTransaction((Transaction transaction) async {
@@ -168,7 +168,7 @@ Future<void> main() async {
         'visits': FieldValue.increment(1),
       });
     }, options: TransactionOptions(maxAttempts: 2));
-  } on FirestoreError catch (e) {
+  } on FirestoreException catch (e) {
     // The code is the one of the last failed commit: the emulator answers
     // with failedPrecondition, the backend can also answer with aborted.
     print('transaction gave up after $attempts attempts: ${e.code}');
@@ -179,7 +179,7 @@ Future<void> main() async {
   //    cause says why.
   try {
     await firestore.loadBundle(utf8.encode('not a bundle')).future;
-  } on FirestoreError catch (e) {
+  } on FirestoreException catch (e) {
     print('bad bundle: ${e.code}, cause: ${e.cause.runtimeType}');
   }
 
@@ -187,9 +187,9 @@ Future<void> main() async {
   //    already is a StateError; any call on a terminated instance fails with
   //    failedPrecondition.
   try {
-    Firestore.instanceFor(
+    FirebaseFirestore.instanceFor(
       app: FirebaseApp.instance,
-      settings: FirestoreSettings(),
+      settings: Settings(),
     );
   } on StateError {
     print('instanceFor with other settings: StateError');
@@ -197,7 +197,7 @@ Future<void> main() async {
   await firestore.terminate();
   try {
     await cities.doc('SF').get();
-  } on FirestoreError catch (e) {
+  } on FirestoreException catch (e) {
     print('after terminate: ${e.code}');
   }
 }

@@ -46,19 +46,19 @@ class ChaosEnv {
         EmulatorAddress.parse(IntegrationTestUtil.emulatorHost!);
     final ChaosProxy proxy =
         await ChaosProxy.start(emulator.host, emulator.port);
-    final Firestore oracle = await IntegrationTestUtil.testFirestore();
+    final FirebaseFirestore oracle = await IntegrationTestUtil.testFirestore();
     return ChaosEnv._(proxy, oracle);
   }
 
   final ChaosProxy proxy;
 
   /// A client that talks to the emulator directly and is never disturbed.
-  final Firestore oracle;
+  final FirebaseFirestore oracle;
 
   final List<ChaosProxy> _extraProxies = <ChaosProxy>[];
 
-  FirestoreSettings _settings(ChaosProxy proxy) =>
-      FirestoreSettings(host: proxy.host, port: proxy.port, sslEnabled: false);
+  Settings _settings(ChaosProxy proxy) =>
+      Settings(host: proxy.host, port: proxy.port, sslEnabled: false);
 
   /// A client that reaches the emulator through [proxy] (the proxy of this environment by default).
   ///
@@ -66,7 +66,7 @@ class ChaosEnv {
   /// name starts from the persisted state (a restart).
   ///
   /// The clients of the tests have no connectivity detector unless [connectivityDetector] is given.
-  Future<Firestore> newClient(
+  Future<FirebaseFirestore> newClient(
       {ChaosProxy? proxy,
       String? fixedDbName,
       ConnectivityChangeDetector? connectivityDetector}) {
@@ -197,14 +197,14 @@ class RecordingListener {
       for (final DocumentChange<Map<String, Object?>> change
           in snapshot.getDocumentChanges(MetadataChanges.include)) {
         if (change.type != DocumentChangeType.added) {
-          if (replayed[change.oldIndex] != change.document.id) {
-            violations.add('event $index: change of ${change.document.id} has '
+          if (replayed[change.oldIndex] != change.doc.id) {
+            violations.add('event $index: change of ${change.doc.id} has '
                 'oldIndex ${change.oldIndex}, which is ${replayed[change.oldIndex]}');
           }
           replayed.removeAt(change.oldIndex);
         }
         if (change.type != DocumentChangeType.removed) {
-          replayed.insert(change.newIndex, change.document.id);
+          replayed.insert(change.newIndex, change.doc.id);
         }
       }
     } on RangeError catch (e) {

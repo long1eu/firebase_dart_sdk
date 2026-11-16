@@ -459,14 +459,14 @@ void main() {
         raw.userVersion = SQLiteSchema.version + 1;
 
         Matcher skew(int version) => throwsA(
-          isA<FirestoreError>()
+          isA<FirestoreException>()
               .having(
-                (FirestoreError e) => e.code,
+                (FirestoreException e) => e.code,
                 'code',
                 FirestoreErrorCode.failedPrecondition,
               )
               .having(
-                (FirestoreError e) => e.message,
+                (FirestoreException e) => e.message,
                 'message',
                 allOf(
                   contains('different version of the SDK'),

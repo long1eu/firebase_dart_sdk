@@ -23,7 +23,7 @@ void main() {
 
   test('snapshots of the same document are equal', () async {
     final DocumentReference documentReference =
-        (await testCollection('rooms')).document('eros');
+        (await testCollection('rooms')).doc('eros');
     final Map<String, Object?> initialValue = map(<dynamic>[
       'desc',
       'Description',

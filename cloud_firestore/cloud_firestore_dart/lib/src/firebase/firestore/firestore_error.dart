@@ -5,7 +5,7 @@
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/grpc_status.dart';
 import 'package:firebase_app_dart/firebase_app_dart.dart';
 
-/// The status code of a [FirestoreError]. The codes and their numeric [value]s are the canonical
+/// The status code of a [FirestoreException]. The codes and their numeric [value]s are the canonical
 /// gRPC status codes.
 ///
 /// Most codes come from the backend and reach you unchanged. The client also
@@ -43,7 +43,7 @@ class FirestoreErrorCode {
   /// The numeric gRPC status code, for example 7 for [permissionDenied].
   final int value;
 
-  /// The operation completed successfully. Never the code of a thrown [FirestoreError].
+  /// The operation completed successfully. Never the code of a thrown [FirestoreException].
   static const FirestoreErrorCode ok = FirestoreErrorCode._(0);
 
   /// The operation was cancelled, typically by the caller.
@@ -56,7 +56,7 @@ class FirestoreErrorCode {
 
   /// An unknown error, or an error from a different error domain.
   ///
-  /// The client produces it when an error that is not a [FirestoreError]
+  /// The client produces it when an error that is not a [FirestoreException]
   /// occurs below a write of a `DocumentReference` or in a call to the
   /// backend, and when `Firestore.clearPersistence` cannot delete the files
   /// of the cache (on Windows, for example, while another isolate or process
@@ -248,11 +248,11 @@ class FirestoreErrorCode {
 /// The error thrown by Firestore operations. [code] says what went wrong.
 ///
 /// Futures fail with it, and streams (`snapshots`) deliver it to `onError`,
-/// after which the stream is done. [FirestoreError.message] (from
+/// after which the stream is done. [FirestoreException.message] (from
 /// `FirebaseError`) describes the cause in words; it is meant for logs, not
 /// for program logic. Check [code] instead. Invalid arguments that the client
 /// detects before sending anything are reported as an [ArgumentError], not as
-/// a [FirestoreError].
+/// a [FirestoreException].
 ///
 /// Like `FirebaseError`, it implements [Error], not [Exception]: catch it with
 /// `on FirestoreError`, not `on Exception`.
@@ -268,13 +268,13 @@ class FirestoreErrorCode {
 ///   },
 /// );
 /// ```
-class FirestoreError extends FirebaseError {
+class FirestoreException extends FirebaseException {
   /// Creates an error with a [message] and a [code], optionally keeping the [cause] and a stack
   /// trace.
   ///
   /// The SDK creates these errors; you need the constructor only for tests
   /// and fakes.
-  FirestoreError(
+  FirestoreException(
     String message,
     this.code, [
     this.cause,

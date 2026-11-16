@@ -66,7 +66,7 @@ class FirebaseApp with _PlatformDependenciesMixin {
   /// * [dependencies] connect the app to its platform (storage, connectivity, token providers).
   ///   Without them the app keeps its data in memory, reports the network as connected and the
   ///   app as in the foreground, and has no token providers. They are read once, here.
-  /// * The value of [dataCollectionDefaultEnabled] is read from the storage of [dependencies]
+  /// * The value of [isAutomaticDataCollectionEnabled] is read from the storage of [dependencies]
   ///   (default `true`).
   ///
   /// Throws an [ArgumentError] if `options.applicationId` is empty, and a [StateError] if an app
@@ -80,9 +80,9 @@ class FirebaseApp with _PlatformDependenciesMixin {
 
     // The const constructor of [FirebaseOptions] only checks this with an
     // assert, which a release build skips.
-    if (options.applicationId.isEmpty) {
+    if (options.appId.isEmpty) {
       throw ArgumentError.value(
-        options.applicationId,
+        options.appId,
         'options.applicationId',
         'ApplicationId must be set.',
       );
@@ -237,12 +237,12 @@ class FirebaseApp with _PlatformDependenciesMixin {
   /// [FirebaseOptions.dataCollectionEnabled].
   ///
   /// Throws a [StateError] after [delete].
-  bool get dataCollectionDefaultEnabled {
+  bool get isAutomaticDataCollectionEnabled {
     _checkNotDeleted();
     return _dataCollectionDefaultEnabled;
   }
 
-  /// Enables or disables automatic data collection (see [dataCollectionDefaultEnabled]).
+  /// Enables or disables automatic data collection (see [isAutomaticDataCollectionEnabled]).
   ///
   /// A change is written to [storage] under the key `firebase_data_collection_default_enabled`
   /// and emitted by [onDataCollectionChange]; setting the current value does nothing.
@@ -270,7 +270,7 @@ class FirebaseApp with _PlatformDependenciesMixin {
   ///
   /// Throws a [StateError] after [delete].
   String get persistenceKey {
-    return getPersistenceKeyFor(name, options.applicationId);
+    return getPersistenceKeyFor(name, options.appId);
   }
 
   /// Forgets every app without deleting it. For tests only.
@@ -329,7 +329,7 @@ class FirebaseApp with _PlatformDependenciesMixin {
 
 // ignore_for_file: close_sinks
 mixin _PlatformDependenciesMixin
-    implements PlatformDependencies, LocalStorage, InternalTokenProvider {
+    implements PlatformDependencies, LocalStorage, AuthTokenProvider {
   final Map<String, String> _map = <String, String>{};
 
   PlatformDependencies? get _dependencies;
@@ -338,8 +338,8 @@ mixin _PlatformDependenciesMixin
   BehaviorSubject<bool>? _onNetworkConnected;
   HeaderBuilder? _headersBuilder;
   LocalStorage? _storage;
-  InternalTokenProvider? _authProvider;
-  InternalAppCheckTokenProvider? _appCheckProvider;
+  AuthTokenProvider? _authProvider;
+  AppCheckTokenProvider? _appCheckProvider;
 
   void _initPlatformDependencies() {
     // Without platform dependencies the defaults are created once, so that
@@ -396,7 +396,7 @@ mixin _PlatformDependenciesMixin
   /// user ([getAccessToken] throws). Firestore recognises the app and sends its requests without a
   /// token.
   @override
-  InternalTokenProvider get authProvider {
+  AuthTokenProvider get authProvider {
     return _authProvider ?? this;
   }
 
@@ -406,7 +406,7 @@ mixin _PlatformDependenciesMixin
   /// Set it before the Firestore instance of this app is created: Firestore reads it once. The
   /// setter asks [provider] for a token right away (`forceRefresh: true`) to warm it up; an error
   /// of that request is ignored here, and surfaces when a service asks for a token.
-  set authProvider(InternalTokenProvider provider) {
+  set authProvider(AuthTokenProvider provider) {
     _authProvider = provider;
     // Warm up the token; a failing provider must not become an unhandled
     // asynchronous error here, callers see it when they ask for a token.
@@ -420,11 +420,11 @@ mixin _PlatformDependenciesMixin
   /// Firestore sends its token in the `x-firebase-appcheck` header of every request, and
   /// `FirebaseUserAuth` of `package:firebase_auth_providers_dart` in `X-Firebase-AppCheck`.
   @override
-  InternalAppCheckTokenProvider? get appCheckProvider => _appCheckProvider;
+  AppCheckTokenProvider? get appCheckProvider => _appCheckProvider;
 
   /// Replaces the App Check token source; null removes it. Set it before the Firestore instance of
   /// this app (and a `FirebaseUserAuth.forApp`) is created: they read it once.
-  set appCheckProvider(InternalAppCheckTokenProvider? provider) {
+  set appCheckProvider(AppCheckTokenProvider? provider) {
     _appCheckProvider = provider;
   }
 
@@ -464,6 +464,6 @@ mixin _PlatformDependenciesMixin
 
   /// An empty stream (see [getAccessToken]). Listen to `authProvider.onTokenChanged` instead.
   @override
-  Stream<InternalTokenResult> get onTokenChanged =>
-      const Stream<InternalTokenResult>.empty();
+  Stream<AuthTokenChange> get onTokenChanged =>
+      const Stream<AuthTokenChange>.empty();
 }

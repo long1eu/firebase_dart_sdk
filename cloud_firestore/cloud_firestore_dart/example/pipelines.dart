@@ -27,13 +27,12 @@ Future<void> main() async {
     return;
   }
   final int colon = emulator.lastIndexOf(':');
-  final Firestore firestore = Firestore.instanceFor(
+  final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(
     app: exampleApp(),
-    settings: FirestoreSettings(cacheSettings: const MemoryCacheSettings())
-        .withEmulator(
-          emulator.substring(0, colon),
-          int.parse(emulator.substring(colon + 1)),
-        ),
+    settings: Settings(cacheSettings: const MemoryCacheSettings()).withEmulator(
+      emulator.substring(0, colon),
+      int.parse(emulator.substring(colon + 1)),
+    ),
   );
 
   final CollectionReference<Map<String, Object?>> books = firestore.collection(

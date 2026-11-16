@@ -18,12 +18,12 @@ void main() {
 
   test('two instances have their own scheduler and do not block each other',
       () async {
-    final Firestore a = await IntegrationTestUtil.testFirestore();
-    final Firestore b = await IntegrationTestUtil.testFirestore();
+    final FirebaseFirestore a = await IntegrationTestUtil.testFirestore();
+    final FirebaseFirestore b = await IntegrationTestUtil.testFirestore();
     expect(identical(a.scheduler, b.scheduler), isFalse);
 
-    final DocumentReference refA = a.collection('multi-instance').document();
-    final DocumentReference refB = b.collection('multi-instance').document();
+    final DocumentReference refA = a.collection('multi-instance').doc();
+    final DocumentReference refB = b.collection('multi-instance').doc();
 
     await Future.wait(<Future<void>>[
       refA.set(<String, Object?>{'who': 'a'}),
@@ -36,7 +36,7 @@ void main() {
     expect(fromB.data, <String, Object?>{'who': 'b'});
 
     // Shutting one instance down leaves the other fully usable.
-    await a.shutdown();
+    await a.terminate();
     await refB.set(<String, Object?>{'who': 'b2'});
     expect((await refB.get()).data, <String, Object?>{'who': 'b2'});
   });

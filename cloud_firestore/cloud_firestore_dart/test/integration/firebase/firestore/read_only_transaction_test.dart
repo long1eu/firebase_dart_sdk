@@ -9,12 +9,12 @@ import 'package:test/test.dart';
 
 import '../../../util/integration_test_util.dart';
 
-TypeMatcher<FirestoreError> firestoreError(FirestoreErrorCode code) =>
-    isA<FirestoreError>().having((FirestoreError e) => e.code, 'code', code);
+TypeMatcher<FirestoreException> firestoreError(FirestoreErrorCode code) =>
+    isA<FirestoreException>().having((FirestoreException e) => e.code, 'code', code);
 
 void main() {
   IntegrationTestUtil.currentDatabasePath = 'integration/read_only_transaction';
-  late Firestore firestore;
+  late FirebaseFirestore firestore;
   late CollectionReference<Map<String, Object?>> collection;
   final TransactionOptions readOnly = TransactionOptions(readOnly: true);
 

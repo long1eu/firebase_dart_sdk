@@ -45,7 +45,7 @@ import 'package:meta/meta.dart';
 // query_builder.dart, which the Query of the main library uses too.
 class Query<T extends dynamic> {
   /// Implementation detail of the SDK; not part of the supported API. Use
-  /// [Firestore.collection] or [Firestore.collectionGroup].
+  /// [FirebaseFirestore.collection] or [FirebaseFirestore.collectionGroup].
   @internal
   const Query(this.query, this.firestore, [this.converter]);
 
@@ -70,7 +70,7 @@ class Query<T extends dynamic> {
   final core.Query query;
 
   /// The Firestore instance of this query.
-  final Firestore firestore;
+  final FirebaseFirestore firestore;
 
   /// Creates and returns a new [Query] with additional filters.
   ///
@@ -421,20 +421,20 @@ class Query<T extends dynamic> {
 /// [Query]).
 class CollectionReference<T extends dynamic> extends Query<T> {
   /// Implementation detail of the SDK; not part of the supported API. Use
-  /// [Firestore.collection] or [DocumentReference.collection].
+  /// [FirebaseFirestore.collection] or [DocumentReference.collection].
   @internal
   CollectionReference(
     ResourcePath path,
-    Firestore firestore, [
+    FirebaseFirestore firestore, [
     FirestoreDataConverter<T>? converter,
   ]) : super(core.Query(path), firestore, converter);
 
   /// Implementation detail of the SDK; not part of the supported API. Use
-  /// [Firestore.collection] or [DocumentReference.collection].
+  /// [FirebaseFirestore.collection] or [DocumentReference.collection].
   @internal
   factory CollectionReference.forPath(
     ResourcePath path,
-    Firestore firestore, [
+    FirebaseFirestore firestore, [
     FirestoreDataConverter<T>? converter,
   ]) {
     if (path.length.remainder(2) != 1) {

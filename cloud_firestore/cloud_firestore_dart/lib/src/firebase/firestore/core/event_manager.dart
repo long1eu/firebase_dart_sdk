@@ -98,7 +98,7 @@ class EventManager implements SyncEngineCallback {
       }
       Log.w('EventManager', 'Initialization of query \'$query\' failed: $e');
       queryListener.onError(
-        FirestoreError(
+        FirestoreException(
           'Initialization of query \'$query\' failed: $e',
           FirestoreErrorCode.unavailable,
         ),

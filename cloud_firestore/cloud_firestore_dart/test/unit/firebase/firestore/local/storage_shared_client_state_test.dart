@@ -32,7 +32,7 @@ import 'package:test/test.dart';
 const String _persistencePrefix = 'firestore/[DEFAULT]/test-project';
 const User _authenticatedUser = User('test');
 const User _unauthenticatedUser = User.unauthenticated;
-final FirestoreError _testError = FirestoreError(
+final FirestoreException _testError = FirestoreException(
   'Test Error',
   FirestoreErrorCode.internal,
 );
@@ -67,10 +67,10 @@ class _TestSharedClientSyncer implements SharedClientStateSyncer {
 
   List<ClientId> activeClients;
 
-  final Map<int, (MutationBatchState, FirestoreError?)> mutationState =
-      <int, (MutationBatchState, FirestoreError?)>{};
-  final Map<int, (QueryTargetState, FirestoreError?)> targetState =
-      <int, (QueryTargetState, FirestoreError?)>{};
+  final Map<int, (MutationBatchState, FirestoreException?)> mutationState =
+      <int, (MutationBatchState, FirestoreException?)>{};
+  final Map<int, (QueryTargetState, FirestoreException?)> targetState =
+      <int, (QueryTargetState, FirestoreException?)>{};
   final Set<int> activeTargets = <int>{};
   OnlineState onlineState = OnlineState.unknown;
 
@@ -78,7 +78,7 @@ class _TestSharedClientSyncer implements SharedClientStateSyncer {
   Future<void> applyBatchState(
     int batchId,
     MutationBatchState state,
-    FirestoreError? error,
+    FirestoreException? error,
   ) async {
     mutationState[batchId] = (state, error);
   }
@@ -87,7 +87,7 @@ class _TestSharedClientSyncer implements SharedClientStateSyncer {
   Future<void> applyTargetState(
     int targetId,
     QueryTargetState state,
-    FirestoreError? error,
+    FirestoreException? error,
   ) async {
     targetState[targetId] = (state, error);
   }
@@ -195,7 +195,7 @@ void main() {
     void assertBatchState(
       int batchId,
       String mutationBatchState, [
-      FirestoreError? error,
+      FirestoreException? error,
     ]) {
       final Map<String, dynamic> actual =
           jsonDecode(
@@ -251,7 +251,7 @@ void main() {
     void assertTargetState(
       int targetId,
       String queryTargetState, [
-      FirestoreError? error,
+      FirestoreException? error,
     ]) {
       if (queryTargetState == 'pending') {
         expect(storage.getItem(_targetKey(targetId)), isNull);
@@ -560,7 +560,7 @@ void main() {
       );
       expect(state.mutationState, hasLength(1));
       expect(state.mutationState[1]!.$1, MutationBatchState.rejected);
-      final FirestoreError error = state.mutationState[1]!.$2!;
+      final FirestoreException error = state.mutationState[1]!.$2!;
       expect(error.code, FirestoreErrorCode.internal);
       expect(error.message, 'Test Error');
     });
@@ -756,7 +756,8 @@ void main() {
         state.targetState[firstClientTargetId]!.$1,
         QueryTargetState.rejected,
       );
-      final FirestoreError error = state.targetState[firstClientTargetId]!.$2!;
+      final FirestoreException error =
+          state.targetState[firstClientTargetId]!.$2!;
       expect(error.code, FirestoreErrorCode.internal);
       expect(error.message, 'Test Error');
     });

@@ -56,7 +56,7 @@ class Filter {
   /// Creates a new filter for checking that the given field is equal to the
   /// given value.
   static Filter equalTo(String field, Object? value) =>
-      equalToField(FieldPath.fromDotSeparatedPath(field), value);
+      equalToField(FieldPath.fromString(field), value);
 
   /// Creates a new filter for checking that the given field path is equal to
   /// the given value.
@@ -66,7 +66,7 @@ class Filter {
   /// Creates a new filter for checking that the given field is not equal to
   /// the given value. Documents without the field do not match.
   static Filter notEqualTo(String field, Object? value) =>
-      notEqualToField(FieldPath.fromDotSeparatedPath(field), value);
+      notEqualToField(FieldPath.fromString(field), value);
 
   /// Creates a new filter for checking that the given field path is not equal
   /// to the given value.
@@ -76,7 +76,7 @@ class Filter {
   /// Creates a new filter for checking that the given field is greater than
   /// the given value.
   static Filter greaterThan(String field, Object? value) =>
-      greaterThanField(FieldPath.fromDotSeparatedPath(field), value);
+      greaterThanField(FieldPath.fromString(field), value);
 
   /// Creates a new filter for checking that the given field path is greater
   /// than the given value.
@@ -86,7 +86,7 @@ class Filter {
   /// Creates a new filter for checking that the given field is greater than or
   /// equal to the given value.
   static Filter greaterThanOrEqualTo(String field, Object? value) =>
-      greaterThanOrEqualToField(FieldPath.fromDotSeparatedPath(field), value);
+      greaterThanOrEqualToField(FieldPath.fromString(field), value);
 
   /// Creates a new filter for checking that the given field path is greater
   /// than or equal to the given value.
@@ -96,7 +96,7 @@ class Filter {
   /// Creates a new filter for checking that the given field is less than the
   /// given value.
   static Filter lessThan(String field, Object? value) =>
-      lessThanField(FieldPath.fromDotSeparatedPath(field), value);
+      lessThanField(FieldPath.fromString(field), value);
 
   /// Creates a new filter for checking that the given field path is less than
   /// the given value.
@@ -106,7 +106,7 @@ class Filter {
   /// Creates a new filter for checking that the given field is less than or
   /// equal to the given value.
   static Filter lessThanOrEqualTo(String field, Object? value) =>
-      lessThanOrEqualToField(FieldPath.fromDotSeparatedPath(field), value);
+      lessThanOrEqualToField(FieldPath.fromString(field), value);
 
   /// Creates a new filter for checking that the given field path is less than
   /// or equal to the given value.
@@ -116,7 +116,7 @@ class Filter {
   /// Creates a new filter for checking that the given array field contains the
   /// given value.
   static Filter arrayContains(String field, Object? value) =>
-      arrayContainsField(FieldPath.fromDotSeparatedPath(field), value);
+      arrayContainsField(FieldPath.fromString(field), value);
 
   /// Creates a new filter for checking that the given array field path
   /// contains the given value.
@@ -126,7 +126,7 @@ class Filter {
   /// Creates a new filter for checking that the given array field contains any
   /// of the given values.
   static Filter arrayContainsAny(String field, List<Object?> values) =>
-      arrayContainsAnyField(FieldPath.fromDotSeparatedPath(field), values);
+      arrayContainsAnyField(FieldPath.fromString(field), values);
 
   /// Creates a new filter for checking that the given array field path
   /// contains any of the given values.
@@ -138,7 +138,7 @@ class Filter {
   /// Creates a new filter for checking that the given field equals any of the
   /// given values. This is the `in` operator of the other SDKs.
   static Filter inArray(String field, List<Object?> values) =>
-      inArrayField(FieldPath.fromDotSeparatedPath(field), values);
+      inArrayField(FieldPath.fromString(field), values);
 
   /// Creates a new filter for checking that the given field path equals any of
   /// the given values.
@@ -149,7 +149,7 @@ class Filter {
   /// of the given values. This is the `not-in` operator of the other SDKs; documents without the
   /// field do not match.
   static Filter notInArray(String field, List<Object?> values) =>
-      notInArrayField(FieldPath.fromDotSeparatedPath(field), values);
+      notInArrayField(FieldPath.fromString(field), values);
 
   /// Creates a new filter for checking that the given field path does not
   /// equal any of the given values.

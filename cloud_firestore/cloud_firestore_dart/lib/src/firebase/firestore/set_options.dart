@@ -67,9 +67,7 @@ class SetOptions {
   /// for one of [fields].
   factory SetOptions.mergeFields(List<String> fields) {
     final Set<model.FieldPath> fieldPaths = fields
-        .map(
-          (String field) => FieldPath.fromDotSeparatedPath(field).internalPath,
-        )
+        .map((String field) => FieldPath.fromString(field).internalPath)
         .toSet();
     return SetOptions._(true, FieldMask(fieldPaths));
   }

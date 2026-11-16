@@ -34,9 +34,9 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/util/util.dart';
 /// listen to the location. There may or may not exist a document at the referenced location. A [DocumentReference] can
 /// also be used to create a [CollectionReference] to a subcollection.
 ///
-/// Get one from [Firestore.doc] or [CollectionReference.doc]. Creating a reference does not contact the backend.
+/// Get one from [FirebaseFirestore.doc] or [CollectionReference.doc]. Creating a reference does not contact the backend.
 /// [T] is the type of the document data, `Map<String, Object?>` unless a converter was attached with
-/// [withConverter]. Two references are equal when they point to the same document of the same [Firestore] instance
+/// [withConverter]. Two references are equal when they point to the same document of the same [FirebaseFirestore] instance
 /// with the same converter.
 ///
 /// Writes ([set], [update], [delete]) are applied to the local cache at once and their futures complete when the
@@ -60,15 +60,15 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/util/util.dart';
 /// is not supported in production code and new SDK releases may break code that does so.
 class DocumentReference<T extends dynamic> {
   // TODO(long1eu): We should checkNotNull(firestore), but tests are currently cheating and setting it to null.
-  /// Implementation detail of the SDK; not part of the supported API. Use [Firestore.doc] or
+  /// Implementation detail of the SDK; not part of the supported API. Use [FirebaseFirestore.doc] or
   /// [CollectionReference.doc].
   DocumentReference._(this._key, this.firestore, [this.converter]);
 
-  /// Implementation detail of the SDK; not part of the supported API. Use [Firestore.doc] or
+  /// Implementation detail of the SDK; not part of the supported API. Use [FirebaseFirestore.doc] or
   /// [CollectionReference.doc].
   factory DocumentReference._forPath(
     ResourcePath path,
-    Firestore firestore, [
+    FirebaseFirestore firestore, [
     FirestoreDataConverter<T>? converter,
   ]) {
     if (path.isEmpty) {
@@ -95,7 +95,7 @@ class DocumentReference<T extends dynamic> {
   /// Throws an [ArgumentError] if [json] does not have that shape or `referencePath` is not a document path. This is
   /// the JS SDK `DocumentReference.fromJSON()`.
   factory DocumentReference.fromJson(
-    Firestore firestore,
+    FirebaseFirestore firestore,
     Map<String, Object?> json, {
     FirestoreDataConverter<T>? converter,
   }) {
@@ -135,7 +135,7 @@ class DocumentReference<T extends dynamic> {
 
   /// The Firestore instance this reference belongs to. A `WriteBatch` or a `Transaction` only accepts references of
   /// its own instance.
-  final Firestore firestore;
+  final FirebaseFirestore firestore;
 
   /// The converter attached with [withConverter], or null for raw maps.
   final FirestoreDataConverter<T>? converter;
@@ -225,7 +225,7 @@ class DocumentReference<T extends dynamic> {
   /// Returns a Future that will be resolved when the write finishes, that is when the backend has acknowledged it.
   /// The write is applied to the local cache at once, so reads and listeners see it immediately; while the client is
   /// offline the future does not complete. The future fails with an [ArgumentError] when [data] holds a value
-  /// Firestore cannot store, and with a [FirestoreError] when the backend rejects the write (for example
+  /// Firestore cannot store, and with a [FirestoreException] when the backend rejects the write (for example
   /// [FirestoreErrorCode.permissionDenied]).
   ///
   /// Values can be `null`, `bool`, `int`, `double`, `String`, `Timestamp`, `DateTime`, `GeoPoint`, `Blob`,
@@ -316,7 +316,7 @@ class DocumentReference<T extends dynamic> {
   ///
   /// Returns a Future that will be resolved when the write finishes, that is when the backend has acknowledged it.
   /// The update is applied to the local cache at once; while the client is offline the future does not complete.
-  /// When the document does not exist the backend rejects the update and the future fails with a [FirestoreError]
+  /// When the document does not exist the backend rejects the update and the future fails with a [FirestoreException]
   /// with the code [FirestoreErrorCode.notFound]. The future fails with an [ArgumentError] for an invalid field path
   /// or value.
   ///
@@ -392,7 +392,7 @@ class DocumentReference<T extends dynamic> {
   ///     .get(Source.cache);
   /// ```
   Future<DocumentSnapshot<T>> get([Source? source]) async {
-    source ??= Source.defaultSource;
+    source ??= Source.serverAndCache;
 
     if (source == Source.cache) {
       final Document? doc = await firestore.client.getDocumentFromLocalCache(
@@ -424,14 +424,14 @@ class DocumentReference<T extends dynamic> {
           //  document.exists set to false. If we're offline however, we set the Error on the Task. Two options:
           //    1. Cache the negative response from the server so we can deliver that even when you're offline.
           //    2. Actually set the Error of the Task if the document doesn't exist when you are offline.
-          throw FirestoreError(
+          throw FirestoreException(
             'Failed to get document because the client is offline.',
             FirestoreErrorCode.unavailable,
           );
         } else if (snapshot.exists &&
             snapshot.metadata.isFromCache &&
             source == Source.server) {
-          throw FirestoreError(
+          throw FirestoreException(
             'Failed to get document from server. (However, this document does exist in the local cache. Run again '
             'without setting source to Source.SERVER to retrieve the cached document.)',
             FirestoreErrorCode.unavailable,
@@ -604,7 +604,7 @@ extension DocumentReferenceInternal<T> on DocumentReference<T> {
   /// A reference to the document with [key] in [firestore].
   static DocumentReference<T> create<T extends dynamic>(
     DocumentKey key,
-    Firestore firestore, [
+    FirebaseFirestore firestore, [
     FirestoreDataConverter<T>? converter,
   ]) => DocumentReference<T>._(key, firestore, converter);
 
@@ -612,7 +612,7 @@ extension DocumentReferenceInternal<T> on DocumentReference<T> {
   /// path.
   static DocumentReference<T> forPath<T extends dynamic>(
     ResourcePath path,
-    Firestore firestore, [
+    FirebaseFirestore firestore, [
     FirestoreDataConverter<T>? converter,
   ]) => DocumentReference<T>._forPath(path, firestore, converter);
 }

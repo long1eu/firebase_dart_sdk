@@ -76,7 +76,7 @@ void main() {
 
   persistenceTest('the cache is persistent and holds what was read and written',
       () async {
-    final Firestore firestore = await newClient(openDatabase: opener());
+    final FirebaseFirestore firestore = await newClient(openDatabase: opener());
     expect(firestore.client.persistence, isA<SQLitePersistence>());
     final DocumentReference<Json> doc =
         firestore.collection(newCollectionName()).doc('a');
@@ -91,7 +91,7 @@ void main() {
       () async {
     final String app = newAppName();
     final String collection = newCollectionName();
-    Firestore firestore = await newClient(openDatabase: opener(), appName: app);
+    FirebaseFirestore firestore = await newClient(openDatabase: opener(), appName: app);
     for (int i = 0; i < 3; i++) {
       await firestore.collection(collection).doc('d$i').set(<String, Object?>{
         'n': i,
@@ -122,7 +122,7 @@ void main() {
       () async {
     final String app = newAppName();
     final String collection = newCollectionName();
-    Firestore firestore = await newClient(openDatabase: opener(), appName: app);
+    FirebaseFirestore firestore = await newClient(openDatabase: opener(), appName: app);
     await firestore.collection(collection).doc('synced').set(<String, Object?>{
       'v': 1,
     });
@@ -157,7 +157,7 @@ void main() {
     // Back online the queue is sent, once.
     await firestore.enableNetwork();
     await firestore.waitForPendingWrites().timeout(const Duration(seconds: 20));
-    final Firestore other = await newClient();
+    final FirebaseFirestore other = await newClient();
     final QuerySnapshot<Json> server =
         await other.collection(collection).get(Source.server);
     expect(<String, Object?>{
@@ -176,10 +176,10 @@ void main() {
     // What a second tab runs into: the same origin, the same lock.
     await expectLater(
         opener()(name, version: 1),
-        throwsA(isA<FirestoreError>()
-            .having((FirestoreError e) => e.code, 'code',
+        throwsA(isA<FirestoreException>()
+            .having((FirestoreException e) => e.code, 'code',
                 FirestoreErrorCode.failedPrecondition)
-            .having((FirestoreError e) => e.message, 'message',
+            .having((FirestoreException e) => e.message, 'message',
                 contains('another tab'))));
 
     // Another database is not affected.
@@ -192,7 +192,7 @@ void main() {
     for (int i = 0; i < 50 && again == null; i++) {
       try {
         again = await opener()(name, version: 1);
-      } on FirestoreError {
+      } on FirestoreException {
         await Future<void>.delayed(const Duration(milliseconds: 20));
       }
     }
@@ -207,7 +207,7 @@ void main() {
     // for.
     final String app = newAppName();
     final String collection = newCollectionName();
-    Firestore firestore = await newClient(openDatabase: opener(), appName: app);
+    FirebaseFirestore firestore = await newClient(openDatabase: opener(), appName: app);
     await firestore.collection(collection).doc('a').set(<String, Object?>{'a': 1});
     final String storageName = (await storedDatabases(app)).single;
     await shutDown(firestore);
@@ -231,7 +231,7 @@ void main() {
 
     await expectLater(
         newClient(openDatabase: opener(), appName: app),
-        throwsA(isA<FirestoreError>().having((FirestoreError e) => e.code,
+        throwsA(isA<FirestoreException>().having((FirestoreException e) => e.code,
             'code', FirestoreErrorCode.failedPrecondition)));
 
     // The other "tab" goes away: the cache can be opened again, with its data.
@@ -246,13 +246,13 @@ void main() {
   persistenceTest('clearPersistence deletes the stored cache', () async {
     final String app = newAppName();
     final String collection = newCollectionName();
-    Firestore firestore = await newClient(openDatabase: opener(), appName: app);
+    FirebaseFirestore firestore = await newClient(openDatabase: opener(), appName: app);
     await firestore.collection(collection).doc('a').set(<String, Object?>{'a': 1});
 
     // Refused while the client runs, as everywhere.
     await expectLater(
         firestore.clearPersistence(),
-        throwsA(isA<FirestoreError>().having((FirestoreError e) => e.code,
+        throwsA(isA<FirestoreException>().having((FirestoreException e) => e.code,
             'code', FirestoreErrorCode.failedPrecondition)));
 
     await firestore.terminate();
@@ -271,7 +271,7 @@ void main() {
 
   persistenceTest('the index engine works on it (automatic index creation)',
       () async {
-    final Firestore firestore = await newClient(openDatabase: opener());
+    final FirebaseFirestore firestore = await newClient(openDatabase: opener());
     final LocalStore localStore = firestore.client.localStore;
     final PersistentCacheIndexManager indexes =
         firestore.persistentCacheIndexManager!;

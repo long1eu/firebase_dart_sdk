@@ -10,7 +10,7 @@ void main() {
     FirebaseUserAuth.emulatorHostFromEnvironment,
     OAuthTokenProvider.datastoreScopes,
     InMemoryAuthStorage(),
-    const FirebaseAuthProviderException('code', 'message'),
+    const FirebaseAuthException('code', 'message'),
     OAuthTokenProvider.serviceAccount,
   ]);
 }

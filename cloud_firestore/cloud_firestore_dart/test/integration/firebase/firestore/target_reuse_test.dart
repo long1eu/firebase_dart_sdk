@@ -32,15 +32,16 @@ void main() {
     addTearDown(() => DatabaseMock.deleteDatabaseFiles(dbName));
     final String name = 'target-reuse-${const Uuid().v4()}';
 
-    Future<Firestore> open() => IntegrationTestUtil.testFirestoreInstance(
-      IntegrationTestUtil.provider.projectId,
-      InternalLogLevel.w,
-      IntegrationTestUtil.newTestSettings(),
-      IntegrationTestUtil.currentDatabasePath,
-      fixedDbName: dbName,
-    );
+    Future<FirebaseFirestore> open() =>
+        IntegrationTestUtil.testFirestoreInstance(
+          IntegrationTestUtil.provider.projectId,
+          InternalLogLevel.w,
+          IntegrationTestUtil.newTestSettings(),
+          IntegrationTestUtil.currentDatabasePath,
+          fixedDbName: dbName,
+        );
 
-    Map<String, Query<Map<String, Object?>>> queries(Firestore db) {
+    Map<String, Query<Map<String, Object?>>> queries(FirebaseFirestore db) {
       final CollectionReference<Map<String, Object?>> rooms = db.collection(
         name,
       );
@@ -78,11 +79,11 @@ void main() {
         .map((QueryDocumentSnapshot<Map<String, Object?>> d) => d.id)
         .toList();
 
-    Future<QueryData?> stored(Firestore db, Query<Object?> query) =>
+    Future<QueryData?> stored(FirebaseFirestore db, Query<Object?> query) =>
         db.client.localStore.getQueryData(query.query.toTarget());
 
     // First run: write the documents and listen to the queries.
-    Firestore db = await open();
+    FirebaseFirestore db = await open();
     await db.collection(name).doc('a').set(<String, Object?>{
       'at': const Timestamp(20, 0),
       'owner': db.doc('users/eros'),

@@ -66,7 +66,9 @@ void main() {
       pollInterval: pollInterval,
       now: () => clock = clock.add(pollInterval),
     );
-    final Firestore db = await env.newClient(connectivityDetector: detector);
+    final FirebaseFirestore db = await env.newClient(
+      connectivityDetector: detector,
+    );
     // The remote store installed its handler; count the signals on top of it.
     final void Function() restart = detector.onChange!;
     detector.onChange = () {

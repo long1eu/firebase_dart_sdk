@@ -3,7 +3,7 @@ import 'package:test/test.dart';
 
 const FirebaseOptions _options = FirebaseOptions(
   apiKey: 'key',
-  applicationId: 'app-id',
+  appId: 'app-id',
 );
 
 void main() {

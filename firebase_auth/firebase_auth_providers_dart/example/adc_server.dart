@@ -39,7 +39,7 @@ Future<void> main(List<String> arguments) async {
       // An empty API key is not sent with Firestore requests.
       apiKey: '',
       // Any non-empty id works outside of Android and iOS.
-      applicationId: '1:1234567890:dart:server',
+      appId: '1:1234567890:dart:server',
       projectId: projectId,
     ),
   );
@@ -49,13 +49,13 @@ Future<void> main(List<String> arguments) async {
   app.authProvider = applicationDefaultCredentials();
 
   // A server has no use for a cache on disk: the default memory cache.
-  final Firestore firestore = Firestore.instanceFor(app: app);
+  final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(app: app);
   try {
     final DocumentSnapshot<Map<String, Object?>> snapshot = await firestore
         .doc(path)
         .get(Source.server);
     print('$path exists: ${snapshot.exists}');
-  } on FirestoreError catch (e) {
+  } on FirestoreException catch (e) {
     // unauthenticated: no credentials were found, or they were refused;
     // permission-denied: the account lacks the Cloud Datastore User role.
     print('reading $path failed: ${e.code}: ${e.message}');

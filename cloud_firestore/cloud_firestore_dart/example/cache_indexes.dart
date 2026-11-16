@@ -21,7 +21,7 @@ Future<void> main() async {
     'firestore_example_',
   );
 
-  final Firestore firestore = Firestore.instanceFor(
+  final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(
     app: exampleApp(),
     // Cache indexes need the persistent cache: with a memory cache
     // `persistentCacheIndexManager` is null.

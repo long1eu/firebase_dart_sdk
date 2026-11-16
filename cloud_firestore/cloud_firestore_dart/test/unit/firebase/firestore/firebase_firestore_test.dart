@@ -34,8 +34,8 @@ Matcher get throwsAlreadyStarted => throwsA(
 );
 
 /// Settings that point at a port nothing listens on.
-FirestoreSettings loopback({int port = 1}) =>
-    FirestoreSettings(host: '127.0.0.1', port: port, sslEnabled: false);
+Settings loopback({int port = 1}) =>
+    Settings(host: '127.0.0.1', port: port, sslEnabled: false);
 
 void main() {
   checkTestsLeaveNothingBehind();
@@ -44,7 +44,7 @@ void main() {
     final FirebaseApp app = FirebaseApp.withOptions(
       const FirebaseOptions(
         apiKey: 'fake-api-key',
-        applicationId: '1:1234567890:dart:test',
+        appId: '1:1234567890:dart:test',
         projectId: 'test-project',
       ),
       dependencies: null,
@@ -54,14 +54,14 @@ void main() {
     return app;
   }
 
-  Firestore instanceFor(
+  FirebaseFirestore instanceFor(
     FirebaseApp app, {
     String database = '(default)',
-    FirestoreSettings? settings,
+    Settings? settings,
   }) {
-    final Firestore firestore = Firestore.instanceFor(
+    final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(
       app: app,
-      database: database,
+      databaseId: database,
       settings: settings,
     );
     addTearDown(firestore.terminate);
@@ -70,7 +70,7 @@ void main() {
 
   /// Uses [firestore] without a backend, like the first call that starts an
   /// instance upstream.
-  Future<void> use(Firestore firestore) async {
+  Future<void> use(FirebaseFirestore firestore) async {
     await firestore.collection('foo').get(Source.cache);
   }
 
@@ -78,11 +78,11 @@ void main() {
     test('getInstance_withEmulator', () {
       final FirebaseApp app = newApp('getInstance_withEmulator');
 
-      final Firestore firestore = instanceFor(
+      final FirebaseFirestore firestore = instanceFor(
         app,
-        settings: FirestoreSettings().withEmulator('10.0.2.2', 8080),
+        settings: Settings().withEmulator('10.0.2.2', 8080),
       );
-      final FirestoreSettings settings = firestore.settings;
+      final Settings settings = firestore.settings;
 
       expect('${settings.host}:${settings.port}', '10.0.2.2:8080');
       expect(settings.sslEnabled, isFalse);
@@ -95,13 +95,13 @@ void main() {
         'getInstance_withEmulator_mergeSettingsSuccess',
       );
 
-      final Firestore firestore = instanceFor(
+      final FirebaseFirestore firestore = instanceFor(
         app,
-        settings: FirestoreSettings(
+        settings: Settings(
           cacheSettings: const MemoryCacheSettings(),
         ).withEmulator('10.0.2.2', 8080),
       );
-      final FirestoreSettings settings = firestore.settings;
+      final Settings settings = firestore.settings;
 
       expect('${settings.host}:${settings.port}', '10.0.2.2:8080');
       expect(settings.sslEnabled, isFalse);
@@ -111,13 +111,16 @@ void main() {
     test('getInstance_withEmulator_lateFailure', () {
       final FirebaseApp app = newApp('getInstance_withEmulator_lateFailure');
 
-      final Firestore firestore = instanceFor(app, settings: loopback());
+      final FirebaseFirestore firestore = instanceFor(
+        app,
+        settings: loopback(),
+      );
       firestore.collection('foo');
 
       expect(
-        () => Firestore.instanceFor(
+        () => FirebaseFirestore.instanceFor(
           app: app,
-          settings: FirestoreSettings().withEmulator('10.0.2.2', 8080),
+          settings: Settings().withEmulator('10.0.2.2', 8080),
         ),
         throwsAlreadyStarted,
       );
@@ -125,19 +128,19 @@ void main() {
 
     test('setSettings_repeatedSuccess', () async {
       final FirebaseApp app = newApp('setSettings_repeatedSuccess');
-      final FirestoreSettings settings = loopback();
-      final Firestore firestore = instanceFor(app, settings: settings);
+      final Settings settings = loopback();
+      final FirebaseFirestore firestore = instanceFor(app, settings: settings);
 
       // This should 'start' Firestore
       await use(firestore);
 
       // Second settings set should pass because the settings are equal
       expect(
-        Firestore.instanceFor(app: app, settings: settings),
+        FirebaseFirestore.instanceFor(app: app, settings: settings),
         same(firestore),
       );
       expect(
-        Firestore.instanceFor(app: app, settings: loopback()),
+        FirebaseFirestore.instanceFor(app: app, settings: loopback()),
         same(firestore),
       );
     });
@@ -146,32 +149,35 @@ void main() {
       final FirebaseApp app = newApp(
         'setSettings_repeatedSuccess_withEmulator',
       );
-      FirestoreSettings settings() => FirestoreSettings(
+      Settings settings() => Settings(
         cacheSettings: const MemoryCacheSettings(),
       ).withEmulator('127.0.0.1', 1);
-      final Firestore firestore = instanceFor(app, settings: settings());
+      final FirebaseFirestore firestore = instanceFor(
+        app,
+        settings: settings(),
+      );
 
       // This should 'start' Firestore
       await use(firestore);
 
       // Second settings set should pass because the settings are equal
       expect(
-        Firestore.instanceFor(app: app, settings: settings()),
+        FirebaseFirestore.instanceFor(app: app, settings: settings()),
         same(firestore),
       );
     });
 
     test('setSettings_repeatedFailure', () async {
       final FirebaseApp app = newApp('setSettings_repeatedFailure');
-      final FirestoreSettings settings = loopback();
-      final FirestoreSettings otherSettings = loopback(port: 2);
-      final Firestore firestore = instanceFor(app, settings: settings);
+      final Settings settings = loopback();
+      final Settings otherSettings = loopback(port: 2);
+      final FirebaseFirestore firestore = instanceFor(app, settings: settings);
 
       // This should 'start' Firestore
       await use(firestore);
 
       expect(
-        () => Firestore.instanceFor(app: app, settings: otherSettings),
+        () => FirebaseFirestore.instanceFor(app: app, settings: otherSettings),
         throwsAlreadyStarted,
       );
       // The instance keeps the settings it was created with.
@@ -182,17 +188,17 @@ void main() {
   group('Firestore Provider', () {
     test('can provide setting', () {
       final FirebaseApp app = newApp('test-app-initializeFirestore');
-      final Firestore fs1 = instanceFor(app, settings: loopback());
-      expect(fs1, isA<Firestore>());
+      final FirebaseFirestore fs1 = instanceFor(app, settings: loopback());
+      expect(fs1, isA<FirebaseFirestore>());
     });
 
     test('returns same default instance from named app', () {
       final FirebaseApp app = newApp('test-app-getFirestore');
-      final Firestore fs1 = instanceFor(app, settings: loopback());
-      final Firestore fs2 = Firestore.instanceFor(app: app);
-      final Firestore fs3 = Firestore.instanceFor(
+      final FirebaseFirestore fs1 = instanceFor(app, settings: loopback());
+      final FirebaseFirestore fs2 = FirebaseFirestore.instanceFor(app: app);
+      final FirebaseFirestore fs3 = FirebaseFirestore.instanceFor(
         app: app,
-        database: '(default)',
+        databaseId: '(default)',
       );
       expect(fs1, same(fs2));
       expect(fs1, same(fs3));
@@ -200,17 +206,17 @@ void main() {
 
     test('returns different instance from named app', () {
       final FirebaseApp app = newApp('test-app-getFirestore');
-      final Firestore fs1 = instanceFor(
+      final FirebaseFirestore fs1 = instanceFor(
         app,
         database: 'init1',
         settings: loopback(),
       );
-      final Firestore fs2 = instanceFor(
+      final FirebaseFirestore fs2 = instanceFor(
         app,
         database: 'init2',
         settings: loopback(),
       );
-      final Firestore fs3 = instanceFor(app, settings: loopback());
+      final FirebaseFirestore fs3 = instanceFor(app, settings: loopback());
 
       expect(fs1.databaseId, 'init1');
       expect(fs2.databaseId, 'init2');
@@ -221,11 +227,11 @@ void main() {
     });
 
     test('returns different instance from different named app', () {
-      final Firestore fs1 = instanceFor(
+      final FirebaseFirestore fs1 = instanceFor(
         newApp('test-app-getFirestore-1'),
         settings: loopback(),
       );
-      final Firestore fs2 = instanceFor(
+      final FirebaseFirestore fs2 = instanceFor(
         newApp('test-app-getFirestore-2'),
         settings: loopback(),
       );
@@ -234,8 +240,8 @@ void main() {
 
     test('can call initializeFirestore() twice if settings are same', () {
       final FirebaseApp app = newApp('test-app-initializeFirestore-twice');
-      final Firestore fs1 = instanceFor(app, settings: loopback());
-      final Firestore fs2 = Firestore.instanceFor(
+      final FirebaseFirestore fs1 = instanceFor(app, settings: loopback());
+      final FirebaseFirestore fs2 = FirebaseFirestore.instanceFor(
         app: app,
         settings: loopback(),
       );
@@ -248,7 +254,10 @@ void main() {
       final FirebaseApp app = newApp('test-app-initializeFirestore-different');
       instanceFor(app, settings: loopback());
       expect(
-        () => Firestore.instanceFor(app: app, settings: loopback(port: 2)),
+        () => FirebaseFirestore.instanceFor(
+          app: app,
+          settings: loopback(port: 2),
+        ),
         throwsAlreadyStarted,
       );
     });
@@ -257,12 +266,15 @@ void main() {
       'a terminated instance can be created again with other settings',
       () async {
         final FirebaseApp app = newApp('test-app-terminated');
-        final Firestore fs1 = Firestore.instanceFor(
+        final FirebaseFirestore fs1 = FirebaseFirestore.instanceFor(
           app: app,
           settings: loopback(),
         );
         await fs1.terminate();
-        final Firestore fs2 = instanceFor(app, settings: loopback(port: 2));
+        final FirebaseFirestore fs2 = instanceFor(
+          app,
+          settings: loopback(port: 2),
+        );
         expect(fs2, isNot(same(fs1)));
         expect(fs2.settings.port, 2);
       },
@@ -272,15 +284,12 @@ void main() {
   group('FirestoreSettings', () {
     test('disallows changing settings after use', () async {
       final FirebaseApp app = newApp('disallows-changing-settings');
-      final Firestore db = instanceFor(app, settings: loopback());
+      final FirebaseFirestore db = instanceFor(app, settings: loopback());
       await use(db);
       expect(
-        () => Firestore.instanceFor(
+        () => FirebaseFirestore.instanceFor(
           app: app,
-          settings: FirestoreSettings().withEmulator(
-            'something-else.example.com',
-            8080,
-          ),
+          settings: Settings().withEmulator('something-else.example.com', 8080),
         ),
         throwsAlreadyStarted,
       );
@@ -289,10 +298,7 @@ void main() {
     test('connectFirestoreEmulator() can set host and port', () {
       final FirebaseApp app = newApp('emulator-host-and-port');
       // Verify that this doesn't throw.
-      instanceFor(
-        app,
-        settings: FirestoreSettings().withEmulator('127.0.0.1', 9000),
-      );
+      instanceFor(app, settings: Settings().withEmulator('127.0.0.1', 9000));
     });
 
     test('connectFirestoreEmulator() can set mockUserToken object', () {
@@ -300,7 +306,7 @@ void main() {
       // Verify that this doesn't throw.
       instanceFor(
         app,
-        settings: FirestoreSettings().withEmulator(
+        settings: Settings().withEmulator(
           '127.0.0.1',
           9000,
           mockUserToken: <String, Object?>{'sub': 'foo'},
@@ -312,12 +318,12 @@ void main() {
       'disallows calling connectFirestoreEmulator() for first time after use',
       () async {
         final FirebaseApp app = newApp('emulator-first-time-after-use');
-        final Firestore db = instanceFor(app, settings: loopback());
+        final FirebaseFirestore db = instanceFor(app, settings: loopback());
         await use(db);
         expect(
-          () => Firestore.instanceFor(
+          () => FirebaseFirestore.instanceFor(
             app: app,
-            settings: FirestoreSettings().withEmulator('127.0.0.1', 9000),
+            settings: Settings().withEmulator('127.0.0.1', 9000),
           ),
           throwsAlreadyStarted,
         );
@@ -328,15 +334,15 @@ void main() {
       'allows calling connectFirestoreEmulator() after use with same config',
       () async {
         final FirebaseApp app = newApp('emulator-same-config');
-        final Firestore db = instanceFor(
+        final FirebaseFirestore db = instanceFor(
           app,
-          settings: FirestoreSettings().withEmulator('127.0.0.1', 1),
+          settings: Settings().withEmulator('127.0.0.1', 1),
         );
         await use(db);
         expect(
-          Firestore.instanceFor(
+          FirebaseFirestore.instanceFor(
             app: app,
-            settings: FirestoreSettings().withEmulator('127.0.0.1', 1),
+            settings: Settings().withEmulator('127.0.0.1', 1),
           ),
           same(db),
         );
@@ -348,15 +354,15 @@ void main() {
       'config',
       () async {
         final FirebaseApp app = newApp('emulator-different-config');
-        final Firestore db = instanceFor(
+        final FirebaseFirestore db = instanceFor(
           app,
-          settings: FirestoreSettings().withEmulator('127.0.0.1', 1),
+          settings: Settings().withEmulator('127.0.0.1', 1),
         );
         await use(db);
         expect(
-          () => Firestore.instanceFor(
+          () => FirebaseFirestore.instanceFor(
             app: app,
-            settings: FirestoreSettings().withEmulator('127.0.0.1', 2),
+            settings: Settings().withEmulator('127.0.0.1', 2),
           ),
           throwsAlreadyStarted,
         );

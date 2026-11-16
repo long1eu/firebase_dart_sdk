@@ -8,7 +8,7 @@ import 'package:rxdart/rxdart.dart';
 import 'package:test/test.dart';
 
 const FirebaseOptions _options =
-    FirebaseOptions(apiKey: 'k', applicationId: 'app');
+    FirebaseOptions(apiKey: 'k', appId: 'app');
 
 class _Deps extends PlatformDependencies {
   final BehaviorSubject<bool> background = BehaviorSubject<bool>.seeded(false);
@@ -17,7 +17,7 @@ class _Deps extends PlatformDependencies {
   BehaviorSubject<bool> get onBackgroundChanged => background;
 }
 
-class _FailingTokenProvider implements InternalTokenProvider {
+class _FailingTokenProvider implements AuthTokenProvider {
   int calls = 0;
 
   @override
@@ -27,8 +27,8 @@ class _FailingTokenProvider implements InternalTokenProvider {
   }
 
   @override
-  Stream<InternalTokenResult> get onTokenChanged =>
-      const Stream<InternalTokenResult>.empty();
+  Stream<AuthTokenChange> get onTokenChanged =>
+      const Stream<AuthTokenChange>.empty();
 
   @override
   String? get uid => null;
@@ -75,7 +75,7 @@ void main() {
       final _Deps deps = _Deps();
       final FirebaseApp app =
           FirebaseApp.withOptions(_options, dependencies: deps);
-      expect(app.dataCollectionDefaultEnabled, isTrue);
+      expect(app.isAutomaticDataCollectionEnabled, isTrue);
 
       final List<bool> changes = <bool>[];
       final StreamSubscription<bool> sub =
@@ -87,20 +87,20 @@ void main() {
       await sub.cancel();
 
       expect(changes, <bool>[false]);
-      expect(app.dataCollectionDefaultEnabled, isFalse);
+      expect(app.isAutomaticDataCollectionEnabled, isFalse);
       expect(deps.get('firebase_data_collection_default_enabled'), 'false');
 
       // A new app over the same storage starts from the persisted value.
       app.delete();
       final FirebaseApp again =
           FirebaseApp.withOptions(_options, dependencies: deps);
-      expect(again.dataCollectionDefaultEnabled, isFalse);
+      expect(again.isAutomaticDataCollectionEnabled, isFalse);
     });
 
     test('a deleted app refuses data collection calls', () {
       final FirebaseApp app = FirebaseApp.withOptions(_options);
       app.delete();
-      expect(() => app.dataCollectionDefaultEnabled, throwsStateError);
+      expect(() => app.isAutomaticDataCollectionEnabled, throwsStateError);
       expect(() => app.setDataCollectionDefaultEnabled(enabled: false),
           throwsStateError);
       expect(() => app.setAutomaticResourceManagementEnabled(enabled: true),

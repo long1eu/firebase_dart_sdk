@@ -88,8 +88,8 @@ void main() {
               map<dynamic>(<dynamic>['e', 'f', 'ignore', true])
             ]),
             SetOptions.mergeFieldPaths(<FieldPath>[
-              FieldPath.of(<String>['e']),
-              FieldPath.of(<String>['nested', 'e'])
+              FieldPath(<String>['e']),
+              FieldPath(<String>['nested', 'e'])
             ]))
         .commit();
 
@@ -123,11 +123,11 @@ void main() {
     await doc.set(map(<String>['a.b', 'old', 'c.d', 'old']));
 
     await doc.firestore.batch().updateFromList(doc, <dynamic>[
-      FieldPath.of(<String>['a.b']),
+      FieldPath(<String>['a.b']),
       'new'
     ]).commit();
     await doc.firestore.batch().updateFromList(doc, <dynamic>[
-      FieldPath.of(<String>['c.d']),
+      FieldPath(<String>['c.d']),
       'new'
     ]).commit();
 
@@ -178,8 +178,8 @@ void main() {
 
   test('testBatchesCommitAtomicallyRaisingCorrectEvents', () async {
     final CollectionReference collection = await testCollection();
-    final DocumentReference docA = collection.document('a');
-    final DocumentReference docB = collection.document('b');
+    final DocumentReference docA = collection.doc('a');
+    final DocumentReference docB = collection.doc('b');
     final EventAccumulator<QuerySnapshot> accumulator =
         EventAccumulator<QuerySnapshot>();
     collection
@@ -212,8 +212,8 @@ void main() {
 
   test('testBatchesFailAtomicallyRaisingCorrectEvents', () async {
     final CollectionReference collection = await testCollection();
-    final DocumentReference docA = collection.document('a');
-    final DocumentReference docB = collection.document('b');
+    final DocumentReference docA = collection.doc('a');
+    final DocumentReference docB = collection.doc('b');
     final EventAccumulator<QuerySnapshot> accumulator =
         EventAccumulator<QuerySnapshot>();
     collection
@@ -264,14 +264,14 @@ void main() {
     expect(serverSnap.length, 0);
 
     expect(err, isNotNull);
-    expect(err, const TypeMatcher<FirestoreError>());
+    expect(err, const TypeMatcher<FirestoreException>());
     expect(err.code, FirestoreErrorCode.notFound);
   });
 
   test('testWriteTheSameServerTimestampAcrossWrites', () async {
     final CollectionReference collection = await testCollection();
-    final DocumentReference docA = collection.document('a');
-    final DocumentReference docB = collection.document('b');
+    final DocumentReference docA = collection.doc('a');
+    final DocumentReference docB = collection.doc('b');
     final EventAccumulator<QuerySnapshot> accumulator =
         EventAccumulator<QuerySnapshot>();
     collection
@@ -304,7 +304,7 @@ void main() {
     }
     expect(serverSnap.metadata.hasPendingWrites, isFalse);
     expect(serverSnap.length, 2);
-    final Timestamp when = serverSnap.documents[0].getTimestamp('when')!;
+    final Timestamp when = serverSnap.docs[0].getTimestamp('when')!;
     expect(when, isNotNull);
     expect(querySnapshotToValues(serverSnap), <dynamic>[
       map<dynamic>(<dynamic>['when', when]),

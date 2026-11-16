@@ -46,10 +46,10 @@
 ///   }
 /// }
 /// ```
-class FirebaseAuthProviderException implements Exception {
+class FirebaseAuthException implements Exception {
   /// Creates an exception with the SDK style [code] (for example `wrong-password`) and a [message]. The
   /// package creates them; you need this only for tests and token providers of your own.
-  const FirebaseAuthProviderException(
+  const FirebaseAuthException(
     this.code,
     this.message, {
     this.serverCode,
@@ -69,7 +69,7 @@ class FirebaseAuthProviderException implements Exception {
   /// );
   /// print(e.code); // email-already-in-use
   /// ```
-  factory FirebaseAuthProviderException.fromServer(
+  factory FirebaseAuthException.fromServer(
     String serverMessage, {
     int? httpStatus,
   }) {
@@ -88,7 +88,7 @@ class FirebaseAuthProviderException implements Exception {
                 serverCode.contains('API_KEY_INVALID')
             ? 'invalid-api-key'
             : serverCode.toLowerCase().replaceAll(RegExp(r'[_\s]+'), '-'));
-    return FirebaseAuthProviderException(
+    return FirebaseAuthException(
       code,
       detail ?? _messages[code] ?? serverMessage,
       serverCode: serverCode,
@@ -97,7 +97,7 @@ class FirebaseAuthProviderException implements Exception {
   }
 
   /// The error code in the style of the Firebase SDKs: `wrong-password`, `email-already-in-use`,
-  /// `network-request-failed`, `internal-error`, ... (see the table of [FirebaseAuthProviderException]).
+  /// `network-request-failed`, `internal-error`, ... (see the table of [FirebaseAuthException]).
   final String code;
 
   /// A description of the error. It never contains a token or a password.

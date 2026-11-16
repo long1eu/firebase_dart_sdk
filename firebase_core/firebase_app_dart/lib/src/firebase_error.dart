@@ -5,8 +5,8 @@
 /// The base class of the errors thrown by the Firebase SDKs of this repository.
 ///
 /// `FirestoreError` of `cloud_firestore_dart` extends it. The subclasses below come from the Android
-/// SDK; of them, token providers use [FirebaseNoSignedInUserError] and
-/// [FirebaseApiNotAvailableError] to tell Firestore to send a request without a token.
+/// SDK; of them, token providers use [FirebaseNoSignedInUserException] and
+/// [FirebaseApiNotAvailableException] to tell Firestore to send a request without a token.
 ///
 /// ```dart
 /// import 'package:firebase_app_dart/firebase_app_dart.dart';
@@ -19,9 +19,9 @@
 ///   }
 /// }
 /// ```
-class FirebaseError implements Error {
+class FirebaseException implements Error {
   /// Creates an error with a [message] and, optionally, the stack trace of its origin.
-  const FirebaseError(this.message, [this.stackTrace]);
+  const FirebaseException(this.message, [this.stackTrace]);
 
   /// A description of what went wrong.
   final String message;
@@ -50,9 +50,9 @@ class FirebaseError implements Error {
 ///   return GetTokenResult(idToken);
 /// }
 /// ```
-class FirebaseNoSignedInUserError extends FirebaseError {
+class FirebaseNoSignedInUserException extends FirebaseException {
   /// Creates the error with a [message].
-  FirebaseNoSignedInUserError(super.message);
+  FirebaseNoSignedInUserException(super.message);
 }
 
 /// Thrown when a Firebase service or feature that an operation needs is not available.
@@ -67,9 +67,9 @@ class FirebaseNoSignedInUserError extends FirebaseError {
 ///   'App Check is not available.',
 /// );
 /// ```
-class FirebaseApiNotAvailableError extends FirebaseError {
+class FirebaseApiNotAvailableException extends FirebaseException {
   /// Creates the error with a [message].
-  const FirebaseApiNotAvailableError(super.message);
+  const FirebaseApiNotAvailableException(super.message);
 }
 
 /// A request to a Firebase service failed because of the network. Kept from the Android SDK; no
@@ -80,7 +80,7 @@ class FirebaseApiNotAvailableError extends FirebaseError {
 ///
 /// const FirebaseNetworkError error = FirebaseNetworkError('Offline.');
 /// ```
-class FirebaseNetworkError extends FirebaseError {
+class FirebaseNetworkError extends FirebaseException {
   /// Creates the error with a [message].
   const FirebaseNetworkError(super.message);
 }
@@ -95,7 +95,7 @@ class FirebaseNetworkError extends FirebaseError {
 ///   'Try again later.',
 /// );
 /// ```
-class FirebaseTooManyRequestsError extends FirebaseError {
+class FirebaseTooManyRequestsError extends FirebaseException {
   /// Creates the error with a [message].
   const FirebaseTooManyRequestsError(super.message);
 }

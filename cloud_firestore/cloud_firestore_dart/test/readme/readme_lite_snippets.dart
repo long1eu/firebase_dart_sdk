@@ -13,12 +13,12 @@ import 'package:cloud_firestore_dart/lite.dart';
 import 'package:firebase_app_dart/firebase_app_dart.dart';
 
 late FirebaseApp app;
-late Firestore firestore;
+late FirebaseFirestore firestore;
 
 // ../../docs/guides/lite.md:23
 Future<void> liteGuideLine23() async {
   // Synchronous, and nothing is sent until the first call.
-  final Firestore firestore = Firestore.instanceFor(app: app);
+  final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(app: app);
 
   final CollectionReference<Map<String, Object?>> cities = firestore.collection('cities');
   await cities.doc('LA').set({'name': 'Los Angeles', 'state': 'CA', 'population': 3900000});
@@ -49,7 +49,7 @@ Future<void> serverGuideLine297() async {
       request.response
         ..statusCode = task.exists ? HttpStatus.ok : HttpStatus.notFound
         ..write(jsonEncode(task.data ?? <String, Object?>{}));
-    } on FirestoreError catch (error) {
+    } on FirestoreException catch (error) {
       request.response
         ..statusCode = HttpStatus.serviceUnavailable
         ..write('${error.code}');
@@ -60,7 +60,7 @@ Future<void> serverGuideLine297() async {
 
 // ../../docs/guides/web.md:225
 Future<void> webGuideLine225() async {
-  final Firestore firestore = Firestore.instanceFor(app: app);
+  final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(app: app);
   final QuerySnapshot<Map<String, Object?>> notes =
       await firestore.collection('notes').limit(20).get();
 }

@@ -33,32 +33,33 @@ import 'package:collection/collection.dart';
 /// ```
 ///
 /// `Settings` is an alias of this class.
-class FirestoreSettings {
+class Settings {
   /// Creates settings; every argument has the default of the field of the same name.
   ///
   /// Throws an [ArgumentError] when [host] is not a plain host name or IP address (it must not contain a scheme,
   /// user info or path), when [sslEnabled] is false with the production host, when [cacheSizeBytes] is below
   /// [minimumCacheBytes] (and not [cacheSizeUnlimited]), when both long-polling options are turned on, and for the
-  /// invalid values described on [experimentalLongPollingOptions] and [grpcFlowControlWindow]. Throws a [StateError]
+  /// invalid values described on [webExperimentalLongPollingOptions] and [grpcFlowControlWindow]. Throws a [StateError]
   /// when [cacheSettings] is given together with a non-default [persistenceEnabled] or [cacheSizeBytes].
   ///
   /// To use the emulator, call [withEmulator] on the result rather than passing its host here.
-  FirestoreSettings({
+  Settings({
     String host = defaultHost,
     int port = defaultPort,
     bool sslEnabled = true,
     bool persistenceEnabled = true,
     int cacheSizeBytes = defaultCacheSizeBytes,
     LocalCacheSettings? cacheSettings,
-    bool experimentalForceLongPolling = false,
-    bool? experimentalAutoDetectLongPolling,
-    ExperimentalLongPollingOptions experimentalLongPollingOptions =
-        const ExperimentalLongPollingOptions(),
+    bool webExperimentalForceLongPolling = false,
+    bool? webExperimentalAutoDetectLongPolling,
+    WebExperimentalLongPollingOptions webExperimentalLongPollingOptions =
+        const WebExperimentalLongPollingOptions(),
     int grpcFlowControlWindow = defaultGrpcFlowControlWindow,
   }) : this._(
-         experimentalForceLongPolling: experimentalForceLongPolling,
-         experimentalAutoDetectLongPolling: experimentalAutoDetectLongPolling,
-         experimentalLongPollingOptions: experimentalLongPollingOptions,
+         webExperimentalForceLongPolling: webExperimentalForceLongPolling,
+         experimentalAutoDetectLongPolling:
+             webExperimentalAutoDetectLongPolling,
+         experimentalLongPollingOptions: webExperimentalLongPollingOptions,
          grpcFlowControlWindow: grpcFlowControlWindow,
          host: host,
          port: port,
@@ -73,7 +74,7 @@ class FirestoreSettings {
   /// [emulator] is true only for settings made by [withEmulator]; a
   /// [mockUserToken] is rejected without it, so that the unsigned token is
   /// never sent to a production host.
-  FirestoreSettings._({
+  Settings._({
     required String host,
     required this.port,
     required bool sslEnabled,
@@ -82,12 +83,12 @@ class FirestoreSettings {
     required this.cacheSettings,
     required bool emulator,
     required Object? mockUserToken,
-    required this.experimentalForceLongPolling,
+    required this.webExperimentalForceLongPolling,
     required bool? experimentalAutoDetectLongPolling,
-    required ExperimentalLongPollingOptions experimentalLongPollingOptions,
+    required WebExperimentalLongPollingOptions experimentalLongPollingOptions,
     required int grpcFlowControlWindow,
   }) : _emulator = emulator,
-       experimentalLongPollingOptions = _checkLongPollingOptions(
+       webExperimentalLongPollingOptions = _checkLongPollingOptions(
          experimentalLongPollingOptions,
        ),
        grpcFlowControlWindow = _checkGrpcFlowControlWindow(
@@ -95,8 +96,8 @@ class FirestoreSettings {
        ),
        host = _checkHost(host),
        sslEnabled = _checkSslEnabled(sslEnabled, host),
-       experimentalAutoDetectLongPolling = _resolveAutoDetectLongPolling(
-         experimentalForceLongPolling,
+       webExperimentalAutoDetectLongPolling = _resolveAutoDetectLongPolling(
+         webExperimentalForceLongPolling,
          experimentalAutoDetectLongPolling,
        ),
        mockUserToken = _checkMockUserToken(
@@ -210,21 +211,21 @@ class FirestoreSettings {
   /// For networks with a proxy or an antivirus that buffers responses, which
   /// otherwise shows as listeners and writes that never complete. Less
   /// efficient. Same as `experimentalForceLongPolling` of the JS SDK. Cannot be
-  /// combined with [experimentalAutoDetectLongPolling].
-  final bool experimentalForceLongPolling;
+  /// combined with [webExperimentalAutoDetectLongPolling].
+  final bool webExperimentalForceLongPolling;
 
   /// Web only (ignored where the client uses gRPC): switch a stream to long
   /// polling when its first response does not arrive in time, which is how a
   /// buffering proxy shows. On by default, unless
-  /// [experimentalForceLongPolling] is set. The option of the same name of the
+  /// [webExperimentalForceLongPolling] is set. The option of the same name of the
   /// JS SDK has the same purpose but detects differently.
-  final bool experimentalAutoDetectLongPolling;
+  final bool webExperimentalAutoDetectLongPolling;
 
-  /// Web only: options of long polling, see [ExperimentalLongPollingOptions].
+  /// Web only: options of long polling, see [WebExperimentalLongPollingOptions].
   /// Same as `experimentalLongPollingOptions` of the JS SDK. Throws an
-  /// [ArgumentError] when [ExperimentalLongPollingOptions.timeoutSeconds] is
+  /// [ArgumentError] when [WebExperimentalLongPollingOptions.timeoutSeconds] is
   /// NaN or not between 5 and 30.
-  final ExperimentalLongPollingOptions experimentalLongPollingOptions;
+  final WebExperimentalLongPollingOptions webExperimentalLongPollingOptions;
 
   /// The minimum long-polling timeout is hard-coded on the server, which
   /// silently ignores a smaller value (as noted in the JS SDK).
@@ -235,8 +236,8 @@ class FirestoreSettings {
   static const int _maxLongPollingTimeoutSeconds = 30;
 
   /// Port of `validateLongPollingOptions` of the JS SDK.
-  static ExperimentalLongPollingOptions _checkLongPollingOptions(
-    ExperimentalLongPollingOptions options,
+  static WebExperimentalLongPollingOptions _checkLongPollingOptions(
+    WebExperimentalLongPollingOptions options,
   ) {
     final num? timeoutSeconds = options.timeoutSeconds;
     if (timeoutSeconds != null) {
@@ -431,7 +432,7 @@ class FirestoreSettings {
   /// instance is created. A host that was set before is replaced.
   ///
   /// [mockUserToken] authenticates the requests to the emulator, see
-  /// [FirestoreSettings.mockUserToken]. Like `connectFirestoreEmulator`, the
+  /// [Settings.mockUserToken]. Like `connectFirestoreEmulator`, the
   /// emulator options replace the previous ones: without [mockUserToken] the
   /// copy has none.
   ///
@@ -448,11 +449,7 @@ class FirestoreSettings {
   ///   ),
   /// );
   /// ```
-  FirestoreSettings withEmulator(
-    String host,
-    int port, {
-    Object? mockUserToken,
-  }) {
+  Settings withEmulator(String host, int port, {Object? mockUserToken}) {
     if (_isProductionHost(host)) {
       throw ArgumentError.value(
         host,
@@ -482,16 +479,16 @@ class FirestoreSettings {
   ///   cacheSettings: const MemoryCacheSettings(),
   /// );
   /// ```
-  FirestoreSettings copyWith({
+  Settings copyWith({
     String? host,
     int? port,
     bool? sslEnabled,
     bool? persistenceEnabled,
     int? cacheSizeBytes,
     LocalCacheSettings? cacheSettings,
-    bool? experimentalForceLongPolling,
-    bool? experimentalAutoDetectLongPolling,
-    ExperimentalLongPollingOptions? experimentalLongPollingOptions,
+    bool? webExperimentalForceLongPolling,
+    bool? webExperimentalAutoDetectLongPolling,
+    WebExperimentalLongPollingOptions? webExperimentalLongPollingOptions,
     int? grpcFlowControlWindow,
   }) {
     // The settings stay emulator settings (and keep their mock user token)
@@ -509,16 +506,16 @@ class FirestoreSettings {
       persistenceEnabled: persistenceEnabled,
       cacheSizeBytes: cacheSizeBytes,
       cacheSettings: cacheSettings,
-      experimentalForceLongPolling: experimentalForceLongPolling,
-      experimentalAutoDetectLongPolling: experimentalAutoDetectLongPolling,
-      experimentalLongPollingOptions: experimentalLongPollingOptions,
+      experimentalForceLongPolling: webExperimentalForceLongPolling,
+      experimentalAutoDetectLongPolling: webExperimentalAutoDetectLongPolling,
+      experimentalLongPollingOptions: webExperimentalLongPollingOptions,
       grpcFlowControlWindow: grpcFlowControlWindow,
       emulator: emulator,
       mockUserToken: mockUserToken,
     );
   }
 
-  FirestoreSettings _copy({
+  Settings _copy({
     String? host,
     int? port,
     bool? sslEnabled,
@@ -527,18 +524,18 @@ class FirestoreSettings {
     LocalCacheSettings? cacheSettings,
     bool? experimentalForceLongPolling,
     bool? experimentalAutoDetectLongPolling,
-    ExperimentalLongPollingOptions? experimentalLongPollingOptions,
+    WebExperimentalLongPollingOptions? experimentalLongPollingOptions,
     int? grpcFlowControlWindow,
     required bool emulator,
     required Object? mockUserToken,
   }) {
     final bool forceLongPolling =
-        experimentalForceLongPolling ?? this.experimentalForceLongPolling;
+        experimentalForceLongPolling ?? webExperimentalForceLongPolling;
     // The persistence flags are derived when there are cache settings, so only
     // the explicitly given ones are forwarded (and checked) in that case.
     final LocalCacheSettings? newCacheSettings =
         cacheSettings ?? this.cacheSettings;
-    return FirestoreSettings._(
+    return Settings._(
       host: host ?? this.host,
       port: port ?? this.port,
       sslEnabled: sslEnabled ?? this.sslEnabled,
@@ -553,15 +550,15 @@ class FirestoreSettings {
               ? this.cacheSizeBytes
               : defaultCacheSizeBytes),
       cacheSettings: newCacheSettings,
-      experimentalForceLongPolling: forceLongPolling,
+      webExperimentalForceLongPolling: forceLongPolling,
       // Turning one option on turns the other off, unless both are given.
       experimentalAutoDetectLongPolling:
           experimentalAutoDetectLongPolling ??
           (experimentalForceLongPolling == null
-              ? this.experimentalAutoDetectLongPolling
+              ? webExperimentalAutoDetectLongPolling
               : null),
       experimentalLongPollingOptions:
-          experimentalLongPollingOptions ?? this.experimentalLongPollingOptions,
+          experimentalLongPollingOptions ?? webExperimentalLongPollingOptions,
       grpcFlowControlWindow:
           grpcFlowControlWindow ?? this.grpcFlowControlWindow,
       emulator: emulator,
@@ -572,7 +569,7 @@ class FirestoreSettings {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is FirestoreSettings &&
+      other is Settings &&
           runtimeType == other.runtimeType &&
           host == other.host &&
           port == other.port &&
@@ -580,11 +577,12 @@ class FirestoreSettings {
           persistenceEnabled == other.persistenceEnabled &&
           cacheSizeBytes == other.cacheSizeBytes &&
           cacheSettings == other.cacheSettings &&
-          experimentalForceLongPolling == other.experimentalForceLongPolling &&
-          experimentalAutoDetectLongPolling ==
-              other.experimentalAutoDetectLongPolling &&
-          experimentalLongPollingOptions ==
-              other.experimentalLongPollingOptions &&
+          webExperimentalForceLongPolling ==
+              other.webExperimentalForceLongPolling &&
+          webExperimentalAutoDetectLongPolling ==
+              other.webExperimentalAutoDetectLongPolling &&
+          webExperimentalLongPollingOptions ==
+              other.webExperimentalLongPollingOptions &&
           grpcFlowControlWindow == other.grpcFlowControlWindow &&
           const DeepCollectionEquality().equals(
             mockUserToken,
@@ -599,9 +597,9 @@ class FirestoreSettings {
       persistenceEnabled.hashCode ^
       cacheSizeBytes.hashCode ^
       cacheSettings.hashCode ^
-      experimentalForceLongPolling.hashCode ^
-      experimentalAutoDetectLongPolling.hashCode ^
-      experimentalLongPollingOptions.hashCode ^
+      webExperimentalForceLongPolling.hashCode ^
+      webExperimentalAutoDetectLongPolling.hashCode ^
+      webExperimentalLongPollingOptions.hashCode ^
       grpcFlowControlWindow.hashCode ^
       const DeepCollectionEquality().hash(mockUserToken);
 
@@ -610,9 +608,9 @@ class FirestoreSettings {
       'FirestoreSettings{host=$host, port=$port, sslEnabled=$sslEnabled, '
       'persistenceEnabled=$persistenceEnabled, cacheSizeBytes=$cacheSizeBytes, '
       'grpcFlowControlWindow=$grpcFlowControlWindow, cacheSettings=$cacheSettings, '
-      'experimentalForceLongPolling=$experimentalForceLongPolling, '
-      'experimentalAutoDetectLongPolling=$experimentalAutoDetectLongPolling, '
-      'experimentalLongPollingOptions=$experimentalLongPollingOptions, '
+      'experimentalForceLongPolling=$webExperimentalForceLongPolling, '
+      'experimentalAutoDetectLongPolling=$webExperimentalAutoDetectLongPolling, '
+      'experimentalLongPollingOptions=$webExperimentalLongPollingOptions, '
       // The token is a credential: only whether there is one.
       'mockUserToken=${mockUserToken == null ? null : '<set>'}}';
 }

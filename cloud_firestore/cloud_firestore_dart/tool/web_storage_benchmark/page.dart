@@ -72,25 +72,25 @@ Future<void> report(String kind, Map<String, Object?> body) async {
       .toDart;
 }
 
-Firestore newClient() {
+FirebaseFirestore newClient() {
   final FirebaseApp app = FirebaseApp.withOptions(
     const FirebaseOptions(
       apiKey: 'demo-key',
-      applicationId: '1:1234567890:dart:bench',
+      appId: '1:1234567890:dart:bench',
       projectId: projectId,
     ),
     name: 'bench',
   );
-  return Firestore.instanceFor(
+  return FirebaseFirestore.instanceFor(
     app: app,
     openDatabase: sqliteWebOpener(
       sqlite3Wasm: Uri.parse('sqlite3.wasm'),
       opfsWorker: storage == 'opfs' ? Uri.parse('sqlite_opfs_worker.js') : null,
     ),
-    settings: FirestoreSettings(
+    settings: Settings(
       // No eviction: every document stays in the cache.
       cacheSettings: PersistentCacheSettings(
-        sizeBytes: FirestoreSettings.cacheSizeUnlimited,
+        sizeBytes: Settings.cacheSizeUnlimited,
       ),
     ).withEmulator('127.0.0.1', 9),
   );
@@ -144,10 +144,10 @@ Stream<List<int>> bundle() async* {
 
 Future<Map<String, Object?>> fill() async {
   final Stopwatch watch = Stopwatch()..start();
-  final Firestore firestore = newClient();
+  final FirebaseFirestore firestore = newClient();
   await firestore.initialized;
   await firestore.disableNetwork();
-  final LoadBundleTaskProgress progress = await firestore
+  final LoadBundleTaskSnapshot progress = await firestore
       .loadBundleStream(bundle())
       .future;
   final int loaded = progress.documentsLoaded;
@@ -192,7 +192,7 @@ double median(List<double> values) {
 Future<Map<String, Object?>> read() async {
   final Map<String, int> before = await memory();
   final Stopwatch watch = Stopwatch()..start();
-  final Firestore firestore = newClient();
+  final FirebaseFirestore firestore = newClient();
   await firestore.initialized;
   await firestore.disableNetwork();
   final int openMs = watch.elapsedMilliseconds;

@@ -296,7 +296,7 @@ void main() {
       expect(auth.currentUser, isNull);
       await expectLater(
         auth.getAccessToken(forceRefresh: false),
-        throwsA(isA<FirebaseNoSignedInUserError>()),
+        throwsA(isA<FirebaseNoSignedInUserException>()),
       );
       expect(requests, isEmpty);
     });
@@ -352,9 +352,8 @@ void main() {
     test('token and user changes are announced', () async {
       final List<String> tokens = <String>[];
       final List<AuthUser?> users = <AuthUser?>[];
-      final StreamSubscription<InternalTokenResult> tokenSub = auth
-          .onTokenChanged
-          .listen((InternalTokenResult r) => tokens.add(r.token));
+      final StreamSubscription<AuthTokenChange> tokenSub = auth.onTokenChanged
+          .listen((AuthTokenChange r) => tokens.add(r.token));
       final StreamSubscription<AuthUser?> userSub = auth.userChanges.listen(
         users.add,
       );
@@ -423,8 +422,8 @@ void main() {
         await expectLater(
           pending,
           throwsA(
-            isA<FirebaseAuthProviderException>().having(
-              (FirebaseAuthProviderException e) => e.code,
+            isA<FirebaseAuthException>().having(
+              (FirebaseAuthException e) => e.code,
               'code',
               'cancelled',
             ),
@@ -441,8 +440,8 @@ void main() {
       // A chain like the one of Firestore: the listener forwards the change through a few asynchronous hops before
       // it acts on it. An operation issued right after `await signIn...()` must come after that.
       final List<String> order = <String>[];
-      final StreamSubscription<InternalTokenResult> sub = auth.onTokenChanged
-          .listen((InternalTokenResult result) async {
+      final StreamSubscription<AuthTokenChange> sub = auth.onTokenChanged
+          .listen((AuthTokenChange result) async {
             await null;
             await Future<void>.microtask(() {});
             await null;
@@ -481,12 +480,12 @@ void main() {
   });
 
   group('errors', () {
-    Future<FirebaseAuthProviderException> failure(
+    Future<FirebaseAuthException> failure(
       Future<Object?> Function() action,
     ) async {
       try {
         await action();
-      } on FirebaseAuthProviderException catch (e) {
+      } on FirebaseAuthException catch (e) {
         return e;
       }
       fail('No exception');
@@ -529,7 +528,7 @@ void main() {
       };
       for (final MapEntry<String, String> entry in expected.entries) {
         handler = (http.Request request) async => error(entry.key);
-        final FirebaseAuthProviderException e = await failure(
+        final FirebaseAuthException e = await failure(
           () => auth.signInWithEmailAndPassword('a@example.com', 'secret'),
         );
         expect(e.code, entry.value, reason: entry.key);
@@ -550,9 +549,7 @@ void main() {
     test('a network error does not leak the URL or the API key', () async {
       handler = (http.Request request) =>
           throw http.ClientException('Connection refused', request.url);
-      final FirebaseAuthProviderException e = await failure(
-        auth.signInAnonymously,
-      );
+      final FirebaseAuthException e = await failure(auth.signInAnonymously);
       expect(e.code, 'network-request-failed');
       expect('$e', isNot(contains(apiKey)));
       expect('$e', isNot(contains('identitytoolkit')));
@@ -561,9 +558,7 @@ void main() {
     test('an answer that is not JSON is an internal error', () async {
       handler = (http.Request request) async =>
           http.Response('<html>Bad gateway</html>', 502);
-      final FirebaseAuthProviderException e = await failure(
-        auth.signInAnonymously,
-      );
+      final FirebaseAuthException e = await failure(auth.signInAnonymously);
       expect(e.code, 'internal-error');
       expect(e.httpStatus, 502);
     });
@@ -580,11 +575,10 @@ void main() {
           handler = backend;
           await auth.signInAnonymously();
           final List<String> tokens = <String>[];
-          final StreamSubscription<InternalTokenResult> sub = auth
-              .onTokenChanged
-              .listen((InternalTokenResult r) => tokens.add(r.token));
+          final StreamSubscription<AuthTokenChange> sub = auth.onTokenChanged
+              .listen((AuthTokenChange r) => tokens.add(r.token));
           handler = (http.Request request) async => error(message);
-          final FirebaseAuthProviderException e = await failure(
+          final FirebaseAuthException e = await failure(
             () => auth.getAccessToken(forceRefresh: true),
           );
           expect(e.invalidatesSession, isTrue, reason: message);
@@ -601,7 +595,7 @@ void main() {
       await auth.signInAnonymously();
       handler = (http.Request request) =>
           throw http.ClientException('offline', request.url);
-      final FirebaseAuthProviderException e = await failure(
+      final FirebaseAuthException e = await failure(
         () => auth.getAccessToken(forceRefresh: true),
       );
       expect(e.code, 'network-request-failed');
@@ -748,8 +742,8 @@ void main() {
             actionCodeSettings: settings,
           ),
           throwsA(
-            isA<FirebaseAuthProviderException>().having(
-              (FirebaseAuthProviderException e) => e.code,
+            isA<FirebaseAuthException>().having(
+              (FirebaseAuthException e) => e.code,
               'code',
               code,
             ),
@@ -782,8 +776,8 @@ void main() {
       await expectLater(
         auth.checkActionCode('SOMETHING_ELSE'),
         throwsA(
-          isA<FirebaseAuthProviderException>().having(
-            (FirebaseAuthProviderException e) => e.code,
+          isA<FirebaseAuthException>().having(
+            (FirebaseAuthException e) => e.code,
             'code',
             'internal-error',
           ),
@@ -801,7 +795,7 @@ void main() {
         await auth.signInWithEmailAndPassword('a@example.com', 'secret');
         await expectLater(
           auth.updateProfile(displayName: 'x'),
-          throwsA(isA<FirebaseAuthProviderException>()),
+          throwsA(isA<FirebaseAuthException>()),
         );
         expect(auth.uid, isNull);
       },
@@ -816,8 +810,8 @@ void main() {
       await expectLater(
         auth.updatePassword('another'),
         throwsA(
-          isA<FirebaseAuthProviderException>().having(
-            (FirebaseAuthProviderException e) => e.code,
+          isA<FirebaseAuthException>().having(
+            (FirebaseAuthException e) => e.code,
             'code',
             'requires-recent-login',
           ),
@@ -831,8 +825,8 @@ void main() {
       await expectLater(
         auth.reauthenticateWithEmailAndPassword('b@example.com', 'secret'),
         throwsA(
-          isA<FirebaseAuthProviderException>().having(
-            (FirebaseAuthProviderException e) => e.code,
+          isA<FirebaseAuthException>().having(
+            (FirebaseAuthException e) => e.code,
             'code',
             'user-mismatch',
           ),
@@ -986,8 +980,8 @@ void main() {
       'with a listener the token is refreshed five minutes before expiry',
       () async {
         final List<String> tokens = <String>[];
-        final StreamSubscription<InternalTokenResult> sub = auth.onTokenChanged
-            .listen((InternalTokenResult r) => tokens.add(r.token));
+        final StreamSubscription<AuthTokenChange> sub = auth.onTokenChanged
+            .listen((AuthTokenChange r) => tokens.add(r.token));
         await auth.signInAnonymously();
         expect(timers.active.single.delay, const Duration(minutes: 55));
 
@@ -1010,7 +1004,7 @@ void main() {
       () async {
         await auth.signInAnonymously();
         clock.advance(const Duration(minutes: 10));
-        final StreamSubscription<InternalTokenResult> sub = auth.onTokenChanged
+        final StreamSubscription<AuthTokenChange> sub = auth.onTokenChanged
             .listen((_) {});
         expect(timers.active.single.delay, const Duration(minutes: 45));
         await sub.cancel();
@@ -1018,7 +1012,7 @@ void main() {
     );
 
     test('a failed attempt is retried with a growing delay', () async {
-      final StreamSubscription<InternalTokenResult> sub = auth.onTokenChanged
+      final StreamSubscription<AuthTokenChange> sub = auth.onTokenChanged
           .listen((_) {});
       await auth.signInAnonymously();
       handler = (http.Request request) =>
@@ -1054,7 +1048,7 @@ void main() {
     });
 
     test('sign-out and dispose cancel the schedule', () async {
-      final StreamSubscription<InternalTokenResult> sub = auth.onTokenChanged
+      final StreamSubscription<AuthTokenChange> sub = auth.onTokenChanged
           .listen((_) {});
       await auth.signInAnonymously();
       expect(timers.active, hasLength(1));
@@ -1077,7 +1071,7 @@ void main() {
         final FirebaseApp app = FirebaseApp.withOptions(
           const FirebaseOptions(
             apiKey: apiKey,
-            applicationId: '1:1:web:1',
+            appId: '1:1:web:1',
             projectId: 'demo',
           ),
           name: 'forApp-${DateTime.now().microsecondsSinceEpoch}',
@@ -1115,7 +1109,7 @@ void main() {
       final FirebaseApp app = FirebaseApp.withOptions(
         const FirebaseOptions(
           apiKey: apiKey,
-          applicationId: '1:1:web:1',
+          appId: '1:1:web:1',
           projectId: 'demo',
         ),
         name: 'forApp-${DateTime.now().microsecondsSinceEpoch}',
@@ -1148,7 +1142,7 @@ void main() {
   });
 
   group('the headers of the JS SDK', () {
-    FirebaseUserAuth withAppCheck(InternalAppCheckTokenProvider? appCheck) {
+    FirebaseUserAuth withAppCheck(AppCheckTokenProvider? appCheck) {
       final FirebaseUserAuth created = FirebaseUserAuth(
         apiKey: apiKey,
         appId: '1:2:web:3',
@@ -1263,7 +1257,7 @@ class _AsyncStorage implements AuthStorage {
   }
 }
 
-class _AppCheck implements InternalAppCheckTokenProvider {
+class _AppCheck implements AppCheckTokenProvider {
   _AppCheck(this._getToken);
 
   final Future<AppCheckTokenResult> Function() _getToken;

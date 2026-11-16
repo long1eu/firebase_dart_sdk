@@ -401,7 +401,7 @@ class SyncEngine implements RemoteStoreCallback, SharedClientStateSyncer {
       }
       Log.w(_tag, 'Failed to persist write: $e');
       userTask.completeError(
-        FirestoreError(
+        FirestoreException(
           'Failed to persist write: $e',
           FirestoreErrorCode.unavailable,
         ),
@@ -630,7 +630,7 @@ class SyncEngine implements RemoteStoreCallback, SharedClientStateSyncer {
     final ImmutableSortedMap<DocumentKey, MaybeDocument> changes;
     try {
       changes = await _localStore.applyRemoteEvent(event);
-    } on FirestoreError catch (e) {
+    } on FirestoreException catch (e) {
       if (!isPrimaryLeaseLoss(e)) {
         rethrow;
       }
@@ -812,7 +812,7 @@ class SyncEngine implements RemoteStoreCallback, SharedClientStateSyncer {
     final ImmutableSortedMap<DocumentKey, MaybeDocument> changes;
     try {
       changes = await _localStore.acknowledgeBatch(mutationBatchResult);
-    } on FirestoreError catch (e) {
+    } on FirestoreException catch (e) {
       if (!isPrimaryLeaseLoss(e)) {
         rethrow;
       }
@@ -853,7 +853,7 @@ class SyncEngine implements RemoteStoreCallback, SharedClientStateSyncer {
     final ImmutableSortedMap<DocumentKey, MaybeDocument> changes;
     try {
       changes = await _localStore.rejectBatch(batchId);
-    } on FirestoreError catch (e) {
+    } on FirestoreException catch (e) {
       // As in the JS SDK the user is not told: the batch stays in the queue for the primary client.
       if (!isPrimaryLeaseLoss(e)) {
         rethrow;
@@ -869,7 +869,7 @@ class SyncEngine implements RemoteStoreCallback, SharedClientStateSyncer {
     // The local store may or may not be able to apply the write result and raise events immediately (depending on
     // whether the watcher is caught up), so we raise user callbacks first so that they consistently happen before
     // listen events.
-    final FirestoreError error = exceptionFromStatus(status);
+    final FirestoreException error = exceptionFromStatus(status);
     _notifyUser(batchId, error);
 
     _resolvePendingWriteTasks(batchId);
@@ -904,7 +904,7 @@ class SyncEngine implements RemoteStoreCallback, SharedClientStateSyncer {
         return;
       }
       userTask.completeError(
-        FirestoreError(
+        FirestoreException(
           'Initialization of waitForPendingWrites() operation failed: $e',
           FirestoreErrorCode.unavailable,
         ),
@@ -942,7 +942,7 @@ class SyncEngine implements RemoteStoreCallback, SharedClientStateSyncer {
     _pendingWritesCallbacks.clear();
     for (Completer<void> task in tasks) {
       task.completeError(
-        FirestoreError(
+        FirestoreException(
           '\'waitForPendingWrites\' task is cancelled due to User change.',
           FirestoreErrorCode.cancelled,
         ),
@@ -951,7 +951,7 @@ class SyncEngine implements RemoteStoreCallback, SharedClientStateSyncer {
   }
 
   /// Resolves the task corresponding to this write result.
-  void _notifyUser(int batchId, FirestoreError? error) {
+  void _notifyUser(int batchId, FirestoreException? error) {
     final Map<int, Completer<void>>? userTasks =
         _mutationUserCallbacks[_currentUser];
 
@@ -1242,7 +1242,7 @@ class SyncEngine implements RemoteStoreCallback, SharedClientStateSyncer {
         return;
       }
 
-      LoadBundleTaskProgress? progress =
+      LoadBundleTaskSnapshot? progress =
           LoadBundleTaskProgressInternal.forInitial(bundleMetadata);
       resultTask.updateProgress(progress);
 
@@ -1280,7 +1280,7 @@ class SyncEngine implements RemoteStoreCallback, SharedClientStateSyncer {
     } catch (e, stackTrace) {
       Log.w('Firestore', 'Loading bundle failed : $e');
       resultTask.setException(
-        FirestoreError(
+        FirestoreException(
           'Bundle failed to load',
           FirestoreErrorCode.invalidArgument,
           e,
@@ -1303,7 +1303,7 @@ class SyncEngine implements RemoteStoreCallback, SharedClientStateSyncer {
   Future<void> applyBatchState(
     int batchId,
     MutationBatchState state,
-    FirestoreError? error,
+    FirestoreException? error,
   ) async {
     final ImmutableSortedMap<DocumentKey, MaybeDocument>? documents =
         await _localStore.lookupMutationDocuments(batchId);
@@ -1332,7 +1332,7 @@ class SyncEngine implements RemoteStoreCallback, SharedClientStateSyncer {
   Future<void> applyTargetState(
     int targetId,
     QueryTargetState state,
-    FirestoreError? error,
+    FirestoreException? error,
   ) async {
     if (_isPrimary) {
       // A primary client gets the state of the targets from the backend.

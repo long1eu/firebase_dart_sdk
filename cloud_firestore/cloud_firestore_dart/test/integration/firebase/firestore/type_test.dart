@@ -38,7 +38,7 @@ void main() {
   }
 
   Future<DocumentReference> testDoc() async {
-    return (await testCollection()).document();
+    return (await testCollection()).doc();
   }
 
   test('testCanReadAndWriteNullFields', () async {
@@ -143,10 +143,7 @@ void main() {
     await doc.set(data);
     final DocumentSnapshot snapshot = await doc.get();
     expect(snapshot['null'], data['null']);
-    expect(
-      snapshot.getField(FieldPath.fromDotSeparatedPath('null')),
-      data['null'],
-    );
+    expect(snapshot.getField(FieldPath.fromString('null')), data['null']);
     expect(snapshot.getBool('boolean'), data['boolean']);
     expect(snapshot.getString('string'), data['string']);
     expect(snapshot.getDouble('double'), data['double']);
@@ -204,7 +201,7 @@ void main() {
   test('snapshotListenerSortsDifferentTypesSameAsServer', () async {
     final CollectionReference colRef = await testCollection();
     // The reference is created first to make sure it uses the same Firestore instance.
-    final DocumentReference docRef = colRef.document('testDocRef');
+    final DocumentReference docRef = colRef.doc('testDocRef');
 
     final Map<String, Map<String, Object?>> testDocs =
         <String, Map<String, Object?>>{

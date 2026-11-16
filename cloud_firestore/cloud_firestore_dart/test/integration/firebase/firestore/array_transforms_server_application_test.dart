@@ -56,7 +56,7 @@ void main() {
     // stored in our cache.
     await (await testFirestore(newTestSettings(),
             'integration/array_transforms_updateWithNoCachedBaseDoc.db'))
-        .document(docRef.path)
+        .doc(docRef.path)
         .set(map(<dynamic>[
           'array',
           <int>[42]
@@ -70,7 +70,7 @@ void main() {
     // Nothing should be cached since it was an update and we had no base doc.
     try {
       await docRef.get(Source.cache);
-    } on FirestoreError catch (e) {
+    } on FirestoreException catch (e) {
       expect(e.code, FirestoreErrorCode.unavailable);
     }
   });
@@ -80,7 +80,7 @@ void main() {
     // stored in our cache.
     await (await testFirestore(newTestSettings(),
             'integration/array_transforms_mergeSetWithNoCachedBaseDoc.db'))
-        .document(docRef.path)
+        .doc(docRef.path)
         .set(map(<dynamic>[
           'array',
           <int>[42]

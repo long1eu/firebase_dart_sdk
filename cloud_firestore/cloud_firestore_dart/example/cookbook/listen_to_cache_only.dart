@@ -19,13 +19,13 @@ import '../common.dart';
 
 Future<void> main() async {
   // Two clients: "other" stands in for another device.
-  final Firestore firestore = Firestore.instanceFor(
+  final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(
     app: exampleApp(),
     settings: emulatorSettings(
       cacheSettings: MemoryCacheSettings(gcSettings: MemoryLruGcSettings()),
     ),
   );
-  final Firestore other = connect('other');
+  final FirebaseFirestore other = connect('other');
   final String path = scratch('settings');
   final DocumentReference<Map<String, Object?>> theme = firestore
       .collection(path)

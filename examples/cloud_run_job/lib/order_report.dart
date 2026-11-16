@@ -46,7 +46,7 @@ enum ReportOutcome { written, alreadyWritten }
 /// The report remembers the execution that wrote it last, so that the second
 /// attempt finds it and leaves `runs` as it is: the write is idempotent.
 Future<ReportOutcome> writeReport(
-  Firestore firestore,
+  FirebaseFirestore firestore,
   DocumentReference<Map<String, Object?>> report,
   OrderSummary summary,
   String executionId,

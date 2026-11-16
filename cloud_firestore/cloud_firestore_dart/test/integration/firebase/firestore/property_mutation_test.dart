@@ -307,7 +307,7 @@ void main() {
   configureGeneratorsForBackend();
   IntegrationTestUtil.currentDatabasePath = 'integration/property_mutation';
 
-  late Firestore firestore;
+  late FirebaseFirestore firestore;
 
   setUp(() async {
     firestore = await IntegrationTestUtil.testFirestore();

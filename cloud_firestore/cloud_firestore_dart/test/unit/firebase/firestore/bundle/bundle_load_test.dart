@@ -147,7 +147,7 @@ void main() {
 
         expect(task.isComplete, isTrue);
         expect(task.isSuccessful, isTrue);
-        final LoadBundleTaskProgress result = await task.future;
+        final LoadBundleTaskSnapshot result = await task.future;
         expect(result.taskState, LoadBundleTaskState.success);
         expect(result.documentsLoaded, 2);
         expect(result.totalDocuments, 2);
@@ -177,8 +177,8 @@ void main() {
 
       test('reports the progress while loading', () async {
         final LoadBundleTask task = LoadBundleTaskInternal.create();
-        final List<LoadBundleTaskProgress> progress =
-            <LoadBundleTaskProgress>[];
+        final List<LoadBundleTaskSnapshot> progress =
+            <LoadBundleTaskSnapshot>[];
         final Future<void> done = task.stream.forEach(progress.add);
 
         final String bundle = bundleWithQueryAndDocuments();
@@ -187,7 +187,7 @@ void main() {
         await done;
 
         expect(
-            progress.map((LoadBundleTaskProgress p) => p.taskState).toList(),
+            progress.map((LoadBundleTaskSnapshot p) => p.taskState).toList(),
             <LoadBundleTaskState>[
               LoadBundleTaskState.running, // initial
               LoadBundleTaskState.running, // coll/doc1
@@ -196,7 +196,7 @@ void main() {
             ]);
         expect(
             progress
-                .map((LoadBundleTaskProgress p) => p.documentsLoaded)
+                .map((LoadBundleTaskSnapshot p) => p.documentsLoaded)
                 .toList(),
             <int>[0, 1, 2, 2]);
         expect(progress.last.bytesLoaded, progress.last.totalBytes);
@@ -220,8 +220,8 @@ void main() {
 
         // Same id and the same (or older) create time.
         final LoadBundleTask task = LoadBundleTaskInternal.create();
-        final List<LoadBundleTaskProgress> progress =
-            <LoadBundleTaskProgress>[];
+        final List<LoadBundleTaskSnapshot> progress =
+            <LoadBundleTaskSnapshot>[];
         final Future<void> done = task.stream.forEach(progress.add);
         await syncEngine.loadBundle(
             BundleReader.fromBytes(
@@ -259,10 +259,10 @@ void main() {
         expect(task.isComplete, isTrue);
         expect(task.isSuccessful, isFalse);
         expect(task.snapshot.taskState, LoadBundleTaskState.error);
-        expect(task.exception, isA<FirestoreError>());
-        expect((task.exception! as FirestoreError).code,
+        expect(task.exception, isA<FirestoreException>());
+        expect((task.exception! as FirestoreException).code,
             FirestoreErrorCode.invalidArgument);
-        await expectLater(task.future, throwsA(isA<FirestoreError>()));
+        await expectLater(task.future, throwsA(isA<FirestoreException>()));
 
         // Nothing was applied: the bundle is not marked as loaded and its documents are not in the cache.
         expect(await localStore.readDocument(key('coll/doc1')), isNull);
@@ -282,7 +282,7 @@ void main() {
         final LoadBundleTask task = await load(broken);
 
         expect(task.snapshot.taskState, LoadBundleTaskState.error);
-        await expectLater(task.future, throwsA(isA<FirestoreError>()));
+        await expectLater(task.future, throwsA(isA<FirestoreException>()));
       });
     });
   });

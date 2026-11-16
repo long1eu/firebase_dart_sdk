@@ -434,7 +434,7 @@ class SQLitePersistence extends Persistence {
   /// network is enabled or disabled.
   ///
   /// A failure of the database (another connection holding the lock for longer than [busyTimeout]) is logged and
-  /// leaves the state as it was, as in the JS SDK; a [FirestoreError] (the cache was cleared or migrated by another
+  /// leaves the state as it was, as in the JS SDK; a [FirestoreException] (the cache was cleared or migrated by another
   /// client) is thrown.
   Future<void> refreshClientMetadata() async {
     await _lock();
@@ -446,7 +446,7 @@ class SQLitePersistence extends Persistence {
         await clientMetadata._update();
         await clientMetadata._maybeGarbageCollect();
       });
-    } on FirestoreError {
+    } on FirestoreException {
       rethrow;
     } catch (e) {
       Log.w(tag, 'Refreshing the client metadata failed: $e');
@@ -557,7 +557,7 @@ class SQLitePersistence extends Persistence {
     final int schemaVersion =
         (await _db.query('PRAGMA user_version')).first.values.first as int;
     if (schemaVersion != SQLiteSchema.version) {
-      throw FirestoreError(
+      throw FirestoreException(
         'The persistent cache was opened by a different version of the SDK while this client was using it '
         '(its schema version is now $schemaVersion, this client uses ${SQLiteSchema.version}). Terminate this '
         'instance; a new instance migrates the cache when it starts.',
@@ -585,7 +585,7 @@ class SQLitePersistence extends Persistence {
     foreignCommitsSeen++;
   }
 
-  FirestoreError _clearedError() => FirestoreError(
+  FirestoreException _clearedError() => FirestoreException(
     'The persistent cache was cleared by another client (Firestore.clearPersistence) while this client was using it.',
     FirestoreErrorCode.failedPrecondition,
   );
@@ -607,10 +607,10 @@ class SQLitePersistence extends Persistence {
       if (clearStorage != null) {
         try {
           await clearStorage();
-        } on FirestoreError {
+        } on FirestoreException {
           rethrow;
         } catch (e) {
-          throw FirestoreError(
+          throw FirestoreException(
             'Failed to clear persistence: $e',
             FirestoreErrorCode.unknown,
             e,

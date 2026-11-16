@@ -76,7 +76,7 @@ void main() {
 
   final String? skip = IntegrationTestUtil.enterpriseEmulatorSkipReason;
 
-  late Firestore firestore;
+  late FirebaseFirestore firestore;
   late CollectionReference<Map<String, Object?>> collection;
 
   /// Runs [query] on the server and as a pipeline and expects the same
@@ -154,7 +154,7 @@ void main() {
 
     test('nested fields', () async {
       await check(collection.where('geo.continent', isEqualTo: 'AS'));
-      await check(collection.where(FieldPath.of(<String>['geo', 'elevation']),
+      await check(collection.where(FieldPath(<String>['geo', 'elevation']),
           isGreaterThan: 50));
       await check(collection.orderBy('geo.elevation', Direction.descending));
     });
@@ -212,13 +212,13 @@ void main() {
     });
 
     test('filters on the document id', () async {
-      await check(collection.where(FieldPath.documentIdField,
+      await check(collection.where(FieldPath.documentId,
           isEqualTo: collection.doc('paris')));
-      await check(collection.where(FieldPath.documentIdField,
+      await check(collection.where(FieldPath.documentId,
           isGreaterThan: collection.doc('m')));
-      await check(collection.where(FieldPath.documentIdField,
+      await check(collection.where(FieldPath.documentId,
           whereIn: <Object>[collection.doc('rome'), collection.doc('porto')]));
-      await check(collection.orderByField(FieldPath.documentIdField));
+      await check(collection.orderByField(FieldPath.documentId));
       // Not compared with a descending order by document id: the Enterprise
       // edition emulator rejects that classic query ("does not support
       // descending key scans"), while the pipeline runs.

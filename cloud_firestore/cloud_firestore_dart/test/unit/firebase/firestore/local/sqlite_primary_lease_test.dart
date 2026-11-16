@@ -406,7 +406,7 @@ void main() {
       await expectLater(
         a.runPrimaryTransaction('op', () async {}),
         throwsA(
-          isA<FirestoreError>().having(
+          isA<FirestoreException>().having(
             isPrimaryLeaseLoss,
             'lease loss',
             isTrue,
@@ -420,7 +420,11 @@ void main() {
 
   group('primary-only transactions', () {
     final Matcher leaseLost = throwsA(
-      isA<FirestoreError>().having(isPrimaryLeaseLoss, 'is lease loss', isTrue),
+      isA<FirestoreException>().having(
+        isPrimaryLeaseLoss,
+        'is lease loss',
+        isTrue,
+      ),
     );
 
     test('the primary runs them and extends its lease', () async {
@@ -580,14 +584,14 @@ void main() {
       expect(await b.query('SELECT * FROM target_globals'), hasLength(1));
 
       final Matcher clearedError = throwsA(
-        isA<FirestoreError>()
+        isA<FirestoreException>()
             .having(
-              (FirestoreError e) => e.code,
+              (FirestoreException e) => e.code,
               'code',
               FirestoreErrorCode.failedPrecondition,
             )
             .having(
-              (FirestoreError e) => e.message,
+              (FirestoreException e) => e.message,
               'message',
               contains('cleared by another client'),
             ),
@@ -724,7 +728,7 @@ void main() {
         // The deletion is a commit of another connection for A: as after a clear.
         await expectLater(
           a.runTransaction('after', () async {}),
-          throwsA(isA<FirestoreError>()),
+          throwsA(isA<FirestoreException>()),
         );
 
         final SQLitePersistence c = await start('C');
@@ -963,7 +967,7 @@ Future<void> _learnPrimaryState(SQLitePersistence client) async {
   }
   try {
     await client.runPrimaryTransaction('look', () async {});
-  } on FirestoreError catch (e) {
+  } on FirestoreException catch (e) {
     if (!isPrimaryLeaseLoss(e)) {
       rethrow;
     }

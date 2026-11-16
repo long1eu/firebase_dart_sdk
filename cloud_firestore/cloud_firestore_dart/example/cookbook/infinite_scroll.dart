@@ -27,7 +27,7 @@ class Page {
 }
 
 Future<void> main() async {
-  final Firestore firestore = connect();
+  final FirebaseFirestore firestore = connect();
   final CollectionReference<Map<String, Object?>> messages = firestore
       .collection(scratch('messages'));
 

@@ -29,7 +29,7 @@ Future<void> main() async {
   );
   final String notes = scratch('notes');
 
-  final Firestore firestore = _open(directory);
+  final FirebaseFirestore firestore = _open(directory);
   final CollectionReference<Map<String, Object?>> collection = firestore
       .collection(notes);
   await collection.doc('main').set(<String, Object?>{'from': 'main isolate'});
@@ -111,7 +111,7 @@ Future<void> _background(List<Object?> args) async {
   final ReceivePort commands = ReceivePort();
   toMain.send(commands.sendPort);
 
-  final Firestore firestore = _open(directory);
+  final FirebaseFirestore firestore = _open(directory);
   await firestore.collection(notes).doc('background').set(<String, Object?>{
     'from': 'background isolate',
   });
@@ -124,8 +124,8 @@ Future<void> _background(List<Object?> args) async {
 
 /// A Firestore instance with a SQLite cache in [directory]. Both isolates
 /// call it with the same (default) app name, so they open the same file.
-Firestore _open(Directory directory) {
-  return Firestore.instanceFor(
+FirebaseFirestore _open(Directory directory) {
+  return FirebaseFirestore.instanceFor(
     app: exampleApp(),
     openDatabase: sqliteOpener(directory),
     settings: emulatorSettings(cacheSettings: PersistentCacheSettings()),

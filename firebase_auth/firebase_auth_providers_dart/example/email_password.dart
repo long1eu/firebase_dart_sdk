@@ -26,7 +26,7 @@ Future<void> main() async {
   final FirebaseApp app = FirebaseApp.withOptions(
     const FirebaseOptions(
       apiKey: 'fake-api-key',
-      applicationId: '1:1234567890:dart:example',
+      appId: '1:1234567890:dart:example',
       projectId: 'demo-test',
     ),
   );
@@ -84,12 +84,12 @@ Future<void> main() async {
   app.delete();
 }
 
-/// Runs [signIn] and prints the code of the [FirebaseAuthProviderException].
+/// Runs [signIn] and prints the code of the [FirebaseAuthException].
 Future<void> _show(String what, Future<AuthUser> Function() signIn) async {
   try {
     await signIn();
     print('$what: no error');
-  } on FirebaseAuthProviderException catch (e) {
+  } on FirebaseAuthException catch (e) {
     print('$what: ${e.code}');
   }
 }

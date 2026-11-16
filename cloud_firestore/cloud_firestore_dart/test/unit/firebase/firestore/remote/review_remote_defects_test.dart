@@ -82,7 +82,7 @@ void main() {
     });
 
     test('exceptionFromStatus does not throw for unknown codes', () {
-      final FirestoreError error =
+      final FirestoreException error =
           exceptionFromStatus(const GrpcError.custom(99, 'forward compatible'));
       expect(error.code, FirestoreErrorCode.unknown);
       expect(error.message, 'forward compatible');

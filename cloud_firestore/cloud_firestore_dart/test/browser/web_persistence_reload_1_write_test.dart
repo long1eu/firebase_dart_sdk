@@ -30,17 +30,17 @@ const String reloadAppName = 'reload-test-app';
 FirebaseApp reloadApp() => FirebaseApp.withOptions(
       const FirebaseOptions(
         apiKey: 'demo-key',
-        applicationId: '1:1234567890:dart:browser',
+        appId: '1:1234567890:dart:browser',
         projectId: projectId,
       ),
       name: reloadAppName,
     );
 
-Firestore reloadClient() => Firestore.instanceFor(
+FirebaseFirestore reloadClient() => FirebaseFirestore.instanceFor(
       app: reloadApp(),
       openDatabase:
           sqliteWebOpener(sqlite3Wasm: Uri.base.resolve('sqlite3.wasm')),
-      settings: FirestoreSettings().withEmulator(emulatorHost, emulatorPort),
+      settings: Settings().withEmulator(emulatorHost, emulatorPort),
     );
 
 Future<bool> hasSqlite3Wasm() async {
@@ -65,7 +65,7 @@ void main() {
     web.window.localStorage.removeItem(reloadStorageKey);
 
     // Not terminated and not torn down: the page just goes away.
-    final Firestore firestore = reloadClient();
+    final FirebaseFirestore firestore = reloadClient();
     final String collection = newCollectionName();
     await firestore.collection(collection).doc('acknowledged').set(
       <String, Object?>{'v': 1},

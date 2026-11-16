@@ -52,7 +52,7 @@ void main() {
         collection.getSnapshotsWithOptions(cacheOptions).listen(events.add);
     await waitFor(events, 1);
 
-    expect(events.first.documentChanges, isEmpty);
+    expect(events.first.docChanges, isEmpty);
     expect(events.first.metadata.isFromCache, isTrue);
     await sub.cancel();
   });
@@ -75,13 +75,13 @@ void main() {
     await waitFor(events, 1);
 
     expect(events.first.metadata.isFromCache, isTrue);
-    expect(events.first.documentChanges.length, 2);
+    expect(events.first.docChanges.length, 2);
 
     // A local write raises an event even though the cache only listener never
     // contacts the backend itself.
-    unawaited(collection.document('c').set(map(<String>['k', 'c'])));
+    unawaited(collection.doc('c').set(map(<String>['k', 'c'])));
     await waitFor(events, 2);
-    expect(events.last.documentChanges.length, 1);
+    expect(events.last.docChanges.length, 1);
     expect(events.last.metadata.hasPendingWrites, isTrue);
     expect(events.last.metadata.isFromCache, isTrue);
     await sub.cancel();
@@ -130,29 +130,29 @@ void main() {
       await Future<void>.delayed(const Duration(milliseconds: 50));
     }
     expect(remoteEvents.last.metadata.isFromCache, isFalse);
-    expect(remoteEvents.last.documentChanges.length, 1);
+    expect(remoteEvents.last.docChanges.length, 1);
 
     // Removing the default listener leaves the cache listener working.
     await remoteSub.cancel();
-    await collection.document('b').set(map(<String>['k', 'b']));
+    await collection.doc('b').set(map(<String>['k', 'b']));
     await waitFor(cacheEvents, 2);
-    expect(cacheEvents.last.documentChanges.length, 1);
+    expect(cacheEvents.last.docChanges.length, 1);
     await cacheSub.cancel();
   });
 
 
   // The emulator behaviour of these two is not verified (not run).
   test('memory cache settings with LRU gc open a working instance', () async {
-    final FirestoreSettings base = IntegrationTestUtil.newTestSettings();
-    final Firestore firestore =
-        await IntegrationTestUtil.testFirestore(FirestoreSettings(
+    final Settings base = IntegrationTestUtil.newTestSettings();
+    final FirebaseFirestore firestore =
+        await IntegrationTestUtil.testFirestore(Settings(
       host: base.host,
       port: base.port,
       sslEnabled: base.sslEnabled,
       cacheSettings: MemoryCacheSettings(
           gcSettings: MemoryLruGcSettings(sizeBytes: 2 * 1024 * 1024)),
     ));
-    final DocumentReference doc = firestore.collection('lru').document();
+    final DocumentReference doc = firestore.collection('lru').doc();
     await doc.set(map(<String>['k', 'v']));
     expect((await doc.get()).data, map(<String>['k', 'v']));
   });

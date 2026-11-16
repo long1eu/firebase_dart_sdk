@@ -14,7 +14,7 @@ import 'package:test/test.dart';
 import '../../../util/test_util.dart' as util;
 
 // ignore: non_constant_identifier_names
-Firestore _TestFirestore() =>
+FirebaseFirestore _TestFirestore() =>
     FirestoreInternal.detached(DatabaseId.forProject('project'));
 
 String _fromFirestore(
@@ -25,7 +25,7 @@ Map<String, Object?> _toFirestore(String value, SetOptions? _) =>
     <String, Object?>{'value': value};
 
 void main() {
-  final Firestore db = _TestFirestore();
+  final FirebaseFirestore db = _TestFirestore();
   Query<Map<String, Object?>> collection() =>
       QueryInternal.create<Map<String, Object?>>(util.query('collection'), db);
 
@@ -68,10 +68,10 @@ void main() {
   test('the field can be a dotted string or a FieldPath', () {
     final Query<Map<String, Object?>> q = collection();
     expect(q.where('a.b', isEqualTo: 1),
-        q.whereEqualToField(FieldPath.of(<String>['a', 'b']), 1));
-    expect(q.where(FieldPath.of(<String>['a.b']), isEqualTo: 1),
-        q.whereEqualToField(FieldPath.of(<String>['a.b']), 1));
-    expect(q.where(FieldPath.of(<String>['a.b']), isEqualTo: 1),
+        q.whereEqualToField(FieldPath(<String>['a', 'b']), 1));
+    expect(q.where(FieldPath(<String>['a.b']), isEqualTo: 1),
+        q.whereEqualToField(FieldPath(<String>['a.b']), 1));
+    expect(q.where(FieldPath(<String>['a.b']), isEqualTo: 1),
         isNot(q.where('a.b', isEqualTo: 1)));
   });
 

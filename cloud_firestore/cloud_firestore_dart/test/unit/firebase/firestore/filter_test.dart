@@ -10,7 +10,7 @@ void main() {
   test('equalTo', () {
     final Filter filter = Filter.equalTo('x', 'v');
     expect(filter, filter);
-    expect(filter, Filter.equalToField(FieldPath.of(<String>['x']), 'v'));
+    expect(filter, Filter.equalToField(FieldPath(<String>['x']), 'v'));
     expect(filter, isNot(Filter.equalTo('x', 'z')));
     expect(filter, isNot(Filter.equalTo('y', 'v')));
     expect(filter, isNot(Filter.notEqualTo('x', 'v')));
@@ -19,7 +19,7 @@ void main() {
   test('notEqualTo', () {
     final Filter filter = Filter.notEqualTo('x', 'v');
     expect(filter, filter);
-    expect(filter, Filter.notEqualToField(FieldPath.of(<String>['x']), 'v'));
+    expect(filter, Filter.notEqualToField(FieldPath(<String>['x']), 'v'));
     expect(filter, isNot(Filter.notEqualTo('x', 'z')));
     expect(filter, isNot(Filter.notEqualTo('y', 'v')));
     expect(filter, isNot(Filter.equalTo('x', 'v')));
@@ -28,7 +28,7 @@ void main() {
   test('greaterThan', () {
     final Filter filter = Filter.greaterThan('x', 'v');
     expect(filter, filter);
-    expect(filter, Filter.greaterThanField(FieldPath.of(<String>['x']), 'v'));
+    expect(filter, Filter.greaterThanField(FieldPath(<String>['x']), 'v'));
     expect(filter, isNot(Filter.greaterThan('x', 'z')));
     expect(filter, isNot(Filter.greaterThan('y', 'v')));
     expect(filter, isNot(Filter.lessThan('x', 'v')));
@@ -39,7 +39,7 @@ void main() {
     expect(filter, filter);
     expect(
       filter,
-      Filter.greaterThanOrEqualToField(FieldPath.of(<String>['x']), 'v'),
+      Filter.greaterThanOrEqualToField(FieldPath(<String>['x']), 'v'),
     );
     expect(filter, isNot(Filter.greaterThanOrEqualTo('x', 'z')));
     expect(filter, isNot(Filter.greaterThanOrEqualTo('y', 'v')));
@@ -49,7 +49,7 @@ void main() {
   test('lessThan', () {
     final Filter filter = Filter.lessThan('x', 'v');
     expect(filter, filter);
-    expect(filter, Filter.lessThanField(FieldPath.of(<String>['x']), 'v'));
+    expect(filter, Filter.lessThanField(FieldPath(<String>['x']), 'v'));
     expect(filter, isNot(Filter.lessThan('x', 'z')));
     expect(filter, isNot(Filter.lessThan('y', 'v')));
     expect(filter, isNot(Filter.greaterThan('x', 'v')));
@@ -60,7 +60,7 @@ void main() {
     expect(filter, filter);
     expect(
       filter,
-      Filter.lessThanOrEqualToField(FieldPath.of(<String>['x']), 'v'),
+      Filter.lessThanOrEqualToField(FieldPath(<String>['x']), 'v'),
     );
     expect(filter, isNot(Filter.lessThanOrEqualTo('x', 'z')));
     expect(filter, isNot(Filter.lessThanOrEqualTo('y', 'v')));
@@ -70,7 +70,7 @@ void main() {
   test('arrayContains', () {
     final Filter filter = Filter.arrayContains('x', 'v');
     expect(filter, filter);
-    expect(filter, Filter.arrayContainsField(FieldPath.of(<String>['x']), 'v'));
+    expect(filter, Filter.arrayContainsField(FieldPath(<String>['x']), 'v'));
     expect(filter, isNot(Filter.arrayContains('x', 'z')));
     expect(filter, isNot(Filter.arrayContains('y', 'v')));
     expect(filter, isNot(Filter.equalTo('x', 'v')));
@@ -81,7 +81,7 @@ void main() {
     expect(filter, filter);
     expect(
       filter,
-      Filter.arrayContainsAnyField(FieldPath.of(<String>['x']), <Object?>[
+      Filter.arrayContainsAnyField(FieldPath(<String>['x']), <Object?>[
         'v1',
         'v2',
       ]),
@@ -97,7 +97,7 @@ void main() {
     expect(filter, filter);
     expect(
       filter,
-      Filter.inArrayField(FieldPath.of(<String>['x']), <Object?>['v1', 'v2']),
+      Filter.inArrayField(FieldPath(<String>['x']), <Object?>['v1', 'v2']),
     );
     expect(filter, isNot(Filter.inArray('x', <Object?>['v2', 'v1'])));
     expect(filter, isNot(Filter.inArray('x', <Object?>['v2', 'v3'])));
@@ -110,10 +110,7 @@ void main() {
     expect(filter, filter);
     expect(
       filter,
-      Filter.notInArrayField(FieldPath.of(<String>['x']), <Object?>[
-        'v1',
-        'v2',
-      ]),
+      Filter.notInArrayField(FieldPath(<String>['x']), <Object?>['v1', 'v2']),
     );
     expect(filter, isNot(Filter.notInArray('x', <Object?>['v2', 'v1'])));
     expect(filter, isNot(Filter.notInArray('x', <Object?>['v2', 'v3'])));
@@ -129,8 +126,8 @@ void main() {
     expect(
       filter,
       Filter.or(<Filter>[
-        Filter.inArrayField(FieldPath.of(<String>['x']), <Object?>['v1', 'v2']),
-        Filter.inArrayField(FieldPath.of(<String>['y']), <Object?>['v3', 'v4']),
+        Filter.inArrayField(FieldPath(<String>['x']), <Object?>['v1', 'v2']),
+        Filter.inArrayField(FieldPath(<String>['y']), <Object?>['v3', 'v4']),
       ]),
     );
     expect(
@@ -161,8 +158,8 @@ void main() {
     expect(
       filter,
       Filter.and(<Filter>[
-        Filter.inArrayField(FieldPath.of(<String>['x']), <Object?>['v1', 'v2']),
-        Filter.inArrayField(FieldPath.of(<String>['y']), <Object?>['v3', 'v4']),
+        Filter.inArrayField(FieldPath(<String>['x']), <Object?>['v1', 'v2']),
+        Filter.inArrayField(FieldPath(<String>['y']), <Object?>['v3', 'v4']),
       ]),
     );
     expect(

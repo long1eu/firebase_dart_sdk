@@ -55,7 +55,8 @@ void main() {
     'wrong types and errors in its arguments',
     skip: IntegrationTestUtil.enterpriseEmulatorSkipReason,
     () async {
-      final Firestore db = await IntegrationTestUtil.testEnterpriseFirestore();
+      final FirebaseFirestore db =
+          await IntegrationTestUtil.testEnterpriseFirestore();
       // ignore: invalid_use_of_internal_member
       final LocalEvaluation local = LocalEvaluation(db.modelDatabaseId);
       final _Stats stats = _Stats();
@@ -101,10 +102,11 @@ void main() {
     skip: IntegrationTestUtil.enterpriseEmulatorSkipReason,
     () async {
       // The recorded references name the project, the default database and the document.
-      final Firestore db = await IntegrationTestUtil.testEnterpriseFirestore(
-        null,
-        DatabaseId.defaultDatabaseId,
-      );
+      final FirebaseFirestore db =
+          await IntegrationTestUtil.testEnterpriseFirestore(
+            null,
+            DatabaseId.defaultDatabaseId,
+          );
       expect(db.projectId, evaluationCasesProject);
       // ignore: invalid_use_of_internal_member
       final LocalEvaluation local = LocalEvaluation(db.modelDatabaseId);
@@ -182,7 +184,8 @@ void main() {
     'aggregate functions evaluate locally as aggregate() on the emulator',
     skip: IntegrationTestUtil.enterpriseEmulatorSkipReason,
     () async {
-      final Firestore db = await IntegrationTestUtil.testEnterpriseFirestore();
+      final FirebaseFirestore db =
+          await IntegrationTestUtil.testEnterpriseFirestore();
       // ignore: invalid_use_of_internal_member
       final LocalEvaluation local = LocalEvaluation(db.modelDatabaseId);
       final List<String> unknown = <String>[];
@@ -257,7 +260,7 @@ void main() {
               return data.containsKey('r')
                   ? EvaluateValue(local.toModel(data['r']))
                   : EvaluateResult.unset;
-            } on FirestoreError catch (e) {
+            } on FirestoreException catch (e) {
               failure = e.code;
               return EvaluateResult.error;
             }
@@ -316,7 +319,8 @@ void main() {
     'expressions evaluate locally as select(expression) on the emulator',
     skip: IntegrationTestUtil.enterpriseEmulatorSkipReason,
     () async {
-      final Firestore db = await IntegrationTestUtil.testEnterpriseFirestore();
+      final FirebaseFirestore db =
+          await IntegrationTestUtil.testEnterpriseFirestore();
       // ignore: invalid_use_of_internal_member
       final LocalEvaluation local = LocalEvaluation(db.modelDatabaseId);
       final _Stats stats = _Stats();
@@ -381,7 +385,7 @@ Future<List<PipelineResult>> _execute(Pipeline pipeline) async {
       return (await pipeline.execute().timeout(
         const Duration(seconds: 30),
       )).results;
-    } on FirestoreError catch (e) {
+    } on FirestoreException catch (e) {
       if (e.code == FirestoreErrorCode.invalidArgument || attempt == 4) {
         rethrow;
       }
@@ -398,7 +402,7 @@ Future<List<PipelineResult>> _execute(Pipeline pipeline) async {
 /// one [EvaluateResult] per expression, or null for an expression the
 /// emulator rejected before running the pipeline.
 Future<Map<String, List<EvaluateResult?>>> _remote(
-  Firestore db,
+  FirebaseFirestore db,
   LocalEvaluation local,
   CollectionReference<Map<String, Object?>> collection,
   List<Expression> expressions, {
@@ -443,7 +447,7 @@ Future<Map<String, List<EvaluateResult?>>> _remote(
   Future<void> runAll(List<int> indexes) async {
     try {
       record(await run(indexes), indexes);
-    } on FirestoreError catch (e) {
+    } on FirestoreException catch (e) {
       if (indexes.length > 1) {
         final int half = indexes.length ~/ 2;
         await runAll(indexes.sublist(0, half));
@@ -461,7 +465,7 @@ Future<Map<String, List<EvaluateResult?>>> _remote(
 }
 
 Future<void> _compare(
-  Firestore db,
+  FirebaseFirestore db,
   LocalEvaluation local,
   CollectionReference<Map<String, Object?>> collection,
   Map<String, Map<String, Object?>> documents,
@@ -501,7 +505,7 @@ Future<void> _compare(
                   ])
                   .select(<Selectable>[expression.isError().as('e')]),
             );
-          } on FirestoreError {
+          } on FirestoreException {
             String localText;
             try {
               localText = describeResult(

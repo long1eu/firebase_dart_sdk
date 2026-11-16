@@ -52,10 +52,10 @@ import 'package:test/test.dart';
 
 import '../../../util/test_util.dart' as util;
 
-Firestore _testFirestore(DatabaseId databaseId) =>
+FirebaseFirestore _testFirestore(DatabaseId databaseId) =>
     FirestoreInternal.detached(databaseId);
 
-final Firestore firestore = _testFirestore(DatabaseId.forProject('project'));
+final FirebaseFirestore firestore = _testFirestore(DatabaseId.forProject('project'));
 
 DocumentSnapshot<Map<String, Object?>> documentSnapshot(
   String path,
@@ -101,12 +101,12 @@ QuerySnapshot<Map<String, Object?>> querySnapshot(
 
 Matcher throwsFirestoreError(FirestoreErrorCode code, [Object? message]) {
   Matcher matcher =
-      isA<FirestoreError>().having((FirestoreError e) => e.code, 'code', code);
+      isA<FirestoreException>().having((FirestoreException e) => e.code, 'code', code);
   if (message != null) {
     matcher = allOf(
         matcher,
-        isA<FirestoreError>()
-            .having((FirestoreError e) => e.message, 'message', message));
+        isA<FirestoreException>()
+            .having((FirestoreException e) => e.message, 'message', message));
   }
   return throwsA(matcher);
 }
@@ -378,7 +378,7 @@ void main() {
             'which is not supported.');
       });
       test('a bundle of another project', () {
-        final Firestore other =
+        final FirebaseFirestore other =
             _testFirestore(DatabaseId.forProject('other-project'));
         final Map<String, Object?> json =
             documentSnapshot('foo/bar', <String, Object?>{'a': 1}).toJson();

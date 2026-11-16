@@ -77,8 +77,8 @@ enum Direction {
 /// **Subclassing Note**: Firestore classes are not meant to be subclassed except for use in test mocks. Subclassing is
 /// not supported in production code and new SDK releases may break code that does so.
 class Query<T extends dynamic> {
-  /// Implementation detail of the SDK; not part of the supported API. Use [Firestore.collection] or
-  /// [Firestore.collectionGroup].
+  /// Implementation detail of the SDK; not part of the supported API. Use [FirebaseFirestore.collection] or
+  /// [FirebaseFirestore.collectionGroup].
   const Query._(this._query, this.firestore, [this.converter]);
 
   /// The converter attached with [withConverter], or null for raw maps.
@@ -117,8 +117,8 @@ class Query<T extends dynamic> {
 
   final core.Query _query;
 
-  /// The [Firestore] instance this query belongs to.
-  final Firestore firestore;
+  /// The [FirebaseFirestore] instance this query belongs to.
+  final FirebaseFirestore firestore;
 
   /// Creates and returns a new Query with the additional filter that documents must contain the specified field and the
   /// value should be equal to the specified value.
@@ -492,7 +492,7 @@ class Query<T extends dynamic> {
   /// Creates and returns a new [Query] that's additionally sorted by the specified field, optionally in descending
   /// order instead of ascending.
   ///
-  /// [fieldPath] the field to sort by; [FieldPath.documentIdField] sorts by document id.
+  /// [fieldPath] the field to sort by; [FieldPath.documentId] sorts by document id.
   /// [direction] the direction to sort.
   ///
   /// Returns the created Query. Same rules as [orderBy].
@@ -585,7 +585,7 @@ class Query<T extends dynamic> {
   /// Returns the created Query.
   ///
   /// You can give fewer values than there are [orderBy] clauses; throws an [ArgumentError] if you give more. For an
-  /// ordering by [FieldPath.documentIdField] the value is a document id string. A later call of a start cursor
+  /// ordering by [FieldPath.documentId] the value is a document id string. A later call of a start cursor
   /// ([startAt], [startAfter] or their `Document` variants) replaces the earlier one.
   ///
   /// ```dart
@@ -796,7 +796,7 @@ class Query<T extends dynamic> {
   ///     .collection('cities')
   ///     .get(Source.cache);
   /// ```
-  Future<QuerySnapshot<T>> get([Source source = Source.defaultSource]) async {
+  Future<QuerySnapshot<T>> get([Source source = Source.serverAndCache]) async {
     _validateHasExplicitOrderByForLimitToLast();
     if (source == Source.cache) {
       final ViewSnapshot viewSnap = await firestore.client
@@ -818,7 +818,7 @@ class Query<T extends dynamic> {
     return _firstAndCancel(
       _getSnapshotsInternal(options).map((QuerySnapshot<T> snapshot) {
         if (snapshot.metadata.isFromCache && source == Source.server) {
-          throw FirestoreError(
+          throw FirestoreException(
             'Failed to get documents from server. (However, these documents may exist in the local cache. Run again '
             'without setting source to Source.server to retrieve the cached documents.)',
             FirestoreErrorCode.unavailable,
@@ -852,7 +852,7 @@ class Query<T extends dynamic> {
     double? distanceThreshold,
   }) {
     return findNearestField(
-      FieldPath.fromDotSeparatedPath(vectorField),
+      FieldPath.fromString(vectorField),
       queryVector,
       limit,
       distanceMeasure,
@@ -1134,7 +1134,7 @@ DocumentKey? _referenceKey(Object? value) =>
 class CollectionReference<T extends dynamic> extends Query<T> {
   CollectionReference._(
     ResourcePath path,
-    Firestore firestore, [
+    FirebaseFirestore firestore, [
     FirestoreDataConverter<T>? converter,
   ]) : super._(core.Query(_checkPath(path)), firestore, converter);
 
@@ -1194,7 +1194,7 @@ class CollectionReference<T extends dynamic> extends Query<T> {
   /// final DocumentReference<Map<String, Object?>> created = cities.doc();
   /// await created.set({'name': 'Lisbon', 'id': created.id});
   /// ```
-  DocumentReference<T> doc([String? documentPath]) => document(documentPath);
+  DocumentReference<T> doc([String? documentPath]) => doc(documentPath);
 
   /// Gets a [DocumentReference] instance that refers to the document at the specified path within
   /// this collection. Same as [doc].
@@ -1230,7 +1230,7 @@ class CollectionReference<T extends dynamic> extends Query<T> {
   /// ```
   Future<DocumentReference<T>> add(T data) async {
     checkNotNull<Object>(data, 'Provided data must not be null.');
-    final DocumentReference<T> ref = document();
+    final DocumentReference<T> ref = doc();
     await ref.setFor('CollectionReference.add', data);
     return ref;
   }
@@ -1277,7 +1277,7 @@ extension QueryInternal<T> on Query<T> {
   /// Wraps the core [query] of [firestore].
   static Query<T> create<T extends dynamic>(
     core.Query query,
-    Firestore firestore, [
+    FirebaseFirestore firestore, [
     FirestoreDataConverter<T>? converter,
   ]) => Query<T>._(query, firestore, converter);
 }
@@ -1288,7 +1288,7 @@ extension CollectionReferenceInternal<T> on CollectionReference<T> {
   /// collection path.
   static CollectionReference<T> create<T extends dynamic>(
     ResourcePath path,
-    Firestore firestore, [
+    FirebaseFirestore firestore, [
     FirestoreDataConverter<T>? converter,
   ]) => CollectionReference<T>._(path, firestore, converter);
 }

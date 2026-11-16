@@ -35,7 +35,7 @@ void main() {
     web.window.localStorage.removeItem(reloadStorageKey);
 
     // The first page is gone, and with it its Web Lock.
-    final Firestore firestore = reloadClient();
+    final FirebaseFirestore firestore = reloadClient();
     addTearDown(() async {
       await firestore.terminate();
       await firestore.clearPersistence();
@@ -54,7 +54,7 @@ void main() {
     expect(pending.metadata.hasPendingWrites, isTrue);
 
     // The backend only has what page 1 was told is written.
-    final Firestore other = await newClient();
+    final FirebaseFirestore other = await newClient();
     expect(
         (await other.collection(collection).doc('acknowledged').get(Source.server))
             .data,

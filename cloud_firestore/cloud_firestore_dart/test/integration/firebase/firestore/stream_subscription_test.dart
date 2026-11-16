@@ -26,7 +26,7 @@ void main() {
 
   test('canBeRemoved', () async {
     final CollectionReference collectionReference = await testCollection();
-    final DocumentReference documentReference = collectionReference.document();
+    final DocumentReference documentReference = collectionReference.doc();
 
     final AwaitHelper<void> events = AwaitHelper<void>(4);
     final StreamSubscription<QuerySnapshot> one =
@@ -69,7 +69,7 @@ void main() {
     final StreamSubscription<QuerySnapshot> one =
         reference.snapshots.listen((QuerySnapshot value) {});
     final StreamSubscription<DocumentSnapshot> two =
-        reference.document().snapshots.listen((DocumentSnapshot value) {});
+        reference.doc().snapshots.listen((DocumentSnapshot value) {});
 
     await one.cancel();
     await one.cancel();

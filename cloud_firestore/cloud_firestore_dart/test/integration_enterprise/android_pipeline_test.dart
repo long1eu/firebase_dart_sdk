@@ -265,7 +265,7 @@ void main() {
   IntegrationTestUtil.currentDatabasePath =
       'integration_enterprise/android_pipeline';
   late CollectionReference<Map<String, Object?>> randomCol;
-  late Firestore firestore;
+  late FirebaseFirestore firestore;
 
   group('PipelineTest', skip: IntegrationTestUtil.enterpriseEmulatorSkipReason, () {
     setUp(() async {
@@ -1745,7 +1745,7 @@ void main() {
       Future<PipelineSnapshot> execute = firestore
           .pipeline()
           .collection(randomCol)
-          .sort([field(FieldPath.documentId()).ascending()])
+          .sort([field(FieldPath.documentId).ascending()])
           .limit(1)
           .addFields([
             ex(
@@ -1771,7 +1771,7 @@ void main() {
       Future<PipelineSnapshot> execute = firestore
           .pipeline()
           .collection(randomCol)
-          .sort([field(FieldPath.documentId()).ascending()])
+          .sort([field(FieldPath.documentId).ascending()])
           .limit(1)
           .addFields([
             ex(
@@ -2720,9 +2720,7 @@ void main() {
         ).isLessThan(0);
       }
 
-      (await randomCol.document("book1").update(<String, Object?>{
-        "rating": 5.0,
-      }));
+      (await randomCol.doc("book1").update(<String, Object?>{"rating": 5.0}));
       snapshot = (await pipeline
           .where(ex("title").equal("The Hitchhiker's Guide to the Galaxy"))
           .execute());
@@ -3987,7 +3985,7 @@ void main() {
       Future<PipelineSnapshot> execute = firestore
           .pipeline()
           .collection(randomCol.path)
-          .sort([field(FieldPath.documentId()).ascending()])
+          .sort([field(FieldPath.documentId).ascending()])
           .limit(1)
           .select([
             field("title").type().as("titleType"),
@@ -4018,7 +4016,7 @@ void main() {
       execute = firestore
           .pipeline()
           .collection(randomCol.path)
-          .sort([field(FieldPath.documentId()).ascending()])
+          .sort([field(FieldPath.documentId).ascending()])
           .limit(1)
           .select([
             ex("title").type().as("titleType"),
@@ -4062,7 +4060,7 @@ void main() {
               "geoPoint": GeoPoint(0.1, 0.2),
               "timestamp": Timestamp(123456, 0),
               "bytes": blobFromBytes(<int>[1, 2, 3]),
-              "docRef": randomCol.document("bar"),
+              "docRef": randomCol.doc("bar"),
               "vector": FieldValue.vector(<double>[1.0, 2.0, 3.0]),
               "map": map(<String, Object?>{
                 "numberK": 1,
@@ -4200,9 +4198,9 @@ void main() {
 
     test('testSupportsParent', () async {
       dynamic reviewRef = randomCol
-          .document("book4")
+          .doc("book4")
           .collection("reviews")
-          .document("review1");
+          .doc("review1");
 
       Future<PipelineSnapshot> execute = firestore
           .pipeline()
@@ -4230,19 +4228,19 @@ void main() {
 
     test('testDocumentsAsSource', () async {
       Future<PipelineSnapshot> execute = firestore.pipeline().documents([
-        randomCol.document("book1"),
-        randomCol.document("book2"),
-        randomCol.document("book3"),
+        randomCol.doc("book1"),
+        randomCol.doc("book2"),
+        randomCol.doc("book3"),
       ]).execute();
       assertThat((await execute).results).hasSize(3);
     });
 
     test('testCollectionGroupAsSource', () async {
-      dynamic subcollectionId = randomCol.document().id;
-      (await randomCol.document("book1").collection(subcollectionId).add(
+      dynamic subcollectionId = randomCol.doc().id;
+      (await randomCol.doc("book1").collection(subcollectionId).add(
         <String, Object?>{"order": 1},
       ));
-      (await randomCol.document("book2").collection(subcollectionId).add(
+      (await randomCol.doc("book2").collection(subcollectionId).add(
         <String, Object?>{"order": 2},
       ));
       Future<PipelineSnapshot> execute = firestore
@@ -4304,7 +4302,7 @@ void main() {
       dynamic values = <String, Object?>{};
       values["title"] = "Book With Null";
       values["optional_field"] = null;
-      (await randomCol.document("bookWithNull").set(values));
+      (await randomCol.doc("bookWithNull").set(values));
       execute = firestore
           .pipeline()
           .collection(randomCol)
@@ -4316,7 +4314,7 @@ void main() {
           ])
           .execute();
       assertThat((await execute).results[0].get("field_or_default")).isNull();
-      (await randomCol.document("bookWithNull").delete());
+      (await randomCol.doc("bookWithNull").delete());
 
       // Case 4: Test different overloads.
       // ifAbsent(String, Any)

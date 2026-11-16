@@ -53,7 +53,7 @@ class Fixture {
     this.queryJson,
   );
 
-  final Firestore firestore;
+  final FirebaseFirestore firestore;
   final CollectionReference<Map<String, Object?>> collection;
   final DocumentReference<Map<String, Object?>> doc;
   final Map<String, Object?> docJson;
@@ -296,7 +296,7 @@ final List<Entry> entries = <Entry>[
     'Firestore.getNamedQuery',
     <String>{'Firestore.getNamedQuery'},
     After.futureFails,
-    (Fixture f) => f.firestore.getNamedQuery('missing'),
+    (Fixture f) => f.firestore.namedQuery('missing'),
   ),
   Entry(
     'Firestore.documentSnapshotsFromJson',
@@ -346,7 +346,8 @@ final List<Entry> entries = <Entry>[
     <String>{'Firestore.setIndexConfiguration'},
     After.futureFails,
     // ignore: deprecated_member_use_from_same_package
-    (Fixture f) => f.firestore.setIndexConfiguration(_indexConfiguration),
+    (Fixture f) =>
+        f.firestore.setIndexConfigurationFromJSON(_indexConfiguration),
   ),
   Entry(
     'PersistentCacheIndexManager.enableIndexAutoCreation',
@@ -448,7 +449,7 @@ Set<String> publicIoMembers() {
 }
 
 bool isTerminatedError(Object? error) =>
-    error is FirestoreError &&
+    error is FirestoreException &&
     error.code == FirestoreErrorCode.failedPrecondition &&
     error.message == terminatedMessage;
 
@@ -514,7 +515,8 @@ void main() {
   });
 
   Future<Fixture> newFixture() async {
-    final Firestore firestore = await IntegrationTestUtil.testFirestore();
+    final FirebaseFirestore firestore =
+        await IntegrationTestUtil.testFirestore();
     final CollectionReference<Map<String, Object?>> collection = firestore
         .collection('terminated-${DateTime.now().microsecondsSinceEpoch}');
     final DocumentReference<Map<String, Object?>> doc = collection.doc('doc');
@@ -575,8 +577,8 @@ void main() {
       await expectLater(
         fixture.firestore.clearPersistence(),
         throwsA(
-          isA<FirestoreError>().having(
-            (FirestoreError e) => e.code,
+          isA<FirestoreException>().having(
+            (FirestoreException e) => e.code,
             'code',
             FirestoreErrorCode.failedPrecondition,
           ),
@@ -635,7 +637,7 @@ void main() {
     test('terminate and shutdown can be repeated', () async {
       await fixture.firestore.terminate();
       // ignore: deprecated_member_use_from_same_package
-      await fixture.firestore.shutdown();
+      await fixture.firestore.terminate();
     });
 
     test('clearPersistence completes', () async {
@@ -660,14 +662,14 @@ void main() {
       () async {
         await expectLater(
           // ignore: deprecated_member_use_from_same_package
-          fixture.firestore.setIndexConfiguration('not json'),
+          fixture.firestore.setIndexConfigurationFromJSON('not json'),
           throwsTerminated,
         );
       },
     );
 
     test('builders that do no I/O keep working', () {
-      final Firestore firestore = fixture.firestore;
+      final FirebaseFirestore firestore = fixture.firestore;
       expect(firestore.collection('a').doc('b').path, 'a/b');
       expect(firestore.doc('a/b').parent.id, 'a');
       expect(
@@ -690,7 +692,7 @@ void main() {
           await fixture.firestore.terminate();
           await transaction.get(fixture.doc);
         }),
-        throwsA(isA<FirestoreError>()),
+        throwsA(isA<FirestoreException>()),
       );
     },
   );

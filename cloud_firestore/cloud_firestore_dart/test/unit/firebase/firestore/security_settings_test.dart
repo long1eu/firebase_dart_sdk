@@ -8,22 +8,22 @@ import 'package:test/test.dart';
 void main() {
   group('sslEnabled: false with the production host', () {
     test('is rejected by the constructor with an ArgumentError', () {
-      expect(() => FirestoreSettings(sslEnabled: false), throwsArgumentError);
+      expect(() => Settings(sslEnabled: false), throwsArgumentError);
       expect(
-          () => FirestoreSettings(
-              host: FirestoreSettings.defaultHost, sslEnabled: false),
+          () => Settings(
+              host: Settings.defaultHost, sslEnabled: false),
           throwsArgumentError);
     });
 
     test('is rejected by copyWith', () {
-      expect(() => FirestoreSettings().copyWith(sslEnabled: false),
+      expect(() => Settings().copyWith(sslEnabled: false),
           throwsArgumentError);
       // Emulator settings moved back to the production host must not keep
       // their plaintext setting.
       expect(
-          () => FirestoreSettings()
+          () => Settings()
               .withEmulator('127.0.0.1', 8080)
-              .copyWith(host: FirestoreSettings.defaultHost),
+              .copyWith(host: Settings.defaultHost),
           throwsArgumentError);
     });
 
@@ -33,14 +33,14 @@ void main() {
         'firestore.googleapis.com.',
         ' firestore.googleapis.com',
       ]) {
-        expect(() => FirestoreSettings(host: host, sslEnabled: false),
+        expect(() => Settings(host: host, sslEnabled: false),
             throwsArgumentError,
             reason: host);
-        expect(() => FirestoreSettings().withEmulator(host, 443),
+        expect(() => Settings().withEmulator(host, 443),
             throwsArgumentError,
             reason: host);
         expect(
-            () => FirestoreSettings().withEmulator(host, 443,
+            () => Settings().withEmulator(host, 443,
                 mockUserToken: <String, Object?>{'sub': 'alice'}),
             throwsArgumentError,
             reason: host);
@@ -61,12 +61,12 @@ void main() {
       'http://evil.example',
       '',
     ]) {
-      expect(() => FirestoreSettings(host: host), throwsArgumentError,
+      expect(() => Settings(host: host), throwsArgumentError,
           reason: host);
       expect(
-          () => FirestoreSettings().copyWith(host: host), throwsArgumentError,
+          () => Settings().copyWith(host: host), throwsArgumentError,
           reason: host);
-      expect(() => FirestoreSettings().withEmulator(host, 8080),
+      expect(() => Settings().withEmulator(host, 8080),
           throwsArgumentError,
           reason: host);
     }
@@ -78,21 +78,21 @@ void main() {
       '[::1]',
       'my-proxy.internal.example.com',
     ]) {
-      expect(FirestoreSettings(host: host).host, host);
+      expect(Settings(host: host).host, host);
     }
   });
 
   test('TLS stays on by default and for a custom host', () {
-    expect(FirestoreSettings().sslEnabled, isTrue);
-    expect(FirestoreSettings(host: 'example.com').sslEnabled, isTrue);
+    expect(Settings().sslEnabled, isTrue);
+    expect(Settings(host: 'example.com').sslEnabled, isTrue);
     expect(
-        FirestoreSettings().copyWith(host: 'example.com').sslEnabled, isTrue);
+        Settings().copyWith(host: 'example.com').sslEnabled, isTrue);
   });
 
   test('plaintext is possible for an explicitly configured other host', () {
-    expect(FirestoreSettings(host: 'localhost', sslEnabled: false).sslEnabled,
+    expect(Settings(host: 'localhost', sslEnabled: false).sslEnabled,
         isFalse);
-    expect(FirestoreSettings().withEmulator('localhost', 8080).sslEnabled,
+    expect(Settings().withEmulator('localhost', 8080).sslEnabled,
         isFalse);
   });
 }

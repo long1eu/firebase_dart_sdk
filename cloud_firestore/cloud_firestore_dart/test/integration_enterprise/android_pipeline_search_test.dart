@@ -124,7 +124,7 @@ Future<bool> emulatorRejectsSearch(Future<PipelineSnapshot> execute) async {
   try {
     await execute;
     return false;
-  } on FirestoreError catch (e) {
+  } on FirestoreException catch (e) {
     print('EMU_ANSWER ${e.code} ${e.message}');
     if (e.code == FirestoreErrorCode.invalidArgument &&
         RegExp(
@@ -147,7 +147,7 @@ void assertResultIds(PipelineSnapshot snapshot, List<String> ids) {
 void main() {
   IntegrationTestUtil.currentDatabasePath =
       'integration_enterprise/android_pipeline_search';
-  late Firestore firestore;
+  late FirebaseFirestore firestore;
 
   group(
     'PipelineSearchTest',
@@ -156,13 +156,13 @@ void main() {
       // Android's @BeforeClass setupRestaurantDocs: the documents are written
       // once.
       setUpAll(() async {
-        final Firestore writer =
+        final FirebaseFirestore writer =
             await IntegrationTestUtil.testEnterpriseFirestore();
         final CollectionReference<Map<String, Object?>> restaurants = writer
             .collection(collectionName);
         for (final MapEntry<String, Map<String, Object?>> doc
             in restaurantDocs.entries) {
-          await restaurants.document(doc.key).set(doc.value);
+          await restaurants.doc(doc.key).set(doc.value);
         }
       });
 

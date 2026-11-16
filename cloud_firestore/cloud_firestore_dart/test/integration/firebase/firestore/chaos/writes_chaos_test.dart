@@ -32,7 +32,7 @@ void main() {
   /// Issues the writes of the scenario on [collection] and returns their futures. The expected result is
   /// [expectedDocs].
   List<Future<void>> issueWrites(
-      Firestore db, CollectionReference<Map<String, Object?>> collection) {
+      FirebaseFirestore db, CollectionReference<Map<String, Object?>> collection) {
     final DocumentReference<Map<String, Object?>> a = collection.doc('a');
     final DocumentReference<Map<String, Object?>> b = collection.doc('b');
     final DocumentReference<Map<String, Object?>> log = collection.doc('log');
@@ -100,14 +100,14 @@ void main() {
   };
 
   Future<CollectionReference<Map<String, Object?>>> prepare(
-      Firestore db) async {
+      FirebaseFirestore db) async {
     final String name = uniqueName('writes');
     await env.oracle.collection(name).doc('existing').set(<String, Object?>{});
     await env.oracle.collection(name).doc('existing2').set(<String, Object?>{});
     return db.collection(name);
   }
 
-  Future<void> expectLanded(Firestore db,
+  Future<void> expectLanded(FirebaseFirestore db,
       CollectionReference<Map<String, Object?>> collection) async {
     expect(await env.serverDocs(collection.path), expectedDocs,
         reason: 'the backend');
@@ -121,7 +121,7 @@ void main() {
   group('writes', () {
     test('queued while the connection is cut land exactly once and in order',
         () async {
-      final Firestore db = await env.newClient();
+      final FirebaseFirestore db = await env.newClient();
       final CollectionReference<Map<String, Object?>> collection =
           await prepare(db);
       // Open the write stream first, then lose the network.
@@ -148,7 +148,7 @@ void main() {
       // Found by the soak test on the web transports: the WebChannel session of a write stream that the client
       // closed went on sending its request again (after 100 ms, then after 1 s) until it got through, after the
       // client had sent the same write and a newer one on its next stream. The backend applied the old write last.
-      final Firestore db = await env.newClient();
+      final FirebaseFirestore db = await env.newClient();
       final DocumentReference<Map<String, Object?>> doc =
           db.collection(uniqueName('late')).doc('k');
       // Opens the write stream.
@@ -180,7 +180,7 @@ void main() {
 
     test('issued before the first connection land exactly once', () async {
       env.proxy.disconnect();
-      final Firestore db = await env.newClient();
+      final FirebaseFirestore db = await env.newClient();
       final CollectionReference<Map<String, Object?>> collection =
           await prepare(db);
       final List<Future<void>> writes = issueWrites(db, collection);
@@ -192,7 +192,7 @@ void main() {
 
     test('survive cuts in the middle of the write stream that lose requests',
         () async {
-      final Firestore db = await env.newClient();
+      final FirebaseFirestore db = await env.newClient();
       final CollectionReference<Map<String, Object?>> collection =
           await prepare(db);
       await collection.doc('warmup').set(<String, Object?>{});
@@ -229,7 +229,7 @@ void main() {
     });
 
     test('survive cuts that lose acknowledgements (at least once)', () async {
-      final Firestore db = await env.newClient();
+      final FirebaseFirestore db = await env.newClient();
       final CollectionReference<Map<String, Object?>> collection =
           await prepare(db);
       await collection.doc('warmup').set(<String, Object?>{});
@@ -307,7 +307,7 @@ void main() {
     test(
         'after a lost acknowledgement the cache has the re-sent write that '
         'changed nothing (F1b)', () async {
-      final Firestore db = await env.newClient();
+      final FirebaseFirestore db = await env.newClient();
       final CollectionReference<Map<String, Object?>> collection =
           db.collection(uniqueName('stale'));
       final DocumentReference<Map<String, Object?>> doc = collection.doc('a');
@@ -352,7 +352,7 @@ void main() {
             'needs two increments in flight at once; the web transport does not send an increment ahead'));
 
     test('survive a stalled connection that is then cut', () async {
-      final Firestore db = await env.newClient();
+      final FirebaseFirestore db = await env.newClient();
       final CollectionReference<Map<String, Object?>> collection =
           await prepare(db);
       await collection.doc('warmup').set(<String, Object?>{});
@@ -370,7 +370,7 @@ void main() {
 
     test('survive a connection that swallows the traffic for a while',
         () async {
-      final Firestore db = await env.newClient();
+      final FirebaseFirestore db = await env.newClient();
       final CollectionReference<Map<String, Object?>> collection =
           await prepare(db);
       await collection.doc('warmup').set(<String, Object?>{});
@@ -388,7 +388,7 @@ void main() {
     }, timeout: const Timeout(Duration(seconds: 120)));
 
     test('survive a stalled connection that recovers, and latency', () async {
-      final Firestore db = await env.newClient();
+      final FirebaseFirestore db = await env.newClient();
       final CollectionReference<Map<String, Object?>> collection =
           await prepare(db);
       env.proxy.delay = const Duration(milliseconds: 30);

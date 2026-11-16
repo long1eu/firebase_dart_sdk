@@ -153,8 +153,8 @@ void main() {
     });
 
     test('testCanRunCountCollectionGroupQuery', () async {
-      final Firestore db = await testFirestore();
-      final String group = 'b${db.collection('foo').document().id}';
+      final FirebaseFirestore db = await testFirestore();
+      final String group = 'b${db.collection('foo').doc().id}';
       final List<String> paths = <String>[
         'abc/123/$group/cg-doc1',
         'abc/123/$group/cg-doc2',
@@ -170,7 +170,7 @@ void main() {
       ];
       final batch = db.batch();
       for (final String path in paths) {
-        batch.set(db.document(path), <String, Object?>{'x': 1});
+        batch.set(db.doc(path), <String, Object?>{'x': 1});
       }
       await batch.commit();
 
@@ -192,7 +192,7 @@ void main() {
         final CollectionReference coll = await testCollection();
         final List<String> segments = documentPath.split('/');
         final CollectionReference sub = coll
-            .document(segments[0])
+            .doc(segments[0])
             .collection(segments[1]);
         await sub.add(<String, Object?>{'foo': 'bar'});
         await sub.add(<String, Object?>{'foo': 'baz'});
@@ -223,8 +223,8 @@ void main() {
       await expectLater(
         c.count().get(AggregateSource.server),
         throwsA(
-          isA<FirestoreError>().having(
-            (FirestoreError e) => e.code,
+          isA<FirestoreException>().having(
+            (FirestoreException e) => e.code,
             'code',
             FirestoreErrorCode.unavailable,
           ),
@@ -282,14 +282,14 @@ void main() {
             AggregateField.sum('baz'),
           ]),
           throwsA(
-            isA<FirestoreError>()
+            isA<FirestoreException>()
                 .having(
-                  (FirestoreError e) => e.code,
+                  (FirestoreException e) => e.code,
                   'code',
                   FirestoreErrorCode.invalidArgument,
                 )
                 .having(
-                  (FirestoreError e) => e.message,
+                  (FirestoreException e) => e.message,
                   'message',
                   contains('maximum number of aggregations'),
                 ),
@@ -610,13 +610,13 @@ void main() {
       final AggregateQuery query1 = coll1.count();
       final AggregateQuery query1Same = coll1Same.count();
       AggregateQuery query2() => coll1
-          .document('bar')
+          .doc('bar')
           .collection('baz')
           .whereEqualTo('a', 1)
           .limit(100)
           .count();
       AggregateQuery query3() => coll1
-          .document('bar')
+          .doc('bar')
           .collection('baz')
           .whereEqualTo('b', 1)
           .orderBy('c')
@@ -656,7 +656,7 @@ void main() {
       expect(query3.hashCode, isNot(query1.hashCode));
 
       final Query base = coll
-          .document('bar')
+          .doc('bar')
           .collection('baz')
           .whereEqualTo('a', 1)
           .limit(100);
@@ -699,7 +699,7 @@ void main() {
           .whereEqualTo('k', 'a')
           .count()
           .get(AggregateSource.server);
-      await collection.document('d').set(<String, Object?>{'k': 'a'});
+      await collection.doc('d').set(<String, Object?>{'k': 'a'});
       final AggregateQuerySnapshot snapshot2Different = await collection
           .whereEqualTo('k', 'a')
           .count()

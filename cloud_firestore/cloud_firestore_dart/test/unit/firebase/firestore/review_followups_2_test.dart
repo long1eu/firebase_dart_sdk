@@ -65,24 +65,24 @@ void main() {
   group('L9: copyWith(cacheSettings:) on settings that used the old flags', () {
     test('reports the mixed APIs instead of dropping persistenceEnabled', () {
       expect(
-          () => FirestoreSettings(persistenceEnabled: false)
+          () => Settings(persistenceEnabled: false)
               .copyWith(cacheSettings: PersistentCacheSettings()),
           throwsStateError);
     });
 
     test('reports the mixed APIs instead of dropping cacheSizeBytes', () {
       expect(
-          () => FirestoreSettings(cacheSizeBytes: 2 * 1024 * 1024)
+          () => Settings(cacheSizeBytes: 2 * 1024 * 1024)
               .copyWith(cacheSettings: PersistentCacheSettings()),
           throwsStateError);
     });
 
     test('still works on default settings and on settings with a cache', () {
-      final FirestoreSettings memory = FirestoreSettings()
+      final Settings memory = Settings()
           .copyWith(cacheSettings: const MemoryCacheSettings());
       expect(memory.persistenceEnabled, isFalse);
       // The flags derived from the cache settings are not "mixed" flags.
-      final FirestoreSettings persistent =
+      final Settings persistent =
           memory.copyWith(cacheSettings: PersistentCacheSettings());
       expect(persistent.persistenceEnabled, isTrue);
       expect(memory.copyWith(host: 'localhost').persistenceEnabled, isFalse);
@@ -103,11 +103,11 @@ void main() {
     await runZonedGuarded(() async {
       final FirebaseApp app = FirebaseApp.withOptions(
         const FirebaseOptions(
-            apiKey: 'key', applicationId: 'appId', projectId: 'p'),
+            apiKey: 'key', appId: 'appId', projectId: 'p'),
         dependencies: null,
         name: 'reviewDeleteAppShutdownFails',
       );
-      final Firestore firestore = FirestoreInternal.create(DatabaseId.forProject('p'), app,
+      final FirebaseFirestore firestore = FirestoreInternal.create(DatabaseId.forProject('p'), app,
           _FailingShutdownClient(), TaskScheduler('test'));
       FirestoreMultiDbComponent.register(
           app, DatabaseId.defaultDatabaseId, firestore);

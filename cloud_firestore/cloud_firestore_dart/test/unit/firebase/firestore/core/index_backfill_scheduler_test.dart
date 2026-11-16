@@ -26,7 +26,7 @@ import '../../../../util/test_util.dart' show filter, key, path;
 import '../local/mock/database_mock.dart';
 
 /// A client on an unreachable host: writes stay pending, queries are served from the cache.
-Future<Firestore> open(FirestoreSettings settings, TaskScheduler scheduler,
+Future<FirebaseFirestore> open(Settings settings, TaskScheduler scheduler,
     {MockCredentialsProvider? credentials}) {
   final String dbPath =
       '${Directory.systemTemp.path}/index_backfill_${const Uuid().v4()}.db';
@@ -57,8 +57,8 @@ Future<Firestore> open(FirestoreSettings settings, TaskScheduler scheduler,
   );
 }
 
-final FirestoreSettings offline =
-    FirestoreSettings().withEmulator('127.0.0.1', 1);
+final Settings offline =
+    Settings().withEmulator('127.0.0.1', 1);
 
 /// Runs the scheduled backfill now and waits until it rescheduled itself (which it does when the run is over).
 Future<void> runBackfill(TaskScheduler scheduler) async {
@@ -78,7 +78,7 @@ Future<void> runBackfill(TaskScheduler scheduler) async {
 void main() {
   test('the index backfill is scheduled with SQLite persistence', () async {
     final TaskScheduler scheduler = TaskScheduler('');
-    final Firestore firestore = await open(offline, scheduler);
+    final FirebaseFirestore firestore = await open(offline, scheduler);
     expect(scheduler.getTask(TaskId.indexBackfill), isNotNull);
     await firestore.terminate();
     expect(scheduler.getTask(TaskId.indexBackfill), isNull);
@@ -86,7 +86,7 @@ void main() {
 
   test('the index backfill is not scheduled with memory persistence', () async {
     final TaskScheduler scheduler = TaskScheduler('');
-    final Firestore firestore = await open(
+    final FirebaseFirestore firestore = await open(
         offline.copyWith(cacheSettings: const MemoryCacheSettings()),
         scheduler);
     expect(scheduler.getTask(TaskId.indexBackfill), isNull);
@@ -97,7 +97,7 @@ void main() {
       'a scheduled run fills the configured indexes and the next one is scheduled',
       () async {
     final TaskScheduler scheduler = TaskScheduler('');
-    final Firestore firestore = await open(offline, scheduler);
+    final FirebaseFirestore firestore = await open(offline, scheduler);
     addTearDown(firestore.terminate);
     final LocalStore localStore = firestore.client.localStore;
 
@@ -154,7 +154,7 @@ void main() {
 
   test('a run with nothing to do reschedules itself', () async {
     final TaskScheduler scheduler = TaskScheduler('');
-    final Firestore firestore = await open(offline, scheduler);
+    final FirebaseFirestore firestore = await open(offline, scheduler);
     addTearDown(firestore.terminate);
 
     // No index is configured.
@@ -189,7 +189,7 @@ void main() {
   test('index state and entries follow the user', () async {
     final TaskScheduler scheduler = TaskScheduler('');
     final MockCredentialsProvider credentials = MockCredentialsProvider();
-    final Firestore firestore =
+    final FirebaseFirestore firestore =
         await open(offline, scheduler, credentials: credentials);
     addTearDown(firestore.terminate);
     final LocalStore localStore = firestore.client.localStore;

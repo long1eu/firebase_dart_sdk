@@ -187,9 +187,9 @@ void main() {
     });
 
     test('field path variants match the string variants', () {
-      expect(AggregateField.sumField(FieldPath.fromDotSeparatedPath('a.b')),
+      expect(AggregateField.sumField(FieldPath.fromString('a.b')),
           AggregateField.sum('a.b'));
-      expect(AggregateField.averageField(FieldPath.fromDotSeparatedPath('a.b')),
+      expect(AggregateField.averageField(FieldPath.fromString('a.b')),
           AggregateField.average('a.b'));
     });
 

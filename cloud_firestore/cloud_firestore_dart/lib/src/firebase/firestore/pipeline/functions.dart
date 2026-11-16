@@ -17,12 +17,12 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/pipeline/expression.
 import 'package:cloud_firestore_dart/src/firebase/firestore/pipeline/pipeline_source.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/pipeline/window.dart';
 
-/// Adds [pipeline] to [Firestore]. Importing
+/// Adds [pipeline] to [FirebaseFirestore]. Importing
 /// `package:cloud_firestore_dart/pipelines.dart` makes it available.
 ///
 /// **Preview, Enterprise only**: the Pipelines API is experimental, may change
 /// in any release and needs a Firestore Enterprise edition database.
-extension FirestorePipelines on Firestore {
+extension FirestorePipelines on FirebaseFirestore {
   /// Starts a pipeline query: choose a source on the returned
   /// [PipelineSource], add stages and call `execute()`.
   ///

@@ -24,7 +24,7 @@ Future<void> main() async {
   final String path = scratch('articles');
 
   // --- Server: write some data, read the query, keep the bundle. ---
-  final Firestore server = connect('server');
+  final FirebaseFirestore server = connect('server');
   final CollectionReference<Map<String, Object?>> articles = server.collection(
     path,
   );
@@ -50,7 +50,7 @@ Future<void> main() async {
   final Directory directory = Directory.systemTemp.createTempSync(
     'firestore_example_',
   );
-  final Firestore client = Firestore.instanceFor(
+  final FirebaseFirestore client = FirebaseFirestore.instanceFor(
     app: exampleApp('client'),
     openDatabase: sqliteOpener(directory),
     settings: emulatorSettings(cacheSettings: PersistentCacheSettings()),
@@ -60,7 +60,7 @@ Future<void> main() async {
   // In an app the bundle would come from your server or a CDN, or be shipped
   // as an asset; loadBundleStream takes the body of an HTTP response.
   await client.loadBundle(utf8.encode(bundle)).future;
-  final Query<Map<String, Object?>> latest = (await client.getNamedQuery(
+  final Query<Map<String, Object?>> latest = (await client.namedQuery(
     bundleName,
   ))!;
   final QuerySnapshot<Map<String, Object?>> cached = await latest.get(

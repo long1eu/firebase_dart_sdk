@@ -17,7 +17,7 @@ void main() {
 
   final String? skip = IntegrationTestUtil.enterpriseEmulatorSkipReason;
 
-  late Firestore firestore;
+  late FirebaseFirestore firestore;
 
   setUp(() async {
     firestore = await IntegrationTestUtil.testEnterpriseFirestore();
@@ -32,7 +32,7 @@ void main() {
     final CollectionReference collection =
         firestore.collection('bson_queries_${autoId()}');
     for (int i = 0; i < values.length; i++) {
-      await collection.document('d$i').set(<String, Object?>{'v': values[i]});
+      await collection.doc('d$i').set(<String, Object?>{'v': values[i]});
     }
     return collection;
   }
@@ -55,7 +55,7 @@ void main() {
     test('results return the BSON value classes', () async {
       final CollectionReference collection =
           firestore.collection('bson_queries_${autoId()}');
-      await collection.document('doc').set(allTypes);
+      await collection.doc('doc').set(allTypes);
 
       final PipelineSnapshot snapshot =
           await firestore.pipeline().collection(collection.path).execute();
@@ -71,14 +71,14 @@ void main() {
 
       // The same document read with a get() has the same data.
       final DocumentSnapshot document =
-          await collection.document('doc').get(Source.server);
+          await collection.doc('doc').get(Source.server);
       expect(result.data(), document.data);
     });
 
     test('selected and computed fields keep their BSON type', () async {
       final CollectionReference collection =
           firestore.collection('bson_queries_${autoId()}');
-      await collection.document('doc').set(allTypes);
+      await collection.doc('doc').set(allTypes);
 
       final PipelineSnapshot snapshot = await firestore
           .pipeline()
@@ -257,7 +257,7 @@ void main() {
 
     test('are rejected in document data', () async {
       final DocumentReference document =
-          firestore.collection('bson_queries_${autoId()}').document('doc');
+          firestore.collection('bson_queries_${autoId()}').doc('doc');
       expect(
           () => document.set(<String, Object?>{
                 'v': <String, Object?>{'__int__': 5}
@@ -268,7 +268,7 @@ void main() {
 
     test('are that BSON value in an array transform', () async {
       final DocumentReference document =
-          firestore.collection('bson_queries_${autoId()}').document('doc');
+          firestore.collection('bson_queries_${autoId()}').doc('doc');
       await document.set(<String, Object?>{
         'l': <Object?>[Int32Value(5)]
       });

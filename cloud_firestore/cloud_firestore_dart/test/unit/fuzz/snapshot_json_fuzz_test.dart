@@ -173,11 +173,11 @@ void main() {
 }
 
 /// [acceptOrReject] for the public API: the only clean rejection is a
-/// [FirestoreError].
+/// [FirestoreException].
 T? acceptOrRejectFirestore<T>(T Function() body, String Function() input) {
   try {
     return body();
-  } on FirestoreError catch (error) {
+  } on FirestoreException catch (error) {
     final Object? cause = error.cause;
     if (cause != null &&
         !isCleanRejection(cause, error.stackTrace ?? StackTrace.empty)) {

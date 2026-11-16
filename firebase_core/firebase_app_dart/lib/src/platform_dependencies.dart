@@ -93,11 +93,11 @@ class PlatformDependencies extends LocalStorage {
   /// You can also leave it null and set `FirebaseApp.authProvider` later, before the Firestore
   /// instance is created; `FirebaseUserAuth.forApp` of `package:firebase_auth_providers_dart` does
   /// that.
-  InternalTokenProvider? get authProvider => null;
+  AuthTokenProvider? get authProvider => null;
 
   /// Firestore sends the token of this provider in the `x-firebase-appcheck` header of every
   /// request. Default null: no App Check header is sent.
-  InternalAppCheckTokenProvider? get appCheckProvider => null;
+  AppCheckTokenProvider? get appCheckProvider => null;
 
   /// The value stored in memory under [key], or null.
   @override

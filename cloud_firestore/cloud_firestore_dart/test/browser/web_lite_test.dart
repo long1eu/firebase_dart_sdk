@@ -29,18 +29,18 @@ int _apps = 0;
 
 /// A new instance with an app of its own. It is terminated when the test
 /// ends, and its app is deleted.
-Firestore newFirestore({Object? mockUserToken}) {
+FirebaseFirestore newFirestore({Object? mockUserToken}) {
   final FirebaseApp app = FirebaseApp.withOptions(
     const FirebaseOptions(
       apiKey: 'demo-key',
-      applicationId: '1:1234567890:dart:browser',
+      appId: '1:1234567890:dart:browser',
       projectId: projectId,
     ),
     name: 'browser-lite-${_apps++}-${_random.nextInt(0x7fffffff)}',
   );
-  final Firestore firestore = Firestore.instanceFor(
+  final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(
     app: app,
-    settings: FirestoreSettings().withEmulator(
+    settings: Settings().withEmulator(
       emulatorHost,
       emulatorPort,
       mockUserToken: mockUserToken,
@@ -54,7 +54,7 @@ Firestore newFirestore({Object? mockUserToken}) {
 }
 
 CollectionReference<Map<String, Object?>> newCollection([
-  Firestore? firestore,
+  FirebaseFirestore? firestore,
 ]) => (firestore ?? newFirestore()).collection(
   'browser-lite-${DateTime.now().microsecondsSinceEpoch}-${_random.nextInt(0x7fffffff)}',
 );
@@ -130,8 +130,8 @@ void main() {
     await expectLater(
       newCollection().doc('missing').update(<String, Object?>{'a': 1}),
       throwsA(
-        isA<FirestoreError>().having(
-          (FirestoreError e) => e.code,
+        isA<FirestoreException>().having(
+          (FirestoreException e) => e.code,
           'code',
           FirestoreErrorCode.notFound,
         ),
@@ -293,7 +293,7 @@ void main() {
   });
 
   test('requests with a mock user token succeed', () async {
-    final Firestore firestore = newFirestore(
+    final FirebaseFirestore firestore = newFirestore(
       mockUserToken: <String, Object?>{'sub': 'alice'},
     );
     final DocumentReference<Map<String, Object?>> doc = newCollection(
@@ -304,7 +304,7 @@ void main() {
   });
 
   test('a terminated instance rejects calls; calls in flight finish', () async {
-    final Firestore firestore = newFirestore();
+    final FirebaseFirestore firestore = newFirestore();
     final CollectionReference<Map<String, Object?>> collection = newCollection(
       firestore,
     );
@@ -316,8 +316,8 @@ void main() {
     await expectLater(
       collection.doc('a').get(),
       throwsA(
-        isA<FirestoreError>().having(
-          (FirestoreError e) => e.code,
+        isA<FirestoreException>().having(
+          (FirestoreException e) => e.code,
           'code',
           FirestoreErrorCode.failedPrecondition,
         ),

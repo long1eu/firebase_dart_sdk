@@ -28,7 +28,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/remote/datastore/dat
 import 'package:cloud_firestore_dart/src/proto/index.dart' as proto;
 
 /// The [TransactionClient] of a Firestore Lite transaction: every request is
-/// a call of its own of [Firestore.run]. It forwards every method of
+/// a call of its own of [FirebaseFirestore.run]. It forwards every method of
 /// [TransactionClient] (a new one there fails to compile here until it is
 /// forwarded too).
 ///
@@ -40,7 +40,7 @@ class LiteTransactionClient implements TransactionClient {
   /// A client that sends the requests of a transaction of [firestore].
   LiteTransactionClient(this._firestore);
 
-  final Firestore _firestore;
+  final FirebaseFirestore _firestore;
 
   @override
   Future<List<MutationResult>> commit(List<Mutation> mutations) =>

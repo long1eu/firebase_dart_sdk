@@ -8,19 +8,13 @@ void main() {
 
   group('FirebaseOptions', () {
     test('== agrees with hashCode, including dataCollectionEnabled', () {
-      const FirebaseOptions a = FirebaseOptions(
-        apiKey: 'k',
-        applicationId: 'a',
-      );
+      const FirebaseOptions a = FirebaseOptions(apiKey: 'k', appId: 'a');
       const FirebaseOptions b = FirebaseOptions(
         apiKey: 'k',
-        applicationId: 'a',
+        appId: 'a',
         dataCollectionEnabled: false,
       );
-      const FirebaseOptions c = FirebaseOptions(
-        apiKey: 'k',
-        applicationId: 'a',
-      );
+      const FirebaseOptions c = FirebaseOptions(apiKey: 'k', appId: 'a');
       expect(a == c, isTrue);
       expect(a.hashCode, c.hashCode);
       expect(a == b, isFalse);
@@ -29,7 +23,7 @@ void main() {
     test('fromJson accepts a decoded JSON map', () {
       const FirebaseOptions options = FirebaseOptions(
         apiKey: 'k',
-        applicationId: 'a',
+        appId: 'a',
         projectId: 'p',
         storageBucket: 's',
       );
@@ -49,7 +43,7 @@ void main() {
   group('FirebaseApp defaults', () {
     test('background and network subjects are stable', () {
       final FirebaseApp app = FirebaseApp.withOptions(
-        const FirebaseOptions(apiKey: 'k', applicationId: 'a'),
+        const FirebaseOptions(apiKey: 'k', appId: 'a'),
       );
       expect(
         identical(app.onBackgroundChanged, app.onBackgroundChanged),

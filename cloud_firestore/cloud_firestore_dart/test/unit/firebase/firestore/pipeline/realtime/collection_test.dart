@@ -297,7 +297,7 @@ void main() {
 
   test('sort on path', () {
     final pipeline = RealtimePipelineSource().collection('/users').sort([
-      Field.of(FieldPath.documentIdField).ascending(),
+      Field.of(FieldPath.documentId).ascending(),
     ]);
 
     final doc1 = doc('users/bob', 1000, <String, Object?>{'score': 90});
@@ -312,7 +312,7 @@ void main() {
   test('limit', () {
     final pipeline = RealtimePipelineSource()
         .collection('/users')
-        .sort([Field.of(FieldPath.documentIdField).ascending()])
+        .sort([Field.of(FieldPath.documentId).ascending()])
         .limit(2);
 
     final doc1 = doc('users/bob', 1000, <String, Object?>{'score': 90});
@@ -327,7 +327,7 @@ void main() {
   test('sort on key ascending', () {
     final pipeline = RealtimePipelineSource()
         .collection('/users/bob/games')
-        .sort([Field.of(FieldPath.documentIdField).ascending()]);
+        .sort([Field.of(FieldPath.documentId).ascending()]);
 
     final doc1 = doc('users/bob/games/a', 1000, <String, Object?>{
       'title': 'minecraft',
@@ -352,7 +352,7 @@ void main() {
   test('sort on key descending', () {
     final pipeline = RealtimePipelineSource()
         .collection('/users/bob/games')
-        .sort([Field.of(FieldPath.documentIdField).descending()]);
+        .sort([Field.of(FieldPath.documentId).descending()]);
 
     final doc1 = doc('users/bob/games/a', 1000, <String, Object?>{
       'title': 'minecraft',

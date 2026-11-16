@@ -54,7 +54,7 @@ void main() {
           'embedding': FieldValue.vector(<double>[1.0, 2.0, 3.0]),
         },
       });
-      final DocumentSnapshot snap = await c.document('a').get();
+      final DocumentSnapshot snap = await c.doc('a').get();
       expect(snap.getVectorValue('embedding'),
           FieldValue.vector(<double>[1.0, 2.0, 3.0]));
       expect(snap.get('embedding'), isA<VectorValue>());
@@ -153,7 +153,7 @@ void main() {
               .findNearest(
                   'embedding', <double>[0.0, 0.0], 2, DistanceMeasure.cosine)
               .get(),
-          throwsA(isA<FirestoreError>().having((FirestoreError e) => e.code,
+          throwsA(isA<FirestoreException>().having((FirestoreException e) => e.code,
               'code', FirestoreErrorCode.unavailable)));
       await c.firestore.enableNetwork();
     });
@@ -228,7 +228,7 @@ void main() {
 
     test('writeAndReadVectorEmbeddings', () async {
       final DocumentReference doc =
-          (await testFirestore()).collection('vec').document();
+          (await testFirestore()).collection('vec').doc();
 
       await doc.set(<String, Object?>{
         'vector0': FieldValue.vector(<double>[0.0]),
@@ -259,7 +259,7 @@ void main() {
     test('listenToDocumentsWithVectors', () async {
       final CollectionReference collection =
           (await testFirestore()).collection('vec-listen-${autoId()}');
-      final DocumentReference ref = collection.document();
+      final DocumentReference ref = collection.doc();
       final EventAccumulator<QuerySnapshot> accumulator =
           EventAccumulator<QuerySnapshot>();
       final StreamSubscription<QuerySnapshot> registration = collection
@@ -277,7 +277,7 @@ void main() {
           'vector1': FieldValue.vector(<double>[1, 2, 3.99]),
         });
         snap = await accumulator.wait();
-        DocumentSnapshot doc = snap.documents.first;
+        DocumentSnapshot doc = snap.docs.first;
         expect(doc.getVectorValue('vector0'), FieldValue.vector(<double>[0.0]));
         expect(doc.getVectorValue('vector1'),
             FieldValue.vector(<double>[1, 2, 3.99]));
@@ -289,7 +289,7 @@ void main() {
           'vector2': FieldValue.vector(<double>[0, 0, 0]),
         });
         snap = await accumulator.wait();
-        doc = snap.documents.first;
+        doc = snap.docs.first;
         expect(doc.getVectorValue('vector2'),
             FieldValue.vector(<double>[0, 0, 0]));
 
@@ -297,7 +297,7 @@ void main() {
           'vector3': FieldValue.vector(<double>[-1, -200, -999]),
         });
         snap = await accumulator.wait();
-        doc = snap.documents.first;
+        doc = snap.docs.first;
         expect(doc.getVectorValue('vector0'), FieldValue.vector(<double>[0.0]));
         expect(doc.getVectorValue('vector1'),
             FieldValue.vector(<double>[1, 2, 3.99]));

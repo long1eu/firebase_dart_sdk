@@ -72,7 +72,7 @@ class _RecordingConverter extends FirestoreDataConverter<City> {
 
 void main() {
   late _RecordingClient client;
-  late Firestore db;
+  late FirebaseFirestore db;
 
   setUp(() {
     client = _RecordingClient();
@@ -214,8 +214,8 @@ void main() {
       expect(snap.data!.name, 'SF');
       expect(snap.data!.population, 10);
       expect(snap.getData(ServerTimestampBehavior.none)!.name, 'SF');
-      expect(snap.ref.converter, same(cityConverter));
-      expect(snap.ref.path, 'cities/sf');
+      expect(snap.reference.converter, same(cityConverter));
+      expect(snap.reference.path, 'cities/sf');
       // Field access stays raw.
       expect(snap.get('population'), 10);
 
@@ -286,7 +286,7 @@ void main() {
           <String>['A', 'B']);
       expect(
           snapshot.docChanges
-              .map((DocumentChange<City> c) => c.document.data.population),
+              .map((DocumentChange<City> c) => c.doc.data.population),
           <int>[1, 2]);
       expect(snapshot.query.converter, same(cityConverter));
     });

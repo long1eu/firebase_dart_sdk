@@ -95,9 +95,10 @@ void main() {
         ),
     () async {
       final _Stats stats = _Stats();
-      final lite.Firestore backend = newLiteTestFirestore();
-      final Firestore writer = await IntegrationTestUtil.testFirestore();
-      final FirestoreSettings settings = IntegrationTestUtil.newTestSettings();
+      final lite.FirebaseFirestore backend = newLiteTestFirestore();
+      final FirebaseFirestore writer =
+          await IntegrationTestUtil.testFirestore();
+      final Settings settings = IntegrationTestUtil.newTestSettings();
       final List<_Client> clients = <_Client>[
         _Client(
           'memory',
@@ -155,8 +156,9 @@ void main() {
         ),
     () async {
       final _Stats stats = _Stats();
-      final lite.Firestore backend = newLiteTestFirestore();
-      final Firestore writer = await IntegrationTestUtil.testFirestore();
+      final lite.FirebaseFirestore backend = newLiteTestFirestore();
+      final FirebaseFirestore writer =
+          await IntegrationTestUtil.testFirestore();
       for (int i = 0; i < cases(2); i++) {
         await _checkSharedCacheCase(
           caseSeed(5000 + i),
@@ -192,7 +194,7 @@ class _Client {
   _Client(this.name, this.firestore, {required this.keepsTargets});
 
   final String name;
-  final Firestore firestore;
+  final FirebaseFirestore firestore;
 
   /// Whether the target and its documents stay in the cache after the last
   /// listener of a query is removed (not with eager garbage collection).
@@ -245,7 +247,7 @@ Object? _withoutSentinels(Object? value) => switch (value) {
 
 /// [value] with every document reference replaced by the same path in
 /// [firestore]: a client only accepts its own references.
-Object? _rebind(Object? value, Firestore firestore) => switch (value) {
+Object? _rebind(Object? value, FirebaseFirestore firestore) => switch (value) {
   final DocumentReference<Object?> ref => firestore.doc(ref.path),
   final List<Object?> list => <Object?>[
     for (final Object? v in list) _rebind(v, firestore),
@@ -313,7 +315,7 @@ Future<void> _apply(
     (_) => stats.writesApplied++,
     onError: (Object error) {
       if (write.kind == 'update' &&
-          error is FirestoreError &&
+          error is FirestoreException &&
           error.code == FirestoreErrorCode.notFound) {
         stats.writesRejected++;
         return;
@@ -331,7 +333,7 @@ List<String> _ids(QuerySnapshot<Map<String, Object?>> snapshot) => <String>[
 /// The documents the backend returns for [query], or null when it rejects
 /// the query.
 Future<List<String>?> _backendIds(
-  lite.Firestore backend,
+  lite.FirebaseFirestore backend,
   Query<Map<String, Object?>> query,
   _Stats stats,
 ) async {
@@ -343,7 +345,7 @@ Future<List<String>?> _backendIds(
           in snapshot.docs)
         doc.id,
     ];
-  } on FirestoreError catch (e) {
+  } on FirestoreException catch (e) {
     if (e.code == FirestoreErrorCode.invalidArgument ||
         e.code == FirestoreErrorCode.failedPrecondition ||
         e.code == FirestoreErrorCode.unimplemented) {
@@ -356,7 +358,7 @@ Future<List<String>?> _backendIds(
 
 /// The data of every document of [path] on the backend, for messages.
 Future<Map<String, Object?>> _backendData(
-  lite.Firestore backend,
+  lite.FirebaseFirestore backend,
   String path,
 ) async {
   final lite.QuerySnapshot<Map<String, Object?>> snapshot = await backend
@@ -515,8 +517,8 @@ void _compare({
 
 Future<void> _checkCase(
   int seed, {
-  required lite.Firestore backend,
-  required Firestore writer,
+  required lite.FirebaseFirestore backend,
+  required FirebaseFirestore writer,
   required List<_Client> clients,
   required _Stats stats,
 }) async {
@@ -714,14 +716,17 @@ Future<void> _checkCase(
   }
 }
 
-String _describeLease(String name, Firestore firestore) =>
+String _describeLease(String name, FirebaseFirestore firestore) =>
     '$name holds the lease ${firestore.client.isPrimaryClient}, acts as '
     'primary ${firestore.client.syncEngine.isPrimaryClient}, can use the '
     'network ${firestore.client.remoteStore.canUseNetwork}';
 
 /// Waits until [primary] holds the primary lease of the shared cache and
 /// [secondary] knows that it does not.
-Future<void> _waitForLease(Firestore primary, Firestore secondary) async {
+Future<void> _waitForLease(
+  FirebaseFirestore primary,
+  FirebaseFirestore secondary,
+) async {
   bool settled() =>
       primary.client.isPrimaryClient &&
       primary.client.syncEngine.isPrimaryClient &&
@@ -766,8 +771,8 @@ Future<void> _waitForLease(Firestore primary, Firestore secondary) async {
 /// row in docs/ARCHITECTURE.md).
 Future<void> _checkSharedCacheCase(
   int seed, {
-  required lite.Firestore backend,
-  required Firestore writer,
+  required lite.FirebaseFirestore backend,
+  required FirebaseFirestore writer,
   required _Stats stats,
 }) async {
   final Gen gen = Gen(seed);
@@ -781,7 +786,7 @@ Future<void> _checkSharedCacheCase(
   final String path = 'property_query_shared_${autoId()}';
   final String dbName = 'property_query_shared_${autoId()}.db';
   DatabaseMock.deleteDatabaseFiles(dbName);
-  Future<Firestore> open() => IntegrationTestUtil.testFirestoreInstance(
+  Future<FirebaseFirestore> open() => IntegrationTestUtil.testFirestoreInstance(
     IntegrationTestUtil.provider.projectId,
     InternalLogLevel.w,
     IntegrationTestUtil.newTestSettings(),
@@ -790,9 +795,11 @@ Future<void> _checkSharedCacheCase(
   );
 
   String phase = 'opening the clients';
-  final List<(String, Firestore)> opened = <(String, Firestore)>[];
+  final List<(String, FirebaseFirestore)> opened =
+      <(String, FirebaseFirestore)>[];
   String leaseState() => <String>[
-    for (final (String name, Firestore f) in opened) _describeLease(name, f),
+    for (final (String name, FirebaseFirestore f) in opened)
+      _describeLease(name, f),
   ].join('; ');
   Future<T> step<T>(String what, Future<T> future) {
     if (traceProperties) {
@@ -817,9 +824,9 @@ Future<void> _checkSharedCacheCase(
   }
 
   // The client that opens the cache last takes the primary lease.
-  final Firestore b = await step('open B', open());
+  final FirebaseFirestore b = await step('open B', open());
   opened.add(('B', b));
-  final Firestore a = await step('open A', open());
+  final FirebaseFirestore a = await step('open A', open());
   opened.add(('A', a));
   final List<StreamSubscription<Object?>> subscriptions =
       <StreamSubscription<Object?>>[];
@@ -1075,10 +1082,10 @@ Future<void> _checkSharedCacheCase(
     for (final StreamSubscription<Object?> subscription in subscriptions) {
       await subscription.cancel();
     }
-    for (final Firestore firestore in <Firestore>[a, b]) {
+    for (final FirebaseFirestore firestore in <FirebaseFirestore>[a, b]) {
       IntegrationTestUtil.firestoreStatus.remove(firestore);
       IntegrationTestUtil.credentialsProviders.remove(firestore);
-      await firestore.shutdown();
+      await firestore.terminate();
     }
     DatabaseMock.deleteDatabaseFiles(dbName);
   }

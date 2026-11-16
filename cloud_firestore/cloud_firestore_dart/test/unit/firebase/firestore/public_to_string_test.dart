@@ -73,8 +73,8 @@ void main() {
     });
 
     test('FieldPath', () {
-      expectString(FieldPath.of(<String>['a', 'b.c']), 'a.`b.c`');
-      expectString(FieldPath.documentId(), '__name__');
+      expectString(FieldPath(<String>['a', 'b.c']), 'a.`b.c`');
+      expectString(FieldPath.documentId, '__name__');
     });
 
     test('AggregateField', () {
@@ -117,7 +117,7 @@ void main() {
 
     test('FirestoreError', () {
       expectString(
-        FirestoreError('Missing', FirestoreErrorCode.permissionDenied),
+        FirestoreException('Missing', FirestoreErrorCode.permissionDenied),
         'FirestoreError: [code=permissionDenied]: Missing',
       );
     });
@@ -133,7 +133,7 @@ void main() {
   group('settings and options', () {
     test('FirestoreSettings', () {
       expectString(
-        FirestoreSettings(),
+        Settings(),
         'FirestoreSettings{host=firestore.googleapis.com, port=443, '
         'sslEnabled=true, persistenceEnabled=true, cacheSizeBytes=104857600, '
         'grpcFlowControlWindow=262144, cacheSettings=null, '
@@ -147,13 +147,13 @@ void main() {
 
     test('ExperimentalLongPollingOptions', () {
       expectString(
-        const ExperimentalLongPollingOptions(timeoutSeconds: 25),
+        const WebExperimentalLongPollingOptions(timeoutSeconds: 25),
         'ExperimentalLongPollingOptions{timeoutSeconds=25}',
       );
     });
 
     test('FirestoreSettings does not print the mock user token', () {
-      final String text = FirestoreSettings()
+      final String text = Settings()
           .withEmulator(
             '127.0.0.1',
             8080,
@@ -211,7 +211,7 @@ void main() {
 
     test('LoadBundleTaskProgress', () {
       expectString(
-        LoadBundleTaskProgress.initial,
+        LoadBundleTaskSnapshot.initial,
         'LoadBundleTaskProgress{documentsLoaded: 0, totalDocuments: 0, '
         'bytesLoaded: 0, totalBytes: 0, '
         'taskState: LoadBundleTaskState.success, exception: null}',
@@ -220,13 +220,13 @@ void main() {
   });
 
   group('references and snapshots', () {
-    late Firestore db;
+    late FirebaseFirestore db;
     late CollectionReference<Map<String, Object?>> rooms;
 
     setUp(() {
       final FirebaseApp app = newApp('to-string-${const Uuid().v4()}');
       addTearDown(app.delete);
-      db = Firestore.instanceFor(app: app, settings: offlineSettings);
+      db = FirebaseFirestore.instanceFor(app: app, settings: offlineSettings);
       addTearDown(db.terminate);
       rooms = db.collection('rooms');
     });
@@ -311,7 +311,7 @@ void main() {
     test('Pipeline', () {
       final FirebaseApp app = newApp('to-string-${const Uuid().v4()}');
       addTearDown(app.delete);
-      final Firestore db = Firestore.instanceFor(
+      final FirebaseFirestore db = FirebaseFirestore.instanceFor(
         app: app,
         settings: offlineSettings,
       );
@@ -331,7 +331,9 @@ void main() {
     test('Firestore, references, Query and FirestoreSettings', () {
       final FirebaseApp app = newApp('to-string-lite');
       addTearDown(app.delete);
-      final lite.Firestore db = lite.Firestore.instanceFor(app: app);
+      final lite.FirebaseFirestore db = lite.FirebaseFirestore.instanceFor(
+        app: app,
+      );
       expectString(db, 'Firestore{app: to-string-lite, database: (default)}');
       expectString(db.collection('rooms'), 'CollectionReference{path: rooms}');
       expectString(db.doc('rooms/eros'), 'DocumentReference{path: rooms/eros}');
@@ -341,7 +343,7 @@ void main() {
         '__name__);limitType=LIMIT_TO_FIRST)}',
       );
       expectString(
-        lite.FirestoreSettings(),
+        lite.Settings(),
         'FirestoreSettings{host: firestore.googleapis.com, port: 443, '
         'sslEnabled: true, grpcFlowControlWindow: 262144}',
       );

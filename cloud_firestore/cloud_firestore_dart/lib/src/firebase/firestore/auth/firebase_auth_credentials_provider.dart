@@ -63,10 +63,10 @@ class FirebaseAuthCredentialsProvider extends CredentialsProvider {
   /// changes).
   late final BehaviorSubject<User> _onUserChange;
 
-  StreamSubscription<InternalTokenResult>? _tokenSubscription;
+  StreamSubscription<AuthTokenChange>? _tokenSubscription;
   bool _wasUnsubscribed = false;
 
-  final InternalTokenProvider authProvider;
+  final AuthTokenProvider authProvider;
 
   /// Counter used to detect if the token changed while a getToken request was
   /// outstanding.
@@ -75,7 +75,7 @@ class FirebaseAuthCredentialsProvider extends CredentialsProvider {
 
   /// The listener registered with FirebaseApp; used to stop receiving auth
   /// changes once changeListener is removed.
-  void tokenObserver(InternalTokenResult tokenResult) {
+  void tokenObserver(AuthTokenChange tokenResult) {
     _tokenCounter++;
     _onUserChange.add(getUser());
   }

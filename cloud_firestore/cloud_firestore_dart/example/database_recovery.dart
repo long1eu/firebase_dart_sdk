@@ -27,7 +27,7 @@ Future<void> main() async {
   );
   late FlakyDatabase database;
   final OpenDatabase sqlite = sqliteOpener(directory);
-  final Firestore firestore = Firestore.instanceFor(
+  final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(
     app: exampleApp(),
     openDatabase:
         (
@@ -64,7 +64,7 @@ Future<void> main() async {
   database.failNextWrites('mutations', 1);
   try {
     await doc.set(<String, Object?>{'step': 2});
-  } on FirestoreError catch (e) {
+  } on FirestoreException catch (e) {
     if (e.code != FirestoreErrorCode.unavailable) {
       rethrow;
     }
@@ -83,7 +83,7 @@ Future<void> main() async {
 
   database.failNextWrites('remote_documents', 3);
   // Another client changes the document on the backend.
-  final Firestore other = connect('other-client');
+  final FirebaseFirestore other = connect('other-client');
   await other.doc(doc.path).set(<String, Object?>{'step': 3});
   do {
     await listener.moveNext();

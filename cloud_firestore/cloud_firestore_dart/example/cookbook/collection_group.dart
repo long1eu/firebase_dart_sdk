@@ -10,7 +10,7 @@ import 'package:cloud_firestore_dart/cloud_firestore_dart.dart';
 import '../common.dart';
 
 Future<void> main() async {
-  final Firestore firestore = connect();
+  final FirebaseFirestore firestore = connect();
   // A collection group spans the whole database. This example makes the
   // collection id unique per run so that earlier runs do not show up; in an
   // app it is a fixed name such as 'reviews'.
@@ -40,7 +40,9 @@ Future<void> main() async {
       .get();
   for (final QueryDocumentSnapshot<Map<String, Object?>> review in byAda) {
     // The parent of the review's collection is the product.
-    print('ada on ${review.ref.parent.parent!.id}: ${review['stars']} stars');
+    print(
+      'ada on ${review.reference.parent.parent!.id}: ${review['stars']} stars',
+    );
   }
 
   // Aggregations work on collection groups too.

@@ -64,7 +64,7 @@ Future<void> run() async {
   final Directory directory = Directory.systemTemp.createTempSync(
     'firestore_example_',
   );
-  final Firestore firestore = Firestore.instanceFor(
+  final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(
     app: exampleApp(),
     openDatabase: sqliteOpener(directory),
     settings: emulatorSettings(cacheSettings: PersistentCacheSettings()),
@@ -94,7 +94,7 @@ Future<void> run() async {
   // backend has them (an index is filled from those, not from pending writes).
   await orders.get(Source.server);
 
-  Firestore.setLogLevel(LogLevel.debug);
+  FirebaseFirestore.setLogLevel(LogLevel.debug);
 
   Future<void> timed(String label, Query<Map<String, Object?>> query) async {
     final Stopwatch stopwatch = Stopwatch()..start();
@@ -141,7 +141,7 @@ Future<void> run() async {
   // Such a query can get an index by configuration instead (deprecated API,
   // as in the other SDKs). It is filled by the same background runs.
   // ignore: deprecated_member_use
-  await firestore.setIndexConfiguration('''
+  await firestore.setIndexConfigurationFromJSON('''
 {
   "indexes": [
     {
@@ -157,7 +157,7 @@ Future<void> run() async {
     orders.orderBy('total', Direction.descending).limit(5),
   );
 
-  Firestore.setLogLevel(LogLevel.warn);
+  FirebaseFirestore.setLogLevel(LogLevel.warn);
   // Back to plain scans for every query of this instance.
   await indexes.deleteAllIndexes();
 

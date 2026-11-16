@@ -5,23 +5,19 @@ import 'package:test/test.dart';
 import 'clear_persistence_test.dart' show offlineSettings;
 
 FirebaseApp _defaultApp() => FirebaseApp.withOptions(
-  const FirebaseOptions(
-    apiKey: 'key',
-    applicationId: 'appId',
-    projectId: 'projectId',
-  ),
+  const FirebaseOptions(apiKey: 'key', appId: 'appId', projectId: 'projectId'),
 );
 
 void main() {
   test('without a default app it fails like FirebaseApp.instance', () {
-    expect(() => Firestore.instance, throwsStateError);
+    expect(() => FirebaseFirestore.instance, throwsStateError);
   });
 
   test('before instanceFor it names the call to make', () {
     final FirebaseApp app = _defaultApp();
     addTearDown(app.delete);
     expect(
-      () => Firestore.instance,
+      () => FirebaseFirestore.instance,
       throwsA(
         isA<StateError>()
             .having(
@@ -41,7 +37,7 @@ void main() {
   test('returns the default database instance of the default app', () async {
     final FirebaseApp app = _defaultApp();
     addTearDown(app.delete);
-    final Firestore firestore = Firestore.instanceFor(
+    final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(
       app: app,
       settings: offlineSettings.copyWith(
         cacheSettings: const MemoryCacheSettings(),
@@ -49,30 +45,30 @@ void main() {
     );
     addTearDown(firestore.terminate);
 
-    expect(Firestore.instance, same(firestore));
+    expect(FirebaseFirestore.instance, same(firestore));
 
     // An instance of another database is not the default one.
-    final Firestore other = Firestore.instanceFor(
+    final FirebaseFirestore other = FirebaseFirestore.instanceFor(
       app: app,
-      database: 'other',
+      databaseId: 'other',
       settings: offlineSettings.copyWith(
         cacheSettings: const MemoryCacheSettings(),
       ),
     );
     addTearDown(other.terminate);
-    expect(Firestore.instance, same(firestore));
+    expect(FirebaseFirestore.instance, same(firestore));
   });
 
   test('a terminated default instance is no longer returned', () async {
     final FirebaseApp app = _defaultApp();
     addTearDown(app.delete);
-    final Firestore firestore = Firestore.instanceFor(
+    final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(
       app: app,
       settings: offlineSettings.copyWith(
         cacheSettings: const MemoryCacheSettings(),
       ),
     );
     await firestore.terminate();
-    expect(() => Firestore.instance, throwsStateError);
+    expect(() => FirebaseFirestore.instance, throwsStateError);
   });
 }

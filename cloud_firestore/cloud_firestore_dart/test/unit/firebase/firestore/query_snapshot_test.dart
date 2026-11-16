@@ -188,7 +188,7 @@ void main() {
           hasPendingWrites: false,
         );
 
-    expect(snapshot.documentChanges.length, 1);
+    expect(snapshot.docChanges.length, 1);
     final List<DocumentChange> changesWithoutMetadata = <DocumentChange>[
       DocumentChangeInternal.create(
         doc2Snap,
@@ -197,7 +197,7 @@ void main() {
         1 /*newIndex*/,
       ),
     ];
-    expect(snapshot.documentChanges, changesWithoutMetadata);
+    expect(snapshot.docChanges, changesWithoutMetadata);
 
     final List<DocumentChange> changesWithMetadata = <DocumentChange>[
       DocumentChangeInternal.create(

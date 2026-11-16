@@ -31,7 +31,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/vector_value.dart';
 import 'package:cloud_firestore_dart/src/firebase/timestamp.dart';
 import 'package:firebase_app_dart/internal.dart';
 
-/// A [DocumentSnapshot] contains data read from a document in your [Firestore] database. The data can be extracted with
+/// A [DocumentSnapshot] contains data read from a document in your [FirebaseFirestore] database. The data can be extracted with
 /// the [data] or [get] methods.
 ///
 /// If the [DocumentSnapshot] points to a non-existing document, [data] and its corresponding methods will return null.
@@ -73,7 +73,7 @@ class DocumentSnapshot<T extends dynamic> {
 
   /// Implementation detail of the SDK; not part of the supported API.
   factory DocumentSnapshot._fromDocument(
-    Firestore firestore,
+    FirebaseFirestore firestore,
     Document doc, {
     required bool isFromCache,
     required bool hasPendingWrites,
@@ -91,7 +91,7 @@ class DocumentSnapshot<T extends dynamic> {
 
   /// Implementation detail of the SDK; not part of the supported API.
   factory DocumentSnapshot._fromNoDocument(
-    Firestore firestore,
+    FirebaseFirestore firestore,
     DocumentKey key, {
     required bool isFromCache,
     required bool hasPendingWrites,
@@ -110,12 +110,12 @@ class DocumentSnapshot<T extends dynamic> {
   /// Builds a [DocumentSnapshot] from the JSON object written by [toJson], for the [firestore] instance.
   ///
   /// The snapshot is not from cache and has no pending writes. Pass the [converter] of the original snapshot to get
-  /// typed data back. Throws a [FirestoreError] if [json] is not a valid document snapshot JSON object, for example
+  /// typed data back. Throws a [FirestoreException] if [json] is not a valid document snapshot JSON object, for example
   /// one of a different project or database.
   ///
   /// This is the JS SDK `documentSnapshotFromJSON()`.
   factory DocumentSnapshot.fromJson(
-    Firestore firestore,
+    FirebaseFirestore firestore,
     Map<String, Object?> json, {
     FirestoreDataConverter<T>? converter,
   }) {
@@ -126,7 +126,7 @@ class DocumentSnapshot<T extends dynamic> {
     );
   }
 
-  final Firestore _firestore;
+  final FirebaseFirestore _firestore;
 
   final FirestoreDataConverter<T>? _converter;
 
@@ -147,7 +147,7 @@ class DocumentSnapshot<T extends dynamic> {
   /// `Firestore.documentSnapshotsFromJson` listens from.
   ///
   /// The `bundle` field holds the document as a Firestore bundle (empty when the document does not exist). Throws a
-  /// [FirestoreError] (failed-precondition) if the snapshot has pending writes: await `waitForPendingWrites()` first.
+  /// [FirestoreException] (failed-precondition) if the snapshot has pending writes: await `waitForPendingWrites()` first.
   ///
   /// This is the JS SDK `DocumentSnapshot.toJSON()`; the JSON is interchangeable with the one of the JS SDK (Node).
   /// One difference: for a document that does not exist the `bundle` is empty, which this SDK reads back as a missing
@@ -468,19 +468,12 @@ class DocumentSnapshot<T extends dynamic> {
   DocumentReference<Map<String, Object?>>? getDocumentReference(String field) =>
       _getTypedValue(field);
 
-  /// Gets the reference to the document.
-  ///
-  /// Returns the reference to the document.
-  @Deprecated('Use ref instead.')
-  DocumentReference<T> get reference => ref;
-
-  /// Gets the reference to the document, with the converter of this snapshot. Same as [reference]; this is the name
-  /// used by the current official Firestore API.
+  /// The reference to the document, with the converter of this snapshot.
   ///
   /// ```dart
   /// await snapshot.ref.update({'visited': true});
   /// ```
-  DocumentReference<T> get ref =>
+  DocumentReference<T> get reference =>
       DocumentReferenceInternal.create<T>(_key, _firestore, _converter);
 
   V? _getTypedValue<V>(String field) {
@@ -669,7 +662,7 @@ class QueryDocumentSnapshot<T extends dynamic> extends DocumentSnapshot<T> {
       );
 
   factory QueryDocumentSnapshot._fromDocument(
-    Firestore firestore,
+    FirebaseFirestore firestore,
     Document doc, {
     required bool fromCache,
     required bool hasPendingWrites,
@@ -716,7 +709,7 @@ extension DocumentSnapshotInternal<T> on DocumentSnapshot<T> {
 
   /// A snapshot of the document with [key]: [document], or a missing document if it is null.
   static DocumentSnapshot<T> create<T extends dynamic>(
-    Firestore firestore,
+    FirebaseFirestore firestore,
     DocumentKey key,
     Document? document, {
     required bool isFromCache,
@@ -733,7 +726,7 @@ extension DocumentSnapshotInternal<T> on DocumentSnapshot<T> {
 
   /// A snapshot of the existing document [doc].
   static DocumentSnapshot<T> fromDocument<T extends dynamic>(
-    Firestore firestore,
+    FirebaseFirestore firestore,
     Document doc, {
     required bool isFromCache,
     required bool hasPendingWrites,
@@ -748,7 +741,7 @@ extension DocumentSnapshotInternal<T> on DocumentSnapshot<T> {
 
   /// A snapshot of the missing document with [key].
   static DocumentSnapshot<T> fromNoDocument<T extends dynamic>(
-    Firestore firestore,
+    FirebaseFirestore firestore,
     DocumentKey key, {
     required bool isFromCache,
     required bool hasPendingWrites,
@@ -766,7 +759,7 @@ extension DocumentSnapshotInternal<T> on DocumentSnapshot<T> {
 extension QueryDocumentSnapshotInternal<T> on QueryDocumentSnapshot<T> {
   /// A snapshot of the existing document [doc] in a query result.
   static QueryDocumentSnapshot<T> fromDocument<T extends dynamic>(
-    Firestore firestore,
+    FirebaseFirestore firestore,
     Document doc, {
     required bool fromCache,
     required bool hasPendingWrites,

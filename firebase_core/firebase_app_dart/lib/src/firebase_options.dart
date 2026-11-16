@@ -35,23 +35,23 @@ import 'package:firebase_app_dart/src/firebase_app.dart';
 /// }
 /// ```
 class FirebaseOptions {
-  /// Creates the options. [apiKey] and [applicationId] are required; the other values are needed
+  /// Creates the options. [apiKey] and [appId] are required; the other values are needed
   /// only by the services that use them (Firestore needs [projectId]). [dataCollectionEnabled]
   /// defaults to `true`.
   ///
-  /// An empty [applicationId] fails an assert in debug mode; [FirebaseApp.withOptions] throws an
+  /// An empty [appId] fails an assert in debug mode; [FirebaseApp.withOptions] throws an
   /// [ArgumentError] for it in every mode. An empty [apiKey] is allowed: Firestore does not send
   /// it, which suits a server with a service account.
   const FirebaseOptions({
     required this.apiKey,
-    required this.applicationId,
-    this.databaseUrl,
-    this.gaTrackingId,
-    this.gcmSenderId,
+    required this.appId,
+    this.databaseURL,
+    this.trackingId,
+    this.messagingSenderId,
     this.storageBucket,
     this.projectId,
     this.dataCollectionEnabled = true,
-  }) : assert(applicationId != '', 'ApplicationId must be set.');
+  }) : assert(appId != '', 'ApplicationId must be set.');
 
   /// Reads the options from [json], with the key names of the Android resource values (as written
   /// by [toJson]):
@@ -59,12 +59,12 @@ class FirebaseOptions {
   /// | Key | Option |
   /// | --- | --- |
   /// | `google_api_key` | [apiKey] (required) |
-  /// | `google_app_id` | [applicationId] (required) |
+  /// | `google_app_id` | [appId] (required) |
   /// | `project_id` | [projectId] |
   /// | `google_storage_bucket` | [storageBucket] |
-  /// | `gcm_defaultSenderId` | [gcmSenderId] |
-  /// | `firebase_database_url` | [databaseUrl] |
-  /// | `ga_trackingId` | [gaTrackingId] |
+  /// | `gcm_defaultSenderId` | [messagingSenderId] |
+  /// | `firebase_database_url` | [databaseURL] |
+  /// | `ga_trackingId` | [trackingId] |
   ///
   /// Other keys are ignored, and [dataCollectionEnabled] is always `true`. This is not the format
   /// of `google-services.json` or of the web config object (`apiKey`, `appId`, ...): map those
@@ -81,11 +81,11 @@ class FirebaseOptions {
       );
     }
     return FirebaseOptions(
-      applicationId: applicationId,
+      appId: applicationId,
       apiKey: apiKey,
-      databaseUrl: json[_databaseUrl] as String?,
-      gaTrackingId: json[_gaTrackingId] as String?,
-      gcmSenderId: json[_gcmSenderId] as String?,
+      databaseURL: json[_databaseUrl] as String?,
+      trackingId: json[_gaTrackingId] as String?,
+      messagingSenderId: json[_gcmSenderId] as String?,
       storageBucket: json[_storageBucket] as String?,
       projectId: json[_projectId] as String?,
     );
@@ -106,19 +106,19 @@ class FirebaseOptions {
 
   /// The Google App ID that identifies the app in the project, for example
   /// `1:1234567890:web:0123456789abcdef`. Must not be empty.
-  final String applicationId;
+  final String appId;
 
   /// The Realtime Database URL, for example `https://my-project.firebaseio.com`. Stored, not used:
   /// there is no Realtime Database client in this repository.
-  final String? databaseUrl;
+  final String? databaseURL;
 
   /// The Google Analytics tracking id, for example `UA-12345678-1`. Stored, not used.
   // TODO(long1eu): unhide once an API (AppInvite) starts reading it.
-  final String? gaTrackingId;
+  final String? trackingId;
 
   /// The project number, for example `012345678901` (the sender id of Cloud Messaging). Stored,
   /// not used.
-  final String? gcmSenderId;
+  final String? messagingSenderId;
 
   /// The Cloud Storage bucket, for example `my-project.appspot.com`. Stored, not used.
   final String? storageBucket;
@@ -127,7 +127,7 @@ class FirebaseOptions {
   final String? projectId;
 
   /// Whether automatic data collection is enabled. Default `true`. Stored, not used: no service of
-  /// this repository collects data, and [FirebaseApp.dataCollectionDefaultEnabled] does not read
+  /// this repository collects data, and [FirebaseApp.isAutomaticDataCollectionEnabled] does not read
   /// it. Not part of [toJson] and [FirebaseOptions.fromJson].
   final bool dataCollectionEnabled;
 
@@ -135,11 +135,11 @@ class FirebaseOptions {
   /// set are null; [dataCollectionEnabled] is not included.
   Map<String, String?> toJson() {
     return <String, String?>{
-      _appId: applicationId,
+      _appId: appId,
       _apiKey: apiKey,
-      _databaseUrl: databaseUrl,
-      _gaTrackingId: gaTrackingId,
-      _gcmSenderId: gcmSenderId,
+      _databaseUrl: databaseURL,
+      _gaTrackingId: trackingId,
+      _gcmSenderId: messagingSenderId,
       _storageBucket: storageBucket,
       _projectId: projectId,
     };
@@ -151,10 +151,10 @@ class FirebaseOptions {
       other is FirebaseOptions &&
           runtimeType == other.runtimeType &&
           apiKey == other.apiKey &&
-          applicationId == other.applicationId &&
-          databaseUrl == other.databaseUrl &&
-          gaTrackingId == other.gaTrackingId &&
-          gcmSenderId == other.gcmSenderId &&
+          appId == other.appId &&
+          databaseURL == other.databaseURL &&
+          trackingId == other.trackingId &&
+          messagingSenderId == other.messagingSenderId &&
           storageBucket == other.storageBucket &&
           projectId == other.projectId &&
           dataCollectionEnabled == other.dataCollectionEnabled;
@@ -162,10 +162,10 @@ class FirebaseOptions {
   @override
   int get hashCode =>
       apiKey.hashCode ^
-      applicationId.hashCode ^
-      databaseUrl.hashCode ^
-      gaTrackingId.hashCode ^
-      gcmSenderId.hashCode ^
+      appId.hashCode ^
+      databaseURL.hashCode ^
+      trackingId.hashCode ^
+      messagingSenderId.hashCode ^
       storageBucket.hashCode ^
       projectId.hashCode ^
       dataCollectionEnabled.hashCode;
@@ -174,10 +174,10 @@ class FirebaseOptions {
   String toString() {
     return (ToStringHelper(runtimeType)
           ..add('apiKey', apiKey)
-          ..add('applicationId', applicationId)
-          ..add('databaseUrl', databaseUrl)
-          ..add('gaTrackingId', gaTrackingId)
-          ..add('gcmSenderId', gcmSenderId)
+          ..add('applicationId', appId)
+          ..add('databaseUrl', databaseURL)
+          ..add('gaTrackingId', trackingId)
+          ..add('gcmSenderId', messagingSenderId)
           ..add('storageBucket', storageBucket)
           ..add('projectId', projectId))
         .toString();

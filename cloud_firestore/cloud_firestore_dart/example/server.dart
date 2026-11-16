@@ -30,7 +30,7 @@ import 'package:cloud_firestore_dart/cloud_firestore_dart.dart';
 import 'common.dart';
 
 Future<void> main() async {
-  final Firestore firestore = Firestore.instanceFor(
+  final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(
     app: exampleApp(),
     settings: emulatorSettings(
       cacheSettings: const MemoryCacheSettings(
@@ -69,14 +69,14 @@ Future<void> main() async {
 }
 
 /// The request handlers. Every handler runs against the one shared
-/// [Firestore] instance.
+/// [FirebaseFirestore] instance.
 class TaskApi {
-  TaskApi(Firestore firestore, String path)
+  TaskApi(FirebaseFirestore firestore, String path)
     : _tasks = firestore.collection(path),
       _stats = firestore.doc('$path-stats/counts'),
       _firestore = firestore;
 
-  final Firestore _firestore;
+  final FirebaseFirestore _firestore;
   final CollectionReference<Map<String, Object?>> _tasks;
   final DocumentReference<Map<String, Object?>> _stats;
 
@@ -105,7 +105,7 @@ class TaskApi {
           status = HttpStatus.notFound;
           body = <String, Object?>{'error': 'no route'};
       }
-    } on FirestoreError catch (e) {
+    } on FirestoreException catch (e) {
       status = HttpStatus.internalServerError;
       body = <String, Object?>{'error': e.message};
     }

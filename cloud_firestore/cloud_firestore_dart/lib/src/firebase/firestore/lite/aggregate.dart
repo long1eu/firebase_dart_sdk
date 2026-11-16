@@ -55,7 +55,7 @@ class AggregateQuery {
 
   /// Runs the aggregations on the backend.
   Future<AggregateQuerySnapshot> get() async {
-    final Firestore firestore = query.firestore;
+    final FirebaseFirestore firestore = query.firestore;
     final Map<String, FieldValue> data = await firestore.run(
       (Datastore datastore) =>
           datastore.runAggregateQuery(query.query, aggregateFields),

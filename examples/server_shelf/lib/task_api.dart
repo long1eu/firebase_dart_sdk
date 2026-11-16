@@ -6,7 +6,7 @@ import 'package:shelf_router/shelf_router.dart';
 
 import 'change_feed.dart';
 
-/// The routes of the task API on one shared [Firestore] instance:
+/// The routes of the task API on one shared [FirebaseFirestore] instance:
 ///
 ///     GET    /tasks?done=true|false    list (all without `done`)
 ///     POST   /tasks {"title": "..."}   create; 201 {"id": "..."}
@@ -25,7 +25,7 @@ class TaskApi {
     _feed = ChangeFeed(_tasks);
   }
 
-  final Firestore _firestore;
+  final FirebaseFirestore _firestore;
   final CollectionReference<Map<String, Object?>> _tasks;
   late final ChangeFeed _feed;
 
@@ -135,7 +135,7 @@ class TaskApi {
     return (Request request) async {
       try {
         return await inner(request);
-      } on FirestoreError catch (e) {
+      } on FirestoreException catch (e) {
         final int status = switch (e.code) {
           FirestoreErrorCode.notFound => 404,
           FirestoreErrorCode.invalidArgument => 400,

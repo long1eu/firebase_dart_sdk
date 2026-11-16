@@ -47,7 +47,7 @@ class PipelineSource {
   @internal
   PipelineSource(this._firestore);
 
-  final Firestore _firestore;
+  final FirebaseFirestore _firestore;
 
   /// Reads the documents of one collection: a slash-separated path
   /// (`String`) or a [CollectionReference].
@@ -355,7 +355,7 @@ class PipelineSource {
   /// to a path relative to the database root.
   @internal
   static String collectionPath(
-    Firestore firestore,
+    FirebaseFirestore firestore,
     Object collection,
     String method,
   ) {

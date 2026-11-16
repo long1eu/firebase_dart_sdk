@@ -32,7 +32,7 @@ void main() {
   ///
   /// Returns the number of attempts of each transaction; a transaction that failed has a negative number.
   Future<List<int>> runTransactions(
-    Firestore db,
+    FirebaseFirestore db,
     CollectionReference<Map<String, Object?>> collection,
     int count,
     FutureOr<void> Function(int index, {required bool beforeLookup}) chaos,
@@ -62,7 +62,7 @@ void main() {
             ..set(collection.doc('marker$i'), <String, Object?>{'i': i});
         }).timeout(const Duration(seconds: 20));
         attempts.add(attempt);
-      } on FirestoreError catch (e) {
+      } on FirestoreException catch (e) {
         // ignore: avoid_print
         print('transaction $i failed after $attempt attempts: ${e.code}');
         attempts.add(-attempt);
@@ -72,7 +72,7 @@ void main() {
   }
 
   Future<CollectionReference<Map<String, Object?>>> prepare(
-      Firestore db) async {
+      FirebaseFirestore db) async {
     final String name = uniqueName('tx');
     await env.oracle
         .collection(name)
@@ -99,7 +99,7 @@ void main() {
 
   group('transactions', () {
     test('retry a lookup whose request or response is lost', () async {
-      final Firestore db = await env.newClient();
+      final FirebaseFirestore db = await env.newClient();
       final CollectionReference<Map<String, Object?>> collection =
           await prepare(db);
 
@@ -133,7 +133,7 @@ void main() {
     });
 
     test('retry a commit whose request is lost, exactly once', () async {
-      final Firestore db = await env.newClient();
+      final FirebaseFirestore db = await env.newClient();
       final CollectionReference<Map<String, Object?>> collection =
           await prepare(db);
 
@@ -158,7 +158,7 @@ void main() {
 
     test('a commit whose response is lost is never lost, and reported',
         () async {
-      final Firestore db = await env.newClient();
+      final FirebaseFirestore db = await env.newClient();
       final CollectionReference<Map<String, Object?>> collection =
           await prepare(db);
 
@@ -203,7 +203,7 @@ void main() {
 
     test('concurrent transactions of two clients under cuts lose no update',
         () async {
-      final Firestore db = await env.newClient();
+      final FirebaseFirestore db = await env.newClient();
       final CollectionReference<Map<String, Object?>> collection =
           await prepare(db);
       final DocumentReference<Map<String, Object?>> counter =

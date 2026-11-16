@@ -19,7 +19,7 @@ const List<String> sqliteSideFileSuffixes = <String>[
 /// hot journal is rolled back into whatever file has that name), while one
 /// left next to its own database is harmless.
 ///
-/// Throws a [FirestoreError] with [FirestoreErrorCode.unknown] that names every
+/// Throws a [FirestoreException] with [FirestoreErrorCode.unknown] that names every
 /// file that couldn't be deleted (like `SQLitePersistence.clearPersistence` on
 /// Android).
 void deleteSqliteDatabaseFiles(String path) {
@@ -43,7 +43,7 @@ void deleteSqliteDatabaseFiles(String path) {
     delete(path);
   }
   if (failures.isNotEmpty) {
-    throw FirestoreError(
+    throw FirestoreException(
       'Failed to clear persistence: ${failures.join('; ')}',
       FirestoreErrorCode.unknown,
       failures.first,

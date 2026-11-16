@@ -17,7 +17,7 @@ import 'package:test/test.dart';
 
 void main() {
   test('default settings', () {
-    final FirestoreSettings settings = FirestoreSettings();
+    final Settings settings = Settings();
     expect(settings.host, 'firestore.googleapis.com');
     expect(settings.sslEnabled, isTrue);
     expect(settings.persistenceEnabled, isTrue);
@@ -26,7 +26,7 @@ void main() {
   });
 
   test('persistent cache settings customize the legacy getters', () {
-    final FirestoreSettings settings = FirestoreSettings(
+    final Settings settings = Settings(
       host: 'a.b.c',
       sslEnabled: false,
       cacheSettings: PersistentCacheSettings(sizeBytes: 2000000),
@@ -38,34 +38,34 @@ void main() {
   });
 
   test('memory cache settings map onto the legacy getters', () {
-    final FirestoreSettings settings = FirestoreSettings(
+    final Settings settings = Settings(
       host: 'a.b.c',
       sslEnabled: false,
       cacheSettings: const MemoryCacheSettings(),
     );
     expect(settings.persistenceEnabled, isFalse);
-    expect(settings.cacheSizeBytes, FirestoreSettings.cacheSizeUnlimited);
+    expect(settings.cacheSizeBytes, Settings.cacheSizeUnlimited);
     expect((settings.cacheSettings! as MemoryCacheSettings).gcSettings,
         const MemoryEagerGcSettings());
   });
 
   test('copyWith keeps the cache settings and the derived values', () {
-    final FirestoreSettings settings1 = FirestoreSettings(
+    final Settings settings1 = Settings(
       host: 'a.b.c',
       sslEnabled: false,
       cacheSettings: const MemoryCacheSettings(),
     );
-    final FirestoreSettings settings2 = settings1.copyWith(port: 1234);
+    final Settings settings2 = settings1.copyWith(port: 1234);
     expect(settings2.host, 'a.b.c');
     expect(settings2.port, 1234);
     expect(settings2.sslEnabled, isFalse);
     expect(settings2.persistenceEnabled, isFalse);
-    expect(settings2.cacheSizeBytes, FirestoreSettings.cacheSizeUnlimited);
+    expect(settings2.cacheSizeBytes, Settings.cacheSizeUnlimited);
     expect(settings2.cacheSettings, settings1.cacheSettings);
   });
 
   test('copyWith can replace the cache settings', () {
-    final FirestoreSettings settings = FirestoreSettings(
+    final Settings settings = Settings(
       cacheSettings: const MemoryCacheSettings(),
     ).copyWith(cacheSettings: PersistentCacheSettings(sizeBytes: 5000000));
     expect(settings.persistenceEnabled, isTrue);
@@ -74,29 +74,29 @@ void main() {
 
   test('cannot mix the legacy and the new cache config', () {
     expect(
-        () => FirestoreSettings(
+        () => Settings(
               persistenceEnabled: false,
               cacheSettings: const MemoryCacheSettings(),
             ),
         throwsStateError);
     expect(
-        () => FirestoreSettings(
+        () => Settings(
               cacheSizeBytes: 2000000,
               cacheSettings: PersistentCacheSettings(),
             ),
         throwsStateError);
     expect(
-        () => FirestoreSettings(cacheSettings: const MemoryCacheSettings())
+        () => Settings(cacheSettings: const MemoryCacheSettings())
             .copyWith(persistenceEnabled: false),
         throwsStateError);
   });
 
   test('legacy settings keep working', () {
-    final FirestoreSettings settings =
-        FirestoreSettings(persistenceEnabled: false);
+    final Settings settings =
+        Settings(persistenceEnabled: false);
     expect(settings.persistenceEnabled, isFalse);
     expect(settings.cacheSettings, isNull);
-    final FirestoreSettings sized = FirestoreSettings(cacheSizeBytes: 2000000);
+    final Settings sized = Settings(cacheSizeBytes: 2000000);
     expect(sized.cacheSizeBytes, 2000000);
   });
 
@@ -104,11 +104,11 @@ void main() {
     expect(() => PersistentCacheSettings(sizeBytes: 100), throwsArgumentError);
     expect(() => MemoryLruGcSettings(sizeBytes: 100), throwsArgumentError);
     expect(
-        PersistentCacheSettings(sizeBytes: FirestoreSettings.cacheSizeUnlimited)
+        PersistentCacheSettings(sizeBytes: Settings.cacheSizeUnlimited)
             .sizeBytes,
         -1);
     expect(MemoryLruGcSettings().sizeBytes,
-        FirestoreSettings.defaultCacheSizeBytes);
+        Settings.defaultCacheSizeBytes);
   });
 
   test('cache settings have value semantics', () {
@@ -124,43 +124,43 @@ void main() {
     expect(const MemoryEagerGcSettings(), const MemoryEagerGcSettings());
     expect(const MemoryEagerGcSettings().hashCode,
         const MemoryEagerGcSettings().hashCode);
-    expect(FirestoreSettings(cacheSettings: const MemoryCacheSettings()),
-        FirestoreSettings(cacheSettings: const MemoryCacheSettings()));
-    expect(FirestoreSettings(cacheSettings: const MemoryCacheSettings()),
-        isNot(FirestoreSettings(persistenceEnabled: false)));
+    expect(Settings(cacheSettings: const MemoryCacheSettings()),
+        Settings(cacheSettings: const MemoryCacheSettings()));
+    expect(Settings(cacheSettings: const MemoryCacheSettings()),
+        isNot(Settings(persistenceEnabled: false)));
     expect(
-        FirestoreSettings(cacheSettings: const MemoryCacheSettings())
+        Settings(cacheSettings: const MemoryCacheSettings())
             .toString(),
         contains('MemoryCacheSettings{gcSettings=MemoryEagerGcSettings{}}'));
   });
 
   group('emulator', () {
     test('withEmulator sets host, port and disables ssl', () {
-      final FirestoreSettings settings =
-          FirestoreSettings().withEmulator('10.0.2.2', 8080);
+      final Settings settings =
+          Settings().withEmulator('10.0.2.2', 8080);
       expect(settings.host, '10.0.2.2');
       expect(settings.port, 8080);
       expect(settings.sslEnabled, isFalse);
     });
 
     test('withEmulator keeps the other settings', () {
-      final FirestoreSettings settings = FirestoreSettings(
+      final Settings settings = Settings(
         cacheSettings: PersistentCacheSettings(sizeBytes: 2000000),
       ).withEmulator('localhost', 9000);
       expect(
           settings.cacheSettings, PersistentCacheSettings(sizeBytes: 2000000));
       expect(settings.cacheSizeBytes, 2000000);
 
-      final FirestoreSettings legacy =
-          FirestoreSettings(persistenceEnabled: false)
+      final Settings legacy =
+          Settings(persistenceEnabled: false)
               .withEmulator('localhost', 9000);
       expect(legacy.persistenceEnabled, isFalse);
     });
 
     test('withEmulator replaces a host that was set before', () {
       // Upstream (57ffa1f) warns and uses the emulator host.
-      final FirestoreSettings settings =
-          FirestoreSettings(host: 'myhost.com', port: 1, sslEnabled: true)
+      final Settings settings =
+          Settings(host: 'myhost.com', port: 1, sslEnabled: true)
               .withEmulator('10.0.2.2', 8080);
       expect(settings.host, '10.0.2.2');
       expect(settings.port, 8080);
@@ -188,55 +188,55 @@ void main() {
   });
   group('long polling settings', () {
     test('auto detection is on by default and off when polling is forced', () {
-      final FirestoreSettings defaults = FirestoreSettings();
-      expect(defaults.experimentalForceLongPolling, isFalse);
-      expect(defaults.experimentalAutoDetectLongPolling, isTrue);
+      final Settings defaults = Settings();
+      expect(defaults.webExperimentalForceLongPolling, isFalse);
+      expect(defaults.webExperimentalAutoDetectLongPolling, isTrue);
 
-      final FirestoreSettings forced =
-          FirestoreSettings(experimentalForceLongPolling: true);
-      expect(forced.experimentalForceLongPolling, isTrue);
-      expect(forced.experimentalAutoDetectLongPolling, isFalse);
+      final Settings forced =
+          Settings(webExperimentalForceLongPolling: true);
+      expect(forced.webExperimentalForceLongPolling, isTrue);
+      expect(forced.webExperimentalAutoDetectLongPolling, isFalse);
 
-      final FirestoreSettings off =
-          FirestoreSettings(experimentalAutoDetectLongPolling: false);
-      expect(off.experimentalForceLongPolling, isFalse);
-      expect(off.experimentalAutoDetectLongPolling, isFalse);
+      final Settings off =
+          Settings(webExperimentalAutoDetectLongPolling: false);
+      expect(off.webExperimentalForceLongPolling, isFalse);
+      expect(off.webExperimentalAutoDetectLongPolling, isFalse);
     });
 
     test('both together are rejected, as in the JS SDK', () {
       expect(
-          () => FirestoreSettings(
-              experimentalForceLongPolling: true,
-              experimentalAutoDetectLongPolling: true),
+          () => Settings(
+              webExperimentalForceLongPolling: true,
+              webExperimentalAutoDetectLongPolling: true),
           throwsArgumentError);
     });
 
     test('copies keep them, and forcing in a copy turns detection off', () {
-      final FirestoreSettings forced =
-          FirestoreSettings(experimentalForceLongPolling: true);
-      final FirestoreSettings emulator = forced.withEmulator('localhost', 8080);
-      expect(emulator.experimentalForceLongPolling, isTrue);
-      expect(emulator.experimentalAutoDetectLongPolling, isFalse);
-      expect(forced.copyWith(port: 1).experimentalForceLongPolling, isTrue);
+      final Settings forced =
+          Settings(webExperimentalForceLongPolling: true);
+      final Settings emulator = forced.withEmulator('localhost', 8080);
+      expect(emulator.webExperimentalForceLongPolling, isTrue);
+      expect(emulator.webExperimentalAutoDetectLongPolling, isFalse);
+      expect(forced.copyWith(port: 1).webExperimentalForceLongPolling, isTrue);
 
-      final FirestoreSettings copy =
-          FirestoreSettings().copyWith(experimentalForceLongPolling: true);
-      expect(copy.experimentalForceLongPolling, isTrue);
-      expect(copy.experimentalAutoDetectLongPolling, isFalse);
+      final Settings copy =
+          Settings().copyWith(webExperimentalForceLongPolling: true);
+      expect(copy.webExperimentalForceLongPolling, isTrue);
+      expect(copy.webExperimentalAutoDetectLongPolling, isFalse);
       expect(
           copy
-              .copyWith(experimentalForceLongPolling: false)
-              .experimentalAutoDetectLongPolling,
+              .copyWith(webExperimentalForceLongPolling: false)
+              .webExperimentalAutoDetectLongPolling,
           isTrue);
     });
 
     test('they are part of equality', () {
-      expect(FirestoreSettings(experimentalForceLongPolling: true),
-          FirestoreSettings(experimentalForceLongPolling: true));
-      expect(FirestoreSettings(experimentalForceLongPolling: true),
-          isNot(FirestoreSettings()));
-      expect(FirestoreSettings(experimentalAutoDetectLongPolling: false),
-          isNot(FirestoreSettings()));
+      expect(Settings(webExperimentalForceLongPolling: true),
+          Settings(webExperimentalForceLongPolling: true));
+      expect(Settings(webExperimentalForceLongPolling: true),
+          isNot(Settings()));
+      expect(Settings(webExperimentalAutoDetectLongPolling: false),
+          isNot(Settings()));
     });
   });
 
@@ -245,9 +245,9 @@ void main() {
   // FirestoreError with code invalid-argument; this port throws an
   // ArgumentError, like its other settings, with the same message.
   group('experimentalLongPollingOptions', () {
-    FirestoreSettings withTimeout(num? timeoutSeconds) => FirestoreSettings(
-          experimentalLongPollingOptions:
-              ExperimentalLongPollingOptions(timeoutSeconds: timeoutSeconds),
+    Settings withTimeout(num? timeoutSeconds) => Settings(
+          webExperimentalLongPollingOptions:
+              WebExperimentalLongPollingOptions(timeoutSeconds: timeoutSeconds),
         );
 
     Matcher throwsInvalidTimeout(String pattern) => throwsA(
@@ -260,25 +260,25 @@ void main() {
 
     test('timeoutSeconds is undefined by default', () {
       expect(
-          FirestoreSettings().experimentalLongPollingOptions.timeoutSeconds,
+          Settings().webExperimentalLongPollingOptions.timeoutSeconds,
           isNull);
     });
 
     test('timeoutSeconds minimum value is allowed', () {
-      expect(withTimeout(5).experimentalLongPollingOptions.timeoutSeconds, 5);
+      expect(withTimeout(5).webExperimentalLongPollingOptions.timeoutSeconds, 5);
     });
 
     test('timeoutSeconds maximum value is allowed', () {
-      expect(withTimeout(30).experimentalLongPollingOptions.timeoutSeconds, 30);
+      expect(withTimeout(30).webExperimentalLongPollingOptions.timeoutSeconds, 30);
     });
 
     test('timeoutSeconds typical value is allowed', () {
-      expect(withTimeout(25).experimentalLongPollingOptions.timeoutSeconds, 25);
+      expect(withTimeout(25).webExperimentalLongPollingOptions.timeoutSeconds, 25);
     });
 
     test('timeoutSeconds floating point value is allowed', () {
       expect(
-          withTimeout(12.3456).experimentalLongPollingOptions.timeoutSeconds,
+          withTimeout(12.3456).webExperimentalLongPollingOptions.timeoutSeconds,
           12.3456);
     });
 
@@ -323,29 +323,29 @@ void main() {
     });
 
     test('copies keep the options, which are part of equality', () {
-      final FirestoreSettings settings = withTimeout(25);
+      final Settings settings = withTimeout(25);
       expect(
           settings
               .copyWith(host: 'example.com')
-              .experimentalLongPollingOptions
+              .webExperimentalLongPollingOptions
               .timeoutSeconds,
           25);
       expect(
           settings
               .copyWith(
-                  experimentalLongPollingOptions:
-                      const ExperimentalLongPollingOptions(timeoutSeconds: 10))
-              .experimentalLongPollingOptions
+                  webExperimentalLongPollingOptions:
+                      const WebExperimentalLongPollingOptions(timeoutSeconds: 10))
+              .webExperimentalLongPollingOptions
               .timeoutSeconds,
           10);
       expect(() => settings.copyWith(
-              experimentalLongPollingOptions:
-                  const ExperimentalLongPollingOptions(timeoutSeconds: 31)),
+              webExperimentalLongPollingOptions:
+                  const WebExperimentalLongPollingOptions(timeoutSeconds: 31)),
           throwsArgumentError);
       expect(withTimeout(25), withTimeout(25));
       expect(withTimeout(25).hashCode, withTimeout(25).hashCode);
       expect(withTimeout(25), isNot(withTimeout(26)));
-      expect(withTimeout(25), isNot(FirestoreSettings()));
+      expect(withTimeout(25), isNot(Settings()));
     });
   });
 
@@ -353,12 +353,12 @@ void main() {
     // Upstream: FirebaseFirestoreSettingsTest (Android) and the settings
     // validation of the JS SDK.
     test('defaults to 256 KiB', () {
-      expect(FirestoreSettings.defaultGrpcFlowControlWindow, 262144);
-      expect(FirestoreSettings().grpcFlowControlWindow, 262144);
+      expect(Settings.defaultGrpcFlowControlWindow, 262144);
+      expect(Settings().grpcFlowControlWindow, 262144);
     });
 
     test('can be set, and copies keep it', () {
-      final FirestoreSettings settings = FirestoreSettings(
+      final Settings settings = Settings(
         grpcFlowControlWindow: 65535,
       );
       expect(settings.grpcFlowControlWindow, 65535);
@@ -378,22 +378,22 @@ void main() {
     test('must be a positive integer of at most 2147483647', () {
       for (final int window in <int>[0, -1, 2147483648]) {
         expect(
-          () => FirestoreSettings(grpcFlowControlWindow: window),
+          () => Settings(grpcFlowControlWindow: window),
           throwsArgumentError,
           reason: '$window',
         );
         expect(
-          () => FirestoreSettings().copyWith(grpcFlowControlWindow: window),
+          () => Settings().copyWith(grpcFlowControlWindow: window),
           throwsArgumentError,
           reason: '$window',
         );
       }
       expect(
-        FirestoreSettings(grpcFlowControlWindow: 1).grpcFlowControlWindow,
+        Settings(grpcFlowControlWindow: 1).grpcFlowControlWindow,
         1,
       );
       expect(
-        FirestoreSettings(
+        Settings(
           grpcFlowControlWindow: 2147483647,
         ).grpcFlowControlWindow,
         2147483647,
@@ -402,12 +402,12 @@ void main() {
 
     test('is part of equality', () {
       expect(
-        FirestoreSettings(grpcFlowControlWindow: 65535),
-        FirestoreSettings(grpcFlowControlWindow: 65535),
+        Settings(grpcFlowControlWindow: 65535),
+        Settings(grpcFlowControlWindow: 65535),
       );
       expect(
-        FirestoreSettings(grpcFlowControlWindow: 65535),
-        isNot(FirestoreSettings()),
+        Settings(grpcFlowControlWindow: 65535),
+        isNot(Settings()),
       );
     });
   });

@@ -30,6 +30,7 @@ library;
 export 'src/firebase/firestore/aggregate_field.dart'
     hide AggregateFieldInternal;
 export 'src/firebase/firestore/blob.dart';
+export 'src/firebase/firestore/lite/aliases.dart';
 export 'src/firebase/firestore/bson_object_id.dart';
 export 'src/firebase/firestore/bson_timestamp.dart';
 export 'src/firebase/firestore/decimal128_value.dart'

@@ -26,7 +26,7 @@ void main() {
 
   final String? skip = IntegrationTestUtil.enterpriseEmulatorSkipReason;
 
-  late Firestore firestore;
+  late FirebaseFirestore firestore;
   int collectionIndex = 0;
 
   setUp(() async {
@@ -54,7 +54,7 @@ void main() {
   }
 
   Future<void> verifySuccessfulWriteReadCycle(Map<String, Object?> data) async {
-    final DocumentReference document = testCollection().document();
+    final DocumentReference document = testCollection().doc();
     await document.set(data);
     final DocumentSnapshot snapshot = await document.get(Source.server);
     expect(snapshot.data, data);
@@ -76,14 +76,14 @@ void main() {
 
   Matcher throwsInvalidArgument(String message) {
     return throwsA(
-      isA<FirestoreError>()
+      isA<FirestoreException>()
           .having(
-            (FirestoreError e) => e.code,
+            (FirestoreException e) => e.code,
             'code',
             FirestoreErrorCode.invalidArgument,
           )
           .having(
-            (FirestoreError e) => e.message,
+            (FirestoreException e) => e.message,
             'message',
             contains(message),
           ),
@@ -132,7 +132,7 @@ void main() {
     });
 
     test('writeAndReadBsonTypeOffline', () async {
-      final DocumentReference docRef = testCollection().document();
+      final DocumentReference docRef = testCollection().doc();
       await firestore.disableNetwork();
 
       // Adding docs to cache, do not wait for the write to be acknowledged.
@@ -198,10 +198,10 @@ void main() {
 
         // A document that sorts in the middle moves to its place.
         next = Completer<void>();
-        await collection.document('i').set(<String, Object?>{
+        await collection.doc('i').set(<String, Object?>{
           'key': BsonTimestamp(1, 3),
         });
-        await collection.document('g').set(<String, Object?>{
+        await collection.doc('g').set(<String, Object?>{
           'key': Decimal128Value('1.3e3'),
         });
         if (IntegrationTestUtil.querySnapshotToIds(snapshots.last).length !=
@@ -444,7 +444,7 @@ void main() {
         );
         for (final String id in docs.keys) {
           final DocumentSnapshot snapshot = await collection
-              .document(id)
+              .doc(id)
               .get(Source.server);
           expect(
             snapshot.data!['key'],
@@ -757,17 +757,17 @@ void main() {
 
       await firestore.runTransaction((Transaction transaction) async {
         final DocumentSnapshot snapshot = await transaction.get(
-          collection.document('a'),
+          collection.doc('a'),
         );
         expect(
           snapshot.getBsonObjectId('key'),
           BsonObjectId('507f191e810c19729de860ea'),
         );
         transaction
-          ..update(collection.document('b'), <String, Object?>{
+          ..update(collection.doc('b'), <String, Object?>{
             'key': const RegexValue('^bar', 'i'),
           })
-          ..delete(collection.document('c'));
+          ..delete(collection.doc('c'));
       });
 
       final QuerySnapshot snapshot = await collection.get(Source.server);
@@ -776,11 +776,11 @@ void main() {
         'b',
       ]);
       expect(
-        snapshot.documents[0].getBsonObjectId('key'),
+        snapshot.docs[0].getBsonObjectId('key'),
         BsonObjectId('507f191e810c19729de860ea'),
       );
       expect(
-        snapshot.documents[1].getRegexValue('key'),
+        snapshot.docs[1].getRegexValue('key'),
         const RegexValue('^bar', 'i'),
       );
     });
@@ -788,7 +788,7 @@ void main() {
     test(
       'numericIncrementWithBsonTypes',
       () async {
-        final DocumentReference docRef = testCollection().document();
+        final DocumentReference docRef = testCollection().doc();
 
         await docRef.set(<String, Object?>{'val': Decimal128Value('10.5')});
         await docRef.update(<String, Object?>{
@@ -812,7 +812,7 @@ void main() {
     );
 
     test('numericMinimumAndMaximumWithBsonTypes', () async {
-      final DocumentReference docRef = testCollection().document();
+      final DocumentReference docRef = testCollection().doc();
 
       // Minimum: the base wins.
       await docRef.set(<String, Object?>{'val': Decimal128Value('10.5')});
@@ -942,7 +942,7 @@ void main() {
       docs['doc3'] = <String, Object?>{
         'binary': _binary(0, <int>[1]),
       };
-      await collection.document('doc3').set(docs['doc3']!);
+      await collection.doc('doc3').set(docs['doc3']!);
       await expectConsistent(
         collection,
         collection.whereEqualTo('binary', Blob(Uint8List.fromList(<int>[1]))),
@@ -953,7 +953,7 @@ void main() {
 
     test('invalidRegexGetsRejected', () async {
       await expectLater(
-        testCollection().document().set(<String, Object?>{
+        testCollection().doc().set(<String, Object?>{
           'key': const RegexValue('foo', 'a'),
         }),
         throwsInvalidArgument("Invalid regex option 'a'"),
@@ -963,7 +963,7 @@ void main() {
     test('invalidBsonObjectIdGetsRejected', () async {
       // An ObjectId whose length is not 24 gets rejected.
       await expectLater(
-        testCollection().document().set(<String, Object?>{
+        testCollection().doc().set(<String, Object?>{
           'key': BsonObjectId('foobar'),
         }),
         throwsInvalidArgument('Object ID hex string has incorrect length.'),
@@ -981,7 +981,7 @@ void main() {
       // The backend rejects it too (Android's assertion), when it gets there
       // without the client-side check.
       await expectLater(
-        testCollection().document().set(<String, Object?>{
+        testCollection().doc().set(<String, Object?>{
           'key': Decimal128ValueInternal.unchecked(
             '1.0000000000000000000000000000000001',
           ),
@@ -1039,7 +1039,7 @@ void main() {
     });
 
     test('testCanUseTypedAccessors', () async {
-      final DocumentReference docRef = testCollection().document();
+      final DocumentReference docRef = testCollection().doc();
       await docRef.set(allTypes());
       final DocumentSnapshot snapshot = await docRef.get(Source.server);
       expect(
@@ -1079,9 +1079,7 @@ void main() {
         'bsonBinary': <String, Object?>{
           'value': _binary(1, <int>[1, 2, 3]),
         },
-        'reference': <String, Object?>{
-          'value': collection.document('testDocRef'),
-        },
+        'reference': <String, Object?>{'value': collection.doc('testDocRef')},
         'bsonObjectId': <String, Object?>{
           'value': BsonObjectId('507f191e810c19729de860ea'),
         },

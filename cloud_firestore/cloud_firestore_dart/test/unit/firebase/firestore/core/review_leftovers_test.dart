@@ -125,7 +125,7 @@ void main() {
   });
 
   group('M6: shutdown', () {
-    Future<Firestore> open(TaskScheduler scheduler) {
+    Future<FirebaseFirestore> open(TaskScheduler scheduler) {
       final String name =
           '${Directory.systemTemp.path}/review_left_${const Uuid().v4()}.db';
       return IntegrationTestUtil.forTests(
@@ -150,22 +150,22 @@ void main() {
           db.renamePath = false;
           return db;
         },
-        FirestoreSettings(),
+        Settings(),
       );
     }
 
     test('concurrent shutdown calls share one shutdown', () async {
       final TaskScheduler scheduler = TaskScheduler('');
-      final Firestore firestore = await open(scheduler);
+      final FirebaseFirestore firestore = await open(scheduler);
       expect(scheduler.getTask(TaskId.garbageCollection), isNotNull);
 
-      final Future<void> first = firestore.shutdown();
-      final Future<void> second = firestore.shutdown();
+      final Future<void> first = firestore.terminate();
+      final Future<void> second = firestore.terminate();
       await Future.wait(<Future<void>>[first, second])
           .timeout(const Duration(seconds: 10));
       expect(scheduler.getTask(TaskId.garbageCollection), isNull);
       // And a late call is still fine.
-      await firestore.shutdown();
+      await firestore.terminate();
     });
   });
 }

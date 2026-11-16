@@ -1055,10 +1055,10 @@ void main() {
     final pipeline = RealtimePipelineSource()
         .collection('users')
         .where(
-          exists(Field.of(FieldPath.documentIdField)),
+          exists(Field.of(FieldPath.documentId)),
         ) // Ensure __name__ is considered
         .sort([
-          Field.of(FieldPath.documentIdField).ascending(),
+          Field.of(FieldPath.documentId).ascending(),
         ]) // Sort by key: 1, 2, 3
         .sort([
           field('age').ascending(),
@@ -1091,10 +1091,10 @@ void main() {
 
     final pipeline = RealtimePipelineSource()
         .collection('users')
-        .where(exists(Field.of(FieldPath.documentIdField)))
+        .where(exists(Field.of(FieldPath.documentId)))
         .sort([field('age').ascending()]) // Sort by age: 2(30), 1(40), 3(50)
         .sort([
-          Field.of(FieldPath.documentIdField).ascending(),
+          Field.of(FieldPath.documentId).ascending(),
         ]); // Sort by key: 1, 2, 3
 
     final result = runPipeline(pipeline, documents);
@@ -1105,7 +1105,7 @@ void main() {
   // `SortOnOtherFieldAndKeyOnMultipleStages`
   // are identical to the `Path` versions because `kDocumentKeyPath` is used.
   // These are effectively duplicates of the above two tests in Kotlin if we use
-  // `PublicFieldPath.documentId()`.
+  // `PublicFieldPath.documentId`.
   // I'll include them for completeness, mirroring the C++ structure.
   test('sort on key and other field on multiple stages', () {
     final doc1 = doc('users/1', 1000, <String, Object?>{
@@ -1124,8 +1124,8 @@ void main() {
 
     final pipeline = RealtimePipelineSource()
         .collection('users')
-        .where(exists(Field.of(FieldPath.documentIdField)))
-        .sort([Field.of(FieldPath.documentIdField).ascending()])
+        .where(exists(Field.of(FieldPath.documentId)))
+        .sort([Field.of(FieldPath.documentId).ascending()])
         .sort([field('age').ascending()]);
 
     final result = runPipeline(pipeline, documents);
@@ -1149,9 +1149,9 @@ void main() {
 
     final pipeline = RealtimePipelineSource()
         .collection('users')
-        .where(exists(Field.of(FieldPath.documentIdField)))
+        .where(exists(Field.of(FieldPath.documentId)))
         .sort([field('age').ascending()])
-        .sort([Field.of(FieldPath.documentIdField).ascending()]);
+        .sort([Field.of(FieldPath.documentId).ascending()]);
 
     final result = runPipeline(pipeline, documents);
     assertThat(result).containsExactly([doc1, doc2, doc3]).inOrder();

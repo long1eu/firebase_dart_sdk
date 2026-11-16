@@ -286,7 +286,7 @@ void main() {
       // the default, but that requires an extra index
       var docs = (await db
           .pipeline()
-          .createFrom(collection.orderByField(FieldPath.documentIdField))
+          .createFrom(collection.orderByField(FieldPath.documentId))
           .execute());
       assertEquals(<Object?>[
         testDocs["a"],
@@ -306,9 +306,7 @@ void main() {
       var db = collection.firestore;
       var docs = (await db
           .pipeline()
-          .createFrom(
-            collection.where(FieldPath.documentIdField, isEqualTo: "ab"),
-          )
+          .createFrom(collection.where(FieldPath.documentId, isEqualTo: "ab"))
           .execute());
       assertEquals(<Object?>[testDocs["ab"]], pipelineSnapshotToValues(docs));
 
@@ -316,8 +314,8 @@ void main() {
           .pipeline()
           .createFrom(
             collection
-                .where(FieldPath.documentIdField, isGreaterThan: "aa")
-                .where(FieldPath.documentIdField, isLessThanOrEqualTo: "ba"),
+                .where(FieldPath.documentId, isGreaterThan: "aa")
+                .where(FieldPath.documentId, isLessThanOrEqualTo: "ba"),
           )
           .execute());
       assertEquals(<Object?>[
@@ -339,8 +337,8 @@ void main() {
           .pipeline()
           .createFrom(
             collection.where(
-              FieldPath.documentIdField,
-              isEqualTo: collection.document("ab"),
+              FieldPath.documentId,
+              isEqualTo: collection.doc("ab"),
             ),
           )
           .execute());
@@ -351,12 +349,12 @@ void main() {
           .createFrom(
             collection
                 .where(
-                  FieldPath.documentIdField,
-                  isGreaterThan: collection.document("aa"),
+                  FieldPath.documentId,
+                  isGreaterThan: collection.doc("aa"),
                 )
                 .where(
-                  FieldPath.documentIdField,
-                  isLessThanOrEqualTo: collection.document("ba"),
+                  FieldPath.documentId,
+                  isLessThanOrEqualTo: collection.doc("ba"),
                 ),
           )
           .execute());
@@ -373,10 +371,7 @@ void main() {
       Future<PipelineSnapshot> query1 = db
           .pipeline()
           .createFrom(
-            collection.orderByField(
-              FieldPath.documentIdField,
-              Direction.ascending,
-            ),
+            collection.orderByField(FieldPath.documentId, Direction.ascending),
           )
           .execute();
       Future<PipelineSnapshot> query2 = db
@@ -517,7 +512,7 @@ void main() {
       var docs = (await db
           .pipeline()
           .createFrom(
-            collection.where(FieldPath.documentIdField, isNotEqualTo: "aa"),
+            collection.where(FieldPath.documentId, isNotEqualTo: "aa"),
           )
           .execute());
       assertEquals(<Object?>[docB, docC, docD], pipelineSnapshotToValues(docs));
@@ -694,7 +689,7 @@ void main() {
           .pipeline()
           .createFrom(
             collection.where(
-              FieldPath.documentIdField,
+              FieldPath.documentId,
               whereIn: <Object?>["aa", "ab"],
             ),
           )
@@ -863,7 +858,7 @@ void main() {
           .pipeline()
           .createFrom(
             collection.where(
-              FieldPath.documentIdField,
+              FieldPath.documentId,
               whereNotIn: <Object?>["aa", "ab"],
             ),
           )
@@ -975,7 +970,7 @@ void main() {
       var db = await IntegrationTestUtil.testEnterpriseFirestore();
       // Use .document() to get a random collection group name to use but ensure it starts with 'b'
       // for predictable ordering.
-      var collectionGroup = "b" + db.collection("foo").document().id;
+      var collectionGroup = "b" + db.collection("foo").doc().id;
 
       var docPaths = <String>[
         "abc/123/\${collectionGroup}/cg-doc1",
@@ -993,7 +988,7 @@ void main() {
       WriteBatch batch = db.batch();
       for (final path in docPaths) {
         batch.set(
-          db.document(path.replaceAll("\${collectionGroup}", collectionGroup)),
+          db.doc(path.replaceAll("\${collectionGroup}", collectionGroup)),
           <String, Object?>{"x": 1},
         );
       }
@@ -1018,7 +1013,7 @@ void main() {
         var db = await IntegrationTestUtil.testEnterpriseFirestore();
         // Use .document() to get a random collection group name to use but ensure it starts with 'b'
         // for predictable ordering.
-        var collectionGroup = "b" + db.collection("foo").document().id;
+        var collectionGroup = "b" + db.collection("foo").doc().id;
 
         var docPaths = <String>[
           "a/a/\${collectionGroup}/cg-doc1",
@@ -1032,9 +1027,7 @@ void main() {
         WriteBatch batch = db.batch();
         for (final path in docPaths) {
           batch.set(
-            db.document(
-              path.replaceAll("\${collectionGroup}", collectionGroup),
-            ),
+            db.doc(path.replaceAll("\${collectionGroup}", collectionGroup)),
             <String, Object?>{"x": 1},
           );
         }
@@ -1045,7 +1038,7 @@ void main() {
             .createFrom(
               db
                   .collectionGroup(collectionGroup)
-                  .orderByField(FieldPath.documentIdField)
+                  .orderByField(FieldPath.documentId)
                   .startAt(["a/b"])
                   .endAt(["a/b0"]),
             )
@@ -1061,7 +1054,7 @@ void main() {
             .createFrom(
               db
                   .collectionGroup(collectionGroup)
-                  .orderByField(FieldPath.documentIdField)
+                  .orderByField(FieldPath.documentId)
                   .startAfter(["a/b"])
                   .endBefore(["a/b/" + collectionGroup + "/cg-doc3"]),
             )
@@ -1076,7 +1069,7 @@ void main() {
         var db = await IntegrationTestUtil.testEnterpriseFirestore();
         // Use .document() to get a random collection group name to use but ensure it starts with 'b'
         // for predictable ordering.
-        var collectionGroup = "b" + db.collection("foo").document().id;
+        var collectionGroup = "b" + db.collection("foo").doc().id;
 
         var docPaths = <String>[
           "a/a/\${collectionGroup}/cg-doc1",
@@ -1090,9 +1083,7 @@ void main() {
         WriteBatch batch = db.batch();
         for (final path in docPaths) {
           batch.set(
-            db.document(
-              path.replaceAll("\${collectionGroup}", collectionGroup),
-            ),
+            db.doc(path.replaceAll("\${collectionGroup}", collectionGroup)),
             <String, Object?>{"x": 1},
           );
         }
@@ -1103,14 +1094,8 @@ void main() {
             .createFrom(
               db
                   .collectionGroup(collectionGroup)
-                  .where(
-                    FieldPath.documentIdField,
-                    isGreaterThanOrEqualTo: "a/b",
-                  )
-                  .where(
-                    FieldPath.documentIdField,
-                    isLessThanOrEqualTo: "a/b0",
-                  ),
+                  .where(FieldPath.documentId, isGreaterThanOrEqualTo: "a/b")
+                  .where(FieldPath.documentId, isLessThanOrEqualTo: "a/b0"),
             )
             .execute());
         assertEquals(<Object?>[
@@ -1124,9 +1109,9 @@ void main() {
             .createFrom(
               db
                   .collectionGroup(collectionGroup)
-                  .where(FieldPath.documentIdField, isGreaterThan: "a/b")
+                  .where(FieldPath.documentId, isGreaterThan: "a/b")
                   .where(
-                    FieldPath.documentIdField,
+                    FieldPath.documentId,
                     isLessThan: "a/b/" + collectionGroup + "/cg-doc3",
                   ),
             )

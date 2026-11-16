@@ -228,7 +228,7 @@ class UserDataConverter {
     DocumentKey? targetDoc,
   ) {
     if (methodName == null) {
-      return firestore.FieldPath.fromDotSeparatedPath(path).internalPath;
+      return firestore.FieldPath.fromString(path).internalPath;
     }
     return firestore.FieldPathInternal.fromArgument(
       methodName,

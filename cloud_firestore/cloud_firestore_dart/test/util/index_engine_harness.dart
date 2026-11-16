@@ -59,7 +59,7 @@ List<String> _ids(QuerySnapshot<Object?> snapshot) =>
 
 /// Runs index backfills until there is nothing left to index. This is the hook for tests: the scheduled backfill
 /// first runs 15 seconds after the client started.
-Future<int> backfillAllIndexes(Firestore firestore) async {
+Future<int> backfillAllIndexes(FirebaseFirestore firestore) async {
   int total = 0;
   while (true) {
     final int processed = await firestore.client.backfillIndexes();
@@ -89,7 +89,7 @@ Future<Map<String, List<String>>> _cacheResults(
 /// they must differ from the results without the writes for [affectedByPendingWrites]; and once the writes are
 /// committed the server must agree with them.
 Future<void> checkIndexedQueries({
-  required Firestore firestore,
+  required FirebaseFirestore firestore,
   required CollectionReference<Map<String, Object?>> collection,
   required Docs docs,
   required List<List<String>> indexes,
@@ -107,7 +107,7 @@ Future<void> checkIndexedQueries({
   // Everything is in the cache as the backend has it.
   expect(_ids(await collection.get(Source.server)), hasLength(docs.length));
 
-  await firestore.setIndexConfiguration(
+  await firestore.setIndexConfigurationFromJSON(
     indexConfiguration(collection.id, indexes),
   );
   expect(localStore.getFieldIndexes(), hasLength(indexes.length));

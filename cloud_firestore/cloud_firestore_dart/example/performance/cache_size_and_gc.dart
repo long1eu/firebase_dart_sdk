@@ -57,7 +57,7 @@ Future<void> run() async {
     'firestore_example_',
   );
   final Stopwatch sinceStart = Stopwatch()..start();
-  final Firestore firestore = Firestore.instanceFor(
+  final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(
     app: exampleApp(),
     openDatabase: sqliteOpener(directory),
     settings: emulatorSettings(
@@ -100,13 +100,13 @@ Future<void> run() async {
     'before: ${await cached()} documents in the cache, files ${filesSize(directory)}',
   );
 
-  Firestore.setLogLevel(LogLevel.debug);
+  FirebaseFirestore.setLogLevel(LogLevel.debug);
   final Duration wait =
       const Duration(seconds: 65) -
       Duration(milliseconds: sinceStart.elapsedMilliseconds);
   print('waiting ${wait.inSeconds} seconds for the first collection run...');
   await Future<void>.delayed(wait);
-  Firestore.setLogLevel(LogLevel.warn);
+  FirebaseFirestore.setLogLevel(LogLevel.warn);
 
   // The files do not get smaller: SQLite keeps the freed pages and reuses
   // them for new data. The size the collector compares with the threshold is

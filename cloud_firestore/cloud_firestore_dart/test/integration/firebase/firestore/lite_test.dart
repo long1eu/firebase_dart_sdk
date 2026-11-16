@@ -170,8 +170,8 @@ void genericMutationTests(MutationTester op) {
             'baz': <String, Object?>{'foobar': 3},
           },
           SetOptions.mergeFieldPaths(<FieldPath>[
-            FieldPath.of(<String>['bar']),
-            FieldPath.of(<String>['baz', 'foobar']),
+            FieldPath(<String>['bar']),
+            FieldPath(<String>['baz', 'foobar']),
           ]),
         );
         expect((await ref.get()).data, <String, Object?>{
@@ -268,7 +268,7 @@ void genericMutationTests(MutationTester op) {
         await op.updateFromList(ref, <Object?>[
           'foo',
           2,
-          FieldPath.of(<String>['baz']),
+          FieldPath(<String>['baz']),
           2,
         ]);
         expect((await ref.get()).data, <String, Object?>{
@@ -286,8 +286,8 @@ void genericMutationTests(MutationTester op) {
           await expectLater(
             op.update(ref, <String, Object?>{'foo': 2, 'baz': 2}),
             throwsA(
-              isA<FirestoreError>().having(
-                (FirestoreError e) => e.code,
+              isA<FirestoreException>().having(
+                (FirestoreException e) => e.code,
                 'code',
                 FirestoreErrorCode.notFound,
               ),
@@ -338,14 +338,14 @@ void verifyResults(
 }
 
 Matcher get throwsTerminated => throwsA(
-  isA<FirestoreError>()
+  isA<FirestoreException>()
       .having(
-        (FirestoreError e) => e.code,
+        (FirestoreException e) => e.code,
         'code',
         FirestoreErrorCode.failedPrecondition,
       )
       .having(
-        (FirestoreError e) => e.message,
+        (FirestoreException e) => e.message,
         'message',
         'The client has already been terminated.',
       ),
@@ -356,9 +356,9 @@ void main() {
 
   group('Firestore', () {
     test('can provide setting', () {
-      final Firestore firestore = Firestore.instanceFor(
+      final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(
         app: newLiteTestApp(),
-        settings: FirestoreSettings(host: 'localhost', sslEnabled: false),
+        settings: Settings(host: 'localhost', sslEnabled: false),
       );
       addTearDown(firestore.terminate);
       expect(firestore.settings.host, 'localhost');
@@ -367,12 +367,12 @@ void main() {
 
     test('returns same default instance from named app', () {
       final FirebaseApp app = newLiteTestApp();
-      final Firestore fs1 = Firestore.instanceFor(app: app);
+      final FirebaseFirestore fs1 = FirebaseFirestore.instanceFor(app: app);
       addTearDown(fs1.terminate);
-      final Firestore fs2 = Firestore.instanceFor(app: app);
-      final Firestore fs3 = Firestore.instanceFor(
+      final FirebaseFirestore fs2 = FirebaseFirestore.instanceFor(app: app);
+      final FirebaseFirestore fs3 = FirebaseFirestore.instanceFor(
         app: app,
-        database: '(default)',
+        databaseId: '(default)',
       );
       expect(fs1, same(fs2));
       expect(fs1, same(fs3));
@@ -382,38 +382,44 @@ void main() {
       final FirebaseApp app = FirebaseApp.withOptions(
         const FirebaseOptions(
           apiKey: 'fake-api-key',
-          applicationId: 'appId',
+          appId: 'appId',
           projectId: 'test-project',
         ),
         dependencies: null,
       );
       addTearDown(app.delete);
-      final Firestore fs1 = Firestore.instanceFor(
+      final FirebaseFirestore fs1 = FirebaseFirestore.instanceFor(
         app: app,
-        settings: FirestoreSettings(host: 'localhost', sslEnabled: false),
+        settings: Settings(host: 'localhost', sslEnabled: false),
       );
       addTearDown(fs1.terminate);
       // getFirestore(), getFirestore(app), getFirestore('(default)') and
       // getFirestore(app, '(default)') of the JS test.
-      expect(Firestore.instance, same(fs1));
-      expect(Firestore.instanceFor(app: app), same(fs1));
+      expect(FirebaseFirestore.instance, same(fs1));
+      expect(FirebaseFirestore.instanceFor(app: app), same(fs1));
       expect(
-        Firestore.instanceFor(app: FirebaseApp.instance, database: '(default)'),
+        FirebaseFirestore.instanceFor(
+          app: FirebaseApp.instance,
+          databaseId: '(default)',
+        ),
         same(fs1),
       );
-      expect(Firestore.instanceFor(app: app, database: '(default)'), same(fs1));
+      expect(
+        FirebaseFirestore.instanceFor(app: app, databaseId: '(default)'),
+        same(fs1),
+      );
     });
 
     test('returns different instance from named app', () {
       final FirebaseApp app = newLiteTestApp();
-      final List<Firestore> instances = <Firestore>[
-        Firestore.instanceFor(app: app, database: 'init1'),
-        Firestore.instanceFor(app: app, database: 'init2'),
-        Firestore.instanceFor(app: app),
-        Firestore.instanceFor(app: app, database: 'name1'),
-        Firestore.instanceFor(app: app, database: 'name2'),
+      final List<FirebaseFirestore> instances = <FirebaseFirestore>[
+        FirebaseFirestore.instanceFor(app: app, databaseId: 'init1'),
+        FirebaseFirestore.instanceFor(app: app, databaseId: 'init2'),
+        FirebaseFirestore.instanceFor(app: app),
+        FirebaseFirestore.instanceFor(app: app, databaseId: 'name1'),
+        FirebaseFirestore.instanceFor(app: app, databaseId: 'name2'),
       ];
-      for (final Firestore firestore in instances) {
+      for (final FirebaseFirestore firestore in instances) {
         addTearDown(firestore.terminate);
       }
       expect(instances.toSet(), hasLength(5));
@@ -422,8 +428,12 @@ void main() {
     });
 
     test('returns different instance from different named app', () {
-      final Firestore fs1 = Firestore.instanceFor(app: newLiteTestApp());
-      final Firestore fs2 = Firestore.instanceFor(app: newLiteTestApp());
+      final FirebaseFirestore fs1 = FirebaseFirestore.instanceFor(
+        app: newLiteTestApp(),
+      );
+      final FirebaseFirestore fs2 = FirebaseFirestore.instanceFor(
+        app: newLiteTestApp(),
+      );
       addTearDown(fs1.terminate);
       addTearDown(fs2.terminate);
       expect(fs1, isNot(same(fs2)));
@@ -432,32 +442,32 @@ void main() {
     test('cannot call initializeFirestore() twice', () {
       // In Dart: asking for the instance again with other settings.
       final FirebaseApp app = newLiteTestApp();
-      final Firestore firestore = Firestore.instanceFor(
+      final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(
         app: app,
-        settings: FirestoreSettings(host: 'localhost', sslEnabled: false),
+        settings: Settings(host: 'localhost', sslEnabled: false),
       );
       addTearDown(firestore.terminate);
       expect(
-        () => Firestore.instanceFor(
+        () => FirebaseFirestore.instanceFor(
           app: app,
-          settings: FirestoreSettings(host: 'otherhost', sslEnabled: false),
+          settings: Settings(host: 'otherhost', sslEnabled: false),
         ),
         throwsStateError,
       );
       // The same settings are not a second initialization.
       expect(
-        Firestore.instanceFor(
+        FirebaseFirestore.instanceFor(
           app: app,
-          settings: FirestoreSettings(host: 'localhost', sslEnabled: false),
+          settings: Settings(host: 'localhost', sslEnabled: false),
         ),
         same(firestore),
       );
     });
 
     test('cannot use once terminated', () async {
-      final Firestore firestore = Firestore.instanceFor(
+      final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(
         app: newLiteTestApp(),
-        settings: FirestoreSettings(host: 'localhost', sslEnabled: false),
+        settings: Settings(host: 'localhost', sslEnabled: false),
       );
       // The termination is not awaited: any operation started after it is
       // rejected.
@@ -466,9 +476,9 @@ void main() {
     });
 
     test('can call terminate() multiple times', () async {
-      final Firestore firestore = Firestore.instanceFor(
+      final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(
         app: newLiteTestApp(),
-        settings: FirestoreSettings(host: 'localhost', sslEnabled: false),
+        settings: Settings(host: 'localhost', sslEnabled: false),
       );
       await firestore.terminate();
       await firestore.terminate();
@@ -476,9 +486,9 @@ void main() {
 
     test('returns a new instance after terminate()', () async {
       final FirebaseApp app = newLiteTestApp();
-      final Firestore first = Firestore.instanceFor(app: app);
+      final FirebaseFirestore first = FirebaseFirestore.instanceFor(app: app);
       await first.terminate();
-      final Firestore second = Firestore.instanceFor(app: app);
+      final FirebaseFirestore second = FirebaseFirestore.instanceFor(app: app);
       addTearDown(second.terminate);
       expect(second, isNot(same(first)));
     });
@@ -487,13 +497,15 @@ void main() {
       final FirebaseApp app = FirebaseApp.withOptions(
         const FirebaseOptions(
           apiKey: 'fake-api-key',
-          applicationId: 'appId',
+          appId: 'appId',
           projectId: 'demo-test',
         ),
         dependencies: null,
         name: 'lite-deleted-app',
       );
-      final Firestore firestore = Firestore.instanceFor(app: app);
+      final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(
+        app: app,
+      );
       app.delete();
       await pumpEventQueue();
       await expectLater(firestore.doc('coll/doc').get(), throwsTerminated);
@@ -501,9 +513,9 @@ void main() {
   });
 
   group('doc', () {
-    late Firestore db;
+    late FirebaseFirestore db;
     setUp(() {
-      db = Firestore.instanceFor(app: newLiteTestApp());
+      db = FirebaseFirestore.instanceFor(app: newLiteTestApp());
       addTearDown(db.terminate);
     });
 
@@ -598,9 +610,9 @@ void main() {
   });
 
   group('collection', () {
-    late Firestore db;
+    late FirebaseFirestore db;
     setUp(() {
-      db = Firestore.instanceFor(app: newLiteTestApp());
+      db = FirebaseFirestore.instanceFor(app: newLiteTestApp());
       addTearDown(db.terminate);
     });
 
@@ -666,9 +678,9 @@ void main() {
   });
 
   group('parent', () {
-    late Firestore db;
+    late FirebaseFirestore db;
     setUp(() {
-      db = Firestore.instanceFor(app: newLiteTestApp());
+      db = FirebaseFirestore.instanceFor(app: newLiteTestApp());
       addTearDown(db.terminate);
     });
 
@@ -882,7 +894,7 @@ void main() {
           await doc.update(<String, Object?>{'counter': attempts});
           transaction.update(doc, <String, Object?>{'counter': -1});
         }, options: TransactionOptions(maxAttempts: 1)),
-        throwsA(isA<FirestoreError>()),
+        throwsA(isA<FirestoreException>()),
       );
       expect(attempts, 1);
     });
@@ -902,8 +914,8 @@ void main() {
           transaction.set(doc, <String, Object?>{'counter': 8});
         }, options: TransactionOptions(readOnly: true)),
         throwsA(
-          isA<FirestoreError>().having(
-            (FirestoreError e) => e.code,
+          isA<FirestoreException>().having(
+            (FirestoreException e) => e.code,
             'code',
             FirestoreErrorCode.invalidArgument,
           ),
@@ -961,13 +973,13 @@ void main() {
             transaction.set(doc, <String, Object?>{'counter': 2});
             try {
               await transaction.get(doc);
-            } on FirestoreError catch (_) {
+            } on FirestoreException catch (_) {
               // The commit fails all the same.
             }
           }),
           throwsA(
-            isA<FirestoreError>().having(
-              (FirestoreError e) => e.code,
+            isA<FirestoreException>().having(
+              (FirestoreException e) => e.code,
               'code',
               FirestoreErrorCode.invalidArgument,
             ),
@@ -981,7 +993,7 @@ void main() {
       final DocumentReference<Map<String, Object?>> doc = await newLiteTestDoc(
         <String, Object?>{'counter': 1},
       );
-      final Firestore db = doc.firestore;
+      final FirebaseFirestore db = doc.firestore;
       int attempts = 0;
       await expectLater(
         db.runTransaction<void>((Transaction transaction) async {
@@ -994,7 +1006,7 @@ void main() {
         throwsTerminated,
       );
       expect(attempts, 1);
-      final Firestore other = newLiteTestFirestore();
+      final FirebaseFirestore other = newLiteTestFirestore();
       expect((await other.doc(doc.path).get()).get('counter'), 1);
     });
 
@@ -1006,8 +1018,8 @@ void main() {
           (Transaction transaction) => transaction.getQuery(coll),
         ),
         throwsA(
-          isA<FirestoreError>().having(
-            (FirestoreError e) => e.code,
+          isA<FirestoreException>().having(
+            (FirestoreException e) => e.code,
             'code',
             FirestoreErrorCode.invalidArgument,
           ),
@@ -1055,7 +1067,7 @@ void main() {
           })).get();
       expect(snap.get('foo'), 1);
       expect(snap['foo'], 1);
-      expect(snap.getField(FieldPath.of(<String>['bar'])), 2);
+      expect(snap.getField(FieldPath(<String>['bar'])), 2);
       expect(snap.contains('foo'), isTrue);
       expect(snap.contains('baz'), isFalse);
     });
@@ -1066,7 +1078,7 @@ void main() {
             'foo': <String, Object?>{'bar': 1},
           })).get();
       expect(snap.get('foo.bar'), 1);
-      expect(snap.getField(FieldPath.of(<String>['foo', 'bar'])), 1);
+      expect(snap.getField(FieldPath(<String>['foo', 'bar'])), 1);
     });
 
     test('returns Bytes', () async {
@@ -1266,7 +1278,7 @@ void main() {
             foo(2),
           ]);
       verifyResults(
-        await coll.where(FieldPath.of(<String>['foo']), isEqualTo: 1).get(),
+        await coll.where(FieldPath(<String>['foo']), isEqualTo: 1).get(),
         <Map<String, Object?>>[foo(1)],
       );
     });
@@ -1457,7 +1469,7 @@ void main() {
     test('supports collection groups', () async {
       final CollectionReference<Map<String, Object?>> coll =
           newLiteTestCollection();
-      final Firestore db = coll.firestore;
+      final FirebaseFirestore db = coll.firestore;
       final String group = '${coll.id}group';
       await db.doc('${coll.id}/foo/$group/doc1').set(<String, Object?>{
         'foo': 1,
@@ -1476,7 +1488,7 @@ void main() {
     });
 
     test('validates collection groups', () {
-      final Firestore db = newLiteTestFirestore();
+      final FirebaseFirestore db = newLiteTestFirestore();
       expect(() => db.collectionGroup(''), throwsArgumentError);
       expect(
         () => db.collectionGroup('/'),
@@ -1519,7 +1531,9 @@ void main() {
         );
 
     test('for collection references', () {
-      final Firestore db = Firestore.instanceFor(app: newLiteTestApp());
+      final FirebaseFirestore db = FirebaseFirestore.instanceFor(
+        app: newLiteTestApp(),
+      );
       addTearDown(db.terminate);
       final CollectionReference<Map<String, Object?>> coll1a = db.collection(
         'a',
@@ -1535,7 +1549,9 @@ void main() {
     });
 
     test('for document references', () {
-      final Firestore db = Firestore.instanceFor(app: newLiteTestApp());
+      final FirebaseFirestore db = FirebaseFirestore.instanceFor(
+        app: newLiteTestApp(),
+      );
       addTearDown(db.terminate);
       final DocumentReference<Map<String, Object?>> doc1a = db.doc('a/b');
       expect(doc1a, db.collection('a').doc('b'));
@@ -1546,7 +1562,9 @@ void main() {
     });
 
     test('for queries', () {
-      final Firestore db = Firestore.instanceFor(app: newLiteTestApp());
+      final FirebaseFirestore db = FirebaseFirestore.instanceFor(
+        app: newLiteTestApp(),
+      );
       addTearDown(db.terminate);
       final CollectionReference<Map<String, Object?>> coll = db.collection(
         'coll',
@@ -1593,7 +1611,7 @@ void main() {
       expect(snap1a.docs[0].hashCode, snap1b.docs[0].hashCode);
 
       // Modify the document and obtain the snapshot again.
-      await snap1a.docs[0].ref.update(<String, Object?>{'foo': 3});
+      await snap1a.docs[0].reference.update(<String, Object?>{'foo': 3});
       final QuerySnapshot<Map<String, Object?>> snap3 = await coll.get();
       expect(snap1a.docs[0], isNot(snap3.docs[0]));
     }, skip: skip);
@@ -1676,7 +1694,7 @@ void main() {
     test(
       'keeps the converter when calling parent() with a DocumentReference',
       () {
-        final Firestore db = newLiteTestFirestore();
+        final FirebaseFirestore db = newLiteTestFirestore();
         final DocumentReference<Post> doc = db
             .doc('root/doc')
             .withConverter(postConverter);
@@ -1687,7 +1705,7 @@ void main() {
     test(
       'drops the converter when calling parent() with a CollectionReference',
       () {
-        final Firestore db = newLiteTestFirestore();
+        final FirebaseFirestore db = newLiteTestFirestore();
         final CollectionReference<Post> coll = db
             .collection('root/doc/parent')
             .withConverter(postConverter);
@@ -1696,7 +1714,7 @@ void main() {
     );
 
     test('checks converter when comparing with isEqual()', () {
-      final Firestore db = newLiteTestFirestore();
+      final FirebaseFirestore db = newLiteTestFirestore();
       final FirestoreDataConverter<Post>
       postConverter2 = FirestoreDataConverter<Post>.from(
         fromFirestore: (QueryDocumentSnapshot<Map<String, Object?>> snapshot) =>
@@ -1790,10 +1808,10 @@ void main() {
     });
 
     test('run count query fails on invalid collection reference', () async {
-      final Firestore db = newLiteTestFirestore();
+      final FirebaseFirestore db = newLiteTestFirestore();
       await expectLater(
         db.collection('__badpath__').count().get(),
-        throwsA(isA<FirestoreError>()),
+        throwsA(isA<FirestoreException>()),
       );
     });
 
@@ -1922,7 +1940,7 @@ void main() {
     });
 
     test('count query supports collection groups', () async {
-      final Firestore db = newLiteTestFirestore();
+      final FirebaseFirestore db = newLiteTestFirestore();
       final String group = db.collection('countTest').doc().id;
       final WriteBatch batch = db.batch();
       for (final String path in <String>[
@@ -2035,12 +2053,12 @@ void main() {
     });
 
     test('run aggregate query fails on invalid collection reference', () async {
-      final Firestore db = newLiteTestFirestore();
+      final FirebaseFirestore db = newLiteTestFirestore();
       await expectLater(
         db.collection('__badpath__').aggregateWithAliases(
           <String, AggregateField>{'myCount': AggregateField.count()},
         ).get(),
-        throwsA(isA<FirestoreError>()),
+        throwsA(isA<FirestoreException>()),
       );
     });
 
@@ -2114,7 +2132,7 @@ void main() {
     });
 
     test('aggregate query supports collection groups', () async {
-      final Firestore db = newLiteTestFirestore();
+      final FirebaseFirestore db = newLiteTestFirestore();
       final String group = db.collection('aggregateTest').doc().id;
       final WriteBatch batch = db.batch();
       for (final String path in <String>[
@@ -2417,7 +2435,7 @@ void main() {
 
   group('mockUserToken', () {
     test('requests with a mock user token succeed', () async {
-      final Firestore db = newLiteTestFirestore(
+      final FirebaseFirestore db = newLiteTestFirestore(
         mockUserToken: <String, Object?>{'sub': 'alice'},
       );
       final DocumentReference<Map<String, Object?>> ref = newLiteTestCollection(
@@ -2430,10 +2448,12 @@ void main() {
     test('a malformed token reaches the emulator', () async {
       // The emulator decodes the token: one that is not a JWT is rejected,
       // which shows that the header is sent.
-      final Firestore db = newLiteTestFirestore(mockUserToken: 'not-a-jwt');
+      final FirebaseFirestore db = newLiteTestFirestore(
+        mockUserToken: 'not-a-jwt',
+      );
       await expectLater(
         newLiteTestCollection(db).doc().set(<String, Object?>{'a': 1}),
-        throwsA(isA<FirestoreError>()),
+        throwsA(isA<FirestoreException>()),
       );
     });
   }, skip: skip);

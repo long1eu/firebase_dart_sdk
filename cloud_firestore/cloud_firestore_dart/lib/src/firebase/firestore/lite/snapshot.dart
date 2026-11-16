@@ -43,7 +43,7 @@ class DocumentSnapshot<T extends dynamic> {
     this._converter,
   ]);
 
-  final Firestore _firestore;
+  final FirebaseFirestore _firestore;
   final DocumentKey _key;
   final FirestoreDataConverter<T>? _converter;
 
@@ -55,7 +55,7 @@ class DocumentSnapshot<T extends dynamic> {
   String get id => _key.path.last;
 
   /// The reference of the document.
-  DocumentReference<T> get ref =>
+  DocumentReference<T> get reference =>
       DocumentReference<T>(_key, _firestore, _converter);
 
   /// Whether the document exists.
@@ -166,7 +166,7 @@ class QueryDocumentSnapshot<T extends dynamic> extends DocumentSnapshot<T> {
   /// Implementation detail of the SDK; not part of the supported API.
   @internal
   QueryDocumentSnapshot(
-    Firestore firestore,
+    FirebaseFirestore firestore,
     Document document, [
     FirestoreDataConverter<T>? converter,
   ]) : super(firestore, document.key, document, converter);

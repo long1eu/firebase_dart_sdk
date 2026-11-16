@@ -103,8 +103,8 @@ Future<void> eventually(FutureOr<bool> Function() condition, String what,
   }
 }
 
-final Matcher isPermissionDenied = isA<FirestoreError>().having(
-    (FirestoreError e) => e.code, 'code', FirestoreErrorCode.permissionDenied);
+final Matcher isPermissionDenied = isA<FirestoreException>().having(
+    (FirestoreException e) => e.code, 'code', FirestoreErrorCode.permissionDenied);
 
 /// A listener that records its snapshots and its error.
 class Listening {
@@ -166,7 +166,7 @@ void main() {
   FirebaseApp newApp() {
     final FirebaseApp app = FirebaseApp.withOptions(
       const FirebaseOptions(
-          apiKey: 'fake-api-key', applicationId: 'appId', projectId: projectId),
+          apiKey: 'fake-api-key', appId: 'appId', projectId: projectId),
       name: unique('auth-e2e-'),
     );
     apps.add(app);
@@ -181,7 +181,7 @@ void main() {
   }
 
   /// A Firestore instance of the full SDK for [app], over gRPC or over the web transport, with a memory cache.
-  Future<Firestore> newFirestore(FirebaseApp app, {required bool web}) async {
+  Future<FirebaseFirestore> newFirestore(FirebaseApp app, {required bool web}) async {
     // The transport is created with the client, on its first operation: the override stays in place until the
     // tear-down (resetting it right after instanceFor ran the "web transport" tests over gRPC).
     Datastore.transportOverride = web
@@ -192,9 +192,9 @@ void main() {
             return WebChannelTransport(http, databaseInfo, options);
           }
         : null;
-    final Firestore firestore = Firestore.instanceFor(
+    final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(
       app: app,
-      settings: FirestoreSettings(
+      settings: Settings(
         host: firestoreAddress!.host,
         port: firestoreAddress.port,
         sslEnabled: false,
@@ -212,7 +212,7 @@ void main() {
       test('the security rules see the signed-in user', () async {
         final FirebaseApp app = newApp();
         final FirebaseUserAuth auth = await newAuth(app);
-        final Firestore db = await newFirestore(app, web: web);
+        final FirebaseFirestore db = await newFirestore(app, web: web);
         final String run = unique('run');
 
         // Nobody is signed in: the request carries no token and the rules refuse it.
@@ -246,7 +246,7 @@ void main() {
           () async {
         final FirebaseApp app = newApp();
         final FirebaseUserAuth auth = await newAuth(app);
-        final Firestore db = await newFirestore(app, web: web);
+        final FirebaseFirestore db = await newFirestore(app, web: web);
         final String run = unique('run');
         final String emailA = '${unique('a')}@example.com';
         final String emailB = '${unique('b')}@example.com';
@@ -300,7 +300,7 @@ void main() {
       test('pending writes stay with the user who made them', () async {
         final FirebaseApp app = newApp();
         final FirebaseUserAuth auth = await newAuth(app);
-        final Firestore db = await newFirestore(app, web: web);
+        final FirebaseFirestore db = await newFirestore(app, web: web);
         final String run = unique('run');
         final String emailA = '${unique('a')}@example.com';
         final String emailB = '${unique('b')}@example.com';
@@ -330,7 +330,7 @@ void main() {
         expect(await admin.get(pendingPath), isNull);
         expect(acknowledged, isFalse);
         await expectLater(db.doc(pendingPath).get(Source.cache),
-            throwsA(isA<FirestoreError>()),
+            throwsA(isA<FirestoreException>()),
             reason: 'B has no cached document of A');
 
         // A comes back: the write is sent with the token of A.
@@ -346,7 +346,7 @@ void main() {
       test('a refreshed token keeps the listeners going', () async {
         final FirebaseApp app = newApp();
         final FirebaseUserAuth auth = await newAuth(app);
-        final Firestore db = await newFirestore(app, web: web);
+        final FirebaseFirestore db = await newFirestore(app, web: web);
         final String run = unique('run');
         final AuthUser user = await auth.signInAnonymously();
         final String first =
@@ -374,7 +374,7 @@ void main() {
       test('sign-out drops access', () async {
         final FirebaseApp app = newApp();
         final FirebaseUserAuth auth = await newAuth(app);
-        final Firestore db = await newFirestore(app, web: web);
+        final FirebaseFirestore db = await newFirestore(app, web: web);
         final String run = unique('run');
         final AuthUser user = await auth.signInAnonymously();
         final DocumentReference<Map<String, Object?>> ref =
@@ -414,9 +414,9 @@ void main() {
               return RestTransport(httpClients.last, databaseInfo, options);
             }
           : null;
-      final lite.Firestore db = lite.Firestore.instanceFor(
+      final lite.FirebaseFirestore db = lite.FirebaseFirestore.instanceFor(
         app: app,
-        settings: lite.FirestoreSettings()
+        settings: lite.Settings()
             .withEmulator(firestoreAddress!.host, firestoreAddress.port),
       );
       cleanups.add(db.terminate);

@@ -52,7 +52,7 @@ void main() {
     final QuerySnapshot qrySnap = await colRef.get();
     expect(qrySnap.metadata.isFromCache, isFalse);
     expect(qrySnap.metadata.hasPendingWrites, isFalse);
-    expect(qrySnap.documentChanges.length, 3);
+    expect(qrySnap.docChanges.length, 3);
     expect(toDataMap(qrySnap), initialDocs);
   });
 
@@ -88,15 +88,15 @@ void main() {
 
     // Since we're offline, the returned promises won't complete
     unawaited(colRef
-        .document('doc2')
+        .doc('doc2')
         .set(map(<String>['key2b', 'value2b']), SetOptions.mergeAllFields));
-    unawaited(colRef.document('doc3').set(map(<String>['key3b', 'value3b'])));
-    unawaited(colRef.document('doc4').set(map(<String>['key4', 'value4'])));
+    unawaited(colRef.doc('doc3').set(map(<String>['key3b', 'value3b'])));
+    unawaited(colRef.doc('doc4').set(map(<String>['key4', 'value4'])));
 
     final QuerySnapshot qrySnap = await colRef.get();
     expect(qrySnap.metadata.isFromCache, isTrue);
     expect(qrySnap.metadata.hasPendingWrites, isTrue);
-    expect(qrySnap.documentChanges.length, 4);
+    expect(qrySnap.docChanges.length, 4);
     expect(
         toDataMap(qrySnap),
         map<dynamic>(<dynamic>[
@@ -142,7 +142,7 @@ void main() {
     final QuerySnapshot qrySnap = await colRef.get(Source.cache);
     expect(qrySnap.metadata.isFromCache, isTrue);
     expect(qrySnap.metadata.hasPendingWrites, isFalse);
-    expect(qrySnap.documentChanges.length, 3);
+    expect(qrySnap.docChanges.length, 3);
     expect(toDataMap(qrySnap), initialDocs);
   });
 
@@ -177,15 +177,15 @@ void main() {
 
     // Since we're offline, the returned promises won't complete
     unawaited(colRef
-        .document('doc2')
+        .doc('doc2')
         .set(map(<String>['key2b', 'value2b']), SetOptions.mergeAllFields));
-    unawaited(colRef.document('doc3').set(map(<String>['key3b', 'value3b'])));
-    unawaited(colRef.document('doc4').set(map(<String>['key4', 'value4'])));
+    unawaited(colRef.doc('doc3').set(map(<String>['key3b', 'value3b'])));
+    unawaited(colRef.doc('doc4').set(map(<String>['key4', 'value4'])));
 
     final QuerySnapshot qrySnap = await colRef.get(Source.cache);
     expect(qrySnap.metadata.isFromCache, isTrue);
     expect(qrySnap.metadata.hasPendingWrites, isTrue);
-    expect(qrySnap.documentChanges.length, 4);
+    expect(qrySnap.docChanges.length, 4);
     expect(
         toDataMap(qrySnap),
         map<dynamic>(<dynamic>[
@@ -227,7 +227,7 @@ void main() {
     final QuerySnapshot qrySnap = await colRef.get(Source.server);
     expect(qrySnap.metadata.isFromCache, isFalse);
     expect(qrySnap.metadata.hasPendingWrites, isFalse);
-    expect(qrySnap.documentChanges.length, 3);
+    expect(qrySnap.docChanges.length, 3);
     expect(toDataMap(qrySnap), initialDocs);
   });
 
@@ -310,10 +310,10 @@ void main() {
 
     // since we're offline, the returned promises won't complete
     unawaited(colRef
-        .document('doc2')
+        .doc('doc2')
         .set(map(<String>['key2b', 'value2b']), SetOptions.mergeAllFields));
-    unawaited(colRef.document('doc3').set(map(<String>['key3b', 'value3b'])));
-    unawaited(colRef.document('doc4').set(map(<String>['key4', 'value4'])));
+    unawaited(colRef.doc('doc3').set(map(<String>['key3b', 'value3b'])));
+    unawaited(colRef.doc('doc4').set(map(<String>['key4', 'value4'])));
 
     // Create an initial listener for this query (to attempt to disrupt the gets
     // below) and wait for the listener to deliver its initial snapshot before
@@ -330,7 +330,7 @@ void main() {
     QuerySnapshot qrySnap = await colRef.get(Source.cache);
     expect(qrySnap.metadata.isFromCache, isTrue);
     expect(qrySnap.metadata.hasPendingWrites, isTrue);
-    expect(qrySnap.documentChanges.length, 4);
+    expect(qrySnap.docChanges.length, 4);
     expect(
         toDataMap(qrySnap),
         map<dynamic>(<dynamic>[
@@ -347,7 +347,7 @@ void main() {
     qrySnap = await colRef.get();
     expect(qrySnap.metadata.isFromCache, isTrue);
     expect(qrySnap.metadata.hasPendingWrites, isTrue);
-    expect(qrySnap.documentChanges.length, 4);
+    expect(qrySnap.docChanges.length, 4);
     expect(
         toDataMap(qrySnap),
         map<dynamic>(<dynamic>[
@@ -378,7 +378,7 @@ void main() {
 
     final QuerySnapshot qrySnap = await colRef.get();
     expect(qrySnap, isEmpty);
-    expect(qrySnap.documentChanges.length, 0);
+    expect(qrySnap.docChanges.length, 0);
     expect(qrySnap.metadata.isFromCache, isFalse);
     expect(qrySnap.metadata.hasPendingWrites, isFalse);
   });
@@ -416,7 +416,7 @@ void main() {
 
     final QuerySnapshot qrySnap = await colRef.get();
     expect(qrySnap, isEmpty);
-    expect(qrySnap.documentChanges.length, 0);
+    expect(qrySnap.docChanges.length, 0);
     expect(qrySnap.metadata.isFromCache, isTrue);
     expect(qrySnap.metadata.hasPendingWrites, isFalse);
   });
@@ -433,7 +433,7 @@ void main() {
 
     final QuerySnapshot qrySnap = await colRef.get(Source.cache);
     expect(qrySnap, isEmpty);
-    expect(qrySnap.documentChanges.length, 0);
+    expect(qrySnap.docChanges.length, 0);
     expect(qrySnap.metadata.isFromCache, isTrue);
     expect(qrySnap.metadata.hasPendingWrites, isFalse);
   });
@@ -467,7 +467,7 @@ void main() {
 
     final QuerySnapshot qrySnap = await colRef.get(Source.cache);
     expect(qrySnap, isEmpty);
-    expect(qrySnap.documentChanges.length, 0);
+    expect(qrySnap.docChanges.length, 0);
     expect(qrySnap.metadata.isFromCache, isTrue);
     expect(qrySnap.metadata.hasPendingWrites, isFalse);
   });
@@ -486,7 +486,7 @@ void main() {
 
     final QuerySnapshot qrySnap = await colRef.get(Source.server);
     expect(qrySnap, isEmpty);
-    expect(qrySnap.documentChanges.length, 0);
+    expect(qrySnap.docChanges.length, 0);
     expect(qrySnap.metadata.isFromCache, isFalse);
     expect(qrySnap.metadata.hasPendingWrites, isFalse);
   });

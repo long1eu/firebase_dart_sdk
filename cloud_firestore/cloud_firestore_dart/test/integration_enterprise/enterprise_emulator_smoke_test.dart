@@ -30,14 +30,14 @@ void main() {
 
   test('writes and reads documents on the enterprise emulator',
       skip: skipReason, () async {
-    final Firestore firestore =
+    final FirebaseFirestore firestore =
         await IntegrationTestUtil.testEnterpriseFirestore();
     final CollectionReference collection =
         firestore.collection('enterprise-smoke-${autoId()}');
-    final DocumentReference doc = collection.document('a');
+    final DocumentReference doc = collection.doc('a');
 
     await doc.set(<String, Object?>{'value': 1, 'name': 'enterprise'});
-    await collection.document('b').set(<String, Object?>{'value': 2});
+    await collection.doc('b').set(<String, Object?>{'value': 2});
 
     final DocumentSnapshot snapshot = await doc.get(Source.server);
     expect(snapshot.exists, isTrue);
@@ -58,13 +58,13 @@ void main() {
                   ? 'both variables name the same emulator: needs both emulators'
                   : null), () async {
     final String path = 'enterprise-smoke-${autoId()}/doc';
-    final Firestore enterprise =
+    final FirebaseFirestore enterprise =
         await IntegrationTestUtil.testEnterpriseFirestore();
-    await enterprise.document(path).set(<String, Object?>{'value': 1});
+    await enterprise.doc(path).set(<String, Object?>{'value': 1});
 
-    final Firestore standard = await IntegrationTestUtil.testFirestore();
+    final FirebaseFirestore standard = await IntegrationTestUtil.testFirestore();
     final DocumentSnapshot snapshot =
-        await standard.document(path).get(Source.server);
+        await standard.doc(path).get(Source.server);
     expect(snapshot.exists, isFalse);
   });
 }

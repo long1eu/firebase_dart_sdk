@@ -59,10 +59,10 @@ void main(List<String> arguments) {
   };
   final FirebaseOptions fromWeb = FirebaseOptions(
     apiKey: webConfig['apiKey']!,
-    applicationId: webConfig['appId']!,
+    appId: webConfig['appId']!,
     projectId: webConfig['projectId'],
     storageBucket: webConfig['storageBucket'],
-    gcmSenderId: webConfig['messagingSenderId'],
+    messagingSenderId: webConfig['messagingSenderId'],
   );
   print('from a web config: ${fromWeb.projectId}');
 }

@@ -36,18 +36,18 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/util/util.dart';
 import 'package:meta/meta.dart';
 
 /// A [Transaction] is passed to the function given to
-/// [Firestore.runTransaction], to read and write documents within the
+/// [FirebaseFirestore.runTransaction], to read and write documents within the
 /// transaction.
 ///
 /// All the reads must come before the first write.
 class Transaction {
   /// Implementation detail of the SDK; not part of the supported API. Use
-  /// [Firestore.runTransaction].
+  /// [FirebaseFirestore.runTransaction].
   @internal
   Transaction(this._transaction, this._firestore);
 
   final core.Transaction _transaction;
-  final Firestore _firestore;
+  final FirebaseFirestore _firestore;
 
   /// Reads the document referred to by [documentRef].
   Future<DocumentSnapshot<T>> get<T extends Object?>(
@@ -75,7 +75,7 @@ class Transaction {
   /// sees.
   ///
   /// In a read-write transaction the returned future fails with a
-  /// [FirestoreError] with code `invalidArgument`: such a transaction verifies
+  /// [FirestoreException] with code `invalidArgument`: such a transaction verifies
   /// at commit that the documents it read did not change, which is not possible
   /// for the result of a query.
   Future<QuerySnapshot<T>> getQuery<T extends Object?>(Query<T> query) async {

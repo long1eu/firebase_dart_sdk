@@ -27,7 +27,7 @@ Future<void> main() async {
   final String collectionPath = scratch('products');
 
   // Fill the collection once, with its own instance.
-  final Firestore writer = connect('writer');
+  final FirebaseFirestore writer = connect('writer');
   final CollectionReference<Map<String, Object?>> products = writer.collection(
     collectionPath,
   );
@@ -43,26 +43,26 @@ Future<void> main() async {
   }
   await writer.terminate();
 
-  final Map<String, Firestore> clients = <String, Firestore>{
-    'memory, eager GC': Firestore.instanceFor(
+  final Map<String, FirebaseFirestore> clients = <String, FirebaseFirestore>{
+    'memory, eager GC': FirebaseFirestore.instanceFor(
       app: exampleApp('eager'),
       settings: emulatorSettings(),
     ),
-    'memory, LRU GC': Firestore.instanceFor(
+    'memory, LRU GC': FirebaseFirestore.instanceFor(
       app: exampleApp('lru'),
       settings: emulatorSettings(
         cacheSettings: MemoryCacheSettings(gcSettings: MemoryLruGcSettings()),
       ),
     ),
-    'SQLite': Firestore.instanceFor(
+    'SQLite': FirebaseFirestore.instanceFor(
       app: exampleApp('sqlite'),
       openDatabase: sqliteOpener(directory),
       settings: emulatorSettings(cacheSettings: PersistentCacheSettings()),
     ),
   };
 
-  for (final MapEntry<String, Firestore> entry in clients.entries) {
-    final Firestore firestore = entry.value;
+  for (final MapEntry<String, FirebaseFirestore> entry in clients.entries) {
+    final FirebaseFirestore firestore = entry.value;
     final Query<Map<String, Object?>> cheap = firestore
         .collection(collectionPath)
         .where('category', isEqualTo: 3);
@@ -95,7 +95,7 @@ Future<void> main() async {
 
   // Listener reuse: the second listener on an equal query joins the first
   // one's target. Its first snapshot comes from the view that already exists.
-  final Firestore firestore = clients['SQLite']!;
+  final FirebaseFirestore firestore = clients['SQLite']!;
   final Query<Map<String, Object?>> query = firestore
       .collection(collectionPath)
       .where('category', isEqualTo: 5);
@@ -133,7 +133,7 @@ Future<void> main() async {
   await one.cancel();
   await two.cancel();
 
-  for (final Firestore client in clients.values) {
+  for (final FirebaseFirestore client in clients.values) {
     await client.terminate();
   }
   directory.deleteSync(recursive: true);

@@ -65,14 +65,14 @@ class IntegrationTestUtil {
   static const String badProjectId = 'test-project-2';
 
   /// Online status of all active Firestore clients.
-  static final Map<Firestore, bool> firestoreStatus = <Firestore, bool>{};
+  static final Map<FirebaseFirestore, bool> firestoreStatus = <FirebaseFirestore, bool>{};
 
   /// The credentials provider of each test instance, to be able to switch the user.
-  static final Map<Firestore, MockCredentialsProvider> credentialsProviders =
-      <Firestore, MockCredentialsProvider>{};
+  static final Map<FirebaseFirestore, MockCredentialsProvider> credentialsProviders =
+      <FirebaseFirestore, MockCredentialsProvider>{};
 
   /// Switches the user of the given test [firestore] instance.
-  static void testChangeUserTo(Firestore firestore, User user) {
+  static void testChangeUserTo(FirebaseFirestore firestore, User user) {
     credentialsProviders[firestore]!.changeUserTo(user);
   }
 
@@ -203,26 +203,26 @@ class IntegrationTestUtil {
     );
   }
 
-  static FirestoreSettings newTestSettings() {
+  static Settings newTestSettings() {
     useWebTransportIfRequested();
     final String? emulator = emulatorHost;
     if (emulator == null) {
-      return FirestoreSettings();
+      return Settings();
     }
 
     return _emulatorSettings(emulator);
   }
 
-  static FirestoreSettings _emulatorSettings(String emulator) {
+  static Settings _emulatorSettings(String emulator) {
     final EmulatorAddress address = EmulatorAddress.parse(emulator);
-    return FirestoreSettings(
+    return Settings(
         host: address.host, port: address.port, sslEnabled: false);
   }
 
   /// Initializes a new Firestore instance that talks to the Enterprise edition
   /// emulator, on [enterpriseDatabaseId] unless [databaseId] names another
   /// database. Guard the tests that use it with [enterpriseEmulatorSkipReason].
-  static Future<Firestore> testEnterpriseFirestore([String? dbPath,
+  static Future<FirebaseFirestore> testEnterpriseFirestore([String? dbPath,
       String? databaseId]) {
     final String? emulator = enterpriseEmulatorHost;
     if (emulator == null) {
@@ -264,8 +264,8 @@ class IntegrationTestUtil {
 
   /// Initializes a new Firestore instance that uses the default project, customized with the provided settings if
   /// provided.
-  static Future<Firestore> testFirestore(
-      [FirestoreSettings? settings, String? dbPath]) async {
+  static Future<FirebaseFirestore> testFirestore(
+      [Settings? settings, String? dbPath]) async {
     return testFirestoreInstance(
       provider.projectId,
       InternalLogLevel.w,
@@ -277,7 +277,7 @@ class IntegrationTestUtil {
   }
 
   /// Initializes a new Firestore instance that uses a non-existing default project.
-  static Future<Firestore> testAlternateFirestore() async {
+  static Future<FirebaseFirestore> testAlternateFirestore() async {
     return testFirestoreInstance(
       badProjectId,
       InternalLogLevel.w,
@@ -286,13 +286,13 @@ class IntegrationTestUtil {
     );
   }
 
-  static Future<Firestore> forTests(
+  static Future<FirebaseFirestore> forTests(
       DatabaseId databaseId,
       String persistenceKey,
       CredentialsProvider provider,
       TaskScheduler scheduler,
       OpenDatabase openDatabase,
-      FirestoreSettings settings,
+      Settings settings,
       {ConnectivityChangeDetector? connectivityDetector}) async {
     final DatabaseInfo databaseInfo = DatabaseInfo(
         databaseId, persistenceKey, settings.host,
@@ -321,8 +321,8 @@ class IntegrationTestUtil {
   ///
   /// With [fixedDbName] the instance uses exactly that database file and does not delete it, so that a later instance
   /// created with the same name sees the persisted data (restart). Use [databaseName] to address a named database.
-  static Future<Firestore> testFirestoreInstance(String projectId,
-      InternalLogLevel logLevel, FirestoreSettings settings, String dbPath,
+  static Future<FirebaseFirestore> testFirestoreInstance(String projectId,
+      InternalLogLevel logLevel, Settings settings, String dbPath,
       {String? fixedDbName,
       String databaseName = DatabaseId.defaultDatabaseId,
       ConnectivityChangeDetector? connectivityDetector}) async {
@@ -349,7 +349,7 @@ class IntegrationTestUtil {
         usesRealProject && settings.host == TestBackend.productionHost;
     final MockCredentialsProvider credentialsProvider = MockCredentialsProvider(
         tokenSource: authenticate ? _realProjectTokens : null);
-    final Firestore firestore = await forTests(
+    final FirebaseFirestore firestore = await forTests(
       databaseId,
       persistenceKey,
       credentialsProvider,
@@ -383,7 +383,7 @@ class IntegrationTestUtil {
       // after the test body), then the files are deleted. Outside a test [tearDown] does it.
       try {
         addTearDown(() async {
-          await firestore.shutdown();
+          await firestore.terminate();
           if (_createdDatabases.remove(dbName)) {
             DatabaseMock.deleteDatabaseFiles(dbName);
           }
@@ -396,8 +396,8 @@ class IntegrationTestUtil {
   }
 
   static Future<void> tearDown() async {
-    for (Firestore firestore in firestoreStatus.keys) {
-      await firestore.shutdown();
+    for (FirebaseFirestore firestore in firestoreStatus.keys) {
+      await firestore.terminate();
     }
     firestoreStatus.clear();
     credentialsProviders.clear();
@@ -411,7 +411,7 @@ class IntegrationTestUtil {
   }
 
   static Future<DocumentReference> testDocument() async {
-    return (await testCollection('test-collection')).document();
+    return (await testCollection('test-collection')).doc();
   }
 
   static Future<DocumentReference> testDocumentWithData(
@@ -439,7 +439,7 @@ class IntegrationTestUtil {
   static Future<void> writeAllDocs(CollectionReference collection,
       Map<String, Map<String, Object?>> docs) async {
     for (MapEntry<String, Map<String, Object?>> doc in docs.entries) {
-      await collection.document(doc.key).set(doc.value);
+      await collection.doc(doc.key).set(doc.value);
     }
   }
 
@@ -531,29 +531,29 @@ class IntegrationTestUtil {
     return res;
   }
 
-  static Future<void> disableNetwork(Firestore firestore) async {
+  static Future<void> disableNetwork(FirebaseFirestore firestore) async {
     if (firestoreStatus[firestore] ?? false) {
       await firestore.disableNetwork();
       firestoreStatus[firestore] = false;
     }
   }
 
-  static Future<void> enableNetwork(Firestore firestore) async {
+  static Future<void> enableNetwork(FirebaseFirestore firestore) async {
     if (!(firestoreStatus[firestore] ?? false)) {
       await firestore.enableNetwork();
       // Wait for the client to connect.
-      await firestore.collection('unknown').document().delete();
+      await firestore.collection('unknown').doc().delete();
       firestoreStatus[firestore] = true;
     }
   }
 
-  static bool isNetworkEnabled(Firestore firestore) {
+  static bool isNetworkEnabled(FirebaseFirestore firestore) {
     return firestoreStatus[firestore] ?? false;
   }
 
   static Map<String, Object?> toDataMap(QuerySnapshot qrySnap) {
     final Map<String, Object?> result = <String, Object>{};
-    for (DocumentSnapshot docSnap in qrySnap.documents) {
+    for (DocumentSnapshot docSnap in qrySnap.docs) {
       result[docSnap.id] = docSnap.data;
     }
     return result;

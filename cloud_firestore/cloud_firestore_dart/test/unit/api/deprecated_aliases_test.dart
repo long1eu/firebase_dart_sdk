@@ -34,30 +34,30 @@ void main() {
   group('FirebaseFirestore alias of Firestore', () {
     test('is the same type', () {
       final FirebaseFirestore viaAlias = _testFirestore();
-      final Firestore viaClass = viaAlias;
+      final FirebaseFirestore viaClass = viaAlias;
       expect(identical(viaAlias, viaClass), isTrue);
-      expect(viaAlias, isA<Firestore>());
       expect(viaAlias, isA<FirebaseFirestore>());
-      expect(FirebaseFirestore, Firestore);
+      expect(viaAlias, isA<FirebaseFirestore>());
+      expect(FirebaseFirestore, FirebaseFirestore);
     });
 
     test('statics are reachable through the alias', () {
-      expect(identical(FirebaseFirestore.getInstance, Firestore.getInstance),
+      expect(identical(FirebaseFirestore.getInstance, FirebaseFirestore.getInstance),
           isTrue);
-      expect(identical(FirebaseFirestore.setLogLevel, Firestore.setLogLevel),
+      expect(identical(FirebaseFirestore.setLogLevel, FirebaseFirestore.setLogLevel),
           isTrue);
-      expect(identical(FirebaseFirestore.instanceFor, Firestore.instanceFor),
+      expect(identical(FirebaseFirestore.instanceFor, FirebaseFirestore.instanceFor),
           isTrue);
       expect(
           identical(
-              FirebaseFirestore.setLoggingEnabled, Firestore.setLoggingEnabled),
+              FirebaseFirestore.setLoggingEnabled, FirebaseFirestore.setLoggingEnabled),
           isTrue);
     });
 
     test('doc and document agree', () {
-      final Firestore firestore = _testFirestore();
+      final FirebaseFirestore firestore = _testFirestore();
       expect(firestore.doc('rooms/a/messages/1'),
-          firestore.document('rooms/a/messages/1'));
+          firestore.doc('rooms/a/messages/1'));
       expect(firestore.doc('rooms/a').path, 'rooms/a');
       expect(firestore.doc('rooms/a').id, 'a');
     });
@@ -66,9 +66,9 @@ void main() {
   group('Settings alias of FirestoreSettings', () {
     test('constructor, statics and copyWith work through the alias', () {
       final Settings settings = Settings(persistenceEnabled: false);
-      expect(settings, isA<FirestoreSettings>());
+      expect(settings, isA<Settings>());
       expect(settings.persistenceEnabled, isFalse);
-      expect(Settings.defaultHost, FirestoreSettings.defaultHost);
+      expect(Settings.defaultHost, Settings.defaultHost);
       expect(settings.copyWith(host: 'localhost', sslEnabled: false).sslEnabled,
           isFalse);
     });
@@ -76,9 +76,9 @@ void main() {
 
   group('CollectionReference', () {
     test('doc and document agree', () {
-      final Firestore firestore = _testFirestore();
+      final FirebaseFirestore firestore = _testFirestore();
       final CollectionReference rooms = firestore.collection('rooms');
-      expect(rooms.doc('a'), rooms.document('a'));
+      expect(rooms.doc('a'), rooms.doc('a'));
       expect(rooms.doc('a').path, 'rooms/a');
       expect(rooms.doc().parent.path, 'rooms');
       expect(rooms.doc().id, hasLength(20));
@@ -87,20 +87,20 @@ void main() {
 
   group('DocumentSnapshot', () {
     test('ref and reference agree', () {
-      final Firestore firestore = _testFirestore();
+      final FirebaseFirestore firestore = _testFirestore();
       final DocumentSnapshot snapshot = DocumentSnapshotInternal.fromNoDocument(
         firestore,
         util.key('rooms/a'),
         isFromCache: false,
         hasPendingWrites: false,
       );
-      expect(snapshot.ref, snapshot.reference);
-      expect(snapshot.ref.path, 'rooms/a');
+      expect(snapshot.reference, snapshot.reference);
+      expect(snapshot.reference.path, 'rooms/a');
     });
   });
 
   group('QuerySnapshot', () {
-    QuerySnapshot snapshot(Firestore firestore) {
+    QuerySnapshot snapshot(FirebaseFirestore firestore) {
       final Document doc1Old = util.docForValue('foo/bar', 1,
           util.wrapList(<String>['a', 'b']), DocumentState.localMutations);
       final Document doc1New = util.docForValue('foo/bar', 1,
@@ -132,31 +132,31 @@ void main() {
       final QuerySnapshot querySnapshot = snapshot(_testFirestore());
       expect(querySnapshot.docs, isA<List<QueryDocumentSnapshot>>());
       expect(querySnapshot.docs.length, 2);
-      expect(querySnapshot.docs, querySnapshot.documents);
+      expect(querySnapshot.docs, querySnapshot.docs);
       expect(querySnapshot.docs.map((QueryDocumentSnapshot d) => d.id),
           <String>['bar', 'baz']);
     });
 
     test('docChanges and documentChanges agree', () {
       final QuerySnapshot querySnapshot = snapshot(_testFirestore());
-      expect(querySnapshot.docChanges, querySnapshot.documentChanges);
+      expect(querySnapshot.docChanges, querySnapshot.docChanges);
       expect(querySnapshot.docChanges.length, 1);
     });
   });
 
   group('FieldPath', () {
     test('documentIdField and documentId() agree', () {
-      expect(FieldPath.documentIdField, FieldPath.documentId());
+      expect(FieldPath.documentId, FieldPath.documentId);
       expect(
-          identical(FieldPath.documentIdField, FieldPath.documentId()), isTrue);
+          identical(FieldPath.documentId, FieldPath.documentId), isTrue);
     });
   });
 
   group('Source', () {
     test('serverAndCache is the default source', () {
-      expect(Source.serverAndCache, Source.defaultSource);
+      expect(Source.serverAndCache, Source.serverAndCache);
       expect(Source.values, <Source>[
-        Source.defaultSource,
+        Source.serverAndCache,
         Source.server,
         Source.cache,
       ]);

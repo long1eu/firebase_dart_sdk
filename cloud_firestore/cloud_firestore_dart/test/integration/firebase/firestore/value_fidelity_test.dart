@@ -38,8 +38,8 @@ void main() {
   /// Writes [data] with one client and reads it from the backend with another, so that nothing comes from a cache.
   Future<Json> throughBackend(Json data,
       {bool viaTransaction = false}) async {
-    final Firestore writer = await IntegrationTestUtil.testFirestore();
-    final Firestore reader = await IntegrationTestUtil.testFirestore();
+    final FirebaseFirestore writer = await IntegrationTestUtil.testFirestore();
+    final FirebaseFirestore reader = await IntegrationTestUtil.testFirestore();
     final DocumentReference<Json> doc =
         writer.collection('fidelity${autoId()}').doc('values');
     if (viaTransaction) {
@@ -155,7 +155,7 @@ void main() {
   }
 
   test('these values work as query bounds and in transforms', () async {
-    final Firestore firestore = await IntegrationTestUtil.testFirestore();
+    final FirebaseFirestore firestore = await IntegrationTestUtil.testFirestore();
     final CollectionReference<Json> collection =
         firestore.collection('fidelity${autoId()}');
     await collection.doc('nan').set(<String, Object?>{'v': double.nan});

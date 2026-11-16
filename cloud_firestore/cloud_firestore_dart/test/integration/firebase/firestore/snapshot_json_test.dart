@@ -60,7 +60,7 @@ void main() {
     final DocumentSnapshot<Map<String, Object?>> snapshot = await docRef.get();
     final Map<String, Object?> json = transfer(snapshot.toJson());
 
-    final Firestore other = await IntegrationTestUtil.testFirestore();
+    final FirebaseFirestore other = await IntegrationTestUtil.testFirestore();
     final DocumentSnapshot<Map<String, Object?>> fromJson =
         DocumentSnapshot<Map<String, Object?>>.fromJson(other, json);
     expect(fromJson.exists, isTrue);
@@ -75,7 +75,7 @@ void main() {
         })).withoutConverter();
     final Map<String, Object?> json = transfer((await docRef.get()).toJson());
 
-    final Firestore other = await IntegrationTestUtil.testFirestore();
+    final FirebaseFirestore other = await IntegrationTestUtil.testFirestore();
     final List<DocumentSnapshot<Map<String, Object?>>> events =
         <DocumentSnapshot<Map<String, Object?>>>[];
     final StreamSubscription<DocumentSnapshot<Map<String, Object?>>> sub = other
@@ -109,7 +109,7 @@ void main() {
       expect(snapshot.exists, isFalse);
       final Map<String, Object?> json = transfer(snapshot.toJson());
 
-      final Firestore other = await IntegrationTestUtil.testFirestore();
+      final FirebaseFirestore other = await IntegrationTestUtil.testFirestore();
       expect(
         DocumentSnapshot<Map<String, Object?>>.fromJson(other, json).exists,
         isFalse,
@@ -142,19 +142,19 @@ void main() {
           'b': <String, Object?>{'bar': 2},
         });
     final Query<Map<String, Object?>> query = collection.orderByField(
-      FieldPath.documentIdField,
+      FieldPath.documentId,
     );
     final QuerySnapshot<Map<String, Object?>> snapshot = await query.get();
     expect(snapshot.metadata.isFromCache, isFalse);
     final Map<String, Object?> json = transfer(snapshot.toJson());
 
     // A change made after the snapshot was taken, before listening resumes.
-    await collection.document('c').set(<String, Object?>{'baz': 3});
+    await collection.doc('c').set(<String, Object?>{'baz': 3});
 
     final List<String> sent = <String>[];
     final InternalLogLevel level = Log.level;
     Log.level = InternalLogLevel.d;
-    late final Firestore other;
+    late final FirebaseFirestore other;
     final List<QuerySnapshot<Map<String, Object?>>> events =
         <QuerySnapshot<Map<String, Object?>>>[];
     late final StreamSubscription<QuerySnapshot<Map<String, Object?>>> sub;
@@ -223,7 +223,7 @@ void main() {
     expect(queryListens.first, isNot(contains('resumeToken')));
 
     // Later changes are received.
-    await collection.document('a').update(<String, Object?>{'foo': 5});
+    await collection.doc('a').update(<String, Object?>{'foo': 5});
     final QuerySnapshot<Map<String, Object?>> updated = await waitFor(
       events,
       (QuerySnapshot<Map<String, Object?>> s) => s.docs.first.data['foo'] == 5,
@@ -256,7 +256,7 @@ void main() {
       (await collection.orderBy('n').withConverter(converter).get()).toJson(),
     );
 
-    final Firestore other = await IntegrationTestUtil.testFirestore();
+    final FirebaseFirestore other = await IntegrationTestUtil.testFirestore();
     expect(
       QuerySnapshot<int>.fromJson(
         other,
@@ -282,7 +282,7 @@ void main() {
   });
 
   test('QuerySnapshot error events for an invalid bundle', () async {
-    final Firestore db = await IntegrationTestUtil.testFirestore();
+    final FirebaseFirestore db = await IntegrationTestUtil.testFirestore();
     final Map<String, Object?> json = <String, Object?>{
       'bundle': 'BadData',
       'bundleName': 'bundleName',
@@ -297,7 +297,7 @@ void main() {
   });
 
   test('DocumentSnapshot error events for an invalid bundle', () async {
-    final Firestore db = await IntegrationTestUtil.testFirestore();
+    final FirebaseFirestore db = await IntegrationTestUtil.testFirestore();
     final Map<String, Object?> json = <String, Object?>{
       'bundle': 'BadData',
       'bundleName': 'coll/doc',
@@ -312,7 +312,7 @@ void main() {
   });
 
   test('resume rejects JSON of the other snapshot type', () async {
-    final Firestore db = await IntegrationTestUtil.testFirestore();
+    final FirebaseFirestore db = await IntegrationTestUtil.testFirestore();
     final Map<String, Object?> json = <String, Object?>{
       'bundle': 'BadData',
       'bundleName': 'coll/doc',
@@ -320,13 +320,13 @@ void main() {
     };
     expect(
       () => db.querySnapshotsFromJson<Map<String, Object?>>(json),
-      throwsA(isA<FirestoreError>()),
+      throwsA(isA<FirestoreException>()),
     );
     expect(
       () => db.documentSnapshotsFromJson<Map<String, Object?>>(
         <String, Object?>{'bundle': 'x', 'bundleSource': 'DocumentSnapshot'},
       ),
-      throwsA(isA<FirestoreError>()),
+      throwsA(isA<FirestoreException>()),
     );
   });
 
@@ -359,7 +359,7 @@ void main() {
       final String bundle = json['bundle']! as String;
       expect(bundle, isNotEmpty);
 
-      final Firestore other = await IntegrationTestUtil.testFirestore();
+      final FirebaseFirestore other = await IntegrationTestUtil.testFirestore();
       await other.loadBundle(utf8.encode(bundle)).future;
       final DocumentSnapshot<Map<String, Object?>> fromCache = await other
           .doc(path)

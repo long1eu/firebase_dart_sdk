@@ -354,7 +354,7 @@ void main() {
   });
 
   test('createFrom rejects a query of another database', () {
-    final Firestore other = FakeFirestore(util.dbId('other'));
+    final FirebaseFirestore other = FakeFirestore(util.dbId('other'));
     expect(() => source().createFrom(QueryInternal.create<Object?>(util.query('coll'), other)),
         throwsArgumentError);
     expect(

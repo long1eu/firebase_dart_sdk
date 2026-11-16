@@ -6,7 +6,7 @@ import '../../../util/test_hygiene.dart';
 
 FirebaseApp newApp(String name) => FirebaseApp.withOptions(
       const FirebaseOptions(
-          apiKey: 'key', applicationId: 'appId', projectId: 'projectId'),
+          apiKey: 'key', appId: 'appId', projectId: 'projectId'),
       dependencies: null,
       name: name,
     );
@@ -24,22 +24,22 @@ void main() {
     });
 
     // ignore: deprecated_member_use_from_same_package
-    final Firestore first = Firestore.getInstance(app);
-    expect(identical(Firestore.getInstance(app), first), isTrue);
+    final FirebaseFirestore first = FirebaseFirestore.getInstance(app);
+    expect(identical(FirebaseFirestore.getInstance(app), first), isTrue);
     expect(first.app, same(app));
     expect(first.app, same(first.firebaseApp));
 
     // Repeated calls return the same instance.
-    final List<Firestore> both = <Firestore>[
-      Firestore.getInstance(other),
-      Firestore.getInstance(other),
+    final List<FirebaseFirestore> both = <FirebaseFirestore>[
+      FirebaseFirestore.getInstance(other),
+      FirebaseFirestore.getInstance(other),
     ];
     expect(identical(both[0], both[1]), isTrue);
     expect(identical(both[0], first), isFalse);
 
-    final Firestore named = Firestore.getInstance(app, database: 'db2');
+    final FirebaseFirestore named = FirebaseFirestore.getInstance(app, databaseId: 'db2');
     expect(identical(named, first), isFalse);
-    expect(identical(Firestore.getInstance(app, database: 'db2'), named),
+    expect(identical(FirebaseFirestore.getInstance(app, databaseId: 'db2'), named),
         isTrue);
   });
 
@@ -47,16 +47,16 @@ void main() {
     final FirebaseApp app = newApp('cacheTestShutdownApp');
     addTearDown(app.delete);
 
-    final Firestore first = Firestore.getInstance(app);
-    await first.shutdown();
-    final Firestore second = Firestore.getInstance(app);
+    final FirebaseFirestore first = FirebaseFirestore.getInstance(app);
+    await first.terminate();
+    final FirebaseFirestore second = FirebaseFirestore.getInstance(app);
     expect(identical(second, first), isFalse);
-    await second.shutdown();
+    await second.terminate();
   });
 
   test('deleting the app shuts its instances down', () async {
     final FirebaseApp app = newApp('cacheTestDeleteApp');
-    final Firestore first = Firestore.getInstance(app);
+    final FirebaseFirestore first = FirebaseFirestore.getInstance(app);
     app.delete();
     await Future<void>.delayed(const Duration(milliseconds: 50));
     expect(() => first.collection('a').get(), throwsA(anything));

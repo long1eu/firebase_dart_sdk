@@ -53,7 +53,7 @@ void main() {
       expect(AggregateField.count(), AggregateField.count());
       expect(AggregateField.sum('a'), AggregateField.sum('a'));
       expect(AggregateField.sum('a'),
-          AggregateField.sumField(api.FieldPath.of(<String>['a'])));
+          AggregateField.sumField(api.FieldPath(<String>['a'])));
       expect(AggregateField.sum('a'), isNot(AggregateField.sum('b')));
       expect(AggregateField.sum('a'), isNot(AggregateField.average('a')));
       expect(AggregateField.count(), isNot(AggregateField.sum('a')));
@@ -82,7 +82,7 @@ void main() {
           <AggregateField>[
             AggregateField.sum('a.b'),
             AggregateField.average('c'),
-            AggregateField.sumField(api.FieldPath.of(<String>['d.e', 'f g'])),
+            AggregateField.sumField(api.FieldPath(<String>['d.e', 'f g'])),
           ],
           aliases);
 

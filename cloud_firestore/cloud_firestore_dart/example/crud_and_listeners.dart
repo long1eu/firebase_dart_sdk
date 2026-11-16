@@ -9,7 +9,7 @@ import 'package:cloud_firestore_dart/cloud_firestore_dart.dart';
 import 'common.dart';
 
 Future<void> main() async {
-  final Firestore firestore = connect();
+  final FirebaseFirestore firestore = connect();
   final CollectionReference<Map<String, Object?>> cities = firestore.collection(
     scratch('cities'),
   );
@@ -20,7 +20,7 @@ Future<void> main() async {
       cities.snapshots.listen((QuerySnapshot<Map<String, Object?>> snapshot) {
         for (final DocumentChange<Map<String, Object?>> change
             in snapshot.docChanges) {
-          print('listener: ${change.type.name} ${change.document.id}');
+          print('listener: ${change.type.name} ${change.doc.id}');
         }
       });
 

@@ -16,14 +16,14 @@ void main() {
     // JS: `${name}: [code=${code}]: ${message}`, with the name of the code
     // in this SDK.
     expect(
-      FirestoreError(
+      FirestoreException(
         'Missing permissions',
         FirestoreErrorCode.permissionDenied,
       ).toString(),
       'FirestoreError: [code=permissionDenied]: Missing permissions',
     );
     expect(
-      FirestoreError(
+      FirestoreException(
         'Failed',
         FirestoreErrorCode.unavailable,
         StateError('cause'),

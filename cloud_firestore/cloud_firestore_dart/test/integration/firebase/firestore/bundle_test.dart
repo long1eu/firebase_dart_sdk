@@ -59,7 +59,7 @@ void main() {
         '{"integerValue":2}}}}',
   ];
 
-  late Firestore db;
+  late FirebaseFirestore db;
 
   setUp(() async {
     db = await IntegrationTestUtil.testFirestore();
@@ -105,28 +105,28 @@ void main() {
       <String, Object?>{'bar': 2, 'k': '\u{1F60A}'},
     ]);
 
-    final Query? limitQuery = await db.getNamedQuery('limit');
+    final Query? limitQuery = await db.namedQuery('limit');
     expect(limitQuery, isNotNull);
     expect(await cachedValues(limitQuery!), <Map<String, Object?>>[
       <String, Object?>{'bar': 2, 'k': '\u{1F60A}'},
     ]);
 
-    expect(await db.getNamedQuery('does-not-exist'), isNull);
+    expect(await db.namedQuery('does-not-exist'), isNull);
   }
 
-  void verifySuccessProgress(LoadBundleTaskProgress progress) {
+  void verifySuccessProgress(LoadBundleTaskSnapshot progress) {
     expect(progress.taskState, LoadBundleTaskState.success);
     expect(progress.bytesLoaded, progress.totalBytes);
     expect(progress.documentsLoaded, progress.totalDocuments);
   }
 
   test('testLoadDocumentsWithProgressUpdates', () async {
-    final List<LoadBundleTaskProgress> progressEvents =
-        <LoadBundleTaskProgress>[];
+    final List<LoadBundleTaskSnapshot> progressEvents =
+        <LoadBundleTaskSnapshot>[];
 
     final LoadBundleTask bundleTask = db.loadBundle(createBundle());
     final Future<void> done = bundleTask.stream.forEach(progressEvents.add);
-    final LoadBundleTaskProgress result = await bundleTask.future;
+    final LoadBundleTaskSnapshot result = await bundleTask.future;
     await done;
 
     expect(progressEvents.length, 4);
@@ -147,7 +147,7 @@ void main() {
   // JS bundle.test.ts "load with documents and queries with promise
   // interface": only the Future, nobody listens to the progress.
   test('testLoadWithDocumentsAndQueriesWithFutureInterface', () async {
-    final LoadBundleTaskProgress result = await db
+    final LoadBundleTaskSnapshot result = await db
         .loadBundle(createBundle())
         .future;
     verifySuccessProgress(result);
@@ -162,7 +162,7 @@ void main() {
         bundle.sublist(i, i + 37 > bundle.length ? bundle.length : i + 37),
     ]);
 
-    final LoadBundleTaskProgress result = await db
+    final LoadBundleTaskSnapshot result = await db
         .loadBundleStream(chunks)
         .future;
     verifySuccessProgress(result);
@@ -174,8 +174,8 @@ void main() {
     final List<int> bundle = createBundle();
     await db.loadBundle(bundle).future;
 
-    final List<LoadBundleTaskProgress> progressEvents =
-        <LoadBundleTaskProgress>[];
+    final List<LoadBundleTaskSnapshot> progressEvents =
+        <LoadBundleTaskSnapshot>[];
     final LoadBundleTask secondLoad = db.loadBundle(bundle);
     final Future<void> done = secondLoad.stream.forEach(progressEvents.add);
     await secondLoad.future;
@@ -189,10 +189,10 @@ void main() {
   });
 
   test('testLoadWithDocumentsThatAreAlreadyPulledFromBackend', () async {
-    await db.document('coll-1/a').set(<String, Object?>{'bar': 'newValueA'});
-    await db.document('coll-1/b').set(<String, Object?>{'bar': 'newValueB'});
+    await db.doc('coll-1/a').set(<String, Object?>{'bar': 'newValueA'});
+    await db.doc('coll-1/b').set(<String, Object?>{'bar': 'newValueB'});
 
-    final LoadBundleTaskProgress result = await db
+    final LoadBundleTaskSnapshot result = await db
         .loadBundle(createBundle())
         .future;
     verifySuccessProgress(result);
@@ -205,8 +205,8 @@ void main() {
   });
 
   test('testLoadWithDocumentsFromOtherProjectFails', () async {
-    final List<LoadBundleTaskProgress> progressEvents =
-        <LoadBundleTaskProgress>[];
+    final List<LoadBundleTaskSnapshot> progressEvents =
+        <LoadBundleTaskSnapshot>[];
     final LoadBundleTask bundleTask = db.loadBundle(
       createBundle('other-project'),
     );
@@ -215,8 +215,8 @@ void main() {
     await expectLater(
       bundleTask.future,
       throwsA(
-        isA<FirestoreError>().having(
-          (FirestoreError e) => e.code,
+        isA<FirestoreException>().having(
+          (FirestoreException e) => e.code,
           'code',
           FirestoreErrorCode.invalidArgument,
         ),
@@ -236,9 +236,9 @@ void main() {
   });
   test('testLoadedDocumentsShouldNotBeGarbageCollectedRightAway', () async {
     // Only meaningful with memory persistence (SQLite only ever deletes lazily): use a memory cache with eager GC.
-    final FirestoreSettings base = IntegrationTestUtil.newTestSettings();
+    final Settings base = IntegrationTestUtil.newTestSettings();
     db = await IntegrationTestUtil.testFirestore(
-      FirestoreSettings(
+      Settings(
         host: base.host,
         port: base.port,
         sslEnabled: base.sslEnabled,
@@ -246,7 +246,7 @@ void main() {
       ),
     );
 
-    final LoadBundleTaskProgress result = await db
+    final LoadBundleTaskSnapshot result = await db
         .loadBundle(createBundle())
         .future;
     verifySuccessProgress(result);

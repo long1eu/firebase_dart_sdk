@@ -27,7 +27,7 @@ Future<int> deleteCollection(
     }
     final WriteBatch batch = collection.firestore.batch();
     for (final QueryDocumentSnapshot<Map<String, Object?>> doc in page) {
-      batch.delete(doc.ref);
+      batch.delete(doc.reference);
     }
     await batch.commit();
     deleted += page.length;
@@ -35,7 +35,7 @@ Future<int> deleteCollection(
 }
 
 Future<void> main() async {
-  final Firestore firestore = connect();
+  final FirebaseFirestore firestore = connect();
   final CollectionReference<Map<String, Object?>> logs = firestore.collection(
     scratch('logs'),
   );

@@ -19,9 +19,9 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/firestore_settings.d
 ///
 /// Note: this class is experimental and may change in any release.
 ///
-/// See [FirestoreSettings.experimentalAutoDetectLongPolling],
-/// [FirestoreSettings.experimentalForceLongPolling] and
-/// [FirestoreSettings.experimentalLongPollingOptions].
+/// See [Settings.webExperimentalAutoDetectLongPolling],
+/// [Settings.webExperimentalForceLongPolling] and
+/// [Settings.webExperimentalLongPollingOptions].
 ///
 /// ```dart
 /// final FirestoreSettings settings = FirestoreSettings(
@@ -34,14 +34,14 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/firestore_settings.d
 ///
 /// Only the web transport uses these options; the gRPC transport ignores
 /// them.
-class ExperimentalLongPollingOptions {
+class WebExperimentalLongPollingOptions {
   /// Creates long-polling options. Without [timeoutSeconds] the default
   /// timeout of 30 seconds applies.
-  const ExperimentalLongPollingOptions({this.timeoutSeconds});
+  const WebExperimentalLongPollingOptions({this.timeoutSeconds});
 
   /// The longest time, in seconds, that the backend should hold a
   /// long-polling request open before it answers. Valid values are between 5
-  /// and 30, inclusive (checked by [FirestoreSettings]); fractions are rounded
+  /// and 30, inclusive (checked by [Settings]); fractions are rounded
   /// to the nearest millisecond.
   ///
   /// By default the hanging request of long polling times out after 30
@@ -51,14 +51,14 @@ class ExperimentalLongPollingOptions {
   /// https://github.com/firebase/firebase-js-sdk/issues/6987.
   ///
   /// Only the web transport uses this, and only while it long-polls
-  /// ([FirestoreSettings.experimentalForceLongPolling], or a buffering proxy
-  /// that [FirestoreSettings.experimentalAutoDetectLongPolling] detected).
+  /// ([Settings.webExperimentalForceLongPolling], or a buffering proxy
+  /// that [Settings.webExperimentalAutoDetectLongPolling] detected).
   final num? timeoutSeconds;
 
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is ExperimentalLongPollingOptions &&
+      other is WebExperimentalLongPollingOptions &&
           timeoutSeconds == other.timeoutSeconds;
 
   @override

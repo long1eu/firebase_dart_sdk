@@ -141,13 +141,13 @@ FunctionExpression switchOn(
 Future<CollectionReference<Map<String, Object?>>> testCollectionWithDocs(
   Map<String, Object?> docs,
 ) async {
-  final Firestore firestore =
+  final FirebaseFirestore firestore =
       await IntegrationTestUtil.testEnterpriseFirestore();
   final CollectionReference<Map<String, Object?>> collection = firestore
       .collection('test-collection_${autoId()}');
   for (final MapEntry<String, Object?> doc in docs.entries) {
     await collection
-        .document(doc.key)
+        .doc(doc.key)
         .set((doc.value! as Map<Object?, Object?>).cast<String, Object?>());
   }
   return collection;
