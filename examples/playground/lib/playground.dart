@@ -13,7 +13,7 @@ import 'package:firebase_app_dart/firebase_app_dart.dart';
 /// the client never sends a request with them (see [openOffline]).
 const FirebaseOptions playgroundOptions = FirebaseOptions(
   apiKey: 'demo-key',
-  applicationId: '1:1234567890:web:playground',
+  appId: '1:1234567890:web:playground',
   projectId: 'demo-playground',
 );
 
@@ -25,15 +25,13 @@ const List<String> playgroundCollections = <String>['cities', 'tasks'];
 ///
 /// The client starts its network on its own queue when it is created, but it
 /// opens a stream only for a listener or a pending write. Both are queued
-/// behind [Firestore.disableNetwork] here, so no stream is ever opened and no
-/// request is ever made. A memory cache starts empty, so there is no pending
-/// write from an earlier visit that the start could try to send.
-Future<Firestore> openOffline(FirebaseApp app) async {
-  final Firestore firestore = Firestore.instanceFor(
+/// behind [FirebaseFirestore.disableNetwork] here, so no stream is ever opened
+/// and no request is ever made. A memory cache starts empty, so there is no
+/// pending write from an earlier visit that the start could try to send.
+Future<FirebaseFirestore> openOffline(FirebaseApp app) async {
+  final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(
     app: app,
-    settings: FirestoreSettings().copyWith(
-      cacheSettings: const MemoryCacheSettings(),
-    ),
+    settings: Settings().copyWith(cacheSettings: const MemoryCacheSettings()),
   );
   await firestore.disableNetwork();
   return firestore;
@@ -83,12 +81,22 @@ class QuerySpec {
 
   /// The query on [firestore]. Throws what the client throws for a query it
   /// does not accept (an [ArgumentError] for an invalid field, for example).
-  Query<Map<String, Object?>> build(Firestore firestore) {
+  Query<Map<String, Object?>> build(FirebaseFirestore firestore) {
     Query<Map<String, Object?>> query = firestore.collection(collection);
     if (_hasWhere) {
       final Object? value = parseValue(whereValue);
       query = switch (op) {
         WhereOp.none => query,
+        // A null argument counts as not given: == null and != null are
+        // isNull: true and isNull: false.
+        WhereOp.isEqualTo when value == null => query.where(
+          whereField,
+          isNull: true,
+        ),
+        WhereOp.isNotEqualTo when value == null => query.where(
+          whereField,
+          isNull: false,
+        ),
         WhereOp.isEqualTo => query.where(whereField, isEqualTo: value),
         WhereOp.isNotEqualTo => query.where(whereField, isNotEqualTo: value),
         WhereOp.isLessThan => query.where(whereField, isLessThan: value),
@@ -105,10 +113,7 @@ class QuerySpec {
       };
     }
     if (orderField.isNotEmpty) {
-      query = query.orderBy(
-        orderField,
-        descending ? Direction.descending : Direction.ascending,
-      );
+      query = query.orderBy(orderField, descending: descending);
     }
     final int? max = limit;
     if (max != null) {
@@ -123,22 +128,27 @@ class QuerySpec {
       "firestore\n    .collection('$collection')",
     );
     if (_hasWhere) {
+      final Object? value = parseValue(whereValue);
       code.write(
-        "\n    .where('$whereField', ${op.name}: "
-        '${_dartLiteral(parseValue(whereValue))})',
+        "\n    .where('$whereField', "
+        '${switch (op) {
+          WhereOp.isEqualTo when value == null => 'isNull: true',
+          WhereOp.isNotEqualTo when value == null => 'isNull: false',
+          _ => '${op.name}: ${_dartLiteral(value)}',
+        }})',
       );
     }
     if (orderField.isNotEmpty) {
       code.write(
         "\n    .orderBy('$orderField'"
-        '${descending ? ', Direction.descending' : ''})',
+        '${descending ? ', descending: true' : ''})',
       );
     }
     if (limit != null) {
       code.write('\n    .limit($limit)');
     }
     code.write(
-      '\n    .getSnapshots(MetadataChanges.include)\n    .listen(...);',
+      '\n    .snapshots(includeMetadataChanges: true)\n    .listen(...);',
     );
     return code.toString();
   }

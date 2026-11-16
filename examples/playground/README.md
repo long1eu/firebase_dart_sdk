@@ -13,7 +13,8 @@ What you can do:
 - Add, edit and delete documents in two collections, `cities` and `tasks`, or add sample data
   in one batch.
 - Build a query (a collection, one where clause, one orderBy, a limit) and listen to it. The
-  page shows the Dart code of the listener.
+  page shows the Dart code of the listener. A where value of `null` with `==` or `!=` becomes
+  `isNull: true` or `isNull: false`: the client takes a null comparison only that way.
 - Watch each snapshot arrive: the documents it added, modified or removed, and its
   `isFromCache` and `hasPendingWrites` flags.
 - See the writes that wait for a server. There is none, so every write stays in that queue and
@@ -53,7 +54,7 @@ flowchart LR
 
 `lib/playground.dart` opens the instance (`openOffline`):
 
-1. `Firestore.instanceFor` with `MemoryCacheSettings`. The client starts its network on its own
+1. `FirebaseFirestore.instanceFor` with `MemoryCacheSettings`. The client starts its network on its own
    queue, but it opens a stream only for a listener or a pending write, and there is none yet.
 2. `disableNetwork()`, queued right behind the start. Every listener and write of the page is
    queued after it, so no stream is ever opened.
@@ -126,12 +127,12 @@ a newer build.
 
 ## Sizes
 
-Measured with Dart 3.12.2 and `-O2`; gzipped with `gzip -9`.
+Measured with Dart 3.12.2 and `-O2`, with `cloud_firestore_dart` 0.2.0; gzipped with `gzip -9`.
 
 | File | Bytes | Gzipped |
 | --- | ---: | ---: |
-| `main.dart.js` | 680,865 | 207,234 |
-| `main.wasm` + `main.mjs` | 631,009 + 17,411 | 244,953 + 4,554 |
+| `main.dart.js` | 685,722 | 208,214 |
+| `main.wasm` + `main.mjs` | 635,537 + 17,411 | 245,805 + 4,554 |
 | `index.html` + `styles.css` + `bootstrap.js` + `favicon.svg` | 15,754 | 5,323 |
 
 ## Status
@@ -141,6 +142,11 @@ Measured with Dart 3.12.2 and `-O2`; gzipped with `gzip -9`.
   sub-path: sample data, an edit, a new document, a delete, a where clause, an invalid field
   path, and **Reset**. The network log showed only the page's own files, and the console stayed
   empty, also for 8 seconds after the last action.
+- Run again the same way with version 0.2.0 of the packages (Chrome 157, both builds, under
+  `/firebase_dart_sdk/`), adding a where clause on `null` (`isNull: false` in the code shown):
+  the network log had only the page's own files (5 requests for the dart2js build, 6 for
+  dart2wasm, all to the page's origin), and the console stayed empty. The two screenshots above
+  were taken then, from the dart2js build at 1280 and 390 pixels wide.
 - Not tried in other browsers, and not yet published anywhere.
 
 ## Dependencies

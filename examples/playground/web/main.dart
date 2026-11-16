@@ -17,7 +17,7 @@ import 'package:web/web.dart' as web;
 const int _maxEvents = 60;
 
 late final FirebaseApp _app;
-late Firestore _firestore;
+late FirebaseFirestore _firestore;
 
 /// Bumped by a reset: callbacks of the instance before it do nothing.
 int _generation = 0;
@@ -112,7 +112,7 @@ void _listen() {
   );
   final int generation = _generation;
   _subscription = query
-      .getSnapshots(MetadataChanges.include)
+      .snapshots(includeMetadataChanges: true)
       .listen(
         (QuerySnapshot<Map<String, Object?>> snapshot) {
           if (generation == _generation) {
@@ -133,8 +133,8 @@ void _onSnapshot(QuerySnapshot<Map<String, Object?>> snapshot) {
   _renderDocuments(snapshot);
   final List<String> changes = <String>[
     for (final DocumentChange<Map<String, Object?>> change
-        in snapshot.getDocumentChanges(MetadataChanges.include))
-      '${change.type.name} ${change.document.ref.path}'
+        in snapshot.docChanges)
+      '${change.type.name} ${change.doc.reference.path}'
           '${change.type == DocumentChangeType.removed ? '' : ' at ${change.newIndex}'}',
   ];
   _logEvent(
@@ -177,12 +177,12 @@ void _renderDocuments(QuerySnapshot<Map<String, Object?>> snapshot) {
 }
 
 web.Element _card(QueryDocumentSnapshot<Map<String, Object?>> doc) {
-  final String path = doc.ref.path;
+  final String path = doc.reference.path;
   // A server timestamp the backend has not set yet reads as null; `estimate`
   // gives the local time instead.
-  final Map<String, Object?> raw = doc.getData(ServerTimestampBehavior.none);
-  final Map<String, Object?> data = doc.getData(
-    ServerTimestampBehavior.estimate,
+  final Map<String, Object?> raw = doc.data();
+  final Map<String, Object?> data = doc.data(
+    serverTimestamps: ServerTimestampBehavior.estimate,
   );
   final web.Element card = _element('li', className: 'card');
   final web.Element header = _element('div', className: 'card-head')
@@ -210,10 +210,12 @@ web.Element _card(QueryDocumentSnapshot<Map<String, Object?>> doc) {
   }
   card.append(fields);
   final web.HTMLButtonElement edit = _button('Edit', 'Edit $path')
-    ..onClick.listen((_) => _edit(doc.ref, raw));
+    ..onClick.listen((_) => _edit(doc.reference, raw));
   final web.HTMLButtonElement delete = _button('Delete', 'Delete $path')
     ..className = 'danger'
-    ..onClick.listen((_) => _track('delete', <String>[path], doc.ref.delete()));
+    ..onClick.listen(
+      (_) => _track('delete', <String>[path], doc.reference.delete()),
+    );
   card.append(
     _element('div', className: 'actions')
       ..append(edit)
