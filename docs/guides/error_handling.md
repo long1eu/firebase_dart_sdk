@@ -43,6 +43,33 @@ try {
 
 ## Where errors arrive
 
+The picture shows the two kinds of failure for the four common calls: a lost connection mostly does not
+reach your code, a rejection by the backend does. The table below has every call.
+
+```mermaid
+flowchart LR
+  accTitle: Where a lost connection and a rejection surface
+  accDescr: When the connection is lost, a write future waits and the write is sent again later, a listener gets snapshots from the cache with isFromCache true, get answers from the cache or fails with unavailable if the document is not cached, and a transaction attempt fails with unavailable and is retried up to maxAttempts. When the backend rejects the call, a write future fails and the change is rolled back in the cache, a listener gets onError and its stream closes, get fails, and a transaction fails unless the code is one that starts a new attempt.
+  lost["Connection lost or<br/>backend unreachable"]
+  rejected["The backend rejects the call<br/>(permissionDenied, notFound, ...)"]
+  lostWrite["write: the future waits,<br/>the write is sent again later"]
+  lostListen["listener: snapshots from the cache,<br/>isFromCache true"]
+  lostGet["get(): answered from the cache,<br/>unavailable if not cached"]
+  lostTx["transaction: the attempt fails with unavailable,<br/>retried up to maxAttempts"]
+  rejWrite["write: the future fails,<br/>the change is rolled back in the cache"]
+  rejListen["listener: onError,<br/>then the stream closes"]
+  rejGet["get(): the future fails"]
+  rejTx["transaction: the future fails, unless<br/>the code starts a new attempt"]
+  lost --> lostWrite
+  lost --> lostListen
+  lost --> lostGet
+  lost --> lostTx
+  rejected --> rejWrite
+  rejected --> rejListen
+  rejected --> rejGet
+  rejected --> rejTx
+```
+
 | Call | How it fails |
 |---|---|
 | `set`, `update`, `delete`, `WriteBatch.commit`, `runBatch` | the future fails when the backend **rejects** the write. It does not fail while the client is offline: it waits. See [Writes while offline](#writes-while-offline). |
@@ -110,6 +137,27 @@ future fails only for the "permanent" codes (`invalidArgument`, `notFound`, `alr
 `permissionDenied`, `failedPrecondition`, `outOfRange`, `unimplemented`, `dataLoss`), never for
 `aborted`. A listen is rejected only when the backend removes its target with an error (permission
 denied, a missing index).
+
+The same rule as a decision tree, from the error the backend sends to what your code sees:
+
+```mermaid
+flowchart TD
+  accTitle: What the client does with an error of a listen or write stream
+  accDescr: When the write stream fails while a write is in flight and the code is invalidArgument, notFound, alreadyExists, permissionDenied, failedPrecondition, outOfRange, unimplemented or dataLoss, the write is dropped, rolled back in the cache and its future fails. For any other code, including aborted, the stream reconnects with backoff and sends the write again. When the listen stream fails, it reconnects with backoff for every code and listeners keep their subscription. When the backend removes a listen target with an error, the listener gets onError and closes.
+  writeErr["The write stream fails<br/>while a write is in flight"]
+  permanent{"invalidArgument, notFound, alreadyExists,<br/>permissionDenied, failedPrecondition, outOfRange,<br/>unimplemented or dataLoss?"}
+  dropped["The write is dropped and rolled back,<br/>its future fails"]
+  resent["Reconnect with backoff,<br/>the write is sent again"]
+  listenErr["The listen stream fails"]
+  relisten["Reconnect with backoff, for every code,<br/>the listeners stay subscribed"]
+  targetErr["The backend removes a listen target<br/>with an error"]
+  closed["The listener gets onError<br/>and its stream closes"]
+  writeErr --> permanent
+  permanent -- yes --> dropped
+  permanent -- "no, also aborted" --> resent
+  listenErr --> relisten
+  targetErr --> closed
+```
 
 ## Writes while offline
 
@@ -215,6 +263,31 @@ at least 1). The rule is in `core/transaction_runner.dart`:
   connection each attempt fails with `unavailable`; with the default of 5 attempts the future
   fails after the four waits in between, about 8 seconds give or take the random part (9 seconds
   in one run against a closed port).
+
+One attempt and what decides whether another one follows:
+
+```mermaid
+flowchart TD
+  accTitle: How runTransaction decides to retry
+  accDescr: Each attempt runs the callback and commits. On success the future completes with the result. An exception from the callback that is not a FirestoreError fails the future at once. For a FirestoreError the client checks whether the code is retryable, aborted, alreadyExists, failedPrecondition or a temporary code for read-write transactions and only a temporary code for read-only ones, and whether attempts are left and the instance is not terminated. If so it waits with backoff and runs another attempt, otherwise the future fails with the error.
+  attempt["Attempt: run the callback, then commit"]
+  outcome{"Result?"}
+  success["The future completes<br/>with the callback's result"]
+  thrown["The future fails<br/>with that exception"]
+  retryable{"Retryable code?<br/>read-write: aborted, alreadyExists,<br/>failedPrecondition or a temporary code<br/>read-only: a temporary code"}
+  left{"Attempts left and<br/>instance not terminated?"}
+  wait["Wait: 1 s, then 1.5 times longer,<br/>give or take half"]
+  failed["The future fails<br/>with this error"]
+  attempt --> outcome
+  outcome -- "it succeeded" --> success
+  outcome -- "your callback threw, not a FirestoreError" --> thrown
+  outcome -- "a FirestoreError" --> retryable
+  retryable -- no --> failed
+  retryable -- yes --> left
+  left -- no --> failed
+  left -- yes --> wait
+  wait --> attempt
+```
 
 When all attempts are used up the future fails with the error of the last one: for a conflict,
 `aborted` or `failedPrecondition` (the emulator answers `failedPrecondition`). Run the transaction
