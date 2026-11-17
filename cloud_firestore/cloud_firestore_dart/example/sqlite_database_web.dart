@@ -51,13 +51,14 @@
 //    file system of package:sqlite3 copies its files, the rollback journal
 //    included, to IndexedDB in the background, in the order SQLite wrote them
 //    and one IndexedDB transaction per file. This opener waits for the copies
-//    at the end of every transaction, so what a write future acknowledged is
-//    stored. With OPFS, SQLite writes its journal and its database file
+//    at the end of every transaction (`_flushAll`), so what a write future
+//    acknowledged is stored. With OPFS, SQLite writes its journal and its database file
 //    itself and flushes them at the end of every transaction, as on disk. A
 //    tab that dies in the middle of a transaction leaves a journal behind and
 //    SQLite rolls that transaction back on the next open; the setup of a new
 //    or upgraded cache is one transaction as well. Tested by killing a worker
-//    at random moments (test/browser, 2700 kills on IndexedDB, 1500 on OPFS):
+//    at random moments (test/browser, with sqlite3 2.9.4 2700 kills on
+//    IndexedDB and 1500 on OPFS, with 3.9.1 900 on IndexedDB and 900 on OPFS):
 //    the database always passed `PRAGMA integrity_check`, had every
 //    acknowledged transaction, and at most one that was not acknowledged yet.
 //    Not covered: a crash of the browser itself or a power cut.
@@ -258,7 +259,7 @@ OpenDatabase sqliteWebOpener({
         }
         rethrow;
       }
-      await fileSystem.flush();
+      await _flushAll(fileSystem);
 
       await onOpen?.call(db);
       return db;
@@ -398,6 +399,41 @@ class _ReadCopyFile implements sqlite.VirtualFileSystemFile {
   void xUnlock(int mode) => _inner.xUnlock(mode);
 }
 
+/// Waits until every write that [fileSystem] was given before this call is
+/// stored in IndexedDB. What a write future acknowledges rests on it.
+///
+/// One `flush()` is not enough with every sqlite3 version, so this calls it
+/// twice. Why two calls are enough, from the source of
+/// `IndexedDbFileSystem.flush()` and its work queue:
+///
+///  * 2.7.3 to 3.3.4: `flush()` adds a no-op item to the end of a queue that runs one
+///    item at a time, in order, and returns that item's future: it completes
+///    after every write queued before it. The first call is enough; the
+///    second costs one more turn of the queue.
+///  * 3.6.0 to 3.9.1: the queued writes are written in batches, one batch at a
+///    time. `flush()` returns the batch being written, or, when none is,
+///    starts one with every queued write and returns it. Writes queued while a
+///    batch is being written wait for the next batch, which the first call
+///    does not wait for: this is the bug that lost acknowledged transactions
+///    when a tab was killed. When a batch is done, its completion handler
+///    moves every queued write into the next batch and starts it before the
+///    future of the first call completes. So the second call returns the
+///    batch with the remaining writes, or, if that batch is done too, a later
+///    batch or nothing to wait for.
+///  * 3.4.0 to 3.5.2: `flush()` returns at once while a batch is being
+///    written, without waiting for it. No number of calls is enough there,
+///    and the file system has no other way to wait; do not use these
+///    versions with the IndexedDB storage (see the README).
+///
+/// A loop until nothing is pending is not possible: the file system does not
+/// say whether writes are pending. Check this again before allowing a sqlite3
+/// version whose `flush()` changed; the crash test in test/browser of the
+/// repository catches a wait that is too short.
+Future<void> _flushAll(sqlite.IndexedDbFileSystem fileSystem) async {
+  await fileSystem.flush();
+  await fileSystem.flush();
+}
+
 /// The databases of this page that are being closed, by storage name.
 final Map<String, Future<void>> _closing = <String, Future<void>>{};
 
@@ -520,7 +556,7 @@ class SqliteWebDatabase implements ClearableDatabase, ExclusiveDatabase {
       return;
     }
     try {
-      await _fileSystem.flush();
+      await _flushAll(_fileSystem);
       _unstored = null;
     } catch (e) {
       _unstored = e;
@@ -534,7 +570,7 @@ class SqliteWebDatabase implements ClearableDatabase, ExclusiveDatabase {
       return;
     }
     try {
-      await _fileSystem.flush();
+      await _flushAll(_fileSystem);
       _unstored = null;
     } catch (e) {
       _unstored = e;

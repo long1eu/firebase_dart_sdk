@@ -1,3 +1,24 @@
+## 0.1.1
+
+- **Fix: the IndexedDB storage in a browser could lose acknowledged writes with `sqlite3` 3.x.**
+  Affected: browser apps on 0.1.0 that use the IndexedDB storage (`sqliteOpener()` without
+  `opfsWorker`, or with it in a browser without synchronous OPFS in workers) and resolve
+  `sqlite3` 3.4.0 or later (pub picks the newest 3.x on Dart 3.10 or later). When the tab was
+  killed or crashed shortly after a write, that write could be missing on the next page load
+  although its future had completed. Lost were whole transactions at the end, never a part of
+  one: the database stayed intact. The opener waited for the IndexedDB file system of `sqlite3`
+  with one `flush()`, which since `sqlite3` 3.6.0 returns when the batch of writes in progress is
+  stored, not the writes queued behind it. It now waits for those too (see the README for what
+  each `sqlite3` version does). Not affected: `sqlite3` 2.7.3 to 3.3.4, the OPFS storage, the
+  Dart VM and Flutter.
+- `sqlite3` 3.4.0 to 3.5.2 cannot be made safe this way: their `flush()` does not wait at all
+  while writes are in progress. Do not use them with the IndexedDB storage; pub only picks them
+  when you pin them.
+- With `sqlite3` 3.x a write transaction on the IndexedDB storage now waits for IndexedDB, which
+  it did not before: in Chrome the median went from 0.6 to 1.3 ms to 1.2 to 1.7 ms per
+  transaction (`tool/web_storage_benchmark` of the repository, noisy). With 2.x the extra
+  `flush()` made no measurable difference.
+
 ## 0.1.0
 
 First version, for `cloud_firestore_dart` 0.2 (`FirebaseFirestore`, `Settings`,

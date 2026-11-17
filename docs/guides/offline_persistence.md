@@ -78,7 +78,9 @@ final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(
 );
 ```
 
-It works with `sqlite3` 2.7.3 to 3.x. With 3.x (Dart 3.10 and later) `sqlite3` bundles SQLite
+It works with `sqlite3` 2.7.3 to 3.x, except 3.4.0 to 3.5.2 in a browser with the IndexedDB
+storage; in a browser with 3.x use `cloud_firestore_dart_sqlite` 0.1.1 or later (0.1.0 could lose
+writes acknowledged just before the tab died, see its CHANGELOG). With 3.x (Dart 3.10 and later) `sqlite3` bundles SQLite
 itself and nothing else is needed; with 2.x a Flutter app adds `sqlite3_flutter_libs: ^0.5.0`
 and a Linux server needs `libsqlite3.so`. Its README has the details per platform.
 
@@ -248,7 +250,8 @@ What to know (all measured in Chrome against the emulator; other browsers are un
   `openWithMemoryFallback` of `cloud_firestore_dart_sqlite` waits for a first operation that only
   reads the cache, and on `failedPrecondition` terminates that instance and creates one with a
   memory cache.
-- **Crash safety.** What a write future acknowledged is stored. A tab that dies in the middle
+- **Crash safety.** What a write future acknowledged is stored (with
+  `cloud_firestore_dart_sqlite` 0.1.1 or later; see above for the `sqlite3` versions). A tab that dies in the middle
   of a transaction loses only that transaction. A crash of the browser itself or a power cut is
   not covered.
 - **Memory.** With IndexedDB the whole database is read into memory when it is opened (about

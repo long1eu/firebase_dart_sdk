@@ -7,12 +7,16 @@ pending writes kept while offline, data read without a network after the app sta
 on top of [`sqlite3`](https://pub.dev/packages/sqlite3). It is not affiliated with or endorsed by Google or
 Firebase.
 
-> **Status: 0.1.0.** The openers were the `example/` files of `cloud_firestore_dart` 0.1.1 that
-> apps had to copy; the code is the same. The browser storage is **experimental**. Run on macOS
-> (Dart VM, `sqlite3` 2.9.4 and 3.9.1) and in headless Chrome (dart2js and dart2wasm, `sqlite3`
-> 2.9.4), against the FirebaseFirestore emulator, and in one Flutter Linux desktop app (Debian 13
-> x86_64, `sqlite3` 3.5.2, a cache read back after a restart, 2026-11-16). Not run on Windows, Android
-> or iOS, or in Safari or Firefox.
+> **Status: 0.1.1.** The openers were the `example/` files of `cloud_firestore_dart` 0.1.1 that
+> apps had to copy. The browser storage is **experimental**. Run on macOS (Dart VM, `sqlite3`
+> 2.9.4 and 3.9.1) and in headless Chrome (dart2js and dart2wasm, `sqlite3` 2.9.4 and 3.9.1),
+> against the Firestore emulator, and in one Flutter Linux desktop app (Debian 13 x86_64,
+> `sqlite3` 3.5.2, a cache read back after a restart, 2026-11-16). Not run on Windows, Android or
+> iOS, or in Safari or Firefox.
+>
+> **Upgrade from 0.1.0 if your app runs in a browser.** With `sqlite3` 3.x, 0.1.0's IndexedDB
+> storage could lose writes acknowledged shortly before the tab was killed or crashed (see the
+> CHANGELOG). OPFS, the Dart VM and Flutter were not affected.
 
 ## Install
 
@@ -127,11 +131,10 @@ Limits:
   page) fails after `lockTimeout` with a `FirestoreException` with the code
   `failed-precondition`; use `openWithMemoryFallback` to get a memory cache there instead. The Web Locks API needs a secure
   context (HTTPS or `localhost`).
-- **Crash safety** was tested with `sqlite3` 2.9.4 by killing a worker at random moments (2,700
-  kills on IndexedDB, 1,500 on OPFS, in the repository of `cloud_firestore_dart`): the database
-  stayed intact and kept every acknowledged transaction. A crash of the browser itself or a power
-  cut is not covered. `sqlite3` 3.4 rewrote how its IndexedDB file system batches writes; that
-  was not tested here.
+- **Crash safety** was tested by killing a worker at random moments (in the repository of
+  `cloud_firestore_dart`): with `sqlite3` 2.9.4 (2,700 kills on IndexedDB, 1,500 on OPFS) and,
+  from 0.1.1, with 3.9.1 (900 kills on IndexedDB, 900 on OPFS): the database stayed intact and kept every acknowledged
+  transaction. A crash of the browser itself or a power cut is not covered.
 - Only Chrome was tried.
 
 ## Which `sqlite3`
@@ -187,10 +190,19 @@ void useLibsqlite3So0() {
 
 Not in a Flutter app: there the override would hide the library of `sqlite3_flutter_libs`.
 
-In a browser both majors work the same way; only the `sqlite3.wasm` file differs per version.
-Avoid `sqlite3` 3.4.0 to 3.5.2 there: their IndexedDB file system's `flush()` did not wait for a
-write already in progress (fixed in 3.6.0), and the IndexedDB storage relies on it to report a
-transaction as stored. The browser storage was only run with 2.9.4.
+In a browser both majors work the same way; only the `sqlite3.wasm` file differs per version. The
+IndexedDB storage reports a transaction as stored once the IndexedDB file system of `sqlite3` has
+written it, and what `flush()` waits for differs per version:
+
+| `sqlite3` | `flush()` waits for | IndexedDB storage |
+| --- | --- | --- |
+| 2.7.3 to 3.3.4 | every write made before it | safe |
+| 3.4.0 to 3.5.2 | nothing while a batch of writes is in progress | **unsafe**: do not use |
+| 3.6.0 to 3.9.1 | the batch in progress, not the writes queued behind it | safe from 0.1.1, which waits for those too; lost writes with 0.1.0 |
+
+Recommended: `cloud_firestore_dart_sqlite` 0.1.1 or later, with any `sqlite3` but 3.4.0 to 3.5.2
+(pub picks the newest one your SDK allows; check `pubspec.lock` if you pinned `sqlite3`). The
+browser tests run with 2.9.4 and 3.9.1. The OPFS storage does not use this file system.
 
 ## Recovery and errors
 
