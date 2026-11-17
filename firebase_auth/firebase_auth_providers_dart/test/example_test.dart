@@ -50,7 +50,7 @@ final Map<String, List<Matcher>> _expectedOutput = <String, List<Matcher>>{
     equals('first run, signed in: false'),
     equals('second run, same user: true'),
     equals('fresh ID token for the user: true'),
-    equals('session left in the file: {}'),
+    equals('session file removed: true'),
   ],
   'firestore_wiring.dart': <Matcher>[
     equals('signed out, write refused: permissionDenied'),

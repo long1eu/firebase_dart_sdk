@@ -2,11 +2,12 @@ import 'dart:async';
 
 import 'firebase_user_auth.dart';
 
-/// Where [FirebaseUserAuth] keeps the session of the signed-in user (its refresh token), so that the user is still
-/// signed in after a restart.
+/// Where [FirebaseUserAuth] keeps the session of the signed-in user (its refresh token and the user record), so
+/// that the user is still signed in after a restart.
 ///
-/// The default, [InMemoryAuthStorage], forgets it when the process ends. An application that wants the session to
-/// survive implements this on top of its own storage.
+/// The package has three: [InMemoryAuthStorage] (the default; forgets the session when the process ends),
+/// `FileAuthStorage` (an owner-only file on the Dart VM) and `WebAuthStorage` (`sessionStorage` or `localStorage`
+/// in a browser). An application that keeps secrets elsewhere implements this on top of its own storage.
 ///
 /// **The stored value is a credential.** It holds the refresh token of the user, which does not expire: whoever
 /// reads it can get ID tokens and act as that user (read and write what the security rules allow the user) until
@@ -16,54 +17,24 @@ import 'firebase_user_auth.dart';
 /// * Flutter on iOS, Android, macOS, Windows and Linux: a secure storage plugin such as `flutter_secure_storage`
 ///   (Keychain, Android Keystore, Windows Credential Manager, libsecret).
 /// * A command line tool or a server: the system keychain or secret service, or a file readable only by its owner
-///   (mode 0600 in a directory with mode 0700).
+///   (`FileAuthStorage`: mode 0600 in a directory with mode 0700).
 /// * The web: `localStorage` and IndexedDB are readable by every script of the origin, so a cross-site scripting
 ///   flaw gives the session away; prefer [InMemoryAuthStorage] (sign in again on every visit) or
-///   `sessionStorage`, and keep a strict Content Security Policy.
+///   `WebAuthStorage.session`, and keep a strict Content Security Policy.
 ///
 /// Delete the value ([write] with null) when the user signs out; [FirebaseUserAuth] does that itself.
 ///
 /// [FirebaseUserAuth] calls [read] once, in [FirebaseUserAuth.restore], and [write] after every sign-in, sign-out
 /// and change of the user or of the refresh token, and waits for both. An exception they throw reaches the caller
-/// of the operation.
-///
-/// A file-backed storage for a command line tool (Dart VM; `example/persistent_session.dart` is the complete
-/// program):
+/// of the operation. The value is a JSON object with a `version` (2 since 0.3; 0.2 wrote no version); treat it as
+/// opaque.
 ///
 /// ```dart
-/// import 'dart:convert';
-/// import 'dart:io';
-///
-/// import 'package:firebase_auth_providers_dart/firebase_auth_providers_dart.dart';
-///
-/// class FileAuthStorage implements AuthStorage {
-///   FileAuthStorage(this.file);
-///
-///   final File file;
-///
-///   Map<String, Object?> _all() => file.existsSync()
-///       ? jsonDecode(file.readAsStringSync()) as Map<String, Object?>
-///       : <String, Object?>{};
-///
-///   @override
-///   String? read(String key) => _all()[key] as String?;
-///
-///   @override
-///   Future<void> write(String key, String? value) async {
-///     final Map<String, Object?> all = _all();
-///     if (value == null) {
-///       all.remove(key);
-///     } else {
-///       all[key] = value;
-///     }
-///     if (!file.existsSync()) {
-///       await file.create(recursive: true);
-///       // Readable by its owner only, before anything is written to it.
-///       await Process.run('chmod', <String>['600', file.path]);
-///     }
-///     await file.writeAsString(jsonEncode(all));
-///   }
-/// }
+/// // Dart VM: a command line tool keeps its session in the user's configuration directory.
+/// final FirebaseUserAuth auth = await FirebaseUserAuth.forApp(
+///   app,
+///   storage: FileAuthStorage('${Platform.environment['HOME']}/.config/my_tool/session.json'),
+/// );
 /// ```
 abstract class AuthStorage {
   /// Constructor for subclasses.

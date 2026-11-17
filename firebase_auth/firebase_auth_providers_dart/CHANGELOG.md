@@ -59,6 +59,12 @@
 - `validatePassword(password)` with the new `PasswordPolicy` and `PasswordValidationStatus` (FlutterFire's names):
   the project's (or tenant's) policy is fetched once from `v2/passwordPolicy`, cached, and fetched again after
   `password-does-not-meet-requirements`, like the JS SDK. The Auth emulator does not implement the endpoint.
+- Ready-made storages: `FileAuthStorage(path)` on the Dart VM (a JSON file written atomically and owner-only:
+  mode 0600 in a 0700 directory on Linux and macOS, checked before anything is written; on Windows it inherits the
+  access list of its directory) and `WebAuthStorage.session()` / `WebAuthStorage.local()` in a browser
+  (`sessionStorage` / `localStorage`), exported through conditional imports so that the library still compiles
+  everywhere (each throws `UnsupportedError` on the other platform). Their documentation says what a stored refresh
+  token exposes. `example/persistent_session.dart` uses `FileAuthStorage`.
 
 ## 0.2.1
 
