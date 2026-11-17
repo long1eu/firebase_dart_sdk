@@ -55,11 +55,17 @@ import 'package:firebase_app_dart/firebase_app_dart.dart';
 class FirebaseAuthException extends FirebaseException {
   /// Creates an exception with the SDK style [code] (for example `wrong-password`) and a [message]. The
   /// package creates them; you need this only for tests and token providers of your own.
+  ///
+  /// [email], [phoneNumber] and [tenantId] are those of FlutterFire's `FirebaseAuthException`: the account an
+  /// error is about, when the backend names it.
   const FirebaseAuthException({
     required String code,
     required String message,
     this.serverCode,
     this.httpStatus,
+    this.email,
+    this.phoneNumber,
+    this.tenantId,
   }) : super(plugin: 'firebase_auth', code: code, message: message);
 
   /// Maps the error message of the Identity Toolkit or Secure Token API ([serverMessage], for example
@@ -75,9 +81,14 @@ class FirebaseAuthException extends FirebaseException {
   /// );
   /// print(e.code); // email-already-in-use
   /// ```
+  ///
+  /// [response] is the decoded body of the answer. For the errors the JS SDK tags with the answer
+  /// (`credential-already-in-use`, `email-already-in-use`, `user-disabled`) its `email`, `phoneNumber` and
+  /// `tenantId` become those of the exception, and the message is the standard one.
   factory FirebaseAuthException.fromServer(
     String serverMessage, {
     int? httpStatus,
+    Map<String, Object?>? response,
   }) {
     final int separator = serverMessage.indexOf(' : ');
     final String serverCode =
@@ -94,11 +105,49 @@ class FirebaseAuthException extends FirebaseException {
                 serverCode.contains('API_KEY_INVALID')
             ? 'invalid-api-key'
             : serverCode.toLowerCase().replaceAll(RegExp(r'[_\s]+'), '-'));
+    // _performFetchWithErrorHandling: these three are thrown with the answer attached (_makeTaggedError).
+    final bool tagged = const <String>{
+      'FEDERATED_USER_ID_ALREADY_LINKED',
+      'EMAIL_EXISTS',
+      'USER_DISABLED',
+    }.contains(serverCode);
+    String? text(String key) {
+      final Object? value = response?[key];
+      return value is String && value.isNotEmpty ? value : null;
+    }
+
     return FirebaseAuthException(
       code: code,
-      message: detail ?? _messages[code] ?? serverMessage,
+      message: tagged
+          ? _messages[code]!
+          : detail ?? _messages[code] ?? serverMessage,
       serverCode: serverCode,
       httpStatus: httpStatus,
+      email: tagged ? text('email') : null,
+      phoneNumber: tagged ? text('phoneNumber') : null,
+      tenantId: tagged ? text('tenantId') : null,
+    );
+  }
+
+  /// The exception for an answer of the Identity Toolkit API with `needConfirmation` (the JS SDK checks it before
+  /// anything else): the account of the email address of a federated credential exists and was created with
+  /// another sign-in method. The code is `account-exists-with-different-credential`; [email] is the address.
+  factory FirebaseAuthException.needConfirmation(
+    Map<String, Object?> response, {
+    int? httpStatus,
+  }) {
+    String? text(String key) {
+      final Object? value = response[key];
+      return value is String && value.isNotEmpty ? value : null;
+    }
+
+    return FirebaseAuthException(
+      code: 'account-exists-with-different-credential',
+      message: _messages['account-exists-with-different-credential']!,
+      httpStatus: httpStatus,
+      email: text('email'),
+      phoneNumber: text('phoneNumber'),
+      tenantId: text('tenantId'),
     );
   }
 
@@ -117,6 +166,16 @@ class FirebaseAuthException extends FirebaseException {
   /// The HTTP status of the response, when there was one.
   final int? httpStatus;
 
+  /// The email address of the account the error is about, when the backend named it (for example with
+  /// `account-exists-with-different-credential`).
+  final String? email;
+
+  /// The phone number of the account the error is about, when the backend named it.
+  final String? phoneNumber;
+
+  /// The tenant of the account the error is about, when the backend named it.
+  final String? tenantId;
+
   /// Whether the session is no longer valid: the refresh token was revoked or the account is gone or disabled.
   /// The user is signed out when a token refresh fails with such an error.
   bool get invalidatesSession => const <String>{
@@ -126,8 +185,8 @@ class FirebaseAuthException extends FirebaseException {
     'user-not-found',
   }.contains(code);
 
-  /// SERVER_ERROR_MAP of the JS SDK (packages/auth/src/api/errors.ts), the entries that the REST calls of this
-  /// package can meet. Codes that are not listed map to their kebab case form.
+  /// `SERVER_ERROR_MAP` of the JS SDK (`packages/auth/src/api/errors.ts` of `@firebase/auth` 1.13.10), complete.
+  /// Codes that are not listed map to their kebab case form, as in the JS SDK.
   static const Map<String, String> _codes = <String, String>{
     // Custom token.
     'CREDENTIAL_MISMATCH': 'custom-token-mismatch',
@@ -141,6 +200,7 @@ class FirebaseAuthException extends FirebaseException {
     'INVALID_LOGIN_CREDENTIALS': 'invalid-credential',
     'EMAIL_EXISTS': 'email-already-in-use',
     'PASSWORD_LOGIN_DISABLED': 'operation-not-allowed',
+    // signInWithIdp.
     'INVALID_IDP_RESPONSE': 'invalid-credential',
     'INVALID_PENDING_TOKEN': 'invalid-credential',
     'FEDERATED_USER_ID_ALREADY_LINKED': 'credential-already-in-use',
@@ -160,45 +220,170 @@ class FirebaseAuthException extends FirebaseException {
     'TOO_MANY_ATTEMPTS_TRY_LATER': 'too-many-requests',
     'PASSWORD_DOES_NOT_MEET_REQUIREMENTS':
         'password-does-not-meet-requirements',
+    // Phone.
+    'INVALID_CODE': 'invalid-verification-code',
+    'INVALID_SESSION_INFO': 'invalid-verification-id',
+    'INVALID_TEMPORARY_PROOF': 'invalid-credential',
+    'MISSING_SESSION_INFO': 'missing-verification-id',
+    'SESSION_EXPIRED': 'code-expired',
+    // Action code settings.
+    'MISSING_ANDROID_PACKAGE_NAME': 'missing-android-pkg-name',
+    'UNAUTHORIZED_DOMAIN': 'unauthorized-continue-uri',
+    // getProjectConfig with a client id.
+    'INVALID_OAUTH_CLIENT_ID': 'invalid-oauth-client-id',
+    // Sign-up or deletion restricted to administrators.
     'ADMIN_ONLY_OPERATION': 'admin-restricted-operation',
+    // Multi-factor.
+    'INVALID_MFA_PENDING_CREDENTIAL': 'invalid-multi-factor-session',
+    'MFA_ENROLLMENT_NOT_FOUND': 'multi-factor-info-not-found',
+    'MISSING_MFA_ENROLLMENT_ID': 'missing-multi-factor-info',
+    'MISSING_MFA_PENDING_CREDENTIAL': 'missing-multi-factor-session',
+    'SECOND_FACTOR_EXISTS': 'second-factor-already-in-use',
+    'SECOND_FACTOR_LIMIT_EXCEEDED': 'maximum-second-factor-count-exceeded',
+    // Blocking functions.
+    'BLOCKING_FUNCTION_ERROR_RESPONSE': 'internal-error',
+    // reCAPTCHA.
+    'RECAPTCHA_NOT_ENABLED': 'recaptcha-not-enabled',
+    'MISSING_RECAPTCHA_TOKEN': 'missing-recaptcha-token',
+    'INVALID_RECAPTCHA_TOKEN': 'invalid-recaptcha-token',
+    'INVALID_RECAPTCHA_ACTION': 'invalid-recaptcha-action',
+    'MISSING_CLIENT_TYPE': 'missing-client-type',
+    'MISSING_RECAPTCHA_VERSION': 'missing-recaptcha-version',
+    'INVALID_RECAPTCHA_VERSION': 'invalid-recaptcha-version',
     'INVALID_REQ_TYPE': 'invalid-req-type',
-    // Not in the map of the JS SDK, which turns them into the same codes (kebab case); listed for clarity.
-    'INVALID_EMAIL': 'invalid-email',
-    'WEAK_PASSWORD': 'weak-password',
-    'USER_DISABLED': 'user-disabled',
-    'OPERATION_NOT_ALLOWED': 'operation-not-allowed',
-    'INVALID_CUSTOM_TOKEN': 'invalid-custom-token',
-    'INVALID_REFRESH_TOKEN': 'invalid-refresh-token',
   };
 
+  /// The messages of the JS SDK (`_debugErrorMap` of `packages/auth/src/core/errors.ts`) for the codes the backend
+  /// can produce, shortened where the original addresses a web page.
   static const Map<String, String> _messages = <String, String>{
+    'account-exists-with-different-credential':
+        'An account already exists with the same email address but different sign-in credentials. Sign in '
+        'using a provider associated with this email address.',
+    'admin-restricted-operation':
+        'This operation is restricted to administrators only.',
+    'captcha-check-failed':
+        'The reCAPTCHA response token provided is either invalid, expired, already used or the domain associated '
+        'with it does not match the list of allowed domains.',
+    'code-expired':
+        'The SMS code has expired. Re-send the verification code to try again.',
+    'credential-already-in-use':
+        'This credential is already associated with a different user account.',
+    'custom-token-mismatch': 'The custom token belongs to another project.',
+    'dynamic-link-not-activated':
+        'Activate Dynamic Links in the Firebase Console and agree to the terms and conditions.',
     'email-already-in-use':
         'The email address is already in use by another account.',
-    'user-not-found': 'There is no user record for this identifier.',
-    'wrong-password': 'The password is invalid.',
+    'email-change-needs-verification':
+        'Multi-factor users must always have a verified email.',
+    'expired-action-code': 'The action code has expired.',
+    'internal-error': 'An internal error has occurred.',
+    'invalid-api-key': 'The API key is not valid.',
+    'invalid-app-credential':
+        'The phone verification request contains an invalid application verifier. The reCAPTCHA token response '
+        'is either invalid or expired.',
+    'invalid-app-id':
+        'The mobile app identifier is not registered for the current project.',
+    'invalid-cert-hash': 'The SHA-1 certificate hash provided is invalid.',
+    'invalid-continue-uri':
+        'The continue URL provided in the request is invalid.',
     'invalid-credential':
         'The supplied credential is incorrect or has expired.',
-    'invalid-email': 'The email address is badly formatted.',
-    'weak-password': 'The password is too weak.',
-    'user-disabled': 'The user account has been disabled.',
-    'too-many-requests': 'Too many attempts. Try again later.',
-    'operation-not-allowed':
-        'This sign-in method is not enabled for the project.',
     'invalid-custom-token':
         'The custom token is malformed or its signature is invalid.',
-    'custom-token-mismatch': 'The custom token belongs to another project.',
+    'invalid-dynamic-link-domain':
+        'The provided dynamic link domain is not configured or authorized for the current project.',
+    'invalid-email': 'The email address is badly formatted.',
+    'invalid-hosting-link-domain':
+        'The provided Hosting link domain is not configured in Firebase Hosting or is not owned by the current '
+        'project.',
+    'invalid-message-payload':
+        'The email template corresponding to this action contains invalid characters in its message.',
+    'invalid-multi-factor-session':
+        'The request does not contain a valid proof of first factor successful sign-in.',
+    'invalid-oauth-client-id':
+        'The OAuth client ID provided is either invalid or does not match the specified API key.',
+    'invalid-phone-number':
+        'The format of the phone number provided is incorrect (expected E.164: +[country code][number]).',
+    'invalid-provider-id': 'The specified provider ID is invalid.',
+    'invalid-recipient-email':
+        'The email corresponding to this action failed to send as the provided recipient email address is '
+        'invalid.',
+    'invalid-req-type': 'Invalid request parameters.',
+    'invalid-sender':
+        'The email template corresponding to this action contains an invalid sender email or name.',
+    'invalid-tenant-id': 'The tenant ID is invalid.',
+    'invalid-user-token': 'The credential of the user is no longer valid.',
+    'invalid-verification-code':
+        'The SMS verification code used to create the phone auth credential is invalid.',
+    'invalid-verification-id':
+        'The verification ID used to create the phone auth credential is invalid.',
+    'maximum-second-factor-count-exceeded':
+        'The maximum allowed number of second factors on a user has been exceeded.',
+    'missing-android-pkg-name':
+        'An Android package name must be provided if the Android app is required to be installed.',
+    'missing-ios-bundle-id':
+        'An iOS bundle ID must be provided if an App Store ID is provided.',
+    'missing-multi-factor-info': 'No second factor identifier is provided.',
+    'missing-multi-factor-session':
+        'The request is missing proof of first factor successful sign-in.',
+    'missing-or-invalid-nonce':
+        'The request does not contain a valid nonce. This can occur if the SHA-256 hash of the provided raw nonce '
+        'does not match the hashed nonce in the ID token payload.',
+    'missing-password': 'A non-empty password must be provided.',
+    'missing-verification-id':
+        'The phone auth credential was created with an empty verification ID.',
+    'multi-factor-info-not-found':
+        'The user does not have a second factor matching the identifier provided.',
+    'operation-not-allowed':
+        'This sign-in method is not enabled for the project.',
+    'password-does-not-meet-requirements':
+        'The password does not meet the requirements.',
+    'quota-exceeded':
+        "The project's quota for this operation has been exceeded.",
+    'recaptcha-not-enabled':
+        'reCAPTCHA Enterprise integration is not enabled for this project.',
+    'missing-recaptcha-token':
+        'The reCAPTCHA token is missing when sending request to the backend.',
+    'invalid-recaptcha-token':
+        'The reCAPTCHA token is invalid when sending request to the backend.',
+    'invalid-recaptcha-action':
+        'The reCAPTCHA action is invalid when sending request to the backend.',
+    'missing-client-type':
+        'The reCAPTCHA client type is missing when sending request to the backend.',
+    'missing-recaptcha-version':
+        'The reCAPTCHA version is missing when sending request to the backend.',
+    'invalid-recaptcha-version':
+        'The reCAPTCHA version is invalid when sending request to the backend.',
+    'rejected-credential':
+        'The request contains malformed or mismatching credentials.',
+    'requires-recent-login':
+        'This operation is sensitive and requires recent authentication. Sign in again.',
+    'second-factor-already-in-use':
+        'The second factor is already enrolled on this account.',
+    'tenant-id-mismatch':
+        "The provided tenant ID does not match the Auth instance's tenant ID.",
+    'too-many-requests': 'Too many attempts. Try again later.',
+    'unauthorized-continue-uri':
+        'The domain of the continue URL is not allowed. Add it to the authorized domains of the project.',
+    'unsupported-first-factor':
+        'Enrolling a second factor or signing in with a multi-factor account requires sign-in with a supported '
+        'first factor.',
+    'unsupported-tenant-operation':
+        'This operation is not supported in a multi-tenant context.',
+    'unverified-email': 'The operation requires a verified email.',
+    'user-cancelled':
+        'The user did not grant your application the permissions it requested.',
+    'user-disabled': 'The user account has been disabled.',
+    'user-mismatch':
+        'The supplied credentials do not correspond to the signed-in user.',
+    'user-not-found': 'There is no user record for this identifier.',
     'user-token-expired':
         'The credential of the user is no longer valid. Sign in again.',
     'invalid-refresh-token': 'The refresh token is invalid. Sign in again.',
-    'invalid-api-key': 'The API key is not valid.',
-    'expired-action-code': 'The action code has expired.',
     'invalid-action-code':
         'The action code is invalid. It may be malformed, expired, or already used.',
-    'requires-recent-login':
-        'This operation is sensitive and requires recent authentication. Sign in again.',
-    'user-mismatch':
-        'The supplied credentials do not correspond to the signed-in user.',
-    'invalid-user-token': 'The credential of the user is no longer valid.',
+    'weak-password': 'The password is too weak.',
+    'wrong-password': 'The password is invalid.',
   };
 
   @override

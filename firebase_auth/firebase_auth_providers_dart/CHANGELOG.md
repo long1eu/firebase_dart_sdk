@@ -1,3 +1,20 @@
+## 0.3.0 (unreleased)
+
+- The complete server error map of the JS SDK (`SERVER_ERROR_MAP` of `@firebase/auth` 1.13.10): the phone,
+  multi-factor, reCAPTCHA, `signInWithIdp` and action code settings codes are mapped like the JS SDK maps them
+  (`INVALID_CODE` is `invalid-verification-code`, `UNAUTHORIZED_DOMAIN` is `unauthorized-continue-uri`, ...), with
+  the JS SDK's messages. Codes that were already mapped are unchanged.
+- Fix: an answer with HTTP 200 whose body has an `errorMessage` was taken for a success; it is an error now, like in
+  the JS SDK. An answer with `needConfirmation` throws `account-exists-with-different-credential`.
+- `FirebaseAuthException` has FlutterFire's `email`, `phoneNumber` and `tenantId`, set for the errors the JS SDK
+  tags with the answer (`credential-already-in-use`, `email-already-in-use`, `user-disabled`,
+  `account-exists-with-different-credential`).
+- Fix: `checkActionCode` threw `internal-error` for an operation the package does not know; it returns it, like the
+  JS SDK, as the new `ActionCodeOperation.unknown` with the backend's name in the new `ActionCodeInfo.requestType`.
+  **Breaking** for a `switch` over `ActionCodeOperation` without a default: add a case for `unknown` (FlutterFire's
+  `ActionCodeInfoOperation` has the same value). `ActionCodeInfo.multiFactorInfo` is the factor of
+  `revertSecondFactorAddition`, which now requires it, like the JS SDK.
+
 ## 0.2.1
 
 - Fix: signing in (`signInWithEmailAndPassword`, `signInWithCustomToken`) or reauthenticating

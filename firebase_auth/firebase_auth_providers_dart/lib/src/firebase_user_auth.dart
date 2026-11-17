@@ -1006,17 +1006,32 @@ class FirebaseUserAuth implements AuthTokenProvider {
     } on FormatException {
       body = null;
     }
-    if (response.statusCode == 200 && body is Map<String, Object?>) {
-      return body;
+    // Like _performFetchWithErrorHandling of the JS SDK: `needConfirmation` first, then an answer is a success
+    // only when it is OK and has no `errorMessage` (signInWithIdp reports some errors with HTTP 200 and an
+    // `errorMessage` next to the data of the account).
+    final bool ok = response.statusCode == 200;
+    if (body is Map<String, Object?>) {
+      if (body.containsKey('needConfirmation')) {
+        throw FirebaseAuthException.needConfirmation(
+          body,
+          httpStatus: response.statusCode,
+        );
+      }
+      if (ok && !body.containsKey('errorMessage')) {
+        return body;
+      }
     }
     final Object? error = body is Map<String, Object?> ? body['error'] : null;
-    final Object? message = error is Map<String, Object?>
+    final Object? message = ok && body is Map<String, Object?>
+        ? body['errorMessage']
+        : error is Map<String, Object?>
         ? error['message']
         : null;
     if (message is String) {
       throw FirebaseAuthException.fromServer(
         message,
         httpStatus: response.statusCode,
+        response: body is Map<String, Object?> ? body : null,
       );
     }
     throw FirebaseAuthException(

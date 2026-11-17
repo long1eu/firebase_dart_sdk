@@ -531,6 +531,43 @@ void main() {
         'MISSING_CUSTOM_TOKEN': 'internal-error',
         'PASSWORD_DOES_NOT_MEET_REQUIREMENTS : Missing password requirements: [Password must contain an upper case character]':
             'password-does-not-meet-requirements',
+        // The rest of SERVER_ERROR_MAP.
+        'INVALID_IDP_RESPONSE': 'invalid-credential',
+        'INVALID_PENDING_TOKEN': 'invalid-credential',
+        'FEDERATED_USER_ID_ALREADY_LINKED': 'credential-already-in-use',
+        'MISSING_REQ_TYPE': 'internal-error',
+        'MISSING_CONTINUE_URI': 'internal-error',
+        'MISSING_PASSWORD': 'missing-password',
+        'INVALID_CODE': 'invalid-verification-code',
+        'INVALID_SESSION_INFO': 'invalid-verification-id',
+        'INVALID_TEMPORARY_PROOF': 'invalid-credential',
+        'MISSING_SESSION_INFO': 'missing-verification-id',
+        'SESSION_EXPIRED': 'code-expired',
+        'MISSING_ANDROID_PACKAGE_NAME': 'missing-android-pkg-name',
+        'UNAUTHORIZED_DOMAIN': 'unauthorized-continue-uri',
+        'INVALID_OAUTH_CLIENT_ID': 'invalid-oauth-client-id',
+        'INVALID_MFA_PENDING_CREDENTIAL': 'invalid-multi-factor-session',
+        'MFA_ENROLLMENT_NOT_FOUND': 'multi-factor-info-not-found',
+        'MISSING_MFA_ENROLLMENT_ID': 'missing-multi-factor-info',
+        'MISSING_MFA_PENDING_CREDENTIAL': 'missing-multi-factor-session',
+        'SECOND_FACTOR_EXISTS': 'second-factor-already-in-use',
+        'SECOND_FACTOR_LIMIT_EXCEEDED': 'maximum-second-factor-count-exceeded',
+        'BLOCKING_FUNCTION_ERROR_RESPONSE : HTTP Cloud Function returned an error':
+            'internal-error',
+        'RECAPTCHA_NOT_ENABLED': 'recaptcha-not-enabled',
+        'MISSING_RECAPTCHA_TOKEN': 'missing-recaptcha-token',
+        'INVALID_RECAPTCHA_TOKEN': 'invalid-recaptcha-token',
+        'INVALID_RECAPTCHA_ACTION': 'invalid-recaptcha-action',
+        'MISSING_CLIENT_TYPE': 'missing-client-type',
+        'MISSING_RECAPTCHA_VERSION': 'missing-recaptcha-version',
+        'INVALID_RECAPTCHA_VERSION': 'invalid-recaptcha-version',
+        'INVALID_REQ_TYPE': 'invalid-req-type',
+        // Not in the map: kebab case, which is the client code of the JS SDK too.
+        'TENANT_ID_MISMATCH': 'tenant-id-mismatch',
+        'INVALID_TENANT_ID': 'invalid-tenant-id',
+        'MISSING_OR_INVALID_NONCE': 'missing-or-invalid-nonce',
+        'UNSUPPORTED_TENANT_OPERATION': 'unsupported-tenant-operation',
+        'INVALID_HOSTING_LINK_DOMAIN': 'invalid-hosting-link-domain',
         // Like the JS SDK, any other code of the backend in kebab case.
         'SOMETHING_NEW': 'something-new',
         'QUOTA_EXCEEDED : Exceeded quota for email lookup.': 'quota-exceeded',
@@ -560,6 +597,62 @@ void main() {
         'Password should be at least 6 characters',
       );
     });
+
+    test('an HTTP 200 answer with an errorMessage is an error', () async {
+      handler = (http.Request request) async => json(<String, Object?>{
+        'errorMessage': 'INVALID_IDP_RESPONSE : Unable to parse id_token',
+        'localId': 'someone',
+        'idToken': idToken(
+          'someone',
+          expires: clock.now.add(const Duration(hours: 1)),
+        ),
+        'refreshToken': 'refresh:someone',
+      });
+      final FirebaseAuthException e = await failure(auth.signInAnonymously);
+      expect(e.code, 'invalid-credential');
+      expect(e.message, 'Unable to parse id_token');
+      expect(e.httpStatus, 200);
+      expect(auth.uid, isNull);
+    });
+
+    test('the errors the JS SDK tags carry the account', () async {
+      handler = (http.Request request) async => json(<String, Object?>{
+        'errorMessage': 'FEDERATED_USER_ID_ALREADY_LINKED',
+        'email': 'a@example.com',
+        'tenantId': 'tenant-1',
+      });
+      FirebaseAuthException e = await failure(auth.signInAnonymously);
+      expect(e.code, 'credential-already-in-use');
+      expect(e.email, 'a@example.com');
+      expect(e.tenantId, 'tenant-1');
+      expect(
+        e.message,
+        'This credential is already associated with a different user account.',
+      );
+      // Other errors do not take the address.
+      handler = (http.Request request) async => json(<String, Object?>{
+        'errorMessage': 'INVALID_IDP_RESPONSE',
+        'email': 'a@example.com',
+      });
+      e = await failure(auth.signInAnonymously);
+      expect(e.email, isNull);
+    });
+
+    test(
+      'needConfirmation is account-exists-with-different-credential',
+      () async {
+        handler = (http.Request request) async => json(<String, Object?>{
+          'needConfirmation': true,
+          'email': 'a@example.com',
+          'providerId': 'google.com',
+        });
+        final FirebaseAuthException e = await failure(auth.signInAnonymously);
+        expect(e.code, 'account-exists-with-different-credential');
+        expect(e.email, 'a@example.com');
+        expect(e.httpStatus, 200);
+        expect(auth.uid, isNull);
+      },
+    );
 
     test('a network error does not leak the URL or the API key', () async {
       handler = (http.Request request) =>
@@ -1044,16 +1137,56 @@ void main() {
       );
       expect(recover.email, 'old@example.com');
       expect(recover.previousEmail, 'new@example.com');
-      await expectLater(
-        auth.checkActionCode('SOMETHING_ELSE'),
-        throwsA(
-          isA<FirebaseAuthException>().having(
-            (FirebaseAuthException e) => e.code,
-            'code',
-            'internal-error',
-          ),
+      // An operation the package does not know is returned as given, like the JS SDK does.
+      final ActionCodeInfo other = await auth.checkActionCode('SOMETHING_NEW');
+      expect(other.operation, ActionCodeOperation.unknown);
+      expect(other.requestType, 'SOMETHING_NEW');
+      expect(other.email, 'old@example.com');
+      expect('$other', 'ActionCodeInfo(SOMETHING_NEW)');
+      expect(change.requestType, 'VERIFY_AND_CHANGE_EMAIL');
+    });
+
+    test('checkActionCode checks what each operation needs', () async {
+      Map<String, Object?> answer = <String, Object?>{};
+      answering(
+        (String method, Map<String, Object?> body) async => json(answer),
+      );
+      Matcher internal = throwsA(
+        isA<FirebaseAuthException>().having(
+          (FirebaseAuthException e) => e.code,
+          'code',
+          'internal-error',
         ),
       );
+      // No operation, and an unknown operation without an email address.
+      answer = <String, Object?>{'email': 'a@example.com'};
+      await expectLater(auth.checkActionCode('c'), internal);
+      answer = <String, Object?>{'requestType': 'SOMETHING_NEW'};
+      await expectLater(auth.checkActionCode('c'), internal);
+      // An email link sign-in needs nothing.
+      answer = <String, Object?>{'requestType': 'EMAIL_SIGNIN'};
+      expect(
+        (await auth.checkActionCode('c')).operation,
+        ActionCodeOperation.emailSignIn,
+      );
+      // Reverting a second factor needs the factor and the address.
+      answer = <String, Object?>{
+        'requestType': 'REVERT_SECOND_FACTOR_ADDITION',
+        'email': 'a@example.com',
+      };
+      await expectLater(auth.checkActionCode('c'), internal);
+      answer = <String, Object?>{
+        'requestType': 'REVERT_SECOND_FACTOR_ADDITION',
+        'email': 'a@example.com',
+        'mfaInfo': <String, Object?>{
+          'mfaEnrollmentId': 'factor-1',
+          'phoneInfo': '+*******1234',
+        },
+      };
+      final ActionCodeInfo revert = await auth.checkActionCode('c');
+      expect(revert.operation, ActionCodeOperation.revertSecondFactorAddition);
+      expect(revert.multiFactorInfo?.uid, 'factor-1');
+      expect(revert.multiFactorInfo?.factorId, MultiFactorInfo.phoneFactorId);
     });
 
     test(
