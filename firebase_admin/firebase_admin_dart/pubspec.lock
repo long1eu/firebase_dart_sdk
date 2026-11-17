@@ -118,7 +118,7 @@ packages:
       path: "../../firebase_auth/firebase_auth_providers_dart"
       relative: true
     source: path
-    version: "0.2.0"
+    version: "0.2.1"
   frontend_server_client:
     dependency: transitive
     description:

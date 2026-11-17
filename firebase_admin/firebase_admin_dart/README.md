@@ -5,10 +5,12 @@ integration tests. The first library is Firebase Auth: mint custom tokens, creat
 delete users, set custom claims, revoke sessions and verify ID tokens. It is not affiliated with or
 supported by Google or Firebase.
 
-> **Status: 0.1.0.** Verified with unit tests and against the Firebase Auth emulator only: nothing
-> was run against the real Firebase Auth service or Google's endpoints. Run
-> [`example/production_check.dart`](#checking-a-real-project) once against a test project before
-> you rely on it.
+> **Status: 0.1.0.** Unit tests and the Firebase Auth emulator cover every call. On 2026-11-18 the
+> main path also passed against one real Firebase project, keyless: Application Default Credentials
+> of a person, custom tokens signed by the IAM Credentials API (see
+> [Checking a real project](#checking-a-real-project) for the steps and what was not run). Run
+> [`example/production_check.dart`](example/production_check.dart) once against your own test
+> project before you rely on it.
 
 > **Admin credentials bypass security rules and can act as any user.** Use this package only in
 > code you control. Never put a service account key in an app you ship, a web page, a Flutter asset
@@ -71,6 +73,7 @@ FlutterFire (`FirebaseAuth`, `User`): you can import them side by side without p
 | Where | App | Custom tokens are signed |
 | --- | --- | --- |
 | A machine you control with a key file (CI, a CLI, a test runner) | `FirebaseAdminApp(projectId: ..., credential: AdminCredential.serviceAccount(keyJson))` | locally, RS256 |
+| Your own machine, keyless, after `gcloud auth application-default login` | `FirebaseAdminApp(projectId: ..., credential: applicationDefaultCredential(serviceAccountEmail: ..., quotaProjectId: ...))` | by the IAM Credentials API (`signBlob`) as that service account |
 | Google Cloud (Cloud Run, Functions, GKE, Compute Engine) | `FirebaseAdminApp(projectId: ..., credential: applicationDefaultCredential())` | by the IAM Credentials API (`signBlob`) as the default service account |
 | The Auth emulator | `FirebaseAdminApp.emulator(projectId: 'demo-test', authEmulatorHost: '127.0.0.1:9099')` | not at all (`alg: none`) |
 
@@ -199,7 +202,47 @@ void main() {
 ## Checking a real project
 
 [`example/production_check.dart`](example/production_check.dart) runs the main path against a
-real project, for you to run by hand (no test runs it):
+real project, for you to run by hand (no test runs it). It creates one user with a random uid,
+mints a token with claims whose JSON forces `+` and `/` in standard base64, signs in with
+`firebase_auth_providers_dart`, checks that the claims arrive in the ID token, verifies the ID token
+with Google's keys and `checkRevoked`, sets and reads custom claims, revokes and checks that the old
+token is rejected with `id-token-revoked`, and deletes the user (again in `finally` if a step
+failed). It prints `PASS` or `FAIL` and never a token or a key. Use a test project.
+
+**Keyless** (no key file anywhere): admin calls use the Application Default Credentials of the
+person signed in with gcloud, and custom tokens are signed by the IAM Credentials API as a service
+account that person may impersonate. One-time setup, with your own project id and account:
+
+```shell
+gcloud services enable iamcredentials.googleapis.com --project my-project
+gcloud iam service-accounts create admin-check --project my-project
+gcloud projects add-iam-policy-binding my-project \
+  --member serviceAccount:admin-check@my-project.iam.gserviceaccount.com \
+  --role roles/firebaseauth.admin
+gcloud iam service-accounts add-iam-policy-binding \
+  admin-check@my-project.iam.gserviceaccount.com --project my-project \
+  --member user:you@example.com --role roles/iam.serviceAccountTokenCreator
+gcloud auth application-default login
+```
+
+Then:
+
+```shell
+ADMIN_CHECK_PROJECT_ID=my-project \
+ADMIN_CHECK_SERVICE_ACCOUNT=admin-check@my-project.iam.gserviceaccount.com \
+FIREBASE_WEB_API_KEY=<the Web API key of the same project> \
+dart run example/production_check.dart
+```
+
+`GOOGLE_APPLICATION_CREDENTIALS` must be unset. The admin calls run as you, so your account needs
+the right to manage Firebase Auth users in the project (Firebase Authentication Admin, or Owner).
+The check passes the project as `quotaProjectId` (`X-Goog-User-Project`), which Google APIs may ask
+for with the credentials of a person. A role granted seconds before can still be refused: a first
+run that fails at `signBlob` with HTTP 403 `iam.serviceAccounts.signBlob denied` passed when run
+again 25 seconds later, once IAM had propagated the grant.
+
+**With a key file**: admin calls use the key, and custom tokens are signed locally with its private
+key. The key's service account needs `roles/firebaseauth.admin`.
 
 ```shell
 GOOGLE_APPLICATION_CREDENTIALS=/path/to/key.json \
@@ -207,11 +250,16 @@ FIREBASE_WEB_API_KEY=<the Web API key of the same project> \
 dart run example/production_check.dart
 ```
 
-It creates one user with a random uid, mints a token with claims whose JSON forces `+` and `/` in
-standard base64, signs in, verifies the ID token with Google's keys, sets and reads custom claims,
-revokes and checks the revocation, and deletes the user in `finally`. It prints `PASS` or `FAIL`
-and never a token or a key. Add `ADMIN_CHECK_SIGN_BLOB=1` to also sign through the IAM Credentials
-API with Application Default Credentials.
+Add `ADMIN_CHECK_SIGN_BLOB=1` to also sign through the IAM Credentials API with Application Default
+Credentials, as the key's service account (the IAM Credentials API enabled, and Service Account
+Token Creator for that account on itself).
+
+What ran against a real project on 2026-11-18, with this package at `main` and
+`firebase_auth_providers_dart` 0.2.1 as the client: the keyless mode, all seven steps passed. Not run
+against a real project yet: signing locally with a key (`AdminCredential.serviceAccount`, the
+key-file mode above), `findUserByEmail`, `updateUser`, `deleteUsers` batches, tenants, the email
+lookup of the default service account on the metadata server of Google Cloud, and user credentials
+without a quota project. These are covered by unit tests and the Auth emulator only.
 
 ## What it does not do
 
