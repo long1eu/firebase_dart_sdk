@@ -8,6 +8,7 @@
 @TestOn('vm')
 library;
 
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:firebase_auth_providers_dart/firebase_auth_providers_dart.dart';
@@ -124,7 +125,8 @@ void main() {
         );
         expect(result.stderr, isEmpty);
         expect(
-          (result.stdout as String).split('\n'),
+          // LineSplitter: print ends lines with \r\n on Windows.
+          const LineSplitter().convert(result.stdout as String),
           containsAllInOrder(lines),
         );
       },
