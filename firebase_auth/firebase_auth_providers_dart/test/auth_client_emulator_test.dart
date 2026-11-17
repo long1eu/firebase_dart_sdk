@@ -300,4 +300,108 @@ void main() {
       );
     }, skip: skip);
   });
+
+  group('email link', () {
+    const ActionCodeSettings settings = ActionCodeSettings(
+      url: 'https://example.com/finish',
+      handleCodeInApp: true,
+    );
+
+    Future<String> sendLink(FirebaseUserAuth auth, String email) async {
+      await auth.sendSignInLinkToEmail(
+        email: email,
+        actionCodeSettings: settings,
+      );
+      return (await lastOob(email, 'EMAIL_SIGNIN'))['oobLink']! as String;
+    }
+
+    test('send, check and sign in with a link', () async {
+      final FirebaseUserAuth auth = create();
+      final String email = uniqueEmail('link');
+      final String emailLink = await sendLink(auth, email);
+      expect(auth.isSignInWithEmailLink(emailLink), isTrue);
+      final ActionCodeURL url = ActionCodeURL.parseLink(emailLink)!;
+      expect(url.continueUrl, 'https://example.com/finish');
+      final ActionCodeInfo info = await auth.checkActionCode(url.code);
+      expect(info.operation, ActionCodeOperation.emailSignIn);
+      // The JS SDK allows an EMAIL_SIGNIN answer without the address; the emulator sends none.
+      expect(info.email, anyOf(isNull, email));
+
+      final UserCredential result = await auth.signInWithEmailLink(
+        email: email,
+        emailLink: emailLink,
+      );
+      expect(result.email, email);
+      expect(result.emailVerified, isTrue);
+      expect(result.additionalUserInfo?.isNewUser, isTrue);
+      expect(result.providerData.single.providerId, 'password');
+      // A link is used once.
+      await auth.signOut();
+      await expectLater(
+        auth.signInWithEmailLink(email: email, emailLink: emailLink),
+        throwsAuth('invalid-action-code'),
+      );
+      // A new link signs the same account in.
+      final UserCredential again = await auth.signInWithEmailLink(
+        email: email,
+        emailLink: await sendLink(auth, email),
+      );
+      expect(again.uid, result.uid);
+      expect(again.additionalUserInfo?.isNewUser, isFalse);
+      // Reauthentication with a third link.
+      final UserCredential reauthenticated = await auth
+          .reauthenticateWithCredential(
+            EmailAuthProvider.credentialWithLink(
+              email: email,
+              emailLink: await sendLink(auth, email),
+            ),
+          );
+      expect(reauthenticated.uid, result.uid);
+    }, skip: skip);
+
+    test('link an email link and a password to anonymous users', () async {
+      final FirebaseUserAuth auth = create();
+      final UserCredential anonymous = await auth.signInAnonymously();
+      final String email = uniqueEmail('linked');
+      final UserCredential linked = await auth.linkWithCredential(
+        EmailAuthProvider.credentialWithLink(
+          email: email,
+          emailLink: await sendLink(auth, email),
+        ),
+      );
+      expect(linked.uid, anonymous.uid);
+      expect(linked.isAnonymous, isFalse);
+      expect(linked.email, email);
+      expect(linked.providerData.single.providerId, 'password');
+      await expectLater(
+        auth.linkWithCredential(
+          EmailAuthProvider.credential(email: email, password: 'secret1'),
+        ),
+        throwsAuth('provider-already-linked'),
+      );
+
+      final UserCredential second = await auth.signInAnonymously();
+      final String other = uniqueEmail('linked');
+      final UserCredential withPassword = await auth.linkWithCredential(
+        EmailAuthProvider.credential(email: other, password: 'secret1'),
+      );
+      expect(withPassword.uid, second.uid);
+      expect(withPassword.isAnonymous, isFalse);
+      await auth.signOut();
+      expect(
+        (await auth.signInWithCredential(
+          EmailAuthProvider.credential(email: other, password: 'secret1'),
+        )).uid,
+        second.uid,
+      );
+      await expectLater(
+        auth.reauthenticateWithCredential(
+          EmailAuthProvider.credential(email: email, password: 'nope'),
+        ),
+        throwsAuth(
+          anyOf('user-mismatch', 'wrong-password', 'invalid-credential'),
+        ),
+      );
+    }, skip: skip);
+  });
 }

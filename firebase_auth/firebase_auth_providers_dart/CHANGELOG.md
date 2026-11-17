@@ -39,6 +39,14 @@
 - `tenantId` (Identity Platform multi-tenancy), sent with the requests the JS SDK sends it with (sign-ins, action
   code requests, `createAuthUri`); a sign-in or `updateCurrentUser` of a user of another tenant throws
   `tenant-id-mismatch`, like the JS SDK.
+- Email link sign-in: `sendSignInLinkToEmail(email:, actionCodeSettings:)`, `isSignInWithEmailLink(link)`,
+  `signInWithEmailLink(email:, emailLink:)`, and `ActionCodeURL.parseLink(link)` (the JS SDK's
+  `parseActionCodeURL`, with its Dynamic Link and iOS deep link unwrapping).
+- Credentials: `AuthCredential`, `EmailAuthCredential` and `EmailAuthProvider.credential` /
+  `credentialWithLink` (FlutterFire names), with `signInWithCredential`, `linkWithCredential` (an email and password
+  or an email link to an anonymous user, for example) and `reauthenticateWithCredential`.
+  `reauthenticateWithEmailAndPassword` stays, as a shortcut for the latter. New error codes from the JS SDK:
+  `provider-already-linked`, `argument-error`, `login-blocked`, `tenant-id-mismatch`.
 
 ## 0.2.1
 

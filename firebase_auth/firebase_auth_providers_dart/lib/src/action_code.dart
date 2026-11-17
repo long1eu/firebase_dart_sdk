@@ -238,3 +238,124 @@ class ActionCodeInfo {
   String toString() =>
       'ActionCodeInfo(${operation == ActionCodeOperation.unknown ? requestType : operation.name})';
 }
+
+/// The parts of the link of an action email (`ActionCodeURL` of the JS SDK): what it is for, its code, and the
+/// settings it was sent with. [parseLink] reads a link; `FirebaseUserAuth.isSignInWithEmailLink` and
+/// `FirebaseUserAuth.signInWithEmailLink` use it.
+///
+/// ```dart
+/// final ActionCodeURL? url = ActionCodeURL.parseLink(link);
+/// if (url?.operation == ActionCodeOperation.emailSignIn) {
+///   print('A sign-in link that continues at ${url!.continueUrl}');
+/// }
+/// ```
+class ActionCodeURL {
+  /// Creates the parts. [parseLink] creates them; you need this only for tests.
+  const ActionCodeURL({
+    required this.apiKey,
+    required this.code,
+    required this.operation,
+    this.continueUrl,
+    this.languageCode,
+    this.tenantId,
+  });
+
+  /// Reads [link] (`parseActionCodeURL` of the JS SDK), or returns null when it is not the link of an action email:
+  /// it needs the `apiKey`, `oobCode` and `mode` query parameters, with a mode the JS SDK knows (`signIn`,
+  /// `resetPassword`, `verifyEmail`, `verifyAndChangeEmail`, `recoverEmail`, `revertSecondFactorAddition`).
+  ///
+  /// Like the JS SDK, a link wrapped in another one is unwrapped first: the `link` parameter of a Dynamic Link, and
+  /// the `deep_link_id` parameter (and its `link`) of an iOS one.
+  static ActionCodeURL? parseLink(String link) {
+    final Map<String, String> outer = _query(link);
+    final String? inner = outer['link'];
+    final String? doubleDeepLink = inner == null
+        ? null
+        : _query(inner)['deep_link_id'];
+    final String? iOSDeepLink = outer['deep_link_id'];
+    final String? iOSDoubleDeepLink = iOSDeepLink == null
+        ? null
+        : _query(iOSDeepLink)['link'];
+    final String actionLink =
+        iOSDoubleDeepLink ?? iOSDeepLink ?? doubleDeepLink ?? inner ?? link;
+
+    final Map<String, String> query = _query(actionLink);
+    final String? apiKey = query['apiKey'];
+    final String? code = query['oobCode'];
+    final ActionCodeOperation? operation = switch (query['mode']) {
+      'recoverEmail' => ActionCodeOperation.recoverEmail,
+      'resetPassword' => ActionCodeOperation.passwordReset,
+      'signIn' => ActionCodeOperation.emailSignIn,
+      'verifyEmail' => ActionCodeOperation.verifyEmail,
+      'verifyAndChangeEmail' => ActionCodeOperation.verifyAndChangeEmail,
+      'revertSecondFactorAddition' =>
+        ActionCodeOperation.revertSecondFactorAddition,
+      _ => null,
+    };
+    if (apiKey == null ||
+        apiKey.isEmpty ||
+        code == null ||
+        code.isEmpty ||
+        operation == null) {
+      return null;
+    }
+    return ActionCodeURL(
+      apiKey: apiKey,
+      code: code,
+      operation: operation,
+      continueUrl: query['continueUrl'],
+      languageCode: query['lang'],
+      tenantId: query['tenantId'],
+    );
+  }
+
+  /// The query parameters of [url] (`extractQuerystring` and `querystringDecode` of the JS SDK): what follows the
+  /// first `?`, up to a `#`.
+  static Map<String, String> _query(String url) {
+    final int start = url.indexOf('?');
+    if (start < 0) {
+      return const <String, String>{};
+    }
+    String query = url.substring(start + 1);
+    final int hash = query.indexOf('#');
+    if (hash >= 0) {
+      query = query.substring(0, hash);
+    }
+    final Map<String, String> result = <String, String>{};
+    for (final String part in query.split('&')) {
+      if (part.isEmpty) {
+        continue;
+      }
+      final int equals = part.indexOf('=');
+      final String key = equals < 0 ? part : part.substring(0, equals);
+      final String value = equals < 0 ? '' : part.substring(equals + 1);
+      try {
+        result[Uri.decodeComponent(key)] = Uri.decodeComponent(value);
+      } on ArgumentError {
+        // A malformed escape: the parameter is left out.
+      }
+    }
+    return result;
+  }
+
+  /// The API key of the project that sent the email.
+  final String apiKey;
+
+  /// The action code (`oobCode`). It is a one-time credential: [toString] leaves it out.
+  final String code;
+
+  /// What the link is for.
+  final ActionCodeOperation operation;
+
+  /// The continue URL of the [ActionCodeSettings] the email was sent with, if any.
+  final String? continueUrl;
+
+  /// The language the email was sent in (`lang`), if any.
+  final String? languageCode;
+
+  /// The tenant of the account, for an email of a tenant.
+  final String? tenantId;
+
+  @override
+  String toString() => 'ActionCodeURL(${operation.name})';
+}

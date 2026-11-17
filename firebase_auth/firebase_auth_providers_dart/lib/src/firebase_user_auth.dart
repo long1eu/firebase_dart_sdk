@@ -7,6 +7,7 @@ import 'package:http/http.dart' as http;
 import 'package:meta/meta.dart';
 
 import 'action_code.dart';
+import 'auth_credential.dart';
 import 'auth_exception.dart';
 import 'auth_storage.dart';
 import 'auth_user.dart';
@@ -812,9 +813,9 @@ class FirebaseUserAuth implements AuthTokenProvider {
     });
   }
 
-  /// Signs the signed-in user in again with [email] and [password] (`reauthenticateWithCredential` with an
-  /// `EmailAuthProvider` credential), which operations such as [updatePassword] and [deleteCurrentUser] need
-  /// when the last sign-in is too long ago.
+  /// Signs the signed-in user in again with [email] and [password]: [reauthenticateWithCredential] with an
+  /// [EmailAuthProvider.credential], which operations such as [updatePassword] and [deleteCurrentUser] need when
+  /// the last sign-in is too long ago.
   ///
   /// Throws `user-mismatch` when the credentials are those of another account (or of none), `wrong-password`,
   /// `invalid-credential`, ...; and a [FirebaseAuthMultiFactorException] (`multi-factor-auth-required`) when the
@@ -822,20 +823,170 @@ class FirebaseUserAuth implements AuthTokenProvider {
   Future<UserCredential> reauthenticateWithEmailAndPassword({
     required String email,
     required String password,
+  }) => reauthenticateWithCredential(
+    EmailAuthProvider.credential(email: email, password: password),
+  );
+
+  // ---- email link sign-in ----
+
+  /// Sends an email with a sign-in link to [email] (`sendSignInLinkToEmail`). The link opens the URL of
+  /// [actionCodeSettings], whose [ActionCodeSettings.handleCodeInApp] must be true: the app receives the link and
+  /// passes it to [signInWithEmailLink], with the address (keep it, for example in local storage, until then).
+  ///
+  /// The sign-in method "Email link (passwordless sign-in)" must be enabled for the project. Throws
+  /// `argument-error` when `handleCodeInApp` is not true, and `invalid-email`, `operation-not-allowed`,
+  /// `unauthorized-continue-uri`, `invalid-continue-uri`, ...
+  ///
+  /// ```dart
+  /// await auth.sendSignInLinkToEmail(
+  ///   email: 'ada@example.com',
+  ///   actionCodeSettings: const ActionCodeSettings(
+  ///     url: 'https://my-project.web.app/finish-sign-in',
+  ///     handleCodeInApp: true,
+  ///   ),
+  /// );
+  /// ```
+  Future<void> sendSignInLinkToEmail({
+    required String email,
+    required ActionCodeSettings actionCodeSettings,
   }) async {
+    _checkNotDisposed();
+    if (actionCodeSettings.handleCodeInApp != true) {
+      throw const FirebaseAuthException(
+        code: 'argument-error',
+        message:
+            'An email link sign-in needs ActionCodeSettings with handleCodeInApp: true.',
+      );
+    }
+    await _send(
+      _identityToolkit('accounts:sendOobCode'),
+      json: <String, Object?>{
+        'requestType': ActionCodeOperation.emailSignIn.serverName,
+        'email': email,
+        ...actionCodeSettings.toRequest(),
+      },
+      tenant: true,
+    );
+  }
+
+  /// Whether [emailLink] is a sign-in link of [sendSignInLinkToEmail] (`isSignInWithEmailLink`): see
+  /// [ActionCodeURL.parseLink].
+  bool isSignInWithEmailLink(String emailLink) =>
+      ActionCodeURL.parseLink(emailLink)?.operation ==
+      ActionCodeOperation.emailSignIn;
+
+  /// Signs in with the sign-in link of the email [sendSignInLinkToEmail] sent to [email] (`signInWithEmailLink`):
+  /// [signInWithCredential] with [EmailAuthProvider.credentialWithLink]. The account is created if there is none,
+  /// and its address counts as verified.
+  ///
+  /// Throws `argument-error` for a link that is not the link of an action email, `tenant-id-mismatch` when the
+  /// link is for another tenant than [tenantId], `invalid-action-code` or `expired-action-code` for a used or old
+  /// link, `invalid-email` when [email] is not the address the link was sent to, ...
+  ///
+  /// ```dart
+  /// if (auth.isSignInWithEmailLink(link)) {
+  ///   final UserCredential result = await auth.signInWithEmailLink(
+  ///     email: 'ada@example.com',
+  ///     emailLink: link,
+  ///   );
+  ///   print(result.user?.emailVerified); // true
+  /// }
+  /// ```
+  Future<UserCredential> signInWithEmailLink({
+    required String email,
+    required String emailLink,
+  }) async {
+    _checkNotDisposed();
+    if (_parseEmailLink(emailLink).tenantId != tenantId) {
+      throw const FirebaseAuthException(
+        code: 'tenant-id-mismatch',
+        message:
+            "The provided tenant ID does not match the Auth instance's tenant ID.",
+      );
+    }
+    return signInWithCredential(
+      EmailAuthProvider.credentialWithLink(email: email, emailLink: emailLink),
+    );
+  }
+
+  // ---- credentials ----
+
+  /// Signs in with [credential] (`signInWithCredential`), replacing the current user like the other sign-ins:
+  /// an [EmailAuthProvider] credential signs in with the password or the email link.
+  ///
+  /// Throws what the sign-in of the credential throws (`wrong-password`, `invalid-action-code`, ...), and a
+  /// [FirebaseAuthMultiFactorException] when the account has a second factor.
+  Future<UserCredential> signInWithCredential(AuthCredential credential) async {
+    _checkNotDisposed();
+    final _CredentialRequest request = _requestFor(credential);
+    return _signIn(request.method, request.body);
+  }
+
+  /// Links [credential] to the signed-in user (`linkWithCredential`): the account can then sign in with it too. An
+  /// anonymous user linked to an email address and a password, or to a federated provider, is no longer anonymous.
+  ///
+  /// Throws `null-user`, `provider-already-linked` (the user has a credential of this provider already: the
+  /// account is read first), `credential-already-in-use` (another account has it), `email-already-in-use`,
+  /// `requires-recent-login`, ...
+  Future<UserCredential> linkWithCredential(
+    AuthCredential credential,
+  ) => _forUser((String idToken, int generation) async {
+    // _assertLinkedStatus of the JS SDK.
+    await _reload(generation);
+    final AuthUser? user = _session?.user;
+    if (user == null || generation != _generation) {
+      throw _overtaken;
+    }
+    if (user.providerData.any(
+      (UserInfo info) => info.providerId == credential.providerId,
+    )) {
+      throw const FirebaseAuthException(
+        code: 'provider-already-linked',
+        message:
+            'User can only be linked to one identity for the given provider.',
+      );
+    }
+    final _CredentialRequest request = _requestFor(
+      credential,
+      idToken: (await getAccessToken(forceRefresh: false)).token,
+    );
+    final Map<String, Object?> response = await _send(
+      _identityToolkit(request.method),
+      json: request.body,
+      tenant: request.tenant,
+    );
+    _throwIfSecondFactorRequired(response);
+    if (generation != _generation) {
+      throw _overtaken;
+    }
+    await _updateSession(response, generation);
+    await _reload(generation);
+    return _result(response, _session?.user ?? user);
+  });
+
+  /// Signs the signed-in user in again with [credential] (`reauthenticateWithCredential`), which operations such
+  /// as [updatePassword] and [deleteCurrentUser] need when the last sign-in is too long ago. The user stays the
+  /// same; the session continues with the new tokens.
+  ///
+  /// Throws `null-user`, `user-mismatch` when the credential is that of another account (or of none),
+  /// `wrong-password`, `invalid-credential`, ...; and a [FirebaseAuthMultiFactorException]
+  /// (`multi-factor-auth-required`) when the account has a second factor (the signed-in user stays signed in).
+  Future<UserCredential> reauthenticateWithCredential(
+    AuthCredential credential,
+  ) async {
     _checkNotDisposed();
     final _Session session = _requireSession();
     final int generation = _generation;
+    final _CredentialRequest request = _requestFor(
+      credential,
+      reauthenticate: true,
+    );
     final Map<String, Object?> response;
     try {
       response = await _send(
-        _identityToolkit('accounts:signInWithPassword'),
-        json: <String, Object?>{
-          'email': email,
-          'password': password,
-          'returnSecureToken': true,
-        },
-        tenant: true,
+        _identityToolkit(request.method),
+        json: request.body,
+        tenant: request.tenant,
       );
     } on FirebaseAuthException catch (e) {
       if (e.code == 'user-not-found') {
@@ -864,10 +1015,84 @@ class FirebaseUserAuth implements AuthTokenProvider {
     }
     await _updateSession(response, generation);
     await _reload(generation);
-    return UserCredential(
-      _session?.user ?? session.user,
+    return _result(response, _session?.user ?? session.user);
+  }
+
+  /// The request that signs in with [credential] (`_getIdTokenResponse` of the JS SDK's credentials), links it to
+  /// the user of [idToken] (`_linkToIdToken`), or reauthenticates with it (`_getReauthenticationResolver`).
+  _CredentialRequest _requestFor(
+    AuthCredential credential, {
+    String? idToken,
+    bool reauthenticate = false,
+  }) {
+    switch (credential) {
+      case EmailAuthCredential(
+        signInMethod: EmailAuthProvider.EMAIL_PASSWORD_SIGN_IN_METHOD,
+        :final String email,
+        :final String password?,
+      ):
+        if (idToken != null) {
+          // linkEmailPassword: accounts:signUp with the ID token, without the tenant.
+          return _CredentialRequest('accounts:signUp', <String, Object?>{
+            'idToken': idToken,
+            'email': email,
+            'password': password,
+            'returnSecureToken': true,
+          }, tenant: false);
+        }
+        return _CredentialRequest(
+          'accounts:signInWithPassword',
+          <String, Object?>{
+            'email': email,
+            'password': password,
+            'returnSecureToken': true,
+          },
+        );
+      case EmailAuthCredential(
+        signInMethod: EmailAuthProvider.EMAIL_LINK_SIGN_IN_METHOD,
+        :final String email,
+        :final String emailLink?,
+      ):
+        return _CredentialRequest(
+          'accounts:signInWithEmailLink',
+          <String, Object?>{
+            'idToken': ?idToken,
+            'email': email,
+            'oobCode': _parseEmailLink(emailLink).code,
+          },
+        );
+      default:
+        throw ArgumentError.value(
+          credential,
+          'credential',
+          'Not a credential of this package',
+        );
+    }
+  }
+
+  /// The parts of an email link, or `argument-error` (`EmailAuthProvider.credentialWithLink` of the JS SDK).
+  static ActionCodeURL _parseEmailLink(String emailLink) {
+    final ActionCodeURL? url = ActionCodeURL.parseLink(emailLink);
+    if (url == null) {
+      throw const FirebaseAuthException(
+        code: 'argument-error',
+        message: 'The email link is not the link of an action email.',
+      );
+    }
+    return url;
+  }
+
+  /// The result of a sign-in, a link or a reauthentication [response] for [user].
+  UserCredential _result(Map<String, Object?> response, AuthUser user) {
+    final UserCredential result = UserCredential(
+      user,
       additionalUserInfo: additionalUserInfoOf(response),
     );
+    final _Session? session = _session;
+    if (session != null && identical(session.user, user)) {
+      _sessionOfUser[result] = (apiKey, session);
+    }
+    return result;
   }
 
   /// Reads the data of the signed-in user from the backend again (`reload`): email address, verification, display
@@ -1290,12 +1515,7 @@ class FirebaseUserAuth implements AuthTokenProvider {
     _emitToken(idToken);
     _notifyAuthState();
     await _letListenersReact();
-    final UserCredential result = UserCredential(
-      session.user,
-      additionalUserInfo: additionalUserInfoOf(response),
-    );
-    _sessionOfUser[result] = (apiKey, session);
-    return result;
+    return _result(response, session.user);
   }
 
   /// Like `_performSignInRequest` of the JS SDK: a sign-in answer with an `mfaPendingCredential` (and no tokens)
@@ -1549,6 +1769,15 @@ class FirebaseUserAuth implements AuthTokenProvider {
   /// When the proactive refresh is due, for tests.
   @visibleForTesting
   bool get hasRefreshTimer => _refreshTimer != null;
+}
+
+/// The request of a credential: the Identity Toolkit method, the body, and whether the tenant goes in it.
+class _CredentialRequest {
+  _CredentialRequest(this.method, this.body, {this.tenant = true});
+
+  final String method;
+  final Map<String, Object?> body;
+  final bool tenant;
 }
 
 class _BeforeStateCallback {
