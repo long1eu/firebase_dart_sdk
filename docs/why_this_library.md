@@ -52,7 +52,10 @@ Ranked by how strong the evidence is that this library is the better or the only
    cases, only local development workflows" ([Flutter setup](https://firebase.google.com/docs/flutter/setup)),
    and the Windows plugin rejects sum and average aggregations, pipelines and the cache index manager
    ([cloud_firestore_plugin.cpp](https://github.com/firebase/flutterfire/blob/main/packages/cloud_firestore/cloud_firestore/windows/cloud_firestore_plugin.cpp)).
-   The gap is well proven; that this library fills it is not: it has never been run on Windows.
+   The gap is well proven; that this library fills it is shown only on one Windows 11 VM against the emulator
+   (2026-11-17): the test suites pass there, and a Flutter Windows app on the official API ran sum and average
+   aggregations through it (`examples/flutterfire_on_windows`). Not in CI, not on a logged-on desktop, not
+   against production.
 
 Two weaker reasons follow: testing real client code under `dart test` against the emulator (Hypothesis 3), and
 Firestore in a Dart web app that does not use Flutter, such as Jaspr (Hypothesis 7).
@@ -92,18 +95,19 @@ and the cache index manager.
   plugin list was checked.
 - Non-Flutter Dart: no Google client SDK exists. The official Dart option is the Admin SDK (Hypothesis 2).
 
-**This library.** Linux is tested on the Dart VM (CI on Ubuntu x64, a Debian arm64 container). Windows is "not
-tested", with known notes (`sqlite3.dll`, `clearPersistence()` while the file is open). No Flutter app was built
-for Windows, Android or iOS; `examples/flutter_notes` ran on macOS only (`docs/guides/flutter.md`). Updated
+**This library.** Linux is tested on the Dart VM (CI on Ubuntu x64, a Debian arm64 container). On Windows 11
+x64 (one VM, 2026-11-17) the Dart VM suites pass, and `flutter_notes` and `flutterfire_on_windows` were built
+and run against the emulator (no window drawn). No Flutter app was built for Android or iOS
+(`docs/guides/flutter.md`). Updated
 2026-11-17: a Flutter Linux app on the official `cloud_firestore` API ran on Debian 13 x86_64 with
 `cloud_firestore_dart_platform`, against the emulator, in a debug build (see the update at the top).
 
 **How sure.** High that the gaps exist. Medium-high that this library fills Linux (Dart VM tested, one Flutter
-Linux app run against the emulator). Low for Windows.
+Linux app run against the emulator). Medium-low for Windows: one VM, emulator only.
 
 **Unverified.** Sign-in in a Flutter Linux app (`firebase_auth` has no Linux implementation), a real project
-and TLS from a Flutter Linux process, a release build, arm64 and other distributions, any Windows run, an
-embedded board.
+and TLS from a Flutter Linux process, a release build, arm64 and other distributions, a Windows release build, a logged-on
+Windows desktop, Windows in CI, an embedded board.
 
 ## Hypothesis 2: pure-Dart servers and CLIs
 
@@ -273,7 +277,7 @@ on the Dart VM, but no Flutter app ran a listener in a background isolate.
 | Situation | Official option | This library | Who wins and why |
 |---|---|---|---|
 | Flutter app on Linux desktop or embedded Linux | none for Firestore | the official `cloud_firestore` API through `cloud_firestore_dart_platform`; listeners, offline cache | this library: the only option (one debug build run on Debian against the emulator; embedded not tried) |
-| Flutter app on Windows, shipped to users | `cloud_firestore`, "development only", C++ SDK gaps | untested on Windows | unclear until tested; the official option is not supported in production |
+| Flutter app on Windows, shipped to users | `cloud_firestore`, "development only", C++ SDK gaps | run on one Windows 11 VM against the emulator; sum, average and the disk cache work | unclear until tested; the official option is not supported in production |
 | Dart server reacting to changes | Admin SDK: no listeners (drafts in progress); polling | listeners with resume and backoff | this library today; may change in months |
 | Dart server or CLI acting as a user under rules, or working offline | none (Admin bypasses rules; `firedart` has no cache, no queries) | yes | this library |
 | Dart server doing admin jobs (bulk writes, user management, recursive delete) | Admin SDK | Firestore: not built for it; `firebase_admin_dart` (unpublished, emulator only): Auth users, custom tokens, ID tokens | Admin SDK |
@@ -344,8 +348,8 @@ Ranked by expected effect on adoption.
 **It must not say yet:**
 
 - "Production ready", or anything that implies scale or reliability beyond the emulator and the 15-check kit.
-- "Works on Windows" or "works in Flutter apps on Android / iOS": not run there yet. Say "expected to work"
-  until it has been. For Linux (updated 2026-11-17), do not go beyond what ran: one debug build on Debian 13
+- "Works in Flutter apps on Android / iOS": not run there yet. Say "expected to work" until it has been.
+  "Works on Windows": say only what ran (one VM, the emulator, debug builds). For Linux (updated 2026-11-17), do not go beyond what ran: one debug build on Debian 13
   x86_64 against the emulator, without sign-in.
 - "Faster builds" or "smaller apps" than FlutterFire: not measured, and the iOS build argument is mostly
   obsolete.
