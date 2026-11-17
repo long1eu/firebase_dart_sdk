@@ -1,0 +1,78 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 710" role="img" aria-labelledby="title desc" font-family="system-ui, -apple-system, Segoe UI, Helvetica, Arial, sans-serif">
+  <title id="title">dart2wasm time as a share of dart2js time</title>
+  <desc id="desc">Bar chart. For each case, the time (or memory) of the dart2wasm build as a percentage of the dart2js build, in headless Chrome. Shorter is better; 100 % means the same. 1 KB document, to backend bytes: 25 %; 1 KB document, from backend bytes: 38 %; 50 KB document, to cache bytes: 25 %; 50 KB document, from cache bytes: 35 %; filter, 10,000 documents: 33 %; orderBy + limit, 10,000 documents: 22 %; first snapshot, 10,000 documents: 31 %; filter, 50,000 documents: 45 %; load a bundle of 10,000 documents: 36 %; 500 writes, 1 listener: 25 %; 500 writes, 20 listeners: 21 %; remote event changing 1,000 documents: 26 %; filter, IndexedDB: 50 %; filter, OPFS: 54 %; first load: script to first snapshot: 101 %; third load: script to first snapshot: 63 %; memory for 50,000 documents: 95 %.</desc>
+  <rect x="0" y="0" width="960" height="710" rx="10" fill="#ffffff" stroke="#d0d7de"/>
+  <text x="20" y="28" font-size="14" fill="#1f2328" font-weight="600">dart2wasm as a share of dart2js, in Chrome (shorter is better)</text>
+  <line x1="330.0" y1="44" x2="330.0" y2="630" stroke="#d0d7de" stroke-width="1" stroke-dasharray="3 3"/>
+  <text x="330.0" y="646" font-size="11" fill="#57606a" text-anchor="middle">0 %</text>
+  <line x1="405.0" y1="44" x2="405.0" y2="630" stroke="#d0d7de" stroke-width="1" stroke-dasharray="3 3"/>
+  <text x="405.0" y="646" font-size="11" fill="#57606a" text-anchor="middle">25 %</text>
+  <line x1="480.0" y1="44" x2="480.0" y2="630" stroke="#d0d7de" stroke-width="1" stroke-dasharray="3 3"/>
+  <text x="480.0" y="646" font-size="11" fill="#57606a" text-anchor="middle">50 %</text>
+  <line x1="555.0" y1="44" x2="555.0" y2="630" stroke="#d0d7de" stroke-width="1" stroke-dasharray="3 3"/>
+  <text x="555.0" y="646" font-size="11" fill="#57606a" text-anchor="middle">75 %</text>
+  <line x1="630.0" y1="44" x2="630.0" y2="630" stroke="#57606a" stroke-width="1"/>
+  <text x="630.0" y="646" font-size="11" fill="#57606a" text-anchor="middle">100 %</text>
+  <line x1="705.0" y1="44" x2="705.0" y2="630" stroke="#d0d7de" stroke-width="1" stroke-dasharray="3 3"/>
+  <text x="705.0" y="646" font-size="11" fill="#57606a" text-anchor="middle">125 %</text>
+  <line x1="780.0" y1="44" x2="780.0" y2="630" stroke="#d0d7de" stroke-width="1" stroke-dasharray="3 3"/>
+  <text x="780.0" y="646" font-size="11" fill="#57606a" text-anchor="middle">150 %</text>
+  <text x="630.0" y="40" font-size="11" fill="#57606a" text-anchor="middle">dart2js = 100 %</text>
+  <text x="20" y="86" font-size="12" fill="#1f2328" font-weight="700">Serialization</text>
+  <text x="318" y="109" font-size="12" fill="#1f2328" text-anchor="end">1 KB document, to backend bytes</text>
+  <rect x="330" y="96" width="74.1" height="18" rx="3" fill="#0969da"/>
+  <text x="410.1" y="109" font-size="12" fill="#1f2328" stroke="#ffffff" stroke-width="4" paint-order="stroke">25 % (4.0x faster)</text>
+  <text x="318" y="135" font-size="12" fill="#1f2328" text-anchor="end">1 KB document, from backend bytes</text>
+  <rect x="330" y="122" width="113.9" height="18" rx="3" fill="#0969da"/>
+  <text x="449.9" y="135" font-size="12" fill="#1f2328" stroke="#ffffff" stroke-width="4" paint-order="stroke">38 % (2.6x faster)</text>
+  <text x="318" y="161" font-size="12" fill="#1f2328" text-anchor="end">50 KB document, to cache bytes</text>
+  <rect x="330" y="148" width="74.7" height="18" rx="3" fill="#0969da"/>
+  <text x="410.7" y="161" font-size="12" fill="#1f2328" stroke="#ffffff" stroke-width="4" paint-order="stroke">25 % (4.0x faster)</text>
+  <text x="318" y="187" font-size="12" fill="#1f2328" text-anchor="end">50 KB document, from cache bytes</text>
+  <rect x="330" y="174" width="105.6" height="18" rx="3" fill="#0969da"/>
+  <text x="441.6" y="187" font-size="12" fill="#1f2328" stroke="#ffffff" stroke-width="4" paint-order="stroke">35 % (2.8x faster)</text>
+  <text x="20" y="220" font-size="12" fill="#1f2328" font-weight="700">Memory cache</text>
+  <text x="318" y="243" font-size="12" fill="#1f2328" text-anchor="end">filter, 10,000 documents</text>
+  <rect x="330" y="230" width="99.9" height="18" rx="3" fill="#0969da"/>
+  <text x="435.9" y="243" font-size="12" fill="#1f2328" stroke="#ffffff" stroke-width="4" paint-order="stroke">33 % (3.0x faster)</text>
+  <text x="318" y="269" font-size="12" fill="#1f2328" text-anchor="end">orderBy + limit, 10,000 documents</text>
+  <rect x="330" y="256" width="66.1" height="18" rx="3" fill="#0969da"/>
+  <text x="402.1" y="269" font-size="12" fill="#1f2328" stroke="#ffffff" stroke-width="4" paint-order="stroke">22 % (4.5x faster)</text>
+  <text x="318" y="295" font-size="12" fill="#1f2328" text-anchor="end">first snapshot, 10,000 documents</text>
+  <rect x="330" y="282" width="91.9" height="18" rx="3" fill="#0969da"/>
+  <text x="427.9" y="295" font-size="12" fill="#1f2328" stroke="#ffffff" stroke-width="4" paint-order="stroke">31 % (3.3x faster)</text>
+  <text x="318" y="321" font-size="12" fill="#1f2328" text-anchor="end">filter, 50,000 documents</text>
+  <rect x="330" y="308" width="135.0" height="18" rx="3" fill="#0969da"/>
+  <text x="471.0" y="321" font-size="12" fill="#1f2328" stroke="#ffffff" stroke-width="4" paint-order="stroke">45 % (2.2x faster)</text>
+  <text x="318" y="347" font-size="12" fill="#1f2328" text-anchor="end">load a bundle of 10,000 documents</text>
+  <rect x="330" y="334" width="109.4" height="18" rx="3" fill="#0969da"/>
+  <text x="445.4" y="347" font-size="12" fill="#1f2328" stroke="#ffffff" stroke-width="4" paint-order="stroke">36 % (2.7x faster)</text>
+  <text x="318" y="373" font-size="12" fill="#1f2328" text-anchor="end">500 writes, 1 listener</text>
+  <rect x="330" y="360" width="73.5" height="18" rx="3" fill="#0969da"/>
+  <text x="409.5" y="373" font-size="12" fill="#1f2328" stroke="#ffffff" stroke-width="4" paint-order="stroke">25 % (4.1x faster)</text>
+  <text x="318" y="399" font-size="12" fill="#1f2328" text-anchor="end">500 writes, 20 listeners</text>
+  <rect x="330" y="386" width="61.9" height="18" rx="3" fill="#0969da"/>
+  <text x="397.9" y="399" font-size="12" fill="#1f2328" stroke="#ffffff" stroke-width="4" paint-order="stroke">21 % (4.8x faster)</text>
+  <text x="318" y="425" font-size="12" fill="#1f2328" text-anchor="end">remote event changing 1,000 documents</text>
+  <rect x="330" y="412" width="77.6" height="18" rx="3" fill="#0969da"/>
+  <text x="413.6" y="425" font-size="12" fill="#1f2328" stroke="#ffffff" stroke-width="4" paint-order="stroke">26 % (3.9x faster)</text>
+  <text x="20" y="458" font-size="12" fill="#1f2328" font-weight="700">SQLite cache, 10,000 documents</text>
+  <text x="318" y="481" font-size="12" fill="#1f2328" text-anchor="end">filter, IndexedDB</text>
+  <rect x="330" y="468" width="151.5" height="18" rx="3" fill="#0969da"/>
+  <text x="487.5" y="481" font-size="12" fill="#1f2328" stroke="#ffffff" stroke-width="4" paint-order="stroke">50 % (2.0x faster)</text>
+  <text x="318" y="507" font-size="12" fill="#1f2328" text-anchor="end">filter, OPFS</text>
+  <rect x="330" y="494" width="162.1" height="18" rx="3" fill="#0969da"/>
+  <text x="498.1" y="507" font-size="12" fill="#1f2328" stroke="#ffffff" stroke-width="4" paint-order="stroke">54 % (1.9x faster)</text>
+  <text x="20" y="540" font-size="12" fill="#1f2328" font-weight="700">Start-up and memory</text>
+  <text x="318" y="563" font-size="12" fill="#1f2328" text-anchor="end">first load: script to first snapshot</text>
+  <rect x="330" y="550" width="304.1" height="18" rx="3" fill="#8c959f"/>
+  <text x="640.1" y="563" font-size="12" fill="#1f2328" stroke="#ffffff" stroke-width="4" paint-order="stroke">101 %, within the spread (37.3 vs 36.8 ms)</text>
+  <text x="318" y="589" font-size="12" fill="#1f2328" text-anchor="end">third load: script to first snapshot</text>
+  <rect x="330" y="576" width="188.2" height="18" rx="3" fill="#0969da"/>
+  <text x="524.2" y="589" font-size="12" fill="#1f2328" stroke="#ffffff" stroke-width="4" paint-order="stroke">63 % (3.9 vs 6.3 ms)</text>
+  <text x="318" y="615" font-size="12" fill="#1f2328" text-anchor="end">memory for 50,000 documents</text>
+  <rect x="330" y="602" width="285.5" height="18" rx="3" fill="#0969da"/>
+  <text x="621.5" y="615" font-size="12" fill="#1f2328" stroke="#ffffff" stroke-width="4" paint-order="stroke">95 % (209 MB vs 220 MB)</text>
+  <text x="20" y="672" font-size="11" fill="#57606a">Median of 7 runs per compiler, each the median of 5 repetitions after a warm-up. Grey: the ranges of the</text>
+  <text x="20" y="688" font-size="11" fill="#57606a">two compilers overlap. tool/web_cpu_benchmark, headless Chrome 157, Dart 3.12.2, -O2, Apple M5, 2026-11-18.</text>
+</svg>
