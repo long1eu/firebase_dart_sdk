@@ -14,12 +14,6 @@ import '../../../util/test_hygiene.dart';
 /// Files of example/ that are libraries, not programs.
 const Set<String> _libraries = <String>{
   'common.dart',
-  'sqlite_database.dart',
-  // For browsers; exercised by test/browser/web_persistence_test.dart.
-  'sqlite_database_web.dart',
-  // The OPFS worker of sqlite_database_web.dart, compiled to JavaScript;
-  // exercised by test/browser/web_persistence_opfs_test.dart.
-  'sqlite_opfs_worker.dart',
 };
 
 /// The topics that must stay covered; a missing file fails the test.
@@ -139,7 +133,12 @@ void main() {
           },
         );
         final String output = await stdoutText;
-        final String errors = await stderrText;
+        // `dart run` reports on stderr that it runs the build hooks of the
+        // dependencies (sqlite3 3.x has one), without a line break.
+        final String errors = (await stderrText).replaceAll(
+          'Running build hooks...',
+          '',
+        );
 
         expect(
           exitCode,

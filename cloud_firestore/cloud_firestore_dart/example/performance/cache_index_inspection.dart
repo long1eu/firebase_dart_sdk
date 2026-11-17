@@ -17,9 +17,9 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:cloud_firestore_dart/cloud_firestore_dart.dart';
+import 'package:cloud_firestore_dart_sqlite/cloud_firestore_dart_sqlite.dart';
 
 import '../common.dart';
-import '../sqlite_database.dart';
 
 const int documentCount = 2000;
 
@@ -66,7 +66,7 @@ Future<void> run() async {
   );
   final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(
     app: exampleApp(),
-    openDatabase: sqliteOpener(directory),
+    openDatabase: sqliteOpener(directory: directory.path),
     settings: emulatorSettings(cacheSettings: PersistentCacheSettings()),
   );
   final PersistentCacheIndexManager indexes =

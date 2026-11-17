@@ -12,6 +12,9 @@
 // Nothing here names the current schema version: the tests go up to
 // `SQLiteSchema.version`, so a new migration is covered when it is added.
 
+// `dispose()` is the close of sqlite3 2.x, which Dart 3.8 and 3.9 resolve; 3.x deprecates it.
+// ignore_for_file: deprecated_member_use
+
 import 'dart:io';
 import 'dart:typed_data';
 

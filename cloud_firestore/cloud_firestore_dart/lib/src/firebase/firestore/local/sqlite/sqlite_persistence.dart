@@ -959,7 +959,7 @@ class SQLitePersistence extends Persistence {
         await db.execute('BEGIN EXCLUSIVE;');
         began = true;
       } catch (e) {
-        // An opener may run the callbacks inside a transaction of its own (example/sqlite_database_web.dart does).
+        // An opener may run the callbacks inside a transaction of its own (the web opener of cloud_firestore_dart_sqlite does).
         if (!'$e'.contains('within a transaction')) {
           rethrow;
         }

@@ -6,10 +6,10 @@
 import 'dart:io';
 
 import 'package:cloud_firestore_dart/cloud_firestore_dart.dart';
+import 'package:cloud_firestore_dart_sqlite/cloud_firestore_dart_sqlite.dart';
 import 'package:firebase_app_dart/firebase_app_dart.dart';
 
 import 'common.dart';
-import 'sqlite_database.dart';
 
 Future<void> main() async {
   // Log level: `warn` (the default) prints warnings and errors, `debug`
@@ -24,7 +24,7 @@ Future<void> main() async {
   FirebaseFirestore open() {
     return FirebaseFirestore.instanceFor(
       app: app,
-      openDatabase: sqliteOpener(directory),
+      openDatabase: sqliteOpener(directory: directory.path),
       settings: emulatorSettings(cacheSettings: PersistentCacheSettings()),
     );
   }

@@ -5,12 +5,11 @@
 import 'dart:io';
 
 import 'package:cloud_firestore_dart/cloud_firestore_dart.dart';
+import 'package:cloud_firestore_dart_sqlite/cloud_firestore_dart_sqlite.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 import 'package:test/test.dart';
 
-import '../../../../../example/sqlite_database.dart';
-
-/// The opener of `example/sqlite_database.dart` reports the SQLite errors that may go away on their own as a
+/// The VM opener of `cloud_firestore_dart_sqlite` (`sqliteOpener`) reports the SQLite errors that may go away on their own as a
 /// [TransientDatabaseException] (Firestore then goes offline and retries), and every other error as it is.
 void main() {
   late Directory directory;
@@ -19,12 +18,17 @@ void main() {
 
   setUp(() async {
     directory = await Directory.systemTemp.createTemp('example_opener_test');
-    database = await sqliteOpener(directory)('errors', version: 1);
+    database = await sqliteOpener(directory: directory.path)(
+      'errors',
+      version: 1,
+    );
     await database.execute('CREATE TABLE t (a INTEGER)');
     other = sqlite.sqlite3.open('${directory.path}/errors.db');
   });
 
   tearDown(() async {
+    // `dispose()` is the close of sqlite3 2.x (the Dart 3.8 CI job resolves 2.x); deprecated in 3.x.
+    // ignore: deprecated_member_use
     other.dispose();
     database.close();
     await directory.delete(recursive: true);
@@ -121,12 +125,18 @@ void main() {
 
   test('the page cache size is applied, the default is left alone', () async {
     // The default of the library: -2000 (2 MB) in SQLite's own build, 2000 pages (8 MB) in the one of macOS.
-    expect((await database.query('PRAGMA cache_size')).single.values.single,
-        anyOf(-2000, 2000));
-    final Database sized =
-        await sqliteOpener(directory, pageCacheMb: 16)('sized', version: 1);
+    expect(
+      (await database.query('PRAGMA cache_size')).single.values.single,
+      anyOf(-2000, 2000),
+    );
+    final Database sized = await sqliteOpener(
+      directory: directory.path,
+      pageCacheMb: 16,
+    )('sized', version: 1);
     addTearDown(sized.close);
-    expect((await sized.query('PRAGMA cache_size')).single.values.single,
-        -16 * 1024);
+    expect(
+      (await sized.query('PRAGMA cache_size')).single.values.single,
+      -16 * 1024,
+    );
   });
 }

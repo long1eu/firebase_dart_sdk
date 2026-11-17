@@ -10,6 +10,9 @@
 // fail with a TypeError or a RangeError, also not in the warnings that a
 // refresh logs instead of throwing.
 
+// `dispose()` is the close of sqlite3 2.x, which Dart 3.8 and 3.9 resolve; 3.x deprecates it.
+// ignore_for_file: deprecated_member_use
+
 @TestOn('vm')
 library;
 

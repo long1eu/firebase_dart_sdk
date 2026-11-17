@@ -8,6 +8,9 @@
 // SQL, not storage). It needs test/browser/sqlite3.wasm, see
 // test/browser/web_persistence_test.dart.
 
+// `dispose()` is the close of sqlite3 2.x, which Dart 3.8 and 3.9 resolve; 3.x deprecates it.
+// ignore_for_file: deprecated_member_use
+
 import 'dart:async';
 
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/database.dart';

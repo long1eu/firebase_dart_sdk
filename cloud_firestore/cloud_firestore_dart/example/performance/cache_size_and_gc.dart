@@ -19,9 +19,9 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:cloud_firestore_dart/cloud_firestore_dart.dart';
+import 'package:cloud_firestore_dart_sqlite/cloud_firestore_dart_sqlite.dart';
 
 import '../common.dart';
-import '../sqlite_database.dart';
 
 const int documentCount = 600;
 
@@ -59,7 +59,7 @@ Future<void> run() async {
   final Stopwatch sinceStart = Stopwatch()..start();
   final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(
     app: exampleApp(),
-    openDatabase: sqliteOpener(directory),
+    openDatabase: sqliteOpener(directory: directory.path),
     settings: emulatorSettings(
       // The smallest threshold allowed: 1 MB. The default is 100 MB;
       // FirestoreSettings.cacheSizeUnlimited turns the collection off.

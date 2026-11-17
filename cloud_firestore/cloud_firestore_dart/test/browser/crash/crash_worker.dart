@@ -1,5 +1,5 @@
 // The worker of web_persistence_crash_test.dart: it opens a database with the
-// opener of example/sqlite_database_web.dart (in IndexedDB, or in OPFS when
+// web opener of cloud_firestore_dart_sqlite (in IndexedDB, or in OPFS when
 // the test passes `opfsWorker`) and writes transactions until the
 // test terminates it, at a moment of the test's choosing. Terminating a
 // worker ends its JavaScript and aborts its IndexedDB transactions wherever
@@ -28,9 +28,8 @@ import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:cloud_firestore_dart/cloud_firestore_dart.dart';
+import 'package:cloud_firestore_dart_sqlite/web.dart';
 import 'package:web/web.dart' as web;
-
-import '../../../example/sqlite_database_web.dart';
 
 @JS('self')
 external web.DedicatedWorkerGlobalScope get _self;

@@ -16,9 +16,9 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:cloud_firestore_dart/cloud_firestore_dart.dart';
+import 'package:cloud_firestore_dart_sqlite/cloud_firestore_dart_sqlite.dart';
 
 import '../common.dart';
-import '../sqlite_database.dart';
 
 Future<void> main() async {
   final String path = scratch('articles');
@@ -49,7 +49,7 @@ Future<void> main() async {
   );
   final FirebaseFirestore client = FirebaseFirestore.instanceFor(
     app: exampleApp('client'),
-    openDatabase: sqliteOpener(directory),
+    openDatabase: sqliteOpener(directory: directory.path),
     settings: emulatorSettings(cacheSettings: PersistentCacheSettings()),
   );
 

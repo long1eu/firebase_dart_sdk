@@ -1,6 +1,6 @@
 // The offline cache in a browser with its database in the origin private
-// file system (OPFS): example/sqlite_database_web.dart with `opfsWorker`,
-// SQLite in the dedicated worker of example/sqlite_opfs_worker.dart.
+// file system (OPFS): the web opener of cloud_firestore_dart_sqlite with
+// `opfsWorker`, SQLite in the dedicated worker of its opfs_worker.dart.
 //
 // Needs test/browser/sqlite3.wasm (see web_persistence_test.dart) and the
 // compiled worker test/browser/opfs/sqlite_opfs_worker.js
@@ -22,12 +22,13 @@ import 'dart:typed_data';
 import 'package:cloud_firestore_dart/cloud_firestore_dart.dart';
 import 'package:cloud_firestore_dart/src/internal_access.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/sqlite/sqlite_persistence.dart';
+import 'package:cloud_firestore_dart_sqlite/opfs_worker.dart'
+    show isTransientError;
+import 'package:cloud_firestore_dart_sqlite/web.dart';
 import 'package:sqlite3/wasm.dart' as sqlite;
 import 'package:test/test.dart';
 import 'package:web/web.dart' as web;
 
-import '../../example/sqlite_database_web.dart';
-import '../../example/sqlite_opfs_worker.dart' show isTransientError;
 import 'browser_test_util.dart';
 
 typedef Json = Map<String, Object?>;

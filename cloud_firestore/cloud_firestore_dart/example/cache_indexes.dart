@@ -5,16 +5,16 @@
 // Firestore index and it never changes what a query returns, only how many
 // cached documents the SDK has to read to answer it.
 //
-// The opener is in sqlite_database.dart (package:sqlite3).
+// The opener is `sqliteOpener` of package:cloud_firestore_dart_sqlite.
 //
 //     FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 dart run example/cache_indexes.dart
 
 import 'dart:io';
 
 import 'package:cloud_firestore_dart/cloud_firestore_dart.dart';
+import 'package:cloud_firestore_dart_sqlite/cloud_firestore_dart_sqlite.dart';
 
 import 'common.dart';
-import 'sqlite_database.dart';
 
 Future<void> main() async {
   final Directory directory = Directory.systemTemp.createTempSync(
@@ -25,7 +25,7 @@ Future<void> main() async {
     app: exampleApp(),
     // Cache indexes need the persistent cache: with a memory cache
     // `persistentCacheIndexManager` is null.
-    openDatabase: sqliteOpener(directory),
+    openDatabase: sqliteOpener(directory: directory.path),
     settings: emulatorSettings(cacheSettings: PersistentCacheSettings()),
   );
 

@@ -2,7 +2,7 @@
 //
 // A `Database` reports an error that may go away on its own (SQLite busy or
 // locked, an I/O error, a full disk) by throwing `TransientDatabaseException`;
-// the opener in sqlite_database.dart does. Firestore then:
+// `sqliteOpener` of package:cloud_firestore_dart_sqlite does. Firestore then:
 // - fails a write or a listen that could not be stored with `unavailable`,
 //   so that the app can try again;
 // - keeps what the backend sent when it could not be stored, goes offline and
@@ -17,16 +17,16 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:cloud_firestore_dart/cloud_firestore_dart.dart';
+import 'package:cloud_firestore_dart_sqlite/cloud_firestore_dart_sqlite.dart';
 
 import 'common.dart';
-import 'sqlite_database.dart';
 
 Future<void> main() async {
   final Directory directory = Directory.systemTemp.createTempSync(
     'firestore_recovery_',
   );
   late FlakyDatabase database;
-  final OpenDatabase sqlite = sqliteOpener(directory);
+  final OpenDatabase sqlite = sqliteOpener(directory: directory.path);
   final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(
     app: exampleApp(),
     openDatabase:

@@ -1,17 +1,17 @@
 // Offline persistence: keep the cache in a SQLite file so that data survives a
 // restart and can be read without a connection.
 //
-// The opener is in sqlite_database.dart (package:sqlite3).
+// The opener is `sqliteOpener` of package:cloud_firestore_dart_sqlite.
 //
 //     FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 dart run example/offline_persistence.dart
 
 import 'dart:io';
 
 import 'package:cloud_firestore_dart/cloud_firestore_dart.dart';
+import 'package:cloud_firestore_dart_sqlite/cloud_firestore_dart_sqlite.dart';
 import 'package:firebase_app_dart/firebase_app_dart.dart';
 
 import 'common.dart';
-import 'sqlite_database.dart';
 
 Future<void> main() async {
   // Where the database file lives is your choice; here a temporary directory
@@ -25,7 +25,7 @@ Future<void> main() async {
     return FirebaseFirestore.instanceFor(
       app: app,
       // Without `openDatabase` the cache is in memory, whatever the settings.
-      openDatabase: sqliteOpener(directory),
+      openDatabase: sqliteOpener(directory: directory.path),
       settings: emulatorSettings(
         cacheSettings: PersistentCacheSettings(sizeBytes: 100 * 1024 * 1024),
       ),

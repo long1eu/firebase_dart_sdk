@@ -1,5 +1,5 @@
 // Crash safety of the offline cache in a browser: a worker writes
-// transactions through the opener of example/sqlite_database_web.dart and is
+// transactions through the web opener of cloud_firestore_dart_sqlite and is
 // terminated at random moments, hundreds of times; after every kill the
 // database is read back from IndexedDB and checked.
 //
@@ -16,11 +16,10 @@ import 'dart:convert';
 import 'dart:js_interop';
 import 'dart:math';
 
+import 'package:cloud_firestore_dart_sqlite/web.dart';
 import 'package:sqlite3/wasm.dart' as sqlite;
 import 'package:test/test.dart';
 import 'package:web/web.dart' as web;
-
-import '../../example/sqlite_database_web.dart';
 
 /// How many times the worker is started and killed.
 const int crashIterations = 300;
@@ -85,8 +84,8 @@ void main() {
 Future<void> crashTest({required bool opfs}) async {
   if (!opfs && const bool.fromEnvironment('dart.tool.dart2wasm')) {
     // The checks after each kill read the database with the file system of
-    // sqlite3 2.9.4 directly, without the read fix of the opener
-    // (`_ReadCopyFileSystem` in example/sqlite_database_web.dart): compiled
+    // sqlite3 directly, without the read fix of the opener
+    // (`_ReadCopyFileSystem` of cloud_firestore_dart_sqlite): compiled
     // with dart2wasm every read then costs a copy of the whole file, and
     // checking the 3 MB database takes a minute instead of 2 ms.
     markTestSkipped(
@@ -251,6 +250,8 @@ Future<void> crashTest({required bool opfs}) async {
           Map<String, Object?>.of(row),
       ];
       done = () async {
+        // The close of sqlite3 2.x; deprecated, not removed, in 3.x.
+        // ignore: deprecated_member_use
         db.dispose();
         await fileSystem.flush();
         sqlite3.unregisterVirtualFileSystem(fileSystem);
