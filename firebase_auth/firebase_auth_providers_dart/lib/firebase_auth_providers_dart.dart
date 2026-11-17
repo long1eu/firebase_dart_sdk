@@ -40,4 +40,5 @@ export 'src/auth_storage.dart';
 export 'src/auth_user.dart';
 export 'src/firebase_user_auth.dart';
 export 'src/oauth_token_provider.dart';
+export 'src/password_policy.dart';
 export 'src/service_account_key.dart';

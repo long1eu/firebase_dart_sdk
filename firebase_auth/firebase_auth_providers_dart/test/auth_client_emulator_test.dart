@@ -596,4 +596,22 @@ void main() {
       skip: skip,
     );
   });
+
+  test(
+    'the emulator does not implement v2/passwordPolicy (HTTP 501): validatePassword fails',
+    () async {
+      final FirebaseUserAuth auth = create();
+      await expectLater(
+        auth.validatePassword('x'),
+        throwsA(
+          isA<FirebaseAuthException>().having(
+            (FirebaseAuthException e) => e.httpStatus,
+            'httpStatus',
+            501,
+          ),
+        ),
+      );
+    },
+    skip: skip,
+  );
 }

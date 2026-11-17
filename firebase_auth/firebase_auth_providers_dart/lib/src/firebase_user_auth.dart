@@ -12,6 +12,7 @@ import 'auth_exception.dart';
 import 'auth_storage.dart';
 import 'auth_user.dart';
 import 'user_record.dart';
+import 'password_policy.dart';
 import 'environment_stub.dart'
     if (dart.library.io) 'environment_io.dart'
     if (dart.library.js_interop) 'environment_web.dart';
@@ -354,6 +355,10 @@ class FirebaseUserAuth implements AuthTokenProvider {
   /// The [restore] in progress.
   Future<void>? _restoring;
 
+  /// The password policies fetched by [validatePassword], by tenant (null for the project).
+  final Map<String?, PasswordPolicy> _passwordPolicies =
+      <String?, PasswordPolicy>{};
+
   final List<_BeforeStateCallback> _beforeStateCallbacks =
       <_BeforeStateCallback>[];
 
@@ -536,11 +541,13 @@ class FirebaseUserAuth implements AuthTokenProvider {
   Future<UserCredential> signInWithEmailAndPassword({
     required String email,
     required String password,
-  }) => _signIn('accounts:signInWithPassword', <String, Object?>{
-    'email': email,
-    'password': password,
-    'returnSecureToken': true,
-  });
+  }) => _recachePasswordPolicyOnFailure(
+    _signIn('accounts:signInWithPassword', <String, Object?>{
+      'email': email,
+      'password': password,
+      'returnSecureToken': true,
+    }),
+  );
 
   /// Creates an account with an email address and a password and signs it in
   /// (`createUserWithEmailAndPassword`). The new user is not anonymous, and its email address is not verified:
@@ -551,11 +558,13 @@ class FirebaseUserAuth implements AuthTokenProvider {
   Future<UserCredential> createUserWithEmailAndPassword({
     required String email,
     required String password,
-  }) => _signIn('accounts:signUp', <String, Object?>{
-    'email': email,
-    'password': password,
-    'returnSecureToken': true,
-  });
+  }) => _recachePasswordPolicyOnFailure(
+    _signIn('accounts:signUp', <String, Object?>{
+      'email': email,
+      'password': password,
+      'returnSecureToken': true,
+    }),
+  );
 
   /// Signs in with a custom token minted by a server (for example with `createCustomToken` of the Admin SDK),
   /// for users that your own backend authenticates (`signInWithCustomToken`). The custom claims of the token are
@@ -636,10 +645,12 @@ class FirebaseUserAuth implements AuthTokenProvider {
     required String newPassword,
   }) async {
     _checkNotDisposed();
-    await _send(
-      _identityToolkit('accounts:resetPassword'),
-      json: <String, Object?>{'oobCode': code, 'newPassword': newPassword},
-      tenant: true,
+    await _recachePasswordPolicyOnFailure(
+      _send(
+        _identityToolkit('accounts:resetPassword'),
+        json: <String, Object?>{'oobCode': code, 'newPassword': newPassword},
+        tenant: true,
+      ),
     );
   }
 
@@ -826,6 +837,78 @@ class FirebaseUserAuth implements AuthTokenProvider {
   }) => reauthenticateWithCredential(
     EmailAuthProvider.credential(email: email, password: password),
   );
+
+  // ---- password policy ----
+
+  /// Checks [password] against the password policy of the project, or of [tenantId] (`validatePassword` of the
+  /// JS SDK and of FlutterFire), for example to show what a new password still lacks before
+  /// [createUserWithEmailAndPassword] or [updatePassword].
+  ///
+  /// The policy is fetched once (`v2/passwordPolicy`) per tenant and cached; it is fetched again after the backend
+  /// refuses a password with `password-does-not-meet-requirements` (as the JS SDK does). An empty password is not
+  /// an error: it fails the minimum length.
+  ///
+  /// Throws a [FirebaseAuthException] when the policy cannot be fetched (`network-request-failed`, ...), and
+  /// `unsupported-password-policy-schema-version` for a policy of a schema this package does not know.
+  ///
+  /// ```dart
+  /// final PasswordValidationStatus status = await auth.validatePassword('hunter2');
+  /// if (!status.isValid) {
+  ///   print('at least ${status.passwordPolicy.minPasswordLength} characters');
+  /// }
+  /// ```
+  Future<PasswordValidationStatus> validatePassword(String password) async {
+    _checkNotDisposed();
+    final PasswordPolicy policy =
+        _passwordPolicies[tenantId] ?? await _fetchPasswordPolicy();
+    if (policy.schemaVersion != PasswordPolicy.supportedSchemaVersion) {
+      throw const FirebaseAuthException(
+        code: 'unsupported-password-policy-schema-version',
+        message:
+            'The password policy received from the backend uses a schema version that is not supported by this '
+            'version of the package.',
+      );
+    }
+    return policy.validate(password);
+  }
+
+  /// Fetches the policy of [tenantId] and caches it (`_updatePasswordPolicy` of the JS SDK).
+  Future<PasswordPolicy> _fetchPasswordPolicy() async {
+    final String? tenant = tenantId;
+    final PasswordPolicy policy = PasswordPolicy.fromResponse(
+      await _send(
+        _identityToolkit(
+          'passwordPolicy',
+          version: 'v2',
+          query: <String, String>{'tenantId': ?tenant},
+        ),
+        get: true,
+      ),
+    );
+    _passwordPolicies[tenant] = policy;
+    return policy;
+  }
+
+  /// Like `recachePasswordPolicy` of the JS SDK: when [operation] fails with `password-does-not-meet-requirements`
+  /// and a policy was fetched before, it is fetched again in the background.
+  Future<T> _recachePasswordPolicyOnFailure<T>(
+    Future<T> operation,
+  ) => operation.catchError((Object error, StackTrace stackTrace) {
+    if (error is FirebaseAuthException &&
+        error.code == 'password-does-not-meet-requirements' &&
+        _passwordPolicies.containsKey(tenantId) &&
+        !_disposed) {
+      unawaited(
+        _fetchPasswordPolicy().then<void>(
+          (_) {},
+          onError: (Object _) {
+            // The policy stays as it was; the next validatePassword uses it.
+          },
+        ),
+      );
+    }
+    return Future<T>.error(error, stackTrace);
+  });
 
   // ---- email link sign-in ----
 
@@ -1386,17 +1469,32 @@ class FirebaseUserAuth implements AuthTokenProvider {
     return expiry != null && _clock().add(refreshBefore).isBefore(expiry);
   }
 
-  Uri _identityToolkit(String method) {
+  Uri _identityToolkit(
+    String method, {
+    String version = 'v1',
+    Map<String, String> query = const <String, String>{},
+  }) {
     final String? emulator = _emulatorOrigin;
-    return emulator == null
-        ? Uri.https(
-            'identitytoolkit.googleapis.com',
-            '/v1/$method',
-            <String, String>{'key': apiKey},
-          )
-        : Uri.parse(
-            '$emulator/identitytoolkit.googleapis.com/v1/$method?key=${Uri.encodeQueryComponent(apiKey)}',
-          );
+    final Map<String, String> parameters = <String, String>{
+      ...query,
+      'key': apiKey,
+    };
+    if (emulator == null) {
+      return Uri.https(
+        'identitytoolkit.googleapis.com',
+        '/$version/$method',
+        parameters,
+      );
+    }
+    final String queryString = parameters.entries
+        .map(
+          (MapEntry<String, String> e) =>
+              '${Uri.encodeQueryComponent(e.key)}=${Uri.encodeQueryComponent(e.value)}',
+        )
+        .join('&');
+    return Uri.parse(
+      '$emulator/identitytoolkit.googleapis.com/$version/$method?$queryString',
+    );
   }
 
   Uri get _secureToken {
@@ -1453,6 +1551,7 @@ class FirebaseUserAuth implements AuthTokenProvider {
     Map<String, Object?>? json,
     Map<String, String>? form,
     bool tenant = false,
+    bool get = false,
   }) async {
     final String? tenantId = this.tenantId;
     if (tenant &&
@@ -1463,12 +1562,20 @@ class FirebaseUserAuth implements AuthTokenProvider {
     }
     final Map<String, String> headers = await _additionalHeaders();
     final String? locale = languageCode;
-    if (json != null && locale != null && locale.isNotEmpty) {
+    if ((json != null || get) && locale != null && locale.isNotEmpty) {
       headers['X-Firebase-Locale'] = locale;
     }
     final http.Response response;
     try {
-      response = json != null
+      response = get
+          ? await _http.get(
+              url,
+              headers: <String, String>{
+                ...headers,
+                'Content-Type': 'application/json',
+              },
+            )
+          : json != null
           ? await _http.post(
               url,
               headers: <String, String>{

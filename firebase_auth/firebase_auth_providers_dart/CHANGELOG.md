@@ -56,6 +56,9 @@
 - `UserCredential.credential` and `FirebaseAuthException.credential`: the provider's credential the backend
   returned, so that `account-exists-with-different-credential` and `credential-already-in-use` can be recovered
   (sign in with the existing method, then link). New error codes: `no-such-provider`.
+- `validatePassword(password)` with the new `PasswordPolicy` and `PasswordValidationStatus` (FlutterFire's names):
+  the project's (or tenant's) policy is fetched once from `v2/passwordPolicy`, cached, and fetched again after
+  `password-does-not-meet-requirements`, like the JS SDK. The Auth emulator does not implement the endpoint.
 
 ## 0.2.1
 
