@@ -7,9 +7,9 @@
   examples, the tests and the browser tests of this package now use it too.
 - Development only: the `sqlite3` dev dependency allows 2.7.3 to 3.x, like
   `cloud_firestore_dart_sqlite`, and the tests no longer import `package:sqlite3/open.dart`
-  (gone in 3.x). The lock file stays on 2.9.4: on 3.9.1 the IndexedDB crash test of the browser
-  storage loses an acknowledged transaction (`IndexedDbFileSystem.flush()` of 3.x does not wait
-  for the writes queued behind the batch in progress).
+  (gone in 3.x). The lock file and the browser tests' `sqlite3.wasm` move to 3.9.1, now that
+  `cloud_firestore_dart_sqlite` 0.1.1 waits for every queued IndexedDB write (the IndexedDB crash
+  test lost acknowledged transactions on 3.9.1 before).
 
 ## 0.2.0
 

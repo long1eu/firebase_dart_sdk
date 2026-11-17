@@ -60,9 +60,9 @@ dev_dependencies:
   mockito: ^5.4.0
   # The tests use SQLite directly too (package:sqlite3/sqlite3.dart and wasm.dart). The same range as
   # cloud_firestore_dart_sqlite, and the code compiles with both majors (no package:sqlite3/open.dart).
-  # pubspec.lock stays on 2.9.4: the browser tests run on the sqlite3.wasm whose checksum
-  # tool/build_web_test_assets.sh pins, and the IndexedDB crash test fails on 3.9.1 (see there).
-  # Dart 3.8 and 3.9 resolve 2.x in any case; 3.x needs Dart 3.10.
+  # pubspec.lock has 3.9.1; the browser tests run on the sqlite3.wasm whose checksum
+  # tool/build_web_test_assets.sh pins for the locked version. Dart 3.8 and 3.9 resolve 2.x (3.x
+  # needs Dart 3.10), so the CI job on the lowest SDK tests that major.
   sqlite3: '>=2.7.3 <4.0.0'
   test: ^1.25.0
   uuid: ^4.0.0

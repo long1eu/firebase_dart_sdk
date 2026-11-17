@@ -1,9 +1,9 @@
 # The image of tool/linux/run_in_container.sh: the Dart SDK (Debian), Java 21 for the Firestore emulator JAR, and
 # SQLite. iproute2 is for the connectivity test that adds a network interface.
 #
-# libsqlite3-dev provides libsqlite3.so, the name sqlite3 2.x loads: cloud_firestore_dart's pubspec.lock stays on
-# sqlite3 2.9.4 (see tool/build_web_test_assets.sh) and its tests no longer override the lookup with
-# package:sqlite3/open.dart, which 3.x removed. With sqlite3 3.x the library comes from its build hook instead.
+# libsqlite3-dev provides libsqlite3.so, the name sqlite3 2.x loads, for a DART_IMAGE older than Dart 3.10 (which
+# resolves sqlite3 2.x): the tests no longer override the lookup with package:sqlite3/open.dart, which 3.x removed.
+# With sqlite3 3.x (dart:stable) the library comes from its build hook instead.
 ARG DART_IMAGE=dart:stable
 FROM eclipse-temurin:21-jre AS jre
 FROM ${DART_IMAGE}
