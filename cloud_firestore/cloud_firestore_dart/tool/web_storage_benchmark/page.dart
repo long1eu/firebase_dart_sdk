@@ -248,6 +248,7 @@ Future<Map<String, Object?>> read() async {
 
   await firestore.terminate();
   final Map<String, int> closed = await memory();
+  final Map<String, Object?> transactions = await writeTransactions();
   final JSObject estimate = await web.window.navigator.storage
       .estimate()
       .toDart;
@@ -263,5 +264,42 @@ Future<Map<String, Object?>> read() async {
     'memoryAfterScan': scanned,
     'memoryClosed': closed,
     'storageUsage': (estimate['usage'] as JSNumber?)?.toDartDouble,
+    ...transactions,
+  };
+}
+
+/// The cost of a write transaction through the opener itself, with the wait
+/// for the storage that acknowledges it: 200 transactions of one INSERT of
+/// about 1 KB each, on a database of their own, one after the other.
+Future<Map<String, Object?>> writeTransactions() async {
+  final OpenDatabase open = sqliteWebOpener(
+    sqlite3Wasm: Uri.parse('sqlite3.wasm'),
+    opfsWorker: storage == 'opfs' ? Uri.parse('sqlite_opfs_worker.js') : null,
+  );
+  final Database db = await open(
+    'transactions',
+    version: 1,
+    onCreate: (Database db, int version) =>
+        db.execute('CREATE TABLE t (id INTEGER PRIMARY KEY, payload TEXT)'),
+  );
+  final String payload = 'x' * 1000;
+  final List<double> txMs = <double>[];
+  final Stopwatch total = Stopwatch()..start();
+  final Stopwatch watch = Stopwatch();
+  for (int i = 0; i < 200; i++) {
+    watch
+      ..reset()
+      ..start();
+    await db.execute('BEGIN');
+    await db.execute('INSERT INTO t (payload) VALUES (?)', <Object?>[payload]);
+    await db.execute('COMMIT');
+    txMs.add(watch.elapsedMicroseconds / 1000);
+  }
+  final int totalMs = total.elapsedMilliseconds;
+  db.close();
+  return <String, Object?>{
+    'txMedianMs': median(txMs),
+    'txMaxMs': txMs.reduce(max),
+    'txTotalMs': totalMs,
   };
 }

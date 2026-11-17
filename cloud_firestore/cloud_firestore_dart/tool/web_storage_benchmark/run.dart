@@ -232,9 +232,9 @@ void printTable(List<Map<String, Object?>> results) {
     ..writeln(
       '| Documents | Compiler | Storage | Open | First read | Read by id '
       '(median; max) | Filtered query (scan) | Full scan | Memory open '
-      '(workers) | Memory after scan | Fill |',
+      '(workers) | Memory after scan | Fill | Write transaction (median; max) |',
     )
-    ..writeln('|---|---|---|---|---|---|---|---|---|---|---|');
+    ..writeln('|---|---|---|---|---|---|---|---|---|---|---|---|');
   for (final Map<String, Object?> r in results) {
     if (r['failed'] == true) {
       stdout.writeln(
@@ -251,7 +251,9 @@ void printTable(List<Map<String, Object?>> results) {
       '${r['filteredMs']} ms | ${r['scanMs']} ms | '
       '${mb(r['memoryOpen'], 'total')} MB (${mb(r['memoryOpen'], 'workers')}) | '
       '${mb(r['memoryAfterScan'], 'total')} MB | '
-      '${((r['fillMs']! as num) / 1000).toStringAsFixed(0)} s |',
+      '${((r['fillMs']! as num) / 1000).toStringAsFixed(0)} s | '
+      '${(r['txMedianMs']! as num).toStringAsFixed(2)} ms; '
+      '${(r['txMaxMs']! as num).toStringAsFixed(1)} ms |',
     );
   }
 }
