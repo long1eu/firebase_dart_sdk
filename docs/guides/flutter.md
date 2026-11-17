@@ -9,7 +9,9 @@ can run against the emulator.
 The package is plain Dart: there is no plugin to register and nothing to configure in the
 native projects except network access. It talks gRPC on Android, iOS, macOS, Linux and Windows,
 as on a server. The tests of this repository do not run any Flutter app; the example app was
-built and run on macOS only (see [What was tried where](#what-was-tried-where)).
+built and run on macOS only (see [What was tried where](#what-was-tried-where)). For a Flutter app
+built for the web, read [A Flutter web app](web.md#a-flutter-web-app) too: the transport, the
+`sqlite3.wasm` file and the app names of a page with several clients differ.
 
 This is the example app on macOS against the emulator. The status line under the title comes
 from the snapshot metadata ([An offline indicator from the metadata](#an-offline-indicator-from-the-metadata)):
@@ -464,6 +466,6 @@ From [Platforms](platforms.md) and the example app:
 | Linux | The package: unit and integration suites pass in CI (Ubuntu x64) and in a Debian arm64 container, on the Dart VM. A Flutter app: not built or run |
 | Windows | The package: unit and standard integration suites pass on the Dart VM on Windows 11 x64 (one VM, not in CI). The example app: built with Flutter 3.47.8 (`flutter build windows --debug`, 84 seconds) and run against the emulator from an SSH session, driven through its widgets (a note added and synced, then read from the SQLite file after a restart without the emulator); Flutter could not draw the window there (no interactive desktop), so it was not looked at. `sqlite3` 3.x bundles SQLite (with 2.x, `sqlite3_flutter_libs` does) |
 | Android, iOS | No tests run on devices or emulators, and the example was not built for them. The client runs on the Dart VM there as on a server, so they are expected to work |
-| Web | Not a target of the example. The package's web support is experimental and tested in Chrome with `dart test`, not in a Flutter web app. `sqliteOpener` of `cloud_firestore_dart_sqlite` compiles for the web too and keeps the cache in IndexedDB or OPFS there; pass no directory on the web (`directory: kIsWeb ? null : ...`) and see [Offline persistence on the web](offline_persistence.md#on-the-web) |
+| Web | Not a target of this example. [`examples/flutter_web_two_users`](../../examples/flutter_web_two_users/README.md) is a Flutter web app (two signed-in users in one page, a memory or SQLite cache), built with `flutter build web` and `--wasm` with Flutter 3.44.9 (CI builds both) and driven in headless Chrome against the emulators. The package's web support is experimental; its browser tests run in Chrome with `dart test`. `sqliteOpener` keeps the cache in IndexedDB or OPFS there; pass no directory on the web (`directory: kIsWeb ? null : ...`), pin `sqlite3` (see [A Flutter web app](web.md#a-flutter-web-app)) and see [Offline persistence on the web](offline_persistence.md#on-the-web) |
 
 Nothing in this guide was tried against a real Firebase project.

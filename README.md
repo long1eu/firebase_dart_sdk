@@ -177,9 +177,11 @@ yet.]_
 - Web support is experimental. In a browser the client uses REST and WebChannel over `fetch`
   instead of gRPC, with a memory cache or an opt-in SQLite cache in IndexedDB. The browser tests
   pass in Chrome against the emulator (dart2wasm and dart2js), and the whole standard
-  integration suite passes on the VM over the web transport. No other browser was tried, and no
-  browser was run against a production backend (the verification kit used the web transport
-  against production from the VM).
+  integration suite passes on the VM over the web transport. A Flutter web app with two signed-in
+  users in one page ([`examples/flutter_web_two_users`](examples/flutter_web_two_users/)) is built
+  with dart2js and dart2wasm in CI and was driven in headless Chrome against the emulators. No
+  other browser was tried, and no browser was run against a production backend (the verification
+  kit used the web transport against production from the VM).
 - Not implemented: coordination between clients that share one cache (the multi-tab support of
   the JS SDK; deferred until after 0.1.0), a full Firebase Auth SDK (no federated sign-in), and
   Pipelines beyond the preview (no real-time pipelines and no offline evaluation; a local
