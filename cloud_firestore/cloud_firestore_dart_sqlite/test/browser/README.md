@@ -5,7 +5,7 @@ It loads three files from this folder that are not in the repository (see `../..
 
 | File | How to get it |
 | --- | --- |
-| `sqlite3.wasm` | The build of the `sqlite3` version in `pubspec.lock`; `dart run cloud_firestore_dart_sqlite:setup_web test/browser` prints the URL. For 2.9.4, `tool/build_web_test_assets.sh` of the repository downloads it (with a pinned checksum) to `cloud_firestore/cloud_firestore_dart/test/browser/`. |
+| `sqlite3.wasm` | The build of the `sqlite3` version in `pubspec.lock`; `dart run cloud_firestore_dart_sqlite:setup_web test/browser` prints the URL. `tool/build_web_test_assets.sh` of the repository downloads the build of the version that `cloud_firestore_dart` locks (3.9.1, with a pinned checksum) to `cloud_firestore/cloud_firestore_dart/test/browser/`. |
 | `sqlite_opfs_worker.js` | `dart run cloud_firestore_dart_sqlite:setup_web test/browser` |
 | `emulator_port.txt` | The port of the emulator, e.g. `echo 8090 > test/browser/emulator_port.txt` (default 8090). |
 
