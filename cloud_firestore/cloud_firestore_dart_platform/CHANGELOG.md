@@ -1,3 +1,10 @@
+## (unreleased)
+
+- README: records the first Windows run (Windows 11 x64, Flutter 3.47.8, against the emulator):
+  `CloudFirestoreDart.use()` replaced the native Firestore of `cloud_firestore` in
+  `examples/flutterfire_on_windows`, whose integration tests passed, sum and average aggregations included. No
+  code change.
+
 ## 0.1.0
 
 - First version, built against the 0.2 API of `cloud_firestore_dart`: an implementation of `FirebaseFirestorePlatform` (the platform interface of the official

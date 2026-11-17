@@ -134,9 +134,10 @@ deletes the files. When another live client still uses the cache, it empties the
 instead of deleting the file under that client; the other client then fails with
 `failedPrecondition` at its next operation and terminates itself, as in the JS SDK.
 
-On Windows, deleting a file that another handle has open is not possible: `clearPersistence()`
-fails with `unknown` while another isolate or process still has the file open, where Linux and
-macOS delete it anyway.
+On Windows, deleting a file that another handle has open is not possible. On Windows 11, with a
+second process holding the cache open, `clearPersistence()` emptied it in place as above; once no
+client had it open, it deleted the files. It fails with `unknown` only when it tries to delete
+files that something else still holds open.
 
 ```dart
 await firestore.terminate();

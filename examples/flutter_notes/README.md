@@ -97,7 +97,8 @@ project. To add sign-in, see [Authentication](../../docs/guides/authentication.m
 | --- | --- |
 | macOS | Built (`flutter build macos --debug`) and run against the emulator by hand: the listener, an edit offline, the sync when the emulator came back, the cache across a restart, and `terminate()` on Cmd-Q. Again with 0.2.0 and `cloud_firestore_dart_sqlite` 0.1.0 (`sqlite3` 3.5.2): the notes loaded, a note added and deleted in the app reached the emulator, the app quit from its menu, and started again with the emulator stopped it showed the notes from its SQLite file (a file first created by the 0.1 build with the copied opener) |
 | macOS, screenshots | Taken with the 0.1 build; the UI did not change in 0.2. `flutter build macos --debug --dart-define=EMULATOR_PORT=8141`, the built app run against a private emulator with three notes written through the emulator's REST API, captured with `screencapture -l` |
-| Android, iOS, Linux, Windows | Not built and not run. The platform folders are those of `flutter create` with the changes below |
+| Windows | Built with Flutter 3.47.8 on Windows 11 x64 (`flutter build windows --debug`, 84 seconds, no change to the `windows/` folder; `--release` built too, not run) and run against the emulator from an SSH session, driven through its widgets with Marionette: the notes loaded ("Up to date"), a note added in the dialog reached the emulator, and started again with the emulator stopped the app said "Offline: showing the saved notes" and showed it from its SQLite file in `%APPDATA%`. Nobody was logged on at the console, so Flutter could not draw the window (no Direct3D swap chain outside a desktop session) and no screenshot was taken |
+| Android, iOS, Linux | Not built and not run. The platform folders are those of `flutter create` with the changes below |
 
 Changes to the generated platform projects:
 

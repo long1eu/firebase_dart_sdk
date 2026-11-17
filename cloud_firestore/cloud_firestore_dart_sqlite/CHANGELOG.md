@@ -1,3 +1,9 @@
+## (unreleased)
+
+- README: records the first Windows run (Windows 11 x64, 2026-11-17): the Dart VM with `sqlite3` 3.9.1, which
+  loads the build hook's `sqlite3.dll`, and with 2.9.4, which falls back to the `winsqlite3.dll` of Windows; and
+  two Flutter Windows apps with 3.5.2. No code change.
+
 ## 0.1.1
 
 - **Fix: the IndexedDB storage in a browser could lose acknowledged writes with `sqlite3` 3.x.**

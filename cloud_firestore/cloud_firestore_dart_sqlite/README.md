@@ -11,7 +11,9 @@ Firebase.
 > apps had to copy. The browser storage is **experimental**. Run on macOS (Dart VM, `sqlite3`
 > 2.9.4 and 3.9.1) and in headless Chrome (dart2js and dart2wasm, `sqlite3` 2.9.4 and 3.9.1),
 > against the Firestore emulator, and in one Flutter Linux desktop app (Debian 13 x86_64,
-> `sqlite3` 3.5.2, a cache read back after a restart, 2026-11-16). Not run on Windows, Android or
+> `sqlite3` 3.5.2, a cache read back after a restart, 2026-11-16). On Windows 11 x64
+> (2026-11-17): the Dart VM with `sqlite3` 3.9.1 (the build hook's `sqlite3.dll`) and 2.9.4 (the
+> `winsqlite3.dll` of Windows), and two Flutter Windows apps with 3.5.2. Not run on Android or
 > iOS, or in Safari or Firefox.
 >
 > **Upgrade from 0.1.0 if your app runs in a browser.** With `sqlite3` 3.x, 0.1.0's IndexedDB
@@ -162,11 +164,11 @@ hashes in the package) and bundles it with the program or app. Nothing else is n
 | --- | --- | --- |
 | Flutter Android | `libsqlite3.so` from the app | `sqlite3_flutter_libs: ^0.5.0` (required) |
 | Flutter iOS, macOS | the framework of `sqlite3_flutter_libs`, else the system SQLite | `sqlite3_flutter_libs` (recommended) |
-| Flutter Windows | `sqlite3.dll` from `sqlite3_flutter_libs`, else `winsqlite3.dll` of Windows (2.7.5 and later) | `sqlite3_flutter_libs` (recommended) |
+| Flutter Windows | `sqlite3.dll` from `sqlite3_flutter_libs`, else `winsqlite3.dll` of Windows (2.7.5 and later; not tried in Flutter) | `sqlite3_flutter_libs` (recommended) |
 | Flutter Linux | the library bundled by `sqlite3_flutter_libs`, else the system `libsqlite3.so` | `sqlite3_flutter_libs` (recommended) |
 | Dart VM, macOS | the system SQLite | nothing |
 | Dart VM, Linux | `libsqlite3.so` | `libsqlite3-dev` (Debian, Ubuntu), or the override below |
-| Dart VM, Windows | `sqlite3.dll` next to the program or on the `PATH`, else `winsqlite3.dll` (2.7.5 and later) | usually nothing |
+| Dart VM, Windows | `sqlite3.dll` next to the program or on the `PATH`, else `winsqlite3.dll` (2.7.5 and later; seen with 2.9.4 on Windows 11: `System32\winsqlite3.dll`, SQLite 3.51.1) | nothing |
 
 This package does not override the 2.x lookup (the copied opener did, see the CHANGELOG). On a
 Linux machine with only the runtime package (`libsqlite3-0`, which has `libsqlite3.so.0`), run
