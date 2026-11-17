@@ -1,3 +1,4 @@
+import 'auth_credential.dart';
 import 'firebase_user_auth.dart';
 
 /// The signed-in user of a [FirebaseUserAuth]: [FirebaseUserAuth.currentUser], the result of a sign-in, and the
@@ -231,7 +232,7 @@ class AdditionalUserInfo {
 /// ```
 class UserCredential extends AuthUser {
   /// Creates the result for [user]. [FirebaseUserAuth] creates them; you need this only for tests.
-  UserCredential(AuthUser user, {this.additionalUserInfo})
+  UserCredential(AuthUser user, {this.additionalUserInfo, this.credential})
     : _user = user,
       super(
         uid: user.uid,
@@ -253,6 +254,11 @@ class UserCredential extends AuthUser {
 
   /// What the sign-in told beyond the user: whether the account is new, the provider and its profile.
   final AdditionalUserInfo? additionalUserInfo;
+
+  /// The provider's credential the backend returned for a federated sign-in or link (its OAuth tokens, as
+  /// FlutterFire's `UserCredential.credential` and the JS SDK's `credentialFromResult`), or null. It holds tokens:
+  /// [toString] leaves it out.
+  final AuthCredential? credential;
 
   @override
   String toString() => 'UserCredential(uid: $uid, isAnonymous: $isAnonymous)';

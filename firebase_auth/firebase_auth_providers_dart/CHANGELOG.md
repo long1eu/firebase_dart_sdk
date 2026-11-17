@@ -47,6 +47,15 @@
   or an email link to an anonymous user, for example) and `reauthenticateWithCredential`.
   `reauthenticateWithEmailAndPassword` stays, as a shortcut for the latter. New error codes from the JS SDK:
   `provider-already-linked`, `argument-error`, `login-blocked`, `tenant-id-mismatch`.
+- Federated sign-in by token exchange: `OAuthCredential` and the providers `GoogleAuthProvider`,
+  `AppleAuthProvider` (with `credentialWithIDToken` and its raw nonce), `FacebookAuthProvider`, `GithubAuthProvider`,
+  `TwitterAuthProvider`, `MicrosoftAuthProvider`, `YahooAuthProvider` and `OAuthProvider(providerId)` (`oidc.*` and
+  any other id), with FlutterFire's names. The app gets the provider's ID or access token itself;
+  `signInWithCredential`, `linkWithCredential` and `reauthenticateWithCredential` exchange it through
+  `accounts:signInWithIdp` with the request of the JS SDK. `unlink(providerId)` removes a sign-in method.
+- `UserCredential.credential` and `FirebaseAuthException.credential`: the provider's credential the backend
+  returned, so that `account-exists-with-different-credential` and `credential-already-in-use` can be recovered
+  (sign in with the existing method, then link). New error codes: `no-such-provider`.
 
 ## 0.2.1
 

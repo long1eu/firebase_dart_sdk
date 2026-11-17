@@ -404,4 +404,196 @@ void main() {
       );
     }, skip: skip);
   });
+
+  group('federated credentials (fake provider tokens)', () {
+    // The emulator accepts an unsigned JWT or a JSON object with a `sub` as the provider's ID token, and also as
+    // its access token; it checks no signature, audience or nonce. So these tests check the requests and the
+    // flows, not what the real backend verifies with each provider.
+    String fakeIdToken(Map<String, Object?> claims) {
+      String part(Object json) =>
+          base64Url.encode(utf8.encode(jsonEncode(json))).replaceAll('=', '');
+      return '${part(<String, Object?>{'alg': 'none', 'typ': 'JWT'})}.${part(claims)}.';
+    }
+
+    String fakeAccessToken(String sub, [Map<String, Object?>? more]) =>
+        jsonEncode(<String, Object?>{'sub': sub, ...?more});
+
+    String sub() => 'sub${DateTime.now().microsecondsSinceEpoch}x${_counter++}';
+
+    test('every provider signs in, and again as the same user', () async {
+      final FirebaseUserAuth auth = create();
+      final Map<String, AuthCredential Function(String sub)> providers =
+          <String, AuthCredential Function(String sub)>{
+            'google.com': (String s) => GoogleAuthProvider.credential(
+              idToken: fakeIdToken(<String, Object?>{
+                'sub': s,
+                'name': 'Ada G',
+                'given_name': 'Ada',
+              }),
+            ),
+            'apple.com': (String s) => AppleAuthProvider.credentialWithIDToken(
+              fakeIdToken(<String, Object?>{'sub': s}),
+              'a raw nonce',
+            ),
+            'facebook.com': (String s) =>
+                FacebookAuthProvider.credential(fakeAccessToken(s)),
+            'github.com': (String s) => GithubAuthProvider.credential(
+              fakeAccessToken(s, <String, Object?>{'login': 'ada'}),
+            ),
+            'twitter.com': (String s) => TwitterAuthProvider.credential(
+              accessToken: fakeAccessToken(s, <String, Object?>{
+                'screen_name': 'ada_l',
+              }),
+              secret: 'twitter-secret',
+            ),
+            'microsoft.com': (String s) => MicrosoftAuthProvider.credential(
+              idToken: fakeIdToken(<String, Object?>{'sub': s}),
+            ),
+            'yahoo.com': (String s) =>
+                YahooAuthProvider.credential(fakeAccessToken(s)),
+            'oidc.tier1': (String s) => OAuthProvider(
+              'oidc.tier1',
+            ).credential(idToken: fakeIdToken(<String, Object?>{'sub': s})),
+          };
+      for (final MapEntry<String, AuthCredential Function(String sub)> entry
+          in providers.entries) {
+        final String s = sub();
+        final UserCredential first = await auth.signInWithCredential(
+          entry.value(s),
+        );
+        expect(first.additionalUserInfo?.isNewUser, isTrue, reason: entry.key);
+        expect(first.additionalUserInfo?.providerId, entry.key);
+        expect(first.providerData.single.providerId, entry.key);
+        expect(first.providerData.single.uid, s);
+        expect(first.isAnonymous, isFalse);
+        // The emulator returns no oauthTokenSecret; without it there is no Twitter credential (JS SDK too).
+        if (entry.key != 'twitter.com') {
+          expect(first.credential?.providerId, entry.key, reason: entry.key);
+        }
+        final GetTokenResult token = await auth.getAccessToken(
+          forceRefresh: false,
+        );
+        expect(token.signInProvider, entry.key);
+        final UserCredential second = await auth.signInWithCredential(
+          entry.value(s),
+        );
+        expect(second.uid, first.uid, reason: entry.key);
+        expect(second.additionalUserInfo?.isNewUser, isFalse);
+      }
+      // What the providers' profiles give.
+      final UserCredential google = await auth.signInWithCredential(
+        providers['google.com']!(sub()),
+      );
+      expect(google.displayName, 'Ada G');
+      expect(google.additionalUserInfo?.profile?['given_name'], 'Ada');
+      final UserCredential github = await auth.signInWithCredential(
+        providers['github.com']!(sub()),
+      );
+      expect(github.additionalUserInfo?.username, 'ada');
+      final UserCredential twitter = await auth.signInWithCredential(
+        providers['twitter.com']!(sub()),
+      );
+      expect(twitter.additionalUserInfo?.username, 'ada_l');
+    }, skip: skip);
+
+    test('link, reauthenticate and unlink', () async {
+      final FirebaseUserAuth auth = create();
+      final UserCredential anonymous = await auth.signInAnonymously();
+      final String s = sub();
+      final UserCredential linked = await auth.linkWithCredential(
+        GoogleAuthProvider.credential(
+          idToken: fakeIdToken(<String, Object?>{'sub': s}),
+        ),
+      );
+      expect(linked.uid, anonymous.uid);
+      expect(linked.isAnonymous, isFalse);
+      expect(linked.providerData.single.providerId, 'google.com');
+      await expectLater(
+        auth.linkWithCredential(
+          GoogleAuthProvider.credential(
+            idToken: fakeIdToken(<String, Object?>{'sub': sub()}),
+          ),
+        ),
+        throwsAuth('provider-already-linked'),
+      );
+      final UserCredential reauthenticated = await auth
+          .reauthenticateWithCredential(
+            GoogleAuthProvider.credential(
+              idToken: fakeIdToken(<String, Object?>{'sub': s}),
+            ),
+          );
+      expect(reauthenticated.uid, anonymous.uid);
+      final String email = uniqueEmail('fed');
+      await auth.linkWithCredential(
+        EmailAuthProvider.credential(email: email, password: 'secret1'),
+      );
+      final AuthUser unlinked = await auth.unlink('google.com');
+      expect(unlinked.providerData.single.providerId, 'password');
+      expect(auth.currentUser!.providerData.single.providerId, 'password');
+      await expectLater(
+        auth.unlink('google.com'),
+        throwsAuth('no-such-provider'),
+      );
+
+      // The Google account is free again; another user takes it, and this one cannot link it any more.
+      final FirebaseUserAuth other = create(withStorage: InMemoryAuthStorage());
+      await other.signInAnonymously();
+      await other.linkWithCredential(
+        GoogleAuthProvider.credential(
+          idToken: fakeIdToken(<String, Object?>{'sub': s}),
+        ),
+      );
+      await expectLater(
+        auth.linkWithCredential(
+          GoogleAuthProvider.credential(
+            idToken: fakeIdToken(<String, Object?>{'sub': s}),
+          ),
+        ),
+        throwsAuth('credential-already-in-use'),
+      );
+      expect(auth.uid, anonymous.uid);
+    }, skip: skip);
+
+    test(
+      'account-exists-with-different-credential carries the email and the credential',
+      () async {
+        final FirebaseUserAuth auth = create();
+        final String email = uniqueEmail('exists');
+        await auth.createUserWithEmailAndPassword(
+          email: email,
+          password: 'secret1',
+        );
+        await auth.signOut();
+        final OAuthCredential google = GoogleAuthProvider.credential(
+          idToken: fakeIdToken(<String, Object?>{
+            'sub': sub(),
+            'email': email,
+            'email_verified': false,
+          }),
+        );
+        try {
+          await auth.signInWithCredential(google);
+          fail('no exception');
+        } on FirebaseAuthException catch (e) {
+          expect(e.code, 'account-exists-with-different-credential');
+          expect(e.email, email);
+          expect(e.credential?.providerId, 'google.com');
+          expect(auth.currentUser, isNull);
+          // The recovery the JS SDK documents: sign in with the existing method, then link.
+          await auth.signInWithEmailAndPassword(
+            email: email,
+            password: 'secret1',
+          );
+          final UserCredential linked = await auth.linkWithCredential(
+            e.credential!,
+          );
+          expect(
+            linked.providerData.map((UserInfo i) => i.providerId),
+            containsAll(<String>['password', 'google.com']),
+          );
+        }
+      },
+      skip: skip,
+    );
+  });
 }

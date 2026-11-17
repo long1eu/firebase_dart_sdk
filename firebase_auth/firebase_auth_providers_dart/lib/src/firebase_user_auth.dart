@@ -912,10 +912,28 @@ class FirebaseUserAuth implements AuthTokenProvider {
   // ---- credentials ----
 
   /// Signs in with [credential] (`signInWithCredential`), replacing the current user like the other sign-ins:
-  /// an [EmailAuthProvider] credential signs in with the password or the email link.
+  /// an [EmailAuthProvider] credential signs in with the password or the email link, an [OAuthCredential] (of
+  /// [GoogleAuthProvider], [AppleAuthProvider], [OAuthProvider], ...) exchanges the provider's token through
+  /// `accounts:signInWithIdp`; the account is created when it does not exist
+  /// ([AdditionalUserInfo.isNewUser]). The result's [UserCredential.credential] holds the provider's tokens the
+  /// backend returned.
   ///
-  /// Throws what the sign-in of the credential throws (`wrong-password`, `invalid-action-code`, ...), and a
-  /// [FirebaseAuthMultiFactorException] when the account has a second factor.
+  /// Throws `invalid-credential` (the backend refused the token), `account-exists-with-different-credential` (an
+  /// account with the email address of the credential exists with another sign-in method:
+  /// [FirebaseAuthException.email] and [FirebaseAuthException.credential] let the app sign in with that method and
+  /// link the credential), `operation-not-allowed` (the provider is not enabled), `missing-or-invalid-nonce`,
+  /// `user-disabled`, ...
+  ///
+  /// The email credentials throw what their sign-ins throw (`wrong-password`, `invalid-action-code`, ...); all
+  /// throw a [FirebaseAuthMultiFactorException] when the account has a second factor.
+  ///
+  /// ```dart
+  /// // The ID token comes from Google Sign-In (or any other way the app signs the user in with Google).
+  /// final UserCredential result = await auth.signInWithCredential(
+  ///   GoogleAuthProvider.credential(idToken: googleIdToken),
+  /// );
+  /// print(result.additionalUserInfo?.isNewUser);
+  /// ```
   Future<UserCredential> signInWithCredential(AuthCredential credential) async {
     _checkNotDisposed();
     final _CredentialRequest request = _requestFor(credential);
@@ -926,8 +944,8 @@ class FirebaseUserAuth implements AuthTokenProvider {
   /// anonymous user linked to an email address and a password, or to a federated provider, is no longer anonymous.
   ///
   /// Throws `null-user`, `provider-already-linked` (the user has a credential of this provider already: the
-  /// account is read first), `credential-already-in-use` (another account has it), `email-already-in-use`,
-  /// `requires-recent-login`, ...
+  /// account is read first), `credential-already-in-use` (another account has it; [FirebaseAuthException.credential]
+  /// may carry it back), `email-already-in-use`, `requires-recent-login`, ...
   Future<UserCredential> linkWithCredential(
     AuthCredential credential,
   ) => _forUser((String idToken, int generation) async {
@@ -948,7 +966,7 @@ class FirebaseUserAuth implements AuthTokenProvider {
     }
     final _CredentialRequest request = _requestFor(
       credential,
-      idToken: (await getAccessToken(forceRefresh: false)).token,
+      userIdToken: (await getAccessToken(forceRefresh: false)).token,
     );
     final Map<String, Object?> response = await _send(
       _identityToolkit(request.method),
@@ -1018,11 +1036,60 @@ class FirebaseUserAuth implements AuthTokenProvider {
     return _result(response, _session?.user ?? session.user);
   }
 
+  /// Removes the sign-in method of [providerId] (`password`, `google.com`, ...) from the account of the signed-in
+  /// user (`unlink`), and returns the user without it. The account is read first; [userChanges] emits the new user.
+  ///
+  /// Throws `null-user`, `no-such-provider` (the user has no such method), `requires-recent-login`, ...
+  Future<AuthUser> unlink(String providerId) => _forUser((
+    String idToken,
+    int generation,
+  ) async {
+    // _assertLinkedStatus of the JS SDK.
+    await _reload(generation);
+    final AuthUser? user = _session?.user;
+    if (user == null || generation != _generation) {
+      throw _overtaken;
+    }
+    if (!user.providerData.any(
+      (UserInfo info) => info.providerId == providerId,
+    )) {
+      throw const FirebaseAuthException(
+        code: 'no-such-provider',
+        message: 'User was not linked to an account with the given provider.',
+      );
+    }
+    final Map<String, Object?> response = await _send(
+      _identityToolkit('accounts:update'),
+      json: <String, Object?>{
+        'idToken': (await getAccessToken(forceRefresh: false)).token,
+        'deleteProvider': <String>[providerId],
+      },
+    );
+    final AuthUser? current = _session?.user;
+    if (current == null || generation != _generation) {
+      throw _overtaken;
+    }
+    final Set<String> left = <String>{
+      for (final UserInfo info in providerDataOf(response['providerUserInfo']))
+        info.providerId,
+    };
+    final AuthUser updated = copyUser(
+      current,
+      providerData: List<UserInfo>.unmodifiable(<UserInfo>[
+        for (final UserInfo info in current.providerData)
+          if (left.contains(info.providerId)) info,
+      ]),
+      clearPhoneNumber: !left.contains('phone'),
+    );
+    await _updateSession(const <String, Object?>{}, generation, user: updated);
+    return updated;
+  });
+
   /// The request that signs in with [credential] (`_getIdTokenResponse` of the JS SDK's credentials), links it to
-  /// the user of [idToken] (`_linkToIdToken`), or reauthenticates with it (`_getReauthenticationResolver`).
+  /// the user of [userIdToken] (`_linkToIdToken`), or reauthenticates with it (`_getReauthenticationResolver`).
   _CredentialRequest _requestFor(
     AuthCredential credential, {
-    String? idToken,
+    String? userIdToken,
     bool reauthenticate = false,
   }) {
     switch (credential) {
@@ -1031,10 +1098,10 @@ class FirebaseUserAuth implements AuthTokenProvider {
         :final String email,
         :final String password?,
       ):
-        if (idToken != null) {
+        if (userIdToken != null) {
           // linkEmailPassword: accounts:signUp with the ID token, without the tenant.
           return _CredentialRequest('accounts:signUp', <String, Object?>{
-            'idToken': idToken,
+            'idToken': userIdToken,
             'email': email,
             'password': password,
             'returnSecureToken': true,
@@ -1056,11 +1123,45 @@ class FirebaseUserAuth implements AuthTokenProvider {
         return _CredentialRequest(
           'accounts:signInWithEmailLink',
           <String, Object?>{
-            'idToken': ?idToken,
+            'idToken': ?userIdToken,
             'email': email,
             'oobCode': _parseEmailLink(emailLink).code,
           },
         );
+      case OAuthCredential(
+        :final String providerId,
+        :final String? idToken,
+        :final String? accessToken,
+        :final String? secret,
+        :final String? rawNonce,
+        :final String? pendingToken,
+      ):
+        // OAuthCredential.buildRequest of the JS SDK: the provider's tokens in a form-encoded postBody, for the
+        // requestUri http://localhost; a pending token of the backend instead when there is one.
+        final Map<String, Object?> body = <String, Object?>{
+          'requestUri': 'http://localhost',
+          'returnSecureToken': true,
+        };
+        if (pendingToken != null && pendingToken.isNotEmpty) {
+          body['pendingToken'] = pendingToken;
+        } else {
+          body['postBody'] = <String>[
+            if (idToken != null && idToken.isNotEmpty)
+              'id_token=${Uri.encodeComponent(idToken)}',
+            if (accessToken != null && accessToken.isNotEmpty)
+              'access_token=${Uri.encodeComponent(accessToken)}',
+            if (secret != null && secret.isNotEmpty)
+              'oauth_token_secret=${Uri.encodeComponent(secret)}',
+            'providerId=${Uri.encodeComponent(providerId)}',
+            if (rawNonce != null && rawNonce.isNotEmpty)
+              'nonce=${Uri.encodeComponent(rawNonce)}',
+          ].join('&');
+        }
+        return _CredentialRequest('accounts:signInWithIdp', <String, Object?>{
+          ...body,
+          'idToken': ?userIdToken,
+          if (reauthenticate) 'autoCreate': false,
+        });
       default:
         throw ArgumentError.value(
           credential,
@@ -1087,6 +1188,7 @@ class FirebaseUserAuth implements AuthTokenProvider {
     final UserCredential result = UserCredential(
       user,
       additionalUserInfo: additionalUserInfoOf(response),
+      credential: credentialFromResponse(response),
     );
     final _Session? session = _session;
     if (session != null && identical(session.user, user)) {

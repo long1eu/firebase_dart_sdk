@@ -5,6 +5,7 @@ import 'dart:convert';
 
 import 'package:firebase_app_dart/firebase_app_dart.dart';
 
+import 'auth_credential.dart';
 import 'auth_user.dart';
 
 String? _text(Object? value) =>
@@ -225,4 +226,62 @@ String encodeSession(AuthUser user, String refreshToken) =>
     ),
     refreshToken: json['refreshToken']! as String,
   );
+}
+
+/// The credential the backend returned in a sign-in answer or a tagged error (`credentialFromResult` and
+/// `credentialFromError` of the JS SDK's providers), or null when it returned none.
+OAuthCredential? credentialFromResponse(Map<String, Object?>? response) {
+  if (response == null) {
+    return null;
+  }
+  final String? providerId = _text(response['providerId']);
+  final String? idToken = _text(response['oauthIdToken']);
+  final String? accessToken = _text(response['oauthAccessToken']);
+  final String? secret = _text(response['oauthTokenSecret']);
+  final String? pendingToken = _text(response['pendingToken']);
+  if (providerId == null) {
+    return null;
+  }
+  switch (providerId) {
+    case TwitterAuthProvider.PROVIDER_ID:
+      return accessToken == null || secret == null
+          ? null
+          : TwitterAuthProvider.credential(
+              accessToken: accessToken,
+              secret: secret,
+            );
+    case FacebookAuthProvider.PROVIDER_ID || GithubAuthProvider.PROVIDER_ID:
+      return accessToken == null
+          ? null
+          : OAuthCredential(
+              providerId: providerId,
+              signInMethod: providerId,
+              accessToken: accessToken,
+            );
+    case GoogleAuthProvider.PROVIDER_ID:
+      return idToken == null && accessToken == null
+          ? null
+          : GoogleAuthProvider.credential(
+              idToken: idToken,
+              accessToken: accessToken,
+            );
+    case 'password' || 'phone' || 'anonymous' || 'custom':
+      return null;
+    default:
+      if (idToken == null &&
+          accessToken == null &&
+          secret == null &&
+          pendingToken == null) {
+        return null;
+      }
+      return OAuthCredential(
+        providerId: providerId,
+        signInMethod: providerId,
+        idToken: idToken,
+        accessToken: accessToken,
+        secret: secret,
+        rawNonce: pendingToken == null ? _text(response['nonce']) : null,
+        pendingToken: pendingToken,
+      );
+  }
 }

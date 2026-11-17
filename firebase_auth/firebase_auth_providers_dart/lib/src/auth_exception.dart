@@ -1,5 +1,8 @@
 import 'package:firebase_app_dart/firebase_app_dart.dart';
 
+import 'auth_credential.dart';
+import 'user_record.dart' show credentialFromResponse;
+
 /// Thrown when a Firebase Auth request, or a token request of an `OAuthTokenProvider`, fails.
 ///
 /// It extends [FirebaseException] with the [plugin] `firebase_auth`, like FlutterFire's
@@ -66,6 +69,7 @@ class FirebaseAuthException extends FirebaseException {
     this.email,
     this.phoneNumber,
     this.tenantId,
+    this.credential,
   }) : super(plugin: 'firebase_auth', code: code, message: message);
 
   /// Maps the error message of the Identity Toolkit or Secure Token API ([serverMessage], for example
@@ -126,6 +130,7 @@ class FirebaseAuthException extends FirebaseException {
       email: tagged ? text('email') : null,
       phoneNumber: tagged ? text('phoneNumber') : null,
       tenantId: tagged ? text('tenantId') : null,
+      credential: tagged ? credentialFromResponse(response) : null,
     );
   }
 
@@ -148,6 +153,7 @@ class FirebaseAuthException extends FirebaseException {
       email: text('email'),
       phoneNumber: text('phoneNumber'),
       tenantId: text('tenantId'),
+      credential: credentialFromResponse(response),
     );
   }
 
@@ -175,6 +181,12 @@ class FirebaseAuthException extends FirebaseException {
 
   /// The tenant of the account the error is about, when the backend named it.
   final String? tenantId;
+
+  /// The provider's credential of a failed federated sign-in or link, when the backend returned it
+  /// (FlutterFire's `credential`, the JS SDK's `credentialFromError`): with
+  /// `account-exists-with-different-credential`, sign in with a method of [email], then link this credential.
+  /// It holds tokens: [toString] and [message] leave it out.
+  final AuthCredential? credential;
 
   /// Whether the session is no longer valid: the refresh token was revoked or the account is gone or disabled.
   /// The user is signed out when a token refresh fails with such an error.
