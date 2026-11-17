@@ -50,9 +50,10 @@ supported by Firebase.
 
 - your app is a Flutter app on the platforms it supports and it works for you. Moving brings no
   new capability for that case, and you give up official support and much wider production use;
-- you need Firebase Authentication beyond email/password, anonymous and custom-token sign-in
-  (Google, Apple and other providers, phone, email link, multi-factor): this repository has no
-  Firebase Auth SDK, only token providers ([Authentication](authentication.md));
+- you need Firebase Authentication that opens a provider's sign-in page (Google, Apple and other
+  providers by popup or redirect), phone sign-in or multi-factor: this repository signs in over REST
+  only, with email and password, email links, anonymous and custom tokens, and federated credentials
+  whose token the app obtained itself ([Authentication](authentication.md));
 - you need other Firebase products from the same SDK family (Storage, Messaging, Analytics,
   Crashlytics, Remote Config ...);
 - you need a cache shared by several browser tabs (the JS SDK's multi-tab persistence), or a web
@@ -179,9 +180,10 @@ final FirebaseFirestore signedIn = FirebaseFirestore.instanceFor(app: app);
 await auth.signInWithEmailAndPassword(email: 'ada@example.com', password: password);
 ```
 
-It covers anonymous, email/password and custom-token sign-in, the token refresh and the account
-operations listed in [Authentication](authentication.md). Federated providers, phone sign-in,
-email links and multi-factor are not there. Servers use a service account or Application Default
+It covers anonymous, email/password, email link and custom-token sign-in, federated sign-in with a
+token the app already has (`signInWithCredential`), linking, the token refresh and the account
+operations listed in [Authentication](authentication.md). Popup and redirect flows, phone sign-in
+and multi-factor are not there. Servers use a service account or Application Default
 Credentials instead (these bypass the security rules).
 
 ### The emulator

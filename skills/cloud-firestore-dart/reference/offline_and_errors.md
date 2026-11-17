@@ -133,7 +133,7 @@ final int next = await firestore.runTransaction<int>((Transaction transaction) a
 
 ## What is not supported
 
-No federated sign-in, no device attestation for App Check, no cache shared across browser tabs,
+No federated sign-in through a provider's sign-in page (only with a token the app has), no device attestation for App Check, no cache shared across browser tabs,
 no real-time Pipelines, no `findNearest` against the cache. The web was tested in Chrome only;
 Windows is untested. Full list:
 <https://raw.githubusercontent.com/long1eu/firebase_dart_sdk/main/docs/guides/features.md>.

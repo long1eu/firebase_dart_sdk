@@ -52,6 +52,18 @@ final Map<String, List<Matcher>> _expectedOutput = <String, List<Matcher>>{
     equals('fresh ID token for the user: true'),
     equals('session file removed: true'),
   ],
+  'linking_and_email_link.dart': <Matcher>[
+    equals('state: signed out'),
+    equals('state: signed in (anonymous: true)'),
+    equals('linked Google, same user: true'),
+    equals('providers: google.com'),
+    equals('is a sign-in link: true'),
+    equals('state: signed in (anonymous: false)'),
+    equals('signed in by link: new account true, email verified true'),
+    equals('state: signed in (anonymous: false)'),
+    equals('unlinked Google, providers left: 0'),
+    equals('state: signed out'),
+  ],
   'firestore_wiring.dart': <Matcher>[
     equals('signed out, write refused: permissionDenied'),
     equals('signed in, read back: hello'),
@@ -67,6 +79,7 @@ const Map<String, String> _notes = <String, String>{
   'custom_token.dart': 'Set FIREBASE_AUTH_EMULATOR_HOST',
   'persistent_session.dart': 'Set FIREBASE_AUTH_EMULATOR_HOST',
   'firestore_wiring.dart': 'Set FIREBASE_AUTH_EMULATOR_HOST',
+  'linking_and_email_link.dart': 'Set FIREBASE_AUTH_EMULATOR_HOST',
   'service_account.dart': 'Set FIREBASE_SERVICE_ACCOUNT_KEY_FILE',
   'adc_server.dart': 'Set FIREBASE_PROJECT_ID',
 };

@@ -304,7 +304,8 @@ on the Dart VM, but no Flutter app ran a listener in a background isolate.
 - A Flutter app on Android, iOS or the web where FlutterFire works: you get Google's SDKs, Google's support,
   and years of production use. This library has 58 downloads in 30 days, 0 likes, 80 GitHub stars and one
   maintainer (499 of the 513 commits GitHub counts).
-- When you need federated sign-in (Google, Apple), phone or email-link sign-in, or multi-factor: not provided
+- When you need a provider's sign-in page (Google, Apple popups or redirects), phone sign-in, or multi-factor:
+  not provided. Email link sign-in and federated sign-in with a token the app already has are
   (`docs/guides/authentication.md`).
 - When you need App Check with device attestation, Analytics, Crashlytics, Remote Config, Messaging or Storage:
   not part of this project (see `appsup-dart/firebase_dart` for Auth, Realtime Database and Storage in pure

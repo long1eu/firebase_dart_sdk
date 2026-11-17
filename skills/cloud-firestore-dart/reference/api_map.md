@@ -58,9 +58,10 @@ Right: the name in this client, or "not available".
 | FF `persistentCacheIndexManager()` | `persistentCacheIndexManager` (a getter, null with a memory cache) |
 | FF `FirebaseFirestore.setLoggingEnabled(true)`; JS `setLogLevel('debug')` | `FirebaseFirestore.setLogLevel(LogLevel.debug)` |
 | JS `clearIndexedDbPersistence(db)`, `terminate(db)` | `firestore.terminate()`, then `firestore.clearPersistence()` |
-| FF `FirebaseAuth.instance.signInWithEmailAndPassword(email: ..., password: ...)` | `final auth = await FirebaseUserAuth.forApp(app);` then `auth.signInWithEmailAndPassword(email, password)` (positional) |
-| FF `FirebaseAuth.instance.currentUser?.uid`, `authStateChanges()` | `auth.uid`, `auth.currentUser`, `auth.userChanges()` |
-| Google, Apple or other federated sign-in, phone, email link, multi-factor, `signInWithPopup` | not available |
+| FF `FirebaseAuth.instance.signInWithEmailAndPassword(email: ..., password: ...)` | `final auth = await FirebaseUserAuth.forApp(app);` then `auth.signInWithEmailAndPassword(email: ..., password: ...)` |
+| FF `FirebaseAuth.instance.currentUser?.uid`, `authStateChanges()`, `idTokenChanges()`, `userChanges()` | `auth.uid`, `auth.currentUser`, `auth.authStateChanges()`, `auth.idTokenChanges()`, `auth.userChanges()` |
+| FF `signInWithCredential(GoogleAuthProvider.credential(idToken: ...))` and the other providers, `linkWithCredential`, `unlink`, email link sign-in | the same names on `FirebaseUserAuth` (the app gets the provider's token itself) |
+| `signInWithPopup`, `signInWithProvider`, phone, multi-factor | not available |
 | FF `webExperimentalForceLongPolling` | `Settings(webExperimentalForceLongPolling: true)` |
 | FF `ignoreUndefinedProperties`, JS `Temporal` conversion | not available (not applicable to Dart) |
 | Storage, Messaging, Realtime Database, Analytics, Remote Config | not available in these packages |

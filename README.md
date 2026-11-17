@@ -27,7 +27,7 @@ endorsed by Google or Firebase.
 - You ship a Windows app and cannot test it yourself first: it was run on one Windows 11 VM against the
   emulator only (the Dart VM suites and two Flutter debug apps, no window drawn), not in CI, not in a
   release build and not against production.
-- You need federated, phone or email-link sign-in, multi-factor, Storage, Messaging or the other Firebase
+- You need a provider's sign-in page (popup or redirect), phone sign-in, multi-factor, Storage, Messaging or the other Firebase
   services, or admin jobs such as bulk writes and recursive deletes (use `firebase_admin_sdk`).
 - You need a vendor to call: one person maintains it, with no SLA.
 
@@ -181,7 +181,7 @@ yet.]_
   browser was run against a production backend (the verification kit used the web transport
   against production from the VM).
 - Not implemented: coordination between clients that share one cache (the multi-tab support of
-  the JS SDK; deferred until after 0.1.0), a full Firebase Auth SDK (no federated sign-in), and
+  the JS SDK; deferred until after 0.1.0), a full Firebase Auth SDK (no popup or redirect sign-in, phone or multi-factor), and
   Pipelines beyond the preview (no real-time pipelines and no offline evaluation; a local
   evaluator exists but is internal and not used yet; search, window functions and explain
   options are only checked for their encoding, since the emulator rejects them).

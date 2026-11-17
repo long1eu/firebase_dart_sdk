@@ -23,8 +23,14 @@ import 'user_record.dart' show credentialFromResponse;
 /// | `operation-not-allowed` | the sign-in method is not enabled for the project |
 /// | `admin-restricted-operation` | the project allows this operation to administrators only (for example sign-up) |
 /// | `invalid-custom-token`, `custom-token-mismatch` | the custom token is malformed or for another project |
-/// | `requires-recent-login` | sign in again (`FirebaseUserAuth.reauthenticateWithEmailAndPassword`) and retry |
+/// | `requires-recent-login` | sign in again (`FirebaseUserAuth.reauthenticateWithCredential`) and retry |
 /// | `user-mismatch` | the reauthentication used the credentials of another account |
+/// | `account-exists-with-different-credential` | a federated sign-in found an account of the same email address with another method: sign in with it and link [credential] |
+/// | `credential-already-in-use`, `provider-already-linked`, `no-such-provider` | a link or unlink that cannot be done |
+/// | `tenant-id-mismatch` | the user or the email link belongs to another tenant than `FirebaseUserAuth.tenantId` |
+/// | `login-blocked` | a `beforeAuthStateChanged` callback refused the change |
+/// | `password-does-not-meet-requirements` | the password fails the project's policy (`FirebaseUserAuth.validatePassword`) |
+/// | `argument-error` | an argument the backend was not asked about is wrong (an email link that is not one) |
 /// | `multi-factor-auth-required` | the account has a second factor; this package cannot finish that sign-in (a [FirebaseAuthMultiFactorException]) |
 /// | `user-token-expired`, `invalid-refresh-token` | the session ended (account deleted, refresh token revoked); the user is signed out |
 /// | `invalid-user-token` | the backend refused the ID token |
@@ -37,7 +43,8 @@ import 'user_record.dart' show credentialFromResponse;
 /// | `invalid-api-key` | the API key is not valid |
 /// | `internal-error` | the backend answered with something unexpected |
 ///
-/// Any other code of the backend arrives in kebab case: `QUOTA_EXCEEDED` is `quota-exceeded`.
+/// The backend's codes are mapped with the complete `SERVER_ERROR_MAP` of the JS SDK; any other code arrives in kebab
+/// case: `QUOTA_EXCEEDED` is `quota-exceeded`.
 /// `OAuthTokenProvider.serviceAccount` throws `invalid-credential` when the token endpoint refuses the key
 /// (`invalid_grant`), and `network-request-failed` or `internal-error` otherwise.
 ///

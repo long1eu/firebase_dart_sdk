@@ -65,6 +65,8 @@
   (`sessionStorage` / `localStorage`), exported through conditional imports so that the library still compiles
   everywhere (each throws `UnsupportedError` on the other platform). Their documentation says what a stored refresh
   token exposes. `example/persistent_session.dart` uses `FileAuthStorage`.
+- Documentation: the README, the authentication guide and the API docs cover the new sign-in methods, streams,
+  tenants, language, password policy and storages; a new example, `example/linking_and_email_link.dart`.
 
 ## 0.2.1
 

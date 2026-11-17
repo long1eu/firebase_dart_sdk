@@ -120,8 +120,9 @@ has the changes with before and after code.
 - **The web** beyond the experiment: browsers other than Chrome, and a cache shared between tabs.
 - `findNearest` evaluation against the local cache, and cache indexes for queries with
   inequalities on several fields.
-- A Firebase Auth SDK: sign-in with email and password, anonymously or with custom tokens, and
-  server credentials, are in `firebase_auth_providers_dart`; federated sign-in is not.
+- A full Firebase Auth SDK: sign-in with email and password, email links, anonymously, with custom tokens
+  or with a federated provider's token, and server credentials, are in `firebase_auth_providers_dart`;
+  popup and redirect flows, phone sign-in and multi-factor are not.
 
 The full list, with the known gaps of what is done, is in
 [features and limits](https://github.com/long1eu/firebase_dart_sdk/blob/main/docs/guides/features.md).

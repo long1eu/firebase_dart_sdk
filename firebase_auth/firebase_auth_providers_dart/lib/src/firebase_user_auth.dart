@@ -18,7 +18,7 @@ import 'environment_stub.dart'
     if (dart.library.js_interop) 'environment_web.dart';
 
 /// Firebase Auth user sign-in over the Identity Toolkit and Secure Token REST APIs: anonymous, email and password,
-/// and custom tokens.
+/// email link, custom tokens, and federated providers by token exchange.
 ///
 /// It is the token provider of a [FirebaseApp]: Firestore sends the ID token of the signed-in user with every
 /// request (so the security rules see `request.auth`), and follows sign-in, sign-out and a switch of users like the
@@ -48,11 +48,13 @@ import 'environment_stub.dart'
 /// }
 /// ```
 ///
-/// **Sign-in.** [signInAnonymously], [createUserWithEmailAndPassword], [signInWithEmailAndPassword] and
-/// [signInWithCustomToken] each replace the current user (if any) and return the new one. They complete after
-/// [userChanges] and [onTokenChanged] have emitted and their listeners had a turn of the event loop, so a
-/// Firestore write issued right after belongs to the new user. When two sign-ins overlap, the later one wins and
-/// the earlier one throws `cancelled`.
+/// **Sign-in.** [signInAnonymously], [createUserWithEmailAndPassword], [signInWithEmailAndPassword],
+/// [signInWithEmailLink], [signInWithCustomToken] and [signInWithCredential] each replace the current user (if any)
+/// and return a [UserCredential]: the new user (read from the backend with `accounts:lookup`, like the JS SDK) with
+/// [AdditionalUserInfo]. They complete after [userChanges], [authStateChanges], [idTokenChanges] and
+/// [onTokenChanged] have emitted and their listeners had a turn of the event loop, so a Firestore write issued
+/// right after belongs to the new user. When two sign-ins overlap, the later one wins and the earlier one throws
+/// `cancelled`. [linkWithCredential], [reauthenticateWithCredential] and [unlink] act on the signed-in user.
 ///
 /// **Token refresh.** The ID token lives for an hour. It is refreshed with the refresh token when it is within
 /// five minutes ([refreshBefore]) of its expiry: on demand when a token is requested ([getAccessToken]), and
@@ -77,10 +79,11 @@ import 'environment_stub.dart'
 /// unit tests and against the emulator.
 ///
 /// Account management follows the REST-backed operations of the JS SDK: password reset, email verification and
-/// action codes, email, password and profile updates, reauthentication with a password, account deletion, and
-/// the sign-in methods of an email address. This is not a port of the whole Firebase Auth SDK: there are no
-/// federated providers or popup and redirect flows, no phone sign-in, no email link sign-in and no multi-factor.
-/// A sign-in or reauthentication of an account with a second factor throws a [FirebaseAuthMultiFactorException]
+/// action codes, email, password and profile updates, reauthentication, account deletion, the sign-in methods of
+/// an email address, and [validatePassword]. [tenantId] and [languageCode] are sent like the JS SDK sends them.
+/// This is not a port of the whole Firebase Auth SDK: a federated provider's token comes from the app (there are
+/// no popup and redirect flows), and there is no phone sign-in and no sign-in with a second factor. A sign-in or
+/// reauthentication of an account with a second factor throws a [FirebaseAuthMultiFactorException]
 /// (`multi-factor-auth-required`) with the enrolled factors and the pending credential.
 class FirebaseUserAuth implements AuthTokenProvider {
   /// Creates an instance for the project of [apiKey] (the Web API key of the Firebase project).

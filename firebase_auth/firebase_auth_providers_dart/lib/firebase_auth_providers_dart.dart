@@ -1,11 +1,14 @@
 /// Ready-made token providers for `firebase_app_dart` and `cloud_firestore_dart`.
 ///
-/// * [FirebaseUserAuth]: Firebase Auth user sign-in over REST (anonymous, email and password, custom tokens).
+/// * [FirebaseUserAuth]: Firebase Auth user sign-in over REST (anonymous, email and password, email link, custom
+///   tokens, and federated providers by token exchange), with FlutterFire's names, and the storages of its session
+///   ([InMemoryAuthStorage], `FileAuthStorage` on the VM, `WebAuthStorage` in a browser).
 /// * [OAuthTokenProvider.serviceAccount]: a service account, for servers. Bypasses security rules.
 /// * `applicationDefaultCredentials()` in `package:firebase_auth_providers_dart/adc.dart` (needs `dart:io`):
 ///   Application Default Credentials, for servers and command line tools. Bypasses security rules.
 ///
-/// This library does not import `dart:io` and works on the web.
+/// This library does not import `dart:io` unconditionally and works on the web (`FileAuthStorage` is the VM's,
+/// `WebAuthStorage` the browser's; each throws an [UnsupportedError] on the other platform).
 ///
 /// ```dart
 /// import 'package:firebase_app_dart/firebase_app_dart.dart';
@@ -30,6 +33,7 @@
 library;
 
 // Imported for the references in the documentation above.
+import 'src/auth_storage.dart';
 import 'src/firebase_user_auth.dart';
 import 'src/oauth_token_provider.dart';
 
