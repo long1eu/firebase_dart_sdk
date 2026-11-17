@@ -168,4 +168,43 @@ void main() {
       expect(second.currentUser!.providerData.single.displayName, 'Ada');
     }, skip: skip);
   });
+
+  group('streams and state', () {
+    test(
+      'authStateChanges, idTokenChanges and updateCurrentUser with real tokens',
+      () async {
+        final FirebaseUserAuth first = create();
+        final FirebaseUserAuth second = create(
+          withStorage: InMemoryAuthStorage(),
+        );
+        final List<String?> states = <String?>[];
+        final List<String?> tokens = <String?>[];
+        second.authStateChanges().listen((AuthUser? u) => states.add(u?.uid));
+        second.idTokenChanges().listen((AuthUser? u) => tokens.add(u?.uid));
+        final UserCredential signedIn = await first
+            .createUserWithEmailAndPassword(
+              email: uniqueEmail(),
+              password: 'correct horse',
+            );
+        await second.updateCurrentUser(first.currentUser);
+        expect(second.uid, signedIn.uid);
+        // The copied session refreshes on its own.
+        await Future<void>.delayed(const Duration(milliseconds: 1100));
+        final String token = (await second.getAccessToken(
+          forceRefresh: true,
+        )).token;
+        expect(
+          token,
+          isNot((await first.getAccessToken(forceRefresh: false)).token),
+        );
+        await second.reload();
+        await second.signOut();
+        await Future<void>.delayed(Duration.zero);
+        expect(states, <String?>[null, signedIn.uid, null]);
+        expect(tokens, <String?>[null, signedIn.uid, signedIn.uid, null]);
+        expect(first.uid, signedIn.uid);
+      },
+      skip: skip,
+    );
+  });
 }

@@ -308,6 +308,27 @@ class FirebaseUserAuth implements AuthTokenProvider {
   final StreamController<AuthUser?> _userChanges =
       StreamController<AuthUser?>.broadcast();
 
+  // Synchronous, so that the stream of authStateChanges() and idTokenChanges() knows at once that a change replaces
+  // the current user it still has to emit; those streams deliver asynchronously.
+  final StreamController<AuthUser?> _authStateChanges =
+      StreamController<AuthUser?>.broadcast(sync: true);
+  final StreamController<AuthUser?> _idTokenChanges =
+      StreamController<AuthUser?>.broadcast(sync: true);
+
+  /// The uid authStateChanges() last emitted (the JS SDK's `lastNotifiedUid`); an instance starts signed out.
+  String? _lastNotifiedUid;
+
+  /// The [restore] in progress.
+  Future<void>? _restoring;
+
+  final List<_BeforeStateCallback> _beforeStateCallbacks =
+      <_BeforeStateCallback>[];
+
+  /// The session behind each user this class handed out (for [updateCurrentUser]), with the API key of its
+  /// instance. Weak: it does not keep a user alive.
+  static final Expando<(String, _Session)> _sessionOfUser =
+      Expando<(String, _Session)>('FirebaseUserAuth session');
+
   _Session? _session;
   Future<String?>? _refreshing;
   Timer? _refreshTimer;
@@ -335,14 +356,110 @@ class FirebaseUserAuth implements AuthTokenProvider {
   @override
   Stream<AuthTokenChange> get onTokenChanged => _tokenChanges.stream;
 
+  /// Emits the current user (null when signed out) when it is listened to, once a [restore] in progress has
+  /// finished, and then the user after every sign-in of another user and after a sign-out (FlutterFire's
+  /// `authStateChanges()`, the JS SDK's `onAuthStateChanged`). A sign-in of the user who is already signed in, a
+  /// token refresh or a change of the user's data does not emit: see [idTokenChanges] and [userChanges].
+  ///
+  /// ```dart
+  /// auth.authStateChanges().listen((AuthUser? user) {
+  ///   print(user == null ? 'signed out' : 'signed in as ${user.uid}');
+  /// });
+  /// ```
+  Stream<AuthUser?> authStateChanges() =>
+      _startingWithCurrentUser(_authStateChanges.stream);
+
+  /// Like [authStateChanges], and also after every new ID token of the signed-in user: a token refresh, a
+  /// password change, a link (FlutterFire's `idTokenChanges()`, the JS SDK's `onIdTokenChanged`).
+  Stream<AuthUser?> idTokenChanges() =>
+      _startingWithCurrentUser(_idTokenChanges.stream);
+
+  /// Completes when the initial state is known (the JS SDK's `authStateReady`): when the [restore] in progress has
+  /// finished (with its error, if it failed), or at once when none is in progress. [forApp] has restored the session
+  /// before it returns.
+  Future<void> authStateReady() => _restoring ?? Future<void>.value();
+
+  /// Registers [callback] to run before the signed-in user changes (the JS SDK's `beforeAuthStateChanged`): before
+  /// a sign-in completes (with the new user), before [signOut] (with null), and before [updateCurrentUser]. It may
+  /// be asynchronous; the change waits for it. When it throws, the change does not happen: the operation throws a
+  /// [FirebaseAuthException] with the code `login-blocked`, and the [onAbort] of the callbacks that ran before it
+  /// are called, in reverse order. A session that ends on the backend (the user is signed out after a refused token
+  /// refresh) does not run the callbacks. Returns a function that removes the callback.
+  ///
+  /// ```dart
+  /// final void Function() remove = auth.beforeAuthStateChanged((AuthUser? user) {
+  ///   if (user != null && !user.emailVerified && !user.isAnonymous) {
+  ///     throw StateError('verify your email address first');
+  ///   }
+  /// });
+  /// ```
+  void Function() beforeAuthStateChanged(
+    FutureOr<void> Function(AuthUser? user) callback, {
+    void Function()? onAbort,
+  }) {
+    final _BeforeStateCallback entry = _BeforeStateCallback(callback, onAbort);
+    _beforeStateCallbacks.add(entry);
+    return () => _beforeStateCallbacks.remove(entry);
+  }
+
+  /// Makes [user] the signed-in user of this instance (the JS SDK's `updateCurrentUser`), or signs out for null.
+  /// [user] must come from a [FirebaseUserAuth] with the same API key (its [currentUser], or the result of one of
+  /// its sign-ins): this instance continues that session with its own copy of the tokens, and stores it.
+  ///
+  /// Runs the [beforeAuthStateChanged] callbacks. Throws a [FirebaseAuthException] with the code
+  /// `invalid-user-token` for a user of another API key or one this package did not hand out.
+  Future<void> updateCurrentUser(AuthUser? user) async {
+    _checkNotDisposed();
+    if (user == null) {
+      await signOut();
+      return;
+    }
+    final (String, _Session)? source =
+        _sessionOfUser[user] ??
+        (user is UserCredential ? _sessionOfUser[user.user!] : null);
+    if (source == null || source.$1 != apiKey) {
+      throw const FirebaseAuthException(
+        code: 'invalid-user-token',
+        message:
+            "This user's credential isn't valid for this project: it does not come from a FirebaseUserAuth "
+            'with the same API key.',
+      );
+    }
+    final _Session session = source.$2;
+    if (identical(session.user, _session?.user)) {
+      return;
+    }
+    final int generation = ++_generation;
+    await _runBeforeStateCallbacks(session.user);
+    if (generation != _generation) {
+      throw _overtaken;
+    }
+    await _setSession(session, persist: true);
+    _userChanges.add(session.user);
+    final String? idToken = session.idToken;
+    _emitToken(idToken ?? '');
+    _notifyAuthState();
+    await _letListenersReact();
+  }
+
   /// Loads the session that an earlier instance stored. The ID token is fetched when it is first needed.
   ///
   /// Does nothing when a user is already signed in or nothing is stored; a stored value that this class did not
   /// write is ignored. Sessions stored by 0.1 and 0.2 are read too; their user has empty [AuthUser.providerData]
   /// and [AuthUser.metadata] until [reload]. It does not check the session with the backend: a session that ended there signs the user
-  /// out at the first token refresh. [userChanges] does not emit for a restored user. Throws whatever the `read` of
-  /// the storage throws.
-  Future<void> restore() async {
+  /// out at the first token refresh. [userChanges] does not emit for a restored user; [authStateChanges] and
+  /// [idTokenChanges] do. Throws whatever the `read` of the storage throws.
+  Future<void> restore() {
+    final Future<void> restoring = _restore();
+    _restoring = restoring;
+    return restoring.whenComplete(() {
+      if (identical(_restoring, restoring)) {
+        _restoring = null;
+      }
+    });
+  }
+
+  Future<void> _restore() async {
     final String? stored = await _storage.read(_storageKey);
     if (stored == null || _session != null) {
       return;
@@ -360,6 +477,11 @@ class FirebaseUserAuth implements AuthTokenProvider {
       _Session(decoded.user, decoded.refreshToken, null, null),
       persist: false,
     );
+    // authStateChanges() and idTokenChanges() tell listeners that came before; userChanges() does not emit.
+    if (!_idTokenChanges.isClosed) {
+      _idTokenChanges.add(decoded.user);
+    }
+    _notifyAuthState();
   }
 
   /// Signs in a new anonymous user, a new account every time (`signInAnonymously`).
@@ -412,13 +534,20 @@ class FirebaseUserAuth implements AuthTokenProvider {
     <String, Object?>{'token': token, 'returnSecureToken': true},
   );
 
-  /// Signs the user out: the session is forgotten, also in the storage, [userChanges] emits null and
-  /// [onTokenChanged] an empty token. Does nothing when nobody is signed in.
+  /// Signs the user out: the session is forgotten, also in the storage, [userChanges], [authStateChanges] and
+  /// [idTokenChanges] emit null and [onTokenChanged] an empty token. Does nothing when nobody is signed in. Runs the
+  /// [beforeAuthStateChanged] callbacks first, and throws `login-blocked` when one of them throws.
   ///
   /// It makes no request: the refresh token is not revoked on the backend (as in the other Firebase SDKs).
   /// Firestore continues without a token; the pending writes of the user stay with that user.
   Future<void> signOut() async {
     if (_session == null) {
+      return;
+    }
+    final int generation = _generation;
+    await _runBeforeStateCallbacks(null);
+    if (generation != _generation || _session == null) {
+      // Another sign-in or sign-out happened while the callbacks ran.
       return;
     }
     await _clearSession();
@@ -743,6 +872,8 @@ class FirebaseUserAuth implements AuthTokenProvider {
     _cancelProactiveRefresh();
     await _tokenChanges.close();
     await _userChanges.close();
+    await _authStateChanges.close();
+    await _idTokenChanges.close();
     if (_ownsHttp) {
       _http.close();
     }
@@ -835,11 +966,11 @@ class FirebaseUserAuth implements AuthTokenProvider {
           updated.refreshToken != session.refreshToken ||
           newUser != session.user,
     );
-    if (idToken is String && !_tokenChanges.isClosed) {
-      _tokenChanges.add(AuthTokenChange(idToken));
-    }
     if (newUser != session.user && !_userChanges.isClosed) {
       _userChanges.add(newUser);
+    }
+    if (idToken is String) {
+      _emitToken(idToken);
     }
   }
 
@@ -1077,6 +1208,10 @@ class FirebaseUserAuth implements AuthTokenProvider {
       account,
       AuthUser(uid: uid, isAnonymous: token.signInProvider == 'anonymous'),
     );
+    await _runBeforeStateCallbacks(user);
+    if (generation != _generation) {
+      throw _overtaken;
+    }
     final _Session session = _Session(
       user,
       refreshToken,
@@ -1085,12 +1220,15 @@ class FirebaseUserAuth implements AuthTokenProvider {
     );
     await _setSession(session, persist: true);
     _userChanges.add(session.user);
-    _tokenChanges.add(AuthTokenChange(idToken));
+    _emitToken(idToken);
+    _notifyAuthState();
     await _letListenersReact();
-    return UserCredential(
+    final UserCredential result = UserCredential(
       session.user,
       additionalUserInfo: additionalUserInfoOf(response),
     );
+    _sessionOfUser[result] = (apiKey, session);
+    return result;
   }
 
   /// Like `_performSignInRequest` of the JS SDK: a sign-in answer with an `mfaPendingCredential` (and no tokens)
@@ -1163,14 +1301,13 @@ class FirebaseUserAuth implements AuthTokenProvider {
       persist: refreshed.refreshToken != session.refreshToken,
     );
     _refreshFailures = 0;
-    if (!_tokenChanges.isClosed) {
-      _tokenChanges.add(AuthTokenChange(idToken));
-    }
+    _emitToken(idToken);
     return idToken;
   }
 
   Future<void> _setSession(_Session session, {required bool persist}) async {
     _session = session;
+    _sessionOfUser[session.user] = (apiKey, session);
     if (persist) {
       await _storage.write(
         _storageKey,
@@ -1190,10 +1327,86 @@ class FirebaseUserAuth implements AuthTokenProvider {
     if (!_userChanges.isClosed) {
       _userChanges.add(null);
     }
-    if (!_tokenChanges.isClosed) {
-      _tokenChanges.add(const AuthTokenChange(''));
-    }
+    _emitToken('');
+    _notifyAuthState();
     await _letListenersReact();
+  }
+
+  /// Tells the token listeners (Firestore) and [idTokenChanges] about a new ID token of the current session, or an
+  /// empty one after a sign-out.
+  void _emitToken(String idToken) {
+    if (!_tokenChanges.isClosed) {
+      _tokenChanges.add(AuthTokenChange(idToken));
+    }
+    if (!_idTokenChanges.isClosed) {
+      _idTokenChanges.add(_session?.user);
+    }
+  }
+
+  /// [authStateChanges] emits when the uid differs from the one it last emitted (`notifyAuthListeners` of the JS
+  /// SDK).
+  void _notifyAuthState() {
+    final String? uid = _session?.user.uid;
+    if (uid == _lastNotifiedUid) {
+      return;
+    }
+    _lastNotifiedUid = uid;
+    if (!_authStateChanges.isClosed) {
+      _authStateChanges.add(_session?.user);
+    }
+  }
+
+  /// [changes], preceded by the current user once [authStateReady] completes, unless a change came first.
+  Stream<AuthUser?> _startingWithCurrentUser(Stream<AuthUser?> changes) =>
+      Stream<AuthUser?>.multi((MultiStreamController<AuthUser?> controller) {
+        bool emitted = false;
+        final StreamSubscription<AuthUser?> subscription = changes.listen((
+          AuthUser? user,
+        ) {
+          emitted = true;
+          controller.add(user);
+        }, onDone: controller.close);
+        controller.onCancel = subscription.cancel;
+        void emitCurrent() {
+          if (!emitted && !controller.isClosed) {
+            emitted = true;
+            controller.add(_session?.user);
+          }
+        }
+
+        authStateReady().then<void>(
+          (_) => emitCurrent(),
+          onError: (Object _) => emitCurrent(),
+        );
+      });
+
+  /// Runs the [beforeAuthStateChanged] callbacks for [next] (`AuthMiddlewareQueue.runMiddleware` of the JS SDK).
+  Future<void> _runBeforeStateCallbacks(AuthUser? next) async {
+    final List<void Function()> onAbort = <void Function()>[];
+    for (final _BeforeStateCallback entry in List<_BeforeStateCallback>.of(
+      _beforeStateCallbacks,
+    )) {
+      try {
+        await entry.callback(next);
+      } on Object catch (e) {
+        for (final void Function() abort in onAbort.reversed) {
+          try {
+            abort();
+          } on Object {
+            // Like the JS SDK: an onAbort that throws does not stop the others.
+          }
+        }
+        throw FirebaseAuthException(
+          code: 'login-blocked',
+          message:
+              'Login blocked by user-provided method: ${e is FirebaseException ? e.message : e}',
+        );
+      }
+      final void Function()? abort = entry.onAbort;
+      if (abort != null) {
+        onAbort.add(abort);
+      }
+    }
   }
 
   /// Gives the listeners of the token (and whatever they forward the change to) a turn of the event loop before a
@@ -1258,6 +1471,13 @@ class FirebaseUserAuth implements AuthTokenProvider {
   /// When the proactive refresh is due, for tests.
   @visibleForTesting
   bool get hasRefreshTimer => _refreshTimer != null;
+}
+
+class _BeforeStateCallback {
+  _BeforeStateCallback(this.callback, this.onAbort);
+
+  final FutureOr<void> Function(AuthUser? user) callback;
+  final void Function()? onAbort;
 }
 
 class _Session {

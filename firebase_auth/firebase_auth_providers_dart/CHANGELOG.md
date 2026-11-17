@@ -25,6 +25,13 @@
   **breaking** only for classes that implement or mock `FirebaseUserAuth` and return an `AuthUser` from these methods.
 - The stored session has a version (2) and the whole record. Sessions stored by 0.1 and 0.2 are still restored;
   their user lacks the new fields until `reload`.
+- `authStateChanges()` and `idTokenChanges()` (FlutterFire's streams): they start with the current user (after a
+  `restore` in progress) and then follow sign-ins of another user and sign-outs, and, for `idTokenChanges()`, every
+  new ID token. `userChanges()` is unchanged (it still does not emit the current user when listened to).
+- `authStateReady()`, `beforeAuthStateChanged(callback, onAbort:)` (a throwing callback blocks the sign-in, sign-out
+  or switch with `login-blocked`) and `updateCurrentUser(user)` (continue the session of a user of another
+  instance with the same API key), from the JS SDK. The token stream Firestore follows (`onTokenChanged`) emits as
+  before; `updateCurrentUser` is a user switch for it.
 
 ## 0.2.1
 

@@ -51,22 +51,21 @@ AuthUser copyUser(
 );
 
 /// The entries of `providerUserInfo` (`extractProviderData` of the JS SDK).
-List<UserInfo> providerDataOf(Object? providers) => List<UserInfo>.unmodifiable(
-  <UserInfo>[
-    if (providers is List)
-      for (final Object? provider in providers)
-        if (provider is Map<String, Object?> &&
-            _text(provider['providerId']) != null)
-          UserInfo(
-            providerId: provider['providerId']! as String,
-            uid: _text(provider['rawId']) ?? '',
-            email: _text(provider['email']),
-            displayName: _text(provider['displayName']),
-            photoUrl: _text(provider['photoUrl']),
-            phoneNumber: _text(provider['phoneNumber']),
-          ),
-  ],
-);
+List<UserInfo> providerDataOf(Object? providers) =>
+    List<UserInfo>.unmodifiable(<UserInfo>[
+      if (providers is List)
+        for (final Object? provider in providers)
+          if (provider is Map<String, Object?> &&
+              _text(provider['providerId']) != null)
+            UserInfo(
+              providerId: provider['providerId']! as String,
+              uid: _text(provider['rawId']) ?? '',
+              email: _text(provider['email']),
+              displayName: _text(provider['displayName']),
+              photoUrl: _text(provider['photoUrl']),
+              phoneNumber: _text(provider['phoneNumber']),
+            ),
+    ]);
 
 /// The user of an account of `accounts:lookup`, like `_reloadWithoutSaving` of the JS SDK: [previous] is the user
 /// before (its provider data is merged with the new one, and a user that was not anonymous never becomes
