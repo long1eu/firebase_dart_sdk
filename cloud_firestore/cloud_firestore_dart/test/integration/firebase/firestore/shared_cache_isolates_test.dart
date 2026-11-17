@@ -22,6 +22,7 @@
 library;
 
 import 'dart:async';
+import 'dart:io';
 import 'dart:isolate';
 
 import 'package:cloud_firestore_dart/cloud_firestore_dart.dart';
@@ -292,7 +293,17 @@ void main() {
       }
     }
     if (skip == null) {
-      DatabaseMock.deleteDatabaseFiles(db);
+      try {
+        DatabaseMock.deleteDatabaseFiles(db);
+      } on PathAccessException {
+        // A killed isolate never closes its SQLite connection, so the file
+        // stays open in this process. Windows does not delete an open file;
+        // it is left in build/test there.
+        if (!Platform.isWindows ||
+            !workers.any((_Worker worker) => worker.killed)) {
+          rethrow;
+        }
+      }
     }
   });
 
