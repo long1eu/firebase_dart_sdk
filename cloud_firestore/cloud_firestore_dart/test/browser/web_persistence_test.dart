@@ -1,5 +1,5 @@
 // The offline cache in a browser: SQLite compiled to WebAssembly with its
-// database in IndexedDB, through example/sqlite_database_web.dart.
+// database in IndexedDB, through the web opener of cloud_firestore_dart_sqlite.
 //
 // The tests need test/browser/sqlite3.wasm, the WebAssembly build of SQLite
 // for the sqlite3 package version in pubspec.lock. It is not in the
@@ -22,11 +22,11 @@ import 'package:cloud_firestore_dart/src/internal_access.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/local_store.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/persistance/index_manager.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/sqlite/sqlite_persistence.dart';
+import 'package:cloud_firestore_dart_sqlite/web.dart';
 import 'package:sqlite3/wasm.dart' as sqlite;
 import 'package:test/test.dart';
 import 'package:web/web.dart' as web;
 
-import '../../example/sqlite_database_web.dart';
 import 'browser_test_util.dart';
 
 typedef Json = Map<String, Object?>;

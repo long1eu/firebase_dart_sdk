@@ -1,4 +1,4 @@
-// Measures the two storages of example/sqlite_database_web.dart (IndexedDB
+// Measures the two storages of the web opener of cloud_firestore_dart_sqlite (IndexedDB
 // and OPFS) in headless Chrome: memory and read latency of a cache of N
 // documents of about 1 KB, compiled with dart2js and with dart2wasm.
 //

@@ -1,7 +1,7 @@
 // A cache that can't be opened: `Firestore.instanceFor` returns at once and opens the cache in the background, so
 // every operation, including the ones queued while the open was running, fails with the error of the open (before,
 // the first queued one failed with `LateInitializationError: Field 'localStore'`). The pattern of
-// `openWithMemoryFallback` (example/sqlite_database_web.dart) then works: wait for a first operation, terminate,
+// `openWithMemoryFallback` (cloud_firestore_dart_sqlite) then works: wait for a first operation, terminate,
 // create an instance with a memory cache.
 
 @TestOn('vm')

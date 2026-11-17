@@ -1,3 +1,6 @@
+// `dispose()` is the close of sqlite3 2.x, which Dart 3.8 and 3.9 resolve; 3.x deprecates it.
+// ignore_for_file: deprecated_member_use
+
 import 'dart:async';
 import 'dart:io';
 

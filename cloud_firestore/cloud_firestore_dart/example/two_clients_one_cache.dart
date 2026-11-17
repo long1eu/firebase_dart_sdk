@@ -19,9 +19,9 @@ import 'dart:io';
 import 'dart:isolate';
 
 import 'package:cloud_firestore_dart/cloud_firestore_dart.dart';
+import 'package:cloud_firestore_dart_sqlite/cloud_firestore_dart_sqlite.dart';
 
 import 'common.dart';
-import 'sqlite_database.dart';
 
 Future<void> main() async {
   final Directory directory = Directory.systemTemp.createTempSync(
@@ -127,7 +127,7 @@ Future<void> _background(List<Object?> args) async {
 FirebaseFirestore _open(Directory directory) {
   return FirebaseFirestore.instanceFor(
     app: exampleApp(),
-    openDatabase: sqliteOpener(directory),
+    openDatabase: sqliteOpener(directory: directory.path),
     settings: emulatorSettings(cacheSettings: PersistentCacheSettings()),
   );
 }

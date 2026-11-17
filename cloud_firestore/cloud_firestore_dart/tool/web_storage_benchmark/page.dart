@@ -15,10 +15,9 @@ import 'dart:math';
 import 'package:cloud_firestore_dart/cloud_firestore_dart.dart';
 // For `Firestore.initialized`: when the cache is open.
 import 'package:cloud_firestore_dart/src/internal_access.dart';
+import 'package:cloud_firestore_dart_sqlite/web.dart';
 import 'package:firebase_app_dart/firebase_app_dart.dart';
 import 'package:web/web.dart' as web;
-
-import '../../example/sqlite_database_web.dart';
 
 const String projectId = 'demo-bench';
 const String collection = 'bench';

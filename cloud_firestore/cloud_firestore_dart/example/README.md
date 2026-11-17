@@ -22,9 +22,6 @@ FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 dart run example/main.dart
 | `two_clients_one_cache.dart` | Two clients on one SQLite cache: a background isolate opens the cache of the main isolate and takes the lease; the main isolate turns secondary (answers from the cache, keeps its write pending) and becomes primary again when the background isolate terminates. See `docs/guides/multiple_clients.md`. |
 | `database_recovery.dart` | Recovery from a cache that is busy for a moment: a `Database` wrapper throws `TransientDatabaseException`; a write fails with `unavailable` and can be tried again, a change from the backend is stored once the cache works again. |
 | `cache_indexes.dart` | Persistent cache indexes: `persistentCacheIndexManager`, automatic index creation, `deleteAllIndexes`. |
-| `sqlite_database_web.dart` | The `OpenDatabase` for browsers: SQLite as WebAssembly with the database in IndexedDB, one tab at a time. Kept for this package's tests; apps use `sqliteOpener` of `cloud_firestore_dart_sqlite`, which holds the same code. Not a command-line program. |
-| `sqlite_opfs_worker.dart` | The worker of the OPFS storage of `sqlite_database_web.dart` (experimental). Kept for this package's tests; apps compile the worker of `cloud_firestore_dart_sqlite` with `dart run cloud_firestore_dart_sqlite:setup_web`. Not a command-line program. |
-| `sqlite_database.dart` | The complete `OpenDatabase` on top of `package:sqlite3` used by the examples and tests around it. Apps use `sqliteOpener` of `cloud_firestore_dart_sqlite` instead of copying it. |
 | `emulator_mock_user_token.dart` | `withEmulator` and `mockUserToken` to act as a signed-in user. |
 | `lifecycle.dart` | `setLogLevel`, `waitForPendingWrites`, `snapshotsInSync()`, `terminate`, `clearPersistence`. |
 | `lite.dart` | Firestore Lite (experimental, `package:cloud_firestore_dart/lite.dart`): the client without cache and listeners. Reads, writes, a batch, queries with `limitToLast` and cursors, aggregations, a converter, a transaction, `terminate`. Does not use `common.dart`, so that it only imports the lite library. |
@@ -35,7 +32,9 @@ FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 dart run example/main.dart
 | `performance/` | Cache and query timing, cache index decisions, cache size and garbage collection (about 70 s), a bundle for the first screen. See `docs/guides/performance.md`. |
 
 `common.dart` holds the setup the examples share (a `FirebaseApp` for the `demo-example`
-project and emulator settings). Every example ends with `firestore.terminate()`; without it
+project and emulator settings). The examples with a SQLite cache open it with `sqliteOpener` of
+[`cloud_firestore_dart_sqlite`](../../cloud_firestore_dart_sqlite), a dev dependency of this
+package. Every example ends with `firestore.terminate()`; without it
 the open gRPC channel keeps the process alive.
 
 In the [repository](https://github.com/long1eu/firebase_dart_sdk/tree/main/cloud_firestore/cloud_firestore_dart),

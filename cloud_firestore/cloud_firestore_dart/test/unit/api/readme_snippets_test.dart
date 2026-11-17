@@ -16,9 +16,8 @@
 // of the function; everything else is a statement and may use `await`. The
 // names declared in [_context] (app, firestore, users, ...) can be used
 // without declaring them. An import of a file of this package's example/
-// folder (`import 'sqlite_database.dart';`, which the guides tell the reader
-// to copy) is rewritten to import that file, so the snippet is checked
-// against it.
+// folder (`import 'common.dart';`) is rewritten to import that file, so the
+// snippet is checked against it.
 //
 // A block fenced as ```dart lite is a snippet for Firestore Lite: its classes
 // have the names of the main library, so these blocks go to a file of their

@@ -1,4 +1,4 @@
-// The worker of example/sqlite_opfs_worker.dart with a file system that fails
+// The OPFS worker of cloud_firestore_dart_sqlite with a file system that fails
 // on command, for web_persistence_opfs_test.dart: the page arms a fault over
 // the BroadcastChannel `opfs-faults` with a JSON message
 // `{"point": "<operation>:<file>", "code": <extended result code>,
@@ -17,10 +17,10 @@ import 'dart:convert';
 import 'dart:js_interop';
 import 'dart:typed_data';
 
+import 'package:cloud_firestore_dart_sqlite/opfs_worker.dart'
+    show runOpfsWorker;
 import 'package:sqlite3/wasm.dart' as sqlite;
 import 'package:web/web.dart' as web;
-
-import '../../../example/sqlite_opfs_worker.dart' show runOpfsWorker;
 
 /// The armed fault, if any.
 String? _point;
@@ -80,6 +80,9 @@ final class _FaultyFileSystem extends sqlite.BaseVirtualFileSystem {
   void xSleep(Duration duration) => _inner.xSleep(duration);
 }
 
+// sqlite3 3.4 deprecates implementing VirtualFileSystemFile in favour of
+// VirtualFileSystemFileV1, which 2.x does not have (as in the OPFS worker).
+// ignore: deprecated_implement
 class _FaultyFile implements sqlite.VirtualFileSystemFile {
   _FaultyFile(this._name, this._inner);
 

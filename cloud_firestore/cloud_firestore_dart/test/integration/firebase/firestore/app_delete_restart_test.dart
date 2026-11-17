@@ -3,18 +3,18 @@
 // file: the old connection is closed before the new one is opened, the
 // in-process lock of the database is released, and the cache is still there.
 //
-// Uses the opener of example/sqlite_database.dart, the one users are told to
-// copy.
+// Uses `sqliteOpener` of cloud_firestore_dart_sqlite, the opener users are
+// told to use.
 
 import 'dart:async';
 import 'dart:io';
 
 import 'package:cloud_firestore_dart/cloud_firestore_dart.dart';
 import 'package:cloud_firestore_dart/src/internal_access.dart';
+import 'package:cloud_firestore_dart_sqlite/cloud_firestore_dart_sqlite.dart';
 import 'package:firebase_app_dart/firebase_app_dart.dart';
 import 'package:test/test.dart';
 
-import '../../../../example/sqlite_database.dart';
 import '../../../util/integration_test_util.dart';
 
 /// Wraps [inner] to record when connections are opened and closed.
@@ -114,7 +114,7 @@ void main() {
     final Settings base = IntegrationTestUtil.newTestSettings();
     final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(
       app: app,
-      openDatabase: recording(sqliteOpener(directory), log),
+      openDatabase: recording(sqliteOpener(directory: directory.path), log),
       settings: Settings(cacheSettings: PersistentCacheSettings())
           .withEmulator(base.host, base.port),
     );

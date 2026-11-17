@@ -46,7 +46,8 @@ dependencies:
   web: ^1.1.0
 
 dev_dependencies:
-  # Only for test/readme: the guides import the SQLite opener from it. Local
+  # The SQLite opener of the examples, of the tests that open a real cache
+  # (test/readme, the browser tests, their workers) and of the benchmarks. Local
   # development resolves it from ../cloud_firestore_dart_sqlite through
   # pubspec_overrides.yaml.
   cloud_firestore_dart_sqlite: ^0.1.0
@@ -57,9 +58,11 @@ dev_dependencies:
   firebase_auth_providers_dart: ^0.2.0
   lints: ^6.1.0
   mockito: ^5.4.0
-  # 2.7.3 is the first version whose package:sqlite3/wasm.dart (used by
-  # example/sqlite_database_web.dart) is not @experimental and has
-  # IndexedDbFileSystem.open(vfsName:).
-  sqlite3: ^2.7.3
+  # The tests use SQLite directly too (package:sqlite3/sqlite3.dart and wasm.dart). The same range as
+  # cloud_firestore_dart_sqlite, and the code compiles with both majors (no package:sqlite3/open.dart).
+  # pubspec.lock stays on 2.9.4: the browser tests run on the sqlite3.wasm whose checksum
+  # tool/build_web_test_assets.sh pins, and the IndexedDB crash test fails on 3.9.1 (see there).
+  # Dart 3.8 and 3.9 resolve 2.x in any case; 3.x needs Dart 3.10.
+  sqlite3: '>=2.7.3 <4.0.0'
   test: ^1.25.0
   uuid: ^4.0.0

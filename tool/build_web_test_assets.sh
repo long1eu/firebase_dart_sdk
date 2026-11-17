@@ -15,8 +15,8 @@
 #                                       tests and the SQLite unit tests in a browser
 #   test/browser/crash/crash_worker.js  the worker of web_persistence_crash_test.dart
 #   test/browser/opfs/sqlite_opfs_worker.js
-#                                       example/sqlite_opfs_worker.dart compiled, for the
-#                                       OPFS storage tests
+#                                       the OPFS worker of cloud_firestore_dart_sqlite,
+#                                       compiled by its setup_web, for the OPFS storage tests
 #   test/browser/opfs/faulty_opfs_worker.js
 #                                       the same worker with I/O errors on command
 #
@@ -45,13 +45,16 @@ up_to_date() {
 # "sqlite3-<version>" of simolus3/sqlite3.dart (the release page shows it as the digest of the
 # asset). pubspec.lock decides which one CI uses; the other lines let the same tests run on
 # another version, for example after `dart pub upgrade sqlite3` or with a dependency override.
-# Add a line before moving pubspec.lock to a new version.
+# Add a line before moving pubspec.lock to a new version, and run the crash test on it
+# (web_persistence_crash_test.dart, dart2js): 3.x lost acknowledged transactions on IndexedDB
+# until cloud_firestore_dart_sqlite 0.1.1 waited for its queued writes.
 sqlite3_wasm_sha256() {
   case "$1" in
     2.9.4) echo 922a76b182b6af69b030c8e2fdd3283ecc8e827248b20e4b1f3f3db170b52117;;
     3.9.1) echo e7451780e78c56ff864fe9317a0fbcd6aeb2e8de3beba7f5efd963202f7ec3d9;;
   esac
 }
+SQLITE_PKG="$ROOT/cloud_firestore/cloud_firestore_dart_sqlite"
 
 WASM="$PKG/test/browser/sqlite3.wasm"
 SQLITE3_VERSION=$(awk '/^  sqlite3:/{f=1} f && /version:/{gsub(/"/,"",$2); print $2; exit}' "$PKG/pubspec.lock")
@@ -86,10 +89,10 @@ fi
 
 # --- crash_worker.js ----------------------------------------------------------------------
 # The test runner only compiles tests, so the worker of web_persistence_crash_test.dart is
-# compiled here. Rebuilt when the worker, the library, the example opener it uses or the
-# resolved dependencies changed.
+# compiled here. Rebuilt when the worker, the library, the opener it uses
+# (cloud_firestore_dart_sqlite) or the resolved dependencies changed.
 WORKER="$PKG/test/browser/crash/crash_worker.js"
-if up_to_date "$WORKER" "$PKG/test/browser/crash/crash_worker.dart" "$PKG/lib" "$PKG/example" \
+if up_to_date "$WORKER" "$PKG/test/browser/crash/crash_worker.dart" "$PKG/lib" "$SQLITE_PKG/lib" \
   "$PKG/pubspec.lock" "$ROOT/firebase_core/firebase_app_dart/lib"; then
   :
 else
@@ -105,16 +108,16 @@ else
 fi
 
 # --- sqlite_opfs_worker.js ----------------------------------------------------------------
-# The worker of the OPFS storage of example/sqlite_database_web.dart, compiled the way its
-# header tells apps to.
+# The worker of the OPFS storage of cloud_firestore_dart_sqlite, compiled the way its README
+# tells apps to (`dart run cloud_firestore_dart_sqlite:setup_web <web dir>`, dart2js -O2).
 OPFS_WORKER="$PKG/test/browser/opfs/sqlite_opfs_worker.js"
-if up_to_date "$OPFS_WORKER" "$PKG/example/sqlite_opfs_worker.dart" "$PKG/pubspec.lock"; then
+if up_to_date "$OPFS_WORKER" "$SQLITE_PKG/lib" "$SQLITE_PKG/bin" "$PKG/pubspec.lock"; then
   :
 else
   echo "Compiling test/browser/opfs/sqlite_opfs_worker.js"
   COMPILE_LOG="$(mktemp)"
-  if ! (cd "$PKG" && dart compile js -O2 -o test/browser/opfs/sqlite_opfs_worker.js \
-    example/sqlite_opfs_worker.dart) >"$COMPILE_LOG" 2>&1; then
+  if ! (cd "$PKG" && dart run cloud_firestore_dart_sqlite:setup_web test/browser/opfs) \
+    >"$COMPILE_LOG" 2>&1; then
     cat "$COMPILE_LOG"; rm -f "$OPFS_WORKER" "$COMPILE_LOG"
     echo "Could not compile sqlite_opfs_worker.js"
     exit 1
@@ -126,7 +129,7 @@ fi
 # The OPFS worker with a file system that fails on command (web_persistence_opfs_test.dart).
 FAULTY_WORKER="$PKG/test/browser/opfs/faulty_opfs_worker.js"
 if up_to_date "$FAULTY_WORKER" "$PKG/test/browser/opfs/faulty_opfs_worker.dart" \
-  "$PKG/example/sqlite_opfs_worker.dart" "$PKG/pubspec.lock"; then
+  "$SQLITE_PKG/lib" "$PKG/pubspec.lock"; then
   :
 else
   echo "Compiling test/browser/opfs/faulty_opfs_worker.js"

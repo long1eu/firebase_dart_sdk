@@ -6,6 +6,9 @@
 // The first group runs two persistences in this isolate, interleaved step by step. The second group runs real
 // concurrent writers in several isolates.
 
+// `dispose()` is the close of sqlite3 2.x, which Dart 3.8 and 3.9 resolve; 3.x deprecates it.
+// ignore_for_file: deprecated_member_use
+
 @TestOn('vm')
 library;
 
@@ -568,7 +571,7 @@ void main() {
     });
   });
 
-  // example/sqlite_database_web.dart does this, so that the setup and the version it leads to are one transaction.
+  // The web opener of cloud_firestore_dart_sqlite does this, so that the setup and the version it leads to are one transaction.
   test('an opener may run the setup inside a transaction of its own', () async {
     File(fixturePath).copySync(
       (DatabaseMock.pathForName(name)..parent.createSync(recursive: true)).path,
