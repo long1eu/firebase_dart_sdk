@@ -1,3 +1,11 @@
+## (unreleased)
+
+- `example/sqlite_database_web.dart` waits for every queued write to reach IndexedDB before it
+  acknowledges a transaction, like `cloud_firestore_dart_sqlite` 0.1.1. With `sqlite3` 3.x the
+  copied opener could lose acknowledged writes when the tab died. Apps use
+  `cloud_firestore_dart_sqlite`; if you still have a copy of this file, update it or move to the
+  package.
+
 ## 0.2.0
 
 Breaking: the public API takes the names and shapes of FlutterFire's `cloud_firestore` and of
