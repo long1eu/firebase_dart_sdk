@@ -92,10 +92,19 @@ packages:
   cloud_firestore_dart_sqlite:
     dependency: "direct dev"
     description:
-      path: "../cloud_firestore_dart_sqlite"
-      relative: true
-    source: path
+      name: cloud_firestore_dart_sqlite
+      sha256: "33efd5f9a88ab51aebf9ef2f53af83af21fe7fef0bae77dd9be982cff9d10518"
+      url: "https://pub.dev"
+    source: hosted
     version: "0.1.0"
+  code_assets:
+    dependency: transitive
+    description:
+      name: code_assets
+      sha256: "1ef22a0be3af9370bd9481ac76db114db92bfe75d5ca2b2d7bc911764478a4d9"
+      url: "https://pub.dev"
+    source: hosted
+    version: "2.2.0"
   code_builder:
     dependency: transitive
     description:
@@ -171,16 +180,18 @@ packages:
   firebase_app_dart:
     dependency: "direct main"
     description:
-      path: "../../firebase_core/firebase_app_dart"
-      relative: true
-    source: path
+      name: firebase_app_dart
+      sha256: "2e3dbe78660ab4d451c41b536c272314cce26551dc88c2205b9636f050c1df59"
+      url: "https://pub.dev"
+    source: hosted
     version: "0.2.0"
   firebase_auth_providers_dart:
     dependency: "direct dev"
     description:
-      path: "../../firebase_auth/firebase_auth_providers_dart"
-      relative: true
-    source: path
+      name: firebase_auth_providers_dart
+      sha256: cab1975a18aceaa8a7f4d2f565372c670b9333e84a29a3775c4d4374aef13d44
+      url: "https://pub.dev"
+    source: hosted
     version: "0.2.0"
   fixnum:
     dependency: "direct main"
@@ -238,6 +249,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "5.2.0"
+  hooks:
+    dependency: transitive
+    description:
+      name: hooks
+      sha256: eaac480a35ec0814146c2c48d96aaa829e0e44a7662c88ae84c9edf4bc35651f
+      url: "https://pub.dev"
+    source: hosted
+    version: "2.2.0"
   http:
     dependency: transitive
     description:
@@ -326,6 +345,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "5.8.1"
+  native_toolchain_c:
+    dependency: transitive
+    description:
+      name: native_toolchain_c
+      sha256: "120b6fc66acd8a5ddeaeb1e59b78836bb3ec9919bd9d9dfb1e2401985710c2c0"
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.19.6"
   node_preamble:
     dependency: transitive
     description:
@@ -350,6 +377,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.9.1"
+  platform:
+    dependency: transitive
+    description:
+      name: platform
+      sha256: a36d119c13416516a7b5913fbe8af8531e11633d784c550b2125f76c758524ec
+      url: "https://pub.dev"
+    source: hosted
+    version: "3.2.0"
   pool:
     dependency: transitive
     description:
@@ -358,6 +393,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.5.3"
+  process:
+    dependency: transitive
+    description:
+      name: process
+      sha256: "4242ba3508d37e01808bdf71ad1d5bb93a8d671bf2e7450e6b1b353fb0808891"
+      url: "https://pub.dev"
+    source: hosted
+    version: "5.0.6"
   protobuf:
     dependency: "direct main"
     description:
@@ -374,6 +417,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.2.1"
+  record_use:
+    dependency: transitive
+    description:
+      name: record_use
+      sha256: "1cb8564af8d43b464294411db9217f5ec04891c6f22ee2c32d73ae05e88a6bd2"
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.1.1"
   rxdart:
     dependency: "direct main"
     description:
@@ -458,10 +509,10 @@ packages:
     dependency: "direct dev"
     description:
       name: sqlite3
-      sha256: "3145bd74dcdb4fd6f5c6dda4d4e4490a8087d7f286a14dee5d37087290f0f8a2"
+      sha256: "8765980411f9b6733534efe9d014fad0750fa649590598772c04692deb34886b"
       url: "https://pub.dev"
     source: hosted
-    version: "2.9.4"
+    version: "3.9.1"
   stack_trace:
     dependency: transitive
     description:
@@ -554,10 +605,10 @@ packages:
     dependency: "direct main"
     description:
       name: web
-      sha256: "868d88a33d8a87b18ffc05f9f030ba328ffefba92d6c127917a2ba740f9cfe4a"
+      sha256: e119e82ac4795c7925103b7cf3768191f33941b99e7ccffbd6c645201d9f606b
       url: "https://pub.dev"
     source: hosted
-    version: "1.1.1"
+    version: "1.1.2"
   web_socket:
     dependency: transitive
     description:
