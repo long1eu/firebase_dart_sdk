@@ -390,6 +390,60 @@ jobs:
           name: browser-log
           path: ${{ runner.temp }}/emulator/*.log
 
+  # The Flutter packages, which the unit jobs skip (they install Dart only): flutter analyze and
+  # flutter test of cloud_firestore_dart_flutterfire and cloud_firestore_dart_platform, the
+  # platform package's emulator tests included (FIRESTORE_EMULATOR_HOST: 15 of its 29 tests skip
+  # without it), and flutter analyze of examples/flutter_notes. Through tool/test_all.sh, with
+  # TEST_ALL_REQUIRE_FLUTTER=1 so that a missing Flutter fails the job instead of skipping. The
+  # emulator is a private one on 8090 (tool/start_private_emulator.sh), as in the web transport
+  # job. Required: nothing else checks these packages.
+  flutter:
+    name: Flutter packages (Flutter stable)
+    needs: [changes, unit]
+    if: ${{ needs.changes.outputs.code == 'true' }}
+    runs-on: ubuntu-26.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Set the emulator work directory
+        # The `runner` context is not available in job-level `env`.
+        run: echo "EMULATOR_DIR=$RUNNER_TEMP/emulator" >> "$GITHUB_ENV"
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          channel: stable
+          cache: true
+      - uses: ./.github/actions/emulators
+      - name: Start a private Firestore emulator
+        run: ./tool/start_private_emulator.sh 8090
+      - name: Analyze and test the Flutter packages and the Flutter example
+        env:
+          FIRESTORE_EMULATOR_HOST: 127.0.0.1:8090
+          TEST_ALL_REQUIRE_FLUTTER: '1'
+          TEST_LOG_DIR: ${{ runner.temp }}/emulator/flutter
+        # A skipped test of the platform package means the emulator did not reach it: the step
+        # fails then.
+        run: |
+          set -o pipefail
+          flutter --version
+          ./tool/test_all.sh cloud_firestore_dart_flutterfire cloud_firestore_dart_platform \
+            examples/flutter_notes 2>&1 | tee "$RUNNER_TEMP/flutter_summary.txt"
+          if ! grep -Eq '^cloud_firestore_dart_platform: .*test PASS \([0-9]+ passed, 0 skipped' \
+            "$RUNNER_TEMP/flutter_summary.txt"; then
+            echo "::error::Tests of cloud_firestore_dart_platform were skipped: FIRESTORE_EMULATOR_HOST did not reach them."
+            exit 1
+          fi
+      - name: Stop the private Firestore emulator
+        if: always()
+        run: ./tool/stop_private_emulator.sh 8090
+      - name: Upload test output
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: flutter-log
+          path: |
+            ${{ runner.temp }}/emulator/*.log
+            ${{ runner.temp }}/emulator/flutter/*
+
   # The size of a program that uses Firestore Lite, and that it does not contain the sync
   # engine, the local store or WebChannel, and the size of the same program on the main library
   # (tool/check_size.sh, budgets in tool/size/check_size.dart). Pinned to the SDK the budgets

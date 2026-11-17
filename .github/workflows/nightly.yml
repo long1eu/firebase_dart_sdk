@@ -228,6 +228,21 @@ jobs:
               exit 1
             fi
           done
+      - name: Run the Auth emulator tests of firebase_admin_dart
+        # test/auth_emulator_test.dart is skipped in the unit jobs, which start no Auth emulator.
+        if: ${{ !cancelled() }}
+        working-directory: firebase_admin/firebase_admin_dart
+        env:
+          FIREBASE_AUTH_EMULATOR_HOST: 127.0.0.1:9197
+        run: |
+          set -o pipefail
+          dart pub get
+          log="$EMULATOR_DIR/admin_auth_emulator.log"
+          dart test --reporter expanded test/auth_emulator_test.dart 2>&1 | tee "$log"
+          if grep -Eq ' ~[0-9]+' "$log"; then
+            echo "::error::The admin Auth emulator tests skipped: FIREBASE_AUTH_EMULATOR_HOST did not reach them."
+            exit 1
+          fi
       - name: Run the end-to-end tests of cloud_firestore_dart (test/integration_auth)
         if: ${{ !cancelled() }}
         working-directory: cloud_firestore/cloud_firestore_dart
