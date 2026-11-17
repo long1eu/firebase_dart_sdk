@@ -1,12 +1,28 @@
 // A check against a REAL Firebase project, for the owner to run by hand. Nothing in the test suite runs it.
 //
+// Keyless (no key file anywhere): admin calls use the Application Default Credentials of the person signed in
+// with `gcloud auth application-default login`, and custom tokens are signed by the IAM Credentials API
+// (signBlob) as a service account that person may impersonate:
+//
+//     ADMIN_CHECK_PROJECT_ID=my-project \
+//     ADMIN_CHECK_SERVICE_ACCOUNT=admin-check@my-project.iam.gserviceaccount.com \
+//     FIREBASE_WEB_API_KEY=<the Web API key of the same project> \
+//     dart run example/production_check.dart
+//
+// That needs the IAM Service Account Credentials API enabled in the project, the role Firebase Authentication
+// Admin (roles/firebaseauth.admin) for the service account, and the role Service Account Token Creator
+// (roles/iam.serviceAccountTokenCreator) on that account for the signed-in person. ADMIN_CHECK_PROJECT_ID is
+// also sent as the quota project. GOOGLE_APPLICATION_CREDENTIALS must be unset.
+//
+// With a key file: admin calls use the key, and custom tokens are signed locally with its private key:
+//
 //     GOOGLE_APPLICATION_CREDENTIALS=/path/to/key.json \
 //     FIREBASE_WEB_API_KEY=<the Web API key of the same project> \
 //     dart run example/production_check.dart
 //
-// Optional: ADMIN_CHECK_SIGN_BLOB=1 also mints a token through the IAM Credentials API (signBlob) with
-// Application Default Credentials, signing as the key's service account. That needs the IAM Service Account
-// Credentials API enabled and the role Service Account Token Creator for that account on itself.
+// The key's service account needs Firebase Authentication Admin. Optional: ADMIN_CHECK_SIGN_BLOB=1 also mints a
+// token through signBlob with Application Default Credentials, signing as the key's service account; that needs
+// the IAM Service Account Credentials API and Service Account Token Creator for that account on itself.
 //
 // What it does: creates one user with a random uid, mints a custom token with claims whose JSON forces `+` and
 // `/` in standard base64 (so a wrong alphabet would fail), signs in with firebase_auth_providers_dart, verifies
@@ -14,7 +30,8 @@
 // checks that the verifier sees it, and deletes the user in `finally`. It prints PASS or FAIL, and never a
 // token or a key.
 //
-// The service account needs the role Firebase Authentication Admin (roles/firebaseauth.admin).
+// A role granted seconds before the run may not be in effect yet (signBlob answers 403 with
+// `iam.serviceAccounts.signBlob denied`): wait a minute and run it again.
 
 // ignore_for_file: avoid_print
 
@@ -27,18 +44,40 @@ import 'package:firebase_admin_dart/auth.dart';
 import 'package:firebase_app_dart/firebase_app_dart.dart';
 import 'package:firebase_auth_providers_dart/firebase_auth_providers_dart.dart';
 
+const String _usage = '''
+Usage: set either
+
+  keyless:   ADMIN_CHECK_PROJECT_ID, ADMIN_CHECK_SERVICE_ACCOUNT and FIREBASE_WEB_API_KEY
+             (after `gcloud auth application-default login`; GOOGLE_APPLICATION_CREDENTIALS unset)
+
+  key file:  GOOGLE_APPLICATION_CREDENTIALS and FIREBASE_WEB_API_KEY
+             (optional ADMIN_CHECK_SIGN_BLOB=1 also tries IAM signBlob)
+
+then run: dart run example/production_check.dart
+The top of example/production_check.dart lists the roles each mode needs.''';
+
 Future<void> main() async {
-  final String? keyPath =
-      Platform.environment['GOOGLE_APPLICATION_CREDENTIALS'];
-  final String? apiKey = Platform.environment['FIREBASE_WEB_API_KEY'];
-  if (keyPath == null || apiKey == null) {
+  final Map<String, String> env = Platform.environment;
+  final String? keyPath = env['GOOGLE_APPLICATION_CREDENTIALS'];
+  final String? keylessProjectId = env['ADMIN_CHECK_PROJECT_ID'];
+  final String? keylessAccount = env['ADMIN_CHECK_SERVICE_ACCOUNT'];
+  final String? apiKey = env['FIREBASE_WEB_API_KEY'];
+  final bool keyless =
+      keyPath == null && keylessProjectId != null && keylessAccount != null;
+
+  if (apiKey == null || (keyPath == null && !keyless)) {
+    print(_usage);
+    exitCode = 2;
+    return;
+  }
+  if (keyPath != null && keylessAccount != null) {
     print(
-      'Set GOOGLE_APPLICATION_CREDENTIALS and FIREBASE_WEB_API_KEY (see the top of this file).',
+      'Both GOOGLE_APPLICATION_CREDENTIALS and ADMIN_CHECK_SERVICE_ACCOUNT are set; pick one mode.\n\n$_usage',
     );
     exitCode = 2;
     return;
   }
-  if (Platform.environment['FIREBASE_AUTH_EMULATOR_HOST'] != null) {
+  if (env['FIREBASE_AUTH_EMULATOR_HOST'] != null) {
     print(
       'FIREBASE_AUTH_EMULATOR_HOST is set; this check is for a real project. Unset it.',
     );
@@ -46,12 +85,33 @@ Future<void> main() async {
     return;
   }
 
-  final Map<String, Object?> key =
-      jsonDecode(File(keyPath).readAsStringSync()) as Map<String, Object?>;
-  final String projectId = key['project_id']! as String;
+  final String projectId;
+  final AdminCredential credential;
+  final String signing;
+  // The service account to sign as through signBlob in the key-file mode, when ADMIN_CHECK_SIGN_BLOB=1.
+  String? signBlobAccount;
+  if (keyless) {
+    projectId = keylessProjectId;
+    credential = applicationDefaultCredential(
+      serviceAccountEmail: keylessAccount,
+      quotaProjectId: keylessProjectId,
+    );
+    signing = 'IAM signBlob, no key';
+  } else {
+    final Map<String, Object?> key =
+        jsonDecode(File(keyPath!).readAsStringSync()) as Map<String, Object?>;
+    projectId = key['project_id']! as String;
+    credential = AdminCredential.serviceAccount(key);
+    signing = 'local RS256';
+    if (env['ADMIN_CHECK_SIGN_BLOB'] == '1') {
+      signBlobAccount = key['client_email']! as String;
+    }
+  }
+  print('mode: ${keyless ? 'keyless' : 'key file'}');
+
   final FirebaseAdminApp app = FirebaseAdminApp(
     projectId: projectId,
-    credential: AdminCredential.serviceAccount(key),
+    credential: credential,
   );
   final FirebaseAuthAdmin admin = app.auth();
   final FirebaseUserAuth client = FirebaseUserAuth(apiKey: apiKey);
@@ -95,7 +155,7 @@ Future<void> main() async {
       throw StateError('the custom token is not base64url');
     }
     await client.signInWithCustomToken(token);
-    step('createCustomToken (local RS256) + signInWithCustomToken');
+    step('createCustomToken ($signing) + signInWithCustomToken');
 
     final GetTokenResult idToken = await client.getAccessToken(
       forceRefresh: false,
@@ -129,11 +189,11 @@ Future<void> main() async {
     }
     step('setCustomUserClaims + getUser + refreshed ID token');
 
-    if (Platform.environment['ADMIN_CHECK_SIGN_BLOB'] == '1') {
+    if (signBlobAccount != null) {
       final FirebaseAdminApp adcApp = FirebaseAdminApp(
         projectId: projectId,
         credential: applicationDefaultCredential(
-          serviceAccountEmail: key['client_email']! as String,
+          serviceAccountEmail: signBlobAccount,
         ),
       );
       try {

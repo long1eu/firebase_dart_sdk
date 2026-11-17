@@ -17,6 +17,16 @@ First version.
   no `pointycastle`.
 - Requires Dart 3.8.0 or later.
 
-Verified with unit tests and against the Firebase Auth emulator only. Nothing was run against the real
-Firebase Auth service, Google's token endpoint, the IAM Credentials API or Google's public key endpoint.
-`example/production_check.dart` is the check to run by hand against a test project.
+Verified with unit tests and against the Firebase Auth emulator. On 2026-11-18 the main path also passed against
+one real Firebase project (`example/production_check.dart`, `firebase_auth_providers_dart` 0.2.1 as the client),
+keyless: admin calls with the Application Default Credentials of a person
+(`applicationDefaultCredential(serviceAccountEmail: ..., quotaProjectId: ...)`), custom tokens signed by the IAM
+Credentials API `signBlob` as a service account that person may impersonate. All seven steps passed: `createUser`;
+`createCustomToken` and `signInWithCustomToken` with claims whose standard base64 would hold `+` and `/`; the
+claims in the ID token; `verifyIdToken` against Google's keys with `checkRevoked`; `setCustomUserClaims`, `getUser`
+and a refreshed ID token with the claims; `revokeRefreshTokens`, after which `checkRevoked` rejects the old token
+with `id-token-revoked`; `deleteUser`, after which `getUser` gives `user-not-found`.
+
+Not run against a real project: local signing with a key (`AdminCredential.serviceAccount`), `findUserByEmail`,
+`updateUser`, `deleteUsers` batches, tenants, the email lookup on the metadata server of Google Cloud, and user
+credentials without a quota project.
