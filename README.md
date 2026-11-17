@@ -3,61 +3,84 @@
 [![CI](../../actions/workflows/ci.yml/badge.svg)](../../actions/workflows/ci.yml)
 [![Nightly](../../actions/workflows/nightly.yml/badge.svg)](../../actions/workflows/nightly.yml)
 
-> **Revived, November 2026.** The Firestore port had its last change in August 2020, the
-> repository in June 2021, and it was then archived. In November 2026 it was revived: the
-> Firestore client was rebuilt on Dart 3 with sound null safety and brought forward toward parity
-> with the current upstream Firestore SDKs (the Android SDK, which it ports class by class, and
-> the JS SDK, which is the reference for the public API and for the behaviour the SDKs share). It
-> has about 5,900 unit tests and about 880 integration tests per transport (gRPC, WebChannel,
-> WebChannel with long polling) against the Firestore emulator, and a short verification kit was
-> run against production Firestore ([how we test](docs/how_we_test.md)).
->
-> **Status:** version 0.2.0 is on pub.dev. What is not done is listed openly in
-> [features and limits](docs/guides/features.md).
->
-> **Issues:** <https://github.com/long1eu/firebase_dart_sdk/issues>.
->
-> **Maintenance:** _[MAINTAINER: one sentence on who maintains this project and how. Not
-> written yet.]_
+An unofficial Cloud Firestore client written only in Dart, with real-time listeners, queries, transactions and
+an offline cache, for the places the official FlutterFire plugins do not reach. It is not affiliated with or
+endorsed by Google or Firebase.
 
-A pure-Dart client for Cloud Firestore: no Flutter plugin, no native SDK, just `dart:io`, gRPC and
-SQLite. Use it from Dart servers, CLIs and Flutter apps. (Web support is experimental.)
+**Use it when**, most proven first ([the evidence](docs/why_this_library.md)):
 
-It is an unofficial port of the open-source
-[Firebase Android SDK](https://github.com/firebase/firebase-android-sdk), including its offline
-cache, listeners with local-write snapshots, transactions and retry logic. It is not affiliated
-with or endorsed by Google or Firebase.
+1. **You build a Flutter app for Linux desktop.** FlutterFire has no Linux implementation and says it is not
+   on its roadmap. Add `cloud_firestore_dart_platform` and keep the official `cloud_firestore` API. Caveat:
+   one app was built and run on Debian 13 x86_64, a debug build against the emulator only.
+2. **You write a Dart server, worker or CLI that needs listeners, an offline cache, or to act as a signed-in
+   Firebase user under security rules.** The official Dart Admin SDK has no listeners and always bypasses
+   rules. Caveat: it has draft PRs for listeners since 2026-11-09, so that part of the gap may close.
+3. **You need a Firestore listener on a background isolate of a Flutter app.** FlutterFire does not support it
+   and closed the request as not planned. Caveat: tested in isolates on the Dart VM, not in a Flutter app.
+4. **You want to test Firestore code with `dart test` or `flutter test` against the emulator, running a real
+   client instead of a fake.** Caveat: the test runs this engine, not the Android or iOS SDK your app ships.
 
-The picture shows where each package sits: your program creates a `FirebaseApp`, an optional token
-provider plugs into it, and `cloud_firestore_dart` talks to Firestore over gRPC on the Dart VM and
-in Flutter, or over REST and WebChannel in the browser.
+**Do not use it when**
 
-![Your Dart program, Flutter app or browser app uses three packages: firebase_auth_providers_dart sets the token provider of the FirebaseApp from firebase_app_dart, and cloud_firestore_dart is created from that app. cloud_firestore_dart reaches Cloud Firestore or the emulator over gRPC on the VM and in Flutter, and over REST and WebChannel in the browser.](https://raw.githubusercontent.com/long1eu/firebase_dart_sdk/main/docs/images/readme/overview.svg)
+- FlutterFire already works for you on Android, iOS or the web: Google's SDKs come with support and years of
+  production use. This client was checked against a real database only by a 15-check kit.
+- You ship a Windows app: it has never been run on Windows.
+- You need federated, phone or email-link sign-in, multi-factor, Storage, Messaging or the other Firebase
+  services, or admin jobs such as bulk writes and recursive deletes (use `firebase_admin_sdk`).
+- You need a vendor to call: one person maintains it, with no SLA.
 
-```dart
-import 'package:cloud_firestore_dart/cloud_firestore_dart.dart';
-
-final firestore = FirebaseFirestore.instanceFor(app: app);
-await firestore.collection('users').doc('ada').set({'name': 'Ada', 'age': 36});
-
-firestore
-    .collection('users')
-    .where(Filter.or([
-      Filter('role', isEqualTo: 'admin'),
-      Filter('age', isGreaterThan: 40),
-    ]))
-    .limit(10)
-    .snapshots()
-    .listen((snapshot) => print(snapshot.docs.length));
-```
-
-(`app` is a `FirebaseApp` from `firebase_app_dart`; see the
-[guides](docs/guides/README.md) for more and
-`cloud_firestore/cloud_firestore_dart/example/main.dart` for a runnable program.)
+**Start** with the emulator (`firebase emulators:start --only firestore --project demo-my-app`):
 
 ```shell
 dart pub add cloud_firestore_dart firebase_app_dart
 ```
+
+```dart
+import 'package:cloud_firestore_dart/cloud_firestore_dart.dart';
+import 'package:firebase_app_dart/firebase_app_dart.dart';
+
+final FirebaseApp app = FirebaseApp.withOptions(
+  const FirebaseOptions(apiKey: 'demo-key', appId: '1:1234567890:dart:demo', projectId: 'demo-my-app'),
+);
+final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(
+  app: app,
+  settings: Settings().withEmulator('127.0.0.1', 8080), // drop this line for a real project
+);
+
+await firestore.collection('users').doc('ada').set({'name': 'Ada', 'age': 36});
+firestore
+    .collection('users')
+    .where('age', isGreaterThan: 30)
+    .snapshots()
+    .listen((snapshot) => print(snapshot.docs.length));
+```
+
+In a Flutter app that already uses `cloud_firestore`, add `cloud_firestore_dart_platform` instead: on Linux
+it registers itself, elsewhere one call turns it on ([guide](docs/guides/flutterfire_platform.md)). Coming
+from 0.1? The 0.2 API took FlutterFire's names: [what changed](docs/api_migration_0_2.md).
+
+| Package | pub.dev | Who needs it |
+|---|---|---|
+| [`cloud_firestore_dart`](cloud_firestore/cloud_firestore_dart/) | 0.2.0 | Any Dart program, server or Flutter app that calls Firestore through this client |
+| [`firebase_app_dart`](firebase_core/firebase_app_dart/) | 0.2.0 | Every user of `cloud_firestore_dart`: the `FirebaseApp` and its options |
+| [`firebase_auth_providers_dart`](firebase_auth/firebase_auth_providers_dart/) | 0.2.0 | Apps with signed-in users, and servers with a service account or Application Default Credentials |
+| [`cloud_firestore_dart_sqlite`](cloud_firestore/cloud_firestore_dart_sqlite/) | 0.1.0 | Anyone who wants the offline cache on disk instead of in memory |
+| [`cloud_firestore_dart_platform`](cloud_firestore/cloud_firestore_dart_platform/) | 0.1.0 | Flutter apps written against the official `cloud_firestore` API, on Linux or by choice elsewhere |
+| [`cloud_firestore_dart_flutterfire`](cloud_firestore/cloud_firestore_dart_flutterfire/) | 0.1.0 | Flutter apps that sign in with `firebase_auth` and want `cloud_firestore_dart` to use that user |
+| [`firebase_admin_dart`](firebase_admin/firebase_admin_dart/) | not published | Servers, tools and integration tests that mint custom tokens, manage users or verify ID tokens |
+
+## How it fits together
+
+It is a port of the open-source [Firebase Android SDK](https://github.com/firebase/firebase-android-sdk),
+including its offline cache, listeners with local-write snapshots, transactions and retry logic, on Dart 3
+with `dart:io`, gRPC and SQLite; no Flutter plugin and no native SDK. Your program creates a `FirebaseApp`, an
+optional token provider plugs into it, and `cloud_firestore_dart` talks to Firestore over gRPC on the Dart VM
+and in Flutter, or over REST and WebChannel in the browser (experimental).
+
+![Your Dart program, Flutter app or browser app uses three packages: firebase_auth_providers_dart sets the token provider of the FirebaseApp from firebase_app_dart, and cloud_firestore_dart is created from that app. cloud_firestore_dart reaches Cloud Firestore or the emulator over gRPC on the VM and in Flutter, and over REST and WebChannel in the browser.](https://raw.githubusercontent.com/long1eu/firebase_dart_sdk/main/docs/images/readme/overview.svg)
+
+See the [guides](docs/guides/README.md) for more and `cloud_firestore/cloud_firestore_dart/example/main.dart`
+for a runnable program.
 
 ## Start here
 
@@ -78,7 +101,6 @@ dart pub add cloud_firestore_dart firebase_app_dart
 - [How we test](docs/how_we_test.md): the suites, how to run them, and bugs they caught.
 - [Support policy](docs/support_policy.md): supported Dart SDKs and platforms, how upstream
   changes are tracked, versioning.
-- [Guides](docs/guides/README.md).
 
 ## What it does
 
@@ -119,9 +141,16 @@ migrating from the `_vm` packages.
 
 ## Status
 
-Revival of the original port, which stopped at the 2019 Android SDK; it now follows the Android
-SDK's behaviour up to late 2026 on Dart 3.8 or later with sound null safety, and parts of its
-public API follow the JS SDK.
+The original port stopped at the 2019 Android SDK and the repository was archived in 2021. Since
+November 2026 it follows the Android SDK's behaviour up to late 2026, on Dart 3.8 or later, and
+its public API follows FlutterFire and the JS SDK. It has about 5,900 unit tests and about 880
+integration tests per transport (gRPC, WebChannel, WebChannel with long polling) against the
+Firestore emulator ([how we test](docs/how_we_test.md)).
+
+**Issues:** <https://github.com/long1eu/firebase_dart_sdk/issues>.
+
+**Maintenance:** _[MAINTAINER: one sentence on who maintains this project and how. Not written
+yet.]_
 
 - **Tested mostly against the Firestore emulator.** Against production, only the production
   verification kit (`tool/verify_production`) was run, on a real Firestore database in Standard
@@ -131,11 +160,14 @@ public API follow the JS SDK.
   against production: the Enterprise edition features (BSON value types, Pipelines; tested
   against the emulator in Enterprise edition only), Firebase Auth user sign-in, the integration
   suite as a whole and long-running load. Test against your own project before relying on it.
-- Version 0.2.0 is published on pub.dev as `cloud_firestore_dart`, `firebase_app_dart` and
-  `firebase_auth_providers_dart`. `cloud_firestore_dart` 0.0.1 on pub.dev (2020) is an early
-  release of the same package. They replace the packages published as
-  `cloud_firestore_vm` and `firebase_core_vm` (and the internal `_firebase_internal_vm` and
-  `_firebase_database_collection_vm`, now folded in). See
+- Platforms: the Dart VM on macOS and Linux (CI on Ubuntu x64, a Debian arm64 container). In
+  Flutter: an app with this client was built and run on macOS, and an app on the official
+  `cloud_firestore` API with `cloud_firestore_dart_platform` on Debian 13 x86_64, both against
+  the emulator only. Never run: Windows, Android or iOS (devices or emulators), embedded Linux,
+  a Linux release build.
+- `cloud_firestore_dart` 0.0.1 on pub.dev (2020) is an early release of the same package. The
+  packages replace the ones published as `cloud_firestore_vm` and `firebase_core_vm` (and the
+  internal `_firebase_internal_vm` and `_firebase_database_collection_vm`, now folded in). See
   [docs/migrating_from_vm_packages.md](docs/migrating_from_vm_packages.md).
 - Web support is experimental. In a browser the client uses REST and WebChannel over `fetch`
   instead of gRPC, with a memory cache or an opt-in SQLite cache in IndexedDB. The browser tests
@@ -151,7 +183,8 @@ public API follow the JS SDK.
   [docs/guides/features.md](docs/guides/features.md) lists the known gaps.
 
 This repository ports Firestore and the Firebase Core pieces it needs, plus token providers for
-Firestore in `firebase_auth/firebase_auth_providers_dart`. There is no full Auth SDK, no Storage
+Firestore in `firebase_auth/firebase_auth_providers_dart` and a few Firebase Auth admin calls in
+`firebase_admin/firebase_admin_dart`. There is no full Auth SDK, no Storage
 and no Realtime Database client here; for those see
 [appsup-dart/firebase_dart](https://github.com/appsup-dart/firebase_dart). The other directories
 under `firebase_auth`, and `firebase_storage_dart` and `google_sign_in_dart`, are older code from
@@ -159,19 +192,11 @@ the original project and are not part of the migrated, tested set.
 
 ## Packages
 
-| Package | Path | Purpose |
-|---|---|---|
-| `cloud_firestore_dart` | `cloud_firestore/cloud_firestore_dart` | The Firestore client (formerly `cloud_firestore_vm`) |
-| `firebase_app_dart` | `firebase_core/firebase_app_dart` | `FirebaseApp` and options (formerly `firebase_core_vm`) |
-| `firebase_auth_providers_dart` | `firebase_auth/firebase_auth_providers_dart` | Optional token providers: Firebase Auth users over REST, service accounts, Application Default Credentials |
-| `cloud_firestore_dart_sqlite` | `cloud_firestore/cloud_firestore_dart_sqlite` | The SQLite offline cache for `cloud_firestore_dart` on the VM, in Flutter and in the browser (`sqliteOpener`) (0.1.0) |
-| `cloud_firestore_dart_flutterfire` | `cloud_firestore/cloud_firestore_dart_flutterfire` | Optional Flutter bridge: the FlutterFire app options and `firebase_auth` user for `cloud_firestore_dart` (0.1.0) |
-| `cloud_firestore_dart_platform` | `cloud_firestore/cloud_firestore_dart_platform` | Optional Flutter package: the official `cloud_firestore` API backed by `cloud_firestore_dart`, automatically on Linux or by one call elsewhere (0.1.0) |
-| `firebase_admin_dart` | `firebase_admin/firebase_admin_dart` | Light, pure-Dart admin calls for servers, command-line tools and tests: Firebase Auth custom tokens, users, claims and ID token verification (0.1.0, not published) |
-
-The former internal packages are folded in: `_firebase_database_collection_vm` into
-`cloud_firestore_dart` (`lib/src/database_collection`) and `_firebase_internal_vm` into
-`firebase_app_dart` (`package:firebase_app_dart/internal.dart`, not public API).
+The table at the top lists the packages. `cloud_firestore_dart` was formerly `cloud_firestore_vm` and
+`firebase_app_dart` was `firebase_core_vm`. `firebase_admin_dart` (0.1.0, not published) was checked with unit
+tests and the Auth emulator only, not against a real project. The former internal packages are folded in:
+`_firebase_database_collection_vm` into `cloud_firestore_dart` (`lib/src/database_collection`) and
+`_firebase_internal_vm` into `firebase_app_dart` (`package:firebase_app_dart/internal.dart`, not public API).
 `cloud_firestore_dart` depends on the hosted `firebase_app_dart`; inside this repository its
 `pubspec_overrides.yaml` points it at the sibling directory.
 

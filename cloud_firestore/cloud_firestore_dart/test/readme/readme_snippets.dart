@@ -84,18 +84,20 @@ class City {
   Map<String, Object?> toMap() => {'name': name, 'population': population};
 }
 
-// ../../README.md:37
-Future<void> rootReadmeLine37() async {
-  final firestore = FirebaseFirestore.instanceFor(app: app);
-  await firestore.collection('users').doc('ada').set({'name': 'Ada', 'age': 36});
+// ../../README.md:38
+Future<void> rootReadmeLine38() async {
+  final FirebaseApp app = FirebaseApp.withOptions(
+    const FirebaseOptions(apiKey: 'demo-key', appId: '1:1234567890:dart:demo', projectId: 'demo-my-app'),
+  );
+  final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(
+    app: app,
+    settings: Settings().withEmulator('127.0.0.1', 8080), // drop this line for a real project
+  );
 
+  await firestore.collection('users').doc('ada').set({'name': 'Ada', 'age': 36});
   firestore
       .collection('users')
-      .where(Filter.or([
-        Filter('role', isEqualTo: 'admin'),
-        Filter('age', isGreaterThan: 40),
-      ]))
-      .limit(10)
+      .where('age', isGreaterThan: 30)
       .snapshots()
       .listen((snapshot) => print(snapshot.docs.length));
 }
