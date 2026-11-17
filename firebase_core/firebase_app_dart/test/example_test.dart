@@ -3,6 +3,7 @@
 @TestOn('vm')
 library;
 
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:test/test.dart';
@@ -18,7 +19,8 @@ void main() {
       expect(result.exitCode, 0, reason: '${result.stdout}\n${result.stderr}');
       expect(result.stderr, isEmpty);
       expect(
-        (result.stdout as String).split('\n'),
+        // LineSplitter: print ends lines with \r\n on Windows.
+        const LineSplitter().convert(result.stdout as String),
         containsAllInOrder(<String>[
           'default app: [DEFAULT], project my-project',
           'named app: secondary',

@@ -24,7 +24,14 @@ class DatabaseMock extends Database {
   /// open of the same name starts from a fresh file.
   bool renamePath = true;
 
+  /// The file of [name]: [name] itself when it is an absolute path (some tests
+  /// pass a file in the system temp directory), otherwise `build/test/<name>`.
+  /// Appending an absolute path happened to work on POSIX (`build/test//tmp/x`)
+  /// but is an invalid path on Windows (`build/test/C:\...`).
   static File pathForName(String name) {
+    if (File(name).isAbsolute) {
+      return File(name);
+    }
     return File('${Directory.current.path}/build/test/$name');
   }
 

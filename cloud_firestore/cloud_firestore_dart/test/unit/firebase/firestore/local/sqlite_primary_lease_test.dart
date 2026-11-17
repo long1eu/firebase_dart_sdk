@@ -908,7 +908,11 @@ class _IsolateClient {
     return reply! as bool;
   }
 
+  /// Shuts the client down before the isolate is killed: a killed isolate does not close its SQLite connection, and
+  /// on Windows a file that is still open cannot be deleted by the tear-down.
   Future<void> close() async {
+    _commands.send(<Object?>['close', 0]);
+    await _replies.moveNext();
     _isolate.kill(priority: Isolate.immediate);
     await _replies.cancel();
   }
@@ -940,6 +944,10 @@ class _IsolateClient {
             await _learnPrimaryState(persistence);
           case 'shutdown':
             await persistence.shutdown();
+          case 'close':
+            if (persistence.started) {
+              await persistence.shutdown();
+            }
         }
         replies.send(persistence.isPrimary);
       } catch (e) {
