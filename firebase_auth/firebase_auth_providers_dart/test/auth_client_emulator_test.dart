@@ -15,6 +15,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:firebase_app_dart/firebase_app_dart.dart';
 import 'package:firebase_auth_providers_dart/firebase_auth_providers_dart.dart';
 import 'package:test/test.dart';
 
@@ -206,5 +207,97 @@ void main() {
       },
       skip: skip,
     );
+  });
+
+  group('tenants (the emulator implements them)', () {
+    late String tenant;
+
+    setUpAll(() async {
+      if (host == null) {
+        return;
+      }
+      final Map<String, Object?> created = await emulatorCall(
+        'POST',
+        'identitytoolkit.googleapis.com/v2/projects/$project/tenants',
+        <String, Object?>{
+          'displayName': 'tier1',
+          'allowPasswordSignup': true,
+          'enableEmailLinkSignin': true,
+          'enableAnonymousUser': true,
+        },
+      );
+      tenant = created['tenantId']! as String;
+    });
+
+    test('sign-up, sign-in and password reset in a tenant', () async {
+      final FirebaseUserAuth auth = create()..tenantId = tenant;
+      auth.languageCode = 'fr';
+      final String email = uniqueEmail('tenant');
+      final UserCredential signUp = await auth.createUserWithEmailAndPassword(
+        email: email,
+        password: 'correct horse',
+      );
+      expect(signUp.tenantId, tenant);
+      final GetTokenResult token = await auth.getAccessToken(
+        forceRefresh: false,
+      );
+      expect(
+        (token.claims['firebase'] as Map<String, dynamic>)['tenant'],
+        tenant,
+      );
+      await auth.signOut();
+      expect(
+        (await auth.signInWithEmailAndPassword(
+          email: email,
+          password: 'correct horse',
+        )).tenantId,
+        tenant,
+      );
+      expect((await auth.signInAnonymously()).tenantId, tenant);
+
+      // The user does not exist for the project itself.
+      final FirebaseUserAuth projectAuth = create();
+      await expectLater(
+        projectAuth.signInWithEmailAndPassword(
+          email: email,
+          password: 'correct horse',
+        ),
+        throwsAuth(anyOf('user-not-found', 'invalid-credential')),
+      );
+
+      await auth.sendPasswordResetEmail(email: email);
+      final Map<String, Object?> codes = await emulatorCall(
+        'GET',
+        'emulator/v1/projects/$project/tenants/$tenant/oobCodes',
+      );
+      final List<Map<String, Object?>> entries =
+          (codes['oobCodes']! as List<Object?>).cast<Map<String, Object?>>();
+      final String code =
+          entries.lastWhere(
+                (Map<String, Object?> c) => c['email'] == email,
+              )['oobCode']!
+              as String;
+      expect(await auth.verifyPasswordResetCode(code), email);
+      await auth.confirmPasswordReset(code: code, newPassword: 'new horse');
+      expect(
+        (await auth.signInWithEmailAndPassword(
+          email: email,
+          password: 'new horse',
+        )).uid,
+        signUp.uid,
+      );
+    }, skip: skip);
+
+    test('updateCurrentUser across tenants is a tenant-id-mismatch', () async {
+      final FirebaseUserAuth tenantAuth = create()..tenantId = tenant;
+      await tenantAuth.signInAnonymously();
+      final FirebaseUserAuth projectAuth = create(
+        withStorage: InMemoryAuthStorage(),
+      );
+      await expectLater(
+        projectAuth.updateCurrentUser(tenantAuth.currentUser),
+        throwsAuth('tenant-id-mismatch'),
+      );
+    }, skip: skip);
   });
 }

@@ -32,6 +32,13 @@
   or switch with `login-blocked`) and `updateCurrentUser(user)` (continue the session of a user of another
   instance with the same API key), from the JS SDK. The token stream Firestore follows (`onTokenChanged`) emits as
   before; `updateCurrentUser` is a user switch for it.
+- `languageCode`, `setLanguageCode` (FlutterFire) and `useDeviceLanguage()` (JS SDK): the language of the emails
+  the backend sends, in `X-Firebase-Locale` of every Identity Toolkit request. The device language is
+  `Platform.localeName` on the VM and `navigator.languages` in a browser. New dependency: `web` (already in the
+  dependency graph through `http`).
+- `tenantId` (Identity Platform multi-tenancy), sent with the requests the JS SDK sends it with (sign-ins, action
+  code requests, `createAuthUri`); a sign-in or `updateCurrentUser` of a user of another tenant throws
+  `tenant-id-mismatch`, like the JS SDK.
 
 ## 0.2.1
 

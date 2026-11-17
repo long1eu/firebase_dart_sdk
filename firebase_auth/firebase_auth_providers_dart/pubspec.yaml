@@ -35,6 +35,9 @@ dependencies:
   googleapis_auth: ^2.0.0
   http: ^1.2.0
   meta: ^1.11.0
+  # navigator.language and the browser storages on the web (FirebaseUserAuth.useDeviceLanguage, WebAuthStorage).
+  # Already part of the dependency graph through package:http.
+  web: ^1.1.0
 
 dev_dependencies:
   # Only for example/firestore_wiring.dart and example/adc_server.dart. Local

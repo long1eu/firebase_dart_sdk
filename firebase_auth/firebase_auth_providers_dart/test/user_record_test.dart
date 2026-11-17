@@ -264,6 +264,7 @@ void main() {
         ...fullAccount,
         'tenantId': 'tenant-1',
       };
+      auth.tenantId = 'tenant-1';
       await auth.signInWithEmailAndPassword(
         email: 'ada@example.com',
         password: 'secret',

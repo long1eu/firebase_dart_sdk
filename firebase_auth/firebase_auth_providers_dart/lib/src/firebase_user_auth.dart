@@ -11,7 +11,9 @@ import 'auth_exception.dart';
 import 'auth_storage.dart';
 import 'auth_user.dart';
 import 'user_record.dart';
-import 'environment_stub.dart' if (dart.library.io) 'environment_io.dart';
+import 'environment_stub.dart'
+    if (dart.library.io) 'environment_io.dart'
+    if (dart.library.js_interop) 'environment_web.dart';
 
 /// Firebase Auth user sign-in over the Identity Toolkit and Secure Token REST APIs: anonymous, email and password,
 /// and custom tokens.
@@ -192,6 +194,36 @@ class FirebaseUserAuth implements AuthTokenProvider {
 
   /// The id of the Firebase app, sent as `X-Firebase-gmpid`; null sends none.
   final String? appId;
+
+  /// The language of the emails and SMS messages the backend sends (password reset, email verification, email
+  /// link sign-in), as a BCP 47 tag such as `fr` or `pt-BR`; null lets the project's default apply. Sent as
+  /// `X-Firebase-Locale` with every request of the Identity Toolkit API, like the JS SDK does. Set it, or call
+  /// [setLanguageCode] or [useDeviceLanguage].
+  String? languageCode;
+
+  /// Sets [languageCode] (FlutterFire's `setLanguageCode`); null takes the language of the device, like
+  /// [useDeviceLanguage] (FlutterFire does that on the web).
+  Future<void> setLanguageCode(String? languageCode) async {
+    if (languageCode == null) {
+      useDeviceLanguage();
+    } else {
+      this.languageCode = languageCode;
+    }
+  }
+
+  /// Sets [languageCode] to the language of the device (the JS SDK's `useDeviceLanguage`): on the Dart VM the
+  /// locale of the process (`Platform.localeName`, for example `en_US.UTF-8` becomes `en-US`; the POSIX locale `C`
+  /// gives null), in a browser the first of `navigator.languages`.
+  void useDeviceLanguage() => languageCode = deviceLanguage();
+
+  /// The tenant to sign in to (Identity Platform multi-tenancy), or null for the users of the project itself
+  /// (FlutterFire's and the JS SDK's `tenantId`).
+  ///
+  /// It is sent with the sign-ins, the action code requests (password reset, email verification, email link) and
+  /// the other requests the JS SDK sends it with. A sign-in (or [updateCurrentUser]) whose user belongs to another
+  /// tenant than this one throws a [FirebaseAuthException] with the code `tenant-id-mismatch`. Changing it does not
+  /// sign the current user out.
+  String? tenantId;
 
   final AppCheckTokenProvider? _appCheck;
 
@@ -407,7 +439,8 @@ class FirebaseUserAuth implements AuthTokenProvider {
   /// its sign-ins): this instance continues that session with its own copy of the tokens, and stores it.
   ///
   /// Runs the [beforeAuthStateChanged] callbacks. Throws a [FirebaseAuthException] with the code
-  /// `invalid-user-token` for a user of another API key or one this package did not hand out.
+  /// `invalid-user-token` for a user of another API key or one this package did not hand out, and
+  /// `tenant-id-mismatch` when the tenant of the user is not [tenantId].
   Future<void> updateCurrentUser(AuthUser? user) async {
     _checkNotDisposed();
     if (user == null) {
@@ -429,6 +462,7 @@ class FirebaseUserAuth implements AuthTokenProvider {
     if (identical(session.user, _session?.user)) {
       return;
     }
+    _checkTenant(session.user);
     final int generation = ++_generation;
     await _runBeforeStateCallbacks(session.user);
     if (generation != _generation) {
@@ -589,6 +623,7 @@ class FirebaseUserAuth implements AuthTokenProvider {
         'email': email,
         ...?actionCodeSettings?.toRequest(),
       },
+      tenant: true,
     );
   }
 
@@ -603,6 +638,7 @@ class FirebaseUserAuth implements AuthTokenProvider {
     await _send(
       _identityToolkit('accounts:resetPassword'),
       json: <String, Object?>{'oobCode': code, 'newPassword': newPassword},
+      tenant: true,
     );
   }
 
@@ -616,6 +652,7 @@ class FirebaseUserAuth implements AuthTokenProvider {
       await _send(
         _identityToolkit('accounts:resetPassword'),
         json: <String, Object?>{'oobCode': code},
+        tenant: true,
       ),
     );
   }
@@ -645,6 +682,7 @@ class FirebaseUserAuth implements AuthTokenProvider {
     await _send(
       _identityToolkit('accounts:update'),
       json: <String, Object?>{'oobCode': code},
+      tenant: true,
     );
   }
 
@@ -662,6 +700,7 @@ class FirebaseUserAuth implements AuthTokenProvider {
     final Map<String, Object?> response = await _send(
       _identityToolkit('accounts:createAuthUri'),
       json: <String, Object?>{'identifier': email, 'continueUri': continueUri},
+      tenant: true,
     );
     final Object? methods = response['signinMethods'];
     return methods is List ? methods.whereType<String>().toList() : <String>[];
@@ -682,6 +721,7 @@ class FirebaseUserAuth implements AuthTokenProvider {
         'idToken': idToken,
         ...?actionCodeSettings?.toRequest(),
       },
+      tenant: true,
     );
     if (response['email'] != _session?.user.email) {
       await _reload(generation);
@@ -705,6 +745,7 @@ class FirebaseUserAuth implements AuthTokenProvider {
         'newEmail': newEmail,
         ...?actionCodeSettings?.toRequest(),
       },
+      tenant: true,
     );
     if (response['email'] != _session?.user.email) {
       await _reload(generation);
@@ -794,6 +835,7 @@ class FirebaseUserAuth implements AuthTokenProvider {
           'password': password,
           'returnSecureToken': true,
         },
+        tenant: true,
       );
     } on FirebaseAuthException catch (e) {
       if (e.code == 'user-not-found') {
@@ -1075,12 +1117,28 @@ class FirebaseUserAuth implements AuthTokenProvider {
   }
 
   /// Sends a request and returns the decoded JSON object of the answer, or throws.
+  ///
+  /// With [tenant], the [tenantId] goes into the [json] body unless it names one (`_addTidIfNecessary` of the JS
+  /// SDK). The [languageCode] goes into `X-Firebase-Locale` of every JSON request (the JS SDK sends it from
+  /// `_performApiRequest`, which the token refresh does not use).
   Future<Map<String, Object?>> _send(
     Uri url, {
     Map<String, Object?>? json,
     Map<String, String>? form,
+    bool tenant = false,
   }) async {
+    final String? tenantId = this.tenantId;
+    if (tenant &&
+        json != null &&
+        tenantId != null &&
+        json['tenantId'] == null) {
+      json = <String, Object?>{...json, 'tenantId': tenantId};
+    }
     final Map<String, String> headers = await _additionalHeaders();
+    final String? locale = languageCode;
+    if (json != null && locale != null && locale.isNotEmpty) {
+      headers['X-Firebase-Locale'] = locale;
+    }
     final http.Response response;
     try {
       response = json != null
@@ -1159,6 +1217,7 @@ class FirebaseUserAuth implements AuthTokenProvider {
     final Map<String, Object?> response = await _send(
       _identityToolkit(method),
       json: request,
+      tenant: true,
     );
     return _completeSignIn(response, generation);
   }
@@ -1204,10 +1263,18 @@ class FirebaseUserAuth implements AuthTokenProvider {
     if (generation != _generation) {
       throw _overtaken;
     }
-    final AuthUser user = userFromAccount(
+    AuthUser user = userFromAccount(
       account,
       AuthUser(uid: uid, isAnonymous: token.signInProvider == 'anonymous'),
     );
+    if (user.tenantId == null) {
+      final Object? firebase = token.claims['firebase'];
+      final Object? tenant = firebase is Map ? firebase['tenant'] : null;
+      if (tenant is String && tenant.isNotEmpty) {
+        user = copyUser(user, tenantId: tenant);
+      }
+    }
+    _checkTenant(user);
     await _runBeforeStateCallbacks(user);
     if (generation != _generation) {
       throw _overtaken;
@@ -1379,6 +1446,17 @@ class FirebaseUserAuth implements AuthTokenProvider {
           onError: (Object _) => emitCurrent(),
         );
       });
+
+  /// Like `_updateCurrentUser` of the JS SDK: the user of a sign-in must belong to [tenantId].
+  void _checkTenant(AuthUser user) {
+    if (user.tenantId != tenantId) {
+      throw const FirebaseAuthException(
+        code: 'tenant-id-mismatch',
+        message:
+            "The provided tenant ID does not match the Auth instance's tenant ID.",
+      );
+    }
+  }
 
   /// Runs the [beforeAuthStateChanged] callbacks for [next] (`AuthMiddlewareQueue.runMiddleware` of the JS SDK).
   Future<void> _runBeforeStateCallbacks(AuthUser? next) async {
