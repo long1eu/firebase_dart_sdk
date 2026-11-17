@@ -1,16 +1,18 @@
 # cloud_firestore_dart_sqlite
 
-The SQLite offline cache of [`cloud_firestore_dart`](https://pub.dev/packages/cloud_firestore_dart)
-on the Dart VM, in Flutter and in the browser, as one dependency. `cloud_firestore_dart` keeps its
-cache in memory unless you pass it a function that opens a SQLite database; this package is that
-function, on top of [`sqlite3`](https://pub.dev/packages/sqlite3). It is not affiliated with or
-endorsed by Google or Firebase.
+The SQLite offline cache of [`cloud_firestore_dart`](https://pub.dev/packages/cloud_firestore_dart) on the
+Dart VM, in Flutter and in the browser, as one dependency. You need it when the cache must survive a restart:
+pending writes kept while offline, data read without a network after the app starts again. Without it
+`cloud_firestore_dart` keeps its cache in memory. This package is the function that opens the SQLite database,
+on top of [`sqlite3`](https://pub.dev/packages/sqlite3). It is not affiliated with or endorsed by Google or
+Firebase.
 
 > **Status: 0.1.0.** The openers were the `example/` files of `cloud_firestore_dart` 0.1.1 that
 > apps had to copy; the code is the same. The browser storage is **experimental**. Run on macOS
 > (Dart VM, `sqlite3` 2.9.4 and 3.9.1) and in headless Chrome (dart2js and dart2wasm, `sqlite3`
-> 2.9.4), against the FirebaseFirestore emulator. Not run on Linux, Windows, Android or iOS, or in
-> Safari or Firefox.
+> 2.9.4), against the FirebaseFirestore emulator, and in one Flutter Linux desktop app (Debian 13
+> x86_64, `sqlite3` 3.5.2, a cache read back after a restart, 2026-11-16). Not run on Windows, Android
+> or iOS, or in Safari or Firefox.
 
 ## Install
 

@@ -1,11 +1,11 @@
 # firebase_app_dart
 
-An unofficial, pure-Dart `FirebaseApp` and `FirebaseOptions` for Dart servers, command line tools
-and Flutter apps: the app layer of
-[`cloud_firestore_dart`](https://pub.dev/packages/cloud_firestore_dart). You need it to create a
-Firestore instance; on its own it holds the configuration of a Firebase project and connects the
-services to the platform (storage, connectivity, auth and App Check tokens). It is not affiliated
-with or endorsed by Google or Firebase.
+An unofficial, pure-Dart `FirebaseApp` and `FirebaseOptions`: the app layer of
+[`cloud_firestore_dart`](https://pub.dev/packages/cloud_firestore_dart). You need it whenever you use
+`cloud_firestore_dart` directly, in a Dart server, a command-line tool or a Flutter app: it holds the
+configuration of a Firebase project and connects the services to the platform (storage, connectivity, auth and
+App Check tokens). A Flutter app that keeps the official `firebase_core` API does not add it by hand. It is not
+affiliated with or endorsed by Google or Firebase.
 
 > **Status: 0.2.0.** Unit tests, plus `cloud_firestore_dart`'s integration
 > suite against the Firestore emulator. Against production it was only used by the short

@@ -102,8 +102,8 @@ Future<void> rootReadmeLine38() async {
       .listen((snapshot) => print(snapshot.docs.length));
 }
 
-// README.md:55
-Future<void> firestoreReadmeLine55() async {
+// README.md:60
+Future<void> firestoreReadmeLine60() async {
   Future<void> main() async {
     final app = FirebaseApp.withOptions(const FirebaseOptions(
         apiKey: '<API key>', appId: '1:1234567890:web:abc', projectId: 'my-project'));
@@ -135,8 +135,8 @@ Future<void> appReadmeLine25() async {
   await firestore.terminate();
 }
 
-// ../../firebase_auth/firebase_auth_providers_dart/README.md:25
-Future<void> authProvidersReadmeLine25() async {
+// ../../firebase_auth/firebase_auth_providers_dart/README.md:26
+Future<void> authProvidersReadmeLine26() async {
   final FirebaseApp app = FirebaseApp.withOptions(
     const FirebaseOptions(
       apiKey: '<the Web API key of the project>',

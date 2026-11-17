@@ -1,14 +1,15 @@
 # cloud_firestore_dart_flutterfire
 
 Unofficial bridge from the FlutterFire plugins to
-[`cloud_firestore_dart`](https://pub.dev/packages/cloud_firestore_dart), the pure-Dart Firestore
-client. For a Flutter app that initializes Firebase with `firebase_core` and signs its users in
-with `firebase_auth`, and wants to use `cloud_firestore_dart` for Firestore: for example to run
-the same Dart client and code as its backend, or to keep the native Firestore SDKs out of the
-build. (It does not open a new platform: `firebase_auth` and the official `cloud_firestore`
-plugin support the same platforms.) The bridge reuses the FlutterFire app options and the signed-in user, so you do not
-copy the options by hand and the user does not sign in twice. It is not affiliated with or
-supported by Google or Firebase.
+[`cloud_firestore_dart`](https://pub.dev/packages/cloud_firestore_dart), the pure-Dart Firestore client. You
+need it in a Flutter app that initializes Firebase with `firebase_core`, signs its users in with
+`firebase_auth`, and uses `cloud_firestore_dart` (not the official `cloud_firestore` plugin) for Firestore:
+for example to run the same Dart client and code as its backend, or to keep the native Firestore SDKs out of
+the build. It reuses the FlutterFire app options and the signed-in user, so you do not copy the options by
+hand and the user does not sign in twice. It does not open a new platform: `firebase_auth` supports the same
+platforms as the official `cloud_firestore`. To keep the official `cloud_firestore` API instead, see
+[`cloud_firestore_dart_platform`](https://pub.dev/packages/cloud_firestore_dart_platform). It is not
+affiliated with or supported by Google or Firebase.
 
 > **Status: 0.1.0.** Covered by unit tests with fake plugins only. It has not been run in a
 > Flutter app with the real plugins, on any platform, or against a real Firebase project.

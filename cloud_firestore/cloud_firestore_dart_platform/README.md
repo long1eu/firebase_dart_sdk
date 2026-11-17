@@ -6,10 +6,13 @@ An unofficial implementation of the platform interface of the official
 (`FirebaseFirestore.instance.collection(...)`, `withConverter`, `snapshots()`, `runTransaction`, ...), and
 `cloud_firestore_dart` does the work underneath, in Dart, without the native Firebase SDKs.
 
-It is not affiliated with or endorsed by Google or Firebase.
+You need it for a Flutter app on Linux desktop, where `cloud_firestore` and `firebase_core` have no
+implementation of their own: add it to `pubspec.yaml` and it registers itself. On other platforms it is an opt-in, for one Dart implementation
+everywhere. It is not affiliated with or endorsed by Google or Firebase.
 
-> **Status: 0.1.0, not published; built against the 0.2 API of `cloud_firestore_dart`.** Tested with `flutter test` against the Firestore emulator through the
-> classes of `cloud_firestore` 7.1.0. It has not run inside a Flutter app on a device or a desktop yet.
+> **Status: 0.1.0; built against the 0.2 API of `cloud_firestore_dart`.** Tested with `flutter test` against the Firestore emulator through the
+> classes of `cloud_firestore` 7.1.0. One Flutter Linux desktop app ran on it (Debian 13 x86_64, debug build,
+> against the emulator, 2026-11-16); it has not run on a device or on another desktop yet.
 
 ## When to use it
 

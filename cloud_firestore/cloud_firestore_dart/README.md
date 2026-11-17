@@ -1,13 +1,18 @@
 # cloud_firestore_dart
 
-An unofficial, pure-Dart client for [Cloud Firestore](https://firebase.google.com/docs/firestore):
-real-time listeners, queries, transactions and an offline cache, without a Flutter plugin or
-native code of its own. It is for Dart servers and command line tools, Flutter apps that want one
-Dart implementation on every platform (including desktop), and, experimentally, the web.
+An unofficial Cloud Firestore client written only in Dart: real-time listeners, queries, transactions and an
+offline cache, with FlutterFire's API names (`FirebaseFirestore.instanceFor`, `collection`, `snapshots()`)
+and no native code. It is not affiliated with or endorsed by Google or Firebase.
 
-It is a port of the open-source Firebase Android SDK, kept close to its current behaviour, with
-parts of the API following the JS SDK and FlutterFire. It is not affiliated with or endorsed by
-Google or Firebase.
+Use it for a Dart server, worker or command-line tool that needs listeners, an offline cache, or to act as a
+signed-in Firebase user under security rules; for a Firestore listener on a background isolate of a Flutter
+app; or to test Firestore code with `dart test` against the emulator, running the real client. For a Flutter
+app on Linux that uses the official `cloud_firestore` API, add
+[`cloud_firestore_dart_platform`](https://pub.dev/packages/cloud_firestore_dart_platform), which runs on this
+package. On Android, iOS and the web, where the official plugin works, prefer it.
+
+It is a port of the open-source Firebase Android SDK, kept close to its current behaviour. Start with
+`dart pub add cloud_firestore_dart firebase_app_dart` and the [Quickstart](#quickstart).
 
 > **Status: 0.2.0.** Most of it was verified against the Firestore emulator
 > only. Against production Firestore, a short verification kit was run on a Standard edition
