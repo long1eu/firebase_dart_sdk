@@ -8,8 +8,8 @@ In short, read across a row for the transport and the caches of a platform:
 
 | Platform | Transport | Cache without an `openDatabase` | Persistent cache | Tested |
 |---|---|---|---|---|
-| Dart VM (servers, command line) | gRPC | memory | SQLite file (`cloud_firestore_dart_sqlite`) | macOS, Linux; Windows not tested |
-| Flutter on Android, iOS, desktop | gRPC | memory | SQLite file (`cloud_firestore_dart_sqlite`) | not on devices |
+| Dart VM (servers, command line) | gRPC | memory | SQLite file (`cloud_firestore_dart_sqlite`) | macOS, Linux, Windows 11 x64 (one VM, not in CI) |
+| Flutter on Android, iOS, desktop | gRPC | memory | SQLite file (`cloud_firestore_dart_sqlite`) | not on Android or iOS; desktop apps on macOS, Linux (Debian 13) and Windows 11 x64, against the emulator |
 | Web, dart2wasm | REST and WebChannel over `fetch` | memory | SQLite in WebAssembly, in IndexedDB or OPFS (`cloud_firestore_dart_sqlite`) | Chrome, against the emulator |
 | Web, dart2js | REST and WebChannel over `fetch` | memory | the same as dart2wasm | Chrome, against the emulator; integers above 2^53 lose precision |
 
@@ -18,8 +18,14 @@ In short, read across a row for the transport and the caches of a platform:
 Pure Dart on the VM (`dart:io`, `package:grpc`, SQLite through an `OpenDatabase` function you
 supply, for example with `package:sqlite3`). Targets Dart `^3.8.0` (the minimum of `grpc` 5). Developed and tested on
 macOS. On Linux the unit tests and the standard integration suite (against the emulator) pass in a Debian arm64
-container (`tool/linux/run_in_container.sh`), and CI runs them on Ubuntu x64. Windows is
-expected to work but is not tested. Flutter apps (Android, iOS, desktop) can use it as a plain Dart package.
+container (`tool/linux/run_in_container.sh`), and CI runs them on Ubuntu x64. On Windows 11 x64
+(a VM, Dart 3.13.7, 2026-11-17) the unit tests (5947 passed) and the standard integration suite against the
+emulator (903 passed, 22 skipped) pass, after fixes to test helpers that assumed POSIX paths, `\n` line ends or
+that an open file can be deleted; nothing in `lib/` changed. CI does not run Windows. SQLite commits were much
+slower on that VM than on a Mac (about 78 ms each in rollback-journal mode and 24 ms in WAL mode, against 0.3 and 0.1 ms), because
+each commit waits for the virtual disk to flush; two to four tests on SQLite (depending on the load) needed more
+than their timeouts there and passed with `--ignore-timeouts`. Flutter apps (Android, iOS, desktop) can use it as
+a plain Dart package.
 
 - Linux: with `sqlite3` 3.x (Dart 3.10 and later) the opener of `cloud_firestore_dart_sqlite` uses the SQLite that
   the build hook of `sqlite3` bundles; `dart build cli` puts it next to the program, `dart compile exe` does not and
@@ -27,11 +33,19 @@ expected to work but is not tested. Flutter apps (Android, iOS, desktop) can use
   loads `libsqlite3.so`, which only the development package installs (`libsqlite3-dev` on Debian and Ubuntu); with
   just the runtime package (`libsqlite3-0`) it fails with "Failed to load dynamic library 'libsqlite3.so'". The
   README of `cloud_firestore_dart_sqlite` has an override that falls back to `libsqlite3.so.0`.
-- Windows: `sqlite3` 3.x bundles SQLite. `sqlite3` 2.x loads `sqlite3.dll` from next to the executable or the
-  `PATH` (`sqlite3_flutter_libs` bundles it in a Flutter app) and, from 2.7.5 on, falls back to `winsqlite3.dll`,
-  which Windows ships; neither was tried here. SQLite locks files with `LockFileEx` there, so
-  two clients on one file behave as on Linux and macOS, but `Firestore.clearPersistence()` fails with `unknown` while
-  any other handle (another isolate or process) still has the file open, where Linux and macOS delete it anyway.
+- Windows: `sqlite3` 3.x bundles SQLite. On Windows 11 with `sqlite3` 3.9.1, `dart run` loaded the
+  `sqlite3.dll` of the build hook (SQLite 3.54.1) from `.dart_tool\lib`, and `dart build cli` put it in
+  `bundle\lib\` next to the program. `sqlite3` 2.x loads `sqlite3.dll` from next to the executable or the `PATH`
+  (`sqlite3_flutter_libs` bundles it in a Flutter app) and, from 2.7.5 on, falls back to `winsqlite3.dll`, which
+  Windows ships: with 2.9.4 and no `sqlite3.dll` it loaded `C:\Windows\System32\winsqlite3.dll` (SQLite 3.51.1).
+  With both, a cache was written, read back offline by a new process and cleared. SQLite locks files with
+  `LockFileEx` there, so two clients on one file behave as on Linux and macOS. `Firestore.clearPersistence()`
+  while another process had the cache open emptied it in place, as on the other platforms; once no client had it
+  open, it deleted the files. Windows does not delete a file that is still open, so code that deletes the cache
+  files itself must close every connection first (a killed isolate never closes its own).
+- Windows, `dart run`: a second `dart run` of the same package fails while the first still runs, because it
+  tries to replace `.dart_tool\lib\sqlite3.dll`, which the first one has loaded ("Access is denied"). For
+  several processes, build once with `dart build cli` and start the executable.
 
 ## The web (experimental)
 

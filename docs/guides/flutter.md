@@ -339,11 +339,13 @@ Where the SQLite library comes from:
 
 Only macOS was tried with this example: first with `sqlite3` 2.x and the copied opener of 0.1,
 then with `cloud_firestore_dart_sqlite` and `sqlite3` 3.x (3.5.2, the newest that Flutter 3.44
-resolves). The Android, iOS, Windows and Linux rows are what `sqlite3` documents, not tried.
+resolves). On Windows 11 it was built and run against the emulator with `sqlite3` 3.5.2: the build hook's
+`sqlite3.dll` sits next to the executable, and the notes came back from the SQLite file after a restart with the
+emulator stopped. The Android, iOS and Linux rows are what `sqlite3` documents, not tried with this example.
 The application support directory is inside the app's container on macOS
-(`~/Library/Containers/<bundle id>/...`) and private to the app on Android and iOS. On Windows,
-`clearPersistence()` fails while another handle still has the file open
-([Platforms](platforms.md)). [Offline persistence](offline_persistence.md) covers the cache size,
+(`~/Library/Containers/<bundle id>/...`) and private to the app on Android and iOS; on Windows it is
+`%APPDATA%\<company>\<app>`. On Windows a file that is still open cannot be deleted; `clearPersistence()`
+empties the cache in place while another client has it open, as elsewhere ([Platforms](platforms.md)). [Offline persistence](offline_persistence.md) covers the cache size,
 protecting the files, and cache indexes.
 
 ## Connectivity
@@ -458,7 +460,7 @@ From [Platforms](platforms.md) and the example app:
 | --- | --- |
 | macOS | The package: developed and tested on the Dart VM. The example app: built with Flutter 3.44.9 and run against the emulator by hand (the listener, an edit offline and its sync, the cache across a restart, `terminate()` on Cmd-Q) |
 | Linux | The package: unit and integration suites pass in CI (Ubuntu x64) and in a Debian arm64 container, on the Dart VM. A Flutter app: not built or run |
-| Windows | Not tested, not built. `sqlite3` 3.x bundles SQLite (with 2.x, `sqlite3_flutter_libs` does); `clearPersistence()` fails while another handle has the file open |
+| Windows | The package: unit and standard integration suites pass on the Dart VM on Windows 11 x64 (one VM, not in CI). The example app: built with Flutter 3.47.8 (`flutter build windows --debug`, 84 seconds) and run against the emulator from an SSH session, driven through its widgets (a note added and synced, then read from the SQLite file after a restart without the emulator); Flutter could not draw the window there (no interactive desktop), so it was not looked at. `sqlite3` 3.x bundles SQLite (with 2.x, `sqlite3_flutter_libs` does) |
 | Android, iOS | No tests run on devices or emulators, and the example was not built for them. The client runs on the Dart VM there as on a server, so they are expected to work |
 | Web | Not a target of the example. The package's web support is experimental and tested in Chrome with `dart test`, not in a Flutter web app. `sqliteOpener` of `cloud_firestore_dart_sqlite` compiles for the web too and keeps the cache in IndexedDB or OPFS there; pass no directory on the web (`directory: kIsWeb ? null : ...`) and see [Offline persistence on the web](offline_persistence.md#on-the-web) |
 

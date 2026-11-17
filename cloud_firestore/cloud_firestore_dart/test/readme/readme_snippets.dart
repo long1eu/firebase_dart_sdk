@@ -1043,8 +1043,8 @@ Future<void> multipleClientsGuideLine119() async {
   );
 }
 
-// ../../docs/guides/multiple_clients.md:141
-Future<void> multipleClientsGuideLine141() async {
+// ../../docs/guides/multiple_clients.md:142
+Future<void> multipleClientsGuideLine142() async {
   await firestore.terminate();
   await firestore.clearPersistence();
 }
@@ -1468,8 +1468,8 @@ Future<void> troubleshootingGuideLine59() async {
   FirebaseFirestore.setLogLevel(LogLevel.debug);
 }
 
-// ../../docs/guides/troubleshooting.md:284
-Future<void> troubleshootingGuideLine284() async {
+// ../../docs/guides/troubleshooting.md:287
+Future<void> troubleshootingGuideLine287() async {
   final Settings settings = Settings(
     webExperimentalForceLongPolling: true,
     webExperimentalLongPollingOptions: const WebExperimentalLongPollingOptions(timeoutDuration: Duration(seconds: 25)),

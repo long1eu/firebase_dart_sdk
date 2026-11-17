@@ -211,7 +211,10 @@ same):
   installs (`libsqlite3-dev` on Debian and Ubuntu). The runtime package (`libsqlite3-0`) has
   `libsqlite3.so.0`.
 - **Windows:** Windows does not ship `sqlite3.dll`; `sqlite3` 2.7.5 and later fall back to
-  `winsqlite3.dll`, which it does ship (not tried here).
+  `winsqlite3.dll`, which it does ship. Seen on Windows 11 with `sqlite3` 2.9.4 and no
+  `sqlite3.dll` anywhere: it loaded `C:\Windows\System32\winsqlite3.dll` (SQLite 3.51.1), and the
+  cache wrote, reopened offline and cleared. So on Windows this error needs an older `sqlite3` 2.x
+  or a Windows without `winsqlite3.dll`.
 
 **Fix.** Use `cloud_firestore_dart_sqlite` with `sqlite3` 3.x (Dart 3.10 and later), which bundles
 SQLite, and build programs with `dart build cli`. With 2.x install `libsqlite3-dev`, or use the

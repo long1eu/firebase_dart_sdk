@@ -56,7 +56,8 @@ Future<void> main() async {
 `use()` replaces `FirebaseFirestorePlatform.instance` and `FieldValueFactoryPlatform.instance`. It runs after the
 plugin registrant, so it wins over the official implementation. On Android, iOS, macOS and Windows,
 `firebase_core` keeps its native implementation (it provides the `FirebaseApp` and its options), and the native
-Firestore SDK of `cloud_firestore` is still built into the app, unused.
+Firestore SDK of `cloud_firestore` is still built into the app, unused (on Windows the debug executable of
+`examples/flutterfire_on_windows` is 55.7 MB, most of it the Firebase C++ SDK).
 
 ### Options of `use`
 
@@ -192,7 +193,8 @@ What `cloud_firestore` can ask of a platform implementation, and what this one d
 | Platform | Selected by | Notes |
 | --- | --- | --- |
 | Linux | automatic (`dartPluginClass`) | `DartFirebaseCore` is installed too; registration checked with `flutter pub get` in a throwaway app only |
-| Windows, macOS, Android, iOS | `CloudFirestoreDart.use()` | `firebase_core` stays native; not run on these platforms yet |
+| Windows | `CloudFirestoreDart.use()` | `firebase_core` stays native. Run on Windows 11 x64 (Flutter 3.47.8, against the emulator): `examples/flutterfire_on_windows` passed its integration tests, sum and average aggregations included, and the disk cache across a restart. The native Firestore of `cloud_firestore` is still built and linked, unused |
+| macOS, Android, iOS | `CloudFirestoreDart.use()` | `firebase_core` stays native; not run on these platforms yet |
 | Web | `CloudFirestoreDart.use()` | `cloud_firestore_dart` on the web is experimental; not run through this package |
 
 ## Running the tests
