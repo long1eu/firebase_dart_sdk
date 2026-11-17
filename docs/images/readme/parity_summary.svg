@@ -1,6 +1,67 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 552" role="img" aria-labelledby="title desc" font-family="system-ui, -apple-system, Segoe UI, Helvetica, Arial, sans-serif">
   <title id="title">Parity with the JS SDK, area by area</title>
   <desc id="desc">One mark per row of the tables of docs/parity.md, grouped by area. Documents and writes: 15 supported, 1 partial, 3 not applicable; Queries and filters: 9 supported; Aggregations: 3 supported; Listeners and snapshot options: 9 supported; Transactions and batches: 5 supported; Offline persistence and cache settings: 6 supported, 2 not applicable; Indexes: 4 supported, 1 not supported; Bundles: 2 supported; Lite: 4 supported; Pipelines: 6 supported, 3 partial, 1 not supported; Multi-tab or multi-client: 1 supported, 1 partial, 2 not supported; App Check: 1 supported, 1 not supported; Emulator: 2 supported, 1 not applicable; Web transports: 7 supported, 1 not applicable; Platforms: 1 supported, 3 partial, 2 not applicable.</desc>
+  <style id="figure-theme">
+    /* Palette shared by every figure in docs/images (see docs/images/README.md). */
+    :root {
+      --fig-bg: #ffffff;
+      --fig-panel: #f6f8fa;
+      --fig-panel-strong: #eaeef2;
+      --fig-border: #d0d7de;
+      --fig-grid: #eaeef2;
+      --fig-fg: #1f2328;
+      --fig-fg-muted: #57606a;
+      --fig-faint: #818b98;
+      --fig-bar: #6e7781;
+      --fig-on-bar: #ffffff;
+      --fig-on-accent: #ffffff;
+      --fig-accent: #0969da;
+      --fig-accent-bg: #ddf4ff;
+      --fig-success: #1a7f37;
+      --fig-success-bg: #dafbe1;
+      --fig-danger: #cf222e;
+      --fig-attention: #9a6700;
+      --fig-severe: #bc4c00;
+      --fig-severe-bg: #fff1e5;
+      --fig-done: #8250df;
+      --fig-done-bg: #fbefff;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --fig-bg: #0d1117;
+        --fig-panel: #151b23;
+        --fig-panel-strong: #212830;
+        --fig-border: #3d444d;
+        --fig-grid: #2a313c;
+        --fig-fg: #f0f6fc;
+        --fig-fg-muted: #9198a1;
+        --fig-faint: #7d8590;
+        --fig-bar: #6e7781;
+        --fig-on-bar: #ffffff;
+        --fig-on-accent: #0d1117;
+        --fig-accent: #4493f8;
+        --fig-accent-bg: #12294a;
+        --fig-success: #3fb950;
+        --fig-success-bg: #132a1c;
+        --fig-danger: #f85149;
+        --fig-attention: #d29922;
+        --fig-severe: #db6d28;
+        --fig-severe-bg: #2b1c12;
+        --fig-done: #ab7df8;
+        --fig-done-bg: #231c38;
+      }
+    }
+    [fill="#ffffff"] { fill: var(--fig-bg); }
+    [fill="#f6f8fa"] { fill: var(--fig-panel); }
+    [fill="#1f2328"] { fill: var(--fig-fg); }
+    [fill="#57606a"] { fill: var(--fig-fg-muted); }
+    [fill="#1a7f37"] { fill: var(--fig-success); }
+    [fill="#9a6700"] { fill: var(--fig-attention); }
+    [stroke="#d0d7de"] { stroke: var(--fig-border); }
+    [stroke="#818b98"] { stroke: var(--fig-faint); }
+    [stroke="#cf222e"] { stroke: var(--fig-danger); }
+    [stroke="#9a6700"] { stroke: var(--fig-attention); }
+  </style>
   <rect x="0" y="0" width="900" height="552" rx="10" fill="#ffffff" stroke="#d0d7de"/>
   <text x="20" y="30" font-size="14" fill="#1f2328" font-weight="600">Parity with the Firestore JS SDK: one mark per feature row of this page</text>
   <circle cx="27" cy="52" r="7" fill="#1a7f37"/>
@@ -9,12 +70,12 @@
   <text x="150" y="56" font-size="12" fill="#1f2328">partial</text>
   <rect x="220.5" y="45.5" width="13" height="13" rx="2" fill="#ffffff" stroke="#cf222e" stroke-width="2"/><path d="M223.5,48.5 L230.5,55.5 M230.5,48.5 L223.5,55.5" stroke="#cf222e" stroke-width="2" stroke-linecap="round"/>
   <text x="240" y="56" font-size="12" fill="#1f2328">not supported</text>
-  <circle cx="352" cy="52" r="6.5" fill="#ffffff" stroke="#8c959f" stroke-width="1.5" stroke-dasharray="2 2"/><line x1="348.5" y1="52" x2="355.5" y2="52" stroke="#8c959f" stroke-width="2"/>
+  <circle cx="352" cy="52" r="6.5" fill="#ffffff" stroke="#818b98" stroke-width="1.5" stroke-dasharray="2 2"/><line x1="348.5" y1="52" x2="355.5" y2="52" stroke="#818b98" stroke-width="2"/>
   <text x="365" y="56" font-size="12" fill="#1f2328">not applicable</text>
   <circle cx="700" cy="80" r="7" fill="#1a7f37"/>
   <circle cx="756" cy="80" r="6.5" fill="#ffffff" stroke="#9a6700" stroke-width="2"/><path d="M756,73.5 A6.5,6.5 0 0 0 756,86.5 z" fill="#9a6700"/>
   <rect x="805.5" y="73.5" width="13" height="13" rx="2" fill="#ffffff" stroke="#cf222e" stroke-width="2"/><path d="M808.5,76.5 L815.5,83.5 M815.5,76.5 L808.5,83.5" stroke="#cf222e" stroke-width="2" stroke-linecap="round"/>
-  <circle cx="868" cy="80" r="6.5" fill="#ffffff" stroke="#8c959f" stroke-width="1.5" stroke-dasharray="2 2"/><line x1="864.5" y1="80" x2="871.5" y2="80" stroke="#8c959f" stroke-width="2"/>
+  <circle cx="868" cy="80" r="6.5" fill="#ffffff" stroke="#818b98" stroke-width="1.5" stroke-dasharray="2 2"/><line x1="864.5" y1="80" x2="871.5" y2="80" stroke="#818b98" stroke-width="2"/>
   <rect x="12" y="88" width="876" height="26" rx="4" fill="#f6f8fa"/>
   <text x="266" y="105" font-size="12" fill="#1f2328" font-weight="600" text-anchor="end">Documents and writes</text>
   <circle cx="286" cy="101" r="7" fill="#1a7f37"/>
@@ -33,9 +94,9 @@
   <circle cx="533" cy="101" r="7" fill="#1a7f37"/>
   <circle cx="552" cy="101" r="7" fill="#1a7f37"/>
   <circle cx="571" cy="101" r="6.5" fill="#ffffff" stroke="#9a6700" stroke-width="2"/><path d="M571,94.5 A6.5,6.5 0 0 0 571,107.5 z" fill="#9a6700"/>
-  <circle cx="590" cy="101" r="6.5" fill="#ffffff" stroke="#8c959f" stroke-width="1.5" stroke-dasharray="2 2"/><line x1="586.5" y1="101" x2="593.5" y2="101" stroke="#8c959f" stroke-width="2"/>
-  <circle cx="609" cy="101" r="6.5" fill="#ffffff" stroke="#8c959f" stroke-width="1.5" stroke-dasharray="2 2"/><line x1="605.5" y1="101" x2="612.5" y2="101" stroke="#8c959f" stroke-width="2"/>
-  <circle cx="628" cy="101" r="6.5" fill="#ffffff" stroke="#8c959f" stroke-width="1.5" stroke-dasharray="2 2"/><line x1="624.5" y1="101" x2="631.5" y2="101" stroke="#8c959f" stroke-width="2"/>
+  <circle cx="590" cy="101" r="6.5" fill="#ffffff" stroke="#818b98" stroke-width="1.5" stroke-dasharray="2 2"/><line x1="586.5" y1="101" x2="593.5" y2="101" stroke="#818b98" stroke-width="2"/>
+  <circle cx="609" cy="101" r="6.5" fill="#ffffff" stroke="#818b98" stroke-width="1.5" stroke-dasharray="2 2"/><line x1="605.5" y1="101" x2="612.5" y2="101" stroke="#818b98" stroke-width="2"/>
+  <circle cx="628" cy="101" r="6.5" fill="#ffffff" stroke="#818b98" stroke-width="1.5" stroke-dasharray="2 2"/><line x1="624.5" y1="101" x2="631.5" y2="101" stroke="#818b98" stroke-width="2"/>
   <text x="700" y="105" font-size="12" fill="#1f2328" font-weight="600" text-anchor="middle">15</text>
   <text x="756" y="105" font-size="12" fill="#1f2328" font-weight="600" text-anchor="middle">1</text>
   <text x="812" y="105" font-size="12" fill="#57606a" text-anchor="middle">–</text>
@@ -95,8 +156,8 @@
   <circle cx="343" cy="231" r="7" fill="#1a7f37"/>
   <circle cx="362" cy="231" r="7" fill="#1a7f37"/>
   <circle cx="381" cy="231" r="7" fill="#1a7f37"/>
-  <circle cx="400" cy="231" r="6.5" fill="#ffffff" stroke="#8c959f" stroke-width="1.5" stroke-dasharray="2 2"/><line x1="396.5" y1="231" x2="403.5" y2="231" stroke="#8c959f" stroke-width="2"/>
-  <circle cx="419" cy="231" r="6.5" fill="#ffffff" stroke="#8c959f" stroke-width="1.5" stroke-dasharray="2 2"/><line x1="415.5" y1="231" x2="422.5" y2="231" stroke="#8c959f" stroke-width="2"/>
+  <circle cx="400" cy="231" r="6.5" fill="#ffffff" stroke="#818b98" stroke-width="1.5" stroke-dasharray="2 2"/><line x1="396.5" y1="231" x2="403.5" y2="231" stroke="#818b98" stroke-width="2"/>
+  <circle cx="419" cy="231" r="6.5" fill="#ffffff" stroke="#818b98" stroke-width="1.5" stroke-dasharray="2 2"/><line x1="415.5" y1="231" x2="422.5" y2="231" stroke="#818b98" stroke-width="2"/>
   <text x="700" y="235" font-size="12" fill="#1f2328" font-weight="600" text-anchor="middle">6</text>
   <text x="756" y="235" font-size="12" fill="#57606a" text-anchor="middle">–</text>
   <text x="812" y="235" font-size="12" fill="#57606a" text-anchor="middle">–</text>
@@ -165,7 +226,7 @@
   <text x="266" y="417" font-size="12" fill="#1f2328" font-weight="600" text-anchor="end">Emulator</text>
   <circle cx="286" cy="413" r="7" fill="#1a7f37"/>
   <circle cx="305" cy="413" r="7" fill="#1a7f37"/>
-  <circle cx="324" cy="413" r="6.5" fill="#ffffff" stroke="#8c959f" stroke-width="1.5" stroke-dasharray="2 2"/><line x1="320.5" y1="413" x2="327.5" y2="413" stroke="#8c959f" stroke-width="2"/>
+  <circle cx="324" cy="413" r="6.5" fill="#ffffff" stroke="#818b98" stroke-width="1.5" stroke-dasharray="2 2"/><line x1="320.5" y1="413" x2="327.5" y2="413" stroke="#818b98" stroke-width="2"/>
   <text x="700" y="417" font-size="12" fill="#1f2328" font-weight="600" text-anchor="middle">2</text>
   <text x="756" y="417" font-size="12" fill="#57606a" text-anchor="middle">–</text>
   <text x="812" y="417" font-size="12" fill="#57606a" text-anchor="middle">–</text>
@@ -178,7 +239,7 @@
   <circle cx="362" cy="439" r="7" fill="#1a7f37"/>
   <circle cx="381" cy="439" r="7" fill="#1a7f37"/>
   <circle cx="400" cy="439" r="7" fill="#1a7f37"/>
-  <circle cx="419" cy="439" r="6.5" fill="#ffffff" stroke="#8c959f" stroke-width="1.5" stroke-dasharray="2 2"/><line x1="415.5" y1="439" x2="422.5" y2="439" stroke="#8c959f" stroke-width="2"/>
+  <circle cx="419" cy="439" r="6.5" fill="#ffffff" stroke="#818b98" stroke-width="1.5" stroke-dasharray="2 2"/><line x1="415.5" y1="439" x2="422.5" y2="439" stroke="#818b98" stroke-width="2"/>
   <text x="700" y="443" font-size="12" fill="#1f2328" font-weight="600" text-anchor="middle">7</text>
   <text x="756" y="443" font-size="12" fill="#57606a" text-anchor="middle">–</text>
   <text x="812" y="443" font-size="12" fill="#57606a" text-anchor="middle">–</text>
@@ -189,8 +250,8 @@
   <circle cx="305" cy="465" r="6.5" fill="#ffffff" stroke="#9a6700" stroke-width="2"/><path d="M305,458.5 A6.5,6.5 0 0 0 305,471.5 z" fill="#9a6700"/>
   <circle cx="324" cy="465" r="6.5" fill="#ffffff" stroke="#9a6700" stroke-width="2"/><path d="M324,458.5 A6.5,6.5 0 0 0 324,471.5 z" fill="#9a6700"/>
   <circle cx="343" cy="465" r="6.5" fill="#ffffff" stroke="#9a6700" stroke-width="2"/><path d="M343,458.5 A6.5,6.5 0 0 0 343,471.5 z" fill="#9a6700"/>
-  <circle cx="362" cy="465" r="6.5" fill="#ffffff" stroke="#8c959f" stroke-width="1.5" stroke-dasharray="2 2"/><line x1="358.5" y1="465" x2="365.5" y2="465" stroke="#8c959f" stroke-width="2"/>
-  <circle cx="381" cy="465" r="6.5" fill="#ffffff" stroke="#8c959f" stroke-width="1.5" stroke-dasharray="2 2"/><line x1="377.5" y1="465" x2="384.5" y2="465" stroke="#8c959f" stroke-width="2"/>
+  <circle cx="362" cy="465" r="6.5" fill="#ffffff" stroke="#818b98" stroke-width="1.5" stroke-dasharray="2 2"/><line x1="358.5" y1="465" x2="365.5" y2="465" stroke="#818b98" stroke-width="2"/>
+  <circle cx="381" cy="465" r="6.5" fill="#ffffff" stroke="#818b98" stroke-width="1.5" stroke-dasharray="2 2"/><line x1="377.5" y1="465" x2="384.5" y2="465" stroke="#818b98" stroke-width="2"/>
   <text x="700" y="469" font-size="12" fill="#1f2328" font-weight="600" text-anchor="middle">1</text>
   <text x="756" y="469" font-size="12" fill="#1f2328" font-weight="600" text-anchor="middle">3</text>
   <text x="812" y="469" font-size="12" fill="#57606a" text-anchor="middle">–</text>

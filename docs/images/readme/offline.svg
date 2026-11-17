@@ -1,6 +1,67 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 360" role="img" aria-labelledby="title desc" font-family="system-ui, -apple-system, Segoe UI, Helvetica, Arial, sans-serif">
   <title id="title">What works offline</title>
   <desc id="desc">Two lists. Works offline, answered by the local cache: get() and listeners (from the cache, isFromCache true); get(GetOptions(source: Source.cache)) and listeners with ListenSource.cache; set, update, delete and batches, which are in the cache at once and sent when the client is back online; pending writes kept across restarts with the SQLite cache; loadBundle and named queries. Needs the backend: transactions (read-write and read-only); count, sum and average; findNearest; Pipelines; get(GetOptions(source: Source.server)); Firestore Lite, which has no cache. Write futures and waitForPendingWrites complete only when the backend has confirmed the writes. The cache answers only with what it holds.</desc>
+  <style id="figure-theme">
+    /* Palette shared by every figure in docs/images (see docs/images/README.md). */
+    :root {
+      --fig-bg: #ffffff;
+      --fig-panel: #f6f8fa;
+      --fig-panel-strong: #eaeef2;
+      --fig-border: #d0d7de;
+      --fig-grid: #eaeef2;
+      --fig-fg: #1f2328;
+      --fig-fg-muted: #57606a;
+      --fig-faint: #818b98;
+      --fig-bar: #6e7781;
+      --fig-on-bar: #ffffff;
+      --fig-on-accent: #ffffff;
+      --fig-accent: #0969da;
+      --fig-accent-bg: #ddf4ff;
+      --fig-success: #1a7f37;
+      --fig-success-bg: #dafbe1;
+      --fig-danger: #cf222e;
+      --fig-attention: #9a6700;
+      --fig-severe: #bc4c00;
+      --fig-severe-bg: #fff1e5;
+      --fig-done: #8250df;
+      --fig-done-bg: #fbefff;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --fig-bg: #0d1117;
+        --fig-panel: #151b23;
+        --fig-panel-strong: #212830;
+        --fig-border: #3d444d;
+        --fig-grid: #2a313c;
+        --fig-fg: #f0f6fc;
+        --fig-fg-muted: #9198a1;
+        --fig-faint: #7d8590;
+        --fig-bar: #6e7781;
+        --fig-on-bar: #ffffff;
+        --fig-on-accent: #0d1117;
+        --fig-accent: #4493f8;
+        --fig-accent-bg: #12294a;
+        --fig-success: #3fb950;
+        --fig-success-bg: #132a1c;
+        --fig-danger: #f85149;
+        --fig-attention: #d29922;
+        --fig-severe: #db6d28;
+        --fig-severe-bg: #2b1c12;
+        --fig-done: #ab7df8;
+        --fig-done-bg: #231c38;
+      }
+    }
+    [fill="#ffffff"] { fill: var(--fig-bg); }
+    [fill="#f6f8fa"] { fill: var(--fig-panel); }
+    [fill="#1f2328"] { fill: var(--fig-fg); }
+    [fill="#57606a"] { fill: var(--fig-fg-muted); }
+    [fill="#1a7f37"] { fill: var(--fig-success); }
+    [fill="#cf222e"] { fill: var(--fig-danger); }
+    [stroke="#ffffff"] { stroke: var(--fig-on-accent); }
+    [stroke="#d0d7de"] { stroke: var(--fig-border); }
+    [stroke="#1a7f37"] { stroke: var(--fig-success); }
+    [stroke="#cf222e"] { stroke: var(--fig-danger); }
+  </style>
   <rect x="0" y="0" width="900" height="360" rx="10" fill="#ffffff" stroke="#d0d7de"/>
 
   <!-- Left column: works offline -->

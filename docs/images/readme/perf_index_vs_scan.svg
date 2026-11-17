@@ -1,9 +1,67 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 500" role="img" aria-labelledby="title desc" font-family="system-ui, -apple-system, Segoe UI, Helvetica, Arial, sans-serif">
   <title id="title">Scan or persistent cache index</title>
   <desc id="desc">Grouped bar chart of one query on 50,000 cached documents, scan versus persistent cache index: a == 7, scan 149.8 ms, index 3.9 ms; r in a range, scan 151.9 ms, index 4.3 ms; array-contains, scan 157.4 ms, index 6.6 ms; orderBy descending with limit 10, scan 305.3 ms and 234 MB more resident memory, index 0.35 ms; a == 7 with 10 percent of the documents not yet indexed, index 26.5 ms. Measured once with index_bench.dart 50000 --reps=3 on 2026-11-15.</desc>
+  <style id="figure-theme">
+    /* Palette shared by every figure in docs/images (see docs/images/README.md). */
+    :root {
+      --fig-bg: #ffffff;
+      --fig-panel: #f6f8fa;
+      --fig-panel-strong: #eaeef2;
+      --fig-border: #d0d7de;
+      --fig-grid: #eaeef2;
+      --fig-fg: #1f2328;
+      --fig-fg-muted: #57606a;
+      --fig-faint: #818b98;
+      --fig-bar: #6e7781;
+      --fig-on-bar: #ffffff;
+      --fig-on-accent: #ffffff;
+      --fig-accent: #0969da;
+      --fig-accent-bg: #ddf4ff;
+      --fig-success: #1a7f37;
+      --fig-success-bg: #dafbe1;
+      --fig-danger: #cf222e;
+      --fig-attention: #9a6700;
+      --fig-severe: #bc4c00;
+      --fig-severe-bg: #fff1e5;
+      --fig-done: #8250df;
+      --fig-done-bg: #fbefff;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --fig-bg: #0d1117;
+        --fig-panel: #151b23;
+        --fig-panel-strong: #212830;
+        --fig-border: #3d444d;
+        --fig-grid: #2a313c;
+        --fig-fg: #f0f6fc;
+        --fig-fg-muted: #9198a1;
+        --fig-faint: #7d8590;
+        --fig-bar: #6e7781;
+        --fig-on-bar: #ffffff;
+        --fig-on-accent: #0d1117;
+        --fig-accent: #4493f8;
+        --fig-accent-bg: #12294a;
+        --fig-success: #3fb950;
+        --fig-success-bg: #132a1c;
+        --fig-danger: #f85149;
+        --fig-attention: #d29922;
+        --fig-severe: #db6d28;
+        --fig-severe-bg: #2b1c12;
+        --fig-done: #ab7df8;
+        --fig-done-bg: #231c38;
+      }
+    }
+    [fill="#ffffff"] { fill: var(--fig-bg); }
+    [fill="#1f2328"] { fill: var(--fig-fg); }
+    [fill="#57606a"] { fill: var(--fig-fg-muted); }
+    [fill="#6e7781"] { fill: var(--fig-bar); }
+    [fill="#0969da"] { fill: var(--fig-accent); }
+    [stroke="#d0d7de"] { stroke: var(--fig-border); }
+    text[fill="#ffffff"] { fill: var(--fig-on-bar); }
+  </style>
   <rect x="0" y="0" width="900" height="500" rx="10" fill="#ffffff" stroke="#d0d7de"/>
   <text x="20" y="30" font-size="14" fill="#1f2328" font-weight="600">One query on 50,000 cached documents: scan or index (ms, shorter is faster)</text>
-  <rect x="20" y="44" width="16" height="12" rx="2" fill="#8c959f"/>
+  <rect x="20" y="44" width="16" height="12" rx="2" fill="#6e7781"/>
   <text x="42" y="54" font-size="12" fill="#1f2328">scan of the collection</text>
   <rect x="200" y="44" width="16" height="12" rx="2" fill="#0969da"/>
   <text x="222" y="54" font-size="12" fill="#1f2328">persistent cache index</text>
@@ -23,25 +81,25 @@
   <text x="787.5" y="392" font-size="11" fill="#57606a" text-anchor="middle">300 ms</text>
   <text x="288" y="92" font-size="12" fill="#1f2328" font-weight="600" text-anchor="end" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">a == 7</text>
   <text x="288" y="108" font-size="11" fill="#57606a" text-anchor="end">1 % of the documents</text>
-  <rect x="300" y="76" width="243.4" height="20" rx="3" fill="#8c959f"/>
+  <rect x="300" y="76" width="243.4" height="20" rx="3" fill="#6e7781"/>
   <text x="535.4" y="90" font-size="12" fill="#ffffff" font-weight="600" text-anchor="end">scan 149.8 ms</text>
   <rect x="300" y="100" width="6.3" height="20" rx="2" fill="#0969da"/>
   <text x="312.3" y="114" font-size="12" fill="#1f2328" font-weight="600">index 3.9 ms</text>
   <text x="288" y="154" font-size="12" fill="#1f2328" font-weight="600" text-anchor="end" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">r in a range</text>
   <text x="288" y="170" font-size="11" fill="#57606a" text-anchor="end">1 %</text>
-  <rect x="300" y="138" width="246.8" height="20" rx="3" fill="#8c959f"/>
+  <rect x="300" y="138" width="246.8" height="20" rx="3" fill="#6e7781"/>
   <text x="538.8" y="152" font-size="12" fill="#ffffff" font-weight="600" text-anchor="end">scan 151.9 ms</text>
   <rect x="300" y="162" width="7.0" height="20" rx="2" fill="#0969da"/>
   <text x="313.0" y="176" font-size="12" fill="#1f2328" font-weight="600">index 4.3 ms</text>
   <text x="288" y="216" font-size="12" fill="#1f2328" font-weight="600" text-anchor="end" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">array-contains</text>
   <text x="288" y="232" font-size="11" fill="#57606a" text-anchor="end">2 %</text>
-  <rect x="300" y="200" width="255.8" height="20" rx="3" fill="#8c959f"/>
+  <rect x="300" y="200" width="255.8" height="20" rx="3" fill="#6e7781"/>
   <text x="547.8" y="214" font-size="12" fill="#ffffff" font-weight="600" text-anchor="end">scan 157.4 ms</text>
   <rect x="300" y="224" width="10.7" height="20" rx="2" fill="#0969da"/>
   <text x="316.7" y="238" font-size="12" fill="#1f2328" font-weight="600">index 6.6 ms</text>
   <text x="288" y="278" font-size="12" fill="#1f2328" font-weight="600" text-anchor="end" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">orderBy('order', descending)</text>
   <text x="288" y="294" font-size="11" fill="#57606a" text-anchor="end">.limit(10)</text>
-  <rect x="300" y="262" width="496.1" height="20" rx="3" fill="#8c959f"/>
+  <rect x="300" y="262" width="496.1" height="20" rx="3" fill="#6e7781"/>
   <text x="788.1" y="276" font-size="12" fill="#ffffff" font-weight="600" text-anchor="end">scan 305.3 ms, +234 MB memory</text>
   <rect x="300" y="286" width="1.5" height="20" rx="2" fill="#0969da"/>
   <text x="307.5" y="300" font-size="12" fill="#1f2328" font-weight="600">index 0.35 ms</text>

@@ -6,13 +6,73 @@ messages. The integration suites over gRPC and over WebChannel, the chaos and so
 browser tests and the production verification kit run the whole client from the public API to the transport. They run
 against the Standard edition emulator, a TCP proxy in front of it, the Enterprise edition emulator, the emulator from
 Chrome, and a real Firestore database or the emulator respectively.</desc>
+  <style id="figure-theme">
+    /* Palette shared by every figure in docs/images (see docs/images/README.md). */
+    :root {
+      --fig-bg: #ffffff;
+      --fig-panel: #f6f8fa;
+      --fig-panel-strong: #eaeef2;
+      --fig-border: #d0d7de;
+      --fig-grid: #eaeef2;
+      --fig-fg: #1f2328;
+      --fig-fg-muted: #57606a;
+      --fig-faint: #818b98;
+      --fig-bar: #6e7781;
+      --fig-on-bar: #ffffff;
+      --fig-on-accent: #ffffff;
+      --fig-accent: #0969da;
+      --fig-accent-bg: #ddf4ff;
+      --fig-success: #1a7f37;
+      --fig-success-bg: #dafbe1;
+      --fig-danger: #cf222e;
+      --fig-attention: #9a6700;
+      --fig-severe: #bc4c00;
+      --fig-severe-bg: #fff1e5;
+      --fig-done: #8250df;
+      --fig-done-bg: #fbefff;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --fig-bg: #0d1117;
+        --fig-panel: #151b23;
+        --fig-panel-strong: #212830;
+        --fig-border: #3d444d;
+        --fig-grid: #2a313c;
+        --fig-fg: #f0f6fc;
+        --fig-fg-muted: #9198a1;
+        --fig-faint: #7d8590;
+        --fig-bar: #6e7781;
+        --fig-on-bar: #ffffff;
+        --fig-on-accent: #0d1117;
+        --fig-accent: #4493f8;
+        --fig-accent-bg: #12294a;
+        --fig-success: #3fb950;
+        --fig-success-bg: #132a1c;
+        --fig-danger: #f85149;
+        --fig-attention: #d29922;
+        --fig-severe: #db6d28;
+        --fig-severe-bg: #2b1c12;
+        --fig-done: #ab7df8;
+        --fig-done-bg: #231c38;
+      }
+    }
+    [fill="#ffffff"] { fill: var(--fig-bg); }
+    [fill="#f6f8fa"] { fill: var(--fig-panel); }
+    [fill="#1f2328"] { fill: var(--fig-fg); }
+    [fill="#57606a"] { fill: var(--fig-fg-muted); }
+    [fill="#ddf4ff"] { fill: var(--fig-accent-bg); }
+    [stroke="#d0d7de"] { stroke: var(--fig-border); }
+    [stroke="#57606a"] { stroke: var(--fig-fg-muted); }
+    [stroke="#0969da"] { stroke: var(--fig-accent); }
+    [stroke="#bc4c00"] { stroke: var(--fig-severe); }
+  </style>
   <rect x="0" y="0" width="1020" height="500" fill="#ffffff"/>
 
-  <text x="24" y="34" font-size="20" font-weight="700" fill="#111827">What each suite runs, and against what</text>
-  <text x="24" y="56" font-size="13" fill="#4b5563">A solid bar is the code of the SDK, run for real. A dashed box is a fake in its place. The last column is the other end.</text>
+  <text x="24" y="34" font-size="20" font-weight="700" fill="#1f2328">What each suite runs, and against what</text>
+  <text x="24" y="56" font-size="13" fill="#57606a">A solid bar is the code of the SDK, run for real. A dashed box is a fake in its place. The last column is the other end.</text>
 
   <!-- Column headers -->
-  <g font-size="12" font-weight="700" fill="#111827" text-anchor="middle">
+  <g font-size="12" font-weight="700" fill="#1f2328" text-anchor="middle">
     <text x="326" y="92">Public API</text>
     <text x="438" y="86">EventManager,</text>
     <text x="438" y="102">SyncEngine</text>
@@ -23,7 +83,7 @@ Chrome, and a real Firestore database or the emulator respectively.</desc>
     <text x="774" y="102">transport</text>
     <text x="915" y="92">Runs against</text>
   </g>
-  <g stroke="#d1d5db" stroke-width="1">
+  <g stroke="#d0d7de" stroke-width="1">
     <line x1="24" y1="114" x2="1000" y2="114"/>
     <line x1="270" y1="70" x2="270" y2="474"/>
     <line x1="382" y1="70" x2="382" y2="474"/>
@@ -34,22 +94,22 @@ Chrome, and a real Firestore database or the emulator respectively.</desc>
   </g>
 
   <!-- Row labels -->
-  <g font-size="13" fill="#111827">
+  <g font-size="13" fill="#1f2328">
     <text x="24" y="143">Spec tests (JSON shared</text>
-    <text x="24" y="159" font-size="11" fill="#4b5563">with the JS and Android SDKs)</text>
+    <text x="24" y="159" font-size="11" fill="#57606a">with the JS and Android SDKs)</text>
     <text x="24" y="193">View property tests</text>
-    <text x="24" y="209" font-size="11" fill="#4b5563">held_back_view, view_listeners</text>
+    <text x="24" y="209" font-size="11" fill="#57606a">held_back_view, view_listeners</text>
     <text x="24" y="250">Integration over gRPC</text>
     <text x="24" y="300">Integration over WebChannel</text>
-    <text x="24" y="316" font-size="11" fill="#4b5563">on the Dart VM, also long polling</text>
+    <text x="24" y="316" font-size="11" fill="#57606a">on the Dart VM, also long polling</text>
     <text x="24" y="350">Chaos and soak tests</text>
     <text x="24" y="400">Enterprise suite</text>
     <text x="24" y="443">Browser tests (Chrome)</text>
-    <text x="24" y="459" font-size="11" fill="#4b5563">dart2js and dart2wasm</text>
+    <text x="24" y="459" font-size="11" fill="#57606a">dart2js and dart2wasm</text>
   </g>
 
   <!-- Bars: real code -->
-  <g fill="#dbeafe" stroke="#1d4ed8" stroke-width="1.2">
+  <g fill="#ddf4ff" stroke="#0969da" stroke-width="1.2">
     <rect x="386" y="128" width="328" height="34" rx="5"/>
     <rect x="386" y="178" width="328" height="34" rx="5"/>
     <rect x="274" y="228" width="552" height="34" rx="5"/>
@@ -58,7 +118,7 @@ Chrome, and a real Firestore database or the emulator respectively.</desc>
     <rect x="274" y="378" width="552" height="34" rx="5"/>
     <rect x="274" y="428" width="552" height="34" rx="5"/>
   </g>
-  <g font-size="12" fill="#111827" text-anchor="middle">
+  <g font-size="12" fill="#1f2328" text-anchor="middle">
     <text x="550" y="150">memory and SQLite persistence</text>
     <text x="550" y="200">memory and SQLite persistence</text>
     <text x="550" y="250">the whole client, gRPC transport</text>
@@ -69,17 +129,17 @@ Chrome, and a real Firestore database or the emulator respectively.</desc>
   </g>
 
   <!-- Fakes -->
-  <g fill="#ffffff" stroke="#c2410c" stroke-width="1.2" stroke-dasharray="5 3">
+  <g fill="#ffffff" stroke="#bc4c00" stroke-width="1.2" stroke-dasharray="5 3">
     <rect x="722" y="128" width="104" height="34" rx="5"/>
     <rect x="722" y="178" width="104" height="34" rx="5"/>
   </g>
-  <g font-size="12" fill="#111827" text-anchor="middle">
+  <g font-size="12" fill="#1f2328" text-anchor="middle">
     <text x="774" y="150">MockDatastore</text>
     <text x="774" y="200">MockDatastore</text>
   </g>
 
   <!-- Other end -->
-  <g fill="#f3f4f6" stroke="#6b7280" stroke-width="1.2">
+  <g fill="#f6f8fa" stroke="#57606a" stroke-width="1.2">
     <rect x="834" y="128" width="166" height="34" rx="5"/>
     <rect x="834" y="178" width="166" height="34" rx="5"/>
     <rect x="834" y="228" width="166" height="34" rx="5"/>
@@ -88,7 +148,7 @@ Chrome, and a real Firestore database or the emulator respectively.</desc>
     <rect x="834" y="378" width="166" height="34" rx="5"/>
     <rect x="834" y="428" width="166" height="34" rx="5"/>
   </g>
-  <g font-size="11" fill="#111827" text-anchor="middle">
+  <g font-size="11" fill="#1f2328" text-anchor="middle">
     <text x="917" y="142">scripted watch and</text>
     <text x="917" y="156">write messages</text>
     <text x="917" y="192">seeded random backend</text>
@@ -101,5 +161,5 @@ Chrome, and a real Firestore database or the emulator respectively.</desc>
     <text x="917" y="449">Standard emulator</text>
   </g>
 
-  <text x="24" y="492" font-size="12" fill="#374151">Not shown: the production verification kit (the whole client against a real database, opt-in), unit tests of single classes, and fuzz tests of the parsers.</text>
+  <text x="24" y="492" font-size="12" fill="#57606a">Not shown: the production verification kit (the whole client against a real database, opt-in), unit tests of single classes, and fuzz tests of the parsers.</text>
 </svg>

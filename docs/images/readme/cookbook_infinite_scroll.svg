@@ -1,6 +1,67 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 330" role="img" aria-labelledby="title desc" font-family="system-ui, -apple-system, Segoe UI, Helvetica, Arial, sans-serif">
   <title id="title">Pages of an infinite list, each with its own listener</title>
   <desc id="desc">Messages m10 to m80 ordered by rank, three per page. Page 1 holds m10, m20, m30 and listens from m10 to m30; page 2 holds m40, m50, m60 and listens from m40 to m60; page 3 holds m70 and m80. When m45 is added, it falls inside the bounds of page 2, so page 2 grows to four documents.</desc>
+  <style id="figure-theme">
+    /* Palette shared by every figure in docs/images (see docs/images/README.md). */
+    :root {
+      --fig-bg: #ffffff;
+      --fig-panel: #f6f8fa;
+      --fig-panel-strong: #eaeef2;
+      --fig-border: #d0d7de;
+      --fig-grid: #eaeef2;
+      --fig-fg: #1f2328;
+      --fig-fg-muted: #57606a;
+      --fig-faint: #818b98;
+      --fig-bar: #6e7781;
+      --fig-on-bar: #ffffff;
+      --fig-on-accent: #ffffff;
+      --fig-accent: #0969da;
+      --fig-accent-bg: #ddf4ff;
+      --fig-success: #1a7f37;
+      --fig-success-bg: #dafbe1;
+      --fig-danger: #cf222e;
+      --fig-attention: #9a6700;
+      --fig-severe: #bc4c00;
+      --fig-severe-bg: #fff1e5;
+      --fig-done: #8250df;
+      --fig-done-bg: #fbefff;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --fig-bg: #0d1117;
+        --fig-panel: #151b23;
+        --fig-panel-strong: #212830;
+        --fig-border: #3d444d;
+        --fig-grid: #2a313c;
+        --fig-fg: #f0f6fc;
+        --fig-fg-muted: #9198a1;
+        --fig-faint: #7d8590;
+        --fig-bar: #6e7781;
+        --fig-on-bar: #ffffff;
+        --fig-on-accent: #0d1117;
+        --fig-accent: #4493f8;
+        --fig-accent-bg: #12294a;
+        --fig-success: #3fb950;
+        --fig-success-bg: #132a1c;
+        --fig-danger: #f85149;
+        --fig-attention: #d29922;
+        --fig-severe: #db6d28;
+        --fig-severe-bg: #2b1c12;
+        --fig-done: #ab7df8;
+        --fig-done-bg: #231c38;
+      }
+    }
+    [fill="#ffffff"] { fill: var(--fig-bg); }
+    [fill="#f6f8fa"] { fill: var(--fig-panel); }
+    [fill="#1f2328"] { fill: var(--fig-fg); }
+    [fill="#57606a"] { fill: var(--fig-fg-muted); }
+    [fill="#ddf4ff"] { fill: var(--fig-accent-bg); }
+    [fill="#1a7f37"] { fill: var(--fig-success); }
+    [stroke="#d0d7de"] { stroke: var(--fig-border); }
+    [stroke="#1f2328"] { stroke: var(--fig-fg); }
+    [stroke="#57606a"] { stroke: var(--fig-fg-muted); }
+    [stroke="#1a7f37"] { stroke: var(--fig-success); }
+  </style>
   <defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#57606a"/></marker></defs>
   <rect x="0" y="0" width="900" height="330" rx="10" fill="#ffffff" stroke="#d0d7de"/>
   <path d="M150,86 L150,78 L340,78 L340,86" stroke="#1f2328" stroke-width="1.5" fill="none"/>

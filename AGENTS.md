@@ -19,6 +19,8 @@ Maintained, tested and published (version 0.2.0, Dart `^3.8.0`):
 
 - `examples/`: complete example packages (`server_shelf`, `cli`, `cloud_run_job`).
 - `docs/`: guides (`docs/guides/`), parity, support policy, how we test, upstream sync records.
+  The SVG figures in `docs/images/` follow the palette and light/dark rules of
+  `docs/images/README.md`; check them with `dart tool/check_figures.dart`.
 - `tool/`: test, emulator and size scripts; `tool/README.md` describes each one.
 - Legacy code from the original project, not maintained and not part of the tested set:
   `firebase_auth/firebase_auth_dart`, `firebase_auth/firebase_auth_vm`,
