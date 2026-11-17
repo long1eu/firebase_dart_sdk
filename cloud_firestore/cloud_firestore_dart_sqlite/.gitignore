@@ -4,3 +4,4 @@ test/browser/sqlite_opfs_worker.js
 test/browser/sqlite_opfs_worker.js.deps
 test/browser/sqlite_opfs_worker.js.map
 test/browser/emulator_port.txt
+test/browser/other_sqlite3.wasm

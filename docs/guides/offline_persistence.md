@@ -79,7 +79,9 @@ final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(
 ```
 
 It works with `sqlite3` 2.7.3 to 3.x, except 3.4.0 to 3.5.2 in a browser with the IndexedDB
-storage; in a browser with 3.x use `cloud_firestore_dart_sqlite` 0.1.1 or later (0.1.0 could lose
+storage, which `cloud_firestore_dart_sqlite` 0.1.2 refuses at open with a
+`SqliteWebSetupException` (Flutter 3.44 resolves 3.5.2 for a web app: pin `sqlite3: 3.3.4` there,
+see [Web](web.md#the-sqlite3-version)); in a browser with 3.x use 0.1.1 or later (0.1.0 could lose
 writes acknowledged just before the tab died, see its CHANGELOG). With 3.x (Dart 3.10 and later) `sqlite3` bundles SQLite
 itself and nothing else is needed; with 2.x a Flutter app adds `sqlite3_flutter_libs: ^0.5.0`
 and a Linux server needs `libsqlite3.so`. Its README has the details per platform.

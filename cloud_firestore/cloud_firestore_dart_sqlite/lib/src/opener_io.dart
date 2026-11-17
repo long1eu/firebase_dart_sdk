@@ -10,6 +10,7 @@ OpenDatabase platformSqliteOpener({
   required Uri? opfsWorker,
   required String storagePrefix,
   required Duration lockTimeout,
+  required bool acceptIndexedDbWriteLoss,
 }) {
   if (directory == null) {
     throw ArgumentError.notNull('directory');

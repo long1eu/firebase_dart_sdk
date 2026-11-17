@@ -339,7 +339,9 @@ Where the SQLite library comes from:
 
 Only macOS was tried with this example: first with `sqlite3` 2.x and the copied opener of 0.1,
 then with `cloud_firestore_dart_sqlite` and `sqlite3` 3.x (3.5.2, the newest that Flutter 3.44
-resolves). On Windows 11 it was built and run against the emulator with `sqlite3` 3.5.2: the build hook's
+resolves). 3.5.2 is fine on these platforms, but not in a browser with the IndexedDB storage:
+a Flutter web build that uses the SQLite cache pins another `sqlite3` (see
+[Web](web.md#the-sqlite3-version); `cloud_firestore_dart_sqlite` 0.1.2 refuses 3.5.2 there at open). On Windows 11 it was built and run against the emulator with `sqlite3` 3.5.2: the build hook's
 `sqlite3.dll` sits next to the executable, and the notes came back from the SQLite file after a restart with the
 emulator stopped. The Android, iOS and Linux rows are what `sqlite3` documents, not tried with this example.
 The application support directory is inside the app's container on macOS

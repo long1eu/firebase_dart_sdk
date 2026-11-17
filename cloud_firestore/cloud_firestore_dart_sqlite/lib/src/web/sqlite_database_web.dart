@@ -35,7 +35,7 @@
 //    file system of package:sqlite3 copies its files, the rollback journal
 //    included, to IndexedDB in the background, in the order SQLite wrote them
 //    and one IndexedDB transaction per file. This opener waits for the copies
-//    at the end of every transaction (`_flushAll`), so what a write future
+//    at the end of every transaction (`flushAll`), so what a write future
 //    acknowledged is stored. With OPFS, SQLite writes its journal and its database file
 //    itself and flushes them at the end of every transaction, as on disk. A
 //    tab that dies in the middle of a transaction leaves a journal behind and
@@ -52,8 +52,8 @@
 //    until a wait succeeds; the client goes offline meanwhile and retries (see
 //    `SqliteWebDatabase._stored`). With sqlite3 2.9.4 only a closed IndexedDB
 //    file system makes the wait fail: the file system does not report a copy
-//    that failed. sqlite3 3.4.0 to 3.5.2 are not safe with this storage
-//    (see `_flushAll`).
+//    that failed. sqlite3 3.4.0 to 3.5.2 are not safe with this storage: the
+//    opener refuses them (see `checkIndexedDbFlush` in setup_checks.dart).
 //  * When OPFS fails (OPFS storage). SQLite reports the I/O error of the
 //    statement that ran into it. The worker reports BUSY, LOCKED, IOERR and
 //    FULL as a [TransientDatabaseException] (the client goes offline and
@@ -85,6 +85,8 @@ import 'package:sqlite3/wasm.dart' as sqlite;
 import 'package:web/web.dart' as web;
 
 import '../sqlite_opfs_exception.dart';
+import '../sqlite_web_setup_exception.dart';
+import 'setup_checks.dart';
 
 /// Returns an [OpenDatabase] that keeps each database in IndexedDB, or in the
 /// origin private file system (OPFS) when [opfsWorker] is given and the
@@ -104,11 +106,19 @@ import '../sqlite_opfs_exception.dart';
 /// synchronous OPFS access in workers the opener uses IndexedDB as without
 /// it ([SqliteWebDatabase]). The first OPFS open of a cache that exists in
 /// IndexedDB only moves it to OPFS, pending writes included.
+///
+/// Before the first IndexedDB open of the page the opener checks that the
+/// resolved sqlite3 package can store what a write acknowledged: with 3.4.0
+/// to 3.5.2 it can not, and the open fails with a [SqliteWebSetupException]
+/// ([SqliteWebSetupProblem.unsafeSqlite3]) unless [acceptIndexedDbWriteLoss]
+/// is true. A [sqlite3Wasm] that is missing, or the build of another sqlite3
+/// version, fails the open with a [SqliteWebSetupException] that says so.
 OpenDatabase sqliteWebOpener({
   required Uri sqlite3Wasm,
   Uri? opfsWorker,
   String storagePrefix = 'cloud_firestore_dart',
   Duration lockTimeout = const Duration(seconds: 2),
+  bool acceptIndexedDbWriteLoss = false,
 }) {
   Future<sqlite.WasmSqlite3>? loading;
 
@@ -181,10 +191,19 @@ OpenDatabase sqliteWebOpener({
     try {
       // A failed download is tried again on the next open.
       sqlite3 = await (loading ??= sqlite.WasmSqlite3.loadFromUrl(sqlite3Wasm)
-          .onError<Object>((Object error, StackTrace stackTrace) {
+          .onError<Object>((Object error, StackTrace stackTrace) async {
             loading = null;
-            Error.throwWithStackTrace(error, stackTrace);
+            final SqliteWebSetupException? explained = await explainWasmFailure(
+              Uri.base.resolveUri(sqlite3Wasm),
+              error,
+            );
+            Error.throwWithStackTrace(explained ?? error, stackTrace);
           }));
+
+      // sqlite3 3.4.0 to 3.5.2 can not keep what was acknowledged.
+      if (!acceptIndexedDbWriteLoss) {
+        await checkIndexedDbFlush(storagePrefix: storagePrefix);
+      }
 
       // Reads the database into memory. A file system of its own per open
       // database, registered under a name of its own.
@@ -245,7 +264,7 @@ OpenDatabase sqliteWebOpener({
         }
         rethrow;
       }
-      await _flushAll(fileSystem);
+      await flushAll(fileSystem);
 
       await onOpen?.call(db);
       return db;
@@ -347,41 +366,6 @@ class _ReadCopyFile implements sqlite.VirtualFileSystemFile {
 
   @override
   void xUnlock(int mode) => _inner.xUnlock(mode);
-}
-
-/// Waits until every write that [fileSystem] was given before this call is
-/// stored in IndexedDB. What a write future acknowledges rests on it.
-///
-/// One `flush()` is not enough with every sqlite3 version, so this calls it
-/// twice. Why two calls are enough, from the source of
-/// `IndexedDbFileSystem.flush()` and its work queue:
-///
-///  * 2.7.3 to 3.3.4: `flush()` adds a no-op item to the end of a queue that runs one
-///    item at a time, in order, and returns that item's future: it completes
-///    after every write queued before it. The first call is enough; the
-///    second costs one more turn of the queue.
-///  * 3.6.0 to 3.9.1: the queued writes are written in batches, one batch at a
-///    time. `flush()` returns the batch being written, or, when none is,
-///    starts one with every queued write and returns it. Writes queued while a
-///    batch is being written wait for the next batch, which the first call
-///    does not wait for: this is the bug that lost acknowledged transactions
-///    when a tab was killed. When a batch is done, its completion handler
-///    moves every queued write into the next batch and starts it before the
-///    future of the first call completes. So the second call returns the
-///    batch with the remaining writes, or, if that batch is done too, a later
-///    batch or nothing to wait for.
-///  * 3.4.0 to 3.5.2: `flush()` returns at once while a batch is being
-///    written, without waiting for it. No number of calls is enough there,
-///    and the file system has no other way to wait; do not use these
-///    versions with the IndexedDB storage (see the README).
-///
-/// A loop until nothing is pending is not possible: the file system does not
-/// say whether writes are pending. Check this again before allowing a sqlite3
-/// version whose `flush()` changed; the crash test in test/browser of the
-/// repository catches a wait that is too short.
-Future<void> _flushAll(sqlite.IndexedDbFileSystem fileSystem) async {
-  await fileSystem.flush();
-  await fileSystem.flush();
 }
 
 /// The databases of this page that are being closed, by storage name.
@@ -506,7 +490,7 @@ class SqliteWebDatabase implements ClearableDatabase, ExclusiveDatabase {
       return;
     }
     try {
-      await _flushAll(_fileSystem);
+      await flushAll(_fileSystem);
       _unstored = null;
     } catch (e) {
       _unstored = e;
@@ -520,7 +504,7 @@ class SqliteWebDatabase implements ClearableDatabase, ExclusiveDatabase {
       return;
     }
     try {
-      await _flushAll(_fileSystem);
+      await flushAll(_fileSystem);
       _unstored = null;
     } catch (e) {
       _unstored = e;
@@ -629,15 +613,23 @@ Future<SqliteOpfsDatabase?> _openOpfs({
     return null;
   }
   try {
-    final JSObject loaded =
-        (await connection.call(
-              'load',
-              JSObject()
-                ..['wasm'] = sqlite3Wasm.toString().toJS
-                ..['path'] = storageName.toJS
-                ..['waitMs'] = handleTimeout.inMilliseconds.toJS,
-            ))!
-            as JSObject;
+    final JSObject loaded;
+    try {
+      loaded =
+          (await connection.call(
+                'load',
+                JSObject()
+                  ..['wasm'] = sqlite3Wasm.toString().toJS
+                  ..['path'] = storageName.toJS
+                  ..['waitMs'] = handleTimeout.inMilliseconds.toJS,
+              ))!
+              as JSObject;
+    } catch (error, stackTrace) {
+      Error.throwWithStackTrace(
+        await explainWasmFailure(sqlite3Wasm, error) ?? error,
+        stackTrace,
+      );
+    }
     if (!(loaded['supported']! as JSBoolean).toDart) {
       connection.terminate();
       return null;

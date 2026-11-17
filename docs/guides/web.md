@@ -180,6 +180,25 @@ final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(
 - The cache holds every document the page read, in clear text, readable by every script of the
   origin. `clearPersistence()` deletes it; call it when a user signs out of a shared computer.
 
+### The `sqlite3` version
+
+Two rules, both checked when the cache opens (`cloud_firestore_dart_sqlite` 0.1.2 and later), both
+failing with a `SqliteWebSetupException` whose message says what to change:
+
+- **`sqlite3.wasm` must be the build of the exact `sqlite3` version in your `pubspec.lock`.** A
+  2.x file with a 3.x package, or the reverse, cannot be loaded (`wasmVersionMismatch`); a missing
+  file, or the page a server sends instead of it, is `wasmMissing`. Pin `sqlite3` in your
+  `pubspec.yaml` so that `pub upgrade` does not move it away from the file you serve.
+- **Not `sqlite3` 3.4.0 to 3.5.2 with the IndexedDB storage** (`unsafeSqlite3`): their IndexedDB
+  file system can lose a write the cache acknowledged when the tab closes a moment later. A
+  Flutter app on Flutter 3.44 resolves 3.5.2 (Flutter pins `meta` 1.18, `sqlite3` 3.6.0 needs
+  1.19): pin `sqlite3: 3.3.4` (or `^2.7.3`) there, `^3.6.0` on an SDK that allows `meta` 1.19, or
+  use OPFS. `sqliteOpener(acceptIndexedDbWriteLoss: true)` opens anyway.
+
+`openWithMemoryFallback` does not hide either error behind a memory cache. The
+[README of `cloud_firestore_dart_sqlite`](../../cloud_firestore/cloud_firestore_dart_sqlite/README.md#which-sqlite3)
+has the table of versions.
+
 [Offline persistence on the web](offline_persistence.md#on-the-web) has the crash safety, and
 [Platforms](platforms.md#the-web-experimental) the full measurements.
 
