@@ -2,10 +2,11 @@
 
 Unofficial, pure-Dart token providers for
 [`cloud_firestore_dart`](https://pub.dev/packages/cloud_firestore_dart) and
-[`firebase_app_dart`](https://pub.dev/packages/firebase_app_dart): what Firestore needs to send
-a token with its requests. For apps whose users sign in with Firebase Auth, and for servers and
-tools that use a service account or Application Default Credentials. It is not affiliated with
-or supported by Google or Firebase.
+[`firebase_app_dart`](https://pub.dev/packages/firebase_app_dart): what Firestore sends with its requests so
+that they run as someone. You need it when your users sign in with Firebase Auth (email and password,
+anonymous, custom token) and their requests must pass your security rules, or when a server or tool uses a
+service account or Application Default Credentials. Without it, requests carry no user, which is enough for
+the emulator and open rules. It is not affiliated with or supported by Google or Firebase.
 
 > **Status: 0.2.1.** Verified with unit tests and against the Firebase
 > emulators only: nothing was run against the real Firebase Auth service or Google's token
