@@ -396,7 +396,8 @@ jobs:
   # The Flutter packages, which the unit jobs skip (they install Dart only): flutter analyze and
   # flutter test of cloud_firestore_dart_flutterfire and cloud_firestore_dart_platform, the
   # platform package's emulator tests included (FIRESTORE_EMULATOR_HOST: 15 of its 29 tests skip
-  # without it), and flutter analyze of examples/flutter_notes. Through tool/test_all.sh, with
+  # without it), flutter analyze of examples/flutter_notes, and flutter analyze and the web builds
+  # (`flutter build web` and `flutter build web --wasm`) of examples/flutter_web_two_users. Through tool/test_all.sh, with
   # TEST_ALL_REQUIRE_FLUTTER=1 so that a missing Flutter fails the job instead of skipping. The
   # emulator is a private one on 8090 (tool/start_private_emulator.sh), as in the web transport
   # job. Required: nothing else checks these packages.
@@ -422,7 +423,7 @@ jobs:
       - uses: ./.github/actions/emulators
       - name: Start a private Firestore emulator
         run: ./tool/start_private_emulator.sh 8090
-      - name: Analyze and test the Flutter packages and the Flutter example
+      - name: Analyze and test the Flutter packages, analyze and build the Flutter examples
         env:
           FIRESTORE_EMULATOR_HOST: 127.0.0.1:8090
           TEST_ALL_REQUIRE_FLUTTER: '1'
@@ -433,7 +434,8 @@ jobs:
           set -o pipefail
           flutter --version
           ./tool/test_all.sh cloud_firestore_dart_flutterfire cloud_firestore_dart_platform \
-            examples/flutter_notes 2>&1 | tee "$RUNNER_TEMP/flutter_summary.txt"
+            examples/flutter_notes examples/flutter_web_two_users 2>&1 \
+            | tee "$RUNNER_TEMP/flutter_summary.txt"
           if ! grep -Eq '^cloud_firestore_dart_platform: .*test PASS \([0-9]+ passed, 0 skipped' \
             "$RUNNER_TEMP/flutter_summary.txt"; then
             echo "::error::Tests of cloud_firestore_dart_platform were skipped: FIRESTORE_EMULATOR_HOST did not reach them."
