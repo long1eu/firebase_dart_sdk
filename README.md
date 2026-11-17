@@ -69,7 +69,7 @@ from 0.1? The 0.2 API took FlutterFire's names: [what changed](docs/api_migratio
 | [`cloud_firestore_dart_sqlite`](cloud_firestore/cloud_firestore_dart_sqlite/) | 0.1.0 | Anyone who wants the offline cache on disk instead of in memory |
 | [`cloud_firestore_dart_platform`](cloud_firestore/cloud_firestore_dart_platform/) | 0.1.0 | Flutter apps written against the official `cloud_firestore` API, on Linux or by choice elsewhere |
 | [`cloud_firestore_dart_flutterfire`](cloud_firestore/cloud_firestore_dart_flutterfire/) | 0.1.0 | Flutter apps that sign in with `firebase_auth` and want `cloud_firestore_dart` to use that user |
-| [`firebase_admin_dart`](firebase_admin/firebase_admin_dart/) | not published | Servers, tools and integration tests that mint custom tokens, manage users or verify ID tokens |
+| [`firebase_admin_dart`](firebase_admin/firebase_admin_dart/) | 0.1.0 | Servers, tools and integration tests that mint custom tokens, manage users or verify ID tokens |
 
 ## How it fits together
 
@@ -198,8 +198,11 @@ the original project and are not part of the migrated, tested set.
 ## Packages
 
 The table at the top lists the packages. `cloud_firestore_dart` was formerly `cloud_firestore_vm` and
-`firebase_app_dart` was `firebase_core_vm`. `firebase_admin_dart` (0.1.0, not published) was checked with unit
-tests and the Auth emulator only, not against a real project. The former internal packages are folded in:
+`firebase_app_dart` was `firebase_core_vm`. `firebase_admin_dart` 0.1.0 is checked with unit
+tests and the Auth emulator; on 2026-11-18 its main path also passed against one real project, keyless
+(Application Default Credentials of a person, custom tokens signed by IAM `signBlob`). Local signing with
+a key file, `findUserByEmail`, `updateUser`, `deleteUsers` and tenants were not run against a real
+project. The former internal packages are folded in:
 `_firebase_database_collection_vm` into `cloud_firestore_dart` (`lib/src/database_collection`) and
 `_firebase_internal_vm` into `firebase_app_dart` (`package:firebase_app_dart/internal.dart`, not public API).
 `cloud_firestore_dart` depends on the hosted `firebase_app_dart`; inside this repository its

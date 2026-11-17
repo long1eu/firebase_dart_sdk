@@ -29,9 +29,10 @@ and dependency constraints that may not resolve next to `cloud_firestore_dart`.
 
 What `firebase_admin_dart` gives in return: pure Dart (VM, Flutter, web), five direct dependencies
 that are already in the graph of the other packages of this repository, names that do not collide
-with `firebase_app_dart` or FlutterFire, and the error codes of the Node Admin SDK. It is younger,
-smaller, and verified only against the emulator: run its production check once against a test
-project.
+with `firebase_app_dart` or FlutterFire, and the error codes of the Node Admin SDK. It is younger and
+smaller. Its main path passed against one real project on 2026-11-18, keyless (see
+[Checking a real project](#checking-a-real-project) for what was and was not run): run its
+production check once against your own test project.
 
 ## The loop
 
@@ -117,7 +118,7 @@ which needs the API enabled and the role Service Account Token Creator on the si
 | --- | --- | --- |
 | Your machine or CI, with a key file | `AdminCredential.serviceAccount(keyJson)` | You read the file; the package never does. Keep the file out of the repository |
 | Cloud Run, Cloud Functions, GKE, Compute Engine | `applicationDefaultCredential()` | No key held; one IAM request per custom token |
-| A person's `gcloud auth application-default login` | `applicationDefaultCredential(serviceAccountEmail: ..., quotaProjectId: ...)` | Signing as a service account needs Token Creator on it |
+| A person's `gcloud auth application-default login` | `applicationDefaultCredential(serviceAccountEmail: ..., quotaProjectId: ...)` | No key held; admin calls run as the person; signing as the service account needs Token Creator on it |
 | The Auth emulator | `FirebaseAdminApp.emulator(...)` | No credential; unsigned tokens, accepted only in this mode |
 
 The service account needs the role Firebase Authentication Admin (`roles/firebaseauth.admin`).
@@ -143,6 +144,25 @@ that binary: never pass the key to `flutter build` of an app you ship, and never
 
 ## Checking a real project
 
-`example/production_check.dart` of the package runs the loop against a real project with a key
-file and the Web API key, and prints `PASS` or `FAIL`. Run it by hand once per project and after an
+`example/production_check.dart` of the package runs the loop against a real project and prints
+`PASS` or `FAIL`. It has two modes: keyless (`ADMIN_CHECK_PROJECT_ID`,
+`ADMIN_CHECK_SERVICE_ACCOUNT` and the Web API key, after `gcloud auth application-default login`)
+and with a key file (`GOOGLE_APPLICATION_CREDENTIALS` and the Web API key). The README of the
+package has the gcloud setup of the keyless mode. Run it by hand once per project and after an
 upgrade; nothing in CI runs it.
+
+On 2026-11-18 the keyless mode passed against one real Firebase project, with the package at
+`main` and `firebase_auth_providers_dart` 0.2.1 as the client: admin calls with a person's
+Application Default Credentials, custom tokens signed by IAM `signBlob` as a service account the
+person may impersonate. All seven steps passed: `createUser`; `createCustomToken` and
+`signInWithCustomToken` (claims whose standard base64 would hold `+` and `/`); the claims in the ID
+token; `verifyIdToken` against Google's keys with `checkRevoked`; `setCustomUserClaims`, `getUser`
+and a refreshed ID token with the claims; `revokeRefreshTokens`, then `id-token-revoked` for the old
+token; `deleteUser`, then `user-not-found`. The first attempt failed at `signBlob` with HTTP 403
+`iam.serviceAccounts.signBlob denied` because the Token Creator role had been granted seconds
+before; it passed 25 seconds later, once IAM had propagated the grant.
+
+Not run against a real project yet: local signing with a key (`AdminCredential.serviceAccount`),
+`findUserByEmail`, `updateUser`, `deleteUsers` batches, tenants, the email lookup of the default
+service account on the metadata server of Google Cloud, and user credentials without a quota
+project. Those rest on unit tests and the Auth emulator.

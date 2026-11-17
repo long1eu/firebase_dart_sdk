@@ -17,12 +17,22 @@ on that date:
   window passed, and so did a disk-cache test across a restart with the emulator stopped. Source: the run
   record in the README of the `flutterfire_on_linux` example, which is not on `main` yet.
 - `firebase_admin_dart` 0.1.0 is on `main` (`firebase_admin/firebase_admin_dart`): Firebase Auth custom
-  tokens, users, custom claims and ID token verification. Not published; checked with unit tests and the Auth
-  emulator only, never against a real project (its README).
+  tokens, users, custom claims and ID token verification. Checked with unit tests and the Auth emulator (its
+  README). See the 2026-11-18 update below for its first run against a real project.
 - 0.2.0 of `cloud_firestore_dart`, `firebase_app_dart` and `firebase_auth_providers_dart` (pub.dev,
   2026-11-16) took FlutterFire's API names (`docs/api_migration_0_2.md`). `cloud_firestore_dart_sqlite`,
   `cloud_firestore_dart_platform` and `cloud_firestore_dart_flutterfire` 0.1.0 were published the same day.
   The examples on `main` use 0.2.
+
+**Updated 2026-11-18** for one fact, from the run record in the README and CHANGELOG of `firebase_admin_dart`:
+
+- `firebase_admin_dart` 0.1.0 passed its production check against one real Firebase project on 2026-11-18,
+  with `firebase_auth_providers_dart` 0.2.1 as the client, keyless: admin calls with the Application Default
+  Credentials of a person, custom tokens signed by the IAM Credentials API (`signBlob`) as a service account.
+  All seven steps passed (create a user, mint a custom token and sign in, claims in the ID token,
+  `verifyIdToken` with `checkRevoked`, custom claims, revocation, delete). Not run against a real project:
+  local signing with a key file, `findUserByEmail`, `updateUser`, `deleteUsers`, tenants, the metadata server
+  of Google Cloud.
 
 ## The answer
 
@@ -146,8 +156,9 @@ Firebase user whose reads and writes are checked by security rules (email/passwo
 `docs/guides/server.md`), and it keeps an offline cache with pending writes that survive a restart. That fits a
 CLI on a laptop, a kiosk or field device, or an agent process that must not hold admin rights. It is the same
 engine as the mobile SDKs, not a server SDK: no bulk writer, no recursive delete, no partitioned queries.
-Updated 2026-11-17: `firebase_admin_dart` (on `main`, not published) adds a small set of Firebase Auth admin
-calls (custom tokens, users, claims, ID token verification); it was checked against the Auth emulator only.
+Updated 2026-11-17: `firebase_admin_dart` 0.1.0 adds a small set of Firebase Auth admin calls (custom tokens,
+users, claims, ID token verification). Updated 2026-11-18: besides the Auth emulator, its main path passed once
+against a real project, keyless (see the update at the top).
 
 **How sure.** High for the current table (read from source and READMEs). Medium on timing of Admin listeners.
 
@@ -174,7 +185,7 @@ queries, and timestamps are not supported in rules
 the rules, not the production SDK. Updated 2026-11-17: code written against the official `cloud_firestore` API
 can run this way too, through `cloud_firestore_dart_platform` 0.1.0 (`CloudFirestoreDart.use()`); that
 package's own tests run `cloud_firestore` 7.1.0 classes under `flutter test` against the emulator. No outside
-app has done it yet. `firebase_admin_dart` (not published) has no Flutter dependency, so an integration test
+app has done it yet. `firebase_admin_dart` 0.1.0 has no Flutter dependency, so an integration test
 can create a user and mint a custom token with it.
 
 **How sure.** High on the facts; medium on the value (demand for test tools is large; the bridge to
@@ -280,7 +291,7 @@ on the Dart VM, but no Flutter app ran a listener in a background isolate.
 | Flutter app on Windows, shipped to users | `cloud_firestore`, "development only", C++ SDK gaps | run on one Windows 11 VM against the emulator; sum, average and the disk cache work | unclear until tested; the official option is not supported in production |
 | Dart server reacting to changes | Admin SDK: no listeners (drafts in progress); polling | listeners with resume and backoff | this library today; may change in months |
 | Dart server or CLI acting as a user under rules, or working offline | none (Admin bypasses rules; `firedart` has no cache, no queries) | yes | this library |
-| Dart server doing admin jobs (bulk writes, user management, recursive delete) | Admin SDK | Firestore: not built for it; `firebase_admin_dart` (unpublished, emulator only): Auth users, custom tokens, ID tokens | Admin SDK |
+| Dart server doing admin jobs (bulk writes, user management, recursive delete) | Admin SDK | Firestore: not built for it; `firebase_admin_dart` 0.1.0 (emulator, and one keyless run against a real project): Auth users, custom tokens, ID tokens | Admin SDK |
 | Listener on a Flutter background isolate | not supported, not planned | runs in any isolate | this library (not tried in Flutter yet) |
 | Testing Firestore code without a device | fake (`fake_cloud_firestore`) or device tests | real client under `dart test` with the emulator; `cloud_firestore` code through `cloud_firestore_dart_platform` | this library, with no outside user of the second path yet |
 | Flutter app on Android or iOS | `cloud_firestore`, Google-supported, native SDKs | works as plain Dart, never run on a device | official |
@@ -301,8 +312,8 @@ on the Dart VM, but no Flutter app ran a listener in a background isolate.
 - Several browser tabs sharing one cache, or secondary isolates sharing listeners: not supported.
 - High load or long running time in production: only a 15-check verification kit ran against a real
   database; the integration suite's real-project mode and long load have not (`docs/parity.md`, limitation 1).
-- Admin work on a server: use `firebase_admin_sdk`. `firebase_admin_dart` here covers only a few Auth calls, is
-  not published and was never run against a real project.
+- Admin work on a server: use `firebase_admin_sdk`. `firebase_admin_dart` here covers only a few Auth calls, and
+  ran against a real project once (2026-11-18, keyless; local key signing and several calls not run).
 - When you need a vendor to call: there is no SLA and no Google support; it is not affiliated with Google.
 
 ## What would make the case stronger
@@ -360,8 +371,8 @@ Ranked by expected effect on adoption.
   or leave it out.
 - "Drop-in replacement for FlutterFire": the platform implementation (published 2026-11-16) covers
   `cloud_firestore` and `firebase_core` only, has its own differences, and has run in one app.
-- (Added 2026-11-17) Anything about `firebase_admin_dart` beyond "unpublished, checked against the Auth
-  emulator".
+- (Added 2026-11-17, updated 2026-11-18) Anything about `firebase_admin_dart` beyond "checked against the
+  Auth emulator, and its main path once against one real project, keyless".
 
 ## Demand signals (pub.dev API and GitHub, 2026-11-16)
 
