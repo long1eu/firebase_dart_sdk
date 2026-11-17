@@ -14,6 +14,17 @@
   **Breaking** for a `switch` over `ActionCodeOperation` without a default: add a case for `unknown` (FlutterFire's
   `ActionCodeInfoOperation` has the same value). `ActionCodeInfo.multiFactorInfo` is the factor of
   `revertSecondFactorAddition`, which now requires it, like the JS SDK.
+- The full user record, like FlutterFire's `User`: `AuthUser.providerData` (a list of the new `UserInfo`),
+  `metadata` (the new `UserMetadata`: creation and last sign-in time), `phoneNumber`, `tenantId`, and `photoURL`
+  (the FlutterFire name of `photoUrl`). Like the JS SDK, every sign-in now reads the account (`accounts:lookup`)
+  before it completes, so a sign-in makes two requests; a sign-in whose account cannot be read fails and signs
+  nobody in. `reload` reads the same fields.
+- The sign-in methods and `reauthenticateWithEmailAndPassword` return a `UserCredential` (FlutterFire's name), which
+  is also the `AuthUser` they returned before: `user` and the new `additionalUserInfo` (`AdditionalUserInfo`:
+  `isNewUser`, `providerId`, `profile`, `username`). Code that reads the result as an `AuthUser` is unchanged;
+  **breaking** only for classes that implement or mock `FirebaseUserAuth` and return an `AuthUser` from these methods.
+- The stored session has a version (2) and the whole record. Sessions stored by 0.1 and 0.2 are still restored;
+  their user lacks the new fields until `reload`.
 
 ## 0.2.1
 

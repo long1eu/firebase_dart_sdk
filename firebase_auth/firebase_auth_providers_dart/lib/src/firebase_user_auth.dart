@@ -10,6 +10,7 @@ import 'action_code.dart';
 import 'auth_exception.dart';
 import 'auth_storage.dart';
 import 'auth_user.dart';
+import 'user_record.dart';
 import 'environment_stub.dart' if (dart.library.io) 'environment_io.dart';
 
 /// Firebase Auth user sign-in over the Identity Toolkit and Secure Token REST APIs: anonymous, email and password,
@@ -337,7 +338,8 @@ class FirebaseUserAuth implements AuthTokenProvider {
   /// Loads the session that an earlier instance stored. The ID token is fetched when it is first needed.
   ///
   /// Does nothing when a user is already signed in or nothing is stored; a stored value that this class did not
-  /// write is ignored. It does not check the session with the backend: a session that ended there signs the user
+  /// write is ignored. Sessions stored by 0.1 and 0.2 are read too; their user has empty [AuthUser.providerData]
+  /// and [AuthUser.metadata] until [reload]. It does not check the session with the backend: a session that ended there signs the user
   /// out at the first token refresh. [userChanges] does not emit for a restored user. Throws whatever the `read` of
   /// the storage throws.
   Future<void> restore() async {
@@ -345,35 +347,19 @@ class FirebaseUserAuth implements AuthTokenProvider {
     if (stored == null || _session != null) {
       return;
     }
-    try {
-      final Object? json = jsonDecode(stored);
-      if (json is Map<String, Object?> &&
-          json['refreshToken'] is String &&
-          json['uid'] is String) {
-        await _setSession(
-          _Session(
-            AuthUser(
-              uid: json['uid']! as String,
-              email: json['email'] is String ? json['email']! as String : null,
-              isAnonymous: json['isAnonymous'] == true,
-              emailVerified: json['emailVerified'] == true,
-              displayName: json['displayName'] is String
-                  ? json['displayName']! as String
-                  : null,
-              photoUrl: json['photoUrl'] is String
-                  ? json['photoUrl']! as String
-                  : null,
-            ),
-            json['refreshToken']! as String,
-            null,
-            null,
-          ),
-          persist: false,
-        );
-      }
-    } on FormatException {
+    // Any version of the stored format: a session stored by 0.2 has no provider data, metadata, phone number or
+    // tenant until the first reload.
+    final ({AuthUser user, String refreshToken})? decoded = decodeSession(
+      stored,
+    );
+    if (decoded == null) {
       // Not something this class wrote: start signed out.
+      return;
     }
+    await _setSession(
+      _Session(decoded.user, decoded.refreshToken, null, null),
+      persist: false,
+    );
   }
 
   /// Signs in a new anonymous user, a new account every time (`signInAnonymously`).
@@ -381,7 +367,7 @@ class FirebaseUserAuth implements AuthTokenProvider {
   /// Throws a [FirebaseAuthException] with the code `operation-not-allowed` (anonymous sign-in is not
   /// enabled for the project), `admin-restricted-operation`, `cancelled` (overtaken by another sign-in or a
   /// sign-out), ...
-  Future<AuthUser> signInAnonymously() =>
+  Future<UserCredential> signInAnonymously() =>
       _signIn('accounts:signUp', <String, Object?>{'returnSecureToken': true});
 
   /// Signs in with an email address and a password (`signInWithEmailAndPassword`).
@@ -390,7 +376,7 @@ class FirebaseUserAuth implements AuthTokenProvider {
   /// `invalid-credential` (projects with email enumeration protection), `invalid-email`, `user-disabled`,
   /// `operation-not-allowed` (email sign-in is not enabled), `too-many-requests`, `cancelled`, ...; and a
   /// [FirebaseAuthMultiFactorException] (`multi-factor-auth-required`) when the account has a second factor.
-  Future<AuthUser> signInWithEmailAndPassword({
+  Future<UserCredential> signInWithEmailAndPassword({
     required String email,
     required String password,
   }) => _signIn('accounts:signInWithPassword', <String, Object?>{
@@ -405,7 +391,7 @@ class FirebaseUserAuth implements AuthTokenProvider {
   ///
   /// Throws a [FirebaseAuthException] with the code `email-already-in-use`, `weak-password`,
   /// `invalid-email`, `missing-password`, `operation-not-allowed`, `cancelled`, ...
-  Future<AuthUser> createUserWithEmailAndPassword({
+  Future<UserCredential> createUserWithEmailAndPassword({
     required String email,
     required String password,
   }) => _signIn('accounts:signUp', <String, Object?>{
@@ -421,7 +407,7 @@ class FirebaseUserAuth implements AuthTokenProvider {
   /// Throws a [FirebaseAuthException] with the code `invalid-custom-token`, `custom-token-mismatch` (a
   /// token for another project), `user-disabled`, `cancelled`, ...; and a [FirebaseAuthMultiFactorException]
   /// (`multi-factor-auth-required`) if the backend asks for a second factor.
-  Future<AuthUser> signInWithCustomToken(String token) => _signIn(
+  Future<UserCredential> signInWithCustomToken(String token) => _signIn(
     'accounts:signInWithCustomToken',
     <String, Object?>{'token': token, 'returnSecureToken': true},
   );
@@ -645,13 +631,12 @@ class FirebaseUserAuth implements AuthTokenProvider {
       await _updateSession(
         response,
         generation,
-        user: AuthUser(
-          uid: user.uid,
-          email: user.email,
-          isAnonymous: user.isAnonymous,
-          emailVerified: user.emailVerified,
+        user: copyUser(
+          user,
           displayName: newName is String && newName.isNotEmpty ? newName : null,
+          clearDisplayName: newName is! String || newName.isEmpty,
           photoUrl: newPhoto is String && newPhoto.isNotEmpty ? newPhoto : null,
+          clearPhotoUrl: newPhoto is! String || newPhoto.isEmpty,
         ),
       );
     });
@@ -664,7 +649,7 @@ class FirebaseUserAuth implements AuthTokenProvider {
   /// Throws `user-mismatch` when the credentials are those of another account (or of none), `wrong-password`,
   /// `invalid-credential`, ...; and a [FirebaseAuthMultiFactorException] (`multi-factor-auth-required`) when the
   /// account has a second factor (the signed-in user stays signed in).
-  Future<AuthUser> reauthenticateWithEmailAndPassword({
+  Future<UserCredential> reauthenticateWithEmailAndPassword({
     required String email,
     required String password,
   }) async {
@@ -708,7 +693,10 @@ class FirebaseUserAuth implements AuthTokenProvider {
     }
     await _updateSession(response, generation);
     await _reload(generation);
-    return _session?.user ?? session.user;
+    return UserCredential(
+      _session?.user ?? session.user,
+      additionalUserInfo: additionalUserInfoOf(response),
+    );
   }
 
   /// Reads the data of the signed-in user from the backend again (`reload`): email address, verification, display
@@ -861,6 +849,20 @@ class FirebaseUserAuth implements AuthTokenProvider {
       return;
     }
     final String idToken = (await getAccessToken(forceRefresh: false)).token;
+    final Map<String, Object?> account = await _lookup(idToken);
+    final AuthUser? user = _session?.user;
+    if (user == null || generation != _generation) {
+      return;
+    }
+    await _updateSession(
+      const <String, Object?>{},
+      generation,
+      user: userFromAccount(account, user),
+    );
+  }
+
+  /// The account of [idToken] (`accounts:lookup`).
+  Future<Map<String, Object?>> _lookup(String idToken) async {
     final Map<String, Object?> response = await _send(
       _identityToolkit('accounts:lookup'),
       json: <String, Object?>{'idToken': idToken},
@@ -876,32 +878,7 @@ class FirebaseUserAuth implements AuthTokenProvider {
         message: 'The authentication service returned no account.',
       );
     }
-    final AuthUser? user = _session?.user;
-    if (user == null || generation != _generation) {
-      return;
-    }
-    String? text(Object? value) =>
-        value is String && value.isNotEmpty ? value : null;
-    final String? email = text(account['email']);
-    final Object? providers = account['providerUserInfo'];
-    // Like the JS SDK: a user stays anonymous until the account has an email address and a password, or a
-    // provider; a user that was not anonymous never becomes anonymous.
-    final bool isAnonymous =
-        user.isAnonymous &&
-        !(email != null && account['passwordHash'] != null) &&
-        !(providers is List && providers.isNotEmpty);
-    await _updateSession(
-      const <String, Object?>{},
-      generation,
-      user: AuthUser(
-        uid: user.uid,
-        email: email,
-        isAnonymous: isAnonymous,
-        emailVerified: account['emailVerified'] == true,
-        displayName: text(account['displayName']),
-        photoUrl: text(account['photoUrl']),
-      ),
-    );
+    return account;
   }
 
   bool _isFresh(_Session session) {
@@ -1042,13 +1019,31 @@ class FirebaseUserAuth implements AuthTokenProvider {
     );
   }
 
-  Future<AuthUser> _signIn(String method, Map<String, Object?> request) async {
+  Future<UserCredential> _signIn(
+    String method,
+    Map<String, Object?> request,
+  ) async {
     _checkNotDisposed();
     final int generation = ++_generation;
     final Map<String, Object?> response = await _send(
       _identityToolkit(method),
       json: request,
     );
+    return _completeSignIn(response, generation);
+  }
+
+  static const FirebaseAuthException _overtaken = FirebaseAuthException(
+    code: 'cancelled',
+    message: 'The sign-in was overtaken by another sign-in or a sign-out.',
+  );
+
+  /// Makes the user of a sign-in [response] the current user, like `UserCredentialImpl._fromIdTokenResponse` and
+  /// `_updateCurrentUser` of the JS SDK: the account is read (`accounts:lookup`) first, so that the user is
+  /// complete when it is announced.
+  Future<UserCredential> _completeSignIn(
+    Map<String, Object?> response,
+    int generation,
+  ) async {
     _throwIfSecondFactorRequired(response);
     final Object? idToken = response['idToken'];
     final Object? refreshToken = response['refreshToken'];
@@ -1060,10 +1055,7 @@ class FirebaseUserAuth implements AuthTokenProvider {
     }
     if (generation != _generation) {
       // Another sign-in or a sign-out happened meanwhile and wins.
-      throw const FirebaseAuthException(
-        code: 'cancelled',
-        message: 'The sign-in was overtaken by another sign-in or a sign-out.',
-      );
+      throw _overtaken;
     }
     final GetTokenResult token = GetTokenResult(idToken);
     final Object? localId = response['localId'];
@@ -1077,21 +1069,16 @@ class FirebaseUserAuth implements AuthTokenProvider {
             'The authentication service did not return the id of the user.',
       );
     }
-    final Object? email = response['email'] ?? token.claims['email'];
-    final Object? displayName = response['displayName'] ?? token.claims['name'];
-    final Object? photoUrl =
-        response['profilePicture'] ?? token.claims['picture'];
+    final Map<String, Object?> account = await _lookup(idToken);
+    if (generation != _generation) {
+      throw _overtaken;
+    }
+    final AuthUser user = userFromAccount(
+      account,
+      AuthUser(uid: uid, isAnonymous: token.signInProvider == 'anonymous'),
+    );
     final _Session session = _Session(
-      AuthUser(
-        uid: uid,
-        email: email is String && email.isNotEmpty ? email : null,
-        isAnonymous: token.signInProvider == 'anonymous',
-        emailVerified: token.claims['email_verified'] == true,
-        displayName: displayName is String && displayName.isNotEmpty
-            ? displayName
-            : null,
-        photoUrl: photoUrl is String && photoUrl.isNotEmpty ? photoUrl : null,
-      ),
+      user,
       refreshToken,
       idToken,
       _expiry(token, response['expiresIn']),
@@ -1100,7 +1087,10 @@ class FirebaseUserAuth implements AuthTokenProvider {
     _userChanges.add(session.user);
     _tokenChanges.add(AuthTokenChange(idToken));
     await _letListenersReact();
-    return session.user;
+    return UserCredential(
+      session.user,
+      additionalUserInfo: additionalUserInfoOf(response),
+    );
   }
 
   /// Like `_performSignInRequest` of the JS SDK: a sign-in answer with an `mfaPendingCredential` (and no tokens)
@@ -1184,15 +1174,7 @@ class FirebaseUserAuth implements AuthTokenProvider {
     if (persist) {
       await _storage.write(
         _storageKey,
-        jsonEncode(<String, Object?>{
-          'uid': session.user.uid,
-          'email': session.user.email,
-          'isAnonymous': session.user.isAnonymous,
-          'emailVerified': session.user.emailVerified,
-          'displayName': session.user.displayName,
-          'photoUrl': session.user.photoUrl,
-          'refreshToken': session.refreshToken,
-        }),
+        encodeSession(session.user, session.refreshToken),
       );
     }
     if (_tokenChanges.hasListener) {

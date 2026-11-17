@@ -47,6 +47,35 @@ void main() {
     );
   }
 
+  /// The accounts that `accounts:lookup` of [backend] knows beyond what the ID token says, by uid.
+  late Map<String, Map<String, Object?>> accounts;
+
+  /// The answer of `accounts:lookup` for the ID token in [body]: the uid and email of the token, the fields of
+  /// [accounts], and a password provider for an account with an email address.
+  http.Response lookupAnswer(Map<String, Object?> body) {
+    final GetTokenResult token = GetTokenResult(body['idToken']! as String);
+    final String uid = token.claims['sub'] as String;
+    final String? email = token.claims['email'] as String?;
+    return json(<String, Object?>{
+      'users': <Object?>[
+        <String, Object?>{
+          'localId': uid,
+          'email': ?email,
+          if (email != null) 'passwordHash': 'hash',
+          if (email != null)
+            'providerUserInfo': <Object?>[
+              <String, Object?>{
+                'providerId': 'password',
+                'rawId': email,
+                'email': email,
+              },
+            ],
+          ...?accounts[uid],
+        },
+      ],
+    });
+  }
+
   /// The backend: sign-in answers for the user in the request, the token endpoint answers with a new ID token.
   Future<http.Response> backend(http.Request request) async {
     if (request.url.path.endsWith('/token')) {
@@ -66,6 +95,9 @@ void main() {
     }
     final Map<String, Object?> body =
         jsonDecode(request.body) as Map<String, Object?>;
+    if (request.url.path.endsWith('accounts:lookup')) {
+      return lookupAnswer(body);
+    }
     final String? email = body['email'] as String?;
     final bool custom = request.url.path.endsWith(':signInWithCustomToken');
     final String uid = custom
@@ -93,6 +125,7 @@ void main() {
   }
 
   setUp(() {
+    accounts = <String, Map<String, Object?>>{};
     clock = FakeClock();
     timers = FakeTimers();
     storage = InMemoryAuthStorage();
@@ -108,7 +141,16 @@ void main() {
     test('anonymous sign-in', () async {
       final AuthUser user = await auth.signInAnonymously();
       expect(user, const AuthUser(uid: 'anon-user', isAnonymous: true));
-      final http.Request request = requests.single;
+      // Like the JS SDK, the account is read right after the sign-in.
+      expect(requests, hasLength(2));
+      expect(
+        requests.last.url.toString(),
+        'https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=$apiKey',
+      );
+      expect(jsonDecode(requests.last.body), <String, Object?>{
+        'idToken': (await auth.getAccessToken(forceRefresh: false)).token,
+      });
+      final http.Request request = requests.first;
       expect(request.method, 'POST');
       expect(
         request.url.toString(),
@@ -127,13 +169,23 @@ void main() {
       );
       expect(
         user,
-        const AuthUser(uid: 'uid-of-a@example.com', email: 'a@example.com'),
+        const AuthUser(
+          uid: 'uid-of-a@example.com',
+          email: 'a@example.com',
+          providerData: <UserInfo>[
+            UserInfo(
+              providerId: 'password',
+              uid: 'a@example.com',
+              email: 'a@example.com',
+            ),
+          ],
+        ),
       );
       expect(
-        requests.single.url.toString(),
+        requests.first.url.toString(),
         'https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=$apiKey',
       );
-      expect(jsonDecode(requests.single.body), <String, Object?>{
+      expect(jsonDecode(requests.first.body), <String, Object?>{
         'email': 'a@example.com',
         'password': 'secret',
         'returnSecureToken': true,
@@ -144,8 +196,8 @@ void main() {
         email: 'b@example.com',
         password: 'secret2',
       );
-      expect(requests.single.url.path, '/v1/accounts:signUp');
-      expect(jsonDecode(requests.single.body), <String, Object?>{
+      expect(requests.first.url.path, '/v1/accounts:signUp');
+      expect(jsonDecode(requests.first.body), <String, Object?>{
         'email': 'b@example.com',
         'password': 'secret2',
         'returnSecureToken': true,
@@ -159,8 +211,8 @@ void main() {
       );
       expect(user.uid, 'custom-user');
       expect(user.isAnonymous, isFalse);
-      expect(requests.single.url.path, '/v1/accounts:signInWithCustomToken');
-      expect(jsonDecode(requests.single.body), <String, Object?>{
+      expect(requests.first.url.path, '/v1/accounts:signInWithCustomToken');
+      expect(jsonDecode(requests.first.body), <String, Object?>{
         'token': 'minted.by.server',
         'returnSecureToken': true,
       });
@@ -192,6 +244,7 @@ void main() {
       await auth.getAccessToken(forceRefresh: true);
       expect(requests.map((http.Request r) => r.url.toString()), <String>[
         'http://127.0.0.1:9099/identitytoolkit.googleapis.com/v1/accounts:signUp?key=$apiKey',
+        'http://127.0.0.1:9099/identitytoolkit.googleapis.com/v1/accounts:lookup?key=$apiKey',
         'http://127.0.0.1:9099/securetoken.googleapis.com/v1/token?key=$apiKey',
       ]);
     });
@@ -211,7 +264,7 @@ void main() {
           auth = create(emulatorHost: given);
           await auth.signInAnonymously();
           expect(
-            requests.single.url.toString(),
+            requests.first.url.toString(),
             '$origin/identitytoolkit.googleapis.com/v1/accounts:signUp?key=$apiKey',
             reason: given,
           );
@@ -974,7 +1027,16 @@ void main() {
     ) {
       handler = (http.Request request) async {
         final String method = request.url.pathSegments.last;
-        if (method.startsWith('accounts:sign') || method == 'token') {
+        // A sign-in reads the account right after (accounts:lookup).
+        final bool afterSignIn =
+            method == 'accounts:lookup' &&
+            requests.length > 1 &&
+            requests[requests.length - 2].url.pathSegments.last.startsWith(
+              'accounts:sign',
+            );
+        if (method.startsWith('accounts:sign') ||
+            method == 'token' ||
+            afterSignIn) {
           return backend(request);
         }
         return answer(method, jsonDecode(request.body) as Map<String, Object?>);
@@ -1277,6 +1339,13 @@ void main() {
           email: 'a@example.com',
           displayName: 'Ada',
           photoUrl: 'https://example.com/a.png',
+          providerData: <UserInfo>[
+            UserInfo(
+              providerId: 'password',
+              uid: 'a@example.com',
+              email: 'a@example.com',
+            ),
+          ],
         ),
       );
     });
@@ -1293,12 +1362,27 @@ void main() {
           password: 'secret',
         );
         expect(jsonDecode(storage.read(key)!), <String, Object?>{
+          'version': 2,
           'uid': 'uid-of-a@example.com',
           'email': 'a@example.com',
           'isAnonymous': false,
           'emailVerified': false,
           'displayName': null,
           'photoUrl': null,
+          'phoneNumber': null,
+          'tenantId': null,
+          'createdAt': null,
+          'lastLoginAt': null,
+          'providerData': <Object?>[
+            <String, Object?>{
+              'providerId': 'password',
+              'rawId': 'a@example.com',
+              'email': 'a@example.com',
+              'displayName': null,
+              'photoUrl': null,
+              'phoneNumber': null,
+            },
+          ],
           'refreshToken': 'refresh:uid-of-a@example.com',
         });
         await auth.signOut();
@@ -1551,7 +1635,7 @@ void main() {
       addTearDown(auth.dispose);
       await auth.signInAnonymously();
       await auth.getAccessToken(forceRefresh: true);
-      expect(requests, hasLength(2));
+      expect(requests, hasLength(3));
       for (final http.Request request in requests) {
         expect(request.headers['X-Firebase-gmpid'], '1:1:web:1');
         expect(request.headers['X-Firebase-AppCheck'], 'app-check-token');
@@ -1585,7 +1669,7 @@ void main() {
       final FirebaseUserAuth auth = withAppCheck(null);
       await auth.signInAnonymously();
       await auth.getAccessToken(forceRefresh: true);
-      expect(requests, hasLength(2));
+      expect(requests, hasLength(3));
       for (final http.Request request in requests) {
         expect(
           request.headers['X-Client-Version'],
@@ -1600,15 +1684,19 @@ void main() {
       );
       expect(
         requests[1].headers['content-type'],
+        startsWith('application/json'),
+      );
+      expect(
+        requests[2].headers['content-type'],
         startsWith('application/x-www-form-urlencoded'),
       );
     });
 
     test('no app id: no X-Firebase-gmpid', () async {
       await auth.signInAnonymously();
-      expect(requests.single.headers.containsKey('X-Firebase-gmpid'), isFalse);
+      expect(requests.first.headers.containsKey('X-Firebase-gmpid'), isFalse);
       expect(
-        requests.single.headers['X-Client-Version'],
+        requests.first.headers['X-Client-Version'],
         FirebaseUserAuth.clientVersion,
       );
     });
@@ -1636,11 +1724,15 @@ void main() {
                 printed.add(line),
           ),
         );
-        expect(requests, hasLength(2));
+        // Two requests each: the sign-in and the account lookup.
+        expect(requests, hasLength(4));
         expect(requests[0].headers['X-Firebase-AppCheck'], 'placeholder');
-        expect(requests[1].headers.containsKey('X-Firebase-AppCheck'), isFalse);
+        expect(requests[1].headers['X-Firebase-AppCheck'], 'placeholder');
+        expect(requests[2].headers.containsKey('X-Firebase-AppCheck'), isFalse);
         expect(printed, <Matcher>[
           contains('attestation failed'),
+          contains('attestation failed'),
+          contains('no provider'),
           contains('no provider'),
         ]);
       },
