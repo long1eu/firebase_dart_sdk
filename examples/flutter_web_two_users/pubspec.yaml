@@ -1,0 +1,34 @@
+name: flutter_web_two_users
+description: >-
+  A Flutter web page with two signed-in users side by side, each with its own
+  FirebaseApp and Firestore client, against the Auth and Firestore emulators:
+  each sees the other's writes, the security rules tell them apart, and a
+  SQLite cache brings the document back before the network after a reload.
+publish_to: none
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.8.0
+
+dependencies:
+  cloud_firestore_dart: ^0.2.0
+  # The SQLite cache in IndexedDB.
+  cloud_firestore_dart_sqlite: ^0.1.1
+  firebase_app_dart: ^0.2.0
+  # Email and password sign-in against the Auth emulator.
+  firebase_auth_providers_dart: ^0.2.1
+  flutter:
+    sdk: flutter
+  # Pinned: Flutter 3.44 would resolve sqlite3 3.5.2, whose IndexedDB file
+  # system can lose acknowledged writes (cloud_firestore_dart_sqlite 0.1.2
+  # refuses it in a browser). 3.3.4 is safe, is the newest that Flutter 3.44
+  # resolves below 3.4.0, and sqlite3.wasm next to the page must be its build
+  # (run.sh fetches it). With a Flutter that allows meta 1.19: ^3.6.0.
+  sqlite3: 3.3.4
+  web: ^1.1.0
+
+dev_dependencies:
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
