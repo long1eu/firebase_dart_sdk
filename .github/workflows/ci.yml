@@ -408,9 +408,13 @@ jobs:
       - name: Set the emulator work directory
         # The `runner` context is not available in job-level `env`.
         run: echo "EMULATOR_DIR=$RUNNER_TEMP/emulator" >> "$GITHUB_ENV"
+      # A pinned version, not the newest stable: Flutter 3.50 deprecates
+      # `package:flutter/material.dart` in favour of `package:material_ui`, which the examples
+      # do not use yet, and the job treats analyzer infos as failures.
       - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
         with:
           channel: stable
+          flutter-version: 3.44.9
           cache: true
       - uses: ./.github/actions/emulators
       - name: Start a private Firestore emulator
