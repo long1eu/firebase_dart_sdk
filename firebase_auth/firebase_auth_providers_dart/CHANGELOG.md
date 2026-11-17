@@ -1,4 +1,4 @@
-## 0.2.1 (unreleased)
+## 0.2.1
 
 - Fix: signing in (`signInWithEmailAndPassword`, `signInWithCustomToken`) or reauthenticating
   (`reauthenticateWithEmailAndPassword`) with an account that has a second factor threw
