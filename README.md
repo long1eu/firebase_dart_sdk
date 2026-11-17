@@ -24,7 +24,9 @@ endorsed by Google or Firebase.
 
 - FlutterFire already works for you on Android, iOS or the web: Google's SDKs come with support and years of
   production use. This client was checked against a real database only by a 15-check kit.
-- You ship a Windows app: it has never been run on Windows.
+- You ship a Windows app and cannot test it yourself first: it was run on one Windows 11 VM against the
+  emulator only (the Dart VM suites and two Flutter debug apps, no window drawn), not in CI, not in a
+  release build and not against production.
 - You need federated, phone or email-link sign-in, multi-factor, Storage, Messaging or the other Firebase
   services, or admin jobs such as bulk writes and recursive deletes (use `firebase_admin_sdk`).
 - You need a vendor to call: one person maintains it, with no SLA.
@@ -163,8 +165,11 @@ yet.]_
 - Platforms: the Dart VM on macOS and Linux (CI on Ubuntu x64, a Debian arm64 container). In
   Flutter: an app with this client was built and run on macOS, and an app on the official
   `cloud_firestore` API with `cloud_firestore_dart_platform` on Debian 13 x86_64, both against
-  the emulator only. Never run: Windows, Android or iOS (devices or emulators), embedded Linux,
-  a Linux release build.
+  the emulator only. On Windows 11 x64 (one VM, against the emulator): the unit and standard
+  integration suites on the Dart VM, and two Flutter debug apps (`flutter_notes`, and
+  `flutterfire_on_windows` on the official `cloud_firestore` API), driven from an SSH session
+  without a drawn window. Never run: Android or iOS (devices or emulators), embedded Linux, a
+  Linux or Windows release build, Windows in CI.
 - `cloud_firestore_dart` 0.0.1 on pub.dev (2020) is an early release of the same package. The
   packages replace the ones published as `cloud_firestore_vm` and `firebase_core_vm` (and the
   internal `_firebase_internal_vm` and `_firebase_database_collection_vm`, now folded in). See
