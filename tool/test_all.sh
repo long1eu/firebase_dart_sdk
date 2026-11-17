@@ -2,12 +2,17 @@
 # Runs pub get, analyze (lib) and tests for the packages of the revival.
 # cloud_firestore_dart runs only test/unit (integration needs a live backend).
 # The example programs in examples/ are analyzed only (their tests need an emulator); select
-# them alone with the name "examples".
+# them alone with the name "examples", or one with "examples/<name>".
+# The Flutter packages (cloud_firestore_dart_flutterfire, cloud_firestore_dart_platform) and the
+# Flutter examples need the Flutter SDK and are skipped without it; the CI job "flutter" runs
+# them (with FIRESTORE_EMULATOR_HOST set, so that the emulator tests of the platform package run).
 # Exits non-zero if any step of any package fails.
 # Usage: tool/test_all.sh [package-name ...]
 #
 # Environment:
 #   TEST_LOG_DIR  where the outputs of pub get, analyze and test go (default: a new temp dir)
+#   TEST_ALL_REQUIRE_FLUTTER=1  a selected Flutter package or example fails instead of being
+#                 skipped when `flutter` is not on the PATH (for the CI job that installs it)
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 
@@ -21,6 +26,26 @@ PACKAGES=(
 
 summary=()
 failed=0
+
+# flutter_skipped <name>: records a Flutter package or example that cannot run here.
+flutter_skipped() {
+  if [ "${TEST_ALL_REQUIRE_FLUTTER:-}" = 1 ]; then
+    summary+=("$1: FAIL (flutter is not on the PATH)"); failed=1
+  else
+    summary+=("$1: skipped (needs the Flutter SDK)")
+  fi
+}
+
+# test_counts <log>: "N passed, N skipped, N failed" from the last progress line of a
+# `dart test` or `flutter test` run.
+test_counts() {
+  local last p s f
+  last=$(tr '\r' '\n' <"$1" | grep -E "^[0-9:]+ \+[0-9]+" | tail -1)
+  p=$(echo "$last" | sed -nE 's/^[0-9:]+ \+([0-9]+).*/\1/p'); p=${p:-0}
+  s=$(echo "$last" | sed -nE 's/^[0-9:]+ \+[0-9]+ ~([0-9]+).*/\1/p'); s=${s:-0}
+  f=$(echo "$last" | sed -nE 's/^[0-9:]+ \+[0-9]+( ~[0-9]+)? -([0-9]+).*/\2/p'); f=${f:-0}
+  echo "$p passed, $s skipped, $f failed"
+}
 LOG="${TEST_LOG_DIR:-$(mktemp -d)}"
 mkdir -p "$LOG" || exit 2
 
@@ -62,65 +87,55 @@ for entry in "${PACKAGES[@]}"; do
   summary+=("$name: pub get $pub | analyze $analyze | test $tests")
 done
 
-if [ $# -eq 0 ] || printf '%s\n' "$@" | grep -qx "examples"; then
-  for pubspec in "$ROOT"/examples/*/pubspec.yaml; do
-    [ -f "$pubspec" ] || continue
-    dir="$(dirname "$pubspec")"
-    name="examples/$(basename "$dir")"
-    log="$LOG/examples_$(basename "$dir")"
-    echo "=== $name ==="
-    # A Flutter example resolves only with the Flutter SDK, which CI does not install.
-    if grep -qE '^\s*sdk:\s*flutter\s*$' "$pubspec" && ! command -v flutter >/dev/null 2>&1; then
-      summary+=("$name: skipped (needs the Flutter SDK)")
-      continue
-    fi
-    pub=PASS analyze=PASS
-    (cd "$dir" && dart pub get >"$log.pub" 2>&1) || { pub=FAIL; tail -5 "$log.pub"; }
-    (cd "$dir" && dart analyze >"$log.an" 2>&1)
-    if grep -qE "^\s*(error|warning|info) -" "$log.an"; then
-      analyze="FAIL ($(grep -cE '^\s*(error|warning|info) -' "$log.an") issues)"
-      grep -E "^\s*(error|warning|info) -" "$log.an" | head -10
-    elif ! grep -q "No issues found" "$log.an"; then
-      analyze="FAIL (analyzer crashed)"
-    fi
-    case "$pub$analyze" in *FAIL*) failed=1;; esac
-    summary+=("$name: pub get $pub | analyze $analyze | test not run (needs an emulator)")
-  done
-fi
-
-if [ $# -eq 0 ] || printf '%s\n' "$@" | grep -qx "cloud_firestore_dart_flutterfire"; then
-  name=cloud_firestore_dart_flutterfire
-  dir="$ROOT/cloud_firestore/cloud_firestore_dart_flutterfire"
+for pubspec in "$ROOT"/examples/*/pubspec.yaml; do
+  [ -f "$pubspec" ] || continue
+  dir="$(dirname "$pubspec")"
+  name="examples/$(basename "$dir")"
+  if [ $# -gt 0 ] && ! printf '%s\n' "$@" | grep -qxE "examples|$name"; then continue; fi
+  log="$LOG/examples_$(basename "$dir")"
   echo "=== $name ==="
-  # A Flutter package: `dart test` cannot load flutter_test, and CI installs Dart only.
-  if ! command -v flutter >/dev/null 2>&1; then
-    summary+=("$name: skipped (needs the Flutter SDK)")
-  else
-    pub=PASS analyze=PASS tests=PASS
-    (cd "$dir" && flutter pub get >"$LOG/$name.pub" 2>&1) || { pub=FAIL; tail -5 "$LOG/$name.pub"; }
-    (cd "$dir" && flutter analyze >"$LOG/$name.an" 2>&1) || { analyze=FAIL; tail -10 "$LOG/$name.an"; }
-    (cd "$dir" && flutter test >"$LOG/$name.test" 2>&1) || { tests=FAIL; tail -20 "$LOG/$name.test"; }
-    case "$pub$analyze$tests" in *FAIL*) failed=1;; esac
-    summary+=("$name: pub get $pub | analyze $analyze | test $tests")
+  tool=dart
+  if grep -qE '^\s*sdk:\s*flutter\s*$' "$pubspec"; then
+    # A Flutter example resolves only with the Flutter SDK.
+    if ! command -v flutter >/dev/null 2>&1; then flutter_skipped "$name"; continue; fi
+    tool=flutter
   fi
-fi
+  pub=PASS analyze=PASS
+  (cd "$dir" && $tool pub get >"$log.pub" 2>&1) || { pub=FAIL; tail -5 "$log.pub"; }
+  # `flutter analyze` prints its issues as "info • ..." and exits non-zero on any issue.
+  (cd "$dir" && $tool analyze >"$log.an" 2>&1)
+  rc=$?
+  if grep -qE "^\s*(error|warning|info) (-|•)" "$log.an"; then
+    analyze="FAIL ($(grep -cE '^\s*(error|warning|info) (-|•)' "$log.an") issues)"
+    grep -E "^\s*(error|warning|info) (-|•)" "$log.an" | head -10
+  elif [ $rc -ne 0 ] || ! grep -q "No issues found" "$log.an"; then
+    analyze="FAIL (analyzer crashed)"; tail -10 "$log.an"
+  fi
+  case "$pub$analyze" in *FAIL*) failed=1;; esac
+  summary+=("$name: pub get $pub | analyze $analyze | test not run (needs an emulator)")
+done
 
-if [ $# -eq 0 ] || printf '%s\n' "$@" | grep -qx "cloud_firestore_dart_platform"; then
-  name=cloud_firestore_dart_platform
-  dir="$ROOT/cloud_firestore/cloud_firestore_dart_platform"
+# The Flutter packages: `dart test` cannot load flutter_test. The emulator tests of
+# cloud_firestore_dart_platform run only when FIRESTORE_EMULATOR_HOST is set.
+for entry in "cloud_firestore_dart_flutterfire|cloud_firestore/cloud_firestore_dart_flutterfire" \
+  "cloud_firestore_dart_platform|cloud_firestore/cloud_firestore_dart_platform"; do
+  IFS='|' read -r name dir <<<"$entry"
+  if [ $# -gt 0 ] && ! printf '%s\n' "$@" | grep -qx "$name"; then continue; fi
   echo "=== $name ==="
-  # A Flutter package; its emulator tests run only when FIRESTORE_EMULATOR_HOST is set.
-  if ! command -v flutter >/dev/null 2>&1; then
-    summary+=("$name: skipped (needs the Flutter SDK)")
+  if ! command -v flutter >/dev/null 2>&1; then flutter_skipped "$name"; continue; fi
+  dir="$ROOT/$dir"
+  pub=PASS analyze=PASS
+  (cd "$dir" && flutter pub get >"$LOG/$name.pub" 2>&1) || { pub=FAIL; tail -5 "$LOG/$name.pub"; }
+  (cd "$dir" && flutter analyze >"$LOG/$name.an" 2>&1) || { analyze=FAIL; tail -10 "$LOG/$name.an"; }
+  # The expanded reporter: one progress line per event, which test_counts reads.
+  if (cd "$dir" && flutter test --reporter expanded >"$LOG/$name.test" 2>&1); then
+    tests="PASS ($(test_counts "$LOG/$name.test"))"
   else
-    pub=PASS analyze=PASS tests=PASS
-    (cd "$dir" && flutter pub get >"$LOG/$name.pub" 2>&1) || { pub=FAIL; tail -5 "$LOG/$name.pub"; }
-    (cd "$dir" && flutter analyze >"$LOG/$name.an" 2>&1) || { analyze=FAIL; tail -10 "$LOG/$name.an"; }
-    (cd "$dir" && flutter test >"$LOG/$name.test" 2>&1) || { tests=FAIL; tail -20 "$LOG/$name.test"; }
-    case "$pub$analyze$tests" in *FAIL*) failed=1;; esac
-    summary+=("$name: pub get $pub | analyze $analyze | test $tests")
+    tests="FAIL ($(test_counts "$LOG/$name.test"))"; tail -20 "$LOG/$name.test"
   fi
-fi
+  case "$pub$analyze$tests" in *FAIL*) failed=1;; esac
+  summary+=("$name: pub get $pub | analyze $analyze | test $tests")
+done
 
 echo
 echo "================ SUMMARY ================"
