@@ -423,6 +423,145 @@ There is no local store to open, no queue of background work and no listen strea
 only Lite is smaller ([Firestore Lite](lite.md) has the sizes). Use it in servers, tools and functions that
 read and write but never listen or work offline.
 
+## dart2js or dart2wasm in the browser
+
+A web program can be compiled with `dart compile js` (dart2js) or `dart compile wasm` (dart2wasm); the two
+builds are about the same size (see [the web guide](web.md#dart2js-or-dart2wasm)). This section measures
+which one runs this client faster in Chrome.
+
+**In short.** Every CPU-bound case ran two to five times faster with dart2wasm: serialization, queries on the
+memory cache, a batch of writes with its listeners, a remote event. Queries on a SQLite cache, where part of
+the time is spent in `sqlite3.wasm` and the storage, ran about twice as fast; filling the SQLite cache, which
+waits for storage most, showed no difference larger than the noise. Start-up was the same within the noise on
+a first load, and dart2wasm was 2 ms faster on a third. dart2wasm used 5 % less memory for 50,000 cached
+documents. Nothing was slower with dart2wasm.
+
+![Bar chart of the dart2wasm time as a share of the dart2js time. Serialization: 25 to 38 percent. Memory cache: filter on 10,000 documents 33 percent, orderBy and limit 22 percent, first snapshot 31 percent, filter on 50,000 documents 45 percent, bundle load 36 percent, 500 writes with 1 listener 25 percent and with 20 listeners 21 percent, remote event changing 1,000 documents 26 percent. SQLite cache of 10,000 documents: filter on IndexedDB 50 percent, on OPFS 54 percent. First load, script to first snapshot: 101 percent, within the spread. Third load: 63 percent, 3.9 against 6.3 ms. Memory for 50,000 documents: 95 percent, 209 against 220 MB.](../images/readme/perf_wasm_vs_js.svg)
+
+**Method.** The benchmark is
+[`tool/web_cpu_benchmark/`](../../cloud_firestore/cloud_firestore_dart/tool/web_cpu_benchmark/README.md)
+(its README says what each case measures). Unlike the rest of this page, these numbers are repeated: 7 runs per
+compiler, each in a new headless Chrome with an empty profile, the compilers alternating from one run to the
+next; in each run every case ran once to warm up and then 5 times, and the run reports the median of those 5.
+The table gives the median of the 7 runs and, in brackets, their minimum and maximum. A ratio marked "(same)"
+is one where the ranges of the two compilers overlap: it is not a difference. Taken on 2026-11-18 on an Apple
+M5 (10 cores, 32 GB), macOS 27.2, Chrome 157.0.8103.79 (`--headless=new`), Dart 3.12.2, both compilers at
+`-O2` (the repository uses no other level), the page served with cross-origin isolation. The machine ran other
+work at the same time (load average about 13); the alternation spreads that over both compilers, and it is
+why some maxima are far from their medians. Every client had its network disabled: there is no backend in
+these numbers. Documents in the queries have five fields, about 250 bytes; the raw reports are in
+[`results/`](../../cloud_firestore/cloud_firestore_dart/tool/web_cpu_benchmark/results/).
+
+| Case | dart2js | dart2wasm | wasm / js |
+|---|---:|---:|---:|
+| **Serialization (microseconds per document)** | | | |
+| Small document (4 fields) to backend bytes | 9.78 (8.89–23.1) | 2.14 (2.05–2.51) | 0.22 |
+| Small document from backend bytes | 5.11 (4.21–10.1) | 1.41 (1.40–1.58) | 0.28 |
+| 1 KB document to backend bytes | 128 (110–148) | 31.6 (31.1–35.2) | 0.25 |
+| 1 KB document from backend bytes | 60.9 (58.7–79.5) | 23.1 (22.5–24.0) | 0.38 |
+| 1 KB document to cache bytes | 95.0 (86.1–158) | 23.6 (22.4–24.2) | 0.25 |
+| 1 KB document from cache bytes | 60.4 (59.0–83.2) | 23.3 (21.9–25.9) | 0.39 |
+| 50 KB document to backend bytes | 8,000 (7,614–10,482) | 2,227 (2,098–2,547) | 0.28 |
+| 50 KB document from backend bytes | 4,401 (4,192–6,095) | 1,573 (1,481–1,811) | 0.36 |
+| 50 KB document to cache bytes | 5,890 (5,429–13,685) | 1,466 (1,400–1,938) | 0.25 |
+| 50 KB document from cache bytes | 4,336 (4,155–10,410) | 1,526 (1,466–1,799) | 0.35 |
+| Maps nested 20 deep to backend bytes | 145 (137–189) | 34.3 (33.3–36.3) | 0.24 |
+| Maps nested 20 deep from cache bytes | 69.7 (66.0–94.4) | 22.9 (21.6–28.1) | 0.33 |
+| **Memory cache (milliseconds)** | | | |
+| Filter, 1,000 documents | 0.62 (0.58–1.71) | 0.43 (0.40–0.56) | 0.68 |
+| Filter, 10,000 documents | 5.11 (4.58–9.39) | 1.70 (1.52–2.21) | 0.33 |
+| Filter, 50,000 documents | 26.7 (25.9–45.9) | 12.0 (9.65–12.6) | 0.45 |
+| `orderBy` + `limit(10)`, 1,000 documents | 77.5 (74.8–108) | 18.6 (18.0–20.2) | 0.24 |
+| `orderBy` + `limit(10)`, 10,000 documents | 1,126 (1,037–1,560) | 248 (233–305) | 0.22 |
+| `orderBy` + `limit(10)`, 50,000 documents | 6,700 (6,214–8,466) | 1,483 (1,452–1,805) | 0.22 |
+| First snapshot of a listener, 1,000 documents | 1.71 (1.60–2.55) | 0.43 (0.39–0.46) | 0.25 |
+| First snapshot of a listener, 10,000 documents | 17.1 (15.8–23.4) | 5.25 (4.02–5.79) | 0.31 |
+| First snapshot of a listener, 50,000 documents | 95.1 (89.4–131) | 36.3 (30.0–63.3) | 0.38 |
+| Load a bundle of 10,000 documents | 472 (453–993) | 172 (166–196) | 0.36 |
+| Load a bundle of 50,000 documents | 2,799 (2,479–4,916) | 965 (879–1,192) | 0.34 |
+| Batch of 500 writes, until 1 listener has them | 65.1 (60.7–81.6) | 15.9 (14.9–17.3) | 0.25 |
+| Batch of 500 writes, until 20 listeners have them | 262 (255–384) | 54.0 (51.9–60.0) | 0.21 |
+| Remote event changing 1,000 documents, until the snapshot | 50.9 (48.8–68.8) | 13.2 (12.1–16.6) | 0.26 |
+| **SQLite cache, 10,000 documents (milliseconds)** | | | |
+| Filter, IndexedDB | 93.4 (83.1–104) | 47.2 (42.5–49.1) | 0.50 |
+| `orderBy` + `limit(10)`, IndexedDB | 831 (788–895) | 230 (224–262) | 0.28 |
+| First snapshot, IndexedDB | 100 (94.5–120) | 50.5 (49.1–60.9) | 0.51 |
+| Load the bundle, IndexedDB | 905 (839–1,368) | 666 (590–887) | 0.74 (same) |
+| Filter, OPFS | 91.7 (83.9–108) | 49.6 (48.0–62.8) | 0.54 |
+| `orderBy` + `limit(10)`, OPFS | 807 (777–861) | 252 (230–287) | 0.31 |
+| First snapshot, OPFS | 101 (97.3–133) | 57.2 (53.1–65.6) | 0.57 |
+| Load the bundle, OPFS | 1,757 (1,613–2,115) | 1,430 (1,300–1,727) | 0.81 (same) |
+| **Start-up (milliseconds)** | | | |
+| First load: navigation to first snapshot | 151 (122–221) | 154 (119–247) | 1.02 (same) |
+| First load: first script to first snapshot | 36.8 (32.8–48.4) | 37.3 (16.7–67.8) | 1.01 (same) |
+| Second load (HTTP cache): navigation to first snapshot | 29.9 (15.2–59.2) | 23.6 (9.64–47.3) | 0.79 (same) |
+| Second load: first script to first snapshot | 5.88 (5.61–6.97) | 5.27 (3.26–8.17) | 0.90 (same) |
+| Third load (code caches): navigation to first snapshot | 20.4 (15.3–44.4) | 24.0 (16.2–39.2) | 1.18 (same) |
+| Third load: first script to first snapshot | 6.27 (5.33–9.71) | 3.93 (3.34–5.12) | 0.63 |
+| **Memory (MB, `measureUserAgentSpecificMemory`)** | | | |
+| Page with the program loaded, before any client | 38.7 (37.2–38.9) | 31.2 (31.2–31.2) | 0.81 |
+| After loading 50,000 documents into a memory cache | 259 (257–259) | 241 (241–241) | 0.93 |
+| Of which the 50,000 documents | 220 (220–220) | 209 (209–209) | 0.95 |
+
+Notes on the cases:
+
+- **Start-up** is what the playground does: a client on a memory cache, `disableNetwork()`, one listener, its
+  first (empty) snapshot. The program is 645 KB as JavaScript (197 KB gzipped) and 580 KB of WebAssembly plus
+  17 KB of `.mjs` (226 + 4 KB gzipped). On a first load, dart2js took 16 ms (11–18) from the end of the
+  download to `main`; dart2wasm took 19 ms (4–32) in `compileStreaming`, which overlaps the download, and
+  2.5 ms to instantiate. Chrome caches the compiled code of both, so later loads spend 2 to 4 ms there. The
+  navigation itself (100 ms or more on a first load in a new profile) is the same for both and larger than
+  any difference between them.
+- **Memory.** `performance.measureUserAgentSpecificMemory()` counts the JavaScript heap, which also holds the
+  objects of a dart2wasm program (WasmGC objects live in the browser's garbage-collected heap, not in a linear
+  memory), plus array buffers and WebAssembly memories, so the two builds are measured the same way. Its
+  numbers vary little between runs.
+- **I/O-bound work.** A write transaction on the IndexedDB storage takes about 1.4 ms with either compiler
+  (`tool/web_storage_benchmark`), and filling the SQLite caches from a bundle showed no difference beyond the
+  noise. The SQLite queries above still ran twice as fast with dart2wasm, because decoding and matching the
+  documents read from SQLite is Dart work.
+- **`orderBy` + `limit`** on a cache is a scan of the collection followed by a sort and the limit (see the first
+  section), and it cost far more than a filter on the same documents: 1.1 s (dart2js) or 0.25 s (dart2wasm)
+  for 10,000 documents, against 5 ms and 1.7 ms. Avoid such queries on large cached collections, or give them
+  a cache index.
+- **Not the same numbers.** dart2js stores a `double` with an integral value (`3.0`) as an integer, so the same
+  map encodes to slightly different bytes (1,234 against 1,255 bytes for the 1 KB document), and integers
+  above 2^53 lose precision under dart2js ([web guide](web.md)).
+- **Other browsers** were not measured: Firefox is not installed on the measuring machine, and Safari cannot be
+  driven headless without changing a system setting (`safaridriver --enable`).
+
+**Which browsers run a dart2wasm build** (checked on 2026-11-18). The Dart documentation lists Chrome or Edge
+137+, Firefox 134+ and Safari 26.2+ (macOS and iOS) for the current compiler, which uses WebAssembly garbage
+collection (WasmGC), JS String Builtins and exception handling with `exnref`
+([dart.dev/web/wasm](https://dart.dev/web/wasm), page dated 2026-11-10). WasmGC alone shipped in Chrome 119,
+Firefox 120 ([caniuse](https://caniuse.com/wasm-gc)) and Safari 18.2
+([WebKit features in Safari 18.2](https://webkit.org/blog/16301/webkit-features-in-safari-18-2/)); caniuse
+still lists Safari as unsupported, which the WebKit post contradicts. The `.mjs` that dart2wasm writes falls
+back to a JavaScript implementation of the string builtins when the browser lacks them. A browser without
+WasmGC cannot run the build at all, so a page that must work everywhere keeps the dart2js build as a fallback.
+
+- **Content-Security-Policy.** A page with a CSP must allow `'wasm-unsafe-eval'` in `script-src`, or the
+  browser refuses to compile the module
+  ([MDN](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Content-Security-Policy/script-src));
+  `'unsafe-eval'` also allows it but allows JavaScript `eval` too.
+- **Headers.** A dart2wasm build of this client needs none; the host must send `.wasm` as `application/wasm`
+  for `compileStreaming`. Neither build needs cross-origin isolation for the OPFS storage (its worker uses the
+  synchronous access handles of OPFS, not shared memory). Flutter web needs `Cross-Origin-Opener-Policy:
+  same-origin` and `Cross-Origin-Embedder-Policy: require-corp` (or `credentialless`) only to render with
+  several threads ([Flutter: Support for WebAssembly](https://docs.flutter.dev/platform-integration/web/wasm)).
+- **How Flutter chooses.** `flutter build web --wasm` writes both builds; at start-up `flutter_bootstrap.js`
+  tests the browser's WebAssembly features and loads the dart2js build when they are missing. Flutter 3.50
+  uses the WebAssembly build by default only on Chromium 137+, and on Firefox and Safari only when the app
+  opts in with `wasmAllowList` (same page, dated 2026-11-11).
+
+**What to do.** For a browser app, load the dart2wasm build when the browser supports it and the dart2js build
+otherwise, and allow `'wasm-unsafe-eval'` if the page has a CSP. The playground does exactly that
+([`examples/playground/web/bootstrap.js`](../../examples/playground/web/bootstrap.js)): it runs the same
+WasmGC check that dart2wasm writes to `main.support.js`, falls back to dart2js when the check fails or the
+module does not compile, and keeps `?compiler=js` and `?compiler=wasm` to pick one by hand. The gain is in the
+client's own work, so it matters most for large caches, large documents and many listeners; it does not make
+the network or the storage faster.
+
 ## Checklist
 
 - Persistent cache for apps that must work offline; default memory cache or Lite for servers and tools.
