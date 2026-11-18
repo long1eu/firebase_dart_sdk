@@ -44,12 +44,28 @@ Future<FirebaseFirestore> open() async {
 }
 
 Future<void> readBack(FirebaseFirestore firestore) async {
-  final DocumentSnapshot<Map<String, Object?>> doc = await firestore
-      .doc('items/a')
-      .get(const GetOptions(source: Source.cache));
-  log(
-    'items/a exists=${doc.exists} pending=${doc.metadata.hasPendingWrites} data=${doc.data()}',
-  );
+  // items/a and items/b are this page's; the others are those of js_import/writer.js and engine_check.js.
+  for (final String path in <String>[
+    'items/a',
+    'items/fromjs',
+    'items/w1',
+    'items/w2',
+    'items/w3',
+    'items/cached1',
+    'items/gone',
+    'items/b1',
+  ]) {
+    try {
+      final DocumentSnapshot<Map<String, Object?>> doc = await firestore
+          .doc(path)
+          .get(const GetOptions(source: Source.cache));
+      log(
+        '$path exists=${doc.exists} pending=${doc.metadata.hasPendingWrites} data=${doc.data()}',
+      );
+    } on FirestoreException catch (e) {
+      log('$path not in the cache (${e.errorCode.name})');
+    }
+  }
   final QuerySnapshot<Map<String, Object?>> query = await firestore
       .collection('items')
       .where('n', isGreaterThan: 0)
@@ -57,16 +73,6 @@ Future<void> readBack(FirebaseFirestore firestore) async {
   log(
     'items where n > 0: ${query.docs.map((QueryDocumentSnapshot<Map<String, Object?>> d) => d.id).toList()}',
   );
-  try {
-    final DocumentSnapshot<Map<String, Object?>> fromJs = await firestore
-        .doc('items/fromjs')
-        .get(const GetOptions(source: Source.cache));
-    log(
-      'items/fromjs (written by js_import/engine_check.js) exists=${fromJs.exists} data=${fromJs.data()}',
-    );
-  } on FirestoreException catch (e) {
-    log('items/fromjs not in the cache (${e.errorCode.name})');
-  }
   log('pending writes: ${await firestore.getPendingWriteCount()}');
 }
 

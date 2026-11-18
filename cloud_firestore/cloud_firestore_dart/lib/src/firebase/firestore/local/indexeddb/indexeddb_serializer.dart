@@ -95,6 +95,83 @@ class IndexedDbSerializer {
     return node;
   }
 
+  /// [json] (proto3 JSON the JS SDK wrote) in the strict form `package:protobuf` reads.
+  ///
+  /// The JS SDK's readers accept more than proto3 JSON (`normalizeTimestamp`, `normalizeByteString`,
+  /// `normalizeNumber` of `normalize.ts`), and its rows hold such values: the local write time of a pending server
+  /// timestamp is `{timestampValue: {seconds, nanos}}` (`server_timestamps.ts`), bytes may be a `Uint8Array` (a map of
+  /// indexes once it went through `JSON.stringify`), and numbers may be strings or numbers. This rewrites them to RFC
+  /// 3339 strings, base64 and the proto3 JSON number forms. As in [toProto3Json], a field is only rewritten when its
+  /// value has the shape of such a value: inside `fields` the values are always objects of the `Value` message.
+  static Object? fromJsProto3Json(Object? json) {
+    if (json is Map) {
+      final Map<String, Object?> result = <String, Object?>{};
+      for (final MapEntry<Object?, Object?> entry in json.entries) {
+        final String key = entry.key! as String;
+        result[key] = _fromJsField(key, entry.value);
+      }
+      return result;
+    } else if (json is List) {
+      return <Object?>[for (final Object? item in json) fromJsProto3Json(item)];
+    }
+    return json;
+  }
+
+  static Object? _fromJsField(String key, Object? value) {
+    if (_timestampFields.contains(key) || key == 'readTime') {
+      if (value is Map &&
+          (value.containsKey('seconds') || value.containsKey('nanos'))) {
+        return _timestampString(
+          value['seconds'],
+          value['nanos'] ?? value['nanoseconds'],
+        );
+      }
+      if (value is String) {
+        return _nineDigits(value);
+      }
+    } else if (key == 'bytesValue' && value is Map) {
+      final List<int>? bytes = _indexedBytes(value);
+      if (bytes != null) {
+        return base64.encode(bytes);
+      }
+    } else if (key == 'integerValue' && value is num) {
+      return value.toInt().toString();
+    } else if ((key == 'doubleValue' ||
+            key == 'latitude' ||
+            key == 'longitude') &&
+        value is String) {
+      return num.tryParse(value) ?? value;
+    }
+    return fromJsProto3Json(value);
+  }
+
+  /// The bytes of a `Uint8Array` after `JSON.stringify` (`{"0": 1, "1": 2}`), or null for another map.
+  static List<int>? _indexedBytes(Map<Object?, Object?> value) {
+    final List<int> bytes = List<int>.filled(value.length, 0);
+    for (final MapEntry<Object?, Object?> entry in value.entries) {
+      final int? index = int.tryParse('${entry.key}');
+      final Object? byte = entry.value;
+      if (index == null || index < 0 || index >= bytes.length || byte is! num) {
+        return null;
+      }
+      bytes[index] = byte.toInt();
+    }
+    return bytes;
+  }
+
+  /// `toTimestamp` of the JS SDK for [seconds] and [nanos], each a number or a numeric string.
+  static String _timestampString(Object? seconds, Object? nanos) {
+    int number(Object? value) => value is num
+        ? value.toInt()
+        : (value is String ? int.tryParse(value) ?? 0 : 0);
+    final String date = DateTime.fromMillisecondsSinceEpoch(
+      number(seconds) * 1000,
+      isUtc: true,
+    ).toIso8601String();
+    final String fraction = '${number(nanos)}'.padLeft(9, '0');
+    return '${date.substring(0, date.indexOf('.'))}.${fraction}Z';
+  }
+
   static String _nineDigits(String timestamp) {
     final RegExpMatch? match = _rfc3339.firstMatch(timestamp);
     if (match == null) {
@@ -156,7 +233,10 @@ class IndexedDbSerializer {
       document = localSerializer.decodeMaybeDocument(
         proto.MaybeDocument()
           ..document = (proto.Document()
-            ..mergeFromProto3Json(remote, ignoreUnknownFields: true))
+            ..mergeFromProto3Json(
+              fromJsProto3Json(remote),
+              ignoreUnknownFields: true,
+            ))
           ..hasCommittedMutations = hasCommittedMutations,
       );
     } else if (deleted is Map) {
@@ -231,12 +311,18 @@ class IndexedDbSerializer {
     for (final Object? write
         in (row['baseMutations'] as List<Object?>?) ?? const <Object?>[]) {
       batch.baseWrites.add(
-        proto.Write()..mergeFromProto3Json(write, ignoreUnknownFields: false),
+        proto.Write()..mergeFromProto3Json(
+          fromJsProto3Json(write),
+          ignoreUnknownFields: false,
+        ),
       );
     }
     for (final Object? write in squashed) {
       batch.writes.add(
-        proto.Write()..mergeFromProto3Json(write, ignoreUnknownFields: false),
+        proto.Write()..mergeFromProto3Json(
+          fromJsProto3Json(write),
+          ignoreUnknownFields: false,
+        ),
       );
     }
     return localSerializer.decodeMutationBatch(batch);
@@ -287,13 +373,17 @@ class IndexedDbSerializer {
       throw const FormatException('a pipeline target');
     } else if (query['documents'] != null) {
       target = _rpc.decodeDocumentsTarget(
-        proto.Target_DocumentsTarget()
-          ..mergeFromProto3Json(query, ignoreUnknownFields: true),
+        proto.Target_DocumentsTarget()..mergeFromProto3Json(
+          fromJsProto3Json(query),
+          ignoreUnknownFields: true,
+        ),
       );
     } else {
       target = _rpc.decodeQueryTarget(
-        proto.Target_QueryTarget()
-          ..mergeFromProto3Json(query, ignoreUnknownFields: true),
+        proto.Target_QueryTarget()..mergeFromProto3Json(
+          fromJsProto3Json(query),
+          ignoreUnknownFields: true,
+        ),
       );
     }
     final Object? limboFree = row['lastLimboFreeSnapshotVersion'];
@@ -335,7 +425,7 @@ class IndexedDbSerializer {
       (row['largestBatchId']! as num).toInt(),
       localSerializer.decodeOverlayMutation(
         proto.Write()..mergeFromProto3Json(
-          row['overlayMutation'],
+          fromJsProto3Json(row['overlayMutation']),
           ignoreUnknownFields: false,
         ),
       ),
