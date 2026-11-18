@@ -46,6 +46,17 @@ class _ExpectingLocalDocumentsView extends LocalDocumentsView {
 
   bool? expectFullCollectionScan;
 
+  /// The number of keys of every [getDocuments] call.
+  final List<int> documentsRead = <int>[];
+
+  @override
+  Future<ImmutableSortedMap<DocumentKey, MaybeDocument>> getDocuments(
+    Iterable<DocumentKey> keys,
+  ) {
+    documentsRead.add(keys.length);
+    return super.getDocuments(keys);
+  }
+
   @override
   Future<ImmutableSortedMap<DocumentKey, Document>> getDocumentsMatchingQuery(
     Query query,
@@ -1273,6 +1284,99 @@ void main() {
         () => runQuery(q, SnapshotVersion.none),
       );
       expect(result, isEmpty);
+    });
+
+    // Not upstream either: a limit query keeps the window of the index when the document at its edge has pending
+    // writes that the index already has, see DefaultQueryEngine._performQueryUsingIndex.
+    group('limit queries on documents with pending writes', () {
+      late Query q;
+
+      // addMutation stores the mutation itself as the overlay, so every write here is a whole document.
+
+      setUp(() async {
+        await indexManager.addFieldIndex(
+          fieldIndex(
+            'coll',
+            fieldsAndKinds: <Object>['a', SegmentKind.ascending],
+          ),
+        );
+        // Documents that exist only as pending writes.
+        for (int i = 1; i <= 6; i++) {
+          await addMutation(
+            setMutation('coll/$i', map(<dynamic>['a', i, 'x', 0])),
+          );
+        }
+        await backfill();
+        q = query('coll').orderBy(orderBy('a')).limitToFirst(2);
+        localDocuments.documentsRead.clear();
+      });
+
+      Future<List<String>> ids() async {
+        final DocumentSet result = await expectOptimizedCollectionScan(
+          () => runQuery(q, SnapshotVersion.none),
+        );
+        return result.map((Document d) => d.key.path.segments.last).toList();
+      }
+
+      test(
+        'read only the window when the index has the pending writes',
+        () async {
+          expect(await ids(), <String>['1', '2']);
+          expect(localDocuments.documentsRead, <int>[2]);
+        },
+      );
+
+      test(
+        'keep the window after a write to a field that is not indexed',
+        () async {
+          await addMutation(
+            setMutation('coll/2', map(<dynamic>['a', 2, 'x', 1])),
+          );
+          expect(await ids(), <String>['1', '2']);
+        },
+      );
+
+      test('a later write moves the edge document out of the window', () async {
+        await addMutation(
+          setMutation('coll/2', map(<dynamic>['a', 9, 'x', 0])),
+        );
+        expect(await ids(), <String>['1', '3']);
+      });
+
+      test(
+        'a later write moves the first document behind the window',
+        () async {
+          await addMutation(
+            setMutation('coll/1', map(<dynamic>['a', 9, 'x', 0])),
+          );
+          expect(await ids(), <String>['2', '3']);
+        },
+      );
+
+      test('a later write moves a document into the window', () async {
+        await addMutation(
+          setMutation('coll/6', map(<dynamic>['a', 0, 'x', 0])),
+        );
+        expect(await ids(), <String>['6', '1']);
+      });
+
+      test('a later write deletes the edge document', () async {
+        await addMutation(deleteMutation('coll/2'));
+        expect(await ids(), <String>['1', '3']);
+      });
+
+      test('the index is filled again after the later writes', () async {
+        await addMutation(
+          setMutation('coll/2', map(<dynamic>['a', 9, 'x', 0])),
+        );
+        await addMutation(
+          setMutation('coll/6', map(<dynamic>['a', 0, 'x', 0])),
+        );
+        await backfill();
+        localDocuments.documentsRead.clear();
+        expect(await ids(), <String>['6', '1']);
+        expect(localDocuments.documentsRead, <int>[2]);
+      });
     });
   });
 }
