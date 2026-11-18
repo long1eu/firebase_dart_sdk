@@ -25,14 +25,16 @@ const int liteBudget = 450000;
 const int liteGzipBudget = 140000;
 
 /// The budget of the full application (the main library), in the same units.
-/// Measured with Dart 3.12.2 on main 1645e672: 651,311 and 199,005; the
+/// Measured with Dart 3.12.2 on main 1645e672: 651,311 and 199,005; again on
+/// 2026-11-19 with the merge of unsent writes, the import of the JS SDK's
+/// cache and the merge of a queue at start: 729,120 and 221,692. The
 /// budget is those numbers plus about 10%, rounded up to a thousand, so that
 /// the normal growth of the library passes and an accidental large
 /// dependency (a second copy of the protos, a JS interop layer pulled in by
 /// mistake) does not. Same rules as the lite budget: raise it deliberately,
 /// with the new numbers in this comment.
-const int fullBudget = 717000;
-const int fullGzipBudget = 219000;
+const int fullBudget = 803000;
+const int fullGzipBudget = 244000;
 
 /// Libraries of the main library that a lite program must not contain code
 /// of, as parts of their URI.
