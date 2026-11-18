@@ -2,6 +2,12 @@
 
 - Docs only, no code change: the web (browser) support is now described as supported in Chrome
   (tested against the emulator; other browsers untested) instead of experimental.
+- With many pending writes, a query of a collection reads only the pending writes of that
+  collection instead of every pending write of the user (a collection of 10 among 1,000,000
+  pending writes: 128 ms to 0.07 ms), and an index fill run reads only the next pending writes of
+  its collection group (schema 20 adds an index on the overlays, built once on open: about 1 s for
+  1,000,000 pending writes). The local store also forgets the keys of a batch once it is
+  acknowledged or rejected.
 - The copied SQLite openers are gone from `example/`: `sqlite_database.dart`,
   `sqlite_database_web.dart` and `sqlite_opfs_worker.dart`. Since 0.2.0 apps use
   [`cloud_firestore_dart_sqlite`](https://pub.dev/packages/cloud_firestore_dart_sqlite)

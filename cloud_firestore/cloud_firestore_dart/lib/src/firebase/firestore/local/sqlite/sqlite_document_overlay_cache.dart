@@ -156,12 +156,16 @@ class SQLiteDocumentOverlayCache implements DocumentOverlayCache {
     ResourcePath collection,
     int sinceBatchId,
   ) async {
+    // DEVIATION FROM UPSTREAM: the unary `+` keeps SQLite from reading the overlays through `batch_id_overlay`
+    // (uid, largest_batch_id), which it prefers without statistics: with the range `largest_batch_id > -1` of a scan
+    // that walks every overlay of the user instead of those of the collection (246 ms for a collection of 10 among
+    // 1M pending writes). The primary key (uid, collection_path, document_id) reads only the collection.
     final List<Map<String, dynamic>> rows = await _db.query(
       // @formatter:off
       '''
           SELECT overlay_mutation, largest_batch_id
           FROM document_overlays
-          WHERE uid = ? AND collection_path = ? AND largest_batch_id > ?
+          WHERE uid = ? AND collection_path = ? AND +largest_batch_id > ?
         ''',
       // @formatter:on
       <Object>[_uid, EncodedPath.encode(collection), sinceBatchId],
@@ -178,6 +182,8 @@ class SQLiteDocumentOverlayCache implements DocumentOverlayCache {
     int count,
   ) async {
     final Map<DocumentKey, Overlay> result = <DocumentKey, Overlay>{};
+    // Read through `collection_group_batch_id_overlay` (uid, collection_group, largest_batch_id, schema migration 20):
+    // the first [count] rows of the group from the offset, instead of every later overlay of the user.
     final List<Map<String, dynamic>> rows = await _db.query(
       // @formatter:off
       '''
@@ -200,7 +206,8 @@ class SQLiteDocumentOverlayCache implements DocumentOverlayCache {
 
     // This function should not return partial batch overlays, even if the number of overlays in the result set exceeds
     // the given `count` argument. Since the `LIMIT` in the above query might result in a partial batch, the following
-    // query appends any remaining overlays for the last batch.
+    // query appends any remaining overlays for the last batch. The unary `+` keeps SQLite off the primary key, where
+    // `collection_path > ?` is a range over the overlays of every later collection of the user (seconds at 1M).
     final Map<String, dynamic> last = rows.last;
     final List<Map<String, dynamic>> remaining = await _db.query(
       // @formatter:off
@@ -208,7 +215,7 @@ class SQLiteDocumentOverlayCache implements DocumentOverlayCache {
           SELECT overlay_mutation, largest_batch_id
           FROM document_overlays
           WHERE uid = ? AND collection_group = ?
-            AND (collection_path > ? OR (collection_path = ? AND document_id > ?))
+            AND (+collection_path > ? OR (+collection_path = ? AND document_id > ?))
             AND largest_batch_id = ?
         ''',
       // @formatter:on

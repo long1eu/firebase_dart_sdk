@@ -11,6 +11,7 @@
 //     --index configures cache indexes, fills them and queries again. --ack then acknowledges every batch, puts the
 //     queried collections in sync once (a remote event, as after a listen) and reads again: the "mixed" case.
 //     --forget-batch-keys drops the keys the local store keeps in memory for every written batch (a memory check).
+//     --fill-once stops after the first index fill run. --no-group skips the collection group queries.
 //   dart run offline_forever_bench.dart hot <updates> [--transform] [<directory>]
 //     One document, set once and then updated <updates> times (with --transform each update also sets a
 //     serverTimestamp field). Reads, queries, one rejection, then acknowledgements.
@@ -317,6 +318,9 @@ Future<void> pending(
     int processed = await backfiller.backfill();
     record('index fill, one scheduled run', sw.elapsedMicroseconds / 1000, 'ms',
         '$processed documents');
+    if (flags.contains('--fill-once')) {
+      return; // only the cost of one run (a complete fill can take hours)
+    }
     backfiller.maxDocumentsToProcess = 1000;
     sw = Stopwatch()..start();
     int filled = 0;
