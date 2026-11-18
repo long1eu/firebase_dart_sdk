@@ -18,7 +18,7 @@ FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 dart run example/main.dart
 | `transactions_and_batches.dart` | `WriteBatch`, `runBatch`, read-write and read-only transactions, `maxAttempts`. |
 | `bundles.dart` | `loadBundle`, progress, reading bundled documents from the cache, `namedQuery`. |
 | `snapshot_json.dart` | `toJson` / `fromJson` on snapshots and references, `querySnapshotsFromJson` to resume a listener. |
-| `offline_persistence.dart` | A SQLite cache on disk: reading and writing offline, syncing when back online. |
+| `offline_persistence.dart` | A SQLite cache on disk: reading and writing offline, syncing when back online, the progress of the sync with `getPendingWriteCount` and `pendingWriteCounts()`. |
 | `two_clients_one_cache.dart` | Two clients on one SQLite cache: a background isolate opens the cache of the main isolate and takes the lease; the main isolate turns secondary (answers from the cache, keeps its write pending) and becomes primary again when the background isolate terminates. See `docs/guides/multiple_clients.md`. |
 | `database_recovery.dart` | Recovery from a cache that is busy for a moment: a `Database` wrapper throws `TransientDatabaseException`; a write fails with `unavailable` and can be tried again, a change from the backend is stored once the cache works again. |
 | `cache_indexes.dart` | Persistent cache indexes: `persistentCacheIndexManager`, automatic index creation, `deleteAllIndexes`. |

@@ -803,6 +803,10 @@ class SQLitePersistence extends Persistence {
       return result;
     } catch (_) {
       referenceDelegate.onTransactionRolledBack();
+      for (final WeakReference<SQLiteMutationQueue> reference
+          in _mutationQueues) {
+        reference.target?._forgetBatchCount();
+      }
       if (began) {
         try {
           await _db.execute('ROLLBACK;');

@@ -296,6 +296,53 @@ class FirestoreClient implements RemoteStoreCallback {
     return source.future;
   }
 
+  /// The shortest time between two reads of the count by a stream of [pendingWriteCounts]: the changes of the
+  /// mutation queue within that time are read and emitted together, so a stream emits at most 4 times a second.
+  static const Duration pendingWriteCountInterval = Duration(milliseconds: 250);
+
+  /// The streams of [pendingWriteCounts] that are listened to. [shutdown] closes them.
+  final Set<_PendingWriteCounts> _pendingWriteCounts = <_PendingWriteCounts>{};
+
+  /// Returns the number of batches in the mutation queue of the current user.
+  Future<int> getPendingWriteCount() async {
+    _verifyNotShutdown();
+    return _enqueue<int>(() => localStore.getPendingWriteCount());
+  }
+
+  /// A stream of [getPendingWriteCount]: the count when it is listened to, and then the count after the mutation queue
+  /// changed, at most once per [pendingWriteCountInterval] and only when it differs from the last one. Closes when the
+  /// client shuts down.
+  Stream<int> pendingWriteCounts() {
+    late final _PendingWriteCounts counts;
+    final StreamController<int> controller = StreamController<int>(
+      onListen: () {
+        if (_isShutdown) {
+          counts.fail(
+            FirestoreException(
+              message: terminatedMessage,
+              errorCode: FirestoreErrorCode.failedPrecondition,
+            ),
+          );
+          return;
+        }
+        _pendingWriteCounts.add(counts);
+        counts.read();
+      },
+      onCancel: () {
+        _pendingWriteCounts.remove(counts);
+        counts.stop();
+      },
+    );
+    counts = _PendingWriteCounts(controller, getPendingWriteCount);
+    return controller.stream;
+  }
+
+  void _onPendingWritesChanged() {
+    for (final _PendingWriteCounts counts in _pendingWriteCounts) {
+      counts.changed();
+    }
+  }
+
   /// Adds a listener that is called whenever all the snapshot listeners are in sync with each other (and once right
   /// away).
   Future<void> addSnapshotsInSyncListener(void Function() listener) async {
@@ -340,6 +387,10 @@ class FirestoreClient implements RemoteStoreCallback {
     // Reject new client calls and stop the background GC before anything is closed, so nothing starts against a
     // closed database.
     _isShutdown = true;
+    for (final _PendingWriteCounts counts in _pendingWriteCounts) {
+      counts.close();
+    }
+    _pendingWriteCounts.clear();
     // An initialization that is still running (the instance was terminated right after it was created) finishes
     // first: it may already have opened the persistence, and clearPersistence needs to know the file it opened.
     try {
@@ -724,7 +775,8 @@ class FirestoreClient implements RemoteStoreCallback {
     );
     _remoteStoreCreated = true;
 
-    syncEngine = SyncEngine(localStore, remoteStore, user);
+    syncEngine = SyncEngine(localStore, remoteStore, user)
+      ..onPendingWritesChanged = _onPendingWritesChanged;
     eventManager = EventManager(syncEngine);
 
     // NOTE: RemoteStore depends on LocalStore (for persisting stream tokens,
@@ -820,5 +872,59 @@ class FirestoreClient implements RemoteStoreCallback {
     return (int targetId) {
       return syncEngine.getRemoteKeysForTarget(targetId);
     };
+  }
+}
+
+/// One stream of [FirestoreClient.pendingWriteCounts]. A change starts a timer of
+/// [FirestoreClient.pendingWriteCountInterval] (unless one runs already) and the count is read once when it fires: a
+/// trailing throttle, so the last change is always emitted.
+class _PendingWriteCounts {
+  _PendingWriteCounts(this._controller, this._count);
+
+  final StreamController<int> _controller;
+  final Future<int> Function() _count;
+  Timer? _timer;
+  int? _last;
+
+  void changed() {
+    _timer ??= Timer(FirestoreClient.pendingWriteCountInterval, () {
+      _timer = null;
+      read();
+    });
+  }
+
+  /// Reads the count and emits it when it differs from the last one. The reads run on the client's queue, so they
+  /// complete in order.
+  void read() {
+    _count().then(
+      (int count) {
+        if (!_controller.isClosed && count != _last) {
+          _last = count;
+          _controller.add(count);
+        }
+      },
+      onError: (Object error, StackTrace stackTrace) {
+        if (!_controller.isClosed) {
+          _controller.addError(error, stackTrace);
+        }
+      },
+    );
+  }
+
+  void stop() {
+    _timer?.cancel();
+    _timer = null;
+  }
+
+  void fail(Object error) {
+    if (!_controller.isClosed) {
+      _controller.addError(error);
+    }
+    close();
+  }
+
+  void close() {
+    stop();
+    unawaited(_controller.close());
   }
 }

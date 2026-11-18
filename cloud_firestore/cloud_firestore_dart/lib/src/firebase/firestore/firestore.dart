@@ -630,6 +630,53 @@ class FirebaseFirestore {
     return controller.stream;
   }
 
+  /// Returns the number of write batches of the signed-in user that the backend has not acknowledged or rejected yet.
+  ///
+  /// **Experimental**: this API may change in any release. The official SDKs have no equivalent; they only offer
+  /// [waitForPendingWrites] and `hasPendingWrites` on a snapshot.
+  ///
+  /// A batch is one call of `set`, `update` or `delete`, or one [WriteBatch.commit]; a transaction is not queued. The
+  /// count is that of the current user's queue (the queue is per user) and, with a persistent cache that several
+  /// clients share, includes the batches the other clients wrote for that user. It is cheap also with millions of
+  /// pending writes: the memory cache knows it, and the SQLite cache counts the keys of an index once and then keeps
+  /// the number in memory.
+  ///
+  /// On a terminated instance the future fails with a [FirestoreException] (failed-precondition).
+  ///
+  /// ```dart
+  /// final int pending = await firestore.getPendingWriteCount();
+  /// print('$pending writes wait for the backend');
+  /// ```
+  Future<int> getPendingWriteCount() {
+    return client.getPendingWriteCount();
+  }
+
+  /// A stream of [getPendingWriteCount]: it emits the count when it is listened to, and then a new count after the
+  /// queue of pending writes changed (a write, an acknowledgement, a rejection, a change of the signed-in user).
+  ///
+  /// **Experimental**: this API may change in any release. The official SDKs have no equivalent.
+  ///
+  /// The stream is throttled: the changes within 250 milliseconds are read together, so a queue that drains 100,000
+  /// writes emits at most 4 counts a second, the last one being the final count. A count equal to the previous one is
+  /// not emitted. The stream closes when the instance is terminated; listened to on a terminated instance it fails with
+  /// a [FirestoreException] (failed-precondition) and closes.
+  ///
+  /// With a persistent cache that several clients share, the stream emits after the changes this client makes or is
+  /// told about: a batch another client writes or sends is counted at the next emission or by [getPendingWriteCount],
+  /// not as it happens.
+  ///
+  /// ```dart
+  /// final int total = await firestore.getPendingWriteCount();
+  /// final StreamSubscription<int> progress = firestore.pendingWriteCounts().listen(
+  ///   (int pending) => print('syncing ${total - pending} of $total'),
+  /// );
+  /// // ...
+  /// await progress.cancel();
+  /// ```
+  Stream<int> pendingWriteCounts() {
+    return client.pendingWriteCounts();
+  }
+
   /// Terminates this [FirebaseFirestore] instance, releasing all the resources it holds.
   ///
   /// After this the instance cannot be used anymore: to start again, create a new instance with [instanceFor].

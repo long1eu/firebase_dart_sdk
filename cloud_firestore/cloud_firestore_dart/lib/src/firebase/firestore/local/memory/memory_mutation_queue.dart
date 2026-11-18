@@ -64,6 +64,9 @@ class MemoryMutationQueue implements MutationQueue {
   }
 
   @override
+  Future<int> getMutationBatchCount() async => _queue.length;
+
+  @override
   Future<int> getHighestUnacknowledgedBatchId({
     bool skipOtherClients = false,
   }) async {

@@ -1177,8 +1177,23 @@ Future<void> offlinePersistenceGuideLine127() async {
   await firestore.enableNetwork();
 }
 
+<<<<<<< HEAD
 // ../../docs/guides/offline_persistence.md:194
 Future<void> offlinePersistenceGuideLine194() async {
+=======
+// ../../docs/guides/offline_persistence.md:185
+Future<void> offlinePersistenceGuideLine185() async {
+  final int total = await firestore.getPendingWriteCount();
+  final StreamSubscription<int> progress = firestore.pendingWriteCounts().listen(
+    (int pending) => print('syncing ${total - pending} of $total'),
+  );
+  // ...
+  await progress.cancel();
+}
+
+// ../../docs/guides/offline_persistence.md:226
+Future<void> offlinePersistenceGuideLine226() async {
+>>>>>>> 37f75f1e (Show the number of writes waiting for the backend)
   final Directory directory = Directory('/home/ada/.local/share/my_app')
     ..createSync(recursive: true);
   if (!Platform.isWindows) {
@@ -1186,8 +1201,13 @@ Future<void> offlinePersistenceGuideLine194() async {
   }
 }
 
+<<<<<<< HEAD
 // ../../docs/guides/offline_persistence.md:219
 Future<void> offlinePersistenceGuideLine219() async {
+=======
+// ../../docs/guides/offline_persistence.md:251
+Future<void> offlinePersistenceGuideLine251() async {
+>>>>>>> 37f75f1e (Show the number of writes waiting for the backend)
   // IndexedDB: SQLite runs in the page on a copy of the whole database in memory.
   final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(
     app: app,
@@ -1195,23 +1215,38 @@ Future<void> offlinePersistenceGuideLine219() async {
   );
 }
 
+<<<<<<< HEAD
 // ../../docs/guides/offline_persistence.md:236
 Future<void> offlinePersistenceGuideLine236() async {
+=======
+// ../../docs/guides/offline_persistence.md:268
+Future<void> offlinePersistenceGuideLine268() async {
+>>>>>>> 37f75f1e (Show the number of writes waiting for the backend)
   final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(
     app: app,
     openDatabase: sqliteOpener(opfsWorker: Uri.parse('sqlite_opfs_worker.js')),
   );
 }
 
+<<<<<<< HEAD
 // ../../docs/guides/offline_persistence.md:270
 Future<void> offlinePersistenceGuideLine270() async {
+=======
+// ../../docs/guides/offline_persistence.md:302
+Future<void> offlinePersistenceGuideLine302() async {
+>>>>>>> 37f75f1e (Show the number of writes waiting for the backend)
   await firestore.terminate();        // the cache must not be in use by this instance
   await firestore.clearPersistence(); // deletes the files (or the browser storage)
   final FirebaseFirestore fresh = FirebaseFirestore.instanceFor(app: app);
 }
 
+<<<<<<< HEAD
 // ../../docs/guides/offline_persistence.md:289
 Future<void> offlinePersistenceGuideLine289() async {
+=======
+// ../../docs/guides/offline_persistence.md:321
+Future<void> offlinePersistenceGuideLine321() async {
+>>>>>>> 37f75f1e (Show the number of writes waiting for the backend)
   final indexes = firestore.persistentCacheIndexManager; // null with a memory cache
   await indexes?.enableIndexAutoCreation();
 }

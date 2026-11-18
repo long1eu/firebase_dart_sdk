@@ -279,6 +279,9 @@ class _CountingMutationQueue implements MutationQueue {
   Future<bool> isEmpty() => _subject.isEmpty();
 
   @override
+  Future<int> getMutationBatchCount() => _subject.getMutationBatchCount();
+
+  @override
   Future<int> getHighestUnacknowledgedBatchId({
     bool skipOtherClients = false,
   }) => _subject.getHighestUnacknowledgedBatchId(

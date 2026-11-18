@@ -889,6 +889,15 @@ class LocalStore implements BundleCallback {
     return _mutationQueue.getHighestUnacknowledgedBatchId();
   }
 
+  /// Returns the number of batches in the current user's mutation queue: the writes the backend has not acknowledged
+  /// or rejected yet. In a transaction, so that a SQLite queue sees what other clients of the cache committed.
+  Future<int> getPendingWriteCount() {
+    return _persistence.runTransactionAndReturn(
+      'Get pending write count',
+      () => _mutationQueue.getMutationBatchCount(),
+    );
+  }
+
   /// Like [getHighestUnacknowledgedBatchId], among the batches that this client sends (see [getNextMutationBatch]): the
   /// batch whose acknowledgement completes `waitForPendingWrites`.
   Future<int> getHighestBatchIdToSend() {

@@ -172,10 +172,12 @@ class FirebaseFirestore
   get persistentCacheIndexManager: PersistentCacheIndexManager
   get projectId: String
   get settings: Settings
+  getPendingWriteCount(): Future<int>
   loadBundle(List<int> bundleData): LoadBundleTask
   loadBundleStream(Stream<List<int>> bundleData): LoadBundleTask
   namedQuery(String name): Future<Query<Map<String, Object>>>
   namedQueryGet(String name, {GetOptions options}): Future<QuerySnapshot<Map<String, Object>>>
+  pendingWriteCounts(): Stream<int>
   querySnapshotsFromJson(Map<String, Object> json, {bool includeMetadataChanges, ListenSource source, FirestoreDataConverter<dynamic> converter}): Stream<QuerySnapshot<dynamic>>
   runBatch((.WriteBatch) -> dart.async.Future batchFunction): Future<void>
   runTransaction((.Transaction) -> dart.async.Future updateFunction, {Duration timeout, int maxAttempts, bool readOnly, Timestamp readTime}): Future<dynamic>
