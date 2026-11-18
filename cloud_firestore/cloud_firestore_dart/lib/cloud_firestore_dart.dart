@@ -1,5 +1,5 @@
 /// A pure-Dart Cloud Firestore client for the Dart VM and Flutter, with
-/// experimental web support (REST and WebChannel over `fetch`).
+/// web support in Chrome (REST and WebChannel over `fetch`).
 ///
 /// Start from [FirebaseFirestore.instanceFor] with a `FirebaseApp` created with
 /// `package:firebase_app_dart`, then use [FirebaseFirestore.collection] and

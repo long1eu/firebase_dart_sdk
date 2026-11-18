@@ -8,7 +8,7 @@ on top of [`sqlite3`](https://pub.dev/packages/sqlite3). It is not affiliated wi
 Firebase.
 
 > **Status: 0.1.2.** The openers were the `example/` files of `cloud_firestore_dart` 0.1.1 that
-> apps had to copy. The browser storage is **experimental**. Run on macOS (Dart VM, `sqlite3`
+> apps had to copy. The browser storage is **supported in Chrome**, tested against the Firestore emulator; other browsers are untested. Run on macOS (Dart VM, `sqlite3`
 > 2.9.4 and 3.9.1) and in headless Chrome (dart2js and dart2wasm, `sqlite3` 2.9.4 and 3.9.1),
 > against the Firestore emulator, and in one Flutter Linux desktop app (Debian 13 x86_64,
 > `sqlite3` 3.5.2, a cache read back after a restart, 2026-11-16). On Windows 11 x64

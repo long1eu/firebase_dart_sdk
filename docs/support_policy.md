@@ -33,7 +33,7 @@ As tested in this repository (details in [docs/guides/platforms.md](guides/platf
 | Dart VM on Linux | CI on Ubuntu x64: the unit, integration (three transports) and Enterprise suites on every change, the browser suite on dart2wasm when a change touches what it covers, and nightly the browser suite on both compilers, the scale soak and the long property runs; unit and standard integration suites in a Debian arm64 container (`tool/linux/run_in_container.sh`); the unit suite in a Debian container on linux/amd64 nightly | supported |
 | Dart VM on Windows | not tested | expected to work; see the notes on `sqlite3.dll` and file locks in the platforms guide |
 | Flutter apps (Android, iOS, desktop) | not run by the tests; the client runs on the Dart VM there, like on a server | expected to work |
-| Web, Chrome | browser suite in Chrome with dart2wasm and dart2js against the emulator; the standard integration suite on the VM over the web transport (REST, WebChannel, WebChannel with long polling) | **experimental** |
+| Web, Chrome | browser suite in Chrome with dart2wasm and dart2js against the emulator; the standard integration suite on the VM over the web transport (REST, WebChannel, WebChannel with long polling) | **supported in Chrome** |
 | Web, other browsers | not tested | unknown |
 
 Backends:

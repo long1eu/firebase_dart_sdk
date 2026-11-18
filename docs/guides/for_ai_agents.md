@@ -332,8 +332,7 @@ Names that are the same here: `collection`, `doc`, `collectionGroup`, `add`, `de
 7. **What needs `dart:io`.** `package:firebase_auth_providers_dart/adc.dart` and any
    `Platform.environment` you read. `cloud_firestore_dart_sqlite` compiles everywhere. The main
    libraries of the three packages also compile for the web.
-8. **Experimental or preview.** The web (tested in Chrome against the emulator only), Firestore
-   Lite (`lite.dart`) and Pipelines (`pipelines.dart`, Enterprise edition only). These, and
+8. **Experimental or preview.** Firestore Lite (`lite.dart`) and Pipelines (`pipelines.dart`, Enterprise edition only). These, and
    `package:firebase_app_dart/internal.dart`, are outside any compatibility promise.
 9. **Errors.** A failed operation reports a `FirestoreException`; compare
    `FirestoreErrorCode` values through `e.errorCode` (`e.code` is FlutterFire's string, such as

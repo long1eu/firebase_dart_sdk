@@ -388,7 +388,7 @@ On the Dart VM and in Flutter the client uses gRPC over HTTP/2 (`remote/datastor
   first request of a new connection.
 
 In the browser the client uses WebChannel for the listen and write streams and REST for one-shot calls
-([Platforms](platforms.md#the-web-experimental)). It switches a stream to long polling when the first response
+([Platforms](platforms.md#the-web-supported-in-chrome)). It switches a stream to long polling when the first response
 does not arrive within 10 seconds (`webExperimentalAutoDetectLongPolling`, on by default), which is how a
 buffering proxy shows. Long polling works on every network but makes a new request for every batch of changes.
 

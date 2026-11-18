@@ -1,5 +1,5 @@
-/// A pure-Dart `FirebaseApp` for the Dart VM and Flutter, with experimental
-/// web support.
+/// A pure-Dart `FirebaseApp` for the Dart VM and Flutter, with web support
+/// in Chrome.
 ///
 /// Create an app with [FirebaseApp.withOptions] and a set of
 /// [FirebaseOptions], then hand it to a service such as
