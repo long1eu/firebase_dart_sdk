@@ -258,11 +258,20 @@ Future<void> main(List<String> arguments) async {
   await finished.future;
   watchdog?.cancel();
   if (browserName == 'safari') {
-    // Close the tabs this run opened in the user's Safari.
-    await Process.run('osascript', <String>[
+    // Close the tab this run opened in the user's Safari. Needs the Automation permission for Safari; without it
+    // (over ssh, for example) osascript can wait on a prompt, hence the timeout: the tab then stays open.
+    final Process close = await Process.start('osascript', <String>[
       '-e',
       'tell application "Safari" to close (every tab of every window whose URL starts with "$origin")',
     ]);
+    await close.exitCode.timeout(
+      const Duration(seconds: 10),
+      onTimeout: () {
+        close.kill();
+        stderr.writeln('Could not close the Safari tab at $origin');
+        return -1;
+      },
+    );
   }
   browser.kill();
   await browser.exitCode;
