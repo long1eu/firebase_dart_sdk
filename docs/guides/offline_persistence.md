@@ -291,14 +291,16 @@ What the app gives up:
   followed by a `set` succeeds instead of failing.
 
 For one document set once and updated 100,000 times offline (`tool/bench/offline_forever_bench.dart`,
-`hot` and `drainhot`, on an Apple M4 Pro against a local emulator):
+`hot` and `drainhot`, one run on a Mac mini with an Apple M4 Pro against a local emulator 1.21.0, with other
+runs going at the same time, so single numbers can be off by tens of percent; see
+[Long offline use, measured](long_offline.md#what-was-measured-and-how)):
 
 | | off | on |
 |---|---|---|
 | pending writes | 100,001 | 1 |
 | cache file, public API | 34 MB | 3 MB (mostly the SQLite log) |
-| time per offline write, public API | 90 us | 116 us |
-| `enableNetwork` until `waitForPendingWrites` completes | 132 s | 0.45 s |
+| time per offline write, public API | 133 us | 227 us |
+| `enableNetwork` until `waitForPendingWrites` completes | 256 s | 0.09 s |
 | billed writes | 100,001 | 1 |
 
 For what a queue of thousands or millions of pending writes costs, with the numbers, see
@@ -390,7 +392,7 @@ What to know (all measured in Chrome against the emulator; other browsers are un
   size limit of 100 MB starts removing unused documents before 100,000 documents.
   [Platforms](platforms.md#the-web-supported-in-chrome) has the measurements.
 - **Size.** The persistent cache adds about 220 KB of JavaScript (60 KB gzipped) to a small
-  app, plus the `sqlite3.wasm` file (759 KB, 364 KB gzipped); the OPFS worker is 183 KB more.
+  app, plus the `sqlite3.wasm` file (759 KB, 364 KB gzipped); the OPFS worker is 174 KB more (54 KB gzipped, built with `sqlite3` 3.9.1).
 - `clearPersistence()` deletes the IndexedDB database or the OPFS directory.
 
 ## Deleting the cache

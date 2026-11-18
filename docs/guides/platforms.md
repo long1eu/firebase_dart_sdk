@@ -73,7 +73,7 @@ listen and write streams, over `fetch`. What to know:
   the IndexedDB database or the OPFS directory. Cost, measured for a small app compiled with
   `dart compile js -O2`: 588 KB (180 KB gzipped) with a memory cache, 807 KB (239 KB gzipped)
   with the persistent cache, plus `sqlite3.wasm`, 759 KB (364 KB gzipped); the OPFS worker is
-  183 KB more (`-O2`).
+  174 KB more (`-O2`, 54 KB gzipped, built with `sqlite3` 3.9.1; 185 KB with 2.9.4).
   - Crash safety: what a write future acknowledged is stored, and a tab that dies in the middle
     of a transaction loses only that transaction (SQLite's rollback journal is stored too and
     is applied on the next open). Tested by killing a worker at random moments, 2700 times on

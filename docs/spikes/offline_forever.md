@@ -4,7 +4,7 @@
 > pending writes and the keys kept per batch) are fixed in the change that adds this document; the numbers below
 > are those before the fix, and the changelog of `cloud_firestore_dart` has the ones after.
 >
-> **Update, 2026-11-18, later the same day.** Most of the list at the end has landed since (#58 to #66 and
+> **Update, 2026-11-18, later the same day.** Most of the list at the end has landed since (#58 to #68 and
 > two commits without a number, see the notes at each item). **The numbers in this document are historical:
 > they describe the code before those changes, and several are now wrong by orders of magnitude.** The same
 > tool, `tool/bench/offline_forever_bench.dart`, was run again on the current code, on the same machine, with the
@@ -323,7 +323,8 @@ on the client's queue): that is the normal LRU cost, not specific to being offli
    index `(uid, collection_group, largest_batch_id)` makes one fill run read 50 rows instead of sorting the group
    (6.5 s to milliseconds) and the full fill linear. The Android SDK creates the same two overlay indexes (`SQLiteSchema.java:713`), so
    it probably has the same plan; worth a look before choosing the fix.
-   > **Landed** in #58: a unary `+` keeps the read of a collection on the primary key, and schema 20 adds
+   > **Landed** in #58 (and #68, which reads the newest pending writes of a collection through the batch id index again,
+   > after #58 made an indexed query read every overlay of the collection): a unary `+` keeps the read of a collection on the primary key, and schema 20 adds
    > `(uid, collection_group, largest_batch_id)` for the index fill (built once on open, about 1 s for 1,000,000
    > pending writes). A fill over many small collections was also made cheaper in #65. The collection group
    > case is no longer quadratic in the overlay reads, but it is still one query per parent collection.
