@@ -1,5 +1,9 @@
 # Spike: a year offline, what grows and what it costs
 
+> **Status.** Measured on 2026-11-18, before any fix. Items 1 and 4 of the list at the end (the query plan of the
+> pending writes and the keys kept per batch) are fixed in the change that adds this document; the numbers below
+> are those before the fix, and the changelog of `cloud_firestore_dart` has the ones after.
+
 **The answer.** Yes for writes and reads by key, no for queries as the library is today. An app on a SQLite
 cache can stay offline for a year: a write costs the same 0.15 to 0.2 ms with 10 million pending writes as with
 10,000, a document read by key stays at 20 to 35 us, reopening the cache takes a few milliseconds at any size, and
