@@ -61,7 +61,7 @@ flowchart LR
 
 **Why a memory cache.** A persistent cache would keep the writes of an earlier visit, and the
 client starts its write stream for them as soon as it starts, before `disableNetwork()` runs. A memory
-cache starts empty every time, needs no `sqlite3.wasm` (about 730 KB), stores nothing on the
+cache starts empty every time, needs no `sqlite3.wasm` (about 760 KB), stores nothing on the
 visitor's device, and makes **Reset** simple: the page terminates the instance, which drops its
 cache and its pending writes, and opens a new one.
 
@@ -82,8 +82,8 @@ dart run bin/serve.dart 8000  # serves build/web on http://localhost:8000/
 `build.sh` writes the whole site to `build/web`:
 
 ```sh
-dart compile js -O2 --no-source-maps -o build/web/main.dart.js web/main.dart
 dart compile wasm -O2 --no-source-maps -o build/web/main.wasm web/main.dart
+dart compile js -O2 --no-source-maps -o build/web/main.dart.js web/main.dart   # the fallback
 cp web/index.html web/styles.css web/bootstrap.js web/favicon.svg build/web/
 ```
 
