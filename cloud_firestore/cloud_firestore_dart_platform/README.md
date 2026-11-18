@@ -11,8 +11,11 @@ implementation of their own: add it to `pubspec.yaml` and it registers itself. O
 everywhere. It is not affiliated with or endorsed by Google or Firebase.
 
 > **Status: 0.1.0; built against the 0.2 API of `cloud_firestore_dart`.** Tested with `flutter test` against the Firestore emulator through the
-> classes of `cloud_firestore` 7.1.0. One Flutter Linux desktop app ran on it (Debian 13 x86_64, debug build,
-> against the emulator, 2026-11-16); it has not run on a device or on another desktop yet.
+> classes of `cloud_firestore` 7.1.0. Tried on Debian 13 (trixie), x86_64, Flutter 3.44.9, on 2026-11-16: the Linux
+> desktop app [`examples/flutterfire_on_linux`](https://github.com/long1eu/firebase_dart_sdk/tree/main/examples/flutterfire_on_linux)
+> built in debug, registered this package automatically and passed its integration tests (live list, writes, batch,
+> transaction, query, disk cache across a restart) against the emulator under Xvfb. On Windows 11 see the table
+> below. Not yet run on a device or against a production project.
 
 ## When to use it
 
@@ -192,7 +195,7 @@ What `cloud_firestore` can ask of a platform implementation, and what this one d
 
 | Platform | Selected by | Notes |
 | --- | --- | --- |
-| Linux | automatic (`dartPluginClass`) | `DartFirebaseCore` is installed too; registration checked with `flutter pub get` in a throwaway app only |
+| Linux | automatic (`dartPluginClass`) | `DartFirebaseCore` is installed too; tried in a debug build on Debian 13 x86_64 with Flutter 3.44.9 (`examples/flutterfire_on_linux`) |
 | Windows | `CloudFirestoreDart.use()` | `firebase_core` stays native. Run on Windows 11 x64 (Flutter 3.47.8, against the emulator): `examples/flutterfire_on_windows` passed its integration tests, sum and average aggregations included, and the disk cache across a restart. The native Firestore of `cloud_firestore` is still built and linked, unused |
 | macOS, Android, iOS | `CloudFirestoreDart.use()` | `firebase_core` stays native; not run on these platforms yet |
 | Web | `CloudFirestoreDart.use()` | `cloud_firestore_dart` on the web is supported in Chrome; not run through this package |

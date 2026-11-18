@@ -15,7 +15,7 @@ on that date:
   built and run on 2026-11-16, with `cloud_firestore_dart_platform` 0.1.0 from pub.dev: Debian 13 x86_64,
   Flutter 3.44.9, debug build under Xvfb, Firestore emulator only. Its 3 integration tests that drive the
   window passed, and so did a disk-cache test across a restart with the emulator stopped. Source: the run
-  record in the README of the `flutterfire_on_linux` example, which is not on `main` yet.
+  record in the README of [`examples/flutterfire_on_linux`](../examples/flutterfire_on_linux/).
 - `firebase_admin_dart` 0.1.0 is on `main` (`firebase_admin/firebase_admin_dart`): Firebase Auth custom
   tokens, users, custom claims and ID token verification. Checked with unit tests and the Auth emulator (its
   README). See the 2026-11-18 update below for its first run against a real project.

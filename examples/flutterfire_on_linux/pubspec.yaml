@@ -1,0 +1,34 @@
+name: flutterfire_on_linux
+description: >-
+  A Flutter Linux desktop app written against the official FlutterFire API
+  (firebase_core, cloud_firestore), running on cloud_firestore_dart through
+  cloud_firestore_dart_platform.
+publish_to: none
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.8.0
+
+dependencies:
+  # The official FlutterFire packages: the app code imports only these two.
+  cloud_firestore: ^7.1.0
+  # Implements cloud_firestore (and firebase_core) on Linux. Flutter registers
+  # it before main() through its dartPluginClass; the app does not import it,
+  # except for the optional disk cache (lib/disk_cache.dart).
+  cloud_firestore_dart_platform: ^0.1.0
+  # The SQLite opener of the optional disk cache (--dart-define=DISK_CACHE=true).
+  cloud_firestore_dart_sqlite: ^0.1.0
+  firebase_core: ^5.1.0
+  flutter:
+    sdk: flutter
+  path_provider: ^2.1.6
+
+dev_dependencies:
+  flutter_lints: ^6.0.0
+  flutter_test:
+    sdk: flutter
+  integration_test:
+    sdk: flutter
+
+flutter:
+  uses-material-design: true
