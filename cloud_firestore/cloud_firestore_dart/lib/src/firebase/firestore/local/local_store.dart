@@ -403,6 +403,7 @@ class LocalStore implements BundleCallback {
         mutations,
       );
       _documentKeysByBatchId[batch.batchId] = batch.keys;
+      _localDocuments.forgetPendingWrites(batch.keys);
       // Apply the new batch on top of the current local view and save the resulting overlays.
       ImmutableSortedMap<DocumentKey, MaybeDocument> changedDocuments =
           DocumentCollections.emptyMaybeDocumentMap();
@@ -466,8 +467,14 @@ class LocalStore implements BundleCallback {
       await _mutationQueue.performConsistencyCheck();
 
       await _documentOverlayCache.removeOverlaysForBatchId(batch.batchId);
-      await _localDocuments.recalculateAndSaveOverlays(
+      // DEVIATION FROM UPSTREAM: the overlays are recalculated from a summary of the remaining batches of each document
+      // that the previous acknowledgement of the document kept, not by applying those batches one by one, which made
+      // draining many pending writes with a transform on one document quadratic. The overlays and local views are the
+      // same (see LocalDocumentsView.recalculateAndSaveOverlaysAfterAcknowledgement).
+      await _localDocuments.recalculateAndSaveOverlaysAfterAcknowledgement(
+        batch,
         _getKeysWithTransformResults(batchResult),
+        _persistence.changesByOtherClients,
       );
       // As the JS SDK: the batch is gone from the queue, so are its cached keys (a failed commit leaves the batch in
       // the queue, where lookupMutationDocuments finds it again).
@@ -494,6 +501,7 @@ class LocalStore implements BundleCallback {
       await _mutationQueue.performConsistencyCheck();
 
       await _documentOverlayCache.removeOverlaysForBatchId(batchId);
+      _localDocuments.forgetPendingWrites(toReject.keys);
       await _localDocuments.recalculateAndSaveOverlays(toReject.keys);
       _documentKeysByBatchId.remove(batchId);
 

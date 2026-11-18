@@ -207,6 +207,9 @@ class SQLitePersistence extends Persistence {
   int foreignCommitsSeen = 0;
 
   @override
+  int get changesByOtherClients => foreignCommitsSeen;
+
+  @override
   bool started = false;
 
   @override
