@@ -267,6 +267,36 @@ class Int32Value
   static final maxValue: int
   static final minValue: int
   toString(): String
+class JsSdkCacheImportException
+  final message: String
+  final reason: JsSdkCacheImportRefusal
+  new JsSdkCacheImportException(JsSdkCacheImportRefusal reason, String message)
+  toString(): String
+enum JsSdkCacheImportRefusal
+  new JsSdkCacheImportRefusal(int #index, String #name)
+  static final jsClientActive: JsSdkCacheImportRefusal
+  static final memoryCache: JsSdkCacheImportRefusal
+  static final pendingWritesInCache: JsSdkCacheImportRefusal
+  static final pendingWritesNotImported: JsSdkCacheImportRefusal
+  static final unreadableWrites: JsSdkCacheImportRefusal
+  static final unsupportedSchemaVersion: JsSdkCacheImportRefusal
+  static final values: List<JsSdkCacheImportRefusal>
+class JsSdkCacheImportResult
+  final batches: int
+  final databaseName: String
+  final documents: int
+  final skipped: List<String>
+  final status: JsSdkCacheImportStatus
+  final users: int
+  new JsSdkCacheImportResult({JsSdkCacheImportStatus status, String databaseName, int users, int batches, int documents, List<String> skipped})
+  toString(): String
+enum JsSdkCacheImportStatus
+  new JsSdkCacheImportStatus(int #index, String #name)
+  static final imported: JsSdkCacheImportStatus
+  static final noJsDatabase: JsSdkCacheImportStatus
+  static final notOnWeb: JsSdkCacheImportStatus
+  static final nothingToImport: JsSdkCacheImportStatus
+  static final values: List<JsSdkCacheImportStatus>
 enum ListenSource
   new ListenSource(int #index, String #name)
   static final cache: ListenSource
@@ -521,3 +551,5 @@ class WriteBatch
   delete(DocumentReference<Object> documentRef): WriteBatch
   set(DocumentReference<dynamic> documentRef, dynamic data, [SetOptions options]): WriteBatch
   update(DocumentReference<Object> documentRef, Map<Object, Object> data): WriteBatch
+deleteJsSdkCache(FirebaseFirestore firestore, {bool discardPendingWrites, String jsAppName}): Future<bool>
+importJsSdkCache(FirebaseFirestore firestore, {bool includeDocuments, bool allowMemoryCache, String jsAppName}): Future<JsSdkCacheImportResult>

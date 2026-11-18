@@ -1,0 +1,11 @@
+{
+  "name": "js-import-spike",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "firebase": "^12.0.0"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.0"
+  }
+}

@@ -1,0 +1,8 @@
+.dart_tool/
+out/
+web/sqlite3.wasm
+web/*.js
+web/*.mjs
+web/*.wasm
+web/*.map
+web/*.deps

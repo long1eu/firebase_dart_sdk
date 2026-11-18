@@ -112,6 +112,7 @@ export 'src/firebase/firestore/geo_point.dart';
 export 'src/firebase/firestore/get_options.dart';
 export 'src/firebase/firestore/int32_value.dart';
 export 'src/firebase/firestore/listen_source.dart';
+export 'src/firebase/firestore/js_sdk_cache_import.dart';
 export 'src/firebase/firestore/load_bundle_task.dart'
     hide LoadBundleTaskInternal;
 export 'src/firebase/firestore/load_bundle_task_progress.dart'

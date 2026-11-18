@@ -21,11 +21,25 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/local/persistance/gl
 class MemoryGlobalsCache implements GlobalsCache {
   Uint8List _sessionToken = Uint8List(0);
 
+  final Map<String, Uint8List> _values = <String, Uint8List>{};
+
   @override
   Future<Uint8List> getSessionToken() async => _sessionToken;
 
   @override
   Future<void> setSessionToken(Uint8List value) async {
     _sessionToken = value;
+  }
+
+  @override
+  Future<Uint8List?> getValue(String name) async => _values[name];
+
+  @override
+  Future<void> setValue(String name, Uint8List? value) async {
+    if (value == null) {
+      _values.remove(name);
+    } else {
+      _values[name] = value;
+    }
   }
 }

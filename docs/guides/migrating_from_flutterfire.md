@@ -165,6 +165,12 @@ final FirebaseFirestore persistent = FirebaseFirestore.instanceFor(
 [Offline persistence](offline_persistence.md) has the details, including the web cache
 (IndexedDB or OPFS) and hot restart.
 
+On the web FlutterFire runs the official JS SDK, whose cache this package does not read. To keep
+the writes a user left pending with the FlutterFire version of a web app, call the experimental
+`importJsSdkCache` at start-up: see
+[Switching from the official JS SDK](web.md#switching-from-the-official-js-sdk). On Android, iOS
+and macOS the native SDKs' caches are not imported.
+
 ### Authentication
 
 FlutterFire's `firebase_auth` signs the user in and the Firestore plugin picks the user up by

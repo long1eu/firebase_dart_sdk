@@ -1,5 +1,15 @@
 ## (unreleased)
 
+- Experimental, web: `importJsSdkCache(firestore)` imports the IndexedDB cache of the official
+  Firebase JS SDK (or of FlutterFire on the web) once, so that a web app switching to this SDK
+  keeps the writes its users left pending: the pending writes of every user, in order, and the
+  cached documents (not the targets, resume tokens, indexes or bundles). Exactly once across
+  crashes; refuses while a JS tab may be open, for unknown schema versions (5 to 18 are read),
+  when the cache already has pending writes of the same user, and with a memory cache unless
+  `allowMemoryCache: true` (a reload would lose the imported writes).
+  `deleteJsSdkCache(firestore)` deletes the JS database. A no-op off the web. See "Switching from the official JS SDK" in
+  `docs/guides/web.md`.
+
 - Docs only, no code change: the web (browser) support is now described as supported in Chrome
   (tested against the emulator; other browsers untested) instead of experimental.
 - Experimental, not in the official SDKs, off by default: `mergeUnsentWrites` on
