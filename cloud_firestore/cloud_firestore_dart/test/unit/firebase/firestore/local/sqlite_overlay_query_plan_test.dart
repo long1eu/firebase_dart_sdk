@@ -47,6 +47,28 @@ void main() {
   );
 
   test(
+    'the few overlays after a batch are counted and read through the batch id index',
+    () async {
+      await SQLiteSchema(db).runMigrations();
+      final String count = await plan(
+        SQLiteDocumentOverlayCache.fewNewOverlaysSql,
+        <Object>['', 5, 1000],
+      );
+      expect(
+        count,
+        contains(
+          'COVERING INDEX batch_id_overlay (uid=? AND largest_batch_id>?)',
+        ),
+      );
+      final String read = await plan(
+        SQLiteDocumentOverlayCache.newOverlaysOfCollectionSql,
+        <Object>['', 5, 'c'],
+      );
+      expect(read, contains('batch_id_overlay (uid=? AND largest_batch_id>?)'));
+    },
+  );
+
+  test(
     'the next overlays of a collection group are read in batch order from an index, without sorting the group',
     () async {
       await SQLiteSchema(db).runMigrations();
