@@ -159,13 +159,13 @@ has the numbers of a program without the opener.
   the backend unreachable, the read and the write fail with
   `unavailable: Request failed with error: TypeError: Failed to fetch`.
 - Not run against a real Firebase project, and not in other browsers.
-- The two screenshots above (taken with 0.1; the page did not change): built with
-  `dart compile js -O2` as described, served by
-  `bin/serve.dart`, opened in headless Chrome with `?emulator=127.0.0.1:8141` and driven over the
-  Chrome DevTools protocol (memory cache, Dart 3.12.2, Firestore emulator v1.22.0). The dark
-  captures (`web_app_online_dark.png`, `web_app_offline_dark.png`) were taken the same way on
-  2026-11-18 against a private emulator (`tool/start_private_emulator.sh 8341`), with
-  `--blink-settings=preferredColorScheme=0`: the page's own dark colours from `styles.css`.
+- The screenshots above, light and dark (2026-11-18, with 0.2.0): built with
+  `dart compile js -O2` as described, served by `bin/serve.dart`, opened in headless Chrome
+  with `?emulator=127.0.0.1:8341` against a private emulator (`tool/start_private_emulator.sh
+  8341`) and driven over the Chrome DevTools protocol (memory cache, Dart 3.12.2, Firestore
+  emulator v1.22.0). Each state was captured twice from the same page, with
+  `prefers-color-scheme` emulated as light and as dark: the dark one shows the page's own dark
+  colours from `styles.css`.
 
 ## A real project
 
