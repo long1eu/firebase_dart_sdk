@@ -119,12 +119,15 @@ Future<void> main(List<String> arguments) async {
     return;
   }
   int runs = 5;
+  String browserName = 'chrome';
   final Set<String> parts = <String>{};
   for (final String a in arguments) {
     if (a.startsWith('--engines=')) {
       engines = a.substring(10).split(',');
     } else if (a.startsWith('--compilers=')) {
       compilers = a.substring(12).split(',');
+    } else if (a.startsWith('--browser=')) {
+      browserName = a.substring(10);
     } else if (a.startsWith('--runs=')) {
       runs = int.parse(a.substring(7));
     } else {
@@ -202,16 +205,30 @@ Future<void> main(List<String> arguments) async {
     'web_idb_chrome',
   );
   arm();
-  final Process browser = await Process.start(chrome, <String>[
-    '--headless=new',
-    '--user-data-dir=${profile.path}',
-    '--no-first-run',
-    '--no-default-browser-check',
-    '--disable-extensions',
-    '--disable-background-timer-throttling',
-    '--disable-renderer-backgrounding',
-    '$origin/${steps.first.url}',
-  ]);
+  // Chrome and Firefox run headless on a fresh profile. Safari has no headless mode and no profile option: the
+  // page opens in the Safari of the logged-in user (a new database name per run, see the pages).
+  final String first = '$origin/${steps.first.url}';
+  final Process browser = switch (browserName) {
+    'firefox' => await Process.start(
+      '/Applications/Firefox.app/Contents/MacOS/firefox',
+      <String>['--headless', '--no-remote', '--profile', profile.path, first],
+    ),
+    'safari' => await Process.start('/usr/bin/open', <String>[
+      '-a',
+      'Safari',
+      first,
+    ]),
+    _ => await Process.start(chrome, <String>[
+      '--headless=new',
+      '--user-data-dir=${profile.path}',
+      '--no-first-run',
+      '--no-default-browser-check',
+      '--disable-extensions',
+      '--disable-background-timer-throttling',
+      '--disable-renderer-backgrounding',
+      first,
+    ]),
+  };
   unawaited(browser.stdout.drain<void>());
   unawaited(browser.stderr.drain<void>());
   await finished.future;
