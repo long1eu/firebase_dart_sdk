@@ -1,4 +1,4 @@
-// Keeping the user signed in across restarts: a file-backed AuthStorage,
+// Keeping the user signed in across restarts: the package's FileAuthStorage,
 // against the Firebase Auth emulator.
 //
 //     tool/start_auth_emulators.sh        (repository root; needs the firebase CLI)
@@ -7,71 +7,22 @@
 // The program plays two runs of a command line tool: the first signs in, the
 // second finds the user signed in. The session file goes to a temporary
 // directory that the program removes at the end; a real tool keeps it in the
-// configuration directory of the user. Dart VM only (dart:io).
+// configuration directory of the user. Dart VM only (dart:io); on the web use
+// WebAuthStorage.
 //
 // The stored value holds the refresh token: whoever reads it can act as the
-// user. This storage creates the file readable by its owner only (mode 0600,
-// in a directory with mode 0700) on macOS and Linux. On Windows, on iOS and
-// Android, and in Flutter apps in general, use the secret store of the
-// platform instead (for example flutter_secure_storage).
+// user. FileAuthStorage writes the file readable by its owner only (mode 0600,
+// in a directory with mode 0700) on macOS and Linux; on Windows the file
+// inherits the access list of its directory (keep it in the user's profile).
+// In Flutter apps on mobile, the secret store of the platform (for example
+// flutter_secure_storage) is the better place.
 
 // ignore_for_file: avoid_print
 
-import 'dart:convert';
 import 'dart:io';
 
 import 'package:firebase_app_dart/firebase_app_dart.dart';
 import 'package:firebase_auth_providers_dart/firebase_auth_providers_dart.dart';
-
-/// An [AuthStorage] that keeps its values in a JSON file.
-class FileAuthStorage implements AuthStorage {
-  /// Creates a storage on top of [file], which need not exist yet.
-  FileAuthStorage(this.file);
-
-  /// The file that holds the values.
-  final File file;
-
-  Map<String, Object?> _readAll() {
-    if (!file.existsSync()) {
-      return <String, Object?>{};
-    }
-    return jsonDecode(file.readAsStringSync()) as Map<String, Object?>;
-  }
-
-  @override
-  String? read(String key) => _readAll()[key] as String?;
-
-  @override
-  Future<void> write(String key, String? value) async {
-    final Map<String, Object?> values = _readAll();
-    if (value == null) {
-      values.remove(key);
-    } else {
-      values[key] = value;
-    }
-    if (!file.existsSync()) {
-      await _createPrivate(file);
-    }
-    // Write a copy and rename it over the file, so that a crash never leaves
-    // half a file behind. The copy is private before it holds anything.
-    final File copy = File('${file.path}.tmp');
-    await _createPrivate(copy);
-    await copy.writeAsString(jsonEncode(values), flush: true);
-    await copy.rename(file.path);
-  }
-
-  /// Creates [target] (and its directory) readable by its owner only.
-  static Future<void> _createPrivate(File target) async {
-    final bool newDirectory = !target.parent.existsSync();
-    await target.create(recursive: true);
-    if (Platform.isMacOS || Platform.isLinux) {
-      if (newDirectory) {
-        await Process.run('chmod', <String>['700', target.parent.path]);
-      }
-      await Process.run('chmod', <String>['600', target.path]);
-    }
-  }
-}
 
 const FirebaseOptions _options = FirebaseOptions(
   apiKey: 'fake-api-key',
@@ -113,11 +64,12 @@ Future<void> main() async {
       );
       print('fresh ID token for the user: ${token.claims['user_id'] == uid}');
       // Deleting the account signs out (as signOut() does), which removes the
-      // session from the file.
+      // session from the storage.
       await auth.deleteCurrentUser();
       return uid;
     });
-    print('session left in the file: ${sessionFile.readAsStringSync()}');
+    // The last value gone, FileAuthStorage removes the file.
+    print('session file removed: ${!sessionFile.existsSync()}');
   } finally {
     await home.delete(recursive: true);
   }
@@ -133,7 +85,7 @@ Future<String> _run(
   final FirebaseApp app = FirebaseApp.withOptions(_options);
   final FirebaseUserAuth auth = await FirebaseUserAuth.forApp(
     app,
-    storage: FileAuthStorage(sessionFile),
+    storage: FileAuthStorage(sessionFile.path),
     emulatorHost: emulator,
   );
   try {

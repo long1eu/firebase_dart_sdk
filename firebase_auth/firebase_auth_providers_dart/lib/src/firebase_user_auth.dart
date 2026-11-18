@@ -7,13 +7,18 @@ import 'package:http/http.dart' as http;
 import 'package:meta/meta.dart';
 
 import 'action_code.dart';
+import 'auth_credential.dart';
 import 'auth_exception.dart';
 import 'auth_storage.dart';
 import 'auth_user.dart';
-import 'environment_stub.dart' if (dart.library.io) 'environment_io.dart';
+import 'user_record.dart';
+import 'password_policy.dart';
+import 'environment_stub.dart'
+    if (dart.library.io) 'environment_io.dart'
+    if (dart.library.js_interop) 'environment_web.dart';
 
 /// Firebase Auth user sign-in over the Identity Toolkit and Secure Token REST APIs: anonymous, email and password,
-/// and custom tokens.
+/// email link, custom tokens, and federated providers by token exchange.
 ///
 /// It is the token provider of a [FirebaseApp]: Firestore sends the ID token of the signed-in user with every
 /// request (so the security rules see `request.auth`), and follows sign-in, sign-out and a switch of users like the
@@ -43,11 +48,13 @@ import 'environment_stub.dart' if (dart.library.io) 'environment_io.dart';
 /// }
 /// ```
 ///
-/// **Sign-in.** [signInAnonymously], [createUserWithEmailAndPassword], [signInWithEmailAndPassword] and
-/// [signInWithCustomToken] each replace the current user (if any) and return the new one. They complete after
-/// [userChanges] and [onTokenChanged] have emitted and their listeners had a turn of the event loop, so a
-/// Firestore write issued right after belongs to the new user. When two sign-ins overlap, the later one wins and
-/// the earlier one throws `cancelled`.
+/// **Sign-in.** [signInAnonymously], [createUserWithEmailAndPassword], [signInWithEmailAndPassword],
+/// [signInWithEmailLink], [signInWithCustomToken] and [signInWithCredential] each replace the current user (if any)
+/// and return a [UserCredential]: the new user (read from the backend with `accounts:lookup`, like the JS SDK) with
+/// [AdditionalUserInfo]. They complete after [userChanges], [authStateChanges], [idTokenChanges] and
+/// [onTokenChanged] have emitted and their listeners had a turn of the event loop, so a Firestore write issued
+/// right after belongs to the new user. When two sign-ins overlap, the later one wins and the earlier one throws
+/// `cancelled`. [linkWithCredential], [reauthenticateWithCredential] and [unlink] act on the signed-in user.
 ///
 /// **Token refresh.** The ID token lives for an hour. It is refreshed with the refresh token when it is within
 /// five minutes ([refreshBefore]) of its expiry: on demand when a token is requested ([getAccessToken]), and
@@ -55,8 +62,10 @@ import 'environment_stub.dart' if (dart.library.io) 'environment_io.dart';
 /// retried after 30 seconds, then 1, 2, 4, 8 and 16 minutes. A refresh that the backend refuses because the
 /// session ended (the account was deleted or disabled, the refresh token revoked) signs the user out.
 ///
-/// **Sign-out.** [signOut] forgets the session here and in the storage. It does not revoke the refresh token on
-/// the backend, like the other Firebase SDKs.
+/// **Sign-out.** [signOut] removes the session from this instance and from the storage. It does not revoke the
+/// refresh token on the backend, like the other Firebase SDKs; and, like the user objects of the JS SDK, an
+/// [AuthUser] or [UserCredential] handed out before keeps its session: [updateCurrentUser] with it signs that user
+/// in again. Drop those objects to forget the session in memory.
 ///
 /// **Session.** The session (the refresh token) is kept in an [AuthStorage]; the default, [InMemoryAuthStorage],
 /// forgets it when the process ends. [restore] (called by [forApp]) loads a stored session.
@@ -72,10 +81,11 @@ import 'environment_stub.dart' if (dart.library.io) 'environment_io.dart';
 /// unit tests and against the emulator.
 ///
 /// Account management follows the REST-backed operations of the JS SDK: password reset, email verification and
-/// action codes, email, password and profile updates, reauthentication with a password, account deletion, and
-/// the sign-in methods of an email address. This is not a port of the whole Firebase Auth SDK: there are no
-/// federated providers or popup and redirect flows, no phone sign-in, no email link sign-in and no multi-factor.
-/// A sign-in or reauthentication of an account with a second factor throws a [FirebaseAuthMultiFactorException]
+/// action codes, email, password and profile updates, reauthentication, account deletion, the sign-in methods of
+/// an email address, and [validatePassword]. [tenantId] and [languageCode] are sent like the JS SDK sends them.
+/// This is not a port of the whole Firebase Auth SDK: a federated provider's token comes from the app (there are
+/// no popup and redirect flows), and there is no phone sign-in and no sign-in with a second factor. A sign-in or
+/// reauthentication of an account with a second factor throws a [FirebaseAuthMultiFactorException]
 /// (`multi-factor-auth-required`) with the enrolled factors and the pending credential.
 class FirebaseUserAuth implements AuthTokenProvider {
   /// Creates an instance for the project of [apiKey] (the Web API key of the Firebase project).
@@ -192,6 +202,36 @@ class FirebaseUserAuth implements AuthTokenProvider {
   /// The id of the Firebase app, sent as `X-Firebase-gmpid`; null sends none.
   final String? appId;
 
+  /// The language of the emails and SMS messages the backend sends (password reset, email verification, email
+  /// link sign-in), as a BCP 47 tag such as `fr` or `pt-BR`; null lets the project's default apply. Sent as
+  /// `X-Firebase-Locale` with every request of the Identity Toolkit API, like the JS SDK does. Set it, or call
+  /// [setLanguageCode] or [useDeviceLanguage].
+  String? languageCode;
+
+  /// Sets [languageCode] (FlutterFire's `setLanguageCode`); null takes the language of the device, like
+  /// [useDeviceLanguage] (FlutterFire does that on the web).
+  Future<void> setLanguageCode(String? languageCode) async {
+    if (languageCode == null) {
+      useDeviceLanguage();
+    } else {
+      this.languageCode = languageCode;
+    }
+  }
+
+  /// Sets [languageCode] to the language of the device (the JS SDK's `useDeviceLanguage`): on the Dart VM the
+  /// locale of the process (`Platform.localeName`, for example `en_US.UTF-8` becomes `en-US`; the POSIX locale `C`
+  /// gives null), in a browser the first of `navigator.languages`.
+  void useDeviceLanguage() => languageCode = deviceLanguage();
+
+  /// The tenant to sign in to (Identity Platform multi-tenancy), or null for the users of the project itself
+  /// (FlutterFire's and the JS SDK's `tenantId`).
+  ///
+  /// It is sent with the sign-ins, the action code requests (password reset, email verification, email link) and
+  /// the other requests the JS SDK sends it with. A sign-in (or [updateCurrentUser]) whose user belongs to another
+  /// tenant than this one throws a [FirebaseAuthException] with the code `tenant-id-mismatch`. Changing it does not
+  /// sign the current user out.
+  String? tenantId;
+
   final AppCheckTokenProvider? _appCheck;
 
   /// The value of `X-Client-Version`, in the format of the JS SDK (`Chrome/JsCore/<version>/FirebaseCore-web`):
@@ -307,15 +347,46 @@ class FirebaseUserAuth implements AuthTokenProvider {
   final StreamController<AuthUser?> _userChanges =
       StreamController<AuthUser?>.broadcast();
 
+  // Synchronous, so that the stream of authStateChanges() and idTokenChanges() knows at once that a change replaces
+  // the current user it still has to emit; those streams deliver asynchronously.
+  final StreamController<AuthUser?> _authStateChanges =
+      StreamController<AuthUser?>.broadcast(sync: true);
+  final StreamController<AuthUser?> _idTokenChanges =
+      StreamController<AuthUser?>.broadcast(sync: true);
+
+  /// The uid authStateChanges() last emitted (the JS SDK's `lastNotifiedUid`); an instance starts signed out.
+  String? _lastNotifiedUid;
+
+  /// The [restore] in progress.
+  Future<void>? _restoring;
+
+  /// The password policies fetched by [validatePassword], by tenant (null for the project).
+  final Map<String?, PasswordPolicy> _passwordPolicies =
+      <String?, PasswordPolicy>{};
+
+  final List<_BeforeStateCallback> _beforeStateCallbacks =
+      <_BeforeStateCallback>[];
+
+  /// The session behind each user this class handed out (for [updateCurrentUser]), with the API key of its
+  /// instance. Weak: it does not keep a user alive.
+  static final Expando<(String, _Session)> _sessionOfUser =
+      Expando<(String, _Session)>('FirebaseUserAuth session');
+
   _Session? _session;
   Future<String?>? _refreshing;
   Timer? _refreshTimer;
   int _refreshFailures = 0;
   bool _disposed = false;
 
-  /// Counts the changes of the session, so that the result of a request that was overtaken by a sign-in or a
-  /// sign-out is dropped.
+  /// Counts the sessions: it changes when a session is installed for a sign-in, [updateCurrentUser] or [restore],
+  /// and when the session is cleared. An operation of the signed-in user (a token refresh, an update, a link)
+  /// records it when it starts and drops its result when it changed, so that a result of the previous session is
+  /// never written into the next one or its storage.
   int _generation = 0;
+
+  /// Counts the sign-ins, [updateCurrentUser] and [signOut] calls, so that when they overlap the later one wins and
+  /// the earlier one throws `cancelled`. A sign-in that fails does not affect the operations of the signed-in user.
+  int _signInAttempt = 0;
 
   /// The signed-in user, or null. After [restore] it is the user of the stored session, as it was when it was
   /// stored; [reload] reads it from the backend again.
@@ -330,50 +401,148 @@ class FirebaseUserAuth implements AuthTokenProvider {
   /// listened to: read [currentUser] for that.
   Stream<AuthUser?> userChanges() => _userChanges.stream;
 
-  /// Emits the ID token after a sign-in, after every refresh, and an empty token after a sign-out.
+  /// Emits the ID token after a sign-in, after every refresh, and an empty token after a sign-out. [updateCurrentUser]
+  /// with a user whose session has no ID token yet (one from [restore]) emits an empty token too: read [uid] for the
+  /// user, the token comes with the first refresh.
   @override
   Stream<AuthTokenChange> get onTokenChanged => _tokenChanges.stream;
+
+  /// Emits the current user (null when signed out) when it is listened to, once a [restore] in progress has
+  /// finished, and then the user after every sign-in of another user and after a sign-out (FlutterFire's
+  /// `authStateChanges()`, the JS SDK's `onAuthStateChanged`). A sign-in of the user who is already signed in, a
+  /// token refresh or a change of the user's data does not emit: see [idTokenChanges] and [userChanges].
+  ///
+  /// ```dart
+  /// auth.authStateChanges().listen((AuthUser? user) {
+  ///   print(user == null ? 'signed out' : 'signed in as ${user.uid}');
+  /// });
+  /// ```
+  Stream<AuthUser?> authStateChanges() =>
+      _startingWithCurrentUser(_authStateChanges.stream);
+
+  /// Like [authStateChanges], and also after every new ID token of the signed-in user: a token refresh, a
+  /// password change, a link (FlutterFire's `idTokenChanges()`, the JS SDK's `onIdTokenChanged`).
+  Stream<AuthUser?> idTokenChanges() =>
+      _startingWithCurrentUser(_idTokenChanges.stream);
+
+  /// Completes when the initial state is known (the JS SDK's `authStateReady`): when the [restore] in progress has
+  /// finished (with its error, if it failed), or at once when none is in progress. [forApp] has restored the session
+  /// before it returns.
+  Future<void> authStateReady() => _restoring ?? Future<void>.value();
+
+  /// Registers [callback] to run before the signed-in user changes (the JS SDK's `beforeAuthStateChanged`): before
+  /// a sign-in completes (with the new user), before [signOut] (with null), and before [updateCurrentUser]. It may
+  /// be asynchronous; the change waits for it. When it throws, the change does not happen: the operation throws a
+  /// [FirebaseAuthException] with the code `login-blocked`, and the [onAbort] of the callbacks that ran before it
+  /// are called, in reverse order. A session that ends on the backend (the user is signed out after a refused token
+  /// refresh) does not run the callbacks. Returns a function that removes the callback.
+  ///
+  /// ```dart
+  /// final void Function() remove = auth.beforeAuthStateChanged((AuthUser? user) {
+  ///   if (user != null && !user.emailVerified && !user.isAnonymous) {
+  ///     throw StateError('verify your email address first');
+  ///   }
+  /// });
+  /// ```
+  void Function() beforeAuthStateChanged(
+    FutureOr<void> Function(AuthUser? user) callback, {
+    void Function()? onAbort,
+  }) {
+    final _BeforeStateCallback entry = _BeforeStateCallback(callback, onAbort);
+    _beforeStateCallbacks.add(entry);
+    return () => _beforeStateCallbacks.remove(entry);
+  }
+
+  /// Makes [user] the signed-in user of this instance (the JS SDK's `updateCurrentUser`), or signs out for null.
+  /// [user] must come from a [FirebaseUserAuth] with the same API key (its [currentUser], or the result of one of
+  /// its sign-ins): this instance continues that session with its own copy of the tokens, and stores it.
+  ///
+  /// Runs the [beforeAuthStateChanged] callbacks. Throws a [FirebaseAuthException] with the code
+  /// `invalid-user-token` for a user of another API key or one this package did not hand out, and
+  /// `tenant-id-mismatch` when the tenant of the user is not [tenantId].
+  Future<void> updateCurrentUser(AuthUser? user) async {
+    _checkNotDisposed();
+    if (user == null) {
+      await signOut();
+      return;
+    }
+    final (String, _Session)? source =
+        _sessionOfUser[user] ??
+        (user is UserCredential ? _sessionOfUser[user.user!] : null);
+    if (source == null || source.$1 != apiKey) {
+      throw const FirebaseAuthException(
+        code: 'invalid-user-token',
+        message:
+            "This user's credential isn't valid for this project: it does not come from a FirebaseUserAuth "
+            'with the same API key.',
+      );
+    }
+    final _Session session = source.$2;
+    if (identical(session.user, _session?.user)) {
+      return;
+    }
+    _checkTenant(session.user);
+    final int attempt = ++_signInAttempt;
+    await _runBeforeStateCallbacks(session.user);
+    if (attempt != _signInAttempt || _disposed) {
+      throw _overtaken;
+    }
+    final int generation = await _installSession(session);
+    if (generation != _generation) {
+      throw _overtaken;
+    }
+    if (!_userChanges.isClosed) {
+      _userChanges.add(session.user);
+    }
+    // A restored session has no ID token until its first refresh; the empty token tells the token listeners
+    // (Firestore) that the user changed, as after a sign-out.
+    final String? idToken = session.idToken;
+    _emitToken(idToken ?? '');
+    _notifyAuthState();
+    await _letListenersReact();
+  }
 
   /// Loads the session that an earlier instance stored. The ID token is fetched when it is first needed.
   ///
   /// Does nothing when a user is already signed in or nothing is stored; a stored value that this class did not
-  /// write is ignored. It does not check the session with the backend: a session that ended there signs the user
-  /// out at the first token refresh. [userChanges] does not emit for a restored user. Throws whatever the `read` of
-  /// the storage throws.
-  Future<void> restore() async {
+  /// write is ignored. Sessions stored by 0.1 and 0.2 are read too; their user has empty [AuthUser.providerData]
+  /// and [AuthUser.metadata] until [reload]. It does not check the session with the backend: a session that ended there signs the user
+  /// out at the first token refresh. [userChanges] does not emit for a restored user; [authStateChanges] and
+  /// [idTokenChanges] do. Throws whatever the `read` of the storage throws.
+  Future<void> restore() {
+    final Future<void> restoring = _restore();
+    _restoring = restoring;
+    return restoring.whenComplete(() {
+      if (identical(_restoring, restoring)) {
+        _restoring = null;
+      }
+    });
+  }
+
+  Future<void> _restore() async {
     final String? stored = await _storage.read(_storageKey);
     if (stored == null || _session != null) {
       return;
     }
-    try {
-      final Object? json = jsonDecode(stored);
-      if (json is Map<String, Object?> &&
-          json['refreshToken'] is String &&
-          json['uid'] is String) {
-        await _setSession(
-          _Session(
-            AuthUser(
-              uid: json['uid']! as String,
-              email: json['email'] is String ? json['email']! as String : null,
-              isAnonymous: json['isAnonymous'] == true,
-              emailVerified: json['emailVerified'] == true,
-              displayName: json['displayName'] is String
-                  ? json['displayName']! as String
-                  : null,
-              photoUrl: json['photoUrl'] is String
-                  ? json['photoUrl']! as String
-                  : null,
-            ),
-            json['refreshToken']! as String,
-            null,
-            null,
-          ),
-          persist: false,
-        );
-      }
-    } on FormatException {
+    // Any version of the stored format: a session stored by 0.2 has no provider data, metadata, phone number or
+    // tenant until the first reload.
+    final ({AuthUser user, String refreshToken})? decoded = decodeSession(
+      stored,
+    );
+    if (decoded == null) {
       // Not something this class wrote: start signed out.
+      return;
     }
+    _generation++;
+    await _setSession(
+      _Session(decoded.user, decoded.refreshToken, null, null),
+      persist: false,
+    );
+    // authStateChanges() and idTokenChanges() tell listeners that came before; userChanges() does not emit.
+    if (!_idTokenChanges.isClosed) {
+      _idTokenChanges.add(decoded.user);
+    }
+    _notifyAuthState();
   }
 
   /// Signs in a new anonymous user, a new account every time (`signInAnonymously`).
@@ -381,7 +550,7 @@ class FirebaseUserAuth implements AuthTokenProvider {
   /// Throws a [FirebaseAuthException] with the code `operation-not-allowed` (anonymous sign-in is not
   /// enabled for the project), `admin-restricted-operation`, `cancelled` (overtaken by another sign-in or a
   /// sign-out), ...
-  Future<AuthUser> signInAnonymously() =>
+  Future<UserCredential> signInAnonymously() =>
       _signIn('accounts:signUp', <String, Object?>{'returnSecureToken': true});
 
   /// Signs in with an email address and a password (`signInWithEmailAndPassword`).
@@ -390,14 +559,16 @@ class FirebaseUserAuth implements AuthTokenProvider {
   /// `invalid-credential` (projects with email enumeration protection), `invalid-email`, `user-disabled`,
   /// `operation-not-allowed` (email sign-in is not enabled), `too-many-requests`, `cancelled`, ...; and a
   /// [FirebaseAuthMultiFactorException] (`multi-factor-auth-required`) when the account has a second factor.
-  Future<AuthUser> signInWithEmailAndPassword({
+  Future<UserCredential> signInWithEmailAndPassword({
     required String email,
     required String password,
-  }) => _signIn('accounts:signInWithPassword', <String, Object?>{
-    'email': email,
-    'password': password,
-    'returnSecureToken': true,
-  });
+  }) => _recachePasswordPolicyOnFailure(
+    _signIn('accounts:signInWithPassword', <String, Object?>{
+      'email': email,
+      'password': password,
+      'returnSecureToken': true,
+    }),
+  );
 
   /// Creates an account with an email address and a password and signs it in
   /// (`createUserWithEmailAndPassword`). The new user is not anonymous, and its email address is not verified:
@@ -405,14 +576,16 @@ class FirebaseUserAuth implements AuthTokenProvider {
   ///
   /// Throws a [FirebaseAuthException] with the code `email-already-in-use`, `weak-password`,
   /// `invalid-email`, `missing-password`, `operation-not-allowed`, `cancelled`, ...
-  Future<AuthUser> createUserWithEmailAndPassword({
+  Future<UserCredential> createUserWithEmailAndPassword({
     required String email,
     required String password,
-  }) => _signIn('accounts:signUp', <String, Object?>{
-    'email': email,
-    'password': password,
-    'returnSecureToken': true,
-  });
+  }) => _recachePasswordPolicyOnFailure(
+    _signIn('accounts:signUp', <String, Object?>{
+      'email': email,
+      'password': password,
+      'returnSecureToken': true,
+    }),
+  );
 
   /// Signs in with a custom token minted by a server (for example with `createCustomToken` of the Admin SDK),
   /// for users that your own backend authenticates (`signInWithCustomToken`). The custom claims of the token are
@@ -421,20 +594,30 @@ class FirebaseUserAuth implements AuthTokenProvider {
   /// Throws a [FirebaseAuthException] with the code `invalid-custom-token`, `custom-token-mismatch` (a
   /// token for another project), `user-disabled`, `cancelled`, ...; and a [FirebaseAuthMultiFactorException]
   /// (`multi-factor-auth-required`) if the backend asks for a second factor.
-  Future<AuthUser> signInWithCustomToken(String token) => _signIn(
+  Future<UserCredential> signInWithCustomToken(String token) => _signIn(
     'accounts:signInWithCustomToken',
     <String, Object?>{'token': token, 'returnSecureToken': true},
   );
 
-  /// Signs the user out: the session is forgotten, also in the storage, [userChanges] emits null and
-  /// [onTokenChanged] an empty token. Does nothing when nobody is signed in.
+  /// Signs the user out: the session is forgotten, also in the storage, [userChanges], [authStateChanges] and
+  /// [idTokenChanges] emit null and [onTokenChanged] an empty token. Does nothing when nobody is signed in. Runs the
+  /// [beforeAuthStateChanged] callbacks first, and throws `login-blocked` when one of them throws.
   ///
   /// It makes no request: the refresh token is not revoked on the backend (as in the other Firebase SDKs).
   /// Firestore continues without a token; the pending writes of the user stay with that user.
   Future<void> signOut() async {
+    _checkNotDisposed();
     if (_session == null) {
       return;
     }
+    final int attempt = _signInAttempt;
+    await _runBeforeStateCallbacks(null);
+    if (attempt != _signInAttempt || _session == null || _disposed) {
+      // Another sign-in or sign-out started while the callbacks ran.
+      return;
+    }
+    // A sign-in that started before and is still in flight is overtaken.
+    _signInAttempt++;
     await _clearSession();
   }
 
@@ -474,6 +657,7 @@ class FirebaseUserAuth implements AuthTokenProvider {
         'email': email,
         ...?actionCodeSettings?.toRequest(),
       },
+      tenant: true,
     );
   }
 
@@ -485,9 +669,12 @@ class FirebaseUserAuth implements AuthTokenProvider {
     required String newPassword,
   }) async {
     _checkNotDisposed();
-    await _send(
-      _identityToolkit('accounts:resetPassword'),
-      json: <String, Object?>{'oobCode': code, 'newPassword': newPassword},
+    await _recachePasswordPolicyOnFailure(
+      _send(
+        _identityToolkit('accounts:resetPassword'),
+        json: <String, Object?>{'oobCode': code, 'newPassword': newPassword},
+        tenant: true,
+      ),
     );
   }
 
@@ -501,6 +688,7 @@ class FirebaseUserAuth implements AuthTokenProvider {
       await _send(
         _identityToolkit('accounts:resetPassword'),
         json: <String, Object?>{'oobCode': code},
+        tenant: true,
       ),
     );
   }
@@ -530,6 +718,7 @@ class FirebaseUserAuth implements AuthTokenProvider {
     await _send(
       _identityToolkit('accounts:update'),
       json: <String, Object?>{'oobCode': code},
+      tenant: true,
     );
   }
 
@@ -547,6 +736,7 @@ class FirebaseUserAuth implements AuthTokenProvider {
     final Map<String, Object?> response = await _send(
       _identityToolkit('accounts:createAuthUri'),
       json: <String, Object?>{'identifier': email, 'continueUri': continueUri},
+      tenant: true,
     );
     final Object? methods = response['signinMethods'];
     return methods is List ? methods.whereType<String>().toList() : <String>[];
@@ -567,6 +757,7 @@ class FirebaseUserAuth implements AuthTokenProvider {
         'idToken': idToken,
         ...?actionCodeSettings?.toRequest(),
       },
+      tenant: true,
     );
     if (response['email'] != _session?.user.email) {
       await _reload(generation);
@@ -590,6 +781,7 @@ class FirebaseUserAuth implements AuthTokenProvider {
         'newEmail': newEmail,
         ...?actionCodeSettings?.toRequest(),
       },
+      tenant: true,
     );
     if (response['email'] != _session?.user.email) {
       await _reload(generation);
@@ -645,41 +837,281 @@ class FirebaseUserAuth implements AuthTokenProvider {
       await _updateSession(
         response,
         generation,
-        user: AuthUser(
-          uid: user.uid,
-          email: user.email,
-          isAnonymous: user.isAnonymous,
-          emailVerified: user.emailVerified,
+        user: copyUser(
+          user,
           displayName: newName is String && newName.isNotEmpty ? newName : null,
+          clearDisplayName: newName is! String || newName.isEmpty,
           photoUrl: newPhoto is String && newPhoto.isNotEmpty ? newPhoto : null,
+          clearPhotoUrl: newPhoto is! String || newPhoto.isEmpty,
         ),
       );
     });
   }
 
-  /// Signs the signed-in user in again with [email] and [password] (`reauthenticateWithCredential` with an
-  /// `EmailAuthProvider` credential), which operations such as [updatePassword] and [deleteCurrentUser] need
-  /// when the last sign-in is too long ago.
+  /// Signs the signed-in user in again with [email] and [password]: [reauthenticateWithCredential] with an
+  /// [EmailAuthProvider.credential], which operations such as [updatePassword] and [deleteCurrentUser] need when
+  /// the last sign-in is too long ago.
   ///
   /// Throws `user-mismatch` when the credentials are those of another account (or of none), `wrong-password`,
   /// `invalid-credential`, ...; and a [FirebaseAuthMultiFactorException] (`multi-factor-auth-required`) when the
   /// account has a second factor (the signed-in user stays signed in).
-  Future<AuthUser> reauthenticateWithEmailAndPassword({
+  Future<UserCredential> reauthenticateWithEmailAndPassword({
     required String email,
     required String password,
+  }) => reauthenticateWithCredential(
+    EmailAuthProvider.credential(email: email, password: password),
+  );
+
+  // ---- password policy ----
+
+  /// Checks [password] against the password policy of the project, or of [tenantId] (`validatePassword` of the
+  /// JS SDK and of FlutterFire), for example to show what a new password still lacks before
+  /// [createUserWithEmailAndPassword] or [updatePassword].
+  ///
+  /// The policy is fetched once (`v2/passwordPolicy`) per tenant and cached; it is fetched again after the backend
+  /// refuses a password with `password-does-not-meet-requirements` (as the JS SDK does). An empty password is not
+  /// an error: it fails the minimum length.
+  ///
+  /// Throws a [FirebaseAuthException] when the policy cannot be fetched (`network-request-failed`, ...), and
+  /// `unsupported-password-policy-schema-version` for a policy of a schema this package does not know.
+  ///
+  /// ```dart
+  /// final PasswordValidationStatus status = await auth.validatePassword('hunter2');
+  /// if (!status.isValid) {
+  ///   print('at least ${status.passwordPolicy.minPasswordLength} characters');
+  /// }
+  /// ```
+  Future<PasswordValidationStatus> validatePassword(String password) async {
+    _checkNotDisposed();
+    final PasswordPolicy policy =
+        _passwordPolicies[tenantId] ?? await _fetchPasswordPolicy();
+    if (policy.schemaVersion != PasswordPolicy.supportedSchemaVersion) {
+      throw const FirebaseAuthException(
+        code: 'unsupported-password-policy-schema-version',
+        message:
+            'The password policy received from the backend uses a schema version that is not supported by this '
+            'version of the package.',
+      );
+    }
+    return policy.validate(password);
+  }
+
+  /// Fetches the policy of [tenantId] and caches it (`_updatePasswordPolicy` of the JS SDK).
+  Future<PasswordPolicy> _fetchPasswordPolicy() async {
+    final String? tenant = tenantId;
+    final PasswordPolicy policy = PasswordPolicy.fromResponse(
+      await _send(
+        _identityToolkit(
+          'passwordPolicy',
+          version: 'v2',
+          query: <String, String>{'tenantId': ?tenant},
+        ),
+        get: true,
+      ),
+    );
+    _passwordPolicies[tenant] = policy;
+    return policy;
+  }
+
+  /// Like `recachePasswordPolicy` of the JS SDK: when [operation] fails with `password-does-not-meet-requirements`
+  /// and a policy was fetched before, it is fetched again in the background.
+  Future<T> _recachePasswordPolicyOnFailure<T>(
+    Future<T> operation,
+  ) => operation.catchError((Object error, StackTrace stackTrace) {
+    if (error is FirebaseAuthException &&
+        error.code == 'password-does-not-meet-requirements' &&
+        _passwordPolicies.containsKey(tenantId) &&
+        !_disposed) {
+      unawaited(
+        _fetchPasswordPolicy().then<void>(
+          (_) {},
+          onError: (Object _) {
+            // The policy stays as it was; the next validatePassword uses it.
+          },
+        ),
+      );
+    }
+    return Future<T>.error(error, stackTrace);
+  });
+
+  // ---- email link sign-in ----
+
+  /// Sends an email with a sign-in link to [email] (`sendSignInLinkToEmail`). The link opens the URL of
+  /// [actionCodeSettings], whose [ActionCodeSettings.handleCodeInApp] must be true: the app receives the link and
+  /// passes it to [signInWithEmailLink], with the address (keep it, for example in local storage, until then).
+  ///
+  /// The sign-in method "Email link (passwordless sign-in)" must be enabled for the project. Throws
+  /// `argument-error` when `handleCodeInApp` is not true, and `invalid-email`, `operation-not-allowed`,
+  /// `unauthorized-continue-uri`, `invalid-continue-uri`, ...
+  ///
+  /// ```dart
+  /// await auth.sendSignInLinkToEmail(
+  ///   email: 'ada@example.com',
+  ///   actionCodeSettings: const ActionCodeSettings(
+  ///     url: 'https://my-project.web.app/finish-sign-in',
+  ///     handleCodeInApp: true,
+  ///   ),
+  /// );
+  /// ```
+  Future<void> sendSignInLinkToEmail({
+    required String email,
+    required ActionCodeSettings actionCodeSettings,
   }) async {
+    _checkNotDisposed();
+    if (actionCodeSettings.handleCodeInApp != true) {
+      throw const FirebaseAuthException(
+        code: 'argument-error',
+        message:
+            'An email link sign-in needs ActionCodeSettings with handleCodeInApp: true.',
+      );
+    }
+    await _send(
+      _identityToolkit('accounts:sendOobCode'),
+      json: <String, Object?>{
+        'requestType': ActionCodeOperation.emailSignIn.serverName,
+        'email': email,
+        ...actionCodeSettings.toRequest(),
+      },
+      tenant: true,
+    );
+  }
+
+  /// Whether [emailLink] is a sign-in link of [sendSignInLinkToEmail] (`isSignInWithEmailLink`): see
+  /// [ActionCodeURL.parseLink].
+  bool isSignInWithEmailLink(String emailLink) =>
+      ActionCodeURL.parseLink(emailLink)?.operation ==
+      ActionCodeOperation.emailSignIn;
+
+  /// Signs in with the sign-in link of the email [sendSignInLinkToEmail] sent to [email] (`signInWithEmailLink`):
+  /// [signInWithCredential] with [EmailAuthProvider.credentialWithLink]. The account is created if there is none,
+  /// and its address counts as verified.
+  ///
+  /// Throws `argument-error` for a link that is not the link of an action email, `tenant-id-mismatch` when the
+  /// link is for another tenant than [tenantId], `invalid-action-code` or `expired-action-code` for a used or old
+  /// link, `invalid-email` when [email] is not the address the link was sent to, ...
+  ///
+  /// ```dart
+  /// if (auth.isSignInWithEmailLink(link)) {
+  ///   final UserCredential result = await auth.signInWithEmailLink(
+  ///     email: 'ada@example.com',
+  ///     emailLink: link,
+  ///   );
+  ///   print(result.user?.emailVerified); // true
+  /// }
+  /// ```
+  Future<UserCredential> signInWithEmailLink({
+    required String email,
+    required String emailLink,
+  }) async {
+    _checkNotDisposed();
+    if (_parseEmailLink(emailLink).tenantId != tenantId) {
+      throw const FirebaseAuthException(
+        code: 'tenant-id-mismatch',
+        message:
+            "The provided tenant ID does not match the Auth instance's tenant ID.",
+      );
+    }
+    return signInWithCredential(
+      EmailAuthProvider.credentialWithLink(email: email, emailLink: emailLink),
+    );
+  }
+
+  // ---- credentials ----
+
+  /// Signs in with [credential] (`signInWithCredential`), replacing the current user like the other sign-ins:
+  /// an [EmailAuthProvider] credential signs in with the password or the email link, an [OAuthCredential] (of
+  /// [GoogleAuthProvider], [AppleAuthProvider], [OAuthProvider], ...) exchanges the provider's token through
+  /// `accounts:signInWithIdp`; the account is created when it does not exist
+  /// ([AdditionalUserInfo.isNewUser]). The result's [UserCredential.credential] holds the provider's tokens the
+  /// backend returned.
+  ///
+  /// Throws `invalid-credential` (the backend refused the token), `account-exists-with-different-credential` (an
+  /// account with the email address of the credential exists with another sign-in method:
+  /// [FirebaseAuthException.email] and [FirebaseAuthException.credential] let the app sign in with that method and
+  /// link the credential), `operation-not-allowed` (the provider is not enabled), `missing-or-invalid-nonce`,
+  /// `user-disabled`, ...
+  ///
+  /// The email credentials throw what their sign-ins throw (`wrong-password`, `invalid-action-code`, ...); all
+  /// throw a [FirebaseAuthMultiFactorException] when the account has a second factor.
+  ///
+  /// ```dart
+  /// // The ID token comes from Google Sign-In (or any other way the app signs the user in with Google).
+  /// final UserCredential result = await auth.signInWithCredential(
+  ///   GoogleAuthProvider.credential(idToken: googleIdToken),
+  /// );
+  /// print(result.additionalUserInfo?.isNewUser);
+  /// ```
+  Future<UserCredential> signInWithCredential(AuthCredential credential) async {
+    _checkNotDisposed();
+    final _CredentialRequest request = _requestFor(credential);
+    return _signIn(request.method, request.body);
+  }
+
+  /// Links [credential] to the signed-in user (`linkWithCredential`): the account can then sign in with it too. An
+  /// anonymous user linked to an email address and a password, or to a federated provider, is no longer anonymous.
+  ///
+  /// Throws `null-user`, `provider-already-linked` (the user has a credential of this provider already: the
+  /// account is read first), `credential-already-in-use` (another account has it; [FirebaseAuthException.credential]
+  /// may carry it back), `email-already-in-use`, `requires-recent-login`, ...
+  Future<UserCredential> linkWithCredential(
+    AuthCredential credential,
+  ) => _forUser((String idToken, int generation) async {
+    // _assertLinkedStatus of the JS SDK.
+    await _reload(generation);
+    final AuthUser? user = _session?.user;
+    if (user == null || generation != _generation) {
+      throw _overtaken;
+    }
+    if (user.providerData.any(
+      (UserInfo info) => info.providerId == credential.providerId,
+    )) {
+      throw const FirebaseAuthException(
+        code: 'provider-already-linked',
+        message:
+            'User can only be linked to one identity for the given provider.',
+      );
+    }
+    final _CredentialRequest request = _requestFor(
+      credential,
+      userIdToken: await _idTokenOf(generation),
+    );
+    final Map<String, Object?> response = await _send(
+      _identityToolkit(request.method),
+      json: request.body,
+      tenant: request.tenant,
+    );
+    _throwIfSecondFactorRequired(response);
+    if (generation != _generation) {
+      throw _overtaken;
+    }
+    await _updateSession(response, generation);
+    await _reload(generation);
+    return _result(response, _session?.user ?? user);
+  });
+
+  /// Signs the signed-in user in again with [credential] (`reauthenticateWithCredential`), which operations such
+  /// as [updatePassword] and [deleteCurrentUser] need when the last sign-in is too long ago. The user stays the
+  /// same; the session continues with the new tokens.
+  ///
+  /// Throws `null-user`, `user-mismatch` when the credential is that of another account (or of none),
+  /// `wrong-password`, `invalid-credential`, ...; and a [FirebaseAuthMultiFactorException]
+  /// (`multi-factor-auth-required`) when the account has a second factor (the signed-in user stays signed in).
+  Future<UserCredential> reauthenticateWithCredential(
+    AuthCredential credential,
+  ) async {
     _checkNotDisposed();
     final _Session session = _requireSession();
     final int generation = _generation;
+    final _CredentialRequest request = _requestFor(
+      credential,
+      reauthenticate: true,
+    );
     final Map<String, Object?> response;
     try {
       response = await _send(
-        _identityToolkit('accounts:signInWithPassword'),
-        json: <String, Object?>{
-          'email': email,
-          'password': password,
-          'returnSecureToken': true,
-        },
+        _identityToolkit(request.method),
+        json: request.body,
+        tenant: request.tenant,
       );
     } on FirebaseAuthException catch (e) {
       if (e.code == 'user-not-found') {
@@ -708,7 +1140,168 @@ class FirebaseUserAuth implements AuthTokenProvider {
     }
     await _updateSession(response, generation);
     await _reload(generation);
-    return _session?.user ?? session.user;
+    return _result(response, _session?.user ?? session.user);
+  }
+
+  /// Removes the sign-in method of [providerId] (`password`, `google.com`, ...) from the account of the signed-in
+  /// user (`unlink`), and returns the user without it. The account is read first; [userChanges] emits the new user.
+  ///
+  /// Throws `null-user`, `no-such-provider` (the user has no such method), `requires-recent-login`, ...
+  Future<AuthUser> unlink(String providerId) => _forUser((
+    String idToken,
+    int generation,
+  ) async {
+    // _assertLinkedStatus of the JS SDK.
+    await _reload(generation);
+    final AuthUser? user = _session?.user;
+    if (user == null || generation != _generation) {
+      throw _overtaken;
+    }
+    if (!user.providerData.any(
+      (UserInfo info) => info.providerId == providerId,
+    )) {
+      throw const FirebaseAuthException(
+        code: 'no-such-provider',
+        message: 'User was not linked to an account with the given provider.',
+      );
+    }
+    final Map<String, Object?> response = await _send(
+      _identityToolkit('accounts:update'),
+      json: <String, Object?>{
+        'idToken': await _idTokenOf(generation),
+        'deleteProvider': <String>[providerId],
+      },
+    );
+    final AuthUser? current = _session?.user;
+    if (current == null || generation != _generation) {
+      throw _overtaken;
+    }
+    final Set<String> left = <String>{
+      for (final UserInfo info in providerDataOf(response['providerUserInfo']))
+        info.providerId,
+    };
+    final AuthUser updated = copyUser(
+      current,
+      providerData: List<UserInfo>.unmodifiable(<UserInfo>[
+        for (final UserInfo info in current.providerData)
+          if (left.contains(info.providerId)) info,
+      ]),
+      clearPhoneNumber: !left.contains('phone'),
+    );
+    await _updateSession(const <String, Object?>{}, generation, user: updated);
+    return updated;
+  });
+
+  /// The request that signs in with [credential] (`_getIdTokenResponse` of the JS SDK's credentials), links it to
+  /// the user of [userIdToken] (`_linkToIdToken`), or reauthenticates with it (`_getReauthenticationResolver`).
+  _CredentialRequest _requestFor(
+    AuthCredential credential, {
+    String? userIdToken,
+    bool reauthenticate = false,
+  }) {
+    switch (credential) {
+      case EmailAuthCredential(
+        signInMethod: EmailAuthProvider.EMAIL_PASSWORD_SIGN_IN_METHOD,
+        :final String email,
+        :final String password?,
+      ):
+        if (userIdToken != null) {
+          // linkEmailPassword: accounts:signUp with the ID token, without the tenant.
+          return _CredentialRequest('accounts:signUp', <String, Object?>{
+            'idToken': userIdToken,
+            'email': email,
+            'password': password,
+            'returnSecureToken': true,
+          }, tenant: false);
+        }
+        return _CredentialRequest(
+          'accounts:signInWithPassword',
+          <String, Object?>{
+            'email': email,
+            'password': password,
+            'returnSecureToken': true,
+          },
+        );
+      case EmailAuthCredential(
+        signInMethod: EmailAuthProvider.EMAIL_LINK_SIGN_IN_METHOD,
+        :final String email,
+        :final String emailLink?,
+      ):
+        return _CredentialRequest(
+          'accounts:signInWithEmailLink',
+          <String, Object?>{
+            'idToken': ?userIdToken,
+            'email': email,
+            'oobCode': _parseEmailLink(emailLink).code,
+          },
+        );
+      case OAuthCredential(
+        :final String providerId,
+        :final String? idToken,
+        :final String? accessToken,
+        :final String? secret,
+        :final String? rawNonce,
+        :final String? pendingToken,
+      ):
+        // OAuthCredential.buildRequest of the JS SDK: the provider's tokens in a form-encoded postBody, for the
+        // requestUri http://localhost; a pending token of the backend instead when there is one.
+        final Map<String, Object?> body = <String, Object?>{
+          'requestUri': 'http://localhost',
+          'returnSecureToken': true,
+        };
+        if (pendingToken != null && pendingToken.isNotEmpty) {
+          body['pendingToken'] = pendingToken;
+        } else {
+          body['postBody'] = <String>[
+            if (idToken != null && idToken.isNotEmpty)
+              'id_token=${Uri.encodeComponent(idToken)}',
+            if (accessToken != null && accessToken.isNotEmpty)
+              'access_token=${Uri.encodeComponent(accessToken)}',
+            if (secret != null && secret.isNotEmpty)
+              'oauth_token_secret=${Uri.encodeComponent(secret)}',
+            'providerId=${Uri.encodeComponent(providerId)}',
+            if (rawNonce != null && rawNonce.isNotEmpty)
+              'nonce=${Uri.encodeComponent(rawNonce)}',
+          ].join('&');
+        }
+        return _CredentialRequest('accounts:signInWithIdp', <String, Object?>{
+          ...body,
+          'idToken': ?userIdToken,
+          if (reauthenticate) 'autoCreate': false,
+        });
+      default:
+        throw ArgumentError.value(
+          credential,
+          'credential',
+          'Not a credential of this package',
+        );
+    }
+  }
+
+  /// The parts of an email link, or `argument-error` (`EmailAuthProvider.credentialWithLink` of the JS SDK).
+  static ActionCodeURL _parseEmailLink(String emailLink) {
+    final ActionCodeURL? url = ActionCodeURL.parseLink(emailLink);
+    if (url == null) {
+      throw const FirebaseAuthException(
+        code: 'argument-error',
+        message: 'The email link is not the link of an action email.',
+      );
+    }
+    return url;
+  }
+
+  /// The result of a sign-in, a link or a reauthentication [response] for [user].
+  UserCredential _result(Map<String, Object?> response, AuthUser user) {
+    final UserCredential result = UserCredential(
+      user,
+      additionalUserInfo: additionalUserInfoOf(response),
+      credential: credentialFromResponse(response),
+    );
+    final _Session? session = _session;
+    if (session != null && identical(session.user, user)) {
+      _sessionOfUser[result] = (apiKey, session);
+    }
+    return result;
   }
 
   /// Reads the data of the signed-in user from the backend again (`reload`): email address, verification, display
@@ -755,6 +1348,8 @@ class FirebaseUserAuth implements AuthTokenProvider {
     _cancelProactiveRefresh();
     await _tokenChanges.close();
     await _userChanges.close();
+    await _authStateChanges.close();
+    await _idTokenChanges.close();
     if (_ownsHttp) {
       _http.close();
     }
@@ -787,7 +1382,7 @@ class FirebaseUserAuth implements AuthTokenProvider {
     _checkNotDisposed();
     _requireSession();
     final int generation = _generation;
-    final String idToken = (await getAccessToken(forceRefresh: false)).token;
+    final String idToken = await _idTokenOf(generation);
     try {
       return await operation(idToken, generation);
     } on FirebaseAuthException catch (e) {
@@ -798,6 +1393,16 @@ class FirebaseUserAuth implements AuthTokenProvider {
       }
       rethrow;
     }
+  }
+
+  /// The ID token of the session of [generation]; throws `cancelled` when another session took its place, so that
+  /// a request meant for the previous user is never sent with the token of the next one.
+  Future<String> _idTokenOf(int generation) async {
+    final String idToken = (await getAccessToken(forceRefresh: false)).token;
+    if (generation != _generation) {
+      throw _overtaken;
+    }
+    return idToken;
   }
 
   Future<void> _updateEmailOrPassword(Map<String, Object?> fields) =>
@@ -847,11 +1452,14 @@ class FirebaseUserAuth implements AuthTokenProvider {
           updated.refreshToken != session.refreshToken ||
           newUser != session.user,
     );
-    if (idToken is String && !_tokenChanges.isClosed) {
-      _tokenChanges.add(AuthTokenChange(idToken));
+    if (generation != _generation) {
+      return;
     }
     if (newUser != session.user && !_userChanges.isClosed) {
       _userChanges.add(newUser);
+    }
+    if (idToken is String) {
+      _emitToken(idToken);
     }
   }
 
@@ -861,6 +1469,23 @@ class FirebaseUserAuth implements AuthTokenProvider {
       return;
     }
     final String idToken = (await getAccessToken(forceRefresh: false)).token;
+    if (generation != _generation) {
+      return;
+    }
+    final Map<String, Object?> account = await _lookup(idToken);
+    final AuthUser? user = _session?.user;
+    if (user == null || generation != _generation) {
+      return;
+    }
+    await _updateSession(
+      const <String, Object?>{},
+      generation,
+      user: userFromAccount(account, user),
+    );
+  }
+
+  /// The account of [idToken] (`accounts:lookup`).
+  Future<Map<String, Object?>> _lookup(String idToken) async {
     final Map<String, Object?> response = await _send(
       _identityToolkit('accounts:lookup'),
       json: <String, Object?>{'idToken': idToken},
@@ -876,32 +1501,7 @@ class FirebaseUserAuth implements AuthTokenProvider {
         message: 'The authentication service returned no account.',
       );
     }
-    final AuthUser? user = _session?.user;
-    if (user == null || generation != _generation) {
-      return;
-    }
-    String? text(Object? value) =>
-        value is String && value.isNotEmpty ? value : null;
-    final String? email = text(account['email']);
-    final Object? providers = account['providerUserInfo'];
-    // Like the JS SDK: a user stays anonymous until the account has an email address and a password, or a
-    // provider; a user that was not anonymous never becomes anonymous.
-    final bool isAnonymous =
-        user.isAnonymous &&
-        !(email != null && account['passwordHash'] != null) &&
-        !(providers is List && providers.isNotEmpty);
-    await _updateSession(
-      const <String, Object?>{},
-      generation,
-      user: AuthUser(
-        uid: user.uid,
-        email: email,
-        isAnonymous: isAnonymous,
-        emailVerified: account['emailVerified'] == true,
-        displayName: text(account['displayName']),
-        photoUrl: text(account['photoUrl']),
-      ),
-    );
+    return account;
   }
 
   bool _isFresh(_Session session) {
@@ -909,17 +1509,32 @@ class FirebaseUserAuth implements AuthTokenProvider {
     return expiry != null && _clock().add(refreshBefore).isBefore(expiry);
   }
 
-  Uri _identityToolkit(String method) {
+  Uri _identityToolkit(
+    String method, {
+    String version = 'v1',
+    Map<String, String> query = const <String, String>{},
+  }) {
     final String? emulator = _emulatorOrigin;
-    return emulator == null
-        ? Uri.https(
-            'identitytoolkit.googleapis.com',
-            '/v1/$method',
-            <String, String>{'key': apiKey},
-          )
-        : Uri.parse(
-            '$emulator/identitytoolkit.googleapis.com/v1/$method?key=${Uri.encodeQueryComponent(apiKey)}',
-          );
+    final Map<String, String> parameters = <String, String>{
+      ...query,
+      'key': apiKey,
+    };
+    if (emulator == null) {
+      return Uri.https(
+        'identitytoolkit.googleapis.com',
+        '/$version/$method',
+        parameters,
+      );
+    }
+    final String queryString = parameters.entries
+        .map(
+          (MapEntry<String, String> e) =>
+              '${Uri.encodeQueryComponent(e.key)}=${Uri.encodeQueryComponent(e.value)}',
+        )
+        .join('&');
+    return Uri.parse(
+      '$emulator/identitytoolkit.googleapis.com/$version/$method?$queryString',
+    );
   }
 
   Uri get _secureToken {
@@ -967,15 +1582,40 @@ class FirebaseUserAuth implements AuthTokenProvider {
   }
 
   /// Sends a request and returns the decoded JSON object of the answer, or throws.
+  ///
+  /// With [tenant], the [tenantId] goes into the [json] body unless it names one (`_addTidIfNecessary` of the JS
+  /// SDK). The [languageCode] goes into `X-Firebase-Locale` of every JSON request (the JS SDK sends it from
+  /// `_performApiRequest`, which the token refresh does not use).
   Future<Map<String, Object?>> _send(
     Uri url, {
     Map<String, Object?>? json,
     Map<String, String>? form,
+    bool tenant = false,
+    bool get = false,
   }) async {
+    final String? tenantId = this.tenantId;
+    if (tenant &&
+        json != null &&
+        tenantId != null &&
+        json['tenantId'] == null) {
+      json = <String, Object?>{...json, 'tenantId': tenantId};
+    }
     final Map<String, String> headers = await _additionalHeaders();
+    final String? locale = languageCode;
+    if ((json != null || get) && locale != null && locale.isNotEmpty) {
+      headers['X-Firebase-Locale'] = locale;
+    }
     final http.Response response;
     try {
-      response = json != null
+      response = get
+          ? await _http.get(
+              url,
+              headers: <String, String>{
+                ...headers,
+                'Content-Type': 'application/json',
+              },
+            )
+          : json != null
           ? await _http.post(
               url,
               headers: <String, String>{
@@ -1006,17 +1646,32 @@ class FirebaseUserAuth implements AuthTokenProvider {
     } on FormatException {
       body = null;
     }
-    if (response.statusCode == 200 && body is Map<String, Object?>) {
-      return body;
+    // Like _performFetchWithErrorHandling of the JS SDK: `needConfirmation` first, then an answer is a success
+    // only when it is OK and has no `errorMessage` (signInWithIdp reports some errors with HTTP 200 and an
+    // `errorMessage` next to the data of the account).
+    final bool ok = response.statusCode == 200;
+    if (body is Map<String, Object?>) {
+      if (body.containsKey('needConfirmation')) {
+        throw FirebaseAuthException.needConfirmation(
+          body,
+          httpStatus: response.statusCode,
+        );
+      }
+      if (ok && !body.containsKey('errorMessage')) {
+        return body;
+      }
     }
     final Object? error = body is Map<String, Object?> ? body['error'] : null;
-    final Object? message = error is Map<String, Object?>
+    final Object? message = ok && body is Map<String, Object?>
+        ? body['errorMessage']
+        : error is Map<String, Object?>
         ? error['message']
         : null;
     if (message is String) {
       throw FirebaseAuthException.fromServer(
         message,
         httpStatus: response.statusCode,
+        response: body is Map<String, Object?> ? body : null,
       );
     }
     throw FirebaseAuthException(
@@ -1027,13 +1682,32 @@ class FirebaseUserAuth implements AuthTokenProvider {
     );
   }
 
-  Future<AuthUser> _signIn(String method, Map<String, Object?> request) async {
+  Future<UserCredential> _signIn(
+    String method,
+    Map<String, Object?> request,
+  ) async {
     _checkNotDisposed();
-    final int generation = ++_generation;
+    final int attempt = ++_signInAttempt;
     final Map<String, Object?> response = await _send(
       _identityToolkit(method),
       json: request,
+      tenant: true,
     );
+    return _completeSignIn(response, attempt);
+  }
+
+  static const FirebaseAuthException _overtaken = FirebaseAuthException(
+    code: 'cancelled',
+    message: 'The operation was overtaken by another sign-in or a sign-out.',
+  );
+
+  /// Makes the user of a sign-in [response] the current user, like `UserCredentialImpl._fromIdTokenResponse` and
+  /// `_updateCurrentUser` of the JS SDK: the account is read (`accounts:lookup`) first, so that the user is
+  /// complete when it is announced.
+  Future<UserCredential> _completeSignIn(
+    Map<String, Object?> response,
+    int attempt,
+  ) async {
     _throwIfSecondFactorRequired(response);
     final Object? idToken = response['idToken'];
     final Object? refreshToken = response['refreshToken'];
@@ -1043,12 +1717,9 @@ class FirebaseUserAuth implements AuthTokenProvider {
         message: 'The authentication service did not return tokens.',
       );
     }
-    if (generation != _generation) {
-      // Another sign-in or a sign-out happened meanwhile and wins.
-      throw const FirebaseAuthException(
-        code: 'cancelled',
-        message: 'The sign-in was overtaken by another sign-in or a sign-out.',
-      );
+    if (attempt != _signInAttempt || _disposed) {
+      // Another sign-in or a sign-out started meanwhile and wins.
+      throw _overtaken;
     }
     final GetTokenResult token = GetTokenResult(idToken);
     final Object? localId = response['localId'];
@@ -1062,30 +1733,44 @@ class FirebaseUserAuth implements AuthTokenProvider {
             'The authentication service did not return the id of the user.',
       );
     }
-    final Object? email = response['email'] ?? token.claims['email'];
-    final Object? displayName = response['displayName'] ?? token.claims['name'];
-    final Object? photoUrl =
-        response['profilePicture'] ?? token.claims['picture'];
+    final Map<String, Object?> account = await _lookup(idToken);
+    if (attempt != _signInAttempt || _disposed) {
+      throw _overtaken;
+    }
+    AuthUser user = userFromAccount(
+      account,
+      AuthUser(uid: uid, isAnonymous: token.signInProvider == 'anonymous'),
+    );
+    if (user.tenantId == null) {
+      final Object? firebase = token.claims['firebase'];
+      final Object? tenant = firebase is Map ? firebase['tenant'] : null;
+      if (tenant is String && tenant.isNotEmpty) {
+        user = copyUser(user, tenantId: tenant);
+      }
+    }
+    _checkTenant(user);
+    await _runBeforeStateCallbacks(user);
+    if (attempt != _signInAttempt || _disposed) {
+      throw _overtaken;
+    }
     final _Session session = _Session(
-      AuthUser(
-        uid: uid,
-        email: email is String && email.isNotEmpty ? email : null,
-        isAnonymous: token.signInProvider == 'anonymous',
-        emailVerified: token.claims['email_verified'] == true,
-        displayName: displayName is String && displayName.isNotEmpty
-            ? displayName
-            : null,
-        photoUrl: photoUrl is String && photoUrl.isNotEmpty ? photoUrl : null,
-      ),
+      user,
       refreshToken,
       idToken,
       _expiry(token, response['expiresIn']),
     );
-    await _setSession(session, persist: true);
-    _userChanges.add(session.user);
-    _tokenChanges.add(AuthTokenChange(idToken));
+    final int generation = await _installSession(session);
+    if (generation != _generation) {
+      // Signed out (or the session ended) while the session was stored.
+      throw _overtaken;
+    }
+    if (!_userChanges.isClosed) {
+      _userChanges.add(session.user);
+    }
+    _emitToken(idToken);
+    _notifyAuthState();
     await _letListenersReact();
-    return session.user;
+    return _result(response, session.user);
   }
 
   /// Like `_performSignInRequest` of the JS SDK: a sign-in answer with an `mfaPendingCredential` (and no tokens)
@@ -1157,27 +1842,30 @@ class FirebaseUserAuth implements AuthTokenProvider {
       refreshed,
       persist: refreshed.refreshToken != session.refreshToken,
     );
-    _refreshFailures = 0;
-    if (!_tokenChanges.isClosed) {
-      _tokenChanges.add(AuthTokenChange(idToken));
+    if (generation != _generation) {
+      return null;
     }
+    _refreshFailures = 0;
+    _emitToken(idToken);
     return idToken;
+  }
+
+  /// Installs the [session] of a new sign-in (or of [updateCurrentUser]) and stores it. The session count changes
+  /// before the session is installed, so that no operation of the previous session writes into this one. Returns
+  /// the count of this session.
+  Future<int> _installSession(_Session session) async {
+    final int generation = ++_generation;
+    await _setSession(session, persist: true);
+    return generation;
   }
 
   Future<void> _setSession(_Session session, {required bool persist}) async {
     _session = session;
+    _sessionOfUser[session.user] = (apiKey, session);
     if (persist) {
       await _storage.write(
         _storageKey,
-        jsonEncode(<String, Object?>{
-          'uid': session.user.uid,
-          'email': session.user.email,
-          'isAnonymous': session.user.isAnonymous,
-          'emailVerified': session.user.emailVerified,
-          'displayName': session.user.displayName,
-          'photoUrl': session.user.photoUrl,
-          'refreshToken': session.refreshToken,
-        }),
+        encodeSession(session.user, session.refreshToken),
       );
     }
     if (_tokenChanges.hasListener) {
@@ -1189,14 +1877,104 @@ class FirebaseUserAuth implements AuthTokenProvider {
     _generation++;
     _session = null;
     _cancelProactiveRefresh();
-    await _storage.write(_storageKey, null);
+    if (!_disposed) {
+      // After dispose the stored session may belong to a new instance that restored it.
+      await _storage.write(_storageKey, null);
+    }
     if (!_userChanges.isClosed) {
       _userChanges.add(null);
     }
-    if (!_tokenChanges.isClosed) {
-      _tokenChanges.add(const AuthTokenChange(''));
-    }
+    _emitToken('');
+    _notifyAuthState();
     await _letListenersReact();
+  }
+
+  /// Tells the token listeners (Firestore) and [idTokenChanges] about a new ID token of the current session, or an
+  /// empty one after a sign-out.
+  void _emitToken(String idToken) {
+    if (!_tokenChanges.isClosed) {
+      _tokenChanges.add(AuthTokenChange(idToken));
+    }
+    if (!_idTokenChanges.isClosed) {
+      _idTokenChanges.add(_session?.user);
+    }
+  }
+
+  /// [authStateChanges] emits when the uid differs from the one it last emitted (`notifyAuthListeners` of the JS
+  /// SDK).
+  void _notifyAuthState() {
+    final String? uid = _session?.user.uid;
+    if (uid == _lastNotifiedUid) {
+      return;
+    }
+    _lastNotifiedUid = uid;
+    if (!_authStateChanges.isClosed) {
+      _authStateChanges.add(_session?.user);
+    }
+  }
+
+  /// [changes], preceded by the current user once [authStateReady] completes, unless a change came first.
+  Stream<AuthUser?> _startingWithCurrentUser(Stream<AuthUser?> changes) =>
+      Stream<AuthUser?>.multi((MultiStreamController<AuthUser?> controller) {
+        bool emitted = false;
+        final StreamSubscription<AuthUser?> subscription = changes.listen((
+          AuthUser? user,
+        ) {
+          emitted = true;
+          controller.add(user);
+        }, onDone: controller.close);
+        controller.onCancel = subscription.cancel;
+        void emitCurrent() {
+          if (!emitted && !controller.isClosed) {
+            emitted = true;
+            controller.add(_session?.user);
+          }
+        }
+
+        authStateReady().then<void>(
+          (_) => emitCurrent(),
+          onError: (Object _) => emitCurrent(),
+        );
+      });
+
+  /// Like `_updateCurrentUser` of the JS SDK: the user of a sign-in must belong to [tenantId].
+  void _checkTenant(AuthUser user) {
+    if (user.tenantId != tenantId) {
+      throw const FirebaseAuthException(
+        code: 'tenant-id-mismatch',
+        message:
+            "The provided tenant ID does not match the Auth instance's tenant ID.",
+      );
+    }
+  }
+
+  /// Runs the [beforeAuthStateChanged] callbacks for [next] (`AuthMiddlewareQueue.runMiddleware` of the JS SDK).
+  Future<void> _runBeforeStateCallbacks(AuthUser? next) async {
+    final List<void Function()> onAbort = <void Function()>[];
+    for (final _BeforeStateCallback entry in List<_BeforeStateCallback>.of(
+      _beforeStateCallbacks,
+    )) {
+      try {
+        await entry.callback(next);
+      } on Object catch (e) {
+        for (final void Function() abort in onAbort.reversed) {
+          try {
+            abort();
+          } on Object {
+            // Like the JS SDK: an onAbort that throws does not stop the others.
+          }
+        }
+        throw FirebaseAuthException(
+          code: 'login-blocked',
+          message:
+              'Login blocked by user-provided method: ${e is FirebaseException ? e.message : e}',
+        );
+      }
+      final void Function()? abort = entry.onAbort;
+      if (abort != null) {
+        onAbort.add(abort);
+      }
+    }
   }
 
   /// Gives the listeners of the token (and whatever they forward the change to) a turn of the event loop before a
@@ -1261,6 +2039,22 @@ class FirebaseUserAuth implements AuthTokenProvider {
   /// When the proactive refresh is due, for tests.
   @visibleForTesting
   bool get hasRefreshTimer => _refreshTimer != null;
+}
+
+/// The request of a credential: the Identity Toolkit method, the body, and whether the tenant goes in it.
+class _CredentialRequest {
+  _CredentialRequest(this.method, this.body, {this.tenant = true});
+
+  final String method;
+  final Map<String, Object?> body;
+  final bool tenant;
+}
+
+class _BeforeStateCallback {
+  _BeforeStateCallback(this.callback, this.onAbort);
+
+  final FutureOr<void> Function(AuthUser? user) callback;
+  final void Function()? onAbort;
 }
 
 class _Session {

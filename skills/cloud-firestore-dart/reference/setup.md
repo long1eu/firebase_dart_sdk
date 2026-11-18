@@ -137,9 +137,9 @@ Future<void> signedIn(FirebaseApp app, String email, String password) async {
 }
 ```
 
-- Covers anonymous, email/password and custom-token sign-in, token refresh, sign-out and the
-  REST account operations. No Google, Apple or other federated sign-in, no phone, no email link,
-  no multi-factor.
+- Covers anonymous, email/password, email link and custom-token sign-in, federated sign-in with a
+  provider token the app already has (`signInWithCredential`), linking, token refresh, sign-out and
+  the REST account operations. No popup or redirect flows, no phone, no multi-factor.
 - `auth.userChanges()` (stream), `auth.currentUser`, `auth.uid`. Errors are
   `FirebaseAuthException` with codes such as `wrong-password`.
 - The session is forgotten when the process ends unless you pass `storage:` (an `AuthStorage`);
