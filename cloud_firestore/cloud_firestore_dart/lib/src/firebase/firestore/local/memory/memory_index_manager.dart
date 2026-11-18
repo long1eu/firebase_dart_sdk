@@ -42,6 +42,10 @@ class MemoryIndexManager extends IndexManager {
       null;
 
   @override
+  Future<bool> hasCurrentIndexEntries(Target target, Document document) async =>
+      false;
+
+  @override
   String? getNextCollectionGroupToUpdate() => null;
 
   @override

@@ -18,6 +18,9 @@
   (gone in 3.x). The lock file and the browser tests' `sqlite3.wasm` move to 3.9.1, now that
   `cloud_firestore_dart_sqlite` 0.1.1 waits for every queued IndexedDB write (the IndexedDB crash
   test lost acknowledged transactions on 3.9.1 before).
+- A query with `limit` served by a cache index reads only the documents of its window when the
+  last document of the window has pending writes that the index already holds, instead of every
+  match (an `orderBy.limit(10)` on 100,000 pending documents: about 2 s before).
 
 ## 0.2.0
 

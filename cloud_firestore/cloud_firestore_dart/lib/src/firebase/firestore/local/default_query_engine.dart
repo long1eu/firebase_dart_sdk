@@ -197,7 +197,26 @@ class DefaultQueryEngine implements QueryEngine {
       query,
       indexedDocuments,
     );
-    if (_needsRefill(query, keys.length, previousResults, offset.readTime)) {
+    // PORTING NOTE: the JS and Android SDKs refill whenever the document at the edge has pending writes, as for the
+    // previous result of a target. An index has the document at the place of its contents when the index was
+    // filled, so the window it returned is complete when that place is the current one: the entries computed from
+    // the document as it is now are the stored ones. Without that a limit query on documents that exist only as
+    // pending writes reads every match through the index.
+    final Document? documentAtLimitEdge = _documentAtLimitEdge(
+      query,
+      previousResults,
+    );
+    final bool edgeIndexedAsIs =
+        documentAtLimitEdge != null &&
+        documentAtLimitEdge.hasPendingWrites &&
+        await indexManager.hasCurrentIndexEntries(target, documentAtLimitEdge);
+    if (_needsRefill(
+      query,
+      keys.length,
+      previousResults,
+      offset.readTime,
+      edgeIndexedAsIs: edgeIndexedAsIs,
+    )) {
       // A limit query whose boundaries change due to local edits can be re-run against the cache by excluding the
       // limit. This ensures that all documents that match the query's filters are included in the result set. The SDK
       // can then apply the limit once all local edits are incorporated.
@@ -229,15 +248,25 @@ class DefaultQueryEngine implements QueryEngine {
     ImmutableSortedSet<Document> previousResults,
     ImmutableSortedMap<DocumentKey, Document> changedSinceOffset,
   ) {
-    if (!query.hasLimit) {
-      return false;
-    }
-    final Document? documentAtLimitEdge =
-        query.limitType == LimitType.limitToFirst
-        ? previousResults.maxEntry
-        : previousResults.minEntry;
+    final Document? documentAtLimitEdge = _documentAtLimitEdge(
+      query,
+      previousResults,
+    );
     return documentAtLimitEdge != null &&
         changedSinceOffset.containsKey(documentAtLimitEdge.key);
+  }
+
+  /// The last document of [sortedResults] in the order of the limit of [query], or null without a limit or results.
+  Document? _documentAtLimitEdge(
+    Query query,
+    ImmutableSortedSet<Document> sortedResults,
+  ) {
+    if (!query.hasLimit) {
+      return null;
+    }
+    return query.limitType == LimitType.limitToFirst
+        ? sortedResults.maxEntry
+        : sortedResults.minEntry;
   }
 
   /// Performs a query based on the target's persisted query mapping. Returns null if the mapping is not available or
@@ -317,13 +346,15 @@ class DefaultQueryEngine implements QueryEngine {
   /// [expectedDocumentCount] is the number of documents keys that matched the query at the last snapshot,
   /// [sortedPreviousResults] the documents that match the query based on the previous result, sorted by the query's
   /// comparator (its size may be different from [expectedDocumentCount] if documents cease to match the query) and
-  /// [limboFreeSnapshotVersion] the version of the snapshot when the query was last synchronized.
+  /// [limboFreeSnapshotVersion] the version of the snapshot when the query was last synchronized. [edgeIndexedAsIs]
+  /// says that the previous results come from an index that has the document at the edge with its pending writes.
   bool _needsRefill(
     Query query,
     int expectedDocumentCount,
     ImmutableSortedSet<Document> sortedPreviousResults,
-    SnapshotVersion limboFreeSnapshotVersion,
-  ) {
+    SnapshotVersion limboFreeSnapshotVersion, {
+    bool edgeIndexedAsIs = false,
+  }) {
     if (!query.hasLimit) {
       // Queries without limits do not need to be refilled.
       return false;
@@ -339,15 +370,15 @@ class DefaultQueryEngine implements QueryEngine {
     // the document at the edge of the limit goes out of limit. If a document that is not the limit boundary sorts
     // differently, the boundary of the limit itself did not change and documents from cache will continue to be
     // "rejected" by this boundary. Therefore, we can ignore any modifications that don't affect the last document.
-    final Document? documentAtLimitEdge =
-        query.limitType == LimitType.limitToFirst
-        ? sortedPreviousResults.maxEntry
-        : sortedPreviousResults.minEntry;
+    final Document? documentAtLimitEdge = _documentAtLimitEdge(
+      query,
+      sortedPreviousResults,
+    );
     if (documentAtLimitEdge == null) {
       // We don't need to refill the query if there were already no documents.
       return false;
     }
-    return documentAtLimitEdge.hasPendingWrites ||
+    return (documentAtLimitEdge.hasPendingWrites && !edgeIndexedAsIs) ||
         documentAtLimitEdge.version.compareTo(limboFreeSnapshotVersion) > 0;
   }
 

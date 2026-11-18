@@ -5,6 +5,7 @@
 import 'dart:collection';
 
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/target.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/model/document.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/document_key.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/field_index.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/maybe_document.dart';
@@ -88,6 +89,13 @@ abstract class IndexManager {
   /// Returns the documents that match the given target based on the provided
   /// index or null if the query cannot be served from an index.
   Future<List<DocumentKey>?> getDocumentsMatchingTarget(Target target);
+
+  /// Whether the entries of [document] in the index that serves [target] are the ones its current contents give, so
+  /// that [getDocumentsMatchingTarget] sorts it at its current place. False when [target] is not served by exactly
+  /// one index or the document has no entries in it.
+  ///
+  /// PORTING NOTE: not in the other SDKs, see `DefaultQueryEngine`.
+  Future<bool> hasCurrentIndexEntries(Target target, Document document);
 
   /// Returns the next collection group to update. Returns null if no group
   /// exists.
