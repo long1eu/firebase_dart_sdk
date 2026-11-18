@@ -10,11 +10,13 @@ OpenDatabase platformSqliteOpener({
   required Uri? opfsWorker,
   required String storagePrefix,
   required Duration lockTimeout,
+  required bool acceptIndexedDbWriteLoss,
 }) {
   return sqliteWebOpener(
     sqlite3Wasm: sqlite3Wasm,
     opfsWorker: opfsWorker,
     storagePrefix: storagePrefix,
     lockTimeout: lockTimeout,
+    acceptIndexedDbWriteLoss: acceptIndexedDbWriteLoss,
   );
 }

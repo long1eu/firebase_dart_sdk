@@ -29,7 +29,7 @@ What the repository can show about its state (each number with where it comes fr
   states its reason in the code: opt-in long soak runs, Enterprise-only cases, and tests that do
   not apply to that transport.
 - **Browser tests**: in the last recorded run, 54 tests in Chrome with each of dart2js and
-  dart2wasm, 53 passing and 1 skipped per compiler, against the emulator
+  dart2wasm, 56 passing and 1 skipped per compiler, against the emulator
   ([Platforms](platforms.md)).
 - **Production**: a verification kit of 15 checks (`tool/verify_production`) was run once
   against a real Firestore database in Standard edition: 13 passed and 2 were skipped (one needs

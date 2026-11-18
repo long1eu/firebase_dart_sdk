@@ -22,7 +22,10 @@ import 'package:cloud_firestore_dart/src/internal_access.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/local_store.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/persistance/index_manager.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/sqlite/sqlite_persistence.dart';
+import 'package:cloud_firestore_dart_sqlite/cloud_firestore_dart_sqlite.dart'
+    show openWithMemoryFallback;
 import 'package:cloud_firestore_dart_sqlite/web.dart';
+import 'package:firebase_app_dart/firebase_app_dart.dart';
 import 'package:sqlite3/wasm.dart' as sqlite;
 import 'package:test/test.dart';
 import 'package:web/web.dart' as web;
@@ -241,6 +244,68 @@ void main() {
     await firestore.disableNetwork();
     expect((await firestore.collection(collection).doc('a').get(GetOptions(source: Source.cache))).data(),
         <String, Object?>{'a': 1});
+  });
+
+  persistenceTest('the second tab gets a memory cache from '
+      'openWithMemoryFallback, and works', () async {
+    // As above, a frame of the same origin holds the lock of the cache, the
+    // way the first tab does.
+    final String app = newAppName();
+    final String collection = newCollectionName();
+    FirebaseFirestore firestore =
+        await newClient(openDatabase: opener(), appName: app);
+    await firestore.collection(collection).doc('a').set(<String, Object?>{'a': 1});
+    final String storageName = (await storedDatabases(app)).single;
+    await shutDown(firestore);
+
+    final web.HTMLIFrameElement frame =
+        web.document.createElement('iframe') as web.HTMLIFrameElement;
+    web.document.body!.appendChild(frame);
+    addTearDown(() => frame.remove());
+    final web.LockManager frameLocks = (frame.contentWindow! as JSObject)
+        .getProperty<JSObject>('navigator'.toJS)
+        .getProperty<web.LockManager>('locks'.toJS);
+    final Completer<void> held = Completer<void>();
+    final Completer<void> release = Completer<void>();
+    addTearDown(() {
+      if (!release.isCompleted) {
+        release.complete();
+      }
+    });
+    JSPromise<JSAny?> hold(web.Lock? lock) {
+      held.complete();
+      return release.future.then<JSAny?>((_) => null).toJS;
+    }
+
+    unawaited(frameLocks.request(storageName, hold.toJS).toDart);
+    await held.future.timeout(const Duration(seconds: 5));
+
+    final FirebaseApp secondTab = FirebaseApp.withOptions(
+      const FirebaseOptions(
+        apiKey: 'demo-key',
+        appId: '1:1234567890:dart:browser',
+        projectId: projectId,
+      ),
+      name: app,
+    );
+    firestore = await openWithMemoryFallback(
+      app: secondTab,
+      openDatabase: opener(),
+      settings: Settings().withEmulator(emulatorHost, emulatorPort),
+    );
+    addTearDown(() async {
+      await firestore.terminate();
+      await secondTab.delete();
+    });
+    // A memory cache: nothing of the stored cache, and no index manager.
+    expect(firestore.persistentCacheIndexManager, isNull);
+    await expectLater(
+        firestore.collection(collection).doc('a').get(GetOptions(source: Source.cache)),
+        throwsA(isA<FirestoreException>().having((FirestoreException e) => e.errorCode,
+            'code', FirestoreErrorCode.unavailable)));
+    // And it works against the backend.
+    await firestore.collection(collection).doc('b').set(<String, Object?>{'b': 2});
+    expect((await firestore.collection(collection).get(GetOptions(source: Source.server))).size, 2);
   });
 
   persistenceTest('clearPersistence deletes the stored cache', () async {

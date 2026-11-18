@@ -40,8 +40,9 @@ READMEs are short landing pages; the API reference is on pub.dev.
 16. [Flutter](flutter.md): creating the client before `runApp`, `StreamBuilder` and snapshot
     metadata, the SQLite cache per platform, connectivity, the app lifecycle, and what was tried on
     which platform.
-17. [The web](web.md): using the client in a browser (experimental): transports, caches, the one-tab
-    limit, CORS, bundle size, dart2js and dart2wasm.
+17. [The web](web.md): using the client in a browser (experimental), plain Dart or Flutter web:
+    transports, caches and the `sqlite3` version, the one-tab limit, several clients in one page,
+    CORS, bundle size, dart2js and dart2wasm.
 18. [Servers, jobs and command-line tools](server.md): credentials per environment, the memory
     cache, one instance per process, listeners and transactions in workers, graceful shutdown,
     containers, and what this client is not compared with the Admin SDK.

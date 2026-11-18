@@ -8,6 +8,7 @@ OpenDatabase platformSqliteOpener({
   required Uri? opfsWorker,
   required String storagePrefix,
   required Duration lockTimeout,
+  required bool acceptIndexedDbWriteLoss,
 }) {
   throw UnsupportedError(
     'cloud_firestore_dart_sqlite needs dart:io (the Dart VM, Flutter) or '

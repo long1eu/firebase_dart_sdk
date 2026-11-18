@@ -95,7 +95,7 @@ packages:
       path: "../cloud_firestore_dart_sqlite"
       relative: true
     source: path
-    version: "0.1.1"
+    version: "0.1.2"
   code_assets:
     dependency: transitive
     description:

@@ -7,7 +7,7 @@ pending writes kept while offline, data read without a network after the app sta
 on top of [`sqlite3`](https://pub.dev/packages/sqlite3). It is not affiliated with or endorsed by Google or
 Firebase.
 
-> **Status: 0.1.1.** The openers were the `example/` files of `cloud_firestore_dart` 0.1.1 that
+> **Status: 0.1.2.** The openers were the `example/` files of `cloud_firestore_dart` 0.1.1 that
 > apps had to copy. The browser storage is **experimental**. Run on macOS (Dart VM, `sqlite3`
 > 2.9.4 and 3.9.1) and in headless Chrome (dart2js and dart2wasm, `sqlite3` 2.9.4 and 3.9.1),
 > against the Firestore emulator, and in one Flutter Linux desktop app (Debian 13 x86_64,
@@ -19,6 +19,10 @@ Firebase.
 > **Upgrade from 0.1.0 if your app runs in a browser.** With `sqlite3` 3.x, 0.1.0's IndexedDB
 > storage could lose writes acknowledged shortly before the tab was killed or crashed (see the
 > CHANGELOG). OPFS, the Dart VM and Flutter were not affected.
+>
+> **A Flutter web app on Flutter 3.44 resolves `sqlite3` 3.5.2**, which the IndexedDB storage
+> cannot use safely. From 0.1.2 the open fails there with a `SqliteWebSetupException` that says
+> what to pin; see [Which `sqlite3`](#which-sqlite3).
 
 ## Install
 
@@ -81,6 +85,7 @@ A Flutter app that also builds for the web uses one call: `sqliteOpener(director
 | `opfsWorker` | browser | The URL of the compiled OPFS worker. With it the database is a file in the origin private file system, read as needed by SQLite in a worker. Without it, or in a browser without synchronous OPFS access in workers, the database is in IndexedDB. |
 | `storagePrefix` | browser | Names the IndexedDB databases, OPFS directories and Web Locks (`<prefix>/<name>`). Default `cloud_firestore_dart`, the name the copied opener used, so an existing cache is found again. |
 | `lockTimeout` | browser | How long an open waits for a cache that is open elsewhere. Default 2 seconds. |
+| `acceptIndexedDbWriteLoss` | browser | Opens the IndexedDB storage with `sqlite3` 3.4.0 to 3.5.2 anyway, which can lose acknowledged writes (see [Which `sqlite3`](#which-sqlite3)). Default `false`: the open fails there. |
 
 Also exported: `openWithMemoryFallback`, which creates the instance with the persistent cache, or
 with a memory cache when another client (in a browser: another tab) has that cache:
@@ -92,7 +97,9 @@ final FirebaseFirestore firestore = await openWithMemoryFallback(
 );
 ```
 
-and `SqliteOpfsException`, the cause of a failed statement in the OPFS worker.
+`SqliteOpfsException`, the cause of a failed statement in the OPFS worker, and
+`SqliteWebSetupException`, a browser setup that cannot work or is not safe (see [Recovery and
+errors](#recovery-and-errors)).
 `package:cloud_firestore_dart_sqlite/web.dart` (browser only) has the database classes and
 `inspectOpfsDatabase`, for tests and debugging; `package:cloud_firestore_dart_sqlite/opfs_worker.dart`
 has `runOpfsWorker`, to build the worker yourself.
@@ -103,7 +110,7 @@ The page needs one or two files next to it:
 
 | File | When | Where it comes from |
 | --- | --- | --- |
-| `sqlite3.wasm` | always | SQLite compiled to WebAssembly, an asset of the release `sqlite3-<version>` of [simolus3/sqlite3.dart](https://github.com/simolus3/sqlite3.dart/releases). It must be the build of the exact `sqlite3` version your app resolves (`pubspec.lock`). |
+| `sqlite3.wasm` | always | SQLite compiled to WebAssembly, an asset of the release `sqlite3-<version>` of [simolus3/sqlite3.dart](https://github.com/simolus3/sqlite3.dart/releases). It must be the build of the exact `sqlite3` version your app resolves (`pubspec.lock`): a 2.x file with a 3.x package, or the reverse, cannot be loaded, and the open fails with a `SqliteWebSetupException` (`wasmVersionMismatch`) that says which major line the file is. |
 | `sqlite_opfs_worker.js` | with `opfsWorker` | The worker of this package compiled to JavaScript, with your app's dependencies. |
 
 One command does the second and tells you the URL of the first. From your app's directory, after
@@ -199,14 +206,42 @@ written it, and what `flush()` waits for differs per version:
 | `sqlite3` | `flush()` waits for | IndexedDB storage |
 | --- | --- | --- |
 | 2.7.3 to 3.3.4 | every write made before it | safe |
-| 3.4.0 to 3.5.2 | nothing while a batch of writes is in progress | **unsafe**: do not use |
+| 3.4.0 to 3.5.2 | nothing while a batch of writes is in progress | **unsafe**: refused from 0.1.2 (the open fails), silently used by 0.1.0 and 0.1.1 |
 | 3.6.0 to 3.9.1 | the batch in progress, not the writes queued behind it | safe from 0.1.1, which waits for those too; lost writes with 0.1.0 |
 
-Recommended: `cloud_firestore_dart_sqlite` 0.1.1 or later, with any `sqlite3` but 3.4.0 to 3.5.2
-(pub picks the newest one your SDK allows; check `pubspec.lock` if you pinned `sqlite3`). The
-browser tests run with 2.9.4 and 3.9.1. The OPFS storage does not use this file system.
+Pub picks the newest `sqlite3` your SDK and your other dependencies allow, and that can be an
+unsafe one: **Flutter 3.44 pins `meta` 1.18, `sqlite3` 3.6.0 needs `meta` 1.19, so a Flutter app
+on Flutter 3.44 resolves 3.5.2.** There is no version number of a package at run time, so before
+the first IndexedDB open of a page the opener looks at what `flush()` does (a few milliseconds, in a
+scratch IndexedDB database `<storagePrefix>/sqlite3-flush-probe-<n>` that it deletes again). With
+3.4.0 to 3.5.2 the open fails with a `SqliteWebSetupException` (`unsafeSqlite3`). The ways out:
+
+- Pin a safe `sqlite3` in your app's `pubspec.yaml`, and put the `sqlite3.wasm` of that exact
+  version next to the page:
+  - Flutter 3.44: `sqlite3: 3.3.4` (3.x, so the native platforms keep the build hook and need no
+    other package), or `sqlite3: ^2.7.3` (2.9.4; then Flutter Android needs `sqlite3_flutter_libs`,
+    see the table below).
+  - A Flutter or Dart SDK that allows `meta` 1.19: `sqlite3: ^3.6.0`, or no pin at all.
+- Or use the OPFS storage (`sqliteOpener(opfsWorker: ...)`), which does not use this file system.
+  In a browser without synchronous OPFS in workers it falls back to IndexedDB, and the check
+  applies again.
+- Or accept the risk: `sqliteOpener(acceptIndexedDbWriteLoss: true)` skips the check. A write
+  acknowledged shortly before the tab is closed or crashes can then be missing on the next load.
+
+The check only runs in a browser, for the IndexedDB storage: the Dart VM and Flutter on Android,
+iOS, macOS, Windows and Linux are fine with 3.5.2. Recommended: `cloud_firestore_dart_sqlite` 0.1.2
+or later. The browser tests run with 2.9.4 and 3.9.1, and the check was tried with 2.9.4, 3.5.2
+and 3.9.1.
 
 ## Recovery and errors
+
+In a browser, a setup that cannot work or is not safe fails the open with a
+`SqliteWebSetupException`; its `problem` says which: `unsafeSqlite3` (above), `wasmVersionMismatch`
+(`sqlite3.wasm` of another release) or `wasmMissing` (not at its URL, or not WebAssembly: often the
+page a server sends for a missing file). Like every open error it comes from the first operation of
+the instance. `openWithMemoryFallback` rethrows it instead of falling back to a memory cache: it is a
+mistake of the build, the same in every tab, that a memory cache would hide. To fall back anyway,
+catch it, terminate the instance and create one without `openDatabase`.
 
 The VM opener reports SQLite's `BUSY`, `LOCKED`, `IOERR` and `FULL` as a
 `TransientDatabaseException`, after which FirebaseFirestore goes offline and retries; every other error
