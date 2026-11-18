@@ -168,6 +168,9 @@ void main() {
                   .length,
         );
 
+    // The count the app can show follows the merges.
+    expect(await firestore.getPendingWriteCount(), waiting);
+
     await firestore.enableNetwork();
     await firestore.waitForPendingWrites();
     final QuerySnapshot snapshot = await collection.get(
