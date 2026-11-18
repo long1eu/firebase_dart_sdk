@@ -35,29 +35,29 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/core/firestore_clien
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/sync_engine.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/firestore.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/js_sdk_cache_import.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/local/indexeddb/indexeddb_persistence.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/local/indexeddb/indexeddb_schema.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/local/indexeddb/indexeddb_serializer.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/js_sdk_import/js_sdk_database.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/js_sdk_import/js_sdk_database_platform.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/local_serializer.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/local_store.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/memory/memory_persistence.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/persistance/persistence.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/local/persistance/remote_document_cache.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/database_id.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/document_collections.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/document_key.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/maybe_document.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/mutation_batch.dart';
-import 'package:cloud_firestore_dart/src/firebase/firestore/model/no_document.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/snapshot_version.dart';
-import 'package:cloud_firestore_dart/src/firebase/firestore/model/unknown_document.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/remote/remote_serializer.dart';
-import 'package:cloud_firestore_dart/src/firebase/timestamp.dart';
-import 'package:cloud_firestore_dart/src/proto/index.dart' as proto;
 import 'package:firebase_app_dart/internal.dart';
 
 const String _tag = 'JsSdkCacheImport';
 
 /// The newest schema version of the JS SDK's database that is read (`SCHEMA_VERSION` in `indexeddb_schema.ts`).
-const int jsSdkNewestSchemaVersion = 18;
+const int jsSdkNewestSchemaVersion = indexedDbSchemaVersion;
 
 /// The oldest schema version that is read. Version 4 gave the `mutations` store its current key (an auto-incremented
 /// `batchId`) and index; version 5 removed the acknowledged batches that older versions left in it. No later version
@@ -68,26 +68,19 @@ const int jsSdkOldestSchemaVersion = 5;
 /// their read time in the key.
 const int jsSdkOldestSchemaVersionWithDocuments = 13;
 
-/// `MAX_PRIMARY_ELIGIBLE_AGE_MS` of `indexeddb_persistence.ts`: the JS SDK's primary lease is valid for 5 s after its
-/// last refresh (every 4 s, `CLIENT_METADATA_REFRESH_INTERVAL_MS`).
-const int jsSdkPrimaryLeaseMs = 5000;
+/// See [indexedDbPrimaryLeaseMs].
+const int jsSdkPrimaryLeaseMs = indexedDbPrimaryLeaseMs;
 
-/// `MAX_CLIENT_AGE_MS` of `indexeddb_persistence.ts`: the JS SDK counts a client as active while it refreshed its row in
-/// `clientMetadata` less than 30 minutes ago (and it did not mark itself as closed in LocalStorage). A tab in the
-/// background refreshes less often than every 4 s.
-const int jsSdkMaxClientAgeMs = 30 * 60 * 1000;
+/// See [indexedDbMaxClientAgeMs].
+const int jsSdkMaxClientAgeMs = indexedDbMaxClientAgeMs;
 
 /// The bundle name under which the imported documents are kept in the cache (an umbrella target holds them, as the
 /// documents of a bundle, so that they are not collected as garbage at once).
 const String _documentsBundleName = 'js-sdk-cache-import';
 
 /// The prefix of the JS SDK's IndexedDB database name and of its LocalStorage keys (`indexedDbStoragePrefix`).
-String jsSdkStoragePrefix(String appName, DatabaseId databaseId) {
-  final String database = databaseId.databaseId == DatabaseId.defaultDatabaseId
-      ? databaseId.projectId
-      : '${databaseId.projectId}.${databaseId.databaseId}';
-  return 'firestore/$appName/$database/';
-}
+String jsSdkStoragePrefix(String appName, DatabaseId databaseId) =>
+    indexedDbStoragePrefix(appName, databaseId);
 
 /// See `importJsSdkCache`.
 Future<JsSdkCacheImportResult> runJsSdkCacheImport(
@@ -295,11 +288,8 @@ class _JsSdkCache {
   /// `filterActiveClients` in `indexeddb_persistence.ts`).
   Future<void> _checkNoActiveClient(JsSdkDatabase db) async {
     final int now = DateTime.now().millisecondsSinceEpoch;
-    // As the JS SDK: a time in the future is not within the age.
     bool isWithinAge(Object? updateTimeMs, int maxAgeMs) =>
-        updateTimeMs is num &&
-        updateTimeMs >= now - maxAgeMs &&
-        updateTimeMs <= now;
+        indexedDbIsWithinAge(updateTimeMs, maxAgeMs, now);
     bool isZombied(Object? clientId) =>
         clientId is String && isJsSdkClientZombied(storagePrefix, clientId);
 
@@ -334,99 +324,11 @@ class _JsSdkCache {
     }
   }
 
-  /// The batch of a row of the JS `mutations` store (`fromDbMutationBatch` of `local_serializer.ts`).
-  MutationBatch _decodeBatch(
-    LocalSerializer serializer,
-    Map<String, Object?> row,
-  ) {
-    final List<Object?> writes = row['mutations']! as List<Object?>;
-    // Old JS SDKs stored a transform as a separate write after its set or patch: squash it into that write.
-    final List<Object?> squashed = <Object?>[];
-    for (int i = 0; i < writes.length; i++) {
-      final Map<String, Object?> write = Map<String, Object?>.of(
-        (writes[i]! as Map<Object?, Object?>).cast(),
-      );
-      final Object? next = i + 1 < writes.length ? writes[i + 1] : null;
-      if (next is Map && next['transform'] is Map) {
-        write['updateTransforms'] =
-            (next['transform'] as Map<Object?, Object?>)['fieldTransforms'];
-        i++;
-      }
-      squashed.add(write);
-    }
-    final proto.WriteBatch batch = proto.WriteBatch()
-      ..batchId = (row['batchId']! as num).toInt()
-      ..localWriteTime = serializer.rpcSerializer.encodeTimestamp(
-        Timestamp.fromMillisecondsSinceEpoch(
-          (row['localWriteTimeMs']! as num).toInt(),
-        ),
-      );
-    for (final Object? write
-        in (row['baseMutations'] as List<Object?>?) ?? const <Object?>[]) {
-      batch.baseWrites.add(
-        proto.Write()..mergeFromProto3Json(write, ignoreUnknownFields: false),
-      );
-    }
-    for (final Object? write in squashed) {
-      batch.writes.add(
-        proto.Write()..mergeFromProto3Json(write, ignoreUnknownFields: false),
-      );
-    }
-    return serializer.decodeMutationBatch(batch);
-  }
-
-  /// A `{seconds, nanoseconds}` timestamp of the JS SDK's rows (`DbTimestamp`).
-  static SnapshotVersion _dbTimestamp(Object? value) {
-    final Map<Object?, Object?> timestamp = value! as Map<Object?, Object?>;
-    return SnapshotVersion(
-      Timestamp(
-        (timestamp['seconds']! as num).toInt(),
-        (timestamp['nanoseconds']! as num).toInt(),
-      ),
-    );
-  }
-
-  /// The document of a row of the JS `remoteDocumentsV14` store (`fromDbRemoteDocument` of `local_serializer.ts`) and
-  /// its read time.
-  ({MaybeDocument document, SnapshotVersion readTime}) _decodeDocument(
-    LocalSerializer serializer,
-    Map<String, Object?> row,
-  ) {
-    final bool hasCommittedMutations = row['hasCommittedMutations'] == true;
-    final MaybeDocument document;
-    final Object? remote = row['document'];
-    final Object? deleted = row['noDocument'];
-    final Object? unknown = row['unknownDocument'];
-    if (remote != null) {
-      document = serializer.decodeMaybeDocument(
-        proto.MaybeDocument()
-          ..document = (proto.Document()
-            ..mergeFromProto3Json(remote, ignoreUnknownFields: true))
-          ..hasCommittedMutations = hasCommittedMutations,
-      );
-    } else if (deleted is Map) {
-      document = NoDocument(
-        DocumentKey.fromSegments((deleted['path']! as List<Object?>).cast()),
-        _dbTimestamp(deleted['readTime']),
-        hasCommittedMutations: hasCommittedMutations,
-      );
-    } else if (unknown is Map) {
-      document = UnknownDocument(
-        DocumentKey.fromSegments((unknown['path']! as List<Object?>).cast()),
-        _dbTimestamp(unknown['version']),
-      );
-    } else {
-      throw const FormatException('no document, noDocument or unknownDocument');
-    }
-    // The key's read time: [seconds, nanoseconds].
-    final List<Object?> readTime = row['readTime']! as List<Object?>;
-    return (
-      document: document,
-      readTime: SnapshotVersion(
-        Timestamp((readTime[0]! as num).toInt(), (readTime[1]! as num).toInt()),
-      ),
-    );
-  }
+  /// Whether [persistence] is the IndexedDB engine on this very database: there is nothing to import from it, and it
+  /// must not be deleted under the running instance.
+  bool _isThisCache(Persistence persistence) =>
+      persistence is IndexedDbPersistence &&
+      persistence.databaseName == databaseName;
 
   static User _user(String userId) =>
       userId.isEmpty ? User.unauthenticated : User(userId);
@@ -438,10 +340,19 @@ class _JsSdkCache {
     required bool allowMemoryCache,
   }) async {
     final Persistence persistence = client.persistence;
+    if (_isThisCache(persistence)) {
+      return JsSdkCacheImportResult(
+        status: JsSdkCacheImportStatus.nothingToImport,
+        databaseName: databaseName,
+        skipped: const <String>[
+          'everything: this instance uses the JS SDK database as its cache (IndexedDbCacheSettings)',
+        ],
+      );
+    }
     final LocalStore localStore = client.localStore;
     final SyncEngine syncEngine = client.syncEngine;
-    final LocalSerializer serializer = LocalSerializer(
-      RemoteSerializer(databaseId),
+    final IndexedDbSerializer serializer = IndexedDbSerializer(
+      LocalSerializer(RemoteSerializer(databaseId)),
     );
 
     // Step 1.
@@ -479,7 +390,7 @@ class _JsSdkCache {
       for (final Map<String, Object?> row in await db.readAll('mutations')) {
         final MutationBatch batch;
         try {
-          batch = _decodeBatch(serializer, row);
+          batch = serializer.fromDbMutationBatch(row);
         } catch (e) {
           throw _refuse(
             JsSdkCacheImportRefusal.unreadableWrites,
@@ -551,9 +462,9 @@ class _JsSdkCache {
         for (final Map<String, Object?> row in await db.readAll(
           'remoteDocumentsV14',
         )) {
-          final ({MaybeDocument document, SnapshotVersion readTime}) decoded;
+          final ReadDocument decoded;
           try {
-            decoded = _decodeDocument(serializer, row);
+            decoded = serializer.fromDbRemoteDocument(row);
           } catch (e) {
             unreadable++;
             Log.d(_tag, 'Skipping an unreadable document of $databaseName: $e');
@@ -694,6 +605,13 @@ class _JsSdkCache {
     required bool discardPendingWrites,
   }) async {
     final Persistence persistence = client.persistence;
+    if (_isThisCache(persistence)) {
+      Log.w(
+        _tag,
+        '$databaseName is the cache of this instance (IndexedDbCacheSettings): not deleted. Use clearPersistence.',
+      );
+      return false;
+    }
     final JsSdkDatabase? db = await openJsSdkDatabase(databaseName);
     if (db == null) {
       return false;
