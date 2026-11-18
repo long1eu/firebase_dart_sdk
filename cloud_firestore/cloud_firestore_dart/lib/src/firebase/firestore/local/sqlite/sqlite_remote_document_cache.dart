@@ -10,7 +10,8 @@ class SQLiteRemoteDocumentCache implements RemoteDocumentCache {
 
   /// Up to this many documents read after an offset (in the whole cache), they are read through the `read_time`
   /// index rather than by a scan of the collection.
-  static const int _readTimeIndexMaxRows = 5000;
+  @visibleForTesting
+  static int readTimeIndexMaxRows = 5000;
 
   /// Whether the `read_time` index exists (it comes with the field index tables of schema 13).
   bool? _hasReadTimeIndex;
@@ -258,7 +259,7 @@ class SQLiteRemoteDocumentCache implements RemoteDocumentCache {
     }
   }
 
-  /// Whether fewer than [_readTimeIndexMaxRows] documents of the whole cache were read at or after [readTime] (counted
+  /// Whether fewer than [readTimeIndexMaxRows] documents of the whole cache were read at or after [readTime] (counted
   /// on the `read_time` index), so that reading them through that index is cheaper than reading by path.
   Future<bool> _fewReadSince(Timestamp readTime) async {
     if (!(_hasReadTimeIndex ??= (await db.query(
@@ -269,9 +270,9 @@ class SQLiteRemoteDocumentCache implements RemoteDocumentCache {
     final List<Map<String, dynamic>> newer = await db.query(
       'SELECT COUNT(*) AS count FROM (SELECT 1 FROM remote_documents INDEXED BY read_time '
       'WHERE (read_time_seconds, read_time_nanos) >= (?, ?) LIMIT ?)',
-      <Object>[readTime.seconds, readTime.nanoseconds, _readTimeIndexMaxRows],
+      <Object>[readTime.seconds, readTime.nanoseconds, readTimeIndexMaxRows],
     );
-    return (newer.single['count'] as int) < _readTimeIndexMaxRows;
+    return (newer.single['count'] as int) < readTimeIndexMaxRows;
   }
 
   /// [getAllForCollectionGroup] through the `read_time` index: the paths of the documents read after [offset], in the
@@ -485,7 +486,7 @@ class SQLiteRemoteDocumentCache implements RemoteDocumentCache {
     // or changed since a query was last in sync) by walking the whole collection by path and comparing read times,
     // so an indexed query costs a scan of the collection however few documents changed (170 ms for 1M documents).
     // When few documents of the whole cache were read after the offset (counted on the `read_time` index, stopping at
-    // [_readTimeIndexMaxRows]), they are read through that index instead.
+    // [readTimeIndexMaxRows]), they are read through that index instead.
     if (sinceOffset && await _fewReadSince(readTime)) {
       addRows(
         await db.query(
