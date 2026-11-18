@@ -55,10 +55,12 @@ final class PersistentCacheSettings extends LocalCacheSettings {
   ///
   /// [indexAutoCreation] and [indexBackfill] configure the persistent cache
   /// indexes; the defaults are the behaviour of the official SDKs.
+  /// [mergeUnsentWrites] is experimental and off by default, see [mergeUnsentWrites].
   PersistentCacheSettings({
     this.sizeBytes = Settings.defaultCacheSizeBytes,
     this.indexAutoCreation = false,
     IndexBackfillSettings? indexBackfill,
+    this.mergeUnsentWrites = false,
   }) : indexBackfill = indexBackfill ?? IndexBackfillSettings() {
     if (sizeBytes != Settings.cacheSizeUnlimited &&
         sizeBytes < Settings.minimumCacheBytes) {
@@ -85,21 +87,79 @@ final class PersistentCacheSettings extends LocalCacheSettings {
   /// default is the fixed rate of the official SDKs.
   final IndexBackfillSettings indexBackfill;
 
+  /// **Experimental, not in the official SDKs.** Whether a write to a document whose previous write is still pending
+  /// and was not sent yet replaces that write with one merged write, instead of queuing a second one. Off by default;
+  /// when off nothing changes.
+  ///
+  /// This keeps the queue of pending writes short for an app that stays offline for a long time and edits the same
+  /// documents again and again: about one pending write per document instead of one per edit, so a smaller cache, a
+  /// shorter reconnect and fewer billed writes. The documents on the backend end up the same as when every write is
+  /// sent, as long as the backend would have accepted each of them.
+  ///
+  /// A write is merged only when all of these hold:
+  ///
+  /// * It is a single write (`set`, `update` or `delete`, or a `WriteBatch` with one write), and the newest pending
+  ///   write of its document is also a batch with one write. Batches with several writes are atomic and are never
+  ///   merged into, nor merged.
+  /// * That pending write was never handed to the network layer in this session (in particular it is not in flight,
+  ///   and the up to 10 writes queued for the write stream are left alone). Writes queued while the network is enabled
+  ///   but the device is offline are handed out ahead of time, so the first few writes of an offline period stay
+  ///   separate.
+  /// * No other client uses the cache: with a persistent cache, no other client refreshed its row in the cache within
+  ///   the last 30 minutes (unless the database is an `ExclusiveDatabase`); clients that share their state are never
+  ///   merged.
+  /// * The two writes combine in one of these ways (other combinations stay queued as two writes):
+  ///   * The new write is a `set` without merge (also one with transforms such as `serverTimestamp`, `increment`,
+  ///     `arrayUnion` or `arrayRemove`) or a `delete`: it replaces the pending write, whatever that was. The result
+  ///     of such a write does not depend on the document before it.
+  ///   * The new write is an `update` or a `set` with merge, without transforms, and the pending write has no
+  ///     transforms:
+  ///     * after a `set`: one `set` of the pending value with the new fields applied;
+  ///     * after an `update` or a `set` with merge: one write of the fields of both (the paths of both masks, with
+  ///       the values after both), with the precondition of the pending write; only when the pending write has no
+  ///       precondition (a `set` with merge) or both are `update`s (if the first one fails on a missing document,
+  ///       so does the second);
+  ///     * after a `delete`, a `set` with merge only: one `set` of the new fields.
+  ///
+  /// The merged write takes the place of the newer write in the queue: writes to other documents queued in between
+  /// now reach the backend before the earlier state of this document, which never reaches it at all. The future of
+  /// every merged write completes, or fails, with the merged write, and `waitForPendingWrites` waits for it.
+  ///
+  /// What the app gives up:
+  ///
+  /// * Security rules and Cloud Functions triggers see one write instead of several, and never the intermediate
+  ///   states. Rules that check a transition (`request.resource` against `resource`) see the transition from the
+  ///   first state to the last.
+  /// * A rejection rejects all the merged writes: the future of each of them fails with the same error.
+  /// * Writes to other documents in between no longer see this document in its intermediate state, for example a
+  ///   rule that reads it with `get()`. Do not enable this when rules or functions depend on the order of writes
+  ///   across documents.
+  /// * The precondition of a write that is replaced by a `set` or a `delete` is not checked: an `update` of a
+  ///   missing document that is followed by a `set` succeeds instead of failing.
+  final bool mergeUnsentWrites;
+
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       other is PersistentCacheSettings &&
           sizeBytes == other.sizeBytes &&
           indexAutoCreation == other.indexAutoCreation &&
-          indexBackfill == other.indexBackfill;
+          indexBackfill == other.indexBackfill &&
+          mergeUnsentWrites == other.mergeUnsentWrites;
 
   @override
-  int get hashCode => Object.hash(sizeBytes, indexAutoCreation, indexBackfill);
+  int get hashCode => Object.hash(
+    sizeBytes,
+    indexAutoCreation,
+    indexBackfill,
+    mergeUnsentWrites,
+  );
 
   @override
   String toString() =>
       'PersistentCacheSettings{sizeBytes=$sizeBytes, '
-      'indexAutoCreation=$indexAutoCreation, indexBackfill=$indexBackfill}';
+      'indexAutoCreation=$indexAutoCreation, indexBackfill=$indexBackfill'
+      '${mergeUnsentWrites ? ', mergeUnsentWrites=true' : ''}}';
 }
 
 /// The rate at which the persistent cache indexes are filled in the
@@ -220,22 +280,34 @@ final class IndexBackfillSettings {
 /// );
 /// ```
 final class MemoryCacheSettings extends LocalCacheSettings {
-  /// Creates the settings, by default with eager garbage collection.
-  const MemoryCacheSettings({this.gcSettings = const MemoryEagerGcSettings()});
+  /// Creates the settings, by default with eager garbage collection and without merging writes.
+  const MemoryCacheSettings({
+    this.gcSettings = const MemoryEagerGcSettings(),
+    this.mergeUnsentWrites = false,
+  });
 
   /// The garbage collector of the memory cache.
   final MemoryGarbageCollectorSettings gcSettings;
 
+  /// **Experimental, not in the official SDKs.** Whether a write to a document whose previous write is still pending
+  /// and was not sent yet replaces that write with one merged write. Off by default. The conditions and what the app
+  /// gives up are those of [PersistentCacheSettings.mergeUnsentWrites].
+  final bool mergeUnsentWrites;
+
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is MemoryCacheSettings && gcSettings == other.gcSettings;
+      other is MemoryCacheSettings &&
+          gcSettings == other.gcSettings &&
+          mergeUnsentWrites == other.mergeUnsentWrites;
 
   @override
-  int get hashCode => gcSettings.hashCode;
+  int get hashCode => Object.hash(gcSettings, mergeUnsentWrites);
 
   @override
-  String toString() => 'MemoryCacheSettings{gcSettings=$gcSettings}';
+  String toString() =>
+      'MemoryCacheSettings{gcSettings=$gcSettings'
+      '${mergeUnsentWrites ? ', mergeUnsentWrites=true' : ''}}';
 }
 
 /// Configures the garbage collector of a [MemoryCacheSettings]: [MemoryEagerGcSettings] (the default) or

@@ -30,6 +30,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/local/query_engine.d
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/query_purpose.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/query_result.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/reference_set.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/local/unsent_write_merge.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/document.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/document_collections.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/document_key.dart';
@@ -39,6 +40,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/field
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/mutation.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/mutation_batch.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/mutation_batch_result.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/overlay.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/patch_mutation.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/precondition.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/no_document.dart';
@@ -356,7 +358,14 @@ class LocalStore implements BundleCallback {
   }
 
   /// Accepts locally generated [Mutations] and commits them to storage.
-  Future<LocalWriteResult> writeLocally(List<Mutation> mutations) async {
+  ///
+  /// With [mergeUnsentWrites] and [mayMerge] (false when the sync engine shares the state of its batches with other
+  /// clients), a write that [_findUnsentWriteMerge] can merge replaces the pending write of its document: the batch of
+  /// that write is removed and its id is in [LocalWriteResult.mergedBatchIds].
+  Future<LocalWriteResult> writeLocally(
+    List<Mutation> mutations, {
+    bool mayMerge = false,
+  }) async {
     final Timestamp localWriteTime = Timestamp.now();
     // TODO(long1eu): Call queryEngine.handleDocumentChange() appropriately.
 
@@ -400,11 +409,22 @@ class LocalStore implements BundleCallback {
         }
       }
 
+      // DEVIATION FROM UPSTREAM (opt-in, see [mergeUnsentWrites]): the merged write is added as a new batch, at the
+      // end of the queue, and the batch it replaces is removed.
+      final _UnsentWriteMerge? merge = mergeUnsentWrites && mayMerge
+          ? await _findUnsentWriteMerge(mutations)
+          : null;
       final MutationBatch batch = await _mutationQueue.addMutationBatch(
         localWriteTime,
-        baseMutations,
-        mutations,
+        merge == null || merge.keepsBaseMutations
+            ? baseMutations
+            : const <Mutation>[],
+        merge == null ? mutations : <Mutation>[merge.mutation],
       );
+      if (merge != null) {
+        await _mutationQueue.removeMutationBatch(merge.replaced);
+        _documentKeysByBatchId.remove(merge.replaced.batchId);
+      }
       _documentKeysByBatchId[batch.batchId] = batch.keys;
       _localDocuments.forgetPendingWrites(batch.keys);
       // Apply the new batch on top of the current local view and save the resulting overlays.
@@ -444,9 +464,72 @@ class LocalStore implements BundleCallback {
               ),
         );
       }
+      if (merge != null && !overlays.containsKey(merge.mutation.key)) {
+        // The pending writes leave the document as it is (a patch whose precondition fails locally): an overlay that
+        // an earlier batch saved stays, now under the id of the batch that replaced it.
+        final Overlay? kept = await _documentOverlayCache.getOverlay(
+          merge.mutation.key,
+        );
+        if (kept != null && kept.largestBatchId == merge.replaced.batchId) {
+          overlays[merge.mutation.key] = kept.mutation;
+        }
+      }
       await _documentOverlayCache.saveOverlays(batch.batchId, overlays);
-      return LocalWriteResult(batch.batchId, changedDocuments);
+      return LocalWriteResult(
+        batch.batchId,
+        changedDocuments,
+        mergedBatchIds: merge == null
+            ? const <int>[]
+            : <int>[merge.replaced.batchId],
+      );
     });
+  }
+
+  /// The batch that the single write in [mutations] can replace, and the mutation that replaces both, or null. Runs in
+  /// the transaction of [writeLocally]. The conditions, all required:
+  ///
+  /// * [mutations] is one write, and the newest batch of its document has only one write, to that document.
+  /// * That batch was never handed to the remote store ([_highestBatchIdHandedOut]): it is not in the write pipeline
+  ///   and was not sent in this session. One sent in an earlier session that ended before its acknowledgement may
+  ///   have been committed; the merged write applied again on top of it gives the same document (see below).
+  /// * No other client uses the cache ([Persistence.hasOtherClients]): another client may have the batch in its write
+  ///   pipeline, and the client that wrote a batch completes its future.
+  /// * [mergeUnsentMutations] knows a mutation equivalent to the two.
+  ///
+  /// The batches in between touch other documents only (the replaced batch is the newest one of this document). The
+  /// merged write takes the place of the newer write, so the last write of every document keeps its order; only the
+  /// earlier state of this document never reaches the backend.
+  ///
+  /// Applying a merged write on top of the replaced one (sent and committed in a previous session) gives the merged
+  /// result again: a set or a delete does not depend on the document before; a patch sets every path of its mask to
+  /// the value it has after both writes, which does not depend on the document either, and its `exists` precondition
+  /// holds after the replaced write.
+  Future<_UnsentWriteMerge?> _findUnsentWriteMerge(
+    List<Mutation> mutations,
+  ) async {
+    if (mutations.length != 1) {
+      return null;
+    }
+    final Mutation next = mutations.single;
+    final MutationBatch? previous = await _mutationQueue
+        .getNewestMutationBatchAffectingDocumentKey(next.key);
+    if (previous == null ||
+        previous.batchId <= _highestBatchIdHandedOut ||
+        previous.mutations.length != 1) {
+      return null;
+    }
+    final Mutation? merged = mergeUnsentMutations(
+      previous.mutations.single,
+      next,
+    );
+    if (merged == null || await _persistence.hasOtherClients()) {
+      return null;
+    }
+    return _UnsentWriteMerge(
+      previous,
+      merged,
+      keepsBaseMutations: identical(merged, next),
+    );
   }
 
   /// Acknowledges the given batch.
@@ -883,12 +966,30 @@ class LocalStore implements BundleCallback {
   /// Returns the next mutation or null if there wasn't one.
   ///
   /// Skips the batches of the other live clients of a shared cache unless [sendsOtherClientsBatches].
-  Future<MutationBatch?> getNextMutationBatch(int afterBatchId) {
-    return _mutationQueue.getNextMutationBatchAfterBatchId(
-      afterBatchId,
-      skipOtherClients: !sendsOtherClientsBatches,
-    );
+  ///
+  /// The remote store sends the batches it gets here: a batch returned once is never merged into by [writeLocally]
+  /// (see [mergeUnsentWrites]).
+  Future<MutationBatch?> getNextMutationBatch(int afterBatchId) async {
+    final MutationBatch? batch = await _mutationQueue
+        .getNextMutationBatchAfterBatchId(
+          afterBatchId,
+          skipOtherClients: !sendsOtherClientsBatches,
+        );
+    if (batch != null && batch.batchId > _highestBatchIdHandedOut) {
+      _highestBatchIdHandedOut = batch.batchId;
+    }
+    return batch;
   }
+
+  /// The highest batch id that [getNextMutationBatch] returned, in this session. It only grows (also across a restart
+  /// of the network or a change of user, which empty the write pipeline): a batch at or below it may be in the write
+  /// pipeline of the remote store, or on the wire.
+  int _highestBatchIdHandedOut = MutationBatch.unknown;
+
+  /// NOT IN THE OFFICIAL SDKS: whether [writeLocally] merges a write into the pending write of the same document that
+  /// was not sent yet (`PersistentCacheSettings.mergeUnsentWrites` and `MemoryCacheSettings.mergeUnsentWrites`, which
+  /// document the conditions). Set by the client at start; false by default.
+  bool mergeUnsentWrites = false;
 
   /// Whether this client sends the batches that other clients of a shared cache wrote: only when the clients share
   /// the state of their batches, so that the client that wrote one learns its result. Set by the sync engine.
@@ -1449,4 +1550,23 @@ class UserChangeResult {
 
   /// The batches of the new user.
   final List<int> addedBatchIds;
+}
+
+/// A write that replaces the pending write in [replaced] (see [LocalStore._findUnsentWriteMerge]).
+class _UnsentWriteMerge {
+  const _UnsentWriteMerge(
+    this.replaced,
+    this.mutation, {
+    required this.keepsBaseMutations,
+  });
+
+  /// The batch that is removed.
+  final MutationBatch replaced;
+
+  /// The only mutation of the new batch.
+  final Mutation mutation;
+
+  /// Whether [mutation] is the new write itself, whose base mutations (of its transforms) the new batch keeps. A
+  /// mutation merged from both has no transforms, and so no base mutations.
+  final bool keepsBaseMutations;
 }

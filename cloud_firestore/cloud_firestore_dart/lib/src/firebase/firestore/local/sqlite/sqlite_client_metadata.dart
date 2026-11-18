@@ -362,6 +362,18 @@ class SQLiteClientMetadata {
     ];
   }
 
+  /// Whether the `clients` table has a row of another client that is not older than [maxClientAgeMs]. A row with a
+  /// time in the future counts as well (unlike [_activeClients]): the answer is used to rule out that another client
+  /// is alive, so a clock that runs ahead must not hide it.
+  Future<bool> _hasOtherClients() async {
+    final List<Map<String, dynamic>> rows = await _db.query(
+      'SELECT 1 FROM clients WHERE client_id != ? AND '
+      '(typeof(update_time_ms) != \'integer\' OR update_time_ms >= ?) LIMIT 1',
+      <Object?>[clientId, _clock() - maxClientAgeMs],
+    );
+    return rows.isNotEmpty;
+  }
+
   /// Releases the lease and removes the row of this client, when it terminates.
   Future<void> _remove() async {
     await _releaseLeaseIfHeld();

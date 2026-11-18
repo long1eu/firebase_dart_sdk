@@ -95,6 +95,12 @@ abstract class MutationQueue {
     DocumentKey documentKey,
   );
 
+  /// The batch with the highest id that contains a mutation of [documentKey], or null. Used by
+  /// `LocalStore.mergeUnsentWrites`, which must not read every batch of a document at every write.
+  Future<MutationBatch?> getNewestMutationBatchAffectingDocumentKey(
+    DocumentKey documentKey,
+  );
+
   /// Finds all mutation batches that could possibly affect the given set of
   /// document keys. Not all mutations in a batch will necessarily affect each
   /// key, so when looping through the batch you'll need to check that the

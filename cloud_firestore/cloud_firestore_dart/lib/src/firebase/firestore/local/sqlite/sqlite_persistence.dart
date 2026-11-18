@@ -479,6 +479,10 @@ class SQLitePersistence extends Persistence {
     listener(isPrimary);
   }
 
+  @override
+  Future<bool> hasOtherClients() async =>
+      !hasExclusiveAccess && await clientMetadata._hasOtherClients();
+
   /// The ids of the clients of this cache that refreshed their metadata within
   /// [SQLiteClientMetadata.maxClientAgeMs], this one included.
   @override

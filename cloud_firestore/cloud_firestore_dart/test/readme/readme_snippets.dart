@@ -1187,8 +1187,15 @@ Future<void> offlinePersistenceGuideLine187() async {
   await progress.cancel();
 }
 
-// ../../docs/guides/offline_persistence.md:228
-Future<void> offlinePersistenceGuideLine228() async {
+// ../../docs/guides/offline_persistence.md:221
+Future<void> offlinePersistenceGuideLine221() async {
+  final Settings settings = Settings(
+    cacheSettings: PersistentCacheSettings(mergeUnsentWrites: true),
+  );
+}
+
+// ../../docs/guides/offline_persistence.md:283
+Future<void> offlinePersistenceGuideLine283() async {
   final Directory directory = Directory('/home/ada/.local/share/my_app')
     ..createSync(recursive: true);
   if (!Platform.isWindows) {
@@ -1196,8 +1203,8 @@ Future<void> offlinePersistenceGuideLine228() async {
   }
 }
 
-// ../../docs/guides/offline_persistence.md:253
-Future<void> offlinePersistenceGuideLine253() async {
+// ../../docs/guides/offline_persistence.md:308
+Future<void> offlinePersistenceGuideLine308() async {
   // IndexedDB: SQLite runs in the page on a copy of the whole database in memory.
   final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(
     app: app,
@@ -1205,23 +1212,23 @@ Future<void> offlinePersistenceGuideLine253() async {
   );
 }
 
-// ../../docs/guides/offline_persistence.md:270
-Future<void> offlinePersistenceGuideLine270() async {
+// ../../docs/guides/offline_persistence.md:325
+Future<void> offlinePersistenceGuideLine325() async {
   final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(
     app: app,
     openDatabase: sqliteOpener(opfsWorker: Uri.parse('sqlite_opfs_worker.js')),
   );
 }
 
-// ../../docs/guides/offline_persistence.md:304
-Future<void> offlinePersistenceGuideLine304() async {
+// ../../docs/guides/offline_persistence.md:359
+Future<void> offlinePersistenceGuideLine359() async {
   await firestore.terminate();        // the cache must not be in use by this instance
   await firestore.clearPersistence(); // deletes the files (or the browser storage)
   final FirebaseFirestore fresh = FirebaseFirestore.instanceFor(app: app);
 }
 
-// ../../docs/guides/offline_persistence.md:323
-Future<void> offlinePersistenceGuideLine323() async {
+// ../../docs/guides/offline_persistence.md:378
+Future<void> offlinePersistenceGuideLine378() async {
   final indexes = firestore.persistentCacheIndexManager; // null with a memory cache
   await indexes?.enableIndexAutoCreation();
 }

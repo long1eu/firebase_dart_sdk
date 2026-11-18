@@ -136,6 +136,11 @@ class SyncEngine implements RemoteStoreCallback, SharedClientStateSyncer {
   /// Stores user completion blocks, indexed by user and batch id.
   final Map<User, Map<int, Completer<void>>> _mutationUserCallbacks;
 
+  /// The user completion blocks of the writes that were merged into a later batch, indexed by user and the id of that
+  /// batch (see [_moveCallbacksOfMergedBatch]). Empty unless `LocalStore.mergeUnsentWrites` is on.
+  final Map<User, Map<int, List<Completer<void>>>> _mergedUserCallbacks =
+      <User, Map<int, List<Completer<void>>>>{};
+
   /// Stores user callbacks waiting for all pending writes to be acknowledged, indexed by the batch id of the last
   /// write that was pending when they were registered.
   final Map<int, List<Completer<void>>> _pendingWritesCallbacks;
@@ -395,7 +400,11 @@ class SyncEngine implements RemoteStoreCallback, SharedClientStateSyncer {
 
     final LocalWriteResult result;
     try {
-      result = await _localStore.writeLocally(mutations);
+      result = await _localStore.writeLocally(
+        mutations,
+        // A merge removes a batch without a result that the other clients could be told.
+        mayMerge: !_sharedClientState.sharesState,
+      );
     } catch (e, s) {
       // As JS (`syncEngineWrite`): a write that could not be stored fails, and nothing else happens. The error is for
       // the user, whatever it is: it does not leave the operation.
@@ -414,6 +423,9 @@ class SyncEngine implements RemoteStoreCallback, SharedClientStateSyncer {
     }
     _sharedClientState.addPendingMutation(result.batchId);
     _addUserCallback(result.batchId, userTask);
+    for (int mergedBatchId in result.mergedBatchIds) {
+      _moveCallbacksOfMergedBatch(mergedBatchId, result.batchId);
+    }
     onPendingWritesChanged?.call();
 
     await _emitNewSnapsAndNotifyLocalStore(
@@ -421,6 +433,40 @@ class SyncEngine implements RemoteStoreCallback, SharedClientStateSyncer {
       /*remoteEvent:*/ null,
     );
     await _remoteStore.fillWritePipeline();
+  }
+
+  /// NOT IN THE OFFICIAL SDKS (`LocalStore.mergeUnsentWrites`): the batch [mergedBatchId] was merged into the new
+  /// batch [batchId] and is gone. The writes of the merged batch complete with the new one, and so does every
+  /// `waitForPendingWrites` that waits for a batch from [mergedBatchId] on: the write of the merged batch reaches the
+  /// backend with [batchId] now, after the batches in between.
+  void _moveCallbacksOfMergedBatch(int mergedBatchId, int batchId) {
+    // The list is moved, not copied: a document written 100,000 times offline carries 100,000 futures along.
+    final Map<int, List<Completer<void>>> mergedTasks =
+        _mergedUserCallbacks[_currentUser] ??= <int, List<Completer<void>>>{};
+    final List<Completer<void>> moved =
+        mergedTasks.remove(mergedBatchId) ?? <Completer<void>>[];
+    final Completer<void>? mergedTask = _mutationUserCallbacks[_currentUser]
+        ?.remove(mergedBatchId);
+    if (mergedTask != null) {
+      moved.add(mergedTask);
+    }
+    if (moved.isNotEmpty) {
+      mergedTasks.update(
+        batchId,
+        (List<Completer<void>> tasks) => moved..addAll(tasks),
+        ifAbsent: () => moved,
+      );
+    }
+
+    final List<int> waiting = <int>[
+      for (int waitingFor in _pendingWritesCallbacks.keys)
+        if (waitingFor >= mergedBatchId && waitingFor < batchId) waitingFor,
+    ];
+    for (int waitingFor in waiting) {
+      (_pendingWritesCallbacks[batchId] ??= <Completer<void>>[]).addAll(
+        _pendingWritesCallbacks.remove(waitingFor)!,
+      );
+    }
   }
 
   void _addUserCallback(int batchId, Completer<void> userTask) {
@@ -961,6 +1007,22 @@ class SyncEngine implements RemoteStoreCallback, SharedClientStateSyncer {
 
   /// Resolves the task corresponding to this write result.
   void _notifyUser(int batchId, FirestoreException? error) {
+    // First the earlier writes that were merged into this batch (see [_moveCallbacksOfMergedBatch]).
+    final List<Completer<void>>? merged = _mergedUserCallbacks[_currentUser]
+        ?.remove(batchId);
+    if (merged != null) {
+      for (Completer<void> userTask in merged) {
+        if (userTask.isCompleted) {
+          continue;
+        }
+        if (error != null) {
+          userTask.completeError(error);
+        } else {
+          userTask.complete(null);
+        }
+      }
+    }
+
     final Map<int, Completer<void>>? userTasks =
         _mutationUserCallbacks[_currentUser];
 

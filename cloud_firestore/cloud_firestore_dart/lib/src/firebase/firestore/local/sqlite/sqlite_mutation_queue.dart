@@ -408,6 +408,20 @@ class SQLiteMutationQueue implements MutationQueue {
   }
 
   @override
+  Future<MutationBatch?> getNewestMutationBatchAffectingDocumentKey(
+    DocumentKey documentKey,
+  ) async {
+    _statsCollector.recordRowsRead(MutationQueue.statsTag, 1);
+    final List<Map<String, dynamic>> rows = await db.query(
+      'SELECT m.mutations FROM document_mutations dm, mutations m '
+      'WHERE dm.uid = ? AND dm.path = ? AND dm.uid = m.uid AND dm.batch_id = m.batch_id '
+      'ORDER BY dm.batch_id DESC LIMIT 1',
+      <String>[uid, EncodedPath.encode(documentKey.path)],
+    );
+    return rows.isEmpty ? null : decodeMutationBatch(rows.first['mutations']);
+  }
+
+  @override
   Future<List<MutationBatch>> getAllMutationBatchesAffectingDocumentKeys(
     Iterable<DocumentKey> documentKeys,
   ) async {

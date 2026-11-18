@@ -2,6 +2,12 @@
 
 - Docs only, no code change: the web (browser) support is now described as supported in Chrome
   (tested against the emulator; other browsers untested) instead of experimental.
+- Experimental, not in the official SDKs, off by default: `mergeUnsentWrites` on
+  `PersistentCacheSettings` and `MemoryCacheSettings` merges a write into the pending write of its
+  document when that one was not sent yet and the two have the same result on the backend, so a
+  document edited many times offline keeps one pending write (see "Merging repeated offline
+  writes" in `docs/guides/offline_persistence.md` for the conditions and what rules and triggers
+  no longer see).
 - With many pending writes, a query of a collection reads only the pending writes of that
   collection instead of every pending write of the user (a collection of 10 among 1,000,000
   pending writes: 128 ms to 0.07 ms), and an index fill run reads only the next pending writes of
