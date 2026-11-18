@@ -129,7 +129,11 @@ enum ActionCodeOperation {
   emailSignIn('EMAIL_SIGNIN'),
 
   /// The undoing of the enrolment of a second factor.
-  revertSecondFactorAddition('REVERT_SECOND_FACTOR_ADDITION');
+  revertSecondFactorAddition('REVERT_SECOND_FACTOR_ADDITION'),
+
+  /// An operation this package does not know (FlutterFire's `ActionCodeInfoOperation.unknown`): the backend's
+  /// name is in [ActionCodeInfo.requestType]. Its [serverName] is empty.
+  unknown('');
 
   const ActionCodeOperation(this.serverName);
 
@@ -137,8 +141,7 @@ enum ActionCodeOperation {
   final String serverName;
 }
 
-/// What an action code does, from `FirebaseUserAuth.checkActionCode` (`ActionCodeInfo` of the JS SDK, without the
-/// multi-factor information).
+/// What an action code does, from `FirebaseUserAuth.checkActionCode` (`ActionCodeInfo` of the JS SDK).
 ///
 /// ```dart
 /// final ActionCodeInfo info = await auth.checkActionCode(code);
@@ -146,54 +149,80 @@ enum ActionCodeOperation {
 /// ```
 class ActionCodeInfo {
   /// Creates the information. `FirebaseUserAuth.checkActionCode` creates them; you need this only for tests.
-  const ActionCodeInfo(this.operation, {this.email, this.previousEmail});
-
-  /// Reads the answer of `accounts:resetPassword` with only an `oobCode`, checked like the JS SDK.
   ///
-  /// Throws a [FirebaseAuthException] with the code `internal-error` when the operation is unknown or the
-  /// email address it needs is missing.
+  /// [requestType] defaults to the [ActionCodeOperation.serverName] of [operation].
+  const ActionCodeInfo(
+    this.operation, {
+    this.email,
+    this.previousEmail,
+    this.multiFactorInfo,
+    String? requestType,
+  }) : _requestType = requestType;
+
+  /// Reads the answer of `accounts:resetPassword` with only an `oobCode`, checked like `checkActionCode` of the JS
+  /// SDK: an operation the package does not know is [ActionCodeOperation.unknown], with the backend's name in
+  /// [requestType].
+  ///
+  /// Throws a [FirebaseAuthException] with the code `internal-error` when the answer has no operation or lacks the
+  /// email address (or the multi-factor information) the operation needs.
   factory ActionCodeInfo.fromResponse(Map<String, Object?> response) {
     const FirebaseAuthException malformed = FirebaseAuthException(
       code: 'internal-error',
       message: 'The authentication service returned an incomplete action code.',
     );
     final Object? requestType = response['requestType'];
-    ActionCodeOperation? operation;
+    if (requestType is! String || requestType.isEmpty) {
+      throw malformed;
+    }
+    ActionCodeOperation operation = ActionCodeOperation.unknown;
     for (final ActionCodeOperation value in ActionCodeOperation.values) {
       if (value.serverName == requestType) {
         operation = value;
       }
     }
-    if (operation == null) {
-      throw malformed;
-    }
-    final Object? email = response['email'];
-    final Object? newEmail = response['newEmail'];
+    String? nonEmpty(Object? value) =>
+        value is String && value.isNotEmpty ? value : null;
+    final String? email = nonEmpty(response['email']);
+    final String? newEmail = nonEmpty(response['newEmail']);
+    final MultiFactorInfo? multiFactorInfo = MultiFactorInfo.fromResponse(
+      response['mfaInfo'],
+    );
     switch (operation) {
       case ActionCodeOperation.emailSignIn:
         break;
       case ActionCodeOperation.verifyAndChangeEmail:
-        if (newEmail is! String) {
+        if (newEmail == null) {
+          throw malformed;
+        }
+      case ActionCodeOperation.revertSecondFactorAddition:
+        if (response['mfaInfo'] == null || email == null) {
           throw malformed;
         }
       default:
-        if (email is! String) {
+        // Also an operation this package does not know, like the JS SDK.
+        if (email == null) {
           throw malformed;
         }
     }
     final bool changesEmail =
         operation == ActionCodeOperation.verifyAndChangeEmail;
-    String? nonEmpty(Object? value) =>
-        value is String && value.isNotEmpty ? value : null;
     return ActionCodeInfo(
       operation,
-      email: nonEmpty(changesEmail ? newEmail : email),
-      previousEmail: nonEmpty(changesEmail ? email : newEmail),
+      email: changesEmail ? newEmail : email,
+      previousEmail: changesEmail ? email : newEmail,
+      multiFactorInfo: multiFactorInfo,
+      requestType: requestType,
     );
   }
 
-  /// What the code is for.
+  /// What the code is for; [ActionCodeOperation.unknown] for an operation this package does not know.
   final ActionCodeOperation operation;
+
+  final String? _requestType;
+
+  /// The name of the operation as the backend gave it, for example `PASSWORD_RESET`; also for an
+  /// [ActionCodeOperation.unknown] operation (the JS SDK returns this string as the operation).
+  String get requestType => _requestType ?? operation.serverName;
 
   /// The email address the code is about: for [ActionCodeOperation.verifyAndChangeEmail] the new address.
   final String? email;
@@ -202,6 +231,131 @@ class ActionCodeInfo {
   /// [ActionCodeOperation.recoverEmail].
   final String? previousEmail;
 
+  /// The second factor that [ActionCodeOperation.revertSecondFactorAddition] removes, when the backend sent it.
+  final MultiFactorInfo? multiFactorInfo;
+
   @override
-  String toString() => 'ActionCodeInfo(${operation.name})';
+  String toString() =>
+      'ActionCodeInfo(${operation == ActionCodeOperation.unknown ? requestType : operation.name})';
+}
+
+/// The parts of the link of an action email (`ActionCodeURL` of the JS SDK): what it is for, its code, and the
+/// settings it was sent with. [parseLink] reads a link; `FirebaseUserAuth.isSignInWithEmailLink` and
+/// `FirebaseUserAuth.signInWithEmailLink` use it.
+///
+/// ```dart
+/// final ActionCodeURL? url = ActionCodeURL.parseLink(link);
+/// if (url?.operation == ActionCodeOperation.emailSignIn) {
+///   print('A sign-in link that continues at ${url!.continueUrl}');
+/// }
+/// ```
+class ActionCodeURL {
+  /// Creates the parts. [parseLink] creates them; you need this only for tests.
+  const ActionCodeURL({
+    required this.apiKey,
+    required this.code,
+    required this.operation,
+    this.continueUrl,
+    this.languageCode,
+    this.tenantId,
+  });
+
+  /// Reads [link] (`parseActionCodeURL` of the JS SDK), or returns null when it is not the link of an action email:
+  /// it needs the `apiKey`, `oobCode` and `mode` query parameters, with a mode the JS SDK knows (`signIn`,
+  /// `resetPassword`, `verifyEmail`, `verifyAndChangeEmail`, `recoverEmail`, `revertSecondFactorAddition`).
+  ///
+  /// Like the JS SDK, a link wrapped in another one is unwrapped first: the `link` parameter of a Dynamic Link, and
+  /// the `deep_link_id` parameter (and its `link`) of an iOS one.
+  static ActionCodeURL? parseLink(String link) {
+    final Map<String, String> outer = _query(link);
+    final String? inner = outer['link'];
+    final String? doubleDeepLink = inner == null
+        ? null
+        : _query(inner)['deep_link_id'];
+    final String? iOSDeepLink = outer['deep_link_id'];
+    final String? iOSDoubleDeepLink = iOSDeepLink == null
+        ? null
+        : _query(iOSDeepLink)['link'];
+    final String actionLink =
+        iOSDoubleDeepLink ?? iOSDeepLink ?? doubleDeepLink ?? inner ?? link;
+
+    final Map<String, String> query = _query(actionLink);
+    final String? apiKey = query['apiKey'];
+    final String? code = query['oobCode'];
+    final ActionCodeOperation? operation = switch (query['mode']) {
+      'recoverEmail' => ActionCodeOperation.recoverEmail,
+      'resetPassword' => ActionCodeOperation.passwordReset,
+      'signIn' => ActionCodeOperation.emailSignIn,
+      'verifyEmail' => ActionCodeOperation.verifyEmail,
+      'verifyAndChangeEmail' => ActionCodeOperation.verifyAndChangeEmail,
+      'revertSecondFactorAddition' =>
+        ActionCodeOperation.revertSecondFactorAddition,
+      _ => null,
+    };
+    if (apiKey == null ||
+        apiKey.isEmpty ||
+        code == null ||
+        code.isEmpty ||
+        operation == null) {
+      return null;
+    }
+    return ActionCodeURL(
+      apiKey: apiKey,
+      code: code,
+      operation: operation,
+      continueUrl: query['continueUrl'],
+      languageCode: query['lang'],
+      tenantId: query['tenantId'],
+    );
+  }
+
+  /// The query parameters of [url] (`extractQuerystring` and `querystringDecode` of the JS SDK): what follows the
+  /// first `?`, up to a `#`.
+  static Map<String, String> _query(String url) {
+    final int start = url.indexOf('?');
+    if (start < 0) {
+      return const <String, String>{};
+    }
+    String query = url.substring(start + 1);
+    final int hash = query.indexOf('#');
+    if (hash >= 0) {
+      query = query.substring(0, hash);
+    }
+    final Map<String, String> result = <String, String>{};
+    for (final String part in query.split('&')) {
+      if (part.isEmpty) {
+        continue;
+      }
+      final int equals = part.indexOf('=');
+      final String key = equals < 0 ? part : part.substring(0, equals);
+      final String value = equals < 0 ? '' : part.substring(equals + 1);
+      try {
+        result[Uri.decodeComponent(key)] = Uri.decodeComponent(value);
+      } on ArgumentError {
+        // A malformed escape: the parameter is left out.
+      }
+    }
+    return result;
+  }
+
+  /// The API key of the project that sent the email.
+  final String apiKey;
+
+  /// The action code (`oobCode`). It is a one-time credential: [toString] leaves it out.
+  final String code;
+
+  /// What the link is for.
+  final ActionCodeOperation operation;
+
+  /// The continue URL of the [ActionCodeSettings] the email was sent with, if any.
+  final String? continueUrl;
+
+  /// The language the email was sent in (`lang`), if any.
+  final String? languageCode;
+
+  /// The tenant of the account, for an email of a tenant.
+  final String? tenantId;
+
+  @override
+  String toString() => 'ActionCodeURL(${operation.name})';
 }

@@ -253,8 +253,9 @@ Places where these packages keep a shape of their own, on purpose:
 - `QuerySnapshot` is an `Iterable` of its documents (`for (final doc in snapshot)`).
 - `LoadBundleTask` reports a failure as a last event with `taskState == LoadBundleTaskState.error` and an
   `exception`, and has a `future`.
-- `firebase_auth_providers_dart` returns an `AuthUser` from the sign-in methods, not a `UserCredential`, and has no
-  `authStateChanges()` or `idTokenChanges()`.
+- `firebase_auth_providers_dart` 0.2 returns an `AuthUser` from the sign-in methods, not a `UserCredential`, and has
+  no `authStateChanges()` or `idTokenChanges()`. 0.3 returns a `UserCredential` that is also that `AuthUser`, and
+  adds both streams (see its CHANGELOG).
 - Pipelines follow the JS SDK, not FlutterFire's preview (for example `PipelineResult.ref`, `PipelineSnapshot.results`).
 
 ## Not supported
