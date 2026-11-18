@@ -308,8 +308,9 @@ class MaxKey
 class MemoryCacheSettings extends LocalCacheSettings
   ==(Object other): bool
   final gcSettings: MemoryGarbageCollectorSettings
+  final mergeUnsentWrites: bool
   get hashCode: int
-  new MemoryCacheSettings({MemoryGarbageCollectorSettings gcSettings})
+  new MemoryCacheSettings({MemoryGarbageCollectorSettings gcSettings, bool mergeUnsentWrites})
   toString(): String
 class MemoryEagerGcSettings extends MemoryGarbageCollectorSettings
   ==(Object other): bool
@@ -341,9 +342,10 @@ class PersistentCacheSettings extends LocalCacheSettings
   ==(Object other): bool
   final indexAutoCreation: bool
   final indexBackfill: IndexBackfillSettings
+  final mergeUnsentWrites: bool
   final sizeBytes: int
   get hashCode: int
-  new PersistentCacheSettings({int sizeBytes, bool indexAutoCreation, IndexBackfillSettings indexBackfill})
+  new PersistentCacheSettings({int sizeBytes, bool indexAutoCreation, IndexBackfillSettings indexBackfill, bool mergeUnsentWrites})
   toString(): String
 class Query
   ==(Object other): bool

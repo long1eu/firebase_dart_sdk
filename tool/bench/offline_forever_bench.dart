@@ -12,11 +12,12 @@
 //     queried collections in sync once (a remote event, as after a listen) and reads again: the "mixed" case.
 //     --forget-batch-keys drops the keys the local store keeps in memory for every written batch (a memory check).
 //     --fill-once stops after the first index fill run. --no-group skips the collection group queries.
-//   dart run offline_forever_bench.dart hot <updates> [--transform] [<directory>]
+//   dart run offline_forever_bench.dart hot <updates> [--transform] [--merge] [<directory>]
 //     One document, set once and then updated <updates> times (with --transform each update also sets a
-//     serverTimestamp field). Reads, queries, one rejection, then acknowledgements.
+//     serverTimestamp field). Reads, queries, one rejection, then acknowledgements. --merge turns on
+//     `mergeUnsentWrites` (experimental): the updates are merged into one pending write where they can be.
 //   FIRESTORE_EMULATOR_HOST=127.0.0.1:8391 dart run offline_forever_bench.dart drain <documents> [<directory>]
-//   FIRESTORE_EMULATOR_HOST=127.0.0.1:8391 dart run offline_forever_bench.dart drainhot <updates> [--transform] [<directory>]
+//   FIRESTORE_EMULATOR_HOST=127.0.0.1:8391 dart run offline_forever_bench.dart drainhot <updates> [--transform] [--merge] [<directory>]
 //     Public API: writes offline (network disabled), then enables the network and times waitForPendingWrites.
 
 import 'dart:async';
@@ -138,11 +139,15 @@ Future<void> main(List<String> args) async {
       await pending(n, positional[2], flags,
           positional.length > 3 ? positional[3] : Directory.systemTemp.path);
     case 'hot':
-      await hot(n, flags.contains('--transform'),
+      await hot(n, flags.contains('--transform'), flags.contains('--merge'),
           positional.length > 2 ? positional[2] : Directory.systemTemp.path);
     case 'drain':
     case 'drainhot':
-      await drain(mode == 'drainhot', n, flags.contains('--transform'),
+      await drain(
+          mode == 'drainhot',
+          n,
+          flags.contains('--transform'),
+          flags.contains('--merge'),
           positional.length > 2 ? positional[2] : Directory.systemTemp.path);
     default:
       throw ArgumentError('unknown mode $mode');
@@ -455,13 +460,14 @@ Future<void> pending(
 // ---------------------------------------------------------------------------------------------------------------------
 // hot
 
-Future<void> hot(int updates, bool transform, String dir) async {
+Future<void> hot(int updates, bool transform, bool merge, String dir) async {
   final String file = '$dir/offline_forever_hot_$updates.db';
   deleteFiles(file);
   print(
-      'hot: one document updated $updates times${transform ? ' with a serverTimestamp' : ''}');
+      'hot: one document updated $updates times${transform ? ' with a serverTimestamp' : ''}${merge ? ', mergeUnsentWrites' : ''}');
   SQLitePersistence persistence = await openPersistence(file);
-  LocalStore store = LocalStore(persistence, User.unauthenticated);
+  LocalStore store = LocalStore(persistence, User.unauthenticated)
+    ..mergeUnsentWrites = merge;
   await store.start();
 
   final ResourcePath collection = ResourcePath.fromString('hot');
@@ -472,7 +478,8 @@ Future<void> hot(int updates, bool transform, String dir) async {
         ]
       : const <FieldTransform>[];
   await store.writeLocally(
-      <Mutation>[SetMutation(key, dataOf(0), Precondition.none, transforms)]);
+      <Mutation>[SetMutation(key, dataOf(0), Precondition.none, transforms)],
+      mayMerge: merge);
   const int window = 1000;
   Stopwatch sw = Stopwatch()..start();
   final Stopwatch total = Stopwatch()..start();
@@ -485,7 +492,7 @@ Future<void> hot(int updates, bool transform, String dir) async {
           FieldMask(<FieldPath>{f('n')}),
           Precondition(exists: true),
           transforms)
-    ]);
+    ], mayMerge: merge);
     if (i == min(window, updates)) {
       record('update, first ${min(window, updates)}',
           sw.elapsedMicroseconds / min(window, updates), 'us/write');
@@ -499,6 +506,13 @@ Future<void> hot(int updates, bool transform, String dir) async {
   }
   record('update, all ($updates)', total.elapsedMicroseconds / updates,
       'us/write');
+  final int pendingBatches = (await persistence.runTransactionAndReturn(
+          'Count batches',
+          () => persistence
+              .getMutationQueue(User.unauthenticated)
+              .getAllMutationBatches()))
+      .length;
+  record('pending batches', pendingBatches.toDouble(), 'batches');
   record('file size', mb(fileSize(file)), 'MB');
 
   await persistence.shutdown();
@@ -507,7 +521,7 @@ Future<void> hot(int updates, bool transform, String dir) async {
   store = LocalStore(persistence, User.unauthenticated);
   await store.start();
   record('reopen', sw.elapsedMicroseconds / 1000, 'ms',
-      '${updates + 1} pending batches');
+      '$pendingBatches pending batches');
 
   sw = Stopwatch()..start();
   for (int i = 0; i < 100; i++) {
@@ -555,8 +569,15 @@ Future<void> hot(int updates, bool transform, String dir) async {
     times.add(one.elapsedMicroseconds / 1000);
     acked++;
   }
-  final int remaining = updates - acked;
-  record('acknowledge, first', times.first, 'ms', '$updates batches pending');
+  if (times.isEmpty) {
+    record('acknowledge', 0, 'ms', 'no batch left after the rejection');
+    await persistence.shutdown();
+    deleteFiles(file);
+    return;
+  }
+  final int remaining = pendingBatches - 1 - acked;
+  record('acknowledge, first', times.first, 'ms',
+      '${pendingBatches - 1} batches pending');
   record(
       'acknowledge, average of the first $acked',
       times.reduce((double a, double b) => a + b) / acked,
@@ -572,7 +593,8 @@ Future<void> hot(int updates, bool transform, String dir) async {
 // ---------------------------------------------------------------------------------------------------------------------
 // drain (public API, emulator)
 
-Future<void> drain(bool hotDocument, int n, bool transform, String dir) async {
+Future<void> drain(
+    bool hotDocument, int n, bool transform, bool merge, String dir) async {
   final String emulator =
       Platform.environment['FIRESTORE_EMULATOR_HOST'] ?? '127.0.0.1:8391';
   if (emulator.endsWith(':8080')) {
@@ -594,14 +616,14 @@ Future<void> drain(bool hotDocument, int n, bool transform, String dir) async {
     app: app,
     openDatabase: BenchDatabase.opener(file),
     settings: api.Settings(
-      cacheSettings: api.PersistentCacheSettings(),
+      cacheSettings: api.PersistentCacheSettings(mergeUnsentWrites: merge),
     ).withEmulator(
         emulator.substring(0, colon), int.parse(emulator.substring(colon + 1))),
   );
   await firestore.disableNetwork();
   final String run = DateTime.now().microsecondsSinceEpoch.toString();
   print(
-      'drain: ${hotDocument ? 'one document updated $n times' : '$n documents'}${transform ? ' with a serverTimestamp' : ''}, run $run');
+      'drain: ${hotDocument ? 'one document updated $n times' : '$n documents'}${transform ? ' with a serverTimestamp' : ''}${merge ? ', mergeUnsentWrites' : ''}, run $run');
 
   final List<Future<void>> writes = <Future<void>>[];
   late api.DocumentReference<Map<String, Object?>> last;

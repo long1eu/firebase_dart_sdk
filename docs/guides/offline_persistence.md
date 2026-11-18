@@ -210,6 +210,61 @@ await progress.cancel();
 
 `example/offline_persistence.dart` prints the progress of a small drain.
 
+### Merging repeated offline writes (experimental)
+
+Every write is a pending write until the backend accepts it, so an app that edits the same
+documents for months offline queues one write per edit: about 1 KB of cache each, and a
+reconnect that sends them all, one billed write each (see `docs/spikes/offline_forever.md`).
+`mergeUnsentWrites`, on `PersistentCacheSettings` or `MemoryCacheSettings`, keeps one pending
+write per document instead. It is not in the official SDKs, and it is off by default.
+
+```dart
+final Settings settings = Settings(
+  cacheSettings: PersistentCacheSettings(mergeUnsentWrites: true),
+);
+```
+
+A new write replaces the pending write of its document when that write was never handed to the
+network (the up to 10 writes handed to the write stream, sent or not, are left alone), both are
+single writes (not a `WriteBatch` of several), no other client uses the cache, and the two
+combine into one write with the same result on the backend:
+
+| Pending write | New write | Becomes |
+|---|---|---|
+| anything | `set` without merge (`serverTimestamp` allowed), or `delete` | the new write |
+| `set` | `update` or `set` with merge, no transforms | one `set` with the new fields applied |
+| `update` | `update`, no transforms | one `update` of the fields of both |
+| `set` with merge | `update` or `set` with merge, no transforms | one `set` with merge of the fields of both |
+| `delete` | `set` with merge, no transforms | one `set` of the new fields |
+
+Everything else (a transform in an `update` or in the pending write before it, an `increment`,
+`arrayUnion` or `arrayRemove` in a `set`, a `set` with merge after an `update`, an `update` after a `delete`) stays queued as two writes, as without the
+setting. The merged write takes the place of the newest write in the queue, and the future of every write
+that went into it completes or fails with it; `waitForPendingWrites` waits for it too.
+
+What the app gives up:
+
+- Security rules and Cloud Functions triggers see one write, from the first state to the last,
+  and never the states in between.
+- A rejection rejects all the merged writes, with the same error.
+- Writes to other documents made in between reach the backend before this document's earlier
+  edits (which never reach it at all), so a rule that reads this document with `get()` while
+  checking them sees its older state. Do not enable it when rules or functions depend on the
+  order of writes across documents.
+- A write replaced by a `set` or a `delete` is not checked: an `update` of a missing document
+  followed by a `set` succeeds instead of failing.
+
+For one document set once and updated 100,000 times offline (`tool/bench/offline_forever_bench.dart`,
+`hot` and `drainhot`, on an Apple M4 Pro against a local emulator):
+
+| | off | on |
+|---|---|---|
+| pending writes | 100,001 | 1 |
+| cache file, public API | 34 MB | 3 MB (mostly the SQLite log) |
+| time per offline write, public API | 90 us | 116 us |
+| `enableNetwork` until `waitForPendingWrites` completes | 132 s | 0.45 s |
+| billed writes | 100,001 | 1 |
+
 ### Protect the cache files
 
 The cache holds every document the app has read and its pending writes, in clear text. SQLite

@@ -231,6 +231,12 @@ class FirestoreClient implements RemoteStoreCallback {
             final PersistentCacheSettings persistent => persistent,
             _ => null,
           },
+          mergeUnsentWrites: switch (settings.cacheSettings) {
+            final PersistentCacheSettings persistent =>
+              persistent.mergeUnsentWrites,
+            final MemoryCacheSettings memory => memory.mergeUnsentWrites,
+            null => false,
+          },
         );
         initialization.complete();
       } catch (error, stackTrace) {
@@ -717,6 +723,7 @@ class FirestoreClient implements RemoteStoreCallback {
     MemoryGarbageCollectorSettings? memoryLruGcSettings,
     PersistentCacheSettings? persistentCacheSettings,
     ConnectivityChangeDetector? connectivityDetector,
+    bool mergeUnsentWrites = false,
   }) async {
     // Note: The initialization work must all be synchronous (we can't dispatch more work) since external write/listen
     // operations could get queued to run before that subsequent work completes.
@@ -759,7 +766,8 @@ class FirestoreClient implements RemoteStoreCallback {
 
     await persistence.start();
     _persistenceStarted = true;
-    localStore = LocalStore(persistence, user);
+    localStore = LocalStore(persistence, user)
+      ..mergeUnsentWrites = mergeUnsentWrites;
     if (gc != null) {
       _lruScheduler =
           gc.newScheduler(scheduler, localStore) //

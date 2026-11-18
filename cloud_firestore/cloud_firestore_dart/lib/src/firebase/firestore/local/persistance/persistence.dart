@@ -176,6 +176,14 @@ abstract class Persistence {
   /// The ids of the clients that use this cache and are alive (refreshed their metadata recently), this one included.
   /// Empty for a cache that only one client can use.
   Future<List<String>> getActiveClients() async => const <String>[];
+
+  /// Whether another client may be using this cache: one that refreshed its metadata within the last 30 minutes (or
+  /// at a time in the future). Runs inside a transaction. Always false for a cache that only one client can use, and
+  /// for a database that no other client can have open (see `ExclusiveDatabase`).
+  ///
+  /// Used by `LocalStore.mergeUnsentWrites`, which only rewrites the mutation queue when no other client can be
+  /// sending its batches.
+  Future<bool> hasOtherClients() async => false;
 }
 
 /// Whether [error], thrown by a persistence transaction, means that the transaction did not take effect and may work

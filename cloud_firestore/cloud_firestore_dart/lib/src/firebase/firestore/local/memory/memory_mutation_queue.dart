@@ -153,8 +153,8 @@ class MemoryMutationQueue implements MutationQueue {
     }
 
     final MutationBatch batch = _queue[index];
-    hardAssert(batch.batchId == batchId, 'If found batch must match');
-    return batch;
+    // Only a queue with a gap (see [removeMutationBatch]) can have another batch at that index.
+    return batch.batchId == batchId ? batch : null;
   }
 
   @override
@@ -200,6 +200,18 @@ class MemoryMutationQueue implements MutationQueue {
 
     _statsCollector.recordRowsRead(MutationQueue.statsTag, result.length);
     return result;
+  }
+
+  @override
+  Future<MutationBatch?> getNewestMutationBatchAffectingDocumentKey(
+    DocumentKey documentKey,
+  ) async {
+    final Iterator<DocumentReference> iterator = _batchesByDocumentKey
+        .reverseIteratorFrom(DocumentReference(documentKey, _nextBatchId));
+    if (!iterator.moveNext() || iterator.current.key != documentKey) {
+      return null;
+    }
+    return lookupMutationBatch(iterator.current.id);
   }
 
   @override
@@ -296,14 +308,11 @@ class MemoryMutationQueue implements MutationQueue {
 
   @override
   Future<void> removeMutationBatch(MutationBatch batch) async {
-    // Find the position of the first batch for removal. This need not be the first entry in the queue.
+    // DEVIATION FROM UPSTREAM: a batch that was not sent yet can be removed from anywhere in the queue when a later
+    // write is merged into it (`LocalStore.mergeUnsentWrites`); acknowledged and rejected batches are still the first
+    // one, which [acknowledgeBatch] checks.
     final int batchIndex = _indexOfExistingBatchId(batch.batchId, 'removed');
-    hardAssert(
-      batchIndex == 0,
-      'Can only remove the first entry of the mutation queue',
-    );
-
-    _queue.removeAt(0);
+    _queue.removeAt(batchIndex);
 
     // Remove entries from the index too.
     ImmutableSortedSet<DocumentReference> references = _batchesByDocumentKey;
@@ -351,10 +360,28 @@ class MemoryMutationQueue implements MutationQueue {
   /// the state of the queue. Note this index can be negative if the requested
   /// [batchId] has already been removed from the queue or past the end of the
   /// queue if the [batchId] is larger than the last added batch.
+  ///
+  /// DEVIATION FROM UPSTREAM: when a batch was removed from the middle of the queue (see [removeMutationBatch]) the
+  /// batch ids have a gap, and the index is found by a binary search instead: the index of the first batch whose id
+  /// is not smaller than [batchId].
   int _indexOfBatchId(int batchId) {
     if (_queue.isEmpty) {
       // As an index this is past the end of the queue
       return 0;
+    }
+
+    if (_queue.last.batchId - _queue.first.batchId != _queue.length - 1) {
+      int low = 0;
+      int high = _queue.length;
+      while (low < high) {
+        final int middle = (low + high) >> 1;
+        if (_queue[middle].batchId < batchId) {
+          low = middle + 1;
+        } else {
+          high = middle;
+        }
+      }
+      return low;
     }
 
     // Examine the front of the queue to figure out the difference between the
@@ -374,7 +401,7 @@ class MemoryMutationQueue implements MutationQueue {
   int _indexOfExistingBatchId(int batchId, String action) {
     final int index = _indexOfBatchId(batchId);
     hardAssertLazy(
-      index >= 0 && index < _queue.length,
+      index >= 0 && index < _queue.length && _queue[index].batchId == batchId,
       () => 'Batches must exist to be $action',
     );
     return index;

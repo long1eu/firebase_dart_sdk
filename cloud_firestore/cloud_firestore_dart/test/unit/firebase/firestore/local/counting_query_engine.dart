@@ -337,6 +337,16 @@ class _CountingMutationQueue implements MutationQueue {
   }
 
   @override
+  Future<MutationBatch?> getNewestMutationBatchAffectingDocumentKey(
+    DocumentKey documentKey,
+  ) async {
+    final MutationBatch? result = await _subject
+        .getNewestMutationBatchAffectingDocumentKey(documentKey);
+    _counter.mutationsReadByKey += result == null ? 0 : 1;
+    return result;
+  }
+
+  @override
   Future<List<MutationBatch>> getAllMutationBatchesAffectingDocumentKeys(
     Iterable<DocumentKey> documentKeys,
   ) async {
