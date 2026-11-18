@@ -85,6 +85,11 @@ abstract class Persistence {
 
   bool get started;
 
+  /// How many times a transaction of this client found the storage changed by another client (another connection to
+  /// the same database file). State that is derived from the storage and kept in memory across transactions is valid
+  /// only while this stays the same. Always 0 for a storage that only this client uses.
+  int get changesByOtherClients => 0;
+
   ReferenceDelegate get referenceDelegate;
 
   /// Returns a [MutationQueue] representing the persisted mutations for the

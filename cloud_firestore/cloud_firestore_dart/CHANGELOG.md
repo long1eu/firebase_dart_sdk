@@ -19,6 +19,10 @@
   before), and `persistentCacheIndexManager.fillIndexes({maxDocuments})` fills the indexes now, in
   runs of 100 documents between the other operations. `PersistentCacheSettings.toString()` lists
   the new fields.
+- Acknowledging one of many pending updates of a document with a `serverTimestamp` or `increment`
+  no longer applies all the remaining updates again: the overlay is recalculated from a summary
+  of them that the previous acknowledgement kept (100,000 updates: 623 ms to 0.16 ms per
+  acknowledgement in the local store). The local views stay the same.
 - The copied SQLite openers are gone from `example/`: `sqlite_database.dart`,
   `sqlite_database_web.dart` and `sqlite_opfs_worker.dart`. Since 0.2.0 apps use
   [`cloud_firestore_dart_sqlite`](https://pub.dev/packages/cloud_firestore_dart_sqlite)
