@@ -23,6 +23,10 @@ abstract class MutationQueue {
   /// Returns true if this queue contains no mutation batches.
   Future<bool> isEmpty();
 
+  /// Returns the number of batches in this queue, without decoding them. The batches that other clients of a shared
+  /// cache wrote for the same user are counted too.
+  Future<int> getMutationBatchCount();
+
   /// Returns the highest batch id in the queue, i.e. of the newest batch that is not yet acknowledged or rejected, or
   /// [MutationBatch.unknown] if the queue is empty.
   ///

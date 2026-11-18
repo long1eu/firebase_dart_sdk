@@ -8,6 +8,10 @@
   its collection group (schema 20 adds an index on the overlays, built once on open: about 1 s for
   1,000,000 pending writes). The local store also forgets the keys of a batch once it is
   acknowledged or rejected.
+- Experimental: `FirebaseFirestore.getPendingWriteCount()` and `pendingWriteCounts()` give the
+  number of write batches the backend has not acknowledged yet, and a throttled stream of it, to
+  show the progress of a sync after a long time offline. The official SDKs have no equivalent.
+  See "Writes waiting for the backend" in `docs/guides/offline_persistence.md`.
 - The copied SQLite openers are gone from `example/`: `sqlite_database.dart`,
   `sqlite_database_web.dart` and `sqlite_opfs_worker.dart`. Since 0.2.0 apps use
   [`cloud_firestore_dart_sqlite`](https://pub.dev/packages/cloud_firestore_dart_sqlite)

@@ -35,8 +35,20 @@ class SQLiteMutationQueue implements MutationQueue {
 
   bool _started = false;
 
+  /// The number of rows of this user in `mutations`, or null when it must be counted again. Counted once with
+  /// [getMutationBatchCount] and then kept up to date by [addMutationBatch] and [removeMutationBatch]; forgotten when
+  /// another connection committed (see [_refresh]) and when a transaction of this client rolled back (see
+  /// [_forgetBatchCount]), since this client then does not know the rows.
+  int? _batchCount;
+
+  /// Forgets [_batchCount], after a transaction that may have changed it rolled back.
+  void _forgetBatchCount() {
+    _batchCount = null;
+  }
+
   /// Reads the next batch id and the stream token again, after another connection changed the database.
   Future<void> _refresh() async {
+    _batchCount = null;
     if (_started) {
       await start();
     }
@@ -140,6 +152,18 @@ class SQLiteMutationQueue implements MutationQueue {
       // @formatter:on
       <String>[uid],
     )).isEmpty;
+  }
+
+  /// One query on the primary key `(uid, batch_id)` the first time (it reads the keys of the index, not the batches),
+  /// and no query after that while only this client changes the queue.
+  @override
+  Future<int> getMutationBatchCount() async {
+    return _batchCount ??=
+        (await db.query(
+              'SELECT COUNT(*) AS count FROM mutations WHERE uid = ?',
+              <String>[uid],
+            )).first['count']
+            as int;
   }
 
   @override
@@ -248,6 +272,10 @@ class SQLiteMutationQueue implements MutationQueue {
         db.clientMetadata.clientId,
       ],
     );
+    final int? batchCount = _batchCount;
+    if (batchCount != null) {
+      _batchCount = batchCount + 1;
+    }
 
     // PORTING NOTE: Unlike LevelDB, these entries must be unique. Since [user]
     // and [batchId] are fixed within this function body, it's enough to track
@@ -527,6 +555,10 @@ class SQLiteMutationQueue implements MutationQueue {
       deleted != 0,
       () => 'Mutation batch ($uid, ${batch.batchId}) did not exist',
     );
+    final int? batchCount = _batchCount;
+    if (batchCount != null) {
+      _batchCount = batchCount - 1;
+    }
 
     for (Mutation mutation in batch.mutations) {
       final DocumentKey key = mutation.key;

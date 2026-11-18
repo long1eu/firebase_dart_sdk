@@ -143,6 +143,10 @@ class SyncEngine implements RemoteStoreCallback, SharedClientStateSyncer {
   /// Used for creating the target ids for the listens used to resolve limbo documents.
   final TargetIdGenerator _targetIdGenerator;
 
+  /// Called when the mutation queue of the current user may have changed size: a batch was written, acknowledged or
+  /// rejected, another client changed the state of one, or the user changed.
+  void Function()? onPendingWritesChanged;
+
   User _currentUser;
 
   /// Manages the state shared with the other clients of the persistence.
@@ -410,6 +414,7 @@ class SyncEngine implements RemoteStoreCallback, SharedClientStateSyncer {
     }
     _sharedClientState.addPendingMutation(result.batchId);
     _addUserCallback(result.batchId, userTask);
+    onPendingWritesChanged?.call();
 
     await _emitNewSnapsAndNotifyLocalStore(
       result.changes,
@@ -825,6 +830,7 @@ class SyncEngine implements RemoteStoreCallback, SharedClientStateSyncer {
     // The local store may or may not be able to apply the write result and raise events immediately (depending on
     // whether the watcher is caught up), so we raise user callbacks before the listen events.
     _notifyAcknowledged(mutationBatchResult);
+    onPendingWritesChanged?.call();
 
     _sharedClientState.updateMutationState(
       mutationBatchResult.batch.batchId,
@@ -873,6 +879,7 @@ class SyncEngine implements RemoteStoreCallback, SharedClientStateSyncer {
     _notifyUser(batchId, error);
 
     _resolvePendingWriteTasks(batchId);
+    onPendingWritesChanged?.call();
 
     _sharedClientState.updateMutationState(
       batchId,
@@ -1212,6 +1219,7 @@ class SyncEngine implements RemoteStoreCallback, SharedClientStateSyncer {
           .handleUserChangeWithBatchIds(user);
       // Switch the user only once the local store switched its mutation queue, so both agree on the current user.
       _currentUser = user;
+      onPendingWritesChanged?.call();
       _sharedClientState.handleUserChange(
         user,
         result.removedBatchIds,
@@ -1326,6 +1334,7 @@ class SyncEngine implements RemoteStoreCallback, SharedClientStateSyncer {
       _resolvePendingWriteTasks(batchId);
       _localStore.removeCachedMutationBatchMetadata(batchId);
     }
+    onPendingWritesChanged?.call();
 
     await _emitNewSnapsAndNotifyLocalStore(documents, /*remoteEvent:*/ null);
   }

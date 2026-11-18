@@ -69,9 +69,29 @@ Future<void> main() async {
     '(pending: ${local.metadata.hasPendingWrites})',
   );
 
-  // Back online the pending write is sent.
+  // The queue of writes the backend has not seen (experimental, no official
+  // SDK has it): a count now, and a throttled stream of it while it drains.
+  final List<Future<void>> more = <Future<void>>[
+    for (int i = 0; i < 20; i++)
+      firestore.doc('${scratch('notes')}/offline_$i').set(<String, Object?>{
+        'n': i,
+      }),
+  ];
+  final int total = await firestore.getPendingWriteCount();
+  print('pending writes: $total');
+  final Future<int> drained = firestore
+      .pendingWriteCounts()
+      .map((int pending) {
+        print('synced ${total - pending} of $total');
+        return pending;
+      })
+      .firstWhere((int pending) => pending == 0);
+
+  // Back online the pending writes are sent.
   await firestore.enableNetwork();
   await pendingWrite;
+  await Future.wait(more);
+  await drained.timeout(const Duration(seconds: 10));
   final DocumentSnapshot<Map<String, Object?>> synced = await firestore
       .doc(path)
       .get(GetOptions(source: Source.server));

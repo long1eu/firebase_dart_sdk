@@ -176,6 +176,40 @@ stateDiagram-v2
 | In sync | completed | `false` | `false` |
 | Rejected | failed with the error | `false`: the change is removed from the cache | `false` |
 
+### Writes waiting for the backend
+
+An app that was offline for a long time can show how far the sync is. `getPendingWriteCount()`
+returns the number of write batches of the signed-in user that the backend has not acknowledged
+or rejected (one `set`, `update` or `delete`, or one `WriteBatch.commit`, is one batch), and
+`pendingWriteCounts()` is a stream of that number. This API is experimental: the official SDKs
+have no equivalent, only `waitForPendingWrites()` and `hasPendingWrites`.
+
+```dart
+final int total = await firestore.getPendingWriteCount();
+final StreamSubscription<int> progress = firestore.pendingWriteCounts().listen(
+  (int pending) => print('syncing ${total - pending} of $total'),
+);
+// ...
+await progress.cancel();
+```
+
+- **Cost.** The memory cache knows the number. The SQLite cache counts the keys of the
+  `mutations` primary key once (no batch is read or decoded) and then keeps the number in
+  memory as writes are added and removed, so a call is cheap also with millions of pending
+  writes. It counts again after another client of the cache committed.
+- **Throttled.** The stream emits the count when it is listened to, and then reads it at most
+  once every 250 ms after the queue changed (a write, an acknowledgement, a rejection, a
+  change of user), so a drain of 100,000 writes gives at most 4 events a second; a count equal
+  to the previous one is not emitted. It closes when the instance is terminated.
+- **Per user.** The queue is per user: after a sign-in or sign-out the stream emits the count
+  of the new user.
+- **Several clients on one cache.** The count includes the batches the other clients wrote
+  for the same user, but the stream emits after the changes this client makes or is told
+  about; what another client writes or sends shows up at the next emission or the next
+  `getPendingWriteCount()`.
+
+`example/offline_persistence.dart` prints the progress of a small drain.
+
 ### Protect the cache files
 
 The cache holds every document the app has read and its pending writes, in clear text. SQLite
