@@ -463,6 +463,34 @@ the increment and array-union transforms, and a `DeleteMutation`. Not exercised:
 (`noDocument`) and `unknownDocument` rows (the reader's `noDocument` branch is a sketch), and
 the `targets`, `targetDocuments`, `documentOverlays` and `owner` stores.
 
+## 7. Firefox and Safari (added after the first report)
+
+Run on a Mac mini (M4 Pro, macOS 27.2, load average about 6) with `dart run.dart <part> --browser=<name>`:
+Chrome 157 and Firefox 152.0.6 headless on a fresh profile, Safari 27.2 in the logged-in session.
+
+**Transaction lifetime (point 4).** All 14 cases gave the same result in the three browsers, with dart2js and
+with dart2wasm: the transaction survives requests, `Future.value`, completers, microtasks, JS promises and
+`Stream.toList()`, and it closes with `TransactionInactiveError` on `Future.delayed(Duration.zero)`,
+`Timer.run` and `Future(() {})`, with the first write committed and the second not. The rule of point 4
+holds everywhere.
+
+**Raw engine speed (point 3), medians of 3 runs, ms, dart2js** (the dart2wasm numbers are within about 1.5x):
+
+| Operation | Chrome IndexedDB | Chrome SQLite (IDB / OPFS) | Firefox IndexedDB | Firefox SQLite (IDB / OPFS) | Safari IndexedDB | Safari SQLite (IDB / OPFS) |
+| --- | --- | --- | --- | --- | --- | --- |
+| 10,000 inserts, one transaction each | 1,181 | 15,709 / 14,908 | 1,474 | 10,103 / 11,076 | 1,722 | 10,863 / 3,377 |
+| 10,000 inserts, 100 per transaction | 555 | 1,681 / 589 | 641 | 1,386 / 1,201 | 696 | 1,195 / 489 |
+| 1,000 point reads, one transaction each | 53 | 16 / 40 | 63 | 16 / 68 | 139 | 13 / 41 |
+| scan of 1,000 keys | 5.5 | 1.9 / 2.1 | 5.4 | 1.5 / 2.1 | 24 | 1.4 / 2.1 |
+| 1,000 deletes, one transaction each | 88 | 1,308 / 3,371 | 134 | 989 / 832 | 153 | 861 / 255 |
+| reopen and read one row | 0.2 | 71 / 29 | 5 | 58 / 27 | 5 | 93 / 30 |
+
+Reading it: small writes are 6 to 13 times faster on IndexedDB in every browser, except against SQLite on
+OPFS in Safari (2 times). Point reads cost 0.05 to 0.14 ms each on IndexedDB: 3 to 4 times slower than
+SQLite on IndexedDB storage in Chrome and Firefox, about 10 times in Safari. A scan of 1,000 keys is about 3
+times slower in Chrome and Firefox and 17 times slower in Safari (24 ms). Safari is the browser where reads
+over a large cache need watching.
+
 ## Summary
 
 | Question | Measured or estimated | Result |
