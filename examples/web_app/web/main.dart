@@ -1,7 +1,7 @@
 // The page of the main library: a real-time list of notes, a form that adds
 // one, an online/offline indicator, and a choice of cache.
 //
-// EXPERIMENTAL: the web support of cloud_firestore_dart is experimental. See
+// The web support of cloud_firestore_dart is supported in Chrome. See
 // README.md for how to build and serve this page.
 
 import 'dart:async';

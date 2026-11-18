@@ -1,5 +1,23 @@
-## (unreleased)
+## 0.1.2 (unreleased)
 
+- **The IndexedDB storage refuses `sqlite3` 3.4.0 to 3.5.2.** With them it could lose writes it had
+  acknowledged when the tab was closed or crashed a moment later (their `IndexedDbFileSystem.flush()`
+  waits for nothing while a batch of writes is in progress; see 0.1.1), and a fresh Flutter app gets
+  3.5.2: Flutter 3.44 pins `meta` 1.18, and `sqlite3` 3.6.0 needs 1.19. Before its first IndexedDB open
+  a page now checks what `flush()` does (a few milliseconds, in a scratch IndexedDB database it deletes
+  again), and with those versions the open fails with a `SqliteWebSetupException`
+  (`SqliteWebSetupProblem.unsafeSqlite3`) whose message names the cause and the ways out: pin a safe
+  `sqlite3` (`sqlite3: 3.3.4` or `^2.7.3` with Flutter 3.44, `^3.6.0` where `meta` 1.19 is allowed),
+  or use the OPFS storage. `sqliteOpener(acceptIndexedDbWriteLoss: true)` opens anyway. The Dart VM,
+  Flutter on other platforms and the OPFS storage do not run the check.
+- **A `sqlite3.wasm` that does not fit is named.** When `sqlite3.wasm` cannot be loaded the open now
+  fails with a `SqliteWebSetupException` that says why: missing (`wasmMissing`, with the HTTP status),
+  not WebAssembly (often the page a server sends for a missing file), or the build of another `sqlite3`
+  release (`wasmVersionMismatch`, with the major line of the file: a 2.x build with a 3.x package, or
+  the reverse, failed with a `LinkError` or `TypeError` about an import before). For the OPFS worker
+  too. A file of another minor version that happens to load is not detected.
+- `openWithMemoryFallback` rethrows a `SqliteWebSetupException` instead of falling back to a memory
+  cache: it is a mistake of the build that a memory cache would hide in every tab.
 - README: records the first Windows run (Windows 11 x64, 2026-11-17): the Dart VM with `sqlite3` 3.9.1, which
   loads the build hook's `sqlite3.dll`, and with 2.9.4, which falls back to the `winsqlite3.dll` of Windows; and
   two Flutter Windows apps with 3.5.2. No code change.

@@ -51,7 +51,7 @@ class MyDatabase implements Database {
   void close() {}
 }
 
-class FileAuthStorage implements AuthStorage {
+class KeychainAuthStorage implements AuthStorage {
   @override
   Future<String?> read(String key) async { /* ... */ return null; } // null: no value
 
@@ -135,8 +135,8 @@ Future<void> appReadmeLine25() async {
   await firestore.terminate();
 }
 
-// ../../firebase_auth/firebase_auth_providers_dart/README.md:26
-Future<void> authProvidersReadmeLine26() async {
+// ../../firebase_auth/firebase_auth_providers_dart/README.md:27
+Future<void> authProvidersReadmeLine27() async {
   final FirebaseApp app = FirebaseApp.withOptions(
     const FirebaseOptions(
       apiKey: '<the Web API key of the project>',
@@ -151,6 +151,19 @@ Future<void> authProvidersReadmeLine26() async {
   await auth.signInWithEmailAndPassword(email: 'ada@example.com', password: password);
   await firestore.doc('users/${auth.uid}/notes/first').set({'text': 'hello'});
   await auth.signOut();
+}
+
+// ../../firebase_auth/firebase_auth_providers_dart/README.md:87
+Future<void> authProvidersReadmeLine87() async {
+  final FirebaseUserAuth auth = await FirebaseUserAuth.forApp(app);
+  auth.authStateChanges().listen((AuthUser? user) => print(user?.uid ?? 'signed out'));
+
+  // From Google Sign-In, or any other way your app signs the user in with Google.
+  const String googleIdToken = '<a Google ID token>';
+  final UserCredential result = await auth.signInWithCredential(
+    GoogleAuthProvider.credential(idToken: googleIdToken),
+  );
+  print(result.additionalUserInfo?.isNewUser);
 }
 
 // ../../docs/migrating_from_vm_packages.md:67
@@ -243,8 +256,8 @@ Future<void> migrationGuideLine405() async {
     }
 }
 
-// ../../docs/guides/authentication.md:49
-Future<void> authenticationGuideLine49() async {
+// ../../docs/guides/authentication.md:51
+Future<void> authenticationGuideLine51() async {
   // A signed-in Firebase Auth user: the security rules see request.auth.
   final auth = await FirebaseUserAuth.forApp(app);
   final firestore = FirebaseFirestore.instanceFor(app: app);
@@ -255,8 +268,8 @@ Future<void> authenticationGuideLine49() async {
   //   app.authProvider = applicationDefaultCredentials();   // package:.../adc.dart
 }
 
-// ../../docs/guides/authentication.md:71
-Future<void> authenticationGuideLine71() async {
+// ../../docs/guides/authentication.md:73
+Future<void> authenticationGuideLine73() async {
   final app = FirebaseApp.withOptions(const FirebaseOptions(
     apiKey: '<the Web API key of the project>',
     appId: '1:1234567890:dart:example',
@@ -276,21 +289,72 @@ Future<void> authenticationGuideLine71() async {
   await auth.signOut();
 }
 
-// ../../docs/guides/authentication.md:178
-Future<void> authenticationGuideLine178() async {
-  final auth = await FirebaseUserAuth.forApp(app, storage: FileAuthStorage());
+// ../../docs/guides/authentication.md:192
+Future<void> authenticationGuideLine192() async {
+  final auth = await FirebaseUserAuth.forApp(app);
+  const settings = ActionCodeSettings(
+    url: 'https://my-project.web.app/finish-sign-in', // must be an authorized domain
+    handleCodeInApp: true, // required for a sign-in link
+  );
+  await auth.sendSignInLinkToEmail(email: 'ada@example.com', actionCodeSettings: settings);
+  // Keep the address until the link comes back (the backend wants it again).
+
+  // Later, with the link the app received:
+  const link = '<the link of the email>';
+  if (auth.isSignInWithEmailLink(link)) {
+    await auth.signInWithEmailLink(email: 'ada@example.com', emailLink: link);
+  }
+}
+
+// ../../docs/guides/authentication.md:218
+Future<void> authenticationGuideLine218() async {
+  final auth = await FirebaseUserAuth.forApp(app);
+  const googleIdToken = '<an ID token from Google Sign-In>';
+  const appleIdToken = '<an ID token from Sign in with Apple>';
+  const rawNonce = '<the nonce whose SHA-256 the app sent to Apple>';
+  const oidcIdToken = '<an ID token of your OpenID Connect provider>';
+
+  await auth.signInWithCredential(GoogleAuthProvider.credential(idToken: googleIdToken));
+  await auth.signInWithCredential(AppleAuthProvider.credentialWithIDToken(appleIdToken, rawNonce));
+  await auth.signInWithCredential(OAuthProvider('oidc.my-provider').credential(idToken: oidcIdToken));
+  // Access tokens: FacebookAuthProvider.credential(token), GithubAuthProvider.credential(token),
+  // TwitterAuthProvider.credential(accessToken: ..., secret: ...), YahooAuthProvider.credential(token).
+}
+
+// ../../docs/guides/authentication.md:243
+Future<void> authenticationGuideLine243() async {
+  final auth = await FirebaseUserAuth.forApp(app);
+  const googleIdToken = '<an ID token from Google Sign-In>';
+  try {
+    await auth.signInWithCredential(GoogleAuthProvider.credential(idToken: googleIdToken));
+  } on FirebaseAuthException catch (e) {
+    if (e.code == 'account-exists-with-different-credential' && e.credential != null) {
+      await auth.signInWithEmailAndPassword(email: e.email!, password: password);
+      await auth.linkWithCredential(e.credential!);
+    }
+  }
+}
+
+// ../../docs/guides/authentication.md:276
+Future<void> authenticationGuideLine276() async {
+  final auth = await FirebaseUserAuth.forApp(app,
+      storage: FileAuthStorage('${Platform.environment['HOME']}/.config/my_tool/session.json'));
   // auth.currentUser is the user of the last run, if there was one.
 }
 
-// ../../docs/guides/authentication.md:208
-Future<void> authenticationGuideLine208() async {
+// ../../docs/guides/authentication.md:284
+Future<void> authenticationGuideLine284() async {
+}
+
+// ../../docs/guides/authentication.md:313
+Future<void> authenticationGuideLine313() async {
   final auth = await FirebaseUserAuth.forApp(app,
       emulatorHost: FirebaseUserAuth.emulatorHostFromEnvironment); // FIREBASE_AUTH_EMULATOR_HOST
   // or emulatorHost: '127.0.0.1:9099'
 }
 
-// ../../docs/guides/authentication.md:234
-Future<void> authenticationGuideLine234() async {
+// ../../docs/guides/authentication.md:339
+Future<void> authenticationGuideLine339() async {
   final app = FirebaseApp.withOptions(const FirebaseOptions(
     apiKey: '',                  // an empty key is not sent; any other key is, with each request
     appId: '1:1234567890:dart:server',
@@ -982,8 +1046,8 @@ Future<void> gettingStartedGuideLine187() async {
   );
 }
 
-// ../../docs/guides/migrating_from_flutterfire.md:105
-Future<void> migratingFromFlutterfireGuideLine105() async {
+// ../../docs/guides/migrating_from_flutterfire.md:106
+Future<void> migratingFromFlutterfireGuideLine106() async {
   // The values of a web app of the project (Firebase console, Project settings,
   // Your apps) work on every platform. From a generated firebase_options.dart:
   // the same names: apiKey, appId, projectId.
@@ -996,8 +1060,8 @@ Future<void> migratingFromFlutterfireGuideLine105() async {
   );
 }
 
-// ../../docs/guides/migrating_from_flutterfire.md:153
-Future<void> migratingFromFlutterfireGuideLine153() async {
+// ../../docs/guides/migrating_from_flutterfire.md:154
+Future<void> migratingFromFlutterfireGuideLine154() async {
   final String cacheDirectory = '<the application support directory>';
   final FirebaseFirestore persistent = FirebaseFirestore.instanceFor(
     app: app,
@@ -1006,15 +1070,15 @@ Future<void> migratingFromFlutterfireGuideLine153() async {
   );
 }
 
-// ../../docs/guides/migrating_from_flutterfire.md:174
-Future<void> migratingFromFlutterfireGuideLine174() async {
+// ../../docs/guides/migrating_from_flutterfire.md:175
+Future<void> migratingFromFlutterfireGuideLine175() async {
   final FirebaseUserAuth auth = await FirebaseUserAuth.forApp(app);
   final FirebaseFirestore signedIn = FirebaseFirestore.instanceFor(app: app);
   await auth.signInWithEmailAndPassword(email: 'ada@example.com', password: password);
 }
 
-// ../../docs/guides/migrating_from_flutterfire.md:328
-Future<void> migratingFromFlutterfireGuideLine328() async {
+// ../../docs/guides/migrating_from_flutterfire.md:330
+Future<void> migratingFromFlutterfireGuideLine330() async {
   final QuerySnapshot<Map<String, Object?>> page = await firestore
       .collection('users')
       .where('age', isGreaterThanOrEqualTo: 18)
@@ -1082,16 +1146,16 @@ Future<void> offlinePersistenceGuideLine71() async {
   );
 }
 
-// ../../docs/guides/offline_persistence.md:104
-Future<void> offlinePersistenceGuideLine104() async {
+// ../../docs/guides/offline_persistence.md:106
+Future<void> offlinePersistenceGuideLine106() async {
   final OpenDatabase opener = sqliteOpener(
     directory: '/home/ada/.local/share/my_app',
     pageCacheMb: 32,
   );
 }
 
-// ../../docs/guides/offline_persistence.md:125
-Future<void> offlinePersistenceGuideLine125() async {
+// ../../docs/guides/offline_persistence.md:127
+Future<void> offlinePersistenceGuideLine127() async {
   // Only the cache, never the network.
   final DocumentSnapshot<Map<String, Object?>> cached =
       await firestore.doc('cities/SF').get(const GetOptions(source: Source.cache));
@@ -1113,8 +1177,8 @@ Future<void> offlinePersistenceGuideLine125() async {
   await firestore.enableNetwork();
 }
 
-// ../../docs/guides/offline_persistence.md:192
-Future<void> offlinePersistenceGuideLine192() async {
+// ../../docs/guides/offline_persistence.md:194
+Future<void> offlinePersistenceGuideLine194() async {
   final Directory directory = Directory('/home/ada/.local/share/my_app')
     ..createSync(recursive: true);
   if (!Platform.isWindows) {
@@ -1122,8 +1186,8 @@ Future<void> offlinePersistenceGuideLine192() async {
   }
 }
 
-// ../../docs/guides/offline_persistence.md:217
-Future<void> offlinePersistenceGuideLine217() async {
+// ../../docs/guides/offline_persistence.md:219
+Future<void> offlinePersistenceGuideLine219() async {
   // IndexedDB: SQLite runs in the page on a copy of the whole database in memory.
   final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(
     app: app,
@@ -1131,23 +1195,23 @@ Future<void> offlinePersistenceGuideLine217() async {
   );
 }
 
-// ../../docs/guides/offline_persistence.md:234
-Future<void> offlinePersistenceGuideLine234() async {
+// ../../docs/guides/offline_persistence.md:236
+Future<void> offlinePersistenceGuideLine236() async {
   final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(
     app: app,
     openDatabase: sqliteOpener(opfsWorker: Uri.parse('sqlite_opfs_worker.js')),
   );
 }
 
-// ../../docs/guides/offline_persistence.md:268
-Future<void> offlinePersistenceGuideLine268() async {
+// ../../docs/guides/offline_persistence.md:270
+Future<void> offlinePersistenceGuideLine270() async {
   await firestore.terminate();        // the cache must not be in use by this instance
   await firestore.clearPersistence(); // deletes the files (or the browser storage)
   final FirebaseFirestore fresh = FirebaseFirestore.instanceFor(app: app);
 }
 
-// ../../docs/guides/offline_persistence.md:287
-Future<void> offlinePersistenceGuideLine287() async {
+// ../../docs/guides/offline_persistence.md:289
+Future<void> offlinePersistenceGuideLine289() async {
   final indexes = firestore.persistentCacheIndexManager; // null with a memory cache
   await indexes?.enableIndexAutoCreation();
 }
@@ -1476,8 +1540,8 @@ Future<void> troubleshootingGuideLine287() async {
   );
 }
 
-// ../../docs/guides/web.md:21
-Future<void> webGuideLine21() async {
+// ../../docs/guides/web.md:23
+Future<void> webGuideLine23() async {
   void main() {
     final FirebaseApp app = FirebaseApp.withOptions(
       const FirebaseOptions(
@@ -1503,16 +1567,16 @@ Future<void> webGuideLine21() async {
   }
 }
 
-// ../../docs/guides/web.md:118
-Future<void> webGuideLine118() async {
+// ../../docs/guides/web.md:172
+Future<void> webGuideLine172() async {
   final Settings settings = Settings(
     webExperimentalForceLongPolling: true,
     webExperimentalLongPollingOptions: const WebExperimentalLongPollingOptions(timeoutDuration: Duration(seconds: 25)),
   );
 }
 
-// ../../docs/guides/web.md:164
-Future<void> webGuideLine164() async {
+// ../../docs/guides/web.md:218
+Future<void> webGuideLine218() async {
   final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(
     app: app,
     openDatabase: sqliteOpener(opfsWorker: Uri.parse('sqlite_opfs_worker.js')),
@@ -1520,8 +1584,8 @@ Future<void> webGuideLine164() async {
   );
 }
 
-// ../../docs/guides/web.md:195
-Future<void> webGuideLine195() async {
+// ../../docs/guides/web.md:274
+Future<void> webGuideLine274() async {
   final FirebaseFirestore firestore = await openWithMemoryFallback(
     app: app,
     openDatabase: sqliteOpener(),
@@ -1531,7 +1595,18 @@ Future<void> webGuideLine195() async {
   final bool persistent = firestore.persistentCacheIndexManager != null;
 }
 
-// ../../docs/guides/web.md:222
-Future<void> webGuideLine222() async {
+// ../../docs/guides/web.md:306
+Future<void> webGuideLine306() async {
+  // One client of the page: `client` names its app ('client-left', 'client-right').
+  Future<FirebaseFirestore> startClient(String client, String email) async {
+    final FirebaseApp clientApp = FirebaseApp.withOptions(app.options, name: client);
+    final FirebaseUserAuth auth = await FirebaseUserAuth.forApp(clientApp);
+    await auth.signInWithEmailAndPassword(email: email, password: password);
+    return FirebaseFirestore.instanceFor(app: clientApp);
+  }
+}
+
+// ../../docs/guides/web.md:334
+Future<void> webGuideLine334() async {
   final Settings settings = Settings().withEmulator('127.0.0.1', 8080);
 }

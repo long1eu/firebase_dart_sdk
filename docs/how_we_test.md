@@ -18,7 +18,7 @@ has the current ones.
 | Integration over WebChannel | Standard edition emulator | 882 run, 26 skipped | `./tool/test_integration.sh standard --transport=webchannel` |
 | Integration over WebChannel with long polling | Standard edition emulator | 882 run, 26 skipped | `./tool/test_integration.sh standard --transport=webchannel-longpolling` |
 | Enterprise edition | Enterprise edition emulator | 447 run, 86 skipped | `./tool/test_integration.sh enterprise` |
-| Browser | Chrome, dart2wasm and dart2js, against the emulator | 54 per compiler: 53 pass, 1 skipped (source: [platforms guide](guides/platforms.md)) | `./tool/test_browser.sh both` |
+| Browser | Chrome, dart2wasm and dart2js, against the emulator | 57 per compiler: 56 pass, 1 skipped (source: [platforms guide](guides/platforms.md)) | `./tool/test_browser.sh both` |
 | Production verification kit | a real Firestore database (opt-in), or the emulator | 15 checks; latest production run: 13 passed, 2 skipped | `tool/verify_production/run.sh` |
 
 The skipped tests are skipped with a reason that the test runner prints. 361 of the 498 skipped
@@ -92,8 +92,19 @@ example's directory, `dart pub get`, then `FIRESTORE_EMULATOR_HOST=127.0.0.1:808
 
 `./tool/test_browser.sh both` runs `test/browser` in Chrome, compiled with dart2wasm and with
 dart2js, against a private emulator: the web transport, the SQLite cache in IndexedDB and OPFS,
-reloads, crashes of the storage, Firestore Lite. CI runs them on dart2wasm when a change touches
-what they cover, and on both compilers every night.
+reloads (a document and a pending write survive, and the write is sent after the reload), a
+second tab (`failedPrecondition`, and a memory cache from `openWithMemoryFallback`), crashes of
+the storage, Firestore Lite, and two signed-in users in one page against the Auth emulator
+(each sees the other's writes, the rules apply per user, and a stale token refreshes only its own
+client). CI runs them on dart2wasm when a change touches what they cover, and on both compilers
+every night.
+
+What the test runner cannot do, the driver of
+[`examples/flutter_web_two_users`](../examples/flutter_web_two_users/README.md) did by hand over the
+DevTools protocol: a page frozen with `Page.setWebLifecycleState` for three minutes, with a write
+made meanwhile by another client, which arrived after the thaw. The `sqlite3` checks of
+`cloud_firestore_dart_sqlite` (`test/browser/setup_checks_test.dart` there) ran with `sqlite3`
+2.9.4, 3.5.2 and 3.9.1; CI does not run that package's browser tests.
 
 ### Property and fuzz tests
 

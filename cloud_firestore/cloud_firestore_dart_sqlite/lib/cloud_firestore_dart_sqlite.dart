@@ -19,6 +19,8 @@ import 'src/opener_stub.dart'
 
 export 'src/memory_fallback.dart' show openWithMemoryFallback;
 export 'src/sqlite_opfs_exception.dart' show SqliteOpfsException;
+export 'src/sqlite_web_setup_exception.dart'
+    show SqliteWebSetupException, SqliteWebSetupProblem;
 
 /// Returns the [OpenDatabase] of this platform, for
 /// `FirebaseFirestore.instanceFor(openDatabase: ...)`.
@@ -37,7 +39,8 @@ export 'src/sqlite_opfs_exception.dart' show SqliteOpfsException;
 ///
 /// **A browser** (`dart:js_interop`): SQLite compiled to WebAssembly, with the
 /// database in IndexedDB, or in the origin private file system (OPFS) when
-/// [opfsWorker] is given and the browser supports it. Experimental.
+/// [opfsWorker] is given and the browser supports it. Supported in Chrome; other
+/// browsers are untested.
 ///
 /// * [sqlite3Wasm] is the URL of the `sqlite3.wasm` build of the `sqlite3`
 ///   package version the app resolves (default: `sqlite3.wasm` next to the
@@ -54,6 +57,16 @@ export 'src/sqlite_opfs_exception.dart' show SqliteOpfsException;
 ///   short for a second tab. After it the open fails with a `FirestoreException`
 ///   with the code `failed-precondition`: one tab at a time (see
 ///   `openWithMemoryFallback`).
+/// * [acceptIndexedDbWriteLoss] opens the IndexedDB storage with `sqlite3`
+///   3.4.0 to 3.5.2 anyway. Without it the open fails there with a
+///   [SqliteWebSetupException]: the IndexedDB file system of those versions
+///   can lose a write that the cache reported as stored when the tab is
+///   closed or crashes a moment later. Pin another `sqlite3` instead (the
+///   exception says which), or use [opfsWorker].
+///
+/// A `sqlite3.wasm` that is missing, or the build of another `sqlite3`
+/// version than the one the app resolves, fails the open with a
+/// [SqliteWebSetupException] that says so.
 ///
 /// Relative URLs are resolved against the page. `FirebaseFirestore.clearPersistence`
 /// deletes the file, the IndexedDB database or the OPFS directory.
@@ -64,6 +77,7 @@ OpenDatabase sqliteOpener({
   Uri? opfsWorker,
   String storagePrefix = 'cloud_firestore_dart',
   Duration lockTimeout = const Duration(seconds: 2),
+  bool acceptIndexedDbWriteLoss = false,
 }) {
   return platformSqliteOpener(
     directory: directory,
@@ -72,5 +86,6 @@ OpenDatabase sqliteOpener({
     opfsWorker: opfsWorker,
     storagePrefix: storagePrefix,
     lockTimeout: lockTimeout,
+    acceptIndexedDbWriteLoss: acceptIndexedDbWriteLoss,
   );
 }

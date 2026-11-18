@@ -66,8 +66,8 @@ The shortest program is [`example/main.dart`](https://github.com/long1eu/firebas
 lists them all. None of them needs an emulator or the network.
 
 **Platforms.** Android, iOS, Linux, macOS and Windows (the Dart VM, including Flutter apps);
-developed and tested on macOS. The web, experimentally: tried in Chrome with
-`cloud_firestore_dart`.
+developed and tested on macOS. The web: supported in Chrome with
+`cloud_firestore_dart`; other browsers are untested.
 
 ## Documentation
 

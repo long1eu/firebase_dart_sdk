@@ -3,7 +3,7 @@
 A browser page where you can try `cloud_firestore_dart` and see what the client does, with no
 backend and no Firebase project. It is plain Dart (`package:web`, no Flutter), compiled to
 JavaScript or WebAssembly, and it is only static files: any static host can serve it. Web
-support of the library is **experimental**: see the [web guide](../../docs/guides/web.md).
+is **supported in Chrome**: see the [web guide](../../docs/guides/web.md).
 
 The client runs with its network disabled, on a memory cache. Nothing you type leaves the
 browser, and everything is gone when you close or reload the tab.
@@ -43,7 +43,7 @@ reads from the cache. The dashed arrow is the network, which stays off.
 
 ```mermaid
 flowchart LR
-  page["index.html + bootstrap.js"] --> program["main.dart.js or main.wasm"]
+  page["index.html + bootstrap.js"] --> program["main.wasm, or main.dart.js as the fallback"]
   program --> ui["web/main.dart: forms, cards, events"]
   ui -->|"set, delete, batch"| client["Firestore instance"]
   client --> cache["Memory cache"]
@@ -87,9 +87,16 @@ dart compile wasm -O2 --no-source-maps -o build/web/main.wasm web/main.dart
 cp web/index.html web/styles.css web/bootstrap.js web/favicon.svg build/web/
 ```
 
-Open <http://localhost:8000/> for the dart2js build and <http://localhost:8000/?compiler=wasm>
-for the dart2wasm one (the browser needs WebAssembly garbage collection: a recent Chrome, Firefox
-or Safari). `bin/serve.dart` serves only `build/web`, on the loopback interface, so you test
+Open <http://localhost:8000/>. The page runs the dart2wasm build when the browser can, and the
+dart2js build otherwise: `web/bootstrap.js` checks for WebAssembly garbage collection (the same
+check that `dart compile wasm` writes to `main.support.js`), and falls back to `main.dart.js`
+when the check fails or the module does not compile. The header says which build runs, and why
+when it fell back. <http://localhost:8000/?compiler=js> forces dart2js, and
+<http://localhost:8000/?compiler=wasm> forces dart2wasm and shows the error instead of falling
+back; the footer links to the build that is not running. dart2wasm is the default because the
+client's own work runs two to five times faster with it in Chrome, with no difference in start-up
+time that the measurements could separate from the noise (see
+[dart2js or dart2wasm in the browser](../../docs/guides/performance.md#dart2js-or-dart2wasm-in-the-browser)). `bin/serve.dart` serves only `build/web`, on the loopback interface, so you test
 exactly what you publish. To try a sub-path as GitHub Pages uses, pass it:
 `dart run bin/serve.dart 8000 /firebase_dart_sdk/`.
 
@@ -120,7 +127,7 @@ a newer build.
 | `web/main.dart` | The program of the page. |
 | `lib/playground.dart` | What does not touch the page: `openOffline`, the query of the form (`QuerySpec`), the sample data. |
 | `web/index.html`, `web/styles.css`, `web/favicon.svg` | The page, light and dark through `prefers-color-scheme`. |
-| `web/bootstrap.js` | Starts `main.dart.js`, or `main.mjs` and `main.wasm` with `?compiler=wasm`. |
+| `web/bootstrap.js` | Starts `main.mjs` and `main.wasm` when the browser can, `main.dart.js` otherwise; `?compiler=js` or `?compiler=wasm` picks one. |
 | `build.sh` | Builds `build/web`. |
 | `bin/serve.dart` | The local static file server. |
 | `test/playground_test.dart` | The smoke test. |
@@ -147,6 +154,12 @@ Measured with Dart 3.12.2 and `-O2`, with `cloud_firestore_dart` 0.2.0; gzipped 
   the network log had only the page's own files (5 requests for the dart2js build, 6 for
   dart2wasm, all to the page's origin), and the console stayed empty. The two screenshots above
   were taken then, from the dart2js build at 1280 and 390 pixels wide.
+- With dart2wasm as the default (Dart 3.12.2, Chrome 157, headless, under
+  `/firebase_dart_sdk/`): the page started the dart2wasm build; `?compiler=js` started dart2js;
+  with WebAssembly turned off (`--js-flags=--jitless`) it fell back to dart2js and said so; with
+  `'wasm-unsafe-eval'` removed from the Content-Security-Policy the module did not compile and the
+  page fell back to dart2js (a console warning names the CSP error); `?compiler=wasm` showed the
+  error in both cases instead.
 - Not tried in other browsers, and not yet published anywhere.
 
 ## Dependencies

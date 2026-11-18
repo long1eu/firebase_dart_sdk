@@ -6,6 +6,9 @@
 # The Flutter packages (cloud_firestore_dart_flutterfire, cloud_firestore_dart_platform) and the
 # Flutter examples need the Flutter SDK and are skipped without it; the CI job "flutter" runs
 # them (with FIRESTORE_EMULATOR_HOST set, so that the emulator tests of the platform package run).
+# A Flutter example with a web/index.html is also built for the web, with dart2js
+# (`flutter build web`) and with dart2wasm (`flutter build web --wasm`), so that a change that
+# breaks web compilation fails here.
 # Exits non-zero if any step of any package fails.
 # Usage: tool/test_all.sh [package-name ...]
 #
@@ -111,8 +114,15 @@ for pubspec in "$ROOT"/examples/*/pubspec.yaml; do
   elif [ $rc -ne 0 ] || ! grep -q "No issues found" "$log.an"; then
     analyze="FAIL (analyzer crashed)"; tail -10 "$log.an"
   fi
-  case "$pub$analyze" in *FAIL*) failed=1;; esac
-  summary+=("$name: pub get $pub | analyze $analyze | test not run (needs an emulator)")
+  web=""
+  if [ "$tool" = flutter ] && [ -f "$dir/web/index.html" ]; then
+    js=PASS wasm=PASS
+    (cd "$dir" && flutter build web >"$log.web" 2>&1) || { js=FAIL; tail -10 "$log.web"; }
+    (cd "$dir" && flutter build web --wasm >"$log.wasm" 2>&1) || { wasm=FAIL; tail -10 "$log.wasm"; }
+    web=" | build web $js | build web --wasm $wasm"
+  fi
+  case "$pub$analyze$web" in *FAIL*) failed=1;; esac
+  summary+=("$name: pub get $pub | analyze $analyze$web | test not run (needs an emulator)")
 done
 
 # The Flutter packages: `dart test` cannot load flutter_test. The emulator tests of

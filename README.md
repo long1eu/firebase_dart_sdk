@@ -27,7 +27,7 @@ endorsed by Google or Firebase.
 - You ship a Windows app and cannot test it yourself first: it was run on one Windows 11 VM against the
   emulator only (the Dart VM suites and two Flutter debug apps, no window drawn), not in CI, not in a
   release build and not against production.
-- You need federated, phone or email-link sign-in, multi-factor, Storage, Messaging or the other Firebase
+- You need a provider's sign-in page (popup or redirect), phone sign-in, multi-factor, Storage, Messaging or the other Firebase
   services, or admin jobs such as bulk writes and recursive deletes (use `firebase_admin_sdk`).
 - You need a vendor to call: one person maintains it, with no SLA.
 
@@ -77,7 +77,7 @@ It is a port of the open-source [Firebase Android SDK](https://github.com/fireba
 including its offline cache, listeners with local-write snapshots, transactions and retry logic, on Dart 3
 with `dart:io`, gRPC and SQLite; no Flutter plugin and no native SDK. Your program creates a `FirebaseApp`, an
 optional token provider plugs into it, and `cloud_firestore_dart` talks to Firestore over gRPC on the Dart VM
-and in Flutter, or over REST and WebChannel in the browser (experimental).
+and in Flutter, or over REST and WebChannel in the browser (supported in Chrome).
 
 ![Your Dart program, Flutter app or browser app uses three packages: firebase_auth_providers_dart sets the token provider of the FirebaseApp from firebase_app_dart, and cloud_firestore_dart is created from that app. cloud_firestore_dart reaches Cloud Firestore or the emulator over gRPC on the VM and in Flutter, and over REST and WebChannel in the browser.](https://raw.githubusercontent.com/long1eu/firebase_dart_sdk/main/docs/images/readme/overview.svg)
 
@@ -174,14 +174,16 @@ yet.]_
   packages replace the ones published as `cloud_firestore_vm` and `firebase_core_vm` (and the
   internal `_firebase_internal_vm` and `_firebase_database_collection_vm`, now folded in). See
   [docs/migrating_from_vm_packages.md](docs/migrating_from_vm_packages.md).
-- Web support is experimental. In a browser the client uses REST and WebChannel over `fetch`
+- Web is supported in Chrome. In a browser the client uses REST and WebChannel over `fetch`
   instead of gRPC, with a memory cache or an opt-in SQLite cache in IndexedDB. The browser tests
   pass in Chrome against the emulator (dart2wasm and dart2js), and the whole standard
-  integration suite passes on the VM over the web transport. No other browser was tried, and no
-  browser was run against a production backend (the verification kit used the web transport
-  against production from the VM).
+  integration suite passes on the VM over the web transport. A Flutter web app with two signed-in
+  users in one page ([`examples/flutter_web_two_users`](examples/flutter_web_two_users/)) is built
+  with dart2js and dart2wasm in CI and was driven in headless Chrome against the emulators. No
+  other browser was tried, and no browser was run against a production backend (the verification
+  kit used the web transport against production from the VM).
 - Not implemented: coordination between clients that share one cache (the multi-tab support of
-  the JS SDK; deferred until after 0.1.0), a full Firebase Auth SDK (no federated sign-in), and
+  the JS SDK; deferred until after 0.1.0), a full Firebase Auth SDK (no popup or redirect sign-in, phone or multi-factor), and
   Pipelines beyond the preview (no real-time pipelines and no offline evaluation; a local
   evaluator exists but is internal and not used yet; search, window functions and explain
   options are only checked for their encoding, since the emulator rejects them).

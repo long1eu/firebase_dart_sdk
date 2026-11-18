@@ -1,0 +1,25 @@
+rules_version = '2';
+// The rules of the example: both users read and write boards/<board>, and
+// only the owner (alice@example.com) may lock it. A locked board is written
+// by the owner only.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /boards/{board} {
+      function signedIn() {
+        return request.auth != null;
+      }
+      function isOwner() {
+        return request.auth.token.email == 'alice@example.com';
+      }
+      function byCaller() {
+        return request.resource.data.updatedBy == request.auth.uid;
+      }
+      allow read: if signedIn();
+      allow create: if signedIn() && byCaller()
+          && (isOwner() || request.resource.data.locked == false);
+      allow update: if signedIn() && byCaller()
+          && (isOwner()
+              || (resource.data.locked == false && request.resource.data.locked == false));
+    }
+  }
+}

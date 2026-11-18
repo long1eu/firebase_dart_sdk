@@ -1,3 +1,81 @@
+## 0.3.0 (unreleased)
+
+- The complete server error map of the JS SDK (`SERVER_ERROR_MAP` of `@firebase/auth` 1.13.10): the phone,
+  multi-factor, reCAPTCHA, `signInWithIdp` and action code settings codes are mapped like the JS SDK maps them
+  (`INVALID_CODE` is `invalid-verification-code`, `UNAUTHORIZED_DOMAIN` is `unauthorized-continue-uri`, ...), with
+  the JS SDK's messages. Codes that were already mapped are unchanged.
+- Fix: an answer with HTTP 200 whose body has an `errorMessage` was taken for a success; it is an error now, like in
+  the JS SDK. An answer with `needConfirmation` throws `account-exists-with-different-credential`.
+- `FirebaseAuthException` has FlutterFire's `email`, `phoneNumber` and `tenantId`, set for the errors the JS SDK
+  tags with the answer (`credential-already-in-use`, `email-already-in-use`, `user-disabled`,
+  `account-exists-with-different-credential`).
+- Fix: `checkActionCode` threw `internal-error` for an operation the package does not know; it returns it, like the
+  JS SDK, as the new `ActionCodeOperation.unknown` with the backend's name in the new `ActionCodeInfo.requestType`.
+  **Breaking** for a `switch` over `ActionCodeOperation` without a default: add a case for `unknown` (FlutterFire's
+  `ActionCodeInfoOperation` has the same value). `ActionCodeInfo.multiFactorInfo` is the factor of
+  `revertSecondFactorAddition`, which now requires it, like the JS SDK.
+- The full user record, like FlutterFire's `User`: `AuthUser.providerData` (a list of the new `UserInfo`),
+  `metadata` (the new `UserMetadata`: creation and last sign-in time), `phoneNumber`, `tenantId`, and `photoURL`
+  (the FlutterFire name of `photoUrl`). Like the JS SDK, every sign-in now reads the account (`accounts:lookup`)
+  before it completes, so a sign-in makes two requests; a sign-in whose account cannot be read fails and signs
+  nobody in. `reload` reads the same fields.
+- The sign-in methods and `reauthenticateWithEmailAndPassword` return a `UserCredential` (FlutterFire's name), which
+  is also the `AuthUser` they returned before: `user` and the new `additionalUserInfo` (`AdditionalUserInfo`:
+  `isNewUser`, `providerId`, `profile`, `username`). Code that reads the result as an `AuthUser` is unchanged;
+  **breaking** only for classes that implement or mock `FirebaseUserAuth` and return an `AuthUser` from these methods.
+- The stored session has a version (2) and the whole record. Sessions stored by 0.1 and 0.2 are still restored;
+  their user lacks the new fields until `reload`.
+- `authStateChanges()` and `idTokenChanges()` (FlutterFire's streams): they start with the current user (after a
+  `restore` in progress) and then follow sign-ins of another user and sign-outs, and, for `idTokenChanges()`, every
+  new ID token. `userChanges()` is unchanged (it still does not emit the current user when listened to).
+- `authStateReady()`, `beforeAuthStateChanged(callback, onAbort:)` (a throwing callback blocks the sign-in, sign-out
+  or switch with `login-blocked`) and `updateCurrentUser(user)` (continue the session of a user of another
+  instance with the same API key), from the JS SDK. The token stream Firestore follows (`onTokenChanged`) emits as
+  before; `updateCurrentUser` is a user switch for it.
+- `languageCode`, `setLanguageCode` (FlutterFire) and `useDeviceLanguage()` (JS SDK): the language of the emails
+  the backend sends, in `X-Firebase-Locale` of every Identity Toolkit request. The device language is
+  `Platform.localeName` on the VM and `navigator.languages` in a browser. New dependency: `web` (already in the
+  dependency graph through `http`).
+- `tenantId` (Identity Platform multi-tenancy), sent with the requests the JS SDK sends it with (sign-ins, action
+  code requests, `createAuthUri`); a sign-in or `updateCurrentUser` of a user of another tenant throws
+  `tenant-id-mismatch`, like the JS SDK.
+- Email link sign-in: `sendSignInLinkToEmail(email:, actionCodeSettings:)`, `isSignInWithEmailLink(link)`,
+  `signInWithEmailLink(email:, emailLink:)`, and `ActionCodeURL.parseLink(link)` (the JS SDK's
+  `parseActionCodeURL`, with its Dynamic Link and iOS deep link unwrapping).
+- Credentials: `AuthCredential`, `EmailAuthCredential` and `EmailAuthProvider.credential` /
+  `credentialWithLink` (FlutterFire names), with `signInWithCredential`, `linkWithCredential` (an email and password
+  or an email link to an anonymous user, for example) and `reauthenticateWithCredential`.
+  `reauthenticateWithEmailAndPassword` stays, as a shortcut for the latter. New error codes from the JS SDK:
+  `provider-already-linked`, `argument-error`, `login-blocked`, `tenant-id-mismatch`.
+- Federated sign-in by token exchange: `OAuthCredential` and the providers `GoogleAuthProvider`,
+  `AppleAuthProvider` (with `credentialWithIDToken` and its raw nonce), `FacebookAuthProvider`, `GithubAuthProvider`,
+  `TwitterAuthProvider`, `MicrosoftAuthProvider`, `YahooAuthProvider` and `OAuthProvider(providerId)` (`oidc.*` and
+  any other id), with FlutterFire's names. The app gets the provider's ID or access token itself;
+  `signInWithCredential`, `linkWithCredential` and `reauthenticateWithCredential` exchange it through
+  `accounts:signInWithIdp` with the request of the JS SDK. `unlink(providerId)` removes a sign-in method.
+- `UserCredential.credential` and `FirebaseAuthException.credential`: the provider's credential the backend
+  returned, so that `account-exists-with-different-credential` and `credential-already-in-use` can be recovered
+  (sign in with the existing method, then link). New error codes: `no-such-provider`.
+- `validatePassword(password)` with the new `PasswordPolicy` and `PasswordValidationStatus` (FlutterFire's names):
+  the project's (or tenant's) policy is fetched once from `v2/passwordPolicy`, cached, and fetched again after
+  `password-does-not-meet-requirements`, like the JS SDK. The Auth emulator does not implement the endpoint.
+- Ready-made storages: `FileAuthStorage(path)` on the Dart VM (a JSON file written atomically and owner-only: on
+  Linux and macOS it is written in a new staging directory with mode 0700, checked before anything is written, and
+  renamed into place with mode 0600; on Windows it inherits the access list of its directory) and `WebAuthStorage.session()` / `WebAuthStorage.local()` in a browser
+  (`sessionStorage` / `localStorage`), exported through conditional imports so that the library still compiles
+  everywhere (each throws `UnsupportedError` on the other platform). Their documentation says what a stored refresh
+  token exposes. `example/persistent_session.dart` uses `FileAuthStorage`. `FileAuthStorage` is exported from the
+  main library: **breaking** for an app that declared its own `FileAuthStorage` (as the 0.2 docs and example
+  suggested) in another library and imports both, which is now an `ambiguous_import`; rename the class or import
+  the package with `hide FileAuthStorage`.
+- Fix: a token refresh or an operation of the signed-in user (a profile update, a link, an unlink) that completed
+  after another user signed in could write the tokens or data of the previous user into the new session and its
+  storage. Each operation now belongs to the session it started in, and its result is dropped once another session
+  is installed or the session is cleared. A sign-in that fails or is blocked no longer cancels the operations of the
+  signed-in user, and `signOut()` after `dispose()` throws a `StateError` instead of deleting the stored session.
+- Documentation: the README, the authentication guide and the API docs cover the new sign-in methods, streams,
+  tenants, language, password policy and storages; a new example, `example/linking_and_email_link.dart`.
+
 ## 0.2.1
 
 - Fix: signing in (`signInWithEmailAndPassword`, `signInWithCustomToken`) or reauthenticating

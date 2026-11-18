@@ -47,9 +47,9 @@ a plain Dart package.
   tries to replace `.dart_tool\lib\sqlite3.dll`, which the first one has loaded ("Access is denied"). For
   several processes, build once with `dart build cli` and start the executable.
 
-## The web (experimental)
+## The web (supported in Chrome)
 
-Web support is experimental. Browsers have no sockets, so there the client talks to
+Web is supported in Chrome; Firefox, Safari and Edge are untested. Browsers have no sockets, so there the client talks to
 Firestore the way the JS SDK does: REST/JSON for the one-shot calls and WebChannel for the
 listen and write streams, over `fetch`. What to know:
 
@@ -111,13 +111,19 @@ listen and write streams, over `fetch`. What to know:
   web with `unavailable` (the emulator's WebChannel endpoint drops the stream; over gRPC the
   same query works). Read such collections in pages there. Whether the production backend
   has such a limit was not checked.
-- It was verified against the emulator only: 54 tests in Chrome (`tool/test_browser.sh both`
-  from the repository root; 53 pass and 1 is skipped with each compiler: under dart2wasm the
+- It was verified against the emulator only: 57 tests in Chrome (`tool/test_browser.sh both`
+  from the repository root; 56 pass and 1 is skipped with each compiler: under dart2wasm the
   crash harness of the IndexedDB storage, under dart2js the test of 64 bit integers), and the
   whole standard integration suite on the VM over the web transport
   (`tool/test_integration.sh standard --transport=webchannel`). Other browsers and the
   production backend are untested.
-- Prefer dart2wasm. Compiled to JavaScript, integers above 2^53 lose precision.
+- A Flutter web app works the same way: [A Flutter web app](web.md#a-flutter-web-app) and
+  [`examples/flutter_web_two_users`](../../examples/flutter_web_two_users/), built with both
+  compilers in CI. On Flutter 3.44 pin `sqlite3: 3.3.4` for the IndexedDB cache:
+  `cloud_firestore_dart_sqlite` 0.1.2 refuses the 3.5.2 that Flutter 3.44 resolves
+  ([The `sqlite3` version](web.md#the-sqlite3-version)).
+- Prefer dart2wasm. Compiled to JavaScript, integers above 2^53 lose precision, and shifts are
+  32-bit (`1 << 32` is `0`).
 - If listeners or writes never complete on some network (a proxy or antivirus that buffers
   streamed responses), set `Settings(webExperimentalForceLongPolling: true)`. The
   client also tries to detect this by itself (`webExperimentalAutoDetectLongPolling`, on by

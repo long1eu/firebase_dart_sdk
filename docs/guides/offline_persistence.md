@@ -79,7 +79,9 @@ final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(
 ```
 
 It works with `sqlite3` 2.7.3 to 3.x, except 3.4.0 to 3.5.2 in a browser with the IndexedDB
-storage; in a browser with 3.x use `cloud_firestore_dart_sqlite` 0.1.1 or later (0.1.0 could lose
+storage, which `cloud_firestore_dart_sqlite` 0.1.2 refuses at open with a
+`SqliteWebSetupException` (Flutter 3.44 resolves 3.5.2 for a web app: pin `sqlite3: 3.3.4` there,
+see [Web](web.md#the-sqlite3-version)); in a browser with 3.x use 0.1.1 or later (0.1.0 could lose
 writes acknowledged just before the tab died, see its CHANGELOG). With 3.x (Dart 3.10 and later) `sqlite3` bundles SQLite
 itself and nothing else is needed; with 2.x a Flutter app adds `sqlite3_flutter_libs: ^0.5.0`
 and a Linux server needs `libsqlite3.so`. Its README has the details per platform.
@@ -258,7 +260,7 @@ What to know (all measured in Chrome against the emulator; other browsers are un
   1.4 KB per document of 1 KB; 100,000 documents take about 1 s to open and 130 MB). With OPFS
   memory stays at a few MB and the cache opens in well under 0.2 s at any size. The default
   size limit of 100 MB starts removing unused documents before 100,000 documents.
-  [Platforms](platforms.md#the-web-experimental) has the measurements.
+  [Platforms](platforms.md#the-web-supported-in-chrome) has the measurements.
 - **Size.** The persistent cache adds about 220 KB of JavaScript (60 KB gzipped) to a small
   app, plus the `sqlite3.wasm` file (731 KB, 349 KB gzipped); the OPFS worker is 183 KB more.
 - `clearPersistence()` deletes the IndexedDB database or the OPFS directory.

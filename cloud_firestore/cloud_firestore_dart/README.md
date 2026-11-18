@@ -33,7 +33,7 @@ It is a port of the open-source Firebase Android SDK, kept close to its current 
 | BSON value types of Enterprise edition databases | stable |
 | Pipelines (`package:cloud_firestore_dart/pipelines.dart`), Enterprise edition only | **preview** |
 | Firestore Lite (`package:cloud_firestore_dart/lite.dart`): no cache, one request per call | **experimental** |
-| The web: REST and WebChannel over `fetch`, cache in memory, IndexedDB or OPFS | **experimental** |
+| The web: REST and WebChannel over `fetch`, cache in memory, IndexedDB or OPFS | **supported in Chrome** |
 
 *Stable* means the API is not expected to change; a *preview* or *experimental* API may change in
 any release. Authentication is in the companion package
@@ -42,7 +42,7 @@ tokens can be supplied through the app.
 
 **Platforms.** The Dart VM on macOS (developed and tested there) and Linux (tested in CI);
 Windows is expected to work but is not tested. Flutter on Android, iOS and desktop, as a plain
-Dart package. The web, experimentally: tested in Chrome only. Dart 3.8 or later.
+Dart package. The web: supported in Chrome, tested against the emulator; Firefox, Safari and Edge are untested. Dart 3.8 or later.
 
 Inside the package, every call goes through one queue to the local cache and to the network; the
 transport depends on the platform, and Firestore Lite skips the cache:
@@ -120,8 +120,9 @@ has the changes with before and after code.
 - **The web** beyond the experiment: browsers other than Chrome, and a cache shared between tabs.
 - `findNearest` evaluation against the local cache, and cache indexes for queries with
   inequalities on several fields.
-- A Firebase Auth SDK: sign-in with email and password, anonymously or with custom tokens, and
-  server credentials, are in `firebase_auth_providers_dart`; federated sign-in is not.
+- A full Firebase Auth SDK: sign-in with email and password, email links, anonymously, with custom tokens
+  or with a federated provider's token, and server credentials, are in `firebase_auth_providers_dart`;
+  popup and redirect flows, phone sign-in and multi-factor are not.
 
 The full list, with the known gaps of what is done, is in
 [features and limits](https://github.com/long1eu/firebase_dart_sdk/blob/main/docs/guides/features.md).

@@ -29,7 +29,7 @@ What the repository can show about its state (each number with where it comes fr
   states its reason in the code: opt-in long soak runs, Enterprise-only cases, and tests that do
   not apply to that transport.
 - **Browser tests**: in the last recorded run, 54 tests in Chrome with each of dart2js and
-  dart2wasm, 53 passing and 1 skipped per compiler, against the emulator
+  dart2wasm, 56 passing and 1 skipped per compiler, against the emulator
   ([Platforms](platforms.md)).
 - **Production**: a verification kit of 15 checks (`tool/verify_production`) was run once
   against a real Firestore database in Standard edition: 13 passed and 2 were skipped (one needs
@@ -50,9 +50,10 @@ supported by Firebase.
 
 - your app is a Flutter app on the platforms it supports and it works for you. Moving brings no
   new capability for that case, and you give up official support and much wider production use;
-- you need Firebase Authentication beyond email/password, anonymous and custom-token sign-in
-  (Google, Apple and other providers, phone, email link, multi-factor): this repository has no
-  Firebase Auth SDK, only token providers ([Authentication](authentication.md));
+- you need Firebase Authentication that opens a provider's sign-in page (Google, Apple and other
+  providers by popup or redirect), phone sign-in or multi-factor: this repository signs in over REST
+  only, with email and password, email links, anonymous and custom tokens, and federated credentials
+  whose token the app obtained itself ([Authentication](authentication.md));
 - you need other Firebase products from the same SDK family (Storage, Messaging, Analytics,
   Crashlytics, Remote Config ...);
 - you need a cache shared by several browser tabs (the JS SDK's multi-tab persistence), or a web
@@ -76,8 +77,8 @@ supported by Firebase.
   edition databases.
 
 **Know the gaps before you switch**: 0.1.0 is a first release with little production use; the
-testing is mostly against the emulator; the web support is experimental and was tested in Chrome
-only; the repository runs no tests on Android or iOS devices (Flutter apps can use the package as
+testing is mostly against the emulator; the web is supported in Chrome only (tested against
+the emulator); the repository runs no tests on Android or iOS devices (Flutter apps can use the package as
 a plain Dart package, see [Platforms](platforms.md)); two clients on one cache do not share
 listeners or pending writes ([Several clients on one cache](multiple_clients.md)).
 
@@ -179,9 +180,10 @@ final FirebaseFirestore signedIn = FirebaseFirestore.instanceFor(app: app);
 await auth.signInWithEmailAndPassword(email: 'ada@example.com', password: password);
 ```
 
-It covers anonymous, email/password and custom-token sign-in, the token refresh and the account
-operations listed in [Authentication](authentication.md). Federated providers, phone sign-in,
-email links and multi-factor are not there. Servers use a service account or Application Default
+It covers anonymous, email/password, email link and custom-token sign-in, federated sign-in with a
+token the app already has (`signInWithCredential`), linking, the token refresh and the account
+operations listed in [Authentication](authentication.md). Popup and redirect flows, phone sign-in
+and multi-factor are not there. Servers use a service account or Application Default
 Credentials instead (these bypass the security rules).
 
 ### The emulator

@@ -72,10 +72,10 @@ Not done:
 - **Persistent cache indexes** for queries with inequalities on several fields, and with a
   memory cache (neither exists upstream: such queries are scanned).
 - Android-specific pieces of the Android SDK.
-- A Firebase Auth SDK. Tokens for Firestore (user sign-in over REST, service accounts,
-  Application Default Credentials) are in `firebase_auth_providers_dart`, see
-  [Authentication](authentication.md). For federated sign-in, Storage and Realtime Database see
-  [appsup-dart/firebase_dart](https://github.com/appsup-dart/firebase_dart).
+- A full Firebase Auth SDK. Tokens for Firestore (user sign-in over REST, including email links and
+  federated sign-in with a token the app already has, service accounts, Application Default Credentials)
+  are in `firebase_auth_providers_dart`, see [Authentication](authentication.md). For phone sign-in,
+  Storage and Realtime Database see [appsup-dart/firebase_dart](https://github.com/appsup-dart/firebase_dart).
 
 Known gaps in what is done:
 

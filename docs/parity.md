@@ -36,7 +36,7 @@ These are the numbers behind the statements below. Each one says where it comes 
 | Integration, `test/integration` over gRPC (`tool/test_integration.sh standard --transport=grpc test/integration`, emulator v1.22.0) | 887 passed, 21 skipped, 0 failed | run for this page on 2026-11-14 |
 | The same tests over the web transport (`--transport=webchannel`: REST and WebChannel, on the VM) | 882 passed, 26 skipped, 0 failed | run for this page on 2026-11-14 |
 | The same tests with WebChannel in long-polling mode (`--transport=webchannel-longpolling`) | 882 passed, 26 skipped, 0 failed | run for this page on 2026-11-14 |
-| Browser tests in Chrome (`tool/test_browser.sh both`) | 54 tests per compiler, 53 pass and 1 is skipped, on dart2js and dart2wasm | [Platforms](guides/platforms.md); run on 2026-11-14 at main 50470689 |
+| Browser tests in Chrome (`tool/test_browser.sh both`) | 57 tests per compiler, 56 pass and 1 is skipped, on dart2js and dart2wasm | [Platforms](guides/platforms.md); run on 2026-11-17 on the branch wave/web-support |
 | Production verification kit (`tool/verify_production`) against a real Standard edition database | 13 of 15 checks passed, 2 skipped | [Features and limits](guides/features.md), [The emulator and testing](guides/emulator_and_testing.md) |
 
 Each integration run used a fresh emulator. The same 908 tests run on every transport. The web transport skips five
@@ -203,7 +203,7 @@ Preview, Enterprise edition only, as in the JS SDK. See [Pipelines](guides/pipel
 
 | JS feature | Status | Dart API or gap |
 |---|---|---|
-| WebChannel streams for listen and write | supported (experimental) | Used automatically on the web; the integration suite runs over it on the VM (see the numbers above) and `test/browser/web_transport_smoke_test.dart` in Chrome |
+| WebChannel streams for listen and write | supported in Chrome | Used automatically on the web; the integration suite runs over it on the VM (see the numbers above) and `test/browser/web_transport_smoke_test.dart` in Chrome |
 | REST for one-shot calls (fetch) | supported | `test/unit/firebase/firestore/remote/web/rest_transport_test.dart` |
 | `experimentalForceLongPolling`, `experimentalAutoDetectLongPolling` | supported | `webExperimentalForceLongPolling`, `webExperimentalAutoDetectLongPolling` on `Settings`; long polling has its own integration run (above) and `test/browser/web_robustness_test.dart` |
 | `experimentalLongPollingOptions.timeoutSeconds` | supported | `Settings(webExperimentalLongPollingOptions: WebExperimentalLongPollingOptions(timeoutDuration: Duration(seconds: 25)))`, validated as in JS (5 to 30 seconds), sent as the `TO` parameter of long-polling requests; `test/unit/firebase/firestore/firestore_settings_test.dart`, `long_polling_options_test.dart`, `test/unit/firebase/firestore/remote/web/web_channel_test.dart` |
@@ -216,7 +216,7 @@ Preview, Enterprise edition only, as in the JS SDK. See [Pipelines](guides/pipel
 
 | JS feature | Status | Dart API or gap |
 |---|---|---|
-| Browsers | partial (experimental) | Chrome only (dart2js and dart2wasm); other browsers untested. See [Platforms](guides/platforms.md) |
+| Browsers | partial (supported in Chrome) | Chrome only (dart2js and dart2wasm); other browsers untested. See [Platforms](guides/platforms.md) |
 | Node.js | not applicable | The Dart VM takes its place: servers, command line tools, Flutter apps (Android, iOS, desktop) over gRPC |
 | Linux, macOS on the VM | supported | Developed on macOS; unit and integration suites run in a Linux container and on Ubuntu in CI (`tool/linux/run_in_container.sh`) |
 | Windows | partial | Expected to work, not tested |
@@ -231,7 +231,7 @@ Every gap and behaviour difference we know of, the ones you are most likely to m
    these names. Most testing is against the emulator. Against a real Firestore database only the
    production verification kit has run (13 of 15 checks passed, 2 skipped); the integration
    suite's real-project mode, the Enterprise edition features and long-running load have not.
-2. **The web is experimental.** Chrome only; a persistent cache can be open in one tab at a time;
+2. **The web is supported in Chrome only.** Other browsers are untested; a persistent cache can be open in one tab at a time;
    compiled to JavaScript (dart2js), integers above 2^53 lose precision, so prefer dart2wasm;
    against the emulator a query that returns more than about 10,000 documents fails on the web
    transport (production not checked). See [Platforms](guides/platforms.md).

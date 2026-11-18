@@ -1,12 +1,14 @@
 # The web
 
-This page shows you how to use `cloud_firestore_dart` in a Dart web app (no Flutter needed):
-connect, choose a cache, keep the bundle small, and pick a compiler. It also lists what does
-not work in a browser yet.
+This page shows you how to use `cloud_firestore_dart` in a Dart web app or a Flutter web app:
+connect, choose a cache, run several clients in one page, keep the bundle small, and pick a
+compiler. It also lists what does not work in a browser yet.
 
-**Web support is experimental.** It was tested in Chrome only, against the Firestore emulator
-only, and it may change in any release. [`examples/web_app/`](../../examples/web_app/) is a
-complete app you can build and open in a browser.
+**Web is supported in Chrome.** It was tested in Chrome only, against the Firestore emulator
+only; Firefox, Safari and Edge are untested. [`examples/web_app/`](../../examples/web_app/) is a
+complete app you can build and open in a browser, and
+[`examples/flutter_web_two_users/`](../../examples/flutter_web_two_users/) a Flutter web page
+with two signed-in users side by side.
 [`examples/playground/`](../../examples/playground/) runs the client with its network disabled on a
 memory cache, so you can try queries, writes and listeners in a page that needs no backend. This is its main page in headless Chrome with
 the network turned off: look at the **Sync** line and at the note marked `[not sent yet]`.
@@ -51,6 +53,31 @@ void main() {
 Without an `openDatabase` the cache is in memory: writes made offline are kept while the page is
 open, and lost when it is closed. [Choosing a cache](#choosing-a-cache) shows how to keep it.
 
+## A Flutter web app
+
+The same packages work in a Flutter app built for the web, with `flutter build web` (dart2js) or
+`flutter build web --wasm` (dart2wasm): there is no plugin, and the client picks the web
+transport by itself. Create the app and the instance as in any Flutter app
+([Flutter](flutter.md)); what differs is around them:
+
+- Put `sqlite3.wasm` (and `sqlite_opfs_worker.js` for OPFS) in `web/`: `flutter build web` copies
+  it next to the page. Pin `sqlite3` in `pubspec.yaml` to the version of that file; on Flutter
+  3.44 pin `sqlite3: 3.3.4`, see [The `sqlite3` version](#the-sqlite3-version).
+- `sqliteOpener()` takes no directory on the web: `sqliteOpener(directory: kIsWeb ? null : ...)`
+  in an app that also builds for other platforms.
+- Code that uses `dart:io` (`File`, `Directory`, `Platform`) compiles behind a conditional
+  import but throws `Unsupported operation` when it runs in a page.
+- Several clients in one page need one app name per client
+  ([Several clients in one page](#several-clients-in-one-page)).
+- Flutter's semantics tree (screen readers, and test automation that turns it on) changes how
+  text fields are created; in a page with several `MaterialApp`s one report saw typing reach only
+  one of them. A Flutter matter, not this package's.
+
+[`examples/flutter_web_two_users`](../../examples/flutter_web_two_users/) is such an app: two
+users signed in with `firebase_auth_providers_dart` against the Auth emulator, the rules telling
+them apart, a memory or SQLite cache, and a `run.sh` that serves the build on another port than
+the emulators. It was built with both compilers and driven in headless Chrome.
+
 ## What works and what does not
 
 What works in Chrome, with both compilers: listeners, queries, writes and offline writes,
@@ -93,6 +120,33 @@ flowchart LR
   webChannel --> backend["Firestore backend or emulator"]
   rest --> backend
 ```
+
+The whole path of a request, from a page with one client per `FirebaseApp`:
+
+```mermaid
+flowchart LR
+  subgraph page["Browser page, dart2js or dart2wasm"]
+    app["Your code: one FirebaseApp per client"]
+    authProvider["AuthTokenProvider of the app, for example FirebaseUserAuth"]
+    firestore["FirebaseFirestore, one per app and database"]
+    cache["Cache: memory, SQLite in IndexedDB, or SQLite in OPFS in a worker"]
+    transport["WebChannelTransport, chosen by transport_factory.dart"]
+    fetchClient["FetchHttpClient: fetch with streamed responses"]
+    app --> firestore
+    app --> authProvider
+    firestore --> cache
+    firestore --> transport
+    authProvider -- "ID token, Authorization header" --> transport
+    transport --> fetchClient
+  end
+  fetchClient -- "Listen and Write: WebChannel sessions on /channel" --> backend["Firestore backend or emulator"]
+  fetchClient -- "other calls: REST and proto3 JSON" --> backend
+  authProvider -- "sign-in and token refresh" --> authService["Firebase Auth or its emulator"]
+```
+
+The token goes through the client's credentials provider into the headers of each request, and
+the cache is local to the client: nothing is shared between two clients of a page except the
+browser's six connections per host.
 
 The client picks this transport by itself when it is compiled for the web. It listens to the
 `online` and `offline` events of the browser, and restarts its streams at once when the network
@@ -179,9 +233,34 @@ final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(
   size limit of 100 MB removes unused documents before that.
 - The cache holds every document the page read, in clear text, readable by every script of the
   origin. `clearPersistence()` deletes it; call it when a user signs out of a shared computer.
+- **The IndexedDB database names** (and the OPFS directory names): one per app and database,
+  `<storagePrefix>/firestore.<app name>.<project id>.<database id>`, each part URL-encoded, with the
+  default prefix `cloud_firestore_dart`. The default app and database of the project `my-project`:
+  `cloud_firestore_dart/firestore.%5BDEFAULT%5D.my-project.%28default%29`. A page with a memory
+  cache creates none. Before its first IndexedDB open a page also creates and deletes
+  `cloud_firestore_dart/sqlite3-flush-probe-<n>` (see the next section).
+
+### The `sqlite3` version
+
+Two rules, both checked when the cache opens (`cloud_firestore_dart_sqlite` 0.1.2 and later), both
+failing with a `SqliteWebSetupException` whose message says what to change:
+
+- **`sqlite3.wasm` must be the build of the exact `sqlite3` version in your `pubspec.lock`.** A
+  2.x file with a 3.x package, or the reverse, cannot be loaded (`wasmVersionMismatch`); a missing
+  file, or the page a server sends instead of it, is `wasmMissing`. Pin `sqlite3` in your
+  `pubspec.yaml` so that `pub upgrade` does not move it away from the file you serve.
+- **Not `sqlite3` 3.4.0 to 3.5.2 with the IndexedDB storage** (`unsafeSqlite3`): their IndexedDB
+  file system can lose a write the cache acknowledged when the tab closes a moment later. A
+  Flutter app on Flutter 3.44 resolves 3.5.2 (Flutter pins `meta` 1.18, `sqlite3` 3.6.0 needs
+  1.19): pin `sqlite3: 3.3.4` (or `^2.7.3`) there, `^3.6.0` on an SDK that allows `meta` 1.19, or
+  use OPFS. `sqliteOpener(acceptIndexedDbWriteLoss: true)` opens anyway.
+
+`openWithMemoryFallback` does not hide either error behind a memory cache. The
+[README of `cloud_firestore_dart_sqlite`](../../cloud_firestore/cloud_firestore_dart_sqlite/README.md#which-sqlite3)
+has the table of versions.
 
 [Offline persistence on the web](offline_persistence.md#on-the-web) has the crash safety, and
-[Platforms](platforms.md#the-web-experimental) the full measurements.
+[Platforms](platforms.md#the-web-supported-in-chrome) the full measurements.
 
 ## One tab at a time
 
@@ -209,6 +288,33 @@ released when a page goes away, a reloaded page knows the page before it is gone
 writes it left pending at once. [Several clients on one cache](multiple_clients.md) has the
 details.
 
+## Several clients in one page
+
+A page can hold several whole clients, each with its own `FirebaseApp`, user and
+`FirebaseFirestore`: a support tool that shows two accounts, a test page, a demo of what two users
+see. They share nothing but the page.
+
+- **Name each app after the client, not after the user.** App names are global in the page: two
+  clients of the same user named after the user collide (`FirebaseApp name ... already exists`).
+  The app name also names the client's cache database, so two clients with different names never
+  compete for one cache.
+- Each app has its own token provider (`FirebaseUserAuth.forApp(app)` stores its session under the
+  app name), and each client refreshes its own token.
+- Against the emulator, which speaks HTTP/1.1, every client holds up to two long requests:
+  Chrome's six connections per host are shared by all of them (see below).
+
+```dart
+import 'package:firebase_auth_providers_dart/firebase_auth_providers_dart.dart';
+
+// One client of the page: `client` names its app ('client-left', 'client-right').
+Future<FirebaseFirestore> startClient(String client, String email) async {
+  final FirebaseApp clientApp = FirebaseApp.withOptions(app.options, name: client);
+  final FirebaseUserAuth auth = await FirebaseUserAuth.forApp(clientApp);
+  await auth.signInWithEmailAndPassword(email: email, password: password);
+  return FirebaseFirestore.instanceFor(app: clientApp);
+}
+```
+
 ## CORS and the emulator
 
 Your page and the backend are on different origins (for example `http://localhost:8000` and
@@ -216,6 +322,12 @@ Your page and the backend are on different origins (for example `http://localhos
 for any origin (`Access-Control-Allow-Origin` echoes the page's origin), so nothing needs to be
 set up. Against production the requests go to `firestore.googleapis.com` from your page's
 origin, as those of the JS SDK do; this was not tried with this client.
+
+**Your own endpoints need CORS too.** Google's endpoints and the emulators answer cross-origin
+requests; a server of your own that the page calls next to Firestore (a function, an API, a
+proxy) must answer them as well, for the page's origin, the `OPTIONS` preflight included.
+Otherwise the browser blocks the request before your code sees a response. In development a
+loopback proxy that adds the headers for the page's origin is enough.
 
 Connect to the emulator with `withEmulator`, which also turns TLS off:
 
@@ -269,17 +381,21 @@ classes with the same names; import one of them with a prefix if a file needs bo
 | --- | --- | --- |
 | Integers | 53 bits: larger integers lose precision | 64 bits |
 | Browsers | Every current browser | Needs WebAssembly garbage collection (recent Chrome, Firefox, Safari) |
-| Tested | Chrome, 53 browser tests pass, 1 skipped (64-bit integers) | Chrome, 53 pass, 1 skipped (a crash test of the IndexedDB cache) |
+| Tested | Chrome, 56 browser tests pass, 1 skipped (64-bit integers) | Chrome, 56 pass, 1 skipped (a crash test of the IndexedDB cache) |
 | Example app, main page | 924 KB (273 KB gzipped) | 915 KB `.wasm` + 29 KB `.mjs` (342 KB + 6 KB gzipped) |
 | Example app, Lite page | 398 KB (122 KB gzipped) | 341 KB `.wasm` + 16 KB `.mjs` (136 KB + 4 KB gzipped) |
 
-Prefer dart2wasm when your data has large integers. Two things to know:
+Prefer dart2wasm when your data has large integers. Three things to know:
 
+- Under dart2js shifts are 32-bit: `1 << 32` is `0`, so `Random.secure().nextInt(1 << 32)`, valid
+  on the VM, throws a `RangeError` (`max must be in range 0 < max ≤ 2^32, was 0`). Write
+  `0x100000000`, or ask for a smaller range. Code shared with the VM is worth a search for such
+  expressions.
 - `dart compile wasm` writes a `.wasm` and an `.mjs` file, and your page has to load them; see
   `web/bootstrap.js` of the example. The OPFS worker stays JavaScript.
 - The `sqlite3` package calls its dart2wasm support experimental. The persistent caches pass
   the browser tests with both compilers, and the opener works around a slowness of
-  `sqlite3` 2.9.4 under dart2wasm, fixed in `sqlite3` 3.8 (see [Platforms](platforms.md#the-web-experimental)); the
+  `sqlite3` 2.9.4 under dart2wasm, fixed in `sqlite3` 3.8 (see [Platforms](platforms.md#the-web-supported-in-chrome)); the
   crash test of the IndexedDB storage runs with dart2js only.
 
 ## Known gaps

@@ -26,7 +26,8 @@ tool/stop_auth_emulators.sh                 # from the repository root
 | `email_password.dart` | Sign-up, sign-out and sign-in with an email and a password, and the error codes a sign-in form handles (`wrong-password` or `invalid-credential`, `email-already-in-use`, `weak-password`, `invalid-email`). |
 | `account_flows.dart` | Email verification, `updateProfile`, a password reset with its action code, reauthentication and account deletion. Reads the action codes from the emulator in place of an inbox. |
 | `custom_token.dart` | `signInWithCustomToken` and the custom claims in the ID token. The emulator accepts an unsigned token; a real one comes from your server. |
-| `persistent_session.dart` | A file-backed `AuthStorage` (owner-only file on macOS and Linux): a second run finds the user signed in. |
+| `persistent_session.dart` | `FileAuthStorage` (an owner-only file on macOS and Linux): a second run finds the user signed in. |
+| `linking_and_email_link.dart` | `authStateChanges()`, an anonymous user that links a Google credential (a fake ID token the emulator accepts), email link sign-in (`sendSignInLinkToEmail`, `isSignInWithEmailLink`, `signInWithEmailLink`) and `unlink`. |
 | `firestore_wiring.dart` | `FirebaseUserAuth.forApp` before `FirebaseFirestore.instanceFor`: a write refused while signed out, accepted for the signed-in user, and a read of another user's document refused. |
 
 ## With a real project

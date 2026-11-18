@@ -14,5 +14,12 @@ void main() {
     OAuthTokenProvider.serviceAccount,
     ServiceAccountKey.fromJson,
     FirebaseUserAuth.emulatorOrigin,
+    WebAuthStorage.session,
+    WebAuthStorage.local,
+    FileAuthStorage.new,
+    GoogleAuthProvider.credential,
+    ActionCodeURL.parseLink,
+    auth.useDeviceLanguage,
+    auth.validatePassword,
   ]);
 }

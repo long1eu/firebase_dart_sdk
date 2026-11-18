@@ -291,9 +291,10 @@ Right: the name in this client, or "not available".
 | FF `persistentCacheIndexManager()` | `persistentCacheIndexManager` (a getter, null with a memory cache) |
 | FF `FirebaseFirestore.setLoggingEnabled(true)`; JS `setLogLevel('debug')` | `FirebaseFirestore.setLogLevel(LogLevel.debug)` |
 | JS `clearIndexedDbPersistence(db)`, `terminate(db)` | `firestore.terminate()`, then `firestore.clearPersistence()` |
-| FF `FirebaseAuth.instance.signInWithEmailAndPassword(email: ..., password: ...)` | `final auth = await FirebaseUserAuth.forApp(app);` then `auth.signInWithEmailAndPassword(email, password)` (positional) |
-| FF `FirebaseAuth.instance.currentUser?.uid`, `authStateChanges()` | `auth.uid`, `auth.currentUser`, `auth.userChanges()` |
-| Google, Apple or other federated sign-in, phone, email link, multi-factor, `signInWithPopup` | not available |
+| FF `FirebaseAuth.instance.signInWithEmailAndPassword(email: ..., password: ...)` | `final auth = await FirebaseUserAuth.forApp(app);` then `auth.signInWithEmailAndPassword(email: ..., password: ...)` |
+| FF `FirebaseAuth.instance.currentUser?.uid`, `authStateChanges()`, `idTokenChanges()`, `userChanges()` | `auth.uid`, `auth.currentUser`, `auth.authStateChanges()`, `auth.idTokenChanges()`, `auth.userChanges()` |
+| FF `signInWithCredential(GoogleAuthProvider.credential(idToken: ...))` and the other providers, `linkWithCredential`, `unlink`, email link sign-in | the same names on `FirebaseUserAuth` (the app gets the provider's token itself) |
+| `signInWithPopup`, `signInWithProvider`, phone, multi-factor | not available |
 | FF `webExperimentalForceLongPolling` | `Settings(webExperimentalForceLongPolling: true)` |
 | FF `ignoreUndefinedProperties`, JS `Temporal` conversion | not available (not applicable to Dart) |
 | Storage, Messaging, Realtime Database, Analytics, Remote Config | not available in these packages |
@@ -332,8 +333,7 @@ Names that are the same here: `collection`, `doc`, `collectionGroup`, `add`, `de
 7. **What needs `dart:io`.** `package:firebase_auth_providers_dart/adc.dart` and any
    `Platform.environment` you read. `cloud_firestore_dart_sqlite` compiles everywhere. The main
    libraries of the three packages also compile for the web.
-8. **Experimental or preview.** The web (tested in Chrome against the emulator only), Firestore
-   Lite (`lite.dart`) and Pipelines (`pipelines.dart`, Enterprise edition only). These, and
+8. **Experimental or preview.** Firestore Lite (`lite.dart`) and Pipelines (`pipelines.dart`, Enterprise edition only). These, and
    `package:firebase_app_dart/internal.dart`, are outside any compatibility promise.
 9. **Errors.** A failed operation reports a `FirestoreException`; compare
    `FirestoreErrorCode` values through `e.errorCode` (`e.code` is FlutterFire's string, such as

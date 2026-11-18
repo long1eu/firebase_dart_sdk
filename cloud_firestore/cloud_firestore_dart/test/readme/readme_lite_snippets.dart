@@ -58,8 +58,8 @@ Future<void> serverGuideLine340() async {
   }
 }
 
-// ../../docs/guides/web.md:253
-Future<void> webGuideLine253() async {
+// ../../docs/guides/web.md:365
+Future<void> webGuideLine365() async {
   final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(app: app);
   final QuerySnapshot<Map<String, Object?>> notes =
       await firestore.collection('notes').limit(20).get();
