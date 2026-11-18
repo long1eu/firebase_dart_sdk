@@ -3,8 +3,8 @@
 // no sync engine, local store, SQLite layer or WebChannel. Compare its size
 // with the page of the main library (README.md).
 //
-// EXPERIMENTAL: the web support and the Lite API of cloud_firestore_dart are
-// experimental.
+// The web support of cloud_firestore_dart is supported in Chrome; the Lite API
+// is experimental.
 
 import 'dart:async';
 

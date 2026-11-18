@@ -4,8 +4,8 @@ This page shows you how to use `cloud_firestore_dart` in a Dart web app or a Flu
 connect, choose a cache, run several clients in one page, keep the bundle small, and pick a
 compiler. It also lists what does not work in a browser yet.
 
-**Web support is experimental.** It was tested in Chrome only, against the Firestore emulator
-only, and it may change in any release. [`examples/web_app/`](../../examples/web_app/) is a
+**Web is supported in Chrome.** It was tested in Chrome only, against the Firestore emulator
+only; Firefox, Safari and Edge are untested. [`examples/web_app/`](../../examples/web_app/) is a
 complete app you can build and open in a browser, and
 [`examples/flutter_web_two_users/`](../../examples/flutter_web_two_users/) a Flutter web page
 with two signed-in users side by side.
@@ -260,7 +260,7 @@ failing with a `SqliteWebSetupException` whose message says what to change:
 has the table of versions.
 
 [Offline persistence on the web](offline_persistence.md#on-the-web) has the crash safety, and
-[Platforms](platforms.md#the-web-experimental) the full measurements.
+[Platforms](platforms.md#the-web-supported-in-chrome) the full measurements.
 
 ## One tab at a time
 
@@ -395,7 +395,7 @@ Prefer dart2wasm when your data has large integers. Three things to know:
   `web/bootstrap.js` of the example. The OPFS worker stays JavaScript.
 - The `sqlite3` package calls its dart2wasm support experimental. The persistent caches pass
   the browser tests with both compilers, and the opener works around a slowness of
-  `sqlite3` 2.9.4 under dart2wasm, fixed in `sqlite3` 3.8 (see [Platforms](platforms.md#the-web-experimental)); the
+  `sqlite3` 2.9.4 under dart2wasm, fixed in `sqlite3` 3.8 (see [Platforms](platforms.md#the-web-supported-in-chrome)); the
   crash test of the IndexedDB storage runs with dart2js only.
 
 ## Known gaps

@@ -255,7 +255,7 @@ on the Dart VM, but no Flutter app ran a listener in a background isolate.
   is 196 KB gzipped in total, with Lite 128 KB (`docs/guides/web.md`, dart2js `-O2`). That is roughly the same
   as app + Firestore from the CDN, and bigger than JS Lite. Inside a Flutter web app (several MB of engine)
   the difference is noise. **Not a differentiator.**
-- Maturity: the JS SDK is the reference; this library's web support is experimental, Chrome only, one tab per
+- Maturity: the JS SDK is the reference; this library's web is supported in Chrome only (other browsers untested), one tab per
   persistent cache (`docs/guides/platforms.md`).
 - One real niche: Dart web apps without Flutter (Jaspr and similar) cannot use the FlutterFire web packages,
   because the platform interfaces still declare the Flutter SDK
@@ -295,8 +295,8 @@ on the Dart VM, but no Flutter app ran a listener in a background isolate.
 | Listener on a Flutter background isolate | not supported, not planned | runs in any isolate | this library (not tried in Flutter yet) |
 | Testing Firestore code without a device | fake (`fake_cloud_firestore`) or device tests | real client under `dart test` with the emulator; `cloud_firestore` code through `cloud_firestore_dart_platform` | this library, with no outside user of the second path yet |
 | Flutter app on Android or iOS | `cloud_firestore`, Google-supported, native SDKs | works as plain Dart, never run on a device | official |
-| Flutter web | JS SDK via `cloud_firestore_web`, wasm-ready | experimental, Chrome only | official |
-| Dart web without Flutter (Jaspr) | none packaged; hand-written JS interop | experimental | this library, weakly |
+| Flutter web | JS SDK via `cloud_firestore_web`, wasm-ready | supported in Chrome only | official |
+| Dart web without Flutter (Jaspr) | none packaged; hand-written JS interop | supported in Chrome | this library, weakly |
 | iOS build time | precompiled via SwiftPM since Flutter 3.44 | not measured | no claim possible |
 
 ## When not to use it

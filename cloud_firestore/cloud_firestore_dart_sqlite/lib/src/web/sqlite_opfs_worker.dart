@@ -1,7 +1,7 @@
 // The dedicated worker that keeps the database of the OPFS storage of
 // sqlite_database_web.dart (`sqliteWebOpener(opfsWorker: ...)`).
 //
-// EXPERIMENTAL. Moved from example/sqlite_opfs_worker.dart of
+// Supported in Chrome; other browsers are untested. Moved from example/sqlite_opfs_worker.dart of
 // cloud_firestore_dart 0.1.1. The app compiles it to JavaScript with
 //
 //     dart run cloud_firestore_dart_sqlite:setup_web web

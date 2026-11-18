@@ -39,7 +39,8 @@ export 'src/sqlite_web_setup_exception.dart'
 ///
 /// **A browser** (`dart:js_interop`): SQLite compiled to WebAssembly, with the
 /// database in IndexedDB, or in the origin private file system (OPFS) when
-/// [opfsWorker] is given and the browser supports it. Experimental.
+/// [opfsWorker] is given and the browser supports it. Supported in Chrome; other
+/// browsers are untested.
 ///
 /// * [sqlite3Wasm] is the URL of the `sqlite3.wasm` build of the `sqlite3`
 ///   package version the app resolves (default: `sqlite3.wasm` next to the
