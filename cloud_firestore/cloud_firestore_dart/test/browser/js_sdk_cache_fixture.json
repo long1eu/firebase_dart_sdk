@@ -1,0 +1,1121 @@
+{
+ "name": "firestore/[DEFAULT]/demo-idb/main",
+ "version": 18,
+ "stores": [
+  {
+   "name": "bundles",
+   "keyPath": "bundleId",
+   "autoIncrement": false,
+   "indexes": [],
+   "records": [
+    {
+     "key": "b1",
+     "value": {
+      "bundleId": "b1",
+      "createTime": {
+       "seconds": 1700000000,
+       "nanoseconds": 123456000
+      },
+      "version": 1
+     }
+    }
+   ]
+  },
+  {
+   "name": "clientMetadata",
+   "keyPath": "clientId",
+   "autoIncrement": false,
+   "indexes": [],
+   "records": []
+  },
+  {
+   "name": "collectionParents",
+   "keyPath": [
+    "collectionId",
+    "parent"
+   ],
+   "autoIncrement": false,
+   "indexes": [],
+   "records": [
+    {
+     "key": [
+      "items",
+      "\u0001\u0001"
+     ],
+     "value": {
+      "collectionId": "items",
+      "parent": "\u0001\u0001"
+     }
+    }
+   ]
+  },
+  {
+   "name": "documentMutations",
+   "keyPath": null,
+   "autoIncrement": false,
+   "indexes": [],
+   "records": [
+    {
+     "key": [
+      "",
+      "items\u0001\u0001b1\u0001\u0001",
+      5
+     ],
+     "value": {}
+    },
+    {
+     "key": [
+      "",
+      "items\u0001\u0001b2\u0001\u0001",
+      5
+     ],
+     "value": {}
+    },
+    {
+     "key": [
+      "",
+      "items\u0001\u0001cached1\u0001\u0001",
+      5
+     ],
+     "value": {}
+    },
+    {
+     "key": [
+      "",
+      "items\u0001\u0001w1\u0001\u0001",
+      1
+     ],
+     "value": {}
+    },
+    {
+     "key": [
+      "",
+      "items\u0001\u0001w2\u0001\u0001",
+      2
+     ],
+     "value": {}
+    },
+    {
+     "key": [
+      "",
+      "items\u0001\u0001w2\u0001\u0001",
+      3
+     ],
+     "value": {}
+    },
+    {
+     "key": [
+      "",
+      "items\u0001\u0001w3\u0001\u0001",
+      4
+     ],
+     "value": {}
+    },
+    {
+     "key": [
+      "user2",
+      "items\u0001\u0001w1\u0001\u0001",
+      6
+     ],
+     "value": {}
+    }
+   ]
+  },
+  {
+   "name": "documentOverlays",
+   "keyPath": [
+    "userId",
+    "collectionPath",
+    "documentId"
+   ],
+   "autoIncrement": false,
+   "indexes": [
+    {
+     "name": "collectionGroupOverlayIndex",
+     "keyPath": [
+      "userId",
+      "collectionGroup",
+      "largestBatchId"
+     ],
+     "unique": false,
+     "multiEntry": false
+    },
+    {
+     "name": "collectionPathOverlayIndex",
+     "keyPath": [
+      "userId",
+      "collectionPath",
+      "largestBatchId"
+     ],
+     "unique": false,
+     "multiEntry": false
+    }
+   ],
+   "records": [
+    {
+     "key": [
+      "",
+      "items\u0001\u0001",
+      "b1"
+     ],
+     "value": {
+      "userId": "",
+      "collectionPath": "items\u0001\u0001",
+      "documentId": "b1",
+      "collectionGroup": "items",
+      "largestBatchId": 5,
+      "overlayMutation": {
+       "update": {
+        "name": "projects/demo-idb/databases/(default)/documents/items/b1",
+        "fields": {
+         "inBatch": {
+          "booleanValue": true
+         }
+        }
+       }
+      }
+     }
+    },
+    {
+     "key": [
+      "",
+      "items\u0001\u0001",
+      "b2"
+     ],
+     "value": {
+      "userId": "",
+      "collectionPath": "items\u0001\u0001",
+      "documentId": "b2",
+      "collectionGroup": "items",
+      "largestBatchId": 5,
+      "overlayMutation": {
+       "delete": "projects/demo-idb/databases/(default)/documents/items/b2"
+      }
+     }
+    },
+    {
+     "key": [
+      "",
+      "items\u0001\u0001",
+      "cached1"
+     ],
+     "value": {
+      "userId": "",
+      "collectionPath": "items\u0001\u0001",
+      "documentId": "cached1",
+      "collectionGroup": "items",
+      "largestBatchId": 5,
+      "overlayMutation": {
+       "update": {
+        "name": "projects/demo-idb/databases/(default)/documents/items/cached1",
+        "fields": {
+         "title": {
+          "stringValue": "updated offline"
+         }
+        }
+       },
+       "updateMask": {
+        "fieldPaths": [
+         "title"
+        ]
+       }
+      }
+     }
+    },
+    {
+     "key": [
+      "",
+      "items\u0001\u0001",
+      "w1"
+     ],
+     "value": {
+      "userId": "",
+      "collectionPath": "items\u0001\u0001",
+      "documentId": "w1",
+      "collectionGroup": "items",
+      "largestBatchId": 1,
+      "overlayMutation": {
+       "update": {
+        "name": "projects/demo-idb/databases/(default)/documents/items/w1",
+        "fields": {
+         "title": {
+          "stringValue": "written offline"
+         },
+         "n": {
+          "integerValue": "1"
+         },
+         "d": {
+          "doubleValue": 2.5
+         },
+         "ts": {
+          "timestampValue": "2023-11-14T22:13:20.123000000Z"
+         },
+         "b": {
+          "bytesValue": "AQID"
+         },
+         "g": {
+          "geoPointValue": {
+           "latitude": 10,
+           "longitude": 20
+          }
+         },
+         "r": {
+          "referenceValue": "projects/demo-idb/databases/(default)/documents/items/other"
+         },
+         "m": {
+          "mapValue": {
+           "fields": {
+            "x": {
+             "booleanValue": true
+            },
+            "y": {
+             "nullValue": "NULL_VALUE"
+            }
+           }
+          }
+         },
+         "a": {
+          "arrayValue": {
+           "values": [
+            {
+             "integerValue": "1"
+            },
+            {
+             "stringValue": "two"
+            }
+           ]
+          }
+         },
+         "st": {
+          "mapValue": {
+           "fields": {
+            "__type__": {
+             "stringValue": "server_timestamp"
+            },
+            "__local_write_time__": {
+             "timestampValue": {
+              "seconds": 1795029664,
+              "nanos": 379000000
+             }
+            }
+           }
+          }
+         }
+        }
+       }
+      }
+     }
+    },
+    {
+     "key": [
+      "",
+      "items\u0001\u0001",
+      "w2"
+     ],
+     "value": {
+      "userId": "",
+      "collectionPath": "items\u0001\u0001",
+      "documentId": "w2",
+      "collectionGroup": "items",
+      "largestBatchId": 3,
+      "overlayMutation": {
+       "update": {
+        "name": "projects/demo-idb/databases/(default)/documents/items/w2",
+        "fields": {
+         "count": {
+          "integerValue": "6"
+         },
+         "nested": {
+          "mapValue": {
+           "fields": {
+            "field": {
+             "stringValue": "v"
+            }
+           }
+          }
+         },
+         "tags": {
+          "arrayValue": {
+           "values": [
+            {
+             "stringValue": "a"
+            },
+            {
+             "stringValue": "b"
+            }
+           ]
+          }
+         }
+        }
+       }
+      }
+     }
+    },
+    {
+     "key": [
+      "",
+      "items\u0001\u0001",
+      "w3"
+     ],
+     "value": {
+      "userId": "",
+      "collectionPath": "items\u0001\u0001",
+      "documentId": "w3",
+      "collectionGroup": "items",
+      "largestBatchId": 4,
+      "overlayMutation": {
+       "delete": "projects/demo-idb/databases/(default)/documents/items/w3"
+      }
+     }
+    }
+   ]
+  },
+  {
+   "name": "globals",
+   "keyPath": "name",
+   "autoIncrement": false,
+   "indexes": [],
+   "records": []
+  },
+  {
+   "name": "indexConfiguration",
+   "keyPath": "indexId",
+   "autoIncrement": true,
+   "indexes": [
+    {
+     "name": "collectionGroupIndex",
+     "keyPath": "collectionGroup",
+     "unique": false,
+     "multiEntry": false
+    }
+   ],
+   "records": []
+  },
+  {
+   "name": "indexEntries",
+   "keyPath": [
+    "indexId",
+    "uid",
+    "arrayValue",
+    "directionalValue",
+    "orderedDocumentKey",
+    "documentKey"
+   ],
+   "autoIncrement": false,
+   "indexes": [
+    {
+     "name": "documentKeyIndex",
+     "keyPath": [
+      "indexId",
+      "uid",
+      "orderedDocumentKey"
+     ],
+     "unique": false,
+     "multiEntry": false
+    }
+   ],
+   "records": []
+  },
+  {
+   "name": "indexState",
+   "keyPath": [
+    "indexId",
+    "uid"
+   ],
+   "autoIncrement": false,
+   "indexes": [
+    {
+     "name": "sequenceNumberIndex",
+     "keyPath": [
+      "uid",
+      "sequenceNumber"
+     ],
+     "unique": false,
+     "multiEntry": false
+    }
+   ],
+   "records": []
+  },
+  {
+   "name": "mutationQueues",
+   "keyPath": "userId",
+   "autoIncrement": false,
+   "indexes": [],
+   "records": [
+    {
+     "key": "user2",
+     "value": {
+      "userId": "user2",
+      "lastAcknowledgedBatchId": -1,
+      "lastStreamToken": ""
+     }
+    }
+   ]
+  },
+  {
+   "name": "mutations",
+   "keyPath": "batchId",
+   "autoIncrement": true,
+   "indexes": [
+    {
+     "name": "userMutationsIndex",
+     "keyPath": [
+      "userId",
+      "batchId"
+     ],
+     "unique": true,
+     "multiEntry": false
+    }
+   ],
+   "records": [
+    {
+     "key": 1,
+     "value": {
+      "userId": "",
+      "batchId": 1,
+      "localWriteTimeMs": 1795029664379,
+      "baseMutations": [],
+      "mutations": [
+       {
+        "update": {
+         "name": "projects/demo-idb/databases/(default)/documents/items/w1",
+         "fields": {
+          "title": {
+           "stringValue": "written offline"
+          },
+          "n": {
+           "integerValue": "1"
+          },
+          "d": {
+           "doubleValue": 2.5
+          },
+          "ts": {
+           "timestampValue": "2023-11-14T22:13:20.123000000Z"
+          },
+          "b": {
+           "bytesValue": "AQID"
+          },
+          "g": {
+           "geoPointValue": {
+            "latitude": 10,
+            "longitude": 20
+           }
+          },
+          "r": {
+           "referenceValue": "projects/demo-idb/databases/(default)/documents/items/other"
+          },
+          "m": {
+           "mapValue": {
+            "fields": {
+             "x": {
+              "booleanValue": true
+             },
+             "y": {
+              "nullValue": "NULL_VALUE"
+             }
+            }
+           }
+          },
+          "a": {
+           "arrayValue": {
+            "values": [
+             {
+              "integerValue": "1"
+             },
+             {
+              "stringValue": "two"
+             }
+            ]
+           }
+          }
+         }
+        },
+        "updateTransforms": [
+         {
+          "fieldPath": "st",
+          "setToServerValue": "REQUEST_TIME"
+         }
+        ]
+       }
+      ]
+     }
+    },
+    {
+     "key": 2,
+     "value": {
+      "userId": "",
+      "batchId": 2,
+      "localWriteTimeMs": 1795029664384,
+      "baseMutations": [],
+      "mutations": [
+       {
+        "update": {
+         "name": "projects/demo-idb/databases/(default)/documents/items/w2",
+         "fields": {
+          "count": {
+           "integerValue": "1"
+          }
+         }
+        }
+       }
+      ]
+     }
+    },
+    {
+     "key": 3,
+     "value": {
+      "userId": "",
+      "batchId": 3,
+      "localWriteTimeMs": 1795029664388,
+      "baseMutations": [
+       {
+        "update": {
+         "name": "projects/demo-idb/databases/(default)/documents/items/w2",
+         "fields": {
+          "count": {
+           "integerValue": "1"
+          }
+         }
+        },
+        "updateMask": {
+         "fieldPaths": [
+          "count"
+         ]
+        },
+        "currentDocument": {
+         "exists": true
+        }
+       }
+      ],
+      "mutations": [
+       {
+        "update": {
+         "name": "projects/demo-idb/databases/(default)/documents/items/w2",
+         "fields": {
+          "nested": {
+           "mapValue": {
+            "fields": {
+             "field": {
+              "stringValue": "v"
+             }
+            }
+           }
+          }
+         }
+        },
+        "updateMask": {
+         "fieldPaths": [
+          "nested.field"
+         ]
+        },
+        "updateTransforms": [
+         {
+          "fieldPath": "count",
+          "increment": {
+           "integerValue": "5"
+          }
+         },
+         {
+          "fieldPath": "tags",
+          "appendMissingElements": {
+           "values": [
+            {
+             "stringValue": "a"
+            },
+            {
+             "stringValue": "b"
+            }
+           ]
+          }
+         }
+        ],
+        "currentDocument": {
+         "exists": true
+        }
+       }
+      ]
+     }
+    },
+    {
+     "key": 4,
+     "value": {
+      "userId": "",
+      "batchId": 4,
+      "localWriteTimeMs": 1795029664391,
+      "baseMutations": [],
+      "mutations": [
+       {
+        "delete": "projects/demo-idb/databases/(default)/documents/items/w3"
+       }
+      ]
+     }
+    },
+    {
+     "key": 5,
+     "value": {
+      "userId": "",
+      "batchId": 5,
+      "localWriteTimeMs": 1795029664393,
+      "baseMutations": [],
+      "mutations": [
+       {
+        "update": {
+         "name": "projects/demo-idb/databases/(default)/documents/items/b1",
+         "fields": {
+          "inBatch": {
+           "booleanValue": true
+          }
+         }
+        }
+       },
+       {
+        "update": {
+         "name": "projects/demo-idb/databases/(default)/documents/items/cached1",
+         "fields": {
+          "title": {
+           "stringValue": "updated offline"
+          }
+         }
+        },
+        "updateMask": {
+         "fieldPaths": [
+          "title"
+         ]
+        },
+        "currentDocument": {
+         "exists": true
+        }
+       },
+       {
+        "delete": "projects/demo-idb/databases/(default)/documents/items/b2"
+       }
+      ]
+     }
+    },
+    {
+     "key": 6,
+     "value": {
+      "userId": "user2",
+      "localWriteTimeMs": 1795029664380,
+      "baseMutations": [],
+      "mutations": [
+       {
+        "update": {
+         "name": "projects/demo-idb/databases/(default)/documents/items/w1",
+         "fields": {
+          "title": {
+           "stringValue": "written offline"
+          },
+          "n": {
+           "integerValue": "1"
+          },
+          "d": {
+           "doubleValue": 2.5
+          },
+          "ts": {
+           "timestampValue": "2023-11-14T22:13:20.123000000Z"
+          },
+          "b": {
+           "bytesValue": "AQID"
+          },
+          "g": {
+           "geoPointValue": {
+            "latitude": 10,
+            "longitude": 20
+           }
+          },
+          "r": {
+           "referenceValue": "projects/demo-idb/databases/(default)/documents/items/other"
+          },
+          "m": {
+           "mapValue": {
+            "fields": {
+             "x": {
+              "booleanValue": true
+             },
+             "y": {
+              "nullValue": "NULL_VALUE"
+             }
+            }
+           }
+          },
+          "a": {
+           "arrayValue": {
+            "values": [
+             {
+              "integerValue": "1"
+             },
+             {
+              "stringValue": "two"
+             }
+            ]
+           }
+          }
+         }
+        },
+        "updateTransforms": [
+         {
+          "fieldPath": "st",
+          "setToServerValue": "REQUEST_TIME"
+         }
+        ]
+       }
+      ],
+      "batchId": 6
+     }
+    }
+   ]
+  },
+  {
+   "name": "namedQueries",
+   "keyPath": "name",
+   "autoIncrement": false,
+   "indexes": [],
+   "records": [
+    {
+     "key": "q1",
+     "value": {
+      "name": "q1",
+      "readTime": {
+       "seconds": 1700000000,
+       "nanoseconds": 123456000
+      },
+      "bundledQuery": {
+       "parent": "projects/demo-idb/databases/(default)/documents",
+       "structuredQuery": {
+        "from": [
+         {
+          "collectionId": "items"
+         }
+        ]
+       }
+      }
+     }
+    }
+   ]
+  },
+  {
+   "name": "owner",
+   "keyPath": null,
+   "autoIncrement": false,
+   "indexes": [],
+   "records": []
+  },
+  {
+   "name": "remoteDocumentGlobal",
+   "keyPath": null,
+   "autoIncrement": false,
+   "indexes": [],
+   "records": [
+    {
+     "key": "remoteDocumentGlobalKey",
+     "value": {
+      "byteSize": 727
+     }
+    }
+   ]
+  },
+  {
+   "name": "remoteDocumentsV14",
+   "keyPath": [
+    "prefixPath",
+    "collectionGroup",
+    "readTime",
+    "documentId"
+   ],
+   "autoIncrement": false,
+   "indexes": [
+    {
+     "name": "collectionGroupIndex",
+     "keyPath": [
+      "collectionGroup",
+      "readTime",
+      "prefixPath",
+      "documentId"
+     ],
+     "unique": false,
+     "multiEntry": false
+    },
+    {
+     "name": "documentKeyIndex",
+     "keyPath": [
+      "prefixPath",
+      "collectionGroup",
+      "documentId"
+     ],
+     "unique": false,
+     "multiEntry": false
+    }
+   ],
+   "records": [
+    {
+     "key": [
+      [],
+      "items",
+      [
+       1700000000,
+       123456000
+      ],
+      "cached1"
+     ],
+     "value": {
+      "prefixPath": [],
+      "collectionGroup": "items",
+      "documentId": "cached1",
+      "readTime": [
+       1700000000,
+       123456000
+      ],
+      "hasCommittedMutations": false,
+      "document": {
+       "name": "projects/demo-idb/databases/(default)/documents/items/cached1",
+       "fields": {
+        "title": {
+         "stringValue": "from bundle"
+        },
+        "n": {
+         "integerValue": "42"
+        },
+        "d": {
+         "doubleValue": 1.5
+        },
+        "ts": {
+         "timestampValue": "2023-11-14T22:13:20.123456Z"
+        },
+        "b": {
+         "bytesValue": "AAEC"
+        },
+        "g": {
+         "geoPointValue": {
+          "latitude": 1.5,
+          "longitude": -2.5
+         }
+        },
+        "r": {
+         "referenceValue": "projects/demo-idb/databases/(default)/documents/items/other"
+        },
+        "m": {
+         "mapValue": {
+          "fields": {
+           "x": {
+            "booleanValue": true
+           },
+           "y": {
+            "nullValue": "NULL_VALUE"
+           }
+          }
+         }
+        },
+        "a": {
+         "arrayValue": {
+          "values": [
+           {
+            "stringValue": "p"
+           },
+           {
+            "integerValue": "7"
+           }
+          ]
+         }
+        }
+       },
+       "updateTime": "2023-11-14T22:13:20.123456000Z",
+       "createTime": "2023-11-14T22:13:20.123456000Z"
+      }
+     }
+    },
+    {
+     "key": [
+      [],
+      "items",
+      [
+       1700000000,
+       123456000
+      ],
+      "gone"
+     ],
+     "value": {
+      "prefixPath": [],
+      "collectionGroup": "items",
+      "documentId": "gone",
+      "readTime": [
+       1700000000,
+       123456000
+      ],
+      "hasCommittedMutations": false,
+      "noDocument": {
+       "path": [
+        "items",
+        "gone"
+       ],
+       "readTime": {
+        "seconds": 1700000000,
+        "nanoseconds": 123456000
+       }
+      }
+     }
+    }
+   ]
+  },
+  {
+   "name": "targetDocuments",
+   "keyPath": [
+    "targetId",
+    "path"
+   ],
+   "autoIncrement": false,
+   "indexes": [
+    {
+     "name": "documentTargetsIndex",
+     "keyPath": [
+      "path",
+      "targetId"
+     ],
+     "unique": true,
+     "multiEntry": false
+    }
+   ],
+   "records": [
+    {
+     "key": [
+      0,
+      "items\u0001\u0001cached1\u0001\u0001"
+     ],
+     "value": {
+      "targetId": 0,
+      "path": "items\u0001\u0001cached1\u0001\u0001",
+      "sequenceNumber": 7
+     }
+    },
+    {
+     "key": [
+      2,
+      "items\u0001\u0001cached1\u0001\u0001"
+     ],
+     "value": {
+      "targetId": 2,
+      "path": "items\u0001\u0001cached1\u0001\u0001"
+     }
+    },
+    {
+     "key": [
+      4,
+      "items\u0001\u0001cached1\u0001\u0001"
+     ],
+     "value": {
+      "targetId": 4,
+      "path": "items\u0001\u0001cached1\u0001\u0001"
+     }
+    }
+   ]
+  },
+  {
+   "name": "targetGlobal",
+   "keyPath": null,
+   "autoIncrement": false,
+   "indexes": [],
+   "records": [
+    {
+     "key": "targetGlobalKey",
+     "value": {
+      "highestTargetId": 4,
+      "highestListenSequenceNumber": 6,
+      "lastRemoteSnapshotVersion": {
+       "seconds": 0,
+       "nanoseconds": 0
+      },
+      "targetCount": 2
+     }
+    }
+   ]
+  },
+  {
+   "name": "targets",
+   "keyPath": "targetId",
+   "autoIncrement": false,
+   "indexes": [
+    {
+     "name": "queryTargetsIndex",
+     "keyPath": [
+      "canonicalId",
+      "targetId"
+     ],
+     "unique": true,
+     "multiEntry": false
+    }
+   ],
+   "records": [
+    {
+     "key": 2,
+     "value": {
+      "targetId": 2,
+      "canonicalId": "__bundle__/docs/b1|f:|ob:__name__asc",
+      "readTime": {
+       "seconds": 0,
+       "nanoseconds": 0
+      },
+      "resumeToken": "",
+      "lastListenSequenceNumber": 4,
+      "lastLimboFreeSnapshotVersion": {
+       "seconds": 0,
+       "nanoseconds": 0
+      },
+      "query": {
+       "structuredQuery": {
+        "from": [
+         {
+          "collectionId": "b1"
+         }
+        ],
+        "orderBy": [
+         {
+          "field": {
+           "fieldPath": "__name__"
+          },
+          "direction": "ASCENDING"
+         }
+        ]
+       },
+       "parent": "projects/demo-idb/databases/(default)/documents/__bundle__/docs"
+      }
+     }
+    },
+    {
+     "key": 4,
+     "value": {
+      "targetId": 4,
+      "canonicalId": "items|f:|ob:__name__asc",
+      "readTime": {
+       "seconds": 1700000000,
+       "nanoseconds": 123456000
+      },
+      "resumeToken": "",
+      "lastListenSequenceNumber": 6,
+      "lastLimboFreeSnapshotVersion": {
+       "seconds": 0,
+       "nanoseconds": 0
+      },
+      "query": {
+       "structuredQuery": {
+        "from": [
+         {
+          "collectionId": "items"
+         }
+        ],
+        "orderBy": [
+         {
+          "field": {
+           "fieldPath": "__name__"
+          },
+          "direction": "ASCENDING"
+         }
+        ]
+       },
+       "parent": "projects/demo-idb/databases/(default)/documents"
+      }
+     }
+    }
+   ]
+  }
+ ]
+}

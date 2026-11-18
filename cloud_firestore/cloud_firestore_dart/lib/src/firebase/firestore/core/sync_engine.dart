@@ -469,6 +469,31 @@ class SyncEngine implements RemoteStoreCallback, SharedClientStateSyncer {
     }
   }
 
+  /// The user whose mutation queue the local store uses.
+  User get currentUser => _currentUser;
+
+  /// Tells the views about [changes] made to the cache without a write or a remote event (the documents and the writes
+  /// imported from the JS SDK's cache), and the write pipeline about [batchIds], batches added to the queue of the
+  /// current user that way. Nobody waits for these batches: they have no user callback.
+  ///
+  /// PORTING NOTE: not in the official SDKs.
+  Future<void> handleImportedChanges(
+    ImmutableSortedMap<DocumentKey, MaybeDocument> changes,
+    List<int> batchIds,
+  ) async {
+    _assertCallback('handleImportedChanges');
+    for (final int batchId in batchIds) {
+      _sharedClientState.addPendingMutation(batchId);
+    }
+    if (batchIds.isNotEmpty) {
+      onPendingWritesChanged?.call();
+    }
+    await _emitNewSnapsAndNotifyLocalStore(changes, /*remoteEvent:*/ null);
+    if (batchIds.isNotEmpty) {
+      await _remoteStore.fillWritePipeline();
+    }
+  }
+
   void _addUserCallback(int batchId, Completer<void> userTask) {
     Map<int, Completer<void>>? userTasks = _mutationUserCallbacks[_currentUser];
     if (userTasks == null) {

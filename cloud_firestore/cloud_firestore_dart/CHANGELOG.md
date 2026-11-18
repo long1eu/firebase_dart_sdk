@@ -1,5 +1,15 @@
 ## (unreleased)
 
+- Experimental, web: `importJsSdkCache(firestore)` imports the IndexedDB cache of the official
+  Firebase JS SDK (or of FlutterFire on the web) once, so that a web app switching to this SDK
+  keeps the writes its users left pending: the pending writes of every user, in order, and the
+  cached documents (not the targets, resume tokens, indexes or bundles). Exactly once across
+  crashes; refuses while a JS tab may be open, for unknown schema versions (5 to 18 are read),
+  when the cache already has pending writes of the same user, and with a memory cache unless
+  `allowMemoryCache: true` (a reload would lose the imported writes).
+  `deleteJsSdkCache(firestore)` deletes the JS database. A no-op off the web. See "Switching from the official JS SDK" in
+  `docs/guides/web.md`.
+
 - Docs only, no code change: the web (browser) support is now described as supported in Chrome
   (tested against the emulator; other browsers untested) instead of experimental.
 - Experimental, not in the official SDKs, off by default: `mergeUnsentWrites` on
@@ -14,6 +24,11 @@
   its collection group (schema 20 adds an index on the overlays, built once on open: about 1 s for
   1,000,000 pending writes). The local store also forgets the keys of a batch once it is
   acknowledged or rejected.
+- An index fill run of a collection group spread over many collections no longer reads every
+  collection of the group when few cached documents changed since the last run: those are read
+  in read time order and the ones of the group kept (one run of 50 documents with 100,000
+  pending writes in 10,000 collections: about 1.1 s to 15 to 60 ms, now about the same as with
+  10,000 pending writes).
 - Experimental: `FirebaseFirestore.getPendingWriteCount()` and `pendingWriteCounts()` give the
   number of write batches the backend has not acknowledged yet, and a throttled stream of it, to
   show the progress of a sync after a long time offline. The official SDKs have no equivalent.
