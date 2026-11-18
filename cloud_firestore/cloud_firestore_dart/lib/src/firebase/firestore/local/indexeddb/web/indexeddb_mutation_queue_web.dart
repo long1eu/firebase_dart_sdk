@@ -311,6 +311,22 @@ class IndexedDbMutationQueue implements MutationQueue {
   }
 
   @override
+  Future<MutationBatch?> getNewestMutationBatchAffectingDocumentKey(
+    DocumentKey documentKey,
+  ) async {
+    final _IdbTransaction transaction = _transaction;
+    final List<int> ids = await _batchIdsFor(transaction, documentKey.path);
+    if (ids.isEmpty) {
+      return null;
+    }
+    final List<MutationBatch> batches = await _lookupMutationBatches(
+      transaction,
+      <int>[ids.reduce((int a, int b) => a > b ? a : b)],
+    );
+    return batches.isEmpty ? null : batches.single;
+  }
+
+  @override
   Future<List<MutationBatch>> getAllMutationBatchesAffectingDocumentKeys(
     Iterable<DocumentKey> documentKeys,
   ) async {

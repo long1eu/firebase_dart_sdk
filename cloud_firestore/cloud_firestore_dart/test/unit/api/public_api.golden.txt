@@ -259,6 +259,11 @@ class IndexBackfillSettings
   static final maxDocumentsPerRun: int
   static final minInterval: Duration
   toString(): String
+class IndexedDbCacheSettings extends LocalCacheSettings
+  ==(Object other): bool
+  get hashCode: int
+  new IndexedDbCacheSettings()
+  toString(): String
 class Int32Value
   ==(Object other): bool
   final value: int

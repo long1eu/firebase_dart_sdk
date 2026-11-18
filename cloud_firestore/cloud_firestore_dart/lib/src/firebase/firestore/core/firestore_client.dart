@@ -244,7 +244,7 @@ class FirestoreClient implements RemoteStoreCallback {
             final PersistentCacheSettings persistent =>
               persistent.mergeUnsentWrites,
             final MemoryCacheSettings memory => memory.mergeUnsentWrites,
-            null => false,
+            _ => false,
           },
         );
         initialization.complete();
