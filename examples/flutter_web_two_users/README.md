@@ -9,8 +9,8 @@ board, and the guest's attempt is refused. A switch picks a memory cache or a SQ
 cache before the network answers.
 
 The packages come from pub.dev (`cloud_firestore_dart` 0.2.0, `cloud_firestore_dart_sqlite` 0.1.1,
-`firebase_app_dart` 0.2.0, `firebase_auth_providers_dart` 0.2.1). Web support of
-`cloud_firestore_dart` is **experimental**; see the [web guide](../../docs/guides/web.md).
+`firebase_app_dart` 0.2.0, `firebase_auth_providers_dart` 0.2.1). On the web,
+`cloud_firestore_dart` is **supported in Chrome**; see the [web guide](../../docs/guides/web.md).
 
 The guest (right) was refused the lock, the owner (left) locked the board, and the guest's write
 to the locked board was refused too:

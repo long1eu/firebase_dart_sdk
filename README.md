@@ -77,7 +77,7 @@ It is a port of the open-source [Firebase Android SDK](https://github.com/fireba
 including its offline cache, listeners with local-write snapshots, transactions and retry logic, on Dart 3
 with `dart:io`, gRPC and SQLite; no Flutter plugin and no native SDK. Your program creates a `FirebaseApp`, an
 optional token provider plugs into it, and `cloud_firestore_dart` talks to Firestore over gRPC on the Dart VM
-and in Flutter, or over REST and WebChannel in the browser (experimental).
+and in Flutter, or over REST and WebChannel in the browser (supported in Chrome).
 
 ![Your Dart program, Flutter app or browser app uses three packages: firebase_auth_providers_dart sets the token provider of the FirebaseApp from firebase_app_dart, and cloud_firestore_dart is created from that app. cloud_firestore_dart reaches Cloud Firestore or the emulator over gRPC on the VM and in Flutter, and over REST and WebChannel in the browser.](https://raw.githubusercontent.com/long1eu/firebase_dart_sdk/main/docs/images/readme/overview.svg)
 
@@ -174,7 +174,7 @@ yet.]_
   packages replace the ones published as `cloud_firestore_vm` and `firebase_core_vm` (and the
   internal `_firebase_internal_vm` and `_firebase_database_collection_vm`, now folded in). See
   [docs/migrating_from_vm_packages.md](docs/migrating_from_vm_packages.md).
-- Web support is experimental. In a browser the client uses REST and WebChannel over `fetch`
+- Web is supported in Chrome. In a browser the client uses REST and WebChannel over `fetch`
   instead of gRPC, with a memory cache or an opt-in SQLite cache in IndexedDB. The browser tests
   pass in Chrome against the emulator (dart2wasm and dart2js), and the whole standard
   integration suite passes on the VM over the web transport. A Flutter web app with two signed-in

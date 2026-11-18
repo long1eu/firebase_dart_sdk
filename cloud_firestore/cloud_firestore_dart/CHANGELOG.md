@@ -1,5 +1,7 @@
 ## (unreleased)
 
+- Docs only, no code change: the web (browser) support is now described as supported in Chrome
+  (tested against the emulator; other browsers untested) instead of experimental.
 - The copied SQLite openers are gone from `example/`: `sqlite_database.dart`,
   `sqlite_database_web.dart` and `sqlite_opfs_worker.dart`. Since 0.2.0 apps use
   [`cloud_firestore_dart_sqlite`](https://pub.dev/packages/cloud_firestore_dart_sqlite)

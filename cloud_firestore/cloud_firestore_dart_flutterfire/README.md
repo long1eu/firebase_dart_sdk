@@ -129,7 +129,7 @@ and a warning is logged, as with the App Check SDKs.
 
 The bridge is plain Dart on top of the plugins, so it runs where both `firebase_auth` and
 `cloud_firestore_dart` run: Android, iOS, macOS and the web (where `cloud_firestore_dart` is
-experimental), and Windows where `firebase_auth` supports it. On Linux there is no
+supported in Chrome), and Windows where `firebase_auth` supports it. On Linux there is no
 `firebase_auth` plugin. None of these was tried with the bridge; see the
 [Flutter guide](https://github.com/long1eu/firebase_dart_sdk/blob/main/docs/guides/flutter.md)
 for what was tried with `cloud_firestore_dart` itself, and the

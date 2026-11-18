@@ -171,7 +171,7 @@ Two Flutter specifics:
 
 ## The web
 
-The same code runs in the browser (experimental: tested in Chrome, against the emulator only).
+The same code runs in the browser (supported in Chrome, tested against the emulator only).
 Browsers have no sockets, so there the client talks to Firestore the way the JS SDK does: REST
 for one-shot calls, WebChannel for listeners and writes.
 

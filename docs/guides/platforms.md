@@ -47,9 +47,9 @@ a plain Dart package.
   tries to replace `.dart_tool\lib\sqlite3.dll`, which the first one has loaded ("Access is denied"). For
   several processes, build once with `dart build cli` and start the executable.
 
-## The web (experimental)
+## The web (supported in Chrome)
 
-Web support is experimental. Browsers have no sockets, so there the client talks to
+Web is supported in Chrome; Firefox, Safari and Edge are untested. Browsers have no sockets, so there the client talks to
 Firestore the way the JS SDK does: REST/JSON for the one-shot calls and WebChannel for the
 listen and write streams, over `fetch`. What to know:
 

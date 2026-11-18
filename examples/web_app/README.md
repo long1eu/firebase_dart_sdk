@@ -1,7 +1,7 @@
 # web_app
 
-A browser app in plain Dart (`package:web`, no Flutter) on `cloud_firestore_dart`. Web support
-is **experimental**: see the [web guide](../../docs/guides/web.md).
+A browser app in plain Dart (`package:web`, no Flutter) on `cloud_firestore_dart`. Web is
+**supported in Chrome**: see the [web guide](../../docs/guides/web.md).
 
 Two pages share one collection, `web_app_notes`:
 

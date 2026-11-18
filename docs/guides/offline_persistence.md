@@ -260,7 +260,7 @@ What to know (all measured in Chrome against the emulator; other browsers are un
   1.4 KB per document of 1 KB; 100,000 documents take about 1 s to open and 130 MB). With OPFS
   memory stays at a few MB and the cache opens in well under 0.2 s at any size. The default
   size limit of 100 MB starts removing unused documents before 100,000 documents.
-  [Platforms](platforms.md#the-web-experimental) has the measurements.
+  [Platforms](platforms.md#the-web-supported-in-chrome) has the measurements.
 - **Size.** The persistent cache adds about 220 KB of JavaScript (60 KB gzipped) to a small
   app, plus the `sqlite3.wasm` file (731 KB, 349 KB gzipped); the OPFS worker is 183 KB more.
 - `clearPersistence()` deletes the IndexedDB database or the OPFS directory.

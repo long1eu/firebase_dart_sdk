@@ -943,8 +943,8 @@ Future<void> forAiAgentsGuideLine98() async {
   }
 }
 
-// ../../docs/guides/for_ai_agents.md:371
-Future<void> forAiAgentsGuideLine371() async {
+// ../../docs/guides/for_ai_agents.md:370
+Future<void> forAiAgentsGuideLine370() async {
   void main() {
     late FirebaseFirestore db;
     int instances = 0;

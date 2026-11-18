@@ -82,13 +82,13 @@ A name that is not in it does not exist.
 6. **Memory cache by default.** Without `openDatabase` nothing is on disk. The opener is
    `sqliteOpener` of `cloud_firestore_dart_sqlite` (VM, Flutter and web); never copy opener files.
 7. **`dart:io` only where needed**: `adc.dart`, `Platform.environment`. The
-   main libraries compile for the web (experimental, Chrome only).
+   main libraries compile for the web (supported in Chrome; other browsers untested).
 8. **Errors**: `FirestoreException` is an `Exception` (a `FirebaseException`); catch `on FirestoreException`.
 9. **Transactions rerun** their callback (keep it free of side effects); `getQuery` and
    `getAggregate` need `readOnly: true`.
 10. **Server credentials bypass security rules.** ADC and service accounts only on machines you
     control; end-user apps use `FirebaseUserAuth`. No key files in the repository.
-11. **Experimental or preview**: the web, Lite, Pipelines. Say so in code comments or reviews when
+11. **Experimental or preview**: Lite, Pipelines. Say so in code comments or reviews when
     the project depends on them.
 
 ## Verify with the emulator

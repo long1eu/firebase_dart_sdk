@@ -3,7 +3,7 @@
 A browser page where you can try `cloud_firestore_dart` and see what the client does, with no
 backend and no Firebase project. It is plain Dart (`package:web`, no Flutter), compiled to
 JavaScript or WebAssembly, and it is only static files: any static host can serve it. Web
-support of the library is **experimental**: see the [web guide](../../docs/guides/web.md).
+is **supported in Chrome**: see the [web guide](../../docs/guides/web.md).
 
 The client runs with its network disabled, on a memory cache. Nothing you type leaves the
 browser, and everything is gone when you close or reload the tab.

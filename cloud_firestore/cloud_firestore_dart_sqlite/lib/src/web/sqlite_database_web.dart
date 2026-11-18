@@ -4,8 +4,8 @@
 // sqlite_database.dart for the web.
 //
 // Moved from example/sqlite_database_web.dart of cloud_firestore_dart 0.1.1;
-// the differences are listed in the CHANGELOG. EXPERIMENTAL: verified in Chrome
-// against the emulator only.
+// the differences are listed in the CHANGELOG. Supported in Chrome, tested
+// against the emulator; other browsers are untested.
 //
 // Which storage:
 //

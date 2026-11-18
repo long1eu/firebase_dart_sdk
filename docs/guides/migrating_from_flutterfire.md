@@ -77,8 +77,8 @@ supported by Firebase.
   edition databases.
 
 **Know the gaps before you switch**: 0.1.0 is a first release with little production use; the
-testing is mostly against the emulator; the web support is experimental and was tested in Chrome
-only; the repository runs no tests on Android or iOS devices (Flutter apps can use the package as
+testing is mostly against the emulator; the web is supported in Chrome only (tested against
+the emulator); the repository runs no tests on Android or iOS devices (Flutter apps can use the package as
 a plain Dart package, see [Platforms](platforms.md)); two clients on one cache do not share
 listeners or pending writes ([Several clients on one cache](multiple_clients.md)).
 
