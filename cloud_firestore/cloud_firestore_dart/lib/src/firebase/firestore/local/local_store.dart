@@ -21,6 +21,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/local/local_write_re
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/persistance/index_manager.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/persistance/bundle_cache.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/persistance/document_overlay_cache.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/local/persistance/globals_cache.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/persistance/mutation_queue.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/persistance/persistence.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/persistance/query_cache.dart';
@@ -144,6 +145,7 @@ class LocalStore implements BundleCallback {
       <int, QueryData>{},
       <Target, int>{},
       persistence.bundleCache,
+      initialUser.uid ?? '',
     );
   }
 
@@ -161,6 +163,7 @@ class LocalStore implements BundleCallback {
     this._targetIds,
     this._targetIdByTarget,
     this._bundleCache,
+    this._uid,
   );
 
   /// The maximum time to leave a resume token buffered without writing it out.
@@ -211,6 +214,9 @@ class LocalStore implements BundleCallback {
 
   /// Holds information about the bundles loaded into the SDK.
   final BundleCache _bundleCache;
+
+  /// The normalized uid of the current user ('' for no user), the key of its [QueuedWritesMergeMark].
+  String _uid;
 
   /// Used to generate targetIds for queries tracked locally.
   final TargetIdGenerator _targetIdGenerator;
@@ -321,6 +327,11 @@ class LocalStore implements BundleCallback {
         );
 
     _mutationQueue = mutationQueue;
+    _uid = user.uid ?? '';
+    // The merge of the queue of the previous user stops (its mark keeps what it did). The sync engine starts the merge
+    // of the queue of the new user.
+    _queuedWritesMerge = null;
+    _queueMerged = false;
     _documentOverlayCache = _persistence.getDocumentOverlayCache(user);
     _indexManager = indexManager;
     _remoteDocuments.indexManager = _indexManager;
@@ -411,7 +422,10 @@ class LocalStore implements BundleCallback {
 
       // DEVIATION FROM UPSTREAM (opt-in, see [mergeUnsentWrites]): the merged write is added as a new batch, at the
       // end of the queue, and the batch it replaces is removed.
-      final _UnsentWriteMerge? merge = mergeUnsentWrites && mayMerge
+      // While the queue is merged (see [mergeQueuedWrites]) the new write is only added: the merge of the queue reaches
+      // it in turn, as if it had been made after the writes before it were merged.
+      final _UnsentWriteMerge? merge =
+          mergeUnsentWrites && mayMerge && _queuedWritesMerge == null
           ? await _findUnsentWriteMerge(mutations)
           : null;
       final MutationBatch batch = await _mutationQueue.addMutationBatch(
@@ -430,6 +444,14 @@ class LocalStore implements BundleCallback {
         _documentKeysByBatchId.remove(merge.replaced.batchId);
       }
       _documentKeysByBatchId[batch.batchId] = batch.keys;
+      if (_queueMerged && mayMerge) {
+        // The queue up to the new batch is what the merge at write time made of the writes (see
+        // [startMergingQueuedWrites]): the merge of the queue at the next start begins after it.
+        await _persistence.globalsCache.setQueuedWritesMergeMark(
+          _uid,
+          QueuedWritesMergeMark(batch.batchId, localWriteTime),
+        );
+      }
       _localDocuments.forgetPendingWrites(batch.keys);
       // Apply the new batch on top of the current local view and save the resulting overlays.
       ImmutableSortedMap<DocumentKey, MaybeDocument> changedDocuments =
@@ -535,6 +557,226 @@ class LocalStore implements BundleCallback {
       return null;
     }
     return _UnsentWriteMerge(previous, merged);
+  }
+
+  /// NOT IN THE OFFICIAL SDKS: the number of batches that one transaction of [mergeQueuedWrites] goes through, at most
+  /// two writes and three indexed reads each. Small enough that an operation queued behind a transaction (the first
+  /// read of the app) waits tens of milliseconds, not the whole merge; large enough that the cost of a transaction
+  /// (a commit, on the web an IndexedDB write) is shared by many batches.
+  static const int queuedWritesMergeBatchesPerTransaction = 500;
+
+  /// The merge of the queue that runs (see [startMergingQueuedWrites]), or null.
+  _QueuedWritesMerge? _queuedWritesMerge;
+
+  /// Whether the queue of the current user was merged to its end in this session ([mergeQueuedWrites]): every write
+  /// that [writeLocally] adds then keeps the queue as the merge at write time leaves it, and moves the
+  /// [QueuedWritesMergeMark] to its batch.
+  bool _queueMerged = false;
+
+  /// Whether the merge of the queue runs: [startMergingQueuedWrites] started it, and [mergeQueuedWrites] did not
+  /// reach the end of the queue yet.
+  bool get mergingQueuedWrites => _queuedWritesMerge != null;
+
+  /// NOT IN THE OFFICIAL SDKS: starts the merge of the writes that are already queued (with [mergeUnsentWrites]), which
+  /// [mergeQueuedWrites] then does a part at a time. The sync engine calls it after [start] and before the remote store
+  /// starts, and after a change of user; not when the clients of the cache share the state of their batches (as
+  /// [writeLocally] with `mayMerge` false). Returns whether there is something to merge ([mergingQueuedWrites]).
+  ///
+  /// The writes that an earlier session queued, or that were queued with the setting off, are one batch each. The
+  /// merge goes through the queue in order and does to each batch what [writeLocally] would have done if its write had
+  /// been made now: it merges it into the newest earlier batch of its document, on the same conditions (see
+  /// [_findUnsentWriteMerge]). The merged write takes the place of the later batch (its id and local write time), and
+  /// the earlier batch is removed: as at write time, where the merged write is the newest batch. A chain of writes to a
+  /// document stops at the first pair that does not merge, as at write time. The queue that results is the one the
+  /// merge at write time would have built from the same writes.
+  ///
+  /// The [QueuedWritesMergeMark] of the user records how far the queue is merged, in the transaction that merged it:
+  /// a merge that stopped (a crash, a shutdown, a failed transaction) resumes after it at the next start, and a queue
+  /// that is merged to its end is not read again. Writes made with the setting on move the mark (see [writeLocally]).
+  ///
+  /// The merge does not start when another client uses the cache ([Persistence.hasOtherClients]), and stops when
+  /// one appears. Until it ends, [getNextMutationBatch] holds the batches back and [writeLocally] does not merge.
+  Future<bool> startMergingQueuedWrites() async {
+    _queuedWritesMerge = null;
+    _queueMerged = false;
+    if (!mergeUnsentWrites) {
+      return false;
+    }
+    final _QueuedWritesMerge?
+    merge = await _persistence.runTransactionAndReturn<_QueuedWritesMerge?>(
+      'Start merging queued writes',
+      () async {
+        if (await _persistence.hasOtherClients()) {
+          return null;
+        }
+        final MutationBatch? oldest = await _mutationQueue
+            .getNextMutationBatchAfterBatchId(MutationBatch.unknown);
+        if (oldest == null) {
+          return const _QueuedWritesMerge(MutationBatch.unknown, done: true);
+        }
+        final QueuedWritesMergeMark? mark = await _persistence.globalsCache
+            .getQueuedWritesMergeMark(_uid);
+        if (mark == null ||
+            (oldest.batchId <= mark.batchId &&
+                oldest.localWriteTime.compareTo(mark.localWriteTime) > 0)) {
+          // Never merged, or the ids were reused since the mark was set (see [QueuedWritesMergeMark]).
+          return const _QueuedWritesMerge(MutationBatch.unknown);
+        }
+        final int newest = await _mutationQueue
+            .getHighestUnacknowledgedBatchId();
+        return _QueuedWritesMerge(mark.batchId, done: newest <= mark.batchId);
+      },
+    );
+    if (merge == null) {
+      return false;
+    }
+    if (merge.done) {
+      _queueMerged = true;
+      return false;
+    }
+    _queuedWritesMerge = merge;
+    return true;
+  }
+
+  /// NOT IN THE OFFICIAL SDKS: merges the next [maxBatches] batches of the queue (see [startMergingQueuedWrites]) in one
+  /// transaction, and returns the merges it made, oldest first. Does nothing when the merge does not run. Once it
+  /// reaches the end of the queue, or when another client uses the cache, the merge ends ([mergingQueuedWrites] is
+  /// false); a failed transaction leaves it where it was.
+  ///
+  /// A transaction leaves a valid queue: each merge replaces two batches with one in that transaction, with its base
+  /// mutations ([mergedBaseMutations]) and the overlay of its document, and the mark moves to the last batch it went
+  /// through.
+  Future<List<MergedBatch>> mergeQueuedWrites({
+    int maxBatches = queuedWritesMergeBatchesPerTransaction,
+  }) async {
+    final _QueuedWritesMerge? merge = _queuedWritesMerge;
+    if (merge == null) {
+      return const <MergedBatch>[];
+    }
+    final List<MergedBatch> merged = <MergedBatch>[];
+    final _QueuedWritesMerge? next = await _persistence
+        .runTransactionAndReturn<_QueuedWritesMerge?>(
+          'Merge queued writes',
+          () async {
+            merged.clear();
+            if (await _persistence.hasOtherClients()) {
+              return null;
+            }
+            int afterBatchId = merge.afterBatchId;
+            MutationBatch? last;
+            for (int i = 0; i < maxBatches; i++) {
+              final MutationBatch? batch = await _mutationQueue
+                  .getNextMutationBatchAfterBatchId(afterBatchId);
+              if (batch == null) {
+                break;
+              }
+              afterBatchId = batch.batchId;
+              last = batch;
+              final int? replaced = await _mergeQueuedBatch(batch);
+              if (replaced != null) {
+                merged.add(
+                  MergedBatch(mergedBatchId: replaced, batchId: batch.batchId),
+                );
+              }
+            }
+            if (last != null) {
+              await _persistence.globalsCache.setQueuedWritesMergeMark(
+                _uid,
+                QueuedWritesMergeMark(last.batchId, last.localWriteTime),
+              );
+            }
+            return _QueuedWritesMerge(
+              afterBatchId,
+              done:
+                  await _mutationQueue.getNextMutationBatchAfterBatchId(
+                    afterBatchId,
+                  ) ==
+                  null,
+            );
+          },
+        );
+    if (!identical(_queuedWritesMerge, merge)) {
+      // The user changed meanwhile.
+      return merged;
+    }
+    if (next == null) {
+      _queuedWritesMerge = null;
+    } else if (next.done) {
+      _queuedWritesMerge = null;
+      _queueMerged = true;
+    } else {
+      _queuedWritesMerge = next;
+    }
+    return merged;
+  }
+
+  /// NOT IN THE OFFICIAL SDKS: stops the merge of the queue (see [startMergingQueuedWrites]) where it is, after a
+  /// failure. The mark keeps what it did; [writeLocally] merges again and [getNextMutationBatch] returns the batches.
+  void stopMergingQueuedWrites() {
+    _queuedWritesMerge = null;
+  }
+
+  /// Merges [batch] into the newest earlier batch of its document, as [writeLocally] would have merged its write into
+  /// that batch (the conditions of [_findUnsentWriteMerge]), and returns the id of the removed batch, or null. Runs in
+  /// the transaction of [mergeQueuedWrites], whose caller checked [Persistence.hasOtherClients].
+  ///
+  /// The merged write replaces [batch] in place: its id and local write time (the merge at write time gives the
+  /// merged batch the local write time of the newer write too), with the base mutations that the merge at write time
+  /// would have given it. The base mutations of [batch] were computed on the local view after the earlier batch, as
+  /// at write time.
+  ///
+  /// The overlay of the document is kept: the local view of the merged write is that of the two writes (see
+  /// [mergeUnsentMutations]), and it already includes both, under the id of [batch] or of a later batch. Only when the
+  /// writes left the document as it was (no overlay was saved for them) is an overlay saved with the id of the removed
+  /// batch; it moves to the id of [batch], as in [writeLocally].
+  Future<int?> _mergeQueuedBatch(MutationBatch batch) async {
+    // Never a batch that was handed to the remote store (none was in this session when the merge started, and
+    // [getNextMutationBatch] hands none out while it runs; after a change of user some may have been).
+    if (batch.mutations.length != 1 ||
+        batch.batchId <= _highestBatchIdHandedOut) {
+      return null;
+    }
+    final Mutation next = batch.mutations.single;
+    final MutationBatch? previous = await _mutationQueue
+        .getNewestMutationBatchAffectingDocumentKey(
+          next.key,
+          beforeBatchId: batch.batchId,
+        );
+    if (previous == null ||
+        previous.batchId <= _highestBatchIdHandedOut ||
+        previous.mutations.length != 1) {
+      return null;
+    }
+    final Mutation? merged = mergeUnsentMutations(
+      previous.mutations.single,
+      next,
+    );
+    if (merged == null) {
+      return null;
+    }
+    await _mutationQueue.replaceMutationBatch(
+      MutationBatch(
+        batchId: batch.batchId,
+        localWriteTime: batch.localWriteTime,
+        baseMutations: mergedBaseMutations(
+          previous,
+          batch.baseMutations,
+          merged,
+        ),
+        mutations: <Mutation>[merged],
+      ),
+    );
+    await _mutationQueue.removeMutationBatch(previous);
+    _documentKeysByBatchId.remove(previous.batchId);
+    _localDocuments.forgetPendingWrites(batch.keys);
+    final Overlay? kept = await _documentOverlayCache.getOverlay(next.key);
+    if (kept != null && kept.largestBatchId == previous.batchId) {
+      await _documentOverlayCache.saveOverlays(
+        batch.batchId,
+        <DocumentKey, Mutation>{next.key: kept.mutation},
+      );
+    }
+    return previous.batchId;
   }
 
   /// Acknowledges the given batch.
@@ -974,7 +1216,13 @@ class LocalStore implements BundleCallback {
   ///
   /// The remote store sends the batches it gets here: a batch returned once is never merged into by [writeLocally]
   /// (see [mergeUnsentWrites]).
+  ///
+  /// Returns null while the queue is merged ([mergingQueuedWrites]): no batch is sent before the merge is done, so
+  /// that every batch can still be merged. The sync engine fills the write pipeline when the merge ends.
   Future<MutationBatch?> getNextMutationBatch(int afterBatchId) async {
+    if (_queuedWritesMerge != null) {
+      return null;
+    }
     final MutationBatch? batch = await _mutationQueue
         .getNextMutationBatchAfterBatchId(
           afterBatchId,
@@ -1676,6 +1924,29 @@ class UserChangeResult {
 
   /// The batches of the new user.
   final List<int> addedBatchIds;
+}
+
+/// NOT IN THE OFFICIAL SDKS: a merge that [LocalStore.mergeQueuedWrites] made: the write of the batch [mergedBatchId]
+/// was merged into the batch [batchId], and [mergedBatchId] is gone.
+class MergedBatch {
+  const MergedBatch({required this.mergedBatchId, required this.batchId});
+
+  final int mergedBatchId;
+
+  final int batchId;
+
+  @override
+  String toString() => 'MergedBatch{$mergedBatchId into $batchId}';
+}
+
+/// Where the merge of the queue is (see [LocalStore.startMergingQueuedWrites]): the batches up to [afterBatchId] are
+/// merged; [done] when there is no batch after it.
+class _QueuedWritesMerge {
+  const _QueuedWritesMerge(this.afterBatchId, {this.done = false});
+
+  final int afterBatchId;
+
+  final bool done;
 }
 
 /// A write that replaces the pending write in [replaced] (see [LocalStore._findUnsentWriteMerge]).

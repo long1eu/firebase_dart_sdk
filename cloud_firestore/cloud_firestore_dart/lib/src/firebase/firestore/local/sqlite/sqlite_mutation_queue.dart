@@ -409,14 +409,18 @@ class SQLiteMutationQueue implements MutationQueue {
 
   @override
   Future<MutationBatch?> getNewestMutationBatchAffectingDocumentKey(
-    DocumentKey documentKey,
-  ) async {
+    DocumentKey documentKey, {
+    int? beforeBatchId,
+  }) async {
     _statsCollector.recordRowsRead(MutationQueue.statsTag, 1);
+    // A seek on the primary key (uid, path, batch_id) of document_mutations.
     final List<Map<String, dynamic>> rows = await db.query(
       'SELECT m.mutations FROM document_mutations dm, mutations m '
-      'WHERE dm.uid = ? AND dm.path = ? AND dm.uid = m.uid AND dm.batch_id = m.batch_id '
+      'WHERE dm.uid = ? AND dm.path = ? '
+      '${beforeBatchId == null ? '' : 'AND dm.batch_id < ? '}'
+      'AND dm.uid = m.uid AND dm.batch_id = m.batch_id '
       'ORDER BY dm.batch_id DESC LIMIT 1',
-      <String>[uid, EncodedPath.encode(documentKey.path)],
+      <Object>[uid, EncodedPath.encode(documentKey.path), ?beforeBatchId],
     );
     return rows.isEmpty ? null : decodeMutationBatch(rows.first['mutations']);
   }
@@ -534,6 +538,20 @@ class SQLiteMutationQueue implements MutationQueue {
 
     _statsCollector.recordRowsRead(MutationQueue.statsTag, rows.length);
     return result;
+  }
+
+  @override
+  Future<void> replaceMutationBatch(MutationBatch batch) async {
+    // The owner (client_id) and the rows of document_mutations stay: the batch changes the same documents.
+    final GeneratedMessage proto = serializer.encodeMutationBatch(batch);
+    await db.execute(
+      'UPDATE mutations SET mutations = ? WHERE uid = ? AND batch_id = ?',
+      <Object>[proto.writeToBuffer(), uid, batch.batchId],
+    );
+    _statsCollector.recordRowsWritten(
+      MutationQueue.statsTag,
+      batch.mutations.length,
+    );
   }
 
   @override

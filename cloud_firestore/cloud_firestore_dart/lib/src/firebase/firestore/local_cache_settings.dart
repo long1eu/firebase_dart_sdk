@@ -146,6 +146,16 @@ final class PersistentCacheSettings extends LocalCacheSettings {
   /// now reach the backend before the earlier state of this document, which never reaches it at all. The future of
   /// every merged write completes, or fails, with the merged write, and `waitForPendingWrites` waits for it.
   ///
+  /// Writes that are already queued when an instance starts with the setting on (queued in an earlier session, or
+  /// with the setting off) are merged once, at start, by the same rules and on the same conditions: each write is
+  /// merged into the pending write of its document as if it had just been made, in the order of the queue, so the
+  /// queue becomes the one the setting would have built from the same writes. This runs in transactions of 500
+  /// writes queued as operations of the instance, so reads and writes of the app run between them; no write is sent
+  /// to the backend until it is done. A write made meanwhile is merged when the merge of the queue reaches it. The
+  /// progress is saved with each transaction: a merge that is stopped (the app is closed, the process is killed)
+  /// resumes where it was at the next start, and a queue that was merged is not read again. It does not run while
+  /// another client uses the cache, and the queue of a user who signs in later is merged when they sign in.
+  ///
   /// What the app gives up:
   ///
   /// * Security rules and Cloud Functions triggers see one write instead of several, and never the intermediate
