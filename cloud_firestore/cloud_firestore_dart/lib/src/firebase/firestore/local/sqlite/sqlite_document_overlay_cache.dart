@@ -39,6 +39,27 @@ class SQLiteDocumentOverlayCache implements DocumentOverlayCache {
           WHERE uid = ? AND collection_path = ? AND +largest_batch_id > ?
         ''';
 
+  /// The overlays of a collection among the few written after a batch: through the index on the batch id.
+  @visibleForTesting
+  static const String newOverlaysOfCollectionSql = '''
+          SELECT overlay_mutation, largest_batch_id
+          FROM document_overlays INDEXED BY batch_id_overlay
+          WHERE uid = ? AND largest_batch_id > ? AND collection_path = ?
+        ''';
+
+  /// Whether fewer than `LIMIT` overlays of the user were written after a batch (read from the index alone).
+  @visibleForTesting
+  static const String fewNewOverlaysSql = '''
+          SELECT COUNT(*) AS count FROM (
+            SELECT 1 FROM document_overlays INDEXED BY batch_id_overlay
+            WHERE uid = ? AND largest_batch_id > ? LIMIT ?)
+        ''';
+
+  /// With fewer overlays than this after the batch asked for, [getOverlaysForCollection] reads them through the
+  /// index on the batch id; with more, it reads the overlays of the collection.
+  @visibleForTesting
+  static int batchIdIndexMaxRows = 1000;
+
   @visibleForTesting
   static const String nextOverlaysOfGroupSql = '''
           SELECT overlay_mutation, largest_batch_id, collection_path, document_id
@@ -184,14 +205,33 @@ class SQLiteDocumentOverlayCache implements DocumentOverlayCache {
     ResourcePath collection,
     int sinceBatchId,
   ) async {
-    // DEVIATION FROM UPSTREAM: the unary `+` keeps SQLite from reading the overlays through `batch_id_overlay`
-    // (uid, largest_batch_id), which it prefers without statistics: with the range `largest_batch_id > -1` of a scan
-    // that walks every overlay of the user instead of those of the collection (246 ms for a collection of 10 among
-    // 1M pending writes). The primary key (uid, collection_path, document_id) reads only the collection.
-    final List<Map<String, dynamic>> rows = await _db.query(
-      overlaysOfCollectionSql,
-      <Object>[_uid, EncodedPath.encode(collection), sinceBatchId],
-    );
+    // DEVIATION FROM UPSTREAM, which has one statement and leaves the choice of the index to SQLite. Without
+    // statistics SQLite prefers `batch_id_overlay` (uid, largest_batch_id): with the range `largest_batch_id > -1`
+    // that walks every overlay of the user (246 ms for a collection of 10 among 1M pending writes). The primary key
+    // (uid, collection_path, document_id) reads only the collection, but all of it: 150 ms for the few overlays
+    // written after the offset of an index in a collection of 100,000 pending writes. So the batch id index is used
+    // when few overlays of the user are newer than [sinceBatchId], and the primary key otherwise.
+    final String path = EncodedPath.encode(collection);
+    final bool few =
+        sinceBatchId >= 0 &&
+        ((await _db.query(fewNewOverlaysSql, <Object>[
+                  _uid,
+                  sinceBatchId,
+                  batchIdIndexMaxRows,
+                ])).single['count']
+                as int) <
+            batchIdIndexMaxRows;
+    final List<Map<String, dynamic>> rows = few
+        ? await _db.query(newOverlaysOfCollectionSql, <Object>[
+            _uid,
+            sinceBatchId,
+            path,
+          ])
+        : await _db.query(overlaysOfCollectionSql, <Object>[
+            _uid,
+            path,
+            sinceBatchId,
+          ]);
     return <DocumentKey, Overlay>{
       for (Overlay overlay in rows.map(_decodeOverlay)) overlay.key: overlay,
     };
