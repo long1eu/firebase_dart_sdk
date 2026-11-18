@@ -37,8 +37,9 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/model/value/field_va
 ///
 /// 1. [next] is a set or a delete, without precondition, whose only transforms are server timestamps: [next] alone.
 ///    The document after [next] does not depend on the document before it, whatever [previous] was and whether its
-///    precondition held. A set with an increment or an array transform does depend on it (the transform starts from
-///    the value the field had before the set), so it is not merged.
+///    precondition held. A set with an increment or an array transform is not merged: the local view computes such
+///    a transform from the value the field had before the set, so the document the app sees would change with the
+///    merge. (The emulator computes it from the new value, where the merge would make no difference.)
 /// 2. [next] is a patch without transforms, with no precondition or `exists`, and [previous] has no transforms:
 ///    a. [previous] is a set without precondition: a set of the value of [previous] patched by [next], without
 ///       precondition. After [previous] the document exists, so the `exists` of [next] holds.
