@@ -36,7 +36,7 @@ class IndexedDbRemoteDocumentCache implements RemoteDocumentCache {
       'noDocument',
     ]) {
       final JSAny? value = object.getProperty(field.toJS);
-      if (value != null && !value.isUndefined) {
+      if (!value.isUndefinedOrNull) {
         return idbJsonLength(value);
       }
     }

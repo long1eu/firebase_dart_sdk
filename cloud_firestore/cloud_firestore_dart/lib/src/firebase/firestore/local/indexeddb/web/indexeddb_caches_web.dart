@@ -222,7 +222,7 @@ class IndexedDbGlobalsCache implements GlobalsCache {
       'get the global "$name"',
       () => transaction.store(DbStores.globals).get(name.toJS),
     );
-    if (row == null || row.isUndefined) {
+    if (row.isUndefinedOrNull) {
       return null;
     }
     final JSAny? value = (row as JSObject).getProperty('value'.toJS);
