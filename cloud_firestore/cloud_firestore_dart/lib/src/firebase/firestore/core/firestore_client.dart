@@ -29,6 +29,8 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/firestore_error.dart
 import 'package:cloud_firestore_dart/src/firebase/firestore/firestore_settings.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/load_bundle_task.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/index_backfiller.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/local/indexeddb/indexeddb_persistence.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/local/indexeddb/indexeddb_persistence_platform.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/local_serializer.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/local_store.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/lru_garbage_collector.dart';
@@ -92,7 +94,7 @@ class FirestoreClient implements RemoteStoreCallback {
   IndexBackfillerScheduler? _indexBackfillScheduler;
   IndexBackfiller? _indexBackfiller;
 
-  /// Refreshes the client metadata and the primary lease. Only with SQLite persistence.
+  /// Refreshes the client metadata and the primary lease. Only with SQLite or IndexedDB persistence.
   ClientMetadataRefresher? _clientMetadataRefresher;
 
   /// Whether this client holds the primary lease of its cache. Always true with memory persistence. Only the primary
@@ -101,7 +103,11 @@ class FirestoreClient implements RemoteStoreCallback {
   @visibleForTesting
   bool get isPrimaryClient {
     final Persistence persistence = this.persistence;
-    return persistence is! SQLitePersistence || persistence.isPrimary;
+    return switch (persistence) {
+      final SQLitePersistence sqlite => sqlite.isPrimary,
+      final IndexedDbPersistence indexedDb => indexedDb.isPrimary,
+      _ => true,
+    };
   }
 
   /// Whether this client has field indexes: only with SQLite persistence. Known when the client is created, before
@@ -166,10 +172,12 @@ class FirestoreClient implements RemoteStoreCallback {
     ConnectivityChangeDetector? connectivityDetector,
     Future<void>? after,
   }) {
+    // The IndexedDB cache needs no database function, and wins over one.
+    final bool useIndexedDb = settings.cacheSettings is IndexedDbCacheSettings;
     final bool usePersistence =
         // TODO(long1eu): Make sure you remove the openDatabase != null once we
         //  provide a default way to instantiate a db instance
-        settings.persistenceEnabled && openDatabase != null;
+        !useIndexedDb && settings.persistenceEnabled && openDatabase != null;
     final FirestoreClient client = FirestoreClient._(
       databaseInfo,
       credentialsProvider,
@@ -220,6 +228,7 @@ class FirestoreClient implements RemoteStoreCallback {
           usePersistence,
           settings.cacheSizeBytes,
           openDatabase,
+          useIndexedDb: useIndexedDb,
           onNetworkConnected,
           scheduler,
           connectivityDetector: connectivityDetector,
@@ -455,6 +464,8 @@ class FirestoreClient implements RemoteStoreCallback {
     }
     final Persistence persistence = this.persistence;
     if (persistence is SQLitePersistence) {
+      await persistence.clearPersistence();
+    } else if (persistence is IndexedDbPersistence) {
       await persistence.clearPersistence();
     }
   }
@@ -731,13 +742,21 @@ class FirestoreClient implements RemoteStoreCallback {
     PersistentCacheSettings? persistentCacheSettings,
     ConnectivityChangeDetector? connectivityDetector,
     bool mergeUnsentWrites = false,
+    bool useIndexedDb = false,
   }) async {
     // Note: The initialization work must all be synchronous (we can't dispatch more work) since external write/listen
     // operations could get queued to run before that subsequent work completes.
     Log.d(logTag, 'Initializing. user=${user.uid}');
 
     LruGarbageCollector? gc;
-    if (usePersistence && openDatabase != null) {
+    if (useIndexedDb) {
+      // Experimental, first slice: no garbage collection and no field indexes yet (see IndexedDbCacheSettings).
+      persistence = createIndexedDbPersistence(
+        persistenceKey: databaseInfo.persistenceKey,
+        databaseId: databaseInfo.databaseId,
+        serializer: LocalSerializer(RemoteSerializer(databaseInfo.databaseId)),
+      );
+    } else if (usePersistence && openDatabase != null) {
       final LocalSerializer serializer = LocalSerializer(
         RemoteSerializer(databaseInfo.databaseId),
       );
@@ -814,6 +833,18 @@ class FirestoreClient implements RemoteStoreCallback {
           }
         }),
       )..start();
+    } else if (started is IndexedDbPersistence) {
+      // Another client that deletes the database while this one runs ends this one, as in the JS SDK.
+      started.databaseClearedListener = () => shutdown();
+      // The JS SDK refreshes the client row and the primary lease every 4 s: a JS tab finds the lease alive.
+      _clientMetadataRefresher = ClientMetadataRefresher(
+        scheduler,
+        run: () => _enqueue<void>(() async {
+          if (!_isShutdown) {
+            await started.refreshClientMetadata();
+          }
+        }),
+      )..start();
     }
 
     final Datastore datastore = Datastore(
@@ -877,6 +908,8 @@ class FirestoreClient implements RemoteStoreCallback {
   Future<void> _setPersistenceNetworkEnabled(bool enabled) async {
     final Persistence persistence = this.persistence;
     if (persistence is SQLitePersistence) {
+      await persistence.setNetworkEnabled(enabled);
+    } else if (persistence is IndexedDbPersistence) {
       await persistence.setNetworkEnabled(enabled);
     }
   }

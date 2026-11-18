@@ -12,11 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import 'package:cloud_firestore_dart/src/firebase/firestore/firestore_error.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/firestore_settings.dart';
 
 /// Configures the local cache of a Firestore instance, see
 /// [Settings.cacheSettings]. The implementations are
-/// [PersistentCacheSettings] and [MemoryCacheSettings].
+/// [PersistentCacheSettings], [MemoryCacheSettings] and, on the web, [IndexedDbCacheSettings] (experimental).
 ///
 /// The cache holds the documents that listeners and reads received and the writes that the backend has not
 /// acknowledged yet; reads and listeners use it while the client is offline. This is the `localCache` setting of
@@ -268,6 +269,64 @@ final class IndexBackfillSettings {
   String toString() =>
       'IndexBackfillSettings{documentsPerRun=$documentsPerRun, '
       'interval=$interval, initialDelay=$initialDelay}';
+}
+
+/// Configures a cache stored in IndexedDB in the format of the official Firebase JS SDK, on the web, without SQLite
+/// (no `sqlite3.wasm` to download, no `openDatabase` function).
+///
+/// **Experimental, first slice**: the API, the behaviour and what is stored may change in a minor version.
+///
+/// The cache is the IndexedDB database the JS SDK's `persistentLocalCache()` uses for the same app and database,
+/// `firestore/<app name>/<project id>[.<database id>]/main` (the app name is `[DEFAULT]` for the default app), at the
+/// JS SDK's schema version 18, with its stores, keys and rows. A web app that used the JS SDK with a persistent cache
+/// keeps its pending writes and cached documents when it switches to this SDK on the same browser profile, and the
+/// JS SDK can open a cache this SDK wrote. A database of another schema version is refused: open the app once with a
+/// current JS SDK to migrate an older one.
+///
+/// What this first slice does not have yet:
+///
+/// - client-side indexes (`PersistentCacheIndexManager`): queries scan the documents of their collection, as with a
+///   memory cache;
+/// - garbage collection: nothing is removed from the cache until it is cleared (`clearPersistence`); the sequence
+///   numbers the JS SDK's collector uses are kept;
+/// - several tabs: one tab at a time. The tab takes the JS SDK's primary lease as a JS tab with
+///   `persistentSingleTabManager` does, and the instance fails to start (every operation fails with
+///   [FirestoreErrorCode.failedPrecondition]) while another tab (of this SDK or of the JS SDK) uses the cache;
+/// - bundles and named queries: `loadBundle` fails with an [UnimplementedError].
+///
+/// The constructor throws an [UnsupportedError] on other platforms than the web.
+///
+/// ```dart
+/// final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(
+///   app: app,
+///   settings: Settings(cacheSettings: IndexedDbCacheSettings()),
+/// );
+/// ```
+///
+/// NOT IN THE OFFICIAL SDKS: the JS SDK always stores its persistent cache this way (`persistentLocalCache`); this SDK
+/// stores it in SQLite by default ([PersistentCacheSettings]).
+final class IndexedDbCacheSettings extends LocalCacheSettings {
+  /// Creates the settings. Throws an [UnsupportedError] on other platforms than the web.
+  IndexedDbCacheSettings() {
+    if (!_isWeb) {
+      throw UnsupportedError(
+        'IndexedDbCacheSettings select a cache in IndexedDB, which only exists on the web. Use '
+        'PersistentCacheSettings (SQLite) or MemoryCacheSettings on this platform.',
+      );
+    }
+  }
+
+  static const bool _isWeb = bool.fromEnvironment('dart.library.js_interop');
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) || other is IndexedDbCacheSettings;
+
+  @override
+  int get hashCode => (IndexedDbCacheSettings).hashCode;
+
+  @override
+  String toString() => 'IndexedDbCacheSettings{}';
 }
 
 /// Configures an in memory cache, which is lost when the instance is shut

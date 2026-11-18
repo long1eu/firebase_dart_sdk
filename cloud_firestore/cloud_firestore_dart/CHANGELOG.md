@@ -1,5 +1,18 @@
 ## (unreleased)
 
+- Experimental, web, first slice: `IndexedDbCacheSettings()` stores the cache in IndexedDB in the
+  format of the official Firebase JS SDK (database `firestore/<app>/<project>[.<database>]/main`,
+  schema version 18, the same stores, keys and proto3 JSON rows), without SQLite: no
+  `sqlite3.wasm` to download and no `openDatabase` function. A new database is created as the JS
+  SDK creates it, an existing one of version 18 (left by a JS SDK app) is opened as it is, any
+  other version is refused. Stored: the pending writes, the cached documents, the overlays, the
+  targets, the globals and the collection parents. Not yet: client-side indexes (queries scan
+  their collection, as with a memory cache), garbage collection (nothing is removed until
+  `clearPersistence`; the sequence numbers are kept), several tabs (one tab at a time: it takes
+  the JS SDK's primary lease as a single JS tab does and refuses to start while another tab or a
+  JS tab uses the cache), bundles and named queries (`loadBundle` fails with an
+  `UnimplementedError`). Throws an `UnsupportedError` off the web. `importJsSdkCache` and
+  `deleteJsSdkCache` do nothing on an instance whose cache is that database.
 - Experimental, web: `importJsSdkCache(firestore)` imports the IndexedDB cache of the official
   Firebase JS SDK (or of FlutterFire on the web) once, so that a web app switching to this SDK
   keeps the writes its users left pending: the pending writes of every user, in order, and the
