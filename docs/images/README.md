@@ -2,7 +2,7 @@
 
 The `.svg` files in this folder are written by hand: real text, a `viewBox`, `<title>` and
 `<desc>`, the system font stack, no scripts and no external references. The `.png` files are
-screenshots of real apps and are not covered here.
+screenshots of real apps: see [Screenshots](#screenshots).
 
 ## Light and dark
 
@@ -70,6 +70,24 @@ on a GitHub page (`#0d1117`, or `#212830` in dark dimmed) like the page's own bo
   `#ffffff` otherwise means the background.
 - Reference figures with a plain `![alt](...)` image. READMEs that pub.dev shows use the absolute
   `https://raw.githubusercontent.com/long1eu/firebase_dart_sdk/main/docs/images/...` URL.
+
+## Screenshots
+
+A screenshot of an app comes as two captures of the same state at the same size: a light one,
+`<name>.png`, and a dark one, `<name>_dark.png` (the playground: `playground-desktop-light.png`
+and `playground-desktop-dark.png`). The dark one shows the app's own dark theme (Flutter's
+`darkTheme`, or the page's `prefers-color-scheme` CSS), never a colour filter of the browser such
+as `--force-dark-mode`. The Markdown shows the pair with a `<picture>` element, which GitHub
+switches with the reader's theme:
+
+```html
+<picture><source media="(prefers-color-scheme: dark)" srcset="examples/web_app_online_dark.png"><img src="examples/web_app_online.png" alt="..."></picture>
+```
+
+A viewer without `<picture>` support shows the light capture. Each example's README says how its
+screenshots were taken. Web pages: headless Chrome with
+`--blink-settings=preferredColorScheme=0` for the dark capture (`=1` for light). The macOS app:
+the system in dark appearance, `screencapture -o -l <window id>`.
 
 ## Checks
 

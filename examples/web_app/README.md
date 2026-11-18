@@ -13,7 +13,7 @@ Two pages share one collection, `web_app_notes`:
 This is the main page in headless Chrome against a private emulator, after three notes were
 added. Look at the **Sync** line: the list comes from the backend.
 
-![The main page of web_app: backend emulator, compiler dart2js, cache Memory, Sync "Online: in sync with the backend", and three notes in the list](../../docs/images/examples/web_app_online.png)
+<picture><source media="(prefers-color-scheme: dark)" srcset="../../docs/images/examples/web_app_online_dark.png"><img src="../../docs/images/examples/web_app_online.png" alt="The main page of web_app: backend emulator, compiler dart2js, cache Memory, Sync &quot;Online: in sync with the backend&quot;, and three notes in the list"></picture>
 
 The pieces of the main page, and where each request goes:
 
@@ -34,7 +34,7 @@ What to try:
   and the indicator says the list comes from the cache. Press **Enable network** and it is
   sent. The page then looked like this, with the button already showing **Enable network**:
 
-  ![The same page offline: Sync "Offline: showing the cache", the button reads "Enable network", and the newest note "Water the plants" is marked "[not sent yet]"](../../docs/images/examples/web_app_offline.png)
+  <picture><source media="(prefers-color-scheme: dark)" srcset="../../docs/images/examples/web_app_offline_dark.png"><img src="../../docs/images/examples/web_app_offline.png" alt="The same page offline: Sync &quot;Offline: showing the cache&quot;, the button reads &quot;Enable network&quot;, and the newest note &quot;Water the plants&quot; is marked &quot;[not sent yet]&quot;"></picture>
 
 - Pick **SQLite in IndexedDB** or **SQLite in OPFS**, then reload: the notes are on the page
   before the backend answers, also with the emulator stopped. A note written offline is sent
@@ -98,7 +98,7 @@ special headers are needed (the OPFS cache does not need cross-origin isolation)
 | File | What it is |
 | --- | --- |
 | `web/main.dart`, `web/lite.dart` | The two programs. |
-| `web/index.html`, `web/lite.html`, `web/styles.css` | The pages. |
+| `web/index.html`, `web/lite.html`, `web/styles.css` | The pages, light and dark through `prefers-color-scheme`. |
 | `web/bootstrap.js` | Starts `<app>.dart.js`, or `<app>.mjs` and `<app>.wasm` with `?compiler=wasm`. |
 | `lib/app_config.dart` | The `FirebaseOptions`, and the settings read from the address (`emulator`, `cache`). It imports neither Firestore library, so the Lite page stays small. |
 | `bin/serve.dart` | The static file server. |
@@ -159,10 +159,13 @@ has the numbers of a program without the opener.
   the backend unreachable, the read and the write fail with
   `unavailable: Request failed with error: TypeError: Failed to fetch`.
 - Not run against a real Firebase project, and not in other browsers.
-- The two screenshots above (taken with 0.1; the page did not change): built with
-  `dart compile js -O2` as described, served by
-  `bin/serve.dart`, opened in headless Chrome with `?emulator=127.0.0.1:8141` and driven over the
-  Chrome DevTools protocol (memory cache, Dart 3.12.2, Firestore emulator v1.22.0).
+- The screenshots above, light and dark (2026-11-18, with 0.2.0): built with
+  `dart compile js -O2` as described, served by `bin/serve.dart`, opened in headless Chrome
+  with `?emulator=127.0.0.1:8341` against a private emulator (`tool/start_private_emulator.sh
+  8341`) and driven over the Chrome DevTools protocol (memory cache, Dart 3.12.2, Firestore
+  emulator v1.22.0). Each state was captured twice from the same page, with
+  `prefers-color-scheme` emulated as light and as dark: the dark one shows the page's own dark
+  colours from `styles.css`.
 
 ## A real project
 

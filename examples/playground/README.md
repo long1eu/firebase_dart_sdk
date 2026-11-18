@@ -24,10 +24,10 @@ What you can do:
 The screenshot below is the page after the sample data, an edit, a new document, a delete and a
 where clause: look at the queue of five writes on the left and the snapshot events on the right.
 
-![The playground in a desktop browser: a live query on cities where country is JP with its Dart
-code, two result cards marked "pending write", the form to write a document, a queue of five
+<picture><source media="(prefers-color-scheme: dark)" srcset="../../docs/images/playground/playground-desktop-dark.png"><img src="../../docs/images/playground/playground-desktop-light.png" alt="The playground in a desktop browser: a live query on cities where country is JP with its Dart
+code, two result cards marked &quot;pending write&quot;, the form to write a document, a queue of five
 pending writes, a timeline of write and snapshot markers, and the list of snapshot events with
-isFromCache true and hasPendingWrites true](../../docs/images/playground/playground-desktop-light.png)
+isFromCache true and hasPendingWrites true"></picture>
 
 On a phone the panels stack in one column, here in the dark theme:
 
@@ -153,7 +153,9 @@ Measured with Dart 3.12.2 and `-O2`, with `cloud_firestore_dart` 0.2.0; gzipped 
   `/firebase_dart_sdk/`), adding a where clause on `null` (`isNull: false` in the code shown):
   the network log had only the page's own files (5 requests for the dart2js build, 6 for
   dart2wasm, all to the page's origin), and the console stayed empty. The two screenshots above
-  were taken then, from the dart2js build at 1280 and 390 pixels wide.
+  were taken then, from the dart2js build at 1280 and 390 pixels wide. The dark desktop capture
+  (`playground-desktop-dark.png`) repeats the same steps in headless Chrome with
+  `--blink-settings=preferredColorScheme=0` (2026-11-18).
 - With dart2wasm as the default (Dart 3.12.2, Chrome 157, headless, under
   `/firebase_dart_sdk/`): the page started the dart2wasm build; `?compiler=js` started dart2js;
   with WebAssembly turned off (`--js-flags=--jitless`) it fell back to dart2js and said so; with
