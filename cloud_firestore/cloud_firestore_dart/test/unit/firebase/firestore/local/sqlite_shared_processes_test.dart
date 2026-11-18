@@ -72,16 +72,17 @@ void main() {
 
       const int writers = 2;
       const int rounds = 20;
-      final List<WriterProcess> processes = <WriterProcess>[
-        for (int writer = 0; writer < writers; writer++)
-          await WriterProcess.start(name, writer),
-      ];
+      final List<WriterProcess> processes = <WriterProcess>[];
       addTearDown(() {
         for (final WriterProcess p in processes) {
           p.process.kill(ProcessSignal.sigkill);
         }
       });
-      for (final WriterProcess p in processes) {
+      // One at a time: on a cold start `dart run` builds the SQLite library of package:sqlite3 first, and two
+      // processes that do it at once get in each other's way. The second one finds it built.
+      for (int writer = 0; writer < writers; writer++) {
+        final WriterProcess p = await WriterProcess.start(name, writer);
+        processes.add(p);
         expect(await p.next(), 'ready');
       }
 
