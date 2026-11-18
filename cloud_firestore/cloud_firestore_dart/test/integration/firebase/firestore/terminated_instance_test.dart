@@ -303,15 +303,17 @@ final List<Entry> entries = <Entry>[
     After.futureFails,
     // On a running instance the query is missing: that error is not the one
     // under test.
-    (Fixture f) => f.firestore.namedQueryGet('missing').then<void>(
-      (_) {},
-      onError: (Object e, StackTrace stackTrace) {
-        if (e is! FirestoreException ||
-            e.errorCode != FirestoreErrorCode.notFound) {
-          Error.throwWithStackTrace(e, stackTrace);
-        }
-      },
-    ),
+    (Fixture f) => f.firestore
+        .namedQueryGet('missing')
+        .then<void>(
+          (_) {},
+          onError: (Object e, StackTrace stackTrace) {
+            if (e is! FirestoreException ||
+                e.errorCode != FirestoreErrorCode.notFound) {
+              Error.throwWithStackTrace(e, stackTrace);
+            }
+          },
+        ),
   ),
   Entry(
     'FirebaseFirestore.documentSnapshotsFromJson',
@@ -340,6 +342,18 @@ final List<Entry> entries = <Entry>[
     <String>{'FirebaseFirestore.snapshotsInSync'},
     After.streamFails,
     (Fixture f) => f.firestore.snapshotsInSync(),
+  ),
+  Entry(
+    'FirebaseFirestore.getPendingWriteCount',
+    <String>{'FirebaseFirestore.getPendingWriteCount'},
+    After.futureFails,
+    (Fixture f) => f.firestore.getPendingWriteCount(),
+  ),
+  Entry(
+    'FirebaseFirestore.pendingWriteCounts',
+    <String>{'FirebaseFirestore.pendingWriteCounts'},
+    After.streamFails,
+    (Fixture f) => f.firestore.pendingWriteCounts(),
   ),
   Entry(
     'FirebaseFirestore.disableNetwork',
