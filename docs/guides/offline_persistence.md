@@ -232,15 +232,37 @@ combine into one write with the same result on the backend:
 | Pending write | New write | Becomes |
 |---|---|---|
 | anything | `set` without merge (`serverTimestamp` allowed), or `delete` | the new write |
-| `set` | `update` or `set` with merge, no transforms | one `set` with the new fields applied |
-| `update` | `update`, no transforms | one `update` of the fields of both |
-| `set` with merge | `update` or `set` with merge, no transforms | one `set` with merge of the fields of both |
-| `delete` | `set` with merge, no transforms | one `set` of the new fields |
+| `set` (`serverTimestamp` allowed) | `update` or `set` with merge | one `set` with the new fields applied |
+| `update` | `update` | one `update` of the fields of both |
+| `set` with merge | `update` or `set` with merge | one `set` with merge of the fields of both |
+| `delete` | `set` with merge | one `set` of the new fields |
 
-Everything else (a transform in an `update` or in the pending write before it, an `increment`,
-`arrayUnion` or `arrayRemove` in a `set`, a `set` with merge after an `update`, an `update` after a `delete`) stays queued as two writes, as without the
-setting. The merged write takes the place of the newest write in the queue, and the future of every write
-that went into it completes or fails with it; `waitForPendingWrites` waits for it too.
+Transforms in the two writes combine field by field:
+
+| Pending write has | New write has, on the same field | Becomes |
+|---|---|---|
+| any transform | a value, a delete or `serverTimestamp` (on that field or one containing it) | the new write's |
+| a value | `serverTimestamp` | `serverTimestamp` |
+| a value (or the pending write is a `set` or `delete`) | `increment` | the sum as a value, if both are integers within ±(2^53 − 1) or both are doubles |
+| `arrayUnion(a)` | `arrayUnion(b)` | `arrayUnion` of `a` then `b`, without repeats |
+| `arrayRemove(a)` | `arrayRemove(b)` | `arrayRemove` of `a` and `b` |
+| a transform | nothing on that field, on a field inside it or on one containing it | the transform, unchanged |
+| nothing on that field, inside it or containing it (an `update` or `set` with merge) | a transform | the transform, unchanged |
+
+Everything else stays queued as two writes, as without the setting. In particular `increment`
+after `increment` of the same field: the backend adds the numbers one at a time, so on a field
+that holds a double adding the two operands first can round differently (and integers saturate
+at each step).
+Also `arrayUnion` with `arrayRemove` on one field, an array transform after a `set` or `delete`,
+a pending `set` with `increment` or array transforms, any other overlap of a transform with a
+field of the other write, a `set` with merge after an `update`, and an `update` after a
+`delete`. The merged write takes the place of the newest write in the queue, and the future of
+every write that went into it completes or fails with it; `waitForPendingWrites` waits for it
+too.
+
+Until the backend confirms it, the app sees the merged document as it would see the two writes,
+with one exception: a `serverTimestamp` of the pending write that stays shows the time of the
+newer write as its estimate.
 
 What the app gives up:
 

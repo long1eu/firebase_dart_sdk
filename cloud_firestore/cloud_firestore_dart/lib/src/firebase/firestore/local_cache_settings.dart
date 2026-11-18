@@ -113,14 +113,34 @@ final class PersistentCacheSettings extends LocalCacheSettings {
   ///     `arrayUnion` or `arrayRemove`, which the local view computes from the value before the write) or a
   ///     `delete`: it replaces the pending write, whatever that was. The result of such a write does not depend on
   ///     the document before it.
-  ///   * The new write is an `update` or a `set` with merge, without transforms, and the pending write has no
-  ///     transforms:
-  ///     * after a `set`: one `set` of the pending value with the new fields applied;
-  ///     * after an `update` or a `set` with merge: one write of the fields of both (the paths of both masks, with
-  ///       the values after both), with the precondition of the pending write; only when the pending write has no
-  ///       precondition (a `set` with merge) or both are `update`s (if the first one fails on a missing document,
-  ///       so does the second);
-  ///     * after a `delete`, a `set` with merge only: one `set` of the new fields.
+  ///   * The new write is an `update` or a `set` with merge, and the pending write is:
+  ///     * a `set` (with no transforms but `serverTimestamp`): one `set` of the pending value with the new fields
+  ///       applied;
+  ///     * an `update` or a `set` with merge: one write of the fields of both (the paths of both masks, with the values
+  ///       after both), with the precondition of the pending write; only when the pending write has no precondition (a
+  ///       `set` with merge) or both are `update`s (if the first one fails on a missing document, so does the second);
+  ///     * a `delete`, and the new write is a `set` with merge: one `set` of the new fields.
+  ///
+  ///     Their transforms (`serverTimestamp`, `increment`, `arrayUnion`, `arrayRemove`) combine field by field:
+  ///     * a transform of the pending write on a field that the new write writes, deletes or sets to `serverTimestamp`
+  ///       is dropped (the later write wins); a `serverTimestamp` of the new write stays;
+  ///     * two `arrayUnion`s of the same field become one `arrayUnion` of the elements of both, in order and without
+  ///       repeating an element; two `arrayRemove`s become one `arrayRemove` of the elements of both;
+  ///     * an `increment` of the new write on a field whose value before it is known (one the pending write set, or
+  ///       any field when the pending write is a `set` or a `delete`) is written as its result, when both numbers are
+  ///       integers (within +-2^53) or both are doubles;
+  ///     * after an `update` or a `set` with merge, a transform on a field that overlaps nothing the other write
+  ///       writes, deletes or transforms (no field equal to it, inside it or containing it) stays as it is, and so does
+  ///       a transform of the new write on a field it writes itself.
+  ///
+  ///     Anything else stays queued as two writes, in particular an `increment` after an `increment` of the same
+  ///     field: the backend adds the two numbers one at a time, and a field that holds a double can round differently
+  ///     when the two are added first. Also an `arrayUnion` after an `arrayRemove` of the same field (or the reverse),
+  ///     an `arrayUnion` or `arrayRemove` of the new write after a `set` or a `delete`, a pending `set` with
+  ///     `increment` or array transforms, and any other overlap of a transform with a field of the other write.
+  ///
+  ///   The local view of the merged write is the same as with two writes, except for a `serverTimestamp` of the
+  ///   pending write that stays: until the backend confirms it, its estimate is the time of the newer write.
   ///
   /// The merged write takes the place of the newer write in the queue: writes to other documents queued in between
   /// now reach the backend before the earlier state of this document, which never reaches it at all. The future of
