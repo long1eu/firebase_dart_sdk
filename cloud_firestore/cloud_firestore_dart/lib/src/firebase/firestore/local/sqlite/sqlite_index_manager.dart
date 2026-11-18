@@ -621,6 +621,27 @@ class SqliteIndexManager extends IndexManager {
     return result;
   }
 
+  @override
+  Future<bool> hasCurrentIndexEntries(Target target, Document document) async {
+    hardAssert(_started, 'IndexManager not started');
+
+    final List<Target> subTargets = _getSubTargets(target);
+    if (subTargets.length != 1) {
+      return false;
+    }
+    final FieldIndex? fieldIndex = _getFieldIndex(subTargets.first);
+    if (fieldIndex == null) {
+      return false;
+    }
+    final SplayTreeSet<IndexEntry> existingEntries =
+        await _getExistingIndexEntries(document.key, fieldIndex);
+    return existingEntries.isNotEmpty &&
+        const IterableEquality<IndexEntry>().equals(
+          existingEntries,
+          _computeIndexEntries(document.key, document, fieldIndex),
+        );
+  }
+
   /// Constructs a SQL query on 'index_entries' that unions all bounds. Returns the SQL query string and its binding
   /// arguments.
   (String, List<Object>) _generateQueryAndBindings(
