@@ -66,6 +66,60 @@ final Map<String, _Write> _writes = <String, _Write>{
   }),
   'update with increment': (DocumentReference r) =>
       r.update(<String, Object?>{'count': FieldValue.increment(4)}),
+  'update time only': (DocumentReference r) =>
+      r.update(<String, Object?>{'time': FieldValue.serverTimestamp()}),
+  'update time to a value': (DocumentReference r) =>
+      r.update(<String, Object?>{'time': 40}),
+  'update b with time': (DocumentReference r) => r.update(<String, Object?>{
+    'b': 41,
+    'time': FieldValue.serverTimestamp(),
+  }),
+  'update n.t time': (DocumentReference r) =>
+      r.update(<String, Object?>{'n.t': FieldValue.serverTimestamp()}),
+  'update count': (DocumentReference r) =>
+      r.update(<String, Object?>{'count': 42}),
+  'update count to a double': (DocumentReference r) =>
+      r.update(<String, Object?>{'count': 1.5}),
+  'update with increment 1.5': (DocumentReference r) =>
+      r.update(<String, Object?>{'count': FieldValue.increment(1.5)}),
+  'update with negative increment': (DocumentReference r) =>
+      r.update(<String, Object?>{'count': FieldValue.increment(-4)}),
+  'update a with increment': (DocumentReference r) =>
+      r.update(<String, Object?>{'a': 43, 'count': FieldValue.increment(1)}),
+  'update with arrayUnion': (DocumentReference r) => r.update(<String, Object?>{
+    'tags': FieldValue.arrayUnion(<Object?>[2, 8]),
+  }),
+  'update with arrayUnion 8,9': (DocumentReference r) =>
+      r.update(<String, Object?>{
+        'tags': FieldValue.arrayUnion(<Object?>[8, 9, 3.0]),
+      }),
+  'update with arrayRemove': (DocumentReference r) =>
+      r.update(<String, Object?>{
+        'tags': FieldValue.arrayRemove(<Object?>[1]),
+      }),
+  'update with arrayRemove 2': (DocumentReference r) =>
+      r.update(<String, Object?>{
+        'tags': FieldValue.arrayRemove(<Object?>[2, 7]),
+      }),
+  'update tags': (DocumentReference r) => r.update(<String, Object?>{
+    'tags': <int>[3, 4],
+  }),
+  'update n.tags union': (DocumentReference r) => r.update(<String, Object?>{
+    'n.tags': FieldValue.arrayUnion(<Object?>[1]),
+  }),
+  'update n.count increment': (DocumentReference r) =>
+      r.update(<String, Object?>{'n.count': FieldValue.increment(6)}),
+  'merge with arrayUnion': (DocumentReference r) => r.set(<String, Object?>{
+    'tags': FieldValue.arrayUnion(<Object?>[9]),
+  }, SetOptions(merge: true)),
+  'merge time and a': (DocumentReference r) => r.set(<String, Object?>{
+    'a': 44,
+    'time': FieldValue.serverTimestamp(),
+  }, SetOptions(merge: true)),
+  'set count': (DocumentReference r) => r.set(<String, Object?>{'count': 0}),
+  'set tags': (DocumentReference r) => r.set(<String, Object?>{
+    'tags': <int>[1],
+  }),
   'delete': (DocumentReference r) => r.delete(),
 };
 
@@ -90,6 +144,16 @@ final Map<String, Map<String, Object?>?> _documents =
         },
       },
       'n is a number': <String, Object?>{'n': 5, 'a': 6},
+      'with time and doubles': <String, Object?>{
+        'time': 7,
+        'count': 2.5,
+        'tags': <Object>[2.0, 'x', 8],
+        'n': <String, Object?>{'t': 1, 'count': 9007199254740992.0, 'tags': 3},
+      },
+      'large count': <String, Object?>{
+        'count': 9223372036854775806,
+        'n': <String, Object?>{'count': 9223372036854775807},
+      },
     };
 
 /// The data with every timestamp replaced: the backend sets its own time on each write.
@@ -205,6 +269,6 @@ void main() {
         expect(merged[id], separate[id], reason: id);
       }
     },
-    timeout: const Timeout(Duration(minutes: 10)),
+    timeout: const Timeout(Duration(minutes: 30)),
   );
 }

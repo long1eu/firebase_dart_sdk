@@ -107,6 +107,58 @@ void main() {
     'merge an empty map': setMerge(<String, Object?>{'n': <String, Object?>{}}),
     'merge nothing': setMerge(<String, Object?>{}),
     'set n is a number': set(<String, Object?>{'n': 31}),
+    'update time only': update(<String, Object?>{
+      'time': FieldValue.serverTimestamp(),
+    }),
+    'update time to a value': update(<String, Object?>{'time': 40}),
+    'update b with time': update(<String, Object?>{
+      'b': 41,
+      'time': FieldValue.serverTimestamp(),
+    }),
+    'update n.t time': update(<String, Object?>{
+      'n.t': FieldValue.serverTimestamp(),
+    }),
+    'update count': update(<String, Object?>{'count': 42}),
+    'update count to a double': update(<String, Object?>{'count': 1.5}),
+    'update with increment 1.5': update(<String, Object?>{
+      'count': FieldValue.increment(1.5),
+    }),
+    'update with negative increment': update(<String, Object?>{
+      'count': FieldValue.increment(-4),
+    }),
+    'update a with increment': update(<String, Object?>{
+      'a': 43,
+      'count': FieldValue.increment(1),
+    }),
+    'update with arrayUnion': update(<String, Object?>{
+      'tags': FieldValue.arrayUnion(<Object?>[2, 8]),
+    }),
+    'update with arrayUnion 8,9': update(<String, Object?>{
+      'tags': FieldValue.arrayUnion(<Object?>[8, 9, 3.0]),
+    }),
+    'update with arrayRemove 2': update(<String, Object?>{
+      'tags': FieldValue.arrayRemove(<Object?>[2, 7]),
+    }),
+    'update tags': update(<String, Object?>{
+      'tags': <int>[3, 4],
+    }),
+    'update n.tags union': update(<String, Object?>{
+      'n.tags': FieldValue.arrayUnion(<Object?>[1]),
+    }),
+    'update n.count increment': update(<String, Object?>{
+      'n.count': FieldValue.increment(6),
+    }),
+    'merge with arrayUnion': setMerge(<String, Object?>{
+      'tags': FieldValue.arrayUnion(<Object?>[9]),
+    }),
+    'merge time and a': setMerge(<String, Object?>{
+      'a': 44,
+      'time': FieldValue.serverTimestamp(),
+    }),
+    'set count': set(<String, Object?>{'count': 0}),
+    'set tags': set(<String, Object?>{
+      'tags': <int>[1],
+    }),
     'delete': deleteMutation('coll/a'),
   };
 
@@ -120,6 +172,16 @@ void main() {
       'c': 102,
       'count': 5,
       'tags': <int>[1, 2],
+    }),
+    'with time and doubles': doc('coll/a', 1, <String, Object?>{
+      'time': 7,
+      'count': 2.5,
+      'tags': <Object>[2.0, 'x', 8],
+      'n': <String, Object?>{'t': 1, 'count': 9007199254740992.0, 'tags': 3},
+    }),
+    'large count': doc('coll/a', 1, <String, Object?>{
+      'count': 9223372036854775806,
+      'n': <String, Object?>{'count': 9223372036854775807},
     }),
     'nested': doc('coll/a', 1, <String, Object?>{
       'a': <String, Object?>{'x': 1, 'w': 2},
@@ -140,8 +202,14 @@ void main() {
       ? mutation.applyToLocalView(document, document, time)
       : document;
 
-  String describe(MaybeDocument? document) =>
-      document is Document ? document.data.toString() : 'no document';
+  // The backend stores its own time for a server timestamp; the previous value under the estimate exists only in
+  // the client.
+  final RegExp estimate = RegExp(
+    r'\{__local_write_time__:.*?__type__:server_timestamp\}',
+  );
+  String describe(MaybeDocument? document) => document is Document
+      ? document.data.toString().replaceAll(estimate, 'time')
+      : 'no document';
 
   test('a merged write leaves the backend as the two writes do', () {
     final List<String> merged = <String>[];
@@ -204,18 +272,37 @@ void main() {
     },
   );
 
-  test('writes with transforms in an update are never merged', () {
-    for (final String name in <String>[
-      'update with time',
-      'update with increment',
-      'update with arrayRemove',
-      'merge with time',
-      'merge with increment',
-    ]) {
-      for (final Mutation other in writes.values) {
-        expect(mergeUnsentMutations(other, writes[name]!), isNull);
-      }
-      expect(mergeUnsentMutations(writes[name]!, writes['update a']!), isNull);
-    }
+  test('transforms that merge, and transforms that do not', () {
+    Mutation? merge(String first, String second) =>
+        mergeUnsentMutations(writes[first]!, writes[second]!);
+
+    // An edit that stamps a time, again and again: the usual shape of an offline edit.
+    expect(merge('update with time', 'update with time'), isNotNull);
+    expect(merge('update with time', 'update b with time'), isNotNull);
+    expect(merge('update time only', 'update a'), isNotNull);
+    expect(merge('update with time', 'update time to a value'), isNotNull);
+    expect(merge('set a,b', 'update with time'), isNotNull);
+    expect(merge('set with time', 'update with time'), isNotNull);
+    expect(
+      merge('update with arrayUnion', 'update with arrayUnion 8,9'),
+      isNotNull,
+    );
+    expect(merge('set count', 'update with increment'), isNotNull);
+    expect(merge('update count', 'update with increment'), isNotNull);
+    expect(merge('update with increment', 'update a'), isNotNull);
+
+    // The backend adds one operand at a time, rounding and saturating at each step.
+    expect(merge('update with increment', 'update with increment'), isNull);
+    expect(
+      merge('update with increment', 'update with negative increment'),
+      isNull,
+    );
+    expect(merge('update count to a double', 'update with increment'), isNull);
+    expect(
+      merge('update with arrayUnion', 'update with arrayRemove 2'),
+      isNull,
+    );
+    expect(merge('update with arrayRemove', 'update with arrayUnion'), isNull);
+    expect(merge('update with time', 'set with increment'), isNull);
   });
 }

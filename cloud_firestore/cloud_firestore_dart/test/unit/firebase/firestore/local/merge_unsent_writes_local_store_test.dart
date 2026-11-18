@@ -81,7 +81,8 @@ void main() {
 
   /// The data without the fields that transforms write. A server timestamp shows the time of its batch, and an
   /// increment or array transform starts from the value recorded when it was written, which a plain replay of the
-  /// writes does not know. Writes with transforms in an update are never merged, so the first check covers them.
+  /// writes does not know once a write under it was acknowledged or rejected. The runs with writes only compare
+  /// these fields too, see [withTimes].
   String withoutTransforms(MaybeDocument? document) => document is Document
       ? document.data
             .toString()
@@ -91,11 +92,26 @@ void main() {
             .replaceAll('{,', '{')
       : 'no document';
 
+  /// The whole data, with every pending server timestamp as one word: its estimate is the time of its batch.
+  String withTimes(MaybeDocument? document) => document is Document
+      ? document.data.toString().replaceAll(
+          RegExp(r'\{__local_write_time__:.*?__type__:server_timestamp\}'),
+          'time',
+        )
+      : 'no document';
+
   String withoutPreviousValue(String data) =>
       data.replaceAll(RegExp(r'__previous_value__:.*?,__type__'), '__type__');
 
   /// Returns the number of writes that were merged.
-  Future<int> run(Persistence persistence, int seed) async {
+  ///
+  /// With [onlyWrites] nothing is acknowledged or rejected, and the documents must equal a replay of all the writes
+  /// in every field: what the app sees with merging is what it sees without.
+  Future<int> run(
+    Persistence persistence,
+    int seed, {
+    bool onlyWrites = false,
+  }) async {
     final Random random = Random(seed);
     final LocalStore localStore = LocalStore(persistence, User.unauthenticated)
       ..mergeUnsentWrites = true;
@@ -137,11 +153,13 @@ void main() {
                           a.$1.compareTo(b.$1),
                     );
               for (final (int, List<Mutation>) entry in all) {
+                // As a batch does: the transforms of all its writes start from the document before the batch.
+                final MaybeDocument? beforeBatch = fromWrites;
                 for (final Mutation mutation in entry.$2) {
                   if (mutation.key == documentKey) {
                     fromWrites = mutation.applyToLocalView(
                       fromWrites,
-                      fromWrites,
+                      beforeBatch,
                       Timestamp(1000, 0),
                     );
                   }
@@ -167,6 +185,9 @@ void main() {
           withoutTransforms(expected.$2),
           reason: reason,
         );
+        if (onlyWrites) {
+          expect(withTimes(actual), withTimes(expected.$2), reason: reason);
+        }
       }
     }
 
@@ -188,7 +209,7 @@ void main() {
     await check('start');
 
     for (int step = 0; step < 200; step++) {
-      final int action = random.nextInt(20);
+      final int action = random.nextInt(onlyWrites ? 16 : 20);
       if (action < 14) {
         final DocumentKey documentKey = keys[random.nextInt(2)];
         final List<Mutation> mutations = <Mutation>[
@@ -271,6 +292,25 @@ void main() {
         expect(merges, greaterThan(200));
       },
       timeout: const Timeout(Duration(minutes: 5)),
+    );
+
+    test(
+      'random writes with merging and no acknowledgement, $cache cache',
+      () async {
+        int merges = 0;
+        for (int seed = 0; seed < (cache == 'memory' ? 200 : 20); seed++) {
+          final Persistence persistence = cache == 'memory'
+              ? await createLRUMemoryPersistence()
+              : await createSQLitePersistence();
+          try {
+            merges += await run(persistence, 1000 + seed, onlyWrites: true);
+          } finally {
+            await persistence.shutdown();
+          }
+        }
+        expect(merges, greaterThan(1000));
+      },
+      timeout: const Timeout(Duration(minutes: 10)),
     );
   }
 }
