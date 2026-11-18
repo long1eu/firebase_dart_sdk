@@ -214,7 +214,8 @@ await progress.cancel();
 
 Every write is a pending write until the backend accepts it, so an app that edits the same
 documents for months offline queues one write per edit: about 1 KB of cache each, and a
-reconnect that sends them all, one billed write each (see `docs/spikes/offline_forever.md`).
+reconnect that sends them all, one billed write each (see [Long offline use, measured](long_offline.md)
+and `docs/spikes/offline_forever.md`).
 `mergeUnsentWrites`, on `PersistentCacheSettings` or `MemoryCacheSettings`, keeps one pending
 write per document instead. It is not in the official SDKs, and it is off by default.
 
@@ -299,6 +300,9 @@ For one document set once and updated 100,000 times offline (`tool/bench/offline
 | time per offline write, public API | 90 us | 116 us |
 | `enableNetwork` until `waitForPendingWrites` completes | 132 s | 0.45 s |
 | billed writes | 100,001 | 1 |
+
+For what a queue of thousands or millions of pending writes costs, with the numbers, see
+[Long offline use, measured](long_offline.md).
 
 ### Protect the cache files
 
@@ -386,7 +390,7 @@ What to know (all measured in Chrome against the emulator; other browsers are un
   size limit of 100 MB starts removing unused documents before 100,000 documents.
   [Platforms](platforms.md#the-web-supported-in-chrome) has the measurements.
 - **Size.** The persistent cache adds about 220 KB of JavaScript (60 KB gzipped) to a small
-  app, plus the `sqlite3.wasm` file (731 KB, 349 KB gzipped); the OPFS worker is 183 KB more.
+  app, plus the `sqlite3.wasm` file (759 KB, 364 KB gzipped); the OPFS worker is 183 KB more.
 - `clearPersistence()` deletes the IndexedDB database or the OPFS directory.
 
 ## Deleting the cache

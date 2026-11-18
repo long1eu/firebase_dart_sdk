@@ -77,4 +77,5 @@ public API of the main library is the golden listing linked below.
 - [Error handling](https://raw.githubusercontent.com/long1eu/firebase_dart_sdk/main/docs/guides/error_handling.md): errors, their codes and what to do about them
 - [Troubleshooting](https://raw.githubusercontent.com/long1eu/firebase_dart_sdk/main/docs/guides/troubleshooting.md): common problems and their causes
 - [Performance](https://raw.githubusercontent.com/long1eu/firebase_dart_sdk/main/docs/guides/performance.md): what costs time and memory, and how to measure it
+- [Long offline use](https://raw.githubusercontent.com/long1eu/firebase_dart_sdk/main/docs/guides/long_offline.md): what a queue of millions of pending writes costs, and the settings that keep it small
 - [Servers](https://raw.githubusercontent.com/long1eu/firebase_dart_sdk/main/docs/guides/server.md): the client in a backend process
