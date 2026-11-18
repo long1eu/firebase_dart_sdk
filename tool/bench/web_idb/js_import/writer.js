@@ -1,10 +1,16 @@
 // Writes a few documents with the official JS SDK (IndexedDB persistence, network disabled) so that the database
-// holds pending mutations and a cached remote document. Network never starts: the project is a fake demo- one and
+// holds pending mutations and cached remote documents. Network never starts: the project is a fake demo- one and
 // disableNetwork() runs before any write. Result is reported in document.title and on the page.
+//
+// For the importer (importer.dart): the bundle also has a deleted document (a noDocument row), one batch has three
+// writes (a WriteBatch), the client terminates at the end (it releases its lease and removes its clientMetadata row,
+// as a tab that closes normally does), and a copy of the first batch is then added for a second user, user2, with
+// raw IndexedDB (signing in needs a backend): its rows have the shape the JS SDK writes.
 import { initializeApp } from 'firebase/app';
 import {
   initializeFirestore, persistentLocalCache, persistentSingleTabManager, disableNetwork, doc, setDoc, updateDoc,
   getDocFromCache, loadBundle, Timestamp, GeoPoint, Bytes, serverTimestamp, increment, arrayUnion, deleteDoc,
+  writeBatch, terminate,
 } from 'firebase/firestore';
 
 const out = [];
@@ -29,9 +35,10 @@ function buildBundle(project) {
       m: { mapValue: { fields: { x: { booleanValue: true }, y: { nullValue: 'NULL_VALUE' } } } },
       a: { arrayValue: { values: [{ stringValue: 'p' }, { integerValue: '7' }] } },
     } } }),
+    element({ documentMetadata: { name: `${parent}/items/gone`, readTime: t, exists: false } }),
   ];
   const total = body.reduce((n, e) => n + new TextEncoder().encode(e).length, 0);
-  const meta = element({ metadata: { id: 'b1', createTime: t, version: 1, totalDocuments: 1, totalBytes: total } });
+  const meta = element({ metadata: { id: 'b1', createTime: t, version: 1, totalDocuments: 2, totalBytes: total } });
   return meta + body.join('');
 }
 
@@ -55,11 +62,43 @@ async function main() {
   step('w2', () => setDoc(doc(db, 'items/w2'), { count: 1 }));
   step('w2u', () => updateDoc(doc(db, 'items/w2'), { count: increment(5), tags: arrayUnion('a', 'b'), 'nested.field': 'v' }));
   step('w3', () => deleteDoc(doc(db, 'items/w3')));
+  step('batch', () => writeBatch(db)
+    .set(doc(db, 'items/b1'), { inBatch: true })
+    .update(doc(db, 'items/cached1'), { title: 'updated offline' })
+    .delete(doc(db, 'items/b2'))
+    .commit());
   // Reading from the cache runs after the writes on the same queue, so they are persisted when this returns.
   const snap = await getDocFromCache(doc(db, 'items/w1'));
   log('local doc w1 exists=' + snap.exists() + ' ' + JSON.stringify(snap.data()?.title));
   const c = await getDocFromCache(doc(db, 'items/cached1'));
   log('cached1 exists=' + c.exists());
+  await terminate(db);
+  log('terminated');
+  await addSecondUser(`firestore/[DEFAULT]/${project}/main`);
+  log('copied the first batch for user2');
   document.title = 'done: ' + out.join(' | ').replace(/\n/g,' ');
+}
+
+const req = (r) => new Promise((resolve, reject) => { r.onsuccess = () => resolve(r.result); r.onerror = () => reject(r.error); });
+
+// The rows the JS SDK writes for a batch (indexeddb_mutation_queue.ts addMutationBatch): the batch with an
+// auto-incremented batchId, the user's mutationQueues row, and one documentMutations key per document
+// ([userId, encodeResourcePath(path), batchId]; each segment followed by \u0001\u0001).
+async function addSecondUser(name) {
+  const idb = await req(indexedDB.open(name));
+  const tx = idb.transaction(['mutations', 'mutationQueues', 'documentMutations'], 'readwrite');
+  const done = new Promise((resolve, reject) => { tx.oncomplete = resolve; tx.onabort = () => reject(tx.error); });
+  const first = (await req(tx.objectStore('mutations').getAll()))[0];
+  const copy = { ...first, userId: 'user2', localWriteTimeMs: first.localWriteTimeMs + 1 };
+  delete copy.batchId;
+  const batchId = await req(tx.objectStore('mutations').add(copy));
+  await req(tx.objectStore('mutationQueues').put({ userId: 'user2', lastAcknowledgedBatchId: -1, lastStreamToken: '' }));
+  for (const write of copy.mutations) {
+    const docName = write.update ? write.update.name : write.delete;
+    const path = docName.split('/documents/')[1].split('/').map((s) => s + '\u0001\u0001').join('');
+    await req(tx.objectStore('documentMutations').put({}, ['user2', path, batchId]));
+  }
+  await done;
+  idb.close();
 }
 main().catch((e) => { log('ERROR ' + e); document.title = 'error: ' + e + ' after ' + out.join(' | '); });

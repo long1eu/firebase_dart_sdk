@@ -44,6 +44,17 @@ class SQLiteGlobalsCache implements GlobalsCache {
     return _set(_sessionToken, value);
   }
 
+  @override
+  Future<Uint8List?> getValue(String name) => _get(name);
+
+  @override
+  Future<void> setValue(String name, Uint8List? value) {
+    if (value == null) {
+      return _db.execute('DELETE FROM globals WHERE name = ?', <Object?>[name]);
+    }
+    return _set(name, value);
+  }
+
   /// The value as a blob. The column is typed by affinity only, and another process may have written a value of
   /// another type: SQLite converts it like the `Cursor.getBlob` of Android does for text (its UTF-8 bytes), and a
   /// number to the bytes of its text.

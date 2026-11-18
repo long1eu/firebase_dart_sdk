@@ -30,4 +30,13 @@ abstract class GlobalsCache {
 
   /// Stores [value] as the session token.
   Future<void> setSessionToken(Uint8List value);
+
+  /// Returns the value stored under [name], or null when there is none.
+  ///
+  /// PORTING NOTE: not upstream, which reads and writes the session token only. The import of the JS SDK's cache
+  /// keeps its record here, in the transaction that adds the imported writes.
+  Future<Uint8List?> getValue(String name);
+
+  /// Stores [value] under [name], or removes the entry when [value] is null.
+  Future<void> setValue(String name, Uint8List? value);
 }

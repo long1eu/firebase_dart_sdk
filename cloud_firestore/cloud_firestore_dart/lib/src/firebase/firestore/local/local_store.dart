@@ -1526,12 +1526,133 @@ class LocalStore implements BundleCallback {
     );
   }
 
+  /// Adds mutation batches written by another SDK (the import of the JS SDK's cache) to the mutation queues of their
+  /// users, in their order, with new batch ids, and saves the document overlays they imply. [currentUser] is the user
+  /// of this local store. [inTransaction] runs last, in the same transaction: the importer records there what it
+  /// imported, so that the batches and the record are committed together or not at all.
+  ///
+  /// Nothing is written, and [ImportedMutationBatches.nonEmptyQueues] names the users, when the mutation queue of one
+  /// of the users of [batchesByUser] is not empty: the imported batches were written before the ones in the queue, and
+  /// appending them would send them after those.
+  ///
+  /// PORTING NOTE: not in the official SDKs.
+  Future<ImportedMutationBatches> importMutationBatches(
+    Map<User, List<MutationBatch>> batchesByUser,
+    User currentUser,
+    Future<void> Function() inTransaction,
+  ) {
+    return _persistence.runTransactionAndReturn<
+      ImportedMutationBatches
+    >('Import mutation batches', () async {
+      // The queue of the current user is the instance of this store: a SQLite queue counts its batches in memory.
+      MutationQueue queueOf(User user) => user == currentUser
+          ? _mutationQueue
+          : _persistence.getMutationQueue(user);
+
+      final List<User> nonEmpty = <User>[];
+      for (final MapEntry<User, List<MutationBatch>> entry
+          in batchesByUser.entries) {
+        if (entry.value.isEmpty) {
+          continue;
+        }
+        final MutationQueue queue = queueOf(entry.key);
+        if (entry.key != currentUser) {
+          await queue.start();
+        }
+        if (!await queue.isEmpty()) {
+          nonEmpty.add(entry.key);
+        }
+      }
+      if (nonEmpty.isNotEmpty) {
+        return ImportedMutationBatches(
+          const <int>[],
+          DocumentCollections.emptyMaybeDocumentMap(),
+          nonEmpty,
+        );
+      }
+
+      // The current user first: its queue read the next batch id when it started. The queue of each other user reads
+      // it when it starts, after the batches added before.
+      final List<User> users = <User>[
+        if (batchesByUser.containsKey(currentUser)) currentUser,
+        for (final User user in batchesByUser.keys)
+          if (user != currentUser) user,
+      ];
+      final List<int> currentUserBatchIds = <int>[];
+      Set<DocumentKey> currentUserKeys = <DocumentKey>{};
+      for (final User user in users) {
+        final List<MutationBatch> batches = batchesByUser[user]!;
+        if (batches.isEmpty) {
+          continue;
+        }
+        final MutationQueue queue = queueOf(user);
+        if (user != currentUser) {
+          await queue.start();
+        }
+        final Set<DocumentKey> keys = <DocumentKey>{};
+        for (final MutationBatch batch in batches) {
+          final MutationBatch added = await queue.addMutationBatch(
+            batch.localWriteTime,
+            batch.baseMutations,
+            batch.mutations,
+          );
+          keys.addAll(added.keys);
+          if (user == currentUser) {
+            currentUserBatchIds.add(added.batchId);
+            _documentKeysByBatchId[added.batchId] = added.keys;
+          }
+        }
+        final LocalDocumentsView view = user == currentUser
+            ? _localDocuments
+            : LocalDocumentsView(
+                remoteDocumentCache: _remoteDocuments,
+                mutationQueue: queue,
+                documentOverlayCache: _persistence.getDocumentOverlayCache(
+                  user,
+                ),
+                indexManager: _persistence.indexManager,
+              );
+        await view.recalculateAndSaveOverlays(keys);
+        if (user == currentUser) {
+          currentUserKeys = keys;
+        }
+      }
+      // The batch ids are global: the queue of this store reads the next one again, after the other users' batches.
+      await _mutationQueue.start();
+      await inTransaction();
+
+      return ImportedMutationBatches(
+        currentUserBatchIds,
+        await _localDocuments.getDocuments(currentUserKeys),
+        const <User>[],
+      );
+    });
+  }
+
   /// Creates a new query using the given bundle name, which will be used to hold the keys of all documents from the
   /// bundle in query-document mappings. This ensures that the loaded documents do not get garbage collected right away.
   static Query _newUmbrellaQuery(String bundleName) {
     // It is OK that the path used for the query is not valid, because this will not be read and queried.
     return Query(ResourcePath.fromString('__bundle__/docs/$bundleName'));
   }
+}
+
+/// The result of [LocalStore.importMutationBatches].
+class ImportedMutationBatches {
+  const ImportedMutationBatches(
+    this.currentUserBatchIds,
+    this.currentUserChanges,
+    this.nonEmptyQueues,
+  );
+
+  /// The new ids of the batches added to the queue of the current user.
+  final List<int> currentUserBatchIds;
+
+  /// The local view of the documents that the batches of the current user write.
+  final ImmutableSortedMap<DocumentKey, MaybeDocument> currentUserChanges;
+
+  /// The users whose queue was not empty: nothing was imported when there is one.
+  final List<User> nonEmptyQueues;
 }
 
 /// The result of [LocalStore.handleUserChangeWithBatchIds].

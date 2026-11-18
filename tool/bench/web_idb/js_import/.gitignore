@@ -6,3 +6,5 @@ package-lock.json
 *.bundle.js
 static/reader.js
 static/reader.js.*
+static/importer.js
+static/importer.js.*

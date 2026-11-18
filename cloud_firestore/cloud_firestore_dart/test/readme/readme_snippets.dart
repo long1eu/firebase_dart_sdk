@@ -1070,15 +1070,15 @@ Future<void> migratingFromFlutterfireGuideLine154() async {
   );
 }
 
-// ../../docs/guides/migrating_from_flutterfire.md:175
-Future<void> migratingFromFlutterfireGuideLine175() async {
+// ../../docs/guides/migrating_from_flutterfire.md:181
+Future<void> migratingFromFlutterfireGuideLine181() async {
   final FirebaseUserAuth auth = await FirebaseUserAuth.forApp(app);
   final FirebaseFirestore signedIn = FirebaseFirestore.instanceFor(app: app);
   await auth.signInWithEmailAndPassword(email: 'ada@example.com', password: password);
 }
 
-// ../../docs/guides/migrating_from_flutterfire.md:330
-Future<void> migratingFromFlutterfireGuideLine330() async {
+// ../../docs/guides/migrating_from_flutterfire.md:336
+Future<void> migratingFromFlutterfireGuideLine336() async {
   final QuerySnapshot<Map<String, Object?>> page = await firestore
       .collection('users')
       .where('age', isGreaterThanOrEqualTo: 18)
@@ -1626,8 +1626,26 @@ Future<void> webGuideLine274() async {
   final bool persistent = firestore.persistentCacheIndexManager != null;
 }
 
-// ../../docs/guides/web.md:306
-Future<void> webGuideLine306() async {
+// ../../docs/guides/web.md:299
+Future<void> webGuideLine299() async {
+  final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(
+    app: app,
+    openDatabase: sqliteOpener(),
+    settings: Settings(cacheSettings: PersistentCacheSettings()),
+  );
+  // At every start, before the first write.
+  try {
+    final JsSdkCacheImportResult result = await importJsSdkCache(firestore);
+    print('${result.status.name}: ${result.batches} pending writes of '
+        '${result.users} users, ${result.documents} documents');
+  } on JsSdkCacheImportException catch (e) {
+    // Nothing was imported; the next start tries again.
+    print('Not imported (${e.reason.name}): ${e.message}');
+  }
+}
+
+// ../../docs/guides/web.md:375
+Future<void> webGuideLine375() async {
   // One client of the page: `client` names its app ('client-left', 'client-right').
   Future<FirebaseFirestore> startClient(String client, String email) async {
     final FirebaseApp clientApp = FirebaseApp.withOptions(app.options, name: client);
@@ -1637,7 +1655,7 @@ Future<void> webGuideLine306() async {
   }
 }
 
-// ../../docs/guides/web.md:334
-Future<void> webGuideLine334() async {
+// ../../docs/guides/web.md:403
+Future<void> webGuideLine403() async {
   final Settings settings = Settings().withEmulator('127.0.0.1', 8080);
 }

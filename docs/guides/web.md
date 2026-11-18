@@ -288,6 +288,75 @@ released when a page goes away, a reloaded page knows the page before it is gone
 writes it left pending at once. [Several clients on one cache](multiple_clients.md) has the
 details.
 
+## Switching from the official JS SDK
+
+**Experimental.** A web app that used the official Firebase JS SDK with persistence (directly, or
+through FlutterFire on the web) has its cache in an IndexedDB database of its own,
+`firestore/[DEFAULT]/<project id>/main`. This SDK does not read that database, but
+`importJsSdkCache` copies it into this SDK's cache, once, so that the writes the old version of
+the app left pending are not lost when the new version starts on the same browser profile:
+
+```dart
+import 'package:cloud_firestore_dart_sqlite/cloud_firestore_dart_sqlite.dart';
+
+final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(
+  app: app,
+  openDatabase: sqliteOpener(),
+  settings: Settings(cacheSettings: PersistentCacheSettings()),
+);
+// At every start, before the first write.
+try {
+  final JsSdkCacheImportResult result = await importJsSdkCache(firestore);
+  print('${result.status.name}: ${result.batches} pending writes of '
+      '${result.users} users, ${result.documents} documents');
+} on JsSdkCacheImportException catch (e) {
+  // Nothing was imported; the next start tries again.
+  print('Not imported (${e.reason.name}): ${e.message}');
+}
+```
+
+What is carried over:
+
+- **The pending writes of every user** (not only the signed-in one), in their order and with their
+  local write times. The app's local reads include them at once, and they are sent when the client
+  is online. Each one is then removed from the JS database. A write the JS SDK had sent but whose
+  acknowledgement it never received is sent again, as the JS SDK itself would have done.
+- **The cached documents** (unless `includeDocuments: false`), with their versions and read times,
+  the first time only, so that the first start offline still shows data. A document this cache
+  holds in a newer version is kept.
+
+What is not: targets, resume tokens, the index configuration, bundles and named queries.
+Listeners read their results from the backend again, as on a first start.
+
+How it behaves:
+
+- **Call it at every start, right after creating the instance and before any write.** It runs on
+  the client's queue like every operation. It refuses (`pendingWritesInCache`) when this cache
+  already holds pending writes of a user who also has some in the JS database: the JS writes are
+  older and would be sent after the newer ones. When there is nothing left to import it costs one
+  IndexedDB open; when there is no JS database it returns `noJsDatabase`; off the web it returns
+  `notOnWeb`.
+- **Exactly once.** The cache records what it imported in the transaction that adds the writes,
+  and the next call finishes their removal from the JS database if the page closed in between. A
+  crash at any point loses no pending write and imports none twice. With a memory cache the
+  imported writes, like every write made with it, are lost if the page closes before the backend
+  acknowledges them: use a persistent cache.
+- **The JS database is never deleted.** `deleteJsSdkCache(firestore)` deletes it when the app is
+  sure it no longer needs it; it refuses while the database holds writes that were not imported
+  (unless `discardPendingWrites: true`).
+- **Schema versions 5 to 18** of the JS database are read (the pending writes have the same shape
+  since version 5); the cached documents from version 13 on. A database written by a newer JS SDK
+  is refused (`unsupportedSchemaVersion`).
+
+**No JS tab may be open.** A JS tab and a page of this SDK can not share the cache: the import
+refuses (`jsClientActive`) while the JS SDK's primary lease is less than 5 seconds old, or while
+one of its clients refreshed its metadata less than 30 minutes ago and did not mark itself as
+closed (the JS SDK's own windows). A JS tab that closes normally marks itself; one that crashed
+counts as open for 30 minutes. Deploy the new version so that no tab keeps running the old one
+(a service worker that serves the old bundle, for example), and after the switch do not open the
+old version again on the same profile: its writes would land in the JS database and wait for the
+next import.
+
 ## Several clients in one page
 
 A page can hold several whole clients, each with its own `FirebaseApp`, user and

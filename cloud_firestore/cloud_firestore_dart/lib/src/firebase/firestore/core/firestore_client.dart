@@ -289,6 +289,13 @@ class FirestoreClient implements RemoteStoreCallback {
     return result.future;
   }
 
+  /// Runs [task] on the queue of the client, after its initialization: no other operation of this client runs in
+  /// between. For the import of the JS SDK's cache, which reads another database between its transactions.
+  Future<T> runExclusive<T>(Future<T> Function() task) {
+    _verifyNotShutdown();
+    return _enqueue<T>(task);
+  }
+
   /// Returns a future that completes when all the writes that are pending right now were acknowledged (or rejected)
   /// by the backend.
   Future<void> waitForPendingWrites() async {

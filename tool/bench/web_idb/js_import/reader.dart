@@ -13,6 +13,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/mutat
 import 'package:cloud_firestore_dart/src/firebase/firestore/remote/remote_serializer.dart';
 import 'package:cloud_firestore_dart/src/firebase/timestamp.dart';
 import 'package:cloud_firestore_dart/src/proto/index.dart' as proto;
+import 'package:fixnum/fixnum.dart';
 import 'package:web/web.dart' as web;
 
 final StringBuffer out = StringBuffer();
@@ -82,7 +83,13 @@ Future<void> main() async {
         m.noDocument = proto.NoDocument()
           ..name =
               'projects/demo-idb/databases/(default)/documents/${(row['noDocument'] as Map)['path'].join('/')}'
-          ..readTime = (proto.Timestamp()..mergeFromProto3Json(null));
+          ..readTime = (proto.Timestamp()
+            ..seconds = Int64(
+              ((row['noDocument'] as Map)['readTime'] as Map)['seconds'] as int,
+            )
+            ..nanos =
+                ((row['noDocument'] as Map)['readTime'] as Map)['nanoseconds']
+                    as int);
       }
       m.hasCommittedMutations = row['hasCommittedMutations'] == true;
       final MaybeDocument doc = serializer.decodeMaybeDocument(m);
