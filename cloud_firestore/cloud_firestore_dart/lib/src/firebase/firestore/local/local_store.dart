@@ -416,9 +416,13 @@ class LocalStore implements BundleCallback {
           : null;
       final MutationBatch batch = await _mutationQueue.addMutationBatch(
         localWriteTime,
-        merge == null || merge.keepsBaseMutations
+        merge == null
             ? baseMutations
-            : const <Mutation>[],
+            : mergedBaseMutations(
+                merge.replaced,
+                baseMutations,
+                merge.mutation,
+              ),
         merge == null ? mutations : <Mutation>[merge.mutation],
       );
       if (merge != null) {
@@ -500,10 +504,15 @@ class LocalStore implements BundleCallback {
   /// merged write takes the place of the newer write, so the last write of every document keeps its order; only the
   /// earlier state of this document never reaches the backend.
   ///
-  /// Applying a merged write on top of the replaced one (sent and committed in a previous session) gives the merged
-  /// result again: a set or a delete does not depend on the document before; a patch sets every path of its mask to
-  /// the value it has after both writes, which does not depend on the document either, and its `exists` precondition
-  /// holds after the replaced write.
+  /// A replaced write sent and committed in a previous session would be sent again without the merge (writes are sent
+  /// at least once), so the backend would see it twice and then the new write. With the merge it sees it once and then
+  /// the merged write, which is the same as the replaced write followed by the new one: the same document in the end,
+  /// also for increments.
+  ///
+  /// The new batch is applied to the local view after the replaced one, which already includes the replaced write.
+  /// That is the same as the two writes because the merged write rewrites every field the replaced write wrote, and
+  /// its other transforms are idempotent (server timestamps, array transforms), except for increments: those of the
+  /// replaced write that stay keep its base value (the value before it), see [mergedBaseMutations].
   Future<_UnsentWriteMerge?> _findUnsentWriteMerge(
     List<Mutation> mutations,
   ) async {
@@ -525,11 +534,7 @@ class LocalStore implements BundleCallback {
     if (merged == null || await _persistence.hasOtherClients()) {
       return null;
     }
-    return _UnsentWriteMerge(
-      previous,
-      merged,
-      keepsBaseMutations: identical(merged, next),
-    );
+    return _UnsentWriteMerge(previous, merged);
   }
 
   /// Acknowledges the given batch.
@@ -1675,19 +1680,11 @@ class UserChangeResult {
 
 /// A write that replaces the pending write in [replaced] (see [LocalStore._findUnsentWriteMerge]).
 class _UnsentWriteMerge {
-  const _UnsentWriteMerge(
-    this.replaced,
-    this.mutation, {
-    required this.keepsBaseMutations,
-  });
+  const _UnsentWriteMerge(this.replaced, this.mutation);
 
   /// The batch that is removed.
   final MutationBatch replaced;
 
-  /// The only mutation of the new batch.
+  /// The only mutation of the new batch, whose base mutations are [mergedBaseMutations].
   final Mutation mutation;
-
-  /// Whether [mutation] is the new write itself, whose base mutations (of its transforms) the new batch keeps. A
-  /// mutation merged from both has no transforms, and so no base mutations.
-  final bool keepsBaseMutations;
 }

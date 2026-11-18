@@ -1194,8 +1194,8 @@ Future<void> offlinePersistenceGuideLine221() async {
   );
 }
 
-// ../../docs/guides/offline_persistence.md:283
-Future<void> offlinePersistenceGuideLine283() async {
+// ../../docs/guides/offline_persistence.md:305
+Future<void> offlinePersistenceGuideLine305() async {
   final Directory directory = Directory('/home/ada/.local/share/my_app')
     ..createSync(recursive: true);
   if (!Platform.isWindows) {
@@ -1203,8 +1203,8 @@ Future<void> offlinePersistenceGuideLine283() async {
   }
 }
 
-// ../../docs/guides/offline_persistence.md:308
-Future<void> offlinePersistenceGuideLine308() async {
+// ../../docs/guides/offline_persistence.md:330
+Future<void> offlinePersistenceGuideLine330() async {
   // IndexedDB: SQLite runs in the page on a copy of the whole database in memory.
   final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(
     app: app,
@@ -1212,23 +1212,23 @@ Future<void> offlinePersistenceGuideLine308() async {
   );
 }
 
-// ../../docs/guides/offline_persistence.md:325
-Future<void> offlinePersistenceGuideLine325() async {
+// ../../docs/guides/offline_persistence.md:347
+Future<void> offlinePersistenceGuideLine347() async {
   final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(
     app: app,
     openDatabase: sqliteOpener(opfsWorker: Uri.parse('sqlite_opfs_worker.js')),
   );
 }
 
-// ../../docs/guides/offline_persistence.md:359
-Future<void> offlinePersistenceGuideLine359() async {
+// ../../docs/guides/offline_persistence.md:381
+Future<void> offlinePersistenceGuideLine381() async {
   await firestore.terminate();        // the cache must not be in use by this instance
   await firestore.clearPersistence(); // deletes the files (or the browser storage)
   final FirebaseFirestore fresh = FirebaseFirestore.instanceFor(app: app);
 }
 
-// ../../docs/guides/offline_persistence.md:378
-Future<void> offlinePersistenceGuideLine378() async {
+// ../../docs/guides/offline_persistence.md:400
+Future<void> offlinePersistenceGuideLine400() async {
   final indexes = firestore.persistentCacheIndexManager; // null with a memory cache
   await indexes?.enableIndexAutoCreation();
 }
