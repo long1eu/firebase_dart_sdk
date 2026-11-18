@@ -69,6 +69,10 @@ class _NotesAppState extends State<NotesApp> {
     return MaterialApp(
       title: 'Notes',
       theme: ThemeData(colorSchemeSeed: Colors.indigo),
+      darkTheme: ThemeData(
+        colorSchemeSeed: Colors.indigo,
+        brightness: Brightness.dark,
+      ),
       home: NotesPage(firestore: widget.firestore),
     );
   }

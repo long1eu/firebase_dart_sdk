@@ -8,3 +8,11 @@ form input { flex: 1; }
 .online { color: #186a3b; }
 .offline { color: #a04000; }
 #error { color: #b03a2e; }
+
+/* Dark when the system or browser asks for it; the browser draws the page and controls. */
+:root { color-scheme: light dark; }
+@media (prefers-color-scheme: dark) {
+  .online { color: #7bd88f; }
+  .offline { color: #f5a65b; }
+  #error { color: #ff8a80; }
+}

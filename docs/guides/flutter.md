@@ -16,7 +16,7 @@ built for the web, read [A Flutter web app](web.md#a-flutter-web-app) too: the t
 This is the example app on macOS against the emulator. The status line under the title comes
 from the snapshot metadata ([An offline indicator from the metadata](#an-offline-indicator-from-the-metadata)):
 
-![The flutter_notes window on macOS: the status line says "Up to date" and three notes are listed, each with a delete button](../images/examples/flutter_notes_online.png)
+<picture><source media="(prefers-color-scheme: dark)" srcset="../images/examples/flutter_notes_online_dark.png"><img src="../images/examples/flutter_notes_online.png" alt="The flutter_notes window on macOS: the status line says &quot;Up to date&quot; and three notes are listed, each with a delete button"></picture>
 
 The Dart blocks of this guide are fenced as `dart flutter`: they import Flutter or plugins, so
 the snippet test of the package, which compiles the other guides, skips them. They are checked

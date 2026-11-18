@@ -15,12 +15,12 @@ The packages come from pub.dev (`cloud_firestore_dart` 0.2.0, `cloud_firestore_d
 The guest (right) was refused the lock, the owner (left) locked the board, and the guest's write
 to the locked board was refused too:
 
-![Two columns: alice@example.com (owner) and bob@example.com (guest), memory cache, both showing "Hello from bob #1", Locked, last by alice@example.com; the left column says "Locked", the right one "Refused: permissionDenied"](../../docs/images/examples/flutter_web_two_users_rules.png)
+<picture><source media="(prefers-color-scheme: dark)" srcset="../../docs/images/examples/flutter_web_two_users_rules_dark.png"><img src="../../docs/images/examples/flutter_web_two_users_rules.png" alt="Two columns: alice@example.com (owner) and bob@example.com (guest), memory cache, both showing &quot;Hello from bob #1&quot;, Locked, last by alice@example.com; the left column says &quot;Locked&quot;, the right one &quot;Refused: permissionDenied&quot;"></picture>
 
 After a reload with the SQLite cache: the first snapshot of each client came from its cache (about
 100 ms after `main()`), the first one from the server about 30 ms later:
 
-![The same page with "SQLite cache" selected after a reload: each column names its IndexedDB database, "First snapshot: 99 ms, from the cache", "First from the server: 129 ms", and the text "Hello from alice #1"](../../docs/images/examples/flutter_web_two_users_reload.png)
+<picture><source media="(prefers-color-scheme: dark)" srcset="../../docs/images/examples/flutter_web_two_users_reload_dark.png"><img src="../../docs/images/examples/flutter_web_two_users_reload.png" alt="The same page with &quot;SQLite cache&quot; selected after a reload: each column names its IndexedDB database, &quot;First snapshot: 99 ms, from the cache&quot;, &quot;First from the server: 129 ms&quot;, and the text &quot;Hello from alice #1&quot;"></picture>
 
 ## Run it
 
@@ -117,7 +117,10 @@ checked, with both builds:
   the document through the emulator's REST API: both columns showed the write within 105 ms of
   the thaw (dart2wasm build). Not tried: hours in the background, a laptop asleep.
 
-The screenshots are from the dart2wasm build. Only Chrome was tried.
+The screenshots are from the dart2wasm build. Only Chrome was tried. The dark captures
+(`*_dark.png`, 2026-11-18) are the same steps in headless Chrome with
+`--blink-settings=preferredColorScheme=0`, against `AUTH_PORT=9351 FIRESTORE_PORT=8352
+WEB_PORT=8355 ./run.sh --wasm`; the page follows the system scheme through `darkTheme`.
 
 With a temporary `pubspec_overrides.yaml` on the `cloud_firestore_dart_sqlite` 0.1.2 of the
 repository (not published yet when this was written): with the pinned `sqlite3` 3.3.4 the SQLite
