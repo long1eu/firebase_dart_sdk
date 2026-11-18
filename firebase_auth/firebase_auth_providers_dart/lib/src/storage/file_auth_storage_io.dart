@@ -8,14 +8,16 @@ import '../auth_storage.dart';
 /// An [AuthStorage] in a file that only its owner can read (Dart VM: command line tools, servers, Flutter desktop).
 ///
 /// The file holds a JSON object of the stored values, one per key, so several `FirebaseUserAuth` instances (apps,
-/// projects) can share it. It is written atomically: a new file is created next to it, made readable and writable
-/// by its owner only, checked, filled, and renamed over the old one. A secret never sits in a file other users can
-/// read, not even for a moment.
+/// projects) can share it. It is written atomically: a new file is written in a new staging directory next to it
+/// and renamed over the old one.
 ///
-/// * Linux and macOS: the file gets mode 0600 (`chmod`, run as a process, because `dart:io` cannot set
-///   permissions), and a directory this class creates gets 0700. The mode is checked before anything is written:
-///   when it is not owner-only (for example `chmod` is missing), [write] throws a [FileSystemException] and stores
-///   nothing. Put the file in a directory of the user (for example `~/.config/<app>/`).
+/// * Linux and macOS: the staging directory gets mode 0700 before the file is created in it, so no other user can
+///   open the file while it is written, not even for a moment; the file gets mode 0600 (`chmod`, run as a process,
+///   because `dart:io` cannot set permissions). Both modes are checked before anything is written: when they are
+///   not owner-only (for example `chmod` is missing), [write] throws a [FileSystemException] and stores nothing. A
+///   directory on the way to the file that this class creates gets 0700; an existing one is neither changed nor
+///   checked. Put the file in a directory of the user that other users cannot write to (for example
+///   `~/.config/<app>/`).
 /// * Windows: files have no POSIX mode; a new file inherits the access control list of its directory. A directory
 ///   in the user's profile (`%APPDATA%\<app>` or `%LOCALAPPDATA%\<app>`) is readable by the user, administrators
 ///   and SYSTEM only, which is what this class relies on: it does not change ACLs. Do not use a shared directory
@@ -106,20 +108,29 @@ class FileAuthStorage implements AuthStorage {
       await directory.create(recursive: true);
       await _restrict(directory.path, '700');
     }
-    final File temporary = File(
-      '$path.${pid}_${_random.nextInt(1 << 32).toRadixString(16)}.tmp',
+    // A staging directory that only the owner can enter: the file is created inside it only after its mode is
+    // checked, so no other user can open the file between its creation and its chmod. Same filesystem as [path],
+    // so the rename is atomic.
+    final String name = file.uri.pathSegments.last;
+    final Directory staging = Directory(
+      '${directory.path}${Platform.pathSeparator}.$name.${pid}_${_random.nextInt(1 << 32).toRadixString(16)}.d',
     );
-    await temporary.create(exclusive: true);
+    await staging.create();
     try {
+      await _restrict(staging.path, '700');
+      _checkOwnerOnly(staging);
+      final File temporary = File(
+        '${staging.path}${Platform.pathSeparator}$name',
+      );
+      await temporary.create(exclusive: true);
       await _restrict(temporary.path, '600');
       _checkOwnerOnly(temporary);
       await temporary.writeAsString(jsonEncode(all), flush: true);
       await temporary.rename(path);
-    } on Object {
-      if (temporary.existsSync()) {
-        await temporary.delete();
+    } finally {
+      if (staging.existsSync()) {
+        await staging.delete(recursive: true);
       }
-      rethrow;
     }
   }
 
@@ -147,16 +158,17 @@ class FileAuthStorage implements AuthStorage {
     }
   }
 
-  /// Throws when [file] can be read or written by others than its owner (Linux and macOS).
-  static void _checkOwnerOnly(File file) {
+  /// Throws when [entity] (a file or a directory) can be accessed by others than its owner (Linux and macOS).
+  static void _checkOwnerOnly(FileSystemEntity entity) {
     if (!_posix) {
       return;
     }
-    final int mode = file.statSync().mode;
+    final int mode = entity.statSync().mode;
     if (mode & 0x3f != 0) {
       throw FileSystemException(
-        'The file is accessible to other users (mode ${(mode & 0x1ff).toRadixString(8)}); nothing was written',
-        file.path,
+        'The ${entity is Directory ? 'directory' : 'file'} is accessible to other users '
+        '(mode ${(mode & 0x1ff).toRadixString(8)}); nothing was written',
+        entity.path,
       );
     }
   }

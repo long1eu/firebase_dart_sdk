@@ -17,7 +17,7 @@ import 'firebase_user_auth.dart';
 /// * Flutter on iOS, Android, macOS, Windows and Linux: a secure storage plugin such as `flutter_secure_storage`
 ///   (Keychain, Android Keystore, Windows Credential Manager, libsecret).
 /// * A command line tool or a server: the system keychain or secret service, or a file readable only by its owner
-///   (`FileAuthStorage`: mode 0600 in a directory with mode 0700).
+///   (`FileAuthStorage`: mode 0600, in a directory of the user that others cannot write to).
 /// * The web: `localStorage` and IndexedDB are readable by every script of the origin, so a cross-site scripting
 ///   flaw gives the session away; prefer [InMemoryAuthStorage] (sign in again on every visit) or
 ///   `WebAuthStorage.session`, and keep a strict Content Security Policy.

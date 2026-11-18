@@ -59,12 +59,20 @@
 - `validatePassword(password)` with the new `PasswordPolicy` and `PasswordValidationStatus` (FlutterFire's names):
   the project's (or tenant's) policy is fetched once from `v2/passwordPolicy`, cached, and fetched again after
   `password-does-not-meet-requirements`, like the JS SDK. The Auth emulator does not implement the endpoint.
-- Ready-made storages: `FileAuthStorage(path)` on the Dart VM (a JSON file written atomically and owner-only:
-  mode 0600 in a 0700 directory on Linux and macOS, checked before anything is written; on Windows it inherits the
-  access list of its directory) and `WebAuthStorage.session()` / `WebAuthStorage.local()` in a browser
+- Ready-made storages: `FileAuthStorage(path)` on the Dart VM (a JSON file written atomically and owner-only: on
+  Linux and macOS it is written in a new staging directory with mode 0700, checked before anything is written, and
+  renamed into place with mode 0600; on Windows it inherits the access list of its directory) and `WebAuthStorage.session()` / `WebAuthStorage.local()` in a browser
   (`sessionStorage` / `localStorage`), exported through conditional imports so that the library still compiles
   everywhere (each throws `UnsupportedError` on the other platform). Their documentation says what a stored refresh
-  token exposes. `example/persistent_session.dart` uses `FileAuthStorage`.
+  token exposes. `example/persistent_session.dart` uses `FileAuthStorage`. `FileAuthStorage` is exported from the
+  main library: **breaking** for an app that declared its own `FileAuthStorage` (as the 0.2 docs and example
+  suggested) in another library and imports both, which is now an `ambiguous_import`; rename the class or import
+  the package with `hide FileAuthStorage`.
+- Fix: a token refresh or an operation of the signed-in user (a profile update, a link, an unlink) that completed
+  after another user signed in could write the tokens or data of the previous user into the new session and its
+  storage. Each operation now belongs to the session it started in, and its result is dropped once another session
+  is installed or the session is cleared. A sign-in that fails or is blocked no longer cancels the operations of the
+  signed-in user, and `signOut()` after `dispose()` throws a `StateError` instead of deleting the stored session.
 - Documentation: the README, the authentication guide and the API docs cover the new sign-in methods, streams,
   tenants, language, password policy and storages; a new example, `example/linking_and_email_link.dart`.
 

@@ -62,8 +62,10 @@ import 'environment_stub.dart'
 /// retried after 30 seconds, then 1, 2, 4, 8 and 16 minutes. A refresh that the backend refuses because the
 /// session ended (the account was deleted or disabled, the refresh token revoked) signs the user out.
 ///
-/// **Sign-out.** [signOut] forgets the session here and in the storage. It does not revoke the refresh token on
-/// the backend, like the other Firebase SDKs.
+/// **Sign-out.** [signOut] removes the session from this instance and from the storage. It does not revoke the
+/// refresh token on the backend, like the other Firebase SDKs; and, like the user objects of the JS SDK, an
+/// [AuthUser] or [UserCredential] handed out before keeps its session: [updateCurrentUser] with it signs that user
+/// in again. Drop those objects to forget the session in memory.
 ///
 /// **Session.** The session (the refresh token) is kept in an [AuthStorage]; the default, [InMemoryAuthStorage],
 /// forgets it when the process ends. [restore] (called by [forApp]) loads a stored session.
@@ -376,9 +378,15 @@ class FirebaseUserAuth implements AuthTokenProvider {
   int _refreshFailures = 0;
   bool _disposed = false;
 
-  /// Counts the changes of the session, so that the result of a request that was overtaken by a sign-in or a
-  /// sign-out is dropped.
+  /// Counts the sessions: it changes when a session is installed for a sign-in, [updateCurrentUser] or [restore],
+  /// and when the session is cleared. An operation of the signed-in user (a token refresh, an update, a link)
+  /// records it when it starts and drops its result when it changed, so that a result of the previous session is
+  /// never written into the next one or its storage.
   int _generation = 0;
+
+  /// Counts the sign-ins, [updateCurrentUser] and [signOut] calls, so that when they overlap the later one wins and
+  /// the earlier one throws `cancelled`. A sign-in that fails does not affect the operations of the signed-in user.
+  int _signInAttempt = 0;
 
   /// The signed-in user, or null. After [restore] it is the user of the stored session, as it was when it was
   /// stored; [reload] reads it from the backend again.
@@ -393,7 +401,9 @@ class FirebaseUserAuth implements AuthTokenProvider {
   /// listened to: read [currentUser] for that.
   Stream<AuthUser?> userChanges() => _userChanges.stream;
 
-  /// Emits the ID token after a sign-in, after every refresh, and an empty token after a sign-out.
+  /// Emits the ID token after a sign-in, after every refresh, and an empty token after a sign-out. [updateCurrentUser]
+  /// with a user whose session has no ID token yet (one from [restore]) emits an empty token too: read [uid] for the
+  /// user, the token comes with the first refresh.
   @override
   Stream<AuthTokenChange> get onTokenChanged => _tokenChanges.stream;
 
@@ -472,13 +482,20 @@ class FirebaseUserAuth implements AuthTokenProvider {
       return;
     }
     _checkTenant(session.user);
-    final int generation = ++_generation;
+    final int attempt = ++_signInAttempt;
     await _runBeforeStateCallbacks(session.user);
+    if (attempt != _signInAttempt || _disposed) {
+      throw _overtaken;
+    }
+    final int generation = await _installSession(session);
     if (generation != _generation) {
       throw _overtaken;
     }
-    await _setSession(session, persist: true);
-    _userChanges.add(session.user);
+    if (!_userChanges.isClosed) {
+      _userChanges.add(session.user);
+    }
+    // A restored session has no ID token until its first refresh; the empty token tells the token listeners
+    // (Firestore) that the user changed, as after a sign-out.
     final String? idToken = session.idToken;
     _emitToken(idToken ?? '');
     _notifyAuthState();
@@ -516,6 +533,7 @@ class FirebaseUserAuth implements AuthTokenProvider {
       // Not something this class wrote: start signed out.
       return;
     }
+    _generation++;
     await _setSession(
       _Session(decoded.user, decoded.refreshToken, null, null),
       persist: false,
@@ -588,15 +606,18 @@ class FirebaseUserAuth implements AuthTokenProvider {
   /// It makes no request: the refresh token is not revoked on the backend (as in the other Firebase SDKs).
   /// Firestore continues without a token; the pending writes of the user stay with that user.
   Future<void> signOut() async {
+    _checkNotDisposed();
     if (_session == null) {
       return;
     }
-    final int generation = _generation;
+    final int attempt = _signInAttempt;
     await _runBeforeStateCallbacks(null);
-    if (generation != _generation || _session == null) {
-      // Another sign-in or sign-out happened while the callbacks ran.
+    if (attempt != _signInAttempt || _session == null || _disposed) {
+      // Another sign-in or sign-out started while the callbacks ran.
       return;
     }
+    // A sign-in that started before and is still in flight is overtaken.
+    _signInAttempt++;
     await _clearSession();
   }
 
@@ -1052,7 +1073,7 @@ class FirebaseUserAuth implements AuthTokenProvider {
     }
     final _CredentialRequest request = _requestFor(
       credential,
-      userIdToken: (await getAccessToken(forceRefresh: false)).token,
+      userIdToken: await _idTokenOf(generation),
     );
     final Map<String, Object?> response = await _send(
       _identityToolkit(request.method),
@@ -1147,7 +1168,7 @@ class FirebaseUserAuth implements AuthTokenProvider {
     final Map<String, Object?> response = await _send(
       _identityToolkit('accounts:update'),
       json: <String, Object?>{
-        'idToken': (await getAccessToken(forceRefresh: false)).token,
+        'idToken': await _idTokenOf(generation),
         'deleteProvider': <String>[providerId],
       },
     );
@@ -1361,7 +1382,7 @@ class FirebaseUserAuth implements AuthTokenProvider {
     _checkNotDisposed();
     _requireSession();
     final int generation = _generation;
-    final String idToken = (await getAccessToken(forceRefresh: false)).token;
+    final String idToken = await _idTokenOf(generation);
     try {
       return await operation(idToken, generation);
     } on FirebaseAuthException catch (e) {
@@ -1372,6 +1393,16 @@ class FirebaseUserAuth implements AuthTokenProvider {
       }
       rethrow;
     }
+  }
+
+  /// The ID token of the session of [generation]; throws `cancelled` when another session took its place, so that
+  /// a request meant for the previous user is never sent with the token of the next one.
+  Future<String> _idTokenOf(int generation) async {
+    final String idToken = (await getAccessToken(forceRefresh: false)).token;
+    if (generation != _generation) {
+      throw _overtaken;
+    }
+    return idToken;
   }
 
   Future<void> _updateEmailOrPassword(Map<String, Object?> fields) =>
@@ -1421,6 +1452,9 @@ class FirebaseUserAuth implements AuthTokenProvider {
           updated.refreshToken != session.refreshToken ||
           newUser != session.user,
     );
+    if (generation != _generation) {
+      return;
+    }
     if (newUser != session.user && !_userChanges.isClosed) {
       _userChanges.add(newUser);
     }
@@ -1435,6 +1469,9 @@ class FirebaseUserAuth implements AuthTokenProvider {
       return;
     }
     final String idToken = (await getAccessToken(forceRefresh: false)).token;
+    if (generation != _generation) {
+      return;
+    }
     final Map<String, Object?> account = await _lookup(idToken);
     final AuthUser? user = _session?.user;
     if (user == null || generation != _generation) {
@@ -1650,18 +1687,18 @@ class FirebaseUserAuth implements AuthTokenProvider {
     Map<String, Object?> request,
   ) async {
     _checkNotDisposed();
-    final int generation = ++_generation;
+    final int attempt = ++_signInAttempt;
     final Map<String, Object?> response = await _send(
       _identityToolkit(method),
       json: request,
       tenant: true,
     );
-    return _completeSignIn(response, generation);
+    return _completeSignIn(response, attempt);
   }
 
   static const FirebaseAuthException _overtaken = FirebaseAuthException(
     code: 'cancelled',
-    message: 'The sign-in was overtaken by another sign-in or a sign-out.',
+    message: 'The operation was overtaken by another sign-in or a sign-out.',
   );
 
   /// Makes the user of a sign-in [response] the current user, like `UserCredentialImpl._fromIdTokenResponse` and
@@ -1669,7 +1706,7 @@ class FirebaseUserAuth implements AuthTokenProvider {
   /// complete when it is announced.
   Future<UserCredential> _completeSignIn(
     Map<String, Object?> response,
-    int generation,
+    int attempt,
   ) async {
     _throwIfSecondFactorRequired(response);
     final Object? idToken = response['idToken'];
@@ -1680,8 +1717,8 @@ class FirebaseUserAuth implements AuthTokenProvider {
         message: 'The authentication service did not return tokens.',
       );
     }
-    if (generation != _generation) {
-      // Another sign-in or a sign-out happened meanwhile and wins.
+    if (attempt != _signInAttempt || _disposed) {
+      // Another sign-in or a sign-out started meanwhile and wins.
       throw _overtaken;
     }
     final GetTokenResult token = GetTokenResult(idToken);
@@ -1697,7 +1734,7 @@ class FirebaseUserAuth implements AuthTokenProvider {
       );
     }
     final Map<String, Object?> account = await _lookup(idToken);
-    if (generation != _generation) {
+    if (attempt != _signInAttempt || _disposed) {
       throw _overtaken;
     }
     AuthUser user = userFromAccount(
@@ -1713,7 +1750,7 @@ class FirebaseUserAuth implements AuthTokenProvider {
     }
     _checkTenant(user);
     await _runBeforeStateCallbacks(user);
-    if (generation != _generation) {
+    if (attempt != _signInAttempt || _disposed) {
       throw _overtaken;
     }
     final _Session session = _Session(
@@ -1722,8 +1759,14 @@ class FirebaseUserAuth implements AuthTokenProvider {
       idToken,
       _expiry(token, response['expiresIn']),
     );
-    await _setSession(session, persist: true);
-    _userChanges.add(session.user);
+    final int generation = await _installSession(session);
+    if (generation != _generation) {
+      // Signed out (or the session ended) while the session was stored.
+      throw _overtaken;
+    }
+    if (!_userChanges.isClosed) {
+      _userChanges.add(session.user);
+    }
     _emitToken(idToken);
     _notifyAuthState();
     await _letListenersReact();
@@ -1799,9 +1842,21 @@ class FirebaseUserAuth implements AuthTokenProvider {
       refreshed,
       persist: refreshed.refreshToken != session.refreshToken,
     );
+    if (generation != _generation) {
+      return null;
+    }
     _refreshFailures = 0;
     _emitToken(idToken);
     return idToken;
+  }
+
+  /// Installs the [session] of a new sign-in (or of [updateCurrentUser]) and stores it. The session count changes
+  /// before the session is installed, so that no operation of the previous session writes into this one. Returns
+  /// the count of this session.
+  Future<int> _installSession(_Session session) async {
+    final int generation = ++_generation;
+    await _setSession(session, persist: true);
+    return generation;
   }
 
   Future<void> _setSession(_Session session, {required bool persist}) async {
@@ -1822,7 +1877,10 @@ class FirebaseUserAuth implements AuthTokenProvider {
     _generation++;
     _session = null;
     _cancelProactiveRefresh();
-    await _storage.write(_storageKey, null);
+    if (!_disposed) {
+      // After dispose the stored session may belong to a new instance that restored it.
+      await _storage.write(_storageKey, null);
+    }
     if (!_userChanges.isClosed) {
       _userChanges.add(null);
     }

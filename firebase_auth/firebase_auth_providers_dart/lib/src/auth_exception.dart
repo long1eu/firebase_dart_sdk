@@ -37,7 +37,7 @@ import 'user_record.dart' show credentialFromResponse;
 /// | `expired-action-code`, `invalid-action-code` | the code of an email link is used up, expired or wrong |
 /// | `invalid-continue-uri`, `invalid-hosting-link-domain`, `missing-ios-bundle-id`, `missing-android-pkg-name` | an `ActionCodeSettings` value is empty |
 /// | `null-user` | the operation needs a signed-in user and nobody is signed in |
-/// | `cancelled` | a sign-in or a reauthentication was overtaken by another sign-in or a sign-out |
+/// | `cancelled` | a sign-in, a reauthentication or an operation of the signed-in user was overtaken by another sign-in or a sign-out |
 /// | `too-many-requests` | the backend throttles this client; try again later |
 /// | `network-request-failed` | the request did not reach the backend |
 /// | `invalid-api-key` | the API key is not valid |
