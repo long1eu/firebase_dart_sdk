@@ -15,9 +15,11 @@
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/field_path.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/delete_mutation.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/field_mask.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/field_transform.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/mutation.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/patch_mutation.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/precondition.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/server_timestamp_operation.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/set_mutation.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/value/field_value.dart';
 
@@ -33,9 +35,10 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/model/value/field_va
 /// The cases, where `precondition none` is a `set` or a `delete`, `exists` is an `update` and a patch without
 /// precondition is a `set` with merge:
 ///
-/// 1. [next] is a set (with or without transforms) or a delete, without precondition: [next] alone. The document
-///    after [next] does not depend on the document before it, whatever [previous] was and whether its precondition
-///    held. The transforms of [next] are evaluated on the value of [next] in both cases.
+/// 1. [next] is a set or a delete, without precondition, whose only transforms are server timestamps: [next] alone.
+///    The document after [next] does not depend on the document before it, whatever [previous] was and whether its
+///    precondition held. A set with an increment or an array transform does depend on it (the transform starts from
+///    the value the field had before the set), so it is not merged.
 /// 2. [next] is a patch without transforms, with no precondition or `exists`, and [previous] has no transforms:
 ///    a. [previous] is a set without precondition: a set of the value of [previous] patched by [next], without
 ///       precondition. After [previous] the document exists, so the `exists` of [next] holds.
@@ -43,6 +46,8 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/model/value/field_va
 ///       covers), whose value is the empty document patched by [previous] and then by [next], with the precondition
 ///       of [previous]. Every path of the union is a whole subtree that one of the two overwrites, and that subtree
 ///       after both does not depend on the document before them, so setting it (or deleting it) at once is the same.
+///       Not when [next] deletes a nested field (`a.b`): after a [previous] that wrote `a.b` the delete leaves an
+///       empty map `a`, and a single write that deletes `a.b` does not create `a` where it was missing.
 ///       Only when the precondition of [previous] is none, or both are `exists`: if [previous] fails on a missing
 ///       document, so does [next]; if [previous] passes (or has none), the document exists for [next].
 ///    c. [previous] is a delete without precondition and [next] has no precondition: a set of the empty document
@@ -58,7 +63,11 @@ Mutation? mergeUnsentMutations(Mutation previous, Mutation next) {
   }
 
   if ((next is SetMutation || next is DeleteMutation) &&
-      next.precondition.isNone) {
+      next.precondition.isNone &&
+      next.fieldTransforms.every(
+        (FieldTransform transform) =>
+            transform.operation is ServerTimestampOperation,
+      )) {
     return next;
   }
 
@@ -83,6 +92,7 @@ Mutation? mergeUnsentMutations(Mutation previous, Mutation next) {
     case PatchMutation():
       final Precondition before = previous.precondition;
       if (previous.mask.mask.any((FieldPath path) => path.isEmpty) ||
+          _deletesNestedField(next) ||
           !(before.isNone ||
               (before.exists == true && next.precondition.exists == true))) {
         return null;
@@ -113,6 +123,11 @@ bool _isPlainWrite(Mutation mutation) =>
         mutation is PatchMutation ||
         mutation is DeleteMutation) &&
     _isNoneOrExists(mutation.precondition);
+
+/// Whether the mask of [patch] has a nested path without a value: a delete of a field inside a map.
+bool _deletesNestedField(PatchMutation patch) => patch.mask.mask.any(
+  (FieldPath path) => path.length > 1 && patch.value.get(path) == null,
+);
 
 bool _isNoneOrExists(Precondition precondition) =>
     precondition.isNone || precondition.exists != null;

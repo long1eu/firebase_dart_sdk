@@ -231,14 +231,14 @@ combine into one write with the same result on the backend:
 
 | Pending write | New write | Becomes |
 |---|---|---|
-| anything | `set` without merge (transforms allowed), or `delete` | the new write |
+| anything | `set` without merge (`serverTimestamp` allowed), or `delete` | the new write |
 | `set` | `update` or `set` with merge, no transforms | one `set` with the new fields applied |
 | `update` | `update`, no transforms | one `update` of the fields of both |
 | `set` with merge | `update` or `set` with merge, no transforms | one `set` with merge of the fields of both |
 | `delete` | `set` with merge, no transforms | one `set` of the new fields |
 
-Everything else (a transform in an `update` or in the pending write before it, a `set` with
-merge after an `update`, an `update` after a `delete`) stays queued as two writes, as without the
+Everything else (a transform in an `update` or in the pending write before it, an `increment`,
+`arrayUnion` or `arrayRemove` in a `set`, a `set` with merge after an `update`, an `update` after a `delete`) stays queued as two writes, as without the
 setting. The merged write takes the place of the newest write in the queue, and the future of every write
 that went into it completes or fails with it; `waitForPendingWrites` waits for it too.
 

@@ -109,9 +109,9 @@ final class PersistentCacheSettings extends LocalCacheSettings {
   ///   the last 30 minutes (unless the database is an `ExclusiveDatabase`); clients that share their state are never
   ///   merged.
   /// * The two writes combine in one of these ways (other combinations stay queued as two writes):
-  ///   * The new write is a `set` without merge (also one with transforms such as `serverTimestamp`, `increment`,
-  ///     `arrayUnion` or `arrayRemove`) or a `delete`: it replaces the pending write, whatever that was. The result
-  ///     of such a write does not depend on the document before it.
+  ///   * The new write is a `set` without merge (also one with `serverTimestamp`, but not one with `increment`,
+  ///     `arrayUnion` or `arrayRemove`, which start from the value before the write) or a `delete`: it replaces the
+  ///     pending write, whatever that was. The result of such a write does not depend on the document before it.
   ///   * The new write is an `update` or a `set` with merge, without transforms, and the pending write has no
   ///     transforms:
   ///     * after a `set`: one `set` of the pending value with the new fields applied;
