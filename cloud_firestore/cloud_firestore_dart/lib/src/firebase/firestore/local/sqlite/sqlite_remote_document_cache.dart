@@ -206,6 +206,20 @@ class SQLiteRemoteDocumentCache implements RemoteDocumentCache {
     IndexOffset offset,
     int limit,
   ) async {
+    // NOT IN THE OFFICIAL SDKS: upstream reads the group with one `UNION` arm per collection of the group, in
+    // statements of 100 collections, whatever few documents there are. With the documents spread over many small
+    // collections that is the whole cost of an index backfill run, linear in the number of collections (150 ms for
+    // 1,000 collections, 1.1 s for 10,000, with an empty remote document cache). When few documents of the whole cache
+    // were read after the offset, they are read through the `read_time` index and those of the group kept instead.
+    final Timestamp readTime = offset.readTime.timestamp;
+    if (await _fewReadSince(readTime)) {
+      return _getAllForCollectionGroupByReadTime(
+        collectionGroup,
+        offset,
+        limit,
+      );
+    }
+
     final List<ResourcePath> collectionParents = await db.indexManager
         .getCollectionParents(collectionGroup);
     final List<ResourcePath> collections = <ResourcePath>[
@@ -242,6 +256,105 @@ class SQLiteRemoteDocumentCache implements RemoteDocumentCache {
           });
       return Map<DocumentKey, ReadDocument>.fromEntries(entries.take(limit));
     }
+  }
+
+  /// Whether fewer than [_readTimeIndexMaxRows] documents of the whole cache were read at or after [readTime] (counted
+  /// on the `read_time` index), so that reading them through that index is cheaper than reading by path.
+  Future<bool> _fewReadSince(Timestamp readTime) async {
+    if (!(_hasReadTimeIndex ??= (await db.query(
+      "SELECT 1 FROM sqlite_master WHERE type = 'index' AND name = 'read_time'",
+    )).isNotEmpty)) {
+      return false;
+    }
+    final List<Map<String, dynamic>> newer = await db.query(
+      'SELECT COUNT(*) AS count FROM (SELECT 1 FROM remote_documents INDEXED BY read_time '
+      'WHERE (read_time_seconds, read_time_nanos) >= (?, ?) LIMIT ?)',
+      <Object>[readTime.seconds, readTime.nanoseconds, _readTimeIndexMaxRows],
+    );
+    return (newer.single['count'] as int) < _readTimeIndexMaxRows;
+  }
+
+  /// [getAllForCollectionGroup] through the `read_time` index: the paths of the documents read after [offset], in the
+  /// order of the statement of [_getAllForCollections], of which the first [count] in [collectionGroup] are read.
+  /// Every document of the cache has its parent in `collection_parents` ([add]), so these are the documents that the
+  /// collections of the group give.
+  Future<Map<DocumentKey, ReadDocument>> _getAllForCollectionGroupByReadTime(
+    String collectionGroup,
+    IndexOffset offset,
+    int count,
+  ) async {
+    final Timestamp readTime = offset.readTime.timestamp;
+    final List<Map<String, dynamic>> newer = await db.query(
+      '''
+          SELECT path
+          FROM remote_documents INDEXED BY read_time
+          WHERE (read_time_seconds, read_time_nanos) >= (?, ?)
+            AND (read_time_seconds > ?
+              OR (read_time_seconds = ? AND read_time_nanos > ?)
+              OR (read_time_seconds = ? AND read_time_nanos = ? AND path > ?))
+          ORDER BY read_time_seconds, read_time_nanos, path
+        ''',
+      <Object>[
+        readTime.seconds,
+        readTime.nanoseconds,
+        readTime.seconds,
+        readTime.seconds,
+        readTime.nanoseconds,
+        readTime.seconds,
+        readTime.nanoseconds,
+        EncodedPath.encode(offset.documentKey.path),
+      ],
+    );
+    final List<String> paths = <String>[];
+    for (final Map<String, dynamic> row in newer) {
+      if (paths.length >= count) {
+        break;
+      }
+      final String path = row['path'];
+      final ResourcePath resourcePath = EncodedPath.decodeResourcePath(path);
+      if (resourcePath.length >= 2 &&
+          resourcePath.segments[resourcePath.length - 2] == collectionGroup) {
+        paths.add(path);
+      }
+    }
+    if (paths.isEmpty) {
+      return <DocumentKey, ReadDocument>{};
+    }
+
+    final Map<String, Map<String, dynamic>> rowsByPath =
+        <String, Map<String, dynamic>>{};
+    final LongQuery longQuery = LongQuery(
+      db,
+      'SELECT contents, read_time_seconds, read_time_nanos, document_type, path '
+          'FROM remote_documents WHERE path IN (',
+      null,
+      paths,
+      ')',
+    );
+    while (longQuery.hasMoreSubqueries) {
+      for (final Map<String, dynamic> row
+          in await longQuery.performNextSubquery()) {
+        rowsByPath[row['path']] = row;
+      }
+    }
+
+    final Map<DocumentKey, ReadDocument> results =
+        <DocumentKey, ReadDocument>{};
+    for (final String path in paths) {
+      final Map<String, dynamic> row = rowsByPath[path]!;
+      final MaybeDocument document = _processRow(row);
+      results[document.key] = (
+        document: document,
+        readTime: SnapshotVersion(
+          Timestamp(row['read_time_seconds'], row['read_time_nanos']),
+        ),
+      );
+    }
+    _statsCollector.recordRowsRead(RemoteDocumentCache.statsTag, paths.length);
+
+    // Backfill any null "document_type" columns discovered by _processRow().
+    await _documentTypeBackfiller.backfill(db);
+    return results;
   }
 
   /// Returns the next [count] documents from the provided collections, ordered by read time.
@@ -373,43 +486,33 @@ class SQLiteRemoteDocumentCache implements RemoteDocumentCache {
     // so an indexed query costs a scan of the collection however few documents changed (170 ms for 1M documents).
     // When few documents of the whole cache were read after the offset (counted on the `read_time` index, stopping at
     // [_readTimeIndexMaxRows]), they are read through that index instead.
-    if (sinceOffset &&
-        (_hasReadTimeIndex ??= (await db.query(
-          "SELECT 1 FROM sqlite_master WHERE type = 'index' AND name = 'read_time'",
-        )).isNotEmpty)) {
-      final List<Map<String, dynamic>> newer = await db.query(
-        'SELECT COUNT(*) AS count FROM (SELECT 1 FROM remote_documents INDEXED BY read_time '
-        'WHERE (read_time_seconds, read_time_nanos) >= (?, ?) LIMIT ?)',
-        <Object>[readTime.seconds, readTime.nanoseconds, _readTimeIndexMaxRows],
+    if (sinceOffset && await _fewReadSince(readTime)) {
+      addRows(
+        await db.query(
+          'SELECT $rowColumns FROM remote_documents INDEXED BY read_time '
+          'WHERE (read_time_seconds, read_time_nanos) >= (?, ?) '
+          'AND path >= ? AND path < ? AND path_length = ? '
+          '$documentTypeCondition $readTimeCondition',
+          <Object>[
+            readTime.seconds,
+            readTime.nanoseconds,
+            prefixPath,
+            prefixSuccessorPath,
+            immediateChildrenPathLength,
+            foundDocument,
+            ...readTimeBindings,
+          ],
+        ),
       );
-      if ((newer.single['count'] as int) < _readTimeIndexMaxRows) {
-        addRows(
-          await db.query(
-            'SELECT $rowColumns FROM remote_documents INDEXED BY read_time '
-            'WHERE (read_time_seconds, read_time_nanos) >= (?, ?) '
-            'AND path >= ? AND path < ? AND path_length = ? '
-            '$documentTypeCondition $readTimeCondition',
-            <Object>[
-              readTime.seconds,
-              readTime.nanoseconds,
-              prefixPath,
-              prefixSuccessorPath,
-              immediateChildrenPathLength,
-              foundDocument,
-              ...readTimeBindings,
-            ],
-          ),
-        );
-        _statsCollector.recordRowsRead(RemoteDocumentCache.statsTag, rowsRead);
-        context?.incrementDocumentReadCount(rowsRead);
+      _statsCollector.recordRowsRead(RemoteDocumentCache.statsTag, rowsRead);
+      context?.incrementDocumentReadCount(rowsRead);
 
-        // Backfill any null "document_type" columns discovered by _processRow().
-        await _documentTypeBackfiller.backfill(db);
-        return ImmutableSortedMap<DocumentKey, Document>.fromMap(
-          results,
-          DocumentKey.comparator,
-        );
-      }
+      // Backfill any null "document_type" columns discovered by _processRow().
+      await _documentTypeBackfiller.backfill(db);
+      return ImmutableSortedMap<DocumentKey, Document>.fromMap(
+        results,
+        DocumentKey.comparator,
+      );
     }
 
     // PORTING NOTE: upstream walks a cursor over the rows. The `Database` adapter returns all the rows of a statement
