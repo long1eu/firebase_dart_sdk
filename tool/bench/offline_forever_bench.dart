@@ -19,6 +19,10 @@
 //   FIRESTORE_EMULATOR_HOST=127.0.0.1:8391 dart run offline_forever_bench.dart drain <documents> [<directory>]
 //   FIRESTORE_EMULATOR_HOST=127.0.0.1:8391 dart run offline_forever_bench.dart drainhot <updates> [--transform] [--merge] [<directory>]
 //     Public API: writes offline (network disabled), then enables the network and times waitForPendingWrites.
+//   dart run offline_forever_bench.dart startmerge <updates> [--transform] [<directory>]
+//     Public API, no backend: one document updated <updates> times offline with `mergeUnsentWrites` off, the instance
+//     terminated and started again with it on; times how long the queue that already exists takes to be merged (until
+//     getPendingWriteCount returns 1), and the first cache read after the start.
 
 import 'dart:async';
 import 'dart:io';
@@ -148,6 +152,9 @@ Future<void> main(List<String> args) async {
           n,
           flags.contains('--transform'),
           flags.contains('--merge'),
+          positional.length > 2 ? positional[2] : Directory.systemTemp.path);
+    case 'startmerge':
+      await startMerge(n, flags.contains('--transform'),
           positional.length > 2 ? positional[2] : Directory.systemTemp.path);
     default:
       throw ArgumentError('unknown mode $mode');
@@ -674,6 +681,96 @@ Future<void> drain(
       's',
       '${(drainTime.elapsedMicroseconds / (n + (hotDocument ? 1 : 0))).toStringAsFixed(0)} us per write');
   await Future.wait(writes);
+  await firestore.terminate();
+  deleteFiles(file);
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
+// startmerge (public API, no backend)
+
+Future<void> startMerge(int n, bool transform, String dir) async {
+  final String file = '$dir/offline_forever_startmerge_$n.db';
+  deleteFiles(file);
+  final FirebaseApp app = FirebaseApp.withOptions(
+    const FirebaseOptions(
+      apiKey: 'demo-key',
+      appId: '1:1234567890:dart:bench',
+      projectId: 'demo-test',
+    ),
+    name: 'bench',
+  );
+  api.FirebaseFirestore open(bool merge) => api.FirebaseFirestore.instanceFor(
+    app: app,
+    openDatabase: BenchDatabase.opener(file),
+    settings: api.Settings(
+      cacheSettings: api.PersistentCacheSettings(mergeUnsentWrites: merge),
+    ).withEmulator('127.0.0.1', 1), // never reached: the network is off
+  );
+  print(
+    'startmerge: one document updated $n times${transform ? ' with a serverTimestamp' : ''}, then started with mergeUnsentWrites',
+  );
+  api.FirebaseFirestore firestore = open(false);
+  await firestore.disableNetwork();
+  final api.DocumentReference<Map<String, Object?>> doc = firestore
+      .collection('bench/startmerge/hot')
+      .doc('doc');
+  final List<Future<void>> writes = <Future<void>>[
+    doc.set(<String, Object?>{'n': 0, 'payload': payload}),
+  ];
+  for (int i = 1; i <= n; i++) {
+    writes.add(
+      doc.update(<String, Object?>{
+        'n': i,
+        if (transform) 'updatedAt': api.FieldValue.serverTimestamp(),
+      }),
+    );
+    if (i % 1000 == 0) {
+      await Future<void>.delayed(Duration.zero);
+    }
+  }
+  await doc.get(const api.GetOptions(source: api.Source.cache));
+  record(
+    'pending writes before',
+    (await firestore.getPendingWriteCount()).toDouble(),
+    'batches',
+    'file ${mb(fileSize(file)).toStringAsFixed(0)} MB',
+  );
+  // The futures of the writes never complete here (no backend); terminate fails them.
+  for (final Future<void> w in writes) {
+    w.ignore();
+  }
+  await firestore.terminate();
+
+  final Stopwatch sw = Stopwatch()..start();
+  firestore = open(true);
+  await firestore.disableNetwork();
+  await firestore
+      .doc('bench/startmerge/hot/doc')
+      .get(const api.GetOptions(source: api.Source.cache));
+  record(
+    'start with mergeUnsentWrites: first cache read',
+    sw.elapsedMicroseconds / 1000,
+    'ms',
+  );
+  int pending = await firestore.getPendingWriteCount();
+  while (pending > 1) {
+    await Future<void>.delayed(const Duration(milliseconds: 20));
+    pending = await firestore.getPendingWriteCount();
+  }
+  record(
+    'start with mergeUnsentWrites: until one pending write is left',
+    sw.elapsedMicroseconds / 1000,
+    'ms',
+    '$pending pending',
+  );
+  final api.DocumentSnapshot<Map<String, Object?>> snap = await firestore
+      .doc('bench/startmerge/hot/doc')
+      .get(const api.GetOptions(source: api.Source.cache));
+  record(
+    'the document after the merge: n',
+    (snap.data()?['n'] as int).toDouble(),
+    '',
+  );
   await firestore.terminate();
   deleteFiles(file);
 }
