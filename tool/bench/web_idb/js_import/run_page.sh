@@ -11,6 +11,7 @@
 #   cd .. && dart pub get && dart compile js js_import/reader.dart -o js_import/static/reader.js
 #   rm -rf /tmp/idb_profile; js_import/run_page.sh writer.html; js_import/run_page.sh reader.html
 # The importer (importer.dart, see its header) runs on the same profile: js_import/run_page.sh importer.html
+# dump.sh dumps the database writer.html left (the fixture of the browser tests, see its header).
 cd "$(dirname "$0")/static" || exit 1
 python3 -m http.server 8765 --bind 127.0.0.1 >/dev/null 2>&1 &
 S=$!

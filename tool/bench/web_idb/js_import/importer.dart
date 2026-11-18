@@ -1,6 +1,7 @@
-// Runs importJsSdkCache against the database that writer.js left (same origin), with a memory cache, and reports the
-// result and the local view of the documents in document.title. The network never starts: the client points at a
-// closed local port and its network is disabled before the import.
+// Runs importJsSdkCache against the database that writer.js left (same origin), with a memory cache (hence
+// allowMemoryCache: the page only reads the writes back), and reports the result and the local view of the documents
+// in document.title. The network never starts: the client points at a closed local port and its network is disabled
+// before the import.
 //
 //   cd .. && dart compile js js_import/importer.dart -o js_import/static/importer.js
 //   js_import/run_page.sh importer.html
@@ -27,7 +28,10 @@ Future<void> main() async {
       ..useFirestoreEmulator('127.0.0.1', 1);
     await firestore.disableNetwork();
 
-    final JsSdkCacheImportResult result = await importJsSdkCache(firestore);
+    final JsSdkCacheImportResult result = await importJsSdkCache(
+      firestore,
+      allowMemoryCache: true,
+    );
     log('$result');
     for (final String path in <String>[
       'items/cached1',
@@ -53,7 +57,10 @@ Future<void> main() async {
     log(
       'pending writes of the signed-out user: ${await firestore.getPendingWriteCount()}',
     );
-    final JsSdkCacheImportResult again = await importJsSdkCache(firestore);
+    final JsSdkCacheImportResult again = await importJsSdkCache(
+      firestore,
+      allowMemoryCache: true,
+    );
     log('again: $again');
     web.document.title = 'ok: ${out.toString().replaceAll('\n', ' | ')}';
   } catch (e, st) {

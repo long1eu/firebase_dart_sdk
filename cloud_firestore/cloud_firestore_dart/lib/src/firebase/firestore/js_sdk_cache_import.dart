@@ -27,9 +27,10 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/local/js_sdk_import/
 ///
 /// A crash at any point, followed by a restart and another call, neither loses a pending write nor imports one twice:
 /// the cache records what it imported in the transaction that adds the writes, and the next call finishes their
-/// removal from the JS database. With a memory cache that record, like the writes, lasts as long as the page: a write
-/// imported into a memory cache is lost when the page closes before the backend acknowledged it, like every other
-/// write made with a memory cache.
+/// removal from the JS database. A memory cache does not keep the imported writes across a reload, while the JS
+/// database no longer has them: pending writes are imported into a memory cache only with [allowMemoryCache] (a
+/// write imported that way is lost when the page closes before the backend acknowledged it). Documents alone (no
+/// pending writes in the JS database) are imported into a memory cache without it.
 ///
 /// It throws a [JsSdkCacheImportException] and imports nothing when:
 ///
@@ -43,17 +44,21 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/local/js_sdk_import/
 /// - this cache already holds pending writes of a user who has pending writes in the JS database
 ///   ([JsSdkCacheImportRefusal.pendingWritesInCache]): the imported writes are older and would be sent after them.
 ///   This happens when the app wrote before calling this function;
+/// - the cache is in memory, the JS database has pending writes and [allowMemoryCache] is false
+///   ([JsSdkCacheImportRefusal.memoryCache]);
 /// - a pending write can not be read ([JsSdkCacheImportRefusal.unreadableWrites]).
 ///
 /// The JS database is never deleted: call [deleteJsSdkCache] when the app no longer needs it.
 Future<JsSdkCacheImportResult> importJsSdkCache(
   FirebaseFirestore firestore, {
   bool includeDocuments = true,
+  bool allowMemoryCache = false,
   String? jsAppName,
 }) {
   return runJsSdkCacheImport(
     firestore,
     includeDocuments: includeDocuments,
+    allowMemoryCache: allowMemoryCache,
     jsAppName: jsAppName,
   );
 }
@@ -110,6 +115,10 @@ enum JsSdkCacheImportRefusal {
 
   /// A pending write of the JS database could not be read.
   unreadableWrites,
+
+  /// The cache is in memory and the JS database has pending writes: moving them would lose them at the next reload
+  /// (pass `allowMemoryCache: true` to accept that).
+  memoryCache,
 
   /// The JS database holds pending writes that were not imported (from [deleteJsSdkCache]).
   pendingWritesNotImported,

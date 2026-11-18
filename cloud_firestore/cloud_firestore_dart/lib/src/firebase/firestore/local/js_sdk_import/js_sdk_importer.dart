@@ -39,6 +39,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/local/js_sdk_import/
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/js_sdk_import/js_sdk_database_platform.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/local_serializer.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/local_store.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/local/memory/memory_persistence.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/persistance/persistence.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/database_id.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/document_collections.dart';
@@ -92,6 +93,7 @@ String jsSdkStoragePrefix(String appName, DatabaseId databaseId) {
 Future<JsSdkCacheImportResult> runJsSdkCacheImport(
   FirebaseFirestore firestore, {
   required bool includeDocuments,
+  required bool allowMemoryCache,
   String? jsAppName,
 }) async {
   final _JsSdkCache cache = _JsSdkCache(firestore, jsAppName);
@@ -103,7 +105,11 @@ Future<JsSdkCacheImportResult> runJsSdkCacheImport(
   }
   final FirestoreClient client = firestore.client;
   return client.runExclusive(
-    () => cache.import(client, includeDocuments: includeDocuments),
+    () => cache.import(
+      client,
+      includeDocuments: includeDocuments,
+      allowMemoryCache: allowMemoryCache,
+    ),
   );
 }
 
@@ -429,6 +435,7 @@ class _JsSdkCache {
   Future<JsSdkCacheImportResult> import(
     FirestoreClient client, {
     required bool includeDocuments,
+    required bool allowMemoryCache,
   }) async {
     final Persistence persistence = client.persistence;
     final LocalStore localStore = client.localStore;
@@ -491,6 +498,22 @@ class _JsSdkCache {
             (Map<String, Object?>, MutationBatch) a,
             (Map<String, Object?>, MutationBatch) b,
           ) => a.$2.batchId.compareTo(b.$2.batchId),
+        );
+      }
+      // A memory cache loses the writes at the next reload, and the JS database no longer has them after step 5.
+      if (byUser.isNotEmpty &&
+          persistence is MemoryPersistence &&
+          !allowMemoryCache) {
+        final int count = byUser.values.fold<int>(
+          0,
+          (int n, List<(Map<String, Object?>, MutationBatch)> b) =>
+              n + b.length,
+        );
+        throw _refuse(
+          JsSdkCacheImportRefusal.memoryCache,
+          '$databaseName has $count pending write batches and this cache is in memory: after the import they would '
+          'be lost at the next reload of the page. Use a persistent cache, or pass allowMemoryCache: true. Nothing '
+          'was imported.',
         );
       }
       // Checked again in step 4; checked here so that a refused import does not import the documents either.

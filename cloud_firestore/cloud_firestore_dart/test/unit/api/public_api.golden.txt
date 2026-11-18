@@ -275,6 +275,7 @@ class JsSdkCacheImportException
 enum JsSdkCacheImportRefusal
   new JsSdkCacheImportRefusal(int #index, String #name)
   static final jsClientActive: JsSdkCacheImportRefusal
+  static final memoryCache: JsSdkCacheImportRefusal
   static final pendingWritesInCache: JsSdkCacheImportRefusal
   static final pendingWritesNotImported: JsSdkCacheImportRefusal
   static final unreadableWrites: JsSdkCacheImportRefusal
@@ -551,4 +552,4 @@ class WriteBatch
   set(DocumentReference<dynamic> documentRef, dynamic data, [SetOptions options]): WriteBatch
   update(DocumentReference<Object> documentRef, Map<Object, Object> data): WriteBatch
 deleteJsSdkCache(FirebaseFirestore firestore, {bool discardPendingWrites, String jsAppName}): Future<bool>
-importJsSdkCache(FirebaseFirestore firestore, {bool includeDocuments, String jsAppName}): Future<JsSdkCacheImportResult>
+importJsSdkCache(FirebaseFirestore firestore, {bool includeDocuments, bool allowMemoryCache, String jsAppName}): Future<JsSdkCacheImportResult>

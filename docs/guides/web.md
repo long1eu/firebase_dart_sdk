@@ -338,9 +338,11 @@ How it behaves:
   `notOnWeb`.
 - **Exactly once.** The cache records what it imported in the transaction that adds the writes,
   and the next call finishes their removal from the JS database if the page closed in between. A
-  crash at any point loses no pending write and imports none twice. With a memory cache the
-  imported writes, like every write made with it, are lost if the page closes before the backend
-  acknowledges them: use a persistent cache.
+  crash at any point loses no pending write and imports none twice.
+- **A persistent cache, or an explicit opt-in.** A memory cache would lose the imported writes at
+  the next reload, while the JS database no longer has them. With a memory cache the import
+  refuses (`memoryCache`) when the JS database has pending writes, unless you pass
+  `allowMemoryCache: true`; documents alone are imported without it.
 - **The JS database is never deleted.** `deleteJsSdkCache(firestore)` deletes it when the app is
   sure it no longer needs it; it refuses while the database holds writes that were not imported
   (unless `discardPendingWrites: true`).
