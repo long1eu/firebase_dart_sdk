@@ -325,13 +325,19 @@ final indexes = firestore.persistentCacheIndexManager; // null with a memory cac
 await indexes?.enableIndexAutoCreation();
 ```
 
-- **Automatic creation** (off by default, not stored: turn it on after creating the instance).
+- **Automatic creation** (off by default, not stored: turn it on after creating the instance, or
+  set `PersistentCacheSettings(indexAutoCreation: true)`, which turns it on from the start of
+  every instance; that setting is not in the official SDKs).
   When a cache query was run as a collection scan that read at least 100 cached documents and
   more than twice as many as it returned, the SDK creates an index for that query. Only
   documents that came from the backend are counted, not pending writes.
-- **Filling.** An index is filled in the background while the app runs: 50 documents per run,
-  the first run 15 seconds after the instance was created and then one per minute. A query uses
-  an index as far as it is filled and reads the rest, so results are complete at every moment.
+- **Filling.** An index is filled in the background while the app runs: by default 50 documents
+  per run, the first run 15 seconds after the instance was created and then one per minute.
+  `PersistentCacheSettings(indexBackfill: IndexBackfillSettings(...))` changes the documents per
+  run, the interval and the first delay, and `fillIndexes({maxDocuments})` fills the indexes now,
+  in short runs between the other operations, until they are up to date (neither is in the
+  official SDKs). A query uses an index as far as it is filled and reads the rest, so results are
+  complete at every moment.
 - `disableIndexAutoCreation()` stops creating indexes (existing ones stay in use);
   `deleteAllIndexes()` removes them all.
 - `Firestore.setIndexConfigurationFromJSON(json)` (deprecated, as in the other SDKs) configures the

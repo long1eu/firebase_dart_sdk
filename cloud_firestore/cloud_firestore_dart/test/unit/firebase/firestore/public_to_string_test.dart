@@ -176,7 +176,9 @@ void main() {
     test('cache settings', () {
       expectString(
         PersistentCacheSettings(),
-        'PersistentCacheSettings{sizeBytes=104857600}',
+        'PersistentCacheSettings{sizeBytes=104857600, indexAutoCreation=false, '
+        'indexBackfill=IndexBackfillSettings{documentsPerRun=50, '
+        'interval=0:01:00.000000, initialDelay=0:00:15.000000}}',
       );
       expectString(
         MemoryCacheSettings(),

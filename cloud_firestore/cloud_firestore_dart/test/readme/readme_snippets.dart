@@ -1226,9 +1226,23 @@ Future<void> offlinePersistenceGuideLine323() async {
   await indexes?.enableIndexAutoCreation();
 }
 
-// ../../docs/guides/performance.md:170
-Future<void> performanceGuideLine170() async {
+// ../../docs/guides/performance.md:180
+Future<void> performanceGuideLine180() async {
   await firestore.persistentCacheIndexManager?.enableIndexAutoCreation();
+
+  // Or, for an app that lives offline: settings for FirebaseFirestore.instanceFor
+  // that turn automatic creation on from every start and fill faster,
+  final Settings settings = Settings(
+    cacheSettings: PersistentCacheSettings(
+      indexAutoCreation: true,
+      indexBackfill: IndexBackfillSettings(
+        documentsPerRun: 200,
+        interval: const Duration(seconds: 10),
+      ),
+    ),
+  );
+  // and a fill now, during a loading screen (at most 20,000 documents).
+  await firestore.persistentCacheIndexManager?.fillIndexes(maxDocuments: 20000);
 
   // An index for a query that automatic creation skips (deprecated API).
   // ignore: deprecated_member_use
@@ -1245,22 +1259,22 @@ Future<void> performanceGuideLine170() async {
   }''');
 }
 
-// ../../docs/guides/performance.md:226
-Future<void> performanceGuideLine226() async {
+// ../../docs/guides/performance.md:250
+Future<void> performanceGuideLine250() async {
   final Settings settings = Settings(
     cacheSettings: PersistentCacheSettings(sizeBytes: 200 * 1024 * 1024),
   );
 }
 
-// ../../docs/guides/performance.md:278
-Future<void> performanceGuideLine278() async {
+// ../../docs/guides/performance.md:302
+Future<void> performanceGuideLine302() async {
   final Stream<QuerySnapshot<Map<String, Object?>>> local = users
       .where('online', isEqualTo: true)
       .snapshots(source: ListenSource.cache);
 }
 
-// ../../docs/guides/performance.md:293
-Future<void> performanceGuideLine293() async {
+// ../../docs/guides/performance.md:317
+Future<void> performanceGuideLine317() async {
   final QuerySnapshot<Map<String, Object?>> page1 =
       await users.orderBy('name').limit(25).get();
   final QuerySnapshot<Map<String, Object?>> page2 = await users
@@ -1270,21 +1284,21 @@ Future<void> performanceGuideLine293() async {
       .get();
 }
 
-// ../../docs/guides/performance.md:312
-Future<void> performanceGuideLine312() async {
+// ../../docs/guides/performance.md:336
+Future<void> performanceGuideLine336() async {
   final AggregateQuerySnapshot snapshot = await users.where('active', isEqualTo: true).count().get();
   print(snapshot.count);
 }
 
-// ../../docs/guides/performance.md:353
-Future<void> performanceGuideLine353() async {
+// ../../docs/guides/performance.md:377
+Future<void> performanceGuideLine377() async {
   final LoadBundleTaskSnapshot progress = await firestore.loadBundle(bundleBytes).future;
   final Query<Map<String, Object?>>? latest = await firestore.namedQuery('latest-stories');
   final QuerySnapshot<Map<String, Object?>> firstScreen = await latest!.get(const GetOptions(source: Source.cache));
 }
 
-// ../../docs/guides/performance.md:372
-Future<void> performanceGuideLine372() async {
+// ../../docs/guides/performance.md:396
+Future<void> performanceGuideLine396() async {
   final DocumentSnapshot<Map<String, Object?>> cached = await users.doc('ada').get(const GetOptions(source: Source.cache));
 }
 

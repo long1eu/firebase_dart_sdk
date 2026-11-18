@@ -3,6 +3,7 @@
 // on 18/09/2018
 
 import 'dart:async';
+import 'dart:math';
 
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/snapshot_version.dart';
 import 'package:cloud_firestore_dart/src/database_collection/database_collection.dart';
@@ -224,6 +225,10 @@ class FirestoreClient implements RemoteStoreCallback {
           connectivityDetector: connectivityDetector,
           memoryLruGcSettings: switch (settings.cacheSettings) {
             final MemoryCacheSettings memory => memory.gcSettings,
+            _ => null,
+          },
+          persistentCacheSettings: switch (settings.cacheSettings) {
+            final PersistentCacheSettings persistent => persistent,
             _ => null,
           },
         );
@@ -559,17 +564,18 @@ class FirestoreClient implements RemoteStoreCallback {
   }
 
   /// Runs one index backfill now, without waiting for the scheduled one, and returns the number of documents that
-  /// were processed (at most 50 per run; 0 when the indexes are up to date or the client has no field indexes).
+  /// were processed (at most [maxDocuments], by default `IndexBackfillSettings.documentsPerRun`; 0 when the indexes
+  /// are up to date, the client has no field indexes or was shut down).
   @visibleForTesting
-  Future<int> backfillIndexes() async {
+  Future<int> backfillIndexes({int? maxDocuments}) async {
     _verifyNotShutdown();
     return _enqueue<int>(() async {
       final IndexBackfiller? backfiller = _indexBackfiller;
-      if (backfiller == null) {
+      if (backfiller == null || _isShutdown) {
         return 0;
       }
       try {
-        return await backfiller.backfill();
+        return await backfiller.backfill(maxDocuments: maxDocuments);
       } on FirestoreException catch (e) {
         // Only the primary client of the cache backfills.
         if (isPrimaryLeaseLoss(e)) {
@@ -578,6 +584,30 @@ class FirestoreClient implements RemoteStoreCallback {
         rethrow;
       }
     });
+  }
+
+  /// The documents of one run of [fillIndexes]. A run blocks the queue of the client; at 50 to 200 us per document
+  /// (docs/spikes/offline_forever.md) a run of 100 lasts about 5 to 20 ms plus the fixed cost of a run, and the other
+  /// operations of the client run between two runs.
+  static const int fillIndexesDocumentsPerRun = 100;
+
+  /// Fills the field indexes now, in runs of [fillIndexesDocumentsPerRun] documents, each a separate task of the
+  /// queue, until a run finds nothing to index or [maxDocuments] documents were indexed (no limit when null). Returns
+  /// the number of documents indexed. Stops early, with the count so far, when the client is shut down meanwhile.
+  Future<int> fillIndexes({int? maxDocuments}) async {
+    _verifyNotShutdown();
+    int total = 0;
+    while (!_isShutdown && (maxDocuments == null || total < maxDocuments)) {
+      final int cap = maxDocuments == null
+          ? fillIndexesDocumentsPerRun
+          : min(fillIndexesDocumentsPerRun, maxDocuments - total);
+      final int processed = await backfillIndexes(maxDocuments: cap);
+      if (processed == 0) {
+        break;
+      }
+      total += processed;
+    }
+    return total;
   }
 
   /// Returns the named query saved by a loaded bundle under [queryName], or null if there is none.
@@ -685,6 +715,7 @@ class FirestoreClient implements RemoteStoreCallback {
     BehaviorSubject<bool> onNetworkConnected,
     TaskScheduler scheduler, {
     MemoryGarbageCollectorSettings? memoryLruGcSettings,
+    PersistentCacheSettings? persistentCacheSettings,
     ConnectivityChangeDetector? connectivityDetector,
   }) async {
     // Note: The initialization work must all be synchronous (we can't dispatch more work) since external write/listen
@@ -736,14 +767,26 @@ class FirestoreClient implements RemoteStoreCallback {
     }
     final Persistence started = persistence;
     if (started is SQLitePersistence) {
+      // A persistent cache from the deprecated `persistenceEnabled` setting has the default settings.
+      final PersistentCacheSettings cacheSettings =
+          persistentCacheSettings ?? PersistentCacheSettings();
+      final IndexBackfillSettings backfillSettings =
+          cacheSettings.indexBackfill;
+      if (cacheSettings.indexAutoCreation) {
+        // The same switch as PersistentCacheIndexManager.enableIndexAutoCreation, before any query can run.
+        localStore.indexAutoCreationEnabled = true;
+      }
       final IndexBackfiller indexBackfiller = _indexBackfiller =
-          IndexBackfiller(started, localStore);
+          IndexBackfiller(started, localStore)
+            ..maxDocumentsToProcess = backfillSettings.documentsPerRun;
       _indexBackfillScheduler = IndexBackfillerScheduler(
         indexBackfiller,
         scheduler,
         // On the queue of the client, like every other operation of the local store.
         run: (Future<int> Function() backfill) =>
             _enqueue<int>(() async => _isShutdown ? 0 : await backfill()),
+        initialDelay: backfillSettings.initialDelay,
+        regularDelay: backfillSettings.interval,
       )..start();
       // Another client that clears the cache while this one runs ends this one, as in the JS SDK.
       started.databaseClearedListener = () => shutdown();

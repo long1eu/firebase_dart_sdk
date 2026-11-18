@@ -245,6 +245,20 @@ class GetOptions
   get hashCode: int
   new GetOptions({Source source})
   toString(): String
+class IndexBackfillSettings
+  ==(Object other): bool
+  final documentsPerRun: int
+  final initialDelay: Duration
+  final interval: Duration
+  get hashCode: int
+  new IndexBackfillSettings({int documentsPerRun, Duration interval, Duration initialDelay})
+  static final defaultDocumentsPerRun: int
+  static final defaultInitialDelay: Duration
+  static final defaultInterval: Duration
+  static final maxDelay: Duration
+  static final maxDocumentsPerRun: int
+  static final minInterval: Duration
+  toString(): String
 class Int32Value
   ==(Object other): bool
   final value: int
@@ -322,11 +336,14 @@ class PersistentCacheIndexManager
   deleteAllIndexes(): Future<void>
   disableIndexAutoCreation(): Future<void>
   enableIndexAutoCreation(): Future<void>
+  fillIndexes({int maxDocuments}): Future<int>
 class PersistentCacheSettings extends LocalCacheSettings
   ==(Object other): bool
+  final indexAutoCreation: bool
+  final indexBackfill: IndexBackfillSettings
   final sizeBytes: int
   get hashCode: int
-  new PersistentCacheSettings({int sizeBytes})
+  new PersistentCacheSettings({int sizeBytes, bool indexAutoCreation, IndexBackfillSettings indexBackfill})
   toString(): String
 class Query
   ==(Object other): bool
