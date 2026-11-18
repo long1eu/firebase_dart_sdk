@@ -81,6 +81,59 @@ void main() {
     );
   });
 
+  test(
+    'while it is written, the file is never where another user can open it',
+    () async {
+      Process.runSync('chmod', <String>['755', root.path]);
+      final FileAuthStorage storage = FileAuthStorage('${root.path}/s.json');
+      // Looks at the directory between the steps of the writes: whatever is not the final file must be a
+      // directory that only the owner can enter, and the final file is owner-only from its first moment.
+      bool writing = true;
+      int stagingSeen = 0;
+      final List<String> exposed = <String>[];
+      Future<void> watch() async {
+        while (writing) {
+          for (final FileSystemEntity e in root.listSync()) {
+            final FileStat stat = e.statSync();
+            if (stat.type == FileSystemEntityType.notFound) {
+              continue;
+            }
+            if (e is Directory) {
+              stagingSeen++;
+            }
+            if (stat.mode & 0x3f != 0 && !(e is Directory && _fresh(e))) {
+              exposed.add('${e.path} ${(stat.mode & 0x1ff).toRadixString(8)}');
+            }
+          }
+          await Future<void>.delayed(Duration.zero);
+        }
+      }
+
+      final Future<void> watching = watch();
+      for (int i = 0; i < 20; i++) {
+        await storage.write('k', 'secret $i');
+      }
+      writing = false;
+      await watching;
+      expect(exposed, isEmpty);
+      expect(stagingSeen, greaterThan(0));
+      expect(permissions(storage.path), 0x180);
+    },
+    skip: posix ? null : 'POSIX modes (Linux and macOS)',
+  );
+
+  test('a write that fails leaves nothing behind', () async {
+    // The path is a directory with something in it: the rename onto it fails.
+    final String path = '${root.path}/s.json';
+    Directory(path).createSync();
+    File('$path/keep').writeAsStringSync('x');
+    await expectLater(
+      FileAuthStorage(path).write('k', 'secret'),
+      throwsA(isA<FileSystemException>()),
+    );
+    expect(root.listSync().map((FileSystemEntity e) => e.path), <String>[path]);
+  });
+
   test('a file that is not JSON counts as empty and is replaced', () async {
     final String path = '${root.path}/s.json';
     File(path).writeAsStringSync('not json');
@@ -117,4 +170,13 @@ void main() {
     expect(WebAuthStorage.session, throwsUnsupportedError);
     expect(WebAuthStorage.local, throwsUnsupportedError);
   });
+}
+
+/// A staging directory that was created but not restricted yet: it is empty until its mode is 0700.
+bool _fresh(Directory directory) {
+  try {
+    return directory.listSync().isEmpty;
+  } on FileSystemException {
+    return true;
+  }
 }
