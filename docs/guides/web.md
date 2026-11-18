@@ -13,7 +13,7 @@ with two signed-in users side by side.
 memory cache, so you can try queries, writes and listeners in a page that needs no backend. This is its main page in headless Chrome with
 the network turned off: look at the **Sync** line and at the note marked `[not sent yet]`.
 
-![The web_app example offline: Sync "Offline: showing the cache", an "Enable network" button, and the newest note marked "[not sent yet]" above three sent notes](../images/examples/web_app_offline.png)
+<picture><source media="(prefers-color-scheme: dark)" srcset="../images/examples/web_app_offline_dark.png"><img src="../images/examples/web_app_offline.png" alt="The web_app example offline: Sync &quot;Offline: showing the cache&quot;, an &quot;Enable network&quot; button, and the newest note marked &quot;[not sent yet]&quot; above three sent notes"></picture>
 
 ## A first page
 

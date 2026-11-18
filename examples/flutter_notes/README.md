@@ -23,7 +23,7 @@ The notes are in the collection `notes`, as `{title, body, updatedAt}`.
 This is the app on macOS against a private emulator, with three notes. Look at the status line
 under the title:
 
-![The flutter_notes window on macOS: the status line says "Up to date" and three notes are listed, each with a delete button, and an add button at the bottom right](../../docs/images/examples/flutter_notes_online.png)
+<picture><source media="(prefers-color-scheme: dark)" srcset="../../docs/images/examples/flutter_notes_online_dark.png"><img src="../../docs/images/examples/flutter_notes_online.png" alt="The flutter_notes window on macOS: the status line says &quot;Up to date&quot; and three notes are listed, each with a delete button, and an add button at the bottom right"></picture>
 
 How `main()` wires the pieces together before `runApp`, and what the widgets use afterwards:
 
@@ -63,7 +63,7 @@ To see the offline behaviour, stop the emulator while the app runs: the status l
 This is the same window about 20 seconds after the emulator was stopped. Look at the status line:
 the notes stay, served from the SQLite cache.
 
-![The flutter_notes window with the status line "Offline: showing the saved notes" on a tinted background with a crossed-out cloud icon, and the same three notes](../../docs/images/examples/flutter_notes_offline.png)
+<picture><source media="(prefers-color-scheme: dark)" srcset="../../docs/images/examples/flutter_notes_offline_dark.png"><img src="../../docs/images/examples/flutter_notes_offline.png" alt="The flutter_notes window with the status line &quot;Offline: showing the saved notes&quot; on a tinted background with a crossed-out cloud icon, and the same three notes"></picture>
 
 Start the emulator again: within a few seconds (up to a minute, the client's backoff) the write
 is sent and the line says "Up to date". The emulator keeps its data in memory, so after a restart
@@ -96,7 +96,7 @@ project. To add sign-in, see [Authentication](../../docs/guides/authentication.m
 | Platform | Status |
 | --- | --- |
 | macOS | Built (`flutter build macos --debug`) and run against the emulator by hand: the listener, an edit offline, the sync when the emulator came back, the cache across a restart, and `terminate()` on Cmd-Q. Again with 0.2.0 and `cloud_firestore_dart_sqlite` 0.1.0 (`sqlite3` 3.5.2): the notes loaded, a note added and deleted in the app reached the emulator, the app quit from its menu, and started again with the emulator stopped it showed the notes from its SQLite file (a file first created by the 0.1 build with the copied opener) |
-| macOS, screenshots | Taken with the 0.1 build; the UI did not change in 0.2. `flutter build macos --debug --dart-define=EMULATOR_PORT=8141`, the built app run against a private emulator with three notes written through the emulator's REST API, captured with `screencapture -l` |
+| macOS, screenshots | Taken with the 0.1 build; the UI did not change in 0.2. `flutter build macos --debug --dart-define=EMULATOR_PORT=8141`, the built app run against a private emulator with three notes written through the emulator's REST API, captured with `screencapture -l`. The dark captures (`*_dark.png`, 2026-11-18): the same steps with `--dart-define=EMULATOR_PORT=8341` against `tool/start_private_emulator.sh 8341`, macOS in dark appearance (the app follows it through `darkTheme`), the window set to 640 by 566 points and captured with `screencapture -o -l` on a display at 1x, so the text is smaller than in the light captures; the offline one 25 seconds after the emulator was stopped |
 | Windows | Built with Flutter 3.47.8 on Windows 11 x64 (`flutter build windows --debug`, 84 seconds, no change to the `windows/` folder; `--release` built too, not run) and run against the emulator from an SSH session, driven through its widgets with Marionette: the notes loaded ("Up to date"), a note added in the dialog reached the emulator, and started again with the emulator stopped the app said "Offline: showing the saved notes" and showed it from its SQLite file in `%APPDATA%`. Nobody was logged on at the console, so Flutter could not draw the window (no Direct3D swap chain outside a desktop session) and no screenshot was taken |
 | Android, iOS, Linux | Not built and not run. The platform folders are those of `flutter create` with the changes below |
 

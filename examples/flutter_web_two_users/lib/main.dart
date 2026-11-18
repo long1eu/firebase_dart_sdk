@@ -68,6 +68,10 @@ class TwoUsersApp extends StatelessWidget {
     return MaterialApp(
       title: 'Two users, one page',
       theme: ThemeData(colorSchemeSeed: Colors.indigo),
+      darkTheme: ThemeData(
+        colorSchemeSeed: Colors.indigo,
+        brightness: Brightness.dark,
+      ),
       home: Scaffold(
         appBar: AppBar(
           title: const Text('Two users, one page'),
@@ -312,7 +316,14 @@ class _ClientColumnState extends State<ClientColumn> {
             Text('First snapshot: ${_firstSnapshot ?? '...'}'),
             Text('First from the server: ${_firstFromServer ?? '...'}'),
             if (_error != null)
-              Text(_error!, style: TextStyle(color: Colors.red.shade700)),
+              Text(
+                _error!,
+                style: TextStyle(
+                  color: Theme.of(context).brightness == Brightness.dark
+                      ? Colors.red.shade200
+                      : Colors.red.shade700,
+                ),
+              ),
             const Divider(),
             Text('boards/shared', style: text.titleMedium),
             Text(
