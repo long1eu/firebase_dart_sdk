@@ -210,9 +210,10 @@ class LocalStore implements BundleCallback {
   /// Used to generate targetIds for queries tracked locally.
   final TargetIdGenerator _targetIdGenerator;
 
-  /// The keys of the mutation batches that this client wrote or looked up, by batch id, until
-  /// [removeCachedMutationBatchMetadata]: a batch that another client acknowledged is gone from the mutation queue when
-  /// this client learns about it (the JS `IndexedDbMutationQueue.documentKeysByBatchId`). Multi-client only.
+  /// The keys of the mutation batches that this client wrote or looked up, by batch id, until the batch is acknowledged
+  /// or rejected here ([acknowledgeBatch], [rejectBatch]) or [removeCachedMutationBatchMetadata]: a batch that another
+  /// client acknowledged is gone from the mutation queue when this client learns about it (the JS
+  /// `IndexedDbMutationQueue.documentKeysByBatchId`). Read by the multi-client path only.
   final Map<int, Set<DocumentKey>> _documentKeysByBatchId =
       <int, Set<DocumentKey>>{};
 
@@ -468,6 +469,9 @@ class LocalStore implements BundleCallback {
       await _localDocuments.recalculateAndSaveOverlays(
         _getKeysWithTransformResults(batchResult),
       );
+      // As the JS SDK: the batch is gone from the queue, so are its cached keys (a failed commit leaves the batch in
+      // the queue, where lookupMutationDocuments finds it again).
+      _documentKeysByBatchId.remove(batch.batchId);
 
       return _localDocuments.getDocuments(batch.keys);
     });
@@ -491,6 +495,7 @@ class LocalStore implements BundleCallback {
 
       await _documentOverlayCache.removeOverlaysForBatchId(batchId);
       await _localDocuments.recalculateAndSaveOverlays(toReject.keys);
+      _documentKeysByBatchId.remove(batchId);
 
       final ImmutableSortedMap<DocumentKey, MaybeDocument> documents =
           await _localDocuments.getDocuments(toReject.keys);

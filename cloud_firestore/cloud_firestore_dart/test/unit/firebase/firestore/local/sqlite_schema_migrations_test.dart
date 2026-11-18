@@ -166,6 +166,8 @@ const Map<int, List<String>> _additions = <int, List<String>>{
   18: <String>['column:mutations.client_id'],
   // 19 computes the canonical ids of the targets again: no new table or column.
   19: <String>[],
+  // 20 adds an index of the overlays by collection group and batch id.
+  20: <String>['index:collection_group_batch_id_overlay'],
 };
 
 Set<String> _expectedSchema(int version) => <String>{

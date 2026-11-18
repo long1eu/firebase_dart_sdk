@@ -23,7 +23,7 @@ packages:
       path: "../../cloud_firestore/cloud_firestore_dart"
       relative: true
     source: path
-    version: "0.1.0"
+    version: "0.2.0"
   collection:
     dependency: transitive
     description:
@@ -49,12 +49,12 @@ packages:
     source: hosted
     version: "2.2.0"
   firebase_app_dart:
-    dependency: "direct overridden"
+    dependency: "direct main"
     description:
       path: "../../firebase_core/firebase_app_dart"
       relative: true
     source: path
-    version: "0.1.0"
+    version: "0.2.0"
   fixnum:
     dependency: transitive
     description:

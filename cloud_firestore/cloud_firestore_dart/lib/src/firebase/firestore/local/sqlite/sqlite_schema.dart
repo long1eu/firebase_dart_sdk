@@ -16,7 +16,7 @@ class SQLiteSchema {
   const SQLiteSchema(this.db);
 
   /// The version of the schema. Increase this by one for each migration added to [runMigrations] below.
-  static const int version = 19;
+  static const int version = 20;
 
   /// The batch size for data migrations on a large table. This is chosen to balance the memory usage of the rows read
   /// with the number of round trips.
@@ -153,6 +153,14 @@ class SQLiteSchema {
     // the stored targets are computed again, so that the cache finds them.
     if (fromVersion < 19 && toVersion >= 19) {
       await _rewriteTargetCanonicalIds();
+    }
+
+    // Migration 20 has no counterpart in the other SDKs: an index of the overlays by collection group and batch id, so
+    // that the index backfill reads the next overlays of a group without walking those of every collection of the user
+    // (see SQLiteDocumentOverlayCache.getOverlaysForCollectionGroup). Building it on an existing cache reads the
+    // overlays once (0.7 to 1 s for 1M overlays, 450 MB, on an M5 laptop).
+    if (fromVersion < 20 && toVersion >= 20) {
+      await _createV20CollectionGroupBatchIdOverlayIndex();
     }
 
     // Adding a new migration? READ THIS FIRST!
@@ -664,6 +672,13 @@ class SQLiteSchema {
     );
     await db.execute(
       'CREATE INDEX IF NOT EXISTS collection_group_overlay ON document_overlays (uid, collection_group)',
+    );
+  }
+
+  Future<void> _createV20CollectionGroupBatchIdOverlayIndex() async {
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS collection_group_batch_id_overlay '
+      'ON document_overlays (uid, collection_group, largest_batch_id)',
     );
   }
 
