@@ -24,6 +24,11 @@
   its collection group (schema 20 adds an index on the overlays, built once on open: about 1 s for
   1,000,000 pending writes). The local store also forgets the keys of a batch once it is
   acknowledged or rejected.
+- An index fill run of a collection group spread over many collections no longer reads every
+  collection of the group when few cached documents changed since the last run: those are read
+  in read time order and the ones of the group kept (one run of 50 documents with 100,000
+  pending writes in 10,000 collections: about 1.1 s to 15 to 60 ms, now about the same as with
+  10,000 pending writes).
 - Experimental: `FirebaseFirestore.getPendingWriteCount()` and `pendingWriteCounts()` give the
   number of write batches the backend has not acknowledged yet, and a throttled stream of it, to
   show the progress of a sync after a long time offline. The official SDKs have no equivalent.
