@@ -12,6 +12,13 @@
   number of write batches the backend has not acknowledged yet, and a throttled stream of it, to
   show the progress of a sync after a long time offline. The official SDKs have no equivalent.
   See "Writes waiting for the backend" in `docs/guides/offline_persistence.md`.
+- Cache indexes, not in the official SDKs: `PersistentCacheSettings(indexAutoCreation: true)` turns
+  automatic index creation on from the start of every instance (no `enableIndexAutoCreation()`
+  call needed), `PersistentCacheSettings(indexBackfill: IndexBackfillSettings(documentsPerRun:,
+  interval:, initialDelay:))` sets the background fill rate (default 50 documents a minute, as
+  before), and `persistentCacheIndexManager.fillIndexes({maxDocuments})` fills the indexes now, in
+  runs of 100 documents between the other operations. `PersistentCacheSettings.toString()` lists
+  the new fields.
 - The copied SQLite openers are gone from `example/`: `sqlite_database.dart`,
   `sqlite_database_web.dart` and `sqlite_opfs_worker.dart`. Since 0.2.0 apps use
   [`cloud_firestore_dart_sqlite`](https://pub.dev/packages/cloud_firestore_dart_sqlite)

@@ -52,7 +52,14 @@ final class PersistentCacheSettings extends LocalCacheSettings {
   /// beyond it, Firestore starts removing data that has not been recently used.
   /// Use [Settings.cacheSizeUnlimited] to disable the collection. The
   /// minimum is 1 MB, an [ArgumentError] is thrown otherwise.
-  PersistentCacheSettings({this.sizeBytes = Settings.defaultCacheSizeBytes}) {
+  ///
+  /// [indexAutoCreation] and [indexBackfill] configure the persistent cache
+  /// indexes; the defaults are the behaviour of the official SDKs.
+  PersistentCacheSettings({
+    this.sizeBytes = Settings.defaultCacheSizeBytes,
+    this.indexAutoCreation = false,
+    IndexBackfillSettings? indexBackfill,
+  }) : indexBackfill = indexBackfill ?? IndexBackfillSettings() {
     if (sizeBytes != Settings.cacheSizeUnlimited &&
         sizeBytes < Settings.minimumCacheBytes) {
       throw ArgumentError(
@@ -64,16 +71,142 @@ final class PersistentCacheSettings extends LocalCacheSettings {
   /// The cache size threshold, in bytes.
   final int sizeBytes;
 
+  /// Whether the automatic creation of persistent cache indexes is on from the
+  /// start of the instance, as if `PersistentCacheIndexManager.enableIndexAutoCreation`
+  /// had been called before the first query. Defaults to false.
+  ///
+  /// The official SDKs have no such setting (there automatic creation is off
+  /// after every start until the app turns it on); this one is specific to
+  /// this package. `PersistentCacheIndexManager.disableIndexAutoCreation` still
+  /// turns it off until the next start.
+  final bool indexAutoCreation;
+
+  /// How fast the persistent cache indexes are filled in the background. The
+  /// default is the fixed rate of the official SDKs.
+  final IndexBackfillSettings indexBackfill;
+
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is PersistentCacheSettings && sizeBytes == other.sizeBytes;
+      other is PersistentCacheSettings &&
+          sizeBytes == other.sizeBytes &&
+          indexAutoCreation == other.indexAutoCreation &&
+          indexBackfill == other.indexBackfill;
 
   @override
-  int get hashCode => sizeBytes.hashCode;
+  int get hashCode => Object.hash(sizeBytes, indexAutoCreation, indexBackfill);
 
   @override
-  String toString() => 'PersistentCacheSettings{sizeBytes=$sizeBytes}';
+  String toString() =>
+      'PersistentCacheSettings{sizeBytes=$sizeBytes, '
+      'indexAutoCreation=$indexAutoCreation, indexBackfill=$indexBackfill}';
+}
+
+/// The rate at which the persistent cache indexes are filled in the
+/// background, see [PersistentCacheSettings.indexBackfill].
+///
+/// The fill runs on the queue of the instance: while a run lasts, the other
+/// operations of the instance wait. A run costs about 50 to 200 microseconds
+/// per document on a cache without many pending writes (more with many
+/// pending writes in the collection), so [documentsPerRun] sets how long the
+/// instance can be blocked, and [documentsPerRun] / [interval] how fast a new
+/// index is complete: with the defaults, an index on 10,000 cached documents
+/// takes about 200 minutes of running time.
+///
+/// The official SDKs have a fixed rate (the defaults below); this setting is
+/// specific to this package. To fill the indexes at once, for example while a
+/// loading screen is shown, see `PersistentCacheIndexManager.fillIndexes`.
+///
+/// ```dart
+/// final Settings settings = Settings(
+///   cacheSettings: PersistentCacheSettings(
+///     indexAutoCreation: true,
+///     indexBackfill: IndexBackfillSettings(
+///       documentsPerRun: 200,
+///       interval: Duration(seconds: 10),
+///     ),
+///   ),
+/// );
+/// ```
+final class IndexBackfillSettings {
+  /// Throws an [ArgumentError] when [documentsPerRun] is not between 1 and
+  /// [maxDocumentsPerRun], when [interval] is shorter than [minInterval] or
+  /// longer than [maxDelay], or when [initialDelay] is negative or longer than
+  /// [maxDelay].
+  IndexBackfillSettings({
+    this.documentsPerRun = defaultDocumentsPerRun,
+    this.interval = defaultInterval,
+    this.initialDelay = defaultInitialDelay,
+  }) {
+    if (documentsPerRun < 1 || documentsPerRun > maxDocumentsPerRun) {
+      throw ArgumentError.value(
+        documentsPerRun,
+        'documentsPerRun',
+        'must be between 1 and $maxDocumentsPerRun',
+      );
+    }
+    if (interval < minInterval || interval > maxDelay) {
+      throw ArgumentError.value(
+        interval,
+        'interval',
+        'must be between $minInterval and $maxDelay',
+      );
+    }
+    if (initialDelay < Duration.zero || initialDelay > maxDelay) {
+      throw ArgumentError.value(
+        initialDelay,
+        'initialDelay',
+        'must be between ${Duration.zero} and $maxDelay',
+      );
+    }
+  }
+
+  /// The number of documents of the official SDKs, 50.
+  static const int defaultDocumentsPerRun = 50;
+
+  /// The delay between two runs in the official SDKs, one minute.
+  static const Duration defaultInterval = Duration(minutes: 1);
+
+  /// The delay before the first run in the official SDKs, 15 seconds.
+  static const Duration defaultInitialDelay = Duration(seconds: 15);
+
+  /// The largest [documentsPerRun], 1,000: a run of that size blocks the
+  /// instance for about 50 to 200 ms on a cache without many pending writes.
+  static const int maxDocumentsPerRun = 1000;
+
+  /// The shortest [interval], one second.
+  static const Duration minInterval = Duration(seconds: 1);
+
+  /// The longest [interval] and [initialDelay], one day.
+  static const Duration maxDelay = Duration(days: 1);
+
+  /// The maximum number of documents that one run indexes, over all
+  /// collections. Defaults to 50.
+  final int documentsPerRun;
+
+  /// The delay between the end of a run and the start of the next one.
+  /// Defaults to one minute.
+  final Duration interval;
+
+  /// The delay between the start of the instance and the first run. Defaults
+  /// to 15 seconds.
+  final Duration initialDelay;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is IndexBackfillSettings &&
+          documentsPerRun == other.documentsPerRun &&
+          interval == other.interval &&
+          initialDelay == other.initialDelay;
+
+  @override
+  int get hashCode => Object.hash(documentsPerRun, interval, initialDelay);
+
+  @override
+  String toString() =>
+      'IndexBackfillSettings{documentsPerRun=$documentsPerRun, '
+      'interval=$interval, initialDelay=$initialDelay}';
 }
 
 /// Configures an in memory cache, which is lost when the instance is shut

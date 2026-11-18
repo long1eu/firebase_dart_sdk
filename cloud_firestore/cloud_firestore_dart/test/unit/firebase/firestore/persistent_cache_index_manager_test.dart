@@ -20,14 +20,19 @@ import 'local/mock/database_mock.dart';
 void main() {
   int appCounter = 0;
 
-  Future<FirebaseFirestore> open({bool persistent = true}) async {
+  Future<FirebaseFirestore> open({
+    bool persistent = true,
+    PersistentCacheSettings? cacheSettings,
+  }) async {
     final FirebaseApp app = newApp('persistentCacheIndex${appCounter++}');
     addTearDown(app.delete);
     final String dbName = 'cache-index-${const Uuid().v4()}.db';
     addTearDown(() => DatabaseMock.deleteDatabaseFiles(dbName));
     final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(
       app: app,
-      settings: offlineSettings,
+      settings: cacheSettings == null
+          ? offlineSettings
+          : offlineSettings.copyWith(cacheSettings: cacheSettings),
       openDatabase: persistent ? openFixed(dbName) : null,
     );
     addTearDown(firestore.terminate);
@@ -482,6 +487,142 @@ void main() {
       expect(await firestore.client.backfillIndexes(), 10);
       expect(await firestore.client.backfillIndexes(), 0);
       expect(await matchingIds(firestore), <String>['doc000', 'doc001']);
+    });
+  });
+
+  // Not in the official SDKs.
+  group('the cache index settings', () {
+    const String config =
+        '{"indexes": [{"collectionGroup": "coll", "fields": '
+        '[{"fieldPath": "match", "order": "ASCENDING"}]}]}';
+
+    test('indexAutoCreation creates an index without a call', () async {
+      final FirebaseFirestore firestore = await open(
+        cacheSettings: PersistentCacheSettings(indexAutoCreation: true),
+      );
+      await writeDocs(firestore, 120, 3);
+      expect(indexes(firestore), isEmpty);
+      expect(await matchingIds(firestore), hasLength(3));
+      expect(indexes(firestore), hasLength(1));
+    });
+
+    test('the default creates none', () async {
+      final FirebaseFirestore firestore = await open(
+        cacheSettings: PersistentCacheSettings(),
+      );
+      await writeDocs(firestore, 120, 3);
+      expect(await matchingIds(firestore), hasLength(3));
+      expect(indexes(firestore), isEmpty);
+    });
+
+    test('disableIndexAutoCreation still turns the setting off', () async {
+      final FirebaseFirestore firestore = await open(
+        cacheSettings: PersistentCacheSettings(indexAutoCreation: true),
+      );
+      await firestore.persistentCacheIndexManager!.disableIndexAutoCreation();
+      await writeDocs(firestore, 120, 3);
+      expect(await matchingIds(firestore), hasLength(3));
+      expect(indexes(firestore), isEmpty);
+    });
+
+    test('documentsPerRun is the size of a background run', () async {
+      final FirebaseFirestore firestore = await open(
+        cacheSettings: PersistentCacheSettings(
+          indexBackfill: IndexBackfillSettings(documentsPerRun: 7),
+        ),
+      );
+      await firestore.setIndexConfigurationFromJSON(config);
+      await writeDocs(firestore, 20, 2);
+      expect(await firestore.client.backfillIndexes(), 7);
+    });
+
+    test('a short interval fills the index in the background', () async {
+      final FirebaseFirestore firestore = await open(
+        cacheSettings: PersistentCacheSettings(
+          indexBackfill: IndexBackfillSettings(
+            documentsPerRun: 1000,
+            interval: const Duration(seconds: 1),
+            initialDelay: Duration.zero,
+          ),
+        ),
+      );
+      await firestore.setIndexConfigurationFromJSON(config);
+      await writeDocs(firestore, 60, 2);
+      await Future<void>.delayed(const Duration(milliseconds: 2500));
+      // Nothing is left for a run by hand.
+      expect(await firestore.client.backfillIndexes(), 0);
+      expect(await matchingIds(firestore), <String>['doc000', 'doc001']);
+    });
+
+    test('fillIndexes fills everything, over several runs', () async {
+      final FirebaseFirestore firestore = await open();
+      await firestore.setIndexConfigurationFromJSON(config);
+      await writeDocs(firestore, 250, 2);
+      expect(await firestore.persistentCacheIndexManager!.fillIndexes(), 250);
+      expect(await firestore.persistentCacheIndexManager!.fillIndexes(), 0);
+      expect(await firestore.client.backfillIndexes(), 0);
+      expect(await matchingIds(firestore), <String>['doc000', 'doc001']);
+    });
+
+    test('fillIndexes stops at maxDocuments', () async {
+      final FirebaseFirestore firestore = await open();
+      await firestore.setIndexConfigurationFromJSON(config);
+      await writeDocs(firestore, 250, 2);
+      final PersistentCacheIndexManager manager =
+          firestore.persistentCacheIndexManager!;
+      expect(await manager.fillIndexes(maxDocuments: 120), 120);
+      expect(await matchingIds(firestore), <String>['doc000', 'doc001']);
+      expect(await manager.fillIndexes(maxDocuments: 1000), 130);
+      expect(() => manager.fillIndexes(maxDocuments: 0), throwsArgumentError);
+    });
+
+    test('fillIndexes without indexes does nothing', () async {
+      final FirebaseFirestore firestore = await open();
+      await writeDocs(firestore, 10, 2);
+      expect(await firestore.persistentCacheIndexManager!.fillIndexes(), 0);
+    });
+
+    test('fillIndexes fails after terminate()', () async {
+      final FirebaseFirestore firestore = await open();
+      final PersistentCacheIndexManager manager =
+          firestore.persistentCacheIndexManager!;
+      await firestore.terminate();
+      await expectLater(manager.fillIndexes(), throwsTerminated);
+    });
+
+    test('IndexBackfillSettings checks its values', () {
+      expect(IndexBackfillSettings().documentsPerRun, 50);
+      expect(IndexBackfillSettings().interval, const Duration(minutes: 1));
+      expect(IndexBackfillSettings().initialDelay, const Duration(seconds: 15));
+      expect(
+        IndexBackfillSettings(documentsPerRun: 9),
+        IndexBackfillSettings(documentsPerRun: 9),
+      );
+      expect(
+        PersistentCacheSettings(indexAutoCreation: true),
+        isNot(PersistentCacheSettings()),
+      );
+      expect(
+        () => IndexBackfillSettings(documentsPerRun: 0),
+        throwsArgumentError,
+      );
+      expect(
+        () => IndexBackfillSettings(documentsPerRun: 1001),
+        throwsArgumentError,
+      );
+      expect(
+        () =>
+            IndexBackfillSettings(interval: const Duration(milliseconds: 999)),
+        throwsArgumentError,
+      );
+      expect(
+        () => IndexBackfillSettings(interval: const Duration(days: 2)),
+        throwsArgumentError,
+      );
+      expect(
+        () => IndexBackfillSettings(initialDelay: const Duration(seconds: -1)),
+        throwsArgumentError,
+      );
     });
   });
 }

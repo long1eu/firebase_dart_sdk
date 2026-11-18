@@ -45,24 +45,27 @@ class IndexBackfiller {
   final LocalDocumentsView Function() _localDocumentsViewOfCurrentUser;
 
   /// The maximum number of documents to process each time [backfill] is
-  /// called. Can be changed by tests.
+  /// called without a cap. Set from `IndexBackfillSettings.documentsPerRun`;
+  /// can be changed by tests.
   int maxDocumentsToProcess = defaultMaxDocumentsToProcess;
 
   /// Runs a single backfill operation and returns the number of documents
-  /// processed.
-  Future<int> backfill() {
+  /// processed: at most [maxDocuments], or [maxDocumentsToProcess] when it is
+  /// null.
+  Future<int> backfill({int? maxDocuments}) {
+    final int cap = maxDocuments ?? maxDocumentsToProcess;
     return _persistence.runPrimaryTransaction<int>(
       'Backfill Indexes',
-      _writeIndexEntries,
+      () => _writeIndexEntries(cap),
     );
   }
 
-  /// Writes index entries until the cap is reached. Returns the number of
+  /// Writes index entries until [cap] is reached. Returns the number of
   /// documents processed.
-  Future<int> _writeIndexEntries() async {
+  Future<int> _writeIndexEntries(int cap) async {
     final IndexManager indexManager = _indexManagerOfCurrentUser();
     final Set<String> processedCollectionGroups = <String>{};
-    int documentsRemaining = maxDocumentsToProcess;
+    int documentsRemaining = cap;
     while (documentsRemaining > 0) {
       final String? collectionGroup = indexManager
           .getNextCollectionGroupToUpdate();
@@ -77,7 +80,7 @@ class IndexBackfiller {
       );
       processedCollectionGroups.add(collectionGroup);
     }
-    return maxDocumentsToProcess - documentsRemaining;
+    return cap - documentsRemaining;
   }
 
   /// Writes entries for the provided collection group. Returns the number of
@@ -189,8 +192,10 @@ class IndexBackfiller {
   }
 }
 
-/// Schedules the index backfill: a first run shortly after the client
-/// started, then one every minute. Port of `IndexBackfiller.Scheduler`.
+/// Schedules the index backfill: a first run [initialDelay] after the client
+/// started (15 seconds by default), then one every [regularDelay] (one minute
+/// by default). Port of `IndexBackfiller.Scheduler`; the delays are fixed
+/// there.
 class IndexBackfillerScheduler {
   /// [run] executes a backfill; the client passes a function that puts it on
   /// its serial queue, so that a backfill never interleaves with the other
@@ -199,6 +204,8 @@ class IndexBackfillerScheduler {
     this._backfiller,
     this._scheduler, {
     Future<int> Function(Future<int> Function() backfill)? run,
+    this.initialDelay = initialBackfillDelay,
+    this.regularDelay = regularBackfillDelay,
   }) : _run = run ?? ((Future<int> Function() backfill) => backfill());
 
   static const String _tag = 'IndexBackfiller';
@@ -208,6 +215,12 @@ class IndexBackfillerScheduler {
 
   /// Minimum amount of time between backfill checks, after the first one.
   static const Duration regularBackfillDelay = Duration(minutes: 1);
+
+  /// The delay of the first run after [start].
+  final Duration initialDelay;
+
+  /// The delay between the end of a run and the start of the next one.
+  final Duration regularDelay;
 
   final IndexBackfiller _backfiller;
   final TaskScheduler _scheduler;
@@ -230,7 +243,7 @@ class IndexBackfillerScheduler {
     }
     _stopped = false;
     _generation++;
-    _scheduleBackfill(initialBackfillDelay);
+    _scheduleBackfill(initialDelay);
   }
 
   void stop() {
@@ -258,7 +271,7 @@ class IndexBackfillerScheduler {
         }
       }
       if (!_stopped && generation == _generation) {
-        _scheduleBackfill(regularBackfillDelay);
+        _scheduleBackfill(regularDelay);
       }
     });
   }

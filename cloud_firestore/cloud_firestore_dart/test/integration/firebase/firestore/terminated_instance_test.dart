@@ -398,6 +398,12 @@ final List<Entry> entries = <Entry>[
     After.futureFails,
     (Fixture f) => f.firestore.persistentCacheIndexManager!.deleteAllIndexes(),
   ),
+  Entry(
+    'PersistentCacheIndexManager.fillIndexes',
+    <String>{'PersistentCacheIndexManager.fillIndexes'},
+    After.futureFails,
+    (Fixture f) => f.firestore.persistentCacheIndexManager!.fillIndexes(),
+  ),
 ];
 
 /// Public members that return a Future, Stream or LoadBundleTask and are not

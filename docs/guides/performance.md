@@ -108,24 +108,29 @@ has the API; this section is about the cost.
 What the client does:
 
 - **Automatic creation** is off by default and not stored; turn it on after every start with
-  `enableIndexAutoCreation()`. After a cache query was answered by a scan, the client creates an index for it
+  `enableIndexAutoCreation()`, or once in the settings with `PersistentCacheSettings(indexAutoCreation: true)`
+  (not in the official SDKs), which turns it on before the first query of every start. After a cache query was answered by a scan, the client creates an index for it
   when the scan read at least 100 documents and more than twice as many documents as it returned.
 - Because a scan returns every match before the limit is applied, a limit query without selective filters
   (for example `orderBy('total', descending: true).limit(5)` on a large collection) returns as many documents
   as it read, and never gets an index automatically. Configure one with the deprecated
   `setIndexConfigurationFromJSON` instead.
-- **Filling** (`local/index_backfiller.dart`) runs in the background, on the client's queue: the first run 15
-  seconds after the instance was created, then one run per minute, each run indexing at most **50 documents**
-  across all collections. A new index on a collection of 10,000 cached documents is therefore complete after
-  about 200 minutes of the app running. Until then a query uses the index for the documents it covers and reads
+- **Filling** (`local/index_backfiller.dart`) runs in the background, on the client's queue: by default the
+  first run 15 seconds after the instance was created, then one run per minute, each run indexing at most
+  **50 documents** across all collections (the fixed rate of the official SDKs). A new index on a collection of
+  10,000 cached documents is therefore complete after about 200 minutes of the app running. `IndexBackfillSettings`
+  (`documentsPerRun` 1 to 1,000, `interval` 1 second to 1 day, `initialDelay`) changes the rate, and
+  `persistentCacheIndexManager.fillIndexes()` fills the indexes at once; both are not in the official SDKs. A
+  run blocks the other operations of the instance while it lasts (about 50 to 200 us per document without many
+  pending writes), so a larger `documentsPerRun` means longer pauses. Until the index is complete a query uses the index for the documents it covers and reads
   the others: through the `read_time` column when fewer than 5,000 documents in the whole cache changed after
   the index's position, otherwise by a scan of the collection.
 - **Cost on writes.** Writing a document does not write index entries. A document that changes (from the
   backend or from your own acknowledged write) is behind the index's position and is indexed again by a later
   fill run; until then queries read it separately. Removing a document (garbage collection, a delete from the
   backend) deletes its entries in the same transaction. So the write path is not slower, but every change
-  costs one more index update later, and a collection that changes faster than 50 documents a minute keeps
-  queries reading the changed documents separately.
+  costs one more index update later, and a collection that changes faster than the fill rate (50 documents a
+  minute by default) keeps queries reading the changed documents separately.
 - **Cost in space.** Every index adds one row per document that has the indexed fields (one per array element
   for `array-contains`).
 - Queries with inequalities on several fields are never served by an index (scanned, as in the JS SDK).
@@ -160,7 +165,12 @@ queries that no index serves are not affected.
 
 - Turn on automatic creation if your app reads a large cached collection with selective queries offline or
   with `Source.cache`, and the cache lives across many app starts (a persistent cache on a phone or a
-  desktop). The index pays off only once it is filled, which takes minutes to hours of running time.
+  desktop). The index pays off only once it is filled, which takes minutes to hours of running time at the
+  default rate.
+- For an app that lives offline, set `indexAutoCreation: true` in the settings rather than calling
+  `enableIndexAutoCreation()`, raise the fill rate, and call `fillIndexes()` where a pause is acceptable (a
+  loading screen): it runs in batches of 100 documents (about 5 to 20 ms each, other operations run in between)
+  until the indexes are up to date or `maxDocuments` were indexed.
 - For `orderBy` + `limit` queries on large collections, configure an index for the ordered field with
   `setIndexConfigurationFromJSON` (deprecated, as in the other SDKs; it replaces the whole configuration).
 - Do not turn it on for short-lived processes or for small collections (under a few thousand documents a scan
@@ -169,6 +179,20 @@ queries that no index serves are not affected.
 
 ```dart
 await firestore.persistentCacheIndexManager?.enableIndexAutoCreation();
+
+// Or, for an app that lives offline: settings for FirebaseFirestore.instanceFor
+// that turn automatic creation on from every start and fill faster,
+final Settings settings = Settings(
+  cacheSettings: PersistentCacheSettings(
+    indexAutoCreation: true,
+    indexBackfill: IndexBackfillSettings(
+      documentsPerRun: 200,
+      interval: const Duration(seconds: 10),
+    ),
+  ),
+);
+// and a fill now, during a loading screen (at most 20,000 documents).
+await firestore.persistentCacheIndexManager?.fillIndexes(maxDocuments: 20000);
 
 // An index for a query that automatic creation skips (deprecated API).
 // ignore: deprecated_member_use
