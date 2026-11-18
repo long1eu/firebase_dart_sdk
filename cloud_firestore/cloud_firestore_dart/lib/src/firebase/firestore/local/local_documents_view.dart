@@ -5,6 +5,7 @@ import 'dart:async';
 import 'dart:collection';
 import 'dart:math';
 
+import 'package:meta/meta.dart';
 import 'package:cloud_firestore_dart/src/database_collection/database_collection.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/query.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/local_documents_result.dart';
@@ -67,6 +68,10 @@ class LocalDocumentsView {
   /// acknowledgement of the same document (see [recalculateAndSaveOverlaysAfterAcknowledgement]).
   final Map<DocumentKey, _PendingWrites> _pendingWrites =
       <DocumentKey, _PendingWrites>{};
+
+  /// The number of overlays that acknowledgements saved from such a summary instead of a replay of the queue.
+  @visibleForTesting
+  int overlaysSavedFromSummary = 0;
 
   /// Returns the the local view of the document identified by [key]. If we don't have any cached state it returns
   /// null.
@@ -437,6 +442,7 @@ class LocalDocumentsView {
         pending.next++;
         if (!pending.isDone) {
           await _saveOverlayOfPendingWrites(doc, pending);
+          overlaysSavedFromSummary++;
           _pendingWrites[key] = pending;
           continue;
         }

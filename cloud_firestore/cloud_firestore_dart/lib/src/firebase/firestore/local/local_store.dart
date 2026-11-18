@@ -188,6 +188,9 @@ class LocalStore implements BundleCallback {
   /// The current state of all referenced documents, reflecting local changes.
   LocalDocumentsView _localDocuments;
 
+  @visibleForTesting
+  LocalDocumentsView get localDocumentsForTesting => _localDocuments;
+
   /// Performs queries over the [_localDocuments] (and potentially maintains
   /// indexes).
   QueryEngine _queryEngine;
