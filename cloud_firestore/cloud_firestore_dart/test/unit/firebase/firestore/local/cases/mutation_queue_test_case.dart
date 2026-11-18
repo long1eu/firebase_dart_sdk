@@ -81,8 +81,9 @@ class MutationQueueTestCase {
 
     // Remaining entries should still be found
     for (MutationBatch batch in batches) {
-      final MutationBatch? found =
-          await _mutationQueue.lookupMutationBatch(batch.batchId);
+      final MutationBatch? found = await _mutationQueue.lookupMutationBatch(
+        batch.batchId,
+      );
       expect(found, isNotNull);
       expect(found!.batchId, batch.batchId);
     }
@@ -122,8 +123,8 @@ class MutationQueueTestCase {
     expect(found!.batchId, first.batchId);
 
     final MutationBatch last = batches[batches.length - 1];
-    final MutationBatch? notFound =
-        await _mutationQueue.getNextMutationBatchAfterBatchId(last.batchId);
+    final MutationBatch? notFound = await _mutationQueue
+        .getNextMutationBatchAfterBatchId(last.batchId);
     expect(notFound, isNull);
   }
 
@@ -135,21 +136,26 @@ class MutationQueueTestCase {
       patchMutation('foo/bar', map(<dynamic>['b', 1])),
       setMutation('foo/bar/suffix/key', map(<dynamic>['a', 1])),
       setMutation('foo/baz', map(<dynamic>['a', 1])),
-      setMutation('food/bar', map(<dynamic>['a', 1]))
+      setMutation('food/bar', map(<dynamic>['a', 1])),
     ];
 
     // Store all the mutations.
     final List<MutationBatch> batches = <MutationBatch>[];
     await _persistence.runTransaction('New mutation batch', () async {
       for (Mutation mutation in mutations) {
-        batches.add(await _mutationQueue.addMutationBatch(
-            Timestamp.now(), <Mutation>[], <Mutation>[mutation]));
+        batches.add(
+          await _mutationQueue.addMutationBatch(
+            Timestamp.now(),
+            <Mutation>[],
+            <Mutation>[mutation],
+          ),
+        );
       }
     });
 
     final List<MutationBatch> expected = <MutationBatch>[
       batches[1],
-      batches[2]
+      batches[2],
     ];
     final List<MutationBatch> matches = await _mutationQueue
         .getAllMutationBatchesAffectingDocumentKey(key('foo/bar'));
@@ -165,28 +171,34 @@ class MutationQueueTestCase {
       patchMutation('foo/bar', map(<dynamic>['b', 1])),
       setMutation('foo/bar/suffix/key', map(<dynamic>['a', 1])),
       setMutation('foo/baz', map(<dynamic>['a', 1])),
-      setMutation('food/bar', map(<dynamic>['a', 1]))
+      setMutation('food/bar', map(<dynamic>['a', 1])),
     ];
 
     // Store all the mutations.
     final List<MutationBatch> batches = <MutationBatch>[];
     await _persistence.runTransaction('New mutation batch', () async {
       for (Mutation mutation in mutations) {
-        batches.add(await _mutationQueue.addMutationBatch(
-            Timestamp.now(), <Mutation>[], <Mutation>[mutation]));
+        batches.add(
+          await _mutationQueue.addMutationBatch(
+            Timestamp.now(),
+            <Mutation>[],
+            <Mutation>[mutation],
+          ),
+        );
       }
     });
 
-    final ImmutableSortedSet<DocumentKey> keys =
-        DocumentKey.emptyKeySet.insert(key('foo/bar')).insert(key('foo/baz'));
+    final ImmutableSortedSet<DocumentKey> keys = DocumentKey.emptyKeySet
+        .insert(key('foo/bar'))
+        .insert(key('foo/baz'));
 
     final List<MutationBatch> expected = <MutationBatch>[
       batches[1],
       batches[2],
-      batches[4]
+      batches[4],
     ];
-    final List<MutationBatch> matches =
-        await _mutationQueue.getAllMutationBatchesAffectingDocumentKeys(keys);
+    final List<MutationBatch> matches = await _mutationQueue
+        .getAllMutationBatchesAffectingDocumentKeys(keys);
 
     expect(matches, expected);
   }
@@ -194,7 +206,7 @@ class MutationQueueTestCase {
   // timeout: const Timeout(Duration(minutes: 2))
   @testMethod
   Future<void>
-      testAllMutationBatchesAffectingDocumentLotsOfDocumentKeys() async {
+  testAllMutationBatchesAffectingDocumentLotsOfDocumentKeys() async {
     final List<Mutation> mutations = <Mutation>[];
     // Make sure to force SQLite implementation to split the large query into several smaller ones.
     const int lotsOfMutations = 10000;
@@ -204,8 +216,13 @@ class MutationQueueTestCase {
     final List<MutationBatch> batches = <MutationBatch>[];
     await _persistence.runTransaction('New mutation batch', () async {
       for (Mutation mutation in mutations) {
-        batches.add(await _mutationQueue.addMutationBatch(
-            Timestamp.now(), <Mutation>[], <Mutation>[mutation]));
+        batches.add(
+          await _mutationQueue.addMutationBatch(
+            Timestamp.now(),
+            <Mutation>[],
+            <Mutation>[mutation],
+          ),
+        );
       }
     });
 
@@ -232,27 +249,32 @@ class MutationQueueTestCase {
       patchMutation('foo/bar', map(<dynamic>['b', 1])),
       setMutation('foo/bar/suffix/key', map(<dynamic>['a', 1])),
       setMutation('foo/baz', map(<dynamic>['a', 1])),
-      setMutation('food/bar', map(<dynamic>['a', 1]))
+      setMutation('food/bar', map(<dynamic>['a', 1])),
     ];
 
     // Store all the mutations.
     final List<MutationBatch> batches = <MutationBatch>[];
     await _persistence.runTransaction('New mutation batch', () async {
       for (Mutation mutation in mutations) {
-        batches.add(await _mutationQueue.addMutationBatch(
-            Timestamp.now(), <Mutation>[], <Mutation>[mutation]));
+        batches.add(
+          await _mutationQueue.addMutationBatch(
+            Timestamp.now(),
+            <Mutation>[],
+            <Mutation>[mutation],
+          ),
+        );
       }
     });
 
     final List<MutationBatch> expected = <MutationBatch>[
       batches[1],
       batches[2],
-      batches[4]
+      batches[4],
     ];
 
     final Query query = Query(path('foo'));
-    final List<MutationBatch> matches =
-        await _mutationQueue.getAllMutationBatchesAffectingQuery(query);
+    final List<MutationBatch> matches = await _mutationQueue
+        .getAllMutationBatchesAffectingQuery(query);
 
     expect(matches, expected);
   }
@@ -265,26 +287,36 @@ class MutationQueueTestCase {
     final List<MutationBatch> batches = <MutationBatch>[];
     await _persistence.runTransaction('New mutation batch', () async {
       batches
-        ..add(await _mutationQueue.addMutationBatch(
-            Timestamp.now(), <Mutation>[], <SetMutation>[
-          setMutation('foo/bar', value),
-          setMutation('foo/bar/baz/quux', value)
-        ]))
-        ..add(await _mutationQueue.addMutationBatch(
-            Timestamp.now(), <Mutation>[], <SetMutation>[
-          setMutation('foo/bar', value),
-          setMutation('foo/baz', value)
-        ]));
+        ..add(
+          await _mutationQueue.addMutationBatch(
+            Timestamp.now(),
+            <Mutation>[],
+            <SetMutation>[
+              setMutation('foo/bar', value),
+              setMutation('foo/bar/baz/quux', value),
+            ],
+          ),
+        )
+        ..add(
+          await _mutationQueue.addMutationBatch(
+            Timestamp.now(),
+            <Mutation>[],
+            <SetMutation>[
+              setMutation('foo/bar', value),
+              setMutation('foo/baz', value),
+            ],
+          ),
+        );
     });
 
     final List<MutationBatch> expected = <MutationBatch>[
       batches[0],
-      batches[1]
+      batches[1],
     ];
 
     final Query query = Query(path('foo'));
-    final List<MutationBatch> matches =
-        await _mutationQueue.getAllMutationBatchesAffectingQuery(query);
+    final List<MutationBatch> matches = await _mutationQueue
+        .getAllMutationBatchesAffectingQuery(query);
 
     expect(matches, expected);
   }
@@ -302,8 +334,11 @@ class MutationQueueTestCase {
     expect(found, batches);
     expect(found.length, 9);
 
-    await _removeMutationBatches(
-        <MutationBatch>[batches[0], batches[1], batches[2]]);
+    await _removeMutationBatches(<MutationBatch>[
+      batches[0],
+      batches[1],
+      batches[2],
+    ]);
     batches //
       ..remove(batches[0])
       ..remove(batches[0])
@@ -344,16 +379,20 @@ class MutationQueueTestCase {
     final Uint8List streamToken1 = resumeToken('token1')!;
     final Uint8List streamToken2 = resumeToken('token2')!;
 
-    await _persistence.runTransaction('initial stream token',
-        () => _mutationQueue.setLastStreamToken(streamToken1));
+    await _persistence.runTransaction(
+      'initial stream token',
+      () => _mutationQueue.setLastStreamToken(streamToken1),
+    );
 
     final MutationBatch batch1 = await _addMutationBatch();
     await _addMutationBatch();
 
     expect(_mutationQueue.lastStreamToken, streamToken1);
 
-    await _persistence.runTransaction('acknowledgeBatchId',
-        () => _mutationQueue.acknowledgeBatch(batch1, streamToken2));
+    await _persistence.runTransaction(
+      'acknowledgeBatchId',
+      () => _mutationQueue.acknowledgeBatch(batch1, streamToken2),
+    );
 
     expect(_mutationQueue.lastStreamToken, streamToken2);
   }
@@ -363,9 +402,13 @@ class MutationQueueTestCase {
     final SetMutation mutation = setMutation(key, map(<dynamic>['a', 1]));
 
     return _persistence.runTransactionAndReturn(
-        'New mutation batch',
-        () => _mutationQueue.addMutationBatch(
-            Timestamp.now(), <Mutation>[], <SetMutation>[mutation]));
+      'New mutation batch',
+      () => _mutationQueue.addMutationBatch(
+        Timestamp.now(),
+        <Mutation>[],
+        <SetMutation>[mutation],
+      ),
+    );
   }
 
   /// Creates a list of batches containing [number] dummy [MutationBatches]. Each has a different batchId.
@@ -388,8 +431,10 @@ class MutationQueueTestCase {
 
   /// Returns the number of mutation batches in the mutation queue.
   Future<int> _batchCount() {
-    return _persistence.runTransactionAndReturn('batchCount',
-        () async => (await _mutationQueue.getAllMutationBatches()).length);
+    return _persistence.runTransactionAndReturn(
+      'batchCount',
+      () async => (await _mutationQueue.getAllMutationBatches()).length,
+    );
   }
 
   /// Removes the first n from the given [batches] and returns them.
@@ -399,7 +444,9 @@ class MutationQueueTestCase {
   ///
   /// Returns a new list containing all the entries that were removed from [batches].
   Future<List<MutationBatch>> _removeFirstBatches(
-      int n, List<MutationBatch> batches) async {
+    int n,
+    List<MutationBatch> batches,
+  ) async {
     final List<MutationBatch> removed = <MutationBatch>[];
     for (int i = 0; i < n; i++) {
       final MutationBatch batch = batches[0];
@@ -418,5 +465,12 @@ class MutationQueueTestCase {
 
     final int batch = await _batchCount();
     expect(batch, count);
+    expect(
+      await _persistence.runTransactionAndReturn(
+        'getMutationBatchCount',
+        () => _mutationQueue.getMutationBatchCount(),
+      ),
+      count,
+    );
   }
 }
