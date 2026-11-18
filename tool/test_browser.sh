@@ -24,6 +24,13 @@
 #                 it from test/browser/emulator_port.txt, which this script writes for the
 #                 run (see test/browser/emulator_port.dart); 8080, the shared emulator, is
 #                 refused.
+#   AUTH_EMULATOR_PORT, AUTH_RULES_EMULATOR_PORT  the Auth emulator and the Firestore emulator
+#                 with the rules of tool/auth_emulators/firestore.rules that
+#                 web_two_users_test.dart needs (default 9297 and 8297; the Auth emulator's hub
+#                 and logging take the next two ports). Started with tool/start_auth_emulators.sh
+#                 when they do not run yet, and stopped again at the end; written to
+#                 test/browser/auth_emulators.txt. When they cannot be started (no firebase CLI)
+#                 that test skips itself.
 #
 # Exits non-zero if a run fails.
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -33,12 +40,14 @@ case "$PORT" in
   ''|*[!0-9]*) echo "FIRESTORE_EMULATOR_PORT must be a port number"; exit 2;;
   8080) echo "8080 is the shared emulator; use a private one (start_private_emulator.sh)"; exit 2;;
 esac
+AUTH_PORT="${AUTH_EMULATOR_PORT:-9297}"
+RULES_PORT="${AUTH_RULES_EMULATOR_PORT:-8297}"
 
 COMPILERS=(dart2wasm dart2js)
 case "${1:-}" in
   dart2wasm|dart2js) COMPILERS=("$1"); shift;;
   both) shift;;
-  -h|--help) sed -n '2,28p' "$0" | sed 's/^# \{0,1\}//'; exit 0;;
+  -h|--help) sed -n '2,35p' "$0" | sed 's/^# \{0,1\}//'; exit 0;;
 esac
 if [ $# -eq 0 ]; then
   # The files one by one, in the order of their names: the runner loads them in the order
@@ -67,6 +76,23 @@ if ! curl -s -o /dev/null "http://127.0.0.1:$PORT"; then
   STARTED=1
 fi
 
+# The two emulators of web_two_users_test.dart.
+AUTH_FILE="$PKG/test/browser/auth_emulators.txt"
+AUTH_STARTED=0
+rm -f "$AUTH_FILE"
+if curl -s -o /dev/null "http://127.0.0.1:$AUTH_PORT" && curl -s -o /dev/null "http://127.0.0.1:$RULES_PORT"; then
+  AUTH_READY=1
+elif "$ROOT/tool/start_auth_emulators.sh" "$AUTH_PORT" "$RULES_PORT"; then
+  AUTH_READY=1; AUTH_STARTED=1
+else
+  AUTH_READY=0
+  echo "The Auth emulators could not be started: web_two_users_test.dart will be skipped."
+fi
+if [ "$AUTH_READY" = 1 ]; then
+  printf 'auth=127.0.0.1:%s\nfirestore=127.0.0.1:%s\n' "$AUTH_PORT" "$RULES_PORT" >"$AUTH_FILE"
+fi
+trap 'rm -f "$PORT_FILE" "$AUTH_FILE"' EXIT
+
 failed=0
 summary=()
 for compiler in "${COMPILERS[@]}"; do
@@ -88,6 +114,9 @@ done
 
 if [ $STARTED -eq 1 ]; then
   "$ROOT/tool/stop_private_emulator.sh" "$PORT"
+fi
+if [ $AUTH_STARTED -eq 1 ]; then
+  "$ROOT/tool/stop_auth_emulators.sh" "$AUTH_PORT" "$RULES_PORT"
 fi
 
 echo

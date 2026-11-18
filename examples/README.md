@@ -12,6 +12,7 @@ app and a browser app. Each directory is a package of its own with a `pubspec.ya
 | [`flutter_notes/`](flutter_notes/) | A Flutter notes app: a real-time list, offline edits in a SQLite cache, an offline indicator, connectivity events and a clean shutdown. Built and run on macOS, and on Windows from an SSH session (no window drawn). |
 | [`flutterfire_on_windows/`](flutterfire_on_windows/) | A Flutter Windows app on the official `cloud_firestore` API, with `cloud_firestore_dart` selected by `CloudFirestoreDart.use()` instead of the native plugin: a live list, add/edit/delete, a batch, a transaction, a query, a sum and average aggregation, an optional SQLite cache, and integration tests. Run on Windows 11 against the emulator. |
 | [`web_app/`](web_app/) | A browser app in plain Dart (`package:web`): a real-time list, offline writes, a memory or SQLite (IndexedDB/OPFS) cache, and a Firestore Lite page to compare sizes. Experimental, tried in Chrome only. |
+| [`flutter_web_two_users/`](flutter_web_two_users/) | A Flutter web page with two signed-in users side by side (Auth emulator), each with its own `FirebaseApp` and Firestore client: each sees the other's writes, the security rules refuse the guest what the owner may do, and a SQLite cache in IndexedDB answers before the network after a reload. `run.sh` starts the emulators and serves the build on another port. Built with dart2js and dart2wasm, tried in Chrome. |
 | [`playground/`](playground/) | A browser playground with no backend: the client runs with its network disabled on a memory cache, and the page shows each snapshot event, the writes waiting for a server and a timeline. Static files only, ready for any static host. Experimental, tried in Chrome only. |
 
 To pick one, start from where your code runs and follow the arrows:
@@ -25,6 +26,7 @@ flowchart TD
   serverKind -- "runs until stopped, takes jobs" --> workerQueue["worker_queue"]
   start -- "a terminal" --> cli["cli"]
   start -- "a Flutter app" --> flutterNotes["flutter_notes"]
+  start -- "a Flutter web page" --> flutterWeb["flutter_web_two_users"]
   start -- "a browser, without Flutter" --> webApp["web_app"]
   start -- "I want one API topic" --> apiExamples["cloud_firestore_dart/example/"]
 ```

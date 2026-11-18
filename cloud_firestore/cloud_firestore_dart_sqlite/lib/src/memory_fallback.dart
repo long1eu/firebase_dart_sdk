@@ -13,6 +13,14 @@ import 'package:firebase_app_dart/firebase_app_dart.dart';
 /// for a new one) and creates one with a memory cache. Every other error is
 /// rethrown.
 ///
+/// That includes a `SqliteWebSetupException` (a `sqlite3` version that can
+/// lose acknowledged writes in IndexedDB, or a `sqlite3.wasm` of another
+/// version): a mistake of the build, which a memory cache would hide in
+/// every tab. To fall back anyway, catch it and create the instance without
+/// `openDatabase`; the instance that failed is not terminated by this
+/// function, so terminate it first (`FirebaseFirestore.instanceFor` with the
+/// same app returns it).
+///
 /// ```dart
 /// final FirebaseFirestore firestore = await openWithMemoryFallback(
 ///   app: app,
