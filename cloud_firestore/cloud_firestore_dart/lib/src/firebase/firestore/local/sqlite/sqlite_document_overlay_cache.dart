@@ -26,9 +26,37 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/mutat
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/overlay.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/resource_path.dart';
 import 'package:cloud_firestore_dart/src/proto/index.dart' as proto;
+import 'package:meta/meta.dart';
 
 /// SQLite-backed [DocumentOverlayCache] of one user (table `document_overlays`, schema migration 11).
 class SQLiteDocumentOverlayCache implements DocumentOverlayCache {
+  /// The statements whose query plan matters with a long queue of pending writes, as constants so that
+  /// `sqlite_overlay_query_plan_test.dart` checks the plan of exactly what runs here.
+  @visibleForTesting
+  static const String overlaysOfCollectionSql = '''
+          SELECT overlay_mutation, largest_batch_id
+          FROM document_overlays
+          WHERE uid = ? AND collection_path = ? AND +largest_batch_id > ?
+        ''';
+
+  @visibleForTesting
+  static const String nextOverlaysOfGroupSql = '''
+          SELECT overlay_mutation, largest_batch_id, collection_path, document_id
+          FROM document_overlays
+          WHERE uid = ? AND collection_group = ? AND largest_batch_id > ?
+          ORDER BY largest_batch_id, collection_path, document_id
+          LIMIT ?
+        ''';
+
+  @visibleForTesting
+  static const String restOfBatchOfGroupSql = '''
+          SELECT overlay_mutation, largest_batch_id
+          FROM document_overlays
+          WHERE uid = ? AND collection_group = ?
+            AND (+collection_path > ? OR (+collection_path = ? AND document_id > ?))
+            AND largest_batch_id = ?
+        ''';
+
   SQLiteDocumentOverlayCache(this._db, this._serializer, User user)
     : _uid = user.isAuthenticated ? user.uid! : '';
 
@@ -161,13 +189,7 @@ class SQLiteDocumentOverlayCache implements DocumentOverlayCache {
     // that walks every overlay of the user instead of those of the collection (246 ms for a collection of 10 among
     // 1M pending writes). The primary key (uid, collection_path, document_id) reads only the collection.
     final List<Map<String, dynamic>> rows = await _db.query(
-      // @formatter:off
-      '''
-          SELECT overlay_mutation, largest_batch_id
-          FROM document_overlays
-          WHERE uid = ? AND collection_path = ? AND +largest_batch_id > ?
-        ''',
-      // @formatter:on
+      overlaysOfCollectionSql,
       <Object>[_uid, EncodedPath.encode(collection), sinceBatchId],
     );
     return <DocumentKey, Overlay>{
@@ -185,15 +207,7 @@ class SQLiteDocumentOverlayCache implements DocumentOverlayCache {
     // Read through `collection_group_batch_id_overlay` (uid, collection_group, largest_batch_id, schema migration 20):
     // the first [count] rows of the group from the offset, instead of every later overlay of the user.
     final List<Map<String, dynamic>> rows = await _db.query(
-      // @formatter:off
-      '''
-          SELECT overlay_mutation, largest_batch_id, collection_path, document_id
-          FROM document_overlays
-          WHERE uid = ? AND collection_group = ? AND largest_batch_id > ?
-          ORDER BY largest_batch_id, collection_path, document_id
-          LIMIT ?
-        ''',
-      // @formatter:on
+      nextOverlaysOfGroupSql,
       <Object>[_uid, collectionGroup, sinceBatchId, count],
     );
     if (rows.isEmpty) {
@@ -209,25 +223,15 @@ class SQLiteDocumentOverlayCache implements DocumentOverlayCache {
     // query appends any remaining overlays for the last batch. The unary `+` keeps SQLite off the primary key, where
     // `collection_path > ?` is a range over the overlays of every later collection of the user (seconds at 1M).
     final Map<String, dynamic> last = rows.last;
-    final List<Map<String, dynamic>> remaining = await _db.query(
-      // @formatter:off
-      '''
-          SELECT overlay_mutation, largest_batch_id
-          FROM document_overlays
-          WHERE uid = ? AND collection_group = ?
-            AND (+collection_path > ? OR (+collection_path = ? AND document_id > ?))
-            AND largest_batch_id = ?
-        ''',
-      // @formatter:on
-      <Object>[
-        _uid,
-        collectionGroup,
-        last['collection_path'],
-        last['collection_path'],
-        last['document_id'],
-        last['largest_batch_id'],
-      ],
-    );
+    final List<Map<String, dynamic>> remaining = await _db
+        .query(restOfBatchOfGroupSql, <Object>[
+          _uid,
+          collectionGroup,
+          last['collection_path'],
+          last['collection_path'],
+          last['document_id'],
+          last['largest_batch_id'],
+        ]);
     for (Map<String, dynamic> row in remaining) {
       final Overlay overlay = _decodeOverlay(row);
       result[overlay.key] = overlay;
