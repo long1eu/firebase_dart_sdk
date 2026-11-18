@@ -72,7 +72,7 @@ listen and write streams, over `fetch`. What to know:
   memory cache; `openWithMemoryFallback` of the package does this. `clearPersistence()` deletes
   the IndexedDB database or the OPFS directory. Cost, measured for a small app compiled with
   `dart compile js -O2`: 588 KB (180 KB gzipped) with a memory cache, 807 KB (239 KB gzipped)
-  with the persistent cache, plus `sqlite3.wasm`, 731 KB (349 KB gzipped); the OPFS worker is
+  with the persistent cache, plus `sqlite3.wasm`, 759 KB (364 KB gzipped); the OPFS worker is
   183 KB more (`-O2`).
   - Crash safety: what a write future acknowledged is stored, and a tab that dies in the middle
     of a transaction loses only that transaction (SQLite's rollback journal is stored too and

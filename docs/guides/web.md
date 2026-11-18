@@ -429,7 +429,7 @@ Measured with Dart 3.12.2 and `dart compile js -O2`, gzipped:
 | [`examples/web_app`](../../examples/web_app/), Lite page | 398 KB | 122 KB |
 | [`examples/web_app`](../../examples/web_app/), main page with the SQLite opener | 924 KB | 273 KB |
 | `sqlite_opfs_worker.js` | 185 KB | 57 KB |
-| `sqlite3.wasm` (loaded only when a persistent cache opens) | 731 KB | 348 KB |
+| `sqlite3.wasm` (loaded only when a persistent cache opens) | 759 KB | 364 KB |
 
 Use Lite when a page only reads and writes:
 
