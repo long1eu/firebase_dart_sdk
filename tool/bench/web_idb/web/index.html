@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<!-- Loads web/<p>.dart compiled with dart2js (c=js: <p>.js) or dart2wasm
+     (c=wasm: <p>.mjs and <p>.wasm). See run.dart. -->
+<html>
+<head><meta charset="utf-8"><title>web_idb bench</title></head>
+<body>
+<script type="module">
+  const params = new URLSearchParams(location.search);
+  const page = params.get('p');
+  if (params.get('c') === 'wasm') {
+    const loader = await import(`./${page}.mjs`);
+    const app = await loader.compileStreaming(fetch(`${page}.wasm`));
+    const instance = await app.instantiate({});
+    instance.invokeMain();
+  } else {
+    const script = document.createElement('script');
+    script.src = `${page}.js`;
+    document.body.append(script);
+  }
+</script>
+</body>
+</html>
