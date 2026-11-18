@@ -237,16 +237,26 @@ void main() {
 
     await firestore.enableNetwork();
     await firestore.waitForPendingWrites();
-    final QuerySnapshot snapshot = await collection.get(
-      const GetOptions(source: Source.server),
-    );
-    return (
-      <String, Object?>{
-        for (final QueryDocumentSnapshot doc in snapshot.docs)
-          doc.id: _withoutTimes(doc.data()),
-      },
-      waiting,
-    );
+    // In pages: one read of every document is too large for the web transport of the emulator.
+    final Map<String, Object?> documents = <String, Object?>{};
+    QueryDocumentSnapshot? last;
+    while (true) {
+      Query page = collection.orderBy(FieldPath.documentId).limit(500);
+      if (last != null) {
+        page = page.startAfterDocument(last);
+      }
+      final QuerySnapshot snapshot = await page.get(
+        const GetOptions(source: Source.server),
+      );
+      for (final QueryDocumentSnapshot doc in snapshot.docs) {
+        documents[doc.id] = _withoutTimes(doc.data());
+      }
+      if (snapshot.docs.length < 500) {
+        break;
+      }
+      last = snapshot.docs.last;
+    }
+    return (documents, waiting);
   }
 
   test(
