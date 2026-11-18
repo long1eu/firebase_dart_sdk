@@ -1,6 +1,66 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 710" role="img" aria-labelledby="title desc" font-family="system-ui, -apple-system, Segoe UI, Helvetica, Arial, sans-serif">
   <title id="title">dart2wasm time as a share of dart2js time</title>
   <desc id="desc">Bar chart. For each case, the time (or memory) of the dart2wasm build as a percentage of the dart2js build, in headless Chrome. Shorter is better; 100 % means the same. 1 KB document, to backend bytes: 25 %; 1 KB document, from backend bytes: 38 %; 50 KB document, to cache bytes: 25 %; 50 KB document, from cache bytes: 35 %; filter, 10,000 documents: 33 %; orderBy + limit, 10,000 documents: 22 %; first snapshot, 10,000 documents: 31 %; filter, 50,000 documents: 45 %; load a bundle of 10,000 documents: 36 %; 500 writes, 1 listener: 25 %; 500 writes, 20 listeners: 21 %; remote event changing 1,000 documents: 26 %; filter, IndexedDB: 50 %; filter, OPFS: 54 %; first load: script to first snapshot: 101 %; third load: script to first snapshot: 63 %; memory for 50,000 documents: 95 %.</desc>
+  <style id="figure-theme">
+    /* Palette shared by every figure in docs/images (see docs/images/README.md). */
+    :root {
+      --fig-bg: #ffffff;
+      --fig-panel: #f6f8fa;
+      --fig-panel-strong: #eaeef2;
+      --fig-border: #d0d7de;
+      --fig-grid: #eaeef2;
+      --fig-fg: #1f2328;
+      --fig-fg-muted: #57606a;
+      --fig-faint: #818b98;
+      --fig-bar: #6e7781;
+      --fig-on-bar: #ffffff;
+      --fig-on-accent: #ffffff;
+      --fig-accent: #0969da;
+      --fig-accent-bg: #ddf4ff;
+      --fig-success: #1a7f37;
+      --fig-success-bg: #dafbe1;
+      --fig-danger: #cf222e;
+      --fig-attention: #9a6700;
+      --fig-severe: #bc4c00;
+      --fig-severe-bg: #fff1e5;
+      --fig-done: #8250df;
+      --fig-done-bg: #fbefff;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --fig-bg: #0d1117;
+        --fig-panel: #151b23;
+        --fig-panel-strong: #212830;
+        --fig-border: #3d444d;
+        --fig-grid: #2a313c;
+        --fig-fg: #f0f6fc;
+        --fig-fg-muted: #9198a1;
+        --fig-faint: #7d8590;
+        --fig-bar: #6e7781;
+        --fig-on-bar: #ffffff;
+        --fig-on-accent: #0d1117;
+        --fig-accent: #4493f8;
+        --fig-accent-bg: #12294a;
+        --fig-success: #3fb950;
+        --fig-success-bg: #132a1c;
+        --fig-danger: #f85149;
+        --fig-attention: #d29922;
+        --fig-severe: #db6d28;
+        --fig-severe-bg: #2b1c12;
+        --fig-done: #ab7df8;
+        --fig-done-bg: #231c38;
+      }
+    }
+    [fill="#ffffff"] { fill: var(--fig-bg); }
+    [fill="#1f2328"] { fill: var(--fig-fg); }
+    [fill="#57606a"] { fill: var(--fig-fg-muted); }
+    [fill="#6e7781"] { fill: var(--fig-bar); }
+    [fill="#0969da"] { fill: var(--fig-accent); }
+    [stroke="#d0d7de"] { stroke: var(--fig-border); }
+    [stroke="#57606a"] { stroke: var(--fig-fg-muted); }
+    /* The halo behind a value label is the background, so a gridline does not cross the text. */
+    [stroke="#ffffff"] { stroke: var(--fig-bg); }
+  </style>
   <rect x="0" y="0" width="960" height="710" rx="10" fill="#ffffff" stroke="#d0d7de"/>
   <text x="20" y="28" font-size="14" fill="#1f2328" font-weight="600">dart2wasm as a share of dart2js, in Chrome (shorter is better)</text>
   <line x1="330.0" y1="44" x2="330.0" y2="630" stroke="#d0d7de" stroke-width="1" stroke-dasharray="3 3"/>
@@ -65,7 +125,7 @@
   <text x="498.1" y="507" font-size="12" fill="#1f2328" stroke="#ffffff" stroke-width="4" paint-order="stroke">54 % (1.9x faster)</text>
   <text x="20" y="540" font-size="12" fill="#1f2328" font-weight="700">Start-up and memory</text>
   <text x="318" y="563" font-size="12" fill="#1f2328" text-anchor="end">first load: script to first snapshot</text>
-  <rect x="330" y="550" width="304.1" height="18" rx="3" fill="#8c959f"/>
+  <rect x="330" y="550" width="304.1" height="18" rx="3" fill="#6e7781"/>
   <text x="640.1" y="563" font-size="12" fill="#1f2328" stroke="#ffffff" stroke-width="4" paint-order="stroke">101 %, within the spread (37.3 vs 36.8 ms)</text>
   <text x="318" y="589" font-size="12" fill="#1f2328" text-anchor="end">third load: script to first snapshot</text>
   <rect x="330" y="576" width="188.2" height="18" rx="3" fill="#0969da"/>
