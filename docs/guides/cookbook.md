@@ -584,5 +584,5 @@ choice between IndexedDB and OPFS and for the `sqlite3` versions to avoid.
 Measured with Dart 3.12.2 on an Apple M5, for the main page of `examples/web_app`: `dart compile
 wasm -O2` took about 5 seconds and `dart compile js -O2` about 3 seconds. The output is 915 KB of
 `.wasm` and 29 KB of `.mjs` (342 KB and 6 KB gzipped), against 924 KB of JavaScript (273 KB
-gzipped); `sqlite3.wasm` adds 731 KB (348 KB gzipped) when a persistent cache is opened. Time them
+gzipped); `sqlite3.wasm` adds 759 KB (364 KB gzipped, sqlite3 3.9.1) when a persistent cache is opened. Time them
 for your own app with `time dart compile wasm ...`, and the sizes with `ls -l` and `gzip -9 -c`.
