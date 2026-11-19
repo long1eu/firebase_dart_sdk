@@ -26,12 +26,16 @@
 /// | `namedQuery`   | name                                        | read time, `BundledQuery` proto                 |
 /// | `global`       | name                                        | the value (session token, merge marks, the byte size of the documents) |
 ///
+/// and the tables of the persistent cache indexes, see [_KvIndexManager].
+///
 /// Only one client uses a store at a time: it is always the primary client.
 // ignore_for_file: library_private_types_in_public_api
 library;
 
 import 'dart:async';
+import 'dart:collection';
 import 'dart:convert';
+import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:cloud_firestore_dart/src/database_collection/database_collection.dart';
@@ -39,10 +43,16 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/auth/user.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/bundle/bundle_metadata.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/bundle/bundled_query.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/bundle/named_query.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/core/bound.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/core/filter/filter.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/listent_sequence.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/core/order_by.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/query.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/target.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/firestore_error.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/index/firestore_index_value_writer.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/index/index_byte_encoder.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/index/index_entry.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/keyvalue/cache_store.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/keyvalue/key_value_persistence.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/keyvalue/kv_codec.dart';
@@ -67,6 +77,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/model/database_id.da
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/document.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/document_key.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/field_index.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/model/field_path.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/maybe_document.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/mutation.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/mutation_batch.dart';
@@ -74,11 +85,18 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/overl
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/no_document.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/resource_path.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/snapshot_version.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/model/target_index_matcher.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/unknown_document.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/model/value/field_value.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/assert.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/util/logic_utils.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/types.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/util/util.dart';
 import 'package:cloud_firestore_dart/src/firebase/timestamp.dart';
+import 'package:cloud_firestore_dart/src/proto/google/firestore/admin/v1/index.dart'
+    as admin;
 import 'package:cloud_firestore_dart/src/proto/index.dart' as proto;
+import 'package:collection/collection.dart';
 import 'package:firebase_app_dart/internal.dart';
 import 'package:semaphore/semaphore.dart';
 
@@ -114,6 +132,10 @@ abstract final class _Table {
   static const String bundle = 'bundle';
   static const String namedQuery = 'namedQuery';
   static const String global = 'global';
+  static const String indexConfig = 'indexConfig';
+  static const String indexState = 'indexState';
+  static const String indexEntry = 'indexEntry';
+  static const String docIndexEntry = 'docIndexEntry';
 }
 
 /// A writer that starts with the name of [table].
@@ -289,6 +311,9 @@ class CacheStorePersistence extends KeyValuePersistence {
     for (final _KvMutationQueue queue in _mutationQueues.values) {
       await queue._load();
     }
+    for (final _KvIndexManager manager in _startedIndexManagers.toList()) {
+      await manager.start();
+    }
     _stale = false;
   }
 
@@ -369,8 +394,12 @@ class CacheStorePersistence extends KeyValuePersistence {
   DocumentOverlayCache getDocumentOverlayCache(User user) =>
       _KvDocumentOverlayCache(this, user.isAuthenticated ? user.uid! : '');
 
+  /// The index managers of users that were started: their field indexes are read again after a rollback.
+  final Set<_KvIndexManager> _startedIndexManagers = <_KvIndexManager>{};
+
   @override
-  IndexManager getIndexManager(User user) => indexManager;
+  IndexManager getIndexManager(User user) =>
+      _KvIndexManager(this, user.uid ?? '');
 
   @override
   Future<void> runTransaction(String action, Transaction<void> operation) =>

@@ -26,7 +26,6 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/field_value.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/firestore_error.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/firestore_multi_db_component.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/firestore_settings.dart';
-import 'package:cloud_firestore_dart/src/firebase/firestore/local_cache_settings.dart';
 import 'package:cloud_firestore_dart/src/firebase/timestamp.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/listen_source.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/get_options.dart';
@@ -773,7 +772,7 @@ class FirebaseFirestore {
   /// index as far as it is filled, and the result of a query is the same with or without an index.
   ///
   /// The future fails with an [ArgumentError] when [json] is not a valid index definition and with a [StateError] when
-  /// this instance uses a memory cache or a key-value cache. On a terminated instance it fails with the same
+  /// this instance uses a memory cache. On a terminated instance it fails with the same
   /// [FirestoreException] as every other operation, whatever the cache.
   @Deprecated(
     'Instead of creating cache indexes manually, consider using '
@@ -783,17 +782,12 @@ class FirebaseFirestore {
   Future<void> setIndexConfigurationFromJSON(String json) async {
     client.verifyNotTerminated();
     if (!client.supportsFieldIndexes) {
-      throw StateError(
-        settings.cacheSettings is KeyValueCacheSettings
-            ? 'The key-value cache (keyValueCacheSettings) has no persistent cache indexes yet'
-            : 'Cannot enable indexes when persistence is disabled',
-      );
+      throw StateError('Cannot enable indexes when persistence is disabled');
     }
     return client.configureFieldIndexes(parseIndexConfiguration(json));
   }
 
-  /// The [PersistentCacheIndexManager] of this instance, or null when it uses a memory cache (or a key-value cache,
-  /// which has no cache indexes yet).
+  /// The [PersistentCacheIndexManager] of this instance, or null when it uses a memory cache.
   ///
   /// Persistent cache indexes are optional indexes that only exist within the SDK to assist in local query execution;
   /// they are not the same as Cloud Firestore indexes.

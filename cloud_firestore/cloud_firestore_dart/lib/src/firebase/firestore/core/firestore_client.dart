@@ -186,7 +186,7 @@ class FirestoreClient implements RemoteStoreCallback {
       databaseInfo,
       credentialsProvider,
       appCheckProvider,
-      usePersistence || useIndexedDb,
+      usePersistence || useIndexedDb || useKeyValue,
     );
 
     final Completer<User> firstUser = Completer<User>();
@@ -861,14 +861,20 @@ class FirestoreClient implements RemoteStoreCallback {
             ..start();
     }
     final Persistence started = persistence;
-    if (started is SQLitePersistence || started is IndexedDbPersistence) {
+    if (started is SQLitePersistence ||
+        started is IndexedDbPersistence ||
+        started is KeyValuePersistence) {
       // A persistent cache from the deprecated `persistenceEnabled` setting has the default settings.
       final IndexedDbCacheSettings? indexedDbSettings = indexedDbCacheSettings;
+      final KeyValueCacheSettings? keyValueSettings = keyValueCacheSettings;
       final PersistentCacheSettings cacheSettings =
           persistentCacheSettings ?? PersistentCacheSettings();
       final IndexBackfillSettings backfillSettings =
-          indexedDbSettings?.indexBackfill ?? cacheSettings.indexBackfill;
+          indexedDbSettings?.indexBackfill ??
+          keyValueSettings?.indexBackfill ??
+          cacheSettings.indexBackfill;
       if (indexedDbSettings?.indexAutoCreation ??
+          keyValueSettings?.indexAutoCreation ??
           cacheSettings.indexAutoCreation) {
         // The same switch as PersistentCacheIndexManager.enableIndexAutoCreation, before any query can run.
         localStore.indexAutoCreationEnabled = true;

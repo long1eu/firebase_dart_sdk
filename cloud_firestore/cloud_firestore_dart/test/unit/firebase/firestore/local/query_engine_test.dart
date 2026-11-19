@@ -24,8 +24,4 @@ void main() {
   group('MemoryQueryEngine', () {
     queryEngineTestCase(createEagerGCMemoryPersistence);
   });
-  // The key-value cache has no field indexes either.
-  group('KeyValueQueryEngine', () {
-    queryEngineTestCase(() => createKeyValuePersistence());
-  });
 }

@@ -1,5 +1,5 @@
 // The key-value cache (keyValueCacheSettings) through the public API: writes made offline survive a restart, the cache
-// can be cleared, a store is the cache of one instance at a time, and the features it lacks fail loudly.
+// can be cleared, and a store is the cache of one instance (of one database) at a time.
 
 import 'dart:async';
 import 'dart:io';
@@ -80,11 +80,17 @@ void main() {
         },
       );
       expect(notes.metadata.hasPendingWrites, isTrue);
-      expect(firestore.persistentCacheIndexManager, isNull);
-      // ignore: deprecated_member_use_from_same_package
+      // The persistent cache indexes work as with SQLite.
+      await firestore.persistentCacheIndexManager!.enableIndexAutoCreation();
+      final QuerySnapshot<Map<String, Object?>> done = await firestore
+          .collection('notes')
+          .where('done', isEqualTo: true)
+          .get(GetOptions(source: Source.cache));
       expect(
-        () => firestore.setIndexConfigurationFromJSON('{"indexes": []}'),
-        throwsStateError,
+        done.docs.map(
+          (QueryDocumentSnapshot<Map<String, Object?>> note) => note.id,
+        ),
+        <String>['a'],
       );
 
       await firestore.terminate();

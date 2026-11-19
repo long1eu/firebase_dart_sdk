@@ -22,4 +22,4 @@ export 'package:cloud_firestore_dart/src/firebase/firestore/key_value_cache_sett
     show keyValueCacheSettings;
 export 'package:cloud_firestore_dart/src/firebase/firestore/local/keyvalue/cache_store.dart';
 export 'package:cloud_firestore_dart/src/firebase/firestore/local_cache_settings.dart'
-    show KeyValueCacheSettings;
+    show IndexBackfillSettings, KeyValueCacheSettings;

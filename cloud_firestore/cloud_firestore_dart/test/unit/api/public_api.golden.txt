@@ -307,6 +307,8 @@ enum JsSdkCacheImportStatus
   static final values: List<JsSdkCacheImportStatus>
 class KeyValueCacheSettings extends LocalCacheSettings
   ==(Object other): bool
+  final indexAutoCreation: bool
+  final indexBackfill: IndexBackfillSettings
   final mergeUnsentWrites: bool
   final sizeBytes: int
   final store: CacheStore

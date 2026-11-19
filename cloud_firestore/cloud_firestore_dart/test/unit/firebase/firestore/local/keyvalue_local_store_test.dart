@@ -4,7 +4,6 @@
 
 import 'dart:async';
 
-import 'package:cloud_firestore_dart/src/firebase/firestore/local/lru_garbage_collector.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/keyvalue/cache_store_persistence.dart';
 import 'package:test/test.dart';
 
@@ -22,7 +21,6 @@ void main() {
         AccumulatingStatsCollector();
 
     final CacheStorePersistence persistence = await createKeyValuePersistence(
-      params: const LruGarbageCollectorParams(),
       statsCollector: statsCollector,
     );
 
@@ -288,5 +286,152 @@ void main() {
     () => testCase.testGetHighestUnacknowledgedBatchId(),
   );
 
-  // The index cases of SQLiteLocalStoreTest do not apply: the key-value cache has no persistent cache indexes yet.
+  // The index cases of SQLiteLocalStoreTest of the Android SDK.
+  test('testAddsIndexes', () => testCase.testAddsIndexes());
+  test('testRemovesIndexes', () => testCase.testRemovesIndexes());
+  test(
+    'testDoesNotResetIndexWhenSameIndexIsAdded',
+    () => testCase.testDoesNotResetIndexWhenSameIndexIsAdded(),
+  );
+  test(
+    'testDeletedDocumentRemovesIndex',
+    () => testCase.testDeletedDocumentRemovesIndex(),
+  );
+  test('testUsesIndexes', () => testCase.testUsesIndexes());
+  test(
+    'testUsesPartiallyIndexedRemoteDocumentsWhenAvailable',
+    () => testCase.testUsesPartiallyIndexedRemoteDocumentsWhenAvailable(),
+  );
+  test(
+    'testUsesPartiallyIndexedOverlaysWhenAvailable',
+    () => testCase.testUsesPartiallyIndexedOverlaysWhenAvailable(),
+  );
+  test(
+    'testDoesNotUseLimitWhenIndexIsOutdated',
+    () => testCase.testDoesNotUseLimitWhenIndexIsOutdated(),
+  );
+  test(
+    'testUsesIndexForLimitQueryWhenIndexIsUpdated',
+    () => testCase.testUsesIndexForLimitQueryWhenIndexIsUpdated(),
+  );
+  test('testIndexesVectorValues', () => testCase.testIndexesVectorValues());
+  test('testIndexesBsonObjectId', () => testCase.testIndexesBsonObjectId());
+  test('testIndexesBsonTimestamp', () => testCase.testIndexesBsonTimestamp());
+  test('testIndexesBsonBinary', () => testCase.testIndexesBsonBinary());
+  test('testIndexesRegex', () => testCase.testIndexesRegex());
+  test('testIndexesInt32', () => testCase.testIndexesInt32());
+  test(
+    'testIndexesDecimal128Value',
+    () => testCase.testIndexesDecimal128Value(),
+  );
+  test(
+    'testIndexesDecimal128ValueWithPrecisionLoss',
+    () => testCase.testIndexesDecimal128ValueWithPrecisionLoss(),
+  );
+  test('testIndexesMinKey', () => testCase.testIndexesMinKey());
+  test('testIndexesMaxKey', () => testCase.testIndexesMaxKey());
+  test(
+    'testIndexesAllBsonTypesTogether',
+    () => testCase.testIndexesAllBsonTypesTogether(),
+  );
+  test(
+    'testIndexesAllTypesTogether',
+    () => testCase.testIndexesAllTypesTogether(),
+  );
+  test(
+    'testIndexesServerTimestamps',
+    () => testCase.testIndexesServerTimestamps(),
+  );
+
+  // The BSON cases of local_store_indexeddb.test.ts of the JS SDK, which query differently from Android's.
+  test(
+    'testJsIndexesBSONObjectIdFields',
+    () => testCase.testJsIndexesBSONObjectIdFields(),
+  );
+  test(
+    'testJsIndexesBSONTimestampFields',
+    () => testCase.testJsIndexesBSONTimestampFields(),
+  );
+  test(
+    'testJsIndexesBSONBinaryDataFields',
+    () => testCase.testJsIndexesBSONBinaryDataFields(),
+  );
+  test(
+    'testJsIndexesBSONInt32Fields',
+    () => testCase.testJsIndexesBSONInt32Fields(),
+  );
+  test(
+    'testJsIndexesBSONDecimal128Fields',
+    () => testCase.testJsIndexesBSONDecimal128Fields(),
+  );
+  test(
+    'testJsIndexesBSONDecimal128FieldsWithPrecisionLoss',
+    () => testCase.testJsIndexesBSONDecimal128FieldsWithPrecisionLoss(),
+  );
+  test(
+    'testJsIndexesBSONRegexFields',
+    () => testCase.testJsIndexesBSONRegexFields(),
+  );
+  test(
+    'testJsIndexesBSONMinKeyFields',
+    () => testCase.testJsIndexesBSONMinKeyFields(),
+  );
+  test(
+    'testJsIndexesBSONMaxKeyFields',
+    () => testCase.testJsIndexesBSONMaxKeyFields(),
+  );
+  test(
+    'testJsIndexesMultipleBSONTypesTogether',
+    () => testCase.testJsIndexesMultipleBSONTypesTogether(),
+  );
+
+  // The automatic index creation cases of SQLiteLocalStoreTest of the Android SDK.
+  test('testCanAutoCreateIndexes', () => testCase.testCanAutoCreateIndexes());
+  test(
+    'testCanAutoCreateIndexesWorksWithOrQuery',
+    () => testCase.testCanAutoCreateIndexesWorksWithOrQuery(),
+  );
+  test(
+    'testDoesNotAutoCreateIndexesForSmallCollections',
+    () => testCase.testDoesNotAutoCreateIndexesForSmallCollections(),
+  );
+  test(
+    'testDoesNotAutoCreateIndexesWhenIndexLookUpIsExpensive',
+    () => testCase.testDoesNotAutoCreateIndexesWhenIndexLookUpIsExpensive(),
+  );
+  test(
+    'testIndexAutoCreationWorksWhenBackfillerRunsHalfway',
+    () => testCase.testIndexAutoCreationWorksWhenBackfillerRunsHalfway(),
+  );
+  test(
+    'testIndexCreatedByIndexAutoCreationExistsAfterTurnOffAutoCreation',
+    () => testCase
+        .testIndexCreatedByIndexAutoCreationExistsAfterTurnOffAutoCreation(),
+  );
+  test(
+    'testDisableIndexAutoCreationWorks',
+    () => testCase.testDisableIndexAutoCreationWorks(),
+  );
+  test(
+    'testDeleteAllIndexesWorksWithIndexAutoCreation',
+    () => testCase.testDeleteAllIndexesWorksWithIndexAutoCreation(),
+  );
+  test(
+    'testDeleteAllIndexesWorksWithManualAddedIndexes',
+    () => testCase.testDeleteAllIndexesWorksWithManualAddedIndexes(),
+  );
+  test(
+    'testIndexAutoCreationWorksWithMutation',
+    () => testCase.testIndexAutoCreationWorksWithMutation(),
+  );
+  test(
+    'testIndexAutoCreationDoesnotWorkWithMultipleInequality',
+    () => testCase.testIndexAutoCreationDoesnotWorkWithMultipleInequality(),
+  );
+  test(
+    'testDeeplyNestedServerTimestamps',
+    () => testCase.testDeeplyNestedServerTimestamps(),
+  );
+
+  // The "document_type" cases of SQLiteLocalStoreTest are about a column of the SQLite schema.
 }

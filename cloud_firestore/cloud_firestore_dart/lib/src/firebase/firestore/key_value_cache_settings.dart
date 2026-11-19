@@ -8,18 +8,22 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/local_cache_settings
 ///
 /// [sizeBytes] is an approximate cache size threshold, as in [PersistentCacheSettings.sizeBytes]: the size is that of
 /// the cached documents as the SDK writes them to the store. Use [Settings.cacheSizeUnlimited] to disable the
-/// collection; the minimum is 1 MB, an [ArgumentError] is thrown otherwise. [mergeUnsentWrites] is that of
-/// [PersistentCacheSettings].
+/// collection; the minimum is 1 MB, an [ArgumentError] is thrown otherwise. [indexAutoCreation], [indexBackfill] and
+/// [mergeUnsentWrites] are those of [PersistentCacheSettings].
 ///
 /// The store holds the cache of one instance at a time: an instance whose store is the cache of another instance that
 /// is still running fails to start.
 KeyValueCacheSettings keyValueCacheSettings({
   required CacheStore store,
   int sizeBytes = Settings.defaultCacheSizeBytes,
+  bool indexAutoCreation = false,
+  IndexBackfillSettings? indexBackfill,
   bool mergeUnsentWrites = false,
 }) => KeyValueCacheSettingsInternal.create(
   store,
   CacheStorePersistence.factoryFor(store),
   sizeBytes: sizeBytes,
+  indexAutoCreation: indexAutoCreation,
+  indexBackfill: indexBackfill,
   mergeUnsentWrites: mergeUnsentWrites,
 );

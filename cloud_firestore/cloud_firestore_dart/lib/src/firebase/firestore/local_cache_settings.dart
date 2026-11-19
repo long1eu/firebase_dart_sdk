@@ -419,10 +419,9 @@ final class IndexedDbCacheSettings extends LocalCacheSettings {
 /// of the program as long as the store keeps them. The store is opened when the instance starts and closed when it is
 /// terminated; it holds the cache of one instance (one database) at a time.
 ///
-/// Garbage collection runs as with [PersistentCacheSettings] once the documents take more than [sizeBytes]. The
-/// cache has no persistent cache indexes yet: `persistentCacheIndexManager` is null and `setIndexConfiguration`
-/// throws, and queries read the documents of their collection, as with a memory cache. Only one client uses the
-/// cache: it is always the primary client.
+/// Garbage collection runs as with [PersistentCacheSettings] once the documents take more than [sizeBytes], and the
+/// persistent cache indexes work as there ([indexAutoCreation], [indexBackfill], `PersistentCacheIndexManager`). Only
+/// one client uses the cache: it is always the primary client.
 ///
 /// The cache is in its own library, so that apps that do not use it do not carry its code: create the settings with
 /// `keyValueCacheSettings()` of `package:cloud_firestore_dart/cache_store.dart`.
@@ -443,6 +442,8 @@ final class KeyValueCacheSettings extends LocalCacheSettings {
     this.store,
     this._createPersistence, {
     required this.sizeBytes,
+    required this.indexAutoCreation,
+    required this.indexBackfill,
     required this.mergeUnsentWrites,
   }) {
     if (sizeBytes != Settings.cacheSizeUnlimited &&
@@ -462,6 +463,12 @@ final class KeyValueCacheSettings extends LocalCacheSettings {
   /// The cache size threshold, in bytes: the size of the cached documents as the SDK writes them to the store.
   final int sizeBytes;
 
+  /// See [PersistentCacheSettings.indexAutoCreation].
+  final bool indexAutoCreation;
+
+  /// See [PersistentCacheSettings.indexBackfill].
+  final IndexBackfillSettings indexBackfill;
+
   /// See [PersistentCacheSettings.mergeUnsentWrites].
   final bool mergeUnsentWrites;
 
@@ -471,6 +478,8 @@ final class KeyValueCacheSettings extends LocalCacheSettings {
       other is KeyValueCacheSettings &&
           identical(store, other.store) &&
           sizeBytes == other.sizeBytes &&
+          indexAutoCreation == other.indexAutoCreation &&
+          indexBackfill == other.indexBackfill &&
           mergeUnsentWrites == other.mergeUnsentWrites;
 
   @override
@@ -478,12 +487,15 @@ final class KeyValueCacheSettings extends LocalCacheSettings {
     KeyValueCacheSettings,
     identityHashCode(store),
     sizeBytes,
+    indexAutoCreation,
+    indexBackfill,
     mergeUnsentWrites,
   );
 
   @override
   String toString() =>
-      'KeyValueCacheSettings{store=${store.runtimeType}, sizeBytes=$sizeBytes'
+      'KeyValueCacheSettings{store=${store.runtimeType}, sizeBytes=$sizeBytes, '
+      'indexAutoCreation=$indexAutoCreation, indexBackfill=$indexBackfill'
       '${mergeUnsentWrites ? ', mergeUnsentWrites=true' : ''}}';
 }
 
@@ -618,11 +630,15 @@ extension KeyValueCacheSettingsInternal on KeyValueCacheSettings {
     CacheStore store,
     KeyValuePersistenceFactory createPersistence, {
     required int sizeBytes,
+    required bool indexAutoCreation,
+    required IndexBackfillSettings? indexBackfill,
     required bool mergeUnsentWrites,
   }) => KeyValueCacheSettings._(
     store,
     createPersistence,
     sizeBytes: sizeBytes,
+    indexAutoCreation: indexAutoCreation,
+    indexBackfill: indexBackfill ?? IndexBackfillSettings(),
     mergeUnsentWrites: mergeUnsentWrites,
   );
 

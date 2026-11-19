@@ -11,7 +11,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/model/resource_path.
 /// parts, compared one after the other:
 ///
 /// * a string: its UTF-8 bytes, each 0x00 written as `00 FF`, then the terminator `00 01`. A string before any longer
-///   string it is a prefix of, and the encodings are prefix free.
+///   string it is a prefix of, and the encodings are prefix free. Bytes ([KvKeyWriter.bytesPart]) the same way.
 /// * an integer: 8 bytes, big endian, of the value plus 2^53 (values between -2^53 and 2^53, so that the web, whose
 ///   integers are doubles, writes the same bytes).
 /// * a resource path: its segments as strings, then `00 00`, which sorts before any segment: a path before the paths
@@ -25,8 +25,11 @@ class KvKeyWriter {
   static const int _intOffset = 0x20000000000000; // 2^53
 
   /// Writes a string.
-  KvKeyWriter string(String value) {
-    for (final int byte in utf8.encode(value)) {
+  KvKeyWriter string(String value) => bytesPart(utf8.encode(value));
+
+  /// Writes bytes as a part of the key, escaped as a string is: ordered as the bytes are, a prefix first.
+  KvKeyWriter bytesPart(List<int> value) {
+    for (final int byte in value) {
       if (byte == 0) {
         _bytes
           ..add(0)
@@ -101,19 +104,22 @@ class KvKeyReader {
   static const int _intOffset = 0x20000000000000;
 
   /// Reads a string.
-  String string() {
-    final List<int> utf8Bytes = <int>[];
+  String string() => utf8.decode(bytesPart());
+
+  /// Reads what [KvKeyWriter.bytesPart] wrote.
+  Uint8List bytesPart() {
+    final List<int> bytes = <int>[];
     while (true) {
       final int byte = _next();
       if (byte != 0) {
-        utf8Bytes.add(byte);
+        bytes.add(byte);
         continue;
       }
       final int escaped = _next();
       if (escaped == 1) {
-        return utf8.decode(utf8Bytes);
+        return Uint8List.fromList(bytes);
       } else if (escaped == 0xff) {
-        utf8Bytes.add(0);
+        bytes.add(0);
       } else {
         throw const FormatException('Not a string of the key-value cache');
       }
