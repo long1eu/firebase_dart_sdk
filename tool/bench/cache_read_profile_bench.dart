@@ -9,7 +9,7 @@
 //   dart compile exe cache_read_profile_bench.dart -o cache_read_profile_bench
 //   cache_read_profile_bench fill <acked|pending> <file>         creates the database
 //   cache_read_profile_bench index <file> <file with indexes>    copies it and adds a cache index on `a` and `order`
-//   cache_read_profile_bench time <acked|pending> <file> [<file with indexes>] [--reps=7]
+//   cache_read_profile_bench time <acked|pending> <file> [<file with indexes>] [--reps=7] [--no-statement-cache]
 //       warm timings of every case: the whole path, with the time inside SQLite measured in the database adapter
 //   cache_read_profile_bench raw <acked|pending> <file> [--reps=7]
 //       the layers alone: raw SQL with package:sqlite3 (nothing decoded), decode on the blobs in memory, query work
@@ -76,9 +76,10 @@ final String payload = 'x' * 200;
 // ---------------------------------------------------------------------------------------------------------------------
 // The database adapter, with timers.
 
-/// The adapter of the other benchmarks (the `sqlite3` package, a statement prepared for every call, the rows copied to
-/// maps), with the time of the two parts kept apart: `select` (prepare, step, copy the columns out) and the copy of
-/// every row into a `Map`.
+/// The adapter of `cloud_firestore_dart_sqlite` (the `sqlite3` package, the prepared statements of the last 64 queries
+/// kept, the rows copied to maps), with the time of the two parts kept apart: `select` (prepare unless cached, step,
+/// copy the columns out) and the copy of every row into a `Map`. With `--no-statement-cache` a statement is prepared
+/// for every call (the adapter before the statement cache).
 class TimedDatabase extends Database {
   TimedDatabase._(this._db, this.path);
 
@@ -98,6 +99,26 @@ class TimedDatabase extends Database {
 
   /// Time and calls per statement since [reset].
   static final Map<String, List<int>> statements = <String, List<int>>{};
+
+  /// Whether to keep prepared statements, as the adapter of `cloud_firestore_dart_sqlite` does.
+  static bool statementCache = true;
+
+  final Map<String, sql.PreparedStatement> _statements =
+      <String, sql.PreparedStatement>{};
+
+  sql.ResultSet _select(String statement, List<Object?> arguments) {
+    if (!statementCache) {
+      return _db.select(statement, arguments);
+    }
+    sql.PreparedStatement? prepared = _statements.remove(statement);
+    prepared ??= _db.prepare(statement, persistent: true, checkNoTail: true);
+    final sql.ResultSet result = prepared.select(arguments);
+    _statements[statement] = prepared;
+    if (_statements.length > 64) {
+      _statements.remove(_statements.keys.first)!.dispose();
+    }
+    return result;
+  }
 
   static void reset() {
     selectUs = mapUs = calls = rows = bytes = 0;
@@ -149,7 +170,7 @@ class TimedDatabase extends Database {
       [List<Object?>? arguments]) async {
     final Stopwatch sw = Stopwatch()..start();
     final sql.ResultSet result =
-        _db.select(statement, arguments ?? const <Object?>[]);
+        _select(statement, arguments ?? const <Object?>[]);
     final int us = sw.elapsedMicroseconds;
     selectUs += us;
     String? key;
@@ -178,7 +199,13 @@ class TimedDatabase extends Database {
   }
 
   @override
-  void close() => _db.dispose();
+  void close() {
+    for (final sql.PreparedStatement statement in _statements.values) {
+      statement.dispose();
+    }
+    _statements.clear();
+    _db.dispose();
+  }
 }
 
 Future<(SQLitePersistence, LocalStore)> open(String file,
@@ -1068,6 +1095,7 @@ Future<void> main(List<String> args) async {
   final List<String> a =
       args.where((String a) => !a.startsWith('--')).toList();
   int reps = 7;
+  TimedDatabase.statementCache = !flags.contains('--no-statement-cache');
   for (final String flag in flags) {
     if (flag.startsWith('--reps=')) {
       reps = int.parse(flag.substring(7));
