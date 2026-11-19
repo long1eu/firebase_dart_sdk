@@ -264,6 +264,19 @@ Until the backend confirms it, the app sees the merged document as it would see 
 with one exception: a `serverTimestamp` of the pending write that stays shows the time of the
 newer write as its estimate.
 
+Writes that are already queued when an instance starts with the setting on, because an earlier
+session queued them or the setting was off then, are merged once at start: each one, in the order
+of the queue, is merged into the pending write of its document by the same rules and on the same
+conditions, as if it had just been made. The queue ends up as the setting would have built it
+from the same writes, and the documents the app sees do not change. The merge runs in
+transactions of 500 writes, each an operation of the instance, so the app's first reads and
+writes run between them rather than after the whole queue; a write made meanwhile is merged when
+the merge reaches it. No write is sent to the backend until the merge is done. Each transaction
+saves how far the queue is merged, so a merge that is interrupted (the app is closed or killed)
+resumes there at the next start, and a queue that is merged is not read again at later starts.
+It does not run while another client uses the cache. The queue of a user who signs in later is
+merged when they sign in.
+
 What the app gives up:
 
 - Security rules and Cloud Functions triggers see one write, from the first state to the last,

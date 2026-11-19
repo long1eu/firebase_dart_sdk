@@ -338,10 +338,14 @@ class _CountingMutationQueue implements MutationQueue {
 
   @override
   Future<MutationBatch?> getNewestMutationBatchAffectingDocumentKey(
-    DocumentKey documentKey,
-  ) async {
+    DocumentKey documentKey, {
+    int? beforeBatchId,
+  }) async {
     final MutationBatch? result = await _subject
-        .getNewestMutationBatchAffectingDocumentKey(documentKey);
+        .getNewestMutationBatchAffectingDocumentKey(
+          documentKey,
+          beforeBatchId: beforeBatchId,
+        );
     _counter.mutationsReadByKey += result == null ? 0 : 1;
     return result;
   }
@@ -365,6 +369,10 @@ class _CountingMutationQueue implements MutationQueue {
     _counter.mutationsReadByQuery += result.length;
     return result;
   }
+
+  @override
+  Future<void> replaceMutationBatch(MutationBatch batch) =>
+      _subject.replaceMutationBatch(batch);
 
   @override
   Future<void> removeMutationBatch(MutationBatch batch) =>

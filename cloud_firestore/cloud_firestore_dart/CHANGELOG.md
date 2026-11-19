@@ -17,7 +17,10 @@
   document when that one was not sent yet and the two have the same result on the backend, so a
   document edited many times offline keeps one pending write (see "Merging repeated offline
   writes" in `docs/guides/offline_persistence.md` for the conditions and what rules and triggers
-  no longer see).
+  no longer see). The writes already queued when an instance starts with the setting on (from an
+  earlier session, or queued with it off) are merged once at start by the same rules, in
+  transactions of 500 writes between the app's operations and before any write is sent; an
+  interrupted merge resumes at the next start.
 - With many pending writes, a query of a collection reads only the pending writes of that
   collection instead of every pending write of the user (a collection of 10 among 1,000,000
   pending writes: 128 ms to 0.07 ms), and an index fill run reads only the next pending writes of

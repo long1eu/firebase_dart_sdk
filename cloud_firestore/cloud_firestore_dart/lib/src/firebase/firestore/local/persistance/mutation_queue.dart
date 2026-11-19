@@ -95,11 +95,13 @@ abstract class MutationQueue {
     DocumentKey documentKey,
   );
 
-  /// The batch with the highest id that contains a mutation of [documentKey], or null. Used by
-  /// `LocalStore.mergeUnsentWrites`, which must not read every batch of a document at every write.
+  /// The batch with the highest id that contains a mutation of [documentKey], or null. With [beforeBatchId], the one
+  /// with the highest id below [beforeBatchId]. Used by `LocalStore.mergeUnsentWrites`, which must not read every batch
+  /// of a document at every write, nor for every batch when it merges the queue.
   Future<MutationBatch?> getNewestMutationBatchAffectingDocumentKey(
-    DocumentKey documentKey,
-  );
+    DocumentKey documentKey, {
+    int? beforeBatchId,
+  });
 
   /// Finds all mutation batches that could possibly affect the given set of
   /// document keys. Not all mutations in a batch will necessarily affect each
@@ -129,6 +131,11 @@ abstract class MutationQueue {
   /// filter criteria in order to be a match (but any fields it does contain do
   /// need to match).
   Future<List<MutationBatch>> getAllMutationBatchesAffectingQuery(Query query);
+
+  /// NOT IN THE OFFICIAL SDKS: replaces the batch of the queue that has the id of [batch] with [batch], at the same
+  /// place in the queue. [batch] must change the same documents as the batch it replaces (the index of the batches by
+  /// document is kept). Used by `LocalStore.mergeQueuedWrites`, which merges an unsent write into a later one in place.
+  Future<void> replaceMutationBatch(MutationBatch batch);
 
   /// Removes the given mutation batch from the queue. This is useful in two
   /// circumstances:

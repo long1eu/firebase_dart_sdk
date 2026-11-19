@@ -13,10 +13,12 @@
 // limitations under the License.
 
 import 'dart:async';
+import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/persistance/globals_cache.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/sqlite/sqlite_persistence.dart';
+import 'package:cloud_firestore_dart/src/firebase/timestamp.dart';
 
 /// A SQLite-backed cache of global values: key and value pairs in the table `globals` (port of the Android
 /// `SQLiteGlobalsCache`).
@@ -53,6 +55,49 @@ class SQLiteGlobalsCache implements GlobalsCache {
       return _db.execute('DELETE FROM globals WHERE name = ?', <Object?>[name]);
     }
     return _set(name, value);
+  }
+
+  /// NOT IN THE OFFICIAL SDKS: one row per user, named with this prefix and the uid. The value is the text
+  /// `batchId,seconds,nanoseconds` in UTF-8.
+  static const String _queuedWritesMergeMark = 'queuedWritesMergeMark/';
+
+  @override
+  Future<QueuedWritesMergeMark?> getQueuedWritesMergeMark(String uid) async {
+    final Uint8List? value = await _get('$_queuedWritesMergeMark$uid');
+    if (value == null) {
+      return null;
+    }
+    final List<String> parts = utf8
+        .decode(value, allowMalformed: true)
+        .split(',');
+    final List<int?> numbers = <int?>[
+      for (final String part in parts) int.tryParse(part),
+    ];
+    if (numbers.length != 3 ||
+        numbers.contains(null) ||
+        numbers[2]! < 0 ||
+        numbers[2]! >= 1000000000) {
+      // Not written by this version: no mark, the whole queue is merged again.
+      return null;
+    }
+    return QueuedWritesMergeMark(
+      numbers[0]!,
+      Timestamp(numbers[1]!, numbers[2]!),
+    );
+  }
+
+  @override
+  Future<void> setQueuedWritesMergeMark(
+    String uid,
+    QueuedWritesMergeMark mark,
+  ) {
+    final Timestamp time = mark.localWriteTime;
+    return _set(
+      '$_queuedWritesMergeMark$uid',
+      Uint8List.fromList(
+        utf8.encode('${mark.batchId},${time.seconds},${time.nanoseconds}'),
+      ),
+    );
   }
 
   /// The value as a blob. The column is typed by affinity only, and another process may have written a value of
