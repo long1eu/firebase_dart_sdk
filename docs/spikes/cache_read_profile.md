@@ -50,6 +50,57 @@ What is left in b, c and d is the store part (decode and the scan), now 80 to 99
 24 ms. Pending `a == 7` changed little: its cost is the overlay decode (`RemoteSerializer.decodeMutation`,
 `_mapOverlayValues`), which these steps do not touch.
 
+## Overlay decode
+
+Measured on 2026-11-20, branch `wave/overlay-decode`. The machine was loaded by other work for most of the session
+(load average 4 to 20 during the final runs, up to 160 during a backup), so the absolute times are higher than in the
+tables above (the acknowledged whole collection takes about 500 ms here against 401 above) and only the columns of one
+table compare with each other. Each binary ran 3 times, interleaved with the others, 9 warm runs each: medians of the 27
+runs, ahead of time compiled. The bench also prints the CPU time of the process now (all threads, so it includes the
+parallel garbage collector), which the loaded machine disturbed as much as the wall time; the wall time is given.
+
+Pending writes (milliseconds; a: microseconds per document):
+
+| Case | before | 1. key from row | 2. no rebuild | 3. key view (all) | change |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| a. one document by key (us) | 7.2 | 7.4 | 7.2 | 7.3 | 0 |
+| b. whole collection | 566.9 | 587.2 | 544.4 | 541.7 | -4 % |
+| c. `a == 7`, no index | 464.3 | 455.2 | 436.8 | 390.4 | -16 % |
+| d. `orderBy(order desc).limit(20)`, no index | 502.5 | 493.8 | 463.1 | 428.1 | -15 % |
+
+Acknowledged documents, before and after all steps: a 9.0 and 9.3 us, b 501.1 and 509.9 ms, c 201.1 and 198.6 ms, d 480.9
+and 465.5 ms (no change beyond the noise; none of the steps is on that path).
+
+1. **Key from the row** (`SQLiteDocumentOverlayCache.getOverlaysForCollection`, `overlaysOfCollectionSql`,
+   `newOverlaysOfCollectionSql`). The two statements also read `document_id`, and the key is the collection plus the
+   id instead of the name in the stored write. The plan is unchanged (`sqlite_overlay_query_plan_test.dart` passes as
+   it is: the primary key, or the batch id index for the few new overlays).
+2. **No rebuild of values without server timestamps** (`LocalSerializer._decodeServerTimestamps`, `_mapOverlayValues`,
+   `ObjectValue.hasNoKeyOrder`). Every map and array of an overlay was built a second time to look for stored server
+   timestamps; now one without any is kept (a map that came with the key order of its proto still drops it, as the
+   rebuild did, so the IndexedDB cache's index encoding sees the same value), and the mutation is kept when its value
+   did not change.
+3. **The overlay keys as a view** (`LocalDocumentsView._getDocumentsMatchingCollectionQuery`): `MapKeySet(overlays)`
+   instead of `overlays.keys.toSet()`, which hashed and copied 100,000 keys for the scan of the remote documents.
+
+Each step alone is within or close to the noise (2 to 11 %); together they take 15 to 16 % off c and d.
+
+Tried and left out: **decoding set overlays lazily**, as cached documents are (a `SetMutation` that keeps the proto
+fields of its write and writes a `Document` that decodes a field when it is read). The decode leaves the profile
+(`_decodeOverlay` 214 to 118 ms sampled per run of c), but the compiled run was not faster (c 436 against 408 ms in the
+same series) and used more CPU (733 against 573 ms): the 100,000 overlays are all held at once, now with their proto
+messages, and each document builds its own field cache when the filter reads it, so the collector has more to do. It
+also needed care to read the same values as before (server timestamps, vectors and BSON values inside maps).
+
+What is left between pending and acknowledged `a == 7` (390 against 199 ms) is not the model decode any more but the
+shape of the read: the remote document cache parses and filters a page of 1,000 rows at a time and keeps only the
+matches, while the overlays of a collection are all parsed (`Write.fromBuffer`, the largest item left), turned into
+mutations and kept in one map of 100,000 entries before `LocalDocumentsView` applies and filters them. Closing that gap
+means filtering the overlays while they are read: a set overlay does not depend on the remote document, so the overlay
+cache could apply and match it row by row and return only the matching documents and the keys of the others (or a
+streaming variant of `getOverlaysForCollection`). That is a change of the internal `DocumentOverlayCache` interface
+and of its three implementations, not of the schema; it was not done here.
+
 The question: when the SQLite cache serves a read, how is the time split between SQLite itself, decoding the stored
 bytes into the model, the query work above the store, and the rest? The decision it feeds: whether a faster storage
 engine (libmdbx, for example) could matter, or whether the time is above the store.
