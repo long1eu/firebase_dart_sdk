@@ -178,7 +178,8 @@ class WebIndexedDbPersistence extends IndexedDbPersistence {
   /// another client: every later transaction fails with it.
   Object? _fatalError;
 
-  /// Whether the state kept in memory (the target metadata) has to be read again: a transaction rolled back.
+  /// Whether the state kept in memory (the target metadata, the indexes) has to be read again: a transaction rolled
+  /// back.
   bool _reloadState = false;
 
   @override
@@ -602,7 +603,7 @@ class WebIndexedDbPersistence extends IndexedDbPersistence {
       final _IdbTransaction transaction = _begin(action);
       try {
         if (_reloadState) {
-          await _inTransaction(transaction, queryCache._load);
+          await _inTransaction(transaction, _reload);
           _reloadState = false;
         }
         await _verifyOwner(transaction);
@@ -627,6 +628,17 @@ class WebIndexedDbPersistence extends IndexedDbPersistence {
       }
     } finally {
       _semaphore.release();
+    }
+  }
+
+  /// Reads the state kept in memory again (the target metadata, the indexes and index states), after a transaction
+  /// rolled back: it may have changed that state before it failed.
+  Future<void> _reload() async {
+    await queryCache._load();
+    for (final IndexedDbIndexManager manager in _indexManagers.values) {
+      if (manager._started) {
+        await manager.start();
+      }
     }
   }
 
