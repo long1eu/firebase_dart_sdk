@@ -27,6 +27,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/model/document_key.d
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/mutation.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/overlay.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/precondition.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/set_mutation.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/value/field_value.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/user_data_converter.dart';
 import 'package:cloud_firestore_dart/src/firebase/timestamp.dart';
@@ -247,7 +248,10 @@ void _run(String name, Future<Persistence> Function() createPersistence) {
       await saveOverlays(200, <Mutation>[mutation3]);
       await cache.removeOverlaysForBatchId(100);
       expect(await cache.getOverlay(key('coll/doc1')), Overlay(200, mutation3));
-      expect(await cache.getOverlaysForCollection(path('coll'), -1), hasLength(1));
+      expect(
+        await cache.getOverlaysForCollection(path('coll'), -1),
+        hasLength(1),
+      );
     });
 
     // Ported from the iOS SDK (Firestore/core/test/unit/local/document_overlay_cache_test.cc).
@@ -415,6 +419,39 @@ void _run(String name, Future<Persistence> Function() createPersistence) {
       await saveOverlays(5, <Mutation>[overlay]);
 
       expect(await cache.getOverlay(key('coll/doc')), Overlay(5, overlay));
+    });
+
+    test('stores pending server timestamps inside maps and arrays', () async {
+      final ServerTimestampValue time = ServerTimestampValue(
+        Timestamp(10, 0),
+        IntegerValue.valueOf(1),
+      );
+      final ObjectValue value = ObjectValue.fromMap(<String, FieldValue>{
+        'plain': ObjectValue.fromMap(<String, FieldValue>{
+          'b': IntegerValue.valueOf(2),
+          'a': ArrayValue.fromList(<FieldValue>[StringValue.valueOf('x')]),
+        }),
+        'nested': ObjectValue.fromMap(<String, FieldValue>{
+          'list': ArrayValue.fromList(<FieldValue>[
+            IntegerValue.valueOf(3),
+            ObjectValue.fromMap(<String, FieldValue>{'time': time}),
+          ]),
+          'time': ServerTimestampValue(Timestamp(11, 0), null),
+        }),
+        'top': time,
+      });
+      final Mutation overlay = SetMutation(
+        key('coll/doc'),
+        value,
+        Precondition.none,
+      );
+      await saveOverlays(5, <Mutation>[overlay]);
+
+      expect(await cache.getOverlay(key('coll/doc')), Overlay(5, overlay));
+      expect(
+        await cache.getOverlaysForCollection(path('coll'), -1),
+        <DocumentKey, Overlay>{key('coll/doc'): Overlay(5, overlay)},
+      );
     });
   });
 }

@@ -15,6 +15,9 @@
 import 'dart:async';
 import 'dart:typed_data';
 
+import 'package:cloud_firestore_dart/src/firebase/firestore/core/query.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/model/document.dart';
+import 'package:cloud_firestore_dart/src/firebase/timestamp.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/auth/user.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/encoded_path.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/local_serializer.dart';
@@ -34,15 +37,30 @@ class SQLiteDocumentOverlayCache implements DocumentOverlayCache {
   /// `sqlite_overlay_query_plan_test.dart` checks the plan of exactly what runs here.
   @visibleForTesting
   static const String overlaysOfCollectionSql = '''
-          SELECT overlay_mutation, largest_batch_id
+          SELECT overlay_mutation, largest_batch_id, document_id
           FROM document_overlays
           WHERE uid = ? AND collection_path = ? AND +largest_batch_id > ?
         ''';
 
+  /// A page of the overlays of a collection in the order of the primary key, after a document id: the read of
+  /// [getOverlaysForCollectionQuery].
+  @visibleForTesting
+  static const String overlaysOfCollectionPageSql = '''
+          SELECT overlay_mutation, largest_batch_id, document_id
+          FROM document_overlays
+          WHERE uid = ? AND collection_path = ? AND document_id > ?
+          ORDER BY document_id
+          LIMIT ?
+        ''';
+
+  /// The number of rows of a page of [overlaysOfCollectionPageSql].
+  @visibleForTesting
+  static int collectionPageSize = 1000;
+
   /// The overlays of a collection among the few written after a batch: through the index on the batch id.
   @visibleForTesting
   static const String newOverlaysOfCollectionSql = '''
-          SELECT overlay_mutation, largest_batch_id
+          SELECT overlay_mutation, largest_batch_id, document_id
           FROM document_overlays INDEXED BY batch_id_overlay
           WHERE uid = ? AND largest_batch_id > ? AND collection_path = ?
         ''';
@@ -232,9 +250,60 @@ class SQLiteDocumentOverlayCache implements DocumentOverlayCache {
             path,
             sinceBatchId,
           ]);
-    return <DocumentKey, Overlay>{
-      for (Overlay overlay in rows.map(_decodeOverlay)) overlay.key: overlay,
-    };
+    // Every row is a document of [collection]: its key is the collection and the id, not the name in the stored write.
+    final Map<DocumentKey, Overlay> result = <DocumentKey, Overlay>{};
+    for (final Map<String, dynamic> row in rows) {
+      final DocumentKey key = DocumentKey.fromPath(
+        collection.appendSegment(row['document_id'] as String),
+      );
+      result[key] = _decodeOverlay(row, key);
+    }
+    return result;
+  }
+
+  @override
+  Future<CollectionOverlays> getOverlaysForCollectionQuery(
+    Query query,
+    Timestamp now,
+  ) async {
+    // A page at a time, as the remote document cache reads a collection: the document of a set overlay that does not
+    // match the query is dropped at once, so that a large collection of pending writes is not held in memory.
+    final ResourcePath collection = query.path;
+    final String path = EncodedPath.encode(collection);
+    final int pageSize = collectionPageSize;
+    final Map<DocumentKey, Overlay> overlays = <DocumentKey, Overlay>{};
+    final Map<DocumentKey, Document> documents = <DocumentKey, Document>{};
+    final Set<String> hiddenIds = <String>{};
+    String lastId = '';
+    while (true) {
+      final List<Map<String, dynamic>> rows = await _db.query(
+        overlaysOfCollectionPageSql,
+        <Object>[_uid, path, lastId, pageSize],
+      );
+      for (final Map<String, dynamic> row in rows) {
+        final String id = row['document_id'] as String;
+        final DocumentKey key = DocumentKey.fromPath(
+          collection.appendSegment(id),
+        );
+        final Overlay overlay = _decodeOverlay(row, key);
+        final Document? document = CollectionOverlays.setDocument(
+          overlay.mutation,
+          now,
+        );
+        if (document == null) {
+          overlays[key] = overlay;
+        } else if (query.matches(document)) {
+          documents[key] = document;
+        } else {
+          hiddenIds.add(id);
+        }
+      }
+      if (rows.length < pageSize) {
+        break;
+      }
+      lastId = rows.last['document_id'] as String;
+    }
+    return CollectionOverlays(overlays, documents, hiddenIds);
   }
 
   @override

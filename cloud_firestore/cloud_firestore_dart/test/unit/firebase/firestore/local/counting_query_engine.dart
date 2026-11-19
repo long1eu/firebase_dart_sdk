@@ -253,6 +253,27 @@ class _CountingDocumentOverlayCache implements DocumentOverlayCache {
   }
 
   @override
+  Future<CollectionOverlays> getOverlaysForCollectionQuery(
+    Query query,
+    Timestamp now,
+  ) async {
+    final CollectionOverlays result = await _subject
+        .getOverlaysForCollectionQuery(query, now);
+    _counter.overlaysReadByCollection += result.length;
+    _counter._recordOverlays(result.overlays.values);
+    for (final DocumentKey key in result.documents.keys) {
+      _counter.overlayTypes[key] = OverlayType.set;
+    }
+    for (final String id in result.hiddenIds) {
+      _counter.overlayTypes[DocumentKey.fromPath(
+            query.path.appendSegment(id),
+          )] =
+          OverlayType.set;
+    }
+    return result;
+  }
+
+  @override
   Future<Map<DocumentKey, Overlay>> getOverlaysForCollectionGroup(
     String collectionGroup,
     int sinceBatchId,

@@ -47,6 +47,19 @@ void main() {
   );
 
   test(
+    'a page of the overlays of a collection is read in the order of the primary key',
+    () async {
+      await SQLiteSchema(db).runMigrations();
+      final String detail = await plan(
+        SQLiteDocumentOverlayCache.overlaysOfCollectionPageSql,
+        <Object>['', 'c', '', 1000],
+      );
+      expect(detail, contains('uid=? AND collection_path=? AND document_id>?'));
+      expect(detail, isNot(contains('TEMP B-TREE')));
+    },
+  );
+
+  test(
     'the few overlays after a batch are counted and read through the batch id index',
     () async {
       await SQLiteSchema(db).runMigrations();
