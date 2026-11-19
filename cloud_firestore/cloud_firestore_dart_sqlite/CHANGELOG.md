@@ -1,3 +1,8 @@
+## (unreleased)
+
+- The native database keeps the prepared statements of its last 64 distinct queries: a read of one
+  document from the cache is about a third faster.
+
 ## 0.1.2
 
 - **The IndexedDB storage refuses `sqlite3` 3.4.0 to 3.5.2.** With them it could lose writes it had

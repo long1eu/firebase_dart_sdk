@@ -177,6 +177,16 @@ class View {
     // The comparator is created on each access, so only ask for it once.
     final Comparator<Document> queryComparator = query.comparator;
 
+    if (previousChanges == null && oldDocumentSet.isEmpty) {
+      return _computeInitialDocChanges(
+        docChanges,
+        oldDocumentSet,
+        changeSet,
+        newMutatedKeys,
+        newAwaitingSync,
+      );
+    }
+
     // Track the last doc in a (full) limit. This is necessary, because some update (a delete, or an update moving a doc
     // past the old limit) might mean there is some other document in the local cache that either should come (1)
     // between the old last limit doc and the new last document, in the case of updates, or (2) after the new last
@@ -324,6 +334,161 @@ class View {
     );
   }
 
+  /// [computeDocChanges] for a view that has no documents yet and no previous changes (the first snapshot of a query).
+  ///
+  /// Every document that matches is added, and for a limit query the documents beyond the limit are dropped again.
+  /// The result is the same as that of the general loop, which adds every document to the sorted set and then removes
+  /// the ones beyond the limit one at a time; here the documents within the limit are selected first (the adjusted
+  /// order of the document set, the first or last [Query.getLimit] of them), and only those are added. A document beyond
+  /// the limit leaves no change (added, then removed), is not in the mutated keys and is not awaiting a sync.
+  ViewDocumentChanges _computeInitialDocChanges<D extends MaybeDocument>(
+    ImmutableSortedMap<DocumentKey, D> docChanges,
+    DocumentSet oldDocumentSet,
+    DocumentViewChangeSet changeSet,
+    ImmutableSortedSet<DocumentKey> newMutatedKeys,
+    Map<DocumentKey, SnapshotVersion> newAwaitingSync,
+  ) {
+    // In key order, as docChanges.
+    final List<Document> candidates = <Document>[];
+    for (final MapEntry<DocumentKey, MaybeDocument> entry in docChanges) {
+      final MaybeDocument maybeDoc = entry.value;
+      if (maybeDoc is! Document) {
+        continue;
+      }
+      final DocumentKey key = entry.key;
+      hardAssertLazy(
+        key == maybeDoc.key,
+        () => 'Mismatching key in doc change $key != ${maybeDoc.key}',
+      );
+      if (!query.matches(maybeDoc) ||
+          (_backendRejected.contains(key) && !maybeDoc.hasLocalMutations)) {
+        continue;
+      }
+      candidates.add(maybeDoc);
+    }
+
+    List<bool>? kept;
+    if (query.hasLimit && candidates.length > query.getLimit()) {
+      final Comparator<Document> setOrder = oldDocumentSet.comparator;
+      kept = _selectWithinLimit(
+        candidates,
+        query.getLimit(),
+        query.hasLimitToFirst
+            ? setOrder
+            : (Document a, Document b) => setOrder(b, a),
+      );
+    }
+
+    // When the view has no mutated keys yet (the usual case), the new ones are built in bulk: they are in key order.
+    final bool bulkMutatedKeys = newMutatedKeys.isEmpty;
+    final List<DocumentKey> mutated = <DocumentKey>[];
+    final bool trackAwaitingSync = newAwaitingSync.isNotEmpty;
+    final List<Document> added = <Document>[];
+    for (int i = 0; i < candidates.length; i++) {
+      final Document doc = candidates[i];
+      final DocumentKey key = doc.key;
+      if (trackAwaitingSync) {
+        newAwaitingSync.remove(key);
+      }
+      if (kept == null || kept[i]) {
+        changeSet.addChange(
+          DocumentViewChange(DocumentViewChangeType.added, doc),
+        );
+        added.add(doc);
+        if (doc.hasLocalMutations) {
+          if (bulkMutatedKeys) {
+            mutated.add(key);
+          } else {
+            newMutatedKeys = newMutatedKeys.insert(key);
+          }
+        } else if (!bulkMutatedKeys) {
+          newMutatedKeys = newMutatedKeys.remove(key);
+        }
+      } else if (!bulkMutatedKeys) {
+        newMutatedKeys = newMutatedKeys.remove(key);
+      }
+    }
+    if (mutated.isNotEmpty) {
+      final Comparator<DocumentKey> keyOrder = newMutatedKeys.comparator;
+      if (!isSortedBy(mutated, (DocumentKey k) => k, keyOrder)) {
+        mutated.sort(keyOrder);
+      }
+      newMutatedKeys = ImmutableSortedSet<DocumentKey>.fromSortedList(
+        mutated,
+        keyOrder,
+      );
+    }
+
+    return ViewDocumentChanges._(
+      oldDocumentSet.addAll(added),
+      changeSet,
+      newMutatedKeys,
+      false,
+      newAwaitingSync,
+    );
+  }
+
+  /// Marks the [limit] smallest of [documents] under [order] (a total order), with a bounded max-heap: one comparison
+  /// per document beyond the limit, plus log([limit]) for the ones that enter the heap.
+  static List<bool> _selectWithinLimit(
+    List<Document> documents,
+    int limit,
+    Comparator<Document> order,
+  ) {
+    final List<bool> kept = List<bool>.filled(documents.length, false);
+    if (limit <= 0) {
+      return kept;
+    }
+    // Indexes into documents; heap[0] is the largest kept document.
+    final List<int> heap = <int>[];
+    bool greater(int a, int b) => order(documents[a], documents[b]) > 0;
+    void siftDown(int i) {
+      final int n = heap.length;
+      while (true) {
+        final int l = 2 * i + 1;
+        if (l >= n) {
+          return;
+        }
+        int largest = l;
+        final int r = l + 1;
+        if (r < n && greater(heap[r], heap[l])) {
+          largest = r;
+        }
+        if (!greater(heap[largest], heap[i])) {
+          return;
+        }
+        final int t = heap[i];
+        heap[i] = heap[largest];
+        heap[largest] = t;
+        i = largest;
+      }
+    }
+
+    for (int index = 0; index < documents.length; index++) {
+      if (heap.length < limit) {
+        heap.add(index);
+        int i = heap.length - 1;
+        while (i > 0) {
+          final int parent = (i - 1) >> 1;
+          if (!greater(heap[i], heap[parent])) {
+            break;
+          }
+          final int t = heap[i];
+          heap[i] = heap[parent];
+          heap[parent] = t;
+          i = parent;
+        }
+      } else if (order(documents[index], documents[heap[0]]) < 0) {
+        heap[0] = index;
+        siftDown(0);
+      }
+    }
+    for (final int index in heap) {
+      kept[index] = true;
+    }
+    return kept;
+  }
+
   bool shouldWaitForSyncedDocument(Document oldDoc, Document newDoc) {
     // We suppress the initial change event for documents that were modified as part of a write acknowledgment (e.g.
     // when the value of a server transform is applied) as Watch will send us the same document again. By suppressing
@@ -373,17 +538,23 @@ class View {
 
     // Sort changes based on type and query comparator.
     final Comparator<Document> queryComparator = query.comparator;
-    final List<DocumentViewChange> viewChanges =
-        docChanges.changeSet.getChanges()
-          ..sort((DocumentViewChange a, DocumentViewChange b) {
-            final int typeComp = View._changeTypeOrder(
-              a,
-            ).compareTo(View._changeTypeOrder(b));
-            if (typeComp != 0) {
-              return typeComp;
-            }
-            return queryComparator(a.document, b.document);
-          });
+    int changeOrder(DocumentViewChange a, DocumentViewChange b) {
+      final int typeComp = View._changeTypeOrder(
+        a,
+      ).compareTo(View._changeTypeOrder(b));
+      if (typeComp != 0) {
+        return typeComp;
+      }
+      return queryComparator(a.document, b.document);
+    }
+
+    // The order is total (the query order ends with the key, and a document has one change), so changes that are
+    // already in order (the first snapshot of a query by key) need no sort.
+    final List<DocumentViewChange> viewChanges = docChanges.changeSet
+        .getChanges();
+    if (!isSortedBy(viewChanges, (DocumentViewChange c) => c, changeOrder)) {
+      viewChanges.sort(changeOrder);
+    }
 
     _applyTargetChange(targetChange);
     if (snapshotVersion != null && _current && targetCurrentInStream) {

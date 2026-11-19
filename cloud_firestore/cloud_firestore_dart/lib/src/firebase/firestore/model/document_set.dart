@@ -42,6 +42,9 @@ class DocumentSet extends Iterable<Document> {
   final ImmutableSortedMap<DocumentKey, Document> _keyIndex;
   final ImmutableSortedSet<Document> sortedSet;
 
+  /// The order of the documents of this set: the comparator it was created with, then the document key.
+  Comparator<Document> get comparator => sortedSet.comparator;
+
   @override
   int get length => _keyIndex.length;
 
@@ -116,15 +119,52 @@ class DocumentSet extends Iterable<Document> {
     return DocumentSet._(newKeyIndex, newSortedSet);
   }
 
+  /// Returns a new DocumentSet that contains the given documents, which must have distinct keys, replacing any old
+  /// document with the same key.
+  DocumentSet addAll(List<Document> documents) {
+    if (isEmpty && documents.length > 1) {
+      // Built in bulk from the sorted documents (linear when they come in key order, as from a query result).
+      final Comparator<DocumentKey> keyComparator = _keyIndex.comparator;
+      final List<Document> byKey = List<Document>.of(documents);
+      if (!isSortedBy(byKey, (Document d) => d.key, keyComparator)) {
+        byKey.sort((Document a, Document b) => keyComparator(a.key, b.key));
+      }
+      bool distinct = true;
+      for (int i = 1; i < byKey.length; i++) {
+        if (keyComparator(byKey[i - 1].key, byKey[i].key) == 0) {
+          distinct = false;
+          break;
+        }
+      }
+      if (distinct) {
+        final Comparator<Document> order = comparator;
+        final List<Document> sorted = List<Document>.of(byKey);
+        if (!isSortedBy(sorted, (Document d) => d, order)) {
+          sorted.sort(order);
+        }
+        return DocumentSet._(
+          ImmutableSortedMap<DocumentKey, Document>.fromSortedLists(
+            <DocumentKey>[for (final Document d in byKey) d.key],
+            byKey,
+            keyComparator,
+          ),
+          ImmutableSortedSet<Document>.fromSortedList(sorted, order),
+        );
+      }
+    }
+    DocumentSet result = this;
+    for (final Document document in documents) {
+      result = result.add(document);
+    }
+    return result;
+  }
+
   /// Returns a new DocumentSet with the document for the provided key removed.
   DocumentSet remove(DocumentKey key) {
     final Document? document = _keyIndex[key];
     if (document == null) {
       return this;
     }
-
-    _keyIndex.remove(key);
-    sortedSet.remove(document);
 
     final ImmutableSortedMap<DocumentKey, Document> newKeyIndex = _keyIndex
         .remove(key);

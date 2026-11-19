@@ -8,6 +8,20 @@ import 'package:cloud_firestore_dart/src/database_collection/rb_tree_sorted_map.
 
 typedef KeyTranslator<C, D> = D Function(C key);
 
+/// Whether [list] is in ascending order of [comparator] applied to [keyOf] of its elements.
+bool isSortedBy<E, K>(
+  List<E> list,
+  K Function(E element) keyOf,
+  Comparator<K> comparator,
+) {
+  for (int i = 1; i < list.length; i++) {
+    if (comparator(keyOf(list[i - 1]), keyOf(list[i])) > 0) {
+      return false;
+    }
+  }
+  return true;
+}
+
 abstract class ImmutableSortedMap<K, V> extends Iterable<MapEntry<K, V>> {
   const ImmutableSortedMap();
 
@@ -23,6 +37,20 @@ abstract class ImmutableSortedMap<K, V> extends Iterable<MapEntry<K, V>> {
       return ArraySortedMap<K, V>.fromMap(values, comparator);
     } else {
       return RBTreeSortedMap<K, V>.fromMap(values, comparator);
+    }
+  }
+
+  /// A map of [keys], which must be sorted by [comparator] and distinct, to the [values] at the same positions. Built
+  /// in linear time, without comparing the keys. The lists are kept; the caller must not change them.
+  factory ImmutableSortedMap.fromSortedLists(
+    List<K> keys,
+    List<V> values,
+    Comparator<K> comparator,
+  ) {
+    if (keys.length < arrayToRbTreeSizeThreshold) {
+      return ArraySortedMap<K, V>(comparator, keys, values);
+    } else {
+      return RBTreeSortedMap<K, V>.fromSortedLists(keys, values, comparator);
     }
   }
 

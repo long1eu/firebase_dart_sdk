@@ -21,12 +21,28 @@ class RBTreeSortedMap<K, V> extends ImmutableSortedMap<K, V> {
     : _root = root ?? LLRBEmptyNode<K, V>();
 
   factory RBTreeSortedMap.fromMap(Map<K, V> values, Comparator<K> comparator) {
-    return RBTreeSortedMapBuilder.buildFrom(
-      values.keys.toList(),
-      values,
-      ImmutableSortedMap.identityTranslator(),
+    // One pass over the entries instead of a lookup of every key in the map; already sorted entries (a scan by key)
+    // are not sorted again.
+    final List<MapEntry<K, V>> entries = values.entries.toList(growable: false);
+    if (!isSortedBy(entries, (MapEntry<K, V> e) => e.key, comparator)) {
+      entries.sort(
+        (MapEntry<K, V> a, MapEntry<K, V> b) => comparator(a.key, b.key),
+      );
+    }
+    return RBTreeSortedMapBuilder.buildFromSorted(
+      <K>[for (final MapEntry<K, V> e in entries) e.key],
+      <V>[for (final MapEntry<K, V> e in entries) e.value],
       comparator,
     );
+  }
+
+  /// A map of [keys] (sorted by [comparator], distinct) to the [values] at the same positions, built in linear time.
+  factory RBTreeSortedMap.fromSortedLists(
+    List<K> keys,
+    List<V> values,
+    Comparator<K> comparator,
+  ) {
+    return RBTreeSortedMapBuilder.buildFromSorted(keys, values, comparator);
   }
 
   LLRBNode<K, V> _root;
@@ -214,19 +230,17 @@ class RBTreeSortedMap<K, V> extends ImmutableSortedMap<K, V> {
   }
 }
 
-class RBTreeSortedMapBuilder<A, B, C> {
-  RBTreeSortedMapBuilder(this.keys, this.values, this.keyTranslator);
+class RBTreeSortedMapBuilder<A, C> {
+  RBTreeSortedMapBuilder(this.keys, this.values);
 
+  /// Sorted.
   final List<A> keys;
-  final Map<B, C> values;
-  final KeyTranslator<A, B> keyTranslator;
+
+  /// The value of every key, at the same position.
+  final List<C> values;
 
   LLRBValueNode<A, C>? _root;
   LLRBValueNode<A, C>? _leaf;
-
-  C getValue(A key) {
-    return values[keyTranslator(key)] as C;
-  }
 
   void _buildPennant(LLRBNodeColor color, int chunkSize, int start) {
     final LLRBNode<A, C> treeRoot = _buildBalancedTree(
@@ -236,9 +250,9 @@ class RBTreeSortedMapBuilder<A, B, C> {
     final A key = keys[start];
     LLRBValueNode<A, C> node;
     if (color == LLRBNodeColor.red) {
-      node = LLRBRedValueNode<A, C>(key, getValue(key), null, treeRoot);
+      node = LLRBRedValueNode<A, C>(key, values[start], null, treeRoot);
     } else {
-      node = LLRBBlackValueNode<A, C>(key, getValue(key), null, treeRoot);
+      node = LLRBBlackValueNode<A, C>(key, values[start], null, treeRoot);
     }
     if (_root == null) {
       _root = node;
@@ -253,15 +267,18 @@ class RBTreeSortedMapBuilder<A, B, C> {
     if (size == 0) {
       return LLRBEmptyNode<A, C>();
     } else if (size == 1) {
-      final A key = keys[start];
-      return LLRBBlackValueNode<A, C>(key, getValue(key), null, null);
+      return LLRBBlackValueNode<A, C>(keys[start], values[start], null, null);
     } else {
       final int half = size ~/ 2;
       final int middle = start + half;
       final LLRBNode<A, C> left = _buildBalancedTree(start, half);
       final LLRBNode<A, C> right = _buildBalancedTree(middle + 1, half);
-      final A key = keys[middle];
-      return LLRBBlackValueNode<A, C>(key, getValue(key), left, right);
+      return LLRBBlackValueNode<A, C>(
+        keys[middle],
+        values[middle],
+        left,
+        right,
+      );
     }
   }
 
@@ -271,9 +288,22 @@ class RBTreeSortedMapBuilder<A, B, C> {
     KeyTranslator<A, B> translator,
     Comparator<A> comparator,
   ) {
-    final RBTreeSortedMapBuilder<A, B, C> builder =
-        RBTreeSortedMapBuilder<A, B, C>(keys, values, translator);
     keys.sort(comparator);
+    return buildFromSorted<A, C>(keys, <C>[
+      for (final A key in keys) values[translator(key)] as C,
+    ], comparator);
+  }
+
+  /// Builds the tree of [keys], which are sorted by [comparator], with the [values] at the same positions.
+  static RBTreeSortedMap<A, C> buildFromSorted<A, C>(
+    List<A> keys,
+    List<C> values,
+    Comparator<A> comparator,
+  ) {
+    final RBTreeSortedMapBuilder<A, C> builder = RBTreeSortedMapBuilder<A, C>(
+      keys,
+      values,
+    );
     final Iterator<BooleanChunk> it = Base1_2(keys.length).iterator;
     int index = keys.length;
     while (it.moveNext()) {

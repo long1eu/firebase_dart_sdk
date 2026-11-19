@@ -162,12 +162,31 @@ abstract class BasePath<B extends BasePath<B>> implements Comparable<B> {
     return segments.length;
   }
 
+  // FieldPath and ResourcePath are the only subclasses, and neither is extended: `other is B` is the runtime type test.
   @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is BasePath &&
-          runtimeType == other.runtimeType &&
-          const DeepCollectionEquality().equals(segments, other.segments);
+  bool operator ==(Object other) {
+    if (identical(this, other)) {
+      return true;
+    }
+    if (other is! B) {
+      return false;
+    }
+    final List<String> a = segments;
+    final List<String> b = other.segments;
+    if (identical(a, b)) {
+      return true;
+    }
+    final int n = a.length;
+    if (n != b.length) {
+      return false;
+    }
+    for (int i = 0; i < n; i++) {
+      if (a[i] != b[i]) {
+        return false;
+      }
+    }
+    return true;
+  }
 
   @override
   int get hashCode => const ListEquality<String>().hash(segments);

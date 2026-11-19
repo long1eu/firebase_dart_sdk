@@ -76,6 +76,13 @@ class SqliteDatabase implements Database {
 
   final sqlite.Database _database;
 
+  /// The prepared statements of the last [_statementCacheSize] distinct queries, least recently used first. Preparing
+  /// a statement is about 40 % of the SQLite time of a read of one document by key; Firestore runs the same few
+  /// statements again and again. Finalized on [close].
+  final Map<String, sqlite.PreparedStatement> _statements =
+      <String, sqlite.PreparedStatement>{};
+  static const int _statementCacheSize = 64;
+
   /// The path of the database file. `FirebaseFirestore.clearPersistence` deletes this
   /// file (and its `-journal`, `-wal` and `-shm` side files).
   @override
@@ -92,11 +99,33 @@ class SqliteDatabase implements Database {
     List<Object?>? arguments,
   ]) async {
     final sqlite.ResultSet rows = _run(
-      () => _database.select(statement, arguments ?? const <Object?>[]),
+      () => _select(statement, arguments ?? const <Object?>[]),
     );
     return <Map<String, dynamic>>[
       for (final sqlite.Row row in rows) Map<String, dynamic>.of(row),
     ];
+  }
+
+  sqlite.ResultSet _select(String sql, List<Object?> arguments) {
+    sqlite.PreparedStatement? statement = _statements.remove(sql);
+    // `checkNoTail` as `Database.select` of sqlite3 3.x.
+    statement ??= _database.prepare(sql, persistent: true, checkNoTail: true);
+    try {
+      final sqlite.ResultSet rows = statement.select(arguments);
+      // Most recently used last.
+      _statements[sql] = statement;
+      if (_statements.length > _statementCacheSize) {
+        final String oldest = _statements.keys.first;
+        // ignore: deprecated_member_use
+        _statements.remove(oldest)!.dispose();
+      }
+      return rows;
+    } catch (_) {
+      // Not kept after an error, so that a statement is never reused in an unknown state.
+      // ignore: deprecated_member_use
+      statement.dispose();
+      rethrow;
+    }
   }
 
   /// Runs a DELETE and returns the number of rows it removed.
@@ -128,9 +157,17 @@ class SqliteDatabase implements Database {
     }
   }
 
-  // `dispose()` is the only way to close a database in sqlite3 2.x; 3.x adds
-  // `close()` and deprecates `dispose()`, which still works there.
+  // `dispose()` is the only way to close a database or a statement in sqlite3
+  // 2.x; 3.x adds `close()` and deprecates `dispose()`, which still works
+  // there.
   @override
-  // ignore: deprecated_member_use
-  void close() => _database.dispose();
+  void close() {
+    for (final sqlite.PreparedStatement statement in _statements.values) {
+      // ignore: deprecated_member_use
+      statement.dispose();
+    }
+    _statements.clear();
+    // ignore: deprecated_member_use
+    _database.dispose();
+  }
 }

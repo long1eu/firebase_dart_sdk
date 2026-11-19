@@ -144,7 +144,7 @@ class SQLiteRemoteDocumentCache implements RemoteDocumentCache {
     if (result.isEmpty) {
       return null;
     }
-    final MaybeDocument document = _processRow(result.first);
+    final MaybeDocument document = _processRow(result.first, documentKey);
 
     // Backfill the "document_type" column if _processRow() found it null.
     await _documentTypeBackfiller.backfill(db);
@@ -156,8 +156,12 @@ class SQLiteRemoteDocumentCache implements RemoteDocumentCache {
     Iterable<DocumentKey> documentKeys,
   ) async {
     final List<Object?> args = <Object?>[];
+    // The requested keys by their stored path, so that the rows need not parse the name of their document.
+    final Map<String, DocumentKey> keysByPath = <String, DocumentKey>{};
     for (DocumentKey key in documentKeys) {
-      args.add(EncodedPath.encode(key.path));
+      final String path = EncodedPath.encode(key.path);
+      args.add(path);
+      keysByPath[path] = key;
     }
 
     final Map<DocumentKey, MaybeDocument?> results =
@@ -181,7 +185,7 @@ class SQLiteRemoteDocumentCache implements RemoteDocumentCache {
       final List<Map<String, dynamic>> rows = await longQuery
           .performNextSubquery();
       for (Map<String, dynamic> row in rows) {
-        final MaybeDocument decoded = _processRow(row);
+        final MaybeDocument decoded = _processRow(row, keysByPath[row['path']]);
         results[decoded.key] = decoded;
       }
       rowsProcessed += rows.length;
@@ -459,7 +463,10 @@ class SQLiteRemoteDocumentCache implements RemoteDocumentCache {
       for (Map<String, dynamic> row in rows) {
         // `path_length` keeps the documents of subcollections out (as upstream does), so that they are neither copied
         // out of the database nor their paths decoded.
-        final MaybeDocument maybeDoc = _processRow(row);
+        final MaybeDocument maybeDoc = _processRow(
+          row,
+          _keyInCollection(row['path'] as String, prefix, prefixPath),
+        );
         if (maybeDoc is Document &&
             (mutatedKeys.contains(maybeDoc.key) || query.matches(maybeDoc))) {
           results[maybeDoc.key] = maybeDoc;
@@ -557,8 +564,11 @@ class SQLiteRemoteDocumentCache implements RemoteDocumentCache {
 
   /// Decodes the document of a row selecting `contents, read_time_seconds, read_time_nanos, document_type, path`,
   /// and queues the backfill of its "document_type" column if that is null.
-  MaybeDocument _processRow(Map<String, dynamic> row) {
-    final MaybeDocument document = decodeMaybeDocument(row['contents']);
+  ///
+  /// [key] is the key of the row's document when the caller knows it (from the `path` column, or the key it read):
+  /// then the name of the document is not parsed again.
+  MaybeDocument _processRow(Map<String, dynamic> row, [DocumentKey? key]) {
+    final MaybeDocument document = decodeMaybeDocument(row['contents'], key);
     if (row['document_type'] == null) {
       _documentTypeBackfiller.enqueue(
         row['path'],
@@ -575,12 +585,41 @@ class SQLiteRemoteDocumentCache implements RemoteDocumentCache {
     return EncodedPath.encode(key.path);
   }
 
-  MaybeDocument decodeMaybeDocument(Uint8List bytes) {
+  MaybeDocument decodeMaybeDocument(Uint8List bytes, [DocumentKey? key]) {
     return serializer.decodeMaybeDocument(
       parseStoredProto(
         'MaybeDocument',
         () => proto.MaybeDocument.fromBuffer(bytes),
       ),
+      key,
+    );
+  }
+
+  /// The key of a document of the collection [collection] (encoded as [collectionPath]) from the stored [path] of the
+  /// document: the collection's segments and the last segment of the path, which is all that needs decoding. Null
+  /// (the key is then read from the document) if [path] is not that of a direct child of the collection.
+  static DocumentKey? _keyInCollection(
+    String path,
+    ResourcePath collection,
+    String collectionPath,
+  ) {
+    final int start = collectionPath.length;
+    final int end = path.length - 2;
+    if (collection.isEmpty ||
+        end <= start ||
+        !path.startsWith(collectionPath)) {
+      return null;
+    }
+    final int escape = path.indexOf('\x01', start);
+    if (escape != end) {
+      // The id has escaped characters (or the path has more segments): decode it the slow way.
+      final ResourcePath decoded = EncodedPath.decodeResourcePath(path);
+      return decoded.length == collection.length + 1
+          ? DocumentKey.fromPath(decoded)
+          : null;
+    }
+    return DocumentKey.fromPath(
+      collection.appendSegment(path.substring(start, end)),
     );
   }
 }

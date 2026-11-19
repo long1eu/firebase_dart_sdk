@@ -17,6 +17,21 @@ class ImmutableSortedSet<T> extends Iterable<T> {
     );
   }
 
+  /// A set of [elements], which must be sorted by [comparator] and distinct. Built in linear time; the list is kept,
+  /// the caller must not change it.
+  factory ImmutableSortedSet.fromSortedList(
+    List<T> elements,
+    Comparator<T> comparator,
+  ) {
+    return ImmutableSortedSet<T>._(
+      ImmutableSortedMap<T, void>.fromSortedLists(
+        elements,
+        List<void>.filled(elements.length, null),
+        comparator,
+      ),
+    );
+  }
+
   ImmutableSortedSet._(this._map);
 
   final ImmutableSortedMap<T, void> _map;
@@ -49,6 +64,8 @@ class ImmutableSortedSet<T> extends Iterable<T> {
     }
     return result;
   }
+
+  Comparator<T> get comparator => _map.comparator;
 
   T? get minEntry => _map.minKey;
 

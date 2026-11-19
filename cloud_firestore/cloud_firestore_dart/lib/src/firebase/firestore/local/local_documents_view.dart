@@ -650,6 +650,16 @@ class LocalDocumentsView {
     // Apply the overlays and match against the query. Only the documents with an overlay are touched: the others were
     // matched above.
     final Timestamp now = Timestamp.now();
+    if (overlays.length >= matching.length) {
+      return _mergeOverlays(
+        matching,
+        overlays,
+        remoteDocuments,
+        patchBases,
+        query,
+        now,
+      );
+    }
     ImmutableSortedMap<DocumentKey, Document> results = matching;
     for (Overlay overlay in overlays.values) {
       final DocumentKey key = overlay.key;
@@ -667,6 +677,93 @@ class LocalDocumentsView {
     }
 
     return results;
+  }
+
+  /// The overlay loop of [_getDocumentsMatchingCollectionQuery] when there are at least as many overlays as matching
+  /// documents (a collection that exists only as pending writes, for example): the same result as inserting the
+  /// document of every overlay that matches (and removing the key of every other) one at a time, built at once from
+  /// the sorted entries.
+  ImmutableSortedMap<DocumentKey, Document> _mergeOverlays(
+    ImmutableSortedMap<DocumentKey, Document> matching,
+    Map<DocumentKey, Overlay> overlays,
+    ImmutableSortedMap<DocumentKey, Document> remoteDocuments,
+    Map<DocumentKey, MaybeDocument?> patchBases,
+    Query query,
+    Timestamp now,
+  ) {
+    final Comparator<DocumentKey> keyOrder = matching.comparator;
+    // In the order of overlays.values; a null document removes the key.
+    final List<DocumentKey> keys = <DocumentKey>[];
+    final List<Document?> docs = <Document?>[];
+    for (Overlay overlay in overlays.values) {
+      final DocumentKey key = overlay.key;
+      final MaybeDocument? base = remoteDocuments[key] ?? patchBases[key];
+      final MaybeDocument? doc = overlay.mutation.applyToLocalView(
+        base,
+        base,
+        now,
+      );
+      keys.add(key);
+      docs.add(doc is Document && query.matches(doc) ? doc : null);
+    }
+    // Sorted by key, then by position, so that of keys that compare equal the last one wins, as with one insert at a
+    // time.
+    final List<int> order = List<int>.generate(keys.length, (int i) => i);
+    bool sorted = true;
+    for (int i = 1; i < keys.length; i++) {
+      if (keyOrder(keys[i - 1], keys[i]) >= 0) {
+        sorted = false;
+        break;
+      }
+    }
+    if (!sorted) {
+      order.sort((int a, int b) {
+        final int c = keyOrder(keys[a], keys[b]);
+        return c != 0 ? c : a.compareTo(b);
+      });
+    }
+
+    final List<DocumentKey> resultKeys = <DocumentKey>[];
+    final List<Document> resultDocs = <Document>[];
+    final Iterator<MapEntry<DocumentKey, Document>> base = matching.iterator;
+    MapEntry<DocumentKey, Document>? next = base.moveNext()
+        ? base.current
+        : null;
+    int i = 0;
+    while (i < order.length) {
+      // The last update of the keys that compare equal to this one.
+      int last = order[i];
+      int j = i + 1;
+      while (j < order.length && keyOrder(keys[order[j]], keys[last]) == 0) {
+        last = order[j];
+        j++;
+      }
+      final DocumentKey key = keys[last];
+      // The matching documents before the key are kept; one that compares equal is replaced or removed.
+      while (next != null && keyOrder(next.key, key) <= 0) {
+        if (keyOrder(next.key, key) < 0) {
+          resultKeys.add(next.key);
+          resultDocs.add(next.value);
+        }
+        next = base.moveNext() ? base.current : null;
+      }
+      final Document? doc = docs[last];
+      if (doc != null) {
+        resultKeys.add(key);
+        resultDocs.add(doc);
+      }
+      i = j;
+    }
+    while (next != null) {
+      resultKeys.add(next.key);
+      resultDocs.add(next.value);
+      next = base.moveNext() ? base.current : null;
+    }
+    return ImmutableSortedMap<DocumentKey, Document>.fromSortedLists(
+      resultKeys,
+      resultDocs,
+      keyOrder,
+    );
   }
 
   /// Returns a base document that can be used to apply [overlay].

@@ -1,5 +1,11 @@
 ## (unreleased)
 
+- Faster reads from the cache, with no change in results (100,000 documents, an M5 laptop):
+  `orderBy(...).limit(20)` without a cache index 2.7 s to 0.37 s (the documents within the limit
+  are selected before the view is built, instead of all being sorted and then removed one by one),
+  a whole collection 742 to 401 ms (the first result is built in one pass), a filtered scan about
+  13% faster (the key of a document comes from its row). Method and numbers in
+  `docs/spikes/cache_read_profile.md`.
 - Experimental: bring your own cache storage. `keyValueCacheSettings(store: ...)` of the new library
   `package:cloud_firestore_dart/cache_store.dart` keeps the persistent cache in any `CacheStore`,
   an ordered key-value store of bytes that the app implements (`open`, `close`, `transaction` with
