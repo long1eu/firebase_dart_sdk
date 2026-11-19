@@ -30,6 +30,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/firestore_settings.d
 import 'package:cloud_firestore_dart/src/firebase/firestore/load_bundle_task.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/index_backfiller.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/indexeddb/indexeddb_persistence.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/local/keyvalue/key_value_persistence.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/local_serializer.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/local_store.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/lru_garbage_collector.dart';
@@ -171,12 +172,16 @@ class FirestoreClient implements RemoteStoreCallback {
     ConnectivityChangeDetector? connectivityDetector,
     Future<void>? after,
   }) {
-    // The IndexedDB cache needs no database function, and wins over one.
+    // The IndexedDB and key-value caches need no database function, and win over one.
     final bool useIndexedDb = settings.cacheSettings is IndexedDbCacheSettings;
+    final bool useKeyValue = settings.cacheSettings is KeyValueCacheSettings;
     final bool usePersistence =
         // TODO(long1eu): Make sure you remove the openDatabase != null once we
         //  provide a default way to instantiate a db instance
-        !useIndexedDb && settings.persistenceEnabled && openDatabase != null;
+        !useIndexedDb &&
+        !useKeyValue &&
+        settings.persistenceEnabled &&
+        openDatabase != null;
     final FirestoreClient client = FirestoreClient._(
       databaseInfo,
       credentialsProvider,
@@ -243,11 +248,16 @@ class FirestoreClient implements RemoteStoreCallback {
             final IndexedDbCacheSettings indexedDb => indexedDb,
             _ => null,
           },
+          keyValueCacheSettings: switch (settings.cacheSettings) {
+            final KeyValueCacheSettings keyValue => keyValue,
+            _ => null,
+          },
           mergeUnsentWrites: switch (settings.cacheSettings) {
             final PersistentCacheSettings persistent =>
               persistent.mergeUnsentWrites,
             final IndexedDbCacheSettings indexedDb =>
               indexedDb.mergeUnsentWrites,
+            final KeyValueCacheSettings keyValue => keyValue.mergeUnsentWrites,
             final MemoryCacheSettings memory => memory.mergeUnsentWrites,
             _ => false,
           },
@@ -501,6 +511,8 @@ class FirestoreClient implements RemoteStoreCallback {
     if (persistence is SQLitePersistence) {
       await persistence.clearPersistence();
     } else if (persistence is IndexedDbPersistence) {
+      await persistence.clearPersistence();
+    } else if (persistence is KeyValuePersistence) {
       await persistence.clearPersistence();
     }
   }
@@ -776,6 +788,7 @@ class FirestoreClient implements RemoteStoreCallback {
     MemoryGarbageCollectorSettings? memoryLruGcSettings,
     PersistentCacheSettings? persistentCacheSettings,
     IndexedDbCacheSettings? indexedDbCacheSettings,
+    KeyValueCacheSettings? keyValueCacheSettings,
     ConnectivityChangeDetector? connectivityDetector,
     bool mergeUnsentWrites = false,
     bool useIndexedDb = false,
@@ -785,7 +798,16 @@ class FirestoreClient implements RemoteStoreCallback {
     Log.d(logTag, 'Initializing. user=${user.uid}');
 
     LruGarbageCollector? gc;
-    if (useIndexedDb) {
+    if (keyValueCacheSettings != null) {
+      final KeyValuePersistence
+      keyValue = keyValueCacheSettings.createPersistence(
+        databaseId: databaseInfo.databaseId,
+        serializer: LocalSerializer(RemoteSerializer(databaseInfo.databaseId)),
+        lruParams: LruGarbageCollectorParams.withCacheSizeBytes(cacheSizeBytes),
+      );
+      gc = keyValue.garbageCollector;
+      persistence = keyValue;
+    } else if (useIndexedDb) {
       final IndexedDbPersistence
       indexedDb = indexedDbCacheSettings!.createPersistence(
         persistenceKey: databaseInfo.persistenceKey,

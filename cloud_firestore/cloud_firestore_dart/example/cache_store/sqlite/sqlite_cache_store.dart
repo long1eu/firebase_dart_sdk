@@ -20,8 +20,7 @@ class SqliteCacheStore implements CacheStore {
   /// The end of the last transaction: the next one starts after it.
   Future<void> _lastTransaction = Future<void>.value();
 
-  Database get _db =>
-      _database ?? (throw StateError('The store is not open'));
+  Database get _db => _database ?? (throw StateError('The store is not open'));
 
   @override
   Future<void> open() async {
@@ -86,10 +85,10 @@ class _Transaction implements CacheStoreTransaction {
 
   @override
   Future<void> put(Uint8List key, Uint8List value) async {
-    _db.execute('INSERT OR REPLACE INTO entries (key, value) VALUES (?, ?)', <Object>[
-      key,
-      value,
-    ]);
+    _db.execute(
+      'INSERT OR REPLACE INTO entries (key, value) VALUES (?, ?)',
+      <Object>[key, value],
+    );
   }
 
   @override

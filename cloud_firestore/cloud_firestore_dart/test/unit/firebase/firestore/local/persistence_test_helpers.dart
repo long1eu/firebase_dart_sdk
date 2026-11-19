@@ -4,6 +4,8 @@
 
 import 'dart:async';
 
+import 'package:cloud_firestore_dart/cache_store.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/local/keyvalue/cache_store_persistence.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/local_serializer.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/lru_garbage_collector.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/memory/memory_persistence.dart';
@@ -14,6 +16,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/remote/remote_serial
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/database.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../../../../example/cache_store/memory_log/memory_log_store.dart';
 import 'mock/database_mock.dart';
 
 Future<SQLitePersistence> createSQLitePersistence([
@@ -54,6 +57,26 @@ Future<SQLitePersistence> createSQLitePersistenceForProject(
             onOpen: onOpen),
     params,
     statsCollector,
+  );
+  await persistence.start();
+  return persistence;
+}
+
+/// Creates and starts a [CacheStorePersistence] (the key-value cache) over [store], by default a new
+/// `MemoryLogStore` of the examples that only keeps its data in memory.
+Future<CacheStorePersistence> createKeyValuePersistence({
+  CacheStore? store,
+  String projectId = 'projectId',
+  LruGarbageCollectorParams params = const LruGarbageCollectorParams(),
+  StatsCollector statsCollector = StatsCollector.noOp,
+}) async {
+  final DatabaseId databaseId = DatabaseId.forProject(projectId);
+  final CacheStorePersistence persistence = CacheStorePersistence(
+    store ?? MemoryLogStore(),
+    databaseId: databaseId,
+    serializer: LocalSerializer(RemoteSerializer(databaseId)),
+    lruParams: params,
+    statsCollector: statsCollector,
   );
   await persistence.start();
   return persistence;

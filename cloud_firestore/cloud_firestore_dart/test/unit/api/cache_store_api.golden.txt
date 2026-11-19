@@ -1,0 +1,25 @@
+abstract class CacheStore
+  close(): Future<void>
+  new CacheStore()
+  open(): Future<void>
+  transaction((.CacheStoreTransaction) -> dart.async.Future body, {bool readOnly}): Future<dynamic>
+class CacheStoreEntry
+  final key: Uint8List
+  final value: Uint8List
+  new CacheStoreEntry(Uint8List key, Uint8List value)
+  toString(): String
+abstract class CacheStoreTransaction
+  delete(Uint8List key): Future<void>
+  get(Uint8List key): Future<Uint8List>
+  new CacheStoreTransaction()
+  put(Uint8List key, Uint8List value): Future<void>
+  scan(Uint8List start, Uint8List end, {bool reverse, int limit}): Future<List<CacheStoreEntry>>
+class KeyValueCacheSettings extends LocalCacheSettings
+  ==(Object other): bool
+  final mergeUnsentWrites: bool
+  final sizeBytes: int
+  final store: CacheStore
+  get hashCode: int
+  toString(): String
+compareCacheStoreKeys(List<int> a, List<int> b): int
+keyValueCacheSettings({CacheStore store, int sizeBytes, bool mergeUnsentWrites}): KeyValueCacheSettings

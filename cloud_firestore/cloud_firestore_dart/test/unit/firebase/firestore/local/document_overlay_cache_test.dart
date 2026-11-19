@@ -38,6 +38,7 @@ import 'persistence_test_helpers.dart';
 void main() {
   _run('memory', () => createEagerGCMemoryPersistence());
   _run('sqlite', () => createSQLitePersistence());
+  _run('keyvalue', () => createKeyValuePersistence());
 }
 
 void _run(String name, Future<Persistence> Function() createPersistence) {

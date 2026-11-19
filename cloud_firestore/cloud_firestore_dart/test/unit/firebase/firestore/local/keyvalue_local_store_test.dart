@@ -1,0 +1,292 @@
+// File created by
+// Lung Razvan <long1eu>
+// on 29/09/2018
+
+import 'dart:async';
+
+import 'package:cloud_firestore_dart/src/firebase/firestore/local/lru_garbage_collector.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/local/keyvalue/cache_store_persistence.dart';
+import 'package:test/test.dart';
+
+import 'accumulating_stats_collector.dart';
+import 'cases/local_store_test_case.dart';
+import 'persistence_test_helpers.dart';
+
+void main() {
+  late LocalStoreTestCase testCase;
+
+  setUp(() async {
+    print('setUp');
+
+    final AccumulatingStatsCollector statsCollector =
+        AccumulatingStatsCollector();
+
+    final CacheStorePersistence persistence = await createKeyValuePersistence(
+      params: const LruGarbageCollectorParams(),
+      statsCollector: statsCollector,
+    );
+
+    testCase = LocalStoreTestCase(
+      persistence,
+      statsCollector,
+      garbageCollectorIsEager: false,
+    );
+    await testCase.setUp();
+    print('setUpDone');
+  });
+
+  tearDown(
+    () => Future<void>.delayed(
+      const Duration(milliseconds: 250),
+      () => testCase.tearDown(),
+    ),
+  );
+
+  test('testMutationBatchKeys', () => testCase.testMutationBatchKeys());
+  test(
+    'testAllocatesTheSameTargetForMirrorQueries',
+    () => testCase.testAllocatesTheSameTargetForMirrorQueries(),
+  );
+  test(
+    'testExecutesLimitToLastQueryInTheQueryOrder',
+    () => testCase.testExecutesLimitToLastQueryInTheQueryOrder(),
+  );
+  test('testHandlesSetMutation', () => testCase.testHandlesSetMutation());
+  test(
+    'testHandlesSetMutationThenDocument',
+    () => testCase.testHandlesSetMutationThenDocument(),
+  );
+  test(
+    'testHandlesSetMutationThenAckThenRelease',
+    () => testCase.testHandlesSetMutationThenAckThenRelease(),
+  );
+  test(
+    'testHandlesAckThenRejectThenRemoteEvent',
+    () => testCase.testHandlesAckThenRejectThenRemoteEvent(),
+  );
+  test(
+    'testHandlesDeletedDocumentThenSetMutationThenAck',
+    () => testCase.testHandlesDeletedDocumentThenSetMutationThenAck(),
+  );
+  test(
+    'testHandlesSetMutationThenDeletedDocument',
+    () => testCase.testHandlesSetMutationThenDeletedDocument(),
+  );
+  test(
+    'testHandlesDocumentThenSetMutationThenAckThenDocument',
+    () => testCase.testHandlesDocumentThenSetMutationThenAckThenDocument(),
+  );
+  test(
+    'testHandlesPatchWithoutPriorDocument',
+    () => testCase.testHandlesPatchWithoutPriorDocument(),
+  );
+  test(
+    'testHandlesPatchMutationThenDocumentThenAck',
+    () => testCase.testHandlesPatchMutationThenDocumentThenAck(),
+  );
+  test(
+    'testHandlesPatchMutationThenAckThenDocument',
+    () => testCase.testHandlesPatchMutationThenAckThenDocument(),
+  );
+  test(
+    'testHandlesDeleteMutationThenAck',
+    () => testCase.testHandlesDeleteMutationThenAck(),
+  );
+  test(
+    'testHandlesDocumentThenDeleteMutationThenAck',
+    () => testCase.testHandlesDocumentThenDeleteMutationThenAck(),
+  );
+  test(
+    'testHandlesDeleteMutationThenDocumentThenAck',
+    () => testCase.testHandlesDeleteMutationThenDocumentThenAck(),
+  );
+  test(
+    'testHandlesDocumentThenDeletedDocumentThenDocument',
+    () => testCase.testHandlesDocumentThenDeletedDocumentThenDocument(),
+  );
+  test(
+    'testHandlesSetMutationThenPatchMutationThenDocumentThenAckThenAck',
+    () => testCase
+        .testHandlesSetMutationThenPatchMutationThenDocumentThenAckThenAck(),
+  );
+  test(
+    'testHandlesSetMutationAndPatchMutationTogether',
+    () => testCase.testHandlesSetMutationAndPatchMutationTogether(),
+  );
+  test(
+    'testHandlesSetMutationThenPatchMutationThenReject',
+    () => testCase.testHandlesSetMutationThenPatchMutationThenReject(),
+  );
+  test(
+    'testHandlesSetMutationsAndPatchMutationOfJustOneTogether',
+    () => testCase.testHandlesSetMutationsAndPatchMutationOfJustOneTogether(),
+  );
+  test(
+    'testHandlesDeleteMutationThenPatchMutationThenAckThenAck',
+    () => testCase.testHandlesDeleteMutationThenPatchMutationThenAckThenAck(),
+  );
+  test(
+    'testCollectsGarbageAfterChangeBatchWithNoTargetIDs',
+    () => testCase.testCollectsGarbageAfterChangeBatchWithNoTargetIDs(),
+  );
+  test(
+    'testCollectsGarbageAfterChangeBatch',
+    () => testCase.testCollectsGarbageAfterChangeBatch(),
+  );
+  test(
+    'testCollectsGarbageAfterAcknowledgedMutation',
+    () => testCase.testCollectsGarbageAfterAcknowledgedMutation(),
+  );
+  test(
+    'testCollectsGarbageAfterRejectedMutation',
+    () => testCase.testCollectsGarbageAfterRejectedMutation(),
+  );
+  test(
+    'testPinsDocumentsInTheLocalView',
+    () => testCase.testPinsDocumentsInTheLocalView(),
+  );
+  test(
+    'testThrowsAwayDocumentsWithUnknownTargetIDsImmediately',
+    () => testCase.testThrowsAwayDocumentsWithUnknownTargetIDsImmediately(),
+  );
+  test(
+    'testCanExecuteDocumentQueries',
+    () => testCase.testCanExecuteDocumentQueries(),
+  );
+  test(
+    'testCanExecuteCollectionQueries',
+    () => testCase.testCanExecuteCollectionQueries(),
+  );
+  test(
+    'testCanExecuteMixedCollectionQueries',
+    () => testCase.testCanExecuteMixedCollectionQueries(),
+  );
+  test(
+    'testReadsAllDocumentsForCollectionQueries',
+    () => testCase.testReadsAllDocumentsForCollectionQueries(),
+  );
+  test(
+    'testWritesOverlaysAndRemovesThemOnAck',
+    () => testCase.testWritesOverlaysAndRemovesThemOnAck(),
+  );
+  test(
+    'testDeviationRejectRemovesOverlayThatNoLongerApplies',
+    () => testCase.testDeviationRejectRemovesOverlayThatNoLongerApplies(),
+  );
+  test(
+    'testDeviationRemoteDeleteRemovesPatchOverlay',
+    () => testCase.testDeviationRemoteDeleteRemovesPatchOverlay(),
+  );
+  test(
+    'testDeviationEmptyMergeKeepsItsOverlay',
+    () => testCase.testDeviationEmptyMergeKeepsItsOverlay(),
+  );
+  test(
+    'testDeviationSetOverlayOfMergeIsRecalculatedWhenDocumentArrives',
+    () => testCase
+        .testDeviationSetOverlayOfMergeIsRecalculatedWhenDocumentArrives(),
+  );
+  test(
+    'testSetOverlayWithServerTimestampIsKeptWhenDocumentArrives',
+    () => testCase.testSetOverlayWithServerTimestampIsKeptWhenDocumentArrives(),
+  );
+  test(
+    'testViewSeesTwoEventsForSetWithServerTimestamp',
+    () => testCase.testViewSeesTwoEventsForSetWithServerTimestamp(),
+  );
+  test(
+    'testReadsAllDocumentsForInitialCollectionQueries',
+    () => testCase.testReadsAllDocumentsForInitialCollectionQueries(),
+  );
+  test(
+    'testUsesTargetMappingToExecuteQueries',
+    () => testCase.testUsesTargetMappingToExecuteQueries(),
+  );
+  test(
+    'testLastLimboFreeSnapshotIsAdvancedDuringViewProcessing',
+    () => testCase.testLastLimboFreeSnapshotIsAdvancedDuringViewProcessing(),
+  );
+  test(
+    'testQueriesIncludeLocallyModifiedDocuments',
+    () => testCase.testQueriesIncludeLocallyModifiedDocuments(),
+  );
+  test(
+    'testQueriesIncludeDocumentsFromOtherQueries',
+    () => testCase.testQueriesIncludeDocumentsFromOtherQueries(),
+  );
+  test(
+    'testQueriesFilterDocumentsThatNoLongerMatch',
+    () => testCase.testQueriesFilterDocumentsThatNoLongerMatch(),
+  );
+  test(
+    'testQueriesIncludeBundledDocumentsReadAfterTheTargetWasSynced',
+    () => testCase
+        .testQueriesIncludeBundledDocumentsReadAfterTheTargetWasSynced(),
+  );
+  test(
+    'testIgnoresTargetMappingAfterExistenceFilterMismatch',
+    () => testCase.testIgnoresTargetMappingAfterExistenceFilterMismatch(),
+  );
+  test('testPersistsResumeTokens', () => testCase.testPersistsResumeTokens());
+  test(
+    'testDoesNotReplaceResumeTokenWithEmptyByteString',
+    () => testCase.testDoesNotReplaceResumeTokenWithEmptyByteString(),
+  );
+  test(
+    'testRemoteDocumentKeysForTarget',
+    () => testCase.testRemoteDocumentKeysForTarget(),
+  );
+  test(
+    'testHandlesSetMutationThenTransformThenTransform',
+    () => testCase.testHandlesSetMutationThenTransformThenTransform(),
+  );
+  test(
+    'testHandlesSetMutationThenAckThenTransformThenAckThenTransform',
+    () => testCase
+        .testHandlesSetMutationThenAckThenTransformThenAckThenTransform(),
+  );
+  test(
+    'testHandlesSetMutationThenTransformThenRemoteEventThenTransform',
+    () => testCase
+        .testHandlesSetMutationThenTransformThenRemoteEventThenTransform(),
+  );
+  test(
+    'testHandlesSetMutationWithFoldedTransformThenAck',
+    () => testCase.testHandlesSetMutationWithFoldedTransformThenAck(),
+  );
+  test('testHoldsBackTransforms', () => testCase.testHoldsBackTransforms());
+  test(
+    'testHandlesMergeMutationWithTransformThenRemoteEvent',
+    () => testCase.testHandlesMergeMutationWithTransformThenRemoteEvent(),
+  );
+  test(
+    'testHandlesPatchMutationWithTransformThenRemoteEvent',
+    () => testCase.testHandlesPatchMutationWithTransformThenRemoteEvent(),
+  );
+  test(
+    'testOnlyPersistsUpdatesForDocumentsWhenVersionChanges',
+    () => testCase.testOnlyPersistsUpdatesForDocumentsWhenVersionChanges(),
+  );
+  test(
+    'testRemovesManufacturedNoDocumentsFromTheCache',
+    () => testCase.testRemovesManufacturedNoDocumentsFromTheCache(),
+  );
+  test(
+    'testClearsResumeTokenOnExistenceFilterMismatch',
+    () => testCase.testClearsResumeTokenOnExistenceFilterMismatch(),
+  );
+  test(
+    'testUpdateOnRemoteDocLeadsToUpdateOverlay',
+    () => testCase.testUpdateOnRemoteDocLeadsToUpdateOverlay(),
+  );
+  test(
+    'testAddThenUpdateWhileOffline',
+    () => testCase.testAddThenUpdateWhileOffline(),
+  );
+  test(
+    'testGetHighestUnacknowledgedBatchId',
+    () => testCase.testGetHighestUnacknowledgedBatchId(),
+  );
+
+  // The index cases of SQLiteLocalStoreTest do not apply: the key-value cache has no persistent cache indexes yet.
+}

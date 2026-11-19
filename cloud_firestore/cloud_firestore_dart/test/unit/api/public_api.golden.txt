@@ -305,6 +305,13 @@ enum JsSdkCacheImportStatus
   static final notOnWeb: JsSdkCacheImportStatus
   static final nothingToImport: JsSdkCacheImportStatus
   static final values: List<JsSdkCacheImportStatus>
+class KeyValueCacheSettings extends LocalCacheSettings
+  ==(Object other): bool
+  final mergeUnsentWrites: bool
+  final sizeBytes: int
+  final store: CacheStore
+  get hashCode: int
+  toString(): String
 enum ListenSource
   new ListenSource(int #index, String #name)
   static final cache: ListenSource

@@ -119,7 +119,7 @@ export 'src/firebase/firestore/load_bundle_task_progress.dart'
     hide LoadBundleTaskSnapshotInternal;
 export 'src/firebase/firestore/log_level.dart' show LogLevel;
 export 'src/firebase/firestore/local_cache_settings.dart'
-    hide IndexedDbCacheSettingsInternal;
+    hide IndexedDbCacheSettingsInternal, KeyValueCacheSettingsInternal;
 export 'src/firebase/firestore/long_polling_options.dart'
     hide WebExperimentalLongPollingOptionsInternal;
 export 'src/firebase/firestore/max_key.dart';
