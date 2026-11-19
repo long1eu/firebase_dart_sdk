@@ -30,7 +30,6 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/firestore_settings.d
 import 'package:cloud_firestore_dart/src/firebase/firestore/load_bundle_task.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/index_backfiller.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/indexeddb/indexeddb_persistence.dart';
-import 'package:cloud_firestore_dart/src/firebase/firestore/local/indexeddb/indexeddb_persistence_platform.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/local_serializer.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/local_store.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/lru_garbage_collector.dart';
@@ -787,7 +786,8 @@ class FirestoreClient implements RemoteStoreCallback {
 
     LruGarbageCollector? gc;
     if (useIndexedDb) {
-      final IndexedDbPersistence indexedDb = createIndexedDbPersistence(
+      final IndexedDbPersistence
+      indexedDb = indexedDbCacheSettings!.createPersistence(
         persistenceKey: databaseInfo.persistenceKey,
         databaseId: databaseInfo.databaseId,
         serializer: LocalSerializer(RemoteSerializer(databaseInfo.databaseId)),

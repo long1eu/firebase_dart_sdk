@@ -11,6 +11,7 @@ import 'dart:js_interop_unsafe';
 import 'dart:typed_data';
 
 import 'package:cloud_firestore_dart/cloud_firestore_dart.dart';
+import 'package:cloud_firestore_dart/indexeddb_cache.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/target.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/persistance/index_manager.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/document_key.dart';
@@ -40,7 +41,7 @@ Future<FirebaseFirestore> open() async {
   );
   final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(
     app: app,
-    settings: Settings(cacheSettings: IndexedDbCacheSettings()).withEmulator(
+    settings: Settings(cacheSettings: indexedDbCacheSettings()).withEmulator(
       '127.0.0.1',
       params['port']! as int,
       mockUserToken: <String, Object?>{'sub': params['user']},

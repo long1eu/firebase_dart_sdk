@@ -1,6 +1,8 @@
 ## (unreleased)
 
-- Experimental, web: `IndexedDbCacheSettings()` stores the cache in IndexedDB in the format of
+- Experimental, web: `indexedDbCacheSettings()` of the new library
+  `package:cloud_firestore_dart/indexeddb_cache.dart` (only apps that import it carry the engine)
+  stores the cache in IndexedDB in the format of
   the official Firebase JS SDK (database `firestore/<app>/<project>[.<database>]/main`, schema
   version 18, the same stores, keys and proto3 JSON rows), without SQLite: no `sqlite3.wasm` to
   download and no `openDatabase` function. A new database is created as the JS SDK creates it, an

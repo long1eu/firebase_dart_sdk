@@ -24,6 +24,7 @@ import 'dart:js_interop_unsafe';
 import 'dart:math';
 
 import 'package:cloud_firestore_dart/cloud_firestore_dart.dart';
+import 'package:cloud_firestore_dart/indexeddb_cache.dart';
 import 'package:cloud_firestore_dart_sqlite/web.dart';
 import 'package:firebase_app_dart/firebase_app_dart.dart';
 import 'package:web/web.dart' as web;
@@ -64,7 +65,7 @@ FirebaseFirestore open(String kind, String tag) {
   if (kind == 'engine') {
     return FirebaseFirestore.instanceFor(
       app: app,
-      settings: Settings(cacheSettings: IndexedDbCacheSettings()).withEmulator('127.0.0.1', 1),
+      settings: Settings(cacheSettings: indexedDbCacheSettings()).withEmulator('127.0.0.1', 1),
     );
   }
   return FirebaseFirestore.instanceFor(

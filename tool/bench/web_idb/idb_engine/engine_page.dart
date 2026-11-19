@@ -19,6 +19,7 @@ import 'dart:convert';
 import 'dart:js_interop';
 
 import 'package:cloud_firestore_dart/cloud_firestore_dart.dart';
+import 'package:cloud_firestore_dart/indexeddb_cache.dart';
 import 'package:firebase_app_dart/firebase_app_dart.dart';
 import 'package:web/web.dart' as web;
 
@@ -36,7 +37,7 @@ Future<FirebaseFirestore> open() async {
   final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(
     app: app,
     settings: Settings(
-      cacheSettings: IndexedDbCacheSettings(),
+      cacheSettings: indexedDbCacheSettings(),
     ).withEmulator('127.0.0.1', 1),
   );
   await firestore.disableNetwork();

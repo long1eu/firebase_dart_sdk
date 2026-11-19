@@ -13,6 +13,9 @@
 import 'dart:io';
 import 'dart:mirrors';
 
+// Loaded so that the IndexedDB cache library can be found by the mirror system.
+// ignore: unused_import
+import 'package:cloud_firestore_dart/indexeddb_cache.dart';
 // Loaded so that the lite library can be found by the mirror system.
 // ignore: unused_import
 import 'package:cloud_firestore_dart/lite.dart' as lite;
@@ -253,5 +256,20 @@ void main() {
         reason: 'The Firestore Lite API changed. If intended, regenerate with '
             'UPDATE_GOLDEN=1 dart test test/unit/api/public_api_golden_test.dart '
             'and review the diff of test/unit/api/lite_api.golden.txt.');
+  });
+
+  test('exported IndexedDB cache API matches the golden listing', () {
+    final File golden = File('test/unit/api/indexeddb_cache_api.golden.txt');
+    final String actual = describePublicApi('indexeddb_cache.dart');
+    if (Platform.environment['UPDATE_GOLDEN'] == '1') {
+      golden.writeAsStringSync(actual);
+      return;
+    }
+    expect(golden.existsSync(), isTrue,
+        reason: 'Missing golden file. Run with UPDATE_GOLDEN=1.');
+    expect(actual, golden.readAsStringSync(),
+        reason: 'The IndexedDB cache API changed. If intended, regenerate with '
+            'UPDATE_GOLDEN=1 dart test test/unit/api/public_api_golden_test.dart '
+            'and review the diff of test/unit/api/indexeddb_cache_api.golden.txt.');
   });
 }

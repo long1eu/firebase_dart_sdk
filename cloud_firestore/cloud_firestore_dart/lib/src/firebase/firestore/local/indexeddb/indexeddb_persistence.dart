@@ -1,4 +1,6 @@
+import 'package:cloud_firestore_dart/src/firebase/firestore/local/local_serializer.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/lru_garbage_collector.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/model/database_id.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/persistance/persistence.dart';
 
 /// A persistence that stores the cache in IndexedDB in the format of the official Firebase JS SDK (schema version 18,
@@ -13,6 +15,17 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/local/persistance/pe
 ///
 /// NOT IN THE OFFICIAL SDKS: the official Android SDK has no IndexedDB engine; this one shares its format with the JS
 /// SDK's `IndexedDbPersistence`, so that an app can switch between the two on the same browser profile.
+/// Creates the IndexedDB persistence of the app [persistenceKey] (its name) and [databaseId]: the seam between the core
+/// of the SDK and the engine, which only `package:cloud_firestore_dart/indexeddb_cache.dart` imports, so that an app
+/// that does not use the engine does not carry its code.
+typedef IndexedDbPersistenceFactory =
+    IndexedDbPersistence Function({
+      required String persistenceKey,
+      required DatabaseId databaseId,
+      required LocalSerializer serializer,
+      required LruGarbageCollectorParams lruParams,
+    });
+
 abstract class IndexedDbPersistence extends Persistence {
   /// The name of the IndexedDB database.
   String get databaseName;

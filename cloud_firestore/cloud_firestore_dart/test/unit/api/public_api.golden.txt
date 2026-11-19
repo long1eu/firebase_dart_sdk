@@ -266,7 +266,6 @@ class IndexedDbCacheSettings extends LocalCacheSettings
   final mergeUnsentWrites: bool
   final sizeBytes: int
   get hashCode: int
-  new IndexedDbCacheSettings({int sizeBytes, bool indexAutoCreation, IndexBackfillSettings indexBackfill, bool mergeUnsentWrites})
   toString(): String
 class Int32Value
   ==(Object other): bool

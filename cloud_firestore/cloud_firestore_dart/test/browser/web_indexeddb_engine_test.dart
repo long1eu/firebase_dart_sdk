@@ -12,6 +12,7 @@ import 'dart:convert';
 import 'dart:js_interop';
 
 import 'package:cloud_firestore_dart/cloud_firestore_dart.dart';
+import 'package:cloud_firestore_dart/indexeddb_cache.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/indexeddb/indexeddb_schema.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/indexeddb/web/idb.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/local_store.dart';
@@ -59,7 +60,7 @@ Future<FirebaseFirestore> newClient(
     settings: Settings(
       cacheSettings: memory
           ? const MemoryCacheSettings()
-          : cacheSettings ?? IndexedDbCacheSettings(),
+          : cacheSettings ?? indexedDbCacheSettings(),
     ).withEmulator(emulatorHost, emulatorPort),
   );
   _apps[firestore] = app;
@@ -381,7 +382,7 @@ void main() {
     final String appName = newAppName();
     final FirebaseFirestore firestore = await newClient(
       appName,
-      cacheSettings: IndexedDbCacheSettings(indexAutoCreation: true),
+      cacheSettings: indexedDbCacheSettings(indexAutoCreation: true),
     );
     final CollectionReference<Map<String, Object?>> cities = firestore
         .collection(name);
