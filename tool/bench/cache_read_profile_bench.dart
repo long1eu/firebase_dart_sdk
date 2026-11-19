@@ -10,9 +10,10 @@
 //   cache_read_profile_bench fill <acked|pending> <file>         creates the database
 //   cache_read_profile_bench index <file> <file with indexes>    copies it and adds a cache index on `a` and `order`
 //   cache_read_profile_bench time <acked|pending> <file> [<file with indexes>] [--reps=7] [--no-statement-cache]
+//       warm timings of every case: the whole path, with the time inside SQLite measured in the database adapter, and
+//       on macOS the CPU time of the process (steadier than the wall time when other work loads the machine)
 //   --big=N --small=N (all modes): documents in c0 and number of small collections, for a smaller cache (the web
 //       numbers of cache_read_profile.md use --big=20000 --small=100)
-//       warm timings of every case: the whole path, with the time inside SQLite measured in the database adapter
 //   cache_read_profile_bench raw <acked|pending> <file> [--reps=7]
 //       the layers alone: raw SQL with package:sqlite3 (nothing decoded), decode on the blobs in memory, query work
 //   cache_read_profile_bench cold <acked|pending> <file> <point|whole|eq|ord>
@@ -27,6 +28,7 @@
 
 import 'dart:async';
 import 'dart:developer' as developer;
+import 'dart:ffi' as ffi;
 import 'dart:io';
 import 'dart:isolate';
 import 'dart:math';
@@ -375,6 +377,20 @@ Future<void> addIndexes(String from, String to) async {
 // ---------------------------------------------------------------------------------------------------------------------
 // Measuring the whole path.
 
+/// The CPU time of the process (every thread) in microseconds, or -1 where the clock is not available (macOS only):
+/// less sensitive than the wall time to other processes on a loaded machine.
+final int Function() cpuUs = () {
+  try {
+    final int Function(int) clock = ffi.DynamicLibrary.process()
+        .lookupFunction<ffi.Uint64 Function(ffi.Int32), int Function(int)>(
+            'clock_gettime_nsec_np');
+    const int processCpuTimeId = 12; // CLOCK_PROCESS_CPUTIME_ID
+    return () => clock(processCpuTimeId) ~/ 1000;
+  } on ArgumentError {
+    return () => -1;
+  }
+}();
+
 double median(List<double> values) {
   final List<double> sorted = List<double>.of(values)..sort();
   return sorted[sorted.length ~/ 2];
@@ -388,6 +404,9 @@ class Sample {
   final List<double> view = <double>[];
   final List<double> select = <double>[];
   final List<double> map = <double>[];
+
+  /// The CPU time of the process during the run (store and view), see [cpuUs].
+  final List<double> cpu = <double>[];
   int calls = 0;
   int rows = 0;
   int bytes = 0;
@@ -403,6 +422,7 @@ Future<Sample> measureQuery(String name, LocalStore store, Query query,
   final Sample sample = Sample(name);
   for (int rep = 0; rep < reps + 1; rep++) {
     TimedDatabase.reset();
+    final int cpuStart = cpuUs();
     final Stopwatch sw = Stopwatch()..start();
     final QueryResult queryResult = await store.executeQuery(query, true);
     final int storeUs = sw.elapsedMicroseconds;
@@ -419,6 +439,7 @@ Future<Sample> measureQuery(String name, LocalStore store, Query query,
     final int snapshotDocs =
         view.applyChanges(changes).snapshot!.documents.length;
     final int viewUs = sw.elapsedMicroseconds;
+    final int runCpuUs = cpuUs() - cpuStart;
     sample.viewResults = snapshotDocs;
     if (rep == 0) {
       continue; // the first run of a process is not warm; `cold` measures it
@@ -427,6 +448,7 @@ Future<Sample> measureQuery(String name, LocalStore store, Query query,
     sample.view.add(viewUs / 1000);
     sample.select.add(selectUs / 1000);
     sample.map.add(mapUs / 1000);
+    sample.cpu.add(runCpuUs / 1000);
   }
   // One more run that records the statements and the size of the blobs (its time is not used).
   TimedDatabase.collect = true;
@@ -455,6 +477,7 @@ Future<Sample> measurePoint(String name, LocalStore store,
   final List<DocumentKey> keys = randomSmallKeys(7, 1000);
   for (int rep = 0; rep < reps + 1; rep++) {
     TimedDatabase.reset();
+    final int cpuStart = cpuUs();
     final Stopwatch sw = Stopwatch()..start();
     int found = 0;
     for (final DocumentKey key in keys) {
@@ -463,6 +486,7 @@ Future<Sample> measurePoint(String name, LocalStore store,
       }
     }
     final int totalUs = sw.elapsedMicroseconds;
+    final int runCpuUs = cpuUs() - cpuStart;
     sample
       ..calls = TimedDatabase.calls ~/ keys.length
       ..rows = found;
@@ -473,6 +497,7 @@ Future<Sample> measurePoint(String name, LocalStore store,
     sample.view.add(0);
     sample.select.add(TimedDatabase.selectUs / keys.length);
     sample.map.add(TimedDatabase.mapUs / keys.length);
+    sample.cpu.add(runCpuUs / keys.length);
   }
   return sample;
 }
@@ -492,11 +517,13 @@ void printSample(Sample s, {String unit = 'ms'}) {
   final double view = median(s.view);
   final double select = median(s.select);
   final double map = median(s.map);
+  final double cpu = median(s.cpu);
   print('${s.name.padRight(22)} total ${ms(store + view)} $unit '
-      '(store ${ms(store)}, view ${ms(view)}); in the store: sqlite select ${ms(select)} (${(100 * select / store).toStringAsFixed(0)}%), '
+      '(store ${ms(store)}, view ${ms(view)}${cpu < 0 ? '' : ', process cpu ${ms(cpu)}'}); in the store: sqlite select ${ms(select)} (${(100 * select / store).toStringAsFixed(0)}%), '
       'row to map copy ${ms(map)}, ${s.calls} statements, ${s.rows} rows, ${(s.bytes / 1024).toStringAsFixed(0)} KiB of blobs; '
       '${s.results} documents out of the store, ${s.viewResults} in the snapshot; '
-      'runs ${s.store.map((double v) => ms(v)).join(' ')}');
+      'runs ${s.store.map((double v) => ms(v)).join(' ')}'
+      '${cpu < 0 ? '' : '; cpu runs ${s.cpu.map((double v) => ms(v)).join(' ')}'}');
 }
 
 Future<void> timeAll(

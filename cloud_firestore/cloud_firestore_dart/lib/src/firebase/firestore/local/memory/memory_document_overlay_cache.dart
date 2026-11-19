@@ -15,6 +15,8 @@
 import 'dart:async';
 import 'dart:collection';
 
+import 'package:cloud_firestore_dart/src/firebase/firestore/core/query.dart';
+import 'package:cloud_firestore_dart/src/firebase/timestamp.dart';
 import 'package:cloud_firestore_dart/src/database_collection/database_collection.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/persistance/document_overlay_cache.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/document_key.dart';
@@ -128,6 +130,18 @@ class MemoryDocumentOverlayCache implements DocumentOverlayCache {
     }
 
     return result;
+  }
+
+  @override
+  Future<CollectionOverlays> getOverlaysForCollectionQuery(
+    Query query,
+    Timestamp now,
+  ) async {
+    return CollectionOverlays.split(
+      await getOverlaysForCollection(query.path, -1),
+      query,
+      now,
+    );
   }
 
   @override

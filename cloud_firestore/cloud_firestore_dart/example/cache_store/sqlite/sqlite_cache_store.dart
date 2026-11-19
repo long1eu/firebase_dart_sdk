@@ -1,9 +1,13 @@
 // A CacheStore on SQLite (package:sqlite3): one table of keys and values.
 //
 // SQLite compares BLOBs as the store contract orders keys (by unsigned bytes, a prefix first), so a range scan is a
-// range of the primary key. A transaction is a SQLite transaction; transactions run one at a time on the one
-// connection.
+// range of the primary key. A write is one SQLite transaction.
+//
+// A statement outside of a transaction takes and releases SQLite's locks by itself, which costs about as much as the
+// read. So the reads share one read transaction, which ends when the event loop turns (or before a write): the SDK
+// reads a few times per document, all in one turn. Nobody else writes to the store, so the reads see no less.
 
+import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:cloud_firestore_dart/cache_store.dart';
@@ -17,10 +21,28 @@ class SqliteCacheStore implements CacheStore {
 
   Database? _database;
 
-  /// The end of the last transaction: the next one starts after it.
-  Future<void> _lastTransaction = Future<void>.value();
-
   Database get _db => _database ?? (throw StateError('The store is not open'));
+
+  /// Whether the read transaction is open.
+  bool _reading = false;
+
+  /// The database, in the read transaction.
+  Database _read() {
+    final Database db = _db;
+    if (!_reading) {
+      db.execute('BEGIN');
+      _reading = true;
+      Timer.run(_endRead);
+    }
+    return db;
+  }
+
+  void _endRead() {
+    if (_reading) {
+      _reading = false;
+      _database?.execute('COMMIT');
+    }
+  }
 
   @override
   Future<void> open() async {
@@ -36,7 +58,7 @@ class SqliteCacheStore implements CacheStore {
 
   @override
   Future<void> close() async {
-    await _lastTransaction;
+    _endRead();
     // `dispose()` closes the database in sqlite3 2.x and still does in 3.x.
     // ignore: deprecated_member_use
     _database?.dispose();
@@ -44,56 +66,12 @@ class SqliteCacheStore implements CacheStore {
   }
 
   @override
-  Future<T> transaction<T>(
-    Future<T> Function(CacheStoreTransaction transaction) body, {
-    bool readOnly = false,
-  }) {
-    final Future<T> result = _lastTransaction.then((_) => _run(body));
-    _lastTransaction = result.then<void>((_) {}, onError: (Object _) {});
-    return result;
-  }
-
-  Future<T> _run<T>(
-    Future<T> Function(CacheStoreTransaction transaction) body,
-  ) async {
-    final Database db = _db;
-    db.execute('BEGIN IMMEDIATE');
-    try {
-      final T result = await body(_Transaction(db));
-      db.execute('COMMIT');
-      return result;
-    } catch (_) {
-      db.execute('ROLLBACK');
-      rethrow;
-    }
-  }
-}
-
-class _Transaction implements CacheStoreTransaction {
-  _Transaction(this._db);
-
-  final Database _db;
-
-  @override
   Future<Uint8List?> get(Uint8List key) async {
-    final ResultSet rows = _db.select(
+    final ResultSet rows = _read().select(
       'SELECT value FROM entries WHERE key = ?',
       <Object>[key],
     );
     return rows.isEmpty ? null : rows.first['value'] as Uint8List;
-  }
-
-  @override
-  Future<void> put(Uint8List key, Uint8List value) async {
-    _db.execute(
-      'INSERT OR REPLACE INTO entries (key, value) VALUES (?, ?)',
-      <Object>[key, value],
-    );
-  }
-
-  @override
-  Future<void> delete(Uint8List key) async {
-    _db.execute('DELETE FROM entries WHERE key = ?', <Object>[key]);
   }
 
   @override
@@ -103,7 +81,7 @@ class _Transaction implements CacheStoreTransaction {
     bool reverse = false,
     int? limit,
   }) async {
-    final ResultSet rows = _db.select(
+    final ResultSet rows = _read().select(
       'SELECT key, value FROM entries WHERE key >= ? AND key < ? '
       'ORDER BY key ${reverse ? 'DESC' : 'ASC'} LIMIT ?',
       <Object>[start, end, limit ?? -1],
@@ -112,5 +90,50 @@ class _Transaction implements CacheStoreTransaction {
       for (final Row row in rows)
         CacheStoreEntry(row['key'] as Uint8List, row['value'] as Uint8List),
     ];
+  }
+
+  @override
+  Future<void> write(
+    List<CacheStoreEntry> puts,
+    List<Uint8List> deletes,
+  ) async {
+    if (puts.isEmpty && deletes.isEmpty) {
+      return;
+    }
+    _endRead();
+    final Database db = _db;
+    db.execute('BEGIN IMMEDIATE');
+    try {
+      if (puts.isNotEmpty) {
+        final PreparedStatement put = db.prepare(
+          'INSERT OR REPLACE INTO entries (key, value) VALUES (?, ?)',
+        );
+        try {
+          for (final CacheStoreEntry entry in puts) {
+            put.execute(<Object>[entry.key, entry.value]);
+          }
+        } finally {
+          // ignore: deprecated_member_use
+          put.dispose();
+        }
+      }
+      if (deletes.isNotEmpty) {
+        final PreparedStatement delete = db.prepare(
+          'DELETE FROM entries WHERE key = ?',
+        );
+        try {
+          for (final Uint8List key in deletes) {
+            delete.execute(<Object>[key]);
+          }
+        } finally {
+          // ignore: deprecated_member_use
+          delete.dispose();
+        }
+      }
+      db.execute('COMMIT');
+    } catch (_) {
+      db.execute('ROLLBACK');
+      rethrow;
+    }
   }
 }

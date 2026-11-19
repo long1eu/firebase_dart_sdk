@@ -18,7 +18,6 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/core/filter/filter.d
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/query.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/target.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/persistance/index_manager.dart';
-import 'package:cloud_firestore_dart/cache_store.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/keyvalue/cache_store_persistence.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/keyvalue/kv_codec.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/document_key.dart';
@@ -94,13 +93,10 @@ void main() {
 
   /// Validates the number of entries of the tables of the key-value cache that are used for indexing.
   Future<void> validateRowCount(int expectedRows) async {
-    Future<int> count(String table) => persistence.store.transaction(
-          (CacheStoreTransaction tx) async {
-            final Uint8List prefix = KvKeyWriter().string(table).bytes;
-            return (await tx.scan(prefix, prefixEnd(prefix))).length;
-          },
-          readOnly: true,
-        );
+    Future<int> count(String table) async {
+      final Uint8List prefix = KvKeyWriter().string(table).bytes;
+      return (await persistence.store.scan(prefix, prefixEnd(prefix))).length;
+    }
     expect(await count('indexState'), expectedRows);
     expect(await count('indexEntry'), expectedRows);
     expect(await count('indexConfig'), expectedRows);

@@ -14,10 +14,14 @@
 
 import 'dart:async';
 
+import 'package:cloud_firestore_dart/src/firebase/firestore/core/query.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/model/document.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/document_key.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/mutation.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/overlay.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/set_mutation.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/resource_path.dart';
+import 'package:cloud_firestore_dart/src/firebase/timestamp.dart';
 
 /// Provides methods to read and write document overlays.
 ///
@@ -56,6 +60,17 @@ abstract class DocumentOverlayCache {
     int sinceBatchId,
   );
 
+  /// Returns every overlay of the collection of [query] (immediate children only, of every batch), with the plain set
+  /// overlays already applied and matched against [query] (see [CollectionOverlays]).
+  ///
+  /// NOT IN THE OFFICIAL SDKS: a set overlay does not depend on the remote document, so a cache can build its document
+  /// and drop it while it reads, instead of holding every overlay of a large collection of pending writes.
+  /// [CollectionOverlays.split] does it after [getOverlaysForCollection].
+  Future<CollectionOverlays> getOverlaysForCollectionQuery(
+    Query query,
+    Timestamp now,
+  );
+
   /// Returns [count] overlays with a batch id higher than [sinceBatchId] for the provided [collectionGroup], processed
   /// by ascending batch id. The method always returns all overlays for a batch even if [count] is exceeded.
   Future<Map<DocumentKey, Overlay>> getOverlaysForCollectionGroup(
@@ -63,4 +78,64 @@ abstract class DocumentOverlayCache {
     int sinceBatchId,
     int count,
   );
+}
+
+/// The overlays of a collection read for a query ([DocumentOverlayCache.getOverlaysForCollectionQuery]): the plain set
+/// overlays (no precondition, no field transforms) as the documents they write, kept when they match the query and
+/// reduced to their id when they do not, and every other overlay (patch, delete) as it is.
+class CollectionOverlays {
+  CollectionOverlays(this.overlays, this.documents, this.hiddenIds);
+
+  /// Applies and matches the plain set overlays among the overlays [all] of the collection of [query].
+  factory CollectionOverlays.split(
+    Map<DocumentKey, Overlay> all,
+    Query query,
+    Timestamp now,
+  ) {
+    final Map<DocumentKey, Overlay> overlays = <DocumentKey, Overlay>{};
+    final Map<DocumentKey, Document> documents = <DocumentKey, Document>{};
+    final Set<String> hiddenIds = <String>{};
+    for (final Overlay overlay in all.values) {
+      final Document? document = setDocument(overlay.mutation, now);
+      if (document == null) {
+        overlays[overlay.key] = overlay;
+      } else if (query.matches(document)) {
+        documents[document.key] = document;
+      } else {
+        hiddenIds.add(document.key.path.getLastSegment());
+      }
+    }
+    return CollectionOverlays(overlays, documents, hiddenIds);
+  }
+
+  /// The document that the overlay [mutation] writes whatever the remote document is, or null if it depends on it:
+  /// [mutation] is a set without precondition and field transforms (an overlay that sets the whole document).
+  static Document? setDocument(Mutation mutation, Timestamp now) {
+    if (mutation is SetMutation &&
+        mutation.precondition.isNone &&
+        mutation.fieldTransforms.isEmpty) {
+      return mutation.applyToLocalView(null, null, now)! as Document;
+    }
+    return null;
+  }
+
+  /// The overlays that are not plain sets: they are applied to the remote document.
+  final Map<DocumentKey, Overlay> overlays;
+
+  /// The documents of the plain set overlays that match the query.
+  final Map<DocumentKey, Document> documents;
+
+  /// The ids (last segments of the keys) of the documents whose plain set overlay does not match the query: their
+  /// remote document is hidden.
+  final Set<String> hiddenIds;
+
+  /// The number of overlays read.
+  int get length => overlays.length + documents.length + hiddenIds.length;
+
+  bool get isEmpty => length == 0;
+
+  /// Whether the document [key] of the collection has a plain set overlay, matching the query or not.
+  bool hasSetOverlay(DocumentKey key) =>
+      documents.containsKey(key) ||
+      (hiddenIds.isNotEmpty && hiddenIds.contains(key.path.getLastSegment()));
 }
