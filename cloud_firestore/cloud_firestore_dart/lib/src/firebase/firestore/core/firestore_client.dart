@@ -90,7 +90,7 @@ class FirestoreClient implements RemoteStoreCallback {
 
   LruGarbageCollectorScheduler? _lruScheduler;
 
-  /// Fills the field indexes in the background. Only with SQLite persistence: memory persistence has no field indexes.
+  /// Fills the field indexes in the background. Only with SQLite or IndexedDB persistence: memory persistence has no field indexes.
   IndexBackfillerScheduler? _indexBackfillScheduler;
   IndexBackfiller? _indexBackfiller;
 
@@ -110,7 +110,7 @@ class FirestoreClient implements RemoteStoreCallback {
     };
   }
 
-  /// Whether this client has field indexes: only with SQLite persistence. Known when the client is created, before
+  /// Whether this client has field indexes: only with SQLite or IndexedDB persistence. Known when the client is created, before
   /// the persistence is opened.
   final bool supportsFieldIndexes;
 
@@ -182,7 +182,7 @@ class FirestoreClient implements RemoteStoreCallback {
       databaseInfo,
       credentialsProvider,
       appCheckProvider,
-      usePersistence,
+      usePersistence || useIndexedDb,
     );
 
     final Completer<User> firstUser = Completer<User>();
@@ -240,9 +240,15 @@ class FirestoreClient implements RemoteStoreCallback {
             final PersistentCacheSettings persistent => persistent,
             _ => null,
           },
+          indexedDbCacheSettings: switch (settings.cacheSettings) {
+            final IndexedDbCacheSettings indexedDb => indexedDb,
+            _ => null,
+          },
           mergeUnsentWrites: switch (settings.cacheSettings) {
             final PersistentCacheSettings persistent =>
               persistent.mergeUnsentWrites,
+            final IndexedDbCacheSettings indexedDb =>
+              indexedDb.mergeUnsentWrites,
             final MemoryCacheSettings memory => memory.mergeUnsentWrites,
             _ => false,
           },
@@ -770,6 +776,7 @@ class FirestoreClient implements RemoteStoreCallback {
     TaskScheduler scheduler, {
     MemoryGarbageCollectorSettings? memoryLruGcSettings,
     PersistentCacheSettings? persistentCacheSettings,
+    IndexedDbCacheSettings? indexedDbCacheSettings,
     ConnectivityChangeDetector? connectivityDetector,
     bool mergeUnsentWrites = false,
     bool useIndexedDb = false,
@@ -832,13 +839,15 @@ class FirestoreClient implements RemoteStoreCallback {
             ..start();
     }
     final Persistence started = persistence;
-    if (started is SQLitePersistence) {
+    if (started is SQLitePersistence || started is IndexedDbPersistence) {
       // A persistent cache from the deprecated `persistenceEnabled` setting has the default settings.
+      final IndexedDbCacheSettings? indexedDbSettings = indexedDbCacheSettings;
       final PersistentCacheSettings cacheSettings =
           persistentCacheSettings ?? PersistentCacheSettings();
       final IndexBackfillSettings backfillSettings =
-          cacheSettings.indexBackfill;
-      if (cacheSettings.indexAutoCreation) {
+          indexedDbSettings?.indexBackfill ?? cacheSettings.indexBackfill;
+      if (indexedDbSettings?.indexAutoCreation ??
+          cacheSettings.indexAutoCreation) {
         // The same switch as PersistentCacheIndexManager.enableIndexAutoCreation, before any query can run.
         localStore.indexAutoCreationEnabled = true;
       }
@@ -854,6 +863,8 @@ class FirestoreClient implements RemoteStoreCallback {
         initialDelay: backfillSettings.initialDelay,
         regularDelay: backfillSettings.interval,
       )..start();
+    }
+    if (started is SQLitePersistence) {
       // Another client that clears the cache while this one runs ends this one, as in the JS SDK.
       started.databaseClearedListener = () => shutdown();
       _clientMetadataRefresher = ClientMetadataRefresher(

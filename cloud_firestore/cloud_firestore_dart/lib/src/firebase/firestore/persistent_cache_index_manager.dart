@@ -9,7 +9,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/core/firestore_clien
 /// inside the SDK, on this device, and does not change what a query returns.
 ///
 /// To get an instance use `FirebaseFirestore.persistentCacheIndexManager`. It is null
-/// when the instance does not use the persistent (SQLite) cache.
+/// when the instance uses a memory cache.
 ///
 /// ```dart
 /// await firestore.persistentCacheIndexManager?.enableIndexAutoCreation();

@@ -34,19 +34,25 @@
 library;
 
 import 'dart:async';
+import 'dart:collection';
 import 'dart:convert';
 import 'dart:js_interop';
 import 'dart:js_interop_unsafe';
+import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:cloud_firestore_dart/src/database_collection/database_collection.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/auth/user.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/bundle/bundle_metadata.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/bundle/named_query.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/core/bound.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/core/filter/filter.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/listent_sequence.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/query.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/target.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/firestore_error.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/index/index_entry.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/index/js_index_value_writer.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/indexeddb/indexeddb_persistence.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/indexeddb/indexeddb_schema.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/indexeddb/indexeddb_serializer.dart';
@@ -72,22 +78,28 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/model/document.dart'
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/document_collections.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/document_key.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/field_index.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/model/field_path.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/maybe_document.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/mutation.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/mutation_batch.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/overlay.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/resource_path.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/snapshot_version.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/model/target_index_matcher.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/model/value/field_value.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/assert.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/database.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/util/logic_utils.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/types.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/util.dart';
 import 'package:cloud_firestore_dart/src/firebase/timestamp.dart';
+import 'package:collection/collection.dart';
 import 'package:firebase_app_dart/internal.dart';
 import 'package:semaphore/semaphore.dart';
 import 'package:web/web.dart' as web;
 
 part 'indexeddb_caches_web.dart';
+part 'indexeddb_index_manager_web.dart';
 part 'indexeddb_mutation_queue_web.dart';
 part 'indexeddb_query_cache_web.dart';
 part 'indexeddb_remote_document_cache_web.dart';
@@ -136,7 +148,7 @@ class WebIndexedDbPersistence extends IndexedDbPersistence {
     queryCache = IndexedDbQueryCache._(this);
     remoteDocumentCache = IndexedDbRemoteDocumentCache._(this);
     referenceDelegate = IndexedDbReferenceDelegate._(this, lruParams);
-    indexManager = IndexedDbIndexManager._(this);
+    indexManager = IndexedDbIndexManager._(this, null);
     globalsCache = IndexedDbGlobalsCache._(this);
   }
 
@@ -221,10 +233,16 @@ class WebIndexedDbPersistence extends IndexedDbPersistence {
   DocumentOverlayCache getDocumentOverlayCache(User user) =>
       IndexedDbDocumentOverlayCache._(this, user);
 
-  /// The collection parents are shared by every user, and this slice has no field indexes: one index manager serves
-  /// every user.
+  final Map<String, IndexedDbIndexManager> _indexManagers =
+      <String, IndexedDbIndexManager>{};
+
+  /// One index manager per user: the index states and entries are per user (`uid`), the configuration and the
+  /// collection parents are shared.
   @override
-  IndexManager getIndexManager(User user) => indexManager;
+  IndexManager getIndexManager(User user) => _indexManagers.putIfAbsent(
+    user.uid ?? '',
+    () => IndexedDbIndexManager._(this, user),
+  );
 
   /// The transaction of the operation that is running in this zone, or a new read-only transaction for a use outside
   /// of [runTransaction].

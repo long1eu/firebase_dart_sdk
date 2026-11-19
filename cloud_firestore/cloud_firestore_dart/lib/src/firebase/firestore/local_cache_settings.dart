@@ -318,8 +318,6 @@ final class IndexBackfillSettings {
 ///
 /// What this first slice does not have yet:
 ///
-/// - client-side indexes (`PersistentCacheIndexManager`): queries scan the documents of their collection, as with a
-///   memory cache;
 /// - several tabs: one tab at a time. The tab takes the JS SDK's primary lease as a JS tab with
 ///   `persistentSingleTabManager` does, and the instance fails to start (every operation fails with
 ///   [FirestoreErrorCode.failedPrecondition]) while another tab (of this SDK or of the JS SDK) uses the cache;
@@ -341,8 +339,15 @@ final class IndexedDbCacheSettings extends LocalCacheSettings {
   /// one the JS SDK counts (the JSON length of the cached documents). Use [Settings.cacheSizeUnlimited] to disable the
   /// collection; the minimum is 1 MB, an [ArgumentError] is thrown otherwise.
   ///
+  /// [indexAutoCreation], [indexBackfill] and [mergeUnsentWrites] are those of [PersistentCacheSettings].
+  ///
   /// Throws an [UnsupportedError] on other platforms than the web.
-  IndexedDbCacheSettings({this.sizeBytes = Settings.defaultCacheSizeBytes}) {
+  IndexedDbCacheSettings({
+    this.sizeBytes = Settings.defaultCacheSizeBytes,
+    this.indexAutoCreation = false,
+    IndexBackfillSettings? indexBackfill,
+    this.mergeUnsentWrites = false,
+  }) : indexBackfill = indexBackfill ?? IndexBackfillSettings() {
     if (!_isWeb) {
       throw UnsupportedError(
         'IndexedDbCacheSettings select a cache in IndexedDB, which only exists on the web. Use '
@@ -362,16 +367,39 @@ final class IndexedDbCacheSettings extends LocalCacheSettings {
   /// The cache size threshold, in bytes.
   final int sizeBytes;
 
+  /// See [PersistentCacheSettings.indexAutoCreation].
+  final bool indexAutoCreation;
+
+  /// See [PersistentCacheSettings.indexBackfill].
+  final IndexBackfillSettings indexBackfill;
+
+  /// See [PersistentCacheSettings.mergeUnsentWrites]. The merged writes are stored as the JS SDK stores its writes: a
+  /// JS SDK that opens the cache afterwards sends them as they are.
+  final bool mergeUnsentWrites;
+
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is IndexedDbCacheSettings && sizeBytes == other.sizeBytes;
+      other is IndexedDbCacheSettings &&
+          sizeBytes == other.sizeBytes &&
+          indexAutoCreation == other.indexAutoCreation &&
+          indexBackfill == other.indexBackfill &&
+          mergeUnsentWrites == other.mergeUnsentWrites;
 
   @override
-  int get hashCode => Object.hash(IndexedDbCacheSettings, sizeBytes);
+  int get hashCode => Object.hash(
+    IndexedDbCacheSettings,
+    sizeBytes,
+    indexAutoCreation,
+    indexBackfill,
+    mergeUnsentWrites,
+  );
 
   @override
-  String toString() => 'IndexedDbCacheSettings{sizeBytes=$sizeBytes}';
+  String toString() =>
+      'IndexedDbCacheSettings{sizeBytes=$sizeBytes, '
+      'indexAutoCreation=$indexAutoCreation, indexBackfill=$indexBackfill'
+      '${mergeUnsentWrites ? ', mergeUnsentWrites=true' : ''}}';
 }
 
 /// Configures an in memory cache, which is lost when the instance is shut

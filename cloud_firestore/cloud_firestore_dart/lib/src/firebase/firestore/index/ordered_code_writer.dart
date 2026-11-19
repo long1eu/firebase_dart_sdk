@@ -220,6 +220,66 @@ class OrderedCodeWriter {
         : bits ^ (bits.isNegative ? Int64(-1) : Int64.MIN_VALUE);
   }
 
+  /// Writes [val] as the JS SDK's writer does (`writeNumberAscending` of
+  /// `ordered_code_writer.ts`): a length byte, then the big-endian bytes of the
+  /// ordered IEEE 754 bits without their leading zero bytes. Not the encoding
+  /// of [writeDoubleAscending]; only the IndexedDB cache, which keeps the JS
+  /// SDK's index entries, uses it.
+  void writeNumberAscending(double val) {
+    final Uint8List bits = _jsOrderedBits(val);
+    final int length = _jsUnsignedNumLength(bits);
+    _ensureAvailable(1 + length);
+    _buffer[_position++] = length & 0xff;
+    for (int i = 8 - length; i < 8; ++i) {
+      _buffer[_position++] = bits[i];
+    }
+  }
+
+  /// The descending form of [writeNumberAscending] (`writeNumberDescending`).
+  void writeNumberDescending(double val) {
+    final Uint8List bits = _jsOrderedBits(val);
+    final int length = _jsUnsignedNumLength(bits);
+    _ensureAvailable(1 + length);
+    _buffer[_position++] = ~length & 0xff;
+    for (int i = 8 - length; i < 8; ++i) {
+      _buffer[_position++] = ~bits[i] & 0xff;
+    }
+  }
+
+  /// `toOrderedBits` of the JS SDK: the big-endian IEEE 754 bytes of [val],
+  /// with the sign bit flipped for positive numbers and every bit flipped for
+  /// negative ones.
+  static Uint8List _jsOrderedBits(double val) {
+    final Uint8List value = (ByteData(
+      8,
+    )..setFloat64(0, val)).buffer.asUint8List();
+    final bool negative = (value[0] & 0x80) != 0;
+    value[0] ^= negative ? 0xff : 0x80;
+    for (int i = 1; i < 8; ++i) {
+      value[i] ^= negative ? 0xff : 0x00;
+    }
+    return value;
+  }
+
+  /// `unsignedNumLength` of the JS SDK over the 8 bytes [value].
+  static int _jsUnsignedNumLength(Uint8List value) {
+    int leadingZeros = 0;
+    for (int i = 0; i < 8; ++i) {
+      final int byte = value[i];
+      if (byte == 0) {
+        leadingZeros += 8;
+        continue;
+      }
+      int zeros = 0;
+      for (int bit = 7; bit >= 0 && (byte >> bit) & 1 == 0; --bit) {
+        zeros++;
+      }
+      leadingZeros += zeros;
+      break;
+    }
+    return (64 - leadingZeros + 7) ~/ 8;
+  }
+
   /// Writes the "infinity" byte sequence that sorts after all other byte
   /// sequences written in ascending order.
   void writeInfinityAscending() {
