@@ -29,8 +29,7 @@ class OrderByDirection {
 
 /// Represents a sort order for a Firestore Query
 class OrderBy {
-  OrderBy(this.direction, this.field)
-    : _isKeyPath = field == FieldPath.keyPath;
+  OrderBy(this.direction, this.field) : _isKeyPath = field == FieldPath.keyPath;
 
   factory OrderBy.getInstance(OrderByDirection direction, FieldPath path) {
     return OrderBy(direction, path);

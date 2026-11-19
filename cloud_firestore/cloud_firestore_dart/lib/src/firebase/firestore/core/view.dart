@@ -177,7 +177,7 @@ class View {
     // The comparator is created on each access, so only ask for it once.
     final Comparator<Document> queryComparator = query.comparator;
 
-    if (previousChanges == null && oldDocumentSet.isEmpty && query.hasLimit) {
+    if (previousChanges == null && oldDocumentSet.isEmpty) {
       return _computeInitialDocChanges(
         docChanges,
         oldDocumentSet,
@@ -379,24 +379,44 @@ class View {
       );
     }
 
+    // When the view has no mutated keys yet (the usual case), the new ones are built in bulk: they are in key order.
+    final bool bulkMutatedKeys = newMutatedKeys.isEmpty;
+    final List<DocumentKey> mutated = <DocumentKey>[];
+    final bool trackAwaitingSync = newAwaitingSync.isNotEmpty;
     final List<Document> added = <Document>[];
     for (int i = 0; i < candidates.length; i++) {
       final Document doc = candidates[i];
       final DocumentKey key = doc.key;
-      newAwaitingSync.remove(key);
+      if (trackAwaitingSync) {
+        newAwaitingSync.remove(key);
+      }
       if (kept == null || kept[i]) {
         changeSet.addChange(
           DocumentViewChange(DocumentViewChangeType.added, doc),
         );
         added.add(doc);
         if (doc.hasLocalMutations) {
-          newMutatedKeys = newMutatedKeys.insert(key);
-        } else {
+          if (bulkMutatedKeys) {
+            mutated.add(key);
+          } else {
+            newMutatedKeys = newMutatedKeys.insert(key);
+          }
+        } else if (!bulkMutatedKeys) {
           newMutatedKeys = newMutatedKeys.remove(key);
         }
-      } else {
+      } else if (!bulkMutatedKeys) {
         newMutatedKeys = newMutatedKeys.remove(key);
       }
+    }
+    if (mutated.isNotEmpty) {
+      final Comparator<DocumentKey> keyOrder = newMutatedKeys.comparator;
+      if (!isSortedBy(mutated, (DocumentKey k) => k, keyOrder)) {
+        mutated.sort(keyOrder);
+      }
+      newMutatedKeys = ImmutableSortedSet<DocumentKey>.fromSortedList(
+        mutated,
+        keyOrder,
+      );
     }
 
     return ViewDocumentChanges._(
@@ -518,17 +538,23 @@ class View {
 
     // Sort changes based on type and query comparator.
     final Comparator<Document> queryComparator = query.comparator;
-    final List<DocumentViewChange> viewChanges =
-        docChanges.changeSet.getChanges()
-          ..sort((DocumentViewChange a, DocumentViewChange b) {
-            final int typeComp = View._changeTypeOrder(
-              a,
-            ).compareTo(View._changeTypeOrder(b));
-            if (typeComp != 0) {
-              return typeComp;
-            }
-            return queryComparator(a.document, b.document);
-          });
+    int changeOrder(DocumentViewChange a, DocumentViewChange b) {
+      final int typeComp = View._changeTypeOrder(
+        a,
+      ).compareTo(View._changeTypeOrder(b));
+      if (typeComp != 0) {
+        return typeComp;
+      }
+      return queryComparator(a.document, b.document);
+    }
+
+    // The order is total (the query order ends with the key, and a document has one change), so changes that are
+    // already in order (the first snapshot of a query by key) need no sort.
+    final List<DocumentViewChange> viewChanges = docChanges.changeSet
+        .getChanges();
+    if (!isSortedBy(viewChanges, (DocumentViewChange c) => c, changeOrder)) {
+      viewChanges.sort(changeOrder);
+    }
 
     _applyTargetChange(targetChange);
     if (snapshotVersion != null && _current && targetCurrentInStream) {
