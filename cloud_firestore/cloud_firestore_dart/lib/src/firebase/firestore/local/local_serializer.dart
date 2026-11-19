@@ -208,16 +208,24 @@ class LocalSerializer {
     FieldValue Function(FieldValue) convert,
   ) {
     if (mutation is SetMutation) {
+      final FieldValue value = convert(mutation.value);
+      if (identical(value, mutation.value)) {
+        return mutation;
+      }
       return SetMutation(
         mutation.key,
-        convert(mutation.value) as ObjectValue,
+        value as ObjectValue,
         mutation.precondition,
         mutation.fieldTransforms,
       );
     } else if (mutation is PatchMutation) {
+      final FieldValue value = convert(mutation.value);
+      if (identical(value, mutation.value)) {
+        return mutation;
+      }
       return PatchMutation(
         mutation.key,
-        convert(mutation.value) as ObjectValue,
+        value as ObjectValue,
         mutation.mask,
         mutation.precondition,
         mutation.fieldTransforms,
@@ -248,6 +256,9 @@ class LocalSerializer {
     return value;
   }
 
+  /// The value with the stored server timestamps turned back into [ServerTimestampValue]s. A map or an array without
+  /// one is not built again: the same map of fields is kept (a map loses the key order of its proto, as when it was
+  /// built again), and an array is returned as it is.
   static FieldValue _decodeServerTimestamps(FieldValue value) {
     if (value is ObjectValue) {
       final ImmutableSortedMap<String, FieldValue> fields = value.internalValue;
@@ -262,14 +273,33 @@ class LocalSerializer {
           previousValue == null ? null : _decodeServerTimestamps(previousValue),
         );
       }
-      return ObjectValue.fromMap(<String, FieldValue>{
-        for (MapEntry<String, FieldValue> entry in fields)
-          entry.key: _decodeServerTimestamps(entry.value),
-      });
+      ImmutableSortedMap<String, FieldValue> result = fields;
+      for (MapEntry<String, FieldValue> entry in fields) {
+        final FieldValue child = entry.value;
+        if (child is ObjectValue || child is ArrayValue) {
+          final FieldValue decoded = _decodeServerTimestamps(child);
+          if (!identical(decoded, child)) {
+            result = result.insert(entry.key, decoded);
+          }
+        }
+      }
+      if (identical(result, fields) && value.hasNoKeyOrder) {
+        return value;
+      }
+      return ObjectValue.fromImmutableMap(result);
     } else if (value is ArrayValue) {
-      return ArrayValue.fromList(
-        value.internalValue.map(_decodeServerTimestamps).toList(),
-      );
+      final List<FieldValue> values = value.internalValue;
+      List<FieldValue>? result;
+      for (int i = 0; i < values.length; i++) {
+        final FieldValue child = values[i];
+        if (child is ObjectValue || child is ArrayValue) {
+          final FieldValue decoded = _decodeServerTimestamps(child);
+          if (!identical(decoded, child)) {
+            (result ??= List<FieldValue>.of(values))[i] = decoded;
+          }
+        }
+      }
+      return result == null ? value : ArrayValue.fromList(result);
     }
     return value;
   }

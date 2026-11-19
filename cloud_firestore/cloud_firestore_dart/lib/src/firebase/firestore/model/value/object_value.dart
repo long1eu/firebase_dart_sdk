@@ -51,6 +51,9 @@ class ObjectValue extends FieldValue {
     ];
   }
 
+  /// Whether this value has no proto key order (see [entriesInKeyOrder]).
+  bool get hasNoKeyOrder => _keyOrder == null;
+
   @override
   int get typeOrder => FieldValue.typeOrderObject;
 
