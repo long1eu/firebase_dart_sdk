@@ -3,6 +3,13 @@
 > **Status.** Measured on 2026-11-18, before any fix. Items 1 and 4 of the list at the end (the query plan of the
 > pending writes and the keys kept per batch) are fixed in the change that adds this document; the numbers below
 > are those before the fix, and the changelog of `cloud_firestore_dart` has the ones after.
+>
+> **Update, 2026-11-18, later the same day.** Most of the list at the end has landed since (#58 to #68, see
+> the notes at each item). **The numbers in this document are historical:
+> they describe the code before those changes, and several are now wrong by orders of magnitude.** The same
+> tool, `tool/bench/offline_forever_bench.dart`, was run again on the current code, on the same machine, with the
+> same shapes; the numbers, and what an app should switch on, are in
+> [Long offline use, measured](../guides/long_offline.md). Nothing below was rewritten.
 
 **The answer.** Yes for writes and reads by key, no for queries as the library is today. An app on a SQLite
 cache can stay offline for a year: a write costs the same 0.15 to 0.2 ms with 10 million pending writes as with
@@ -316,9 +323,15 @@ on the client's queue): that is the normal LRU cost, not specific to being offli
    index `(uid, collection_group, largest_batch_id)` makes one fill run read 50 rows instead of sorting the group
    (6.5 s to milliseconds) and the full fill linear. The Android SDK creates the same two overlay indexes (`SQLiteSchema.java:713`), so
    it probably has the same plan; worth a look before choosing the fix.
+   > **Landed** in #58 (and #68, which reads the newest pending writes of a collection through the batch id index again,
+   > after #58 made an indexed query read every overlay of the collection): a unary `+` keeps the read of a collection on the primary key, and schema 20 adds
+   > `(uid, collection_group, largest_batch_id)` for the index fill (built once on open, about 1 s for 1,000,000
+   > pending writes). A fill over many small collections was also made cheaper in #65. The collection group
+   > case is no longer quadratic in the overlay reads, but it is still one query per parent collection.
 2. **Let a limit query use an index when the edge document's pending write is already in the index**
    (`default_query_engine.dart:350`): the overlay's batch id is at or below the index offset, so its indexed
    values are current. Then `orderBy.limit(10)` on 100,000 pending documents reads 10 documents instead of all.
+   > **Landed** in #59: a limit query is served from the index when the pending writes at the edge are already in it.
 3. **Acknowledgements with transforms on a document with many pending writes**: recalculate the overlay from the
    remote document plus the remaining batches only when the acknowledged batch is the last one touching the
    document, or keep the transform results and patch the stored overlay instead of replaying the queue
@@ -326,13 +339,23 @@ on the client's queue): that is the normal LRU cost, not specific to being offli
    `serverTimestamp` on a document that is updated thousands of times offline, or let the library squash
    consecutive single-document batches while offline (this changes what the backend sees: one write instead of
    thousands, and security rules evaluated once).
+   > **Landed**: acknowledgements recalculate the overlay from a summary of the remaining writes (#62), and
+   > `mergeUnsentWrites` (#63, with `serverTimestamp`, `increment` and array transforms in #64, and the merge of a queue
+   > that already exists at start in #67) squashes the repeated writes of a document, as
+   > the last alternative of this item proposed. It is opt-in and changes what the backend sees.
 4. **Empty `_documentKeysByBatchId` in a single client** (`local_store.dart:404`), as JS does when a batch is
    acknowledged or rejected: removes the 0.45 KB per write of a long session.
+   > **Landed** in #58: the local store forgets the keys of a batch when it is acknowledged or rejected.
 5. **Collection group queries over many parents**: one query on the overlays by `collection_group` (the column
    exists) instead of one per parent (`local_documents_view.dart:402`). After item 1 this is still one SQL query per
    parent collection, linear in the number of collections.
+   > **Not landed as described**: still one read per parent collection. The cost per parent fell with #58, and
+   > #65 made the index fill over many small collections cheaper.
 6. **The file**: each pending document is stored twice (batch and overlay). Nothing in the library can collect
    pending writes; an app that expects years offline should budget about 1 KB per pending document plus its
    payload, or acknowledge them through a backend. Not worth changing the format for.
+   > **Not changed.** The file still grows by about 1 KB per pending document; `mergeUnsentWrites` (#63) removes
+   > the writes that repeat a document, not the ones to different documents.
 7. **A user change** decodes the whole queue (`local_store.dart:298`): linear, not measured, only on sign-in and
    sign-out.
+   > **Not changed**, and still not measured.

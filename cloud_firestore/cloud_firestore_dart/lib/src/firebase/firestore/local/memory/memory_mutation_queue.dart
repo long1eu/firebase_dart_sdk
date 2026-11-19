@@ -204,10 +204,17 @@ class MemoryMutationQueue implements MutationQueue {
 
   @override
   Future<MutationBatch?> getNewestMutationBatchAffectingDocumentKey(
-    DocumentKey documentKey,
-  ) async {
+    DocumentKey documentKey, {
+    int? beforeBatchId,
+  }) async {
+    // The reverse iterator starts at the reference itself when it is in the set.
     final Iterator<DocumentReference> iterator = _batchesByDocumentKey
-        .reverseIteratorFrom(DocumentReference(documentKey, _nextBatchId));
+        .reverseIteratorFrom(
+          DocumentReference(
+            documentKey,
+            beforeBatchId == null ? _nextBatchId : beforeBatchId - 1,
+          ),
+        );
     if (!iterator.moveNext() || iterator.current.key != documentKey) {
       return null;
     }
@@ -304,6 +311,18 @@ class MemoryMutationQueue implements MutationQueue {
     }
 
     return result;
+  }
+
+  @override
+  Future<void> replaceMutationBatch(MutationBatch batch) async {
+    final int batchIndex = _indexOfExistingBatchId(batch.batchId, 'replaced');
+    final MutationBatch replaced = _queue[batchIndex];
+    hardAssertLazy(
+      replaced.keys.length == batch.keys.length &&
+          replaced.keys.containsAll(batch.keys),
+      () => 'A replaced batch must change the same documents',
+    );
+    _queue[batchIndex] = batch;
   }
 
   @override

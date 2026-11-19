@@ -214,7 +214,8 @@ await progress.cancel();
 
 Every write is a pending write until the backend accepts it, so an app that edits the same
 documents for months offline queues one write per edit: about 1 KB of cache each, and a
-reconnect that sends them all, one billed write each (see `docs/spikes/offline_forever.md`).
+reconnect that sends them all, one billed write each (see [Long offline use, measured](long_offline.md)
+and `docs/spikes/offline_forever.md`).
 `mergeUnsentWrites`, on `PersistentCacheSettings` or `MemoryCacheSettings`, keeps one pending
 write per document instead. It is not in the official SDKs, and it is off by default.
 
@@ -232,15 +233,50 @@ combine into one write with the same result on the backend:
 | Pending write | New write | Becomes |
 |---|---|---|
 | anything | `set` without merge (`serverTimestamp` allowed), or `delete` | the new write |
-| `set` | `update` or `set` with merge, no transforms | one `set` with the new fields applied |
-| `update` | `update`, no transforms | one `update` of the fields of both |
-| `set` with merge | `update` or `set` with merge, no transforms | one `set` with merge of the fields of both |
-| `delete` | `set` with merge, no transforms | one `set` of the new fields |
+| `set` (`serverTimestamp` allowed) | `update` or `set` with merge | one `set` with the new fields applied |
+| `update` | `update` | one `update` of the fields of both |
+| `set` with merge | `update` or `set` with merge | one `set` with merge of the fields of both |
+| `delete` | `set` with merge | one `set` of the new fields |
 
-Everything else (a transform in an `update` or in the pending write before it, an `increment`,
-`arrayUnion` or `arrayRemove` in a `set`, a `set` with merge after an `update`, an `update` after a `delete`) stays queued as two writes, as without the
-setting. The merged write takes the place of the newest write in the queue, and the future of every write
-that went into it completes or fails with it; `waitForPendingWrites` waits for it too.
+Transforms in the two writes combine field by field:
+
+| Pending write has | New write has, on the same field | Becomes |
+|---|---|---|
+| any transform | a value, a delete or `serverTimestamp` (on that field or one containing it) | the new write's |
+| a value | `serverTimestamp` | `serverTimestamp` |
+| a value (or the pending write is a `set` or `delete`) | `increment` | the sum as a value, if both are integers within ±(2^53 − 1) or both are doubles |
+| `arrayUnion(a)` | `arrayUnion(b)` | `arrayUnion` of `a` then `b`, without repeats |
+| `arrayRemove(a)` | `arrayRemove(b)` | `arrayRemove` of `a` and `b` |
+| a transform | nothing on that field, on a field inside it or on one containing it | the transform, unchanged |
+| nothing on that field, inside it or containing it (an `update` or `set` with merge) | a transform | the transform, unchanged |
+
+Everything else stays queued as two writes, as without the setting. In particular `increment`
+after `increment` of the same field: the backend adds the numbers one at a time, so on a field
+that holds a double adding the two operands first can round differently (and integers saturate
+at each step).
+Also `arrayUnion` with `arrayRemove` on one field, an array transform after a `set` or `delete`,
+a pending `set` with `increment` or array transforms, any other overlap of a transform with a
+field of the other write, a `set` with merge after an `update`, and an `update` after a
+`delete`. The merged write takes the place of the newest write in the queue, and the future of
+every write that went into it completes or fails with it; `waitForPendingWrites` waits for it
+too.
+
+Until the backend confirms it, the app sees the merged document as it would see the two writes,
+with one exception: a `serverTimestamp` of the pending write that stays shows the time of the
+newer write as its estimate.
+
+Writes that are already queued when an instance starts with the setting on, because an earlier
+session queued them or the setting was off then, are merged once at start: each one, in the order
+of the queue, is merged into the pending write of its document by the same rules and on the same
+conditions, as if it had just been made. The queue ends up as the setting would have built it
+from the same writes, and the documents the app sees do not change. The merge runs in
+transactions of 500 writes, each an operation of the instance, so the app's first reads and
+writes run between them rather than after the whole queue; a write made meanwhile is merged when
+the merge reaches it. No write is sent to the backend until the merge is done. Each transaction
+saves how far the queue is merged, so a merge that is interrupted (the app is closed or killed)
+resumes there at the next start, and a queue that is merged is not read again at later starts.
+It does not run while another client uses the cache. The queue of a user who signs in later is
+merged when they sign in.
 
 What the app gives up:
 
@@ -255,15 +291,20 @@ What the app gives up:
   followed by a `set` succeeds instead of failing.
 
 For one document set once and updated 100,000 times offline (`tool/bench/offline_forever_bench.dart`,
-`hot` and `drainhot`, on an Apple M4 Pro against a local emulator):
+`hot` and `drainhot`, one run on a Mac mini with an Apple M4 Pro against a local emulator 1.21.0, with other
+runs going at the same time, so single numbers can be off by tens of percent; see
+[Long offline use, measured](long_offline.md#what-was-measured-and-how)):
 
 | | off | on |
 |---|---|---|
 | pending writes | 100,001 | 1 |
 | cache file, public API | 34 MB | 3 MB (mostly the SQLite log) |
-| time per offline write, public API | 90 us | 116 us |
-| `enableNetwork` until `waitForPendingWrites` completes | 132 s | 0.45 s |
+| time per offline write, public API | 133 us | 227 us |
+| `enableNetwork` until `waitForPendingWrites` completes | 256 s | 0.09 s |
 | billed writes | 100,001 | 1 |
+
+For what a queue of thousands or millions of pending writes costs, with the numbers, see
+[Long offline use, measured](long_offline.md).
 
 ### Protect the cache files
 
@@ -351,7 +392,7 @@ What to know (all measured in Chrome against the emulator; other browsers are un
   size limit of 100 MB starts removing unused documents before 100,000 documents.
   [Platforms](platforms.md#the-web-supported-in-chrome) has the measurements.
 - **Size.** The persistent cache adds about 220 KB of JavaScript (60 KB gzipped) to a small
-  app, plus the `sqlite3.wasm` file (731 KB, 349 KB gzipped); the OPFS worker is 183 KB more.
+  app, plus the `sqlite3.wasm` file (759 KB, 364 KB gzipped); the OPFS worker is 174 KB more (54 KB gzipped, built with `sqlite3` 3.9.1).
 - `clearPersistence()` deletes the IndexedDB database or the OPFS directory.
 
 ## Deleting the cache

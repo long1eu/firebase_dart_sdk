@@ -42,4 +42,19 @@ class MemoryGlobalsCache implements GlobalsCache {
       _values[name] = value;
     }
   }
+
+  final Map<String, QueuedWritesMergeMark> _queuedWritesMergeMarks =
+      <String, QueuedWritesMergeMark>{};
+
+  @override
+  Future<QueuedWritesMergeMark?> getQueuedWritesMergeMark(String uid) async =>
+      _queuedWritesMergeMarks[uid];
+
+  @override
+  Future<void> setQueuedWritesMergeMark(
+    String uid,
+    QueuedWritesMergeMark mark,
+  ) async {
+    _queuedWritesMergeMarks[uid] = mark;
+  }
 }

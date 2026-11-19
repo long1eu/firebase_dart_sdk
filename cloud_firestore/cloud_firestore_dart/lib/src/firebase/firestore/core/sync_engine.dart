@@ -494,6 +494,79 @@ class SyncEngine implements RemoteStoreCallback, SharedClientStateSyncer {
     }
   }
 
+  /// Called when [startMergingQueuedWrites] started a merge of the queue: the client then calls
+  /// [mergeQueuedWritesStep] on its queue until it returns false.
+  void Function()? onQueuedWritesToMerge;
+
+  /// NOT IN THE OFFICIAL SDKS (`LocalStore.mergeUnsentWrites`): starts the merge of the writes that are already queued
+  /// (see `LocalStore.startMergingQueuedWrites`), unless this client shares the state of its batches with other
+  /// clients (as [writeMutations]). Called by the client after the local store started and before the remote store
+  /// starts, and by [_switchUser] for the queue of the new user, before the remote store fills its write pipeline
+  /// again. Returns whether the merge runs; [onQueuedWritesToMerge] is called then.
+  ///
+  /// A failure leaves the queue as it is: the merge resumes at the next start.
+  Future<bool> startMergingQueuedWrites() async {
+    if (_sharedClientState.sharesState) {
+      return false;
+    }
+    final bool started;
+    try {
+      started = await _localStore.startMergingQueuedWrites();
+    } catch (e) {
+      if (!isRecoverablePersistenceError(e)) {
+        rethrow;
+      }
+      Log.w(_tag, 'Merging the queued writes did not start: $e');
+      return false;
+    }
+    if (started) {
+      onQueuedWritesToMerge?.call();
+    }
+    return started;
+  }
+
+  /// Merges the next part of the queue (one transaction of `LocalStore.mergeQueuedWrites`), and returns whether there
+  /// is more to merge. The writes of this session that were merged complete with the batch they were merged into (see
+  /// [_moveCallbacksOfMergedBatch]); there are none at start, but the app may write while the merge runs. When the
+  /// merge ends, the write pipeline is filled: the local store holds the batches back until then.
+  ///
+  /// A failed transaction ends the merge where it is (the queue stays valid, and the merge resumes at the next start).
+  Future<bool> mergeQueuedWritesStep() async {
+    if (!_localStore.mergingQueuedWrites) {
+      return false;
+    }
+    final List<MergedBatch> merged;
+    try {
+      merged = await _localStore.mergeQueuedWrites();
+    } catch (e) {
+      _localStore.stopMergingQueuedWrites();
+      Log.w(_tag, 'Merging the queued writes stopped: $e');
+      await _remoteStore.fillWritePipeline();
+      if (!isRecoverablePersistenceError(e)) {
+        rethrow;
+      }
+      return false;
+    }
+    for (final MergedBatch batch in merged) {
+      _moveCallbacksOfMergedBatch(batch.mergedBatchId, batch.batchId);
+    }
+    if (merged.isNotEmpty) {
+      onPendingWritesChanged?.call();
+    }
+    if (_localStore.mergingQueuedWrites) {
+      return true;
+    }
+    await _remoteStore.fillWritePipeline();
+    return false;
+  }
+
+  /// Runs [mergeQueuedWritesStep] until the merge of the queue ends. For tests that drive the sync engine directly;
+  /// the client runs each step as an operation of its queue.
+  @visibleForTesting
+  Future<void> mergeQueuedWrites() async {
+    while (await mergeQueuedWritesStep()) {}
+  }
+
   void _addUserCallback(int batchId, Completer<void> userTask) {
     Map<int, Completer<void>>? userTasks = _mutationUserCallbacks[_currentUser];
     if (userTasks == null) {
@@ -1306,6 +1379,8 @@ class SyncEngine implements RemoteStoreCallback, SharedClientStateSyncer {
           .handleUserChangeWithBatchIds(user);
       // Switch the user only once the local store switched its mutation queue, so both agree on the current user.
       _currentUser = user;
+      // The writes that the new user queued earlier, before the remote store sends them.
+      await startMergingQueuedWrites();
       onPendingWritesChanged?.call();
       _sharedClientState.handleUserChange(
         user,

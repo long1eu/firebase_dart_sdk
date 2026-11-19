@@ -65,6 +65,9 @@ READMEs are short landing pages; the API reference is on pub.dev.
     automatically on Linux or by `CloudFirestoreDart.use()` anywhere.
 26. [Admin calls](admin.md): `firebase_admin_dart` for custom tokens, users, claims and ID token
     checks from trusted code, and when to use the official Admin SDK instead.
+27. [Long offline use, measured](long_offline.md): what stays constant and what grows with up to
+    millions of pending writes, the settings to turn on (`mergeUnsentWrites`, cache indexes,
+    progress), and the limits that remain, with the numbers before and after the fixes.
 
 Every Dart snippet in these guides is compiled against the current API by
 `cloud_firestore/cloud_firestore_dart/test/unit/api/readme_snippets_test.dart`, except the blocks

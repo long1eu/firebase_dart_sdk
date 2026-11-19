@@ -30,13 +30,21 @@
   document when that one was not sent yet and the two have the same result on the backend, so a
   document edited many times offline keeps one pending write (see "Merging repeated offline
   writes" in `docs/guides/offline_persistence.md` for the conditions and what rules and triggers
-  no longer see).
+  no longer see). The writes already queued when an instance starts with the setting on (from an
+  earlier session, or queued with it off) are merged once at start by the same rules, in
+  transactions of 500 writes between the app's operations and before any write is sent; an
+  interrupted merge resumes at the next start.
 - With many pending writes, a query of a collection reads only the pending writes of that
   collection instead of every pending write of the user (a collection of 10 among 1,000,000
   pending writes: 128 ms to 0.07 ms), and an index fill run reads only the next pending writes of
   its collection group (schema 20 adds an index on the overlays, built once on open: about 1 s for
   1,000,000 pending writes). The local store also forgets the keys of a batch once it is
   acknowledged or rejected.
+- An index fill run of a collection group spread over many collections no longer reads every
+  collection of the group when few cached documents changed since the last run: those are read
+  in read time order and the ones of the group kept (one run of 50 documents with 100,000
+  pending writes in 10,000 collections: about 1.1 s to 15 to 60 ms, now about the same as with
+  10,000 pending writes).
 - Experimental: `FirebaseFirestore.getPendingWriteCount()` and `pendingWriteCounts()` give the
   number of write batches the backend has not acknowledged yet, and a throttled stream of it, to
   show the progress of a sync after a long time offline. The official SDKs have no equivalent.

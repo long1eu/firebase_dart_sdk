@@ -370,6 +370,36 @@ class FirestoreClient implements RemoteStoreCallback {
     }
   }
 
+  /// The run of [_mergeQueuedWrites] that was started last, or null.
+  Future<void>? _queuedWritesMerge;
+
+  /// Completes when the merge of the writes that were queued before the instance started (or before the current user
+  /// signed in) has ended: with `mergeUnsentWrites` on, see `SyncEngine.startMergingQueuedWrites`. At once when there
+  /// was nothing to merge.
+  @visibleForTesting
+  Future<void> get queuedWritesMerged async {
+    await _initialized;
+    await _queuedWritesMerge;
+  }
+
+  /// NOT IN THE OFFICIAL SDKS: runs the merge of the queued writes (`SyncEngine.mergeQueuedWritesStep`), one
+  /// transaction per operation of the queue: the operations that the app queues meanwhile, like its first reads, run
+  /// between two parts instead of after the whole merge.
+  void _mergeQueuedWrites() {
+    _queuedWritesMerge = _runQueuedWritesMerge();
+  }
+
+  Future<void> _runQueuedWritesMerge() async {
+    try {
+      while (await _enqueue<bool>(
+        () async => !_isShutdown && await syncEngine.mergeQueuedWritesStep(),
+      )) {}
+    } catch (e) {
+      // The queue stays as the last part left it, and the batches are sent as they are.
+      Log.w(logTag, 'Merging the queued writes failed: $e');
+    }
+  }
+
   /// Adds a listener that is called whenever all the snapshot listeners are in sync with each other (and once right
   /// away).
   Future<void> addSnapshotsInSyncListener(void Function() listener) async {
@@ -865,12 +895,16 @@ class FirestoreClient implements RemoteStoreCallback {
     _remoteStoreCreated = true;
 
     syncEngine = SyncEngine(localStore, remoteStore, user)
-      ..onPendingWritesChanged = _onPendingWritesChanged;
+      ..onPendingWritesChanged = _onPendingWritesChanged
+      ..onQueuedWritesToMerge = _mergeQueuedWrites;
     eventManager = EventManager(syncEngine);
 
     // NOTE: RemoteStore depends on LocalStore (for persisting stream tokens,
     // refilling mutation queue, etc.) so must be started after LocalStore.
     await localStore.start();
+    // Before the remote store asks for the first batch to send: the local store holds the batches back while the
+    // queue is merged.
+    await syncEngine.startMergingQueuedWrites();
     await remoteStore.start();
 
     // Called right away with the current state; a lone client is always primary, and nothing changes then.

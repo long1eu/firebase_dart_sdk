@@ -67,7 +67,7 @@ So a web app pays today, on top of the memory cache:
 | IndexedDB storage (app code + `sqlite3.wasm`) | 1,011,163 | 435,633 | 1,067,310 | 468,965 |
 | OPFS storage (+ the worker) | 1,185,291 | 489,997 | 1,241,438 | 523,329 |
 
-`sqlite3.wasm` is 759 KB with sqlite3 3.9.1; the guides still say 731 KB (349 KB gzipped),
+`sqlite3.wasm` is 759 KB with sqlite3 3.9.1 (the guides said 731 KB, 349 KB gzipped, and now say 759 KB and 364 KB),
 which was the 2.9.4 build. The memory app is also larger than the 651,311 that
 `tool/size/check_size.dart` records for main `1645e672`; the library has grown since.
 
