@@ -1,7 +1,54 @@
 # Spike: where the time of a cache read goes
 
-> **Status.** Measured on 2026-11-19 on branch `wave/cache-read-profile` (from `origin/main` at 47e4ef05). No library
-> code was changed. The tool is `tool/bench/cache_read_profile_bench.dart`.
+> **Status.** Measured on 2026-11-19 on branch `wave/cache-read-profile` (from `origin/main` at 47e4ef05). The tool is
+> `tool/bench/cache_read_profile_bench.dart`. The four fixes of "After the fixes" below were then made on the same
+> branch; the tables keep the measurement before them and add an "after" column (same machine, same method).
+
+## After the fixes
+
+The hot spots named below were fixed in four commits, each measured with the bench (ahead of time compiled, medians;
+the "before" column is a new run of the original code on the same day, files and machine, 7 runs; "after" is 15 runs).
+Totals, milliseconds (a: microseconds per document):
+
+| Case | acked before | acked after | pending before | pending after |
+| --- | ---: | ---: | ---: | ---: |
+| a. one document by key (us) | 11.8 | 8.0 | 8.8 | 6.4 |
+| b. whole collection | 742.2 | 401.0 | 885.0 | 486.2 |
+| c. `a == 7`, no index | 195.3 | 170.2 | 406.0 | 396.5 |
+| d. `orderBy(order desc).limit(20)`, no index | 2,714.3 | 370.6 | 3,348.2 | 432.8 |
+| e. `a == 7`, index | 7.7 | 5.3 | 8.3 | 6.4 |
+| e. `order desc, limit 20`, index | 0.414 | 0.331 | 0.301 | 0.217 |
+
+After each step (7 runs each, so a few percent of noise between columns):
+
+| Case, acked / pending | before | 1. limit first | 2. bulk build | 3. key from row | 4. statement cache |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| a. one document (us) | 11.8 / 8.8 | 12.1 / 8.6 | 12.0 / 8.7 | 11.4 / 8.3 | 8.0 / 6.4 |
+| b. whole collection | 742 / 885 | 729 / 874 | 447 / 481 | 402 / 478 | 401 / 486 |
+| c. `a == 7` | 195 / 406 | 196 / 396 | 193 / 388 | 171 / 384 | 170 / 397 |
+| d. `orderBy.limit(20)` | 2,714 / 3,348 | 468 / 512 | 416 / 413 | 374 / 411 | 371 / 433 |
+
+1. **Limit first** (`View.computeDocChanges`, `DocumentSet.remove`, `OrderBy`, `BasePath.==`). The first snapshot of
+   a limit query selects the documents within the limit with a bounded heap (in the order of the document set) and
+   adds only those, instead of adding all 100,000 and removing 99,980 one at a time; the changes, mutated keys and
+   documents awaiting a sync come out as before. `DocumentSet.remove` no longer removes twice, `OrderBy` decides once
+   whether it orders by key, and `BasePath.==` compares the segments directly.
+2. **Bulk build** (`DocumentSet.addAll`, `ImmutableSortedMap.fromSortedLists`, `ImmutableSortedSet.fromSortedList`,
+   `RBTreeSortedMap.fromMap`, `View.applyChanges`, `LocalDocumentsView`). The first snapshot builds the two trees of
+   the `DocumentSet` and the mutated keys in linear time from sorted lists (input already in order is not sorted again);
+   `applyChanges` does not sort changes that are already in order; `fromMap` reads the entries once instead of looking
+   every key up; a collection with at least as many overlays as matching cached documents merges them at once.
+3. **Key from the row** (`SQLiteRemoteDocumentCache`, `LocalSerializer.decodeMaybeDocument`). A scan builds the key
+   from the collection and the id at the end of the `path` column; a read by key uses the key it was asked for. The
+   overlays of a collection scan still parse their name: passing the key there needed one more column and gained 5 % of
+   `a == 7` on pending writes, so it was left out; the read of one overlay by key passes it.
+4. **Statement cache** (`SqliteDatabase` of `cloud_firestore_dart_sqlite`, Dart VM and Flutter only; the web adapter is
+   a different class). The prepared statements of the last 64 distinct queries are kept and finalized on close. The
+   bench adapter does the same (`--no-statement-cache` prepares one per call, as before); it is what moves a and e.
+
+What is left in b, c and d is the store part (decode and the scan), now 80 to 99 % of the time; the view of d is 18 to
+24 ms. Pending `a == 7` changed little: its cost is the overlay decode (`RemoteSerializer.decodeMutation`,
+`_mapOverlayValues`), which these steps do not touch.
 
 The question: when the SQLite cache serves a read, how is the time split between SQLite itself, decoding the stored
 bytes into the model, the query work above the store, and the rest? The decision it feeds: whether a faster storage
@@ -29,7 +76,9 @@ change the decode share, and that is a separate decision from the engine.
 - **Software.** Dart 3.12.2. Timings are ahead of time compiled (`dart compile exe`). `package:sqlite3` 2.9.4 on the
   system SQLite 3.54.0, page size 4096, the default page cache of 2,000 pages (8 MB, smaller than the 30 MB a scan
   reads), `synchronous` left at its default (reads only; it is off only while the files are filled). The database
-  adapter is the one of the other benchmarks (a statement prepared for every call, the rows copied into maps).
+  adapter is the one of the other benchmarks (a statement prepared for every call, the rows copied into maps); for the
+  "after" columns it keeps prepared statements as `cloud_firestore_dart_sqlite` now does (`--no-statement-cache` for
+  the old behaviour).
 - **The cache.** 100,000 documents of the usual shape in one collection `c0` (`a` = i % 100, `order` a random integer, a
   200 character string) and 1,000 small collections of 10 documents (`m<n>`, written first, so that the cache index of
   `c0` has no later documents behind it). Two shapes: `acked`, delivered by remote events (remote document cache, no
@@ -77,13 +126,17 @@ Times are milliseconds of a compiled run, except case a (microseconds per docume
 
 ### a. One document by key, warm (microseconds per document)
 
-| | acked us | acked % | acked profile % | pending us | pending % | pending profile % |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| 1 SQLite (prepare, step, copy) | 8.4 | 68 | 75 | 5.2 | 58 | 61 |
-| 2 decode (parse, model) | 1.2 | 10 | 13 | 2.0 | 22 | 22 |
-| 3 query work | 0 | 0 | 2 | 0 | 0 | 7 |
-| 4 other (async, adapter, glue) | 2.7 | 22 | 11 | 1.8 | 20 | 10 |
-| **total** | **12.3** | | | **9.0** | | |
+| | acked us | acked % | acked profile % | pending us | pending % | pending profile % | acked after us | pending after us |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 1 SQLite (prepare, step, copy) | 8.4 | 68 | 75 | 5.2 | 58 | 61 | 4.9 | 3.0 |
+| 2 decode (parse, model) | 1.2 | 10 | 13 | 2.0 | 22 | 22 | | |
+| 3 query work | 0 | 0 | 2 | 0 | 0 | 7 | | |
+| 4 other (async, adapter, glue) | 2.7 | 22 | 11 | 1.8 | 20 | 10 | | |
+| **total** | **12.3** | | | **9.0** | | | **8.0** | **6.4** |
+
+In the "after" columns of a to d only the rows that the real run times directly are filled: SQLite (the adapter's
+`select`), the view and the total. The decode rows come from the layer replay, which decodes without the key from the
+row (step 3) and so would not show the change.
 
 An acknowledged read runs two statements (the overlay lookup that finds nothing, then the document); a pending read
 runs one (a set overlay needs no base document). The raw statements alone take 9.5 and 5.5 us when prepared for every
@@ -92,15 +145,15 @@ which a statement cache removes without changing the engine.
 
 ### b. A whole collection (100,000 documents)
 
-| | acked ms | acked % | acked profile % | pending ms | pending % | pending profile % |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| 1 SQLite (select; raw SQL alone: 54.6 and 36.9) | 51.2 | 6.8 | 9 | 34.0 | 3.8 | 5 |
-| 2 decode: protobuf parse | 180.9 | 24.1 | 20 | 87.0 | 9.8 | 14 |
-| 2 decode: model | 70.9 | 9.4 | 6 | 167.7 + 2.2 | 19.1 | 9 |
-| 3 query work: matches and result map | 99.3 | 13.2 | | 93.0 | 10.5 | |
-| 3 query work: view (`computeDocChanges`) | 321.1 | 42.7 | 56 | 416.5 | 46.9 | 67 |
-| 4 other (residual) | 28.4 | 3.8 | 9 | 88.1 | 9.9 | 6 |
-| **total (store 420.1 + view 331.8; store 471.9 + view 416.5)** | **751.8** | | | **888.5** | | |
+| | acked ms | acked % | acked profile % | pending ms | pending % | pending profile % | acked after ms | pending after ms |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 1 SQLite (select; raw SQL alone: 54.6 and 36.9) | 51.2 | 6.8 | 9 | 34.0 | 3.8 | 5 | 50.7 | 37.8 |
+| 2 decode: protobuf parse | 180.9 | 24.1 | 20 | 87.0 | 9.8 | 14 | | |
+| 2 decode: model | 70.9 | 9.4 | 6 | 167.7 + 2.2 | 19.1 | 9 | | |
+| 3 query work: matches and result map | 99.3 | 13.2 | | 93.0 | 10.5 | | | |
+| 3 query work: view (`computeDocChanges`) | 321.1 | 42.7 | 56 | 416.5 | 46.9 | 67 | 70.5 | 84.8 |
+| 4 other (residual) | 28.4 | 3.8 | 9 | 88.1 | 9.9 | 6 | | |
+| **total (store 420.1 + view 331.8; store 471.9 + view 416.5; after: store 330.5 + view 70.5; store 401.4 + view 84.8)** | **751.8** | | | **888.5** | | | **401.0** | **486.2** |
 
 The model decode of a pending document is twice the acknowledged one because the overlay path builds every field value
 (`RemoteSerializer.decodeMutation`) and then maps the server timestamps (`LocalSerializer._mapOverlayValues`), while an
@@ -110,15 +163,15 @@ the keys: 19 ms of SQLite, 13 ms of row copy, the rest decoding them).
 
 ### c. `a == 7`, no index (1 % match, 1,000 documents)
 
-| | acked ms | acked % | acked profile % | pending ms | pending % | pending profile % |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| 1 SQLite (raw SQL alone: 54.6 and 36.9) | 35.6 | 18.2 | 23 | 30.3 | 7.4 | 8 |
-| 2 decode: protobuf parse | 89.2 | 45.5 | 44 | 72.0 | 17.7 | 28 |
-| 2 decode: model | 32.3 | 16.5 | 16 | 129.5 + 1.5 | 32.2 | 20 |
-| 3 query work: matches (reads the one field) and map | 17.0 | 8.7 | 7 | 8.8 | 2.2 | 32 |
-| 3 query work: view | 1.7 | 0.9 | | 2.7 | 0.7 | |
-| 4 other (residual) | 20.1 | 10.3 | 10 | 162.5 | 39.9 | 12 |
-| **total** | **195.9** | | | **407.3** | | |
+| | acked ms | acked % | acked profile % | pending ms | pending % | pending profile % | acked after ms | pending after ms |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 1 SQLite (raw SQL alone: 54.6 and 36.9) | 35.6 | 18.2 | 23 | 30.3 | 7.4 | 8 | 35.1 | 32.6 |
+| 2 decode: protobuf parse | 89.2 | 45.5 | 44 | 72.0 | 17.7 | 28 | | |
+| 2 decode: model | 32.3 | 16.5 | 16 | 129.5 + 1.5 | 32.2 | 20 | | |
+| 3 query work: matches (reads the one field) and map | 17.0 | 8.7 | 7 | 8.8 | 2.2 | 32 | | |
+| 3 query work: view | 1.7 | 0.9 | | 2.7 | 0.7 | | 0.349 | 0.849 |
+| 4 other (residual) | 20.1 | 10.3 | 10 | 162.5 | 39.9 | 12 | | |
+| **total** | **195.9** | | | **407.3** | | | **170.2** | **396.5** |
 
 The one cell where the methods disagree: on pending writes the replay has 40 % "other" and the profile 12 %. The replay
 leaves out the overlay bookkeeping of `LocalDocumentsView._getDocumentsMatchingCollectionQuery` (a map of 100,000
@@ -128,15 +181,15 @@ collector (11 % of the run).
 
 ### d. `orderBy(order desc).limit(20)`, no index
 
-| | acked ms | acked % | acked profile % | pending ms | pending % | pending profile % |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| 1 SQLite (raw SQL alone: 54.6 and 36.9) | 60.2 | 2.2 | 2 | 41.8 | 1.2 | 3 |
-| 2 decode: protobuf parse | 184.4 | 6.7 | 4 | 92.8 | 2.7 | 1 |
-| 2 decode: model | 73.1 | 2.7 | 7 | 155.1 + 3.3 | 4.7 | 3 |
-| 3 query work: matches and result map | 135.3 | 4.9 | | 104.0 | 3.1 | |
-| 3 query work: view | 2,276.5 | 83.2 | 85 | 2,905.8 | 85.7 | 92 |
-| 4 other (residual) | 6.5 | 0.2 | 2 | 89.1 | 2.6 | 1 |
-| **total (store 459.5 + view 2,276.5; store 486.1 + view 2,905.8)** | **2,736.0** | | | **3,391.9** | | |
+| | acked ms | acked % | acked profile % | pending ms | pending % | pending profile % | acked after ms | pending after ms |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 1 SQLite (raw SQL alone: 54.6 and 36.9) | 60.2 | 2.2 | 2 | 41.8 | 1.2 | 3 | 61.9 | 34.8 |
+| 2 decode: protobuf parse | 184.4 | 6.7 | 4 | 92.8 | 2.7 | 1 | | |
+| 2 decode: model | 73.1 | 2.7 | 7 | 155.1 + 3.3 | 4.7 | 3 | | |
+| 3 query work: matches and result map | 135.3 | 4.9 | | 104.0 | 3.1 | | | |
+| 3 query work: view | 2,276.5 | 83.2 | 85 | 2,905.8 | 85.7 | 92 | 18.0 | 24.0 |
+| 4 other (residual) | 6.5 | 0.2 | 2 | 89.1 | 2.6 | 1 | | |
+| **total (store 459.5 + view 2,276.5; store 486.1 + view 2,905.8; after: store 352.5 + view 18.0; store 408.8 + view 24.0)** | **2,736.0** | | | **3,391.9** | | | **370.6** | **432.8** |
 
 ### e. The same two queries with a cache index
 
@@ -146,6 +199,10 @@ collector (11 % of the run).
 | store ms | 5.6 | 0.353 | 6.6 | 0.264 |
 | view ms | 1.7 | 0.051 | 2.3 | 0.066 |
 | 1 SQLite ms (direct) | 1.6 | 0.249 | 1.7 | 0.137 |
+| after: total ms | 5.3 | 0.331 | 6.4 | 0.217 |
+| after: store ms | 4.9 | 0.315 | 5.9 | 0.199 |
+| after: view ms | 0.361 | 0.016 | 0.430 | 0.018 |
+| after: 1 SQLite ms (direct) | 1.4 | 0.225 | 1.3 | 0.086 |
 | 1 SQLite % (direct) | 22 | 62 | 19 | 42 |
 | 1 SQLite % (profile) | 27 | 35 | 23 | 30 |
 | 2 decode % (profile) | 22 | 24 | 21 | 28 |
@@ -163,17 +220,19 @@ compiled run. The queries are 27 to 46 times faster than the scan for `a == 7` a
 
 Median of 5 fresh processes; "open" is opening the SQLite file, starting the persistence and the local store.
 
-| | acked | pending |
-| --- | ---: | ---: |
-| open, ms | 2.4 | 2.2 |
-| a. first read of a document, us (SQLite part) | 83 (30) | 82 (20) |
-| a. second read, another document, us | 22 | 18 |
-| a. warm, us | 12.3 | 9.0 |
-| b. whole collection, store + view = total, ms (SQLite) | 402.1 (46.0) + 331.5 = 734.7 | 455.7 (29.7) + 425.4 = 880.7 |
-| c. `a == 7`, total ms | 198.7 | 408.5 |
-| d. `orderBy.limit`, store + view = total, ms | 420.2 + 2,248.1 = 2,663.9 | 474.3 + 2,845.7 = 3,343.8 |
-| e. `a == 7` with index, total ms (warm 7.3 / 8.9) | 10.6 | 11.6 |
-| e. `orderBy.limit` with index, total ms (warm 0.404 / 0.330) | 0.832 | 0.650 |
+| | acked | pending | acked after | pending after |
+| --- | ---: | ---: | ---: | ---: |
+| open, ms | 2.4 | 2.2 | 2.6 | 2.0 |
+| a. first read of a document, us (SQLite part) | 83 (30) | 82 (20) | 81 (30) | 85 (21) |
+| a. second read, another document, us | 22 | 18 | 15 | 14 |
+| a. warm, us | 12.3 | 9.0 | 8.0 | 6.4 |
+| b. whole collection, store + view = total, ms (SQLite) | 402.1 (46.0) + 331.5 = 734.7 | 455.7 (29.7) + 425.4 = 880.7 | 312.5 (52.1) + 74.8 = 388.7 | 383.1 (29.7) + 84.7 = 469.7 |
+| c. `a == 7`, total ms | 198.7 | 408.5 | 173.0 | 382.1 |
+| d. `orderBy.limit`, store + view = total, ms | 420.2 + 2,248.1 = 2,663.9 | 474.3 + 2,845.7 = 3,343.8 | 357.0 + 19.0 = 376.7 | 385.0 + 26.6 = 411.6 |
+| e. `a == 7` with index, total ms (warm before 7.3 / 8.9, after 5.3 / 6.4) | 10.6 | 11.6 | 9.5 | 9.6 |
+| e. `orderBy.limit` with index, total ms (warm before 0.404 / 0.330, after 0.331 / 0.217) | 0.832 | 0.650 | 0.716 | 0.554 |
+
+The first read of a document is not faster after the statement cache: the first use of a statement still prepares it.
 
 A new process adds about 70 us to the first read of a document and about 3 ms to an indexed query (first use of
 statements and pages); the scans do not change (their page cache is smaller than what they read, warm or not). A cold
@@ -194,21 +253,26 @@ out. The generous bound adds the adapter's copy of every row into a `Map` (a dif
 Garbage collection and decoding are not counted: they stay whatever the engine is, as long as it hands over the same
 protobuf bytes.
 
-| Case | acked: strict ms | strict % | generous % | pending: strict ms | strict % | generous % |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| a. one document (us) | 8.4 | 68 | 68 | 5.2 | 58 | 58 |
-| b. whole collection | 51.2 | 6.8 | 10.9 | 34.0 | 3.8 | 6.0 |
-| c. `a == 7`, no index | 35.6 | 18.2 | 27.6 | 30.3 | 7.4 | 11.9 |
-| d. `order desc limit 20`, no index | 60.2 | 2.2 | 3.2 | 41.8 | 1.2 | 2.0 |
-| e. `a == 7`, index | 1.6 | 22 | 25 | 1.7 | 19 | 21 |
-| e. `order desc limit 20`, index | 0.249 | 62 | 63 | 0.137 | 42 | 43 |
-| f. first read of a document, cold (us) | 30 | 36 | | 20 | 24 | |
+| Case | acked: strict ms | strict % | generous % | pending: strict ms | strict % | generous % | after, acked: strict ms (%) | after, pending: strict ms (%) |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| a. one document (us) | 8.4 | 68 | 68 | 5.2 | 58 | 58 | 4.9 (61) | 3.0 (47) |
+| b. whole collection | 51.2 | 6.8 | 10.9 | 34.0 | 3.8 | 6.0 | 50.7 (12.6) | 37.8 (7.8) |
+| c. `a == 7`, no index | 35.6 | 18.2 | 27.6 | 30.3 | 7.4 | 11.9 | 35.1 (20.6) | 32.6 (8.2) |
+| d. `order desc limit 20`, no index | 60.2 | 2.2 | 3.2 | 41.8 | 1.2 | 2.0 | 61.9 (16.7) | 34.8 (8.0) |
+| e. `a == 7`, index | 1.6 | 22 | 25 | 1.7 | 19 | 21 | 1.4 (26) | 1.3 (20) |
+| e. `order desc limit 20`, index | 0.249 | 62 | 63 | 0.137 | 42 | 43 | 0.225 (68) | 0.086 (40) |
+| f. first read of a document, cold (us) | 30 | 36 | | 20 | 24 | | 30 (37) | 21 (25) |
+
+After the fixes the view no longer dominates b and d, so the share of SQLite grows (it is the same time in a
+smaller total), but it stays at most 8 to 21 % of the scans.
 
 The cases where the store share is large are the ones that are already fast (a point read in 9 to 12 us, an indexed
 query in 0.3 to 8 ms); a point read would go from 12 to about 4 us, and about 40 % of that is available with a
 statement cache in the current engine. In the cases a user waits for (b, c, d) the share is at most 3 to 28 %.
 
 ## Why `orderBy(order desc).limit(20)` costs about 3.7 times a whole collection read
+
+(Before the fixes; step 1 of "After the fixes" removes the removal loop, and the view of this case is now 18 to 24 ms.)
 
 Acknowledged: 2,736 ms against 751.8 ms (3.6 times); pending: 3,392 ms against 888.5 ms (3.8 times). The store part is
 the same as for the whole collection (459.5 against 420.1 ms and 486.1 against 471.9 ms); the whole difference is in
@@ -298,7 +362,8 @@ in the "other" rows of the tables.
 - **The time is above the store, in three places:** decoding (protobuf parse, key parsing, the model of overlays),
   the view and the sorted collections (`DocumentSet`, `RBTreeSortedMap`, `ImmutableSortedMap`), and the overlay
   bookkeeping. These are in the library, the same for every engine.
-- **Cheap things that this measurement points at (not done here, no library code was changed):** the discarded first
+- **Cheap things that this measurement points at (done since, see "After the fixes", except the keys of a listened
+  collection):** the discarded first
   pair of removals in `DocumentSet.remove`; `OrderBy.compare` comparing `field == FieldPath.keyPath` through
   `BasePath.==` (`runtimeType` and `DeepCollectionEquality`) for every comparison; applying the limit before building
   a sorted set of every candidate (a bounded insertion, or `executeQuery` sorting and cutting a limit query that has
@@ -331,6 +396,7 @@ dart compile exe cache_read_profile_bench.dart -o /tmp/crp
 /tmp/crp index /tmp/p/acked.db /tmp/p/acked_idx.db
 /tmp/crp index /tmp/p/pending.db /tmp/p/pending_idx.db
 /tmp/crp time acked /tmp/p/acked.db /tmp/p/acked_idx.db --reps=15
+/tmp/crp time acked /tmp/p/acked.db /tmp/p/acked_idx.db --reps=15 --no-statement-cache
 /tmp/crp raw acked /tmp/p/acked.db
 for i in 1 2 3 4 5; do /tmp/crp cold acked /tmp/p/acked.db whole; done
 dart --enable-vm-service=0 --disable-service-auth-codes --profiler --profile-period=250 \
