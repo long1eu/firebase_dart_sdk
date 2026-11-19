@@ -171,7 +171,17 @@ void main() {
           events.last.metadata.isFromCache ||
           events.last.metadata.hasPendingWrites ||
           events.last.docs.length != 19;
-    }).timeout(const Duration(seconds: 20));
+    }).timeout(
+      const Duration(seconds: 20),
+      onTimeout: () => fail(
+        'The listener did not end in sync: ${events.length} events, the last '
+        '${events.isEmpty ? 'none' : 'fromCache=${events.last.metadata.isFromCache} '
+                  'pendingWrites=${events.last.metadata.hasPendingWrites} '
+                  'docs=${events.last.docs.length} '
+                  'pending=${<String>[for (final d in events.last.docs)
+                    if (d.metadata.hasPendingWrites) d.id]}'}',
+      ),
+    );
     expect(events.last.docs.last['n'], 103);
     await sub.cancel();
 
