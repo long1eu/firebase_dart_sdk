@@ -662,7 +662,9 @@ class RemoteSerializer {
     return builder..freeze();
   }
 
-  Mutation decodeMutation(proto.Write mutation) {
+  /// Decodes a write. [key] is the key of the written document when the caller already knows it (a cache that stores
+  /// the writes by key), which saves parsing the resource name; it must be the key that name decodes to.
+  Mutation decodeMutation(proto.Write mutation, [DocumentKey? key]) {
     final Precondition precondition = mutation.hasCurrentDocument()
         ? _decodePrecondition(mutation.currentDocument)
         : Precondition.none;
@@ -673,7 +675,7 @@ class RemoteSerializer {
           .toList();
       if (mutation.hasUpdateMask()) {
         return PatchMutation(
-          decodeKey(mutation.update.name),
+          key ?? decodeKey(mutation.update.name),
           decodeDocumentFields(mutation.update.fields),
           _decodeDocumentMask(mutation.updateMask),
           precondition,
@@ -681,16 +683,16 @@ class RemoteSerializer {
         );
       } else {
         return SetMutation(
-          decodeKey(mutation.update.name),
+          key ?? decodeKey(mutation.update.name),
           decodeDocumentFields(mutation.update.fields),
           precondition,
           fieldTransforms,
         );
       }
     } else if (mutation.hasDelete()) {
-      return DeleteMutation(decodeKey(mutation.delete), precondition);
+      return DeleteMutation(key ?? decodeKey(mutation.delete), precondition);
     } else if (mutation.hasVerify()) {
-      return VerifyMutation(decodeKey(mutation.verify), precondition);
+      return VerifyMutation(key ?? decodeKey(mutation.verify), precondition);
     } else {
       throw fail('Unknown mutation operation: ${mutation.whichOperation()}');
     }

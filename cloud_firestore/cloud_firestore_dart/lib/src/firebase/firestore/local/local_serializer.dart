@@ -60,13 +60,23 @@ class LocalSerializer {
   }
 
   /// Decodes a MaybeDocument proto to the equivalent model.
-  MaybeDocument decodeMaybeDocument(proto.MaybeDocument data) {
+  ///
+  /// [key] is the key of the document when the caller already knows it (a cache that stores the documents by key),
+  /// which saves parsing the resource name of the proto. It must be the key that name decodes to.
+  MaybeDocument decodeMaybeDocument(
+    proto.MaybeDocument data, [
+    DocumentKey? key,
+  ]) {
     if (data.hasDocument()) {
-      return _decodeDocument(data.document, data.hasCommittedMutations);
+      return _decodeDocument(data.document, data.hasCommittedMutations, key);
     } else if (data.hasNoDocument()) {
-      return _decodeNoDocument(data.noDocument, data.hasCommittedMutations);
+      return _decodeNoDocument(
+        data.noDocument,
+        data.hasCommittedMutations,
+        key,
+      );
     } else if (data.hasUnknownDocument()) {
-      return _decodeUnknownDocument(data.unknownDocument);
+      return _decodeUnknownDocument(data.unknownDocument, key);
     } else {
       throw fail('Unknown MaybeDocument $data');
     }
@@ -91,9 +101,10 @@ class LocalSerializer {
   /// Decodes a Document proto to the equivalent model.
   Document _decodeDocument(
     proto.Document document,
-    bool hasCommittedMutations,
-  ) {
-    final DocumentKey key = rpcSerializer.decodeKey(document.name);
+    bool hasCommittedMutations, [
+    DocumentKey? knownKey,
+  ]) {
+    final DocumentKey key = knownKey ?? rpcSerializer.decodeKey(document.name);
 
     final SnapshotVersion version = rpcSerializer.decodeVersion(
       document.updateTime,
@@ -120,9 +131,10 @@ class LocalSerializer {
   /// Decodes a NoDocument proto to the equivalent model.
   NoDocument _decodeNoDocument(
     proto.NoDocument proto,
-    bool hasCommittedMutations,
-  ) {
-    final DocumentKey key = rpcSerializer.decodeKey(proto.name);
+    bool hasCommittedMutations, [
+    DocumentKey? knownKey,
+  ]) {
+    final DocumentKey key = knownKey ?? rpcSerializer.decodeKey(proto.name);
     final SnapshotVersion version = rpcSerializer.decodeVersion(proto.readTime);
     return NoDocument(
       key,
@@ -141,8 +153,11 @@ class LocalSerializer {
   }
 
   /// Decodes a [UnknownDocument] proto to the equivalent model.
-  UnknownDocument _decodeUnknownDocument(proto.UnknownDocument proto) {
-    final DocumentKey key = rpcSerializer.decodeKey(proto.name);
+  UnknownDocument _decodeUnknownDocument(
+    proto.UnknownDocument proto, [
+    DocumentKey? knownKey,
+  ]) {
+    final DocumentKey key = knownKey ?? rpcSerializer.decodeKey(proto.name);
     final SnapshotVersion version = rpcSerializer.decodeVersion(proto.version);
     return UnknownDocument(key, version);
   }
@@ -174,9 +189,11 @@ class LocalSerializer {
   }
 
   /// Decodes the mutation of a document overlay, see [encodeOverlayMutation].
-  Mutation decodeOverlayMutation(proto.Write write) {
+  ///
+  /// [key] is the key of the document when the caller already knows it (see [RemoteSerializer.decodeMutation]).
+  Mutation decodeOverlayMutation(proto.Write write, [DocumentKey? key]) {
     return _mapOverlayValues(
-      rpcSerializer.decodeMutation(write),
+      rpcSerializer.decodeMutation(write, key),
       _decodeServerTimestamps,
     );
   }

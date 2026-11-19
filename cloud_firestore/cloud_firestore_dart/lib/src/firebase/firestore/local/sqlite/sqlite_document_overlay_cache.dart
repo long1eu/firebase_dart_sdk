@@ -102,7 +102,7 @@ class SQLiteDocumentOverlayCache implements DocumentOverlayCache {
     if (rows.isEmpty) {
       return null;
     }
-    return _decodeOverlay(rows.first);
+    return _decodeOverlay(rows.first, key);
   }
 
   @override
@@ -279,11 +279,14 @@ class SQLiteDocumentOverlayCache implements DocumentOverlayCache {
     return result;
   }
 
-  Overlay _decodeOverlay(Map<String, dynamic> row) {
+  /// [key] is the key of the overlay's document when the caller knows it (the key it looked up), so that the name in
+  /// the stored write is not parsed again.
+  Overlay _decodeOverlay(Map<String, dynamic> row, [DocumentKey? key]) {
     final Uint8List rawMutation = row['overlay_mutation'];
     final int largestBatchId = row['largest_batch_id'];
     final Mutation mutation = _serializer.decodeOverlayMutation(
       parseStoredProto('Overlay', () => proto.Write.fromBuffer(rawMutation)),
+      key,
     );
     return Overlay(largestBatchId, mutation);
   }
