@@ -34,7 +34,7 @@ class SQLiteDocumentOverlayCache implements DocumentOverlayCache {
   /// `sqlite_overlay_query_plan_test.dart` checks the plan of exactly what runs here.
   @visibleForTesting
   static const String overlaysOfCollectionSql = '''
-          SELECT overlay_mutation, largest_batch_id
+          SELECT overlay_mutation, largest_batch_id, document_id
           FROM document_overlays
           WHERE uid = ? AND collection_path = ? AND +largest_batch_id > ?
         ''';
@@ -42,7 +42,7 @@ class SQLiteDocumentOverlayCache implements DocumentOverlayCache {
   /// The overlays of a collection among the few written after a batch: through the index on the batch id.
   @visibleForTesting
   static const String newOverlaysOfCollectionSql = '''
-          SELECT overlay_mutation, largest_batch_id
+          SELECT overlay_mutation, largest_batch_id, document_id
           FROM document_overlays INDEXED BY batch_id_overlay
           WHERE uid = ? AND largest_batch_id > ? AND collection_path = ?
         ''';
@@ -232,9 +232,15 @@ class SQLiteDocumentOverlayCache implements DocumentOverlayCache {
             path,
             sinceBatchId,
           ]);
-    return <DocumentKey, Overlay>{
-      for (Overlay overlay in rows.map(_decodeOverlay)) overlay.key: overlay,
-    };
+    // Every row is a document of [collection]: its key is the collection and the id, not the name in the stored write.
+    final Map<DocumentKey, Overlay> result = <DocumentKey, Overlay>{};
+    for (final Map<String, dynamic> row in rows) {
+      final DocumentKey key = DocumentKey.fromPath(
+        collection.appendSegment(row['document_id'] as String),
+      );
+      result[key] = _decodeOverlay(row, key);
+    }
+    return result;
   }
 
   @override
