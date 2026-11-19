@@ -75,14 +75,14 @@ Needs the Dart SDK (3.8 or later; the numbers below are from 3.12.2) and a brows
 From this directory:
 
 ```sh
-./build.sh                    # dart pub get, dart compile js and wasm, copies the page
+./build.sh                    # dart pub get, dart compile wasm and js, copies the page
 dart run bin/serve.dart 8000  # serves build/web on http://localhost:8000/
 ```
 
 `build.sh` writes the whole site to `build/web`:
 
 ```sh
-dart compile wasm -O2 --no-source-maps -o build/web/main.wasm web/main.dart
+dart compile wasm -O2 --no-source-maps -o build/web/main.wasm web/main.dart   # the default
 dart compile js -O2 --no-source-maps -o build/web/main.dart.js web/main.dart   # the fallback
 cp web/index.html web/styles.css web/bootstrap.js web/favicon.svg build/web/
 ```

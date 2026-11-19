@@ -175,8 +175,11 @@ The same code runs in the browser (supported in Chrome, tested against the emula
 Browsers have no sockets, so there the client talks to Firestore the way the JS SDK does: REST
 for one-shot calls, WebChannel for listeners and writes.
 
-- Build the app as any Dart web app. Prefer dart2wasm (`dart compile wasm`): compiled to
-  JavaScript, integers above 2^53 lose precision.
+- Build the app as any Dart web app, with dart2wasm (`dart compile wasm`, or
+  `flutter build web --wasm`). Use dart2js (`dart compile js`, `flutter build web`) only for a
+  browser without WebAssembly garbage collection or a dependency that does not compile to wasm:
+  compiled to JavaScript, integers above 2^53 lose precision. [Build and serve a web
+  app](cookbook.md#build-and-serve-a-web-app-with-dart2wasm) has the commands.
 - Do not compile with `-Dprotobuf.omit_field_names=true` or `-Dprotobuf.omit_enum_names=true`;
   the web transport needs those names and refuses to start without them.
 - The cache is in memory unless you pass the web opener (IndexedDB or OPFS); see

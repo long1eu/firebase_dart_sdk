@@ -123,7 +123,8 @@ dart run cloud_firestore_dart_sqlite:setup_web web
 It writes `web/sqlite_opfs_worker.js` (`dart compile js -O2`; the worker stays JavaScript also for
 a dart2wasm page) and prints a `curl` command for the matching `sqlite3.wasm`. It downloads
 nothing. Run it again when this package or `sqlite3` changes version. `--no-worker` skips the
-worker for an app that only uses IndexedDB. `flutter build web` copies `web/` into the build.
+worker for an app that only uses IndexedDB. `flutter build web --wasm` (or `flutter build web`) copies
+`web/` into the build; with `dart compile wasm`, put the files next to your build.
 
 Which storage:
 

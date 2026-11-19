@@ -449,8 +449,8 @@ read and write but never listen or work offline.
 
 ## dart2js or dart2wasm in the browser
 
-A web program can be compiled with `dart compile js` (dart2js) or `dart compile wasm` (dart2wasm); the two
-builds are about the same size (see [the web guide](web.md#dart2js-or-dart2wasm)). This section measures
+A web program can be compiled with `dart compile wasm` (dart2wasm, the default) or `dart compile js` (dart2js, the fallback); the two
+builds are about the same size (see [the web guide](web.md#dart2wasm-or-dart2js)). This section measures
 which one runs this client faster in Chrome.
 
 **In short.** Every CPU-bound case ran two to five times faster with dart2wasm: serialization, queries on the
