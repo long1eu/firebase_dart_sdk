@@ -50,6 +50,8 @@ class ImmutableSortedSet<T> extends Iterable<T> {
     return result;
   }
 
+  Comparator<T> get comparator => _map.comparator;
+
   T? get minEntry => _map.minKey;
 
   T? get maxEntry => _map.maxKey;

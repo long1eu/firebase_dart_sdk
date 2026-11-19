@@ -42,6 +42,9 @@ class DocumentSet extends Iterable<Document> {
   final ImmutableSortedMap<DocumentKey, Document> _keyIndex;
   final ImmutableSortedSet<Document> sortedSet;
 
+  /// The order of the documents of this set: the comparator it was created with, then the document key.
+  Comparator<Document> get comparator => sortedSet.comparator;
+
   @override
   int get length => _keyIndex.length;
 
@@ -116,15 +119,22 @@ class DocumentSet extends Iterable<Document> {
     return DocumentSet._(newKeyIndex, newSortedSet);
   }
 
+  /// Returns a new DocumentSet that contains the given documents, which must have distinct keys, replacing any old
+  /// document with the same key.
+  DocumentSet addAll(List<Document> documents) {
+    DocumentSet result = this;
+    for (final Document document in documents) {
+      result = result.add(document);
+    }
+    return result;
+  }
+
   /// Returns a new DocumentSet with the document for the provided key removed.
   DocumentSet remove(DocumentKey key) {
     final Document? document = _keyIndex[key];
     if (document == null) {
       return this;
     }
-
-    _keyIndex.remove(key);
-    sortedSet.remove(document);
 
     final ImmutableSortedMap<DocumentKey, Document> newKeyIndex = _keyIndex
         .remove(key);

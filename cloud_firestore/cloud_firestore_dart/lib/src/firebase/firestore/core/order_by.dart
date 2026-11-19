@@ -29,7 +29,8 @@ class OrderByDirection {
 
 /// Represents a sort order for a Firestore Query
 class OrderBy {
-  const OrderBy(this.direction, this.field);
+  OrderBy(this.direction, this.field)
+    : _isKeyPath = field == FieldPath.keyPath;
 
   factory OrderBy.getInstance(OrderByDirection direction, FieldPath path) {
     return OrderBy(direction, path);
@@ -38,8 +39,11 @@ class OrderBy {
   final OrderByDirection direction;
   final FieldPath field;
 
+  /// Whether [field] is the key path, computed once: [compare] runs for every comparison of a sort.
+  final bool _isKeyPath;
+
   int compare(Document d1, Document d2) {
-    if (field == FieldPath.keyPath) {
+    if (_isKeyPath) {
       return direction._comparisonModifier * d1.key.compareTo(d2.key);
     } else {
       final FieldValue? v1 = d1.getField(field);
