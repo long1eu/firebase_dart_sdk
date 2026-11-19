@@ -126,7 +126,8 @@ const GetOptions cache = GetOptions(source: Source.cache);
 const GetOptions server = GetOptions(source: Source.server);
 
 void main() {
-  test('writes, reads and a listener, and the cache after a restart', () async {
+  for (int round = 0; round < 40; round++)
+  test('writes, reads and a listener, and the cache after a restart, round $round', () async {
     final String appName = newAppName();
     final String name = newCollectionName();
     FirebaseFirestore firestore = await newClient(appName);
