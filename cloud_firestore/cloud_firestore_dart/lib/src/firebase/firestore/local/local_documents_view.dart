@@ -5,6 +5,7 @@ import 'dart:async';
 import 'dart:collection';
 import 'dart:math';
 
+import 'package:collection/collection.dart' show MapKeySet;
 import 'package:meta/meta.dart';
 import 'package:cloud_firestore_dart/src/database_collection/database_collection.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/query.dart';
@@ -604,7 +605,8 @@ class LocalDocumentsView {
         await remoteDocumentCache.getAllDocumentsMatchingQuery(
           overlaysSinceBatch ? Query(query.path) : query,
           offset,
-          mutatedKeys: overlays.keys.toSet(),
+          // A view of the keys, not a copy: a collection of pending writes has as many overlays as documents.
+          mutatedKeys: MapKeySet<DocumentKey>(overlays),
           context: context,
         );
     if (overlaysSinceBatch) {
