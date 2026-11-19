@@ -13,8 +13,8 @@ SQLite transaction (`BEGIN IMMEDIATE`, then `COMMIT`, or `ROLLBACK` when the bod
 Transactions run one at a time on the store's one connection.
 
 This shows the shape of a store over an embedded database. It is not how this SDK's default
-persistent cache works: `PersistentCacheSettings` keeps its own SQL schema, with indexes the
-key-value cache does not have yet.
+persistent cache works: `PersistentCacheSettings` keeps its own SQL schema, with a table per cache
+and SQL indexes, where the key-value cache lays everything out in this one table.
 
 `main.dart` writes offline, terminates the instance, starts a new one over the same database file
 and reads the pending writes back. It needs no emulator and no project.
