@@ -2,19 +2,20 @@
 
 `memory_log_store.dart` implements `CacheStore` of `package:cloud_firestore_dart/cache_store.dart`
 (experimental) without any dependency: the data is a `SplayTreeMap` ordered by
-`compareCacheStoreKeys`, and every committed transaction appends one record to a log file. It is
-the store to read first when you write your own; it fits in one sitting.
+`compareCacheStoreKeys`, and every write appends one record to a log file. It is the store to read
+first when you write your own; it fits in one sitting.
 
-- **Transactions** run one at a time, so a transaction writes into the map directly and remembers
-  what each write replaced. If the body throws, it puts the old values back.
-- **Durability**: at commit, the transaction's writes are appended to the log as one record, which
-  starts with its length, and flushed. Opening the store replays the log. A record that a crash
-  cut short is ignored, so a transaction is kept whole or not at all.
+- **Reads** (`get`, `scan`) read the map. The SDK keeps the writes of its own transactions and
+  reads through them, so the store needs no transactions.
+- **Writes**: `write` changes the map and appends the puts and deletes to the log as one record,
+  which starts with its length, and flushes it. If the log cannot be written, it puts back what it
+  replaced. Opening the store replays the log; a record that a crash cut short is ignored, so a
+  write is kept whole or not at all.
 - **Compaction**: when the log is several times the size of the data, opening the store rewrites
   it as one record (through a temporary file and a rename).
 - Without a path, the store keeps its data in memory only, for tests.
 
-It is meant to teach, not to hold a large cache: all the data is in memory, and every commit
+It is meant to teach, not to hold a large cache: all the data is in memory, and every write
 waits for a flush.
 
 `main.dart` uses it as the cache of a Firestore instance: it writes offline, terminates the

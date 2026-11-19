@@ -39,18 +39,20 @@ void main() {
       final String path = '${directory.path}/cache.log';
       final MemoryLogStore store = MemoryLogStore(path);
       await store.open();
-      await store.transaction((tx) => tx.put(_bytes('a'), _bytes('1')));
-      await store.transaction((tx) => tx.put(_bytes('b'), _bytes('2')));
+      await store.write(<CacheStoreEntry>[
+        CacheStoreEntry(_bytes('a'), _bytes('1')),
+      ], const <Uint8List>[]);
+      await store.write(<CacheStoreEntry>[
+        CacheStoreEntry(_bytes('b'), _bytes('2')),
+      ], const <Uint8List>[]);
       await store.close();
       final File file = File(path);
       final List<int> log = file.readAsBytesSync();
       file.writeAsBytesSync(log.sublist(0, log.length - 1));
 
       await store.open();
-      await store.transaction((tx) async {
-        expect(await tx.get(_bytes('a')), _bytes('1'));
-        expect(await tx.get(_bytes('b')), isNull);
-      });
+      expect(await store.get(_bytes('a')), _bytes('1'));
+      expect(await store.get(_bytes('b')), isNull);
       await store.close();
     });
   });
@@ -68,8 +70,8 @@ void main() {
       return expectFailure('keys are ordered by their unsigned bytes');
     });
 
-    test('fails the rollback check', () {
-      return expectFailure('a transaction whose body throws is rolled back');
+    test('fails the check of writes with puts and deletes', () {
+      return expectFailure('a write applies its puts and deletes together');
     });
   });
 
@@ -96,8 +98,8 @@ int _signedCompare(Uint8List a, Uint8List b) {
   return a.length - b.length;
 }
 
-/// A store with two mistakes the checks must catch: keys compared as signed bytes, and writes that a failing body
-/// leaves behind.
+/// A store with two mistakes the checks must catch: keys compared as signed bytes, and a write that drops its deletes
+/// when it also has puts.
 class _BrokenStore implements CacheStore {
   final SplayTreeMap<Uint8List, Uint8List> _data =
       SplayTreeMap<Uint8List, Uint8List>(_signedCompare);
@@ -109,25 +111,17 @@ class _BrokenStore implements CacheStore {
   Future<void> close() async {}
 
   @override
-  Future<T> transaction<T>(
-    Future<T> Function(CacheStoreTransaction transaction) body, {
-    bool readOnly = false,
-  }) => body(_BrokenTransaction(_data));
-}
-
-class _BrokenTransaction implements CacheStoreTransaction {
-  _BrokenTransaction(this._data);
-
-  final SplayTreeMap<Uint8List, Uint8List> _data;
-
-  @override
   Future<Uint8List?> get(Uint8List key) async => _data[key];
 
   @override
-  Future<void> put(Uint8List key, Uint8List value) async => _data[key] = value;
-
-  @override
-  Future<void> delete(Uint8List key) async => _data.remove(key);
+  Future<void> write(List<CacheStoreEntry> puts, List<Uint8List> deletes) async {
+    for (final CacheStoreEntry entry in puts) {
+      _data[entry.key] = entry.value;
+    }
+    if (puts.isEmpty) {
+      deletes.forEach(_data.remove);
+    }
+  }
 
   @override
   Future<List<CacheStoreEntry>> scan(

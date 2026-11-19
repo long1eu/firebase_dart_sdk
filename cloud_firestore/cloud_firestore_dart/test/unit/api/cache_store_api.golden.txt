@@ -1,19 +1,15 @@
 abstract class CacheStore
   close(): Future<void>
+  get(Uint8List key): Future<Uint8List>
   new CacheStore()
   open(): Future<void>
-  transaction((.CacheStoreTransaction) -> dart.async.Future body, {bool readOnly}): Future<dynamic>
+  scan(Uint8List start, Uint8List end, {bool reverse, int limit}): Future<List<CacheStoreEntry>>
+  write(List<CacheStoreEntry> puts, List<Uint8List> deletes): Future<void>
 class CacheStoreEntry
   final key: Uint8List
   final value: Uint8List
   new CacheStoreEntry(Uint8List key, Uint8List value)
   toString(): String
-abstract class CacheStoreTransaction
-  delete(Uint8List key): Future<void>
-  get(Uint8List key): Future<Uint8List>
-  new CacheStoreTransaction()
-  put(Uint8List key, Uint8List value): Future<void>
-  scan(Uint8List start, Uint8List end, {bool reverse, int limit}): Future<List<CacheStoreEntry>>
 class IndexBackfillSettings
   ==(Object other): bool
   final documentsPerRun: int

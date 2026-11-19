@@ -8,9 +8,9 @@ CREATE TABLE entries (key BLOB PRIMARY KEY, value BLOB NOT NULL) WITHOUT ROWID
 ```
 
 SQLite compares BLOBs byte by byte, a shorter key first when it is a prefix of the other: the
-order the store contract asks for. So `scan` is a range of the primary key, and a transaction is a
-SQLite transaction (`BEGIN IMMEDIATE`, then `COMMIT`, or `ROLLBACK` when the body throws).
-Transactions run one at a time on the store's one connection.
+order the store contract asks for. So `scan` is a range of the primary key, and `write` is one
+SQLite transaction (`BEGIN IMMEDIATE`, the puts and deletes, `COMMIT`, or `ROLLBACK` when a
+statement fails).
 
 This shows the shape of a store over an embedded database. It is not how this SDK's default
 persistent cache works: `PersistentCacheSettings` keeps its own SQL schema, with a table per cache

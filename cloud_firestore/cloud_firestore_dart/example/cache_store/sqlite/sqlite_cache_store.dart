@@ -1,8 +1,7 @@
 // A CacheStore on SQLite (package:sqlite3): one table of keys and values.
 //
 // SQLite compares BLOBs as the store contract orders keys (by unsigned bytes, a prefix first), so a range scan is a
-// range of the primary key. A transaction is a SQLite transaction; transactions run one at a time on the one
-// connection.
+// range of the primary key. A write is one SQLite transaction.
 
 import 'dart:typed_data';
 
@@ -16,9 +15,6 @@ class SqliteCacheStore implements CacheStore {
   final String path;
 
   Database? _database;
-
-  /// The end of the last transaction: the next one starts after it.
-  Future<void> _lastTransaction = Future<void>.value();
 
   Database get _db => _database ?? (throw StateError('The store is not open'));
 
@@ -36,43 +32,11 @@ class SqliteCacheStore implements CacheStore {
 
   @override
   Future<void> close() async {
-    await _lastTransaction;
     // `dispose()` closes the database in sqlite3 2.x and still does in 3.x.
     // ignore: deprecated_member_use
     _database?.dispose();
     _database = null;
   }
-
-  @override
-  Future<T> transaction<T>(
-    Future<T> Function(CacheStoreTransaction transaction) body, {
-    bool readOnly = false,
-  }) {
-    final Future<T> result = _lastTransaction.then((_) => _run(body));
-    _lastTransaction = result.then<void>((_) {}, onError: (Object _) {});
-    return result;
-  }
-
-  Future<T> _run<T>(
-    Future<T> Function(CacheStoreTransaction transaction) body,
-  ) async {
-    final Database db = _db;
-    db.execute('BEGIN IMMEDIATE');
-    try {
-      final T result = await body(_Transaction(db));
-      db.execute('COMMIT');
-      return result;
-    } catch (_) {
-      db.execute('ROLLBACK');
-      rethrow;
-    }
-  }
-}
-
-class _Transaction implements CacheStoreTransaction {
-  _Transaction(this._db);
-
-  final Database _db;
 
   @override
   Future<Uint8List?> get(Uint8List key) async {
@@ -81,19 +45,6 @@ class _Transaction implements CacheStoreTransaction {
       <Object>[key],
     );
     return rows.isEmpty ? null : rows.first['value'] as Uint8List;
-  }
-
-  @override
-  Future<void> put(Uint8List key, Uint8List value) async {
-    _db.execute(
-      'INSERT OR REPLACE INTO entries (key, value) VALUES (?, ?)',
-      <Object>[key, value],
-    );
-  }
-
-  @override
-  Future<void> delete(Uint8List key) async {
-    _db.execute('DELETE FROM entries WHERE key = ?', <Object>[key]);
   }
 
   @override
@@ -112,5 +63,49 @@ class _Transaction implements CacheStoreTransaction {
       for (final Row row in rows)
         CacheStoreEntry(row['key'] as Uint8List, row['value'] as Uint8List),
     ];
+  }
+
+  @override
+  Future<void> write(
+    List<CacheStoreEntry> puts,
+    List<Uint8List> deletes,
+  ) async {
+    if (puts.isEmpty && deletes.isEmpty) {
+      return;
+    }
+    final Database db = _db;
+    db.execute('BEGIN IMMEDIATE');
+    try {
+      if (puts.isNotEmpty) {
+        final PreparedStatement put = db.prepare(
+          'INSERT OR REPLACE INTO entries (key, value) VALUES (?, ?)',
+        );
+        try {
+          for (final CacheStoreEntry entry in puts) {
+            put.execute(<Object>[entry.key, entry.value]);
+          }
+        } finally {
+          // ignore: deprecated_member_use
+          put.dispose();
+        }
+      }
+      if (deletes.isNotEmpty) {
+        final PreparedStatement delete = db.prepare(
+          'DELETE FROM entries WHERE key = ?',
+        );
+        try {
+          for (final Uint8List key in deletes) {
+            delete.execute(<Object>[key]);
+          }
+        } finally {
+          // ignore: deprecated_member_use
+          delete.dispose();
+        }
+      }
+      db.execute('COMMIT');
+    } catch (_) {
+      db.execute('ROLLBACK');
+      rethrow;
+    }
   }
 }

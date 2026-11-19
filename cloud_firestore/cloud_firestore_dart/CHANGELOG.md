@@ -8,13 +8,17 @@
   `docs/spikes/cache_read_profile.md`.
 - Experimental: bring your own cache storage. `keyValueCacheSettings(store: ...)` of the new library
   `package:cloud_firestore_dart/cache_store.dart` keeps the persistent cache in any `CacheStore`,
-  an ordered key-value store of bytes that the app implements (`open`, `close`, `transaction` with
-  `get`, `put`, `delete` and a range `scan`). The SDK lays out the whole cache on it in a format
-  of its own: documents, pending writes, overlays, targets, LRU garbage collection, cache indexes,
-  bundles. `package:cloud_firestore_dart/cache_store_testing.dart` has conformance checks for a
-  store, and `example/cache_store/` two example stores (plain Dart with a log file, and SQLite as
-  a key-value table). One instance uses a store at a time. Only apps that import the library carry
-  the code.
+  an ordered key-value store of bytes that the app implements (`open`, `close`, `get`, a range
+  `scan`, and `write`, which applies a list of puts and deletes atomically and durably). The store
+  needs no transactions: the SDK keeps the writes of each of its transactions in memory, reads
+  through them, and hands them to the store in one `write` at commit, so a store on IndexedDB,
+  whose transactions cannot stay open across the SDK's awaits, works as well as one on SQLite. The
+  SDK lays out the whole cache on it in a format of its own: documents, pending writes, overlays,
+  targets, LRU garbage collection, cache indexes, bundles.
+  `package:cloud_firestore_dart/cache_store_testing.dart` has conformance checks for a store, and
+  `example/cache_store/` three example stores (plain Dart with a log file, SQLite as a key-value
+  table, and IndexedDB for the web). One instance uses a store at a time. Only apps that import
+  the library carry the code.
 - **Breaking** for code that switches over `LocalCacheSettings` exhaustively: there is a new
   subclass, `KeyValueCacheSettings`.
 - Experimental, web: `indexedDbCacheSettings()` of the new library
