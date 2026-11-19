@@ -54,12 +54,12 @@ firebase emulators:start --only firestore --project demo-example    # in another
 
 dart pub get
 
-# The pages, compiled to WebAssembly (dart2wasm).
+# The pages, compiled to WebAssembly (dart2wasm): the build the pages run by default.
 dart compile wasm -O2 -o build/web/main.wasm web/main.dart
 dart compile wasm -O2 -o build/web/lite.wasm web/lite.dart
 
 # The same pages compiled to JavaScript (dart2js), the fallback for a browser without
-# WebAssembly garbage collection.
+# WebAssembly garbage collection (or a dependency that does not compile to wasm).
 dart compile js -O2 -o build/web/main.dart.js web/main.dart
 dart compile js -O2 -o build/web/lite.dart.js web/lite.dart
 
@@ -83,14 +83,17 @@ the query string.
 
 ### Which compiler
 
-Build with dart2wasm first: the client's own work ran 2 to 5 times faster with it in our
+dart2wasm is the default: the client's own work ran 2 to 5 times faster with it in our
 measurements (see [Performance](../../docs/guides/performance.md#dart2js-or-dart2wasm-in-the-browser)),
 and its integers are exact 64-bit. A browser without WebAssembly garbage collection cannot run
-that build and needs the dart2js build.
+that build, so build dart2js as well: `web/bootstrap.js` starts `main.mjs` and `main.wasm` when
+the browser can, and `main.dart.js` when it cannot or when the module does not compile. The
+page says which build runs, and when it fell back, why. Open
+<http://localhost:8000/?compiler=js> to force dart2js, or <http://localhost:8000/?compiler=wasm>
+to force dart2wasm and see the error instead of the fallback. The OPFS worker stays JavaScript.
+Only Chrome was tried.
 
-Each `dart compile wasm` command writes a `.wasm` and a `.mjs` file. Open
-<http://localhost:8000/?compiler=wasm>: `web/bootstrap.js` then loads `main.mjs` and `main.wasm`
-instead of `main.dart.js`. The OPFS worker stays JavaScript. Only Chrome was tried.
+Each `dart compile wasm` command writes a `.wasm` and a `.mjs` file; both must be served.
 
 `bin/serve.dart` is a small static file server on `dart:io`, on the loopback interface only. It
 serves `build/web` first, then `web`, and sends `.wasm` files as `application/wasm` (which
@@ -103,7 +106,7 @@ special headers are needed (the OPFS cache does not need cross-origin isolation)
 | --- | --- |
 | `web/main.dart`, `web/lite.dart` | The two programs. |
 | `web/index.html`, `web/lite.html`, `web/styles.css` | The pages, light and dark through `prefers-color-scheme`. |
-| `web/bootstrap.js` | Starts `<app>.dart.js`, or `<app>.mjs` and `<app>.wasm` with `?compiler=wasm`. |
+| `web/bootstrap.js` | Starts `<app>.mjs` and `<app>.wasm` when the browser can, `<app>.dart.js` otherwise; `?compiler=js` or `?compiler=wasm` picks one. The same file as in `examples/playground`. |
 | `lib/app_config.dart` | The `FirebaseOptions`, and the settings read from the address (`emulator`, `cache`). It imports neither Firestore library, so the Lite page stays small. |
 | `bin/serve.dart` | The static file server. |
 
