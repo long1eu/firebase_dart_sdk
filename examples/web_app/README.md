@@ -54,7 +54,12 @@ firebase emulators:start --only firestore --project demo-example    # in another
 
 dart pub get
 
-# The pages, compiled to JavaScript.
+# The pages, compiled to WebAssembly (dart2wasm).
+dart compile wasm -O2 -o build/web/main.wasm web/main.dart
+dart compile wasm -O2 -o build/web/lite.wasm web/lite.dart
+
+# The same pages compiled to JavaScript (dart2js), the fallback for a browser without
+# WebAssembly garbage collection.
 dart compile js -O2 -o build/web/main.dart.js web/main.dart
 dart compile js -O2 -o build/web/lite.dart.js web/lite.dart
 
@@ -76,17 +81,16 @@ Open <http://localhost:8000/>. The pages connect to the emulator on `127.0.0.1:8
 another one, add `?emulator=127.0.0.1:8090` to the address. The links between the two pages keep
 the query string.
 
-### With dart2wasm
+### Which compiler
 
-```sh
-dart compile wasm -O2 -o build/web/main.wasm web/main.dart
-dart compile wasm -O2 -o build/web/lite.wasm web/lite.dart
-```
+Build with dart2wasm first: the client's own work ran 2 to 5 times faster with it in our
+measurements (see [Performance](../../docs/guides/performance.md#dart2js-or-dart2wasm-in-the-browser)),
+and its integers are exact 64-bit. A browser without WebAssembly garbage collection cannot run
+that build and needs the dart2js build.
 
-Each command writes a `.wasm` and a `.mjs` file. Open <http://localhost:8000/?compiler=wasm>:
-`web/bootstrap.js` then loads `main.mjs` and `main.wasm` instead of `main.dart.js`. The OPFS
-worker stays JavaScript. The browser needs WebAssembly garbage collection (a recent Chrome,
-Firefox or Safari); only Chrome was tried.
+Each `dart compile wasm` command writes a `.wasm` and a `.mjs` file. Open
+<http://localhost:8000/?compiler=wasm>: `web/bootstrap.js` then loads `main.mjs` and `main.wasm`
+instead of `main.dart.js`. The OPFS worker stays JavaScript. Only Chrome was tried.
 
 `bin/serve.dart` is a small static file server on `dart:io`, on the loopback interface only. It
 serves `build/web` first, then `web`, and sends `.wasm` files as `application/wasm` (which
