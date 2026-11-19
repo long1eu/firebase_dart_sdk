@@ -134,10 +134,17 @@ void main() {
       name,
     );
 
+    // With metadata changes: the end of the pending writes of a document can be a metadata change only. When watch
+    // sends doc3 after the client deleted doc4 (a slow client), the snapshot of that delete is the last one with a
+    // data change, and still has the pending writes of doc3 (test/unit/firebase/firestore/spec/
+    // held_back_listener_spec_test.dart).
     final List<QuerySnapshot<Map<String, Object?>>> events =
         <QuerySnapshot<Map<String, Object?>>>[];
     final StreamSubscription<QuerySnapshot<Map<String, Object?>>> sub =
-        collection.orderBy('n').snapshots().listen(events.add);
+        collection
+            .orderBy('n')
+            .snapshots(includeMetadataChanges: true)
+            .listen(events.add);
 
     for (int i = 0; i < 20; i++) {
       await collection.doc('doc$i').set(<String, Object?>{
