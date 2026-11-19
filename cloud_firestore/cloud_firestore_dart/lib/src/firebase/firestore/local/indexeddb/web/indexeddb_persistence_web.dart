@@ -605,7 +605,7 @@ class WebIndexedDbPersistence extends IndexedDbPersistence {
           await _inTransaction(transaction, queryCache._load);
           _reloadState = false;
         }
-        await _verifyLease(transaction, primary: primary);
+        await _verifyOwner(transaction);
         referenceDelegate.onTransactionStarted();
         final T result = await _inTransaction(transaction, operation);
         if (primary) {
@@ -685,29 +685,28 @@ class WebIndexedDbPersistence extends IndexedDbPersistence {
     }
   }
 
-  /// The owner row when another client holds a valid lease (`currentLeaseIsValid` of the JS SDK), else null.
-  Future<Map<String, Object?>?> _otherLease(_IdbTransaction transaction) async {
+  /// The row of `owner`, or null when there is none.
+  Future<Map<String, Object?>?> _readOwner(_IdbTransaction transaction) async {
     final Object? owner = idbToDart(
       await transaction.request(
         'get the primary lease',
         () => transaction.store(DbStores.owner).get(DbStores.ownerKey.toJS),
       ),
     );
-    if (owner is! Map) {
-      return null;
-    }
-    final Map<String, Object?> row = owner.cast<String, Object?>();
-    if (row['ownerId'] == clientId ||
-        !indexedDbIsWithinAge(
-          row['leaseTimestampMs'],
-          indexedDbPrimaryLeaseMs,
-          _nowMs(),
-        ) ||
-        _isZombied(row['ownerId'])) {
-      return null;
-    }
-    return row;
+    return owner is Map ? owner.cast<String, Object?>() : null;
   }
+
+  /// Whether [owner] is a lease of another client that is valid (`currentLeaseIsValid` of the JS SDK): refreshed less
+  /// than 5 s ago by a client that did not mark itself as closed in LocalStorage.
+  bool _isOtherLiveLease(Map<String, Object?>? owner) =>
+      owner != null &&
+      owner['ownerId'] != clientId &&
+      indexedDbIsWithinAge(
+        owner['leaseTimestampMs'],
+        indexedDbPrimaryLeaseMs,
+        _nowMs(),
+      ) &&
+      !_isZombied(owner['ownerId']);
 
   Future<void> _putLease(_IdbTransaction transaction) async {
     await transaction.request(
@@ -728,12 +727,7 @@ class WebIndexedDbPersistence extends IndexedDbPersistence {
   }
 
   Future<void> _putClientMetadata(_IdbTransaction transaction) async {
-    bool inForeground = true;
-    try {
-      inForeground = web.document.visibilityState == 'visible';
-    } catch (_) {
-      // Not in a window (a worker): count as in the foreground.
-    }
+    final bool inForeground = _inForeground;
     await transaction.request(
       'put the client metadata',
       () => transaction
@@ -749,21 +743,72 @@ class WebIndexedDbPersistence extends IndexedDbPersistence {
     );
   }
 
-  /// Checks that no other client may use the database, then takes the lease and writes this client's row, in one
-  /// transaction (so two tabs that start at once can not both pass). The liveness rules are the JS SDK's, as the
-  /// import of a JS cache applies them (`js_sdk_importer.dart`): a lease refreshed less than 5 s ago, or a client row
-  /// refreshed less than 30 minutes ago, of a client that did not mark itself as closed in LocalStorage.
+  /// Checks that no other client uses the database, then takes the lease and writes this client's row, in one
+  /// transaction (so two tabs that start at once can not both pass). As a JS tab with `persistentSingleTabManager`
+  /// starts (`start` and `canActAsPrimary` of `indexeddb_persistence.ts`): it fails while another client holds a valid
+  /// lease, whatever that client allows, and, when this tab is hidden or offline, while another client that refreshed
+  /// its row less than 5 s ago is better placed to take the lease (in the foreground, or online).
   Future<void> _claim(_IdbTransaction transaction) async {
-    final Map<String, Object?>? lease = await _otherLease(transaction);
-    if (lease != null) {
+    final Map<String, Object?>? owner = await _readOwner(transaction);
+    if (_isOtherLiveLease(owner)) {
+      final bool multiTab = owner!['allowTabSynchronization'] == true;
       throw FirestoreException(
         message:
-            '$_exclusiveErrorMessage (The primary lease of $databaseName is held by client ${lease['ownerId']}.)',
+            '$_exclusiveErrorMessage (The primary lease of $databaseName is held by client ${owner['ownerId']}'
+            '${multiTab ? ', a JS SDK tab with persistentMultipleTabManager' : ''}; it was refreshed less than '
+            '${indexedDbPrimaryLeaseMs ~/ 1000} s ago.)',
         errorCode: FirestoreErrorCode.failedPrecondition,
       );
     }
     final int now = _nowMs();
-    final List<Object?> clients =
+    final List<Map<String, Object?>> clients = await _readClients(transaction);
+    final bool inForeground = _inForeground;
+    if (!(_networkEnabled && inForeground)) {
+      for (final Map<String, Object?> other in clients) {
+        final Object? id = other['clientId'];
+        if (id == clientId ||
+            !indexedDbIsWithinAge(
+              other['updateTimeMs'],
+              indexedDbPrimaryLeaseMs,
+              now,
+            ) ||
+            _isZombied(id)) {
+          continue;
+        }
+        final bool otherNetwork = other['networkEnabled'] == true;
+        final bool otherForeground = other['inForeground'] == true;
+        if ((!_networkEnabled && otherNetwork) ||
+            (!inForeground &&
+                otherForeground &&
+                _networkEnabled == otherNetwork)) {
+          throw FirestoreException(
+            message:
+                '$_exclusiveErrorMessage (Client $id of $databaseName is active and better placed to hold the '
+                'primary lease: this tab is ${inForeground ? 'offline' : 'in the background'}.)',
+            errorCode: FirestoreErrorCode.failedPrecondition,
+          );
+        }
+      }
+    }
+    await _putClientMetadata(transaction);
+    await _putLease(transaction);
+    await _removeClients(transaction, _inactiveClients(clients, now));
+    _lastClientGarbageCollectionMs = now;
+  }
+
+  bool get _inForeground {
+    try {
+      return web.document.visibilityState == 'visible';
+    } catch (_) {
+      // Not in a window (a worker): count as in the foreground.
+      return true;
+    }
+  }
+
+  Future<List<Map<String, Object?>>> _readClients(
+    _IdbTransaction transaction,
+  ) async {
+    final List<Object?> rows =
         idbToDart(
               await transaction.request(
                 'get all client metadata',
@@ -771,39 +816,27 @@ class WebIndexedDbPersistence extends IndexedDbPersistence {
               ),
             )!
             as List<Object?>;
-    final List<String> inactive = <String>[];
-    for (final Object? client in clients) {
-      if (client is! Map) {
-        continue;
-      }
-      final Object? id = client['clientId'];
-      if (id == clientId) {
-        continue;
-      }
-      if (indexedDbIsWithinAge(
-            client['updateTimeMs'],
-            indexedDbMaxClientAgeMs,
-            now,
-          ) &&
-          !_isZombied(id)) {
-        final int age = now - (client['updateTimeMs']! as num).toInt();
-        throw FirestoreException(
-          message:
-              '$_exclusiveErrorMessage (Client $id of $databaseName refreshed its metadata ${age ~/ 1000} s ago and '
-              'did not mark itself as closed. A tab that ended without closing counts as active for 30 minutes '
-              'after its last refresh, as in the JS SDK.)',
-          errorCode: FirestoreErrorCode.failedPrecondition,
-        );
-      }
-      if (id is String) {
-        inactive.add(id);
-      }
-    }
-    await _putClientMetadata(transaction);
-    await _putLease(transaction);
-    await _removeClients(transaction, inactive);
-    _lastClientGarbageCollectionMs = now;
+    return <Map<String, Object?>>[
+      for (final Object? row in rows)
+        if (row is Map && row['clientId'] is String)
+          row.cast<String, Object?>(),
+    ];
   }
+
+  /// The ids of the other clients that are no longer active (`filterActiveClients` with `MAX_CLIENT_AGE_MS`): their
+  /// row is older than 30 minutes, or they marked themselves as closed.
+  List<String> _inactiveClients(List<Map<String, Object?>> clients, int now) =>
+      <String>[
+        for (final Map<String, Object?> client in clients)
+          if (client['clientId'] != clientId &&
+              (!indexedDbIsWithinAge(
+                    client['updateTimeMs'],
+                    indexedDbMaxClientAgeMs,
+                    now,
+                  ) ||
+                  _isZombied(client['clientId'])))
+            client['clientId']! as String,
+      ];
 
   /// Removes the rows of the inactive clients [ids] and their zombie marks (`maybeGarbageCollectMultiClientState`).
   Future<void> _removeClients(
@@ -828,32 +861,39 @@ class WebIndexedDbPersistence extends IndexedDbPersistence {
     }
   }
 
-  /// Before an operation: every transaction fails while another client holds a valid lease
-  /// (`verifyAllowTabSynchronization` of the JS SDK, for a client that does not share the database); a primary one
-  /// also tells the listener that this client is not primary.
-  Future<void> _verifyLease(
-    _IdbTransaction transaction, {
-    required bool primary,
-  }) async {
-    final Map<String, Object?>? lease = await _otherLease(transaction);
-    if (lease == null) {
+  /// Before an operation and before a refresh: this client must still be the owner of the lease it took at start.
+  ///
+  /// The lease of a tab in the background can lapse (the browser slows its timers down), and another client (a JS tab,
+  /// or another tab of this SDK) may then have taken it and used the database. The JS SDK's single tab checks the
+  /// lease the same way (`verifyAllowTabSynchronization`, `verifyPrimaryLease`). This client keeps state of the cache
+  /// in memory (the target metadata, the indexes, the local store's targets), which the other client may have made
+  /// stale, so it does not go on: it fails for good and terminates ([databaseClearedListener]), and a new instance
+  /// starts over from the database. Nothing is written in the transaction that finds out.
+  Future<void> _verifyOwner(_IdbTransaction transaction) async {
+    final Map<String, Object?>? owner = await _readOwner(transaction);
+    if (owner != null && owner['ownerId'] == clientId) {
       return;
     }
-    if (primary) {
-      Log.e(
-        tag,
-        'Failed to obtain primary lease for action "${transaction.action}".',
-      );
-      _setPrimary(false);
-      throw FirestoreException(
-        message: primaryLeaseLostErrorMessage,
-        errorCode: FirestoreErrorCode.failedPrecondition,
-      );
-    }
-    throw FirestoreException(
-      message: _exclusiveErrorMessage,
+    final String holder = owner == null
+        ? 'another client held it and released it'
+        : _isOtherLiveLease(owner)
+        ? 'client ${owner['ownerId']} holds it'
+        : 'client ${owner['ownerId']} took it';
+    final FirestoreException error = FirestoreException(
+      message:
+          '$_exclusiveErrorMessage (This client lost the primary lease of $databaseName: $holder. The other client may '
+          'have changed the cache, so this instance stops; a new instance reads the cache again.)',
       errorCode: FirestoreErrorCode.failedPrecondition,
     );
+    Log.e(tag, error.message);
+    _fatalError ??= error;
+    _setPrimary(false);
+    final void Function()? listener = databaseClearedListener;
+    databaseClearedListener = null;
+    if (listener != null) {
+      scheduleMicrotask(listener);
+    }
+    throw error;
   }
 
   void _setPrimary(bool primary) {
@@ -902,9 +942,9 @@ class WebIndexedDbPersistence extends IndexedDbPersistence {
     });
   }
 
-  /// Refreshes this client's row and the lease (`updateClientMetadataAndTryBecomePrimary`): the lease is extended or,
-  /// when it expired (the tab was in the background), taken again unless another client took it in the meantime. As
-  /// the primary, removes the rows of clients that are no longer active every 30 minutes.
+  /// Refreshes this client's row and the lease (`updateClientMetadataAndTryBecomePrimary`), after checking that this
+  /// client still owns the lease ([_verifyOwner]): a lease that lapsed while the tab was in the background is taken
+  /// again when nobody else took it. Removes the rows of clients that are no longer active every 30 minutes.
   @override
   Future<void> refreshClientMetadata() async {
     if (!started) {
@@ -914,14 +954,9 @@ class WebIndexedDbPersistence extends IndexedDbPersistence {
       await _runMetadataTransaction<void>(
         'Update the client metadata and the primary lease',
         (_IdbTransaction transaction) async {
+          await _verifyOwner(transaction);
           await _putClientMetadata(transaction);
-          final Map<String, Object?>? lease = await _otherLease(transaction);
-          if (lease != null) {
-            _setPrimary(false);
-            return;
-          }
           await _putLease(transaction);
-          _setPrimary(true);
           final int now = _nowMs();
           if (!indexedDbIsWithinAge(
             _lastClientGarbageCollectionMs,
@@ -929,28 +964,10 @@ class WebIndexedDbPersistence extends IndexedDbPersistence {
             now,
           )) {
             _lastClientGarbageCollectionMs = now;
-            final List<Object?> clients =
-                idbToDart(
-                      await transaction.request(
-                        'get all client metadata',
-                        () =>
-                            transaction.store(DbStores.clientMetadata).getAll(),
-                      ),
-                    )!
-                    as List<Object?>;
-            await _removeClients(transaction, <String>[
-              for (final Object? client in clients)
-                if (client is Map &&
-                    client['clientId'] != clientId &&
-                    client['clientId'] is String &&
-                    (!indexedDbIsWithinAge(
-                          client['updateTimeMs'],
-                          indexedDbMaxClientAgeMs,
-                          now,
-                        ) ||
-                        _isZombied(client['clientId'])))
-                  client['clientId']! as String,
-            ]);
+            await _removeClients(
+              transaction,
+              _inactiveClients(await _readClients(transaction), now),
+            );
           }
         },
       );

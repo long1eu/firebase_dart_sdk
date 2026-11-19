@@ -319,8 +319,10 @@ final class IndexBackfillSettings {
 ///
 /// One tab at a time: the tab takes the JS SDK's primary lease as a JS tab with `persistentSingleTabManager` does, and
 /// the instance fails to start (every operation fails with [FirestoreErrorCode.failedPrecondition]) while another
-/// client (a tab of this SDK or of the JS SDK) holds a live lease or refreshed its client row less than 30 minutes ago
-/// without closing. The two SDKs can use the cache one after the other, not at the same time.
+/// client (a tab of this SDK or of the JS SDK) holds a valid lease (refreshed less than 5 s ago, by a tab that did not
+/// close). A JS tab that starts while this one holds the lease fails the same way. When the tab was in the background
+/// long enough for its lease to lapse and another client took the cache over meanwhile, the instance terminates with
+/// that error at its next operation. The two SDKs can use the cache one after the other, not at the same time.
 ///
 /// The constructor throws an [UnsupportedError] on other platforms than the web.
 ///
