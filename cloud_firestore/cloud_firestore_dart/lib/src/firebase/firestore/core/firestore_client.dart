@@ -780,12 +780,14 @@ class FirestoreClient implements RemoteStoreCallback {
 
     LruGarbageCollector? gc;
     if (useIndexedDb) {
-      // Experimental, first slice: no garbage collection and no field indexes yet (see IndexedDbCacheSettings).
-      persistence = createIndexedDbPersistence(
+      final IndexedDbPersistence indexedDb = createIndexedDbPersistence(
         persistenceKey: databaseInfo.persistenceKey,
         databaseId: databaseInfo.databaseId,
         serializer: LocalSerializer(RemoteSerializer(databaseInfo.databaseId)),
+        lruParams: LruGarbageCollectorParams.withCacheSizeBytes(cacheSizeBytes),
       );
+      gc = indexedDb.garbageCollector;
+      persistence = indexedDb;
     } else if (usePersistence && openDatabase != null) {
       final LocalSerializer serializer = LocalSerializer(
         RemoteSerializer(databaseInfo.databaseId),

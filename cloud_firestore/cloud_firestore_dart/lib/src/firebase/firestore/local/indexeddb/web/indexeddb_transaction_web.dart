@@ -139,6 +139,19 @@ class _IdbTransaction {
     }
   }
 
+  /// Walks the cursor the request [open] returns, see [idbWalk].
+  Future<void> walk(
+    String what,
+    web.IDBRequest Function() open,
+    Object Function(web.IDBCursor cursor) visit,
+  ) async {
+    try {
+      await idbWalk(_issue(what, open), visit);
+    } on IdbRequestError catch (error) {
+      throw _failed(what, error);
+    }
+  }
+
   /// Commits the transaction (`commit()` where the browser has it; it commits on its own otherwise) and completes
   /// when it is durable.
   Future<void> commit() {

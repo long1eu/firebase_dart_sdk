@@ -52,6 +52,8 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/local/indexeddb/inde
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/indexeddb/indexeddb_serializer.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/indexeddb/web/idb.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/local_serializer.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/local/lru_delegate.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/local/lru_garbage_collector.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/persistance/bundle_cache.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/persistance/document_overlay_cache.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/persistance/globals_cache.dart';
@@ -100,11 +102,13 @@ IndexedDbPersistence createIndexedDbPersistence({
   required String persistenceKey,
   required DatabaseId databaseId,
   required LocalSerializer serializer,
+  required LruGarbageCollectorParams lruParams,
 }) {
   return WebIndexedDbPersistence(
     persistenceKey: persistenceKey,
     databaseId: databaseId,
     serializer: serializer,
+    lruParams: lruParams,
   );
 }
 
@@ -120,6 +124,7 @@ class WebIndexedDbPersistence extends IndexedDbPersistence {
     required String persistenceKey,
     required DatabaseId databaseId,
     required LocalSerializer serializer,
+    required LruGarbageCollectorParams lruParams,
     String? clientId,
   }) : storagePrefix = indexedDbStoragePrefix(persistenceKey, databaseId),
        databaseName = indexedDbDatabaseName(persistenceKey, databaseId),
@@ -130,7 +135,7 @@ class WebIndexedDbPersistence extends IndexedDbPersistence {
        ) {
     queryCache = IndexedDbQueryCache._(this);
     remoteDocumentCache = IndexedDbRemoteDocumentCache._(this);
-    referenceDelegate = IndexedDbReferenceDelegate._(this);
+    referenceDelegate = IndexedDbReferenceDelegate._(this, lruParams);
     indexManager = IndexedDbIndexManager._(this);
     globalsCache = IndexedDbGlobalsCache._(this);
   }
@@ -191,6 +196,10 @@ class WebIndexedDbPersistence extends IndexedDbPersistence {
 
   @override
   late final IndexedDbIndexManager indexManager;
+
+  @override
+  LruGarbageCollector get garbageCollector =>
+      referenceDelegate.garbageCollector;
 
   @override
   late final IndexedDbGlobalsCache globalsCache;

@@ -110,11 +110,28 @@ class IndexedDbRemoteDocumentCache implements RemoteDocumentCache {
     await _updateByteSize(transaction, -size);
   }
 
+  /// The size in `remoteDocumentGlobal` is updated once for all the documents.
   @override
   Future<void> removeAll(Iterable<DocumentKey> documentKeys) async {
+    final _IdbTransaction transaction = _transaction;
+    int size = 0;
     for (final DocumentKey key in documentKeys) {
-      await remove(key);
+      size += await _deleteRows(transaction, key);
     }
+    await _updateByteSize(transaction, -size);
+  }
+
+  /// The size of the cached documents as the JS SDK accounts it (`getSize`): the `byteSize` of `remoteDocumentGlobal`.
+  Future<int> getSize() async {
+    final _IdbTransaction transaction = _transaction;
+    final Object? metadata = await transaction.read(
+      'get the document cache metadata',
+      () => transaction
+          .store(DbStores.remoteDocumentGlobal)
+          .get(DbStores.remoteDocumentGlobalKey.toJS),
+    );
+    final Object? byteSize = metadata is Map ? metadata['byteSize'] : null;
+    return byteSize is num ? byteSize.toInt() : 0;
   }
 
   /// The document of [row], or null for no row and for a sentinel removal (`maybeDecodeDocument`).

@@ -313,12 +313,13 @@ final class IndexBackfillSettings {
 /// JS SDK can open a cache this SDK wrote. A database of another schema version is refused: open the app once with a
 /// current JS SDK to migrate an older one.
 ///
+/// Garbage collection runs as with [PersistentCacheSettings], on the JS SDK's sequence numbers and size accounting
+/// ([sizeBytes]).
+///
 /// What this first slice does not have yet:
 ///
 /// - client-side indexes (`PersistentCacheIndexManager`): queries scan the documents of their collection, as with a
 ///   memory cache;
-/// - garbage collection: nothing is removed from the cache until it is cleared (`clearPersistence`); the sequence
-///   numbers the JS SDK's collector uses are kept;
 /// - several tabs: one tab at a time. The tab takes the JS SDK's primary lease as a JS tab with
 ///   `persistentSingleTabManager` does, and the instance fails to start (every operation fails with
 ///   [FirestoreErrorCode.failedPrecondition]) while another tab (of this SDK or of the JS SDK) uses the cache;
@@ -336,27 +337,41 @@ final class IndexBackfillSettings {
 /// NOT IN THE OFFICIAL SDKS: the JS SDK always stores its persistent cache this way (`persistentLocalCache`); this SDK
 /// stores it in SQLite by default ([PersistentCacheSettings]).
 final class IndexedDbCacheSettings extends LocalCacheSettings {
-  /// Creates the settings. Throws an [UnsupportedError] on other platforms than the web.
-  IndexedDbCacheSettings() {
+  /// [sizeBytes] is an approximate cache size threshold, as in [PersistentCacheSettings.sizeBytes]: the size is the
+  /// one the JS SDK counts (the JSON length of the cached documents). Use [Settings.cacheSizeUnlimited] to disable the
+  /// collection; the minimum is 1 MB, an [ArgumentError] is thrown otherwise.
+  ///
+  /// Throws an [UnsupportedError] on other platforms than the web.
+  IndexedDbCacheSettings({this.sizeBytes = Settings.defaultCacheSizeBytes}) {
     if (!_isWeb) {
       throw UnsupportedError(
         'IndexedDbCacheSettings select a cache in IndexedDB, which only exists on the web. Use '
         'PersistentCacheSettings (SQLite) or MemoryCacheSettings on this platform.',
       );
     }
+    if (sizeBytes != Settings.cacheSizeUnlimited &&
+        sizeBytes < Settings.minimumCacheBytes) {
+      throw ArgumentError(
+        'Cache size must be set to at least ${Settings.minimumCacheBytes} bytes',
+      );
+    }
   }
 
   static const bool _isWeb = bool.fromEnvironment('dart.library.js_interop');
 
+  /// The cache size threshold, in bytes.
+  final int sizeBytes;
+
   @override
   bool operator ==(Object other) =>
-      identical(this, other) || other is IndexedDbCacheSettings;
+      identical(this, other) ||
+      other is IndexedDbCacheSettings && sizeBytes == other.sizeBytes;
 
   @override
-  int get hashCode => (IndexedDbCacheSettings).hashCode;
+  int get hashCode => Object.hash(IndexedDbCacheSettings, sizeBytes);
 
   @override
-  String toString() => 'IndexedDbCacheSettings{}';
+  String toString() => 'IndexedDbCacheSettings{sizeBytes=$sizeBytes}';
 }
 
 /// Configures an in memory cache, which is lost when the instance is shut

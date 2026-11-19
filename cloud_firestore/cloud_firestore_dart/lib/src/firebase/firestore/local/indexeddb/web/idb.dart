@@ -102,12 +102,51 @@ Future<void> idbForEach(
       completer.complete();
       return;
     }
-    final web.IDBCursor cursor = result as web.IDBCursor;
+    final web.IDBCursor cursor = result! as web.IDBCursor;
     try {
       if (visit(cursor)) {
         cursor.continue_();
       } else {
         completer.complete();
+      }
+    } catch (error, stackTrace) {
+      completer.completeError(error, stackTrace);
+    }
+  }).toJS;
+  request.onerror = ((web.Event _) {
+    if (!completer.isCompleted) {
+      completer.completeError(IdbRequestError.of(request));
+    }
+  }).toJS;
+  return completer.future;
+}
+
+/// Like [idbForEach], but [visit] also says where the cursor goes next: `false` stops, `true` goes to the next
+/// position, and a key (a [JSAny]) continues to the first position at or after that key (`IDBCursor.continue(key)`),
+/// which skips the positions in between.
+Future<void> idbWalk(
+  web.IDBRequest request,
+  Object Function(web.IDBCursor cursor) visit,
+) {
+  final Completer<void> completer = Completer<void>();
+  request.onsuccess = ((web.Event _) {
+    if (completer.isCompleted) {
+      return;
+    }
+    final JSAny? result = request.result;
+    if (result.isUndefinedOrNull) {
+      completer.complete();
+      return;
+    }
+    final web.IDBCursor cursor = result! as web.IDBCursor;
+    try {
+      final Object next = visit(cursor);
+      if (next == true) {
+        cursor.continue_();
+      } else if (next == false) {
+        completer.complete();
+      } else {
+        cursor.continue_(next as JSAny);
       }
     } catch (error, stackTrace) {
       completer.completeError(error, stackTrace);

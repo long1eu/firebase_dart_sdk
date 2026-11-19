@@ -405,15 +405,19 @@ class IndexedDbIndexManager extends IndexManager {
   ) async {}
 }
 
-/// The reference delegate of the JS SDK's IndexedDB persistence (`IndexedDbLruDelegateImpl`): every document that
-/// gains or loses a reference gets a sentinel row in `targetDocuments` (target 0) with the sequence number of the
-/// transaction, and a released target keeps its data with a new sequence number.
-///
-/// TODO(long1eu): LRU garbage collection, a later slice. Nothing is collected yet: the cache grows until it is
-/// cleared. The sequence numbers in the rows are kept as the JS SDK keeps them, so that its collector (or this SDK's,
-/// later) can work on them.
-class IndexedDbReferenceDelegate implements ReferenceDelegate {
-  IndexedDbReferenceDelegate._(this._persistence);
+/// The reference delegate and LRU garbage collection of the JS SDK's IndexedDB persistence
+/// (`IndexedDbLruDelegateImpl`): every document that gains or loses a reference gets a sentinel row in
+/// `targetDocuments` (target 0) with the sequence number of the transaction, and a released target keeps its data with
+/// a new sequence number. A document whose only row in `targetDocuments` is its sentinel is orphaned; the collector
+/// removes the orphaned documents and the inactive targets with the lowest sequence numbers once the cache (the
+/// `byteSize` of `remoteDocumentGlobal`, as the JS SDK counts it) is over the threshold.
+class IndexedDbReferenceDelegate implements ReferenceDelegate, LruDelegate {
+  IndexedDbReferenceDelegate._(
+    this._persistence,
+    LruGarbageCollectorParams params,
+  ) {
+    garbageCollector = LruGarbageCollector(this, params);
+  }
 
   final WebIndexedDbPersistence _persistence;
 
@@ -423,6 +427,9 @@ class IndexedDbReferenceDelegate implements ReferenceDelegate {
 
   @override
   ReferenceSet? inMemoryPins;
+
+  @override
+  late final LruGarbageCollector garbageCollector;
 
   void _start(int highestSequenceNumber) {
     _listenSequence = ListenSequence(highestSequenceNumber);
@@ -451,6 +458,10 @@ class IndexedDbReferenceDelegate implements ReferenceDelegate {
   void onTransactionRolledBack() {
     _currentSequenceNumber = ListenSequence.invalid;
   }
+
+  /// `sentinelKey`: `[0, encoded path]`.
+  static JSAny _sentinelKey(String encodedPath) =>
+      idbKey(<Object>[0, encodedPath]);
 
   Future<void> _writeSentinel(DocumentKey key) async {
     final _IdbTransaction transaction = _persistence._current;
@@ -487,6 +498,157 @@ class IndexedDbReferenceDelegate implements ReferenceDelegate {
       ),
     );
   }
+
+  // LRU garbage collection
+
+  @override
+  Future<void> forEachTarget(Consumer<QueryData> consumer) =>
+      _persistence.queryCache.forEachTarget(consumer);
+
+  @override
+  Future<int> getSequenceNumberCount() async {
+    int orphaned = 0;
+    await _forEachOrphanedDocument((String _, int _) => orphaned++);
+    return _persistence.queryCache.targetCount + orphaned;
+  }
+
+  @override
+  Future<void> forEachOrphanedDocumentSequenceNumber(Consumer<int> consumer) =>
+      _forEachOrphanedDocument(
+        (String _, int sequenceNumber) => consumer(sequenceNumber),
+      );
+
+  /// Calls [visit] with the encoded path and the sequence number of every orphaned document: a document whose only row
+  /// in `targetDocuments` is its sentinel row (target 0). The rows are read through `documentTargetsIndex`
+  /// (`[path, targetId]`), where the sentinel of a document comes first (`forEachOrphanedDocument`).
+  Future<void> _forEachOrphanedDocument(
+    void Function(String encodedPath, int sequenceNumber) visit,
+  ) async {
+    final _IdbTransaction transaction = _persistence._current;
+    String? nextPath;
+    int nextToReport = ListenSequence.invalid;
+    await transaction.forEach(
+      'find the orphaned documents',
+      () => transaction
+          .store(DbStores.targetDocuments)
+          .index(DbStores.targetDocumentsDocumentIndex)
+          .openCursor(),
+      (web.IDBCursor cursor) {
+        final JSObject row =
+            (cursor as web.IDBCursorWithValue).value! as JSObject;
+        final JSAny? targetId = row.getProperty('targetId'.toJS);
+        if (targetId.isA<JSNumber>() &&
+            (targetId! as JSNumber).toDartDouble == 0) {
+          // A new document: the previous one had no target if it is still to report.
+          if (nextToReport != ListenSequence.invalid) {
+            visit(nextPath!, nextToReport);
+          }
+          final JSAny? sequenceNumber = row.getProperty('sequenceNumber'.toJS);
+          // The JS SDK always writes it in a sentinel row; one without counts as the oldest.
+          nextToReport = sequenceNumber.isA<JSNumber>()
+              ? (sequenceNumber! as JSNumber).toDartDouble.toInt()
+              : 0;
+          nextPath = (row.getProperty('path'.toJS)! as JSString).toDart;
+        } else {
+          nextToReport = ListenSequence.invalid;
+        }
+        return true;
+      },
+    );
+    if (nextToReport != ListenSequence.invalid) {
+      visit(nextPath!, nextToReport);
+    }
+  }
+
+  @override
+  Future<int> removeTargets(int upperBound, Set<int> activeTargetIds) =>
+      _persistence.queryCache.removeTargets(upperBound, activeTargetIds);
+
+  /// The ids of the users that have a batch in `mutations`, read through `userMutationsIndex` with one step per user.
+  ///
+  /// PORTING NOTE: the JS SDK walks the keys of `mutationQueues` (`mutationQueuesContainKey`), but no longer writes
+  /// rows there itself; the users are read from the batches instead, so that the pending writes of a user the JS SDK
+  /// added are pinned too.
+  Future<List<String>> _usersWithBatches(_IdbTransaction transaction) async {
+    final List<String> users = <String>[];
+    await transaction.walk(
+      'find the users with pending writes',
+      () => transaction
+          .store(DbStores.mutations)
+          .index(DbStores.mutationsUserIndex)
+          .openKeyCursor(),
+      (web.IDBCursor cursor) {
+        final Object? key = idbToDart(cursor.key);
+        if (key is! List || key.isEmpty || key.first is! String) {
+          return true;
+        }
+        final String user = key.first! as String;
+        users.add(user);
+        return idbKey(<Object>[user, double.infinity]);
+      },
+    );
+    return users;
+  }
+
+  /// Whether a pending write of any user changes the document at [encodedPath] (`mutationQueuesContainKey`).
+  Future<bool> _mutationQueuesContain(
+    _IdbTransaction transaction,
+    List<String> users,
+    String encodedPath,
+  ) async {
+    for (final String user in users) {
+      final JSAny? key = await transaction.request(
+        'find a pending write of a document',
+        () => transaction
+            .store(DbStores.documentMutations)
+            .getKey(
+              web.IDBKeyRange.bound(
+                idbKey(<Object>[user, encodedPath]),
+                idbKey(<Object>[user, encodedPath, double.infinity]),
+              ),
+            ),
+      );
+      if (!key.isUndefinedOrNull) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  @override
+  Future<int> removeOrphanedDocuments(int upperBound) async {
+    final _IdbTransaction transaction = _persistence._current;
+    final List<String> candidates = <String>[];
+    await _forEachOrphanedDocument((String path, int sequenceNumber) {
+      if (sequenceNumber <= upperBound) {
+        candidates.add(path);
+      }
+    });
+    if (candidates.isEmpty) {
+      return 0;
+    }
+    final List<String> users = await _usersWithBatches(transaction);
+    final List<DocumentKey> removed = <DocumentKey>[];
+    for (final String path in candidates) {
+      final DocumentKey key = DocumentKey.fromPath(decodeJsResourcePath(path));
+      if ((inMemoryPins?.containsKey(key) ?? false) ||
+          await _mutationQueuesContain(transaction, users, path)) {
+        continue;
+      }
+      removed.add(key);
+      await transaction.request(
+        'delete the sentinel row of $key',
+        () => transaction
+            .store(DbStores.targetDocuments)
+            .delete(_sentinelKey(path)),
+      );
+    }
+    await _persistence.remoteDocumentCache.removeAll(removed);
+    return removed.length;
+  }
+
+  @override
+  Future<int> get byteSize => _persistence.remoteDocumentCache.getSize();
 }
 
 /// Bundles and named queries are not stored yet.

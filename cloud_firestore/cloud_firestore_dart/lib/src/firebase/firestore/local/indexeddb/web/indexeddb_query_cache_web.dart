@@ -175,6 +175,51 @@ class IndexedDbQueryCache implements QueryCache {
     await _writeMetadata();
   }
 
+  /// Removes the targets with a sequence number up to [upperBound] that are not in [activeTargetIds], with their
+  /// documents in `targetDocuments` (`removeTargets` of `indexeddb_target_cache.ts`). The rows are read as they are,
+  /// not decoded: a target this SDK can not read (a pipeline target of the JS SDK) is collected too.
+  Future<int> removeTargets(int upperBound, Set<int> activeTargetIds) async {
+    final _IdbTransaction transaction = _transaction;
+    final List<int> removed = <int>[];
+    await transaction.forEach(
+      'find the targets to collect',
+      () => transaction.store(DbStores.targets).openCursor(),
+      (web.IDBCursor cursor) {
+        final JSObject row =
+            (cursor as web.IDBCursorWithValue).value! as JSObject;
+        final JSAny? id = row.getProperty('targetId'.toJS);
+        final JSAny? sequenceNumber = row.getProperty(
+          'lastListenSequenceNumber'.toJS,
+        );
+        if (id.isA<JSNumber>() &&
+            sequenceNumber.isA<JSNumber>() &&
+            (sequenceNumber! as JSNumber).toDartDouble <= upperBound) {
+          final int targetId = (id! as JSNumber).toDartInt;
+          if (!activeTargetIds.contains(targetId)) {
+            removed.add(targetId);
+          }
+        }
+        return true;
+      },
+    );
+    for (final int targetId in removed) {
+      await removeMatchingKeysForTargetId(targetId);
+      await transaction.request(
+        'delete target $targetId',
+        () => transaction.store(DbStores.targets).delete(targetId.toJS),
+      );
+    }
+    if (removed.isNotEmpty) {
+      hardAssert(
+        targetCount >= removed.length,
+        'Removing from an empty target cache',
+      );
+      targetCount -= removed.length;
+      await _writeMetadata();
+    }
+    return removed.length;
+  }
+
   @override
   Future<QueryData?> getQueryData(Target target) async {
     final _IdbTransaction transaction = _transaction;

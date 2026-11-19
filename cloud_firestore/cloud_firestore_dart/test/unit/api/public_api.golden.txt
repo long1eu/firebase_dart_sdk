@@ -261,8 +261,9 @@ class IndexBackfillSettings
   toString(): String
 class IndexedDbCacheSettings extends LocalCacheSettings
   ==(Object other): bool
+  final sizeBytes: int
   get hashCode: int
-  new IndexedDbCacheSettings()
+  new IndexedDbCacheSettings({int sizeBytes})
   toString(): String
 class Int32Value
   ==(Object other): bool

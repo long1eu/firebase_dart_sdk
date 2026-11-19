@@ -1,3 +1,4 @@
+import 'package:cloud_firestore_dart/src/firebase/firestore/local/lru_garbage_collector.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/persistance/persistence.dart';
 
 /// A persistence that stores the cache in IndexedDB in the format of the official Firebase JS SDK (schema version 18,
@@ -32,6 +33,9 @@ abstract class IndexedDbPersistence extends Persistence {
 
   /// Records whether the network of this client is enabled (`networkEnabled` of its client row).
   Future<void> setNetworkEnabled(bool enabled);
+
+  /// The LRU garbage collector of the cache, on the JS SDK's sequence numbers.
+  LruGarbageCollector get garbageCollector;
 
   /// Deletes the database. Only after [shutdown].
   Future<void> clearPersistence();

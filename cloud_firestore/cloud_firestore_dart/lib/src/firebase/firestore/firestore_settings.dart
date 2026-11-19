@@ -171,7 +171,7 @@ class Settings {
   /// value is 1 MB.
   ///
   /// When [cacheSettings] is set this is derived from it: the size of the
-  /// [PersistentCacheSettings], [cacheSizeUnlimited] for [MemoryCacheSettings] and [IndexedDbCacheSettings].
+  /// [PersistentCacheSettings] or [IndexedDbCacheSettings], [cacheSizeUnlimited] for [MemoryCacheSettings].
   final int cacheSizeBytes;
 
   /// Configures the local cache with [PersistentCacheSettings] or
@@ -409,10 +409,11 @@ class Settings {
       return cacheSizeBytes;
     }
     _checkNotMixed(persistenceEnabled, cacheSizeBytes);
-    // The IndexedDB cache has no garbage collection yet.
-    return cacheSettings is PersistentCacheSettings
-        ? cacheSettings.sizeBytes
-        : cacheSizeUnlimited;
+    return switch (cacheSettings) {
+      final PersistentCacheSettings persistent => persistent.sizeBytes,
+      final IndexedDbCacheSettings indexedDb => indexedDb.sizeBytes,
+      _ => cacheSizeUnlimited,
+    };
   }
 
   static void _checkNotMixed(bool persistenceEnabled, int cacheSizeBytes) {
