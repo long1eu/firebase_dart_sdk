@@ -184,7 +184,7 @@ class IndexedDbRemoteDocumentCache implements RemoteDocumentCache {
     IndexOffset offset,
     int limit,
   ) async {
-    // Only the index backfiller calls this, and this slice has no field indexes; kept as the JS SDK has it.
+    // The index backfiller reads the documents of a collection group after an offset (`getAllFromCollectionGroup`).
     final _IdbTransaction transaction = _transaction;
     List<Object?> groupKey(SnapshotVersion readTime, List<String> path) =>
         <Object?>[
