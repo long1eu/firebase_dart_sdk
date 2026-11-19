@@ -2,7 +2,12 @@
 //
 // SQLite compares BLOBs as the store contract orders keys (by unsigned bytes, a prefix first), so a range scan is a
 // range of the primary key. A write is one SQLite transaction.
+//
+// A statement outside of a transaction takes and releases SQLite's locks by itself, which costs about as much as the
+// read. So the reads share one read transaction, which ends when the event loop turns (or before a write): the SDK
+// reads a few times per document, all in one turn. Nobody else writes to the store, so the reads see no less.
 
+import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:cloud_firestore_dart/cache_store.dart';
@@ -18,6 +23,27 @@ class SqliteCacheStore implements CacheStore {
 
   Database get _db => _database ?? (throw StateError('The store is not open'));
 
+  /// Whether the read transaction is open.
+  bool _reading = false;
+
+  /// The database, in the read transaction.
+  Database _read() {
+    final Database db = _db;
+    if (!_reading) {
+      db.execute('BEGIN');
+      _reading = true;
+      Timer.run(_endRead);
+    }
+    return db;
+  }
+
+  void _endRead() {
+    if (_reading) {
+      _reading = false;
+      _database?.execute('COMMIT');
+    }
+  }
+
   @override
   Future<void> open() async {
     final Database database = sqlite3.open(path);
@@ -32,6 +58,7 @@ class SqliteCacheStore implements CacheStore {
 
   @override
   Future<void> close() async {
+    _endRead();
     // `dispose()` closes the database in sqlite3 2.x and still does in 3.x.
     // ignore: deprecated_member_use
     _database?.dispose();
@@ -40,7 +67,7 @@ class SqliteCacheStore implements CacheStore {
 
   @override
   Future<Uint8List?> get(Uint8List key) async {
-    final ResultSet rows = _db.select(
+    final ResultSet rows = _read().select(
       'SELECT value FROM entries WHERE key = ?',
       <Object>[key],
     );
@@ -54,7 +81,7 @@ class SqliteCacheStore implements CacheStore {
     bool reverse = false,
     int? limit,
   }) async {
-    final ResultSet rows = _db.select(
+    final ResultSet rows = _read().select(
       'SELECT key, value FROM entries WHERE key >= ? AND key < ? '
       'ORDER BY key ${reverse ? 'DESC' : 'ASC'} LIMIT ?',
       <Object>[start, end, limit ?? -1],
@@ -73,6 +100,7 @@ class SqliteCacheStore implements CacheStore {
     if (puts.isEmpty && deletes.isEmpty) {
       return;
     }
+    _endRead();
     final Database db = _db;
     db.execute('BEGIN IMMEDIATE');
     try {

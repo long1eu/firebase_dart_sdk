@@ -12,6 +12,12 @@ order the store contract asks for. So `scan` is a range of the primary key, and 
 SQLite transaction (`BEGIN IMMEDIATE`, the puts and deletes, `COMMIT`, or `ROLLBACK` when a
 statement fails).
 
+The reads share one read transaction that ends when the event loop turns, or before a write: a
+SQLite statement outside of a transaction takes and releases its locks by itself, which costs
+about as much as a read by key, and the SDK reads several times per document within one turn.
+Nobody else writes to the store while the SDK uses it, so this changes nothing in what the reads
+see.
+
 This shows the shape of a store over an embedded database. It is not how this SDK's default
 persistent cache works: `PersistentCacheSettings` keeps its own SQL schema, with a table per cache
 and SQL indexes, where the key-value cache lays everything out in this one table.
