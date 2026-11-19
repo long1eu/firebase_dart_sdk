@@ -158,10 +158,12 @@ class JsIndexValueWriter {
         ..writeNumber(_typeBoolean)
         ..writeNumber(value.value ? 1 : 0);
     } else if (value is IntegerValue) {
-      // `normalizeNumber`: an int64 beyond 2^53 loses precision as in JS.
+      // `normalizeNumber`: an int64 beyond 2^53 loses precision as in JS. On the web a -0.0 of the user is an `int`
+      // (an IntegerValue of -0): the JS SDK has no integer -0, and writes 0.
+      final double number = value.value.toDouble();
       encoder
         ..writeNumber(_typeNumber)
-        ..writeNumber(value.value.toDouble());
+        ..writeNumber(number == 0 ? 0.0 : number);
     } else if (value is DoubleValue) {
       _writeDouble(value.value, encoder);
     } else if (value is Int32FieldValue) {
@@ -318,18 +320,16 @@ class JsIndexValueWriter {
   }
 
   /// The entries of [value] in the order of `Object.keys` on the JS object of its fields: the keys that are array
-  /// indexes ("0", "1", ...) first in numeric order, then the others in the order the object got them. This SDK keeps
-  /// the fields sorted, so "the order the object got them" is the sorted order here.
-  ///
-  /// PORTING NOTE: the JS SDK keeps the order of the document it read (the backend's, or the one a write gave), which
-  /// this SDK does not know: a map value inside an indexed field may be encoded with another key order than the JS
-  /// SDK's, and then only matches the entries this SDK wrote.
+  /// indexes ("0", "1", ...) first in numeric order, then the others in the order the object got them. That order is
+  /// the one of the map the value was made of ([ObjectValue.entriesInKeyOrder]): the user's map for a query value,
+  /// the stored document (the backend's order, which is the order the writer gave) for an index entry, as in the JS
+  /// SDK. A map value built field by field (by a transform or a merge) has its keys sorted instead.
   static Iterable<MapEntry<String, FieldValue>> _jsKeyOrder(ObjectValue value) {
     final List<MapEntry<String, FieldValue>> indexes =
         <MapEntry<String, FieldValue>>[];
     final List<MapEntry<String, FieldValue>> others =
         <MapEntry<String, FieldValue>>[];
-    for (final MapEntry<String, FieldValue> entry in value.internalValue) {
+    for (final MapEntry<String, FieldValue> entry in value.entriesInKeyOrder) {
       (_isArrayIndex(entry.key) ? indexes : others).add(entry);
     }
     if (indexes.isEmpty) {

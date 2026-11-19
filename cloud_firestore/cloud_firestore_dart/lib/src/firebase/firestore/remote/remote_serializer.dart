@@ -378,7 +378,8 @@ class RemoteSerializer {
 
   proto.MapValue _encodeMapValue(ObjectValue value) {
     final proto.MapValue builder = proto.MapValue.create();
-    for (MapEntry<String, FieldValue> entry in value.internalValue) {
+    // NOT IN THE OFFICIAL SDKS: in the order of the user's map (see ObjectValue.entriesInKeyOrder).
+    for (MapEntry<String, FieldValue> entry in value.entriesInKeyOrder) {
       builder.fields[entry.key] = encodeValue(entry.value);
     }
     return builder..freeze();
@@ -560,7 +561,11 @@ class RemoteSerializer {
       final FieldValue value = decodeValue(entry.value);
       result = result.set(path, value);
     }
-    return result;
+    // NOT IN THE OFFICIAL SDKS: the order of the proto map is kept (see ObjectValue.entriesInKeyOrder).
+    return ObjectValue.fromImmutableMap(
+      result.internalValue,
+      keyOrder: fields.keys.toList(growable: false),
+    );
   }
 
   ObjectValue decodeDocumentFields(Map<String, proto_v1.Value> fields) {

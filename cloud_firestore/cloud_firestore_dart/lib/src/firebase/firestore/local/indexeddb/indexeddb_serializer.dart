@@ -102,8 +102,9 @@ class IndexedDbSerializer {
   /// The JS SDK's readers accept more than proto3 JSON (`normalizeTimestamp`, `normalizeByteString`,
   /// `normalizeNumber` of `normalize.ts`), and its rows hold such values: the local write time of a pending server
   /// timestamp is `{timestampValue: {seconds, nanos}}` (`server_timestamps.ts`), bytes may be a `Uint8Array` (a map of
-  /// indexes once it went through `JSON.stringify`), and numbers may be strings or numbers. This rewrites them to RFC
-  /// 3339 strings, base64 and the proto3 JSON number forms. As in [toProto3Json], a field is only rewritten when its
+  /// indexes once it went through `JSON.stringify`), numbers may be strings or numbers, and a document cached from the
+  /// backend writes a null as `nullValue: null` (which proto3 JSON readers take for an unset field). This rewrites them
+  /// to `NULL_VALUE`, RFC 3339 strings, base64 and the proto3 JSON number forms. As in [toProto3Json], a field is only rewritten when its
   /// value has the shape of such a value: inside `fields` the values are always objects of the `Value` message.
   static Object? fromJsProto3Json(Object? json) {
     if (json is Map) {
@@ -120,7 +121,11 @@ class IndexedDbSerializer {
   }
 
   static Object? _fromJsField(String key, Object? value) {
-    if (_timestampFields.contains(key) || key == 'readTime') {
+    if (key == 'nullValue' && value == null) {
+      // The backend's JSON (and so a document the JS SDK cached from a listen) writes a null as `nullValue: null`,
+      // which proto3 JSON readers take for an unset field.
+      return 'NULL_VALUE';
+    } else if (_timestampFields.contains(key) || key == 'readTime') {
       if (value is Map &&
           (value.containsKey('seconds') || value.containsKey('nanos'))) {
         return _timestampString(

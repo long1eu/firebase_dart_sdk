@@ -5,21 +5,24 @@
 part of 'field_value.dart';
 
 class ObjectValue extends FieldValue {
-  const ObjectValue(this._value);
+  const ObjectValue(this._value, [this._keyOrder]);
 
+  /// The value of [value]; the order of its keys is kept (see [entriesInKeyOrder]).
   factory ObjectValue.fromMap(Map<String, FieldValue> value) {
     return ObjectValue.fromImmutableMap(
       ImmutableSortedMap<String, FieldValue>.fromMap(value, compareUtf8Strings),
+      keyOrder: value.keys.toList(growable: false),
     );
   }
 
   factory ObjectValue.fromImmutableMap(
-    ImmutableSortedMap<String, FieldValue> value,
-  ) {
+    ImmutableSortedMap<String, FieldValue> value, {
+    List<String>? keyOrder,
+  }) {
     if (value.isEmpty) {
       return empty;
     } else {
-      return ObjectValue(value);
+      return ObjectValue(value, keyOrder);
     }
   }
 
@@ -28,6 +31,27 @@ class ObjectValue extends FieldValue {
   );
 
   final ImmutableSortedMap<String, FieldValue> _value;
+
+  /// NOT IN THE OFFICIAL SDKS: the order of the keys of the map this value was made of (the user's map, or the proto
+  /// map as the backend or a cache had it), or null when it was built field by field. Not part of the value: equality,
+  /// comparison and every other use go by the sorted keys.
+  final List<String>? _keyOrder;
+
+  /// The entries in the order of the map this value was made of, when it is known, else sorted by key.
+  ///
+  /// NOT IN THE OFFICIAL SDKS: the JS SDK keeps the order of its objects, and its index encoding of a map value
+  /// (in the IndexedDB cache) follows it; the encoding of a map value for the backend keeps it too, so that the
+  /// backend, and the caches that read the document back, have the order the user wrote.
+  Iterable<MapEntry<String, FieldValue>> get entriesInKeyOrder {
+    final List<String>? order = _keyOrder;
+    if (order == null || order.length != _value.length) {
+      return _value;
+    }
+    return <MapEntry<String, FieldValue>>[
+      for (final String key in order)
+        if (_value[key] case final FieldValue value) MapEntry(key, value),
+    ];
+  }
 
   @override
   int get typeOrder => FieldValue.typeOrderObject;
