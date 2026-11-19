@@ -288,7 +288,13 @@ class IndexedDbIndexManager extends IndexManager {
   // Collection parents
 
   @override
-  Future<void> addToCollectionParentIndex(ResourcePath collectionPath) async {
+  Future<void> addToCollectionParentIndex(ResourcePath collectionPath) =>
+      _persistence._write(
+        'Add a collection parent',
+        () => _addToCollectionParentIndex(collectionPath),
+      );
+
+  Future<void> _addToCollectionParentIndex(ResourcePath collectionPath) async {
     hardAssert(collectionPath.length % 2 == 1, 'Expected a collection path.');
     if (_written.contains(collectionPath)) {
       return;
@@ -333,7 +339,10 @@ class IndexedDbIndexManager extends IndexManager {
   // Index configuration
 
   @override
-  Future<void> addFieldIndex(FieldIndex index) async {
+  Future<void> addFieldIndex(FieldIndex index) =>
+      _persistence._write('Add a field index', () => _addFieldIndex(index));
+
+  Future<void> _addFieldIndex(FieldIndex index) async {
     hardAssert(_started, 'IndexManager not started');
     final _IdbTransaction transaction = _transaction;
     // `indexId` is left out: the key generator of the store assigns it, as in the JS SDK.
@@ -376,7 +385,12 @@ class IndexedDbIndexManager extends IndexManager {
   );
 
   @override
-  Future<void> deleteFieldIndex(FieldIndex index) async {
+  Future<void> deleteFieldIndex(FieldIndex index) => _persistence._write(
+    'Delete a field index',
+    () => _deleteFieldIndex(index),
+  );
+
+  Future<void> _deleteFieldIndex(FieldIndex index) async {
     final _IdbTransaction transaction = _transaction;
     await Future.wait(<Future<Object?>>[
       transaction.request(
@@ -406,7 +420,12 @@ class IndexedDbIndexManager extends IndexManager {
   }
 
   @override
-  Future<void> deleteAllFieldIndexes() async {
+  Future<void> deleteAllFieldIndexes() => _persistence._write(
+    'Delete all field indexes',
+    () => _deleteAllFieldIndexes(),
+  );
+
+  Future<void> _deleteAllFieldIndexes() async {
     final _IdbTransaction transaction = _transaction;
     await Future.wait(<Future<Object?>>[
       for (final String store in const <String>[
@@ -424,7 +443,12 @@ class IndexedDbIndexManager extends IndexManager {
   }
 
   @override
-  Future<void> createTargetIndexes(Target target) async {
+  Future<void> createTargetIndexes(Target target) => _persistence._write(
+    'Create target indexes',
+    () => _createTargetIndexes(target),
+  );
+
+  Future<void> _createTargetIndexes(Target target) async {
     hardAssert(_started, 'IndexManager not started');
     for (final Target subTarget in _getSubTargets(target)) {
       final IndexType type = getIndexType(subTarget);
@@ -462,6 +486,14 @@ class IndexedDbIndexManager extends IndexManager {
 
   @override
   Future<void> updateCollectionGroup(
+    String collectionGroup,
+    IndexOffset offset,
+  ) => _persistence._write(
+    'Update the index state of a collection group',
+    () => _updateCollectionGroup(collectionGroup, offset),
+  );
+
+  Future<void> _updateCollectionGroup(
     String collectionGroup,
     IndexOffset offset,
   ) async {
@@ -789,7 +821,13 @@ class IndexedDbIndexManager extends IndexManager {
   }
 
   @override
-  Future<void> updateIndexEntries(
+  Future<void> updateIndexEntries(Map<DocumentKey, MaybeDocument?> documents) =>
+      _persistence._write(
+        'Update index entries',
+        () => _updateIndexEntries(documents),
+      );
+
+  Future<void> _updateIndexEntries(
     Map<DocumentKey, MaybeDocument?> documents,
   ) async {
     hardAssert(_started, 'IndexManager not started');

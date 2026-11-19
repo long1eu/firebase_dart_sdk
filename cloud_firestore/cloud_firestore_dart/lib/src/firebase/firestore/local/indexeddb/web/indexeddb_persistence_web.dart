@@ -262,6 +262,17 @@ class WebIndexedDbPersistence extends IndexedDbPersistence {
     return _begin('A read outside of a persistence transaction', 'readonly');
   }
 
+  /// Runs the write [operation] in the transaction of this zone, or in a persistence transaction of its own when it is
+  /// called outside of one: the local store of this port runs some operations that write outside a transaction (the
+  /// query engine creates indexes from `executeQuery`), which SQLite commits on their own. A read-only transaction
+  /// ([_current]) can not write, and a write must check the lease first ([_verifyOwner]).
+  Future<void> _write(String action, Future<void> Function() operation) {
+    if (Zone.current[_zoneKey] is _IdbTransaction) {
+      return operation();
+    }
+    return runTransaction(action, operation);
+  }
+
   /// Runs [operation] with [transaction] as the transaction of its zone (see [_current]).
   Future<R> _inTransaction<R>(
     _IdbTransaction transaction,

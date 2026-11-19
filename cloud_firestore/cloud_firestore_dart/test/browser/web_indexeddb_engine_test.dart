@@ -64,7 +64,13 @@ Future<FirebaseFirestore> newClient(
   );
   _apps[firestore] = app;
   addTearDown(() => shutDown(firestore));
-  await firestore.initialized;
+  try {
+    await firestore.initialized;
+  } catch (_) {
+    // Frees the app name, so that the test can open the same database again.
+    await shutDown(firestore);
+    rethrow;
+  }
   return firestore;
 }
 
@@ -281,8 +287,8 @@ void main() {
       newClient(appName),
       throwsA(
         isA<FirestoreException>().having(
-          (FirestoreException e) => e.code,
-          'code',
+          (FirestoreException e) => e.errorCode,
+          'errorCode',
           FirestoreErrorCode.failedPrecondition,
         ),
       ),
@@ -296,7 +302,9 @@ void main() {
     }, DbStores.ownerKey);
     final FirebaseFirestore firestore = await newClient(appName);
     await firestore.disableNetwork();
-    await firestore.doc('a/b').set(<String, Object?>{'x': 1});
+    // Offline, a write completes once the backend has it: not awaited, the cache has it.
+    firestore.doc('a/b').set(<String, Object?>{'x': 1}).ignore();
+    expect((await firestore.doc('a/b').get(cache))['x'], 1);
 
     // Another client takes the lease over (as after a lapse in the background): the next operation fails, and nothing
     // more is written.
