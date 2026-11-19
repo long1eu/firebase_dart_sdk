@@ -191,7 +191,9 @@ flowchart TD
   needLive -- "no" --> lite["Firestore Lite: no cache"]
   needLive -- "yes" --> needReload{"Data across reloads?"}
   needReload -- "no" --> memory["Memory cache (default)"]
-  needReload -- "yes" --> cacheSize{"A large cache?"}
+  needReload -- "yes" --> jsFormat{"Share the cache with the JS SDK, or skip sqlite3.wasm?"}
+  jsFormat -- "yes" --> idbCache["IndexedDB cache (experimental, one tab)"]
+  jsFormat -- "no" --> cacheSize{"A large cache?"}
   cacheSize -- "no" --> indexedDb["SQLite in IndexedDB"]
   cacheSize -- "yes" --> opfs["SQLite in OPFS, in a worker"]
 ```
@@ -201,6 +203,7 @@ flowchart TD
 | Memory (the default) | No `openDatabase` | Pages that do not need data across reloads. Smallest download. |
 | SQLite in IndexedDB | `sqliteOpener()` | Small caches. SQLite runs in the page on a copy of the whole database in memory. |
 | SQLite in OPFS | `sqliteOpener(opfsWorker: ...)` | Larger caches. SQLite runs in a worker and reads the file as it needs; memory stays at a few MB. |
+| IndexedDB cache (experimental) | `indexedDbCacheSettings()` of `indexeddb_cache.dart` | No `sqlite3.wasm`, no extra package, and the cache is the JS SDK's own database: an app can switch between the two SDKs, see [The IndexedDB cache](#the-indexeddb-cache-experimental). |
 
 The persistent caches come from the companion package
 [`cloud_firestore_dart_sqlite`](../../cloud_firestore/cloud_firestore_dart_sqlite/). Add it, and
@@ -479,6 +482,75 @@ your app does not compile to wasm. Three things to know:
   `sqlite3` 2.9.4 under dart2wasm, fixed in `sqlite3` 3.8 (see [Platforms](platforms.md#the-web-supported-in-chrome)); the
   crash test of the IndexedDB storage runs with dart2js only.
 
+## The IndexedDB cache (experimental)
+
+**Experimental.** A third persistent cache that stores the cache in IndexedDB in the database and format
+of the official Firebase JS SDK (`firestore/<app>/<project>[.<database>]/main`, schema version 18),
+without SQLite. It is a library of its own, so pass its settings and nothing else:
+
+```dart
+import 'package:cloud_firestore_dart/cloud_firestore_dart.dart';
+import 'package:cloud_firestore_dart/indexeddb_cache.dart';
+
+final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(
+  app: app,
+  settings: Settings(
+    cacheSettings: indexedDbCacheSettings(
+      sizeBytes: 40 * 1024 * 1024,
+      indexAutoCreation: true,
+    ),
+  ),
+);
+```
+
+`sizeBytes`, `indexAutoCreation`, `indexBackfill` and `mergeUnsentWrites` are those of
+`PersistentCacheSettings`; there is no `openDatabase` and no `cloud_firestore_dart_sqlite`.
+
+Why use it:
+
+- **No `sqlite3.wasm`** (759 KB, 364 KB gzipped) and no extra package to add and keep in step.
+- **Both ways with the JS SDK.** An app can switch between the official JS SDK (or FlutterFire on the
+  web) and this SDK on the same browser profile, in either direction, one after the other. The
+  documents, the pending writes of every user, the cache indexes, bundles and named queries are
+  carried over because both SDKs read and write the same database: there is no import step.
+  [`importJsSdkCache`](#switching-from-the-official-js-sdk) goes one way only (JS to this SDK), into
+  the SQLite cache, and carries over the pending writes and the documents, not the indexes or bundles.
+  On an instance that uses the IndexedDB cache it, and `deleteJsSdkCache`, do nothing.
+
+What it costs: about 121 KB more JavaScript (about 34 KB gzipped, dart2js `-O2`, against the same small
+app with the memory cache), only in an app that imports `indexeddb_cache.dart`; an app that does not
+carries none of it.
+
+How fast it is: [section 8 of the spike](../spikes/indexeddb_cache.md#8-the-engine-against-the-sqlite-caches-reads-over-a-large-cache-added-2026-11-18)
+has the numbers against both SQLite caches. In short, it opens fastest and grows least with the size of
+the cache (62 to 80 ms against 145 to 311 ms for SQLite in IndexedDB at 20,000 documents). Whole
+collection and limit queries take about the same time, and filtered reads are slower: `group == x`
+1.5 to 3 times, a collection group 1.4 to 2.3 times, and large batches of writes 1.1 to 1.6 times. That
+measurement was taken on an earlier version of the engine, without the index manager or garbage
+collection, and with every document a pending write; it was not repeated with a cache filled from the
+backend or with field indexes.
+
+Limits:
+
+- **One tab at a time, and no JS SDK tab beside it.** The engine takes the JS SDK's primary lease. While
+  another client (a tab of the JS SDK, or another instance of this SDK) holds a live lease, it refuses to
+  open and its operations fail with `failedPrecondition`. If another client takes the lease while this
+  one is in the background, the instance fails and terminates; create a new one. Close the old
+  version of the app before the new one starts, as in [One tab at a time](#one-tab-at-a-time).
+- **Schema version 18 only.** A JS database of an older version is refused (open the app once with a
+  JS SDK that upgrades it, or clear the cache), and so is a newer one. A new database is created as
+  the JS SDK creates it.
+- **Web only.** `indexedDbCacheSettings()` throws `UnsupportedError` on the Dart VM and in Flutter on
+  other platforms.
+- **Experimental**, and the format belongs to the JS SDK: a new JS schema version means a new release
+  of this package.
+
+It was checked in Chrome only, against `firebase` 12.19.0 (npm) and the Firestore emulator.
+`tool/bench/web_idb/js_import/interop_check.sh` runs the check in headless Chrome: documents,
+pending writes of two users, indexes, bundles and garbage collection from each SDK to the other,
+the lease handover, and index entries per value kind. Firefox and Safari were not checked for
+this interop (the engine's speed was measured in both, see the spike), nor the production backend.
+
 ## Known gaps
 
 - Chrome only; production untested from a browser.
@@ -486,7 +558,8 @@ your app does not compile to wasm. Three things to know:
   a shared worker.
 - A crash of the browser itself or a power cut is not covered by the crash tests of the
   persistent caches (a tab that dies is).
-- The persistent caches are in the separate package `cloud_firestore_dart_sqlite` (0.1), not in
+- The SQLite caches are in the separate package `cloud_firestore_dart_sqlite` (0.1), not in
+  `cloud_firestore_dart`; the experimental [IndexedDB cache](#the-indexeddb-cache-experimental) is in
   `cloud_firestore_dart`.
 - Against the emulator: queries of more than about 10,000 documents fail, and the six-connection
   limit of HTTP/1.1 applies.

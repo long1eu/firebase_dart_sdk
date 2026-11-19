@@ -72,7 +72,7 @@ public API of the main library is the golden listing linked below.
 ## More guides
 
 - [Flutter](https://raw.githubusercontent.com/long1eu/firebase_dart_sdk/main/docs/guides/flutter.md): using the client in a Flutter app
-- [The web](https://raw.githubusercontent.com/long1eu/firebase_dart_sdk/main/docs/guides/web.md): using the client in a browser
+- [The web](https://raw.githubusercontent.com/long1eu/firebase_dart_sdk/main/docs/guides/web.md): using the client in a browser, the caches, and the experimental IndexedDB cache shared with the JS SDK
 - [Cookbook](https://raw.githubusercontent.com/long1eu/firebase_dart_sdk/main/docs/guides/cookbook.md): short recipes for common tasks
 - [Error handling](https://raw.githubusercontent.com/long1eu/firebase_dart_sdk/main/docs/guides/error_handling.md): errors, their codes and what to do about them
 - [Troubleshooting](https://raw.githubusercontent.com/long1eu/firebase_dart_sdk/main/docs/guides/troubleshooting.md): common problems and their causes
