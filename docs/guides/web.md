@@ -540,6 +540,11 @@ Limits:
 - **Schema version 18 only.** A JS database of an older version is refused (open the app once with a
   JS SDK that upgrades it, or clear the cache), and so is a newer one. A new database is created as
   the JS SDK creates it.
+- **An index on a map field, written by the JS SDK with unsorted keys.** The JS SDK's index entry of a
+  map follows the order in which the app wrote the keys; this SDK writes and queries maps with sorted
+  keys. An equality query on a whole map, served from a cache index, can miss a document whose map a JS
+  app wrote in another key order (the JS SDK has the same dependence on its own). Queries on the
+  fields inside the map are not affected.
 - **Web only.** `indexedDbCacheSettings()` throws `UnsupportedError` on the Dart VM and in Flutter on
   other platforms.
 - **Experimental**, and the format belongs to the JS SDK: a new JS schema version means a new release
