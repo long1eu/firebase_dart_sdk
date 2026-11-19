@@ -15,6 +15,8 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
+import 'package:cloud_firestore_dart/src/firebase/firestore/bundle/bundle_metadata.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/bundle/named_query.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/target.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/indexeddb/indexeddb_schema.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/local_serializer.dart';
@@ -399,6 +401,65 @@ class IndexedDbSerializer {
           : Uint8List(0),
       null,
       limboFree == null ? SnapshotVersion.none : fromDbTimestamp(limboFree),
+    );
+  }
+
+  // Bundles
+
+  /// The row of `bundles` for [metadata] (`toDbBundle`).
+  ///
+  /// NOT IN THE OFFICIAL SDKS: `totalDocuments` and `totalBytes` are kept too (the JS SDK's row has no such fields and
+  /// ignores them; a row the JS SDK wrote reads them as 0).
+  Map<String, Object?> toDbBundle(BundleMetadata metadata) => <String, Object?>{
+    'bundleId': metadata.bundleId,
+    'createTime': toDbTimestamp(metadata.createTime),
+    'version': metadata.schemaVersion,
+    'totalDocuments': metadata.totalDocuments,
+    'totalBytes': metadata.totalBytes,
+  };
+
+  /// The metadata of a row of `bundles` (`fromDbBundle`).
+  BundleMetadata fromDbBundle(Map<String, Object?> row) => BundleMetadata(
+    row['bundleId']! as String,
+    (row['version'] as num?)?.toInt() ?? 0,
+    fromDbTimestamp(row['createTime']),
+    (row['totalDocuments'] as num?)?.toInt() ?? 0,
+    (row['totalBytes'] as num?)?.toInt() ?? 0,
+  );
+
+  /// The row of `namedQueries` for [query] (`toDbNamedQuery`): the bundled query as the proto3 JSON of a
+  /// `BundledQuery`, as the JS SDK keeps it from the bundle.
+  Map<String, Object?> toDbNamedQuery(NamedQuery query) => <String, Object?>{
+    'name': query.name,
+    'readTime': toDbTimestamp(query.readTime),
+    'bundledQuery': toProto3Json(
+      localSerializer.encodeBundledQuery(query.bundledQuery),
+    ),
+  };
+
+  /// The named query of a row of `namedQueries` (`fromDbNamedQuery`). The JS SDK stores the bundled query as the
+  /// bundle file had it, which may write an `Int32Value` limit as `{value: n}` (its reader accepts both).
+  NamedQuery fromDbNamedQuery(Map<String, Object?> row) {
+    // A new map of the JSON tree: [fromJsProto3Json] copies every map.
+    final Map<String, Object?> json =
+        fromJsProto3Json(row['bundledQuery'])! as Map<String, Object?>;
+    final Object? structuredQuery = json['structuredQuery'];
+    if (structuredQuery is Map) {
+      final Map<String, Object?> query =
+          structuredQuery as Map<String, Object?>;
+      final Object? limit = query['limit'];
+      if (limit is Map && limit.containsKey('value')) {
+        query['limit'] = limit['value'];
+      }
+      json['structuredQuery'] = query;
+    }
+    return NamedQuery(
+      row['name']! as String,
+      localSerializer.decodeBundledQuery(
+        proto.BundledQuery()
+          ..mergeFromProto3Json(json, ignoreUnknownFields: true),
+      ),
+      fromDbTimestamp(row['readTime']),
     );
   }
 

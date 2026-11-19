@@ -540,30 +540,59 @@ class IndexedDbReferenceDelegate implements ReferenceDelegate, LruDelegate {
   Future<int> get byteSize => _persistence.remoteDocumentCache.getSize();
 }
 
-/// Bundles and named queries are not stored yet.
-///
-/// TODO(long1eu): bundles and named queries, a later slice (`bundles` and `namedQueries`, `indexeddb_bundle_cache.ts`).
-/// Until then nothing is found, and loading a bundle fails with an [UnimplementedError].
+/// The bundles and named queries on `bundles` and `namedQueries` (`indexeddb_bundle_cache.ts`).
 class IndexedDbBundleCache implements BundleCache {
-  const IndexedDbBundleCache._();
+  IndexedDbBundleCache._(this._persistence);
+
+  final WebIndexedDbPersistence _persistence;
+
+  _IdbTransaction get _transaction => _persistence._current;
+
+  IndexedDbSerializer get _serializer => _persistence.serializer;
 
   @override
-  Future<BundleMetadata?> getBundleMetadata(String bundleId) async => null;
+  Future<BundleMetadata?> getBundleMetadata(String bundleId) async {
+    final _IdbTransaction transaction = _transaction;
+    final Object? row = await transaction.read(
+      'get bundle $bundleId',
+      () => transaction.store(DbStores.bundles).get(bundleId.toJS),
+    );
+    return row is Map
+        ? _serializer.fromDbBundle(row.cast<String, Object?>())
+        : null;
+  }
 
   @override
-  Future<NamedQuery?> getNamedQuery(String queryName) async => null;
-
-  @override
-  Future<void> saveBundleMetadata(BundleMetadata metadata) {
-    throw UnimplementedError(
-      'Loading bundles is not supported by the IndexedDB cache (IndexedDbCacheSettings) yet.',
+  Future<void> saveBundleMetadata(BundleMetadata metadata) async {
+    final _IdbTransaction transaction = _transaction;
+    await transaction.request(
+      'put bundle ${metadata.bundleId}',
+      () => transaction
+          .store(DbStores.bundles)
+          .put(idbToJs(_serializer.toDbBundle(metadata))),
     );
   }
 
   @override
-  Future<void> saveNamedQuery(NamedQuery query) {
-    throw UnimplementedError(
-      'Loading bundles is not supported by the IndexedDB cache (IndexedDbCacheSettings) yet.',
+  Future<NamedQuery?> getNamedQuery(String queryName) async {
+    final _IdbTransaction transaction = _transaction;
+    final Object? row = await transaction.read(
+      'get the named query $queryName',
+      () => transaction.store(DbStores.namedQueries).get(queryName.toJS),
+    );
+    return row is Map
+        ? _serializer.fromDbNamedQuery(row.cast<String, Object?>())
+        : null;
+  }
+
+  @override
+  Future<void> saveNamedQuery(NamedQuery query) async {
+    final _IdbTransaction transaction = _transaction;
+    await transaction.request(
+      'put the named query ${query.name}',
+      () => transaction
+          .store(DbStores.namedQueries)
+          .put(idbToJs(_serializer.toDbNamedQuery(query))),
     );
   }
 }

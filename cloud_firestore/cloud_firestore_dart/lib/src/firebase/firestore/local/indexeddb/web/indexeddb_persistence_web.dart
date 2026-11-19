@@ -217,7 +217,7 @@ class WebIndexedDbPersistence extends IndexedDbPersistence {
   late final IndexedDbGlobalsCache globalsCache;
 
   @override
-  final BundleCache bundleCache = const IndexedDbBundleCache._();
+  late final IndexedDbBundleCache bundleCache = IndexedDbBundleCache._(this);
 
   @override
   OverlayMigrationManager get overlayMigrationManager =>

@@ -304,24 +304,23 @@ final class IndexBackfillSettings {
 /// Configures a cache stored in IndexedDB in the format of the official Firebase JS SDK, on the web, without SQLite
 /// (no `sqlite3.wasm` to download, no `openDatabase` function).
 ///
-/// **Experimental, first slice**: the API, the behaviour and what is stored may change in a minor version.
+/// **Experimental**: the API, the behaviour and what is stored may change in a minor version.
 ///
 /// The cache is the IndexedDB database the JS SDK's `persistentLocalCache()` uses for the same app and database,
 /// `firestore/<app name>/<project id>[.<database id>]/main` (the app name is `[DEFAULT]` for the default app), at the
 /// JS SDK's schema version 18, with its stores, keys and rows. A web app that used the JS SDK with a persistent cache
-/// keeps its pending writes and cached documents when it switches to this SDK on the same browser profile, and the
-/// JS SDK can open a cache this SDK wrote. A database of another schema version is refused: open the app once with a
-/// current JS SDK to migrate an older one.
+/// keeps its pending writes, cached documents, targets, cache indexes and loaded bundles when it switches to this SDK
+/// on the same browser profile, and the JS SDK can open a cache this SDK wrote. A database of another schema version
+/// is refused: open the app once with a current JS SDK to migrate an older one.
 ///
 /// Garbage collection runs as with [PersistentCacheSettings], on the JS SDK's sequence numbers and size accounting
-/// ([sizeBytes]).
+/// ([sizeBytes]). Cache indexes ([indexAutoCreation], `PersistentCacheIndexManager`) are stored with the JS SDK's
+/// encoding, so that indexes either SDK built serve the other.
 ///
-/// What this first slice does not have yet:
-///
-/// - several tabs: one tab at a time. The tab takes the JS SDK's primary lease as a JS tab with
-///   `persistentSingleTabManager` does, and the instance fails to start (every operation fails with
-///   [FirestoreErrorCode.failedPrecondition]) while another tab (of this SDK or of the JS SDK) uses the cache;
-/// - bundles and named queries: `loadBundle` fails with an [UnimplementedError].
+/// One tab at a time: the tab takes the JS SDK's primary lease as a JS tab with `persistentSingleTabManager` does, and
+/// the instance fails to start (every operation fails with [FirestoreErrorCode.failedPrecondition]) while another
+/// client (a tab of this SDK or of the JS SDK) holds a live lease or refreshed its client row less than 30 minutes ago
+/// without closing. The two SDKs can use the cache one after the other, not at the same time.
 ///
 /// The constructor throws an [UnsupportedError] on other platforms than the web.
 ///
