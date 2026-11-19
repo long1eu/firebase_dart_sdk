@@ -1046,8 +1046,8 @@ Future<void> gettingStartedGuideLine187() async {
   );
 }
 
-// ../../docs/guides/long_offline.md:117
-Future<void> longOfflineGuideLine117() async {
+// ../../docs/guides/long_offline.md:120
+Future<void> longOfflineGuideLine120() async {
   final Settings settings = Settings(
     cacheSettings: PersistentCacheSettings(
       // One pending write per document, instead of one per edit.
@@ -1063,8 +1063,8 @@ Future<void> longOfflineGuideLine117() async {
   );
 }
 
-// ../../docs/guides/long_offline.md:210
-Future<void> longOfflineGuideLine210() async {
+// ../../docs/guides/long_offline.md:211
+Future<void> longOfflineGuideLine211() async {
   final int total = await firestore.getPendingWriteCount();
   final StreamSubscription<int> progress = firestore.pendingWriteCounts().listen(
     (int pending) => print('sent ${total - pending} of $total'),

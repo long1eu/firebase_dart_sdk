@@ -13,9 +13,10 @@ The short version:
   1 million pending writes took 246 ms before and takes 0.09 ms now.
 - **A document that is edited many times offline can be kept as one pending write** with `mergeUnsentWrites`. The
   drain of 100,000 edits of one document with a `serverTimestamp` went from about 12 hours (estimated) to 344 s
-  without the setting, and to 0.09 s with it.
+  without the setting, and to 0.09 s with it. A queue that already exists when the app starts with the setting on is
+  merged once at start (100,000 writes of one document in 6.5 s, while the app is usable).
 - **Still true:** the cache file grows by about 1 KB per pending document and nothing removes pending writes. A
-  collection group query over 100,000 small collections is still slow (12 s with 1 million pending writes).
+  collection group query over 100,000 small collections is still slow (8 s with 1 million pending writes).
 
 ## The life of a long offline period
 
@@ -67,7 +68,9 @@ Each state costs something different, and the sections below follow it.
   commit), the database on the internal SSD. The emulator, where one was used, was cloud-firestore-emulator 1.21.0 on
   the same machine (Java 21), so a round trip is well under a millisecond. No real Firebase project was used.
 - **Runs.** One run of each case on 2026-11-18 and 2026-11-19, with up to four runs at the same time on the machine, as
-  in the spike. Single numbers can be off by tens of percent; growth over two orders of magnitude is what the numbers
+  in the spike. The rows that read overlays through a cache index (the index table, the `small` group rows and the
+  mixed case at 100,000 and 1,000,000) were run again on 2026-11-19 after #68, one run at a time on a quiet machine, so
+  they are faster across the board, scans included; the 10,000 and 10,000,000 columns were not repeated. Single numbers can be off by tens of percent; growth over two orders of magnitude is what the numbers
   show. A difference of less than 2 times between "before" and "now" is not a finding.
 - **Not run.** 10 million pending writes in `c100k` and `small` (about 10 GB and an hour each); the mixed case and a
   complete index fill at 10 million (acknowledging ten million batches takes hours); a drain of more than 100,000
@@ -86,7 +89,7 @@ Pending writes only, never acknowledged. "Before" is the spike, "now" is the cur
 | a garbage collection run | 0.2 ms, removes nothing | 0.13 to 0.5 ms, removes nothing |
 | a whole small collection (10 documents) | 0.87 ms, 18 ms, 246 ms, 1.5 s | 0.09 to 0.13 ms at every size |
 | an index fill run (50 documents), `c1k` and `c100k` | 2.6 ms to 287 ms | 1.9 to 4.2 ms (3.1 ms at 10 million in `c1k`) |
-| an index fill run (50 documents), `small` | 95 ms, 822 ms, 6.5 s | 1.9 to 2.2 ms (to 1 million) |
+| an index fill run (50 documents), `small` | 95 ms, 822 ms, 6.5 s | 1.5 to 2.2 ms (to 1 million) |
 
 The last three rows are the ones that changed. A query of a collection used to walk every pending write of the user.
 Now it reads the pending writes of that collection through the primary key, and an index fill run reads only the next
@@ -103,7 +106,7 @@ pending writes of its collection group. The write path, the read by key and the 
 | an acknowledgement | the queue, slowly | 0.3 to 0.4 ms | 0.24 ms at 10,000, 0.40 to 0.46 ms at 1 million |
 | an acknowledgement with a transform on a hot document | nothing now | 77 ms (10,000 pending), 900 ms (100,000) | 0.22 ms and 0.23 ms on average; the first one of a drain takes 87 ms and 958 ms, once |
 | a rejection of a hot document's write | the writes pending on that document | 65 ms and 733 ms | 65 ms and 754 ms, unchanged |
-| a complete index fill | the documents to index | quadratic: up to 9.1 ms per document | 30 to 60 us per document in `c1k` and `c100k`, 36 to 107 us in `small` |
+| a complete index fill | the documents to index | quadratic: up to 9.1 ms per document | 30 to 60 us per document in `c1k` and `c100k`, 36 to 71 us in `small` |
 | a drain | the queue | 0.4 ms per write against the emulator | 0.34 to 0.41 ms per write |
 
 The memory row is the one the spike listed as fixed in the library (item 4). The fix drops the keys of a batch when it
@@ -184,23 +187,21 @@ first scan is the first query after a reopen.
 
 | | 10,000 | 100,000 | 1,000,000 | 10,000,000 |
 |---|---|---|---|---|
-| `c1k`, `a == 7` (about 1,000 documents), scan | 6.3 ms / 6.1 ms | 22 ms / 4.8 ms | 258 ms / 5.6 ms | 10.9 s / 8.6 ms |
-| `c1k`, `a == 7`, index | 0.22 ms / 0.60 ms | 0.24 ms / 0.87 ms | 0.60 ms / 0.97 ms | 3.8 ms / 1.5 ms |
-| `c1k`, `orderBy.limit(10)`, scan | 7.7 ms / 7.2 ms | 24 ms / 5.6 ms | 256 ms / 6.5 ms | 1.6 s / 9.8 ms |
-| `c1k`, `orderBy.limit(10)`, index | 13.7 ms / 0.61 ms | 12.5 ms / 0.71 ms | 18 ms / 0.90 ms | 16 ms / 1.2 ms |
-| `c100k`, `a == 7` (100,000 documents), scan | 46 ms / 62 ms | 696 ms / 979 ms | 1,030 ms / 968 ms | not run |
-| `c100k`, `a == 7`, index | 2.2 ms / 4.5 ms | 14 ms / 150 ms | 13 ms / 258 ms | not run |
-| `c100k`, `orderBy.limit(10)`, scan | 60 ms / 72 ms | 1,042 ms / 898 ms | 1,354 ms / 1,072 ms | not run |
-| `c100k`, `orderBy.limit(10)`, index | 229 ms / 3.5 ms | 3,067 ms / 159 ms | 3,209 ms / 216 ms | not run |
+| `c1k`, `a == 7` (about 1,000 documents), scan | 6.3 ms / 6.1 ms | 22 ms / 4.1 ms | 258 ms / 4.2 ms | 10.9 s / 8.6 ms |
+| `c1k`, `a == 7`, index | 0.22 ms / 0.60 ms | 0.24 ms / 0.29 ms | 0.60 ms / 0.65 ms | 3.8 ms / 1.5 ms |
+| `c1k`, `orderBy.limit(10)`, scan | 7.7 ms / 7.2 ms | 24 ms / 4.8 ms | 256 ms / 4.8 ms | 1.6 s / 9.8 ms |
+| `c1k`, `orderBy.limit(10)`, index | 13.7 ms / 0.61 ms | 12.5 ms / 0.22 ms | 18 ms / 0.61 ms | 16 ms / 1.2 ms |
+| `c100k`, `a == 7` (100,000 documents), scan | 46 ms / 62 ms | 696 ms / 626 ms | 1,030 ms / 619 ms | not run |
+| `c100k`, `a == 7`, index | 2.2 ms / 4.5 ms | 14 ms / 8.3 ms | 13 ms / 8.7 ms | not run |
+| `c100k`, `orderBy.limit(10)`, scan | 60 ms / 72 ms | 1,042 ms / 669 ms | 1,354 ms / 694 ms | not run |
+| `c100k`, `orderBy.limit(10)`, index | 229 ms / 3.5 ms (before #68) | 3,067 ms / 0.23 ms | 3,209 ms / 0.23 ms | not run |
 
-Read it like this. A `limit` query with an index is now fast (3.2 s to 0.2 s on 100,000 pending documents). A scan of a
-collection of 1,000 documents is flat. A scan of a collection of 100,000 documents costs what reading 100,000 documents
-costs, about 1 s, as before. And an equality query with an index on a large collection of pending writes got slower,
-not faster: 14 ms before and 150 ms now at 100,000, 13 ms before and 258 ms now at 1 million. The likely cause (not
-verified): the index finds the matches at once, but the client then reads the pending writes of the whole collection to
-see which are newer than the index, and the cheaper collection read does that through the primary key. The index
-still wins against the scan (979 ms to 150 ms), by 4 to 6 times instead of 50. The `small` shape shows the same
-(a collection group `a == 7` with an index, 100,000 documents: 508 ms before, 947 ms now).
+Read it like this. A `limit` query with an index is now answered in a fraction of a millisecond (3.2 s before on
+100,000 pending documents of `c100k`). A scan of a collection of 1,000 documents is flat. A scan of a collection of
+100,000 documents costs what reading 100,000 documents costs, about 0.6 s. An equality query with an index on a large
+collection of pending writes takes 8 to 9 ms for 1,000 matches, against 14 ms before and 13 ms before at 100,000 and 1
+million: not slower any more. A first run after #58 had made it slower (150 ms and 258 ms); #68 fixed that. What is left
+is the collection group query over many small collections, below.
 
 ### Progress
 
@@ -257,22 +258,22 @@ Pending writes only unless the row says otherwise. Before / now. File sizes and 
 | reopen | 0.67 / 2.2 ms | 3.7 / 4.3 ms | 1.9 / 5.6 ms |
 | one document by key | 25 / 19 us | 23 / 20 us | 25 / 27 us |
 | whole small collection | 1.0 / 0.10 ms | 19 / 0.09 ms | 162 ms / 0.13 ms |
-| group `a == 7`, scan | 1.0 s / 91 ms | 230 s / 1.1 s | about 5 hours (estimate) / 12.1 s |
-| group `orderBy.limit(10)`, scan | 1.3 s / 118 ms | 229 s / 1.4 s | not run / 18.4 s |
-| group `a == 7`, index | 47 / 62 ms | 508 / 947 ms | not run / 8.8 s |
-| group `orderBy.limit(10)`, index | 248 / 54 ms | 3.5 s / 839 ms | not run / 8.3 s |
-| index fill, one run (50 documents) | 95 / 1.9 ms | 822 / 2.1 ms | 6.5 s / 2.2 ms |
-| index fill, per document | 147 / 36 us | 902 / 58 us | not run / 107 us |
-| peak memory of the process | not measured | not measured | 6.5 GB (a group query that returns 1 million documents) |
+| group `a == 7`, scan | 1.0 s / 91 ms | 230 s / 0.74 s | about 5 hours (estimate) / 8.3 s |
+| group `orderBy.limit(10)`, scan | 1.3 s / 118 ms | 229 s / 1.0 s | not run / 13.3 s |
+| group `a == 7`, index | 47 / 62 ms | 508 / 427 ms | not run / 6.6 s |
+| group `orderBy.limit(10)`, index | 248 / 54 ms | 3.5 s / 409 ms | not run / 6.6 s |
+| index fill, one run (50 documents) | 95 / 1.9 ms | 822 / 1.5 ms | 6.5 s / 1.5 ms |
+| index fill, per document | 147 / 36 us | 902 / 58 us | not run / 71 us |
+| peak memory of the process | not measured | not measured | 6.8 GB (a group query that returns 1 million documents) |
 
 ### The mixed case: acknowledged, queries in sync once, read offline
 
 | | `c1k` 100,000 | `c1k` 1,000,000 | `c100k` 100,000 | `c100k` 1,000,000 | `small` 100,000 | `small` 1,000,000 |
 |---|---|---|---|---|---|---|
-| acknowledgement, average | 386 / 336 us | 346 / 402 us | 328 / 342 us | 329 / 378 us | 308 / 365 us | 330 / 459 us |
-| `a == 7` | 0.28 / 0.22 ms | 0.19 / 0.27 ms | 12 / 13 ms | 9.2 / 15.7 ms | 451 / 419 ms | not run / 5.8 s |
-| `orderBy.limit(10)` | 0.26 / 0.22 ms | 0.19 / 0.28 ms | 0.25 / 0.30 ms | 0.18 / 0.34 ms | 465 / 399 ms | not run / 5.6 s |
-| whole collection c0 | 5.7 / 4.5 ms | 4.1 / 5.8 ms | 894 / 758 ms | 876 / 1,148 ms | | |
+| acknowledgement, average | 386 / 193 us | 346 / 214 us | 328 / 181 us | 329 / 199 us | 308 / 185 us | 330 / 393 us |
+| `a == 7` | 0.28 / 0.15 ms | 0.19 / 0.14 ms | 12 / 7.7 ms | 9.2 / 8.0 ms | 451 / 324 ms | not run / 4.9 s |
+| `orderBy.limit(10)` | 0.26 / 0.14 ms | 0.19 / 0.14 ms | 0.25 / 0.15 ms | 0.18 / 0.17 ms | 465 / 308 ms | not run / 4.7 s |
+| whole collection c0 | 5.7 / 3.3 ms | 4.1 / 3.2 ms | 894 / 569 ms | 876 / 573 ms | | |
 | garbage collection run (threshold 1 byte) | 335 ms / 291 ms | 6.5 s / 8.5 s | 82 / 81 ms | 6.2 s / 7.2 s | 122 / 115 ms | 1.2 s / 1.6 s |
 
 The `small` columns are collection group queries. Once the documents are acknowledged and the queries were listened to,
@@ -319,13 +320,15 @@ merge them.
   document, not writes to different documents.
 - **Memory grows by about 0.46 KB per write in the session that wrote them**, 458 MB for 1 million. A restart frees it.
 - **A collection group query over many small collections reads each collection.** 10,000 collections: about 1 s.
-  100,000 collections and 1 million pending writes: 12 s with a scan, 8.8 s with an index, 5.7 s when everything is
-  acknowledged and in sync, and up to 6.5 GB of memory when the query returns every document. Before, 10,000
-  collections took 230 s, so this is 200 times better, but it is still linear in the number of collections. Avoid
+  100,000 collections and 1 million pending writes: 8.3 s with a scan, 6.6 s with an index, 4.9 s when everything is
+  acknowledged and in sync, and up to 6.8 GB of memory when the query returns every document. Before, 10,000
+  collections took 230 s and now take 0.4 to 0.7 s at 100,000 pending writes, so this is much better, but an index does
+  not help much: the query still reads each collection (0.4 s with an index at 10,000 collections, 100,000 documents).
+  It is linear in the number of collections. Avoid
   collection group queries without a selective filter over a very large number of parents.
-- **Reading a large collection reads all of it.** The whole collection of 100,000 pending documents takes about 1 s. A
-  query with an index and a `limit` is cheap; an equality query with an index on a large collection of pending writes
-  still reads the pending writes of that collection (150 ms at 100,000, 258 ms at 1 million).
+- **Reading a large collection reads all of it.** The whole collection of 100,000 pending documents takes about 0.6 s. A
+  query with an index and a `limit` is cheap, and an equality query with an index costs 8 to 9 ms for 1,000 matches in
+  such a collection.
 - **A rejection recalculates from the pending writes of the document.** Rejecting the newest of 100,000 pending
   updates of one document costs 0.75 to 0.8 s. A rejection is rare, and merging leaves one write to recalculate.
 - **Automatic indexes ignore pending writes.** See above.

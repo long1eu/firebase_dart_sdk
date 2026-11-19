@@ -4,8 +4,8 @@
 > pending writes and the keys kept per batch) are fixed in the change that adds this document; the numbers below
 > are those before the fix, and the changelog of `cloud_firestore_dart` has the ones after.
 >
-> **Update, 2026-11-18, later the same day.** Most of the list at the end has landed since (#58 to #68 and
-> two commits without a number, see the notes at each item). **The numbers in this document are historical:
+> **Update, 2026-11-18, later the same day.** Most of the list at the end has landed since (#58 to #68, see
+> the notes at each item). **The numbers in this document are historical:
 > they describe the code before those changes, and several are now wrong by orders of magnitude.** The same
 > tool, `tool/bench/offline_forever_bench.dart`, was run again on the current code, on the same machine, with the
 > same shapes; the numbers, and what an app should switch on, are in
@@ -341,7 +341,7 @@ on the client's queue): that is the normal LRU cost, not specific to being offli
    thousands, and security rules evaluated once).
    > **Landed**: acknowledgements recalculate the overlay from a summary of the remaining writes (#62), and
    > `mergeUnsentWrites` (#63, with `serverTimestamp`, `increment` and array transforms in #64, and the merge of a queue
-   > that already exists at start in `e6bef0a1` and `a72fa833`) squashes the repeated writes of a document, as
+   > that already exists at start in #67) squashes the repeated writes of a document, as
    > the last alternative of this item proposed. It is opt-in and changes what the backend sees.
 4. **Empty `_documentKeysByBatchId` in a single client** (`local_store.dart:404`), as JS does when a batch is
    acknowledged or rejected: removes the 0.45 KB per write of a long session.
