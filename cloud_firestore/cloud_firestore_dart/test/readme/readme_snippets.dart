@@ -371,8 +371,8 @@ Future<void> authenticationGuideLine339() async {
   final firestore = FirebaseFirestore.instanceFor(app: app);
 }
 
-// ../../docs/guides/cookbook.md:46
-Future<void> cookbookGuideLine46() async {
+// ../../docs/guides/cookbook.md:48
+Future<void> cookbookGuideLine48() async {
   final ordered = firestore.collection('posts').orderBy('day');
   DocumentSnapshot<Map<String, Object?>>? last;
   while (true) {
@@ -386,8 +386,8 @@ Future<void> cookbookGuideLine46() async {
   }
 }
 
-// ../../docs/guides/cookbook.md:73
-Future<void> cookbookGuideLine73() async {
+// ../../docs/guides/cookbook.md:75
+Future<void> cookbookGuideLine75() async {
   final ordered = firestore.collection('messages').orderBy('rank');
   final pages = <StreamSubscription<QuerySnapshot<Map<String, Object?>>>>[];
   DocumentSnapshot<Map<String, Object?>>? end;
@@ -409,8 +409,8 @@ Future<void> cookbookGuideLine73() async {
   }
 }
 
-// ../../docs/guides/cookbook.md:112
-Future<void> cookbookGuideLine112() async {
+// ../../docs/guides/cookbook.md:114
+Future<void> cookbookGuideLine114() async {
   final orders = firestore.collection('orders');
   final count = (await orders.count().get()).count;
 
@@ -423,8 +423,8 @@ Future<void> cookbookGuideLine112() async {
   print('${paid.count} paid, ${paid.get(revenue)} in total, ${paid.get(average)} each');
 }
 
-// ../../docs/guides/cookbook.md:134
-Future<void> cookbookGuideLine134() async {
+// ../../docs/guides/cookbook.md:136
+Future<void> cookbookGuideLine136() async {
   final page = firestore.collection('pages').doc('home');
   await page.update({'views': FieldValue.increment(1)});
 
@@ -437,15 +437,15 @@ Future<void> cookbookGuideLine134() async {
   final views = (await shards.aggregate([total]).get()).get(total);
 }
 
-// ../../docs/guides/cookbook.md:174
-Future<void> cookbookGuideLine174() async {
+// ../../docs/guides/cookbook.md:176
+Future<void> cookbookGuideLine176() async {
   final post = firestore.collection('posts').doc('hello');
   await post.update({'tags': FieldValue.arrayUnion(['news', 'firestore'])});
   await post.update({'tags': FieldValue.arrayRemove(['news'])});
 }
 
-// ../../docs/guides/cookbook.md:195
-Future<void> cookbookGuideLine195() async {
+// ../../docs/guides/cookbook.md:197
+Future<void> cookbookGuideLine197() async {
   final note = firestore.collection('notes').doc('n1');
   note.snapshots(includeMetadataChanges: true).listen((snapshot) {
     final Object? exact = snapshot['updatedAt']; // null while the write is pending
@@ -458,12 +458,12 @@ Future<void> cookbookGuideLine195() async {
   await note.update({'text': 'second', 'updatedAt': FieldValue.serverTimestamp()});
 }
 
-// ../../docs/guides/cookbook.md:217
-Future<void> cookbookGuideLine217() async {
+// ../../docs/guides/cookbook.md:219
+Future<void> cookbookGuideLine219() async {
 }
 
-// ../../docs/guides/cookbook.md:228
-Future<void> cookbookGuideLine228() async {
+// ../../docs/guides/cookbook.md:230
+Future<void> cookbookGuideLine230() async {
   final products = firestore.collection('products').withConverter<Product>(
         fromFirestore: (snapshot, options) => Product.fromMap(snapshot.data()!),
         toFirestore: (product, options) => product.toMap(),
@@ -474,8 +474,8 @@ Future<void> cookbookGuideLine228() async {
   await products.doc('pen').update({'price': 2}); // update still takes a map
 }
 
-// ../../docs/guides/cookbook.md:247
-Future<void> cookbookGuideLine247() async {
+// ../../docs/guides/cookbook.md:249
+Future<void> cookbookGuideLine249() async {
   final byAda = await firestore
       .collectionGroup('reviews')
       .where('author', isEqualTo: 'ada')
@@ -485,8 +485,8 @@ Future<void> cookbookGuideLine247() async {
   }
 }
 
-// ../../docs/guides/cookbook.md:266
-Future<void> cookbookGuideLine266() async {
+// ../../docs/guides/cookbook.md:268
+Future<void> cookbookGuideLine268() async {
   final users = firestore.collection('users');
   final ids = <String>[/* the document ids you want */];
   final teams = await users.where('team', whereIn: ['team1', 'team2']).get();
@@ -502,8 +502,8 @@ Future<void> cookbookGuideLine266() async {
   }
 }
 
-// ../../docs/guides/cookbook.md:291
-Future<void> cookbookGuideLine291() async {
+// ../../docs/guides/cookbook.md:293
+Future<void> cookbookGuideLine293() async {
   final tasks = firestore.collection('tasks');
   final mineOrUrgent = await tasks
       .where(Filter.or([
@@ -522,8 +522,8 @@ Future<void> cookbookGuideLine291() async {
       .get();
 }
 
-// ../../docs/guides/cookbook.md:319
-Future<void> cookbookGuideLine319() async {
+// ../../docs/guides/cookbook.md:321
+Future<void> cookbookGuideLine321() async {
   final rows = <Map<String, Object?>>[/* from a file, an API, another database */];
   final cities = firestore.collection('cities');
   for (var start = 0; start < rows.length; start += 400) {
@@ -537,8 +537,8 @@ Future<void> cookbookGuideLine319() async {
   }
 }
 
-// ../../docs/guides/cookbook.md:342
-Future<void> cookbookGuideLine342() async {
+// ../../docs/guides/cookbook.md:344
+Future<void> cookbookGuideLine344() async {
   Future<int> moveStock(DocumentReference<Map<String, Object?>> from,
       DocumentReference<Map<String, Object?>> to, int amount) {
     return firestore.runTransaction<int>((transaction) async {
@@ -554,8 +554,8 @@ Future<void> cookbookGuideLine342() async {
   }
 }
 
-// ../../docs/guides/cookbook.md:388
-Future<void> cookbookGuideLine388() async {
+// ../../docs/guides/cookbook.md:390
+Future<void> cookbookGuideLine390() async {
   final accounts = firestore.collection('accounts');
   final orders = firestore.collection('orders');
   final report = await firestore.runTransaction((transaction) async {
@@ -568,8 +568,8 @@ Future<void> cookbookGuideLine388() async {
   }, readOnly: true);
 }
 
-// ../../docs/guides/cookbook.md:411
-Future<void> cookbookGuideLine411() async {
+// ../../docs/guides/cookbook.md:413
+Future<void> cookbookGuideLine413() async {
   Future<int> deleteCollection(CollectionReference<Map<String, Object?>> collection) async {
     var deleted = 0;
     while (true) {
@@ -585,8 +585,8 @@ Future<void> cookbookGuideLine411() async {
   }
 }
 
-// ../../docs/guides/cookbook.md:436
-Future<void> cookbookGuideLine436() async {
+// ../../docs/guides/cookbook.md:438
+Future<void> cookbookGuideLine438() async {
   final theme = firestore.collection('settings').doc('theme');
   theme
       .snapshots(source: ListenSource.cache)
@@ -596,8 +596,8 @@ Future<void> cookbookGuideLine436() async {
   final fresh = await theme.get(const GetOptions(source: Source.server));
 }
 
-// ../../docs/guides/cookbook.md:457
-Future<void> cookbookGuideLine457() async {
+// ../../docs/guides/cookbook.md:459
+Future<void> cookbookGuideLine459() async {
   final todos = firestore.collection('todos');
   todos.snapshots(includeMetadataChanges: true).listen((snapshot) {
     final offline = snapshot.metadata.isFromCache; // offline, or not synced yet
@@ -615,8 +615,8 @@ Future<void> cookbookGuideLine457() async {
   await firestore.terminate();
 }
 
-// ../../docs/guides/cookbook.md:487
-Future<void> cookbookGuideLine487() async {
+// ../../docs/guides/cookbook.md:489
+Future<void> cookbookGuideLine489() async {
   final recipes = firestore.collection('recipes');
   await recipes.doc('pancakes').set({
     'meal': 'breakfast',
@@ -632,8 +632,8 @@ Future<void> cookbookGuideLine487() async {
   }
 }
 
-// ../../docs/guides/cookbook.md:512
-Future<void> cookbookGuideLine512() async {
+// ../../docs/guides/cookbook.md:514
+Future<void> cookbookGuideLine514() async {
   final snapshot = await firestore.collection('events').orderBy('at').get();
   await File('events.json').writeAsString(jsonEncode(snapshot.toJson()));
 
@@ -1038,8 +1038,8 @@ Future<void> gettingStartedGuideLine143() async {
   await firestore.terminate();
 }
 
-// ../../docs/guides/getting_started.md:187
-Future<void> gettingStartedGuideLine187() async {
+// ../../docs/guides/getting_started.md:190
+Future<void> gettingStartedGuideLine190() async {
   final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(
     app: app,
     settings: Settings(webExperimentalForceLongPolling: true),
@@ -1598,8 +1598,8 @@ Future<void> troubleshootingGuideLine287() async {
   );
 }
 
-// ../../docs/guides/web.md:23
-Future<void> webGuideLine23() async {
+// ../../docs/guides/web.md:24
+Future<void> webGuideLine24() async {
   void main() {
     final FirebaseApp app = FirebaseApp.withOptions(
       const FirebaseOptions(
@@ -1625,16 +1625,16 @@ Future<void> webGuideLine23() async {
   }
 }
 
-// ../../docs/guides/web.md:172
-Future<void> webGuideLine172() async {
+// ../../docs/guides/web.md:173
+Future<void> webGuideLine173() async {
   final Settings settings = Settings(
     webExperimentalForceLongPolling: true,
     webExperimentalLongPollingOptions: const WebExperimentalLongPollingOptions(timeoutDuration: Duration(seconds: 25)),
   );
 }
 
-// ../../docs/guides/web.md:218
-Future<void> webGuideLine218() async {
+// ../../docs/guides/web.md:219
+Future<void> webGuideLine219() async {
   final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(
     app: app,
     openDatabase: sqliteOpener(opfsWorker: Uri.parse('sqlite_opfs_worker.js')),
@@ -1642,8 +1642,8 @@ Future<void> webGuideLine218() async {
   );
 }
 
-// ../../docs/guides/web.md:274
-Future<void> webGuideLine274() async {
+// ../../docs/guides/web.md:275
+Future<void> webGuideLine275() async {
   final FirebaseFirestore firestore = await openWithMemoryFallback(
     app: app,
     openDatabase: sqliteOpener(),
@@ -1653,8 +1653,8 @@ Future<void> webGuideLine274() async {
   final bool persistent = firestore.persistentCacheIndexManager != null;
 }
 
-// ../../docs/guides/web.md:299
-Future<void> webGuideLine299() async {
+// ../../docs/guides/web.md:300
+Future<void> webGuideLine300() async {
   final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(
     app: app,
     openDatabase: sqliteOpener(),
@@ -1671,8 +1671,8 @@ Future<void> webGuideLine299() async {
   }
 }
 
-// ../../docs/guides/web.md:377
-Future<void> webGuideLine377() async {
+// ../../docs/guides/web.md:378
+Future<void> webGuideLine378() async {
   // One client of the page: `client` names its app ('client-left', 'client-right').
   Future<FirebaseFirestore> startClient(String client, String email) async {
     final FirebaseApp clientApp = FirebaseApp.withOptions(app.options, name: client);
@@ -1682,7 +1682,7 @@ Future<void> webGuideLine377() async {
   }
 }
 
-// ../../docs/guides/web.md:405
-Future<void> webGuideLine405() async {
+// ../../docs/guides/web.md:406
+Future<void> webGuideLine406() async {
   final Settings settings = Settings().withEmulator('127.0.0.1', 8080);
 }
