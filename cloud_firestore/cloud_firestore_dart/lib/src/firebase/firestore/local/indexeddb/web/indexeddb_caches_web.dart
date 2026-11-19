@@ -213,6 +213,48 @@ class IndexedDbGlobalsCache implements GlobalsCache {
   Future<void> setSessionToken(Uint8List value) =>
       setValue(_sessionToken, value);
 
+  /// The prefix of the rows of the [QueuedWritesMergeMark]s, followed by the user id.
+  static const String _queuedWritesMergeMark = 'queuedWritesMergeMark/';
+
+  /// NOT IN THE OFFICIAL SDKS: the mark is a row `{name, value}` with the value the UTF-8 bytes of
+  /// `<batchId>,<seconds>,<nanoseconds>`, as the SQLite cache stores it. The JS SDK does not read it.
+  @override
+  Future<QueuedWritesMergeMark?> getQueuedWritesMergeMark(String uid) async {
+    final Uint8List? value = await getValue('$_queuedWritesMergeMark$uid');
+    if (value == null) {
+      return null;
+    }
+    final List<int?> numbers = <int?>[
+      for (final String part
+          in utf8.decode(value, allowMalformed: true).split(','))
+        int.tryParse(part),
+    ];
+    if (numbers.length != 3 ||
+        numbers.contains(null) ||
+        numbers[2]! < 0 ||
+        numbers[2]! >= 1000000000) {
+      return null;
+    }
+    return QueuedWritesMergeMark(
+      numbers[0]!,
+      Timestamp(numbers[1]!, numbers[2]!),
+    );
+  }
+
+  @override
+  Future<void> setQueuedWritesMergeMark(
+    String uid,
+    QueuedWritesMergeMark mark,
+  ) {
+    final Timestamp time = mark.localWriteTime;
+    return setValue(
+      '$_queuedWritesMergeMark$uid',
+      Uint8List.fromList(
+        utf8.encode('${mark.batchId},${time.seconds},${time.nanoseconds}'),
+      ),
+    );
+  }
+
   /// NOT IN THE OFFICIAL SDKS: values other than the session token (the record of the JS SDK cache import) are rows of
   /// the same store, which the JS SDK does not read.
   @override
@@ -226,7 +268,7 @@ class IndexedDbGlobalsCache implements GlobalsCache {
       return null;
     }
     final JSAny? value = (row as JSObject).getProperty('value'.toJS);
-    if (value == null || !value.isA<JSUint8Array>()) {
+    if (value.isUndefinedOrNull || !value.isA<JSUint8Array>()) {
       return null;
     }
     return Uint8List.fromList((value as JSUint8Array).toDart);

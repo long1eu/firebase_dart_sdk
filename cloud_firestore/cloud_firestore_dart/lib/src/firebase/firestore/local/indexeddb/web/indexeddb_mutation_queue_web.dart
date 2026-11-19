@@ -72,7 +72,7 @@ class IndexedDbMutationQueue implements MutationQueue {
       'find a batch of "$_userId"',
       () => _userIndex(transaction).getKey(_userRange),
     );
-    return key == null;
+    return key.isUndefinedOrNull;
   }
 
   @override
@@ -312,18 +312,41 @@ class IndexedDbMutationQueue implements MutationQueue {
 
   @override
   Future<MutationBatch?> getNewestMutationBatchAffectingDocumentKey(
-    DocumentKey documentKey,
-  ) async {
+    DocumentKey documentKey, {
+    int? beforeBatchId,
+  }) async {
     final _IdbTransaction transaction = _transaction;
-    final List<int> ids = await _batchIdsFor(transaction, documentKey.path);
-    if (ids.isEmpty) {
+    final String encoded = encodeJsResourcePath(documentKey.path);
+    // A backwards key cursor over the rows `[userId, path, batchId]` of the document, below [beforeBatchId].
+    int? batchId;
+    await transaction.forEach(
+      'find the newest batch of a document',
+      () => transaction
+          .store(DbStores.documentMutations)
+          .openKeyCursor(
+            web.IDBKeyRange.bound(
+              idbKey(<Object>[_userId, encoded, double.negativeInfinity]),
+              idbKey(<Object>[
+                _userId,
+                encoded,
+                beforeBatchId ?? double.infinity,
+              ]),
+              false,
+              true,
+            ),
+            'prev',
+          ),
+      (web.IDBCursor cursor) {
+        final List<Object?> key = idbToDart(cursor.key)! as List<Object?>;
+        batchId = (key[2]! as num).toInt();
+        return false;
+      },
+    );
+    final int? found = batchId;
+    if (found == null) {
       return null;
     }
-    final List<MutationBatch> batches = await _lookupMutationBatches(
-      transaction,
-      <int>[ids.reduce((int a, int b) => a > b ? a : b)],
-    );
-    return batches.isEmpty ? null : batches.single;
+    return (await _lookupMutationBatches(transaction, <int>[found])).single;
   }
 
   @override
@@ -376,6 +399,18 @@ class IndexedDbMutationQueue implements MutationQueue {
       },
     );
     return _lookupMutationBatches(transaction, batchIds);
+  }
+
+  /// The row of the batch is rewritten under the same key; the rows of `documentMutations` stay, since [batch] changes
+  /// the same documents.
+  @override
+  Future<void> replaceMutationBatch(MutationBatch batch) async {
+    final _IdbTransaction transaction = _transaction;
+    final JSAny? row = idbToJs(_serializer.toDbMutationBatch(_userId, batch));
+    await transaction.request(
+      'replace batch ${batch.batchId}',
+      () => transaction.store(DbStores.mutations).put(row),
+    );
   }
 
   @override

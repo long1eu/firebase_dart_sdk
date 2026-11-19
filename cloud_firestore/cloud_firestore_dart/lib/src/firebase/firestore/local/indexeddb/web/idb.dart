@@ -18,7 +18,7 @@ external JSAny? _parse(JSString text);
 /// SDK stores proto3 JSON, plain numbers, strings, booleans and arrays, which survive this unchanged (a `Uint8Array`
 /// does not: read it with its own conversion).
 Object? idbToDart(JSAny? value) {
-  if (value == null) {
+  if (value.isUndefinedOrNull) {
     return null;
   }
   final JSString? json = _stringify(value);
@@ -98,7 +98,7 @@ Future<void> idbForEach(
       return;
     }
     final JSAny? result = request.result;
-    if (result == null) {
+    if (result.isUndefinedOrNull) {
       completer.complete();
       return;
     }

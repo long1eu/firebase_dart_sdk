@@ -26,7 +26,7 @@ class IndexedDbRemoteDocumentCache implements RemoteDocumentCache {
 
   /// `dbDocumentSize`: the length of the JSON of the document part of [row].
   static int _documentSize(JSAny? row) {
-    if (row == null) {
+    if (row.isUndefinedOrNull) {
       return 0;
     }
     final JSObject object = row as JSObject;
