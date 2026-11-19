@@ -126,7 +126,8 @@ const GetOptions cache = GetOptions(source: Source.cache);
 const GetOptions server = GetOptions(source: Source.server);
 
 void main() {
-  test('writes, reads and a listener, and the cache after a restart', () async {
+  for (int round = 0; round < 40; round++)
+  test('writes, reads and a listener, and the cache after a restart, round $round', () async {
     final String appName = newAppName();
     final String name = newCollectionName();
     FirebaseFirestore firestore = await newClient(appName);
@@ -171,7 +172,17 @@ void main() {
           events.last.metadata.isFromCache ||
           events.last.metadata.hasPendingWrites ||
           events.last.docs.length != 19;
-    }).timeout(const Duration(seconds: 20));
+    }).timeout(
+      const Duration(seconds: 20),
+      onTimeout: () => fail(
+        'The listener did not end in sync: ${events.length} events, the last '
+        '${events.isEmpty ? 'none' : 'fromCache=${events.last.metadata.isFromCache} '
+                  'pendingWrites=${events.last.metadata.hasPendingWrites} '
+                  'docs=${events.last.docs.length} '
+                  'pending=${<String>[for (final d in events.last.docs)
+                    if (d.metadata.hasPendingWrites) d.id]}'}',
+      ),
+    );
     expect(events.last.docs.last['n'], 103);
     await sub.cancel();
 
