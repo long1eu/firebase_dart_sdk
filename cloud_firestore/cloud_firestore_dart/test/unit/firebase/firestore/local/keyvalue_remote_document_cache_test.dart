@@ -1,0 +1,99 @@
+// File created by
+// Lung Razvan <long1eu>
+// on 02/10/2018
+
+import 'dart:async';
+
+import 'package:cloud_firestore_dart/src/firebase/firestore/local/keyvalue/cache_store_persistence.dart';
+import 'package:test/test.dart';
+
+import 'cases/remote_document_cache_test_case.dart';
+import 'persistence_test_helpers.dart';
+
+void main() {
+  late RemoteDocumentCacheTestCase testCase;
+
+  setUp(() async {
+    print('setUp');
+    final CacheStorePersistence persistence = await createKeyValuePersistence();
+    testCase = RemoteDocumentCacheTestCase(persistence)..setUp();
+    print('setUpDone');
+  });
+
+  tearDown(
+    () => Future<void>.delayed(
+      const Duration(milliseconds: 250),
+      () => testCase.tearDown(),
+    ),
+  );
+
+  test(
+    'testReadDocumentNotInCache',
+    () => testCase.testReadDocumentNotInCache(),
+  );
+  test('testSetAndReadDocument', () => testCase.testSetAndReadDocument());
+  test(
+    'testSetAndReadSeveralDocuments',
+    () => testCase.testSetAndReadSeveralDocuments(),
+  );
+  test(
+    'testReadSeveralDocumentsIncludingMissingDocument',
+    () => testCase.testReadSeveralDocumentsIncludingMissingDocument(),
+  );
+  test(
+    'testSetAndReadSeveralDocumentsWithOverlappingKeys',
+    () => testCase.testSetAndReadSeveralDocumentsWithOverlappingKeys(),
+  );
+  test(
+    'testSetAndReadSeveralDocumentsWithDeeplyNestedKeys',
+    () => testCase.testSetAndReadSeveralDocumentsWithDeeplyNestedKeys(),
+  );
+  test(
+    'testSetAndReadDeletedDocument',
+    () => testCase.testSetAndReadDeletedDocument(),
+  );
+  test('testSetDocumentToNewValue', () => testCase.testSetDocumentToNewValue());
+  test('testRemoveDocument', () => testCase.testRemoveDocument());
+  test(
+    'testRemoveNonExistentDocument',
+    () => testCase.testRemoveNonExistentDocument(),
+  );
+  test('testGetAllFromCollection', () => testCase.testGetAllFromCollection());
+  test(
+    'testGetAllFromExcludesSubcollections',
+    () => testCase.testGetAllFromExcludesSubcollections(),
+  );
+  test(
+    'testGetAllFromSinceReadTimeAndSeconds',
+    () => testCase.testGetAllFromSinceReadTimeAndSeconds(),
+  );
+  test(
+    'testGetAllFromSinceReadTimeAndNanoseconds',
+    () => testCase.testGetAllFromSinceReadTimeAndNanoseconds(),
+  );
+  test(
+    'testGetAllFromSinceReadTimeAndDocumentKey',
+    () => testCase.testGetAllFromSinceReadTimeAndDocumentKey(),
+  );
+  test(
+    'testGetAllFromUsesReadTimeNotUpdateTime',
+    () => testCase.testGetAllFromUsesReadTimeNotUpdateTime(),
+  );
+  test(
+    'testGetMatchingDocsAppliesQueryCheck',
+    () => testCase.testGetMatchingDocsAppliesQueryCheck(),
+  );
+  test(
+    'testGetMatchingDocsRespectsMutatedDocs',
+    () => testCase.testGetMatchingDocsRespectsMutatedDocs(),
+  );
+  test('testRemoveAllDocuments', () => testCase.testRemoveAllDocuments());
+  test(
+    'testDocumentsMatchingQueryExcludesSubcollections',
+    () => testCase.testDocumentsMatchingQueryExcludesSubcollections(),
+  );
+  test(
+    'testAddingDocumentWithReadTimeOfZeroFails',
+    () => testCase.testAddingDocumentWithReadTimeOfZeroFails(),
+  );
+}

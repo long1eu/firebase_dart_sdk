@@ -1,0 +1,5 @@
+class CacheStoreCheck
+  final name: String
+  run(() -> .CacheStore newStore): Future<void>
+  toString(): String
+var cacheStoreConformanceChecks: List<CacheStoreCheck>

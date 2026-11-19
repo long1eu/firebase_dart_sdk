@@ -158,7 +158,7 @@ class Settings {
   /// cache is in memory even when this is true.
   ///
   /// When [cacheSettings] is set this is derived from it: true for
-  /// [PersistentCacheSettings] and [IndexedDbCacheSettings], false for [MemoryCacheSettings].
+  /// [PersistentCacheSettings], [IndexedDbCacheSettings] and [KeyValueCacheSettings], false for [MemoryCacheSettings].
   final bool persistenceEnabled;
 
   /// Sets an approximate cache size threshold for the on-disk data. If the
@@ -171,7 +171,8 @@ class Settings {
   /// value is 1 MB.
   ///
   /// When [cacheSettings] is set this is derived from it: the size of the
-  /// [PersistentCacheSettings] or [IndexedDbCacheSettings], [cacheSizeUnlimited] for [MemoryCacheSettings].
+  /// [PersistentCacheSettings], [IndexedDbCacheSettings] or [KeyValueCacheSettings], [cacheSizeUnlimited] for
+  /// [MemoryCacheSettings].
   final int cacheSizeBytes;
 
   /// Configures the local cache with [PersistentCacheSettings] or
@@ -387,7 +388,8 @@ class Settings {
     }
     _checkNotMixed(persistenceEnabled, cacheSizeBytes);
     return cacheSettings is PersistentCacheSettings ||
-        cacheSettings is IndexedDbCacheSettings;
+        cacheSettings is IndexedDbCacheSettings ||
+        cacheSettings is KeyValueCacheSettings;
   }
 
   static int _resolveCacheSizeBytes(
@@ -412,6 +414,7 @@ class Settings {
     return switch (cacheSettings) {
       final PersistentCacheSettings persistent => persistent.sizeBytes,
       final IndexedDbCacheSettings indexedDb => indexedDb.sizeBytes,
+      final KeyValueCacheSettings keyValue => keyValue.sizeBytes,
       _ => cacheSizeUnlimited,
     };
   }
