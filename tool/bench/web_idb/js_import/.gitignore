@@ -8,3 +8,4 @@ static/reader.js
 static/reader.js.*
 static/importer.js
 static/importer.js.*
+static/interop_engine.js*
