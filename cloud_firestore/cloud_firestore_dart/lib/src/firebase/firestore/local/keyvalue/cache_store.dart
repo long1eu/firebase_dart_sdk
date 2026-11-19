@@ -9,53 +9,39 @@ import 'dart:typed_data';
 /// and the rest out in that order, in a format of its own that it versions itself; the store never needs to look
 /// inside a key or a value.
 ///
-/// All reads and writes happen in a [transaction]. The contract, which `cacheStoreConformanceChecks` of
-/// `package:cloud_firestore_dart/cache_store_testing.dart` checks:
+/// The store needs no transactions of its own. The SDK keeps the writes of each of its transactions in memory, serves
+/// the reads of that transaction from the store and those writes, and hands the store all of the writes at once, in
+/// one [write], when the transaction commits; a transaction that fails never reaches the store. The contract, which
+/// `cacheStoreConformanceChecks` of `package:cloud_firestore_dart/cache_store_testing.dart` checks:
 ///
-/// * **Atomic.** The writes of a transaction whose body completes are all kept, durably once the future of
-///   [transaction] completes. The writes of a transaction whose body throws are all dropped, and [transaction] throws
-///   that error. A crash in between keeps all or none of them.
-/// * **Read your writes.** Inside a transaction, [CacheStoreTransaction.get] and [CacheStoreTransaction.scan] see the
-///   writes the transaction made before.
-/// * **Isolated.** Two transactions that run at the same time behave as if one ran after the other: neither sees half
-///   of the other's writes. The simplest way is to run one transaction at a time (a lock); the SDK itself never
-///   starts a transaction on a store before its previous one finished.
-/// * **Ordered.** [CacheStoreTransaction.scan] returns the entries of a range in key order, or in reverse order.
+/// * **Ordered.** [scan] returns the entries of a range in key order, or in reverse order.
+/// * **Atomic and durable writes.** [write] keeps all of its puts and deletes, or none of them, also when the app
+///   crashes or the device turns off in between; once its future completes they are durable.
+/// * **Reads see the completed writes.** A [get] or [scan] that starts after a [write] completed sees it.
 ///
-/// The store belongs to one Firestore instance at a time. The SDK calls [open] when the instance starts and [close]
-/// when it is terminated; a store that was closed can be opened again (a new instance with the same settings after
-/// `terminate`). The arrays the SDK passes are not changed afterwards, so the store may keep them; the store may hand
-/// out arrays it keeps, the SDK does not change them.
+/// What the store may assume:
+///
+/// * The store belongs to one Firestore instance at a time, and nothing else changes its data while the instance
+///   runs. The SDK calls [open] when the instance starts and [close] when it is terminated; a store that was closed
+///   can be opened again (a new instance with the same settings after `terminate`).
+/// * The SDK never calls [write] while another [write] runs, and never reads while a [write] runs. Reads ([get] and
+///   [scan]) may run at the same time as each other.
+/// * Each read stands on its own: the SDK does not need two reads to see the same snapshot, since nobody writes
+///   between them.
+/// * The arrays the SDK passes are not changed afterwards, so the store may keep them; the store may hand out arrays
+///   it keeps, the SDK does not change them.
 ///
 /// A store must not import `dart:io` to be usable on the web; this interface does not.
 abstract interface class CacheStore {
-  /// Opens the storage. Called once before the first transaction, and again after [close] when the store is used by
+  /// Opens the storage. Called once before the first read or write, and again after [close] when the store is used by
   /// another instance.
   Future<void> open();
 
-  /// Closes the storage. No transaction runs at that time and none runs after it until [open] is called again.
+  /// Closes the storage. No read or write runs at that time and none runs after it until [open] is called again.
   Future<void> close();
 
-  /// Runs [body] in a transaction and returns what it returns, after the writes are committed.
-  ///
-  /// When [body] throws, the writes it made are dropped and the error is rethrown. When [readOnly] is true the body
-  /// only reads: the store may run it with less locking, and may throw on a write.
-  Future<T> transaction<T>(
-    Future<T> Function(CacheStoreTransaction transaction) body, {
-    bool readOnly = false,
-  });
-}
-
-/// The reads and writes of one [CacheStore.transaction]. Valid only until the future of the body completes.
-abstract interface class CacheStoreTransaction {
   /// The value stored under [key], or null when there is none.
   Future<Uint8List?> get(Uint8List key);
-
-  /// Stores [value] under [key], replacing the value that was there.
-  Future<void> put(Uint8List key, Uint8List value);
-
-  /// Removes [key] and its value. Removing a key that does not exist does nothing.
-  Future<void> delete(Uint8List key);
 
   /// The entries whose keys are at least [start] and less than [end], in key order, or in reverse key order (from the
   /// largest key below [end] down to [start]) when [reverse] is true. With a [limit], only the first [limit] entries
@@ -66,9 +52,16 @@ abstract interface class CacheStoreTransaction {
     bool reverse = false,
     int? limit,
   });
+
+  /// Stores the value of each of [puts] under its key, replacing the value that was there, and removes the keys of
+  /// [deletes] (removing a key that does not exist does nothing), all of them or none, durably once the future
+  /// completes. A key appears at most once in the two lists together.
+  ///
+  /// When the future throws, the SDK takes it that nothing was written.
+  Future<void> write(List<CacheStoreEntry> puts, List<Uint8List> deletes);
 }
 
-/// A key and its value, as [CacheStoreTransaction.scan] returns them.
+/// A key and its value, as [CacheStore.scan] returns them and [CacheStore.write] takes them.
 final class CacheStoreEntry {
   /// Creates an entry.
   const CacheStoreEntry(this.key, this.value);

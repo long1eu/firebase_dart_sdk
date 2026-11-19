@@ -56,6 +56,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/index/index_entry.da
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/keyvalue/cache_store.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/keyvalue/key_value_persistence.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/keyvalue/kv_codec.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/local/keyvalue/kv_transaction.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/local_serializer.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/lru_delegate.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/lru_garbage_collector.dart';
@@ -214,16 +215,16 @@ class CacheStorePersistence extends KeyValuePersistence {
   bool started = false;
 
   /// The transaction that runs, if any.
-  CacheStoreTransaction? _current;
+  KvTransaction? _current;
 
   /// Whether a transaction rolled back, so that the state kept in memory between transactions (the target globals,
   /// the next batch id, the byte size of the documents) is read again before the next one.
   bool _stale = false;
 
   /// The transaction that runs. Every read and write of the caches goes through it. Outside of a transaction (which
-  /// the [Persistence] contract does not allow, but tests do), each read or write is a transaction of its own, as a
+  /// the [Persistence] contract does not allow, but tests do), each write is a write of the store of its own, as a
   /// statement outside of a transaction is in SQLite.
-  CacheStoreTransaction get _tx => _current ?? _AutoCommit(store);
+  KvTransaction get _tx => _current ?? KvTransaction(store, autoCommit: true);
 
   @override
   Future<void> start() async {
@@ -348,27 +349,32 @@ class CacheStorePersistence extends KeyValuePersistence {
       try {
         await store.open();
         try {
-          await store.transaction((CacheStoreTransaction tx) async {
-            final Uint8List end = Uint8List.fromList(<int>[
-              0xff,
-              0xff,
-              0xff,
-              0xff,
-            ]);
-            while (true) {
-              final List<CacheStoreEntry> entries = await tx.scan(
-                Uint8List(0),
-                end,
-                limit: 1000,
-              );
-              for (final CacheStoreEntry entry in entries) {
-                await tx.delete(entry.key);
-              }
-              if (entries.length < 1000) {
-                break;
-              }
+          // Every key, in pages, then one write that deletes them all: a cache cleared halfway would be no cache.
+          final Uint8List end = Uint8List.fromList(<int>[
+            0xff,
+            0xff,
+            0xff,
+            0xff,
+          ]);
+          final List<Uint8List> keys = <Uint8List>[];
+          Uint8List start = Uint8List(0);
+          while (true) {
+            final List<CacheStoreEntry> page = await store.scan(
+              start,
+              end,
+              limit: 1000,
+            );
+            for (final CacheStoreEntry entry in page) {
+              keys.add(entry.key);
             }
-          });
+            if (page.length < 1000) {
+              break;
+            }
+            start = keySuccessor(page.last.key);
+          }
+          if (keys.isNotEmpty) {
+            await store.write(const <CacheStoreEntry>[], keys);
+          }
         } finally {
           await store.close();
         }
@@ -442,16 +448,18 @@ class CacheStorePersistence extends KeyValuePersistence {
     }
   }
 
-  /// Runs [body] in a transaction of the store, with [_tx] set to it.
-  Future<T> _inTransaction<T>(Future<T> Function() body) {
-    return store.transaction<T>((CacheStoreTransaction tx) async {
-      _current = tx;
-      try {
-        return await body();
-      } finally {
-        _current = null;
-      }
-    });
+  /// Runs [body] in a transaction, with [_tx] set to it, then hands its writes to the store in one write.
+  Future<T> _inTransaction<T>(Future<T> Function() body) async {
+    final KvTransaction transaction = KvTransaction(store);
+    _current = transaction;
+    try {
+      final T result = await body();
+      _current = null;
+      await transaction.commit();
+      return result;
+    } finally {
+      _current = null;
+    }
   }
 
   // Helpers of the caches.
@@ -527,37 +535,4 @@ SnapshotVersion _readVersion(KvKeyReader reader) {
   final int seconds = reader.integer();
   final int nanos = reader.integer();
   return SnapshotVersion(Timestamp(seconds, nanos));
-}
-
-/// Runs each read or write in a transaction of its own.
-class _AutoCommit implements CacheStoreTransaction {
-  _AutoCommit(this._store);
-
-  final CacheStore _store;
-
-  @override
-  Future<Uint8List?> get(Uint8List key) => _store.transaction(
-    (CacheStoreTransaction tx) => tx.get(key),
-    readOnly: true,
-  );
-
-  @override
-  Future<void> put(Uint8List key, Uint8List value) =>
-      _store.transaction((CacheStoreTransaction tx) => tx.put(key, value));
-
-  @override
-  Future<void> delete(Uint8List key) =>
-      _store.transaction((CacheStoreTransaction tx) => tx.delete(key));
-
-  @override
-  Future<List<CacheStoreEntry>> scan(
-    Uint8List start,
-    Uint8List end, {
-    bool reverse = false,
-    int? limit,
-  }) => _store.transaction(
-    (CacheStoreTransaction tx) =>
-        tx.scan(start, end, reverse: reverse, limit: limit),
-    readOnly: true,
-  );
 }

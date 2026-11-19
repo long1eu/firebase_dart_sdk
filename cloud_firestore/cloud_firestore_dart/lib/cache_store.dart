@@ -1,5 +1,6 @@
 /// **Experimental.** A persistent cache in a key-value store that the app brings: implement [CacheStore] (an ordered
-/// store of byte keys and byte values, with transactions) and pass it to [keyValueCacheSettings]. The SDK lays the
+/// store of byte keys and byte values: `get`, a range `scan` and an atomic `write`) and pass it to
+/// [keyValueCacheSettings]. The SDK lays the
 /// whole cache out in the store; see [KeyValueCacheSettings] for what the cache does and does not do yet.
 ///
 /// A library of its own, so that only the apps that import it carry the code of the cache:

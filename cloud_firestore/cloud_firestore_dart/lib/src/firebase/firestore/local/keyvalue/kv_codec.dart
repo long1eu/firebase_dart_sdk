@@ -49,12 +49,11 @@ class KvKeyWriter {
     if (value < -_intOffset || value > _intOffset) {
       throw ArgumentError.value(value, 'value', 'Out of the range of a key');
     }
-    final int shifted = value + _intOffset;
-    final int high = shifted ~/ _two32;
-    final int low = shifted - high * _two32;
-    // Division rather than shifts: the web shifts 32-bit integers.
-    _word(high);
-    _word(low);
+    // The two words of value + 2^53, without computing that sum: on the web it needs 54 bits, more than a double
+    // holds exactly. Division rather than shifts: the web shifts 32-bit integers.
+    final int quotient = (value / _two32).floor();
+    _word(quotient + _intOffset ~/ _two32);
+    _word(value - quotient * _two32);
     return this;
   }
 
@@ -136,7 +135,8 @@ class KvKeyReader {
     for (int i = 0; i < 4; i++) {
       low = low * 256 + _next();
     }
-    return high * _two32 + low - _intOffset;
+    // Without forming high * 2^32 + low, which may need 54 bits (see KvKeyWriter.integer).
+    return (high - _intOffset ~/ _two32) * _two32 + low;
   }
 
   /// Reads a resource path.
