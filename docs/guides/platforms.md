@@ -67,6 +67,12 @@ listen and write streams, over `fetch`. What to know:
     falls back to IndexedDB. The first OPFS open of a cache that is in IndexedDB moves it to
     OPFS, pending writes included.
 
+  A third, experimental option needs neither `sqlite3.wasm` nor the package: `indexedDbCacheSettings()` of
+  `package:cloud_firestore_dart/indexeddb_cache.dart` stores the cache in the official JS SDK's own
+  IndexedDB database and format, so an app can switch between the two SDKs in both directions (about
+  121 KB more JavaScript, 34 KB gzipped, only when imported). See
+  [The IndexedDB cache](web.md#the-indexeddb-cache-experimental).
+
   One tab at a time with either: a second tab that opens the same cache gets a
   `FirestoreException` with `failedPrecondition` (a Web Lock guards the database) and should use a
   memory cache; `openWithMemoryFallback` of the package does this. `clearPersistence()` deletes

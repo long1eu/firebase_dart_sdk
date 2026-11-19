@@ -12,11 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import 'package:cloud_firestore_dart/src/firebase/firestore/firestore_error.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/firestore_settings.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/local/indexeddb/indexeddb_persistence.dart';
 
 /// Configures the local cache of a Firestore instance, see
 /// [Settings.cacheSettings]. The implementations are
-/// [PersistentCacheSettings] and [MemoryCacheSettings].
+/// [PersistentCacheSettings], [MemoryCacheSettings] and, on the web, [IndexedDbCacheSettings] (experimental).
 ///
 /// The cache holds the documents that listeners and reads received and the writes that the backend has not
 /// acknowledged yet; reads and listeners use it while the client is offline. This is the `localCache` setting of
@@ -300,6 +302,110 @@ final class IndexBackfillSettings {
       'interval=$interval, initialDelay=$initialDelay}';
 }
 
+/// Configures a cache stored in IndexedDB in the format of the official Firebase JS SDK, on the web, without SQLite
+/// (no `sqlite3.wasm` to download, no `openDatabase` function).
+///
+/// **Experimental**: the API, the behaviour and what is stored may change in a minor version.
+///
+/// The cache is the IndexedDB database the JS SDK's `persistentLocalCache()` uses for the same app and database,
+/// `firestore/<app name>/<project id>[.<database id>]/main` (the app name is `[DEFAULT]` for the default app), at the
+/// JS SDK's schema version 18, with its stores, keys and rows. A web app that used the JS SDK with a persistent cache
+/// keeps its pending writes, cached documents, targets, cache indexes and loaded bundles when it switches to this SDK
+/// on the same browser profile, and the JS SDK can open a cache this SDK wrote. A database of another schema version
+/// is refused: open the app once with a current JS SDK to migrate an older one.
+///
+/// Garbage collection runs as with [PersistentCacheSettings], on the JS SDK's sequence numbers and size accounting
+/// ([sizeBytes]). Cache indexes ([indexAutoCreation], `PersistentCacheIndexManager`) are stored with the JS SDK's
+/// encoding, so that indexes either SDK built serve the other.
+///
+/// One tab at a time: the tab takes the JS SDK's primary lease as a JS tab with `persistentSingleTabManager` does, and
+/// the instance fails to start (every operation fails with [FirestoreErrorCode.failedPrecondition]) while another
+/// client (a tab of this SDK or of the JS SDK) holds a valid lease (refreshed less than 5 s ago, by a tab that did not
+/// close). A JS tab that starts while this one holds the lease fails the same way. When the tab was in the background
+/// long enough for its lease to lapse and another client took the cache over meanwhile, the instance terminates with
+/// that error at its next operation. The two SDKs can use the cache one after the other, not at the same time.
+///
+/// The engine is in its own library, so that apps that do not use it do not carry its code: create the settings with
+/// `indexedDbCacheSettings()` of `package:cloud_firestore_dart/indexeddb_cache.dart` (it throws an [UnsupportedError]
+/// on other platforms than the web).
+///
+/// ```dart
+/// import 'package:cloud_firestore_dart/indexeddb_cache.dart';
+///
+/// final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(
+///   app: app,
+///   settings: Settings(cacheSettings: indexedDbCacheSettings()),
+/// );
+/// ```
+///
+/// NOT IN THE OFFICIAL SDKS: the JS SDK always stores its persistent cache this way (`persistentLocalCache`); this SDK
+/// stores it in SQLite by default ([PersistentCacheSettings]).
+final class IndexedDbCacheSettings extends LocalCacheSettings {
+  /// See `indexedDbCacheSettings` of `package:cloud_firestore_dart/indexeddb_cache.dart`, which creates these settings.
+  IndexedDbCacheSettings._(
+    this._createPersistence, {
+    required this.sizeBytes,
+    required this.indexAutoCreation,
+    required this.indexBackfill,
+    required this.mergeUnsentWrites,
+  }) {
+    if (!_isWeb) {
+      throw UnsupportedError(
+        'IndexedDbCacheSettings select a cache in IndexedDB, which only exists on the web. Use '
+        'PersistentCacheSettings (SQLite) or MemoryCacheSettings on this platform.',
+      );
+    }
+    if (sizeBytes != Settings.cacheSizeUnlimited &&
+        sizeBytes < Settings.minimumCacheBytes) {
+      throw ArgumentError(
+        'Cache size must be set to at least ${Settings.minimumCacheBytes} bytes',
+      );
+    }
+  }
+
+  /// Creates the engine's persistence: given by the entry library of the engine, so that the core does not import it.
+  final IndexedDbPersistenceFactory _createPersistence;
+
+  static const bool _isWeb = bool.fromEnvironment('dart.library.js_interop');
+
+  /// The cache size threshold, in bytes.
+  final int sizeBytes;
+
+  /// See [PersistentCacheSettings.indexAutoCreation].
+  final bool indexAutoCreation;
+
+  /// See [PersistentCacheSettings.indexBackfill].
+  final IndexBackfillSettings indexBackfill;
+
+  /// See [PersistentCacheSettings.mergeUnsentWrites]. The merged writes are stored as the JS SDK stores its writes: a
+  /// JS SDK that opens the cache afterwards sends them as they are.
+  final bool mergeUnsentWrites;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is IndexedDbCacheSettings &&
+          sizeBytes == other.sizeBytes &&
+          indexAutoCreation == other.indexAutoCreation &&
+          indexBackfill == other.indexBackfill &&
+          mergeUnsentWrites == other.mergeUnsentWrites;
+
+  @override
+  int get hashCode => Object.hash(
+    IndexedDbCacheSettings,
+    sizeBytes,
+    indexAutoCreation,
+    indexBackfill,
+    mergeUnsentWrites,
+  );
+
+  @override
+  String toString() =>
+      'IndexedDbCacheSettings{sizeBytes=$sizeBytes, '
+      'indexAutoCreation=$indexAutoCreation, indexBackfill=$indexBackfill'
+      '${mergeUnsentWrites ? ', mergeUnsentWrites=true' : ''}}';
+}
+
 /// Configures an in memory cache, which is lost when the instance is shut
 /// down. The memory cache is garbage collected as configured by [gcSettings].
 ///
@@ -402,4 +508,24 @@ final class MemoryLruGcSettings extends MemoryGarbageCollectorSettings {
 
   @override
   String toString() => 'MemoryLruGcSettings{sizeBytes=$sizeBytes}';
+}
+
+/// Creates [IndexedDbCacheSettings] for the entry library of the engine, and gives the client its persistence factory.
+/// Not exported by the public libraries.
+extension IndexedDbCacheSettingsInternal on IndexedDbCacheSettings {
+  static IndexedDbCacheSettings create(
+    IndexedDbPersistenceFactory createPersistence, {
+    required int sizeBytes,
+    required bool indexAutoCreation,
+    required IndexBackfillSettings? indexBackfill,
+    required bool mergeUnsentWrites,
+  }) => IndexedDbCacheSettings._(
+    createPersistence,
+    sizeBytes: sizeBytes,
+    indexAutoCreation: indexAutoCreation,
+    indexBackfill: indexBackfill ?? IndexBackfillSettings(),
+    mergeUnsentWrites: mergeUnsentWrites,
+  );
+
+  IndexedDbPersistenceFactory get createPersistence => _createPersistence;
 }

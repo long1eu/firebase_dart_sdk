@@ -5,7 +5,7 @@
 part of 'field_value.dart';
 
 class ObjectValue extends FieldValue {
-  const ObjectValue(this._value);
+  const ObjectValue(this._value, [this._keyOrder]);
 
   factory ObjectValue.fromMap(Map<String, FieldValue> value) {
     return ObjectValue.fromImmutableMap(
@@ -14,12 +14,13 @@ class ObjectValue extends FieldValue {
   }
 
   factory ObjectValue.fromImmutableMap(
-    ImmutableSortedMap<String, FieldValue> value,
-  ) {
+    ImmutableSortedMap<String, FieldValue> value, {
+    List<String>? keyOrder,
+  }) {
     if (value.isEmpty) {
       return empty;
     } else {
-      return ObjectValue(value);
+      return ObjectValue(value, keyOrder);
     }
   }
 
@@ -28,6 +29,27 @@ class ObjectValue extends FieldValue {
   );
 
   final ImmutableSortedMap<String, FieldValue> _value;
+
+  /// NOT IN THE OFFICIAL SDKS: the order of the keys of the proto map this value was decoded from (as the backend or
+  /// a cache row of the JS SDK had it), or null for a value made otherwise (from the user's data, or field by field).
+  /// Not part of the value: equality, comparison, encoding and every other use go by the sorted keys.
+  final List<String>? _keyOrder;
+
+  /// The entries in the order of the proto map this value was decoded from, when it is known, else sorted by key.
+  ///
+  /// NOT IN THE OFFICIAL SDKS: only for the JS SDK's index encoding of a map value (in the IndexedDB cache), which
+  /// follows the order of the JS object, that is the order of the stored document. What this SDK sends and stores
+  /// is sorted, as in the official SDKs.
+  Iterable<MapEntry<String, FieldValue>> get entriesInKeyOrder {
+    final List<String>? order = _keyOrder;
+    if (order == null || order.length != _value.length) {
+      return _value;
+    }
+    return <MapEntry<String, FieldValue>>[
+      for (final String key in order)
+        if (_value[key] case final FieldValue value) MapEntry(key, value),
+    ];
+  }
 
   @override
   int get typeOrder => FieldValue.typeOrderObject;

@@ -772,7 +772,7 @@ class FirebaseFirestore {
   /// index as far as it is filled, and the result of a query is the same with or without an index.
   ///
   /// The future fails with an [ArgumentError] when [json] is not a valid index definition and with a [StateError] when
-  /// this instance does not use the persistent (SQLite) cache. On a terminated instance it fails with the same
+  /// this instance uses a memory cache. On a terminated instance it fails with the same
   /// [FirestoreException] as every other operation, whatever the cache.
   @Deprecated(
     'Instead of creating cache indexes manually, consider using '
@@ -787,7 +787,7 @@ class FirebaseFirestore {
     return client.configureFieldIndexes(parseIndexConfiguration(json));
   }
 
-  /// The [PersistentCacheIndexManager] of this instance, or null when it does not use the persistent (SQLite) cache.
+  /// The [PersistentCacheIndexManager] of this instance, or null when it uses a memory cache.
   ///
   /// Persistent cache indexes are optional indexes that only exist within the SDK to assist in local query execution;
   /// they are not the same as Cloud Firestore indexes.

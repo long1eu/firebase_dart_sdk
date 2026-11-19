@@ -560,7 +560,11 @@ class RemoteSerializer {
       final FieldValue value = decodeValue(entry.value);
       result = result.set(path, value);
     }
-    return result;
+    // NOT IN THE OFFICIAL SDKS: the order of the proto map is kept (see ObjectValue.entriesInKeyOrder).
+    return ObjectValue.fromImmutableMap(
+      result.internalValue,
+      keyOrder: fields.keys.toList(growable: false),
+    );
   }
 
   ObjectValue decodeDocumentFields(Map<String, proto_v1.Value> fields) {

@@ -491,6 +491,88 @@ SQLite on IndexedDB storage in Chrome and Firefox, about 10 times in Safari. A s
 times slower in Chrome and Firefox and 17 times slower in Safari (24 ms). Safari is the browser where reads
 over a large cache need watching.
 
+## 8. The engine against the SQLite caches: reads over a large cache (added 2026-11-18)
+
+The experimental engine (`IndexedDbCacheSettings`, branch `wave/web-indexeddb-engine`: no index manager, no GC,
+one tab) against `PersistentCacheSettings` on IndexedDB storage and on OPFS, through the public SDK API, with
+`tool/bench/web_idb/web/cache.dart`. Each client points at a closed local port and disables the network first.
+
+- **seed**: N documents of about 300 bytes (`n`, `group` = `g00`..`g99`, `text`) written as pending writes with
+  `WriteBatch`es of 500 (commits not awaited), 80% in the collection `big`, 20% in subcollections `small` of 10
+  documents under documents of `big`; timed until a cache read of the last document returns.
+- After a new page load (a fresh client on the stored cache): **open_first_read**, from creating the instance to
+  the first `doc().get(Source.cache)`; **doc_reads_100**, 100 awaited single document reads of `big`;
+  **query_all**, the whole of `big`; **query_group_1pct**, `where('group', isEqualTo: 'g42')` (1% of `big`);
+  **query_orderBy_limit20**, `orderBy('n').limit(20)`; **query_collection_group**, `collectionGroup('small')`
+  (20% of N); **write_then_limit_query**, a `set` (not awaited) followed by the limit query, which must return
+  the new document first (it did, every run). Each query runs once per load, in this order.
+- Every result size was checked (1,600 / 16 / 20 / 400 at N = 2,000; 16,000 / 160 / 20 / 4,000 at N = 20,000)
+  and every run of every cell completed; nothing hit the 15-minute limit. Each run seeds its own database, and
+  the page deletes the origin's databases and OPFS files afterwards.
+
+Mac mini (M4 Pro, 64 GB, macOS 27.2, load average 2 to 6), Dart 3.12.2, Chrome 157 and Firefox 160 headless on a
+fresh profile, Safari 27.2 in the logged-in user's profile. Medians of 3 runs, ms. Each cell is
+**engine / SQLite on IndexedDB / SQLite on OPFS**. dart2js everywhere, dart2wasm in Chrome only. Rerun:
+
+```
+cd tool/bench/web_idb && dart pub get && dart run.dart build cache   # sqlite3.wasm and the OPFS worker in web/
+dart run.dart cache --browser=chrome --compilers=js,wasm --sizes=2000,20000 --runs=3
+dart run.dart cache --browser=firefox --compilers=js --sizes=2000,20000 --runs=3
+dart run.dart cache --browser=safari --compilers=js --sizes=2000,20000 --runs=3   # or ./run_cache_all.sh
+```
+
+N = 2,000:
+
+| Operation | Chrome dart2js | Chrome dart2wasm | Firefox dart2js | Safari dart2js |
+| --- | --- | --- | --- | --- |
+| seed (4 batches) | 451 / 402 / 457 | 272 / 176 / 222 | 385 / 371 / 480 | 503 / 518 / 474 |
+| open + first read | 35 / 54 / 52 | 18 / 51 / 38 | 43 / 56 / 62 | 42 / 104 / 77 |
+| 100 document reads | 11 / 5.3 / 9.1 | 7.5 / 8.2 / 6.3 | 11 / 7.0 / 17 | 23 / 6.0 / 13 |
+| query, whole collection (1,600) | 59 / 48 / 49 | 29 / 19 / 19 | 66 / 59 / 60 | 66 / 54 / 57 |
+| query, group == x (16) | 32 / 19 / 20 | 19 / 8.6 / 11 | 36 / 24 / 26 | 34 / 23 / 23 |
+| query, orderBy n limit 20 | 156 / 144 / 146 | 59 / 48 / 50 | 184 / 174 / 176 | 154 / 193 / 182 |
+| collection group (400) | 21 / 14 / 19 | 14 / 9.3 / 11 | 23 / 16 / 25 | 47 / 17 / 45 |
+| write, then the limit query | 152 / 144 / 150 | 60 / 52 / 54 | 185 / 177 / 179 | 109 / 160 / 139 |
+
+N = 20,000:
+
+| Operation | Chrome dart2js | Chrome dart2wasm | Firefox dart2js | Safari dart2js |
+| --- | --- | --- | --- | --- |
+| seed (40 batches) | 4,611 / 3,949 / 4,359 | 2,818 / 1,745 / 2,041 | 3,641 / 3,377 / 4,268 | 4,025 / 2,779 / 3,538 |
+| open + first read | 68 / 157 / 90 | 62 / 145 / 62 | 72 / 157 / 85 | 80 / 311 / 155 |
+| 100 document reads | 12 / 5.2 / 11 | 7.5 / 14 / 7.4 | 11 / 7.0 / 19 | 26 / 6.0 / 30 |
+| query, whole collection (16,000) | 591 / 464 / 474 | 314 / 243 / 202 | 722 / 613 / 590 | 513 / 566 / 598 |
+| query, group == x (160) | 311 / 175 / 182 | 239 / 80 / 100 | 359 / 234 / 242 | 314 / 154 / 174 |
+| query, orderBy n limit 20 | 1,941 / 1,829 / 1,854 | 722 / 602 / 641 | 2,519 / 2,239 / 2,181 | 1,330 / 1,333 / 1,283 |
+| collection group (4,000) | 213 / 134 / 168 | 138 / 87 / 98 | 232 / 170 / 229 | 256 / 114 / 179 |
+| write, then the limit query | 1,941 / 1,844 / 1,856 | 719 / 606 / 624 | 2,340 / 2,269 / 2,205 | 1,304 / 1,332 / 1,267 |
+
+The run-to-run ranges were narrow (most within 5%; the widest: Safari SQLite on IndexedDB, whole collection,
+416 to 660); the raw runs are in `out/results.jsonl` of the run.
+
+What it says:
+
+- **Open + first read**: the engine is the fastest (tied with OPFS in Chrome dart2wasm) and grows least: 62 to 80 ms at 20,000 documents against 145
+  to 311 ms for SQLite on IndexedDB storage (which reads the whole database first) and 62 to 155 ms on OPFS. It
+  is not the 2 to 5 ms estimated in point 2: most of it is the client start and the first read through the
+  local store, not the database open.
+- **Queries**: the engine is seldom faster. Whole collection and limit queries take 0.9 to 1.3 times the time
+  of SQLite on IndexedDB storage (up to 1.55 times OPFS, dart2wasm), because most of their time is spent above the storage, in code all three share (the limit query
+  takes three times the whole-collection query in every cache: it is a full scan and sort in the query
+  engine, with no index). Where the storage share is larger, the engine is behind: `group == x` 1.5 to 3
+  times slower than SQLite on IndexedDB (311 against 175 ms in Chrome dart2js, 239 against 80 in dart2wasm),
+  the collection group 1.4 to 2.3 times.
+- **Seed** (500 writes per transaction): the engine is 1.1 to 1.6 times slower than SQLite on IndexedDB storage,
+  unlike the one-write transactions of point 3 where it was far ahead.
+- **Point reads**: 0.075 to 0.26 ms per document on the engine, against 0.05 to 0.07 on SQLite on IndexedDB
+  storage (0.14 in dart2wasm) and 0.06 to 0.3 on OPFS. Safari is the slowest for the engine, as in point 7.
+- Safari does not need the extra watching that point 7 suggested at this level: there the engine's queries are
+  within 0.9 to 2.3 times of SQLite, like the other browsers.
+
+Limits of this measurement: every document is a pending write, so the queries read the mutation queue and the
+overlays, not the remote document store (a cache filled from the backend would read that store instead; not
+measured). Neither engine had a field index (none configured; the engine has no index manager). One tab.
+
 ## Summary
 
 | Question | Measured or estimated | Result |

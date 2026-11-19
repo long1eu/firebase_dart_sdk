@@ -158,7 +158,7 @@ class Settings {
   /// cache is in memory even when this is true.
   ///
   /// When [cacheSettings] is set this is derived from it: true for
-  /// [PersistentCacheSettings], false for [MemoryCacheSettings].
+  /// [PersistentCacheSettings] and [IndexedDbCacheSettings], false for [MemoryCacheSettings].
   final bool persistenceEnabled;
 
   /// Sets an approximate cache size threshold for the on-disk data. If the
@@ -171,7 +171,7 @@ class Settings {
   /// value is 1 MB.
   ///
   /// When [cacheSettings] is set this is derived from it: the size of the
-  /// [PersistentCacheSettings], [cacheSizeUnlimited] for [MemoryCacheSettings].
+  /// [PersistentCacheSettings] or [IndexedDbCacheSettings], [cacheSizeUnlimited] for [MemoryCacheSettings].
   final int cacheSizeBytes;
 
   /// Configures the local cache with [PersistentCacheSettings] or
@@ -181,7 +181,8 @@ class Settings {
   /// settings.
   ///
   /// As with [persistenceEnabled], [PersistentCacheSettings] only give a persistent cache when
-  /// `FirebaseFirestore.instanceFor` gets an `openDatabase` function.
+  /// `FirebaseFirestore.instanceFor` gets an `openDatabase` function. [IndexedDbCacheSettings] (web only,
+  /// experimental) need none, and win over that function.
   ///
   /// ```dart
   /// // A memory cache that keeps up to 10 MB of recently used documents.
@@ -385,7 +386,8 @@ class Settings {
       return persistenceEnabled;
     }
     _checkNotMixed(persistenceEnabled, cacheSizeBytes);
-    return cacheSettings is PersistentCacheSettings;
+    return cacheSettings is PersistentCacheSettings ||
+        cacheSettings is IndexedDbCacheSettings;
   }
 
   static int _resolveCacheSizeBytes(
@@ -407,9 +409,11 @@ class Settings {
       return cacheSizeBytes;
     }
     _checkNotMixed(persistenceEnabled, cacheSizeBytes);
-    return cacheSettings is PersistentCacheSettings
-        ? cacheSettings.sizeBytes
-        : cacheSizeUnlimited;
+    return switch (cacheSettings) {
+      final PersistentCacheSettings persistent => persistent.sizeBytes,
+      final IndexedDbCacheSettings indexedDb => indexedDb.sizeBytes,
+      _ => cacheSizeUnlimited,
+    };
   }
 
   static void _checkNotMixed(bool persistenceEnabled, int cacheSizeBytes) {

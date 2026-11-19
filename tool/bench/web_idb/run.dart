@@ -4,7 +4,9 @@
 //   cd tool/bench/web_idb && dart pub get
 //   dart run.dart build                  # compiles web/*.dart, copies the assets
 //   dart run.dart [txtest] [engine] [startup] [--runs=N]   # default: all three
-//       [--engines=idb,sqlite-idb,sqlite-opfs] [--compilers=js,wasm]
+//       [--engines=idb,sqlite-idb,sqlite-opfs] [--compilers=js,wasm] [--browser=chrome|firefox|safari]
+//   dart run.dart cache [--kinds=engine,sqlite-idb,sqlite-opfs] [--sizes=2000,20000] [--runs=N]
+//       # web/cache.dart: reads over a large cache through the SDK, a seed load then a measure load per run
 //
 // build compiles engine.dart and startup.dart with dart2js -O2 and dart2wasm
 // -O2, and copies sqlite3.wasm and sqlite_opfs_worker.js from
@@ -28,8 +30,8 @@ final String here = File.fromUri(Platform.script).parent.path;
 const String chrome =
     '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
 
-Future<void> build() async {
-  for (final String page in <String>['engine', 'startup']) {
+Future<void> build(List<String> pages) async {
+  for (final String page in pages) {
     for (final List<String> args in <List<String>>[
       <String>['compile', 'js', '-O2', '-o', 'web/$page.js', 'web/$page.dart'],
       <String>[
@@ -55,10 +57,13 @@ Future<void> build() async {
   }
   final String assets =
       '$here/../../../cloud_firestore/cloud_firestore_dart/test/browser';
-  File('$assets/sqlite3.wasm').copySync('$here/web/sqlite3.wasm');
-  File(
-    '$assets/opfs/sqlite_opfs_worker.js',
-  ).copySync('$here/web/sqlite_opfs_worker.js');
+  // Kept when the assets were put into web/ by hand.
+  if (File('$assets/sqlite3.wasm').existsSync()) {
+    File('$assets/sqlite3.wasm').copySync('$here/web/sqlite3.wasm');
+    File(
+      '$assets/opfs/sqlite_opfs_worker.js',
+    ).copySync('$here/web/sqlite_opfs_worker.js');
+  }
 }
 
 class Step {
@@ -71,6 +76,9 @@ class Step {
 
 List<String> engines = <String>['idb', 'sqlite-idb', 'sqlite-opfs'];
 List<String> compilers = <String>['js', 'wasm'];
+List<String> kinds = <String>['engine', 'sqlite-idb', 'sqlite-opfs'];
+List<int> sizes = <int>[2000, 20000];
+final String tag = DateTime.now().millisecondsSinceEpoch.toString();
 
 List<Step> plan(Set<String> parts, int runs) => <Step>[
   if (parts.contains('txtest'))
@@ -103,6 +111,16 @@ List<Step> plan(Set<String> parts, int runs) => <Step>[
             'index.html?p=startup&c=$c&storage=$storage&phase=measure&cache=warm',
           ),
       ],
+  // Each run seeds a new database (its own name) and measures it on the next page load.
+  if (parts.contains('cache'))
+    for (final String c in compilers)
+      for (final int n in sizes)
+        for (final String kind in kinds)
+          for (int i = 0; i < runs; i++)
+            for (final String phase in <String>['seed', 'measure'])
+              Step(
+                'index.html?p=cache&c=$c&kind=$kind&n=$n&phase=$phase&tag=$tag-$c-$kind-$n-$i',
+              ),
 ];
 
 double median(List<double> values) {
@@ -115,7 +133,8 @@ String ms(double v) => v.toStringAsFixed(v < 10 ? 2 : 0);
 
 Future<void> main(List<String> arguments) async {
   if (arguments.contains('build')) {
-    await build();
+    final List<String> pages = arguments.where((a) => a != 'build').toList();
+    await build(pages.isEmpty ? <String>['engine', 'startup', 'cache'] : pages);
     return;
   }
   int runs = 5;
@@ -128,6 +147,10 @@ Future<void> main(List<String> arguments) async {
       compilers = a.substring(12).split(',');
     } else if (a.startsWith('--browser=')) {
       browserName = a.substring(10);
+    } else if (a.startsWith('--kinds=')) {
+      kinds = a.substring(8).split(',');
+    } else if (a.startsWith('--sizes=')) {
+      sizes = a.substring(8).split(',').map(int.parse).toList();
     } else if (a.startsWith('--runs=')) {
       runs = int.parse(a.substring(7));
     } else {
@@ -161,6 +184,7 @@ Future<void> main(List<String> arguments) async {
       final Map<String, Object?> result =
           jsonDecode(await utf8.decodeStream(request)) as Map<String, Object?>;
       result['step'] = steps[index].url;
+      result['browser'] = browserName;
       result['counted'] = steps[index].count;
       raw.writeln(jsonEncode(result));
       stdout.writeln(
@@ -233,6 +257,22 @@ Future<void> main(List<String> arguments) async {
   unawaited(browser.stderr.drain<void>());
   await finished.future;
   watchdog?.cancel();
+  if (browserName == 'safari') {
+    // Close the tab this run opened in the user's Safari. Needs the Automation permission for Safari; without it
+    // (over ssh, for example) osascript can wait on a prompt, hence the timeout: the tab then stays open.
+    final Process close = await Process.start('osascript', <String>[
+      '-e',
+      'tell application "Safari" to close (every tab of every window whose URL starts with "$origin")',
+    ]);
+    await close.exitCode.timeout(
+      const Duration(seconds: 10),
+      onTimeout: () {
+        close.kill();
+        stderr.writeln('Could not close the Safari tab at $origin');
+        return -1;
+      },
+    );
+  }
   browser.kill();
   await browser.exitCode;
   await raw.close();
@@ -256,6 +296,7 @@ void report(List<Map<String, Object?>> results) {
     });
   }
   // Point 3.
+  reportCache(results.where((r) => r['page'] == 'cache').toList());
   final List<Map<String, Object?>> engines = results
       .where((r) => r['runs'] != null)
       .toList();
@@ -309,4 +350,60 @@ void report(List<Map<String, Object?>> results) {
       );
     });
   }
+}
+
+const List<String> cacheOps = <String>[
+  'seed',
+  'open_first_read',
+  'doc_reads_100',
+  'query_all',
+  'query_group_1pct',
+  'query_orderBy_limit20',
+  'query_collection_group',
+  'write_then_limit_query',
+];
+
+void reportCache(List<Map<String, Object?>> results) {
+  if (results.isEmpty) return;
+  final Map<String, Map<String, List<double>>> byKey =
+      <String, Map<String, List<double>>>{};
+  final Map<String, Map<String, Set<Object?>>> counts =
+      <String, Map<String, Set<Object?>>>{};
+  for (final Map<String, Object?> r in results) {
+    if (r['error'] != null) continue;
+    final String key = '${r['browser']} ${r['compiler']} n=${r['n']} ${r['kind']}';
+    final Map<String, List<double>> ops = byKey.putIfAbsent(
+      key,
+      () => <String, List<double>>{},
+    );
+    for (final String op in cacheOps) {
+      if (r[op] is num) {
+        ops.putIfAbsent(op, () => <double>[]).add((r[op]! as num).toDouble());
+      }
+    }
+    final Map<String, Set<Object?>> c = counts.putIfAbsent(
+      key,
+      () => <String, Set<Object?>>{},
+    );
+    ((r['sizes'] as Map<String, Object?>?) ?? <String, Object?>{}).forEach(
+      (String op, Object? v) => c.putIfAbsent(op, () => <Object?>{}).add(v),
+    );
+    for (final String f in <String>['lastFound', 'pendingWrites', 'writeSeen']) {
+      if (r.containsKey(f)) c.putIfAbsent(f, () => <Object?>{}).add(r[f]);
+    }
+  }
+  stdout.writeln('\nCache medians (ms) [min-max] {result sizes}:');
+  byKey.forEach((String key, Map<String, List<double>> ops) {
+    stdout.writeln('  $key');
+    for (final String op in cacheOps) {
+      final List<double>? v = ops[op];
+      if (v == null) continue;
+      final List<double> sorted = List<double>.of(v)..sort();
+      stdout.writeln(
+        '    $op: ${ms(median(v))} [${ms(sorted.first)}-${ms(sorted.last)}] '
+        '(${v.length}) ${counts[key]![op] ?? ''}',
+      );
+    }
+    stdout.writeln('    checks: ${{for (final f in <String>['lastFound', 'pendingWrites', 'writeSeen']) f: counts[key]![f]}}');
+  });
 }

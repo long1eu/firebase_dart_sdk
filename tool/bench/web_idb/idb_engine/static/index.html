@@ -1,0 +1,20 @@
+<!doctype html>
+<!-- Loads engine_page.dart compiled with dart2js (engine_page.js) or, with ?c=wasm, dart2wasm (engine_page.mjs and
+     engine_page.wasm). See engine_page.dart. -->
+<html>
+<head><meta charset="utf-8"><title>start-dart</title></head>
+<body>
+<script type="module">
+  if (new URLSearchParams(location.search).get('c') === 'wasm') {
+    const loader = await import('./engine_page.mjs');
+    const app = await loader.compileStreaming(fetch('engine_page.wasm'));
+    const instance = await app.instantiate({});
+    instance.invokeMain();
+  } else {
+    const script = document.createElement('script');
+    script.src = 'engine_page.js';
+    document.body.append(script);
+  }
+</script>
+</body>
+</html>

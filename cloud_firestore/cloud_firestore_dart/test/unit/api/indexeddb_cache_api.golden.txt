@@ -1,0 +1,23 @@
+class IndexBackfillSettings
+  ==(Object other): bool
+  final documentsPerRun: int
+  final initialDelay: Duration
+  final interval: Duration
+  get hashCode: int
+  new IndexBackfillSettings({int documentsPerRun, Duration interval, Duration initialDelay})
+  static final defaultDocumentsPerRun: int
+  static final defaultInitialDelay: Duration
+  static final defaultInterval: Duration
+  static final maxDelay: Duration
+  static final maxDocumentsPerRun: int
+  static final minInterval: Duration
+  toString(): String
+class IndexedDbCacheSettings extends LocalCacheSettings
+  ==(Object other): bool
+  final indexAutoCreation: bool
+  final indexBackfill: IndexBackfillSettings
+  final mergeUnsentWrites: bool
+  final sizeBytes: int
+  get hashCode: int
+  toString(): String
+indexedDbCacheSettings({int sizeBytes, bool indexAutoCreation, IndexBackfillSettings indexBackfill, bool mergeUnsentWrites}): IndexedDbCacheSettings
