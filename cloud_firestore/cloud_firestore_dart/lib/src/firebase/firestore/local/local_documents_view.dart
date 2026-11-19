@@ -592,109 +592,38 @@ class LocalDocumentsView {
   ) async {
     // With an offset that comes from a field index only the overlays of the batches after the offset are read: the
     // documents of the earlier batches are in the index with their overlay applied.
-    final bool overlaysSinceBatch =
-        offset.largestBatchId != FieldIndex.initialLargestBatchId;
-    final Map<DocumentKey, Overlay> overlays = await documentOverlayCache
-        .getOverlaysForCollection(query.path, offset.largestBatchId);
-
-    // PORTING NOTE: upstream filters the remote documents by the query here as well. With only the newer overlays at
-    // hand that misses a document that was read after the offset and matches the query (or stops matching it) through
-    // an overlay of an earlier batch, until the next backfill. The port reads all the documents after the offset in
-    // that case and looks their overlays up by key.
-    final ImmutableSortedMap<DocumentKey, Document> remoteDocuments =
-        await remoteDocumentCache.getAllDocumentsMatchingQuery(
-          overlaysSinceBatch ? Query(query.path) : query,
-          offset,
-          // A view of the keys, not a copy: a collection of pending writes has as many overlays as documents.
-          mutatedKeys: MapKeySet<DocumentKey>(overlays),
-          context: context,
-        );
-    if (overlaysSinceBatch) {
-      final List<DocumentKey> withoutOverlay = <DocumentKey>[
-        for (final MapEntry<DocumentKey, Document> entry in remoteDocuments)
-          if (!overlays.containsKey(entry.key)) entry.key,
-      ];
-      if (withoutOverlay.isNotEmpty) {
-        overlays.addAll(await documentOverlayCache.getOverlays(withoutOverlay));
-      }
-    }
-
-    // The documents without an overlay are results as they are. They were read without the filters of the query
-    // when the overlays of the earlier batches had to be looked up.
-    ImmutableSortedMap<DocumentKey, Document> matching = remoteDocuments;
-    if (overlaysSinceBatch) {
-      for (final MapEntry<DocumentKey, Document> entry in remoteDocuments) {
-        if (!overlays.containsKey(entry.key) && !query.matches(entry.value)) {
-          matching = matching.remove(entry.key);
-        }
-      }
-    }
-
-    if (overlays.isEmpty) {
-      return matching;
-    }
-
-    // As documents might match the query because of their overlay we need to include documents for all overlays in
-    // the initial document set. The remote document cache returned the cached documents with an overlay that were read
-    // after the offset; a patch overlay of a document that is not among them (it was read before the offset or is
-    // cached as deleted) needs its base read by key. Set and delete overlays do not need a base document.
-    final List<DocumentKey> missingPatchBases = <DocumentKey>[
-      for (Overlay overlay in overlays.values)
-        if (overlay.mutation is PatchMutation &&
-            !remoteDocuments.containsKey(overlay.key))
-          overlay.key,
-    ];
-    final Map<DocumentKey, MaybeDocument?> patchBases =
-        missingPatchBases.isEmpty
-        ? const <DocumentKey, MaybeDocument?>{}
-        : await remoteDocumentCache.getAll(missingPatchBases);
-
-    // Apply the overlays and match against the query. Only the documents with an overlay are touched: the others were
-    // matched above.
-    final Timestamp now = Timestamp.now();
-    if (overlays.length >= matching.length) {
-      return _mergeOverlays(
-        matching,
-        overlays,
-        remoteDocuments,
-        patchBases,
+    if (offset.largestBatchId != FieldIndex.initialLargestBatchId) {
+      return _getDocumentsMatchingCollectionQuerySinceBatch(
         query,
-        now,
+        offset,
+        context,
       );
     }
-    ImmutableSortedMap<DocumentKey, Document> results = matching;
-    for (Overlay overlay in overlays.values) {
-      final DocumentKey key = overlay.key;
-      final MaybeDocument? base = remoteDocuments[key] ?? patchBases[key];
-      final MaybeDocument? doc = overlay.mutation.applyToLocalView(
-        base,
-        base,
-        now,
-      );
-      if (doc is Document && query.matches(doc)) {
-        results = results.insert(key, doc);
-      } else {
-        results = results.remove(key);
-      }
+
+    // Every overlay of the collection. The plain set overlays come as the documents they write, already matched
+    // against the query (the cache drops the others as it reads them, keeping their ids): they replace or hide the
+    // remote document of their key whatever it is.
+    final Timestamp now = Timestamp.now();
+    final CollectionOverlays collectionOverlays = await documentOverlayCache
+        .getOverlaysForCollectionQuery(query, now);
+    final Map<DocumentKey, Overlay> overlays = collectionOverlays.overlays;
+
+    final ImmutableSortedMap<DocumentKey, Document>
+    remoteDocuments = await remoteDocumentCache.getAllDocumentsMatchingQuery(
+      query,
+      offset,
+      // A view of the keys, not a copy. The documents with a set overlay need not be returned: the overlay decides.
+      mutatedKeys: MapKeySet<DocumentKey>(overlays),
+      context: context,
+    );
+    if (collectionOverlays.isEmpty) {
+      return remoteDocuments;
     }
 
-    return results;
-  }
+    final Map<DocumentKey, MaybeDocument?> patchBases =
+        await _missingPatchBases(overlays, remoteDocuments);
 
-  /// The overlay loop of [_getDocumentsMatchingCollectionQuery] when there are at least as many overlays as matching
-  /// documents (a collection that exists only as pending writes, for example): the same result as inserting the
-  /// document of every overlay that matches (and removing the key of every other) one at a time, built at once from
-  /// the sorted entries.
-  ImmutableSortedMap<DocumentKey, Document> _mergeOverlays(
-    ImmutableSortedMap<DocumentKey, Document> matching,
-    Map<DocumentKey, Overlay> overlays,
-    ImmutableSortedMap<DocumentKey, Document> remoteDocuments,
-    Map<DocumentKey, MaybeDocument?> patchBases,
-    Query query,
-    Timestamp now,
-  ) {
-    final Comparator<DocumentKey> keyOrder = matching.comparator;
-    // In the order of overlays.values; a null document removes the key.
+    // The documents of the overlays (null removes the key), in no particular order.
     final List<DocumentKey> keys = <DocumentKey>[];
     final List<Document?> docs = <Document?>[];
     for (Overlay overlay in overlays.values) {
@@ -708,6 +637,139 @@ class LocalDocumentsView {
       keys.add(key);
       docs.add(doc is Document && query.matches(doc) ? doc : null);
     }
+    for (MapEntry<DocumentKey, Document> entry
+        in collectionOverlays.documents.entries) {
+      keys.add(entry.key);
+      docs.add(entry.value);
+    }
+    // A remote document whose set overlay does not match the query is hidden.
+    if (collectionOverlays.hiddenIds.isNotEmpty) {
+      for (final MapEntry<DocumentKey, Document> entry in remoteDocuments) {
+        if (collectionOverlays.hasSetOverlay(entry.key) &&
+            !collectionOverlays.documents.containsKey(entry.key)) {
+          keys.add(entry.key);
+          docs.add(null);
+        }
+      }
+    }
+    return _applyOverlayDocuments(remoteDocuments, keys, docs);
+  }
+
+  /// [_getDocumentsMatchingCollectionQuery] for an offset of a field index: only the overlays of the batches after
+  /// the offset are read by collection.
+  Future<ImmutableSortedMap<DocumentKey, Document>>
+  _getDocumentsMatchingCollectionQuerySinceBatch(
+    Query query,
+    IndexOffset offset,
+    QueryContext? context,
+  ) async {
+    final Map<DocumentKey, Overlay> overlays = await documentOverlayCache
+        .getOverlaysForCollection(query.path, offset.largestBatchId);
+
+    // PORTING NOTE: upstream filters the remote documents by the query here as well. With only the newer overlays at
+    // hand that misses a document that was read after the offset and matches the query (or stops matching it) through
+    // an overlay of an earlier batch, until the next backfill. The port reads all the documents after the offset in
+    // that case and looks their overlays up by key.
+    final ImmutableSortedMap<DocumentKey, Document> remoteDocuments =
+        await remoteDocumentCache.getAllDocumentsMatchingQuery(
+          Query(query.path),
+          offset,
+          mutatedKeys: MapKeySet<DocumentKey>(overlays),
+          context: context,
+        );
+    final List<DocumentKey> withoutOverlay = <DocumentKey>[
+      for (final MapEntry<DocumentKey, Document> entry in remoteDocuments)
+        if (!overlays.containsKey(entry.key)) entry.key,
+    ];
+    if (withoutOverlay.isNotEmpty) {
+      overlays.addAll(await documentOverlayCache.getOverlays(withoutOverlay));
+    }
+
+    // The documents without an overlay are results as they are. They were read without the filters of the query
+    // when the overlays of the earlier batches had to be looked up.
+    ImmutableSortedMap<DocumentKey, Document> matching = remoteDocuments;
+    for (final MapEntry<DocumentKey, Document> entry in remoteDocuments) {
+      if (!overlays.containsKey(entry.key) && !query.matches(entry.value)) {
+        matching = matching.remove(entry.key);
+      }
+    }
+
+    if (overlays.isEmpty) {
+      return matching;
+    }
+
+    final Map<DocumentKey, MaybeDocument?> patchBases =
+        await _missingPatchBases(overlays, remoteDocuments);
+
+    // Apply the overlays and match against the query. Only the documents with an overlay are touched: the others were
+    // matched above.
+    final Timestamp now = Timestamp.now();
+    final List<DocumentKey> keys = <DocumentKey>[];
+    final List<Document?> docs = <Document?>[];
+    for (Overlay overlay in overlays.values) {
+      final DocumentKey key = overlay.key;
+      final MaybeDocument? base = remoteDocuments[key] ?? patchBases[key];
+      final MaybeDocument? doc = overlay.mutation.applyToLocalView(
+        base,
+        base,
+        now,
+      );
+      keys.add(key);
+      docs.add(doc is Document && query.matches(doc) ? doc : null);
+    }
+    return _applyOverlayDocuments(matching, keys, docs);
+  }
+
+  /// The base documents of the patch overlays among [overlays] that [remoteDocuments] does not have.
+  ///
+  /// As documents might match the query because of their overlay we need to include documents for all overlays in
+  /// the initial document set. The remote document cache returned the cached documents with an overlay that were read
+  /// after the offset; a patch overlay of a document that is not among them (it was read before the offset or is
+  /// cached as deleted) needs its base read by key. Set and delete overlays do not need a base document.
+  Future<Map<DocumentKey, MaybeDocument?>> _missingPatchBases(
+    Map<DocumentKey, Overlay> overlays,
+    ImmutableSortedMap<DocumentKey, Document> remoteDocuments,
+  ) async {
+    final List<DocumentKey> missingPatchBases = <DocumentKey>[
+      for (Overlay overlay in overlays.values)
+        if (overlay.mutation is PatchMutation &&
+            !remoteDocuments.containsKey(overlay.key))
+          overlay.key,
+    ];
+    return missingPatchBases.isEmpty
+        ? const <DocumentKey, MaybeDocument?>{}
+        : await remoteDocumentCache.getAll(missingPatchBases);
+  }
+
+  /// [matching] with the documents [docs] of the overlays of the keys [keys] inserted (a null document removes the
+  /// key); of keys that compare equal the last one wins.
+  ImmutableSortedMap<DocumentKey, Document> _applyOverlayDocuments(
+    ImmutableSortedMap<DocumentKey, Document> matching,
+    List<DocumentKey> keys,
+    List<Document?> docs,
+  ) {
+    if (keys.length >= matching.length) {
+      return _mergeOverlays(matching, keys, docs);
+    }
+    ImmutableSortedMap<DocumentKey, Document> results = matching;
+    for (int i = 0; i < keys.length; i++) {
+      final Document? doc = docs[i];
+      results = doc != null
+          ? results.insert(keys[i], doc)
+          : results.remove(keys[i]);
+    }
+    return results;
+  }
+
+  /// [_applyOverlayDocuments] when there are at least as many overlays as matching documents (a collection that exists
+  /// only as pending writes, for example): the same result as inserting the document of every overlay that matches
+  /// (and removing the key of every other) one at a time, built at once from the sorted entries.
+  ImmutableSortedMap<DocumentKey, Document> _mergeOverlays(
+    ImmutableSortedMap<DocumentKey, Document> matching,
+    List<DocumentKey> keys,
+    List<Document?> docs,
+  ) {
+    final Comparator<DocumentKey> keyOrder = matching.comparator;
     // Sorted by key, then by position, so that of keys that compare equal the last one wins, as with one insert at a
     // time.
     final List<int> order = List<int>.generate(keys.length, (int i) => i);

@@ -158,6 +158,18 @@ class IndexedDbDocumentOverlayCache implements DocumentOverlayCache {
   }
 
   @override
+  Future<CollectionOverlays> getOverlaysForCollectionQuery(
+    Query query,
+    Timestamp now,
+  ) async {
+    return CollectionOverlays.split(
+      await getOverlaysForCollection(query.path, -1),
+      query,
+      now,
+    );
+  }
+
+  @override
   Future<Map<DocumentKey, Overlay>> getOverlaysForCollectionGroup(
     String collectionGroup,
     int sinceBatchId,
