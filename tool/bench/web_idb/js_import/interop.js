@@ -31,9 +31,11 @@ function progress(message) {
   document.title = `${params.step}: ${message}`;
 }
 
-function check(name, pass, detail = '') {
-  checks.push({ name, pass: !!pass, detail: typeof detail === 'string' ? detail : JSON.stringify(detail) });
+/** [known]: a difference between the SDKs that is known and accepted; the driver prints it as KNOWN. */
+function check(name, pass, detail = '', known = false) {
+  checks.push({ name, pass: !!pass, known, detail: typeof detail === 'string' ? detail : JSON.stringify(detail) });
 }
+
 
 let hold = false;
 
@@ -125,6 +127,8 @@ const kindIndex = { indexes: [{ collectionGroup: 'kinds', queryScope: 'COLLECTIO
 function kindValues(db) {
   return {
     map: { b: 1, a: 2, 10: 'ten', 2: 'two', z: { y: 1, x: 2 } },
+    // The same keys written in sorted order (Object.keys still puts the integer-like ones first).
+    mapsorted: { 10: 'ten', 2: 'two', a: 2, b: 1, z: { x: 2, y: 1 } },
     timestamp: Timestamp.fromMillis(1700000000123),
     timestamp0: new Timestamp(0, 5),
     reference: doc(db, 'kinds/target'),
@@ -285,6 +289,13 @@ const steps = {
     check('D1 key order of a map in the JS cache (written b, a, 10, 2, z)', true, keys);
     const filled = await waitFor('entries', async () => (await countRows('indexEntries')) >= Object.keys(values).length, 45000);
     check('D1 the JS SDK backfilled its index', filled, `indexEntries=${await countRows('indexEntries')}`);
+    // For reference: the JS SDK on its own entries, for the two equal maps.
+    setLogLevel('debug');
+    for (const kind of ['map', 'mapsorted']) {
+      const from = logs.length;
+      const result = ids(await getDocsFromCache(query(collection(db, 'kinds'), where('v', '==', values[kind]))));
+      check(`D1 ${kind}: the JS SDK on its own entries (both maps are equal)`, true, { result, usedIndex: usedIndex(from) });
+    }
     await terminate(db);
   },
 
@@ -294,7 +305,17 @@ const steps = {
     const { db } = open();
     await disableNetwork(db);
     const values = kindValues(db);
+    // The two equal maps first, the sorted one first: the JS SDK keeps the first query value of an equal target
+    // (its targets are memoized and stored by canonical id), so the order of the keys of a later equal query value
+    // does not count.
+    {
+      const from = logs.length;
+      const result = ids(await getDocsFromCache(query(collection(db, 'kinds'), where('v', '==', values.mapsorted))));
+      check("D4 map with keys in sorted order: the JS SDK finds the engine's entries (both equal maps)",
+        JSON.stringify(result) === '["map","mapsorted"]' && usedIndex(from), { result, usedIndex: usedIndex(from) });
+    }
     for (const [kind, v] of Object.entries(values)) {
+      if (kind === 'map' || kind === 'mapsorted') continue;
       const from = logs.length;
       let result;
       try {
@@ -302,8 +323,7 @@ const steps = {
       } catch (e) {
         result = `error ${e}`;
       }
-      const expected = kind === 'null' ? '["null"]' : `["${kind}"]`;
-      check(`D4 ${kind}: the JS SDK finds the engine's entry`, JSON.stringify(result) === expected && usedIndex(from),
+      check(`D4 ${kind}: the JS SDK finds the engine's entry`, JSON.stringify(result) === `["${kind}"]` && usedIndex(from),
         { result, usedIndex: usedIndex(from) });
     }
     await terminate(db);

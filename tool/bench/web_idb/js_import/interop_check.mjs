@@ -1,7 +1,8 @@
 // Drives the interop check between the official JS SDK (interop.js) and the IndexedDB engine (interop_engine.dart):
 // serves static/ on 127.0.0.1:8766, starts headless Chrome on a fresh profile, opens one page per step (several
 // tabs at once for the lease steps), reads the result each page leaves in window.interopResult (JSON) through the
-// DevTools protocol and prints PASS or FAIL per check. Run through interop_check.sh.
+// DevTools protocol and prints PASS or FAIL per check (KNOWN for a failure of a check marked as a known difference,
+// which does not fail the run). Run through interop_check.sh.
 //
 //   node interop_check.mjs [emulator port, default 8395] [only these parts, e.g. AB]
 import { spawn } from 'node:child_process';
@@ -81,8 +82,8 @@ async function result(id, label, timeoutMs = 240000) {
       const { state, checks } = JSON.parse(text);
       if (checks.length === 0) { console.log(`FAIL ${label}: no checks reported`); failures++; }
       for (const c of checks) {
-        if (!c.pass) failures++;
-        console.log(`${c.pass ? 'PASS' : 'FAIL'} ${c.name}${c.detail ? `  (${c.detail.replace(/\s+/g, ' ').slice(0, 600)})` : ''}`);
+        if (!c.pass && !c.known) failures++;
+        console.log(`${c.pass ? 'PASS' : c.known ? 'KNOWN' : 'FAIL'} ${c.name}${c.detail ? `  (${c.detail.replace(/\s+/g, ' ').slice(0, 600)})` : ''}`);
       }
       return state === 'holding';
     }

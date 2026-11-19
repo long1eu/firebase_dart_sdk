@@ -378,8 +378,7 @@ class RemoteSerializer {
 
   proto.MapValue _encodeMapValue(ObjectValue value) {
     final proto.MapValue builder = proto.MapValue.create();
-    // NOT IN THE OFFICIAL SDKS: in the order of the user's map (see ObjectValue.entriesInKeyOrder).
-    for (MapEntry<String, FieldValue> entry in value.entriesInKeyOrder) {
+    for (MapEntry<String, FieldValue> entry in value.internalValue) {
       builder.fields[entry.key] = encodeValue(entry.value);
     }
     return builder..freeze();

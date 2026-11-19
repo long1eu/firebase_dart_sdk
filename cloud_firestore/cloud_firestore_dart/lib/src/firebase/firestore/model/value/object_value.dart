@@ -7,11 +7,9 @@ part of 'field_value.dart';
 class ObjectValue extends FieldValue {
   const ObjectValue(this._value, [this._keyOrder]);
 
-  /// The value of [value]; the order of its keys is kept (see [entriesInKeyOrder]).
   factory ObjectValue.fromMap(Map<String, FieldValue> value) {
     return ObjectValue.fromImmutableMap(
       ImmutableSortedMap<String, FieldValue>.fromMap(value, compareUtf8Strings),
-      keyOrder: value.keys.toList(growable: false),
     );
   }
 
@@ -32,16 +30,16 @@ class ObjectValue extends FieldValue {
 
   final ImmutableSortedMap<String, FieldValue> _value;
 
-  /// NOT IN THE OFFICIAL SDKS: the order of the keys of the map this value was made of (the user's map, or the proto
-  /// map as the backend or a cache had it), or null when it was built field by field. Not part of the value: equality,
-  /// comparison and every other use go by the sorted keys.
+  /// NOT IN THE OFFICIAL SDKS: the order of the keys of the proto map this value was decoded from (as the backend or
+  /// a cache row of the JS SDK had it), or null for a value made otherwise (from the user's data, or field by field).
+  /// Not part of the value: equality, comparison, encoding and every other use go by the sorted keys.
   final List<String>? _keyOrder;
 
-  /// The entries in the order of the map this value was made of, when it is known, else sorted by key.
+  /// The entries in the order of the proto map this value was decoded from, when it is known, else sorted by key.
   ///
-  /// NOT IN THE OFFICIAL SDKS: the JS SDK keeps the order of its objects, and its index encoding of a map value
-  /// (in the IndexedDB cache) follows it; the encoding of a map value for the backend keeps it too, so that the
-  /// backend, and the caches that read the document back, have the order the user wrote.
+  /// NOT IN THE OFFICIAL SDKS: only for the JS SDK's index encoding of a map value (in the IndexedDB cache), which
+  /// follows the order of the JS object, that is the order of the stored document. What this SDK sends and stores
+  /// is sorted, as in the official SDKs.
   Iterable<MapEntry<String, FieldValue>> get entriesInKeyOrder {
     final List<String>? order = _keyOrder;
     if (order == null || order.length != _value.length) {

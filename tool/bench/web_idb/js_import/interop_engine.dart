@@ -25,10 +25,12 @@ final List<Map<String, Object?>> checks = <Map<String, Object?>>[];
 /// Whether the client stays open until the tab is closed.
 bool hold = false;
 
-void check(String name, bool pass, [Object? detail = '']) {
+/// [known]: a difference between the SDKs that is known and accepted (see interop.js); printed as KNOWN.
+void check(String name, bool pass, [Object? detail = '', bool known = false]) {
   checks.add(<String, Object?>{
     'name': name,
     'pass': pass,
+    'known': known,
     'detail': detail is String ? detail : '$detail',
   });
 }
@@ -74,6 +76,13 @@ Map<String, Object?> kindValues(FirebaseFirestore firestore) =>
         '10': 'ten',
         '2': 'two',
         'z': <String, Object?>{'y': 1, 'x': 2},
+      },
+      'mapsorted': <String, Object?>{
+        '10': 'ten',
+        '2': 'two',
+        'a': 2,
+        'b': 1,
+        'z': <String, Object?>{'x': 2, 'y': 1},
       },
       'timestamp': Timestamp.fromMillisecondsSinceEpoch(1700000000123),
       'timestamp0': const Timestamp(0, 5),
@@ -387,9 +396,31 @@ steps = <String, Future<void> Function()>{
   'd-read': () async {
     final FirebaseFirestore firestore = await open();
     await firestore.disableNetwork();
-    for (final MapEntry<String, Object?> entry in kindValues(
-      firestore,
-    ).entries) {
+    final Map<String, Object?> values = kindValues(firestore);
+    // The two equal maps: this SDK's query value has its keys sorted, so it finds the JS SDK's entry of the map the
+    // JS SDK wrote with sorted keys, not the one of the map written in another order (a known difference: the JS
+    // SDK's entry follows the order of the keys of the stored document).
+    {
+      final List<String>? keys = await indexKeys(
+        firestore,
+        firestore.collection('kinds').where('v', isEqualTo: values['map']),
+      );
+      check(
+        'D2 map with keys in sorted order: the engine finds the JS entry',
+        keys?.contains('mapsorted') ?? false,
+        'index=$keys',
+      );
+      check(
+        'D2 map with keys in another order: the engine finds the JS entry',
+        keys?.contains('map') ?? false,
+        'index=$keys',
+        true,
+      );
+    }
+    for (final MapEntry<String, Object?> entry in values.entries) {
+      if (entry.key == 'map' || entry.key == 'mapsorted') {
+        continue;
+      }
       final Query<Map<String, Object?>> query = entry.value == null
           ? firestore.collection('kinds').where('v', isNull: true)
           : firestore.collection('kinds').where('v', isEqualTo: entry.value);
