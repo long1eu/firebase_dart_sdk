@@ -13,6 +13,11 @@
 import 'dart:io';
 import 'dart:mirrors';
 
+// Loaded so that the key-value cache libraries can be found by the mirror system.
+// ignore: unused_import
+import 'package:cloud_firestore_dart/cache_store.dart';
+// ignore: unused_import
+import 'package:cloud_firestore_dart/cache_store_testing.dart';
 // Loaded so that the IndexedDB cache library can be found by the mirror system.
 // ignore: unused_import
 import 'package:cloud_firestore_dart/indexeddb_cache.dart';
@@ -272,4 +277,24 @@ void main() {
             'UPDATE_GOLDEN=1 dart test test/unit/api/public_api_golden_test.dart '
             'and review the diff of test/unit/api/indexeddb_cache_api.golden.txt.');
   });
+
+  for (final (String library, String golden, String what) in <(String, String, String)>[
+    ('cache_store.dart', 'cache_store_api.golden.txt', 'key-value cache'),
+    ('cache_store_testing.dart', 'cache_store_testing_api.golden.txt', 'key-value cache testing'),
+  ]) {
+    test('exported $what API matches the golden listing', () {
+      final File file = File('test/unit/api/$golden');
+      final String actual = describePublicApi(library);
+      if (Platform.environment['UPDATE_GOLDEN'] == '1') {
+        file.writeAsStringSync(actual);
+        return;
+      }
+      expect(file.existsSync(), isTrue,
+          reason: 'Missing golden file. Run with UPDATE_GOLDEN=1.');
+      expect(actual, file.readAsStringSync(),
+          reason: 'The $what API changed. If intended, regenerate with '
+              'UPDATE_GOLDEN=1 dart test test/unit/api/public_api_golden_test.dart '
+              'and review the diff of test/unit/api/$golden.');
+    });
+  }
 }

@@ -73,6 +73,15 @@ const Map<String, String> sqliteExcludedTags = <String, String>{
       'eager-gc: relies on eager garbage collection, which only exists for memory persistence (as upstream).',
 };
 
+/// The key-value cache (keyValueCacheSettings) keeps its data across a restart (the persistence of the restarted
+/// client opens the same store again) and is used by one client at a time.
+const Map<String, String> keyValueExcludedTags = <String, String>{
+  'eager-gc':
+      'eager-gc: relies on eager garbage collection, which only exists for memory persistence (as upstream).',
+  'multi-client':
+      'multi-client: the key-value cache is used by one client at a time.',
+};
+
 /// Single specs that need a library design the port (like upstream Android) does not have, or that the harness can
 /// not express, keyed by `'<describeName> <itName>'`. Unlike [skippedSpecFeatures] these are not detectable from the
 /// spec JSON: the spec uses only supported steps.

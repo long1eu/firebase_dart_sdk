@@ -15,10 +15,13 @@
 import 'package:cloud_firestore_dart/src/firebase/firestore/firestore_error.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/firestore_settings.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/indexeddb/indexeddb_persistence.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/local/keyvalue/cache_store.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/local/keyvalue/key_value_persistence.dart';
 
 /// Configures the local cache of a Firestore instance, see
 /// [Settings.cacheSettings]. The implementations are
-/// [PersistentCacheSettings], [MemoryCacheSettings] and, on the web, [IndexedDbCacheSettings] (experimental).
+/// [PersistentCacheSettings], [MemoryCacheSettings], [KeyValueCacheSettings] (experimental) and, on the web,
+/// [IndexedDbCacheSettings] (experimental).
 ///
 /// The cache holds the documents that listeners and reads received and the writes that the backend has not
 /// acknowledged yet; reads and listeners use it while the client is offline. This is the `localCache` setting of
@@ -406,6 +409,96 @@ final class IndexedDbCacheSettings extends LocalCacheSettings {
       '${mergeUnsentWrites ? ', mergeUnsentWrites=true' : ''}}';
 }
 
+/// Configures a persistent cache in a key-value store that the app brings ([CacheStore]): an ordered store of byte
+/// keys and byte values, such as a file, an embedded database or a platform store.
+///
+/// **Experimental**: the API, the behaviour and what is stored may change in a minor version.
+///
+/// The SDK lays the whole cache out in the store (documents, pending writes, targets, bundles, the garbage collector's
+/// sequence numbers) in a format of its own, with a schema version. The data and the pending writes survive a restart
+/// of the program as long as the store keeps them. The store is opened when the instance starts and closed when it is
+/// terminated; it holds the cache of one instance (one database) at a time.
+///
+/// Garbage collection runs as with [PersistentCacheSettings] once the documents take more than [sizeBytes], and the
+/// persistent cache indexes work as there ([indexAutoCreation], [indexBackfill], `PersistentCacheIndexManager`). Only
+/// one client uses the cache: it is always the primary client.
+///
+/// The cache is in its own library, so that apps that do not use it do not carry its code: create the settings with
+/// `keyValueCacheSettings()` of `package:cloud_firestore_dart/cache_store.dart`.
+///
+/// ```dart
+/// import 'package:cloud_firestore_dart/cache_store.dart';
+///
+/// final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(
+///   app: app,
+///   settings: Settings(cacheSettings: keyValueCacheSettings(store: myStore)),
+/// );
+/// ```
+///
+/// NOT IN THE OFFICIAL SDKS.
+final class KeyValueCacheSettings extends LocalCacheSettings {
+  /// See `keyValueCacheSettings` of `package:cloud_firestore_dart/cache_store.dart`, which creates these settings.
+  KeyValueCacheSettings._(
+    this.store,
+    this._createPersistence, {
+    required this.sizeBytes,
+    required this.indexAutoCreation,
+    required this.indexBackfill,
+    required this.mergeUnsentWrites,
+  }) {
+    if (sizeBytes != Settings.cacheSizeUnlimited &&
+        sizeBytes < Settings.minimumCacheBytes) {
+      throw ArgumentError(
+        'Cache size must be set to at least ${Settings.minimumCacheBytes} bytes',
+      );
+    }
+  }
+
+  /// The store that holds the cache.
+  final CacheStore store;
+
+  /// Creates the persistence over [store]: given by the entry library, so that the core does not import it.
+  final KeyValuePersistenceFactory _createPersistence;
+
+  /// The cache size threshold, in bytes: the size of the cached documents as the SDK writes them to the store.
+  final int sizeBytes;
+
+  /// See [PersistentCacheSettings.indexAutoCreation].
+  final bool indexAutoCreation;
+
+  /// See [PersistentCacheSettings.indexBackfill].
+  final IndexBackfillSettings indexBackfill;
+
+  /// See [PersistentCacheSettings.mergeUnsentWrites].
+  final bool mergeUnsentWrites;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is KeyValueCacheSettings &&
+          identical(store, other.store) &&
+          sizeBytes == other.sizeBytes &&
+          indexAutoCreation == other.indexAutoCreation &&
+          indexBackfill == other.indexBackfill &&
+          mergeUnsentWrites == other.mergeUnsentWrites;
+
+  @override
+  int get hashCode => Object.hash(
+    KeyValueCacheSettings,
+    identityHashCode(store),
+    sizeBytes,
+    indexAutoCreation,
+    indexBackfill,
+    mergeUnsentWrites,
+  );
+
+  @override
+  String toString() =>
+      'KeyValueCacheSettings{store=${store.runtimeType}, sizeBytes=$sizeBytes, '
+      'indexAutoCreation=$indexAutoCreation, indexBackfill=$indexBackfill'
+      '${mergeUnsentWrites ? ', mergeUnsentWrites=true' : ''}}';
+}
+
 /// Configures an in memory cache, which is lost when the instance is shut
 /// down. The memory cache is garbage collected as configured by [gcSettings].
 ///
@@ -528,4 +621,26 @@ extension IndexedDbCacheSettingsInternal on IndexedDbCacheSettings {
   );
 
   IndexedDbPersistenceFactory get createPersistence => _createPersistence;
+}
+
+/// Creates [KeyValueCacheSettings] for the entry library of the key-value cache, and gives the client its persistence
+/// factory. Not exported by the public libraries.
+extension KeyValueCacheSettingsInternal on KeyValueCacheSettings {
+  static KeyValueCacheSettings create(
+    CacheStore store,
+    KeyValuePersistenceFactory createPersistence, {
+    required int sizeBytes,
+    required bool indexAutoCreation,
+    required IndexBackfillSettings? indexBackfill,
+    required bool mergeUnsentWrites,
+  }) => KeyValueCacheSettings._(
+    store,
+    createPersistence,
+    sizeBytes: sizeBytes,
+    indexAutoCreation: indexAutoCreation,
+    indexBackfill: indexBackfill ?? IndexBackfillSettings(),
+    mergeUnsentWrites: mergeUnsentWrites,
+  );
+
+  KeyValuePersistenceFactory get createPersistence => _createPersistence;
 }
