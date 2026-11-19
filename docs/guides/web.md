@@ -18,7 +18,8 @@ the network turned off: look at the **Sync** line and at the note marked `[not s
 ## A first page
 
 The API is the same as on the Dart VM. Depend on `cloud_firestore_dart`, `firebase_app_dart` and
-`web`, and compile with `dart compile js` or `dart compile wasm`:
+`web`, and compile with `dart compile wasm` (dart2wasm, the default; `dart compile js` is the
+fallback, see [dart2wasm or dart2js](#dart2wasm-or-dart2js)):
 
 ```dart
 import 'package:cloud_firestore_dart/cloud_firestore_dart.dart';
@@ -55,8 +56,8 @@ open, and lost when it is closed. [Choosing a cache](#choosing-a-cache) shows ho
 
 ## A Flutter web app
 
-The same packages work in a Flutter app built for the web, with `flutter build web` (dart2js) or
-`flutter build web --wasm` (dart2wasm): there is no plugin, and the client picks the web
+The same packages work in a Flutter app built for the web, with `flutter build web --wasm` (dart2wasm,
+which also writes a dart2js fallback) or `flutter build web` (dart2js only): there is no plugin, and the client picks the web
 transport by itself. Create the app and the instance as in any Flutter app
 ([Flutter](flutter.md)); what differs is around them:
 
@@ -446,24 +447,33 @@ write fails with `unavailable` without a connection. A program that only imports
 contains no sync engine, local store, SQLite layer or WebChannel. The two libraries declare
 classes with the same names; import one of them with a prefix if a file needs both.
 
-## dart2js or dart2wasm
+## dart2wasm or dart2js
 
-| | dart2js (`dart compile js`) | dart2wasm (`dart compile wasm`) |
+Build with dart2wasm first, and keep dart2js as the fallback. A page that loads the dart2wasm
+build and falls back to dart2js is what [`examples/web_app/`](../../examples/web_app/) and
+[`examples/playground/`](../../examples/playground/) do (`web/bootstrap.js`, the same file in
+both). [Build and serve a web app](cookbook.md#build-and-serve-a-web-app-with-dart2wasm) in the
+cookbook has the commands.
+
+| | dart2wasm (`dart compile wasm`) | dart2js (`dart compile js`) |
 | --- | --- | --- |
-| Integers | 53 bits: larger integers lose precision | 64 bits |
-| Browsers | Every current browser | Needs WebAssembly garbage collection (recent Chrome, Firefox, Safari) |
-| Tested | Chrome, 56 browser tests pass, 1 skipped (64-bit integers) | Chrome, 56 pass, 1 skipped (a crash test of the IndexedDB cache) |
-| Example app, main page | 924 KB (273 KB gzipped) | 915 KB `.wasm` + 29 KB `.mjs` (342 KB + 6 KB gzipped) |
-| Example app, Lite page | 398 KB (122 KB gzipped) | 341 KB `.wasm` + 16 KB `.mjs` (136 KB + 4 KB gzipped) |
+| Integers | 64 bits | 53 bits: larger integers lose precision |
+| Browsers | Needs WebAssembly garbage collection (recent Chrome, Firefox, Safari) | Every current browser |
+| Tested | Chrome, 56 pass, 1 skipped (a crash test of the IndexedDB cache) | Chrome, 56 browser tests pass, 1 skipped (64-bit integers) |
+| Example app, main page | 915 KB `.wasm` + 29 KB `.mjs` (342 KB + 6 KB gzipped) | 924 KB (273 KB gzipped) |
+| Example app, Lite page | 341 KB `.wasm` + 16 KB `.mjs` (136 KB + 4 KB gzipped) | 398 KB (122 KB gzipped) |
 
-Prefer dart2wasm when your data has large integers. Three things to know:
+Use dart2js when the browser has no WebAssembly garbage collection, or when a dependency of
+your app does not compile to wasm. Three things to know:
 
 - Under dart2js shifts are 32-bit: `1 << 32` is `0`, so `Random.secure().nextInt(1 << 32)`, valid
   on the VM, throws a `RangeError` (`max must be in range 0 < max ≤ 2^32, was 0`). Write
   `0x100000000`, or ask for a smaller range. Code shared with the VM is worth a search for such
   expressions.
 - `dart compile wasm` writes a `.wasm` and an `.mjs` file, and your page has to load them; see
-  `web/bootstrap.js` of the example. The OPFS worker stays JavaScript.
+  `web/bootstrap.js` of the example. The server must send `.wasm` as `application/wasm`, and a
+  Content-Security-Policy needs `'wasm-unsafe-eval'` in `script-src`. The OPFS worker stays
+  JavaScript.
 - The `sqlite3` package calls its dart2wasm support experimental. The persistent caches pass
   the browser tests with both compilers, and the opener works around a slowness of
   `sqlite3` 2.9.4 under dart2wasm, fixed in `sqlite3` 3.8 (see [Platforms](platforms.md#the-web-supported-in-chrome)); the
@@ -480,4 +490,4 @@ Prefer dart2wasm when your data has large integers. Three things to know:
   `cloud_firestore_dart`.
 - Against the emulator: queries of more than about 10,000 documents fail, and the six-connection
   limit of HTTP/1.1 applies.
-- dart2js: integers above 2^53 lose precision.
+- dart2js (the fallback build): integers above 2^53 lose precision.

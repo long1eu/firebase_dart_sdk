@@ -3,9 +3,12 @@
 # builds the page and serves it on another port, so that every request of the page is a
 # cross-origin request (CORS is part of what it shows). Ctrl-C stops what it started.
 #
-# Usage: ./run.sh [--wasm] [--no-build]
+# Usage: ./run.sh [--js] [--no-build]
 #
-#   --wasm      build with dart2wasm (flutter build web --wasm) instead of dart2js
+#   --js        build with dart2js (flutter build web) instead of dart2wasm; the build for a browser
+#               without WebAssembly garbage collection. Without it the build is dart2wasm
+#               (flutter build web --wasm), which also writes a dart2js fallback that
+#               Flutter's loader picks by itself.
 #   --no-build  serve the build that is there
 #
 # Environment (the defaults avoid the emulators' own default ports 8080, 9099, 4400, 4500):
@@ -20,13 +23,14 @@ AUTH_PORT="${AUTH_PORT:-9201}"
 FIRESTORE_PORT="${FIRESTORE_PORT:-8202}"
 WEB_PORT="${WEB_PORT:-8203}"
 PROJECT=demo-two-users
-WASM=0
+WASM=1
 BUILD=1
 for arg in "$@"; do
   case "$arg" in
+    --js) WASM=0;;
     --wasm) WASM=1;;
     --no-build) BUILD=0;;
-    *) sed -n '2,17p' "$0" | sed 's/^# \{0,1\}//'; exit 2;;
+    *) sed -n '2,20p' "$0" | sed 's/^# \{0,1\}//'; exit 2;;
   esac
 done
 

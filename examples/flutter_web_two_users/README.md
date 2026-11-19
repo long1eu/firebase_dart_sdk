@@ -30,14 +30,15 @@ directory:
 
 ```sh
 flutter pub get
-./run.sh --wasm     # dart2wasm
-./run.sh            # dart2js, the fallback
+./run.sh            # dart2wasm (flutter build web --wasm)
+./run.sh --js       # dart2js (flutter build web), the fallback
 ```
 
-Prefer the dart2wasm build: the client's own work ran 2 to 5 times faster with it in our
+dart2wasm is the default: the client's own work ran 2 to 5 times faster with it in our
 measurements (see [Performance](../../docs/guides/performance.md#dart2js-or-dart2wasm-in-the-browser)),
-and its integers are exact 64-bit. A browser without WebAssembly garbage collection needs the
-dart2js build.
+and its integers are exact 64-bit. `flutter build web --wasm` also writes a dart2js build
+(`main.dart.js`) that Flutter's loader picks in a browser without WebAssembly garbage collection.
+Use `--js` to build only dart2js, for a dependency that does not compile to wasm.
 
 `run.sh` starts the Auth and Firestore emulators for the project `demo-two-users` with the rules of
 [`firestore.rules`](firestore.rules) (Auth on 9201, Firestore on 8202), downloads the

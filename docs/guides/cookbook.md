@@ -2,11 +2,12 @@
 
 Short recipes for tasks that come up in most apps: paging through results, counting without
 downloading, counters, typed models, large imports and deletes, transactions, offline state and
-pending writes, vector search and JSON export. Each recipe states the problem, shows the code and
+pending writes, vector search, JSON export and a web build. Each recipe states the problem, shows the code and
 says what to watch for.
 
-Every recipe is also a complete program in
-[`example/cookbook/`](../../cloud_firestore/cloud_firestore_dart/example/cookbook/). Start the
+Every recipe but the last is also a complete program in
+[`example/cookbook/`](../../cloud_firestore/cloud_firestore_dart/example/cookbook/); the last one is
+the web example. Start the
 Firestore emulator (`firebase emulators:start --only firestore --project demo-example`) and run one
 from `cloud_firestore/cloud_firestore_dart`:
 
@@ -38,6 +39,7 @@ against a production database.
 | [Offline state, pending writes and a clean exit](#offline-state-pending-writes-and-a-clean-exit) | `offline_and_pending_writes.dart` |
 | [Nearest neighbours](#nearest-neighbours) | `nearest_neighbours.dart` |
 | [Export a query result to JSON](#export-a-query-result-to-json) | `export_to_json.dart` |
+| [Build and serve a web app with dart2wasm](#build-and-serve-a-web-app-with-dart2wasm) | [`examples/web_app/`](../../examples/web_app/) |
 
 ## Page through a large result
 
@@ -526,3 +528,61 @@ back with their types, and the query comes with them: `firestore.querySnapshotsF
 resumes listening from the saved result. To hand the data to
 something that is not Firestore, build plain maps instead; `Timestamp`, `GeoPoint`,
 `DocumentReference`, `Blob` and `VectorValue` each have a `toJson()`.
+
+## Build and serve a web app with dart2wasm
+
+You have a Dart web app on `cloud_firestore_dart` and want to build it for the browser and open it
+(supported in Chrome). Build with dart2wasm, and keep a dart2js build for a browser without
+WebAssembly garbage collection or a dependency that does not compile to wasm.
+
+```sh
+dart pub get
+dart compile wasm -O2 -o build/web/main.wasm web/main.dart    # writes main.wasm and main.mjs
+dart compile js -O2 -o build/web/main.dart.js web/main.dart   # the fallback
+```
+
+The page loads the two wasm files through a small script that starts the dart2js file when the
+browser cannot run them. [`web/bootstrap.js`](../../examples/web_app/web/bootstrap.js) of the
+example does it (the same file as in [`examples/playground`](../../examples/playground/)); at its
+core:
+
+```js
+const { compileStreaming } = await import('./main.mjs');
+const compiled = await compileStreaming(fetch('main.wasm'));
+const instance = await compiled.instantiate({});
+instance.invokeMain();
+```
+
+In a Flutter app `flutter build web --wasm` does all of this: it writes both builds and
+`flutter_bootstrap.js` picks one.
+
+To serve it, copy `build/web` and the page to any static host, or run
+`dart run bin/serve.dart 8000` in `examples/web_app`. The facts that matter:
+
+- The server must send `.wasm` as `application/wasm`; `compileStreaming` refuses it otherwise.
+  Serve the `.mjs` next to it.
+- No other header is needed: neither the build nor the OPFS cache needs cross-origin isolation.
+  (Flutter's multi-threaded renderer does, but it works without.)
+- A page with a Content-Security-Policy needs `'wasm-unsafe-eval'` in `script-src`; without it
+  the module does not compile and the loader falls back to dart2js.
+
+For the persistent cache, add `cloud_firestore_dart_sqlite`, compile its worker into the build
+folder, and serve `sqlite3.wasm`, SQLite itself, which is a different file from the `main.wasm` of
+your app:
+
+```sh
+dart pub add cloud_firestore_dart_sqlite
+dart run cloud_firestore_dart_sqlite:setup_web build/web   # sqlite_opfs_worker.js, and the URL of sqlite3.wasm
+```
+
+The worker is JavaScript also for a dart2wasm page, and it is only needed for OPFS. `sqlite3.wasm`
+must be the build of the exact `sqlite3` version in your `pubspec.lock`: pin it in
+`pubspec.yaml` and download the file the command names. The cache is then
+`sqliteOpener(opfsWorker: Uri.parse('sqlite_opfs_worker.js'))`; see [The web](web.md) for the
+choice between IndexedDB and OPFS and for the `sqlite3` versions to avoid.
+
+Measured with Dart 3.12.2 on an Apple M5, for the main page of `examples/web_app`: `dart compile
+wasm -O2` took about 5 seconds and `dart compile js -O2` about 3 seconds. The output is 915 KB of
+`.wasm` and 29 KB of `.mjs` (342 KB and 6 KB gzipped), against 924 KB of JavaScript (273 KB
+gzipped); `sqlite3.wasm` adds 759 KB (364 KB gzipped, sqlite3 3.9.1) when a persistent cache is opened. Time them
+for your own app with `time dart compile wasm ...`, and the sizes with `ls -l` and `gzip -9 -c`.
