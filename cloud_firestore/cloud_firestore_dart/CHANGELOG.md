@@ -1,3 +1,8 @@
+## (unreleased)
+
+- `WebExperimentalLongPollingOptions` and the long-polling settings are supported, not experimental: the word
+  "Experimental" in their names comes from the JS SDK and stays for compatibility with it and with FlutterFire.
+
 ## 0.3.0
 
 - Faster reads from the cache, with no change in results (100,000 documents, an M5 laptop):
