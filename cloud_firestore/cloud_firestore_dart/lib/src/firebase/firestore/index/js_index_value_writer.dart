@@ -319,21 +319,22 @@ class JsIndexValueWriter {
     }
   }
 
-  /// The entries of [value] in the order of `Object.keys` on the JS object of its fields: the keys that are array
-  /// indexes ("0", "1", ...) first in numeric order, then the others in the order the object got them. For a stored
-  /// document that is the order of its proto map ([ObjectValue.entriesInKeyOrder]): the backend keeps the order the
-  /// writer gave, the JS SDK the order of the user's object, this SDK the sorted order. A value made from the user's
-  /// data (a query value) or built field by field has its keys sorted.
+  /// The entries of [value] in the canonical order of this SDK's index entries: the order `Object.keys` gives for a JS
+  /// object whose keys were added in sorted order (the keys that are array indexes, "0", "1", ..., first in numeric
+  /// order, then the others sorted as [ObjectValue] sorts them). That is the JS SDK's own encoding of the same map
+  /// whenever the map it encodes has its keys in sorted order; it does not depend on the order of the stored document.
   ///
-  /// PORTING NOTE: so a map value whose keys the JS SDK wrote in another order than sorted gets an entry that an
-  /// equality query of this SDK (sorted) does not find, and the other way round; the JS SDK has the same dependence on
-  /// key order between its own writes and queries.
+  /// PORTING NOTE: the JS SDK encodes the keys in the order of its JS object (`Object.keys` in `writeIndexMap`), which
+  /// is the order the app wrote them in (the backend keeps it). Its entry for a map written in another order than
+  /// sorted differs from this SDK's, so an index entry the JS SDK wrote can not serve a lookup by a map value of this
+  /// SDK: the IndexedDB index manager does not serve a target from an index when a filter or bound value holds a map of
+  /// two or more keys (`IndexedDbIndexManager`), and such a query scans the collection instead.
   static Iterable<MapEntry<String, FieldValue>> _jsKeyOrder(ObjectValue value) {
     final List<MapEntry<String, FieldValue>> indexes =
         <MapEntry<String, FieldValue>>[];
     final List<MapEntry<String, FieldValue>> others =
         <MapEntry<String, FieldValue>>[];
-    for (final MapEntry<String, FieldValue> entry in value.entriesInKeyOrder) {
+    for (final MapEntry<String, FieldValue> entry in value.internalValue) {
       (_isArrayIndex(entry.key) ? indexes : others).add(entry);
     }
     if (indexes.isEmpty) {
@@ -344,6 +345,24 @@ class JsIndexValueWriter {
           int.parse(a.key).compareTo(int.parse(b.key)),
     );
     return <MapEntry<String, FieldValue>>[...indexes, ...others];
+  }
+
+  /// Whether [value] is or holds (in a map or an array, at any depth) a map of two or more keys: a value whose index
+  /// encoding depends on the order of the map's keys, which the JS SDK does not fix (see [_jsKeyOrder]).
+  static bool holdsKeyOrderDependentMap(FieldValue value) {
+    if (value is ObjectValue) {
+      if (value.internalValue.length > 1) {
+        return true;
+      }
+      return value.internalValue.any(
+        (MapEntry<String, FieldValue> entry) =>
+            holdsKeyOrderDependentMap(entry.value),
+      );
+    }
+    if (value is ArrayValue) {
+      return value.internalValue.any(holdsKeyOrderDependentMap);
+    }
+    return false;
   }
 
   /// Whether [key] is a canonical array index of JS: "0", or digits without a leading zero, below 2^32 - 1.

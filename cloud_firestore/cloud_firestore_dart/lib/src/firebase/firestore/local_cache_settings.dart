@@ -21,7 +21,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/local/keyvalue/key_v
 /// Configures the local cache of a Firestore instance, see
 /// [Settings.cacheSettings]. The implementations are
 /// [PersistentCacheSettings], [MemoryCacheSettings], [KeyValueCacheSettings] and, on the web,
-/// [IndexedDbCacheSettings] (experimental).
+/// [IndexedDbCacheSettings].
 ///
 /// The cache holds the documents that listeners and reads received and the writes that the backend has not
 /// acknowledged yet; reads and listeners use it while the client is offline. This is the `localCache` setting of
@@ -317,14 +317,13 @@ final class IndexBackfillSettings {
 /// Configures a cache stored in IndexedDB in the format of the official Firebase JS SDK, on the web, without SQLite
 /// (no `sqlite3.wasm` to download, no `openDatabase` function).
 ///
-/// **Experimental**: the API, the behaviour and what is stored may change in a minor version.
-///
 /// The cache is the IndexedDB database the JS SDK's `persistentLocalCache()` uses for the same app and database,
 /// `firestore/<app name>/<project id>[.<database id>]/main` (the app name is `[DEFAULT]` for the default app), at the
 /// JS SDK's schema version 18, with its stores, keys and rows. A web app that used the JS SDK with a persistent cache
 /// keeps its pending writes, cached documents, targets, cache indexes and loaded bundles when it switches to this SDK
 /// on the same browser profile, and the JS SDK can open a cache this SDK wrote. A database of another schema version
-/// is refused: open the app once with a current JS SDK to migrate an older one.
+/// is refused and left as it is: open the app once with a current JS SDK to migrate an older one. A new schema version
+/// of the JS SDK needs a new release of this package.
 ///
 /// Garbage collection runs as with [PersistentCacheSettings], on the JS SDK's sequence numbers and size accounting
 /// ([sizeBytes]). Cache indexes ([indexAutoCreation], `PersistentCacheIndexManager`) are stored with the JS SDK's
@@ -334,8 +333,10 @@ final class IndexBackfillSettings {
 /// the instance fails to start (every operation fails with [FirestoreErrorCode.failedPrecondition]) while another
 /// client (a tab of this SDK or of the JS SDK) holds a valid lease (refreshed less than 5 s ago, by a tab that did not
 /// close). A JS tab that starts while this one holds the lease fails the same way. When the tab was in the background
-/// long enough for its lease to lapse and another client took the cache over meanwhile, the instance terminates with
-/// that error at its next operation. The two SDKs can use the cache one after the other, not at the same time.
+/// long enough for its lease to lapse and another client took the cache over meanwhile, the instance terminates at its
+/// next transaction or lease refresh, without writing: its query listeners get a
+/// [FirestoreErrorCode.failedPrecondition] error that says it lost the primary lease, and every later call throws it.
+/// The two SDKs can use the cache one after the other, not at the same time.
 ///
 /// The engine is in its own library, so that apps that do not use it do not carry its code: create the settings with
 /// `indexedDbCacheSettings()` of `package:cloud_firestore_dart/indexeddb_cache.dart` (it throws an [UnsupportedError]

@@ -166,6 +166,16 @@ class EventManager implements SyncEngineCallback {
     _queries.remove(query);
   }
 
+  /// Ends every query listener with [error] (the client stops for good) and forgets them.
+  void failAll(FirestoreException error) {
+    for (final _QueryListenersInfo info in _queries.values.toList()) {
+      for (final QueryStream listener in info.listeners.toList()) {
+        listener.onError(error);
+      }
+    }
+    _queries.clear();
+  }
+
   @override
   void handleOnlineStateChange(OnlineState onlineState) {
     _onlineState = onlineState;

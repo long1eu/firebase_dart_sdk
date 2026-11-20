@@ -86,6 +86,10 @@ class FirestoreClient implements RemoteStoreCallback {
   late SyncEngine syncEngine;
   late EventManager eventManager;
   bool _isShutdown = false;
+
+  /// Why the client stopped on its own (the persistence lost its database or its primary lease), or null: the error
+  /// of every operation after that, instead of [terminatedMessage].
+  FirestoreException? _terminationCause;
   Future<void>? _shutdownFuture;
 
   LruGarbageCollectorScheduler? _lruScheduler;
@@ -126,6 +130,7 @@ class FirestoreClient implements RemoteStoreCallback {
   /// initialization that failed half way.
   bool _persistenceStarted = false;
   bool _remoteStoreCreated = false;
+  bool _eventManagerCreated = false;
 
   /// Waits for the initialization of the client (see [start]) and throws its error if it failed.
   Future<void> get initialized => _initialized;
@@ -360,10 +365,11 @@ class FirestoreClient implements RemoteStoreCallback {
       onListen: () {
         if (_isShutdown) {
           counts.fail(
-            FirestoreException(
-              message: terminatedMessage,
-              errorCode: FirestoreErrorCode.failedPrecondition,
-            ),
+            _terminationCause ??
+                FirestoreException(
+                  message: terminatedMessage,
+                  errorCode: FirestoreErrorCode.failedPrecondition,
+                ),
           );
           return;
         }
@@ -905,8 +911,19 @@ class FirestoreClient implements RemoteStoreCallback {
         }),
       )..start();
     } else if (started is IndexedDbPersistence) {
-      // Another client that deletes the database while this one runs ends this one, as in the JS SDK.
-      started.databaseClearedListener = () => shutdown();
+      // Another client that deletes the database while this one runs ends this one, as in the JS SDK; so does one that
+      // took the primary lease over (this tab was in the background long enough for its lease to lapse). The listeners
+      // get the error, and so does every later operation.
+      started.databaseClearedListener = () {
+        final FirestoreException? cause = started.terminationCause;
+        if (cause != null && !_isShutdown) {
+          _terminationCause = cause;
+          if (_eventManagerCreated) {
+            eventManager.failAll(cause);
+          }
+        }
+        shutdown();
+      };
       // The JS SDK refreshes the client row and the primary lease every 4 s: a JS tab finds the lease alive.
       _clientMetadataRefresher = ClientMetadataRefresher(
         scheduler,
@@ -939,6 +956,7 @@ class FirestoreClient implements RemoteStoreCallback {
       ..onPendingWritesChanged = _onPendingWritesChanged
       ..onQueuedWritesToMerge = _mergeQueuedWrites;
     eventManager = EventManager(syncEngine);
+    _eventManagerCreated = true;
 
     // NOTE: RemoteStore depends on LocalStore (for persisting stream tokens,
     // refilling mutation queue, etc.) so must be started after LocalStore.
@@ -998,6 +1016,10 @@ class FirestoreClient implements RemoteStoreCallback {
   /// message). The methods that call it are `async`, so callers get it through the returned future.
   void _verifyNotShutdown() {
     if (_isShutdown) {
+      final FirestoreException? cause = _terminationCause;
+      if (cause != null) {
+        throw cause;
+      }
       throw FirestoreException(
         message: terminatedMessage,
         errorCode: FirestoreErrorCode.failedPrecondition,

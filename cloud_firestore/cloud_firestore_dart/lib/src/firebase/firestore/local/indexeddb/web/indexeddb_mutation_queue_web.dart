@@ -29,19 +29,22 @@ class IndexedDbMutationQueue implements MutationQueue {
   web.IDBIndex _userIndex(_IdbTransaction transaction) =>
       transaction.store(DbStores.mutations).index(DbStores.mutationsUserIndex);
 
+  /// Writes the row of a new queue: in a transaction of its own when it is called outside of one, as SQLite would
+  /// (the local store starts the queue in a transaction, the tests of the mutation queue do not).
   @override
-  Future<void> start() async {
-    final _IdbTransaction transaction = _transaction;
-    final Object? row = await transaction.read(
-      'get the mutation queue of "$_userId"',
-      () => transaction.store(DbStores.mutationQueues).get(_userId.toJS),
-    );
-    if (row is Map && row['lastStreamToken'] is String) {
-      _lastStreamToken = base64.decode(row['lastStreamToken']! as String);
-    } else if (row == null) {
-      await _writeMetadata(MutationBatch.unknown);
-    }
-  }
+  Future<void> start() =>
+      _persistence._write('Start the mutation queue of "$_userId"', () async {
+        final _IdbTransaction transaction = _transaction;
+        final Object? row = await transaction.read(
+          'get the mutation queue of "$_userId"',
+          () => transaction.store(DbStores.mutationQueues).get(_userId.toJS),
+        );
+        if (row is Map && row['lastStreamToken'] is String) {
+          _lastStreamToken = base64.decode(row['lastStreamToken']! as String);
+        } else if (row == null) {
+          await _writeMetadata(MutationBatch.unknown);
+        }
+      });
 
   /// The row of this user in `mutationQueues`.
   ///
@@ -105,7 +108,13 @@ class IndexedDbMutationQueue implements MutationQueue {
   }
 
   @override
-  Future<void> acknowledgeBatch(
+  Future<void> acknowledgeBatch(MutationBatch batch, Uint8List streamToken) =>
+      _persistence._write(
+        'Acknowledge a batch',
+        () => _acknowledgeBatch(batch, streamToken),
+      );
+
+  Future<void> _acknowledgeBatch(
     MutationBatch batch,
     Uint8List streamToken,
   ) async {
@@ -117,7 +126,12 @@ class IndexedDbMutationQueue implements MutationQueue {
   Uint8List get lastStreamToken => _lastStreamToken;
 
   @override
-  Future<void> setLastStreamToken(Uint8List streamToken) async {
+  Future<void> setLastStreamToken(Uint8List streamToken) => _persistence._write(
+    'Set the last stream token',
+    () => _setLastStreamToken(streamToken),
+  );
+
+  Future<void> _setLastStreamToken(Uint8List streamToken) async {
     _lastStreamToken = streamToken;
     final _IdbTransaction transaction = _transaction;
     final Object? row = await transaction.read(
@@ -134,6 +148,15 @@ class IndexedDbMutationQueue implements MutationQueue {
 
   @override
   Future<MutationBatch> addMutationBatch(
+    Timestamp localWriteTime,
+    List<Mutation> baseMutations,
+    List<Mutation> mutations,
+  ) => _persistence._write(
+    'Add a mutation batch',
+    () => _addMutationBatch(localWriteTime, baseMutations, mutations),
+  );
+
+  Future<MutationBatch> _addMutationBatch(
     Timestamp localWriteTime,
     List<Mutation> baseMutations,
     List<Mutation> mutations,
@@ -178,6 +201,10 @@ class IndexedDbMutationQueue implements MutationQueue {
       );
     }
     await Future.wait(writes);
+    _persistence._statsCollector.recordRowsWritten(
+      MutationQueue.statsTag,
+      mutations.length,
+    );
     for (final ResourcePath parent in collectionParents) {
       await _persistence.indexManager.addToCollectionParentIndex(parent);
     }
@@ -188,6 +215,7 @@ class IndexedDbMutationQueue implements MutationQueue {
     if (row is! Map) {
       return null;
     }
+    _persistence._statsCollector.recordRowsRead(MutationQueue.statsTag, 1);
     hardAssertLazy(
       row['userId'] == _userId,
       () =>
@@ -404,7 +432,12 @@ class IndexedDbMutationQueue implements MutationQueue {
   /// The row of the batch is rewritten under the same key; the rows of `documentMutations` stay, since [batch] changes
   /// the same documents.
   @override
-  Future<void> replaceMutationBatch(MutationBatch batch) async {
+  Future<void> replaceMutationBatch(MutationBatch batch) => _persistence._write(
+    'Replace a mutation batch',
+    () => _replaceMutationBatch(batch),
+  );
+
+  Future<void> _replaceMutationBatch(MutationBatch batch) async {
     final _IdbTransaction transaction = _transaction;
     final JSAny? row = idbToJs(_serializer.toDbMutationBatch(_userId, batch));
     await transaction.request(
@@ -414,7 +447,12 @@ class IndexedDbMutationQueue implements MutationQueue {
   }
 
   @override
-  Future<void> removeMutationBatch(MutationBatch batch) async {
+  Future<void> removeMutationBatch(MutationBatch batch) => _persistence._write(
+    'Remove a mutation batch',
+    () => _removeMutationBatch(batch),
+  );
+
+  Future<void> _removeMutationBatch(MutationBatch batch) async {
     final _IdbTransaction transaction = _transaction;
     final int batchId = batch.batchId;
     int deleted = 0;
@@ -432,6 +470,10 @@ class IndexedDbMutationQueue implements MutationQueue {
     hardAssert(
       deleted == 1,
       'Dangling document-mutation reference found: missing batch $batchId',
+    );
+    _persistence._statsCollector.recordRowsDeleted(
+      MutationQueue.statsTag,
+      batch.mutations.length,
     );
     await Future.wait(<Future<Object?>>[
       for (final Mutation mutation in batch.mutations)

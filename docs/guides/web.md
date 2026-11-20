@@ -194,7 +194,7 @@ flowchart TD
   needLive -- "yes" --> needReload{"Data across reloads?"}
   needReload -- "no" --> memory["Memory cache (default)"]
   needReload -- "yes" --> jsFormat{"Share the cache with the JS SDK, or skip sqlite3.wasm?"}
-  jsFormat -- "yes" --> idbCache["IndexedDB cache (experimental, one tab)"]
+  jsFormat -- "yes" --> idbCache["IndexedDB cache (one tab)"]
   jsFormat -- "no" --> cacheSize{"A large cache?"}
   cacheSize -- "no" --> indexedDb["SQLite in IndexedDB"]
   cacheSize -- "yes" --> opfs["SQLite in OPFS, in a worker"]
@@ -205,7 +205,7 @@ flowchart TD
 | Memory (the default) | No `openDatabase` | Pages that do not need data across reloads. Smallest download. |
 | SQLite in IndexedDB | `sqliteOpener()` | Small caches. SQLite runs in the page on a copy of the whole database in memory. |
 | SQLite in OPFS | `sqliteOpener(opfsWorker: ...)` | Larger caches. SQLite runs in a worker and reads the file as it needs; memory stays at a few MB. |
-| IndexedDB cache (experimental) | `indexedDbCacheSettings()` of `indexeddb_cache.dart` | No `sqlite3.wasm`, no extra package, and the cache is the JS SDK's own database: an app can switch between the two SDKs, see [The IndexedDB cache](#the-indexeddb-cache-experimental). |
+| IndexedDB cache | `indexedDbCacheSettings()` of `indexeddb_cache.dart` | No `sqlite3.wasm`, no extra package, and the cache is the JS SDK's own database: an app can switch between the two SDKs, see [The IndexedDB cache](#the-indexeddb-cache). |
 
 The persistent caches come from the companion package
 [`cloud_firestore_dart_sqlite`](../../cloud_firestore/cloud_firestore_dart_sqlite/). Add it, and
@@ -531,9 +531,9 @@ your app does not compile to wasm. Three things to know:
   `sqlite3` 2.9.4 under dart2wasm, fixed in `sqlite3` 3.8 (see [Platforms](platforms.md#the-web-supported-in-chrome)); the
   crash test of the IndexedDB storage runs with dart2js only.
 
-## The IndexedDB cache (experimental)
+## The IndexedDB cache
 
-**Experimental.** A third persistent cache that stores the cache in IndexedDB in the database and format
+A third persistent cache that stores the cache in IndexedDB in the database and format
 of the official Firebase JS SDK (`firestore/<app>/<project>[.<database>]/main`, schema version 18),
 without SQLite. It is a library of its own, so pass its settings and nothing else:
 
@@ -585,26 +585,41 @@ Limits:
 - **One tab at a time, and no JS SDK tab beside it.** The engine takes the JS SDK's primary lease. While
   another client (a tab of the JS SDK, or another instance of this SDK) holds a live lease, it refuses to
   open and its operations fail with `failedPrecondition`. If another client takes the lease while this
-  one is in the background, the instance fails and terminates; create a new one. Close the old
-  version of the app before the new one starts, as in [One tab at a time](#one-tab-at-a-time).
+  one is in the background (its lease lapsed), the instance stops at its next transaction or lease
+  refresh: it writes nothing more, its listeners get a `failedPrecondition` error that says it lost the
+  primary lease, and every later call throws that error. Create a new instance; it reads the cache again
+  (what the other client changed included). Close the old version of the app before the new one starts,
+  as in [One tab at a time](#one-tab-at-a-time).
 - **Schema version 18 only.** A JS database of an older version is refused (open the app once with a
-  JS SDK that upgrades it, or clear the cache), and so is a newer one. A new database is created as
-  the JS SDK creates it.
-- **An index on a map field, written by the JS SDK with unsorted keys.** The JS SDK's index entry of a
-  map follows the order in which the app wrote the keys; this SDK writes and queries maps with sorted
-  keys. An equality query on a whole map, served from a cache index, can miss a document whose map a JS
-  app wrote in another key order (the JS SDK has the same dependence on its own). Queries on the
-  fields inside the map are not affected.
+  JS SDK that upgrades it, or clear the cache), and so is a newer one; the error names the version and
+  the database is left as it is. A new database is created as the JS SDK creates it. The format
+  belongs to the JS SDK: a new JS schema version needs a new release of this package, which then
+  migrates or opens it.
+- **Queries by a map value do not use a cache index.** The JS SDK's index entry of a map follows the
+  order in which the app wrote its keys; this SDK writes maps in one sorted order. So a query whose
+  filter (or cursor) value holds a map of two or more keys is not served from a cache index: it reads
+  the collection, and finds the documents whatever order their keys were written in. Queries on the
+  fields inside a map use indexes as usual. Left: `orderBy` on a map field with a `limit`, served from
+  an index that the JS SDK filled for maps written in unsorted key order, can order those maps
+  differently from the query (the JS SDK has the same dependence on its own).
 - **Web only.** `indexedDbCacheSettings()` throws `UnsupportedError` on the Dart VM and in Flutter on
   other platforms.
-- **Experimental**, and the format belongs to the JS SDK: a new JS schema version means a new release
-  of this package.
 
-It was checked in Chrome only, against `firebase` 12.19.0 (npm) and the Firestore emulator.
-`tool/bench/web_idb/js_import/interop_check.sh` runs the check in headless Chrome: documents,
-pending writes of two users, indexes, bundles and garbage collection from each SDK to the other,
-the lease handover, and index entries per value kind. Firefox and Safari were not checked for
-this interop (the engine's speed was measured in both, see the spike), nor the production backend.
+How it is tested, in Chrome with dart2js and dart2wasm against the emulator:
+
+- The persistence suites of the SQLite, memory and key-value caches run on it
+  (`test/browser/web_indexeddb_*_test.dart`, about 600 tests): the mutation queue, remote documents,
+  targets, overlays, bundles, globals, the index managers, the local store, garbage collection, the
+  query engine and the index backfiller, and the upstream spec tests with restarts (the multi-client
+  specs are skipped: one tab). The numbers, and what running them fixed, are in
+  [section 9 of the spike](../spikes/indexeddb_cache.md#9-verification-of-the-engine-added-2026-11-20).
+- `tool/bench/web_idb/js_import/interop_check.sh` runs the official JS SDK (`firebase` 12.19.0 from
+  npm) and this engine on one database in headless Chrome, both ways: documents, pending writes of
+  two users, indexes, bundles and garbage collection from each SDK to the other, the lease handover,
+  and index entries per value kind. CI runs it when the engine changes.
+
+Not checked: Firefox and Safari (the engine's speed was measured in both, see the spike, but not
+its tests or the interop), and the production backend.
 
 ## Known gaps
 
@@ -614,7 +629,7 @@ this interop (the engine's speed was measured in both, see the spike), nor the p
 - A crash of the browser itself or a power cut is not covered by the crash tests of the
   persistent caches (a tab that dies is).
 - The SQLite caches are in the separate package `cloud_firestore_dart_sqlite` (0.1), not in
-  `cloud_firestore_dart`; the experimental [IndexedDB cache](#the-indexeddb-cache-experimental) is in
+  `cloud_firestore_dart`; the [IndexedDB cache](#the-indexeddb-cache) is in
   `cloud_firestore_dart`.
 - Against the emulator: queries of more than about 10,000 documents fail, and the six-connection
   limit of HTTP/1.1 applies.

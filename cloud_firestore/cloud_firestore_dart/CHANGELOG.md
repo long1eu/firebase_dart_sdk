@@ -69,6 +69,35 @@
 - Fixed, web (dart2js): a timestamp less than half a millisecond before a whole second was sent
   one second late, and the last second of year 9999 as year 10000 (which the backend did not
   answer). The web transport now writes timestamps as the JS SDK does.
+- Web: the IndexedDB cache (`indexedDbCacheSettings()` of
+  `package:cloud_firestore_dart/indexeddb_cache.dart`) is no longer experimental. The persistence
+  suites that the SQLite, memory and key-value caches run (mutation queue, remote documents,
+  targets, overlays, bundles, globals, the index managers, the local store, garbage collection,
+  the query engine, the index backfiller) and the upstream spec tests, restarts included, now run
+  on it in Chrome with dart2js and dart2wasm (`test/browser/web_indexeddb_*_test.dart`), and CI runs
+  the check against the official JS SDK in Chrome, both ways, when the engine changes.
+- Fixed, IndexedDB cache: an equality (or `in`, range, cursor) query whose value holds a map of two
+  or more keys could miss a document whose cache index entry the JS SDK wrote with the map's keys
+  in another order (the JS SDK encodes a map in the order of its JS object's keys). Such queries
+  are no longer served from a cache index, and this SDK writes maps in one canonical key order.
+- Fixed, IndexedDB cache: when another client takes the primary lease over (this tab was in the
+  background long enough for its lease to lapse), the query listeners now get the
+  `failedPrecondition` error that says the lease was lost, and every later call throws it, instead
+  of the listeners stopping without an error and later calls failing with "The client has already
+  been terminated". The same when another client deletes the database.
+- Fixed, IndexedDB cache: removing a cached document (a delete from the backend, garbage
+  collection) now also removes its cache index entries, so a query served by an index no longer
+  looks up a document that is gone. Writes that reach the caches outside a persistence
+  transaction run in a transaction of their own instead of failing on a read-only one.
+- Fixed, IndexedDB cache: the rows are written as the JS SDK writes them. An empty bytes value was
+  stored as `{}` and could not be read back; compiled with dart2js, timestamps were rounded to
+  milliseconds (a time less than half a millisecond before a whole second was stored one second
+  late, and the last second of year 9999 became year 10000, which could not be read back); and
+  -0.0 was stored as `0`. Timestamps now keep their nanoseconds, -0.0 is written as `"-0"` and a
+  `"-0"` the JS SDK wrote is read as -0.0.
+- IndexedDB cache: a database of a schema version other than 18 is refused as before, and the
+  error now says the cache was left as it is; for a newer version it says that a new schema
+  version of the JS SDK needs a new release of this package.
 
 ## 0.3.0
 

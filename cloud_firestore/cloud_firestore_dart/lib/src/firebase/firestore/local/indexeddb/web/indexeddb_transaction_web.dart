@@ -29,13 +29,18 @@ class IndexedDbTransactionInactiveError extends Error {
 /// One IndexedDB transaction over every store, with requests that report a broken transaction rule.
 class _IdbTransaction {
   _IdbTransaction(this._persistence, this.action, this._idb) {
+    _persistence._openTransactions++;
     final Completer<void> done = Completer<void>();
     _done = done.future..ignore();
     _idb.oncomplete = ((web.Event _) {
       _completed = true;
+      _persistence._openTransactions--;
       done.complete();
     }).toJS;
     _idb.onabort = ((web.Event _) {
+      if (!_aborted && !_completed) {
+        _persistence._openTransactions--;
+      }
       _aborted = true;
       if (!done.isCompleted) {
         final web.DOMException? error = _idb.error;

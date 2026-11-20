@@ -1,6 +1,5 @@
 node_modules/
 out/
-package-lock.json
 *.js.deps
 *.js.map
 *.bundle.js

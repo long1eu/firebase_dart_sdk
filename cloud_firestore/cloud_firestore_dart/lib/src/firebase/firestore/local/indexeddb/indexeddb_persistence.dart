@@ -1,3 +1,4 @@
+import 'package:cloud_firestore_dart/src/firebase/firestore/firestore_error.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/local_serializer.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/lru_garbage_collector.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/database_id.dart';
@@ -8,11 +9,11 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/local/persistance/pe
 /// implementation is in `web/indexeddb_persistence_web.dart`, and `createIndexedDbPersistence` of
 /// `indexeddb_persistence_platform.dart` makes one.
 ///
-/// **Experimental.** Stored: the mutation queue, the remote documents, the overlays, the targets, the globals, the
-/// collection parents, the field indexes (configuration, states and entries, in the JS SDK's index value encoding),
-/// bundles and named queries; garbage collection runs on the JS SDK's sequence numbers and size accounting (see the
-/// CHANGELOG of 0.3.0). One tab at a time: it takes the JS SDK's primary lease as a JS tab without tab synchronization
-/// does, and refuses to start while another client (a JS tab or another tab of this SDK) holds a valid lease.
+/// Stored: the mutation queue, the remote documents, the overlays, the targets, the globals, the collection parents,
+/// the field indexes (configuration, states and entries, in the JS SDK's index value encoding), bundles and named
+/// queries; garbage collection runs on the JS SDK's sequence numbers and size accounting. One tab at a time: it takes
+/// the JS SDK's primary lease as a JS tab without tab synchronization does, and refuses to start while another client
+/// (a JS tab or another tab of this SDK) holds a valid lease.
 ///
 /// NOT IN THE OFFICIAL SDKS: the official Android SDK has no IndexedDB engine; this one shares its format with the JS
 /// SDK's `IndexedDbPersistence`, so that an app can switch between the two on the same browser profile.
@@ -38,9 +39,13 @@ abstract class IndexedDbPersistence extends Persistence {
   /// another client takes it over (a JS tab with `forceOwnership`).
   bool get isPrimary;
 
-  /// Called (once) when another client deletes or upgrades the database while this one has it open. The client
-  /// terminates.
+  /// Called (once) when this client can not go on with the database: another client deleted or upgraded it while this
+  /// one had it open, or took the primary lease over. The client terminates, with [terminationCause] as the error of
+  /// its listeners and of every later operation.
   void Function()? databaseClearedListener;
+
+  /// Why this persistence stopped for good (the error of [databaseClearedListener]), or null while it runs.
+  FirestoreException? get terminationCause;
 
   /// Refreshes the row of this client in `clientMetadata` and extends the primary lease, as the JS SDK does every 4 s.
   Future<void> refreshClientMetadata();

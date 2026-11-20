@@ -9,7 +9,7 @@ queries against it use what earlier listens returned. Where the cache lives is u
 | no `openDatabase` | in memory, gone when the instance is terminated |
 | an `openDatabase` (SQLite on the VM) | in a SQLite file, kept across restarts |
 | the web `openDatabase` (web) | SQLite compiled to WebAssembly, stored in IndexedDB or OPFS |
-| `indexedDbCacheSettings()` (web, experimental) | in IndexedDB in the format of the official JS SDK, without SQLite; see [The IndexedDB cache](web.md#the-indexeddb-cache-experimental) |
+| `indexedDbCacheSettings()` (web) | in IndexedDB in the format of the official JS SDK, without SQLite; see [The IndexedDB cache](web.md#the-indexeddb-cache) |
 | `keyValueCacheSettings(store: ...)` (VM and web) | in a key-value store that your app implements (`CacheStore`), kept across restarts; see [A cache in your own storage](custom_cache_store.md) |
 
 On the web the opener picks the storage itself; follow the branches to see which one you get:
@@ -427,11 +427,11 @@ What to know (all measured in Chrome against the emulator; other browsers are un
 - **Size.** The persistent cache adds about 220 KB of JavaScript (60 KB gzipped) to a small
   app, plus the `sqlite3.wasm` file (759 KB, 364 KB gzipped); the OPFS worker is 174 KB more (54 KB gzipped, built with `sqlite3` 3.9.1).
 - `clearPersistence()` deletes the IndexedDB database or the OPFS directory.
-- **The IndexedDB cache (experimental).** `indexedDbCacheSettings()` of
+- **The IndexedDB cache.** `indexedDbCacheSettings()` of
   `package:cloud_firestore_dart/indexeddb_cache.dart` keeps the cache in the JS SDK's own IndexedDB
   database, with no `sqlite3.wasm` and no `cloud_firestore_dart_sqlite`, so that an app can switch
   between the JS SDK and this SDK in both directions. One tab at a time, schema version 18 only. See
-  [The IndexedDB cache](web.md#the-indexeddb-cache-experimental).
+  [The IndexedDB cache](web.md#the-indexeddb-cache).
 
 ## Deleting the cache
 

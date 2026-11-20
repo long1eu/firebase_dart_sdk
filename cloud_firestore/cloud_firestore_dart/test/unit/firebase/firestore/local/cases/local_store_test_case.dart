@@ -76,15 +76,20 @@ import '../accumulating_stats_collector.dart';
 import '../counting_query_engine.dart';
 
 class LocalStoreTestCase {
+  /// [firstIndexId] is the id the persistence gives the first field index it stores: 0 for SQLite and the key-value
+  /// cache, 1 for the IndexedDB engine (the JS SDK's `indexConfiguration` store generates the ids, from 1).
   LocalStoreTestCase(
     this._persistence,
     this._statsCollector, {
     required bool garbageCollectorIsEager,
-  }) : _garbageCollectorIsEager = garbageCollectorIsEager;
+    int firstIndexId = 0,
+  }) : _garbageCollectorIsEager = garbageCollectorIsEager,
+       _firstIndexId = firstIndexId;
 
   final AccumulatingStatsCollector _statsCollector;
   final Persistence _persistence;
   final bool _garbageCollectorIsEager;
+  final int _firstIndexId;
 
   late List<MutationBatch> _batches;
   ImmutableSortedMap<DocumentKey, MaybeDocument>? _lastChanges;
@@ -4070,19 +4075,19 @@ class LocalStoreTestCase {
   Future<void> testAddsIndexes() async {
     final FieldIndex indexA = fieldIndex(
       'coll',
-      indexId: 0,
+      indexId: _firstIndexId,
       indexState: FieldIndex.initialState,
       fieldsAndKinds: <Object>['a', SegmentKind.ascending],
     );
     final FieldIndex indexB = fieldIndex(
       'coll',
-      indexId: 1,
+      indexId: _firstIndexId + 1,
       indexState: FieldIndex.initialState,
       fieldsAndKinds: <Object>['b', SegmentKind.descending],
     );
     final FieldIndex indexC = fieldIndex(
       'coll',
-      indexId: 2,
+      indexId: _firstIndexId + 2,
       indexState: FieldIndex.initialState,
       fieldsAndKinds: <Object>[
         'c1',
@@ -4105,13 +4110,13 @@ class LocalStoreTestCase {
   Future<void> testRemovesIndexes() async {
     final FieldIndex indexA = fieldIndex(
       'coll',
-      indexId: 0,
+      indexId: _firstIndexId,
       indexState: FieldIndex.initialState,
       fieldsAndKinds: <Object>['a', SegmentKind.ascending],
     );
     final FieldIndex indexB = fieldIndex(
       'coll',
-      indexId: 1,
+      indexId: _firstIndexId + 1,
       indexState: FieldIndex.initialState,
       fieldsAndKinds: <Object>['b', SegmentKind.descending],
     );
@@ -4129,7 +4134,7 @@ class LocalStoreTestCase {
   Future<void> testDoesNotResetIndexWhenSameIndexIsAdded() async {
     final FieldIndex indexA = fieldIndex(
       'coll',
-      indexId: 0,
+      indexId: _firstIndexId,
       indexState: FieldIndex.initialState,
       fieldsAndKinds: <Object>['a', SegmentKind.ascending],
     );
@@ -4149,7 +4154,7 @@ class LocalStoreTestCase {
     await _backfillIndexes();
     final FieldIndex updatedIndexA = fieldIndex(
       'coll',
-      indexId: 0,
+      indexId: _firstIndexId,
       indexState: IndexState(1, IndexOffset(version(10), key('coll/a'), -1)),
       fieldsAndKinds: <Object>['a', SegmentKind.ascending],
     );

@@ -451,6 +451,10 @@ class IndexedDbIndexManager extends IndexManager {
   Future<void> _createTargetIndexes(Target target) async {
     hardAssert(_started, 'IndexManager not started');
     for (final Target subTarget in _getSubTargets(target)) {
+      if (_dependsOnMapKeyOrder(subTarget)) {
+        // No index would serve it.
+        continue;
+      }
       final IndexType type = getIndexType(subTarget);
       if (type == IndexType.none || type == IndexType.partial) {
         final FieldIndex? fieldIndex = TargetIndexMatcher(
@@ -547,9 +551,37 @@ class IndexedDbIndexManager extends IndexManager {
     return subTargets;
   }
 
-  /// The index with the most segments that serves [target], or null.
+  /// Whether a value of [target]'s filters or bounds holds a map of two or more keys (see
+  /// [JsIndexValueWriter.holdsKeyOrderDependentMap]).
+  ///
+  /// NOT IN THE OFFICIAL SDKS: such a target is not served from an index. The JS SDK encodes a map in the order of its
+  /// JS object's keys, so its entry for a map the app wrote in another order than sorted differs from the entry this
+  /// SDK computes for the same map (sorted), and a lookup by that map would miss the document. The query scans the
+  /// collection instead, as it would without an index.
+  static bool _dependsOnMapKeyOrder(Target target) {
+    for (final Filter filter in target.filters) {
+      for (final FieldFilter fieldFilter in filter.flattenedFilters) {
+        if (JsIndexValueWriter.holdsKeyOrderDependentMap(fieldFilter.value)) {
+          return true;
+        }
+      }
+    }
+    for (final Bound? bound in <Bound?>[target.startAt, target.endAt]) {
+      if (bound != null &&
+          bound.position.any(JsIndexValueWriter.holdsKeyOrderDependentMap)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /// The index with the most segments that serves [target], or null (also when [target] depends on the key order of a
+  /// map, see [_dependsOnMapKeyOrder]).
   FieldIndex? _getFieldIndex(Target target) {
     hardAssert(_started, 'IndexManager not started');
+    if (_dependsOnMapKeyOrder(target)) {
+      return null;
+    }
     final TargetIndexMatcher matcher = TargetIndexMatcher(target);
     final String collectionGroup =
         target.collectionGroup ?? target.path.getLastSegment();

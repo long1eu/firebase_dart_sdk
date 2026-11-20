@@ -170,4 +170,84 @@ void main() {
       '08c04280000000000008c04e00000000000061000108c04e000000000000620001ffff',
     );
   });
+
+  test(
+    'writes a map in the canonical key order, whatever order it was stored in',
+    () {
+      // The JS SDK writes the keys in the order of its JS object (`Object.keys`): for {b, a, 10, 2} written in that order
+      // that is 2, 10, b, a. This SDK writes the order `Object.keys` gives for the keys added sorted: 2, 10, a, b.
+      String encode(ObjectValue value) {
+        final JsIndexByteEncoder encoder = JsIndexByteEncoder();
+        JsIndexValueWriter.instance.writeIndexValue(
+          value,
+          encoder.forKind(SegmentKind.ascending),
+        );
+        return _hex(encoder.encodedBytes);
+      }
+
+      final Map<String, FieldValue> fields = <String, FieldValue>{
+        'b': IntegerValue.valueOf(1),
+        'a': IntegerValue.valueOf(2),
+        '10': IntegerValue.valueOf(3),
+        '2': IntegerValue.valueOf(4),
+      };
+      final ObjectValue sorted = ObjectValue.fromMap(fields);
+      final ObjectValue stored = ObjectValue.fromImmutableMap(
+        sorted.internalValue,
+        keyOrder: <String>['b', 'a', '10', '2'],
+      );
+      expect(encode(stored), encode(sorted));
+
+      // The bytes of the JS SDK for a JS object with the keys added sorted ({"10", "2", "a", "b"}: Object.keys gives
+      // 2, 10, a, b), written by hand with the same labels.
+      final JsIndexByteEncoder expected = JsIndexByteEncoder();
+      final JsDirectionalIndexByteEncoder ascending = expected.forKind(
+        SegmentKind.ascending,
+      )..writeNumber(55);
+      for (final (String key, double number) in <(String, double)>[
+        ('2', 4),
+        ('10', 3),
+        ('a', 2),
+        ('b', 1),
+      ]) {
+        ascending
+          ..writeNumber(25)
+          ..writeString(key)
+          ..writeNumber(15)
+          ..writeNumber(number);
+      }
+      ascending
+        ..writeNumber(2)
+        ..writeInfinity();
+      expect(encode(sorted), _hex(expected.encodedBytes));
+    },
+  );
+
+  test('tells the values whose encoding depends on the key order of a map', () {
+    final ObjectValue one = ObjectValue.fromMap(<String, FieldValue>{
+      'a': IntegerValue.valueOf(1),
+    });
+    final ObjectValue two = ObjectValue.fromMap(<String, FieldValue>{
+      'a': IntegerValue.valueOf(1),
+      'b': IntegerValue.valueOf(2),
+    });
+    expect(JsIndexValueWriter.holdsKeyOrderDependentMap(one), isFalse);
+    expect(JsIndexValueWriter.holdsKeyOrderDependentMap(two), isTrue);
+    expect(
+      JsIndexValueWriter.holdsKeyOrderDependentMap(
+        ArrayValue.fromList(<FieldValue>[IntegerValue.valueOf(1), two]),
+      ),
+      isTrue,
+    );
+    expect(
+      JsIndexValueWriter.holdsKeyOrderDependentMap(
+        ObjectValue.fromMap(<String, FieldValue>{'m': two}),
+      ),
+      isTrue,
+    );
+    expect(
+      JsIndexValueWriter.holdsKeyOrderDependentMap(StringValue.valueOf('x')),
+      isFalse,
+    );
+  });
 }

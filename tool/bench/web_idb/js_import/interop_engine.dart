@@ -397,24 +397,18 @@ steps = <String, Future<void> Function()>{
     final FirebaseFirestore firestore = await open();
     await firestore.disableNetwork();
     final Map<String, Object?> values = kindValues(firestore);
-    // The two equal maps: this SDK's query value has its keys sorted, so it finds the JS SDK's entry of the map the
-    // JS SDK wrote with sorted keys, not the one of the map written in another order (a known difference: the JS
-    // SDK's entry follows the order of the keys of the stored document).
+    // The two equal maps, which the JS SDK wrote in two key orders: its entries differ, so this SDK does not serve an
+    // equality query on a map of two or more keys from the index (it scans the collection) and finds both.
     {
-      final List<String>? keys = await indexKeys(
-        firestore,
-        firestore.collection('kinds').where('v', isEqualTo: values['map']),
-      );
+      final Query<Map<String, Object?>> query = firestore
+          .collection('kinds')
+          .where('v', isEqualTo: values['map']);
+      final List<String>? keys = await indexKeys(firestore, query);
+      final List<String> result = ids(await query.get(cache))..sort();
       check(
-        'D2 map with keys in sorted order: the engine finds the JS entry',
-        keys?.contains('mapsorted') ?? false,
-        'index=$keys',
-      );
-      check(
-        'D2 map with keys in another order: the engine finds the JS entry',
-        keys?.contains('map') ?? false,
-        'index=$keys',
-        true,
+        'D2 maps in both key orders: the engine finds both, without the index',
+        keys == null && result.join(',') == 'map,mapsorted',
+        'index=$keys result=$result',
       );
     }
     for (final MapEntry<String, Object?> entry in values.entries) {

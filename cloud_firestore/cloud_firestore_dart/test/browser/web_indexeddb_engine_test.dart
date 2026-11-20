@@ -10,15 +10,21 @@ library;
 import 'dart:async';
 import 'dart:convert';
 import 'dart:js_interop';
+import 'dart:js_interop_unsafe';
 
 import 'package:cloud_firestore_dart/cloud_firestore_dart.dart';
 import 'package:cloud_firestore_dart/indexeddb_cache.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/index/js_index_value_writer.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/local/indexeddb/indexeddb_persistence.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/indexeddb/indexeddb_schema.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/indexeddb/web/idb.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/local_store.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/lru_delegate.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/lru_garbage_collector.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/persistance/index_manager.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/model/field_index.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/model/field_path.dart'
+    as model;
 import 'package:cloud_firestore_dart/src/internal_access.dart';
 import 'package:firebase_app_dart/firebase_app_dart.dart';
 import 'package:test/test.dart';
@@ -121,6 +127,41 @@ Future<int> countRows(String appName, String store) async {
     db.close();
   }
 }
+
+/// The row of `owner` in the engine's database of [appName], or null.
+Future<Map<String, Object?>?> readLease(String appName) async {
+  final web.IDBDatabase db =
+      (await idbRequest(
+            web.window.indexedDB.open('firestore/$appName/demo-idb/main'),
+          ))!
+          as web.IDBDatabase;
+  try {
+    final Object? row = idbToDart(
+      await idbRequest(
+        db
+            .transaction(DbStores.owner.toJS)
+            .objectStore(DbStores.owner)
+            .get(DbStores.ownerKey.toJS),
+      ),
+    );
+    return row is Map ? row.cast<String, Object?>() : null;
+  } finally {
+    db.close();
+  }
+}
+
+/// Matches the error of a client whose primary lease another client took over.
+final Matcher isLeaseLost = isA<FirestoreException>()
+    .having(
+      (FirestoreException e) => e.errorCode,
+      'errorCode',
+      FirestoreErrorCode.failedPrecondition,
+    )
+    .having(
+      (FirestoreException e) => e.message,
+      'message',
+      contains('lost the primary lease'),
+    );
 
 const GetOptions cache = GetOptions(source: Source.cache);
 const GetOptions server = GetOptions(source: Source.server);
@@ -508,6 +549,253 @@ void main() {
         (QueryDocumentSnapshot<Map<String, Object?>> d) => d.id,
       ),
       <String>['b'],
+    );
+  });
+
+  test(
+    'an equality query on a map finds a document the JS SDK indexed with the keys in another order',
+    () async {
+      final String appName = newAppName();
+      final FirebaseFirestore firestore = await newClient(appName);
+      await firestore.disableNetwork();
+      final String name = newCollectionName();
+      final LocalStore localStore = firestore.client.localStore;
+      await localStore.configureFieldIndexes(<FieldIndex>[
+        FieldIndex(-1, name, <IndexSegment>[
+          IndexSegment(
+            model.FieldPath.fromSingleSegment('m'),
+            SegmentKind.ascending,
+          ),
+        ], FieldIndex.initialState),
+      ]);
+      // Written offline: the cache has it; the index entry is written by the backfill.
+      firestore.collection(name).doc('x').set(<String, Object?>{
+        'm': <String, Object?>{'b': 1, 'a': 2},
+      }).ignore();
+      firestore.collection(name).doc('y').set(<String, Object?>{
+        'm': <String, Object?>{'a': 1},
+      }).ignore();
+      expect(await firestore.client.backfillIndexes(), 2);
+      expect(await countRows(appName, DbStores.indexEntries), 2);
+
+      // The entry of x as the JS SDK writes it for the JS object {b: 1, a: 2} (`Object.keys` order: b, a), in place of
+      // the one this SDK wrote (a, b).
+      final JsIndexByteEncoder encoder = JsIndexByteEncoder();
+      final JsDirectionalIndexByteEncoder ascending = encoder.forKind(
+        SegmentKind.ascending,
+      )..writeNumber(55);
+      for (final (String key, double number) in <(String, double)>[
+        ('b', 1),
+        ('a', 2),
+      ]) {
+        ascending
+          ..writeNumber(25)
+          ..writeString(key)
+          ..writeNumber(15)
+          ..writeNumber(number);
+      }
+      ascending
+        ..writeNumber(2)
+        ..writeInfinity();
+      final web.IDBDatabase db =
+          (await idbRequest(
+                web.window.indexedDB.open('firestore/$appName/demo-idb/main'),
+              ))!
+              as web.IDBDatabase;
+      try {
+        final web.IDBTransaction transaction = db.transaction(
+          DbStores.indexEntries.toJS,
+          'readwrite',
+        );
+        final Future<void> committed = idbCommitted(transaction);
+        final web.IDBObjectStore entries = transaction.objectStore(
+          DbStores.indexEntries,
+        );
+        final web.IDBRequest cursorRequest = entries.openCursor();
+        cursorRequest.onsuccess = ((web.Event _) {
+          final web.IDBCursorWithValue? cursor =
+              cursorRequest.result as web.IDBCursorWithValue?;
+          if (cursor == null) {
+            return;
+          }
+          final JSObject row = cursor.value! as JSObject;
+          final JSArray<JSAny?> path = row.getProperty<JSArray<JSAny?>>(
+            'documentKey'.toJS,
+          );
+          if ((path.toDart.last! as JSString).toDart == 'x') {
+            cursor.delete();
+            row.setProperty('directionalValue'.toJS, encoder.encodedBytes.toJS);
+            entries.put(row);
+          }
+          cursor.continue_();
+        }).toJS;
+        await committed;
+      } finally {
+        db.close();
+      }
+      expect(await countRows(appName, DbStores.indexEntries), 2);
+
+      final Query<Map<String, Object?>> byMap = firestore
+          .collection(name)
+          .where('m', isEqualTo: <String, Object?>{'a': 2, 'b': 1});
+      expect(
+        (await byMap.get(
+          cache,
+        )).docs.map((QueryDocumentSnapshot<Map<String, Object?>> d) => d.id),
+        <String>['x'],
+      );
+      // Not served from the index: the entry of a map depends on the order of its keys.
+      expect(
+        localStore.indexManagerForCurrentUser.getIndexType(
+          byMap.query.toTarget(),
+        ),
+        IndexType.none,
+      );
+      // A map of one key does not depend on the order: the index serves it.
+      final Query<Map<String, Object?>> byOneKey = firestore
+          .collection(name)
+          .where('m', isEqualTo: <String, Object?>{'a': 1});
+      expect(
+        localStore.indexManagerForCurrentUser.getIndexType(
+          byOneKey.query.toTarget(),
+        ),
+        IndexType.full,
+      );
+      expect(
+        (await byOneKey.get(
+          cache,
+        )).docs.map((QueryDocumentSnapshot<Map<String, Object?>> d) => d.id),
+        <String>['y'],
+      );
+    },
+  );
+
+  group('another client takes the primary lease over', () {
+    /// A client offline with one pending write and a listener on its collection, whose lease then goes to a JS tab.
+    Future<
+      (
+        FirebaseFirestore,
+        CollectionReference<Map<String, Object?>>,
+        Future<Object>,
+      )
+    >
+    takeOver(String appName) async {
+      final FirebaseFirestore firestore = await newClient(appName);
+      await firestore.disableNetwork();
+      final CollectionReference<Map<String, Object?>> collection = firestore
+          .collection(newCollectionName());
+      final Completer<Object> listenerError = Completer<Object>();
+      final Completer<void> firstEvent = Completer<void>();
+      collection.snapshots().listen(
+        (QuerySnapshot<Map<String, Object?>> snapshot) {
+          if (snapshot.docs.isNotEmpty && !firstEvent.isCompleted) {
+            firstEvent.complete();
+          }
+        },
+        onError: (Object error) {
+          if (!listenerError.isCompleted) {
+            listenerError.complete(error);
+          }
+        },
+      );
+      collection.doc('a').set(<String, Object?>{'n': 1}).ignore();
+      await firstEvent.future.timeout(const Duration(seconds: 10));
+
+      // As a JS tab does when this tab's lease lapsed in the background: it takes the lease.
+      await putRow(appName, DbStores.owner, <String, Object?>{
+        'ownerId': 'js-client',
+        'allowTabSynchronization': false,
+        'leaseTimestampMs': DateTime.now().millisecondsSinceEpoch,
+      }, DbStores.ownerKey);
+      return (firestore, collection, listenerError.future);
+    }
+
+    /// The cache after the takeover: the JS tab releases the lease, a new instance opens the database.
+    Future<void> expectCacheIntact(
+      String appName,
+      FirebaseFirestore old,
+      String collectionPath,
+    ) async {
+      expect((await readLease(appName))!['ownerId'], 'js-client');
+      await shutDown(old);
+      await putRow(appName, DbStores.owner, <String, Object?>{
+        'ownerId': 'js-client',
+        'allowTabSynchronization': false,
+        'leaseTimestampMs': DateTime.now().millisecondsSinceEpoch - 60000,
+      }, DbStores.ownerKey);
+      final FirebaseFirestore again = await newClient(appName);
+      await again.disableNetwork();
+      expect(await again.getPendingWriteCount(), 1);
+      final QuerySnapshot<Map<String, Object?>> docs = await again
+          .collection(collectionPath)
+          .get(cache);
+      expect(
+        docs.docs.map((QueryDocumentSnapshot<Map<String, Object?>> d) => d.id),
+        <String>['a'],
+      );
+      expect(docs.docs.single['n'], 1);
+    }
+
+    test(
+      'the next operation fails with the reason, and so do the listeners and every later call',
+      () async {
+        final String appName = newAppName();
+        final (
+          FirebaseFirestore firestore,
+          CollectionReference<Map<String, Object?>> collection,
+          Future<Object> listenerError,
+        ) = await takeOver(
+          appName,
+        );
+
+        await expectLater(
+          collection.doc('b').set(<String, Object?>{'n': 2}),
+          throwsA(isLeaseLost),
+        );
+        expect(
+          await listenerError.timeout(const Duration(seconds: 10)),
+          isLeaseLost,
+        );
+        // Every later call: the same error, not a generic "terminated".
+        await expectLater(collection.doc('a').get(cache), throwsA(isLeaseLost));
+        await expectLater(
+          collection.doc('c').set(<String, Object?>{'n': 3}),
+          throwsA(isLeaseLost),
+        );
+        await expectLater(collection.snapshots().first, throwsA(isLeaseLost));
+        await expectCacheIntact(appName, firestore, collection.path);
+      },
+    );
+
+    test(
+      'the lease refresh finds it without an operation: the listeners get the error',
+      () async {
+        final String appName = newAppName();
+        final (
+          FirebaseFirestore firestore,
+          CollectionReference<Map<String, Object?>> collection,
+          Future<Object> listenerError,
+        ) = await takeOver(
+          appName,
+        );
+
+        // What the refresh timer (every 4 s) does.
+        final IndexedDbPersistence persistence =
+            firestore.client.persistence as IndexedDbPersistence;
+        await expectLater(
+          persistence.refreshClientMetadata(),
+          throwsA(isLeaseLost),
+        );
+        expect(
+          await listenerError.timeout(const Duration(seconds: 10)),
+          isLeaseLost,
+        );
+        await expectLater(
+          collection.doc('b').set(<String, Object?>{'n': 2}),
+          throwsA(isLeaseLost),
+        );
+        await expectCacheIntact(appName, firestore, collection.path);
+      },
     );
   });
 }

@@ -70,6 +70,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/local/persistance/pe
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/persistance/query_cache.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/persistance/reference_delegate.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/persistance/remote_document_cache.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/local/persistance/stats_collector.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/query_context.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/query_data.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/reference_set.dart';
@@ -138,7 +139,9 @@ class WebIndexedDbPersistence extends IndexedDbPersistence {
     required LocalSerializer serializer,
     required LruGarbageCollectorParams lruParams,
     String? clientId,
-  }) : storagePrefix = indexedDbStoragePrefix(persistenceKey, databaseId),
+    StatsCollector statsCollector = StatsCollector.noOp,
+  }) : _statsCollector = statsCollector,
+       storagePrefix = indexedDbStoragePrefix(persistenceKey, databaseId),
        databaseName = indexedDbDatabaseName(persistenceKey, databaseId),
        clientId = clientId ?? autoId(),
        serializer = IndexedDbSerializer(serializer),
@@ -165,6 +168,9 @@ class WebIndexedDbPersistence extends IndexedDbPersistence {
 
   final IndexedDbSerializer serializer;
 
+  /// Counts the rows the mutation queue and the remote document cache read, write and delete (for tests).
+  final StatsCollector _statsCollector;
+
   final Semaphore _semaphore;
 
   web.IDBDatabase? _db;
@@ -173,6 +179,20 @@ class WebIndexedDbPersistence extends IndexedDbPersistence {
   /// value, not a field: code outside the operation (another asynchronous flow of the client) that uses a cache
   /// meanwhile must not make requests on the operation's transaction.
   final Object _zoneKey = Object();
+
+  /// The IndexedDB transactions that are not finished, and the persistence transactions that wait for or run one.
+  int _openTransactions = 0;
+  int _runningTransactions = 0;
+
+  /// Whether no transaction of this persistence runs or waits (for tests that wait until the work a step started is
+  /// done: the spec tests).
+  bool get isIdle => _openTransactions == 0 && _runningTransactions == 0;
+
+  @override
+  FirestoreException? get terminationCause {
+    final Object? fatal = _fatalError;
+    return fatal is FirestoreException ? fatal : null;
+  }
 
   /// Set when a transaction failed for good (see [IndexedDbTransactionInactiveError]), or the database was deleted by
   /// another client: every later transaction fails with it.
@@ -264,13 +284,23 @@ class WebIndexedDbPersistence extends IndexedDbPersistence {
 
   /// Runs the write [operation] in the transaction of this zone, or in a persistence transaction of its own when it is
   /// called outside of one: the local store of this port runs some operations that write outside a transaction (the
-  /// query engine creates indexes from `executeQuery`), which SQLite commits on their own. A read-only transaction
-  /// ([_current]) can not write, and a write must check the lease first ([_verifyOwner]).
-  Future<void> _write(String action, Future<void> Function() operation) {
+  /// query engine creates indexes from `executeQuery`), and the caches are used outside of one by their tests, which
+  /// SQLite commits statement by statement. A read-only transaction ([_current]) can not write, and a write must check
+  /// the lease first ([_verifyOwner]). Every public write of the caches goes through here.
+  ///
+  /// The transaction of its own takes no listen sequence number, as a statement outside a transaction does not with
+  /// SQLite: an operation that needs one ([IndexedDbReferenceDelegate.currentSequenceNumber]) fails outside a
+  /// transaction with either engine.
+  Future<T> _write<T>(String action, Future<T> Function() operation) {
     if (Zone.current[_zoneKey] is _IdbTransaction) {
       return operation();
     }
-    return runTransaction(action, operation);
+    return _runTransaction(
+      action,
+      operation,
+      primary: false,
+      sequenceNumber: false,
+    );
   }
 
   /// Runs [operation] with [transaction] as the transaction of its zone (see [_current]).
@@ -352,8 +382,9 @@ class WebIndexedDbPersistence extends IndexedDbPersistence {
           FirestoreException(
             message:
                 'The IndexedDB cache $databaseName has schema version $version, written by an older JS SDK: '
-                'IndexedDbCacheSettings only open version $indexedDbSchemaVersion. Open the app once with a '
-                'current JS SDK (it migrates the database), or clear the cache with clearPersistence().',
+                'IndexedDbCacheSettings only open version $indexedDbSchemaVersion. The cache was left as it is: open '
+                'the app once with a current JS SDK (it migrates the database), or clear the cache with '
+                'clearPersistence().',
             errorCode: FirestoreErrorCode.failedPrecondition,
           ),
         );
@@ -362,8 +393,9 @@ class WebIndexedDbPersistence extends IndexedDbPersistence {
           FirestoreException(
             message:
                 'The IndexedDB cache $databaseName has a schema version newer than $indexedDbSchemaVersion, written '
-                'by a newer JS SDK: IndexedDbCacheSettings only open version $indexedDbSchemaVersion. Clear the cache '
-                'with clearPersistence() to start over.',
+                'by a newer JS SDK: IndexedDbCacheSettings of this release only open version $indexedDbSchemaVersion '
+                '(a new schema version of the JS SDK needs a new release of cloud_firestore_dart). The cache was left '
+                'as it is; clear it with clearPersistence() to start over with this release.',
             errorCode: FirestoreErrorCode.failedPrecondition,
           ),
         );
@@ -605,8 +637,10 @@ class WebIndexedDbPersistence extends IndexedDbPersistence {
     String action,
     Transaction<T> operation, {
     required bool primary,
+    bool sequenceNumber = true,
   }) async {
     beforeTransaction?.call(action);
+    _runningTransactions++;
     await _semaphore.acquire();
     try {
       _throwIfFailed();
@@ -618,7 +652,9 @@ class WebIndexedDbPersistence extends IndexedDbPersistence {
           _reloadState = false;
         }
         await _verifyOwner(transaction);
-        referenceDelegate.onTransactionStarted();
+        if (sequenceNumber) {
+          referenceDelegate.onTransactionStarted();
+        }
         final T result = await _inTransaction(transaction, operation);
         if (primary) {
           // After the operation, so that a long operation leaves a lease with a recent timestamp (as in the JS SDK).
@@ -638,6 +674,7 @@ class WebIndexedDbPersistence extends IndexedDbPersistence {
         rethrow;
       }
     } finally {
+      _runningTransactions--;
       _semaphore.release();
     }
   }

@@ -46,6 +46,8 @@ jobs:
       code: ${{ github.event_name == 'workflow_dispatch' || steps.filter.outputs.code == 'true' }}
       # Whether the change touches what the browser tests cover.
       browser: ${{ github.event_name == 'workflow_dispatch' || steps.browser.outputs.browser == 'true' }}
+      # Whether the change touches the IndexedDB cache engine or its check against the JS SDK.
+      indexeddb: ${{ github.event_name == 'workflow_dispatch' || steps.browser.outputs.indexeddb == 'true' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
@@ -85,6 +87,18 @@ jobs:
               - 'tool/stop_auth_emulators.sh'
               - 'tool/auth_emulators/**'
               - 'tool/print_test_failures.sh'
+              - '.github/workflows/ci.yml'
+              - '.github/actions/**'
+            indexeddb:
+              - 'cloud_firestore/cloud_firestore_dart/lib/indexeddb_cache.dart'
+              - 'cloud_firestore/cloud_firestore_dart/lib/src/firebase/firestore/indexeddb_cache_settings.dart'
+              - 'cloud_firestore/cloud_firestore_dart/lib/src/firebase/firestore/local/indexeddb/**'
+              - 'cloud_firestore/cloud_firestore_dart/lib/src/firebase/firestore/index/js_index_value_writer.dart'
+              - 'cloud_firestore/cloud_firestore_dart/pubspec.lock'
+              - 'tool/bench/web_idb/js_import/**'
+              - 'tool/bench/web_idb/pubspec.yaml'
+              - 'tool/start_private_emulator.sh'
+              - 'tool/stop_private_emulator.sh'
               - '.github/workflows/ci.yml'
               - '.github/actions/**'
 
@@ -391,6 +405,51 @@ jobs:
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: browser-log
+          path: ${{ runner.temp }}/emulator/*.log
+
+  # The IndexedDB cache engine against the official JS SDK in headless Chrome, both ways, on one database at a time:
+  # tool/bench/web_idb/js_import/interop_check.sh (documents, pending writes of two users, indexes, bundles and garbage
+  # collection written by each SDK and read by the other, the primary lease, index entries of every value kind). The
+  # firebase JS SDK and esbuild come from npm at the versions of its package-lock.json (`npm ci`, cached by the
+  # emulators action), like the harness of tool/interop; the pages are served from 127.0.0.1 and talk to a private
+  # emulator only. Only when the change touches the engine or the check. Required: no other job runs the real JS SDK
+  # on the engine's database.
+  indexeddb-interop:
+    name: IndexedDB cache interop with the JS SDK (Chrome)
+    needs: [changes, unit]
+    if: ${{ needs.changes.outputs.code == 'true' && needs.changes.outputs.indexeddb == 'true' }}
+    runs-on: ubuntu-26.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Set the emulator work directory
+        # The `runner` context is not available in job-level `env`.
+        run: echo "EMULATOR_DIR=$RUNNER_TEMP/emulator" >> "$GITHUB_ENV"
+      - uses: ./.github/actions/dart
+        with:
+          sdk: stable
+      - uses: ./.github/actions/emulators
+        with:
+          npm-lockfile: tool/bench/web_idb/js_import/package-lock.json
+      - name: Install the JS SDK and esbuild
+        working-directory: tool/bench/web_idb/js_import
+        run: npm ci --no-audit --no-fund
+      - name: Start a private Firestore emulator
+        run: ./tool/start_private_emulator.sh 8395
+      - name: Run the interop check
+        env:
+          CHROME: google-chrome
+        run: |
+          set -o pipefail
+          ./tool/bench/web_idb/js_import/interop_check.sh 8395 2>&1 | tee "$EMULATOR_DIR/interop.log"
+      - name: Stop the private Firestore emulator
+        if: always()
+        run: ./tool/stop_private_emulator.sh 8395
+      - name: Upload the logs
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: indexeddb-interop-log
           path: ${{ runner.temp }}/emulator/*.log
 
   # The Flutter packages, which the unit jobs skip (they install Dart only): flutter analyze and

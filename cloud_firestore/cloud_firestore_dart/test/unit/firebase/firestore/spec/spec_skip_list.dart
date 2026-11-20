@@ -82,6 +82,16 @@ const Map<String, String> keyValueExcludedTags = <String, String>{
       'multi-client: the key-value cache is used by one client at a time.',
 };
 
+/// The IndexedDB engine (IndexedDbCacheSettings), run in a browser by test/browser/web_indexeddb_spec_test.dart: it keeps
+/// its data across a restart (the restarted client opens the same database) and is used by one tab at a time.
+const Map<String, String> indexedDbExcludedTags = <String, String>{
+  'eager-gc':
+      'eager-gc: relies on eager garbage collection, which only exists for memory persistence (as upstream).',
+  'multi-client':
+      'multi-client: the IndexedDB engine is used by one tab at a time (it refuses a second client while the first '
+      'holds the primary lease).',
+};
+
 /// Single specs that need a library design the port (like upstream Android) does not have, or that the harness can
 /// not express, keyed by `'<describeName> <itName>'`. Unlike [skippedSpecFeatures] these are not detectable from the
 /// spec JSON: the spec uses only supported steps.

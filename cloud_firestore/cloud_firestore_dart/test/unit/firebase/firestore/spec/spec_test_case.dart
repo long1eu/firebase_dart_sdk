@@ -110,7 +110,17 @@ class SpecTestCase {
   /// [getSharedPersistence] creates the persistence of a client of a multi-client spec: the client [clientId] of the
   /// SQLite database [name], with a primary lease that uses [clock]. Without it the multi-client specs use
   /// [getPersistence] (memory persistence, which does not support them).
-  SpecTestCase(this.getPersistence, {this.getSharedPersistence});
+  ///
+  /// [settle] waits until the work the last step started is done, where the step waits for it (the JS runner drains its
+  /// `AsyncQueue`). By default it lets one turn of the event loop pass, which is enough when the persistence completes
+  /// its operations in microtasks (memory, SQLite on the VM); a persistence that waits for the browser (IndexedDB)
+  /// passes one that waits until it is idle.
+  SpecTestCase(this.getPersistence, {this.getSharedPersistence, this.settle});
+
+  final Future<void> Function()? settle;
+
+  Future<void> _settle() =>
+      settle?.call() ?? Future<void>.delayed(_delayDuration);
 
   final Future<Persistence> Function(bool useEagerGc, String name)
       getPersistence;
@@ -411,7 +421,7 @@ class SpecClient implements RemoteStoreCallback {
     if (isError) {
       log('~~~onError~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~');
     }
-    await Future<void>.delayed(_delayDuration);
+    await _spec._settle();
     // A client that a `shutdown` step shut down has released everything already.
     if (!_isShutdown) {
       _metadataRefresher?.stop();
@@ -559,7 +569,7 @@ class SpecClient implements RemoteStoreCallback {
   Future<void> _drainSharedStateEvents() async {
     while (_pendingSharedStateEvents > 0) {
       await _sharedStateQueue.run<void>(() async {});
-      await Future<void>.delayed(_delayDuration);
+      await _spec._settle();
     }
   }
 
@@ -793,7 +803,7 @@ class SpecClient implements RemoteStoreCallback {
       _datastore.runWatchStreamBackoff();
     }
 
-    await Future<void>.delayed(_delayDuration);
+    await _spec._settle();
   }
 
   Future<void> _doUnlisten(List<dynamic> unlistenSpec) async {
@@ -820,7 +830,7 @@ class SpecClient implements RemoteStoreCallback {
 
     await _syncEngine.writeMutations(<Mutation>[mutation], callback);
     // Let the write stream handshake and the write pipeline settle.
-    await Future<void>.delayed(_delayDuration);
+    await _spec._settle();
   }
 
   Future<void> _doSet(List<dynamic> setSpec) async {
@@ -856,7 +866,7 @@ class SpecClient implements RemoteStoreCallback {
     SnapshotVersion version,
   ) async {
     await _datastore.writeWatchChange(change, version);
-    await Future<void>.delayed(_delayDuration);
+    await _spec._settle();
   }
 
   Future<void> _doWatchAck(List<dynamic> ackedTargets) async {
@@ -903,7 +913,7 @@ class SpecClient implements RemoteStoreCallback {
     await _writeWatchChange(change, SnapshotVersion.none);
     // Unlike web, the MockDatastore detects a watch removal with cause and will remove active targets
 
-    await Future<void>.delayed(_delayDuration);
+    await _spec._settle();
   }
 
   Future<void> _doWatchEntity(Map<String, dynamic> watchEntity) async {
@@ -1056,14 +1066,14 @@ class SpecClient implements RemoteStoreCallback {
     final GrpcError status = GrpcError.custom(error['code'], error['message']);
     _datastore.failWatchStream(status);
     // Let the stream close event be delivered to the remote store.
-    await Future<void>.delayed(_delayDuration);
+    await _spec._settle();
     // The watch stream re-opens through its backoff timer if there are active
     // listeners (JS doWatchStreamClose); without runBackoffTimer it stays in
     // backoff. Only the backoff timer runs: with JS's real backoff delays it is
     // the first timer due, the mock's never elapses on its own.
     if (runBackoffTimer && _queryListeners.isNotEmpty) {
       _datastore.runWatchStreamBackoff();
-      await Future<void>.delayed(_delayDuration);
+      await _spec._settle();
       assert(_datastore.isWatchStreamOpen, 'Watch stream is open');
     }
   }
@@ -1090,7 +1100,7 @@ class SpecClient implements RemoteStoreCallback {
       mutationResult,
     ]);
     // Let the write response be delivered to the remote store.
-    await Future<void>.delayed(_delayDuration);
+    await _spec._settle();
   }
 
   Future<void> _doFailWrite(Map<String, dynamic> writeFailureSpec) async {
@@ -1112,7 +1122,7 @@ class SpecClient implements RemoteStoreCallback {
     log('      Failing a write.');
     await _datastore.failWrite(error);
     // Let the write failure be delivered to the remote store.
-    await Future<void>.delayed(_delayDuration);
+    await _spec._settle();
   }
 
   Future<void> _doRunTimer(String timer) async {
@@ -1140,7 +1150,7 @@ class SpecClient implements RemoteStoreCallback {
         taskId = TaskId.asyncQueueRetry;
         // As in JS (runAllDelayedOperationsUntil does not require the timer), nothing may be waiting for a retry.
         if (_queue.getTask(taskId) == null) {
-          await Future<void>.delayed(_delayDuration);
+          await _spec._settle();
           return;
         }
         break;
@@ -1155,7 +1165,7 @@ class SpecClient implements RemoteStoreCallback {
 
     _queue.runUntil(taskId);
     // Let the task run to completion.
-    await Future<void>.delayed(_delayDuration);
+    await _spec._settle();
   }
 
   Future<void> _doDisableNetwork() async {
@@ -1165,7 +1175,7 @@ class SpecClient implements RemoteStoreCallback {
     await _remoteStore.fillWritePipeline();
     _setPersistenceNetworkEnabled(false);
     await _remoteStore.disableNetwork();
-    await Future<void>.delayed(_delayDuration);
+    await _spec._settle();
   }
 
   Future<void> _doEnableNetwork() async {
@@ -1206,14 +1216,14 @@ class SpecClient implements RemoteStoreCallback {
         () => persistence.execute('DELETE FROM primary_client'),
       );
       _queue.runUntil(TaskId.clientMetadataRefresh);
-      await Future<void>.delayed(_delayDuration);
+      await _spec._settle();
     }
   }
 
   Future<void> _doChangeUser(String? uid) async {
     _currentUser = User(uid);
     await _syncEngine.handleCredentialChange(_currentUser);
-    await Future<void>.delayed(_delayDuration);
+    await _spec._settle();
   }
 
   Future<void> _doRestart() async {
@@ -1304,7 +1314,7 @@ class SpecClient implements RemoteStoreCallback {
     final LoadBundleTask bundleTask = LoadBundleTaskInternal.create();
     await _syncEngine.loadBundle(bundleReader, bundleTask);
     // Let the resulting snapshots be delivered to the listeners.
-    await Future<void>.delayed(_delayDuration);
+    await _spec._settle();
     expect(bundleTask.snapshot.taskState, LoadBundleTaskState.success,
         reason: 'Loading bundle failed with ${bundleTask.snapshot.exception}');
   }
@@ -1319,7 +1329,7 @@ class SpecClient implements RemoteStoreCallback {
               minBytesThreshold: cacheThreshold, percentileToCollect: 100));
       await _localStore.collectGarbage(collector);
     }
-    await Future<void>.delayed(_delayDuration);
+    await _spec._settle();
   }
 
   void _doAddSnapshotsInSyncListener() {
@@ -1395,7 +1405,7 @@ class SpecClient implements RemoteStoreCallback {
       await _drainSharedStateEvents();
       // Upstream waits for its AsyncQueue to be empty. Here the equivalent is letting the event loop settle, which
       // runSteps does after every step anyway.
-      await Future<void>.delayed(_delayDuration);
+      await _spec._settle();
     } else if (step.containsKey('triggerLruGC')) {
       await _doTriggerLruGc(step['triggerLruGC']);
     } else if (step.containsKey('watchAck')) {
@@ -1844,7 +1854,7 @@ class SpecClient implements RemoteStoreCallback {
     await _drainSharedStateEvents();
     // The Android SDK processes everything synchronously. Here the streams deliver their events asynchronously, so
     // let them settle before validating the expectations.
-    await Future<void>.delayed(_delayDuration);
+    await _spec._settle();
 
     if (expect != null) {
       log('      Validating step expectations $expect');

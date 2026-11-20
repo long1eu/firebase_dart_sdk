@@ -17,10 +17,8 @@ import 'dart:io';
 
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/persistance/persistence.dart';
 import 'package:path/path.dart';
-import 'package:test/test.dart';
 
-import 'spec_skip_list.dart';
-import 'spec_test_case.dart';
+import 'spec_runner_core.dart';
 
 /// Registers one `test()` per spec case found in `test/res/json/*.json` (the CURRENT upstream spec format), grouped by
 /// file. Specs that can not run are registered with `skip:` and a reason (see spec_skip_list.dart).
@@ -29,73 +27,38 @@ import 'spec_test_case.dart';
 void registerSpecTests({
   required String variant,
   required Future<Persistence> Function(bool useEagerGc, String name)
-      getPersistence,
+  getPersistence,
   required Map<String, String> excludedTags,
   Future<Persistence> Function(
     String name,
     String clientId,
     int Function() clock,
-  )? getSharedPersistence,
+  )?
+  getSharedPersistence,
 }) {
   final Directory jsonDir = Directory(
     '${Directory.current.path}/test/res/json',
   );
-  final List<File> jsonFiles = jsonDir
-      .listSync()
-      .whereType<File>()
-      .where((File f) => f.path.endsWith('.json'))
-      .toList()
-    ..sort((File a, File b) => a.path.compareTo(b.path));
+  final List<File> jsonFiles =
+      jsonDir
+          .listSync()
+          .whereType<File>()
+          .where((File f) => f.path.endsWith('.json'))
+          .toList()
+        ..sort((File a, File b) => a.path.compareTo(b.path));
 
   final Map<String, Map<String, dynamic>> files =
       <String, Map<String, dynamic>>{
-    for (final File f in jsonFiles)
-      basenameWithoutExtension(f.path):
-          jsonDecode(f.readAsStringSync()) as Map<String, dynamic>,
-  };
+        for (final File f in jsonFiles)
+          basenameWithoutExtension(f.path):
+              jsonDecode(f.readAsStringSync()) as Map<String, dynamic>,
+      };
 
-  // The 'exclusive' tag disables all other tests (useful when debugging). Multiple tests can have it.
-  final bool exclusiveMode = files.values.any(
-    (Map<String, dynamic> file) => file.values.any(
-      (dynamic t) => ((t as Map<String, dynamic>)['tags'] as List<dynamic>)
-          .contains('exclusive'),
-    ),
+  registerSpecTestFiles(
+    files: files,
+    variant: variant,
+    getPersistence: getPersistence,
+    excludedTags: excludedTags,
+    getSharedPersistence: getSharedPersistence,
   );
-
-  for (final MapEntry<String, Map<String, dynamic>> file in files.entries) {
-    group('$variant ${file.key}', () {
-      int index = 0;
-      for (final dynamic value in file.value.values) {
-        final Map<String, dynamic> testJson = value as Map<String, dynamic>;
-        final int id = index++;
-        final String name = '${testJson['describeName']} ${testJson['itName']}';
-        final List<dynamic> tags = testJson['tags'];
-
-        String? skip = skipReasonFor(testJson, excludedTags);
-        if (skip == null && exclusiveMode && !tags.contains('exclusive')) {
-          skip = '[exclusive] another spec is tagged exclusive';
-        }
-
-        test(
-          name,
-          () async {
-            // Steps are mutated while running (expectations are removed): work on a deep copy.
-            final Map<String, dynamic> copy =
-                jsonDecode(jsonEncode(testJson)) as Map<String, dynamic>;
-            final SpecTestCase testCase = SpecTestCase(
-              getPersistence,
-              getSharedPersistence: getSharedPersistence,
-            )
-              ..currentName = '${file.key}_$id';
-            await testCase.runSteps(
-              copy['steps'] as List<dynamic>,
-              copy['config'] as Map<String, dynamic>,
-            );
-          },
-          skip: skip,
-          timeout: const Timeout(Duration(seconds: 60)),
-        );
-      }
-    });
-  }
 }

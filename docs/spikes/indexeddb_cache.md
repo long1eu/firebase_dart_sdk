@@ -493,7 +493,7 @@ over a large cache need watching.
 
 ## 8. The engine against the SQLite caches: reads over a large cache (added 2026-11-18)
 
-The experimental engine (`IndexedDbCacheSettings`, branch `wave/web-indexeddb-engine`: no index manager, no GC,
+The engine (`IndexedDbCacheSettings`, as it was on branch `wave/web-indexeddb-engine`, then experimental: no index manager, no GC,
 one tab) against `PersistentCacheSettings` on IndexedDB storage and on OPFS, through the public SDK API, with
 `tool/bench/web_idb/web/cache.dart`. Each client points at a closed local port and disables the network first.
 
@@ -572,6 +572,89 @@ What it says:
 Limits of this measurement: every document is a pending write, so the queries read the mutation queue and the
 overlays, not the remote document store (a cache filled from the backend would read that store instead; not
 measured). Neither engine had a field index (none configured; the engine has no index manager). One tab.
+
+## 9. Verification of the engine (added 2026-11-20)
+
+Branch `wave/grad-indexeddb`, MacBook with an Apple M5, Chrome 157 headless, Dart 3.12.2, against a private emulator.
+The persistence suites that the SQLite, memory and key-value caches run were moved onto the engine in the browser,
+with dart2js and with dart2wasm (`tool/test_browser.sh both test/browser/web_indexeddb_*_test.dart`). Passed /
+skipped per file, the same in both compilers except where noted:
+
+| File | Shared body | Passed | Skipped |
+| --- | --- | ---: | ---: |
+| `web_indexeddb_mutation_queue_test.dart` | `cases/mutation_queue_test_case.dart` | 11 | 0 |
+| `web_indexeddb_remote_document_cache_test.dart` | `cases/remote_document_cache_test_case.dart` | 21 | 0 |
+| `web_indexeddb_query_cache_test.dart` (targets) | `cases/query_cache_test_case.dart` | 15 | 0 |
+| `web_indexeddb_document_overlay_cache_test.dart` | `cases/document_overlay_cache_test_case.dart` | 23 | 0 |
+| `web_indexeddb_bundle_cache_test.dart` | `cases/bundle_cache_test_case.dart` | 9 | 0 |
+| `web_indexeddb_globals_cache_test.dart` | `cases/globals_cache_test_case.dart` | 4 | 0 |
+| `web_indexeddb_index_manager_test.dart` | `cases/index_manager_test_case.dart` | 1 | 0 |
+| `web_indexeddb_field_index_manager_test.dart` | the list of `keyvalue_field_index_manager_test.dart` | 67 (dart2js 66) | 0 (dart2js 1) |
+| `web_indexeddb_local_store_test.dart` | `cases/local_store_test_case.dart` | 107 | 0 |
+| `web_indexeddb_local_store_bundle_test.dart` | `cases/local_store_bundle_test_case.dart` | 13 | 0 |
+| `web_indexeddb_lru_garbage_collector_test.dart` | `cases/lru_garbage_collector_test_case.dart` | 21 | 0 |
+| `web_indexeddb_query_engine_test.dart` | `cases/query_engine_test_case.dart` | 46 | 0 |
+| `web_indexeddb_index_backfiller_test.dart` | the list of `keyvalue_index_backfiller_test.dart` | 20 | 0 |
+| `web_indexeddb_spec_test.dart` | the JSON spec tests of `test/res/json`, restarts included | 220 | 92 |
+| `web_indexeddb_engine_test.dart` | the engine end to end through the public API | 9 | 0 |
+| `web_indexeddb_schema_version_test.dart` | versions other than 18 | 4 | 0 |
+| `web_indexeddb_serializer_test.dart` | rows of values proto3 JSON writes unlike the JS SDK | 5 | 0 |
+
+The skipped specs: 81 multi-client (one tab at a time, as for the key-value cache), 9 eager-gc (memory only), 2 known
+divergences shared with the other caches. The dart2js skip is `testAdvancedQueries`, which orders by the integer 0
+against the double 0.0 (`tool/test_unit_browser.sh` leaves the SQLite copy out for the same reason).
+
+What running them found and fixed in the engine:
+
+- **Writes outside a persistence transaction failed.** Outside `runTransaction` a cache call got a read-only IndexedDB
+  transaction, so a write (the mutation queue's `start`, a target, an overlay, a document, garbage collection) threw
+  `ReadOnlyError`, and a call that used several caches could find its first transaction committed. SQLite commits such
+  a statement on its own. Every public write of the caches now runs in a transaction of its own when it is called
+  outside one, without taking a listen sequence number (as a SQLite statement outside a transaction does not).
+- **A removed document kept its index entries.** A document deleted by the backend (removed from the cache) or
+  collected left its entries in `indexEntries`, so a query served by the index looked up a document that was gone. The
+  remote document cache now removes them, as the SQLite cache and the Android SDK do.
+- **Rows that differ from the JS SDK's** (found by another review, fixed here with a test): `package:protobuf`'s
+  proto3 JSON wrote an empty bytes value as `{}` (unreadable), -0.0 as `0`, and under dart2js rounded timestamps to
+  milliseconds, so a time less than half a millisecond before a whole second was stored one second late and the last
+  second of year 9999 became year 10000, which could not be read back. The serializer now writes values and timestamps
+  as the JS SDK's serializer does, and reads `"-0"` as -0.0.
+- **Map key order** (below).
+- **The lease** (below).
+
+Test harness changes, no engine change: the field index ids start at 1 (the JS SDK's `indexConfiguration` store
+generates them), which `LocalStoreTestCase` now takes as a parameter; the spec runner waits for the engine to be idle
+after each step (IndexedDB answers in browser tasks, not microtasks, so the one event-loop turn of the VM runner is too
+short), through a `settle` hook; the engine reports rows to a `StatsCollector` for the local store's read counts.
+
+**Map key order.** The JS SDK encodes a map in an index entry in the order of its JS object's keys (`Object.keys` in
+`writeIndexMap`, firebase-js-sdk `firestore_index_value_writer.ts`), which is the order the app wrote them in: the
+emulator returned a document's map fields in the order they were written. So the JS SDK's entry for `{b: 1, a: 2}`
+differs from its entry for `{a: 2, b: 1}`, and this SDK's equality query missed a document the JS SDK had indexed in
+another order. The engine now writes and queries a map in one canonical order (the order `Object.keys` gives for keys
+added sorted: array-index keys first by number, then the others sorted), and does not serve a target from an index
+when a filter or bound value holds a map of two or more keys: such a query scans the collection. Checked with the real
+JS SDK (`interop_check.sh` part D: both maps found, without the index) and by `web_indexeddb_engine_test.dart`, which
+writes the JS-ordered entry by hand. Left: `orderBy` on a map field with a `limit`, served from entries the JS SDK
+wrote for maps in unsorted key order, can order those maps differently from the query (the JS SDK has the same
+dependence on its own).
+
+**The lease.** When another client takes the primary lease over (the tab was in the background long enough for its
+lease to lapse), the next transaction finds it (`_verifyOwner`), writes nothing and fails with `failedPrecondition`
+("This client lost the primary lease ..."), and the client terminates. Before, the query listeners stopped without an
+error and later calls failed with "The client has already been terminated"; now the listeners get that error and every
+later call throws it. Tested by writing the `owner` row as a JS tab does, once found by a user operation and once by the
+lease refresh, and by opening the cache again afterwards (the pending write is there, the refused one is not).
+
+**Schema versions.** A database of version 12, 17 or 19 is refused with `failedPrecondition` naming the version, and
+is left at its version with its rows (`web_indexeddb_schema_version_test.dart`). Policy: the engine opens version 18
+only; a new schema version of the JS SDK needs a new release of this package.
+
+**The JS SDK interop check** (`tool/bench/web_idb/js_import/interop_check.sh`, firebase 12.19.0 pinned in its
+`package-lock.json`) passed every check, both ways, and runs in CI (job `indexeddb-interop`) when the engine changes.
+
+**Other browsers.** Firefox is not installed on this machine, so `dart test -p firefox` could not run; `dart test -p
+safari` failed to start Safari (`Failed to run Safari`). The suites ran in Chrome only.
 
 ## Summary
 
