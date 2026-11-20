@@ -196,8 +196,8 @@ Future<void> authProvidersReadmeLine27() async {
   await auth.signOut();
 }
 
-// ../../firebase_auth/firebase_auth_providers_dart/README.md:88
-Future<void> authProvidersReadmeLine88() async {
+// ../../firebase_auth/firebase_auth_providers_dart/README.md:89
+Future<void> authProvidersReadmeLine89() async {
   final FirebaseUserAuth auth = await FirebaseUserAuth.forApp(app);
   auth.authStateChanges().listen((AuthUser? user) => print(user?.uid ?? 'signed out'));
 
@@ -209,8 +209,27 @@ Future<void> authProvidersReadmeLine88() async {
   print(result.additionalUserInfo?.isNewUser);
 }
 
-// ../../firebase_auth/firebase_auth_providers_dart/README.md:169
-Future<void> authProvidersReadmeLine169() async {
+// ../../firebase_auth/firebase_auth_providers_dart/README.md:170
+Future<void> authProvidersReadmeLine170() async {
+  // Enrol: show the URI as a QR code (or the secret for typing in), then ask for a code of the app.
+  final TotpSecret secret = await auth.startTotpEnrollment();
+  print(secret.otpauthUri(issuer: 'My App')); // otpauth://totp/My%20App:ada@example.com?secret=...
+  await auth.finalizeTotpEnrollment(secret, code: '123456', displayName: 'Phone');
+  print(auth.currentUser!.enrolledFactors); // [MultiFactorInfo(totp, ...)]
+
+  // Sign in: the first factor throws, the resolver finishes with a code.
+  try {
+    await auth.signInWithEmailAndPassword(email: email, password: password);
+  } on FirebaseAuthMultiFactorException catch (e) {
+    final UserCredential result = await e.resolver!.resolveSignInWithTotp(await askForCode());
+  }
+
+  // Remove a factor (TOTP or SMS).
+  await auth.unenrollMultiFactor(auth.currentUser!.enrolledFactors.first.uid);
+}
+
+// ../../firebase_auth/firebase_auth_providers_dart/README.md:206
+Future<void> authProvidersReadmeLine206() async {
   final FirebaseUserAuth auth = await FirebaseUserAuth.forApp(app);
   final UserCredential result = await auth.signInWithOAuthLoopback(
     OAuthLoopbackProvider.google(
