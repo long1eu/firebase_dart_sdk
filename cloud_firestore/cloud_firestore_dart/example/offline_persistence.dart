@@ -69,8 +69,9 @@ Future<void> main() async {
     '(pending: ${local.metadata.hasPendingWrites})',
   );
 
-  // The queue of writes the backend has not seen (experimental, no official
-  // SDK has it): a count now, and a throttled stream of it while it drains.
+  // The queue of writes the backend has not seen (an extension of this SDK,
+  // no official SDK has it): a count now, and a throttled stream of it while
+  // it drains.
   final List<Future<void>> more = <Future<void>>[
     for (int i = 0; i < 20; i++)
       firestore.doc('${scratch('notes')}/offline_$i').set(<String, Object?>{

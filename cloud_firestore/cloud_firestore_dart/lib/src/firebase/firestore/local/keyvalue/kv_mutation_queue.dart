@@ -14,6 +14,10 @@ class _KvMutationQueue implements MutationQueue {
 
   Uint8List _lastStreamToken = Uint8List(0);
 
+  /// The number of batches of the queue, kept in memory once counted (a count reads every batch), or null when not
+  /// known: before the first count and after a transaction rolled back ([_load]).
+  int? _batchCount;
+
   Uint8List get _queueKey => _key(_Table.mutQueue).string(_uid).bytes;
 
   Uint8List get _batchesPrefix => _key(_Table.mut).string(_uid).bytes;
@@ -36,6 +40,7 @@ class _KvMutationQueue implements MutationQueue {
 
   /// Reads the next batch id and the stream token.
   Future<void> _load() async {
+    _batchCount = null;
     if (!_started) {
       return;
     }
@@ -72,7 +77,7 @@ class _KvMutationQueue implements MutationQueue {
 
   @override
   Future<int> getMutationBatchCount() async =>
-      (await _db._scanAll(_batchesPrefix)).length;
+      _batchCount ??= (await _db._scanAll(_batchesPrefix)).length;
 
   @override
   Future<int> getHighestUnacknowledgedBatchId({
@@ -118,6 +123,9 @@ class _KvMutationQueue implements MutationQueue {
     List<Mutation> mutations,
   ) async {
     final int batchId = _nextBatchId++;
+    if (_batchCount != null) {
+      _batchCount = _batchCount! + 1;
+    }
     final MutationBatch batch = MutationBatch(
       batchId: batchId,
       localWriteTime: localWriteTime,
@@ -290,6 +298,9 @@ class _KvMutationQueue implements MutationQueue {
       () => 'Mutation batch ($_uid, ${batch.batchId}) did not exist',
     );
     await _db._tx.delete(batchKey);
+    if (_batchCount != null) {
+      _batchCount = _batchCount! - 1;
+    }
     for (final Mutation mutation in batch.mutations) {
       final DocumentKey key = mutation.key;
       await _db._tx.delete(

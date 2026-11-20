@@ -211,6 +211,104 @@ void main() {
     );
   });
 
+  test('cursors from values and from document snapshots', () async {
+    final CollectionReference<Map<String, Object?>> collection =
+        newCollection();
+    final WriteBatch batch = collection.firestore.batch();
+    for (int n = 1; n <= 5; n++) {
+      batch.set(collection.doc('doc$n'), <String, Object?>{'n': n});
+    }
+    await batch.commit();
+    final Query<Map<String, Object?>> ordered = collection.orderBy('n');
+    final DocumentSnapshot<Map<String, Object?>> second = await collection
+        .doc('doc2')
+        .get();
+    final DocumentSnapshot<Map<String, Object?>> fourth = await collection
+        .doc('doc4')
+        .get();
+
+    expect(
+      values(await ordered.startAt(<Object?>[2]).endBefore(<Object?>[4]).get()),
+      <int>[2, 3],
+    );
+    expect(values(await ordered.startAtDocument(second).get()), <int>[
+      2,
+      3,
+      4,
+      5,
+    ]);
+    expect(values(await ordered.endAtDocument(second).get()), <int>[1, 2]);
+    expect(
+      values(
+        await ordered
+            .startAfterDocument(second)
+            .endBeforeDocument(fourth)
+            .get(),
+      ),
+      <int>[3],
+    );
+    expect(
+      values(await ordered.endAtDocument(fourth).limitToLast(2).get()),
+      <int>[3, 4],
+    );
+  });
+
+  test(
+    'a batch commits a set, an update and a delete together, or nothing',
+    () async {
+      final CollectionReference<Map<String, Object?>> collection =
+          newCollection();
+      await collection.doc('updated').set(<String, Object?>{'n': 1});
+      await collection.doc('deleted').set(<String, Object?>{'n': 2});
+      await (collection.firestore.batch()
+            ..set(collection.doc('created'), <String, Object?>{'n': 3})
+            ..update(collection.doc('updated'), <String, Object?>{
+              'n': FieldValue.increment(10),
+            })
+            ..delete(collection.doc('deleted')))
+          .commit();
+      expect(values(await collection.orderBy('n').get()), <int>[3, 11]);
+
+      await expectLater(
+        (collection.firestore.batch()
+              ..set(collection.doc('more'), <String, Object?>{'n': 4})
+              ..update(collection.doc('missing'), <String, Object?>{'n': 5}))
+            .commit(),
+        throwsA(
+          isA<FirestoreException>().having(
+            (FirestoreException e) => e.errorCode,
+            'code',
+            FirestoreErrorCode.notFound,
+          ),
+        ),
+      );
+      expect((await collection.doc('more').get()).exists, isFalse);
+    },
+  );
+
+  test('aggregations over a filtered query with cursors', () async {
+    final CollectionReference<Map<String, Object?>> collection =
+        newCollection();
+    final WriteBatch batch = collection.firestore.batch();
+    for (int n = 1; n <= 6; n++) {
+      batch.set(collection.doc('doc$n'), <String, Object?>{
+        'n': n,
+        'even': n.isEven,
+      });
+    }
+    await batch.commit();
+    final Query<Map<String, Object?>> query = collection
+        .where('even', isEqualTo: true)
+        .orderBy('n')
+        .startAfter(<Object?>[2]);
+    expect((await query.count().get()).count, 2);
+    final AggregateQuerySnapshot snapshot = await query.aggregate(
+      <AggregateField>[AggregateField.sum('n'), AggregateField.average('n')],
+    ).get();
+    expect(snapshot.getSum('n'), 10);
+    expect(snapshot.getAverage('n'), 5.0);
+  });
+
   test('collection group queries and aggregations', () async {
     final CollectionReference<Map<String, Object?>> collection =
         newCollection();
@@ -287,6 +385,23 @@ void main() {
     final DocumentReference<String> ada = await names.add('Ada');
     expect((await ada.get()).data(), 'Ada');
     expect((await names.get()).docs.single.data(), 'Ada');
+
+    // In a batch, in a transaction, and in a query with a cursor.
+    await (names.firestore.batch()
+          ..set(names.doc('b'), 'Babbage')
+          ..set(names.doc('c'), 'Curie'))
+        .commit();
+    await names.firestore.runTransaction<void>((Transaction transaction) async {
+      final String name = (await transaction.get(names.doc('c'))).data()!;
+      transaction.set(names.doc('c'), '$name!');
+    });
+    final DocumentSnapshot<String> first = await ada.get();
+    expect(
+      (await names.orderBy('name').startAfterDocument(first).get()).docs
+          .map((QueryDocumentSnapshot<String> doc) => doc.data())
+          .toList(),
+      <String>['Babbage', 'Curie!'],
+    );
   });
 
   test('requests with a mock user token succeed', () async {

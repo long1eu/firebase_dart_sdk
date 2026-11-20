@@ -10,6 +10,7 @@ queries against it use what earlier listens returned. Where the cache lives is u
 | an `openDatabase` (SQLite on the VM) | in a SQLite file, kept across restarts |
 | the web `openDatabase` (web) | SQLite compiled to WebAssembly, stored in IndexedDB or OPFS |
 | `indexedDbCacheSettings()` (web, experimental) | in IndexedDB in the format of the official JS SDK, without SQLite; see [The IndexedDB cache](web.md#the-indexeddb-cache-experimental) |
+| `keyValueCacheSettings(store: ...)` (VM and web) | in a key-value store that your app implements (`CacheStore`), kept across restarts; see [A cache in your own storage](custom_cache_store.md) |
 
 On the web the opener picks the storage itself; follow the branches to see which one you get:
 
@@ -182,8 +183,8 @@ stateDiagram-v2
 An app that was offline for a long time can show how far the sync is. `getPendingWriteCount()`
 returns the number of write batches of the signed-in user that the backend has not acknowledged
 or rejected (one `set`, `update` or `delete`, or one `WriteBatch.commit`, is one batch), and
-`pendingWriteCounts()` is a stream of that number. This API is experimental: the official SDKs
-have no equivalent, only `waitForPendingWrites()` and `hasPendingWrites`.
+`pendingWriteCounts()` is a stream of that number. Both are a supported extension of this SDK:
+the official SDKs have no equivalent, only `waitForPendingWrites()` and `hasPendingWrites`.
 
 ```dart
 final int total = await firestore.getPendingWriteCount();

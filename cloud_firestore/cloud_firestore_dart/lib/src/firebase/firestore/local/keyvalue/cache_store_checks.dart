@@ -3,7 +3,7 @@ import 'dart:typed_data';
 
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/keyvalue/cache_store.dart';
 
-/// **Experimental.** One check of the contract of a [CacheStore], to run in the tests of a store:
+/// One check of the contract of a [CacheStore], to run in the tests of a store:
 ///
 /// ```dart
 /// import 'package:cloud_firestore_dart/cache_store_testing.dart';
@@ -39,7 +39,7 @@ final class CacheStoreCheck {
   String toString() => 'CacheStoreCheck($name)';
 }
 
-/// **Experimental.** The checks of the contract of a [CacheStore] (see [CacheStoreCheck]): reads, writes and deletes,
+/// The checks of the contract of a [CacheStore] (see [CacheStoreCheck]): reads, writes and deletes,
 /// the byte order of the keys, range scans (bounds, reverse order, limit), writes of puts and deletes together, reads
 /// that run at the same time, keys and values kept byte for byte (also empty values), large writes, and data that is
 /// still there after the store is closed and opened again.

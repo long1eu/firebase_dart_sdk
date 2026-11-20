@@ -20,7 +20,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/local/keyvalue/key_v
 
 /// Configures the local cache of a Firestore instance, see
 /// [Settings.cacheSettings]. The implementations are
-/// [PersistentCacheSettings], [MemoryCacheSettings], [KeyValueCacheSettings] (experimental) and, on the web,
+/// [PersistentCacheSettings], [MemoryCacheSettings], [KeyValueCacheSettings] and, on the web,
 /// [IndexedDbCacheSettings] (experimental).
 ///
 /// The cache holds the documents that listeners and reads received and the writes that the backend has not
@@ -421,7 +421,10 @@ final class IndexedDbCacheSettings extends LocalCacheSettings {
 /// Configures a persistent cache in a key-value store that the app brings ([CacheStore]): an ordered store of byte
 /// keys and byte values, such as a file, an embedded database or a platform store.
 ///
-/// **Experimental**: the API, the behaviour and what is stored may change in a minor version.
+/// The stored format is versioned: a newer SDK migrates a store written by an older one, and an older SDK refuses a
+/// store written by a newer one (see docs/keyvalue_cache_format.md). Limits: one instance and one client per store (no
+/// primary lease, no coordination of tabs or processes), and the writes of each transaction are held in memory until
+/// it commits. See docs/guides/custom_cache_store.md.
 ///
 /// The SDK lays the whole cache out in the store (documents, pending writes, targets, bundles, the garbage collector's
 /// sequence numbers) in a format of its own, with a schema version. The data and the pending writes survive a restart
