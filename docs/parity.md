@@ -24,7 +24,7 @@ signatures are in `test/unit/api/public_api.golden.txt`.
 The area tables below at a glance, one mark per row; most gaps are in Pipelines, multi-client and
 the platforms:
 
-![One mark per feature row, by area. Documents and writes: 15 supported, 1 partial, 3 not applicable. Queries and filters: 9 supported. Aggregations: 3 supported. Listeners: 9 supported. Transactions and batches: 6 supported. Offline persistence: 8 supported, 2 not applicable. Indexes: 4 supported, 1 not supported. Bundles: 2 supported. Lite: 4 supported, 1 not supported. Pipelines: 6 supported, 3 partial, 1 not supported. Multi-tab or multi-client: 1 supported, 1 partial, 2 not supported. App Check: 1 supported, 1 not supported. Emulator: 2 supported, 1 not applicable. Web transports: 7 supported, 1 not applicable. Platforms: 1 supported, 3 partial, 2 not applicable. In all: 78 supported, 8 partial, 6 not supported, 9 not applicable.](images/readme/parity_summary.svg)
+![One mark per feature row, by area. Documents and writes: 15 supported, 1 partial, 3 not applicable. Queries and filters: 9 supported. Aggregations: 3 supported. Listeners: 9 supported. Transactions and batches: 6 supported. Offline persistence: 8 supported, 2 not applicable. Indexes: 4 supported, 1 not supported. Bundles: 2 supported. Lite: 4 supported, 1 not supported. Pipelines: 6 supported, 3 partial, 1 not supported. Multi-tab or multi-client: 1 supported, 3 partial. App Check: 1 supported, 1 not supported. Emulator: 2 supported, 1 not applicable. Web transports: 7 supported, 1 not applicable. Platforms: 1 supported, 3 partial, 2 not applicable. In all: 78 supported, 10 partial, 4 not supported, 9 not applicable.](images/readme/parity_summary.svg)
 
 ## How it is tested
 
@@ -183,10 +183,10 @@ Preview, Enterprise edition only, as in the JS SDK. See [Pipelines](guides/pipel
 
 | JS feature | Status | Dart API or gap |
 |---|---|---|
-| `persistentSingleTabManager` | supported | The default: one client per cache. On the web a Web Lock keeps a second tab out (`failedPrecondition`) |
-| `persistentMultipleTabManager`: several clients on one cache, one primary, lease of 5 s | partial | Clients on one SQLite file (isolates, processes, a Flutter hot restart) elect a primary with the JS lease; the cache stays consistent. `test/unit/firebase/firestore/local/sqlite_shared_clients_test.dart`, `sqlite_shared_processes_test.dart`, `sqlite_primary_lease_test.dart`, `test/unit/firebase/firestore/primary_client_test.dart`, `test/integration/firebase/firestore/shared_cache_isolates_test.dart`. See [Several clients on one cache](guides/multiple_clients.md) |
-| Secondary tabs share the primary's listeners and writes | not supported | A secondary client works from the cache, reports itself offline and keeps its writes pending until it becomes primary. Deferred until after 0.1.0 |
-| Several tabs on one cache in a browser | not supported | One tab at a time |
+| `persistentSingleTabManager` | supported | The default: one client per cache. On the web a Web Lock (SQLite caches) or the primary lease (IndexedDB cache) keeps a second tab out (`failedPrecondition`) |
+| `persistentMultipleTabManager`: several clients on one cache, one primary, lease of 5 s | partial | On the web, `indexedDbCacheSettings(multiTab: true)` (**preview**, new in the next version): see the two rows below. Clients on one SQLite file (isolates, processes, a Flutter hot restart) elect a primary with the JS lease; the cache stays consistent. `test/unit/firebase/firestore/local/sqlite_shared_clients_test.dart`, `sqlite_shared_processes_test.dart`, `sqlite_primary_lease_test.dart`, `test/unit/firebase/firestore/primary_client_test.dart`, `test/integration/firebase/firestore/shared_cache_isolates_test.dart`. See [Several clients on one cache](guides/multiple_clients.md) |
+| Secondary tabs share the primary's listeners and writes | partial | Only with the IndexedDB cache and `multiTab: true` in Chrome (**preview**, new in the next version): a secondary gets its listeners' results and the acknowledgement of its writes through the primary (`test/browser/web_indexeddb_multi_tab_client_test.dart`, `test/integration/firebase/firestore/shared_client_state_test.dart`). Not with clients on one SQLite file: a secondary there works from the cache, reports itself offline and keeps its writes pending until it becomes primary. Deferred until after 0.1.0 |
+| Several tabs on one cache in a browser | partial | `indexedDbCacheSettings(multiTab: true)` (**preview**, new in the next version), same lease, rows and `localStorage` keys as the JS SDK; tested in Chrome only. Two differences: a secondary takes the lease at once when it hears a closing tab remove its state (JS waits for the next refresh), and a page restored from the back/forward cache comes back with a terminated client. Not tested: a JS SDK tab beside a tab of this SDK, handover on real visibility changes, different users in the tabs. The SQLite caches (IndexedDB, OPFS) stay at one tab, guarded by a Web Lock. See [The IndexedDB cache](guides/web.md#multi-tab-mode-preview) |
 
 ## App Check
 
@@ -235,7 +235,7 @@ Every gap and behaviour difference we know of, the ones you are most likely to m
    these names. Most testing is against the emulator. Against a real Firestore database only the
    production verification kit has run (13 of 15 checks passed, 2 skipped); the integration
    suite's real-project mode, the Enterprise edition features and long-running load have not.
-2. **The web is supported in Chrome only.** Other browsers are untested; a persistent cache can be open in one tab at a time;
+2. **The web is supported in Chrome only.** Other browsers are untested; the SQLite caches can be open in one tab at a time (the IndexedDB cache can be shared by tabs with `multiTab: true`, a preview);
    compiled to JavaScript (dart2js), integers above 2^53 lose precision, so prefer dart2wasm;
    against the emulator a query that returns more than about 10,000 documents fails on the web
    transport (production not checked). See [Platforms](guides/platforms.md).

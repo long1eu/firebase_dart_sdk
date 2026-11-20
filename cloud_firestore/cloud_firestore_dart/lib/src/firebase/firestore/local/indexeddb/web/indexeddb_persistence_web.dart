@@ -96,6 +96,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/util/util.dart';
 import 'package:cloud_firestore_dart/src/firebase/timestamp.dart';
 import 'package:collection/collection.dart';
 import 'package:firebase_app_dart/internal.dart';
+import 'package:meta/meta.dart';
 import 'package:semaphore/semaphore.dart';
 import 'package:web/web.dart' as web;
 
@@ -110,18 +111,20 @@ part 'indexeddb_transaction_web.dart';
 const bool indexedDbPersistenceSupported = true;
 
 /// Creates the IndexedDB persistence of the app [persistenceKey] (its name) and [databaseId]. It is opened by
-/// [Persistence.start].
+/// [Persistence.start]. [multiTab]: see [WebIndexedDbPersistence.multiTab].
 IndexedDbPersistence createIndexedDbPersistence({
   required String persistenceKey,
   required DatabaseId databaseId,
   required LocalSerializer serializer,
   required LruGarbageCollectorParams lruParams,
+  bool multiTab = false,
 }) {
   return WebIndexedDbPersistence(
     persistenceKey: persistenceKey,
     databaseId: databaseId,
     serializer: serializer,
     lruParams: lruParams,
+    multiTab: multiTab,
   );
 }
 
@@ -140,6 +143,7 @@ class WebIndexedDbPersistence extends IndexedDbPersistence {
     required LruGarbageCollectorParams lruParams,
     String? clientId,
     StatsCollector statsCollector = StatsCollector.noOp,
+    this.multiTab = false,
   }) : _statsCollector = statsCollector,
        storagePrefix = indexedDbStoragePrefix(persistenceKey, databaseId),
        databaseName = indexedDbDatabaseName(persistenceKey, databaseId),
@@ -156,6 +160,16 @@ class WebIndexedDbPersistence extends IndexedDbPersistence {
   }
 
   static const String tag = 'IndexedDbPersistence';
+
+  /// Whether this client shares the database with other tabs (`persistentMultipleTabManager` of the JS SDK,
+  /// `allowTabSynchronization` in its lease), instead of using it alone (`persistentSingleTabManager`, the default).
+  ///
+  /// With it, a client that finds the primary lease held by another multi-tab client starts as a secondary client: it
+  /// reads and writes the cache, but [runPrimaryTransaction] fails for it with [primaryLeaseLostErrorMessage], and it
+  /// takes the lease at a later [refreshClientMetadata] once the lease is free or lapsed and no other client is better
+  /// placed for it (`canActAsPrimary`). The state the caches keep in memory is read again at every transaction, as
+  /// other clients change the database. A one-tab client and a multi-tab client refuse each other, as in the JS SDK.
+  final bool multiTab;
 
   /// The prefix of the database name and of the LocalStorage keys of the JS SDK.
   final String storagePrefix;
@@ -214,6 +228,11 @@ class WebIndexedDbPersistence extends IndexedDbPersistence {
 
   JSFunction? _pageHideHandler;
   JSFunction? _pageShowHandler;
+  JSFunction? _visibilityHandler;
+
+  /// Whether the page of this client is visible, as last told by its `visibilitychange` event ([multiTab] only; a
+  /// one-tab client reads the visibility when it needs it).
+  bool? _foreground;
 
   /// When this client last removed the rows of inactive clients (`maybeGarbageCollectMultiClientState`).
   int _lastClientGarbageCollectionMs = 0;
@@ -326,8 +345,14 @@ class WebIndexedDbPersistence extends IndexedDbPersistence {
       final _IdbTransaction transaction = _begin(
         'Start the IndexedDB persistence',
       );
+      bool primary = true;
       try {
-        await _claim(transaction);
+        if (multiTab) {
+          _foreground = _documentVisible;
+          primary = await _updateClientMetadataAndTryBecomePrimary(transaction);
+        } else {
+          await _claim(transaction);
+        }
         await _inTransaction(transaction, queryCache._load);
         await transaction.commit();
       } catch (_) {
@@ -337,9 +362,12 @@ class WebIndexedDbPersistence extends IndexedDbPersistence {
         rethrow;
       }
       referenceDelegate._start(queryCache.highestListenSequenceNumber);
-      isPrimary = true;
+      isPrimary = primary;
       started = true;
       _attachPageHandlers();
+      if (multiTab) {
+        _attachVisibilityHandler();
+      }
     } finally {
       _semaphore.release();
     }
@@ -647,11 +675,21 @@ class WebIndexedDbPersistence extends IndexedDbPersistence {
       Log.d(tag, 'Starting transaction: $action');
       final _IdbTransaction transaction = _begin(action);
       try {
-        if (_reloadState) {
+        // Other clients of a shared database change the rows whose state the caches keep in memory: read it again.
+        if (_reloadState || multiTab) {
           await _inTransaction(transaction, _reload);
           _reloadState = false;
+          if (multiTab) {
+            referenceDelegate._listenSequence.advanceTo(
+              queryCache.highestListenSequenceNumber,
+            );
+          }
         }
-        await _verifyOwner(transaction);
+        if (multiTab) {
+          await _verifyMultiTabTransaction(transaction, action, primary);
+        } else {
+          await _verifyOwner(transaction);
+        }
         if (sequenceNumber) {
           referenceDelegate.onTransactionStarted();
         }
@@ -663,6 +701,10 @@ class WebIndexedDbPersistence extends IndexedDbPersistence {
         transaction.checkNotFinished('the end of the operation');
         await transaction.commit();
         await referenceDelegate.onTransactionCommitted();
+        if (primary && multiTab) {
+          // A secondary that could take the lease took it (as `SQLitePersistence` does).
+          _setPrimary(true);
+        }
         return result;
       } catch (error) {
         referenceDelegate.onTransactionRolledBack();
@@ -777,8 +819,9 @@ class WebIndexedDbPersistence extends IndexedDbPersistence {
             idbToJs(<String, Object?>{
               'ownerId': clientId,
               // A single tab: a JS tab that finds this lease does not share the database (it fails with its
-              // PRIMARY_LEASE_EXCLUSIVE_ERROR_MSG, or falls back to a memory cache).
-              'allowTabSynchronization': false,
+              // PRIMARY_LEASE_EXCLUSIVE_ERROR_MSG, or falls back to a memory cache). A multi-tab client shares it with
+              // the other multi-tab clients.
+              'allowTabSynchronization': multiTab,
               'leaseTimestampMs': _nowMs(),
             }),
             DbStores.ownerKey.toJS,
@@ -815,7 +858,7 @@ class WebIndexedDbPersistence extends IndexedDbPersistence {
       throw FirestoreException(
         message:
             '$_exclusiveErrorMessage (The primary lease of $databaseName is held by client ${owner['ownerId']}'
-            '${multiTab ? ', a JS SDK tab with persistentMultipleTabManager' : ''}; it was refreshed less than '
+            '${multiTab ? ', which shares the cache with other tabs (multiTab, or persistentMultipleTabManager of the JS SDK)' : ''}; it was refreshed less than '
             '${indexedDbPrimaryLeaseMs ~/ 1000} s ago.)',
         errorCode: FirestoreErrorCode.failedPrecondition,
       );
@@ -856,7 +899,9 @@ class WebIndexedDbPersistence extends IndexedDbPersistence {
     _lastClientGarbageCollectionMs = now;
   }
 
-  bool get _inForeground {
+  bool get _inForeground => _foreground ?? _documentVisible;
+
+  static bool get _documentVisible {
     try {
       return web.document.visibilityState == 'visible';
     } catch (_) {
@@ -1010,6 +1055,9 @@ class WebIndexedDbPersistence extends IndexedDbPersistence {
     if (!started) {
       return;
     }
+    if (multiTab) {
+      return _refreshMultiTab();
+    }
     try {
       await _runMetadataTransaction<void>(
         'Update the client metadata and the primary lease',
@@ -1042,6 +1090,16 @@ class WebIndexedDbPersistence extends IndexedDbPersistence {
   }
 
   @override
+  void advanceListenSequenceNumber(int sequenceNumber) {
+    if (started) {
+      referenceDelegate._listenSequence.advanceTo(sequenceNumber);
+    }
+  }
+
+  @override
+  void markClosing() => _setZombied(true);
+
+  @override
   Future<void> setNetworkEnabled(bool enabled) async {
     if (_networkEnabled != enabled) {
       _networkEnabled = enabled;
@@ -1055,6 +1113,7 @@ class WebIndexedDbPersistence extends IndexedDbPersistence {
     try {
       final JSFunction hide = _pageHideHandler = ((web.Event _) {
         _setZombied(true);
+        pageHideListener?.call();
       }).toJS;
       final JSFunction show = _pageShowHandler =
           ((web.PageTransitionEvent event) {
@@ -1086,6 +1145,253 @@ class WebIndexedDbPersistence extends IndexedDbPersistence {
     _pageShowHandler = null;
   }
 
+  // The primary lease and the client metadata (multi-tab).
+
+  /// The error a client fails with when the other client that holds a valid lease does not share the database with
+  /// it (`PRIMARY_LEASE_EXCLUSIVE_ERROR_MSG`): a one-tab client against a multi-tab one, either way round.
+  FirestoreException _mixedModeError(
+    Map<String, Object?> owner,
+  ) => FirestoreException(
+    message:
+        '$_exclusiveErrorMessage (The primary lease of $databaseName is held by client ${owner['ownerId']}, '
+        '${owner['allowTabSynchronization'] == true ? 'which shares the cache with other tabs, while this client '
+                  'uses it alone' : 'which uses the cache alone, while this client shares it with other tabs'}.)',
+    errorCode: FirestoreErrorCode.failedPrecondition,
+  );
+
+  static bool _isMixedModeError(Object error) =>
+      error is FirestoreException &&
+      error.errorCode == FirestoreErrorCode.failedPrecondition &&
+      error.message.startsWith(_exclusiveErrorMessage);
+
+  /// Whether [owner] is a lease that is valid (`currentLeaseIsValid` of the JS SDK): refreshed less than 5 s ago by a
+  /// client that did not mark itself as closed in LocalStorage.
+  bool _isValidLease(Map<String, Object?>? owner) =>
+      owner != null &&
+      indexedDbIsWithinAge(
+        owner['leaseTimestampMs'],
+        indexedDbPrimaryLeaseMs,
+        _nowMs(),
+      ) &&
+      !_isZombied(owner['ownerId']);
+
+  /// Whether this client may hold the primary lease now (`canActAsPrimary` of the JS SDK). Fails with
+  /// [_mixedModeError] when a one-tab client holds a valid lease.
+  ///
+  /// A client is eligible when the lease is its own and its network is enabled; or when nobody else holds a valid
+  /// lease and its network is enabled and its page visible; or, failing that, when no other active client (one that
+  /// refreshed its row less than 5 s ago) has its network enabled while this one has not, or is visible while this one
+  /// is not with the same network state.
+  Future<bool> _canActAsPrimary(_IdbTransaction transaction) async {
+    final Map<String, Object?>? owner = await _readOwner(transaction);
+    if (_isValidLease(owner)) {
+      final bool isLocal = owner!['ownerId'] == clientId;
+      if (isLocal && _networkEnabled) {
+        return true;
+      }
+      if (!isLocal) {
+        if (owner['allowTabSynchronization'] != true) {
+          throw _mixedModeError(owner);
+        }
+        return false;
+      }
+    }
+    final bool inForeground = _inForeground;
+    if (_networkEnabled && inForeground) {
+      return true;
+    }
+    final int now = _nowMs();
+    for (final Map<String, Object?> other in await _readClients(transaction)) {
+      final Object? id = other['clientId'];
+      if (id == clientId ||
+          !indexedDbIsWithinAge(
+            other['updateTimeMs'],
+            indexedDbPrimaryLeaseMs,
+            now,
+          ) ||
+          _isZombied(id)) {
+        continue;
+      }
+      final bool otherNetwork = other['networkEnabled'] == true;
+      final bool otherForeground = other['inForeground'] == true;
+      if ((!_networkEnabled && otherNetwork) ||
+          (!inForeground &&
+              otherForeground &&
+              _networkEnabled == otherNetwork)) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  /// Writes this client's row, and takes, extends or releases the primary lease
+  /// (`updateClientMetadataAndTryBecomePrimary` of the JS SDK). Returns whether this client is primary once the
+  /// transaction commits. A primary that finds its lease taken by another client is told at once that it is not
+  /// primary any more ([setPrimaryStateListener]), even when it takes the lease again in the same step.
+  Future<bool> _updateClientMetadataAndTryBecomePrimary(
+    _IdbTransaction transaction,
+  ) async {
+    await _putClientMetadata(transaction);
+    if (isPrimary) {
+      final Map<String, Object?>? owner = await _readOwner(transaction);
+      if (owner?['ownerId'] != clientId) {
+        Log.d(tag, 'Client $clientId lost the primary lease');
+        _setPrimary(false);
+      }
+    }
+    final bool canActAsPrimary = await _canActAsPrimary(transaction);
+    if (isPrimary && !canActAsPrimary) {
+      final Map<String, Object?>? owner = await _readOwner(transaction);
+      if (owner?['ownerId'] == clientId) {
+        await transaction.request(
+          'release the primary lease',
+          () =>
+              transaction.store(DbStores.owner).delete(DbStores.ownerKey.toJS),
+        );
+      }
+      return false;
+    } else if (canActAsPrimary) {
+      await _putLease(transaction);
+      return true;
+    }
+    return false;
+  }
+
+  /// The refresh of a multi-tab client: [_updateClientMetadataAndTryBecomePrimary], then, for the primary, the removal
+  /// of the rows of inactive clients every 30 minutes (`maybeGarbageCollectMultiClientState`). As in the JS SDK, a
+  /// failure of IndexedDB leaves the state as it is (the next transaction checks the lease), and a one-tab client
+  /// holding the lease makes this client a secondary.
+  Future<void> _refreshMultiTab() async {
+    bool primary;
+    try {
+      primary = await _runMetadataTransaction<bool>(
+        'Update the client metadata and try to become primary',
+        (_IdbTransaction transaction) async {
+          final bool primary = await _updateClientMetadataAndTryBecomePrimary(
+            transaction,
+          );
+          final int now = _nowMs();
+          if (primary &&
+              !indexedDbIsWithinAge(
+                _lastClientGarbageCollectionMs,
+                indexedDbMaxClientAgeMs,
+                now,
+              )) {
+            _lastClientGarbageCollectionMs = now;
+            await _removeClients(
+              transaction,
+              _inactiveClients(await _readClients(transaction), now),
+            );
+          }
+          return primary;
+        },
+      );
+    } on IndexedDbTransactionInactiveError {
+      rethrow;
+    } catch (e) {
+      if (_fatalError != null) {
+        rethrow;
+      }
+      if (!started) {
+        return;
+      }
+      if (!_isMixedModeError(e)) {
+        Log.w(tag, 'Refreshing the client metadata failed: $e');
+        return;
+      }
+      Log.w(tag, 'Releasing the primary state after a refresh failed: $e');
+      primary = false;
+    }
+    _setPrimary(primary);
+  }
+
+  /// The check before the operation of a transaction of a multi-tab client (`runTransaction` of the JS SDK): a
+  /// primary-only transaction needs the lease (this client's, whatever its age, or one this client may take now),
+  /// otherwise it fails with [primaryLeaseLostErrorMessage] and this client is not primary; any other transaction
+  /// fails while a one-tab client holds a valid lease (`verifyAllowTabSynchronization`).
+  Future<void> _verifyMultiTabTransaction(
+    _IdbTransaction transaction,
+    String action,
+    bool primary,
+  ) async {
+    final Map<String, Object?>? owner = await _readOwner(transaction);
+    if (!primary) {
+      if (_isOtherLiveLease(owner) &&
+          owner!['allowTabSynchronization'] != true) {
+        throw _mixedModeError(owner);
+      }
+      return;
+    }
+    if (owner?['ownerId'] == clientId || await _canActAsPrimary(transaction)) {
+      return;
+    }
+    Log.w(tag, 'Failed to obtain the primary lease for action "$action".');
+    _setPrimary(false);
+    throw FirestoreException(
+      message: primaryLeaseLostErrorMessage,
+      errorCode: FirestoreErrorCode.failedPrecondition,
+    );
+  }
+
+  /// Records whether the page of this client is visible and refreshes the metadata: a hidden client gives the lease to
+  /// a visible one. Called by the `visibilitychange` event of the document ([multiTab] only), and by tests.
+  @visibleForTesting
+  Future<void> setInForeground(bool inForeground) async {
+    if (_foreground == inForeground) {
+      return;
+    }
+    _foreground = inForeground;
+    await refreshClientMetadata();
+  }
+
+  void _attachVisibilityHandler() {
+    try {
+      final JSFunction handler = _visibilityHandler = ((web.Event _) {
+        setInForeground(_documentVisible).catchError((Object e) {
+          Log.w(tag, 'Refreshing the client metadata failed: $e');
+        });
+      }).toJS;
+      web.document.addEventListener('visibilitychange', handler);
+    } catch (e) {
+      Log.d(tag, 'No visibility events (not in a window): $e');
+    }
+  }
+
+  void _detachVisibilityHandler() {
+    final JSFunction? handler = _visibilityHandler;
+    _visibilityHandler = null;
+    if (handler == null) {
+      return;
+    }
+    try {
+      web.document.removeEventListener('visibilitychange', handler);
+    } catch (_) {
+      // Not in a window.
+    }
+  }
+
+  /// Whether another client may be using this database: a multi-tab client finds a row of another client that is not
+  /// older than 30 minutes (or that has a time in the future) and that did not mark itself as closed. A one-tab client
+  /// has the database alone: false.
+  @override
+  Future<bool> hasOtherClients() async {
+    if (!multiTab) {
+      return false;
+    }
+    final _IdbTransaction transaction = _current;
+    final int minimum = _nowMs() - indexedDbMaxClientAgeMs;
+    for (final Map<String, Object?> client in await _readClients(transaction)) {
+      final Object? id = client['clientId'];
+      final Object? updateTime = client['updateTimeMs'];
+      if (id != clientId &&
+          (updateTime is! num || updateTime >= minimum) &&
+          !_isZombied(id)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   // Closing
 
   @override
@@ -1093,6 +1399,7 @@ class WebIndexedDbPersistence extends IndexedDbPersistence {
     hardAssert(started, 'IndexedDbPersistence shutdown without start!');
     started = false;
     _detachPageHandlers();
+    _detachVisibilityHandler();
     // As the JS SDK: marked as closed first, so that another tab may take over even if the release below does not
     // finish; the mark goes once the rows are gone.
     _setZombied(true);
@@ -1127,6 +1434,10 @@ class WebIndexedDbPersistence extends IndexedDbPersistence {
       } catch (e) {
         Log.w(tag, 'Could not release the primary lease: $e');
       }
+    }
+    if (multiTab) {
+      // The listener is no longer called (not started).
+      _setPrimary(false);
     }
     await _semaphore.acquire();
     try {

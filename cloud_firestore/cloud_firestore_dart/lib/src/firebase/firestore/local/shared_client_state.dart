@@ -430,6 +430,10 @@ class StorageSharedClientState extends SharedClientState {
   @override
   bool get sharesState => true;
 
+  /// Called on the queue of the client after another client removed its state (it shut down or its page closed).
+  /// NOT IN THE JS SDK, where a secondary waits for its next lease refresh to take over from a primary that closed.
+  Future<void> Function()? clientRemovedHandler;
+
   StorageSharedClientState(
     this._storage,
     this._enqueue,
@@ -852,6 +856,9 @@ class StorageSharedClientState extends SharedClientState {
       existingTargets.difference(newTargets).toList(),
     );
     _activeClients = updatedClients;
+    if (clientState == null) {
+      await clientRemovedHandler?.call();
+    }
   }
 
   void _handleOnlineStateEvent(SharedOnlineState onlineState) {

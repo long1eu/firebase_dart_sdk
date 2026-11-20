@@ -182,8 +182,8 @@ yet.]_
   with dart2js and dart2wasm in CI and was driven in headless Chrome against the emulators. No
   other browser was tried, and no browser was run against a production backend (the verification
   kit used the web transport against production from the VM).
-- Not implemented: coordination between clients that share one cache (the multi-tab support of
-  the JS SDK; deferred until after 0.1.0), a full Firebase Auth SDK (no popup or redirect sign-in, phone or multi-factor), and
+- Not implemented: coordination between clients that share one SQLite cache (isolates and processes;
+  deferred until after 0.1.0; the tabs of the web IndexedDB cache have a preview, `multiTab: true`), a full Firebase Auth SDK (no popup or redirect sign-in, phone or multi-factor), and
   Pipelines beyond the preview (no real-time pipelines and no offline evaluation; a local
   evaluator exists but is internal and not used yet; search, window functions and explain
   options are only checked for their encoding, since the emulator rejects them).

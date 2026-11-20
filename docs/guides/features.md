@@ -58,15 +58,18 @@ Not done:
   features (only against the Enterprise edition emulator), Firebase Auth user sign-in, the
   integration suite (its opt-in real-project mode has not been run) and long-running load.
 - **Web beyond the experiment**: any browser other than Chrome (the OPFS storage was not run
-  in Safari or Firefox either), and a cache shared between tabs or owned by a shared worker.
+  in Safari or Firefox either), a cache shared between tabs other than the IndexedDB cache with
+  `multiTab` (a preview), and a cache owned by a shared worker.
 - **Pipelines** beyond the [preview](pipelines.md): local evaluation (an
   evaluator exists inside the package but the client does not use it yet) and real-time
   pipelines. Full-text search, window functions and explain options are encoded but were not
   run against a backend that supports them.
 - `Query.findNearest` evaluation against the local cache.
 - **Coordination between running clients that share one cache** (the multi-tab support of the
-  JS SDK). Two clients on one SQLite file keep it consistent but do not see each other's
-  listeners or pending writes; in a browser, one tab at a time. Sharing them (stage 3 of the
+  JS SDK), except the tabs of the web IndexedDB cache with `multiTab: true` (**preview**, new in
+  the next version, Chrome only; see [the web guide](web.md#multi-tab-mode-preview)). Two clients
+  on one SQLite file keep it consistent but do not see each other's listeners or pending
+  writes, and the SQLite caches of the web stay at one tab. Sharing them (stage 3 of the
   multi-client plan) is deferred until after 0.1.0. See
   [Several clients on one cache](multiple_clients.md).
 - **Persistent cache indexes** for queries with inequalities on several fields, and with a

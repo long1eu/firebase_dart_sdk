@@ -78,7 +78,8 @@ listen and write streams, over `fetch`. What to know:
   implements, on the VM or the web; `example/cache_store/indexeddb` is such a store on IndexedDB.
   See [A cache in your own storage](custom_cache_store.md).
 
-  One tab at a time with either: a second tab that opens the same cache gets a
+  One tab at a time with either (the IndexedDB cache has a [multi-tab mode](web.md#multi-tab-mode-preview), a
+  preview): a second tab that opens the same cache gets a
   `FirestoreException` with `failedPrecondition` (a Web Lock guards the database) and should use a
   memory cache; `openWithMemoryFallback` of the package does this. `clearPersistence()` deletes
   the IndexedDB database or the OPFS directory. Cost, measured for a small app compiled with

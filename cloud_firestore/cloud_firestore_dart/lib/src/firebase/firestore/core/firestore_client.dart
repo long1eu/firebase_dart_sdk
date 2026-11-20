@@ -30,6 +30,8 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/firestore_settings.d
 import 'package:cloud_firestore_dart/src/firebase/firestore/load_bundle_task.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/index_backfiller.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/indexeddb/indexeddb_persistence.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/local/indexeddb/indexeddb_schema.dart'
+    show indexedDbStoragePrefix;
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/keyvalue/key_value_persistence.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/local_serializer.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/local_store.dart';
@@ -37,6 +39,8 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/local/lru_garbage_co
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/memory/memory_persistence.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/persistance/persistence.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/query_result.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/local/shared_client_state.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/local/shared_client_state_storage.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/sqlite/client_metadata_refresher.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/sqlite/sqlite_persistence.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local_cache_settings.dart';
@@ -102,8 +106,8 @@ class FirestoreClient implements RemoteStoreCallback {
   ClientMetadataRefresher? _clientMetadataRefresher;
 
   /// Whether this client holds the primary lease of its cache. Always true with memory persistence. Only the primary
-  /// client uses the network, collects garbage and backfills indexes; the clients of one cache share no other state
-  /// yet (stage 1 of the multi-client plan).
+  /// client uses the network, collects garbage and backfills indexes; unless the clients share their state (see
+  /// [start]), they share nothing else.
   @visibleForTesting
   bool get isPrimaryClient {
     final Persistence persistence = this.persistence;
@@ -145,6 +149,7 @@ class FirestoreClient implements RemoteStoreCallback {
     TaskScheduler scheduler, {
     FirebaseAppCheckTokenProvider? appCheckProvider,
     ConnectivityChangeDetector? connectivityDetector,
+    SharedClientStateStorage? sharedClientStateStorage,
   }) async {
     final FirestoreClient client = start(
       databaseInfo,
@@ -155,6 +160,7 @@ class FirestoreClient implements RemoteStoreCallback {
       scheduler,
       appCheckProvider: appCheckProvider,
       connectivityDetector: connectivityDetector,
+      sharedClientStateStorage: sharedClientStateStorage,
     );
     await client._initialized;
     return client;
@@ -166,6 +172,15 @@ class FirestoreClient implements RemoteStoreCallback {
   /// its error): the shutdown of another client that has the same persistence open.
   ///
   /// When the initialization fails, every operation fails with its error.
+  ///
+  /// With [sharedClientStateStorage] the client shares its state with the other clients of its cache that use the
+  /// same storage (the JS SDK's multi-tab mode, `MultiTabOfflineComponentProvider`), when its persistence can be
+  /// opened by several clients (SQLite, IndexedDB): the primary client listens and writes for all of them and tells
+  /// them the results, and a secondary client takes its online state from the primary. Each client needs its own
+  /// [SharedClientStateStorage] (for example one `InMemorySharedClientStateStorage.connect()` per client), since a
+  /// storage does not report a client's own changes to it. A SQLite cache is then opened with the election of the JS
+  /// SDK ([PrimaryLeaseMode.multipleClients]): a client that opens the cache respects the lease of a live primary.
+  /// Ignored with a memory or key-value cache. Not part of the public API.
   static FirestoreClient start(
     DatabaseInfo databaseInfo,
     Settings settings,
@@ -176,6 +191,7 @@ class FirestoreClient implements RemoteStoreCallback {
     FirebaseAppCheckTokenProvider? appCheckProvider,
     ConnectivityChangeDetector? connectivityDetector,
     Future<void>? after,
+    SharedClientStateStorage? sharedClientStateStorage,
   }) {
     // The IndexedDB and key-value caches need no database function, and win over one.
     final bool useIndexedDb = settings.cacheSettings is IndexedDbCacheSettings;
@@ -242,6 +258,7 @@ class FirestoreClient implements RemoteStoreCallback {
           onNetworkConnected,
           scheduler,
           connectivityDetector: connectivityDetector,
+          sharedClientStateStorage: sharedClientStateStorage,
           memoryLruGcSettings: switch (settings.cacheSettings) {
             final MemoryCacheSettings memory => memory.gcSettings,
             _ => null,
@@ -497,6 +514,15 @@ class FirestoreClient implements RemoteStoreCallback {
     _lruScheduler?.stop();
     _indexBackfillScheduler?.stop();
     _clientMetadataRefresher?.stop();
+    final Persistence? opened = _persistenceStarted ? persistence : null;
+    if (_sharedClientState != null && opened is IndexedDbPersistence) {
+      // Before the other tabs learn that this one is gone (below): they no longer count on its lease and can take it
+      // over at once.
+      opened.markClosing();
+    }
+    // Before the remote store is shut down: the changes of the other clients are no longer applied, and the other
+    // clients learn that this one is gone (the primary stops listening to the targets of this client).
+    _sharedClientState?.shutdown();
 
     await onCredentialChangeSubscription.cancel();
     await appCheckProvider?.close();
@@ -814,6 +840,7 @@ class FirestoreClient implements RemoteStoreCallback {
     IndexedDbCacheSettings? indexedDbCacheSettings,
     KeyValueCacheSettings? keyValueCacheSettings,
     ConnectivityChangeDetector? connectivityDetector,
+    SharedClientStateStorage? sharedClientStateStorage,
     bool mergeUnsentWrites = false,
     bool useIndexedDb = false,
   }) async {
@@ -832,12 +859,30 @@ class FirestoreClient implements RemoteStoreCallback {
       gc = keyValue.garbageCollector;
       persistence = keyValue;
     } else if (useIndexedDb) {
+      final IndexedDbCacheSettings indexedDbSettings = indexedDbCacheSettings!;
+      // Multi-tab: the tabs share their state through LocalStorage (`WebStorageSharedClientState.isAvailable` of the
+      // JS SDK, checked in `MultiTabOfflineComponentProvider`). A test gives the storage of another window.
+      final bool multiTab =
+          indexedDbSettings.multiTab || sharedClientStateStorage != null;
+      if (multiTab) {
+        sharedClientStateStorage ??= indexedDbSettings
+            .createSharedClientStateStorage();
+        if (sharedClientStateStorage == null) {
+          throw FirestoreException(
+            message:
+                'IndexedDbCacheSettings.multiTab needs window.localStorage, which is not available here (a worker, or '
+                'the storage of the page is blocked). Use the cache of one tab (multiTab: false) instead.',
+            errorCode: FirestoreErrorCode.unimplemented,
+          );
+        }
+      }
       final IndexedDbPersistence
-      indexedDb = indexedDbCacheSettings!.createPersistence(
+      indexedDb = indexedDbSettings.createPersistence(
         persistenceKey: databaseInfo.persistenceKey,
         databaseId: databaseInfo.databaseId,
         serializer: LocalSerializer(RemoteSerializer(databaseInfo.databaseId)),
         lruParams: LruGarbageCollectorParams.withCacheSizeBytes(cacheSizeBytes),
+        multiTab: multiTab,
       );
       gc = indexedDb.garbageCollector;
       persistence = indexedDb;
@@ -848,12 +893,18 @@ class FirestoreClient implements RemoteStoreCallback {
       final LruGarbageCollectorParams params =
           LruGarbageCollectorParams.withCacheSizeBytes(cacheSizeBytes);
 
-      final SQLitePersistence persistence = await SQLitePersistence.create(
+      final SQLitePersistence
+      persistence = await SQLitePersistence.createWithLease(
         databaseInfo.persistenceKey,
         databaseInfo.databaseId,
         serializer,
         openDatabase,
         params,
+        // Clients that share their state elect the primary as JS tabs with tab synchronization do; the others
+        // take the lease when they start (see PrimaryLeaseMode.forceOwnership).
+        leaseMode: sharedClientStateStorage != null
+            ? PrimaryLeaseMode.multipleClients
+            : PrimaryLeaseMode.forceOwnership,
       );
 
       final SQLiteLruReferenceDelegate lruDelegate =
@@ -942,12 +993,15 @@ class FirestoreClient implements RemoteStoreCallback {
         }
         shutdown();
       };
-      // The JS SDK refreshes the client row and the primary lease every 4 s: a JS tab finds the lease alive.
+      // The JS SDK refreshes the client row and the primary lease every 4 s: a JS tab finds the lease alive. In
+      // multi-tab mode the refresh is also how a secondary takes the lease over, and the primary then fills its write
+      // pipeline as with SQLite.
       _clientMetadataRefresher = ClientMetadataRefresher(
         scheduler,
         run: () => _enqueue<void>(() async {
           if (!_isShutdown) {
             await started.refreshClientMetadata();
+            await syncEngine.handleClientMetadataRefresh();
           }
         }),
       )..start();
@@ -970,11 +1024,67 @@ class FirestoreClient implements RemoteStoreCallback {
     );
     _remoteStoreCreated = true;
 
-    syncEngine = SyncEngine(localStore, remoteStore, user)
-      ..onPendingWritesChanged = _onPendingWritesChanged
-      ..onQueuedWritesToMerge = _mergeQueuedWrites;
+    final String? sharedClientId = _multiClientId(persistence);
+    final StorageSharedClientState? sharedClientState =
+        sharedClientStateStorage != null && sharedClientId != null
+        ? StorageSharedClientState(
+            sharedClientStateStorage,
+            // The changes of the other clients are applied on the queue of this client, and retried while the
+            // persistence fails (the JS `enqueueRetryable`).
+            (Future<void> Function() operation) =>
+                remoteStore.enqueueRetryable(() async {
+                  if (!_isShutdown) {
+                    await operation();
+                  }
+                }),
+            indexedDbStoragePrefix(
+              databaseInfo.persistenceKey,
+              databaseInfo.databaseId,
+            ),
+            sharedClientId,
+            user,
+          )
+        : null;
+    _sharedClientState = sharedClientState;
+    final Persistence opened = persistence;
+    if (sharedClientState != null && opened is IndexedDbPersistence) {
+      // The tabs share the listen sequence numbers (`sequenceNumberSyncer` of the JS SDK), so that the sequence
+      // numbers of the documents and targets keep the order of their use across tabs for the garbage collector.
+      opened.sequenceNumberListener = sharedClientState.writeSequenceNumber;
+      sharedClientState
+        ..sequenceNumberHandler = opened.advanceListenSequenceNumber
+        // A tab that closed (or terminated) marked itself as closed before it removed its state: a secondary can take
+        // the lease at once instead of at its next refresh.
+        ..clientRemovedHandler = () async {
+          if (!_isShutdown && !isPrimaryClient) {
+            await opened.refreshClientMetadata();
+          }
+        };
+      // As a JS tab: a page hidden for good shuts the client down, which releases the lease and removes its state.
+      opened.pageHideListener = () => unawaited(shutdown());
+    }
+
+    syncEngine =
+        SyncEngine(
+            localStore,
+            remoteStore,
+            user,
+            sharedClientState: sharedClientState,
+            // A client that shares its state is primary once the lease says so (as in the JS SDK).
+            startAsPrimary: sharedClientState == null,
+          )
+          ..onPendingWritesChanged = _onPendingWritesChanged
+          ..onQueuedWritesToMerge = _mergeQueuedWrites;
     eventManager = EventManager(syncEngine);
     _eventManagerCreated = true;
+    sharedClientState
+      ?..syncEngine = syncEngine
+      ..onlineStateHandler = (OnlineState onlineState) => unawaited(
+        syncEngine.applyOnlineStateChange(
+          onlineState,
+          OnlineStateSource.sharedClientState,
+        ),
+      );
 
     // NOTE: RemoteStore depends on LocalStore (for persisting stream tokens,
     // refilling mutation queue, etc.) so must be started after LocalStore.
@@ -982,6 +1092,13 @@ class FirestoreClient implements RemoteStoreCallback {
     // Before the remote store asks for the first batch to send: the local store holds the batches back while the
     // queue is merged.
     await syncEngine.startMergingQueuedWrites();
+    if (sharedClientState != null) {
+      await sharedClientState.start();
+      // The primary state is known before the remote store starts, so that a secondary client never opens a stream
+      // (the JS `remoteStoreApplyPrimaryState` before the network is enabled). The listener below is called again
+      // with the same state, which changes nothing.
+      await _applyPrimaryState(isPrimaryClient);
+    }
     await remoteStore.start();
 
     // Called right away with the current state; a lone client is always primary, and nothing changes then.
@@ -998,6 +1115,23 @@ class FirestoreClient implements RemoteStoreCallback {
           });
     });
   }
+
+  /// The state shared with the other clients of the cache, when the client was started with a
+  /// [SharedClientStateStorage] and its persistence can have several clients; null otherwise.
+  SharedClientState? _sharedClientState;
+
+  /// Whether this client shares its state with the other clients of its cache (see [start]).
+  @visibleForTesting
+  bool get sharesClientState => _sharedClientState != null;
+
+  /// The id of this client in a persistence that several clients can open at once, or null for one that only one
+  /// client can use (memory, key-value).
+  static String? _multiClientId(Persistence persistence) =>
+      switch (persistence) {
+        final SQLitePersistence sqlite => sqlite.clientMetadata.clientId,
+        final IndexedDbPersistence indexedDb => indexedDb.clientId,
+        _ => null,
+      };
 
   /// Only the primary client of a cache uses the network, collects garbage and backfills indexes
   /// (`setPrimaryStateListener` in the `MultiTabOfflineComponentProvider` of the JS SDK).

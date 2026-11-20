@@ -7,6 +7,9 @@
 import 'dart:async';
 
 import 'package:cloud_firestore_dart/cloud_firestore_dart.dart';
+import 'package:cloud_firestore_dart/indexeddb_cache.dart';
+// Internal: only for the primary/secondary indicator of the multi-tab mode.
+import 'package:cloud_firestore_dart/src/internal_access.dart';
 import 'package:cloud_firestore_dart_sqlite/cloud_firestore_dart_sqlite.dart';
 import 'package:firebase_app_dart/firebase_app_dart.dart';
 import 'package:web/web.dart' as web;
@@ -28,7 +31,9 @@ Future<void> main() async {
 
   final FirebaseFirestore firestore;
   try {
-    firestore = await _open(app, settings, config.cache);
+    firestore = config.multiTab
+        ? await _openMultiTab(app, settings)
+        : await _open(app, settings, config.cache);
   } catch (e) {
     _text('#cache-status', 'The cache could not be opened: $e');
     return;
@@ -41,6 +46,32 @@ Future<void> main() async {
   _setUpForm(notes);
   _setUpNetworkToggle(firestore);
   _watchBrowserConnectivity();
+}
+
+/// `?multiTab=1`: the IndexedDB cache shared by the tabs. One tab (the
+/// primary) uses the network for all of them; open the page in two tabs and
+/// close the primary one to see the other take over.
+Future<FirebaseFirestore> _openMultiTab(
+  FirebaseApp app,
+  Settings settings,
+) async {
+  _text('#cache-status', 'IndexedDB, shared by the tabs of this page.');
+  final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(
+    app: app,
+    settings: settings.copyWith(
+      cacheSettings: indexedDbCacheSettings(multiTab: true),
+    ),
+  );
+  await firestore.initialized;
+  void showRole() => _text(
+    '#tab-role',
+    firestore.client.syncEngine.isPrimaryClient
+        ? 'Primary: this tab uses the network for all tabs'
+        : 'Secondary: the primary tab listens and writes for this one',
+  );
+  showRole();
+  Timer.periodic(const Duration(milliseconds: 500), (_) => showRole());
+  return firestore;
 }
 
 /// Creates the instance with the cache the page was asked for.

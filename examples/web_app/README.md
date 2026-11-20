@@ -39,8 +39,14 @@ What to try:
 - Pick **SQLite in IndexedDB** or **SQLite in OPFS**, then reload: the notes are on the page
   before the backend answers, also with the emulator stopped. A note written offline is sent
   when the page is opened again with a connection.
-- Open the persistent page in a second tab: only one tab can have the persistent cache, so the
+- Open the persistent page in a second tab (`?cache=indexeddb` or `?cache=opfs`): only one tab can have the persistent cache, so the
   second one says so and uses a memory cache (`openWithMemoryFallback`).
+- Open `http://localhost:8000/?multiTab=1` in two tabs (**preview**, new in the next version): the
+  page uses the IndexedDB cache in the JS SDK's format, shared by the tabs. The **Tab** line says
+  which tab is primary, and uses the network for both, and which is secondary. Add a note in the
+  secondary tab: it shows at once and is acknowledged through the primary. Close the primary tab and
+  the other one takes over. Chrome only; see
+  [Multi-tab mode](../../docs/guides/web.md#multi-tab-mode-preview).
 - On the Lite page, stop the emulator and add a note: the write fails with `unavailable`. Lite
   has no cache and does not queue writes.
 

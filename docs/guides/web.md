@@ -94,7 +94,7 @@ What does not, or was not tried:
 | --- | --- |
 | Browsers other than Chrome | Not tested (Firefox, Safari, Edge; also not the OPFS cache). |
 | The production backend from a browser | Not tested. The browser tests and the example ran against the emulator only. |
-| A persistent cache in several tabs | Not supported: one tab at a time, see [One tab at a time](#one-tab-at-a-time). |
+| A persistent cache in several tabs | Only the IndexedDB cache with `multiTab: true` (preview, Chrome only), see [Multi-tab mode](#multi-tab-mode-preview). The SQLite caches: one tab at a time, see [One tab at a time](#one-tab-at-a-time). |
 | Integers above 2^53 with dart2js | Lose precision. Use dart2wasm if you store such integers. |
 | More than about 10,000 documents in one query against the emulator | Fails with `unavailable` over WebChannel (an emulator limit). Read in pages. Production not checked. |
 | `-Dprotobuf.omit_field_names=true`, `-Dprotobuf.omit_enum_names=true` | Not allowed: the web transport needs the names, and refuses to start without them. |
@@ -194,7 +194,7 @@ flowchart TD
   needLive -- "yes" --> needReload{"Data across reloads?"}
   needReload -- "no" --> memory["Memory cache (default)"]
   needReload -- "yes" --> jsFormat{"Share the cache with the JS SDK, or skip sqlite3.wasm?"}
-  jsFormat -- "yes" --> idbCache["IndexedDB cache (one tab)"]
+  jsFormat -- "yes" --> idbCache["IndexedDB cache (one tab, or several)"]
   jsFormat -- "no" --> cacheSize{"A large cache?"}
   cacheSize -- "no" --> indexedDb["SQLite in IndexedDB"]
   cacheSize -- "yes" --> opfs["SQLite in OPFS, in a worker"]
@@ -270,7 +270,8 @@ has the table of versions.
 
 ## One tab at a time
 
-A Web Lock guards each persistent cache. A second tab (or a second instance in the same page)
+With the SQLite caches, a Web Lock guards each persistent cache. (The IndexedDB cache has a
+[multi-tab mode](#multi-tab-mode-preview).) A second tab (or a second instance in the same page)
 that opens the same cache waits two seconds for the lock, then its operations fail with a
 `FirestoreException` whose code is `failedPrecondition`. `FirebaseFirestore.instanceFor` returns at once,
 so the error comes with the first operation. `openWithMemoryFallback` of
@@ -289,7 +290,7 @@ final FirebaseFirestore firestore = await openWithMemoryFallback(
 final bool persistent = firestore.persistentCacheIndexManager != null;
 ```
 
-Tabs do not share listeners or writes, as the JS SDK's multi-tab mode does. Because the lock is
+Tabs of a SQLite cache do not share listeners or writes. Because the lock is
 released when a page goes away, a reloaded page knows the page before it is gone, and sends the
 writes it left pending at once. [Several clients on one cache](multiple_clients.md) has the
 details.
@@ -567,6 +568,8 @@ Why use it:
   On an instance whose IndexedDB cache is the JS database itself it, and `deleteJsSdkCache`, do
   nothing.
 
+Several tabs can share it: see [Multi-tab mode](#multi-tab-mode-preview) below.
+
 What it costs: about 121 KB more JavaScript (about 34 KB gzipped, dart2js `-O2`, against the same small
 app with the memory cache), only in an app that imports `indexeddb_cache.dart`; an app that does not
 carries none of it.
@@ -582,7 +585,9 @@ backend or with field indexes.
 
 Limits:
 
-- **One tab at a time, and no JS SDK tab beside it.** The engine takes the JS SDK's primary lease. While
+- **One tab at a time by default, and no JS SDK tab beside it.** (With `multiTab: true` several tabs
+  share the cache, see [Multi-tab mode](#multi-tab-mode-preview); a JS SDK tab beside it was not
+  tried.) The engine takes the JS SDK's primary lease. While
   another client (a tab of the JS SDK, or another instance of this SDK) holds a live lease, it refuses to
   open and its operations fail with `failedPrecondition`. If another client takes the lease while this
   one is in the background (its lease lapsed), the instance stops at its next transaction or lease
@@ -611,7 +616,7 @@ How it is tested, in Chrome with dart2js and dart2wasm against the emulator:
   (`test/browser/web_indexeddb_*_test.dart`, about 600 tests): the mutation queue, remote documents,
   targets, overlays, bundles, globals, the index managers, the local store, garbage collection, the
   query engine and the index backfiller, and the upstream spec tests with restarts (the multi-client
-  specs are skipped: one tab). The numbers, and what running them fixed, are in
+  specs are skipped there). The numbers, and what running them fixed, are in
   [section 9 of the spike](../spikes/indexeddb_cache.md#9-verification-of-the-engine-added-2026-11-20).
 - `tool/bench/web_idb/js_import/interop_check.sh` runs the official JS SDK (`firebase` 12.19.0 from
   npm) and this engine on one database in headless Chrome, both ways: documents, pending writes of
@@ -621,11 +626,57 @@ How it is tested, in Chrome with dart2js and dart2wasm against the emulator:
 Not checked: Firefox and Safari (the engine's speed was measured in both, see the spike, but not
 its tests or the interop), and the production backend.
 
+## Multi-tab mode (preview)
+
+New in the next version. It is a *preview*: the API may change in any release (see the
+[package README](../../cloud_firestore/cloud_firestore_dart/README.md)).
+
+`indexedDbCacheSettings(multiTab: true)` lets several tabs of an app open one IndexedDB cache:
+
+```dart
+final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(
+  app: app,
+  settings: Settings(cacheSettings: indexedDbCacheSettings(multiTab: true)),
+);
+```
+
+How it works:
+
+- One tab is the *primary* and uses the network. The other tabs are *secondary*: their listeners get
+  their results, and their writes are acknowledged, through the primary.
+- When the primary closes, or its lease lapses, another tab takes over. The lease lasts 5 s and the
+  primary refreshes it every 4 s.
+- The lease, the rows and the `localStorage` keys are those of `persistentMultipleTabManager` of the
+  JS SDK.
+
+Limits:
+
+- It is off by default. A one-tab instance and a multi-tab instance on the same cache refuse each
+  other, as in the JS SDK.
+- It needs `window.localStorage`. Without it (a worker, or blocked storage) the instance fails at
+  start with `unimplemented`.
+- Only the IndexedDB cache. The SQLite caches (IndexedDB, OPFS) stay at one tab. On the Dart VM,
+  clients on one SQLite file still do not share state through the public API.
+- Tested in Chrome only, with dart2js and dart2wasm against the emulator.
+
+Two differences from the JS SDK:
+
+- A secondary takes the lease at once when it hears a closing tab remove its state. The JS SDK waits
+  for its next refresh.
+- A page restored from the back/forward cache comes back with a terminated client.
+
+Not done (not tested):
+
+- A JS SDK tab that shares the cache with a tab of this SDK.
+- The handover on real visibility changes (a tab hidden or shown by the user).
+- Different users signed in in the tabs.
+- Browsers other than Chrome.
+
 ## Known gaps
 
 - Chrome only; production untested from a browser.
-- One tab per persistent cache; no sharing of listeners or writes between tabs, and no cache in
-  a shared worker.
+- One tab per persistent cache, except the IndexedDB cache with `multiTab: true` (preview); no
+  sharing of listeners or writes between tabs of a SQLite cache, and no cache in a shared worker.
 - A crash of the browser itself or a power cut is not covered by the crash tests of the
   persistent caches (a tab that dies is).
 - The SQLite caches are in the separate package `cloud_firestore_dart_sqlite` (0.1), not in

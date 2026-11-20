@@ -35,7 +35,7 @@ It is a port of the open-source Firebase Android SDK, kept close to its current 
 | Pipelines (`package:cloud_firestore_dart/pipelines.dart`), Enterprise edition only | **preview** |
 | Firestore Lite (`package:cloud_firestore_dart/lite.dart`): no cache, one request per call | stable |
 | The web: REST and WebChannel over `fetch`, cache in memory, IndexedDB or OPFS | **supported in Chrome** |
-| The web: a cache in the official JS SDK's own IndexedDB database (`package:cloud_firestore_dart/indexeddb_cache.dart`), no SQLite | **supported in Chrome**, one tab |
+| The web: a cache in the official JS SDK's own IndexedDB database (`package:cloud_firestore_dart/indexeddb_cache.dart`), no SQLite | **supported in Chrome**, one tab; several tabs with `multiTab: true` (**preview**, new in the next version) |
 | A cache in your own storage: any ordered key-value store you implement (`package:cloud_firestore_dart/cache_store.dart`, [guide](https://github.com/long1eu/firebase_dart_sdk/blob/main/docs/guides/custom_cache_store.md)) | stable, one client per store |
 
 *Stable* means the API is not expected to change; a *preview* API may change in
@@ -116,12 +116,13 @@ has the changes with before and after code.
   production: the Enterprise edition features (only against the Enterprise edition emulator),
   Firebase Auth user sign-in, the integration suite as a whole and long-running load.
 - **Coordination between clients that share one cache** (the multi-tab support of the JS SDK):
-  clients keep the file consistent and elect a primary, but do not share listeners or writes;
-  in a browser, one tab at a time. Sharing them (stage 3 of the multi-client plan: shared state
+  clients on one SQLite file keep it consistent and elect a primary, but do not share listeners or
+  writes; the SQLite caches of the web stay at one tab. Only the IndexedDB cache of the web
+  shares them, between tabs, with `multiTab: true` (a preview). Sharing them (stage 3 of the multi-client plan: shared state
   in SQLite between isolates and processes, and the tab manager settings of the JS SDK) is
   deferred until after 0.1.0.
 - **Pipelines** beyond the preview: evaluation against the local cache, and real-time pipelines.
-- **The web** beyond the experiment: browsers other than Chrome, and a cache shared between tabs.
+- **The web** beyond the experiment: browsers other than Chrome, and a cache shared between tabs other than the IndexedDB cache (a preview).
 - `findNearest` evaluation against the local cache, and cache indexes for queries with
   inequalities on several fields.
 - A full Firebase Auth SDK: sign-in with email and password, email links, anonymously, with custom tokens

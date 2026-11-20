@@ -15,6 +15,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/document_snapshot.da
 import 'package:cloud_firestore_dart/src/firebase/firestore/firestore.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/firestore_settings.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/get_options.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/local/shared_client_state_storage.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/database_id.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/query.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/query_snapshot.dart';
@@ -293,7 +294,8 @@ class IntegrationTestUtil {
       TaskScheduler scheduler,
       OpenDatabase openDatabase,
       Settings settings,
-      {ConnectivityChangeDetector? connectivityDetector}) async {
+      {ConnectivityChangeDetector? connectivityDetector,
+      SharedClientStateStorage? sharedClientStateStorage}) async {
     final DatabaseInfo databaseInfo = DatabaseInfo(
         databaseId, persistenceKey, settings.host,
         port: settings.port,
@@ -311,6 +313,7 @@ class IntegrationTestUtil {
       onNetworkConnected,
       scheduler,
       connectivityDetector: connectivityDetector,
+      sharedClientStateStorage: sharedClientStateStorage,
     );
 
     return FirestoreInternal.create(databaseId, null, client, scheduler);
@@ -321,17 +324,23 @@ class IntegrationTestUtil {
   ///
   /// With [fixedDbName] the instance uses exactly that database file and does not delete it, so that a later instance
   /// created with the same name sees the persisted data (restart). Use [databaseName] to address a named database.
+  ///
+  /// [persistenceKey] replaces the generated one (clients that share their state need the same key), and
+  /// [sharedClientStateStorage] makes the client share its state with the other clients of its cache (see
+  /// `FirestoreClient.start`).
   static Future<FirebaseFirestore> testFirestoreInstance(String projectId,
       InternalLogLevel logLevel, Settings settings, String dbPath,
       {String? fixedDbName,
       String databaseName = DatabaseId.defaultDatabaseId,
-      ConnectivityChangeDetector? connectivityDetector}) async {
+      ConnectivityChangeDetector? connectivityDetector,
+      String? persistenceKey,
+      SharedClientStateStorage? sharedClientStateStorage}) async {
     // This unfortunately is a global setting that affects existing Firestore clients.
     Log.level = logLevel;
 
     final DatabaseId databaseId =
         DatabaseId.forDatabase(projectId, databaseName);
-    final String persistenceKey = 'db${firestoreStatus.length}';
+    persistenceKey ??= 'db${firestoreStatus.length}';
 
     print('index: $dbIndex');
     // A name relative to build/test: DatabaseMock resolves it to a path itself.
@@ -373,6 +382,7 @@ class IntegrationTestUtil {
       },
       settings,
       connectivityDetector: connectivityDetector,
+      sharedClientStateStorage: sharedClientStateStorage,
     );
 
     firestoreStatus[firestore] = true;

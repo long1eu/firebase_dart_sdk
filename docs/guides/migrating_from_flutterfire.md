@@ -56,7 +56,8 @@ supported by Firebase.
   whose token the app obtained itself ([Authentication](authentication.md));
 - you need other Firebase products from the same SDK family (Storage, Messaging, Analytics,
   Crashlytics, Remote Config ...);
-- you need a cache shared by several browser tabs (the JS SDK's multi-tab persistence), or a web
+- you need a cache shared by several browser tabs beyond the preview (`multiTab: true` of the
+  IndexedDB cache; the JS SDK's multi-tab persistence is its model), or a web
   client tested in browsers other than Chrome.
 
 **Consider `cloud_firestore_dart`** when:

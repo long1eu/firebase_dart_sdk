@@ -11,8 +11,11 @@ clients open the same file:
 This page describes what the client does then. In short: the file stays consistent, one client
 at a time (the *primary*) talks to the backend, and the others work from the cache. The clients
 do not share listeners or writes. That is the first part of the multi-tab support of the JS
-SDK; sharing listeners and writes between clients is deferred until after 0.1.0. In a browser a cache can only be open in one tab (see
-[Offline persistence on the web](offline_persistence.md#on-the-web)).
+SDK; sharing listeners and writes between clients is deferred until after 0.1.0. In a browser the
+SQLite caches can only be open in one tab (see
+[Offline persistence on the web](offline_persistence.md#on-the-web)). The IndexedDB cache of the web
+does share them between tabs with `multiTab: true`, a preview that is new in the next version: see
+[Multi-tab mode](web.md#multi-tab-mode-preview).
 
 ## The file stays consistent
 
@@ -147,9 +150,10 @@ await firestore.clearPersistence();
 ## Not done
 
 The JS SDK goes further: secondary tabs share the listeners and the writes of the primary
-through the cache, so every tab is online through one connection. Here the clients share only
-the file and the lease. Until that exists, do not run two active clients on one cache on
-purpose.
+through the cache, so every tab is online through one connection. Here only the tabs of the web
+IndexedDB cache with `multiTab: true` do that ([preview](web.md#multi-tab-mode-preview)). On a
+SQLite file the clients share only the file and the lease, also on the VM through the public API.
+Until that exists, do not run two active clients on one SQLite cache on purpose.
 
 ## Example
 
