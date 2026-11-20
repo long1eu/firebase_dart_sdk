@@ -105,7 +105,7 @@ Path shorthand:
 | delete | `deleteCurrentUser` | user.dart:31 | same | firebase_user_auth.dart:646 |
 | User.toJSON | `AuthUser.toJson()` auth_user.dart:88 | — | different | Same keys as JS, but no `stsTokenManager`, `apiKey` or `appName`, so it cannot restore a session. |
 | getAdditionalUserInfo(cred) | `UserCredential.additionalUserInfo` (isNewUser, providerId, profile, username) | passed through (convert.dart:306) | different | a field, not a function; auth_user.dart:207-227 |
-| UserCredential {user, providerId} | `UserCredential extends AuthUser` + `user`, `credential` | `DartUserCredential` (user.dart:154) | different | no `providerId`; auth_user.dart:245-274 |
+| UserCredential {user, providerId} | `UserCredential extends AuthUser` + `user`, `credential` | `DartUserCredential` (user.dart:154) | different | No `providerId`, by design: `UserCredential` extends `AuthUser`, whose `providerId` is `'firebase'` as on a JS `User`. The sign-in provider is in `credential.providerId` and `additionalUserInfo.providerId`. auth_user.dart:245-274 |
 | UserCredential.operationType | `UserCredential.operationType` (`OperationType`: signIn, link, reauthenticate) auth_user.dart:337 | none | same | |
 
 ## Tokens
@@ -317,7 +317,7 @@ Effort: S takes hours, M a few days, L more than a week or needs outside pieces.
 | 5 | closed | `toJson`/`fromJson` for `EmailAuthCredential` and `OAuthCredential`, plus `OAuthProvider.credentialFromJson` | S | no | no | med | Keeps a pending credential across the `account-exists-with-different-credential` flow. Uses the JS JSON format. |
 | 6 | partly closed: client done, shim left | `revokeAccessToken(token)` (ACCESS_TOKEN, `tenantId`) in the client, and both revoke methods in the shim | S | no | no | med | The endpoint call already exists. Apple's account-deletion rule makes it matter on iOS and macOS. |
 | 7 | partly closed: `emulatorConfig` and `disableWarnings` done; no `emulator-config-failed` or `invalid-emulator-scheme` code, by design | Emulator parity: an `emulator-config-failed` guard, an `invalid-emulator-scheme` code, a parsed `emulatorConfig`, and `disableWarnings` | S | no | no | med | Today a late emulator setting silently mixes origins, and a bad host throws `ArgumentError`. |
-| 8 | partly closed: `refreshToken` and `UserCredential.providerId` left | `User.providerId`, `User.refreshToken` and `User.toJson`; `UserCredential.operationType` and `providerId` | S | no | no | med | Plain fields that JS exposes. |
+| 8 | partly closed: `refreshToken` left; `UserCredential.providerId` not added, by design (see the user table) | `User.providerId`, `User.refreshToken` and `User.toJson`; `UserCredential.operationType` and `providerId` | S | no | no | med | Plain fields that JS exposes. |
 | 9 | open | `setPersistence` and a `Persistence` enum in the client, using the shim's `SwitchableStorage` | S | no | no | med | The shim already has this logic. Without it, apps that don't use the shim pick storage only at construction. |
 | 10 | open | Shim passthroughs: `validatePassword`, and keeping `serverCode` and `httpStatus` in `exceptionOf` | S | no | no | med | The client has them; the shim drops them. |
 | 11 | open | Keep the raw server response on tagged errors (JS `_tokenResponse`) | S | no | no | low-med | Helps handle linking and debugging. |
@@ -336,3 +336,4 @@ Not counted as gaps, by design:
 - `FirebaseAuthException` codes have no `auth/` prefix and the class is FlutterFire's.
 - Streams replace the JS observer callbacks.
 - Credentials are created through static factories rather than provider instances.
+- `UserCredential` has no `providerId` of its own: it extends `AuthUser`, whose `providerId` is `'firebase'`.
