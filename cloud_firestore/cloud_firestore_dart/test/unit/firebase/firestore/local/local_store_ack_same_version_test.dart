@@ -32,6 +32,7 @@ void main() {
       'firebase/firestore/local/local_store_ack_same_version_test-${const Uuid().v4()}.db',
       const LruGarbageCollectorParams(),
     ),
+    'keyvalue': () => createKeyValuePersistence(),
   };
 
   for (final MapEntry<String, Future<Persistence> Function()> variant

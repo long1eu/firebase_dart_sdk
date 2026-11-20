@@ -1,6 +1,9 @@
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:cloud_firestore_dart/cloud_firestore_dart.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/local/keyvalue/cache_store.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/local/keyvalue/cache_store_persistence.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/local_serializer.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/lru_garbage_collector.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/sqlite/sqlite_database_files.dart';
@@ -11,9 +14,12 @@ import 'package:firebase_app_dart/firebase_app_dart.dart';
 import 'package:test/test.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../../../example/cache_store/memory_log/memory_log_store.dart';
 import 'local/mock/database_mock.dart';
+import 'local/persistence_test_helpers.dart';
 
 import '../../../util/test_hygiene.dart';
+import '../../../util/test_util.dart' show doc, key, map, version;
 
 /// An [OpenDatabase] that always opens the file of [dbName], keeping it when
 /// the database is closed (like a real app restart).
@@ -245,6 +251,87 @@ void main() {
       final SQLitePersistence persistence = await create(dbName);
       await persistence.clearPersistence();
       expect(DatabaseMock.pathForName(dbName).existsSync(), isFalse);
+    });
+  });
+
+  group('CacheStorePersistence.clearPersistence', () {
+    Future<List<CacheStoreEntry>> everything(CacheStore store) async {
+      await store.open();
+      try {
+        return await store.scan(
+          Uint8List(0),
+          Uint8List.fromList(<int>[0xff, 0xff, 0xff, 0xff]),
+        );
+      } finally {
+        await store.close();
+      }
+    }
+
+    test('removes every entry of the store after shutdown', () async {
+      final MemoryLogStore store = MemoryLogStore();
+      final CacheStorePersistence persistence = await createKeyValuePersistence(
+        store: store,
+      );
+      await persistence.runTransaction('add', () async {
+        await persistence.remoteDocumentCache.add(
+          doc('col/doc', 1, map(<dynamic>['a', 1])),
+          version(1),
+        );
+      });
+      await persistence.shutdown();
+      expect(await everything(store), isNotEmpty);
+
+      await persistence.clearPersistence();
+      expect(await everything(store), isEmpty);
+
+      // A persistence on the same store starts from an empty cache.
+      final CacheStorePersistence again = await createKeyValuePersistence(
+        store: store,
+      );
+      addTearDown(again.shutdown);
+      expect(await again.remoteDocumentCache.get(key('col/doc')), isNull);
+    });
+
+    test('is rejected while the persistence is running', () async {
+      final MemoryLogStore store = MemoryLogStore();
+      final CacheStorePersistence persistence = await createKeyValuePersistence(
+        store: store,
+      );
+      addTearDown(persistence.shutdown);
+
+      await expectLater(
+        persistence.clearPersistence(),
+        throwsA(isA<AssertionError>()),
+      );
+    });
+
+    test('fails with failedPrecondition while another persistence uses the '
+        'store', () async {
+      final MemoryLogStore store = MemoryLogStore();
+      final CacheStorePersistence first = await createKeyValuePersistence(
+        store: store,
+      );
+      await first.shutdown();
+      final CacheStorePersistence second = await createKeyValuePersistence(
+        store: store,
+      );
+      addTearDown(second.shutdown);
+
+      await expectLater(
+        first.clearPersistence(),
+        throwsA(firestoreErrorWithCode(FirestoreErrorCode.failedPrecondition)),
+      );
+    });
+
+    test('does nothing when the store was never written', () async {
+      final MemoryLogStore store = MemoryLogStore();
+      final CacheStorePersistence persistence = await createKeyValuePersistence(
+        store: store,
+      );
+      await persistence.shutdown();
+      await persistence.clearPersistence();
+      await persistence.clearPersistence();
+      expect(await everything(store), isEmpty);
     });
   });
 

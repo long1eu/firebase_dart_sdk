@@ -8,9 +8,13 @@
 // ignore_for_file: unused_element
 
 import 'dart:async';
+import 'dart:collection';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
+import 'dart:typed_data';
+import 'package:cloud_firestore_dart/cache_store.dart';
+import 'package:cloud_firestore_dart/cache_store_testing.dart';
 import 'package:cloud_firestore_dart/cloud_firestore_dart.dart';
 import 'package:cloud_firestore_dart/indexeddb_cache.dart';
 import 'package:cloud_firestore_dart/pipelines.dart';
@@ -69,6 +73,44 @@ class Product {
   Map<String, Object?> toMap() => {'name': name, 'price': price};
 }
 
+class SortedMapStore implements CacheStore {
+  final SplayTreeMap<Uint8List, Uint8List> _data =
+      SplayTreeMap<Uint8List, Uint8List>(compareCacheStoreKeys);
+
+  @override
+  Future<void> open() async {}
+
+  @override
+  Future<void> close() async {}
+
+  @override
+  Future<Uint8List?> get(Uint8List key) async => _data[key];
+
+  @override
+  Future<List<CacheStoreEntry>> scan(Uint8List start, Uint8List end,
+      {bool reverse = false, int? limit}) async {
+    final Iterable<MapEntry<Uint8List, Uint8List>> range = _data.entries.where(
+        (MapEntry<Uint8List, Uint8List> e) =>
+            compareCacheStoreKeys(e.key, start) >= 0 &&
+            compareCacheStoreKeys(e.key, end) < 0);
+    final Iterable<MapEntry<Uint8List, Uint8List>> ordered =
+        reverse ? range.toList().reversed : range;
+    return <CacheStoreEntry>[
+      for (final MapEntry<Uint8List, Uint8List> e
+          in limit == null ? ordered : ordered.take(limit))
+        CacheStoreEntry(e.key, e.value),
+    ];
+  }
+
+  @override
+  Future<void> write(List<CacheStoreEntry> puts, List<Uint8List> deletes) async {
+    for (final CacheStoreEntry entry in puts) {
+      _data[entry.key] = entry.value;
+    }
+    deletes.forEach(_data.remove);
+  }
+}
+
 class AppDependencies extends PlatformDependencies {
   final BehaviorSubject<bool> connectivity = BehaviorSubject<bool>.seeded(true);
 
@@ -103,8 +145,8 @@ Future<void> rootReadmeLine40() async {
       .listen((snapshot) => print(snapshot.docs.length));
 }
 
-// README.md:61
-Future<void> firestoreReadmeLine61() async {
+// README.md:63
+Future<void> firestoreReadmeLine63() async {
   Future<void> main() async {
     final app = FirebaseApp.withOptions(const FirebaseOptions(
         apiKey: '<API key>', appId: '1:1234567890:web:abc', projectId: 'my-project'));
@@ -643,6 +685,30 @@ Future<void> cookbookGuideLine514() async {
   final restored = QuerySnapshot<Map<String, Object?>>.fromJson(firestore, json);
 }
 
+// ../../docs/guides/custom_cache_store.md:9
+Future<void> customCacheStoreGuideLine9() async {
+  Future<void> withMyStore(CacheStore store) async {
+    final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(
+      app: app,
+      settings: Settings(cacheSettings: keyValueCacheSettings(store: store)),
+    );
+    await firestore.collection('notes').add(<String, Object?>{'text': 'kept in my store'});
+  }
+}
+
+// ../../docs/guides/custom_cache_store.md:89
+Future<void> customCacheStoreGuideLine89() async {
+}
+
+// ../../docs/guides/custom_cache_store.md:153
+Future<void> customCacheStoreGuideLine153() async {
+  void checkMyStore(CacheStore Function() newEmptyStore) {
+    for (final CacheStoreCheck check in cacheStoreConformanceChecks) {
+      test(check.name, () => check.run(newEmptyStore));
+    }
+  }
+}
+
 // ../../docs/guides/emulator_and_testing.md:22
 Future<void> emulatorAndTestingGuideLine22() async {
   final FirebaseApp app = FirebaseApp.withOptions(
@@ -944,8 +1010,8 @@ Future<void> forAiAgentsGuideLine98() async {
   }
 }
 
-// ../../docs/guides/for_ai_agents.md:370
-Future<void> forAiAgentsGuideLine370() async {
+// ../../docs/guides/for_ai_agents.md:371
+Future<void> forAiAgentsGuideLine371() async {
   void main() {
     late FirebaseFirestore db;
     int instances = 0;
@@ -1141,8 +1207,8 @@ Future<void> multipleClientsGuideLine142() async {
   await firestore.clearPersistence();
 }
 
-// ../../docs/guides/offline_persistence.md:30
-Future<void> offlinePersistenceGuideLine30() async {
+// ../../docs/guides/offline_persistence.md:31
+Future<void> offlinePersistenceGuideLine31() async {
   // Persistent (needs an openDatabase): unused documents are removed once the
   // cache grows beyond about 100 MB, the default.
   final Settings persistent = Settings(
@@ -1165,8 +1231,8 @@ Future<void> offlinePersistenceGuideLine30() async {
   );
 }
 
-// ../../docs/guides/offline_persistence.md:72
-Future<void> offlinePersistenceGuideLine72() async {
+// ../../docs/guides/offline_persistence.md:73
+Future<void> offlinePersistenceGuideLine73() async {
   final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(
     app: app,
     openDatabase: sqliteOpener(directory: '/home/ada/.local/share/my_app'),
@@ -1174,16 +1240,16 @@ Future<void> offlinePersistenceGuideLine72() async {
   );
 }
 
-// ../../docs/guides/offline_persistence.md:107
-Future<void> offlinePersistenceGuideLine107() async {
+// ../../docs/guides/offline_persistence.md:108
+Future<void> offlinePersistenceGuideLine108() async {
   final OpenDatabase opener = sqliteOpener(
     directory: '/home/ada/.local/share/my_app',
     pageCacheMb: 32,
   );
 }
 
-// ../../docs/guides/offline_persistence.md:128
-Future<void> offlinePersistenceGuideLine128() async {
+// ../../docs/guides/offline_persistence.md:129
+Future<void> offlinePersistenceGuideLine129() async {
   // Only the cache, never the network.
   final DocumentSnapshot<Map<String, Object?>> cached =
       await firestore.doc('cities/SF').get(const GetOptions(source: Source.cache));
@@ -1205,8 +1271,8 @@ Future<void> offlinePersistenceGuideLine128() async {
   await firestore.enableNetwork();
 }
 
-// ../../docs/guides/offline_persistence.md:188
-Future<void> offlinePersistenceGuideLine188() async {
+// ../../docs/guides/offline_persistence.md:189
+Future<void> offlinePersistenceGuideLine189() async {
   final int total = await firestore.getPendingWriteCount();
   final StreamSubscription<int> progress = firestore.pendingWriteCounts().listen(
     (int pending) => print('syncing ${total - pending} of $total'),
@@ -1215,15 +1281,15 @@ Future<void> offlinePersistenceGuideLine188() async {
   await progress.cancel();
 }
 
-// ../../docs/guides/offline_persistence.md:223
-Future<void> offlinePersistenceGuideLine223() async {
+// ../../docs/guides/offline_persistence.md:227
+Future<void> offlinePersistenceGuideLine227() async {
   final Settings settings = Settings(
     cacheSettings: PersistentCacheSettings(mergeUnsentWrites: true),
   );
 }
 
-// ../../docs/guides/offline_persistence.md:325
-Future<void> offlinePersistenceGuideLine325() async {
+// ../../docs/guides/offline_persistence.md:357
+Future<void> offlinePersistenceGuideLine357() async {
   final Directory directory = Directory('/home/ada/.local/share/my_app')
     ..createSync(recursive: true);
   if (!Platform.isWindows) {
@@ -1231,8 +1297,8 @@ Future<void> offlinePersistenceGuideLine325() async {
   }
 }
 
-// ../../docs/guides/offline_persistence.md:350
-Future<void> offlinePersistenceGuideLine350() async {
+// ../../docs/guides/offline_persistence.md:382
+Future<void> offlinePersistenceGuideLine382() async {
   // IndexedDB: SQLite runs in the page on a copy of the whole database in memory.
   final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(
     app: app,
@@ -1240,23 +1306,23 @@ Future<void> offlinePersistenceGuideLine350() async {
   );
 }
 
-// ../../docs/guides/offline_persistence.md:367
-Future<void> offlinePersistenceGuideLine367() async {
+// ../../docs/guides/offline_persistence.md:399
+Future<void> offlinePersistenceGuideLine399() async {
   final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(
     app: app,
     openDatabase: sqliteOpener(opfsWorker: Uri.parse('sqlite_opfs_worker.js')),
   );
 }
 
-// ../../docs/guides/offline_persistence.md:406
-Future<void> offlinePersistenceGuideLine406() async {
+// ../../docs/guides/offline_persistence.md:438
+Future<void> offlinePersistenceGuideLine438() async {
   await firestore.terminate();        // the cache must not be in use by this instance
   await firestore.clearPersistence(); // deletes the files (or the browser storage)
   final FirebaseFirestore fresh = FirebaseFirestore.instanceFor(app: app);
 }
 
-// ../../docs/guides/offline_persistence.md:425
-Future<void> offlinePersistenceGuideLine425() async {
+// ../../docs/guides/offline_persistence.md:457
+Future<void> offlinePersistenceGuideLine457() async {
   final indexes = firestore.persistentCacheIndexManager; // null with a memory cache
   await indexes?.enableIndexAutoCreation();
 }
@@ -1634,8 +1700,8 @@ Future<void> webGuideLine173() async {
   );
 }
 
-// ../../docs/guides/web.md:222
-Future<void> webGuideLine222() async {
+// ../../docs/guides/web.md:224
+Future<void> webGuideLine224() async {
   final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(
     app: app,
     openDatabase: sqliteOpener(opfsWorker: Uri.parse('sqlite_opfs_worker.js')),
@@ -1643,8 +1709,8 @@ Future<void> webGuideLine222() async {
   );
 }
 
-// ../../docs/guides/web.md:278
-Future<void> webGuideLine278() async {
+// ../../docs/guides/web.md:280
+Future<void> webGuideLine280() async {
   final FirebaseFirestore firestore = await openWithMemoryFallback(
     app: app,
     openDatabase: sqliteOpener(),
@@ -1654,8 +1720,8 @@ Future<void> webGuideLine278() async {
   final bool persistent = firestore.persistentCacheIndexManager != null;
 }
 
-// ../../docs/guides/web.md:303
-Future<void> webGuideLine303() async {
+// ../../docs/guides/web.md:305
+Future<void> webGuideLine305() async {
   final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(
     app: app,
     openDatabase: sqliteOpener(),
@@ -1672,8 +1738,8 @@ Future<void> webGuideLine303() async {
   }
 }
 
-// ../../docs/guides/web.md:428
-Future<void> webGuideLine428() async {
+// ../../docs/guides/web.md:430
+Future<void> webGuideLine430() async {
   // One client of the page: `client` names its app ('client-left', 'client-right').
   Future<FirebaseFirestore> startClient(String client, String email) async {
     final FirebaseApp clientApp = FirebaseApp.withOptions(app.options, name: client);
@@ -1683,13 +1749,13 @@ Future<void> webGuideLine428() async {
   }
 }
 
-// ../../docs/guides/web.md:456
-Future<void> webGuideLine456() async {
+// ../../docs/guides/web.md:458
+Future<void> webGuideLine458() async {
   final Settings settings = Settings().withEmulator('127.0.0.1', 8080);
 }
 
-// ../../docs/guides/web.md:538
-Future<void> webGuideLine538() async {
+// ../../docs/guides/web.md:540
+Future<void> webGuideLine540() async {
   final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(
     app: app,
     settings: Settings(

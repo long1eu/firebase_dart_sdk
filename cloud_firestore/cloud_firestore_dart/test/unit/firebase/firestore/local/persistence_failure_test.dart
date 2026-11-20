@@ -67,6 +67,12 @@ void main() {
     await persistence.shutdown();
   });
 
+  test('key-value persistence survives a throwing transaction', () async {
+    final Persistence persistence = await createKeyValuePersistence();
+    await expectUsableAfterFailure(persistence);
+    await persistence.shutdown();
+  });
+
   test('sqlite persistence releases the semaphore when ROLLBACK throws',
       () async {
     final persistence = await createSQLitePersistence();

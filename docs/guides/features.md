@@ -19,7 +19,7 @@ What `cloud_firestore_dart` does, what it does not do yet, and the known gaps. T
   `Decimal128Value`, `BsonObjectId`, `BsonTimestamp`, `RegexValue` and `Blob.bsonBinary`.
 - Pipelines (**preview**, Enterprise edition databases, server only): see
   [Pipelines](pipelines.md).
-- Firestore Lite (**experimental**): a second entry point without cache, listeners and sync
+- Firestore Lite: a second entry point without cache, listeners and sync
   engine, where every call is one request. See [Firestore Lite](lite.md).
 - Transactions with `maxAttempts` and retry with exponential backoff,
   read-only transactions (`readOnly: true`); write batches.

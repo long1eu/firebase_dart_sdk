@@ -2,9 +2,8 @@
 /// listeners and without the sync engine. Every call is one request to the
 /// backend and one response, over gRPC on native platforms and over REST on
 /// the web. It is the Dart counterpart of `firebase/firestore/lite` of the JS
-/// SDK.
-///
-/// **Experimental**: this API may change in any release.
+/// SDK. Supported like the main library; `docs/guides/lite.md` lists how it
+/// differs from the JS SDK's Lite and what was verified.
 ///
 /// ```dart
 /// import 'package:cloud_firestore_dart/lite.dart';

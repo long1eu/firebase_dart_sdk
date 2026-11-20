@@ -1,5 +1,57 @@
 ## (unreleased)
 
+- `WebExperimentalLongPollingOptions` and the long-polling settings are supported, not experimental: the word
+  "Experimental" in their names comes from the JS SDK and stays for compatibility with it and with FlutterFire.
+- `getPendingWriteCount()` and `pendingWriteCounts()` are a supported extension, no longer experimental (the official
+  SDKs have no equivalent). New tests: the count per user and after a change of user, with writes of several users,
+  with the memory and the SQLite cache; the 250 ms throttle of the stream; a second client on the same SQLite cache,
+  whose writes the stream shows at its next emission.
+- Firestore Lite (`package:cloud_firestore_dart/lite.dart`) is supported, no longer experimental, and covered by
+  the support policy like the main library. Its public API was compared export by export with the JS SDK's
+  `firebase/firestore/lite`; `docs/guides/lite.md` lists every difference (all deliberate; the JS SDK's
+  `firebase/firestore/lite/pipelines` is not ported) and what was verified: the emulator over gRPC and REST, and
+  Chrome (dart2js and dart2wasm), never a production backend. New tests: batches with several kinds of writes and
+  all-or-nothing failure, cursors from document snapshots and on several fields, aggregations over cursors, and
+  converters in batches, transactions and cursor queries.
+- The cache in your own storage (`package:cloud_firestore_dart/cache_store.dart`,
+  `keyValueCacheSettings` over a `CacheStore`) is no longer experimental. What it stores is now a
+  commitment: the format is versioned, a newer SDK migrates the store of an older one in the
+  transaction that opens it, and a store written by a newer SDK is refused with
+  `failed-precondition` (no downgrade; `clearPersistence()` starts over). The format of 0.3.0 is
+  kept as a test fixture, and a format change without a new version and a migration fails the
+  tests. Limits, stated plainly: one Firestore instance and one client per store (no primary lease,
+  no coordination of tabs, isolates or processes), and the writes of each SDK transaction are held
+  in memory until it commits. New guide: `docs/guides/custom_cache_store.md`; the format is
+  described in `docs/keyvalue_cache_format.md`.
+- An error thrown by a `CacheStore` (`get`, `scan` or `write`) is now treated as a database that is
+  not available right now (`TransientDatabaseException`, with the store's error as its `cause`):
+  the listen or write that needed it fails with `unavailable`, acknowledgements and remote changes
+  are stored again later, and the client goes offline and tries the store again with a backoff.
+  Before, the error was fatal for the client.
+- `getPendingWriteCount()` on the key-value cache reads the pending batches once and then keeps the
+  count; it read every batch on each call (10,000 pending writes: about 4 ms per call before,
+  under 0.1 ms after the first).
+- The key-value cache no longer counts deleted documents it skips in a collection scan as read,
+  as the SQLite cache does; the count feeds the choice of a cache index.
+- `mergeUnsentWrites` is no longer experimental: it is a supported opt-in extension that differs
+  from the official SDKs (off by default; the backend ends with the same documents, rules and
+  functions see fewer writes). Each merge rule of the guide is tied to a test, and new property
+  tests compare random offline sequences with and without the setting on a model backend, on the
+  emulator (SQLite, memory and key-value caches, with what the app sees after every write and the
+  outcome of every write), against security rules, and with the merge at start killed at random
+  points. The guide also documents that after a process kill a SQLite cache that is not an
+  `ExclusiveDatabase` merges nothing until the row of the killed client is 30 minutes old.
+- `mergeUnsentWrites`: a `set` (or an earlier merged write that became one) with a
+  `serverTimestamp` on a nested field (`n.t`) followed by an `update` that deletes that field or
+  a map above it is no longer merged. The timestamp creates the map `n`, which the delete leaves
+  empty on the backend; the merged write did not create it, so `n` was missing. Found by a new
+  property test of random offline sequences.
+- `mergeUnsentWrites`: a merged write no longer carries the fields that a `serverTimestamp` of the
+  newer write overwrites (for example `n.t` of the older write and a timestamp on `n` in the
+  newer one). The backend ends the same; until it confirms the write, the value that
+  `ServerTimestampBehavior.previous` shows under the pending timestamp is now the one it shows
+  without the setting (it showed the older write's fields, or an earlier map). Found by a new
+  test that compares the cache views with and without the setting after every offline write.
 - `importJsSdkCache` and `deleteJsSdkCache` are no longer experimental. They are now tested in
   Chrome (dart2wasm and dart2js) against databases the real JS SDK wrote: every kind of write and
   value type reaches the backend with the same result as when the JS SDK sends it, the writes of

@@ -9,6 +9,9 @@ import 'dart:typed_data';
 import 'package:cloud_firestore_dart/src/firebase/firestore/auth/user.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/online_state.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/serial_queue.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/local/keyvalue/cache_store.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/local/keyvalue/kv_codec.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/local/persistance/persistence.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/shared_client_state.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/shared_client_state_storage.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/sqlite/sqlite_persistence.dart';
@@ -18,6 +21,7 @@ import 'package:cloud_firestore_dart/src/proto/index.dart' as proto;
 import 'package:protobuf/protobuf.dart';
 import 'package:test/test.dart';
 
+import '../../../example/cache_store/memory_log/memory_log_store.dart';
 import '../../util/sqlite3_database.dart';
 import '../../util/test_util.dart' as util;
 import '../firebase/firestore/local/persistence_test_helpers.dart';
@@ -106,6 +110,60 @@ void main() {
           'UPDATE remote_documents SET contents = ?',
           <Object?>[corrupt],
         );
+        await expectLater(
+          persistence.runTransactionAndReturn(
+            'read',
+            () => persistence.remoteDocumentCache.get(key),
+          ),
+          failsToParse('MaybeDocument'),
+          reason: '$corrupt',
+        );
+      }
+    });
+  });
+
+  group('protos stored in the key-value cache', () {
+    test('a corrupt remote document entry fails to parse instead of a '
+        'RangeError', () async {
+      final MemoryLogStore store = MemoryLogStore();
+      final Persistence persistence = await createKeyValuePersistence(
+        store: store,
+      );
+      addTearDown(persistence.shutdown);
+      final DocumentKey key = util.key('coll/doc');
+      await persistence.runTransaction('add', () async {
+        await persistence.remoteDocumentCache.add(
+          util.doc('coll/doc', 1, <String, Object?>{'a': 1}),
+          util.version(1),
+        );
+      });
+
+      // The entry of the document: its read time and type, then the proto.
+      final Uint8List start = KvKeyWriter().string('doc').bytes;
+      final Uint8List end = Uint8List.fromList(start);
+      end[end.length - 1]++;
+      final CacheStoreEntry entry = (await store.scan(start, end)).single;
+      // Skip the read time (two integers) and the type: the proto follows.
+      final KvKeyReader reader = KvKeyReader(entry.value);
+      reader
+        ..integer()
+        ..integer()
+        ..integer();
+      final int protoOffset = entry.value.length - reader.rest().length;
+
+      for (final Uint8List corrupt in <Uint8List>[
+        rangeErrorBytes,
+        argumentErrorBytes,
+      ]) {
+        await store.write(<CacheStoreEntry>[
+          CacheStoreEntry(
+            entry.key,
+            Uint8List.fromList(<int>[
+              ...entry.value.sublist(0, protoOffset),
+              ...corrupt,
+            ]),
+          ),
+        ], <Uint8List>[]);
         await expectLater(
           persistence.runTransactionAndReturn(
             'read',

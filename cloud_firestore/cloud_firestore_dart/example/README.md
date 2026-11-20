@@ -24,7 +24,7 @@ FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 dart run example/main.dart
 | `cache_indexes.dart` | Persistent cache indexes: `persistentCacheIndexManager`, automatic index creation, `deleteAllIndexes`. |
 | `emulator_mock_user_token.dart` | `withEmulator` and `mockUserToken` to act as a signed-in user. |
 | `lifecycle.dart` | `setLogLevel`, `waitForPendingWrites`, `snapshotsInSync()`, `terminate`, `clearPersistence`. |
-| `lite.dart` | Firestore Lite (experimental, `package:cloud_firestore_dart/lite.dart`): the client without cache and listeners. Reads, writes, a batch, queries with `limitToLast` and cursors, aggregations, a converter, a transaction, `terminate`. Does not use `common.dart`, so that it only imports the lite library. |
+| `lite.dart` | Firestore Lite (`package:cloud_firestore_dart/lite.dart`): the client without cache and listeners. Reads, writes, a batch, queries with `limitToLast` and cursors, aggregations, a converter, a transaction, `terminate`. Does not use `common.dart`, so that it only imports the lite library. |
 | `pipelines.dart` | Pipelines (preview): stages, expressions, grouped aggregation, lambdas, `createFrom(query)`, subqueries, an atomic `update`. Needs an Enterprise edition emulator (`FIRESTORE_ENTERPRISE_EMULATOR_HOST`); prints a note and exits without one. |
 | `error_handling.dart` | Catching `FirestoreException` and telling the codes apart, a `withRetry` helper for the temporary codes, offline writes, a listener with `onError`, a transaction that runs out of attempts, `StateError` for different settings, a terminated instance. |
 | `logging.dart` | `setLogLevel(LogLevel.debug)` and sending the SDK's log lines to your own logger through a zone that overrides `print`. |

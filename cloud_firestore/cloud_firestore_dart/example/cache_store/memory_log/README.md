@@ -1,7 +1,7 @@
 # A cache store in plain Dart: a sorted map and a log file
 
 `memory_log_store.dart` implements `CacheStore` of `package:cloud_firestore_dart/cache_store.dart`
-(experimental) without any dependency: the data is a `SplayTreeMap` ordered by
+without any dependency: the data is a `SplayTreeMap` ordered by
 `compareCacheStoreKeys`, and every write appends one record to a log file. It is the store to read
 first when you write your own; it fits in one sitting.
 

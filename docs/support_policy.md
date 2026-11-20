@@ -95,10 +95,16 @@ Behaviour is ported in Dart, not copied. Where the port deliberately differs fro
   (the schema version is in `local/sqlite/sqlite_schema.dart`; the migration tests open caches
   written by older versions, including caches written by the published `cloud_firestore_vm`
   0.0.7).
+- **DRAFT:** The same holds for the format of the key-value cache (`package:cloud_firestore_dart/cache_store.dart`)
+  since 0.3.0: a change comes with a new schema version and a migration of the stores of the
+  older versions (`kvSchemaVersion` and `kvMigrations` in `local/keyvalue/cache_store_persistence.dart`;
+  `keyvalue_schema_test.dart` opens a fixture of what every version wrote and fails when the
+  format changes without a new version, see [`docs/keyvalue_cache_format.md`](keyvalue_cache_format.md)).
+  A store of a newer version is refused, not downgraded.
 - What is not covered by any compatibility promise: everything under `lib/src`,
-  `package:firebase_app_dart/internal.dart`, the Pipelines library
-  (`package:cloud_firestore_dart/pipelines.dart`, preview) and Firestore Lite
-  (`package:cloud_firestore_dart/lite.dart`, experimental). These can change in any release.
+  `package:firebase_app_dart/internal.dart` and the Pipelines library
+  (`package:cloud_firestore_dart/pipelines.dart`, preview). These can change in any release.
+  Firestore Lite (`package:cloud_firestore_dart/lite.dart`) is covered like the main library.
 
 ## Reporting problems
 

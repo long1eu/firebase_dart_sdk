@@ -2,8 +2,8 @@
 
 `package:cloud_firestore_dart/lite.dart` is a second entry point: a client without a local
 cache, without listeners and without the sync engine. Every call is one request to the backend
-and one response. It is the counterpart of `firebase/firestore/lite` of the JS SDK. The API is
-**experimental** and may change in any release.
+and one response. It is the counterpart of `firebase/firestore/lite` of the JS SDK, and supported
+like the main library (see [what was verified](#what-was-verified)).
 
 ## When to use it
 
@@ -86,7 +86,30 @@ to use both in one file, import one with a prefix. The value types (`Timestamp`,
   `mockUserToken`, Firebase Auth and App Check tokens of the `FirebaseApp`.
 - **What it does not have:** snapshot streams, `Source`, snapshot metadata
   (`hasPendingWrites`, `isFromCache`), persistence and cache settings, bundles, offline
-  behaviour of any kind, vector queries (`findNearest`) and pipelines.
+  behaviour of any kind, vector queries (`findNearest`) and pipelines. The JS SDK has a
+  separate `firebase/firestore/lite/pipelines` entry point; this package has Pipelines only in
+  the main library (preview, `package:cloud_firestore_dart/pipelines.dart`), not for Lite.
+
+### Compared with `firebase/firestore/lite`
+
+Every export of the JS entry point (`packages/firestore/lite/index.ts`, checked on 2026-11-20)
+has a counterpart here, except the ones below. All of them are deliberate.
+
+| JS | Here | Why |
+|---|---|---|
+| `firebase/firestore/lite/pipelines` (`execute`, the stages and expressions) | none in Lite | Pipelines are a preview of the main library; not ported to Lite |
+| `Settings.ignoreUndefinedProperties` | none | Dart has no `undefined` |
+| `connectFirestoreEmulator(db, host, port, {mockUserToken})` | `useFirestoreEmulator(host, port, {sslEnabled})`; the mock token through `Settings().withEmulator(host, port, mockUserToken: ...)` | The FlutterFire signature, as in the main library |
+| `updateDoc(ref, 'a', 1, 'b', 2)` (field and value pairs) | `update({'a': 1, 'b': 2})` only | The FlutterFire and Android form, as in the main library |
+| Free functions (`getDoc`, `setDoc`, `query(q, where(...))`, `writeBatch`, `getCount`, `getAggregate`, `refEqual`, `queryEqual`, `snapshotEqual`, `aggregateQuerySnapshotEqual`, `aggregateFieldEqual`, `documentId`, `deleteField`, `vector`, ...) and the `Query...Constraint` classes | Methods and constructors: `ref.get()`, `ref.set()`, `query.where(...)`, `firestore.batch()`, `query.count().get()`, `query.aggregate(...)`, `==`, `FieldPath.documentId`, `FieldValue.delete()`, `VectorValue(...)` | The API of the main library and FlutterFire |
+| `Bytes`, `FirestoreError`, `snapshot.exists()`, `snapshot.ref`, `querySnapshot.empty`, `querySnapshot.forEach` | `Blob`, `FirestoreException`, `snapshot.exists`, `snapshot.reference`, `isEmpty`, `docs.forEach` | The names of the main library and FlutterFire |
+| `snapshot.get('missing')` is `undefined` | `null` | Dart has no `undefined` |
+| `Firestore.toJSON()`, `Firestore.type` and the TypeScript helper types (`DocumentData`, `UpdateData`, `WithFieldValue`, `AggregateSpec`, ...) | none | Not needed in Dart |
+
+Beyond the JS entry point, Lite here has: read-only transactions (`readOnly`, `readTime`) with
+`Transaction.getQuery` and `getAggregate`, a transaction `timeout`, `Filter(isNull: ...)`,
+`DocumentSnapshot.contains` and `[]`, `FirebaseFirestore.instance` and a `settings` setter that
+works until the first request.
 
 Differences from the main library that are not just missing features:
 `FirebaseFirestore.instanceFor` is synchronous; `FirestoreDataConverter.fromFirestore` takes only the
@@ -115,3 +138,17 @@ job that is allowed to fail.
 
 [`example/lite.dart`](../../cloud_firestore/cloud_firestore_dart/example/lite.dart) is a runnable
 program.
+
+## What was verified
+
+- **The Firestore emulator only.** `test/integration/firebase/firestore/lite_test.dart` (a port
+  of the JS SDK's Lite integration tests, with additions) runs on the Dart VM over gRPC and over
+  REST (`FIRESTORE_TEST_TRANSPORT=rest`): reads, writes, merges, transforms, batches (several
+  writes, all or nothing), transactions (retries, `maxAttempts`, read-only), queries with
+  filters, orders, limits, `limitToLast`, cursors from values and from document snapshots,
+  collection groups, `count`, `sum` and `average` (also over cursors), converters (on
+  references, queries, batches and transactions), vectors and mock user tokens.
+- **Chrome only.** `test/browser/web_lite_test.dart` runs the same areas in Chrome, compiled
+  with dart2js and dart2wasm, against the emulator. Firefox and Safari were not tried.
+- **Never against a production backend.** Lite was not run against a real Firebase project.
+

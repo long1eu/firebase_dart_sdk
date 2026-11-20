@@ -9,9 +9,18 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/local/unsent_write_m
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/database_id.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/document.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/document_key.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/model/field_path.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/maybe_document.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/model/value/field_value.dart'
+    as model;
+import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/array_transform_operation.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/field_transform.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/mutation.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/numeric_increment_transform_operation.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/patch_mutation.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/precondition.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/server_timestamp_operation.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/set_mutation.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/user_data_converter.dart';
 import 'package:cloud_firestore_dart/src/firebase/timestamp.dart';
 import 'package:test/test.dart';
@@ -118,6 +127,7 @@ void main() {
     'update n.t time': update(<String, Object?>{
       'n.t': FieldValue.serverTimestamp(),
     }),
+    'update deletes n.t': update(<String, Object?>{'n.t': FieldValue.delete()}),
     'update count': update(<String, Object?>{'count': 42}),
     'update count to a double': update(<String, Object?>{'count': 1.5}),
     'update with increment 1.5': update(<String, Object?>{
@@ -304,5 +314,279 @@ void main() {
     );
     expect(merge('update with arrayRemove', 'update with arrayUnion'), isNull);
     expect(merge('update with time', 'set with increment'), isNull);
+
+    // Found by merge_unsent_writes_model_test.dart: the timestamp at n.t creates the map n, which the delete of n.t
+    // leaves empty; a merged write without the timestamp would not create n.
+    final Mutation stamped = merge('set count', 'update n.t time')!;
+    expect(stamped, isA<SetMutation>());
+    expect(
+      mergeUnsentMutations(stamped, writes['update deletes n.t']!),
+      isNull,
+    );
+  });
+
+  // One test per row of the tables in "Merging repeated offline writes" of docs/guides/offline_persistence.md: the
+  // guide names the row by these ids (W1 to W5, T1 to T7, N). Each pair merges (or not) as the row says, and a pair
+  // that merges leaves the backend as the two writes do on every starting document.
+  group('the tables of the guide', () {
+    /// The merged write of [first] then [second], checked against the two writes on every starting document.
+    Mutation merged(String first, String second) {
+      final Mutation? one = mergeUnsentMutations(
+        writes[first]!,
+        writes[second]!,
+      );
+      expect(one, isNotNull, reason: '"$first" then "$second"');
+      for (final MapEntry<String, MaybeDocument?> before in documents.entries) {
+        expect(
+          describe(commit(one!, before.value)),
+          describe(
+            commit(writes[second]!, commit(writes[first]!, before.value)),
+          ),
+          reason: '"$first" then "$second" on "${before.key}"',
+        );
+      }
+      return one!;
+    }
+
+    void notMerged(String first, String second) => expect(
+      mergeUnsentMutations(writes[first]!, writes[second]!),
+      isNull,
+      reason: '"$first" then "$second"',
+    );
+
+    FieldTransform? transformAt(Mutation mutation, String path) {
+      for (final FieldTransform t in mutation.fieldTransforms) {
+        if (t.fieldPath == FieldPath.fromServerFormat(path)) {
+          return t;
+        }
+      }
+      return null;
+    }
+
+    test(
+      'W1: anything, then a set (serverTimestamp allowed) or a delete: the new write',
+      () {
+        for (final String first in writes.keys) {
+          for (final String second in <String>[
+            'set a,b',
+            'set with time',
+            'delete',
+          ]) {
+            expect(merged(first, second), same(writes[second]));
+          }
+        }
+      },
+    );
+
+    test(
+      'W2: a set, then an update or a set with merge: one set with the new fields applied',
+      () {
+        for (final (String, String) pair in <(String, String)>[
+          ('set a,b', 'update n.x'),
+          ('set with time', 'update a'),
+          ('set nested', 'merge b,c'),
+          ('set with time', 'merge with time'),
+        ]) {
+          final Mutation one = merged(pair.$1, pair.$2);
+          expect(one, isA<SetMutation>());
+          expect(one.precondition, Precondition.none);
+        }
+      },
+    );
+
+    test('W3: an update, then an update: one update of the fields of both', () {
+      final Mutation one = merged('update a', 'update n.y, a');
+      expect(one, isA<PatchMutation>());
+      expect(one.precondition, Precondition(exists: true));
+      expect((one as PatchMutation).mask.mask, <FieldPath>{
+        field('a'),
+        field('n.y'),
+      });
+    });
+
+    test(
+      'W4: a set with merge, then an update or a set with merge: one set with merge of the fields of both',
+      () {
+        for (final String second in <String>['update b', 'merge b,c']) {
+          final Mutation one = merged('merge a', second);
+          expect(one, isA<PatchMutation>());
+          expect(one.precondition, Precondition.none);
+        }
+      },
+    );
+
+    test('W5: a delete, then a set with merge: one set of the new fields', () {
+      final Mutation one = merged('delete', 'merge b,c');
+      expect(one, isA<SetMutation>());
+      expect(
+        (one as SetMutation).value,
+        wrapMap(<String, Object?>{'b': 12, 'c': 13}),
+      );
+    });
+
+    test(
+      'T1: any transform, then a value, a delete or a serverTimestamp on that field (or one containing it): the new write\'s',
+      () {
+        expect(
+          transformAt(merged('update with increment', 'update count'), 'count'),
+          isNull,
+        );
+        expect(
+          transformAt(merged('update with arrayRemove', 'update tags'), 'tags'),
+          isNull,
+        );
+        expect(
+          transformAt(
+            merged('update n.count increment', 'update deletes n'),
+            'n.count',
+          ),
+          isNull,
+        );
+        expect(
+          transformAt(
+            merged('update with time', 'update time only'),
+            'time',
+          )!.operation,
+          isA<ServerTimestampOperation>(),
+        );
+      },
+    );
+
+    test('T2: a value, then a serverTimestamp: serverTimestamp', () {
+      expect(
+        transformAt(
+          merged('update time to a value', 'update time only'),
+          'time',
+        )!.operation,
+        isA<ServerTimestampOperation>(),
+      );
+    });
+
+    test(
+      'T3: a value (or a set or a delete), then increment: the sum, for two integers within 2^53 - 1 or two doubles',
+      () {
+        final Mutation ints = merged('update count', 'update with increment');
+        expect(transformAt(ints, 'count'), isNull);
+        expect((ints as PatchMutation).value.get(field('count')), wrap(46));
+        final Mutation fromSet = merged('set count', 'update with increment');
+        expect((fromSet as SetMutation).value.get(field('count')), wrap(4));
+        final Mutation doubles = merged(
+          'update count to a double',
+          'update with increment 1.5',
+        );
+        expect((doubles as PatchMutation).value.get(field('count')), wrap(3.0));
+        // An integer with a double, and an increment of a field the pending write does not set.
+        notMerged('update count to a double', 'update with increment');
+        expect(
+          transformAt(
+            merged('update a', 'update with increment'),
+            'count',
+          )!.operation,
+          isA<NumericIncrementTransformOperation>(),
+        );
+        // Out of the exact range of JavaScript numbers.
+        final Mutation large = converter
+            .parseUpdateData(<String, Object?>{'count': 9007199254740991})
+            .toMutation(documentKey, Precondition(exists: true));
+        expect(
+          mergeUnsentMutations(large, writes['update with increment']!),
+          isNull,
+        );
+      },
+    );
+
+    test(
+      'T4: arrayUnion(a), then arrayUnion(b): arrayUnion of a then b, without repeats',
+      () {
+        final FieldTransform union = transformAt(
+          merged('update with arrayUnion', 'update with arrayUnion 8,9'),
+          'tags',
+        )!;
+        expect(union.operation, isA<ArrayTransformOperationUnion>());
+        expect(
+          (union.operation as ArrayTransformOperation).elements,
+          <model.FieldValue>[wrap(2), wrap(8), wrap(9), wrap(3.0)],
+        );
+      },
+    );
+
+    test('T5: arrayRemove(a), then arrayRemove(b): arrayRemove of a and b', () {
+      final FieldTransform remove = transformAt(
+        merged('update with arrayRemove', 'update with arrayRemove 2'),
+        'tags',
+      )!;
+      expect(remove.operation, isA<ArrayTransformOperationRemove>());
+      expect(
+        (remove.operation as ArrayTransformOperation).elements,
+        <model.FieldValue>[wrap(1), wrap(2), wrap(7)],
+      );
+    });
+
+    test(
+      'T6: a transform, then nothing on that field, inside it or containing it: the transform, unchanged',
+      () {
+        expect(
+          transformAt(
+            merged('update with increment', 'update a'),
+            'count',
+          )!.operation,
+          isA<NumericIncrementTransformOperation>(),
+        );
+        expect(
+          transformAt(merged('update with time', 'update b'), 'time'),
+          isNotNull,
+        );
+        expect(
+          transformAt(merged('update n.tags union', 'update a'), 'n.tags'),
+          isNotNull,
+        );
+      },
+    );
+
+    test(
+      'T7: nothing on that field (an update or a set with merge), then a transform: the transform, unchanged',
+      () {
+        expect(
+          transformAt(
+            merged('update a', 'update with arrayUnion'),
+            'tags',
+          )!.operation,
+          isA<ArrayTransformOperationUnion>(),
+        );
+        expect(
+          transformAt(merged('merge a', 'update n.count increment'), 'n.count'),
+          isNotNull,
+        );
+      },
+    );
+
+    test('N: everything else stays queued as two writes', () {
+      // increment after increment of the same field.
+      notMerged('update with increment', 'update with increment');
+      notMerged('update with increment', 'update with negative increment');
+      // arrayUnion with arrayRemove on one field.
+      notMerged('update with arrayUnion', 'update with arrayRemove 2');
+      notMerged('update with arrayRemove', 'update with arrayUnion');
+      // An array transform after a set or a delete.
+      notMerged('set tags', 'update with arrayUnion');
+      notMerged('delete', 'merge with arrayUnion');
+      // A pending set with increment or array transforms.
+      notMerged('set with increment', 'update a');
+      notMerged('set with arrayUnion', 'update a');
+      // Another overlap of a transform with a field of the other write.
+      notMerged('update n', 'update n.count increment');
+      notMerged('update tags', 'update with arrayUnion');
+      // A set with merge after an update, an update after a delete.
+      notMerged('update a', 'merge b,c');
+      notMerged('delete', 'update a');
+      // A nested delete after a set whose serverTimestamp is at or under it.
+      expect(
+        mergeUnsentMutations(
+          merged('set count', 'update n.t time'),
+          writes['update deletes n.t']!,
+        ),
+        isNull,
+      );
+    });
   });
 }

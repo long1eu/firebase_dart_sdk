@@ -177,7 +177,9 @@ final Settings settings = Settings(
 );
 ```
 
-The three settings are the ones of the JS SDK, with the same names. They are ignored on the
+The three settings are the ones of the JS SDK, with the same names. They are supported: the word
+"Experimental" in the names comes from the JS SDK and is kept for compatibility with it and with
+FlutterFire. They are ignored on the
 Dart VM, which uses gRPC, and by Firestore Lite, which has no streams. The auto detection is in
 the spirit of the JS SDK's, not a port of it.
 

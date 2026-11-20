@@ -1,7 +1,7 @@
 # A cache store on IndexedDB, for the web
 
 `indexeddb_cache_store.dart` implements `CacheStore` of
-`package:cloud_firestore_dart/cache_store.dart` (experimental) on IndexedDB, through
+`package:cloud_firestore_dart/cache_store.dart` on IndexedDB, through
 `package:web` and `dart:js_interop`: one database with one object store, `entries`, whose keys
 are the binary keys of the SDK and whose values are its byte arrays.
 

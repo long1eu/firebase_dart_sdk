@@ -20,7 +20,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/local/keyvalue/key_v
 
 /// Configures the local cache of a Firestore instance, see
 /// [Settings.cacheSettings]. The implementations are
-/// [PersistentCacheSettings], [MemoryCacheSettings], [KeyValueCacheSettings] (experimental) and, on the web,
+/// [PersistentCacheSettings], [MemoryCacheSettings], [KeyValueCacheSettings] and, on the web,
 /// [IndexedDbCacheSettings] (experimental).
 ///
 /// The cache holds the documents that listeners and reads received and the writes that the backend has not
@@ -60,7 +60,8 @@ final class PersistentCacheSettings extends LocalCacheSettings {
   ///
   /// [indexAutoCreation] and [indexBackfill] configure the persistent cache
   /// indexes; the defaults are the behaviour of the official SDKs.
-  /// [mergeUnsentWrites] is experimental and off by default, see [mergeUnsentWrites].
+  /// [mergeUnsentWrites] is an opt-in extension that differs from the official SDKs, off by default, see
+  /// [mergeUnsentWrites].
   PersistentCacheSettings({
     this.sizeBytes = Settings.defaultCacheSizeBytes,
     this.indexAutoCreation = false,
@@ -92,9 +93,10 @@ final class PersistentCacheSettings extends LocalCacheSettings {
   /// default is the fixed rate of the official SDKs.
   final IndexBackfillSettings indexBackfill;
 
-  /// **Experimental, not in the official SDKs.** Whether a write to a document whose previous write is still pending
-  /// and was not sent yet replaces that write with one merged write, instead of queuing a second one. Off by default;
-  /// when off nothing changes.
+  /// **Not in the official SDKs: a supported opt-in extension that differs from them in what the backend sees (see
+  /// "What the app gives up" below).** Whether a write to a document whose previous write is still pending and was not
+  /// sent yet replaces that write with one merged write, instead of queuing a second one. Off by default; when off
+  /// nothing changes.
   ///
   /// This keeps the queue of pending writes short for an app that stays offline for a long time and edits the same
   /// documents again and again: about one pending write per document instead of one per edit, so a smaller cache, a
@@ -142,10 +144,14 @@ final class PersistentCacheSettings extends LocalCacheSettings {
   ///     field: the backend adds the two numbers one at a time, and a field that holds a double can round differently
   ///     when the two are added first. Also an `arrayUnion` after an `arrayRemove` of the same field (or the reverse),
   ///     an `arrayUnion` or `arrayRemove` of the new write after a `set` or a `delete`, a pending `set` with
-  ///     `increment` or array transforms, and any other overlap of a transform with a field of the other write.
+  ///     `increment` or array transforms, an `update` that deletes a nested field at or above a `serverTimestamp` of a
+  ///     pending `set`, and any other overlap of a transform with a field of the other write. `minimum` and `maximum`
+  ///     combine only as the first and last rules above say (overwritten, or on a field the other write leaves alone).
   ///
-  ///   The local view of the merged write is the same as with two writes, except for a `serverTimestamp` of the
-  ///   pending write that stays: until the backend confirms it, its estimate is the time of the newer write.
+  ///   The local view of the merged write is the same as with two writes (the documents, their pending-writes flag,
+  ///   query results, and the value under a pending `serverTimestamp` with `ServerTimestampBehavior.previous`),
+  ///   except for a `serverTimestamp` of the pending write that stays: until the backend confirms it, its estimate is
+  ///   the time of the newer write.
   ///
   /// The merged write takes the place of the newer write in the queue: writes to other documents queued in between
   /// now reach the backend before the earlier state of this document, which never reaches it at all. The future of
@@ -159,7 +165,10 @@ final class PersistentCacheSettings extends LocalCacheSettings {
   /// to the backend until it is done. A write made meanwhile is merged when the merge of the queue reaches it. The
   /// progress is saved with each transaction: a merge that is stopped (the app is closed, the process is killed)
   /// resumes where it was at the next start, and a queue that was merged is not read again. It does not run while
-  /// another client uses the cache, and the queue of a user who signs in later is merged when they sign in.
+  /// another client uses the cache, and the queue of a user who signs in later is merged when they sign in. After the
+  /// process was killed, the row of the killed client in a SQLite cache counts as another client for up to 30 minutes
+  /// (not with an `ExclusiveDatabase`, such as the web openers): until then neither merge runs, and writes queue as
+  /// with the setting off.
   ///
   /// What the app gives up:
   ///
@@ -412,7 +421,10 @@ final class IndexedDbCacheSettings extends LocalCacheSettings {
 /// Configures a persistent cache in a key-value store that the app brings ([CacheStore]): an ordered store of byte
 /// keys and byte values, such as a file, an embedded database or a platform store.
 ///
-/// **Experimental**: the API, the behaviour and what is stored may change in a minor version.
+/// The stored format is versioned: a newer SDK migrates a store written by an older one, and an older SDK refuses a
+/// store written by a newer one (see docs/keyvalue_cache_format.md). Limits: one instance and one client per store (no
+/// primary lease, no coordination of tabs or processes), and the writes of each transaction are held in memory until
+/// it commits. See docs/guides/custom_cache_store.md.
 ///
 /// The SDK lays the whole cache out in the store (documents, pending writes, targets, bundles, the garbage collector's
 /// sequence numbers) in a format of its own, with a schema version. The data and the pending writes survive a restart
@@ -519,9 +531,9 @@ final class MemoryCacheSettings extends LocalCacheSettings {
   /// The garbage collector of the memory cache.
   final MemoryGarbageCollectorSettings gcSettings;
 
-  /// **Experimental, not in the official SDKs.** Whether a write to a document whose previous write is still pending
-  /// and was not sent yet replaces that write with one merged write. Off by default. The conditions and what the app
-  /// gives up are those of [PersistentCacheSettings.mergeUnsentWrites].
+  /// **Not in the official SDKs: a supported opt-in extension that differs from them.** Whether a write to a document
+  /// whose previous write is still pending and was not sent yet replaces that write with one merged write. Off by
+  /// default. The conditions and what the app gives up are those of [PersistentCacheSettings.mergeUnsentWrites].
   final bool mergeUnsentWrites;
 
   @override

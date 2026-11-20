@@ -3,8 +3,31 @@ import 'dart:typed_data';
 
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/keyvalue/cache_store.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/keyvalue/kv_codec.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/util/database.dart';
 
 final Future<void> _done = Future<void>.value();
+
+/// What the SDK makes of an error of the store: the transaction that needed it did not take effect (the contract of
+/// [CacheStore.write]), so it is a [TransientDatabaseException], which the SDK recovers from as the JS SDK does from a
+/// failed IndexedDB transaction (the operation fails with `unavailable` or is retried with a backoff while the client
+/// stays offline).
+Never _storeFailed(String what, Object error, StackTrace stackTrace) {
+  if (error is TransientDatabaseException) {
+    Error.throwWithStackTrace(error, stackTrace);
+  }
+  Error.throwWithStackTrace(
+    TransientDatabaseException(
+      'The CacheStore failed in $what: ${error.runtimeType}',
+      error,
+    ),
+    stackTrace,
+  );
+}
+
+Future<T> _guard<T>(String what, Future<T> future) => future.catchError(
+  (Object error, StackTrace stackTrace) =>
+      _storeFailed(what, error, stackTrace),
+);
 
 /// The reads and writes of one transaction of the persistence.
 ///
@@ -26,12 +49,12 @@ class KvTransaction {
     if (_writes.containsKey(key)) {
       return Future<Uint8List?>.value(_writes[key]);
     }
-    return _store.get(key);
+    return _get(key);
   }
 
   Future<void> put(Uint8List key, Uint8List value) {
     if (autoCommit) {
-      return _store.write(<CacheStoreEntry>[
+      return _write(<CacheStoreEntry>[
         CacheStoreEntry(key, value),
       ], const <Uint8List>[]);
     }
@@ -41,7 +64,7 @@ class KvTransaction {
 
   Future<void> delete(Uint8List key) {
     if (autoCommit) {
-      return _store.write(const <CacheStoreEntry>[], <Uint8List>[key]);
+      return _write(const <CacheStoreEntry>[], <Uint8List>[key]);
     }
     _writes[key] = null;
     return _done;
@@ -62,7 +85,41 @@ class KvTransaction {
       }
     });
     _writes.clear();
-    return _store.write(puts, deletes);
+    return _write(puts, deletes);
+  }
+
+  // The calls of the store, whose errors are made [TransientDatabaseException]s (see [_storeFailed]).
+
+  Future<Uint8List?> _get(Uint8List key) {
+    try {
+      return _guard('get', _store.get(key));
+    } catch (error, stackTrace) {
+      _storeFailed('get', error, stackTrace);
+    }
+  }
+
+  Future<List<CacheStoreEntry>> _scan(
+    Uint8List start,
+    Uint8List end, {
+    required bool reverse,
+    int? limit,
+  }) {
+    try {
+      return _guard(
+        'scan',
+        _store.scan(start, end, reverse: reverse, limit: limit),
+      );
+    } catch (error, stackTrace) {
+      _storeFailed('scan', error, stackTrace);
+    }
+  }
+
+  Future<void> _write(List<CacheStoreEntry> puts, List<Uint8List> deletes) {
+    try {
+      return _guard('write', _store.write(puts, deletes));
+    } catch (error, stackTrace) {
+      _storeFailed('write', error, stackTrace);
+    }
   }
 
   /// The first written key that is at least [key].
@@ -82,7 +139,7 @@ class KvTransaction {
   }) async {
     final Uint8List? firstWrite = _writes.isEmpty ? null : _firstFrom(start);
     if (firstWrite == null || compareCacheStoreKeys(firstWrite, end) >= 0) {
-      return _store.scan(start, end, reverse: reverse, limit: limit);
+      return _scan(start, end, reverse: reverse, limit: limit);
     }
     final List<CacheStoreEntry> result = <CacheStoreEntry>[];
     if (limit != null && limit <= 0) {
@@ -96,7 +153,7 @@ class KvTransaction {
     Uint8List to = end;
     while (true) {
       final int? wanted = limit == null ? null : limit - result.length;
-      final List<CacheStoreEntry> page = await _store.scan(
+      final List<CacheStoreEntry> page = await _scan(
         from,
         to,
         reverse: reverse,
