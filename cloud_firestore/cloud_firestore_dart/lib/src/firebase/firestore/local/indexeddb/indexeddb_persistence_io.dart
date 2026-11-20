@@ -12,6 +12,7 @@ IndexedDbPersistence createIndexedDbPersistence({
   required DatabaseId databaseId,
   required LocalSerializer serializer,
   required LruGarbageCollectorParams lruParams,
+  bool multiTab = false,
 }) {
   throw UnsupportedError(
     'IndexedDbCacheSettings select a cache in IndexedDB, which only exists on the web. Use PersistentCacheSettings '
