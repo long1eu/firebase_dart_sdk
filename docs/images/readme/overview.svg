@@ -79,7 +79,7 @@
     <text x="450" y="90" font-size="12" fill="#57606a">Android, iOS, desktop</text>
     <rect x="610" y="46" width="260" height="58" rx="8" fill="#ddf4ff" stroke="#0969da" stroke-dasharray="5 3"/>
     <text x="740" y="70" font-weight="600">Browser app</text>
-    <text x="740" y="90" font-size="12" fill="#57606a">web, experimental (Chrome)</text>
+    <text x="740" y="90" font-size="12" fill="#57606a">web (Chrome)</text>
   </g>
   <g stroke="#57606a" stroke-width="1.5" marker-end="url(#arrow)">
     <line x1="160" y1="104" x2="160" y2="140"/>

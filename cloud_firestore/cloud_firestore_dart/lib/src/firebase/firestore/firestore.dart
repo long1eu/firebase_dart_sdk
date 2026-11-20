@@ -632,8 +632,8 @@ class FirebaseFirestore {
 
   /// Returns the number of write batches of the signed-in user that the backend has not acknowledged or rejected yet.
   ///
-  /// **Experimental**: this API may change in any release. The official SDKs have no equivalent; they only offer
-  /// [waitForPendingWrites] and `hasPendingWrites` on a snapshot.
+  /// A supported extension: the official SDKs have no equivalent; they only offer [waitForPendingWrites] and
+  /// `hasPendingWrites` on a snapshot.
   ///
   /// A batch is one call of `set`, `update` or `delete`, or one [WriteBatch.commit]; a transaction is not queued. The
   /// count is that of the current user's queue (the queue is per user) and, with a persistent cache that several
@@ -654,7 +654,7 @@ class FirebaseFirestore {
   /// A stream of [getPendingWriteCount]: it emits the count when it is listened to, and then a new count after the
   /// queue of pending writes changed (a write, an acknowledgement, a rejection, a change of the signed-in user).
   ///
-  /// **Experimental**: this API may change in any release. The official SDKs have no equivalent.
+  /// A supported extension: the official SDKs have no equivalent.
   ///
   /// The stream is throttled: the changes within 250 milliseconds are read together, so a queue that drains 100,000
   /// writes emits at most 4 counts a second, the last one being the final count. A count equal to the previous one is

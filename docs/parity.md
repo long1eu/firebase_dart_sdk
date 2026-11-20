@@ -24,7 +24,7 @@ signatures are in `test/unit/api/public_api.golden.txt`.
 The area tables below at a glance, one mark per row; most gaps are in Pipelines, multi-client and
 the platforms:
 
-![One mark per feature row, by area. Documents and writes: 15 supported, 1 partial, 3 not applicable. Queries and filters: 9 supported. Aggregations: 3 supported. Listeners: 9 supported. Transactions and batches: 5 supported. Offline persistence: 7 supported, 2 not applicable. Indexes: 4 supported, 1 not supported. Bundles: 2 supported. Lite: 4 supported. Pipelines: 6 supported, 3 partial, 1 not supported. Multi-tab or multi-client: 1 supported, 1 partial, 2 not supported. App Check: 1 supported, 1 not supported. Emulator: 2 supported, 1 not applicable. Web transports: 7 supported, 1 not applicable. Platforms: 1 supported, 3 partial, 2 not applicable. In all: 76 supported, 8 partial, 5 not supported, 9 not applicable.](images/readme/parity_summary.svg)
+![One mark per feature row, by area. Documents and writes: 15 supported, 1 partial, 3 not applicable. Queries and filters: 9 supported. Aggregations: 3 supported. Listeners: 9 supported. Transactions and batches: 6 supported. Offline persistence: 7 supported, 2 not applicable. Indexes: 4 supported, 1 not supported. Bundles: 2 supported. Lite: 4 supported, 1 not supported. Pipelines: 6 supported, 3 partial, 1 not supported. Multi-tab or multi-client: 1 supported, 1 partial, 2 not supported. App Check: 1 supported, 1 not supported. Emulator: 2 supported, 1 not applicable. Web transports: 7 supported, 1 not applicable. Platforms: 1 supported, 3 partial, 2 not applicable. In all: 77 supported, 8 partial, 6 not supported, 9 not applicable.](images/readme/parity_summary.svg)
 
 ## How it is tested
 
@@ -117,6 +117,7 @@ for a real project that has not been run yet; see [Known limitations](#known-lim
 | `writeBatch` | supported | `firestore.batch()`, `runBatch(fn)`; `test/integration/firebase/firestore/write_batch_test.dart` |
 | Read-only transactions | supported (extra) | `readOnly: true, readTime: ...` with `getQuery` and `getAggregate`. Not in the JS client SDK (the server SDKs have it); `test/integration/firebase/firestore/read_only_transaction_test.dart` |
 | `waitForPendingWrites` | supported | `firestore.waitForPendingWrites()` |
+| Number of pending writes | supported (extra) | `firestore.getPendingWriteCount()` and the throttled stream `pendingWriteCounts()`. Not in the official SDKs; see [Offline persistence](guides/offline_persistence.md#writes-waiting-for-the-backend). `test/unit/firebase/firestore/pending_write_count_test.dart` (memory and SQLite cache, per user, the throttle, a second client on the same SQLite cache) |
 | `terminate` | supported | `firestore.terminate()`; `test/integration/firebase/firestore/terminate_in_flight_test.dart`, `terminated_instance_test.dart` |
 
 ## Offline persistence and cache settings
@@ -154,7 +155,8 @@ for a real project that has not been run yet; see [Known limitations](#known-lim
 
 | JS feature | Status | Dart API or gap |
 |---|---|---|
-| `firebase/firestore/lite` entry point | supported (experimental) | `package:cloud_firestore_dart/lite.dart`; `test/integration/firebase/firestore/lite_test.dart`, browser `test/browser/web_lite_test.dart`. See [Firestore Lite](guides/lite.md) |
+| `firebase/firestore/lite` entry point | supported | `package:cloud_firestore_dart/lite.dart`; `test/integration/firebase/firestore/lite_test.dart`, browser `test/browser/web_lite_test.dart`. Emulator and Chrome only. The differences from the JS exports are listed in [Firestore Lite](guides/lite.md#compared-with-firebasefirestorelite) |
+| `firebase/firestore/lite/pipelines` entry point | not supported | Pipelines are in the main library only (preview), not in `lite.dart` |
 | Reads, writes, batches, transactions, queries, aggregations, converters | supported | Same as the main library, every call one request |
 | `where` with named arguments / `Filter` | supported | The same `where` and `Filter` as the main library |
 | Small web build | supported | `tool/check_size.sh` checks that the Lite program contains no sync engine, cache or WebChannel |
@@ -311,4 +313,4 @@ Every gap and behaviour difference we know of, the ones you are most likely to m
     API spelling follows the Android SDK and FlutterFire (see
     [Coming from FlutterFire or the JS SDK](guides/queries_and_data.md#coming-from-flutterfire-or-the-js-sdk)).
     Extras over the JS client SDK: `Query.findNearest`, read-only transactions (also with
-    pipelines).
+    pipelines), the number of pending writes (`getPendingWriteCount`, `pendingWriteCounts`).

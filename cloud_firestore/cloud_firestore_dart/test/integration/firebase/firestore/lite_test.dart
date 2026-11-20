@@ -797,6 +797,48 @@ void main() {
       await op;
       expect(() => batch.delete(doc), throwsCommitted);
     });
+
+    test('commits a set, an update and a delete together', () async {
+      final CollectionReference<Map<String, Object?>> coll =
+          newLiteTestCollection();
+      await coll.doc('updated').set(<String, Object?>{'n': 1});
+      await coll.doc('deleted').set(<String, Object?>{'n': 2});
+      await (coll.firestore.batch()
+            ..set(coll.doc('created'), <String, Object?>{'n': 3})
+            ..update(coll.doc('updated'), <String, Object?>{
+              'n': FieldValue.increment(10),
+            })
+            ..delete(coll.doc('deleted')))
+          .commit();
+      expect((await coll.doc('created').get()).data(), <String, Object?>{
+        'n': 3,
+      });
+      expect((await coll.doc('updated').get()).data(), <String, Object?>{
+        'n': 11,
+      });
+      expect((await coll.doc('deleted').get()).exists, isFalse);
+    });
+
+    test('writes nothing when one of its writes fails', () async {
+      final CollectionReference<Map<String, Object?>> coll =
+          newLiteTestCollection();
+      final Future<void> commit =
+          (coll.firestore.batch()
+                ..set(coll.doc('a'), <String, Object?>{'n': 1})
+                ..update(coll.doc('missing'), <String, Object?>{'n': 2}))
+              .commit();
+      await expectLater(
+        commit,
+        throwsA(
+          isA<FirestoreException>().having(
+            (FirestoreException e) => e.errorCode,
+            'code',
+            FirestoreErrorCode.notFound,
+          ),
+        ),
+      );
+      expect((await coll.doc('a').get()).exists, isFalse);
+    });
   }, skip: skip);
 
   group('Transaction', () {
@@ -1456,6 +1498,72 @@ void main() {
       verifyResults(result, <Map<String, Object?>>[foo(2)]);
     });
 
+    test('supports cursors from document snapshots', () async {
+      final CollectionReference<Map<String, Object?>> coll =
+          newLiteTestCollection();
+      final WriteBatch batch = coll.firestore.batch();
+      for (int i = 1; i <= 4; i++) {
+        batch.set(coll.doc('d$i'), foo(i));
+      }
+      await batch.commit();
+      final DocumentSnapshot<Map<String, Object?>> second = await coll
+          .doc('d2')
+          .get();
+      final DocumentSnapshot<Map<String, Object?>> third = await coll
+          .doc('d3')
+          .get();
+      final Query<Map<String, Object?>> ordered = coll.orderBy('foo');
+
+      verifyResults(
+        await ordered.startAtDocument(second).get(),
+        <Map<String, Object?>>[foo(2), foo(3), foo(4)],
+      );
+      verifyResults(
+        await ordered.endAtDocument(second).get(),
+        <Map<String, Object?>>[foo(1), foo(2)],
+      );
+      verifyResults(
+        await ordered.endBeforeDocument(third).get(),
+        <Map<String, Object?>>[foo(1), foo(2)],
+      );
+      verifyResults(
+        await ordered.startAfterDocument(second).endBeforeDocument(third).get(),
+        <Map<String, Object?>>[],
+      );
+      // Without an orderBy the cursor orders by the document id.
+      verifyResults(
+        await coll.startAfterDocument(second).get(),
+        <Map<String, Object?>>[foo(3), foo(4)],
+      );
+      // With limitToLast the cursors apply before the last documents are taken.
+      verifyResults(
+        await ordered.endAtDocument(third).limitToLast(2).get(),
+        <Map<String, Object?>>[foo(2), foo(3)],
+      );
+    });
+
+    test('supports cursors on several fields', () async {
+      final CollectionReference<Map<String, Object?>> coll =
+          await newLiteTestCollectionWith(<Map<String, Object?>>[
+            <String, Object?>{'a': 1, 'b': 1},
+            <String, Object?>{'a': 1, 'b': 2},
+            <String, Object?>{'a': 2, 'b': 1},
+            <String, Object?>{'a': 2, 'b': 2},
+          ]);
+      verifyResults(
+        await coll
+            .orderBy('a')
+            .orderBy('b')
+            .startAfter(<Object?>[1, 1])
+            .endBefore(<Object?>[2, 2])
+            .get(),
+        <Map<String, Object?>>[
+          <String, Object?>{'a': 1, 'b': 2},
+          <String, Object?>{'a': 2, 'b': 1},
+        ],
+      );
+    });
+
     test('supports collection groups', () async {
       final CollectionReference<Map<String, Object?>> coll =
           newLiteTestCollection();
@@ -1714,6 +1822,32 @@ void main() {
         transaction.set(ref, Post('${post.title}!', post.author));
       });
       expect((await ref.get()).data()!.byline(), 'post!, by author');
+    });
+
+    test('for WriteBatch.set() and a query with a cursor', () async {
+      final CollectionReference<Post> coll = newLiteTestCollection()
+          .withConverter(
+            fromFirestore: postConverter.fromFirestore,
+            toFirestore: postConverter.toFirestore,
+          );
+      await (coll.firestore.batch()
+            ..set(coll.doc('a'), Post('a', 'ann'))
+            ..set(coll.doc('b'), Post('b', 'bob'))
+            ..set(coll.doc('c'), Post('c', 'cid')))
+          .commit();
+      final DocumentSnapshot<Post> first = await coll.doc('a').get();
+      final QuerySnapshot<Post> rest = await coll
+          .orderBy('title')
+          .startAfterDocument(first)
+          .get();
+      expect(
+        rest.docs.map((QueryDocumentSnapshot<Post> doc) => doc.data().byline()),
+        <String>['b, by bob', 'c, by cid'],
+      );
+      expect(
+        (await coll.where('author', isEqualTo: 'bob').count().get()).count,
+        1,
+      );
     });
 
     test(

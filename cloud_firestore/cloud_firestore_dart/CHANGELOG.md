@@ -1,5 +1,18 @@
 ## (unreleased)
 
+- `WebExperimentalLongPollingOptions` and the long-polling settings are supported, not experimental: the word
+  "Experimental" in their names comes from the JS SDK and stays for compatibility with it and with FlutterFire.
+- `getPendingWriteCount()` and `pendingWriteCounts()` are a supported extension, no longer experimental (the official
+  SDKs have no equivalent). New tests: the count per user and after a change of user, with writes of several users,
+  with the memory and the SQLite cache; the 250 ms throttle of the stream; a second client on the same SQLite cache,
+  whose writes the stream shows at its next emission.
+- Firestore Lite (`package:cloud_firestore_dart/lite.dart`) is supported, no longer experimental, and covered by
+  the support policy like the main library. Its public API was compared export by export with the JS SDK's
+  `firebase/firestore/lite`; `docs/guides/lite.md` lists every difference (all deliberate; the JS SDK's
+  `firebase/firestore/lite/pipelines` is not ported) and what was verified: the emulator over gRPC and REST, and
+  Chrome (dart2js and dart2wasm), never a production backend. New tests: batches with several kinds of writes and
+  all-or-nothing failure, cursors from document snapshots and on several fields, aggregations over cursors, and
+  converters in batches, transactions and cursor queries.
 - The cache in your own storage (`package:cloud_firestore_dart/cache_store.dart`,
   `keyValueCacheSettings` over a `CacheStore`) is no longer experimental. What it stores is now a
   commitment: the format is versioned, a newer SDK migrates the store of an older one in the

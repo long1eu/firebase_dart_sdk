@@ -1010,8 +1010,8 @@ Future<void> forAiAgentsGuideLine98() async {
   }
 }
 
-// ../../docs/guides/for_ai_agents.md:370
-Future<void> forAiAgentsGuideLine370() async {
+// ../../docs/guides/for_ai_agents.md:371
+Future<void> forAiAgentsGuideLine371() async {
   void main() {
     late FirebaseFirestore db;
     int instances = 0;
@@ -1700,8 +1700,8 @@ Future<void> webGuideLine173() async {
   );
 }
 
-// ../../docs/guides/web.md:222
-Future<void> webGuideLine222() async {
+// ../../docs/guides/web.md:224
+Future<void> webGuideLine224() async {
   final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(
     app: app,
     openDatabase: sqliteOpener(opfsWorker: Uri.parse('sqlite_opfs_worker.js')),
@@ -1709,8 +1709,8 @@ Future<void> webGuideLine222() async {
   );
 }
 
-// ../../docs/guides/web.md:278
-Future<void> webGuideLine278() async {
+// ../../docs/guides/web.md:280
+Future<void> webGuideLine280() async {
   final FirebaseFirestore firestore = await openWithMemoryFallback(
     app: app,
     openDatabase: sqliteOpener(),
@@ -1720,8 +1720,8 @@ Future<void> webGuideLine278() async {
   final bool persistent = firestore.persistentCacheIndexManager != null;
 }
 
-// ../../docs/guides/web.md:303
-Future<void> webGuideLine303() async {
+// ../../docs/guides/web.md:305
+Future<void> webGuideLine305() async {
   final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(
     app: app,
     openDatabase: sqliteOpener(),
@@ -1738,8 +1738,8 @@ Future<void> webGuideLine303() async {
   }
 }
 
-// ../../docs/guides/web.md:381
-Future<void> webGuideLine381() async {
+// ../../docs/guides/web.md:383
+Future<void> webGuideLine383() async {
   // One client of the page: `client` names its app ('client-left', 'client-right').
   Future<FirebaseFirestore> startClient(String client, String email) async {
     final FirebaseApp clientApp = FirebaseApp.withOptions(app.options, name: client);
@@ -1749,13 +1749,13 @@ Future<void> webGuideLine381() async {
   }
 }
 
-// ../../docs/guides/web.md:409
-Future<void> webGuideLine409() async {
+// ../../docs/guides/web.md:411
+Future<void> webGuideLine411() async {
   final Settings settings = Settings().withEmulator('127.0.0.1', 8080);
 }
 
-// ../../docs/guides/web.md:491
-Future<void> webGuideLine491() async {
+// ../../docs/guides/web.md:493
+Future<void> webGuideLine493() async {
   final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(
     app: app,
     settings: Settings(

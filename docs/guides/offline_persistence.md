@@ -183,8 +183,8 @@ stateDiagram-v2
 An app that was offline for a long time can show how far the sync is. `getPendingWriteCount()`
 returns the number of write batches of the signed-in user that the backend has not acknowledged
 or rejected (one `set`, `update` or `delete`, or one `WriteBatch.commit`, is one batch), and
-`pendingWriteCounts()` is a stream of that number. This API is experimental: the official SDKs
-have no equivalent, only `waitForPendingWrites()` and `hasPendingWrites`.
+`pendingWriteCounts()` is a stream of that number. Both are a supported extension of this SDK:
+the official SDKs have no equivalent, only `waitForPendingWrites()` and `hasPendingWrites`.
 
 ```dart
 final int total = await firestore.getPendingWriteCount();
