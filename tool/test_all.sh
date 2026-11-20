@@ -21,6 +21,8 @@
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 
+# CI runs cloud_firestore_dart and the others in separate legs (.github/workflows/ci.yml,
+# unit-legs and unit-stable-legs): a package added here goes into their `others` leg too.
 PACKAGES=(
   "firebase_app_dart|firebase_core/firebase_app_dart|"
   "firebase_auth_providers_dart|firebase_auth/firebase_auth_providers_dart|"
