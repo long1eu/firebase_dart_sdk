@@ -1,5 +1,5 @@
 // The loopback OAuth helper against an in-process identity provider: a local HttpServer plays the authorization,
-// token and exchange endpoints, and the presenter follows the redirect itself instead of opening a browser.
+// token endpoints, and the presenter follows the redirect itself instead of opening a browser.
 
 @TestOn('vm')
 library;
@@ -9,8 +9,10 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:crypto/crypto.dart';
+import 'package:firebase_app_dart/firebase_app_dart.dart' show GetTokenResult;
 import 'package:firebase_auth_providers_dart/firebase_auth_providers_dart.dart';
 import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
 import 'package:test/test.dart';
 
 import 'harness.dart';
@@ -23,7 +25,7 @@ String _jwt(Map<String, Object?> claims) {
 }
 
 /// The identity provider: `/authorize` redirects to the redirect URL with a code (or what the test sets), `/token`
-/// takes the form of RFC 6749, `/exchange` the JSON text of google_sign_in_dart's endpoint.
+/// takes the form of RFC 6749.
 class FakeIdentityProvider {
   late HttpServer _server;
 
@@ -34,9 +36,6 @@ class FakeIdentityProvider {
 
   /// The form of the last token request.
   Map<String, String>? tokenForm;
-
-  /// The last request to the exchange endpoint: its content type and decoded body.
-  (String?, Map<String, Object?>)? exchangeRequest;
 
   /// Builds the redirect query from the authorization request; by default a code with the state sent.
   Map<String, String> Function(Map<String, String> authorization) redirect =
@@ -99,22 +98,6 @@ class FakeIdentityProvider {
                     },
             ),
           );
-      case '/exchange':
-        exchangeRequest = (
-          request.headers.contentType?.mimeType,
-          jsonDecode(await utf8.decoder.bind(request).join())
-              as Map<String, Object?>,
-        );
-        if (tokenError != null) {
-          response
-            ..statusCode = 400
-            ..headers.contentType = ContentType.text
-            ..write(tokenError);
-        } else {
-          response
-            ..headers.contentType = ContentType.json
-            ..write(jsonEncode(_tokens()));
-        }
       case '/.well-known/openid-configuration':
         response
           ..headers.contentType = ContentType.json
@@ -181,15 +164,15 @@ void main() {
   });
 
   OAuthLoopbackProvider oidc({
-    bool exchange = false,
+    OAuthCodeExchange? exchangeCode,
     String redirectPath = '/',
   }) => OAuthLoopbackProvider.oidc(
     providerId: 'oidc.fake',
     authorizationEndpoint: idp.base.resolve('/authorize'),
     tokenEndpoint: idp.base.resolve('/token'),
     clientId: 'client-1',
-    clientSecret: exchange ? null : 'not-so-secret',
-    exchangeEndpoint: exchange ? idp.base.resolve('/exchange') : null,
+    clientSecret: exchangeCode != null ? null : 'not-so-secret',
+    exchangeCode: exchangeCode,
     customParameters: <String, String>{'prompt': 'consent'},
     redirectPath: redirectPath,
   );
@@ -269,49 +252,49 @@ void main() {
   );
 
   test(
-    'exchange endpoint: the request of google_sign_in_dart\'s cloud function',
+    'exchangeCode gets the code, the verifier, the redirect and the client id',
     () async {
-      final OAuthLoopbackResult result = await run(oidc(exchange: true));
+      OAuthAuthorizationCode? seen;
+      final OAuthLoopbackResult result = await run(
+        oidc(
+          exchangeCode: (OAuthAuthorizationCode code) {
+            seen = code;
+            return <String, Object?>{'access_token': 'from-my-server'};
+          },
+        ),
+      );
 
       expect(idp.tokenForm, isNull);
-      final (String? contentType, Map<String, Object?> body) =
-          idp.exchangeRequest!;
-      expect(contentType, 'text/plain');
+      expect(seen!.code, 'the-code');
+      expect(seen!.clientId, 'client-1');
+      expect(seen!.redirectUri, idp.authorization['redirect_uri']);
       expect(
-        body.keys,
-        unorderedEquals(<String>[
-          'code',
-          'codeVerifier',
-          'clientId',
-          'redirectUrl',
-        ]),
-      );
-      expect(body['code'], 'the-code');
-      expect(body['clientId'], 'client-1');
-      expect(body['redirectUrl'], idp.authorization['redirect_uri']);
-      expect(
-        _challengeOf(body['codeVerifier']! as String),
+        _challengeOf(seen!.codeVerifier),
         idp.authorization['code_challenge'],
       );
-      expect(result.accessToken, 'the-access-token');
+      expect(result.accessToken, 'from-my-server');
     },
   );
 
   test(
-    'a refused exchange at the exchange endpoint is invalid-credential',
+    'an error of exchangeCode is invalid-credential; its own FirebaseAuthException is kept',
     () async {
-      idp.tokenError = 'invalid_client_id';
       await expectLater(
-        run(oidc(exchange: true)),
-        throwsA(
-          authError('invalid-credential').having(
-            (FirebaseAuthException e) => e.serverCode,
-            'serverCode',
-            'invalid_client_id',
-          ),
-        ),
+        run(oidc(exchangeCode: (_) => throw StateError('server down'))),
+        throwsA(authError('invalid-credential')),
       );
       expect(presenter.page!.statusCode, 400);
+      await expectLater(
+        run(
+          oidc(
+            exchangeCode: (_) => throw const FirebaseAuthException(
+              code: 'network-request-failed',
+              message: 'no route',
+            ),
+          ),
+        ),
+        throwsA(authError('network-request-failed')),
+      );
     },
   );
 
@@ -331,23 +314,74 @@ void main() {
     );
   });
 
-  test('a state mismatch fails without an exchange', () async {
+  test(
+    'a redirect with another state gets a 400 and does not end the wait',
+    () async {
+      idp.redirect = (Map<String, String> a) => <String, String>{
+        'code': 'the-code',
+        'state': 'forged',
+      };
+      await expectLater(
+        run(oidc(), timeout: const Duration(milliseconds: 500)),
+        throwsA(authError('timeout')),
+      );
+      expect(idp.tokenForm, isNull);
+      expect(presenter.page!.statusCode, 400);
+    },
+  );
+
+  test('a redirect without state does not end the wait', () async {
     idp.redirect = (Map<String, String> a) => <String, String>{
       'code': 'the-code',
-      'state': 'forged',
     };
-    await expectLater(run(oidc()), throwsA(authError('oauth-state-mismatch')));
+    await expectLater(
+      run(oidc(), timeout: const Duration(milliseconds: 500)),
+      throwsA(authError('timeout')),
+    );
     expect(idp.tokenForm, isNull);
     expect(presenter.page!.statusCode, 400);
-    expect(presenter.page!.body, contains('oauth-state-mismatch'));
   });
 
-  test('a redirect without state fails', () async {
-    idp.redirect = (Map<String, String> a) => <String, String>{
-      'code': 'the-code',
-    };
-    await expectLater(run(oidc()), throwsA(authError('oauth-state-mismatch')));
-  });
+  test(
+    'a query that does not parse and another Host get a 400; the real redirect still signs in',
+    () async {
+      final List<int> statuses = <int>[];
+      final OAuthLoopbackResult result = await authorizeWithOAuthLoopback(
+        oidc(),
+        presenter: (Uri url) async {
+          final Uri redirect = Uri.parse(url.queryParameters['redirect_uri']!);
+          final String state = url.queryParameters['state']!;
+          // An invalid UTF-8 escape: Uri.queryParameters throws on it.
+          statuses.add(
+            (await presenter.client.get(
+              Uri.parse('$redirect/?code=x&state=%ff'),
+            )).statusCode,
+          );
+          // The right state, but the Host header of another name (DNS rebinding).
+          final HttpClient io = HttpClient();
+          try {
+            final HttpClientRequest request = await io.getUrl(
+              redirect.replace(
+                queryParameters: <String, String>{'code': 'x', 'state': state},
+              ),
+            );
+            request.headers.host = 'evil.example';
+            final HttpClientResponse response = await request.close();
+            await response.drain<void>();
+            statuses.add(response.statusCode);
+          } finally {
+            io.close(force: true);
+          }
+          await presenter(url);
+        },
+        timeout: const Duration(seconds: 10),
+        httpClient: client,
+      );
+      expect(statuses, <int>[400, 400]);
+      expect(result.accessToken, 'the-access-token');
+      expect(idp.tokenForm!['code'], 'the-code');
+    },
+  );
 
   test('access_denied is user-cancelled', () async {
     idp.redirect = (Map<String, String> a) => <String, String>{
@@ -368,11 +402,17 @@ void main() {
       await expectLater(
         run(oidc()),
         throwsA(
-          authError('invalid-oauth-response').having(
-            (FirebaseAuthException e) => e.serverCode,
-            'serverCode',
-            '<script>x</script>',
-          ),
+          authError('invalid-oauth-response')
+              .having(
+                (FirebaseAuthException e) => e.serverCode,
+                'serverCode',
+                isNull,
+              )
+              .having(
+                (FirebaseAuthException e) => e.message,
+                'message',
+                isNot(contains('<script>')),
+              ),
         ),
       );
       expect(presenter.page!.body, isNot(contains('<script>')));
@@ -491,6 +531,152 @@ void main() {
     },
   );
 
+  test(
+    'the GitHub preset: PKCE, client secret, no nonce, access token only',
+    () async {
+      final FakeBackend backend = FakeBackend();
+      final FirebaseUserAuth auth = backend.create();
+      addTearDown(auth.dispose);
+      Map<String, String>? postBody;
+      backend.on('accounts:signInWithIdp', (Map<String, Object?> body) {
+        postBody = Uri.splitQueryString(body['postBody']! as String);
+        return jsonResponse(<String, Object?>{
+          'providerId': 'github.com',
+          ...backend.tokensFor('github-user', provider: 'github.com'),
+        });
+      });
+      // GitHub's token endpoint, played in process: nothing leaves the machine.
+      http.Request? tokenRequest;
+      final MockClient github = MockClient((http.Request request) async {
+        tokenRequest = request;
+        return jsonResponse(<String, Object?>{
+          'access_token': 'gho_access',
+          'scope': 'read:user,user:email',
+          'token_type': 'bearer',
+        });
+      });
+      Uri? url;
+
+      final UserCredential result = await auth.signInWithOAuthLoopback(
+        OAuthLoopbackProvider.github(
+          clientId: 'github-client',
+          clientSecret: 'github-secret',
+        ),
+        presenter: (Uri authorizationUrl) async {
+          url = authorizationUrl;
+          final Uri redirect = Uri.parse(
+            authorizationUrl.queryParameters['redirect_uri']!,
+          );
+          await presenter.client.get(
+            redirect.replace(
+              queryParameters: <String, String>{
+                'code': 'github-code',
+                'state': authorizationUrl.queryParameters['state']!,
+              },
+            ),
+          );
+        },
+        httpClient: github,
+      );
+
+      expect(
+        '${url!.scheme}://${url!.host}${url!.path}',
+        'https://github.com/login/oauth/authorize',
+      );
+      final Map<String, String> a = url!.queryParameters;
+      expect(a['client_id'], 'github-client');
+      expect(a['scope'], 'read:user user:email');
+      expect(a['response_type'], 'code');
+      expect(a['code_challenge_method'], 'S256');
+      expect(a['redirect_uri'], matches(RegExp(r'^http://127\.0\.0\.1:\d+$')));
+      expect(a, isNot(contains('nonce')));
+
+      expect(
+        tokenRequest!.url.toString(),
+        'https://github.com/login/oauth/access_token',
+      );
+      expect(tokenRequest!.method, 'POST');
+      expect(tokenRequest!.headers['accept'], 'application/json');
+      final Map<String, String> form = tokenRequest!.bodyFields;
+      expect(form['client_id'], 'github-client');
+      expect(form['client_secret'], 'github-secret');
+      expect(form['code'], 'github-code');
+      expect(form['redirect_uri'], a['redirect_uri']);
+      expect(_challengeOf(form['code_verifier']!), a['code_challenge']);
+
+      expect(postBody, <String, String>{
+        'access_token': 'gho_access',
+        'providerId': 'github.com',
+      });
+      expect(result.user!.uid, 'github-user');
+    },
+  );
+
+  test(
+    'GitHub: comma-separated scopes are split, and an error with status 200 is invalid-credential',
+    () async {
+      Future<OAuthLoopbackResult> run(Map<String, Object?> answer) {
+        return authorizeWithOAuthLoopback(
+          OAuthLoopbackProvider.github(
+            clientId: 'github-client',
+            clientSecret: 'github-secret',
+          ),
+          presenter: (Uri authorizationUrl) async {
+            final Uri redirect = Uri.parse(
+              authorizationUrl.queryParameters['redirect_uri']!,
+            );
+            await presenter.client.get(
+              redirect.replace(
+                queryParameters: <String, String>{
+                  'code': 'github-code',
+                  'state': authorizationUrl.queryParameters['state']!,
+                },
+              ),
+            );
+          },
+          httpClient: MockClient(
+            (http.Request request) async => jsonResponse(answer),
+          ),
+        );
+      }
+
+      final OAuthLoopbackResult result = await run(<String, Object?>{
+        'access_token': 'gho_access',
+        'scope': 'read:user,user:email',
+        'token_type': 'bearer',
+      });
+      expect(result.grantedScopes, <String>['read:user', 'user:email']);
+
+      await expectLater(
+        run(<String, Object?>{
+          'error': 'bad_verification_code',
+          'error_description': 'The code passed is incorrect or expired.',
+        }),
+        throwsA(
+          authError('invalid-credential').having(
+            (FirebaseAuthException e) => e.serverCode,
+            'serverCode',
+            'bad_verification_code',
+          ),
+        ),
+      );
+    },
+  );
+
+  test('the GitHub preset needs a client secret, and takes other scopes', () {
+    expect(
+      () => OAuthLoopbackProvider.github(clientId: 'c', clientSecret: ''),
+      throwsArgumentError,
+    );
+    final OAuthLoopbackProvider github = OAuthLoopbackProvider.github(
+      clientId: 'c',
+      clientSecret: 's',
+      scopes: <String>['repo'],
+    );
+    expect(github.scopes, <String>['repo']);
+    expect(github.useNonce, isFalse);
+  });
+
   test('endpoints must be https except on loopback', () {
     expect(
       () => OAuthLoopbackProvider.oidc(
@@ -513,6 +699,131 @@ void main() {
     expect(provider.authorizationEndpoint, idp.base.resolve('/authorize'));
     expect(provider.tokenEndpoint, idp.base.resolve('/token'));
     expect(provider.sendNonceToFirebase, isTrue);
+  });
+
+  /// Runs [body] with the 30 second network timers caught: [fire] runs them now.
+  Future<T> withNetworkTimers<T>(
+    Future<T> Function(void Function() fire) body,
+  ) {
+    final List<void Function()> pending = <void Function()>[];
+    void fire() {
+      final List<void Function()> due = List<void Function()>.of(pending);
+      pending.clear();
+      for (final void Function() f in due) {
+        f();
+      }
+    }
+
+    return runZoned(
+      () => body(fire),
+      zoneSpecification: ZoneSpecification(
+        createTimer:
+            (
+              Zone self,
+              ZoneDelegate parent,
+              Zone zone,
+              Duration duration,
+              void Function() f,
+            ) {
+              if (duration != const Duration(seconds: 30)) {
+                return parent.createTimer(zone, duration, f);
+              }
+              pending.add(f);
+              return parent.createTimer(zone, const Duration(days: 1), () {});
+            },
+      ),
+    );
+  }
+
+  test(
+    'an exchangeCode that does not answer fails with network-request-failed',
+    () async {
+      await withNetworkTimers((void Function() fire) async {
+        await expectLater(
+          run(
+            oidc(
+              exchangeCode: (OAuthAuthorizationCode code) {
+                // The exchange started: let its 30 seconds pass.
+                Timer.run(fire);
+                return Completer<Map<String, Object?>>().future;
+              },
+            ),
+          ),
+          throwsA(authError('network-request-failed')),
+        );
+      });
+    },
+  );
+
+  test(
+    'a discovery request that does not answer fails with network-request-failed',
+    () async {
+      await withNetworkTimers((void Function() fire) async {
+        final MockClient hanging = MockClient((http.Request request) {
+          Timer.run(fire);
+          return Completer<http.Response>().future;
+        });
+        await expectLater(
+          OAuthLoopbackProvider.discover(
+            issuer: Uri.parse('https://idp.example.com'),
+            providerId: 'oidc.fake',
+            clientId: 'client-1',
+            httpClient: hanging,
+          ),
+          throwsA(authError('network-request-failed')),
+        );
+      });
+    },
+  );
+
+  test('an expires_in that is not finite is ignored', () async {
+    final OAuthLoopbackResult result = await run(
+      oidc(
+        exchangeCode: (_) =>
+            jsonDecode('{"access_token": "at", "expires_in": 1e400}')
+                as Map<String, Object?>,
+      ),
+    );
+    expect(result.accessToken, 'at');
+    expect(result.expiresIn, isNull);
+  });
+
+  test(
+    'a discovery document with an http endpoint is invalid-oauth-provider',
+    () async {
+      final MockClient discovery = MockClient(
+        (http.Request request) async => http.Response(
+          jsonEncode(<String, Object?>{
+            'issuer': 'https://idp.example.com',
+            'authorization_endpoint': 'http://idp.example.com/authorize',
+            'token_endpoint': 'https://idp.example.com/token',
+          }),
+          200,
+        ),
+      );
+      await expectLater(
+        OAuthLoopbackProvider.discover(
+          issuer: Uri.parse('https://idp.example.com'),
+          providerId: 'oidc.fake',
+          clientId: 'client-1',
+          httpClient: discovery,
+        ),
+        throwsA(authError('invalid-oauth-provider')),
+      );
+    },
+  );
+
+  test('plain http is accepted on 127.0.0.1 and ::1, not on localhost', () {
+    OAuthLoopbackProvider withEndpoint(String url) =>
+        OAuthLoopbackProvider.oidc(
+          providerId: 'oidc.x',
+          authorizationEndpoint: Uri.parse(url),
+          tokenEndpoint: Uri.parse('https://idp.example.com/token'),
+          clientId: 'c',
+        );
+    expect(withEndpoint('http://127.0.0.1:8080/a'), isNotNull);
+    expect(withEndpoint('http://[::1]:8080/a'), isNotNull);
+    expect(() => withEndpoint('http://localhost:8080/a'), throwsArgumentError);
   });
 
   test(
@@ -542,6 +853,93 @@ void main() {
       );
       expect(result.user!.uid, 'idp-user');
       expect(result.additionalUserInfo?.isNewUser, isTrue);
+    },
+  );
+
+  test(
+    'FirebaseUserAuth.linkWithOAuthLoopback links the credential to the signed-in user',
+    () async {
+      final FakeBackend backend = FakeBackend();
+      final FirebaseUserAuth auth = backend.create();
+      addTearDown(auth.dispose);
+
+      // Nobody signed in: it fails before the browser opens.
+      await expectLater(
+        auth.linkWithOAuthLoopback(
+          oidc(),
+          presenter: presenter.call,
+          httpClient: client,
+        ),
+        throwsA(authError('null-user')),
+      );
+      expect(presenter.url, isNull);
+
+      final AuthUser anonymous = (await auth.signInAnonymously()).user!;
+      backend.on('accounts:signInWithIdp', (Map<String, Object?> body) {
+        expect(
+          GetTokenResult(body['idToken']! as String).claims['sub'],
+          anonymous.uid,
+        );
+        final Map<String, String> post = Uri.splitQueryString(
+          body['postBody']! as String,
+        );
+        expect(post['providerId'], 'oidc.fake');
+        expect(post['access_token'], 'the-access-token');
+        backend.accounts[anonymous.uid] = <String, Object?>{
+          'providerUserInfo': <Object?>[
+            <String, Object?>{'providerId': 'oidc.fake', 'rawId': 'user-1'},
+          ],
+        };
+        return jsonResponse(<String, Object?>{
+          'providerId': 'oidc.fake',
+          ...backend.tokensFor(anonymous.uid, provider: 'oidc.fake'),
+        });
+      });
+
+      final UserCredential result = await auth.linkWithOAuthLoopback(
+        oidc(),
+        presenter: presenter.call,
+        httpClient: client,
+      );
+      expect(presenter.url, isNotNull);
+      expect(result.user!.uid, anonymous.uid);
+      expect(
+        result.user!.providerData.map((UserInfo info) => info.providerId),
+        contains('oidc.fake'),
+      );
+    },
+  );
+
+  test(
+    'FirebaseUserAuth.reauthenticateWithOAuthLoopback signs the same user in again',
+    () async {
+      final FakeBackend backend = FakeBackend();
+      final FirebaseUserAuth auth = backend.create();
+      addTearDown(auth.dispose);
+      final AuthUser user = (await auth.signInWithEmailAndPassword(
+        email: 'ada@example.com',
+        password: 'secret-1',
+      )).user!;
+      backend.on('accounts:signInWithIdp', (Map<String, Object?> body) {
+        final Map<String, String> post = Uri.splitQueryString(
+          body['postBody']! as String,
+        );
+        expect(post['providerId'], 'oidc.fake');
+        expect(post['access_token'], 'the-access-token');
+        return jsonResponse(<String, Object?>{
+          'providerId': 'oidc.fake',
+          ...backend.tokensFor(user.uid, provider: 'oidc.fake'),
+        });
+      });
+
+      final UserCredential result = await auth.reauthenticateWithOAuthLoopback(
+        oidc(),
+        presenter: presenter.call,
+        httpClient: client,
+      );
+      expect(result.user!.uid, user.uid);
+      expect(auth.currentUser!.uid, user.uid);
+      expect(backend.methods, contains('accounts:signInWithIdp'));
     },
   );
 }

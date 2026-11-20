@@ -3,9 +3,11 @@
 # cloud_firestore_dart runs only test/unit (integration needs a live backend).
 # The example programs in examples/ are analyzed only (their tests need an emulator); select
 # them alone with the name "examples", or one with "examples/<name>".
-# The Flutter packages (cloud_firestore_dart_flutterfire, cloud_firestore_dart_platform) and the
+# The Flutter packages (cloud_firestore_dart_flutterfire, cloud_firestore_dart_platform,
+# firebase_auth_dart_platform) and the
 # Flutter examples need the Flutter SDK and are skipped without it; the CI job "flutter" runs
-# them (with FIRESTORE_EMULATOR_HOST set, so that the emulator tests of the platform package run).
+# them (with FIRESTORE_EMULATOR_HOST and FIREBASE_AUTH_EMULATOR_HOST set, so that the emulator tests
+# of the platform packages run).
 # A Flutter example with a web/index.html is also built for the web, with dart2js
 # (`flutter build web`) and with dart2wasm (`flutter build web --wasm`), so that a change that
 # breaks web compilation fails here.
@@ -128,9 +130,11 @@ for pubspec in "$ROOT"/examples/*/pubspec.yaml; do
 done
 
 # The Flutter packages: `dart test` cannot load flutter_test. The emulator tests of
-# cloud_firestore_dart_platform run only when FIRESTORE_EMULATOR_HOST is set.
+# cloud_firestore_dart_platform run only when FIRESTORE_EMULATOR_HOST is set, those of
+# firebase_auth_dart_platform only when FIREBASE_AUTH_EMULATOR_HOST is set.
 for entry in "cloud_firestore_dart_flutterfire|cloud_firestore/cloud_firestore_dart_flutterfire" \
-  "cloud_firestore_dart_platform|cloud_firestore/cloud_firestore_dart_platform"; do
+  "cloud_firestore_dart_platform|cloud_firestore/cloud_firestore_dart_platform" \
+  "firebase_auth_dart_platform|firebase_auth/firebase_auth_dart_platform"; do
   IFS='|' read -r name dir <<<"$entry"
   if [ $# -gt 0 ] && ! printf '%s\n' "$@" | grep -qx "$name"; then continue; fi
   echo "=== $name ==="

@@ -80,8 +80,8 @@ import 'environment_stub.dart'
 /// throw a [StateError].
 ///
 /// **Emulator.** Pass `emulatorHost` (for example from [emulatorHostFromEnvironment]) to talk to the Firebase
-/// Auth emulator. Nothing in this package was run against the real Firebase Auth service; it was tested with
-/// unit tests and against the emulator.
+/// Auth emulator. Only Google sign-in through [signInWithOAuthLoopback] with a "Desktop app" client was run against
+/// a real Firebase project (on 2026-11-20); the rest was tested with unit tests and against the emulator.
 ///
 /// Account management follows the REST-backed operations of the JS SDK: password reset, email verification and
 /// action codes, email, password and profile updates, reauthentication, account deletion, the sign-in methods of
@@ -115,11 +115,12 @@ class FirebaseUserAuth implements AuthTokenProvider {
     AppCheckTokenProvider? appCheck,
     AuthStorage? storage,
     String? storageKey,
-    this.emulatorHost,
+    String? emulatorHost,
     http.Client? httpClient,
     DateTime Function()? clock,
     Timer Function(Duration delay, void Function() callback)? createTimer,
-  }) : _emulatorOrigin = emulatorHost == null
+  }) : _emulatorHost = emulatorHost,
+       _emulatorOrigin = emulatorHost == null
            ? null
            : _emulatorOriginOf(emulatorHost),
        _appCheck = appCheck,
@@ -198,9 +199,24 @@ class FirebaseUserAuth implements AuthTokenProvider {
   /// The Web API key of the project.
   final String apiKey;
 
-  /// The Auth emulator as it was passed to the constructor (`host:port`, or with a scheme), or null for the real
-  /// service.
-  final String? emulatorHost;
+  /// The Auth emulator as it was passed to the constructor or to [useEmulator] (`host:port`, or with a scheme), or
+  /// null for the real service.
+  String? get emulatorHost => _emulatorHost;
+  String? _emulatorHost;
+
+  /// Sends the requests from now on to the Firebase Auth emulator at [emulatorHost] (`host:port`, or
+  /// `https://host:port`), like the `emulatorHost` of the constructor (FlutterFire's `useAuthEmulator`, the JS SDK's
+  /// `connectAuthEmulator`). For an instance that is created before the emulator is known, such as the one of a
+  /// FlutterFire platform implementation.
+  ///
+  /// Call it before the first request: a request in flight keeps the service it was sent to, and a session restored
+  /// from the real service stays signed in until its first token refresh fails against the emulator. Throws an
+  /// [ArgumentError] for an invalid [emulatorHost], as the constructor does, and changes nothing then.
+  void useEmulator(String emulatorHost) {
+    final String origin = _emulatorOriginOf(emulatorHost);
+    _emulatorHost = emulatorHost;
+    _emulatorOrigin = origin;
+  }
 
   /// The id of the Firebase app, sent as `X-Firebase-gmpid`; null sends none.
   final String? appId;
@@ -242,7 +258,7 @@ class FirebaseUserAuth implements AuthTokenProvider {
   static const String clientVersion = 'Dart/DartCore/0.3.0/FirebaseCore-dart';
 
   /// `http://host:port` (or `https://...`) of the Auth emulator, checked; null for the real service.
-  final String? _emulatorOrigin;
+  String? _emulatorOrigin;
 
   static final RegExp _notAuthorityCharacters = RegExp(r'[/@?#\\\s]');
   static final RegExp _scheme = RegExp(r'^(https?)://', caseSensitive: false);
@@ -1056,10 +1072,9 @@ class FirebaseUserAuth implements AuthTokenProvider {
   ///
   /// [presenter] opens the authorization URL ([openInSystemBrowser] by default), [timeout] bounds the wait for the
   /// redirect, and [httpClient] is used for the code exchange (the client of this instance by default). It throws
-  /// what both steps throw: `timeout`, `user-cancelled`, `oauth-state-mismatch`, `invalid-credential`, ...
+  /// what both steps throw: `timeout`, `user-cancelled`, `invalid-oauth-response`, `invalid-credential`, ...
   ///
-  /// To link or reauthenticate instead, call [authorizeWithOAuthLoopback] and pass
-  /// [OAuthLoopbackResult.credential] to [linkWithCredential] or [reauthenticateWithCredential].
+  /// To link or reauthenticate instead, use [linkWithOAuthLoopback] or [reauthenticateWithOAuthLoopback].
   ///
   /// ```dart
   /// final UserCredential result = await auth.signInWithOAuthLoopback(
@@ -1083,6 +1098,54 @@ class FirebaseUserAuth implements AuthTokenProvider {
       httpClient: httpClient ?? _http,
     );
     return signInWithCredential(result.credential);
+  }
+
+  /// Links [provider] to the signed-in user through the system browser (VM only): runs [authorizeWithOAuthLoopback]
+  /// and then [linkWithCredential] with the credential of the provider's tokens. On the web it throws an
+  /// [UnsupportedError].
+  ///
+  /// The parameters are those of [signInWithOAuthLoopback]. It throws `null-user` before the browser opens when
+  /// nobody is signed in, then what both steps throw: `timeout`, `user-cancelled`, `provider-already-linked`,
+  /// `credential-already-in-use`, ...
+  Future<UserCredential> linkWithOAuthLoopback(
+    OAuthLoopbackProvider provider, {
+    UrlPresenter? presenter,
+    Duration timeout = const Duration(minutes: 5),
+    http.Client? httpClient,
+  }) async {
+    _checkNotDisposed();
+    _requireSession();
+    final OAuthLoopbackResult result = await authorizeWithOAuthLoopback(
+      provider,
+      presenter: presenter,
+      timeout: timeout,
+      httpClient: httpClient ?? _http,
+    );
+    return linkWithCredential(result.credential);
+  }
+
+  /// Signs the signed-in user in again with [provider] through the system browser (VM only): runs
+  /// [authorizeWithOAuthLoopback] and then [reauthenticateWithCredential] with the credential of the provider's
+  /// tokens. On the web it throws an [UnsupportedError].
+  ///
+  /// The parameters are those of [signInWithOAuthLoopback]. It throws `null-user` before the browser opens when
+  /// nobody is signed in, then what both steps throw: `timeout`, `user-cancelled`, `user-mismatch` (the user signed
+  /// in to the provider with another account), ...
+  Future<UserCredential> reauthenticateWithOAuthLoopback(
+    OAuthLoopbackProvider provider, {
+    UrlPresenter? presenter,
+    Duration timeout = const Duration(minutes: 5),
+    http.Client? httpClient,
+  }) async {
+    _checkNotDisposed();
+    _requireSession();
+    final OAuthLoopbackResult result = await authorizeWithOAuthLoopback(
+      provider,
+      presenter: presenter,
+      timeout: timeout,
+      httpClient: httpClient ?? _http,
+    );
+    return reauthenticateWithCredential(result.credential);
   }
 
   /// Links [credential] to the signed-in user (`linkWithCredential`): the account can then sign in with it too. An
