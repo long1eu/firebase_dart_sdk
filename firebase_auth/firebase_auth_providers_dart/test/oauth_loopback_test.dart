@@ -1,5 +1,5 @@
 // The loopback OAuth helper against an in-process identity provider: a local HttpServer plays the authorization,
-// token and exchange endpoints, and the presenter follows the redirect itself instead of opening a browser.
+// token endpoints, and the presenter follows the redirect itself instead of opening a browser.
 
 @TestOn('vm')
 library;
@@ -23,7 +23,7 @@ String _jwt(Map<String, Object?> claims) {
 }
 
 /// The identity provider: `/authorize` redirects to the redirect URL with a code (or what the test sets), `/token`
-/// takes the form of RFC 6749, `/exchange` the JSON text of google_sign_in_dart's endpoint.
+/// takes the form of RFC 6749.
 class FakeIdentityProvider {
   late HttpServer _server;
 
@@ -34,9 +34,6 @@ class FakeIdentityProvider {
 
   /// The form of the last token request.
   Map<String, String>? tokenForm;
-
-  /// The last request to the exchange endpoint: its content type and decoded body.
-  (String?, Map<String, Object?>)? exchangeRequest;
 
   /// Builds the redirect query from the authorization request; by default a code with the state sent.
   Map<String, String> Function(Map<String, String> authorization) redirect =
@@ -99,22 +96,6 @@ class FakeIdentityProvider {
                     },
             ),
           );
-      case '/exchange':
-        exchangeRequest = (
-          request.headers.contentType?.mimeType,
-          jsonDecode(await utf8.decoder.bind(request).join())
-              as Map<String, Object?>,
-        );
-        if (tokenError != null) {
-          response
-            ..statusCode = 400
-            ..headers.contentType = ContentType.text
-            ..write(tokenError);
-        } else {
-          response
-            ..headers.contentType = ContentType.json
-            ..write(jsonEncode(_tokens()));
-        }
       case '/.well-known/openid-configuration':
         response
           ..headers.contentType = ContentType.json
@@ -181,15 +162,15 @@ void main() {
   });
 
   OAuthLoopbackProvider oidc({
-    bool exchange = false,
+    OAuthCodeExchange? exchangeCode,
     String redirectPath = '/',
   }) => OAuthLoopbackProvider.oidc(
     providerId: 'oidc.fake',
     authorizationEndpoint: idp.base.resolve('/authorize'),
     tokenEndpoint: idp.base.resolve('/token'),
     clientId: 'client-1',
-    clientSecret: exchange ? null : 'not-so-secret',
-    exchangeEndpoint: exchange ? idp.base.resolve('/exchange') : null,
+    clientSecret: exchangeCode != null ? null : 'not-so-secret',
+    exchangeCode: exchangeCode,
     customParameters: <String, String>{'prompt': 'consent'},
     redirectPath: redirectPath,
   );
@@ -269,49 +250,49 @@ void main() {
   );
 
   test(
-    'exchange endpoint: the request of google_sign_in_dart\'s cloud function',
+    'exchangeCode gets the code, the verifier, the redirect and the client id',
     () async {
-      final OAuthLoopbackResult result = await run(oidc(exchange: true));
+      OAuthAuthorizationCode? seen;
+      final OAuthLoopbackResult result = await run(
+        oidc(
+          exchangeCode: (OAuthAuthorizationCode code) {
+            seen = code;
+            return <String, Object?>{'access_token': 'from-my-server'};
+          },
+        ),
+      );
 
       expect(idp.tokenForm, isNull);
-      final (String? contentType, Map<String, Object?> body) =
-          idp.exchangeRequest!;
-      expect(contentType, 'text/plain');
+      expect(seen!.code, 'the-code');
+      expect(seen!.clientId, 'client-1');
+      expect(seen!.redirectUri, idp.authorization['redirect_uri']);
       expect(
-        body.keys,
-        unorderedEquals(<String>[
-          'code',
-          'codeVerifier',
-          'clientId',
-          'redirectUrl',
-        ]),
-      );
-      expect(body['code'], 'the-code');
-      expect(body['clientId'], 'client-1');
-      expect(body['redirectUrl'], idp.authorization['redirect_uri']);
-      expect(
-        _challengeOf(body['codeVerifier']! as String),
+        _challengeOf(seen!.codeVerifier),
         idp.authorization['code_challenge'],
       );
-      expect(result.accessToken, 'the-access-token');
+      expect(result.accessToken, 'from-my-server');
     },
   );
 
   test(
-    'a refused exchange at the exchange endpoint is invalid-credential',
+    'an error of exchangeCode is invalid-credential; its own FirebaseAuthException is kept',
     () async {
-      idp.tokenError = 'invalid_client_id';
       await expectLater(
-        run(oidc(exchange: true)),
-        throwsA(
-          authError('invalid-credential').having(
-            (FirebaseAuthException e) => e.serverCode,
-            'serverCode',
-            'invalid_client_id',
-          ),
-        ),
+        run(oidc(exchangeCode: (_) => throw StateError('server down'))),
+        throwsA(authError('invalid-credential')),
       );
       expect(presenter.page!.statusCode, 400);
+      await expectLater(
+        run(
+          oidc(
+            exchangeCode: (_) => throw const FirebaseAuthException(
+              code: 'network-request-failed',
+              message: 'no route',
+            ),
+          ),
+        ),
+        throwsA(authError('network-request-failed')),
+      );
     },
   );
 

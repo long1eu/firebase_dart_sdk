@@ -18,7 +18,7 @@ import 'oauth_loopback.dart';
 ///    and, with [OAuthLoopbackProvider.useNonce], a nonce. Without a presenter, [openInSystemBrowser] opens it.
 ///    On Flutter mobile pass a presenter of your own (`url_launcher`'s `launchUrl`).
 /// 3. The first GET on the redirect path ends the wait: its `state` is compared in constant time, an `error` of
-///    the provider is reported, and the code is exchanged at the token endpoint or at the exchange endpoint (see
+///    the provider is reported, and the code is exchanged at the token endpoint or by the provider's `exchangeCode` (see
 ///    [OAuthLoopbackProvider]). The browser gets a short page that says whether it worked. Requests to other paths
 ///    get a 404 and do not end the wait.
 /// 4. The server is closed in every case: success, error, [timeout] (default five minutes) or a presenter that
@@ -35,8 +35,8 @@ import 'oauth_loopback.dart';
 /// | `invalid-oauth-response` | the provider answered another `error` ([FirebaseAuthException.serverCode]), no code, or no token |
 /// | `oauth-state-mismatch` | the `state` of the redirect is not the one sent (another page or program called the server) |
 /// | `missing-or-invalid-nonce` | the ID token carries another nonce than the one sent |
-/// | `invalid-credential` | the token or exchange endpoint refused the code ([FirebaseAuthException.serverCode] is its `error`) |
-/// | `network-request-failed` | the token or exchange endpoint could not be reached |
+/// | `invalid-credential` | the token endpoint or `exchangeCode` refused the code ([FirebaseAuthException.serverCode] is its `error`) |
+/// | `network-request-failed` | the token endpoint could not be reached |
 ///
 /// An error of [presenter] is rethrown as it is. Nothing of the flow is logged; the tokens are never part of an
 /// exception message.
@@ -299,8 +299,8 @@ Future<OAuthLoopbackResult> _complete(
   );
 }
 
-/// Exchanges [code] at the token endpoint (form, RFC 6749 section 4.1.3) or at the exchange endpoint (the JSON text
-/// of `google_sign_in_dart`'s contract) and returns the decoded token response.
+/// Exchanges [code] at the token endpoint (form, RFC 6749 section 4.1.3), or through the provider's
+/// [OAuthLoopbackProvider.exchangeCode], and returns the decoded token response.
 Future<Map<String, Object?>> _exchange(
   OAuthLoopbackProvider provider,
   http.Client client, {
@@ -308,36 +308,40 @@ Future<Map<String, Object?>> _exchange(
   required String codeVerifier,
   required String redirectUrl,
 }) async {
-  final Uri? exchangeEndpoint = provider.exchangeEndpoint;
+  final OAuthCodeExchange? exchangeCode = provider.exchangeCode;
+  if (exchangeCode != null) {
+    try {
+      return await exchangeCode(
+        OAuthAuthorizationCode(
+          code: code,
+          codeVerifier: codeVerifier,
+          redirectUri: redirectUrl,
+          clientId: provider.clientId,
+        ),
+      );
+    } on FirebaseAuthException {
+      rethrow;
+    } on Object catch (e) {
+      throw FirebaseAuthException(
+        code: 'invalid-credential',
+        message: 'The code exchange failed: $e',
+      );
+    }
+  }
   final http.Response response;
   try {
-    response = exchangeEndpoint != null
-        // A JSON text sent as text/plain, like google_sign_in_dart sent it: its Cloud Function example runs
-        // JSON.parse on the body, which Cloud Functions leaves a string only for this content type.
-        ? await client.post(
-            exchangeEndpoint,
-            headers: <String, String>{
-              'content-type': 'text/plain; charset=utf-8',
-            },
-            body: jsonEncode(<String, String>{
-              'code': code,
-              'codeVerifier': codeVerifier,
-              'clientId': provider.clientId,
-              'redirectUrl': redirectUrl,
-            }),
-          )
-        : await client.post(
-            provider.tokenEndpoint,
-            headers: <String, String>{'accept': 'application/json'},
-            body: <String, String>{
-              'grant_type': 'authorization_code',
-              'code': code,
-              'redirect_uri': redirectUrl,
-              'client_id': provider.clientId,
-              'code_verifier': codeVerifier,
-              'client_secret': ?provider.clientSecret,
-            },
-          );
+    response = await client.post(
+      provider.tokenEndpoint,
+      headers: <String, String>{'accept': 'application/json'},
+      body: <String, String>{
+        'grant_type': 'authorization_code',
+        'code': code,
+        'redirect_uri': redirectUrl,
+        'client_id': provider.clientId,
+        'code_verifier': codeVerifier,
+        'client_secret': ?provider.clientSecret,
+      },
+    );
   } on http.ClientException catch (e) {
     throw FirebaseAuthException(
       code: 'network-request-failed',
@@ -357,8 +361,7 @@ Future<Map<String, Object?>> _exchange(
     body = null;
   }
   if (response.statusCode != 200) {
-    // An OAuth error ({"error": "invalid_grant", ...}), or the plain text code of the exchange endpoint example
-    // (`invalid_client_id`). Neither carries a token.
+    // An OAuth error ({"error": "invalid_grant", ...}) or some other text. Neither carries a token.
     final String? serverCode = body is Map<String, Object?>
         ? _nonEmptyString(body['error'])
         : _shortText(response.body);
@@ -367,7 +370,7 @@ Future<Map<String, Object?>> _exchange(
       serverCode: serverCode,
       httpStatus: response.statusCode,
       message:
-          'The ${exchangeEndpoint != null ? 'exchange' : 'token'} endpoint refused the authorization code'
+          'The token endpoint refused the authorization code'
           '${serverCode == null ? '' : ' ($serverCode)'}.',
     );
   }
