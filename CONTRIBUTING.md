@@ -31,7 +31,7 @@ Do not weaken or remove an assertion to get a test passing. If a test is flaky, 
 
 ## Where things are
 
-[`ARCHITECTURE.md`](ARCHITECTURE.md) explains the layers and how they map to the Android SDK. Code that is
+[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) explains the layers and how they map to the Android SDK. Code that is
 ported keeps the upstream names, so the Android source is the best reference for why something is the way it
 is.
 
