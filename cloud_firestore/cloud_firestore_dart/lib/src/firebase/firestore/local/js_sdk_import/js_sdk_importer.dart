@@ -53,6 +53,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/mutat
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/snapshot_version.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/remote/remote_serializer.dart';
 import 'package:firebase_app_dart/internal.dart';
+import 'package:meta/meta.dart';
 
 const String _tag = 'JsSdkCacheImport';
 
@@ -67,6 +68,35 @@ const int jsSdkOldestSchemaVersion = 5;
 /// The oldest schema version whose cached documents are read: version 13 moved them to `remoteDocumentsV14`, with
 /// their read time in the key.
 const int jsSdkOldestSchemaVersionWithDocuments = 13;
+
+/// Test only: called with the name of each point of the protocol the import reaches, so that a test can stop it there
+/// as a crash of the page would (by throwing): `documents` (the documents of step 3 are imported), `step4` (inside the
+/// transaction of step 4, after the batches were added), `step4Committed`, `removal:<n>` (inside the IndexedDB
+/// transaction of step 5, before the n-th batch is removed) and `step5Committed`.
+@visibleForTesting
+void Function(String point)? jsSdkCacheImportFaultForTesting;
+
+void _fault(String point) => jsSdkCacheImportFaultForTesting?.call(point);
+
+/// [row] with every `doubleValue: "-0"` (how the JS SDK writes -0) replaced by the number -0.0: the serializer reads
+/// the string with `num.tryParse`, which gives the integer 0 and loses the sign.
+// TODO(long1eu): remove once IndexedDbSerializer reads "-0" as -0.0 itself (reported to the owners of local/indexeddb).
+Map<String, Object?> _withNegativeZeros(Map<String, Object?> row) =>
+    _negativeZeros(row)! as Map<String, Object?>;
+
+Object? _negativeZeros(Object? value) {
+  if (value is Map) {
+    return <String, Object?>{
+      for (final MapEntry<Object?, Object?> entry in value.entries)
+        entry.key! as String: entry.key == 'doubleValue' && entry.value == '-0'
+            ? -0.0
+            : _negativeZeros(entry.value),
+    };
+  } else if (value is List) {
+    return <Object?>[for (final Object? item in value) _negativeZeros(item)];
+  }
+  return value;
+}
 
 /// See [indexedDbPrimaryLeaseMs].
 const int jsSdkPrimaryLeaseMs = indexedDbPrimaryLeaseMs;
@@ -252,9 +282,11 @@ class _JsSdkCache {
     final Map<int, _BatchRef> byId = <int, _BatchRef>{
       for (final _BatchRef ref in record.pending) ref.batchId: ref,
     };
+    int checked = 0;
     final int removed = await db.removeMutationBatches(byId.keys, (
       Map<String, Object?> row,
     ) {
+      _fault('removal:${++checked}');
       final Object? batchId = row['batchId'];
       final _BatchRef? ref = batchId is num ? byId[batchId.toInt()] : null;
       return ref != null && ref.matches(row);
@@ -263,6 +295,7 @@ class _JsSdkCache {
       _tag,
       'Removed $removed of ${byId.length} imported batches from $databaseName',
     );
+    _fault('step5Committed');
     await _writeRecord(persistence, record.withPending(const <_BatchRef>[]));
   }
 
@@ -390,7 +423,7 @@ class _JsSdkCache {
       for (final Map<String, Object?> row in await db.readAll('mutations')) {
         final MutationBatch batch;
         try {
-          batch = serializer.fromDbMutationBatch(row);
+          batch = serializer.fromDbMutationBatch(_withNegativeZeros(row));
         } catch (e) {
           throw _refuse(
             JsSdkCacheImportRefusal.unreadableWrites,
@@ -464,7 +497,7 @@ class _JsSdkCache {
         )) {
           final ReadDocument decoded;
           try {
-            decoded = serializer.fromDbRemoteDocument(row);
+            decoded = serializer.fromDbRemoteDocument(_withNegativeZeros(row));
           } catch (e) {
             unreadable++;
             Log.d(_tag, 'Skipping an unreadable document of $databaseName: $e');
@@ -504,6 +537,7 @@ class _JsSdkCache {
           await syncEngine.handleImportedChanges(changes, const <int>[]);
         }
         documentsImported = true;
+        _fault('documents');
       }
 
       // Step 4.
@@ -534,10 +568,13 @@ class _JsSdkCache {
                   ],
               },
               currentUser,
-              () => persistence.globalsCache.setValue(
-                _recordName,
-                imported.encode(),
-              ),
+              () {
+                _fault('step4');
+                return persistence.globalsCache.setValue(
+                  _recordName,
+                  imported.encode(),
+                );
+              },
             );
         if (result.nonEmptyQueues.isNotEmpty) {
           throw _pendingWritesInCache(result.nonEmptyQueues, currentUser);
@@ -546,6 +583,7 @@ class _JsSdkCache {
           result.currentUserChanges,
           result.currentUserBatchIds,
         );
+        _fault('step4Committed');
       }
 
       // Steps 5 and 6. The writes are imported: a failure here is finished by the next call.
