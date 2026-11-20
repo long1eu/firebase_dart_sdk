@@ -125,9 +125,9 @@
   <rect x="200" y="432" width="236" height="56" rx="8" fill="#ffffff" stroke="#1f2328"/>
   <text x="318" y="455" font-size="13" font-weight="600" fill="#1f2328" text-anchor="middle">gRPC over HTTP/2</text>
   <text x="318" y="474" font-size="12" fill="#57606a" text-anchor="middle">Dart VM and Flutter</text>
-  <rect x="456" y="432" width="236" height="56" rx="8" fill="#ffffff" stroke="#1f2328" stroke-dasharray="5 3"/>
+  <rect x="456" y="432" width="236" height="56" rx="8" fill="#ffffff" stroke="#1f2328"/>
   <text x="574" y="455" font-size="13" font-weight="600" fill="#1f2328" text-anchor="middle">REST and WebChannel</text>
-  <text x="574" y="474" font-size="12" fill="#57606a" text-anchor="middle">browser, experimental</text>
+  <text x="574" y="474" font-size="12" fill="#57606a" text-anchor="middle">browser (Chrome)</text>
   <text x="186" y="455" font-size="12" font-weight="600" fill="#57606a" text-anchor="end">transport</text>
   <text x="186" y="472" font-size="11" fill="#57606a" text-anchor="end">picked by the platform</text>
 

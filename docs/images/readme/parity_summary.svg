@@ -233,7 +233,7 @@
   <text x="756" y="417" font-size="12" fill="#57606a" text-anchor="middle">–</text>
   <text x="812" y="417" font-size="12" fill="#57606a" text-anchor="middle">–</text>
   <text x="868" y="417" font-size="12" fill="#1f2328" font-weight="600" text-anchor="middle">1</text>
-  <text x="266" y="443" font-size="12" fill="#1f2328" font-weight="600" text-anchor="end">Web transports (experimental)</text>
+  <text x="266" y="443" font-size="12" fill="#1f2328" font-weight="600" text-anchor="end">Web transports</text>
   <circle cx="286" cy="439" r="7" fill="#1a7f37"/>
   <circle cx="305" cy="439" r="7" fill="#1a7f37"/>
   <circle cx="324" cy="439" r="7" fill="#1a7f37"/>
