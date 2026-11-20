@@ -73,6 +73,11 @@ listen and write streams, over `fetch`. What to know:
   121 KB more JavaScript, 34 KB gzipped, only when imported). See
   [The IndexedDB cache](web.md#the-indexeddb-cache).
 
+  A fourth needs no package either: `keyValueCacheSettings(store: ...)` of
+  `package:cloud_firestore_dart/cache_store.dart` keeps the cache in a key-value store the app
+  implements, on the VM or the web; `example/cache_store/indexeddb` is such a store on IndexedDB.
+  See [A cache in your own storage](custom_cache_store.md).
+
   One tab at a time with either: a second tab that opens the same cache gets a
   `FirestoreException` with `failedPrecondition` (a Web Lock guards the database) and should use a
   memory cache; `openWithMemoryFallback` of the package does this. `clearPersistence()` deletes

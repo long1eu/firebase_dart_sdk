@@ -10,6 +10,7 @@ queries against it use what earlier listens returned. Where the cache lives is u
 | an `openDatabase` (SQLite on the VM) | in a SQLite file, kept across restarts |
 | the web `openDatabase` (web) | SQLite compiled to WebAssembly, stored in IndexedDB or OPFS |
 | `indexedDbCacheSettings()` (web) | in IndexedDB in the format of the official JS SDK, without SQLite; see [The IndexedDB cache](web.md#the-indexeddb-cache) |
+| `keyValueCacheSettings(store: ...)` (VM and web) | in a key-value store that your app implements (`CacheStore`), kept across restarts; see [A cache in your own storage](custom_cache_store.md) |
 
 On the web the opener picks the storage itself; follow the branches to see which one you get:
 
@@ -182,8 +183,8 @@ stateDiagram-v2
 An app that was offline for a long time can show how far the sync is. `getPendingWriteCount()`
 returns the number of write batches of the signed-in user that the backend has not acknowledged
 or rejected (one `set`, `update` or `delete`, or one `WriteBatch.commit`, is one batch), and
-`pendingWriteCounts()` is a stream of that number. This API is experimental: the official SDKs
-have no equivalent, only `waitForPendingWrites()` and `hasPendingWrites`.
+`pendingWriteCounts()` is a stream of that number. Both are a supported extension of this SDK:
+the official SDKs have no equivalent, only `waitForPendingWrites()` and `hasPendingWrites`.
 
 ```dart
 final int total = await firestore.getPendingWriteCount();
@@ -211,14 +212,17 @@ await progress.cancel();
 
 `example/offline_persistence.dart` prints the progress of a small drain.
 
-### Merging repeated offline writes (experimental)
+### Merging repeated offline writes (opt-in extension)
 
 Every write is a pending write until the backend accepts it, so an app that edits the same
 documents for months offline queues one write per edit: about 1 KB of cache each, and a
 reconnect that sends them all, one billed write each (see [Long offline use, measured](long_offline.md)
 and `docs/spikes/offline_forever.md`).
-`mergeUnsentWrites`, on `PersistentCacheSettings` or `MemoryCacheSettings`, keeps one pending
-write per document instead. It is not in the official SDKs, and it is off by default.
+`mergeUnsentWrites`, on `PersistentCacheSettings` or `MemoryCacheSettings` (and on the key-value
+and IndexedDB caches), keeps one pending write per document instead. It is off by default. It is a
+supported extension of this package that the official SDKs do not have, and it can never behave
+exactly as they do: the documents on the backend end up the same, but rules and functions see
+fewer writes, in another order across documents (see "What the app gives up" below).
 
 ```dart
 final Settings settings = Settings(
@@ -231,40 +235,45 @@ network (the up to 10 writes handed to the write stream, sent or not, are left a
 single writes (not a `WriteBatch` of several), no other client uses the cache, and the two
 combine into one write with the same result on the backend:
 
-| Pending write | New write | Becomes |
-|---|---|---|
-| anything | `set` without merge (`serverTimestamp` allowed), or `delete` | the new write |
-| `set` (`serverTimestamp` allowed) | `update` or `set` with merge | one `set` with the new fields applied |
-| `update` | `update` | one `update` of the fields of both |
-| `set` with merge | `update` or `set` with merge | one `set` with merge of the fields of both |
-| `delete` | `set` with merge | one `set` of the new fields |
+| Row | Pending write | New write | Becomes |
+|---|---|---|---|
+| W1 | anything | `set` without merge (`serverTimestamp` allowed), or `delete` | the new write |
+| W2 | `set` (`serverTimestamp` allowed) | `update` or `set` with merge | one `set` with the new fields applied |
+| W3 | `update` | `update` | one `update` of the fields of both |
+| W4 | `set` with merge | `update` or `set` with merge | one `set` with merge of the fields of both |
+| W5 | `delete` | `set` with merge | one `set` of the new fields |
 
 Transforms in the two writes combine field by field:
 
-| Pending write has | New write has, on the same field | Becomes |
-|---|---|---|
-| any transform | a value, a delete or `serverTimestamp` (on that field or one containing it) | the new write's |
-| a value | `serverTimestamp` | `serverTimestamp` |
-| a value (or the pending write is a `set` or `delete`) | `increment` | the sum as a value, if both are integers within ±(2^53 − 1) or both are doubles |
-| `arrayUnion(a)` | `arrayUnion(b)` | `arrayUnion` of `a` then `b`, without repeats |
-| `arrayRemove(a)` | `arrayRemove(b)` | `arrayRemove` of `a` and `b` |
-| a transform | nothing on that field, on a field inside it or on one containing it | the transform, unchanged |
-| nothing on that field, inside it or containing it (an `update` or `set` with merge) | a transform | the transform, unchanged |
+| Row | Pending write has | New write has, on the same field | Becomes |
+|---|---|---|---|
+| T1 | any transform | a value, a delete or `serverTimestamp` (on that field or one containing it) | the new write's |
+| T2 | a value | `serverTimestamp` | `serverTimestamp` |
+| T3 | a value (or the pending write is a `set` or `delete`) | `increment` | the sum as a value, if both are integers within ±(2^53 − 1) or both are doubles |
+| T4 | `arrayUnion(a)` | `arrayUnion(b)` | `arrayUnion` of `a` then `b`, without repeats |
+| T5 | `arrayRemove(a)` | `arrayRemove(b)` | `arrayRemove` of `a` and `b` |
+| T6 | a transform | nothing on that field, on a field inside it or on one containing it | the transform, unchanged |
+| T7 | nothing on that field, inside it or containing it (an `update` or `set` with merge) | a transform | the transform, unchanged |
 
-Everything else stays queued as two writes, as without the setting. In particular `increment`
+"Any transform" and "a transform" include `minimum` and `maximum`, which merge only by rows T1, T6
+and T7.
+
+Everything else (row N) stays queued as two writes, as without the setting. In particular `increment`
 after `increment` of the same field: the backend adds the numbers one at a time, so on a field
 that holds a double adding the two operands first can round differently (and integers saturate
 at each step).
 Also `arrayUnion` with `arrayRemove` on one field, an array transform after a `set` or `delete`,
 a pending `set` with `increment` or array transforms, any other overlap of a transform with a
-field of the other write, a `set` with merge after an `update`, and an `update` after a
-`delete`. The merged write takes the place of the newest write in the queue, and the future of
+field of the other write, a `set` with merge after an `update`, an `update` after a
+`delete`, and an `update` that deletes a nested field at or above a `serverTimestamp` of a pending
+`set` (the timestamp created the map that the delete leaves empty). The merged write takes the place of the newest write in the queue, and the future of
 every write that went into it completes or fails with it; `waitForPendingWrites` waits for it
 too.
 
-Until the backend confirms it, the app sees the merged document as it would see the two writes,
-with one exception: a `serverTimestamp` of the pending write that stays shows the time of the
-newer write as its estimate.
+Until the backend confirms it, the app sees the merged document as it would see the two writes
+(the data, `hasPendingWrites`, query results, and the value under a pending `serverTimestamp` with
+`ServerTimestampBehavior.previous`), with one exception: a `serverTimestamp` of the pending write
+that stays shows the time of the newer write as its estimate.
 
 Writes that are already queued when an instance starts with the setting on, because an earlier
 session queued them or the setting was off then, are merged once at start: each one, in the order
@@ -277,7 +286,10 @@ the merge reaches it. No write is sent to the backend until the merge is done. E
 saves how far the queue is merged, so a merge that is interrupted (the app is closed or killed)
 resumes there at the next start, and a queue that is merged is not read again at later starts.
 It does not run while another client uses the cache. The queue of a user who signs in later is
-merged when they sign in.
+merged when they sign in. After the process was killed, the row of the killed client in a SQLite
+cache counts as another client for up to 30 minutes (not with an `ExclusiveDatabase`, such as the
+web openers): a start within that time neither merges the queue nor merges new writes, and the next
+start after it resumes the merge.
 
 What the app gives up:
 
@@ -286,10 +298,30 @@ What the app gives up:
 - A rejection rejects all the merged writes, with the same error.
 - Writes to other documents made in between reach the backend before this document's earlier
   edits (which never reach it at all), so a rule that reads this document with `get()` while
-  checking them sees its older state. Do not enable it when rules or functions depend on the
-  order of writes across documents.
+  checking them sees its older state: a write that the rules accept without the setting can be
+  rejected with it. Do not enable it when rules or functions depend on the order of writes across
+  documents.
 - A write replaced by a `set` or a `delete` is not checked: an `update` of a missing document
   followed by a `set` succeeds instead of failing.
+
+How it is tested, in `cloud_firestore/cloud_firestore_dart/test`:
+
+- Each row above is one test of the group "the tables of the guide" in
+  `unit/firebase/firestore/local/unsent_write_merge_test.dart`, named by its row (`W1: ...`,
+  `T3: ...`, `N: ...`), which also checks the merged write against the two writes on a pool of
+  starting documents.
+- Random offline sequences of every write kind and transform (`util/merge_writes_gen.dart`): on a
+  model of the backend, `unit/.../local/merge_unsent_writes_model_test.dart` (30,000 sequences by
+  default; 1.2 million were run once); against the emulator, on the SQLite, memory and key-value
+  caches, `integration/firebase/firestore/merge_unsent_writes_sequences_test.dart`, which also
+  compares what the app sees after every offline write and the outcome of every write; the local
+  view alone, `unit/.../local/merge_unsent_writes_local_view_test.dart`.
+- The rejection of a merged write and the ordering with a rule that uses `get()`:
+  `integration/firebase/firestore/merge_unsent_writes_rules_test.dart`.
+- The merge at start killed at random points, with several users and a change of user in the
+  middle: `unit/.../local/merge_queued_writes_crash_test.dart`; the boundary with the write
+  pipeline: `unit/firebase/firestore/core/merge_unsent_writes_sync_engine_test.dart`; the
+  IndexedDB engine: `browser/web_merge_unsent_writes_test.dart`.
 
 For one document set once and updated 100,000 times offline (`tool/bench/offline_forever_bench.dart`,
 `hot` and `drainhot`, one run on a Mac mini with an Apple M4 Pro against a local emulator 1.21.0, with other

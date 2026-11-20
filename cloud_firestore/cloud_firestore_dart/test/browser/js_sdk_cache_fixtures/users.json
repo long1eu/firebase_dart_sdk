@@ -1,0 +1,1157 @@
+{
+ "generatedBy": "tool/bench/web_idb/js_import/fixtures.sh (static/fixtures.js)",
+ "jsSdkVersion": "13.3.0",
+ "what": "Writes of alice, bob and the signed-out user, interleaved, queued offline by the JS SDK (mockUserToken).",
+ "projectId": "demo-jsimport-users",
+ "appName": "js-users",
+ "referenceProject": "demo-jsref-users",
+ "ops": {
+  "open": [
+   {
+    "user": "alice",
+    "label": "alice 1: set her note",
+    "outcome": "ok"
+   },
+   {
+    "user": "",
+    "label": "signed out 1: set an open document",
+    "outcome": "ok"
+   },
+   {
+    "user": "bob",
+    "label": "bob 1: set his note",
+    "outcome": "ok"
+   },
+   {
+    "user": "alice",
+    "label": "alice 2: update her note",
+    "outcome": "ok"
+   },
+   {
+    "user": "alice",
+    "label": "alice 3: write to bob (denied by the rules)",
+    "outcome": "ok"
+   },
+   {
+    "user": "",
+    "label": "signed out 2: write to alice (denied by the rules)",
+    "outcome": "ok"
+   },
+   {
+    "user": "bob",
+    "label": "bob 2: increment his note",
+    "outcome": "ok"
+   },
+   {
+    "user": "alice",
+    "label": "alice 4: a signed-in document",
+    "outcome": "ok"
+   },
+   {
+    "user": "",
+    "label": "signed out 3: update the open document",
+    "outcome": "ok"
+   },
+   {
+    "user": "bob",
+    "label": "bob 3: a batch",
+    "outcome": "ok"
+   }
+  ],
+  "rules": [
+   {
+    "user": "alice",
+    "label": "alice 1: set her note",
+    "outcome": "ok"
+   },
+   {
+    "user": "",
+    "label": "signed out 1: set an open document",
+    "outcome": "permission-denied"
+   },
+   {
+    "user": "bob",
+    "label": "bob 1: set his note",
+    "outcome": "ok"
+   },
+   {
+    "user": "alice",
+    "label": "alice 2: update her note",
+    "outcome": "ok"
+   },
+   {
+    "user": "alice",
+    "label": "alice 3: write to bob (denied by the rules)",
+    "outcome": "permission-denied"
+   },
+   {
+    "user": "",
+    "label": "signed out 2: write to alice (denied by the rules)",
+    "outcome": "permission-denied"
+   },
+   {
+    "user": "bob",
+    "label": "bob 2: increment his note",
+    "outcome": "ok"
+   },
+   {
+    "user": "alice",
+    "label": "alice 4: a signed-in document",
+    "outcome": "ok"
+   },
+   {
+    "user": "",
+    "label": "signed out 3: update the open document",
+    "outcome": "permission-denied"
+   },
+   {
+    "user": "bob",
+    "label": "bob 3: a batch",
+    "outcome": "ok"
+   }
+  ]
+ },
+ "seed": {},
+ "expected": {
+  "open": {
+   "users/alice/notes/n1": {
+    "v": {
+     "integerValue": "2"
+    },
+    "log": {
+     "arrayValue": {
+      "values": [
+       {
+        "stringValue": "first"
+       },
+       {
+        "stringValue": "second"
+       }
+      ]
+     }
+    }
+   },
+   "open/anon1": {
+    "by": {
+     "stringValue": "anon"
+    },
+    "n": {
+     "integerValue": "1"
+    }
+   },
+   "users/bob/notes/n1": {
+    "v": {
+     "integerValue": "111"
+    }
+   },
+   "users/bob/notes/fromAlice": {
+    "x": {
+     "integerValue": "1"
+    }
+   },
+   "users/alice/notes/anon": {
+    "x": {
+     "integerValue": "1"
+    }
+   },
+   "signed_in/alice": {
+    "ok": {
+     "booleanValue": true
+    },
+    "at": {
+     "timestampValue": "2026-11-20T03:24:52.384Z"
+    }
+   },
+   "users/bob/notes/n2": {
+    "b": {
+     "booleanValue": true
+    }
+   }
+  },
+  "rules": {
+   "users/alice/notes/n1": {
+    "v": {
+     "integerValue": "2"
+    },
+    "log": {
+     "arrayValue": {
+      "values": [
+       {
+        "stringValue": "first"
+       },
+       {
+        "stringValue": "second"
+       }
+      ]
+     }
+    }
+   },
+   "open/anon1": null,
+   "users/bob/notes/n1": {
+    "v": {
+     "integerValue": "111"
+    }
+   },
+   "users/bob/notes/fromAlice": null,
+   "users/alice/notes/anon": null,
+   "signed_in/alice": {
+    "ok": {
+     "booleanValue": true
+    },
+    "at": {
+     "timestampValue": "2026-11-20T03:24:54.232Z"
+    }
+   },
+   "users/bob/notes/n2": {
+    "b": {
+     "booleanValue": true
+    }
+   }
+  }
+ },
+ "name": "firestore/js-users/demo-jsimport-users/main",
+ "version": 18,
+ "stores": [
+  {
+   "name": "bundles",
+   "keyPath": "bundleId",
+   "autoIncrement": false,
+   "indexes": [],
+   "records": []
+  },
+  {
+   "name": "clientMetadata",
+   "keyPath": "clientId",
+   "autoIncrement": false,
+   "indexes": [],
+   "records": []
+  },
+  {
+   "name": "collectionParents",
+   "keyPath": [
+    "collectionId",
+    "parent"
+   ],
+   "autoIncrement": false,
+   "indexes": [],
+   "records": [
+    {
+     "key": [
+      "notes",
+      "users\u0001\u0001alice\u0001\u0001"
+     ],
+     "value": {
+      "collectionId": "notes",
+      "parent": "users\u0001\u0001alice\u0001\u0001"
+     }
+    },
+    {
+     "key": [
+      "notes",
+      "users\u0001\u0001bob\u0001\u0001"
+     ],
+     "value": {
+      "collectionId": "notes",
+      "parent": "users\u0001\u0001bob\u0001\u0001"
+     }
+    },
+    {
+     "key": [
+      "open",
+      "\u0001\u0001"
+     ],
+     "value": {
+      "collectionId": "open",
+      "parent": "\u0001\u0001"
+     }
+    },
+    {
+     "key": [
+      "signed_in",
+      "\u0001\u0001"
+     ],
+     "value": {
+      "collectionId": "signed_in",
+      "parent": "\u0001\u0001"
+     }
+    }
+   ]
+  },
+  {
+   "name": "documentMutations",
+   "keyPath": null,
+   "autoIncrement": false,
+   "indexes": [],
+   "records": [
+    {
+     "key": [
+      "",
+      "open\u0001\u0001anon1\u0001\u0001",
+      2
+     ],
+     "value": {}
+    },
+    {
+     "key": [
+      "",
+      "open\u0001\u0001anon1\u0001\u0001",
+      9
+     ],
+     "value": {}
+    },
+    {
+     "key": [
+      "",
+      "users\u0001\u0001alice\u0001\u0001notes\u0001\u0001anon\u0001\u0001",
+      6
+     ],
+     "value": {}
+    },
+    {
+     "key": [
+      "alice",
+      "signed_in\u0001\u0001alice\u0001\u0001",
+      8
+     ],
+     "value": {}
+    },
+    {
+     "key": [
+      "alice",
+      "users\u0001\u0001alice\u0001\u0001notes\u0001\u0001n1\u0001\u0001",
+      1
+     ],
+     "value": {}
+    },
+    {
+     "key": [
+      "alice",
+      "users\u0001\u0001alice\u0001\u0001notes\u0001\u0001n1\u0001\u0001",
+      4
+     ],
+     "value": {}
+    },
+    {
+     "key": [
+      "alice",
+      "users\u0001\u0001bob\u0001\u0001notes\u0001\u0001fromAlice\u0001\u0001",
+      5
+     ],
+     "value": {}
+    },
+    {
+     "key": [
+      "bob",
+      "users\u0001\u0001bob\u0001\u0001notes\u0001\u0001n1\u0001\u0001",
+      3
+     ],
+     "value": {}
+    },
+    {
+     "key": [
+      "bob",
+      "users\u0001\u0001bob\u0001\u0001notes\u0001\u0001n1\u0001\u0001",
+      7
+     ],
+     "value": {}
+    },
+    {
+     "key": [
+      "bob",
+      "users\u0001\u0001bob\u0001\u0001notes\u0001\u0001n1\u0001\u0001",
+      10
+     ],
+     "value": {}
+    },
+    {
+     "key": [
+      "bob",
+      "users\u0001\u0001bob\u0001\u0001notes\u0001\u0001n2\u0001\u0001",
+      10
+     ],
+     "value": {}
+    }
+   ]
+  },
+  {
+   "name": "documentOverlays",
+   "keyPath": [
+    "userId",
+    "collectionPath",
+    "documentId"
+   ],
+   "autoIncrement": false,
+   "indexes": [
+    {
+     "name": "collectionGroupOverlayIndex",
+     "keyPath": [
+      "userId",
+      "collectionGroup",
+      "largestBatchId"
+     ],
+     "unique": false,
+     "multiEntry": false
+    },
+    {
+     "name": "collectionPathOverlayIndex",
+     "keyPath": [
+      "userId",
+      "collectionPath",
+      "largestBatchId"
+     ],
+     "unique": false,
+     "multiEntry": false
+    }
+   ],
+   "records": [
+    {
+     "key": [
+      "",
+      "open\u0001\u0001",
+      "anon1"
+     ],
+     "value": {
+      "userId": "",
+      "collectionPath": "open\u0001\u0001",
+      "documentId": "anon1",
+      "collectionGroup": "open",
+      "largestBatchId": 9,
+      "overlayMutation": {
+       "update": {
+        "name": "projects/demo-jsimport-users/databases/(default)/documents/open/anon1",
+        "fields": {
+         "by": {
+          "stringValue": "anon"
+         },
+         "n": {
+          "integerValue": "1"
+         }
+        }
+       }
+      }
+     }
+    },
+    {
+     "key": [
+      "",
+      "users\u0001\u0001alice\u0001\u0001notes\u0001\u0001",
+      "anon"
+     ],
+     "value": {
+      "userId": "",
+      "collectionPath": "users\u0001\u0001alice\u0001\u0001notes\u0001\u0001",
+      "documentId": "anon",
+      "collectionGroup": "notes",
+      "largestBatchId": 6,
+      "overlayMutation": {
+       "update": {
+        "name": "projects/demo-jsimport-users/databases/(default)/documents/users/alice/notes/anon",
+        "fields": {
+         "x": {
+          "integerValue": "1"
+         }
+        }
+       }
+      }
+     }
+    },
+    {
+     "key": [
+      "alice",
+      "signed_in\u0001\u0001",
+      "alice"
+     ],
+     "value": {
+      "userId": "alice",
+      "collectionPath": "signed_in\u0001\u0001",
+      "documentId": "alice",
+      "collectionGroup": "signed_in",
+      "largestBatchId": 8,
+      "overlayMutation": {
+       "update": {
+        "name": "projects/demo-jsimport-users/databases/(default)/documents/signed_in/alice",
+        "fields": {
+         "ok": {
+          "booleanValue": true
+         },
+         "at": {
+          "mapValue": {
+           "fields": {
+            "__type__": {
+             "stringValue": "server_timestamp"
+            },
+            "__local_write_time__": {
+             "timestampValue": {
+              "seconds": 1795145092,
+              "nanos": 248000000
+             }
+            }
+           }
+          }
+         }
+        }
+       }
+      }
+     }
+    },
+    {
+     "key": [
+      "alice",
+      "users\u0001\u0001alice\u0001\u0001notes\u0001\u0001",
+      "n1"
+     ],
+     "value": {
+      "userId": "alice",
+      "collectionPath": "users\u0001\u0001alice\u0001\u0001notes\u0001\u0001",
+      "documentId": "n1",
+      "collectionGroup": "notes",
+      "largestBatchId": 4,
+      "overlayMutation": {
+       "update": {
+        "name": "projects/demo-jsimport-users/databases/(default)/documents/users/alice/notes/n1",
+        "fields": {
+         "v": {
+          "integerValue": "2"
+         },
+         "log": {
+          "arrayValue": {
+           "values": [
+            {
+             "stringValue": "first"
+            },
+            {
+             "stringValue": "second"
+            }
+           ]
+          }
+         }
+        }
+       }
+      }
+     }
+    },
+    {
+     "key": [
+      "alice",
+      "users\u0001\u0001bob\u0001\u0001notes\u0001\u0001",
+      "fromAlice"
+     ],
+     "value": {
+      "userId": "alice",
+      "collectionPath": "users\u0001\u0001bob\u0001\u0001notes\u0001\u0001",
+      "documentId": "fromAlice",
+      "collectionGroup": "notes",
+      "largestBatchId": 5,
+      "overlayMutation": {
+       "update": {
+        "name": "projects/demo-jsimport-users/databases/(default)/documents/users/bob/notes/fromAlice",
+        "fields": {
+         "x": {
+          "integerValue": "1"
+         }
+        }
+       }
+      }
+     }
+    },
+    {
+     "key": [
+      "bob",
+      "users\u0001\u0001bob\u0001\u0001notes\u0001\u0001",
+      "n1"
+     ],
+     "value": {
+      "userId": "bob",
+      "collectionPath": "users\u0001\u0001bob\u0001\u0001notes\u0001\u0001",
+      "documentId": "n1",
+      "collectionGroup": "notes",
+      "largestBatchId": 10,
+      "overlayMutation": {
+       "update": {
+        "name": "projects/demo-jsimport-users/databases/(default)/documents/users/bob/notes/n1",
+        "fields": {
+         "v": {
+          "integerValue": "111"
+         }
+        }
+       }
+      }
+     }
+    },
+    {
+     "key": [
+      "bob",
+      "users\u0001\u0001bob\u0001\u0001notes\u0001\u0001",
+      "n2"
+     ],
+     "value": {
+      "userId": "bob",
+      "collectionPath": "users\u0001\u0001bob\u0001\u0001notes\u0001\u0001",
+      "documentId": "n2",
+      "collectionGroup": "notes",
+      "largestBatchId": 10,
+      "overlayMutation": {
+       "update": {
+        "name": "projects/demo-jsimport-users/databases/(default)/documents/users/bob/notes/n2",
+        "fields": {
+         "b": {
+          "booleanValue": true
+         }
+        }
+       }
+      }
+     }
+    }
+   ]
+  },
+  {
+   "name": "globals",
+   "keyPath": "name",
+   "autoIncrement": false,
+   "indexes": [],
+   "records": []
+  },
+  {
+   "name": "indexConfiguration",
+   "keyPath": "indexId",
+   "autoIncrement": true,
+   "indexes": [
+    {
+     "name": "collectionGroupIndex",
+     "keyPath": "collectionGroup",
+     "unique": false,
+     "multiEntry": false
+    }
+   ],
+   "records": []
+  },
+  {
+   "name": "indexEntries",
+   "keyPath": [
+    "indexId",
+    "uid",
+    "arrayValue",
+    "directionalValue",
+    "orderedDocumentKey",
+    "documentKey"
+   ],
+   "autoIncrement": false,
+   "indexes": [
+    {
+     "name": "documentKeyIndex",
+     "keyPath": [
+      "indexId",
+      "uid",
+      "orderedDocumentKey"
+     ],
+     "unique": false,
+     "multiEntry": false
+    }
+   ],
+   "records": []
+  },
+  {
+   "name": "indexState",
+   "keyPath": [
+    "indexId",
+    "uid"
+   ],
+   "autoIncrement": false,
+   "indexes": [
+    {
+     "name": "sequenceNumberIndex",
+     "keyPath": [
+      "uid",
+      "sequenceNumber"
+     ],
+     "unique": false,
+     "multiEntry": false
+    }
+   ],
+   "records": []
+  },
+  {
+   "name": "mutationQueues",
+   "keyPath": "userId",
+   "autoIncrement": false,
+   "indexes": [],
+   "records": []
+  },
+  {
+   "name": "mutations",
+   "keyPath": "batchId",
+   "autoIncrement": true,
+   "indexes": [
+    {
+     "name": "userMutationsIndex",
+     "keyPath": [
+      "userId",
+      "batchId"
+     ],
+     "unique": true,
+     "multiEntry": false
+    }
+   ],
+   "records": [
+    {
+     "key": 1,
+     "value": {
+      "userId": "alice",
+      "batchId": 1,
+      "localWriteTimeMs": 1795145092192,
+      "baseMutations": [],
+      "mutations": [
+       {
+        "update": {
+         "name": "projects/demo-jsimport-users/databases/(default)/documents/users/alice/notes/n1",
+         "fields": {
+          "v": {
+           "integerValue": "1"
+          },
+          "log": {
+           "arrayValue": {
+            "values": [
+             {
+              "stringValue": "first"
+             }
+            ]
+           }
+          }
+         }
+        }
+       }
+      ]
+     }
+    },
+    {
+     "key": 2,
+     "value": {
+      "userId": "",
+      "batchId": 2,
+      "localWriteTimeMs": 1795145092198,
+      "baseMutations": [],
+      "mutations": [
+       {
+        "update": {
+         "name": "projects/demo-jsimport-users/databases/(default)/documents/open/anon1",
+         "fields": {
+          "by": {
+           "stringValue": "anon"
+          }
+         }
+        }
+       }
+      ]
+     }
+    },
+    {
+     "key": 3,
+     "value": {
+      "userId": "bob",
+      "batchId": 3,
+      "localWriteTimeMs": 1795145092206,
+      "baseMutations": [],
+      "mutations": [
+       {
+        "update": {
+         "name": "projects/demo-jsimport-users/databases/(default)/documents/users/bob/notes/n1",
+         "fields": {
+          "v": {
+           "integerValue": "1"
+          }
+         }
+        }
+       }
+      ]
+     }
+    },
+    {
+     "key": 4,
+     "value": {
+      "userId": "alice",
+      "batchId": 4,
+      "localWriteTimeMs": 1795145092213,
+      "baseMutations": [],
+      "mutations": [
+       {
+        "update": {
+         "name": "projects/demo-jsimport-users/databases/(default)/documents/users/alice/notes/n1",
+         "fields": {
+          "v": {
+           "integerValue": "2"
+          }
+         }
+        },
+        "updateMask": {
+         "fieldPaths": [
+          "v"
+         ]
+        },
+        "updateTransforms": [
+         {
+          "fieldPath": "log",
+          "appendMissingElements": {
+           "values": [
+            {
+             "stringValue": "second"
+            }
+           ]
+          }
+         }
+        ],
+        "currentDocument": {
+         "exists": true
+        }
+       }
+      ]
+     }
+    },
+    {
+     "key": 5,
+     "value": {
+      "userId": "alice",
+      "batchId": 5,
+      "localWriteTimeMs": 1795145092215,
+      "baseMutations": [],
+      "mutations": [
+       {
+        "update": {
+         "name": "projects/demo-jsimport-users/databases/(default)/documents/users/bob/notes/fromAlice",
+         "fields": {
+          "x": {
+           "integerValue": "1"
+          }
+         }
+        }
+       }
+      ]
+     }
+    },
+    {
+     "key": 6,
+     "value": {
+      "userId": "",
+      "batchId": 6,
+      "localWriteTimeMs": 1795145092223,
+      "baseMutations": [],
+      "mutations": [
+       {
+        "update": {
+         "name": "projects/demo-jsimport-users/databases/(default)/documents/users/alice/notes/anon",
+         "fields": {
+          "x": {
+           "integerValue": "1"
+          }
+         }
+        }
+       }
+      ]
+     }
+    },
+    {
+     "key": 7,
+     "value": {
+      "userId": "bob",
+      "batchId": 7,
+      "localWriteTimeMs": 1795145092232,
+      "baseMutations": [
+       {
+        "update": {
+         "name": "projects/demo-jsimport-users/databases/(default)/documents/users/bob/notes/n1",
+         "fields": {
+          "v": {
+           "integerValue": "1"
+          }
+         }
+        },
+        "updateMask": {
+         "fieldPaths": [
+          "v"
+         ]
+        },
+        "currentDocument": {
+         "exists": true
+        }
+       }
+      ],
+      "mutations": [
+       {
+        "update": {
+         "name": "projects/demo-jsimport-users/databases/(default)/documents/users/bob/notes/n1"
+        },
+        "updateMask": {
+         "fieldPaths": []
+        },
+        "updateTransforms": [
+         {
+          "fieldPath": "v",
+          "increment": {
+           "integerValue": "10"
+          }
+         }
+        ],
+        "currentDocument": {
+         "exists": true
+        }
+       }
+      ]
+     }
+    },
+    {
+     "key": 8,
+     "value": {
+      "userId": "alice",
+      "batchId": 8,
+      "localWriteTimeMs": 1795145092248,
+      "baseMutations": [],
+      "mutations": [
+       {
+        "update": {
+         "name": "projects/demo-jsimport-users/databases/(default)/documents/signed_in/alice",
+         "fields": {
+          "ok": {
+           "booleanValue": true
+          }
+         }
+        },
+        "updateTransforms": [
+         {
+          "fieldPath": "at",
+          "setToServerValue": "REQUEST_TIME"
+         }
+        ]
+       }
+      ]
+     }
+    },
+    {
+     "key": 9,
+     "value": {
+      "userId": "",
+      "batchId": 9,
+      "localWriteTimeMs": 1795145092264,
+      "baseMutations": [
+       {
+        "update": {
+         "name": "projects/demo-jsimport-users/databases/(default)/documents/open/anon1",
+         "fields": {
+          "n": {
+           "integerValue": 0
+          }
+         }
+        },
+        "updateMask": {
+         "fieldPaths": [
+          "n"
+         ]
+        },
+        "currentDocument": {
+         "exists": true
+        }
+       }
+      ],
+      "mutations": [
+       {
+        "update": {
+         "name": "projects/demo-jsimport-users/databases/(default)/documents/open/anon1"
+        },
+        "updateMask": {
+         "fieldPaths": []
+        },
+        "updateTransforms": [
+         {
+          "fieldPath": "n",
+          "increment": {
+           "integerValue": "1"
+          }
+         }
+        ],
+        "currentDocument": {
+         "exists": true
+        }
+       }
+      ]
+     }
+    },
+    {
+     "key": 10,
+     "value": {
+      "userId": "bob",
+      "batchId": 10,
+      "localWriteTimeMs": 1795145092274,
+      "baseMutations": [
+       {
+        "update": {
+         "name": "projects/demo-jsimport-users/databases/(default)/documents/users/bob/notes/n1",
+         "fields": {
+          "v": {
+           "integerValue": "11"
+          }
+         }
+        },
+        "updateMask": {
+         "fieldPaths": [
+          "v"
+         ]
+        },
+        "currentDocument": {
+         "exists": true
+        }
+       }
+      ],
+      "mutations": [
+       {
+        "update": {
+         "name": "projects/demo-jsimport-users/databases/(default)/documents/users/bob/notes/n2",
+         "fields": {
+          "b": {
+           "booleanValue": true
+          }
+         }
+        }
+       },
+       {
+        "update": {
+         "name": "projects/demo-jsimport-users/databases/(default)/documents/users/bob/notes/n1"
+        },
+        "updateMask": {
+         "fieldPaths": []
+        },
+        "updateTransforms": [
+         {
+          "fieldPath": "v",
+          "increment": {
+           "integerValue": "100"
+          }
+         }
+        ],
+        "currentDocument": {
+         "exists": true
+        }
+       }
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "name": "namedQueries",
+   "keyPath": "name",
+   "autoIncrement": false,
+   "indexes": [],
+   "records": []
+  },
+  {
+   "name": "owner",
+   "keyPath": null,
+   "autoIncrement": false,
+   "indexes": [],
+   "records": []
+  },
+  {
+   "name": "remoteDocumentGlobal",
+   "keyPath": null,
+   "autoIncrement": false,
+   "indexes": [],
+   "records": [
+    {
+     "key": "remoteDocumentGlobalKey",
+     "value": {
+      "byteSize": 0
+     }
+    }
+   ]
+  },
+  {
+   "name": "remoteDocumentsV14",
+   "keyPath": [
+    "prefixPath",
+    "collectionGroup",
+    "readTime",
+    "documentId"
+   ],
+   "autoIncrement": false,
+   "indexes": [
+    {
+     "name": "collectionGroupIndex",
+     "keyPath": [
+      "collectionGroup",
+      "readTime",
+      "prefixPath",
+      "documentId"
+     ],
+     "unique": false,
+     "multiEntry": false
+    },
+    {
+     "name": "documentKeyIndex",
+     "keyPath": [
+      "prefixPath",
+      "collectionGroup",
+      "documentId"
+     ],
+     "unique": false,
+     "multiEntry": false
+    }
+   ],
+   "records": []
+  },
+  {
+   "name": "targetDocuments",
+   "keyPath": [
+    "targetId",
+    "path"
+   ],
+   "autoIncrement": false,
+   "indexes": [
+    {
+     "name": "documentTargetsIndex",
+     "keyPath": [
+      "path",
+      "targetId"
+     ],
+     "unique": true,
+     "multiEntry": false
+    }
+   ],
+   "records": []
+  },
+  {
+   "name": "targetGlobal",
+   "keyPath": null,
+   "autoIncrement": false,
+   "indexes": [],
+   "records": [
+    {
+     "key": "targetGlobalKey",
+     "value": {
+      "highestTargetId": 0,
+      "highestListenSequenceNumber": 0,
+      "lastRemoteSnapshotVersion": {
+       "seconds": 0,
+       "nanoseconds": 0
+      },
+      "targetCount": 0
+     }
+    }
+   ]
+  },
+  {
+   "name": "targets",
+   "keyPath": "targetId",
+   "autoIncrement": false,
+   "indexes": [
+    {
+     "name": "queryTargetsIndex",
+     "keyPath": [
+      "canonicalId",
+      "targetId"
+     ],
+     "unique": true,
+     "multiEntry": false
+    }
+   ],
+   "records": []
+  }
+ ]
+}

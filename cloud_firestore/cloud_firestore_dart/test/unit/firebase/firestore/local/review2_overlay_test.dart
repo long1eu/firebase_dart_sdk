@@ -21,6 +21,7 @@ void main() {
     'sqlite': () => createSQLitePersistence(
         'firebase/firestore/local/review2_overlay_test-${const Uuid().v4()}.db',
         const LruGarbageCollectorParams()),
+    'keyvalue': () => createKeyValuePersistence(),
   };
 
   for (final MapEntry<String, Future<Persistence> Function()> variant

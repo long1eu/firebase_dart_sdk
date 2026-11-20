@@ -65,8 +65,6 @@ liteTransportOverride;
 /// cache and without listeners. Every call is one request to the backend and
 /// one response.
 ///
-/// **Experimental**: this API may change in any release.
-///
 /// ```dart
 /// final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(app: app);
 /// final DocumentSnapshot<Map<String, Object?>> city =

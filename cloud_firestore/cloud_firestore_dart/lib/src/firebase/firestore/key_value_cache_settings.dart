@@ -3,7 +3,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/local/keyvalue/cache
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/keyvalue/cache_store_persistence.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local_cache_settings.dart';
 
-/// **Experimental.** Settings for a persistent cache in [store], a key-value store the app brings (see
+/// Settings for a persistent cache in [store], a key-value store the app brings (see
 /// [KeyValueCacheSettings] and [CacheStore]).
 ///
 /// [sizeBytes] is an approximate cache size threshold, as in [PersistentCacheSettings.sizeBytes]: the size is that of

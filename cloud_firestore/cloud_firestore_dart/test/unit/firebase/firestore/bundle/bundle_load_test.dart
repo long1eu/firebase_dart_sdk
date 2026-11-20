@@ -80,6 +80,7 @@ void main() {
     'memory': createEagerGCMemoryPersistence,
     'sqlite': () => createSQLitePersistence(
         'firebase/firestore/bundle/bundle_load_test-${const Uuid().v4()}.db'),
+    'keyvalue': () => createKeyValuePersistence(),
   };
 
   persistences.forEach((String name, Future<Persistence> Function() create) {

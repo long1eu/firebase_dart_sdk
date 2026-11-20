@@ -15,6 +15,10 @@ abstract class JsSdkDatabase {
   /// The values of every row of the object store [name], in key order, read in one transaction.
   Future<List<Map<String, Object?>>> readAll(String name);
 
+  /// The values of the rows of the object store [name], in key order, at most [count] at a time, each chunk read in
+  /// a transaction of its own: a large store is never held whole.
+  Stream<List<Map<String, Object?>>> readChunks(String name, int count);
+
   /// Removes, in one transaction, the rows of the `mutations` store with the keys [batchIds] for which [matches] is
   /// true, with their rows in `documentMutations` and the rows of `documentOverlays` (when the store exists) whose
   /// largest batch id is one of them, for the same user. Completes when the transaction committed, with the number of

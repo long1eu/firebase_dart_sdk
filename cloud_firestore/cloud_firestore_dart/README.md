@@ -30,11 +30,13 @@ It is a port of the open-source Firebase Android SDK, kept close to its current 
 | Typed converters (`withConverter`), snapshots as JSON, data bundles | stable |
 | Offline cache in SQLite (you supply the opener) or in memory; LRU garbage collection; cache indexes | stable |
 | Several clients on one SQLite cache: consistent file, one primary client | stable, coordination not done |
+| Merging repeated offline writes to a document into one pending write (`mergeUnsentWrites`, off by default): not in the official SDKs, the backend ends with the same documents but rules and functions see fewer writes ([guide](https://github.com/long1eu/firebase_dart_sdk/blob/main/docs/guides/offline_persistence.md#merging-repeated-offline-writes-opt-in-extension)) | supported, opt-in extension |
 | BSON value types of Enterprise edition databases | stable |
 | Pipelines (`package:cloud_firestore_dart/pipelines.dart`), Enterprise edition only | **preview** |
-| Firestore Lite (`package:cloud_firestore_dart/lite.dart`): no cache, one request per call | **experimental** |
+| Firestore Lite (`package:cloud_firestore_dart/lite.dart`): no cache, one request per call | stable |
 | The web: REST and WebChannel over `fetch`, cache in memory, IndexedDB or OPFS | **supported in Chrome** |
 | The web: a cache in the official JS SDK's own IndexedDB database (`package:cloud_firestore_dart/indexeddb_cache.dart`), no SQLite | **supported in Chrome**, one tab |
+| A cache in your own storage: any ordered key-value store you implement (`package:cloud_firestore_dart/cache_store.dart`, [guide](https://github.com/long1eu/firebase_dart_sdk/blob/main/docs/guides/custom_cache_store.md)) | stable, one client per store |
 
 *Stable* means the API is not expected to change; a *preview* or *experimental* API may change in
 any release. Authentication is in the companion package
@@ -80,6 +82,7 @@ Future<void> main() async {
   [queries, data and the API](https://github.com/long1eu/firebase_dart_sdk/blob/main/docs/guides/queries_and_data.md),
   [transactions and the lifecycle](https://github.com/long1eu/firebase_dart_sdk/blob/main/docs/guides/transactions_and_lifecycle.md),
   [offline persistence and cache settings](https://github.com/long1eu/firebase_dart_sdk/blob/main/docs/guides/offline_persistence.md),
+  [a cache in your own storage](https://github.com/long1eu/firebase_dart_sdk/blob/main/docs/guides/custom_cache_store.md),
   [several clients on one cache](https://github.com/long1eu/firebase_dart_sdk/blob/main/docs/guides/multiple_clients.md),
   [authentication and App Check](https://github.com/long1eu/firebase_dart_sdk/blob/main/docs/guides/authentication.md),
   [Pipelines](https://github.com/long1eu/firebase_dart_sdk/blob/main/docs/guides/pipelines.md),

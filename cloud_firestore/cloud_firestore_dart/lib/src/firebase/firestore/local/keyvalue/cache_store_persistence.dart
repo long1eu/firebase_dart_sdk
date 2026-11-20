@@ -99,6 +99,7 @@ import 'package:cloud_firestore_dart/src/proto/google/firestore/admin/v1/index.d
 import 'package:cloud_firestore_dart/src/proto/index.dart' as proto;
 import 'package:collection/collection.dart';
 import 'package:firebase_app_dart/internal.dart';
+import 'package:meta/meta.dart';
 import 'package:semaphore/semaphore.dart';
 
 part 'kv_bundle_and_globals.dart';
@@ -109,8 +110,24 @@ part 'kv_query_cache.dart';
 part 'kv_reference_delegate.dart';
 part 'kv_remote_document_cache.dart';
 
-/// The version of the layout this SDK writes. A store with another version is not opened.
+/// The version of the stored format this SDK writes (docs/keyvalue_cache_format.md). A store of an older version is
+/// migrated when it opens ([kvMigrations]); a store of a newer version is refused.
+///
+/// Every change of what is stored (a table, a key or a value) increments it, adds the migration of the stores of the
+/// previous version to [kvMigrations] and a fixture of the new version (test/res/keyvalue, see
+/// keyvalue_schema_test.dart).
 const int kvSchemaVersion = 1;
+
+/// A migration of a store to a schema version: it reads and writes the store through the transaction that opens it,
+/// so that the store holds the old version or the new one, never a part of a migration.
+typedef KvMigration = Future<void> Function(KvTransaction transaction);
+
+/// The migrations, by the schema version that each one upgrades a store to (from the version before it). They run in
+/// the order of the versions, all of them in the transaction that opens the store.
+///
+/// The writes of that transaction stay in memory until it commits (see [KvTransaction]): a migration that rewrites a
+/// large table needs memory for all of it.
+const Map<int, KvMigration> kvMigrations = <int, KvMigration>{};
 
 /// The tables of the layout (see the library comment).
 abstract final class _Table {
@@ -152,7 +169,11 @@ class CacheStorePersistence extends KeyValuePersistence {
     required this.serializer,
     required LruGarbageCollectorParams lruParams,
     StatsCollector statsCollector = StatsCollector.noOp,
-  }) : _statsCollector = statsCollector {
+    @visibleForTesting int schemaVersion = kvSchemaVersion,
+    @visibleForTesting Map<int, KvMigration> migrations = kvMigrations,
+  }) : _statsCollector = statsCollector,
+       _schemaVersion = schemaVersion,
+       _migrations = migrations {
     queryCache = _KvQueryCache(this);
     remoteDocumentCache = _KvRemoteDocumentCache(this);
     indexManager = _KvIndexManager(this);
@@ -184,6 +205,11 @@ class CacheStorePersistence extends KeyValuePersistence {
   final LocalSerializer serializer;
   final StatsCollector _statsCollector;
   final Semaphore _semaphore = LocalSemaphore(1);
+
+  /// The schema version this persistence writes, and the migrations to it ([kvSchemaVersion] and [kvMigrations],
+  /// other values in tests).
+  final int _schemaVersion;
+  final Map<int, KvMigration> _migrations;
 
   @override
   late final _KvQueryCache queryCache;
@@ -261,7 +287,8 @@ class CacheStorePersistence extends KeyValuePersistence {
     }
   }
 
-  /// Writes the version and the database of a new store, and checks those of a store written before.
+  /// Writes the version and the database of a new store; checks those of a store written before, and migrates it
+  /// when it is of an older version.
   Future<void> _checkSchema() async {
     final Uint8List versionKey = _key(_Table.meta).string('version').bytes;
     final Uint8List databaseKey = _key(_Table.meta).string('database').bytes;
@@ -281,16 +308,25 @@ class CacheStorePersistence extends KeyValuePersistence {
           errorCode: FirestoreErrorCode.failedPrecondition,
         );
       }
-      await _tx.put(versionKey, KvKeyWriter().integer(kvSchemaVersion).bytes);
+      await _tx.put(versionKey, KvKeyWriter().integer(_schemaVersion).bytes);
       await _tx.put(databaseKey, utf8.encode(database));
       return;
     }
     final int stored = KvKeyReader(version).integer();
-    if (stored != kvSchemaVersion) {
+    if (stored > _schemaVersion) {
       throw FirestoreException(
         message:
-            'The CacheStore holds a cache of schema version $stored, this SDK reads version $kvSchemaVersion. '
-            'Clear the store (FirebaseFirestore.clearPersistence) or use the SDK that wrote it.',
+            'The CacheStore holds a cache of schema version $stored, written by a newer version of the SDK; this SDK '
+            'reads versions up to $_schemaVersion. Use the newer SDK, or clear the store '
+            '(FirebaseFirestore.clearPersistence) to start an empty cache.',
+        errorCode: FirestoreErrorCode.failedPrecondition,
+      );
+    }
+    if (stored < 1) {
+      throw FirestoreException(
+        message:
+            'The CacheStore holds a cache of schema version $stored, which no SDK writes. Clear the store '
+            '(FirebaseFirestore.clearPersistence).',
         errorCode: FirestoreErrorCode.failedPrecondition,
       );
     }
@@ -303,6 +339,21 @@ class CacheStorePersistence extends KeyValuePersistence {
         errorCode: FirestoreErrorCode.failedPrecondition,
       );
     }
+    if (stored == _schemaVersion) {
+      return;
+    }
+    final KvTransaction transaction = _tx;
+    for (int to = stored + 1; to <= _schemaVersion; to++) {
+      final KvMigration? migration = _migrations[to];
+      if (migration == null) {
+        throw StateError(
+          'The key-value cache has no migration to schema version $to',
+        );
+      }
+      Log.d(tag, 'Migrating the cache to schema version $to');
+      await migration(transaction);
+    }
+    await _tx.put(versionKey, KvKeyWriter().integer(_schemaVersion).bytes);
   }
 
   /// Reads the state kept in memory between transactions.

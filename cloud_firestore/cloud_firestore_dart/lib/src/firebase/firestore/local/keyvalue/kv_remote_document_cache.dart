@@ -255,12 +255,14 @@ class _KvRemoteDocumentCache implements RemoteDocumentCache {
       final Uint8List prefix = _key(_Table.doc).path(query.path).bytes;
       await _db._scanPrefix(prefix, (List<CacheStoreEntry> page) {
         for (final CacheStoreEntry entry in page) {
-          read++;
           final KvKeyReader reader = KvKeyReader(entry.value);
           _readVersion(reader);
+          // Deleted and unknown documents are skipped by their type, not decoded: not counted as read (as the SQLite
+          // cache, whose query filters them out).
           if (reader.integer() != _foundDocument) {
             continue;
           }
+          read++;
           consider(_decodeDocument(reader.rest()));
         }
         return true;

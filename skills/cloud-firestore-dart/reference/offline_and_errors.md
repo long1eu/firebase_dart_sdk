@@ -22,7 +22,7 @@ Firebase Android SDK.
   backend accepted.
 - Writes are re-sent after a broken connection. A relative transform such as
   `FieldValue.increment` can then be applied twice if the acknowledgement was lost.
-- Firestore Lite (`package:cloud_firestore_dart/lite.dart`, experimental) is different: no
+- Firestore Lite (`package:cloud_firestore_dart/lite.dart`) is different: no
   queue, no retry; a write fails with `unavailable` without a connection.
 
 ## Reads and listeners
