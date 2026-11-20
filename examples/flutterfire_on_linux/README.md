@@ -23,8 +23,8 @@ registers before `main()` on Linux. The app code does not import it; the only si
 ```yaml
 dependencies:
   cloud_firestore: ^7.1.0
-  cloud_firestore_dart_platform: ^0.1.0   # registers itself on Linux
-  cloud_firestore_dart_sqlite: ^0.1.0     # only for the disk cache
+  cloud_firestore_dart_platform: ^0.1.2   # registers itself on Linux
+  cloud_firestore_dart_sqlite: ^0.1.3     # only for the disk cache
   firebase_core: ^5.1.0
   path_provider: ^2.1.6                   # only for the disk cache directory
 ```
