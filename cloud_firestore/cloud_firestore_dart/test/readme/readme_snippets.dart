@@ -196,8 +196,8 @@ Future<void> authProvidersReadmeLine27() async {
   await auth.signOut();
 }
 
-// ../../firebase_auth/firebase_auth_providers_dart/README.md:87
-Future<void> authProvidersReadmeLine87() async {
+// ../../firebase_auth/firebase_auth_providers_dart/README.md:88
+Future<void> authProvidersReadmeLine88() async {
   final FirebaseUserAuth auth = await FirebaseUserAuth.forApp(app);
   auth.authStateChanges().listen((AuthUser? user) => print(user?.uid ?? 'signed out'));
 
@@ -207,6 +207,18 @@ Future<void> authProvidersReadmeLine87() async {
     GoogleAuthProvider.credential(idToken: googleIdToken),
   );
   print(result.additionalUserInfo?.isNewUser);
+}
+
+// ../../firebase_auth/firebase_auth_providers_dart/README.md:169
+Future<void> authProvidersReadmeLine169() async {
+  final FirebaseUserAuth auth = await FirebaseUserAuth.forApp(app);
+  final UserCredential result = await auth.signInWithOAuthLoopback(
+    OAuthLoopbackProvider.google(
+      clientId: '<the client id of a "Desktop app" OAuth client>',
+      clientSecret: '<its client secret>', // not confidential for a desktop client, says Google
+    ),
+  );
+  print(result.user?.email);
 }
 
 // ../../docs/migrating_from_vm_packages.md:67

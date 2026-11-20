@@ -3,7 +3,8 @@
 // test/auth_emulator_test.dart; firestore_wiring.dart also needs
 // FIRESTORE_AUTH_RULES_EMULATOR_HOST), and without it, where they only print
 // how to run them. service_account.dart and adc_server.dart need a real
-// project, so they only run without their variables.
+// project, so they only run without their variables, like
+// google_desktop_sign_in.dart, which needs a Google OAuth client and a browser.
 
 @TestOn('vm')
 library;
@@ -82,6 +83,7 @@ const Map<String, String> _notes = <String, String>{
   'linking_and_email_link.dart': 'Set FIREBASE_AUTH_EMULATOR_HOST',
   'service_account.dart': 'Set FIREBASE_SERVICE_ACCOUNT_KEY_FILE',
   'adc_server.dart': 'Set FIREBASE_PROJECT_ID',
+  'google_desktop_sign_in.dart': 'Set GOOGLE_DESKTOP_CLIENT_ID',
 };
 
 /// The variables that point the examples at an emulator or a real project.
@@ -90,6 +92,8 @@ const List<String> _variables = <String>[
   'FIRESTORE_AUTH_RULES_EMULATOR_HOST',
   'FIREBASE_SERVICE_ACCOUNT_KEY_FILE',
   'FIREBASE_PROJECT_ID',
+  'GOOGLE_DESKTOP_CLIENT_ID',
+  'FIREBASE_API_KEY',
 ];
 
 Future<ProcessResult> _runExample(
