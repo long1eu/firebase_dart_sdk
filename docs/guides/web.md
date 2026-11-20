@@ -558,7 +558,7 @@ Limits:
 How it is tested, in Chrome with dart2js and dart2wasm against the emulator:
 
 - The persistence suites of the SQLite, memory and key-value caches run on it
-  (`test/browser/web_indexeddb_*_test.dart`, about 590 tests): the mutation queue, remote documents,
+  (`test/browser/web_indexeddb_*_test.dart`, about 600 tests): the mutation queue, remote documents,
   targets, overlays, bundles, globals, the index managers, the local store, garbage collection, the
   query engine and the index backfiller, and the upstream spec tests with restarts (the multi-client
   specs are skipped: one tab). The numbers, and what running them fixed, are in

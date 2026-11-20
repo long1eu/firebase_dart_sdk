@@ -598,6 +598,7 @@ skipped per file, the same in both compilers except where noted:
 | `web_indexeddb_spec_test.dart` | the JSON spec tests of `test/res/json`, restarts included | 220 | 92 |
 | `web_indexeddb_engine_test.dart` | the engine end to end through the public API | 9 | 0 |
 | `web_indexeddb_schema_version_test.dart` | versions other than 18 | 4 | 0 |
+| `web_indexeddb_serializer_test.dart` | rows of values proto3 JSON writes unlike the JS SDK | 5 | 0 |
 
 The skipped specs: 81 multi-client (one tab at a time, as for the key-value cache), 9 eager-gc (memory only), 2 known
 divergences shared with the other caches. The dart2js skip is `testAdvancedQueries`, which orders by the integer 0
@@ -613,6 +614,11 @@ What running them found and fixed in the engine:
 - **A removed document kept its index entries.** A document deleted by the backend (removed from the cache) or
   collected left its entries in `indexEntries`, so a query served by the index looked up a document that was gone. The
   remote document cache now removes them, as the SQLite cache and the Android SDK do.
+- **Rows that differ from the JS SDK's** (found by another review, fixed here with a test): `package:protobuf`'s
+  proto3 JSON wrote an empty bytes value as `{}` (unreadable), -0.0 as `0`, and under dart2js rounded timestamps to
+  milliseconds, so a time less than half a millisecond before a whole second was stored one second late and the last
+  second of year 9999 became year 10000, which could not be read back. The serializer now writes values and timestamps
+  as the JS SDK's serializer does, and reads `"-0"` as -0.0.
 - **Map key order** (below).
 - **The lease** (below).
 
