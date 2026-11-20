@@ -208,6 +208,10 @@ print(result.user?.email);
 An `exchangeCode` that posts the four values to a server of yours:
 
 ```dart
+import 'dart:convert';
+
+import 'package:http/http.dart' as http;
+
 final OAuthLoopbackProvider provider = OAuthLoopbackProvider.oidc(
   providerId: 'oidc.example',
   authorizationEndpoint: Uri.parse('https://idp.example.com/authorize'),

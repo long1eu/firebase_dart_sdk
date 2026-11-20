@@ -23,6 +23,7 @@ import 'package:firebase_app_dart/firebase_app_dart.dart';
 import 'package:firebase_app_dart/platform_dependencies.dart';
 import 'package:firebase_auth_providers_dart/adc.dart'; // needs dart:io
 import 'package:firebase_auth_providers_dart/firebase_auth_providers_dart.dart';
+import 'package:http/http.dart' as http;
 import 'package:rxdart/rxdart.dart';
 import 'package:test/test.dart';
 import 'package:web/web.dart' as web;
@@ -209,8 +210,8 @@ Future<void> authProvidersReadmeLine88() async {
   print(result.additionalUserInfo?.isNewUser);
 }
 
-// ../../firebase_auth/firebase_auth_providers_dart/README.md:169
-Future<void> authProvidersReadmeLine169() async {
+// ../../firebase_auth/firebase_auth_providers_dart/README.md:170
+Future<void> authProvidersReadmeLine170() async {
   final FirebaseUserAuth auth = await FirebaseUserAuth.forApp(app);
   final UserCredential result = await auth.signInWithOAuthLoopback(
     OAuthLoopbackProvider.google(
@@ -219,6 +220,32 @@ Future<void> authProvidersReadmeLine169() async {
     ),
   );
   print(result.user?.email);
+}
+
+// ../../firebase_auth/firebase_auth_providers_dart/README.md:210
+Future<void> authProvidersReadmeLine210() async {
+  final OAuthLoopbackProvider provider = OAuthLoopbackProvider.oidc(
+    providerId: 'oidc.example',
+    authorizationEndpoint: Uri.parse('https://idp.example.com/authorize'),
+    tokenEndpoint: Uri.parse('https://idp.example.com/token'),
+    clientId: '<the client id>',
+    exchangeCode: (OAuthAuthorizationCode code) async {
+      final http.Response response = await http.post(
+        Uri.parse('https://api.example.com/oauth/exchange'),
+        headers: <String, String>{'content-type': 'application/json'},
+        body: jsonEncode(<String, String>{
+          'code': code.code,
+          'codeVerifier': code.codeVerifier,
+          'redirectUri': code.redirectUri,
+          'clientId': code.clientId,
+        }),
+      );
+      if (response.statusCode != 200) {
+        throw StateError('The exchange failed: ${response.statusCode}');
+      }
+      return jsonDecode(response.body) as Map<String, Object?>;
+    },
+  );
 }
 
 // ../../docs/migrating_from_vm_packages.md:67
