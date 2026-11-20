@@ -14,7 +14,7 @@ package. On Android, iOS and the web, where the official plugin works, prefer it
 It is a port of the open-source Firebase Android SDK, kept close to its current behaviour. Start with
 `dart pub add cloud_firestore_dart firebase_app_dart` and the [Quickstart](#quickstart).
 
-> **Status: 0.3.0.** Most of it was verified against the Firestore emulator
+> **Status: 0.3.1.** Most of it was verified against the Firestore emulator
 > only. Against production Firestore, a short verification kit was run on a Standard edition
 > database (see [Not done](#not-done)). Test against your own project before relying on it.
 

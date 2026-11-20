@@ -1,4 +1,4 @@
-## (unreleased)
+## 0.3.1
 
 - `WebExperimentalLongPollingOptions` and the long-polling settings are supported, not experimental: the word
   "Experimental" in their names comes from the JS SDK and stays for compatibility with it and with FlutterFire.
