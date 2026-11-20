@@ -210,6 +210,44 @@ void main() {
     expect(await db.query('SELECT a FROM t'), hasLength(1));
   });
 
+  test(
+    'statements with arguments run again, also after a schema change',
+    () async {
+      final Database db = await sqliteOpener(directory: directory.path)(
+        'cached',
+        version: 1,
+      );
+      addTearDown(db.close);
+      await db.execute('CREATE TABLE t (a INTEGER PRIMARY KEY, b TEXT)');
+      const String insert = 'INSERT INTO t (a, b) VALUES (?, ?)';
+      await db.execute(insert, <Object?>[1, 'x']);
+      await db.execute(insert, <Object?>[2, 'x']);
+      await db.execute(insert, <Object?>[3, 'y']);
+      await expectLater(
+        db.execute(insert, <Object?>[1, 'duplicate']),
+        throwsA(isA<sqlite.SqliteException>()),
+      );
+
+      await db.execute('ALTER TABLE t ADD COLUMN c INTEGER DEFAULT 7');
+      await db.execute(insert, <Object?>[4, 'x']);
+      expect(
+        await db.query('SELECT a, c FROM t WHERE b = ? ORDER BY a', <Object?>[
+          'x',
+        ]),
+        <Json>[
+          <String, Object?>{'a': 1, 'c': 7},
+          <String, Object?>{'a': 2, 'c': 7},
+          <String, Object?>{'a': 4, 'c': 7},
+        ],
+      );
+
+      const String delete = 'DELETE FROM t WHERE b = ?';
+      expect(await db.delete(delete, <Object?>['x']), 3);
+      expect(await db.delete(delete, <Object?>['x']), 0);
+      expect(await db.delete('DELETE FROM t'), 1);
+    },
+  );
+
   test('other SQLite errors are not transient', () async {
     final Database db = await sqliteOpener(directory: directory.path)(
       'syntax',
