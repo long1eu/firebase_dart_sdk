@@ -142,7 +142,7 @@ against the Firebase Auth emulator; nothing was run against the real service.
 | `user.uid`, `email`, `emailVerified`, `isAnonymous`, `displayName`, `photoURL`, `phoneNumber`, `tenantId`, `metadata`, `providerData` | `currentUser` (`AuthUser`, read with `accounts:lookup` after every sign-in) | emulator |
 | `setPersistence` (`inMemory`, `browserSession`, `browserLocal`) | an `AuthStorage`: `InMemoryAuthStorage` (default), `WebAuthStorage.session()`, `WebAuthStorage.local()`, and `FileAuthStorage(path)` on the VM | unit, Chrome |
 | `ActionCodeSettings` (`url`, `handleCodeInApp`, `iOS`, `android`, `linkDomain`) | `ActionCodeSettings` (flattened; no `dynamicLinkDomain`) | unit |
-| Popup and redirect flows on desktop and command line (no JS SDK equivalent) | `signInWithOAuthLoopback(OAuthLoopbackProvider.google(...))` / `.oidc(...)` / `.discover(...)`, `linkWithOAuthLoopback`, `reauthenticateWithOAuthLoopback`, or `authorizeWithOAuthLoopback(...)` for the credential (VM only; see below) | unit (fake identity provider); Google with a Desktop client against a real project |
+| Popup and redirect flows on desktop and command line (no JS SDK equivalent) | `signInWithOAuthLoopback(OAuthLoopbackProvider.google(...))` / `.github(...)` / `.oidc(...)` / `.discover(...)`, `linkWithOAuthLoopback`, `reauthenticateWithOAuthLoopback`, or `authorizeWithOAuthLoopback(...)` for the credential (VM only; see below) | unit (fake identity provider); Google with a Desktop client against a real project |
 | Popup and redirect flows in a browser, `signInWithProvider`, SAML | – (use a token from elsewhere with `signInWithCredential`) | |
 | Phone sign-in, reCAPTCHA, multi-factor sign-in and enrolment, TOTP, `revokeAccessToken`, passkeys | – | |
 
@@ -189,6 +189,10 @@ print(result.user?.email);
 - `OAuthLoopbackProvider.oidc(providerId: 'oidc.<name>', authorizationEndpoint:, tokenEndpoint:, clientId:)` or
   `OAuthLoopbackProvider.discover(issuer:, ...)` for an OpenID Connect provider of Identity Platform; the client id
   must be the one configured for the provider in the project.
+- `OAuthLoopbackProvider.github(clientId:, clientSecret:)` for GitHub, with a GitHub OAuth App whose authorization
+  callback URL is `http://127.0.0.1` (GitHub accepts any port on a loopback redirect). GitHub's code exchange needs
+  the client secret even with PKCE, so it ships with the app. The default scopes are `read:user user:email`; no
+  nonce is sent, and Firebase gets the access token only.
 - `linkWithOAuthLoopback` links the provider to the signed-in user, and `reauthenticateWithOAuthLoopback` signs
   the same user in again. Both take the same arguments as `signInWithOAuthLoopback`, and throw `null-user` before
   the browser opens when nobody is signed in.
@@ -241,6 +245,18 @@ An error thrown by `exchangeCode` becomes `invalid-credential`; throw a `Firebas
 On 2026-11-20, Google sign-in with a Desktop client was run against a real Firebase project: the code was
 exchanged directly with the client secret and PKCE, and the redirect was `http://127.0.0.1:<port>`.
 `exchangeCode` and generic OpenID Connect providers were run only against the fake identity provider of the tests.
+GitHub was run only against the fake provider too.
+
+Not offered by the loopback helper:
+
+- Facebook: its documentation does not cover `http` loopback redirects with an arbitrary port (Strict Mode wants an
+  exact match), and Firebase documents a Facebook ID token only for iOS Limited Login.
+- Microsoft: Firebase does not support direct sign-in with Microsoft OAuth tokens
+  ([Firebase docs](https://firebase.google.com/docs/auth/web/microsoft-oauth)).
+- Phone sign-in, from plain Dart outside the Auth emulator: `sendVerificationCode` needs app verification
+  (reCAPTCHA, Play Integrity or APNs).
+- Auth-domain options (`customAuthDomain`): the loopback flow builds no hosted auth-domain page, so they do not
+  apply.
 
 ## Documentation
 

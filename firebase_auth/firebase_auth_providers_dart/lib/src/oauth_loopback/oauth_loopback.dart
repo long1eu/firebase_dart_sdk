@@ -49,7 +49,8 @@ class OAuthAuthorizationCode {
 /// authorization code flow with PKCE (S256) whose redirect comes back to a one-shot HTTP server on 127.0.0.1
 /// (RFC 8252, "OAuth 2.0 for Native Apps").
 ///
-/// Make one with [OAuthLoopbackProvider.google], [OAuthLoopbackProvider.oidc] or [OAuthLoopbackProvider.discover].
+/// Make one with [OAuthLoopbackProvider.google], [OAuthLoopbackProvider.github], [OAuthLoopbackProvider.oidc] or
+/// [OAuthLoopbackProvider.discover].
 ///
 /// The code is exchanged for the provider's tokens in one of two ways:
 ///
@@ -144,6 +145,38 @@ class OAuthLoopbackProvider {
       ...customParameters,
     },
   );
+
+  /// GitHub (`github.com`), with a GitHub OAuth App whose "Authorization callback URL" is `http://127.0.0.1` (GitHub
+  /// accepts any port on a loopback redirect) and whose client secret is [clientSecret]: GitHub's code exchange needs
+  /// it even with PKCE, so it ships with the app and is not confidential. GitHub is not an OpenID Connect provider:
+  /// no nonce is sent, and the credential carries only the access token. [scopes] are `read:user` and `user:email`
+  /// by default; [customParameters] can add `login` or `allow_signup`.
+  factory OAuthLoopbackProvider.github({
+    required String clientId,
+    required String clientSecret,
+    List<String> scopes = const <String>['read:user', 'user:email'],
+    Map<String, String> customParameters = const <String, String>{},
+  }) {
+    if (clientSecret.isEmpty) {
+      throw ArgumentError.value(
+        clientSecret,
+        'clientSecret',
+        'must not be empty',
+      );
+    }
+    return OAuthLoopbackProvider(
+      providerId: GithubAuthProvider.PROVIDER_ID,
+      authorizationEndpoint: Uri.parse(
+        'https://github.com/login/oauth/authorize',
+      ),
+      tokenEndpoint: Uri.parse('https://github.com/login/oauth/access_token'),
+      clientId: clientId,
+      clientSecret: clientSecret,
+      scopes: scopes,
+      useNonce: false,
+      customParameters: customParameters,
+    );
+  }
 
   /// An OpenID Connect provider from its [authorizationEndpoint] and [tokenEndpoint]. [providerId] is its id in
   /// Firebase (`oidc.<name>` for a provider configured in Identity Platform); [clientId] must be the client id

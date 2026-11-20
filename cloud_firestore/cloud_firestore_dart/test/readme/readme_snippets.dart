@@ -222,8 +222,8 @@ Future<void> authProvidersReadmeLine170() async {
   print(result.user?.email);
 }
 
-// ../../firebase_auth/firebase_auth_providers_dart/README.md:210
-Future<void> authProvidersReadmeLine210() async {
+// ../../firebase_auth/firebase_auth_providers_dart/README.md:214
+Future<void> authProvidersReadmeLine214() async {
   final OAuthLoopbackProvider provider = OAuthLoopbackProvider.oidc(
     providerId: 'oidc.example',
     authorizationEndpoint: Uri.parse('https://idp.example.com/authorize'),

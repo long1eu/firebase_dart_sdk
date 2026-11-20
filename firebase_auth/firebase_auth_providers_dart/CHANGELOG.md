@@ -21,6 +21,9 @@
   exchanged directly with the client secret and PKCE, and the redirect was `http://127.0.0.1:<port>`.
   `exchangeCode` and generic OpenID Connect providers were run only against the fake identity provider of the
   tests.
+- `OAuthLoopbackProvider.github`: GitHub sign-in through the loopback helper (PKCE S256, client secret, default
+  scopes `read:user user:email`, no nonce; Firebase gets the access token only). Run only against the fake
+  identity provider of the tests.
 
 ## 0.3.0
 

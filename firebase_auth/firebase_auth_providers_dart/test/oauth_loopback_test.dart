@@ -531,6 +531,152 @@ void main() {
     },
   );
 
+  test(
+    'the GitHub preset: PKCE, client secret, no nonce, access token only',
+    () async {
+      final FakeBackend backend = FakeBackend();
+      final FirebaseUserAuth auth = backend.create();
+      addTearDown(auth.dispose);
+      Map<String, String>? postBody;
+      backend.on('accounts:signInWithIdp', (Map<String, Object?> body) {
+        postBody = Uri.splitQueryString(body['postBody']! as String);
+        return jsonResponse(<String, Object?>{
+          'providerId': 'github.com',
+          ...backend.tokensFor('github-user', provider: 'github.com'),
+        });
+      });
+      // GitHub's token endpoint, played in process: nothing leaves the machine.
+      http.Request? tokenRequest;
+      final MockClient github = MockClient((http.Request request) async {
+        tokenRequest = request;
+        return jsonResponse(<String, Object?>{
+          'access_token': 'gho_access',
+          'scope': 'read:user,user:email',
+          'token_type': 'bearer',
+        });
+      });
+      Uri? url;
+
+      final UserCredential result = await auth.signInWithOAuthLoopback(
+        OAuthLoopbackProvider.github(
+          clientId: 'github-client',
+          clientSecret: 'github-secret',
+        ),
+        presenter: (Uri authorizationUrl) async {
+          url = authorizationUrl;
+          final Uri redirect = Uri.parse(
+            authorizationUrl.queryParameters['redirect_uri']!,
+          );
+          await presenter.client.get(
+            redirect.replace(
+              queryParameters: <String, String>{
+                'code': 'github-code',
+                'state': authorizationUrl.queryParameters['state']!,
+              },
+            ),
+          );
+        },
+        httpClient: github,
+      );
+
+      expect(
+        '${url!.scheme}://${url!.host}${url!.path}',
+        'https://github.com/login/oauth/authorize',
+      );
+      final Map<String, String> a = url!.queryParameters;
+      expect(a['client_id'], 'github-client');
+      expect(a['scope'], 'read:user user:email');
+      expect(a['response_type'], 'code');
+      expect(a['code_challenge_method'], 'S256');
+      expect(a['redirect_uri'], matches(RegExp(r'^http://127\.0\.0\.1:\d+$')));
+      expect(a, isNot(contains('nonce')));
+
+      expect(
+        tokenRequest!.url.toString(),
+        'https://github.com/login/oauth/access_token',
+      );
+      expect(tokenRequest!.method, 'POST');
+      expect(tokenRequest!.headers['accept'], 'application/json');
+      final Map<String, String> form = tokenRequest!.bodyFields;
+      expect(form['client_id'], 'github-client');
+      expect(form['client_secret'], 'github-secret');
+      expect(form['code'], 'github-code');
+      expect(form['redirect_uri'], a['redirect_uri']);
+      expect(_challengeOf(form['code_verifier']!), a['code_challenge']);
+
+      expect(postBody, <String, String>{
+        'access_token': 'gho_access',
+        'providerId': 'github.com',
+      });
+      expect(result.user!.uid, 'github-user');
+    },
+  );
+
+  test(
+    'GitHub: comma-separated scopes are split, and an error with status 200 is invalid-credential',
+    () async {
+      Future<OAuthLoopbackResult> run(Map<String, Object?> answer) {
+        return authorizeWithOAuthLoopback(
+          OAuthLoopbackProvider.github(
+            clientId: 'github-client',
+            clientSecret: 'github-secret',
+          ),
+          presenter: (Uri authorizationUrl) async {
+            final Uri redirect = Uri.parse(
+              authorizationUrl.queryParameters['redirect_uri']!,
+            );
+            await presenter.client.get(
+              redirect.replace(
+                queryParameters: <String, String>{
+                  'code': 'github-code',
+                  'state': authorizationUrl.queryParameters['state']!,
+                },
+              ),
+            );
+          },
+          httpClient: MockClient(
+            (http.Request request) async => jsonResponse(answer),
+          ),
+        );
+      }
+
+      final OAuthLoopbackResult result = await run(<String, Object?>{
+        'access_token': 'gho_access',
+        'scope': 'read:user,user:email',
+        'token_type': 'bearer',
+      });
+      expect(result.grantedScopes, <String>['read:user', 'user:email']);
+
+      await expectLater(
+        run(<String, Object?>{
+          'error': 'bad_verification_code',
+          'error_description': 'The code passed is incorrect or expired.',
+        }),
+        throwsA(
+          authError('invalid-credential').having(
+            (FirebaseAuthException e) => e.serverCode,
+            'serverCode',
+            'bad_verification_code',
+          ),
+        ),
+      );
+    },
+  );
+
+  test('the GitHub preset needs a client secret, and takes other scopes', () {
+    expect(
+      () => OAuthLoopbackProvider.github(clientId: 'c', clientSecret: ''),
+      throwsArgumentError,
+    );
+    final OAuthLoopbackProvider github = OAuthLoopbackProvider.github(
+      clientId: 'c',
+      clientSecret: 's',
+      scopes: <String>['repo'],
+    );
+    expect(github.scopes, <String>['repo']);
+    expect(github.useNonce, isFalse);
+  });
+
   test('endpoints must be https except on loopback', () {
     expect(
       () => OAuthLoopbackProvider.oidc(

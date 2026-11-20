@@ -316,7 +316,7 @@ Future<OAuthLoopbackResult> _complete(
     refreshToken: _nonEmptyString(tokens['refresh_token']),
     expiresIn: _expiresIn(tokens['expires_in']),
     grantedScopes: scope is String
-        ? scope.split(' ').where((String s) => s.isNotEmpty).toList()
+        ? scope.split(RegExp('[ ,]')).where((String s) => s.isNotEmpty).toList()
         : null,
     rawNonce: rawNonce,
   );
@@ -397,7 +397,13 @@ Future<Map<String, Object?>> _exchange(
   } on FormatException {
     body = null;
   }
-  if (response.statusCode != 200) {
+  // GitHub answers a refused code with status 200 and an `error` field.
+  final bool errorIn200 =
+      body is Map<String, Object?> &&
+      body['error'] is String &&
+      body['access_token'] == null &&
+      body['id_token'] == null;
+  if (response.statusCode != 200 || errorIn200) {
     // An OAuth error ({"error": "invalid_grant", ...}) or some other text. Neither carries a token.
     final String? serverCode = body is Map<String, Object?>
         ? _nonEmptyString(body['error'])
