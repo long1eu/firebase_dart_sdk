@@ -8,6 +8,7 @@ import 'package:meta/meta.dart';
 
 import 'action_code.dart';
 import 'auth_credential.dart';
+import 'auth_emulator_config.dart';
 import 'auth_exception.dart';
 import 'auth_storage.dart';
 import 'auth_user.dart';
@@ -114,8 +115,15 @@ class FirebaseUserAuth implements AuthTokenProvider {
   ///   It is checked like the host of the Firestore settings: an [ArgumentError] is thrown for anything with user
   ///   info, a path, a query or a bad port, and for a Google host (`*.googleapis.com`, `*.google.com`), which is
   ///   never an emulator. An emulator that is not on the loopback interface gets a warning in the log, like the
-  ///   JS SDK warns for every emulator: passwords and tokens travel unencrypted to it. See
-  ///   [emulatorHostFromEnvironment].
+  ///   JS SDK warns for every emulator: passwords and tokens travel unencrypted to it;
+  ///   `emulatorOptions: AuthEmulatorOptions(disableWarnings: true)` leaves that warning out. See
+  ///   [emulatorHostFromEnvironment] and [emulatorConfig].
+  ///
+  ///   The JS SDK throws a `FirebaseAuthException` (`invalid-emulator-scheme`) only for a URL without `http://`
+  ///   or `https://` (`packages/auth/src/core/auth/emulator.ts:51-55`) and does not check the rest. Here a
+  ///   scheme is optional (`host:port` is the form of `FIREBASE_AUTH_EMULATOR_HOST`), every invalid value is a
+  ///   programming error thrown before any request, and [emulatorOrigin] shares the check with
+  ///   `firebase_admin_dart`, so it stays an [ArgumentError]; an `ftp://` scheme is one.
   /// * [appId] (the `appId` of the app's options) is sent as `X-Firebase-gmpid`, and the token of [appCheck]
   ///   as `X-Firebase-AppCheck`, with every request, like the JS SDK does. [forApp] takes both from the app.
   /// * [httpClient] is used for all requests and is not closed by [dispose]; without it one is created and closed.
@@ -128,14 +136,15 @@ class FirebaseUserAuth implements AuthTokenProvider {
     AuthStorage? storage,
     String? storageKey,
     String? emulatorHost,
+    AuthEmulatorOptions emulatorOptions = const AuthEmulatorOptions(),
     http.Client? httpClient,
     Duration requestTimeout = const Duration(seconds: 30),
     DateTime Function()? clock,
     Timer Function(Duration delay, void Function() callback)? createTimer,
   }) : _emulatorHost = emulatorHost,
-       _emulatorOrigin = emulatorHost == null
+       _emulatorConfig = emulatorHost == null
            ? null
-           : _emulatorOriginOf(emulatorHost),
+           : _emulatorConfigOf(emulatorHost, emulatorOptions),
        _appCheck = appCheck,
        _storage = storage ?? InMemoryAuthStorage(),
        _storageKey = storageKey ?? 'firebase_auth_providers_dart:$apiKey',
@@ -157,7 +166,8 @@ class FirebaseUserAuth implements AuthTokenProvider {
   /// it before the Firestore instance of the app is created, and after the App Check provider is set on the app.
   ///
   /// The session is stored in [storage] (default: in memory) under a key made of the API key and the name of the
-  /// app, so that two apps keep two sessions. [emulatorHost] and [httpClient] are those of the constructor.
+  /// app, so that two apps keep two sessions. [emulatorHost], [emulatorOptions] and [httpClient] are those of the
+  /// constructor.
   ///
   /// Throws an [ArgumentError] for an invalid [emulatorHost], and whatever the `read` of [storage] throws. In the
   /// second case the instance is the token provider of the app all the same, signed out, and the stored session is
@@ -174,6 +184,7 @@ class FirebaseUserAuth implements AuthTokenProvider {
     FirebaseApp app, {
     AuthStorage? storage,
     String? emulatorHost,
+    AuthEmulatorOptions emulatorOptions = const AuthEmulatorOptions(),
     http.Client? httpClient,
   }) async {
     final FirebaseUserAuth auth = FirebaseUserAuth(
@@ -184,6 +195,7 @@ class FirebaseUserAuth implements AuthTokenProvider {
       storageKey:
           'firebase_auth_providers_dart:${app.options.apiKey}:${app.name}',
       emulatorHost: emulatorHost,
+      emulatorOptions: emulatorOptions,
       httpClient: httpClient,
     );
     try {
@@ -210,7 +222,7 @@ class FirebaseUserAuth implements AuthTokenProvider {
   /// print(FirebaseUserAuth.emulatorOrigin('127.0.0.1:9099')); // http://127.0.0.1:9099
   /// ```
   static String emulatorOrigin(String emulatorHost) =>
-      _emulatorOriginOf(emulatorHost);
+      _originOf(_emulatorConfigOf(emulatorHost, const AuthEmulatorOptions()));
 
   /// How long before its expiry an ID token is refreshed.
   static const Duration refreshBefore = Duration(minutes: 5);
@@ -231,11 +243,23 @@ class FirebaseUserAuth implements AuthTokenProvider {
   /// Call it before the first request: a request in flight keeps the service it was sent to, and a session restored
   /// from the real service stays signed in until its first token refresh fails against the emulator. Throws an
   /// [ArgumentError] for an invalid [emulatorHost], as the constructor does, and changes nothing then.
-  void useEmulator(String emulatorHost) {
-    final String origin = _emulatorOriginOf(emulatorHost);
+  void useEmulator(
+    String emulatorHost, {
+    AuthEmulatorOptions options = const AuthEmulatorOptions(),
+  }) {
+    final AuthEmulatorConfig config = _emulatorConfigOf(emulatorHost, options);
     _emulatorHost = emulatorHost;
-    _emulatorOrigin = origin;
+    _emulatorConfig = config;
   }
+
+  /// The parsed [emulatorHost] and the options it was given with, or null for the real service: the
+  /// `emulatorConfig` of the JS SDK (`packages/auth/src/core/auth/emulator.ts:65-70`).
+  ///
+  /// The JS SDK's `emulator-config-failed` (`connectAuthEmulator` called after the first request, or with another
+  /// configuration, `emulator.ts:72-89`) does not exist here: [useEmulator] may be called at any time and the later
+  /// requests follow it.
+  AuthEmulatorConfig? get emulatorConfig => _emulatorConfig;
+  AuthEmulatorConfig? _emulatorConfig;
 
   /// The id of the Firebase app, sent as `X-Firebase-gmpid`; null sends none.
   final String? appId;
@@ -276,15 +300,29 @@ class FirebaseUserAuth implements AuthTokenProvider {
   /// platform, implementation, version of the package, framework.
   static const String clientVersion = 'Dart/DartCore/0.3.0/FirebaseCore-dart';
 
-  /// `http://host:port` (or `https://...`) of the Auth emulator, checked; null for the real service.
-  String? _emulatorOrigin;
+  /// `http://host:port` (or `https://...`) of the Auth emulator; null for the real service.
+  String? get _emulatorOrigin {
+    final AuthEmulatorConfig? config = emulatorConfig;
+    return config == null ? null : _originOf(config);
+  }
+
+  static String _originOf(AuthEmulatorConfig config) {
+    final int? port = config.port;
+    return '${config.protocol}://${config.host}${port == null ? '' : ':$port'}';
+  }
 
   static final RegExp _notAuthorityCharacters = RegExp(r'[/@?#\\\s]');
-  static final RegExp _scheme = RegExp(r'^(https?)://', caseSensitive: false);
+  static final RegExp _scheme = RegExp(
+    r'^([a-z][a-z0-9+.-]*)://',
+    caseSensitive: false,
+  );
 
   /// Checks [value], the `host:port` (optionally with an `http://` or `https://` scheme and a trailing `/`) of an
-  /// Auth emulator, and returns the origin the requests go to.
-  static String _emulatorOriginOf(String value) {
+  /// Auth emulator, and returns it parsed.
+  static AuthEmulatorConfig _emulatorConfigOf(
+    String value,
+    AuthEmulatorOptions options,
+  ) {
     Never invalid(String why) =>
         throw ArgumentError.value(value, 'emulatorHost', why);
     String authority = value.trim();
@@ -292,6 +330,11 @@ class FirebaseUserAuth implements AuthTokenProvider {
     final RegExpMatch? match = _scheme.firstMatch(authority);
     if (match != null) {
       scheme = match.group(1)!.toLowerCase();
+      if (scheme != 'http' && scheme != 'https') {
+        invalid(
+          'The scheme must be http or https (invalid-emulator-scheme in the JS SDK)',
+        );
+      }
       authority = authority.substring(match.end);
     }
     if (authority.endsWith('/')) {
@@ -303,7 +346,7 @@ class FirebaseUserAuth implements AuthTokenProvider {
       );
     }
     final String host;
-    String? port;
+    String? portText;
     if (authority.startsWith('[')) {
       // An IPv6 address: [::1]:9099.
       final int end = authority.indexOf(']');
@@ -316,7 +359,7 @@ class FirebaseUserAuth implements AuthTokenProvider {
         if (!rest.startsWith(':')) {
           invalid('Must be host:port');
         }
-        port = rest.substring(1);
+        portText = rest.substring(1);
       }
     } else {
       final List<String> parts = authority.split(':');
@@ -324,16 +367,14 @@ class FirebaseUserAuth implements AuthTokenProvider {
         invalid('Must be host:port (an IPv6 address goes in brackets)');
       }
       host = parts[0];
-      port = parts.length == 2 ? parts[1] : null;
+      portText = parts.length == 2 ? parts[1] : null;
     }
     if (host.isEmpty || host == '[]') {
       invalid('The host is empty');
     }
-    if (port != null) {
-      final int? number = int.tryParse(port);
-      if (number == null || number < 1 || number > 65535) {
-        invalid('The port must be a number from 1 to 65535');
-      }
+    final int? port = portText == null ? null : int.tryParse(portText);
+    if (portText != null && (port == null || port < 1 || port > 65535)) {
+      invalid('The port must be a number from 1 to 65535');
     }
     String normalized = host.toLowerCase();
     while (normalized.endsWith('.')) {
@@ -348,14 +389,19 @@ class FirebaseUserAuth implements AuthTokenProvider {
         'protection of the real service',
       );
     }
-    if (!_isLoopback(normalized)) {
+    if (!_isLoopback(normalized) && !options.disableWarnings) {
       Log.w(
         'FirebaseUserAuth',
         'WARNING: You are using the Auth Emulator at $scheme://$authority, which is intended for local testing '
             'only. Do not use with production credentials.',
       );
     }
-    return '$scheme://$authority';
+    return AuthEmulatorConfig(
+      protocol: scheme,
+      host: host,
+      port: port,
+      options: options,
+    );
   }
 
   static bool _isLoopback(String host) {
