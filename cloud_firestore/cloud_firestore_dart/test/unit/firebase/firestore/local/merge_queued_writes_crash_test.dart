@@ -368,6 +368,14 @@ void main() {
           kills++;
           await storage.kill(persistence);
           continue;
+        } on TransientDatabaseException catch (e) {
+          // The key-value cache hands on an error of its store as a transient one.
+          if (e.cause is! _InjectedFault) {
+            rethrow;
+          }
+          kills++;
+          await storage.kill(persistence);
+          continue;
         }
         faults.arm(null);
         if (!done) {
