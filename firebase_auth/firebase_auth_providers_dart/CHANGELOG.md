@@ -19,6 +19,11 @@
   not a number counts as one hour, an `exp` claim more than 24 h ahead is not trusted, and a proactive refresh
   delay beyond 24 h refreshes right away.
 
+- `FirebaseUserAuth.revokeToken(authorizationCode)` revokes the Sign in with Apple token of the signed-in user
+  with Apple's authorization code (`v2/accounts:revokeToken`, like `revokeToken(withAuthorizationCode:)` of the
+  iOS SDK). The user stays signed in. Throws `null-user` when nobody is signed in. Tested with a fake HTTP client
+  only.
+
 ## 0.3.0
 
 - The complete server error map of the JS SDK (`SERVER_ERROR_MAP` of `@firebase/auth` 1.13.10): the phone,

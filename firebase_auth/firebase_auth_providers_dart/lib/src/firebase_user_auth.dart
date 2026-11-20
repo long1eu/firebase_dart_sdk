@@ -641,6 +641,26 @@ class FirebaseUserAuth implements AuthTokenProvider {
     });
   }
 
+  /// Revokes the Sign in with Apple token of the signed-in user with the [authorizationCode] that Apple returned
+  /// (`revokeToken(withAuthorizationCode:)` of the iOS SDK; `v2/accounts:revokeToken`). Apple asks apps that let
+  /// users delete their account to revoke the token first. The user stays signed in.
+  ///
+  /// Throws a [FirebaseAuthException] with the code `null-user` (nobody is signed in), `invalid-credential`,
+  /// `user-token-expired`, ...
+  Future<void> revokeToken(String authorizationCode) async {
+    await _forUser((String idToken, int generation) async {
+      await _send(
+        _identityToolkit('accounts:revokeToken', version: 'v2'),
+        json: <String, Object?>{
+          'providerId': 'apple.com',
+          'tokenType': '3',
+          'token': authorizationCode,
+          'idToken': idToken,
+        },
+      );
+    });
+  }
+
   // ---- account management (the REST-backed operations of the JS SDK) ----
 
   /// Sends a password reset email to [email] (`sendPasswordResetEmail`). The link carries the code that
