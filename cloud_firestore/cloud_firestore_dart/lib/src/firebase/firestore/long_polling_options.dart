@@ -17,7 +17,10 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/firestore_settings.d
 /// Options of the web transport (WebChannel) for when it uses long polling.
 /// Port of `WebExperimentalLongPollingOptions` of the JS SDK.
 ///
-/// Note: this class is experimental and may change in any release.
+/// This class is supported like the rest of [Settings]. The word
+/// "Experimental" in its name, and in the names of the long-polling settings,
+/// comes from the JS SDK (and FlutterFire), whose names are kept for
+/// compatibility; it does not mark the API as experimental here.
 ///
 /// See [Settings.webExperimentalAutoDetectLongPolling],
 /// [Settings.webExperimentalForceLongPolling] and

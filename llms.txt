@@ -1,9 +1,10 @@
 # firebase_dart_sdk: Cloud Firestore for pure Dart
 
 > An unofficial pure-Dart Cloud Firestore client, ported from the Firebase Android SDK, for Dart
-> servers, command line tools and Flutter apps (web support is experimental). Three packages on
-> pub.dev, version 0.1.0: `cloud_firestore_dart` (the client), `firebase_app_dart` (the
-> `FirebaseApp`) and `firebase_auth_providers_dart` (token providers). It is not FlutterFire's
+> servers, command line tools, Flutter apps and the web (supported in Chrome). The core packages
+> on pub.dev: `cloud_firestore_dart` 0.3.0 (the client), `firebase_app_dart` 0.2.0 (the
+> `FirebaseApp`) and `firebase_auth_providers_dart` 0.3.0 (token providers); the repository README
+> lists the others (the SQLite cache, the FlutterFire platform and admin packages). It is not FlutterFire's
 > `cloud_firestore` and not the Firebase JS SDK: there is no `firebase_core`, no
 > `Firebase.initializeApp()` and no platform channel, and many names differ.
 
@@ -33,7 +34,7 @@ public API of the main library is the golden listing linked below.
 - [Authentication and App Check](https://raw.githubusercontent.com/long1eu/firebase_dart_sdk/main/docs/guides/authentication.md): signed-in users over REST, service accounts, Application Default Credentials, the Auth emulator
 - [The emulator and testing](https://raw.githubusercontent.com/long1eu/firebase_dart_sdk/main/docs/guides/emulator_and_testing.md): connecting to the emulator, mock users, tests with `package:test`, Enterprise edition differences
 - [Platforms](https://raw.githubusercontent.com/long1eu/firebase_dart_sdk/main/docs/guides/platforms.md): the Dart VM on macOS, Linux and Windows, Flutter, the web transport and its limits
-- [Firestore Lite](https://raw.githubusercontent.com/long1eu/firebase_dart_sdk/main/docs/guides/lite.md): the experimental client without cache and listeners
+- [Firestore Lite](https://raw.githubusercontent.com/long1eu/firebase_dart_sdk/main/docs/guides/lite.md): the client without cache and listeners
 - [Pipelines](https://raw.githubusercontent.com/long1eu/firebase_dart_sdk/main/docs/guides/pipelines.md): server-side pipelines, preview, Enterprise edition only
 - [Parity with the Firebase JS SDK](https://raw.githubusercontent.com/long1eu/firebase_dart_sdk/main/docs/parity.md): every area compared with the JS SDK, with the known limitations
 - [Migrating from the `_vm` packages](https://raw.githubusercontent.com/long1eu/firebase_dart_sdk/main/docs/migrating_from_vm_packages.md): from `cloud_firestore_vm` and `firebase_core_vm`

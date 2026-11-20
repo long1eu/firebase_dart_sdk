@@ -32,7 +32,7 @@ It is a port of the open-source Firebase Android SDK, kept close to its current 
 | Several clients on one SQLite cache: consistent file, one primary client | stable, coordination not done |
 | BSON value types of Enterprise edition databases | stable |
 | Pipelines (`package:cloud_firestore_dart/pipelines.dart`), Enterprise edition only | **preview** |
-| Firestore Lite (`package:cloud_firestore_dart/lite.dart`): no cache, one request per call | **experimental** |
+| Firestore Lite (`package:cloud_firestore_dart/lite.dart`): no cache, one request per call | stable |
 | The web: REST and WebChannel over `fetch`, cache in memory, IndexedDB or OPFS | **supported in Chrome** |
 | The web: a cache in the official JS SDK's own IndexedDB database (`package:cloud_firestore_dart/indexeddb_cache.dart`), no SQLite | **experimental** |
 

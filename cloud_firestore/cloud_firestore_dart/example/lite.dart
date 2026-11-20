@@ -1,4 +1,4 @@
-// Firestore Lite (experimental): the client without a local cache and without
+// Firestore Lite: the client without a local cache and without
 // listeners. Every call is one request to the backend and one response.
 //
 //     FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 dart run example/lite.dart

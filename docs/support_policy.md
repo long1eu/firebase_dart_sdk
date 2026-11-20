@@ -96,9 +96,9 @@ Behaviour is ported in Dart, not copied. Where the port deliberately differs fro
   written by older versions, including caches written by the published `cloud_firestore_vm`
   0.0.7).
 - What is not covered by any compatibility promise: everything under `lib/src`,
-  `package:firebase_app_dart/internal.dart`, the Pipelines library
-  (`package:cloud_firestore_dart/pipelines.dart`, preview) and Firestore Lite
-  (`package:cloud_firestore_dart/lite.dart`, experimental). These can change in any release.
+  `package:firebase_app_dart/internal.dart` and the Pipelines library
+  (`package:cloud_firestore_dart/pipelines.dart`, preview). These can change in any release.
+  Firestore Lite (`package:cloud_firestore_dart/lite.dart`) is covered like the main library.
 
 ## Reporting problems
 

@@ -125,7 +125,7 @@ for a runnable program.
 - Authentication through a token provider on the `FirebaseApp`; ready-made ones (Firebase Auth
   sign-in over REST, service accounts, Application Default Credentials) are in
   `firebase_auth_providers_dart`.
-- Firestore Lite (experimental, `package:cloud_firestore_dart/lite.dart`): a client without
+- Firestore Lite (`package:cloud_firestore_dart/lite.dart`): a client without
   cache and listeners where every call is one request.
 
 Without a connection, the client answers from its cache and queues writes; what needs the backend

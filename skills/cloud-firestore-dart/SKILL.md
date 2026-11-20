@@ -88,8 +88,8 @@ A name that is not in it does not exist.
    `getAggregate` need `readOnly: true`.
 10. **Server credentials bypass security rules.** ADC and service accounts only on machines you
     control; end-user apps use `FirebaseUserAuth`. No key files in the repository.
-11. **Experimental or preview**: Lite, Pipelines. Say so in code comments or reviews when
-    the project depends on them.
+11. **Preview**: Pipelines. Say so in code comments or reviews when
+    the project depends on it.
 
 ## Verify with the emulator
 
