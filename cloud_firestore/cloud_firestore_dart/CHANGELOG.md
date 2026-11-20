@@ -2,6 +2,10 @@
 
 - `WebExperimentalLongPollingOptions` and the long-polling settings are supported, not experimental: the word
   "Experimental" in their names comes from the JS SDK and stays for compatibility with it and with FlutterFire.
+- `getPendingWriteCount()` and `pendingWriteCounts()` are a supported extension, no longer experimental (the official
+  SDKs have no equivalent). New tests: the count per user and after a change of user, with writes of several users,
+  with the memory and the SQLite cache; the 250 ms throttle of the stream; a second client on the same SQLite cache,
+  whose writes the stream shows at its next emission.
 
 ## 0.3.0
 

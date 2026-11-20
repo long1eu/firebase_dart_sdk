@@ -117,6 +117,7 @@ for a real project that has not been run yet; see [Known limitations](#known-lim
 | `writeBatch` | supported | `firestore.batch()`, `runBatch(fn)`; `test/integration/firebase/firestore/write_batch_test.dart` |
 | Read-only transactions | supported (extra) | `readOnly: true, readTime: ...` with `getQuery` and `getAggregate`. Not in the JS client SDK (the server SDKs have it); `test/integration/firebase/firestore/read_only_transaction_test.dart` |
 | `waitForPendingWrites` | supported | `firestore.waitForPendingWrites()` |
+| Number of pending writes | supported (extra) | `firestore.getPendingWriteCount()` and the throttled stream `pendingWriteCounts()`. Not in the official SDKs; see [Offline persistence](guides/offline_persistence.md#writes-waiting-for-the-backend). `test/unit/firebase/firestore/pending_write_count_test.dart` (memory and SQLite cache, per user, the throttle, a second client on the same SQLite cache) |
 | `terminate` | supported | `firestore.terminate()`; `test/integration/firebase/firestore/terminate_in_flight_test.dart`, `terminated_instance_test.dart` |
 
 ## Offline persistence and cache settings
@@ -310,4 +311,4 @@ Every gap and behaviour difference we know of, the ones you are most likely to m
     API spelling follows the Android SDK and FlutterFire (see
     [Coming from FlutterFire or the JS SDK](guides/queries_and_data.md#coming-from-flutterfire-or-the-js-sdk)).
     Extras over the JS client SDK: `Query.findNearest`, read-only transactions (also with
-    pipelines).
+    pipelines), the number of pending writes (`getPendingWriteCount`, `pendingWriteCounts`).
