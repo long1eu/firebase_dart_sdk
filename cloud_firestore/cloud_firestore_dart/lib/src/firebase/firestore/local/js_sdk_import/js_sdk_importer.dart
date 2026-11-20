@@ -10,8 +10,9 @@
 //    recorded user, local write time and number of writes: the JS SDK never reuses a batch id in the same database,
 //    and a database deleted and created again by a JS tab could, with other contents.
 // 2. Check that no JS tab may use the database and that its schema is one this SDK reads.
-// 3. Read the JS batches of every user and decode them; if documents are to be imported, import them in their own
-//    transaction (they are a cache: importing them again does nothing, older versions never replace newer ones).
+// 3. Read the JS batches of every user and decode them; if documents are to be imported, import them, 2,000 at a
+//    time, each chunk in its own transaction (they are a cache: importing them again does nothing, older versions
+//    never replace newer ones).
 // 4. In one transaction of this cache: check that the queues of these users are empty, add the batches with new batch
 //    ids, save their overlays, and write the record with `pending` = these batches. Either all of it commits or none.
 // 5. In one IndexedDB transaction: remove these batches (and their `documentMutations` and `documentOverlays` rows)
@@ -53,6 +54,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/mutat
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/snapshot_version.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/remote/remote_serializer.dart';
 import 'package:firebase_app_dart/internal.dart';
+import 'package:meta/meta.dart';
 
 const String _tag = 'JsSdkCacheImport';
 
@@ -68,6 +70,35 @@ const int jsSdkOldestSchemaVersion = 5;
 /// their read time in the key.
 const int jsSdkOldestSchemaVersionWithDocuments = 13;
 
+/// Test only: called with the name of each point of the protocol the import reaches, so that a test can stop it there
+/// as a crash of the page would (by throwing): `documents` (the documents of step 3 are imported), `step4` (inside the
+/// transaction of step 4, after the batches were added), `step4Committed`, `removal:<n>` (inside the IndexedDB
+/// transaction of step 5, before the n-th batch is removed) and `step5Committed`.
+@visibleForTesting
+void Function(String point)? jsSdkCacheImportFaultForTesting;
+
+void _fault(String point) => jsSdkCacheImportFaultForTesting?.call(point);
+
+/// [row] with every `doubleValue: "-0"` (how the JS SDK writes -0) replaced by the number -0.0: the serializer reads
+/// the string with `num.tryParse`, which gives the integer 0 and loses the sign.
+// TODO(long1eu): remove once IndexedDbSerializer reads "-0" as -0.0 itself (reported to the owners of local/indexeddb).
+Map<String, Object?> _withNegativeZeros(Map<String, Object?> row) =>
+    _negativeZeros(row)! as Map<String, Object?>;
+
+Object? _negativeZeros(Object? value) {
+  if (value is Map) {
+    return <String, Object?>{
+      for (final MapEntry<Object?, Object?> entry in value.entries)
+        entry.key! as String: entry.key == 'doubleValue' && entry.value == '-0'
+            ? -0.0
+            : _negativeZeros(entry.value),
+    };
+  } else if (value is List) {
+    return <Object?>[for (final Object? item in value) _negativeZeros(item)];
+  }
+  return value;
+}
+
 /// See [indexedDbPrimaryLeaseMs].
 const int jsSdkPrimaryLeaseMs = indexedDbPrimaryLeaseMs;
 
@@ -77,6 +108,9 @@ const int jsSdkMaxClientAgeMs = indexedDbMaxClientAgeMs;
 /// The bundle name under which the imported documents are kept in the cache (an umbrella target holds them, as the
 /// documents of a bundle, so that they are not collected as garbage at once).
 const String _documentsBundleName = 'js-sdk-cache-import';
+
+/// How many cached documents are read and imported at a time.
+const int _documentsPerChunk = 2000;
 
 /// The prefix of the JS SDK's IndexedDB database name and of its LocalStorage keys (`indexedDbStoragePrefix`).
 String jsSdkStoragePrefix(String appName, DatabaseId databaseId) =>
@@ -252,9 +286,11 @@ class _JsSdkCache {
     final Map<int, _BatchRef> byId = <int, _BatchRef>{
       for (final _BatchRef ref in record.pending) ref.batchId: ref,
     };
+    int checked = 0;
     final int removed = await db.removeMutationBatches(byId.keys, (
       Map<String, Object?> row,
     ) {
+      _fault('removal:${++checked}');
       final Object? batchId = row['batchId'];
       final _BatchRef? ref = batchId is num ? byId[batchId.toInt()] : null;
       return ref != null && ref.matches(row);
@@ -263,6 +299,7 @@ class _JsSdkCache {
       _tag,
       'Removed $removed of ${byId.length} imported batches from $databaseName',
     );
+    _fault('step5Committed');
     await _writeRecord(persistence, record.withPending(const <_BatchRef>[]));
   }
 
@@ -390,7 +427,7 @@ class _JsSdkCache {
       for (final Map<String, Object?> row in await db.readAll('mutations')) {
         final MutationBatch batch;
         try {
-          batch = serializer.fromDbMutationBatch(row);
+          batch = serializer.fromDbMutationBatch(_withNegativeZeros(row));
         } catch (e) {
           throw _refuse(
             JsSdkCacheImportRefusal.unreadableWrites,
@@ -453,57 +490,74 @@ class _JsSdkCache {
           '$jsSdkOldestSchemaVersionWithDocuments and later are read)',
         );
       } else {
-        ImmutableSortedMap<DocumentKey, MaybeDocument> docs =
-            DocumentCollections.emptyMaybeDocumentMap();
-        final Map<DocumentKey, SnapshotVersion> readTimes =
-            <DocumentKey, SnapshotVersion>{};
+        // In chunks: a large cache is never held whole. A document can be in several rows (read at different
+        // times) and so in several chunks: the cache keeps the newest version whatever the order.
+        final Set<DocumentKey> imported = <DocumentKey>{};
+        final Set<DocumentKey> seen = <DocumentKey>{};
         int unreadable = 0;
         int withoutVersion = 0;
-        for (final Map<String, Object?> row in await db.readAll(
+        await for (final List<Map<String, Object?>> rows in db.readChunks(
           'remoteDocumentsV14',
+          _documentsPerChunk,
         )) {
-          final ReadDocument decoded;
-          try {
-            decoded = serializer.fromDbRemoteDocument(row);
-          } catch (e) {
-            unreadable++;
-            Log.d(_tag, 'Skipping an unreadable document of $databaseName: $e');
-            continue;
+          ImmutableSortedMap<DocumentKey, MaybeDocument> docs =
+              DocumentCollections.emptyMaybeDocumentMap();
+          final Map<DocumentKey, SnapshotVersion> readTimes =
+              <DocumentKey, SnapshotVersion>{};
+          for (final Map<String, Object?> row in rows) {
+            final ReadDocument decoded;
+            try {
+              decoded = serializer.fromDbRemoteDocument(
+                _withNegativeZeros(row),
+              );
+            } catch (e) {
+              unreadable++;
+              Log.d(
+                _tag,
+                'Skipping an unreadable document of $databaseName: $e',
+              );
+              continue;
+            }
+            final MaybeDocument document = decoded.document;
+            if (document.version == SnapshotVersion.none) {
+              withoutVersion++;
+              continue;
+            }
+            seen.add(document.key);
+            final MaybeDocument? earlier = docs[document.key];
+            if (earlier == null ||
+                earlier.version.compareTo(document.version) < 0) {
+              docs = docs.insert(document.key, document);
+              readTimes[document.key] = decoded.readTime;
+            }
           }
-          final MaybeDocument document = decoded.document;
-          if (document.version == SnapshotVersion.none) {
-            withoutVersion++;
-            continue;
-          }
-          final MaybeDocument? earlier = docs[document.key];
-          if (earlier == null ||
-              earlier.version.compareTo(document.version) < 0) {
-            docs = docs.insert(document.key, document);
-            readTimes[document.key] = decoded.readTime;
+          if (docs.isNotEmpty) {
+            final ImmutableSortedMap<DocumentKey, MaybeDocument> changes =
+                await localStore.applyBundledDocuments(
+                  docs,
+                  _documentsBundleName,
+                  readTimes: readTimes,
+                );
+            for (final MapEntry<DocumentKey, MaybeDocument> change in changes) {
+              imported.add(change.key);
+            }
+            await syncEngine.handleImportedChanges(changes, const <int>[]);
           }
         }
+        documents = imported.length;
         if (unreadable > 0) {
           skipped.add('documents: $unreadable could not be read');
         }
         if (withoutVersion > 0) {
           skipped.add('documents: $withoutVersion without a version');
         }
-        if (docs.isNotEmpty) {
-          final ImmutableSortedMap<DocumentKey, MaybeDocument> changes =
-              await localStore.applyBundledDocuments(
-                docs,
-                _documentsBundleName,
-                readTimes: readTimes,
-              );
-          documents = changes.length;
-          if (documents < docs.length) {
-            skipped.add(
-              'documents: ${docs.length - documents} held by this cache in the same or a newer version',
-            );
-          }
-          await syncEngine.handleImportedChanges(changes, const <int>[]);
+        if (documents < seen.length) {
+          skipped.add(
+            'documents: ${seen.length - documents} held by this cache in the same or a newer version',
+          );
         }
         documentsImported = true;
+        _fault('documents');
       }
 
       // Step 4.
@@ -534,10 +588,13 @@ class _JsSdkCache {
                   ],
               },
               currentUser,
-              () => persistence.globalsCache.setValue(
-                _recordName,
-                imported.encode(),
-              ),
+              () {
+                _fault('step4');
+                return persistence.globalsCache.setValue(
+                  _recordName,
+                  imported.encode(),
+                );
+              },
             );
         if (result.nonEmptyQueues.isNotEmpty) {
           throw _pendingWritesInCache(result.nonEmptyQueues, currentUser);
@@ -546,6 +603,7 @@ class _JsSdkCache {
           result.currentUserChanges,
           result.currentUserBatchIds,
         );
+        _fault('step4Committed');
       }
 
       // Steps 5 and 6. The writes are imported: a failure here is finished by the next call.

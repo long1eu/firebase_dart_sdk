@@ -86,6 +86,34 @@ class _WebJsSdkDatabase implements JsSdkDatabase {
   }
 
   @override
+  Stream<List<Map<String, Object?>>> readChunks(String name, int count) async* {
+    JSAny? after;
+    while (true) {
+      final web.IDBObjectStore store = _db
+          .transaction(name.toJS, 'readonly')
+          .objectStore(name);
+      final JSAny? range = after == null
+          ? null
+          : web.IDBKeyRange.lowerBound(after, true);
+      // Both requests are made at once, in the same transaction.
+      final Future<JSAny?> keys = idbRequest(store.getAllKeys(range, count));
+      final Future<JSAny?> values = idbRequest(store.getAll(range, count));
+      final List<JSAny?> chunkKeys = (await keys as JSArray<JSAny?>).toDart;
+      final List<Object?> rows = idbToDart(await values)! as List<Object?>;
+      if (rows.isNotEmpty) {
+        yield <Map<String, Object?>>[
+          for (final Object? row in rows)
+            (row! as Map<Object?, Object?>).cast(),
+        ];
+      }
+      if (chunkKeys.length < count) {
+        return;
+      }
+      after = chunkKeys.last;
+    }
+  }
+
+  @override
   Future<int> removeMutationBatches(
     Iterable<int> batchIds,
     bool Function(Map<String, Object?> row) matches,
@@ -106,48 +134,59 @@ class _WebJsSdkDatabase implements JsSdkDatabase {
 
     // The removed batch ids of each user.
     final Map<String, Set<int>> removed = <String, Set<int>>{};
-    for (final int batchId in batchIds) {
-      final Object? row = idbToDart(
-        await idbRequest(mutations.get(batchId.toJS)),
-      );
-      if (row is! Map || !matches(row.cast<String, Object?>())) {
-        continue;
+    try {
+      for (final int batchId in batchIds) {
+        final Object? row = idbToDart(
+          await idbRequest(mutations.get(batchId.toJS)),
+        );
+        if (row is! Map || !matches(row.cast<String, Object?>())) {
+          continue;
+        }
+        await idbRequest(mutations.delete(batchId.toJS));
+        (removed[row['userId'] as String] ??= <int>{}).add(batchId);
       }
-      await idbRequest(mutations.delete(batchId.toJS));
-      (removed[row['userId'] as String] ??= <int>{}).add(batchId);
-    }
 
-    if (removed.isNotEmpty) {
-      // Keys [userId, encodedPath, batchId].
-      await idbForEach(
-        transaction.objectStore('documentMutations').openCursor(),
-        (web.IDBCursor cursor) {
-          final List<Object?> key = idbToDart(cursor.key)! as List<Object?>;
-          final Set<int>? ids = removed[key[0]];
-          if (ids != null && ids.contains((key[2]! as num).toInt())) {
-            cursor.delete();
-          }
-          return true;
-        },
-      );
-      if (hasOverlays) {
+      if (removed.isNotEmpty) {
+        // Keys [userId, encodedPath, batchId].
         await idbForEach(
-          transaction.objectStore('documentOverlays').openCursor(),
+          transaction.objectStore('documentMutations').openCursor(),
           (web.IDBCursor cursor) {
-            final Map<Object?, Object?> overlay =
-                idbToDart((cursor as web.IDBCursorWithValue).value)!
-                    as Map<Object?, Object?>;
-            final Set<int>? ids = removed[overlay['userId']];
-            final Object? largestBatchId = overlay['largestBatchId'];
-            if (ids != null &&
-                largestBatchId is num &&
-                ids.contains(largestBatchId.toInt())) {
+            final List<Object?> key = idbToDart(cursor.key)! as List<Object?>;
+            final Set<int>? ids = removed[key[0]];
+            if (ids != null && ids.contains((key[2]! as num).toInt())) {
               cursor.delete();
             }
             return true;
           },
         );
+        if (hasOverlays) {
+          await idbForEach(
+            transaction.objectStore('documentOverlays').openCursor(),
+            (web.IDBCursor cursor) {
+              final Map<Object?, Object?> overlay =
+                  idbToDart((cursor as web.IDBCursorWithValue).value)!
+                      as Map<Object?, Object?>;
+              final Set<int>? ids = removed[overlay['userId']];
+              final Object? largestBatchId = overlay['largestBatchId'];
+              if (ids != null &&
+                  largestBatchId is num &&
+                  ids.contains(largestBatchId.toInt())) {
+                cursor.delete();
+              }
+              return true;
+            },
+          );
+        }
       }
+    } catch (_) {
+      // Without this the requests made so far would commit when the transaction ends: batches removed without their
+      // documentMutations rows, which the JS SDK asserts on when it reads them.
+      try {
+        transaction.abort();
+      } catch (_) {
+        // Already finished.
+      }
+      rethrow;
     }
     await committed;
     return removed.values.fold<int>(0, (int n, Set<int> ids) => n + ids.length);

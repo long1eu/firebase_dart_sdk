@@ -499,6 +499,14 @@ class RemoteStore implements TargetMetadataProvider {
   /// are sent together with the pipeline, writes added after are sent right away.
   bool _writeHandshakeHandled = false;
 
+  /// The network epoch in which the write stream failed while the handler of that close still waits in the queue, or
+  /// null. Until it runs, the write stream is not started again: the handlers queued before it (the acknowledgements
+  /// the stream received before it failed) refill the pipeline, and a stream they started would get writes before its
+  /// handshake (the handshake state of the closed stream is still set), and the close would then be taken for a
+  /// failed handshake, retrying a rejected write instead of rejecting it. Upstream runs the close at once, before any
+  /// other handler (and drops the callbacks of a closed stream, CloseGuardedRunner).
+  int? _writeClosePendingEpoch;
+
   void _enqueueEvent(
     Future<void> Function() handler, {
     bool staleWhenNetworkRestarted = false,
@@ -627,6 +635,7 @@ class RemoteStore implements TargetMetadataProvider {
   bool get _shouldStartWriteStream {
     return _canUseNetwork &&
         !_writeStream.isStarted &&
+        _writeClosePendingEpoch != _networkEpoch &&
         _writePipeline.isNotEmpty;
   }
 
@@ -928,10 +937,13 @@ class RemoteStore implements TargetMetadataProvider {
         }
       }, staleWhenNetworkRestarted: true);
     } else if (event is CloseEvent) {
-      _enqueueEvent(
-        () => _handleWriteStreamClose(event.error),
-        staleWhenNetworkRestarted: true,
-      );
+      if (event.error.code != StatusCode.ok) {
+        _writeClosePendingEpoch = _networkEpoch;
+      }
+      _enqueueEvent(() {
+        _writeClosePendingEpoch = null;
+        return _handleWriteStreamClose(event.error);
+      }, staleWhenNetworkRestarted: true);
     } else if (event is HandshakeCompleteEvent) {
       _enqueueEvent(
         _handleWriteStreamHandshakeComplete,
@@ -1019,6 +1031,8 @@ class RemoteStore implements TargetMetadataProvider {
       _shouldStartWriteStream,
       'startWriteStream() called when shouldStartWriteStream() is false.',
     );
+    // A new stream: nothing is sent to it before its own handshake.
+    _writeHandshakeHandled = false;
     _writeStream.start();
   }
 

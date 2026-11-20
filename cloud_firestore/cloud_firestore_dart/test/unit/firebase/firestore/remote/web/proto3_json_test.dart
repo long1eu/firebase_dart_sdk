@@ -8,6 +8,8 @@ import 'package:cloud_firestore_dart/src/proto/google/firestore/v1/index.dart'
     as proto;
 import 'package:cloud_firestore_dart/src/proto/google/type/latlng.pb.dart'
     as proto;
+import 'package:cloud_firestore_dart/src/proto/google/protobuf/index.dart'
+    as wkt;
 import 'package:fixnum/fixnum.dart';
 import 'package:test/test.dart';
 
@@ -192,5 +194,30 @@ void main() {
     expect(document.fields['b']!.whichValueType(),
         proto.Value_ValueType.bytesValue);
     expect(document.fields['g']!.geoPointValue.latitude.isNegative, isTrue);
+  });
+
+  test('timestamps are written exactly, also just before a whole second', () {
+    // toProto3Json() goes through a DateTime of microseconds, which dart2js
+    // rounds to milliseconds: these were written one second late there.
+    final Map<(int, int), String> cases = <(int, int), String>{
+      (1700000000, 123456000): '2023-11-14T22:13:20.123456000Z',
+      (1700000000, 999999999): '2023-11-14T22:13:20.999999999Z',
+      (1700000000, 999500000): '2023-11-14T22:13:20.999500000Z',
+      (253402300799, 999999999): '9999-12-31T23:59:59.999999999Z',
+      (-62135596800, 0): '0001-01-01T00:00:00.000000000Z',
+      (-1, 999999000): '1969-12-31T23:59:59.999999000Z',
+    };
+    cases.forEach(((int, int) time, String text) {
+      final proto.Value value = proto.Value()
+        ..timestampValue = (wkt.Timestamp()
+          ..seconds = Int64(time.$1)
+          ..nanos = time.$2);
+      expect(toFirestoreProto3Json(value), <String, Object?>{'timestampValue': text});
+      expect(roundTrip<proto.Value>(value).timestampValue, value.timestampValue);
+      // A timestamp outside a value (a precondition) too.
+      final proto.Precondition precondition = proto.Precondition()
+        ..updateTime = value.timestampValue;
+      expect(toFirestoreProto3Json(precondition), <String, Object?>{'updateTime': text});
+    });
   });
 }

@@ -5,6 +5,8 @@ import 'dart:convert';
 import 'package:cloud_firestore_dart/src/proto/google/firestore/v1/index.dart'
     as proto;
 import 'package:protobuf/protobuf.dart';
+import 'package:protobuf/well_known_types/google/protobuf/timestamp.pb.dart'
+    as wkt;
 
 /// Encodes [message] as proto3 JSON, with the Firestore values in it encoded
 /// the way the serializer of the JS SDK does.
@@ -34,7 +36,9 @@ void _patch(GeneratedMessage message, Object? json) {
       continue;
     }
     final String key = info.name;
-    if (field is proto.Value) {
+    if (field is wkt.Timestamp) {
+      json[key] = _encodeTimestamp(field);
+    } else if (field is proto.Value) {
       json[key] = _encodeValue(field);
     } else if (field is GeneratedMessage) {
       _patch(field, json[key]);
@@ -78,9 +82,24 @@ Object _encodeDouble(double value) {
   return value;
 }
 
+/// `toTimestamp` of the JS SDK: the whole seconds in ISO 8601, and nine digits
+/// of nanoseconds.
+String _encodeTimestamp(wkt.Timestamp timestamp) {
+  final String seconds = DateTime.fromMillisecondsSinceEpoch(
+    timestamp.seconds.toInt() * 1000,
+    isUtc: true,
+  ).toIso8601String();
+  final String nanos = timestamp.nanos.toString().padLeft(9, '0');
+  return '${seconds.substring(0, seconds.indexOf('.'))}.${nanos}Z';
+}
+
 Object? _encodeValue(proto.Value value) {
   // The oneof case, not hasXxx(): an empty bytes value 'has' no value.
   switch (value.whichValueType()) {
+    case proto.Value_ValueType.timestampValue:
+      return <String, Object?>{
+        'timestampValue': _encodeTimestamp(value.timestampValue),
+      };
     case proto.Value_ValueType.doubleValue:
       return <String, Object?>{'doubleValue': _encodeDouble(value.doubleValue)};
     case proto.Value_ValueType.bytesValue:

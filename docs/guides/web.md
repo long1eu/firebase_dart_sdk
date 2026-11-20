@@ -296,7 +296,7 @@ details.
 
 ## Switching from the official JS SDK
 
-**Experimental.** A web app that used the official Firebase JS SDK with persistence (directly, or
+A web app that used the official Firebase JS SDK with persistence (directly, or
 through FlutterFire on the web) has its cache in an IndexedDB database of its own,
 `firestore/[DEFAULT]/<project id>/main`. This SDK does not read that database, but
 `importJsSdkCache` copies it into this SDK's cache, once, so that the writes the old version of
@@ -356,6 +356,16 @@ How it behaves:
   since version 5); the cached documents from version 13 on. A database written by a newer JS SDK
   is refused (`unsupportedSchemaVersion`).
 
+**Destinations.** The SQLite cache (in IndexedDB or in OPFS), the key-value cache
+(`keyValueCacheSettings`) and the memory cache (with `allowMemoryCache`) take the import. So does
+the IndexedDB cache (`indexedDbCacheSettings()`) of an app whose name differs from the JS app's
+(pass `jsAppName`); on an instance whose IndexedDB cache *is* the JS database (same app name) there
+is nothing to import (`nothingToImport`) and `deleteJsSdkCache` deletes nothing, because that
+cache already reads the JS SDK's writes as its own. Two known faults of the IndexedDB cache's own
+storage apply to imported writes as to any other: it can not read back an empty `Bytes` value, and
+with dart2js it stores a timestamp less than half a millisecond before a whole second one second
+late.
+
 **No JS tab may be open.** A JS tab and a page of this SDK can not share the cache: the import
 refuses (`jsClientActive`) while the JS SDK's primary lease is less than 5 seconds old, or while
 one of its clients refreshed its metadata less than 30 minutes ago and did not mark itself as
@@ -363,7 +373,44 @@ closed (the JS SDK's own windows). A JS tab that closes normally marks itself; o
 counts as open for 30 minutes. Deploy the new version so that no tab keeps running the old one
 (a service worker that serves the old bundle, for example), and after the switch do not open the
 old version again on the same profile: its writes would land in the JS database and wait for the
-next import.
+next import. The check reads the rows the JS SDK keeps for that (its `owner` lease and its
+`clientMetadata`) and the `firestore_zombie_...` key it sets in LocalStorage when a page goes away;
+it can not see a JS tab of another browser profile, which has its own database anyway.
+
+What is tested (`test/browser/web_js_sdk_cache_import_*_test.dart`, Chrome, dart2wasm and dart2js,
+against the emulator):
+
+- **The same backend result as the JS SDK.** The fixtures are databases the real JS SDK (13.3.0,
+  schema 18) wrote offline (`tool/bench/web_idb/js_import/fixtures.sh`); the generator also sends
+  the same writes with the JS SDK itself, and the tests compare the backend after the import with
+  that, document by document: `set`, `set` with `merge` and `mergeFields`, `update` with nested
+  and dotted field paths and `deleteField`, `delete`, every transform (`serverTimestamp`,
+  `increment` of integers and doubles, `arrayUnion`, `arrayRemove`), batches, updates of missing
+  documents (rejected, as with the JS SDK, a failing batch as a whole), subcollections, and every
+  value type (bytes, geopoint, reference, timestamp, vector, nested maps and arrays, NaN,
+  infinities, the largest safe integers).
+- **Users.** Writes of two signed-in users and the signed-out user, interleaved, are each sent
+  only while that user is signed in, in their order; against rules that check `request.auth`
+  too.
+- **Every schema version from 5 to 18** (versions 5 to 17 built by hand from the history of the
+  JS schema), rows of older JS SDKs (a transform stored as its own write), 64-bit integers (with
+  dart2wasm; with dart2js an integer outside ±2^53 is rounded, as everywhere on the web, but the JS
+  SDK never writes one).
+  Versions below 5 and above 18 are refused and the database is left as it was.
+- **Exactly once.** The import stopped at every step of its protocol and run again after a
+  reload (a new client on the same cache) sends every write once; the removal from the JS database is all or nothing; a JS
+  database deleted or made again in between loses nothing and is not touched wrongly.
+- **Every destination** above, and **size**: 5,000 pending writes and 20,000 documents import in
+  9 to 12 seconds into the SQLite cache in headless Chrome on an Apple laptop (the JS heap peaks at
+  about 600 MB with dart2wasm, 350 MB with dart2js), and the 5,000 writes then reach the emulator
+  in about a minute. The documents go 2,000 at a time; the pending writes go in one transaction,
+  which is what makes the import all or nothing.
+
+What it does not do, by design: it does not import targets, resume tokens, cache indexes or
+bundles; it does not read a database of schema version 19 or later (a JS SDK newer than this
+SDK knows); it can not take writes queued after a write of this SDK for the same user
+(`pendingWritesInCache`); and a write imported into a memory cache is lost if the page closes
+before the backend acknowledged it.
 
 ## Several clients in one page
 
@@ -516,8 +563,9 @@ Why use it:
   documents, the pending writes of every user, the cache indexes, bundles and named queries are
   carried over because both SDKs read and write the same database: there is no import step.
   [`importJsSdkCache`](#switching-from-the-official-js-sdk) goes one way only (JS to this SDK), into
-  the SQLite cache, and carries over the pending writes and the documents, not the indexes or bundles.
-  On an instance that uses the IndexedDB cache it, and `deleteJsSdkCache`, do nothing.
+  another cache, and carries over the pending writes and the documents, not the indexes or bundles.
+  On an instance whose IndexedDB cache is the JS database itself it, and `deleteJsSdkCache`, do
+  nothing.
 
 What it costs: about 121 KB more JavaScript (about 34 KB gzipped, dart2js `-O2`, against the same small
 app with the memory cache), only in an app that imports `indexeddb_cache.dart`; an app that does not

@@ -52,6 +52,23 @@
   `ServerTimestampBehavior.previous` shows under the pending timestamp is now the one it shows
   without the setting (it showed the older write's fields, or an earlier map). Found by a new
   test that compares the cache views with and without the setting after every offline write.
+- `importJsSdkCache` and `deleteJsSdkCache` are no longer experimental. They are now tested in
+  Chrome (dart2wasm and dart2js) against databases the real JS SDK wrote: every kind of write and
+  value type reaches the backend with the same result as when the JS SDK sends it, the writes of
+  several users each under their user and in their order, every JS schema version from 5 to 18,
+  an import stopped at every step and run again (each write sent once), a JS tab still running
+  (refused), 5,000 pending writes with 20,000 documents, and every kind of cache as destination.
+- Fixed, JS SDK cache import: a failure while the imported writes were removed from the JS
+  database could leave some batches removed without their `documentMutations` rows, which the JS
+  SDK asserts on; the removal is now all or nothing. A `-0` in a JS write is kept (it was read as
+  `0`). The cached documents are read and imported 2,000 at a time instead of all at once.
+- Fixed, all platforms: a write stream that failed while acknowledgements of earlier writes were
+  still being processed could be restarted before its failure was handled. Writes then went to
+  the new stream before its handshake, and the rejected write was retried instead of being
+  rejected. Seen when many pending writes, one of them rejected, are sent at once.
+- Fixed, web (dart2js): a timestamp less than half a millisecond before a whole second was sent
+  one second late, and the last second of year 9999 as year 10000 (which the backend did not
+  answer). The web transport now writes timestamps as the JS SDK does.
 
 ## 0.3.0
 

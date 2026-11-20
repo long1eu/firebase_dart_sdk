@@ -1738,8 +1738,8 @@ Future<void> webGuideLine305() async {
   }
 }
 
-// ../../docs/guides/web.md:383
-Future<void> webGuideLine383() async {
+// ../../docs/guides/web.md:430
+Future<void> webGuideLine430() async {
   // One client of the page: `client` names its app ('client-left', 'client-right').
   Future<FirebaseFirestore> startClient(String client, String email) async {
     final FirebaseApp clientApp = FirebaseApp.withOptions(app.options, name: client);
@@ -1749,13 +1749,13 @@ Future<void> webGuideLine383() async {
   }
 }
 
-// ../../docs/guides/web.md:411
-Future<void> webGuideLine411() async {
+// ../../docs/guides/web.md:458
+Future<void> webGuideLine458() async {
   final Settings settings = Settings().withEmulator('127.0.0.1', 8080);
 }
 
-// ../../docs/guides/web.md:493
-Future<void> webGuideLine493() async {
+// ../../docs/guides/web.md:540
+Future<void> webGuideLine540() async {
   final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(
     app: app,
     settings: Settings(
