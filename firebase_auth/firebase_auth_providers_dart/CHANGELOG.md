@@ -1,5 +1,7 @@
 ## Unreleased
 
+- `FirebaseUserAuth.useEmulator(emulatorHost)`: sends the later requests to the Auth emulator, for an instance that
+  is created before the emulator is known (FlutterFire's `useAuthEmulator`). `emulatorHost` is now a getter.
 - Browser sign-in for desktop apps and command line tools (VM only): `FirebaseUserAuth.signInWithOAuthLoopback`
   and `authorizeWithOAuthLoopback`, with `OAuthLoopbackProvider.google`, `.oidc` and `.discover`. The system
   browser (`openInSystemBrowser`, or a `presenter` of your own) runs the authorization code flow with PKCE (S256),

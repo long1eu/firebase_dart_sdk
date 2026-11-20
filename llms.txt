@@ -46,6 +46,7 @@ public API of the main library is the golden listing linked below.
 - [firebase_auth_providers_dart README](https://raw.githubusercontent.com/long1eu/firebase_dart_sdk/main/firebase_auth/firebase_auth_providers_dart/README.md): Firebase Auth sign-in over REST, service accounts, Application Default Credentials
 - [cloud_firestore_dart_sqlite README](https://raw.githubusercontent.com/long1eu/firebase_dart_sdk/main/cloud_firestore/cloud_firestore_dart_sqlite/README.md): the SQLite offline cache (`sqliteOpener`) for the VM, Flutter and the browser
 - [cloud_firestore_dart_platform README](https://raw.githubusercontent.com/long1eu/firebase_dart_sdk/main/cloud_firestore/cloud_firestore_dart_platform/README.md): the official `cloud_firestore` API with `cloud_firestore_dart` underneath
+- [firebase_auth_dart_platform README](https://raw.githubusercontent.com/long1eu/firebase_dart_sdk/main/firebase_auth/firebase_auth_dart_platform/README.md): the official `firebase_auth` API with `firebase_auth_providers_dart` underneath, for Linux desktop (0.1.0, unreleased)
 - [cloud_firestore_dart_flutterfire README](https://raw.githubusercontent.com/long1eu/firebase_dart_sdk/main/cloud_firestore/cloud_firestore_dart_flutterfire/README.md): the FlutterFire app options and `firebase_auth` user for `cloud_firestore_dart`
 - [firebase_admin_dart README](https://raw.githubusercontent.com/long1eu/firebase_dart_sdk/main/firebase_admin/firebase_admin_dart/README.md): admin calls for trusted code (`auth.dart`: custom tokens, users, claims, revocation, `verifyIdToken`)
 
