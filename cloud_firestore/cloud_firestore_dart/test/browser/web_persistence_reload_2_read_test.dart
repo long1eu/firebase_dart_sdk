@@ -19,21 +19,17 @@ void main() {
   setUpAll(loadEmulatorPort);
   test('page 2 finds the data and the pending writes of page 1', () async {
     if (!await hasSqlite3Wasm()) {
-      markTestSkipped(
-        'test/browser/sqlite3.wasm is missing: see '
-        'web_persistence_test.dart',
-      );
+      markTestSkipped('test/browser/sqlite3.wasm is missing: see '
+          'web_persistence_test.dart');
       return;
     }
-    final String? collection = web.window.localStorage.getItem(
-      reloadStorageKey,
-    );
+    final String? collection =
+        web.window.localStorage.getItem(reloadStorageKey);
     if (collection == null) {
       markTestSkipped(
-        'Page 1 did not run before this page in the same test run: pass '
-        'web_persistence_reload_1_write_test.dart and then this file to '
-        '`dart test -j 1 -p chrome`',
-      );
+          'Page 1 did not run before this page in the same test run: pass '
+          'web_persistence_reload_1_write_test.dart and then this file to '
+          '`dart test -j 1 -p chrome`');
       return;
     }
     web.window.localStorage.removeItem(reloadStorageKey);
@@ -48,50 +44,35 @@ void main() {
     await firestore.disableNetwork();
     final DocumentSnapshot<Json> acknowledged = await firestore
         .collection(collection)
-        .doc('acknowledged')
-        .get(GetOptions(source: Source.cache));
+        .doc('acknowledged').get(GetOptions(source: Source.cache));
     expect(acknowledged.data(), <String, Object?>{'v': 11});
     expect(acknowledged.metadata.hasPendingWrites, isTrue);
-    final DocumentSnapshot<Json> pending = await firestore
-        .collection(collection)
-        .doc('pending')
-        .get(GetOptions(source: Source.cache));
+    final DocumentSnapshot<Json> pending =
+        await firestore.collection(collection).doc('pending').get(GetOptions(source: Source.cache));
     expect(pending.data(), <String, Object?>{'v': 2});
     expect(pending.metadata.hasPendingWrites, isTrue);
 
     // The backend only has what page 1 was told is written.
     final FirebaseFirestore other = await newClient();
     expect(
-      (await other
-              .collection(collection)
-              .doc('acknowledged')
-              .get(GetOptions(source: Source.server)))
-          .data(),
-      <String, Object?>{'v': 1},
-    );
+        (await other.collection(collection).doc('acknowledged').get(GetOptions(source: Source.server)))
+            .data(),
+        <String, Object?>{'v': 1});
     expect(
-      (await other
-              .collection(collection)
-              .doc('pending')
-              .get(GetOptions(source: Source.server)))
-          .exists,
-      isFalse,
-    );
+        (await other.collection(collection).doc('pending').get(GetOptions(source: Source.server)))
+            .exists,
+        isFalse);
 
     // Page 2 sends the writes of page 1, once.
     await firestore.enableNetwork();
     await firestore.waitForPendingWrites().timeout(const Duration(seconds: 20));
-    final QuerySnapshot<Json> server = await other
-        .collection(collection)
-        .get(GetOptions(source: Source.server));
-    expect(
-      <String, Object?>{
-        for (final QueryDocumentSnapshot<Json> d in server.docs) d.id: d.data(),
-      },
-      <String, Object?>{
-        'acknowledged': <String, Object?>{'v': 11},
-        'pending': <String, Object?>{'v': 2},
-      },
-    );
+    final QuerySnapshot<Json> server =
+        await other.collection(collection).get(GetOptions(source: Source.server));
+    expect(<String, Object?>{
+      for (final QueryDocumentSnapshot<Json> d in server.docs) d.id: d.data(),
+    }, <String, Object?>{
+      'acknowledged': <String, Object?>{'v': 11},
+      'pending': <String, Object?>{'v': 2},
+    });
   });
 }
