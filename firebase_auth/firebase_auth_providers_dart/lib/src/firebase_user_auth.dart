@@ -75,7 +75,9 @@ import 'environment_stub.dart'
 /// **Session.** The session (the refresh token) is kept in an [AuthStorage]; the default, [InMemoryAuthStorage],
 /// forgets it when the process ends. [restore] (called by [forApp]) loads a stored session. When the storage fails
 /// to write a new session, the operation throws the error of the storage but the session in memory is the new one,
-/// and the next token refresh writes it again; a failing storage never signs the user out.
+/// and the next token refresh writes it again; a failing storage never signs the user out. When it fails to delete
+/// the session at [signOut], the user is signed out all the same and [signOut] throws the error of the storage;
+/// [restore] on that instance deletes it again instead of loading it, but a new instance still finds it.
 ///
 /// **Errors.** Requests fail with a [FirebaseAuthException]; its [FirebaseAuthException.code] lists
 /// the codes. Any request can fail with `network-request-failed`, `too-many-requests`, `invalid-api-key` or
@@ -421,7 +423,8 @@ class FirebaseUserAuth implements AuthTokenProvider {
   Timer? _refreshTimer;
   int _refreshFailures = 0;
 
-  /// Whether the session in memory differs from the stored one because its write failed.
+  /// Whether the stored session differs from the one in memory (or from none, after a sign-out) because its write
+  /// failed.
   bool _unsaved = false;
   bool _disposed = false;
 
@@ -567,6 +570,13 @@ class FirebaseUserAuth implements AuthTokenProvider {
   }
 
   Future<void> _restore() async {
+    if (_unsaved && _session == null) {
+      // A sign-out failed to delete the stored session: delete it, never load it.
+      await _storage.write(_storageKey, null);
+      // A sign-in during the write may have been stored before it: store that session again.
+      _unsaved = _session != null;
+      return;
+    }
     final String? stored = await _storage.read(_storageKey);
     if (stored == null || _session != null) {
       return;
@@ -649,6 +659,9 @@ class FirebaseUserAuth implements AuthTokenProvider {
   /// Signs the user out: the session is forgotten, also in the storage, [userChanges], [authStateChanges] and
   /// [idTokenChanges] emit null and [onTokenChanged] an empty token. Does nothing when nobody is signed in. Runs the
   /// [beforeAuthStateChanged] callbacks first, and throws `login-blocked` when one of them throws.
+  ///
+  /// When the storage fails to delete the session, the user is signed out all the same (the streams emit) and the
+  /// error of the storage is thrown; [restore] on this instance deletes the session again instead of loading it.
   ///
   /// It makes no request: the refresh token is not revoked on the backend (as in the other Firebase SDKs).
   /// Firestore continues without a token; the pending writes of the user stay with that user.
@@ -2239,18 +2252,23 @@ class FirebaseUserAuth implements AuthTokenProvider {
   Future<void> _clearSession() async {
     _generation++;
     _session = null;
-    _unsaved = false;
     _cancelProactiveRefresh();
-    if (!_disposed) {
-      // After dispose the stored session may belong to a new instance that restored it.
-      await _storage.write(_storageKey, null);
+    try {
+      if (!_disposed) {
+        // After dispose the stored session may belong to a new instance that restored it.
+        _unsaved = true;
+        await _storage.write(_storageKey, null);
+      }
+      _unsaved = false;
+    } finally {
+      // Signed out in memory even when the write failed, like `directlySetCurrentUser` of the JS SDK.
+      if (!_userChanges.isClosed) {
+        _userChanges.add(null);
+      }
+      _emitToken('');
+      _notifyAuthState();
+      await _letListenersReact();
     }
-    if (!_userChanges.isClosed) {
-      _userChanges.add(null);
-    }
-    _emitToken('');
-    _notifyAuthState();
-    await _letListenersReact();
   }
 
   /// Tells the token listeners (Firestore) and [idTokenChanges] about a new ID token of the current session, or an

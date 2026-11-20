@@ -263,6 +263,70 @@ void main() {
     );
   });
 
+  group('signOut with a storage that fails to delete', () {
+    const String key = 'firebase_auth_providers_dart:$apiKey';
+
+    Future<void> failedSignOut() async {
+      await auth.signInAnonymously();
+      storage.failWrites = true;
+      final List<AuthUser?> states = <AuthUser?>[];
+      final StreamSubscription<AuthUser?> sub = auth.authStateChanges().listen(
+        states.add,
+      );
+      await expectLater(auth.signOut(), throwsStateError);
+      await sub.cancel();
+      expect(auth.currentUser, isNull);
+      expect(auth.uid, isNull);
+      expect(states.last, isNull);
+      // The storage still has the session.
+      expect(storage.read(key), contains('anon-user'));
+    }
+
+    test(
+      'signs out in memory, throws, and restore() deletes the session',
+      () async {
+        await failedSignOut();
+        storage.failWrites = false;
+        await auth.restore();
+        expect(auth.uid, isNull);
+        expect(storage.read(key), isNull);
+      },
+    );
+
+    test('restore() stays signed out while the delete keeps failing', () async {
+      await failedSignOut();
+      await expectLater(auth.restore(), throwsStateError);
+      expect(auth.uid, isNull);
+      storage.failWrites = false;
+      await auth.restore();
+      expect(auth.uid, isNull);
+      expect(storage.read(key), isNull);
+    });
+
+    test(
+      'a sign-in after the failed sign-out stores the new session',
+      () async {
+        await failedSignOut();
+        storage.failWrites = false;
+        await auth.signInAnonymously();
+        await auth.restore();
+        expect(auth.uid, 'anon-user');
+        expect(storage.read(key), contains('anon-user'));
+      },
+    );
+
+    // Known limit: the session stays on disk until a write succeeds, so a new instance (the next run of the
+    // app) restores it. Nothing can prevent that without a successful write.
+    test('a new instance restores the session that was not deleted', () async {
+      await failedSignOut();
+      await auth.dispose();
+      storage.failWrites = false;
+      auth = backend.create(storage: storage);
+      await auth.restore();
+      expect(auth.uid, 'anon-user');
+    });
+  });
+
   group('restore', () {
     test('a storage that throws on read keeps the stored session', () async {
       await auth.signInAnonymously();
