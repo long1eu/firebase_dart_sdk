@@ -9,9 +9,9 @@ their requests must pass your security rules, or when a server or tool uses a se
 Default Credentials. Without it, requests carry no user, which is enough for
 the emulator and open rules. It is not affiliated with or supported by Google or Firebase.
 
-> **Status: 0.3.0.** Verified with unit tests and against the Firebase
-> emulators only: nothing was run against the real Firebase Auth service or Google's token
-> endpoint.
+> **Status: 0.3.0.** Verified with unit tests and against the Firebase emulators. One flow was also run
+> against a real Firebase project: Google sign-in in the system browser with a "Desktop app" client (see
+> [Browser sign-in on desktop and command line](#browser-sign-in-on-desktop-and-command-line)).
 
 ## Install
 
@@ -143,14 +143,15 @@ against the Firebase Auth emulator; nothing was run against the real service.
 | `user.uid`, `email`, `emailVerified`, `isAnonymous`, `displayName`, `photoURL`, `phoneNumber`, `tenantId`, `metadata`, `providerData` | `currentUser` (`AuthUser`, read with `accounts:lookup` after every sign-in) | emulator |
 | `setPersistence` (`inMemory`, `browserSession`, `browserLocal`) | an `AuthStorage`: `InMemoryAuthStorage` (default), `WebAuthStorage.session()`, `WebAuthStorage.local()`, and `FileAuthStorage(path)` on the VM | unit, Chrome |
 | `ActionCodeSettings` (`url`, `handleCodeInApp`, `iOS`, `android`, `linkDomain`) | `ActionCodeSettings` (flattened; no `dynamicLinkDomain`) | unit |
-| Popup and redirect flows on desktop and command line (no JS SDK equivalent) | `signInWithOAuthLoopback(OAuthLoopbackProvider.google(...))` / `.oidc(...)` / `.discover(...)`, or `authorizeWithOAuthLoopback(...)` for the credential (VM only; see below) | unit (fake identity provider) |
+| Popup and redirect flows on desktop and command line (no JS SDK equivalent) | `signInWithOAuthLoopback(OAuthLoopbackProvider.google(...))` / `.github(...)` / `.oidc(...)` / `.discover(...)`, `linkWithOAuthLoopback`, `reauthenticateWithOAuthLoopback`, or `authorizeWithOAuthLoopback(...)` for the credential (VM only; see below) | unit (fake identity provider); Google with a Desktop client against a real project |
 | Popup and redirect flows in a browser, `signInWithProvider`, SAML | – (use a token from elsewhere with `signInWithCredential`) | |
 | Phone sign-in, reCAPTCHA, multi-factor sign-in and enrolment, TOTP, `revokeAccessToken`, passkeys | – | |
 
 Of the federated providers, only the request and the flows were exercised, against the emulator with fake
 tokens (the emulator checks no signature, audience or nonce). The checks of the real backend (the audience of an
 ID token must be a client id configured for the provider in the project, which matters for Google, Microsoft,
-Yahoo and OIDC providers; Apple's nonce) were not run.
+Yahoo and OIDC providers; Apple's nonce) were not run, except for Google: a Google ID token from
+`signInWithOAuthLoopback` with a Desktop client signed in to a real project.
 
 Error codes are those of the JS SDK: its complete map of server codes (`SERVER_ERROR_MAP` of
 `packages/auth/src/api/errors.ts`: `EXPIRED_OOB_CODE` is `expired-action-code`, `USER_NOT_FOUND` is
@@ -180,22 +181,83 @@ print(result.user?.email);
 
 - The browser is opened with `open`, `xdg-open` or `rundll32` (`openInSystemBrowser`); pass `presenter:` to open it
   another way (`url_launcher` in a Flutter app, or a printed link). The package depends on no Flutter plugin.
-- The code is exchanged at the provider's token endpoint with the client id and secret, or, with
-  `exchangeEndpoint:`, on a server of yours that keeps the secret. That endpoint gets the request of
-  `google_sign_in_dart`'s code exchange endpoint (a JSON text with `code`, `codeVerifier`, `clientId` and
-  `redirectUrl`), so an existing Cloud Function for it keeps working.
+- The code is exchanged at the provider's token endpoint with the client id and the secret. Google with a
+  "Desktop app" client needs nothing more: Google says the secret of such a client is not confidential.
+- `exchangeCode:` is optional. It is for a provider that wants a confidential client, whose secret must stay on a
+  server of yours. It is the counterpart of `serverAuthCode` in `google_sign_in`: the function gets the code, the
+  PKCE verifier, the redirect URL and the client id, sends them to your server, and returns the JSON of the token
+  endpoint. How you call your server is up to you. See the example below.
 - `OAuthLoopbackProvider.oidc(providerId: 'oidc.<name>', authorizationEndpoint:, tokenEndpoint:, clientId:)` or
   `OAuthLoopbackProvider.discover(issuer:, ...)` for an OpenID Connect provider of Identity Platform; the client id
   must be the one configured for the provider in the project.
-- `authorizeWithOAuthLoopback` returns the tokens and the credential without signing in, for
-  `linkWithCredential` and `reauthenticateWithCredential`.
+- `OAuthLoopbackProvider.github(clientId:, clientSecret:)` for GitHub, with a GitHub OAuth App whose authorization
+  callback URL is `http://127.0.0.1` (GitHub accepts any port on a loopback redirect). GitHub's code exchange needs
+  the client secret even with PKCE, so it ships with the app. The default scopes are `read:user user:email`; no
+  nonce is sent, and Firebase gets the access token only.
+- `linkWithOAuthLoopback` links the provider to the signed-in user, and `reauthenticateWithOAuthLoopback` signs
+  the same user in again. Both take the same arguments as `signInWithOAuthLoopback`, and throw `null-user` before
+  the browser opens when nobody is signed in.
+- `authorizeWithOAuthLoopback` returns the tokens and the credential without signing in.
 - Only the code is exchanged: once signed in, the Firebase session refreshes itself; the provider's refresh token is
   returned but not used.
 - Errors are `FirebaseAuthException`s: `timeout` (five minutes by default), `user-cancelled`,
-  `oauth-state-mismatch`, `invalid-oauth-response`, `missing-or-invalid-nonce`, `invalid-credential` (the code was
-  refused) and `network-request-failed`.
+  `invalid-oauth-response`, `missing-or-invalid-nonce`, `invalid-credential` (the code was refused) and
+  `network-request-failed` (also when the exchange takes more than 30 seconds).
+- The loopback server ends the wait only for the redirect of this sign-in: the `Host` header must be
+  `127.0.0.1:<port>` and the `state` must be the one sent. Any other request gets an error page, and the server keeps
+  waiting until the timeout.
+- The ID token is not verified locally. Firebase checks it at sign-in, so do not trust its claims before that.
+- On a machine shared with other users, another local user can read the authorization URL from the process list.
+  This is inherent to loopback flows (RFC 8252); PKCE keeps the code useless to them.
 
-Tested against an in-process fake identity provider only: no real Google client or Firebase project was used.
+An `exchangeCode` that posts the four values to a server of yours:
+
+```dart
+import 'dart:convert';
+
+import 'package:http/http.dart' as http;
+
+final OAuthLoopbackProvider provider = OAuthLoopbackProvider.oidc(
+  providerId: 'oidc.example',
+  authorizationEndpoint: Uri.parse('https://idp.example.com/authorize'),
+  tokenEndpoint: Uri.parse('https://idp.example.com/token'),
+  clientId: '<the client id>',
+  exchangeCode: (OAuthAuthorizationCode code) async {
+    final http.Response response = await http.post(
+      Uri.parse('https://api.example.com/oauth/exchange'),
+      headers: <String, String>{'content-type': 'application/json'},
+      body: jsonEncode(<String, String>{
+        'code': code.code,
+        'codeVerifier': code.codeVerifier,
+        'redirectUri': code.redirectUri,
+        'clientId': code.clientId,
+      }),
+    );
+    if (response.statusCode != 200) {
+      throw StateError('The exchange failed: ${response.statusCode}');
+    }
+    return jsonDecode(response.body) as Map<String, Object?>;
+  },
+);
+```
+
+An error thrown by `exchangeCode` becomes `invalid-credential`; throw a `FirebaseAuthException` to choose the code.
+
+On 2026-11-20, Google sign-in with a Desktop client was run against a real Firebase project: the code was
+exchanged directly with the client secret and PKCE, and the redirect was `http://127.0.0.1:<port>`.
+`exchangeCode` and generic OpenID Connect providers were run only against the fake identity provider of the tests.
+GitHub was run only against the fake provider too.
+
+Not offered by the loopback helper:
+
+- Facebook: its documentation does not cover `http` loopback redirects with an arbitrary port (Strict Mode wants an
+  exact match), and Firebase documents a Facebook ID token only for iOS Limited Login.
+- Microsoft: Firebase does not support direct sign-in with Microsoft OAuth tokens
+  ([Firebase docs](https://firebase.google.com/docs/auth/web/microsoft-oauth)).
+- Phone sign-in, from plain Dart outside the Auth emulator: `sendVerificationCode` needs app verification
+  (reCAPTCHA, Play Integrity or APNs).
+- Auth-domain options (`customAuthDomain`): the loopback flow builds no hosted auth-domain page, so they do not
+  apply.
 
 ## Documentation
 
@@ -208,9 +270,10 @@ Tested against an in-process fake identity provider only: no real Google client 
 
 ## Limits
 
-- Nothing was run against the real Firebase Auth service or Google's token endpoint: the
-  providers were tested with unit tests and against the Firebase emulators. Application Default
-  Credentials are delegated to `package:googleapis_auth` without a test of their own.
+- The providers were tested with unit tests and against the Firebase emulators. Only Google sign-in with a
+  Desktop client (`signInWithOAuthLoopback`) was run against a real Firebase project, on 2026-11-20.
+  `exchangeCode` and generic OpenID Connect providers were run only against a fake identity provider. Application
+  Default Credentials are delegated to `package:googleapis_auth` without a test of their own.
 - Federated sign-in needs a provider token the app obtained itself, or, on desktop and command line, the browser
   sign-in of `signInWithOAuthLoopback` (Google and OpenID Connect; not Apple, which does not accept loopback
   redirects). There are no popup or redirect flows in a browser.

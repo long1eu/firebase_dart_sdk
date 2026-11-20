@@ -17,10 +17,12 @@ import 'oauth_loopback.dart';
 /// 2. [presenter] opens the authorization URL: an authorization code request with PKCE (S256), a random `state`
 ///    and, with [OAuthLoopbackProvider.useNonce], a nonce. Without a presenter, [openInSystemBrowser] opens it.
 ///    On Flutter mobile pass a presenter of your own (`url_launcher`'s `launchUrl`).
-/// 3. The first GET on the redirect path ends the wait: its `state` is compared in constant time, an `error` of
-///    the provider is reported, and the code is exchanged at the token endpoint or at the exchange endpoint (see
-///    [OAuthLoopbackProvider]). The browser gets a short page that says whether it worked. Requests to other paths
-///    get a 404 and do not end the wait.
+/// 3. The first GET on the redirect path whose `Host` header is `127.0.0.1:<port>` and whose `state` is the one
+///    sent (compared in constant time) ends the wait. A request with another host, a missing or wrong state, or a
+///    query that does not parse gets a 400 and does not end the wait; requests to other paths get a 404. Then an
+///    `error` of the provider is reported, or the code is exchanged at the token endpoint or by the provider's
+///    `exchangeCode` (see [OAuthLoopbackProvider]), each with a 30 second limit. The browser gets a short page that
+///    says whether it worked.
 /// 4. The server is closed in every case: success, error, [timeout] (default five minutes) or a presenter that
 ///    throws.
 ///
@@ -30,16 +32,22 @@ import 'oauth_loopback.dart';
 ///
 /// | Code | When |
 /// | --- | --- |
-/// | `timeout` | no redirect came back within [timeout] |
+/// | `timeout` | no redirect of this sign-in came back within [timeout] |
 /// | `user-cancelled` | the provider answered `access_denied` (the user refused) |
 /// | `invalid-oauth-response` | the provider answered another `error` ([FirebaseAuthException.serverCode]), no code, or no token |
-/// | `oauth-state-mismatch` | the `state` of the redirect is not the one sent (another page or program called the server) |
 /// | `missing-or-invalid-nonce` | the ID token carries another nonce than the one sent |
-/// | `invalid-credential` | the token or exchange endpoint refused the code ([FirebaseAuthException.serverCode] is its `error`) |
-/// | `network-request-failed` | the token or exchange endpoint could not be reached |
+/// | `invalid-credential` | the token endpoint or `exchangeCode` refused the code ([FirebaseAuthException.serverCode] is its `error`) |
+/// | `network-request-failed` | the token endpoint could not be reached, or it or `exchangeCode` did not answer within 30 seconds |
 ///
 /// An error of [presenter] is rethrown as it is. Nothing of the flow is logged; the tokens are never part of an
 /// exception message.
+///
+/// The ID token is not verified here: its signature, issuer and audience are checked by Firebase when the
+/// credential signs in. Do not trust its claims before that.
+///
+/// On a machine shared with other users, another local user can read the authorization URL from the list of
+/// processes while the browser opens. This is inherent to loopback flows (RFC 8252); PKCE keeps the code useless
+/// to them.
 ///
 /// ```dart
 /// final OAuthLoopbackResult result = await authorizeWithOAuthLoopback(
@@ -67,13 +75,13 @@ Future<OAuthLoopbackResult> authorizeWithOAuthLoopback(
         ? 'http://127.0.0.1:${server.port}'
         : 'http://127.0.0.1:${server.port}${provider.redirectPath}';
 
-    final Completer<HttpRequest> callback = Completer<HttpRequest>();
+    final String host = '127.0.0.1:${server.port}';
+    final Completer<(HttpRequest, Map<String, String>)> callback =
+        Completer<(HttpRequest, Map<String, String>)>();
     server.listen((HttpRequest request) {
-      if (!callback.isCompleted &&
-          request.method == 'GET' &&
-          request.uri.path == provider.redirectPath) {
-        callback.complete(request);
-      } else {
+      if (callback.isCompleted ||
+          request.method != 'GET' ||
+          request.uri.path != provider.redirectPath) {
         // Favicons, other paths, other methods, and anything after the one redirect.
         unawaited(
           _respond(
@@ -83,7 +91,32 @@ Future<OAuthLoopbackResult> authorizeWithOAuthLoopback(
             'This address only receives the sign-in redirect.',
           ),
         );
+        return;
       }
+      // Only the redirect of this sign-in ends the wait: the Host header must be the loopback address (a page of
+      // another site that resolves its name to 127.0.0.1 sends its own name), and the query must parse and carry the
+      // state that was sent. Anything else gets a 400 and the server keeps waiting until the timeout.
+      Map<String, String>? query;
+      if (request.headers.value(HttpHeaders.hostHeader)?.toLowerCase() ==
+          host) {
+        try {
+          query = request.uri.queryParameters;
+        } on Object {
+          query = null;
+        }
+      }
+      if (query == null || !_constantTimeEquals(query['state'] ?? '', state)) {
+        unawaited(
+          _respond(
+            request,
+            HttpStatus.badRequest,
+            'Not this sign-in',
+            'This request does not belong to the sign-in in progress. Return to the app and try again.',
+          ),
+        );
+        return;
+      }
+      callback.complete((request, query));
     }, onError: (Object _) {});
 
     final Uri authorizationUrl = provider.authorizationEndpoint.replace(
@@ -117,8 +150,9 @@ Future<OAuthLoopbackResult> authorizeWithOAuthLoopback(
     );
 
     final HttpRequest request;
+    final Map<String, String> query;
     try {
-      request = await callback.future.timeout(timeout);
+      (request, query) = await callback.future.timeout(timeout);
     } on TimeoutException {
       throw FirebaseAuthException(
         code: 'timeout',
@@ -130,8 +164,7 @@ Future<OAuthLoopbackResult> authorizeWithOAuthLoopback(
     try {
       final OAuthLoopbackResult result = await _complete(
         provider,
-        request.uri.queryParameters,
-        state: state,
+        query,
         codeVerifier: codeVerifier,
         redirectUrl: redirectUrl,
         rawNonce: rawNonce,
@@ -208,30 +241,25 @@ Future<void> openInSystemBrowser(Uri url) async {
 Future<OAuthLoopbackResult> _complete(
   OAuthLoopbackProvider provider,
   Map<String, String> response, {
-  required String state,
   required String codeVerifier,
   required String redirectUrl,
   required String? rawNonce,
   required String? hashedNonce,
   required http.Client? httpClient,
 }) async {
-  if (!_constantTimeEquals(response['state'] ?? '', state)) {
-    throw const FirebaseAuthException(
-      code: 'oauth-state-mismatch',
-      message:
-          'The sign-in redirect did not carry the state that was sent; it was ignored.',
-    );
-  }
   final String? error = response['error'];
   if (error != null) {
+    // The value comes from the address bar: only a short code goes into the exception.
+    final String? serverCode = _shortText(error);
     throw FirebaseAuthException(
       code: error == 'access_denied'
           ? 'user-cancelled'
           : 'invalid-oauth-response',
-      serverCode: error,
+      serverCode: serverCode,
       message: error == 'access_denied'
           ? 'The user did not grant the requested permissions.'
-          : 'The provider answered with the error $error.',
+          : 'The provider answered with an error'
+                '${serverCode == null ? '' : ' ($serverCode)'}.',
     );
   }
   final String? code = response['code'];
@@ -276,7 +304,6 @@ Future<OAuthLoopbackResult> _complete(
       );
     }
   }
-  final Object? expiresIn = tokens['expires_in'];
   final Object? scope = tokens['scope'];
   return OAuthLoopbackResult(
     credential: provider.credentialFor(
@@ -287,20 +314,16 @@ Future<OAuthLoopbackResult> _complete(
     idToken: idToken,
     accessToken: accessToken,
     refreshToken: _nonEmptyString(tokens['refresh_token']),
-    expiresIn: expiresIn is num
-        ? Duration(seconds: expiresIn.toInt())
-        : expiresIn is String && int.tryParse(expiresIn) != null
-        ? Duration(seconds: int.parse(expiresIn))
-        : null,
+    expiresIn: _expiresIn(tokens['expires_in']),
     grantedScopes: scope is String
-        ? scope.split(' ').where((String s) => s.isNotEmpty).toList()
+        ? scope.split(RegExp('[ ,]')).where((String s) => s.isNotEmpty).toList()
         : null,
     rawNonce: rawNonce,
   );
 }
 
-/// Exchanges [code] at the token endpoint (form, RFC 6749 section 4.1.3) or at the exchange endpoint (the JSON text
-/// of `google_sign_in_dart`'s contract) and returns the decoded token response.
+/// Exchanges [code] at the token endpoint (form, RFC 6749 section 4.1.3), or through the provider's
+/// [OAuthLoopbackProvider.exchangeCode], and returns the decoded token response.
 Future<Map<String, Object?>> _exchange(
   OAuthLoopbackProvider provider,
   http.Client client, {
@@ -308,36 +331,54 @@ Future<Map<String, Object?>> _exchange(
   required String codeVerifier,
   required String redirectUrl,
 }) async {
-  final Uri? exchangeEndpoint = provider.exchangeEndpoint;
+  final OAuthCodeExchange? exchangeCode = provider.exchangeCode;
+  if (exchangeCode != null) {
+    try {
+      return await Future<Map<String, Object?>>.sync(
+        () => exchangeCode(
+          OAuthAuthorizationCode(
+            code: code,
+            codeVerifier: codeVerifier,
+            redirectUri: redirectUrl,
+            clientId: provider.clientId,
+          ),
+        ),
+      ).timeout(_networkTimeout);
+    } on FirebaseAuthException {
+      rethrow;
+    } on TimeoutException {
+      throw const FirebaseAuthException(
+        code: 'network-request-failed',
+        message: 'The code exchange did not answer in time.',
+      );
+    } on Object catch (e) {
+      throw FirebaseAuthException(
+        code: 'invalid-credential',
+        message: 'The code exchange failed: $e',
+      );
+    }
+  }
   final http.Response response;
   try {
-    response = exchangeEndpoint != null
-        // A JSON text sent as text/plain, like google_sign_in_dart sent it: its Cloud Function example runs
-        // JSON.parse on the body, which Cloud Functions leaves a string only for this content type.
-        ? await client.post(
-            exchangeEndpoint,
-            headers: <String, String>{
-              'content-type': 'text/plain; charset=utf-8',
-            },
-            body: jsonEncode(<String, String>{
-              'code': code,
-              'codeVerifier': codeVerifier,
-              'clientId': provider.clientId,
-              'redirectUrl': redirectUrl,
-            }),
-          )
-        : await client.post(
-            provider.tokenEndpoint,
-            headers: <String, String>{'accept': 'application/json'},
-            body: <String, String>{
-              'grant_type': 'authorization_code',
-              'code': code,
-              'redirect_uri': redirectUrl,
-              'client_id': provider.clientId,
-              'code_verifier': codeVerifier,
-              'client_secret': ?provider.clientSecret,
-            },
-          );
+    response = await client
+        .post(
+          provider.tokenEndpoint,
+          headers: <String, String>{'accept': 'application/json'},
+          body: <String, String>{
+            'grant_type': 'authorization_code',
+            'code': code,
+            'redirect_uri': redirectUrl,
+            'client_id': provider.clientId,
+            'code_verifier': codeVerifier,
+            'client_secret': ?provider.clientSecret,
+          },
+        )
+        .timeout(_networkTimeout);
+  } on TimeoutException {
+    throw const FirebaseAuthException(
+      code: 'network-request-failed',
+      message: 'The token endpoint did not answer in time.',
+    );
   } on http.ClientException catch (e) {
     throw FirebaseAuthException(
       code: 'network-request-failed',
@@ -356,9 +397,14 @@ Future<Map<String, Object?>> _exchange(
   } on FormatException {
     body = null;
   }
-  if (response.statusCode != 200) {
-    // An OAuth error ({"error": "invalid_grant", ...}), or the plain text code of the exchange endpoint example
-    // (`invalid_client_id`). Neither carries a token.
+  // GitHub answers a refused code with status 200 and an `error` field.
+  final bool errorIn200 =
+      body is Map<String, Object?> &&
+      body['error'] is String &&
+      body['access_token'] == null &&
+      body['id_token'] == null;
+  if (response.statusCode != 200 || errorIn200) {
+    // An OAuth error ({"error": "invalid_grant", ...}) or some other text. Neither carries a token.
     final String? serverCode = body is Map<String, Object?>
         ? _nonEmptyString(body['error'])
         : _shortText(response.body);
@@ -367,7 +413,7 @@ Future<Map<String, Object?>> _exchange(
       serverCode: serverCode,
       httpStatus: response.statusCode,
       message:
-          'The ${exchangeEndpoint != null ? 'exchange' : 'token'} endpoint refused the authorization code'
+          'The token endpoint refused the authorization code'
           '${serverCode == null ? '' : ' ($serverCode)'}.',
     );
   }
@@ -463,6 +509,26 @@ Map<String, Object?>? _claimsOf(String jwt) {
   } on FormatException {
     return null;
   }
+}
+
+/// How long a request of the code exchange may take before it fails with `network-request-failed`.
+const Duration _networkTimeout = Duration(seconds: 30);
+
+/// The `expires_in` of a token response (a number or a numeric string, in seconds), or null when it is missing or
+/// not a sane duration (negative, not finite, or longer than a year).
+Duration? _expiresIn(Object? value) {
+  final num? seconds = value is num
+      ? value
+      : value is String
+      ? num.tryParse(value)
+      : null;
+  if (seconds == null ||
+      !seconds.isFinite ||
+      seconds < 0 ||
+      seconds > const Duration(days: 366).inSeconds) {
+    return null;
+  }
+  return Duration(seconds: seconds.toInt());
 }
 
 String? _nonEmptyString(Object? value) =>

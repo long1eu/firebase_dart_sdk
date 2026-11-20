@@ -1,0 +1,18 @@
+# Files left out of the published package. When this file exists, pub does not
+# read .gitignore in this directory, so the build output entries are repeated.
+.dart_tool/
+.packages
+.pub/
+build/
+doc/api/
+.idea/
+*.iml
+.DS_Store
+.metadata
+pubspec.lock
+
+# Local development only: path overrides for the sibling packages.
+pubspec_overrides.yaml
+
+# The tests need the sibling packages of the repository.
+test/

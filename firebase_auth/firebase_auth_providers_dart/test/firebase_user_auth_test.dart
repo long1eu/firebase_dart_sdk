@@ -249,6 +249,18 @@ void main() {
       ]);
     });
 
+    test('useEmulator sends the later requests to the emulator', () async {
+      expect(() => auth.useEmulator('user@host:9099'), throwsArgumentError);
+      expect(auth.emulatorHost, isNull);
+      auth.useEmulator('127.0.0.1:9099');
+      expect(auth.emulatorHost, '127.0.0.1:9099');
+      await auth.signInAnonymously();
+      expect(
+        requests.first.url.toString(),
+        'http://127.0.0.1:9099/identitytoolkit.googleapis.com/v1/accounts:signUp?key=$apiKey',
+      );
+    });
+
     test(
       'the emulator host may name its scheme, like connectAuthEmulator',
       () async {
