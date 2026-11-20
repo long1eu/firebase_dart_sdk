@@ -90,7 +90,20 @@ class SqliteDatabase implements Database {
 
   @override
   Future<void> execute(String statement, [List<Object?>? arguments]) async {
-    _run(() => _database.execute(statement, arguments ?? const <Object?>[]));
+    _run(() => _write(statement, arguments ?? const <Object?>[]));
+  }
+
+  /// Runs a statement that returns no rows. Only statements with arguments go through the
+  /// cache: they are single INSERT, UPDATE and DELETE statements run again and again, and
+  /// `Database.execute` prepares those with `checkNoTail` as well. Without arguments it
+  /// runs `sqlite3_exec` as before, which takes several statements at once and serves the
+  /// one-off DDL, PRAGMA and transaction control statements that are not worth keeping.
+  void _write(String sql, List<Object?> arguments) {
+    if (arguments.isEmpty) {
+      _database.execute(sql);
+    } else {
+      _cached(sql, (sqlite.PreparedStatement s) => s.execute(arguments));
+    }
   }
 
   @override
@@ -107,11 +120,16 @@ class SqliteDatabase implements Database {
   }
 
   sqlite.ResultSet _select(String sql, List<Object?> arguments) {
+    return _cached(sql, (sqlite.PreparedStatement s) => s.select(arguments));
+  }
+
+  /// Runs [run] on the cached prepared statement of [sql], preparing it first if needed.
+  T _cached<T>(String sql, T Function(sqlite.PreparedStatement) run) {
     sqlite.PreparedStatement? statement = _statements.remove(sql);
     // `checkNoTail` as `Database.select` of sqlite3 3.x.
     statement ??= _database.prepare(sql, persistent: true, checkNoTail: true);
     try {
-      final sqlite.ResultSet rows = statement.select(arguments);
+      final T result = run(statement);
       // Most recently used last.
       _statements[sql] = statement;
       if (_statements.length > _statementCacheSize) {
@@ -119,7 +137,7 @@ class SqliteDatabase implements Database {
         // ignore: deprecated_member_use
         _statements.remove(oldest)!.dispose();
       }
-      return rows;
+      return result;
     } catch (_) {
       // Not kept after an error, so that a statement is never reused in an unknown state.
       // ignore: deprecated_member_use
@@ -131,7 +149,9 @@ class SqliteDatabase implements Database {
   /// Runs a DELETE and returns the number of rows it removed.
   @override
   Future<int> delete(String statement, [List<Object?>? arguments]) async {
-    _run(() => _database.execute(statement, arguments ?? const <Object?>[]));
+    _run(() => _write(statement, arguments ?? const <Object?>[]));
+    // `sqlite3_changes`: the rows changed by the last statement that finished on the
+    // connection, whether it ran prepared or through `sqlite3_exec`.
     return _database.updatedRows;
   }
 
