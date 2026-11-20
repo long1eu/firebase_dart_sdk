@@ -288,7 +288,7 @@ pin them.
 
 ## Contributing
 
-Issues and pull requests are welcome. Before opening a pull request, run `./tool/test_all.sh`
+Issues and pull requests are welcome; [`CONTRIBUTING.md`](CONTRIBUTING.md) says what helps most. Before opening a pull request, run `./tool/test_all.sh`
 and, for changes that touch networking or the local store, the emulator integration tests. Do not
 weaken or remove assertions to get a test passing; report flaky tests instead.
 
