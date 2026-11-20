@@ -139,7 +139,8 @@ against the Firebase Auth emulator; nothing was run against the real service.
 | `updateProfile(user, {displayName, photoURL})` | `updateProfile(displayName:, photoUrl:)`; `''` removes a value (JS: `null`) | emulator, Chrome |
 | `user.reload()` | `reload()` | emulator, Chrome |
 | `user.delete()` / `deleteUser(user)` | `deleteCurrentUser()` | emulator, Chrome |
-| `revokeToken(withAuthorizationCode:)` of the iOS SDK (Sign in with Apple; no JS equivalent) | `revokeToken(authorizationCode)` (`v2/accounts:revokeToken`; the user stays signed in) | unit only |
+| `revokeToken(withAuthorizationCode:)` of the iOS SDK (Sign in with Apple; no JS equivalent) | `revokeToken(authorizationCode)` (`v2/accounts:revokeToken`; the user stays signed in; sends `tenantId` when set) | unit only |
+| `revokeAccessToken(auth, token)` (Sign in with Apple) | `revokeAccessToken(token)` (`v2/accounts:revokeToken`, token type `ACCESS_TOKEN`; the user stays signed in; throws `null-user` where JS does nothing) | unit only |
 | `fetchSignInMethodsForEmail(auth, email)` (deprecated upstream: empty with email enumeration protection) | `fetchSignInMethodsForEmail(email)` | emulator, Chrome |
 | `connectAuthEmulator(auth, url)` | the `emulatorHost` argument | emulator, Chrome |
 | `user.uid`, `email`, `emailVerified`, `isAnonymous`, `displayName`, `photoURL`, `phoneNumber`, `tenantId`, `metadata`, `providerData` | `currentUser` (`AuthUser`, read with `accounts:lookup` after every sign-in) | emulator |

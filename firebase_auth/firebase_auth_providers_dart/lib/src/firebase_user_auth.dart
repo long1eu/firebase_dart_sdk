@@ -700,7 +700,8 @@ class FirebaseUserAuth implements AuthTokenProvider {
 
   /// Revokes the Sign in with Apple token of the signed-in user with the [authorizationCode] that Apple returned
   /// (`revokeToken(withAuthorizationCode:)` of the iOS SDK; `v2/accounts:revokeToken`). Apple asks apps that let
-  /// users delete their account to revoke the token first. The user stays signed in.
+  /// users delete their account to revoke the token first. The user stays signed in. The [tenantId], when set, is
+  /// sent with it, as the JS SDK's `revokeToken` request does.
   ///
   /// Throws a [FirebaseAuthException] with the code `null-user` (nobody is signed in), `invalid-credential`,
   /// `user-token-expired`, ...
@@ -714,6 +715,27 @@ class FirebaseUserAuth implements AuthTokenProvider {
           'token': authorizationCode,
           'idToken': idToken,
         },
+        tenant: true,
+      );
+    });
+  }
+
+  /// Revokes the Sign in with Apple access [token] of the signed-in user (`revokeAccessToken` of the JS SDK;
+  /// `v2/accounts:revokeToken` with the token type `ACCESS_TOKEN`). The user stays signed in.
+  ///
+  /// Throws a [FirebaseAuthException] with the code `null-user` (nobody is signed in; the JS SDK does nothing
+  /// then), `invalid-credential`, `user-token-expired`, ...
+  Future<void> revokeAccessToken(String token) async {
+    await _forUser((String idToken, int generation) async {
+      await _send(
+        _identityToolkit('accounts:revokeToken', version: 'v2'),
+        json: <String, Object?>{
+          'providerId': 'apple.com',
+          'tokenType': 'ACCESS_TOKEN',
+          'token': token,
+          'idToken': idToken,
+        },
+        tenant: true,
       );
     });
   }
