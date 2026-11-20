@@ -198,14 +198,17 @@ class FirebaseAuthException extends FirebaseException {
   /// It holds tokens: [toString] and [message] leave it out.
   final AuthCredential? credential;
 
-  /// Whether the session is no longer valid: the refresh token was revoked or the account is gone or disabled.
-  /// The user is signed out when a token refresh fails with such an error.
-  bool get invalidatesSession => const <String>{
-    'user-token-expired',
-    'invalid-refresh-token',
-    'user-disabled',
-    'user-not-found',
-  }.contains(code);
+  /// Whether the session is no longer valid: the backend rejected the request with HTTP 400 because the refresh
+  /// token was revoked or the account is gone or disabled. The user is signed out when a token refresh fails with
+  /// such an error. The same code with another status (a 5xx of an overloaded backend) does not end the session.
+  bool get invalidatesSession =>
+      httpStatus == 400 &&
+      const <String>{
+        'user-token-expired',
+        'invalid-refresh-token',
+        'user-disabled',
+        'user-not-found',
+      }.contains(code);
 
   /// `SERVER_ERROR_MAP` of the JS SDK (`packages/auth/src/api/errors.ts` of `@firebase/auth` 1.13.10), complete.
   /// Codes that are not listed map to their kebab case form, as in the JS SDK.

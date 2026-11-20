@@ -1,5 +1,7 @@
 ## Unreleased
 
+- `FirebaseUserAuth.useEmulator(emulatorHost)`: sends the later requests to the Auth emulator, for an instance that
+  is created before the emulator is known (FlutterFire's `useAuthEmulator`). `emulatorHost` is now a getter.
 - Authenticator app (TOTP) multi-factor authentication, for projects on Identity Platform:
   `FirebaseUserAuth.startTotpEnrollment` returns a `TotpSecret` (`secretKey`, `hashingAlgorithm`, `codeLength`,
   `codeIntervalSeconds`, `enrollmentCompletionDeadline`, and `otpauthUri(issuer:, accountName:)` for a QR code),
@@ -17,11 +19,38 @@
   browser (`openInSystemBrowser`, or a `presenter` of your own) runs the authorization code flow with PKCE (S256),
   a random `state` (compared in constant time) and a nonce; the redirect comes back to a one-shot server on
   127.0.0.1 that answers 404 to any other path and is always closed (success, error or `timeout`). The code is
-  exchanged at the token endpoint, or through an `exchangeEndpoint` with the request and answer of
-  `google_sign_in_dart`'s code exchange endpoint. The result (`OAuthLoopbackResult`) has the provider's tokens and
-  a ready `OAuthCredential`. On the web these throw an `UnsupportedError`. New error codes: `timeout`,
-  `user-cancelled`, `oauth-state-mismatch`, `invalid-oauth-response`, `invalid-oauth-provider`. Tested against an
-  in-process fake identity provider only.
+  exchanged at the token endpoint with the client id and secret. Google with a "Desktop app" client needs nothing
+  more. The optional `exchangeCode` callback is for a provider that wants a confidential client: it gets the code,
+  the PKCE verifier, the redirect URL and the client id (`OAuthAuthorizationCode`), sends them to a server of yours,
+  and returns the token endpoint's JSON. It is the counterpart of `serverAuthCode` in `google_sign_in`. The result
+  (`OAuthLoopbackResult`) has the provider's tokens and a ready `OAuthCredential`. On the web these throw an
+  `UnsupportedError`. New error codes: `timeout`, `user-cancelled`,
+  `invalid-oauth-response`, `invalid-oauth-provider`. Only the redirect of this sign-in (its `Host` header and its
+  `state`) ends the wait; any other request gets a 400. The code exchange and the discovery request fail with
+  `network-request-failed` after 30 seconds. Plain `http` endpoints are accepted only on `127.0.0.1` and `::1`.
+- `FirebaseUserAuth.linkWithOAuthLoopback` and `reauthenticateWithOAuthLoopback`: the same browser sign-in, then
+  `linkWithCredential` or `reauthenticateWithCredential`. Same arguments as `signInWithOAuthLoopback`; `null-user`
+  before the browser opens when nobody is signed in.
+- On 2026-11-20, Google sign-in with a Desktop client was run against a real Firebase project: the code was
+  exchanged directly with the client secret and PKCE, and the redirect was `http://127.0.0.1:<port>`.
+  `exchangeCode` and generic OpenID Connect providers were run only against the fake identity provider of the
+  tests.
+- `OAuthLoopbackProvider.github`: GitHub sign-in through the loopback helper (PKCE S256, client secret, default
+  scopes `read:user user:email`, no nonce; Firebase gets the access token only). Run only against the fake
+  identity provider of the tests.
+- A backend error ends the session only when it comes with HTTP 400: `invalidatesSession` is false for a 5xx that
+  names `TOKEN_EXPIRED`, `USER_DISABLED`, ..., and the user stays signed in.
+- When a request with the ID token is rejected with `TOKEN_EXPIRED` or `INVALID_ID_TOKEN`, the token is refreshed
+  once to check the session (as in the iOS SDK): the user is signed out only when the refresh says that the session
+  ended, and otherwise the request is sent once more with the new token.
+- Token lifetimes from the backend are bounded as in the iOS SDK: an `expiresIn` outside of (0, 24 h], missing or
+  not a number counts as one hour, an `exp` claim more than 24 h ahead is not trusted, and a proactive refresh
+  delay beyond 24 h refreshes right away.
+
+- `FirebaseUserAuth.revokeToken(authorizationCode)` revokes the Sign in with Apple token of the signed-in user
+  with Apple's authorization code (`v2/accounts:revokeToken`, like `revokeToken(withAuthorizationCode:)` of the
+  iOS SDK). The user stays signed in. Throws `null-user` when nobody is signed in. Tested with a fake HTTP client
+  only.
 
 ## 0.3.0
 

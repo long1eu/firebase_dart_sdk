@@ -337,6 +337,13 @@ anonymous, custom token, email link, account management and linking of tokens th
 browser. Phone never works. That is roughly what Invertase's `firebase_auth_desktop` offered before it stopped
 in 2022. It also needs a `firebase_core` Linux implementation, which is part of the separate drop-in work.
 
+Status 2026-11-20: `firebase_auth/firebase_auth_dart_platform` 0.1.0 (unreleased) now exists: the official
+`firebase_auth` platform interface on top of `FirebaseUserAuth`, registered for Linux and opt-in elsewhere,
+with the `firebase_core` Linux piece. It throws `unimplemented` for `signInWithProvider`, `linkWithProvider`,
+`reauthenticateWithProvider`, popup and redirect, phone, multi-factor (`User.multiFactor`, TOTP), token
+revocation, and Play Games and Game Center credentials. Not yet run in a Linux desktop build or against a
+production project. It needs `firebase_auth_providers_dart` 0.3.1, which is not released yet.
+
 ## 6. Is it worth it?
 
 Who needs client auth from this package:

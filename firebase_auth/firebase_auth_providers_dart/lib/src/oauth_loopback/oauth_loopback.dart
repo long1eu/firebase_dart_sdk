@@ -10,22 +10,56 @@ import '../auth_exception.dart';
 /// printed by a command line tool. It may return before the user is done; the sign-in waits for the redirect.
 typedef UrlPresenter = FutureOr<void> Function(Uri url);
 
+/// Exchanges an authorization code for the provider's tokens somewhere else than at the token endpoint: on a server
+/// of yours that holds the client secret. It returns the JSON object of the token endpoint (`id_token`,
+/// `access_token`, `expires_in`, ...). Throw a [FirebaseAuthException] to choose the error of the sign-in; any other
+/// error becomes `invalid-credential`.
+typedef OAuthCodeExchange =
+    FutureOr<Map<String, Object?>> Function(OAuthAuthorizationCode code);
+
+/// The authorization code of a loopback sign-in, with what the token endpoint wants next to it (RFC 6749 section
+/// 4.1.3 and RFC 7636): the server that exchanges it needs all four.
+class OAuthAuthorizationCode {
+  /// Used by the sign-in; public for tests of an [OAuthCodeExchange].
+  const OAuthAuthorizationCode({
+    required this.code,
+    required this.codeVerifier,
+    required this.redirectUri,
+    required this.clientId,
+  });
+
+  /// The `code` parameter of the redirect.
+  final String code;
+
+  /// The PKCE verifier of this sign-in (`code_verifier`).
+  final String codeVerifier;
+
+  /// The redirect URL of this sign-in (`redirect_uri`), `http://127.0.0.1:<port>`.
+  final String redirectUri;
+
+  /// The OAuth client id the code was issued to.
+  final String clientId;
+
+  @override
+  String toString() => 'OAuthAuthorizationCode(clientId: $clientId)';
+}
+
 /// An identity provider for the browser sign-in of desktop apps and command line tools
 /// (`authorizeWithOAuthLoopback` and `FirebaseUserAuth.signInWithOAuthLoopback`, VM only): the OAuth 2.0
 /// authorization code flow with PKCE (S256) whose redirect comes back to a one-shot HTTP server on 127.0.0.1
 /// (RFC 8252, "OAuth 2.0 for Native Apps").
 ///
-/// Make one with [OAuthLoopbackProvider.google], [OAuthLoopbackProvider.oidc] or [OAuthLoopbackProvider.discover].
+/// Make one with [OAuthLoopbackProvider.google], [OAuthLoopbackProvider.github], [OAuthLoopbackProvider.oidc] or
+/// [OAuthLoopbackProvider.discover].
 ///
 /// The code is exchanged for the provider's tokens in one of two ways:
 ///
 /// * directly at [tokenEndpoint], with [clientId] and [clientSecret] (if any). For a Google client of the
 ///   "Desktop app" type the secret is required and Google documents that it is not treated as a secret: it ships
 ///   with the app.
-/// * through [exchangeEndpoint], a server of yours that holds the client secret (for example a Cloud Function).
-///   It receives `{"code", "codeVerifier", "clientId", "redirectUrl"}` as a JSON text (content type `text/plain`)
-///   and answers with the token endpoint's JSON. This is the contract of the code exchange endpoint of
-///   `google_sign_in_dart` (its `example/gcp`), so an endpoint written for that package keeps working.
+/// * through [exchangeCode], a function of yours that sends the code to a server that holds the client secret (a
+///   provider that wants a confidential client) and returns the token endpoint's JSON. It is the counterpart of
+///   `serverAuthCode` in `google_sign_in`; how the server is called is up to you.
 ///
 /// Only the code is exchanged: once signed in, Firebase keeps its own refresh token, so the provider's refresh token
 /// (if any) is not used by this package.
@@ -33,8 +67,8 @@ class OAuthLoopbackProvider {
   /// A provider from explicit endpoints. Prefer the named constructors.
   ///
   /// * [providerId] is the Firebase provider id of the credential: `google.com`, `oidc.<name>`, `microsoft.com`, ...
-  /// * [authorizationEndpoint], [tokenEndpoint] and [exchangeEndpoint] must be `https` URLs (plain `http` is accepted
-  ///   only for a loopback host, for tests and local identity providers); otherwise an [ArgumentError] is thrown.
+  /// * [authorizationEndpoint] and [tokenEndpoint] must be `https` URLs (plain `http` is accepted
+  ///   only on `127.0.0.1` and `::1`, for tests and local identity providers); otherwise an [ArgumentError] is thrown.
   /// * [scopes] are requested as one space-separated `scope` parameter.
   /// * [useNonce] sends the SHA-256 hash (hex) of a random nonce as the `nonce` parameter and checks it against the
   ///   `nonce` claim of the ID token (when the token has one). [sendNonceToFirebase] adds the raw nonce to the
@@ -50,7 +84,7 @@ class OAuthLoopbackProvider {
     required this.tokenEndpoint,
     required this.clientId,
     this.clientSecret,
-    this.exchangeEndpoint,
+    this.exchangeCode,
     this.scopes = defaultScopes,
     this.useNonce = true,
     this.sendNonceToFirebase = false,
@@ -60,9 +94,6 @@ class OAuthLoopbackProvider {
   }) {
     _checkEndpoint(authorizationEndpoint, 'authorizationEndpoint');
     _checkEndpoint(tokenEndpoint, 'tokenEndpoint');
-    if (exchangeEndpoint != null) {
-      _checkEndpoint(exchangeEndpoint!, 'exchangeEndpoint');
-    }
     if (providerId.isEmpty) {
       throw ArgumentError.value(providerId, 'providerId', 'must not be empty');
     }
@@ -87,7 +118,7 @@ class OAuthLoopbackProvider {
   /// the client is in the same project, so that Firebase accepts its ID tokens.
   ///
   /// Pass [clientSecret] (Google requires it for the code exchange of a desktop client; it is not confidential), or
-  /// [exchangeEndpoint] to exchange the code on a server of yours instead. [loginHint] (an email address) and
+  /// [exchangeCode] to exchange the code on a server of yours instead. [loginHint] (an email address) and
   /// [hostedDomain] (a Google Workspace domain) become `login_hint` and `hd`.
   ///
   /// The nonce is sent to Google and checked against the ID token here; it is not sent to Firebase, like the
@@ -95,7 +126,7 @@ class OAuthLoopbackProvider {
   factory OAuthLoopbackProvider.google({
     required String clientId,
     String? clientSecret,
-    Uri? exchangeEndpoint,
+    OAuthCodeExchange? exchangeCode,
     List<String> scopes = defaultScopes,
     String? loginHint,
     String? hostedDomain,
@@ -106,7 +137,7 @@ class OAuthLoopbackProvider {
     tokenEndpoint: googleTokenEndpoint,
     clientId: clientId,
     clientSecret: clientSecret,
-    exchangeEndpoint: exchangeEndpoint,
+    exchangeCode: exchangeCode,
     scopes: scopes,
     customParameters: <String, String>{
       'login_hint': ?loginHint,
@@ -114,6 +145,38 @@ class OAuthLoopbackProvider {
       ...customParameters,
     },
   );
+
+  /// GitHub (`github.com`), with a GitHub OAuth App whose "Authorization callback URL" is `http://127.0.0.1` (GitHub
+  /// accepts any port on a loopback redirect) and whose client secret is [clientSecret]: GitHub's code exchange needs
+  /// it even with PKCE, so it ships with the app and is not confidential. GitHub is not an OpenID Connect provider:
+  /// no nonce is sent, and the credential carries only the access token. [scopes] are `read:user` and `user:email`
+  /// by default; [customParameters] can add `login` or `allow_signup`.
+  factory OAuthLoopbackProvider.github({
+    required String clientId,
+    required String clientSecret,
+    List<String> scopes = const <String>['read:user', 'user:email'],
+    Map<String, String> customParameters = const <String, String>{},
+  }) {
+    if (clientSecret.isEmpty) {
+      throw ArgumentError.value(
+        clientSecret,
+        'clientSecret',
+        'must not be empty',
+      );
+    }
+    return OAuthLoopbackProvider(
+      providerId: GithubAuthProvider.PROVIDER_ID,
+      authorizationEndpoint: Uri.parse(
+        'https://github.com/login/oauth/authorize',
+      ),
+      tokenEndpoint: Uri.parse('https://github.com/login/oauth/access_token'),
+      clientId: clientId,
+      clientSecret: clientSecret,
+      scopes: scopes,
+      useNonce: false,
+      customParameters: customParameters,
+    );
+  }
 
   /// An OpenID Connect provider from its [authorizationEndpoint] and [tokenEndpoint]. [providerId] is its id in
   /// Firebase (`oidc.<name>` for a provider configured in Identity Platform); [clientId] must be the client id
@@ -125,7 +188,7 @@ class OAuthLoopbackProvider {
     required Uri tokenEndpoint,
     required String clientId,
     String? clientSecret,
-    Uri? exchangeEndpoint,
+    OAuthCodeExchange? exchangeCode,
     List<String> scopes = defaultScopes,
     bool useNonce = true,
     bool sendNonceToFirebase = true,
@@ -138,7 +201,7 @@ class OAuthLoopbackProvider {
     tokenEndpoint: tokenEndpoint,
     clientId: clientId,
     clientSecret: clientSecret,
-    exchangeEndpoint: exchangeEndpoint,
+    exchangeCode: exchangeCode,
     scopes: scopes,
     useNonce: useNonce,
     sendNonceToFirebase: useNonce && sendNonceToFirebase,
@@ -150,14 +213,15 @@ class OAuthLoopbackProvider {
   /// An OpenID Connect provider whose endpoints are read from the discovery document of [issuer]
   /// (`<issuer>/.well-known/openid-configuration`). The other arguments are those of [OAuthLoopbackProvider.oidc].
   ///
-  /// Throws a [FirebaseAuthException] with `network-request-failed` when the document cannot be fetched, and
-  /// `invalid-oauth-provider` when it is not a discovery document of [issuer].
+  /// Throws a [FirebaseAuthException] with `network-request-failed` when the document cannot be fetched within 30
+  /// seconds, and `invalid-oauth-provider` when it is not a discovery document of [issuer] or its endpoints are not
+  /// `https` URLs.
   static Future<OAuthLoopbackProvider> discover({
     required Uri issuer,
     required String providerId,
     required String clientId,
     String? clientSecret,
-    Uri? exchangeEndpoint,
+    OAuthCodeExchange? exchangeCode,
     List<String> scopes = defaultScopes,
     bool useNonce = true,
     bool sendNonceToFirebase = true,
@@ -172,7 +236,13 @@ class OAuthLoopbackProvider {
     final http.Client client = httpClient ?? http.Client();
     final http.Response response;
     try {
-      response = await client.get(url);
+      response = await client.get(url).timeout(_networkTimeout);
+    } on TimeoutException {
+      throw FirebaseAuthException(
+        code: 'network-request-failed',
+        message:
+            'The discovery document of $issuer did not come within 30 seconds.',
+      );
     } on http.ClientException catch (e) {
       throw FirebaseAuthException(
         code: 'network-request-failed',
@@ -210,13 +280,21 @@ class OAuthLoopbackProvider {
     if (authorization is! String || token is! String) {
       throw invalid('no authorization_endpoint or token_endpoint');
     }
+    final Uri? authorizationEndpoint = Uri.tryParse(authorization);
+    final Uri? tokenEndpoint = Uri.tryParse(token);
+    if (authorizationEndpoint == null ||
+        tokenEndpoint == null ||
+        !_isAllowedEndpoint(authorizationEndpoint) ||
+        !_isAllowedEndpoint(tokenEndpoint)) {
+      throw invalid('its endpoints are not https URLs');
+    }
     return OAuthLoopbackProvider.oidc(
       providerId: providerId,
-      authorizationEndpoint: Uri.parse(authorization),
-      tokenEndpoint: Uri.parse(token),
+      authorizationEndpoint: authorizationEndpoint,
+      tokenEndpoint: tokenEndpoint,
       clientId: clientId,
       clientSecret: clientSecret,
-      exchangeEndpoint: exchangeEndpoint,
+      exchangeCode: exchangeCode,
       scopes: scopes,
       useNonce: useNonce,
       sendNonceToFirebase: sendNonceToFirebase,
@@ -249,7 +327,7 @@ class OAuthLoopbackProvider {
   /// Where the browser is sent to sign in.
   final Uri authorizationEndpoint;
 
-  /// Where the code is exchanged when there is no [exchangeEndpoint].
+  /// Where the code is exchanged when there is no [exchangeCode].
   final Uri tokenEndpoint;
 
   /// The OAuth client id of the app at the provider.
@@ -258,9 +336,9 @@ class OAuthLoopbackProvider {
   /// The client secret for the exchange at [tokenEndpoint], if the provider wants one. Not part of [toString].
   final String? clientSecret;
 
-  /// A server of yours that exchanges the code (see the class documentation); when set, [tokenEndpoint] and
+  /// Exchanges the code on a server of yours (see the class documentation); when set, [tokenEndpoint] and
   /// [clientSecret] are not used.
-  final Uri? exchangeEndpoint;
+  final OAuthCodeExchange? exchangeCode;
 
   /// The scopes to request.
   final List<String> scopes;
@@ -302,23 +380,29 @@ class OAuthLoopbackProvider {
       'OAuthLoopbackProvider(providerId: $providerId, clientId: $clientId, '
       'authorizationEndpoint: $authorizationEndpoint)';
 
-  static void _checkEndpoint(Uri endpoint, String name) {
+  /// An `https` URL, or plain `http` on the loopback addresses `127.0.0.1` and `::1` (not the name `localhost`,
+  /// which the system may resolve elsewhere).
+  static bool _isAllowedEndpoint(Uri endpoint) {
     final bool loopback =
-        endpoint.host == '127.0.0.1' ||
-        endpoint.host == 'localhost' ||
-        endpoint.host == '::1';
-    if (endpoint.host.isEmpty ||
-        endpoint.hasFragment ||
-        !(endpoint.isScheme('https') ||
-            endpoint.isScheme('http') && loopback)) {
+        endpoint.host == '127.0.0.1' || endpoint.host == '::1';
+    return endpoint.host.isNotEmpty &&
+        !endpoint.hasFragment &&
+        (endpoint.isScheme('https') || endpoint.isScheme('http') && loopback);
+  }
+
+  static void _checkEndpoint(Uri endpoint, String name) {
+    if (!_isAllowedEndpoint(endpoint)) {
       throw ArgumentError.value(
         endpoint,
         name,
-        'must be an https URL (http only on a loopback host)',
+        'must be an https URL (http only on 127.0.0.1 or ::1)',
       );
     }
   }
 }
+
+/// How long the discovery request may take before it fails with `network-request-failed`.
+const Duration _networkTimeout = Duration(seconds: 30);
 
 /// What the browser sign-in of an [OAuthLoopbackProvider] returns: the provider's tokens and the [credential] for
 /// `FirebaseUserAuth.signInWithCredential`, `linkWithCredential` or `reauthenticateWithCredential`.
@@ -339,7 +423,8 @@ class OAuthLoopbackResult {
   /// The credential of the tokens, for the provider's Firebase provider id.
   final OAuthCredential credential;
 
-  /// The OpenID Connect ID token, if the provider returned one.
+  /// The OpenID Connect ID token, if the provider returned one. It is not verified locally: Firebase checks it when
+  /// the [credential] signs in, so do not trust its claims before that.
   final String? idToken;
 
   /// The OAuth access token, if the provider returned one.

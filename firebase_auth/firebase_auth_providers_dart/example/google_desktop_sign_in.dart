@@ -10,9 +10,7 @@
 // It needs an OAuth client of the "Desktop app" type in the Google Cloud
 // project of the Firebase project (Google Auth Platform, Clients) and the
 // Google provider enabled in Firebase Authentication. Google documents that the
-// secret of a desktop client is not confidential; to keep it on a server
-// anyway, set GOOGLE_CODE_EXCHANGE_URL to an exchange endpoint (see
-// OAuthLoopbackProvider) instead of GOOGLE_DESKTOP_CLIENT_SECRET.
+// secret of a desktop client is not confidential.
 //
 // With FIREBASE_AUTH_EMULATOR_HOST set, the Firebase part runs against the Auth
 // emulator (FIREBASE_API_KEY is then not needed); the Google part is always
@@ -36,7 +34,6 @@ Future<void> main() async {
     );
     return;
   }
-  final String? exchange = env['GOOGLE_CODE_EXCHANGE_URL'];
 
   final FirebaseUserAuth auth = FirebaseUserAuth(
     apiKey: apiKey,
@@ -47,7 +44,6 @@ Future<void> main() async {
       OAuthLoopbackProvider.google(
         clientId: clientId,
         clientSecret: env['GOOGLE_DESKTOP_CLIENT_SECRET'],
-        exchangeEndpoint: exchange == null ? null : Uri.parse(exchange),
       ),
       // Opens the system browser; also print the address, for a machine
       // without one (open it on the same machine: the redirect goes to

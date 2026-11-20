@@ -23,6 +23,7 @@ import 'package:firebase_app_dart/firebase_app_dart.dart';
 import 'package:firebase_app_dart/platform_dependencies.dart';
 import 'package:firebase_auth_providers_dart/adc.dart'; // needs dart:io
 import 'package:firebase_auth_providers_dart/firebase_auth_providers_dart.dart';
+import 'package:http/http.dart' as http;
 import 'package:rxdart/rxdart.dart';
 import 'package:test/test.dart';
 import 'package:web/web.dart' as web;
@@ -127,8 +128,8 @@ class City {
   Map<String, Object?> toMap() => {'name': name, 'population': population};
 }
 
-// ../../README.md:55
-Future<void> rootReadmeLine55() async {
+// ../../README.md:56
+Future<void> rootReadmeLine56() async {
   final FirebaseApp app = FirebaseApp.withOptions(
     const FirebaseOptions(apiKey: 'demo-key', appId: '1:1234567890:dart:demo', projectId: 'demo-my-app'),
   );
@@ -209,8 +210,8 @@ Future<void> authProvidersReadmeLine89() async {
   print(result.additionalUserInfo?.isNewUser);
 }
 
-// ../../firebase_auth/firebase_auth_providers_dart/README.md:170
-Future<void> authProvidersReadmeLine170() async {
+// ../../firebase_auth/firebase_auth_providers_dart/README.md:172
+Future<void> authProvidersReadmeLine172() async {
   final FirebaseUserAuth auth = await FirebaseUserAuth.forApp(app);
 
   // Enrol: show the URI as a QR code (or the secret for typing in), then ask for a code of the app.
@@ -232,8 +233,8 @@ Future<void> authProvidersReadmeLine170() async {
   await auth.unenrollMultiFactor(auth.currentUser!.enrolledFactors.first.uid);
 }
 
-// ../../firebase_auth/firebase_auth_providers_dart/README.md:210
-Future<void> authProvidersReadmeLine210() async {
+// ../../firebase_auth/firebase_auth_providers_dart/README.md:212
+Future<void> authProvidersReadmeLine212() async {
   final FirebaseUserAuth auth = await FirebaseUserAuth.forApp(app);
   final UserCredential result = await auth.signInWithOAuthLoopback(
     OAuthLoopbackProvider.google(
@@ -242,6 +243,32 @@ Future<void> authProvidersReadmeLine210() async {
     ),
   );
   print(result.user?.email);
+}
+
+// ../../firebase_auth/firebase_auth_providers_dart/README.md:256
+Future<void> authProvidersReadmeLine256() async {
+  final OAuthLoopbackProvider provider = OAuthLoopbackProvider.oidc(
+    providerId: 'oidc.example',
+    authorizationEndpoint: Uri.parse('https://idp.example.com/authorize'),
+    tokenEndpoint: Uri.parse('https://idp.example.com/token'),
+    clientId: '<the client id>',
+    exchangeCode: (OAuthAuthorizationCode code) async {
+      final http.Response response = await http.post(
+        Uri.parse('https://api.example.com/oauth/exchange'),
+        headers: <String, String>{'content-type': 'application/json'},
+        body: jsonEncode(<String, String>{
+          'code': code.code,
+          'codeVerifier': code.codeVerifier,
+          'redirectUri': code.redirectUri,
+          'clientId': code.clientId,
+        }),
+      );
+      if (response.statusCode != 200) {
+        throw StateError('The exchange failed: ${response.statusCode}');
+      }
+      return jsonDecode(response.body) as Map<String, Object?>;
+    },
+  );
 }
 
 // ../../docs/migrating_from_vm_packages.md:67
