@@ -54,8 +54,38 @@
 
 - `FirebaseUserAuth.revokeToken(authorizationCode)` revokes the Sign in with Apple token of the signed-in user
   with Apple's authorization code (`v2/accounts:revokeToken`, like `revokeToken(withAuthorizationCode:)` of the
-  iOS SDK). The user stays signed in. Throws `null-user` when nobody is signed in. Tested with a fake HTTP client
-  only.
+  iOS SDK). The user stays signed in. Throws `null-user` when nobody is signed in. Sends the `tenantId` when one is
+  set, like the JS SDK's `revokeToken` request. Tested with a fake HTTP client only.
+- `FirebaseUserAuth.revokeAccessToken(token)` revokes a Sign in with Apple access token of the signed-in user
+  (`revokeAccessToken` of the JS SDK: `v2/accounts:revokeToken` with the token type `ACCESS_TOKEN` and the
+  `tenantId` when set). The user stays signed in. Throws `null-user` when nobody is signed in, where the JS SDK
+  does nothing. Tested with a fake HTTP client only.
+- A storage that fails to write a new session no longer leaves the stored session behind for good: the session in
+  memory is the new one (the backend may have replaced the refresh token), the operation throws the error of the
+  storage, and the next session change (a token refresh, a reload, a sign-in) writes it again, even when the refresh
+  token did not change. The user is not signed out.
+- `FirebaseUserAuth.forApp` sets `app.authProvider` even when the `read` of the storage throws, then rethrows: the
+  app works signed out, and `restore()` on that instance tries again.
+- `signOut` with a storage that fails to delete the session signs the user out in memory (the streams emit null)
+  and throws the error of the storage; `restore()` on that instance deletes the stored session again instead of
+  signing the user back in. A new instance still restores it until a write succeeds.
+- JSON for credentials in the format of the JS SDK: `EmailAuthCredential.toJson`/`fromJson`,
+  `OAuthCredential.toJson`/`fromJson` and `OAuthProvider.credentialFromJson` (`toJSON`, `fromJSON` and
+  `credentialFromJSON` of the JS SDK). `fromJson` returns null for JSON that is not a credential, as in the JS SDK;
+  `credentialFromJson` throws an `ArgumentError`. An email link is written as its code and tenant, as in the JS SDK.
+  The JSON holds the credential's password or tokens. Tested with fixtures derived from the JS sources only.
+- `FirebaseUserAuth.emulatorConfig` (`AuthEmulatorConfig`: protocol, host, port, options), like the JS SDK's
+  `emulatorConfig`; null without an emulator. `emulatorOptions: AuthEmulatorOptions(disableWarnings: true)` on the
+  constructor and `forApp`, and `options:` on `useEmulator`, leave out the warning for an emulator off the loopback
+  interface. An invalid emulator host stays an `ArgumentError` (the JS SDK's `invalid-emulator-scheme` is a
+  `FirebaseAuthException`); a scheme other than `http` or `https` now says so in the message.
+- `AuthUser.providerId` (always `firebase`), `UserCredential.operationType` (the new `OperationType` enum:
+  `signIn`, `link`, `reauthenticate`, with the JS SDK's strings in `value`) and `AuthUser.toJson()` with the keys of
+  the JS SDK's `User.toJSON`, except `stsTokenManager`, `apiKey` and `appName`, which belong to the session.
+- On 2026-11-20, a generic OpenID Connect provider was run against a real Firebase project with `discover` and with
+  an `exchangeCode` callback. GitHub was run with a real OAuth App up to the backend, which accepts only a token of
+  the GitHub app configured in the project; the callback URL of the app must be `http://127.0.0.1` without a `/`
+  at the end. Both are in the README.
 
 ## 0.3.0
 

@@ -234,9 +234,12 @@ print(result.user?.email);
   `OAuthLoopbackProvider.discover(issuer:, ...)` for an OpenID Connect provider of Identity Platform; the client id
   must be the one configured for the provider in the project.
 - `OAuthLoopbackProvider.github(clientId:, clientSecret:)` for GitHub, with a GitHub OAuth App whose authorization
-  callback URL is `http://127.0.0.1` (GitHub accepts any port on a loopback redirect). GitHub's code exchange needs
-  the client secret even with PKCE, so it ships with the app. The default scopes are `read:user user:email`; no
-  nonce is sent, and Firebase gets the access token only.
+  callback URL is `http://127.0.0.1`, exactly so, without a `/` at the end (GitHub accepts any port on a loopback
+  redirect, but with `http://127.0.0.1/` it answers "The redirect_uri is not associated with this application").
+  GitHub's code exchange needs the client secret even with PKCE, so it ships with the app. The default scopes are
+  `read:user user:email`; no nonce is sent, and Firebase gets the access token only. The OAuth App must be the one
+  whose client id and secret are set for GitHub in the Firebase project: the backend checks the access token
+  against that app and answers `INVALID_IDP_RESPONSE` (`invalid-credential`) for a token of another app.
 - `linkWithOAuthLoopback` links the provider to the signed-in user, and `reauthenticateWithOAuthLoopback` signs
   the same user in again. Both take the same arguments as `signInWithOAuthLoopback`, and throw `null-user` before
   the browser opens when nobody is signed in.
@@ -288,8 +291,12 @@ An error thrown by `exchangeCode` becomes `invalid-credential`; throw a `Firebas
 
 On 2026-11-20, Google sign-in with a Desktop client was run against a real Firebase project: the code was
 exchanged directly with the client secret and PKCE, and the redirect was `http://127.0.0.1:<port>`.
-`exchangeCode` and generic OpenID Connect providers were run only against the fake identity provider of the tests.
-GitHub was run only against the fake provider too.
+The same day, a generic OpenID Connect provider (`oidc.<name>` of Identity Platform, with Google as the issuer) was
+run against the real project twice: with `discover` and a direct exchange, and with explicit endpoints and an
+`exchangeCode` callback, which also reauthenticated the user. GitHub was run with a real OAuth App up to the
+backend: the authorization and the code exchange at GitHub worked, and Firebase refused the token because the
+project had another GitHub app configured (see above). A GitHub sign-in accepted by the real backend has not been
+run yet.
 
 Not offered by the loopback helper:
 

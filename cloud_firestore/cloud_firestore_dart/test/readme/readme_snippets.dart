@@ -210,8 +210,8 @@ Future<void> authProvidersReadmeLine89() async {
   print(result.additionalUserInfo?.isNewUser);
 }
 
-// ../../firebase_auth/firebase_auth_providers_dart/README.md:172
-Future<void> authProvidersReadmeLine172() async {
+// ../../firebase_auth/firebase_auth_providers_dart/README.md:174
+Future<void> authProvidersReadmeLine174() async {
   final FirebaseUserAuth auth = await FirebaseUserAuth.forApp(app);
 
   // Enrol: show the URI as a QR code (or the secret for typing in), then ask for a code of the app.
@@ -233,8 +233,8 @@ Future<void> authProvidersReadmeLine172() async {
   await auth.unenrollMultiFactor(auth.currentUser!.enrolledFactors.first.uid);
 }
 
-// ../../firebase_auth/firebase_auth_providers_dart/README.md:212
-Future<void> authProvidersReadmeLine212() async {
+// ../../firebase_auth/firebase_auth_providers_dart/README.md:214
+Future<void> authProvidersReadmeLine214() async {
   final FirebaseUserAuth auth = await FirebaseUserAuth.forApp(app);
   final UserCredential result = await auth.signInWithOAuthLoopback(
     OAuthLoopbackProvider.google(
@@ -245,8 +245,8 @@ Future<void> authProvidersReadmeLine212() async {
   print(result.user?.email);
 }
 
-// ../../firebase_auth/firebase_auth_providers_dart/README.md:256
-Future<void> authProvidersReadmeLine256() async {
+// ../../firebase_auth/firebase_auth_providers_dart/README.md:261
+Future<void> authProvidersReadmeLine261() async {
   final OAuthLoopbackProvider provider = OAuthLoopbackProvider.oidc(
     providerId: 'oidc.example',
     authorizationEndpoint: Uri.parse('https://idp.example.com/authorize'),
