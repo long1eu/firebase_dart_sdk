@@ -54,7 +54,8 @@ this repository was re-checked except the adoption numbers below. No Firebase se
 - Multi-tab, a preview that is unreleased (CHANGELOG "(unreleased)", `docs/guides/web.md`):
   `indexedDbCacheSettings(multiTab: true)` lets several tabs share one IndexedDB cache. Chrome only, emulator only,
   tested with dart2js and dart2wasm. **Never tried with a JS SDK tab beside a tab of this client.** Not tested
-  either: the handover on real visibility changes, different users in the tabs, other browsers. The SQLite caches
+  either: different users in the tabs, other browsers, a tab hidden for more than a few minutes. The handover
+  between a hidden and a visible tab was tried by hand in Chrome, not in the automated tests. The SQLite caches
   stay at one tab, and secondary isolates on the Dart VM still do not share listeners through the public API.
   The statements "one tab per persistent cache" and "several tabs ... not supported" were true on 2026-11-16;
   they are updated in place below, with a mark.
@@ -330,8 +331,8 @@ on the Dart VM, but no Flutter app ran a listener in a background isolate.
 - (Added 2026-11-20) **Tabs.** Before, a persistent cache meant one tab. With `multiTab: true` the tabs elect a
   primary with the JS SDK's lease (5 s), rows and `localStorage` keys, and the others get listener results and
   write acknowledgements through it. Tested in Chrome with dart2js and dart2wasm against the emulator. Not
-  tested: a JS SDK tab beside a tab of this client, handover on real visibility changes, different users in the
-  tabs, other browsers. It is unreleased.
+  tested: a JS SDK tab beside a tab of this client, different users in the tabs, other browsers, a tab hidden
+  for more than a few minutes. The handover between a hidden and a visible tab was tried by hand in Chrome. It is unreleased.
 - One real niche: Dart web apps without Flutter (Jaspr and similar) cannot use the FlutterFire web packages,
   because the platform interfaces still declare the Flutter SDK
   ([flutterfire#18645](https://github.com/firebase/flutterfire/issues/18645), open, 2 thumbs-up). They can

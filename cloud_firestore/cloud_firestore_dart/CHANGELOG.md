@@ -7,8 +7,9 @@
   `persistentMultipleTabManager` and needs `window.localStorage` (`unimplemented` without it). A one-tab and a
   multi-tab instance on one cache refuse each other. Differences from JS: a secondary takes the lease at once when
   it hears a closing tab remove its state, and a page restored from the back/forward cache comes back with a
-  terminated client. Not tested: a JS SDK tab beside a tab of this SDK, handover on real visibility changes,
-  different users in the tabs, other browsers. The SQLite caches stay at one tab. See `docs/guides/web.md`.
+  terminated client. Not tested: a JS SDK tab beside a tab of this SDK, different users in the tabs,
+  other browsers, a tab hidden for more than a few minutes; the handover between a hidden and a visible tab was
+  tried by hand in Chrome only. The SQLite caches stay at one tab. See `docs/guides/web.md`.
 
 ## 0.3.1
 

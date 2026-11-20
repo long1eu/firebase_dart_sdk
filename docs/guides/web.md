@@ -646,6 +646,8 @@ How it works:
   their results, and their writes are acknowledged, through the primary.
 - When the primary closes, or its lease lapses, another tab takes over. The lease lasts 5 s and the
   primary refreshes it every 4 s.
+- A visible tab takes the lease from a primary that is hidden (a background tab), as in the JS SDK.
+  The hidden tab becomes a secondary and keeps working.
 - The lease, the rows and the `localStorage` keys are those of `persistentMultipleTabManager` of the
   JS SDK.
 
@@ -657,7 +659,15 @@ Limits:
   start with `unimplemented`.
 - Only the IndexedDB cache. The SQLite caches (IndexedDB, OPFS) stay at one tab. On the Dart VM,
   clients on one SQLite file still do not share state through the public API.
-- Tested in Chrome only, with dart2js and dart2wasm against the emulator.
+- Tested in Chrome only, with dart2js and dart2wasm against the emulator. The automated tests run
+  in headless Chrome, where no tab is hidden.
+- Tried on 2026-11-20 in a visible Chrome 157 window on macOS with two tabs of the
+  [web example](../../examples/web_app), seven runs (three dart2wasm, four dart2js), driven by a
+  script and not part of the automated tests. A write from each tab reached the other. The visible
+  secondary took the lease from the hidden primary after 12 s to 36 s. When the visible primary
+  closed, the hidden tab took over within 13 s (at once in three runs). A third tab joined as a
+  secondary and had every note. In one more dart2js run the visible tab stopped answering the
+  script while the lease moved; that did not happen again and its cause is not known.
 
 Two differences from the JS SDK:
 
@@ -668,7 +678,8 @@ Two differences from the JS SDK:
 Not done (not tested):
 
 - A JS SDK tab that shares the cache with a tab of this SDK.
-- The handover on real visibility changes (a tab hidden or shown by the user).
+- A tab hidden for more than a few minutes, when Chrome slows its timers to one a minute, and a
+  minimised or occluded window.
 - Different users signed in in the tabs.
 - Browsers other than Chrome.
 
