@@ -1,4 +1,4 @@
-/// **Experimental.** The checks of the contract of a `CacheStore` (see `package:cloud_firestore_dart/cache_store.dart`),
+/// The checks of the contract of a `CacheStore` (see `package:cloud_firestore_dart/cache_store.dart`),
 /// for the tests of a store. They need no test framework: each check throws when the store breaks the contract.
 ///
 /// ```dart

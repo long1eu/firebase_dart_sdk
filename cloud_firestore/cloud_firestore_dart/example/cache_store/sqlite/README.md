@@ -1,7 +1,7 @@
 # A cache store on SQLite
 
 `sqlite_cache_store.dart` implements `CacheStore` of `package:cloud_firestore_dart/cache_store.dart`
-(experimental) on one SQLite table, through [`package:sqlite3`](https://pub.dev/packages/sqlite3):
+on one SQLite table, through [`package:sqlite3`](https://pub.dev/packages/sqlite3):
 
 ```sql
 CREATE TABLE entries (key BLOB PRIMARY KEY, value BLOB NOT NULL) WITHOUT ROWID

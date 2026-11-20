@@ -1,6 +1,6 @@
 import 'dart:typed_data';
 
-/// **Experimental.** An ordered key-value store that holds the persistent cache of a Firestore instance, for an app
+/// An ordered key-value store that holds the persistent cache of a Firestore instance, for an app
 /// that brings its own storage (see `keyValueCacheSettings` of `package:cloud_firestore_dart/cache_store.dart`).
 ///
 /// The store only keeps bytes: keys and values are byte arrays, and keys are ordered by their unsigned bytes, the

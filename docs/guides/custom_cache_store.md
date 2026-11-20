@@ -203,7 +203,7 @@ by any target), and 10,000 pending writes:
 
 | Operation | Time |
 |---|---|
-| `getPendingWriteCount()`, first call after the instance starts (reads every pending batch) | 9 ms |
+| `getPendingWriteCount()`, first call after the instance starts (reads every pending batch; in 0.3.0 every call did) | 7 to 11 ms |
 | `getPendingWriteCount()`, later calls (the count is kept in memory) | under 0.1 ms |
 | One more local write with 10,000 pending | 0.1 to 0.3 ms |
 | One pass of garbage collection over the documents (each collection makes three: count, find the threshold, remove) | 90 to 200 ms |
