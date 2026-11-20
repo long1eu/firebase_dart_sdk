@@ -57,6 +57,8 @@ Baseline: the port last synced with firebase-android-sdk commit `576da00e85` (20
 707 commits touched `firebase-firestore` since; 706 analysed (the sync-point commit itself is skipped).
 Sources: `analysis_0.md` .. `analysis_4.md` (one per chunk, full tables) in this directory.
 
+The Auth client has its own recurring review in [`auth/`](auth/BRIEF.md); the first pass is in [`auth/review_2026-11.md`](auth/review_2026-11.md).
+
 ## Totals across the five chunks
 
 | Relevance | Commits |
