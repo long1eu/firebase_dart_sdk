@@ -10,6 +10,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/model/document_key.d
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/field_index.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/maybe_document.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/resource_path.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/model/snapshot_version.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/assert.dart';
 
 /// Represents the index state as it relates to a particular target.
@@ -115,6 +116,19 @@ abstract class IndexManager {
   /// Updates the index entries for the provided documents. A key that maps to
   /// null or to a document that does not exist loses its entries.
   Future<void> updateIndexEntries(Map<DocumentKey, MaybeDocument?> documents);
+
+  /// Moves the offset of the field indexes of [collectionGroup] back to
+  /// ([readTime], empty key), for every user, where it is at or after
+  /// ([readTime], [documentKey]): a document stored there would otherwise be
+  /// behind the offset, and the backfill would never index it.
+  ///
+  /// PORTING NOTE: not in the JS and Android SDKs, which leave such a
+  /// document unindexed (see `LocalStore.applyRemoteEvent`).
+  Future<void> moveOffsetsBefore(
+    String collectionGroup,
+    SnapshotVersion readTime,
+    DocumentKey documentKey,
+  );
 }
 
 /// Internal implementation of the collection-parent index. Also used for

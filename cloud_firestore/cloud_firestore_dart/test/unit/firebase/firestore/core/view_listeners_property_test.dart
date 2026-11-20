@@ -53,8 +53,7 @@
 // return, for every listener's query, what a scan of the same cache returns,
 // and after every step and after the drain the listeners of both runs must
 // show the same documents in the same order. Its queries are a mix of the
-// shapes above. Its global snapshots never repeat a version (see the skipped
-// test of the backfill below).
+// shapes above.
 //
 // Which invariant applies to which query shape:
 //  * snapshot sequence, limit never exceeded, same documents for listeners
@@ -501,74 +500,63 @@ void main() {
 
   // Found by the index comparison (seed 21646938, 43 steps). Watch can deliver new documents in a later event at
   // the same snapshot version as one that the backfill has already passed: a document whose key sorts before the key
-  // of the offset is behind it and never indexed. No acknowledged write is involved (that case is fixed above). The JS
-  // and Android SDKs have the same gap. Not fixed: see the summary of the property work; the index comparison avoids
-  // it with `RunConfig.distinctSnapshotVersions`.
-  test(
-    'the index backfill indexes a document that watch delivers in a later '
-    'event at the snapshot version of the offset',
-    skip:
-        'Known gap, inherited from the JS and Android SDKs, waiting for a '
-        'decision: the backfill offset passes documents that a later event '
-        'delivers at the same snapshot version with a smaller key.',
-    () async {
-      final String name =
-          'firebase/firestore/core/view_property_${const Uuid().v4()}';
-      final ViewRun run = ViewRun(
-        0,
-        Gen(0),
-        Stats(),
-        RunConfig(queries: <QuerySpec>[_mFirst2, _inEven], documents: 2),
+  // of the offset was behind it and never indexed. No acknowledged write is involved (that case is fixed above). The
+  // JS and Android SDKs have the same gap. Such an event now moves the offset back (`LocalStore.applyRemoteEvent`).
+  test('the index backfill indexes a document that watch delivers in a later '
+      'event at the snapshot version of the offset', () async {
+    final String name =
+        'firebase/firestore/core/view_property_${const Uuid().v4()}';
+    final ViewRun run = ViewRun(
+      0,
+      Gen(0),
+      Stats(),
+      RunConfig(queries: <QuerySpec>[_mFirst2, _inEven], documents: 2),
+    );
+    try {
+      await run.start(
+        await createSQLitePersistenceForProject('test-project', name),
+        indexes: <FieldIndex>[
+          fieldIndex('c', fieldsAndKinds: <Object>['v', SegmentKind.ascending]),
+          fieldIndex(
+            'c',
+            fieldsAndKinds: <Object>[
+              'm',
+              SegmentKind.ascending,
+              'v',
+              SegmentKind.ascending,
+            ],
+          ),
+        ],
       );
-      try {
-        await run.start(
-          await createSQLitePersistenceForProject('test-project', name),
-          indexes: <FieldIndex>[
-            fieldIndex(
-              'c',
-              fieldsAndKinds: <Object>['v', SegmentKind.ascending],
-            ),
-            fieldIndex(
-              'c',
-              fieldsAndKinds: <Object>[
-                'm',
-                SegmentKind.ascending,
-                'v',
-                SegmentKind.ascending,
-              ],
-            ),
-          ],
-        );
-        // d1 is a result of the limit query, d0 only of `v in [even]`.
-        run.backend.change('d0', <String, Object?>{'m': false, 'v': 2});
-        run.backend.change('d1', <String, Object?>{'m': true, 'v': 1});
-        await run.sendChanges(run.main!, 3000);
-        await run.markCurrent(run.main!);
-        await run.globalSnapshot(3000);
-        await run.backfill();
+      // d1 is a result of the limit query, d0 only of `v in [even]`.
+      run.backend.change('d0', <String, Object?>{'m': false, 'v': 2});
+      run.backend.change('d1', <String, Object?>{'m': true, 'v': 1});
+      await run.sendChanges(run.main!, 3000);
+      await run.markCurrent(run.main!);
+      await run.globalSnapshot(3000);
+      await run.backfill();
 
-        // A listener of `v in [even]`: its target gets d0 in a snapshot at the same version 3000.
-        await run.addListener(_inEven, includeMetadata: true);
-        await run.syncTargets();
-        final WatchTarget inEven = run.queryTargets.firstWhere(
-          (WatchTarget t) => t.spec == _inEven,
-        );
-        await run.sendChanges(inEven, 3000);
-        await run.markCurrent(inEven);
-        await run.globalSnapshot(3000);
-        await run.backfill();
-        expect(run.listeners.last.documents, <String>['d0: 2']);
-        expect(
-          await run.engineDifferences(),
-          isEmpty,
-          reason: run.trace.join('\n'),
-        );
-      } finally {
-        await run.shutdown();
-        DatabaseMock.deleteDatabaseFiles(name);
-      }
-    },
-  );
+      // A listener of `v in [even]`: its target gets d0 in a snapshot at the same version 3000.
+      await run.addListener(_inEven, includeMetadata: true);
+      await run.syncTargets();
+      final WatchTarget inEven = run.queryTargets.firstWhere(
+        (WatchTarget t) => t.spec == _inEven,
+      );
+      await run.sendChanges(inEven, 3000);
+      await run.markCurrent(inEven);
+      await run.globalSnapshot(3000);
+      await run.backfill();
+      expect(run.listeners.last.documents, <String>['d0: 2']);
+      expect(
+        await run.engineDifferences(),
+        isEmpty,
+        reason: run.trace.join('\n'),
+      );
+    } finally {
+      await run.shutdown();
+      DatabaseMock.deleteDatabaseFiles(name);
+    }
+  });
 
   test('the listeners show the same documents with and without field '
       'indexes', () async {
@@ -585,7 +573,6 @@ void main() {
       ],
       documents: 6,
       maxListeners: 3,
-      distinctSnapshotVersions: true,
       indexes: <FieldIndex>[
         fieldIndex('c', fieldsAndKinds: <Object>['v', SegmentKind.ascending]),
         fieldIndex(

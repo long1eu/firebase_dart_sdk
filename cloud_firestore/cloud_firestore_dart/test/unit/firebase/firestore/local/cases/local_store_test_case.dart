@@ -4372,6 +4372,97 @@ class LocalStoreTestCase {
     _expectQueryReturned(<String>['coll/a', 'coll/c']);
   }
 
+  /// A second remote event at the snapshot version of the index offset, with a document whose key sorts before the
+  /// key of the offset: the offset moves back so that the backfill indexes the document. (Not in Android.)
+  @testMethod
+  Future<void> testMovesIndexOffsetBackForASecondEventAtTheSameVersion() async {
+    final FieldIndex index = fieldIndex(
+      'coll',
+      indexId: 0,
+      indexState: FieldIndex.initialState,
+      fieldsAndKinds: <Object>['count', SegmentKind.ascending],
+    );
+    await _configureFieldIndexes(<FieldIndex>[index]);
+
+    final Query qry = query('coll').filter(filter('count', '>', 0));
+    final int targetId = await _allocateQuery(qry);
+
+    await _applyRemoteEvent(
+      addedRemoteEvents(
+        <MaybeDocument>[doc('coll/b', 10, map(<dynamic>['count', 2]))],
+        <int>[targetId],
+        <int>[],
+      ),
+    );
+    await _backfillIndexes();
+    expect(_indexOffset('coll'), IndexOffset(version(10), key('coll/b'), -1));
+
+    // Another event at version 10: coll/a sorts before coll/b.
+    await _applyRemoteEvent(
+      addedRemoteEvents(
+        <MaybeDocument>[doc('coll/a', 10, map(<dynamic>['count', 1]))],
+        <int>[targetId],
+        <int>[],
+      ),
+    );
+    expect(
+      _indexOffset('coll'),
+      IndexOffset(version(10), DocumentKey.empty(), -1),
+    );
+
+    await _backfillIndexes();
+    expect(_indexOffset('coll'), IndexOffset(version(10), key('coll/b'), -1));
+    await _executeQuery(qry);
+    _expectQueryReturned(<String>['coll/a', 'coll/b']);
+  }
+
+  /// An event at a newer snapshot version than the index offset does not move it. (Not in Android.)
+  @testMethod
+  Future<void> testDoesNotMoveIndexOffsetForAnEventAtANewerVersion() async {
+    final FieldIndex index = fieldIndex(
+      'coll',
+      indexId: 0,
+      indexState: FieldIndex.initialState,
+      fieldsAndKinds: <Object>['count', SegmentKind.ascending],
+    );
+    await _configureFieldIndexes(<FieldIndex>[index]);
+
+    final Query qry = query('coll').filter(filter('count', '>', 0));
+    final int targetId = await _allocateQuery(qry);
+
+    await _applyRemoteEvent(
+      addedRemoteEvents(
+        <MaybeDocument>[doc('coll/b', 10, map(<dynamic>['count', 2]))],
+        <int>[targetId],
+        <int>[],
+      ),
+    );
+    await _backfillIndexes();
+    expect(_indexOffset('coll'), IndexOffset(version(10), key('coll/b'), -1));
+
+    await _applyRemoteEvent(
+      addedRemoteEvents(
+        <MaybeDocument>[doc('coll/a', 20, map(<dynamic>['count', 1]))],
+        <int>[targetId],
+        <int>[],
+      ),
+    );
+    expect(_indexOffset('coll'), IndexOffset(version(10), key('coll/b'), -1));
+
+    await _backfillIndexes();
+    expect(_indexOffset('coll'), IndexOffset(version(20), key('coll/a'), -1));
+    await _executeQuery(qry);
+    _expectQueryReturned(<String>['coll/a', 'coll/b']);
+  }
+
+  /// The offset of the field indexes of [collectionGroup] for the current user.
+  IndexOffset _indexOffset(String collectionGroup) => _localStore
+      .indexManagerForCurrentUser
+      .getFieldIndexes(collectionGroup)
+      .single
+      .indexState
+      .offset;
+
   @testMethod
   Future<void> testIndexesVectorValues() async {
     final FieldIndex index = fieldIndex(

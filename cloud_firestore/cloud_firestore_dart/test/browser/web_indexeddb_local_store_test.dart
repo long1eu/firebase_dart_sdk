@@ -320,6 +320,14 @@ void main() {
     'testUsesIndexForLimitQueryWhenIndexIsUpdated',
     () => testCase.testUsesIndexForLimitQueryWhenIndexIsUpdated(),
   );
+  test(
+    'testMovesIndexOffsetBackForASecondEventAtTheSameVersion',
+    () => testCase.testMovesIndexOffsetBackForASecondEventAtTheSameVersion(),
+  );
+  test(
+    'testDoesNotMoveIndexOffsetForAnEventAtANewerVersion',
+    () => testCase.testDoesNotMoveIndexOffsetForAnEventAtANewerVersion(),
+  );
   test('testIndexesVectorValues', () => testCase.testIndexesVectorValues());
   test('testIndexesBsonObjectId', () => testCase.testIndexesBsonObjectId());
   test('testIndexesBsonTimestamp', () => testCase.testIndexesBsonTimestamp());

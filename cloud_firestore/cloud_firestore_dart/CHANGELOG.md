@@ -109,6 +109,10 @@
   `AsyncQueue is already failed`. Before, the client went on in a state nobody had checked. The
   errors of your own operations (a rejected write, a busy cache) stay with their caller and do
   not fail the queue; `terminate()` and `clearPersistence()` still work on a failed queue.
+- Persistent cache indexes: a query served by a field index could miss a document that watch sent in a later
+  snapshot with the same version as an earlier one, when the index had already been brought up to date for that
+  version and the document's id sorted before the documents indexed last. Such a snapshot now makes the index read
+  its documents again. The JS and Android SDKs have the same gap.
 
 ## 0.3.0
 

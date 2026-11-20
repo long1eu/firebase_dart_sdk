@@ -793,4 +793,71 @@ class _KvIndexManager implements IndexManager {
       );
     }
   }
+
+  @override
+  Future<void> moveOffsetsBefore(
+    String collectionGroup,
+    SnapshotVersion readTime,
+    DocumentKey documentKey,
+  ) async {
+    hardAssert(_started, 'IndexManager not started');
+    final List<FieldIndex> fieldIndexes = getFieldIndexes(collectionGroup);
+    if (fieldIndexes.isEmpty) {
+      return;
+    }
+    final Map<int, FieldIndex> byId = <int, FieldIndex>{
+      for (final FieldIndex fieldIndex in fieldIndexes)
+        fieldIndex.indexId: fieldIndex,
+    };
+    final IndexOffset document = IndexOffset(
+      readTime,
+      documentKey,
+      FieldIndex.initialLargestBatchId,
+    );
+    // The offsets of all users: each one backfills its own.
+    for (final CacheStoreEntry entry in await _db._scanAll(
+      _key(_Table.indexState).bytes,
+    )) {
+      final KvKeyReader keyReader = KvKeyReader(entry.key)..string();
+      final String uid = keyReader.string();
+      final int indexId = keyReader.integer();
+      final FieldIndex? fieldIndex = byId[indexId];
+      if (fieldIndex == null) {
+        continue;
+      }
+      final KvKeyReader reader = KvKeyReader(entry.value);
+      final int sequenceNumber = reader.integer();
+      final IndexOffset offset = IndexOffset(
+        _readVersion(reader),
+        DocumentKey.fromPath(reader.path()),
+        FieldIndex.initialLargestBatchId,
+      );
+      final int largestBatchId = reader.integer();
+      if (offset.compareTo(document) < 0) {
+        continue;
+      }
+      final IndexOffset movedBack = IndexOffset(
+        readTime,
+        DocumentKey.empty(),
+        largestBatchId,
+      );
+      await _db._tx.put(
+        entry.key,
+        _writeVersion(
+          KvKeyWriter().integer(sequenceNumber),
+          movedBack.readTime,
+        ).path(movedBack.documentKey.path).integer(largestBatchId).bytes,
+      );
+      if (uid == _uid) {
+        _memoizeIndex(
+          FieldIndex(
+            fieldIndex.indexId,
+            fieldIndex.collectionGroup,
+            fieldIndex.segments,
+            IndexState(sequenceNumber, movedBack),
+          ),
+        );
+      }
+    }
+  }
 }

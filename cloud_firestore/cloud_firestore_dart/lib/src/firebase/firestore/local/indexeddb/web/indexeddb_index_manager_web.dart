@@ -519,6 +519,86 @@ class IndexedDbIndexManager extends IndexManager {
     }
   }
 
+  @override
+  Future<void> moveOffsetsBefore(
+    String collectionGroup,
+    SnapshotVersion readTime,
+    DocumentKey documentKey,
+  ) => _persistence._write(
+    'Move the index offsets of a collection group back',
+    () => _moveOffsetsBefore(collectionGroup, readTime, documentKey),
+  );
+
+  Future<void> _moveOffsetsBefore(
+    String collectionGroup,
+    SnapshotVersion readTime,
+    DocumentKey documentKey,
+  ) async {
+    hardAssert(_started, 'IndexManager not started');
+    final _IdbTransaction transaction = _transaction;
+    final IndexOffset document = IndexOffset(
+      readTime,
+      documentKey,
+      FieldIndex.initialLargestBatchId,
+    );
+    for (final FieldIndex fieldIndex in getFieldIndexes(collectionGroup)) {
+      // The states of all users (keyed by [indexId, uid]): each one backfills its own.
+      final List<Object?> rows =
+          (await transaction.read(
+                'get the states of index ${fieldIndex.indexId}',
+                () => transaction
+                    .store(DbStores.indexState)
+                    .getAll(_indexRange(fieldIndex.indexId)),
+              ))!
+              as List<Object?>;
+      for (final Object? row in rows) {
+        if (row is! Map) {
+          continue;
+        }
+        final Map<String, Object?> stored = row.cast<String, Object?>();
+        final IndexState state = _decodeState(stored);
+        if (IndexOffset(
+              state.offset.readTime,
+              state.offset.documentKey,
+              FieldIndex.initialLargestBatchId,
+            ).compareTo(document) <
+            0) {
+          continue;
+        }
+        final IndexOffset movedBack = IndexOffset(
+          readTime,
+          DocumentKey.empty(),
+          state.offset.largestBatchId,
+        );
+        // The row as stored, with only the offset's read time and document key changed.
+        await transaction.request(
+          'move back the state of index ${fieldIndex.indexId}',
+          () => transaction
+              .store(DbStores.indexState)
+              .put(
+                idbToJs(<String, Object?>{
+                  ...stored,
+                  'readTime': toDbTimestamp(movedBack.readTime),
+                  'documentKey': encodeJsResourcePath(
+                    movedBack.documentKey.path,
+                  ),
+                }),
+              ),
+        );
+        if (stored['uid'] == _uid) {
+          _memoizeIndex(
+            FieldIndex(
+              fieldIndex.indexId,
+              fieldIndex.collectionGroup,
+              fieldIndex.segments,
+              IndexState(state.sequenceNumber, movedBack),
+            ),
+          );
+        }
+      }
+    }
+  }
+
   // Targets
 
   List<Target> _getSubTargets(Target target) {

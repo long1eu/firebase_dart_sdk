@@ -422,7 +422,6 @@ class RunConfig {
     required this.documents,
     this.maxListeners = 1,
     this.indexes,
-    this.distinctSnapshotVersions = false,
   });
 
   /// The queries of the listeners; the first listener uses the first one.
@@ -439,13 +438,6 @@ class RunConfig {
   /// and without the field indexes, and compares the listeners after every
   /// step (see [runIndexPair]).
   final List<FieldIndex>? indexes;
-
-  /// Every global snapshot of watch gets a version above the one before (the
-  /// version of the backend it stands for, plus a count). See the skipped
-  /// test "the index backfill indexes a document that watch delivers in a
-  /// later event at the snapshot version of the offset" in
-  /// view_listeners_property_test.dart.
-  final bool distinctSnapshotVersions;
 
   bool get churn => maxListeners > 1;
 }
@@ -501,7 +493,6 @@ class ViewRun {
   String? _justRejected;
   int _counter = 0;
   int _listenerCount = 0;
-  int _snapshotCount = 0;
 
   final List<String> trace = <String>[];
   final List<String> violations = <String>[];
@@ -1061,10 +1052,7 @@ class ViewRun {
         change,
         snapshotVersion == null
             ? SnapshotVersion.none
-            : version(
-                snapshotVersion +
-                    (config.distinctSnapshotVersions ? ++_snapshotCount : 0),
-              ),
+            : version(snapshotVersion),
       );
 
   /// The documents of [target] at [version].
