@@ -1,0 +1,55 @@
+name: firebase_auth_dart_platform
+description: >-
+  Unofficial pure-Dart implementation of the FlutterFire Firebase Auth platform
+  interface: the official firebase_auth API on Linux, or on any platform you
+  choose.
+version: 0.1.0
+homepage: https://github.com/long1eu/firebase_dart_sdk
+repository: https://github.com/long1eu/firebase_dart_sdk/tree/main/firebase_auth/firebase_auth_dart_platform
+issue_tracker: https://github.com/long1eu/firebase_dart_sdk/issues
+topics:
+  - firebase
+  - authentication
+  - flutterfire
+  - linux
+
+environment:
+  sdk: ^3.8.0
+  flutter: '>=3.32.0'
+
+# Flutter registers the plugin class before main() only on the platforms listed
+# here. Linux is the only platform where neither firebase_auth nor
+# firebase_core has an implementation of its own; elsewhere the app calls
+# FirebaseAuthDart.use() (see the README).
+flutter:
+  plugin:
+    implements: firebase_auth
+    platforms:
+      linux:
+        dartPluginClass: FirebaseAuthDart
+
+dependencies:
+  # Local development resolves firebase_auth_providers_dart and
+  # firebase_app_dart from the sibling packages through pubspec_overrides.yaml
+  # (not published). 0.3.1 is the first version with
+  # FirebaseUserAuth.useEmulator.
+  firebase_app_dart: ^0.2.0
+  firebase_auth_platform_interface: ^9.1.2
+  firebase_auth_providers_dart: ^0.3.1
+  firebase_core: ^5.1.0
+  firebase_core_platform_interface: ^8.1.1
+  flutter:
+    sdk: flutter
+  http: ^1.2.0
+
+dev_dependencies:
+  # Its FlutterFireAuthTokenProvider is the documented way to give Firestore the
+  # signed-in user; test/firestore_wiring_test.dart checks it against this
+  # package. Resolved from the sibling directory through
+  # pubspec_overrides.yaml.
+  cloud_firestore_dart_flutterfire: ^0.1.0
+  # The app-facing package the tests drive, as an app would.
+  firebase_auth: ^7.0.1
+  flutter_test:
+    sdk: flutter
+  lints: ^6.1.0
