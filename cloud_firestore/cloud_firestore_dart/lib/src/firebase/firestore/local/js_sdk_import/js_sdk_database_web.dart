@@ -86,6 +86,34 @@ class _WebJsSdkDatabase implements JsSdkDatabase {
   }
 
   @override
+  Stream<List<Map<String, Object?>>> readChunks(String name, int count) async* {
+    JSAny? after;
+    while (true) {
+      final web.IDBObjectStore store = _db
+          .transaction(name.toJS, 'readonly')
+          .objectStore(name);
+      final JSAny? range = after == null
+          ? null
+          : web.IDBKeyRange.lowerBound(after, true);
+      // Both requests are made at once, in the same transaction.
+      final Future<JSAny?> keys = idbRequest(store.getAllKeys(range, count));
+      final Future<JSAny?> values = idbRequest(store.getAll(range, count));
+      final List<JSAny?> chunkKeys = (await keys as JSArray<JSAny?>).toDart;
+      final List<Object?> rows = idbToDart(await values)! as List<Object?>;
+      if (rows.isNotEmpty) {
+        yield <Map<String, Object?>>[
+          for (final Object? row in rows)
+            (row! as Map<Object?, Object?>).cast(),
+        ];
+      }
+      if (chunkKeys.length < count) {
+        return;
+      }
+      after = chunkKeys.last;
+    }
+  }
+
+  @override
   Future<int> removeMutationBatches(
     Iterable<int> batchIds,
     bool Function(Map<String, Object?> row) matches,

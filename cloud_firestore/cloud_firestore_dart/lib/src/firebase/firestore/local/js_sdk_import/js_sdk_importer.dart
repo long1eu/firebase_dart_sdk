@@ -10,8 +10,9 @@
 //    recorded user, local write time and number of writes: the JS SDK never reuses a batch id in the same database,
 //    and a database deleted and created again by a JS tab could, with other contents.
 // 2. Check that no JS tab may use the database and that its schema is one this SDK reads.
-// 3. Read the JS batches of every user and decode them; if documents are to be imported, import them in their own
-//    transaction (they are a cache: importing them again does nothing, older versions never replace newer ones).
+// 3. Read the JS batches of every user and decode them; if documents are to be imported, import them, 2,000 at a
+//    time, each chunk in its own transaction (they are a cache: importing them again does nothing, older versions
+//    never replace newer ones).
 // 4. In one transaction of this cache: check that the queues of these users are empty, add the batches with new batch
 //    ids, save their overlays, and write the record with `pending` = these batches. Either all of it commits or none.
 // 5. In one IndexedDB transaction: remove these batches (and their `documentMutations` and `documentOverlays` rows)
@@ -107,6 +108,9 @@ const int jsSdkMaxClientAgeMs = indexedDbMaxClientAgeMs;
 /// The bundle name under which the imported documents are kept in the cache (an umbrella target holds them, as the
 /// documents of a bundle, so that they are not collected as garbage at once).
 const String _documentsBundleName = 'js-sdk-cache-import';
+
+/// How many cached documents are read and imported at a time.
+const int _documentsPerChunk = 2000;
 
 /// The prefix of the JS SDK's IndexedDB database name and of its LocalStorage keys (`indexedDbStoragePrefix`).
 String jsSdkStoragePrefix(String appName, DatabaseId databaseId) =>
@@ -486,55 +490,71 @@ class _JsSdkCache {
           '$jsSdkOldestSchemaVersionWithDocuments and later are read)',
         );
       } else {
-        ImmutableSortedMap<DocumentKey, MaybeDocument> docs =
-            DocumentCollections.emptyMaybeDocumentMap();
-        final Map<DocumentKey, SnapshotVersion> readTimes =
-            <DocumentKey, SnapshotVersion>{};
+        // In chunks: a large cache is never held whole. A document can be in several rows (read at different
+        // times) and so in several chunks: the cache keeps the newest version whatever the order.
+        final Set<DocumentKey> imported = <DocumentKey>{};
+        final Set<DocumentKey> seen = <DocumentKey>{};
         int unreadable = 0;
         int withoutVersion = 0;
-        for (final Map<String, Object?> row in await db.readAll(
+        await for (final List<Map<String, Object?>> rows in db.readChunks(
           'remoteDocumentsV14',
+          _documentsPerChunk,
         )) {
-          final ReadDocument decoded;
-          try {
-            decoded = serializer.fromDbRemoteDocument(_withNegativeZeros(row));
-          } catch (e) {
-            unreadable++;
-            Log.d(_tag, 'Skipping an unreadable document of $databaseName: $e');
-            continue;
+          ImmutableSortedMap<DocumentKey, MaybeDocument> docs =
+              DocumentCollections.emptyMaybeDocumentMap();
+          final Map<DocumentKey, SnapshotVersion> readTimes =
+              <DocumentKey, SnapshotVersion>{};
+          for (final Map<String, Object?> row in rows) {
+            final ReadDocument decoded;
+            try {
+              decoded = serializer.fromDbRemoteDocument(
+                _withNegativeZeros(row),
+              );
+            } catch (e) {
+              unreadable++;
+              Log.d(
+                _tag,
+                'Skipping an unreadable document of $databaseName: $e',
+              );
+              continue;
+            }
+            final MaybeDocument document = decoded.document;
+            if (document.version == SnapshotVersion.none) {
+              withoutVersion++;
+              continue;
+            }
+            seen.add(document.key);
+            final MaybeDocument? earlier = docs[document.key];
+            if (earlier == null ||
+                earlier.version.compareTo(document.version) < 0) {
+              docs = docs.insert(document.key, document);
+              readTimes[document.key] = decoded.readTime;
+            }
           }
-          final MaybeDocument document = decoded.document;
-          if (document.version == SnapshotVersion.none) {
-            withoutVersion++;
-            continue;
-          }
-          final MaybeDocument? earlier = docs[document.key];
-          if (earlier == null ||
-              earlier.version.compareTo(document.version) < 0) {
-            docs = docs.insert(document.key, document);
-            readTimes[document.key] = decoded.readTime;
+          if (docs.isNotEmpty) {
+            final ImmutableSortedMap<DocumentKey, MaybeDocument> changes =
+                await localStore.applyBundledDocuments(
+                  docs,
+                  _documentsBundleName,
+                  readTimes: readTimes,
+                );
+            for (final MapEntry<DocumentKey, MaybeDocument> change in changes) {
+              imported.add(change.key);
+            }
+            await syncEngine.handleImportedChanges(changes, const <int>[]);
           }
         }
+        documents = imported.length;
         if (unreadable > 0) {
           skipped.add('documents: $unreadable could not be read');
         }
         if (withoutVersion > 0) {
           skipped.add('documents: $withoutVersion without a version');
         }
-        if (docs.isNotEmpty) {
-          final ImmutableSortedMap<DocumentKey, MaybeDocument> changes =
-              await localStore.applyBundledDocuments(
-                docs,
-                _documentsBundleName,
-                readTimes: readTimes,
-              );
-          documents = changes.length;
-          if (documents < docs.length) {
-            skipped.add(
-              'documents: ${docs.length - documents} held by this cache in the same or a newer version',
-            );
-          }
-          await syncEngine.handleImportedChanges(changes, const <int>[]);
+        if (documents < seen.length) {
+          skipped.add(
+            'documents: ${seen.length - documents} held by this cache in the same or a newer version',
+          );
         }
         documentsImported = true;
         _fault('documents');
