@@ -11,6 +11,8 @@ import 'auth_credential.dart';
 import 'auth_exception.dart';
 import 'auth_storage.dart';
 import 'auth_user.dart';
+import 'multi_factor.dart';
+import 'multi_factor_api.dart';
 import 'oauth_loopback/oauth_loopback.dart';
 import 'oauth_loopback/oauth_loopback_stub.dart'
     if (dart.library.io) 'oauth_loopback/oauth_loopback_io.dart';
@@ -87,9 +89,14 @@ import 'environment_stub.dart'
 /// action codes, email, password and profile updates, reauthentication, account deletion, the sign-in methods of
 /// an email address, and [validatePassword]. [tenantId] and [languageCode] are sent like the JS SDK sends them.
 /// This is not a port of the whole Firebase Auth SDK: a federated provider's token comes from the app (there are
-/// no popup and redirect flows), and there is no phone sign-in and no sign-in with a second factor. A sign-in or
-/// reauthentication of an account with a second factor throws a [FirebaseAuthMultiFactorException]
-/// (`multi-factor-auth-required`) with the enrolled factors and the pending credential.
+/// no popup and redirect flows), and there is no phone sign-in.
+///
+/// **Multi-factor authentication** works with authenticator apps (TOTP; it needs Identity Platform with TOTP
+/// enabled for the project): [startTotpEnrollment] and [finalizeTotpEnrollment] enrol one, [unenrollMultiFactor]
+/// removes a factor, and [AuthUser.enrolledFactors] lists them. A sign-in or reauthentication of an account with a
+/// second factor throws a [FirebaseAuthMultiFactorException] (`multi-factor-auth-required`) whose
+/// [FirebaseAuthMultiFactorException.resolver] finishes it with a code of the app. SMS second factors are listed and
+/// can be unenrolled, but not enrolled or used to sign in.
 class FirebaseUserAuth implements AuthTokenProvider {
   /// Creates an instance for the project of [apiKey] (the Web API key of the Firebase project).
   ///
@@ -128,7 +135,10 @@ class FirebaseUserAuth implements AuthTokenProvider {
        _http = httpClient ?? http.Client(),
        _ownsHttp = httpClient == null,
        _clock = clock ?? DateTime.now,
-       _createTimer = createTimer ?? Timer.new {
+       _createTimer = createTimer ?? Timer.new,
+       multiFactorWireFormat = emulatorHost == null
+           ? MultiFactorWireFormat.protobuf
+           : MultiFactorWireFormat.json {
     // Synchronous: a listener (FirebaseFirestore) hears about a new user before the sign-in call returns.
     _tokenChanges = StreamController<AuthTokenChange>.broadcast(
       sync: true,
@@ -362,6 +372,21 @@ class FirebaseUserAuth implements AuthTokenProvider {
 
   /// The [restore] in progress.
   Future<void>? _restoring;
+
+  /// How the multi-factor calls are encoded: protocol buffers where Google's published definitions describe the call
+  /// (`mfaEnrollment:withdraw`), JSON otherwise; JSON for every call with the Auth emulator. Internal: for the
+  /// tests of this package and for checking both formats against the backend.
+  @internal
+  MultiFactorWireFormat multiFactorWireFormat;
+
+  MultiFactorApi get _multiFactor => MultiFactorApi(
+    multiFactorWireFormat,
+    MultiFactorTransport(
+      postJson: (String method, Map<String, Object?> body) =>
+          _send(_identityToolkit(method, version: 'v2'), json: body),
+      postProtobuf: _postProtobuf,
+    ),
+  );
 
   /// The password policies fetched by [validatePassword], by tenant (null for the project).
   final Map<String?, PasswordPolicy> _passwordPolicies =
@@ -1157,7 +1182,21 @@ class FirebaseUserAuth implements AuthTokenProvider {
       }
       rethrow;
     }
-    _throwIfSecondFactorRequired(response);
+    _throwIfSecondFactorRequired(
+      response,
+      finish: (Future<Map<String, Object?>> finalized) async =>
+          _completeReauthentication(await finalized, session, generation),
+    );
+    return _completeReauthentication(response, session, generation);
+  }
+
+  /// Takes the tokens of a reauthentication [response] into the [session] of [generation], when they are those of
+  /// its user.
+  Future<UserCredential> _completeReauthentication(
+    Map<String, Object?> response,
+    _Session session,
+    int generation,
+  ) async {
     final Object? idToken = response['idToken'];
     if (idToken is! String) {
       throw const FirebaseAuthException(
@@ -1229,6 +1268,99 @@ class FirebaseUserAuth implements AuthTokenProvider {
     await _updateSession(const <String, Object?>{}, generation, user: updated);
     return updated;
   });
+
+  // ---- multi-factor authentication ----
+
+  /// Starts enrolling an authenticator app (TOTP) as a second factor of the signed-in user
+  /// (`v2/accounts/mfaEnrollment:start`; FlutterFire's `multiFactor.getSession()` and
+  /// `TotpMultiFactorGenerator.generateSecret`). The user adds the returned [TotpSecret] to the app
+  /// ([TotpSecret.otpauthUri] as a QR code, or [TotpSecret.secretKey] by hand), and [finalizeTotpEnrollment] finishes
+  /// with a code of the app before [TotpSecret.enrollmentCompletionDeadline].
+  ///
+  /// The project must use Identity Platform with TOTP enabled, and the account needs a verified email address.
+  /// Throws a [FirebaseAuthException] with the code `null-user`, `unverified-email`, `requires-recent-login`,
+  /// `operation-not-allowed` (TOTP is not enabled), `maximum-second-factor-count-exceeded`, `unsupported-first-factor`
+  /// (for example an anonymous user), ..., and `internal-error` when the answer has no secret.
+  ///
+  /// ```dart
+  /// final TotpSecret secret = await auth.startTotpEnrollment();
+  /// final Uri uri = secret.otpauthUri(issuer: 'My App'); // show it as a QR code
+  /// await auth.finalizeTotpEnrollment(secret, code: codeFromTheApp, displayName: 'Phone');
+  /// print(auth.currentUser?.enrolledFactors); // [MultiFactorInfo(totp, ...)]
+  /// ```
+  Future<TotpSecret> startTotpEnrollment() =>
+      _forUser((String idToken, int generation) async {
+        final String? email = _session?.user.email;
+        final Map<String, Object?> response = await _multiFactor
+            .startTotpEnrollment(idToken: idToken, tenantId: tenantId);
+        final TotpSecret? secret = TotpSecret.fromResponse(
+          response['totpSessionInfo'],
+          accountName: email,
+        );
+        if (secret == null) {
+          throw const FirebaseAuthException(
+            code: 'internal-error',
+            message: 'The authentication service did not return a TOTP secret.',
+          );
+        }
+        return secret;
+      });
+
+  /// Finishes the enrolment of [secret] with [code], a code the authenticator app shows for it
+  /// (`v2/accounts/mfaEnrollment:finalize`; FlutterFire's `multiFactor.enroll` with
+  /// `TotpMultiFactorGenerator.getAssertionForEnrollment`). [displayName] names the factor for the user.
+  ///
+  /// The session continues with the new tokens the backend returns, and the account is read again: [userChanges]
+  /// and [idTokenChanges] emit, the session is stored, and [AuthUser.enrolledFactors] lists the new factor. From
+  /// now on every sign-in of the account throws a [FirebaseAuthMultiFactorException].
+  ///
+  /// Throws `null-user`, `invalid-verification-code` (or another code the backend gives for a wrong code),
+  /// `requires-recent-login`, `second-factor-already-in-use`, ...; and `argument-error` for a [secret] without the
+  /// session information of the backend.
+  Future<void> finalizeTotpEnrollment(
+    TotpSecret secret, {
+    required String code,
+    String? displayName,
+  }) => _forUser((String idToken, int generation) async {
+    final String? sessionInfo = totpSessionInfoOf(secret);
+    if (sessionInfo == null) {
+      throw const FirebaseAuthException(
+        code: 'argument-error',
+        message:
+            'The TOTP secret has no session information: start the enrolment with startTotpEnrollment.',
+      );
+    }
+    final Map<String, Object?> response = await _multiFactor
+        .finalizeTotpEnrollment(
+          idToken: idToken,
+          sessionInfo: sessionInfo,
+          code: code,
+          displayName: displayName,
+          tenantId: tenantId,
+        );
+    await _updateSession(response, generation);
+    await _reload(generation);
+  });
+
+  /// Removes the second factor [uid] (a [MultiFactorInfo.uid] of [AuthUser.enrolledFactors]) from the account of the
+  /// signed-in user (`v2/accounts/mfaEnrollment:withdraw`; FlutterFire's `multiFactor.unenroll`). Works for SMS
+  /// factors too.
+  ///
+  /// The session continues with the new tokens the backend returns, and the account is read again, like after
+  /// [finalizeTotpEnrollment].
+  ///
+  /// Throws `null-user`, `multi-factor-info-not-found` (no such factor), `requires-recent-login`, ... See the
+  /// README for what the errors look like over protocol buffers.
+  Future<void> unenrollMultiFactor(String uid) =>
+      _forUser((String idToken, int generation) async {
+        final Map<String, Object?> response = await _multiFactor.withdraw(
+          idToken: idToken,
+          enrollmentId: uid,
+          tenantId: tenantId,
+        );
+        await _updateSession(response, generation);
+        await _reload(generation);
+      });
 
   /// The request that signs in with [credential] (`_getIdTokenResponse` of the JS SDK's credentials), links it to
   /// the user of [userIdToken] (`_linkToIdToken`), or reauthenticates with it (`_getReauthenticationResolver`).
@@ -1699,25 +1831,35 @@ class FirebaseUserAuth implements AuthTokenProvider {
         return body;
       }
     }
-    final Object? error = body is Map<String, Object?> ? body['error'] : null;
-    final Object? message = ok && body is Map<String, Object?>
-        ? body['errorMessage']
-        : error is Map<String, Object?>
-        ? error['message']
-        : null;
-    if (message is String) {
-      throw FirebaseAuthException.fromServer(
-        message,
-        httpStatus: response.statusCode,
-        response: body is Map<String, Object?> ? body : null,
+    throw exceptionFromJsonError(response.statusCode, body);
+  }
+
+  /// Posts the protocol buffer [body] to the v2 [method] with `$alt=proto`, with the headers of [_send], and returns
+  /// the response as it is: the caller decodes it, also an error ([decodeProtobufAnswer]).
+  Future<http.Response> _postProtobuf(String method, List<int> body) async {
+    final Map<String, String> headers = await _additionalHeaders();
+    final String? locale = languageCode;
+    if (locale != null && locale.isNotEmpty) {
+      headers['X-Firebase-Locale'] = locale;
+    }
+    final Uri url = _identityToolkit(method, version: 'v2');
+    try {
+      return await _http.post(
+        // `$alt` as it is (Uri.https would write %24alt).
+        url.replace(query: '${url.query}&\$alt=proto'),
+        headers: <String, String>{
+          ...headers,
+          'Content-Type': 'application/x-protobuf',
+        },
+        body: body,
+      );
+    } on Object catch (_) {
+      throw const FirebaseAuthException(
+        code: 'network-request-failed',
+        message:
+            'The request to the authentication service failed (network error).',
       );
     }
-    throw FirebaseAuthException(
-      code: 'internal-error',
-      message:
-          'The authentication service answered with HTTP ${response.statusCode}.',
-      httpStatus: response.statusCode,
-    );
   }
 
   Future<UserCredential> _signIn(
@@ -1746,7 +1888,15 @@ class FirebaseUserAuth implements AuthTokenProvider {
     Map<String, Object?> response,
     int attempt,
   ) async {
-    _throwIfSecondFactorRequired(response);
+    // Finishing with a second factor is a sign-in of its own: it overtakes the sign-ins started before it, and
+    // is overtaken by those started while its request is in flight.
+    _throwIfSecondFactorRequired(
+      response,
+      finish: (Future<Map<String, Object?>> finalized) async {
+        final int attempt = ++_signInAttempt;
+        return _completeSignIn(await finalized, attempt);
+      },
+    );
     final Object? idToken = response['idToken'];
     final Object? refreshToken = response['refreshToken'];
     if (idToken is! String || refreshToken is! String) {
@@ -1812,16 +1962,59 @@ class FirebaseUserAuth implements AuthTokenProvider {
   }
 
   /// Like `_performSignInRequest` of the JS SDK: a sign-in answer with an `mfaPendingCredential` (and no tokens)
-  /// means that the account has a second factor.
-  static void _throwIfSecondFactorRequired(Map<String, Object?> response) {
+  /// means that the account has a second factor. [finish] completes the operation with the answer of
+  /// `mfaSignIn:finalize` merged into [response] (`MultiFactorResolverImpl._fromError` of the JS SDK), which it gets
+  /// while the request is in flight; without it the exception has no resolver.
+  void _throwIfSecondFactorRequired(
+    Map<String, Object?> response, {
+    Future<UserCredential> Function(Future<Map<String, Object?>> response)?
+    finish,
+  }) {
     final FirebaseAuthMultiFactorException? error =
         FirebaseAuthMultiFactorException.fromResponse(
           response,
           httpStatus: 200,
         );
-    if (error != null) {
+    if (error == null) {
+      return;
+    }
+    if (finish == null) {
       throw error;
     }
+    // The pending credential belongs to the tenant of the first factor.
+    final String? tenant = tenantId;
+    throw FirebaseAuthMultiFactorException(
+      pendingCredential: error.pendingCredential,
+      hints: error.hints,
+      message: error.message,
+      httpStatus: error.httpStatus,
+      resolver: createMultiFactorResolver(error.hints, (
+        String enrollmentId,
+        String code,
+      ) {
+        _checkNotDisposed();
+        return finish(
+          _multiFactor
+              .finalizeTotpSignIn(
+                pendingCredential: error.pendingCredential,
+                enrollmentId: enrollmentId,
+                code: code,
+                tenantId: tenant,
+              )
+              .then(
+                (Map<String, Object?> finalized) => <String, Object?>{
+                  for (final MapEntry<String, Object?> entry
+                      in response.entries)
+                    if (entry.key != 'mfaPendingCredential' &&
+                        entry.key != 'mfaInfo')
+                      entry.key: entry.value,
+                  'idToken': finalized['idToken'],
+                  'refreshToken': finalized['refreshToken'],
+                },
+              ),
+        );
+      }),
+    );
   }
 
   /// The expiry of an ID token: its `exp` claim, or now plus the `expiresIn` seconds of the response.
