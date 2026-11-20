@@ -25,7 +25,8 @@ Never _storeFailed(String what, Object error, StackTrace stackTrace) {
 }
 
 Future<T> _guard<T>(String what, Future<T> future) => future.catchError(
-  (Object error, StackTrace stackTrace) => _storeFailed(what, error, stackTrace),
+  (Object error, StackTrace stackTrace) =>
+      _storeFailed(what, error, stackTrace),
 );
 
 /// The reads and writes of one transaction of the persistence.
