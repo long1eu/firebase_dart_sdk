@@ -5,6 +5,9 @@
 //   dart run.dart build                  # compiles web/*.dart, copies the assets
 //   dart run.dart [txtest] [engine] [startup] [--runs=N]   # default: all three
 //       [--engines=idb,sqlite-idb,sqlite-opfs] [--compilers=js,wasm] [--browser=chrome|firefox|safari]
+//   dart run.dart read [--kinds=engine,sqlite-idb,sqlite-opfs] [--docs=20000] [--port=8397] [--runs=N]
+//       # web/read.dart: the read cases of docs/spikes/cache_read_profile.md on acknowledged documents (needs a
+//       # Firestore emulator on --port; it writes the documents there once, then a seed and a measure load per run)
 //   dart run.dart cache [--kinds=engine,sqlite-idb,sqlite-opfs] [--sizes=2000,20000] [--runs=N]
 //       # web/cache.dart: reads over a large cache through the SDK, a seed load then a measure load per run
 //
@@ -78,6 +81,8 @@ List<String> engines = <String>['idb', 'sqlite-idb', 'sqlite-opfs'];
 List<String> compilers = <String>['js', 'wasm'];
 List<String> kinds = <String>['engine', 'sqlite-idb', 'sqlite-opfs'];
 List<int> sizes = <int>[2000, 20000];
+int docs = 20000;
+int port = 8397;
 final String tag = DateTime.now().millisecondsSinceEpoch.toString();
 
 List<Step> plan(Set<String> parts, int runs) => <Step>[
@@ -111,6 +116,23 @@ List<Step> plan(Set<String> parts, int runs) => <Step>[
             'index.html?p=startup&c=$c&storage=$storage&phase=measure&cache=warm',
           ),
       ],
+  // The documents are written to the emulator once; each run reads them into a new cache, then measures it.
+  if (parts.contains('read')) ...<Step>[
+    Step(
+      'index.html?p=read&c=${compilers.first}&n=$docs&port=$port&phase=load',
+      cache: 'cold',
+      count: false,
+    ),
+    for (final String c in compilers)
+      for (final String kind in kinds)
+        for (int i = 0; i < runs; i++)
+          for (final String phase in <String>['seed', 'measure'])
+            Step(
+              'index.html?p=read&c=$c&kind=$kind&n=$docs&port=$port&phase=$phase&tag=$tag-$c-$kind-$i',
+              cache: 'cold',
+              count: phase == 'measure',
+            ),
+  ],
   // Each run seeds a new database (its own name) and measures it on the next page load.
   if (parts.contains('cache'))
     for (final String c in compilers)
@@ -134,7 +156,9 @@ String ms(double v) => v.toStringAsFixed(v < 10 ? 2 : 0);
 Future<void> main(List<String> arguments) async {
   if (arguments.contains('build')) {
     final List<String> pages = arguments.where((a) => a != 'build').toList();
-    await build(pages.isEmpty ? <String>['engine', 'startup', 'cache'] : pages);
+    await build(
+      pages.isEmpty ? <String>['engine', 'startup', 'cache', 'read'] : pages,
+    );
     return;
   }
   int runs = 5;
@@ -151,6 +175,10 @@ Future<void> main(List<String> arguments) async {
       kinds = a.substring(8).split(',');
     } else if (a.startsWith('--sizes=')) {
       sizes = a.substring(8).split(',').map(int.parse).toList();
+    } else if (a.startsWith('--docs=')) {
+      docs = int.parse(a.substring(7));
+    } else if (a.startsWith('--port=')) {
+      port = int.parse(a.substring(7));
     } else if (a.startsWith('--runs=')) {
       runs = int.parse(a.substring(7));
     } else {
@@ -297,6 +325,7 @@ void report(List<Map<String, Object?>> results) {
   }
   // Point 3.
   reportCache(results.where((r) => r['page'] == 'cache').toList());
+  reportRead(results.where((r) => r['page'] == 'read').toList());
   final List<Map<String, Object?>> engines = results
       .where((r) => r['runs'] != null)
       .toList();
@@ -371,7 +400,8 @@ void reportCache(List<Map<String, Object?>> results) {
       <String, Map<String, Set<Object?>>>{};
   for (final Map<String, Object?> r in results) {
     if (r['error'] != null) continue;
-    final String key = '${r['browser']} ${r['compiler']} n=${r['n']} ${r['kind']}';
+    final String key =
+        '${r['browser']} ${r['compiler']} n=${r['n']} ${r['kind']}';
     final Map<String, List<double>> ops = byKey.putIfAbsent(
       key,
       () => <String, List<double>>{},
@@ -388,7 +418,11 @@ void reportCache(List<Map<String, Object?>> results) {
     ((r['sizes'] as Map<String, Object?>?) ?? <String, Object?>{}).forEach(
       (String op, Object? v) => c.putIfAbsent(op, () => <Object?>{}).add(v),
     );
-    for (final String f in <String>['lastFound', 'pendingWrites', 'writeSeen']) {
+    for (final String f in <String>[
+      'lastFound',
+      'pendingWrites',
+      'writeSeen',
+    ]) {
       if (r.containsKey(f)) c.putIfAbsent(f, () => <Object?>{}).add(r[f]);
     }
   }
@@ -404,6 +438,54 @@ void reportCache(List<Map<String, Object?>> results) {
         '(${v.length}) ${counts[key]![op] ?? ''}',
       );
     }
-    stdout.writeln('    checks: ${{for (final f in <String>['lastFound', 'pendingWrites', 'writeSeen']) f: counts[key]![f]}}');
+    stdout.writeln(
+      '    checks: ${{
+        for (final f in <String>['lastFound', 'pendingWrites', 'writeSeen']) f: counts[key]![f],
+      }}',
+    );
+  });
+}
+
+const List<String> readCases = <String>['point', 'whole', 'eq', 'ord'];
+
+/// Per compiler and kind, the median over the measure loads of each case (the median of its timed reads, in ms; the
+/// point read per document), and the median of the first read.
+void reportRead(List<Map<String, Object?>> results) {
+  if (results.isEmpty) return;
+  final Map<String, List<Map<String, Object?>>> byKey =
+      <String, List<Map<String, Object?>>>{};
+  for (final Map<String, Object?> r in results) {
+    if (r['error'] != null) continue;
+    byKey
+        .putIfAbsent(
+          '${r['compiler']} ${r['kind']} n=${r['n']}',
+          () => <Map<String, Object?>>[],
+        )
+        .add(r);
+  }
+  stdout.writeln(
+    '\nRead medians (ms) over the loads [min-max] (loads) {sizes}; first = first read after open:',
+  );
+  byKey.forEach((String key, List<Map<String, Object?>> list) {
+    stdout.writeln(
+      '  $key (${list.length} loads), user agent ${list.first['userAgent']}',
+    );
+    String three(double v) => v.toStringAsFixed(v < 10 ? 3 : 1);
+    for (final String c in readCases) {
+      final List<double> v = <double>[
+        for (final r in list) (r['read_$c']! as num).toDouble(),
+      ];
+      final List<double> f = <double>[
+        for (final r in list) (r['first_$c']! as num).toDouble(),
+      ];
+      final List<double> sorted = List<double>.of(v)..sort();
+      stdout.writeln(
+        '    $c: ${three(median(v))} [${three(sorted.first)}-${three(sorted.last)}] first ${three(median(f))} '
+        '{${<Object?>{for (final r in list) (r['sizes'] as Map<String, Object?>)[c]}}}',
+      );
+    }
+    stdout.writeln(
+      '    open_first_read: ${three(median(<double>[for (final r in list) (r['open_first_read']! as num).toDouble()]))}',
+    );
   });
 }

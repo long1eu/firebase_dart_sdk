@@ -12,6 +12,8 @@
 //   cache_read_profile_bench time <acked|pending> <file> [<file with indexes>] [--reps=7] [--no-statement-cache]
 //       warm timings of every case: the whole path, with the time inside SQLite measured in the database adapter, and
 //       on macOS the CPU time of the process (steadier than the wall time when other work loads the machine)
+//   --big=N --small=N (all modes): documents in c0 and number of small collections, for a smaller cache (the web
+//       numbers of cache_read_profile.md use --big=20000 --small=100)
 //   cache_read_profile_bench raw <acked|pending> <file> [--reps=7]
 //       the layers alone: raw SQL with package:sqlite3 (nothing decoded), decode on the blobs in memory, query work
 //   cache_read_profile_bench cold <acked|pending> <file> <point|whole|eq|ord>
@@ -68,8 +70,9 @@ import 'package:sqlite3/sqlite3.dart' as sql;
 import 'package:vm_service/vm_service.dart' as vms;
 import 'package:vm_service/vm_service_io.dart' as vms_io;
 
-const int bigDocs = 100000;
-const int smallCollections = 1000;
+/// 100,000 and 1,000 unless `--big=N` and `--small=N` say otherwise (same on every mode that opens the file).
+int bigDocs = 100000;
+int smallCollections = 1000;
 const int smallDocs = 10;
 const int limit = 20;
 final DatabaseId databaseId = DatabaseId.forProject('bench');
@@ -1126,6 +1129,10 @@ Future<void> main(List<String> args) async {
   for (final String flag in flags) {
     if (flag.startsWith('--reps=')) {
       reps = int.parse(flag.substring(7));
+    } else if (flag.startsWith('--big=')) {
+      bigDocs = int.parse(flag.substring(6));
+    } else if (flag.startsWith('--small=')) {
+      smallCollections = int.parse(flag.substring(8));
     }
   }
   switch (a[0]) {

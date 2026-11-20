@@ -143,6 +143,95 @@ most those shares. What costs the time is:
 A new engine that returns the same protobuf bytes does not change any of those. Only a different stored format would
 change the decode share, and that is a separate decision from the engine.
 
+## In the browser
+
+Measured on 2026-11-20 on branch `wave/web-read-numbers`. PR #73 (107ecdec) was never measured in a browser; this
+section does that, with the same reads on the code before it (434ec7ed, its parent) and after it (4a0f1cea, `origin/main`
+at the time), for both compilers and the three web cache engines.
+
+Milliseconds, medians of 5 page loads, "before -> after". `point` is one document by key, per document (the mean of 100
+reads in one load). `whole`, `eq` and `ord` are the whole collection, `a == 7` and `orderBy(order desc).limit(20)`, all
+without an index, on 20,000 documents in one collection, acknowledged in the cache.
+
+| Case | dart2js, IndexedDB engine | dart2js, SQLite on IndexedDB | dart2js, SQLite on OPFS | dart2wasm, IndexedDB engine | dart2wasm, SQLite on IndexedDB | dart2wasm, SQLite on OPFS |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| whole collection | 562 -> 368 | 313 -> 157 | 326 -> 153 | 374 -> 250 | 225 -> 87 | 246 -> 101 |
+| `a == 7` | 283 -> 247 | 126 -> 117 | 127 -> 120 | 189 -> 169 | 77 -> 59 | 84 -> 73 |
+| `orderBy(order desc).limit(20)` | 2,031 -> 385 | 1,720 -> 158 | 1,758 -> 155 | 842 -> 238 | 695 -> 83 | 798 -> 96 |
+| one document by key | 0.186 -> 0.169 | 0.043 -> 0.041 | 0.105 -> 0.096 | 0.143 -> 0.137 | 0.085 -> 0.071 | 0.095 -> 0.082 |
+
+Ranges (min to max of the 5 loads) are in the raw results, `tool/bench/web_idb/out/results.jsonl` (not committed). The
+spread of one cell is 2 to 8 % of its median, except `a == 7` on the IndexedDB engine on dart2js (240 to 417 ms before)
+and `ord` on dart2wasm with OPFS before (659 to 841 ms).
+
+The same four cases on the Dart VM, SQLite cache (ahead of time compiled), 20,000 documents in `c0` (plus 1,000 documents
+in 100 small collections, which the point reads use), 9 warm runs each, the "before" with the adapter that prepares a
+statement per call (`--no-statement-cache`, as before #73):
+
+| Case | Dart VM, SQLite (before -> after) |
+| --- | ---: |
+| whole collection | 129.7 -> 65.5 |
+| `a == 7` | 39.1 -> 34.3 |
+| `orderBy(order desc).limit(20)` | 431.3 -> 64.2 |
+| one document by key (ms per document) | 0.0119 -> 0.0074 |
+
+What the numbers say:
+
+- The gain is on the web too, in the same places as on the VM: `orderBy.limit` is 3.5 to 11 times faster (limit first; 8 to 11
+  times on SQLite, 5.3 and 3.5 times on the IndexedDB engine), a whole collection 1.5 to 2.6 times (bulk build), `a == 7`
+  only 1.1 to 1.3 times (it is mostly decode, which #73 hardly touches). One document by key moves by 4 to 9 %, which is
+  the size of the noise of the loads, except dart2wasm on SQLite (-16 % and -14 %).
+- The statement cache is VM only, and the web gain of one document by key is small as expected; the VM gain there
+  (0.0119 to 0.0074 ms) is the statement cache.
+- At one size the browser is 1.3 to 3.5 times slower than the VM on the same SQLite work after the fix: whole collection
+  87 ms (dart2wasm, IndexedDB) to 157 ms (dart2js) against 65.5 ms; `ord` 83 to 158 ms against 64.2 ms; `a == 7` 59 to
+  120 ms against 34.3 ms. dart2wasm is 1.5 to 2.0 times faster than dart2js on SQLite, in every case.
+- The IndexedDB engine is the slowest of the three after the fix (whole collection 368 ms on dart2js, 250 ms on
+  dart2wasm; `a == 7` 247 and 169 ms) and has the lowest open time (3 to 8 ms against 38 to 76 ms for SQLite). The two
+  SQLite storages are within 5 to 20 % of each other.
+- The "first read" after open (not in the table, in the raw results) is the same as the median within 20 % for the
+  whole collection and for `ord`, and up to 1.5 times the median for `a == 7` on SQLite.
+
+### Method
+
+- **Machine.** MacBook with an Apple M5 (10 cores), 32 GB, macOS 27.2. Google Chrome 157.0.8103.79, headless
+  (`--headless=new`, a fresh profile in a temp directory), one page load after the other. Other agents were running (the
+  load average was 3 to 5 on the VM runs). Dart 3.12.2; `-O2` for dart2js and dart2wasm; sqlite3 package 3.9.1 and its
+  `sqlite3.wasm` (the version of `tool/bench/web_idb/pubspec.lock`).
+- **Harness.** `tool/bench/web_idb/web/read.dart` and `dart run.dart read --docs=20000 --port=8397 --runs=5` (see
+  `run.dart`). The documents are written once to a private Firestore emulator (project `demo-readbench`, never a real
+  project) by a client with a memory cache: `rb/d0000000...`, `a` = i % 100, `order` a random integer, `payload` a string
+  of 200 characters, the shape of the VM bench. For each run, a `seed` page reads them from the emulator into a new cache
+  of the engine under test (100 queries, `a == k`, because one `get` of 20,000 documents overflows the emulator's
+  WebChannel back channel), so every document is in the remote document cache as acknowledged by the backend, with no
+  pending write and no index. A `measure` page, a new page load, then opens that cache with the network disabled, reads
+  one document (not counted), and for each case does one first read (kept apart) followed by 5 timed reads
+  (`get(Source.cache)`, through the public API, the result is the median of those); the table is the median of the 5
+  loads. The result sizes (100, 20,000, 200, 20) are checked in each load. After a load the origin's databases and
+  OPFS files are deleted.
+- **Before and after.** The same bench files were copied into a second worktree at 434ec7ed and compiled there against
+  that code (library code is not changed); the after is this branch on `origin/main`. Both were run one after the
+  other, the emulator being the same and idle otherwise.
+- **VM.** `tool/bench/cache_read_profile_bench.dart` with the new flags `--big=20000 --small=100` (documents in `c0` and
+  number of small collections), `fill acked`, then `time acked --reps=9`; before with `--no-statement-cache`, built
+  from the same file in the 434ec7ed tree.
+
+### Limits
+
+- The VM bench measures the layers inside the store (`LocalStore.executeQuery`), the web page the public `get` of a
+  query, which also builds the `QuerySnapshot`. The two are therefore not the same work: compare ratios, not absolute
+  values, between a web column and the VM row. The VM point read is over documents of the small collections.
+- One machine, one Chrome, headless, a clean profile; Firefox and Safari were not measured. Timer resolution in Chrome is
+  0.1 ms, which is why one document by key is the mean of 100 reads.
+- The documents of the cache are read from the server in 100 queries, so the cache also has 100 query targets; this does
+  not touch the cases (no index, and the cases read the remote document cache and the collection scan), but it is not the
+  state after one listen of the whole collection.
+- Warm reads (the same query repeated in one load, after one first read); a cold start of the page is only the "first
+  read" column of the raw results. Memory: not measured.
+- The first attempt (one `get` of 20,000 documents, and a paged `get` ordered by document id) did not seed the cache
+  (the back channel of the emulator aborts; the paged query returned 0 documents on the web transport, not investigated),
+  which is why the seed uses 100 queries.
+
 ## What was measured, and how
 
 - **Machine.** MacBook with an Apple M5 (10 cores), 32 GB, macOS 27.2, internal SSD. Other agents were running, the load
