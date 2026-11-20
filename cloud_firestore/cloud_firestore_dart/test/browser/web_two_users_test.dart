@@ -41,8 +41,9 @@ Future<void> loadAuthEmulators() async {
     if (!response.ok) {
       return;
     }
-    for (final String line
-        in (await response.text().toDart).toDart.split('\n')) {
+    for (final String line in (await response.text().toDart).toDart.split(
+      '\n',
+    )) {
       final int eq = line.indexOf('=');
       if (eq < 0) {
         continue;
@@ -81,7 +82,8 @@ class Client {
   set clockOffset(Duration offset) => _clock.offset = offset;
 
   static Future<Client> start(String role) async {
-    final String id = '${DateTime.now().microsecondsSinceEpoch}-'
+    final String id =
+        '${DateTime.now().microsecondsSinceEpoch}-'
         '${_random.nextInt(1 << 30)}';
     final FirebaseApp app = FirebaseApp.withOptions(
       const FirebaseOptions(
@@ -232,7 +234,9 @@ void main() {
       b.firestore.doc(path).snapshots(),
     );
     await a.write(doc, <String, Object?>{'text': 'before', 'locked': false});
-    await bSees.waitFor((DocumentSnapshot<Json> s) => s.data()?['text'] == 'before');
+    await bSees.waitFor(
+      (DocumentSnapshot<Json> s) => s.data()?['text'] == 'before',
+    );
     a.refreshes = 0;
     b.refreshes = 0;
 
@@ -243,16 +247,15 @@ void main() {
     await a.firestore.disableNetwork();
     await a.firestore.enableNetwork();
     await a.write(doc, <String, Object?>{'text': 'after'});
-    await bSees.waitFor((DocumentSnapshot<Json> s) => s.data()?['text'] == 'after');
+    await bSees.waitFor(
+      (DocumentSnapshot<Json> s) => s.data()?['text'] == 'after',
+    );
 
     expect(a.refreshes, greaterThanOrEqualTo(1));
     expect(b.refreshes, 0);
     // Both still write as themselves, under their own rules.
     await b.write(doc, <String, Object?>{'text': 'from b'});
-    await expectLater(
-      b.write(doc, <String, Object?>{'locked': true}),
-      refused,
-    );
+    await expectLater(b.write(doc, <String, Object?>{'locked': true}), refused);
     expect(b.refreshes, 0);
   });
 }

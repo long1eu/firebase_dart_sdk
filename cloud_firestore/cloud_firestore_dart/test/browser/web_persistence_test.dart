@@ -54,8 +54,9 @@ void main() {
 
   setUpAll(() async {
     try {
-      final web.Response response =
-          await web.window.fetch(sqlite3Wasm.toString().toJS).toDart;
+      final web.Response response = await web.window
+          .fetch(sqlite3Wasm.toString().toJS)
+          .toDart;
       if (!response.ok) {
         skip =
             'test/browser/sqlite3.wasm is missing (HTTP ${response.status}): '
@@ -77,174 +78,248 @@ void main() {
     });
   }
 
-  persistenceTest('the cache is persistent and holds what was read and written',
-      () async {
-    final FirebaseFirestore firestore = await newClient(openDatabase: opener());
-    expect(firestore.client.persistence, isA<SQLitePersistence>());
-    final DocumentReference<Json> doc =
-        firestore.collection(newCollectionName()).doc('a');
-    await doc.set(<String, Object?>{'a': 1, 'text': 'héllo \u{1F600}'});
+  persistenceTest(
+    'the cache is persistent and holds what was read and written',
+    () async {
+      final FirebaseFirestore firestore = await newClient(
+        openDatabase: opener(),
+      );
+      expect(firestore.client.persistence, isA<SQLitePersistence>());
+      final DocumentReference<Json> doc = firestore
+          .collection(newCollectionName())
+          .doc('a');
+      await doc.set(<String, Object?>{'a': 1, 'text': 'héllo \u{1F600}'});
 
-    final DocumentSnapshot<Json> cached = await doc.get(GetOptions(source: Source.cache));
-    expect(cached.data(), <String, Object?>{'a': 1, 'text': 'héllo \u{1F600}'});
-    expect(cached.metadata.hasPendingWrites, isFalse);
-  });
-
-  persistenceTest('acknowledged data is there again after the client is reopened',
-      () async {
-    final String app = newAppName();
-    final String collection = newCollectionName();
-    FirebaseFirestore firestore = await newClient(openDatabase: opener(), appName: app);
-    for (int i = 0; i < 3; i++) {
-      await firestore.collection(collection).doc('d$i').set(<String, Object?>{
-        'n': i,
+      final DocumentSnapshot<Json> cached = await doc.get(
+        GetOptions(source: Source.cache),
+      );
+      expect(cached.data(), <String, Object?>{
+        'a': 1,
+        'text': 'héllo \u{1F600}',
       });
-    }
-    // Read through a listener too, so that the query has a cached target.
-    await firestore.collection(collection).get(GetOptions(source: Source.server));
-    await shutDown(firestore);
-    expect(await storedDatabases(app), hasLength(1));
+      expect(cached.metadata.hasPendingWrites, isFalse);
+    },
+  );
 
-    // A new SQLite instance that reads its pages back from IndexedDB, as
-    // after a page load. Offline, so that nothing can come from the backend.
-    firestore = await newClient(openDatabase: opener(), appName: app);
-    await firestore.disableNetwork();
-    final QuerySnapshot<Json> cached =
-        await firestore.collection(collection).orderBy('n').get(GetOptions(source: Source.cache));
-    expect(cached.metadata.isFromCache, isTrue);
-    expect(
+  persistenceTest(
+    'acknowledged data is there again after the client is reopened',
+    () async {
+      final String app = newAppName();
+      final String collection = newCollectionName();
+      FirebaseFirestore firestore = await newClient(
+        openDatabase: opener(),
+        appName: app,
+      );
+      for (int i = 0; i < 3; i++) {
+        await firestore.collection(collection).doc('d$i').set(<String, Object?>{
+          'n': i,
+        });
+      }
+      // Read through a listener too, so that the query has a cached target.
+      await firestore
+          .collection(collection)
+          .get(GetOptions(source: Source.server));
+      await shutDown(firestore);
+      expect(await storedDatabases(app), hasLength(1));
+
+      // A new SQLite instance that reads its pages back from IndexedDB, as
+      // after a page load. Offline, so that nothing can come from the backend.
+      firestore = await newClient(openDatabase: opener(), appName: app);
+      await firestore.disableNetwork();
+      final QuerySnapshot<Json> cached = await firestore
+          .collection(collection)
+          .orderBy('n')
+          .get(GetOptions(source: Source.cache));
+      expect(cached.metadata.isFromCache, isTrue);
+      expect(
         cached.docs.map((QueryDocumentSnapshot<Json> d) => d.data()).toList(),
         <Json>[
           <String, Object?>{'n': 0},
           <String, Object?>{'n': 1},
           <String, Object?>{'n': 2},
-        ]);
-  });
+        ],
+      );
+    },
+  );
 
-  persistenceTest('pending writes survive and are sent after the client is reopened',
-      () async {
-    final String app = newAppName();
-    final String collection = newCollectionName();
-    FirebaseFirestore firestore = await newClient(openDatabase: opener(), appName: app);
-    await firestore.collection(collection).doc('synced').set(<String, Object?>{
-      'v': 1,
-    });
+  persistenceTest(
+    'pending writes survive and are sent after the client is reopened',
+    () async {
+      final String app = newAppName();
+      final String collection = newCollectionName();
+      FirebaseFirestore firestore = await newClient(
+        openDatabase: opener(),
+        appName: app,
+      );
+      await firestore.collection(collection).doc('synced').set(
+        <String, Object?>{'v': 1},
+      );
 
-    // Written offline: they only exist in the mutation queue.
-    await firestore.disableNetwork();
-    unawaited(firestore.collection(collection).doc('pending').set(
-      <String, Object?>{'v': 2},
-    ));
-    unawaited(firestore.collection(collection).doc('synced').update(
-      <String, Object?>{'v': FieldValue.increment(10)},
-    ));
-    // The writes are in the cache once a cache read sees them.
-    expect(
-        (await firestore.collection(collection).doc('pending').get(GetOptions(source: Source.cache)))
+      // Written offline: they only exist in the mutation queue.
+      await firestore.disableNetwork();
+      unawaited(
+        firestore.collection(collection).doc('pending').set(<String, Object?>{
+          'v': 2,
+        }),
+      );
+      unawaited(
+        firestore.collection(collection).doc('synced').update(<String, Object?>{
+          'v': FieldValue.increment(10),
+        }),
+      );
+      // The writes are in the cache once a cache read sees them.
+      expect(
+        (await firestore
+                .collection(collection)
+                .doc('pending')
+                .get(GetOptions(source: Source.cache)))
             .metadata
             .hasPendingWrites,
-        isTrue);
-    await shutDown(firestore);
+        isTrue,
+      );
+      await shutDown(firestore);
 
-    firestore = await newClient(openDatabase: opener(), appName: app);
-    await firestore.disableNetwork();
-    final DocumentSnapshot<Json> pending =
-        await firestore.collection(collection).doc('pending').get(GetOptions(source: Source.cache));
-    expect(pending.data(), <String, Object?>{'v': 2});
-    expect(pending.metadata.hasPendingWrites, isTrue);
-    final DocumentSnapshot<Json> synced =
-        await firestore.collection(collection).doc('synced').get(GetOptions(source: Source.cache));
-    expect(synced.data(), <String, Object?>{'v': 11});
-    expect(synced.metadata.hasPendingWrites, isTrue);
+      firestore = await newClient(openDatabase: opener(), appName: app);
+      await firestore.disableNetwork();
+      final DocumentSnapshot<Json> pending = await firestore
+          .collection(collection)
+          .doc('pending')
+          .get(GetOptions(source: Source.cache));
+      expect(pending.data(), <String, Object?>{'v': 2});
+      expect(pending.metadata.hasPendingWrites, isTrue);
+      final DocumentSnapshot<Json> synced = await firestore
+          .collection(collection)
+          .doc('synced')
+          .get(GetOptions(source: Source.cache));
+      expect(synced.data(), <String, Object?>{'v': 11});
+      expect(synced.metadata.hasPendingWrites, isTrue);
 
-    // Back online the queue is sent, once.
-    await firestore.enableNetwork();
-    await firestore.waitForPendingWrites().timeout(const Duration(seconds: 20));
-    final FirebaseFirestore other = await newClient();
-    final QuerySnapshot<Json> server =
-        await other.collection(collection).get(GetOptions(source: Source.server));
-    expect(<String, Object?>{
-      for (final QueryDocumentSnapshot<Json> d in server.docs) d.id: d.data(),
-    }, <String, Object?>{
-      'pending': <String, Object?>{'v': 2},
-      'synced': <String, Object?>{'v': 11},
-    });
-  });
+      // Back online the queue is sent, once.
+      await firestore.enableNetwork();
+      await firestore.waitForPendingWrites().timeout(
+        const Duration(seconds: 20),
+      );
+      final FirebaseFirestore other = await newClient();
+      final QuerySnapshot<Json> server = await other
+          .collection(collection)
+          .get(GetOptions(source: Source.server));
+      expect(
+        <String, Object?>{
+          for (final QueryDocumentSnapshot<Json> d in server.docs)
+            d.id: d.data(),
+        },
+        <String, Object?>{
+          'pending': <String, Object?>{'v': 2},
+          'synced': <String, Object?>{'v': 11},
+        },
+      );
+    },
+  );
 
-  persistenceTest('a cache that is open cannot be opened a second time',
-      () async {
-    final String name = 'guard-${newAppName()}';
-    final Database first = await opener()(name, version: 1);
+  persistenceTest(
+    'a cache that is open cannot be opened a second time',
+    () async {
+      final String name = 'guard-${newAppName()}';
+      final Database first = await opener()(name, version: 1);
 
-    // What a second tab runs into: the same origin, the same lock.
-    await expectLater(
+      // What a second tab runs into: the same origin, the same lock.
+      await expectLater(
         opener()(name, version: 1),
-        throwsA(isA<FirestoreException>()
-            .having((FirestoreException e) => e.errorCode, 'code',
-                FirestoreErrorCode.failedPrecondition)
-            .having((FirestoreException e) => e.message, 'message',
-                contains('another tab'))));
+        throwsA(
+          isA<FirestoreException>()
+              .having(
+                (FirestoreException e) => e.errorCode,
+                'code',
+                FirestoreErrorCode.failedPrecondition,
+              )
+              .having(
+                (FirestoreException e) => e.message,
+                'message',
+                contains('another tab'),
+              ),
+        ),
+      );
 
-    // Another database is not affected.
-    final Database other = await opener()('$name-other', version: 1);
-    other.close();
+      // Another database is not affected.
+      final Database other = await opener()('$name-other', version: 1);
+      other.close();
 
-    first.close();
-    // Closing stores what is left and then releases the lock.
-    Database? again;
-    for (int i = 0; i < 50 && again == null; i++) {
-      try {
-        again = await opener()(name, version: 1);
-      } on FirestoreException {
-        await Future<void>.delayed(const Duration(milliseconds: 20));
+      first.close();
+      // Closing stores what is left and then releases the lock.
+      Database? again;
+      for (int i = 0; i < 50 && again == null; i++) {
+        try {
+          again = await opener()(name, version: 1);
+        } on FirestoreException {
+          await Future<void>.delayed(const Duration(milliseconds: 20));
+        }
       }
-    }
-    expect(again, isNotNull, reason: 'the lock is released by close()');
-    again!.close();
-  });
+      expect(again, isNotNull, reason: 'the lock is released by close()');
+      again!.close();
+    },
+  );
 
-  persistenceTest('a cache held by another browsing context is refused',
-      () async {
-    // A frame of the same origin is another context for the Web Locks API,
-    // like a second tab: it takes the lock of the cache the client will ask
-    // for.
-    final String app = newAppName();
-    final String collection = newCollectionName();
-    FirebaseFirestore firestore = await newClient(openDatabase: opener(), appName: app);
-    await firestore.collection(collection).doc('a').set(<String, Object?>{'a': 1});
-    final String storageName = (await storedDatabases(app)).single;
-    await shutDown(firestore);
+  persistenceTest(
+    'a cache held by another browsing context is refused',
+    () async {
+      // A frame of the same origin is another context for the Web Locks API,
+      // like a second tab: it takes the lock of the cache the client will ask
+      // for.
+      final String app = newAppName();
+      final String collection = newCollectionName();
+      FirebaseFirestore firestore = await newClient(
+        openDatabase: opener(),
+        appName: app,
+      );
+      await firestore.collection(collection).doc('a').set(<String, Object?>{
+        'a': 1,
+      });
+      final String storageName = (await storedDatabases(app)).single;
+      await shutDown(firestore);
 
-    final web.HTMLIFrameElement frame =
-        web.document.createElement('iframe') as web.HTMLIFrameElement;
-    web.document.body!.appendChild(frame);
-    addTearDown(() => frame.remove());
-    final web.LockManager frameLocks = (frame.contentWindow! as JSObject)
-        .getProperty<JSObject>('navigator'.toJS)
-        .getProperty<web.LockManager>('locks'.toJS);
-    final Completer<void> held = Completer<void>();
-    final Completer<void> release = Completer<void>();
-    JSPromise<JSAny?> hold(web.Lock? lock) {
-      held.complete();
-      return release.future.then<JSAny?>((_) => null).toJS;
-    }
+      final web.HTMLIFrameElement frame =
+          web.document.createElement('iframe') as web.HTMLIFrameElement;
+      web.document.body!.appendChild(frame);
+      addTearDown(() => frame.remove());
+      final web.LockManager frameLocks = (frame.contentWindow! as JSObject)
+          .getProperty<JSObject>('navigator'.toJS)
+          .getProperty<web.LockManager>('locks'.toJS);
+      final Completer<void> held = Completer<void>();
+      final Completer<void> release = Completer<void>();
+      JSPromise<JSAny?> hold(web.Lock? lock) {
+        held.complete();
+        return release.future.then<JSAny?>((_) => null).toJS;
+      }
 
-    unawaited(frameLocks.request(storageName, hold.toJS).toDart);
-    await held.future.timeout(const Duration(seconds: 5));
+      unawaited(frameLocks.request(storageName, hold.toJS).toDart);
+      await held.future.timeout(const Duration(seconds: 5));
 
-    await expectLater(
+      await expectLater(
         newClient(openDatabase: opener(), appName: app),
-        throwsA(isA<FirestoreException>().having((FirestoreException e) => e.errorCode,
-            'code', FirestoreErrorCode.failedPrecondition)));
+        throwsA(
+          isA<FirestoreException>().having(
+            (FirestoreException e) => e.errorCode,
+            'code',
+            FirestoreErrorCode.failedPrecondition,
+          ),
+        ),
+      );
 
-    // The other "tab" goes away: the cache can be opened again, with its data.
-    release.complete();
-    await Future<void>.delayed(const Duration(milliseconds: 100));
-    firestore = await newClient(openDatabase: opener(), appName: app);
-    await firestore.disableNetwork();
-    expect((await firestore.collection(collection).doc('a').get(GetOptions(source: Source.cache))).data(),
-        <String, Object?>{'a': 1});
-  });
+      // The other "tab" goes away: the cache can be opened again, with its data.
+      release.complete();
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+      firestore = await newClient(openDatabase: opener(), appName: app);
+      await firestore.disableNetwork();
+      expect(
+        (await firestore
+                .collection(collection)
+                .doc('a')
+                .get(GetOptions(source: Source.cache)))
+            .data(),
+        <String, Object?>{'a': 1},
+      );
+    },
+  );
 
   persistenceTest('the second tab gets a memory cache from '
       'openWithMemoryFallback, and works', () async {
@@ -252,9 +327,13 @@ void main() {
     // way the first tab does.
     final String app = newAppName();
     final String collection = newCollectionName();
-    FirebaseFirestore firestore =
-        await newClient(openDatabase: opener(), appName: app);
-    await firestore.collection(collection).doc('a').set(<String, Object?>{'a': 1});
+    FirebaseFirestore firestore = await newClient(
+      openDatabase: opener(),
+      appName: app,
+    );
+    await firestore.collection(collection).doc('a').set(<String, Object?>{
+      'a': 1,
+    });
     final String storageName = (await storedDatabases(app)).single;
     await shutDown(firestore);
 
@@ -300,25 +379,53 @@ void main() {
     // A memory cache: nothing of the stored cache, and no index manager.
     expect(firestore.persistentCacheIndexManager, isNull);
     await expectLater(
-        firestore.collection(collection).doc('a').get(GetOptions(source: Source.cache)),
-        throwsA(isA<FirestoreException>().having((FirestoreException e) => e.errorCode,
-            'code', FirestoreErrorCode.unavailable)));
+      firestore
+          .collection(collection)
+          .doc('a')
+          .get(GetOptions(source: Source.cache)),
+      throwsA(
+        isA<FirestoreException>().having(
+          (FirestoreException e) => e.errorCode,
+          'code',
+          FirestoreErrorCode.unavailable,
+        ),
+      ),
+    );
     // And it works against the backend.
-    await firestore.collection(collection).doc('b').set(<String, Object?>{'b': 2});
-    expect((await firestore.collection(collection).get(GetOptions(source: Source.server))).size, 2);
+    await firestore.collection(collection).doc('b').set(<String, Object?>{
+      'b': 2,
+    });
+    expect(
+      (await firestore
+              .collection(collection)
+              .get(GetOptions(source: Source.server)))
+          .size,
+      2,
+    );
   });
 
   persistenceTest('clearPersistence deletes the stored cache', () async {
     final String app = newAppName();
     final String collection = newCollectionName();
-    FirebaseFirestore firestore = await newClient(openDatabase: opener(), appName: app);
-    await firestore.collection(collection).doc('a').set(<String, Object?>{'a': 1});
+    FirebaseFirestore firestore = await newClient(
+      openDatabase: opener(),
+      appName: app,
+    );
+    await firestore.collection(collection).doc('a').set(<String, Object?>{
+      'a': 1,
+    });
 
     // Refused while the client runs, as everywhere.
     await expectLater(
-        firestore.clearPersistence(),
-        throwsA(isA<FirestoreException>().having((FirestoreException e) => e.errorCode,
-            'code', FirestoreErrorCode.failedPrecondition)));
+      firestore.clearPersistence(),
+      throwsA(
+        isA<FirestoreException>().having(
+          (FirestoreException e) => e.errorCode,
+          'code',
+          FirestoreErrorCode.failedPrecondition,
+        ),
+      ),
+    );
 
     await firestore.terminate();
     expect(await storedDatabases(app), hasLength(1));
@@ -329,168 +436,199 @@ void main() {
     // A new client starts with an empty cache.
     firestore = await newClient(openDatabase: opener(), appName: app);
     await firestore.disableNetwork();
-    final QuerySnapshot<Json> cached =
-        await firestore.collection(collection).get(GetOptions(source: Source.cache));
+    final QuerySnapshot<Json> cached = await firestore
+        .collection(collection)
+        .get(GetOptions(source: Source.cache));
     expect(cached.docs, isEmpty);
   });
 
-  persistenceTest('the index engine works on it (automatic index creation)',
-      () async {
-    final FirebaseFirestore firestore = await newClient(openDatabase: opener());
-    final LocalStore localStore = firestore.client.localStore;
-    final PersistentCacheIndexManager indexes =
-        firestore.persistentCacheIndexManager!;
-    await indexes.enableIndexAutoCreation();
-
-    final CollectionReference<Json> cities =
-        firestore.collection(newCollectionName());
-    final WriteBatch batch = firestore.batch();
-    for (int i = 0; i < 150; i++) {
-      batch.set(cities.doc('city$i'), <String, Object?>{
-        'country': i < 5 ? 'RO' : 'other',
-        'population': 1000 * i,
-      });
-    }
-    await batch.commit();
-    await cities.get(GetOptions(source: Source.server));
-
-    final Query<Json> romanian =
-        cities.where('country', isEqualTo: 'RO').orderBy('population');
-    IndexType indexType() => localStore.indexManagerForCurrentUser
-        .getIndexType(romanian.query.toTarget());
-    final List<String> expected = <String>[
-      for (int i = 0; i < 5; i++) 'city$i',
-    ];
-    List<String> ids(QuerySnapshot<Json> snapshot) => <String>[
-          for (final QueryDocumentSnapshot<Json> doc in snapshot.docs) doc.id,
-        ];
-
-    expect(localStore.getFieldIndexes(), isEmpty);
-    expect(indexType(), IndexType.none);
-
-    // The first run scans, and creates the index.
-    expect(ids(await romanian.get(GetOptions(source: Source.cache))), expected);
-    expect(localStore.getFieldIndexes(), hasLength(1));
-    expect(indexType(), IndexType.full);
-
-    // Before the backfill, halfway, and when the index is complete.
-    expect(await firestore.client.backfillIndexes(), 50);
-    expect(ids(await romanian.get(GetOptions(source: Source.cache))), expected);
-    int filled = 50;
-    for (int n = await firestore.client.backfillIndexes();
-        n > 0;
-        n = await firestore.client.backfillIndexes()) {
-      filled += n;
-    }
-    expect(filled, 150);
-    expect(ids(await romanian.get(GetOptions(source: Source.cache))), expected);
-
-    await indexes.deleteAllIndexes();
-    expect(localStore.getFieldIndexes(), isEmpty);
-    expect(ids(await romanian.get(GetOptions(source: Source.cache))), expected);
-  });
-
   persistenceTest(
-      'every schema migration runs on it, one version at a time and at once',
-      () async {
-    Future<List<String>> schemaOf(Database db) async => <String>[
-          for (final Map<String, dynamic> row in await db.query(
-            'SELECT type, name, sql FROM sqlite_master '
-            "WHERE name NOT LIKE 'sqlite_%' ORDER BY type, name",
-          ))
-            '${row['type']} ${row['name']}: ${row['sql']}',
-        ];
-    Future<int> userVersion(Database db) async =>
-        (await db.query('PRAGMA user_version')).single.values.first as int;
-
-    // One version at a time, closing and reopening the database in between,
-    // the way a cache that has existed since version 1 was upgraded.
-    final String stepwise = 'schema-steps-${newAppName()}';
-    final List<String> ran = <String>[];
-    for (int version = 1; version <= SQLiteSchema.version; version++) {
-      final Database db = await opener()(
-        stepwise,
-        version: version,
-        onCreate: (Database db, int to) async {
-          ran.add('create $to');
-          await SQLiteSchema(db).runMigrations(0, to);
-        },
-        onUpgrade: (Database db, int from, int to) async {
-          ran.add('$from->$to');
-          await SQLiteSchema(db).runMigrations(from, to);
-        },
+    'the index engine works on it (automatic index creation)',
+    () async {
+      final FirebaseFirestore firestore = await newClient(
+        openDatabase: opener(),
       );
-      expect(await userVersion(db), version);
-      db.close();
-    }
-    expect(ran, <String>[
-      'create 1',
-      for (int v = 1; v < SQLiteSchema.version; v++) '$v->${v + 1}',
-    ]);
-    expect(SQLiteSchema.version, 20,
-        reason: 'a new migration: check that it runs in the browser too');
+      final LocalStore localStore = firestore.client.localStore;
+      final PersistentCacheIndexManager indexes =
+          firestore.persistentCacheIndexManager!;
+      await indexes.enableIndexAutoCreation();
 
-    // All at once, as for a new cache.
-    final String direct = 'schema-direct-${newAppName()}';
-    final Database fresh = await opener()(
-      direct,
-      version: SQLiteSchema.version,
-      onCreate: (Database db, int to) => SQLiteSchema(db).runMigrations(0, to),
-    );
-    final Database upgraded =
-        await opener()(stepwise, version: SQLiteSchema.version);
-    final List<String> freshSchema = await schemaOf(fresh);
-    expect(freshSchema, isNotEmpty);
-    expect(await schemaOf(upgraded), freshSchema);
-    for (final String table in <String>[
-      'mutation_queues',
-      'mutations',
-      'document_mutations',
-      'targets',
-      'target_globals',
-      'target_documents',
-      'remote_documents',
-      'collection_parents',
-      'document_overlays',
-      'bundles',
-      'named_queries',
-      'data_migrations',
-      'index_configuration',
-      'index_entries',
-      'index_state',
-    ]) {
-      expect(freshSchema.any((String s) => s.startsWith('table $table:')),
-          isTrue, reason: 'table $table');
-    }
+      final CollectionReference<Json> cities = firestore.collection(
+        newCollectionName(),
+      );
+      final WriteBatch batch = firestore.batch();
+      for (int i = 0; i < 150; i++) {
+        batch.set(cities.doc('city$i'), <String, Object?>{
+          'country': i < 5 ? 'RO' : 'other',
+          'population': 1000 * i,
+        });
+      }
+      await batch.commit();
+      await cities.get(GetOptions(source: Source.server));
 
-    for (final Database db in <Database>[fresh, upgraded]) {
-      await (db as ClearableDatabase).clearStorage();
-    }
-    expect(await storedDatabases('schema-'), isEmpty);
-  });
+      final Query<Json> romanian = cities
+          .where('country', isEqualTo: 'RO')
+          .orderBy('population');
+      IndexType indexType() => localStore.indexManagerForCurrentUser
+          .getIndexType(romanian.query.toTarget());
+      final List<String> expected = <String>[
+        for (int i = 0; i < 5; i++) 'city$i',
+      ];
+      List<String> ids(QuerySnapshot<Json> snapshot) => <String>[
+        for (final QueryDocumentSnapshot<Json> doc in snapshot.docs) doc.id,
+      ];
+
+      expect(localStore.getFieldIndexes(), isEmpty);
+      expect(indexType(), IndexType.none);
+
+      // The first run scans, and creates the index.
+      expect(
+        ids(await romanian.get(GetOptions(source: Source.cache))),
+        expected,
+      );
+      expect(localStore.getFieldIndexes(), hasLength(1));
+      expect(indexType(), IndexType.full);
+
+      // Before the backfill, halfway, and when the index is complete.
+      expect(await firestore.client.backfillIndexes(), 50);
+      expect(
+        ids(await romanian.get(GetOptions(source: Source.cache))),
+        expected,
+      );
+      int filled = 50;
+      for (
+        int n = await firestore.client.backfillIndexes();
+        n > 0;
+        n = await firestore.client.backfillIndexes()
+      ) {
+        filled += n;
+      }
+      expect(filled, 150);
+      expect(
+        ids(await romanian.get(GetOptions(source: Source.cache))),
+        expected,
+      );
+
+      await indexes.deleteAllIndexes();
+      expect(localStore.getFieldIndexes(), isEmpty);
+      expect(
+        ids(await romanian.get(GetOptions(source: Source.cache))),
+        expected,
+      );
+    },
+  );
 
   persistenceTest(
-      'an upgrade that fails halfway leaves the previous schema and version',
-      () async {
-    final String name = 'atomic-${newAppName()}';
-    Future<List<String>> tables(Database db) async => <String>[
-          for (final Map<String, dynamic> row in await db.query(
-            "SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name",
-          ))
-            row['name'] as String,
-        ];
-    Future<int> userVersion(Database db) async =>
-        (await db.query('PRAGMA user_version')).single.values.first as int;
+    'every schema migration runs on it, one version at a time and at once',
+    () async {
+      Future<List<String>> schemaOf(Database db) async => <String>[
+        for (final Map<String, dynamic> row in await db.query(
+          'SELECT type, name, sql FROM sqlite_master '
+          "WHERE name NOT LIKE 'sqlite_%' ORDER BY type, name",
+        ))
+          '${row['type']} ${row['name']}: ${row['sql']}',
+      ];
+      Future<int> userVersion(Database db) async =>
+          (await db.query('PRAGMA user_version')).single.values.first as int;
 
-    Database db = await opener()(
-      name,
-      version: 1,
-      onCreate: (Database db, int to) => db.execute('CREATE TABLE one (a)'),
-    );
-    db.close();
+      // One version at a time, closing and reopening the database in between,
+      // the way a cache that has existed since version 1 was upgraded.
+      final String stepwise = 'schema-steps-${newAppName()}';
+      final List<String> ran = <String>[];
+      for (int version = 1; version <= SQLiteSchema.version; version++) {
+        final Database db = await opener()(
+          stepwise,
+          version: version,
+          onCreate: (Database db, int to) async {
+            ran.add('create $to');
+            await SQLiteSchema(db).runMigrations(0, to);
+          },
+          onUpgrade: (Database db, int from, int to) async {
+            ran.add('$from->$to');
+            await SQLiteSchema(db).runMigrations(from, to);
+          },
+        );
+        expect(await userVersion(db), version);
+        db.close();
+      }
+      expect(ran, <String>[
+        'create 1',
+        for (int v = 1; v < SQLiteSchema.version; v++) '$v->${v + 1}',
+      ]);
+      expect(
+        SQLiteSchema.version,
+        20,
+        reason: 'a new migration: check that it runs in the browser too',
+      );
 
-    // The second statement of the upgrade fails: the first one must not stay.
-    await expectLater(
+      // All at once, as for a new cache.
+      final String direct = 'schema-direct-${newAppName()}';
+      final Database fresh = await opener()(
+        direct,
+        version: SQLiteSchema.version,
+        onCreate: (Database db, int to) =>
+            SQLiteSchema(db).runMigrations(0, to),
+      );
+      final Database upgraded = await opener()(
+        stepwise,
+        version: SQLiteSchema.version,
+      );
+      final List<String> freshSchema = await schemaOf(fresh);
+      expect(freshSchema, isNotEmpty);
+      expect(await schemaOf(upgraded), freshSchema);
+      for (final String table in <String>[
+        'mutation_queues',
+        'mutations',
+        'document_mutations',
+        'targets',
+        'target_globals',
+        'target_documents',
+        'remote_documents',
+        'collection_parents',
+        'document_overlays',
+        'bundles',
+        'named_queries',
+        'data_migrations',
+        'index_configuration',
+        'index_entries',
+        'index_state',
+      ]) {
+        expect(
+          freshSchema.any((String s) => s.startsWith('table $table:')),
+          isTrue,
+          reason: 'table $table',
+        );
+      }
+
+      for (final Database db in <Database>[fresh, upgraded]) {
+        await (db as ClearableDatabase).clearStorage();
+      }
+      expect(await storedDatabases('schema-'), isEmpty);
+    },
+  );
+
+  persistenceTest(
+    'an upgrade that fails halfway leaves the previous schema and version',
+    () async {
+      final String name = 'atomic-${newAppName()}';
+      Future<List<String>> tables(Database db) async => <String>[
+        for (final Map<String, dynamic> row in await db.query(
+          "SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name",
+        ))
+          row['name'] as String,
+      ];
+      Future<int> userVersion(Database db) async =>
+          (await db.query('PRAGMA user_version')).single.values.first as int;
+
+      Database db = await opener()(
+        name,
+        version: 1,
+        onCreate: (Database db, int to) => db.execute('CREATE TABLE one (a)'),
+      );
+      db.close();
+
+      // The second statement of the upgrade fails: the first one must not stay.
+      await expectLater(
         opener()(
           name,
           version: 2,
@@ -500,29 +638,30 @@ void main() {
             throw StateError('the tab would die here');
           },
         ),
-        throwsStateError);
+        throwsStateError,
+      );
 
-    // The next open finds version 1 and runs the whole upgrade again.
-    final List<String> upgrades = <String>[];
-    db = await opener()(
-      name,
-      version: 2,
-      onCreate: (Database db, int to) async => fail('not a new database'),
-      onUpgrade: (Database db, int from, int to) async {
-        upgrades.add('$from->$to');
-        expect(await tables(db), <String>['one']);
-        expect(await db.query('SELECT * FROM one'), isEmpty);
-        await db.execute('CREATE TABLE two (a)');
-      },
-    );
-    expect(upgrades, <String>['1->2']);
-    expect(await tables(db), <String>['one', 'two']);
-    expect(await userVersion(db), 2);
-    await (db as ClearableDatabase).clearStorage();
+      // The next open finds version 1 and runs the whole upgrade again.
+      final List<String> upgrades = <String>[];
+      db = await opener()(
+        name,
+        version: 2,
+        onCreate: (Database db, int to) async => fail('not a new database'),
+        onUpgrade: (Database db, int from, int to) async {
+          upgrades.add('$from->$to');
+          expect(await tables(db), <String>['one']);
+          expect(await db.query('SELECT * FROM one'), isEmpty);
+          await db.execute('CREATE TABLE two (a)');
+        },
+      );
+      expect(upgrades, <String>['1->2']);
+      expect(await tables(db), <String>['one', 'two']);
+      expect(await userVersion(db), 2);
+      await (db as ClearableDatabase).clearStorage();
 
-    // The same for a new cache whose creation fails: it stays new.
-    final String fresh = 'atomic-new-${newAppName()}';
-    await expectLater(
+      // The same for a new cache whose creation fails: it stays new.
+      final String fresh = 'atomic-new-${newAppName()}';
+      await expectLater(
         opener()(
           fresh,
           version: 3,
@@ -531,21 +670,23 @@ void main() {
             throw StateError('the tab would die here');
           },
         ),
-        throwsStateError);
-    bool created = false;
-    db = await opener()(
-      fresh,
-      version: 3,
-      onCreate: (Database db, int to) async {
-        created = true;
-        expect(await tables(db), isEmpty);
-        await db.execute('CREATE TABLE one (a)');
-      },
-      onUpgrade: (Database db, int from, int to) async =>
-          fail('still a new database'),
-    );
-    expect(created, isTrue);
-    expect(await userVersion(db), 3);
-    await (db as ClearableDatabase).clearStorage();
-  });
+        throwsStateError,
+      );
+      bool created = false;
+      db = await opener()(
+        fresh,
+        version: 3,
+        onCreate: (Database db, int to) async {
+          created = true;
+          expect(await tables(db), isEmpty);
+          await db.execute('CREATE TABLE one (a)');
+        },
+        onUpgrade: (Database db, int from, int to) async =>
+            fail('still a new database'),
+      );
+      expect(created, isTrue);
+      expect(await userVersion(db), 3);
+      await (db as ClearableDatabase).clearStorage();
+    },
+  );
 }

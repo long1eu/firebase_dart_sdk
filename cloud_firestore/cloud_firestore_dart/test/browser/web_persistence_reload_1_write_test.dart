@@ -28,20 +28,19 @@ const String reloadStorageKey = 'cloud_firestore_dart.reload_test.collection';
 const String reloadAppName = 'reload-test-app';
 
 FirebaseApp reloadApp() => FirebaseApp.withOptions(
-      const FirebaseOptions(
-        apiKey: 'demo-key',
-        appId: '1:1234567890:dart:browser',
-        projectId: projectId,
-      ),
-      name: reloadAppName,
-    );
+  const FirebaseOptions(
+    apiKey: 'demo-key',
+    appId: '1:1234567890:dart:browser',
+    projectId: projectId,
+  ),
+  name: reloadAppName,
+);
 
 FirebaseFirestore reloadClient() => FirebaseFirestore.instanceFor(
-      app: reloadApp(),
-      openDatabase:
-          sqliteWebOpener(sqlite3Wasm: Uri.base.resolve('sqlite3.wasm')),
-      settings: Settings().withEmulator(emulatorHost, emulatorPort),
-    );
+  app: reloadApp(),
+  openDatabase: sqliteWebOpener(sqlite3Wasm: Uri.base.resolve('sqlite3.wasm')),
+  settings: Settings().withEmulator(emulatorHost, emulatorPort),
+);
 
 Future<bool> hasSqlite3Wasm() async {
   try {
@@ -58,8 +57,10 @@ void main() {
   setUpAll(loadEmulatorPort);
   test('page 1 writes, and leaves without closing the client', () async {
     if (!await hasSqlite3Wasm()) {
-      markTestSkipped('test/browser/sqlite3.wasm is missing: see '
-          'web_persistence_test.dart');
+      markTestSkipped(
+        'test/browser/sqlite3.wasm is missing: see '
+        'web_persistence_test.dart',
+      );
       return;
     }
     web.window.localStorage.removeItem(reloadStorageKey);
@@ -72,17 +73,23 @@ void main() {
     );
 
     await firestore.disableNetwork();
-    unawaited(firestore.collection(collection).doc('pending').set(
-      <String, Object?>{'v': 2},
-    ));
-    unawaited(firestore.collection(collection).doc('acknowledged').update(
-      <String, Object?>{'v': FieldValue.increment(10)},
-    ));
+    unawaited(
+      firestore.collection(collection).doc('pending').set(<String, Object?>{
+        'v': 2,
+      }),
+    );
+    unawaited(
+      firestore.collection(collection).doc('acknowledged').update(
+        <String, Object?>{'v': FieldValue.increment(10)},
+      ),
+    );
     // A cache read comes after the writes on the client's queue: once it
     // answers, the writes are in the mutation queue (and their transaction is
     // stored).
-    final DocumentSnapshot<Json> pending =
-        await firestore.collection(collection).doc('pending').get(GetOptions(source: Source.cache));
+    final DocumentSnapshot<Json> pending = await firestore
+        .collection(collection)
+        .doc('pending')
+        .get(GetOptions(source: Source.cache));
     expect(pending.metadata.hasPendingWrites, isTrue);
 
     web.window.localStorage.setItem(reloadStorageKey, collection);
