@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 552" role="img" aria-labelledby="title desc" font-family="system-ui, -apple-system, Segoe UI, Helvetica, Arial, sans-serif">
   <title id="title">Parity with the JS SDK, area by area</title>
-  <desc id="desc">One mark per row of the tables of docs/parity.md, grouped by area. Documents and writes: 15 supported, 1 partial, 3 not applicable; Queries and filters: 9 supported; Aggregations: 3 supported; Listeners and snapshot options: 9 supported; Transactions and batches: 5 supported; Offline persistence and cache settings: 6 supported, 2 not applicable; Indexes: 4 supported, 1 not supported; Bundles: 2 supported; Lite: 4 supported; Pipelines: 6 supported, 3 partial, 1 not supported; Multi-tab or multi-client: 1 supported, 1 partial, 2 not supported; App Check: 1 supported, 1 not supported; Emulator: 2 supported, 1 not applicable; Web transports: 7 supported, 1 not applicable; Platforms: 1 supported, 3 partial, 2 not applicable.</desc>
+  <desc id="desc">One mark per row of the tables of docs/parity.md, grouped by area. Documents and writes: 15 supported, 1 partial, 3 not applicable; Queries and filters: 9 supported; Aggregations: 3 supported; Listeners and snapshot options: 9 supported; Transactions and batches: 6 supported; Offline persistence and cache settings: 6 supported, 2 not applicable; Indexes: 4 supported, 1 not supported; Bundles: 2 supported; Lite: 4 supported, 1 not supported; Pipelines: 6 supported, 3 partial, 1 not supported; Multi-tab or multi-client: 1 supported, 1 partial, 2 not supported; App Check: 1 supported, 1 not supported; Emulator: 2 supported, 1 not applicable; Web transports: 7 supported, 1 not applicable; Platforms: 1 supported, 3 partial, 2 not applicable.</desc>
   <style id="figure-theme">
     /* Palette shared by every figure in docs/images (see docs/images/README.md). */
     :root {
@@ -145,7 +145,8 @@
   <circle cx="324" cy="205" r="7" fill="#1a7f37"/>
   <circle cx="343" cy="205" r="7" fill="#1a7f37"/>
   <circle cx="362" cy="205" r="7" fill="#1a7f37"/>
-  <text x="700" y="209" font-size="12" fill="#1f2328" font-weight="600" text-anchor="middle">5</text>
+  <circle cx="381" cy="205" r="7" fill="#1a7f37"/>
+  <text x="700" y="209" font-size="12" fill="#1f2328" font-weight="600" text-anchor="middle">6</text>
   <text x="756" y="209" font-size="12" fill="#57606a" text-anchor="middle">–</text>
   <text x="812" y="209" font-size="12" fill="#57606a" text-anchor="middle">–</text>
   <text x="868" y="209" font-size="12" fill="#57606a" text-anchor="middle">–</text>
@@ -181,14 +182,15 @@
   <text x="812" y="287" font-size="12" fill="#57606a" text-anchor="middle">–</text>
   <text x="868" y="287" font-size="12" fill="#57606a" text-anchor="middle">–</text>
   <rect x="12" y="296" width="876" height="26" rx="4" fill="#f6f8fa"/>
-  <text x="266" y="313" font-size="12" fill="#1f2328" font-weight="600" text-anchor="end">Lite (experimental)</text>
+  <text x="266" y="313" font-size="12" fill="#1f2328" font-weight="600" text-anchor="end">Lite</text>
   <circle cx="286" cy="309" r="7" fill="#1a7f37"/>
   <circle cx="305" cy="309" r="7" fill="#1a7f37"/>
   <circle cx="324" cy="309" r="7" fill="#1a7f37"/>
   <circle cx="343" cy="309" r="7" fill="#1a7f37"/>
+  <rect x="355.5" y="302.5" width="13" height="13" rx="2" fill="#ffffff" stroke="#cf222e" stroke-width="2"/><path d="M358.5,305.5 L365.5,312.5 M365.5,305.5 L358.5,312.5" stroke="#cf222e" stroke-width="2" stroke-linecap="round"/>
   <text x="700" y="313" font-size="12" fill="#1f2328" font-weight="600" text-anchor="middle">4</text>
   <text x="756" y="313" font-size="12" fill="#57606a" text-anchor="middle">–</text>
-  <text x="812" y="313" font-size="12" fill="#57606a" text-anchor="middle">–</text>
+  <text x="812" y="313" font-size="12" fill="#1f2328" font-weight="600" text-anchor="middle">1</text>
   <text x="868" y="313" font-size="12" fill="#57606a" text-anchor="middle">–</text>
   <text x="266" y="339" font-size="12" fill="#1f2328" font-weight="600" text-anchor="end">Pipelines (preview)</text>
   <circle cx="286" cy="335" r="7" fill="#1a7f37"/>
@@ -258,9 +260,9 @@
   <text x="868" y="469" font-size="12" fill="#1f2328" font-weight="600" text-anchor="middle">2</text>
   <line x1="670" y1="482" x2="880" y2="482" stroke="#d0d7de"/>
   <text x="266" y="499" font-size="12" fill="#1f2328" font-weight="700" text-anchor="end">All areas</text>
-  <text x="700" y="499" font-size="12" fill="#1f2328" font-weight="700" text-anchor="middle">75</text>
+  <text x="700" y="499" font-size="12" fill="#1f2328" font-weight="700" text-anchor="middle">76</text>
   <text x="756" y="499" font-size="12" fill="#1f2328" font-weight="700" text-anchor="middle">8</text>
-  <text x="812" y="499" font-size="12" fill="#1f2328" font-weight="700" text-anchor="middle">5</text>
+  <text x="812" y="499" font-size="12" fill="#1f2328" font-weight="700" text-anchor="middle">6</text>
   <text x="868" y="499" font-size="12" fill="#1f2328" font-weight="700" text-anchor="middle">9</text>
   <text x="20" y="530" font-size="11" fill="#57606a">Supported includes the rows marked preview, experimental, extra or Enterprise edition. Read the tables below for</text>
   <text x="20" y="544" font-size="11" fill="#57606a">what each partial or missing row lacks; the Known limitations list the gaps inside supported rows.</text>

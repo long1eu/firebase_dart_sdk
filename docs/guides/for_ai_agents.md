@@ -22,7 +22,7 @@ when in doubt, search it.
 | End users signed in (email/password, anonymous, custom token) or a service account key | `firebase_auth_providers_dart: ^0.3.0` | `package:firebase_auth_providers_dart/firebase_auth_providers_dart.dart` |
 | Application Default Credentials (servers, CLIs; needs `dart:io`) | `firebase_auth_providers_dart: ^0.3.0` | `package:firebase_auth_providers_dart/adc.dart` |
 | A disk cache (VM, Flutter, web) | `cloud_firestore_dart_sqlite: ^0.1.3` | `package:cloud_firestore_dart_sqlite/cloud_firestore_dart_sqlite.dart` |
-| Firestore Lite, no cache and no listeners (experimental) | `cloud_firestore_dart` | `package:cloud_firestore_dart/lite.dart` instead of the main library |
+| Firestore Lite, no cache and no listeners | `cloud_firestore_dart` | `package:cloud_firestore_dart/lite.dart` instead of the main library |
 | Pipelines (preview, Enterprise edition databases only) | `cloud_firestore_dart` | `package:cloud_firestore_dart/pipelines.dart` in addition to the main library |
 
 ```shell
@@ -333,8 +333,9 @@ Names that are the same here: `collection`, `doc`, `collectionGroup`, `add`, `de
 7. **What needs `dart:io`.** `package:firebase_auth_providers_dart/adc.dart` and any
    `Platform.environment` you read. `cloud_firestore_dart_sqlite` compiles everywhere. The main
    libraries of the three packages also compile for the web.
-8. **Experimental or preview.** Firestore Lite (`lite.dart`) and Pipelines (`pipelines.dart`, Enterprise edition only). These, and
-   `package:firebase_app_dart/internal.dart`, are outside any compatibility promise.
+8. **Preview.** Pipelines (`pipelines.dart`, Enterprise edition only). It, and
+   `package:firebase_app_dart/internal.dart`, are outside any compatibility promise. Firestore
+   Lite (`lite.dart`) is supported like the main library.
 9. **Errors.** A failed operation reports a `FirestoreException`; compare
    `FirestoreErrorCode` values through `e.errorCode` (`e.code` is FlutterFire's string, such as
    `'not-found'`). `FirestoreException` extends `FirebaseException`, an `Exception`: use

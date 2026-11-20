@@ -24,7 +24,7 @@ signatures are in `test/unit/api/public_api.golden.txt`.
 The area tables below at a glance, one mark per row; most gaps are in Pipelines, multi-client and
 the platforms:
 
-![One mark per feature row, by area. Documents and writes: 15 supported, 1 partial, 3 not applicable. Queries and filters: 9 supported. Aggregations: 3 supported. Listeners: 9 supported. Transactions and batches: 5 supported. Offline persistence: 6 supported, 2 not applicable. Indexes: 4 supported, 1 not supported. Bundles: 2 supported. Lite: 4 supported. Pipelines: 6 supported, 3 partial, 1 not supported. Multi-tab or multi-client: 1 supported, 1 partial, 2 not supported. App Check: 1 supported, 1 not supported. Emulator: 2 supported, 1 not applicable. Web transports: 7 supported, 1 not applicable. Platforms: 1 supported, 3 partial, 2 not applicable. In all: 75 supported, 8 partial, 5 not supported, 9 not applicable.](images/readme/parity_summary.svg)
+![One mark per feature row, by area. Documents and writes: 15 supported, 1 partial, 3 not applicable. Queries and filters: 9 supported. Aggregations: 3 supported. Listeners: 9 supported. Transactions and batches: 6 supported. Offline persistence: 6 supported, 2 not applicable. Indexes: 4 supported, 1 not supported. Bundles: 2 supported. Lite: 4 supported, 1 not supported. Pipelines: 6 supported, 3 partial, 1 not supported. Multi-tab or multi-client: 1 supported, 1 partial, 2 not supported. App Check: 1 supported, 1 not supported. Emulator: 2 supported, 1 not applicable. Web transports: 7 supported, 1 not applicable. Platforms: 1 supported, 3 partial, 2 not applicable. In all: 76 supported, 8 partial, 6 not supported, 9 not applicable.](images/readme/parity_summary.svg)
 
 ## How it is tested
 
@@ -154,7 +154,8 @@ for a real project that has not been run yet; see [Known limitations](#known-lim
 
 | JS feature | Status | Dart API or gap |
 |---|---|---|
-| `firebase/firestore/lite` entry point | supported (experimental) | `package:cloud_firestore_dart/lite.dart`; `test/integration/firebase/firestore/lite_test.dart`, browser `test/browser/web_lite_test.dart`. See [Firestore Lite](guides/lite.md) |
+| `firebase/firestore/lite` entry point | supported | `package:cloud_firestore_dart/lite.dart`; `test/integration/firebase/firestore/lite_test.dart`, browser `test/browser/web_lite_test.dart`. Emulator and Chrome only. The differences from the JS exports are listed in [Firestore Lite](guides/lite.md#compared-with-firebasefirestorelite) |
+| `firebase/firestore/lite/pipelines` entry point | not supported | Pipelines are in the main library only (preview), not in `lite.dart` |
 | Reads, writes, batches, transactions, queries, aggregations, converters | supported | Same as the main library, every call one request |
 | `where` with named arguments / `Filter` | supported | The same `where` and `Filter` as the main library |
 | Small web build | supported | `tool/check_size.sh` checks that the Lite program contains no sync engine, cache or WebChannel |

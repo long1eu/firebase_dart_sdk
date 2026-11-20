@@ -34,7 +34,7 @@ public API of the main library is the golden listing linked below.
 - [Authentication and App Check](https://raw.githubusercontent.com/long1eu/firebase_dart_sdk/main/docs/guides/authentication.md): signed-in users over REST, service accounts, Application Default Credentials, the Auth emulator
 - [The emulator and testing](https://raw.githubusercontent.com/long1eu/firebase_dart_sdk/main/docs/guides/emulator_and_testing.md): connecting to the emulator, mock users, tests with `package:test`, Enterprise edition differences
 - [Platforms](https://raw.githubusercontent.com/long1eu/firebase_dart_sdk/main/docs/guides/platforms.md): the Dart VM on macOS, Linux and Windows, Flutter, the web transport and its limits
-- [Firestore Lite](https://raw.githubusercontent.com/long1eu/firebase_dart_sdk/main/docs/guides/lite.md): the experimental client without cache and listeners
+- [Firestore Lite](https://raw.githubusercontent.com/long1eu/firebase_dart_sdk/main/docs/guides/lite.md): the client without cache and listeners
 - [Pipelines](https://raw.githubusercontent.com/long1eu/firebase_dart_sdk/main/docs/guides/pipelines.md): server-side pipelines, preview, Enterprise edition only
 - [Parity with the Firebase JS SDK](https://raw.githubusercontent.com/long1eu/firebase_dart_sdk/main/docs/parity.md): every area compared with the JS SDK, with the known limitations
 - [Migrating from the `_vm` packages](https://raw.githubusercontent.com/long1eu/firebase_dart_sdk/main/docs/migrating_from_vm_packages.md): from `cloud_firestore_vm` and `firebase_core_vm`
