@@ -22,3 +22,14 @@ dependencies:
 
 dev_dependencies:
   lints: ^6.0.0
+
+# The multi-tab IndexedDB cache (?multiTab=1) is not on pub.dev yet: the
+# overrides make the packages come from this repository. Outside the
+# repository, remove this section and depend on the versions on pub.dev.
+dependency_overrides:
+  cloud_firestore_dart:
+    path: ../../cloud_firestore/cloud_firestore_dart
+  cloud_firestore_dart_sqlite:
+    path: ../../cloud_firestore/cloud_firestore_dart_sqlite
+  firebase_app_dart:
+    path: ../../firebase_core/firebase_app_dart

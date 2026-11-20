@@ -39,11 +39,14 @@ enum CacheChoice {
 /// - `emulator=<host>:<port>`: the Firestore emulator (default
 ///   `127.0.0.1:8080`); `emulator=none` uses the production backend.
 /// - `cache=memory|indexeddb|opfs` (default `memory`; main page only).
+/// - `multiTab=1`: the IndexedDB cache in the JS SDK's format, shared by the
+///   tabs of the page (main page only; `cache` is then ignored).
 class AppConfig {
   const AppConfig({
     required this.emulatorHost,
     required this.emulatorPort,
     required this.cache,
+    this.multiTab = false,
   });
 
   factory AppConfig.fromUri(Uri uri) {
@@ -66,13 +69,19 @@ class AppConfig {
       (CacheChoice choice) => choice.name == cacheName,
       orElse: () => CacheChoice.memory,
     );
-    return AppConfig(emulatorHost: host, emulatorPort: port, cache: cache);
+    return AppConfig(
+      emulatorHost: host,
+      emulatorPort: port,
+      cache: cache,
+      multiTab: uri.queryParameters['multiTab'] == '1',
+    );
   }
 
   /// Null when the page talks to the production backend.
   final String? emulatorHost;
   final int? emulatorPort;
   final CacheChoice cache;
+  final bool multiTab;
 
   String get backendLabel => emulatorHost == null
       ? 'production (${firebaseOptions.projectId})'
