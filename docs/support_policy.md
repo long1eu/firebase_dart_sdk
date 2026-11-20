@@ -19,9 +19,9 @@ confirmed they are not commitments.
 - Flutter: the packages do not depend on Flutter. A Flutter app can use them as plain Dart
   packages with any Flutter release whose Dart SDK is 3.8 or later. No Flutter app is run by
   the tests of this repository (see [Platforms](#platforms)).
-- **DRAFT:** The lower bound is raised only in a release whose changelog says so, and only when
+- The lower bound is raised only in a release whose changelog says so, and only when
   a dependency or a language feature needs it.
-- **DRAFT:** A new stable Dart SDK is supported once CI passes on it; a problem with a new SDK is
+- A new stable Dart SDK is supported once CI passes on it; a problem with a new SDK is
   treated as a bug.
 
 ## Platforms
@@ -70,7 +70,7 @@ Behaviour is ported in Dart, not copied. Where the port deliberately differs fro
 - **DRAFT:** Upstream Firestore releases (Android and JS) are reviewed for changes that apply to
   the port at least once per upstream minor release, and the review is recorded in
   `docs/upstream_sync/`.
-- **DRAFT:** Fixes of data-safety and correctness bugs in upstream are ported with priority over
+- Fixes of data-safety and correctness bugs in upstream are ported with priority over
   new features.
 
 ## Versions and breaking changes
@@ -84,18 +84,18 @@ Behaviour is ported in Dart, not copied. Where the port deliberately differs fro
   token that GitHub issues to that one job, and each run waits for the maintainer's approval. The
   first version of a new package is published by hand.
 - Each package has a `CHANGELOG.md` with a heading for every version.
-- **DRAFT:** Versions follow [semantic versioning](https://semver.org/) as pub applies it before
+- Versions follow [semantic versioning](https://semver.org/) as pub applies it before
   1.0: while the version is 0.x, a breaking change increments the minor version (0.1.x to
   0.2.0), and everything else increments the patch version.
-- **DRAFT:** Every breaking change is listed in the changelog under a "Breaking changes" heading,
+- Every breaking change is listed in the changelog under a "Breaking changes" heading,
   with what to change in calling code.
-- **DRAFT:** Public API that is replaced is first marked `@Deprecated` for at least one minor
+- Public API that is replaced is first marked `@Deprecated` for at least one minor
   release before it is removed, unless keeping it would be unsafe.
-- **DRAFT:** Changes to the SQLite cache format always come with a migration of existing caches
+- Changes to the SQLite cache format always come with a migration of existing caches
   (the schema version is in `local/sqlite/sqlite_schema.dart`; the migration tests open caches
   written by older versions, including caches written by the published `cloud_firestore_vm`
   0.0.7).
-- **DRAFT:** The same holds for the format of the key-value cache (`package:cloud_firestore_dart/cache_store.dart`)
+- The same holds for the format of the key-value cache (`package:cloud_firestore_dart/cache_store.dart`)
   since 0.3.0: a change comes with a new schema version and a migration of the stores of the
   older versions (`kvSchemaVersion` and `kvMigrations` in `local/keyvalue/cache_store_persistence.dart`;
   `keyvalue_schema_test.dart` opens a fixture of what every version wrote and fails when the
