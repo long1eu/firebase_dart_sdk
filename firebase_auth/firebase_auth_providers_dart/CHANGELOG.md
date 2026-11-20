@@ -18,6 +18,11 @@
 - Token lifetimes from the backend are bounded as in the iOS SDK: an `expiresIn` outside of (0, 24 h], missing or
   not a number counts as one hour, an `exp` claim more than 24 h ahead is not trusted, and a proactive refresh
   delay beyond 24 h refreshes right away.
+- Every request is bounded by `requestTimeout` (a new named parameter of `FirebaseUserAuth`, 30 s by default): a
+  request that takes longer fails with `network-request-failed`, and the next token request tries again. The
+  proactive token refresh retries with backoff after any error that does not end the session (a failing storage,
+  for example), not only after a `FirebaseAuthException`. A storage that throws on read in `restore` keeps the
+  stored session (tested; the behavior was already so).
 
 - `FirebaseUserAuth.revokeToken(authorizationCode)` revokes the Sign in with Apple token of the signed-in user
   with Apple's authorization code (`v2/accounts:revokeToken`, like `revokeToken(withAuthorizationCode:)` of the
