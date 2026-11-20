@@ -116,7 +116,13 @@ class IndexedDbQueryCache implements QueryCache {
   }
 
   @override
-  Future<void> setLastRemoteSnapshotVersion(
+  Future<void> setLastRemoteSnapshotVersion(SnapshotVersion snapshotVersion) =>
+      _persistence._write(
+        'Set the last remote snapshot version',
+        () => _setLastRemoteSnapshotVersion(snapshotVersion),
+      );
+
+  Future<void> _setLastRemoteSnapshotVersion(
     SnapshotVersion snapshotVersion,
   ) async {
     lastRemoteSnapshotVersion = snapshotVersion;
@@ -146,7 +152,10 @@ class IndexedDbQueryCache implements QueryCache {
   }
 
   @override
-  Future<void> addQueryData(QueryData queryData) async {
+  Future<void> addQueryData(QueryData queryData) =>
+      _persistence._write('Add a target', () => _addQueryData(queryData));
+
+  Future<void> _addQueryData(QueryData queryData) async {
     await _saveQueryData(queryData);
     _updateMetadata(queryData);
     targetCount++;
@@ -154,7 +163,10 @@ class IndexedDbQueryCache implements QueryCache {
   }
 
   @override
-  Future<void> updateQueryData(QueryData queryData) async {
+  Future<void> updateQueryData(QueryData queryData) =>
+      _persistence._write('Update a target', () => _updateQueryData(queryData));
+
+  Future<void> _updateQueryData(QueryData queryData) async {
     await _saveQueryData(queryData);
     if (_updateMetadata(queryData)) {
       await _writeMetadata();
@@ -162,7 +174,10 @@ class IndexedDbQueryCache implements QueryCache {
   }
 
   @override
-  Future<void> removeQueryData(QueryData queryData) async {
+  Future<void> removeQueryData(QueryData queryData) =>
+      _persistence._write('Remove a target', () => _removeQueryData(queryData));
+
+  Future<void> _removeQueryData(QueryData queryData) async {
     final _IdbTransaction transaction = _transaction;
     final int targetId = queryData.targetId;
     await removeMatchingKeysForTargetId(targetId);
@@ -260,6 +275,14 @@ class IndexedDbQueryCache implements QueryCache {
   Future<void> addMatchingKeys(
     ImmutableSortedSet<DocumentKey> keys,
     int targetId,
+  ) => _persistence._write(
+    'Add matching keys',
+    () => _addMatchingKeys(keys, targetId),
+  );
+
+  Future<void> _addMatchingKeys(
+    ImmutableSortedSet<DocumentKey> keys,
+    int targetId,
   ) async {
     final _IdbTransaction transaction = _transaction;
     final ReferenceDelegate delegate = _persistence.referenceDelegate;
@@ -280,6 +303,14 @@ class IndexedDbQueryCache implements QueryCache {
   Future<void> removeMatchingKeys(
     ImmutableSortedSet<DocumentKey> keys,
     int targetId,
+  ) => _persistence._write(
+    'Remove matching keys',
+    () => _removeMatchingKeys(keys, targetId),
+  );
+
+  Future<void> _removeMatchingKeys(
+    ImmutableSortedSet<DocumentKey> keys,
+    int targetId,
   ) async {
     final _IdbTransaction transaction = _transaction;
     final ReferenceDelegate delegate = _persistence.referenceDelegate;
@@ -295,7 +326,13 @@ class IndexedDbQueryCache implements QueryCache {
   }
 
   @override
-  Future<void> removeMatchingKeysForTargetId(int targetId) async {
+  Future<void> removeMatchingKeysForTargetId(int targetId) =>
+      _persistence._write(
+        'Remove the matching keys of a target',
+        () => _removeMatchingKeysForTargetId(targetId),
+      );
+
+  Future<void> _removeMatchingKeysForTargetId(int targetId) async {
     final _IdbTransaction transaction = _transaction;
     await transaction.request(
       'delete the documents of target $targetId',

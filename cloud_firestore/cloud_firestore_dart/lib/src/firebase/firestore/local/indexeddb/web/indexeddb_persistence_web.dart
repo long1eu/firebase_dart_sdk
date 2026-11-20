@@ -70,6 +70,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/local/persistance/pe
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/persistance/query_cache.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/persistance/reference_delegate.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/persistance/remote_document_cache.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/local/persistance/stats_collector.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/query_context.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/query_data.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/reference_set.dart';
@@ -138,7 +139,9 @@ class WebIndexedDbPersistence extends IndexedDbPersistence {
     required LocalSerializer serializer,
     required LruGarbageCollectorParams lruParams,
     String? clientId,
-  }) : storagePrefix = indexedDbStoragePrefix(persistenceKey, databaseId),
+    StatsCollector statsCollector = StatsCollector.noOp,
+  }) : _statsCollector = statsCollector,
+       storagePrefix = indexedDbStoragePrefix(persistenceKey, databaseId),
        databaseName = indexedDbDatabaseName(persistenceKey, databaseId),
        clientId = clientId ?? autoId(),
        serializer = IndexedDbSerializer(serializer),
@@ -164,6 +167,9 @@ class WebIndexedDbPersistence extends IndexedDbPersistence {
   final String clientId;
 
   final IndexedDbSerializer serializer;
+
+  /// Counts the rows the mutation queue and the remote document cache read, write and delete (for tests).
+  final StatsCollector _statsCollector;
 
   final Semaphore _semaphore;
 
@@ -264,13 +270,23 @@ class WebIndexedDbPersistence extends IndexedDbPersistence {
 
   /// Runs the write [operation] in the transaction of this zone, or in a persistence transaction of its own when it is
   /// called outside of one: the local store of this port runs some operations that write outside a transaction (the
-  /// query engine creates indexes from `executeQuery`), which SQLite commits on their own. A read-only transaction
-  /// ([_current]) can not write, and a write must check the lease first ([_verifyOwner]).
-  Future<void> _write(String action, Future<void> Function() operation) {
+  /// query engine creates indexes from `executeQuery`), and the caches are used outside of one by their tests, which
+  /// SQLite commits statement by statement. A read-only transaction ([_current]) can not write, and a write must check
+  /// the lease first ([_verifyOwner]). Every public write of the caches goes through here.
+  ///
+  /// The transaction of its own takes no listen sequence number, as a statement outside a transaction does not with
+  /// SQLite: an operation that needs one ([IndexedDbReferenceDelegate.currentSequenceNumber]) fails outside a
+  /// transaction with either engine.
+  Future<T> _write<T>(String action, Future<T> Function() operation) {
     if (Zone.current[_zoneKey] is _IdbTransaction) {
       return operation();
     }
-    return runTransaction(action, operation);
+    return _runTransaction(
+      action,
+      operation,
+      primary: false,
+      sequenceNumber: false,
+    );
   }
 
   /// Runs [operation] with [transaction] as the transaction of its zone (see [_current]).
@@ -605,6 +621,7 @@ class WebIndexedDbPersistence extends IndexedDbPersistence {
     String action,
     Transaction<T> operation, {
     required bool primary,
+    bool sequenceNumber = true,
   }) async {
     beforeTransaction?.call(action);
     await _semaphore.acquire();
@@ -618,7 +635,9 @@ class WebIndexedDbPersistence extends IndexedDbPersistence {
           _reloadState = false;
         }
         await _verifyOwner(transaction);
-        referenceDelegate.onTransactionStarted();
+        if (sequenceNumber) {
+          referenceDelegate.onTransactionStarted();
+        }
         final T result = await _inTransaction(transaction, operation);
         if (primary) {
           // After the operation, so that a long operation leaves a lease with a recent timestamp (as in the JS SDK).

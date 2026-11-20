@@ -61,6 +61,14 @@ class IndexedDbDocumentOverlayCache implements DocumentOverlayCache {
   Future<void> saveOverlays(
     int largestBatchId,
     Map<DocumentKey, Mutation> overlays,
+  ) => _persistence._write(
+    'Save overlays',
+    () => _saveOverlays(largestBatchId, overlays),
+  );
+
+  Future<void> _saveOverlays(
+    int largestBatchId,
+    Map<DocumentKey, Mutation> overlays,
   ) async {
     final _IdbTransaction transaction = _transaction;
     await Future.wait(<Future<Object?>>[
@@ -82,7 +90,12 @@ class IndexedDbDocumentOverlayCache implements DocumentOverlayCache {
   }
 
   @override
-  Future<void> removeOverlaysForBatchId(int batchId) async {
+  Future<void> removeOverlaysForBatchId(int batchId) => _persistence._write(
+    'Remove the overlays of a batch',
+    () => _removeOverlaysForBatchId(batchId),
+  );
+
+  Future<void> _removeOverlaysForBatchId(int batchId) async {
     final _IdbTransaction transaction = _transaction;
     // PORTING NOTE: the JS SDK gets the keys of the batch and deletes per collection through
     // `collectionPathOverlayIndex`; this interface gives the batch id only, so the rows of the user are scanned.
@@ -112,7 +125,10 @@ class IndexedDbDocumentOverlayCache implements DocumentOverlayCache {
   }
 
   @override
-  Future<void> removeOverlays(Iterable<DocumentKey> keys) async {
+  Future<void> removeOverlays(Iterable<DocumentKey> keys) =>
+      _persistence._write('Remove overlays', () => _removeOverlays(keys));
+
+  Future<void> _removeOverlays(Iterable<DocumentKey> keys) async {
     final _IdbTransaction transaction = _transaction;
     await Future.wait(<Future<Object?>>[
       for (final DocumentKey key in keys)
@@ -287,7 +303,10 @@ class IndexedDbGlobalsCache implements GlobalsCache {
   }
 
   @override
-  Future<void> setValue(String name, Uint8List? value) async {
+  Future<void> setValue(String name, Uint8List? value) =>
+      _persistence._write('Set a global value', () => _setValue(name, value));
+
+  Future<void> _setValue(String name, Uint8List? value) async {
     final _IdbTransaction transaction = _transaction;
     if (value == null) {
       await transaction.request(
@@ -463,7 +482,11 @@ class IndexedDbReferenceDelegate implements ReferenceDelegate, LruDelegate {
 
   @override
   Future<int> removeTargets(int upperBound, Set<int> activeTargetIds) =>
-      _persistence.queryCache.removeTargets(upperBound, activeTargetIds);
+      _persistence._write(
+        'Remove targets',
+        () =>
+            _persistence.queryCache.removeTargets(upperBound, activeTargetIds),
+      );
 
   /// The ids of the users that have a batch in `mutations`, read through `userMutationsIndex` with one step per user.
   ///
@@ -517,7 +540,12 @@ class IndexedDbReferenceDelegate implements ReferenceDelegate, LruDelegate {
   }
 
   @override
-  Future<int> removeOrphanedDocuments(int upperBound) async {
+  Future<int> removeOrphanedDocuments(int upperBound) => _persistence._write(
+    'Remove orphaned documents',
+    () => _removeOrphanedDocuments(upperBound),
+  );
+
+  Future<int> _removeOrphanedDocuments(int upperBound) async {
     final _IdbTransaction transaction = _persistence._current;
     final List<String> candidates = <String>[];
     await _forEachOrphanedDocument((String path, int sequenceNumber) {
@@ -575,7 +603,10 @@ class IndexedDbBundleCache implements BundleCache {
   }
 
   @override
-  Future<void> saveBundleMetadata(BundleMetadata metadata) async {
+  Future<void> saveBundleMetadata(BundleMetadata metadata) => _persistence
+      ._write('Save bundle metadata', () => _saveBundleMetadata(metadata));
+
+  Future<void> _saveBundleMetadata(BundleMetadata metadata) async {
     final _IdbTransaction transaction = _transaction;
     await transaction.request(
       'put bundle ${metadata.bundleId}',
@@ -598,7 +629,10 @@ class IndexedDbBundleCache implements BundleCache {
   }
 
   @override
-  Future<void> saveNamedQuery(NamedQuery query) async {
+  Future<void> saveNamedQuery(NamedQuery query) =>
+      _persistence._write('Save a named query', () => _saveNamedQuery(query));
+
+  Future<void> _saveNamedQuery(NamedQuery query) async {
     final _IdbTransaction transaction = _transaction;
     await transaction.request(
       'put the named query ${query.name}',

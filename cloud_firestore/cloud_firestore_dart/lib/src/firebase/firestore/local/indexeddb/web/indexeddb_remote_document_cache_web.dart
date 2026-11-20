@@ -54,6 +54,10 @@ class IndexedDbRemoteDocumentCache implements RemoteDocumentCache {
       (web.IDBCursor cursor) {
         size += _documentSize((cursor as web.IDBCursorWithValue).value);
         cursor.delete();
+        _persistence._statsCollector.recordRowsDeleted(
+          RemoteDocumentCache.statsTag,
+          1,
+        );
         return true;
       },
     );
@@ -84,7 +88,13 @@ class IndexedDbRemoteDocumentCache implements RemoteDocumentCache {
   }
 
   @override
-  Future<void> add(MaybeDocument document, SnapshotVersion readTime) async {
+  Future<void> add(MaybeDocument document, SnapshotVersion readTime) =>
+      _persistence._write(
+        'Add a cached document',
+        () => _add(document, readTime),
+      );
+
+  Future<void> _add(MaybeDocument document, SnapshotVersion readTime) async {
     hardAssert(
       readTime != SnapshotVersion.none,
       'Cannot add document to the RemoteDocumentCache with a read time of zero',
@@ -98,27 +108,47 @@ class IndexedDbRemoteDocumentCache implements RemoteDocumentCache {
       'put the cached document ${document.key}',
       () => transaction.store(DbStores.remoteDocuments).put(row),
     );
+    _persistence._statsCollector.recordRowsWritten(
+      RemoteDocumentCache.statsTag,
+      1,
+    );
     await _updateByteSize(transaction, _documentSize(row) - previousSize);
     await (_indexManager ?? _persistence.indexManager)
         .addToCollectionParentIndex(document.key.path.popLast());
   }
 
   @override
-  Future<void> remove(DocumentKey documentKey) async {
+  Future<void> remove(DocumentKey documentKey) => _persistence._write(
+    'Remove a cached document',
+    () => _remove(documentKey),
+  );
+
+  Future<void> _remove(DocumentKey documentKey) async {
     final _IdbTransaction transaction = _transaction;
     final int size = await _deleteRows(transaction, documentKey);
     await _updateByteSize(transaction, -size);
+    // A removed document has no index entries (as the SQLite cache and the Android SDK's `removeAll`): without this a
+    // query served by an index finds the key of a document that is gone.
+    await _indexManager?.updateIndexEntries(<DocumentKey, MaybeDocument?>{
+      documentKey: null,
+    });
   }
 
   /// The size in `remoteDocumentGlobal` is updated once for all the documents.
   @override
-  Future<void> removeAll(Iterable<DocumentKey> documentKeys) async {
+  Future<void> removeAll(Iterable<DocumentKey> documentKeys) => _persistence
+      ._write('Remove cached documents', () => _removeAll(documentKeys));
+
+  Future<void> _removeAll(Iterable<DocumentKey> documentKeys) async {
     final _IdbTransaction transaction = _transaction;
     int size = 0;
     for (final DocumentKey key in documentKeys) {
       size += await _deleteRows(transaction, key);
     }
     await _updateByteSize(transaction, -size);
+    await _indexManager?.updateIndexEntries(<DocumentKey, MaybeDocument?>{
+      for (final DocumentKey key in documentKeys) key: null,
+    });
   }
 
   /// The size of the cached documents as the JS SDK accounts it (`getSize`): the `byteSize` of `remoteDocumentGlobal`.
@@ -154,6 +184,10 @@ class IndexedDbRemoteDocumentCache implements RemoteDocumentCache {
         transaction,
       ).get(web.IDBKeyRange.only(idbKey(dbRemoteDocumentKey(documentKey)))),
     );
+    _persistence._statsCollector.recordRowsRead(
+      RemoteDocumentCache.statsTag,
+      1,
+    );
     return _decode(row)?.document;
   }
 
@@ -173,6 +207,10 @@ class IndexedDbRemoteDocumentCache implements RemoteDocumentCache {
           ).get(web.IDBKeyRange.only(idbKey(dbRemoteDocumentKey(key)))),
         ),
     ]);
+    _persistence._statsCollector.recordRowsRead(
+      RemoteDocumentCache.statsTag,
+      rows.where((Object? row) => row != null).length,
+    );
     return <DocumentKey, MaybeDocument?>{
       for (int i = 0; i < keys.length; i++) keys[i]: _decode(rows[i])?.document,
     };
@@ -214,6 +252,10 @@ class IndexedDbRemoteDocumentCache implements RemoteDocumentCache {
             ),
           ),
       (web.IDBCursor cursor) {
+        _persistence._statsCollector.recordRowsRead(
+          RemoteDocumentCache.statsTag,
+          1,
+        );
         final ReadDocument? read = _decode(
           idbToDart((cursor as web.IDBCursorWithValue).value),
         );
@@ -270,6 +312,10 @@ class IndexedDbRemoteDocumentCache implements RemoteDocumentCache {
             ))!
             as List<Object?>;
     context?.incrementDocumentReadCount(rows.length);
+    _persistence._statsCollector.recordRowsRead(
+      RemoteDocumentCache.statsTag,
+      rows.length,
+    );
     ImmutableSortedMap<DocumentKey, Document> result =
         DocumentCollections.emptyDocumentMap();
     for (final Object? row in rows) {
