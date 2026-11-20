@@ -181,8 +181,8 @@ Firestore emulator ([how we test](docs/how_we_test.md)).
 
 **Issues:** <https://github.com/long1eu/firebase_dart_sdk/issues>.
 
-**Maintenance:** _[MAINTAINER: one sentence on who maintains this project and how. Not written
-yet.]_
+**Maintenance:** one maintainer, Razvan Lung, in his own time; most of the recent code was written with Claude
+Code and reviewed and tested by him. Response times are in the [support policy](docs/support_policy.md).
 
 - **Tested mostly against the Firestore emulator.** Against production, only the production
   verification kit (`tool/verify_production`) was run, on a real Firestore database in Standard
