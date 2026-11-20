@@ -73,6 +73,7 @@ One example per task, each runnable on its own (the header of each file says how
 | Keeping the user signed in across restarts: `FileAuthStorage` | [`persistent_session.dart`](https://github.com/long1eu/firebase_dart_sdk/blob/main/firebase_auth/firebase_auth_providers_dart/example/persistent_session.dart) | Auth emulator |
 | `authStateChanges()`, linking a Google credential to an anonymous user, email link sign-in, `unlink` | [`linking_and_email_link.dart`](https://github.com/long1eu/firebase_dart_sdk/blob/main/firebase_auth/firebase_auth_providers_dart/example/linking_and_email_link.dart) | Auth emulator |
 | Wiring a provider into Firestore; the rules see the user | [`firestore_wiring.dart`](https://github.com/long1eu/firebase_dart_sdk/blob/main/firebase_auth/firebase_auth_providers_dart/example/firestore_wiring.dart) | Auth and Firestore emulators |
+| Google sign-in through the system browser, for desktop apps and command line tools | [`google_desktop_sign_in.dart`](https://github.com/long1eu/firebase_dart_sdk/blob/main/firebase_auth/firebase_auth_providers_dart/example/google_desktop_sign_in.dart) | a Google OAuth client and a real project (or the Auth emulator) |
 | A service account key, its path in an environment variable | [`service_account.dart`](https://github.com/long1eu/firebase_dart_sdk/blob/main/firebase_auth/firebase_auth_providers_dart/example/service_account.dart) | a real project |
 | Application Default Credentials on a server | [`adc_server.dart`](https://github.com/long1eu/firebase_dart_sdk/blob/main/firebase_auth/firebase_auth_providers_dart/example/adc_server.dart) | a real project |
 
@@ -141,7 +142,8 @@ against the Firebase Auth emulator; nothing was run against the real service.
 | `user.uid`, `email`, `emailVerified`, `isAnonymous`, `displayName`, `photoURL`, `phoneNumber`, `tenantId`, `metadata`, `providerData` | `currentUser` (`AuthUser`, read with `accounts:lookup` after every sign-in) | emulator |
 | `setPersistence` (`inMemory`, `browserSession`, `browserLocal`) | an `AuthStorage`: `InMemoryAuthStorage` (default), `WebAuthStorage.session()`, `WebAuthStorage.local()`, and `FileAuthStorage(path)` on the VM | unit, Chrome |
 | `ActionCodeSettings` (`url`, `handleCodeInApp`, `iOS`, `android`, `linkDomain`) | `ActionCodeSettings` (flattened; no `dynamicLinkDomain`) | unit |
-| Popup and redirect flows, `signInWithProvider`, SAML | – (use a token from elsewhere with `signInWithCredential`) | |
+| Popup and redirect flows on desktop and command line (no JS SDK equivalent) | `signInWithOAuthLoopback(OAuthLoopbackProvider.google(...))` / `.oidc(...)` / `.discover(...)`, or `authorizeWithOAuthLoopback(...)` for the credential (VM only; see below) | unit (fake identity provider) |
+| Popup and redirect flows in a browser, `signInWithProvider`, SAML | – (use a token from elsewhere with `signInWithCredential`) | |
 | Phone sign-in, reCAPTCHA, multi-factor sign-in and enrolment, TOTP, `revokeAccessToken`, passkeys | – | |
 
 Of the federated providers, only the request and the flows were exercised, against the emulator with fake
@@ -155,6 +157,44 @@ Error codes are those of the JS SDK: its complete map of server codes (`SERVER_E
 `quota-exceeded`). An answer with HTTP 200 and an `errorMessage` is an error, as in the JS SDK. Operations of
 the signed-in user throw `null-user` when nobody is signed in, and sign the user out when the
 backend answers `user-disabled` or `user-token-expired` (`_logoutIfInvalidated` of the JS SDK).
+
+### Browser sign-in on desktop and command line
+
+`signInWithOAuthLoopback` (VM only; it throws an `UnsupportedError` on the web) signs the user in to Google or an
+OpenID Connect provider in the system browser, the way RFC 8252 describes for native apps: an authorization code
+request with PKCE (S256), a random `state` and a nonce, whose redirect comes back to a one-shot HTTP server bound to
+127.0.0.1 on a free port. The code is exchanged for the provider's tokens and the ID token signs in to Firebase
+with `signInWithCredential`.
+
+```dart
+final FirebaseUserAuth auth = await FirebaseUserAuth.forApp(app);
+final UserCredential result = await auth.signInWithOAuthLoopback(
+  OAuthLoopbackProvider.google(
+    clientId: '<the client id of a "Desktop app" OAuth client>',
+    clientSecret: '<its client secret>', // not confidential for a desktop client, says Google
+  ),
+);
+print(result.user?.email);
+```
+
+- The browser is opened with `open`, `xdg-open` or `rundll32` (`openInSystemBrowser`); pass `presenter:` to open it
+  another way (`url_launcher` in a Flutter app, or a printed link). The package depends on no Flutter plugin.
+- The code is exchanged at the provider's token endpoint with the client id and secret, or, with
+  `exchangeEndpoint:`, on a server of yours that keeps the secret. That endpoint gets the request of
+  `google_sign_in_dart`'s code exchange endpoint (a JSON text with `code`, `codeVerifier`, `clientId` and
+  `redirectUrl`), so an existing Cloud Function for it keeps working.
+- `OAuthLoopbackProvider.oidc(providerId: 'oidc.<name>', authorizationEndpoint:, tokenEndpoint:, clientId:)` or
+  `OAuthLoopbackProvider.discover(issuer:, ...)` for an OpenID Connect provider of Identity Platform; the client id
+  must be the one configured for the provider in the project.
+- `authorizeWithOAuthLoopback` returns the tokens and the credential without signing in, for
+  `linkWithCredential` and `reauthenticateWithCredential`.
+- Only the code is exchanged: once signed in, the Firebase session refreshes itself; the provider's refresh token is
+  returned but not used.
+- Errors are `FirebaseAuthException`s: `timeout` (five minutes by default), `user-cancelled`,
+  `oauth-state-mismatch`, `invalid-oauth-response`, `missing-or-invalid-nonce`, `invalid-credential` (the code was
+  refused) and `network-request-failed`.
+
+Tested against an in-process fake identity provider only: no real Google client or Firebase project was used.
 
 ## Documentation
 
@@ -170,7 +210,9 @@ backend answers `user-disabled` or `user-token-expired` (`_logoutIfInvalidated` 
 - Nothing was run against the real Firebase Auth service or Google's token endpoint: the
   providers were tested with unit tests and against the Firebase emulators. Application Default
   Credentials are delegated to `package:googleapis_auth` without a test of their own.
-- Federated sign-in needs a provider token the app obtained itself: there are no popup or redirect flows.
+- Federated sign-in needs a provider token the app obtained itself, or, on desktop and command line, the browser
+  sign-in of `signInWithOAuthLoopback` (Google and OpenID Connect; not Apple, which does not accept loopback
+  redirects). There are no popup or redirect flows in a browser.
   Phone sign-in, multi-factor sign-in and enrolment, and reCAPTCHA are not there (the table above lists the
   rest). A project that enforces reCAPTCHA Enterprise for email and password refuses these sign-ins
   (`missing-recaptcha-token`).

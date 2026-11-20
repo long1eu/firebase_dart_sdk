@@ -2,6 +2,16 @@
 
 - `FirebaseUserAuth.useEmulator(emulatorHost)`: sends the later requests to the Auth emulator, for an instance that
   is created before the emulator is known (FlutterFire's `useAuthEmulator`). `emulatorHost` is now a getter.
+- Browser sign-in for desktop apps and command line tools (VM only): `FirebaseUserAuth.signInWithOAuthLoopback`
+  and `authorizeWithOAuthLoopback`, with `OAuthLoopbackProvider.google`, `.oidc` and `.discover`. The system
+  browser (`openInSystemBrowser`, or a `presenter` of your own) runs the authorization code flow with PKCE (S256),
+  a random `state` (compared in constant time) and a nonce; the redirect comes back to a one-shot server on
+  127.0.0.1 that answers 404 to any other path and is always closed (success, error or `timeout`). The code is
+  exchanged at the token endpoint, or through an `exchangeEndpoint` with the request and answer of
+  `google_sign_in_dart`'s code exchange endpoint. The result (`OAuthLoopbackResult`) has the provider's tokens and
+  a ready `OAuthCredential`. On the web these throw an `UnsupportedError`. New error codes: `timeout`,
+  `user-cancelled`, `oauth-state-mismatch`, `invalid-oauth-response`, `invalid-oauth-provider`. Tested against an
+  in-process fake identity provider only.
 
 ## 0.3.0
 

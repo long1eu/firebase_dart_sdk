@@ -299,7 +299,7 @@ against a throwaway real project (owner action: it needs a project and its Web A
 | Item | Size | Tests |
 | --- | --- | --- |
 | TOTP multi-factor: enrol, sign in with the resolver, unenrol, list factors, QR URL (`openInOtpApp` stays in a Flutter adapter) | 2 days, 600 lines | unit; real project with Identity Platform (emulator TOTP not documented) |
-| Desktop/CLI OAuth helper (`oauth_loopback.dart`, VM only): browser open, 127.0.0.1 redirect, PKCE, state, timeout; presets for Google and generic OIDC; then tier 1 credentials | 3 to 4 days, 700 lines | unit with an in-process fake IdP; emulator for the exchange |
+| Desktop/CLI OAuth helper (`lib/src/oauth_loopback/`, VM only): browser open, 127.0.0.1 redirect, PKCE, state, timeout; presets for Google and generic OIDC; then tier 1 credentials. **Done (unreleased)**: `signInWithOAuthLoopback`, `authorizeWithOAuthLoopback`, `OAuthLoopbackProvider.google` / `.oidc` / `.discover`; direct code exchange or through `google_sign_in_dart`'s exchange endpoint contract | about 870 lines, plus 550 of tests | unit with an in-process fake IdP (19 tests); not run with a real Google client or project |
 | `revokeAccessToken` (Apple) | 2 h, 60 lines | unit |
 | reCAPTCHA Enterprise token on the web for projects that enforce it | 2 days, 400 lines | Chrome with a real site key (owner) |
 | Web popup/redirect resolver with `package:web` | 5 to 8 days, 1,500 lines | Chrome against the emulator's handler; real project for authorized domains |

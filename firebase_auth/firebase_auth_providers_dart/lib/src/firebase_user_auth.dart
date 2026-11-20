@@ -11,6 +11,9 @@ import 'auth_credential.dart';
 import 'auth_exception.dart';
 import 'auth_storage.dart';
 import 'auth_user.dart';
+import 'oauth_loopback/oauth_loopback.dart';
+import 'oauth_loopback/oauth_loopback_stub.dart'
+    if (dart.library.io) 'oauth_loopback/oauth_loopback_io.dart';
 import 'user_record.dart';
 import 'password_policy.dart';
 import 'environment_stub.dart'
@@ -1061,6 +1064,41 @@ class FirebaseUserAuth implements AuthTokenProvider {
     _checkNotDisposed();
     final _CredentialRequest request = _requestFor(credential);
     return _signIn(request.method, request.body);
+  }
+
+  /// Signs in with [provider] in the system browser (desktop apps and command line tools, VM only): runs
+  /// [authorizeWithOAuthLoopback] and then [signInWithCredential] with the credential of the provider's tokens. On
+  /// the web it throws an [UnsupportedError].
+  ///
+  /// [presenter] opens the authorization URL ([openInSystemBrowser] by default), [timeout] bounds the wait for the
+  /// redirect, and [httpClient] is used for the code exchange (the client of this instance by default). It throws
+  /// what both steps throw: `timeout`, `user-cancelled`, `oauth-state-mismatch`, `invalid-credential`, ...
+  ///
+  /// To link or reauthenticate instead, call [authorizeWithOAuthLoopback] and pass
+  /// [OAuthLoopbackResult.credential] to [linkWithCredential] or [reauthenticateWithCredential].
+  ///
+  /// ```dart
+  /// final UserCredential result = await auth.signInWithOAuthLoopback(
+  ///   OAuthLoopbackProvider.google(
+  ///     clientId: '<the client id of a Desktop OAuth client>',
+  ///     clientSecret: '<its client secret>',
+  ///   ),
+  /// );
+  /// ```
+  Future<UserCredential> signInWithOAuthLoopback(
+    OAuthLoopbackProvider provider, {
+    UrlPresenter? presenter,
+    Duration timeout = const Duration(minutes: 5),
+    http.Client? httpClient,
+  }) async {
+    _checkNotDisposed();
+    final OAuthLoopbackResult result = await authorizeWithOAuthLoopback(
+      provider,
+      presenter: presenter,
+      timeout: timeout,
+      httpClient: httpClient ?? _http,
+    );
+    return signInWithCredential(result.credential);
   }
 
   /// Links [credential] to the signed-in user (`linkWithCredential`): the account can then sign in with it too. An
