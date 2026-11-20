@@ -148,6 +148,21 @@ fails until it is reachable again:
 
 ![Works offline: get() and listeners from the cache, Source.cache and ListenSource.cache, set, update, delete and batches queued and sent later, pending writes kept across restarts with the SQLite cache, loadBundle and named queries. Needs the backend: transactions, count, sum and average, findNearest, Pipelines, get(Source.server) and Firestore Lite.](https://raw.githubusercontent.com/long1eu/firebase_dart_sdk/main/docs/images/readme/offline.svg)
 
+## What it has that the official client SDKs do not
+
+Besides the places it runs (above), these are in this client and not in the official ones. Each row of
+[the parity page](docs/parity.md) marked *extra* has its test.
+
+| Extra | What it is |
+|---|---|
+| `mergeUnsentWrites` | A document edited many times offline stays one pending write. Off by default; rules and functions then see fewer writes ([guide](docs/guides/long_offline.md)) |
+| `getPendingWriteCount()`, `pendingWriteCounts()` | How many writes still wait for the backend ([guide](docs/guides/offline_persistence.md)) |
+| A cache in your own storage | `keyValueCacheSettings(store: ...)` over any ordered key-value store ([guide](docs/guides/custom_cache_store.md)) |
+| The JS SDK's cache | The IndexedDB cache reads and writes the JS SDK's database, and `importJsSdkCache` moves it, pending writes included, into the other caches. Chrome only ([guide](docs/guides/web.md)) |
+| A busy or failing cache database | The client recovers instead of failing (`TransientDatabaseException`) ([guide](docs/guides/offline_persistence.md)) |
+| Several clients on one SQLite file | Isolates, processes or a Flutter hot restart elect one primary and keep the file consistent; they do not share listeners ([guide](docs/guides/multiple_clients.md)) |
+| Read-only transactions, `findNearest` on a query, pipelines in a read-only transaction | Not in the JS client SDK; FlutterFire was not checked ([parity](docs/parity.md)) |
+
 ## Guides
 
 [docs/guides](docs/guides/README.md): getting started (VM, Flutter, web), queries and data,
