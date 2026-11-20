@@ -7,6 +7,16 @@ done by [`cloud_firestore_dart`](https://pub.dev/packages/cloud_firestore_dart) 
 registers before `main()` on Linux. The app code does not import it; the only sign of it is one line in
 `pubspec.yaml`, plus `lib/disk_cache.dart` for the optional disk cache.
 
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="screenshots/02-offline-pending-dark.png">
+    <img src="screenshots/02-offline-pending-light.png" width="720"
+         alt="The app with the Network switch off, a status line reading 6 docs and hasPendingWrites true, and six items, the last three with an upload cloud icon and a pending server time">
+  </picture>
+</p>
+
+The app on Linux with the network switched off: three items were added while offline and are shown as pending.
+
 | What | Where |
 | --- | --- |
 | `Firebase.initializeApp(options: FirebaseOptions(...))` with placeholder `demo-` values, `useFirestoreEmulator(host, port)` from `--dart-define` | `lib/bootstrap.dart` |
@@ -118,10 +128,26 @@ and `sqlite3` 3.5.2 from pub.dev.
   `CACHE_DIR`. With the emulator **stopped**, the read phase (a new process, network disabled from the
   start) passed: the document came from the SQLite file. A control run of the read phase with an empty
   `CACHE_DIR` failed as it should (timed out with `0 docs`).
-- **Not yet done:** a screenshot of the window, and typing through the real X keyboard path (`xdotool`); the
-  integration tests enter text through the test binding, not through GTK.
+Run again on 2026-11-20, with the dark theme and the package versions of this folder, in an **arm64 Linux container (Ubuntu 24.04, aarch64) inside a VM
+on an Apple Silicon Mac**, not on a physical ARM board, under **Xvfb** 1280x800 with software rendering and no
+window manager. **Flutter 3.50.1** (Dart 3.14.0); from pub.dev: `cloud_firestore` 7.2.0,
+`cloud_firestore_dart` 0.3.2, `cloud_firestore_dart_platform` 0.1.2 and `cloud_firestore_dart_sqlite` 0.1.3;
+Firestore emulator 1.22.0.
 
-One problem was found on the way, in this example and not in a package: the edit dialog disposed its
+- **Release build.** `flutter build linux --release --dart-define=DISK_CACHE=true` worked (58 seconds, a 26 MB
+  bundle) and the app ran without a crash. The integration tests were not rerun in this pass.
+- **Real input and screenshots.** Items were typed through the real X input path with `xdotool`, not through the
+  test binding. Screenshots were taken in light and dark: online with three items
+  ([light](screenshots/01-online-light.png), [dark](screenshots/01-online-dark.png)); with the network switched
+  off and three more items added, shown as pending
+  ([light](screenshots/02-offline-pending-light.png), [dark](screenshots/02-offline-pending-dark.png)). After
+  the app was killed and the emulator stopped, a `START_OFFLINE=true` build started on the same cache directory
+  and showed all six items from the SQLite file, the three offline ones still pending.
+- **Dark mode.** The app follows the system colour scheme. Under Xvfb, Flutter's Linux embedder took it from
+  the XDG desktop portal (`xdg-desktop-portal` and `xdg-desktop-portal-gtk` running, and `gsettings set
+  org.gnome.desktop.interface color-scheme prefer-dark`); `GTK_THEME=Adwaita:dark` alone had no effect.
+
+One problem was found on the way in the first run, in this example and not in a package: the edit dialog disposed its
 `TextEditingController` as soon as `showDialog` returned, while the dialog's closing animation still used it
 ("A TextEditingController was used after being disposed"). The dialog now owns its controller
 (`_EditDialog`).
@@ -131,6 +157,6 @@ One problem was found on the way, in this example and not in a package: the edit
 Not tried here: sign-in (`firebase_auth` has no Linux implementation; see the package README for
 `FirebaseUserAuth`), App Check, a production project (only the emulator, over plain text), TLS to a real
 backend from a Flutter Linux process, a real desktop session with a GPU and a window manager, other
-distributions, arm64, release and profile builds, and packaging (snap, Flatpak, AppImage). The SQLite files
+distributions, a physical ARM board, profile builds, and packaging (snap, Flatpak, AppImage). The SQLite files
 were left with a `-wal` file after the test process ended, which SQLite replays on the next open; a desktop app
 should call `FirebaseFirestore.instance.terminate()` when it quits.

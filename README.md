@@ -196,12 +196,13 @@ code; he reviews and tests it. Response times are in the [support policy](docs/s
   suite as a whole and long-running load. Test against your own project before relying on it.
 - Platforms: the Dart VM on macOS and Linux (CI on Ubuntu x64, a Debian arm64 container). In
   Flutter: an app with this client was built and run on macOS, and an app on the official
-  `cloud_firestore` API with `cloud_firestore_dart_platform` on Debian 13 x86_64, both against
-  the emulator only. On Windows 11 x64 (one VM, against the emulator): the unit and standard
-  integration suites on the Dart VM, and two Flutter debug apps (`flutter_notes`, and
+  `cloud_firestore` API with `cloud_firestore_dart_platform` on Debian 13 x86_64 (debug) and in
+  an Ubuntu 24.04 arm64 container (release), both against the emulator only. On Windows 11 x64
+  (one VM, against the emulator): the unit and standard integration suites on the Dart VM, and
+  two Flutter debug apps (`flutter_notes`, and
   `flutterfire_on_windows` on the official `cloud_firestore` API), driven from an SSH session
-  without a drawn window. Never run: Android or iOS (devices or emulators), embedded Linux, a
-  Linux or Windows release build, Windows in CI.
+  without a drawn window. Never run: Android or iOS (devices or emulators), embedded Linux or a
+  physical ARM board, a Linux profile build, a Windows release build, Windows in CI.
 - `cloud_firestore_dart` 0.0.1 on pub.dev (2020) is an early release of the same package. The
   packages replace the ones published as `cloud_firestore_vm` and `firebase_core_vm` (and the
   internal `_firebase_internal_vm` and `_firebase_database_collection_vm`, now folded in). See

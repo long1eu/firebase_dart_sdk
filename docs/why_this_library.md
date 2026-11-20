@@ -77,8 +77,9 @@ Ranked by how strong the evidence is that this library is the better or the only
    roadmap" ([flutterfire#18461](https://github.com/firebase/flutterfire/pull/18461), closed 2026-07-23).
    Here this library is the only Firestore client with listeners and an offline cache, and through
    `cloud_firestore_dart_platform` the app keeps the official `cloud_firestore` API. Caveat: one app was built
-   and run on Debian 13 x86_64, a debug build against the emulator (see the update above); no sign-in, no
-   real project, no release build, no embedded board.
+   and run on Debian 13 x86_64, a debug build against the emulator (see the update above), and a release
+   build ran in an Ubuntu 24.04 arm64 container on 2026-11-20; no sign-in, no real project, no profile build,
+   no physical ARM board.
 2. **Dart servers, workers and CLIs that need real-time listeners, an offline cache, or access as a Firebase
    user under security rules.** The official Dart Admin SDK has no listeners: its own design note says "no
    bidirectional `Listen` RPC, so realtime listeners are a transport limit and a gap"
@@ -167,13 +168,15 @@ x64 (one VM, 2026-11-17) the Dart VM suites pass, and `flutter_notes` and `flutt
 and run against the emulator (no window drawn). No Flutter app was built for Android or iOS
 (`docs/guides/flutter.md`). Updated
 2026-11-17: a Flutter Linux app on the official `cloud_firestore` API ran on Debian 13 x86_64 with
-`cloud_firestore_dart_platform`, against the emulator, in a debug build (see the update at the top).
+`cloud_firestore_dart_platform`, against the emulator, in a debug build (see the update at the top). Updated
+2026-11-20: a release build of the same app ran in an Ubuntu 24.04 arm64 container (a VM on a Mac), against the
+emulator.
 
 **How sure.** High that the gaps exist. Medium-high that this library fills Linux (Dart VM tested, one Flutter
 Linux app run against the emulator). Medium-low for Windows: one VM, emulator only.
 
 **Unverified.** Sign-in in a Flutter Linux app (`firebase_auth` has no Linux implementation), a real project
-and TLS from a Flutter Linux process, a release build, arm64 and other distributions, a Windows release build, a logged-on
+and TLS from a Flutter Linux process, a Linux profile build, a physical ARM board and other distributions, a Windows release build, a logged-on
 Windows desktop, Windows in CI, an embedded board.
 
 ## Hypothesis 2: pure-Dart servers and CLIs
@@ -365,7 +368,7 @@ is still the weakest place to aim; for a Flutter web app where FlutterFire works
 
 | Situation | Official option | This library | Who wins and why |
 |---|---|---|---|
-| Flutter app on Linux desktop or embedded Linux | none for Firestore | the official `cloud_firestore` API through `cloud_firestore_dart_platform`; listeners, offline cache | this library: the only option (one debug build run on Debian against the emulator; embedded not tried) |
+| Flutter app on Linux desktop or embedded Linux | none for Firestore | the official `cloud_firestore` API through `cloud_firestore_dart_platform`; listeners, offline cache | this library: the only option (a debug build run on Debian x86_64 and a release build in an arm64 container, against the emulator; embedded not tried) |
 | Flutter app on Windows, shipped to users | `cloud_firestore`, "development only", C++ SDK gaps | run on one Windows 11 VM against the emulator; sum, average and the disk cache work | unclear until tested; the official option is not supported in production |
 | Dart server reacting to changes | Admin SDK: no listeners (drafts in progress); polling | listeners with resume and backoff | this library today; may change in months |
 | Dart server or CLI acting as a user under rules, or working offline | none (Admin bypasses rules; `firedart` has no cache, no queries) | yes | this library |
@@ -456,8 +459,8 @@ Ranked by expected effect on adoption.
 
 - "Production ready", or anything that implies scale or reliability beyond the emulator and the 15-check kit.
 - "Works in Flutter apps on Android / iOS": not run there yet. Say "expected to work" until it has been.
-  "Works on Windows": say only what ran (one VM, the emulator, debug builds). For Linux (updated 2026-11-17), do not go beyond what ran: one debug build on Debian 13
-  x86_64 against the emulator, without sign-in.
+  "Works on Windows": say only what ran (one VM, the emulator, debug builds). For Linux (updated 2026-11-17), do not go beyond what ran: a debug build on Debian 13
+  x86_64 and (2026-11-20) a release build in an Ubuntu 24.04 arm64 container, against the emulator, without sign-in.
 - "Faster builds" or "smaller apps" than FlutterFire: not measured, and the iOS build argument is mostly
   obsolete.
 - "Smaller web bundles" or "the wasm option": FlutterFire web is wasm-ready and about the same size.
