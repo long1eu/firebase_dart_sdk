@@ -5,6 +5,10 @@ This package is an unofficial client of the Firebase Auth REST APIs (Identity
 Toolkit and Secure Token) and of Google's OAuth 2.0 token endpoint. It is not a
 port of a Firebase SDK.
 
+The generated protocol buffer code under lib/src/proto is compiled from
+Google API definitions (googleapis), Copyright Google LLC, licensed under the
+Apache License, Version 2.0.
+
 This package is not affiliated with, endorsed by or supported by Google LLC or
 Firebase. "Firebase" is a trademark of Google LLC.
 
