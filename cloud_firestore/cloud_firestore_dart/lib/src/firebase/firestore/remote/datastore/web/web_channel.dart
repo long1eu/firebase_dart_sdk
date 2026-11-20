@@ -125,6 +125,8 @@ class WebChannelStream {
     this.longPollingTimeoutMs,
     this.releaseTimeout = const Duration(seconds: 3),
     this.forwardRequestTimeout = const Duration(seconds: 20),
+    this.deadBackChannelTimeout = const Duration(seconds: 6),
+    this.rttEstimate = const Duration(seconds: 3),
     this.retryDelays = const <Duration>[
       Duration(milliseconds: 100),
       Duration(seconds: 1),
@@ -174,6 +176,19 @@ class WebChannelStream {
   /// alive. The closure WebChannel uses the same 20 seconds.
   final Duration forwardRequestTimeout;
 
+  /// How long the back channel may stay silent after the answer to a forward
+  /// request said that the server sent arrays the client does not have,
+  /// before the back channel request is given up and made again (port of the
+  /// dead back channel timer of the closure WebChannel: `handlePostResponse_`
+  /// and `onBackChannelDead_` in webchannelbase.js; 6 seconds in closure-net,
+  /// twice its RTT estimate of 3 seconds in closure-library).
+  final Duration deadBackChannelTimeout;
+
+  /// The round trip time the closure WebChannel assumes (`RTT_ESTIMATE`): a
+  /// back channel request sent less than this before a forward request may
+  /// not have reached the server when it answered that request.
+  final Duration rttEstimate;
+
   /// Whether the back channel is requested in long polling mode.
   bool get isLongPolling => _longPolling;
   bool _longPolling;
@@ -201,6 +216,11 @@ class WebChannelStream {
   static const int _maxEmptyBackChannelRequests = 3;
 
   /// The longest error body of a back channel request that is read.
+  /// Above this many bytes not yet received the back channel is assumed to be
+  /// busy delivering them, not dead
+  /// (`OUTSTANDING_DATA_BACKCHANNEL_RETRY_CUTOFF` of the closure WebChannel).
+  static const int _outstandingBytesRetryCutoff = 37500;
+
   static const int _maxErrorBodyLength = 1024 * 1024;
 
   final StreamController<Map<String, Object?>> _messages =
@@ -226,6 +246,19 @@ class WebChannelStream {
 
   WebHttpRequest? _forwardRequest;
   WebHttpRequest? _backRequest;
+
+  /// When the back channel request in flight was sent, or null between
+  /// requests.
+  DateTime? _backRequestSentAt;
+
+  /// The back channel requests in a row that ended without data (or that
+  /// were given up as dead); reset by any array that arrives.
+  int _backChannelRetries = 0;
+  Timer? _deadBackChannelTimer;
+
+  /// Whether the back channel request in flight is aborted to be made again
+  /// at once, see [_retryBackChannel].
+  bool _restartingBackChannel = false;
   Timer? _backChannelTimer;
 
   /// The messages of the server. Fails with a [GrpcError] when the session
@@ -345,11 +378,13 @@ class WebChannelStream {
             't': '$attempt',
           });
 
+    late DateTime sentAt;
     try {
       late WebHttpResponse response;
       late String text;
       for (int attempt = 1; ; attempt++) {
         try {
+          sentAt = DateTime.now();
           final WebHttpRequest request = _http.send(
             'POST',
             url(attempt),
@@ -411,6 +446,8 @@ class WebChannelStream {
         if (!_onHandshake(response, text)) {
           return;
         }
+      } else {
+        _onForwardAnswer(text, sentAt);
       }
       _sentCount += batch.length;
     } catch (e) {
@@ -554,7 +591,6 @@ class WebChannelStream {
   }
 
   Future<void> _runBackChannel() async {
-    int emptyRequests = 0;
     while (!_closed) {
       bool receivedData = false;
       bool failed = false;
@@ -575,6 +611,7 @@ class WebChannelStream {
         }),
       );
       _backRequest = request;
+      _backRequestSentAt = DateTime.now();
       _armBackChannelTimer(request);
       _armLongPollingDetection(request);
       try {
@@ -610,7 +647,9 @@ class WebChannelStream {
             for (final Object? array in chunk) {
               receivedData = true;
               _receivedBackChannelData = true;
+              _backChannelRetries = 0;
               _detectionTimer?.cancel();
+              _clearDeadBackChannelTimer();
               if (!resumed && _isNewArray(array)) {
                 resumed = true;
                 if (!_resumesAfter(array, requestedAfter)) {
@@ -633,15 +672,27 @@ class WebChannelStream {
         // A network error or the timeout below: counted as an empty request.
         failed = true;
       }
+      _backRequestSentAt = null;
+      _clearDeadBackChannelTimer();
       if (_closed) {
         return;
       }
+      if (_restartingBackChannel) {
+        // Made again at once, and counted as a retry, as the closure
+        // WebChannel does (`maybeRetryBackChannel_`).
+        _restartingBackChannel = false;
+        if (++_backChannelRetries >= _maxEmptyBackChannelRequests) {
+          _fail(const GrpcError.unavailable('The stream connection was lost'));
+          return;
+        }
+        continue;
+      }
       if (failed &&
           !_switchedToLongPolling &&
-          emptyRequests < retryDelays.length) {
+          _backChannelRetries < retryDelays.length) {
         // The request is made again with the last array id that arrived: the
         // server sends what the client missed, so a cut loses nothing.
-        await Future<void>.delayed(retryDelays[emptyRequests]);
+        await Future<void>.delayed(retryDelays[_backChannelRetries]);
         if (_closed) {
           return;
         }
@@ -651,12 +702,85 @@ class WebChannelStream {
         _switchedToLongPolling = false;
         continue;
       }
-      emptyRequests = receivedData ? 0 : emptyRequests + 1;
-      if (emptyRequests >= _maxEmptyBackChannelRequests) {
+      if (!receivedData) {
+        _backChannelRetries++;
+      }
+      if (_backChannelRetries >= _maxEmptyBackChannelRequests) {
         _fail(const GrpcError.unavailable('The stream connection was lost'));
         return;
       }
     }
+  }
+
+  /// Handles the answer to a forward request: `[backChannelPresent,
+  /// lastArrayId, outstandingBytes]`. Port of `handlePostResponse_` of the
+  /// closure WebChannel (webchannelbase.js), with the 6 second timer of
+  /// closure-net. An answer of another shape is ignored.
+  void _onForwardAnswer(String text, DateTime sentAt) {
+    final List<Object?> values;
+    try {
+      final List<Object?> chunks = WebChannelChunkParser().add(text);
+      final Object? first = chunks.isEmpty ? null : chunks.first;
+      if (first is! List ||
+          first.length != 3 ||
+          first.any((Object? value) => value is! int)) {
+        return;
+      }
+      values = first;
+    } on FormatException {
+      return;
+    }
+    if (_closed) {
+      return;
+    }
+    if (values[0] == 0) {
+      _onBackChannelMissing(sentAt);
+      return;
+    }
+    final int lastServerArrayId = values[1]! as int;
+    final int outstandingBytes = values[2]! as int;
+    // Not too many bytes outstanding, not long polling, and not after a
+    // retry (`shouldRetryBackChannel_`).
+    if (lastServerArrayId > _lastArrayId &&
+        outstandingBytes < _outstandingBytesRetryCutoff &&
+        !_longPolling &&
+        _backChannelRetries == 0 &&
+        _deadBackChannelTimer == null) {
+      _deadBackChannelTimer = Timer(deadBackChannelTimeout, () {
+        _deadBackChannelTimer = null;
+        _retryBackChannel();
+      });
+    }
+  }
+
+  /// The server says it has no back channel request of this session. Port of
+  /// `handleBackchannelMissing_` of the closure WebChannel: the request in
+  /// flight is made again if it was sent well before the forward request
+  /// (otherwise it may just not have reached the server yet).
+  void _onBackChannelMissing(DateTime forwardSentAt) {
+    final DateTime? backSentAt = _backRequestSentAt;
+    if (backSentAt != null &&
+        backSentAt.add(rttEstimate).isBefore(forwardSentAt)) {
+      _clearDeadBackChannelTimer();
+      _retryBackChannel();
+    }
+  }
+
+  /// Aborts the back channel request in flight; [_runBackChannel] makes it
+  /// again at once, with the last array id that arrived (`onBackChannelDead_`
+  /// and `maybeRetryBackChannel_` of the closure WebChannel).
+  void _retryBackChannel() {
+    final WebHttpRequest? request = _backRequest;
+    if (_closed || _backRequestSentAt == null || request == null) {
+      return;
+    }
+    _restartingBackChannel = true;
+    request.abort();
+  }
+
+  void _clearDeadBackChannelTimer() {
+    _deadBackChannelTimer?.cancel();
+    _deadBackChannelTimer = null;
   }
 
   /// Aborts [request] if the server stays silent for too long (it sends a
@@ -804,6 +928,7 @@ class WebChannelStream {
     _closed = true;
     _backChannelTimer?.cancel();
     _detectionTimer?.cancel();
+    _clearDeadBackChannelTimer();
     _outgoing.clear();
     if (!_handshakeHeaders.isCompleted) {
       _handshakeHeaders.complete(const <String, String>{});
