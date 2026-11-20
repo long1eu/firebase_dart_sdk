@@ -11,6 +11,7 @@ topics:
   - firestore
   - database
   - offline
+  - server
 
 # The VM uses native gRPC over HTTP/2 (dart:io). The web uses REST and
 # WebChannel over fetch, with a memory cache or an opt-in SQLite cache in
