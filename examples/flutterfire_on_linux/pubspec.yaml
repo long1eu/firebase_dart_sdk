@@ -15,9 +15,9 @@ dependencies:
   # Implements cloud_firestore (and firebase_core) on Linux. Flutter registers
   # it before main() through its dartPluginClass; the app does not import it,
   # except for the optional disk cache (lib/disk_cache.dart).
-  cloud_firestore_dart_platform: ^0.1.0
+  cloud_firestore_dart_platform: ^0.1.2
   # The SQLite opener of the optional disk cache (--dart-define=DISK_CACHE=true).
-  cloud_firestore_dart_sqlite: ^0.1.0
+  cloud_firestore_dart_sqlite: ^0.1.3
   firebase_core: ^5.1.0
   flutter:
     sdk: flutter

@@ -9,7 +9,7 @@ In short, read across a row for the transport and the caches of a platform:
 | Platform | Transport | Cache without an `openDatabase` | Persistent cache | Tested |
 |---|---|---|---|---|
 | Dart VM (servers, command line) | gRPC | memory | SQLite file (`cloud_firestore_dart_sqlite`) | macOS, Linux, Windows 11 x64 (one VM, not in CI) |
-| Flutter on Android, iOS, desktop | gRPC | memory | SQLite file (`cloud_firestore_dart_sqlite`) | not on Android or iOS; desktop apps on macOS, Linux (Debian 13) and Windows 11 x64, against the emulator |
+| Flutter on Android, iOS, desktop | gRPC | memory | SQLite file (`cloud_firestore_dart_sqlite`) | not on Android or iOS; desktop apps on macOS, Linux (Debian 13 x86_64, and a release build in an Ubuntu 24.04 arm64 container) and Windows 11 x64, against the emulator |
 | Web, dart2wasm | REST and WebChannel over `fetch` | memory | SQLite in WebAssembly, in IndexedDB or OPFS (`cloud_firestore_dart_sqlite`) | Chrome, against the emulator |
 | Web, dart2js | REST and WebChannel over `fetch` | memory | the same as dart2wasm | Chrome, against the emulator; integers above 2^53 lose precision |
 

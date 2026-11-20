@@ -15,9 +15,9 @@ dependencies:
   # Implements cloud_firestore. On Windows the official plugin has a native
   # implementation, so the app selects this one with CloudFirestoreDart.use()
   # at the start of main() (lib/dart_firestore.dart).
-  cloud_firestore_dart_platform: ^0.1.0
+  cloud_firestore_dart_platform: ^0.1.2
   # The SQLite opener of the optional disk cache (--dart-define=DISK_CACHE=true).
-  cloud_firestore_dart_sqlite: ^0.1.0
+  cloud_firestore_dart_sqlite: ^0.1.3
   firebase_core: ^5.1.0
   flutter:
     sdk: flutter

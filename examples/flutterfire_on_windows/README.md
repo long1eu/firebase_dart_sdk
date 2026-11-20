@@ -27,8 +27,8 @@ average ("not supported by the Firebase C++ SDK on Windows").
 ```yaml
 dependencies:
   cloud_firestore: ^7.1.0
-  cloud_firestore_dart_platform: ^0.1.0   # selected with CloudFirestoreDart.use()
-  cloud_firestore_dart_sqlite: ^0.1.0     # only for the disk cache
+  cloud_firestore_dart_platform: ^0.1.2   # selected with CloudFirestoreDart.use()
+  cloud_firestore_dart_sqlite: ^0.1.3     # only for the disk cache
   firebase_core: ^5.1.0
   path_provider: ^2.1.6                   # only for the disk cache directory
 ```

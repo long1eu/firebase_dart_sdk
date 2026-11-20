@@ -17,6 +17,11 @@ class FlutterfireOnLinuxApp extends StatelessWidget {
       title: 'FlutterFire on Linux',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(colorSchemeSeed: Colors.indigo),
+      // Follows the system setting (themeMode defaults to ThemeMode.system).
+      darkTheme: ThemeData(
+        colorSchemeSeed: Colors.indigo,
+        brightness: Brightness.dark,
+      ),
       home: const ItemsPage(),
     );
   }

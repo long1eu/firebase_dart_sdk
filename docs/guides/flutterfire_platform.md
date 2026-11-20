@@ -8,8 +8,9 @@ implementation everywhere.
 Tried on Debian 13 (trixie), x86_64, with Flutter 3.44.9 on 2026-11-16: the Linux desktop app
 [`examples/flutterfire_on_linux`](../../examples/flutterfire_on_linux/), written only against the official API,
 built in debug, registered the package with no code, and passed its integration tests against the emulator under
-Xvfb, including the disk cache across a restart. Other platforms, release builds and production projects are not
-tried yet.
+Xvfb, including the disk cache across a restart. On 2026-11-20 the same app was built in release and run in an
+Ubuntu 24.04 arm64 container (in a VM on an Apple Silicon Mac), with screenshots in light and dark. Other
+platforms, profile builds, physical ARM boards and production projects are not tried yet.
 
 ## How the official plugin finds its implementation
 
