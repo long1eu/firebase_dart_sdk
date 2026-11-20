@@ -6,6 +6,7 @@ import 'dart:async';
 import 'package:firebase_app_dart/firebase_app_dart.dart';
 import 'package:firebase_auth_providers_dart/firebase_auth_providers_dart.dart';
 import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
 import 'package:test/test.dart';
 
 import 'fakes.dart';
@@ -143,6 +144,123 @@ void main() {
       expect(auth.uid, isNull);
       expect(backend.timers.active, isEmpty);
     });
+  });
+
+  group('storage write', () {
+    const String key = 'firebase_auth_providers_dart:$apiKey';
+
+    /// A secure token service that rejects a refresh token once it has been used, and replaces it with a new one
+    /// while [rotate] says so.
+    late bool rotate;
+    setUp(() {
+      rotate = true;
+      final Set<String> revoked = <String>{};
+      int rotation = 0;
+      backend.on('token', (Map<String, Object?> body) {
+        final String refreshToken = body['refresh_token']! as String;
+        if (revoked.contains(refreshToken)) {
+          return errorResponse('INVALID_REFRESH_TOKEN');
+        }
+        final String uid = refreshToken.split(':')[1];
+        String next = refreshToken;
+        if (rotate) {
+          revoked.add(refreshToken);
+          next = 'refresh:$uid:${++rotation}';
+        }
+        return jsonResponse(<String, Object?>{
+          'id_token': idToken(
+            uid,
+            expires: backend.clock.now.add(const Duration(hours: 1)),
+            tag: 'rotation$rotation',
+          ),
+          'refresh_token': next,
+          'expires_in': '3600',
+        });
+      });
+    });
+
+    test(
+      'a failed write keeps the new session in memory and stores it at the next refresh',
+      () async {
+        await auth.signInAnonymously();
+        final String? before = storage.read(key);
+        expect(before, contains('refresh:anon-user'));
+
+        storage.failWrites = true;
+        await expectLater(
+          auth.getAccessToken(forceRefresh: true),
+          throwsStateError,
+        );
+        // Still signed in, with the new tokens; the storage has the old session.
+        expect(auth.uid, 'anon-user');
+        expect(storage.read(key), before);
+        final GetTokenResult token = await auth.getAccessToken(
+          forceRefresh: false,
+        );
+        expect(token.claims['tag'], 'rotation1');
+        expect(countOf('token'), 1);
+
+        // The next refresh keeps the same refresh token, and stores the session all the same.
+        storage.failWrites = false;
+        rotate = false;
+        await auth.getAccessToken(forceRefresh: true);
+        expect(storage.read(key), contains('refresh:anon-user:1'));
+        await auth.dispose();
+
+        auth = backend.create(storage: storage);
+        await auth.restore();
+        expect(auth.uid, 'anon-user');
+        expect(
+          (await auth.getAccessToken(forceRefresh: false)).token,
+          isNotEmpty,
+        );
+        expect(auth.uid, 'anon-user');
+      },
+    );
+  });
+
+  group('forApp', () {
+    test(
+      'registers the provider when the storage throws on read, and restore() retries',
+      () async {
+        final FirebaseApp app = FirebaseApp.withOptions(
+          const FirebaseOptions(
+            apiKey: apiKey,
+            appId: '1:1:web:1',
+            projectId: 'demo',
+          ),
+          name: 'forApp-${DateTime.now().microsecondsSinceEpoch}',
+        );
+        addTearDown(app.delete);
+        final MockClient client = MockClient((http.Request request) {
+          backend.requests.add(request);
+          return backend.handler(request);
+        });
+        final FirebaseUserAuth first = await FirebaseUserAuth.forApp(
+          app,
+          storage: storage,
+          httpClient: client,
+        );
+        await first.signInAnonymously();
+        await first.dispose();
+
+        storage.failReads = true;
+        await expectLater(
+          FirebaseUserAuth.forApp(app, storage: storage, httpClient: client),
+          throwsStateError,
+        );
+        final AuthTokenProvider provider = app.authProvider;
+        expect(provider, isA<FirebaseUserAuth>());
+        expect(provider, isNot(same(first)));
+        final FirebaseUserAuth second = provider as FirebaseUserAuth;
+        addTearDown(second.dispose);
+        expect(second.uid, isNull);
+
+        storage.failReads = false;
+        await second.restore();
+        expect(second.uid, 'anon-user');
+      },
+    );
   });
 
   group('restore', () {

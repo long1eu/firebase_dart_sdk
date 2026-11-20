@@ -73,7 +73,9 @@ import 'environment_stub.dart'
 /// in again. Drop those objects to forget the session in memory.
 ///
 /// **Session.** The session (the refresh token) is kept in an [AuthStorage]; the default, [InMemoryAuthStorage],
-/// forgets it when the process ends. [restore] (called by [forApp]) loads a stored session.
+/// forgets it when the process ends. [restore] (called by [forApp]) loads a stored session. When the storage fails
+/// to write a new session, the operation throws the error of the storage but the session in memory is the new one,
+/// and the next token refresh writes it again; a failing storage never signs the user out.
 ///
 /// **Errors.** Requests fail with a [FirebaseAuthException]; its [FirebaseAuthException.code] lists
 /// the codes. Any request can fail with `network-request-failed`, `too-many-requests`, `invalid-api-key` or
@@ -155,7 +157,9 @@ class FirebaseUserAuth implements AuthTokenProvider {
   /// The session is stored in [storage] (default: in memory) under a key made of the API key and the name of the
   /// app, so that two apps keep two sessions. [emulatorHost] and [httpClient] are those of the constructor.
   ///
-  /// Throws an [ArgumentError] for an invalid [emulatorHost], and whatever the `read` of [storage] throws.
+  /// Throws an [ArgumentError] for an invalid [emulatorHost], and whatever the `read` of [storage] throws. In the
+  /// second case the instance is the token provider of the app all the same, signed out, and the stored session is
+  /// kept: call [restore] on it (`app.authProvider as FirebaseUserAuth`) to try again.
   ///
   /// ```dart
   /// final FirebaseUserAuth auth = await FirebaseUserAuth.forApp(
@@ -180,8 +184,11 @@ class FirebaseUserAuth implements AuthTokenProvider {
       emulatorHost: emulatorHost,
       httpClient: httpClient,
     );
-    await auth.restore();
-    app.authProvider = auth;
+    try {
+      await auth.restore();
+    } finally {
+      app.authProvider = auth;
+    }
     return auth;
   }
 
@@ -413,6 +420,9 @@ class FirebaseUserAuth implements AuthTokenProvider {
   Future<String?>? _refreshing;
   Timer? _refreshTimer;
   int _refreshFailures = 0;
+
+  /// Whether the session in memory differs from the stored one because its write failed.
+  bool _unsaved = false;
   bool _disposed = false;
 
   /// Counts the sessions: it changes when a session is installed for a sign-in, [updateCurrentUser] or [restore],
@@ -1564,7 +1574,8 @@ class FirebaseUserAuth implements AuthTokenProvider {
   /// Throws a [FirebaseNoSignedInUserException] when nobody is signed in (Firestore then sends the request without
   /// a token), and a [FirebaseAuthException] when the refresh fails. When the refresh fails because the
   /// session is no longer valid (the account was deleted or disabled, the refresh token revoked), the user is
-  /// signed out.
+  /// signed out. Throws whatever the `write` of the storage throws when a new refresh token cannot be stored; the
+  /// new token is in use all the same, and the write is tried again at the next refresh.
   @override
   Future<GetTokenResult> getAccessToken({required bool forceRefresh}) async {
     final _Session? session = _session;
@@ -2202,23 +2213,33 @@ class FirebaseUserAuth implements AuthTokenProvider {
     return generation;
   }
 
+  /// Makes [session] the current one and, when [persist] is set or an earlier write failed, stores it. The session
+  /// changes in memory first, like `directlySetCurrentUser` of the JS SDK: the backend may already have replaced
+  /// the refresh token, so the old session is not kept for a failed write. The error of the write is rethrown and
+  /// the next session change (a token refresh, a reload, a sign-in) writes again.
   Future<void> _setSession(_Session session, {required bool persist}) async {
     _session = session;
     _sessionOfUser[session.user] = (apiKey, session);
-    if (persist) {
-      await _storage.write(
-        _storageKey,
-        encodeSession(session.user, session.refreshToken),
-      );
-    }
-    if (_tokenChanges.hasListener) {
-      _scheduleProactiveRefresh();
+    try {
+      if (persist || _unsaved) {
+        _unsaved = true;
+        await _storage.write(
+          _storageKey,
+          encodeSession(session.user, session.refreshToken),
+        );
+        _unsaved = false;
+      }
+    } finally {
+      if (_tokenChanges.hasListener) {
+        _scheduleProactiveRefresh();
+      }
     }
   }
 
   Future<void> _clearSession() async {
     _generation++;
     _session = null;
+    _unsaved = false;
     _cancelProactiveRefresh();
     if (!_disposed) {
       // After dispose the stored session may belong to a new instance that restored it.
