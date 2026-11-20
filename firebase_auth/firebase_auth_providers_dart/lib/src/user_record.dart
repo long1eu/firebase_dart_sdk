@@ -7,6 +7,7 @@ import 'package:firebase_app_dart/firebase_app_dart.dart';
 
 import 'auth_credential.dart';
 import 'auth_user.dart';
+import 'multi_factor.dart';
 
 String? _text(Object? value) =>
     value is String && value.isNotEmpty ? value : null;
@@ -35,6 +36,7 @@ AuthUser copyUser(
   String? tenantId,
   UserMetadata? metadata,
   List<UserInfo>? providerData,
+  List<MultiFactorInfo>? enrolledFactors,
   bool clearDisplayName = false,
   bool clearPhotoUrl = false,
   bool clearPhoneNumber = false,
@@ -49,6 +51,7 @@ AuthUser copyUser(
   tenantId: tenantId ?? user.tenantId,
   metadata: metadata ?? user.metadata,
   providerData: providerData ?? user.providerData,
+  enrolledFactors: enrolledFactors ?? user.enrolledFactors,
 );
 
 /// The entries of `providerUserInfo` (`extractProviderData` of the JS SDK).
@@ -66,6 +69,14 @@ List<UserInfo> providerDataOf(Object? providers) =>
               photoUrl: _text(provider['photoUrl']),
               phoneNumber: _text(provider['phoneNumber']),
             ),
+    ]);
+
+/// The entries of `mfaInfo` (`MultiFactorUserImpl` of the JS SDK reads them on every reload).
+List<MultiFactorInfo> enrolledFactorsOf(Object? mfaInfo) =>
+    List<MultiFactorInfo>.unmodifiable(<MultiFactorInfo>[
+      if (mfaInfo is List)
+        for (final Object? enrollment in mfaInfo)
+          ?MultiFactorInfo.fromResponse(enrollment),
     ]);
 
 /// The user of an account of `accounts:lookup`, like `_reloadWithoutSaving` of the JS SDK: [previous] is the user
@@ -98,6 +109,8 @@ AuthUser userFromAccount(Map<String, Object?> account, AuthUser previous) {
       lastSignInTime: _millis(account['lastLoginAt']),
     ),
     providerData: providerData,
+    // The answer is the account as it is: without `mfaInfo` it has no second factor (left).
+    enrolledFactors: enrolledFactorsOf(account['mfaInfo']),
   );
 }
 
@@ -167,32 +180,47 @@ AdditionalUserInfo? additionalUserInfoOf(Map<String, Object?> response) {
 const int storageVersion = 2;
 
 /// The stored form of a session: the user and the refresh token.
-String encodeSession(AuthUser user, String refreshToken) =>
-    jsonEncode(<String, Object?>{
-      'version': storageVersion,
-      'uid': user.uid,
-      'email': user.email,
-      'isAnonymous': user.isAnonymous,
-      'emailVerified': user.emailVerified,
-      'displayName': user.displayName,
-      'photoUrl': user.photoUrl,
-      'phoneNumber': user.phoneNumber,
-      'tenantId': user.tenantId,
-      'createdAt': user.metadata.creationTime?.millisecondsSinceEpoch,
-      'lastLoginAt': user.metadata.lastSignInTime?.millisecondsSinceEpoch,
-      'providerData': <Object?>[
-        for (final UserInfo info in user.providerData)
-          <String, Object?>{
-            'providerId': info.providerId,
-            'rawId': info.uid,
-            'email': info.email,
-            'displayName': info.displayName,
-            'photoUrl': info.photoUrl,
-            'phoneNumber': info.phoneNumber,
-          },
-      ],
-      'refreshToken': refreshToken,
-    });
+String encodeSession(
+  AuthUser user,
+  String refreshToken,
+) => jsonEncode(<String, Object?>{
+  'version': storageVersion,
+  'uid': user.uid,
+  'email': user.email,
+  'isAnonymous': user.isAnonymous,
+  'emailVerified': user.emailVerified,
+  'displayName': user.displayName,
+  'photoUrl': user.photoUrl,
+  'phoneNumber': user.phoneNumber,
+  'tenantId': user.tenantId,
+  'createdAt': user.metadata.creationTime?.millisecondsSinceEpoch,
+  'lastLoginAt': user.metadata.lastSignInTime?.millisecondsSinceEpoch,
+  'providerData': <Object?>[
+    for (final UserInfo info in user.providerData)
+      <String, Object?>{
+        'providerId': info.providerId,
+        'rawId': info.uid,
+        'email': info.email,
+        'displayName': info.displayName,
+        'photoUrl': info.photoUrl,
+        'phoneNumber': info.phoneNumber,
+      },
+  ],
+  // In the shape of `mfaInfo`, so that it is read back like an answer of the backend.
+  'mfaInfo': <Object?>[
+    for (final MultiFactorInfo factor in user.enrolledFactors)
+      <String, Object?>{
+        'mfaEnrollmentId': factor.uid,
+        'displayName': factor.displayName,
+        if (factor.factorId == MultiFactorInfo.phoneFactorId)
+          'phoneInfo': factor.phoneNumber ?? '',
+        if (factor.factorId == MultiFactorInfo.totpFactorId)
+          'totpInfo': const <String, Object?>{},
+        'enrolledAt': factor.enrollmentTime?.toIso8601String(),
+      },
+  ],
+  'refreshToken': refreshToken,
+});
 
 /// Reads a stored session of any version: the fields a version does not have are left empty. Returns null for a
 /// value this package did not write (not JSON, no uid or refresh token).
@@ -223,6 +251,7 @@ String encodeSession(AuthUser user, String refreshToken) =>
         lastSignInTime: _millis(json['lastLoginAt']),
       ),
       providerData: providerDataOf(json['providerData']),
+      enrolledFactors: enrolledFactorsOf(json['mfaInfo']),
     ),
     refreshToken: json['refreshToken']! as String,
   );

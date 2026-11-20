@@ -914,7 +914,7 @@ void main() {
           .having(
             (FirebaseAuthMultiFactorException e) => e.message,
             'message',
-            contains('not supported by this package'),
+            FirebaseAuthMultiFactorException.defaultMessage,
           )
           .having(
             (FirebaseAuthMultiFactorException e) => '$e',
@@ -1466,6 +1466,7 @@ void main() {
               'phoneNumber': null,
             },
           ],
+          'mfaInfo': <Object?>[],
           'refreshToken': 'refresh:uid-of-a@example.com',
         });
         await auth.signOut();

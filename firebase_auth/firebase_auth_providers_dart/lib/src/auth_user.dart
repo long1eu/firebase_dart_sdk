@@ -1,5 +1,6 @@
 import 'auth_credential.dart';
 import 'firebase_user_auth.dart';
+import 'multi_factor.dart';
 
 /// The signed-in user of a [FirebaseUserAuth]: [FirebaseUserAuth.currentUser], the result of a sign-in, and the
 /// events of [FirebaseUserAuth.userChanges()].
@@ -7,8 +8,9 @@ import 'firebase_user_auth.dart';
 /// An immutable snapshot: a change (a [FirebaseUserAuth.updateProfile], a [FirebaseUserAuth.reload]) produces a new
 /// object. Two users are equal when all their fields are. [toString] shows only [uid] and [isAnonymous].
 ///
-/// The fields follow FlutterFire's `User` (and the JS SDK's): [providerData], [metadata], [phoneNumber] and
-/// [tenantId] are read from the account (`accounts:lookup`) after every sign-in and [FirebaseUserAuth.reload].
+/// The fields follow FlutterFire's `User` (and the JS SDK's): [providerData], [metadata], [phoneNumber],
+/// [tenantId] and [enrolledFactors] are read from the account (`accounts:lookup`) after every sign-in and
+/// [FirebaseUserAuth.reload].
 ///
 /// ```dart
 /// final AuthUser user = await auth.signInAnonymously();
@@ -28,6 +30,7 @@ class AuthUser {
     this.tenantId,
     this.metadata = const UserMetadata(),
     this.providerData = const <UserInfo>[],
+    this.enrolledFactors = const <MultiFactorInfo>[],
   });
 
   /// The id of the user.
@@ -65,6 +68,13 @@ class AuthUser {
   /// An anonymous user has none.
   final List<UserInfo> providerData;
 
+  /// The second factors enrolled on the account (`mfaInfo`; the JS SDK's `multiFactor(user).enrolledFactors`,
+  /// FlutterFire's `user.multiFactor.getEnrolledFactors()`): authenticator app factors that
+  /// [FirebaseUserAuth.finalizeTotpEnrollment] added, and SMS factors enrolled elsewhere, with their full phone
+  /// number. Empty when the account has none, and for a session stored by an earlier version until
+  /// [FirebaseUserAuth.reload].
+  final List<MultiFactorInfo> enrolledFactors;
+
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -78,7 +88,8 @@ class AuthUser {
           phoneNumber == other.phoneNumber &&
           tenantId == other.tenantId &&
           metadata == other.metadata &&
-          _listEquals(providerData, other.providerData);
+          _listEquals(providerData, other.providerData) &&
+          _listEquals(enrolledFactors, other.enrolledFactors);
 
   @override
   int get hashCode => Object.hash(
@@ -92,13 +103,14 @@ class AuthUser {
     tenantId,
     metadata,
     Object.hashAll(providerData),
+    Object.hashAll(enrolledFactors),
   );
 
   @override
   String toString() => 'AuthUser(uid: $uid, isAnonymous: $isAnonymous)';
 }
 
-bool _listEquals(List<UserInfo> a, List<UserInfo> b) {
+bool _listEquals(List<Object> a, List<Object> b) {
   if (a.length != b.length) {
     return false;
   }
@@ -245,6 +257,7 @@ class UserCredential extends AuthUser {
         tenantId: user.tenantId,
         metadata: user.metadata,
         providerData: user.providerData,
+        enrolledFactors: user.enrolledFactors,
       );
 
   final AuthUser _user;

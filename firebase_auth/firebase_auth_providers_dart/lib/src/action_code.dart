@@ -1,4 +1,5 @@
 import 'auth_exception.dart';
+import 'multi_factor.dart';
 
 /// Where the link of an action email (password reset, email verification, ...) leads, like `ActionCodeSettings`
 /// of the JS SDK.

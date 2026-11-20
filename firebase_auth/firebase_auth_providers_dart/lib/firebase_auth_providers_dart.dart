@@ -1,7 +1,8 @@
 /// Ready-made token providers for `firebase_app_dart` and `cloud_firestore_dart`.
 ///
 /// * [FirebaseUserAuth]: Firebase Auth user sign-in over REST (anonymous, email and password, email link, custom
-///   tokens, and federated providers by token exchange), with FlutterFire's names, and the storages of its session
+///   tokens, and federated providers by token exchange; authenticator app second factors), with FlutterFire's names,
+///   and the storages of its session
 ///   ([InMemoryAuthStorage], `FileAuthStorage` on the VM, `WebAuthStorage` in a browser).
 /// * [OAuthTokenProvider.serviceAccount]: a service account, for servers. Bypasses security rules.
 /// * `applicationDefaultCredentials()` in `package:firebase_auth_providers_dart/adc.dart` (needs `dart:io`):
@@ -43,6 +44,8 @@ export 'src/auth_exception.dart';
 export 'src/auth_storage.dart';
 export 'src/auth_user.dart';
 export 'src/firebase_user_auth.dart';
+export 'src/multi_factor.dart'
+    hide createMultiFactorResolver, timestampOf, totpSessionInfoOf;
 export 'src/oauth_loopback/oauth_loopback.dart';
 export 'src/oauth_loopback/oauth_loopback_stub.dart'
     if (dart.library.io) 'src/oauth_loopback/oauth_loopback_io.dart';
