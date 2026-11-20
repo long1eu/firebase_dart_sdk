@@ -30,6 +30,7 @@ It is a port of the open-source Firebase Android SDK, kept close to its current 
 | Typed converters (`withConverter`), snapshots as JSON, data bundles | stable |
 | Offline cache in SQLite (you supply the opener) or in memory; LRU garbage collection; cache indexes | stable |
 | Several clients on one SQLite cache: consistent file, one primary client | stable, coordination not done |
+| Merging repeated offline writes to a document into one pending write (`mergeUnsentWrites`, off by default): not in the official SDKs, the backend ends with the same documents but rules and functions see fewer writes ([guide](https://github.com/long1eu/firebase_dart_sdk/blob/main/docs/guides/offline_persistence.md#merging-repeated-offline-writes-opt-in-extension)) | supported, opt-in extension |
 | BSON value types of Enterprise edition databases | stable |
 | Pipelines (`package:cloud_firestore_dart/pipelines.dart`), Enterprise edition only | **preview** |
 | Firestore Lite (`package:cloud_firestore_dart/lite.dart`): no cache, one request per call | stable |

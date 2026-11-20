@@ -33,6 +33,25 @@
   under 0.1 ms after the first).
 - The key-value cache no longer counts deleted documents it skips in a collection scan as read,
   as the SQLite cache does; the count feeds the choice of a cache index.
+- `mergeUnsentWrites` is no longer experimental: it is a supported opt-in extension that differs
+  from the official SDKs (off by default; the backend ends with the same documents, rules and
+  functions see fewer writes). Each merge rule of the guide is tied to a test, and new property
+  tests compare random offline sequences with and without the setting on a model backend, on the
+  emulator (SQLite, memory and key-value caches, with what the app sees after every write and the
+  outcome of every write), against security rules, and with the merge at start killed at random
+  points. The guide also documents that after a process kill a SQLite cache that is not an
+  `ExclusiveDatabase` merges nothing until the row of the killed client is 30 minutes old.
+- `mergeUnsentWrites`: a `set` (or an earlier merged write that became one) with a
+  `serverTimestamp` on a nested field (`n.t`) followed by an `update` that deletes that field or
+  a map above it is no longer merged. The timestamp creates the map `n`, which the delete leaves
+  empty on the backend; the merged write did not create it, so `n` was missing. Found by a new
+  property test of random offline sequences.
+- `mergeUnsentWrites`: a merged write no longer carries the fields that a `serverTimestamp` of the
+  newer write overwrites (for example `n.t` of the older write and a timestamp on `n` in the
+  newer one). The backend ends the same; until it confirms the write, the value that
+  `ServerTimestampBehavior.previous` shows under the pending timestamp is now the one it shows
+  without the setting (it showed the older write's fields, or an earlier map). Found by a new
+  test that compares the cache views with and without the setting after every offline write.
 
 ## 0.3.0
 
