@@ -149,9 +149,10 @@ void main() {
     }
   });
 
-  for (final bool sqlite in <bool>[false, true]) {
+  for (final String persistence in <String>['memory', 'SQLite', 'key-value']) {
+    final bool sqlite = persistence == 'SQLite';
     test('held-back documents under watch reconnects, '
-        '${sqlite ? 'SQLite' : 'memory'} persistence', () async {
+        '$persistence persistence', () async {
       final Stats stats = Stats();
       final String? failure = await runProperty(
         'held-back documents under watch reconnects',
@@ -159,12 +160,13 @@ void main() {
         count: cases(30),
         steps: _steps,
         sqlite: sqlite,
+        keyValue: persistence == 'key-value',
         stats: stats,
       );
       if (failure != null) {
         fail(failure);
       }
-      print('held-back property (${sqlite ? 'SQLite' : 'memory'}): $stats');
+      print('held-back property ($persistence): $stats');
       // The interleavings must reach the cases the property is about.
       expect(stats.reconnects, greaterThan(0), reason: '$stats');
       expect(stats.limboResolutions, greaterThan(0), reason: '$stats');

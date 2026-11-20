@@ -1441,12 +1441,15 @@ Future<(List<String>, List<String>)> runSeed(
   int steps,
   RunConfig config, {
   required bool sqlite,
+  bool keyValue = false,
   Stats? stats,
 }) async {
   final String name =
       'firebase/firestore/core/view_property_${const Uuid().v4()}';
   final Persistence persistence = sqlite
       ? await createSQLitePersistenceForProject('test-project', name)
+      : keyValue
+      ? await createKeyValuePersistence(projectId: 'test-project')
       : await createLRUMemoryPersistence();
   final ViewRun run = ViewRun(seed, Gen(seed), stats ?? Stats(), config);
   try {
@@ -1552,6 +1555,7 @@ Future<String?> runProperty(
   required int count,
   required int steps,
   required bool sqlite,
+  bool keyValue = false,
   required Stats stats,
 }) async {
   for (int i = 0; i < count; i++) {
@@ -1559,7 +1563,14 @@ Future<String?> runProperty(
     final bool pair = config.indexes != null;
     final (List<String> failures, List<String> trace) = pair
         ? await runIndexPair(seed, steps, config, stats: stats)
-        : await runSeed(seed, steps, config, sqlite: sqlite, stats: stats);
+        : await runSeed(
+            seed,
+            steps,
+            config,
+            sqlite: sqlite,
+            keyValue: keyValue,
+            stats: stats,
+          );
     if (failures.isEmpty) {
       continue;
     }
@@ -1570,7 +1581,7 @@ Future<String?> runProperty(
     for (int n = 0; n < steps; n++) {
       final (List<String> f, List<String> t) = pair
           ? await runIndexPair(seed, n, config)
-          : await runSeed(seed, n, config, sqlite: sqlite);
+          : await runSeed(seed, n, config, sqlite: sqlite, keyValue: keyValue);
       if (f.isNotEmpty) {
         shortest = n;
         shortestFailures = f;
@@ -1580,7 +1591,7 @@ Future<String?> runProperty(
     }
     return 'Property "$property" failed.\n'
         '  seed: $seed (rerun with PROPERTY_SEED=$seed), '
-        '${sqlite ? 'SQLite' : 'memory'} persistence, shortest failing '
+        '${sqlite ? 'SQLite' : (keyValue ? 'key-value' : 'memory')} persistence, shortest failing '
         'prefix: $shortest of $steps steps, then the drain\n'
         '  failures:\n${shortestFailures.map((String f) => '    $f\n').join()}'
         '  trace:\n${shortestTrace.map((String t) => '    $t\n').join()}';

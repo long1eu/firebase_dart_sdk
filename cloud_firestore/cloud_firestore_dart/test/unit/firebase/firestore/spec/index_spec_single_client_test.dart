@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:test/test.dart';
 
+import '../../../../../example/cache_store/memory_log/memory_log_store.dart';
 import '../local/persistence_test_helpers.dart';
 import 'spec_test_case.dart';
 
@@ -33,12 +34,22 @@ Map<String, dynamic> _singleClient(Map<String, dynamic> spec) {
   };
 }
 
-Future<void> _run(String name, Map<String, dynamic> spec) {
+Future<void> _run(
+  String name,
+  Map<String, dynamic> spec, {
+  bool keyValue = false,
+}) {
+  final Map<String, MemoryLogStore> stores = <String, MemoryLogStore>{};
   final SpecTestCase testCase = SpecTestCase(
-    (_, String persistenceName) => createSQLitePersistenceForProject(
-      'test-project',
-      'firebase/firestore/spec/index_spec_single_client_test_${Uri.encodeQueryComponent(persistenceName)}',
-    ),
+    (_, String persistenceName) => keyValue
+        ? createKeyValuePersistence(
+            store: stores.putIfAbsent(persistenceName, MemoryLogStore.new),
+            projectId: 'test-project',
+          )
+        : createSQLitePersistenceForProject(
+            'test-project',
+            'firebase/firestore/spec/index_spec_single_client_test_${Uri.encodeQueryComponent(persistenceName)}',
+          ),
   )..currentName = name;
   return testCase.runSteps(
     spec['steps'] as List<dynamic>,
@@ -47,6 +58,13 @@ Future<void> _run(String name, Map<String, dynamic> spec) {
 }
 
 void main() {
+  for (final bool keyValue in <bool>[false, true]) {
+    _define(keyValue);
+  }
+}
+
+void _define(bool keyValue) {
+  final String suffix = keyValue ? ', key-value' : '';
   final Map<String, dynamic> specs =
       jsonDecode(File('test/res/json/index_spec_test.json').readAsStringSync())
           as Map<String, dynamic>;
@@ -54,7 +72,7 @@ void main() {
   int index = 0;
   for (final MapEntry<String, dynamic> entry in specs.entries) {
     final int id = index++;
-    test('${entry.key} (on one client)', () async {
+    test('${entry.key} (on one client$suffix)', () async {
       final Map<String, dynamic> spec = _singleClient(
         jsonDecode(jsonEncode(entry.value)) as Map<String, dynamic>,
       );
@@ -77,12 +95,12 @@ void main() {
         ),
         isNotEmpty,
       );
-      await _run('index_single_$id', spec);
+      await _run('index_single_$id', spec, keyValue: keyValue);
     });
   }
 
   test(
-    'expectedState.indexes fails for an index that is not configured',
+    'expectedState.indexes fails for an index that is not configured$suffix',
     () async {
       final Map<String, dynamic> spec = <String, dynamic>{
         'config': <String, dynamic>{
@@ -124,7 +142,7 @@ void main() {
         ],
       };
       await expectLater(
-        _run('index_single_mismatch', spec),
+        _run('index_single_mismatch', spec, keyValue: keyValue),
         throwsA(isA<TestFailure>()),
       );
     },

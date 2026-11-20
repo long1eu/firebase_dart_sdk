@@ -33,6 +33,7 @@ void main() {
     'memory': createEagerGCMemoryPersistence,
     'sqlite': () => createSQLitePersistence(
         'firebase/firestore/local/remote_document_cache_lots_test-${const Uuid().v4()}.db'),
+    'keyvalue': () => createKeyValuePersistence(),
   };
 
   for (final MapEntry<String, Future<Persistence> Function()> variant

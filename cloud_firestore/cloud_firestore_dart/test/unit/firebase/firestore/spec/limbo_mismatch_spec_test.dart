@@ -13,6 +13,7 @@
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/persistance/persistence.dart';
 import 'package:test/test.dart';
 
+import '../../../../../example/cache_store/memory_log/memory_log_store.dart';
 import '../local/persistence_test_helpers.dart';
 import 'spec_test_case.dart';
 
@@ -208,12 +209,17 @@ List<Map<String, Object?>> limboResolutionFindsTheDocument(
 }
 
 void main() {
+  final Map<String, MemoryLogStore> stores = <String, MemoryLogStore>{};
   final Map<String, Future<Persistence> Function(String name)>
   variants = <String, Future<Persistence> Function(String name)>{
     'memory': (_) async => createLRUMemoryPersistence(),
     'sqlite': (String name) => createSQLitePersistenceForProject(
       'test-project',
       'firebase/firestore/spec/limbo_mismatch_spec_test_${Uri.encodeQueryComponent(name)}',
+    ),
+    'keyvalue': (String name) => createKeyValuePersistence(
+      store: stores.putIfAbsent(name, MemoryLogStore.new),
+      projectId: 'test-project',
     ),
   };
 

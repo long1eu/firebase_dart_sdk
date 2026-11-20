@@ -34,7 +34,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/auth/user.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/filter/filter.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/query.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/persistance/index_manager.dart';
-import 'package:cloud_firestore_dart/src/firebase/firestore/local/sqlite/sqlite_persistence.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/local/persistance/persistence.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/document.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/document_key.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/field_index.dart';
@@ -420,113 +420,129 @@ void main() {
     );
   });
 
-  group('the index', () {
-    late SQLitePersistence persistence;
-    late IndexManager indexManager;
-
-    setUpAll(() async {
-      persistence = await createSQLitePersistence(
-        'property/filter_index_agreement-${const Uuid().v4()}.db',
-      );
-      indexManager = persistence.getIndexManager(User.unauthenticated);
-      await indexManager.start();
-    });
-
-    tearDownAll(() => persistence.shutdown());
-
-    // Pinned upstream behaviour (Android SQLiteIndexManager, JS
-    // IndexedDbIndexManager): numbers are indexed as doubles, so a number
-    // that is not exactly a double shares its index entry with others. An
-    // exclusive bound or a `!=` / `not-in` on that entry drops documents that
-    // match. A fix needs an index encoding that tells these numbers apart (a
-    // persisted format change); see the summary of this change.
-    test('quirk: the index misses numbers that share an entry', () async {
-      final Map<String, List<Object>> cases = <String, List<Object>>{
-        // op, filter value, document value that matches but is missed
-        'a != 1e-6176 misses 0': <Object>['!=', Decimal128Value('1e-6176'), 0],
-        'a not-in [0] misses 1e-6176': <Object>[
-          'not-in',
-          <Object>[0],
-          Decimal128Value('1e-6176'),
-        ],
-        'a < 1 misses 0.99999999999999999999': <Object>[
-          '<',
-          1,
-          Decimal128Value('0.99999999999999999999'),
-        ],
-        'a > 1 misses 1.000000000000000000000000000000001': <Object>[
-          '>',
-          1,
-          Decimal128Value('1.000000000000000000000000000000001'),
-        ],
-        'a > 2^53 misses 2^53 + 1': <Object>[
-          '>',
-          9007199254740992.0,
-          9007199254740993,
-        ],
+  final Map<String, Future<Persistence> Function()> persistences =
+      <String, Future<Persistence> Function()>{
+        'sqlite': () => createSQLitePersistence(
+          'property/filter_index_agreement-${const Uuid().v4()}.db',
+        ),
+        'key-value': () => createKeyValuePersistence(),
       };
-      int n = 0;
-      for (final MapEntry<String, List<Object>> e in cases.entries) {
-        final String collection = 'quirk${n++}';
-        final Document d = util.doc('$collection/d', 1, <String, Object?>{
-          _field: e.value[2],
-        });
-        final Query query = Query(util.path(collection))
-            .orderBy(util.orderBy(_field))
-            .filter(util.filter(_field, e.value[0] as String, e.value[1]));
-        await indexManager.addFieldIndex(
-          fieldIndex(
-            collection,
-            fieldsAndKinds: <Object>[_field, SegmentKind.ascending],
-          ),
-        );
-        await indexManager.updateIndexEntries(<DocumentKey, MaybeDocument?>{
-          d.key: d,
-        });
-        expect(query.matches(d), isTrue, reason: e.key);
-        expect(
-          await indexManager.getDocumentsMatchingTarget(query.toTarget()),
-          isEmpty,
-          reason: e.key,
-        );
-      }
-    });
 
-    test('returns the documents that match on doubles', () async {
-      int index = 0;
-      await forAllAsync<Case>(
-        'index',
-        count: cases(500),
-        generate: (Gen gen) => _generate(gen, index++),
-        show: (Case c) => '$c',
-        check: (Case c) async {
+  persistences.forEach((String name, Future<Persistence> Function() create) {
+    group('the index ($name)', () {
+      late Persistence persistence;
+      late IndexManager indexManager;
+
+      setUpAll(() async {
+        persistence = await create();
+        indexManager = persistence.getIndexManager(User.unauthenticated);
+        await indexManager.start();
+      });
+
+      tearDownAll(() => persistence.shutdown());
+
+      // Pinned upstream behaviour (Android SQLiteIndexManager, JS
+      // IndexedDbIndexManager): numbers are indexed as doubles, so a number
+      // that is not exactly a double shares its index entry with others. An
+      // exclusive bound or a `!=` / `not-in` on that entry drops documents that
+      // match. A fix needs an index encoding that tells these numbers apart (a
+      // persisted format change); see the summary of this change.
+      test('quirk: the index misses numbers that share an entry', () async {
+        final Map<String, List<Object>> cases = <String, List<Object>>{
+          // op, filter value, document value that matches but is missed
+          'a != 1e-6176 misses 0': <Object>[
+            '!=',
+            Decimal128Value('1e-6176'),
+            0,
+          ],
+          'a not-in [0] misses 1e-6176': <Object>[
+            'not-in',
+            <Object>[0],
+            Decimal128Value('1e-6176'),
+          ],
+          'a < 1 misses 0.99999999999999999999': <Object>[
+            '<',
+            1,
+            Decimal128Value('0.99999999999999999999'),
+          ],
+          'a > 1 misses 1.000000000000000000000000000000001': <Object>[
+            '>',
+            1,
+            Decimal128Value('1.000000000000000000000000000000001'),
+          ],
+          'a > 2^53 misses 2^53 + 1': <Object>[
+            '>',
+            9007199254740992.0,
+            9007199254740993,
+          ],
+        };
+        int n = 0;
+        for (final MapEntry<String, List<Object>> e in cases.entries) {
+          final String collection = 'quirk${n++}';
+          final Document d = util.doc('$collection/d', 1, <String, Object?>{
+            _field: e.value[2],
+          });
+          final Query query = Query(util.path(collection))
+              .orderBy(util.orderBy(_field))
+              .filter(util.filter(_field, e.value[0] as String, e.value[1]));
           await indexManager.addFieldIndex(
-            fieldIndex(c.collection, fieldsAndKinds: <Object>[_field, c.kind]),
+            fieldIndex(
+              collection,
+              fieldsAndKinds: <Object>[_field, SegmentKind.ascending],
+            ),
           );
           await indexManager.updateIndexEntries(<DocumentKey, MaybeDocument?>{
-            for (int i = 0; i < c.docs.length; i++) _doc(c, i).key: _doc(c, i),
+            d.key: d,
           });
+          expect(query.matches(d), isTrue, reason: e.key);
+          expect(
+            await indexManager.getDocumentsMatchingTarget(query.toTarget()),
+            isEmpty,
+            reason: e.key,
+          );
+        }
+      });
 
-          final Query query = _query(c);
-          final List<DocumentKey>? keys = await indexManager
-              .getDocumentsMatchingTarget(query.toTarget());
-          expect(keys, isNotNull, reason: 'the index cannot serve $query');
-          final Set<String> fromIndex = <String>{
-            for (final DocumentKey key in keys!) key.path.getLastSegment(),
-          };
+      test('returns the documents that match on doubles', () async {
+        int index = 0;
+        await forAllAsync<Case>(
+          'index',
+          count: cases(500),
+          generate: (Gen gen) => _generate(gen, index++),
+          show: (Case c) => '$c',
+          check: (Case c) async {
+            await indexManager.addFieldIndex(
+              fieldIndex(
+                c.collection,
+                fieldsAndKinds: <Object>[_field, c.kind],
+              ),
+            );
+            await indexManager.updateIndexEntries(<DocumentKey, MaybeDocument?>{
+              for (int i = 0; i < c.docs.length; i++)
+                _doc(c, i).key: _doc(c, i),
+            });
 
-          for (int i = 0; i < c.docs.length; i++) {
-            final bool indexed = fromIndex.contains('d$i');
-            final bool expected = _indexOracle(c, i);
-            if (indexed != expected) {
-              fail(
-                'the index ${indexed ? 'returns' : 'does not return'} d$i '
-                '(Query.matches: ${query.matches(_doc(c, i))})',
-              );
+            final Query query = _query(c);
+            final List<DocumentKey>? keys = await indexManager
+                .getDocumentsMatchingTarget(query.toTarget());
+            expect(keys, isNotNull, reason: 'the index cannot serve $query');
+            final Set<String> fromIndex = <String>{
+              for (final DocumentKey key in keys!) key.path.getLastSegment(),
+            };
+
+            for (int i = 0; i < c.docs.length; i++) {
+              final bool indexed = fromIndex.contains('d$i');
+              final bool expected = _indexOracle(c, i);
+              if (indexed != expected) {
+                fail(
+                  'the index ${indexed ? 'returns' : 'does not return'} d$i '
+                  '(Query.matches: ${query.matches(_doc(c, i))})',
+                );
+              }
             }
-          }
-        },
-      );
+          },
+        );
+      });
     });
   });
 }

@@ -39,6 +39,7 @@ void main() {
     'sqlite': () => createSQLitePersistence(
         'firebase/firestore/local/local_store_additional_test-${const Uuid().v4()}.db',
         const LruGarbageCollectorParams()),
+    'keyvalue': () => createKeyValuePersistence(),
   };
 
   for (final MapEntry<String, Future<Persistence> Function()> variant
