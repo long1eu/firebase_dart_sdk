@@ -1,5 +1,18 @@
 ## Unreleased
 
+- Authenticator app (TOTP) multi-factor authentication, for projects on Identity Platform:
+  `FirebaseUserAuth.startTotpEnrollment` returns a `TotpSecret` (`secretKey`, `hashingAlgorithm`, `codeLength`,
+  `codeIntervalSeconds`, `enrollmentCompletionDeadline`, and `otpauthUri(issuer:, accountName:)` for a QR code),
+  `finalizeTotpEnrollment(secret, code:, displayName:)` finishes the enrolment, `unenrollMultiFactor(uid)` removes
+  any factor, and the new `AuthUser.enrolledFactors` lists them (read with `accounts:lookup` and stored with the
+  session; storage format still version 2). `FirebaseAuthMultiFactorException` has a `resolver`
+  (`MultiFactorResolver.resolveSignInWithTotp(code, enrollmentId:)`) that finishes a sign-in or a
+  reauthentication; its message now says when the account's only factors are SMS, which this package cannot use
+  (the resolver then throws `multi-factor-info-not-found`). `MultiFactorInfo` moved to its own file (same export)
+  and reads `enrolledAt` strictly as RFC 3339 with a time zone. `mfaEnrollment:withdraw` is sent as protocol
+  buffers (new dependencies `protobuf` and `fixnum`, already in cloud_firestore_dart's graph); the TOTP calls as
+  JSON, since Google's published definitions lack their fields. Tested against a fake backend only.
+
 - Browser sign-in for desktop apps and command line tools (VM only): `FirebaseUserAuth.signInWithOAuthLoopback`
   and `authorizeWithOAuthLoopback`, with `OAuthLoopbackProvider.google`, `.oidc` and `.discover`. The system
   browser (`openInSystemBrowser`, or a `presenter` of your own) runs the authorization code flow with PKCE (S256),

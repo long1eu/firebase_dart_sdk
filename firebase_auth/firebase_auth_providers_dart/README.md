@@ -83,7 +83,8 @@ This is **not** a port of the whole Firebase Auth SDK: it has the REST-backed op
 (see [What is supported](#what-is-supported)), with FlutterFire's names. Federated providers work by
 **token exchange**: the app gets the provider's ID token or access token itself (a platform sign-in package, a
 browser flow of its own) and `signInWithCredential` exchanges it, as the JS SDK does for a credential. There are
-no popup or redirect flows (nothing opens a sign-in page), no phone sign-in and no sign-in with a second factor.
+no popup or redirect flows (nothing opens a sign-in page) and no phone sign-in; second factors work with
+authenticator apps (TOTP) only.
 
 ```dart
 final FirebaseUserAuth auth = await FirebaseUserAuth.forApp(app);
@@ -144,7 +145,10 @@ against the Firebase Auth emulator; nothing was run against the real service.
 | `ActionCodeSettings` (`url`, `handleCodeInApp`, `iOS`, `android`, `linkDomain`) | `ActionCodeSettings` (flattened; no `dynamicLinkDomain`) | unit |
 | Popup and redirect flows on desktop and command line (no JS SDK equivalent) | `signInWithOAuthLoopback(OAuthLoopbackProvider.google(...))` / `.oidc(...)` / `.discover(...)`, or `authorizeWithOAuthLoopback(...)` for the credential (VM only; see below) | unit (fake identity provider) |
 | Popup and redirect flows in a browser, `signInWithProvider`, SAML | – (use a token from elsewhere with `signInWithCredential`) | |
-| Phone sign-in, reCAPTCHA, multi-factor sign-in and enrolment, TOTP, `revokeAccessToken`, passkeys | – | |
+| `multiFactor(user).getSession()` + `TotpMultiFactorGenerator.generateSecret`, `TotpSecret.generateQrCodeUrl` | `startTotpEnrollment()`, `TotpSecret.otpauthUri(issuer:)` and its parameters (see below) | unit (fake backend) |
+| `multiFactor(user).enroll(TotpMultiFactorGenerator.assertionForEnrollment(...))`, `unenroll`, `enrolledFactors` | `finalizeTotpEnrollment(secret, code:)`, `unenrollMultiFactor(uid)`, `AuthUser.enrolledFactors` | unit (fake backend) |
+| `getMultiFactorResolver(auth, error).resolveSignIn(TotpMultiFactorGenerator.assertionForSignIn(...))` | `FirebaseAuthMultiFactorException.resolver.resolveSignInWithTotp(code)` | unit (fake backend) |
+| Phone sign-in, SMS second factors (enrolment and sign-in), reCAPTCHA, `revokeAccessToken`, passkeys | – (SMS factors are listed and can be unenrolled) | |
 
 Of the federated providers, only the request and the flows were exercised, against the emulator with fake
 tokens (the emulator checks no signature, audience or nonce). The checks of the real backend (the audience of an
@@ -157,6 +161,42 @@ Error codes are those of the JS SDK: its complete map of server codes (`SERVER_E
 `quota-exceeded`). An answer with HTTP 200 and an `errorMessage` is an error, as in the JS SDK. Operations of
 the signed-in user throw `null-user` when nobody is signed in, and sign the user out when the
 backend answers `user-disabled` or `user-token-expired` (`_logoutIfInvalidated` of the JS SDK).
+
+### Authenticator app second factors (TOTP)
+
+Needs Identity Platform with TOTP enabled for the project (the Auth emulator has no TOTP), and a verified email
+address on the account.
+
+```dart
+// Enrol: show the URI as a QR code (or the secret for typing in), then ask for a code of the app.
+final TotpSecret secret = await auth.startTotpEnrollment();
+print(secret.otpauthUri(issuer: 'My App')); // otpauth://totp/My%20App:ada@example.com?secret=...
+await auth.finalizeTotpEnrollment(secret, code: '123456', displayName: 'Phone');
+print(auth.currentUser!.enrolledFactors); // [MultiFactorInfo(totp, ...)]
+
+// Sign in: the first factor throws, the resolver finishes with a code.
+try {
+  await auth.signInWithEmailAndPassword(email: email, password: password);
+} on FirebaseAuthMultiFactorException catch (e) {
+  final UserCredential result = await e.resolver!.resolveSignInWithTotp(await askForCode());
+}
+
+// Remove a factor (TOTP or SMS).
+await auth.unenrollMultiFactor(auth.currentUser!.enrolledFactors.first.uid);
+```
+
+Enrolment, unenrolment and the resolver update the session like any sign-in or token change: the streams emit,
+the new tokens are stored, and the account is read again. A reauthentication of an account with a second factor
+goes through the same resolver. An account whose only second factors are SMS cannot finish a sign-in here: the
+exception's message says so and `resolveSignInWithTotp` throws `multi-factor-info-not-found`.
+
+The calls use the Identity Toolkit API v2. `mfaEnrollment:withdraw` goes as protocol buffers (`$alt=proto`, the
+messages generated from Google's published definitions); the three TOTP calls go as JSON because the published
+definitions do not describe their TOTP fields. A protobuf error comes back as a `google.rpc.Status`, whose message
+can be generic ("Request contains an invalid argument."): when neither the message nor the details carry the
+backend's code (`MFA_ENROLLMENT_NOT_FOUND`, `TOKEN_EXPIRED`, ...), the error's `code` is the status code in kebab
+case (`invalid-argument`) and its `message` the status message. Nothing of this was run against the real service
+yet.
 
 ### Browser sign-in on desktop and command line
 
@@ -213,13 +253,11 @@ Tested against an in-process fake identity provider only: no real Google client 
 - Federated sign-in needs a provider token the app obtained itself, or, on desktop and command line, the browser
   sign-in of `signInWithOAuthLoopback` (Google and OpenID Connect; not Apple, which does not accept loopback
   redirects). There are no popup or redirect flows in a browser.
-  Phone sign-in, multi-factor sign-in and enrolment, and reCAPTCHA are not there (the table above lists the
+  Phone sign-in, SMS second factors and reCAPTCHA are not there (the table above lists the
   rest). A project that enforces reCAPTCHA Enterprise for email and password refuses these sign-ins
   (`missing-recaptcha-token`).
-- An account with a second factor cannot sign in: the sign-in and the reauthentication throw a
-  `FirebaseAuthMultiFactorException` (`multi-factor-auth-required`, like the JS SDK) whose `hints`
-  list the enrolled factors and whose `pendingCredential` lets your own code finish the sign-in
-  over REST (`v2/accounts/mfaSignIn:start` and `:finalize`).
+- An account with a second factor signs in with an authenticator app code through
+  `FirebaseAuthMultiFactorException.resolver`; an account with SMS second factors only cannot sign in here.
 - The session is kept in memory unless you supply an `AuthStorage` (`FileAuthStorage`, `WebAuthStorage` or your
   own). The stored value is a credential, the refresh token: keep it where the platform keeps secrets.
 - `signOut()` forgets the session locally; it does not revoke the refresh token on the backend.
