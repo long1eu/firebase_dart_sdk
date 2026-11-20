@@ -80,8 +80,10 @@ class FakeBackend {
     String? emulatorHost,
     AuthStorage? storage,
     String? appId,
+    Duration requestTimeout = const Duration(seconds: 30),
   }) => FirebaseUserAuth(
     apiKey: apiKey,
+    requestTimeout: requestTimeout,
     appId: appId,
     storage: storage ?? this.storage,
     emulatorHost: emulatorHost,

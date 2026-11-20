@@ -115,6 +115,7 @@ class FirebaseUserAuth implements AuthTokenProvider {
   /// * [appId] (the `appId` of the app's options) is sent as `X-Firebase-gmpid`, and the token of [appCheck]
   ///   as `X-Firebase-AppCheck`, with every request, like the JS SDK does. [forApp] takes both from the app.
   /// * [httpClient] is used for all requests and is not closed by [dispose]; without it one is created and closed.
+  /// * [requestTimeout] bounds every request: one that takes longer fails with `network-request-failed`.
   /// * [clock] and [createTimer] are for tests.
   FirebaseUserAuth({
     required this.apiKey,
@@ -124,6 +125,7 @@ class FirebaseUserAuth implements AuthTokenProvider {
     String? storageKey,
     String? emulatorHost,
     http.Client? httpClient,
+    Duration requestTimeout = const Duration(seconds: 30),
     DateTime Function()? clock,
     Timer Function(Duration delay, void Function() callback)? createTimer,
   }) : _emulatorHost = emulatorHost,
@@ -135,6 +137,7 @@ class FirebaseUserAuth implements AuthTokenProvider {
        _storageKey = storageKey ?? 'firebase_auth_providers_dart:$apiKey',
        _http = httpClient ?? http.Client(),
        _ownsHttp = httpClient == null,
+       _requestTimeout = requestTimeout,
        _clock = clock ?? DateTime.now,
        _createTimer = createTimer ?? Timer.new {
     // Synchronous: a listener (FirebaseFirestore) hears about a new user before the sign-in call returns.
@@ -366,6 +369,7 @@ class FirebaseUserAuth implements AuthTokenProvider {
   final String _storageKey;
   final http.Client _http;
   final bool _ownsHttp;
+  final Duration _requestTimeout;
   final DateTime Function() _clock;
   final Timer Function(Duration delay, void Function() callback) _createTimer;
 
@@ -1889,8 +1893,8 @@ class FirebaseUserAuth implements AuthTokenProvider {
     }
     final http.Response response;
     try {
-      response = get
-          ? await _http.get(
+      final Future<http.Response> request = get
+          ? _http.get(
               url,
               headers: <String, String>{
                 ...headers,
@@ -1898,7 +1902,7 @@ class FirebaseUserAuth implements AuthTokenProvider {
               },
             )
           : json != null
-          ? await _http.post(
+          ? _http.post(
               url,
               headers: <String, String>{
                 ...headers,
@@ -1906,7 +1910,7 @@ class FirebaseUserAuth implements AuthTokenProvider {
               },
               body: jsonEncode(json),
             )
-          : await _http.post(
+          : _http.post(
               url,
               headers: <String, String>{
                 ...headers,
@@ -1914,6 +1918,14 @@ class FirebaseUserAuth implements AuthTokenProvider {
               },
               body: form,
             );
+      response = await request.timeout(_requestTimeout);
+    } on TimeoutException {
+      throw FirebaseAuthException(
+        code: 'network-request-failed',
+        message:
+            'The request to the authentication service timed out after '
+            '${_requestTimeout.inMilliseconds} ms.',
+      );
     } on Object catch (_) {
       // The error of the HTTP client may quote the URL, which holds the API key.
       throw const FirebaseAuthException(
@@ -2346,9 +2358,12 @@ class FirebaseUserAuth implements AuthTokenProvider {
       _refresh().then<void>(
         (String? _) {},
         onError: (Object error) {
-          if (error is FirebaseAuthException &&
-              !error.invalidatesSession &&
+          // Any error but the end of the session (a network error, a failing storage, ...) is retried later.
+          final bool sessionEnded =
+              error is FirebaseAuthException && error.invalidatesSession;
+          if (!sessionEnded &&
               _session != null &&
+              !_disposed &&
               _tokenChanges.hasListener) {
             _refreshFailures++;
             _scheduleProactiveRefresh();
