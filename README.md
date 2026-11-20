@@ -19,11 +19,20 @@ endorsed by Google or Firebase.
    and closed the request as not planned. Caveat: tested in isolates on the Dart VM, not in a Flutter app.
 4. **You want to test Firestore code with `dart test` or `flutter test` against the emulator, running a real
    client instead of a fake.** Caveat: the test runs this engine, not the Android or iOS SDK your app ships.
+5. **Your web app has users on the Firebase JS SDK or FlutterFire web, and you want to move to this client
+   and keep their offline cache, pending writes included.** The IndexedDB cache reads and writes the JS SDK's
+   own database, `importJsSdkCache` moves a JS cache into the other caches, and tabs can share it (a preview).
+   Caveat: Chrome and the emulator only; the format is checked against the real JS SDK in a CI job, but no JS
+   SDK tab was run beside a tab of this client, and multi-tab is unreleased.
 
 **Do not use it when**
 
 - FlutterFire already works for you on Android, iOS or the web: Google's SDKs come with support and years of
-  production use. This client was checked against a real database only by a 15-check kit.
+  production use. This client was checked against a real database only by a 15-check kit. On the web it was
+  run in Chrome against the emulator only (Firefox, Safari and production untested).
+- You need several browser tabs on one cache: only the IndexedDB cache has it (`multiTab: true`, a preview, not
+  released yet), and never beside a JS SDK tab. The SQLite caches stay at one tab, and isolates on the Dart VM
+  do not share listeners.
 - You ship a Windows app and cannot test it yourself first: it was run on one Windows 11 VM against the
   emulator only (the Dart VM suites and two Flutter debug apps, no window drawn), not in CI, not in a
   release build and not against production.
@@ -145,7 +154,7 @@ migrating from the `_vm` packages.
 
 The original port stopped at the 2019 Android SDK and the repository was archived in 2021. Since
 November 2026 it follows the Android SDK's behaviour up to late 2026, on Dart 3.8 or later, and
-its public API follows FlutterFire and the JS SDK. It has about 5,900 unit tests and about 880
+its public API follows FlutterFire and the JS SDK. It has 6869 passing unit tests (2026-11-20) and about 880
 integration tests per transport (gRPC, WebChannel, WebChannel with long polling) against the
 Firestore emulator ([how we test](docs/how_we_test.md)).
 

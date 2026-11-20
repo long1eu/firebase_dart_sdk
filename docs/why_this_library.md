@@ -34,6 +34,37 @@ on that date:
   local signing with a key file, `findUserByEmail`, `updateUser`, `deleteUsers`, tenants, the metadata server
   of Google Cloud.
 
+**Updated 2026-11-20** for the 0.3.1 release, the web, and fresh numbers. Repository facts are read on branch
+`wave/why-this-library-update` (`2d703778`, on top of `origin/main`), in `docs/parity.md`, `docs/guides/web.md`,
+`docs/guides/platforms.md`, `docs/support_policy.md` and the CHANGELOG of `cloud_firestore_dart`. Nothing outside
+this repository was re-checked except the adoption numbers below. No Firebase service was contacted.
+
+- Versions: `cloud_firestore_dart` 0.3.1 (pub.dev, published 2026-11-20), `firebase_app_dart` 0.2.0,
+  `firebase_auth_providers_dart` 0.3.0, `cloud_firestore_dart_sqlite` 0.1.3, `cloud_firestore_dart_platform`
+  0.1.1, `cloud_firestore_dart_flutterfire` 0.1.1, `firebase_admin_dart` 0.1.1. Where this note says "version 0.2"
+  below, read 0.3.1; the FlutterFire API names of 0.2 are unchanged.
+- Tests: the full unit suite had 6869 passing tests on this branch on 2026-11-20 (run for this note). No newer
+  integration count exists in the repository: `docs/parity.md` still gives 887 passed and 21 skipped over gRPC, and
+  882 passed and 26 skipped over each web transport, run on 2026-11-14. The integration suite was not run for this
+  update.
+- No longer experimental since 0.3.1 (CHANGELOG): Firestore Lite, the cache in your own storage, `mergeUnsentWrites`,
+  `importJsSdkCache` and `deleteJsSdkCache`, the pending write count, and the IndexedDB cache engine on the web
+  (it reads and writes the JS SDK's own database, rows and schema). The CHANGELOG states what each was tested with:
+  mostly the emulator and Chrome, never a production backend. Pipelines stay a preview.
+- Multi-tab, a preview that is unreleased (CHANGELOG "(unreleased)", `docs/guides/web.md`):
+  `indexedDbCacheSettings(multiTab: true)` lets several tabs share one IndexedDB cache. Chrome only, emulator only,
+  tested with dart2js and dart2wasm. **Never tried with a JS SDK tab beside a tab of this client.** Not tested
+  either: the handover on real visibility changes, different users in the tabs, other browsers. The SQLite caches
+  stay at one tab, and secondary isolates on the Dart VM still do not share listeners through the public API.
+  The statements "one tab per persistent cache" and "several tabs ... not supported" were true on 2026-11-16;
+  they are updated in place below, with a mark.
+- The web is now a reason (new reason 5 in "The answer", Hypothesis 6 and the table). It is the weakest of the
+  five, because its evidence is a CI interop job and emulator tests in one browser.
+- Adoption on 2026-11-20 (pub.dev API `/score`, and `gh api repos/long1eu/firebase_dart_sdk`): 221 downloads in
+  30 days (58 on 2026-11-16), 0 likes (0), 80 GitHub stars (80). The 499 of 513 commits was not counted again.
+- Not changed: every outside source (FlutterFire, the Admin SDK, `firedart`, Flutter docs, the other pub.dev
+  numbers) is still as of 2026-11-16 to 2026-11-18.
+
 ## The answer
 
 Ranked by how strong the evidence is that this library is the better or the only choice today.
@@ -66,13 +97,23 @@ Ranked by how strong the evidence is that this library is the better or the only
    (2026-11-17): the test suites pass there, and a Flutter Windows app on the official API ran sum and average
    aggregations through it (`examples/flutterfire_on_windows`). Not in CI, not on a logged-on desktop, not
    against production.
+5. **(Added 2026-11-20) A web app whose users are on the Firebase JS SDK or FlutterFire web, and that wants to
+   move to this client without losing their offline cache.** The IndexedDB engine reads and writes the JS SDK's
+   own database (documents, pending writes of every user, indexes, bundles), so the switch needs no import step
+   and works in both directions; `importJsSdkCache` moves a JS cache, pending writes included, into the other
+   engines (SQLite, memory, your own storage); and tabs can share the cache with `multiTab: true`. Caveat:
+   Chrome only, against the emulator only. The evidence for the format is the JS SDK interop job in CI
+   (`tool/bench/web_idb/js_import/interop_check.sh`, `firebase` 12.19.0, headless Chrome, both ways, run when the
+   engine changes) and the persistence suites on the engine (about 600 tests). No JS SDK tab was ever run beside
+   a tab of this client. Multi-tab is a preview and unreleased. The reason exists only for an app that already
+   has a JS SDK cache to keep; it is not a reason to choose this client for a new web app.
 
 Two weaker reasons follow: testing real client code under `dart test` against the emulator (Hypothesis 3), and
 Firestore in a Dart web app that does not use Flutter, such as Jaspr (Hypothesis 7).
 
 Four reasons that were expected and **do not hold up** today: iOS build time (Firestore now ships precompiled
 through Swift Package Manager, the Flutter default since 3.44), dart2wasm (the FlutterFire web plugins are
-`is:wasm-ready`), web bundle size (about the same), and de-Googled Android (Firestore and Auth do not need
+`is:wasm-ready`), web bundle size (about the same; this is separate from reason 5), and de-Googled Android (Firestore and Auth do not need
 Google Play services). Feature gaps are also not a reason: FlutterFire has pipelines, bundles, named databases
 and the cache index manager.
 
@@ -179,7 +220,8 @@ queries, and timestamps are not supported in rules
 
 **This library.** The real client (sync engine, cache, listeners, pending writes, transactions) runs under
 `dart test` or `flutter test` against the emulator, with `mockUserToken` for rules as a user
-(`docs/guides/emulator_and_testing.md`). The repository's own 887 integration tests per transport run this way.
+(`docs/guides/emulator_and_testing.md`). The repository's own 887 integration tests over gRPC (882 over each web transport; `docs/parity.md`, run
+2026-11-14, not repeated since) and its 6869 passing unit tests (2026-11-20) run this way or need no backend.
 
 **The catch.** The test runs this engine, not the Android or iOS one that ships, so it tests the app logic and
 the rules, not the production SDK. Updated 2026-11-17: code written against the official `cloud_firestore` API
@@ -255,14 +297,34 @@ on the Dart VM, but no Flutter app ran a listener in a background isolate.
   is 196 KB gzipped in total, with Lite 128 KB (`docs/guides/web.md`, dart2js `-O2`). That is roughly the same
   as app + Firestore from the CDN, and bigger than JS Lite. Inside a Flutter web app (several MB of engine)
   the difference is noise. **Not a differentiator.**
-- Maturity: the JS SDK is the reference; this library's web is supported in Chrome only (other browsers untested), one tab per
-  persistent cache (`docs/guides/platforms.md`).
+- Maturity: the JS SDK is the reference; this library's web is supported in Chrome only (other browsers
+  untested), against the emulator (`docs/guides/platforms.md`). Updated 2026-11-20: several tabs can share one
+  IndexedDB cache with `indexedDbCacheSettings(multiTab: true)`, a preview, unreleased, Chrome only, emulator only
+  (`docs/guides/web.md`); the SQLite caches stay at one tab.
+- (Added 2026-11-20) **A way across for apps that already run on the JS SDK or FlutterFire web.** The
+  IndexedDB cache engine (supported in 0.3.1, no longer experimental) uses the JS SDK's own database and schema
+  (version 18), so an app can switch between the two SDKs on one browser profile, one after the other, in either
+  direction, and keep the documents and the pending writes of every user.
+  `importJsSdkCache` copies a JS cache into the SQLite, memory or key-value caches, one way. No way to carry
+  a JS cache to another client was found in the official docs; that was not searched for exhaustively. Evidence and limits: the interop job in CI runs the real JS SDK and this engine on one database in
+  headless Chrome, both ways (documents, pending writes of two users, indexes, bundles, garbage collection, the
+  lease handover); `importJsSdkCache` was tested against databases the JS SDK wrote, every schema version from 5
+  to 18, up to 5,000 pending writes. Not done: Firefox and Safari, a production backend, a JS SDK tab running
+  beside a tab of this client (the engine refuses to open while a JS client holds a live lease), a schema
+  version other than 18 for the engine.
+- (Added 2026-11-20) **Tabs.** Before, a persistent cache meant one tab. With `multiTab: true` the tabs elect a
+  primary with the JS SDK's lease (5 s), rows and `localStorage` keys, and the others get listener results and
+  write acknowledgements through it. Tested in Chrome with dart2js and dart2wasm against the emulator. Not
+  tested: a JS SDK tab beside a tab of this client, handover on real visibility changes, different users in the
+  tabs, other browsers. It is unreleased.
 - One real niche: Dart web apps without Flutter (Jaspr and similar) cannot use the FlutterFire web packages,
   because the platform interfaces still declare the Flutter SDK
   ([flutterfire#18645](https://github.com/firebase/flutterfire/issues/18645), open, 2 thumbs-up). They can
   call the JS SDK through `dart:js_interop` themselves, or use this library.
 
-**How sure.** High. The web is the weakest place to aim.
+**How sure.** High on wasm and size. Updated 2026-11-20: medium-low on the switch from the JS SDK (one browser,
+emulator only, the evidence is the CI interop job, and the two SDKs were never run in two tabs at once). The web
+is still the weakest place to aim; for a Flutter web app where FlutterFire works, the official option wins.
 
 ## Hypothesis 7: other reasons
 
@@ -295,22 +357,27 @@ on the Dart VM, but no Flutter app ran a listener in a background isolate.
 | Listener on a Flutter background isolate | not supported, not planned | runs in any isolate | this library (not tried in Flutter yet) |
 | Testing Firestore code without a device | fake (`fake_cloud_firestore`) or device tests | real client under `dart test` with the emulator; `cloud_firestore` code through `cloud_firestore_dart_platform` | this library, with no outside user of the second path yet |
 | Flutter app on Android or iOS | `cloud_firestore`, Google-supported, native SDKs | works as plain Dart, never run on a device | official |
-| Flutter web | JS SDK via `cloud_firestore_web`, wasm-ready | supported in Chrome only | official |
+| Flutter web, FlutterFire works | JS SDK via `cloud_firestore_web`, wasm-ready | supported in Chrome only; tabs can share a cache (preview, unreleased) | official |
+| Web app with users on the JS SDK or FlutterFire web, moving to this client (added 2026-11-20) | the JS SDK itself; no import to another client was found (not searched exhaustively) | IndexedDB engine on the JS SDK's own database, both ways; `importJsSdkCache`; tabs (preview) | this library, weakly: Chrome and emulator only, interop checked in CI, never with a JS SDK tab beside it |
 | Dart web without Flutter (Jaspr) | none packaged; hand-written JS interop | supported in Chrome | this library, weakly |
 | iOS build time | precompiled via SwiftPM since Flutter 3.44 | not measured | no claim possible |
 
 ## When not to use it
 
 - A Flutter app on Android, iOS or the web where FlutterFire works: you get Google's SDKs, Google's support,
-  and years of production use. This library has 58 downloads in 30 days, 0 likes, 80 GitHub stars and one
-  maintainer (499 of the 513 commits GitHub counts).
+  and years of production use. This library has 221 downloads in 30 days, 0 likes and 80 GitHub stars
+  (2026-11-20; 58, 0 and 80 on 2026-11-16) and one maintainer (499 of the 513 commits GitHub counts, 2026-11-16).
 - When you need a provider's sign-in page (Google, Apple popups or redirects), phone sign-in, or multi-factor:
   not provided. Email link sign-in and federated sign-in with a token the app already has are
   (`docs/guides/authentication.md`).
 - When you need App Check with device attestation, Analytics, Crashlytics, Remote Config, Messaging or Storage:
   not part of this project (see `appsup-dart/firebase_dart` for Auth, Realtime Database and Storage in pure
   Dart).
-- Several browser tabs sharing one cache, or secondary isolates sharing listeners: not supported.
+- Several browser tabs sharing one cache: only the IndexedDB cache with `multiTab: true`, a preview that is
+  unreleased, in Chrome against the emulator, never with a JS SDK tab beside it (updated 2026-11-20; it was "not
+  supported" on 2026-11-16). With a SQLite cache, one tab at a time. Secondary isolates sharing listeners through
+  the public API: not supported.
+- Web: Chrome only, emulator only; Firefox, Safari and a production backend were not tested.
 - High load or long running time in production: only a 15-check verification kit ran against a real
   database; the integration suite's real-project mode and long load have not (`docs/parity.md`, limitation 1).
 - Admin work on a server: use `firebase_admin_sdk`. `firebase_admin_dart` here covers only a few Auth calls, and
@@ -351,11 +418,19 @@ Ranked by expected effect on adoption.
 - "Real-time listeners and an offline cache on the Dart VM, as a Firebase user under security rules or with
   service-account credentials."
 - "The same client engine on every platform: a port of the Firebase Android SDK, tested against the emulator
-  with about 5,900 unit and about 880 integration tests per transport."
+  with 6869 unit tests passing (2026-11-20) and about 880 integration tests per transport (2026-11-14)."
 - "Test your Firestore code with `dart test` against the emulator, running the real client."
-- "Unofficial, maintained by one person, version 0.2, with FlutterFire's API names."
+- "Unofficial, maintained by one person, version 0.3.1, with FlutterFire's API names."
 - (Added 2026-11-17) "A Flutter Linux desktop app on the official `cloud_firestore` API was built and run with
   `cloud_firestore_dart_platform`, against the emulator." Say emulator and debug build with it.
+- (Added 2026-11-20) "Firestore Lite, the cache in your own storage, `mergeUnsentWrites`, the JS SDK cache
+  import, the pending write count and the IndexedDB cache on the web are supported since 0.3.1; Pipelines are a
+  preview." Say Chrome and emulator for the web parts.
+- (Added 2026-11-20) "On the web, the IndexedDB cache uses the official JS SDK's own database, so an app can move
+  from the JS SDK or FlutterFire web and keep its offline cache and pending writes; the format is checked against
+  the real JS SDK in a CI job in Chrome." Say Chrome, emulator only.
+- (Added 2026-11-20) "Several tabs can share one IndexedDB cache (`multiTab: true`, a preview, in the next
+  version)." Say Chrome, emulator, preview, and that it is not released.
 
 **It must not say yet:**
 
@@ -366,6 +441,10 @@ Ranked by expected effect on adoption.
 - "Faster builds" or "smaller apps" than FlutterFire: not measured, and the iOS build argument is mostly
   obsolete.
 - "Smaller web bundles" or "the wasm option": FlutterFire web is wasm-ready and about the same size.
+- (Added 2026-11-20) "Works beside the JS SDK in another tab": no JS SDK tab was ever run beside a tab of this
+  client. Also not "multi-tab is supported" or "released" (preview, unreleased), "works in Firefox or Safari",
+  "migrates any JS cache" (the engine opens schema version 18 only; the import was tested with versions 5 to 18),
+  or "experimental" for the features of 0.3.1 listed above (they are supported). Do not call Pipelines supported.
 - "Works on devices without Google Play services, unlike FlutterFire": the native Firestore SDK does not need
   them either.
 - "The only Dart server client with listeners": true today, but the Admin SDK has draft PRs; date the claim
@@ -375,7 +454,7 @@ Ranked by expected effect on adoption.
 - (Added 2026-11-17, updated 2026-11-18) Anything about `firebase_admin_dart` beyond "checked against the
   Auth emulator, and its main path once against one real project, keyless".
 
-## Demand signals (pub.dev API and GitHub, 2026-11-16)
+## Demand signals (pub.dev API and GitHub, 2026-11-16; this library's own row also 2026-11-20)
 
 | Package or issue | Signal |
 |---|---|
@@ -385,7 +464,7 @@ Ranked by expected effect on adoption.
 | `dart_firebase_admin` (discontinued) | 18,908 downloads in 30 days, 61 likes |
 | `firebase_dart` (pure-Dart Auth, Realtime Database, Storage; no Firestore) | 18,650 downloads in 30 days, 130 likes |
 | `firedart` | 3,898 downloads in 30 days, 319 likes, no release since 2024-03 |
-| `cloud_firestore_dart` | 58 downloads in 30 days, 0 likes |
+| `cloud_firestore_dart` | 58 downloads in 30 days, 0 likes; on 2026-11-20 (pub.dev API): 221 downloads in 30 days, 0 likes |
 | flutterfire#17338, Linux for `firebase_auth` | open since 2025-05, 37 thumbs-up |
 | flutter#119207, platform channel calls into background isolates | open since 2023-01, 65 thumbs-up |
 | firebase-admin-dart#95, `onSnapshot` on the server | open since 2025-10, 0 reactions, 7 comments |
