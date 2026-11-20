@@ -35,22 +35,27 @@ void main() {
     firestore = Firestore.instanceFor(app: app, settings: offlineSettings);
     doc = firestore.doc('col/doc');
     // Starts the client.
-    await doc.get(Source.cache).then((_) {}, onError: (Object _) {});
+    await doc
+        .get(GetOptions(source: Source.cache))
+        .then((_) {}, onError: (Object _) {});
     expect(firestore.client.queue.isFailed, isFalse);
   });
 
   Future<void> expectFailedForGood() async {
     expect(firestore.client.queue.isFailed, isTrue);
-    await expectLater(doc.get(Source.cache), throwsA(_alreadyFailed));
+    await expectLater(
+      doc.get(GetOptions(source: Source.cache)),
+      throwsA(_alreadyFailed),
+    );
     await expectLater(
       doc.set(<String, Object?>{'a': 1}),
       throwsA(_alreadyFailed),
     );
     await expectLater(
-      firestore.collection('col').get(Source.cache),
+      firestore.collection('col').get(GetOptions(source: Source.cache)),
       throwsA(_alreadyFailed),
     );
-    await expectLater(doc.snapshots.first, throwsA(_alreadyFailed));
+    await expectLater(doc.snapshots().first, throwsA(_alreadyFailed));
 
     // The client can still be shut down, and its cache cleared.
     await firestore.terminate();
@@ -99,7 +104,7 @@ void main() {
       () async => throw StateError('broken invariant'),
     );
     // Requested before the failure: rejected with the error that failed the queue.
-    final Future<Object?> waiting = doc.get(Source.cache);
+    final Future<Object?> waiting = doc.get(GetOptions(source: Source.cache));
     final Future<void> terminated = firestore.terminate();
 
     await expectLater(failing, throwsStateError);
