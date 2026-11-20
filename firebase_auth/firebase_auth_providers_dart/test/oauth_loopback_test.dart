@@ -9,6 +9,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:crypto/crypto.dart';
+import 'package:firebase_app_dart/firebase_app_dart.dart' show GetTokenResult;
 import 'package:firebase_auth_providers_dart/firebase_auth_providers_dart.dart';
 import 'package:http/http.dart' as http;
 import 'package:test/test.dart';
@@ -523,6 +524,93 @@ void main() {
       );
       expect(result.user!.uid, 'idp-user');
       expect(result.additionalUserInfo?.isNewUser, isTrue);
+    },
+  );
+
+  test(
+    'FirebaseUserAuth.linkWithOAuthLoopback links the credential to the signed-in user',
+    () async {
+      final FakeBackend backend = FakeBackend();
+      final FirebaseUserAuth auth = backend.create();
+      addTearDown(auth.dispose);
+
+      // Nobody signed in: it fails before the browser opens.
+      await expectLater(
+        auth.linkWithOAuthLoopback(
+          oidc(),
+          presenter: presenter.call,
+          httpClient: client,
+        ),
+        throwsA(authError('null-user')),
+      );
+      expect(presenter.url, isNull);
+
+      final AuthUser anonymous = (await auth.signInAnonymously()).user!;
+      backend.on('accounts:signInWithIdp', (Map<String, Object?> body) {
+        expect(
+          GetTokenResult(body['idToken']! as String).claims['sub'],
+          anonymous.uid,
+        );
+        final Map<String, String> post = Uri.splitQueryString(
+          body['postBody']! as String,
+        );
+        expect(post['providerId'], 'oidc.fake');
+        expect(post['access_token'], 'the-access-token');
+        backend.accounts[anonymous.uid] = <String, Object?>{
+          'providerUserInfo': <Object?>[
+            <String, Object?>{'providerId': 'oidc.fake', 'rawId': 'user-1'},
+          ],
+        };
+        return jsonResponse(<String, Object?>{
+          'providerId': 'oidc.fake',
+          ...backend.tokensFor(anonymous.uid, provider: 'oidc.fake'),
+        });
+      });
+
+      final UserCredential result = await auth.linkWithOAuthLoopback(
+        oidc(),
+        presenter: presenter.call,
+        httpClient: client,
+      );
+      expect(presenter.url, isNotNull);
+      expect(result.user!.uid, anonymous.uid);
+      expect(
+        result.user!.providerData.map((UserInfo info) => info.providerId),
+        contains('oidc.fake'),
+      );
+    },
+  );
+
+  test(
+    'FirebaseUserAuth.reauthenticateWithOAuthLoopback signs the same user in again',
+    () async {
+      final FakeBackend backend = FakeBackend();
+      final FirebaseUserAuth auth = backend.create();
+      addTearDown(auth.dispose);
+      final AuthUser user = (await auth.signInWithEmailAndPassword(
+        email: 'ada@example.com',
+        password: 'secret-1',
+      )).user!;
+      backend.on('accounts:signInWithIdp', (Map<String, Object?> body) {
+        final Map<String, String> post = Uri.splitQueryString(
+          body['postBody']! as String,
+        );
+        expect(post['providerId'], 'oidc.fake');
+        expect(post['access_token'], 'the-access-token');
+        return jsonResponse(<String, Object?>{
+          'providerId': 'oidc.fake',
+          ...backend.tokensFor(user.uid, provider: 'oidc.fake'),
+        });
+      });
+
+      final UserCredential result = await auth.reauthenticateWithOAuthLoopback(
+        oidc(),
+        presenter: presenter.call,
+        httpClient: client,
+      );
+      expect(result.user!.uid, user.uid);
+      expect(auth.currentUser!.uid, user.uid);
+      expect(backend.methods, contains('accounts:signInWithIdp'));
     },
   );
 }

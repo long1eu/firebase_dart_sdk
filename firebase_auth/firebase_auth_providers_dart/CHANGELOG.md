@@ -5,11 +5,20 @@
   browser (`openInSystemBrowser`, or a `presenter` of your own) runs the authorization code flow with PKCE (S256),
   a random `state` (compared in constant time) and a nonce; the redirect comes back to a one-shot server on
   127.0.0.1 that answers 404 to any other path and is always closed (success, error or `timeout`). The code is
-  exchanged at the token endpoint, or through an `exchangeEndpoint` with the request and answer of
-  `google_sign_in_dart`'s code exchange endpoint. The result (`OAuthLoopbackResult`) has the provider's tokens and
-  a ready `OAuthCredential`. On the web these throw an `UnsupportedError`. New error codes: `timeout`,
-  `user-cancelled`, `oauth-state-mismatch`, `invalid-oauth-response`, `invalid-oauth-provider`. Tested against an
-  in-process fake identity provider only.
+  exchanged at the token endpoint with the client id and secret. Google with a "Desktop app" client needs nothing
+  more. The optional `exchangeCode` callback is for a provider that wants a confidential client: it gets the code,
+  the PKCE verifier, the redirect URL and the client id (`OAuthAuthorizationCode`), sends them to a server of yours,
+  and returns the token endpoint's JSON. It is the counterpart of `serverAuthCode` in `google_sign_in`. The result
+  (`OAuthLoopbackResult`) has the provider's tokens and a ready `OAuthCredential`. On the web these throw an
+  `UnsupportedError`. New error codes: `timeout`, `user-cancelled`, `oauth-state-mismatch`,
+  `invalid-oauth-response`, `invalid-oauth-provider`.
+- `FirebaseUserAuth.linkWithOAuthLoopback` and `reauthenticateWithOAuthLoopback`: the same browser sign-in, then
+  `linkWithCredential` or `reauthenticateWithCredential`. Same arguments as `signInWithOAuthLoopback`; `null-user`
+  before the browser opens when nobody is signed in.
+- On 2026-11-20, Google sign-in with a Desktop client was run against a real Firebase project: the code was
+  exchanged directly with the client secret and PKCE, and the redirect was `http://127.0.0.1:<port>`.
+  `exchangeCode` and generic OpenID Connect providers were run only against the fake identity provider of the
+  tests.
 
 ## 0.3.0
 
