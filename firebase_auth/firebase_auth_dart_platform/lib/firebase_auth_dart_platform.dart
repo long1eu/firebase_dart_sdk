@@ -29,11 +29,13 @@ import 'package:firebase_auth_providers_dart/firebase_auth_providers_dart.dart'
 import 'package:firebase_core/firebase_core.dart';
 import 'package:http/http.dart' as http;
 
+import 'src/convert.dart' show guard, passwordValidationStatusOf;
 import 'src/core.dart';
 import 'src/firebase_auth.dart';
 import 'src/multi_factor.dart';
 import 'src/storage.dart' show runningUnderFlutterTest;
 
+export 'src/convert.dart' show DartFirebaseAuthException;
 export 'src/firebase_auth.dart' show AuthStorageFactory, DartFirebaseAuth;
 export 'src/storage.dart' show defaultSessionFile;
 
@@ -127,4 +129,32 @@ abstract final class FirebaseAuthDart {
   /// for an app whose `FirebaseAuth` this package implements.
   static FirebaseUserAuth userAuthFor(FirebaseApp app) =>
       DartFirebaseAuth.forApp(app).client;
+
+  /// Checks [password] against the password policy of the project of [app]
+  /// (of its tenant when `FirebaseAuth.tenantId` is set), with the result type
+  /// of `FirebaseAuth.validatePassword`.
+  ///
+  /// Use it instead of `FirebaseAuth.validatePassword`, which fetches the
+  /// policy itself from the production endpoint: this one goes through the
+  /// app's client, so it uses the emulator, the tenant and the HTTP client
+  /// configured here, and caches the policy as the JS SDK does.
+  ///
+  /// Throws a [FirebaseAuthException] with the code `invalid-password` when
+  /// [password] is empty, as `FirebaseAuth.validatePassword` does.
+  static Future<PasswordValidationStatus> validatePassword(
+    FirebaseApp app,
+    String password,
+  ) async {
+    if (password.isEmpty) {
+      throw FirebaseAuthException(
+        code: 'invalid-password',
+        message: 'Password cannot be null or empty',
+      );
+    }
+    return guard(
+      () async => passwordValidationStatusOf(
+        await userAuthFor(app).validatePassword(password),
+      ),
+    );
+  }
 }

@@ -149,14 +149,17 @@ These throw a `FirebaseAuthException` with the code `unimplemented` and a messag
   reCAPTCHA or the app verification of Android and iOS.
 - **Multi-factor**: `User.multiFactor` (`getSession`, `enroll`, `unenroll`, `getEnrolledFactors`),
   `MultiFactorResolver.resolveSignIn`, `TotpMultiFactorGenerator`.
-- **Token revocation**: `revokeAccessToken`, `revokeTokenWithAuthorizationCode`.
 - **Play Games and Game Center credentials**, which need their native SDKs.
 
 ## How it differs from the official plugin
 
 - **`validatePassword`**: `firebase_auth` does not ask the platform; it fetches the password policy itself from the
-  production endpoint, without the tenant and without the emulator. `FirebaseAuthDart.userAuthFor(app)
-  .validatePassword(password)` asks the client, which sends the tenant and follows `useAuthEmulator`.
+  production endpoint, without the tenant and without the emulator. `FirebaseAuthDart.validatePassword(app, password)`
+  returns the same `PasswordValidationStatus` but asks the client, which sends the tenant, follows `useAuthEmulator`
+  and caches the policy.
+- **Errors keep what the server said**: an error from the backend is a `DartFirebaseAuthException`, a
+  `FirebaseAuthException` with `serverCode` (such as `EMAIL_EXISTS`) and `httpStatus` added, for logs. Branch on
+  `code` as usual.
 - **`useAuthEmulator`**: call it before the first request, as the documentation of `firebase_auth` says. A session
   restored from the real service stays signed in until its first token refresh fails against the emulator.
 - **`User.refreshToken`** is null: the client keeps the refresh token to itself.

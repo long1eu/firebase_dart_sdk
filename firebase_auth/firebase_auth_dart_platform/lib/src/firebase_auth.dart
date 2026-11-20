@@ -426,18 +426,14 @@ class DartFirebaseAuth extends FirebaseAuthPlatform {
   Future<void> initializeRecaptchaConfig() async =>
       throw unimplemented('initializeRecaptchaConfig', noPhone);
 
+  /// Revokes an Apple access token (`revokeAccessToken` of the client).
   @override
-  Future<void> revokeAccessToken(String accessToken) async =>
-      throw unimplemented(
-        'revokeAccessToken',
-        'revoking a provider token is not supported yet.',
-      );
+  Future<void> revokeAccessToken(String accessToken) =>
+      guard(() => client.revokeAccessToken(accessToken));
 
+  /// Revokes the tokens of a Sign in with Apple authorization code
+  /// (`revokeToken` of the client).
   @override
-  Future<void> revokeTokenWithAuthorizationCode(
-    String authorizationCode,
-  ) async => throw unimplemented(
-    'revokeTokenWithAuthorizationCode',
-    'revoking a provider token is not supported yet.',
-  );
+  Future<void> revokeTokenWithAuthorizationCode(String authorizationCode) =>
+      guard(() => client.revokeToken(authorizationCode));
 }

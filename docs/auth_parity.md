@@ -60,7 +60,7 @@ Path shorthand:
 | setPersistence | none; storage is a constructor argument (`AuthStorage`, auth_storage.dart) | `setPersistence` firebase_auth.dart:180 maps NONE and SESSION to in-memory and LOCAL to file | different | There is no runtime switch in the client. |
 | inMemoryPersistence | `InMemoryAuthStorage` auth_storage.dart:66 (default) | via setPersistence | same | |
 | browserLocalPersistence / browserSessionPersistence / indexedDBLocalPersistence / browserCookiePersistence | `WebAuthStorage` (`storage/web_auth_storage_web.dart`) and `FileAuthStorage` (`storage/file_auth_storage_io.dart`) | `defaultStorage()` storage.dart | different | Equivalent in purpose. The web storage is not selectable by name, and there is no cookie variant. |
-| revokeAccessToken | `revokeAccessToken(token)` FUA:774 (`tokenType: 'ACCESS_TOKEN'`, `tenantId` sent); also `revokeToken(authorizationCode)` FUA:754 (`tokenType: '3'`, as the iOS SDK, `tenantId` sent) | throws firebase_auth.dart:430 and :437 | different | Same `v2/accounts:revokeToken` endpoint and body as JS. With no signed-in user the client throws `null-user`; JS returns silently. The shim does not wire either method. |
+| revokeAccessToken | `revokeAccessToken(token)` FUA:774 (`tokenType: 'ACCESS_TOKEN'`, `tenantId` sent); also `revokeToken(authorizationCode)` FUA:754 (`tokenType: '3'`, as the iOS SDK, `tenantId` sent) | `revokeAccessToken` and `revokeTokenWithAuthorizationCode` call the client | different | Same `v2/accounts:revokeToken` endpoint and body as JS. With no signed-in user the client throws `null-user`; JS returns silently. |
 | sendPasswordResetEmail, confirmPasswordReset, verifyPasswordResetCode, checkActionCode, applyActionCode, sendEmailVerification, verifyBeforeUpdateEmail, updateProfile, updateEmail, updatePassword, reload | all present (FUA:665 to 828, 1471) | all wired (firebase_auth.dart:344 to 380, user.dart) | same | Listed for completeness; account management is probably another auditor's area. |
 
 ## Providers
@@ -150,7 +150,7 @@ Path shorthand:
 | sendSignInLinkToEmail | yes | :355 | same | firebase_user_auth.dart:973 |
 | signInWithEmailLink | yes | :325 | same | firebase_user_auth.dart:1019 |
 | fetchSignInMethodsForEmail | yes | :383 | same | firebase_user_auth.dart:746 |
-| validatePassword | returns `PasswordValidationStatus`; cached policy, re-fetched on failure | not overridden | same | shim lacks it; firebase_user_auth.dart:901, :935 |
+| validatePassword | returns `PasswordValidationStatus`; cached policy, re-fetched on failure | `FirebaseAuthDart.validatePassword(app, password)` | same | `FirebaseAuth.validatePassword` never reaches the platform (it fetches the policy from production itself), so the shim offers a static that goes through the client; firebase_user_auth.dart:901, :935 |
 | PasswordPolicy / PasswordValidationStatus | flat fields; `meets*Requirement` | none | different | JS `contains*`, `customStrengthOptions`; password_policy.dart:6, :142 |
 
 ## Multi-factor
@@ -250,7 +250,7 @@ Path shorthand:
 | customData._tokenResponse (raw server body on tagged errors, `J:api/index.ts:369`) | not kept raw; parsed into `credential` (`D:auth_exception.dart:196`, `credentialFromResponse`) | `credential` converted | different | Raw fields such as `rawUserInfo`, `oauthIdToken` are only available through the parsed credential. |
 | customData._serverResponse / MultiFactorError (`J:mfa/mfa_error.ts:28-50`) | `FirebaseAuthMultiFactorException` with `pendingCredential` and `hints` (`D:auth_exception.dart:435-486`); resolver and TOTP (`D:multi_factor.dart:225`) | converted to `FirebaseAuthMultiFactorExceptionPlatform`, but resolver throws unimplemented (`S:multi_factor.dart:44`) | different | |
 | credentialFromError (`GoogleAuthProvider.credentialFromError` etc.) | `FirebaseAuthException.credential` (`D:auth_exception.dart:196`) | `credential` | different | A property instead of per-provider static helpers; same data. |
-| Dart-only fields `serverCode`, `httpStatus`, `invalidatesSession` (`D:auth_exception.dart:177,180,203`) | present | dropped by `exceptionOf` (`S:convert.dart:98`) | different | The shim loses the server code and status. |
+| Dart-only fields `serverCode`, `httpStatus`, `invalidatesSession` (`D:auth_exception.dart:177,180,203`) | present | `serverCode` and `httpStatus` kept on `DartFirebaseAuthException` (`S:convert.dart`) | different | Not on a multi-factor error, which `firebase_auth` rebuilds as its own class. `invalidatesSession` is not passed on. |
 
 Counts for the AuthErrorCodes comparison: 105 distinct client codes in JS map (106 entries, `INVALID_IDP_RESPONSE` and `INVALID_LOGIN_CREDENTIALS` both `invalid-credential`), 108 in the enum. Dart covers 79; 9 missing individually (listed above); 20 browser-only.
 
@@ -275,7 +275,7 @@ Counts for the AuthErrorCodes comparison: 105 distinct client codes in JS map (1
 | PhoneAuthCredential toJSON / fromJSON (`J:core/credentials/phone.ts:100,121`) | no phone credential | `convert.dart:208` throws `unimplemented` | missing | Phone auth needs SMS verification and app verification (reCAPTCHA or APNs/Play Integrity). |
 | getReactNativePersistence (`J:platform_react_native/persistence`) | analogue: custom `AuthStorage` | `storageFor` | n/a outside a browser | React Native only; the Dart analogue exists in spirit (`AuthStorage`). |
 | Cordova helpers (`J:platform_cordova`: `cordovaPopupRedirectResolver` etc.) | none | none | n/a outside a browser | Cordova WebView plugins. |
-| revokeAccessToken(auth, token) (`J:core/index.ts:264`, `auth_impl.ts:609`: `providerId apple.com`, `tokenType ACCESS_TOKEN`, optional `tenantId`) | `revokeAccessToken(token)` (`D:firebase_user_auth.dart:774`) and `revokeToken(authorizationCode)` (`:754`, `tokenType '3'`); both send `tenantId` | `revokeAccessToken` and `revokeTokenWithAuthorizationCode` both throw `unimplemented` with "not supported yet" (`S:firebase_auth.dart` ~430-440) | different | The client has both paths. With no user, the client throws `null-user`; JS returns silently. The shim does not call either. |
+| revokeAccessToken(auth, token) (`J:core/index.ts:264`, `auth_impl.ts:609`: `providerId apple.com`, `tokenType ACCESS_TOKEN`, optional `tenantId`) | `revokeAccessToken(token)` (`D:firebase_user_auth.dart:774`) and `revokeToken(authorizationCode)` (`:754`, `tokenType '3'`); both send `tenantId` | both call the client (`S:firebase_auth.dart`) | different | With no user, the client throws `null-user`; JS returns silently. |
 
 ## Shim coverage of the FlutterFire platform interface
 
@@ -289,7 +289,7 @@ The shim never throws Dart's `UnimplementedError`: every missing member throws a
 | signInWithPopup, signInWithRedirect, getRedirectResult (`:395,399,403`) | none | unimplemented, `noBrowserFlow` | n/a outside a browser | |
 | signInWithPhoneNumber, verifyPhoneNumber (`:409,423`) | none | unimplemented, `noPhone` | missing | |
 | initializeRecaptchaConfig (`:427`) | none | unimplemented, `noPhone` | n/a outside a browser | |
-| revokeAccessToken, revokeTokenWithAuthorizationCode (~430-440) | `revokeAccessToken` and `revokeToken` (authorization code) in client | unimplemented "not supported yet" | missing | Client method exists; shim does not use it. |
+| revokeAccessToken, revokeTokenWithAuthorizationCode (~430-440) | `revokeAccessToken` and `revokeToken` (authorization code) in client | calls the client | same | |
 | User.linkWithProvider, reauthenticateWithProvider (`S:user.dart:118,123`) | loopback flow in client | unimplemented, `noProviderFlow` | missing | |
 | User.linkWithPopup, linkWithRedirect, reauthenticateWithPopup, reauthenticateWithRedirect (`:127,131,136,140`) | none | unimplemented, `noBrowserFlow` | n/a outside a browser | |
 | User.linkWithPhoneNumber, updatePhoneNumber (`:146,150`) | none | unimplemented, `noPhone` | missing | |
@@ -298,7 +298,7 @@ The shim never throws Dart's `UnimplementedError`: every missing member throws a
 | TotpMultiFactorGenerator generateSecret, getAssertionForEnrollment, getAssertionForSignIn (`:60,69,78`) | in the client (`D:multi_factor.dart:113` `TotpSecret`) | unimplemented, `noMultiFactor` | missing | |
 | Credentials: PhoneAuthCredential, Play Games, Game Center (`S:convert.dart:208-212`) | none | unimplemented | missing | Play Games and Game Center need native SDKs. |
 
-Unimplemented in the shim: 26 members (9 on `FirebaseAuthPlatform`, 8 on `UserPlatform`, 9 in the multi-factor classes) plus 3 credential kinds. Breakdown of the 26: 8 browser-only (3 sign-in popup/redirect, 4 user popup/redirect, `initializeRecaptchaConfig`), 9 MFA (exist in the client), 4 phone, 3 provider flows (the client has a loopback flow), 2 revocations (the client has `revokeToken` and `revokeAccessToken`).
+Unimplemented in the shim: 24 members (7 on `FirebaseAuthPlatform`, 8 on `UserPlatform`, 9 in the multi-factor classes) plus 3 credential kinds. Breakdown of the 24: 8 browser-only (3 sign-in popup/redirect, 4 user popup/redirect, `initializeRecaptchaConfig`), 9 MFA (exist in the client), 4 phone, 3 provider flows (the client has a loopback flow).
 
 ## Gaps worth closing, ranked
 
@@ -315,11 +315,11 @@ Effort: S takes hours, M a few days, L more than a week or needs outside pieces.
 | 3 | open | Connect the shim's multi-factor classes to the client's TOTP API (9 members) | M | no | no | high | The client already enrols, unenrols and resolves TOTP. The shim throws `unimplemented` (S:multi_factor.dart). Needs 1. |
 | 4 | open | Back the shim's `signInWithProvider`, `linkWithProvider` and `reauthenticateWithProvider` with the loopback OAuth flow | M | system browser | no | high | This is the usual desktop sign-in. The client has the flow; the shim throws `noProviderFlow`. |
 | 5 | closed | `toJson`/`fromJson` for `EmailAuthCredential` and `OAuthCredential`, plus `OAuthProvider.credentialFromJson` | S | no | no | med | Keeps a pending credential across the `account-exists-with-different-credential` flow. Uses the JS JSON format. |
-| 6 | partly closed: client done, shim left | `revokeAccessToken(token)` (ACCESS_TOKEN, `tenantId`) in the client, and both revoke methods in the shim | S | no | no | med | The endpoint call already exists. Apple's account-deletion rule makes it matter on iOS and macOS. |
+| 6 | closed | `revokeAccessToken(token)` (ACCESS_TOKEN, `tenantId`) in the client, and both revoke methods in the shim | S | no | no | med | The endpoint call already exists. Apple's account-deletion rule makes it matter on iOS and macOS. |
 | 7 | partly closed: `emulatorConfig` and `disableWarnings` done; no `emulator-config-failed` or `invalid-emulator-scheme` code, by design | Emulator parity: an `emulator-config-failed` guard, an `invalid-emulator-scheme` code, a parsed `emulatorConfig`, and `disableWarnings` | S | no | no | med | Today a late emulator setting silently mixes origins, and a bad host throws `ArgumentError`. |
 | 8 | partly closed: `refreshToken` left; `UserCredential.providerId` not added, by design (see the user table) | `User.providerId`, `User.refreshToken` and `User.toJson`; `UserCredential.operationType` and `providerId` | S | no | no | med | Plain fields that JS exposes. |
 | 9 | open | `setPersistence` and a `Persistence` enum in the client, using the shim's `SwitchableStorage` | S | no | no | med | The shim already has this logic. Without it, apps that don't use the shim pick storage only at construction. |
-| 10 | open | Shim passthroughs: `validatePassword`, and keeping `serverCode` and `httpStatus` in `exceptionOf` | S | no | no | med | The client has them; the shim drops them. |
+| 10 | closed (`validatePassword` as `FirebaseAuthDart.validatePassword`) | Shim passthroughs: `validatePassword`, and keeping `serverCode` and `httpStatus` in `exceptionOf` | S | no | no | med | The client has them; the shim drops them. |
 | 11 | open | Keep the raw server response on tagged errors (JS `_tokenResponse`) | S | no | no | low-med | Helps handle linking and debugging. |
 | 12 | open | An optional secure-storage adapter (Keychain, Keystore, libsecret), as a separate package | M | no | yes | med | The refresh token sits in a file with mode 0600. |
 | 13 | open | Client-side validation codes: `missing-continue-uri`, and `app-deleted` or `user-signed-out` after `dispose` | S | no | no | low | Today these show up as server errors, `StateError` or `null-user`. |

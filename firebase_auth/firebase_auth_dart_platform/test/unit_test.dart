@@ -445,6 +445,127 @@ void main() {
     });
   });
 
+  group('passthroughs', () {
+    test('revokeAccessToken and revokeTokenWithAuthorizationCode reach the '
+        'revoke endpoint', () async {
+      final FirebaseAuth auth = await newAuth();
+      await auth.signInAnonymously();
+      backend.override = (http.Request request) =>
+          request.url.path.endsWith('accounts:revokeToken')
+          ? jsonResponse(<String, Object?>{})
+          : null;
+      await auth.revokeAccessToken('apple-access-token');
+      expect(backend.bodyOf('accounts:revokeToken'), <String, Object?>{
+        'providerId': 'apple.com',
+        'tokenType': 'ACCESS_TOKEN',
+        'token': 'apple-access-token',
+        'idToken': isA<String>(),
+      });
+      await auth.revokeTokenWithAuthorizationCode('apple-code');
+      expect(
+        backend.bodyOf('accounts:revokeToken'),
+        containsPair('tokenType', '3'),
+      );
+      expect(
+        backend.bodyOf('accounts:revokeToken'),
+        containsPair('token', 'apple-code'),
+      );
+      expect(
+        backend.requests.last.url.path,
+        endsWith('v2/accounts:revokeToken'),
+      );
+    });
+
+    test('revoking without a user fails like the other user calls', () async {
+      final FirebaseAuth auth = await newAuth();
+      await expectLater(
+        auth.revokeAccessToken('apple-access-token'),
+        throwsA(isA<FirebaseAuthException>()),
+      );
+      expect(backend.paths, isNot(contains(endsWith('accounts:revokeToken'))));
+    });
+
+    test('a server error keeps the server code and the HTTP status', () async {
+      final FirebaseAuth auth = await newAuth();
+      backend.override = (http.Request request) =>
+          jsonResponse(<String, Object?>{
+            'error': <String, Object?>{'code': 400, 'message': 'EMAIL_EXISTS'},
+          }, 400);
+      await expectLater(
+        auth.createUserWithEmailAndPassword(
+          email: 'a@example.com',
+          password: 'secret1',
+        ),
+        throwsA(
+          isA<DartFirebaseAuthException>()
+              .having(
+                (DartFirebaseAuthException e) => e.code,
+                'code',
+                'email-already-in-use',
+              )
+              .having(
+                (DartFirebaseAuthException e) => e.serverCode,
+                'serverCode',
+                'EMAIL_EXISTS',
+              )
+              .having(
+                (DartFirebaseAuthException e) => e.httpStatus,
+                'httpStatus',
+                400,
+              ),
+        ),
+      );
+    });
+
+    test('validatePassword checks against the fetched policy', () async {
+      final FirebaseAuth auth = await newAuth();
+      backend.override = (http.Request request) =>
+          request.url.path.endsWith('passwordPolicy')
+          ? jsonResponse(<String, Object?>{
+              'customStrengthOptions': <String, Object?>{
+                'minPasswordLength': 8,
+                'containsNumericCharacter': true,
+              },
+              'allowedNonAlphanumericCharacters': <String>['!'],
+              'enforcementState': 'ENFORCE',
+              'schemaVersion': 1,
+            })
+          : null;
+      final PasswordValidationStatus weak =
+          await FirebaseAuthDart.validatePassword(auth.app, 'abc');
+      expect(weak.isValid, isFalse);
+      expect(weak.meetsMinPasswordLength, isFalse);
+      expect(weak.meetsDigitsRequirement, isFalse);
+      expect(weak.meetsLowercaseRequirement, isTrue);
+      expect(weak.passwordPolicy.minPasswordLength, 8);
+      expect(weak.passwordPolicy.containsNumericCharacter, isTrue);
+      expect(weak.passwordPolicy.allowedNonAlphanumericCharacters, <String>[
+        '!',
+      ]);
+      expect(weak.passwordPolicy.enforcementState, 'ENFORCE');
+      final PasswordValidationStatus strong =
+          await FirebaseAuthDart.validatePassword(auth.app, 'abcdefg1');
+      expect(strong.isValid, isTrue);
+      expect(
+        backend.paths.where((String path) => path.endsWith('passwordPolicy')),
+        hasLength(1),
+        reason: 'the policy is cached',
+      );
+    });
+
+    test(
+      'validatePassword rejects an empty password without a request',
+      () async {
+        final FirebaseAuth auth = await newAuth();
+        await expectLater(
+          FirebaseAuthDart.validatePassword(auth.app, ''),
+          throwsAuthCode('invalid-password'),
+        );
+        expect(backend.requests, isEmpty);
+      },
+    );
+  });
+
   group('not available', () {
     test('provider, popup, redirect and phone throw unimplemented', () async {
       final FirebaseAuth auth = await newAuth();

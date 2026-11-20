@@ -99,14 +99,70 @@ FirebaseAuthException exceptionOf(dart_auth.FirebaseAuthException e) {
       ], MultiFactorSession(e.pendingCredential)),
     );
   }
-  return FirebaseAuthException(
+  return DartFirebaseAuthException(
     code: e.code,
     message: e.message,
     email: e.email,
     phoneNumber: e.phoneNumber,
     tenantId: e.tenantId,
     credential: credentialOf(e.credential),
+    serverCode: e.serverCode,
+    httpStatus: e.httpStatus,
   );
+}
+
+/// A [FirebaseAuthException] of the platform interface that also keeps what
+/// the server answered, for logs: `firebase_auth` passes it to the app as it
+/// is, so `catch (e)` can test `e is DartFirebaseAuthException`.
+class DartFirebaseAuthException extends FirebaseAuthException {
+  /// Creates the exception; [exceptionOf] creates them.
+  DartFirebaseAuthException({
+    required super.code,
+    super.message,
+    super.email,
+    super.credential,
+    super.phoneNumber,
+    super.tenantId,
+    this.serverCode,
+    this.httpStatus,
+  });
+
+  /// The error code of the server before mapping (`EMAIL_EXISTS`), or null
+  /// when the error did not come from the server.
+  final String? serverCode;
+
+  /// The HTTP status of the response, or null when there was none.
+  final int? httpStatus;
+}
+
+/// The result of `validatePassword` of the client as the interface's
+/// [PasswordValidationStatus], with a [PasswordPolicy] built from the same
+/// policy.
+PasswordValidationStatus passwordValidationStatusOf(
+  dart_auth.PasswordValidationStatus status,
+) {
+  final dart_auth.PasswordPolicy policy = status.passwordPolicy;
+  final PasswordPolicy interfacePolicy = PasswordPolicy(<String, dynamic>{
+    'customStrengthOptions': <String, dynamic>{
+      'minPasswordLength': policy.minPasswordLength,
+      'maxPasswordLength': ?policy.maxPasswordLength,
+      'containsLowercaseCharacter': ?policy.containsLowercaseCharacter,
+      'containsUppercaseCharacter': ?policy.containsUppercaseCharacter,
+      'containsNumericCharacter': ?policy.containsNumericCharacter,
+      'containsNonAlphanumericCharacter':
+          ?policy.containsNonAlphanumericCharacter,
+    },
+    'allowedNonAlphanumericCharacters': policy.allowedNonAlphanumericCharacters,
+    'enforcementState': policy.enforcementState,
+    'schemaVersion': policy.schemaVersion,
+  });
+  return PasswordValidationStatus(status.isValid, interfacePolicy)
+    ..meetsMinPasswordLength = status.meetsMinPasswordLength
+    ..meetsMaxPasswordLength = status.meetsMaxPasswordLength
+    ..meetsLowercaseRequirement = status.meetsLowercaseRequirement
+    ..meetsUppercaseRequirement = status.meetsUppercaseRequirement
+    ..meetsDigitsRequirement = status.meetsDigitsRequirement
+    ..meetsSymbolsRequirement = status.meetsSymbolsRequirement;
 }
 
 /// A second factor of the client as the interface lists it. The enrolment time
