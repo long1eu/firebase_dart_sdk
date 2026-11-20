@@ -1,3 +1,11 @@
+## (unreleased)
+
+- `mergeUnsentWrites`: a `set` (or an earlier merged write that became one) with a
+  `serverTimestamp` on a nested field (`n.t`) followed by an `update` that deletes that field or
+  a map above it is no longer merged. The timestamp creates the map `n`, which the delete leaves
+  empty on the backend; the merged write did not create it, so `n` was missing. Found by a new
+  property test of random offline sequences.
+
 ## 0.3.0
 
 - Faster reads from the cache, with no change in results (100,000 documents, an M5 laptop):

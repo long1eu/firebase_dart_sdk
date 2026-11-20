@@ -52,7 +52,9 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/model/value/field_va
 ///    rule 3:
 ///    a. [previous] is a set without precondition whose only transforms are server timestamps: a set of the value of
 ///       [previous] patched by [next], without precondition. After [previous] the document exists, so the `exists`
-///       of [next] holds.
+///       of [next] holds. Not when [next] deletes a nested field (`a.b`) at or above a server timestamp of
+///       [previous]: the timestamp creates the map `a`, which the delete leaves empty, and the merged write, which
+///       drops the timestamp, would not create it.
 ///    b. [previous] is a patch: a patch of the union of both masks (minus the paths that a shorter path of the union
 ///       covers), whose value is the empty document patched by [previous] and then by [next], with the precondition
 ///       of [previous]. Every path of the union is a whole subtree that one of the two overwrites, and that subtree
@@ -133,7 +135,8 @@ Mutation? mergeUnsentMutations(Mutation previous, Mutation next) {
           !previous.fieldTransforms.every(
             (FieldTransform transform) =>
                 transform.operation is ServerTimestampOperation,
-          )) {
+          ) ||
+          _deletesTransformedField(next, previous)) {
         return null;
       }
       final _MergedTransforms? merged = _mergeTransforms(
@@ -410,6 +413,19 @@ bool _isPlainWrite(Mutation mutation) =>
 bool _deletesNestedField(PatchMutation patch) => patch.mask.mask.any(
   (FieldPath path) => path.length > 1 && patch.value.get(path) == null,
 );
+
+/// Whether [next] deletes a nested field (`a.b`) at or above a field that a transform of [previous] writes: the
+/// transform creates the map `a`, which stays (empty) after the delete, but the merged write drops the transform and
+/// would not create `a` (rule 2a of [mergeUnsentMutations]).
+bool _deletesTransformedField(PatchMutation next, Mutation previous) =>
+    next.mask.mask.any(
+      (FieldPath path) =>
+          path.length > 1 &&
+          next.value.get(path) == null &&
+          previous.fieldTransforms.any(
+            (FieldTransform transform) => path.isPrefixOf(transform.fieldPath),
+          ),
+    );
 
 bool _isNoneOrExists(Precondition precondition) =>
     precondition.isNone || precondition.exists != null;

@@ -12,6 +12,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/model/document_key.d
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/maybe_document.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/mutation.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/precondition.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/set_mutation.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/user_data_converter.dart';
 import 'package:cloud_firestore_dart/src/firebase/timestamp.dart';
 import 'package:test/test.dart';
@@ -118,6 +119,7 @@ void main() {
     'update n.t time': update(<String, Object?>{
       'n.t': FieldValue.serverTimestamp(),
     }),
+    'update deletes n.t': update(<String, Object?>{'n.t': FieldValue.delete()}),
     'update count': update(<String, Object?>{'count': 42}),
     'update count to a double': update(<String, Object?>{'count': 1.5}),
     'update with increment 1.5': update(<String, Object?>{
@@ -304,5 +306,11 @@ void main() {
     );
     expect(merge('update with arrayRemove', 'update with arrayUnion'), isNull);
     expect(merge('update with time', 'set with increment'), isNull);
+
+    // Found by merge_unsent_writes_model_test.dart: the timestamp at n.t creates the map n, which the delete of n.t
+    // leaves empty; a merged write without the timestamp would not create n.
+    final Mutation stamped = merge('set count', 'update n.t time')!;
+    expect(stamped, isA<SetMutation>());
+    expect(mergeUnsentMutations(stamped, writes['update deletes n.t']!), isNull);
   });
 }
