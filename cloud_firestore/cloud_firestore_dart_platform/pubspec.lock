@@ -55,14 +55,14 @@ packages:
       path: "../cloud_firestore_dart"
       relative: true
     source: path
-    version: "0.2.0"
+    version: "0.3.0"
   cloud_firestore_dart_flutterfire:
     dependency: "direct dev"
     description:
       path: "../cloud_firestore_dart_flutterfire"
       relative: true
     source: path
-    version: "0.1.0"
+    version: "0.1.1"
   cloud_firestore_platform_interface:
     dependency: "direct main"
     description:
