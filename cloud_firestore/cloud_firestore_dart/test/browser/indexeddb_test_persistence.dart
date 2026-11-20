@@ -29,6 +29,7 @@ Future<WebIndexedDbPersistence> newIndexedDbTestPersistence({
   LruGarbageCollectorParams params = const LruGarbageCollectorParams(),
   StatsCollector statsCollector = StatsCollector.noOp,
   String? clientId,
+  bool multiTab = false,
 }) async {
   final DatabaseId databaseId = DatabaseId.forProject(projectId);
   final WebIndexedDbPersistence persistence = WebIndexedDbPersistence(
@@ -38,6 +39,7 @@ Future<WebIndexedDbPersistence> newIndexedDbTestPersistence({
     lruParams: params,
     statsCollector: statsCollector,
     clientId: clientId,
+    multiTab: multiTab,
   );
   await persistence.start();
   return persistence;
