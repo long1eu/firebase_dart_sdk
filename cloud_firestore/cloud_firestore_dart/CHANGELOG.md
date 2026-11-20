@@ -20,6 +20,12 @@
   collection) now also removes its cache index entries, so a query served by an index no longer
   looks up a document that is gone. Writes that reach the caches outside a persistence
   transaction run in a transaction of their own instead of failing on a read-only one.
+- Fixed, IndexedDB cache: the rows are written as the JS SDK writes them. An empty bytes value was
+  stored as `{}` and could not be read back; compiled with dart2js, timestamps were rounded to
+  milliseconds (a time less than half a millisecond before a whole second was stored one second
+  late, and the last second of year 9999 became year 10000, which could not be read back); and
+  -0.0 was stored as `0`. Timestamps now keep their nanoseconds, -0.0 is written as `"-0"` and a
+  `"-0"` the JS SDK wrote is read as -0.0.
 - IndexedDB cache: a database of a schema version other than 18 is refused as before, and the
   error now says the cache was left as it is; for a newer version it says that a new schema
   version of the JS SDK needs a new release of this package.

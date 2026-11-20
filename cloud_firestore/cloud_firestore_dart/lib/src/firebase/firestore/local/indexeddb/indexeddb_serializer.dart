@@ -35,8 +35,12 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/model/unknown_docume
 import 'package:cloud_firestore_dart/src/firebase/firestore/remote/remote_serializer.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/assert.dart';
 import 'package:cloud_firestore_dart/src/firebase/timestamp.dart';
+import 'package:cloud_firestore_dart/src/proto/google/firestore/v1/document.pb.dart'
+    as v1;
 import 'package:cloud_firestore_dart/src/proto/index.dart' as proto;
 import 'package:protobuf/protobuf.dart';
+import 'package:protobuf/well_known_types/google/protobuf/timestamp.pb.dart'
+    as wkt;
 
 /// Converts between the model of this SDK and the rows of the JS SDK's IndexedDB cache (`toDb...` and `fromDb...` of
 /// `local_serializer.ts`).
@@ -58,10 +62,132 @@ class IndexedDbSerializer {
 
   RemoteSerializer get _rpc => localSerializer.rpcSerializer;
 
-  /// The proto3 JSON of [message], with every timestamp written with nine fraction digits as `toTimestamp` of the JS
-  /// SDK does.
-  static Object? toProto3Json(GeneratedMessage message) =>
-      _normalizeTimestamps(message.toProto3Json());
+  /// The proto3 JSON of [message] as the JS SDK's `JsonProtoSerializer` (`useProto3Json`) writes it.
+  ///
+  /// PORTING NOTE: `GeneratedMessage.toProto3Json()` alone is not faithful. It writes an empty `bytesValue` as `{}`
+  /// (the value loses its type and can not be read back), the double -0.0 as `0`, and, compiled with dart2js, a
+  /// timestamp rounded to milliseconds through `DateTime` (a time less than half a millisecond before a whole second
+  /// comes out one second late, and the last second of year 9999 becomes year 10000, which can not be read back). The
+  /// values and timestamps are written again here: timestamps as `toTimestamp` of the JS SDK (the whole seconds and
+  /// nine digits of nanoseconds, no rounding), doubles as `toDouble` (`'-0'`, `'NaN'`, `'Infinity'`), bytes in base64.
+  static Object? toProto3Json(GeneratedMessage message) {
+    if (message is v1.Value) {
+      return _encodeValue(message);
+    }
+    final Object? json = message.toProto3Json();
+    _patch(message, json);
+    return json;
+  }
+
+  /// Replaces the JSON of every timestamp and value below [message] in [json].
+  static void _patch(GeneratedMessage message, Object? json) {
+    if (json is! Map) {
+      return;
+    }
+    for (final FieldInfo<dynamic> info in message.info_.fieldInfo.values) {
+      final Object? field = message.getFieldOrNull(info.tagNumber);
+      if (field == null) {
+        continue;
+      }
+      final String key = info.name;
+      if (!json.containsKey(key)) {
+        continue;
+      }
+      if (field is wkt.Timestamp) {
+        json[key] = _encodeTimestamp(field);
+      } else if (field is v1.Value) {
+        json[key] = _encodeValue(field);
+      } else if (field is GeneratedMessage) {
+        _patch(field, json[key]);
+      } else if (field is Map) {
+        final Object? encoded = json[key];
+        if (encoded is Map) {
+          field.forEach((Object? name, Object? element) {
+            if (element is v1.Value) {
+              encoded[name] = _encodeValue(element);
+            } else if (element is GeneratedMessage) {
+              _patch(element, encoded[name]);
+            }
+          });
+        }
+      } else if (field is List) {
+        final Object? encoded = json[key];
+        if (encoded is List && encoded.length == field.length) {
+          for (int i = 0; i < field.length; i++) {
+            final Object? element = field[i];
+            if (element is v1.Value) {
+              encoded[i] = _encodeValue(element);
+            } else if (element is GeneratedMessage) {
+              _patch(element, encoded[i]);
+            }
+          }
+        }
+      }
+    }
+  }
+
+  /// `toDouble` of the JS SDK with proto3 JSON.
+  static Object _encodeDouble(double value) {
+    if (value.isNaN) {
+      return 'NaN';
+    } else if (value.isInfinite) {
+      return value.isNegative ? '-Infinity' : 'Infinity';
+    } else if (value == 0 && value.isNegative) {
+      return '-0';
+    }
+    return value;
+  }
+
+  /// `toTimestamp` of the JS SDK: the whole seconds in ISO 8601 and nine digits of nanoseconds.
+  static String _encodeTimestamp(wkt.Timestamp timestamp) =>
+      _timestampString(timestamp.seconds.toInt(), timestamp.nanos);
+
+  static Object? _encodeValue(v1.Value value) {
+    // The oneof case, not hasXxx(): an empty bytes value 'has' no value.
+    switch (value.whichValueType()) {
+      case v1.Value_ValueType.timestampValue:
+        return <String, Object?>{
+          'timestampValue': _encodeTimestamp(value.timestampValue),
+        };
+      case v1.Value_ValueType.doubleValue:
+        return <String, Object?>{
+          'doubleValue': _encodeDouble(value.doubleValue),
+        };
+      case v1.Value_ValueType.bytesValue:
+        return <String, Object?>{'bytesValue': base64.encode(value.bytesValue)};
+      case v1.Value_ValueType.geoPointValue:
+        return <String, Object?>{
+          'geoPointValue': <String, Object?>{
+            'latitude': _encodeDouble(value.geoPointValue.latitude),
+            'longitude': _encodeDouble(value.geoPointValue.longitude),
+          },
+        };
+      case v1.Value_ValueType.arrayValue:
+        return <String, Object?>{
+          'arrayValue': <String, Object?>{
+            'values': <Object?>[
+              for (final v1.Value element in value.arrayValue.values)
+                _encodeValue(element),
+            ],
+          },
+        };
+      case v1.Value_ValueType.mapValue:
+        return <String, Object?>{
+          'mapValue': <String, Object?>{
+            'fields': <String, Object?>{
+              for (final MapEntry<String, v1.Value> field
+                  in value.mapValue.fields.entries)
+                field.key: _encodeValue(field.value),
+            },
+          },
+        };
+      // ignore: no_default_cases
+      default:
+        final Object? json = value.toProto3Json();
+        _patch(value, json);
+        return json;
+    }
+  }
 
   /// The fields that hold a `google.protobuf.Timestamp` in the protos the cache stores (`Document`, `Value`,
   /// `Precondition`). Inside `Document.fields` and `MapValue.fields` the values are objects, never strings, so a
@@ -75,27 +201,6 @@ class IndexedDbSerializer {
   static final RegExp _rfc3339 = RegExp(
     r'^(.*T\d\d:\d\d:\d\d)(?:\.(\d{1,9}))?Z$',
   );
-
-  static Object? _normalizeTimestamps(Object? node) {
-    if (node is Map) {
-      final Map<String, Object?> result = <String, Object?>{};
-      for (final MapEntry<Object?, Object?> entry in node.entries) {
-        final String key = entry.key! as String;
-        final Object? value = entry.value;
-        if (value is String && _timestampFields.contains(key)) {
-          result[key] = _nineDigits(value);
-        } else {
-          result[key] = _normalizeTimestamps(value);
-        }
-      }
-      return result;
-    } else if (node is List) {
-      return <Object?>[
-        for (final Object? item in node) _normalizeTimestamps(item),
-      ];
-    }
-    return node;
-  }
 
   /// [json] (proto3 JSON the JS SDK wrote) in the strict form `package:protobuf` reads.
   ///
@@ -147,7 +252,8 @@ class IndexedDbSerializer {
             key == 'latitude' ||
             key == 'longitude') &&
         value is String) {
-      return num.tryParse(value) ?? value;
+      // A double, also for "-0" (a JS -0 stays -0: `num.tryParse` would give the integer 0) and "NaN"/"Infinity".
+      return double.tryParse(value) ?? value;
     }
     return fromJsProto3Json(value);
   }
