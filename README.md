@@ -11,7 +11,8 @@ endorsed by Google or Firebase.
 
 1. **You build a Flutter app for Linux desktop.** FlutterFire has no Linux implementation and says it is not
    on its roadmap. Add `cloud_firestore_dart_platform` and keep the official `cloud_firestore` API. Caveat:
-   one app was built and run on Debian 13 x86_64, a debug build against the emulator only.
+   one app was built and run on Debian 13 x86_64, a debug build against the emulator only. For sign-in on
+   Linux add `firebase_auth_dart_platform` (0.1.0, unreleased) and keep the official `firebase_auth` API.
 2. **You write a Dart server, worker or CLI that needs listeners, an offline cache, or to act as a signed-in
    Firebase user under security rules.** The official Dart Admin SDK has no listeners and always bypasses
    rules. Caveat: it has draft PRs for listeners since 2026-11-09, so that part of the gap may close.
@@ -84,6 +85,7 @@ from 0.1? The 0.2 API took FlutterFire's names: [what changed](docs/api_migratio
 | [`cloud_firestore_dart_sqlite`](cloud_firestore/cloud_firestore_dart_sqlite/) | 0.1.3 | Anyone who wants the offline cache on disk instead of in memory |
 | [`cloud_firestore_dart_platform`](cloud_firestore/cloud_firestore_dart_platform/) | 0.1.2 | Flutter apps written against the official `cloud_firestore` API, on Linux or by choice elsewhere |
 | [`cloud_firestore_dart_flutterfire`](cloud_firestore/cloud_firestore_dart_flutterfire/) | 0.1.2 | Flutter apps that sign in with `firebase_auth` and want `cloud_firestore_dart` to use that user |
+| [`firebase_auth_dart_platform`](firebase_auth/firebase_auth_dart_platform/) | 0.1.0, unreleased | Flutter apps written against the official `firebase_auth` API, on Linux or by choice elsewhere; needs `firebase_auth_providers_dart` 0.3.1 |
 | [`firebase_admin_dart`](firebase_admin/firebase_admin_dart/) | 0.1.1 | Servers, tools and integration tests that mint custom tokens, manage users or verify ID tokens |
 
 ## How it fits together
@@ -224,7 +226,7 @@ code; he reviews and tests it. Response times are in the [support policy](docs/s
 
 This repository ports Firestore and the Firebase Core pieces it needs, plus token providers for
 Firestore in `firebase_auth/firebase_auth_providers_dart` and a few Firebase Auth admin calls in
-`firebase_admin/firebase_admin_dart`. There is no full Auth SDK, no Storage
+`firebase_admin/firebase_admin_dart`. `firebase_auth/firebase_auth_dart_platform` runs the official `firebase_auth` API on top of those. There is no full Auth SDK, no Storage
 and no Realtime Database client here; for those see
 [appsup-dart/firebase_dart](https://github.com/appsup-dart/firebase_dart). The other directories
 under `firebase_auth`, and `firebase_storage_dart` and `google_sign_in_dart`, are older code from
@@ -333,11 +335,11 @@ currently 3.8.0, the lowest supported one). Do not format
 
 ## License
 
-The [`LICENSE`](LICENSE) file at the root is the Apache License 2.0, the licence of the seven published
+The [`LICENSE`](LICENSE) file at the root is the Apache License 2.0, the licence of the eight published
 packages. The older packages that were not migrated carry their own licence in their own folder.
 
 `cloud_firestore_dart`, `firebase_app_dart`, `firebase_auth_providers_dart`, `cloud_firestore_dart_sqlite`,
-`cloud_firestore_dart_flutterfire`, `cloud_firestore_dart_platform` and `firebase_admin_dart` are licensed under
+`cloud_firestore_dart_flutterfire`, `cloud_firestore_dart_platform`, `firebase_auth_dart_platform` and `firebase_admin_dart` are licensed under
 the Apache License 2.0, as upstream; see the `LICENSE` and `NOTICE` files of each package. The
 `_vm` packages they replace were licensed under BSD-3-Clause. The packages of this repository
 that were not migrated keep their own `LICENSE` files.
