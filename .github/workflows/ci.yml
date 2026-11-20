@@ -25,10 +25,12 @@ concurrency:
 # the image ubuntu-latest resolved to in every run so far, the only one the jobs were seen
 # green on.
 #
-# Order: `changes` and the two unit jobs start at once. The emulator suites wait for the unit job
-# on the lowest SDK (analyze, unit tests, formatting) and are skipped when a change touches only
-# documentation, which the emulator suites cannot see (the unit jobs still run: they check the
-# snippets of the READMEs). A skipped job counts as passed for a required check.
+# Order: every job starts at once except the emulator suites, the Flutter job and the size check,
+# which wait only for `changes` (a few seconds) and are skipped when a change touches only
+# documentation, which they cannot see (the unit jobs still run: they check the snippets of the
+# READMEs). A skipped job counts as passed for a required check. They do not wait for the unit
+# jobs: a broken change fails the unit check either way, and waiting added the whole unit run
+# (about 10 minutes) to every pull request.
 #
 # Actions are pinned by commit; the comment names the release. Dependabot (dependabot.yml) keeps
 # them current.
@@ -102,14 +104,30 @@ jobs:
               - '.github/workflows/ci.yml'
               - '.github/actions/**'
 
+  # The unit suite (tool/test_all.sh) runs in two parallel legs per SDK: cloud_firestore_dart
+  # alone (its tests take about 9 of the 11 minutes) and every other package with the examples.
+  # A package added to PACKAGES in tool/test_all.sh must be added to the `others` leg of both
+  # jobs. The jobs `unit` and `unit-stable` below report the result of each SDK under the check
+  # names the unit jobs had before the split.
+  #
   # The lowest supported SDK (the `sdk: ^3.8.0` floor of cloud_firestore_dart). The formatting
   # check runs only here, on a pinned SDK, so that a formatter change in a new Dart release
   # cannot fail CI without a code change. `lib` is formatted identically by 3.8.0 and by the
   # SDK it was last formatted with (3.12.2); when the pin moves, reformat with the new one.
-  unit:
-    name: Unit tests and formatting (Dart 3.8.0)
+  unit-legs:
+    name: Unit tests and formatting (Dart 3.8.0, ${{ matrix.leg }})
     runs-on: ubuntu-26.04
     timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - leg: cloud_firestore_dart
+            packages: cloud_firestore_dart
+          - leg: others
+            packages: >-
+              firebase_app_dart firebase_auth_providers_dart cloud_firestore_dart_sqlite
+              firebase_admin_dart examples
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./.github/actions/dart
@@ -118,34 +136,38 @@ jobs:
       - name: Analyze and run unit tests
         env:
           TEST_LOG_DIR: ${{ runner.temp }}/unit
-        run: ./tool/test_all.sh
+          PACKAGES: ${{ matrix.packages }}
+        run: |
+          read -ra selected <<<"$PACKAGES"
+          ./tool/test_all.sh "${selected[@]}"
       - name: Upload test output
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: unit-log
+          name: unit-log-${{ matrix.leg }}
           path: ${{ runner.temp }}/unit/*
       # After test_all.sh, which runs `dart pub get`: the formatter takes the language version
       # (and so the style) from the resolved package. Generated protos are included; the
-      # plugin and tool/gen_protos.sh emit formatted code.
+      # plugin and tool/gen_protos.sh emit formatted code. Each package is checked in the leg
+      # that resolved it.
       - name: Check formatting (firebase_app_dart)
         # Also when a test failed: test_all.sh has run `dart pub get` by then.
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.leg == 'others' }}
         working-directory: firebase_core/firebase_app_dart
         run: dart format --output=none --set-exit-if-changed lib example
       - name: Check formatting (cloud_firestore_dart)
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.leg == 'cloud_firestore_dart' }}
         working-directory: cloud_firestore/cloud_firestore_dart
         run: dart format --output=none --set-exit-if-changed lib example
       - name: Check formatting (firebase_auth_providers_dart)
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.leg == 'others' }}
         working-directory: firebase_auth/firebase_auth_providers_dart
         run: dart format --output=none --set-exit-if-changed lib example
       - name: Lowest versions of the dependencies (firebase_auth_providers_dart)
         # The package claims `googleapis_auth: ^2.0.0`, `http: ^1.2.0` and `crypto: ^3.0.3`: run its
         # tests with the lowest versions this SDK resolves (only the runtime dependencies are
         # downgraded: the lowest versions of the test tooling do not compile on 3.8).
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.leg == 'others' }}
         working-directory: firebase_auth/firebase_auth_providers_dart
         run: |
           dart pub downgrade googleapis_auth crypto http meta
@@ -154,10 +176,20 @@ jobs:
           dart test --reporter expanded
 
   # The same on the current stable SDK, without the formatting check.
-  unit-stable:
-    name: Unit tests (Dart stable)
+  unit-stable-legs:
+    name: Unit tests (Dart stable, ${{ matrix.leg }})
     runs-on: ubuntu-26.04
     timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - leg: cloud_firestore_dart
+            packages: cloud_firestore_dart
+          - leg: others
+            packages: >-
+              firebase_app_dart firebase_auth_providers_dart cloud_firestore_dart_sqlite
+              firebase_admin_dart examples
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./.github/actions/dart
@@ -166,13 +198,16 @@ jobs:
       - name: Analyze and run unit tests
         env:
           TEST_LOG_DIR: ${{ runner.temp }}/unit
-        run: ./tool/test_all.sh
+          PACKAGES: ${{ matrix.packages }}
+        run: |
+          read -ra selected <<<"$PACKAGES"
+          ./tool/test_all.sh "${selected[@]}"
       # The connectivity detector against a real change of the network interfaces: the test adds a dummy interface
       # with `ip`, so it runs as root (it is skipped, with a reason, everywhere else). Last, because it leaves root
       # owned files in .dart_tool. It passed in a Debian container with CAP_NET_ADMIN (tool/linux/run_in_container.sh)
       # but has not run on a GitHub runner yet: allowed to fail until it did.
       - name: Connectivity detector with a real interface change (root)
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.leg == 'cloud_firestore_dart' }}
         continue-on-error: true
         working-directory: cloud_firestore/cloud_firestore_dart
         run: |
@@ -182,8 +217,37 @@ jobs:
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: unit-stable-log
+          name: unit-stable-log-${{ matrix.leg }}
           path: ${{ runner.temp }}/unit/*
+
+  # One check per SDK under the old names, passed only when every leg of that SDK passed.
+  unit:
+    name: Unit tests and formatting (Dart 3.8.0)
+    needs: unit-legs
+    if: always()
+    runs-on: ubuntu-26.04
+    timeout-minutes: 5
+    steps:
+      - name: Every leg passed
+        env:
+          RESULT: ${{ needs.unit-legs.result }}
+        run: |
+          echo "unit-legs: $RESULT"
+          [ "$RESULT" = success ]
+
+  unit-stable:
+    name: Unit tests (Dart stable)
+    needs: unit-stable-legs
+    if: always()
+    runs-on: ubuntu-26.04
+    timeout-minutes: 5
+    steps:
+      - name: Every leg passed
+        env:
+          RESULT: ${{ needs.unit-stable-legs.result }}
+        run: |
+          echo "unit-stable-legs: $RESULT"
+          [ "$RESULT" = success ]
 
   # Required: the suite passed on Linux in Debian containers (arm64, and x64 under emulation;
   # tool/linux/run_in_container.sh) and in five stress runs on macOS, where one test failed once
@@ -191,7 +255,7 @@ jobs:
   # increment counted twice. A failure here is a signal to look at; the full output is uploaded.
   integration:
     name: Standard emulator integration tests
-    needs: [changes, unit]
+    needs: changes
     if: ${{ needs.changes.outputs.code == 'true' }}
     runs-on: ubuntu-26.04
     timeout-minutes: 60
@@ -233,16 +297,18 @@ jobs:
           path: ${{ runner.temp }}/*.log
 
   # The same standard suite over the web transport (REST and WebChannel instead of gRPC),
-  # still on the VM: tool/test_integration.sh --transport=webchannel, then the same with the
-  # streams in long polling mode. Against a private emulator started from the JAR on port 8090
-  # (tool/start_private_emulator.sh), which is where the web runs go by default. Required, like
-  # the job above: both modes passed in a Debian arm64 container.
+  # still on the VM: tool/test_integration.sh --transport=webchannel. Against a private emulator
+  # started from the JAR on port 8090 (tool/start_private_emulator.sh), which is where the web
+  # runs go by default. The long polling mode runs in the next job, in parallel, on its own
+  # emulator: the emulator keeps one thread per WebChannel session for good (tool/README.md), so
+  # each mode gets a fresh one. Required, like the job above: both modes passed in a Debian arm64
+  # container.
   integration-webchannel:
     name: Standard emulator integration tests over the web transport
-    needs: [changes, unit]
+    needs: changes
     if: ${{ needs.changes.outputs.code == 'true' }}
     runs-on: ubuntu-26.04
-    timeout-minutes: 75
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Set the emulator work directory
@@ -259,20 +325,10 @@ jobs:
       - name: Install the JS interop harness
         working-directory: tool/interop
         run: npm ci
-      - name: Run integration tests over the web transport
+      - name: Run integration tests over the web transport (--transport=webchannel)
         run: |
           (cd cloud_firestore/cloud_firestore_dart && dart pub get)
           TEST_LOG_DIR="$EMULATOR_DIR" ./tool/test_integration.sh standard --transport=webchannel
-      - name: Restart the private Firestore emulator
-        # It keeps one thread per WebChannel session for good (tool/README.md).
-        if: always()
-        run: |
-          ./tool/stop_private_emulator.sh 8090
-          ./tool/start_private_emulator.sh 8090
-      - name: Run integration tests over the web transport with long polling
-        if: always()
-        run: |
-          TEST_LOG_DIR="$EMULATOR_DIR" ./tool/test_integration.sh standard --transport=webchannel-longpolling
       - name: Stop the private Firestore emulator
         if: always()
         run: ./tool/stop_private_emulator.sh 8090
@@ -283,13 +339,52 @@ jobs:
           name: integration-webchannel-log
           path: ${{ runner.temp }}/emulator/*.log
 
+  # The same with the streams in long polling mode (--transport=webchannel-longpolling). Required.
+  integration-webchannel-longpolling:
+    name: Standard emulator integration tests over the web transport with long polling
+    needs: changes
+    if: ${{ needs.changes.outputs.code == 'true' }}
+    runs-on: ubuntu-26.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set the emulator work directory
+        # The `runner` context is not available in job-level `env`.
+        run: echo "EMULATOR_DIR=$RUNNER_TEMP/emulator" >> "$GITHUB_ENV"
+      - uses: ./.github/actions/dart
+        with:
+          sdk: stable
+      - uses: ./.github/actions/emulators
+        with:
+          npm-lockfile: tool/interop/package-lock.json
+      - name: Start a private Firestore emulator
+        run: ./tool/start_private_emulator.sh 8090
+      - name: Install the JS interop harness
+        working-directory: tool/interop
+        run: npm ci
+      - name: Run integration tests over the web transport (--transport=webchannel-longpolling)
+        run: |
+          (cd cloud_firestore/cloud_firestore_dart && dart pub get)
+          TEST_LOG_DIR="$EMULATOR_DIR" ./tool/test_integration.sh standard --transport=webchannel-longpolling
+      - name: Stop the private Firestore emulator
+        if: always()
+        run: ./tool/stop_private_emulator.sh 8090
+      - name: Upload test output
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: integration-webchannel-longpolling-log
+          path: ${{ runner.temp }}/emulator/*.log
+
   # Tests that need the Enterprise edition of Firestore (test/integration_enterprise). They run
   # against a second emulator started from the emulator JAR with `--database-edition enterprise`
   # on port 8181 (tool/start_enterprise_emulator.sh); the standard emulator runs next to it on
   # 8080 for the tests that compare the two. Required: they passed in a Debian arm64 container.
   enterprise:
     name: Enterprise emulator tests
-    needs: [changes, unit]
+    needs: changes
     if: ${{ needs.changes.outputs.code == 'true' }}
     runs-on: ubuntu-26.04
     timeout-minutes: 60
@@ -342,7 +437,7 @@ jobs:
   # three times on its own; the timing of that test is not yet robust on this emulator.
   standard-suite-on-enterprise:
     name: Standard suite on the Enterprise emulator (allowed to fail)
-    needs: [changes, unit]
+    needs: changes
     if: ${{ needs.changes.outputs.code == 'true' }}
     runs-on: ubuntu-26.04
     timeout-minutes: 60
@@ -382,7 +477,7 @@ jobs:
   # seen by any other job.
   browser:
     name: Browser tests in Chrome (dart2wasm)
-    needs: [changes, unit]
+    needs: changes
     if: ${{ needs.changes.outputs.code == 'true' && needs.changes.outputs.browser == 'true' }}
     runs-on: ubuntu-26.04
     timeout-minutes: 40
@@ -416,7 +511,7 @@ jobs:
   # on the engine's database.
   indexeddb-interop:
     name: IndexedDB cache interop with the JS SDK (Chrome)
-    needs: [changes, unit]
+    needs: changes
     if: ${{ needs.changes.outputs.code == 'true' && needs.changes.outputs.indexeddb == 'true' }}
     runs-on: ubuntu-26.04
     timeout-minutes: 30
@@ -462,7 +557,7 @@ jobs:
   # job. Required: nothing else checks these packages.
   flutter:
     name: Flutter packages (Flutter stable)
-    needs: [changes, unit]
+    needs: changes
     if: ${{ needs.changes.outputs.code == 'true' }}
     runs-on: ubuntu-26.04
     timeout-minutes: 40
@@ -517,7 +612,7 @@ jobs:
   # (tool/check_size.sh, budgets in tool/size/check_size.dart). Pinned to the SDK the budgets
   # were measured with: most of the compiled program is the Dart runtime, so the numbers move
   # with the SDK. When the pin moves, measure again and update the budgets and the README.
-  # Allowed to fail. Short: it does not wait for the unit job.
+  # Allowed to fail.
   size:
     name: Web size check, lite and full (Dart 3.12.2, allowed to fail)
     needs: changes
