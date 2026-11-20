@@ -1,6 +1,8 @@
 // The provider ids and sign-in method names are FlutterFire's (and the JS SDK's) constants, in their upper case.
 // ignore_for_file: constant_identifier_names
 
+import 'dart:convert';
+
 import 'action_code.dart';
 import 'auth_exception.dart';
 import 'auth_user.dart';
@@ -49,6 +51,90 @@ class EmailAuthCredential extends AuthCredential {
 
   /// The sign-in link of the email, for [EmailAuthProvider.EMAIL_LINK_SIGN_IN_METHOD]. Not part of [toString].
   final String? emailLink;
+
+  /// The credential in the JSON shape of the JS SDK's `toJSON`, which [fromJson] here and `fromJSON` of the JS SDK
+  /// read back: `email`, `password`, `signInMethod` and `tenantId` (null when there is none).
+  ///
+  /// For an email link, as in the JS SDK, `password` is the code of the link (`oobCode`) and `tenantId` its tenant;
+  /// the rest of the link is not kept. Throws an [ArgumentError] when [emailLink] is not the link of an action email
+  /// ([ActionCodeURL.parseLink]).
+  ///
+  /// The map holds the password or the code of the link: keep it as secret as they are.
+  Map<String, Object?> toJson() {
+    final String? link = emailLink;
+    if (link == null) {
+      return <String, Object?>{
+        'email': email,
+        'password': password,
+        'signInMethod': signInMethod,
+        'tenantId': null,
+      };
+    }
+    final ActionCodeURL? url = ActionCodeURL.parseLink(link);
+    if (url == null) {
+      throw ArgumentError(
+        'The email link of the credential is not the link of an action email',
+      );
+    }
+    return <String, Object?>{
+      'email': email,
+      'password': url.code,
+      'signInMethod': signInMethod,
+      'tenantId': url.tenantId,
+    };
+  }
+
+  /// Reads the JSON of [toJson] or of the JS SDK's `toJSON` (`EmailAuthCredential.fromJSON`): [json] is the map, or
+  /// its JSON text.
+  ///
+  /// As in the JS SDK, returns null when it is not the JSON of an email credential: not a map, an empty or missing
+  /// `email` or `password`, or a `signInMethod` other than `password` and `emailLink`; and text that is not JSON
+  /// throws (a [FormatException] here, as `JSON.parse` throws there). Unlike the JS SDK, a value that is not a string
+  /// counts as missing.
+  ///
+  /// The JSON of an email link holds only the code of the link and its tenant: the [emailLink] of the credential is
+  /// then a link made of them, `https://localhost/?apiKey=none&mode=signIn&oobCode=<code>[&tenantId=<tenant>]`.
+  static EmailAuthCredential? fromJson(Object json) {
+    final Map<Object?, Object?>? map = _jsonMap(json);
+    final Object? email = map?['email'];
+    final Object? password = map?['password'];
+    if (email is! String ||
+        email.isEmpty ||
+        password is! String ||
+        password.isEmpty) {
+      return null;
+    }
+    final Object? tenantId = map!['tenantId'];
+    return switch (map['signInMethod']) {
+      EmailAuthProvider.EMAIL_PASSWORD_SIGN_IN_METHOD =>
+        EmailAuthProvider.credential(email: email, password: password),
+      EmailAuthProvider.EMAIL_LINK_SIGN_IN_METHOD =>
+        EmailAuthProvider.credentialWithLink(
+          email: email,
+          emailLink: _signInLinkOf(
+            password,
+            tenantId is String ? tenantId : null,
+          ),
+        ),
+      _ => null,
+    };
+  }
+}
+
+/// [json] as a map: a map as it is, and a string decoded first (a [FormatException] when it is not JSON); null for
+/// anything else.
+Map<Object?, Object?>? _jsonMap(Object json) {
+  final Object? value = json is String ? jsonDecode(json) : json;
+  return value is Map ? value : null;
+}
+
+/// A sign-in link with only the [code] and the [tenantId], for an email link credential read from JSON.
+String _signInLinkOf(String code, String? tenantId) {
+  final String tenant = tenantId == null
+      ? ''
+      : '&tenantId=${Uri.encodeComponent(tenantId)}';
+  return 'https://localhost/?apiKey=none&mode=signIn'
+      '&oobCode=${Uri.encodeComponent(code)}$tenant';
 }
 
 /// The email and password provider (`EmailAuthProvider` of FlutterFire and of the JS SDK): makes the credentials of
@@ -142,7 +228,70 @@ class OAuthCredential extends AuthCredential {
   /// Kept for FlutterFire compatibility; like the JS SDK, it is not sent to the backend: set it with
   /// `updateProfile` after the first sign-in if you want it.
   final AppleFullPersonName? appleFullPersonName;
+
+  /// The credential in the JSON shape of the JS SDK's `toJSON` (as `JSON.stringify` writes it), which [fromJson]
+  /// and [OAuthProvider.credentialFromJson] here and `fromJSON` and `OAuthProvider.credentialFromJSON` of the JS SDK
+  /// read back: `idToken`, `accessToken`, `secret` and `nonce` ([rawNonce]) when they are set, `pendingToken` (null
+  /// when there is none), `providerId` and `signInMethod`. [appleFullPersonName] has no key in the JS SDK and is
+  /// left out.
+  ///
+  /// The map holds the provider's tokens: keep it as secret as they are.
+  Map<String, Object?> toJson() => <String, Object?>{
+    'idToken': ?idToken,
+    'accessToken': ?accessToken,
+    'secret': ?secret,
+    'nonce': ?rawNonce,
+    'pendingToken': pendingToken,
+    'providerId': providerId,
+    'signInMethod': signInMethod,
+  };
+
+  /// Reads the JSON of [toJson] or of the JS SDK's `toJSON` (`OAuthCredential.fromJSON`): [json] is the map, or its
+  /// JSON text.
+  ///
+  /// As in the JS SDK, returns null when it is not the JSON of a credential: not a map, or an empty or missing
+  /// `providerId` or `signInMethod`; and text that is not JSON throws (a [FormatException] here, as `JSON.parse`
+  /// throws there). Unlike the JS SDK, a field that is there and not a string also gives null. Like the JS SDK, it
+  /// needs no token (an empty `idToken`, `accessToken` or `pendingToken` counts as none):
+  /// [OAuthProvider.credentialFromJson] checks that there is one.
+  static OAuthCredential? fromJson(Object json) {
+    final Map<Object?, Object?>? map = _jsonMap(json);
+    if (map == null) {
+      return null;
+    }
+    final Object? providerId = map['providerId'];
+    final Object? signInMethod = map['signInMethod'];
+    if (providerId is! String ||
+        providerId.isEmpty ||
+        signInMethod is! String ||
+        signInMethod.isEmpty ||
+        _oauthTokenKeys.any((String key) => map[key] is! String?)) {
+      return null;
+    }
+    return OAuthCredential(
+      providerId: providerId,
+      signInMethod: signInMethod,
+      idToken: _nonEmpty(map['idToken']),
+      accessToken: _nonEmpty(map['accessToken']),
+      secret: map['secret'] as String?,
+      rawNonce: map['nonce'] as String?,
+      pendingToken: _nonEmpty(map['pendingToken']),
+    );
+  }
 }
+
+/// The keys of the JSON of an [OAuthCredential] that hold an optional string.
+const List<String> _oauthTokenKeys = <String>[
+  'idToken',
+  'accessToken',
+  'secret',
+  'nonce',
+  'pendingToken',
+];
+
+/// [value], a string or null, with an empty string as null (`value || undefined` of the JS SDK).
+String? _nonEmpty(Object? value) =>
+    value is String && value.isNotEmpty ? value : null;
 
 /// The name Sign in with Apple gives the app on the first sign-in (FlutterFire's `AppleFullPersonName`).
 class AppleFullPersonName {
@@ -249,6 +398,40 @@ class OAuthProvider {
             secret: secret,
             rawNonce: rawNonce,
           );
+  }
+
+  /// Reads the JSON of [OAuthCredential.toJson] or of the JS SDK's `toJSON` into a credential to sign in with
+  /// (`OAuthProvider.credentialFromJSON` of the JS SDK): [json] is the map, or its JSON text.
+  ///
+  /// Unlike [OAuthCredential.fromJson], it throws when the JSON is not that of a usable credential, as the JS SDK
+  /// does: an [ArgumentError] (the JS SDK's `argument-error`) when it is not a map, when [OAuthCredential.fromJson]
+  /// would return null, or when there is neither an `idToken` nor an `accessToken`; a [FormatException] for text that
+  /// is not JSON. As in the JS SDK, `nonce` is dropped when there is a `pendingToken`. Unlike the JS SDK, which drops
+  /// it here, `secret` is kept, so that a Twitter credential still signs in.
+  static OAuthCredential credentialFromJson(Object json) {
+    final Map<Object?, Object?>? map = _jsonMap(json);
+    final OAuthCredential? read = map == null
+        ? null
+        : OAuthCredential.fromJson(map);
+    if (read == null) {
+      throw ArgumentError(
+        'Not the JSON of an OAuth credential: it needs a providerId and a signInMethod',
+      );
+    }
+    if (read.idToken == null && read.accessToken == null) {
+      throw ArgumentError(
+        'A credential of ${read.providerId} needs an ID token or an access token',
+      );
+    }
+    return OAuthCredential(
+      providerId: read.providerId,
+      signInMethod: read.signInMethod,
+      idToken: read.idToken,
+      accessToken: read.accessToken,
+      secret: read.secret,
+      rawNonce: read.pendingToken == null ? read.rawNonce : null,
+      pendingToken: read.pendingToken,
+    );
   }
 }
 

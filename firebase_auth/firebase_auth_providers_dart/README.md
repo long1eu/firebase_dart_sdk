@@ -118,6 +118,7 @@ against the Firebase Auth emulator; nothing was run against the real service.
 | `linkWithCredential`, `reauthenticateWithCredential`, `unlink` | `linkWithCredential(credential)`, `reauthenticateWithCredential(credential)` (and `reauthenticateWithEmailAndPassword`), `unlink(providerId)` | emulator |
 | `credentialFromResult` / `credentialFromError` | `UserCredential.credential` / `FirebaseAuthException.credential` (with `account-exists-with-different-credential`, `credential-already-in-use`) | emulator |
 | `sendSignInLinkToEmail`, `isSignInWithEmailLink`, `signInWithEmailLink`, `parseActionCodeURL` | the same names; `ActionCodeURL.parseLink(link)` | emulator |
+| `AuthCredential.toJSON`, `EmailAuthCredential.fromJSON`, `OAuthCredential.fromJSON`, `OAuthProvider.credentialFromJSON` | `toJson()`, `EmailAuthCredential.fromJson(json)`, `OAuthCredential.fromJson(json)`, `OAuthProvider.credentialFromJson(json)` (same JSON; an email link keeps only its code and tenant) | unit (fixtures from the JS sources) |
 | `signOut` | `signOut()` | emulator |
 | `onAuthStateChanged` / `onIdTokenChanged` | `authStateChanges()` / `idTokenChanges()` (start with the current user); `userChanges()` also after profile changes; `onTokenChanged` for Firestore | unit, emulator |
 | `beforeAuthStateChanged`, `authStateReady`, `updateCurrentUser` | the same names | unit, emulator |
