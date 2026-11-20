@@ -66,8 +66,8 @@ Not done:
   run against a backend that supports them.
 - `Query.findNearest` evaluation against the local cache.
 - **Coordination between running clients that share one cache** (the multi-tab support of the
-  JS SDK), except the tabs of the web IndexedDB cache with `multiTab: true` (**preview**, new in
-  the next version, Chrome only; see [the web guide](web.md#multi-tab-mode-preview)). Two clients
+  JS SDK), except the tabs of the web IndexedDB cache with `multiTab: true` (**preview**, new in 0.3.2,
+  Chrome only; see [the web guide](web.md#multi-tab-mode-preview)). Two clients
   on one SQLite file keep it consistent but do not see each other's listeners or pending
   writes, and the SQLite caches of the web stay at one tab. Sharing them (stage 3 of the
   multi-client plan) is deferred until after 0.1.0. See

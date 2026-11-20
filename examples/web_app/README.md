@@ -41,7 +41,7 @@ What to try:
   when the page is opened again with a connection.
 - Open the persistent page in a second tab (`?cache=indexeddb` or `?cache=opfs`): only one tab can have the persistent cache, so the
   second one says so and uses a memory cache (`openWithMemoryFallback`).
-- Open `http://localhost:8000/?multiTab=1` in two tabs (**preview**, new in the next version): the
+- Open `http://localhost:8000/?multiTab=1` in two tabs (**preview**, new in 0.3.2): the
   page uses the IndexedDB cache in the JS SDK's format, shared by the tabs. The **Tab** line says
   which tab is primary, and uses the network for both, and which is secondary. Add a note in the
   secondary tab: it shows at once and is acknowledged through the primary. Close the primary tab and

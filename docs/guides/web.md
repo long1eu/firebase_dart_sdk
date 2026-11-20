@@ -628,7 +628,7 @@ its tests or the interop), and the production backend.
 
 ## Multi-tab mode (preview)
 
-New in the next version. It is a *preview*: the API may change in any release (see the
+New in 0.3.2. It is a *preview*: the API may change in any release (see the
 [package README](../../cloud_firestore/cloud_firestore_dart/README.md)).
 
 `indexedDbCacheSettings(multiTab: true)` lets several tabs of an app open one IndexedDB cache:

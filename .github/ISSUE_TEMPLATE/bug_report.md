@@ -4,7 +4,7 @@ about: Something behaves wrongly, or differently from the official Firebase SDKs
 labels: bug
 ---
 
-**Package and version** (for example `cloud_firestore_dart` 0.3.1):
+**Package and version** (for example `cloud_firestore_dart` 0.3.2):
 
 **Where it runs** (Dart VM, Flutter on which platform, browser and compiler):
 

@@ -29,7 +29,7 @@ endorsed by Google or Firebase.
    and keep their offline cache, pending writes included.** The IndexedDB cache reads and writes the JS SDK's
    own database, `importJsSdkCache` moves a JS cache into the other caches, and tabs can share it (a preview).
    Caveat: Chrome and the emulator only; the format is checked against the real JS SDK in a CI job, but no JS
-   SDK tab was run beside a tab of this client, and multi-tab is unreleased.
+   SDK tab was run beside a tab of this client, and multi-tab is a preview since 0.3.2.
 
 **Do not use it when**
 
@@ -78,12 +78,12 @@ from 0.1? The 0.2 API took FlutterFire's names: [what changed](docs/api_migratio
 
 | Package | pub.dev | Who needs it |
 |---|---|---|
-| [`cloud_firestore_dart`](cloud_firestore/cloud_firestore_dart/) | 0.3.1 | Any Dart program, server or Flutter app that calls Firestore through this client |
+| [`cloud_firestore_dart`](cloud_firestore/cloud_firestore_dart/) | 0.3.2 | Any Dart program, server or Flutter app that calls Firestore through this client |
 | [`firebase_app_dart`](firebase_core/firebase_app_dart/) | 0.2.0 | Every user of `cloud_firestore_dart`: the `FirebaseApp` and its options |
 | [`firebase_auth_providers_dart`](firebase_auth/firebase_auth_providers_dart/) | 0.3.0 | Apps with signed-in users, and servers with a service account or Application Default Credentials |
 | [`cloud_firestore_dart_sqlite`](cloud_firestore/cloud_firestore_dart_sqlite/) | 0.1.3 | Anyone who wants the offline cache on disk instead of in memory |
-| [`cloud_firestore_dart_platform`](cloud_firestore/cloud_firestore_dart_platform/) | 0.1.1 | Flutter apps written against the official `cloud_firestore` API, on Linux or by choice elsewhere |
-| [`cloud_firestore_dart_flutterfire`](cloud_firestore/cloud_firestore_dart_flutterfire/) | 0.1.1 | Flutter apps that sign in with `firebase_auth` and want `cloud_firestore_dart` to use that user |
+| [`cloud_firestore_dart_platform`](cloud_firestore/cloud_firestore_dart_platform/) | 0.1.2 | Flutter apps written against the official `cloud_firestore` API, on Linux or by choice elsewhere |
+| [`cloud_firestore_dart_flutterfire`](cloud_firestore/cloud_firestore_dart_flutterfire/) | 0.1.2 | Flutter apps that sign in with `firebase_auth` and want `cloud_firestore_dart` to use that user |
 | [`firebase_admin_dart`](firebase_admin/firebase_admin_dart/) | 0.1.1 | Servers, tools and integration tests that mint custom tokens, manage users or verify ID tokens |
 
 ## How it fits together

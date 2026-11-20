@@ -3,7 +3,7 @@ description: >-
   Unofficial bridge from FlutterFire (firebase_core, firebase_auth) to
   cloud_firestore_dart: the pure-Dart Firestore client uses the FlutterFire
   app options and signed-in user.
-version: 0.1.1
+version: 0.1.2
 homepage: https://github.com/long1eu/firebase_dart_sdk
 repository: https://github.com/long1eu/firebase_dart_sdk/tree/main/cloud_firestore/cloud_firestore_dart_flutterfire
 issue_tracker: https://github.com/long1eu/firebase_dart_sdk/issues

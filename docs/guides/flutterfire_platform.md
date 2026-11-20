@@ -1,6 +1,6 @@
 # The official cloud_firestore API on cloud_firestore_dart
 
-`cloud_firestore_dart_platform` (in `cloud_firestore/cloud_firestore_dart_platform`, version 0.1.0 on
+`cloud_firestore_dart_platform` (in `cloud_firestore/cloud_firestore_dart_platform`, version 0.1.2 on
 pub.dev) lets a Flutter app keep the official `cloud_firestore` API while `cloud_firestore_dart` does the
 work. Use it on Linux, where the official plugin has no implementation, or on any platform when you want one Dart
 implementation everywhere.
