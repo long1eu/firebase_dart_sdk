@@ -230,7 +230,8 @@ operations of a second tab fail after two seconds with `failedPrecondition`: `Th
 use a memory cache in this tab.`
 
 **Cause.** The cache can be open in one tab at a time; a Web Lock guards it. Sharing it between tabs
-is not done yet.
+is not done for the SQLite caches. (The IndexedDB cache can be shared with `multiTab: true`, a
+preview: see [Multi-tab mode](web.md#multi-tab-mode-preview).)
 
 **Fix.** Create such tabs with a memory cache. `openWithMemoryFallback` of
 `cloud_firestore_dart_sqlite` tries the persistent cache and falls back to a memory cache on

@@ -407,7 +407,8 @@ final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(
 
 What to know (all measured in Chrome against the emulator; other browsers are untested):
 
-- **One tab at a time.** The database is guarded by a Web Lock. A second tab (or a second
+- **One tab at a time** (SQLite caches; the IndexedDB cache can have several, see
+  [Multi-tab mode](web.md#multi-tab-mode-preview)). The database is guarded by a Web Lock. A second tab (or a second
   instance in the same page) that opens the same cache waits two seconds for the lock and then
   fails: the operations of that instance fail with a `FirestoreException` whose code is
   `failedPrecondition`. Such a tab should use a memory cache. `FirebaseFirestore.instanceFor` returns

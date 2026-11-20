@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 552" role="img" aria-labelledby="title desc" font-family="system-ui, -apple-system, Segoe UI, Helvetica, Arial, sans-serif">
   <title id="title">Parity with the JS SDK, area by area</title>
-  <desc id="desc">One mark per row of the tables of docs/parity.md, grouped by area. Documents and writes: 15 supported, 1 partial, 3 not applicable; Queries and filters: 9 supported; Aggregations: 3 supported; Listeners and snapshot options: 9 supported; Transactions and batches: 6 supported; Offline persistence and cache settings: 8 supported, 2 not applicable; Indexes: 4 supported, 1 not supported; Bundles: 2 supported; Lite: 4 supported, 1 not supported; Pipelines: 6 supported, 3 partial, 1 not supported; Multi-tab or multi-client: 1 supported, 1 partial, 2 not supported; App Check: 1 supported, 1 not supported; Emulator: 2 supported, 1 not applicable; Web transports: 7 supported, 1 not applicable; Platforms: 1 supported, 3 partial, 2 not applicable.</desc>
+  <desc id="desc">One mark per row of the tables of docs/parity.md, grouped by area. Documents and writes: 15 supported, 1 partial, 3 not applicable; Queries and filters: 9 supported; Aggregations: 3 supported; Listeners and snapshot options: 9 supported; Transactions and batches: 6 supported; Offline persistence and cache settings: 8 supported, 2 not applicable; Indexes: 4 supported, 1 not supported; Bundles: 2 supported; Lite: 4 supported, 1 not supported; Pipelines: 6 supported, 3 partial, 1 not supported; Multi-tab or multi-client: 1 supported, 3 partial; App Check: 1 supported, 1 not supported; Emulator: 2 supported, 1 not applicable; Web transports: 7 supported, 1 not applicable; Platforms: 1 supported, 3 partial, 2 not applicable.</desc>
   <style id="figure-theme">
     /* Palette shared by every figure in docs/images (see docs/images/README.md). */
     :root {
@@ -213,11 +213,11 @@
   <text x="266" y="365" font-size="12" fill="#1f2328" font-weight="600" text-anchor="end">Multi-tab or multi-client</text>
   <circle cx="286" cy="361" r="7" fill="#1a7f37"/>
   <circle cx="305" cy="361" r="6.5" fill="#ffffff" stroke="#9a6700" stroke-width="2"/><path d="M305,354.5 A6.5,6.5 0 0 0 305,367.5 z" fill="#9a6700"/>
-  <rect x="317.5" y="354.5" width="13" height="13" rx="2" fill="#ffffff" stroke="#cf222e" stroke-width="2"/><path d="M320.5,357.5 L327.5,364.5 M327.5,357.5 L320.5,364.5" stroke="#cf222e" stroke-width="2" stroke-linecap="round"/>
-  <rect x="336.5" y="354.5" width="13" height="13" rx="2" fill="#ffffff" stroke="#cf222e" stroke-width="2"/><path d="M339.5,357.5 L346.5,364.5 M346.5,357.5 L339.5,364.5" stroke="#cf222e" stroke-width="2" stroke-linecap="round"/>
+  <circle cx="324" cy="361" r="6.5" fill="#ffffff" stroke="#9a6700" stroke-width="2"/><path d="M324,354.5 A6.5,6.5 0 0 0 324,367.5 z" fill="#9a6700"/>
+  <circle cx="343" cy="361" r="6.5" fill="#ffffff" stroke="#9a6700" stroke-width="2"/><path d="M343,354.5 A6.5,6.5 0 0 0 343,367.5 z" fill="#9a6700"/>
   <text x="700" y="365" font-size="12" fill="#1f2328" font-weight="600" text-anchor="middle">1</text>
-  <text x="756" y="365" font-size="12" fill="#1f2328" font-weight="600" text-anchor="middle">1</text>
-  <text x="812" y="365" font-size="12" fill="#1f2328" font-weight="600" text-anchor="middle">2</text>
+  <text x="756" y="365" font-size="12" fill="#1f2328" font-weight="600" text-anchor="middle">3</text>
+  <text x="812" y="365" font-size="12" fill="#57606a" text-anchor="middle">–</text>
   <text x="868" y="365" font-size="12" fill="#57606a" text-anchor="middle">–</text>
   <text x="266" y="391" font-size="12" fill="#1f2328" font-weight="600" text-anchor="end">App Check</text>
   <circle cx="286" cy="387" r="7" fill="#1a7f37"/>
@@ -263,8 +263,8 @@
   <line x1="670" y1="482" x2="880" y2="482" stroke="#d0d7de"/>
   <text x="266" y="499" font-size="12" fill="#1f2328" font-weight="700" text-anchor="end">All areas</text>
   <text x="700" y="499" font-size="12" fill="#1f2328" font-weight="700" text-anchor="middle">78</text>
-  <text x="756" y="499" font-size="12" fill="#1f2328" font-weight="700" text-anchor="middle">8</text>
-  <text x="812" y="499" font-size="12" fill="#1f2328" font-weight="700" text-anchor="middle">6</text>
+  <text x="756" y="499" font-size="12" fill="#1f2328" font-weight="700" text-anchor="middle">10</text>
+  <text x="812" y="499" font-size="12" fill="#1f2328" font-weight="700" text-anchor="middle">4</text>
   <text x="868" y="499" font-size="12" fill="#1f2328" font-weight="700" text-anchor="middle">9</text>
   <text x="20" y="530" font-size="11" fill="#57606a">Supported includes the rows marked preview, extra or Enterprise edition. Read the tables below for</text>
   <text x="20" y="544" font-size="11" fill="#57606a">what each partial or missing row lacks; the Known limitations list the gaps inside supported rows.</text>

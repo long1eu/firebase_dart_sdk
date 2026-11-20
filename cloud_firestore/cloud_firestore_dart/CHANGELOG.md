@@ -1,3 +1,15 @@
+## (unreleased)
+
+- Several tabs can share one IndexedDB cache: `indexedDbCacheSettings(multiTab: true)` (a **preview**, off by
+  default; Chrome only, tested with dart2js and dart2wasm). One tab is primary and uses the network; the others
+  get their listeners' results and the acknowledgement of their writes through it, and another tab takes over
+  when it closes or its lease (5 s) lapses. It uses the lease, rows and `localStorage` keys of the JS SDK's
+  `persistentMultipleTabManager` and needs `window.localStorage` (`unimplemented` without it). A one-tab and a
+  multi-tab instance on one cache refuse each other. Differences from JS: a secondary takes the lease at once when
+  it hears a closing tab remove its state, and a page restored from the back/forward cache comes back with a
+  terminated client. Not tested: a JS SDK tab beside a tab of this SDK, handover on real visibility changes,
+  different users in the tabs, other browsers. The SQLite caches stay at one tab. See `docs/guides/web.md`.
+
 ## 0.3.1
 
 - `WebExperimentalLongPollingOptions` and the long-polling settings are supported, not experimental: the word

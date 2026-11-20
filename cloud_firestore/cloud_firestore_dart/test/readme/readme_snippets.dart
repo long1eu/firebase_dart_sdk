@@ -1140,8 +1140,8 @@ Future<void> longOfflineGuideLine211() async {
   await progress.cancel();
 }
 
-// ../../docs/guides/migrating_from_flutterfire.md:106
-Future<void> migratingFromFlutterfireGuideLine106() async {
+// ../../docs/guides/migrating_from_flutterfire.md:107
+Future<void> migratingFromFlutterfireGuideLine107() async {
   // The values of a web app of the project (Firebase console, Project settings,
   // Your apps) work on every platform. From a generated firebase_options.dart:
   // the same names: apiKey, appId, projectId.
@@ -1154,8 +1154,8 @@ Future<void> migratingFromFlutterfireGuideLine106() async {
   );
 }
 
-// ../../docs/guides/migrating_from_flutterfire.md:154
-Future<void> migratingFromFlutterfireGuideLine154() async {
+// ../../docs/guides/migrating_from_flutterfire.md:155
+Future<void> migratingFromFlutterfireGuideLine155() async {
   final String cacheDirectory = '<the application support directory>';
   final FirebaseFirestore persistent = FirebaseFirestore.instanceFor(
     app: app,
@@ -1164,15 +1164,15 @@ Future<void> migratingFromFlutterfireGuideLine154() async {
   );
 }
 
-// ../../docs/guides/migrating_from_flutterfire.md:181
-Future<void> migratingFromFlutterfireGuideLine181() async {
+// ../../docs/guides/migrating_from_flutterfire.md:182
+Future<void> migratingFromFlutterfireGuideLine182() async {
   final FirebaseUserAuth auth = await FirebaseUserAuth.forApp(app);
   final FirebaseFirestore signedIn = FirebaseFirestore.instanceFor(app: app);
   await auth.signInWithEmailAndPassword(email: 'ada@example.com', password: password);
 }
 
-// ../../docs/guides/migrating_from_flutterfire.md:336
-Future<void> migratingFromFlutterfireGuideLine336() async {
+// ../../docs/guides/migrating_from_flutterfire.md:337
+Future<void> migratingFromFlutterfireGuideLine337() async {
   final QuerySnapshot<Map<String, Object?>> page = await firestore
       .collection('users')
       .where('age', isGreaterThanOrEqualTo: 18)
@@ -1191,8 +1191,8 @@ Future<void> migratingFromFlutterfireGuideLine336() async {
   print('${totals.count} users, ${totals.get(AggregateField.sum('age'))} years');
 }
 
-// ../../docs/guides/multiple_clients.md:119
-Future<void> multipleClientsGuideLine119() async {
+// ../../docs/guides/multiple_clients.md:122
+Future<void> multipleClientsGuideLine122() async {
   // In the background isolate: the same project, another app name, another cache file.
   final FirebaseApp worker = FirebaseApp.withOptions(app.options, name: 'background-sync');
   final FirebaseFirestore workerFirestore = FirebaseFirestore.instanceFor(
@@ -1201,8 +1201,8 @@ Future<void> multipleClientsGuideLine119() async {
   );
 }
 
-// ../../docs/guides/multiple_clients.md:142
-Future<void> multipleClientsGuideLine142() async {
+// ../../docs/guides/multiple_clients.md:145
+Future<void> multipleClientsGuideLine145() async {
   await firestore.terminate();
   await firestore.clearPersistence();
 }
@@ -1314,15 +1314,15 @@ Future<void> offlinePersistenceGuideLine399() async {
   );
 }
 
-// ../../docs/guides/offline_persistence.md:438
-Future<void> offlinePersistenceGuideLine438() async {
+// ../../docs/guides/offline_persistence.md:439
+Future<void> offlinePersistenceGuideLine439() async {
   await firestore.terminate();        // the cache must not be in use by this instance
   await firestore.clearPersistence(); // deletes the files (or the browser storage)
   final FirebaseFirestore fresh = FirebaseFirestore.instanceFor(app: app);
 }
 
-// ../../docs/guides/offline_persistence.md:457
-Future<void> offlinePersistenceGuideLine457() async {
+// ../../docs/guides/offline_persistence.md:458
+Future<void> offlinePersistenceGuideLine458() async {
   final indexes = firestore.persistentCacheIndexManager; // null with a memory cache
   await indexes?.enableIndexAutoCreation();
 }
@@ -1657,8 +1657,8 @@ Future<void> troubleshootingGuideLine59() async {
   FirebaseFirestore.setLogLevel(LogLevel.debug);
 }
 
-// ../../docs/guides/troubleshooting.md:287
-Future<void> troubleshootingGuideLine287() async {
+// ../../docs/guides/troubleshooting.md:288
+Future<void> troubleshootingGuideLine288() async {
   final Settings settings = Settings(
     webExperimentalForceLongPolling: true,
     webExperimentalLongPollingOptions: const WebExperimentalLongPollingOptions(timeoutDuration: Duration(seconds: 25)),
@@ -1709,8 +1709,8 @@ Future<void> webGuideLine224() async {
   );
 }
 
-// ../../docs/guides/web.md:280
-Future<void> webGuideLine280() async {
+// ../../docs/guides/web.md:281
+Future<void> webGuideLine281() async {
   final FirebaseFirestore firestore = await openWithMemoryFallback(
     app: app,
     openDatabase: sqliteOpener(),
@@ -1720,8 +1720,8 @@ Future<void> webGuideLine280() async {
   final bool persistent = firestore.persistentCacheIndexManager != null;
 }
 
-// ../../docs/guides/web.md:305
-Future<void> webGuideLine305() async {
+// ../../docs/guides/web.md:306
+Future<void> webGuideLine306() async {
   final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(
     app: app,
     openDatabase: sqliteOpener(),
@@ -1738,8 +1738,8 @@ Future<void> webGuideLine305() async {
   }
 }
 
-// ../../docs/guides/web.md:430
-Future<void> webGuideLine430() async {
+// ../../docs/guides/web.md:431
+Future<void> webGuideLine431() async {
   // One client of the page: `client` names its app ('client-left', 'client-right').
   Future<FirebaseFirestore> startClient(String client, String email) async {
     final FirebaseApp clientApp = FirebaseApp.withOptions(app.options, name: client);
@@ -1749,13 +1749,13 @@ Future<void> webGuideLine430() async {
   }
 }
 
-// ../../docs/guides/web.md:458
-Future<void> webGuideLine458() async {
+// ../../docs/guides/web.md:459
+Future<void> webGuideLine459() async {
   final Settings settings = Settings().withEmulator('127.0.0.1', 8080);
 }
 
-// ../../docs/guides/web.md:540
-Future<void> webGuideLine540() async {
+// ../../docs/guides/web.md:541
+Future<void> webGuideLine541() async {
   final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(
     app: app,
     settings: Settings(
@@ -1764,5 +1764,13 @@ Future<void> webGuideLine540() async {
         indexAutoCreation: true,
       ),
     ),
+  );
+}
+
+// ../../docs/guides/web.md:636
+Future<void> webGuideLine636() async {
+  final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(
+    app: app,
+    settings: Settings(cacheSettings: indexedDbCacheSettings(multiTab: true)),
   );
 }
