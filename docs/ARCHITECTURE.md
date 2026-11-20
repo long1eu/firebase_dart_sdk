@@ -50,7 +50,7 @@ Also in the tree:
   internal and not yet used by the client (`test/unit/firebase/firestore/pipeline/evaluation/`,
   the port of Android's realtime pipeline tests in `test/unit/firebase/firestore/pipeline/realtime/`,
   and `test/integration_enterprise/pipeline_*_property_test.dart`).
-- **Firestore Lite** (experimental, separate library `lib/lite.dart`): `lib/lite/`. No cache, no
+- **Firestore Lite** (separate library `lib/lite.dart`): `lib/lite/`. No cache, no
   listeners: the API classes call `Datastore` directly (`remote/datastore/unary_client.dart`,
   `TransactionClient`), over gRPC or, on the web, over `remote/datastore/web/rest_transport.dart`
   (REST without WebChannel). Both `Query` classes build and validate their internal query with

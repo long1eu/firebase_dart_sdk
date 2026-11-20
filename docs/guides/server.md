@@ -359,9 +359,9 @@ await for (final HttpRequest request in server) {
 }
 ```
 
-Lite is **experimental** and its API may change; credentials and the emulator settings work as
-in the main library. A program that needs one listener and many plain requests can use both
-libraries, importing one with a prefix. See [Firestore Lite](lite.md).
+Credentials and the emulator settings work in Lite as in the main library. A program that needs
+one listener and many plain requests can use both libraries, importing one with a prefix. See
+[Firestore Lite](lite.md).
 
 ## Graceful shutdown
 
