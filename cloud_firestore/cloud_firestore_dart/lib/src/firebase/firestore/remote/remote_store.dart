@@ -113,20 +113,18 @@ class RemoteStore implements TargetMetadataProvider {
     if (_eventsDisabled) {
       return;
     }
-    _queue
-        .run<void>(() async {
-          // The streams may have recovered, or the network may have been disabled,
-          // while this was waiting for its turn.
-          if (!_canUseNetwork || !(_watchStreamFailed || _writeStreamFailed)) {
-            return;
-          }
-          Log.d(
-            '$runtimeType',
-            'Restarting streams: the network interfaces changed or the machine woke up.',
-          );
-          await _restartNetwork();
-        })
-        .catchError(_reportError);
+    _queue.enqueueAndForget(() async {
+      // The streams may have recovered, or the network may have been disabled,
+      // while this was waiting for its turn.
+      if (!_canUseNetwork || !(_watchStreamFailed || _writeStreamFailed)) {
+        return;
+      }
+      Log.d(
+        '$runtimeType',
+        'Restarting streams: the network interfaces changed or the machine woke up.',
+      );
+      await _restartNetwork();
+    });
   }
 
   /// The queue on which every operation and every stream event handler runs, one at a time (see [SerialQueue]).
@@ -195,7 +193,7 @@ class RemoteStore implements TargetMetadataProvider {
   late final OnlineStateTracker _onlineStateTracker = OnlineStateTracker(
     _scheduler,
     _remoteStoreCallback.handleOnlineStateChange,
-    runOnQueue: _queue.run,
+    runOnQueue: _queue.enqueueAndForget,
   );
   final BehaviorSubject<bool> _onNetworkConnected;
   final WatchStream _watchStream;
@@ -328,7 +326,8 @@ class RemoteStore implements TargetMetadataProvider {
   Future<void> shutdown() {
     // Events that are still waiting for their turn must not run against a store that is going away.
     _eventsDisabled = true;
-    return _queue.run<void>(_shutdown);
+    // Also on a queue that failed: the client can always be shut down.
+    return _queue.run<void>(_shutdown, evenIfFailed: true);
   }
 
   Future<void> _shutdown() async {
@@ -475,7 +474,7 @@ class RemoteStore implements TargetMetadataProvider {
       '$runtimeType',
       'Restarting streams for network reachability change.',
     );
-    return _queue.run<void>(_restartNetwork).catchError(_reportError);
+    return _queue.enqueueAndForget(_restartNetwork);
   }
 
   void _reportError(Object error, StackTrace stackTrace) {
@@ -512,17 +511,15 @@ class RemoteStore implements TargetMetadataProvider {
     bool staleWhenNetworkRestarted = false,
   }) {
     final int epoch = _networkEpoch;
-    _queue
-        .run<void>(() async {
-          if (_eventsDisabled) {
-            return;
-          }
-          if (staleWhenNetworkRestarted && epoch != _networkEpoch) {
-            return;
-          }
-          await handler();
-        })
-        .catchError(_reportError);
+    _queue.enqueueAndForget(() async {
+      if (_eventsDisabled) {
+        return;
+      }
+      if (staleWhenNetworkRestarted && epoch != _networkEpoch) {
+        return;
+      }
+      await handler();
+    });
   }
 
   void _watchEvents(StreamEvent event) {

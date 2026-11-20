@@ -94,14 +94,14 @@ void main() {
   /// Nothing left an operation of the queue, and the client still works.
   Future<void> expectClientWorks() async {
     database.heal();
-    expect(queue().escapedErrors, 0);
+    expect(queue().failure, isNull);
     // ignore: unawaited_futures, the write stays pending: nothing listens on the port.
     doc.set(<String, Object?>{'works': true});
     expect(
       (await doc.get(GetOptions(source: Source.cache))).data(),
       <String, Object?>{'works': true},
     );
-    expect(queue().escapedErrors, 0);
+    expect(queue().failure, isNull);
   }
 
   Future<void> open({Object Function()? openError}) async {
@@ -304,7 +304,7 @@ void main() {
       );
       await expectLater(firestore.waitForPendingWrites(), throwsA(same(error)));
       await expectLater(doc.snapshots().first, throwsA(same(error)));
-      expect(queue().escapedErrors, 0);
+      expect(queue().failure, isNull);
     },
   );
 }

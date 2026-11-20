@@ -217,7 +217,8 @@ class FirestoreClient implements RemoteStoreCallback {
             return;
           }
           Log.d(logTag, 'Credential changed. Current user: ${user.uid}');
-          client.syncEngine.handleCredentialChange(user);
+          // An error of the change that is not recoverable fails the queue, which reports it.
+          client.syncEngine.handleCredentialChange(user).ignore();
         });
       }
     });
@@ -295,26 +296,43 @@ class FirestoreClient implements RemoteStoreCallback {
   /// Runs [task] on the queue, after the initialization. Fails with the error of the initialization if that failed.
   ///
   /// The operation on the queue settles the returned future itself, with the result or the error of [task] (the JS
-  /// operations do that with a `Deferred`): the error of a client operation is for its caller and never leaves the
-  /// operation on the queue.
+  /// operations do that with a `Deferred`): the error of a client operation is for its caller and does not leave the
+  /// operation on the queue. The exception is a failed internal assertion ([hardAssert]): the state of the client can
+  /// not be trusted any more, so it also fails the queue, and with it every later operation (as an assertion that
+  /// fails outside of the guarded part of a JS operation does).
   ///
   /// The initialization future is awaited rather than [_initError] read: a task that was queued while the
   /// initialization ran starts before the listener that records the error (the queue listens to the future first),
   /// and would otherwise run against a client whose stores were never created.
   Future<T> _enqueue<T>(Future<T> Function() task) {
     final Completer<T> result = Completer<T>();
-    _queue.run<void>(() async {
-      try {
-        final Object? initError = _initError;
-        if (initError != null) {
-          Error.throwWithStackTrace(initError, _initStackTrace!);
-        }
-        await _initialized;
-        result.complete(await task());
-      } catch (error, stackTrace) {
-        result.completeError(error, stackTrace);
-      }
-    });
+    _queue
+        .run<void>(() async {
+          try {
+            final Object? initError = _initError;
+            if (initError != null) {
+              Error.throwWithStackTrace(initError, _initStackTrace!);
+            }
+            await _initialized;
+          } catch (error, stackTrace) {
+            result.completeError(error, stackTrace);
+            return;
+          }
+          try {
+            result.complete(await task());
+          } catch (error, stackTrace) {
+            result.completeError(error, stackTrace);
+            if (error is AssertionError) {
+              rethrow;
+            }
+          }
+        })
+        .catchError((Object error, StackTrace stackTrace) {
+          // The queue failed before the operation ran.
+          if (!result.isCompleted) {
+            result.completeError(error, stackTrace);
+          }
+        });
     return result.future;
   }
 

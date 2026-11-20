@@ -98,6 +98,17 @@
 - IndexedDB cache: a database of a schema version other than 18 is refused as before, and the
   error now says the cache was left as it is; for a newer version it says that a new schema
   version of the JS SDK needs a new release of this package.
+- Web transport: a WebChannel back channel that stops delivering without failing is now made again, as the
+  WebChannel of the JS SDK does. When the server answers a message of the client with the number of the last
+  message it sent, and the client has not received that one, the client waits 6 seconds for data on the back
+  channel and then requests it again from the last message it has. When the server answers that it has no back
+  channel request at all, one sent more than 3 seconds before is made again at once.
+- An unexpected error inside the client's internal queue now fails the queue for good, as the
+  `AsyncQueue` of the JS SDK does: it is logged once with its stack (`INTERNAL UNHANDLED ERROR`),
+  operations that wait for their turn fail with it, and later ones fail with
+  `AsyncQueue is already failed`. Before, the client went on in a state nobody had checked. The
+  errors of your own operations (a rejected write, a busy cache) stay with their caller and do
+  not fail the queue; `terminate()` and `clearPersistence()` still work on a failed queue.
 - Persistent cache indexes: a query served by a field index could miss a document that watch sent in a later
   snapshot with the same version as an earlier one, when the index had already been brought up to date for that
   version and the document's id sorted before the documents indexed last. Such a snapshot now makes the index read

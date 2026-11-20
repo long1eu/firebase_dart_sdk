@@ -141,6 +141,12 @@ void main() {
       bool autoDetectLongPolling = false,
       Duration forwardRequestTimeout = const Duration(seconds: 20),
       int? longPollingTimeoutMs,
+      Duration deadBackChannelTimeout = const Duration(seconds: 6),
+      Duration rttEstimate = const Duration(seconds: 3),
+      List<Duration> retryDelays = const <Duration>[
+        Duration(milliseconds: 5),
+        Duration(milliseconds: 10),
+      ],
     }) {
       http = FakeHttpClient();
       stream = WebChannelStream(
@@ -149,15 +155,14 @@ void main() {
         database,
         headers,
         random: Random(1),
-        retryDelays: const <Duration>[
-          Duration(milliseconds: 5),
-          Duration(milliseconds: 10),
-        ],
+        retryDelays: retryDelays,
         forceLongPolling: forceLongPolling,
         autoDetectLongPolling: autoDetectLongPolling,
         longPollingDetectionTimeout: const Duration(milliseconds: 60),
         longPollingTimeoutMs: longPollingTimeoutMs,
         forwardRequestTimeout: forwardRequestTimeout,
+        deadBackChannelTimeout: deadBackChannelTimeout,
+        rttEstimate: rttEstimate,
       );
       messages = <Map<String, Object?>>[];
       errors = <Object>[];
@@ -1120,6 +1125,268 @@ void main() {
       await pump();
       expect(messages, hasLength(5));
       expect((errors.single as GrpcError).code, StatusCode.unavailable);
+    });
+
+    // Ports of the tests of the dead back channel in closure-library
+    // webchannelbase_test.js (testResponseNoBackchannel* and
+    // testResponseWith*): the answer to a forward request,
+    // `[backChannelPresent, lastArrayId, outstandingBytes]`, can make the
+    // client give up its back channel request and make it again. The timings
+    // are scaled down: deadBackChannelTimeout stands for the 6 seconds of
+    // closure-net (2 * RTT_ESTIMATE in closure-library), rttEstimate for
+    // RTT_ESTIMATE.
+    group('dead back channel', () {
+      const Duration dead = Duration(milliseconds: 80);
+      const Duration rtt = Duration(milliseconds: 60);
+
+      /// `connect(8)` of the closure tests: a session whose back channel
+      /// request delivered array 1 and stays open.
+      Future<FakeRequest> connect({
+        bool forceLongPolling = false,
+        List<Duration> retryDelays = const <Duration>[
+          Duration(milliseconds: 5),
+          Duration(milliseconds: 10),
+        ],
+      }) async {
+        open(
+          deadBackChannelTimeout: dead,
+          rttEstimate: rtt,
+          forceLongPolling: forceLongPolling,
+          retryDelays: retryDelays,
+        );
+        await handshake();
+        final FakeRequest back = await http.next();
+        expect(back.method, 'GET');
+        back
+          ..stream(200)
+          ..add(chunk('[[1,["foo"]]]'));
+        if (forceLongPolling) {
+          back.end();
+        }
+        await pump();
+        return back;
+      }
+
+      /// `sendMap` and `response` of the closure tests: a message, and the
+      /// answer of the server to the forward request that carries it.
+      Future<FakeRequest> sendAndAnswer(List<int> answer) async {
+        stream.send(addTarget);
+        final FakeRequest forward = await http.next();
+        expect(forward.method, 'POST');
+        forward.respond(200, body: chunk(jsonEncode(answer)));
+        await pump();
+        return forward;
+      }
+
+      Future<void> wait(Duration duration) => Future<void>.delayed(duration);
+
+      Iterable<FakeRequest> backChannelRequests() =>
+          http.requests.where((FakeRequest r) => r.method == 'GET');
+
+      test('testResponseWithNoArraySent', () async {
+        final FakeRequest back = await connect();
+        // An array id lower than the last one received is OK.
+        await sendAndAnswer(<int>[1, -1, 0]);
+        await wait(dead * 2);
+        expect(back.aborted, isFalse);
+        expect(backChannelRequests(), hasLength(1));
+        expect(errors, isEmpty);
+        await stream.close();
+      });
+
+      test('testResponseWithArraysMissing', () async {
+        final FakeRequest back = await connect();
+        // The server sent arrays up to 7; the client has 1.
+        await sendAndAnswer(<int>[1, 7, 111]);
+        await wait(dead ~/ 2);
+        expect(back.aborted, isFalse, reason: 'not before the timeout');
+        await wait(dead);
+        expect(back.aborted, isTrue);
+        // Made again at once, from the last array that arrived.
+        final FakeRequest again = await http.next();
+        expect(again.method, 'GET');
+        expect(again.query['AID'], '1');
+        expect(errors, isEmpty);
+        await stream.close();
+      });
+
+      test('testMultipleResponsesWithArraysMissing', () async {
+        final FakeRequest back = await connect();
+        await sendAndAnswer(<int>[1, 7, 111]);
+        await wait(dead ~/ 2);
+        await sendAndAnswer(<int>[1, 8, 119]);
+        await wait(dead ~/ 2 + const Duration(milliseconds: 20));
+        // The original timer still fires; the second answer did not restart
+        // it.
+        expect(back.aborted, isTrue);
+        expect(errors, isEmpty);
+        await stream.close();
+      });
+
+      test('testOnlyRetryOnceBasedOnResponse', () async {
+        final FakeRequest back = await connect();
+        await sendAndAnswer(<int>[1, 7, 111]);
+        await wait(dead * 2);
+        expect(back.aborted, isTrue);
+        final FakeRequest again = await http.next();
+        expect(again.method, 'GET');
+        again.stream(200);
+        // After a retry that brought nothing yet, another answer with arrays
+        // missing does not start the timer again.
+        await sendAndAnswer(<int>[1, 8, 119]);
+        await wait(dead * 2);
+        expect(again.aborted, isFalse);
+        expect(backChannelRequests(), hasLength(2));
+        expect(errors, isEmpty);
+        await stream.close();
+      });
+
+      test('testResponseWithArraysMissingAndLiveChannel', () async {
+        final FakeRequest back = await connect();
+        await sendAndAnswer(<int>[1, 7, 111]);
+        await wait(dead ~/ 2);
+        // Data on the back channel: it is alive.
+        back.add(chunk('[[2,["ack"]]]'));
+        await wait(dead);
+        expect(back.aborted, isFalse);
+        expect(errors, isEmpty);
+        await stream.close();
+      });
+
+      test('testResponseWithBigOutstandingData', () async {
+        final FakeRequest back = await connect();
+        // 50000 bytes are on their way: the back channel is busy, not dead.
+        await sendAndAnswer(<int>[1, 7, 50000]);
+        await wait(dead * 2);
+        expect(back.aborted, isFalse);
+        expect(errors, isEmpty);
+        await stream.close();
+      });
+
+      test('testResponseInBufferedMode', () async {
+        await connect(forceLongPolling: true);
+        final FakeRequest polling = await http.next();
+        expect(polling.query['CI'], '1');
+        polling.stream(200);
+        // A long polling answer only comes with data: arrays the server
+        // reports as sent are not a sign of a dead back channel.
+        await sendAndAnswer(<int>[1, 7, 111]);
+        await wait(dead * 2);
+        expect(polling.aborted, isFalse);
+        expect(errors, isEmpty);
+        await stream.close();
+      });
+
+      test('testResponseNoBackchannelPostNotBeforeBackchannel', () async {
+        final FakeRequest back = await connect();
+        // The forward request is sent less than an RTT after the back channel
+        // request: the server may not have seen that one yet.
+        await sendAndAnswer(<int>[0, 1, 0]);
+        await wait(dead);
+        expect(back.aborted, isFalse);
+        expect(backChannelRequests(), hasLength(1));
+        await stream.close();
+      });
+
+      test('testResponseNoBackchannel', () async {
+        final FakeRequest back = await connect();
+        await sendAndAnswer(<int>[1, -1, 0]);
+        await wait(rtt + const Duration(milliseconds: 10));
+        await sendAndAnswer(<int>[0, 1, 0]);
+        expect(back.aborted, isTrue);
+        final FakeRequest again = await http.next();
+        expect(again.method, 'GET');
+        expect(again.query['AID'], '1');
+        expect(errors, isEmpty);
+        await stream.close();
+      });
+
+      // testResponseNoBackchannelWithNoBackchannel has no counterpart: the
+      // client always has a back channel request in flight or waits to make
+      // the next one (testResponseNoBackchannelWithStartTimer).
+      test('testResponseNoBackchannelWithStartTimer', () async {
+        final FakeRequest back = await connect();
+        await wait(rtt + const Duration(milliseconds: 10));
+        stream.send(addTarget);
+        final FakeRequest forward = await http.next();
+        // The back channel request is lost; the client waits before it makes
+        // it again (retryDelays) when the answer comes.
+        back.cutBody();
+        await pump();
+        forward.respond(200, body: chunk('[0,1,0]'));
+        await pump();
+        final FakeRequest again = await http.next();
+        expect(again.method, 'GET');
+        await wait(dead);
+        expect(again.aborted, isFalse);
+        expect(backChannelRequests(), hasLength(2));
+        expect(errors, isEmpty);
+        await stream.close();
+      });
+
+      // The timer can fire while the client waits to make a lost back channel
+      // request again: there is nothing to give up then, and the wait for the
+      // request after the next one is not skipped.
+      test(
+        'a timer that fires between back channel requests changes nothing',
+        () async {
+          const Duration retryDelay = Duration(milliseconds: 250);
+          final FakeRequest back = await connect(
+            retryDelays: const <Duration>[retryDelay, retryDelay],
+          );
+          stream.send(addTarget);
+          final FakeRequest forward = await http.next();
+          back.cutBody();
+          await pump();
+          forward.respond(200, body: chunk('[1,7,111]'));
+          await wait(dead + const Duration(milliseconds: 20));
+          expect(backChannelRequests(), hasLength(1), reason: 'still waiting');
+
+          final FakeRequest second = await http.next();
+          expect(second.method, 'GET');
+          final Stopwatch watch = Stopwatch()..start();
+          second
+            ..stream(200)
+            ..cutBody();
+          final FakeRequest third = await http.next();
+          expect(third.method, 'GET');
+          expect(watch.elapsed, greaterThanOrEqualTo(retryDelay * 0.8));
+          expect(errors, isEmpty);
+          await stream.close();
+        },
+      );
+
+      // The request made again carries AID: the answer-start check applies to
+      // it like to any other back channel request.
+      test(
+        'the request made again must be answered from the next array',
+        () async {
+          final FakeRequest back = await connect();
+          await sendAndAnswer(<int>[1, 7, 111]);
+          await wait(dead * 2);
+          expect(back.aborted, isTrue);
+          final FakeRequest again = await http.next();
+          expect(again.query['AID'], '1');
+          again
+            ..stream(200)
+            ..add(chunk('[[2,["a"]],[3,["b"]]]'));
+          await pump();
+          expect(errors, isEmpty);
+          await stream.close();
+
+          final FakeRequest skipped = await connect();
+          await sendAndAnswer(<int>[1, 7, 111]);
+          await wait(dead * 2);
+          expect(skipped.aborted, isTrue);
+          final FakeRequest late = await http.next();
+          late
+            ..stream(200)
+            ..add(chunk('[[5,["c"]]]'));
+          await pump();
+          expect((errors.single as GrpcError).code, StatusCode.unavailable);
+          expect(done, isTrue);
+        },
+      );
     });
   });
 }

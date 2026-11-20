@@ -16,8 +16,8 @@ import 'package:firebase_app_dart/internal.dart';
 /// The operations run in the order they were added, on [queue], and an operation only runs once every operation
 /// before it succeeded. An operation that fails with a recoverable persistence error (see
 /// [isRecoverablePersistenceError]) stays at the head of the queue and is tried again after a backoff
-/// ([TaskId.asyncQueueRetry]); any other error removes it from the queue and is thrown to the caller of [enqueue] (the
-/// JS queue fails the whole client instead).
+/// ([TaskId.asyncQueueRetry]); any other error removes it from the queue, is thrown to the caller of [enqueue] and,
+/// as in JS, fails [queue].
 class RetryableOperationQueue {
   RetryableOperationQueue(TaskScheduler scheduler, this._queue)
     : _backoff = ExponentialBackoff(scheduler, TaskId.asyncQueueRetry);
@@ -77,18 +77,27 @@ class RetryableOperationQueue {
     });
   }
 
-  /// Runs [attempt] on the queue. The operation on the queue settles the returned future itself: an error of the
-  /// attempt that is not recoverable is for the caller of [enqueue] and does not leave the operation.
+  /// Runs [attempt] on the queue. The operation on the queue settles the returned future itself. As in JS, an error
+  /// of a retryable operation that is not recoverable is an unexpected one: it also leaves the operation and fails
+  /// the queue.
   Future<void> _runAttempt(Future<void> Function() attempt) {
     final Completer<void> result = Completer<void>();
-    _queue.run<void>(() async {
-      try {
-        await attempt();
-        result.complete();
-      } catch (error, stackTrace) {
-        result.completeError(error, stackTrace);
-      }
-    });
+    _queue
+        .run<void>(() async {
+          try {
+            await attempt();
+            result.complete();
+          } catch (error, stackTrace) {
+            result.completeError(error, stackTrace);
+            rethrow;
+          }
+        })
+        .catchError((Object error, StackTrace stackTrace) {
+          // The queue failed before the attempt ran.
+          if (!result.isCompleted) {
+            result.completeError(error, stackTrace);
+          }
+        });
     return result.future;
   }
 
@@ -189,12 +198,7 @@ class RetryableOperationQueue {
       return;
     }
     _backoff.backoffAndRun(() {
-      _queue.run<void>(_retryNext).catchError((
-        Object error,
-        StackTrace stackTrace,
-      ) {
-        Zone.current.handleUncaughtError(error, stackTrace);
-      });
+      _queue.enqueueAndForget(_retryNext);
     });
   }
 }
