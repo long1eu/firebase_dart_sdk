@@ -1,4 +1,4 @@
-/// The IndexedDB cache engine (experimental, web only): the cache in IndexedDB in the format of the official Firebase
+/// The IndexedDB cache engine (web only): the cache in IndexedDB in the format of the official Firebase
 /// JS SDK, without SQLite. See [IndexedDbCacheSettings].
 ///
 /// A library of its own, so that only the apps that import it carry the engine's code:

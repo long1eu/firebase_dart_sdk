@@ -34,7 +34,7 @@ It is a port of the open-source Firebase Android SDK, kept close to its current 
 | Pipelines (`package:cloud_firestore_dart/pipelines.dart`), Enterprise edition only | **preview** |
 | Firestore Lite (`package:cloud_firestore_dart/lite.dart`): no cache, one request per call | **experimental** |
 | The web: REST and WebChannel over `fetch`, cache in memory, IndexedDB or OPFS | **supported in Chrome** |
-| The web: a cache in the official JS SDK's own IndexedDB database (`package:cloud_firestore_dart/indexeddb_cache.dart`), no SQLite | **experimental** |
+| The web: a cache in the official JS SDK's own IndexedDB database (`package:cloud_firestore_dart/indexeddb_cache.dart`), no SQLite | **supported in Chrome**, one tab |
 
 *Stable* means the API is not expected to change; a *preview* or *experimental* API may change in
 any release. Authentication is in the companion package
