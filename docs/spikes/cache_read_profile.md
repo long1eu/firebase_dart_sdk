@@ -50,6 +50,56 @@ What is left in b, c and d is the store part (decode and the scan), now 80 to 99
 24 ms. Pending `a == 7` changed little: its cost is the overlay decode (`RemoteSerializer.decodeMutation`,
 `_mapOverlayValues`), which these steps do not touch.
 
+## On a quiet machine (Mac mini, M4 Pro)
+
+The headline cases again, on a machine with nothing else of ours running, for three builds of the same bench: A is
+434ec7ed (before the read fixes of #73, run with `--no-statement-cache`), B is 107ecdec (after #73) and C is `origin/main`
+bd78101f (after #79, pending-write filtering). Totals in milliseconds, except a (microseconds per document); each cell is
+the median of three processes of the medians of 9 warm runs (the three processes differed by 1 to 3 %).
+
+`acked` (documents from a remote event):
+
+| Case | A | B | C |
+| --- | ---: | ---: | ---: |
+| a. one document by key (us) | 15.8 | 9.6 | 9.6 |
+| b. whole collection | 861.6 | 440.9 | 445.9 |
+| c. `a == 7`, no index | 247.5 | 213.0 | 213.2 |
+| d. `orderBy(order desc).limit(20)`, no index | 3,449.5 | 412.2 | 409.2 |
+| e. `a == 7`, index | 9.2 | 6.6 | 6.6 |
+| e. `order desc, limit 20`, index | 0.520 | 0.416 | 0.422 |
+
+`pending` (overlays only):
+
+| Case | A | B | C |
+| --- | ---: | ---: | ---: |
+| a. one document by key (us) | 11.5 | 8.3 | 7.8 |
+| b. whole collection | 1,046.1 | 552.5 | 456.8 |
+| c. `a == 7`, no index | 475.1 | 453.2 | 274.7 |
+| d. `orderBy(order desc).limit(20)`, no index | 4,213.1 | 494.9 | 400.4 |
+| e. `a == 7`, index | 10.6 | 8.2 | 8.0 |
+| e. `order desc, limit 20`, index | 0.398 | 0.283 | 0.275 |
+
+- **Machine.** Mac mini, Apple M4 Pro (14 cores), 64 GB, macOS, internal SSD. Dart 3.12.2 (the same as the laptop
+  numbers above), `dart compile exe`, `package:sqlite3` as pinned by the tool's lock at each commit (the bench file of
+  `origin/main` was copied into each tree).
+- **Load.** The mini is shared. The load average (1 minute) read before each of the 18 processes was 27.4 for the
+  first (another job was finishing), then 12.4, 11.2 and 9.0, and 3.0 to 7.5 for the remaining 14; after that it stayed
+  between 3 and 7.5 (the machine has 14 cores). So not idle, but never above the core count while the numbers below were
+  taken, apart from the first three processes (A, B, C of round 1, acked), which do not stand out from rounds 2 and 3.
+  The process CPU time the bench prints agrees with the wall time for single-threaded cases (c, a, e) and is higher for
+  b and d (the collector works on other threads).
+- **Method.** The data were filled once per shape with the C binary (acked 61.5 MB, pending 96.0 MB; indexed copies 81.7
+  and 116.2 MB) and read by all three binaries, which worked (the stored format did not change between A and C).
+  `time <shape> <file> <indexed file> --reps=9`, three rounds, each round A, B, C for acked, then for pending. For A the
+  bench's tool `pubspec.yaml` lacked `vm_service`, so it was taken from C (the library is untouched).
+- **Against the laptop numbers.** The shape agrees: the #73 fixes halve b and cut d by 8 to 9 times, and #79 only
+  matters for pending (c 453 to 275 ms, b 553 to 457, d 495 to 400); acked is unchanged between B and C. In absolute
+  terms the mini is not faster than the M5 laptop: b acked 441 ms (laptop 401), c acked 213 (170), a 9.6 us (8.0), while
+  the "before" cases are about 15 to 25 % slower on a, b and d acked (laptop 742 and 2,714 against 862 and 3,450 here)
+  and 30 % more on d pending. The laptop spread between runs was a few percent, the mini's is 1 to 3 %, so the
+  ratios between columns are the part to trust. The cache-index cases (e) are 15 to 25 % slower here than on the laptop's
+  "after" column for `a == 7` (6.6 against 5.3 ms).
+
 ## Overlay decode
 
 Measured on 2026-11-20, branch `wave/overlay-decode`. The machine was loaded by other work for most of the session
