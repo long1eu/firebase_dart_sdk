@@ -5,7 +5,7 @@ integration tests. The first library is Firebase Auth: mint custom tokens, creat
 delete users, set custom claims, revoke sessions and verify ID tokens. It is not affiliated with or
 supported by Google or Firebase.
 
-> **Status: 0.1.0.** Unit tests and the Firebase Auth emulator cover every call. On 2026-11-18 the
+> **Status: 0.1.1.** Unit tests and the Firebase Auth emulator cover every call. On 2026-11-18 the
 > main path also passed against one real Firebase project, keyless: Application Default Credentials
 > of a person, custom tokens signed by the IAM Credentials API (see
 > [Checking a real project](#checking-a-real-project) for the steps and what was not run). Run

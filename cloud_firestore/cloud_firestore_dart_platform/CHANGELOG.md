@@ -1,5 +1,7 @@
-## (unreleased)
+## 0.1.1
 
+- The constraint on `cloud_firestore_dart` is `>=0.2.0 <0.4.0` instead of `^0.2.0`, so that the package can be used with
+  `cloud_firestore_dart` 0.3.0. No code change.
 - README: records the first Windows run (Windows 11 x64, Flutter 3.47.8, against the emulator):
   `CloudFirestoreDart.use()` replaced the native Firestore of `cloud_firestore` in
   `examples/flutterfire_on_windows`, whose integration tests passed, sum and average aggregations included. No

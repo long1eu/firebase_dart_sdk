@@ -17,11 +17,11 @@ when in doubt, search it.
 
 | You need | Add | Import |
 |---|---|---|
-| Firestore (always) | `cloud_firestore_dart: ^0.2.0` | `package:cloud_firestore_dart/cloud_firestore_dart.dart` |
+| Firestore (always) | `cloud_firestore_dart: ^0.3.0` | `package:cloud_firestore_dart/cloud_firestore_dart.dart` |
 | The `FirebaseApp` (always) | `firebase_app_dart: ^0.2.0` | `package:firebase_app_dart/firebase_app_dart.dart` |
-| End users signed in (email/password, anonymous, custom token) or a service account key | `firebase_auth_providers_dart: ^0.2.0` | `package:firebase_auth_providers_dart/firebase_auth_providers_dart.dart` |
-| Application Default Credentials (servers, CLIs; needs `dart:io`) | `firebase_auth_providers_dart: ^0.2.0` | `package:firebase_auth_providers_dart/adc.dart` |
-| A disk cache (VM, Flutter, web) | `cloud_firestore_dart_sqlite: ^0.1.0` | `package:cloud_firestore_dart_sqlite/cloud_firestore_dart_sqlite.dart` |
+| End users signed in (email/password, anonymous, custom token) or a service account key | `firebase_auth_providers_dart: ^0.3.0` | `package:firebase_auth_providers_dart/firebase_auth_providers_dart.dart` |
+| Application Default Credentials (servers, CLIs; needs `dart:io`) | `firebase_auth_providers_dart: ^0.3.0` | `package:firebase_auth_providers_dart/adc.dart` |
+| A disk cache (VM, Flutter, web) | `cloud_firestore_dart_sqlite: ^0.1.3` | `package:cloud_firestore_dart_sqlite/cloud_firestore_dart_sqlite.dart` |
 | Firestore Lite, no cache and no listeners (experimental) | `cloud_firestore_dart` | `package:cloud_firestore_dart/lite.dart` instead of the main library |
 | Pipelines (preview, Enterprise edition databases only) | `cloud_firestore_dart` | `package:cloud_firestore_dart/pipelines.dart` in addition to the main library |
 

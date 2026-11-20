@@ -1,4 +1,4 @@
-## (unreleased)
+## 0.3.0
 
 - Faster reads from the cache, with no change in results (100,000 documents, an M5 laptop):
   `orderBy(...).limit(20)` without a cache index 2.7 s to 0.37 s (the documents within the limit

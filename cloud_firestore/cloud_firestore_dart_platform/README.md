@@ -10,7 +10,7 @@ You need it for a Flutter app on Linux desktop, where `cloud_firestore` and `fir
 implementation of their own: add it to `pubspec.yaml` and it registers itself. On other platforms it is an opt-in, for one Dart implementation
 everywhere. It is not affiliated with or endorsed by Google or Firebase.
 
-> **Status: 0.1.0; built against the 0.2 API of `cloud_firestore_dart`.** Tested with `flutter test` against the Firestore emulator through the
+> **Status: 0.1.1; built against the 0.2 API of `cloud_firestore_dart`.** Tested with `flutter test` against the Firestore emulator through the
 > classes of `cloud_firestore` 7.1.0. Tried on Debian 13 (trixie), x86_64, Flutter 3.44.9, on 2026-11-16: the Linux
 > desktop app [`examples/flutterfire_on_linux`](https://github.com/long1eu/firebase_dart_sdk/tree/main/examples/flutterfire_on_linux)
 > built in debug, registered this package automatically and passed its integration tests (live list, writes, batch,

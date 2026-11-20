@@ -95,7 +95,7 @@ packages:
       path: "../cloud_firestore_dart_sqlite"
       relative: true
     source: path
-    version: "0.1.2"
+    version: "0.1.3"
   code_assets:
     dependency: transitive
     description:
@@ -189,7 +189,7 @@ packages:
       path: "../../firebase_auth/firebase_auth_providers_dart"
       relative: true
     source: path
-    version: "0.2.1"
+    version: "0.3.0"
   fixnum:
     dependency: "direct main"
     description:
