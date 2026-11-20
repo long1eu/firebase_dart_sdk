@@ -31,8 +31,14 @@ const server = createServer((req, res) => {
 }).listen(httpPort, '127.0.0.1');
 
 const profile = mkdtempSync(join(tmpdir(), 'interop-profile-'));
-const chrome = spawn('/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', [
+// CHROME, else Chrome where macOS and the Linux runners have it.
+const chromeBinary = process.env.CHROME ?? (process.platform === 'darwin'
+  ? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
+  : 'google-chrome');
+const chrome = spawn(chromeBinary, [
   '--headless=new', '--disable-gpu', '--no-first-run', '--no-default-browser-check',
+  // The Linux runners do not allow the sandbox's user namespaces to an unprivileged process.
+  ...(process.platform === 'linux' ? ['--no-sandbox'] : []),
   `--remote-debugging-port=${debugPort}`, '--remote-allow-origins=*', `--user-data-dir=${profile}`, 'about:blank',
 ], { stdio: 'ignore' });
 
