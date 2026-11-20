@@ -382,8 +382,9 @@ class WebIndexedDbPersistence extends IndexedDbPersistence {
           FirestoreException(
             message:
                 'The IndexedDB cache $databaseName has schema version $version, written by an older JS SDK: '
-                'IndexedDbCacheSettings only open version $indexedDbSchemaVersion. Open the app once with a '
-                'current JS SDK (it migrates the database), or clear the cache with clearPersistence().',
+                'IndexedDbCacheSettings only open version $indexedDbSchemaVersion. The cache was left as it is: open '
+                'the app once with a current JS SDK (it migrates the database), or clear the cache with '
+                'clearPersistence().',
             errorCode: FirestoreErrorCode.failedPrecondition,
           ),
         );
@@ -392,8 +393,9 @@ class WebIndexedDbPersistence extends IndexedDbPersistence {
           FirestoreException(
             message:
                 'The IndexedDB cache $databaseName has a schema version newer than $indexedDbSchemaVersion, written '
-                'by a newer JS SDK: IndexedDbCacheSettings only open version $indexedDbSchemaVersion. Clear the cache '
-                'with clearPersistence() to start over.',
+                'by a newer JS SDK: IndexedDbCacheSettings of this release only open version $indexedDbSchemaVersion '
+                '(a new schema version of the JS SDK needs a new release of cloud_firestore_dart). The cache was left '
+                'as it is; clear it with clearPersistence() to start over with this release.',
             errorCode: FirestoreErrorCode.failedPrecondition,
           ),
         );
