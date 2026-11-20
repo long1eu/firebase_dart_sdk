@@ -19,11 +19,26 @@ endorsed by Google or Firebase.
    and closed the request as not planned. Caveat: tested in isolates on the Dart VM, not in a Flutter app.
 4. **You want to test Firestore code with `dart test` or `flutter test` against the emulator, running a real
    client instead of a fake.** Caveat: the test runs this engine, not the Android or iOS SDK your app ships.
+5. **Your app stays offline for weeks or months and keeps writing** (field work, kiosks, embedded devices).
+   Writes, reads by key and reopening stay constant up to 10 million pending writes on the SQLite cache, and two
+   extensions the official SDKs do not have help: `mergeUnsentWrites` keeps a document edited many times as one
+   pending write, and `pendingWriteCounts()` shows the queue drain ([measured](docs/guides/long_offline.md)).
+   Caveat: measured on one desktop machine against the emulator, not on a phone or against production, and not
+   compared with the official SDKs; the cache file grows by about 1 KB per pending document.
+6. **Your web app has users on the Firebase JS SDK or FlutterFire web, and you want to move to this client
+   and keep their offline cache, pending writes included.** The IndexedDB cache reads and writes the JS SDK's
+   own database, `importJsSdkCache` moves a JS cache into the other caches, and tabs can share it (a preview).
+   Caveat: Chrome and the emulator only; the format is checked against the real JS SDK in a CI job, but no JS
+   SDK tab was run beside a tab of this client, and multi-tab is unreleased.
 
 **Do not use it when**
 
 - FlutterFire already works for you on Android, iOS or the web: Google's SDKs come with support and years of
-  production use. This client was checked against a real database only by a 15-check kit.
+  production use. This client was checked against a real database only by a 15-check kit. On the web it was
+  run in Chrome against the emulator only (Firefox, Safari and production untested).
+- You need several browser tabs on one cache: only the IndexedDB cache has it (`multiTab: true`, a preview, not
+  released yet), and never beside a JS SDK tab. The SQLite caches stay at one tab, and isolates on the Dart VM
+  do not share listeners.
 - You ship a Windows app and cannot test it yourself first: it was run on one Windows 11 VM against the
   emulator only (the Dart VM suites and two Flutter debug apps, no window drawn), not in CI, not in a
   release build and not against production.
@@ -133,6 +148,21 @@ fails until it is reachable again:
 
 ![Works offline: get() and listeners from the cache, Source.cache and ListenSource.cache, set, update, delete and batches queued and sent later, pending writes kept across restarts with the SQLite cache, loadBundle and named queries. Needs the backend: transactions, count, sum and average, findNearest, Pipelines, get(Source.server) and Firestore Lite.](https://raw.githubusercontent.com/long1eu/firebase_dart_sdk/main/docs/images/readme/offline.svg)
 
+## What it has that the official client SDKs do not
+
+Besides the places it runs (above), these are in this client and not in the official ones. Each row of
+[the parity page](docs/parity.md) marked *extra* has its test.
+
+| Extra | What it is |
+|---|---|
+| `mergeUnsentWrites` | A document edited many times offline stays one pending write. Off by default; rules and functions then see fewer writes ([guide](docs/guides/long_offline.md)) |
+| `getPendingWriteCount()`, `pendingWriteCounts()` | How many writes still wait for the backend ([guide](docs/guides/offline_persistence.md)) |
+| A cache in your own storage | `keyValueCacheSettings(store: ...)` over any ordered key-value store ([guide](docs/guides/custom_cache_store.md)) |
+| The JS SDK's cache | The IndexedDB cache reads and writes the JS SDK's database, and `importJsSdkCache` moves it, pending writes included, into the other caches. Chrome only ([guide](docs/guides/web.md)) |
+| A busy or failing cache database | The client recovers instead of failing (`TransientDatabaseException`) ([guide](docs/guides/offline_persistence.md)) |
+| Several clients on one SQLite file | Isolates, processes or a Flutter hot restart elect one primary and keep the file consistent; they do not share listeners ([guide](docs/guides/multiple_clients.md)) |
+| Read-only transactions, `findNearest` on a query, pipelines in a read-only transaction | Not in the JS client SDK; FlutterFire was not checked ([parity](docs/parity.md)) |
+
 ## Guides
 
 [docs/guides](docs/guides/README.md): getting started (VM, Flutter, web), queries and data,
@@ -145,7 +175,7 @@ migrating from the `_vm` packages.
 
 The original port stopped at the 2019 Android SDK and the repository was archived in 2021. Since
 November 2026 it follows the Android SDK's behaviour up to late 2026, on Dart 3.8 or later, and
-its public API follows FlutterFire and the JS SDK. It has about 5,900 unit tests and about 880
+its public API follows FlutterFire and the JS SDK. It has 6869 passing unit tests (2026-11-20) and about 880
 integration tests per transport (gRPC, WebChannel, WebChannel with long polling) against the
 Firestore emulator ([how we test](docs/how_we_test.md)).
 
