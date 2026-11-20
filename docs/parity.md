@@ -24,7 +24,7 @@ signatures are in `test/unit/api/public_api.golden.txt`.
 The area tables below at a glance, one mark per row; most gaps are in Pipelines, multi-client and
 the platforms:
 
-![One mark per feature row, by area. Documents and writes: 15 supported, 1 partial, 3 not applicable. Queries and filters: 9 supported. Aggregations: 3 supported. Listeners: 9 supported. Transactions and batches: 5 supported. Offline persistence: 6 supported, 2 not applicable. Indexes: 4 supported, 1 not supported. Bundles: 2 supported. Lite: 4 supported. Pipelines: 6 supported, 3 partial, 1 not supported. Multi-tab or multi-client: 1 supported, 1 partial, 2 not supported. App Check: 1 supported, 1 not supported. Emulator: 2 supported, 1 not applicable. Web transports: 7 supported, 1 not applicable. Platforms: 1 supported, 3 partial, 2 not applicable. In all: 75 supported, 8 partial, 5 not supported, 9 not applicable.](images/readme/parity_summary.svg)
+![One mark per feature row, by area. Documents and writes: 15 supported, 1 partial, 3 not applicable. Queries and filters: 9 supported. Aggregations: 3 supported. Listeners: 9 supported. Transactions and batches: 5 supported. Offline persistence: 7 supported, 2 not applicable. Indexes: 4 supported, 1 not supported. Bundles: 2 supported. Lite: 4 supported. Pipelines: 6 supported, 3 partial, 1 not supported. Multi-tab or multi-client: 1 supported, 1 partial, 2 not supported. App Check: 1 supported, 1 not supported. Emulator: 2 supported, 1 not applicable. Web transports: 7 supported, 1 not applicable. Platforms: 1 supported, 3 partial, 2 not applicable. In all: 76 supported, 8 partial, 5 not supported, 9 not applicable.](images/readme/parity_summary.svg)
 
 ## How it is tested
 
@@ -131,6 +131,7 @@ for a real project that has not been run yet; see [Known limitations](#known-lim
 | `enableNetwork` / `disableNetwork` | supported | Same names |
 | Offline writes, pending writes survive a restart | supported | `test/unit/firebase/firestore/local/` (SQLite persistence tests), browser reload tests `test/browser/web_persistence_reload_*` |
 | Recovery from a busy or failing database | supported (extra) | `TransientDatabaseException`; see [Offline persistence](guides/offline_persistence.md#a-cache-that-is-busy-for-a-moment) |
+| A cache in storage the app provides | supported (extra) | `keyValueCacheSettings(store: ...)` of `package:cloud_firestore_dart/cache_store.dart` over any `CacheStore` (an ordered key-value store of bytes); one client per store. Not in the JS SDK. See [A cache in your own storage](guides/custom_cache_store.md); `test/unit/firebase/firestore/local/keyvalue_*_test.dart`, `test/unit/firebase/firestore/spec/keyvalue_spec_test.dart` |
 
 ## Indexes
 

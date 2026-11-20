@@ -68,6 +68,10 @@ READMEs are short landing pages; the API reference is on pub.dev.
 27. [Long offline use, measured](long_offline.md): what stays constant and what grows with up to
     millions of pending writes, the settings to turn on (`mergeUnsentWrites`, cache indexes,
     progress), and the limits that remain, with the numbers before and after the fixes.
+28. [A cache in your own storage](custom_cache_store.md): `CacheStore` and
+    `keyValueCacheSettings`, the contract a store keeps, the three example stores (plain Dart,
+    SQLite, IndexedDB), the conformance checks, the limits, and when to use it instead of the
+    SQLite cache.
 
 Every Dart snippet in these guides is compiled against the current API by
 `cloud_firestore/cloud_firestore_dart/test/unit/api/readme_snippets_test.dart`, except the blocks

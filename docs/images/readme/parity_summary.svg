@@ -156,9 +156,10 @@
   <circle cx="343" cy="231" r="7" fill="#1a7f37"/>
   <circle cx="362" cy="231" r="7" fill="#1a7f37"/>
   <circle cx="381" cy="231" r="7" fill="#1a7f37"/>
-  <circle cx="400" cy="231" r="6.5" fill="#ffffff" stroke="#818b98" stroke-width="1.5" stroke-dasharray="2 2"/><line x1="396.5" y1="231" x2="403.5" y2="231" stroke="#818b98" stroke-width="2"/>
+  <circle cx="400" cy="231" r="7" fill="#1a7f37"/>
   <circle cx="419" cy="231" r="6.5" fill="#ffffff" stroke="#818b98" stroke-width="1.5" stroke-dasharray="2 2"/><line x1="415.5" y1="231" x2="422.5" y2="231" stroke="#818b98" stroke-width="2"/>
-  <text x="700" y="235" font-size="12" fill="#1f2328" font-weight="600" text-anchor="middle">6</text>
+  <circle cx="438" cy="231" r="6.5" fill="#ffffff" stroke="#818b98" stroke-width="1.5" stroke-dasharray="2 2"/><line x1="434.5" y1="231" x2="441.5" y2="231" stroke="#818b98" stroke-width="2"/>
+  <text x="700" y="235" font-size="12" fill="#1f2328" font-weight="600" text-anchor="middle">7</text>
   <text x="756" y="235" font-size="12" fill="#57606a" text-anchor="middle">–</text>
   <text x="812" y="235" font-size="12" fill="#57606a" text-anchor="middle">–</text>
   <text x="868" y="235" font-size="12" fill="#1f2328" font-weight="600" text-anchor="middle">2</text>
@@ -258,7 +259,7 @@
   <text x="868" y="469" font-size="12" fill="#1f2328" font-weight="600" text-anchor="middle">2</text>
   <line x1="670" y1="482" x2="880" y2="482" stroke="#d0d7de"/>
   <text x="266" y="499" font-size="12" fill="#1f2328" font-weight="700" text-anchor="end">All areas</text>
-  <text x="700" y="499" font-size="12" fill="#1f2328" font-weight="700" text-anchor="middle">75</text>
+  <text x="700" y="499" font-size="12" fill="#1f2328" font-weight="700" text-anchor="middle">76</text>
   <text x="756" y="499" font-size="12" fill="#1f2328" font-weight="700" text-anchor="middle">8</text>
   <text x="812" y="499" font-size="12" fill="#1f2328" font-weight="700" text-anchor="middle">5</text>
   <text x="868" y="499" font-size="12" fill="#1f2328" font-weight="700" text-anchor="middle">9</text>
