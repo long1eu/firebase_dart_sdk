@@ -249,6 +249,125 @@ void main() {
     expect(outcomes, everyElement(<Object>['done']));
   });
 
+  // The boundary of the merge: a write that the remote store took into its write pipeline (up to 10, sent or not)
+  // is never merged into; the writes after a full pipeline are.
+  test(
+    'a write sent and not acknowledged is not merged into, the next one is',
+    () async {
+      await start(merge: true);
+      final Mutation first = setA(1);
+      final List<Object> firstOutcome = await write(first);
+      await _settle();
+      // In flight: sent, not acknowledged.
+      expect(datastore.writesSent, 1);
+      expect(datastore.waitForWriteSend(), <Mutation>[first]);
+
+      // A new write while the first is in flight: queued and sent on its own.
+      final Mutation second = patchMutation('col/a', <String, Object?>{'j': 2});
+      final List<Object> secondOutcome = await write(second);
+      await _settle();
+      expect(datastore.writesSent, 1);
+      expect(datastore.waitForWriteSend(), <Mutation>[second]);
+
+      await acknowledge(10);
+      await acknowledge(11);
+      expect(firstOutcome, <Object>['done']);
+      expect(secondOutcome, <Object>['done']);
+    },
+  );
+
+  test(
+    'the writes after a full write pipeline merge, until a slot frees and the merged write is handed out',
+    () async {
+      await start(merge: true);
+      final List<List<Object>> outcomes = <List<Object>>[];
+      // Ten writes of other documents fill the pipeline.
+      for (int i = 0; i < 10; i++) {
+        outcomes.add(
+          await write(setMutation('col/b$i', <String, Object?>{'i': i})),
+        );
+      }
+      await _settle();
+      expect(datastore.writesSent, 10);
+
+      // Not handed out (the pipeline is full): the second merges into the first.
+      final Mutation a1 = setA(1);
+      final Mutation a2 = patchMutation('col/a', <String, Object?>{'j': 2});
+      outcomes.add(await write(a1));
+      outcomes.add(await write(a2));
+      expect(await localStore.getPendingWriteCount(), 11);
+
+      for (int i = 0; i < 10; i++) {
+        expect(datastore.waitForWriteSend().single.key, key('col/b$i'));
+      }
+      // One acknowledgement frees a slot: the merged write is handed out and sent.
+      await acknowledge(100);
+      expect(datastore.writesSent, 1);
+      expect(datastore.waitForWriteSend(), <Mutation>[
+        setMutation('col/a', <String, Object?>{'i': 1, 'j': 2}),
+      ]);
+
+      // It is in the pipeline now (full again): the next write to a stays separate, and is sent once a slot frees.
+      final Mutation a3 = patchMutation('col/a', <String, Object?>{'k': 3});
+      outcomes.add(await write(a3));
+      await _settle();
+      expect(await localStore.getPendingWriteCount(), 11);
+      expect(datastore.writesSent, 0);
+      await acknowledge(101);
+      expect(datastore.waitForWriteSend(), <Mutation>[a3]);
+
+      for (int i = 2; i <= 11; i++) {
+        await acknowledge(100 + i);
+      }
+      expect(outcomes, everyElement(<Object>['done']));
+      expect(datastore.writesSent, 0);
+    },
+  );
+
+  test(
+    'writes handed out while the write stream is down are not merged, and stay separate once it is back',
+    () async {
+      await start(merge: true);
+      final Mutation a1 = setA(1);
+      final List<List<Object>> outcomes = <List<Object>>[await write(a1)];
+      await _settle();
+      expect(datastore.waitForWriteSend(), <Mutation>[a1]);
+
+      // The connection drops: the stream closes and waits to reconnect, the pipeline keeps a1.
+      await datastore.failWrite(GrpcError.unavailable('offline'));
+      await _settle();
+      final Mutation a2 = patchMutation('col/a', <String, Object?>{'j': 2});
+      final Mutation a3 = patchMutation('col/a', <String, Object?>{'k': 3});
+      outcomes.add(await write(a2));
+      outcomes.add(await write(a3));
+      // Handed out ahead of the stream (the network is enabled), so not merged.
+      expect(await localStore.getPendingWriteCount(), 3);
+
+      // Even after the network is turned off and on again, which empties the pipeline, they stay separate.
+      await goOffline();
+      outcomes.add(
+        await write(patchMutation('col/a', <String, Object?>{'l': 4})),
+      );
+      // a3 was handed out in this session: the write made offline does not merge into it.
+      expect(await localStore.getPendingWriteCount(), 4);
+      await goOnline();
+      final List<List<Mutation>> sent = <List<Mutation>>[
+        for (int i = datastore.writesSent; i > 0; i--)
+          datastore.waitForWriteSend(),
+      ];
+      expect(sent.length, 4);
+      expect(sent.take(3), <List<Mutation>>[
+        <Mutation>[a1],
+        <Mutation>[a2],
+        <Mutation>[a3],
+      ]);
+      for (int i = 0; i < 4; i++) {
+        await acknowledge(10 + i);
+      }
+      expect(outcomes, everyElement(<Object>['done']));
+    },
+  );
+
   test('nothing is merged without the setting', () async {
     await start(merge: false);
     await goOffline();
