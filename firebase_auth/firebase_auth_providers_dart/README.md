@@ -118,6 +118,7 @@ against the Firebase Auth emulator; nothing was run against the real service.
 | `linkWithCredential`, `reauthenticateWithCredential`, `unlink` | `linkWithCredential(credential)`, `reauthenticateWithCredential(credential)` (and `reauthenticateWithEmailAndPassword`), `unlink(providerId)` | emulator |
 | `credentialFromResult` / `credentialFromError` | `UserCredential.credential` / `FirebaseAuthException.credential` (with `account-exists-with-different-credential`, `credential-already-in-use`) | emulator |
 | `sendSignInLinkToEmail`, `isSignInWithEmailLink`, `signInWithEmailLink`, `parseActionCodeURL` | the same names; `ActionCodeURL.parseLink(link)` | emulator |
+| `AuthCredential.toJSON`, `EmailAuthCredential.fromJSON`, `OAuthCredential.fromJSON`, `OAuthProvider.credentialFromJSON` | `toJson()`, `EmailAuthCredential.fromJson(json)`, `OAuthCredential.fromJson(json)`, `OAuthProvider.credentialFromJson(json)` (same JSON; an email link keeps only its code and tenant) | unit (fixtures from the JS sources) |
 | `signOut` | `signOut()` | emulator |
 | `onAuthStateChanged` / `onIdTokenChanged` | `authStateChanges()` / `idTokenChanges()` (start with the current user); `userChanges()` also after profile changes; `onTokenChanged` for Firestore | unit, emulator |
 | `beforeAuthStateChanged`, `authStateReady`, `updateCurrentUser` | the same names | unit, emulator |
@@ -138,7 +139,8 @@ against the Firebase Auth emulator; nothing was run against the real service.
 | `updateProfile(user, {displayName, photoURL})` | `updateProfile(displayName:, photoUrl:)`; `''` removes a value (JS: `null`) | emulator, Chrome |
 | `user.reload()` | `reload()` | emulator, Chrome |
 | `user.delete()` / `deleteUser(user)` | `deleteCurrentUser()` | emulator, Chrome |
-| `revokeToken(withAuthorizationCode:)` of the iOS SDK (Sign in with Apple; no JS equivalent) | `revokeToken(authorizationCode)` (`v2/accounts:revokeToken`; the user stays signed in) | unit only |
+| `revokeToken(withAuthorizationCode:)` of the iOS SDK (Sign in with Apple; no JS equivalent) | `revokeToken(authorizationCode)` (`v2/accounts:revokeToken`; the user stays signed in; sends `tenantId` when set) | unit only |
+| `revokeAccessToken(auth, token)` (Sign in with Apple) | `revokeAccessToken(token)` (`v2/accounts:revokeToken`, token type `ACCESS_TOKEN`; the user stays signed in; throws `null-user` where JS does nothing) | unit only |
 | `fetchSignInMethodsForEmail(auth, email)` (deprecated upstream: empty with email enumeration protection) | `fetchSignInMethodsForEmail(email)` | emulator, Chrome |
 | `connectAuthEmulator(auth, url)` | the `emulatorHost` argument | emulator, Chrome |
 | `user.uid`, `email`, `emailVerified`, `isAnonymous`, `displayName`, `photoURL`, `phoneNumber`, `tenantId`, `metadata`, `providerData` | `currentUser` (`AuthUser`, read with `accounts:lookup` after every sign-in) | emulator |
@@ -232,9 +234,12 @@ print(result.user?.email);
   `OAuthLoopbackProvider.discover(issuer:, ...)` for an OpenID Connect provider of Identity Platform; the client id
   must be the one configured for the provider in the project.
 - `OAuthLoopbackProvider.github(clientId:, clientSecret:)` for GitHub, with a GitHub OAuth App whose authorization
-  callback URL is `http://127.0.0.1` (GitHub accepts any port on a loopback redirect). GitHub's code exchange needs
-  the client secret even with PKCE, so it ships with the app. The default scopes are `read:user user:email`; no
-  nonce is sent, and Firebase gets the access token only.
+  callback URL is `http://127.0.0.1`, exactly so, without a `/` at the end (GitHub accepts any port on a loopback
+  redirect, but with `http://127.0.0.1/` it answers "The redirect_uri is not associated with this application").
+  GitHub's code exchange needs the client secret even with PKCE, so it ships with the app. The default scopes are
+  `read:user user:email`; no nonce is sent, and Firebase gets the access token only. The OAuth App must be the one
+  whose client id and secret are set for GitHub in the Firebase project: the backend checks the access token
+  against that app and answers `INVALID_IDP_RESPONSE` (`invalid-credential`) for a token of another app.
 - `linkWithOAuthLoopback` links the provider to the signed-in user, and `reauthenticateWithOAuthLoopback` signs
   the same user in again. Both take the same arguments as `signInWithOAuthLoopback`, and throw `null-user` before
   the browser opens when nobody is signed in.
@@ -286,8 +291,13 @@ An error thrown by `exchangeCode` becomes `invalid-credential`; throw a `Firebas
 
 On 2026-11-20, Google sign-in with a Desktop client was run against a real Firebase project: the code was
 exchanged directly with the client secret and PKCE, and the redirect was `http://127.0.0.1:<port>`.
-`exchangeCode` and generic OpenID Connect providers were run only against the fake identity provider of the tests.
-GitHub was run only against the fake provider too.
+The same day, a generic OpenID Connect provider (`oidc.<name>` of Identity Platform, with Google as the issuer) was
+run against the real project twice: with `discover` and a direct exchange, and with explicit endpoints and an
+`exchangeCode` callback, which also reauthenticated the user. GitHub was run with a real OAuth App: with another
+GitHub app configured in the project the backend refused the token (see above); with the same app, the sign-in
+gave `account-exists-with-different-credential` for an email that already had an account, and after a Google
+sign-in `linkWithOAuthLoopback` linked `github.com` to that account and `unlink` removed it again. A GitHub
+sign-in that creates a new account has not been run on a real project.
 
 Not offered by the loopback helper:
 

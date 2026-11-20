@@ -622,6 +622,96 @@ void main() {
       );
       expect(auth.uid, isNotNull);
     });
+
+    test('sends the tenant id when one is set', () async {
+      // The fake backend's users have no tenant, so the tenant is set after the sign-in.
+      await auth.signInAnonymously();
+      auth.tenantId = 'tenant-1';
+      requests.clear();
+      handler = (http.Request request) async => json(<String, Object?>{});
+      await auth.revokeToken('apple-code');
+      expect(
+        (jsonDecode(requests.single.body) as Map<String, Object?>)['tenantId'],
+        'tenant-1',
+      );
+    });
+  });
+
+  group('revokeAccessToken', () {
+    test('posts the Apple access token and keeps the user', () async {
+      await auth.signInAnonymously();
+      final String uid = auth.uid!;
+      final String token = (await auth.getAccessToken(
+        forceRefresh: false,
+      )).token;
+      requests.clear();
+      handler = (http.Request request) async => json(<String, Object?>{});
+      await auth.revokeAccessToken('apple-access-token');
+      expect(
+        requests.single.url.toString(),
+        'https://identitytoolkit.googleapis.com/v2/accounts:revokeToken'
+        '?key=$apiKey',
+      );
+      expect(requests.single.method, 'POST');
+      expect(jsonDecode(requests.single.body), <String, Object?>{
+        'providerId': 'apple.com',
+        'tokenType': 'ACCESS_TOKEN',
+        'token': 'apple-access-token',
+        'idToken': token,
+      });
+      expect(auth.uid, uid);
+      expect(storage.read('firebase_auth_providers_dart:$apiKey'), isNotNull);
+    });
+
+    test('sends the tenant id when one is set', () async {
+      // The fake backend's users have no tenant, so the tenant is set after the sign-in.
+      await auth.signInAnonymously();
+      auth.tenantId = 'tenant-1';
+      final String token = (await auth.getAccessToken(
+        forceRefresh: false,
+      )).token;
+      requests.clear();
+      handler = (http.Request request) async => json(<String, Object?>{});
+      await auth.revokeAccessToken('apple-access-token');
+      expect(jsonDecode(requests.single.body), <String, Object?>{
+        'providerId': 'apple.com',
+        'tokenType': 'ACCESS_TOKEN',
+        'token': 'apple-access-token',
+        'idToken': token,
+        'tenantId': 'tenant-1',
+      });
+    });
+
+    test('throws null-user when nobody is signed in', () async {
+      await expectLater(
+        auth.revokeAccessToken('apple-access-token'),
+        throwsA(
+          isA<FirebaseAuthException>().having(
+            (FirebaseAuthException e) => e.code,
+            'code',
+            'null-user',
+          ),
+        ),
+      );
+      expect(requests, isEmpty);
+    });
+
+    test('maps a server error and keeps the user', () async {
+      await auth.signInAnonymously();
+      final String uid = auth.uid!;
+      handler = (http.Request request) async => error('INVALID_IDP_RESPONSE');
+      await expectLater(
+        auth.revokeAccessToken('apple-access-token'),
+        throwsA(
+          isA<FirebaseAuthException>().having(
+            (FirebaseAuthException e) => e.code,
+            'code',
+            'invalid-credential',
+          ),
+        ),
+      );
+      expect(auth.uid, uid);
+    });
   });
 
   group('errors', () {

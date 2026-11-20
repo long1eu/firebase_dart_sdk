@@ -8,6 +8,7 @@ import 'package:meta/meta.dart';
 
 import 'action_code.dart';
 import 'auth_credential.dart';
+import 'auth_emulator_config.dart';
 import 'auth_exception.dart';
 import 'auth_storage.dart';
 import 'auth_user.dart';
@@ -73,7 +74,11 @@ import 'environment_stub.dart'
 /// in again. Drop those objects to forget the session in memory.
 ///
 /// **Session.** The session (the refresh token) is kept in an [AuthStorage]; the default, [InMemoryAuthStorage],
-/// forgets it when the process ends. [restore] (called by [forApp]) loads a stored session.
+/// forgets it when the process ends. [restore] (called by [forApp]) loads a stored session. When the storage fails
+/// to write a new session, the operation throws the error of the storage but the session in memory is the new one,
+/// and the next token refresh writes it again; a failing storage never signs the user out. When it fails to delete
+/// the session at [signOut], the user is signed out all the same and [signOut] throws the error of the storage;
+/// [restore] on that instance deletes it again instead of loading it, but a new instance still finds it.
 ///
 /// **Errors.** Requests fail with a [FirebaseAuthException]; its [FirebaseAuthException.code] lists
 /// the codes. Any request can fail with `network-request-failed`, `too-many-requests`, `invalid-api-key` or
@@ -110,11 +115,19 @@ class FirebaseUserAuth implements AuthTokenProvider {
   ///   It is checked like the host of the Firestore settings: an [ArgumentError] is thrown for anything with user
   ///   info, a path, a query or a bad port, and for a Google host (`*.googleapis.com`, `*.google.com`), which is
   ///   never an emulator. An emulator that is not on the loopback interface gets a warning in the log, like the
-  ///   JS SDK warns for every emulator: passwords and tokens travel unencrypted to it. See
-  ///   [emulatorHostFromEnvironment].
+  ///   JS SDK warns for every emulator: passwords and tokens travel unencrypted to it;
+  ///   `emulatorOptions: AuthEmulatorOptions(disableWarnings: true)` leaves that warning out. See
+  ///   [emulatorHostFromEnvironment] and [emulatorConfig].
+  ///
+  ///   The JS SDK throws a `FirebaseAuthException` (`invalid-emulator-scheme`) only for a URL without `http://`
+  ///   or `https://` (`packages/auth/src/core/auth/emulator.ts:51-55`) and does not check the rest. Here a
+  ///   scheme is optional (`host:port` is the form of `FIREBASE_AUTH_EMULATOR_HOST`), every invalid value is a
+  ///   programming error thrown before any request, and [emulatorOrigin] shares the check with
+  ///   `firebase_admin_dart`, so it stays an [ArgumentError]; an `ftp://` scheme is one.
   /// * [appId] (the `appId` of the app's options) is sent as `X-Firebase-gmpid`, and the token of [appCheck]
   ///   as `X-Firebase-AppCheck`, with every request, like the JS SDK does. [forApp] takes both from the app.
   /// * [httpClient] is used for all requests and is not closed by [dispose]; without it one is created and closed.
+  /// * [requestTimeout] bounds every request: one that takes longer fails with `network-request-failed`.
   /// * [clock] and [createTimer] are for tests.
   FirebaseUserAuth({
     required this.apiKey,
@@ -123,18 +136,21 @@ class FirebaseUserAuth implements AuthTokenProvider {
     AuthStorage? storage,
     String? storageKey,
     String? emulatorHost,
+    AuthEmulatorOptions emulatorOptions = const AuthEmulatorOptions(),
     http.Client? httpClient,
+    Duration requestTimeout = const Duration(seconds: 30),
     DateTime Function()? clock,
     Timer Function(Duration delay, void Function() callback)? createTimer,
   }) : _emulatorHost = emulatorHost,
-       _emulatorOrigin = emulatorHost == null
+       _emulatorConfig = emulatorHost == null
            ? null
-           : _emulatorOriginOf(emulatorHost),
+           : _emulatorConfigOf(emulatorHost, emulatorOptions),
        _appCheck = appCheck,
        _storage = storage ?? InMemoryAuthStorage(),
        _storageKey = storageKey ?? 'firebase_auth_providers_dart:$apiKey',
        _http = httpClient ?? http.Client(),
        _ownsHttp = httpClient == null,
+       _requestTimeout = requestTimeout,
        _clock = clock ?? DateTime.now,
        _createTimer = createTimer ?? Timer.new {
     // Synchronous: a listener (FirebaseFirestore) hears about a new user before the sign-in call returns.
@@ -150,9 +166,12 @@ class FirebaseUserAuth implements AuthTokenProvider {
   /// it before the Firestore instance of the app is created, and after the App Check provider is set on the app.
   ///
   /// The session is stored in [storage] (default: in memory) under a key made of the API key and the name of the
-  /// app, so that two apps keep two sessions. [emulatorHost] and [httpClient] are those of the constructor.
+  /// app, so that two apps keep two sessions. [emulatorHost], [emulatorOptions] and [httpClient] are those of the
+  /// constructor.
   ///
-  /// Throws an [ArgumentError] for an invalid [emulatorHost], and whatever the `read` of [storage] throws.
+  /// Throws an [ArgumentError] for an invalid [emulatorHost], and whatever the `read` of [storage] throws. In the
+  /// second case the instance is the token provider of the app all the same, signed out, and the stored session is
+  /// kept: call [restore] on it (`app.authProvider as FirebaseUserAuth`) to try again.
   ///
   /// ```dart
   /// final FirebaseUserAuth auth = await FirebaseUserAuth.forApp(
@@ -165,6 +184,7 @@ class FirebaseUserAuth implements AuthTokenProvider {
     FirebaseApp app, {
     AuthStorage? storage,
     String? emulatorHost,
+    AuthEmulatorOptions emulatorOptions = const AuthEmulatorOptions(),
     http.Client? httpClient,
   }) async {
     final FirebaseUserAuth auth = FirebaseUserAuth(
@@ -175,10 +195,14 @@ class FirebaseUserAuth implements AuthTokenProvider {
       storageKey:
           'firebase_auth_providers_dart:${app.options.apiKey}:${app.name}',
       emulatorHost: emulatorHost,
+      emulatorOptions: emulatorOptions,
       httpClient: httpClient,
     );
-    await auth.restore();
-    app.authProvider = auth;
+    try {
+      await auth.restore();
+    } finally {
+      app.authProvider = auth;
+    }
     return auth;
   }
 
@@ -198,7 +222,7 @@ class FirebaseUserAuth implements AuthTokenProvider {
   /// print(FirebaseUserAuth.emulatorOrigin('127.0.0.1:9099')); // http://127.0.0.1:9099
   /// ```
   static String emulatorOrigin(String emulatorHost) =>
-      _emulatorOriginOf(emulatorHost);
+      _originOf(_emulatorConfigOf(emulatorHost, const AuthEmulatorOptions()));
 
   /// How long before its expiry an ID token is refreshed.
   static const Duration refreshBefore = Duration(minutes: 5);
@@ -219,11 +243,23 @@ class FirebaseUserAuth implements AuthTokenProvider {
   /// Call it before the first request: a request in flight keeps the service it was sent to, and a session restored
   /// from the real service stays signed in until its first token refresh fails against the emulator. Throws an
   /// [ArgumentError] for an invalid [emulatorHost], as the constructor does, and changes nothing then.
-  void useEmulator(String emulatorHost) {
-    final String origin = _emulatorOriginOf(emulatorHost);
+  void useEmulator(
+    String emulatorHost, {
+    AuthEmulatorOptions options = const AuthEmulatorOptions(),
+  }) {
+    final AuthEmulatorConfig config = _emulatorConfigOf(emulatorHost, options);
     _emulatorHost = emulatorHost;
-    _emulatorOrigin = origin;
+    _emulatorConfig = config;
   }
+
+  /// The parsed [emulatorHost] and the options it was given with, or null for the real service: the
+  /// `emulatorConfig` of the JS SDK (`packages/auth/src/core/auth/emulator.ts:65-70`).
+  ///
+  /// The JS SDK's `emulator-config-failed` (`connectAuthEmulator` called after the first request, or with another
+  /// configuration, `emulator.ts:72-89`) does not exist here: [useEmulator] may be called at any time and the later
+  /// requests follow it.
+  AuthEmulatorConfig? get emulatorConfig => _emulatorConfig;
+  AuthEmulatorConfig? _emulatorConfig;
 
   /// The id of the Firebase app, sent as `X-Firebase-gmpid`; null sends none.
   final String? appId;
@@ -264,15 +300,29 @@ class FirebaseUserAuth implements AuthTokenProvider {
   /// platform, implementation, version of the package, framework.
   static const String clientVersion = 'Dart/DartCore/0.3.0/FirebaseCore-dart';
 
-  /// `http://host:port` (or `https://...`) of the Auth emulator, checked; null for the real service.
-  String? _emulatorOrigin;
+  /// `http://host:port` (or `https://...`) of the Auth emulator; null for the real service.
+  String? get _emulatorOrigin {
+    final AuthEmulatorConfig? config = emulatorConfig;
+    return config == null ? null : _originOf(config);
+  }
+
+  static String _originOf(AuthEmulatorConfig config) {
+    final int? port = config.port;
+    return '${config.protocol}://${config.host}${port == null ? '' : ':$port'}';
+  }
 
   static final RegExp _notAuthorityCharacters = RegExp(r'[/@?#\\\s]');
-  static final RegExp _scheme = RegExp(r'^(https?)://', caseSensitive: false);
+  static final RegExp _scheme = RegExp(
+    r'^([a-z][a-z0-9+.-]*)://',
+    caseSensitive: false,
+  );
 
   /// Checks [value], the `host:port` (optionally with an `http://` or `https://` scheme and a trailing `/`) of an
-  /// Auth emulator, and returns the origin the requests go to.
-  static String _emulatorOriginOf(String value) {
+  /// Auth emulator, and returns it parsed.
+  static AuthEmulatorConfig _emulatorConfigOf(
+    String value,
+    AuthEmulatorOptions options,
+  ) {
     Never invalid(String why) =>
         throw ArgumentError.value(value, 'emulatorHost', why);
     String authority = value.trim();
@@ -280,6 +330,11 @@ class FirebaseUserAuth implements AuthTokenProvider {
     final RegExpMatch? match = _scheme.firstMatch(authority);
     if (match != null) {
       scheme = match.group(1)!.toLowerCase();
+      if (scheme != 'http' && scheme != 'https') {
+        invalid(
+          'The scheme must be http or https (invalid-emulator-scheme in the JS SDK)',
+        );
+      }
       authority = authority.substring(match.end);
     }
     if (authority.endsWith('/')) {
@@ -291,7 +346,7 @@ class FirebaseUserAuth implements AuthTokenProvider {
       );
     }
     final String host;
-    String? port;
+    String? portText;
     if (authority.startsWith('[')) {
       // An IPv6 address: [::1]:9099.
       final int end = authority.indexOf(']');
@@ -304,7 +359,7 @@ class FirebaseUserAuth implements AuthTokenProvider {
         if (!rest.startsWith(':')) {
           invalid('Must be host:port');
         }
-        port = rest.substring(1);
+        portText = rest.substring(1);
       }
     } else {
       final List<String> parts = authority.split(':');
@@ -312,16 +367,14 @@ class FirebaseUserAuth implements AuthTokenProvider {
         invalid('Must be host:port (an IPv6 address goes in brackets)');
       }
       host = parts[0];
-      port = parts.length == 2 ? parts[1] : null;
+      portText = parts.length == 2 ? parts[1] : null;
     }
     if (host.isEmpty || host == '[]') {
       invalid('The host is empty');
     }
-    if (port != null) {
-      final int? number = int.tryParse(port);
-      if (number == null || number < 1 || number > 65535) {
-        invalid('The port must be a number from 1 to 65535');
-      }
+    final int? port = portText == null ? null : int.tryParse(portText);
+    if (portText != null && (port == null || port < 1 || port > 65535)) {
+      invalid('The port must be a number from 1 to 65535');
     }
     String normalized = host.toLowerCase();
     while (normalized.endsWith('.')) {
@@ -336,14 +389,19 @@ class FirebaseUserAuth implements AuthTokenProvider {
         'protection of the real service',
       );
     }
-    if (!_isLoopback(normalized)) {
+    if (!_isLoopback(normalized) && !options.disableWarnings) {
       Log.w(
         'FirebaseUserAuth',
         'WARNING: You are using the Auth Emulator at $scheme://$authority, which is intended for local testing '
             'only. Do not use with production credentials.',
       );
     }
-    return '$scheme://$authority';
+    return AuthEmulatorConfig(
+      protocol: scheme,
+      host: host,
+      port: port,
+      options: options,
+    );
   }
 
   static bool _isLoopback(String host) {
@@ -366,6 +424,7 @@ class FirebaseUserAuth implements AuthTokenProvider {
   final String _storageKey;
   final http.Client _http;
   final bool _ownsHttp;
+  final Duration _requestTimeout;
   final DateTime Function() _clock;
   final Timer Function(Duration delay, void Function() callback) _createTimer;
 
@@ -409,6 +468,10 @@ class FirebaseUserAuth implements AuthTokenProvider {
   Future<String?>? _refreshing;
   Timer? _refreshTimer;
   int _refreshFailures = 0;
+
+  /// Whether the stored session differs from the one in memory (or from none, after a sign-out) because its write
+  /// failed.
+  bool _unsaved = false;
   bool _disposed = false;
 
   /// Counts the sessions: it changes when a session is installed for a sign-in, [updateCurrentUser] or [restore],
@@ -553,6 +616,13 @@ class FirebaseUserAuth implements AuthTokenProvider {
   }
 
   Future<void> _restore() async {
+    if (_unsaved && _session == null) {
+      // A sign-out failed to delete the stored session: delete it, never load it.
+      await _storage.write(_storageKey, null);
+      // A sign-in during the write may have been stored before it: store that session again.
+      _unsaved = _session != null;
+      return;
+    }
     final String? stored = await _storage.read(_storageKey);
     if (stored == null || _session != null) {
       return;
@@ -636,6 +706,9 @@ class FirebaseUserAuth implements AuthTokenProvider {
   /// [idTokenChanges] emit null and [onTokenChanged] an empty token. Does nothing when nobody is signed in. Runs the
   /// [beforeAuthStateChanged] callbacks first, and throws `login-blocked` when one of them throws.
   ///
+  /// When the storage fails to delete the session, the user is signed out all the same (the streams emit) and the
+  /// error of the storage is thrown; [restore] on this instance deletes the session again instead of loading it.
+  ///
   /// It makes no request: the refresh token is not revoked on the backend (as in the other Firebase SDKs).
   /// Firestore continues without a token; the pending writes of the user stay with that user.
   Future<void> signOut() async {
@@ -673,7 +746,8 @@ class FirebaseUserAuth implements AuthTokenProvider {
 
   /// Revokes the Sign in with Apple token of the signed-in user with the [authorizationCode] that Apple returned
   /// (`revokeToken(withAuthorizationCode:)` of the iOS SDK; `v2/accounts:revokeToken`). Apple asks apps that let
-  /// users delete their account to revoke the token first. The user stays signed in.
+  /// users delete their account to revoke the token first. The user stays signed in. The [tenantId], when set, is
+  /// sent with it, as the JS SDK's `revokeToken` request does.
   ///
   /// Throws a [FirebaseAuthException] with the code `null-user` (nobody is signed in), `invalid-credential`,
   /// `user-token-expired`, ...
@@ -687,6 +761,27 @@ class FirebaseUserAuth implements AuthTokenProvider {
           'token': authorizationCode,
           'idToken': idToken,
         },
+        tenant: true,
+      );
+    });
+  }
+
+  /// Revokes the Sign in with Apple access [token] of the signed-in user (`revokeAccessToken` of the JS SDK;
+  /// `v2/accounts:revokeToken` with the token type `ACCESS_TOKEN`). The user stays signed in.
+  ///
+  /// Throws a [FirebaseAuthException] with the code `null-user` (nobody is signed in; the JS SDK does nothing
+  /// then), `invalid-credential`, `user-token-expired`, ...
+  Future<void> revokeAccessToken(String token) async {
+    await _forUser((String idToken, int generation) async {
+      await _send(
+        _identityToolkit('accounts:revokeToken', version: 'v2'),
+        json: <String, Object?>{
+          'providerId': 'apple.com',
+          'tokenType': 'ACCESS_TOKEN',
+          'token': token,
+          'idToken': idToken,
+        },
+        tenant: true,
       );
     });
   }
@@ -1221,7 +1316,7 @@ class FirebaseUserAuth implements AuthTokenProvider {
     }
     await _updateSession(response, generation);
     await _reload(generation);
-    return _result(response, _session?.user ?? user);
+    return _result(response, _session?.user ?? user, OperationType.link);
   });
 
   /// Signs the signed-in user in again with [credential] (`reauthenticateWithCredential`), which operations such
@@ -1289,7 +1384,11 @@ class FirebaseUserAuth implements AuthTokenProvider {
     }
     await _updateSession(response, generation);
     await _reload(generation);
-    return _result(response, _session?.user ?? session.user);
+    return _result(
+      response,
+      _session?.user ?? session.user,
+      OperationType.reauthenticate,
+    );
   }
 
   /// Removes the sign-in method of [providerId] (`password`, `google.com`, ...) from the account of the signed-in
@@ -1533,9 +1632,14 @@ class FirebaseUserAuth implements AuthTokenProvider {
   }
 
   /// The result of a sign-in, a link or a reauthentication [response] for [user].
-  UserCredential _result(Map<String, Object?> response, AuthUser user) {
+  UserCredential _result(
+    Map<String, Object?> response,
+    AuthUser user,
+    OperationType operationType,
+  ) {
     final UserCredential result = UserCredential(
       user,
+      operationType: operationType,
       additionalUserInfo: additionalUserInfoOf(response),
       credential: credentialFromResponse(response),
     );
@@ -1560,7 +1664,8 @@ class FirebaseUserAuth implements AuthTokenProvider {
   /// Throws a [FirebaseNoSignedInUserException] when nobody is signed in (Firestore then sends the request without
   /// a token), and a [FirebaseAuthException] when the refresh fails. When the refresh fails because the
   /// session is no longer valid (the account was deleted or disabled, the refresh token revoked), the user is
-  /// signed out.
+  /// signed out. Throws whatever the `write` of the storage throws when a new refresh token cannot be stored; the
+  /// new token is in use all the same, and the write is tried again at the next refresh.
   @override
   Future<GetTokenResult> getAccessToken({required bool forceRefresh}) async {
     final _Session? session = _session;
@@ -1889,8 +1994,8 @@ class FirebaseUserAuth implements AuthTokenProvider {
     }
     final http.Response response;
     try {
-      response = get
-          ? await _http.get(
+      final Future<http.Response> request = get
+          ? _http.get(
               url,
               headers: <String, String>{
                 ...headers,
@@ -1898,7 +2003,7 @@ class FirebaseUserAuth implements AuthTokenProvider {
               },
             )
           : json != null
-          ? await _http.post(
+          ? _http.post(
               url,
               headers: <String, String>{
                 ...headers,
@@ -1906,7 +2011,7 @@ class FirebaseUserAuth implements AuthTokenProvider {
               },
               body: jsonEncode(json),
             )
-          : await _http.post(
+          : _http.post(
               url,
               headers: <String, String>{
                 ...headers,
@@ -1914,6 +2019,14 @@ class FirebaseUserAuth implements AuthTokenProvider {
               },
               body: form,
             );
+      response = await request.timeout(_requestTimeout);
+    } on TimeoutException {
+      throw FirebaseAuthException(
+        code: 'network-request-failed',
+        message:
+            'The request to the authentication service timed out after '
+            '${_requestTimeout.inMilliseconds} ms.',
+      );
     } on Object catch (_) {
       // The error of the HTTP client may quote the URL, which holds the API key.
       throw const FirebaseAuthException(
@@ -2042,7 +2155,7 @@ class FirebaseUserAuth implements AuthTokenProvider {
     _emitToken(idToken);
     _notifyAuthState();
     await _letListenersReact();
-    return _result(response, session.user);
+    return _result(response, session.user, OperationType.signIn);
   }
 
   /// Like `_performSignInRequest` of the JS SDK: a sign-in answer with an `mfaPendingCredential` (and no tokens)
@@ -2190,17 +2303,26 @@ class FirebaseUserAuth implements AuthTokenProvider {
     return generation;
   }
 
+  /// Makes [session] the current one and, when [persist] is set or an earlier write failed, stores it. The session
+  /// changes in memory first, like `directlySetCurrentUser` of the JS SDK: the backend may already have replaced
+  /// the refresh token, so the old session is not kept for a failed write. The error of the write is rethrown and
+  /// the next session change (a token refresh, a reload, a sign-in) writes again.
   Future<void> _setSession(_Session session, {required bool persist}) async {
     _session = session;
     _sessionOfUser[session.user] = (apiKey, session);
-    if (persist) {
-      await _storage.write(
-        _storageKey,
-        encodeSession(session.user, session.refreshToken),
-      );
-    }
-    if (_tokenChanges.hasListener) {
-      _scheduleProactiveRefresh();
+    try {
+      if (persist || _unsaved) {
+        _unsaved = true;
+        await _storage.write(
+          _storageKey,
+          encodeSession(session.user, session.refreshToken),
+        );
+        _unsaved = false;
+      }
+    } finally {
+      if (_tokenChanges.hasListener) {
+        _scheduleProactiveRefresh();
+      }
     }
   }
 
@@ -2208,16 +2330,22 @@ class FirebaseUserAuth implements AuthTokenProvider {
     _generation++;
     _session = null;
     _cancelProactiveRefresh();
-    if (!_disposed) {
-      // After dispose the stored session may belong to a new instance that restored it.
-      await _storage.write(_storageKey, null);
+    try {
+      if (!_disposed) {
+        // After dispose the stored session may belong to a new instance that restored it.
+        _unsaved = true;
+        await _storage.write(_storageKey, null);
+      }
+      _unsaved = false;
+    } finally {
+      // Signed out in memory even when the write failed, like `directlySetCurrentUser` of the JS SDK.
+      if (!_userChanges.isClosed) {
+        _userChanges.add(null);
+      }
+      _emitToken('');
+      _notifyAuthState();
+      await _letListenersReact();
     }
-    if (!_userChanges.isClosed) {
-      _userChanges.add(null);
-    }
-    _emitToken('');
-    _notifyAuthState();
-    await _letListenersReact();
   }
 
   /// Tells the token listeners (Firestore) and [idTokenChanges] about a new ID token of the current session, or an
@@ -2346,9 +2474,12 @@ class FirebaseUserAuth implements AuthTokenProvider {
       _refresh().then<void>(
         (String? _) {},
         onError: (Object error) {
-          if (error is FirebaseAuthException &&
-              !error.invalidatesSession &&
+          // Any error but the end of the session (a network error, a failing storage, ...) is retried later.
+          final bool sessionEnded =
+              error is FirebaseAuthException && error.invalidatesSession;
+          if (!sessionEnded &&
               _session != null &&
+              !_disposed &&
               _tokenChanges.hasListener) {
             _refreshFailures++;
             _scheduleProactiveRefresh();
