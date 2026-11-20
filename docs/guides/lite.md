@@ -108,8 +108,8 @@ has a counterpart here, except the ones below. All of them are deliberate.
 
 Beyond the JS entry point, Lite here has: read-only transactions (`readOnly`, `readTime`) with
 `Transaction.getQuery` and `getAggregate`, a transaction `timeout`, `Filter(isNull: ...)`,
-`DocumentSnapshot.contains` and `[]`, the BSON value types with their names of the main library,
-`FirebaseFirestore.instance` and a `settings` setter that works until the first request.
+`DocumentSnapshot.contains` and `[]`, `FirebaseFirestore.instance` and a `settings` setter that
+works until the first request.
 
 Differences from the main library that are not just missing features:
 `FirebaseFirestore.instanceFor` is synchronous; `FirestoreDataConverter.fromFirestore` takes only the
