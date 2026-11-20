@@ -49,5 +49,7 @@ decided by IAM. Use them on trusted machines only.
 `test/example_test.dart` runs every program without its variables (each prints its note), and
 the emulator programs against the emulators when `FIREBASE_AUTH_EMULATOR_HOST` (and, for
 `firestore_wiring.dart`, `FIRESTORE_AUTH_RULES_EMULATOR_HOST`) is set, checking what they print.
-`service_account.dart`, `adc_server.dart` and `google_desktop_sign_in.dart` were not run against a real project
-(the browser flow itself is tested against a fake identity provider in `test/oauth_loopback_test.dart`).
+`service_account.dart` and `adc_server.dart` were not run against a real project. `google_desktop_sign_in.dart` was
+run against a real Firebase project on 2026-11-20, with a Desktop client: the code was exchanged directly with the
+client secret and PKCE, and the redirect was `http://127.0.0.1:<port>`. The browser flow is also tested against a
+fake identity provider in `test/oauth_loopback_test.dart`.
