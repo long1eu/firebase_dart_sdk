@@ -26,6 +26,19 @@
 - `OAuthLoopbackProvider.github`: GitHub sign-in through the loopback helper (PKCE S256, client secret, default
   scopes `read:user user:email`, no nonce; Firebase gets the access token only). Run only against the fake
   identity provider of the tests.
+- A backend error ends the session only when it comes with HTTP 400: `invalidatesSession` is false for a 5xx that
+  names `TOKEN_EXPIRED`, `USER_DISABLED`, ..., and the user stays signed in.
+- When a request with the ID token is rejected with `TOKEN_EXPIRED` or `INVALID_ID_TOKEN`, the token is refreshed
+  once to check the session (as in the iOS SDK): the user is signed out only when the refresh says that the session
+  ended, and otherwise the request is sent once more with the new token.
+- Token lifetimes from the backend are bounded as in the iOS SDK: an `expiresIn` outside of (0, 24 h], missing or
+  not a number counts as one hour, an `exp` claim more than 24 h ahead is not trusted, and a proactive refresh
+  delay beyond 24 h refreshes right away.
+
+- `FirebaseUserAuth.revokeToken(authorizationCode)` revokes the Sign in with Apple token of the signed-in user
+  with Apple's authorization code (`v2/accounts:revokeToken`, like `revokeToken(withAuthorizationCode:)` of the
+  iOS SDK). The user stays signed in. Throws `null-user` when nobody is signed in. Tested with a fake HTTP client
+  only.
 
 ## 0.3.0
 

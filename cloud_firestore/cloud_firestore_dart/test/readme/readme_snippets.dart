@@ -210,8 +210,8 @@ Future<void> authProvidersReadmeLine88() async {
   print(result.additionalUserInfo?.isNewUser);
 }
 
-// ../../firebase_auth/firebase_auth_providers_dart/README.md:170
-Future<void> authProvidersReadmeLine170() async {
+// ../../firebase_auth/firebase_auth_providers_dart/README.md:171
+Future<void> authProvidersReadmeLine171() async {
   final FirebaseUserAuth auth = await FirebaseUserAuth.forApp(app);
   final UserCredential result = await auth.signInWithOAuthLoopback(
     OAuthLoopbackProvider.google(
@@ -222,8 +222,8 @@ Future<void> authProvidersReadmeLine170() async {
   print(result.user?.email);
 }
 
-// ../../firebase_auth/firebase_auth_providers_dart/README.md:214
-Future<void> authProvidersReadmeLine214() async {
+// ../../firebase_auth/firebase_auth_providers_dart/README.md:215
+Future<void> authProvidersReadmeLine215() async {
   final OAuthLoopbackProvider provider = OAuthLoopbackProvider.oidc(
     providerId: 'oidc.example',
     authorizationEndpoint: Uri.parse('https://idp.example.com/authorize'),

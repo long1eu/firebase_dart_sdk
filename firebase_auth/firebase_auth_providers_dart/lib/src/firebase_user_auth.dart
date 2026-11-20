@@ -657,6 +657,26 @@ class FirebaseUserAuth implements AuthTokenProvider {
     });
   }
 
+  /// Revokes the Sign in with Apple token of the signed-in user with the [authorizationCode] that Apple returned
+  /// (`revokeToken(withAuthorizationCode:)` of the iOS SDK; `v2/accounts:revokeToken`). Apple asks apps that let
+  /// users delete their account to revoke the token first. The user stays signed in.
+  ///
+  /// Throws a [FirebaseAuthException] with the code `null-user` (nobody is signed in), `invalid-credential`,
+  /// `user-token-expired`, ...
+  Future<void> revokeToken(String authorizationCode) async {
+    await _forUser((String idToken, int generation) async {
+      await _send(
+        _identityToolkit('accounts:revokeToken', version: 'v2'),
+        json: <String, Object?>{
+          'providerId': 'apple.com',
+          'tokenType': '3',
+          'token': authorizationCode,
+          'idToken': idToken,
+        },
+      );
+    });
+  }
+
   // ---- account management (the REST-backed operations of the JS SDK) ----
 
   /// Sends a password reset email to [email] (`sendPasswordResetEmail`). The link carries the code that
@@ -1476,7 +1496,11 @@ class FirebaseUserAuth implements AuthTokenProvider {
   }
 
   /// Runs [operation] with the ID token of the signed-in user. Like `_logoutIfInvalidated` of the JS SDK, the user
-  /// is signed out when the backend answers that the account is disabled or the credential no longer valid.
+  /// is signed out when the backend rejects the request with HTTP 400 because the account is disabled.
+  ///
+  /// When it rejects the ID token (`TOKEN_EXPIRED`, `INVALID_ID_TOKEN`), the session may still be valid, so the
+  /// token is refreshed first, like `signOutIfSessionIsInvalid` of the iOS SDK: the refresh signs the user out when
+  /// it fails because the session ended, and otherwise [operation] runs once more with the new token.
   Future<T> _forUser<T>(
     Future<T> Function(String idToken, int generation) operation,
   ) async {
@@ -1487,12 +1511,48 @@ class FirebaseUserAuth implements AuthTokenProvider {
     try {
       return await operation(idToken, generation);
     } on FirebaseAuthException catch (e) {
-      if ((e.code == 'user-disabled' || e.code == 'user-token-expired') &&
-          generation == _generation &&
-          _session != null) {
-        await _clearSession();
+      if (e.httpStatus != 400 ||
+          generation != _generation ||
+          _session == null) {
+        rethrow;
       }
-      rethrow;
+      if (e.code == 'user-disabled') {
+        await _clearSession();
+        rethrow;
+      }
+      if (e.code != 'user-token-expired' && e.code != 'invalid-user-token') {
+        rethrow;
+      }
+      final String? refreshed = await _refreshAfterRejection(
+        idToken,
+        generation,
+      );
+      if (refreshed == null) {
+        rethrow;
+      }
+      return operation(refreshed, generation);
+    }
+  }
+
+  /// Refreshes the ID token after the backend rejected [rejected], to check whether the session of [generation]
+  /// is still valid. Returns the new token, or null when the session changed, the token was replaced since
+  /// [rejected] was sent, or the refresh failed (a refresh that fails because the session ended signs out).
+  Future<String?> _refreshAfterRejection(
+    String rejected,
+    int generation,
+  ) async {
+    if (_session?.idToken != rejected) {
+      return null;
+    }
+    try {
+      final String? refreshed = await _refresh();
+      return generation == _generation ? refreshed : null;
+    } on FirebaseAuthException catch (e) {
+      Log.w(
+        'FirebaseUserAuth',
+        'The ID token was rejected and the refresh that checks the session failed: ${e.code}',
+      );
+      return null;
     }
   }
 
@@ -1887,14 +1947,30 @@ class FirebaseUserAuth implements AuthTokenProvider {
     }
   }
 
-  /// The expiry of an ID token: its `exp` claim, or now plus the `expiresIn` seconds of the response.
+  /// The standard lifetime of an ID token. It replaces a lifetime from the backend that is out of range.
+  static const Duration _standardTokenLifetime = Duration(hours: 1);
+
+  /// The longest accepted token lifetime, and the longest delay of the proactive refresh (`AuthTokenLifetime` of
+  /// the iOS SDK).
+  static const Duration _maximumTokenLifetime = Duration(hours: 24);
+
+  /// The expiry of an ID token: its `exp` claim, or now plus the `expiresIn` seconds of the response. Like
+  /// `AuthTokenLifetime` of the iOS SDK, a lifetime outside of (0, 24 h], missing or not a number is one hour,
+  /// and an `exp` more than 24 h ahead is not trusted.
   DateTime _expiry(GetTokenResult token, Object? expiresIn) {
-    if (token.claims['exp'] is num) {
+    final DateTime now = _clock();
+    if (token.claims['exp'] is num &&
+        !token.expirationTimestamp.isAfter(now.add(_maximumTokenLifetime))) {
       return token.expirationTimestamp;
     }
-    final int seconds =
-        int.tryParse('$expiresIn') ?? const Duration(hours: 1).inSeconds;
-    return _clock().add(Duration(seconds: seconds));
+    final double? seconds = double.tryParse('$expiresIn');
+    if (seconds == null ||
+        !seconds.isFinite ||
+        seconds <= 0 ||
+        seconds > _maximumTokenLifetime.inSeconds) {
+      return now.add(_standardTokenLifetime);
+    }
+    return now.add(Duration(milliseconds: (seconds * 1000).round()));
   }
 
   /// Exchanges the refresh token for a new ID token. One request at a time. Completes with null when the session
@@ -2103,7 +2179,9 @@ class FirebaseUserAuth implements AuthTokenProvider {
       final Duration backoff = Duration(seconds: 30 * (1 << exponent));
       delay = delay > backoff ? delay : backoff;
     }
-    if (delay.isNegative) {
+    // Like `boundedRefreshDelay` of the iOS SDK: a delay beyond the longest token lifetime comes from an expiry
+    // that is out of range, and refreshes right away.
+    if (delay.isNegative || delay > _maximumTokenLifetime) {
       delay = Duration.zero;
     }
     _refreshTimer = _createTimer(delay, () {
