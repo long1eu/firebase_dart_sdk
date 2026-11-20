@@ -209,8 +209,8 @@ Future<void> authProvidersReadmeLine88() async {
   print(result.additionalUserInfo?.isNewUser);
 }
 
-// ../../firebase_auth/firebase_auth_providers_dart/README.md:169
-Future<void> authProvidersReadmeLine169() async {
+// ../../firebase_auth/firebase_auth_providers_dart/README.md:170
+Future<void> authProvidersReadmeLine170() async {
   final FirebaseUserAuth auth = await FirebaseUserAuth.forApp(app);
   final UserCredential result = await auth.signInWithOAuthLoopback(
     OAuthLoopbackProvider.google(
