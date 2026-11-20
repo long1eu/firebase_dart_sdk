@@ -1,0 +1,376 @@
+// Tests through the official firebase_auth API, against a fake backend: the
+// registration, the mapping of each kind of call, and the members that throw.
+
+import 'dart:async';
+import 'dart:convert';
+
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_auth_dart_platform/firebase_auth_dart_platform.dart';
+import 'package:firebase_auth_dart_platform/src/core.dart';
+import 'package:firebase_auth_platform_interface/firebase_auth_platform_interface.dart'
+    show FirebaseAuthPlatform;
+import 'package:firebase_auth_providers_dart/firebase_auth_providers_dart.dart'
+    show InMemoryAuthStorage;
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_core_platform_interface/firebase_core_platform_interface.dart'
+    show FirebasePlatform, FirebaseAppPlatform, MethodChannelFirebase;
+import 'package:flutter/foundation.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+
+import 'fake_backend.dart';
+
+const FirebaseOptions _options = FirebaseOptions(
+  apiKey: 'test-api-key',
+  appId: '1:1:web:1',
+  messagingSenderId: '1',
+  projectId: 'demo-unit',
+);
+
+final FakeBackend backend = FakeBackend();
+final Map<String, InMemoryAuthStorage> storages =
+    <String, InMemoryAuthStorage>{};
+
+int _apps = 0;
+
+/// The FirebaseAuth of a new app, so that every test starts signed out.
+Future<FirebaseAuth> newAuth() async {
+  final FirebaseApp app = await Firebase.initializeApp(
+    name: 'app${_apps++}',
+    options: _options,
+  );
+  return FirebaseAuth.instanceFor(app: app);
+}
+
+Matcher throwsAuthCode(String code) => throwsA(
+  isA<FirebaseAuthException>().having(
+    (FirebaseAuthException e) => e.code,
+    'code',
+    code,
+  ),
+);
+
+void main() {
+  setUpAll(() {
+    // Pretend to be on Linux, where registerWith also installs the Dart core.
+    debugDefaultTargetPlatformOverride = TargetPlatform.linux;
+    FirebaseAuthDart.registerWith();
+    FirebaseAuthDart.use(
+      httpClient: backend.client,
+      storageFor: (FirebaseApp app) =>
+          storages.putIfAbsent(app.name, InMemoryAuthStorage.new),
+    );
+  });
+
+  tearDownAll(() {
+    debugDefaultTargetPlatformOverride = null;
+  });
+
+  setUp(() {
+    backend.requests.clear();
+    backend.override = null;
+  });
+
+  group('registration', () {
+    test(
+      'registerWith on Linux installs the auth and core implementations',
+      () {
+        expect(FirebaseAuthDart.isRegistered, isTrue);
+        expect(FirebaseAuthPlatform.instance, isA<DartFirebaseAuth>());
+        expect(FirebasePlatform.instance, isNot(isA<MethodChannelFirebase>()));
+      },
+    );
+
+    test('a core installed by another package is kept', () {
+      final FirebasePlatform before = FirebasePlatform.instance;
+      final _OtherCore other = _OtherCore();
+      FirebasePlatform.instance = other;
+      installCoreIfNeeded();
+      expect(FirebasePlatform.instance, same(other));
+      FirebasePlatform.instance = before;
+    });
+
+    test('use after the first instance throws', () async {
+      await newAuth().then((FirebaseAuth auth) => auth.currentUser);
+      expect(FirebaseAuthDart.use, throwsStateError);
+    });
+
+    test('the default session file is per executable, under XDG', () {
+      final String? file = defaultSessionFile();
+      expect(file, isNotNull);
+      expect(file, endsWith('firebase_auth_dart_platform/sessions.json'));
+    });
+  });
+
+  group('sign-in', () {
+    test('anonymous sign-in, the streams and sign-out', () async {
+      final FirebaseAuth auth = await newAuth();
+      final List<String?> states = <String?>[];
+      final List<String?> users = <String?>[];
+      final StreamSubscription<User?> s1 = auth.authStateChanges().listen(
+        (User? user) => states.add(user?.uid),
+      );
+      final StreamSubscription<User?> s2 = auth.userChanges().listen(
+        (User? user) => users.add(user?.uid),
+      );
+      await pumpEventQueue();
+
+      final UserCredential result = await auth.signInAnonymously();
+      expect(result.user!.uid, 'anon-user');
+      expect(result.user!.isAnonymous, isTrue);
+      expect(result.additionalUserInfo?.isNewUser, isTrue);
+      expect(auth.currentUser!.uid, 'anon-user');
+      expect(auth.currentUser!.displayName, 'Ada');
+      expect(
+        auth.currentUser!.metadata.creationTime,
+        DateTime.fromMillisecondsSinceEpoch(1700000000000, isUtc: true),
+      );
+      expect(backend.paths, <String>[
+        '/v1/accounts:signUp',
+        '/v1/accounts:lookup',
+      ]);
+
+      await auth.signOut();
+      await pumpEventQueue();
+      expect(auth.currentUser, isNull);
+      expect(states, <String?>[null, 'anon-user', null]);
+      // userChanges starts with the current user and follows every change.
+      expect(users.first, isNull);
+      expect(users, containsAllInOrder(<String?>['anon-user', null]));
+      await s1.cancel();
+      await s2.cancel();
+    });
+
+    test('email and password, with the provider data', () async {
+      final FirebaseAuth auth = await newAuth();
+      await auth.createUserWithEmailAndPassword(
+        email: 'a@example.com',
+        password: 'secret',
+      );
+      final User user = auth.currentUser!;
+      expect(user.uid, 'uid-of-a@example.com');
+      expect(user.email, 'a@example.com');
+      expect(user.providerData.single.providerId, 'password');
+      expect(user.providerData.single.email, 'a@example.com');
+    });
+
+    test('a Google credential goes to signInWithIdp', () async {
+      final FirebaseAuth auth = await newAuth();
+      final UserCredential result = await auth.signInWithCredential(
+        GoogleAuthProvider.credential(idToken: 'google-id-token'),
+      );
+      expect(result.user!.uid, 'google-user');
+      final Map<String, Object?> body = backend.bodyOf(
+        'accounts:signInWithIdp',
+      );
+      expect(
+        body['postBody'],
+        'id_token=google-id-token&providerId=google.com',
+      );
+      expect(result.credential?.providerId, 'google.com');
+      expect(result.additionalUserInfo?.providerId, 'google.com');
+    });
+
+    test('backend errors keep their code', () async {
+      final FirebaseAuth auth = await newAuth();
+      backend.override = (http.Request r) => errorResponse('EMAIL_NOT_FOUND');
+      await expectLater(
+        auth.signInWithEmailAndPassword(email: 'x@example.com', password: 'p'),
+        throwsAuthCode('user-not-found'),
+      );
+      backend.override = (http.Request r) => errorResponse('EMAIL_EXISTS');
+      await expectLater(
+        auth.createUserWithEmailAndPassword(
+          email: 'x@example.com',
+          password: 'p',
+        ),
+        throwsAuthCode('email-already-in-use'),
+      );
+    });
+
+    test('a second factor gives the hints, and cannot be resolved', () async {
+      final FirebaseAuth auth = await newAuth();
+      backend.override = (http.Request r) => jsonResponse(<String, Object?>{
+        'localId': 'uid',
+        'mfaPendingCredential': 'pending',
+        'mfaInfo': <Object?>[
+          <String, Object?>{
+            'mfaEnrollmentId': 'totp-1',
+            'totpInfo': <String, Object?>{},
+          },
+        ],
+      });
+      try {
+        await auth.signInWithEmailAndPassword(email: 'a@b.c', password: 'p');
+        fail('expected a FirebaseAuthMultiFactorException');
+      } on FirebaseAuthMultiFactorException catch (e) {
+        expect(e.code, 'multi-factor-auth-required');
+        expect(e.resolver.hints.single, isA<TotpMultiFactorInfo>());
+        expect(e.resolver.hints.single.uid, 'totp-1');
+        expect(e.resolver.session.id, 'pending');
+      }
+      // The assertion the resolver would need cannot be made yet.
+      await expectLater(
+        TotpMultiFactorGenerator.getAssertionForSignIn('totp-1', '123456'),
+        throwsAuthCode('unimplemented'),
+      );
+    });
+  });
+
+  group('user', () {
+    test('updateProfile: null removes, a missing field stays', () async {
+      final FirebaseAuth auth = await newAuth();
+      await auth.signInAnonymously();
+      await auth.currentUser!.updateProfile(displayName: null);
+      expect(
+        backend.bodyOf('accounts:update'),
+        containsPair('deleteAttribute', <Object?>['DISPLAY_NAME']),
+      );
+      expect(backend.bodyOf('accounts:update'), isNot(contains('photoUrl')));
+      await auth.currentUser!.updatePhotoURL('https://example.com/a.png');
+      expect(
+        backend.bodyOf('accounts:update'),
+        containsPair('photoUrl', 'https://example.com/a.png'),
+      );
+    });
+
+    test('getIdTokenResult reads the claims', () async {
+      final FirebaseAuth auth = await newAuth();
+      await auth.signInAnonymously();
+      final IdTokenResult result = await auth.currentUser!.getIdTokenResult();
+      expect(result.signInProvider, 'anonymous');
+      expect(result.claims?['sub'], 'anon-user');
+      expect(result.expirationTime!.isAfter(DateTime.now()), isTrue);
+      final String? forced = await auth.currentUser!.getIdToken(true);
+      expect(forced, isNot(result.token));
+      expect(backend.paths.last, '/v1/token');
+    });
+
+    test('a user that is no longer signed in throws no-current-user', () async {
+      final FirebaseAuth auth = await newAuth();
+      await auth.signInAnonymously();
+      final User user = auth.currentUser!;
+      await auth.signOut();
+      await expectLater(user.reload(), throwsAuthCode('no-current-user'));
+    });
+
+    test('action codes and email links', () async {
+      final FirebaseAuth auth = await newAuth();
+      final ActionCodeInfo info = await auth.checkActionCode('code');
+      expect(info.operation, ActionCodeInfoOperation.passwordReset);
+      expect(info.data['email'], 'a@example.com');
+      await auth.sendSignInLinkToEmail(
+        email: 'a@example.com',
+        actionCodeSettings: ActionCodeSettings(
+          url: 'https://example.com/finish',
+          handleCodeInApp: true,
+        ),
+      );
+      expect(backend.bodyOf('accounts:sendOobCode'), <String, Object?>{
+        'requestType': 'EMAIL_SIGNIN',
+        'email': 'a@example.com',
+        'continueUrl': 'https://example.com/finish',
+        'canHandleCodeInApp': true,
+      });
+    });
+  });
+
+  group('settings', () {
+    test('tenantId and languageCode reach the requests', () async {
+      final FirebaseAuth auth = await newAuth();
+      auth.tenantId = 'tenant-1';
+      await auth.setLanguageCode('fr');
+      expect(auth.tenantId, 'tenant-1');
+      expect(auth.languageCode, 'fr');
+      await auth.sendPasswordResetEmail(email: 'a@example.com');
+      expect(backend.bodyOf('accounts:sendOobCode')['tenantId'], 'tenant-1');
+      expect(backend.requests.last.headers['X-Firebase-Locale'], 'fr');
+    });
+
+    test('useAuthEmulator sends the requests to the emulator', () async {
+      final FirebaseAuth auth = await newAuth();
+      await auth.useAuthEmulator('localhost', 9099);
+      await auth.signInAnonymously();
+      expect(
+        backend.requests.first.url.toString(),
+        startsWith('http://localhost:9099/identitytoolkit.googleapis.com/'),
+      );
+    });
+
+    test('setPersistence(NONE) moves the session out of the storage', () async {
+      final FirebaseAuth auth = await newAuth();
+      await auth.signInAnonymously();
+      final InMemoryAuthStorage storage = storages[auth.app.name]!;
+      final String key =
+          'firebase_auth_providers_dart:'
+          '${_options.apiKey}:${auth.app.name}';
+      expect(storage.read(key), isNotNull);
+      await auth.setPersistence(Persistence.NONE);
+      expect(storage.read(key), isNull);
+      expect(auth.currentUser?.uid, 'anon-user');
+      await auth.setPersistence(Persistence.LOCAL);
+      expect(jsonDecode(storage.read(key)!), isA<Map<String, Object?>>());
+    });
+
+    test('a stored session is restored by a new instance', () async {
+      final FirebaseAuth first = await newAuth();
+      await first.signInAnonymously();
+      final String name = first.app.name;
+      final InMemoryAuthStorage storage = storages[name]!;
+      await first.app.delete();
+      // A new app of the same name reads the same storage.
+      final FirebaseApp app = await Firebase.initializeApp(
+        name: name,
+        options: _options,
+      );
+      expect(storages[name], same(storage));
+      final FirebaseAuth second = FirebaseAuth.instanceFor(app: app);
+      final User? restored = await second.authStateChanges().first;
+      expect(restored?.uid, 'anon-user');
+    });
+  });
+
+  group('not available', () {
+    test('provider, popup, redirect and phone throw unimplemented', () async {
+      final FirebaseAuth auth = await newAuth();
+      await expectLater(
+        auth.signInWithProvider(GoogleAuthProvider()),
+        throwsAuthCode('unimplemented'),
+      );
+      await expectLater(
+        auth.signInWithPopup(GoogleAuthProvider()),
+        throwsAuthCode('unimplemented'),
+      );
+      await expectLater(
+        auth.signInWithCredential(
+          PhoneAuthProvider.credential(verificationId: 'v', smsCode: '1'),
+        ),
+        throwsAuthCode('unimplemented'),
+      );
+      await expectLater(
+        auth.verifyPhoneNumber(
+          phoneNumber: '+15555550100',
+          verificationCompleted: (_) {},
+          verificationFailed: (_) {},
+          codeSent: (_, _) {},
+          codeAutoRetrievalTimeout: (_) {},
+        ),
+        throwsAuthCode('unimplemented'),
+      );
+      await auth.signInAnonymously();
+      await expectLater(
+        auth.currentUser!.linkWithProvider(GoogleAuthProvider()),
+        throwsAuthCode('unimplemented'),
+      );
+      await expectLater(
+        auth.currentUser!.multiFactor.getEnrolledFactors(),
+        throwsAuthCode('unimplemented'),
+      );
+    });
+  });
+}
+
+class _OtherCore extends FirebasePlatform {
+  @override
+  List<FirebaseAppPlatform> get apps => const <FirebaseAppPlatform>[];
+}
