@@ -1,3 +1,8 @@
+## Unreleased
+
+- `FirebaseUserAuth.useEmulator(emulatorHost)`: sends the later requests to the Auth emulator, for an instance that
+  is created before the emulator is known (FlutterFire's `useAuthEmulator`). `emulatorHost` is now a getter.
+
 ## 0.3.0
 
 - The complete server error map of the JS SDK (`SERVER_ERROR_MAP` of `@firebase/auth` 1.13.10): the phone,
