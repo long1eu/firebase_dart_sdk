@@ -204,7 +204,7 @@ void main() {
   Future<void> signIn() =>
       auth.signInWithEmailAndPassword(email: email, password: 'secret');
 
-  Future<void> enroll({String? displayName = 'Phone'}) async {
+  Future<void> enroll({String displayName = 'Phone'}) async {
     final TotpSecret secret = await auth.startTotpEnrollment();
     await auth.finalizeTotpEnrollment(
       secret,
@@ -366,7 +366,11 @@ void main() {
       await signIn();
       final TotpSecret secret = await auth.startTotpEnrollment();
       await expectLater(
-        auth.finalizeTotpEnrollment(secret, code: '000000'),
+        auth.finalizeTotpEnrollment(
+          secret,
+          code: '000000',
+          displayName: 'Phone',
+        ),
         throwsAuth('invalid-verification-code'),
       );
       expect(auth.currentUser!.enrolledFactors, isEmpty);

@@ -10,7 +10,7 @@
   reauthentication; its message now says when the account's only factors are SMS, which this package cannot use
   (the resolver then throws `multi-factor-info-not-found`). `MultiFactorInfo` moved to its own file (same export)
   and reads `enrolledAt` strictly as RFC 3339 with a time zone. The calls go to the Identity Toolkit API v2 as
-  JSON. Tested against a fake backend only.
+  JSON. On 2026-11-20 one run against a real Identity Platform project went through enrolment, sign-in with the second factor and removal, with the errors for an unverified email, a wrong code and a missing display name. Tenants and SMS factors were not part of it.
 
 - Browser sign-in for desktop apps and command line tools (VM only): `FirebaseUserAuth.signInWithOAuthLoopback`
   and `authorizeWithOAuthLoopback`, with `OAuthLoopbackProvider.google`, `.oidc` and `.discover`. The system

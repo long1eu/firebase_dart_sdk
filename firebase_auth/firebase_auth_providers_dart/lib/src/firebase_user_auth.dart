@@ -1297,7 +1297,8 @@ class FirebaseUserAuth implements AuthTokenProvider {
 
   /// Finishes the enrolment of [secret] with [code], a code the authenticator app shows for it
   /// (`v2/accounts/mfaEnrollment:finalize`; FlutterFire's `multiFactor.enroll` with
-  /// `TotpMultiFactorGenerator.getAssertionForEnrollment`). [displayName] names the factor for the user.
+  /// `TotpMultiFactorGenerator.getAssertionForEnrollment`). [displayName] names the factor for the user; the
+  /// backend refuses an enrolment without one (`missing-display-name`).
   ///
   /// The session continues with the new tokens the backend returns, and the account is read again: [userChanges]
   /// and [idTokenChanges] emit, the session is stored, and [AuthUser.enrolledFactors] lists the new factor. From
@@ -1309,7 +1310,7 @@ class FirebaseUserAuth implements AuthTokenProvider {
   Future<void> finalizeTotpEnrollment(
     TotpSecret secret, {
     required String code,
-    String? displayName,
+    required String displayName,
   }) => _forUser((String idToken, int generation) async {
     final String? sessionInfo = totpSessionInfoOf(secret);
     if (sessionInfo == null) {
