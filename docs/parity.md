@@ -131,6 +131,7 @@ for a real project that has not been run yet; see [Known limitations](#known-lim
 | `enableNetwork` / `disableNetwork` | supported | Same names |
 | Offline writes, pending writes survive a restart | supported | `test/unit/firebase/firestore/local/` (SQLite persistence tests), browser reload tests `test/browser/web_persistence_reload_*` |
 | Recovery from a busy or failing database | supported (extra) | `TransientDatabaseException`; see [Offline persistence](guides/offline_persistence.md#a-cache-that-is-busy-for-a-moment) |
+| Merging repeated offline writes of a document into one pending write | supported (extra, opt-in, differs from JS) | `mergeUnsentWrites: true` on the cache settings, off by default. Not in the JS SDK: the backend ends with the same documents, but rules and functions see one write instead of several, writes to other documents in between reach the backend first, and a rejection rejects every merged write. See [Merging repeated offline writes](guides/offline_persistence.md#merging-repeated-offline-writes-opt-in-extension), which ties each merge rule to a test; `test/integration/firebase/firestore/merge_unsent_writes_sequences_test.dart`, `merge_unsent_writes_rules_test.dart` |
 
 ## Indexes
 
@@ -310,4 +311,5 @@ Every gap and behaviour difference we know of, the ones you are most likely to m
     API spelling follows the Android SDK and FlutterFire (see
     [Coming from FlutterFire or the JS SDK](guides/queries_and_data.md#coming-from-flutterfire-or-the-js-sdk)).
     Extras over the JS client SDK: `Query.findNearest`, read-only transactions (also with
-    pipelines).
+    pipelines), and the opt-in `mergeUnsentWrites`, which by design does not behave as the JS SDK
+    (see the row in [Offline persistence and cache settings](#offline-persistence-and-cache-settings)).

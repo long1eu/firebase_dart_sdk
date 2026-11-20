@@ -136,10 +136,10 @@ final Settings settings = Settings(
 ### `mergeUnsentWrites`
 
 Turn it on when the same documents are edited again and again offline: a counter, a draft, a position, a status. It
-keeps one pending write per document. It is experimental and not in the official SDKs, and it changes what the backend
-sees (one write instead of many, so rules and triggers see only the last state). The conditions and what the app gives
+keeps one pending write per document. It is an opt-in extension of this package, not in the official SDKs, and it
+changes what the backend sees (one write instead of many, so rules and triggers see only the last state). The conditions and what the app gives
 up are in
-[Merging repeated offline writes](offline_persistence.md#merging-repeated-offline-writes-experimental). It does nothing
+[Merging repeated offline writes](offline_persistence.md#merging-repeated-offline-writes-opt-in-extension). It does nothing
 for writes to different documents: each of those stays one pending write.
 
 One document, set once and updated 100,000 times offline, then the network back (`drainhot`, local emulator):
@@ -332,8 +332,9 @@ merge them.
 - **A rejection recalculates from the pending writes of the document.** Rejecting the newest of 100,000 pending
   updates of one document costs 0.75 to 0.8 s. A rejection is rare, and merging leaves one write to recalculate.
 - **Automatic indexes ignore pending writes.** See above.
-- **A merge changes what the backend sees.** `mergeUnsentWrites` is experimental. Do not turn it on when rules or
-  functions depend on every intermediate state.
+- **A merge changes what the backend sees.** `mergeUnsentWrites` is an opt-in extension that differs from the official
+  SDKs. Do not turn it on when rules or functions depend on every intermediate state or on the order of writes across
+  documents.
 - **Reconnecting is bounded by the backend**, not by the client (10 batches in flight, one write a second to one
   document).
 - **Not measured.** A change of user (sign-in, sign-out) reads the whole queue of both users and is linear in it. A real
