@@ -1,3 +1,4 @@
+import 'package:cloud_firestore_dart/src/firebase/firestore/firestore_error.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/local_serializer.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/lru_garbage_collector.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/database_id.dart';
@@ -37,9 +38,13 @@ abstract class IndexedDbPersistence extends Persistence {
   /// another client takes it over (a JS tab with `forceOwnership`).
   bool get isPrimary;
 
-  /// Called (once) when another client deletes or upgrades the database while this one has it open. The client
-  /// terminates.
+  /// Called (once) when this client can not go on with the database: another client deleted or upgraded it while this
+  /// one had it open, or took the primary lease over. The client terminates, with [terminationCause] as the error of
+  /// its listeners and of every later operation.
   void Function()? databaseClearedListener;
+
+  /// Why this persistence stopped for good (the error of [databaseClearedListener]), or null while it runs.
+  FirestoreException? get terminationCause;
 
   /// Refreshes the row of this client in `clientMetadata` and extends the primary lease, as the JS SDK does every 4 s.
   Future<void> refreshClientMetadata();

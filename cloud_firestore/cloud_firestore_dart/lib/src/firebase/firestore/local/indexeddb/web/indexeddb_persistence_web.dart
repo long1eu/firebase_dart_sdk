@@ -188,6 +188,12 @@ class WebIndexedDbPersistence extends IndexedDbPersistence {
   /// done: the spec tests).
   bool get isIdle => _openTransactions == 0 && _runningTransactions == 0;
 
+  @override
+  FirestoreException? get terminationCause {
+    final Object? fatal = _fatalError;
+    return fatal is FirestoreException ? fatal : null;
+  }
+
   /// Set when a transaction failed for good (see [IndexedDbTransactionInactiveError]), or the database was deleted by
   /// another client: every later transaction fails with it.
   Object? _fatalError;
