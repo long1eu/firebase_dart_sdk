@@ -420,7 +420,7 @@ class FirebaseUserAuth implements AuthTokenProvider {
         });
   }
 
-  final AuthStorage _storage;
+  AuthStorage _storage;
   final String _storageKey;
   final http.Client _http;
   final bool _ownsHttp;
@@ -646,6 +646,44 @@ class FirebaseUserAuth implements AuthTokenProvider {
       _idTokenChanges.add(decoded.user);
     }
     _notifyAuthState();
+  }
+
+  /// Keeps the session in [storage] from now on, and moves the current one there (`setPersistence` of the JS
+  /// SDK): it is written to [storage] first, then deleted from the storage used until now.
+  ///
+  /// Waits for a [restore] in progress, so that the restored session moves too. A session that changes during the
+  /// move (a token refresh, a sign-in) is written to [storage] again before the switch.
+  ///
+  /// Throws whatever the `write` of either storage throws. When writing to [storage] fails, nothing changes; when
+  /// deleting from the old storage fails, [storage] is in use and the old storage may still hold the session.
+  ///
+  /// ```dart
+  /// // "Remember me" unticked: keep the session for this run only.
+  /// await auth.setStorage(InMemoryAuthStorage());
+  /// ```
+  Future<void> setStorage(AuthStorage storage) async {
+    _checkNotDisposed();
+    final Future<void>? restoring = _restoring;
+    if (restoring != null) {
+      // Its error reaches the caller of restore(); the move goes on with whatever session there is.
+      await restoring.then<void>((_) {}, onError: (Object _) {});
+    }
+    if (identical(storage, _storage)) {
+      return;
+    }
+    final AuthStorage previous = _storage;
+    _Session? moved;
+    do {
+      moved = _session;
+      await storage.write(
+        _storageKey,
+        moved == null ? null : encodeSession(moved.user, moved.refreshToken),
+      );
+    } while (!identical(moved, _session));
+    _storage = storage;
+    // The session is stored now, also when an earlier write to the old storage had failed.
+    _unsaved = false;
+    await previous.write(_storageKey, null);
   }
 
   /// Signs in a new anonymous user, a new account every time (`signInAnonymously`).
