@@ -266,6 +266,6 @@
   <text x="756" y="499" font-size="12" fill="#1f2328" font-weight="700" text-anchor="middle">8</text>
   <text x="812" y="499" font-size="12" fill="#1f2328" font-weight="700" text-anchor="middle">6</text>
   <text x="868" y="499" font-size="12" fill="#1f2328" font-weight="700" text-anchor="middle">9</text>
-  <text x="20" y="530" font-size="11" fill="#57606a">Supported includes the rows marked preview, experimental, extra or Enterprise edition. Read the tables below for</text>
+  <text x="20" y="530" font-size="11" fill="#57606a">Supported includes the rows marked preview, extra or Enterprise edition. Read the tables below for</text>
   <text x="20" y="544" font-size="11" fill="#57606a">what each partial or missing row lacks; the Known limitations list the gaps inside supported rows.</text>
 </svg>

@@ -155,6 +155,4 @@
   </g>
   <path d="M792,404 L792,522" stroke="#57606a" stroke-width="1.5" stroke-dasharray="4 3" fill="none" marker-start="url(#arrow)" marker-end="url(#arrow)"/>
 
-  <text x="20" y="524" font-size="11" fill="#57606a">Dashed outline:</text>
-  <text x="20" y="540" font-size="11" fill="#57606a">experimental.</text>
 </svg>

@@ -217,7 +217,7 @@ await firestore.waitForPendingWrites();
 await progress.cancel();
 ```
 
-It is experimental and not in the official SDKs. See
+It is a supported extension that the official SDKs do not have. See
 [Writes waiting for the backend](offline_persistence.md#writes-waiting-for-the-backend).
 
 ## The numbers, by shape

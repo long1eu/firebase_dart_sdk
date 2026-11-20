@@ -28,7 +28,7 @@ FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 dart run example/main.dart
 | `pipelines.dart` | Pipelines (preview): stages, expressions, grouped aggregation, lambdas, `createFrom(query)`, subqueries, an atomic `update`. Needs an Enterprise edition emulator (`FIRESTORE_ENTERPRISE_EMULATOR_HOST`); prints a note and exits without one. |
 | `error_handling.dart` | Catching `FirestoreException` and telling the codes apart, a `withRetry` helper for the temporary codes, offline writes, a listener with `onError`, a transaction that runs out of attempts, `StateError` for different settings, a terminated instance. |
 | `logging.dart` | `setLogLevel(LogLevel.debug)` and sending the SDK's log lines to your own logger through a zone that overrides `print`. |
-| `cache_store/` | A cache in a key-value store of your own (experimental, `package:cloud_firestore_dart/cache_store.dart`): `memory_log/` (a sorted map and an append-only log file, plain Dart) and `sqlite/` (a SQLite table through `package:sqlite3`). Each writes offline, restarts and reads back; they need no emulator. See the README of each. |
+| `cache_store/` | A cache in a key-value store of your own (`package:cloud_firestore_dart/cache_store.dart`): `memory_log/` (a sorted map and an append-only log file, plain Dart) and `sqlite/` (a SQLite table through `package:sqlite3`). Each writes offline, restarts and reads back; they need no emulator. See the README of each. |
 | `cookbook/` | Task-shaped recipes, one program each, explained in `docs/guides/cookbook.md`. Run as `dart run example/cookbook/<name>.dart`. |
 | `performance/` | Cache and query timing, cache index decisions, cache size and garbage collection (about 70 s), a bundle for the first screen. See `docs/guides/performance.md`. |
 
