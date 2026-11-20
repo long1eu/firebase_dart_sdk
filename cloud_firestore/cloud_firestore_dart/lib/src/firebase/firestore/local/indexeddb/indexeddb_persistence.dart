@@ -8,10 +8,11 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/local/persistance/pe
 /// implementation is in `web/indexeddb_persistence_web.dart`, and `createIndexedDbPersistence` of
 /// `indexeddb_persistence_platform.dart` makes one.
 ///
-/// **Experimental, first slice**: the mutation queue, the remote documents, the overlays, the targets, the globals and
-/// the collection parents are stored; the field indexes, garbage collection, bundles and named queries are not (see
-/// the CHANGELOG). One tab at a time: it takes the JS SDK's primary lease as a JS tab without tab synchronization
-/// does, and refuses to start while another client (a JS tab or another tab of this SDK) is active.
+/// **Experimental.** Stored: the mutation queue, the remote documents, the overlays, the targets, the globals, the
+/// collection parents, the field indexes (configuration, states and entries, in the JS SDK's index value encoding),
+/// bundles and named queries; garbage collection runs on the JS SDK's sequence numbers and size accounting (see the
+/// CHANGELOG of 0.3.0). One tab at a time: it takes the JS SDK's primary lease as a JS tab without tab synchronization
+/// does, and refuses to start while another client (a JS tab or another tab of this SDK) holds a valid lease.
 ///
 /// NOT IN THE OFFICIAL SDKS: the official Android SDK has no IndexedDB engine; this one shares its format with the JS
 /// SDK's `IndexedDbPersistence`, so that an app can switch between the two on the same browser profile.
