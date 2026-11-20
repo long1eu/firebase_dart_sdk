@@ -19,6 +19,12 @@ import 'dart:typed_data';
 ///   crashes or the device turns off in between; once its future completes they are durable.
 /// * **Reads see the completed writes.** A [get] or [scan] that starts after a [write] completed sees it.
 ///
+/// When a call of the store throws, the SDK takes it that the transaction that needed it did not take effect (a
+/// [write] that throws wrote nothing) and that the store may work again later, as the JS SDK takes a failed IndexedDB
+/// transaction: the listen or write that needed it fails with `unavailable`, an acknowledgement or a remote change is
+/// kept and stored again later, and the client goes offline and tries the store again with a backoff until it works.
+/// The state the SDK keeps in memory is read again from the store before its next transaction.
+///
 /// What the store may assume:
 ///
 /// * The store belongs to one Firestore instance at a time, and nothing else changes its data while the instance
