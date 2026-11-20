@@ -304,7 +304,7 @@ Unimplemented in the shim: 26 members (9 on `FirebaseAuthPlatform`, 8 on `UserPl
 
 Also fixed on this branch: a failed storage write no longer loses the new session (`_setSession`), and `forApp` sets the auth provider even when the storage read fails.
 
-Run against a real Firebase project on 2026-11-20: Google sign-in with a Desktop client, TOTP enrolment, sign-in and unenrolment, and a generic OIDC provider with `discover` and with `exchangeCode`. GitHub was run only up to the backend, because the project had another GitHub app configured. Not run on a real project: tenants, SMS factors, `revokeToken` and `revokeAccessToken`.
+Run against a real Firebase project on 2026-11-20: Google sign-in with a Desktop client, TOTP enrolment, sign-in and unenrolment, and a generic OIDC provider with `discover` and with `exchangeCode`. GitHub was run with a real OAuth App: `account-exists-with-different-credential` for an existing email, then link and unlink on that account. Not run on a real project: tenants, SMS factors, `revokeToken` and `revokeAccessToken`.
 
 Effort: S takes hours, M a few days, L more than a week or needs outside pieces. Each entry also says whether it needs a browser or a new dependency.
 

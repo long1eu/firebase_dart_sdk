@@ -293,10 +293,11 @@ On 2026-11-20, Google sign-in with a Desktop client was run against a real Fireb
 exchanged directly with the client secret and PKCE, and the redirect was `http://127.0.0.1:<port>`.
 The same day, a generic OpenID Connect provider (`oidc.<name>` of Identity Platform, with Google as the issuer) was
 run against the real project twice: with `discover` and a direct exchange, and with explicit endpoints and an
-`exchangeCode` callback, which also reauthenticated the user. GitHub was run with a real OAuth App up to the
-backend: the authorization and the code exchange at GitHub worked, and Firebase refused the token because the
-project had another GitHub app configured (see above). A GitHub sign-in accepted by the real backend has not been
-run yet.
+`exchangeCode` callback, which also reauthenticated the user. GitHub was run with a real OAuth App: with another
+GitHub app configured in the project the backend refused the token (see above); with the same app, the sign-in
+gave `account-exists-with-different-credential` for an email that already had an account, and after a Google
+sign-in `linkWithOAuthLoopback` linked `github.com` to that account and `unlink` removed it again. A GitHub
+sign-in that creates a new account has not been run on a real project.
 
 Not offered by the loopback helper:
 

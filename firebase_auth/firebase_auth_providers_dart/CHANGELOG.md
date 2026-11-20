@@ -83,9 +83,10 @@
   `signIn`, `link`, `reauthenticate`, with the JS SDK's strings in `value`) and `AuthUser.toJson()` with the keys of
   the JS SDK's `User.toJSON`, except `stsTokenManager`, `apiKey` and `appName`, which belong to the session.
 - On 2026-11-20, a generic OpenID Connect provider was run against a real Firebase project with `discover` and with
-  an `exchangeCode` callback. GitHub was run with a real OAuth App up to the backend, which accepts only a token of
-  the GitHub app configured in the project; the callback URL of the app must be `http://127.0.0.1` without a `/`
-  at the end. Both are in the README.
+  an `exchangeCode` callback, and GitHub with a real OAuth App (`account-exists-with-different-credential`, then
+  link and unlink on an existing account). The backend accepts only a token of the GitHub app configured in the
+  project, and the callback URL of the app must be `http://127.0.0.1` without a `/` at the end. All of it is in the
+  README.
 
 ## 0.3.0
 
