@@ -10,6 +10,14 @@
   a ready `OAuthCredential`. On the web these throw an `UnsupportedError`. New error codes: `timeout`,
   `user-cancelled`, `oauth-state-mismatch`, `invalid-oauth-response`, `invalid-oauth-provider`. Tested against an
   in-process fake identity provider only.
+- A backend error ends the session only when it comes with HTTP 400: `invalidatesSession` is false for a 5xx that
+  names `TOKEN_EXPIRED`, `USER_DISABLED`, ..., and the user stays signed in.
+- When a request with the ID token is rejected with `TOKEN_EXPIRED` or `INVALID_ID_TOKEN`, the token is refreshed
+  once to check the session (as in the iOS SDK): the user is signed out only when the refresh says that the session
+  ended, and otherwise the request is sent once more with the new token.
+- Token lifetimes from the backend are bounded as in the iOS SDK: an `expiresIn` outside of (0, 24 h], missing or
+  not a number counts as one hour, an `exp` claim more than 24 h ahead is not trusted, and a proactive refresh
+  delay beyond 24 h refreshes right away.
 
 ## 0.3.0
 
