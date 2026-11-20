@@ -113,6 +113,10 @@ in the packages' `pubspec.yaml`). Useful in a report: the package versions, the 
 platform, whether it happens against the emulator or production, and a log with
 `FirebaseFirestore.setLogLevel(LogLevel.debug)` if the problem is in syncing.
 
-- **DRAFT:** Security problems are reported privately, by the channel the maintainer names here:
-  `<MAINTAINER: security contact>`.
-- **DRAFT:** Response times: `<MAINTAINER: what you can commit to, or "best effort">`.
+- Security problems are reported privately, with GitHub's form at
+  <https://github.com/long1eu/firebase_dart_sdk/security/advisories/new>, not in a public issue; see
+  [`SECURITY.md`](../SECURITY.md).
+- Response times: a first answer to a security report within 48 hours, and to an ordinary issue or pull
+  request within 5 working days. A first answer means the report was read and you are told what happens next.
+  There is no fixed date for a fix; a security fix takes priority over everything else. The project has one
+  maintainer.
