@@ -1,0 +1,22 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>start-fixtures</title>
+<!-- The JS SDK straight from tool/interop/node_modules (served under /node_modules/ by fixtures.sh), no bundler. -->
+<script type="importmap">
+{
+  "imports": {
+    "@firebase/app": "/node_modules/@firebase/app/dist/esm/index.esm.js",
+    "@firebase/firestore": "/node_modules/@firebase/firestore/dist/index.esm.js",
+    "@firebase/util": "/node_modules/@firebase/util/dist/index.esm.js",
+    "@firebase/component": "/node_modules/@firebase/component/dist/esm/index.esm.js",
+    "@firebase/logger": "/node_modules/@firebase/logger/dist/esm/index.esm.js",
+    "@firebase/webchannel-wrapper/bloom-blob": "/node_modules/@firebase/webchannel-wrapper/dist/bloom-blob/esm/bloom_blob_es2018.js",
+    "@firebase/webchannel-wrapper/webchannel-blob": "/node_modules/@firebase/webchannel-wrapper/dist/webchannel-blob/esm/webchannel_blob_es2018.js",
+    "idb": "/node_modules/idb/build/index.js",
+    "tslib": "/node_modules/tslib/tslib.es6.mjs",
+    "re2js": "/node_modules/re2js/build/index.js"
+  }
+}
+</script>
+<pre id="o"></pre>
+<script type="module" src="fixtures.js"></script>

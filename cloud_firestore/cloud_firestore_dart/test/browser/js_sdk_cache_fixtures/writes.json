@@ -1,0 +1,2870 @@
+{
+ "generatedBy": "tool/bench/web_idb/js_import/fixtures.sh (static/fixtures.js)",
+ "jsSdkVersion": "13.3.0",
+ "what": "Every kind of write of the signed-out user, queued offline by the JS SDK and terminated.",
+ "projectId": "demo-jsimport",
+ "appName": "js-writes",
+ "referenceProject": "demo-jsref",
+ "ops": {
+  "open": [
+   {
+    "user": "",
+    "label": "set every value type",
+    "outcome": "ok"
+   },
+   {
+    "user": "",
+    "label": "set with merge, a server timestamp",
+    "outcome": "ok"
+   },
+   {
+    "user": "",
+    "label": "set with mergeFields",
+    "outcome": "ok"
+   },
+   {
+    "user": "",
+    "label": "update nested paths, deleteField, a field path with a dot",
+    "outcome": "ok"
+   },
+   {
+    "user": "",
+    "label": "update with every transform",
+    "outcome": "ok"
+   },
+   {
+    "user": "",
+    "label": "a second update of the same document",
+    "outcome": "ok"
+   },
+   {
+    "user": "",
+    "label": "set with transforms on a new document",
+    "outcome": "ok"
+   },
+   {
+    "user": "",
+    "label": "delete",
+    "outcome": "ok"
+   },
+   {
+    "user": "",
+    "label": "delete of a missing document",
+    "outcome": "ok"
+   },
+   {
+    "user": "",
+    "label": "update of a missing document (precondition fails)",
+    "outcome": "not-found"
+   },
+   {
+    "user": "",
+    "label": "batch: set, update, delete, subcollections",
+    "outcome": "ok"
+   },
+   {
+    "user": "",
+    "label": "batch whose update fails: none of it is applied",
+    "outcome": "not-found"
+   },
+   {
+    "user": "",
+    "label": "order 1: set",
+    "outcome": "ok"
+   },
+   {
+    "user": "",
+    "label": "order 2: update",
+    "outcome": "ok"
+   },
+   {
+    "user": "",
+    "label": "order 3: update",
+    "outcome": "ok"
+   },
+   {
+    "user": "",
+    "label": "order 4: set with merge",
+    "outcome": "ok"
+   },
+   {
+    "user": "",
+    "label": "order 5: delete and set again",
+    "outcome": "ok"
+   },
+   {
+    "user": "",
+    "label": "a document id with spaces and unicode",
+    "outcome": "ok"
+   }
+  ]
+ },
+ "seed": {
+  "docs/upd": {
+   "a": {
+    "integerValue": "1"
+   },
+   "nested": {
+    "mapValue": {
+     "fields": {
+      "x": {
+       "integerValue": "1"
+      },
+      "y": {
+       "integerValue": "2"
+      }
+     }
+    }
+   },
+   "keep": {
+    "stringValue": "k"
+   },
+   "arr": {
+    "arrayValue": {
+     "values": [
+      {
+       "integerValue": "1"
+      },
+      {
+       "integerValue": "2"
+      }
+     ]
+    }
+   }
+  },
+  "docs/merge": {
+   "a": {
+    "integerValue": "1"
+   },
+   "m": {
+    "mapValue": {
+     "fields": {
+      "p": {
+       "integerValue": "1"
+      },
+      "q": {
+       "integerValue": "2"
+      }
+     }
+    }
+   }
+  },
+  "docs/mergeFields": {
+   "a": {
+    "integerValue": "1"
+   },
+   "b": {
+    "integerValue": "1"
+   },
+   "m": {
+    "mapValue": {
+     "fields": {
+      "p": {
+       "integerValue": "1"
+      },
+      "q": {
+       "integerValue": "2"
+      }
+     }
+    }
+   }
+  },
+  "docs/transforms": {
+   "n": {
+    "integerValue": "1"
+   },
+   "d": {
+    "doubleValue": 0.5
+   },
+   "arr": {
+    "arrayValue": {
+     "values": [
+      {
+       "stringValue": "a"
+      },
+      {
+       "stringValue": "b"
+      },
+      {
+       "stringValue": "c"
+      },
+      {
+       "stringValue": "b"
+      }
+     ]
+    }
+   },
+   "big": {
+    "integerValue": "9007199254740990"
+   },
+   "nested": {
+    "mapValue": {
+     "fields": {
+      "c": {
+       "integerValue": "1"
+      }
+     }
+    }
+   }
+  },
+  "docs/del": {
+   "a": {
+    "integerValue": "1"
+   }
+  },
+  "docs/exists": {
+   "a": {
+    "integerValue": "1"
+   }
+  },
+  "docs/b3": {
+   "a": {
+    "integerValue": "1"
+   }
+  }
+ },
+ "expected": {
+  "open": {
+   "docs/values": {
+    "s": {
+     "stringValue": "text é中😀"
+    },
+    "empty": {
+     "stringValue": ""
+    },
+    "t": {
+     "booleanValue": true
+    },
+    "f": {
+     "booleanValue": false
+    },
+    "nul": {
+     "nullValue": null
+    },
+    "i": {
+     "integerValue": "42"
+    },
+    "negI": {
+     "integerValue": "-7"
+    },
+    "maxSafe": {
+     "integerValue": "9007199254740991"
+    },
+    "minSafe": {
+     "integerValue": "-9007199254740991"
+    },
+    "zero": {
+     "integerValue": "0"
+    },
+    "d": {
+     "doubleValue": 2.5
+    },
+    "negD": {
+     "doubleValue": -0.125
+    },
+    "nan": {
+     "doubleValue": "NaN"
+    },
+    "inf": {
+     "doubleValue": "Infinity"
+    },
+    "negInf": {
+     "doubleValue": "-Infinity"
+    },
+    "negZero": {
+     "doubleValue": 0
+    },
+    "tiny": {
+     "doubleValue": 5e-324
+    },
+    "huge": {
+     "doubleValue": 1.7976931348623157e+308
+    },
+    "ts": {
+     "timestampValue": "2023-11-14T22:13:20.123456Z"
+    },
+    "tsOld": {
+     "timestampValue": "0001-01-01T00:00:00Z"
+    },
+    "tsMax": {
+     "timestampValue": "9999-12-31T23:59:59.999999Z"
+    },
+    "b": {
+     "bytesValue": "AAEC/v8="
+    },
+    "bEmpty": {
+     "bytesValue": ""
+    },
+    "g": {
+     "geoPointValue": {
+      "latitude": -90,
+      "longitude": 180
+     }
+    },
+    "r": {
+     "referenceValue": "projects/demo-jsref/databases/(default)/documents/docs/other"
+    },
+    "rSub": {
+     "referenceValue": "projects/demo-jsref/databases/(default)/documents/docs/exists/sub/s1"
+    },
+    "v": {
+     "mapValue": {
+      "fields": {
+       "__type__": {
+        "stringValue": "__vector__"
+       },
+       "value": {
+        "arrayValue": {
+         "values": [
+          {
+           "doubleValue": 1.5
+          },
+          {
+           "doubleValue": -2
+          },
+          {
+           "doubleValue": 0
+          }
+         ]
+        }
+       }
+      }
+     }
+    },
+    "m": {
+     "mapValue": {
+      "fields": {
+       "a": {
+        "mapValue": {
+         "fields": {
+          "b": {
+           "mapValue": {
+            "fields": {
+             "c": {
+              "arrayValue": {
+               "values": [
+                {
+                 "integerValue": "1"
+                },
+                {
+                 "mapValue": {
+                  "fields": {
+                   "d": {
+                    "stringValue": "deep"
+                   },
+                   "e": {
+                    "arrayValue": {
+                     "values": [
+                      {
+                       "integerValue": "2"
+                      }
+                     ]
+                    }
+                   }
+                  }
+                 }
+                }
+               ]
+              }
+             }
+            }
+           }
+          }
+         }
+        }
+       },
+       "key.with.dots": {
+        "integerValue": "1"
+       },
+       "key with spaces": {
+        "integerValue": "2"
+       },
+       "üml": {
+        "integerValue": "3"
+       }
+      }
+     }
+    },
+    "emptyMap": {
+     "mapValue": {}
+    },
+    "emptyArray": {
+     "arrayValue": {}
+    },
+    "mixed": {
+     "arrayValue": {
+      "values": [
+       {
+        "integerValue": "1"
+       },
+       {
+        "stringValue": "two"
+       },
+       {
+        "doubleValue": 3.5
+       },
+       {
+        "nullValue": null
+       },
+       {
+        "booleanValue": true
+       },
+       {
+        "mapValue": {
+         "fields": {
+          "x": {
+           "integerValue": "1"
+          }
+         }
+        }
+       }
+      ]
+     }
+    }
+   },
+   "docs/merge": {
+    "a": {
+     "integerValue": "1"
+    },
+    "b": {
+     "integerValue": "2"
+    },
+    "m": {
+     "mapValue": {
+      "fields": {
+       "p": {
+        "integerValue": "1"
+       },
+       "q": {
+        "integerValue": "20"
+       },
+       "r": {
+        "integerValue": "3"
+       }
+      }
+     }
+    },
+    "st": {
+     "timestampValue": "2026-11-20T03:24:51.766Z"
+    }
+   },
+   "docs/mergeFields": {
+    "b": {
+     "integerValue": "1"
+    },
+    "a": {
+     "integerValue": "9"
+    },
+    "m": {
+     "mapValue": {
+      "fields": {
+       "q": {
+        "integerValue": "2"
+       },
+       "p": {
+        "integerValue": "9"
+       }
+      }
+     }
+    }
+   },
+   "docs/upd": {
+    "a": {
+     "integerValue": "1"
+    },
+    "arr": {
+     "arrayValue": {
+      "values": [
+       {
+        "integerValue": "3"
+       }
+      ]
+     }
+    },
+    "a.b": {
+     "stringValue": "literal dot"
+    },
+    "nested": {
+     "mapValue": {
+      "fields": {
+       "y": {
+        "integerValue": "2"
+       },
+       "x": {
+        "integerValue": "10"
+       },
+       "z": {
+        "mapValue": {
+         "fields": {
+          "deep": {
+           "booleanValue": true
+          }
+         }
+        }
+       }
+      }
+     }
+    }
+   },
+   "docs/transforms": {
+    "big": {
+     "integerValue": "9007199254740991"
+    },
+    "at": {
+     "timestampValue": "2026-11-20T03:24:51.804Z"
+    },
+    "d": {
+     "doubleValue": 0.75
+    },
+    "nested": {
+     "mapValue": {
+      "fields": {
+       "c": {
+        "doubleValue": 2.5
+       },
+       "when": {
+        "timestampValue": "2026-11-20T03:24:51.804Z"
+       }
+      }
+     }
+    },
+    "arr": {
+     "arrayValue": {
+      "values": [
+       {
+        "stringValue": "a"
+       },
+       {
+        "stringValue": "c"
+       },
+       {
+        "stringValue": "z"
+       }
+      ]
+     }
+    },
+    "added": {
+     "arrayValue": {
+      "values": [
+       {
+        "integerValue": "1"
+       },
+       {
+        "mapValue": {
+         "fields": {
+          "x": {
+           "integerValue": "1"
+          }
+         }
+        }
+       },
+       {
+        "integerValue": "2"
+       }
+      ]
+     }
+    },
+    "n": {
+     "integerValue": "-7"
+    }
+   },
+   "docs/setTransforms": {
+    "plain": {
+     "integerValue": "1"
+    },
+    "at": {
+     "timestampValue": "2026-11-20T03:24:51.824Z"
+    },
+    "count": {
+     "integerValue": "3"
+    },
+    "rm": {
+     "arrayValue": {}
+    },
+    "list": {
+     "arrayValue": {
+      "values": [
+       {
+        "stringValue": "x"
+       }
+      ]
+     }
+    },
+    "m": {
+     "mapValue": {
+      "fields": {
+       "when": {
+        "timestampValue": "2026-11-20T03:24:51.824Z"
+       },
+       "n": {
+        "integerValue": "1"
+       }
+      }
+     }
+    }
+   },
+   "docs/del": null,
+   "docs/neverExisted": null,
+   "docs/missing": null,
+   "docs/b1": {
+    "inBatch": {
+     "booleanValue": true
+    }
+   },
+   "docs/exists": {
+    "m": {
+     "mapValue": {
+      "fields": {
+       "n": {
+        "stringValue": "x"
+       }
+      }
+     }
+    },
+    "a": {
+     "integerValue": "2"
+    }
+   },
+   "docs/b3": null,
+   "docs/exists/sub/s1": {
+    "deep": {
+     "booleanValue": true
+    },
+    "ref": {
+     "referenceValue": "projects/demo-jsref/databases/(default)/documents/docs/b1"
+    }
+   },
+   "deep/a/b/c/d/e": {
+    "depth": {
+     "integerValue": "3"
+    }
+   },
+   "docs/batchFail": null,
+   "docs/missing2": null,
+   "docs/order": {
+    "v": {
+     "integerValue": "3"
+    },
+    "log": {
+     "arrayValue": {
+      "values": [
+       {
+        "stringValue": "1"
+       },
+       {
+        "stringValue": "2"
+       },
+       {
+        "stringValue": "3"
+       },
+       {
+        "stringValue": "4"
+       }
+      ]
+     }
+    },
+    "w": {
+     "integerValue": "1"
+    }
+   },
+   "docs/order2": {
+    "again": {
+     "booleanValue": true
+    }
+   },
+   "docs/with space é": {
+    "ok": {
+     "integerValue": "1"
+    }
+   }
+  }
+ },
+ "name": "firestore/js-writes/demo-jsimport/main",
+ "version": 18,
+ "stores": [
+  {
+   "name": "bundles",
+   "keyPath": "bundleId",
+   "autoIncrement": false,
+   "indexes": [],
+   "records": []
+  },
+  {
+   "name": "clientMetadata",
+   "keyPath": "clientId",
+   "autoIncrement": false,
+   "indexes": [],
+   "records": []
+  },
+  {
+   "name": "collectionParents",
+   "keyPath": [
+    "collectionId",
+    "parent"
+   ],
+   "autoIncrement": false,
+   "indexes": [],
+   "records": [
+    {
+     "key": [
+      "d",
+      "deep\u0001\u0001a\u0001\u0001b\u0001\u0001c\u0001\u0001"
+     ],
+     "value": {
+      "collectionId": "d",
+      "parent": "deep\u0001\u0001a\u0001\u0001b\u0001\u0001c\u0001\u0001"
+     }
+    },
+    {
+     "key": [
+      "docs",
+      "\u0001\u0001"
+     ],
+     "value": {
+      "collectionId": "docs",
+      "parent": "\u0001\u0001"
+     }
+    },
+    {
+     "key": [
+      "sub",
+      "docs\u0001\u0001exists\u0001\u0001"
+     ],
+     "value": {
+      "collectionId": "sub",
+      "parent": "docs\u0001\u0001exists\u0001\u0001"
+     }
+    }
+   ]
+  },
+  {
+   "name": "documentMutations",
+   "keyPath": null,
+   "autoIncrement": false,
+   "indexes": [],
+   "records": [
+    {
+     "key": [
+      "",
+      "deep\u0001\u0001a\u0001\u0001b\u0001\u0001c\u0001\u0001d\u0001\u0001e\u0001\u0001",
+      11
+     ],
+     "value": {}
+    },
+    {
+     "key": [
+      "",
+      "docs\u0001\u0001b1\u0001\u0001",
+      11
+     ],
+     "value": {}
+    },
+    {
+     "key": [
+      "",
+      "docs\u0001\u0001b3\u0001\u0001",
+      11
+     ],
+     "value": {}
+    },
+    {
+     "key": [
+      "",
+      "docs\u0001\u0001batchFail\u0001\u0001",
+      12
+     ],
+     "value": {}
+    },
+    {
+     "key": [
+      "",
+      "docs\u0001\u0001del\u0001\u0001",
+      8
+     ],
+     "value": {}
+    },
+    {
+     "key": [
+      "",
+      "docs\u0001\u0001exists\u0001\u0001",
+      11
+     ],
+     "value": {}
+    },
+    {
+     "key": [
+      "",
+      "docs\u0001\u0001exists\u0001\u0001sub\u0001\u0001s1\u0001\u0001",
+      11
+     ],
+     "value": {}
+    },
+    {
+     "key": [
+      "",
+      "docs\u0001\u0001merge\u0001\u0001",
+      2
+     ],
+     "value": {}
+    },
+    {
+     "key": [
+      "",
+      "docs\u0001\u0001mergeFields\u0001\u0001",
+      3
+     ],
+     "value": {}
+    },
+    {
+     "key": [
+      "",
+      "docs\u0001\u0001missing\u0001\u0001",
+      10
+     ],
+     "value": {}
+    },
+    {
+     "key": [
+      "",
+      "docs\u0001\u0001missing2\u0001\u0001",
+      12
+     ],
+     "value": {}
+    },
+    {
+     "key": [
+      "",
+      "docs\u0001\u0001neverExisted\u0001\u0001",
+      9
+     ],
+     "value": {}
+    },
+    {
+     "key": [
+      "",
+      "docs\u0001\u0001order\u0001\u0001",
+      13
+     ],
+     "value": {}
+    },
+    {
+     "key": [
+      "",
+      "docs\u0001\u0001order\u0001\u0001",
+      14
+     ],
+     "value": {}
+    },
+    {
+     "key": [
+      "",
+      "docs\u0001\u0001order\u0001\u0001",
+      15
+     ],
+     "value": {}
+    },
+    {
+     "key": [
+      "",
+      "docs\u0001\u0001order\u0001\u0001",
+      16
+     ],
+     "value": {}
+    },
+    {
+     "key": [
+      "",
+      "docs\u0001\u0001order2\u0001\u0001",
+      17
+     ],
+     "value": {}
+    },
+    {
+     "key": [
+      "",
+      "docs\u0001\u0001setTransforms\u0001\u0001",
+      7
+     ],
+     "value": {}
+    },
+    {
+     "key": [
+      "",
+      "docs\u0001\u0001transforms\u0001\u0001",
+      5
+     ],
+     "value": {}
+    },
+    {
+     "key": [
+      "",
+      "docs\u0001\u0001transforms\u0001\u0001",
+      6
+     ],
+     "value": {}
+    },
+    {
+     "key": [
+      "",
+      "docs\u0001\u0001upd\u0001\u0001",
+      4
+     ],
+     "value": {}
+    },
+    {
+     "key": [
+      "",
+      "docs\u0001\u0001values\u0001\u0001",
+      1
+     ],
+     "value": {}
+    },
+    {
+     "key": [
+      "",
+      "docs\u0001\u0001with space é\u0001\u0001",
+      18
+     ],
+     "value": {}
+    }
+   ]
+  },
+  {
+   "name": "documentOverlays",
+   "keyPath": [
+    "userId",
+    "collectionPath",
+    "documentId"
+   ],
+   "autoIncrement": false,
+   "indexes": [
+    {
+     "name": "collectionGroupOverlayIndex",
+     "keyPath": [
+      "userId",
+      "collectionGroup",
+      "largestBatchId"
+     ],
+     "unique": false,
+     "multiEntry": false
+    },
+    {
+     "name": "collectionPathOverlayIndex",
+     "keyPath": [
+      "userId",
+      "collectionPath",
+      "largestBatchId"
+     ],
+     "unique": false,
+     "multiEntry": false
+    }
+   ],
+   "records": [
+    {
+     "key": [
+      "",
+      "deep\u0001\u0001a\u0001\u0001b\u0001\u0001c\u0001\u0001d\u0001\u0001",
+      "e"
+     ],
+     "value": {
+      "userId": "",
+      "collectionPath": "deep\u0001\u0001a\u0001\u0001b\u0001\u0001c\u0001\u0001d\u0001\u0001",
+      "documentId": "e",
+      "collectionGroup": "d",
+      "largestBatchId": 11,
+      "overlayMutation": {
+       "update": {
+        "name": "projects/demo-jsimport/databases/(default)/documents/deep/a/b/c/d/e",
+        "fields": {
+         "depth": {
+          "integerValue": "3"
+         }
+        }
+       }
+      }
+     }
+    },
+    {
+     "key": [
+      "",
+      "docs\u0001\u0001",
+      "b1"
+     ],
+     "value": {
+      "userId": "",
+      "collectionPath": "docs\u0001\u0001",
+      "documentId": "b1",
+      "collectionGroup": "docs",
+      "largestBatchId": 11,
+      "overlayMutation": {
+       "update": {
+        "name": "projects/demo-jsimport/databases/(default)/documents/docs/b1",
+        "fields": {
+         "inBatch": {
+          "booleanValue": true
+         }
+        }
+       }
+      }
+     }
+    },
+    {
+     "key": [
+      "",
+      "docs\u0001\u0001",
+      "b3"
+     ],
+     "value": {
+      "userId": "",
+      "collectionPath": "docs\u0001\u0001",
+      "documentId": "b3",
+      "collectionGroup": "docs",
+      "largestBatchId": 11,
+      "overlayMutation": {
+       "delete": "projects/demo-jsimport/databases/(default)/documents/docs/b3"
+      }
+     }
+    },
+    {
+     "key": [
+      "",
+      "docs\u0001\u0001",
+      "batchFail"
+     ],
+     "value": {
+      "userId": "",
+      "collectionPath": "docs\u0001\u0001",
+      "documentId": "batchFail",
+      "collectionGroup": "docs",
+      "largestBatchId": 12,
+      "overlayMutation": {
+       "update": {
+        "name": "projects/demo-jsimport/databases/(default)/documents/docs/batchFail",
+        "fields": {
+         "x": {
+          "integerValue": "1"
+         }
+        }
+       }
+      }
+     }
+    },
+    {
+     "key": [
+      "",
+      "docs\u0001\u0001",
+      "del"
+     ],
+     "value": {
+      "userId": "",
+      "collectionPath": "docs\u0001\u0001",
+      "documentId": "del",
+      "collectionGroup": "docs",
+      "largestBatchId": 8,
+      "overlayMutation": {
+       "delete": "projects/demo-jsimport/databases/(default)/documents/docs/del"
+      }
+     }
+    },
+    {
+     "key": [
+      "",
+      "docs\u0001\u0001",
+      "merge"
+     ],
+     "value": {
+      "userId": "",
+      "collectionPath": "docs\u0001\u0001",
+      "documentId": "merge",
+      "collectionGroup": "docs",
+      "largestBatchId": 2,
+      "overlayMutation": {
+       "update": {
+        "name": "projects/demo-jsimport/databases/(default)/documents/docs/merge",
+        "fields": {
+         "b": {
+          "integerValue": "2"
+         },
+         "m": {
+          "mapValue": {
+           "fields": {
+            "q": {
+             "integerValue": "20"
+            },
+            "r": {
+             "integerValue": "3"
+            }
+           }
+          }
+         },
+         "st": {
+          "mapValue": {
+           "fields": {
+            "__type__": {
+             "stringValue": "server_timestamp"
+            },
+            "__local_write_time__": {
+             "timestampValue": {
+              "seconds": 1795145091,
+              "nanos": 470000000
+             }
+            }
+           }
+          }
+         }
+        }
+       }
+      }
+     }
+    },
+    {
+     "key": [
+      "",
+      "docs\u0001\u0001",
+      "mergeFields"
+     ],
+     "value": {
+      "userId": "",
+      "collectionPath": "docs\u0001\u0001",
+      "documentId": "mergeFields",
+      "collectionGroup": "docs",
+      "largestBatchId": 3,
+      "overlayMutation": {
+       "update": {
+        "name": "projects/demo-jsimport/databases/(default)/documents/docs/mergeFields",
+        "fields": {
+         "a": {
+          "integerValue": "9"
+         },
+         "m": {
+          "mapValue": {
+           "fields": {
+            "p": {
+             "integerValue": "9"
+            }
+           }
+          }
+         }
+        }
+       }
+      }
+     }
+    },
+    {
+     "key": [
+      "",
+      "docs\u0001\u0001",
+      "neverExisted"
+     ],
+     "value": {
+      "userId": "",
+      "collectionPath": "docs\u0001\u0001",
+      "documentId": "neverExisted",
+      "collectionGroup": "docs",
+      "largestBatchId": 9,
+      "overlayMutation": {
+       "delete": "projects/demo-jsimport/databases/(default)/documents/docs/neverExisted"
+      }
+     }
+    },
+    {
+     "key": [
+      "",
+      "docs\u0001\u0001",
+      "order"
+     ],
+     "value": {
+      "userId": "",
+      "collectionPath": "docs\u0001\u0001",
+      "documentId": "order",
+      "collectionGroup": "docs",
+      "largestBatchId": 16,
+      "overlayMutation": {
+       "update": {
+        "name": "projects/demo-jsimport/databases/(default)/documents/docs/order",
+        "fields": {
+         "v": {
+          "integerValue": "3"
+         },
+         "log": {
+          "arrayValue": {
+           "values": [
+            {
+             "stringValue": "1"
+            },
+            {
+             "stringValue": "2"
+            },
+            {
+             "stringValue": "3"
+            },
+            {
+             "stringValue": "4"
+            }
+           ]
+          }
+         },
+         "w": {
+          "integerValue": "1"
+         }
+        }
+       }
+      }
+     }
+    },
+    {
+     "key": [
+      "",
+      "docs\u0001\u0001",
+      "order2"
+     ],
+     "value": {
+      "userId": "",
+      "collectionPath": "docs\u0001\u0001",
+      "documentId": "order2",
+      "collectionGroup": "docs",
+      "largestBatchId": 17,
+      "overlayMutation": {
+       "update": {
+        "name": "projects/demo-jsimport/databases/(default)/documents/docs/order2",
+        "fields": {
+         "again": {
+          "booleanValue": true
+         }
+        }
+       }
+      }
+     }
+    },
+    {
+     "key": [
+      "",
+      "docs\u0001\u0001",
+      "setTransforms"
+     ],
+     "value": {
+      "userId": "",
+      "collectionPath": "docs\u0001\u0001",
+      "documentId": "setTransforms",
+      "collectionGroup": "docs",
+      "largestBatchId": 7,
+      "overlayMutation": {
+       "update": {
+        "name": "projects/demo-jsimport/databases/(default)/documents/docs/setTransforms",
+        "fields": {
+         "plain": {
+          "integerValue": "1"
+         },
+         "m": {
+          "mapValue": {
+           "fields": {
+            "when": {
+             "mapValue": {
+              "fields": {
+               "__type__": {
+                "stringValue": "server_timestamp"
+               },
+               "__local_write_time__": {
+                "timestampValue": {
+                 "seconds": 1795145091,
+                 "nanos": 481000000
+                }
+               }
+              }
+             }
+            },
+            "n": {
+             "integerValue": "1"
+            }
+           }
+          }
+         },
+         "count": {
+          "integerValue": "3"
+         },
+         "list": {
+          "arrayValue": {
+           "values": [
+            {
+             "stringValue": "x"
+            }
+           ]
+          }
+         },
+         "rm": {
+          "arrayValue": {
+           "values": []
+          }
+         },
+         "at": {
+          "mapValue": {
+           "fields": {
+            "__type__": {
+             "stringValue": "server_timestamp"
+            },
+            "__local_write_time__": {
+             "timestampValue": {
+              "seconds": 1795145091,
+              "nanos": 481000000
+             }
+            }
+           }
+          }
+         }
+        }
+       }
+      }
+     }
+    },
+    {
+     "key": [
+      "",
+      "docs\u0001\u0001",
+      "values"
+     ],
+     "value": {
+      "userId": "",
+      "collectionPath": "docs\u0001\u0001",
+      "documentId": "values",
+      "collectionGroup": "docs",
+      "largestBatchId": 1,
+      "overlayMutation": {
+       "update": {
+        "name": "projects/demo-jsimport/databases/(default)/documents/docs/values",
+        "fields": {
+         "s": {
+          "stringValue": "text é中😀"
+         },
+         "empty": {
+          "stringValue": ""
+         },
+         "t": {
+          "booleanValue": true
+         },
+         "f": {
+          "booleanValue": false
+         },
+         "nul": {
+          "nullValue": "NULL_VALUE"
+         },
+         "i": {
+          "integerValue": "42"
+         },
+         "negI": {
+          "integerValue": "-7"
+         },
+         "maxSafe": {
+          "integerValue": "9007199254740991"
+         },
+         "minSafe": {
+          "integerValue": "-9007199254740991"
+         },
+         "zero": {
+          "integerValue": "0"
+         },
+         "d": {
+          "doubleValue": 2.5
+         },
+         "negD": {
+          "doubleValue": -0.125
+         },
+         "nan": {
+          "doubleValue": "NaN"
+         },
+         "inf": {
+          "doubleValue": "Infinity"
+         },
+         "negInf": {
+          "doubleValue": "-Infinity"
+         },
+         "negZero": {
+          "doubleValue": "-0"
+         },
+         "tiny": {
+          "doubleValue": 5e-324
+         },
+         "huge": {
+          "doubleValue": 1.7976931348623157e+308
+         },
+         "ts": {
+          "timestampValue": "2023-11-14T22:13:20.123456000Z"
+         },
+         "tsOld": {
+          "timestampValue": "0001-01-01T00:00:00.000000000Z"
+         },
+         "tsMax": {
+          "timestampValue": "9999-12-31T23:59:59.999999000Z"
+         },
+         "b": {
+          "bytesValue": "AAEC/v8="
+         },
+         "bEmpty": {
+          "bytesValue": ""
+         },
+         "g": {
+          "geoPointValue": {
+           "latitude": -90,
+           "longitude": 180
+          }
+         },
+         "r": {
+          "referenceValue": "projects/demo-jsimport/databases/(default)/documents/docs/other"
+         },
+         "rSub": {
+          "referenceValue": "projects/demo-jsimport/databases/(default)/documents/docs/exists/sub/s1"
+         },
+         "v": {
+          "mapValue": {
+           "fields": {
+            "__type__": {
+             "stringValue": "__vector__"
+            },
+            "value": {
+             "arrayValue": {
+              "values": [
+               {
+                "doubleValue": 1.5
+               },
+               {
+                "doubleValue": -2
+               },
+               {
+                "doubleValue": 0
+               }
+              ]
+             }
+            }
+           }
+          }
+         },
+         "m": {
+          "mapValue": {
+           "fields": {
+            "a": {
+             "mapValue": {
+              "fields": {
+               "b": {
+                "mapValue": {
+                 "fields": {
+                  "c": {
+                   "arrayValue": {
+                    "values": [
+                     {
+                      "integerValue": "1"
+                     },
+                     {
+                      "mapValue": {
+                       "fields": {
+                        "d": {
+                         "stringValue": "deep"
+                        },
+                        "e": {
+                         "arrayValue": {
+                          "values": [
+                           {
+                            "integerValue": "2"
+                           }
+                          ]
+                         }
+                        }
+                       }
+                      }
+                     }
+                    ]
+                   }
+                  }
+                 }
+                }
+               }
+              }
+             }
+            },
+            "key.with.dots": {
+             "integerValue": "1"
+            },
+            "key with spaces": {
+             "integerValue": "2"
+            },
+            "üml": {
+             "integerValue": "3"
+            }
+           }
+          }
+         },
+         "emptyMap": {
+          "mapValue": {
+           "fields": {}
+          }
+         },
+         "emptyArray": {
+          "arrayValue": {
+           "values": []
+          }
+         },
+         "mixed": {
+          "arrayValue": {
+           "values": [
+            {
+             "integerValue": "1"
+            },
+            {
+             "stringValue": "two"
+            },
+            {
+             "doubleValue": 3.5
+            },
+            {
+             "nullValue": "NULL_VALUE"
+            },
+            {
+             "booleanValue": true
+            },
+            {
+             "mapValue": {
+              "fields": {
+               "x": {
+                "integerValue": "1"
+               }
+              }
+             }
+            }
+           ]
+          }
+         }
+        }
+       }
+      }
+     }
+    },
+    {
+     "key": [
+      "",
+      "docs\u0001\u0001",
+      "with space é"
+     ],
+     "value": {
+      "userId": "",
+      "collectionPath": "docs\u0001\u0001",
+      "documentId": "with space é",
+      "collectionGroup": "docs",
+      "largestBatchId": 18,
+      "overlayMutation": {
+       "update": {
+        "name": "projects/demo-jsimport/databases/(default)/documents/docs/with space é",
+        "fields": {
+         "ok": {
+          "integerValue": "1"
+         }
+        }
+       }
+      }
+     }
+    },
+    {
+     "key": [
+      "",
+      "docs\u0001\u0001exists\u0001\u0001sub\u0001\u0001",
+      "s1"
+     ],
+     "value": {
+      "userId": "",
+      "collectionPath": "docs\u0001\u0001exists\u0001\u0001sub\u0001\u0001",
+      "documentId": "s1",
+      "collectionGroup": "sub",
+      "largestBatchId": 11,
+      "overlayMutation": {
+       "update": {
+        "name": "projects/demo-jsimport/databases/(default)/documents/docs/exists/sub/s1",
+        "fields": {
+         "deep": {
+          "booleanValue": true
+         },
+         "ref": {
+          "referenceValue": "projects/demo-jsimport/databases/(default)/documents/docs/b1"
+         }
+        }
+       }
+      }
+     }
+    }
+   ]
+  },
+  {
+   "name": "globals",
+   "keyPath": "name",
+   "autoIncrement": false,
+   "indexes": [],
+   "records": []
+  },
+  {
+   "name": "indexConfiguration",
+   "keyPath": "indexId",
+   "autoIncrement": true,
+   "indexes": [
+    {
+     "name": "collectionGroupIndex",
+     "keyPath": "collectionGroup",
+     "unique": false,
+     "multiEntry": false
+    }
+   ],
+   "records": []
+  },
+  {
+   "name": "indexEntries",
+   "keyPath": [
+    "indexId",
+    "uid",
+    "arrayValue",
+    "directionalValue",
+    "orderedDocumentKey",
+    "documentKey"
+   ],
+   "autoIncrement": false,
+   "indexes": [
+    {
+     "name": "documentKeyIndex",
+     "keyPath": [
+      "indexId",
+      "uid",
+      "orderedDocumentKey"
+     ],
+     "unique": false,
+     "multiEntry": false
+    }
+   ],
+   "records": []
+  },
+  {
+   "name": "indexState",
+   "keyPath": [
+    "indexId",
+    "uid"
+   ],
+   "autoIncrement": false,
+   "indexes": [
+    {
+     "name": "sequenceNumberIndex",
+     "keyPath": [
+      "uid",
+      "sequenceNumber"
+     ],
+     "unique": false,
+     "multiEntry": false
+    }
+   ],
+   "records": []
+  },
+  {
+   "name": "mutationQueues",
+   "keyPath": "userId",
+   "autoIncrement": false,
+   "indexes": [],
+   "records": []
+  },
+  {
+   "name": "mutations",
+   "keyPath": "batchId",
+   "autoIncrement": true,
+   "indexes": [
+    {
+     "name": "userMutationsIndex",
+     "keyPath": [
+      "userId",
+      "batchId"
+     ],
+     "unique": true,
+     "multiEntry": false
+    }
+   ],
+   "records": [
+    {
+     "key": 1,
+     "value": {
+      "userId": "",
+      "batchId": 1,
+      "localWriteTimeMs": 1795145091465,
+      "baseMutations": [],
+      "mutations": [
+       {
+        "update": {
+         "name": "projects/demo-jsimport/databases/(default)/documents/docs/values",
+         "fields": {
+          "s": {
+           "stringValue": "text é中😀"
+          },
+          "empty": {
+           "stringValue": ""
+          },
+          "t": {
+           "booleanValue": true
+          },
+          "f": {
+           "booleanValue": false
+          },
+          "nul": {
+           "nullValue": "NULL_VALUE"
+          },
+          "i": {
+           "integerValue": "42"
+          },
+          "negI": {
+           "integerValue": "-7"
+          },
+          "maxSafe": {
+           "integerValue": "9007199254740991"
+          },
+          "minSafe": {
+           "integerValue": "-9007199254740991"
+          },
+          "zero": {
+           "integerValue": "0"
+          },
+          "d": {
+           "doubleValue": 2.5
+          },
+          "negD": {
+           "doubleValue": -0.125
+          },
+          "nan": {
+           "doubleValue": "NaN"
+          },
+          "inf": {
+           "doubleValue": "Infinity"
+          },
+          "negInf": {
+           "doubleValue": "-Infinity"
+          },
+          "negZero": {
+           "doubleValue": "-0"
+          },
+          "tiny": {
+           "doubleValue": 5e-324
+          },
+          "huge": {
+           "doubleValue": 1.7976931348623157e+308
+          },
+          "ts": {
+           "timestampValue": "2023-11-14T22:13:20.123456000Z"
+          },
+          "tsOld": {
+           "timestampValue": "0001-01-01T00:00:00.000000000Z"
+          },
+          "tsMax": {
+           "timestampValue": "9999-12-31T23:59:59.999999000Z"
+          },
+          "b": {
+           "bytesValue": "AAEC/v8="
+          },
+          "bEmpty": {
+           "bytesValue": ""
+          },
+          "g": {
+           "geoPointValue": {
+            "latitude": -90,
+            "longitude": 180
+           }
+          },
+          "r": {
+           "referenceValue": "projects/demo-jsimport/databases/(default)/documents/docs/other"
+          },
+          "rSub": {
+           "referenceValue": "projects/demo-jsimport/databases/(default)/documents/docs/exists/sub/s1"
+          },
+          "v": {
+           "mapValue": {
+            "fields": {
+             "__type__": {
+              "stringValue": "__vector__"
+             },
+             "value": {
+              "arrayValue": {
+               "values": [
+                {
+                 "doubleValue": 1.5
+                },
+                {
+                 "doubleValue": -2
+                },
+                {
+                 "doubleValue": 0
+                }
+               ]
+              }
+             }
+            }
+           }
+          },
+          "m": {
+           "mapValue": {
+            "fields": {
+             "a": {
+              "mapValue": {
+               "fields": {
+                "b": {
+                 "mapValue": {
+                  "fields": {
+                   "c": {
+                    "arrayValue": {
+                     "values": [
+                      {
+                       "integerValue": "1"
+                      },
+                      {
+                       "mapValue": {
+                        "fields": {
+                         "d": {
+                          "stringValue": "deep"
+                         },
+                         "e": {
+                          "arrayValue": {
+                           "values": [
+                            {
+                             "integerValue": "2"
+                            }
+                           ]
+                          }
+                         }
+                        }
+                       }
+                      }
+                     ]
+                    }
+                   }
+                  }
+                 }
+                }
+               }
+              }
+             },
+             "key.with.dots": {
+              "integerValue": "1"
+             },
+             "key with spaces": {
+              "integerValue": "2"
+             },
+             "üml": {
+              "integerValue": "3"
+             }
+            }
+           }
+          },
+          "emptyMap": {
+           "mapValue": {
+            "fields": {}
+           }
+          },
+          "emptyArray": {
+           "arrayValue": {
+            "values": []
+           }
+          },
+          "mixed": {
+           "arrayValue": {
+            "values": [
+             {
+              "integerValue": "1"
+             },
+             {
+              "stringValue": "two"
+             },
+             {
+              "doubleValue": 3.5
+             },
+             {
+              "nullValue": "NULL_VALUE"
+             },
+             {
+              "booleanValue": true
+             },
+             {
+              "mapValue": {
+               "fields": {
+                "x": {
+                 "integerValue": "1"
+                }
+               }
+              }
+             }
+            ]
+           }
+          }
+         }
+        }
+       }
+      ]
+     }
+    },
+    {
+     "key": 2,
+     "value": {
+      "userId": "",
+      "batchId": 2,
+      "localWriteTimeMs": 1795145091470,
+      "baseMutations": [],
+      "mutations": [
+       {
+        "update": {
+         "name": "projects/demo-jsimport/databases/(default)/documents/docs/merge",
+         "fields": {
+          "m": {
+           "mapValue": {
+            "fields": {
+             "q": {
+              "integerValue": "20"
+             },
+             "r": {
+              "integerValue": "3"
+             }
+            }
+           }
+          },
+          "b": {
+           "integerValue": "2"
+          }
+         }
+        },
+        "updateMask": {
+         "fieldPaths": [
+          "b",
+          "m.q",
+          "m.r"
+         ]
+        },
+        "updateTransforms": [
+         {
+          "fieldPath": "st",
+          "setToServerValue": "REQUEST_TIME"
+         }
+        ]
+       }
+      ]
+     }
+    },
+    {
+     "key": 3,
+     "value": {
+      "userId": "",
+      "batchId": 3,
+      "localWriteTimeMs": 1795145091474,
+      "baseMutations": [],
+      "mutations": [
+       {
+        "update": {
+         "name": "projects/demo-jsimport/databases/(default)/documents/docs/mergeFields",
+         "fields": {
+          "a": {
+           "integerValue": "9"
+          },
+          "b": {
+           "integerValue": "9"
+          },
+          "m": {
+           "mapValue": {
+            "fields": {
+             "p": {
+              "integerValue": "9"
+             },
+             "q": {
+              "integerValue": "9"
+             }
+            }
+           }
+          }
+         }
+        },
+        "updateMask": {
+         "fieldPaths": [
+          "a",
+          "m.p"
+         ]
+        }
+       }
+      ]
+     }
+    },
+    {
+     "key": 4,
+     "value": {
+      "userId": "",
+      "batchId": 4,
+      "localWriteTimeMs": 1795145091476,
+      "baseMutations": [],
+      "mutations": [
+       {
+        "update": {
+         "name": "projects/demo-jsimport/databases/(default)/documents/docs/upd",
+         "fields": {
+          "arr": {
+           "arrayValue": {
+            "values": [
+             {
+              "integerValue": "3"
+             }
+            ]
+           }
+          },
+          "a.b": {
+           "stringValue": "literal dot"
+          },
+          "nested": {
+           "mapValue": {
+            "fields": {
+             "z": {
+              "mapValue": {
+               "fields": {
+                "deep": {
+                 "booleanValue": true
+                }
+               }
+              }
+             },
+             "x": {
+              "integerValue": "10"
+             }
+            }
+           }
+          }
+         }
+        },
+        "updateMask": {
+         "fieldPaths": [
+          "`a.b`",
+          "arr",
+          "keep",
+          "nested.x",
+          "nested.z.deep"
+         ]
+        },
+        "currentDocument": {
+         "exists": true
+        }
+       }
+      ]
+     }
+    },
+    {
+     "key": 5,
+     "value": {
+      "userId": "",
+      "batchId": 5,
+      "localWriteTimeMs": 1795145091478,
+      "baseMutations": [
+       {
+        "update": {
+         "name": "projects/demo-jsimport/databases/(default)/documents/docs/transforms",
+         "fields": {
+          "n": {
+           "integerValue": 0
+          },
+          "d": {
+           "integerValue": 0
+          },
+          "big": {
+           "integerValue": 0
+          },
+          "nested": {
+           "mapValue": {
+            "fields": {
+             "c": {
+              "integerValue": 0
+             }
+            }
+           }
+          }
+         }
+        },
+        "updateMask": {
+         "fieldPaths": [
+          "big",
+          "d",
+          "n",
+          "nested.c"
+         ]
+        },
+        "currentDocument": {
+         "exists": true
+        }
+       }
+      ],
+      "mutations": [
+       {
+        "update": {
+         "name": "projects/demo-jsimport/databases/(default)/documents/docs/transforms"
+        },
+        "updateMask": {
+         "fieldPaths": []
+        },
+        "updateTransforms": [
+         {
+          "fieldPath": "n",
+          "increment": {
+           "integerValue": "2"
+          }
+         },
+         {
+          "fieldPath": "d",
+          "increment": {
+           "doubleValue": 0.25
+          }
+         },
+         {
+          "fieldPath": "arr",
+          "removeAllFromArray": {
+           "values": [
+            {
+             "stringValue": "b"
+            }
+           ]
+          }
+         },
+         {
+          "fieldPath": "added",
+          "appendMissingElements": {
+           "values": [
+            {
+             "integerValue": "1"
+            },
+            {
+             "mapValue": {
+              "fields": {
+               "x": {
+                "integerValue": "1"
+               }
+              }
+             }
+            },
+            {
+             "integerValue": "1"
+            }
+           ]
+          }
+         },
+         {
+          "fieldPath": "at",
+          "setToServerValue": "REQUEST_TIME"
+         },
+         {
+          "fieldPath": "big",
+          "increment": {
+           "integerValue": "1"
+          }
+         },
+         {
+          "fieldPath": "nested.c",
+          "increment": {
+           "doubleValue": 1.5
+          }
+         },
+         {
+          "fieldPath": "nested.when",
+          "setToServerValue": "REQUEST_TIME"
+         }
+        ],
+        "currentDocument": {
+         "exists": true
+        }
+       }
+      ]
+     }
+    },
+    {
+     "key": 6,
+     "value": {
+      "userId": "",
+      "batchId": 6,
+      "localWriteTimeMs": 1795145091480,
+      "baseMutations": [
+       {
+        "update": {
+         "name": "projects/demo-jsimport/databases/(default)/documents/docs/transforms",
+         "fields": {
+          "n": {
+           "integerValue": 0
+          }
+         }
+        },
+        "updateMask": {
+         "fieldPaths": [
+          "n"
+         ]
+        },
+        "currentDocument": {
+         "exists": true
+        }
+       }
+      ],
+      "mutations": [
+       {
+        "update": {
+         "name": "projects/demo-jsimport/databases/(default)/documents/docs/transforms"
+        },
+        "updateMask": {
+         "fieldPaths": []
+        },
+        "updateTransforms": [
+         {
+          "fieldPath": "n",
+          "increment": {
+           "integerValue": "-10"
+          }
+         },
+         {
+          "fieldPath": "added",
+          "appendMissingElements": {
+           "values": [
+            {
+             "integerValue": "2"
+            }
+           ]
+          }
+         },
+         {
+          "fieldPath": "arr",
+          "appendMissingElements": {
+           "values": [
+            {
+             "stringValue": "z"
+            }
+           ]
+          }
+         }
+        ],
+        "currentDocument": {
+         "exists": true
+        }
+       }
+      ]
+     }
+    },
+    {
+     "key": 7,
+     "value": {
+      "userId": "",
+      "batchId": 7,
+      "localWriteTimeMs": 1795145091481,
+      "baseMutations": [
+       {
+        "update": {
+         "name": "projects/demo-jsimport/databases/(default)/documents/docs/setTransforms",
+         "fields": {
+          "count": {
+           "integerValue": 0
+          },
+          "m": {
+           "mapValue": {
+            "fields": {
+             "n": {
+              "integerValue": 0
+             }
+            }
+           }
+          }
+         }
+        },
+        "updateMask": {
+         "fieldPaths": [
+          "count",
+          "m.n"
+         ]
+        },
+        "currentDocument": {
+         "exists": true
+        }
+       }
+      ],
+      "mutations": [
+       {
+        "update": {
+         "name": "projects/demo-jsimport/databases/(default)/documents/docs/setTransforms",
+         "fields": {
+          "plain": {
+           "integerValue": "1"
+          },
+          "m": {
+           "mapValue": {
+            "fields": {}
+           }
+          }
+         }
+        },
+        "updateTransforms": [
+         {
+          "fieldPath": "count",
+          "increment": {
+           "integerValue": "3"
+          }
+         },
+         {
+          "fieldPath": "list",
+          "appendMissingElements": {
+           "values": [
+            {
+             "stringValue": "x"
+            },
+            {
+             "stringValue": "x"
+            }
+           ]
+          }
+         },
+         {
+          "fieldPath": "rm",
+          "removeAllFromArray": {
+           "values": [
+            {
+             "stringValue": "y"
+            }
+           ]
+          }
+         },
+         {
+          "fieldPath": "at",
+          "setToServerValue": "REQUEST_TIME"
+         },
+         {
+          "fieldPath": "m.when",
+          "setToServerValue": "REQUEST_TIME"
+         },
+         {
+          "fieldPath": "m.n",
+          "increment": {
+           "integerValue": "1"
+          }
+         }
+        ]
+       }
+      ]
+     }
+    },
+    {
+     "key": 8,
+     "value": {
+      "userId": "",
+      "batchId": 8,
+      "localWriteTimeMs": 1795145091483,
+      "baseMutations": [],
+      "mutations": [
+       {
+        "delete": "projects/demo-jsimport/databases/(default)/documents/docs/del"
+       }
+      ]
+     }
+    },
+    {
+     "key": 9,
+     "value": {
+      "userId": "",
+      "batchId": 9,
+      "localWriteTimeMs": 1795145091485,
+      "baseMutations": [],
+      "mutations": [
+       {
+        "delete": "projects/demo-jsimport/databases/(default)/documents/docs/neverExisted"
+       }
+      ]
+     }
+    },
+    {
+     "key": 10,
+     "value": {
+      "userId": "",
+      "batchId": 10,
+      "localWriteTimeMs": 1795145091487,
+      "baseMutations": [],
+      "mutations": [
+       {
+        "update": {
+         "name": "projects/demo-jsimport/databases/(default)/documents/docs/missing",
+         "fields": {
+          "a": {
+           "integerValue": "1"
+          }
+         }
+        },
+        "updateMask": {
+         "fieldPaths": [
+          "a"
+         ]
+        },
+        "currentDocument": {
+         "exists": true
+        }
+       }
+      ]
+     }
+    },
+    {
+     "key": 11,
+     "value": {
+      "userId": "",
+      "batchId": 11,
+      "localWriteTimeMs": 1795145091488,
+      "baseMutations": [
+       {
+        "update": {
+         "name": "projects/demo-jsimport/databases/(default)/documents/docs/exists",
+         "fields": {
+          "a": {
+           "integerValue": 0
+          }
+         }
+        },
+        "updateMask": {
+         "fieldPaths": [
+          "a"
+         ]
+        },
+        "currentDocument": {
+         "exists": true
+        }
+       }
+      ],
+      "mutations": [
+       {
+        "update": {
+         "name": "projects/demo-jsimport/databases/(default)/documents/docs/b1",
+         "fields": {
+          "inBatch": {
+           "booleanValue": true
+          }
+         }
+        }
+       },
+       {
+        "update": {
+         "name": "projects/demo-jsimport/databases/(default)/documents/docs/exists",
+         "fields": {
+          "m": {
+           "mapValue": {
+            "fields": {
+             "n": {
+              "stringValue": "x"
+             }
+            }
+           }
+          }
+         }
+        },
+        "updateMask": {
+         "fieldPaths": [
+          "m.n"
+         ]
+        },
+        "updateTransforms": [
+         {
+          "fieldPath": "a",
+          "increment": {
+           "integerValue": "1"
+          }
+         }
+        ],
+        "currentDocument": {
+         "exists": true
+        }
+       },
+       {
+        "delete": "projects/demo-jsimport/databases/(default)/documents/docs/b3"
+       },
+       {
+        "update": {
+         "name": "projects/demo-jsimport/databases/(default)/documents/docs/exists/sub/s1",
+         "fields": {
+          "deep": {
+           "booleanValue": true
+          },
+          "ref": {
+           "referenceValue": "projects/demo-jsimport/databases/(default)/documents/docs/b1"
+          }
+         }
+        }
+       },
+       {
+        "update": {
+         "name": "projects/demo-jsimport/databases/(default)/documents/deep/a/b/c/d/e",
+         "fields": {
+          "depth": {
+           "integerValue": "3"
+          }
+         }
+        }
+       }
+      ]
+     }
+    },
+    {
+     "key": 12,
+     "value": {
+      "userId": "",
+      "batchId": 12,
+      "localWriteTimeMs": 1795145091490,
+      "baseMutations": [],
+      "mutations": [
+       {
+        "update": {
+         "name": "projects/demo-jsimport/databases/(default)/documents/docs/batchFail",
+         "fields": {
+          "x": {
+           "integerValue": "1"
+          }
+         }
+        }
+       },
+       {
+        "update": {
+         "name": "projects/demo-jsimport/databases/(default)/documents/docs/missing2",
+         "fields": {
+          "a": {
+           "integerValue": "1"
+          }
+         }
+        },
+        "updateMask": {
+         "fieldPaths": [
+          "a"
+         ]
+        },
+        "currentDocument": {
+         "exists": true
+        }
+       }
+      ]
+     }
+    },
+    {
+     "key": 13,
+     "value": {
+      "userId": "",
+      "batchId": 13,
+      "localWriteTimeMs": 1795145091491,
+      "baseMutations": [],
+      "mutations": [
+       {
+        "update": {
+         "name": "projects/demo-jsimport/databases/(default)/documents/docs/order",
+         "fields": {
+          "v": {
+           "integerValue": "1"
+          },
+          "log": {
+           "arrayValue": {
+            "values": [
+             {
+              "stringValue": "1"
+             }
+            ]
+           }
+          }
+         }
+        }
+       }
+      ]
+     }
+    },
+    {
+     "key": 14,
+     "value": {
+      "userId": "",
+      "batchId": 14,
+      "localWriteTimeMs": 1795145091493,
+      "baseMutations": [],
+      "mutations": [
+       {
+        "update": {
+         "name": "projects/demo-jsimport/databases/(default)/documents/docs/order",
+         "fields": {
+          "v": {
+           "integerValue": "2"
+          }
+         }
+        },
+        "updateMask": {
+         "fieldPaths": [
+          "v"
+         ]
+        },
+        "updateTransforms": [
+         {
+          "fieldPath": "log",
+          "appendMissingElements": {
+           "values": [
+            {
+             "stringValue": "2"
+            }
+           ]
+          }
+         }
+        ],
+        "currentDocument": {
+         "exists": true
+        }
+       }
+      ]
+     }
+    },
+    {
+     "key": 15,
+     "value": {
+      "userId": "",
+      "batchId": 15,
+      "localWriteTimeMs": 1795145091495,
+      "baseMutations": [],
+      "mutations": [
+       {
+        "update": {
+         "name": "projects/demo-jsimport/databases/(default)/documents/docs/order",
+         "fields": {
+          "v": {
+           "integerValue": "3"
+          }
+         }
+        },
+        "updateMask": {
+         "fieldPaths": [
+          "v"
+         ]
+        },
+        "updateTransforms": [
+         {
+          "fieldPath": "log",
+          "appendMissingElements": {
+           "values": [
+            {
+             "stringValue": "3"
+            }
+           ]
+          }
+         }
+        ],
+        "currentDocument": {
+         "exists": true
+        }
+       }
+      ]
+     }
+    },
+    {
+     "key": 16,
+     "value": {
+      "userId": "",
+      "batchId": 16,
+      "localWriteTimeMs": 1795145091497,
+      "baseMutations": [
+       {
+        "update": {
+         "name": "projects/demo-jsimport/databases/(default)/documents/docs/order",
+         "fields": {
+          "w": {
+           "integerValue": 0
+          }
+         }
+        },
+        "updateMask": {
+         "fieldPaths": [
+          "w"
+         ]
+        },
+        "currentDocument": {
+         "exists": true
+        }
+       }
+      ],
+      "mutations": [
+       {
+        "update": {
+         "name": "projects/demo-jsimport/databases/(default)/documents/docs/order",
+         "fields": {}
+        },
+        "updateMask": {
+         "fieldPaths": []
+        },
+        "updateTransforms": [
+         {
+          "fieldPath": "log",
+          "appendMissingElements": {
+           "values": [
+            {
+             "stringValue": "4"
+            }
+           ]
+          }
+         },
+         {
+          "fieldPath": "w",
+          "increment": {
+           "integerValue": "1"
+          }
+         }
+        ]
+       }
+      ]
+     }
+    },
+    {
+     "key": 17,
+     "value": {
+      "userId": "",
+      "batchId": 17,
+      "localWriteTimeMs": 1795145091498,
+      "baseMutations": [],
+      "mutations": [
+       {
+        "delete": "projects/demo-jsimport/databases/(default)/documents/docs/order2"
+       },
+       {
+        "update": {
+         "name": "projects/demo-jsimport/databases/(default)/documents/docs/order2",
+         "fields": {
+          "again": {
+           "booleanValue": true
+          }
+         }
+        }
+       }
+      ]
+     }
+    },
+    {
+     "key": 18,
+     "value": {
+      "userId": "",
+      "batchId": 18,
+      "localWriteTimeMs": 1795145091502,
+      "baseMutations": [],
+      "mutations": [
+       {
+        "update": {
+         "name": "projects/demo-jsimport/databases/(default)/documents/docs/with space é",
+         "fields": {
+          "ok": {
+           "integerValue": "1"
+          }
+         }
+        }
+       }
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "name": "namedQueries",
+   "keyPath": "name",
+   "autoIncrement": false,
+   "indexes": [],
+   "records": []
+  },
+  {
+   "name": "owner",
+   "keyPath": null,
+   "autoIncrement": false,
+   "indexes": [],
+   "records": []
+  },
+  {
+   "name": "remoteDocumentGlobal",
+   "keyPath": null,
+   "autoIncrement": false,
+   "indexes": [],
+   "records": [
+    {
+     "key": "remoteDocumentGlobalKey",
+     "value": {
+      "byteSize": 0
+     }
+    }
+   ]
+  },
+  {
+   "name": "remoteDocumentsV14",
+   "keyPath": [
+    "prefixPath",
+    "collectionGroup",
+    "readTime",
+    "documentId"
+   ],
+   "autoIncrement": false,
+   "indexes": [
+    {
+     "name": "collectionGroupIndex",
+     "keyPath": [
+      "collectionGroup",
+      "readTime",
+      "prefixPath",
+      "documentId"
+     ],
+     "unique": false,
+     "multiEntry": false
+    },
+    {
+     "name": "documentKeyIndex",
+     "keyPath": [
+      "prefixPath",
+      "collectionGroup",
+      "documentId"
+     ],
+     "unique": false,
+     "multiEntry": false
+    }
+   ],
+   "records": []
+  },
+  {
+   "name": "targetDocuments",
+   "keyPath": [
+    "targetId",
+    "path"
+   ],
+   "autoIncrement": false,
+   "indexes": [
+    {
+     "name": "documentTargetsIndex",
+     "keyPath": [
+      "path",
+      "targetId"
+     ],
+     "unique": true,
+     "multiEntry": false
+    }
+   ],
+   "records": []
+  },
+  {
+   "name": "targetGlobal",
+   "keyPath": null,
+   "autoIncrement": false,
+   "indexes": [],
+   "records": [
+    {
+     "key": "targetGlobalKey",
+     "value": {
+      "highestTargetId": 0,
+      "highestListenSequenceNumber": 0,
+      "lastRemoteSnapshotVersion": {
+       "seconds": 0,
+       "nanoseconds": 0
+      },
+      "targetCount": 0
+     }
+    }
+   ]
+  },
+  {
+   "name": "targets",
+   "keyPath": "targetId",
+   "autoIncrement": false,
+   "indexes": [
+    {
+     "name": "queryTargetsIndex",
+     "keyPath": [
+      "canonicalId",
+      "targetId"
+     ],
+     "unique": true,
+     "multiEntry": false
+    }
+   ],
+   "records": []
+  }
+ ]
+}

@@ -1,0 +1,370 @@
+{
+ "generatedBy": "tool/bench/web_idb/js_import/fixtures.sh (static/fixtures.js)",
+ "jsSdkVersion": "13.3.0",
+ "what": "A JS client (persistentSingleTabManager) still running when the database was dumped.",
+ "projectId": "demo-jsimport",
+ "appName": "js-live_single_tab",
+ "dumpedAtMs": 1795145094386,
+ "name": "firestore/js-live_single_tab/demo-jsimport/main",
+ "version": 18,
+ "stores": [
+  {
+   "name": "bundles",
+   "keyPath": "bundleId",
+   "autoIncrement": false,
+   "indexes": [],
+   "records": []
+  },
+  {
+   "name": "clientMetadata",
+   "keyPath": "clientId",
+   "autoIncrement": false,
+   "indexes": [],
+   "records": [
+    {
+     "key": "Y1R258Rg9MLcXrQd5Zu1",
+     "value": {
+      "clientId": "Y1R258Rg9MLcXrQd5Zu1",
+      "updateTimeMs": 1795145094384,
+      "networkEnabled": false,
+      "inForeground": true
+     }
+    }
+   ]
+  },
+  {
+   "name": "collectionParents",
+   "keyPath": [
+    "collectionId",
+    "parent"
+   ],
+   "autoIncrement": false,
+   "indexes": [],
+   "records": [
+    {
+     "key": [
+      "live",
+      "\u0001\u0001"
+     ],
+     "value": {
+      "collectionId": "live",
+      "parent": "\u0001\u0001"
+     }
+    }
+   ]
+  },
+  {
+   "name": "documentMutations",
+   "keyPath": null,
+   "autoIncrement": false,
+   "indexes": [],
+   "records": [
+    {
+     "key": [
+      "",
+      "live\u0001\u0001doc\u0001\u0001",
+      1
+     ],
+     "value": {}
+    }
+   ]
+  },
+  {
+   "name": "documentOverlays",
+   "keyPath": [
+    "userId",
+    "collectionPath",
+    "documentId"
+   ],
+   "autoIncrement": false,
+   "indexes": [
+    {
+     "name": "collectionGroupOverlayIndex",
+     "keyPath": [
+      "userId",
+      "collectionGroup",
+      "largestBatchId"
+     ],
+     "unique": false,
+     "multiEntry": false
+    },
+    {
+     "name": "collectionPathOverlayIndex",
+     "keyPath": [
+      "userId",
+      "collectionPath",
+      "largestBatchId"
+     ],
+     "unique": false,
+     "multiEntry": false
+    }
+   ],
+   "records": [
+    {
+     "key": [
+      "",
+      "live\u0001\u0001",
+      "doc"
+     ],
+     "value": {
+      "userId": "",
+      "collectionPath": "live\u0001\u0001",
+      "documentId": "doc",
+      "collectionGroup": "live",
+      "largestBatchId": 1,
+      "overlayMutation": {
+       "update": {
+        "name": "projects/demo-jsimport/databases/(default)/documents/live/doc",
+        "fields": {
+         "live": {
+          "booleanValue": true
+         }
+        }
+       }
+      }
+     }
+    }
+   ]
+  },
+  {
+   "name": "globals",
+   "keyPath": "name",
+   "autoIncrement": false,
+   "indexes": [],
+   "records": []
+  },
+  {
+   "name": "indexConfiguration",
+   "keyPath": "indexId",
+   "autoIncrement": true,
+   "indexes": [
+    {
+     "name": "collectionGroupIndex",
+     "keyPath": "collectionGroup",
+     "unique": false,
+     "multiEntry": false
+    }
+   ],
+   "records": []
+  },
+  {
+   "name": "indexEntries",
+   "keyPath": [
+    "indexId",
+    "uid",
+    "arrayValue",
+    "directionalValue",
+    "orderedDocumentKey",
+    "documentKey"
+   ],
+   "autoIncrement": false,
+   "indexes": [
+    {
+     "name": "documentKeyIndex",
+     "keyPath": [
+      "indexId",
+      "uid",
+      "orderedDocumentKey"
+     ],
+     "unique": false,
+     "multiEntry": false
+    }
+   ],
+   "records": []
+  },
+  {
+   "name": "indexState",
+   "keyPath": [
+    "indexId",
+    "uid"
+   ],
+   "autoIncrement": false,
+   "indexes": [
+    {
+     "name": "sequenceNumberIndex",
+     "keyPath": [
+      "uid",
+      "sequenceNumber"
+     ],
+     "unique": false,
+     "multiEntry": false
+    }
+   ],
+   "records": []
+  },
+  {
+   "name": "mutationQueues",
+   "keyPath": "userId",
+   "autoIncrement": false,
+   "indexes": [],
+   "records": []
+  },
+  {
+   "name": "mutations",
+   "keyPath": "batchId",
+   "autoIncrement": true,
+   "indexes": [
+    {
+     "name": "userMutationsIndex",
+     "keyPath": [
+      "userId",
+      "batchId"
+     ],
+     "unique": true,
+     "multiEntry": false
+    }
+   ],
+   "records": [
+    {
+     "key": 1,
+     "value": {
+      "userId": "",
+      "batchId": 1,
+      "localWriteTimeMs": 1795145094384,
+      "baseMutations": [],
+      "mutations": [
+       {
+        "update": {
+         "name": "projects/demo-jsimport/databases/(default)/documents/live/doc",
+         "fields": {
+          "live": {
+           "booleanValue": true
+          }
+         }
+        }
+       }
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "name": "namedQueries",
+   "keyPath": "name",
+   "autoIncrement": false,
+   "indexes": [],
+   "records": []
+  },
+  {
+   "name": "owner",
+   "keyPath": null,
+   "autoIncrement": false,
+   "indexes": [],
+   "records": [
+    {
+     "key": "owner",
+     "value": {
+      "ownerId": "Y1R258Rg9MLcXrQd5Zu1",
+      "allowTabSynchronization": false,
+      "leaseTimestampMs": 1795145094384
+     }
+    }
+   ]
+  },
+  {
+   "name": "remoteDocumentGlobal",
+   "keyPath": null,
+   "autoIncrement": false,
+   "indexes": [],
+   "records": [
+    {
+     "key": "remoteDocumentGlobalKey",
+     "value": {
+      "byteSize": 0
+     }
+    }
+   ]
+  },
+  {
+   "name": "remoteDocumentsV14",
+   "keyPath": [
+    "prefixPath",
+    "collectionGroup",
+    "readTime",
+    "documentId"
+   ],
+   "autoIncrement": false,
+   "indexes": [
+    {
+     "name": "collectionGroupIndex",
+     "keyPath": [
+      "collectionGroup",
+      "readTime",
+      "prefixPath",
+      "documentId"
+     ],
+     "unique": false,
+     "multiEntry": false
+    },
+    {
+     "name": "documentKeyIndex",
+     "keyPath": [
+      "prefixPath",
+      "collectionGroup",
+      "documentId"
+     ],
+     "unique": false,
+     "multiEntry": false
+    }
+   ],
+   "records": []
+  },
+  {
+   "name": "targetDocuments",
+   "keyPath": [
+    "targetId",
+    "path"
+   ],
+   "autoIncrement": false,
+   "indexes": [
+    {
+     "name": "documentTargetsIndex",
+     "keyPath": [
+      "path",
+      "targetId"
+     ],
+     "unique": true,
+     "multiEntry": false
+    }
+   ],
+   "records": []
+  },
+  {
+   "name": "targetGlobal",
+   "keyPath": null,
+   "autoIncrement": false,
+   "indexes": [],
+   "records": [
+    {
+     "key": "targetGlobalKey",
+     "value": {
+      "highestTargetId": 0,
+      "highestListenSequenceNumber": 0,
+      "lastRemoteSnapshotVersion": {
+       "seconds": 0,
+       "nanoseconds": 0
+      },
+      "targetCount": 0
+     }
+    }
+   ]
+  },
+  {
+   "name": "targets",
+   "keyPath": "targetId",
+   "autoIncrement": false,
+   "indexes": [
+    {
+     "name": "queryTargetsIndex",
+     "keyPath": [
+      "canonicalId",
+      "targetId"
+     ],
+     "unique": true,
+     "multiEntry": false
+    }
+   ],
+   "records": []
+  }
+ ]
+}
