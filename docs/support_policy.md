@@ -5,9 +5,6 @@ numbered. The packages are `cloud_firestore_dart`, `firebase_app_dart` and
 `firebase_auth_providers_dart`; the current versions are 0.3.1 (`cloud_firestore_dart`), 0.3.0
 (`firebase_auth_providers_dart`) and 0.2.0 (`firebase_app_dart`).
 
-Lines marked **DRAFT** are proposals that the maintainer has not confirmed. Until they are
-confirmed they are not commitments.
-
 ## Dart and Flutter SDKs
 
 - All three packages declare `sdk: ^3.8.0` in their `pubspec.yaml`: Dart 3.8.0 or later, below
@@ -67,9 +64,8 @@ API from the Firebase JS SDK, which is the reference for behaviour that the two 
 Behaviour is ported in Dart, not copied. Where the port deliberately differs from upstream,
 [`docs/ARCHITECTURE.md`](ARCHITECTURE.md) lists the deviation with the test that pins it.
 
-- **DRAFT:** Upstream Firestore releases (Android and JS) are reviewed for changes that apply to
-  the port at least once per upstream minor release, and the review is recorded in
-  `docs/upstream_sync/`.
+- Upstream Firestore releases (Android and JS) are reviewed for changes that apply to the port once a
+  month, and each review is recorded in `docs/upstream_sync/`.
 - Fixes of data-safety and correctness bugs in upstream are ported with priority over
   new features.
 
