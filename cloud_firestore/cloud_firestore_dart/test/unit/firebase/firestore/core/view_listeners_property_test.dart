@@ -3,7 +3,7 @@
 // view_property_harness.dart; held_back_view_property_test.dart has the same
 // interleavings for one listener of one query).
 //
-// One client (memory and SQLite persistence) has up to three listeners at a
+// One client (memory, SQLite and key-value persistence) has up to three listeners at a
 // time on overlapping queries of one collection of six documents:
 //  * `c` and `c where m == true`;
 //  * `c order by v limit 2`, `c where m == true order by v limit 2`,
@@ -628,8 +628,12 @@ void main() {
   }, timeout: Timeout(Duration(minutes: 2 + 2 * cases(1))));
 
   for (final MapEntry<String, RunConfig> config in configs.entries) {
-    for (final bool sqlite in <bool>[false, true]) {
-      final String persistence = sqlite ? 'SQLite' : 'memory';
+    for (final String persistence in <String>[
+      'memory',
+      'SQLite',
+      'key-value',
+    ]) {
+      final bool sqlite = persistence == 'SQLite';
       test(
         '${config.key}, $persistence persistence',
         () async {
@@ -640,6 +644,7 @@ void main() {
             count: cases(_defaultCounts[config.key]!),
             steps: _steps,
             sqlite: sqlite,
+            keyValue: persistence == 'key-value',
             stats: stats,
           );
           if (failure != null) {

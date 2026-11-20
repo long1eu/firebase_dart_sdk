@@ -20,6 +20,7 @@ void main() {
       <String, Future<Persistence> Function()>{
         'memory': createEagerGCMemoryPersistence,
         'sqlite': createSQLitePersistence,
+        'keyvalue': () => createKeyValuePersistence(),
       };
 
   persistences.forEach((String name, Future<Persistence> Function() create) {

@@ -13,6 +13,26 @@
   Chrome (dart2js and dart2wasm), never a production backend. New tests: batches with several kinds of writes and
   all-or-nothing failure, cursors from document snapshots and on several fields, aggregations over cursors, and
   converters in batches, transactions and cursor queries.
+- The cache in your own storage (`package:cloud_firestore_dart/cache_store.dart`,
+  `keyValueCacheSettings` over a `CacheStore`) is no longer experimental. What it stores is now a
+  commitment: the format is versioned, a newer SDK migrates the store of an older one in the
+  transaction that opens it, and a store written by a newer SDK is refused with
+  `failed-precondition` (no downgrade; `clearPersistence()` starts over). The format of 0.3.0 is
+  kept as a test fixture, and a format change without a new version and a migration fails the
+  tests. Limits, stated plainly: one Firestore instance and one client per store (no primary lease,
+  no coordination of tabs, isolates or processes), and the writes of each SDK transaction are held
+  in memory until it commits. New guide: `docs/guides/custom_cache_store.md`; the format is
+  described in `docs/keyvalue_cache_format.md`.
+- An error thrown by a `CacheStore` (`get`, `scan` or `write`) is now treated as a database that is
+  not available right now (`TransientDatabaseException`, with the store's error as its `cause`):
+  the listen or write that needed it fails with `unavailable`, acknowledgements and remote changes
+  are stored again later, and the client goes offline and tries the store again with a backoff.
+  Before, the error was fatal for the client.
+- `getPendingWriteCount()` on the key-value cache reads the pending batches once and then keeps the
+  count; it read every batch on each call (10,000 pending writes: about 4 ms per call before,
+  under 0.1 ms after the first).
+- The key-value cache no longer counts deleted documents it skips in a collection scan as read,
+  as the SQLite cache does; the count feeds the choice of a cache index.
 
 ## 0.3.0
 

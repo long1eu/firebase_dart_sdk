@@ -214,15 +214,17 @@ void main() {
   }
 
   for (final _Mix mix in _Mix.values) {
-    for (final String cache in <String>['memory', 'sqlite']) {
+    for (final String cache in <String>['memory', 'sqlite', 'key-value']) {
       test(
         '${mix.name} writes, $cache cache',
         () async {
           int fromSummary = 0;
           for (int seed = 0; seed < (cache == 'memory' ? 60 : 15); seed++) {
-            final Persistence persistence = cache == 'memory'
-                ? await createLRUMemoryPersistence()
-                : await createSQLitePersistence();
+            final Persistence persistence = switch (cache) {
+              'memory' => await createLRUMemoryPersistence(),
+              'key-value' => await createKeyValuePersistence(),
+              _ => await createSQLitePersistence(),
+            };
             try {
               fromSummary += await run(persistence, seed, mix);
             } finally {

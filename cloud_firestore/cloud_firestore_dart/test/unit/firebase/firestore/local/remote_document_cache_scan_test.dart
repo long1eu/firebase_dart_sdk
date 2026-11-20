@@ -22,6 +22,7 @@ void main() {
     'sqlite': () => createSQLitePersistence(
       'firebase/firestore/local/remote_document_cache_scan_test-${const Uuid().v4()}.db',
     ),
+    'keyvalue': () => createKeyValuePersistence(),
   };
 
   for (final MapEntry<String, Future<Persistence> Function()> variant

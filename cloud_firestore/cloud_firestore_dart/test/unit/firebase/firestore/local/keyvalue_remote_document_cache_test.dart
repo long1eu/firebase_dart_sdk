@@ -4,9 +4,15 @@
 
 import 'dart:async';
 
+import 'package:cloud_firestore_dart/src/database_collection/database_collection.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/keyvalue/cache_store_persistence.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/local/query_context.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/model/document.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/model/document_key.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/model/field_index.dart';
 import 'package:test/test.dart';
 
+import '../../../../util/test_util.dart';
 import 'cases/remote_document_cache_test_case.dart';
 import 'persistence_test_helpers.dart';
 
@@ -95,5 +101,49 @@ void main() {
   test(
     'testAddingDocumentWithReadTimeOfZeroFails',
     () => testCase.testAddingDocumentWithReadTimeOfZeroFails(),
+  );
+
+  // Not in the Android SDK, which has no test that the scan keeps deleted and unknown
+  // documents out of the scan: they are not read, so they do not count as scanned documents.
+  test(
+    'queryScansSkipDeletedAndUnknownDocuments',
+    () async {
+      final CacheStorePersistence persistence =
+          await createKeyValuePersistence();
+      try {
+        await persistence.runTransaction('add documents', () async {
+          await persistence.remoteDocumentCache.add(
+            doc('coll/found', 1, map(<dynamic>['a', 1])),
+            version(1),
+          );
+          await persistence.remoteDocumentCache.add(
+            deletedDoc('coll/deleted', 1),
+            version(1),
+          );
+          await persistence.remoteDocumentCache.add(
+            unknownDoc('coll/unknown', 1),
+            version(1),
+          );
+        });
+
+        final QueryContext context = QueryContext();
+        final ImmutableSortedMap<DocumentKey, Document> results =
+            await persistence.remoteDocumentCache.getAllDocumentsMatchingQuery(
+              query('coll'),
+              IndexOffset.none,
+              context: context,
+            );
+
+        expect(
+          results
+              .map((MapEntry<DocumentKey, Document> e) => e.key.path.toString())
+              .toList(),
+          <String>['coll/found'],
+        );
+        expect(context.documentReadCount, 1);
+      } finally {
+        await persistence.shutdown();
+      }
+    },
   );
 }
