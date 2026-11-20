@@ -180,6 +180,14 @@ class WebIndexedDbPersistence extends IndexedDbPersistence {
   /// meanwhile must not make requests on the operation's transaction.
   final Object _zoneKey = Object();
 
+  /// The IndexedDB transactions that are not finished, and the persistence transactions that wait for or run one.
+  int _openTransactions = 0;
+  int _runningTransactions = 0;
+
+  /// Whether no transaction of this persistence runs or waits (for tests that wait until the work a step started is
+  /// done: the spec tests).
+  bool get isIdle => _openTransactions == 0 && _runningTransactions == 0;
+
   /// Set when a transaction failed for good (see [IndexedDbTransactionInactiveError]), or the database was deleted by
   /// another client: every later transaction fails with it.
   Object? _fatalError;
@@ -624,6 +632,7 @@ class WebIndexedDbPersistence extends IndexedDbPersistence {
     bool sequenceNumber = true,
   }) async {
     beforeTransaction?.call(action);
+    _runningTransactions++;
     await _semaphore.acquire();
     try {
       _throwIfFailed();
@@ -657,6 +666,7 @@ class WebIndexedDbPersistence extends IndexedDbPersistence {
         rethrow;
       }
     } finally {
+      _runningTransactions--;
       _semaphore.release();
     }
   }
