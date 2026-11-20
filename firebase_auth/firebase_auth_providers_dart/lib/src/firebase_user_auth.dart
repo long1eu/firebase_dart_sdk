@@ -115,11 +115,12 @@ class FirebaseUserAuth implements AuthTokenProvider {
     AppCheckTokenProvider? appCheck,
     AuthStorage? storage,
     String? storageKey,
-    this.emulatorHost,
+    String? emulatorHost,
     http.Client? httpClient,
     DateTime Function()? clock,
     Timer Function(Duration delay, void Function() callback)? createTimer,
-  }) : _emulatorOrigin = emulatorHost == null
+  }) : _emulatorHost = emulatorHost,
+       _emulatorOrigin = emulatorHost == null
            ? null
            : _emulatorOriginOf(emulatorHost),
        _appCheck = appCheck,
@@ -198,9 +199,24 @@ class FirebaseUserAuth implements AuthTokenProvider {
   /// The Web API key of the project.
   final String apiKey;
 
-  /// The Auth emulator as it was passed to the constructor (`host:port`, or with a scheme), or null for the real
-  /// service.
-  final String? emulatorHost;
+  /// The Auth emulator as it was passed to the constructor or to [useEmulator] (`host:port`, or with a scheme), or
+  /// null for the real service.
+  String? get emulatorHost => _emulatorHost;
+  String? _emulatorHost;
+
+  /// Sends the requests from now on to the Firebase Auth emulator at [emulatorHost] (`host:port`, or
+  /// `https://host:port`), like the `emulatorHost` of the constructor (FlutterFire's `useAuthEmulator`, the JS SDK's
+  /// `connectAuthEmulator`). For an instance that is created before the emulator is known, such as the one of a
+  /// FlutterFire platform implementation.
+  ///
+  /// Call it before the first request: a request in flight keeps the service it was sent to, and a session restored
+  /// from the real service stays signed in until its first token refresh fails against the emulator. Throws an
+  /// [ArgumentError] for an invalid [emulatorHost], as the constructor does, and changes nothing then.
+  void useEmulator(String emulatorHost) {
+    final String origin = _emulatorOriginOf(emulatorHost);
+    _emulatorHost = emulatorHost;
+    _emulatorOrigin = origin;
+  }
 
   /// The id of the Firebase app, sent as `X-Firebase-gmpid`; null sends none.
   final String? appId;
@@ -242,7 +258,7 @@ class FirebaseUserAuth implements AuthTokenProvider {
   static const String clientVersion = 'Dart/DartCore/0.3.0/FirebaseCore-dart';
 
   /// `http://host:port` (or `https://...`) of the Auth emulator, checked; null for the real service.
-  final String? _emulatorOrigin;
+  String? _emulatorOrigin;
 
   static final RegExp _notAuthorityCharacters = RegExp(r'[/@?#\\\s]');
   static final RegExp _scheme = RegExp(r'^(https?)://', caseSensitive: false);

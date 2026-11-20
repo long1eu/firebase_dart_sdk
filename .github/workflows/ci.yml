@@ -453,9 +453,10 @@ jobs:
           path: ${{ runner.temp }}/emulator/*.log
 
   # The Flutter packages, which the unit jobs skip (they install Dart only): flutter analyze and
-  # flutter test of cloud_firestore_dart_flutterfire and cloud_firestore_dart_platform, the
-  # platform package's emulator tests included (FIRESTORE_EMULATOR_HOST: 15 of its 29 tests skip
-  # without it), flutter analyze of examples/flutter_notes, and flutter analyze and the web builds
+  # flutter test of cloud_firestore_dart_flutterfire, cloud_firestore_dart_platform and
+  # firebase_auth_dart_platform, the emulator tests of the two platform packages included
+  # (FIRESTORE_EMULATOR_HOST: 15 of the Firestore package's 29 tests skip without it;
+  # FIREBASE_AUTH_EMULATOR_HOST, from tool/start_auth_emulators.sh, for the Auth package), flutter analyze of examples/flutter_notes, and flutter analyze and the web builds
   # (`flutter build web` and `flutter build web --wasm`) of examples/flutter_web_two_users. Through tool/test_all.sh, with
   # TEST_ALL_REQUIRE_FLUTTER=1 so that a missing Flutter fails the job instead of skipping. The
   # emulator is a private one on 8090 (tool/start_private_emulator.sh), as in the web transport
@@ -482,17 +483,22 @@ jobs:
       - uses: ./.github/actions/emulators
       - name: Start a private Firestore emulator
         run: ./tool/start_private_emulator.sh 8090
+      - name: Start the Auth emulator
+        # Also starts a Firestore emulator on 8197, which nothing here uses.
+        run: ./tool/start_auth_emulators.sh 9197 8197
       - name: Analyze and test the Flutter packages, analyze and build the Flutter examples
         env:
           FIRESTORE_EMULATOR_HOST: 127.0.0.1:8090
+          FIREBASE_AUTH_EMULATOR_HOST: 127.0.0.1:9197
           TEST_ALL_REQUIRE_FLUTTER: '1'
           TEST_LOG_DIR: ${{ runner.temp }}/emulator/flutter
-        # A skipped test of the platform package means the emulator did not reach it: the step
+        # A skipped test of a platform package means the emulator did not reach it: the step
         # fails then.
         run: |
           set -o pipefail
           flutter --version
           ./tool/test_all.sh cloud_firestore_dart_flutterfire cloud_firestore_dart_platform \
+            firebase_auth_dart_platform \
             examples/flutter_notes examples/flutter_web_two_users 2>&1 \
             | tee "$RUNNER_TEMP/flutter_summary.txt"
           if ! grep -Eq '^cloud_firestore_dart_platform: .*test PASS \([0-9]+ passed, 0 skipped' \
@@ -500,9 +506,17 @@ jobs:
             echo "::error::Tests of cloud_firestore_dart_platform were skipped: FIRESTORE_EMULATOR_HOST did not reach them."
             exit 1
           fi
+          if ! grep -Eq '^firebase_auth_dart_platform: .*test PASS \([0-9]+ passed, 0 skipped' \
+            "$RUNNER_TEMP/flutter_summary.txt"; then
+            echo "::error::Tests of firebase_auth_dart_platform were skipped: FIREBASE_AUTH_EMULATOR_HOST did not reach them."
+            exit 1
+          fi
       - name: Stop the private Firestore emulator
         if: always()
         run: ./tool/stop_private_emulator.sh 8090
+      - name: Stop the Auth emulator
+        if: always()
+        run: ./tool/stop_auth_emulators.sh 9197 8197
       - name: Upload test output
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

@@ -29,8 +29,8 @@ The latest release of each package on pub.dev. Older versions are not patched; t
 ## What is in scope
 
 The packages published from this repository: `cloud_firestore_dart`, `cloud_firestore_dart_sqlite`,
-`cloud_firestore_dart_platform`, `cloud_firestore_dart_flutterfire`, `firebase_app_dart`,
-`firebase_auth_providers_dart` and `firebase_admin_dart`.
+`cloud_firestore_dart_platform`, `cloud_firestore_dart_flutterfire`, `firebase_auth_dart_platform`,
+`firebase_app_dart`, `firebase_auth_providers_dart` and `firebase_admin_dart`.
 
 Problems in the Firebase backend, in the official Firebase SDKs or in the Firestore emulator belong to Google:
 <https://www.google.com/about/appsecurity/>.

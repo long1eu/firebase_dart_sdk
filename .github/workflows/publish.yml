@@ -11,6 +11,7 @@ name: Publish to pub.dev
 #
 #   firebase_app_dart, firebase_auth_providers_dart, cloud_firestore_dart, then
 #   cloud_firestore_dart_sqlite, cloud_firestore_dart_flutterfire, cloud_firestore_dart_platform,
+#   firebase_auth_dart_platform (needs firebase_auth_providers_dart 0.3.1, so release that first),
 #   firebase_admin_dart
 #
 # How it is allowed to publish (there is no stored secret):
@@ -65,6 +66,7 @@ jobs:
             cloud_firestore/cloud_firestore_dart_sqlite \
             cloud_firestore/cloud_firestore_dart_flutterfire \
             cloud_firestore/cloud_firestore_dart_platform \
+            firebase_auth/firebase_auth_dart_platform \
             firebase_admin/firebase_admin_dart; do
             if [ "$(basename "$candidate")" = "$name" ]; then dir="$candidate"; fi
           done
