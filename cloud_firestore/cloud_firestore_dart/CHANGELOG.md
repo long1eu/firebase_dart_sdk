@@ -5,6 +5,12 @@
   a map above it is no longer merged. The timestamp creates the map `n`, which the delete leaves
   empty on the backend; the merged write did not create it, so `n` was missing. Found by a new
   property test of random offline sequences.
+- `mergeUnsentWrites`: a merged write no longer carries the fields that a `serverTimestamp` of the
+  newer write overwrites (for example `n.t` of the older write and a timestamp on `n` in the
+  newer one). The backend ends the same; until it confirms the write, the value that
+  `ServerTimestampBehavior.previous` shows under the pending timestamp is now the one it shows
+  without the setting (it showed the older write's fields, or an earlier map). Found by a new
+  test that compares the cache views with and without the setting after every offline write.
 
 ## 0.3.0
 

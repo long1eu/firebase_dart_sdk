@@ -39,18 +39,18 @@ final class OfflineWrite {
       };
 
   Mutation toMutation(DocumentKey key) => switch (kind) {
-    WriteKind.set => _converter
-        .parseSetData(data)
-        .toMutation(key, Precondition.none),
-    WriteKind.merge => _converter
-        .parseMergeData(data, null)
-        .toMutation(key, Precondition.none),
-    WriteKind.mergeFields => _converter
-        .parseMergeData(data, SetOptions(mergeFields: mergeFields).fieldMask)
-        .toMutation(key, Precondition.none),
-    WriteKind.update => _converter
-        .parseUpdateData(data)
-        .toMutation(key, Precondition(exists: true)),
+    WriteKind.set =>
+      _converter.parseSetData(data).toMutation(key, Precondition.none),
+    WriteKind.merge =>
+      _converter.parseMergeData(data, null).toMutation(key, Precondition.none),
+    WriteKind.mergeFields =>
+      _converter
+          .parseMergeData(data, SetOptions(mergeFields: mergeFields).fieldMask)
+          .toMutation(key, Precondition.none),
+    WriteKind.update =>
+      _converter
+          .parseUpdateData(data)
+          .toMutation(key, Precondition(exists: true)),
     WriteKind.delete => DeleteMutation(key, Precondition.none),
   };
 
@@ -273,13 +273,14 @@ Map<String, Object?> _updateData(Gen gen, {required String noTimestamp}) {
 }
 
 /// The top-level and nested paths that [data] gives a value or a sentinel to.
-List<String> _paths(Map<String, Object?> data, [String prefix = '']) => <String>[
-  for (final MapEntry<String, Object?> entry in data.entries) ...<String>[
-    '$prefix${entry.key}',
-    if (entry.value case final Map<String, Object?> map)
-      ..._paths(map, '$prefix${entry.key}.'),
-  ],
-];
+List<String> _paths(Map<String, Object?> data, [String prefix = '']) =>
+    <String>[
+      for (final MapEntry<String, Object?> entry in data.entries) ...<String>[
+        '$prefix${entry.key}',
+        if (entry.value case final Map<String, Object?> map)
+          ..._paths(map, '$prefix${entry.key}.'),
+      ],
+    ];
 
 /// One write to one of [documents] documents, the first one most often (so that chains of writes to one document are
 /// long). Writes that the API refuses are not generated.
