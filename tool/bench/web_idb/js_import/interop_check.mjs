@@ -46,7 +46,8 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const devtools = (path, method = 'GET') => fetch(`http://127.0.0.1:${debugPort}${path}`, { method });
 
 async function waitForChrome() {
-  for (let i = 0; i < 60; i++) {
+  // Up to 60 seconds: a cold headless Chrome on a busy CI runner has taken more than 15.
+  for (let i = 0; i < 240; i++) {
     try { if ((await devtools('/json/version')).ok) return; } catch {}
     await sleep(250);
   }
