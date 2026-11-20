@@ -196,8 +196,14 @@ print(result.user?.email);
 - Only the code is exchanged: once signed in, the Firebase session refreshes itself; the provider's refresh token is
   returned but not used.
 - Errors are `FirebaseAuthException`s: `timeout` (five minutes by default), `user-cancelled`,
-  `oauth-state-mismatch`, `invalid-oauth-response`, `missing-or-invalid-nonce`, `invalid-credential` (the code was
-  refused) and `network-request-failed`.
+  `invalid-oauth-response`, `missing-or-invalid-nonce`, `invalid-credential` (the code was refused) and
+  `network-request-failed` (also when the exchange takes more than 30 seconds).
+- The loopback server ends the wait only for the redirect of this sign-in: the `Host` header must be
+  `127.0.0.1:<port>` and the `state` must be the one sent. Any other request gets an error page, and the server keeps
+  waiting until the timeout.
+- The ID token is not verified locally. Firebase checks it at sign-in, so do not trust its claims before that.
+- On a machine shared with other users, another local user can read the authorization URL from the process list.
+  This is inherent to loopback flows (RFC 8252); PKCE keeps the code useless to them.
 
 An `exchangeCode` that posts the four values to a server of yours:
 

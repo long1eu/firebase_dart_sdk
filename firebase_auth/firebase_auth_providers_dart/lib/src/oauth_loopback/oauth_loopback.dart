@@ -67,7 +67,7 @@ class OAuthLoopbackProvider {
   ///
   /// * [providerId] is the Firebase provider id of the credential: `google.com`, `oidc.<name>`, `microsoft.com`, ...
   /// * [authorizationEndpoint] and [tokenEndpoint] must be `https` URLs (plain `http` is accepted
-  ///   only for a loopback host, for tests and local identity providers); otherwise an [ArgumentError] is thrown.
+  ///   only on `127.0.0.1` and `::1`, for tests and local identity providers); otherwise an [ArgumentError] is thrown.
   /// * [scopes] are requested as one space-separated `scope` parameter.
   /// * [useNonce] sends the SHA-256 hash (hex) of a random nonce as the `nonce` parameter and checks it against the
   ///   `nonce` claim of the ID token (when the token has one). [sendNonceToFirebase] adds the raw nonce to the
@@ -180,8 +180,9 @@ class OAuthLoopbackProvider {
   /// An OpenID Connect provider whose endpoints are read from the discovery document of [issuer]
   /// (`<issuer>/.well-known/openid-configuration`). The other arguments are those of [OAuthLoopbackProvider.oidc].
   ///
-  /// Throws a [FirebaseAuthException] with `network-request-failed` when the document cannot be fetched, and
-  /// `invalid-oauth-provider` when it is not a discovery document of [issuer].
+  /// Throws a [FirebaseAuthException] with `network-request-failed` when the document cannot be fetched within 30
+  /// seconds, and `invalid-oauth-provider` when it is not a discovery document of [issuer] or its endpoints are not
+  /// `https` URLs.
   static Future<OAuthLoopbackProvider> discover({
     required Uri issuer,
     required String providerId,
@@ -202,7 +203,13 @@ class OAuthLoopbackProvider {
     final http.Client client = httpClient ?? http.Client();
     final http.Response response;
     try {
-      response = await client.get(url);
+      response = await client.get(url).timeout(_networkTimeout);
+    } on TimeoutException {
+      throw FirebaseAuthException(
+        code: 'network-request-failed',
+        message:
+            'The discovery document of $issuer did not come within 30 seconds.',
+      );
     } on http.ClientException catch (e) {
       throw FirebaseAuthException(
         code: 'network-request-failed',
@@ -240,10 +247,18 @@ class OAuthLoopbackProvider {
     if (authorization is! String || token is! String) {
       throw invalid('no authorization_endpoint or token_endpoint');
     }
+    final Uri? authorizationEndpoint = Uri.tryParse(authorization);
+    final Uri? tokenEndpoint = Uri.tryParse(token);
+    if (authorizationEndpoint == null ||
+        tokenEndpoint == null ||
+        !_isAllowedEndpoint(authorizationEndpoint) ||
+        !_isAllowedEndpoint(tokenEndpoint)) {
+      throw invalid('its endpoints are not https URLs');
+    }
     return OAuthLoopbackProvider.oidc(
       providerId: providerId,
-      authorizationEndpoint: Uri.parse(authorization),
-      tokenEndpoint: Uri.parse(token),
+      authorizationEndpoint: authorizationEndpoint,
+      tokenEndpoint: tokenEndpoint,
       clientId: clientId,
       clientSecret: clientSecret,
       exchangeCode: exchangeCode,
@@ -332,23 +347,29 @@ class OAuthLoopbackProvider {
       'OAuthLoopbackProvider(providerId: $providerId, clientId: $clientId, '
       'authorizationEndpoint: $authorizationEndpoint)';
 
-  static void _checkEndpoint(Uri endpoint, String name) {
+  /// An `https` URL, or plain `http` on the loopback addresses `127.0.0.1` and `::1` (not the name `localhost`,
+  /// which the system may resolve elsewhere).
+  static bool _isAllowedEndpoint(Uri endpoint) {
     final bool loopback =
-        endpoint.host == '127.0.0.1' ||
-        endpoint.host == 'localhost' ||
-        endpoint.host == '::1';
-    if (endpoint.host.isEmpty ||
-        endpoint.hasFragment ||
-        !(endpoint.isScheme('https') ||
-            endpoint.isScheme('http') && loopback)) {
+        endpoint.host == '127.0.0.1' || endpoint.host == '::1';
+    return endpoint.host.isNotEmpty &&
+        !endpoint.hasFragment &&
+        (endpoint.isScheme('https') || endpoint.isScheme('http') && loopback);
+  }
+
+  static void _checkEndpoint(Uri endpoint, String name) {
+    if (!_isAllowedEndpoint(endpoint)) {
       throw ArgumentError.value(
         endpoint,
         name,
-        'must be an https URL (http only on a loopback host)',
+        'must be an https URL (http only on 127.0.0.1 or ::1)',
       );
     }
   }
 }
+
+/// How long the discovery request may take before it fails with `network-request-failed`.
+const Duration _networkTimeout = Duration(seconds: 30);
 
 /// What the browser sign-in of an [OAuthLoopbackProvider] returns: the provider's tokens and the [credential] for
 /// `FirebaseUserAuth.signInWithCredential`, `linkWithCredential` or `reauthenticateWithCredential`.
@@ -369,7 +390,8 @@ class OAuthLoopbackResult {
   /// The credential of the tokens, for the provider's Firebase provider id.
   final OAuthCredential credential;
 
-  /// The OpenID Connect ID token, if the provider returned one.
+  /// The OpenID Connect ID token, if the provider returned one. It is not verified locally: Firebase checks it when
+  /// the [credential] signs in, so do not trust its claims before that.
   final String? idToken;
 
   /// The OAuth access token, if the provider returned one.

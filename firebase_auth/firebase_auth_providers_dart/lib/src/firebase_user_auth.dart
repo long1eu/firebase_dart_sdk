@@ -1056,7 +1056,7 @@ class FirebaseUserAuth implements AuthTokenProvider {
   ///
   /// [presenter] opens the authorization URL ([openInSystemBrowser] by default), [timeout] bounds the wait for the
   /// redirect, and [httpClient] is used for the code exchange (the client of this instance by default). It throws
-  /// what both steps throw: `timeout`, `user-cancelled`, `oauth-state-mismatch`, `invalid-credential`, ...
+  /// what both steps throw: `timeout`, `user-cancelled`, `invalid-oauth-response`, `invalid-credential`, ...
   ///
   /// To link or reauthenticate instead, use [linkWithOAuthLoopback] or [reauthenticateWithOAuthLoopback].
   ///

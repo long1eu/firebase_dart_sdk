@@ -10,8 +10,10 @@
   the PKCE verifier, the redirect URL and the client id (`OAuthAuthorizationCode`), sends them to a server of yours,
   and returns the token endpoint's JSON. It is the counterpart of `serverAuthCode` in `google_sign_in`. The result
   (`OAuthLoopbackResult`) has the provider's tokens and a ready `OAuthCredential`. On the web these throw an
-  `UnsupportedError`. New error codes: `timeout`, `user-cancelled`, `oauth-state-mismatch`,
-  `invalid-oauth-response`, `invalid-oauth-provider`.
+  `UnsupportedError`. New error codes: `timeout`, `user-cancelled`,
+  `invalid-oauth-response`, `invalid-oauth-provider`. Only the redirect of this sign-in (its `Host` header and its
+  `state`) ends the wait; any other request gets a 400. The code exchange and the discovery request fail with
+  `network-request-failed` after 30 seconds. Plain `http` endpoints are accepted only on `127.0.0.1` and `::1`.
 - `FirebaseUserAuth.linkWithOAuthLoopback` and `reauthenticateWithOAuthLoopback`: the same browser sign-in, then
   `linkWithCredential` or `reauthenticateWithCredential`. Same arguments as `signInWithOAuthLoopback`; `null-user`
   before the browser opens when nobody is signed in.

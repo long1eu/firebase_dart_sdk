@@ -12,6 +12,7 @@ import 'package:crypto/crypto.dart';
 import 'package:firebase_app_dart/firebase_app_dart.dart' show GetTokenResult;
 import 'package:firebase_auth_providers_dart/firebase_auth_providers_dart.dart';
 import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
 import 'package:test/test.dart';
 
 import 'harness.dart';
@@ -313,23 +314,74 @@ void main() {
     );
   });
 
-  test('a state mismatch fails without an exchange', () async {
+  test(
+    'a redirect with another state gets a 400 and does not end the wait',
+    () async {
+      idp.redirect = (Map<String, String> a) => <String, String>{
+        'code': 'the-code',
+        'state': 'forged',
+      };
+      await expectLater(
+        run(oidc(), timeout: const Duration(milliseconds: 500)),
+        throwsA(authError('timeout')),
+      );
+      expect(idp.tokenForm, isNull);
+      expect(presenter.page!.statusCode, 400);
+    },
+  );
+
+  test('a redirect without state does not end the wait', () async {
     idp.redirect = (Map<String, String> a) => <String, String>{
       'code': 'the-code',
-      'state': 'forged',
     };
-    await expectLater(run(oidc()), throwsA(authError('oauth-state-mismatch')));
+    await expectLater(
+      run(oidc(), timeout: const Duration(milliseconds: 500)),
+      throwsA(authError('timeout')),
+    );
     expect(idp.tokenForm, isNull);
     expect(presenter.page!.statusCode, 400);
-    expect(presenter.page!.body, contains('oauth-state-mismatch'));
   });
 
-  test('a redirect without state fails', () async {
-    idp.redirect = (Map<String, String> a) => <String, String>{
-      'code': 'the-code',
-    };
-    await expectLater(run(oidc()), throwsA(authError('oauth-state-mismatch')));
-  });
+  test(
+    'a query that does not parse and another Host get a 400; the real redirect still signs in',
+    () async {
+      final List<int> statuses = <int>[];
+      final OAuthLoopbackResult result = await authorizeWithOAuthLoopback(
+        oidc(),
+        presenter: (Uri url) async {
+          final Uri redirect = Uri.parse(url.queryParameters['redirect_uri']!);
+          final String state = url.queryParameters['state']!;
+          // An invalid UTF-8 escape: Uri.queryParameters throws on it.
+          statuses.add(
+            (await presenter.client.get(
+              Uri.parse('$redirect/?code=x&state=%ff'),
+            )).statusCode,
+          );
+          // The right state, but the Host header of another name (DNS rebinding).
+          final HttpClient io = HttpClient();
+          try {
+            final HttpClientRequest request = await io.getUrl(
+              redirect.replace(
+                queryParameters: <String, String>{'code': 'x', 'state': state},
+              ),
+            );
+            request.headers.host = 'evil.example';
+            final HttpClientResponse response = await request.close();
+            await response.drain<void>();
+            statuses.add(response.statusCode);
+          } finally {
+            io.close(force: true);
+          }
+          await presenter(url);
+        },
+        timeout: const Duration(seconds: 10),
+        httpClient: client,
+      );
+      expect(statuses, <int>[400, 400]);
+      expect(result.accessToken, 'the-access-token');
+      expect(idp.tokenForm!['code'], 'the-code');
+    },
+  );
 
   test('access_denied is user-cancelled', () async {
     idp.redirect = (Map<String, String> a) => <String, String>{
@@ -350,11 +402,17 @@ void main() {
       await expectLater(
         run(oidc()),
         throwsA(
-          authError('invalid-oauth-response').having(
-            (FirebaseAuthException e) => e.serverCode,
-            'serverCode',
-            '<script>x</script>',
-          ),
+          authError('invalid-oauth-response')
+              .having(
+                (FirebaseAuthException e) => e.serverCode,
+                'serverCode',
+                isNull,
+              )
+              .having(
+                (FirebaseAuthException e) => e.message,
+                'message',
+                isNot(contains('<script>')),
+              ),
         ),
       );
       expect(presenter.page!.body, isNot(contains('<script>')));
@@ -495,6 +553,131 @@ void main() {
     expect(provider.authorizationEndpoint, idp.base.resolve('/authorize'));
     expect(provider.tokenEndpoint, idp.base.resolve('/token'));
     expect(provider.sendNonceToFirebase, isTrue);
+  });
+
+  /// Runs [body] with the 30 second network timers caught: [fire] runs them now.
+  Future<T> withNetworkTimers<T>(
+    Future<T> Function(void Function() fire) body,
+  ) {
+    final List<void Function()> pending = <void Function()>[];
+    void fire() {
+      final List<void Function()> due = List<void Function()>.of(pending);
+      pending.clear();
+      for (final void Function() f in due) {
+        f();
+      }
+    }
+
+    return runZoned(
+      () => body(fire),
+      zoneSpecification: ZoneSpecification(
+        createTimer:
+            (
+              Zone self,
+              ZoneDelegate parent,
+              Zone zone,
+              Duration duration,
+              void Function() f,
+            ) {
+              if (duration != const Duration(seconds: 30)) {
+                return parent.createTimer(zone, duration, f);
+              }
+              pending.add(f);
+              return parent.createTimer(zone, const Duration(days: 1), () {});
+            },
+      ),
+    );
+  }
+
+  test(
+    'an exchangeCode that does not answer fails with network-request-failed',
+    () async {
+      await withNetworkTimers((void Function() fire) async {
+        await expectLater(
+          run(
+            oidc(
+              exchangeCode: (OAuthAuthorizationCode code) {
+                // The exchange started: let its 30 seconds pass.
+                Timer.run(fire);
+                return Completer<Map<String, Object?>>().future;
+              },
+            ),
+          ),
+          throwsA(authError('network-request-failed')),
+        );
+      });
+    },
+  );
+
+  test(
+    'a discovery request that does not answer fails with network-request-failed',
+    () async {
+      await withNetworkTimers((void Function() fire) async {
+        final MockClient hanging = MockClient((http.Request request) {
+          Timer.run(fire);
+          return Completer<http.Response>().future;
+        });
+        await expectLater(
+          OAuthLoopbackProvider.discover(
+            issuer: Uri.parse('https://idp.example.com'),
+            providerId: 'oidc.fake',
+            clientId: 'client-1',
+            httpClient: hanging,
+          ),
+          throwsA(authError('network-request-failed')),
+        );
+      });
+    },
+  );
+
+  test('an expires_in that is not finite is ignored', () async {
+    final OAuthLoopbackResult result = await run(
+      oidc(
+        exchangeCode: (_) =>
+            jsonDecode('{"access_token": "at", "expires_in": 1e400}')
+                as Map<String, Object?>,
+      ),
+    );
+    expect(result.accessToken, 'at');
+    expect(result.expiresIn, isNull);
+  });
+
+  test(
+    'a discovery document with an http endpoint is invalid-oauth-provider',
+    () async {
+      final MockClient discovery = MockClient(
+        (http.Request request) async => http.Response(
+          jsonEncode(<String, Object?>{
+            'issuer': 'https://idp.example.com',
+            'authorization_endpoint': 'http://idp.example.com/authorize',
+            'token_endpoint': 'https://idp.example.com/token',
+          }),
+          200,
+        ),
+      );
+      await expectLater(
+        OAuthLoopbackProvider.discover(
+          issuer: Uri.parse('https://idp.example.com'),
+          providerId: 'oidc.fake',
+          clientId: 'client-1',
+          httpClient: discovery,
+        ),
+        throwsA(authError('invalid-oauth-provider')),
+      );
+    },
+  );
+
+  test('plain http is accepted on 127.0.0.1 and ::1, not on localhost', () {
+    OAuthLoopbackProvider withEndpoint(String url) =>
+        OAuthLoopbackProvider.oidc(
+          providerId: 'oidc.x',
+          authorizationEndpoint: Uri.parse(url),
+          tokenEndpoint: Uri.parse('https://idp.example.com/token'),
+          clientId: 'c',
+        );
+    expect(withEndpoint('http://127.0.0.1:8080/a'), isNotNull);
+    expect(withEndpoint('http://[::1]:8080/a'), isNotNull);
+    expect(() => withEndpoint('http://localhost:8080/a'), throwsArgumentError);
   });
 
   test(
