@@ -1,21 +1,13 @@
 // Authenticator app (TOTP) multi-factor authentication against a fake Identity Toolkit backend that checks real
 // RFC 6238 codes: enrolment, sign-in and reauthentication with the resolver, unenrolment, the factor list, SMS-only
-// accounts, and both wire formats of the v2 calls (JSON, and protocol buffers with `$alt=proto`).
+// accounts, and the JSON bodies of the v2 calls.
 
 import 'dart:async';
 import 'dart:convert';
 
 import 'package:firebase_app_dart/firebase_app_dart.dart';
 import 'package:firebase_auth_providers_dart/firebase_auth_providers_dart.dart';
-import 'package:firebase_auth_providers_dart/src/multi_factor_api.dart';
-import 'package:firebase_auth_providers_dart/src/proto/google/cloud/identitytoolkit/v2/account_management_service.pb.dart'
-    as v2;
-import 'package:firebase_auth_providers_dart/src/proto/google/rpc/error_details.pb.dart'
-    as rpc;
-import 'package:firebase_auth_providers_dart/src/proto/google/rpc/status.pb.dart'
-    as rpc;
 import 'package:http/http.dart' as http;
-import 'package:protobuf/well_known_types/google/protobuf/any.pb.dart';
 import 'package:test/test.dart';
 
 import 'fakes.dart';
@@ -29,23 +21,10 @@ const String storageKey = 'firebase_auth_providers_dart:$apiKey';
 /// The secret the fake backend hands out (base32 of "12345678901234567890", the key of RFC 6238's test vectors).
 const String secretKey = 'GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ';
 
-http.Response protobufResponse(List<int> bytes, [int status = 200]) =>
-    http.Response.bytes(
-      bytes,
-      status,
-      headers: <String, String>{'content-type': 'application/x-protobuf'},
-    );
-
-/// A fake Identity Platform with TOTP: the v2 multi-factor methods in JSON and, for `mfaEnrollment:withdraw`, in
-/// protocol buffers; a password sign-in of an account with factors answers with a pending credential.
+/// A fake Identity Platform with TOTP: the v2 multi-factor methods in JSON; a password sign-in of an account with
+/// factors answers with a pending credential.
 class TotpBackend {
   TotpBackend() {
-    backend.handler = (http.Request request) async {
-      if (request.headers['content-type'] == 'application/x-protobuf') {
-        return protobufHandler(request);
-      }
-      return backend.answer(request);
-    };
     backend
       ..on('accounts:signInWithPassword', _signInWithPassword)
       ..on('mfaEnrollment:start', _start)
@@ -58,11 +37,9 @@ class TotpBackend {
             errorResponse('MFA_ENROLLMENT_NOT_FOUND');
       })
       ..on('mfaSignIn:finalize', _finalizeSignIn);
-    protobufHandler = _protobufWithdraw;
   }
 
   final FakeBackend backend = FakeBackend();
-  late Future<http.Response> Function(http.Request request) protobufHandler;
   int _enrolled = 0;
 
   /// The time the codes are computed for: the fake clock of the client.
@@ -183,41 +160,6 @@ class TotpBackend {
       'idToken': backend.tokensFor(user, email: email)['idToken'],
       'refreshToken': 'refresh:$user:withdrawn',
     });
-  }
-
-  Future<http.Response> _protobufWithdraw(http.Request request) async {
-    final v2.WithdrawMfaRequest withdraw = v2.WithdrawMfaRequest.fromBuffer(
-      request.bodyBytes,
-    );
-    final http.Response? json = _withdraw(
-      withdraw.idToken,
-      withdraw.mfaEnrollmentId,
-    );
-    if (json == null) {
-      // What the owner saw from the real backend: a generic message; the code only in an ErrorInfo here.
-      return protobufResponse(
-        (rpc.Status()
-              ..code = 3
-              ..message = 'Request contains an invalid argument.'
-              ..details.add(
-                Any.pack(
-                  rpc.ErrorInfo()
-                    ..reason = 'MFA_ENROLLMENT_NOT_FOUND'
-                    ..domain = 'identitytoolkit.googleapis.com',
-                ),
-              ))
-            .writeToBuffer(),
-        400,
-      );
-    }
-    final Map<String, Object?> body =
-        jsonDecode(json.body) as Map<String, Object?>;
-    return protobufResponse(
-      v2.WithdrawMfaResponse(
-        idToken: body['idToken']! as String,
-        refreshToken: body['refreshToken']! as String,
-      ).writeToBuffer(),
-    );
   }
 
   http.Response _finalizeSignIn(Map<String, Object?> body) {
@@ -462,16 +404,10 @@ void main() {
       for (final String method in <String>[
         'mfaEnrollment:start',
         'mfaEnrollment:finalize',
+        'mfaEnrollment:withdraw',
       ]) {
         expect(backend.bodiesOf(method).single['tenantId'], 'tenant-1');
       }
-      final http.Request withdraw = backend.requests.lastWhere(
-        (http.Request r) => r.url.path.endsWith('mfaEnrollment:withdraw'),
-      );
-      expect(
-        v2.WithdrawMfaRequest.fromBuffer(withdraw.bodyBytes).tenantId,
-        'tenant-1',
-      );
     });
   });
 
@@ -726,227 +662,61 @@ void main() {
     });
   });
 
-  for (final MultiFactorWireFormat format in MultiFactorWireFormat.values) {
-    group('unenrolment over ${format.name}', () {
-      setUp(() async {
-        auth.multiFactorWireFormat = format;
-        await signIn();
-        await enroll();
-        backend.requests.clear();
-      });
-
-      test('removes the factor and renews the tokens', () async {
-        final List<AuthUser?> users = <AuthUser?>[];
-        final StreamSubscription<AuthUser?> sub = auth.userChanges().listen(
-          users.add,
-        );
-        await auth.unenrollMultiFactor('totp-1');
-        await pump();
-        await sub.cancel();
-        expect(auth.currentUser!.enrolledFactors, isEmpty);
-        expect(users.last?.enrolledFactors, isEmpty);
-        expect(
-          jsonDecode(backend.storage.read(storageKey)!)['refreshToken'],
-          'refresh:$uid:withdrawn',
-        );
-        final http.Request request = backend.requests.firstWhere(
-          (http.Request r) => r.url.path.endsWith('mfaEnrollment:withdraw'),
-        );
-        expect(request.url.path, '/v2/accounts/mfaEnrollment:withdraw');
-        if (format == MultiFactorWireFormat.protobuf) {
-          expect(request.headers['content-type'], 'application/x-protobuf');
-          expect(request.url.toString(), contains(r'&$alt=proto'));
-          expect(request.url.queryParameters['key'], apiKey);
-          final v2.WithdrawMfaRequest sent = v2.WithdrawMfaRequest.fromBuffer(
-            request.bodyBytes,
-          );
-          expect(sent.mfaEnrollmentId, 'totp-1');
-          expect(sent.idToken, isNotEmpty);
-          expect(sent.hasTenantId(), isFalse);
-        } else {
-          expect(
-            (jsonDecode(request.body)
-                as Map<String, Object?>)['mfaEnrollmentId'],
-            'totp-1',
-          );
-        }
-        // Signing in again needs no second factor.
-        await auth.signOut();
-        await signIn();
-        expect(auth.uid, uid);
-      });
-
-      test('an unknown factor is multi-factor-info-not-found', () async {
-        await expectLater(
-          auth.unenrollMultiFactor('nope'),
-          throwsAuth('multi-factor-info-not-found'),
-        );
-        expect(auth.currentUser!.enrolledFactors, hasLength(1));
-      });
-
-      test('the language goes as X-Firebase-Locale', () async {
-        auth.languageCode = 'fr';
-        await auth.unenrollMultiFactor('totp-1');
-        expect(
-          backend.requests
-              .firstWhere(
-                (http.Request r) =>
-                    r.url.path.endsWith('mfaEnrollment:withdraw'),
-              )
-              .headers['X-Firebase-Locale'],
-          'fr',
-        );
-      });
-    });
-  }
-
-  group('protocol buffer errors', () {
+  group('unenrolment', () {
     setUp(() async {
-      auth.multiFactorWireFormat = MultiFactorWireFormat.protobuf;
       await signIn();
+      await enroll();
+      backend.requests.clear();
     });
 
-    Future<FirebaseAuthException> errorOf(http.Response response) async {
-      server.protobufHandler = (http.Request request) async => response;
-      try {
-        await auth.unenrollMultiFactor('totp-1');
-      } on FirebaseAuthException catch (e) {
-        return e;
-      }
-      fail('No error');
-    }
-
-    List<int> status(
-      int code,
-      String message, [
-      List<GeneratedMessageForAny> details = const <GeneratedMessageForAny>[],
-    ]) {
-      final rpc.Status status = rpc.Status()
-        ..code = code
-        ..message = message;
-      for (final GeneratedMessageForAny detail in details) {
-        status.details.add(Any.pack(detail.message));
-      }
-      return status.writeToBuffer();
-    }
-
-    test('a generic status keeps its canonical code and message', () async {
-      final FirebaseAuthException e = await errorOf(
-        protobufResponse(
-          status(3, 'Request contains an invalid argument.'),
-          400,
-        ),
+    test('removes the factor and renews the tokens', () async {
+      final List<AuthUser?> users = <AuthUser?>[];
+      final StreamSubscription<AuthUser?> sub = auth.userChanges().listen(
+        users.add,
       );
-      expect(e.code, 'invalid-argument');
-      expect(e.serverCode, 'INVALID_ARGUMENT');
-      expect(e.message, 'Request contains an invalid argument.');
-      expect(e.httpStatus, 400);
+      await auth.unenrollMultiFactor('totp-1');
+      await pump();
+      await sub.cancel();
+      expect(auth.currentUser!.enrolledFactors, isEmpty);
+      expect(users.last?.enrolledFactors, isEmpty);
+      expect(
+        jsonDecode(backend.storage.read(storageKey)!)['refreshToken'],
+        'refresh:$uid:withdrawn',
+      );
+      final http.Request request = backend.requests.firstWhere(
+        (http.Request r) => r.url.path.endsWith('mfaEnrollment:withdraw'),
+      );
+      expect(request.url.path, '/v2/accounts/mfaEnrollment:withdraw');
+      expect(
+        (jsonDecode(request.body) as Map<String, Object?>)['mfaEnrollmentId'],
+        'totp-1',
+      );
+      // Signing in again needs no second factor.
+      await auth.signOut();
+      await signIn();
       expect(auth.uid, uid);
     });
 
-    test('a server code in the message is mapped', () async {
-      final FirebaseAuthException e = await errorOf(
-        protobufResponse(status(16, 'TOKEN_EXPIRED'), 400),
-      );
-      expect(e.code, 'user-token-expired');
-      // Like the JSON form: the session ended, the user is signed out.
-      expect(auth.uid, isNull);
-    });
-
-    test('a server code in the details is mapped', () async {
-      for (final (GeneratedMessageForAny detail, String code)
-          in <(GeneratedMessageForAny, String)>[
-            (
-              GeneratedMessageForAny(
-                rpc.ErrorInfo()..reason = 'INVALID_ID_TOKEN',
-              ),
-              'invalid-user-token',
-            ),
-            (
-              GeneratedMessageForAny(
-                rpc.LocalizedMessage()..message = 'MFA_ENROLLMENT_NOT_FOUND',
-              ),
-              'multi-factor-info-not-found',
-            ),
-            (
-              GeneratedMessageForAny(
-                rpc.DebugInfo()..detail = 'CREDENTIAL_TOO_OLD_LOGIN_AGAIN',
-              ),
-              'requires-recent-login',
-            ),
-            (
-              GeneratedMessageForAny(
-                rpc.BadRequest()
-                  ..fieldViolations.add(
-                    rpc.BadRequest_FieldViolation()
-                      ..field_1 = 'mfa_enrollment_id'
-                      ..description = 'MISSING_MFA_ENROLLMENT_ID',
-                  ),
-              ),
-              'missing-multi-factor-info',
-            ),
-            (
-              GeneratedMessageForAny(
-                rpc.ErrorInfo()
-                  ..reason = 'API_KEY_INVALID'
-                  ..domain = 'googleapis.com',
-              ),
-              'invalid-api-key',
-            ),
-          ]) {
-        final FirebaseAuthException e = await errorOf(
-          protobufResponse(
-            status(
-              3,
-              'Request contains an invalid argument.',
-              <GeneratedMessageForAny>[detail],
-            ),
-            400,
-          ),
-        );
-        expect(e.code, code, reason: '${detail.message}');
-      }
-    });
-
-    test('a body that is not a status is an internal-error', () async {
-      final FirebaseAuthException e = await errorOf(
-        protobufResponse(<int>[0xff, 0xff, 0xff], 500),
-      );
-      expect(e.code, 'internal-error');
-      expect(e.httpStatus, 500);
-    });
-
-    test('a JSON answer to a protobuf request is read as JSON', () async {
-      final FirebaseAuthException e = await errorOf(
-        errorResponse('MFA_ENROLLMENT_NOT_FOUND'),
-      );
-      expect(e.code, 'multi-factor-info-not-found');
-    });
-
-    test('a malformed success is an internal-error', () async {
-      final FirebaseAuthException e = await errorOf(
-        protobufResponse(<int>[0xff, 0xff, 0xff]),
-      );
-      expect(e.code, 'internal-error');
-    });
-
-    test('a network error', () async {
-      server.protobufHandler = (http.Request request) async =>
-          throw http.ClientException('offline', request.url);
+    test('an unknown factor is multi-factor-info-not-found', () async {
       await expectLater(
-        auth.unenrollMultiFactor('totp-1'),
-        throwsAuth('network-request-failed'),
+        auth.unenrollMultiFactor('nope'),
+        throwsAuth('multi-factor-info-not-found'),
+      );
+      expect(auth.currentUser!.enrolledFactors, hasLength(1));
+    });
+
+    test('the language goes as X-Firebase-Locale', () async {
+      auth.languageCode = 'fr';
+      await auth.unenrollMultiFactor('totp-1');
+      expect(
+        backend.requests
+            .firstWhere(
+              (http.Request r) => r.url.path.endsWith('mfaEnrollment:withdraw'),
+            )
+            .headers['X-Firebase-Locale'],
+        'fr',
       );
     });
-  });
-
-  test('the emulator uses JSON', () {
-    final FirebaseUserAuth emulated = backend.create(
-      emulatorHost: '127.0.0.1:9099',
-    );
-    expect(emulated.multiFactorWireFormat, MultiFactorWireFormat.json);
-    expect(auth.multiFactorWireFormat, MultiFactorWireFormat.protobuf);
-    unawaited(emulated.dispose());
   });
 
   test('MultiFactorInfo reads RFC 3339 timestamps strictly', () {

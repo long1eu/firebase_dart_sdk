@@ -135,10 +135,7 @@ class FirebaseUserAuth implements AuthTokenProvider {
        _http = httpClient ?? http.Client(),
        _ownsHttp = httpClient == null,
        _clock = clock ?? DateTime.now,
-       _createTimer = createTimer ?? Timer.new,
-       multiFactorWireFormat = emulatorHost == null
-           ? MultiFactorWireFormat.protobuf
-           : MultiFactorWireFormat.json {
+       _createTimer = createTimer ?? Timer.new {
     // Synchronous: a listener (FirebaseFirestore) hears about a new user before the sign-in call returns.
     _tokenChanges = StreamController<AuthTokenChange>.broadcast(
       sync: true,
@@ -373,18 +370,10 @@ class FirebaseUserAuth implements AuthTokenProvider {
   /// The [restore] in progress.
   Future<void>? _restoring;
 
-  /// How the multi-factor calls are encoded: protocol buffers where Google's published definitions describe the call
-  /// (`mfaEnrollment:withdraw`), JSON otherwise; JSON for every call with the Auth emulator. Internal: for the
-  /// tests of this package and for checking both formats against the backend.
-  @internal
-  MultiFactorWireFormat multiFactorWireFormat;
-
-  MultiFactorApi get _multiFactor => MultiFactorApi(
-    multiFactorWireFormat,
+  MultiFactorApi get _multiFactor => MultiFactorApi.json(
     MultiFactorTransport(
       postJson: (String method, Map<String, Object?> body) =>
           _send(_identityToolkit(method, version: 'v2'), json: body),
-      postProtobuf: _postProtobuf,
     ),
   );
 
@@ -1349,8 +1338,7 @@ class FirebaseUserAuth implements AuthTokenProvider {
   /// The session continues with the new tokens the backend returns, and the account is read again, like after
   /// [finalizeTotpEnrollment].
   ///
-  /// Throws `null-user`, `multi-factor-info-not-found` (no such factor), `requires-recent-login`, ... See the
-  /// README for what the errors look like over protocol buffers.
+  /// Throws `null-user`, `multi-factor-info-not-found` (no such factor), `requires-recent-login`, ...
   Future<void> unenrollMultiFactor(String uid) =>
       _forUser((String idToken, int generation) async {
         final Map<String, Object?> response = await _multiFactor.withdraw(
@@ -1832,34 +1820,6 @@ class FirebaseUserAuth implements AuthTokenProvider {
       }
     }
     throw exceptionFromJsonError(response.statusCode, body);
-  }
-
-  /// Posts the protocol buffer [body] to the v2 [method] with `$alt=proto`, with the headers of [_send], and returns
-  /// the response as it is: the caller decodes it, also an error ([decodeProtobufAnswer]).
-  Future<http.Response> _postProtobuf(String method, List<int> body) async {
-    final Map<String, String> headers = await _additionalHeaders();
-    final String? locale = languageCode;
-    if (locale != null && locale.isNotEmpty) {
-      headers['X-Firebase-Locale'] = locale;
-    }
-    final Uri url = _identityToolkit(method, version: 'v2');
-    try {
-      return await _http.post(
-        // `$alt` as it is (Uri.https would write %24alt).
-        url.replace(query: '${url.query}&\$alt=proto'),
-        headers: <String, String>{
-          ...headers,
-          'Content-Type': 'application/x-protobuf',
-        },
-        body: body,
-      );
-    } on Object catch (_) {
-      throw const FirebaseAuthException(
-        code: 'network-request-failed',
-        message:
-            'The request to the authentication service failed (network error).',
-      );
-    }
   }
 
   Future<UserCredential> _signIn(

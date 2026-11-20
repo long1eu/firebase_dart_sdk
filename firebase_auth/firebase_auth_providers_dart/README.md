@@ -190,13 +190,8 @@ the new tokens are stored, and the account is read again. A reauthentication of 
 goes through the same resolver. An account whose only second factors are SMS cannot finish a sign-in here: the
 exception's message says so and `resolveSignInWithTotp` throws `multi-factor-info-not-found`.
 
-The calls use the Identity Toolkit API v2. `mfaEnrollment:withdraw` goes as protocol buffers (`$alt=proto`, the
-messages generated from Google's published definitions); the three TOTP calls go as JSON because the published
-definitions do not describe their TOTP fields. A protobuf error comes back as a `google.rpc.Status`, whose message
-can be generic ("Request contains an invalid argument."): when neither the message nor the details carry the
-backend's code (`MFA_ENROLLMENT_NOT_FOUND`, `TOKEN_EXPIRED`, ...), the error's `code` is the status code in kebab
-case (`invalid-argument`) and its `message` the status message. Nothing of this was run against the real service
-yet.
+The calls use the Identity Toolkit API v2. The published Identity Toolkit v2 protos have no TOTP fields, so all
+multi-factor calls use JSON. Nothing of this was run against the real service yet.
 
 ### Browser sign-in on desktop and command line
 
