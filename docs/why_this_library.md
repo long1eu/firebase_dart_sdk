@@ -58,8 +58,10 @@ this repository was re-checked except the adoption numbers below. No Firebase se
   stay at one tab, and secondary isolates on the Dart VM still do not share listeners through the public API.
   The statements "one tab per persistent cache" and "several tabs ... not supported" were true on 2026-11-16;
   they are updated in place below, with a mark.
-- The web is now a reason (new reason 5 in "The answer", Hypothesis 6 and the table). It is the weakest of the
-  five, because its evidence is a CI interop job and emulator tests in one browser.
+- The web is now a reason (new reason 6 in "The answer", Hypothesis 6 and the table). It is the weakest of the
+  six, because its evidence is a CI interop job and emulator tests in one browser.
+- Long offline use is now a reason (new reason 5 in "The answer"), from the measurements of
+  `docs/guides/long_offline.md`. Its weak point is that the official SDKs were not measured the same way.
 - Adoption on 2026-11-20 (pub.dev API `/score`, and `gh api repos/long1eu/firebase_dart_sdk`): 221 downloads in
   30 days (58 on 2026-11-16), 0 likes (0), 80 GitHub stars (80). The 499 of 513 commits was not counted again.
 - Not changed: every outside source (FlutterFire, the Admin SDK, `firedart`, Flutter docs, the other pub.dev
@@ -97,7 +99,20 @@ Ranked by how strong the evidence is that this library is the better or the only
    (2026-11-17): the test suites pass there, and a Flutter Windows app on the official API ran sum and average
    aggregations through it (`examples/flutterfire_on_windows`). Not in CI, not on a logged-on desktop, not
    against production.
-5. **(Added 2026-11-20) A web app whose users are on the Firebase JS SDK or FlutterFire web, and that wants to
+5. **(Added 2026-11-20) An app that stays offline for weeks or months and keeps writing** (field work, kiosks,
+   embedded devices; it goes with reason 1). `docs/guides/long_offline.md` measured the SQLite cache with queues
+   of 10,000 to 10 million pending writes: a write, a read by key, a reopen and garbage collection stay
+   constant; a query of a collection of 10 documents among 1 million pending writes takes 0.09 ms (246 ms before
+   the fixes). Two extensions that the official SDKs do not have matter here: `mergeUnsentWrites` keeps a
+   document that is edited many times as one pending write (the drain of 100,000 edits of one document with a
+   `serverTimestamp`: 0.09 s with it, 344 s without), and `getPendingWriteCount()` / `pendingWriteCounts()` show
+   the queue while it drains. Caveat: no period of a year was run, the queues were generated. One machine (a Mac
+   with 64 GB, `synchronous = OFF`), the emulator only; no phone, no production drain (estimated at about 8
+   minutes for 100,000 writes and 1.4 hours for 1 million, bounded by the backend). The cache file grows by
+   about 1 KB per pending document and nothing shrinks it. `mergeUnsentWrites` changes what rules and functions
+   see. **The official SDKs were not measured with the same queues**, so this is "measured, with its limits
+   written down", not "better than FlutterFire".
+6. **(Added 2026-11-20) A web app whose users are on the Firebase JS SDK or FlutterFire web, and that wants to
    move to this client without losing their offline cache.** The IndexedDB engine reads and writes the JS SDK's
    own database (documents, pending writes of every user, indexes, bundles), so the switch needs no import step
    and works in both directions; `importJsSdkCache` moves a JS cache, pending writes included, into the other
@@ -113,7 +128,7 @@ Firestore in a Dart web app that does not use Flutter, such as Jaspr (Hypothesis
 
 Four reasons that were expected and **do not hold up** today: iOS build time (Firestore now ships precompiled
 through Swift Package Manager, the Flutter default since 3.44), dart2wasm (the FlutterFire web plugins are
-`is:wasm-ready`), web bundle size (about the same; this is separate from reason 5), and de-Googled Android (Firestore and Auth do not need
+`is:wasm-ready`), web bundle size (about the same; this is separate from reason 6), and de-Googled Android (Firestore and Auth do not need
 Google Play services). Feature gaps are also not a reason: FlutterFire has pipelines, bundles, named databases
 and the cache index manager.
 
@@ -408,6 +423,10 @@ Ranked by expected effect on adoption.
 5. **A Windows CI job** (unit and integration on the Dart VM) and one Flutter Windows build. Cheap, and it turns
    reason 4 from a gap into a claim. Build-time and size measurements (Hypothesis 4) come last: they are
    needed only to avoid false claims, not to win users.
+6. **(Added 2026-11-20) The long-offline measurements repeated with the official SDKs and on a phone.** The
+   same queues (100,000 and 1 million pending writes, one document edited 100,000 times) on FlutterFire on
+   Android and on the JS SDK, and this client on one low-memory device. Without it reason 5 can not say
+   "better", only "measured".
 
 ## Positioning statements
 
