@@ -181,8 +181,10 @@ Firestore emulator ([how we test](docs/how_we_test.md)).
 
 **Issues:** <https://github.com/long1eu/firebase_dart_sdk/issues>.
 
-**Maintenance:** _[MAINTAINER: one sentence on who maintains this project and how. Not written
-yet.]_
+**Maintenance:** one maintainer, Razvan Lung, in his own time. The port was started in 2018, had its last
+release in April 2020 and then stood still: keeping a hand port of the Android SDK in step with upstream was
+too much work for one person. It was revived in November 2026 with Claude Code, which wrote most of the recent
+code; he reviews and tests it. Response times are in the [support policy](docs/support_policy.md).
 
 - **Tested mostly against the Firestore emulator.** Against production, only the production
   verification kit (`tool/verify_production`) was run, on a real Firestore database in Standard
