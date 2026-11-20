@@ -300,6 +300,9 @@ currently 3.8.0, the lowest supported one). Do not format
 
 ## License
 
+The [`LICENSE`](LICENSE) file at the root is the Apache License 2.0, the licence of the seven published
+packages. The older packages that were not migrated carry their own licence in their own folder.
+
 `cloud_firestore_dart`, `firebase_app_dart`, `firebase_auth_providers_dart`, `cloud_firestore_dart_sqlite`,
 `cloud_firestore_dart_flutterfire`, `cloud_firestore_dart_platform` and `firebase_admin_dart` are licensed under
 the Apache License 2.0, as upstream; see the `LICENSE` and `NOTICE` files of each package. The
