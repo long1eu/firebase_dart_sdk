@@ -4,15 +4,14 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/local/js_sdk_import/
 /// Imports the cache of the official Firebase JS SDK into the cache of [firestore], once, so that a web app that used
 /// the JS SDK with persistence can switch to this SDK on the same browser profile without losing its pending writes.
 ///
-/// **Experimental**: the API and the behaviour may change in a minor version.
-///
 /// It reads the IndexedDB database the JS SDK keeps for the same app and database,
 /// `firestore/<app name>/<project id>[.<database id>]/main` (the app name is `[DEFAULT]` for the default app; pass
 /// [jsAppName] when the JS app had another name than [FirebaseFirestore.app]), and imports:
 ///
 /// - the pending writes of every user, in their order, with their local write times, into the mutation queues of
-///   this cache, whatever it is (memory or SQLite). The documents the app reads locally include them, and they are
-///   sent to the backend when the client is online. Each imported write is then removed from the JS database;
+///   this cache, whatever it is (memory, SQLite, the key-value cache, or the IndexedDB cache of another app). The
+///   documents the app reads locally include them, and they are sent to the backend when the client is online. Each
+///   imported write is then removed from the JS database;
 /// - with [includeDocuments], the cached documents with their versions and read times, the first time only, so that
 ///   the first start offline after the switch still shows data. A document that this cache holds in a newer version
 ///   is kept.
@@ -49,6 +48,13 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/local/js_sdk_import/
 /// - a pending write can not be read ([JsSdkCacheImportRefusal.unreadableWrites]).
 ///
 /// The JS database is never deleted: call [deleteJsSdkCache] when the app no longer needs it.
+///
+/// On an instance whose IndexedDB cache (`indexedDbCacheSettings`) is the JS database itself there is nothing to
+/// import: that cache reads the JS SDK's pending writes as its own ([JsSdkCacheImportStatus.nothingToImport]).
+///
+/// Tested in Chrome with databases written by the JS SDK 13.3.0 and with hand-built ones of every schema version
+/// from 5 on: the backend ends up as when the JS SDK sends the same writes itself (see "Switching from the official
+/// JS SDK" in the web guide).
 Future<JsSdkCacheImportResult> importJsSdkCache(
   FirebaseFirestore firestore, {
   bool includeDocuments = true,
@@ -66,8 +72,6 @@ Future<JsSdkCacheImportResult> importJsSdkCache(
 /// Deletes the IndexedDB database of the official Firebase JS SDK for the app and database of [firestore] (see
 /// [importJsSdkCache]). Returns false when there is none, or on other platforms than the web.
 ///
-/// **Experimental**: the API and the behaviour may change in a minor version.
-///
 /// Throws a [JsSdkCacheImportException] when a JS tab may still use the database
 /// ([JsSdkCacheImportRefusal.jsClientActive]), and when it holds pending writes that [importJsSdkCache] did not
 /// import ([JsSdkCacheImportRefusal.pendingWritesNotImported]) unless [discardPendingWrites] is true.
@@ -84,8 +88,6 @@ Future<bool> deleteJsSdkCache(
 }
 
 /// What [importJsSdkCache] did.
-///
-/// **Experimental**.
 enum JsSdkCacheImportStatus {
   /// Not on the web: there is no JS SDK cache to import.
   notOnWeb,
@@ -101,8 +103,6 @@ enum JsSdkCacheImportStatus {
 }
 
 /// Why [importJsSdkCache] or [deleteJsSdkCache] refused to run.
-///
-/// **Experimental**.
 enum JsSdkCacheImportRefusal {
   /// A tab of the JS SDK may still use the database.
   jsClientActive,
@@ -125,8 +125,6 @@ enum JsSdkCacheImportRefusal {
 }
 
 /// The error of [importJsSdkCache] and [deleteJsSdkCache] when they refuse to run. Nothing was imported or deleted.
-///
-/// **Experimental**.
 final class JsSdkCacheImportException implements Exception {
   const JsSdkCacheImportException(this.reason, this.message);
 
@@ -141,8 +139,6 @@ final class JsSdkCacheImportException implements Exception {
 }
 
 /// The result of [importJsSdkCache].
-///
-/// **Experimental**.
 final class JsSdkCacheImportResult {
   const JsSdkCacheImportResult({
     required this.status,
