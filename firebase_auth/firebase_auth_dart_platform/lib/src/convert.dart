@@ -9,6 +9,7 @@ import 'package:firebase_auth_platform_interface/firebase_auth_platform_interfac
 import 'package:firebase_auth_providers_dart/firebase_auth_providers_dart.dart'
     as dart_auth;
 
+import 'firebase_auth.dart';
 import 'multi_factor.dart';
 import 'storage.dart' show isFileSystemException;
 
@@ -37,20 +38,17 @@ const String noProviderFlow =
     'browser and a loopback redirect), or get the provider token yourself and '
     'use signInWithCredential.';
 
-/// Why the multi-factor members throw.
-const String noMultiFactor =
-    'multi-factor authentication is not supported yet.';
-
 /// Runs [body] and rethrows its errors as the exceptions of the platform
 /// interface, so that an app always gets a [FirebaseAuthException]: the
-/// errors of `firebase_auth_providers_dart` with the same code, an
+/// errors of `firebase_auth_providers_dart` with the same code (a
+/// second-factor challenge with a resolver that signs in to [auth]), an
 /// [ArgumentError] as `argument-error`, a [StateError] and a failed file
 /// operation as `internal-error`.
-Future<T> guard<T>(Future<T> Function() body) async {
+Future<T> guard<T>(DartFirebaseAuth auth, Future<T> Function() body) async {
   try {
     return await body();
   } on dart_auth.FirebaseAuthException catch (e, stackTrace) {
-    Error.throwWithStackTrace(exceptionOf(e), stackTrace);
+    Error.throwWithStackTrace(exceptionOf(e, auth), stackTrace);
   } on dart_app.FirebaseNoSignedInUserException catch (_, stackTrace) {
     Error.throwWithStackTrace(noCurrentUser(), stackTrace);
   } on ArgumentError catch (e, stackTrace) {
@@ -83,9 +81,13 @@ FirebaseAuthException noCurrentUser() => FirebaseAuthException(
 
 /// [e] as an exception of the platform interface: the same code, message,
 /// email, phone number, tenant and credential. A second-factor challenge
-/// becomes a [FirebaseAuthMultiFactorExceptionPlatform] whose resolver cannot
-/// finish the sign-in yet.
-FirebaseAuthException exceptionOf(dart_auth.FirebaseAuthException e) {
+/// becomes a [FirebaseAuthMultiFactorExceptionPlatform] whose resolver
+/// finishes it with a TOTP code, through the client's resolver, and returns
+/// the result as a credential of [auth].
+FirebaseAuthException exceptionOf(
+  dart_auth.FirebaseAuthException e,
+  DartFirebaseAuth auth,
+) {
   if (e is dart_auth.FirebaseAuthMultiFactorException) {
     return FirebaseAuthMultiFactorExceptionPlatform(
       code: e.code,
@@ -94,9 +96,12 @@ FirebaseAuthException exceptionOf(dart_auth.FirebaseAuthException e) {
       phoneNumber: e.phoneNumber,
       tenantId: e.tenantId,
       credential: credentialOf(e.credential),
-      resolver: DartMultiFactorResolver(<MultiFactorInfo>[
-        for (final hint in e.hints) multiFactorInfoOf(hint),
-      ], MultiFactorSession(e.pendingCredential)),
+      resolver: DartMultiFactorResolver(
+        <MultiFactorInfo>[for (final hint in e.hints) multiFactorInfoOf(hint)],
+        MultiFactorSession(e.pendingCredential),
+        auth: auth,
+        source: e.resolver,
+      ),
     );
   }
   return DartFirebaseAuthException(

@@ -88,6 +88,17 @@ class DartFirebaseAuth extends FirebaseAuthPlatform {
         'which has no app: use FirebaseAuth.instanceFor(app: ...).',
       ));
 
+  /// The [client] while [uid] is its signed-in user. Throws `no-current-user`
+  /// once another user (or nobody) is signed in, like the native
+  /// implementations.
+  dart_auth.FirebaseUserAuth clientFor(String uid) {
+    final dart_auth.FirebaseUserAuth userAuth = client;
+    if (userAuth.uid != uid) {
+      throw noCurrentUser();
+    }
+    return userAuth;
+  }
+
   /// The user of the interface for [user], the same object for the same
   /// snapshot of the client.
   DartUser? userOf(dart_auth.AuthUser? user) {
@@ -283,13 +294,14 @@ class DartFirebaseAuth extends FirebaseAuthPlatform {
 
   @override
   Future<UserCredentialPlatform> signInAnonymously() =>
-      guard(() async => resultOf(await client.signInAnonymously()));
+      guard(this, () async => resultOf(await client.signInAnonymously()));
 
   @override
   Future<UserCredentialPlatform> createUserWithEmailAndPassword(
     String email,
     String password,
   ) => guard(
+    this,
     () async => resultOf(
       await client.createUserWithEmailAndPassword(
         email: email,
@@ -303,19 +315,23 @@ class DartFirebaseAuth extends FirebaseAuthPlatform {
     String email,
     String password,
   ) => guard(
+    this,
     () async => resultOf(
       await client.signInWithEmailAndPassword(email: email, password: password),
     ),
   );
 
   @override
-  Future<UserCredentialPlatform> signInWithCustomToken(String token) =>
-      guard(() async => resultOf(await client.signInWithCustomToken(token)));
+  Future<UserCredentialPlatform> signInWithCustomToken(String token) => guard(
+    this,
+    () async => resultOf(await client.signInWithCustomToken(token)),
+  );
 
   @override
   Future<UserCredentialPlatform> signInWithCredential(
     AuthCredential credential,
   ) => guard(
+    this,
     () async => resultOf(
       await client.signInWithCredential(clientCredentialOf(credential)),
     ),
@@ -326,6 +342,7 @@ class DartFirebaseAuth extends FirebaseAuthPlatform {
     String email,
     String emailLink,
   ) => guard(
+    this,
     () async => resultOf(
       await client.signInWithEmailLink(email: email, emailLink: emailLink),
     ),
@@ -336,7 +353,7 @@ class DartFirebaseAuth extends FirebaseAuthPlatform {
       client.isSignInWithEmailLink(emailLink);
 
   @override
-  Future<void> signOut() => guard(() => client.signOut());
+  Future<void> signOut() => guard(this, () => client.signOut());
 
   // ---- email actions ----
 
@@ -345,6 +362,7 @@ class DartFirebaseAuth extends FirebaseAuthPlatform {
     String email, [
     ActionCodeSettings? actionCodeSettings,
   ]) => guard(
+    this,
     () => client.sendPasswordResetEmail(
       email: email,
       actionCodeSettings: actionCodeSettingsOf(actionCodeSettings),
@@ -356,6 +374,7 @@ class DartFirebaseAuth extends FirebaseAuthPlatform {
     String email,
     ActionCodeSettings actionCodeSettings,
   ) => guard(
+    this,
     () => client.sendSignInLinkToEmail(
       email: email,
       actionCodeSettings: actionCodeSettingsOf(actionCodeSettings)!,
@@ -364,24 +383,27 @@ class DartFirebaseAuth extends FirebaseAuthPlatform {
 
   @override
   Future<void> applyActionCode(String code) =>
-      guard(() => client.applyActionCode(code));
+      guard(this, () => client.applyActionCode(code));
 
   @override
-  Future<ActionCodeInfo> checkActionCode(String code) =>
-      guard(() async => actionCodeInfoOf(await client.checkActionCode(code)));
+  Future<ActionCodeInfo> checkActionCode(String code) => guard(
+    this,
+    () async => actionCodeInfoOf(await client.checkActionCode(code)),
+  );
 
   @override
   Future<void> confirmPasswordReset(String code, String newPassword) => guard(
+    this,
     () => client.confirmPasswordReset(code: code, newPassword: newPassword),
   );
 
   @override
   Future<String> verifyPasswordResetCode(String code) =>
-      guard(() => client.verifyPasswordResetCode(code));
+      guard(this, () => client.verifyPasswordResetCode(code));
 
   @override
   Future<List<String>> fetchSignInMethodsForEmail(String email) =>
-      guard(() => client.fetchSignInMethodsForEmail(email));
+      guard(this, () => client.fetchSignInMethodsForEmail(email));
 
   // ---- not available: see the README ----
 
@@ -429,11 +451,11 @@ class DartFirebaseAuth extends FirebaseAuthPlatform {
   /// Revokes an Apple access token (`revokeAccessToken` of the client).
   @override
   Future<void> revokeAccessToken(String accessToken) =>
-      guard(() => client.revokeAccessToken(accessToken));
+      guard(this, () => client.revokeAccessToken(accessToken));
 
   /// Revokes the tokens of a Sign in with Apple authorization code
   /// (`revokeToken` of the client).
   @override
   Future<void> revokeTokenWithAuthorizationCode(String authorizationCode) =>
-      guard(() => client.revokeToken(authorizationCode));
+      guard(this, () => client.revokeToken(authorizationCode));
 }

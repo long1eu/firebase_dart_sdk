@@ -135,7 +135,8 @@ the new user, `await provider.waitForCurrentUser()` first. `userAuthFor` has no 
 | `authStateChanges()`, `idTokenChanges()`, `userChanges()` | implemented, tested |
 | `tenantId`, `languageCode`, `setLanguageCode`, `useAuthEmulator`, `setPersistence` | implemented, tested |
 | Errors: `FirebaseAuthException` with the client's code (the codes of the JS SDK), `email`, `credential`, `phoneNumber`, `tenantId`; a recoverable credential goes back to `signInWithCredential` unchanged; other errors of the client (`ArgumentError` as `argument-error`, `StateError` and file errors as `internal-error`) are `FirebaseAuthException`s too | implemented, tested |
-| `multi-factor-auth-required`: a `FirebaseAuthMultiFactorException` whose `resolver.hints` lists the factors | implemented, tested; the resolver cannot finish the sign-in (below) |
+| `multi-factor-auth-required`: a `FirebaseAuthMultiFactorException` whose `resolver.hints` lists the factors and whose `resolver.resolveSignIn` finishes the sign-in or reauthentication with `TotpMultiFactorGenerator.getAssertionForSignIn` | implemented, tested |
+| Authenticator app (TOTP) second factors: `User.multiFactor` (`getSession`, `enroll`, `unenroll`, `getEnrolledFactors`), `TotpMultiFactorGenerator` (`generateSecret`, `getAssertionForEnrollment`, `getAssertionForSignIn`), `TotpSecret.generateQrCodeUrl`. SMS factors are listed and can be unenrolled | implemented, tested |
 
 These throw a `FirebaseAuthException` with the code `unimplemented` and a message that says why:
 
@@ -147,8 +148,8 @@ These throw a `FirebaseAuthException` with the code `unimplemented` and a messag
 - **Phone**: `verifyPhoneNumber`, `signInWithPhoneNumber`, `User.linkWithPhoneNumber`, `User.updatePhoneNumber`,
   `initializeRecaptchaConfig`, a `PhoneAuthCredential`, `PhoneMultiFactorGenerator.getAssertion`. Phone sign-in needs
   reCAPTCHA or the app verification of Android and iOS.
-- **Multi-factor**: `User.multiFactor` (`getSession`, `enroll`, `unenroll`, `getEnrolledFactors`),
-  `MultiFactorResolver.resolveSignIn`, `TotpMultiFactorGenerator`.
+- **`TotpSecret.openInOtpApp`**: opening another app needs a URL launcher. Open the URL of `generateQrCodeUrl`
+  with `url_launcher`, or show it as a QR code.
 - **Play Games and Game Center credentials**, which need their native SDKs.
 
 ## How it differs from the official plugin
@@ -167,6 +168,10 @@ These throw a `FirebaseAuthException` with the code `unimplemented` and a messag
   per change of the user's data.
 - **Apple's `appleFullPersonName`** reaches the client, which, like the JS SDK, does not send it to the backend: set
   the name with `updateDisplayName` after the first sign-in.
+- **TOTP enrolment**: `MultiFactor.enroll` needs a `displayName` (`argument-error` without one; the backend
+  refuses a TOTP factor without a name). `getSession()` sends nothing: the enrolment starts on the backend with
+  `generateSecret`, and the session's `id` is the uid of the user. `generateQrCodeUrl()` defaults the account name
+  to the user's email address and the issuer to the name of the Firebase app, as the JS SDK does.
 - **`setSettings`** is accepted and ignored: its settings are for phone sign-in and the iOS keychain.
 - **App Check** tokens are not sent: the client supports them, but this package has no `firebase_app_check`
   implementation to take them from.

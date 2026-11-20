@@ -90,8 +90,9 @@ abstract final class FirebaseAuthDart {
   ///   this repository) keeps it; pass true to force it (for example in tests),
   ///   false to never do it.
   ///
-  /// It also replaces the phone and TOTP multi-factor generators of
-  /// `firebase_auth` with ones that throw `unimplemented`.
+  /// It also replaces the multi-factor generators of `firebase_auth`: the
+  /// TOTP one works through the client, the phone one throws
+  /// `unimplemented`.
   ///
   /// Throws a [StateError] when the instance of an app has already been
   /// created: the configuration is read then.
@@ -151,9 +152,11 @@ abstract final class FirebaseAuthDart {
         message: 'Password cannot be null or empty',
       );
     }
+    final DartFirebaseAuth auth = DartFirebaseAuth.forApp(app);
     return guard(
+      auth,
       () async => passwordValidationStatusOf(
-        await userAuthFor(app).validatePassword(password),
+        await auth.client.validatePassword(password),
       ),
     );
   }

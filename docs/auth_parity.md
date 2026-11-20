@@ -157,17 +157,17 @@ Path shorthand:
 
 | JS export | Dart client | Shim | Status | Notes |
 |---|---|---|---|---|
-| multiFactor(user).enrolledFactors | `AuthUser.enrolledFactors` | `DartMultiFactor.getEnrolledFactors` throws | different | auth_user.dart:76; shim multi_factor.dart:30 |
-| MultiFactorUser.getSession | none | throws unimplemented | missing | shim multi_factor.dart:14 |
-| MultiFactorUser.enroll (TOTP) | `startTotpEnrollment` → `finalizeTotpEnrollment(secret, code, displayName)` | throws | different | firebase_user_auth.dart:1280, :1310 |
-| MultiFactorUser.unenroll | `unenrollMultiFactor(uid)` (SMS factors too) | throws | different | uid only; firebase_user_auth.dart:1343 |
-| getMultiFactorResolver | `FirebaseAuthMultiFactorException.resolver` (also on reauth) | convert.dart:98 converts hints only | different | auth_exception.dart:436; firebase_user_auth.dart:1930 |
+| multiFactor(user).enrolledFactors | `AuthUser.enrolledFactors` | `DartMultiFactor.getEnrolledFactors` reads the client's current user (Phone/Totp subtypes) | different | auth_user.dart:76; shim multi_factor.dart:82 |
+| MultiFactorUser.getSession | none | `DartMultiFactorSession`: keeps the user, id = uid; nothing is sent (the backend session starts in `generateSecret`) | different | shim multi_factor.dart:29, :100 |
+| MultiFactorUser.enroll (TOTP) | `startTotpEnrollment` → `finalizeTotpEnrollment(secret, code, displayName)` | `finalizeTotpEnrollment`; `argument-error` without a displayName | different | firebase_user_auth.dart:1280, :1310; shim multi_factor.dart:38 |
+| MultiFactorUser.unenroll | `unenrollMultiFactor(uid)` (SMS factors too) | `factorUid` or `multiFactorInfo.uid` → `unenrollMultiFactor` | different | uid only in the client; firebase_user_auth.dart:1343; shim multi_factor.dart:65 |
+| getMultiFactorResolver | `FirebaseAuthMultiFactorException.resolver` (also on reauth) | `exceptionOf` wraps the client's resolver in `DartMultiFactorResolver` (convert.dart:87) | different | auth_exception.dart:436; firebase_user_auth.dart:1930 |
 | MultiFactorResolver.hints | `hints` | `DartMultiFactorResolver` | same | multi_factor.dart:229 |
 | MultiFactorResolver.session | none (`pendingCredential` on the exception) | pending credential used as session id | missing | |
-| MultiFactorResolver.resolveSignIn(assertion) | `resolveSignInWithTotp(code, enrollmentId)`; SMS throws `multi-factor-info-not-found` | throws | different | multi_factor.dart:247 |
+| MultiFactorResolver.resolveSignIn(assertion) | `resolveSignInWithTotp(code, enrollmentId)`; SMS throws `multi-factor-info-not-found` | TOTP assertion → `resolveSignInWithTotp`, for sign-in and reauthentication; other assertions `argument-error` | different | multi_factor.dart:247; shim multi_factor.dart:129 |
 | PhoneMultiFactorGenerator | none | throws (noPhone) | missing | needs SMS + reCAPTCHA; shim multi_factor.dart:49 |
-| TotpMultiFactorGenerator | folded into the enroll/resolve methods | throws | different | shim multi_factor.dart:57 |
-| TotpSecret | `TotpSecret` (secretKey, hashingAlgorithm, codeLength, codeIntervalSeconds, enrollmentCompletionDeadline, otpauthUri) | none | different | JS `generateQrCodeUrl`; multi_factor.dart:113-200 |
+| TotpMultiFactorGenerator | folded into the enroll/resolve methods | `generateSecret` → `startTotpEnrollment`; the assertions carry the secret or enrollment id and the code | different | shim multi_factor.dart:167 |
+| TotpSecret | `TotpSecret` (secretKey, hashingAlgorithm, codeLength, codeIntervalSeconds, enrollmentCompletionDeadline, otpauthUri) | `DartTotpSecret`: `generateQrCodeUrl` → `otpauthUri` (issuer defaults to the app name, as in JS); `openInOtpApp` throws `unimplemented` (needs a URL launcher) | different | JS `generateQrCodeUrl`; multi_factor.dart:113-200; shim multi_factor.dart:210 |
 | MultiFactorInfo / PhoneMultiFactorInfo / TotpMultiFactorInfo | one `MultiFactorInfo`; `enrollmentTime` is a `DateTime` | shim builds Phone/Totp subtypes (convert.dart:114) | different | multi_factor.dart:12-98 |
 | FactorId | `phoneFactorId`, `totpFactorId`, `unknownFactorId` | — | same | multi_factor.dart:25-32 |
 | MFA error codes | all 8 JS codes | — | same | auth_exception.dart:259-263, :383, :390 |
@@ -248,7 +248,7 @@ Path shorthand:
 | customData.appName | none | none | missing | Not needed with one client per app, but absent. |
 | customData.email, phoneNumber, tenantId | top-level fields `email`, `phoneNumber`, `tenantId` (`D:auth_exception.dart:184-190`), set only for the 3 tagged codes and `needConfirmation` | copied to FlutterFire exception (`S:convert.dart:114-123`) | different | JS sets them in more places (e.g. MFA errors and user-bound operations). FlutterFire exposes them top-level, so Dart is consistent with the shim target. |
 | customData._tokenResponse (raw server body on tagged errors, `J:api/index.ts:369`) | not kept raw; parsed into `credential` (`D:auth_exception.dart:196`, `credentialFromResponse`) | `credential` converted | different | Raw fields such as `rawUserInfo`, `oauthIdToken` are only available through the parsed credential. |
-| customData._serverResponse / MultiFactorError (`J:mfa/mfa_error.ts:28-50`) | `FirebaseAuthMultiFactorException` with `pendingCredential` and `hints` (`D:auth_exception.dart:435-486`); resolver and TOTP (`D:multi_factor.dart:225`) | converted to `FirebaseAuthMultiFactorExceptionPlatform`, but resolver throws unimplemented (`S:multi_factor.dart:44`) | different | |
+| customData._serverResponse / MultiFactorError (`J:mfa/mfa_error.ts:28-50`) | `FirebaseAuthMultiFactorException` with `pendingCredential` and `hints` (`D:auth_exception.dart:435-486`); resolver and TOTP (`D:multi_factor.dart:225`) | converted to `FirebaseAuthMultiFactorExceptionPlatform` whose resolver finishes TOTP through the client's (`S:multi_factor.dart:111`) | different | |
 | credentialFromError (`GoogleAuthProvider.credentialFromError` etc.) | `FirebaseAuthException.credential` (`D:auth_exception.dart:196`) | `credential` | different | A property instead of per-provider static helpers; same data. |
 | Dart-only fields `serverCode`, `httpStatus`, `invalidatesSession` (`D:auth_exception.dart:177,180,203`) | present | `serverCode` and `httpStatus` kept on `DartFirebaseAuthException` (`S:convert.dart`) | different | Not on a multi-factor error, which `firebase_auth` rebuilds as its own class. `invalidatesSession` is not passed on. |
 
@@ -279,7 +279,7 @@ Counts for the AuthErrorCodes comparison: 105 distinct client codes in JS map (1
 
 ## Shim coverage of the FlutterFire platform interface
 
-The shim never throws Dart's `UnimplementedError`: every missing member throws a `FirebaseAuthException` with code `unimplemented` (`S:convert.dart:17`, text constants `noPhone`, `noBrowserFlow`, `noProviderFlow`, `noMultiFactor` at :24-41).
+The shim never throws Dart's `UnimplementedError`: every missing member throws a `FirebaseAuthException` with code `unimplemented` (`S:convert.dart:17`, text constants `noPhone`, `noBrowserFlow`, `noProviderFlow` at :24-39).
 
 | JS export | Dart client | Shim | Status | Notes |
 | --- | --- | --- | --- | --- |
@@ -293,12 +293,14 @@ The shim never throws Dart's `UnimplementedError`: every missing member throws a
 | User.linkWithProvider, reauthenticateWithProvider (`S:user.dart:118,123`) | loopback flow in client | unimplemented, `noProviderFlow` | missing | |
 | User.linkWithPopup, linkWithRedirect, reauthenticateWithPopup, reauthenticateWithRedirect (`:127,131,136,140`) | none | unimplemented, `noBrowserFlow` | n/a outside a browser | |
 | User.linkWithPhoneNumber, updatePhoneNumber (`:146,150`) | none | unimplemented, `noPhone` | missing | |
-| MultiFactor getSession, enroll, unenroll, getEnrolledFactors (`S:multi_factor.dart:15,21,27,31`) | present in the client (`D:multi_factor.dart`, `multi_factor_api.dart`) | unimplemented, `noMultiFactor` | missing | The shim does not wire them yet. |
-| MultiFactorResolver.resolveSignIn (`:44`), PhoneMultiFactorGenerator.getAssertion (`:52`) | resolver in the client; phone MFA none | unimplemented | missing | |
-| TotpMultiFactorGenerator generateSecret, getAssertionForEnrollment, getAssertionForSignIn (`:60,69,78`) | in the client (`D:multi_factor.dart:113` `TotpSecret`) | unimplemented, `noMultiFactor` | missing | |
+| MultiFactor getSession, enroll, unenroll, getEnrolledFactors (`S:multi_factor.dart:29,38,65,82`) | present in the client (`D:multi_factor.dart`, `multi_factor_api.dart`) | implemented (TOTP; SMS factors listed and unenrolled only) | same | |
+| MultiFactorResolver.resolveSignIn (`:129`) | resolver in the client | implemented for TOTP assertions | same | |
+| PhoneMultiFactorGenerator.getAssertion (`:161`) | phone MFA none | unimplemented, `noPhone` | missing | |
+| TotpMultiFactorGenerator generateSecret, getAssertionForEnrollment, getAssertionForSignIn (`:173,186,202`) | in the client (`D:multi_factor.dart:113` `TotpSecret`) | implemented | same | |
+| TotpSecret generateQrCodeUrl, openInOtpApp (`:229,241`) | `TotpSecret.otpauthUri` | `generateQrCodeUrl` implemented; `openInOtpApp` unimplemented (needs a URL launcher) | different | |
 | Credentials: PhoneAuthCredential, Play Games, Game Center (`S:convert.dart:208-212`) | none | unimplemented | missing | Play Games and Game Center need native SDKs. |
 
-Unimplemented in the shim: 24 members (7 on `FirebaseAuthPlatform`, 8 on `UserPlatform`, 9 in the multi-factor classes) plus 3 credential kinds. Breakdown of the 24: 8 browser-only (3 sign-in popup/redirect, 4 user popup/redirect, `initializeRecaptchaConfig`), 9 MFA (exist in the client), 4 phone, 3 provider flows (the client has a loopback flow).
+Unimplemented in the shim: 17 members (7 on `FirebaseAuthPlatform`, 8 on `UserPlatform`, 2 in the multi-factor classes) plus 3 credential kinds. Breakdown of the 17: 8 browser-only (3 sign-in popup/redirect, 4 user popup/redirect, `initializeRecaptchaConfig`), 5 phone (including `PhoneMultiFactorGenerator.getAssertion`), 3 provider flows (the client has a loopback flow), and `TotpSecret.openInOtpApp` (needs a URL launcher).
 
 ## Gaps worth closing, ranked
 
@@ -312,7 +314,7 @@ Effort: S takes hours, M a few days, L more than a week or needs outside pieces.
 |---|---|---|---|---|---|---|---|
 | 1 | closed | Bring TOTP, the loopback exchange, the request timeout and the session rules together on one branch | M | no | no | high | MFA, `requestTimeout`, `revokeToken` and the loopback link and reauthenticate methods each lived on one branch, and all of them change `firebase_user_auth.dart`. |
 | 2 | closed | Signing out while the storage write fails leaves the old session on disk, and the next `restore` signs the user back in (`_clearSession`) | S | no | no | high | This is a bug, not a parity item. It is the counterpart of the `_setSession` write-failure fix. |
-| 3 | open | Connect the shim's multi-factor classes to the client's TOTP API (9 members) | M | no | no | high | The client already enrols, unenrols and resolves TOTP. The shim throws `unimplemented` (S:multi_factor.dart). Needs 1. |
+| 3 | closed | Connect the shim's multi-factor classes to the client's TOTP API (9 members) | M | no | no | high | The shim enrols, unenrols, lists and resolves TOTP through the client (S:multi_factor.dart); phone assertions and `openInOtpApp` still throw `unimplemented`. |
 | 4 | open | Back the shim's `signInWithProvider`, `linkWithProvider` and `reauthenticateWithProvider` with the loopback OAuth flow | M | system browser | no | high | This is the usual desktop sign-in. The client has the flow; the shim throws `noProviderFlow`. |
 | 5 | closed | `toJson`/`fromJson` for `EmailAuthCredential` and `OAuthCredential`, plus `OAuthProvider.credentialFromJson` | S | no | no | med | Keeps a pending credential across the `account-exists-with-different-credential` flow. Uses the JS JSON format. |
 | 6 | closed | `revokeAccessToken(token)` (ACCESS_TOKEN, `tenantId`) in the client, and both revoke methods in the shim | S | no | no | med | The endpoint call already exists. Apple's account-deletion rule makes it matter on iOS and macOS. |

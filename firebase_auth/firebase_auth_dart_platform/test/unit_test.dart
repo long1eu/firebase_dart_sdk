@@ -267,32 +267,296 @@ void main() {
         throwsAuthCode('email-already-in-use'),
       );
     });
+  });
 
-    test('a second factor gives the hints, and cannot be resolved', () async {
+  group('multi-factor', () {
+    setUp(backend.factors.clear);
+
+    /// Signs [email] in and enrols a TOTP factor named [name]; returns it.
+    Future<MultiFactorInfo> enrollTotp(
+      FirebaseAuth auth,
+      String email, {
+      String name = 'Phone',
+    }) async {
+      await auth.signInWithEmailAndPassword(email: email, password: 'p');
+      final MultiFactor multiFactor = auth.currentUser!.multiFactor;
+      final TotpSecret secret = await TotpMultiFactorGenerator.generateSecret(
+        await multiFactor.getSession(),
+      );
+      await multiFactor.enroll(
+        await TotpMultiFactorGenerator.getAssertionForEnrollment(
+          secret,
+          FakeBackend.totpCode,
+        ),
+        displayName: name,
+      );
+      return (await multiFactor.getEnrolledFactors()).single;
+    }
+
+    test('enrol a TOTP factor, list it, and unenrol it', () async {
       final FirebaseAuth auth = await newAuth();
-      backend.override = (http.Request r) => jsonResponse(<String, Object?>{
-        'localId': 'uid',
-        'mfaPendingCredential': 'pending',
-        'mfaInfo': <Object?>[
-          <String, Object?>{
-            'mfaEnrollmentId': 'totp-1',
-            'totpInfo': <String, Object?>{},
-          },
-        ],
+      await auth.signInWithEmailAndPassword(
+        email: 'enrol@example.com',
+        password: 'p',
+      );
+      final MultiFactor multiFactor = auth.currentUser!.multiFactor;
+      expect(await multiFactor.getEnrolledFactors(), isEmpty);
+
+      final MultiFactorSession session = await multiFactor.getSession();
+      expect(session.id, auth.currentUser!.uid);
+      expect(backend.paths.where((p) => p.contains('mfa')), isEmpty);
+      final TotpSecret secret = await TotpMultiFactorGenerator.generateSecret(
+        session,
+      );
+      expect(secret.secretKey, 'GEZDGNBVGY3TQOJQ');
+      expect(secret.codeLength, 6);
+      expect(secret.codeIntervalSeconds, 30);
+      expect(secret.hashingAlgorithm, 'SHA1');
+      expect(
+        secret.enrollmentCompletionDeadline,
+        DateTime.utc(2026, 1, 1, 12, 10),
+      );
+
+      await multiFactor.enroll(
+        await TotpMultiFactorGenerator.getAssertionForEnrollment(
+          secret,
+          FakeBackend.totpCode,
+        ),
+        displayName: 'Phone',
+      );
+      expect(backend.bodyOf('mfaEnrollment:finalize'), <String, Object?>{
+        'idToken': isA<String>(),
+        'displayName': 'Phone',
+        'totpVerificationInfo': <String, Object?>{
+          'sessionInfo': 'enrollment-session',
+          'verificationCode': FakeBackend.totpCode,
+        },
       });
+      final List<MultiFactorInfo> factors = await multiFactor
+          .getEnrolledFactors();
+      final MultiFactorInfo factor = factors.single;
+      expect(factor, isA<TotpMultiFactorInfo>());
+      expect(factor.factorId, 'totp');
+      expect(factor.displayName, 'Phone');
+      expect(factor.enrollmentTimestamp, 1767268800);
+
+      await multiFactor.unenroll(multiFactorInfo: factor);
+      expect(
+        backend.bodyOf('mfaEnrollment:withdraw'),
+        containsPair('mfaEnrollmentId', factor.uid),
+      );
+      expect(await multiFactor.getEnrolledFactors(), isEmpty);
+      await expectLater(
+        multiFactor.unenroll(factorUid: factor.uid),
+        throwsAuthCode('multi-factor-info-not-found'),
+      );
+    });
+
+    test('the QR code URL defaults to the email and the app name', () async {
+      final FirebaseAuth auth = await newAuth();
+      await auth.signInWithEmailAndPassword(
+        email: 'qr@example.com',
+        password: 'p',
+      );
+      final TotpSecret secret = await TotpMultiFactorGenerator.generateSecret(
+        await auth.currentUser!.multiFactor.getSession(),
+      );
+      expect(
+        await secret.generateQrCodeUrl(),
+        'otpauth://totp/${auth.app.name}:qr@example.com'
+        '?secret=GEZDGNBVGY3TQOJQ&issuer=${auth.app.name}'
+        '&algorithm=SHA1&digits=6',
+      );
+      expect(
+        await secret.generateQrCodeUrl(accountName: 'ada', issuer: 'My App'),
+        'otpauth://totp/My%20App:ada?secret=GEZDGNBVGY3TQOJQ'
+        '&issuer=My%20App&algorithm=SHA1&digits=6',
+      );
+      await expectLater(
+        secret.openInOtpApp('otpauth://totp/x'),
+        throwsAuthCode('unimplemented'),
+      );
+    });
+
+    test('a wrong code or a missing display name does not enrol', () async {
+      final FirebaseAuth auth = await newAuth();
+      await auth.signInWithEmailAndPassword(
+        email: 'wrong@example.com',
+        password: 'p',
+      );
+      final MultiFactor multiFactor = auth.currentUser!.multiFactor;
+      final TotpSecret secret = await TotpMultiFactorGenerator.generateSecret(
+        await multiFactor.getSession(),
+      );
+      await expectLater(
+        multiFactor.enroll(
+          await TotpMultiFactorGenerator.getAssertionForEnrollment(
+            secret,
+            '000000',
+          ),
+          displayName: 'Phone',
+        ),
+        throwsAuthCode('invalid-verification-code'),
+      );
+      backend.requests.clear();
+      await expectLater(
+        multiFactor.enroll(
+          await TotpMultiFactorGenerator.getAssertionForEnrollment(
+            secret,
+            FakeBackend.totpCode,
+          ),
+        ),
+        throwsAuthCode('argument-error'),
+      );
+      expect(backend.requests, isEmpty);
+      expect(await multiFactor.getEnrolledFactors(), isEmpty);
+    });
+
+    test('a TOTP code resolves a sign-in with a second factor', () async {
+      final FirebaseAuth auth = await newAuth();
+      final MultiFactorInfo factor = await enrollTotp(auth, 'mfa@example.com');
+      // A second authenticator app: the resolver must name the factor.
+      backend.factors['uid-of-mfa@example.com']!.insert(0, <String, Object?>{
+        'mfaEnrollmentId': 'totp-other',
+        'totpInfo': <String, Object?>{},
+      });
+      await auth.signOut();
       try {
-        await auth.signInWithEmailAndPassword(email: 'a@b.c', password: 'p');
+        await auth.signInWithEmailAndPassword(
+          email: 'mfa@example.com',
+          password: 'p',
+        );
         fail('expected a FirebaseAuthMultiFactorException');
       } on FirebaseAuthMultiFactorException catch (e) {
         expect(e.code, 'multi-factor-auth-required');
-        expect(e.resolver.hints.single, isA<TotpMultiFactorInfo>());
-        expect(e.resolver.hints.single.uid, 'totp-1');
-        expect(e.resolver.session.id, 'pending');
+        expect(e.resolver.hints, everyElement(isA<TotpMultiFactorInfo>()));
+        expect(
+          <String>[for (final h in e.resolver.hints) h.uid],
+          <String>['totp-other', factor.uid],
+        );
+        expect(e.resolver.session.id, 'pending:uid-of-mfa@example.com');
+        expect(auth.currentUser, isNull);
+        await expectLater(
+          e.resolver.resolveSignIn(
+            await TotpMultiFactorGenerator.getAssertionForSignIn(
+              factor.uid,
+              '000000',
+            ),
+          ),
+          throwsAuthCode('invalid-verification-code'),
+        );
+        final UserCredential result = await e.resolver.resolveSignIn(
+          await TotpMultiFactorGenerator.getAssertionForSignIn(
+            factor.uid,
+            FakeBackend.totpCode,
+          ),
+        );
+        expect(result.user!.uid, 'uid-of-mfa@example.com');
+        expect(auth.currentUser!.uid, 'uid-of-mfa@example.com');
+        expect(backend.bodyOf('mfaSignIn:finalize'), <String, Object?>{
+          'mfaPendingCredential': 'pending:uid-of-mfa@example.com',
+          'mfaEnrollmentId': factor.uid,
+          'totpVerificationInfo': <String, Object?>{
+            'verificationCode': FakeBackend.totpCode,
+          },
+        });
       }
-      // The assertion the resolver would need cannot be made yet.
+    });
+
+    test('a reauthentication with a second factor is resolved', () async {
+      final FirebaseAuth auth = await newAuth();
+      final MultiFactorInfo factor = await enrollTotp(
+        auth,
+        'reauth@example.com',
+      );
+      final User user = auth.currentUser!;
+      try {
+        await user.reauthenticateWithCredential(
+          EmailAuthProvider.credential(
+            email: 'reauth@example.com',
+            password: 'p',
+          ),
+        );
+        fail('expected a FirebaseAuthMultiFactorException');
+      } on FirebaseAuthMultiFactorException catch (e) {
+        final UserCredential result = await e.resolver.resolveSignIn(
+          await TotpMultiFactorGenerator.getAssertionForSignIn(
+            factor.uid,
+            FakeBackend.totpCode,
+          ),
+        );
+        expect(result.user!.uid, user.uid);
+        expect(auth.currentUser!.uid, user.uid);
+      }
+    });
+
+    test('wrong assertions, sessions and secrets are refused', () async {
+      final FirebaseAuth auth = await newAuth();
+      final MultiFactorInfo factor = await enrollTotp(auth, 'kind@example.com');
+      final MultiFactor multiFactor = auth.currentUser!.multiFactor;
       await expectLater(
-        TotpMultiFactorGenerator.getAssertionForSignIn('totp-1', '123456'),
+        TotpMultiFactorGenerator.generateSecret(MultiFactorSession('made-up')),
+        throwsAuthCode('argument-error'),
+      );
+      await expectLater(
+        multiFactor.enroll(
+          await TotpMultiFactorGenerator.getAssertionForSignIn(
+            factor.uid,
+            FakeBackend.totpCode,
+          ),
+          displayName: 'Phone',
+        ),
+        throwsAuthCode('argument-error'),
+      );
+      final TotpSecret secret = await TotpMultiFactorGenerator.generateSecret(
+        await multiFactor.getSession(),
+      );
+      await auth.signOut();
+      try {
+        await auth.signInWithEmailAndPassword(
+          email: 'kind@example.com',
+          password: 'p',
+        );
+        fail('expected a FirebaseAuthMultiFactorException');
+      } on FirebaseAuthMultiFactorException catch (e) {
+        await expectLater(
+          e.resolver.resolveSignIn(
+            await TotpMultiFactorGenerator.getAssertionForEnrollment(
+              secret,
+              FakeBackend.totpCode,
+            ),
+          ),
+          throwsAuthCode('argument-error'),
+        );
+      }
+      expect(
+        () => PhoneMultiFactorGenerator.getAssertion(
+          PhoneAuthProvider.credential(verificationId: 'v', smsCode: '1'),
+        ),
         throwsAuthCode('unimplemented'),
+      );
+    });
+
+    test('a signed-out user cannot use its multi-factor API', () async {
+      final FirebaseAuth auth = await newAuth();
+      await auth.signInWithEmailAndPassword(
+        email: 'gone@example.com',
+        password: 'p',
+      );
+      final MultiFactor multiFactor = auth.currentUser!.multiFactor;
+      final MultiFactorSession session = await multiFactor.getSession();
+      await auth.signOut();
+      await expectLater(
+        multiFactor.getSession(),
+        throwsAuthCode('no-current-user'),
+      );
+      await expectLater(
+        multiFactor.getEnrolledFactors(),
+        throwsAuthCode('no-current-user'),
+      );
+      await expectLater(
+        TotpMultiFactorGenerator.generateSecret(session),
+        throwsAuthCode('no-current-user'),
       );
     });
   });
@@ -431,15 +695,18 @@ void main() {
 
     test('guard turns other errors into FirebaseAuthException', () async {
       await expectLater(
-        guard<void>(() => throw StateError('state')),
+        guard<void>(DartFirebaseAuth(), () => throw StateError('state')),
         throwsAuthCode('internal-error'),
       );
       await expectLater(
-        guard<void>(() => throw ArgumentError('argument')),
+        guard<void>(DartFirebaseAuth(), () => throw ArgumentError('argument')),
         throwsAuthCode('argument-error'),
       );
       await expectLater(
-        guard<void>(() => throw const FileSystemException('disk full')),
+        guard<void>(
+          DartFirebaseAuth(),
+          () => throw const FileSystemException('disk full'),
+        ),
         throwsAuthCode('internal-error'),
       );
     });
@@ -596,10 +863,6 @@ void main() {
       await auth.signInAnonymously();
       await expectLater(
         auth.currentUser!.linkWithProvider(GoogleAuthProvider()),
-        throwsAuthCode('unimplemented'),
-      );
-      await expectLater(
-        auth.currentUser!.multiFactor.getEnrolledFactors(),
         throwsAuthCode('unimplemented'),
       );
     });
