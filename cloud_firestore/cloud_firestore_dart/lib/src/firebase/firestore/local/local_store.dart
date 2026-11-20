@@ -1149,11 +1149,19 @@ class LocalStore implements BundleCallback {
   }
 
   /// Notify the local store of the changed views to locally pin / unpin documents.
+  ///
+  /// The advanced last limbo free snapshot versions are persisted by the primary client only: a client that knows it
+  /// is not primary passes false for [persistLimboFreeVersions] and does not try (in the JS SDK no client persists
+  /// them). A client that believes it is primary tries, and a lost lease then fails that part quietly.
   Future<void> notifyLocalViewChanges(
-    List<LocalViewChanges> viewChanges,
-  ) async {
+    List<LocalViewChanges> viewChanges, {
+    bool persistLimboFreeVersions = true,
+  }) async {
     try {
-      await _notifyLocalViewChanges(viewChanges);
+      await _notifyLocalViewChanges(
+        viewChanges,
+        persistLimboFreeVersions: persistLimboFreeVersions,
+      );
     } catch (e) {
       if (!isRecoverablePersistenceError(e)) {
         rethrow;
@@ -1173,8 +1181,9 @@ class LocalStore implements BundleCallback {
   }
 
   Future<void> _notifyLocalViewChanges(
-    List<LocalViewChanges> viewChanges,
-  ) async {
+    List<LocalViewChanges> viewChanges, {
+    required bool persistLimboFreeVersions,
+  }) async {
     final List<QueryData> toPersist = <QueryData>[];
     await _persistence.runTransaction('notifyLocalViewChanges', () async {
       for (LocalViewChanges viewChange in viewChanges) {
@@ -1209,7 +1218,7 @@ class LocalStore implements BundleCallback {
         }
       }
     });
-    if (toPersist.isEmpty) {
+    if (toPersist.isEmpty || !persistLimboFreeVersions) {
       return;
     }
     // Only the primary client writes target data (as in the JS SDK, where this update is not persisted at all): the

@@ -1283,7 +1283,10 @@ class SyncEngine implements RemoteStoreCallback, SharedClientStateSyncer {
     }
 
     await _listener.onViewSnapshots(newSnapshots);
-    await _localStore.notifyLocalViewChanges(documentChangesInAllViews);
+    await _localStore.notifyLocalViewChanges(
+      documentChangesInAllViews,
+      persistLimboFreeVersions: _isPrimary,
+    );
   }
 
   /// Updates the limbo document state for the given targetId.
