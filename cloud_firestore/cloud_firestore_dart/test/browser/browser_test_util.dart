@@ -29,10 +29,16 @@ int _apps = 0;
 /// The name of a persistent cache comes from [appName]: a later client with
 /// the same name (after this one was terminated with [shutDown]) opens the
 /// same cache.
+///
+/// With [offline] the network is disabled before the client can use it: the
+/// pending writes of a cache opened again stay pending. A `disableNetwork()`
+/// after this function returns is too late for that, as the client sends them
+/// as soon as it is initialized.
 Future<FirebaseFirestore> newClient({
   OpenDatabase? openDatabase,
   bool forceLongPolling = false,
   String? appName,
+  bool offline = false,
 }) async {
   await loadEmulatorPort();
   final FirebaseApp app = FirebaseApp.withOptions(
@@ -59,10 +65,15 @@ Future<FirebaseFirestore> newClient({
     await app.delete();
     rethrow;
   }
+  // Queued right behind the initialization, ahead of every event of the
+  // streams it starts.
+  final Future<void>? disabled = offline ? firestore.disableNetwork() : null;
   // instanceFor returns at once; the tests want a client whose cache is open (and the error if it can't be).
   try {
     await firestore.initialized;
+    await disabled;
   } catch (_) {
+    disabled?.ignore();
     await firestore.terminate();
     await app.delete();
     rethrow;

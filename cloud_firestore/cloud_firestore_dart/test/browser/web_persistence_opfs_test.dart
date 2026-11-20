@@ -219,8 +219,11 @@ void main() {
       await shutDown(firestore);
 
       // A new worker that reads the files back, as after a page load.
-      firestore = await newClient(openDatabase: opener(), appName: app);
-      await firestore.disableNetwork();
+      firestore = await newClient(
+        openDatabase: opener(),
+        appName: app,
+        offline: true,
+      );
       final QuerySnapshot<Json> cached = await firestore
           .collection(collection)
           .orderBy('n')
@@ -458,25 +461,33 @@ void main() {
             .metadata
             .hasPendingWrites,
         isTrue,
+        reason: 'the write made offline is pending',
       );
       await shutDown(firestore);
       expect(await indexedDbDatabases(app), hasLength(1));
       expect(await opfsDirectories(app), isEmpty);
 
-      firestore = await newClient(openDatabase: opener(), appName: app);
+      firestore = await newClient(
+        openDatabase: opener(),
+        appName: app,
+        offline: true,
+      );
       expect(
         await indexedDbDatabases(app),
         isEmpty,
         reason: 'the IndexedDB database is deleted once it is in OPFS',
       );
       expect(await opfsDirectories(app), hasLength(1));
-      await firestore.disableNetwork();
       final DocumentSnapshot<Json> pending = await firestore
           .collection(collection)
           .doc('pending')
           .get(GetOptions(source: Source.cache));
       expect(pending.data(), <String, Object?>{'v': 2});
-      expect(pending.metadata.hasPendingWrites, isTrue);
+      expect(
+        pending.metadata.hasPendingWrites,
+        isTrue,
+        reason: 'the write is still pending after the move',
+      );
       expect(
         (await firestore
                 .collection(collection)
