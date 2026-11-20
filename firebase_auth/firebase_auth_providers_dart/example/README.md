@@ -39,6 +39,7 @@ nothing secret, and the key file stays outside the repository.
 | --- | --- | --- |
 | `service_account.dart` | `OAuthTokenProvider.serviceAccount` from a key file whose path is in an environment variable, set as `app.authProvider`. | `FIREBASE_SERVICE_ACCOUNT_KEY_FILE=/path/to/key.json dart run example/service_account.dart` |
 | `adc_server.dart` | `applicationDefaultCredentials()` with Firestore on a server: reads one document. | `FIREBASE_PROJECT_ID=my-project dart run example/adc_server.dart [document path]` |
+| `google_desktop_sign_in.dart` | Google sign-in through the system browser (`signInWithOAuthLoopback`, `OAuthLoopbackProvider.google`), for desktop apps and command line tools. Needs a "Desktop app" OAuth client; with `FIREBASE_AUTH_EMULATOR_HOST` the Firebase part runs against the emulator. | `GOOGLE_DESKTOP_CLIENT_ID=... GOOGLE_DESKTOP_CLIENT_SECRET=... FIREBASE_API_KEY=... dart run example/google_desktop_sign_in.dart` |
 
 Service accounts and Application Default Credentials bypass the security rules: access is
 decided by IAM. Use them on trusted machines only.
@@ -48,4 +49,5 @@ decided by IAM. Use them on trusted machines only.
 `test/example_test.dart` runs every program without its variables (each prints its note), and
 the emulator programs against the emulators when `FIREBASE_AUTH_EMULATOR_HOST` (and, for
 `firestore_wiring.dart`, `FIRESTORE_AUTH_RULES_EMULATOR_HOST`) is set, checking what they print.
-`service_account.dart` and `adc_server.dart` were not run against a real project.
+`service_account.dart`, `adc_server.dart` and `google_desktop_sign_in.dart` were not run against a real project
+(the browser flow itself is tested against a fake identity provider in `test/oauth_loopback_test.dart`).
