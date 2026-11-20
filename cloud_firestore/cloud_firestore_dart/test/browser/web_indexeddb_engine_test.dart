@@ -10,15 +10,20 @@ library;
 import 'dart:async';
 import 'dart:convert';
 import 'dart:js_interop';
+import 'dart:js_interop_unsafe';
 
 import 'package:cloud_firestore_dart/cloud_firestore_dart.dart';
 import 'package:cloud_firestore_dart/indexeddb_cache.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/index/js_index_value_writer.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/indexeddb/indexeddb_schema.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/indexeddb/web/idb.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/local_store.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/lru_delegate.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/lru_garbage_collector.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/persistance/index_manager.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/model/field_index.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/model/field_path.dart'
+    as model;
 import 'package:cloud_firestore_dart/src/internal_access.dart';
 import 'package:firebase_app_dart/firebase_app_dart.dart';
 import 'package:test/test.dart';
@@ -510,4 +515,122 @@ void main() {
       <String>['b'],
     );
   });
+
+  test(
+    'an equality query on a map finds a document the JS SDK indexed with the keys in another order',
+    () async {
+      final String appName = newAppName();
+      final FirebaseFirestore firestore = await newClient(appName);
+      await firestore.disableNetwork();
+      final String name = newCollectionName();
+      final LocalStore localStore = firestore.client.localStore;
+      await localStore.configureFieldIndexes(<FieldIndex>[
+        FieldIndex(-1, name, <IndexSegment>[
+          IndexSegment(
+            model.FieldPath.fromSingleSegment('m'),
+            SegmentKind.ascending,
+          ),
+        ], FieldIndex.initialState),
+      ]);
+      // Written offline: the cache has it; the index entry is written by the backfill.
+      firestore.collection(name).doc('x').set(<String, Object?>{
+        'm': <String, Object?>{'b': 1, 'a': 2},
+      }).ignore();
+      firestore.collection(name).doc('y').set(<String, Object?>{
+        'm': <String, Object?>{'a': 1},
+      }).ignore();
+      expect(await firestore.client.backfillIndexes(), 2);
+      expect(await countRows(appName, DbStores.indexEntries), 2);
+
+      // The entry of x as the JS SDK writes it for the JS object {b: 1, a: 2} (`Object.keys` order: b, a), in place of
+      // the one this SDK wrote (a, b).
+      final JsIndexByteEncoder encoder = JsIndexByteEncoder();
+      final JsDirectionalIndexByteEncoder ascending = encoder.forKind(
+        SegmentKind.ascending,
+      )..writeNumber(55);
+      for (final (String key, double number) in <(String, double)>[
+        ('b', 1),
+        ('a', 2),
+      ]) {
+        ascending
+          ..writeNumber(25)
+          ..writeString(key)
+          ..writeNumber(15)
+          ..writeNumber(number);
+      }
+      ascending
+        ..writeNumber(2)
+        ..writeInfinity();
+      final web.IDBDatabase db =
+          (await idbRequest(
+                web.window.indexedDB.open('firestore/$appName/demo-idb/main'),
+              ))!
+              as web.IDBDatabase;
+      try {
+        final web.IDBTransaction transaction = db.transaction(
+          DbStores.indexEntries.toJS,
+          'readwrite',
+        );
+        final Future<void> committed = idbCommitted(transaction);
+        final web.IDBObjectStore entries = transaction.objectStore(
+          DbStores.indexEntries,
+        );
+        final web.IDBRequest cursorRequest = entries.openCursor();
+        cursorRequest.onsuccess = ((web.Event _) {
+          final web.IDBCursorWithValue? cursor =
+              cursorRequest.result as web.IDBCursorWithValue?;
+          if (cursor == null) {
+            return;
+          }
+          final JSObject row = cursor.value! as JSObject;
+          final JSArray<JSAny?> path = row.getProperty<JSArray<JSAny?>>(
+            'documentKey'.toJS,
+          );
+          if ((path.toDart.last! as JSString).toDart == 'x') {
+            cursor.delete();
+            row.setProperty('directionalValue'.toJS, encoder.encodedBytes.toJS);
+            entries.put(row);
+          }
+          cursor.continue_();
+        }).toJS;
+        await committed;
+      } finally {
+        db.close();
+      }
+      expect(await countRows(appName, DbStores.indexEntries), 2);
+
+      final Query<Map<String, Object?>> byMap = firestore
+          .collection(name)
+          .where('m', isEqualTo: <String, Object?>{'a': 2, 'b': 1});
+      expect(
+        (await byMap.get(
+          cache,
+        )).docs.map((QueryDocumentSnapshot<Map<String, Object?>> d) => d.id),
+        <String>['x'],
+      );
+      // Not served from the index: the entry of a map depends on the order of its keys.
+      expect(
+        localStore.indexManagerForCurrentUser.getIndexType(
+          byMap.query.toTarget(),
+        ),
+        IndexType.none,
+      );
+      // A map of one key does not depend on the order: the index serves it.
+      final Query<Map<String, Object?>> byOneKey = firestore
+          .collection(name)
+          .where('m', isEqualTo: <String, Object?>{'a': 1});
+      expect(
+        localStore.indexManagerForCurrentUser.getIndexType(
+          byOneKey.query.toTarget(),
+        ),
+        IndexType.full,
+      );
+      expect(
+        (await byOneKey.get(
+          cache,
+        )).docs.map((QueryDocumentSnapshot<Map<String, Object?>> d) => d.id),
+        <String>['y'],
+      );
+    },
+  );
 }
