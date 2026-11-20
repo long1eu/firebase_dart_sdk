@@ -831,7 +831,7 @@ void main() {
           .having(
             (FirebaseAuthMultiFactorException e) => e.message,
             'message',
-            contains('not supported by this package'),
+            FirebaseAuthMultiFactorException.defaultMessage,
           )
           .having(
             (FirebaseAuthMultiFactorException e) => '$e',
