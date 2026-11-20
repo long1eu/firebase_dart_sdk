@@ -50,7 +50,7 @@ What is left in b, c and d is the store part (decode and the scan), now 80 to 99
 24 ms. Pending `a == 7` changed little: its cost is the overlay decode (`RemoteSerializer.decodeMutation`,
 `_mapOverlayValues`), which these steps do not touch.
 
-## On a quiet machine (Mac mini, M4 Pro)
+## On a second machine (Mac mini, M4 Pro)
 
 The headline cases again, on a machine with nothing else of ours running, for three builds of the same bench: A is
 434ec7ed (before the read fixes of #73, run with `--no-statement-cache`), B is 107ecdec (after #73) and C is `origin/main`
