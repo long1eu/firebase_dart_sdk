@@ -2,7 +2,8 @@
 
 What this repository supports today, how it follows upstream Firestore, and how versions are
 numbered. The packages are `cloud_firestore_dart`, `firebase_app_dart` and
-`firebase_auth_providers_dart`; the current version is 0.2.0.
+`firebase_auth_providers_dart`; the current versions are 0.3.0 (`cloud_firestore_dart` and
+`firebase_auth_providers_dart`) and 0.2.0 (`firebase_app_dart`).
 
 Lines marked **DRAFT** are proposals that the maintainer has not confirmed. Until they are
 confirmed they are not commitments.
@@ -74,7 +75,8 @@ Behaviour is ported in Dart, not copied. Where the port deliberately differs fro
 
 ## Versions and breaking changes
 
-- The three packages are versioned together so far (0.1.0, 0.1.1 and 0.2.0). A release tag `v<version>` checks that
+- The three packages are versioned together so far (0.1.0, 0.1.1 and 0.2.0; `cloud_firestore_dart` and `firebase_auth_providers_dart` are at 0.3.0,
+  `firebase_app_dart` stays at 0.2.0, which it has no change to release for). A release tag `v<version>` checks that
   all three are at that version; a tag `<package>-v<version>` checks one package
   (`.github/workflows/release.yml`, which validates and never publishes).
 - Publishing to pub.dev is done by the `Publish to pub.dev` workflow (`.github/workflows/publish.yml`),

@@ -1,4 +1,4 @@
-## 0.3.0 (unreleased)
+## 0.3.0
 
 - The complete server error map of the JS SDK (`SERVER_ERROR_MAP` of `@firebase/auth` 1.13.10): the phone,
   multi-factor, reCAPTCHA, `signInWithIdp` and action code settings codes are mapped like the JS SDK maps them

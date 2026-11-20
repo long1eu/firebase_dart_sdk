@@ -1,5 +1,7 @@
-## (unreleased)
+## 0.1.3
 
+- The constraint on `cloud_firestore_dart` is `>=0.2.0 <0.4.0` instead of `^0.2.0`, so that the package can be used with
+  `cloud_firestore_dart` 0.3.0.
 - The native database keeps the prepared statements of its last 64 distinct queries: a read of one
   document from the cache is about a third faster.
 

@@ -9,7 +9,7 @@ their requests must pass your security rules, or when a server or tool uses a se
 Default Credentials. Without it, requests carry no user, which is enough for
 the emulator and open rules. It is not affiliated with or supported by Google or Firebase.
 
-> **Status: 0.2.1.** Verified with unit tests and against the Firebase
+> **Status: 0.3.0.** Verified with unit tests and against the Firebase
 > emulators only: nothing was run against the real Firebase Auth service or Google's token
 > endpoint.
 

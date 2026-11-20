@@ -14,7 +14,7 @@ sync with the code.
 `cloud_firestore_dart` is an unofficial port of the Firebase Android SDK to pure Dart. It is not
 a Google product and Firebase support does not cover it. The project was archived for some years
 and has been revived towards a 0.1.0 release; the three packages (`cloud_firestore_dart`,
-`firebase_app_dart`, `firebase_auth_providers_dart`) are at 0.2.0; 0.1.0 was their first version on
+`firebase_app_dart`, `firebase_auth_providers_dart`) are at 0.3.0 (`firebase_app_dart` 0.2.0); 0.1.0 was their first version on
 pub.dev under these names.
 
 What the repository can show about its state (each number with where it comes from):
@@ -88,9 +88,9 @@ listeners or pending writes ([Several clients on one cache](multiple_clients.md)
 
 ```yaml
 dependencies:
-  cloud_firestore_dart: ^0.2.0
+  cloud_firestore_dart: ^0.3.0
   firebase_app_dart: ^0.2.0
-  firebase_auth_providers_dart: ^0.2.0 # only for signed-in users or server credentials
+  firebase_auth_providers_dart: ^0.3.0 # only for signed-in users or server credentials
 ```
 
 There is no plugin to register, no `flutterfire configure` step, and nothing to add to the
