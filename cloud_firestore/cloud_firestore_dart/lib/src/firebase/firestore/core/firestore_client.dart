@@ -514,6 +514,12 @@ class FirestoreClient implements RemoteStoreCallback {
     _lruScheduler?.stop();
     _indexBackfillScheduler?.stop();
     _clientMetadataRefresher?.stop();
+    final Persistence? opened = _persistenceStarted ? persistence : null;
+    if (_sharedClientState != null && opened is IndexedDbPersistence) {
+      // Before the other tabs learn that this one is gone (below): they no longer count on its lease and can take it
+      // over at once.
+      opened.markClosing();
+    }
     // Before the remote store is shut down: the changes of the other clients are no longer applied, and the other
     // clients learn that this one is gone (the primary stops listening to the targets of this client).
     _sharedClientState?.shutdown();
@@ -853,12 +859,30 @@ class FirestoreClient implements RemoteStoreCallback {
       gc = keyValue.garbageCollector;
       persistence = keyValue;
     } else if (useIndexedDb) {
+      final IndexedDbCacheSettings indexedDbSettings = indexedDbCacheSettings!;
+      // Multi-tab: the tabs share their state through LocalStorage (`WebStorageSharedClientState.isAvailable` of the
+      // JS SDK, checked in `MultiTabOfflineComponentProvider`). A test gives the storage of another window.
+      final bool multiTab =
+          indexedDbSettings.multiTab || sharedClientStateStorage != null;
+      if (multiTab) {
+        sharedClientStateStorage ??= indexedDbSettings
+            .createSharedClientStateStorage();
+        if (sharedClientStateStorage == null) {
+          throw FirestoreException(
+            message:
+                'IndexedDbCacheSettings.multiTab needs window.localStorage, which is not available here (a worker, or '
+                'the storage of the page is blocked). Use the cache of one tab (multiTab: false) instead.',
+            errorCode: FirestoreErrorCode.unimplemented,
+          );
+        }
+      }
       final IndexedDbPersistence
-      indexedDb = indexedDbCacheSettings!.createPersistence(
+      indexedDb = indexedDbSettings.createPersistence(
         persistenceKey: databaseInfo.persistenceKey,
         databaseId: databaseInfo.databaseId,
         serializer: LocalSerializer(RemoteSerializer(databaseInfo.databaseId)),
         lruParams: LruGarbageCollectorParams.withCacheSizeBytes(cacheSizeBytes),
+        multiTab: multiTab,
       );
       gc = indexedDb.garbageCollector;
       persistence = indexedDb;
@@ -969,12 +993,15 @@ class FirestoreClient implements RemoteStoreCallback {
         }
         shutdown();
       };
-      // The JS SDK refreshes the client row and the primary lease every 4 s: a JS tab finds the lease alive.
+      // The JS SDK refreshes the client row and the primary lease every 4 s: a JS tab finds the lease alive. In
+      // multi-tab mode the refresh is also how a secondary takes the lease over, and the primary then fills its write
+      // pipeline as with SQLite.
       _clientMetadataRefresher = ClientMetadataRefresher(
         scheduler,
         run: () => _enqueue<void>(() async {
           if (!_isShutdown) {
             await started.refreshClientMetadata();
+            await syncEngine.handleClientMetadataRefresh();
           }
         }),
       )..start();
@@ -1019,6 +1046,23 @@ class FirestoreClient implements RemoteStoreCallback {
           )
         : null;
     _sharedClientState = sharedClientState;
+    final Persistence opened = persistence;
+    if (sharedClientState != null && opened is IndexedDbPersistence) {
+      // The tabs share the listen sequence numbers (`sequenceNumberSyncer` of the JS SDK), so that the sequence
+      // numbers of the documents and targets keep the order of their use across tabs for the garbage collector.
+      opened.sequenceNumberListener = sharedClientState.writeSequenceNumber;
+      sharedClientState
+        ..sequenceNumberHandler = opened.advanceListenSequenceNumber
+        // A tab that closed (or terminated) marked itself as closed before it removed its state: a secondary can take
+        // the lease at once instead of at its next refresh.
+        ..clientRemovedHandler = () async {
+          if (!_isShutdown && !isPrimaryClient) {
+            await opened.refreshClientMetadata();
+          }
+        };
+      // As a JS tab: a page hidden for good shuts the client down, which releases the lease and removes its state.
+      opened.pageHideListener = () => unawaited(shutdown());
+    }
 
     syncEngine =
         SyncEngine(

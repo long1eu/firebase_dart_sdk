@@ -17,6 +17,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/firestore_settings.d
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/indexeddb/indexeddb_persistence.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/keyvalue/cache_store.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/keyvalue/key_value_persistence.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/local/shared_client_state_storage.dart';
 
 /// Configures the local cache of a Firestore instance, see
 /// [Settings.cacheSettings]. The implementations are
@@ -329,7 +330,7 @@ final class IndexBackfillSettings {
 /// ([sizeBytes]). Cache indexes ([indexAutoCreation], `PersistentCacheIndexManager`) are stored with the JS SDK's
 /// encoding, so that indexes either SDK built serve the other.
 ///
-/// One tab at a time: the tab takes the JS SDK's primary lease as a JS tab with `persistentSingleTabManager` does, and
+/// One tab at a time, unless [multiTab] is set: the tab takes the JS SDK's primary lease as a JS tab with `persistentSingleTabManager` does, and
 /// the instance fails to start (every operation fails with [FirestoreErrorCode.failedPrecondition]) while another
 /// client (a tab of this SDK or of the JS SDK) holds a valid lease (refreshed less than 5 s ago, by a tab that did not
 /// close). A JS tab that starts while this one holds the lease fails the same way. When the tab was in the background
@@ -361,7 +362,10 @@ final class IndexedDbCacheSettings extends LocalCacheSettings {
     required this.indexAutoCreation,
     required this.indexBackfill,
     required this.mergeUnsentWrites,
-  }) {
+    required this.multiTab,
+    required SharedClientStateStorage? Function()
+    createSharedClientStateStorage,
+  }) : _createSharedClientStateStorage = createSharedClientStateStorage {
     if (!_isWeb) {
       throw UnsupportedError(
         'IndexedDbCacheSettings select a cache in IndexedDB, which only exists on the web. Use '
@@ -394,6 +398,16 @@ final class IndexedDbCacheSettings extends LocalCacheSettings {
   /// JS SDK that opens the cache afterwards sends them as they are.
   final bool mergeUnsentWrites;
 
+  /// Whether the tabs of the app share the cache (`persistentMultipleTabManager` of the JS SDK) instead of one tab
+  /// using it alone (the default). With it, one tab (the primary) uses the network for all of them; the others get its
+  /// results and their online state through `window.localStorage`, and one of them takes over when the primary closes.
+  /// The instance fails to start where `localStorage` is not available (a worker, or storage blocked). A one-tab client
+  /// and a multi-tab client refuse each other, as in the JS SDK.
+  final bool multiTab;
+
+  /// Creates the storage the tabs share their state through, or returns null where there is none.
+  final SharedClientStateStorage? Function() _createSharedClientStateStorage;
+
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -401,7 +415,8 @@ final class IndexedDbCacheSettings extends LocalCacheSettings {
           sizeBytes == other.sizeBytes &&
           indexAutoCreation == other.indexAutoCreation &&
           indexBackfill == other.indexBackfill &&
-          mergeUnsentWrites == other.mergeUnsentWrites;
+          mergeUnsentWrites == other.mergeUnsentWrites &&
+          multiTab == other.multiTab;
 
   @override
   int get hashCode => Object.hash(
@@ -410,13 +425,15 @@ final class IndexedDbCacheSettings extends LocalCacheSettings {
     indexAutoCreation,
     indexBackfill,
     mergeUnsentWrites,
+    multiTab,
   );
 
   @override
   String toString() =>
       'IndexedDbCacheSettings{sizeBytes=$sizeBytes, '
       'indexAutoCreation=$indexAutoCreation, indexBackfill=$indexBackfill'
-      '${mergeUnsentWrites ? ', mergeUnsentWrites=true' : ''}}';
+      '${mergeUnsentWrites ? ', mergeUnsentWrites=true' : ''}'
+      '${multiTab ? ', multiTab=true' : ''}}';
 }
 
 /// Configures a persistent cache in a key-value store that the app brings ([CacheStore]): an ordered store of byte
@@ -625,15 +642,24 @@ extension IndexedDbCacheSettingsInternal on IndexedDbCacheSettings {
     required bool indexAutoCreation,
     required IndexBackfillSettings? indexBackfill,
     required bool mergeUnsentWrites,
+    required bool multiTab,
+    required SharedClientStateStorage? Function()
+    createSharedClientStateStorage,
   }) => IndexedDbCacheSettings._(
     createPersistence,
     sizeBytes: sizeBytes,
     indexAutoCreation: indexAutoCreation,
     indexBackfill: indexBackfill ?? IndexBackfillSettings(),
     mergeUnsentWrites: mergeUnsentWrites,
+    multiTab: multiTab,
+    createSharedClientStateStorage: createSharedClientStateStorage,
   );
 
   IndexedDbPersistenceFactory get createPersistence => _createPersistence;
+
+  /// The storage of the tabs of this origin ([multiTab]), or null where there is none.
+  SharedClientStateStorage? createSharedClientStateStorage() =>
+      _createSharedClientStateStorage();
 }
 
 /// Creates [KeyValueCacheSettings] for the entry library of the key-value cache, and gives the client its persistence

@@ -264,6 +264,7 @@ class IndexedDbCacheSettings extends LocalCacheSettings
   final indexAutoCreation: bool
   final indexBackfill: IndexBackfillSettings
   final mergeUnsentWrites: bool
+  final multiTab: bool
   final sizeBytes: int
   get hashCode: int
   toString(): String

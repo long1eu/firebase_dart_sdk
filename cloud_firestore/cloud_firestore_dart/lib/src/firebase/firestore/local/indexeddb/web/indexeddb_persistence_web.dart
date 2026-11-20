@@ -858,7 +858,7 @@ class WebIndexedDbPersistence extends IndexedDbPersistence {
       throw FirestoreException(
         message:
             '$_exclusiveErrorMessage (The primary lease of $databaseName is held by client ${owner['ownerId']}'
-            '${multiTab ? ', a JS SDK tab with persistentMultipleTabManager' : ''}; it was refreshed less than '
+            '${multiTab ? ', which shares the cache with other tabs (multiTab, or persistentMultipleTabManager of the JS SDK)' : ''}; it was refreshed less than '
             '${indexedDbPrimaryLeaseMs ~/ 1000} s ago.)',
         errorCode: FirestoreErrorCode.failedPrecondition,
       );
@@ -1090,6 +1090,16 @@ class WebIndexedDbPersistence extends IndexedDbPersistence {
   }
 
   @override
+  void advanceListenSequenceNumber(int sequenceNumber) {
+    if (started) {
+      referenceDelegate._listenSequence.advanceTo(sequenceNumber);
+    }
+  }
+
+  @override
+  void markClosing() => _setZombied(true);
+
+  @override
   Future<void> setNetworkEnabled(bool enabled) async {
     if (_networkEnabled != enabled) {
       _networkEnabled = enabled;
@@ -1103,6 +1113,7 @@ class WebIndexedDbPersistence extends IndexedDbPersistence {
     try {
       final JSFunction hide = _pageHideHandler = ((web.Event _) {
         _setZombied(true);
+        pageHideListener?.call();
       }).toJS;
       final JSFunction show = _pageShowHandler =
           ((web.PageTransitionEvent event) {

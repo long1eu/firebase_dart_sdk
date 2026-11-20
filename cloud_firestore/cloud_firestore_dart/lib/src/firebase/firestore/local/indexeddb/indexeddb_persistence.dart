@@ -26,6 +26,7 @@ typedef IndexedDbPersistenceFactory =
       required DatabaseId databaseId,
       required LocalSerializer serializer,
       required LruGarbageCollectorParams lruParams,
+      bool multiTab,
     });
 
 abstract class IndexedDbPersistence extends Persistence {
@@ -58,4 +59,20 @@ abstract class IndexedDbPersistence extends Persistence {
 
   /// Deletes the database. Only after [shutdown].
   Future<void> clearPersistence();
+
+  /// Called with each listen sequence number this client takes, so that the other tabs of a shared cache can be told
+  /// (`writeSequenceNumber` of the JS `SharedClientState`, its `sequenceNumberSyncer`).
+  void Function(int sequenceNumber)? sequenceNumberListener;
+
+  /// Records that another tab of a shared cache took [sequenceNumber]: the next one this client takes is higher
+  /// (`sequenceNumberHandler` of the JS `SharedClientState`).
+  void advanceListenSequenceNumber(int sequenceNumber);
+
+  /// Called when the page of this client is hidden for good (`pagehide`), after this client was marked as closed in
+  /// LocalStorage. A multi-tab client then shuts down, as a JS tab does, so that another tab takes over at once.
+  void Function()? pageHideListener;
+
+  /// Marks this client as closed in LocalStorage (the JS SDK's zombie key), so that the other tabs no longer count on
+  /// its lease or its row: the start of a shutdown. [shutdown] does it too.
+  void markClosing();
 }

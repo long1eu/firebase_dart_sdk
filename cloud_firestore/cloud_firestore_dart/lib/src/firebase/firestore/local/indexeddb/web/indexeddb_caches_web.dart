@@ -367,6 +367,7 @@ class IndexedDbReferenceDelegate implements ReferenceDelegate, LruDelegate {
   @override
   void onTransactionStarted() {
     _currentSequenceNumber = _listenSequence.next;
+    _persistence.sequenceNumberListener?.call(_currentSequenceNumber);
   }
 
   @override
