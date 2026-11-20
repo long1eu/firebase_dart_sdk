@@ -25,13 +25,14 @@ library;
 
 import 'package:firebase_auth_platform_interface/firebase_auth_platform_interface.dart';
 import 'package:firebase_auth_providers_dart/firebase_auth_providers_dart.dart'
-    show FirebaseUserAuth;
+    show FirebaseUserAuth, InMemoryAuthStorage;
 import 'package:firebase_core/firebase_core.dart';
 import 'package:http/http.dart' as http;
 
 import 'src/core.dart';
 import 'src/firebase_auth.dart';
 import 'src/multi_factor.dart';
+import 'src/storage.dart' show runningUnderFlutterTest;
 
 export 'src/firebase_auth.dart' show AuthStorageFactory, DartFirebaseAuth;
 export 'src/storage.dart' show defaultSessionFile;
@@ -52,7 +53,21 @@ abstract final class FirebaseAuthDart {
   /// Called by Flutter's plugin registrant on the platforms this package
   /// declares in its pubspec (Linux only), before `main` runs. Same as [use]
   /// without arguments.
-  static void registerWith() => use();
+  ///
+  /// Under `flutter test` (`FLUTTER_TEST` is set) it installs neither the
+  /// Dart `firebase_core`, so that `setupFirebaseCoreMocks` keeps working, nor
+  /// the session file: each app keeps its session in memory, so that tests do
+  /// not share a file. A test that wants either calls [use].
+  static void registerWith() {
+    if (runningUnderFlutterTest()) {
+      use(
+        storageFor: (FirebaseApp app) => InMemoryAuthStorage(),
+        useDartCore: false,
+      );
+    } else {
+      use();
+    }
+  }
 
   /// Makes `firebase_auth_providers_dart` the implementation of
   /// `firebase_auth` on any platform. Call it at the start of `main`, before
@@ -107,8 +122,9 @@ abstract final class FirebaseAuthDart {
   /// The `FirebaseUserAuth` behind `FirebaseAuth.instanceFor(app: app)`, for
   /// what the official API does not have (`authStateReady`,
   /// `beforeAuthStateChanged`, `validatePassword` with a tenant, ...), and as
-  /// a token provider for `cloud_firestore_dart`. Only for an app whose
-  /// `FirebaseAuth` this package implements.
+  /// a token provider for `cloud_firestore_dart`, and for
+  /// `signInWithOAuthLoopback`, the provider sign-in of a desktop app. Only
+  /// for an app whose `FirebaseAuth` this package implements.
   static FirebaseUserAuth userAuthFor(FirebaseApp app) =>
       DartFirebaseAuth.forApp(app).client;
 }

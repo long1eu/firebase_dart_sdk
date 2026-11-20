@@ -9,14 +9,15 @@ import 'package:flutter/foundation.dart';
 /// Another package may install a core of its own (the Firestore platform
 /// package of this repository does); whichever registers first is kept, so both
 /// can be in one app in either order. Nothing here depends on the type of the
-/// core that is in place.
+/// core that is in place. A [LinuxFirebaseCore] already installed is kept, also
+/// when [force] is true, so that calling `use` again does not lose the apps.
 void installCoreIfNeeded({bool? force}) {
   final bool install =
       force ??
       (!kIsWeb &&
           defaultTargetPlatform == TargetPlatform.linux &&
           FirebasePlatform.instance is MethodChannelFirebase);
-  if (install) {
+  if (install && FirebasePlatform.instance is! LinuxFirebaseCore) {
     FirebasePlatform.instance = LinuxFirebaseCore();
   }
 }

@@ -61,3 +61,11 @@ String _executableName() {
   }
   return name.isEmpty ? 'flutter_app' : name;
 }
+
+/// Whether [error] is a [FileSystemException] (a failed read or write of a
+/// file).
+bool isFileSystemException(Object error) => error is FileSystemException;
+
+/// Whether the program runs under `flutter test`, which sets `FLUTTER_TEST`.
+bool runningUnderFlutterTest() =>
+    Platform.environment.containsKey('FLUTTER_TEST');

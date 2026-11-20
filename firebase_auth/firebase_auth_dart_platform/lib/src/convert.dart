@@ -10,6 +10,7 @@ import 'package:firebase_auth_providers_dart/firebase_auth_providers_dart.dart'
     as dart_auth;
 
 import 'multi_factor.dart';
+import 'storage.dart' show isFileSystemException;
 
 /// The exception for a member of the interface that this package does not
 /// implement, with the code `unimplemented`.
@@ -31,15 +32,20 @@ const String noBrowserFlow =
 
 /// Why signInWithProvider and its link and reauthenticate variants throw.
 const String noProviderFlow =
-    'there is no OAuth flow for desktop yet. Get the provider token yourself '
-    'and use signInWithCredential.';
+    'it has no provider flow of its own. To sign in with a provider, use '
+    'FirebaseAuthDart.userAuthFor(app).signInWithOAuthLoopback (the system '
+    'browser and a loopback redirect), or get the provider token yourself and '
+    'use signInWithCredential.';
 
 /// Why the multi-factor members throw.
 const String noMultiFactor =
     'multi-factor authentication is not supported yet.';
 
-/// Runs [body] and rethrows the errors of `firebase_auth_providers_dart` as the
-/// exceptions of the platform interface, with the same code.
+/// Runs [body] and rethrows its errors as the exceptions of the platform
+/// interface, so that an app always gets a [FirebaseAuthException]: the
+/// errors of `firebase_auth_providers_dart` with the same code, an
+/// [ArgumentError] as `argument-error`, a [StateError] and a failed file
+/// operation as `internal-error`.
 Future<T> guard<T>(Future<T> Function() body) async {
   try {
     return await body();
@@ -47,6 +53,24 @@ Future<T> guard<T>(Future<T> Function() body) async {
     Error.throwWithStackTrace(exceptionOf(e), stackTrace);
   } on dart_app.FirebaseNoSignedInUserException catch (_, stackTrace) {
     Error.throwWithStackTrace(noCurrentUser(), stackTrace);
+  } on ArgumentError catch (e, stackTrace) {
+    Error.throwWithStackTrace(
+      FirebaseAuthException(code: 'argument-error', message: '${e.message}'),
+      stackTrace,
+    );
+  } on StateError catch (e, stackTrace) {
+    Error.throwWithStackTrace(
+      FirebaseAuthException(code: 'internal-error', message: e.message),
+      stackTrace,
+    );
+  } on Exception catch (e, stackTrace) {
+    if (!isFileSystemException(e)) {
+      rethrow;
+    }
+    Error.throwWithStackTrace(
+      FirebaseAuthException(code: 'internal-error', message: '$e'),
+      stackTrace,
+    );
   }
 }
 
@@ -126,11 +150,25 @@ class DartOAuthCredential extends OAuthCredential {
         idToken: source.idToken,
         secret: source.secret,
         rawNonce: source.rawNonce,
+        appleFullPersonName: _nameOf(source.appleFullPersonName),
       );
 
   /// The credential of `firebase_auth_providers_dart`.
   final dart_auth.OAuthCredential source;
 }
+
+/// The Apple name of a credential of the client, as the interface has it.
+AppleFullPersonName? _nameOf(dart_auth.AppleFullPersonName? name) =>
+    name == null
+    ? null
+    : AppleFullPersonName(
+        givenName: name.givenName,
+        familyName: name.familyName,
+        middleName: name.middleName,
+        nickname: name.nickname,
+        namePrefix: name.namePrefix,
+        nameSuffix: name.nameSuffix,
+      );
 
 /// A credential of the client as the interface shows it, or null.
 AuthCredential? credentialOf(
@@ -180,6 +218,7 @@ dart_auth.AuthCredential clientCredentialOf(AuthCredential credential) {
       :final String? accessToken,
       :final String? secret,
       :final String? rawNonce,
+      :final AppleFullPersonName? appleFullPersonName,
     ):
       if ((idToken == null || idToken.isEmpty) &&
           (accessToken == null || accessToken.isEmpty)) {
@@ -197,6 +236,16 @@ dart_auth.AuthCredential clientCredentialOf(AuthCredential credential) {
         accessToken: accessToken,
         secret: secret,
         rawNonce: rawNonce,
+        appleFullPersonName: appleFullPersonName == null
+            ? null
+            : dart_auth.AppleFullPersonName(
+                givenName: appleFullPersonName.givenName,
+                familyName: appleFullPersonName.familyName,
+                middleName: appleFullPersonName.middleName,
+                nickname: appleFullPersonName.nickname,
+                namePrefix: appleFullPersonName.namePrefix,
+                nameSuffix: appleFullPersonName.nameSuffix,
+              ),
       );
     default:
       throw FirebaseAuthException(

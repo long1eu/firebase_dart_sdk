@@ -66,9 +66,14 @@ in one app: whichever registers first provides `firebase_core`, and the other ke
 
 ### The session
 
-The signed-in user survives a restart: the session (its refresh token) is stored, and restored the first time the
-app's `FirebaseAuth` is used. `authStateChanges()` and `idTokenChanges()` emit the restored user (or null) once the
-restore has finished; `currentUser` is null until then, so wait for the first event rather than reading it at start.
+The signed-in user survives a restart: the session (its refresh token) is stored, and the restore starts as soon as
+the app's `FirebaseAuth` instance is created (`firebase_auth` creates it at the first call on it).
+`authStateChanges()` and `idTokenChanges()` emit the restored user (or null) once the restore has finished;
+`currentUser` is null until then. Code that needs the restored user at start awaits `authStateChanges().first`:
+
+```dart
+final User? user = await FirebaseAuth.instance.authStateChanges().first;
+```
 
 By default the sessions are in one file per program, written owner-only (mode 0600) by `FileAuthStorage`:
 
@@ -80,7 +85,14 @@ By default the sessions are in one file per program, written owner-only (mode 06
 
 `<executable>` is the file name of the program, which for a Flutter desktop app is the name of the project.
 `defaultSessionFile()` returns the path. The file holds a refresh token, which does not expire: anyone who can read
-it can act as the user. Pass `storageFor` to keep it in the system keyring instead.
+it can act as the user. Pass `storageFor` to keep it in the system keyring instead. Separate processes of the same
+program share the file: the last one to write it wins.
+
+If the file cannot be written (a read-only or full disk), the sign-in still succeeds: the session stays in memory until
+the program ends, and the failure is printed once.
+
+Under `flutter test`, the registration on Linux uses neither the file nor this package's `firebase_core`, so tests
+do not share a file and `setupFirebaseCoreMocks` keeps working; call `use()` to choose otherwise.
 
 `setPersistence(Persistence.NONE)` (or `SESSION`) moves the session to memory, so the user is signed out at the next
 start; `Persistence.LOCAL` moves it back.
@@ -122,13 +134,14 @@ the new user, `await provider.waitForCurrentUser()` first. `userAuthFor` has no 
 | Action codes: `sendPasswordResetEmail`, `confirmPasswordReset`, `verifyPasswordResetCode`, `checkActionCode`, `applyActionCode`; `fetchSignInMethodsForEmail` | implemented, `checkActionCode` tested |
 | `authStateChanges()`, `idTokenChanges()`, `userChanges()` | implemented, tested |
 | `tenantId`, `languageCode`, `setLanguageCode`, `useAuthEmulator`, `setPersistence` | implemented, tested |
-| Errors: `FirebaseAuthException` with the client's code (the codes of the JS SDK), `email`, `credential`, `phoneNumber`, `tenantId`; a recoverable credential goes back to `signInWithCredential` unchanged | implemented, tested for two codes |
+| Errors: `FirebaseAuthException` with the client's code (the codes of the JS SDK), `email`, `credential`, `phoneNumber`, `tenantId`; a recoverable credential goes back to `signInWithCredential` unchanged; other errors of the client (`ArgumentError` as `argument-error`, `StateError` and file errors as `internal-error`) are `FirebaseAuthException`s too | implemented, tested |
 | `multi-factor-auth-required`: a `FirebaseAuthMultiFactorException` whose `resolver.hints` lists the factors | implemented, tested; the resolver cannot finish the sign-in (below) |
 
 These throw a `FirebaseAuthException` with the code `unimplemented` and a message that says why:
 
-- **Provider flows**: `signInWithProvider`, `User.linkWithProvider`, `User.reauthenticateWithProvider`. There is no
-  OAuth flow for desktop yet; get the provider's token yourself and use `signInWithCredential`.
+- **Provider flows**: `signInWithProvider`, `User.linkWithProvider`, `User.reauthenticateWithProvider`. To sign in
+  with a provider today, use `FirebaseAuthDart.userAuthFor(app).signInWithOAuthLoopback` (the system browser and a
+  loopback redirect), or get the provider's token yourself and use `signInWithCredential`.
 - **Browser flows**: `signInWithPopup`, `signInWithRedirect`, `getRedirectResult`, `User.linkWithPopup`,
   `User.linkWithRedirect`, `User.reauthenticateWithPopup`, `User.reauthenticateWithRedirect`.
 - **Phone**: `verifyPhoneNumber`, `signInWithPhoneNumber`, `User.linkWithPhoneNumber`, `User.updatePhoneNumber`,
@@ -147,8 +160,10 @@ These throw a `FirebaseAuthException` with the code `unimplemented` and a messag
 - **`useAuthEmulator`**: call it before the first request, as the documentation of `firebase_auth` says. A session
   restored from the real service stays signed in until its first token refresh fails against the emulator.
 - **`User.refreshToken`** is null: the client keeps the refresh token to itself.
-- **`userChanges()`** emits after every new ID token and every change of the user's data, so a sign-in can emit the
-  same user twice, as on the native platforms.
+- **`userChanges()`** emits as on the native platforms: once per sign-in or sign-out, once per token refresh and once
+  per change of the user's data.
+- **Apple's `appleFullPersonName`** reaches the client, which, like the JS SDK, does not send it to the backend: set
+  the name with `updateDisplayName` after the first sign-in.
 - **`setSettings`** is accepted and ignored: its settings are for phone sign-in and the iOS keychain.
 - **App Check** tokens are not sent: the client supports them, but this package has no `firebase_app_check`
   implementation to take them from.

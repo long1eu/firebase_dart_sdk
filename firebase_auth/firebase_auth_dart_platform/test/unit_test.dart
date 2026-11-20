@@ -3,12 +3,18 @@
 
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io' show FileSystemException;
 
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_auth_dart_platform/firebase_auth_dart_platform.dart';
+import 'package:firebase_auth_dart_platform/src/convert.dart';
 import 'package:firebase_auth_dart_platform/src/core.dart';
+import 'package:firebase_auth_dart_platform/src/storage.dart';
 import 'package:firebase_auth_platform_interface/firebase_auth_platform_interface.dart'
     show FirebaseAuthPlatform;
+import 'package:firebase_auth_providers_dart/firebase_auth_providers_dart.dart'
+    as dart_auth
+    show AuthStorage, OAuthCredential;
 import 'package:firebase_auth_providers_dart/firebase_auth_providers_dart.dart'
     show InMemoryAuthStorage;
 import 'package:firebase_core/firebase_core.dart';
@@ -30,6 +36,14 @@ const FirebaseOptions _options = FirebaseOptions(
 final FakeBackend backend = FakeBackend();
 final Map<String, InMemoryAuthStorage> storages =
     <String, InMemoryAuthStorage>{};
+
+/// A storage for the app of a name instead of its InMemoryAuthStorage.
+final Map<String, dart_auth.AuthStorage> storageOverrides =
+    <String, dart_auth.AuthStorage>{};
+
+/// What registerWith left in place, before setUpAll calls use.
+late FirebasePlatform coreAfterRegisterWith;
+late AuthStorageFactory? storageAfterRegisterWith;
 
 int _apps = 0;
 
@@ -55,9 +69,12 @@ void main() {
     // Pretend to be on Linux, where registerWith also installs the Dart core.
     debugDefaultTargetPlatformOverride = TargetPlatform.linux;
     FirebaseAuthDart.registerWith();
+    coreAfterRegisterWith = FirebasePlatform.instance;
+    storageAfterRegisterWith = DartFirebaseAuth.config.storageFor;
     FirebaseAuthDart.use(
       httpClient: backend.client,
       storageFor: (FirebaseApp app) =>
+          storageOverrides[app.name] ??
           storages.putIfAbsent(app.name, InMemoryAuthStorage.new),
     );
   });
@@ -72,14 +89,32 @@ void main() {
   });
 
   group('registration', () {
-    test(
-      'registerWith on Linux installs the auth and core implementations',
-      () {
-        expect(FirebaseAuthDart.isRegistered, isTrue);
-        expect(FirebaseAuthPlatform.instance, isA<DartFirebaseAuth>());
-        expect(FirebasePlatform.instance, isNot(isA<MethodChannelFirebase>()));
-      },
-    );
+    test('registerWith under flutter test installs neither the core nor the '
+        'session file', () async {
+      expect(coreAfterRegisterWith, isA<MethodChannelFirebase>());
+      expect(storageAfterRegisterWith, isNotNull);
+      final FirebaseApp app = await Firebase.initializeApp(
+        name: 'registered',
+        options: _options,
+      );
+      expect(storageAfterRegisterWith!(app), isA<InMemoryAuthStorage>());
+    });
+
+    test('use on Linux installs the auth and core implementations', () {
+      expect(FirebaseAuthDart.isRegistered, isTrue);
+      expect(FirebaseAuthPlatform.instance, isA<DartFirebaseAuth>());
+      expect(FirebasePlatform.instance, isA<LinuxFirebaseCore>());
+    });
+
+    test('a forced core does not replace the Dart core', () {
+      final FirebasePlatform before = FirebasePlatform.instance;
+      installCoreIfNeeded(force: true);
+      expect(FirebasePlatform.instance, same(before));
+    });
+
+    test('the default storage is one object for all the apps', () {
+      expect(defaultStorage(), same(defaultStorage()));
+    });
 
     test('a core installed by another package is kept', () {
       final FirebasePlatform before = FirebasePlatform.instance;
@@ -134,11 +169,56 @@ void main() {
       await pumpEventQueue();
       expect(auth.currentUser, isNull);
       expect(states, <String?>[null, 'anon-user', null]);
-      // userChanges starts with the current user and follows every change.
-      expect(users.first, isNull);
-      expect(users, containsAllInOrder(<String?>['anon-user', null]));
+      // userChanges starts with the current user, then one event per change.
+      expect(users, <String?>[null, 'anon-user', null]);
       await s1.cancel();
       await s2.cancel();
+    });
+
+    test('userChanges: one event per sign-in, refresh, profile change and '
+        'sign-out', () async {
+      final FirebaseAuth auth = await newAuth();
+      final List<String?> users = <String?>[];
+      final StreamSubscription<User?> s = auth.userChanges().listen(
+        (User? user) => users.add(user?.uid),
+      );
+      await pumpEventQueue();
+      await auth.signInAnonymously();
+      await pumpEventQueue();
+      await auth.currentUser!.getIdToken(true);
+      await pumpEventQueue();
+      // The fake backend answers the update with a new ID token: the client
+      // emits on both of its streams, this one once.
+      await auth.currentUser!.updateDisplayName('Grace');
+      await pumpEventQueue();
+      await auth.signOut();
+      await pumpEventQueue();
+      expect(users, <String?>[
+        null,
+        'anon-user', // sign-in
+        'anon-user', // refresh
+        'anon-user', // profile change
+        null, // sign-out
+      ]);
+      await s.cancel();
+    });
+
+    test('a failed write of the session keeps the user signed in', () async {
+      storageOverrides['app$_apps'] = _FailingStorage();
+      final FirebaseAuth auth = await newAuth();
+      final List<String?> states = <String?>[];
+      final StreamSubscription<User?> s = auth.authStateChanges().listen(
+        (User? user) => states.add(user?.uid),
+      );
+      await pumpEventQueue();
+      final UserCredential result = await auth.signInAnonymously();
+      await pumpEventQueue();
+      expect(result.user!.uid, 'anon-user');
+      expect(auth.currentUser?.uid, 'anon-user');
+      expect(states, <String?>[null, 'anon-user']);
+      await auth.signOut();
+      expect(auth.currentUser, isNull);
+      await s.cancel();
     });
 
     test('email and password, with the provider data', () async {
@@ -330,6 +410,41 @@ void main() {
     });
   });
 
+  group('conversions', () {
+    test('an Apple credential keeps the name', () {
+      final dart_auth.OAuthCredential credential =
+          clientCredentialOf(
+                AppleAuthProvider.credentialWithIDToken(
+                  'apple-id-token',
+                  'nonce',
+                  AppleFullPersonName(givenName: 'Ada', familyName: 'Lovelace'),
+                ),
+              )
+              as dart_auth.OAuthCredential;
+      expect(credential.idToken, 'apple-id-token');
+      expect(credential.rawNonce, 'nonce');
+      expect(credential.appleFullPersonName?.givenName, 'Ada');
+      expect(credential.appleFullPersonName?.familyName, 'Lovelace');
+      final OAuthCredential back = credentialOf(credential)! as OAuthCredential;
+      expect(back.appleFullPersonName?.familyName, 'Lovelace');
+    });
+
+    test('guard turns other errors into FirebaseAuthException', () async {
+      await expectLater(
+        guard<void>(() => throw StateError('state')),
+        throwsAuthCode('internal-error'),
+      );
+      await expectLater(
+        guard<void>(() => throw ArgumentError('argument')),
+        throwsAuthCode('argument-error'),
+      );
+      await expectLater(
+        guard<void>(() => throw const FileSystemException('disk full')),
+        throwsAuthCode('internal-error'),
+      );
+    });
+  });
+
   group('not available', () {
     test('provider, popup, redirect and phone throw unimplemented', () async {
       final FirebaseAuth auth = await newAuth();
@@ -368,6 +483,15 @@ void main() {
       );
     });
   });
+}
+
+class _FailingStorage implements dart_auth.AuthStorage {
+  @override
+  String? read(String key) => null;
+
+  @override
+  Future<void> write(String key, String? value) async =>
+      throw const FileSystemException('Read-only file system');
 }
 
 class _OtherCore extends FirebasePlatform {

@@ -47,8 +47,12 @@ class DartFirebaseAuth extends FirebaseAuthPlatform {
   /// changes anything for that app.
   static bool get anyStarted => _instances.isNotEmpty;
 
-  /// The instance of [app], created on first use: its client restores the
-  /// stored session in the background (`authStateChanges()` waits for it).
+  /// The instance of [app], created on first use (`firebase_auth` asks for it
+  /// at the first call on `FirebaseAuth.instanceFor(app: app)`). Its client
+  /// starts to restore the stored session at once, in the background:
+  /// [currentUser] is null until that has finished, and `authStateChanges()`
+  /// waits for it, so code that needs the restored user at start awaits
+  /// `authStateChanges().first`.
   static DartFirebaseAuth forApp(FirebaseApp app) =>
       _instances.putIfAbsent(app.name, () {
         final dart_auth.AuthStorage storage =
@@ -132,6 +136,9 @@ class DartFirebaseAuth extends FirebaseAuthPlatform {
     await userAuth.dispose();
   }
 
+  /// The signed-in user. Null until the stored session has been restored,
+  /// which starts when this instance is created: await
+  /// `authStateChanges().first` for the user at start.
   @override
   UserPlatform? get currentUser => userOf(client.currentUser);
 
@@ -199,41 +206,75 @@ class DartFirebaseAuth extends FirebaseAuthPlatform {
   @override
   Stream<UserPlatform?> idTokenChanges() => client.idTokenChanges().map(userOf);
 
-  /// Like `firebase_auth` on the other platforms, a superset of
-  /// [idTokenChanges] (which starts with the current user) and of the changes
-  /// of the user's data.
+  /// Like `firebase_auth` on the other platforms: the current user when it
+  /// is listened to, then one event per sign-in or sign-out, per new ID token
+  /// (a refresh) and per change of the user's data.
+  ///
+  /// It merges the client's [idTokenChanges] and `userChanges()`. One change
+  /// of the client (a sign-in, a sign-out, an update that returns a new ID
+  /// token) emits the same user object, or null, on both, before the next
+  /// timer event: the second of the two is dropped. A refresh emits on
+  /// [idTokenChanges] only and a change of the user's data without a new token
+  /// on `userChanges()` only, so each of them is one event too.
   @override
   Stream<UserPlatform?> userChanges() {
     final dart_auth.FirebaseUserAuth userAuth = client;
+    // Not paused with the listener: this controller buffers instead, so that
+    // the two events of one change still arrive together.
     late final StreamController<UserPlatform?> controller;
     final List<StreamSubscription<dart_auth.AuthUser?>> subscriptions =
         <StreamSubscription<dart_auth.AuthUser?>>[];
-    void add(dart_auth.AuthUser? user) => controller.add(userOf(user));
+    // The events each stream delivered in the current turn, not yet matched
+    // by the other stream.
+    final List<dart_auth.AuthUser?> fromTokens = <dart_auth.AuthUser?>[];
+    final List<dart_auth.AuthUser?> fromUsers = <dart_auth.AuthUser?>[];
+    Timer? endOfTurn;
+
+    void on(
+      dart_auth.AuthUser? user,
+      List<dart_auth.AuthUser?> mine,
+      List<dart_auth.AuthUser?> other,
+    ) {
+      final int match = other.indexWhere(
+        (dart_auth.AuthUser? u) => identical(u, user),
+      );
+      if (match >= 0) {
+        other.removeAt(match);
+        return;
+      }
+      mine.add(user);
+      endOfTurn ??= Timer(Duration.zero, () {
+        endOfTurn = null;
+        fromTokens.clear();
+        fromUsers.clear();
+      });
+      controller.add(userOf(user));
+    }
+
     controller = StreamController<UserPlatform?>(
       sync: true,
       onListen: () {
         subscriptions
           ..add(
-            userAuth.idTokenChanges().listen(add, onError: controller.addError),
+            userAuth.idTokenChanges().listen(
+              (dart_auth.AuthUser? user) => on(user, fromTokens, fromUsers),
+              onError: controller.addError,
+            ),
           )
           ..add(
-            userAuth.userChanges().listen(add, onError: controller.addError),
+            userAuth.userChanges().listen(
+              (dart_auth.AuthUser? user) => on(user, fromUsers, fromTokens),
+              onError: controller.addError,
+            ),
           );
       },
-      onPause: () {
-        for (final StreamSubscription<dart_auth.AuthUser?> s in subscriptions) {
-          s.pause();
-        }
+      onCancel: () async {
+        endOfTurn?.cancel();
+        await Future.wait(<Future<void>>[
+          for (final StreamSubscription<dart_auth.AuthUser?> s in subscriptions)
+            s.cancel(),
+        ]);
       },
-      onResume: () {
-        for (final StreamSubscription<dart_auth.AuthUser?> s in subscriptions) {
-          s.resume();
-        }
-      },
-      onCancel: () => Future.wait(<Future<void>>[
-        for (final StreamSubscription<dart_auth.AuthUser?> s in subscriptions)
-          s.cancel(),
-      ]),
     );
     return controller.stream;
   }
