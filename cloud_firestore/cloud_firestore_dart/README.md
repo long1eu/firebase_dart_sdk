@@ -14,7 +14,7 @@ package. On Android, iOS and the web, where the official plugin works, prefer it
 It is a port of the open-source Firebase Android SDK, kept close to its current behaviour. Start with
 `dart pub add cloud_firestore_dart firebase_app_dart` and the [Quickstart](#quickstart).
 
-> **Status: 0.3.1.** Most of it was verified against the Firestore emulator
+> **Status: 0.3.2.** Most of it was verified against the Firestore emulator
 > only. Against production Firestore, a short verification kit was run on a Standard edition
 > database (see [Not done](#not-done)). Test against your own project before relying on it.
 
@@ -35,7 +35,7 @@ It is a port of the open-source Firebase Android SDK, kept close to its current 
 | Pipelines (`package:cloud_firestore_dart/pipelines.dart`), Enterprise edition only | **preview** |
 | Firestore Lite (`package:cloud_firestore_dart/lite.dart`): no cache, one request per call | stable |
 | The web: REST and WebChannel over `fetch`, cache in memory, IndexedDB or OPFS | **supported in Chrome** |
-| The web: a cache in the official JS SDK's own IndexedDB database (`package:cloud_firestore_dart/indexeddb_cache.dart`), no SQLite | **supported in Chrome**, one tab; several tabs with `multiTab: true` (**preview**, new in the next version) |
+| The web: a cache in the official JS SDK's own IndexedDB database (`package:cloud_firestore_dart/indexeddb_cache.dart`), no SQLite | **supported in Chrome**, one tab; several tabs with `multiTab: true` (**preview**, new in 0.3.2) |
 | A cache in your own storage: any ordered key-value store you implement (`package:cloud_firestore_dart/cache_store.dart`, [guide](https://github.com/long1eu/firebase_dart_sdk/blob/main/docs/guides/custom_cache_store.md)) | stable, one client per store |
 
 *Stable* means the API is not expected to change; a *preview* API may change in

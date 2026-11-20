@@ -2,7 +2,7 @@
 
 > An unofficial pure-Dart Cloud Firestore client, ported from the Firebase Android SDK, for Dart
 > servers, command line tools, Flutter apps and the web (supported in Chrome). The core packages
-> on pub.dev: `cloud_firestore_dart` 0.3.1 (the client), `firebase_app_dart` 0.2.0 (the
+> on pub.dev: `cloud_firestore_dart` 0.3.2 (the client), `firebase_app_dart` 0.2.0 (the
 > `FirebaseApp`) and `firebase_auth_providers_dart` 0.3.0 (token providers); the repository README
 > lists the others (the SQLite cache, the FlutterFire platform and admin packages). It is not FlutterFire's
 > `cloud_firestore` and not the Firebase JS SDK: there is no `firebase_core`, no

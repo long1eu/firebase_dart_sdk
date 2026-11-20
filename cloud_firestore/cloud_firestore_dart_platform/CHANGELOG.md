@@ -1,3 +1,8 @@
+## 0.1.2
+
+No code change. A shorter package description (it was 208 characters, which pub.dev scores as too long) and the
+topic `linux`.
+
 ## 0.1.1
 
 - The constraint on `cloud_firestore_dart` is `>=0.2.0 <0.4.0` instead of `^0.2.0`, so that the package can be used with

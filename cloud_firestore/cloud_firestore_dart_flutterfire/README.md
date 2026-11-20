@@ -11,7 +11,7 @@ platforms as the official `cloud_firestore`. To keep the official `cloud_firesto
 [`cloud_firestore_dart_platform`](https://pub.dev/packages/cloud_firestore_dart_platform). It is not
 affiliated with or supported by Google or Firebase.
 
-> **Status: 0.1.1.** Covered by unit tests with fake plugins only. It has not been run in a
+> **Status: 0.1.2.** Covered by unit tests with fake plugins only. It has not been run in a
 > Flutter app with the real plugins, on any platform, or against a real Firebase project.
 
 ## Install

@@ -17,7 +17,7 @@ when in doubt, search it.
 
 | You need | Add | Import |
 |---|---|---|
-| Firestore (always) | `cloud_firestore_dart: ^0.3.1` | `package:cloud_firestore_dart/cloud_firestore_dart.dart` |
+| Firestore (always) | `cloud_firestore_dart: ^0.3.2` | `package:cloud_firestore_dart/cloud_firestore_dart.dart` |
 | The `FirebaseApp` (always) | `firebase_app_dart: ^0.2.0` | `package:firebase_app_dart/firebase_app_dart.dart` |
 | End users signed in (email/password, anonymous, custom token) or a service account key | `firebase_auth_providers_dart: ^0.3.0` | `package:firebase_auth_providers_dart/firebase_auth_providers_dart.dart` |
 | Application Default Credentials (servers, CLIs; needs `dart:io`) | `firebase_auth_providers_dart: ^0.3.0` | `package:firebase_auth_providers_dart/adc.dart` |

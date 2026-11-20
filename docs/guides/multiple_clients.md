@@ -14,7 +14,7 @@ do not share listeners or writes. That is the first part of the multi-tab suppor
 SDK; sharing listeners and writes between clients is deferred until after 0.1.0. In a browser the
 SQLite caches can only be open in one tab (see
 [Offline persistence on the web](offline_persistence.md#on-the-web)). The IndexedDB cache of the web
-does share them between tabs with `multiTab: true`, a preview that is new in the next version: see
+does share them between tabs with `multiTab: true`, a preview that is new in 0.3.2: see
 [Multi-tab mode](web.md#multi-tab-mode-preview).
 
 ## The file stays consistent

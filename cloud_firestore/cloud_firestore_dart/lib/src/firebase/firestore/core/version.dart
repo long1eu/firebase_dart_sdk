@@ -7,7 +7,7 @@
 class Version {
   /// The version of this package. Must be the `version` of `pubspec.yaml`
   /// (checked by `test/unit/firebase/firestore/core/version_test.dart`).
-  static const String sdkVersion = '0.3.1';
+  static const String sdkVersion = '0.3.2';
 
   /// The version of `package:grpc` this package is developed with: the one
   /// in `pubspec.lock` (checked by the same test).

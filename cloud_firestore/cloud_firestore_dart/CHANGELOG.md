@@ -1,4 +1,4 @@
-## (unreleased)
+## 0.3.2
 
 - Several tabs can share one IndexedDB cache: `indexedDbCacheSettings(multiTab: true)` (a **preview**, off by
   default; Chrome only, tested with dart2js and dart2wasm). One tab is primary and uses the network; the others
@@ -10,6 +10,7 @@
   terminated client. Not tested: a JS SDK tab beside a tab of this SDK, different users in the tabs,
   other browsers, a tab hidden for more than a few minutes; the handover between a hidden and a visible tab was
   tried by hand in Chrome only. The SQLite caches stay at one tab. See `docs/guides/web.md`.
+- The package has the pub.dev topic `server`.
 
 ## 0.3.1
 
