@@ -9,12 +9,14 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_auth_dart_platform/firebase_auth_dart_platform.dart';
 import 'package:firebase_auth_dart_platform/src/convert.dart';
 import 'package:firebase_auth_dart_platform/src/core.dart';
+import 'package:firebase_auth_dart_platform/src/firebase_auth.dart'
+    show DartAuthConfig;
 import 'package:firebase_auth_dart_platform/src/storage.dart';
 import 'package:firebase_auth_platform_interface/firebase_auth_platform_interface.dart'
     show FirebaseAuthPlatform;
 import 'package:firebase_auth_providers_dart/firebase_auth_providers_dart.dart'
     as dart_auth
-    show AuthStorage, OAuthCredential;
+    show AuthStorage, OAuthCredential, OAuthLoopbackProvider;
 import 'package:firebase_auth_providers_dart/firebase_auth_providers_dart.dart'
     show InMemoryAuthStorage;
 import 'package:firebase_core/firebase_core.dart';
@@ -56,6 +58,64 @@ Future<FirebaseAuth> newAuth() async {
   return FirebaseAuth.instanceFor(app: app);
 }
 
+/// The authorization URLs the provider flows presented, in order.
+final List<Uri> presented = <Uri>[];
+
+/// The providers of the provider flows: Google with a login hint, and GitHub.
+final List<dart_auth.OAuthLoopbackProvider> oauthProviders =
+    <dart_auth.OAuthLoopbackProvider>[
+      dart_auth.OAuthLoopbackProvider.google(
+        clientId: 'desktop-client',
+        clientSecret: 'desktop-secret',
+        loginHint: 'ada@example.com',
+      ),
+      dart_auth.OAuthLoopbackProvider.github(
+        clientId: 'github-client',
+        clientSecret: 'github-secret',
+      ),
+    ];
+
+/// Plays the browser of a provider flow: the provider redirects to the
+/// loopback server of the flow at once, with a code and the state it was sent.
+Future<void> followRedirect(Uri url) async {
+  presented.add(url);
+  final Map<String, String> query = url.queryParameters;
+  final Uri redirect = Uri.parse(query['redirect_uri']!).replace(
+    queryParameters: <String, String>{
+      'code': 'the-code',
+      'state': query['state']!,
+    },
+  );
+  final http.Client browser = http.Client();
+  try {
+    await browser.get(redirect);
+  } finally {
+    browser.close();
+  }
+}
+
+/// Answers the code exchange at the token endpoints of Google and GitHub
+/// (the client sends it through the http client of `use`); null for the
+/// requests of the default backend.
+http.Response? providerTokens(http.Request request) =>
+    switch (request.url.host) {
+      'oauth2.googleapis.com' => jsonResponse(<String, Object?>{
+        'access_token': 'google-access-token',
+        'id_token': unsignedJwt(<String, Object?>{
+          'sub': 'google-sub',
+          'nonce': presented.last.queryParameters['nonce'],
+        }),
+        'expires_in': 3599,
+        'token_type': 'Bearer',
+      }),
+      'github.com' => jsonResponse(<String, Object?>{
+        'access_token': 'github-access-token',
+        'token_type': 'bearer',
+        'scope': 'read:user',
+      }),
+      _ => null,
+    };
+
 Matcher throwsAuthCode(String code) => throwsA(
   isA<FirebaseAuthException>().having(
     (FirebaseAuthException e) => e.code,
@@ -76,6 +136,8 @@ void main() {
       storageFor: (FirebaseApp app) =>
           storageOverrides[app.name] ??
           storages.putIfAbsent(app.name, InMemoryAuthStorage.new),
+      oauthProviders: oauthProviders,
+      presentUrl: followRedirect,
     );
   });
 
@@ -86,6 +148,7 @@ void main() {
   setUp(() {
     backend.requests.clear();
     backend.override = null;
+    presented.clear();
   });
 
   group('registration', () {
@@ -561,6 +624,228 @@ void main() {
     });
   });
 
+  group('provider sign-in', () {
+    test(
+      'signInWithProvider runs the loopback flow of the provider passed to '
+      'use, with the scopes and parameters of the FlutterFire provider',
+      () async {
+        final FirebaseAuth auth = await newAuth();
+        backend.override = providerTokens;
+        final UserCredential result = await auth.signInWithProvider(
+          GoogleAuthProvider()
+            ..addScope('https://www.googleapis.com/auth/drive.file')
+            ..addScope('email')
+            ..setCustomParameters(<String, String>{
+              'prompt': 'consent',
+              'login_hint': 'bob@example.com',
+            }),
+        );
+        expect(result.user!.uid, 'google-user');
+        expect(result.credential?.providerId, 'google.com');
+
+        final Uri url = presented.single;
+        expect(url.host, 'accounts.google.com');
+        expect(url.queryParameters['client_id'], 'desktop-client');
+        expect(
+          url.queryParameters['scope'],
+          'openid email profile https://www.googleapis.com/auth/drive.file',
+        );
+        expect(url.queryParameters['prompt'], 'consent');
+        expect(url.queryParameters['login_hint'], 'bob@example.com');
+        final Map<String, String> exchange = backend.requests
+            .singleWhere(
+              (http.Request r) => r.url.host == 'oauth2.googleapis.com',
+            )
+            .bodyFields;
+        expect(exchange['code'], 'the-code');
+        expect(exchange['client_secret'], 'desktop-secret');
+        final Map<String, String> post = Uri.splitQueryString(
+          backend.bodyOf('accounts:signInWithIdp')['postBody']! as String,
+        );
+        expect(post['providerId'], 'google.com');
+        expect(post['access_token'], 'google-access-token');
+
+        // The provider passed to use is not changed by the request.
+        await auth.signOut();
+        await auth.signInWithProvider(GoogleAuthProvider());
+        expect(presented.last.queryParameters['scope'], 'openid email profile');
+        expect(presented.last.queryParameters['login_hint'], 'ada@example.com');
+        expect(presented.last.queryParameters.containsKey('prompt'), isFalse);
+      },
+    );
+
+    test(
+      'linkWithProvider and reauthenticateWithProvider act on the user',
+      () async {
+        final FirebaseAuth auth = await newAuth();
+        await auth.signInAnonymously();
+        final String uid = auth.currentUser!.uid;
+        backend.override = (http.Request r) =>
+            providerTokens(r) ??
+            (r.url.path.endsWith('accounts:signInWithIdp')
+                ? jsonResponse(<String, Object?>{
+                    'localId': uid,
+                    'providerId': 'github.com',
+                    'idToken': idToken(uid, provider: 'github.com'),
+                    'refreshToken': 'refresh:$uid',
+                    'expiresIn': '3600',
+                  })
+                : null);
+
+        final UserCredential linked = await auth.currentUser!.linkWithProvider(
+          GithubAuthProvider()..addScope('repo'),
+        );
+        expect(linked.user!.uid, uid);
+        final Uri url = presented.single;
+        expect(url.host, 'github.com');
+        expect(url.queryParameters['client_id'], 'github-client');
+        expect(url.queryParameters['scope'], 'read:user user:email repo');
+        expect(url.queryParameters.containsKey('nonce'), isFalse);
+        final Map<String, Object?> body = backend.bodyOf(
+          'accounts:signInWithIdp',
+        );
+        expect(body['idToken'], isNotNull);
+        final Map<String, String> post = Uri.splitQueryString(
+          body['postBody']! as String,
+        );
+        expect(post['providerId'], 'github.com');
+        expect(post['access_token'], 'github-access-token');
+
+        final UserCredential again = await auth.currentUser!
+            .reauthenticateWithProvider(GithubAuthProvider());
+        expect(again.user!.uid, uid);
+        expect(presented, hasLength(2));
+        expect(presented.last.queryParameters['scope'], 'read:user user:email');
+      },
+    );
+
+    test('a provider id that was not passed to use throws unimplemented '
+        'before the browser opens', () async {
+      final FirebaseAuth auth = await newAuth();
+      await expectLater(
+        auth.signInWithProvider(OAuthProvider('oidc.none')),
+        throwsA(
+          isA<FirebaseAuthException>()
+              .having(
+                (FirebaseAuthException e) => e.code,
+                'code',
+                'unimplemented',
+              )
+              .having(
+                (FirebaseAuthException e) => e.message,
+                'message',
+                allOf(contains('"oidc.none"'), contains('oauthProviders')),
+              ),
+        ),
+      );
+      await auth.signInAnonymously();
+      await expectLater(
+        auth.currentUser!.linkWithProvider(MicrosoftAuthProvider()),
+        throwsAuthCode('unimplemented'),
+      );
+      await expectLater(
+        auth.currentUser!.reauthenticateWithProvider(YahooAuthProvider()),
+        throwsAuthCode('unimplemented'),
+      );
+      expect(presented, isEmpty);
+    });
+
+    test(
+      'errors of the flow are FirebaseAuthExceptions with their code',
+      () async {
+        final FirebaseAuth auth = await newAuth();
+        backend.override = (http.Request r) =>
+            r.url.host == 'oauth2.googleapis.com'
+            ? jsonResponse(<String, Object?>{'error': 'invalid_grant'}, 400)
+            : null;
+        await expectLater(
+          auth.signInWithProvider(GoogleAuthProvider()),
+          throwsAuthCode('invalid-credential'),
+        );
+        expect(auth.currentUser, isNull);
+
+        // A user that is no longer signed in fails before the browser opens.
+        backend.override = null;
+        await auth.signInAnonymously();
+        final User stale = auth.currentUser!;
+        await auth.signOut();
+        presented.clear();
+        await expectLater(
+          stale.linkWithProvider(GoogleAuthProvider()),
+          throwsAuthCode('no-current-user'),
+        );
+        expect(presented, isEmpty);
+      },
+    );
+
+    test(
+      'without presentUrl, Android and iOS throw before the flow starts',
+      () async {
+        final DartAuthConfig configured = DartFirebaseAuth.config;
+        DartFirebaseAuth.config = DartAuthConfig(
+          httpClient: backend.client,
+          storageFor: (FirebaseApp app) => InMemoryAuthStorage(),
+          oauthProviders: <String, dart_auth.OAuthLoopbackProvider>{
+            'google.com': oauthProviders.first,
+          },
+        );
+        final FirebaseAuth auth;
+        try {
+          auth = await newAuth();
+          await auth.signInAnonymously();
+        } finally {
+          DartFirebaseAuth.config = configured;
+        }
+        for (final TargetPlatform platform in <TargetPlatform>[
+          TargetPlatform.android,
+          TargetPlatform.iOS,
+        ]) {
+          debugDefaultTargetPlatformOverride = platform;
+          try {
+            await expectLater(
+              auth.signInWithProvider(GoogleAuthProvider()),
+              throwsA(
+                isA<FirebaseAuthException>()
+                    .having(
+                      (FirebaseAuthException e) => e.code,
+                      'code',
+                      'unimplemented',
+                    )
+                    .having(
+                      (FirebaseAuthException e) => e.message,
+                      'message',
+                      contains('presentUrl'),
+                    ),
+              ),
+            );
+            await expectLater(
+              auth.currentUser!.linkWithProvider(GoogleAuthProvider()),
+              throwsAuthCode('unimplemented'),
+            );
+          } finally {
+            debugDefaultTargetPlatformOverride = TargetPlatform.linux;
+          }
+        }
+        expect(
+          backend.paths.where((String p) => p.endsWith('/token')),
+          isEmpty,
+        );
+      },
+    );
+
+    test('use rejects two providers with one id', () {
+      expect(
+        () => FirebaseAuthDart.use(
+          oauthProviders: <dart_auth.OAuthLoopbackProvider>[
+            oauthProviders.first,
+            oauthProviders.first,
+          ],
+        ),
+        throwsArgumentError,
+      );
+    });
+  });
+
   group('user', () {
     test('updateProfile: null removes, a missing field stays', () async {
       final FirebaseAuth auth = await newAuth();
@@ -834,12 +1119,8 @@ void main() {
   });
 
   group('not available', () {
-    test('provider, popup, redirect and phone throw unimplemented', () async {
+    test('popup, redirect and phone throw unimplemented', () async {
       final FirebaseAuth auth = await newAuth();
-      await expectLater(
-        auth.signInWithProvider(GoogleAuthProvider()),
-        throwsAuthCode('unimplemented'),
-      );
       await expectLater(
         auth.signInWithPopup(GoogleAuthProvider()),
         throwsAuthCode('unimplemented'),
@@ -862,7 +1143,7 @@ void main() {
       );
       await auth.signInAnonymously();
       await expectLater(
-        auth.currentUser!.linkWithProvider(GoogleAuthProvider()),
+        auth.currentUser!.linkWithPopup(GoogleAuthProvider()),
         throwsAuthCode('unimplemented'),
       );
     });

@@ -31,13 +31,6 @@ const String noBrowserFlow =
     'popup and redirect flows exist only in a browser. Get the provider token '
     'yourself and use signInWithCredential.';
 
-/// Why signInWithProvider and its link and reauthenticate variants throw.
-const String noProviderFlow =
-    'it has no provider flow of its own. To sign in with a provider, use '
-    'FirebaseAuthDart.userAuthFor(app).signInWithOAuthLoopback (the system '
-    'browser and a loopback redirect), or get the provider token yourself and '
-    'use signInWithCredential.';
-
 /// Runs [body] and rethrows its errors as the exceptions of the platform
 /// interface, so that an app always gets a [FirebaseAuthException]: the
 /// errors of `firebase_auth_providers_dart` with the same code (a

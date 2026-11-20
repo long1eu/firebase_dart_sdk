@@ -358,6 +358,32 @@ class OAuthLoopbackProvider {
   /// The port of the loopback server; 0 for any free port.
   final int port;
 
+  /// A copy of this provider with other [scopes] or [customParameters] (each replaces this provider's when given);
+  /// everything else stays. For a sign-in that asks for more than the provider was made with:
+  ///
+  /// ```dart
+  /// final OAuthLoopbackProvider withDrive = google.copyWith(
+  ///   scopes: <String>[...google.scopes, 'https://www.googleapis.com/auth/drive.file'],
+  /// );
+  /// ```
+  OAuthLoopbackProvider copyWith({
+    List<String>? scopes,
+    Map<String, String>? customParameters,
+  }) => OAuthLoopbackProvider(
+    providerId: providerId,
+    authorizationEndpoint: authorizationEndpoint,
+    tokenEndpoint: tokenEndpoint,
+    clientId: clientId,
+    clientSecret: clientSecret,
+    exchangeCode: exchangeCode,
+    scopes: scopes ?? this.scopes,
+    useNonce: useNonce,
+    sendNonceToFirebase: sendNonceToFirebase,
+    customParameters: customParameters ?? this.customParameters,
+    redirectPath: redirectPath,
+    port: port,
+  );
+
   /// The credential of the provider's tokens: [GoogleAuthProvider.credential] for Google, otherwise
   /// [OAuthProvider.credential] with the raw nonce when [sendNonceToFirebase] is set.
   OAuthCredential credentialFor({

@@ -244,6 +244,8 @@ print(result.user?.email);
   the same user in again. Both take the same arguments as `signInWithOAuthLoopback`, and throw `null-user` before
   the browser opens when nobody is signed in.
 - `authorizeWithOAuthLoopback` returns the tokens and the credential without signing in.
+- `provider.copyWith(scopes:, customParameters:)` makes a provider for one request that asks for more, such as one
+  more scope: `google.copyWith(scopes: <String>[...google.scopes, 'https://www.googleapis.com/auth/drive.file'])`.
 - Only the code is exchanged: once signed in, the Firebase session refreshes itself; the provider's refresh token is
   returned but not used.
 - Errors are `FirebaseAuthException`s: `timeout` (five minutes by default), `user-cancelled`,

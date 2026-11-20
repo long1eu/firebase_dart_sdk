@@ -25,7 +25,11 @@ library;
 
 import 'package:firebase_auth_platform_interface/firebase_auth_platform_interface.dart';
 import 'package:firebase_auth_providers_dart/firebase_auth_providers_dart.dart'
-    show FirebaseUserAuth, InMemoryAuthStorage;
+    show
+        FirebaseUserAuth,
+        InMemoryAuthStorage,
+        OAuthLoopbackProvider,
+        UrlPresenter;
 import 'package:firebase_core/firebase_core.dart';
 import 'package:http/http.dart' as http;
 
@@ -34,6 +38,13 @@ import 'src/core.dart';
 import 'src/firebase_auth.dart';
 import 'src/multi_factor.dart';
 import 'src/storage.dart' show runningUnderFlutterTest;
+
+export 'package:firebase_auth_providers_dart/firebase_auth_providers_dart.dart'
+    show
+        OAuthAuthorizationCode,
+        OAuthCodeExchange,
+        OAuthLoopbackProvider,
+        UrlPresenter;
 
 export 'src/convert.dart' show DartFirebaseAuthException;
 export 'src/firebase_auth.dart' show AuthStorageFactory, DartFirebaseAuth;
@@ -89,6 +100,17 @@ abstract final class FirebaseAuthDart {
   ///   package that installed its own core (the Firestore platform package of
   ///   this repository) keeps it; pass true to force it (for example in tests),
   ///   false to never do it.
+  /// * [oauthProviders] back `signInWithProvider`, `User.linkWithProvider` and
+  ///   `User.reauthenticateWithProvider` with the loopback OAuth flow of the
+  ///   client (the system browser and a redirect to 127.0.0.1): the call with
+  ///   a `GoogleAuthProvider` uses the [OAuthLoopbackProvider] whose
+  ///   `providerId` is `google.com`, and so on. The scopes and custom
+  ///   parameters of the FlutterFire provider are added to its request. A
+  ///   provider id without one throws `unimplemented`. Two providers with one
+  ///   id throw an [ArgumentError].
+  /// * [presentUrl] opens the authorization URL of those flows, for example
+  ///   `url_launcher`'s `launchUrl` on Android and iOS; by default the system
+  ///   browser on macOS, Linux and Windows.
   ///
   /// It also replaces the multi-factor generators of `firebase_auth`: the
   /// TOTP one works through the client, the phone one throws
@@ -100,7 +122,22 @@ abstract final class FirebaseAuthDart {
     AuthStorageFactory? storageFor,
     http.Client? httpClient,
     bool? useDartCore,
+    Iterable<OAuthLoopbackProvider> oauthProviders =
+        const <OAuthLoopbackProvider>[],
+    UrlPresenter? presentUrl,
   }) {
+    final Map<String, OAuthLoopbackProvider> byId =
+        <String, OAuthLoopbackProvider>{};
+    for (final OAuthLoopbackProvider provider in oauthProviders) {
+      if (byId.containsKey(provider.providerId)) {
+        throw ArgumentError.value(
+          provider.providerId,
+          'oauthProviders',
+          'has two providers with this id',
+        );
+      }
+      byId[provider.providerId] = provider;
+    }
     if (DartFirebaseAuth.anyStarted) {
       throw StateError(
         'FirebaseAuthDart.use must be called before the first use of '
@@ -110,6 +147,8 @@ abstract final class FirebaseAuthDart {
     DartFirebaseAuth.config = DartAuthConfig(
       storageFor: storageFor,
       httpClient: httpClient,
+      oauthProviders: Map<String, OAuthLoopbackProvider>.unmodifiable(byId),
+      presentUrl: presentUrl,
     );
     installCoreIfNeeded(force: useDartCore);
     if (!isRegistered) {

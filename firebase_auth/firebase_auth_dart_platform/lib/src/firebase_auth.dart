@@ -4,9 +4,12 @@ import 'package:firebase_auth_platform_interface/firebase_auth_platform_interfac
 import 'package:firebase_auth_providers_dart/firebase_auth_providers_dart.dart'
     as dart_auth;
 import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter/foundation.dart'
+    show TargetPlatform, defaultTargetPlatform, kIsWeb;
 import 'package:http/http.dart' as http;
 
 import 'convert.dart';
+import 'oauth_provider.dart';
 import 'storage.dart';
 import 'user.dart';
 
@@ -17,10 +20,23 @@ typedef AuthStorageFactory = dart_auth.AuthStorage Function(FirebaseApp app);
 /// What `FirebaseAuthDart.use` configures; read when the instance of an app is
 /// created.
 class DartAuthConfig {
-  const DartAuthConfig({this.storageFor, this.httpClient});
+  const DartAuthConfig({
+    this.storageFor,
+    this.httpClient,
+    this.oauthProviders = const <String, dart_auth.OAuthLoopbackProvider>{},
+    this.presentUrl,
+  });
 
   final AuthStorageFactory? storageFor;
   final http.Client? httpClient;
+
+  /// The providers of `signInWithProvider` and its link and reauthenticate
+  /// variants, by Firebase provider id (`google.com`, `github.com`, ...).
+  final Map<String, dart_auth.OAuthLoopbackProvider> oauthProviders;
+
+  /// Opens the authorization URL of a provider sign-in; the client's default
+  /// (`openInSystemBrowser`) when null.
+  final dart_auth.UrlPresenter? presentUrl;
 }
 
 /// The implementation of [FirebaseAuthPlatform] on top of
@@ -32,9 +48,13 @@ class DartAuthConfig {
 /// ([delegateFor]).
 class DartFirebaseAuth extends FirebaseAuthPlatform {
   /// The instance without an app, for [FirebaseAuthPlatform.instance].
-  DartFirebaseAuth() : _client = null, _storage = null, super();
+  DartFirebaseAuth()
+    : _client = null,
+      _storage = null,
+      _config = const DartAuthConfig(),
+      super();
 
-  DartFirebaseAuth._(FirebaseApp app, this._client, this._storage)
+  DartFirebaseAuth._(FirebaseApp app, this._client, this._storage, this._config)
     : super(appInstance: app);
 
   /// The configuration of the instances created from now on.
@@ -68,7 +88,7 @@ class DartFirebaseAuth extends FirebaseAuthPlatform {
         // The error of a failed restore (an unreadable storage) reaches
         // authStateReady(); the app starts signed out.
         unawaited(userAuth.restore().catchError((Object _) {}));
-        return DartFirebaseAuth._(app, userAuth, switchable);
+        return DartFirebaseAuth._(app, userAuth, switchable, config);
       });
 
   /// The key of the session of [app] in its storage, the one `forApp` of
@@ -78,6 +98,7 @@ class DartFirebaseAuth extends FirebaseAuthPlatform {
 
   final dart_auth.FirebaseUserAuth? _client;
   final SwitchableStorage? _storage;
+  final DartAuthConfig _config;
   final Expando<DartUser> _users = Expando<DartUser>();
 
   /// The client of this instance's app.
@@ -120,6 +141,53 @@ class DartFirebaseAuth extends FirebaseAuthPlatform {
         credential: credentialOf(result.credential),
         user: userOf(result.user),
       );
+
+  /// The loopback provider registered for [provider]'s id, with the scopes
+  /// and custom parameters of [provider] added to its own (the parameters of
+  /// [provider] win over those of the registered provider).
+  ///
+  /// Throws `unimplemented` when no provider is registered for that id, on
+  /// the web, where the loopback flow does not exist, and on a platform without
+  /// a default browser launcher (Android, iOS) when `use` got no `presentUrl`.
+  dart_auth.OAuthLoopbackProvider loopbackProviderFor(
+    String member,
+    AuthProvider provider,
+  ) {
+    if (kIsWeb) {
+      throw unimplemented(member, noLoopbackOnWeb);
+    }
+    if (_config.presentUrl == null &&
+        !_systemBrowserPlatforms.contains(defaultTargetPlatform)) {
+      throw unimplemented(member, noPresentUrl);
+    }
+    final dart_auth.OAuthLoopbackProvider? registered =
+        _config.oauthProviders[provider.providerId];
+    if (registered == null) {
+      throw unimplemented(member, noProviderFlowFor(provider.providerId));
+    }
+    final (List<String> scopes, Map<String, String> parameters) =
+        oauthRequestOf(provider);
+    if (scopes.isEmpty && parameters.isEmpty) {
+      return registered;
+    }
+    return registered.copyWith(
+      scopes: <String>{...registered.scopes, ...scopes}.toList(),
+      customParameters: <String, String>{
+        ...registered.customParameters,
+        ...parameters,
+      },
+    );
+  }
+
+  /// Where the client opens the system browser without a `presentUrl`.
+  static const Set<TargetPlatform> _systemBrowserPlatforms = <TargetPlatform>{
+    TargetPlatform.macOS,
+    TargetPlatform.linux,
+    TargetPlatform.windows,
+  };
+
+  /// The presenter of the authorization URL passed to `FirebaseAuthDart.use`.
+  dart_auth.UrlPresenter? get presentUrl => _config.presentUrl;
 
   // ---- plumbing ----
 
@@ -405,12 +473,24 @@ class DartFirebaseAuth extends FirebaseAuthPlatform {
   Future<List<String>> fetchSignInMethodsForEmail(String email) =>
       guard(this, () => client.fetchSignInMethodsForEmail(email));
 
-  // ---- not available: see the README ----
-
+  /// Signs in through the system browser and a loopback redirect, with the
+  /// `OAuthLoopbackProvider` passed to `FirebaseAuthDart.use` for the id of
+  /// [provider]; the scopes and custom parameters of [provider] are added to
+  /// its request. Throws `unimplemented` for a provider id that was not
+  /// passed.
   @override
-  Future<UserCredentialPlatform> signInWithProvider(
-    AuthProvider provider,
-  ) async => throw unimplemented('signInWithProvider', noProviderFlow);
+  Future<UserCredentialPlatform> signInWithProvider(AuthProvider provider) =>
+      guard(this, () async {
+        final dart_auth.OAuthLoopbackProvider loopback = loopbackProviderFor(
+          'signInWithProvider',
+          provider,
+        );
+        return resultOf(
+          await client.signInWithOAuthLoopback(loopback, presenter: presentUrl),
+        );
+      });
+
+  // ---- not available: see the README ----
 
   @override
   Future<UserCredentialPlatform> signInWithPopup(AuthProvider provider) async =>

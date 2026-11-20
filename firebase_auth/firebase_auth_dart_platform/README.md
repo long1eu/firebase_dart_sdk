@@ -53,6 +53,8 @@ Future<void> main() async {
 | `storageFor` | a file per program (see below); memory on Android, iOS and the web | Returns the `AuthStorage` that keeps the session of a FlutterFire app, for example a `FileAuthStorage` at a path of your choice, or one on top of a secure storage plugin. |
 | `httpClient` | one per app | The `http.Client` of the requests (tests, proxies). |
 | `useDartCore` | Linux only, when `firebase_core` has no other implementation | Installs a small pure-Dart `firebase_core`. Pass `true` to force it (tests), `false` to never do it. |
+| `oauthProviders` | none | The `OAuthLoopbackProvider`s of `signInWithProvider`, `User.linkWithProvider` and `User.reauthenticateWithProvider`, one per Firebase provider id (see [Provider sign-in](#provider-sign-in)). |
+| `presentUrl` | the system browser on macOS, Linux and Windows | Opens the authorization URL of a provider sign-in, for example `url_launcher`'s `launchUrl`. Needed on Android and iOS: without it the provider calls throw `unimplemented`. |
 
 `use()` throws a `StateError` once the `FirebaseAuth` of an app has been used, because the configuration is read
 then.
@@ -97,6 +99,44 @@ do not share a file and `setupFirebaseCoreMocks` keeps working; call `use()` to 
 `setPersistence(Persistence.NONE)` (or `SESSION`) moves the session to memory, so the user is signed out at the next
 start; `Persistence.LOCAL` moves it back.
 
+## Provider sign-in
+
+`signInWithProvider`, `User.linkWithProvider` and `User.reauthenticateWithProvider` run the loopback OAuth flow of
+`firebase_auth_providers_dart`: the authorization URL opens in the system browser, the provider redirects to a
+one-shot server on 127.0.0.1, and the code is exchanged for the provider's tokens (PKCE, RFC 8252). Pass one
+`OAuthLoopbackProvider` per provider to `use`; the call picks the one whose `providerId` is the id of the FlutterFire
+provider (`google.com` for `GoogleAuthProvider`, `github.com` for `GithubAuthProvider`, `oidc.<name>` for
+`OAuthProvider('oidc.<name>')`, ...):
+
+```dart
+FirebaseAuthDart.use(
+  oauthProviders: <OAuthLoopbackProvider>[
+    OAuthLoopbackProvider.google(
+      clientId: '<the client id of a "Desktop app" OAuth client>',
+      clientSecret: '<its client secret>', // not confidential for a desktop client, says Google
+    ),
+    OAuthLoopbackProvider.github(clientId: '<OAuth App client id>', clientSecret: '<its secret>'),
+  ],
+  // Optional on macOS, Linux and Windows (the system browser opens); needed on Android and iOS.
+  presentUrl: (Uri url) => launchUrl(url),
+);
+
+final UserCredential result = await FirebaseAuth.instance.signInWithProvider(
+  GoogleAuthProvider()..addScope('https://www.googleapis.com/auth/drive.file'),
+);
+```
+
+- The scopes (`addScope`) and custom parameters (`setCustomParameters`) of the FlutterFire provider are added to the
+  request of the registered one; a custom parameter of both takes the FlutterFire provider's value.
+- A provider id without an `OAuthLoopbackProvider` throws `unimplemented`, with a message that names the id.
+- The errors are those of the client's flow: `timeout` (five minutes), `user-cancelled`, `invalid-credential`, ...
+  `linkWithProvider` and `reauthenticateWithProvider` throw `no-current-user` before the browser opens when the user
+  is no longer signed in.
+- `OAuthLoopbackProvider` comes from `firebase_auth_providers_dart` and is exported by this package. Its README
+  ("Browser sign-in on desktop and command line") says how to set up the OAuth clients of Google, GitHub and OpenID
+  Connect providers.
+- On the web the flow does not exist: the calls throw `unimplemented`.
+
 ## Firestore
 
 The Firestore platform package sends requests as the signed-in user through `tokenProviderFor`. Two ways, on any
@@ -137,14 +177,13 @@ the new user, `await provider.waitForCurrentUser()` first. `userAuthFor` has no 
 | Errors: `FirebaseAuthException` with the client's code (the codes of the JS SDK), `email`, `credential`, `phoneNumber`, `tenantId`; a recoverable credential goes back to `signInWithCredential` unchanged; other errors of the client (`ArgumentError` as `argument-error`, `StateError` and file errors as `internal-error`) are `FirebaseAuthException`s too | implemented, tested |
 | `multi-factor-auth-required`: a `FirebaseAuthMultiFactorException` whose `resolver.hints` lists the factors and whose `resolver.resolveSignIn` finishes the sign-in or reauthentication with `TotpMultiFactorGenerator.getAssertionForSignIn` | implemented, tested |
 | Authenticator app (TOTP) second factors: `User.multiFactor` (`getSession`, `enroll`, `unenroll`, `getEnrolledFactors`), `TotpMultiFactorGenerator` (`generateSecret`, `getAssertionForEnrollment`, `getAssertionForSignIn`), `TotpSecret.generateQrCodeUrl`. SMS factors are listed and can be unenrolled | implemented, tested |
+| `signInWithProvider`, `User.linkWithProvider`, `User.reauthenticateWithProvider` through the loopback OAuth flow, with the providers passed to `use` | implemented, tested with a simulated browser |
 
 These throw a `FirebaseAuthException` with the code `unimplemented` and a message that says why:
 
-- **Provider flows**: `signInWithProvider`, `User.linkWithProvider`, `User.reauthenticateWithProvider`. To sign in
-  with a provider today, use `FirebaseAuthDart.userAuthFor(app).signInWithOAuthLoopback` (the system browser and a
-  loopback redirect), or get the provider's token yourself and use `signInWithCredential`.
 - **Browser flows**: `signInWithPopup`, `signInWithRedirect`, `getRedirectResult`, `User.linkWithPopup`,
-  `User.linkWithRedirect`, `User.reauthenticateWithPopup`, `User.reauthenticateWithRedirect`.
+  `User.linkWithRedirect`, `User.reauthenticateWithPopup`, `User.reauthenticateWithRedirect`. Use
+  `signInWithProvider` instead ([Provider sign-in](#provider-sign-in)).
 - **Phone**: `verifyPhoneNumber`, `signInWithPhoneNumber`, `User.linkWithPhoneNumber`, `User.updatePhoneNumber`,
   `initializeRecaptchaConfig`, a `PhoneAuthCredential`, `PhoneMultiFactorGenerator.getAssertion`. Phone sign-in needs
   reCAPTCHA or the app verification of Android and iOS.

@@ -10,6 +10,11 @@ import 'package:http/testing.dart';
 String _encode(Object json) =>
     base64Url.encode(utf8.encode(jsonEncode(json))).replaceAll('=', '');
 
+/// An unsigned JWT with [claims].
+String unsignedJwt(Map<String, Object?> claims) =>
+    '${_encode(<String, Object?>{'alg': 'none', 'typ': 'JWT'})}.'
+    '${_encode(claims)}.';
+
 /// An unsigned ID token for [uid].
 String idToken(
   String uid, {
@@ -18,17 +23,16 @@ String idToken(
   int serial = 0,
 }) {
   final int now = DateTime.now().millisecondsSinceEpoch ~/ 1000;
-  return '${_encode(<String, Object?>{'alg': 'none', 'typ': 'JWT'})}.'
-      '${_encode(<String, Object?>{
-        'user_id': uid,
-        'sub': uid,
-        'email': ?email,
-        'auth_time': now,
-        'iat': now,
-        'exp': now + 3600,
-        'serial': serial,
-        'firebase': <String, Object?>{'sign_in_provider': provider},
-      })}.';
+  return unsignedJwt(<String, Object?>{
+    'user_id': uid,
+    'sub': uid,
+    'email': ?email,
+    'auth_time': now,
+    'iat': now,
+    'exp': now + 3600,
+    'serial': serial,
+    'firebase': <String, Object?>{'sign_in_provider': provider},
+  });
 }
 
 http.Response jsonResponse(Object body, [int status = 200]) => http.Response(
