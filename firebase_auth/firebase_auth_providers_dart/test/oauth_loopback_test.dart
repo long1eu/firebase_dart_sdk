@@ -132,16 +132,38 @@ String _challengeOf(String verifier) => base64Url
     .encode(sha256.convert(ascii.encode(verifier)).bytes)
     .replaceAll('=', '');
 
-Future<bool> _accepts(int port) async {
+/// Whether the loopback listener of a sign-in still answers at [redirectUri].
+///
+/// A bare connect is not enough: once the listener is closed, its ephemeral port can be bound again at once by
+/// another process or test, or a connect from an equal source port can open onto itself. So the port only counts
+/// as ours when it answers the redirect path with one of the listener's own pages: "not this sign-in" while it
+/// waits, "not found" once the redirect came.
+Future<bool> _listenerAnswers(Uri redirectUri) async {
+  final http.Client probe = http.Client();
   try {
-    final Socket socket = await Socket.connect(
-      InternetAddress.loopbackIPv4,
-      port,
-    );
-    socket.destroy();
-    return true;
-  } on SocketException {
+    final http.Response response = await probe
+        .get(
+          redirectUri.replace(
+            queryParameters: <String, String>{'state': 'not-this-sign-in'},
+          ),
+          headers: <String, String>{HttpHeaders.connectionHeader: 'close'},
+        )
+        .timeout(const Duration(seconds: 5));
+    return switch (response.statusCode) {
+      HttpStatus.badRequest => response.body.contains(
+        'This request does not belong to the sign-in in progress.',
+      ),
+      HttpStatus.notFound => response.body.contains(
+        'This address only receives the sign-in redirect.',
+      ),
+      _ => false,
+    };
+  } on http.ClientException {
     return false;
+  } on TimeoutException {
+    return false;
+  } finally {
+    probe.close();
   }
 }
 
@@ -448,14 +470,14 @@ void main() {
       ),
       throwsA(authError('timeout')),
     );
-    final int port = Uri.parse(url!.queryParameters['redirect_uri']!).port;
-    expect(await _accepts(port), isFalse);
+    final Uri redirectUri = Uri.parse(url!.queryParameters['redirect_uri']!);
+    expect(await _listenerAnswers(redirectUri), isFalse);
   });
 
   test('the server is closed after a success', () async {
     await run(oidc());
-    final int port = Uri.parse(idp.authorization['redirect_uri']!).port;
-    expect(await _accepts(port), isFalse);
+    final Uri redirectUri = Uri.parse(idp.authorization['redirect_uri']!);
+    expect(await _listenerAnswers(redirectUri), isFalse);
   });
 
   test('other paths get a 404 and do not end the wait', () async {
