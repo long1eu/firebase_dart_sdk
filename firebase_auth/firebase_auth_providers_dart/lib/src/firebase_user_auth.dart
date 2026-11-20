@@ -1316,7 +1316,7 @@ class FirebaseUserAuth implements AuthTokenProvider {
     }
     await _updateSession(response, generation);
     await _reload(generation);
-    return _result(response, _session?.user ?? user);
+    return _result(response, _session?.user ?? user, OperationType.link);
   });
 
   /// Signs the signed-in user in again with [credential] (`reauthenticateWithCredential`), which operations such
@@ -1384,7 +1384,11 @@ class FirebaseUserAuth implements AuthTokenProvider {
     }
     await _updateSession(response, generation);
     await _reload(generation);
-    return _result(response, _session?.user ?? session.user);
+    return _result(
+      response,
+      _session?.user ?? session.user,
+      OperationType.reauthenticate,
+    );
   }
 
   /// Removes the sign-in method of [providerId] (`password`, `google.com`, ...) from the account of the signed-in
@@ -1628,9 +1632,14 @@ class FirebaseUserAuth implements AuthTokenProvider {
   }
 
   /// The result of a sign-in, a link or a reauthentication [response] for [user].
-  UserCredential _result(Map<String, Object?> response, AuthUser user) {
+  UserCredential _result(
+    Map<String, Object?> response,
+    AuthUser user,
+    OperationType operationType,
+  ) {
     final UserCredential result = UserCredential(
       user,
+      operationType: operationType,
       additionalUserInfo: additionalUserInfoOf(response),
       credential: credentialFromResponse(response),
     );
@@ -2146,7 +2155,7 @@ class FirebaseUserAuth implements AuthTokenProvider {
     _emitToken(idToken);
     _notifyAuthState();
     await _letListenersReact();
-    return _result(response, session.user);
+    return _result(response, session.user, OperationType.signIn);
   }
 
   /// Like `_performSignInRequest` of the JS SDK: a sign-in answer with an `mfaPendingCredential` (and no tokens)

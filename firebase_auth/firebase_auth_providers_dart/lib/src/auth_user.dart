@@ -75,6 +75,45 @@ class AuthUser {
   /// [FirebaseUserAuth.reload].
   final List<MultiFactorInfo> enrolledFactors;
 
+  /// The provider of the user itself, always `firebase` (`User.providerId` of the JS SDK). The sign-in methods of
+  /// the account are in [providerData].
+  String get providerId => 'firebase';
+
+  /// The user as JSON, with the keys of `User.toJSON` of the JS SDK. As in its JSON, a missing [email],
+  /// [displayName], [photoURL], [phoneNumber] or [tenantId] (or [metadata] time) is left out, and `createdAt` and
+  /// `lastLoginAt` are milliseconds since the epoch, as strings.
+  ///
+  /// Unlike the JS SDK, it has no `stsTokenManager`, `apiKey` or `appName`: the tokens and the API key belong to
+  /// the session of [FirebaseUserAuth], not to this snapshot, so the JSON cannot restore a session.
+  Map<String, Object?> toJson() {
+    final DateTime? createdAt = metadata.creationTime;
+    final DateTime? lastLoginAt = metadata.lastSignInTime;
+    return <String, Object?>{
+      'uid': uid,
+      'email': ?email,
+      'emailVerified': emailVerified,
+      'displayName': ?displayName,
+      'isAnonymous': isAnonymous,
+      'photoURL': ?photoUrl,
+      'phoneNumber': ?phoneNumber,
+      'tenantId': ?tenantId,
+      'providerData': <Map<String, Object?>>[
+        for (final UserInfo info in providerData)
+          <String, Object?>{
+            'providerId': info.providerId,
+            'uid': info.uid,
+            'displayName': info.displayName,
+            'email': info.email,
+            'phoneNumber': info.phoneNumber,
+            'photoURL': info.photoUrl,
+          },
+      ],
+      if (createdAt != null) 'createdAt': '${createdAt.millisecondsSinceEpoch}',
+      if (lastLoginAt != null)
+        'lastLoginAt': '${lastLoginAt.millisecondsSinceEpoch}',
+    };
+  }
+
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -231,6 +270,23 @@ class AdditionalUserInfo {
       'AdditionalUserInfo(isNewUser: $isNewUser, providerId: $providerId)';
 }
 
+/// What produced a [UserCredential] (`OperationType` of the JS SDK and of FlutterFire).
+enum OperationType {
+  /// A sign-in.
+  signIn('signIn'),
+
+  /// A link of another provider to the signed-in user.
+  link('link'),
+
+  /// A reauthentication of the signed-in user.
+  reauthenticate('reauthenticate');
+
+  const OperationType(this.value);
+
+  /// The value of the JS SDK: `signIn`, `link` or `reauthenticate`.
+  final String value;
+}
+
 /// The result of a sign-in, a link or a reauthentication (FlutterFire's `UserCredential`).
 ///
 /// For compatibility with 0.2, whose sign-in methods returned an [AuthUser], it is also the signed-in user: the
@@ -244,21 +300,25 @@ class AdditionalUserInfo {
 /// ```
 class UserCredential extends AuthUser {
   /// Creates the result for [user]. [FirebaseUserAuth] creates them; you need this only for tests.
-  UserCredential(AuthUser user, {this.additionalUserInfo, this.credential})
-    : _user = user,
-      super(
-        uid: user.uid,
-        email: user.email,
-        isAnonymous: user.isAnonymous,
-        emailVerified: user.emailVerified,
-        displayName: user.displayName,
-        photoUrl: user.photoUrl,
-        phoneNumber: user.phoneNumber,
-        tenantId: user.tenantId,
-        metadata: user.metadata,
-        providerData: user.providerData,
-        enrolledFactors: user.enrolledFactors,
-      );
+  UserCredential(
+    AuthUser user, {
+    this.additionalUserInfo,
+    this.credential,
+    this.operationType = OperationType.signIn,
+  }) : _user = user,
+       super(
+         uid: user.uid,
+         email: user.email,
+         isAnonymous: user.isAnonymous,
+         emailVerified: user.emailVerified,
+         displayName: user.displayName,
+         photoUrl: user.photoUrl,
+         phoneNumber: user.phoneNumber,
+         tenantId: user.tenantId,
+         metadata: user.metadata,
+         providerData: user.providerData,
+         enrolledFactors: user.enrolledFactors,
+       );
 
   final AuthUser _user;
 
@@ -272,6 +332,9 @@ class UserCredential extends AuthUser {
   /// FlutterFire's `UserCredential.credential` and the JS SDK's `credentialFromResult`), or null. It holds tokens:
   /// [toString] leaves it out.
   final AuthCredential? credential;
+
+  /// Whether this is the result of a sign-in, a link or a reauthentication.
+  final OperationType operationType;
 
   @override
   String toString() => 'UserCredential(uid: $uid, isAnonymous: $isAnonymous)';

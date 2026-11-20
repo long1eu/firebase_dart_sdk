@@ -308,6 +308,27 @@ void main() {
     });
   });
 
+  test('the operation type of sign-in, link and reauthentication', () async {
+    final UserCredential federated = await auth.signInWithCredential(
+      GoogleAuthProvider.credential(idToken: 'g-id'),
+    );
+    expect(federated.operationType, OperationType.signIn);
+    final UserCredential again = await auth.reauthenticateWithCredential(
+      GoogleAuthProvider.credential(idToken: 'g-id-2'),
+    );
+    expect(again.operationType, OperationType.reauthenticate);
+    final UserCredential anonymous = await auth.signInAnonymously();
+    expect(anonymous.operationType, OperationType.signIn);
+    final UserCredential linked = await auth.linkWithCredential(
+      GithubAuthProvider.credential('gh-token'),
+    );
+    expect(linked.operationType, OperationType.link);
+    expect(
+      OperationType.values.map((OperationType type) => type.value),
+      <String>['signIn', 'link', 'reauthenticate'],
+    );
+  });
+
   group('unlink', () {
     test('removes the provider', () async {
       backend.accounts['uid-of-a@example.com'] = <String, Object?>{

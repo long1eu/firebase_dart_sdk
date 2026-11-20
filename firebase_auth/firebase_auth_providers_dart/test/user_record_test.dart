@@ -143,6 +143,69 @@ void main() {
     });
   });
 
+  group('User fields of the JS SDK', () {
+    test('providerId is firebase, for a user and a sign-in result', () async {
+      expect(const AuthUser(uid: 'u').providerId, 'firebase');
+      final UserCredential result = await auth.signInAnonymously();
+      expect(result.providerId, 'firebase');
+      expect(result.user!.providerId, 'firebase');
+    });
+
+    test('toJson has the keys of User.toJSON, without the session', () {
+      expect(fullUser.toJson(), <String, Object?>{
+        'uid': 'uid-of-ada@example.com',
+        'email': 'ada@example.com',
+        'emailVerified': true,
+        'displayName': 'Ada',
+        'isAnonymous': false,
+        'photoURL': 'https://example.com/ada.png',
+        'phoneNumber': '+15555550100',
+        'providerData': <Object?>[
+          <String, Object?>{
+            'providerId': 'password',
+            'uid': 'ada@example.com',
+            'displayName': null,
+            'email': 'ada@example.com',
+            'phoneNumber': null,
+            'photoURL': null,
+          },
+          <String, Object?>{
+            'providerId': 'google.com',
+            'uid': '1234',
+            'displayName': 'Ada L.',
+            'email': 'ada@gmail.com',
+            'phoneNumber': null,
+            'photoURL': 'https://example.com/g.png',
+          },
+          <String, Object?>{
+            'providerId': 'phone',
+            'uid': '',
+            'displayName': null,
+            'email': null,
+            'phoneNumber': '+15555550100',
+            'photoURL': null,
+          },
+        ],
+        'createdAt': '1700000000000',
+        'lastLoginAt': '1790000000000',
+      });
+      expect(jsonDecode(jsonEncode(fullUser.toJson())), fullUser.toJson());
+    });
+
+    test('toJson leaves out what the user does not have', () {
+      expect(
+        const AuthUser(uid: 'u', isAnonymous: true, tenantId: 't').toJson(),
+        <String, Object?>{
+          'uid': 'u',
+          'emailVerified': false,
+          'isAnonymous': true,
+          'tenantId': 't',
+          'providerData': <Object?>[],
+        },
+      );
+    });
+  });
+
   group('AdditionalUserInfo', () {
     test('of the built-in sign-ins', () async {
       final UserCredential anonymous = await auth.signInAnonymously();
