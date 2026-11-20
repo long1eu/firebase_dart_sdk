@@ -168,6 +168,8 @@ Needs Identity Platform with TOTP enabled for the project (the Auth emulator has
 address on the account.
 
 ```dart
+final FirebaseUserAuth auth = await FirebaseUserAuth.forApp(app);
+
 // Enrol: show the URI as a QR code (or the secret for typing in), then ask for a code of the app.
 final TotpSecret secret = await auth.startTotpEnrollment();
 print(secret.otpauthUri(issuer: 'My App')); // otpauth://totp/My%20App:ada@example.com?secret=...
@@ -176,9 +178,11 @@ print(auth.currentUser!.enrolledFactors); // [MultiFactorInfo(totp, ...)]
 
 // Sign in: the first factor throws, the resolver finishes with a code.
 try {
-  await auth.signInWithEmailAndPassword(email: email, password: password);
+  await auth.signInWithEmailAndPassword(email: 'ada@example.com', password: '<the password>');
 } on FirebaseAuthMultiFactorException catch (e) {
-  final UserCredential result = await e.resolver!.resolveSignInWithTotp(await askForCode());
+  // The code the user reads from the authenticator app.
+  final UserCredential result = await e.resolver!.resolveSignInWithTotp('654321');
+  print(result.user?.uid);
 }
 
 // Remove a factor (TOTP or SMS).
