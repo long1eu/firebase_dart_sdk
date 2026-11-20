@@ -103,6 +103,12 @@
   message it sent, and the client has not received that one, the client waits 6 seconds for data on the back
   channel and then requests it again from the last message it has. When the server answers that it has no back
   channel request at all, one sent more than 3 seconds before is made again at once.
+- An unexpected error inside the client's internal queue now fails the queue for good, as the
+  `AsyncQueue` of the JS SDK does: it is logged once with its stack (`INTERNAL UNHANDLED ERROR`),
+  operations that wait for their turn fail with it, and later ones fail with
+  `AsyncQueue is already failed`. Before, the client went on in a state nobody had checked. The
+  errors of your own operations (a rejected write, a busy cache) stay with their caller and do
+  not fail the queue; `terminate()` and `clearPersistence()` still work on a failed queue.
 
 ## 0.3.0
 
