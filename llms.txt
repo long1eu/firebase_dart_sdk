@@ -32,6 +32,7 @@ public API of the main library is the golden listing linked below.
 - [Offline persistence and cache settings](https://raw.githubusercontent.com/long1eu/firebase_dart_sdk/main/docs/guides/offline_persistence.md): memory and SQLite caches, the web cache, cache indexes, connectivity
 - [Several clients on one cache](https://raw.githubusercontent.com/long1eu/firebase_dart_sdk/main/docs/guides/multiple_clients.md): hot restart, background isolates, second processes
 - [Authentication and App Check](https://raw.githubusercontent.com/long1eu/firebase_dart_sdk/main/docs/guides/authentication.md): signed-in users over REST, service accounts, Application Default Credentials, the Auth emulator
+- [Cloud Storage](https://raw.githubusercontent.com/long1eu/firebase_dart_sdk/main/docs/guides/storage.md): `firebase_storage_dart`: references, uploads, resumable uploads, lists, errors, retries, the Storage emulator
 - [The emulator and testing](https://raw.githubusercontent.com/long1eu/firebase_dart_sdk/main/docs/guides/emulator_and_testing.md): connecting to the emulator, mock users, tests with `package:test`, Enterprise edition differences
 - [Platforms](https://raw.githubusercontent.com/long1eu/firebase_dart_sdk/main/docs/guides/platforms.md): the Dart VM on macOS, Linux and Windows, Flutter, the web transport and its limits
 - [Firestore Lite](https://raw.githubusercontent.com/long1eu/firebase_dart_sdk/main/docs/guides/lite.md): the client without cache and listeners
@@ -47,6 +48,7 @@ public API of the main library is the golden listing linked below.
 - [cloud_firestore_dart_sqlite README](https://raw.githubusercontent.com/long1eu/firebase_dart_sdk/main/cloud_firestore/cloud_firestore_dart_sqlite/README.md): the SQLite offline cache (`sqliteOpener`) for the VM, Flutter and the browser
 - [cloud_firestore_dart_platform README](https://raw.githubusercontent.com/long1eu/firebase_dart_sdk/main/cloud_firestore/cloud_firestore_dart_platform/README.md): the official `cloud_firestore` API with `cloud_firestore_dart` underneath
 - [firebase_auth_dart_platform README](https://raw.githubusercontent.com/long1eu/firebase_dart_sdk/main/firebase_auth/firebase_auth_dart_platform/README.md): the official `firebase_auth` API with `firebase_auth_providers_dart` underneath, for Linux desktop (0.1.0, unreleased)
+- [firebase_storage_dart README](https://raw.githubusercontent.com/long1eu/firebase_dart_sdk/main/firebase_storage/firebase_storage_dart/README.md): Cloud Storage for Firebase client for pure Dart (0.1.0, unreleased)
 - [cloud_firestore_dart_flutterfire README](https://raw.githubusercontent.com/long1eu/firebase_dart_sdk/main/cloud_firestore/cloud_firestore_dart_flutterfire/README.md): the FlutterFire app options and `firebase_auth` user for `cloud_firestore_dart`
 - [firebase_admin_dart README](https://raw.githubusercontent.com/long1eu/firebase_dart_sdk/main/firebase_admin/firebase_admin_dart/README.md): admin calls for trusted code (`auth.dart`: custom tokens, users, claims, revocation, `verifyIdToken`)
 

@@ -188,7 +188,8 @@ final class Reference {
   }
 
   /// The pages of [list], one after another: the next page is requested when the previous one was delivered
-  /// and the stream is listened to. [pageSize] is the `maxResults` of each page.
+  /// and the stream is listened to. [pageSize] is the `maxResults` of each page. A page whose next token is the
+  /// one it was requested with ends the stream with `unknown`, instead of requesting it forever.
   Stream<ListResult> listPages({int? pageSize}) async* {
     String? pageToken;
     do {
@@ -196,8 +197,13 @@ final class Reference {
         maxResults: pageSize,
         pageToken: pageToken,
       );
+      final String? next = page.nextPageToken;
+      if (next != null && next.isNotEmpty && next == pageToken) {
+        // A server that hands back the token it was sent would make this loop forever.
+        throw unknownResponse('the server returned the same page token again.');
+      }
       yield page;
-      pageToken = page.nextPageToken;
+      pageToken = next;
     } while (pageToken != null && pageToken.isNotEmpty);
   }
 

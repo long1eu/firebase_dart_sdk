@@ -3,6 +3,7 @@
 # dart2wasm and with dart2js, against a private Firestore emulator on 127.0.0.1:8090 (or the
 # port in FIRESTORE_EMULATOR_PORT).
 #
+# The browser tests of firebase_storage_dart have their own script: tool/test_browser_storage.sh.
 # Usage: tool/test_browser.sh [dart2wasm|dart2js|both] [dart test arguments...]
 #
 # The emulator is started with tool/start_private_emulator.sh if it does not run yet, and in
