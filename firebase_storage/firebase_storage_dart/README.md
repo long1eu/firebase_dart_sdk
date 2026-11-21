@@ -282,6 +282,8 @@ default). A 401 triggers one token refresh and one more try.
   client for trusted code.
 - Not run against a real Firebase project yet; the emulator is the reference used by the tests.
 
+Parity with the other SDKs and the deliberate differences from the JS SDK:
+[docs/storage_parity.md](https://github.com/long1eu/firebase_dart_sdk/blob/main/docs/storage_parity.md).
 More: [the Storage guide](https://github.com/long1eu/firebase_dart_sdk/blob/main/docs/guides/storage.md).
 
 ## License
