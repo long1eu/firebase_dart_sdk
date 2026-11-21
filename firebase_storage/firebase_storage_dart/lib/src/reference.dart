@@ -12,6 +12,8 @@ import 'metadata.dart';
 import 'request/requester.dart';
 import 'string_format.dart';
 import 'upload/multipart.dart';
+import 'upload/upload_source.dart';
+import 'upload/upload_task.dart';
 
 /// A pointer to an object (or a "folder") in a Cloud Storage bucket. Creating one makes no request.
 ///
@@ -272,6 +274,53 @@ final class Reference {
       );
     }
     return _multipartUpload(decoded.bytes, effective);
+  }
+
+  /// Starts an upload of [data] that can be paused, resumed and canceled; see [UploadTask]. Up to 256 KiB it is
+  /// one multipart request, like [putBytes], but with the controls and progress of a task.
+  ///
+  /// With [existingSessionUri] (the [UploadTask.sessionUri] of an earlier task for the same data and
+  /// reference), the task asks that session how much it has and sends the rest. It must be on the host of this
+  /// `FirebaseStorage` (the emulator's, with an `emulatorHost`); any other URI throws `invalid-argument`.
+  ///
+  /// Throws `invalid-root-operation` on the root of the bucket; other errors come through
+  /// [UploadTask.result].
+  UploadTask startUpload(
+    Uint8List data, {
+    SettableMetadata? metadata,
+    Uri? existingSessionUri,
+  }) {
+    throwIfRoot('startUpload');
+    return UploadTask.start(
+      this,
+      UploadSource.bytes(data),
+      metadata,
+      existingSessionUri: existingSessionUri,
+    );
+  }
+
+  /// Starts an upload of the [length] bytes of [data]; see [UploadTask] and [startUpload].
+  ///
+  /// The stream is read one chunk at a time as the upload goes, so only one chunk (at most 16 MiB) is held in
+  /// memory. It must produce exactly [length] bytes, otherwise the task fails with `invalid-argument`; an error
+  /// of the stream fails the task with that error. The stream is canceled when the task ends. To resume with
+  /// [existingSessionUri], pass a stream of the whole data again: the bytes the server already has are read
+  /// and skipped. Throws an [ArgumentError] when [length] is negative, `invalid-root-operation` on the root of
+  /// the bucket, and `invalid-argument` for an [existingSessionUri] on another host.
+  UploadTask startStreamUpload(
+    Stream<List<int>> data, {
+    required int length,
+    SettableMetadata? metadata,
+    Uri? existingSessionUri,
+  }) {
+    RangeError.checkNotNegative(length, 'length');
+    throwIfRoot('startStreamUpload');
+    return UploadTask.start(
+      this,
+      UploadSource.stream(data, length),
+      metadata,
+      existingSessionUri: existingSessionUri,
+    );
   }
 
   Future<FullMetadata> _multipartUpload(
