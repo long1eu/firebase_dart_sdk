@@ -2,6 +2,7 @@
 // that finishes a sign-in with a second factor. The functions at the end are for FirebaseUserAuth and are not
 // exported.
 
+import 'auth_constants.dart';
 import 'auth_exception.dart';
 import 'auth_user.dart';
 import 'firebase_user_auth.dart';
@@ -22,11 +23,11 @@ class MultiFactorInfo {
   /// The [factorId] of an SMS second factor (`PhoneMultiFactorGenerator.FACTOR_ID` of the JS SDK). This package
   /// lists such factors and can unenrol them ([FirebaseUserAuth.unenrollMultiFactor]), but cannot enrol them or sign
   /// in with them.
-  static const String phoneFactorId = 'phone';
+  static const String phoneFactorId = FactorId.phone;
 
   /// The [factorId] of a time-based one-time password (authenticator app) second factor
   /// (`TotpMultiFactorGenerator.FACTOR_ID` of the JS SDK).
-  static const String totpFactorId = 'totp';
+  static const String totpFactorId = FactorId.totp;
 
   /// The [factorId] of a factor this package does not know (neither `phoneInfo` nor `totpInfo` in the answer).
   static const String unknownFactorId = 'unknown';
