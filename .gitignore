@@ -51,3 +51,4 @@ cloud_firestore/cloud_firestore_dart/test/browser/opfs/faulty_opfs_worker.js.map
 # remote test logs (notes/mini/remote_test.sh)
 .remote_logs/
 cloud_firestore/cloud_firestore_dart/example/cache_store/indexeddb/main.dart.js*
+firebase_storage/firebase_storage_dart/test/browser/emulator_port.txt
