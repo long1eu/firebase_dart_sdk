@@ -1904,6 +1904,104 @@ Future<CheckResult> _signedInRoundTrip(Kit kit) async {
   }
 }
 
+Future<CheckResult> _outOfOrder(Kit kit) async {
+  final Uint8List data = Kit.bytes(3 * chunkSize, 21);
+  final String objectName = kit.name('out_of_order.bin');
+  kit.charge(data.length + chunkSize);
+  kit.track(objectName);
+  final http.Client client = kit.newRawClient();
+  final Session session = await _startResumable(
+    kit,
+    client,
+    objectName,
+    data.length,
+  );
+  // The second chunk first: offset 262144 while the server has nothing.
+  final http.Response early = await _sendChunk(
+    kit,
+    client,
+    session,
+    data,
+    chunkSize,
+    chunkSize,
+    last: false,
+  );
+  final int? answered = int.tryParse(
+    early.headers['x-goog-upload-size-received'] ?? '',
+  );
+  final http.Response status = await _query(kit, client, session);
+  final int received =
+      int.tryParse(status.headers['x-goog-upload-size-received'] ?? '') ?? -1;
+  final Map<String, Object?> observed = <String, Object?>{
+    'status': early.statusCode,
+    'uploadStatus': early.headers['x-goog-upload-status'],
+    'sizeReceivedHeader': answered,
+    'queryStatus': status.statusCode,
+    'queryReceived': received,
+  };
+  final String answer =
+      'HTTP ${early.statusCode}, x-goog-upload-status ${early.headers['x-goog-upload-status'] ?? 'none'}, '
+      'size-received ${answered ?? 'none'}, body "${_clip(early.body)}"; the query then said size received $received';
+  if (received >= 2 * chunkSize) {
+    await _cancel(kit, client, session);
+    return CheckResult(
+      Status.fail,
+      'ACCEPTED: the bytes at offset $chunkSize were taken as valid ($answer).',
+      observed: observed,
+    );
+  }
+  final bool refused =
+      (early.statusCode >= 400 && early.statusCode < 500) || received == 0;
+  if (!refused || received != 0) {
+    await _cancel(kit, client, session);
+    return CheckResult(
+      Status.inconclusive,
+      'The out-of-order chunk was neither clearly refused nor accepted ($answer).',
+      details: <String>[
+        if (received > 0)
+          'The server kept $received bytes, so the session cannot be finished in order; it was canceled.',
+      ],
+      observed: observed,
+    );
+  }
+  // The session must still take the data in order.
+  final http.Response first = await _sendChunk(
+    kit,
+    client,
+    session,
+    data,
+    0,
+    chunkSize,
+    last: false,
+  );
+  if (first.statusCode != 200) {
+    await _cancel(kit, client, session);
+    return CheckResult(
+      Status.fail,
+      'REFUSED the early chunk ($answer), but the session then refused the first chunk at offset 0 too '
+      '(HTTP ${first.statusCode}: ${_clip(first.body)}).',
+      observed: observed,
+    );
+  }
+  final http.Response end = await _finish(
+    kit,
+    client,
+    session,
+    data,
+    chunkSize,
+  );
+  final bool stored = _stored(end, data);
+  observed['finished'] = stored;
+  return CheckResult(
+    stored ? Status.pass : Status.fail,
+    stored
+        ? 'REFUSED: the chunk at offset $chunkSize before the first was not taken ($answer); the session then '
+              'accepted the chunks in order and the stored size and md5 match.'
+        : 'REFUSED the early chunk ($answer), but finishing in order ended with HTTP ${end.statusCode}: ${_clip(end.body)}',
+    observed: observed,
+  );
+}
+
 const List<Check> checks = <Check>[
   Check('1', 'Error answer of a missing object (404 envelope)', _error404),
   Check('2', 'Error answer under rules (403 envelope)', _error403),
@@ -1925,6 +2023,7 @@ const List<Check> checks = <Check>[
   Check('18', 'SDK upload, resume by session URI', _sdkSessionResume),
   Check('19', 'SDK download, ranges and maxSize', _sdkDownload),
   Check('20', 'Signed-in round trip', _signedInRoundTrip),
+  Check('21', 'Out-of-order chunk', _outOfOrder),
 ];
 
 // ---------------------------------------------------------------------------------------------------------------

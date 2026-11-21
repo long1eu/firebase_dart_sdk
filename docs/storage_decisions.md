@@ -115,7 +115,9 @@ The client, new in 0.1.1 (none of the following is in 0.1.0):
 - up to 256 KiB, one multipart request;
 - a queue, `maxConcurrentUploads`, with 8 by default, limits the uploads running at once.
 
-Not done: parallel chunks of one file (the protocol refuses them), isolates (the work is I/O, not CPU), and a
+Not done: parallel chunks of one file (the protocol refuses them: in production a chunk sent at offset 262144
+before the first gets HTTP 400 "Client uploaded to the wrong offset (262144 instead of 0).", check 21 of
+`tool/verify_production_storage`; the emulator ignores offsets), isolates (the work is I/O, not CPU), and a
 batch upload (Cloud Storage batch requests exclude uploads).
 
 **Why.** One request removes the round trips between chunks and buffers nothing beyond the socket. Chunks stay

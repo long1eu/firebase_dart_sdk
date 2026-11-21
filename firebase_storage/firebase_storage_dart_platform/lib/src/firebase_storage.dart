@@ -12,12 +12,14 @@ import 'reference.dart';
 class DartStorageConfig {
   const DartStorageConfig({
     this.tokenProviderFor,
+    this.appCheckProviderFor,
     this.httpClient,
     this.maxConcurrentUploads = 8,
     this.maxUploadChunkSize,
   });
 
   final TokenProviderFactory? tokenProviderFor;
+  final AppCheckProviderFactory? appCheckProviderFor;
   final http.Client? httpClient;
 
   /// `FirebaseStorage.maxConcurrentUploads` of each client.
@@ -89,7 +91,11 @@ class DartFirebaseStorage extends FirebaseStoragePlatform {
       );
     }
     return _client ??= fs.FirebaseStorage(
-      dartAppFor(app, config.tokenProviderFor),
+      dartAppFor(
+        app,
+        tokenProviderFor: config.tokenProviderFor,
+        appCheckProviderFor: config.appCheckProviderFor,
+      ),
       bucket: bucket,
       emulatorHost: _emulator,
       retry: fs.StorageRetryPolicy(

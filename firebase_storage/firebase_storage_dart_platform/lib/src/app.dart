@@ -8,6 +8,13 @@ import 'package:firebase_core/firebase_core.dart' as core;
 typedef TokenProviderFactory =
     dart_app.AuthTokenProvider? Function(core.FirebaseApp app);
 
+/// Returns the App Check token provider of the Storage requests of the
+/// FlutterFire [app], or null for requests without an App Check token.
+///
+/// See `FirebaseStorageDart.use` for how it is called.
+typedef AppCheckProviderFactory =
+    dart_app.AppCheckTokenProvider? Function(core.FirebaseApp app);
+
 /// The `firebase_app_dart` options for the FlutterFire [options].
 ///
 /// The same mapping as `dartOptionsOf` of `cloud_firestore_dart_platform`, so
@@ -37,15 +44,19 @@ dart_app.FirebaseOptions dartOptionsOf(core.FirebaseOptions options) {
 
 /// The `firebase_app_dart` app with the name of the FlutterFire [app].
 ///
-/// An existing app of that name is used as it is, with its token providers (an
-/// app that the Firestore platform package or `cloud_firestore_dart_flutterfire`
-/// set up). Otherwise the app is created with the mapped options and the token
-/// provider that [tokenProviderFor] returns. Throws a [StateError] when an
-/// existing app has other options.
+/// An existing app of that name is used with its token providers (an app that
+/// the Firestore platform package or `cloud_firestore_dart_flutterfire` set
+/// up); only when it has no App Check provider does it get the one that
+/// [appCheckProviderFor] returns, as `FlutterFireBridge` of
+/// `cloud_firestore_dart_flutterfire` does. Otherwise the app is created with
+/// the mapped options and the providers that [tokenProviderFor] and
+/// [appCheckProviderFor] return. Throws a [StateError] when an existing app
+/// has other options.
 dart_app.FirebaseApp dartAppFor(
-  core.FirebaseApp app,
+  core.FirebaseApp app, {
   TokenProviderFactory? tokenProviderFor,
-) {
+  AppCheckProviderFactory? appCheckProviderFor,
+}) {
   final dart_app.FirebaseOptions options = dartOptionsOf(app.options);
   // Firebase.app(name) of firebase_app_dart throws when there is no app, and
   // Firebase.initializeApp is asynchronous: look the app up in the list.
@@ -59,6 +70,7 @@ dart_app.FirebaseApp dartAppFor(
         'options than the FlutterFire app.',
       );
     }
+    existing.appCheckProvider ??= appCheckProviderFor?.call(app);
     return existing;
   }
   final dart_app.FirebaseApp created = dart_app.FirebaseApp.withOptions(
@@ -69,5 +81,6 @@ dart_app.FirebaseApp dartAppFor(
   if (provider != null) {
     created.authProvider = provider;
   }
+  created.appCheckProvider = appCheckProviderFor?.call(app);
   return created;
 }

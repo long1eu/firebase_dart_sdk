@@ -37,7 +37,7 @@ import 'src/app.dart';
 import 'src/core.dart';
 import 'src/firebase_storage.dart';
 
-export 'src/app.dart' show TokenProviderFactory;
+export 'src/app.dart' show AppCheckProviderFactory, TokenProviderFactory;
 export 'src/firebase_storage.dart' show DartFirebaseStorage;
 
 /// Selects `firebase_storage_dart` as the implementation of the official
@@ -75,6 +75,29 @@ abstract final class FirebaseStorageDart {
   ///   open rules). A `firebase_app_dart` app that already exists with the
   ///   name of the FlutterFire app (the Firestore platform package creates
   ///   one) is used as it is, with its own providers.
+  /// * [appCheckProviderFor] returns the App Check token provider for the
+  ///   requests of a FlutterFire app, sent in the `X-Firebase-AppCheck`
+  ///   header. For the official `firebase_app_check`, use the
+  ///   `FlutterFireAppCheckProvider` of `cloud_firestore_dart_flutterfire`:
+  ///
+  ///   ```dart
+  ///   FirebaseStorageDart.use(
+  ///     appCheckProviderFor: (FirebaseApp app) {
+  ///       final FirebaseAppCheck appCheck =
+  ///           FirebaseAppCheck.instanceFor(app: app);
+  ///       return FlutterFireAppCheckProvider(
+  ///         getToken: appCheck.getToken,
+  ///         onTokenChange: appCheck.onTokenChange,
+  ///       );
+  ///     },
+  ///   );
+  ///   ```
+  ///
+  ///   It is called once per app. Without it, or when it returns null,
+  ///   requests carry no App Check token. A token that cannot be had (the
+  ///   provider throws or returns none) fails nothing: the request goes
+  ///   without the header and the backend decides. An existing
+  ///   `firebase_app_dart` app without an App Check provider gets this one.
   /// * [httpClient] sends the requests (for tests and proxies); by default
   ///   one client is shared by all instances.
   /// * [maxConcurrentUploads] and [maxUploadChunkSize] are those of the
@@ -90,6 +113,7 @@ abstract final class FirebaseStorageDart {
   /// configuration is read then.
   static void use({
     TokenProviderFactory? tokenProviderFor,
+    AppCheckProviderFactory? appCheckProviderFor,
     http.Client? httpClient,
     int maxConcurrentUploads = 8,
     int? maxUploadChunkSize,
@@ -103,6 +127,7 @@ abstract final class FirebaseStorageDart {
     }
     DartFirebaseStorage.config = DartStorageConfig(
       tokenProviderFor: tokenProviderFor,
+      appCheckProviderFor: appCheckProviderFor,
       httpClient: httpClient,
       maxConcurrentUploads: maxConcurrentUploads,
       maxUploadChunkSize: maxUploadChunkSize,
