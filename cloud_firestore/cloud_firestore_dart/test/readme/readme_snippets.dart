@@ -246,8 +246,8 @@ Future<void> authProvidersReadmeLine215() async {
   print(result.user?.email);
 }
 
-// ../../firebase_auth/firebase_auth_providers_dart/README.md:274
-Future<void> authProvidersReadmeLine274() async {
+// ../../firebase_auth/firebase_auth_providers_dart/README.md:276
+Future<void> authProvidersReadmeLine276() async {
   final OAuthLoopbackProvider provider = OAuthLoopbackProvider.oidc(
     providerId: 'oidc.example',
     authorizationEndpoint: Uri.parse('https://idp.example.com/authorize'),
@@ -272,8 +272,8 @@ Future<void> authProvidersReadmeLine274() async {
   );
 }
 
-// ../../firebase_auth/firebase_auth_providers_dart/README.md:344
-Future<void> authProvidersReadmeLine344() async {
+// ../../firebase_auth/firebase_auth_providers_dart/README.md:346
+Future<void> authProvidersReadmeLine346() async {
   final AppVerification verification = AppVerification.recaptchaV2Loopback();
 }
 
