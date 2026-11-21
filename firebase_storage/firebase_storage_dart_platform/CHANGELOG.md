@@ -1,3 +1,11 @@
+## 0.1.2
+
+- `FirebaseStorageDart.use` takes `appCheckProviderFor`: the App Check token of each FlutterFire app goes in the
+  `X-Firebase-AppCheck` header. With `firebase_app_check`, return a `FlutterFireAppCheckProvider` of
+  `cloud_firestore_dart_flutterfire` built on `FirebaseAppCheck.instanceFor(app: app)`. Without it, or when App
+  Check has no token, requests go without the header and nothing fails. A `firebase_app_dart` app that already
+  exists without an App Check provider gets this one.
+
 ## 0.1.1
 
 - `FirebaseStorageDart.use` takes `maxConcurrentUploads` and `maxUploadChunkSize`, passed to each

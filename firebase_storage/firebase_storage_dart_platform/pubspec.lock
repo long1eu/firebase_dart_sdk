@@ -41,6 +41,20 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.1.2"
+  cloud_firestore_dart:
+    dependency: "direct overridden"
+    description:
+      path: "../../cloud_firestore/cloud_firestore_dart"
+      relative: true
+    source: path
+    version: "0.3.2"
+  cloud_firestore_dart_flutterfire:
+    dependency: "direct dev"
+    description:
+      path: "../../cloud_firestore/cloud_firestore_dart_flutterfire"
+      relative: true
+    source: path
+    version: "0.1.2"
   collection:
     dependency: transitive
     description:
@@ -49,6 +63,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.19.1"
+  crypto:
+    dependency: transitive
+    description:
+      name: crypto
+      sha256: e3626ae6270383c9e3a549f34c9e4cd26c09ae6a9adaab2bf4737a00340efdc4
+      url: "https://pub.dev"
+    source: hosted
+    version: "3.0.8"
   fake_async:
     dependency: transitive
     description:
@@ -64,6 +86,30 @@ packages:
       relative: true
     source: path
     version: "0.2.1"
+  firebase_auth:
+    dependency: transitive
+    description:
+      name: firebase_auth
+      sha256: "8463bcb93f95fa3bc5a479705ea8b41cfd35f637336d8f01c71e4128521c185b"
+      url: "https://pub.dev"
+    source: hosted
+    version: "7.1.0"
+  firebase_auth_platform_interface:
+    dependency: transitive
+    description:
+      name: firebase_auth_platform_interface
+      sha256: fb464ec9ab078c8821bc0a129f224a33865b2976c08cfd5dd61648b71dbf3543
+      url: "https://pub.dev"
+    source: hosted
+    version: "9.2.0"
+  firebase_auth_web:
+    dependency: transitive
+    description:
+      name: firebase_auth_web
+      sha256: "0f41af84ce6849fafc731b1ade9b8f2f41f3913f77bb651f915d7208b04ede67"
+      url: "https://pub.dev"
+    source: hosted
+    version: "6.4.0"
   firebase_core:
     dependency: "direct main"
     description:
@@ -119,6 +165,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "3.12.0"
+  fixnum:
+    dependency: transitive
+    description:
+      name: fixnum
+      sha256: b6dc7065e46c974bc7c5f143080a6764ec7a4be6da1285ececdc37be96de53be
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.1.1"
   flutter:
     dependency: "direct main"
     description: flutter
@@ -134,6 +188,38 @@ packages:
     description: flutter
     source: sdk
     version: "0.0.0"
+  google_cloud:
+    dependency: transitive
+    description:
+      name: google_cloud
+      sha256: b385e20726ef5315d302c5933bfb728103116c5be2d3d17094b01a82da538c1f
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.5.0"
+  google_identity_services_web:
+    dependency: transitive
+    description:
+      name: google_identity_services_web
+      sha256: "5d187c46dc59e02646e10fe82665fc3884a9b71bc1c90c2b8b749316d33ee454"
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.3.3+1"
+  googleapis_auth:
+    dependency: transitive
+    description:
+      name: googleapis_auth
+      sha256: "6c37e60a7e9139b6cb143615b740663f427ffd5162f47c06eb8b9632fc217520"
+      url: "https://pub.dev"
+    source: hosted
+    version: "2.3.7"
+  grpc:
+    dependency: transitive
+    description:
+      name: grpc
+      sha256: "0cde49bc17f6b1e96c374ad1b5d389816cc8ade2015f24294eaa76193de87090"
+      url: "https://pub.dev"
+    source: hosted
+    version: "5.2.0"
   http:
     dependency: "direct main"
     description:
@@ -142,6 +228,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.6.0"
+  http2:
+    dependency: transitive
+    description:
+      name: http2
+      sha256: "382d3aefc5bd6dc68c6b892d7664f29b5beb3251611ae946a98d35158a82bbfa"
+      url: "https://pub.dev"
+    source: hosted
+    version: "2.3.1"
   http_parser:
     dependency: transitive
     description:
@@ -230,6 +324,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.1.8"
+  protobuf:
+    dependency: transitive
+    description:
+      name: protobuf
+      sha256: "13b6717366aa7ec3792dd62c19c7d33a785708224365f2db23c5ca01f1c1a0f2"
+      url: "https://pub.dev"
+    source: hosted
+    version: "6.1.0"
   rxdart:
     dependency: transitive
     description:
@@ -238,6 +340,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "0.28.0"
+  semaphore:
+    dependency: transitive
+    description:
+      name: semaphore
+      sha256: "4080d67aa3f264904d3c8ad0acbeaa8266d5ec854bf8f27948620aba383915d0"
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.0.1"
   sky_engine:
     dependency: transitive
     description: flutter
