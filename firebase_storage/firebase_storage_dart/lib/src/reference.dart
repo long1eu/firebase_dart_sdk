@@ -4,6 +4,7 @@ import 'dart:typed_data';
 
 import 'package:meta/meta.dart';
 
+import 'download.dart';
 import 'errors.dart';
 import 'firebase_storage.dart';
 import 'list_result.dart';
@@ -236,6 +237,25 @@ final class Reference {
     }
     return response.bodyBytes;
   }
+
+  /// Downloads the object as a stream of byte chunks, like `File.openRead`: from byte [start] (default 0) up to
+  /// byte [end] (exclusive; default the end of the object). The bytes are not kept in memory.
+  ///
+  /// Nothing is requested until the stream is listened to; it is single-subscription. Pausing the subscription
+  /// pauses the download, and canceling it aborts the request. A range that starts past the end of the object
+  /// gives an empty stream.
+  ///
+  /// Failures before the first byte arrives are retried until `StorageRetryPolicy.download` runs out
+  /// (`retry-limit-exceeded`). Once bytes were delivered, a failure ends the stream with an error (`unknown`)
+  /// and is not retried, since it would repeat bytes; read the rest with a new [openRead] from the next offset.
+  /// A negative [start] or an [end] before [start] fails with `invalid-argument`.
+  ///
+  /// ```dart
+  /// final int size = await ref.openRead().fold(0, (int n, List<int> chunk) => n + chunk.length);
+  /// final List<int> head = await ref.openRead(0, 512).expand((List<int> c) => c).toList();
+  /// ```
+  Stream<List<int>> openRead([int? start, int? end]) =>
+      openReadStream(this, start, end);
 
   /// Uploads [data] in one multipart request and returns the metadata of the new object, replacing an object
   /// at the same path. The content type is that of [metadata], else `application/octet-stream`.
