@@ -27,7 +27,7 @@ final class Location {
       if (path.endsWith('/')) {
         path = path.substring(0, path.length - 1);
       }
-      return Location(gs.group(1)!, path);
+      return Location(_checkBucket(gs.group(1)!, url), path);
     }
     for (final RegExp regExp in <RegExp>[
       _firebaseRegExp(host),
@@ -35,7 +35,10 @@ final class Location {
     ]) {
       final RegExpMatch? match = regExp.firstMatch(url);
       if (match != null) {
-        return Location(match.group(1)!, _decode(match.group(2) ?? '', url));
+        return Location(
+          _checkBucket(match.group(1)!, url),
+          _decode(match.group(2) ?? '', url),
+        );
       }
     }
     throw invalidUrl(url);
@@ -44,7 +47,8 @@ final class Location {
   /// The bucket of a bucket specification: a bare bucket name (`my-bucket`) or a URL without a path
   /// (`gs://my-bucket`, `gs://my-bucket/`), like `Location.makeFromBucketSpec` of the JS SDK.
   ///
-  /// Throws an [ArgumentError] when [spec] is a URL with an object path, or is empty.
+  /// Throws an [ArgumentError] when [spec] is a URL with an object path, or is not a valid bucket name
+  /// (letters, digits, `.`, `-` and `_`; not `.` or `..`).
   static String bucketOf(String spec, String host) {
     Location location;
     try {
@@ -52,7 +56,7 @@ final class Location {
     } on Object {
       location = Location(spec, '');
     }
-    if (location.path.isNotEmpty || location.bucket.isEmpty) {
+    if (location.path.isNotEmpty || !isValidBucket(location.bucket)) {
       throw ArgumentError.value(
         spec,
         'bucket',
@@ -89,6 +93,20 @@ final class Location {
   String toString() => 'gs://$bucket/$path';
 
   static const String _bucketDomain = r'([A-Za-z0-9.\-_]+)';
+
+  /// Whether [bucket] is a name this package sends: the characters of a bucket name, and not `.` or `..`, which
+  /// would change the meaning of the request URL.
+  static bool isValidBucket(String bucket) =>
+      RegExp(r'^[A-Za-z0-9.\-_]+$').hasMatch(bucket) &&
+      bucket != '.' &&
+      bucket != '..';
+
+  static String _checkBucket(String bucket, String url) {
+    if (!isValidBucket(bucket)) {
+      throw invalidUrl(url);
+    }
+    return bucket;
+  }
 
   static final RegExp _gsRegExp = RegExp(
     '^gs://$_bucketDomain(/(.*))?\$',
