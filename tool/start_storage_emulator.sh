@@ -124,7 +124,10 @@ cat >"$CFG/.firebaserc" <<'JSON'
 }
 JSON
 # exec: the pid file holds the pid of the CLI (node) itself.
-(cd "$CFG" && exec nohup "$CLI" emulators:start --only storage --project demo-test \
+# TMPDIR per port: the emulator keeps uploads in $TMPDIR/firebase/storage/blobs and wipes that directory
+# on start, so emulators sharing the system temp directory delete each other's uploads.
+mkdir -p "$EMU/tmp_$PORT"
+(cd "$CFG" && exec env TMPDIR="$EMU/tmp_$PORT" nohup "$CLI" emulators:start --only storage --project demo-test \
   --config "$CFG/firebase.json" >"$LOG" 2>&1) &
 echo $! >"$PID"
 for _ in $(seq 1 90); do
