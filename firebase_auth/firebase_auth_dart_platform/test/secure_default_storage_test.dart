@@ -20,7 +20,7 @@ import 'package:firebase_auth_dart_platform/src/storage.dart';
 import 'package:firebase_auth_providers_dart/firebase_auth_providers_dart.dart'
     show AuthStorage, FileAuthStorage;
 import 'package:firebase_auth_secure_storage_flutter/firebase_auth_secure_storage_flutter.dart'
-    show SecureAuthStorageException;
+    show SecureAuthStorage, SecureAuthStorageException;
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
@@ -558,28 +558,222 @@ void main() {
         expect(store.values, isEmpty);
       },
     );
+  });
 
-    test('a store unavailable at the next start: signed out on the file, and '
-        'at the start after, the secure session wins', () async {
-      debugDefaultTargetPlatformOverride = TargetPlatform.linux;
-      // A first run stored the session in the secure store.
-      await secureDefaultStorage(sessionFile).write(_key, _secureSession);
-      final String storedKey = store.values.keys.single;
+  group('the marker of the secure store', () {
+    String markerFile() => '$sessionFile.secure';
 
-      // The next run finds the keyring locked: no session, and a new sign-in
-      // goes to the file.
+    Future<String?> markOf(String key) =>
+        FileAuthStorage(markerFile()).read(key);
+
+    /// A new process: a new default storage over the same store and files.
+    SecureDefaultStorage restart() {
+      resetFallbackAnnouncement();
+      store.calls.clear();
+      return secureDefaultStorage(sessionFile);
+    }
+
+    void lockKeyring() {
       store.failures['read'] = _keyringLocked();
-      final SecureDefaultStorage locked = secureDefaultStorage(sessionFile);
-      expect(await locked.read(_key), isNull);
-      await locked.write(_key, _session);
-      expect(store.values, <String, String>{storedKey: _secureSession});
-      expect(await fileValue(_key), _session);
+      store.failures['write'] = _keyringLocked();
+      store.failures['delete'] = _keyringLocked();
+    }
 
-      // The run after that reaches the store again.
+    setUp(() => debugDefaultTargetPlatformOverride = TargetPlatform.linux);
+
+    test(
+      'regression: a sign-in and a sign-out in a run where the keyring is '
+      'locked; at the next start the old session does not come back',
+      () async {
+        // Run 1 moves the session from the file into the store.
+        await seedFile(_key, _session);
+        expect(await restart().read(_key), _session);
+        expect(File(sessionFile).existsSync(), isFalse);
+        expect(await markOf(_key), 'secure');
+
+        // Run 2: the keyring is locked. Signed out, a new sign-in and a
+        // sign-out stay in memory; nothing goes to the file.
+        lockKeyring();
+        final SecureDefaultStorage locked = restart();
+        expect(await locked.read(_key), isNull);
+        expect(locked.usesFallback, isTrue);
+        await locked.write(_key, _secureSession);
+        expect(await locked.read(_key), _secureSession);
+        expect(File(sessionFile).existsSync(), isFalse);
+        await locked.write(_key, null);
+        expect(await markOf(_key), 'sign-out');
+        expect(store.valueOf(_key), _session);
+        expect(
+          printed.single,
+          contains('kept in memory until the program ends'),
+        );
+        expect(printed.single, contains('KeyringLocked'));
+
+        // Run 3: the store works; the sign-out is completed before any read.
+        store.failures.clear();
+        final SecureDefaultStorage unlocked = restart();
+        expect(await unlocked.read(_key), isNull);
+        expect(store.calls, <String>[..._probeCalls, 'delete']);
+        expect(store.valueOf(_key), isNull);
+        expect(await markOf(_key), 'secure');
+        expect(File(sessionFile).existsSync(), isFalse);
+      },
+    );
+
+    test('a sign-in to another account in the locked run is not persisted, '
+        'and the old account does not come back after it', () async {
+      await restart().write(_key, _session);
+      expect(await markOf(_key), 'secure');
+
+      lockKeyring();
+      final SecureDefaultStorage locked = restart();
+      expect(await locked.read(_key), isNull);
+      await locked.write(_key, _secureSession);
+
       store.failures.clear();
-      final SecureDefaultStorage unlocked = secureDefaultStorage(sessionFile);
-      expect(await unlocked.read(_key), _secureSession);
+      expect(await restart().read(_key), isNull);
+      expect(store.values, isEmpty);
+    });
+
+    test(
+      'marked and the probe fails with an error that is not "unavailable": '
+      'a sign-out through FallbackStorage is completed at the next start',
+      () async {
+        await restart().write(_key, _session);
+
+        store.readFailures[SecureDefaultStorage.probeKey] = PlatformException(
+          code: 'Libsecret error',
+          message: 'secret_password_lookupv_sync: timeout',
+        );
+        final FallbackStorage app = FallbackStorage(restart());
+        await expectLater(
+          app.read(_key),
+          throwsA(isA<SecureAuthStorageException>()),
+        );
+        await app.write(_key, null);
+        expect(await app.read(_key), isNull);
+        expect(await markOf(_key), 'sign-out');
+
+        store.readFailures.clear();
+        expect(await restart().read(_key), isNull);
+        expect(store.values, isEmpty);
+      },
+    );
+
+    test('a sign-out the store refuses after a good probe (FallbackStorage '
+        'keeps memory) is completed at the next start', () async {
+      await restart().write(_key, _session);
+
+      final FallbackStorage app = FallbackStorage(restart());
+      expect(await app.read(_key), _session);
+      store.failures['delete'] = PlatformException(
+        code: 'Libsecret error',
+        message: 'secret_password_clear_sync: timeout',
+      );
+      await app.write(_key, null);
+      expect(await app.read(_key), isNull);
+      expect(store.valueOf(_key), _session);
+      expect(await markOf(_key), 'sign-out');
+
+      store.failures.clear();
+      expect(await restart().read(_key), isNull);
+      expect(store.valueOf(_key), isNull);
+    });
+
+    test('a crash between the move and the delete from the file: the next '
+        'start reads the store and deletes the file', () async {
+      await SecureAuthStorage().write(_key, _secureSession);
+      await seedFile(_key, _session);
+      await FileAuthStorage(markerFile()).write(_key, 'secure');
+
+      expect(await restart().read(_key), _secureSession);
+      expect(File(sessionFile).existsSync(), isFalse);
+    });
+
+    test('a marked session is never restored from the file', () async {
+      await seedFile(_key, _session);
+      await FileAuthStorage(markerFile()).write(_key, 'secure');
+
+      expect(await restart().read(_key), isNull);
+      expect(store.values, isEmpty);
+      expect(File(sessionFile).existsSync(), isFalse);
+    });
+
+    test('a marked session with a locked keyring: the file is not read even '
+        'when it holds a session', () async {
+      await seedFile(_key, _session);
+      await FileAuthStorage(markerFile()).write(_key, 'secure');
+      lockKeyring();
+      expect(await restart().read(_key), isNull);
       expect(await fileValue(_key), _session);
+    });
+
+    test('no marker: the file is the fallback, and the session moves when '
+        'the store appears; a later locked run then keeps memory', () async {
+      lockKeyring();
+      final SecureDefaultStorage first = restart();
+      expect(await first.read(_key), isNull);
+      await first.write(_key, _session);
+      expect(await fileValue(_key), _session);
+      expect(await markOf(_key), isNull);
+      expect(printed.single, contains('kept in $sessionFile instead'));
+
+      store.failures.clear();
+      expect(await restart().read(_key), _session);
+      expect(File(sessionFile).existsSync(), isFalse);
+      expect(await markOf(_key), 'secure');
+
+      lockKeyring();
+      final SecureDefaultStorage third = restart();
+      expect(await third.read(_key), isNull);
+      await third.write(_key, _secureSession);
+      expect(File(sessionFile).existsSync(), isFalse);
+    });
+
+    test('marks are per session: an unmarked app still moves from the file '
+        'when another one is marked', () async {
+      await restart().write(_key, _session);
+      await seedFile(_other, _secureSession);
+      expect(await restart().read(_other), _secureSession);
+      expect(await markOf(_other), 'secure');
+      expect(File(sessionFile).existsSync(), isFalse);
+    });
+
+    test('the marker never holds a session', () async {
+      await seedFile(_key, _session);
+      await restart().read(_key);
+      lockKeyring();
+      final SecureDefaultStorage locked = restart();
+      await locked.write(_key, _secureSession);
+      final String text = File(markerFile()).readAsStringSync();
+      expect(text, isNot(contains('refreshToken')));
+      expect(text, '{"$_key":"sign-out"}');
+    });
+
+    test('Windows without an interactive logon: a marked session is kept in '
+        'memory, not in the file', () async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.windows;
+      final WindowsLikePlatform windows = WindowsLikePlatform();
+      FlutterSecureStoragePlatform.instance = windows;
+      await restart().write(_key, _session);
+      expect(windows.dat.values.single, _session);
+
+      windows
+        ..protectFailure = const WindowsException(
+          0x80070005,
+          'Failure on CryptProtectData()',
+        )
+        ..unprotectFailure = const WindowsException(
+          0x80070005,
+          'Failure on CryptUnprotectData()',
+        );
+      final SecureDefaultStorage denied = restart();
+      expect(await denied.read(_key), isNull);
+      expect(denied.usesFallback, isTrue);
+      await denied.write(_key, _secureSession);
+      expect(File(sessionFile).existsSync(), isFalse);
+      expect(printed.single, contains('HRESULT(0x80070005)'));
+      expect(await markOf(_key), 'sign-out');
     });
   });
 

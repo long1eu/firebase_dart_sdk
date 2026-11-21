@@ -31,18 +31,29 @@ AuthStorage defaultStorage() => _defaultStorage ??= kIsWeb
 /// A [SecureDefaultStorage]: a [SecureAuthStorage] that moves the sessions
 /// found in [sessionFile] (see `defaultSessionFile`) into the secure store,
 /// with that file (or memory when [sessionFile] is null) as the fallback for
-/// a run where the secure store is unavailable. The probe uses a second
-/// `SecureAuthStorage` in the same namespace, without `migrateFrom`, so that
-/// deleting the probe entry never touches the file.
+/// a run where the secure store is unavailable, and the marker of the secure
+/// store at `<sessionFile>.secure`. A second `SecureAuthStorage` in the same
+/// namespace, without `migrateFrom`, serves the probe and the sessions the
+/// marker places in the store, so that it never touches the file.
 SecureDefaultStorage secureDefaultStorage(String? sessionFile) {
-  final AuthStorage? file = sessionFile == null
-      ? null
-      : FileAuthStorage(sessionFile);
+  if (sessionFile == null) {
+    return SecureDefaultStorage(
+      secure: SecureAuthStorage(),
+      direct: SecureAuthStorage(),
+      fallback: InMemoryAuthStorage(),
+      fallbackFile: null,
+    );
+  }
+  final FileAuthStorage file = FileAuthStorage(sessionFile);
+  final SecureStoreMarker marker = SecureStoreMarker(
+    FileAuthStorage('$sessionFile.secure'),
+  );
   return SecureDefaultStorage(
-    secure: SecureAuthStorage(migrateFrom: file),
-    probe: SecureAuthStorage(),
-    fallback: file ?? InMemoryAuthStorage(),
+    secure: SecureAuthStorage(migrateFrom: MarkingFileStorage(file, marker)),
+    direct: SecureAuthStorage(),
+    fallback: file,
     fallbackFile: sessionFile,
+    marker: marker,
   );
 }
 

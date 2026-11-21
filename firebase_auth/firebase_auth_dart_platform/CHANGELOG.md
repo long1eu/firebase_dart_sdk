@@ -50,4 +50,10 @@
   sessions in the session file instead (memory on Android and iOS), and one line per process says so. Other probe
   errors are thrown and the next operation probes again; other errors of the store are thrown and never answered from
   the file; a failed write still ends in memory through `FallbackStorage`.
+- The marker of the secure store, `<session file>.secure` (session key to `secure` or `sign-out`, never a token),
+  records the apps whose session lives in the store. A marked session is never read from or written to the session
+  file: in a run where the store cannot be used (any reason, a locked keyring and Windows DPAPI refusing access
+  included) it is kept in memory only, and a sign-in or sign-out there, or a write the store refuses later in a run,
+  marks it `sign-out`; the next run that can use the store deletes it there before anything reads it. A copy left in
+  the file by a crash during the move is deleted, never restored.
 - `storageFor` replaces the default entirely; returning a `FileAuthStorage(defaultSessionFile()!)` keeps the file.

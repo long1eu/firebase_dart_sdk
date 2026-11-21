@@ -96,8 +96,25 @@ The README of `firebase_auth_secure_storage_flutter` explains each set-up.
 **Moving from the session file.** The session file (below) is where the fallback keeps the sessions, and where
 builds of this package from before the secure store was the default kept them. At the first read of an app's
 session, a session found in that file and not in the secure store moves there: it is written, read
-back and compared, and only then deleted from the file (the file goes with its last session). When the secure store
-already has a session for that app, it wins, and the file is left alone; the two are never merged.
+back and compared, marked (see below), and only then deleted from the file (the file goes with its last session).
+When the secure store already has a session for an app that is not marked, it wins, and the file is left alone; the
+two are never merged.
+
+**The marker.** `<session file>.secure`, next to the session file, records which apps' sessions live in the secure
+store. It is a JSON object from the session key to `secure` or `sign-out`, written atomically and owner-only by
+`FileAuthStorage`, and it never holds a token. A session is marked `secure` before it is first written to the store,
+and before it is deleted from the file after a move. From then on:
+
+- The session file is never read for that app: a copy left there (a crash between the move and the delete) is
+  deleted at the next read, and never restored.
+- In a run where the store cannot be used, for any reason, that app's session is kept in memory only: the app starts
+  signed out, a new sign-in lasts until the program ends, and nothing is written to the file. A sign-in or sign-out in
+  such a run marks the session `sign-out`. So does a write the store refuses later in a run that started with it.
+- The first read of the next run that can use the store deletes a session marked `sign-out` from the store before
+  anything is read, so the account of an earlier run never comes back after the user signed out or signed in again.
+
+An app with no mark (the store never held its session) keeps the file as the fallback below. Android and iOS have no
+session file and so no marker.
 
 **When the secure store is unavailable.** Before the first read or write of the run, a probe decides for the whole
 run: it writes an entry (`<namespace>/.probe`), reads it back and deletes it. A read alone cannot tell, because a macOS
@@ -105,16 +122,15 @@ build without the keychain entitlement reads a missing key as null and fails onl
 start while the probe runs wait for it; the probe entry is deleted also when its read-back fails. When a step fails
 because the store as a whole cannot be used (`SecureAuthStorageException.isUnavailable`: no plugin, no Secret Service
 or D-Bus session bus, a locked keyring, a macOS build without the entitlement, Windows without an interactive logon
-such as an SSH session or a service, where DPAPI refuses access; or no services binding yet), every session
-of the run is kept in the session file instead (memory on Android and iOS, which have no file), and one line per
-process says where. Nothing is written to the secure store for the rest of the run. Any other failure of the probe is
+such as an SSH session or a service, where DPAPI refuses access; or no services binding yet), the sessions of the
+run that are not marked are kept in the session file instead (memory on Android and iOS, which have no file), the
+marked ones in memory, and one line per process says each. Nothing is written to the secure store for the rest of the run. Any other failure of the probe is
 thrown by the operation that waited for it, and the next operation probes again. Once the probe has succeeded, a later
 failure in the same run is not a reason to switch: it is thrown like the errors below. Other errors (a value that
 cannot be read or decrypted, an iOS device that is locked for now) are thrown, never answered from the file: the restore
 fails, the app starts signed out with the error in `authStateReady()`, and the stored session is not replaced by the
-file's. A store that becomes unavailable after it held a session (a keyring locked at the next start) starts the app
-signed out on the file, and nothing is copied back into the secure store afterwards: at a later start where the store
-works again, its older session wins over one signed in to meanwhile in the file.
+file's. A locked keyring and DPAPI refusing access count as unavailable only for apps without a mark: their session
+was never in the store, so the file cannot hide or bring back a session there.
 
 The session file of the fallback:
 
@@ -142,7 +158,8 @@ FirebaseAuthDart.use(
 **Failed writes.** Whatever the storage, a write that fails (the secure store refuses it, or the fallback file cannot
 be written: a read-only or full disk) does not fail the sign-in: the session of that app stays in memory until the
 program ends, and the failure is printed once. So there are three levels: the secure store; the session file, for the
-whole run, only when the probe finds the store unavailable; memory, for one app, after a failed write to either.
+whole run, only when the probe finds the store unavailable and the app has no mark; memory, for one app, after a
+failed write to either, or for a marked app when the store cannot be used.
 A failed read is never answered from memory or the file.
 
 Under `flutter test`, the registration on Linux uses neither the default storage nor this package's
