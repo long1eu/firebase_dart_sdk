@@ -168,9 +168,12 @@ Under `flutter test`, the registration on Linux uses neither the default storage
 without faking the plugin's channel gets the fallback and its line.
 
 `setPersistence(Persistence.NONE)` (or `SESSION`) moves the session to memory, so the user is signed out at the next
-start; `Persistence.LOCAL` moves it back. On the web, `SESSION` moves it to the tab's `sessionStorage` instead, and
-`LOCAL` (or `INDEXED_DB`) to the storage of the app (by default IndexedDB, else `localStorage`, else memory).
-IndexedDB and `localStorage` are readable by every script of the origin; there is no cross-tab sync.
+start; `Persistence.LOCAL` moves it back. On the web, `LOCAL` (or `INDEXED_DB`) moves it to the storage of the app
+(by default IndexedDB, else `localStorage`, else memory). Without `storageFor`, `SESSION` on the web moves it to the
+tab's `sessionStorage`: a reload of the tab restores it from there, and a `setPersistence(SESSION)` at start keeps
+it. With `storageFor`, `SESSION` stays memory, so the session is never written outside the storage you chose.
+IndexedDB, `localStorage` and `sessionStorage` are readable by every script of the origin; there is no cross-tab
+sync, so a sign-out in one tab can be undone by another signed-in tab's next write until that tab reloads.
 
 ## Provider sign-in
 

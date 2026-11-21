@@ -4,8 +4,11 @@
   (IndexedDB, else `localStorage`, else memory) instead of memory, so the user stays signed in after a reload. A
   session an app kept in `localStorage` under the same key moves to IndexedDB at the first read.
 - `setPersistence` on the web: `LOCAL` and `INDEXED_DB` keep the session in the storage of the app (that default, or
-  `storageFor`), `SESSION` in the tab's `sessionStorage` (`WebAuthStorage.session`), `NONE` in memory. Elsewhere
-  nothing changes (`SESSION` is memory). `FirebaseAuthDart.use(storageFor: ...)` still replaces the default.
+  `storageFor`). `SESSION` keeps it in the tab's `sessionStorage` (`WebAuthStorage.session`) when the app passed no
+  `storageFor`, and a reloaded tab restores it from there (a `setPersistence(SESSION)` at start keeps it); with
+  `storageFor`, `SESSION` is memory as before. `NONE` is memory. Elsewhere nothing changes (`SESSION` is memory).
+  `FirebaseAuthDart.use(storageFor: ...)` still replaces the default. The web wiring is unit-tested on the VM with
+  fakes; the shim has not been run in a browser.
 
 ## 0.1.0
 

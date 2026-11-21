@@ -83,6 +83,7 @@ class DartFirebaseAuth extends FirebaseAuthPlatform {
   DartFirebaseAuth()
     : _client = null,
       _persistent = null,
+      _session = null,
       _config = const DartAuthConfig(),
       _oauthProviders = const <String, dart_auth.OAuthLoopbackProvider>{},
       super();
@@ -91,6 +92,7 @@ class DartFirebaseAuth extends FirebaseAuthPlatform {
     FirebaseApp app,
     this._client,
     this._persistent,
+    this._session,
     this._config,
     this._oauthProviders,
   ) : super(appInstance: app);
@@ -126,11 +128,20 @@ class DartFirebaseAuth extends FirebaseAuthPlatform {
         final dart_auth.AuthStorage storage =
             config.storageFor?.call(app) ?? defaultStorage();
         final FallbackStorage persistent = FallbackStorage(storage);
+        final FallbackStorage? session = sessionStorageFor(
+          web: kIsWeb,
+          customStorage: config.storageFor != null,
+        );
+        final String key = storageKeyOf(app);
         final dart_auth.FirebaseUserAuth userAuth = dart_auth.FirebaseUserAuth(
           apiKey: app.options.apiKey,
           appId: app.options.appId,
-          storage: persistent,
-          storageKey: storageKeyOf(app),
+          storage: initialStorage(
+            persistent: persistent,
+            session: session,
+            key: key,
+          ),
+          storageKey: key,
           httpClient: config.httpClient,
         );
         // The error of a failed restore (an unreadable storage) reaches
@@ -140,6 +151,7 @@ class DartFirebaseAuth extends FirebaseAuthPlatform {
           app,
           userAuth,
           persistent,
+          session,
           config,
           Map<String, dart_auth.OAuthLoopbackProvider>.unmodifiable(providers),
         );
@@ -159,12 +171,11 @@ class DartFirebaseAuth extends FirebaseAuthPlatform {
   /// Where `setPersistence(Persistence.NONE)` keeps the session.
   final dart_auth.InMemoryAuthStorage _memory = dart_auth.InMemoryAuthStorage();
 
-  /// Where `setPersistence(Persistence.SESSION)` keeps the session on the web:
-  /// the `sessionStorage` of the tab, with memory behind it. Created at first
-  /// use, only on the web.
-  late final FallbackStorage _session = FallbackStorage(
-    dart_auth.WebAuthStorage.session(),
-  );
+  /// Where `setPersistence(Persistence.SESSION)` keeps the session on the web
+  /// when the app passed no `storageFor`: the `sessionStorage` of the tab,
+  /// with memory behind it (see `sessionStorageFor`). Null elsewhere: SESSION
+  /// is memory then.
+  final FallbackStorage? _session;
   final DartAuthConfig _config;
 
   /// The loopback providers of this instance's app: those of `use`'s
@@ -331,19 +342,20 @@ class DartFirebaseAuth extends FirebaseAuthPlatform {
   /// ends); [Persistence.LOCAL] and [Persistence.INDEXED_DB] in the storage of
   /// the app (by default the secure store, and on the web IndexedDB, else
   /// `localStorage`, else memory). [Persistence.SESSION] keeps it in the
-  /// `sessionStorage` of the tab on the web, and in memory elsewhere (see
-  /// `storageForPersistence`). The current session moves to the new place
-  /// (`setStorage` of the client): it is written there first, then deleted
-  /// from the old place.
+  /// `sessionStorage` of the tab on the web when the app passed no
+  /// `storageFor`, and in memory otherwise (see `storageForPersistence`). The
+  /// current session moves to the new place (`setStorage` of the client): it
+  /// is written there first, then deleted from the old place. A tab reloaded
+  /// after SESSION starts on its `sessionStorage` (see `initialStorage`), so
+  /// calling SESSION again at start keeps the session.
   @override
   Future<void> setPersistence(Persistence persistence) {
     final dart_auth.FirebaseUserAuth userAuth = client;
     final dart_auth.AuthStorage target = storageForPersistence(
       persistence,
-      web: kIsWeb,
       persistent: _persistent!,
       memory: _memory,
-      session: () => _session,
+      session: _session,
     );
     return guard(this, () => userAuth.setStorage(target));
   }

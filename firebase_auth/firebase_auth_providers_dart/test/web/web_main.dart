@@ -21,6 +21,7 @@ void main() {
     BestWebAuthStorage.new,
     WebAuthStorageKind.indexedDb,
     IndexedDbOperation.migrate,
+    IndexedDbTimeoutException.new,
     FileAuthStorage.new,
     GoogleAuthProvider.credential,
     ActionCodeURL.parseLink,
