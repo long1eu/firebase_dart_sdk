@@ -562,7 +562,12 @@ void main() {
           <String>[for (final h in e.resolver.hints) h.uid],
           <String>['totp-other', factor.uid],
         );
-        expect(e.resolver.session.id, 'pending:uid-of-mfa@example.com');
+        // The session id is opaque: never the pending credential.
+        expect(e.resolver.session.id, matches(RegExp(r'^sign-in-\d+$')));
+        expect(
+          '${e.resolver.session.id} ${e.resolver}',
+          isNot(contains('pending')),
+        );
         expect(auth.currentUser, isNull);
         await expectLater(
           e.resolver.resolveSignIn(

@@ -108,7 +108,7 @@ FirebaseAuthException exceptionOf(
       credential: credentialOf(e.credential),
       resolver: DartMultiFactorResolver(
         <MultiFactorInfo>[for (final hint in e.hints) multiFactorInfoOf(hint)],
-        DartMultiFactorSignInSession(e.pendingCredential, e.resolver),
+        DartMultiFactorSignInSession(e.resolver),
         auth: auth,
         source: e.resolver,
       ),

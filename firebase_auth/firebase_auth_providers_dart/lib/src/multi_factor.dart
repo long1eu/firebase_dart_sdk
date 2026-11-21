@@ -240,30 +240,53 @@ class TotpSecret {
 class MultiFactorResolver {
   MultiFactorResolver._(
     this.hints, {
-    required Future<UserCredential> Function(String enrollmentId, String code)
+    required String pendingCredential,
+    required Future<UserCredential> Function(
+      String pendingCredential,
+      String enrollmentId,
+      String code,
+    )
     resolveTotp,
     required Future<String> Function(
+      String pendingCredential,
       String enrollmentId,
       AppVerification appVerification,
     )
     startPhone,
-    required Future<UserCredential> Function(PhoneAuthCredential credential)
+    required Future<UserCredential> Function(
+      String pendingCredential,
+      PhoneAuthCredential credential,
+    )
     resolvePhone,
-  }) : _resolveTotp = resolveTotp,
+  }) : session = MultiFactorSession._signIn(pendingCredential),
+       _resolveTotp = resolveTotp,
        _startPhone = startPhone,
        _resolvePhone = resolvePhone;
 
   /// The second factors of the account, as [FirebaseAuthMultiFactorException.hints] lists them.
   final List<MultiFactorInfo> hints;
 
-  final Future<UserCredential> Function(String enrollmentId, String code)
+  /// The session of the pending sign-in (`resolver.session` of the JS SDK and of FlutterFire): a
+  /// [MultiFactorSession] of type [MultiFactorSessionType.signIn] that wraps the backend's pending
+  /// credential. The same object for the life of the resolver.
+  final MultiFactorSession session;
+
+  final Future<UserCredential> Function(
+    String pendingCredential,
+    String enrollmentId,
+    String code,
+  )
   _resolveTotp;
   final Future<String> Function(
+    String pendingCredential,
     String enrollmentId,
     AppVerification appVerification,
   )
   _startPhone;
-  final Future<UserCredential> Function(PhoneAuthCredential credential)
+  final Future<UserCredential> Function(
+    String pendingCredential,
+    PhoneAuthCredential credential,
+  )
   _resolvePhone;
 
   /// Finishes the sign-in with [code], the code an authenticator app shows for the account
@@ -283,6 +306,7 @@ class MultiFactorResolver {
     String code, {
     String? enrollmentId,
   }) async => _resolveTotp(
+    session._pendingCredential,
     _enrollmentOf(MultiFactorInfo.totpFactorId, enrollmentId),
     code,
   );
@@ -304,6 +328,7 @@ class MultiFactorResolver {
     String? enrollmentId,
     required AppVerification appVerification,
   }) async => _startPhone(
+    session._pendingCredential,
     _enrollmentOf(MultiFactorInfo.phoneFactorId, enrollmentId),
     appVerification,
   );
@@ -318,7 +343,7 @@ class MultiFactorResolver {
   /// code.
   Future<UserCredential> resolveSignInWithPhone(
     PhoneAuthCredential credential,
-  ) async => _resolvePhone(credential);
+  ) async => _resolvePhone(session._pendingCredential, credential);
 
   /// The enrolment id of the factor of [factorId] to use: [enrollmentId] when given (and not a
   /// factor of another kind), else the single factor of that kind among [hints].
@@ -374,24 +399,63 @@ class MultiFactorResolver {
   String toString() => 'MultiFactorResolver(hints: $hints)';
 }
 
+/// The kind of a [MultiFactorSession] (`MultiFactorSessionType` of the JS SDK).
+enum MultiFactorSessionType {
+  /// The session of a sign-in or a reauthentication that waits for a second factor: it wraps the
+  /// backend's pending credential (`SIGN_IN` of the JS SDK).
+  signIn,
+}
+
+/// The session of a multi-factor operation (`MultiFactorSession` of the JS SDK and of FlutterFire):
+/// in this package only [MultiFactorResolver.session], of type [MultiFactorSessionType.signIn],
+/// which wraps the pending credential of the sign-in. The enrolments of this package need no session object:
+/// [FirebaseUserAuth.startPhoneEnrollment] and [FirebaseUserAuth.startTotpEnrollment] use the
+/// signed-in user.
+///
+/// It is opaque: the pending credential is a secret, and neither [toString] nor any member shows
+/// it. Its resolver finishes the sign-in.
+class MultiFactorSession {
+  MultiFactorSession._signIn(this._pendingCredential)
+    : type = MultiFactorSessionType.signIn;
+
+  /// The kind of session.
+  final MultiFactorSessionType type;
+
+  final String _pendingCredential;
+
+  @override
+  String toString() => 'MultiFactorSession(${type.name})';
+}
+
 // ---- for FirebaseUserAuth, not exported ----
 
-/// Creates the resolver of a sign-in that needs a second factor: [resolveTotp] finishes it with a
-/// TOTP code, [startPhone] sends the SMS of a phone factor and returns its verification id, and
-/// [resolvePhone] finishes it with a phone credential.
+/// Creates the resolver of a sign-in that needs a second factor, whose session wraps
+/// [pendingCredential]: [resolveTotp] finishes it with a TOTP code, [startPhone] sends the SMS of a
+/// phone factor and returns its verification id, and [resolvePhone] finishes it with a phone
+/// credential. Each callback gets the pending credential from the session.
 MultiFactorResolver createMultiFactorResolver(
   List<MultiFactorInfo> hints, {
-  required Future<UserCredential> Function(String enrollmentId, String code)
+  required String pendingCredential,
+  required Future<UserCredential> Function(
+    String pendingCredential,
+    String enrollmentId,
+    String code,
+  )
   resolveTotp,
   required Future<String> Function(
+    String pendingCredential,
     String enrollmentId,
     AppVerification appVerification,
   )
   startPhone,
-  required Future<UserCredential> Function(PhoneAuthCredential credential)
+  required Future<UserCredential> Function(
+    String pendingCredential,
+    PhoneAuthCredential credential,
+  )
   resolvePhone,
 }) => MultiFactorResolver._(
   hints,
+  pendingCredential: pendingCredential,
   resolveTotp: resolveTotp,
   startPhone: startPhone,
   resolvePhone: resolvePhone,

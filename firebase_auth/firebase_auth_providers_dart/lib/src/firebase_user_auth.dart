@@ -2737,7 +2737,6 @@ class FirebaseUserAuth implements AuthTokenProvider {
   ) {
     // The pending credential belongs to the tenant of the first factor.
     final String? tenant = tenantId;
-    final String pending = error.pendingCredential;
     Future<UserCredential> finishWith(Future<Map<String, Object?>> finalized) =>
         finish(
           finalized.then(
@@ -2753,7 +2752,8 @@ class FirebaseUserAuth implements AuthTokenProvider {
         );
     return createMultiFactorResolver(
       error.hints,
-      resolveTotp: (String enrollmentId, String code) {
+      pendingCredential: error.pendingCredential,
+      resolveTotp: (String pending, String enrollmentId, String code) {
         _checkNotDisposed();
         return finishWith(
           _multiFactor.finalizeTotpSignIn(
@@ -2764,9 +2764,14 @@ class FirebaseUserAuth implements AuthTokenProvider {
           ),
         );
       },
-      startPhone: (String enrollmentId, AppVerification appVerification) =>
-          _startPhoneSignIn(pending, enrollmentId, appVerification, tenant),
-      resolvePhone: (PhoneAuthCredential credential) {
+      startPhone:
+          (
+            String pending,
+            String enrollmentId,
+            AppVerification appVerification,
+          ) =>
+              _startPhoneSignIn(pending, enrollmentId, appVerification, tenant),
+      resolvePhone: (String pending, PhoneAuthCredential credential) {
         _checkNotDisposed();
         final (String verificationId, String code) = _checkPhoneCredential(
           credential,

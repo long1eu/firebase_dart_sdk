@@ -342,6 +342,27 @@ void main() {
       expect(auth.uid, isNull);
     });
 
+    test(
+      'the resolver has a sign-in session that hides the pending credential',
+      () async {
+        final FirebaseAuthMultiFactorException e = await secondFactorRequired(
+          signIn(),
+        );
+        final MultiFactorResolver resolver = e.resolver!;
+
+        expect(resolver.session.type, MultiFactorSessionType.signIn);
+        expect(identical(resolver.session, resolver.session), isTrue);
+        expect('${resolver.session}', 'MultiFactorSession(signIn)');
+        expect('$resolver', isNot(contains('pending:')));
+        // The session carries the pending credential to the backend.
+        await resolver.resolveSignInWithTotp(server.codeNow());
+        expect(
+          backend.bodiesOf('mfaSignIn:finalize').single['mfaPendingCredential'],
+          'pending:$uid',
+        );
+      },
+    );
+
     test('the resolver signs in with a code of the app', () async {
       final List<AuthUser?> states = <AuthUser?>[];
       final StreamSubscription<AuthUser?> sub = auth.authStateChanges().listen(
