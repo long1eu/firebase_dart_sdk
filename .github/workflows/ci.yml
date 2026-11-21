@@ -127,7 +127,7 @@ jobs:
           - leg: others
             packages: >-
               firebase_app_dart firebase_auth_providers_dart cloud_firestore_dart_sqlite
-              firebase_admin_dart examples
+              firebase_admin_dart firebase_storage_dart examples
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./.github/actions/dart
@@ -163,6 +163,10 @@ jobs:
         if: ${{ !cancelled() && matrix.leg == 'others' }}
         working-directory: firebase_auth/firebase_auth_providers_dart
         run: dart format --output=none --set-exit-if-changed lib example
+      - name: Check formatting (firebase_storage_dart)
+        if: ${{ !cancelled() && matrix.leg == 'others' }}
+        working-directory: firebase_storage/firebase_storage_dart
+        run: dart format --output=none --set-exit-if-changed lib test
       - name: Lowest versions of the dependencies (firebase_auth_providers_dart)
         # The package claims `googleapis_auth: ^2.0.0`, `http: ^1.2.0` and `crypto: ^3.0.3`: run its
         # tests with the lowest versions this SDK resolves (only the runtime dependencies are
@@ -189,7 +193,7 @@ jobs:
           - leg: others
             packages: >-
               firebase_app_dart firebase_auth_providers_dart cloud_firestore_dart_sqlite
-              firebase_admin_dart examples
+              firebase_admin_dart firebase_storage_dart examples
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./.github/actions/dart
@@ -547,9 +551,59 @@ jobs:
           name: indexeddb-interop-log
           path: ${{ runner.temp }}/emulator/*.log
 
+  # firebase_storage_dart against the Firebase Storage emulator (test/integration), which
+  # tool/start_storage_emulator.sh starts on 9299 with an open bucket and one whose rules need a
+  # signed-in user. The rules runtime JAR is fetched by `firebase setup:emulators:storage` (the
+  # emulators action caches ~/.cache/firebase/emulators, so it is downloaded once per CLI
+  # version). A skipped test means STORAGE_EMULATOR_HOST did not reach it: the step fails then.
+  # Starts at once, in parallel with the other emulator suites, so it adds no time to a run.
+  storage:
+    name: Storage emulator integration tests
+    needs: changes
+    if: ${{ needs.changes.outputs.code == 'true' }}
+    runs-on: ubuntu-26.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set the emulator work directory
+        # The `runner` context is not available in job-level `env`.
+        run: echo "EMULATOR_DIR=$RUNNER_TEMP/emulator" >> "$GITHUB_ENV"
+      - uses: ./.github/actions/dart
+        with:
+          sdk: stable
+      - uses: ./.github/actions/emulators
+      - name: Download the Storage rules runtime
+        # Does nothing when the cache restored the JAR of this CLI version.
+        run: firebase setup:emulators:storage
+      - name: Start the Storage emulator
+        run: ./tool/start_storage_emulator.sh 9299
+      - name: Run the emulator tests of firebase_storage_dart
+        working-directory: firebase_storage/firebase_storage_dart
+        env:
+          STORAGE_EMULATOR_HOST: 127.0.0.1:9299
+        run: |
+          set -o pipefail
+          dart pub get
+          dart test --reporter expanded test/integration 2>&1 | tee "$EMULATOR_DIR/storage_integration.log"
+          if grep -Eq ' ~[0-9]+' "$EMULATOR_DIR/storage_integration.log"; then
+            echo "::error::The Storage emulator tests skipped: STORAGE_EMULATOR_HOST did not reach them."
+            exit 1
+          fi
+      - name: Stop the Storage emulator
+        if: always()
+        run: ./tool/stop_storage_emulator.sh 9299
+      - name: Upload the logs
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: storage-log
+          path: ${{ runner.temp }}/emulator/*.log
+
   # The Flutter packages, which the unit jobs skip (they install Dart only): flutter analyze and
-  # flutter test of cloud_firestore_dart_flutterfire, cloud_firestore_dart_platform and
-  # firebase_auth_dart_platform, the emulator tests of the two platform packages included
+  # flutter test of cloud_firestore_dart_flutterfire, cloud_firestore_dart_platform,
+  # firebase_auth_dart_platform and firebase_storage_dart_platform, the emulator tests of the two platform packages included
   # (FIRESTORE_EMULATOR_HOST: 15 of the Firestore package's 29 tests skip without it;
   # FIREBASE_AUTH_EMULATOR_HOST, from tool/start_auth_emulators.sh, for the Auth package), flutter analyze of examples/flutter_notes, and flutter analyze and the web builds
   # (`flutter build web` and `flutter build web --wasm`) of examples/flutter_web_two_users. Through tool/test_all.sh, with
@@ -593,7 +647,7 @@ jobs:
           set -o pipefail
           flutter --version
           ./tool/test_all.sh cloud_firestore_dart_flutterfire cloud_firestore_dart_platform \
-            firebase_auth_dart_platform \
+            firebase_auth_dart_platform firebase_storage_dart_platform \
             examples/flutter_notes examples/flutter_web_two_users 2>&1 \
             | tee "$RUNNER_TEMP/flutter_summary.txt"
           if ! grep -Eq '^cloud_firestore_dart_platform: .*test PASS \([0-9]+ passed, 0 skipped' \
