@@ -110,8 +110,11 @@ void main() {
       expect(files, hasLength(2));
       final File file = File(store.fileOf(_account));
       expect(file.existsSync(), isTrue);
-      expect(file.path, matches(RegExp(r'[0-9a-f]{32}\.dpapi$')));
-      expect(file.path, isNot(contains(':')));
+      // The file name only: the directory may hold a drive letter (C:\).
+      final String name = file.path.split(Platform.pathSeparator).last;
+      expect(name, matches(RegExp(r'^[0-9a-f]{32}\.dpapi$')));
+      expect(name, isNot(contains(':')));
+      expect(name, isNot(contains('firebase_auth')));
       final String raw = latin1.decode(file.readAsBytesSync());
       expect(raw, isNot(contains('secret-refresh-token')));
     },
