@@ -6,7 +6,7 @@
   web stay chunked.
 - `FirebaseStorage(maxUploadChunkSize:)` caps the requests of an upload; a value is rounded down to a
   multiple of 256 KiB, with 256 KiB as the minimum.
-- `FirebaseStorage(maxConcurrentUploads:)`, 4 by default: the uploads of an instance over the limit
+- `FirebaseStorage(maxConcurrentUploads:)`, 8 by default: the uploads of an instance over the limit
   (including `putBytes` and `putString`) wait in order. A waiting task is running with 0 bytes and can be
   paused or canceled; a paused task gives its turn to the next one.
 - `requestTimeout` is an idle timeout: it fires when no byte of a request body is sent for that long, when

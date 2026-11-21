@@ -118,7 +118,7 @@ FirebaseStorage storageWith(
   StorageRetryPolicy retry = const StorageRetryPolicy(),
   Duration requestTimeout = const Duration(minutes: 1),
   int? maxUploadChunkSize,
-  int maxConcurrentUploads = 4,
+  int maxConcurrentUploads = 8,
 }) {
   final FakeTime clock = time ?? FakeTime();
   return FirebaseStorage(

@@ -95,7 +95,7 @@ download-size-exceeded"); `test/security/limits_test.dart` ("asks for maxSize + 
 "stops reading when a server ignores Range and sends more"); `test/hardening_test.dart` ("getBytes stops
 reading once the body passes maxSize").
 
-## 6. Upload strategy (0.1.1, not on `main` yet)
+## 6. Upload strategy (0.1.1)
 
 **Decision.** All the SDKs send the data of one file in order, because the server accepts data only at the
 next offset. JS and Android send chunks one at a time (JS waits for the answer of a chunk before it sends the next; Android
@@ -108,24 +108,41 @@ The client, new in 0.1.1 (none of the following is in 0.1.0):
 - bytes and files on the VM go as one streamed request;
 - streams, and everything on the web, go in chunks: a stream cannot be read twice, and `fetch` gives no upload
   progress;
-- `maxChunkSize` forces chunks;
+- `maxUploadChunkSize` forces chunks;
 - up to 256 KiB, one multipart request;
-- a queue, `maxConcurrentUploads`, with 4 by default, limits the uploads running at once.
+- a queue, `maxConcurrentUploads`, with 8 by default, limits the uploads running at once.
 
 Not done: parallel chunks of one file (the protocol refuses them), isolates (the work is I/O, not CPU), and a
 batch upload (Cloud Storage batch requests exclude uploads).
 
-**Why.** One request removes the round trips of a session and is the fastest on a good link. Chunks stay where
-resuming or progress needs them. The queue keeps many small uploads from opening many sockets.
+**Why.** One request removes the round trips between chunks and buffers nothing beyond the socket. Chunks stay
+where resuming or progress needs them: a stream cannot be read again, so the chunk is the resend buffer, and on
+the web `fetch` reports no upload progress. The queue keeps many uploads from opening many sockets.
 
-**What we gave up.** A one-request upload that fails starts again from zero unless a session is in use; the
-chunked path is how a caller asks for resumability.
+**Measured.** `benchmark/upload_benchmark.dart` against Cloud Storage for Firebase from one machine (medians of
+two runs, 2026-11-21):
 
-**Pinned by.** Not on `main`: the tests come with branch `storage/upload-single-request`. On `main`, 0.1.0
-sends `startUpload` data above 256 KiB in chunks that start at 256 KiB, double, and stop at 16 MiB:
-`test/upload_task_test.dart` ("chunks double from 256 KiB and stop at 16 MiB", "256 KiB + 1 byte starts a
-session and sends two chunks"). TODO at merge: the test names of the single request, `maxChunkSize` and
-the queue (`maxConcurrentUploads`). On `main`, `maxChunkSize` is only the internal 16 MiB cap of the growth.
+| | chunked | one request |
+|---|---:|---:|
+| 16 MiB | 6.46 s, 2.5 MiB/s, 8 requests, +5.9 MiB memory | 2.60 s, 6.2 MiB/s, 2 requests, +0.1 MiB |
+| 64 MiB | 10.20 s, 6.3 MiB/s, 11 requests, +33.9 MiB memory | 5.26 s, 12.2 MiB/s, 2 requests, +0.0 MiB |
+
+20 files of 2 MiB took 40.1 s with one upload at a time, 11.4 s with 4 and 6.3 s with 8: small uploads are bound
+by round trips, not bandwidth, so the default is 8. Against the emulator with a proxy that adds latency, one
+request was 1.9 to 2.2 times faster than chunks up to 16 MiB at 50 and 150 ms, 1.3 to 1.4 times at 64 and
+256 MiB; with no added latency the two were about even. The emulator cannot measure concurrency: its rules runtime stalls
+under several simultaneous uploads.
+
+**What we gave up.** A failure inside the one request resumes from the offset the server reports, like a failed
+chunk, but where that offset falls is the server's choice rather than a chunk boundary. Callers who want fixed
+chunks (for example behind a proxy that cuts long requests) set `maxUploadChunkSize`.
+
+**Pinned by.** `test/upload_single_request_test.dart` (the single request with progress, 256 KiB still multipart,
+streams still chunked, resume from the server offset after a mid-request failure for bytes and for a file,
+`maxUploadChunkSize` rounding and caps, the idle timeout, and the `maxConcurrentUploads` group: "runs uploads in
+order, at most the limit at once" and the pause and cancel cases while waiting); `test/upload_task_test.dart`
+for the chunked path; `test/integration/upload_task_emulator_test.dart` ("20 MiB in one request, paused and
+resumed", "6 uploads with maxConcurrentUploads 2 keep at most 2 sessions open").
 
 ## 7. Progress
 

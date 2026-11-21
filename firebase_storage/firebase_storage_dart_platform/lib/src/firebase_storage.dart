@@ -13,7 +13,7 @@ class DartStorageConfig {
   const DartStorageConfig({
     this.tokenProviderFor,
     this.httpClient,
-    this.maxConcurrentUploads = 4,
+    this.maxConcurrentUploads = 8,
     this.maxUploadChunkSize,
   });
 

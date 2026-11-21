@@ -76,7 +76,7 @@ class FirebaseStorage {
     this.retry = const StorageRetryPolicy(),
     http.Client? httpClient,
     Duration requestTimeout = const Duration(minutes: 1),
-    this.maxConcurrentUploads = 4,
+    this.maxConcurrentUploads = 8,
     int? maxUploadChunkSize,
     @visibleForTesting DateTime Function()? clock,
     @visibleForTesting double Function()? random,

@@ -268,7 +268,7 @@ class Bench {
 
   FirebaseStorage storage({
     String? emulatorHost,
-    int maxConcurrentUploads = 4,
+    int maxConcurrentUploads = 8,
     int? maxUploadChunkSize,
     http.Client? httpClient,
   }) {

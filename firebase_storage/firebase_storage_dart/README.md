@@ -216,7 +216,7 @@ How the data goes:
 `startStreamUpload(stream, length: n)` uploads a stream whose total length you know, holding one chunk in
 memory.
 
-At most `maxConcurrentUploads` uploads of a `FirebaseStorage` run at once (4 by default; `putBytes` and
+At most `maxConcurrentUploads` uploads of a `FirebaseStorage` run at once (8 by default; `putBytes` and
 `putString` count). The others wait in order in the running state with 0 bytes; `pause()` and `cancel()`
 work while a task waits, and a paused task gives its turn to the next one.
 
