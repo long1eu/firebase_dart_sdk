@@ -74,13 +74,10 @@ final class UploadProgress {
 @internal
 const int resumableChunkSize = 256 * 1024;
 
-/// The largest chunk: 16 MiB, the effective limit of the JS SDK.
+/// The largest chunk when `FirebaseStorage.maxUploadChunkSize` is null: 16 MiB, the effective limit of the JS
+/// SDK.
 @internal
 const int maxChunkSize = 16 * 1024 * 1024;
-
-/// Whether request bodies can report how much of them was sent. On the web, `fetch` takes the whole body at
-/// once, so the progress there comes per chunk only.
-const bool _bodyProgress = !bool.fromEnvironment('dart.library.js_interop');
 
 /// The shortest time between two progress events while a body is being sent.
 const Duration _progressInterval = Duration(milliseconds: 100);
@@ -95,11 +92,24 @@ enum _Phase { running, pausing, paused, canceling, success, canceled, error }
 /// object.
 ///
 /// Up to 256 KiB the data goes in one multipart request, like `Reference.putBytes`. Larger data uses a
-/// resumable upload session: the chunks start at 256 KiB and double after each one that succeeds, up to
-/// 16 MiB. When a chunk fails with a network error or a retryable status (5xx, 408, 429), the task waits (1 s,
-/// doubling up to 64 s), asks the server how much it has, and goes on from there with a 256 KiB chunk; it
-/// gives up with `retry-limit-exceeded` once the failures have lasted the `upload` time of the
+/// resumable upload session:
+///
+/// * On the VM, bytes (`Reference.startUpload`) and files (`putFile` of `package:firebase_storage_dart/io.dart`)
+///   go in one streamed request with the rest of the data. After a failure or a pause the task asks the server
+///   how much it has and streams the rest from there.
+/// * A stream (`Reference.startStreamUpload`), everything on the web, and every upload of a `FirebaseStorage`
+///   with a `maxUploadChunkSize` go in chunks: they start at 256 KiB and double after each one that succeeds,
+///   up to 16 MiB (or `maxUploadChunkSize`). A stream needs chunks because the chunk is what is sent again
+///   after a failure; the web, because the browser reports no progress inside a request.
+///
+/// When a request fails with a network error or a retryable status (5xx, 408, 429), the task waits (1 s,
+/// doubling up to 64 s), asks the server how much it has, and goes on from there (with a 256 KiB chunk when
+/// chunked); it gives up with `retry-limit-exceeded` once the failures have lasted the `upload` time of the
 /// `StorageRetryPolicy`. A success resets both the wait and that time.
+///
+/// At most `FirebaseStorage.maxConcurrentUploads` uploads of one instance run at once. A task over the limit
+/// waits its turn in [UploadState.running] with 0 bytes; [pause] and [cancel] work while it waits, and a
+/// paused task gives its turn to the next one (it queues again when resumed).
 ///
 /// ```dart
 /// final UploadTask task = storage.ref('videos/clip.mp4').startUpload(bytes);
@@ -109,8 +119,7 @@ enum _Phase { running, pausing, paused, canceling, success, canceled, error }
 /// final FullMetadata metadata = await task.result;
 /// ```
 ///
-/// On the VM, [progress] also reports the bytes as they are written while a chunk (or the one multipart
-/// request) is being sent, at most once per 64 KiB and per 100 ms, and always when the server confirms a
+/// On the VM, [progress] also reports the bytes as they are written while a request is being sent, at most once per 64 KiB and per 100 ms, and always when the server confirms a
 /// chunk. When a chunk fails, [bytesTransferred] goes back to what the server confirmed, with an event. On the
 /// web the browser gives no upload progress, so the events come once per confirmed chunk.
 ///
@@ -119,7 +128,6 @@ enum _Phase { running, pausing, paused, canceling, success, canceled, error }
 final class UploadTask {
   /// Starts an upload of [source] to [ref] with [metadata]. Use `Reference.startUpload` or
   /// `Reference.startStreamUpload` instead.
-  @internal
   ///
   /// With [existingSessionUri] it resumes that session: it asks the server how much data it has first. Throws
   /// `invalid-argument` when that URI is not on the host of `ref.storage`.
@@ -174,6 +182,8 @@ final class UploadTask {
   bool _waitBeforeNextStep = false;
   DateTime? _failingSince;
   Completer<void>? _abort;
+  bool _holdsSlot = false;
+  (Object, StackTrace)? _sourceFailure;
 
   /// The state of the task.
   UploadState get state => switch (_phase) {
@@ -294,6 +304,7 @@ final class UploadTask {
       }
       switch (_phase) {
         case _Phase.pausing:
+          _releaseSlot();
           _phase = _Phase.paused;
           _emit();
         case _Phase.canceling:
@@ -312,6 +323,9 @@ final class UploadTask {
   }
 
   Future<void> _step() {
+    if (!_holdsSlot) {
+      return _takeSlot();
+    }
     if (_sessionUrl == null && totalBytes <= resumableChunkSize) {
       return _oneShot();
     }
@@ -330,6 +344,31 @@ final class UploadTask {
     return _uploadChunk();
   }
 
+  /// Waits for a slot of `FirebaseStorage.maxConcurrentUploads`; a pause or a cancel leaves the queue.
+  Future<void> _takeSlot() async {
+    final bool taken = await ref.storage.uploadSlots.acquire(
+      abortTrigger: _abortTrigger,
+    );
+    if (!taken) {
+      throw canceled();
+    }
+    _holdsSlot = true;
+    _throwIfStopped();
+  }
+
+  void _releaseSlot() {
+    if (_holdsSlot) {
+      _holdsSlot = false;
+      ref.storage.uploadSlots.release();
+    }
+  }
+
+  /// Whether the rest of the data goes in one streamed request (see the class documentation).
+  bool get _singleRequest =>
+      streamsRequestBodies &&
+      _source.openFrom != null &&
+      ref.storage.maxUploadChunkSize == null;
+
   Future<void> _oneShot() async {
     final Uint8List data = await _read(0, totalBytes);
     _throwIfStopped();
@@ -338,7 +377,7 @@ final class UploadTask {
     final StorageResponse response = await _requester.send(
       request,
       abortTrigger: _abortTrigger,
-      onBodyProgress: _bodyProgress && bodyLength > 0
+      onBodyProgress: streamsRequestBodies && bodyLength > 0
           ? (int sent) {
               // The body holds the metadata part too: count the data in proportion.
               if (sent < bodyLength) {
@@ -445,9 +484,11 @@ final class UploadTask {
   Future<void> _uploadChunk() async {
     final int offset = _confirmed;
     final int left = totalBytes - offset;
-    final int size = math.min(left, _chunkSize);
-    final Uint8List data = await _read(offset, size);
+    final bool single = _singleRequest && left > 0;
+    final int size = single ? left : math.min(left, _chunkSize);
+    final Uint8List? data = single ? null : await _read(offset, size);
     _throwIfStopped();
+    _sourceFailure = null;
     final String command = switch (size) {
       0 => 'finalize',
       _ when size == left => 'upload, finalize',
@@ -464,13 +505,16 @@ final class UploadTask {
             'X-Goog-Upload-Offset': '$offset',
           },
           body: data,
-          // A single attempt: a chunk that fails is retried only after a query, here.
+          // A single attempt: a request that fails is retried only after a query, here.
           timeout: Duration.zero,
           retryOnStatus: false,
           errorMapper: _errors,
         ),
         abortTrigger: _abortTrigger,
-        onBodyProgress: _bodyProgress && size > 0
+        streamedBody: single
+            ? RequestBody(size, () => _openFrom(offset))
+            : null,
+        onBodyProgress: streamsRequestBodies && size > 0
             ? (int sent) {
                 if (sent < size) {
                   _reportSending(offset + sent);
@@ -478,9 +522,15 @@ final class UploadTask {
               }
             : null,
       );
-    } on FirebaseStorageException catch (error) {
-      if (error.code == 'retry-limit-exceeded' ||
-          isRetryStatus(error.httpStatus ?? 0)) {
+    } on Object catch (error) {
+      // A failure of the data itself (a file that changed, a read error) is not a network error.
+      final (Object, StackTrace)? source = _sourceFailure;
+      if (source != null) {
+        Error.throwWithStackTrace(source.$1, source.$2);
+      }
+      if (error is FirebaseStorageException &&
+          (error.code == 'retry-limit-exceeded' ||
+              isRetryStatus(error.httpStatus ?? 0))) {
         _scheduleRetry(error);
         return;
       }
@@ -493,7 +543,10 @@ final class UploadTask {
         httpStatus: response.statusCode,
       );
     }
-    _chunkSize = math.min(_chunkSize * 2, maxChunkSize);
+    _chunkSize = math.min(
+      _chunkSize * 2,
+      ref.storage.maxUploadChunkSize ?? maxChunkSize,
+    );
     _retryWait = Duration.zero;
     _failingSince = null;
     _setProgress(offset + size);
@@ -502,6 +555,33 @@ final class UploadTask {
         throw _wrongSize(offset + size);
       }
       _succeed(_checkSize(ref.metadataOf(response)));
+    }
+  }
+
+  /// The data from [offset] to the end, for one streamed request; it must end exactly at [totalBytes]. A
+  /// failure of the source is kept in [_sourceFailure], so that it fails the task instead of being retried.
+  Stream<List<int>> _openFrom(int offset) async* {
+    final int expected = totalBytes - offset;
+    int seen = 0;
+    try {
+      await for (final List<int> event in _source.openFrom!(offset)) {
+        seen += event.length;
+        if (seen > expected) {
+          throw invalidArgument(
+            'The data has more than its length of $totalBytes bytes.',
+          );
+        }
+        yield event;
+      }
+      if (seen < expected) {
+        throw invalidArgument(
+          'The data ended after ${offset + seen} bytes, before its length of '
+          '$totalBytes bytes.',
+        );
+      }
+    } on Object catch (error, stackTrace) {
+      _sourceFailure ??= (error, stackTrace);
+      rethrow;
     }
   }
 
@@ -625,6 +705,7 @@ final class UploadTask {
   void _rollBack() => _setProgress(_confirmed);
 
   void _succeed(FullMetadata metadata) {
+    _releaseSlot();
     _uploaded = metadata;
     _phase = _Phase.success;
     _emit();
@@ -637,6 +718,7 @@ final class UploadTask {
     if (phase == _Phase.canceled) {
       _cancelSession();
     }
+    _releaseSlot();
     _phase = phase;
     _emit();
     unawaited(_events.close());

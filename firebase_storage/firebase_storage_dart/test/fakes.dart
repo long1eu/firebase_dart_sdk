@@ -117,6 +117,8 @@ FirebaseStorage storageWith(
   String? mockUserToken,
   StorageRetryPolicy retry = const StorageRetryPolicy(),
   Duration requestTimeout = const Duration(minutes: 1),
+  int? maxUploadChunkSize,
+  int maxConcurrentUploads = 4,
 }) {
   final FakeTime clock = time ?? FakeTime();
   return FirebaseStorage(
@@ -126,6 +128,8 @@ FirebaseStorage storageWith(
     mockUserToken: mockUserToken,
     retry: retry,
     requestTimeout: requestTimeout,
+    maxUploadChunkSize: maxUploadChunkSize,
+    maxConcurrentUploads: maxConcurrentUploads,
     httpClient: MockClient((http.Request request) {
       final Recorded recorded = Recorded(
         request.method,
@@ -141,6 +145,34 @@ FirebaseStorage storageWith(
     delay: clock.delay,
   );
 }
+
+/// The chunk cap that gives the chunked uploads of the web and of streams (256 KiB doubling to 16 MiB) on the
+/// VM: the tests of the chunk protocol, after the JS SDK, use it.
+const int chunkedUploads = 16 * 1024 * 1024;
+
+/// [storageWith] with chunked uploads ([chunkedUploads]).
+FirebaseStorage chunkedStorageWith(
+  FirebaseApp app,
+  Future<http.Response> Function(Recorded request) handler, {
+  List<Recorded>? requests,
+  FakeTime? time,
+  String? bucket,
+  String? emulatorHost,
+  String? mockUserToken,
+  StorageRetryPolicy retry = const StorageRetryPolicy(),
+  Duration requestTimeout = const Duration(minutes: 1),
+}) => storageWith(
+  app,
+  handler,
+  requests: requests,
+  time: time,
+  bucket: bucket,
+  emulatorHost: emulatorHost,
+  mockUserToken: mockUserToken,
+  retry: retry,
+  requestTimeout: requestTimeout,
+  maxUploadChunkSize: chunkedUploads,
+);
 
 /// A JSON response.
 Future<http.Response> json(Object? body, {int status = 200}) async =>

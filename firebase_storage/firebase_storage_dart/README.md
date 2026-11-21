@@ -5,7 +5,7 @@ for Dart servers, command line tools, Flutter apps and the web. It speaks the sa
 Firebase JS SDK, with Dart names (`Reference`, `putBytes`, `UploadTask`) instead of a Flutter plugin or a
 native SDK. It is not affiliated with or supported by Google or Firebase.
 
-> **Status: 0.1.0, unreleased.** Verified with unit tests, against the Firebase Storage emulator, and once
+> **Status: 0.1.1, unreleased.** Verified with unit tests, against the Firebase Storage emulator, and once
 > against a real Firebase project with a signed-in throwaway user (see [Verified](#verified)).
 
 ## Install
@@ -197,12 +197,32 @@ Future<void> resumable(Reference target, Uint8List data) async {
 }
 ```
 
-`progress` is a broadcast stream that emits on every chunk and every state change and closes when the task
-ends. The task starts as soon as it is created. A stream you listen to first emits the current snapshot, then the new events; earlier events are not replayed. Chunks start at
-256 KiB and double after each success up to 16 MiB. `cancel()` works from the running and the paused state.
+`progress` is a broadcast stream that emits while data is sent and on every state change, and closes when
+the task ends. The task starts as soon as it is created. A stream you listen to first emits the current
+snapshot, then the new events; earlier events are not replayed. `cancel()` works from the running and the
+paused state.
 
-`startStreamUpload(stream, length: n)` uploads a stream whose total length you know, without holding it in
+How the data goes:
+
+- Up to 256 KiB: one multipart request, like `putBytes`.
+- On the VM, bytes (`startUpload`) and files (`putFile`): one streamed request of a resumable session, with
+  progress per 64 KiB. After a failure or a pause the task asks the server how much it has and sends the rest
+  from there.
+- `startStreamUpload`, every upload on the web, and every upload of a `FirebaseStorage` created with
+  `maxUploadChunkSize`: chunks that start at 256 KiB and double after each success, up to 16 MiB (or
+  `maxUploadChunkSize`). A stream is chunked because the chunk is what is sent again after a failure; the
+  web, because the browser reports no progress inside a request, so progress there comes per chunk.
+
+`startStreamUpload(stream, length: n)` uploads a stream whose total length you know, holding one chunk in
 memory.
+
+At most `maxConcurrentUploads` uploads of a `FirebaseStorage` run at once (4 by default; `putBytes` and
+`putString` count). The others wait in order in the running state with 0 bytes; `pause()` and `cancel()`
+work while a task waits, and a paused task gives its turn to the next one.
+
+`requestTimeout` (1 minute by default) is an idle timeout: a request is retried when no byte of its body is
+sent for that long, when no response comes that long after the body was sent, or when a response body
+pauses that long. A long upload or download does not time out while data flows.
 
 ## Files on the VM and in Flutter
 
@@ -224,7 +244,8 @@ Future<void> files(Reference backup) async {
 }
 ```
 
-`putFile` is a resumable upload that streams from disk. `writeToFile` streams into a temporary file next
+`putFile` is a resumable upload that streams from disk; after a failure it reads the file again from the
+offset the server reports. `writeToFile` streams into a temporary file next
 to the target and renames it when the download finishes, so a failed download does not leave a partial
 file.
 

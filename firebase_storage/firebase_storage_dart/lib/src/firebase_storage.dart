@@ -7,6 +7,7 @@ import 'location.dart';
 import 'reference.dart';
 import 'request/requester.dart';
 import 'retry_policy.dart';
+import 'upload/upload_slots.dart';
 
 /// Cloud Storage for Firebase over its REST API: the entry point to the objects of one bucket.
 ///
@@ -56,8 +57,16 @@ class FirebaseStorage {
   ///   [ArgumentError] otherwise.
   /// * [retry] sets how long requests keep being retried.
   /// * [httpClient] sends the requests and is not closed by [close]; without it one is created and closed.
-  /// * [requestTimeout] bounds the wait for the response of each attempt and each pause while a body is read;
-  ///   an attempt that runs over it is retried like a network error.
+  /// * [requestTimeout] is an idle timeout: an attempt is retried like a network error when no byte of its
+  ///   request body is sent for that long, when no response arrives that long after the body was sent, or
+  ///   when a response body pauses that long. A long upload or download never times out while bytes flow. On
+  ///   the web it bounds the time from the start of a request to its response.
+  /// * [maxConcurrentUploads] is how many uploads of this instance run at once (`putBytes`, `putString` and
+  ///   upload tasks); the others wait in a first-in, first-out queue. At least 1, else an [ArgumentError].
+  /// * [maxUploadChunkSize] caps the size of the requests of a resumable upload. Null (the default) sends the
+  ///   rest of an upload of bytes or of a file in one request on the VM, and chunks of up to 16 MiB on the web
+  ///   and for streams. A value is rounded down to a multiple of 256 KiB, with 256 KiB as the minimum; zero
+  ///   or less is an [ArgumentError].
   /// * [clock], [random] and [delay] are for tests.
   FirebaseStorage(
     this.app, {
@@ -67,6 +76,8 @@ class FirebaseStorage {
     this.retry = const StorageRetryPolicy(),
     http.Client? httpClient,
     Duration requestTimeout = const Duration(minutes: 1),
+    this.maxConcurrentUploads = 4,
+    int? maxUploadChunkSize,
     @visibleForTesting DateTime Function()? clock,
     @visibleForTesting double Function()? random,
     @visibleForTesting Future<void> Function(Duration duration)? delay,
@@ -74,7 +85,9 @@ class FirebaseStorage {
        bucket = _bucketOf(
          bucket ?? app.options.storageBucket,
          _hostOf(emulatorHost),
-       ) {
+       ),
+       maxUploadChunkSize = _chunkSizeOf(maxUploadChunkSize),
+       uploadSlots = UploadSlots(_checkConcurrency(maxConcurrentUploads)) {
     if (mockUserToken != null && emulatorHost == null) {
       throw ArgumentError.value(
         mockUserToken,
@@ -112,6 +125,17 @@ class FirebaseStorage {
   /// How long requests keep being retried.
   final StorageRetryPolicy retry;
 
+  /// How many uploads run at once; the others wait their turn.
+  final int maxConcurrentUploads;
+
+  /// The largest request of a resumable upload, a multiple of 256 KiB; null for one request on the VM (see
+  /// the constructor).
+  final int? maxUploadChunkSize;
+
+  /// The queue that [maxConcurrentUploads] sets.
+  @internal
+  final UploadSlots uploadSlots;
+
   /// The host requests go to: `firebasestorage.googleapis.com`, or [emulatorHost].
   @internal
   final String host;
@@ -142,6 +166,28 @@ class FirebaseStorage {
   /// Closes the HTTP client when this instance created it. Later operations throw a [StateError], and so do
   /// those in flight when they would retry.
   void close() => requester.close();
+
+  static int _checkConcurrency(int value) {
+    if (value < 1) {
+      throw ArgumentError.value(value, 'maxConcurrentUploads', 'At least 1');
+    }
+    return value;
+  }
+
+  static int? _chunkSizeOf(int? value) {
+    if (value == null) {
+      return null;
+    }
+    if (value <= 0) {
+      throw ArgumentError.value(
+        value,
+        'maxUploadChunkSize',
+        'Must be positive',
+      );
+    }
+    const int unit = 256 * 1024;
+    return value < unit ? unit : value - value % unit;
+  }
 
   static String _hostOf(String? emulatorHost) {
     if (emulatorHost == null) {

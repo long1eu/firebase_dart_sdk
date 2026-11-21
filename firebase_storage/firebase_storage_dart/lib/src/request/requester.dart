@@ -132,9 +132,9 @@ class Requester {
   ///
   /// [mockUserToken] replaces the token of the app's auth provider (emulator only). [emulatorHost] is the
   /// `host:port` of the emulator, which may receive tokens over plain HTTP (see [mayCarryTokens]).
-  /// [requestTimeout] bounds the wait for the response headers of each attempt and every pause while reading a
-  /// body; an attempt that runs over it fails like a network error, so it is retried. [clock], [random] and
-  /// [delay] are for tests.
+  /// [requestTimeout] is an idle timeout: an attempt fails like a network error (so it is retried) when the
+  /// client takes no byte of the request body for that long, when no response arrives that long after the body
+  /// was sent, or when a response body pauses that long. [clock], [random] and [delay] are for tests.
   Requester({
     required this.app,
     required http.Client client,
@@ -159,8 +159,10 @@ class Requester {
   /// A number in `[0, 1)`: the jitter of the backoff.
   final double Function() random;
 
-  /// The longest wait for the response headers of an attempt, and for each chunk of a body. Readers of
-  /// [open] apply it as the idle timeout of the body.
+  /// The idle timeout of an attempt: the longest time without a byte of the request body taken by the client,
+  /// without a response once the body was sent, or between two chunks of a response body. Readers of [open]
+  /// apply it to the body. On the web, where the body cannot be watched, it bounds the wait from the start of
+  /// the attempt to the response.
   final Duration requestTimeout;
 
   final http.Client _client;
@@ -239,16 +241,21 @@ class Requester {
   /// With [maxBodyBytes], reading stops as soon as the body is longer and [BodyTooLargeException] is thrown.
   /// A body cut by a network error is requested again, within the retry time.
   ///
-  /// With [onBodyProgress], the body is handed to the client in slices of [bodySliceSize] bytes, and
-  /// [onBodyProgress] is called with the number of bytes the client has taken after each slice (from 0 again
-  /// on each attempt). Without it the body goes as one block.
+  /// [streamedBody] replaces the body of [request] with one that is read from a stream, opened again for each
+  /// attempt (VM only). Off the web, a body is handed to the client in slices of at most [bodySliceSize]
+  /// bytes and [onBodyProgress] is called with the number of bytes the client has taken after each slice (from
+  /// 0 again on each attempt).
   Future<StorageResponse> send(
     StorageRequest request, {
     Future<void>? abortTrigger,
     int? maxBodyBytes,
+    RequestBody? streamedBody,
     void Function(int bytesSent)? onBodyProgress,
   }) {
-    return _execute(request, abortTrigger, onBodyProgress, (
+    final Uint8List? bytes = request.body;
+    final RequestBody? body =
+        streamedBody ?? (bytes == null ? null : RequestBody.bytes(bytes));
+    return _execute(request, abortTrigger, body, onBodyProgress, (
       http.StreamedResponse response,
     ) async {
       final Uint8List bytes = await _readAll(response.stream, maxBodyBytes);
@@ -262,9 +269,11 @@ class Requester {
     StorageRequest request, {
     Future<void>? abortTrigger,
   }) {
+    final Uint8List? bytes = request.body;
     return _execute(
       request,
       abortTrigger,
+      bytes == null ? null : RequestBody.bytes(bytes),
       null,
       (http.StreamedResponse response) async => response,
     );
@@ -273,6 +282,7 @@ class Requester {
   Future<T> _execute<T>(
     StorageRequest request,
     Future<void>? abortTrigger,
+    RequestBody? body,
     void Function(int bytesSent)? onBodyProgress,
     Future<T> Function(http.StreamedResponse response) onSuccess,
   ) async {
@@ -296,6 +306,7 @@ class Requester {
           request,
           _headers(request, authToken, appCheckToken),
           abort,
+          body,
           onBodyProgress,
         );
         final int status = response.statusCode;
@@ -365,17 +376,49 @@ class Requester {
     StorageRequest request,
     Map<String, String> headers,
     _AbortState abort,
+    RequestBody? body,
     void Function(int bytesSent)? onBodyProgress,
   ) {
     final Completer<void> attemptAbort = Completer<void>();
-    final Uint8List? body = request.body;
+    final Completer<http.StreamedResponse> result =
+        Completer<http.StreamedResponse>();
+    Timer? timer;
+    void fail(Object error) {
+      timer?.cancel();
+      if (!attemptAbort.isCompleted) {
+        attemptAbort.complete();
+      }
+      if (!result.isCompleted) {
+        result.completeError(error);
+      }
+    }
+
+    // The idle timeout: started again whenever the client takes part of the body, and once more when the
+    // body ends, for the wait for the response.
+    void touch() {
+      if (result.isCompleted) {
+        return;
+      }
+      timer?.cancel();
+      timer = Timer(requestTimeout, () {
+        fail(
+          TimeoutException(
+            'No progress for $requestTimeout on ${request.method} '
+            '${request.url.path}',
+            requestTimeout,
+          ),
+        );
+      });
+    }
+
     final http.BaseRequest httpRequest;
-    if (body != null && onBodyProgress != null) {
-      httpRequest = _SlicedRequest(
+    if (body != null && streamsRequestBodies) {
+      httpRequest = _StreamingRequest(
         request.method,
         request.url,
         body,
-        onBodyProgress,
+        onActivity: touch,
+        onProgress: onBodyProgress,
         abortTrigger: attemptAbort.future,
       );
     } else {
@@ -385,7 +428,9 @@ class Requester {
         abortTrigger: attemptAbort.future,
       );
       if (body != null) {
-        plain.bodyBytes = body;
+        plain.bodyBytes =
+            body.bytes ??
+            (throw UnsupportedError('A streamed request body needs dart:io.'));
       }
       httpRequest = plain;
     }
@@ -394,31 +439,13 @@ class Requester {
       ..followRedirects = false
       ..headers.addAll(headers);
 
-    final Completer<http.StreamedResponse> result =
-        Completer<http.StreamedResponse>();
-    void fail(Object error) {
-      if (!attemptAbort.isCompleted) {
-        attemptAbort.complete();
-      }
-      if (!result.isCompleted) {
-        result.completeError(error);
-      }
-    }
-
-    final Timer timer = Timer(requestTimeout, () {
-      fail(
-        TimeoutException(
-          'No response from ${request.method} ${request.url.path}',
-          requestTimeout,
-        ),
-      );
-    });
+    touch();
     abort.onAbort(() => fail(http.RequestAbortedException(request.url)));
     _client
         .send(httpRequest)
         .then(
           (http.StreamedResponse response) {
-            timer.cancel();
+            timer?.cancel();
             if (result.isCompleted) {
               _discard(response);
             } else {
@@ -426,7 +453,7 @@ class Requester {
             }
           },
           onError: (Object error, StackTrace stackTrace) {
-            timer.cancel();
+            timer?.cancel();
             if (!result.isCompleted) {
               result.completeError(error, stackTrace);
             }
@@ -536,20 +563,49 @@ class Requester {
 
 final math.Random _random = math.Random();
 
-/// The size of the slices of a body sent with progress: 64 KiB.
+/// The largest slice of a request body handed to the client at once: 64 KiB.
 @internal
 const int bodySliceSize = 64 * 1024;
 
-/// A request whose body is handed to the client one slice at a time, reporting how much the client took.
+/// Whether request bodies are streamed to the client slice by slice, which gives upload progress and the idle
+/// timeout. Not on the web: `fetch` takes the whole body at once.
+@internal
+const bool streamsRequestBodies = !bool.fromEnvironment(
+  'dart.library.js_interop',
+);
+
+/// The body of a request: [length] bytes that [open] produces, from the start, for each attempt.
+@internal
+final class RequestBody {
+  /// A body of [length] bytes read from the streams of [open].
+  RequestBody(this.length, this.open) : bytes = null;
+
+  /// A body of [bytes].
+  RequestBody.bytes(Uint8List this.bytes)
+    : length = bytes.length,
+      open = (() => Stream<List<int>>.value(bytes));
+
+  /// The size of the body, sent as `Content-Length`.
+  final int length;
+
+  /// Opens the body; called once per attempt.
+  final Stream<List<int>> Function() open;
+
+  /// The bytes, for a body in memory.
+  final Uint8List? bytes;
+}
+
+/// A request whose body is handed to the client one slice at a time, reporting each slice the client took.
 ///
 /// The slices come from an `async*` generator, so a client that applies backpressure (`IOClient` writing to
 /// a socket) pulls them only as fast as it sends them.
-final class _SlicedRequest extends http.BaseRequest with http.Abortable {
-  _SlicedRequest(
+final class _StreamingRequest extends http.BaseRequest with http.Abortable {
+  _StreamingRequest(
     super.method,
     super.url,
-    this._body,
-    this._onProgress, {
+    this._body, {
+    required this.onActivity,
+    this.onProgress,
     this.abortTrigger,
   }) {
     contentLength = _body.length;
@@ -558,8 +614,13 @@ final class _SlicedRequest extends http.BaseRequest with http.Abortable {
   @override
   final Future<void>? abortTrigger;
 
-  final Uint8List _body;
-  final void Function(int bytesSent) _onProgress;
+  final RequestBody _body;
+
+  /// Called when the client takes a slice, and when the body ends.
+  final void Function() onActivity;
+
+  /// Called with the bytes taken so far after each slice.
+  final void Function(int bytesSent)? onProgress;
 
   @override
   http.ByteStream finalize() {
@@ -568,11 +629,19 @@ final class _SlicedRequest extends http.BaseRequest with http.Abortable {
   }
 
   Stream<List<int>> _slices() async* {
-    for (int start = 0; start < _body.length; start += bodySliceSize) {
-      final int end = math.min(start + bodySliceSize, _body.length);
-      yield Uint8List.sublistView(_body, start, end);
-      _onProgress(end);
+    int sent = 0;
+    await for (final List<int> event in _body.open()) {
+      for (int start = 0; start < event.length; start += bodySliceSize) {
+        final int end = math.min(start + bodySliceSize, event.length);
+        yield event is Uint8List
+            ? Uint8List.sublistView(event, start, end)
+            : event.sublist(start, end);
+        sent += end - start;
+        onActivity();
+        onProgress?.call(sent);
+      }
     }
+    onActivity();
   }
 }
 

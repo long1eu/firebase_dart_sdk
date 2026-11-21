@@ -1,10 +1,12 @@
 @TestOn('vm')
 library;
 
+import 'dart:math' as math;
 import 'dart:typed_data';
 
 import 'package:firebase_app_dart/firebase_app_dart.dart';
 import 'package:firebase_storage_dart/firebase_storage_dart.dart';
+import 'package:http/http.dart' as http;
 import 'package:test/test.dart';
 
 import '../fakes.dart';
@@ -39,6 +41,12 @@ void main() {
   });
 
   test('a multi-chunk upload stores every byte and its metadata', () async {
+    storage.close();
+    storage = FirebaseStorage(
+      app,
+      emulatorHost: host,
+      maxUploadChunkSize: chunkedUploads,
+    );
     final Uint8List data = patternBytes(3 * 1024 * 1024 + 17);
     final Reference ref = storage.ref('$prefix/big.bin');
     final UploadTask task = ref.startUpload(
@@ -147,4 +155,98 @@ void main() {
     expect(task.state, UploadState.canceled);
     await expectLater(ref.metadata(), throwsStorageCode('object-not-found'));
   });
+
+  test('20 MiB in one request, paused and resumed', () async {
+    final _SessionClient client = _SessionClient();
+    addTearDown(client.close);
+    storage.close();
+    storage = FirebaseStorage(app, emulatorHost: host, httpClient: client);
+    final Uint8List data = patternBytes(20 * 1024 * 1024);
+    final Reference ref = storage.ref('$prefix/single.bin');
+    final UploadTask task = ref.startUpload(data);
+
+    await task.progress.firstWhere(
+      (UploadProgress p) => p.bytesTransferred > 1024 * 1024,
+    );
+    expect(task.pause(), isTrue);
+    final UploadProgress paused = await task.progress.firstWhere(
+      (UploadProgress p) => p.state == UploadState.paused,
+    );
+    expect(paused.bytesTransferred, lessThan(data.length));
+    expect(task.resume(), isTrue);
+
+    expect((await task.result).size, data.length);
+    expect(await ref.getBytes(), data);
+    // One data request before the pause and one after it (an empty finalize when the first had sent
+    // everything): never a chunk sequence.
+    final List<String> dataRequests = <String>[
+      for (final String command in client.commands)
+        if (command.contains('upload') || command == 'finalize') command,
+    ];
+    expect(dataRequests.length, lessThanOrEqualTo(2), reason: '$dataRequests');
+    expect(dataRequests.last, anyOf('upload, finalize', 'finalize'));
+  });
+
+  test(
+    '10 uploads with maxConcurrentUploads 4 keep at most 4 sessions open',
+    () async {
+      final _SessionClient client = _SessionClient();
+      addTearDown(client.close);
+      storage.close();
+      storage = FirebaseStorage(
+        app,
+        emulatorHost: host,
+        httpClient: client,
+        maxConcurrentUploads: 4,
+      );
+      final List<Uint8List> data = <Uint8List>[
+        for (int i = 0; i < 10; i++) patternBytes(1024 * 1024 + i),
+      ];
+      final List<UploadTask> tasks = <UploadTask>[
+        for (int i = 0; i < 10; i++)
+          storage.ref('$prefix/many-$i.bin').startUpload(data[i]),
+      ];
+
+      final List<FullMetadata> results = await Future.wait(
+        <Future<FullMetadata>>[
+          for (final UploadTask task in tasks) task.result,
+        ],
+      );
+
+      for (int i = 0; i < 10; i++) {
+        expect(results[i].size, data[i].length);
+      }
+      expect(client.maxOpen, inInclusiveRange(1, 4));
+      expect(client.open, 0);
+    },
+  );
+}
+
+/// Counts the open resumable sessions: from a successful `start` to the response that finalizes them.
+final class _SessionClient extends http.BaseClient {
+  final http.Client _inner = http.Client();
+  final List<String> commands = <String>[];
+  int open = 0;
+  int maxOpen = 0;
+
+  @override
+  Future<http.StreamedResponse> send(http.BaseRequest request) async {
+    final String? command = request.headers['x-goog-upload-command'];
+    if (command != null) {
+      commands.add(command);
+    }
+    final http.StreamedResponse response = await _inner.send(request);
+    if (command == 'start' && response.statusCode == 200) {
+      open++;
+      maxOpen = math.max(maxOpen, open);
+    } else if (command != null &&
+        command.contains('finalize') &&
+        response.headers['x-goog-upload-status'] == 'final') {
+      open--;
+    }
+    return response;
+  }
+
+  @override
+  void close() => _inner.close();
 }

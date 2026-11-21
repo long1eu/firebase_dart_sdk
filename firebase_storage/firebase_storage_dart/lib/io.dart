@@ -19,22 +19,28 @@ import 'dart:io';
 
 import 'package:firebase_storage_dart/firebase_storage_dart.dart';
 import 'package:firebase_storage_dart/src/io/write_file.dart';
+import 'package:firebase_storage_dart/src/upload/upload_source.dart';
 
 /// Uploads from and downloads to files.
 extension ReferenceIo on Reference {
-  /// Uploads [file] with a resumable upload that reads it from disk chunk by chunk, so the file is never held
-  /// in memory. See [Reference.startStreamUpload] for [metadata] and [existingSessionUri].
+  /// Uploads [file] with a resumable upload that streams it from disk, so the file is never held in memory.
+  /// See [Reference.startUpload] for [metadata] and [existingSessionUri].
+  ///
+  /// Up to 256 KiB it is one multipart request. Above that it is one streamed request (or chunks of the
+  /// `maxUploadChunkSize` of `FirebaseStorage`); after a failure or a pause the file is read again from the
+  /// offset the server reports.
   ///
   /// The size of the file is read when the upload starts; a missing file throws a [FileSystemException] right
-  /// away. The file must not change while it is uploaded.
+  /// away. The file must not change while it is uploaded: a file that gets shorter or longer fails the task
+  /// with `invalid-argument`.
   UploadTask putFile(
     File file, {
     SettableMetadata? metadata,
     Uri? existingSessionUri,
   }) {
-    return startStreamUpload(
-      file.openRead(),
-      length: file.lengthSync(),
+    return startUploadFrom(
+      UploadSource.seekable(file.lengthSync(), file.openRead),
+      operation: 'putFile',
       metadata: metadata,
       existingSessionUri: existingSessionUri,
     );

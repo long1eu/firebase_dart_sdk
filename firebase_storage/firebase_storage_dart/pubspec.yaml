@@ -2,7 +2,7 @@ name: firebase_storage_dart
 description: >-
   Unofficial pure-Dart client of Cloud Storage for Firebase: references,
   metadata, listing, downloads and uploads over the Firebase Storage REST API.
-version: 0.1.0
+version: 0.1.1
 homepage: https://github.com/long1eu/firebase_dart_sdk
 repository: https://github.com/long1eu/firebase_dart_sdk/tree/main/firebase_storage/firebase_storage_dart
 issue_tracker: https://github.com/long1eu/firebase_dart_sdk/issues

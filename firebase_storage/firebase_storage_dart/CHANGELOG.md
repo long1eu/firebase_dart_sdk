@@ -1,3 +1,19 @@
+## 0.1.1
+
+- On the VM, `startUpload` and `putFile` send the data in one streamed request of the resumable session,
+  with progress per 64 KiB. After a failure or a pause they ask the server how much it has and send the
+  rest from that offset, reading the file again from there. Streams (`startStreamUpload`) and uploads on the
+  web stay chunked.
+- `FirebaseStorage(maxUploadChunkSize:)` caps the requests of an upload; a value is rounded down to a
+  multiple of 256 KiB, with 256 KiB as the minimum.
+- `FirebaseStorage(maxConcurrentUploads:)`, 4 by default: the uploads of an instance over the limit
+  (including `putBytes` and `putString`) wait in order. A waiting task is running with 0 bytes and can be
+  paused or canceled; a paused task gives its turn to the next one.
+- `requestTimeout` is an idle timeout: it fires when no byte of a request body is sent for that long, when
+  no response arrives that long after the body was sent, or when a response body pauses that long. A long
+  upload no longer times out while data flows.
+- A file that gets shorter or longer during `putFile` fails the task with `invalid-argument`.
+
 ## 0.1.0
 
 - First version: `FirebaseStorage` (bucket from the app's options or `gs://`, emulator host, retry policy),
