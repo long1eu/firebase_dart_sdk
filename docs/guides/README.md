@@ -72,6 +72,8 @@ READMEs are short landing pages; the API reference is on pub.dev.
     `keyValueCacheSettings`, the contract a store keeps, the three example stores (plain Dart,
     SQLite, IndexedDB), the conformance checks, the limits, and when to use it instead of the
     SQLite cache.
+29. [Cloud Storage](storage.md): `firebase_storage_dart`: the token and App Check headers, rules and
+    errors, retries, resumable uploads with progress, metadata, and tests against the Storage emulator.
 
 Every Dart snippet in these guides is compiled against the current API by
 `cloud_firestore/cloud_firestore_dart/test/unit/api/readme_snippets_test.dart`, except the blocks

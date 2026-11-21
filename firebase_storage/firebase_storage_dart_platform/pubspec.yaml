@@ -1,0 +1,51 @@
+name: firebase_storage_dart_platform
+description: >-
+  Unofficial pure-Dart implementation of the FlutterFire Cloud Storage platform
+  interface: the official firebase_storage API on Linux, or on any platform you
+  choose.
+version: 0.1.0
+homepage: https://github.com/long1eu/firebase_dart_sdk
+repository: https://github.com/long1eu/firebase_dart_sdk/tree/main/firebase_storage/firebase_storage_dart_platform
+issue_tracker: https://github.com/long1eu/firebase_dart_sdk/issues
+topics:
+  - firebase
+  - storage
+  - flutterfire
+  - linux
+
+environment:
+  sdk: ^3.8.0
+  flutter: '>=3.32.0'
+
+# Flutter registers the plugin class before main() only on the platforms listed
+# here. Linux is the only platform where neither firebase_storage nor
+# firebase_core has an implementation of its own; elsewhere the app calls
+# FirebaseStorageDart.use() (see the README).
+flutter:
+  plugin:
+    implements: firebase_storage
+    platforms:
+      linux:
+        dartPluginClass: FirebaseStorageDart
+
+dependencies:
+  # Local development resolves firebase_storage_dart and firebase_app_dart from
+  # the sibling packages through pubspec_overrides.yaml (not published).
+  firebase_app_dart: ^0.2.0
+  firebase_core: ^5.1.0
+  firebase_core_platform_interface: ^8.1.1
+  firebase_storage_dart: ^0.1.0
+  firebase_storage_platform_interface: ^6.1.0
+  flutter:
+    sdk: flutter
+  http: ^1.5.0
+  # The content type of putFile from the file name, as the native SDKs do;
+  # firebase_storage already depends on it.
+  mime: ^2.0.0
+
+dev_dependencies:
+  # The app-facing package the tests drive, as an app would.
+  firebase_storage: ^14.1.0
+  flutter_test:
+    sdk: flutter
+  lints: ^6.1.0

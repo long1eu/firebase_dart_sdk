@@ -1,0 +1,41 @@
+name: firebase_storage_dart
+description: >-
+  Unofficial pure-Dart client of Cloud Storage for Firebase: references,
+  metadata, listing, downloads and uploads over the Firebase Storage REST API.
+version: 0.1.0
+homepage: https://github.com/long1eu/firebase_dart_sdk
+repository: https://github.com/long1eu/firebase_dart_sdk/tree/main/firebase_storage/firebase_storage_dart
+issue_tracker: https://github.com/long1eu/firebase_dart_sdk/issues
+topics:
+  - firebase
+  - storage
+  - dart
+  - server
+
+platforms:
+  android:
+  ios:
+  linux:
+  macos:
+  web:
+  windows:
+
+environment:
+  sdk: ^3.8.0
+
+dependencies:
+  # Local development resolves this from ../../firebase_core/firebase_app_dart
+  # through pubspec_overrides.yaml (not published).
+  firebase_app_dart: ^0.2.0
+  # 1.5.0 added AbortableRequest, which pauses and cancels uploads.
+  http: ^1.5.0
+  meta: ^1.11.0
+
+dev_dependencies:
+  args: ^2.5.0
+  # The production verification kit (test/production) signs a test user in and hashes uploads.
+  crypto: ^3.0.3
+  # Resolved from ../../firebase_auth/firebase_auth_providers_dart through pubspec_overrides.yaml.
+  firebase_auth_providers_dart: ^0.3.0
+  lints: ^6.1.0
+  test: ^1.25.0

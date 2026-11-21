@@ -1,0 +1,6 @@
+# The browser tests (test/browser) need a private Storage emulator and Chrome; run them with
+# tool/test_browser.sh storage, which starts the emulator and tells the tests its port.
+tags:
+  browser:
+    test_on: browser
+    timeout: 2x

@@ -3,12 +3,13 @@
 A browser app in plain Dart (`package:web`, no Flutter) on `cloud_firestore_dart`. Web is
 **supported in Chrome**: see the [web guide](../../docs/guides/web.md).
 
-Two pages share one collection, `web_app_notes`:
+Two pages share one collection, `web_app_notes`; a third one uses Cloud Storage:
 
 | Page | What it shows |
 | --- | --- |
 | `index.html` (`web/main.dart`) | The main library. A real-time listener on the 50 newest notes, a form that adds one, an online/offline indicator (`metadata.isFromCache`), a button that calls `disableNetwork()` / `enableNetwork()`, and a choice of cache: memory, SQLite in IndexedDB, or SQLite in OPFS. |
 | `lite.html` (`web/lite.dart`) | The same list and form with `package:cloud_firestore_dart/lite.dart`: no cache, no listener, a Refresh button. Compare the size of the two compiled programs below. |
+| `storage.html` (`web/storage.dart`) | Cloud Storage with `firebase_storage_dart`: a file picker, a resumable upload (`startUpload`) with a progress bar and Pause, Resume and Cancel buttons, the list of the `web_app/` folder (`listAll`), and the images of that folder shown by their `downloadUrl()`. See [The Storage page](#the-storage-page). |
 
 This is the main page in headless Chrome against a private emulator, after three notes were
 added. Look at the **Sync** line: the list comes from the backend.
@@ -69,6 +70,10 @@ dart compile wasm -O2 -o build/web/lite.wasm web/lite.dart
 dart compile js -O2 -o build/web/main.dart.js web/main.dart
 dart compile js -O2 -o build/web/lite.dart.js web/lite.dart
 
+# The Storage page, the same way.
+dart compile wasm -O2 -o build/web/storage.wasm web/storage.dart
+dart compile js -O2 -o build/web/storage.dart.js web/storage.dart
+
 # The worker of the OPFS cache (always JavaScript, also for a dart2wasm page). The tool of
 # cloud_firestore_dart_sqlite compiles it with this app's dependencies, and prints the URL of
 # the sqlite3.wasm that goes with the resolved sqlite3 version.
@@ -106,12 +111,37 @@ serves `build/web` first, then `web`, and sends `.wasm` files as `application/wa
 `WebAssembly.compileStreaming` needs). Use your own server or hosting for anything else; no
 special headers are needed (the OPFS cache does not need cross-origin isolation).
 
+## The Storage page
+
+`storage.html` needs a Storage emulator, not the Firestore one. From the root of the repository:
+
+```sh
+./tool/start_storage_emulator.sh 9199     # bucket demo-test.appspot.com, open rules
+```
+
+Open <http://localhost:8000/storage.html>. The page connects to `127.0.0.1:9199`; to use another
+emulator, add `?storageEmulator=127.0.0.1:9387`. The emulator answers the browser's CORS
+preflight, so no setup is needed. A real bucket needs a CORS configuration that allows your page's
+origin (`gsutil cors set`) and rules that allow the request; neither has been tried here.
+
+What to try:
+
+- Pick a file larger than 256 KiB and press **Upload**. The bar moves one chunk at a
+  time; **Pause** and **Resume** call `pause()` and `resume()` of the `UploadTask`, **Cancel** calls
+  `cancel()`, and the status line then shows `canceled`.
+- Upload a PNG or JPEG: its thumbnail is the `<img>` of its download URL.
+- **Delete** removes an object; **Refresh list** reads the folder again.
+
+The page reads the whole file into memory (`File.arrayBuffer()`) before it starts the upload, which
+is fine for the files of a form; for very large files use a server that streams, such as
+[`server_shelf`](../server_shelf/).
+
 ## Files
 
 | File | What it is |
 | --- | --- |
-| `web/main.dart`, `web/lite.dart` | The two programs. |
-| `web/index.html`, `web/lite.html`, `web/styles.css` | The pages, light and dark through `prefers-color-scheme`. |
+| `web/main.dart`, `web/lite.dart`, `web/storage.dart` | The three programs. |
+| `web/index.html`, `web/lite.html`, `web/storage.html`, `web/styles.css` | The pages, light and dark through `prefers-color-scheme`. |
 | `web/bootstrap.js` | Starts `<app>.mjs` and `<app>.wasm` when the browser can, `<app>.dart.js` otherwise; `?compiler=js` or `?compiler=wasm` picks one. The same file as in `examples/playground`. |
 | `lib/app_config.dart` | The `FirebaseOptions`, and the settings read from the address (`emulator`, `cache`). It imports neither Firestore library, so the Lite page stays small. |
 | `bin/serve.dart` | The static file server. |

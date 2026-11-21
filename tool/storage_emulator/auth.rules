@@ -1,0 +1,18 @@
+rules_version = '2';
+// Bucket demo-test-auth.appspot.com of tool/start_storage_emulator.sh: nothing is readable or
+// writable without a signed-in user. Matches are OR-ed, so the two areas must not overlap: a user
+// reaches users/<their uid>/ only, and any signed-in user reaches shared/.
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /users/{uid}/{allPaths=**} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+    }
+    match /shared/{allPaths=**} {
+      allow read, write: if request.auth != null;
+    }
+    // The production verification kit (tool/verify_production_storage) writes here as a signed-in user.
+    match /verify_storage_kit/{allPaths=**} {
+      allow read, write: if request.auth != null;
+    }
+  }
+}

@@ -23,6 +23,7 @@ import 'package:firebase_app_dart/firebase_app_dart.dart';
 import 'package:firebase_app_dart/platform_dependencies.dart';
 import 'package:firebase_auth_providers_dart/adc.dart'; // needs dart:io
 import 'package:firebase_auth_providers_dart/firebase_auth_providers_dart.dart';
+import 'package:firebase_storage_dart/firebase_storage_dart.dart';
 import 'package:http/http.dart' as http;
 import 'package:rxdart/rxdart.dart';
 import 'package:test/test.dart';
@@ -987,8 +988,8 @@ Future<void> firebaseAppGuideLine93() async {
   dependencies.connectivity.add(true);
 }
 
-// ../../docs/guides/for_ai_agents.md:39
-Future<void> forAiAgentsGuideLine39() async {
+// ../../docs/guides/for_ai_agents.md:40
+Future<void> forAiAgentsGuideLine40() async {
   Future<void> main() async {
     // Synchronous. A `demo-` project id keeps the emulator away from real projects; the emulator
     // accepts any API key and application id.
@@ -1037,8 +1038,8 @@ Future<void> forAiAgentsGuideLine39() async {
   }
 }
 
-// ../../docs/guides/for_ai_agents.md:98
-Future<void> forAiAgentsGuideLine98() async {
+// ../../docs/guides/for_ai_agents.md:99
+Future<void> forAiAgentsGuideLine99() async {
   Future<void> main() async {
     final FirebaseApp app = FirebaseApp.withOptions(
       FirebaseOptions(
@@ -1072,8 +1073,8 @@ Future<void> forAiAgentsGuideLine98() async {
   }
 }
 
-// ../../docs/guides/for_ai_agents.md:371
-Future<void> forAiAgentsGuideLine371() async {
+// ../../docs/guides/for_ai_agents.md:372
+Future<void> forAiAgentsGuideLine372() async {
   void main() {
     late FirebaseFirestore db;
     int instances = 0;
@@ -1701,6 +1702,108 @@ Future<void> serverGuideLine311() async {
     return true;
   });
   print(claimed ? 'mine' : 'taken');
+}
+
+// ../../docs/guides/storage.md:25
+Future<void> storageGuideLine25() async {
+  Future<void> signedIn(FirebaseApp app) async {
+    final FirebaseUserAuth auth = await FirebaseUserAuth.forApp(app);
+    await auth.signInWithEmailAndPassword(email: 'ada@example.com', password: 'a-password');
+
+    final FirebaseStorage storage = FirebaseStorage(app);
+    final Reference mine = storage.ref('users/${auth.uid}/profile.json');
+    print(await mine.metadata());
+  }
+}
+
+// ../../docs/guides/storage.md:51
+Future<void> storageGuideLine51() async {
+  Future<bool> exists(Reference ref) async {
+    try {
+      await ref.metadata();
+      return true;
+    } on FirebaseStorageException catch (e) {
+      if (e.code == 'object-not-found') {
+        return false;
+      }
+      rethrow;
+    }
+  }
+}
+
+// ../../docs/guides/storage.md:78
+Future<void> storageGuideLine78() async {
+  FirebaseStorage patient(FirebaseApp app) => FirebaseStorage(
+        app,
+        retry: const StorageRetryPolicy(
+          operation: Duration(seconds: 30),
+          upload: Duration(minutes: 30),
+          download: Duration(minutes: 5),
+        ),
+      );
+}
+
+// ../../docs/guides/storage.md:102
+Future<void> storageGuideLine102() async {
+  Future<void> pauseAndResume(Reference target, Uint8List data) async {
+    final UploadTask task = target.startUpload(data);
+
+    task.progress.listen((UploadProgress p) {
+      if (p.state == UploadState.running && p.bytesTransferred > data.length ~/ 2) {
+        task.pause();
+      }
+    });
+
+    await Future<void>.delayed(const Duration(seconds: 1));
+    if (task.state == UploadState.paused) {
+      task.resume();
+    }
+    await task.result;
+  }
+}
+
+// ../../docs/guides/storage.md:136
+Future<void> storageGuideLine136() async {
+  Future<void> strings(Reference ref) async {
+    await ref.putString('aGVsbG8=', format: StringFormat.base64);
+    await ref.putString('data:text/plain;base64,aGVsbG8=', format: StringFormat.dataUrl);
+  }
+}
+
+// ../../docs/guides/storage.md:151
+Future<void> storageGuideLine151() async {
+  Future<void> tag(Reference ref) async {
+    final FullMetadata metadata = await ref.updateMetadata(
+      const SettableMetadata(
+        contentLanguage: 'en',
+        customMetadata: <String, String>{'reviewed': 'yes'},
+      ),
+    );
+    print(metadata.toJson());
+  }
+}
+
+// ../../docs/guides/storage.md:172
+Future<void> storageGuideLine172() async {
+  Future<void> roundTrip() async {
+    final FirebaseApp app = FirebaseApp.withOptions(
+      const FirebaseOptions(
+        apiKey: 'demo-key',
+        appId: '1:1234567890:dart:demo',
+        projectId: 'demo-my-app',
+        storageBucket: 'demo-my-app.appspot.com',
+      ),
+    );
+    final FirebaseStorage storage = FirebaseStorage(app, emulatorHost: '127.0.0.1:9199');
+    try {
+      final Reference ref = storage.ref('test/hello.txt');
+      await ref.putBytes(Uint8List.fromList(utf8.encode('hello')));
+      print(utf8.decode(await ref.getBytes()));
+      await ref.delete();
+    } finally {
+      storage.close();
+    }
+  }
 }
 
 // ../../docs/guides/transactions_and_lifecycle.md:55

@@ -1,0 +1,12 @@
+firebase_storage_dart
+Copyright 2018 Razvan Lung (long1eu) and contributors.
+
+This package is an unofficial client of the Cloud Storage for Firebase REST
+API. Its protocol behaviour follows the Firebase JavaScript SDK
+(https://github.com/firebase/firebase-js-sdk, Apache License 2.0); it is not a
+port of a Firebase SDK.
+
+This package is not affiliated with, endorsed by or supported by Google LLC or
+Firebase. "Firebase" is a trademark of Google LLC.
+
+Licensed under the Apache License, Version 2.0; see the LICENSE file.

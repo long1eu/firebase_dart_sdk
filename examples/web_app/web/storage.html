@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Files: firebase_storage_dart</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <nav><a href="index.html">Main library</a><a href="lite.html">Firestore Lite</a><a href="storage.html">Storage</a></nav>
+  <h1>Files</h1>
+  <p>Pick a file to upload it to the <code>web_app/</code> folder of the bucket with
+    <code>firebase_storage_dart</code>. The upload is resumable: pause, resume or cancel it.
+    Images are shown by their download URL.</p>
+  <dl>
+    <dt>Backend</dt><dd id="backend"></dd>
+    <dt>Compiler</dt><dd><span id="compiler"></span> (other build: <a id="other-compiler" href="?compiler=js">dart2js</a>)</dd>
+    <dt>Upload</dt><dd id="status">Nothing selected.</dd>
+  </dl>
+  <form id="upload">
+    <input id="file" type="file">
+    <button id="start" type="submit">Upload</button>
+  </form>
+  <progress id="progress" value="0" max="100" hidden></progress>
+  <p>
+    <button id="pause" type="button" disabled>Pause</button>
+    <button id="resume" type="button" disabled>Resume</button>
+    <button id="cancel" type="button" disabled>Cancel</button>
+    <button id="refresh" type="button">Refresh list</button>
+  </p>
+  <p id="error"></p>
+  <ul id="files"></ul>
+  <script src="bootstrap.js" data-app="storage"></script>
+</body>
+</html>
