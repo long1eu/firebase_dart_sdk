@@ -20,6 +20,7 @@ import 'dart:io';
 import 'dart:math' as math;
 import 'dart:typed_data';
 
+import 'package:args/args.dart';
 import 'package:crypto/crypto.dart' as crypto;
 import 'package:firebase_app_dart/firebase_app_dart.dart';
 import 'package:firebase_auth_providers_dart/firebase_auth_providers_dart.dart';
@@ -1811,27 +1812,63 @@ const List<Check> checks = <Check>[
 // ---------------------------------------------------------------------------------------------------------------
 // The command line.
 
-const String usage =
-    '''
-Usage: dart run test/production/verify_production.dart --backend=production|emulator [options]
+/// The options of the kit. `--name=value` and `--name value` both work.
+final ArgParser parser = ArgParser(usageLineLength: 110)
+  ..addOption(
+    'backend',
+    help:
+        'production: Cloud Storage for Firebase; needs $projectVariable and $bucketVariable (or --bucket). Prints the '
+        'plan and does nothing without --yes.\n'
+        'emulator: the emulator at $emulatorHostVariable (project demo-test).',
+    valueHelp: 'production|emulator',
+  )
+  ..addFlag('yes', negatable: false, help: 'Confirms a run against production.')
+  ..addOption(
+    'bucket',
+    help:
+        "The bucket to write below the run's prefix (default: $bucketVariable, or on the emulator "
+        'demo-test.appspot.com).',
+    valueHelp: 'name',
+  )
+  ..addOption(
+    'denied-bucket',
+    help:
+        'A bucket whose rules refuse requests without a user: runs check 2 (otherwise SKIPPED).',
+    valueHelp: 'name',
+  )
+  ..addOption(
+    'api-key',
+    help: 'The Web API key of the project (default: $webApiKeyVariable).',
+    valueHelp: 'key',
+  )
+  ..addFlag(
+    'create-user',
+    negatable: false,
+    help:
+        'Signs up a throwaway user storage-verify-<run>@example.com with a random password kept in memory, runs the '
+        'checks as that user and deletes the user at the end, also when checks fail. Needs the API key and the '
+        'Email/Password provider (on the emulator also $authEmulatorHostVariable). Without it requests carry no '
+        'user.',
+  )
+  ..addOption('only', help: 'Runs only these checks.', valueHelp: '1,2')
+  ..addOption(
+    'max-bytes',
+    help: 'The cap on the bytes uploaded in total (the default is 64 MiB).',
+    valueHelp: 'n',
+    defaultsTo: '$defaultMaxBytes',
+  )
+  ..addFlag(
+    'keep',
+    negatable: false,
+    help: 'Does not delete the objects of the run at the end.',
+  )
+  ..addFlag('list', negatable: false, help: 'Lists the checks and exits.')
+  ..addFlag('help', abbr: 'h', negatable: false, help: 'Prints this text.');
 
-  --backend=production   Cloud Storage for Firebase; needs FIREBASE_TEST_PROJECT_ID and
-                         FIREBASE_TEST_STORAGE_BUCKET (or --bucket=). Prints the plan and does nothing without --yes.
-  --backend=emulator     The emulator at FIREBASE_STORAGE_EMULATOR_HOST (project demo-test).
-  --yes                  Confirms a run against production.
-  --bucket=NAME          The bucket to write below the run's prefix (default: the variable, or on the emulator
-                         demo-test.appspot.com).
-  --denied-bucket=NAME   A bucket whose rules refuse requests without a user: runs check 2 (otherwise SKIPPED).
-  --api-key=KEY          The Web API key of the project (default: FIREBASE_API_KEY).
-  --create-user          Signs up a throwaway user storage-verify-<run>@example.com with a random password kept in
-                         memory, runs the checks as that user and deletes the user at the end, also when checks
-                         fail. Needs the API key and the Email/Password provider (on the emulator also
-                         FIREBASE_AUTH_EMULATOR_HOST). Without it requests carry no user.
-  --only=1,2             Runs only these checks.
-  --max-bytes=N          The cap on the bytes uploaded in total (default $defaultMaxBytes = 64 MiB).
-  --keep                 Does not delete the objects of the run at the end.
-  --list                 Lists the checks and exits.
-''';
+/// The text printed by `--help` and after a usage error.
+String get usage =>
+    'Usage: dart run test/production/verify_production.dart --backend=production|emulator [options]\n\n'
+    '${parser.usage}';
 
 /// What a run of the kit produced.
 class KitRun {
@@ -1858,15 +1895,6 @@ Future<KitRun> runKit(
 }) async {
   final StringSink sink = out ?? stdout;
   final Map<String, String> env = environment ?? Platform.environment;
-  String? option(String name) {
-    for (final String argument in arguments) {
-      if (argument.startsWith('--$name=')) {
-        return argument.substring(name.length + 3);
-      }
-    }
-    return null;
-  }
-
   String? setting(String name) {
     final String? value = env[name]?.trim();
     return value == null || value.isEmpty ? null : value;
@@ -1879,36 +1907,30 @@ Future<KitRun> runKit(
     return KitRun(2, <String, CheckResult>{}, 0, 0, null);
   }
 
-  const Set<String> flags = <String>{
-    '--yes',
-    '--keep',
-    '--list',
-    '--create-user',
-  };
-  const Set<String> options = <String>{
-    'backend',
-    'only',
-    'max-bytes',
-    'bucket',
-    'denied-bucket',
-    'api-key',
-  };
-  for (final String argument in arguments) {
-    final bool known =
-        flags.contains(argument) ||
-        options.any((String name) => argument.startsWith('--$name='));
-    if (!known) {
-      return usageError('Unknown argument: $argument');
+  final ArgResults args;
+  try {
+    args = parser.parse(arguments);
+    if (args.rest.isNotEmpty) {
+      throw FormatException('Unexpected argument: ${args.rest.first}');
     }
+  } on FormatException catch (e) {
+    sink
+      ..writeln(e.message)
+      ..writeln(usage);
+    return KitRun(64, <String, CheckResult>{}, 0, 0, null);
   }
-  if (arguments.contains('--list')) {
+  if (args.flag('help')) {
+    sink.writeln(usage);
+    return KitRun(0, <String, CheckResult>{}, 0, 0, null);
+  }
+  if (args.flag('list')) {
     for (final Check check in checks) {
       sink.writeln('${check.id.padRight(3)} ${check.name}');
     }
     return KitRun(0, <String, CheckResult>{}, 0, 0, null);
   }
 
-  final String? backendName = option('backend');
+  final String? backendName = args.option('backend');
   final String? emulatorHost = setting(emulatorHostVariable);
   final Backend backend;
   if (backendName == 'production') {
@@ -1918,7 +1940,7 @@ Future<KitRun> runKit(
       );
     }
     final String? project = setting(projectVariable);
-    final String? bucket = option('bucket') ?? setting(bucketVariable);
+    final String? bucket = args.option('bucket') ?? setting(bucketVariable);
     if (project == null || bucket == null) {
       return usageError(
         '$projectVariable and $bucketVariable (or --bucket=) name the project and the bucket to verify.',
@@ -1928,11 +1950,11 @@ Future<KitRun> runKit(
       production: true,
       projectId: project,
       bucket: bucket,
-      deniedBucket: option('denied-bucket'),
+      deniedBucket: args.option('denied-bucket'),
       emulatorHost: null,
       appId: setting(appIdVariable) ?? '1:0:dart:verify-storage-kit',
       apiKey:
-          option('api-key') ??
+          args.option('api-key') ??
           setting(webApiKeyVariable) ??
           'verify-storage-kit-no-key',
     );
@@ -1945,11 +1967,14 @@ Future<KitRun> runKit(
     backend = Backend(
       production: false,
       projectId: 'demo-test',
-      bucket: option('bucket') ?? 'demo-test.appspot.com',
-      deniedBucket: option('denied-bucket'),
+      bucket: args.option('bucket') ?? 'demo-test.appspot.com',
+      deniedBucket: args.option('denied-bucket'),
       emulatorHost: emulatorHost,
       appId: '1:0:dart:verify-storage-kit',
-      apiKey: option('api-key') ?? setting(webApiKeyVariable) ?? 'fake-api-key',
+      apiKey:
+          args.option('api-key') ??
+          setting(webApiKeyVariable) ??
+          'fake-api-key',
     );
   } else {
     return usageError(
@@ -1957,11 +1982,13 @@ Future<KitRun> runKit(
     );
   }
 
-  final int? maxBytes = int.tryParse(option('max-bytes') ?? '$defaultMaxBytes');
+  final int? maxBytes = int.tryParse(
+    args.option('max-bytes') ?? '$defaultMaxBytes',
+  );
   if (maxBytes == null || maxBytes < 0) {
     return usageError('--max-bytes needs a number of bytes.');
   }
-  final bool createUser = arguments.contains('--create-user');
+  final bool createUser = args.flag('create-user');
   if (createUser) {
     if (backend.production && backend.apiKey.startsWith('verify-storage-kit')) {
       return usageError(
@@ -1975,7 +2002,7 @@ Future<KitRun> runKit(
     }
   }
 
-  final Set<String>? only = option('only')?.split(',').toSet();
+  final Set<String>? only = args.option('only')?.split(',').toSet();
   if (only != null) {
     final Set<String> unknown = only.difference(
       checks.map((Check c) => c.id).toSet(),
@@ -2011,7 +2038,7 @@ Future<KitRun> runKit(
       '  cost:      at most $maxBytes bytes uploaded in total; every object is deleted at the end',
     )
     ..writeln('  checks:    ${selected.map((Check c) => c.id).join(', ')}');
-  if (backend.production && !arguments.contains('--yes')) {
+  if (backend.production && !args.flag('yes')) {
     sink
       ..writeln('')
       ..writeln(
@@ -2102,7 +2129,7 @@ Future<KitRun> runKit(
       sink.writeln('');
     }
   } finally {
-    if (arguments.contains('--keep')) {
+    if (args.flag('keep')) {
       sink.writeln('--keep: the objects below $prefix/ were not deleted.');
     } else {
       try {

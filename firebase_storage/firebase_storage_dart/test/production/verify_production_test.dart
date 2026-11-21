@@ -186,6 +186,31 @@ void main() {
     expect(run.exitCode, 2);
   });
 
+  test('an unknown flag prints the usage and exits 64', () async {
+    final StringBuffer out = StringBuffer();
+    final KitRun run = await runKit(
+      <String>['--backend=emulator', '--nonsense'],
+      out: out,
+      environment: <String, String>{emulatorHostVariable: '127.0.0.1:1'},
+    );
+    expect(run.exitCode, 64);
+    expect(out.toString(), contains('--nonsense'));
+    expect(out.toString(), contains('--max-bytes'));
+    expect(run.results, isEmpty);
+  });
+
+  test('--help prints the usage and exits 0', () async {
+    final StringBuffer out = StringBuffer();
+    final KitRun run = await runKit(
+      <String>['--help'],
+      out: out,
+      environment: <String, String>{},
+    );
+    expect(run.exitCode, 0);
+    expect(out.toString(), contains('--denied-bucket'));
+    expect(out.toString(), contains('--create-user'));
+  });
+
   test('--create-user needs the API key in production', () async {
     final StringBuffer out = StringBuffer();
     final KitRun run = await runKit(

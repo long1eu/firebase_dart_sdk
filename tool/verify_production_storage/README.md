@@ -69,7 +69,8 @@ Emulator (to see a run, or to check the kit):
     (cd firebase_storage/firebase_storage_dart && dart test test/production)   # the kit's own test
     tool/stop_storage_emulator.sh 9399; tool/stop_auth_emulators.sh 9398 9397
 
-Exit code: 0 when no check failed, 1 when one is `FAIL`, 2 for a usage error or when `--yes` is missing.
+`--help` prints every option. Exit code: 0 when no check failed, 1 when one is `FAIL`, 2 for a usage error
+(a missing variable, a bad value) or when `--yes` is missing, 64 for an unknown flag.
 
 ## The checks and how to read them
 
