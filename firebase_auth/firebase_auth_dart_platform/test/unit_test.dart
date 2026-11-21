@@ -1648,6 +1648,23 @@ void main() {
         expect(presenter.requests, isEmpty);
       });
 
+      test('widget failures keep the codes of the client', () {
+        for (final (RecaptchaFailureReason reason, String code)
+            in <(RecaptchaFailureReason, String)>[
+              (RecaptchaFailureReason.scriptLoad, 'internal-error'),
+              (RecaptchaFailureReason.loadTimeout, 'network-request-failed'),
+              (RecaptchaFailureReason.widget, 'network-request-failed'),
+              (RecaptchaFailureReason.noToken, 'missing-app-credential'),
+              (RecaptchaFailureReason.superseded, 'cancelled'),
+            ]) {
+          expect(
+            recaptchaExceptionOf(RecaptchaFailure(reason, 'm')).code,
+            code,
+            reason: reason.name,
+          );
+        }
+      });
+
       test('off the web the factory still renders nothing', () {
         final DartRecaptchaVerifierFactory native =
             DartRecaptchaVerifierFactory();
@@ -2035,6 +2052,9 @@ class _FakeInPagePresenter implements InPageRecaptchaPresenter {
 
   @override
   Duration get scriptTimeout => const Duration(seconds: 30);
+
+  @override
+  Uri Function(Uri googleScript)? get scriptAddress => null;
 
   @override
   SecurePresenterKind get kind => SecurePresenterKind.inPage;

@@ -48,10 +48,14 @@ extension type _Enterprise._(JSObject _) implements JSObject {
   );
 }
 
-/// The loads of Google's scripts, shared by every presenter of the page (one script of each kind
-/// per page, like the JS SDK); reset after a failed load so that the next check tries again.
+/// The loads of Google's scripts, shared by every presenter of the page: one v2 script per page,
+/// one Enterprise script per site key (`render=<site key>`, like the JS SDK's Enterprise verifier).
+/// A failed load is forgotten, so that the next check loads again.
 Future<void>? _v2Load;
-Future<void>? _enterpriseLoad;
+final Map<String, Future<void>> _enterpriseLoads = <String, Future<void>>{};
+
+/// The Enterprise site keys whose script has loaded in this page through a presenter.
+final Set<String> _enterpriseKeys = <String>{};
 int _callbacks = 0;
 
 /// Renders a reCAPTCHA into the page the app runs in (a web build of the app) and returns its
@@ -68,11 +72,20 @@ int _callbacks = 0;
 ///   Enterprise verifier does; no widget is rendered (Google shows its badge) and [containerId] is
 ///   not used.
 ///
-/// Google's script (`api.js` or `enterprise.js`) is loaded once per page, unless the page already
-/// has `grecaptcha` with the API the check needs. It must load within [scriptTimeout]
-/// ([RecaptchaFailureReason.loadTimeout]); a script that fails to load (a content security policy
-/// of the page that does not allow `https://www.google.com/recaptcha/` and
-/// `https://www.gstatic.com/recaptcha/`, no network) is [RecaptchaFailureReason.scriptLoad].
+/// Google's v2 script (`api.js`) is loaded once per page, unless the page already has
+/// `grecaptcha.render`. The Enterprise script (`enterprise.js?render=<site key>`) is loaded once
+/// for each site key, also when the page has `grecaptcha.enterprise` already (App Check's
+/// reCAPTCHA Enterprise provider loads it for its own key); after a failed Enterprise execute the
+/// next check loads it again, as the JS SDK's `verify(forceRefresh)` does. A script must load
+/// within [scriptTimeout] ([RecaptchaFailureReason.loadTimeout]); one that fails to load (a
+/// content security policy of the page that does not allow `https://www.google.com/recaptcha/` and
+/// `https://www.gstatic.com/recaptcha/`, no network) is [RecaptchaFailureReason.scriptLoad]. Its
+/// `<script>` element is removed after either failure.
+///
+/// Without a [containerId], the element of the widget is removed again after each check, so that
+/// repeated checks leave nothing in the page. One check runs at a time: a new check fails the one
+/// still waiting with [RecaptchaFailureReason.superseded] (it may have been given up after a
+/// timeout, and must not block the next one).
 class InPageRecaptchaPresenter implements RecaptchaPresenter {
   /// A presenter that renders into the element [containerId] (null: a new invisible one) and
   /// tells [onVerified] when the person passed the check, [onExpired] when a v2 token expired
@@ -84,6 +97,7 @@ class InPageRecaptchaPresenter implements RecaptchaPresenter {
     this.onExpired,
     this.onError,
     this.scriptTimeout = const Duration(seconds: 30),
+    this.scriptAddress,
   });
 
   /// The id of the element the widget goes into, or null for a new invisible one.
@@ -100,6 +114,10 @@ class InPageRecaptchaPresenter implements RecaptchaPresenter {
 
   /// How long Google's script may take to load.
   final Duration scriptTimeout;
+
+  /// Maps the address of Google's script (with its `onload` callback) to the address loaded
+  /// instead, or null to load Google's: for a mirror, or for tests that must not reach Google.
+  final Uri Function(Uri googleScript)? scriptAddress;
 
   Future<JSNumber>? _rendering;
   web.Element? _element;
@@ -141,27 +159,58 @@ class InPageRecaptchaPresenter implements RecaptchaPresenter {
   }
 
   Future<String> _v2Token(RecaptchaRequest request) async {
-    final JSNumber id = await (_rendering ??= _render(request));
-    final _Grecaptcha grecaptcha = _grecaptcha!;
-    final String solved = grecaptcha.getResponse(id).toDart;
-    if (solved.isNotEmpty) {
-      grecaptcha.reset(id);
-      return solved;
-    }
     final Completer<String> pending = Completer<String>();
-    _pending = pending;
-    if (_size == RecaptchaSize.invisible) {
-      grecaptcha.execute(id);
-    }
+    // Its error (superseded, cleared) may come while this check still waits for the render.
+    pending.future.ignore();
+    _supersede(pending);
+    final Future<JSNumber> rendering = _rendering ??= _render(request);
+    JSNumber? widget;
     try {
+      final JSNumber id = widget = await rendering;
+      final String solved = _grecaptcha!.getResponse(id).toDart;
+      if (solved.isNotEmpty) {
+        return solved;
+      }
+      if (_size == RecaptchaSize.invisible) {
+        _grecaptcha!.execute(id);
+      }
       return await pending.future;
     } finally {
       if (identical(_pending, pending)) {
         _pending = null;
       }
-      if (_rendering != null) {
-        grecaptcha.reset(id);
-      }
+      _afterCheck(rendering, widget);
+    }
+  }
+
+  /// Makes [pending] the check that waits for the widget; the one waiting before fails with
+  /// [RecaptchaFailureReason.superseded].
+  void _supersede(Completer<String> pending) {
+    final Completer<String>? earlier = _pending;
+    _pending = pending;
+    earlier?.completeError(
+      const RecaptchaFailure(
+        RecaptchaFailureReason.superseded,
+        'A newer reCAPTCHA check of this presenter replaced this one.',
+      ),
+    );
+  }
+
+  /// After a check on [widget] (null when it did not render) of [rendering]: its element is
+  /// removed when the presenter made it (no [containerId]), else the widget is reset, unless a
+  /// newer check uses it now or it was cleared.
+  void _afterCheck(Future<JSNumber> rendering, JSNumber? widget) {
+    if (_pending != null || !identical(_rendering, rendering)) {
+      return;
+    }
+    if (containerId == null) {
+      _rendering = null;
+      _element?.remove();
+      _element = null;
+      return;
+    }
+    if (widget != null) {
+      _grecaptcha?.reset(widget);
     }
   }
 
@@ -245,6 +294,9 @@ class InPageRecaptchaPresenter implements RecaptchaPresenter {
                   .toDart)
               .toDart;
     } on Object {
+      // The next check loads the script of this key again (the JS SDK's forceRefresh).
+      _enterpriseKeys.remove(request.siteKey);
+      unawaited(_enterpriseLoads.remove(request.siteKey));
       const RecaptchaFailure failure = RecaptchaFailure(
         RecaptchaFailureReason.widget,
         'reCAPTCHA Enterprise could not make a token.',
@@ -271,20 +323,23 @@ class InPageRecaptchaPresenter implements RecaptchaPresenter {
   }
 
   Future<void> _loadEnterprise(String siteKey, String? languageCode) {
-    if (_grecaptcha?.enterprise != null) {
+    if (_grecaptcha?.enterprise != null && _enterpriseKeys.contains(siteKey)) {
       return Future<void>.value();
     }
-    return _enterpriseLoad ??=
+    return _enterpriseLoads[siteKey] ??=
         _load(
           (String onload) => recaptchaEnterpriseScriptUrl(
             siteKey: siteKey,
             onload: onload,
             languageCode: languageCode,
           ),
-        ).catchError((Object error, StackTrace stackTrace) {
-          _enterpriseLoad = null;
-          Error.throwWithStackTrace(error, stackTrace);
-        });
+        ).then(
+          (_) => _enterpriseKeys.add(siteKey),
+          onError: (Object error, StackTrace stackTrace) {
+            _enterpriseLoads.remove(siteKey);
+            Error.throwWithStackTrace(error, stackTrace);
+          },
+        );
   }
 
   /// Adds the script at the address [url] makes for a new global onload callback, and completes
@@ -293,13 +348,20 @@ class InPageRecaptchaPresenter implements RecaptchaPresenter {
     final String callback = '__secureFlowRecaptchaLoaded${_callbacks++}';
     final Completer<void> loaded = Completer<void>();
     late final Timer timer;
+    late final web.HTMLScriptElement script;
     void finish([RecaptchaFailure? failure]) {
       timer.cancel();
       globalContext.delete(callback.toJS);
       if (loaded.isCompleted) {
         return;
       }
-      failure == null ? loaded.complete() : loaded.completeError(failure);
+      if (failure == null) {
+        loaded.complete();
+        return;
+      }
+      // A slow script must not run next to the one a retry adds.
+      script.remove();
+      loaded.completeError(failure);
     }
 
     timer = Timer(
@@ -312,8 +374,9 @@ class InPageRecaptchaPresenter implements RecaptchaPresenter {
       ),
     );
     globalContext[callback] = (() => finish()).toJS;
-    final web.HTMLScriptElement script = web.HTMLScriptElement()
-      ..src = url(callback).toString()
+    final Uri google = url(callback);
+    script = web.HTMLScriptElement()
+      ..src = (scriptAddress?.call(google) ?? google).toString()
       ..async = true;
     script.onerror = ((web.Event _) => finish(
       const RecaptchaFailure(

@@ -60,6 +60,9 @@ enum RecaptchaFailureReason {
 
   /// The presenter returned an empty token.
   noToken,
+
+  /// A newer check of the same presenter replaced this one while it waited.
+  superseded,
 }
 
 /// A reCAPTCHA presenter could not produce a token. Not a [SecureFlowException]: it comes from the

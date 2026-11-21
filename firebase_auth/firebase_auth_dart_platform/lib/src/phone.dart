@@ -244,6 +244,7 @@ FirebaseAuthException recaptchaExceptionOf(RecaptchaFailure failure) =>
         RecaptchaFailureReason.loadTimeout ||
         RecaptchaFailureReason.widget => 'network-request-failed',
         RecaptchaFailureReason.noToken => 'missing-app-credential',
+        RecaptchaFailureReason.superseded => 'cancelled',
       },
       message: failure.message,
     );

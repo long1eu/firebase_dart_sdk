@@ -91,15 +91,19 @@ On the web, `RecaptchaFlow(...).run()` takes the `InPageRecaptchaPresenter` of t
 - **v2**: the widget goes into a new element inside the element `containerId`, in the flow's `size`
   (`normal`, `compact`, `invisible`) and `theme` (the system's light or dark setting without one).
   Without a `containerId` it is invisible, in a new element at the end of the document. A visible
-  widget waits for the check; an invisible one starts at once. The widget is reset after each token;
-  `render` renders it ahead of time and `clear` removes it.
+  widget waits for the check; an invisible one starts at once. The widget is reset after each token
+  (the element the presenter made without a `containerId` is removed, so repeated checks leave
+  nothing); `render` renders it ahead of time and `clear` removes it. One check runs at a time: a
+  newer one fails the one still waiting with `superseded`.
 - **Enterprise** (`RecaptchaFlow.enterprise(siteKey:, action:)`):
   `grecaptcha.enterprise.execute(siteKey, {action})`, with Google's badge and no widget.
-- Google's script (`api.js` or `enterprise.js?render=<site key>`) is loaded once per page unless the
-  page already has `grecaptcha`. Its failures are a `RecaptchaFailure`: `scriptLoad` (blocked, offline,
+- Google's script is loaded once per page (`api.js`, unless the page has `grecaptcha.render`) or once
+  per site key (`enterprise.js?render=<site key>`, also when another key's script is there, and again
+  after a failed execute). `scriptAddress` maps Google's address to another one (a mirror, tests).
+  A script that fails or times out has its tag removed, so a retry loads it again. Its failures are a `RecaptchaFailure`: `scriptLoad` (blocked, offline,
   or refused by the page's content security policy, which must allow `https://www.google.com/recaptcha/`
   and `https://www.gstatic.com/recaptcha/`), `loadTimeout` (30 seconds by default), `widget` (the
-  widget's error callback, or Enterprise refusing to make a token) and `noToken`.
+  widget's error callback, or Enterprise refusing to make a token), `noToken` and `superseded`.
 
 ```dart
 final String token = await RecaptchaFlow(

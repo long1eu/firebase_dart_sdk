@@ -17,8 +17,10 @@
   after `missing-recaptcha-token`. SMS requests with a reCAPTCHA v2 proof read the configuration first, send the
   Enterprise token when the phone provider is protected, fall back to the v2 token under AUDIT after
   `missing-recaptcha-token` or `invalid-app-credential`, and otherwise send the v2 token with
-  `captchaResponse: NO_RECAPTCHA`. A failing source is asked again after the configuration is read again. Without
-  a source nothing changes. Tested against a fake backend; not run against a real project.
+  `captchaResponse: NO_RECAPTCHA`. A failing source is asked again after the configuration is read again; if it
+  still fails under AUDIT (not a timeout, cancel or overtaken check), the SMS goes with the v2 token and a
+  password request with `NO_RECAPTCHA`, as in the JS SDK, while ENFORCE throws. The token never shows in an
+  error. Without a source nothing changes. Tested against a fake backend; not run against a real project.
 - `RecaptchaEnterpriseRequest` carries the Enterprise `siteKey` (null before the configuration is read) and the
   `languageCode`; `RecaptchaAction` has `signInWithPassword`, `signUpPassword` and `getOobCode`.
 - `AppVerification.recaptchaV2Loopback()` works on the web: `secure_flow` runs the widget in the app's page there.

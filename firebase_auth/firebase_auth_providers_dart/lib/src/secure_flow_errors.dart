@@ -37,7 +37,8 @@ Future<T> runSecureFlow<T>(
 ///   caller;
 /// * a [RecaptchaFailure] of an in-page widget into the codes of the JS SDK's reCAPTCHA loader:
 ///   `internal-error` when Google's script did not load, `network-request-failed` when it did not
-///   load in time or the widget reported an error, and `missing-app-credential` for no token.
+///   load in time or the widget reported an error, `missing-app-credential` for no token, and
+///   `cancelled` for a check that a newer one of the same presenter replaced.
 ///
 /// The last three keep the original error as [FirebaseAuthException.cause]. Other errors (of the
 /// presenter itself) are rethrown as they are.
@@ -73,6 +74,7 @@ Future<T> secureFlowErrorsToAuth<T>(
       RecaptchaFailureReason.loadTimeout ||
       RecaptchaFailureReason.widget => 'network-request-failed',
       RecaptchaFailureReason.noToken => 'missing-app-credential',
+      RecaptchaFailureReason.superseded => 'cancelled',
     };
     _rethrowAs(code, e.message, e, stackTrace);
   }

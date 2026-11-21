@@ -494,8 +494,11 @@ print(config.isAnyProviderEnabled);
   Enterprise token replaces the v2 token; under AUDIT, `missing-recaptcha-token` and `invalid-app-credential`
   send the request again with the v2 token. Without protection the v2 token goes with `captchaResponse:
   NO_RECAPTCHA`, as the JS SDK sends it.
-- A source that fails is asked once more after the configuration is read again (not after a timeout or a
-  cancel). An empty token is `missing-recaptcha-token`; a configuration without a site key is
+- A source that fails is asked once more after the configuration is read again (not after a timeout, a
+  cancel, or a check overtaken by a newer one: the person's choices). If it fails again while the provider
+  is under AUDIT, the request still goes out, as in the JS SDK: an SMS with the v2 token, a password
+  request with `NO_RECAPTCHA`; under ENFORCE the failure is thrown. The errors of a request never show its
+  token. An empty token is `missing-recaptcha-token`; a configuration without a site key is
   `recaptcha-not-enabled`. The backend's codes keep the JS SDK's names: `missing-recaptcha-token`,
   `invalid-recaptcha-token`, `invalid-recaptcha-action`, `recaptcha-not-enabled`, `missing-recaptcha-version`,
   `invalid-recaptcha-version`.

@@ -7,6 +7,7 @@ import 'package:firebase_app_dart/internal.dart' show Log;
 
 import 'app_verification.dart';
 import 'auth_exception.dart';
+import 'phone_auth.dart' show redactPhoneSecrets;
 import 'recaptcha_config.dart';
 import 'secure_flow_errors.dart';
 
@@ -30,6 +31,20 @@ const Set<String> _auditFallbackCodes = <String>{
   'missing-recaptcha-token',
   'invalid-app-credential',
 };
+
+/// The codes of a token source failure that the person (or the app) chose: no token after the
+/// timeout, a cancel, a check overtaken by a newer one. Neither retried nor replaced by the AUDIT
+/// fallback. Every other failure is not their choice, among them each `RecaptchaFailure` of a
+/// widget except `superseded` (Google's script blocked or offline, its load timeout, a widget
+/// error, no token): it is retried once, and under AUDIT replaced by the fallback.
+const Set<String> _chosenCodes = <String>{
+  'timeout',
+  'user-cancelled',
+  'cancelled',
+};
+
+bool _isChosen(Object error) =>
+    error is FirebaseAuthException && _chosenCodes.contains(error.code);
 
 /// The reCAPTCHA Enterprise configuration and tokens of one client.
 final class RecaptchaEnterprise {
@@ -68,6 +83,10 @@ final class RecaptchaEnterprise {
   /// `EMAIL_PASSWORD_PROVIDER`): with a token when the configuration of [tenantId] read so far
   /// protects the provider and there is a [source]; otherwise without one, and once more with a
   /// token when the backend answers `missing-recaptcha-token` and there is a [source].
+  ///
+  /// Under AUDIT, a source that fails (not by the person's choice, see [_chosenCodes]) gives
+  /// `NO_RECAPTCHA` instead of a token, as JS's `FAKE_TOKEN`; under ENFORCE its error is thrown.
+  /// The errors of a request with a token never show the token.
   Future<Map<String, Object?>> sendEmailPassword({
     required String? tenantId,
     required RecaptchaAction action,
@@ -81,7 +100,7 @@ final class RecaptchaEnterprise {
         )?.isProviderEnabled(RecaptchaProvider.emailPassword) ??
         false;
     if (protected && source != null) {
-      return send(await _withToken(tenantId, action, body, languageCode));
+      return _sendWithToken(tenantId, action, body, languageCode, send);
     }
     try {
       return await send(body);
@@ -94,7 +113,36 @@ final class RecaptchaEnterprise {
         '${action.value} is protected by reCAPTCHA Enterprise for this project; '
             'sending it again with a token.',
       );
-      return send(await _withToken(tenantId, action, body, languageCode));
+      return _sendWithToken(tenantId, action, body, languageCode, send);
+    }
+  }
+
+  /// [send] with [body] and a token ([_withToken]); its errors without the token.
+  Future<Map<String, Object?>> _sendWithToken(
+    String? tenantId,
+    RecaptchaAction action,
+    Map<String, Object?> body,
+    String? languageCode,
+    RecaptchaSend send,
+  ) async {
+    final Map<String, Object?> protectedBody = await _withToken(
+      tenantId,
+      action,
+      body,
+      languageCode,
+    );
+    final Object? token =
+        protectedBody['captchaResponse'] ?? protectedBody['captchaResp'];
+    try {
+      return await send(protectedBody);
+    } on FirebaseAuthException catch (e, stackTrace) {
+      if (token is! String || token == noRecaptchaToken) {
+        rethrow;
+      }
+      Error.throwWithStackTrace(
+        redactPhoneSecrets(e, <String>[token]),
+        stackTrace,
+      );
     }
   }
 
@@ -104,9 +152,10 @@ final class RecaptchaEnterprise {
   ///
   /// The configuration of [tenantId] is read first when it has not been (a failure counts as "not
   /// protected", as in the JS SDK). Protected: the Enterprise token goes with the request; under
-  /// AUDIT, `missing-recaptcha-token` and `invalid-app-credential` send it again with the v2 token.
-  /// Not protected: the v2 token, with `captchaResponse: NO_RECAPTCHA` and the client type and
-  /// version, as the JS SDK sends it.
+  /// AUDIT, `missing-recaptcha-token` and `invalid-app-credential` send it again with the v2 token,
+  /// and so does a source that fails (not by the person's choice, see [_chosenCodes]), as JS's
+  /// `FAKE_TOKEN` does; under ENFORCE that failure is thrown. Not protected: the v2 token, with
+  /// `captchaResponse: NO_RECAPTCHA` and the client type and version, as the JS SDK sends it.
   Future<T> sendPhone<T>({
     required String? tenantId,
     required RecaptchaAction action,
@@ -134,7 +183,15 @@ final class RecaptchaEnterprise {
     if (config == null || !config.isProviderEnabled(RecaptchaProvider.phone)) {
       return send(await withV2());
     }
-    final String token = await _token(tenantId, action, languageCode);
+    final String? token = await _tokenUnlessAudit(
+      tenantId,
+      action,
+      languageCode,
+      RecaptchaProvider.phone,
+    );
+    if (token == null) {
+      return send(await withV2());
+    }
     secrets.add(token);
     try {
       return await send(_markers(token));
@@ -169,7 +226,14 @@ final class RecaptchaEnterprise {
     Map<String, Object?> body,
     String? languageCode,
   ) async {
-    final String token = await _token(tenantId, action, languageCode);
+    final String token =
+        await _tokenUnlessAudit(
+          tenantId,
+          action,
+          languageCode,
+          RecaptchaProvider.emailPassword,
+        ) ??
+        noRecaptchaToken;
     return <String, Object?>{
       ...body,
       action == RecaptchaAction.getOobCode ? 'captchaResp' : 'captchaResponse':
@@ -177,6 +241,33 @@ final class RecaptchaEnterprise {
       'clientType': clientType.value,
       'recaptchaVersion': 'RECAPTCHA_ENTERPRISE',
     };
+  }
+
+  /// A token for [action] ([_token]), or null when it failed (not by the person's choice) while
+  /// [provider] is under AUDIT in the configuration of [tenantId]: the caller sends the request
+  /// without an Enterprise token then.
+  Future<String?> _tokenUnlessAudit(
+    String? tenantId,
+    RecaptchaAction action,
+    String? languageCode,
+    RecaptchaProvider provider,
+  ) async {
+    try {
+      return await _token(tenantId, action, languageCode);
+    } on Object catch (e) {
+      final bool audit =
+          configOf(tenantId)?.enforcementState(provider) ==
+          RecaptchaEnforcementState.audit;
+      if (!audit || _isChosen(e)) {
+        rethrow;
+      }
+      Log.i(
+        'FirebaseUserAuth',
+        'No reCAPTCHA Enterprise token for ${action.value} (${e.runtimeType}); the provider '
+            'is under AUDIT, so the request goes without one.',
+      );
+      return null;
+    }
   }
 
   /// A token for [action] from [source], with the site key of the configuration of [tenantId]
@@ -191,7 +282,7 @@ final class RecaptchaEnterprise {
     try {
       return await _tokenOnce(tenantId, action, languageCode, refresh: false);
     } on FirebaseAuthException catch (e) {
-      if (e.code == 'timeout' || e.code == 'user-cancelled') {
+      if (_isChosen(e)) {
         rethrow;
       }
     } on Object {

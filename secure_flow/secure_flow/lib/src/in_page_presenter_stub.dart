@@ -16,6 +16,7 @@ class InPageRecaptchaPresenter implements RecaptchaPresenter {
     this.onExpired,
     this.onError,
     this.scriptTimeout = const Duration(seconds: 30),
+    this.scriptAddress,
   });
 
   /// The id of the element the widget goes into, or null for a new invisible one.
@@ -32,6 +33,9 @@ class InPageRecaptchaPresenter implements RecaptchaPresenter {
 
   /// How long Google's script may take to load.
   final Duration scriptTimeout;
+
+  /// Maps the address of Google's script to the address loaded instead, or null.
+  final Uri Function(Uri googleScript)? scriptAddress;
 
   @override
   SecurePresenterKind get kind => SecurePresenterKind.inPage;

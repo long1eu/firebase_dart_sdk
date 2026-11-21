@@ -859,4 +859,196 @@ void main() {
       );
     });
   });
+
+  group('a failing token source', () {
+    /// A source that fails with [error] on every call.
+    _Tokens failing(Exception error) => _Tokens(answer: (_) => throw error);
+
+    const RecaptchaFailure blocked = RecaptchaFailure(
+      RecaptchaFailureReason.scriptLoad,
+      'enterprise.js blocked',
+    );
+
+    setUp(() {
+      backend
+        ..on(
+          'recaptchaParams',
+          (_) => jsonResponse(<String, Object?>{'recaptchaSiteKey': 'v2-key'}),
+        )
+        ..on(
+          'accounts:sendVerificationCode',
+          (_) => jsonResponse(<String, Object?>{'sessionInfo': 'session-1'}),
+        );
+    });
+
+    test('AUDIT, password: the request goes with NO_RECAPTCHA', () async {
+      backend.on('recaptchaConfig', (_) => _config(email: 'AUDIT'));
+      final _Tokens tokens = failing(blocked);
+      final FirebaseUserAuth auth = backend.create(
+        recaptchaEnterprise: tokens.source(),
+      );
+      await auth.initializeRecaptchaConfig();
+      await auth.signInWithEmailAndPassword(email: 'a@b.c', password: 'pw');
+      await auth.sendPasswordResetEmail(email: 'a@b.c');
+      final Map<String, Object?> signIn = backend
+          .bodiesOf('accounts:signInWithPassword')
+          .single;
+      expect(signIn['captchaResponse'], 'NO_RECAPTCHA');
+      expect(signIn['clientType'], 'CLIENT_TYPE_WEB');
+      expect(signIn['recaptchaVersion'], 'RECAPTCHA_ENTERPRISE');
+      expect(
+        backend.bodiesOf('accounts:sendOobCode').single['captchaResp'],
+        'NO_RECAPTCHA',
+      );
+      // Each request asked twice (the retry after reading the configuration again).
+      expect(tokens.requests, hasLength(4));
+    });
+
+    test('ENFORCE, password: the failure is thrown, nothing is sent', () async {
+      backend.on('recaptchaConfig', (_) => _config(email: 'ENFORCE'));
+      final FirebaseUserAuth auth = backend.create(
+        recaptchaEnterprise: failing(blocked).source(),
+      );
+      await auth.initializeRecaptchaConfig();
+      await expectLater(
+        auth.signInWithEmailAndPassword(email: 'a@b.c', password: 'pw'),
+        throwsAuth('internal-error'),
+      );
+      expect(backend.methods, isNot(contains('accounts:signInWithPassword')));
+    });
+
+    test('AUDIT, SMS: the v2 token goes instead', () async {
+      backend.on('recaptchaConfig', (_) => _config(phone: 'AUDIT'));
+      final _V2Tokens v2 = _V2Tokens();
+      await backend
+          .create(recaptchaEnterprise: failing(blocked).source())
+          .verifyPhoneNumber(_phone, appVerification: v2.verification);
+      expect(
+        backend.bodiesOf('accounts:sendVerificationCode').single,
+        <String, Object?>{
+          'phoneNumber': _phone,
+          'recaptchaToken': 'v2-1',
+          'captchaResponse': 'NO_RECAPTCHA',
+          'clientType': 'CLIENT_TYPE_WEB',
+          'recaptchaVersion': 'RECAPTCHA_ENTERPRISE',
+        },
+      );
+      expect(v2.requests, hasLength(1));
+    });
+
+    test('ENFORCE, SMS: the failure is thrown, no SMS, no v2 token', () async {
+      backend.on('recaptchaConfig', (_) => _config(phone: 'ENFORCE'));
+      final _V2Tokens v2 = _V2Tokens();
+      await expectLater(
+        backend
+            .create(
+              recaptchaEnterprise: failing(
+                const RecaptchaFailure(RecaptchaFailureReason.widget, 'x'),
+              ).source(),
+            )
+            .verifyPhoneNumber(_phone, appVerification: v2.verification),
+        throwsAuth('network-request-failed'),
+      );
+      expect(backend.methods, isNot(contains('accounts:sendVerificationCode')));
+      expect(v2.requests, isEmpty);
+    });
+
+    test(
+      'AUDIT: the person\'s timeout, cancel or a newer check is thrown',
+      () async {
+        for (final (Exception error, String code) in <(Exception, String)>[
+          (
+            const FirebaseAuthException(code: 'timeout', message: 'late'),
+            'timeout',
+          ),
+          (
+            const FirebaseAuthException(code: 'user-cancelled', message: 'no'),
+            'user-cancelled',
+          ),
+          (
+            const RecaptchaFailure(RecaptchaFailureReason.superseded, 'newer'),
+            'cancelled',
+          ),
+        ]) {
+          backend = FakeBackend()
+            ..on(
+              'recaptchaConfig',
+              (_) => _config(email: 'AUDIT', phone: 'AUDIT'),
+            );
+          final _Tokens tokens = failing(error);
+          final FirebaseUserAuth auth = backend.create(
+            recaptchaEnterprise: tokens.source(),
+          );
+          await auth.initializeRecaptchaConfig();
+          await expectLater(
+            auth.signInWithEmailAndPassword(email: 'a@b.c', password: 'pw'),
+            throwsAuth(code),
+            reason: code,
+          );
+          await expectLater(
+            auth.verifyPhoneNumber(
+              _phone,
+              appVerification: _V2Tokens().verification,
+            ),
+            throwsAuth(code),
+            reason: code,
+          );
+          expect(tokens.requests, hasLength(2), reason: 'not retried: $code');
+          expect(
+            backend.methods,
+            everyElement(
+              isNot(
+                anyOf(
+                  'accounts:signInWithPassword',
+                  'accounts:sendVerificationCode',
+                ),
+              ),
+            ),
+          );
+        }
+      },
+    );
+  });
+
+  group('the password token in errors', () {
+    test('an echo of the token in an error is redacted', () async {
+      backend
+        ..on('recaptchaConfig', (_) => _config(email: 'ENFORCE'))
+        ..on(
+          'accounts:signInWithPassword',
+          (Map<String, Object?> body) => errorResponse(
+            'INVALID_RECAPTCHA_TOKEN : ${body['captchaResponse']} was refused',
+          ),
+        )
+        ..on(
+          'accounts:sendOobCode',
+          (Map<String, Object?> body) =>
+              errorResponse('INVALID_RECAPTCHA_TOKEN : ${body['captchaResp']}'),
+        );
+      final FirebaseUserAuth auth = backend.create(
+        recaptchaEnterprise: _Tokens().source(),
+      );
+      await auth.initializeRecaptchaConfig();
+      for (final (Future<Object?> Function() call, String token)
+          in <(Future<Object?> Function(), String)>[
+            (
+              () => auth.signInWithEmailAndPassword(
+                email: 'a@b.c',
+                password: 'pw',
+              ),
+              'enterprise-1',
+            ),
+            (() => auth.sendPasswordResetEmail(email: 'a@b.c'), 'enterprise-2'),
+          ]) {
+        try {
+          await call();
+          fail('no error');
+        } on FirebaseAuthException catch (e) {
+          expect(e.code, 'invalid-recaptcha-token');
+          expect('$e ${e.message} ${e.serverCode}', isNot(contains(token)));
+          expect(e.message, contains('<redacted>'));
+        }
+      }
+    });
+  });
 }
