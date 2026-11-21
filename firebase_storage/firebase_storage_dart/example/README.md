@@ -17,6 +17,7 @@ Each program uses a folder of its own name plus a timestamp and deletes what it 
 |---|---|
 | `upload_bytes_and_strings.dart` | `putBytes`, and `putString` with each `StringFormat` (`raw`, `base64`, `base64Url`, `dataUrl`), with metadata. |
 | `resumable_upload.dart` | `startUpload`: the `progress` stream, `result`, `pause()` / `resume()` and `cancel()` with the `bool` they return. |
+| `resume_by_session_uri.dart` | Resuming after a restart: `UploadTask.sessionUri` saved, then `existingSessionUri` of `startUpload` with the same data; only the missing bytes are sent. |
 | `streamed_download.dart` | `openRead()` as a stream, `openRead(start, end)` for a range, `getBytes()` with `maxSize`. |
 | `files.dart` | `putFile` and `writeToFile` of `package:firebase_storage_dart/io.dart`: a file streamed into a resumable upload, and an object streamed into a file. |
 | `list_and_paging.dart` | `list` with `maxResults` and `pageToken`, `listPages`, `listAll`; folders are `prefixes`. |

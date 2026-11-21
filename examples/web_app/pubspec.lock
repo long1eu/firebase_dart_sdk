@@ -62,6 +62,13 @@ packages:
       relative: true
     source: path
     version: "0.2.0"
+  firebase_storage_dart:
+    dependency: "direct main"
+    description:
+      path: "../../firebase_storage/firebase_storage_dart"
+      relative: true
+    source: path
+    version: "0.1.0"
   fixnum:
     dependency: transitive
     description:
