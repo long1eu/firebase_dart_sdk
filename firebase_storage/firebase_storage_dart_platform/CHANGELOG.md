@@ -1,3 +1,9 @@
+## 0.1.1
+
+- `FirebaseStorageDart.use` takes `maxConcurrentUploads` and `maxUploadChunkSize`, passed to each
+  `firebase_storage_dart` client (0.1.1): uploads are queued per app and bucket, and on the VM an upload of bytes
+  or a file goes as one streamed request unless chunks are set.
+
 ## 0.1.0
 
 - First version: an implementation of `FirebaseStoragePlatform` (the platform interface of the official
