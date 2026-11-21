@@ -6,7 +6,7 @@
 - `RecaptchaFlow` takes the `size` (`RecaptchaSize`: normal, compact, invisible) and `theme` (`RecaptchaTheme`)
   of the v2 widget; the loopback page starts an invisible widget at once. Its script keeps its names out of the
   page's global scope.
-- `InPageRecaptchaPresenter` (web builds, `dart:js_interop` and `package:web`): renders the v2 widget into an
+- `InPageRecaptchaPresenter` (web builds, `dart:js_interop` only): renders the v2 widget into an
   element of the app's page (invisible without a container), or runs the Enterprise execute, and returns the
   token without the loopback server; `render`, `clear`, and `onVerified`/`onExpired`/`onError` callbacks.
   `SecureEnvironment.current()` offers one on the web, and `RecaptchaFlow` ranks it first, so a reCAPTCHA runs in
@@ -16,7 +16,6 @@
   `inPage` kind.
 - `RecaptchaFailure` (`scriptLoad`, `loadTimeout`, `widget`, `noToken`) for a presenter that could not make a
   token; `RecaptchaFlow` throws it for an empty token of a `RecaptchaPresenter`.
-- Depends on `package:web`.
 
 ## 0.1.0
 

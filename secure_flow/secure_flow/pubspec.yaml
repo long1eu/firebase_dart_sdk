@@ -24,11 +24,6 @@ platforms:
 environment:
   sdk: ^3.8.0
 
-dependencies:
-  # The in-page reCAPTCHA presenter of web builds (the DOM, through dart:js_interop). No
-  # dependencies of its own.
-  web: ^1.1.0
-
 dev_dependencies:
   lints: ^6.1.0
   test: ^1.25.0

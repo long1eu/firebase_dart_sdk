@@ -2,11 +2,11 @@ import 'dart:async';
 import 'dart:js_interop';
 import 'dart:js_interop_unsafe';
 
+import 'package:secure_flow/src/dom_web.dart' as web;
 import 'package:secure_flow/src/errors.dart';
 import 'package:secure_flow/src/flows/recaptcha_flow.dart';
 import 'package:secure_flow/src/presenter.dart';
 import 'package:secure_flow/src/recaptcha_scripts.dart';
-import 'package:web/web.dart' as web;
 
 /// `window.grecaptcha`, once Google's script (or a page of the app) defined it.
 @JS('grecaptcha')
@@ -193,9 +193,7 @@ class InPageRecaptchaPresenter implements RecaptchaPresenter {
   }
 
   JSObject _parameters(RecaptchaRequest request) {
-    final bool dark = web.window
-        .matchMedia('(prefers-color-scheme: dark)')
-        .matches;
+    final bool dark = web.mediaMatches('(prefers-color-scheme: dark)');
     return JSObject()
       ..['sitekey'] = request.siteKey.toJS
       ..['size'] = _size.value.toJS

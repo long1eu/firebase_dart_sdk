@@ -14,8 +14,8 @@ import 'dart:js_interop';
 import 'dart:js_interop_unsafe';
 
 import 'package:secure_flow/secure_flow.dart';
+import 'package:secure_flow/src/dom_web.dart' as web;
 import 'package:test/test.dart';
-import 'package:web/web.dart' as web;
 
 const String _siteKey = '6LcTestSiteKey-for_the_in_page_widget_0001';
 
@@ -132,7 +132,7 @@ void main() {
     expect(verified, 1);
     expect(fake.resets, <int>[1]);
     presenter.clear();
-    expect(box.children.length, 0);
+    expect(box.childElementCount, 0);
   });
 
   test(
@@ -158,9 +158,7 @@ void main() {
     await InPageRecaptchaPresenter().recaptcha(
       const RecaptchaRequest(siteKey: _siteKey),
     );
-    final bool dark = web.window
-        .matchMedia('(prefers-color-scheme: dark)')
-        .matches;
+    final bool dark = web.mediaMatches('(prefers-color-scheme: dark)');
     expect(fake.parameter('theme'), dark ? 'dark' : 'light');
   });
 

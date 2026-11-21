@@ -13,10 +13,9 @@ Future<void> main() async {
 }
 ```
 
-Pure Dart; its only dependency is `package:web`, for the reCAPTCHA presenter of web builds. The
-library compiles on the web: there the loopback server and its presenters throw an
-`UnsupportedError`, and a `RecaptchaFlow` runs in the app's own page (`InPageRecaptchaPresenter`).
-It is used by `firebase_auth_providers_dart` for its OAuth sign-in and its reCAPTCHA checks.
+Pure Dart, no dependencies. The library compiles on the web: there the loopback server and its
+presenters throw an `UnsupportedError`, and a `RecaptchaFlow` runs in the app's own page
+(`InPageRecaptchaPresenter`). It is used by `firebase_auth_providers_dart` for its OAuth sign-in and its reCAPTCHA checks.
 
 ## Flows choose their presenters
 
