@@ -12,7 +12,8 @@
 #   2. exports that directory at <ref> into a temporary folder (no local edits, no
 #      pubspec_overrides.yaml in it or in its example, so every dependency resolves from pub.dev
 #      as users get it);
-#   3. checks that CHANGELOG.md has a heading for the pubspec version;
+#   3. checks that CHANGELOG.md has a heading for the pubspec version and that this version is not on
+#      pub.dev yet;
 #   4. runs `pub get` and `pub publish --dry-run` (flutter for Flutter packages);
 #   5. runs `pub publish`, which shows the archive and asks y/N. Publishing cannot be undone.
 #
@@ -57,6 +58,13 @@ find . -name pubspec_overrides.yaml -type f -delete
 version="$(sed -n 's/^version: *//p' pubspec.yaml | head -1)"
 if ! grep -Eq "^## \\[?${version//./\\.}\\]?( |$)" CHANGELOG.md; then
   echo "CHANGELOG.md of $name has no '## $version' heading." >&2
+  exit 1
+fi
+
+# A version that is already on pub.dev cannot be published again: stop before building anything.
+status="$(curl -s -o /dev/null -w '%{http_code}' "https://pub.dev/api/packages/$name/versions/$version")"
+if [ "$status" = 200 ]; then
+  echo "$name $version is already on pub.dev. Is the version bump merged into $ref? (git pull)" >&2
   exit 1
 fi
 
