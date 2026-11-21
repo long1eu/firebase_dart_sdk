@@ -91,9 +91,7 @@ const int chunkSize = 256 * 1024;
 const String projectVariable = 'FIREBASE_TEST_PROJECT_ID';
 const String bucketVariable = 'FIREBASE_TEST_STORAGE_BUCKET';
 const String appIdVariable = 'FIREBASE_TEST_APP_ID';
-const String webApiKeyVariable = 'FIREBASE_TEST_WEB_API_KEY';
-const String userEmailVariable = 'FIREBASE_TEST_USER_EMAIL';
-const String userPasswordVariable = 'FIREBASE_TEST_USER_PASSWORD';
+const String webApiKeyVariable = 'FIREBASE_API_KEY';
 const String emulatorHostVariable = 'FIREBASE_STORAGE_EMULATOR_HOST';
 const String authEmulatorHostVariable = 'FIREBASE_AUTH_EMULATOR_HOST';
 
@@ -441,11 +439,6 @@ class Kit {
   Future<void> close() async {
     for (final http.Client client in _clients) {
       client.close();
-    }
-    try {
-      await userAuth?.signOut();
-    } on Object {
-      // The process ends right after; nothing depends on it.
     }
   }
 }
@@ -1339,7 +1332,7 @@ Future<CheckResult> _refresh401(Kit kit) async {
   if (user == null) {
     return CheckResult(
       Status.skipped,
-      'No test user ($webApiKeyVariable, $userEmailVariable and $userPasswordVariable): a refresh needs a user.',
+      'No throwaway user (--create-user with $webApiKeyVariable or --api-key=): a refresh needs a user.',
     );
   }
   final Uint8List data = Kit.bytes(128, 13);
@@ -1363,6 +1356,13 @@ Future<CheckResult> _refresh401(Kit kit) async {
       'statuses': statuses,
       'size': metadata.size,
     };
+    if (statuses.isNotEmpty && statuses.first != 401) {
+      return CheckResult(
+        Status.inconclusive,
+        'The backend answered HTTP ${statuses.first} to a token it should refuse, not 401, so no refresh was provoked.',
+        observed: observed,
+      );
+    }
     final bool ok =
         statuses.length == 2 &&
         statuses.first == 401 &&
@@ -1710,6 +1710,81 @@ Future<CheckResult> _sdkDownload(Kit kit) async {
   }
 }
 
+Future<CheckResult> _signedInRoundTrip(Kit kit) async {
+  if (kit.userAuth == null) {
+    return CheckResult(
+      Status.skipped,
+      'No throwaway user: pass --create-user (with $webApiKeyVariable or --api-key=).',
+    );
+  }
+  final String bucket = kit.backend.deniedBucket ?? kit.backend.bucket;
+  final bool rulesNeedUser = kit.backend.deniedBucket != null;
+  final Uint8List data = Kit.bytes(8192, 20);
+  final String objectName = kit.name('signed_in.bin');
+  kit.charge(data.length);
+  kit.track(objectName, bucket: bucket);
+  final signedIn = kit.newStorage();
+  final signedOut = kit.newStorage(signedIn: false);
+  try {
+    final Reference ref = signedIn.storage.refFromUrl(
+      'gs://$bucket/$objectName',
+    );
+    final FullMetadata written = await ref.putBytes(
+      data,
+      metadata: const SettableMetadata(contentType: 'application/x-verify'),
+    );
+    final Uint8List read = await ref.getBytes();
+    final FullMetadata metadata = await ref.metadata();
+    final ListResult listed = await signedIn.storage
+        .refFromUrl('gs://$bucket/${kit.prefix}')
+        .list();
+    await ref.delete();
+    String after;
+    try {
+      await ref.metadata();
+      after = 'still there';
+    } on FirebaseStorageException catch (e) {
+      after = e.code;
+    }
+    String withoutUser = 'not tried (the bucket does not need a user)';
+    if (rulesNeedUser) {
+      final Reference anonymous = signedOut.storage.refFromUrl(
+        'gs://$bucket/$objectName',
+      );
+      try {
+        await anonymous.getBytes();
+        withoutUser = 'served';
+      } on FirebaseStorageException catch (e) {
+        withoutUser = e.code;
+      }
+    }
+    final Map<String, Object?> observed = <String, Object?>{
+      'bytes': _same(read, data),
+      'md5': _matches(written, data) && metadata.md5Hash == written.md5Hash,
+      'listed': listed.items.any((Reference r) => r.fullPath == objectName),
+      'afterDelete': after,
+      'withoutUser': withoutUser,
+    };
+    final bool ok =
+        observed['bytes'] == true &&
+        observed['md5'] == true &&
+        observed['listed'] == true &&
+        after == 'object-not-found' &&
+        (!rulesNeedUser || withoutUser == 'unauthorized');
+    return CheckResult(
+      ok ? Status.pass : Status.fail,
+      ok
+          ? 'ROUND TRIP: as the throwaway user the SDK uploaded, read, described, listed and deleted an object in $bucket; '
+                '${rulesNeedUser ? 'the same read without a user answered $withoutUser' : 'the bucket does not refuse requests without a user, so that was not tried'}.'
+          : 'The round trip did not end as expected: $observed.',
+      observed: observed,
+    );
+  } finally {
+    signedIn.storage.close();
+    signedOut.storage.close();
+  }
+}
+
 const List<Check> checks = <Check>[
   Check('1', 'Error answer of a missing object (404 envelope)', _error404),
   Check('2', 'Error answer under rules (403 envelope)', _error403),
@@ -1730,6 +1805,7 @@ const List<Check> checks = <Check>[
   Check('17', 'SDK upload, pause and resume', _sdkPauseResume),
   Check('18', 'SDK upload, resume by session URI', _sdkSessionResume),
   Check('19', 'SDK download, ranges and maxSize', _sdkDownload),
+  Check('20', 'Signed-in round trip', _signedInRoundTrip),
 ];
 
 // ---------------------------------------------------------------------------------------------------------------
@@ -1746,9 +1822,11 @@ Usage: dart run test/production/verify_production.dart --backend=production|emul
   --bucket=NAME          The bucket to write below the run's prefix (default: the variable, or on the emulator
                          demo-test.appspot.com).
   --denied-bucket=NAME   A bucket whose rules refuse requests without a user: runs check 2 (otherwise SKIPPED).
-  --auth=none|user|auto  Requests as no user, or as the test user of FIREBASE_TEST_WEB_API_KEY,
-                         FIREBASE_TEST_USER_EMAIL and FIREBASE_TEST_USER_PASSWORD (default auto: user when all three
-                         are set).
+  --api-key=KEY          The Web API key of the project (default: FIREBASE_API_KEY).
+  --create-user          Signs up a throwaway user storage-verify-<run>@example.com with a random password kept in
+                         memory, runs the checks as that user and deletes the user at the end, also when checks
+                         fail. Needs the API key and the Email/Password provider (on the emulator also
+                         FIREBASE_AUTH_EMULATOR_HOST). Without it requests carry no user.
   --only=1,2             Runs only these checks.
   --max-bytes=N          The cap on the bytes uploaded in total (default $defaultMaxBytes = 64 MiB).
   --keep                 Does not delete the objects of the run at the end.
@@ -1801,14 +1879,19 @@ Future<KitRun> runKit(
     return KitRun(2, <String, CheckResult>{}, 0, 0, null);
   }
 
-  const Set<String> flags = <String>{'--yes', '--keep', '--list'};
+  const Set<String> flags = <String>{
+    '--yes',
+    '--keep',
+    '--list',
+    '--create-user',
+  };
   const Set<String> options = <String>{
     'backend',
     'only',
     'max-bytes',
     'bucket',
     'denied-bucket',
-    'auth',
+    'api-key',
   };
   for (final String argument in arguments) {
     final bool known =
@@ -1848,7 +1931,10 @@ Future<KitRun> runKit(
       deniedBucket: option('denied-bucket'),
       emulatorHost: null,
       appId: setting(appIdVariable) ?? '1:0:dart:verify-storage-kit',
-      apiKey: setting(webApiKeyVariable) ?? 'verify-storage-kit-no-key',
+      apiKey:
+          option('api-key') ??
+          setting(webApiKeyVariable) ??
+          'verify-storage-kit-no-key',
     );
   } else if (backendName == 'emulator') {
     if (emulatorHost == null) {
@@ -1863,7 +1949,7 @@ Future<KitRun> runKit(
       deniedBucket: option('denied-bucket'),
       emulatorHost: emulatorHost,
       appId: '1:0:dart:verify-storage-kit',
-      apiKey: setting(webApiKeyVariable) ?? 'fake-api-key',
+      apiKey: option('api-key') ?? setting(webApiKeyVariable) ?? 'fake-api-key',
     );
   } else {
     return usageError(
@@ -1875,21 +1961,19 @@ Future<KitRun> runKit(
   if (maxBytes == null || maxBytes < 0) {
     return usageError('--max-bytes needs a number of bytes.');
   }
-  final String authMode = option('auth') ?? 'auto';
-  if (!<String>{'none', 'user', 'auto'}.contains(authMode)) {
-    return usageError('--auth is none, user or auto.');
+  final bool createUser = arguments.contains('--create-user');
+  if (createUser) {
+    if (backend.production && backend.apiKey.startsWith('verify-storage-kit')) {
+      return usageError(
+        '--create-user needs the Web API key: $webApiKeyVariable or --api-key=.',
+      );
+    }
+    if (!backend.production && setting(authEmulatorHostVariable) == null) {
+      return usageError(
+        '--create-user on the emulator needs $authEmulatorHostVariable (tool/start_auth_emulators.sh).',
+      );
+    }
   }
-  final bool userConfigured =
-      setting(webApiKeyVariable) != null &&
-      setting(userEmailVariable) != null &&
-      setting(userPasswordVariable) != null;
-  if (authMode == 'user' && !userConfigured) {
-    return usageError(
-      '--auth=user needs $webApiKeyVariable, $userEmailVariable and $userPasswordVariable.',
-    );
-  }
-  final bool useUser =
-      authMode == 'user' || (authMode == 'auto' && userConfigured);
 
   final Set<String>? only = option('only')?.split(',').toSet();
   if (only != null) {
@@ -1921,7 +2005,7 @@ Future<KitRun> runKit(
       '  prefix:    $prefix/ (the only place written, listed and deleted)',
     )
     ..writeln(
-      '  user:      ${useUser ? 'a test user, email and password from the environment' : 'none (requests carry no user)'}',
+      '  user:      ${createUser ? 'a throwaway user storage-verify-$runId@example.com is signed up with a random password and deleted at the end' : 'none (requests carry no user; checks 13 and 20 are skipped)'}',
     )
     ..writeln(
       '  cost:      at most $maxBytes bytes uploaded in total; every object is deleted at the end',
@@ -1938,21 +2022,38 @@ Future<KitRun> runKit(
   sink.writeln('');
 
   FirebaseUserAuth? auth;
-  if (useUser) {
-    auth = FirebaseUserAuth(
-      apiKey: setting(webApiKeyVariable)!,
+  String? uid;
+  if (createUser) {
+    final FirebaseApp authApp = FirebaseApp.withOptions(
+      FirebaseOptions(
+        apiKey: backend.apiKey,
+        appId: backend.appId,
+        projectId: backend.projectId,
+        storageBucket: backend.bucket,
+      ),
+      name: 'verify-storage-auth-$runId',
+    );
+    auth = await FirebaseUserAuth.forApp(
+      authApp,
       emulatorHost: backend.production
           ? null
           : setting(authEmulatorHostVariable),
     );
+    final math.Random secure = math.Random.secure();
+    const String alphabet =
+        'abcdefghijkmnopqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    final String password = <String>[
+      for (int i = 0; i < 32; i++) alphabet[secure.nextInt(alphabet.length)],
+    ].join();
     try {
-      await auth.signInWithEmailAndPassword(
-        email: setting(userEmailVariable)!,
-        password: setting(userPasswordVariable)!,
+      final UserCredential created = await auth.createUserWithEmailAndPassword(
+        email: 'storage-verify-$runId@example.com',
+        password: password,
       );
+      uid = created.user?.uid;
     } on FirebaseAuthException catch (e) {
       sink.writeln(
-        'Signing in the test user failed: ${e.code}. Nothing was written.',
+        'Signing up the throwaway user failed: ${e.code}. Nothing was written.',
       );
       return KitRun(2, <String, CheckResult>{}, 0, 0, prefix);
     }
@@ -2015,6 +2116,17 @@ Future<KitRun> runKit(
           ..writeln(
             'Delete the objects below $prefix/ in bucket ${backend.bucket} by hand (for example in the console).',
           );
+      }
+    }
+    if (auth != null) {
+      try {
+        await auth.deleteCurrentUser();
+        sink.writeln('The throwaway user was deleted.');
+      } on Object catch (e) {
+        sink.writeln(
+          'Deleting the throwaway user FAILED: ${_describe(e)}. Delete the user with uid $uid by hand '
+          '(Authentication > Users in the console).',
+        );
       }
     }
     await kit.close();
