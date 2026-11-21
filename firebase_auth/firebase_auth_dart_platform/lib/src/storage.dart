@@ -1,7 +1,14 @@
 import 'dart:async';
 
+import 'package:firebase_auth_platform_interface/firebase_auth_platform_interface.dart'
+    show Persistence;
 import 'package:firebase_auth_providers_dart/firebase_auth_providers_dart.dart'
-    show AuthStorage, FileAuthStorage, InMemoryAuthStorage;
+    show
+        AuthStorage,
+        BestWebAuthStorage,
+        FileAuthStorage,
+        InMemoryAuthStorage,
+        WebAuthStorage;
 import 'package:firebase_auth_secure_storage_flutter/firebase_auth_secure_storage_flutter.dart'
     show SecureAuthStorage;
 import 'package:flutter/foundation.dart';
@@ -18,15 +25,87 @@ export 'storage_path_stub.dart'
 AuthStorage? _defaultStorage;
 
 /// The storage of the sessions when the app passes none: the secure store of
-/// the platform ([secureDefaultStorage]), except on the web, where it is
-/// memory.
+/// the platform ([secureDefaultStorage]), except on the web, where it is the
+/// best storage of the browser ([BestWebAuthStorage]: IndexedDB, else
+/// `localStorage`, else memory).
 ///
 /// One object for the whole program, shared by the instances of every app: it
 /// holds one session per app, and one object writes them one at a time, so
 /// that two apps do not overwrite each other's session.
-AuthStorage defaultStorage() => _defaultStorage ??= kIsWeb
-    ? path.defaultFileStorage()
-    : secureDefaultStorage(path.defaultSessionFile());
+AuthStorage defaultStorage() =>
+    _defaultStorage ??= defaultStorageFor(web: kIsWeb);
+
+/// What [defaultStorage] creates: [webStorage] (by default a
+/// [BestWebAuthStorage]) when [web] is true, else [secureDefaultStorage] in
+/// the default session file. Nothing is read or written here.
+@visibleForTesting
+AuthStorage defaultStorageFor({
+  required bool web,
+  AuthStorage Function() webStorage = BestWebAuthStorage.new,
+}) => web ? webStorage() : secureDefaultStorage(path.defaultSessionFile());
+
+/// The storage `setPersistence(persistence)` moves the session to.
+///
+/// * [Persistence.NONE]: [memory].
+/// * [Persistence.LOCAL] and [Persistence.INDEXED_DB]: [persistent], the
+///   storage of the app (`storageFor` of `FirebaseAuthDart.use`, else
+///   [defaultStorage]; on the web by default IndexedDB, else `localStorage`,
+///   else memory).
+/// * [Persistence.SESSION]: [session], the `sessionStorage` of the tab (see
+///   [sessionStorageFor]), or [memory] when there is none: outside a browser,
+///   the nearest thing, and on the web with `storageFor`, so that an app that
+///   chose its own storage never gets the session written elsewhere.
+AuthStorage storageForPersistence(
+  Persistence persistence, {
+  required AuthStorage persistent,
+  required AuthStorage memory,
+  required AuthStorage? session,
+}) => switch (persistence) {
+  Persistence.NONE => memory,
+  Persistence.LOCAL || Persistence.INDEXED_DB => persistent,
+  Persistence.SESSION => session ?? memory,
+};
+
+/// Where [Persistence.SESSION] keeps the session of an app: on the web ([web])
+/// when the app passed no `storageFor` ([customStorage] false), the
+/// `sessionStorage` of the tab ([sessionStorage], by default
+/// `WebAuthStorage.session`) with memory behind it. Null otherwise, and
+/// [sessionStorage] is not called.
+FallbackStorage? sessionStorageFor({
+  required bool web,
+  required bool customStorage,
+  AuthStorage Function() sessionStorage = WebAuthStorage.session,
+}) => web && !customStorage ? FallbackStorage(sessionStorage()) : null;
+
+/// The storage the client of an app starts on, and restores from: [session]
+/// when it holds a session under [key] (the app set [Persistence.SESSION]
+/// before the tab was reloaded), else [persistent].
+///
+/// [session] is read synchronously, before the client exists; a read that is
+/// asynchronous or throws (a browser that refuses `sessionStorage`) counts as
+/// nothing stored there. A later `setPersistence(SESSION)` then finds the
+/// client on [session] already and moves nothing, so the copy survives.
+AuthStorage initialStorage({
+  required AuthStorage persistent,
+  required AuthStorage? session,
+  required String key,
+}) {
+  if (session == null) {
+    return persistent;
+  }
+  final FutureOr<String?> stored;
+  try {
+    stored = session.read(key);
+  } on Object {
+    // sessionStorage refused: there is nothing to restore from it.
+    return persistent;
+  }
+  if (stored is Future<String?>) {
+    stored.ignore();
+    return persistent;
+  }
+  return stored == null ? persistent : session;
+}
 
 /// A [SecureDefaultStorage]: a [SecureAuthStorage] that moves the sessions
 /// found in [sessionFile] (see `defaultSessionFile`) into the secure store,

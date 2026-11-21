@@ -144,7 +144,7 @@ against the Firebase Auth emulator; nothing was run against the real service.
 | `fetchSignInMethodsForEmail(auth, email)` (deprecated upstream: empty with email enumeration protection) | `fetchSignInMethodsForEmail(email)` | emulator, Chrome |
 | `connectAuthEmulator(auth, url)` | the `emulatorHost` argument | emulator, Chrome |
 | `user.uid`, `email`, `emailVerified`, `isAnonymous`, `displayName`, `photoURL`, `phoneNumber`, `tenantId`, `metadata`, `providerData` | `currentUser` (`AuthUser`, read with `accounts:lookup` after every sign-in) | emulator |
-| `setPersistence` (`inMemory`, `browserSession`, `browserLocal`) | an `AuthStorage`: `InMemoryAuthStorage` (default), `WebAuthStorage.session()`, `WebAuthStorage.local()`, and `FileAuthStorage(path)` on the VM, given to the constructor or switched later with `setStorage`, which moves the session | unit, Chrome |
+| `setPersistence` (`inMemory`, `browserSession`, `browserLocal`, `indexedDBLocal`) | an `AuthStorage`: `InMemoryAuthStorage` (default), `WebAuthStorage.session()`, `WebAuthStorage.local()`, `IndexedDbAuthStorage()` and `BestWebAuthStorage()` (IndexedDB, else `localStorage`, else memory, like `getAuth`; see [Sessions in the browser](#sessions-in-the-browser)), and `FileAuthStorage(path)` on the VM, given to the constructor or switched later with `setStorage`, which moves the session | unit, Chrome |
 | `ActionCodeSettings` (`url`, `handleCodeInApp`, `iOS`, `android`, `linkDomain`) | `ActionCodeSettings` (flattened; no `dynamicLinkDomain`) | unit |
 | Popup and redirect flows on desktop and command line (no JS SDK equivalent) | `signInWithOAuthLoopback(OAuthLoopbackProvider.google(...))` / `.github(...)` / `.oidc(...)` / `.discover(...)`, `linkWithOAuthLoopback`, `reauthenticateWithOAuthLoopback`, or `authorizeWithOAuthLoopback(...)` for the credential (VM only; see below) | unit (fake identity provider); Google with a Desktop client against a real project |
 | Popup and redirect flows in a browser, `signInWithProvider`, SAML | – (use a token from elsewhere with `signInWithCredential`) | |
@@ -168,6 +168,37 @@ Error codes are those of the JS SDK: its complete map of server codes (`SERVER_E
 `quota-exceeded`). An answer with HTTP 200 and an `errorMessage` is an error, as in the JS SDK. Operations of
 the signed-in user throw `null-user` when nobody is signed in, and sign the user out when the
 backend answers `user-disabled` or `user-token-expired` (`_logoutIfInvalidated` of the JS SDK).
+
+### Sessions in the browser
+
+`IndexedDbAuthStorage` keeps the session in an IndexedDB database of the origin (`firebase_auth_providers_dart`,
+object store `sessions`; not the JS SDK's `firebaseLocalStorageDb`, so the two SDKs do not share sessions). A write
+completes once its transaction has completed (`durability: 'strict'`), and the calls of one instance run in order.
+Each request has `requestTimeout` (2.5 s by default) to finish; one that takes longer is aborted and throws an
+`IndexedDbTimeoutException`, and the calls behind it go on. A connection closed under it (the database was deleted,
+another connection upgraded it, the browser closed it) is opened again once. Its errors are
+`IndexedDbAuthStorageException`s, which name the operation and the key, never the value.
+`IndexedDbAuthStorage.isAvailable()` tells whether IndexedDB works here (not in some private windows, with site data
+blocked, or in a worker without it) and never throws.
+
+`BestWebAuthStorage` makes the choice of the JS SDK's `getAuth` once, at its first use: IndexedDB, else
+`localStorage`, else memory (`kind` says which). The probe runs on the connection the sessions then use. When it
+picks IndexedDB, a session that an earlier version of the app kept in `localStorage` (with `WebAuthStorage.local`
+and the same prefix) is moved at the first read: written to IndexedDB, read back, and only then deleted from
+`localStorage`. A session IndexedDB already has wins, and the `localStorage` copy is deleted. On a load where
+IndexedDB failed its probe, each write also leaves a marker in `localStorage` and tries to delete the key from
+IndexedDB; at the next load that picks IndexedDB, the marked state wins (a sign-out made then stays a sign-out).
+
+```dart web
+final FirebaseUserAuth auth = await FirebaseUserAuth.forApp(app, storage: BestWebAuthStorage());
+```
+
+Both are readable by every script of the origin, like `localStorage`: a cross-site scripting flaw gives the refresh
+token away. A change made in another tab is seen at the next read only; there is no cross-tab sync, and none is
+planned here. One consequence: a sign-out in one tab can be undone by another tab that is still signed in, at its
+next write of the session (a refresh that rotates the refresh token, a profile update, a reload of the
+user), until that tab is reloaded. On
+the Dart VM their constructors throw an `UnsupportedError`.
 
 ### Authenticator app second factors (TOTP)
 
@@ -453,8 +484,8 @@ widget from a page of your app is a use of reCAPTCHA under Google's terms; check
   APNs app verification are not there.
 - An account with a second factor signs in with an authenticator app or SMS code through
   `FirebaseAuthMultiFactorException.resolver`.
-- The session is kept in memory unless you supply an `AuthStorage` (`FileAuthStorage`, `WebAuthStorage` or your
-  own). The stored value is a credential, the refresh token: keep it where the platform keeps secrets.
+- The session is kept in memory unless you supply an `AuthStorage` (`FileAuthStorage`, `WebAuthStorage`,
+  `IndexedDbAuthStorage`, `BestWebAuthStorage` or your own). The stored value is a credential, the refresh token: keep it where the platform keeps secrets.
 - `signOut()` forgets the session locally; it does not revoke the refresh token on the backend.
 - The token providers are read once, when the Firestore instance is created: set them first.
 - Service account and Application Default Credentials tokens bypass security rules: use them on

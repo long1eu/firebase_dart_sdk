@@ -27,6 +27,24 @@
   with SMS factors only now gets the default message of `FirebaseAuthMultiFactorException`;
   `unsupportedFactorsMessage` is for factors of an unknown kind. Tested with unit tests against a fake backend;
   not run against the emulator or a real project.
+- `IndexedDbAuthStorage`: an `AuthStorage` in IndexedDB for the web (the JS SDK's `indexedDBLocalPersistence`), in
+  its own database (`firebase_auth_providers_dart`, store `sessions`; not the JS SDK's format). A write completes
+  once its transaction has completed (`durability: 'strict'`); the calls of one instance run in order; each request
+  has `requestTimeout` (2.5 s by default) and one that takes longer is aborted with an `IndexedDbTimeoutException`;
+  an open or deletion blocked by another connection fails at once. A connection found closed, or a transaction
+  aborted by the browser, is opened and tried again once. Only the default database is deleted and created again
+  when it exists without the store; another name throws. Errors are `IndexedDbAuthStorageException`s (with an
+  `IndexedDbOperation` and the browser's `DOMException` name and message), which carry no stored value.
+  `IndexedDbAuthStorage.isAvailable()` probes IndexedDB within the same limit and never throws.
+- `BestWebAuthStorage`: IndexedDB, else `localStorage`, else memory, decided once by a probe on its own connection
+  (`kind`, a `WebAuthStorageKind`), like `getAuth` of the JS SDK; `close()` closes the connection. With IndexedDB, a
+  session of the same key found in `localStorage` (`localStoragePrefix`) is moved at the first read: written, read
+  back, then deleted from `localStorage`; a session IndexedDB already has wins and the `localStorage` copy is
+  deleted. A write made while `localStorage` or memory holds the sessions leaves a marker in `localStorage` and
+  tries to delete the key from IndexedDB, so the next load with IndexedDB keeps that state.
+- No cross-tab sync: a sign-out in one tab can be undone by another signed-in tab's next write until it reloads. On
+  the Dart VM both constructors throw an `UnsupportedError`. `test/browser/indexed_db_auth_storage_test.dart` and
+  `test/browser/web_auth_storage_test.dart` pass in headless Chrome with dart2js and dart2wasm.
 
 ## 0.3.1
 

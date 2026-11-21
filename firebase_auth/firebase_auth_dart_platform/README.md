@@ -50,7 +50,7 @@ Future<void> main() async {
 
 | Argument | Default | What it does |
 | --- | --- | --- |
-| `storageFor` | the secure store of the platform, with the session file as fallback (see [The session](#the-session)); memory on the web | Returns the `AuthStorage` that keeps the session of a FlutterFire app, for example a `FileAuthStorage` at a path of your choice. It replaces the default entirely. |
+| `storageFor` | the secure store of the platform, with the session file as fallback (see [The session](#the-session)); on the web `BestWebAuthStorage` (IndexedDB, else `localStorage`, else memory) | Returns the `AuthStorage` that keeps the session of a FlutterFire app, for example a `FileAuthStorage` at a path of your choice. It replaces the default entirely. |
 | `httpClient` | one per app | The `http.Client` of the requests (tests, proxies). |
 | `useDartCore` | Linux only, when `firebase_core` has no other implementation | Installs a small pure-Dart `firebase_core`. Pass `true` to force it (tests), `false` to never do it. |
 | `oauthProviders` | none | The `OAuthLoopbackProvider`s of `signInWithProvider`, `User.linkWithProvider` and `User.reauthenticateWithProvider`, one per Firebase provider id (see [Provider sign-in](#provider-sign-in)). |
@@ -90,7 +90,7 @@ default namespace, which is unique per program):
 | Windows | one DPAPI-encrypted map in `flutter_secure_storage.dat` in the application support directory | the C++ ATL libraries of Visual Studio Build Tools to build; an interactive logon (not SSH, not a service) to use it |
 | Android | AES-GCM values, key wrapped by the Android Keystore | exclude the plugin's preferences from Auto Backup |
 | iOS | Keychain, accessible while unlocked | nothing |
-| Web | memory (the secure store is not used) | nothing |
+| Web | `BestWebAuthStorage` of `firebase_auth_providers_dart`: IndexedDB, else `localStorage`, else memory, chosen once (the secure store is not used; a session kept in `localStorage` under the same key moves to IndexedDB) | nothing |
 
 The README of `firebase_auth_secure_storage_flutter` explains each set-up.
 
@@ -169,7 +169,12 @@ Under `flutter test`, the registration on Linux uses neither the default storage
 without faking the plugin's channel gets the fallback and its line.
 
 `setPersistence(Persistence.NONE)` (or `SESSION`) moves the session to memory, so the user is signed out at the next
-start; `Persistence.LOCAL` moves it back.
+start; `Persistence.LOCAL` moves it back. On the web, `LOCAL` (or `INDEXED_DB`) moves it to the storage of the app
+(by default IndexedDB, else `localStorage`, else memory). Without `storageFor`, `SESSION` on the web moves it to the
+tab's `sessionStorage`: a reload of the tab restores it from there, and a `setPersistence(SESSION)` at start keeps
+it. With `storageFor`, `SESSION` stays memory, so the session is never written outside the storage you chose.
+IndexedDB, `localStorage` and `sessionStorage` are readable by every script of the origin; there is no cross-tab
+sync, so a sign-out in one tab can be undone by another signed-in tab's next write until that tab reloads.
 
 ## Provider sign-in
 
