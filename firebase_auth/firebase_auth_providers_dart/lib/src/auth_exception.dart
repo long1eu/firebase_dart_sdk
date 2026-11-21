@@ -1,3 +1,5 @@
+import 'dart:collection';
+
 import 'package:firebase_app_dart/firebase_app_dart.dart';
 
 import 'auth_credential.dart';
@@ -80,6 +82,7 @@ class FirebaseAuthException extends FirebaseException {
     this.phoneNumber,
     this.tenantId,
     this.credential,
+    this.serverResponse,
   }) : super(plugin: 'firebase_auth', code: code, message: message);
 
   /// Maps the error message of the Identity Toolkit or Secure Token API ([serverMessage], for example
@@ -98,7 +101,8 @@ class FirebaseAuthException extends FirebaseException {
   ///
   /// [response] is the decoded body of the answer. For the errors the JS SDK tags with the answer
   /// (`credential-already-in-use`, `email-already-in-use`, `user-disabled`) its `email`, `phoneNumber` and
-  /// `tenantId` become those of the exception, and the message is the standard one.
+  /// `tenantId` become those of the exception, the message is the standard one, and the answer is kept as
+  /// [serverResponse].
   factory FirebaseAuthException.fromServer(
     String serverMessage, {
     int? httpStatus,
@@ -141,6 +145,7 @@ class FirebaseAuthException extends FirebaseException {
       phoneNumber: tagged ? text('phoneNumber') : null,
       tenantId: tagged ? text('tenantId') : null,
       credential: tagged ? credentialFromResponse(response) : null,
+      serverResponse: tagged ? _ServerResponse.of(response) : null,
     );
   }
 
@@ -164,6 +169,7 @@ class FirebaseAuthException extends FirebaseException {
       phoneNumber: text('phoneNumber'),
       tenantId: text('tenantId'),
       credential: credentialFromResponse(response),
+      serverResponse: _ServerResponse.of(response),
     );
   }
 
@@ -197,6 +203,15 @@ class FirebaseAuthException extends FirebaseException {
   /// `account-exists-with-different-credential`, sign in with a method of [email], then link this credential.
   /// It holds tokens: [toString] and [message] leave it out.
   final AuthCredential? credential;
+
+  /// The answer of the backend that came with the error, for the errors the JS SDK tags with it
+  /// (`account-exists-with-different-credential`, `credential-already-in-use`, `email-already-in-use`,
+  /// `user-disabled`): the JS SDK's `customData._tokenResponse`. Null for the other errors.
+  ///
+  /// It can hold tokens (`idToken`, `refreshToken`, `oauthAccessToken`, ...): it is unmodifiable, its [toString]
+  /// lists only its keys, and the [toString] of the exception leaves it out. Do not send it anywhere but to your
+  /// own code.
+  final Map<String, Object?>? serverResponse;
 
   /// Whether the session is no longer valid: the backend rejected the request with HTTP 400 because the refresh
   /// token was revoked or the account is gone or disabled. The user is signed out when a token refresh fails with
@@ -413,6 +428,19 @@ class FirebaseAuthException extends FirebaseException {
 
   @override
   String toString() => 'FirebaseAuthException(code: $code): $message';
+}
+
+/// The answer of [FirebaseAuthException.serverResponse]: unmodifiable, and printed without its values.
+class _ServerResponse extends UnmodifiableMapView<String, Object?> {
+  _ServerResponse(super.map);
+
+  static _ServerResponse? of(Map<String, Object?>? response) => response == null
+      ? null
+      : _ServerResponse(Map<String, Object?>.of(response));
+
+  @override
+  String toString() =>
+      '{${keys.map((String key) => '$key: <redacted>').join(', ')}}';
 }
 
 /// Thrown by a sign-in or a reauthentication when the account has a second factor enrolled: the email address and
