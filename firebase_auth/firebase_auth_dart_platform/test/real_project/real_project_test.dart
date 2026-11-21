@@ -58,6 +58,7 @@ Future<(List<StepResult>, List<String>)> _run(HarnessConfig config) async {
       OAuthLoopbackProvider.google(
         clientId: config.googleClientId,
         clientSecret: config.googleClientSecret,
+        loginHint: config.googleLoginHint,
       ),
       if (config.githubClientId != null)
         OAuthLoopbackProvider.github(

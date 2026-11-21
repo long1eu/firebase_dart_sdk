@@ -102,6 +102,24 @@ void _configurationTests() {
     expect(config.googleClientSecret, 'google-secret-value');
     expect(config.githubClientId, 'gh-id');
     expect(config.githubAccountExists, isTrue);
+    expect(config.googleLoginHint, isNull);
+  });
+
+  test('the Google login hint is optional', () {
+    expect(
+      HarnessConfig.fromEnvironment(<String, String>{
+        ..._baseEnvironment,
+        'AUTH_HARNESS_GOOGLE_LOGIN_HINT': ' ada@example.com ',
+      }).googleLoginHint,
+      'ada@example.com',
+    );
+    expect(
+      HarnessConfig.fromEnvironment(<String, String>{
+        ..._baseEnvironment,
+        'AUTH_HARNESS_GOOGLE_LOGIN_HINT': '  ',
+      }).googleLoginHint,
+      isNull,
+    );
   });
 
   test('a malformed app id or flag is an error that does not echo secrets', () {

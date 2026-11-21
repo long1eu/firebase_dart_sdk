@@ -36,6 +36,10 @@ const String stepsVariable = 'AUTH_HARNESS_STEPS';
 /// the GitHub step (see [HarnessConfig.githubAccountExists]).
 const String githubAccountExistsVariable = 'AUTH_HARNESS_GITHUB_ACCOUNT_EXISTS';
 
+/// An optional email address passed to Google as `login_hint`, so that the
+/// account chooser is skipped. Never printed.
+const String googleLoginHintVariable = 'AUTH_HARNESS_GOOGLE_LOGIN_HINT';
+
 const List<String> _firebaseVariables = <String>[
   'FIREBASE_API_KEY',
   'FIREBASE_PROJECT_ID',
@@ -78,6 +82,7 @@ class HarnessConfig {
     required this.githubClientId,
     required this.githubClientSecret,
     required this.githubAccountExists,
+    required this.googleLoginHint,
   });
 
   /// Reads the configuration from [environment] (`Platform.environment`).
@@ -118,6 +123,10 @@ class HarnessConfig {
         githubAccountExistsVariable,
         environment[githubAccountExistsVariable],
       ),
+      googleLoginHint: switch (environment[googleLoginHintVariable]?.trim()) {
+        null || '' => null,
+        final String hint => hint,
+      },
     );
   }
 
@@ -132,6 +141,11 @@ class HarnessConfig {
 
   /// The client secret of the Google "Desktop app" OAuth client.
   final String googleClientSecret;
+
+  /// The `login_hint` of the Google sign-ins, from
+  /// [googleLoginHintVariable]; null when not set. An email address: never
+  /// printed.
+  final String? googleLoginHint;
 
   /// The client id of the GitHub OAuth App; null without [HarnessStep.github].
   final String? githubClientId;

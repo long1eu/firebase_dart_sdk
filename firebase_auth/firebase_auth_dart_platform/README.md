@@ -254,6 +254,7 @@ command):
 | `GOOGLE_DESKTOP_CLIENT_ID`, `GOOGLE_DESKTOP_CLIENT_SECRET` | always: every step signs in with Google first | a "Desktop app" OAuth client |
 | `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET` | `github` | the GitHub OAuth App |
 | `AUTH_HARNESS_GITHUB_ACCOUNT_EXISTS` | optional, `github` | `1` to start the GitHub step with the `account-exists-with-different-credential` recovery (below) |
+| `AUTH_HARNESS_GOOGLE_LOGIN_HINT` | optional | The Google account's email address, passed as `login_hint` so that Google skips the account chooser on each of the browser trips. Never printed |
 
 **Each step prints one line**, `PASS <step>`, `FAIL <step>: <error code>` or `SKIP <step>: <reason>`:
 
