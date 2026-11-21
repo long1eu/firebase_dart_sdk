@@ -109,7 +109,7 @@ void main() {
       });
       tearDown(() => dir.delete(recursive: true));
 
-      test('5 MB round trip through writeToFile', () async {
+      test('5 MB round trip through putFile and writeToFile', () async {
         final math.Random random = math.Random(42);
         final Uint8List data = Uint8List.fromList(
           List<int>.generate(5 * 1024 * 1024 + 123, (_) => random.nextInt(256)),
@@ -118,10 +118,14 @@ void main() {
           ..writeAsBytesSync(data);
         final Reference ref = folder.child('round-trip.bin');
 
-        final FullMetadata uploaded = await ref.putBytes(
-          source.readAsBytesSync(),
-          metadata: const SettableMetadata(contentType: 'application/x-test'),
-        );
+        final FullMetadata uploaded = await ref
+            .putFile(
+              source,
+              metadata: const SettableMetadata(
+                contentType: 'application/x-test',
+              ),
+            )
+            .result;
         expect(uploaded.size, data.length);
         expect(uploaded.contentType, 'application/x-test');
 
