@@ -50,6 +50,8 @@ jobs:
       browser: ${{ github.event_name == 'workflow_dispatch' || steps.browser.outputs.browser == 'true' }}
       # Whether the change touches the IndexedDB cache engine or its check against the JS SDK.
       indexeddb: ${{ github.event_name == 'workflow_dispatch' || steps.browser.outputs.indexeddb == 'true' }}
+      # Whether the change touches firebase_auth_secure_storage_dart or what runs its tests on the real stores.
+      securestorage: ${{ github.event_name == 'workflow_dispatch' || steps.browser.outputs.securestorage == 'true' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
@@ -72,6 +74,7 @@ jobs:
           # `browser` is true when any changed file is one of these: the library, the SQLite
           # opener package (the web opener and OPFS worker the tests use), the browser tests, and
           # what runs them.
+          # `indexeddb` and `securestorage` work the same way for their own jobs.
           filters: |
             browser:
               - 'cloud_firestore/cloud_firestore_dart/lib/**'
@@ -101,6 +104,10 @@ jobs:
               - 'tool/bench/web_idb/pubspec.yaml'
               - 'tool/start_private_emulator.sh'
               - 'tool/stop_private_emulator.sh'
+              - '.github/workflows/ci.yml'
+              - '.github/actions/**'
+            securestorage:
+              - 'firebase_auth/firebase_auth_secure_storage_dart/**'
               - '.github/workflows/ci.yml'
               - '.github/actions/**'
 
@@ -633,6 +640,124 @@ jobs:
         with:
           name: storage-log
           path: ${{ runner.temp }}/emulator/*.log
+
+  # firebase_auth_secure_storage_dart against the real secret store of each system
+  # (test/integration, skipped without FIREBASE_AUTH_SECURE_STORAGE_INTEGRATION=1; the unit legs run
+  # the rest of its tests). Only when a change touches the package, ci.yml or .github/actions/. Each
+  # job runs the command of the package README ("Integration tests") and fails when no test passed
+  # or one was skipped: a test that skips has not touched the store. The expanded reporter ends with
+  # "+<passed>: All tests passed!" only when nothing was skipped ("+<passed> ~<skipped>: ..."
+  # otherwise).
+  #
+  # Linux: libsecret over the Secret Service of gnome-keyring, in a session bus of its own
+  # (dbus-run-session) with the login keyring created and unlocked with an empty password.
+  # secret-tool (libsecret-tools) lets the test check the attributes of the stored item. The test
+  # also runs test/integration/linux_no_bus.dart in a child process with a bus that does not exist,
+  # so that program needs no step of its own. Required.
+  secure-storage-linux:
+    name: Secure storage on the Secret Service (Linux, libsecret)
+    needs: changes
+    if: ${{ needs.changes.outputs.code == 'true' && needs.changes.outputs.securestorage == 'true' }}
+    runs-on: ubuntu-26.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/dart
+        with:
+          sdk: stable
+      - name: Install libsecret, gnome-keyring and D-Bus
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libsecret-1-0 libsecret-tools gnome-keyring dbus
+          command -v dbus-run-session gnome-keyring-daemon secret-tool
+      - name: Run the integration tests
+        working-directory: firebase_auth/firebase_auth_secure_storage_dart
+        env:
+          FIREBASE_AUTH_SECURE_STORAGE_INTEGRATION: '1'
+        run: |
+          set -o pipefail
+          dart pub get
+          dbus-run-session -- sh -c 'printf "" | gnome-keyring-daemon --unlock --components=secrets >/dev/null &&
+            dart test --reporter expanded --no-color test/integration/linux_libsecret_test.dart' 2>&1 \
+            | tee "$RUNNER_TEMP/secure_storage_linux.log"
+          if ! grep -Eq '^[0-9:]+ \+[1-9][0-9]*: All tests passed!$' "$RUNNER_TEMP/secure_storage_linux.log"; then
+            echo "::error::No integration test of the Secret Service passed, or one was skipped."
+            exit 1
+          fi
+
+  # Windows: DPAPI-encrypted files in %LOCALAPPDATA%\<service>. DPAPI needs the profile of a logged
+  # on user; whether the hosted runner's account has one that DPAPI accepts is what this job shows.
+  # setup-dart directly instead of ./.github/actions/dart: that action caches ~/.pub-cache, while
+  # pub keeps its cache in %LOCALAPPDATA%\Pub\Cache on Windows. Bash (Git for Windows) so that the
+  # check of the output is the same as on Linux. Required.
+  secure-storage-windows:
+    name: Secure storage on DPAPI (Windows)
+    needs: changes
+    if: ${{ needs.changes.outputs.code == 'true' && needs.changes.outputs.securestorage == 'true' }}
+    runs-on: windows-2025
+    timeout-minutes: 15
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: dart-lang/setup-dart@2286a0c042b44434fe26d292bbce8d34f7ec662b # v1.8.2
+        with:
+          sdk: stable
+      - name: Run the integration tests
+        working-directory: firebase_auth/firebase_auth_secure_storage_dart
+        env:
+          FIREBASE_AUTH_SECURE_STORAGE_INTEGRATION: '1'
+        run: |
+          set -o pipefail
+          echo "LOCALAPPDATA=$LOCALAPPDATA"
+          dart pub get
+          dart test --reporter expanded --no-color test/integration/windows_dpapi_test.dart 2>&1 \
+            | tee "$RUNNER_TEMP/secure_storage_windows.log"
+          if ! grep -Eq '^[0-9:]+ \+[1-9][0-9]*: All tests passed!' "$RUNNER_TEMP/secure_storage_windows.log"; then
+            echo "::error::No integration test of DPAPI passed, or one was skipped."
+            exit 1
+          fi
+
+  # macOS: the login keychain of the runner's user, through Security.framework. The README asks for a
+  # desktop session because the keychain is locked over SSH and macOS cannot prompt; a hosted runner
+  # logs its user in, but whether its login keychain is the unlocked default keychain is not known
+  # yet. Allowed to fail until it has passed on a runner.
+  secure-storage-macos:
+    name: Secure storage on the login keychain (macOS, allowed to fail)
+    needs: changes
+    if: ${{ needs.changes.outputs.code == 'true' && needs.changes.outputs.securestorage == 'true' }}
+    runs-on: macos-26
+    timeout-minutes: 15
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/dart
+        with:
+          sdk: stable
+      - name: Show the keychains
+        run: |
+          security default-keychain
+          security list-keychains
+      - name: Run the integration tests
+        working-directory: firebase_auth/firebase_auth_secure_storage_dart
+        env:
+          FIREBASE_AUTH_SECURE_STORAGE_INTEGRATION: '1'
+        run: |
+          set -o pipefail
+          dart pub get
+          dart test --reporter expanded --no-color test/integration/macos_keychain_test.dart 2>&1 \
+            | tee "$RUNNER_TEMP/secure_storage_macos.log"
+          if ! grep -Eq '^[0-9:]+ \+[1-9][0-9]*: All tests passed!$' "$RUNNER_TEMP/secure_storage_macos.log"; then
+            echo "::error::No integration test of the login keychain passed, or one was skipped."
+            exit 1
+          fi
 
   # The Flutter packages, which the unit jobs skip (they install Dart only): flutter analyze and
   # flutter test of cloud_firestore_dart_flutterfire, cloud_firestore_dart_platform,
