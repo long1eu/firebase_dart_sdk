@@ -272,14 +272,16 @@ class DartFirebaseAuth extends FirebaseAuthPlatform {
   /// `setSettings(appVerificationDisabledForTesting: true)`, or with the Auth
   /// emulator when `FirebaseAuthDart.use` got no `appVerification` (the
   /// emulator does not check it); else the `appVerification` of `use`, by
-  /// default the reCAPTCHA v2 page of the client in the system browser.
+  /// default the reCAPTCHA v2 page of the client, shown by the `presenter` of
+  /// `use` (the system browser on a desktop when there is none).
   dart_auth.AppVerification get appVerification {
     final dart_auth.AppVerification? configured = _config.appVerification;
     if (_appVerificationDisabled ||
         (configured == null && client.emulatorConfig != null)) {
       return const dart_auth.AppVerification.none();
     }
-    return configured ?? dart_auth.AppVerification.recaptchaV2Loopback();
+    return configured ??
+        dart_auth.AppVerification.recaptchaV2Loopback(presenter: presenter);
   }
 
   // ---- plumbing ----
@@ -667,6 +669,17 @@ class DartFirebaseAuth extends FirebaseAuthPlatform {
       );
     } on FirebaseAuthException catch (e) {
       verificationFailed(e);
+      return;
+    } on Object catch (e) {
+      // An error that guard does not turn into a FirebaseAuthException (one of
+      // a token source of the app, for example). Only its type goes into the
+      // message: its text could quote the phone number.
+      verificationFailed(
+        FirebaseAuthException(
+          code: 'internal-error',
+          message: 'verifyPhoneNumber failed with ${e.runtimeType}.',
+        ),
+      );
       return;
     }
     codeSent(verificationId, null);

@@ -9,7 +9,11 @@ library;
 import 'dart:async';
 import 'dart:convert';
 
+import 'dart:io';
+
 import 'package:firebase_auth_providers_dart/firebase_auth_providers_dart.dart';
+import 'package:firebase_auth_providers_dart/src/phone_auth.dart'
+    show redactPhoneSecrets;
 import 'package:http/http.dart' as http;
 import 'package:test/test.dart';
 
@@ -45,6 +49,7 @@ const Map<String, String> phoneErrors = <String, String>{
   'MISSING_SESSION_INFO': 'missing-verification-id',
   'INVALID_TEMPORARY_PROOF': 'invalid-credential',
   'OPERATION_NOT_ALLOWED': 'operation-not-allowed',
+  'PHONE_NUMBER_EXISTS': 'credential-already-in-use',
 };
 
 /// The secrets a request of the tests carries, which an error must never show.
@@ -76,6 +81,36 @@ void expectNoSecrets(FirebaseAuthException e, List<String> secrets) {
   expect(e.phoneNumber, isNull);
   expect(e.serverResponse, isNull);
 }
+
+/// Posts the form of a secure_flow page at [url], as the page would.
+Future<void> postForm(Uri url, Map<String, String> fields) async {
+  final HttpClient client = HttpClient();
+  try {
+    final HttpClientRequest request = await client.postUrl(
+      url.replace(query: ''),
+    );
+    request.headers
+      ..set(HttpHeaders.contentTypeHeader, 'application/x-www-form-urlencoded')
+      ..set('origin', 'http://${url.host}:${url.port}');
+    request.write(
+      Uri(
+        queryParameters: <String, String>{
+          'state': url.queryParameters['state']!,
+          ...fields,
+        },
+      ).query,
+    );
+    await (await request.close()).drain<void>();
+  } finally {
+    client.close(force: true);
+  }
+}
+
+FirebaseAuthException redact(String message, List<String?> secrets) =>
+    redactPhoneSecrets(
+      FirebaseAuthException(code: 'internal-error', message: message),
+      secrets,
+    );
 
 Future<FirebaseAuthException> authError(Future<Object?> operation) async {
   try {
@@ -356,8 +391,8 @@ void main() {
       );
     });
 
-    test('a number of another account is credential-already-in-use, without '
-        'the number', () async {
+    test('a number of another account is credential-already-in-use, with a '
+        'credential that signs in to that account', () async {
       backend.accounts['someone-else'] = <String, Object?>{
         'phoneNumber': phone,
       };
@@ -365,9 +400,28 @@ void main() {
         auth.linkWithCredential(await credential()),
       );
       expect(e.code, 'credential-already-in-use');
-      expect(e.credential, isNull);
-      expectNoSecrets(e, <String>[phone, 'proof-of-$phone']);
       expect(auth.currentUser!.phoneNumber, isNull);
+      final PhoneAuthCredential proof = e.credential! as PhoneAuthCredential;
+      expect(proof.temporaryProof, 'proof-of-$phone');
+      expect(proof.phoneNumber, phone);
+      expect(proof.verificationId, isNull);
+      expect(<String?>[
+        e.message,
+        e.toString(),
+        proof.toString(),
+        e.phoneNumber,
+      ], everyElement(isNot(contains('5555550100'))));
+      expect(e.toString(), isNot(contains('proof-of')));
+
+      final UserCredential other = await auth.signInWithCredential(proof);
+      expect(other.user!.uid, 'someone-else');
+      expect(
+        backend.bodiesOf('accounts:signInWithPhoneNumber').last,
+        <String, Object?>{
+          'temporaryProof': 'proof-of-$phone',
+          'phoneNumber': phone,
+        },
+      );
     });
 
     test('needs a signed-in user', () async {
@@ -452,7 +506,11 @@ void main() {
         auth.updatePhoneNumber(await credential()),
       );
       expect(e.code, 'credential-already-in-use');
-      expectNoSecrets(e, <String>[phone]);
+      expect(e.message, isNot(contains('5555550100')));
+      expect(
+        (e.credential! as PhoneAuthCredential).temporaryProof,
+        'proof-of-$phone',
+      );
     });
 
     test('needs a signed-in user', () async {
@@ -499,6 +557,27 @@ void main() {
       expect(c.verificationCode, code);
       final UserCredential result = await auth.signInWithCredential(c);
       expect(result.user!.phoneNumber, phone);
+    });
+
+    test('the code presenter also shows the default reCAPTCHA page', () async {
+      final List<Uri> shown = <Uri>[];
+      final PhoneAuthCredential c = await auth.verifyPhoneNumberInteractively(
+        phone,
+        codePresenter: CallbackPresenter((Uri url) async {
+          shown.add(url);
+          // The first page is the reCAPTCHA one, the second asks for the code.
+          await postForm(url, <String, String>{
+            if (shown.length == 1) 'token': 'page-token' else 'code': code,
+          });
+        }),
+        timeout: const Duration(seconds: 20),
+      );
+      expect(shown, hasLength(2));
+      expect(
+        backend.bodiesOf('accounts:sendVerificationCode').single,
+        containsPair('recaptchaToken', 'page-token'),
+      );
+      expect(c.verificationCode, code);
     });
 
     test('no code within the timeout is timeout', () async {
@@ -595,6 +674,82 @@ void main() {
       final FirebaseAuthException e = await authError(send());
       expect(e.code, 'network-request-failed');
       expectNoSecrets(e, <String>[phone]);
+    });
+  });
+
+  group('redaction', () {
+    test('a short code or id is not looked for, so words stay whole', () {
+      for (final String secret in <String>['e', '1', '12345']) {
+        expect(
+          redact('The code 12345 was entered at 1 pm', <String>[
+            secret,
+          ]).message,
+          'The code 12345 was entered at 1 pm',
+        );
+      }
+    });
+
+    test('a secret is cut as a whole token only', () {
+      expect(
+        redact('code abcdef, not xabcdefx', <String>['abcdef']).message,
+        'code <redacted>, not xabcdefx',
+      );
+      expect(
+        redact('session sess-42-abc and code 123456.', <String>[
+          'sess-42-abc',
+          '123456',
+        ]).message,
+        'session <redacted> and code <redacted>.',
+      );
+    });
+
+    test('the 403 of a disabled API keeps its project number and URL', () {
+      const String text =
+          'Identity Toolkit API has not been used in project 123456789012 before or '
+          'it is disabled. Enable it by visiting https://console.developers.google.com/'
+          'apis/api/identitytoolkit.googleapis.com/overview?project=123456789012 then '
+          'retry.';
+      expect(redact(text, <String>[phone]).message, text);
+      expect(
+        redact('see projects/123456789012/config', <String>[]).message,
+        'see projects/123456789012/config',
+      );
+    });
+
+    test('dates and IPv4 addresses survive', () {
+      const String text =
+          'at 2026-11-21 10:00:00, 2026-11-21T10:00:00Z and 21/11/2026 from '
+          '192.168.0.153 and 10.0.0.1:8080';
+      expect(redact(text, <String>[]).message, text);
+    });
+
+    test('a phone number with any separators is cut', () {
+      for (final String written in <String>[
+        '+44 7911/123456',
+        '+44 7911 123456',
+        '+44 7911–123456',
+        '(555) 555-0100',
+        '555.555.0100',
+        '+1 555 555 0100',
+      ]) {
+        expect(
+          redact('number $written refused', <String>[]).message,
+          'number <redacted> refused',
+          reason: written,
+        );
+      }
+    });
+
+    test('both rules together, and the markers stay whole', () {
+      expect(
+        redact(
+          'code 654321 for +15555550100 (15555550100) in project 123456789012 '
+          'on 2026-11-21 via 192.168.0.1',
+          <String>[phone, '654321', 'e'],
+        ).message,
+        'code <redacted> for <redacted> (<redacted>) in project 123456789012 on '
+        '2026-11-21 via 192.168.0.1',
+      );
     });
   });
 }

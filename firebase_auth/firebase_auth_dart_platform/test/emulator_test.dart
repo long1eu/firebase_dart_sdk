@@ -56,6 +56,10 @@ Future<String> _codeFor(String verificationId) async {
           .cast<Map<String, Object?>>()
           .lastWhere(
             (Map<String, Object?> c) => c['sessionInfo'] == verificationId,
+            orElse: () => throw StateError(
+              'The emulator lists no verification code for the verification '
+              'id that verifyPhoneNumber returned.',
+            ),
           )['code']!
       as String;
 }
@@ -81,8 +85,9 @@ Future<String> _sendCode(
 }
 
 /// A phone number no other run uses.
+/// +1 555 and seven digits (a valid NANP length).
 String _uniquePhone() =>
-    '+155501${(DateTime.now().microsecondsSinceEpoch % 1000000).toString().padLeft(6, '0')}';
+    '+1555${(DateTime.now().microsecondsSinceEpoch % 10000000).toString().padLeft(7, '0')}';
 
 void main() {
   final String? skip = _host == null

@@ -1613,8 +1613,8 @@ class FirebaseUserAuth implements AuthTokenProvider {
   /// Sends the SMS code and asks for it, for programs without a code field of their own (command
   /// line tools, desktop apps without a UI for it; VM only): [verifyPhoneNumber] with
   /// [appVerification] (by default the reCAPTCHA v2 page of `package:secure_flow`,
-  /// [AppVerification.recaptchaV2Loopback] with [environment] and [timeout]), then a
-  /// `CodeEntryFlow` of `package:secure_flow` that asks for the code with [prompt]: on the
+  /// [AppVerification.recaptchaV2Loopback] with [codePresenter], [environment] and [timeout]), then
+  /// a `CodeEntryFlow` of `package:secure_flow` that asks for the code with [prompt]: on the
   /// terminal, or on a small page in the system browser, through [codePresenter] (when null, the
   /// presenter of [environment] that the flow ranks best).
   ///
@@ -1642,6 +1642,7 @@ class FirebaseUserAuth implements AuthTokenProvider {
       appVerification:
           appVerification ??
           AppVerification.recaptchaV2Loopback(
+            presenter: codePresenter,
             environment: environment,
             timeout: timeout,
           ),
@@ -1753,21 +1754,25 @@ class FirebaseUserAuth implements AuthTokenProvider {
       ? _withoutPhoneSecrets(<String?>[
           credential.verificationId,
           credential.verificationCode,
+          credential.temporaryProof,
+          credential.phoneNumber,
         ], body)
       : body();
 
   /// Like `linkWithPhoneNumber` of the JS SDK: an answer of `accounts:signInWithPhoneNumber` with a
   /// `temporaryProof` (and no tokens) means that another account has the number. The JS SDK throws
-  /// `account-exists-with-different-credential` with the proof attached; the iOS and Android SDKs,
-  /// and so FlutterFire on them, throw `credential-already-in-use`, which this follows. The proof
-  /// and the number are not attached: no error of this package carries a phone number.
+  /// `account-exists-with-different-credential`; the iOS and Android SDKs, and so FlutterFire on
+  /// them, throw `credential-already-in-use`, which this follows. As in the iOS SDK, the error's
+  /// [FirebaseAuthException.credential] is a [PhoneAuthCredential] of the proof and the number,
+  /// which signs in to that account; its `toString` and the message show neither.
   static void _throwIfPhoneNumberInUse(Map<String, Object?> response) {
     final Object? proof = response['temporaryProof'];
     if (proof is String && proof.isNotEmpty) {
-      throw const FirebaseAuthException(
+      throw FirebaseAuthException(
         code: AuthErrorCode.credentialAlreadyInUse,
         message:
             'This phone number is already associated with a different user account.',
+        credential: phoneCredentialFromProof(response),
       );
     }
   }
@@ -1878,17 +1883,20 @@ class FirebaseUserAuth implements AuthTokenProvider {
   Future<String> startPhoneEnrollment(
     String phoneNumber, {
     required AppVerification appVerification,
-  }) {
+  }) async {
+    _checkNotDisposed();
+    _requireSession();
+    _requirePhoneNumber(phoneNumber);
     final List<String?> secrets = <String?>[phoneNumber];
-    return _withoutPhoneSecrets(
-      secrets,
-      () => _forUser((String idToken, int generation) async {
-        _requirePhoneNumber(phoneNumber);
-        final Map<String, Object?> proof = await _proofOf(
-          appVerification,
-          RecaptchaAction.mfaSmsEnrollment,
-          secrets,
-        );
+    // The proof is asked for once, before _forUser, which runs its operation again after a
+    // rejected ID token: a second run must not show the reCAPTCHA again.
+    return _withoutPhoneSecrets(secrets, () async {
+      final Map<String, Object?> proof = await _proofOf(
+        appVerification,
+        RecaptchaAction.mfaSmsEnrollment,
+        secrets,
+      );
+      return _forUser((String idToken, int generation) async {
         final Map<String, Object?> response = await _multiFactor
             .startPhoneEnrollment(
               idToken: idToken,
@@ -1901,8 +1909,8 @@ class FirebaseUserAuth implements AuthTokenProvider {
         );
         secrets.add(verificationId);
         return verificationId;
-      }),
-    );
+      });
+    });
   }
 
   /// Finishes the SMS enrolment that [startPhoneEnrollment] started, with [credential]: its
@@ -1924,12 +1932,14 @@ class FirebaseUserAuth implements AuthTokenProvider {
   }) => _withoutSecretsOf(
     credential,
     () => _forUser((String idToken, int generation) async {
-      _checkPhoneCredential(credential);
+      final (String verificationId, String code) = _checkPhoneCredential(
+        credential,
+      );
       final Map<String, Object?> response = await _multiFactor
           .finalizePhoneEnrollment(
             idToken: idToken,
-            sessionInfo: credential.verificationId,
-            code: credential.verificationCode,
+            sessionInfo: verificationId,
+            code: code,
             displayName: displayName,
             tenantId: tenantId,
           );
@@ -2034,13 +2044,9 @@ class FirebaseUserAuth implements AuthTokenProvider {
           'idToken': ?userIdToken,
           if (reauthenticate) 'autoCreate': false,
         });
-      case PhoneAuthCredential(
-        :final String verificationId,
-        :final String verificationCode,
-      ):
+      case PhoneAuthCredential():
         return _phoneRequest(
-          verificationId,
-          verificationCode,
+          credential,
           userIdToken: userIdToken,
           reauthenticate: reauthenticate,
         );
@@ -2053,49 +2059,61 @@ class FirebaseUserAuth implements AuthTokenProvider {
     }
   }
 
-  /// `accounts:signInWithPhoneNumber` with [verificationId] and [code] (`signInWithPhoneNumber`,
-  /// `linkWithPhoneNumber` with the ID token, and `verifyPhoneNumberForExisting` with the operation
-  /// `REAUTH` of the JS SDK). Empty values fail before anything is sent, as in the iOS SDK.
+  /// `accounts:signInWithPhoneNumber` with the verification id and code of [credential], or its
+  /// temporary proof and number (`signInWithPhoneNumber`, `linkWithPhoneNumber` with the ID token,
+  /// and `verifyPhoneNumberForExisting` with the operation `REAUTH` of the JS SDK). Empty values
+  /// fail before anything is sent, as in the iOS SDK.
   static _CredentialRequest _phoneRequest(
-    String verificationId,
-    String code, {
+    PhoneAuthCredential credential, {
     required String? userIdToken,
     required bool reauthenticate,
   }) {
-    _checkPhoneCredential(
-      PhoneAuthProvider.credential(
-        verificationId: verificationId,
-        verificationCode: code,
-      ),
-    );
+    final String? proof = credential.temporaryProof;
+    final String? number = credential.phoneNumber;
+    final Map<String, Object?> fields;
+    if (proof != null && number != null) {
+      fields = <String, Object?>{
+        'temporaryProof': proof,
+        'phoneNumber': number,
+      };
+    } else {
+      final (String verificationId, String code) = _checkPhoneCredential(
+        credential,
+      );
+      fields = <String, Object?>{'sessionInfo': verificationId, 'code': code};
+    }
     return _CredentialRequest(
       'accounts:signInWithPhoneNumber',
       <String, Object?>{
         'idToken': ?userIdToken,
-        'sessionInfo': verificationId,
-        'code': code,
+        ...fields,
         if (reauthenticate) 'operation': 'REAUTH',
       },
     );
   }
 
-  /// Throws `missing-verification-id` or `missing-verification-code` for a [credential] with an
-  /// empty part.
-  static void _checkPhoneCredential(PhoneAuthCredential credential) {
-    if (credential.verificationId.isEmpty) {
+  /// The verification id and the code of [credential]; throws `missing-verification-id` or
+  /// `missing-verification-code` when one is empty or missing (a temporary proof has neither).
+  static (String, String) _checkPhoneCredential(
+    PhoneAuthCredential credential,
+  ) {
+    final String? verificationId = credential.verificationId;
+    final String? code = credential.verificationCode;
+    if (verificationId == null || verificationId.isEmpty) {
       throw const FirebaseAuthException(
         code: AuthErrorCode.missingVerificationId,
         message:
             'The phone auth credential was created with an empty verification ID.',
       );
     }
-    if (credential.verificationCode.isEmpty) {
+    if (code == null || code.isEmpty) {
       throw const FirebaseAuthException(
         code: AuthErrorCode.missingVerificationCode,
         message:
             'The phone auth credential was created with an empty SMS verification code.',
       );
     }
+    return (verificationId, code);
   }
 
   /// The parts of an email link, or `argument-error` (`EmailAuthProvider.credentialWithLink` of the JS SDK).
@@ -2745,14 +2763,16 @@ class FirebaseUserAuth implements AuthTokenProvider {
           _startPhoneSignIn(pending, enrollmentId, appVerification, tenant),
       resolvePhone: (PhoneAuthCredential credential) {
         _checkNotDisposed();
-        _checkPhoneCredential(credential);
+        final (String verificationId, String code) = _checkPhoneCredential(
+          credential,
+        );
         return _withoutSecretsOf(
           credential,
           () => finishWith(
             _multiFactor.finalizePhoneSignIn(
               pendingCredential: pending,
-              sessionInfo: credential.verificationId,
-              code: credential.verificationCode,
+              sessionInfo: verificationId,
+              code: code,
               tenantId: tenant,
             ),
           ),

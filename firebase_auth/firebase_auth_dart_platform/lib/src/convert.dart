@@ -253,8 +253,24 @@ AuthCredential? credentialOf(
     :final String emailLink?,
   ) =>
     EmailAuthProvider.credentialWithLink(email: email, emailLink: emailLink),
+  dart_auth.PhoneAuthCredential(:final String temporaryProof?) =>
+    temporaryProof.isEmpty ? null : DartPhoneProofCredential(credential),
   _ => null,
 };
+
+/// The phone credential of a `credential-already-in-use` error: a temporary
+/// proof of a verified number, which `signInWithCredential` takes back to sign
+/// in to the account that has the number. FlutterFire's `PhoneAuthCredential`
+/// has no field for a proof (and no public constructor), so this is a plain
+/// [AuthCredential] of the phone provider that carries the client's credential.
+/// Its `toString` and `asMap` show no proof and no number.
+class DartPhoneProofCredential extends AuthCredential {
+  DartPhoneProofCredential(this.source)
+    : super(providerId: 'phone', signInMethod: 'phone');
+
+  /// The credential of `firebase_auth_providers_dart`.
+  final dart_auth.PhoneAuthCredential source;
+}
 
 /// A phone credential of the interface (a verification id and an SMS code) as
 /// the client takes it. Throws `argument-error` for one made with the
@@ -289,6 +305,8 @@ dart_auth.PhoneAuthCredential clientPhoneCredentialOf(
 dart_auth.AuthCredential clientCredentialOf(AuthCredential credential) {
   switch (credential) {
     case DartOAuthCredential(:final dart_auth.OAuthCredential source):
+      return source;
+    case DartPhoneProofCredential(:final dart_auth.PhoneAuthCredential source):
       return source;
     case EmailAuthCredential(:final String email, :final String password?):
       return dart_auth.EmailAuthProvider.credential(

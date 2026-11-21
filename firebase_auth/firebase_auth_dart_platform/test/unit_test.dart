@@ -3,7 +3,13 @@
 
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io' show FileSystemException, Platform;
+import 'dart:io'
+    show
+        FileSystemException,
+        HttpClient,
+        HttpClientRequest,
+        HttpHeaders,
+        Platform;
 
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_auth_dart_platform/firebase_auth_dart_platform.dart';
@@ -124,6 +130,31 @@ http.Response? providerTokens(http.Request request) =>
       }),
       _ => null,
     };
+
+/// Posts the form of a secure_flow page at [url] (the reCAPTCHA page posts a
+/// `token`), as the page would.
+Future<void> postPageForm(Uri url, Map<String, String> fields) async {
+  final HttpClient client = HttpClient();
+  try {
+    final HttpClientRequest request = await client.postUrl(
+      url.replace(query: ''),
+    );
+    request.headers
+      ..set(HttpHeaders.contentTypeHeader, 'application/x-www-form-urlencoded')
+      ..set('origin', 'http://${url.host}:${url.port}');
+    request.write(
+      Uri(
+        queryParameters: <String, String>{
+          'state': url.queryParameters['state']!,
+          ...fields,
+        },
+      ).query,
+    );
+    await (await request.close()).drain<void>();
+  } finally {
+    client.close(force: true);
+  }
+}
 
 Matcher throwsAuthCode(String code) => throwsA(
   isA<FirebaseAuthException>().having(
@@ -1396,6 +1427,67 @@ void main() {
       ]);
     });
 
+    /// The FirebaseAuth of a new app whose instance reads [config].
+    Future<FirebaseAuth> authWith(DartAuthConfig config) async {
+      final DartAuthConfig shared = DartFirebaseAuth.config;
+      DartFirebaseAuth.config = config;
+      try {
+        final FirebaseAuth auth = await newAuth();
+        // The instance of the app, created now, reads the configuration.
+        await auth.setSettings();
+        return auth;
+      } finally {
+        DartFirebaseAuth.config = shared;
+      }
+    }
+
+    test(
+      'the default reCAPTCHA page is shown by the presenter of use',
+      () async {
+        backend.phone.requireProof = true;
+        final List<Uri> shown = <Uri>[];
+        final FirebaseAuth auth = await authWith(
+          DartAuthConfig(
+            httpClient: backend.client,
+            storageFor: (FirebaseApp app) => InMemoryAuthStorage(),
+            presenter: CallbackPresenter((Uri url) async {
+              shown.add(url);
+              await postPageForm(url, <String, String>{'token': 'page-token'});
+            }),
+          ),
+        );
+        final ConfirmationResult confirmation = await auth
+            .signInWithPhoneNumber(number);
+        expect(shown, hasLength(1));
+        expect(
+          backend.bodyOf('accounts:sendVerificationCode')['recaptchaToken'],
+          'page-token',
+        );
+        await confirmation.confirm(smsCode);
+        expect(auth.currentUser!.phoneNumber, number);
+      },
+    );
+
+    test('an error of a token source reaches verificationFailed', () async {
+      final FirebaseAuth auth = await authWith(
+        DartAuthConfig(
+          httpClient: backend.client,
+          storageFor: (FirebaseApp app) => InMemoryAuthStorage(),
+          appVerification: dart_auth.AppVerification.recaptchaV2(
+            (dart_auth.RecaptchaV2Request request) =>
+                throw const FormatException('no token for +15555550100'),
+          ),
+        ),
+      );
+      final ({String? id, FirebaseAuthException? error}) sent = await sendCode(
+        auth,
+      );
+      expect(sent.id, isNull);
+      expect(sent.error!.code, 'internal-error');
+      expect(sent.error!.message, contains('FormatException'));
+      expect(sent.error!.message, isNot(contains('5555550100')));
+    });
+
     test('verificationFailed gets the errors, without the number', () async {
       final FirebaseAuth auth = await newPhoneAuth();
       final ({String? id, FirebaseAuthException? error}) sent = await sendCode(
@@ -1447,6 +1539,52 @@ void main() {
         backend.bodyOf('accounts:signInWithPhoneNumber')['idToken'],
         isA<String>(),
       );
+    });
+
+    test('linkWithPhoneNumber refuses a user with a phone number before any '
+        'SMS', () async {
+      final FirebaseAuth auth = await newPhoneAuth();
+      await auth.signInWithEmailAndPassword(
+        email: 'twice@example.com',
+        password: 'p',
+      );
+      backend.phones['uid-of-twice@example.com'] = '+15555550199';
+      await expectLater(
+        auth.currentUser!.linkWithPhoneNumber(number),
+        throwsAuthCode('provider-already-linked'),
+      );
+      expect(
+        backend.paths.where((String p) => p.endsWith('sendVerificationCode')),
+        isEmpty,
+      );
+    });
+
+    test('a number of another account comes with a credential that signs in '
+        'to it', () async {
+      final FirebaseAuth auth = await newPhoneAuth();
+      await auth.signInWithEmailAndPassword(
+        email: 'taken@example.com',
+        password: 'p',
+      );
+      backend.phones['phone-owner'] = number;
+      final ConfirmationResult confirmation = await auth.currentUser!
+          .linkWithPhoneNumber(number);
+      try {
+        await confirmation.confirm(smsCode);
+        fail('expected credential-already-in-use');
+      } on FirebaseAuthException catch (e) {
+        expect(e.code, 'credential-already-in-use');
+        expect(e.credential, isA<DartPhoneProofCredential>());
+        expect(
+          '${e.credential} ${e.credential!.asMap()}',
+          isNot(contains('5555550100')),
+        );
+        expect(e.message, isNot(contains('5555550100')));
+        final UserCredential owner = await auth.signInWithCredential(
+          e.credential!,
+        );
+        expect(owner.user!.uid, 'phone-owner');
+      }
     });
 
     test('updatePhoneNumber and reauthenticateWithCredential', () async {

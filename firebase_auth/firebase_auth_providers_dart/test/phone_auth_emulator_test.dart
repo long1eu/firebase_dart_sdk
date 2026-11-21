@@ -26,10 +26,10 @@ final String project =
 
 int _counter = 0;
 
-/// A phone number no other test uses: +1 555 01xx xxxx.
+/// A phone number no other test uses: +1 555 and seven digits (a valid NANP length).
 String uniquePhone() {
-  final int n = (DateTime.now().microsecondsSinceEpoch + _counter++) % 1000000;
-  return '+155501${n.toString().padLeft(6, '0')}';
+  final int n = (DateTime.now().microsecondsSinceEpoch + _counter++) % 10000000;
+  return '+1555${n.toString().padLeft(7, '0')}';
 }
 
 String uniqueEmail() =>
@@ -228,7 +228,7 @@ void main() {
       );
       await expectLater(
         auth.linkWithCredential(await credentialFor(auth, phone)),
-        throwsAuth(anyOf('credential-already-in-use', 'phone-number-exists')),
+        throwsAuth('credential-already-in-use'),
       );
     });
   }, skip: skip);

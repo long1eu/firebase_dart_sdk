@@ -56,7 +56,7 @@ Future<void> main() async {
 | `oauthProviders` | none | The `OAuthLoopbackProvider`s of `signInWithProvider`, `User.linkWithProvider` and `User.reauthenticateWithProvider`, one per Firebase provider id (see [Provider sign-in](#provider-sign-in)). |
 | `oauthProvidersFor` | none | The providers of one FlutterFire app, for apps with several Firebase projects that each have their own OAuth client; called once per app. They are added to `oauthProviders`, and one with the same id as a provider of `oauthProviders` replaces it for that app. |
 | `presenter` | the presenter the `OAuthFlow` of `secure_flow` ranks best in the environment: the system browser on macOS, Linux and Windows, the URL on stderr over SSH or without a display | A `SecurePresenter` that runs the browser part of a provider sign-in: it shows the authorization URL and takes the redirect on 127.0.0.1. `CallbackPresenter((Uri url) => launchUrl(url))` with `url_launcher`, for example. Needed on Android and iOS: without it the provider calls throw `operation-not-supported-in-this-environment`. |
-| `appVerification` | `AppVerification.recaptchaV2Loopback()`: a reCAPTCHA v2 page on 127.0.0.1 in the system browser, once per phone request; no proof with the Auth emulator | The proof of the phone requests (`verifyPhoneNumber`, `signInWithPhoneNumber`, `User.linkWithPhoneNumber`, the SMS second factor): an `AppVerification` of `firebase_auth_providers_dart`, such as `AppVerification.recaptchaV2((request) => tokenFromYourWebView())` (see [Phone sign-in](#phone-sign-in)). `setSettings(appVerificationDisabledForTesting: true)` sends none. |
+| `appVerification` | `AppVerification.recaptchaV2Loopback(presenter:)` with the `presenter` above: a reCAPTCHA v2 page on 127.0.0.1, once per phone request (in the system browser on a desktop without a `presenter`); no proof with the Auth emulator | The proof of the phone requests (`verifyPhoneNumber`, `signInWithPhoneNumber`, `User.linkWithPhoneNumber`, the SMS second factor): an `AppVerification` of `firebase_auth_providers_dart`, such as `AppVerification.recaptchaV2((request) => tokenFromYourWebView())` (see [Phone sign-in](#phone-sign-in)). `setSettings(appVerificationDisabledForTesting: true)` sends none. |
 
 `use()` throws a `StateError` once the `FirebaseAuth` of an app has been used, because the configuration is read
 then.
@@ -300,8 +300,9 @@ These throw a `FirebaseAuthException` with the code `unimplemented` and a messag
 
 `verifyPhoneNumber` and `signInWithPhoneNumber` work as on the other platforms, minus instant verification and
 SMS auto-retrieval. Each request that sends an SMS carries the `appVerification` of `use`: by default the
-reCAPTCHA v2 page of the client in the system browser (desktop), nothing with the Auth emulator. On Android or iOS,
-or in an app that renders reCAPTCHA itself, pass a token source:
+reCAPTCHA v2 page of the client, shown by the `presenter` of `use` (the system browser on a desktop without one),
+nothing with the Auth emulator. On Android or iOS, pass a `presenter` that opens the page (for example
+`CallbackPresenter((Uri url) => launchUrl(url))`), or, in an app that renders reCAPTCHA itself, a token source:
 
 ```dart
 FirebaseAuthDart.use(

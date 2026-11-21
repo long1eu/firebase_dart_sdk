@@ -79,7 +79,7 @@ export 'src/oauth_loopback/oauth_loopback_stub.dart'
     if (dart.library.io) 'src/oauth_loopback/oauth_loopback_io.dart';
 export 'src/oauth_token_provider.dart';
 export 'src/password_policy.dart';
-export 'src/phone_auth.dart' hide redactPhoneSecrets;
+export 'src/phone_auth.dart' hide phoneCredentialFromProof, redactPhoneSecrets;
 export 'src/service_account_key.dart';
 export 'src/storage/file_auth_storage_stub.dart'
     if (dart.library.io) 'src/storage/file_auth_storage_io.dart';

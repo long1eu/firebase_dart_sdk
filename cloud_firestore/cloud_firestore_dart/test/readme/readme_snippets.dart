@@ -277,8 +277,8 @@ Future<void> authProvidersReadmeLine217() async {
   }
 }
 
-// ../../firebase_auth/firebase_auth_providers_dart/README.md:277
-Future<void> authProvidersReadmeLine277() async {
+// ../../firebase_auth/firebase_auth_providers_dart/README.md:279
+Future<void> authProvidersReadmeLine279() async {
   final FirebaseUserAuth auth = await FirebaseUserAuth.forApp(app);
   final UserCredential result = await auth.signInWithOAuthLoopback(
     OAuthLoopbackProvider.google(
@@ -289,8 +289,8 @@ Future<void> authProvidersReadmeLine277() async {
   print(result.user?.email);
 }
 
-// ../../firebase_auth/firebase_auth_providers_dart/README.md:338
-Future<void> authProvidersReadmeLine338() async {
+// ../../firebase_auth/firebase_auth_providers_dart/README.md:340
+Future<void> authProvidersReadmeLine340() async {
   final OAuthLoopbackProvider provider = OAuthLoopbackProvider.oidc(
     providerId: 'oidc.example',
     authorizationEndpoint: Uri.parse('https://idp.example.com/authorize'),
@@ -315,8 +315,8 @@ Future<void> authProvidersReadmeLine338() async {
   );
 }
 
-// ../../firebase_auth/firebase_auth_providers_dart/README.md:406
-Future<void> authProvidersReadmeLine406() async {
+// ../../firebase_auth/firebase_auth_providers_dart/README.md:408
+Future<void> authProvidersReadmeLine408() async {
   final AppVerification verification = AppVerification.recaptchaV2Loopback();
 }
 

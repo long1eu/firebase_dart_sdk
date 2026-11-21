@@ -290,6 +290,9 @@ class FirebaseAuthException extends FirebaseException {
     'MISSING_APP_CREDENTIAL': 'missing-app-credential',
     'INVALID_APP_CREDENTIAL': 'invalid-app-credential',
     'CAPTCHA_CHECK_FAILED': 'captcha-check-failed',
+    // A link or an update with a number that another account has (the code the iOS SDK maps to
+    // credentialAlreadyInUse).
+    'PHONE_NUMBER_EXISTS': 'credential-already-in-use',
     // Action code settings.
     'MISSING_ANDROID_PACKAGE_NAME': 'missing-android-pkg-name',
     'UNAUTHORIZED_DOMAIN': 'unauthorized-continue-uri',

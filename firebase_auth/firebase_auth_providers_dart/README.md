@@ -256,10 +256,12 @@ try {
 }
 ```
 
-A number that another account has is `credential-already-in-use` on a link or an update; a reauthentication with
+A number that another account has is `credential-already-in-use` on a link or an update; as in the iOS SDK, its
+`credential` is a `PhoneAuthCredential` of the backend's temporary proof, and `signInWithCredential(e.credential!)`
+signs in to that account (its `toString` and the message show no number). A reauthentication with
 the number of no account, or of another one, is `user-mismatch`. The errors use the codes of the JS SDK and
 FlutterFire (`invalid-verification-code`, `code-expired`, `invalid-phone-number`, `quota-exceeded`,
-`missing-app-credential`, ...). No error, message or log line holds the phone number, the verification id, the SMS
+`missing-app-credential`, ...). No error message or log line holds the phone number, the verification id, the SMS
 code or the reCAPTCHA token.
 
 Tested with unit tests against a fake backend. The emulator tests (`test/phone_auth_emulator_test.dart`) are

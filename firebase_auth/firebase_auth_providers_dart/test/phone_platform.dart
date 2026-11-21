@@ -135,6 +135,15 @@ class PhonePlatform {
     return (phone, null);
   }
 
+  /// The phone number of a temporary proof `proof-of-<number>` for that number, or the error of
+  /// a wrong one.
+  (String?, http.Response?) _proven(Map<String, Object?> body) {
+    final Object? number = body['phoneNumber'];
+    return body['temporaryProof'] == 'proof-of-$number'
+        ? (number! as String, null)
+        : (null, _error('INVALID_TEMPORARY_PROOF'));
+  }
+
   http.Response _sendVerificationCode(Map<String, Object?> body) => _session(
     body['phoneNumber'],
     body,
@@ -142,7 +151,8 @@ class PhonePlatform {
   );
 
   http.Response _signInWithPhoneNumber(Map<String, Object?> body) {
-    final (String? phone, http.Response? error) = _verify(body);
+    final (String? phone, http.Response? error) =
+        body.containsKey('temporaryProof') ? _proven(body) : _verify(body);
     if (error != null) {
       return error;
     }

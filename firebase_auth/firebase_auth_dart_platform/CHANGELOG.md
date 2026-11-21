@@ -4,9 +4,12 @@
   `verificationFailed`, `codeAutoRetrievalTimeout` after `timeout`; never `verificationCompleted`, since there is
   no instant verification or SMS auto-retrieval outside Android), `signInWithPhoneNumber` and
   `User.linkWithPhoneNumber` (a `ConfirmationResult` whose `confirm` takes the code), `User.updatePhoneNumber`, and
-  phone credentials in `signInWithCredential`, `linkWithCredential` and `reauthenticateWithCredential`.
+  phone credentials in `signInWithCredential`, `linkWithCredential` and `reauthenticateWithCredential`. Every error
+  of `verifyPhoneNumber` reaches `verificationFailed` (`internal-error` for one that is not a
+  `FirebaseAuthException`). `linkWithPhoneNumber` throws `provider-already-linked` before any SMS when the user has
+  a phone number. The `credential` of `credential-already-in-use` signs in to the account that has the number.
 - `FirebaseAuthDart.use(appVerification:)`: the proof of the phone requests, by default the reCAPTCHA v2 page of
-  the client in the system browser. With the Auth emulator, or after
+  the client, shown by the `presenter` of `use` (the system browser on a desktop without one). With the Auth emulator, or after
   `setSettings(appVerificationDisabledForTesting: true)` (no longer ignored), no proof is sent. `use` also
   registers a `RecaptchaVerifier` factory, so that `signInWithPhoneNumber` without a verifier works; it renders
   nothing, and `RecaptchaVerifier.verify` throws `unimplemented`.

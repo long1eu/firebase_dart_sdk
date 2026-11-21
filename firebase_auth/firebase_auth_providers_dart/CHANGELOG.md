@@ -6,7 +6,9 @@
   verificationId:, verificationCode:)` makes a `PhoneAuthCredential` that `signInWithCredential`,
   `linkWithCredential`, `reauthenticateWithCredential` and the new `updatePhoneNumber` take
   (`v1/accounts:signInWithPhoneNumber`). The app asks for the code with its own field. A number that another
-  account has is `credential-already-in-use`; a reauthentication with a number of no account or another account is
+  account has is `credential-already-in-use` (also from `PHONE_NUMBER_EXISTS`), whose `credential` is a
+  `PhoneAuthCredential` of the backend's temporary proof that signs in to that account, as in the iOS SDK; a
+  reauthentication with a number of no account or another account is
   `user-mismatch`. `verifyPhoneNumberInteractively` does both steps for a program without a code field: the
   reCAPTCHA page and a `CodeEntryFlow` of `secure_flow` (VM only). Tested with unit tests against a fake backend;
   not run against the emulator or a real project.

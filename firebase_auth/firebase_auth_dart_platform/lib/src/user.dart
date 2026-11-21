@@ -152,13 +152,26 @@ class DartUser extends UserPlatform {
 
   /// Sends the SMS code to [phoneNumber] with the proof of
   /// `DartFirebaseAuth.appVerification`; the `confirm` of the result links the
-  /// number to this user. [applicationVerifier] is not used.
+  /// number to this user. [applicationVerifier] is not used. Like the JS SDK,
+  /// it reads the account first and throws `provider-already-linked`, before
+  /// any SMS, when the user has a phone number already.
   @override
   Future<ConfirmationResultPlatform> linkWithPhoneNumber(
     String phoneNumber,
     RecaptchaVerifierFactoryPlatform applicationVerifier,
   ) => guard(_auth, () async {
     final dart_auth.FirebaseUserAuth userAuth = _client;
+    await userAuth.reload();
+    if (userAuth.currentUser?.providerData.any(
+          (dart_auth.UserInfo info) => info.providerId == 'phone',
+        ) ??
+        false) {
+      throw FirebaseAuthException(
+        code: 'provider-already-linked',
+        message:
+            'User can only be linked to one identity for the given provider.',
+      );
+    }
     final String verificationId = await userAuth.verifyPhoneNumber(
       phoneNumber,
       appVerification: _auth.appVerification,

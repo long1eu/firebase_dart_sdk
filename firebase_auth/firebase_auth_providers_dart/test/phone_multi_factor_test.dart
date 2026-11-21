@@ -3,9 +3,11 @@
 // finalize), unenrolment, the request bodies, the multi-factor errors, and that no error holds a
 // phone number, a verification id, an SMS code or a reCAPTCHA token.
 
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:firebase_auth_providers_dart/firebase_auth_providers_dart.dart';
+import 'package:http/http.dart' as http;
 import 'package:test/test.dart';
 
 import 'harness.dart';
@@ -164,6 +166,28 @@ void main() {
       expect(
         backend.storage.read('firebase_auth_providers_dart:$apiKey'),
         contains('refresh:$uid:enrolled'),
+      );
+    });
+
+    test('a rejected ID token is retried without a second reCAPTCHA', () async {
+      final FutureOr<http.Response> Function(Map<String, Object?> body) start =
+          backend.overrides['mfaEnrollment:start']!;
+      int failures = 1;
+      backend.on(
+        'mfaEnrollment:start',
+        (Map<String, Object?> body) =>
+            failures-- > 0 ? errorResponse('INVALID_ID_TOKEN') : start(body),
+      );
+      final String verificationId = await auth.startPhoneEnrollment(
+        phone,
+        appVerification: verification,
+      );
+      expect(verificationId, startsWith('session-'));
+      expect(backend.bodiesOf('mfaEnrollment:start'), hasLength(2));
+      expect(actions, <RecaptchaAction>[RecaptchaAction.mfaSmsEnrollment]);
+      expect(
+        backend.bodiesOf('mfaEnrollment:start').last['phoneEnrollmentInfo'],
+        containsPair('recaptchaToken', 'v2-token-1'),
       );
     });
 
