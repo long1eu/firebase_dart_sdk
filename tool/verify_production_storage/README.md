@@ -83,18 +83,18 @@ copes. `FAIL` means the client misbehaved or the backend does something it does 
 | --- | --- | --- |
 | 1 | Missing object | A raw GET of a missing object answers 404 with the JSON envelope `{"error": {"code": 404, ...}}` (`JSON ENVELOPE`), and the SDK reports `object-not-found` with the status and body. `PLAIN BODY` is what the emulator sends. |
 | 2 | Under rules | Needs `--denied-bucket`. A write without a user answers 403 with a JSON envelope and the SDK reports `unauthorized`. `FAIL` if the write is accepted. |
-| 3 | Range | `Range: bytes=10-19` on `alt=media`: `HONOURED` (206 and the right 10 bytes) or `IGNORED` (200 and the whole object); also the answer for a range past the end. |
+| 3 | Range | A control read without `Range`, then `Range: bytes=10-19` on `alt=media`, both with the user's token: `HONOURED` (206 and the right 10 bytes) or `IGNORED` (200 and the whole object); also the answer for a range past the end. `REFUSED` (INCONCLUSIVE) when the ranged read answers 403 although the control read is served. |
 | 4 | Download token | A new object has a download token, and `downloadUrl()` serves it without credentials. The answer to a wrong token is reported (a bucket with public read rules serves it too). |
 | 5 | List paging | Pages of 2 over 3 objects and 1 prefix: a `nextPageToken`, no repeats beyond prefixes, the last page has none. Its length and character class are reported (never the token). |
 | 6 | Multipart | `putBytes`: size, content type and the md5Hash equal the local ones. |
 | 7 | Resumable | Raw protocol: start (`x-goog-upload-status: active`), three chunks of 256 KiB, `upload, finalize`, stored size and md5. |
-| 8 | Pause and resume | The second chunk is aborted in flight; a `query` says how much the server has; the upload goes on from there. |
+| 8 | Pause and resume | The second chunk is aborted in flight; a `query` says how much the server has (a 5xx, 408 or 429 answer is retried up to four times, as the SDK would, and the line says so); the upload goes on from there. |
 | 9 | Resume by session URI | A new connection that knows only the session URI queries and finishes the upload. |
 | 10 | md5Hash integrity | A multipart upload with a wrong `md5Hash` in the metadata: `VERIFIED` (rejected) or `NOT VERIFIED` (accepted; the client must compare the returned hash). The right hash is always accepted. |
 | 11 | App Check header | The SDK sends `X-Firebase-AppCheck` with a token that is not valid: `ACCEPTED` (not enforced) or `ENFORCED` (refused, the SDK reports `unauthorized-app`). A real App Check token is not covered. |
 | 12 | X-Firebase-GMPID | The SDK sends the app id on every request; the answer without the header is reported. |
-| 13 | Refresh after a 401 | Needs `--create-user`. The first token is one the backend refuses (401); the SDK asks for a forced refresh and the retry is served. `INCONCLUSIVE` when the backend does not answer 401 to it. |
-| 14 | CORS | The resumable start response exposes `x-goog-upload-url`, `-status` and `-size-received`, and the preflight allows the `x-goog-upload-*` request headers. |
+| 13 | Refresh after a 401 | Needs `--create-user`. The first token is one the backend refuses (401); the SDK asks for a forced refresh and the retry is served. `INCONCLUSIVE` when the backend does not answer 401 to it: production answers 403 (`unauthorized`), so the refresh path is not reached. |
+| 14 | CORS | Starts a real resumable session from a browser `Origin` with the user's token, then queries it. Every `x-goog-upload-*` header those responses carry must be in `access-control-expose-headers`; a preflight to the returned upload URL must allow `x-goog-upload-command` and `x-goog-upload-offset`. The line and details report exactly what is exposed and allowed. |
 | 15 | Retry on a 5xx | Two 503 answers are **simulated in the client** and never reach the backend; the SDK retries and the third attempt is served. A real 5xx cannot be provoked safely. |
 | 16 | SDK resumable | `Reference.startUpload` over 256 KiB: a session, progress events, stored size and md5. |
 | 17 | SDK pause and resume | `UploadTask.pause()` then `resume()` finishes the upload. `INCONCLUSIVE` if it finished before it could be paused. |

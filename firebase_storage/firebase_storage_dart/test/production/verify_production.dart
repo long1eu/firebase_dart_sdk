@@ -238,6 +238,9 @@ class Kit {
   final String prefix;
 
   int uploadedBytes = 0;
+
+  /// How many times a status query of a resumable session was sent again after a retryable answer.
+  int queryRetries = 0;
   final List<(String bucket, String name)> written = <(String, String)>[];
   final List<http.Client> _clients = <http.Client>[];
   int _appCount = 0;
@@ -607,6 +610,8 @@ Future<CheckResult> _range(Kit kit) async {
   }
   final http.Client client = kit.newRawClient();
   final Uri url = kit.objectUrl(kit.name('range.bin'), media: true);
+  // Every raw request carries the ID token of the throwaway user when there is one, like the SDK's.
+  final http.Response whole = await kit.raw(client, 'GET', url);
   final http.Response part = await kit.raw(
     client,
     'GET',
@@ -619,6 +624,13 @@ Future<CheckResult> _range(Kit kit) async {
     url,
     headers: <String, String>{'Range': 'bytes=5000-5009'},
   );
+  if (whole.statusCode != 200) {
+    return CheckResult(
+      Status.fail,
+      'The control read without a Range answered HTTP ${whole.statusCode} (${_clip(whole.body)}), so a Range '
+      'answer cannot be judged: the user cannot read the object.',
+    );
+  }
   final Map<String, Object?> observed = <String, Object?>{
     'status': part.statusCode,
     'bytes': part.bodyBytes.length,
@@ -630,6 +642,18 @@ Future<CheckResult> _range(Kit kit) async {
       part.bodyBytes.length == 10 &&
       _same(part.bodyBytes, data.sublist(10, 20));
   final bool ignored = part.statusCode == 200 && _same(part.bodyBytes, data);
+  if (part.statusCode == 403) {
+    return CheckResult(
+      Status.inconclusive,
+      'REFUSED: the same read answered HTTP 200 without a Range and HTTP 403 with Range: bytes=10-19 '
+      '(${_clip(part.body)}); a past-the-end range answered HTTP ${beyond.statusCode}.',
+      details: const <String>[
+        'A finding about the backend: a ranged read of a rules-protected object was refused. The SDK sends Range '
+            'only as bytes=0-N in getBytes(maxSize), which check 19 shows is served.',
+      ],
+      observed: observed,
+    );
+  }
   if (!honoured && !ignored) {
     return CheckResult(
       Status.fail,
@@ -903,15 +927,42 @@ Future<http.Response> _sendChunk(
   );
 }
 
-Future<http.Response> _query(Kit kit, http.Client client, Session session) =>
-    kit.raw(
-      client,
-      'POST',
-      session.uri,
-      headers: <String, String>{'X-Goog-Upload-Command': 'query'},
-      user: false,
-      gmpid: false,
-    );
+/// Asks the session how much it has. A 5xx, 408, 429 or a network error is retried up to four times with a
+/// growing pause, as the SDK retries a status request; [Kit.queryRetries] counts the retries.
+Future<http.Response> _query(
+  Kit kit,
+  http.Client client,
+  Session session, {
+  Map<String, String> extraHeaders = const <String, String>{},
+}) async {
+  http.Response? last;
+  for (int attempt = 0; attempt < 5; attempt++) {
+    if (attempt > 0) {
+      kit.queryRetries++;
+      await Future<void>.delayed(Duration(milliseconds: 500 << attempt));
+    }
+    try {
+      last = await kit.raw(
+        client,
+        'POST',
+        session.uri,
+        headers: <String, String>{
+          'X-Goog-Upload-Command': 'query',
+          ...extraHeaders,
+        },
+        user: false,
+        gmpid: false,
+      );
+    } on http.ClientException {
+      continue;
+    }
+    final int status = last.statusCode;
+    if (!(status >= 500 || status == 408 || status == 429)) {
+      return last;
+    }
+  }
+  return last ?? (throw StateError('the session query never got a response'));
+}
 
 Future<void> _cancel(Kit kit, http.Client client, Session session) => kit.raw(
   client,
@@ -1096,7 +1147,7 @@ Future<CheckResult> _pauseResume(Kit kit) async {
   return CheckResult(
     ok ? Status.pass : Status.fail,
     ok
-        ? 'RESUMED at $received of ${data.length} bytes after a pause ($pause); the query said '
+        ? 'RESUMED at $received of ${data.length} bytes after a pause ($pause${kit.queryRetries > 0 ? ', the status query was retried ${kit.queryRetries} time(s) after a retryable answer' : ''}); the query said '
               'x-goog-upload-status: ${status.headers['x-goog-upload-status']}; the stored size and md5 match.'
         : 'Resuming at $received ended with HTTP ${end.statusCode}: ${_clip(end.body)}',
     observed: observed,
@@ -1380,6 +1431,20 @@ Future<CheckResult> _refresh401(Kit kit) async {
       observed: observed,
     );
   } on FirebaseStorageException catch (e) {
+    final List<int?> statuses = <int?>[
+      for (final Seen s in stored.client.seen) s.status,
+    ];
+    if (e.httpStatus == 403 && statuses.every((int? s) => s == 403)) {
+      return CheckResult(
+        Status.inconclusive,
+        'The backend answers HTTP 403 (unauthorized), not 401, to a token that is not valid, so the 401 refresh path '
+        'was not reached; this is a finding about the backend, not a failure of the SDK.',
+        details: <String>[
+          'statuses: $statuses; token requests (forceRefresh): ${stale.calls}',
+        ],
+        observed: <String, Object?>{'statuses': statuses, 'calls': stale.calls},
+      );
+    }
     return CheckResult(
       Status.fail,
       'The request with a stale token failed with ${_describe(e)}; the statuses were '
@@ -1391,25 +1456,18 @@ Future<CheckResult> _refresh401(Kit kit) async {
   }
 }
 
+List<String> _tokens(String? header) => <String>[
+  for (final String part in (header ?? '').split(','))
+    if (part.trim().isNotEmpty) part.trim().toLowerCase(),
+];
+
 Future<CheckResult> _cors(Kit kit) async {
   final http.Client client = kit.newRawClient();
   const String origin = 'https://verify-storage-kit.invalid';
   final Uint8List data = Kit.bytes(chunkSize, 14);
   final String objectName = kit.name('cors.bin');
   kit.track(objectName);
-  final http.Response preflight = await kit.raw(
-    client,
-    'OPTIONS',
-    kit.bucketUrl(query: <String, String>{'name': objectName}),
-    headers: <String, String>{
-      'Origin': origin,
-      'Access-Control-Request-Method': 'POST',
-      'Access-Control-Request-Headers':
-          'x-goog-upload-command,x-goog-upload-protocol,x-goog-upload-offset,content-type,x-firebase-gmpid,x-firebase-storage-version',
-    },
-    user: false,
-    gmpid: false,
-  );
+  // A real resumable session, started like the SDK starts it (with the user's token) from a browser origin.
   final http.Response start = await kit.raw(
     client,
     'POST',
@@ -1422,52 +1480,108 @@ Future<CheckResult> _cors(Kit kit) async {
       'X-Goog-Upload-Header-Content-Type': 'application/octet-stream',
       'Content-Type': 'application/json; charset=utf-8',
     },
-    body: utf8.encode(jsonEncode(<String, Object?>{'name': objectName})),
+    body: utf8.encode(
+      jsonEncode(<String, Object?>{
+        'name': objectName,
+        'contentType': 'application/octet-stream',
+      }),
+    ),
   );
   final String? url = start.headers['x-goog-upload-url'];
-  if (url != null) {
-    await _cancel(kit, client, Session(Uri.parse(url), 'active', null));
+  if (start.statusCode != 200 || url == null) {
+    return CheckResult(
+      Status.fail,
+      'Starting a session from an origin answered HTTP ${start.statusCode} (${_clip(start.body)}).',
+    );
   }
-  final String exposed = (start.headers['access-control-expose-headers'] ?? '')
-      .toLowerCase();
+  final Session session = Session(Uri.parse(url), 'active', null);
+  final http.Response status = await _query(
+    kit,
+    client,
+    session,
+    extraHeaders: <String, String>{'Origin': origin},
+  );
+  final http.Response preflight = await kit.raw(
+    client,
+    'OPTIONS',
+    session.uri,
+    headers: <String, String>{
+      'Origin': origin,
+      'Access-Control-Request-Method': 'POST',
+      'Access-Control-Request-Headers':
+          'x-goog-upload-command,x-goog-upload-offset,content-type',
+    },
+    user: false,
+    gmpid: false,
+  );
+  await _cancel(kit, client, session);
+
+  final List<String> exposedStart = _tokens(
+    start.headers['access-control-expose-headers'],
+  );
+  final List<String> exposedQuery = _tokens(
+    status.headers['access-control-expose-headers'],
+  );
+  bool exposes(List<String> exposed, String header) =>
+      exposed.contains(header) || exposed.contains('*');
+  // Every x-goog-upload-* header the two responses carry must be readable from a browser.
+  final List<String> carried = <String>{
+    for (final String h in start.headers.keys)
+      if (h.startsWith('x-goog-upload-')) h,
+    for (final String h in status.headers.keys)
+      if (h.startsWith('x-goog-upload-')) h,
+  }.toList()..sort();
+  final List<String> notExposed = <String>[
+    for (final String h in carried)
+      if (!exposes(exposedStart, h) && !exposes(exposedQuery, h)) h,
+  ];
   final String allowOrigin = start.headers['access-control-allow-origin'] ?? '';
-  final String allowHeaders =
-      (preflight.headers['access-control-allow-headers'] ?? '').toLowerCase();
-  const List<String> needed = <String>[
-    'x-goog-upload-url',
-    'x-goog-upload-status',
-    'x-goog-upload-size-received',
-  ];
-  final List<String> missingExposed = <String>[
-    for (final String h in needed)
-      if (!exposed.contains(h) && exposed != '*') h,
-  ];
-  final List<String> missingAllowed = <String>[
+  final List<String> allowedHeaders = _tokens(
+    preflight.headers['access-control-allow-headers'],
+  );
+  final List<String> allowedMethods = _tokens(
+    preflight.headers['access-control-allow-methods'],
+  );
+  final List<String> notAllowed = <String>[
     for (final String h in <String>[
       'x-goog-upload-command',
-      'x-goog-upload-protocol',
       'x-goog-upload-offset',
     ])
-      if (!allowHeaders.contains(h) && allowHeaders != '*') h,
+      if (!allowedHeaders.contains(h) && !allowedHeaders.contains('*')) h,
   ];
   final bool originOk = allowOrigin == '*' || allowOrigin == origin;
+  final bool methodOk =
+      allowedMethods.isEmpty ||
+      allowedMethods.contains('post') ||
+      allowedMethods.contains('*');
   final Map<String, Object?> observed = <String, Object?>{
+    'startStatus': start.statusCode,
     'preflightStatus': preflight.statusCode,
     'allowOrigin': allowOrigin,
-    'missingExposed': missingExposed,
-    'missingAllowed': missingAllowed,
+    'carried': carried,
+    'exposedOnStart': exposedStart,
+    'exposedOnQuery': exposedQuery,
+    'notExposed': notExposed,
+    'allowedHeaders': allowedHeaders,
+    'allowedMethods': allowedMethods,
+    'notAllowed': notAllowed,
   };
-  final bool ok = originOk && missingExposed.isEmpty && missingAllowed.isEmpty;
+  final bool ok =
+      originOk && methodOk && notExposed.isEmpty && notAllowed.isEmpty;
   return CheckResult(
     ok
         ? Status.pass
         : (kit.backend.production ? Status.fail : Status.inconclusive),
-    ok
-        ? 'EXPOSED: the resumable start response exposes ${needed.join(', ')} to a browser origin and the preflight '
-              '(HTTP ${preflight.statusCode}) allows the x-goog-upload-* request headers.'
-        : 'MISSING: allow-origin "${allowOrigin.isEmpty ? 'none' : allowOrigin}", exposed headers lacking $missingExposed, '
-              'allowed request headers lacking $missingAllowed (preflight HTTP ${preflight.statusCode}).',
+    '${ok ? 'EXPOSED' : 'MISSING'}: the start response (HTTP ${start.statusCode}) carries '
+    '${carried.join(', ')}; allow-origin "${allowOrigin.isEmpty ? 'none' : allowOrigin}"; not exposed to a browser: '
+    '${notExposed.isEmpty ? 'none' : notExposed.join(', ')}; the preflight to the upload URL '
+    '(HTTP ${preflight.statusCode}) does ${notAllowed.isEmpty ? '' : 'not '}allow x-goog-upload-command and '
+    'x-goog-upload-offset${notAllowed.isEmpty ? '' : ' (lacking ${notAllowed.join(', ')})'}.',
     details: <String>[
+      'access-control-expose-headers on the start response: ${exposedStart.isEmpty ? 'none' : exposedStart.join(', ')}',
+      'access-control-expose-headers on the query response: ${exposedQuery.isEmpty ? 'none' : exposedQuery.join(', ')}',
+      'preflight allow-methods: ${allowedMethods.isEmpty ? 'none' : allowedMethods.join(', ')}; '
+          'allow-headers: ${allowedHeaders.isEmpty ? 'none' : allowedHeaders.join(', ')}',
       if (!ok && !kit.backend.production)
         'The emulator answers CORS differently from production; no browser is involved in this run.',
     ],
