@@ -238,12 +238,17 @@ class Requester {
   ///
   /// With [maxBodyBytes], reading stops as soon as the body is longer and [BodyTooLargeException] is thrown.
   /// A body cut by a network error is requested again, within the retry time.
+  ///
+  /// With [onBodyProgress], the body is handed to the client in slices of [bodySliceSize] bytes, and
+  /// [onBodyProgress] is called with the number of bytes the client has taken after each slice (from 0 again
+  /// on each attempt). Without it the body goes as one block.
   Future<StorageResponse> send(
     StorageRequest request, {
     Future<void>? abortTrigger,
     int? maxBodyBytes,
+    void Function(int bytesSent)? onBodyProgress,
   }) {
-    return _execute(request, abortTrigger, (
+    return _execute(request, abortTrigger, onBodyProgress, (
       http.StreamedResponse response,
     ) async {
       final Uint8List bytes = await _readAll(response.stream, maxBodyBytes);
@@ -260,6 +265,7 @@ class Requester {
     return _execute(
       request,
       abortTrigger,
+      null,
       (http.StreamedResponse response) async => response,
     );
   }
@@ -267,6 +273,7 @@ class Requester {
   Future<T> _execute<T>(
     StorageRequest request,
     Future<void>? abortTrigger,
+    void Function(int bytesSent)? onBodyProgress,
     Future<T> Function(http.StreamedResponse response) onSuccess,
   ) async {
     _checkOpen();
@@ -289,6 +296,7 @@ class Requester {
           request,
           _headers(request, authToken, appCheckToken),
           abort,
+          onBodyProgress,
         );
         final int status = response.statusCode;
         if (request.successCodes.contains(status)) {
@@ -357,21 +365,34 @@ class Requester {
     StorageRequest request,
     Map<String, String> headers,
     _AbortState abort,
+    void Function(int bytesSent)? onBodyProgress,
   ) {
     final Completer<void> attemptAbort = Completer<void>();
-    final http.AbortableRequest httpRequest =
-        http.AbortableRequest(
-            request.method,
-            request.url,
-            abortTrigger: attemptAbort.future,
-          )
-          // The REST API never redirects, and a redirect would carry the App Check header to another host.
-          ..followRedirects = false
-          ..headers.addAll(headers);
     final Uint8List? body = request.body;
-    if (body != null) {
-      httpRequest.bodyBytes = body;
+    final http.BaseRequest httpRequest;
+    if (body != null && onBodyProgress != null) {
+      httpRequest = _SlicedRequest(
+        request.method,
+        request.url,
+        body,
+        onBodyProgress,
+        abortTrigger: attemptAbort.future,
+      );
+    } else {
+      final http.AbortableRequest plain = http.AbortableRequest(
+        request.method,
+        request.url,
+        abortTrigger: attemptAbort.future,
+      );
+      if (body != null) {
+        plain.bodyBytes = body;
+      }
+      httpRequest = plain;
     }
+    httpRequest
+      // The REST API never redirects, and a redirect would carry the App Check header to another host.
+      ..followRedirects = false
+      ..headers.addAll(headers);
 
     final Completer<http.StreamedResponse> result =
         Completer<http.StreamedResponse>();
@@ -514,6 +535,46 @@ class Requester {
 }
 
 final math.Random _random = math.Random();
+
+/// The size of the slices of a body sent with progress: 64 KiB.
+@internal
+const int bodySliceSize = 64 * 1024;
+
+/// A request whose body is handed to the client one slice at a time, reporting how much the client took.
+///
+/// The slices come from an `async*` generator, so a client that applies backpressure (`IOClient` writing to
+/// a socket) pulls them only as fast as it sends them.
+final class _SlicedRequest extends http.BaseRequest with http.Abortable {
+  _SlicedRequest(
+    super.method,
+    super.url,
+    this._body,
+    this._onProgress, {
+    this.abortTrigger,
+  }) {
+    contentLength = _body.length;
+  }
+
+  @override
+  final Future<void>? abortTrigger;
+
+  final Uint8List _body;
+  final void Function(int bytesSent) _onProgress;
+
+  @override
+  http.ByteStream finalize() {
+    super.finalize();
+    return http.ByteStream(_slices());
+  }
+
+  Stream<List<int>> _slices() async* {
+    for (int start = 0; start < _body.length; start += bodySliceSize) {
+      final int end = math.min(start + bodySliceSize, _body.length);
+      yield Uint8List.sublistView(_body, start, end);
+      _onProgress(end);
+    }
+  }
+}
 
 /// The `abortTrigger` of a logical request, shared by its attempts and backoff waits.
 final class _AbortState {

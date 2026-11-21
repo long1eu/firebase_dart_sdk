@@ -78,6 +78,13 @@ const int resumableChunkSize = 256 * 1024;
 @internal
 const int maxChunkSize = 16 * 1024 * 1024;
 
+/// Whether request bodies can report how much of them was sent. On the web, `fetch` takes the whole body at
+/// once, so the progress there comes per chunk only.
+const bool _bodyProgress = !bool.fromEnvironment('dart.library.js_interop');
+
+/// The shortest time between two progress events while a body is being sent.
+const Duration _progressInterval = Duration(milliseconds: 100);
+
 /// The longest wait between two attempts at a failing chunk.
 const Duration _maxRetryWait = Duration(seconds: 64);
 
@@ -101,6 +108,11 @@ enum _Phase { running, pausing, paused, canceling, success, canceled, error }
 /// });
 /// final FullMetadata metadata = await task.result;
 /// ```
+///
+/// On the VM, [progress] also reports the bytes as they are written while a chunk (or the one multipart
+/// request) is being sent, at most once per 64 KiB and per 100 ms, and always when the server confirms a
+/// chunk. When a chunk fails, [bytesTransferred] goes back to what the server confirmed, with an event. On the
+/// web the browser gives no upload progress, so the events come once per confirmed chunk.
 ///
 /// The task is not a `Future`; pausing aborts the request in flight and resuming asks the server where it
 /// stopped. [cancel] works while running and while paused.
@@ -130,6 +142,7 @@ final class UploadTask {
       _sessionUrl = existingSessionUri;
       _needStatus = true;
     }
+    _lastEventAt = _requester.now();
     _result.future.ignore();
     unawaited(_run());
   }
@@ -148,6 +161,8 @@ final class UploadTask {
 
   _Phase _phase = _Phase.running;
   int _transferred = 0;
+  int _confirmed = 0;
+  DateTime? _lastEventAt;
   FullMetadata? _uploaded;
   bool _looping = false;
 
@@ -169,7 +184,8 @@ final class UploadTask {
     _Phase.error => UploadState.error,
   };
 
-  /// The bytes the server has confirmed so far. It can go down when the server lost part of a chunk.
+  /// The bytes sent so far: those the server has confirmed, plus (on the VM) those of the chunk being sent. It
+  /// goes back to the confirmed bytes when a chunk fails.
   int get bytesTransferred => _transferred;
 
   /// The current state as an [UploadProgress].
@@ -317,9 +333,19 @@ final class UploadTask {
   Future<void> _oneShot() async {
     final Uint8List data = await _read(0, totalBytes);
     _throwIfStopped();
+    final StorageRequest request = ref.multipartRequest(data, _metadata);
+    final int bodyLength = request.body?.length ?? 0;
     final StorageResponse response = await _requester.send(
-      ref.multipartRequest(data, _metadata),
+      request,
       abortTrigger: _abortTrigger,
+      onBodyProgress: _bodyProgress && bodyLength > 0
+          ? (int sent) {
+              // The body holds the metadata part too: count the data in proportion.
+              if (sent < bodyLength) {
+                _reportSending(sent * totalBytes ~/ bodyLength);
+              }
+            }
+          : null,
     );
     final FullMetadata metadata = ref.metadataOf(response);
     _setProgress(totalBytes);
@@ -393,7 +419,7 @@ final class UploadTask {
         httpStatus: response.statusCode,
       );
     }
-    if (received < _transferred ||
+    if (received < _confirmed ||
         received > totalBytes ||
         (status == 'final' && received != totalBytes)) {
       throw _wrongSize(received);
@@ -417,7 +443,7 @@ final class UploadTask {
   }
 
   Future<void> _uploadChunk() async {
-    final int offset = _transferred;
+    final int offset = _confirmed;
     final int left = totalBytes - offset;
     final int size = math.min(left, _chunkSize);
     final Uint8List data = await _read(offset, size);
@@ -444,6 +470,13 @@ final class UploadTask {
           errorMapper: _errors,
         ),
         abortTrigger: _abortTrigger,
+        onBodyProgress: _bodyProgress && size > 0
+            ? (int sent) {
+                if (sent < size) {
+                  _reportSending(offset + sent);
+                }
+              }
+            : null,
       );
     } on FirebaseStorageException catch (error) {
       if (error.code == 'retry-limit-exceeded' ||
@@ -509,6 +542,7 @@ final class UploadTask {
         ? const Duration(seconds: 1)
         : (doubled > _maxRetryWait ? _maxRetryWait : doubled);
     _chunkSize = resumableChunkSize;
+    _rollBack();
     _waitBeforeNextStep = true;
     _needStatus = true;
   }
@@ -518,8 +552,10 @@ final class UploadTask {
     if (error is FirebaseStorageException && error.code == 'canceled') {
       // Our own abort (pause, cancel): where the server stopped is unknown.
       _needStatus = _sessionUrl != null;
+      _rollBack();
       return;
     }
+    _transferred = _confirmed;
     _end(_Phase.error, error, stackTrace);
   }
 
@@ -560,13 +596,33 @@ final class UploadTask {
     );
   }
 
-  void _setProgress(int transferred) {
-    if (transferred == _transferred) {
+  /// The server has [confirmed] bytes.
+  void _setProgress(int confirmed) {
+    _confirmed = confirmed;
+    if (confirmed == _transferred) {
+      return;
+    }
+    _transferred = confirmed;
+    _emit();
+  }
+
+  /// [transferred] bytes have been handed to the client; an event at most every 64 KiB and 100 ms. Lower
+  /// values (a body sent again after a 401) are ignored.
+  void _reportSending(int transferred) {
+    if (_phase != _Phase.running ||
+        transferred - _transferred < bodySliceSize) {
+      return;
+    }
+    final DateTime? last = _lastEventAt;
+    if (last != null && _requester.now().difference(last) < _progressInterval) {
       return;
     }
     _transferred = transferred;
     _emit();
   }
+
+  /// Back to the confirmed bytes after a failed or aborted request, with an event when that changes them.
+  void _rollBack() => _setProgress(_confirmed);
 
   void _succeed(FullMetadata metadata) {
     _uploaded = metadata;
@@ -588,7 +644,10 @@ final class UploadTask {
     _result.completeError(error, stackTrace);
   }
 
-  void _emit() => _events.add(snapshot);
+  void _emit() {
+    _lastEventAt = _requester.now();
+    _events.add(snapshot);
+  }
 
   /// Tells the server to drop the session, without waiting and ignoring the outcome: the task is canceled
   /// either way, and the session expires by itself.
