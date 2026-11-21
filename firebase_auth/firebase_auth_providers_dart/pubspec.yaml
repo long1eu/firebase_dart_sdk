@@ -3,7 +3,7 @@ description: >-
   Unofficial pure-Dart token providers for firebase_app_dart and
   cloud_firestore_dart: service accounts, Application Default Credentials and
   Firebase Auth user sign-in over REST.
-version: 0.3.1
+version: 0.3.2
 homepage: https://github.com/long1eu/firebase_dart_sdk
 repository: https://github.com/long1eu/firebase_dart_sdk/tree/main/firebase_auth/firebase_auth_providers_dart
 issue_tracker: https://github.com/long1eu/firebase_dart_sdk/issues

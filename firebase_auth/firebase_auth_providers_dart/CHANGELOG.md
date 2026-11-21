@@ -1,4 +1,4 @@
-## Unreleased
+## 0.3.2
 
 - Phone sign-in, with the names of the iOS SDK: `FirebaseUserAuth.verifyPhoneNumber(phoneNumber, appVerification:)`
   sends the SMS code (`v1/accounts:sendVerificationCode`, with the reCAPTCHA v2 or Enterprise token of the

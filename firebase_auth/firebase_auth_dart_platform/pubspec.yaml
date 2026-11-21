@@ -3,7 +3,7 @@ description: >-
   Unofficial pure-Dart implementation of the FlutterFire Firebase Auth platform
   interface: the official firebase_auth API on Linux, or on any platform you
   choose.
-version: 0.1.0
+version: 0.1.1
 homepage: https://github.com/long1eu/firebase_dart_sdk
 repository: https://github.com/long1eu/firebase_dart_sdk/tree/main/firebase_auth/firebase_auth_dart_platform
 issue_tracker: https://github.com/long1eu/firebase_dart_sdk/issues
@@ -31,11 +31,11 @@ flutter:
 dependencies:
   # Local development resolves firebase_auth_providers_dart and
   # firebase_app_dart from the sibling packages through pubspec_overrides.yaml
-  # (not published). 0.3.1 is the first version with
-  # FirebaseUserAuth.useEmulator.
+  # (not published). 0.3.2 is the first version with
+  # phone sign-in and BestWebAuthStorage.
   firebase_app_dart: ^0.2.1
   firebase_auth_platform_interface: ^9.1.2
-  firebase_auth_providers_dart: ^0.3.1
+  firebase_auth_providers_dart: ^0.3.2
   # The default storage of the sessions (not on the web). Resolved from the
   # sibling directory through pubspec_overrides.yaml (not published).
   firebase_auth_secure_storage_flutter: ^0.1.0

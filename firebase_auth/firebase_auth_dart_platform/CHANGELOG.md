@@ -1,4 +1,4 @@
-## Unreleased
+## 0.1.1
 
 - Phone sign-in through the client: `verifyPhoneNumber` (`codeSent` with the verification id,
   `verificationFailed`, `codeAutoRetrievalTimeout` after `timeout`; never `verificationCompleted`, since there is

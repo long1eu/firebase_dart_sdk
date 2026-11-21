@@ -13,7 +13,7 @@ name: Publish to pub.dev
 #   firebase_app_dart, firebase_auth_providers_dart, cloud_firestore_dart, then
 #   cloud_firestore_dart_sqlite, cloud_firestore_dart_flutterfire, cloud_firestore_dart_platform,
 #   firebase_auth_secure_storage_flutter (needed by firebase_auth_dart_platform, so release it first),
-#   firebase_auth_dart_platform (needs firebase_auth_providers_dart 0.3.1, so release that first),
+#   firebase_auth_dart_platform (needs firebase_auth_providers_dart 0.3.2, so release that first),
 #   firebase_admin_dart, firebase_storage_dart, firebase_storage_dart_platform
 #
 # How it is allowed to publish (there is no stored secret):

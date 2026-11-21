@@ -110,7 +110,7 @@ packages:
       path: "../../firebase_auth_providers_dart"
       relative: true
     source: path
-    version: "0.3.1"
+    version: "0.3.2"
   firebase_auth_secure_storage_flutter:
     dependency: "direct main"
     description:

@@ -17,7 +17,7 @@ name: Release check
 # For each package of the tag, in dependency order (the same order as publish.yml:
 # secure_flow, firebase_app_dart, firebase_auth_providers_dart, cloud_firestore_dart, then
 # cloud_firestore_dart_sqlite, cloud_firestore_dart_flutterfire, cloud_firestore_dart_platform,
-# firebase_auth_secure_storage_flutter, firebase_auth_dart_platform (needs firebase_auth_providers_dart 0.3.1 and
+# firebase_auth_secure_storage_flutter, firebase_auth_dart_platform (needs firebase_auth_providers_dart 0.3.2 and
 # firebase_auth_secure_storage_flutter, so release those first),
 # firebase_admin_dart, firebase_storage_dart, firebase_storage_dart_platform): the version in pubspec.yaml is the
 # version of the tag, CHANGELOG.md has a `## <version>` heading, and `pub publish --dry-run` passes (with Flutter
