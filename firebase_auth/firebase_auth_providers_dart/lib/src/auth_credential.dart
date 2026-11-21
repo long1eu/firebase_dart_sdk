@@ -121,10 +121,24 @@ class EmailAuthCredential extends AuthCredential {
   }
 }
 
-/// [json] as a map: a map as it is, and a string decoded first (a [FormatException] when it is not JSON); null for
-/// anything else. For the `fromJson` of the credentials; not exported.
+/// [json] as a map: a map as it is, and a string decoded first; null for anything else. For the
+/// `fromJson` of the credentials; not exported.
+///
+/// Text that is not JSON throws a [FormatException] that holds only the offset of the error: the
+/// decoder's own exception keeps the whole text as its `source` and prints it, and on the web its
+/// message (the browser's `SyntaxError`) can quote part of the text, which holds the password, the
+/// token, the SMS code or the temporary proof.
 Map<Object?, Object?>? credentialJsonMap(Object json) {
-  final Object? value = json is String ? jsonDecode(json) : json;
+  final Object? value;
+  try {
+    value = json is String ? jsonDecode(json) : json;
+  } on FormatException catch (e) {
+    final int? offset = e.offset;
+    throw FormatException(
+      'The credential is not valid JSON'
+      '${offset == null ? '' : ' (error at offset $offset)'}.',
+    );
+  }
   return value is Map ? value : null;
 }
 

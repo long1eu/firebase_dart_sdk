@@ -413,6 +413,21 @@ void main() {
       );
     });
 
+    test(
+      'the FormatException keeps neither the text nor the decoder\'s message',
+      () {
+        const String text = '{"verificationCode":"123456"';
+        try {
+          PhoneAuthCredential.fromJson(text);
+          fail('expected a FormatException');
+        } on FormatException catch (e) {
+          expect(e.source, isNull);
+          expect(e.message, startsWith('The credential is not valid JSON'));
+          expect('$e', isNot(contains('123456')));
+        }
+      },
+    );
+
     test('toString leaves out the code, the proof and the number', () {
       final PhoneAuthCredential code = PhoneAuthCredential.fromJson(
         '{"verificationId":"id-secret","verificationCode":"code-secret"}',

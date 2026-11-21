@@ -7,6 +7,12 @@
   value that is not a string. `toString` still shows none of the values.
 - `MultiFactorResolver.session`: a `MultiFactorSession` of type `MultiFactorSessionType.signIn` that wraps the
   pending credential of the sign-in (`resolver.session` of the JS SDK). It is opaque: no member, `toString` or JSON
+  form shows the credential. `MultiFactorSessionType` has the two kinds of the JS SDK, `enroll` and `signIn`, so
+  that a `switch` over it stays exhaustive; this package makes no `enroll` session yet (its enrolments use the
+  signed-in user).
+- The `fromJson` of `EmailAuthCredential`, `OAuthCredential` and `PhoneAuthCredential`, and
+  `OAuthProvider.credentialFromJson`, throw a `FormatException` without the text for text that is not JSON. The
+  decoder's exception kept the whole text, with its password, token, SMS code or temporary proof, and printed it.
   form shows the credential.
 - reCAPTCHA Enterprise, as the JS SDK does it: `FirebaseUserAuth.initializeRecaptchaConfig()` reads
   `v2/recaptchaConfig` (the Enterprise site key and the `ENFORCE`/`AUDIT`/`OFF` state of `EMAIL_PASSWORD_PROVIDER`
