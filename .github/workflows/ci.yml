@@ -579,10 +579,13 @@ jobs:
         run: firebase setup:emulators:storage
       - name: Start the Storage emulator
         run: ./tool/start_storage_emulator.sh 9299
+      - name: Start the Auth emulator (the verification kit's throwaway user)
+        run: ./tool/start_auth_emulators.sh 9398 9397
       - name: Run the emulator tests of firebase_storage_dart
         working-directory: firebase_storage/firebase_storage_dart
         env:
           FIREBASE_STORAGE_EMULATOR_HOST: 127.0.0.1:9299
+          FIREBASE_AUTH_EMULATOR_HOST: 127.0.0.1:9398
         run: |
           set -o pipefail
           dart pub get
@@ -594,6 +597,9 @@ jobs:
       - name: Stop the Storage emulator
         if: always()
         run: ./tool/stop_storage_emulator.sh 9299
+      - name: Stop the Auth emulator
+        if: always()
+        run: ./tool/stop_auth_emulators.sh 9398 9397
       - name: Upload the logs
         if: failure()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

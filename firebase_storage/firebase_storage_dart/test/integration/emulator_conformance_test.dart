@@ -295,20 +295,25 @@ void main() {
   });
 
   group('4. media uploads ignore the request Content-Type', () {
-    test('a text/plain media upload is application/octet-stream', () async {
-      final http.Response response = await raw.post(
-        Uri.parse(
-          '${collectionUrl()}?name=${Uri.encodeQueryComponent('$run/media.txt')}',
-        ),
-        headers: <String, String>{'Content-Type': 'text/plain'},
-        body: 'x',
-      );
-      expect(response.statusCode, 200);
-      expect(
-        (jsonDecode(response.body) as Map<String, Object?>)['contentType'],
-        'application/octet-stream',
-      );
-    });
+    // firebase-tools 15.18.0 stored application/octet-stream; 15.37.0 keeps the request's type, as
+    // production does. Both are accepted, so a newer CLI in CI does not fail here.
+    test(
+      'a text/plain media upload keeps text/plain or becomes application/octet-stream',
+      () async {
+        final http.Response response = await raw.post(
+          Uri.parse(
+            '${collectionUrl()}?name=${Uri.encodeQueryComponent('$run/media.txt')}',
+          ),
+          headers: <String, String>{'Content-Type': 'text/plain'},
+          body: 'x',
+        );
+        expect(response.statusCode, 200);
+        expect(
+          (jsonDecode(response.body) as Map<String, Object?>)['contentType'],
+          anyOf('application/octet-stream', startsWith('text/plain')),
+        );
+      },
+    );
 
     test('a multipart upload of the client keeps its content type', () async {
       final FullMetadata metadata = await storage
