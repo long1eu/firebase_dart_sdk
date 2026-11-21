@@ -11,8 +11,9 @@ covers Android, iOS and the data-protection keychain of signed macOS apps). Both
 `migrateFrom` rules.
 
 > **Status: 0.1.0, not published.** Unit-tested with fakes of the store on any system. The integration tests run
-> against the real store of each system; only macOS has run them so far. **Linux and Windows are untested**: the
-> code is written against the documented libsecret and DPAPI interfaces, not proven on a real system. See
+> against the real store of each system and run in CI on every change to the package, on GitHub-hosted runners:
+> libsecret with gnome-keyring on Ubuntu, DPAPI on Windows and the login keychain on macOS. KDE Wallet and
+> KeePassXC, the other Secret Service providers, have not been tried. See
 > [Integration tests](#integration-tests) for the commands.
 
 ## How a command line tool uses it
