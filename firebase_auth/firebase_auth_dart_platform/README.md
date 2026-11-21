@@ -226,3 +226,71 @@ These throw a `FirebaseAuthException` with the code `unimplemented` and a messag
 | Windows, macOS | `FirebaseAuthDart.use()` | `firebase_core` stays native; the session file is in the user's application data |
 | Android, iOS | `FirebaseAuthDart.use()` | the session is in memory unless you pass `storageFor` |
 | Web | not supported | use the official plugin |
+
+## Real-project harness
+
+`test/real_project/real_project_test.dart` drives the official `firebase_auth` API on top of this package against a
+real Firebase project, with you at the browser. It is for the maintainers; it is skipped unless
+`AUTH_HARNESS_STEPS` is set, so a plain `flutter test` does not run it. On macOS (Linux should work too, untested):
+
+```shell
+cd firebase_auth/firebase_auth_dart_platform
+AUTH_HARNESS_STEPS=all flutter test test/real_project/real_project_test.dart -r expanded
+```
+
+It runs under `flutter test` because `package:flutter`, which `firebase_core` and `firebase_auth` import, needs the
+engine (`dart run` cannot load it), and a test needs no app, runner or entitlements. It uses a plain `test()`
+without a test binding, so its `HttpClient` is the real one, and `FirebaseAuthDart.use(useDartCore: true)`
+provides `firebase_core`. The session is kept by a `FileAuthStorage` in a new temporary directory, deleted at the
+end.
+
+**The configuration comes only from the environment** (for example `op run --env-file=... --` in front of the
+command):
+
+| Variable | Needed for | What |
+| --- | --- | --- |
+| `AUTH_HARNESS_STEPS` | always | `all`, or some of `google github reauthenticate totp revoke persistence` (commas or spaces); they always run in that order |
+| `FIREBASE_API_KEY`, `FIREBASE_PROJECT_ID`, `FIREBASE_APP_ID` | always | from the project settings; the app id is that of any app of the project (`1:<number>:<platform>:<hash>`) |
+| `GOOGLE_DESKTOP_CLIENT_ID`, `GOOGLE_DESKTOP_CLIENT_SECRET` | always: every step signs in with Google first | a "Desktop app" OAuth client |
+| `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET` | `github` | the GitHub OAuth App |
+| `AUTH_HARNESS_GITHUB_ACCOUNT_EXISTS` | optional, `github` | `1` to start the GitHub step with the `account-exists-with-different-credential` recovery (below) |
+
+**Each step prints one line**, `PASS <step>`, `FAIL <step>: <error code>` or `SKIP <step>: <reason>`:
+
+| Step | What a PASS means |
+| --- | --- |
+| `google` | `signInWithProvider(GoogleAuthProvider())` signed in to an existing account (the primary account of the run) |
+| `github` | `User.linkWithProvider(GithubAuthProvider())` linked GitHub, a `signInWithProvider` with it signed in to the same account, and `User.unlink` removed it. With `AUTH_HARNESS_GITHUB_ACCOUNT_EXISTS=1`, first a GitHub sign-in failed with `account-exists-with-different-credential`, and the credential of the error was linked (`linkWithCredential`) after a Google sign-in, then unlinked. When GitHub is already linked, it is only signed in with, and stays linked |
+| `reauthenticate` | `User.reauthenticateWithProvider(GoogleAuthProvider())` returned the same user |
+| `totp` | a TOTP factor named `auth-harness` was enrolled, a Google sign-in after a sign-out raised the second-factor challenge, `MultiFactorResolver.resolveSignIn` finished it, and the factor was unenrolled |
+| `revoke` | never a PASS: `revokeAccessToken` is for Sign in with Apple access tokens only, and the harness has no Apple sign-in. It calls it with a placeholder token and reports a SKIP that says whether the request reached the backend (and what it answered) |
+| `persistence` | the session was in the session file, `setPersistence(Persistence.NONE)` removed it from the file while the user stayed signed in (and a token refresh worked), and `setPersistence(Persistence.LOCAL)` wrote it back |
+
+**Codes for the TOTP step**: `flutter test` does not forward the terminal's input to the test, so the harness asks
+for codes on a page served on 127.0.0.1 (at a random path), which it opens in the browser and prints. The first
+page shows the `otpauth://` URI of the new factor (also printed in the terminal): add it to an authenticator app
+(paste it, or type its `secret` as a setup key), then type the code into the page. The sign-in asks for the next
+code: the first one is spent. The URI holds the secret of that factor only, which is unenrolled at the end; its
+account name is the masked email address.
+
+**The account is left as it was**: every link and enrolment is undone in the step, or at the end if the step
+failed, and the last lines say `CLEANUP OK` or `CLEANUP FAILED` with what to fix by hand. The harness never
+deletes an account. A sign-in that created a new account (signing in with a Google account that has none yet, or a
+GitHub sign-in with `AUTH_HARNESS_GITHUB_ACCOUNT_EXISTS=1` in a project that allows several accounts per email
+address) fails the step and is listed for deletion in the console. The output never has a token or a full email
+address in it.
+
+Set up in the consoles first:
+
+- **Google**: a "Desktop app" OAuth client (Google Cloud console, APIs & Services, Credentials), in the project
+  of the Firebase project or listed in the Google provider's "Safelist client IDs from external projects"; the
+  Google provider enabled in Firebase Authentication; a Google account that already has an account in the project.
+- **GitHub**: a GitHub OAuth App whose authorization callback URL is exactly `http://127.0.0.1` (no `/` at the
+  end). Its client id and secret must be the ones set for the GitHub provider in Firebase Authentication: Firebase
+  checks the GitHub token against that app (`invalid-credential` otherwise). The GitHub account must not be linked
+  to another account of the project (`credential-already-in-use`). The `account-exists-with-different-credential`
+  part also needs "one account per email address" (the default) and a GitHub account with the email address of the
+  Google account.
+- **TOTP**: Firebase Authentication with Identity Platform, with TOTP multi-factor authentication enabled (through
+  the Admin SDK or the REST API: there is no console switch for it), and an account with a verified email address
+  (a Google account has one).
