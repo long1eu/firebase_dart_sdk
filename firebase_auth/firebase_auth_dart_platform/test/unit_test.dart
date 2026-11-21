@@ -3,7 +3,7 @@
 
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io' show FileSystemException;
+import 'dart:io' show FileSystemException, Platform;
 
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_auth_dart_platform/firebase_auth_dart_platform.dart';
@@ -210,7 +210,12 @@ void main() {
     test('the default session file is per executable, under XDG', () {
       final String? file = defaultSessionFile();
       expect(file, isNotNull);
-      expect(file, endsWith('firebase_auth_dart_platform/sessions.json'));
+      expect(
+        file,
+        endsWith(
+          'firebase_auth_dart_platform${Platform.pathSeparator}sessions.json',
+        ),
+      );
     });
   });
 
