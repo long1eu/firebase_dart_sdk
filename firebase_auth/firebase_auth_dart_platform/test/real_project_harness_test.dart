@@ -14,6 +14,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 
+import '../../firebase_auth_providers_dart/test/phone_platform.dart';
 import 'fake_backend.dart';
 import 'real_project/cleanup.dart';
 import 'real_project/code_prompt.dart';
@@ -46,6 +47,7 @@ void main() {
     _setUpFakeProject();
     group('google, totp, revoke, persistence', _stepTests);
     group('github', _githubTests);
+    group('phone and sms', _phoneTests);
   });
 }
 
@@ -145,6 +147,40 @@ void _configurationTests() {
     expect(parseFlag('X', ' TRUE '), isTrue);
     expect(() => parseFlag('X', 'yes'), _configError('Set X to 1 or 0'));
   });
+
+  test('the test phone number and its code come together, in E.164', () {
+    final HarnessConfig none = HarnessConfig.fromEnvironment(_baseEnvironment);
+    expect(none.phoneNumber, isNull);
+    expect(none.phoneCode, isNull);
+    final HarnessConfig set = HarnessConfig.fromEnvironment(<String, String>{
+      ..._baseEnvironment,
+      'AUTH_HARNESS_PHONE_NUMBER': ' +15555550100 ',
+      'AUTH_HARNESS_PHONE_CODE': '123456',
+    });
+    expect(set.phoneNumber, '+15555550100');
+    expect(set.phoneCode, '123456');
+    expect(
+      () => HarnessConfig.fromEnvironment(<String, String>{
+        ..._baseEnvironment,
+        'AUTH_HARNESS_PHONE_NUMBER': '+15555550100',
+      }),
+      _configError('AUTH_HARNESS_PHONE_CODE'),
+    );
+    expect(
+      () => HarnessConfig.fromEnvironment(<String, String>{
+        ..._baseEnvironment,
+        'AUTH_HARNESS_PHONE_NUMBER': '555 0100',
+        'AUTH_HARNESS_PHONE_CODE': '123456',
+      }),
+      throwsA(
+        isA<HarnessConfigException>().having(
+          (HarnessConfigException e) => e.message,
+          'message',
+          allOf(contains('E.164'), isNot(contains('555 0100'))),
+        ),
+      ),
+    );
+  });
 }
 
 void _outputTests() {
@@ -155,6 +191,11 @@ void _outputTests() {
     expect(maskEmail(''), '(no email)');
     expect(maskEmail('@example.com'), '***');
     expect(maskEmail('no-at-sign'), '***');
+  });
+
+  test('phone numbers are masked to their last two digits', () {
+    expect(maskPhone('+15555550100'), '+*********00');
+    expect(maskPhone('+1'), '***');
   });
 
   test('redact masks the emails in a text and cuts it', () {
@@ -400,6 +441,9 @@ class _Project {
       if (deleted is List && deleted.contains('github.com')) {
         githubLinked = false;
       }
+      if (deleted is List && deleted.contains('phone')) {
+        backend.phones.remove(uid);
+      }
     }
     if (path.endsWith('mfaEnrollment:start') && recentLoginsRequired > 0) {
       recentLoginsRequired--;
@@ -460,10 +504,17 @@ class _Project {
         'createdAt': '1700000000000',
         'lastLoginAt': '1700000001000',
         if (_factors.isNotEmpty) 'mfaInfo': _factors,
+        'phoneNumber': ?backend.phones[uid],
         'providerUserInfo': <Object?>[
           <String, Object?>{'providerId': 'google.com', 'rawId': 'google-sub'},
           if (githubLinked)
             <String, Object?>{'providerId': 'github.com', 'rawId': '42'},
+          if (backend.phones[uid] != null)
+            <String, Object?>{
+              'providerId': 'phone',
+              'rawId': backend.phones[uid],
+              'phoneNumber': backend.phones[uid],
+            },
         ],
       },
     ],
@@ -472,7 +523,11 @@ class _Project {
 
 int _apps = 0;
 
+/// The test phone number of the phone and sms steps.
+const String _testPhone = '+15555550100';
+
 final FakeBackend _backend = FakeBackend();
+final HarnessProof _proof = HarnessProof();
 final Map<String, RecordingStorage> _storages = <String, RecordingStorage>{};
 late Directory _sessions;
 late _Project _project;
@@ -495,6 +550,7 @@ void _setUpFakeProject() {
         OAuthLoopbackProvider.github(clientId: 'id', clientSecret: 'secret'),
       ],
       presenter: CallbackPresenter(_followRedirect),
+      appVerification: _proof.verification,
     );
   });
   tearDownAll(() => _sessions.delete(recursive: true));
@@ -502,6 +558,8 @@ void _setUpFakeProject() {
   setUp(() {
     _backend.requests.clear();
     _backend.factors.clear();
+    _backend.phones.clear();
+    _backend.phone.requireProof = false;
     _project = _Project(_backend);
     _backend.override = _project.answer;
     _presented.clear();
@@ -513,6 +571,7 @@ void _setUpFakeProject() {
 Future<(HarnessRun, CleanupLedger, _Codes)> _newRun(
   List<String> codes, {
   bool githubAccountExists = false,
+  bool phone = true,
 }) async {
   final FirebaseApp app = await Firebase.initializeApp(
     name: 'harness${_apps++}',
@@ -534,6 +593,9 @@ Future<(HarnessRun, CleanupLedger, _Codes)> _newRun(
     storage: _storages[app.name]!,
     log: (_) {},
     githubAccountExists: githubAccountExists,
+    phoneNumber: phone ? _testPhone : null,
+    phoneCode: phone ? smsCode : null,
+    proof: _proof,
   );
   return (run, ledger, source);
 }
@@ -681,4 +743,102 @@ void _githubTests() {
       expect(ledger.pending, isEmpty);
     },
   );
+}
+
+void _phoneTests() {
+  test('without the phone variables both steps are skipped', () async {
+    final (HarnessRun run, _, _) = await _newRun(<String>[], phone: false);
+    for (final HarnessStep step in <HarnessStep>[
+      HarnessStep.phone,
+      HarnessStep.sms,
+    ]) {
+      final StepResult result = await run.runStep(step);
+      expect(result.status, StepStatus.skip);
+      expect(result.detail, contains('AUTH_HARNESS_PHONE_NUMBER'));
+    }
+    expect(_backend.requests, isEmpty);
+  });
+
+  test('phone links, signs in, reauthenticates and unlinks', () async {
+    final (HarnessRun run, CleanupLedger ledger, _Codes codes) = await _newRun(
+      <String>[],
+    );
+    final StepResult result = await run.runStep(HarnessStep.phone);
+    expect(result.status, StepStatus.pass, reason: result.line());
+    expect(result.detail, contains('proof: no proof'));
+    expect(
+      _backend.paths.where((String p) => p.endsWith('signInWithPhoneNumber')),
+      hasLength(3),
+    );
+    expect(
+      _backend.bodyOf('accounts:signInWithPhoneNumber')['operation'],
+      'REAUTH',
+    );
+    expect(_backend.phones, isEmpty, reason: 'the number is unlinked');
+    expect(ledger.pending, isEmpty);
+    expect(codes.prompts, isEmpty, reason: 'the code comes from the variable');
+    expect(run.auth.currentUser!.uid, _Project.uid);
+  });
+
+  test('a project that wants a proof gets the placeholder token', () async {
+    _backend.phone.requireProof = true;
+    final (HarnessRun run, _, _) = await _newRun(<String>[]);
+    final StepResult result = await run.runStep(HarnessStep.phone);
+    expect(result.status, StepStatus.pass, reason: result.line());
+    expect(result.detail, contains('proof: a placeholder reCAPTCHA token'));
+    expect(run.proofMode, ProofMode.fakeToken);
+    final Object? token = _backend.bodyOf(
+      'accounts:sendVerificationCode',
+    )['recaptchaToken'];
+    expect(token, isA<String>().having((String t) => t.length, 'length', 50));
+  });
+
+  test('an account with a phone number skips the phone step', () async {
+    _backend.phones[_Project.uid] = '+15555550199';
+    final (HarnessRun run, _, _) = await _newRun(<String>[]);
+    final StepResult result = await run.runStep(HarnessStep.phone);
+    expect(result.status, StepStatus.skip);
+    expect(_backend.phones[_Project.uid], '+15555550199');
+  });
+
+  test('sms enrols, signs in through the resolver and unenrols', () async {
+    final (HarnessRun run, CleanupLedger ledger, _Codes codes) = await _newRun(
+      <String>[],
+    );
+    final StepResult result = await run.runStep(HarnessStep.sms);
+    expect(result.status, StepStatus.pass, reason: result.line());
+    expect(
+      _backend.bodyOf('mfaEnrollment:finalize')['displayName'],
+      smsDisplayName,
+    );
+    expect(
+      _backend.paths.where((String p) => p.endsWith('mfaSignIn:start')),
+      hasLength(1),
+    );
+    expect(_backend.factors[_Project.uid], isEmpty);
+    expect(ledger.pending, isEmpty);
+    expect(codes.prompts, isEmpty);
+    expect(run.auth.currentUser!.uid, _Project.uid);
+  });
+
+  test('a failed sms sign-in leaves an unenrol that signs in with the SMS '
+      'factor', () async {
+    final (HarnessRun run, CleanupLedger ledger, _) = await _newRun(<String>[]);
+    int failures = 1;
+    _backend.override = (http.Request request) =>
+        request.url.path.endsWith('mfaSignIn:finalize') && failures-- > 0
+        ? errorResponse('INVALID_CODE')
+        : _project.answer(request);
+    final StepResult result = await run.runStep(HarnessStep.sms);
+    expect(
+      result.line(),
+      'FAIL sms: invalid-verification-code (server: INVALID_CODE)',
+    );
+    expect(ledger.pending, <String>[
+      'unenrol the SMS factor "$smsDisplayName"',
+    ]);
+    await ledger.runPending(describeError);
+    expect(ledger.problems, isEmpty);
+    expect(_backend.factors[_Project.uid], isEmpty);
+  });
 }

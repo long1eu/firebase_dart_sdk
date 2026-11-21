@@ -8,6 +8,9 @@ import 'package:flutter/foundation.dart'
     show TargetPlatform, defaultTargetPlatform, kIsWeb;
 import 'package:http/http.dart' as http;
 
+import 'package:firebase_auth_dart_platform/src/multi_factor.dart';
+import 'package:firebase_auth_dart_platform/src/phone.dart';
+
 import 'convert.dart';
 import 'oauth_provider.dart';
 import 'storage.dart';
@@ -52,6 +55,7 @@ class DartAuthConfig {
     this.oauthProviders = const <String, dart_auth.OAuthLoopbackProvider>{},
     this.oauthProvidersFor,
     this.presenter,
+    this.appVerification,
   });
 
   final AuthStorageFactory? storageFor;
@@ -69,6 +73,9 @@ class DartAuthConfig {
   /// (the presenter of the environment that the flow ranks best: the system
   /// browser on a desktop) when null.
   final dart_auth.SecurePresenter? presenter;
+
+  /// The proof of the phone requests; see `DartFirebaseAuth.appVerification`.
+  final dart_auth.AppVerification? appVerification;
 }
 
 /// The implementation of [FirebaseAuthPlatform] on top of
@@ -276,6 +283,25 @@ class DartFirebaseAuth extends FirebaseAuthPlatform {
   /// The presenter of the provider flows passed to `FirebaseAuthDart.use`.
   dart_auth.SecurePresenter? get presenter => _config.presenter;
 
+  /// Set by `setSettings(appVerificationDisabledForTesting: true)`.
+  bool _appVerificationDisabled = false;
+
+  /// The proof the phone requests of this app carry: none after
+  /// `setSettings(appVerificationDisabledForTesting: true)`, or with the Auth
+  /// emulator when `FirebaseAuthDart.use` got no `appVerification` (the
+  /// emulator does not check it); else the `appVerification` of `use`, by
+  /// default the reCAPTCHA v2 page of the client, shown by the `presenter` of
+  /// `use` (the system browser on a desktop when there is none).
+  dart_auth.AppVerification get appVerification {
+    final dart_auth.AppVerification? configured = _config.appVerification;
+    if (_appVerificationDisabled ||
+        (configured == null && client.emulatorConfig != null)) {
+      return const dart_auth.AppVerification.none();
+    }
+    return configured ??
+        dart_auth.AppVerification.recaptchaV2Loopback(presenter: presenter);
+  }
+
   // ---- plumbing ----
 
   @override
@@ -360,8 +386,11 @@ class DartFirebaseAuth extends FirebaseAuthPlatform {
     return guard(this, () => userAuth.setStorage(target));
   }
 
-  /// Accepted and ignored: the settings are for phone sign-in and the iOS
-  /// keychain, which this implementation does not have.
+  /// [appVerificationDisabledForTesting] sends the phone requests without a
+  /// proof ([appVerification]), for the test phone numbers of a project and
+  /// the emulator. The other settings are for the Android test number
+  /// auto-retrieval, the reCAPTCHA flow of Android and the iOS keychain, and
+  /// are ignored.
   @override
   Future<void> setSettings({
     bool appVerificationDisabledForTesting = false,
@@ -370,7 +399,9 @@ class DartFirebaseAuth extends FirebaseAuthPlatform {
     String? phoneNumber,
     String? smsCode,
     bool? forceRecaptchaFlow,
-  }) async {}
+  }) async {
+    _appVerificationDisabled = appVerificationDisabledForTesting;
+  }
 
   // ---- streams ----
 
@@ -601,11 +632,46 @@ class DartFirebaseAuth extends FirebaseAuthPlatform {
       throw unimplemented('getRedirectResult', noBrowserFlow);
 
   @override
+  Future<void> initializeRecaptchaConfig() async =>
+      throw unimplemented('initializeRecaptchaConfig', noRecaptchaConfig);
+
+  // ---- phone ----
+
+  /// Sends the SMS code to [phoneNumber] with the proof of [appVerification]
+  /// and returns a [ConfirmationResultPlatform] whose `confirm` signs in with
+  /// the code. [applicationVerifier] is not used (see
+  /// `DartRecaptchaVerifierFactory`).
+  @override
   Future<ConfirmationResultPlatform> signInWithPhoneNumber(
     String phoneNumber,
     RecaptchaVerifierFactoryPlatform applicationVerifier,
-  ) async => throw unimplemented('signInWithPhoneNumber', noPhone);
+  ) => guard(this, () async {
+    final dart_auth.FirebaseUserAuth userAuth = client;
+    final String verificationId = await userAuth.verifyPhoneNumber(
+      phoneNumber,
+      appVerification: appVerification,
+    );
+    return DartConfirmationResult(
+      this,
+      verificationId,
+      userAuth.signInWithCredential,
+    );
+  });
 
+  /// Sends an SMS code with the proof of [appVerification]: to [phoneNumber]
+  /// for a sign-in; to [phoneNumber] for an enrolment when
+  /// [multiFactorSession] comes from `User.multiFactor.getSession()`; to the
+  /// factor [multiFactorInfo] when it is the session of a
+  /// `MultiFactorResolver` (a single SMS factor is picked without
+  /// [multiFactorInfo]).
+  ///
+  /// [codeSent] gets the verification id (and no resending token: send again
+  /// to resend), [verificationFailed] every error, and
+  /// [codeAutoRetrievalTimeout] the verification id after [timeout].
+  /// [verificationCompleted] is never called: there is no instant verification
+  /// and no automatic reading of the SMS outside Android, so the user types the
+  /// code in. [forceResendingToken] and [autoRetrievedSmsCodeForTesting] are
+  /// ignored.
   @override
   Future<void> verifyPhoneNumber({
     String? phoneNumber,
@@ -618,11 +684,54 @@ class DartFirebaseAuth extends FirebaseAuthPlatform {
     int? forceResendingToken,
     MultiFactorSession? multiFactorSession,
     String? autoRetrievedSmsCodeForTesting,
-  }) async => throw unimplemented('verifyPhoneNumber', noPhone);
+  }) async {
+    final String verificationId;
+    try {
+      verificationId = await guard(
+        this,
+        () => _sendCode(phoneNumber, multiFactorInfo, multiFactorSession),
+      );
+    } on FirebaseAuthException catch (e) {
+      verificationFailed(e);
+      return;
+    } on Object catch (e) {
+      // An error that guard does not turn into a FirebaseAuthException (one of
+      // a token source of the app, for example). Only its type goes into the
+      // message: its text could quote the phone number.
+      verificationFailed(
+        FirebaseAuthException(
+          code: 'internal-error',
+          message: 'verifyPhoneNumber failed with ${e.runtimeType}.',
+        ),
+      );
+      return;
+    }
+    codeSent(verificationId, null);
+    Timer(timeout, () => codeAutoRetrievalTimeout(verificationId));
+  }
 
-  @override
-  Future<void> initializeRecaptchaConfig() async =>
-      throw unimplemented('initializeRecaptchaConfig', noPhone);
+  Future<String> _sendCode(
+    String? phoneNumber,
+    PhoneMultiFactorInfo? multiFactorInfo,
+    MultiFactorSession? session,
+  ) => switch (session) {
+    null => client.verifyPhoneNumber(
+      phoneNumber ?? '',
+      appVerification: appVerification,
+    ),
+    DartMultiFactorSession(:final DartMultiFactor multiFactor) =>
+      multiFactor.startPhoneEnrollment(phoneNumber ?? '', appVerification),
+    DartMultiFactorSignInSession() => session.startPhoneSignIn(
+      multiFactorInfo?.uid,
+      appVerification,
+    ),
+    _ => throw FirebaseAuthException(
+      code: 'argument-error',
+      message:
+          'verifyPhoneNumber takes the session of User.multiFactor.getSession() '
+          'or of a MultiFactorResolver of this package.',
+    ),
+  };
 
   /// Revokes an Apple access token (`revokeAccessToken` of the client).
   @override

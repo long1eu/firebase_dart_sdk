@@ -83,8 +83,8 @@ This is **not** a port of the whole Firebase Auth SDK: it has the REST-backed op
 (see [What is supported](#what-is-supported)), with FlutterFire's names. Federated providers work by
 **token exchange**: the app gets the provider's ID token or access token itself (a platform sign-in package, a
 browser flow of its own) and `signInWithCredential` exchanges it, as the JS SDK does for a credential. There are
-no popup or redirect flows (nothing opens a sign-in page) and no phone sign-in; second factors work with
-authenticator apps (TOTP) only.
+no popup or redirect flows (nothing opens a sign-in page). Phone numbers sign in with an SMS code that the app
+asks for; second factors work with authenticator apps (TOTP) and SMS.
 
 ```dart
 final FirebaseUserAuth auth = await FirebaseUserAuth.forApp(app);
@@ -151,8 +151,10 @@ against the Firebase Auth emulator; nothing was run against the real service.
 | `multiFactor(user).getSession()` + `TotpMultiFactorGenerator.generateSecret`, `TotpSecret.generateQrCodeUrl` | `startTotpEnrollment()`, `TotpSecret.otpauthUri(issuer:)` and its parameters (see below) | unit (fake backend) |
 | `multiFactor(user).enroll(TotpMultiFactorGenerator.assertionForEnrollment(...))`, `unenroll`, `enrolledFactors` | `finalizeTotpEnrollment(secret, code:, displayName:)`, `unenrollMultiFactor(uid)`, `AuthUser.enrolledFactors` | unit; real project, 2026-11-20 |
 | `getMultiFactorResolver(auth, error).resolveSignIn(TotpMultiFactorGenerator.assertionForSignIn(...))` | `FirebaseAuthMultiFactorException.resolver.resolveSignInWithTotp(code)` | unit; real project, 2026-11-20 |
-| `RecaptchaVerifier` (a reCAPTCHA v2 token) on desktop and command line; `getRecaptchaParams` | `AppVerification.recaptchaV2Loopback()` (VM only; the `RecaptchaFlow` of `secure_flow`), `getRecaptchaSiteKey()`, and the `AppVerification` value the phone calls will take (see below) | unit (simulated browser, fake backend); not run against Google |
-| Phone sign-in, SMS second factors (enrolment and sign-in), reCAPTCHA Enterprise configuration, passkeys | – (SMS factors are listed and can be unenrolled) | |
+| `RecaptchaVerifier` (a reCAPTCHA v2 token) on desktop and command line; `getRecaptchaParams` | `AppVerification.recaptchaV2Loopback()` (VM only; the `RecaptchaFlow` of `secure_flow`), `getRecaptchaSiteKey()`, and the `AppVerification` value the phone calls take (see below) | unit (simulated browser, fake backend); not run against Google |
+| `PhoneAuthProvider.verifyPhoneNumber`, `PhoneAuthProvider.credential`, `signInWithPhoneNumber`, `linkWithPhoneNumber`, `reauthenticateWithPhoneNumber`, `updatePhoneNumber` | `verifyPhoneNumber(phoneNumber, appVerification:)` returns the verification id; `PhoneAuthProvider.credential(verificationId:, verificationCode:)` for `signInWithCredential`, `linkWithCredential`, `reauthenticateWithCredential` and `updatePhoneNumber`; `verifyPhoneNumberInteractively` (VM only) | unit (fake backend); emulator tests written, not run |
+| `PhoneMultiFactorGenerator` (SMS second factor: enrolment and sign-in) | `startPhoneEnrollment` / `finalizePhoneEnrollment`, `resolver.startPhoneSignIn` / `resolveSignInWithPhone` | unit (fake backend); emulator tests written, not run |
+| reCAPTCHA Enterprise configuration, passkeys | – | |
 
 Of the federated providers, only the request and the flows were exercised, against the emulator with fake
 tokens (the emulator checks no signature, audience or nonce). The checks of the real backend (the audience of an
@@ -227,13 +229,75 @@ await auth.unenrollMultiFactor(auth.currentUser!.enrolledFactors.first.uid);
 
 Enrolment, unenrolment and the resolver update the session like any sign-in or token change: the streams emit,
 the new tokens are stored, and the account is read again. A reauthentication of an account with a second factor
-goes through the same resolver. An account whose only second factors are SMS cannot finish a sign-in here: the
-exception's message says so and `resolveSignInWithTotp` throws `multi-factor-info-not-found`.
+goes through the same resolver; `resolveSignInWithTotp` throws `multi-factor-info-not-found` for an account
+without an authenticator app factor.
 
 The calls use the Identity Toolkit API v2. The published Identity Toolkit v2 protos have no TOTP fields, so all
-multi-factor calls use JSON.
+multi-factor calls use JSON (the SMS calls with the field names of the published protos).
 
 On 2026-11-20 one run against a real Identity Platform project went through enrolment, sign-in with the second factor and removal, with the errors for an unverified email, a wrong code and a missing display name. Tenants and SMS factors were not part of it.
+
+### Phone sign-in and SMS second factors
+
+The names follow the iOS SDK: `verifyPhoneNumber` sends the SMS and returns a verification id, and
+`PhoneAuthProvider.credential` pairs it with the code the user types into your own field. Each request that
+sends an SMS carries an `AppVerification` (see [App verification](#app-verification-and-the-loopback-recaptcha-page)):
+a reCAPTCHA token on a real project, `AppVerification.none()` with the Auth emulator. There is no instant
+verification and no automatic reading of the SMS.
+
+```dart
+final FirebaseUserAuth auth = await FirebaseUserAuth.forApp(app);
+const String codeFromYourTextField = '123456';
+
+// Sign in (or linkWithCredential, reauthenticateWithCredential, updatePhoneNumber with the same credential).
+final String verificationId = await auth.verifyPhoneNumber(
+  '+15555550100',
+  appVerification: AppVerification.recaptchaV2Loopback(),
+);
+await auth.signInWithCredential(
+  PhoneAuthProvider.credential(
+    verificationId: verificationId,
+    verificationCode: codeFromYourTextField,
+  ),
+);
+
+// A program without a code field: the reCAPTCHA page, then the code on the terminal or a small page.
+final PhoneAuthCredential credential = await auth.verifyPhoneNumberInteractively('+15555550100');
+
+// Enrol an SMS second factor (Identity Platform with SMS multi-factor enabled, a verified email address).
+final String enrolmentId = await auth.startPhoneEnrollment(
+  '+15555550100',
+  appVerification: AppVerification.recaptchaV2Loopback(),
+);
+await auth.finalizePhoneEnrollment(
+  PhoneAuthProvider.credential(verificationId: enrolmentId, verificationCode: codeFromYourTextField),
+  displayName: 'Work phone',
+);
+
+// Sign in with it.
+try {
+  await auth.signInWithEmailAndPassword(email: 'ada@example.com', password: '<the password>');
+} on FirebaseAuthMultiFactorException catch (e) {
+  final String signInId = await e.resolver!.startPhoneSignIn(
+    appVerification: AppVerification.recaptchaV2Loopback(),
+  );
+  await e.resolver!.resolveSignInWithPhone(
+    PhoneAuthProvider.credential(verificationId: signInId, verificationCode: codeFromYourTextField),
+  );
+}
+```
+
+A number that another account has is `credential-already-in-use` on a link or an update; as in the iOS SDK, its
+`credential` is a `PhoneAuthCredential` of the backend's temporary proof, and `signInWithCredential(e.credential!)`
+signs in to that account (its `toString` and the message show no number). A reauthentication with
+the number of no account, or of another one, is `user-mismatch`. The errors use the codes of the JS SDK and
+FlutterFire (`invalid-verification-code`, `code-expired`, `invalid-phone-number`, `quota-exceeded`,
+`missing-app-credential`, ...). No error message or log line holds the phone number, the verification id, the SMS
+code or the reCAPTCHA token.
+
+Tested with unit tests against a fake backend. The emulator tests (`test/phone_auth_emulator_test.dart`) are
+written but were not run, and nothing was run against a real project; the real-project harness of
+`firebase_auth_dart_platform` has `phone` and `sms` steps for a test phone number of the console.
 
 ### Browser sign-in on desktop and command line
 
@@ -351,15 +415,13 @@ Not offered by the loopback helper:
   exact match), and Firebase documents a Facebook ID token only for iOS Limited Login.
 - Microsoft: Firebase does not support direct sign-in with Microsoft OAuth tokens
   ([Firebase docs](https://firebase.google.com/docs/auth/web/microsoft-oauth)).
-- Phone sign-in: not in the client yet. On a real project `sendVerificationCode` needs app verification
-  (reCAPTCHA, Play Integrity or APNs); see the loopback reCAPTCHA page below.
 - Auth-domain options (`customAuthDomain`): the loopback flow builds no hosted auth-domain page, so they do not
   apply.
 
 ### App verification and the loopback reCAPTCHA page
 
 Phone requests (`accounts:sendVerificationCode`, the start of an SMS second factor) carry a proof that they come
-from a real app. Phone sign-in is not in the client yet; these are the pieces it will use:
+from a real app. These are the pieces:
 
 - `AppVerification`, a sealed value with three shapes: a reCAPTCHA v2 token
   (`AppVerification.recaptchaV2(source)`, where `source` is yours and is called with the project's site key, or
@@ -416,11 +478,12 @@ widget from a page of your app is a use of reCAPTCHA under Google's terms; check
 - Federated sign-in needs a provider token the app obtained itself, or, on desktop and command line, the browser
   sign-in of `signInWithOAuthLoopback` (Google and OpenID Connect; not Apple, which does not accept loopback
   redirects). There are no popup or redirect flows in a browser.
-  Phone sign-in, SMS second factors and reCAPTCHA are not there (the table above lists the
-  rest). A project that enforces reCAPTCHA Enterprise for email and password refuses these sign-ins
-  (`missing-recaptcha-token`).
-- An account with a second factor signs in with an authenticator app code through
-  `FirebaseAuthMultiFactorException.resolver`; an account with SMS second factors only cannot sign in here.
+  The reCAPTCHA Enterprise configuration of the project is not read (the table above lists the rest). A project
+  that enforces reCAPTCHA Enterprise for email and password refuses these sign-ins (`missing-recaptcha-token`).
+- Phone sign-in and SMS second factors were not run against the emulator or a real project; Play Integrity and
+  APNs app verification are not there.
+- An account with a second factor signs in with an authenticator app or SMS code through
+  `FirebaseAuthMultiFactorException.resolver`.
 - The session is kept in memory unless you supply an `AuthStorage` (`FileAuthStorage`, `WebAuthStorage`,
   `IndexedDbAuthStorage`, `BestWebAuthStorage` or your own). The stored value is a credential, the refresh token: keep it where the platform keeps secrets.
 - `signOut()` forgets the session locally; it does not revoke the refresh token on the backend.

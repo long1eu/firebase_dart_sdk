@@ -5,8 +5,11 @@ import 'package:firebase_app_dart/firebase_app_dart.dart';
 import 'package:firebase_app_dart/internal.dart' show Log;
 import 'package:http/http.dart' as http;
 import 'package:meta/meta.dart';
+import 'package:firebase_auth_providers_dart/src/auth_constants.dart';
+import 'package:firebase_auth_providers_dart/src/phone_auth.dart';
+import 'package:firebase_auth_providers_dart/src/secure_flow_errors.dart';
 import 'package:secure_flow/secure_flow.dart'
-    show SecureEnvironment, SecurePresenter;
+    show CodeEntryFlow, SecureEnvironment, SecurePresenter;
 
 import 'action_code.dart';
 import 'app_verification.dart';
@@ -97,14 +100,23 @@ import 'environment_stub.dart'
 /// action codes, email, password and profile updates, reauthentication, account deletion, the sign-in methods of
 /// an email address, and [validatePassword]. [tenantId] and [languageCode] are sent like the JS SDK sends them.
 /// This is not a port of the whole Firebase Auth SDK: a federated provider's token comes from the app (there are
-/// no popup and redirect flows), and there is no phone sign-in.
+/// no popup and redirect flows).
 ///
-/// **Multi-factor authentication** works with authenticator apps (TOTP; it needs Identity Platform with TOTP
-/// enabled for the project): [startTotpEnrollment] and [finalizeTotpEnrollment] enrol one, [unenrollMultiFactor]
-/// removes a factor, and [AuthUser.enrolledFactors] lists them. A sign-in or reauthentication of an account with a
-/// second factor throws a [FirebaseAuthMultiFactorException] (`multi-factor-auth-required`) whose
-/// [FirebaseAuthMultiFactorException.resolver] finishes it with a code of the app. SMS second factors are listed and
-/// can be unenrolled, but not enrolled or used to sign in.
+/// **Phone.** [verifyPhoneNumber] sends an SMS code and returns a verification id;
+/// [PhoneAuthProvider.credential] pairs it with the code the user typed in, for
+/// [signInWithCredential], [linkWithCredential], [reauthenticateWithCredential] and
+/// [updatePhoneNumber]. The request needs a proof that it comes from a real app ([AppVerification]:
+/// a reCAPTCHA token, or none for the emulator). There is no instant verification and no automatic
+/// reading of the SMS: the user types the code in. [verifyPhoneNumberInteractively] does both steps
+/// for a program without a code field of its own.
+///
+/// **Multi-factor authentication** works with authenticator apps (TOTP) and SMS (it needs Identity
+/// Platform with the factor enabled for the project): [startTotpEnrollment] and
+/// [finalizeTotpEnrollment], or [startPhoneEnrollment] and [finalizePhoneEnrollment], enrol one,
+/// [unenrollMultiFactor] removes a factor, and [AuthUser.enrolledFactors] lists them. A sign-in or
+/// reauthentication of an account with a second factor throws a [FirebaseAuthMultiFactorException]
+/// (`multi-factor-auth-required`) whose [FirebaseAuthMultiFactorException.resolver] finishes it
+/// with a code of the app or of an SMS.
 class FirebaseUserAuth implements AuthTokenProvider {
   /// Creates an instance for the project of [apiKey] (the Web API key of the Firebase project).
   ///
@@ -1269,7 +1281,10 @@ class FirebaseUserAuth implements AuthTokenProvider {
   Future<UserCredential> signInWithCredential(AuthCredential credential) async {
     _checkNotDisposed();
     final _CredentialRequest request = _requestFor(credential);
-    return _signIn(request.method, request.body);
+    return _withoutSecretsOf(
+      credential,
+      () => _signIn(request.method, request.body),
+    );
   }
 
   /// Signs in with [provider] in the system browser (desktop apps and command line tools, VM only): runs
@@ -1368,7 +1383,10 @@ class FirebaseUserAuth implements AuthTokenProvider {
   /// Throws `null-user`, `provider-already-linked` (the user has a credential of this provider already: the
   /// account is read first), `credential-already-in-use` (another account has it; [FirebaseAuthException.credential]
   /// may carry it back), `email-already-in-use`, `requires-recent-login`, ...
-  Future<UserCredential> linkWithCredential(
+  Future<UserCredential> linkWithCredential(AuthCredential credential) =>
+      _withoutSecretsOf(credential, () => _linkWithCredential(credential));
+
+  Future<UserCredential> _linkWithCredential(
     AuthCredential credential,
   ) => _forUser((String idToken, int generation) async {
     // _assertLinkedStatus of the JS SDK.
@@ -1395,6 +1413,7 @@ class FirebaseUserAuth implements AuthTokenProvider {
       json: request.body,
       tenant: request.tenant,
     );
+    _throwIfPhoneNumberInUse(response);
     _throwIfSecondFactorRequired(response);
     if (generation != _generation) {
       throw _overtaken;
@@ -1413,6 +1432,13 @@ class FirebaseUserAuth implements AuthTokenProvider {
   /// (`multi-factor-auth-required`) when the account has a second factor (the signed-in user stays signed in).
   Future<UserCredential> reauthenticateWithCredential(
     AuthCredential credential,
+  ) => _withoutSecretsOf(
+    credential,
+    () => _reauthenticateWithCredential(credential),
+  );
+
+  Future<UserCredential> _reauthenticateWithCredential(
+    AuthCredential credential,
   ) async {
     _checkNotDisposed();
     final _Session session = _requireSession();
@@ -1429,7 +1455,11 @@ class FirebaseUserAuth implements AuthTokenProvider {
         tenant: request.tenant,
       );
     } on FirebaseAuthException catch (e) {
-      if (e.code == 'user-not-found') {
+      // VERIFY_PHONE_NUMBER_FOR_EXISTING_ERROR_MAP_ of the JS SDK: for a phone credential the
+      // backend answers USER_NOT_FOUND when the number belongs to no account.
+      if (e.code == 'user-not-found' ||
+          (credential is PhoneAuthCredential &&
+              e.serverCode == 'USER_NOT_FOUND')) {
         throw _userMismatch;
       }
       rethrow;
@@ -1525,6 +1555,228 @@ class FirebaseUserAuth implements AuthTokenProvider {
     return updated;
   });
 
+  // ---- phone ----
+
+  /// Sends an SMS code to [phoneNumber] (`v1/accounts:sendVerificationCode`; `verifyPhoneNumber` of
+  /// the iOS SDK's `FIRPhoneAuthProvider`) and returns the verification id. Pair the id with the
+  /// code the user types in ([PhoneAuthProvider.credential]) and sign in, link, reauthenticate or
+  /// update the phone number with that credential. The code field is the app's own: nothing here
+  /// opens a browser for it.
+  ///
+  /// [phoneNumber] is in E.164 form (`+15555550100`). [appVerification] proves that the request
+  /// comes from a real app: a reCAPTCHA v2 token (the site key is fetched with
+  /// [getRecaptchaSiteKey] first), a reCAPTCHA Enterprise token, or [AppVerification.none] for the
+  /// Auth emulator. [tenantId] and [languageCode] (the language of the SMS) go with the request.
+  ///
+  /// Throws a [FirebaseAuthException]: `missing-phone-number` (empty, before anything is sent),
+  /// `invalid-phone-number`, `missing-app-credential`, `invalid-app-credential`,
+  /// `captcha-check-failed`, `quota-exceeded`, `too-many-requests`, `operation-not-allowed` (phone
+  /// sign-in is not enabled), and what the source of the token throws. No error, message or log
+  /// line holds the phone number, the verification id or the reCAPTCHA token.
+  ///
+  /// ```dart
+  /// final String verificationId = await auth.verifyPhoneNumber(
+  ///   '+15555550100',
+  ///   appVerification: AppVerification.recaptchaV2Loopback(),
+  /// );
+  /// final UserCredential result = await auth.signInWithCredential(
+  ///   PhoneAuthProvider.credential(
+  ///     verificationId: verificationId,
+  ///     verificationCode: codeFromYourTextField,
+  ///   ),
+  /// );
+  /// ```
+  Future<String> verifyPhoneNumber(
+    String phoneNumber, {
+    required AppVerification appVerification,
+  }) async {
+    _checkNotDisposed();
+    _requirePhoneNumber(phoneNumber);
+    final List<String?> secrets = <String?>[phoneNumber];
+    return _withoutPhoneSecrets(secrets, () async {
+      final Map<String, Object?> proof = await _proofOf(
+        appVerification,
+        RecaptchaAction.sendVerificationCode,
+        secrets,
+      );
+      final Map<String, Object?> response = await _send(
+        _identityToolkit('accounts:sendVerificationCode'),
+        json: <String, Object?>{'phoneNumber': phoneNumber, ...proof},
+        tenant: true,
+      );
+      final String verificationId = _sessionInfoOf(response['sessionInfo']);
+      secrets.add(verificationId);
+      return verificationId;
+    });
+  }
+
+  /// Sends the SMS code and asks for it, for programs without a code field of their own (command
+  /// line tools, desktop apps without a UI for it; VM only): [verifyPhoneNumber] with
+  /// [appVerification] (by default the reCAPTCHA v2 page of `package:secure_flow`,
+  /// [AppVerification.recaptchaV2Loopback] with [codePresenter], [environment] and [timeout]), then
+  /// a `CodeEntryFlow` of `package:secure_flow` that asks for the code with [prompt]: on the
+  /// terminal, or on a small page in the system browser, through [codePresenter] (when null, the
+  /// presenter of [environment] that the flow ranks best).
+  ///
+  /// Returns the credential; sign in, link, reauthenticate or update the phone number with it.
+  ///
+  /// Throws what [verifyPhoneNumber] throws, and for the code: `timeout` (no code within
+  /// [timeout]), `operation-not-supported-in-this-environment` (no presenter fits),
+  /// `argument-error` ([codePresenter] cannot ask for a code).
+  ///
+  /// ```dart
+  /// final PhoneAuthCredential credential =
+  ///     await auth.verifyPhoneNumberInteractively('+15555550100');
+  /// await auth.signInWithCredential(credential);
+  /// ```
+  Future<PhoneAuthCredential> verifyPhoneNumberInteractively(
+    String phoneNumber, {
+    AppVerification? appVerification,
+    SecurePresenter? codePresenter,
+    SecureEnvironment? environment,
+    Duration timeout = const Duration(minutes: 5),
+    String prompt = 'Enter the code of the SMS:',
+  }) async {
+    final String verificationId = await verifyPhoneNumber(
+      phoneNumber,
+      appVerification:
+          appVerification ??
+          AppVerification.recaptchaV2Loopback(
+            presenter: codePresenter,
+            environment: environment,
+            timeout: timeout,
+          ),
+    );
+    final String code = await runSecureFlow<String>(
+      CodeEntryFlow(prompt: prompt),
+      presenter: codePresenter,
+      environment: environment,
+      timeout: timeout,
+      timeoutMessage:
+          'No SMS code was entered within ${timeout.inSeconds} seconds.',
+    );
+    return PhoneAuthProvider.credential(
+      verificationId: verificationId,
+      verificationCode: code,
+    );
+  }
+
+  /// Sets the phone number of the signed-in user to the one [credential] verified
+  /// (`v1/accounts:signInWithPhoneNumber` with the ID token, as `updatePhoneNumber` of the JS SDK
+  /// sends it; `updatePhoneNumber` of the iOS SDK's `FIRUser`). It adds the phone provider when the
+  /// user has none and replaces the number when it has one.
+  ///
+  /// The session continues with the new tokens the backend returns, and the account is read again:
+  /// [userChanges] emits a user whose [AuthUser.phoneNumber] is the new number.
+  ///
+  /// Throws `null-user`, `missing-verification-id` and `missing-verification-code` (an empty part
+  /// of the credential, before anything is sent), `invalid-verification-code`,
+  /// `invalid-verification-id`, `code-expired`, `credential-already-in-use` (another account has
+  /// the number), `requires-recent-login`, ...
+  Future<void> updatePhoneNumber(PhoneAuthCredential credential) =>
+      _withoutSecretsOf(
+        credential,
+        () => _forUser((String idToken, int generation) async {
+          final _CredentialRequest request = _requestFor(
+            credential,
+            userIdToken: idToken,
+          );
+          final Map<String, Object?> response = await _send(
+            _identityToolkit(request.method),
+            json: request.body,
+            tenant: request.tenant,
+          );
+          _throwIfPhoneNumberInUse(response);
+          await _updateSession(response, generation);
+          await _reloadAfterChange(generation);
+        }),
+      );
+
+  /// Throws `missing-phone-number` for an empty [phoneNumber], before a reCAPTCHA is asked for.
+  static void _requirePhoneNumber(String phoneNumber) {
+    if (phoneNumber.trim().isEmpty) {
+      throw const FirebaseAuthException(
+        code: AuthErrorCode.missingPhoneNumber,
+        message:
+            'To send verification codes, provide a phone number for the recipient.',
+      );
+    }
+  }
+
+  /// The fields of [verification] for a request of [action]; the token goes into [secrets].
+  Future<Map<String, Object?>> _proofOf(
+    AppVerification verification,
+    RecaptchaAction action,
+    List<String?> secrets,
+  ) async {
+    final Map<String, Object?> fields = await appVerificationFields(
+      verification,
+      action: action,
+      siteKey: getRecaptchaSiteKey,
+      languageCode: languageCode,
+    );
+    secrets
+      ..add(fields['recaptchaToken'] as String?)
+      ..add(fields['captchaResponse'] as String?);
+    return fields;
+  }
+
+  /// The `sessionInfo` of an answer (the verification id), or `internal-error`.
+  static String _sessionInfoOf(Object? sessionInfo) {
+    if (sessionInfo is! String || sessionInfo.isEmpty) {
+      throw const FirebaseAuthException(
+        code: AuthErrorCode.internalError,
+        message: 'The authentication service did not return a verification id.',
+      );
+    }
+    return sessionInfo;
+  }
+
+  /// Runs [body] and rethrows its [FirebaseAuthException]s without [secrets]
+  /// ([redactPhoneSecrets]). [secrets] is read when the error is thrown, so that a value added
+  /// meanwhile (a token, a verification id) is left out too.
+  static Future<T> _withoutPhoneSecrets<T>(
+    List<String?> secrets,
+    Future<T> Function() body,
+  ) async {
+    try {
+      return await body();
+    } on FirebaseAuthException catch (e, stackTrace) {
+      Error.throwWithStackTrace(redactPhoneSecrets(e, secrets), stackTrace);
+    }
+  }
+
+  /// [body], without the secrets of [credential] in its errors when it is a phone credential.
+  static Future<T> _withoutSecretsOf<T>(
+    AuthCredential credential,
+    Future<T> Function() body,
+  ) => credential is PhoneAuthCredential
+      ? _withoutPhoneSecrets(<String?>[
+          credential.verificationId,
+          credential.verificationCode,
+          credential.temporaryProof,
+          credential.phoneNumber,
+        ], body)
+      : body();
+
+  /// Like `linkWithPhoneNumber` of the JS SDK: an answer of `accounts:signInWithPhoneNumber` with a
+  /// `temporaryProof` (and no tokens) means that another account has the number. The JS SDK throws
+  /// `account-exists-with-different-credential`; the iOS and Android SDKs, and so FlutterFire on
+  /// them, throw `credential-already-in-use`, which this follows. As in the iOS SDK, the error's
+  /// [FirebaseAuthException.credential] is a [PhoneAuthCredential] of the proof and the number,
+  /// which signs in to that account; its `toString` and the message show neither.
+  static void _throwIfPhoneNumberInUse(Map<String, Object?> response) {
+    final Object? proof = response['temporaryProof'];
+    if (proof is String && proof.isNotEmpty) {
+      throw FirebaseAuthException(
+        code: AuthErrorCode.credentialAlreadyInUse,
+        message:
+            'This phone number is already associated with a different user account.',
+        credential: phoneCredentialFromProof(response),
+      );
+    }
+  }
+
   // ---- multi-factor authentication ----
 
   /// Starts enrolling an authenticator app (TOTP) as a second factor of the signed-in user
@@ -1598,6 +1850,103 @@ class FirebaseUserAuth implements AuthTokenProvider {
     await _updateSession(response, generation);
     await _reloadAfterChange(generation);
   });
+
+  /// Starts enrolling [phoneNumber] as an SMS second factor of the signed-in user
+  /// (`v2/accounts/mfaEnrollment:start` with `phoneEnrollmentInfo`; `verifyPhoneNumber` with the
+  /// session of `multiFactor.getSession` in the iOS SDK): sends an SMS code to the number and
+  /// returns the verification id. Pair it with the code the user types in
+  /// ([PhoneAuthProvider.credential]) and finish with [finalizePhoneEnrollment].
+  ///
+  /// [phoneNumber] is in E.164 form; [appVerification] is the proof of [verifyPhoneNumber]. The
+  /// project must use Identity Platform with SMS multi-factor authentication enabled, and the
+  /// account needs a verified email address.
+  ///
+  /// Throws `null-user`, `missing-phone-number` (empty, before anything is sent),
+  /// `invalid-phone-number`, `unverified-email`, `requires-recent-login`, `operation-not-allowed`,
+  /// `second-factor-already-in-use`, `maximum-second-factor-count-exceeded`,
+  /// `unsupported-first-factor`, `invalid-app-credential`, `quota-exceeded`, ... No error holds the
+  /// phone number, the verification id or the reCAPTCHA token.
+  ///
+  /// ```dart
+  /// final String verificationId = await auth.startPhoneEnrollment(
+  ///   '+15555550100',
+  ///   appVerification: AppVerification.recaptchaV2Loopback(),
+  /// );
+  /// await auth.finalizePhoneEnrollment(
+  ///   PhoneAuthProvider.credential(
+  ///     verificationId: verificationId,
+  ///     verificationCode: codeFromYourTextField,
+  ///   ),
+  ///   displayName: 'Work phone',
+  /// );
+  /// ```
+  Future<String> startPhoneEnrollment(
+    String phoneNumber, {
+    required AppVerification appVerification,
+  }) async {
+    _checkNotDisposed();
+    _requireSession();
+    _requirePhoneNumber(phoneNumber);
+    final List<String?> secrets = <String?>[phoneNumber];
+    // The proof is asked for once, before _forUser, which runs its operation again after a
+    // rejected ID token: a second run must not show the reCAPTCHA again.
+    return _withoutPhoneSecrets(secrets, () async {
+      final Map<String, Object?> proof = await _proofOf(
+        appVerification,
+        RecaptchaAction.mfaSmsEnrollment,
+        secrets,
+      );
+      return _forUser((String idToken, int generation) async {
+        final Map<String, Object?> response = await _multiFactor
+            .startPhoneEnrollment(
+              idToken: idToken,
+              phoneNumber: phoneNumber,
+              appVerification: proof,
+              tenantId: tenantId,
+            );
+        final String verificationId = _sessionInfoOf(
+          _fieldOf(response['phoneSessionInfo'], 'sessionInfo'),
+        );
+        secrets.add(verificationId);
+        return verificationId;
+      });
+    });
+  }
+
+  /// Finishes the SMS enrolment that [startPhoneEnrollment] started, with [credential]: its
+  /// verification id and the code of the SMS (`v2/accounts/mfaEnrollment:finalize` with
+  /// `phoneVerificationInfo`; `multiFactor.enroll` with `PhoneMultiFactorGenerator.assertion` in
+  /// the iOS SDK). [displayName] names the factor for the user; it may be left out for an SMS
+  /// factor.
+  ///
+  /// The session continues with the new tokens the backend returns, and the account is read again,
+  /// like after [finalizeTotpEnrollment]: [AuthUser.enrolledFactors] lists the new factor, and from
+  /// now on every sign-in of the account throws a [FirebaseAuthMultiFactorException].
+  ///
+  /// Throws `null-user`, `missing-verification-id` and `missing-verification-code` (an empty part,
+  /// before anything is sent), `invalid-verification-code`, `code-expired`,
+  /// `invalid-verification-id`, `requires-recent-login`, `second-factor-already-in-use`, ...
+  Future<void> finalizePhoneEnrollment(
+    PhoneAuthCredential credential, {
+    String? displayName,
+  }) => _withoutSecretsOf(
+    credential,
+    () => _forUser((String idToken, int generation) async {
+      final (String verificationId, String code) = _checkPhoneCredential(
+        credential,
+      );
+      final Map<String, Object?> response = await _multiFactor
+          .finalizePhoneEnrollment(
+            idToken: idToken,
+            sessionInfo: verificationId,
+            code: code,
+            displayName: displayName,
+            tenantId: tenantId,
+          );
+      await _updateSession(response, generation);
+      await _reloadAfterChange(generation);
+    }),
+  );
 
   /// Removes the second factor [uid] (a [MultiFactorInfo.uid] of [AuthUser.enrolledFactors]) from the account of the
   /// signed-in user (`v2/accounts/mfaEnrollment:withdraw`; FlutterFire's `multiFactor.unenroll`). Works for SMS
@@ -1695,6 +2044,12 @@ class FirebaseUserAuth implements AuthTokenProvider {
           'idToken': ?userIdToken,
           if (reauthenticate) 'autoCreate': false,
         });
+      case PhoneAuthCredential():
+        return _phoneRequest(
+          credential,
+          userIdToken: userIdToken,
+          reauthenticate: reauthenticate,
+        );
       default:
         throw ArgumentError.value(
           credential,
@@ -1702,6 +2057,63 @@ class FirebaseUserAuth implements AuthTokenProvider {
           'Not a credential of this package',
         );
     }
+  }
+
+  /// `accounts:signInWithPhoneNumber` with the verification id and code of [credential], or its
+  /// temporary proof and number (`signInWithPhoneNumber`, `linkWithPhoneNumber` with the ID token,
+  /// and `verifyPhoneNumberForExisting` with the operation `REAUTH` of the JS SDK). Empty values
+  /// fail before anything is sent, as in the iOS SDK.
+  static _CredentialRequest _phoneRequest(
+    PhoneAuthCredential credential, {
+    required String? userIdToken,
+    required bool reauthenticate,
+  }) {
+    final String? proof = credential.temporaryProof;
+    final String? number = credential.phoneNumber;
+    final Map<String, Object?> fields;
+    if (proof != null && number != null) {
+      fields = <String, Object?>{
+        'temporaryProof': proof,
+        'phoneNumber': number,
+      };
+    } else {
+      final (String verificationId, String code) = _checkPhoneCredential(
+        credential,
+      );
+      fields = <String, Object?>{'sessionInfo': verificationId, 'code': code};
+    }
+    return _CredentialRequest(
+      'accounts:signInWithPhoneNumber',
+      <String, Object?>{
+        'idToken': ?userIdToken,
+        ...fields,
+        if (reauthenticate) 'operation': 'REAUTH',
+      },
+    );
+  }
+
+  /// The verification id and the code of [credential]; throws `missing-verification-id` or
+  /// `missing-verification-code` when one is empty or missing (a temporary proof has neither).
+  static (String, String) _checkPhoneCredential(
+    PhoneAuthCredential credential,
+  ) {
+    final String? verificationId = credential.verificationId;
+    final String? code = credential.verificationCode;
+    if (verificationId == null || verificationId.isEmpty) {
+      throw const FirebaseAuthException(
+        code: AuthErrorCode.missingVerificationId,
+        message:
+            'The phone auth credential was created with an empty verification ID.',
+      );
+    }
+    if (code == null || code.isEmpty) {
+      throw const FirebaseAuthException(
+        code: AuthErrorCode.missingVerificationCode,
+        message:
+            'The phone auth credential was created with an empty SMS verification code.',
+      );
+    }
+    return (verificationId, code);
   }
 
   /// The parts of an email link, or `argument-error` (`EmailAuthProvider.credentialWithLink` of the JS SDK).
@@ -2300,41 +2712,108 @@ class FirebaseUserAuth implements AuthTokenProvider {
     if (finish == null) {
       throw error;
     }
-    // The pending credential belongs to the tenant of the first factor.
-    final String? tenant = tenantId;
     throw FirebaseAuthMultiFactorException(
       pendingCredential: error.pendingCredential,
       hints: error.hints,
       message: error.message,
       httpStatus: error.httpStatus,
-      resolver: createMultiFactorResolver(error.hints, (
-        String enrollmentId,
-        String code,
-      ) {
-        _checkNotDisposed();
-        return finish(
-          _multiFactor
-              .finalizeTotpSignIn(
-                pendingCredential: error.pendingCredential,
-                enrollmentId: enrollmentId,
-                code: code,
-                tenantId: tenant,
-              )
-              .then(
-                (Map<String, Object?> finalized) => <String, Object?>{
-                  for (final MapEntry<String, Object?> entry
-                      in response.entries)
-                    if (entry.key != 'mfaPendingCredential' &&
-                        entry.key != 'mfaInfo')
-                      entry.key: entry.value,
-                  'idToken': finalized['idToken'],
-                  'refreshToken': finalized['refreshToken'],
-                },
-              ),
-        );
-      }),
+      resolver: _resolverFor(error, response, finish),
     );
   }
+
+  /// The resolver of the second-factor challenge [error] of the sign-in answer [response]: each way
+  /// to finish calls `mfaSignIn:finalize` and hands its answer, merged into [response]
+  /// (`MultiFactorResolverImpl._fromError` of the JS SDK), to [finish].
+  MultiFactorResolver _resolverFor(
+    FirebaseAuthMultiFactorException error,
+    Map<String, Object?> response,
+    Future<UserCredential> Function(Future<Map<String, Object?>> response)
+    finish,
+  ) {
+    // The pending credential belongs to the tenant of the first factor.
+    final String? tenant = tenantId;
+    final String pending = error.pendingCredential;
+    Future<UserCredential> finishWith(Future<Map<String, Object?>> finalized) =>
+        finish(
+          finalized.then(
+            (Map<String, Object?> answer) => <String, Object?>{
+              for (final MapEntry<String, Object?> entry in response.entries)
+                if (entry.key != 'mfaPendingCredential' &&
+                    entry.key != 'mfaInfo')
+                  entry.key: entry.value,
+              'idToken': answer['idToken'],
+              'refreshToken': answer['refreshToken'],
+            },
+          ),
+        );
+    return createMultiFactorResolver(
+      error.hints,
+      resolveTotp: (String enrollmentId, String code) {
+        _checkNotDisposed();
+        return finishWith(
+          _multiFactor.finalizeTotpSignIn(
+            pendingCredential: pending,
+            enrollmentId: enrollmentId,
+            code: code,
+            tenantId: tenant,
+          ),
+        );
+      },
+      startPhone: (String enrollmentId, AppVerification appVerification) =>
+          _startPhoneSignIn(pending, enrollmentId, appVerification, tenant),
+      resolvePhone: (PhoneAuthCredential credential) {
+        _checkNotDisposed();
+        final (String verificationId, String code) = _checkPhoneCredential(
+          credential,
+        );
+        return _withoutSecretsOf(
+          credential,
+          () => finishWith(
+            _multiFactor.finalizePhoneSignIn(
+              pendingCredential: pending,
+              sessionInfo: verificationId,
+              code: code,
+              tenantId: tenant,
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  /// `mfaSignIn:start` for the SMS factor [enrollmentId] of the pending sign-in [pending]: sends
+  /// the SMS and returns the verification id.
+  Future<String> _startPhoneSignIn(
+    String pending,
+    String enrollmentId,
+    AppVerification appVerification,
+    String? tenant,
+  ) async {
+    _checkNotDisposed();
+    final List<String?> secrets = <String?>[];
+    return _withoutPhoneSecrets(secrets, () async {
+      final Map<String, Object?> proof = await _proofOf(
+        appVerification,
+        RecaptchaAction.mfaSmsSignIn,
+        secrets,
+      );
+      final Map<String, Object?> response = await _multiFactor.startPhoneSignIn(
+        pendingCredential: pending,
+        enrollmentId: enrollmentId,
+        appVerification: proof,
+        tenantId: tenant,
+      );
+      final String verificationId = _sessionInfoOf(
+        _fieldOf(response['phoneResponseInfo'], 'sessionInfo'),
+      );
+      secrets.add(verificationId);
+      return verificationId;
+    });
+  }
+
+  /// The value of [key] in [object] when it is a JSON object, else null.
+  static Object? _fieldOf(Object? object, String key) =>
+      object is Map<String, Object?> ? object[key] : null;
 
   /// The standard lifetime of an ID token. It replaces a lifetime from the backend that is out of range.
   static const Duration _standardTokenLifetime = Duration(hours: 1);

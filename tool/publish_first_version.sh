@@ -10,7 +10,8 @@
 # What it does:
 #   1. finds the package directory in the repository by its pubspec name;
 #   2. exports that directory at <ref> into a temporary folder (no local edits, no
-#      pubspec_overrides.yaml, so every dependency resolves from pub.dev as users get it);
+#      pubspec_overrides.yaml in it or in its example, so every dependency resolves from pub.dev
+#      as users get it);
 #   3. checks that CHANGELOG.md has a heading for the pubspec version;
 #   4. runs `pub get` and `pub publish --dry-run` (flutter for Flutter packages);
 #   5. runs `pub publish`, which shows the archive and asks y/N. Publishing cannot be undone.
@@ -51,7 +52,7 @@ cleanup() { if command -v trash >/dev/null; then trash "$work"; else rm -r "$wor
 trap cleanup EXIT
 git archive "$ref" "$dir" | tar -x -C "$work"
 cd "$work/$dir"
-rm -f pubspec_overrides.yaml
+find . -name pubspec_overrides.yaml -type f -delete
 
 version="$(sed -n 's/^version: *//p' pubspec.yaml | head -1)"
 if ! grep -Eq "^## \\[?${version//./\\.}\\]?( |$)" CHANGELOG.md; then

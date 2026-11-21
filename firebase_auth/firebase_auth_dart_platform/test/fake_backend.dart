@@ -7,8 +7,9 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 
-// The TOTP fake of firebase_auth_providers_dart, so that both packages test
-// against the same backend behaviour.
+// The TOTP and phone fakes of firebase_auth_providers_dart, so that both
+// packages test against the same backend behaviour.
+import '../../firebase_auth_providers_dart/test/phone_platform.dart';
 import '../../firebase_auth_providers_dart/test/totp_platform.dart';
 
 String _encode(Object json) =>
@@ -68,7 +69,25 @@ class FakeBackend {
       // the real service does.
       window: 1,
     );
-    _handlers.addAll(totp.handlers);
+    phone = PhonePlatform(
+      uidOf: (String token) => _claims(token)['sub'] as String,
+      ownerOf: (String number) {
+        for (final MapEntry<String, String> entry in phones.entries) {
+          if (entry.value == number) {
+            return entry.key;
+          }
+        }
+        return null;
+      },
+      setPhone: (String uid, String number) => phones[uid] = number,
+      readFactors: (String uid) =>
+          List<Map<String, Object?>>.of(factors[uid] ?? const []),
+      writeFactors: (String uid, List<Map<String, Object?>> list) =>
+          factors[uid] = list,
+      tokensFor: (String uid, String stage) =>
+          _tokensOf(uid, provider: stage == 'phone' ? 'phone' : 'password'),
+    );
+    _handlers.addAll(phone.handlersOver(totp.handlers));
   }
 
   final List<http.Request> requests = <http.Request>[];
@@ -87,6 +106,12 @@ class FakeBackend {
 
   /// The TOTP methods, checking real RFC 6238 codes of [totpSecretKey].
   late final TotpPlatform totp;
+
+  /// The phone methods: every SMS code is [smsCode].
+  late final PhonePlatform phone;
+
+  /// The phone number of each account that has one, by uid.
+  final Map<String, String> phones = <String, String>{};
 
   /// The code an authenticator app shows now.
   String get totpCode => totp.codeNow();
@@ -150,7 +175,11 @@ class FakeBackend {
         'add a handler or set override.',
       );
     }
-    return handler(jsonDecode(request.body) as Map<String, Object?>);
+    return handler(
+      request.method == 'GET'
+          ? request.url.queryParameters
+          : jsonDecode(request.body) as Map<String, Object?>,
+    );
   }
 
   http.Response _refresh(http.Request request) {
@@ -167,6 +196,7 @@ class FakeBackend {
   http.Response _lookup(Map<String, Object?> body) {
     final Map<String, dynamic> claims = _claims(body['idToken']! as String);
     final String? email = claims['email'] as String?;
+    final String? number = phones[claims['sub']];
     return jsonResponse(<String, Object?>{
       'users': <Object?>[
         <String, Object?>{
@@ -178,14 +208,21 @@ class FakeBackend {
           if (factors[claims['sub']]?.isNotEmpty ?? false)
             'mfaInfo': factors[claims['sub']],
           if (email != null) 'passwordHash': 'hash',
-          if (email != null)
-            'providerUserInfo': <Object?>[
+          'phoneNumber': ?number,
+          'providerUserInfo': <Object?>[
+            if (email != null)
               <String, Object?>{
                 'providerId': 'password',
                 'rawId': email,
                 'email': email,
               },
-            ],
+            if (number != null)
+              <String, Object?>{
+                'providerId': 'phone',
+                'rawId': number,
+                'phoneNumber': number,
+              },
+          ],
         },
       ],
     });
@@ -236,15 +273,18 @@ class FakeBackend {
   }
 
   /// New tokens for the account [uid], as the v2 endpoints return them.
-  Map<String, Object?> _tokensOf(String uid) => <String, Object?>{
-    'idToken': idToken(
-      uid,
-      provider: 'password',
-      email: uid.startsWith('uid-of-') ? uid.substring('uid-of-'.length) : null,
-      serial: ++_serial,
-    ),
-    'refreshToken': 'refresh:$uid',
-  };
+  Map<String, Object?> _tokensOf(String uid, {String provider = 'password'}) =>
+      <String, Object?>{
+        'idToken': idToken(
+          uid,
+          provider: provider,
+          email: uid.startsWith('uid-of-') && uid.contains('@')
+              ? uid.substring('uid-of-'.length)
+              : null,
+          serial: ++_serial,
+        ),
+        'refreshToken': 'refresh:$uid',
+      };
 
   static Map<String, dynamic> _claims(String token) {
     final String payload = token.split('.')[1];

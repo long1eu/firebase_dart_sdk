@@ -63,7 +63,9 @@ Future<(List<StepResult>, List<String>)> _run(HarnessConfig config) async {
   final RecordingStorage storage = RecordingStorage(
     FileAuthStorage('${sessionDir.path}/sessions.json'),
   );
+  final HarnessProof proof = HarnessProof();
   FirebaseAuthDart.use(
+    appVerification: proof.verification,
     storageFor: (FirebaseApp app) => storage,
     useDartCore: true,
     oauthProviders: <OAuthLoopbackProvider>[
@@ -94,6 +96,9 @@ Future<(List<StepResult>, List<String>)> _run(HarnessConfig config) async {
     storage: storage,
     log: print,
     githubAccountExists: config.githubAccountExists,
+    phoneNumber: config.phoneNumber,
+    phoneCode: config.phoneCode,
+    proof: proof,
   );
   print('Session file in ${sessionDir.path} (deleted at the end).');
   final List<StepResult> results = <StepResult>[];

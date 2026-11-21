@@ -1,5 +1,32 @@
 ## Unreleased
 
+- Phone sign-in, with the names of the iOS SDK: `FirebaseUserAuth.verifyPhoneNumber(phoneNumber, appVerification:)`
+  sends the SMS code (`v1/accounts:sendVerificationCode`, with the reCAPTCHA v2 or Enterprise token of the
+  `AppVerification`, or none for the emulator) and returns the verification id; `PhoneAuthProvider.credential(
+  verificationId:, verificationCode:)` makes a `PhoneAuthCredential` that `signInWithCredential`,
+  `linkWithCredential`, `reauthenticateWithCredential` and the new `updatePhoneNumber` take
+  (`v1/accounts:signInWithPhoneNumber`). The app asks for the code with its own field. A number that another
+  account has is `credential-already-in-use` (also from `PHONE_NUMBER_EXISTS`), whose `credential` is a
+  `PhoneAuthCredential` of the backend's temporary proof that signs in to that account, as in the iOS SDK; a
+  reauthentication with a number of no account or another account is
+  `user-mismatch`. `verifyPhoneNumberInteractively` does both steps for a program without a code field: the
+  reCAPTCHA page and a `CodeEntryFlow` of `secure_flow` (VM only). Tested with unit tests against a fake backend;
+  not run against the emulator or a real project.
+- The phone errors map to the codes of the JS SDK and FlutterFire: `INVALID_CODE`, `INVALID_SESSION_INFO`,
+  `SESSION_EXPIRED` and `CODE_EXPIRED`, `MISSING_CODE` (`missing-verification-code`), `MISSING_SESSION_INFO`,
+  `INVALID_PHONE_NUMBER`, `MISSING_PHONE_NUMBER`, `QUOTA_EXCEEDED`, `TOO_MANY_ATTEMPTS_TRY_LATER`,
+  `MISSING_APP_CREDENTIAL`, `INVALID_APP_CREDENTIAL` and `CAPTCHA_CHECK_FAILED`. An empty number, verification id
+  or code fails before anything is sent. No error of a phone request holds the phone number, the verification id,
+  the SMS code or the reCAPTCHA token: they are cut from the message, and `phoneNumber` and `serverResponse` are
+  left empty.
+- SMS second factors: `FirebaseUserAuth.startPhoneEnrollment(phoneNumber, appVerification:)` sends the code and
+  returns the verification id, `finalizePhoneEnrollment(credential, displayName:)` enrols the factor
+  (`v2/accounts/mfaEnrollment:start` and `:finalize` with the phone fields), and `MultiFactorResolver` gets
+  `startPhoneSignIn(enrollmentId:, appVerification:)` and `resolveSignInWithPhone(credential)`
+  (`v2/accounts/mfaSignIn:start` and `:finalize`). `unenrollMultiFactor` removes SMS factors as before. An account
+  with SMS factors only now gets the default message of `FirebaseAuthMultiFactorException`;
+  `unsupportedFactorsMessage` is for factors of an unknown kind. Tested with unit tests against a fake backend;
+  not run against the emulator or a real project.
 - `IndexedDbAuthStorage`: an `AuthStorage` in IndexedDB for the web (the JS SDK's `indexedDBLocalPersistence`), in
   its own database (`firebase_auth_providers_dart`, store `sessions`; not the JS SDK's format). A write completes
   once its transaction has completed (`durability: 'strict'`); the calls of one instance run in order; each request

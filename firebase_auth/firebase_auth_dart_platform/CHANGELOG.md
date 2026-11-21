@@ -1,5 +1,25 @@
 ## Unreleased
 
+- Phone sign-in through the client: `verifyPhoneNumber` (`codeSent` with the verification id,
+  `verificationFailed`, `codeAutoRetrievalTimeout` after `timeout`; never `verificationCompleted`, since there is
+  no instant verification or SMS auto-retrieval outside Android), `signInWithPhoneNumber` and
+  `User.linkWithPhoneNumber` (a `ConfirmationResult` whose `confirm` takes the code), `User.updatePhoneNumber`, and
+  phone credentials in `signInWithCredential`, `linkWithCredential` and `reauthenticateWithCredential`. Every error
+  of `verifyPhoneNumber` reaches `verificationFailed` (`internal-error` for one that is not a
+  `FirebaseAuthException`). `linkWithPhoneNumber` throws `provider-already-linked` before any SMS when the user has
+  a phone number. The `credential` of `credential-already-in-use` signs in to the account that has the number.
+- `FirebaseAuthDart.use(appVerification:)`: the proof of the phone requests, by default the reCAPTCHA v2 page of
+  the client, shown by the `presenter` of `use` (the system browser on a desktop without one). With the Auth emulator, or after
+  `setSettings(appVerificationDisabledForTesting: true)` (no longer ignored), no proof is sent. `use` also
+  registers a `RecaptchaVerifier` factory, so that `signInWithPhoneNumber` without a verifier works; it renders
+  nothing, and `RecaptchaVerifier.verify` throws `unimplemented`.
+- SMS second factors: `verifyPhoneNumber` with the session of `User.multiFactor.getSession()` (enrolment) or of a
+  `MultiFactorResolver` (sign-in), `PhoneMultiFactorGenerator.getAssertion`, and `MultiFactor.enroll` and
+  `MultiFactorResolver.resolveSignIn` with the assertion.
+- The real-project harness has `phone` and `sms` steps for a test phone number of the console
+  (`AUTH_HARNESS_PHONE_NUMBER`, `AUTH_HARNESS_PHONE_CODE`; skipped without them).
+- Tested with unit tests against a fake backend; the emulator tests and the harness steps are written but were not
+  run.
 - On the web the default storage of the sessions is `BestWebAuthStorage` of `firebase_auth_providers_dart`
   (IndexedDB, else `localStorage`, else memory) instead of memory, so the user stays signed in after a reload. A
   session an app kept in `localStorage` under the same key moves to IndexedDB at the first read.
