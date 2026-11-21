@@ -33,9 +33,11 @@ sealed class AppVerification {
   /// registered, the system browser on a desktop, the URL on stderr in a terminal). The site key
   /// and the language are those of the request.
   ///
-  /// The token source throws a [FirebaseAuthException] `timeout` when no token came back within
-  /// [timeout], and rethrows the other errors of the presenter ([SecureFlowNoPresenter],
-  /// [SecureFlowRefused], or its own) as they are. VM only; on the web the presenters throw an
+  /// The token source throws a [FirebaseAuthException]: `timeout` when no token came back within
+  /// [timeout], `operation-not-supported-in-this-environment` when the environment offers no
+  /// presenter ([SecureFlowNoPresenter]), `argument-error` when the flow refuses [presenter]
+  /// ([SecureFlowRefused]), each with the original error as [FirebaseAuthException.cause]
+  /// (not for `timeout`). An error of the presenter itself is rethrown as it is. VM only; on the web the presenters throw an
   /// [UnsupportedError].
   factory AppVerification.recaptchaV2Loopback({
     SecurePresenter? presenter,

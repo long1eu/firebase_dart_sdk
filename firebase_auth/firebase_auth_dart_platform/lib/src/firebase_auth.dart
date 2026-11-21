@@ -210,9 +210,11 @@ class DartFirebaseAuth extends FirebaseAuthPlatform {
   /// and custom parameters of [provider] added to its own (the parameters of
   /// [provider] win over those of the registered provider).
   ///
-  /// Throws `unimplemented` when no provider is registered for that id, on
-  /// the web, where the loopback flow does not exist, and on a platform without
-  /// a default browser launcher (Android, iOS) when `use` got no `presenter`.
+  /// Throws `unimplemented` when no provider is registered for that id and on
+  /// the web, where the loopback flow does not exist, and
+  /// `operation-not-supported-in-this-environment` (the code the client gives
+  /// a flow without a presenter) on a platform without a default browser
+  /// launcher (Android, iOS) when `use` got no `presenter`.
   dart_auth.OAuthLoopbackProvider loopbackProviderFor(
     String member,
     AuthProvider provider,
@@ -222,7 +224,10 @@ class DartFirebaseAuth extends FirebaseAuthPlatform {
     }
     if (_config.presenter == null &&
         !_systemBrowserPlatforms.contains(defaultTargetPlatform)) {
-      throw unimplemented(member, noPresenter);
+      throw FirebaseAuthException(
+        code: 'operation-not-supported-in-this-environment',
+        message: '$member: $noPresenter',
+      );
     }
     final dart_auth.OAuthLoopbackProvider? registered =
         _oauthProviders[provider.providerId];

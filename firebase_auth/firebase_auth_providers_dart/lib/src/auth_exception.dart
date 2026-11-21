@@ -34,7 +34,8 @@ import 'user_record.dart' show credentialFromResponse;
 /// | `tenant-id-mismatch` | the user or the email link belongs to another tenant than `FirebaseUserAuth.tenantId` |
 /// | `login-blocked` | a `beforeAuthStateChanged` callback refused the change |
 /// | `password-does-not-meet-requirements` | the password fails the project's policy (`FirebaseUserAuth.validatePassword`) |
-/// | `argument-error` | an argument the backend was not asked about is wrong (an email link that is not one) |
+/// | `argument-error` | an argument the backend was not asked about is wrong (an email link that is not one, a presenter a browser flow refuses: [cause] is the `SecureFlowRefused`) |
+/// | `operation-not-supported-in-this-environment` | a browser flow found no presenter for this environment (Android and iOS without one passed): [cause] is the `SecureFlowNoPresenter` |
 /// | `multi-factor-auth-required` | the account has a second factor: finish with a code of an authenticator app (a [FirebaseAuthMultiFactorException] with a [FirebaseAuthMultiFactorException.resolver]) |
 /// | `multi-factor-info-not-found` | the second factor is not one this package can use (SMS), or the account has no such factor |
 /// | `user-token-expired`, `invalid-refresh-token` | the session ended (account deleted, refresh token revoked); the user is signed out |
@@ -83,6 +84,7 @@ class FirebaseAuthException extends FirebaseException {
     this.tenantId,
     this.credential,
     this.serverResponse,
+    this.cause,
   }) : super(plugin: 'firebase_auth', code: code, message: message);
 
   /// Maps the error message of the Identity Toolkit or Secure Token API ([serverMessage], for example
@@ -212,6 +214,11 @@ class FirebaseAuthException extends FirebaseException {
   /// lists only its keys, and the [toString] of the exception leaves it out. Do not send it anywhere but to your
   /// own code.
   final Map<String, Object?>? serverResponse;
+
+  /// The error this exception was made from, when it wraps one: the `SecureFlowNoPresenter` or
+  /// `SecureFlowRefused` of `secure_flow` for `operation-not-supported-in-this-environment` and `argument-error`
+  /// of a browser flow. Null otherwise. Not part of [toString]; [message] carries its text.
+  final Object? cause;
 
   /// Whether the session is no longer valid: the backend rejected the request with HTTP 400 because the refresh
   /// token was revoked or the account is gone or disabled. The user is signed out when a token refresh fails with

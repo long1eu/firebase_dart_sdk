@@ -54,9 +54,10 @@ import 'oauth_loopback.dart';
 /// | `missing-or-invalid-nonce` | the ID token carries another nonce than the one sent, or an ID token of a provider app carries none |
 /// | `invalid-credential` | the token endpoint or `exchangeCode` refused the code ([FirebaseAuthException.serverCode] is its `error`) |
 /// | `network-request-failed` | the token endpoint could not be reached, or it or `exchangeCode` did not answer within 30 seconds |
+/// | `operation-not-supported-in-this-environment` | no presenter was passed and the environment offers none (Android, iOS); [FirebaseAuthException.cause] is the [SecureFlowNoPresenter] |
+/// | `argument-error` | the flow refuses [presenter] (a web view, a provider app for another provider); [FirebaseAuthException.cause] is the [SecureFlowRefused] |
 ///
-/// A [SecureFlowRefused] (a presenter that shows pages inside the app), a [SecureFlowNoPresenter]
-/// (no default presenter for the environment) and an error of [presenter] are rethrown as they are.
+/// An error of [presenter] itself is rethrown as it is.
 /// Nothing of the flow is logged; the tokens are never part of an exception message.
 ///
 /// The ID token is not verified here: its signature, issuer and audience are checked by Firebase

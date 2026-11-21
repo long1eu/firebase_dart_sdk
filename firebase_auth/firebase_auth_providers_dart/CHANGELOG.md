@@ -6,8 +6,12 @@
   `environment` (a `SecureEnvironment`); without a presenter, the `OAuthFlow` takes the best one the environment
   offers: a `ProviderAppPresenter` registered for the provider, the system browser on a desktop, an in-app
   browser, the console (only the URL on stderr over SSH or on Linux without a display; a timeout then names the
-  `ssh -L` forward that would help). A presenter the flow does not accept (a web view) is refused with
-  `SecureFlowRefused`.
+  `ssh -L` forward that would help). A presenter the flow does not accept (a web view, a provider app for another
+  provider) fails with a `FirebaseAuthException` `argument-error`, and no presenter for the environment (Android
+  and iOS without one passed) with `operation-not-supported-in-this-environment`; both carry the `SecureFlowRefused`
+  or `SecureFlowNoPresenter` of `secure_flow` in the new `FirebaseAuthException.cause`. Before, the flow threw an
+  `UnsupportedError` on Android and iOS, where it had no browser launcher. An error of the presenter itself is
+  rethrown as it is. `AppVerification.recaptchaV2Loopback` maps them the same way.
 - A `ProviderAppPresenter` (the provider's app or SDK; none is part of this package) returns the provider's tokens
   directly: they go to `signInWithIdp` without a code exchange, with the raw nonce in the credential for OpenID
   Connect providers. When a nonce was sent, the ID token must carry it: an ID token without the nonce claim fails

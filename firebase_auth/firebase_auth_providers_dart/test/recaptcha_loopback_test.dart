@@ -186,4 +186,24 @@ void main() {
     );
     expect(shown, isFalse);
   });
+
+  test(
+    'no presenter in the environment is operation-not-supported-in-this-environment; the cause is '
+    'kept',
+    () async {
+      final Object error = await _fields(
+        AppVerification.recaptchaV2Loopback(
+          environment: const SecureEnvironment(operatingSystem: 'ios'),
+        ),
+      ).then<Object>((_) => fail('no error'), onError: (Object e) => e);
+      expect(
+        error,
+        _authError('operation-not-supported-in-this-environment').having(
+          (FirebaseAuthException e) => e.cause,
+          'cause',
+          isA<SecureFlowNoPresenter>(),
+        ),
+      );
+    },
+  );
 }

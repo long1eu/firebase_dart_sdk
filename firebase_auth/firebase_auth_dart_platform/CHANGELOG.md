@@ -21,8 +21,10 @@
 - `signInWithProvider`, `User.linkWithProvider` and `User.reauthenticateWithProvider` run the loopback OAuth flow
   with the providers passed to `FirebaseAuthDart.use(oauthProviders:)`; the scopes and custom parameters of the
   FlutterFire provider are added to the request. `presenter` on `use()` (a `SecurePresenter` of `secure_flow`)
-  runs the browser part; it is needed on Android and iOS, and defaults to the system browser elsewhere (the URL on
-  stderr over SSH or without a display). A provider id that was not passed, and the web, throw `unimplemented`. The
+  runs the browser part; it is needed on Android and iOS (without it the calls throw
+  `operation-not-supported-in-this-environment`, where they threw `unimplemented` before), and defaults to the
+  system browser elsewhere (the URL on stderr over SSH or without a display). A presenter the flow refuses (a web
+  view) is `argument-error`. A provider id that was not passed, and the web, throw `unimplemented`. The
   library exports `OAuthLoopbackProvider`, `OAuthAuthorizationCode`, `OAuthCodeExchange`, `SecurePresenter`,
   `SystemBrowserPresenter`, `ConsolePresenter` and `CallbackPresenter`.
 - `revokeAccessToken` and `revokeTokenWithAuthorizationCode`.

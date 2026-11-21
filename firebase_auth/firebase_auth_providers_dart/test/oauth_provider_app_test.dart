@@ -272,7 +272,65 @@ void main() {
             'facebook.com',
           }, (_) => OAuthTokens(idToken: 'x')),
         ),
-        throwsA(isA<SecureFlowRefused>()),
+        throwsA(
+          _authError('argument-error').having(
+            (FirebaseAuthException e) => e.cause,
+            'cause',
+            isA<SecureFlowRefused>(),
+          ),
+        ),
+      );
+    },
+  );
+
+  test(
+    'a web view is refused: argument-error with the SecureFlowRefused as the cause',
+    () async {
+      await expectLater(
+        authorizeWithOAuthLoopback(
+          _oidc(),
+          presenter: CallbackPresenter(
+            (Uri url) => fail('a web view must not be shown $url'),
+            kind: SecurePresenterKind.embeddedWebView,
+          ),
+        ),
+        throwsA(
+          _authError('argument-error').having(
+            (FirebaseAuthException e) => e.cause,
+            'cause',
+            isA<SecureFlowRefused>(),
+          ),
+        ),
+      );
+    },
+  );
+
+  test(
+    'no presenter in the environment (Android): operation-not-supported-in-this-environment with the '
+    'SecureFlowNoPresenter as the cause',
+    () async {
+      final FakeBackend backend = FakeBackend();
+      final FirebaseUserAuth auth = backend.create();
+      addTearDown(auth.dispose);
+      await expectLater(
+        auth.signInWithOAuthLoopback(
+          _oidc(),
+          environment: const SecureEnvironment(operatingSystem: 'android'),
+        ),
+        throwsA(
+          _authError('operation-not-supported-in-this-environment')
+              .having(
+                (FirebaseAuthException e) => e.cause,
+                'cause',
+                isA<SecureFlowNoPresenter>(),
+              )
+              .having(
+                (FirebaseAuthException e) =>
+                    e.message == (e.cause! as SecureFlowNoPresenter).message,
+                'message is the cause\'s',
+                isTrue,
+              ),
+        ),
       );
     },
   );

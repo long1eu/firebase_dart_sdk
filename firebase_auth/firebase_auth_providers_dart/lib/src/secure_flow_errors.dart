@@ -5,9 +5,20 @@ import 'package:secure_flow/secure_flow.dart';
 import 'auth_exception.dart';
 
 /// Runs [flow] with [presenter] (or the best presenter of [environment] when null, see
-/// [SecureFlow.run]) and turns a
-/// timeout into a [FirebaseAuthException] `timeout` with [timeoutMessage] (plus the presenter's
-/// hint), and a cancel into `user-cancelled`. Other errors are rethrown as they are.
+/// [SecureFlow.run]) and turns the errors of `secure_flow` into a [FirebaseAuthException]:
+///
+/// * a timeout into `timeout`, with [timeoutMessage] (plus the presenter's hint);
+/// * a cancel into `user-cancelled`;
+/// * a [SecureFlowNoPresenter] (no presenter of the environment fits the flow) into
+///   `operation-not-supported-in-this-environment`, the code of the JS SDK for an operation the
+///   environment cannot run;
+/// * a [SecureFlowRefused] (the flow does not accept the presenter it was given) into
+///   `argument-error`, the code of the JS SDK for an argument of the wrong kind (a provider that
+///   is not an OAuth provider passed to `signInWithPopup`): the presenter is an argument of the
+///   caller.
+///
+/// The last two keep the original error as [FirebaseAuthException.cause]. Other errors (of the
+/// presenter itself) are rethrown as they are.
 Future<T> runSecureFlow<T>(
   SecureFlow<T> flow, {
   required SecurePresenter? presenter,
@@ -33,6 +44,24 @@ Future<T> runSecureFlow<T>(
     throw const FirebaseAuthException(
       code: 'user-cancelled',
       message: 'The app cancelled the browser flow.',
+    );
+  } on SecureFlowNoPresenter catch (e, stackTrace) {
+    Error.throwWithStackTrace(
+      FirebaseAuthException(
+        code: 'operation-not-supported-in-this-environment',
+        message: e.message,
+        cause: e,
+      ),
+      stackTrace,
+    );
+  } on SecureFlowRefused catch (e, stackTrace) {
+    Error.throwWithStackTrace(
+      FirebaseAuthException(
+        code: 'argument-error',
+        message: e.message,
+        cause: e,
+      ),
+      stackTrace,
     );
   }
 }

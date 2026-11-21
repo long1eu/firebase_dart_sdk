@@ -823,7 +823,7 @@ void main() {
                     .having(
                       (FirebaseAuthException e) => e.code,
                       'code',
-                      'unimplemented',
+                      'operation-not-supported-in-this-environment',
                     )
                     .having(
                       (FirebaseAuthException e) => e.message,
@@ -834,7 +834,7 @@ void main() {
             );
             await expectLater(
               auth.currentUser!.linkWithProvider(GoogleAuthProvider()),
-              throwsAuthCode('unimplemented'),
+              throwsAuthCode('operation-not-supported-in-this-environment'),
             );
           } finally {
             debugDefaultTargetPlatformOverride = TargetPlatform.linux;
