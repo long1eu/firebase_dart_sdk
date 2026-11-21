@@ -1,9 +1,9 @@
 // Runs storage_cli as a program against the Storage emulator
 // (tool/start_storage_emulator.sh in the repository root):
 //
-//     STORAGE_EMULATOR_HOST=127.0.0.1:9384 dart test
+//     FIREBASE_STORAGE_EMULATOR_HOST=127.0.0.1:9384 dart test
 //
-// Without STORAGE_EMULATOR_HOST the tests are skipped. The rules test also
+// Without FIREBASE_STORAGE_EMULATOR_HOST the tests are skipped. The rules test also
 // needs FIREBASE_AUTH_EMULATOR_HOST (an Auth emulator).
 
 import 'dart:convert';
@@ -12,9 +12,10 @@ import 'dart:io';
 import 'package:test/test.dart';
 
 void main() {
-  final String? emulator = Platform.environment['STORAGE_EMULATOR_HOST'];
+  final String? emulator =
+      Platform.environment['FIREBASE_STORAGE_EMULATOR_HOST'];
   final Object skip = emulator == null || emulator.isEmpty
-      ? 'Set STORAGE_EMULATOR_HOST to run these tests against the Storage '
+      ? 'Set FIREBASE_STORAGE_EMULATOR_HOST to run these tests against the Storage '
             'emulator.'
       : false;
   final String? authEmulator =

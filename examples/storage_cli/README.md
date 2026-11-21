@@ -17,7 +17,7 @@ Global flags, each with an environment variable (the flag wins):
 
 | Flag | Variable | Meaning |
 | --- | --- | --- |
-| `--emulator-host` | `STORAGE_EMULATOR_HOST`, `FIREBASE_STORAGE_EMULATOR_HOST` | `host:port` of the Storage emulator |
+| `--emulator-host` | `FIREBASE_STORAGE_EMULATOR_HOST` | `host:port` of the Storage emulator |
 | `--project` | `FIREBASE_PROJECT_ID` | project id; `demo-example` with an emulator |
 | `--bucket` | `STORAGE_BUCKET` | default `<project>.appspot.com` |
 | `--email`, `--password` | `STORAGE_EMAIL`, `STORAGE_PASSWORD` | sign in first, so rules with `request.auth` pass |
@@ -36,7 +36,7 @@ Needs the Dart SDK (3.8 or later) and the Storage emulator of `tool/start_storag
 ```sh
 ./tool/start_storage_emulator.sh 9384     # buckets demo-test.appspot.com (open rules) and demo-test-auth.appspot.com
 cd examples/storage_cli && dart pub get
-export STORAGE_EMULATOR_HOST=127.0.0.1:9384 FIREBASE_PROJECT_ID=demo-test
+export FIREBASE_STORAGE_EMULATOR_HOST=127.0.0.1:9384 FIREBASE_PROJECT_ID=demo-test
 echo hello > hello.txt && dart run storage_cli put hello.txt docs/hello.txt && dart run storage_cli ls docs
 dart run storage_cli cat docs/hello.txt && dart run storage_cli stat docs/hello.txt && dart run storage_cli rm docs/hello.txt
 ```
@@ -74,7 +74,7 @@ each request.
 ## Test
 
 ```sh
-STORAGE_EMULATOR_HOST=127.0.0.1:9384 dart test      # skipped with a reason when the variable is not set
+FIREBASE_STORAGE_EMULATOR_HOST=127.0.0.1:9384 dart test      # skipped with a reason when the variable is not set
 ```
 
 Add `FIREBASE_AUTH_EMULATOR_HOST` to include the rules test.

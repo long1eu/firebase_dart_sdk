@@ -37,10 +37,8 @@ CommandRunner<void> buildRunner({
     ..addOption(
       'emulator-host',
       help:
-          'host:port of the Storage emulator (STORAGE_EMULATOR_HOST or '
-          'FIREBASE_STORAGE_EMULATOR_HOST).',
+          'host:port of the Storage emulator (FIREBASE_STORAGE_EMULATOR_HOST).',
       defaultsTo: firstEnvironment(<String>[
-        'STORAGE_EMULATOR_HOST',
         'FIREBASE_STORAGE_EMULATOR_HOST',
       ], env),
     )

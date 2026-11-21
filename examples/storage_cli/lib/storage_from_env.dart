@@ -38,7 +38,7 @@ class StorageConfig {
   /// `--bucket` / `STORAGE_BUCKET`; `<project>.appspot.com` when not given.
   final String? bucket;
 
-  /// `--emulator-host` / `STORAGE_EMULATOR_HOST` / `FIREBASE_STORAGE_EMULATOR_HOST`
+  /// `--emulator-host` / `FIREBASE_STORAGE_EMULATOR_HOST`
   /// (`host:port`).
   final String? emulatorHost;
 
@@ -79,7 +79,7 @@ Future<StorageSession> openStorage(StorageConfig config) async {
       _nonEmpty(config.projectId) ?? (emulator == null ? null : 'demo-example');
   if (projectId == null) {
     throw ConfigurationError(
-      'Set --emulator-host (or STORAGE_EMULATOR_HOST), or --project (or '
+      'Set --emulator-host (or FIREBASE_STORAGE_EMULATOR_HOST), or --project (or '
       'FIREBASE_PROJECT_ID) for a real project.',
     );
   }
