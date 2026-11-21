@@ -8,7 +8,7 @@
 PRODUCT_NAME = google_sign_in_dart_example
 
 // The application's bundle identifier
-PRODUCT_BUNDLE_IDENTIFIER = eu.long1.googleSignInDartExample
+PRODUCT_BUNDLE_IDENTIFIER = dev.upcode.googleSignInDartExample
 
 // The copyright displayed in application information
-PRODUCT_COPYRIGHT = Copyright © 2020 eu.long1. All rights reserved.
+PRODUCT_COPYRIGHT = Copyright © 2020 dev.upcode. All rights reserved.
