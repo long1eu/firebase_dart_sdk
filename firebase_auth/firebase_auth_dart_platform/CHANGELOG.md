@@ -3,6 +3,9 @@
 - The id of a `MultiFactorResolver.session` is opaque (`sign-in-<n>`) instead of the backend's pending credential,
   so printing or logging the session shows no secret. `verifyPhoneNumber(multiFactorSession:)` with it still sends
   the SMS of the sign-in through the client's resolver, whose new `session` carries the credential.
+- The OAuth credentials the shim hands out (`UserCredential.credential`, `FirebaseAuthException.credential`) no
+  longer print their access token: their `toString` shows only the provider and the sign-in method. The platform
+  interface's `toString` printed the token. `asMap()` is unchanged.
 
 ## 0.1.1
 

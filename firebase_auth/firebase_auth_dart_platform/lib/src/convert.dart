@@ -212,6 +212,9 @@ MultiFactorInfo multiFactorInfoOf(dart_auth.MultiFactorInfo info) {
 /// client it came from, so that a credential the backend returned (with a
 /// pending token, which the interface has no field for) goes back unchanged,
 /// for example in the recovery of `account-exists-with-different-credential`.
+///
+/// Its [toString] shows only the provider and the sign-in method: the
+/// interface's prints the access token.
 class DartOAuthCredential extends OAuthCredential {
   DartOAuthCredential(this.source)
     : super(
@@ -226,6 +229,10 @@ class DartOAuthCredential extends OAuthCredential {
 
   /// The credential of `firebase_auth_providers_dart`.
   final dart_auth.OAuthCredential source;
+
+  @override
+  String toString() =>
+      'OAuthCredential(providerId: $providerId, signInMethod: $signInMethod)';
 }
 
 /// The Apple name of a credential of the client, as the interface has it.
