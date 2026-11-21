@@ -1,6 +1,9 @@
 import 'package:secure_flow/src/environment_stub.dart'
     if (dart.library.io) 'package:secure_flow/src/environment_io.dart';
 import 'package:secure_flow/src/flow.dart';
+import 'package:secure_flow/src/in_page_presenter_stub.dart'
+    if (dart.library.io) 'package:secure_flow/src/in_page_presenter_stub.dart'
+    if (dart.library.js_interop) 'package:secure_flow/src/in_page_presenter_web.dart';
 import 'package:secure_flow/src/presenter.dart';
 import 'package:secure_flow/src/presenters_stub.dart'
     if (dart.library.io) 'package:secure_flow/src/presenters_io.dart';
@@ -50,11 +53,14 @@ final class SecureEnvironment {
     _ => false,
   };
 
-  /// The presenters on offer: [registered] first, then a `SystemBrowserPresenter` when there is a
-  /// display, then a `ConsolePresenter` when there is a terminal. A flow ranks them by kind
+  /// The presenters on offer: [registered] first, then on the web (`web`) a new
+  /// `InPageRecaptchaPresenter` (an invisible reCAPTCHA in the app's page, which only a
+  /// `RecaptchaFlow` takes), then a `SystemBrowserPresenter` when there is a display, then a
+  /// `ConsolePresenter` when there is a terminal. A flow ranks them by kind
   /// ([SecureFlow.presenterKinds]); the order here only matters between two of one kind.
   List<SecurePresenter> get presenters => <SecurePresenter>[
     ...registered,
+    if (operatingSystem == 'web') InPageRecaptchaPresenter(),
     if (hasDisplay) const SystemBrowserPresenter(),
     if (hasTerminal) ConsolePresenter(),
   ];

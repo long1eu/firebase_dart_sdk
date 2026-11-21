@@ -151,10 +151,11 @@ against the Firebase Auth emulator; nothing was run against the real service.
 | `multiFactor(user).getSession()` + `TotpMultiFactorGenerator.generateSecret`, `TotpSecret.generateQrCodeUrl` | `startTotpEnrollment()`, `TotpSecret.otpauthUri(issuer:)` and its parameters (see below) | unit (fake backend) |
 | `multiFactor(user).enroll(TotpMultiFactorGenerator.assertionForEnrollment(...))`, `unenroll`, `enrolledFactors` | `finalizeTotpEnrollment(secret, code:, displayName:)`, `unenrollMultiFactor(uid)`, `AuthUser.enrolledFactors` | unit; real project, 2026-11-20 |
 | `getMultiFactorResolver(auth, error).resolveSignIn(TotpMultiFactorGenerator.assertionForSignIn(...))` | `FirebaseAuthMultiFactorException.resolver.resolveSignInWithTotp(code)` | unit; real project, 2026-11-20 |
-| `RecaptchaVerifier` (a reCAPTCHA v2 token) on desktop and command line; `getRecaptchaParams` | `AppVerification.recaptchaV2Loopback()` (VM only; the `RecaptchaFlow` of `secure_flow`), `getRecaptchaSiteKey()`, and the `AppVerification` value the phone calls take (see below) | unit (simulated browser, fake backend); not run against Google |
+| `RecaptchaVerifier` (a reCAPTCHA v2 token); `getRecaptchaParams` | `AppVerification.recaptchaV2Loopback()` (the `RecaptchaFlow` of `secure_flow`: a page on localhost on desktop and command line, the widget in the app's page on the web), `getRecaptchaSiteKey()`, and the `AppVerification` value the phone calls take (see below) | unit (simulated browser, fake backend); in-page widget against a fake `grecaptcha` in Chrome; not run against Google |
+| `initializeRecaptchaConfig`, reCAPTCHA Enterprise on password sign-in and sign-up, password reset and email link emails, SMS (ENFORCE and AUDIT) | `initializeRecaptchaConfig()`, `recaptchaConfig`, and a token source passed as `recaptchaEnterprise` (see below) | unit (fake backend); not run against a real project |
 | `PhoneAuthProvider.verifyPhoneNumber`, `PhoneAuthProvider.credential`, `signInWithPhoneNumber`, `linkWithPhoneNumber`, `reauthenticateWithPhoneNumber`, `updatePhoneNumber` | `verifyPhoneNumber(phoneNumber, appVerification:)` returns the verification id; `PhoneAuthProvider.credential(verificationId:, verificationCode:)` for `signInWithCredential`, `linkWithCredential`, `reauthenticateWithCredential` and `updatePhoneNumber`; `verifyPhoneNumberInteractively` (VM only) | unit (fake backend); emulator tests written, not run |
 | `PhoneMultiFactorGenerator` (SMS second factor: enrolment and sign-in) | `startPhoneEnrollment` / `finalizePhoneEnrollment`, `resolver.startPhoneSignIn` / `resolveSignInWithPhone` | unit (fake backend); emulator tests written, not run |
-| reCAPTCHA Enterprise configuration, passkeys | – | |
+| Passkeys | – | |
 
 Of the federated providers, only the request and the flows were exercised, against the emulator with fake
 tokens (the emulator checks no signature, audience or nonce). The checks of the real backend (the audience of an
@@ -440,10 +441,11 @@ from a real app. These are the pieces:
   test number).
 - `auth.getRecaptchaSiteKey()`: the reCAPTCHA v2 site key of the project (`v1/recaptchaParams`), from the
   emulator when one is set (the emulator returns a fake key).
-- `AppVerification.recaptchaV2Loopback(presenter:, timeout:)` (VM only; on the web the presenters throw an
-  `UnsupportedError`): for each phone request, a `RecaptchaFlow` of `secure_flow` serves a page with the
-  reCAPTCHA v2 checkbox for the project's site key on localhost, the presenter shows it (the default presenter of
-  the environment when null), and the token the page posts back is the proof.
+- `AppVerification.recaptchaV2Loopback(presenter:, timeout:)`: for each phone request, a `RecaptchaFlow` of
+  `secure_flow` runs the reCAPTCHA v2 checkbox for the project's site key. On desktop and command line it serves
+  a page on localhost, the presenter shows it (the default presenter of the environment when null), and the
+  token the page posts back is the proof. On the web the default presenter is `InPageRecaptchaPresenter`: an
+  invisible widget in the app's own page.
 
 ```dart
 final AppVerification verification = AppVerification.recaptchaV2Loopback();
@@ -469,6 +471,53 @@ Not checked against Google: whether a token made on a localhost page is accepted
 on the project (the allowed domains of the key, reCAPTCHA Enterprise enforcement, SMS defense). Serving Google's
 widget from a page of your app is a use of reCAPTCHA under Google's terms; check that they fit your app.
 
+### reCAPTCHA Enterprise
+
+A project can protect email and password and phone sign-in with reCAPTCHA Enterprise. The client follows the JS
+SDK (`handleRecaptchaFlow`), with the tokens from a source you pass:
+
+```dart
+final FirebaseUserAuth auth = FirebaseUserAuth(
+  apiKey: '<the Web API key of the project>',
+  recaptchaEnterprise: RecaptchaEnterpriseVerification(
+    (RecaptchaEnterpriseRequest request) => RecaptchaFlow.enterprise(
+      siteKey: request.siteKey!,
+      action: request.action.value,
+    ).run(), // package:secure_flow: in the app's page on the web, a page on localhost elsewhere
+  ),
+);
+final RecaptchaConfig config = await auth.initializeRecaptchaConfig();
+print(config.isAnyProviderEnabled);
+```
+
+- `initializeRecaptchaConfig()` reads `v2/recaptchaConfig` for the project, or the tenant when `tenantId` is set:
+  the Enterprise site key and the state of each provider (`ENFORCE`, `AUDIT`, `OFF`). `recaptchaConfig` is what
+  was read for the current tenant. The answer's SMS toll fraud settings are not read; the JS SDK reads none
+  either.
+- Email and password (`signInWithEmailAndPassword`, `createUserWithEmailAndPassword`, password credentials in
+  `signInWithCredential`, `linkWithCredential` and `reauthenticateWithCredential`, `sendPasswordResetEmail`,
+  `sendSignInLinkToEmail`): with the provider under ENFORCE or AUDIT the request carries `captchaResponse`
+  (`captchaResp` for the emails), `clientType` and `recaptchaVersion`. Without the configuration it goes out
+  without a token, and once more with one when the backend answers `missing-recaptcha-token`.
+- SMS with a reCAPTCHA v2 proof: the configuration is read before the first request. Under ENFORCE or AUDIT the
+  Enterprise token replaces the v2 token; under AUDIT, `missing-recaptcha-token` and `invalid-app-credential`
+  send the request again with the v2 token. Without protection the v2 token goes with `captchaResponse:
+  NO_RECAPTCHA`, as the JS SDK sends it.
+- A source that fails is asked once more after the configuration is read again (not after a timeout, a
+  cancel, or a check overtaken by a newer one: the person's choices). If it fails again while the provider
+  is under AUDIT, the request still goes out, as in the JS SDK: an SMS with the v2 token, a password
+  request with `NO_RECAPTCHA`; under ENFORCE the failure is thrown. The errors of a request never show its
+  token. An empty token is `missing-recaptcha-token`; a configuration without a site key is
+  `recaptcha-not-enabled`. The backend's codes keep the JS SDK's names: `missing-recaptcha-token`,
+  `invalid-recaptcha-token`, `invalid-recaptcha-action`, `recaptcha-not-enabled`, `missing-recaptcha-version`,
+  `invalid-recaptcha-version`.
+- No source, nothing of this: requests go out as they are. An explicit `AppVerification` of a phone request is
+  always sent as it is (an Enterprise one gets the site key once the configuration is known).
+
+Tested with unit tests against a fake backend; not run against a real project. A real project needs reCAPTCHA
+Enterprise turned on for Identity Platform, and an Enterprise key whose allowed domains include the page that
+makes the tokens (`localhost` for the page of `RecaptchaFlow` on desktop).
+
 ## Documentation
 
 - **Guide**: [authentication and App Check](https://github.com/long1eu/firebase_dart_sdk/blob/main/docs/guides/authentication.md):
@@ -487,8 +536,8 @@ widget from a page of your app is a use of reCAPTCHA under Google's terms; check
 - Federated sign-in needs a provider token the app obtained itself, or, on desktop and command line, the browser
   sign-in of `signInWithOAuthLoopback` (Google and OpenID Connect; not Apple, which does not accept loopback
   redirects). There are no popup or redirect flows in a browser.
-  The reCAPTCHA Enterprise configuration of the project is not read (the table above lists the rest). A project
-  that enforces reCAPTCHA Enterprise for email and password refuses these sign-ins (`missing-recaptcha-token`).
+- reCAPTCHA Enterprise needs a token source (`recaptchaEnterprise`); without one, a project that enforces it
+  refuses the protected requests (`missing-recaptcha-token`). It was not run against a real project.
 - Phone sign-in and SMS second factors were run against a real project with a test phone number and no proof,
   not with a real SMS or against the emulator; Play Integrity and
   APNs app verification are not there.

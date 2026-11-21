@@ -524,7 +524,7 @@ packages:
     source: hosted
     version: "0.28.0"
   secure_flow:
-    dependency: "direct overridden"
+    dependency: "direct main"
     description:
       path: "../../secure_flow/secure_flow"
       relative: true

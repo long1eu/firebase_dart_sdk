@@ -1,3 +1,25 @@
+## Unreleased
+
+- `RecaptchaFlow.enterprise(siteKey:, action:)`: a reCAPTCHA Enterprise token for an action. Its loopback page
+  loads `enterprise.js?render=<site key>` and posts the token of `grecaptcha.enterprise.execute` as soon as it is
+  ready. The action is checked (letters, digits, `/` and `_`).
+- `RecaptchaFlow` takes the `size` (`RecaptchaSize`: normal, compact, invisible) and `theme` (`RecaptchaTheme`)
+  of the v2 widget; the loopback page starts an invisible widget at once. Its script keeps its names out of the
+  page's global scope.
+- `InPageRecaptchaPresenter` (web builds, `dart:js_interop` only): renders the v2 widget into an
+  element of the app's page (invisible without a container), or runs the Enterprise execute, and returns the
+  token without the loopback server; `render`, `clear`, and `onVerified`/`onExpired`/`onError` callbacks.
+  The Enterprise script loads once per site key (also next to App Check's), and again after a failed execute;
+  a script that fails or times out loses its tag; without a container the widget's element is removed after
+  each check; a newer check fails the waiting one (`superseded`); `scriptAddress` replaces Google's address.
+  `SecureEnvironment.current()` offers one on the web, and `RecaptchaFlow` ranks it first, so a reCAPTCHA runs in
+  the page there. Tested in Chrome against a fake `grecaptcha`.
+- New presenter kind `SecurePresenterKind.inPage` and interface `RecaptchaPresenter` (a presenter that returns a
+  reCAPTCHA token itself; `RecaptchaFlow` takes one of any kind it ranks). `CallbackPresenter` refuses the
+  `inPage` kind.
+- `RecaptchaFailure` (`scriptLoad`, `loadTimeout`, `widget`, `noToken`, `superseded`) for a presenter that could not make a
+  token; `RecaptchaFlow` throws it for an empty token of a `RecaptchaPresenter`.
+
 ## 0.1.0
 
 First release.

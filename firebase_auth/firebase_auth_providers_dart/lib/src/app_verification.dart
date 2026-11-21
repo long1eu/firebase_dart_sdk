@@ -10,10 +10,13 @@ import 'secure_flow_errors.dart';
 ///
 /// One of three shapes:
 ///
-/// * [RecaptchaV2Verification]: a reCAPTCHA v2 token, from the loopback page of
-///   `package:secure_flow` ([AppVerification.recaptchaV2Loopback], VM only) or from a source of
-///   yours ([AppVerification.recaptchaV2]: a WebView, a web build, a backend step).
-/// * [RecaptchaEnterpriseVerification]: a reCAPTCHA Enterprise token from a source of yours.
+/// * [RecaptchaV2Verification]: a reCAPTCHA v2 token, from a `RecaptchaFlow` of
+///   `package:secure_flow` ([AppVerification.recaptchaV2Loopback]: a page on localhost in a
+///   browser, or the widget in the app's own page on the web) or from a source of yours
+///   ([AppVerification.recaptchaV2]: a WebView, a backend step).
+/// * [RecaptchaEnterpriseVerification]: a reCAPTCHA Enterprise token from a source of yours. The
+///   same type is the Enterprise token source of a whole client (`FirebaseUserAuth`'s
+///   `recaptchaEnterprise`), used where the project's reCAPTCHA configuration asks for a token.
 /// * [NoAppVerification]: no proof, for the Auth emulator and the test phone numbers of a project.
 ///
 /// The token sources receive a request object ([RecaptchaV2Request], [RecaptchaEnterpriseRequest])
@@ -29,16 +32,19 @@ sealed class AppVerification {
 
   /// A reCAPTCHA v2 token from a [RecaptchaFlow] of `package:secure_flow`: a page with the
   /// reCAPTCHA v2 checkbox served on `http://localhost:<port>`, which [presenter] shows (when null,
-  /// the presenter of [environment] that the flow ranks best: a web view or in-app browser the app
-  /// registered, the system browser on a desktop, the URL on stderr in a terminal). The site key
-  /// and the language are those of the request.
+  /// the presenter of [environment] that the flow ranks best: on the web the widget in the app's
+  /// own page (`InPageRecaptchaPresenter`), else a web view or in-app browser the app registered,
+  /// the system browser on a desktop, the URL on stderr in a terminal). The site key and the
+  /// language are those of the request.
   ///
   /// The token source throws a [FirebaseAuthException]: `timeout` when no token came back within
   /// [timeout], `operation-not-supported-in-this-environment` when the environment offers no
   /// presenter ([SecureFlowNoPresenter]), `argument-error` when the flow refuses [presenter]
   /// ([SecureFlowRefused]), each with the original error as [FirebaseAuthException.cause]
-  /// (not for `timeout`). An error of the presenter itself is rethrown as it is. VM only; on the web the presenters throw an
-  /// [UnsupportedError].
+  /// (not for `timeout`). A `RecaptchaFailure` of the in-page widget becomes `internal-error`
+  /// (Google's script did not load), `network-request-failed` (it did not load in time, or the
+  /// widget reported an error) or `missing-app-credential` (no token). Another error of the
+  /// presenter is rethrown as it is.
   factory AppVerification.recaptchaV2Loopback({
     SecurePresenter? presenter,
     SecureEnvironment? environment,
@@ -91,9 +97,15 @@ final class RecaptchaV2Verification extends AppVerification {
 /// A reCAPTCHA Enterprise token, sent as `captchaResponse` with `clientType` and
 /// `recaptchaVersion: RECAPTCHA_ENTERPRISE`.
 ///
-/// [token] is called once for each request that needs a proof, with the action the token is for.
-/// The client does not read the project's Enterprise configuration (`v2/recaptchaConfig`) yet: it
-/// sends the Enterprise token as it is and does not fall back to v2.
+/// As the proof of a phone request, [token] is called once for each request that needs one, with
+/// the action the token is for and the Enterprise site key when the client has read the project's
+/// configuration (`FirebaseUserAuth.initializeRecaptchaConfig`); the token is sent as it is,
+/// without a fallback to v2.
+///
+/// As the `recaptchaEnterprise` of a `FirebaseUserAuth`, it is the token source of the requests
+/// that the project's reCAPTCHA configuration protects (password sign-in and sign-up, the emails
+/// of a password reset and of an email link sign-in, the SMS requests), called with the site key
+/// of that configuration.
 final class RecaptchaEnterpriseVerification extends AppVerification {
   /// A token from [token], made for [clientType] (`CLIENT_TYPE_WEB` by default: a token from a
   /// web page or a WebView).
@@ -147,7 +159,16 @@ enum RecaptchaAction {
   mfaSmsEnrollment('mfaSmsEnrollment'),
 
   /// `accounts/mfaSignIn:start` for an SMS second factor.
-  mfaSmsSignIn('mfaSmsSignIn');
+  mfaSmsSignIn('mfaSmsSignIn'),
+
+  /// `accounts:signInWithPassword` (sign-in and reauthentication with a password).
+  signInWithPassword('signInWithPassword'),
+
+  /// `accounts:signUp` with a password (a new account, or a password linked to the user).
+  signUpPassword('signUpPassword'),
+
+  /// `accounts:sendOobCode` for a password reset or an email link sign-in.
+  getOobCode('getOobCode');
 
   const RecaptchaAction(this.value);
 
@@ -180,11 +201,24 @@ final class RecaptchaV2Request {
 /// What a [RecaptchaEnterpriseTokenSource] is called with.
 final class RecaptchaEnterpriseRequest {
   /// Made by the client.
-  const RecaptchaEnterpriseRequest({required this.action});
+  const RecaptchaEnterpriseRequest({
+    required this.action,
+    this.siteKey,
+    this.languageCode,
+  });
 
   /// The request the token is for: pass [RecaptchaAction.value] as the `action` of
   /// `grecaptcha.enterprise.execute`.
   final RecaptchaAction action;
+
+  /// The reCAPTCHA Enterprise site key of the project or tenant (from `v2/recaptchaConfig`), or
+  /// null when the client has not read the configuration: only for an
+  /// [AppVerification.recaptchaEnterprise] proof passed to a phone request before
+  /// `initializeRecaptchaConfig`. The client's own `recaptchaEnterprise` source always gets one.
+  final String? siteKey;
+
+  /// The language of the client (`FirebaseUserAuth.languageCode`), for the widget's `hl`.
+  final String? languageCode;
 
   @override
   String toString() => 'RecaptchaEnterpriseRequest(action: ${action.value})';
@@ -201,12 +235,15 @@ final class RecaptchaEnterpriseRequest {
 ///   `{'recaptchaToken': <50 random alphanumeric characters>}` in that one case.
 ///
 /// Throws a [FirebaseAuthException] `missing-app-credential` when a source returns an empty token;
-/// errors of the sources and of [siteKey] are rethrown as they are. Not exported: the phone calls
-/// use it.
+/// the errors of `package:secure_flow` that a source throws become a [FirebaseAuthException]
+/// ([secureFlowErrorsToAuth]); other errors of the sources and of [siteKey] are rethrown as they
+/// are. [enterpriseSiteKey] is the Enterprise site key the client knows, or null. Not exported: the
+/// phone calls use it.
 Future<Map<String, Object?>> appVerificationFields(
   AppVerification verification, {
   required RecaptchaAction action,
   required Future<String> Function() siteKey,
+  String? enterpriseSiteKey,
   String? languageCode,
 }) async {
   switch (verification) {
@@ -217,14 +254,21 @@ Future<Map<String, Object?>> appVerificationFields(
         languageCode: languageCode,
       );
       return <String, Object?>{
-        'recaptchaToken': _checked(await token(request)),
+        'recaptchaToken': _checked(
+          await secureFlowErrorsToAuth(() async => token(request)),
+        ),
       };
     case RecaptchaEnterpriseVerification(
       :final RecaptchaEnterpriseTokenSource token,
       :final RecaptchaClientType clientType,
     ):
+      final RecaptchaEnterpriseRequest request = RecaptchaEnterpriseRequest(
+        action: action,
+        siteKey: enterpriseSiteKey,
+        languageCode: languageCode,
+      );
       final String response = _checked(
-        await token(RecaptchaEnterpriseRequest(action: action)),
+        await secureFlowErrorsToAuth(() async => token(request)),
       );
       return <String, Object?>{
         'captchaResponse': response,

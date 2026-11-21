@@ -25,6 +25,8 @@ import 'oauth_loopback/oauth_loopback_stub.dart'
     if (dart.library.io) 'oauth_loopback/oauth_loopback_io.dart';
 import 'user_record.dart';
 import 'password_policy.dart';
+import 'recaptcha_config.dart';
+import 'recaptcha_enterprise.dart';
 import 'environment_stub.dart'
     if (dart.library.io) 'environment_io.dart'
     if (dart.library.js_interop) 'environment_web.dart';
@@ -152,10 +154,14 @@ class FirebaseUserAuth implements AuthTokenProvider {
   ///   as `X-Firebase-AppCheck`, with every request, like the JS SDK does. [forApp] takes both from the app.
   /// * [httpClient] is used for all requests and is not closed by [dispose]; without it one is created and closed.
   /// * [requestTimeout] bounds every request: one that takes longer fails with `network-request-failed`.
+  /// * [recaptchaEnterprise] makes the reCAPTCHA Enterprise tokens of the requests that the
+  ///   project's reCAPTCHA configuration protects; see [initializeRecaptchaConfig]. Without it,
+  ///   requests go out without one and the backend decides.
   /// * [clock] and [createTimer] are for tests.
   FirebaseUserAuth({
     required this.apiKey,
     this.appId,
+    this.recaptchaEnterprise,
     AppCheckTokenProvider? appCheck,
     AuthStorage? storage,
     String? storageKey,
@@ -191,8 +197,8 @@ class FirebaseUserAuth implements AuthTokenProvider {
   /// it before the Firestore instance of the app is created, and after the App Check provider is set on the app.
   ///
   /// The session is stored in [storage] (default: in memory) under a key made of the API key and the name of the
-  /// app, so that two apps keep two sessions. [emulatorHost], [emulatorOptions] and [httpClient] are those of the
-  /// constructor.
+  /// app, so that two apps keep two sessions. [emulatorHost], [emulatorOptions], [httpClient] and
+  /// [recaptchaEnterprise] are those of the constructor.
   ///
   /// Throws an [ArgumentError] for an invalid [emulatorHost], and whatever the `read` of [storage] throws. In the
   /// second case the instance is the token provider of the app all the same, signed out, and the stored session is
@@ -211,10 +217,12 @@ class FirebaseUserAuth implements AuthTokenProvider {
     String? emulatorHost,
     AuthEmulatorOptions emulatorOptions = const AuthEmulatorOptions(),
     http.Client? httpClient,
+    RecaptchaEnterpriseVerification? recaptchaEnterprise,
   }) async {
     final FirebaseUserAuth auth = FirebaseUserAuth(
       apiKey: app.options.apiKey,
       appId: app.options.appId,
+      recaptchaEnterprise: recaptchaEnterprise,
       appCheck: app.appCheckProvider,
       storage: storage,
       storageKey:
@@ -296,6 +304,16 @@ class FirebaseUserAuth implements AuthTokenProvider {
 
   /// The id of the Firebase app, sent as `X-Firebase-gmpid`; null sends none.
   final String? appId;
+
+  /// The source of the reCAPTCHA Enterprise tokens of the requests that the project's reCAPTCHA
+  /// configuration protects, and the client type they are made for; null sends none. See
+  /// [initializeRecaptchaConfig].
+  final RecaptchaEnterpriseVerification? recaptchaEnterprise;
+
+  late final RecaptchaEnterprise _recaptcha = RecaptchaEnterprise(
+    source: recaptchaEnterprise,
+    fetch: _fetchRecaptchaConfig,
+  );
 
   /// The language of the emails and SMS messages the backend sends (password reset, email verification, email
   /// link sign-in), as a BCP 47 tag such as `fr` or `pt-BR`; null lets the project's default apply. Sent as
@@ -756,7 +774,7 @@ class FirebaseUserAuth implements AuthTokenProvider {
       'email': email,
       'password': password,
       'returnSecureToken': true,
-    }),
+    }, recaptcha: RecaptchaAction.signInWithPassword),
   );
 
   /// Creates an account with an email address and a password and signs it in
@@ -773,7 +791,7 @@ class FirebaseUserAuth implements AuthTokenProvider {
       'email': email,
       'password': password,
       'returnSecureToken': true,
-    }),
+    }, recaptcha: RecaptchaAction.signUpPassword),
   );
 
   /// Signs in with a custom token minted by a server (for example with `createCustomToken` of the Admin SDK),
@@ -892,6 +910,7 @@ class FirebaseUserAuth implements AuthTokenProvider {
         ...?actionCodeSettings?.toRequest(),
       },
       tenant: true,
+      recaptcha: RecaptchaAction.getOobCode,
     );
   }
 
@@ -1175,6 +1194,60 @@ class FirebaseUserAuth implements AuthTokenProvider {
     return siteKey;
   }
 
+  /// Reads the reCAPTCHA Enterprise configuration of the project, or of [tenantId] when it is set
+  /// (`v2/recaptchaConfig` with the client type of [recaptchaEnterprise], web without one, and
+  /// `version=RECAPTCHA_ENTERPRISE`; `initializeRecaptchaConfig` of the JS SDK), keeps it for the
+  /// later requests and returns it.
+  ///
+  /// With the configuration known, the requests the JS SDK protects carry a token of
+  /// [recaptchaEnterprise] when it protects their provider (ENFORCE or AUDIT):
+  ///
+  /// * email and password: [signInWithEmailAndPassword], [createUserWithEmailAndPassword], a
+  ///   password credential in [signInWithCredential], [linkWithCredential] and
+  ///   [reauthenticateWithCredential], [sendPasswordResetEmail] and [sendSignInLinkToEmail].
+  ///   Without the configuration they go out without a token, and once more with one when the
+  ///   backend answers `missing-recaptcha-token`, as in the JS SDK; so calling this first saves a
+  ///   round trip, nothing more.
+  /// * SMS ([verifyPhoneNumber], [startPhoneEnrollment], the SMS factor of a
+  ///   `MultiFactorResolver`) with a reCAPTCHA v2 proof: the configuration is read before the first
+  ///   one. Protected, the Enterprise token replaces the v2 token; under AUDIT, an answer
+  ///   `missing-recaptcha-token` or `invalid-app-credential` sends the request again with the v2
+  ///   token. Not protected, the v2 token goes with `captchaResponse: NO_RECAPTCHA`, as the JS SDK
+  ///   sends it.
+  ///
+  /// None of this happens without [recaptchaEnterprise]: requests go out as they are, and an
+  /// explicit [AppVerification] proof of a phone request is always sent as it is.
+  ///
+  /// Unlike the JS SDK, it does not ask the token source for a first token to load Google's
+  /// script: a source may show something to the person, so it is only called for a request. The
+  /// request goes to the Auth emulator when one is set.
+  ///
+  /// Throws a [FirebaseAuthException] when the request fails (`network-request-failed`, ...).
+  Future<RecaptchaConfig> initializeRecaptchaConfig() {
+    _checkNotDisposed();
+    return _recaptcha.initialize(tenantId);
+  }
+
+  /// The reCAPTCHA Enterprise configuration read for the current [tenantId] (or the project), or
+  /// null when it has not been read (`_getRecaptchaConfig` of the JS SDK).
+  RecaptchaConfig? get recaptchaConfig => _recaptcha.configOf(tenantId);
+
+  Future<Map<String, Object?>> _fetchRecaptchaConfig(
+    String? tenantId,
+    RecaptchaClientType clientType,
+  ) => _send(
+    _identityToolkit(
+      'recaptchaConfig',
+      version: 'v2',
+      query: <String, String>{
+        'clientType': clientType.value,
+        'version': 'RECAPTCHA_ENTERPRISE',
+        'tenantId': ?tenantId,
+      },
+    ),
+    get: true,
+  );
+
   /// Like `recachePasswordPolicy` of the JS SDK: when [operation] fails with `password-does-not-meet-requirements`
   /// and a policy was fetched before, it is fetched again in the background.
   Future<T> _recachePasswordPolicyOnFailure<T>(
@@ -1235,6 +1308,7 @@ class FirebaseUserAuth implements AuthTokenProvider {
         ...actionCodeSettings.toRequest(),
       },
       tenant: true,
+      recaptcha: RecaptchaAction.getOobCode,
     );
   }
 
@@ -1308,7 +1382,7 @@ class FirebaseUserAuth implements AuthTokenProvider {
     final _CredentialRequest request = _requestFor(credential);
     return _withoutSecretsOf(
       credential,
-      () => _signIn(request.method, request.body),
+      () => _signIn(request.method, request.body, recaptcha: request.recaptcha),
     );
   }
 
@@ -1437,6 +1511,7 @@ class FirebaseUserAuth implements AuthTokenProvider {
       _identityToolkit(request.method),
       json: request.body,
       tenant: request.tenant,
+      recaptcha: request.recaptcha,
     );
     _throwIfPhoneNumberInUse(response);
     _throwIfSecondFactorRequired(response);
@@ -1478,6 +1553,7 @@ class FirebaseUserAuth implements AuthTokenProvider {
         _identityToolkit(request.method),
         json: request.body,
         tenant: request.tenant,
+        recaptcha: request.recaptcha,
       );
     } on FirebaseAuthException catch (e) {
       // VERIFY_PHONE_NUMBER_FOR_EXISTING_ERROR_MAP_ of the JS SDK: for a phone credential the
@@ -1618,21 +1694,25 @@ class FirebaseUserAuth implements AuthTokenProvider {
     _checkNotDisposed();
     _requirePhoneNumber(phoneNumber);
     final List<String?> secrets = <String?>[phoneNumber];
-    return _withoutPhoneSecrets(secrets, () async {
-      final Map<String, Object?> proof = await _proofOf(
+    return _withoutPhoneSecrets(
+      secrets,
+      () => _withProof(
         appVerification,
         RecaptchaAction.sendVerificationCode,
         secrets,
-      );
-      final Map<String, Object?> response = await _send(
-        _identityToolkit('accounts:sendVerificationCode'),
-        json: <String, Object?>{'phoneNumber': phoneNumber, ...proof},
-        tenant: true,
-      );
-      final String verificationId = _sessionInfoOf(response['sessionInfo']);
-      secrets.add(verificationId);
-      return verificationId;
-    });
+        tenantId,
+        (Map<String, Object?> proof) async {
+          final Map<String, Object?> response = await _send(
+            _identityToolkit('accounts:sendVerificationCode'),
+            json: <String, Object?>{'phoneNumber': phoneNumber, ...proof},
+            tenant: true,
+          );
+          final String verificationId = _sessionInfoOf(response['sessionInfo']);
+          secrets.add(verificationId);
+          return verificationId;
+        },
+      ),
+    );
   }
 
   /// Sends the SMS code and asks for it, for programs without a code field of their own (command
@@ -1728,16 +1808,43 @@ class FirebaseUserAuth implements AuthTokenProvider {
     }
   }
 
+  /// Runs [send] with the proof of an SMS request of [action] for [tenant]: the fields of
+  /// [verification] ([_proofOf]), or, for a reCAPTCHA v2 proof when the client has a
+  /// [recaptchaEnterprise] source, what the project's reCAPTCHA configuration asks for
+  /// ([initializeRecaptchaConfig]). Every token goes into [secrets].
+  Future<T> _withProof<T>(
+    AppVerification verification,
+    RecaptchaAction action,
+    List<String?> secrets,
+    String? tenant,
+    Future<T> Function(Map<String, Object?> proof) send,
+  ) async {
+    if (verification is RecaptchaV2Verification &&
+        recaptchaEnterprise != null) {
+      return _recaptcha.sendPhone(
+        tenantId: tenant,
+        action: action,
+        v2Fields: () => _proofOf(verification, action, secrets, tenant),
+        send: send,
+        secrets: secrets,
+        languageCode: languageCode,
+      );
+    }
+    return send(await _proofOf(verification, action, secrets, tenant));
+  }
+
   /// The fields of [verification] for a request of [action]; the token goes into [secrets].
   Future<Map<String, Object?>> _proofOf(
     AppVerification verification,
     RecaptchaAction action,
     List<String?> secrets,
+    String? tenant,
   ) async {
     final Map<String, Object?> fields = await appVerificationFields(
       verification,
       action: action,
       siteKey: getRecaptchaSiteKey,
+      enterpriseSiteKey: _recaptcha.configOf(tenant)?.siteKey,
       languageCode: languageCode,
     );
     secrets
@@ -1915,27 +2022,30 @@ class FirebaseUserAuth implements AuthTokenProvider {
     final List<String?> secrets = <String?>[phoneNumber];
     // The proof is asked for once, before _forUser, which runs its operation again after a
     // rejected ID token: a second run must not show the reCAPTCHA again.
-    return _withoutPhoneSecrets(secrets, () async {
-      final Map<String, Object?> proof = await _proofOf(
+    return _withoutPhoneSecrets(
+      secrets,
+      () => _withProof(
         appVerification,
         RecaptchaAction.mfaSmsEnrollment,
         secrets,
-      );
-      return _forUser((String idToken, int generation) async {
-        final Map<String, Object?> response = await _multiFactor
-            .startPhoneEnrollment(
-              idToken: idToken,
-              phoneNumber: phoneNumber,
-              appVerification: proof,
-              tenantId: tenantId,
-            );
-        final String verificationId = _sessionInfoOf(
-          _fieldOf(response['phoneSessionInfo'], 'sessionInfo'),
-        );
-        secrets.add(verificationId);
-        return verificationId;
-      });
-    });
+        tenantId,
+        (Map<String, Object?> proof) =>
+            _forUser((String idToken, int generation) async {
+              final Map<String, Object?> response = await _multiFactor
+                  .startPhoneEnrollment(
+                    idToken: idToken,
+                    phoneNumber: phoneNumber,
+                    appVerification: proof,
+                    tenantId: tenantId,
+                  );
+              final String verificationId = _sessionInfoOf(
+                _fieldOf(response['phoneSessionInfo'], 'sessionInfo'),
+              );
+              secrets.add(verificationId);
+              return verificationId;
+            }),
+      ),
+    );
   }
 
   /// Finishes the SMS enrolment that [startPhoneEnrollment] started, with [credential]: its
@@ -2007,12 +2117,17 @@ class FirebaseUserAuth implements AuthTokenProvider {
       ):
         if (userIdToken != null) {
           // linkEmailPassword: accounts:signUp with the ID token, without the tenant.
-          return _CredentialRequest('accounts:signUp', <String, Object?>{
-            'idToken': userIdToken,
-            'email': email,
-            'password': password,
-            'returnSecureToken': true,
-          }, tenant: false);
+          return _CredentialRequest(
+            'accounts:signUp',
+            <String, Object?>{
+              'idToken': userIdToken,
+              'email': email,
+              'password': password,
+              'returnSecureToken': true,
+            },
+            tenant: false,
+            recaptcha: RecaptchaAction.signUpPassword,
+          );
         }
         return _CredentialRequest(
           'accounts:signInWithPassword',
@@ -2021,6 +2136,7 @@ class FirebaseUserAuth implements AuthTokenProvider {
             'password': password,
             'returnSecureToken': true,
           },
+          recaptcha: RecaptchaAction.signInWithPassword,
         );
       case EmailAuthCredential(
         signInMethod: EmailAuthProvider.EMAIL_LINK_SIGN_IN_METHOD,
@@ -2535,14 +2651,27 @@ class FirebaseUserAuth implements AuthTokenProvider {
   ///
   /// With [tenant], the [tenantId] goes into the [json] body unless it names one (`_addTidIfNecessary` of the JS
   /// SDK). The [languageCode] goes into `X-Firebase-Locale` of every JSON request (the JS SDK sends it from
-  /// `_performApiRequest`, which the token refresh does not use).
+  /// `_performApiRequest`, which the token refresh does not use). With [recaptcha], the request is
+  /// one that reCAPTCHA Enterprise may protect for the email and password provider
+  /// ([initializeRecaptchaConfig]).
   Future<Map<String, Object?>> _send(
     Uri url, {
     Map<String, Object?>? json,
     Map<String, String>? form,
     bool tenant = false,
     bool get = false,
+    RecaptchaAction? recaptcha,
   }) async {
+    if (recaptcha != null && json != null) {
+      return _recaptcha.sendEmailPassword(
+        tenantId: this.tenantId,
+        action: recaptcha,
+        body: json,
+        languageCode: languageCode,
+        send: (Map<String, Object?> body) =>
+            _send(url, json: body, tenant: tenant),
+      );
+    }
     final String? tenantId = this.tenantId;
     if (tenant &&
         json != null &&
@@ -2624,14 +2753,16 @@ class FirebaseUserAuth implements AuthTokenProvider {
 
   Future<UserCredential> _signIn(
     String method,
-    Map<String, Object?> request,
-  ) async {
+    Map<String, Object?> request, {
+    RecaptchaAction? recaptcha,
+  }) async {
     _checkNotDisposed();
     final int attempt = ++_signInAttempt;
     final Map<String, Object?> response = await _send(
       _identityToolkit(method),
       json: request,
       tenant: true,
+      recaptcha: recaptcha,
     );
     return _completeSignIn(response, attempt);
   }
@@ -2825,24 +2956,29 @@ class FirebaseUserAuth implements AuthTokenProvider {
   ) async {
     _checkNotDisposed();
     final List<String?> secrets = <String?>[];
-    return _withoutPhoneSecrets(secrets, () async {
-      final Map<String, Object?> proof = await _proofOf(
+    return _withoutPhoneSecrets(
+      secrets,
+      () => _withProof(
         appVerification,
         RecaptchaAction.mfaSmsSignIn,
         secrets,
-      );
-      final Map<String, Object?> response = await _multiFactor.startPhoneSignIn(
-        pendingCredential: pending,
-        enrollmentId: enrollmentId,
-        appVerification: proof,
-        tenantId: tenant,
-      );
-      final String verificationId = _sessionInfoOf(
-        _fieldOf(response['phoneResponseInfo'], 'sessionInfo'),
-      );
-      secrets.add(verificationId);
-      return verificationId;
-    });
+        tenant,
+        (Map<String, Object?> proof) async {
+          final Map<String, Object?> response = await _multiFactor
+              .startPhoneSignIn(
+                pendingCredential: pending,
+                enrollmentId: enrollmentId,
+                appVerification: proof,
+                tenantId: tenant,
+              );
+          final String verificationId = _sessionInfoOf(
+            _fieldOf(response['phoneResponseInfo'], 'sessionInfo'),
+          );
+          secrets.add(verificationId);
+          return verificationId;
+        },
+      ),
+    );
   }
 
   /// The value of [key] in [object] when it is a JSON object, else null.
@@ -3337,11 +3473,19 @@ class FirebaseUserAuth implements AuthTokenProvider {
 
 /// The request of a credential: the Identity Toolkit method, the body, and whether the tenant goes in it.
 class _CredentialRequest {
-  _CredentialRequest(this.method, this.body, {this.tenant = true});
+  _CredentialRequest(
+    this.method,
+    this.body, {
+    this.tenant = true,
+    this.recaptcha,
+  });
 
   final String method;
   final Map<String, Object?> body;
   final bool tenant;
+
+  /// The reCAPTCHA Enterprise action of a password request, else null.
+  final RecaptchaAction? recaptcha;
 }
 
 class _BeforeStateCallback {

@@ -34,11 +34,13 @@
 library;
 
 // The presenters of the browser flows and their errors, so that one import is enough for
-// `signInWithOAuthLoopback` and `AppVerification.recaptchaV2Loopback`.
+// `signInWithOAuthLoopback`, `AppVerification.recaptchaV2Loopback` and a reCAPTCHA Enterprise token
+// source (`RecaptchaFlow.enterprise`).
 export 'package:secure_flow/secure_flow.dart'
     show
         CallbackPresenter,
         ConsolePresenter,
+        InPageRecaptchaPresenter,
         LoopbackPresenter,
         OAuthAppRequest,
         OAuthRedirect,
@@ -46,6 +48,9 @@ export 'package:secure_flow/secure_flow.dart'
         OAuthTokens,
         PromptPresenter,
         ProviderAppPresenter,
+        RecaptchaFailure,
+        RecaptchaFailureReason,
+        RecaptchaFlow,
         SecureEnvironment,
         SecureFlowCancelled,
         SecureFlowException,
@@ -78,6 +83,7 @@ export 'src/oauth_loopback/oauth_loopback.dart';
 export 'src/oauth_loopback/oauth_loopback_stub.dart'
     if (dart.library.io) 'src/oauth_loopback/oauth_loopback_io.dart';
 export 'src/oauth_token_provider.dart';
+export 'src/recaptcha_config.dart';
 export 'src/password_policy.dart';
 export 'src/phone_auth.dart' hide phoneCredentialFromProof, redactPhoneSecrets;
 export 'src/service_account_key.dart';

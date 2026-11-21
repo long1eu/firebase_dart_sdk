@@ -113,28 +113,41 @@ void main() {
       }
     });
 
-    test(
-      'mobile, the web and unknown systems offer only what the app registers',
-      () {
-        final _FakeProviderApp app = _FakeProviderApp(
-          <String>{},
-          (_) => throw StateError('x'),
+    test('the web offers an in-page reCAPTCHA after what the app registers', () {
+      final _FakeProviderApp app = _FakeProviderApp(
+        <String>{},
+        (_) => throw StateError('x'),
+      );
+      final List<SecurePresenter> offered = _env(
+        'web',
+        registered: <SecurePresenter>[app],
+      ).presenters;
+      expect(offered, hasLength(2));
+      expect(offered.first, same(app));
+      expect(offered.last, isA<InPageRecaptchaPresenter>());
+      expect(offered.last.kind, SecurePresenterKind.inPage);
+      // Only a reCAPTCHA takes it: OAuth and code entry find nothing on the web.
+      expect(
+        _recaptcha.choosePresenter(_env('web')),
+        isA<InPageRecaptchaPresenter>(),
+      );
+      expect(() => _oauth().choosePresenter(_env('web')), _noPresenter);
+      expect(() => _code.choosePresenter(_env('web')), _noPresenter);
+    });
+
+    test('mobile and unknown systems offer only what the app registers', () {
+      final _FakeProviderApp app = _FakeProviderApp(
+        <String>{},
+        (_) => throw StateError('x'),
+      );
+      for (final String os in <String>['android', 'ios', 'fuchsia', 'plan9']) {
+        expect(_env(os).presenters, isEmpty, reason: os);
+        expect(
+          _env(os, registered: <SecurePresenter>[app]).presenters,
+          <SecurePresenter>[app],
         );
-        for (final String os in <String>[
-          'android',
-          'ios',
-          'fuchsia',
-          'web',
-          'plan9',
-        ]) {
-          expect(_env(os).presenters, isEmpty, reason: os);
-          expect(
-            _env(os, registered: <SecurePresenter>[app]).presenters,
-            <SecurePresenter>[app],
-          );
-        }
-      },
-    );
+      }
+    });
 
     test('registered presenters come first; toString hides the variables', () {
       final CallbackPresenter mine = CallbackPresenter((_) {});
@@ -218,7 +231,7 @@ void main() {
   );
 
   group(
-    'RecaptchaFlow ranking: embedded web view, system browser, console',
+    'RecaptchaFlow ranking: in page, embedded web view, system browser, console',
     () {
       test('each in turn; an in-app browser or another kind is not taken', () {
         final CallbackPresenter webView = CallbackPresenter(
@@ -499,9 +512,13 @@ void main() {
     });
   });
 
-  test('a CallbackPresenter cannot claim to be a provider app', () {
+  test('a CallbackPresenter cannot claim to be a provider app or in-page', () {
     expect(
       () => CallbackPresenter((_) {}, kind: SecurePresenterKind.providerApp),
+      throwsArgumentError,
+    );
+    expect(
+      () => CallbackPresenter((_) {}, kind: SecurePresenterKind.inPage),
       throwsArgumentError,
     );
   });

@@ -3,6 +3,16 @@
 - The id of a `MultiFactorResolver.session` is opaque (`sign-in-<n>`) instead of the backend's pending credential,
   so printing or logging the session shows no secret. `verifyPhoneNumber(multiFactorSession:)` with it still sends
   the SMS of the sign-in through the client's resolver, whose new `session` carries the credential.
+- `initializeRecaptchaConfig` reads the project's reCAPTCHA Enterprise configuration through the client
+  (it threw `unimplemented`); the requests the project protects then carry a token of the new
+  `recaptchaEnterprise` source of `FirebaseAuthDart.use`, by default reCAPTCHA Enterprise in the app's page on
+  the web and none elsewhere.
+- On the web the `RecaptchaVerifier` renders the reCAPTCHA v2 widget in the page (`InPageRecaptchaPresenter` of
+  `secure_flow`): `container`, `size`, `theme`, `onSuccess`, `onError` and `onExpired` map onto it, `render`,
+  `verify` and `clear` work, and `signInWithPhoneNumber` and `User.linkWithPhoneNumber` take its token unless
+  `use` got an `appVerification`. Elsewhere it still renders nothing.
+- Exports `RecaptchaEnterpriseVerification`, `RecaptchaEnterpriseRequest`, `RecaptchaClientType`, `RecaptchaFlow`
+  and `InPageRecaptchaPresenter`; depends on `secure_flow` directly.
 - On the web the tabs follow each other's sign-outs and sign-ins: the storage wrapper passes on the changes of a
   storage that reports them (`ObservableAuthStorage` of `firebase_auth_providers_dart`, which the default
   IndexedDB/`localStorage` storage and `sessionStorage` are) to the client, and ignores them once a failed write

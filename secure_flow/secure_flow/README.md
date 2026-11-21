@@ -13,9 +13,9 @@ Future<void> main() async {
 }
 ```
 
-Pure Dart, no dependencies. The library compiles on the web, where the presenters and the loopback
-server throw an `UnsupportedError`. It is used by `firebase_auth_providers_dart` for its OAuth
-sign-in and its reCAPTCHA page.
+Pure Dart, no dependencies. The library compiles on the web: there the loopback server and its
+presenters throw an `UnsupportedError`, and a `RecaptchaFlow` runs in the app's own page
+(`InPageRecaptchaPresenter`). It is used by `firebase_auth_providers_dart` for its OAuth sign-in and its reCAPTCHA checks.
 
 ## Flows choose their presenters
 
@@ -33,20 +33,22 @@ to drive each kind: a browser over the loopback server, a terminal prompt, or a 
 | Flow | Result | Presenter kinds, best first | Loopback host and answer |
 | --- | --- | --- | --- |
 | `OAuthFlow` | `OAuthResult`: `OAuthRedirect` (code or error, and the redirect URI) or `OAuthTokens` (from a provider app) | providerApp (if it can sign in to this provider), systemBrowser, inAppBrowser, console; never embeddedWebView or other | exactly `127.0.0.1`; GET on the redirect path, query |
-| `RecaptchaFlow` | the reCAPTCHA v2 token | embeddedWebView, systemBrowser, console | `localhost` (127.0.0.1 and ::1 bound); POST of the page's form, random path |
+| `RecaptchaFlow` (v2 widget) and `RecaptchaFlow.enterprise` (an Enterprise token for an action) | the token | inPage (a `RecaptchaPresenter`: no server), embeddedWebView, systemBrowser, console | `localhost` (127.0.0.1 and ::1 bound); POST of the page's form, random path |
 | `CodeEntryFlow` | the code, trimmed | console (a prompt from the injected input: no browser, no server), systemBrowser | exactly `127.0.0.1`; POST of the page's form, random path |
 
 A **presenter** is a way to show a flow and collect its answer. It has a `SecurePresenterKind`
-(`providerApp`, `systemBrowser`, `inAppBrowser`, `embeddedWebView`, `console`, `other`), and what it can do
-is told by the interfaces it implements: `LoopbackPresenter` (shows a URL), `PromptPresenter` (reads a
-line), `ProviderAppPresenter` (returns OAuth results itself). Flows rank kinds and check interfaces;
+(`providerApp`, `systemBrowser`, `inAppBrowser`, `embeddedWebView`, `console`, `inPage`, `other`), and what
+it can do is told by the interfaces it implements: `LoopbackPresenter` (shows a URL), `PromptPresenter` (reads a
+line), `ProviderAppPresenter` (returns OAuth results itself), `RecaptchaPresenter` (returns a reCAPTCHA token
+itself). Flows rank kinds and check interfaces;
 they never look at a presenter's class, and presenters never look at a flow's.
 
 | Presenter | Kind | In the environment when |
 | --- | --- | --- |
 | `SystemBrowserPresenter()` | systemBrowser: `open`, `xdg-open` or `rundll32` (`openInSystemBrowser`) | macOS or Windows, or Linux with `DISPLAY` or `WAYLAND_DISPLAY`, not over SSH |
 | `ConsolePresenter(sink:, input:)` | console: writes only the URL to `sink` (stderr), which carries the state and the PKCE challenge (see [What it does not protect against](#what-it-does-not-protect-against)); prompts read a line from `input` (stdin) | stdin and stderr are terminals |
-| `CallbackPresenter(show, kind:)` | the kind you declare (systemBrowser by default) | you register it |
+| `CallbackPresenter(show, kind:)` | the kind you declare (systemBrowser by default; not providerApp or inPage) | you register it |
+| `InPageRecaptchaPresenter(containerId:, onVerified:, onExpired:, onError:)` | inPage: the reCAPTCHA in the page of a web app | on the web (`SecureEnvironment.current()`) |
 | a `ProviderAppPresenter` of yours | providerApp | you register it |
 
 ```dart
@@ -79,8 +81,40 @@ that the page it gets says whether the sign-in worked.
 
 `run(presenter:, environment:, timeout:, cancel:)` throws `SecureFlowTimeout` (five minutes by
 default; a console presenter adds an `ssh -L` hint), `SecureFlowCancelled`, `SecureFlowRefused` or
-`SecureFlowNoPresenter` (nothing in the environment fits: on Android, iOS and the web register or
-pass one). Errors of the parser and of the presenter are rethrown as they are.
+`SecureFlowNoPresenter` (nothing in the environment fits: on Android, iOS and, except for reCAPTCHA,
+the web, register or pass one). Errors of the parser and of the presenter are rethrown as they are.
+
+## reCAPTCHA in the page of a web app
+
+On the web, `RecaptchaFlow(...).run()` takes the `InPageRecaptchaPresenter` of the environment:
+
+- **v2**: the widget goes into a new element inside the element `containerId`, in the flow's `size`
+  (`normal`, `compact`, `invisible`) and `theme` (the system's light or dark setting without one).
+  Without a `containerId` it is invisible, in a new element at the end of the document. A visible
+  widget waits for the check; an invisible one starts at once. The widget is reset after each token
+  (the element the presenter made without a `containerId` is removed, so repeated checks leave
+  nothing); `render` renders it ahead of time and `clear` removes it. One check runs at a time: a
+  newer one fails the one still waiting with `superseded`.
+- **Enterprise** (`RecaptchaFlow.enterprise(siteKey:, action:)`):
+  `grecaptcha.enterprise.execute(siteKey, {action})`, with Google's badge and no widget.
+- Google's script is loaded once per page (`api.js`, unless the page has `grecaptcha.render`) or once
+  per site key (`enterprise.js?render=<site key>`, also when another key's script is there, and again
+  after a failed execute). `scriptAddress` maps Google's address to another one (a mirror, tests).
+  A script that fails or times out has its tag removed, so a retry loads it again. Its failures are a `RecaptchaFailure`: `scriptLoad` (blocked, offline,
+  or refused by the page's content security policy, which must allow `https://www.google.com/recaptcha/`
+  and `https://www.gstatic.com/recaptcha/`), `loadTimeout` (30 seconds by default), `widget` (the
+  widget's error callback, or Enterprise refusing to make a token), `noToken` and `superseded`.
+
+```dart
+final String token = await RecaptchaFlow(
+  siteKey: siteKey,
+  size: RecaptchaSize.compact,
+).run(presenter: InPageRecaptchaPresenter(containerId: 'recaptcha'));
+```
+
+Tested in Chrome (dart2js and dart2wasm) against a fake `grecaptcha`; Google's scripts were not loaded.
+On desktop and command line, `RecaptchaFlow.enterprise` serves a page on `localhost` that asks for the
+token as soon as `enterprise.js` is ready; the Enterprise key must allow `localhost`.
 
 ## What the loopback server checks
 

@@ -30,6 +30,7 @@ import 'package:firebase_auth_providers_dart/firebase_auth_providers_dart.dart'
         FirebaseUserAuth,
         InMemoryAuthStorage,
         OAuthLoopbackProvider,
+        RecaptchaEnterpriseVerification,
         SecurePresenter;
 import 'package:firebase_core/firebase_core.dart';
 import 'package:http/http.dart' as http;
@@ -50,8 +51,13 @@ export 'package:firebase_auth_providers_dart/firebase_auth_providers_dart.dart'
         OAuthAuthorizationCode,
         OAuthCodeExchange,
         OAuthLoopbackProvider,
+        RecaptchaClientType,
+        RecaptchaEnterpriseRequest,
+        RecaptchaEnterpriseVerification,
         SecurePresenter,
         SystemBrowserPresenter;
+export 'package:secure_flow/secure_flow.dart'
+    show InPageRecaptchaPresenter, RecaptchaFlow;
 
 export 'src/convert.dart' show DartFirebaseAuthException;
 export 'src/firebase_auth.dart'
@@ -142,11 +148,24 @@ abstract final class FirebaseAuthDart {
   ///   page on 127.0.0.1 in the system browser, once per request. With the
   ///   Auth emulator, or after
   ///   `setSettings(appVerificationDisabledForTesting: true)`, no proof is
-  ///   sent unless one is passed here.
+  ///   sent unless one is passed here. On the web, without one, the
+  ///   `RecaptchaVerifier` the app passes to `signInWithPhoneNumber` (or the
+  ///   invisible one `firebase_auth` makes) renders the reCAPTCHA v2 widget in
+  ///   the page and gives the token.
+  /// * [recaptchaEnterprise] makes the reCAPTCHA Enterprise tokens of the
+  ///   requests the project protects with reCAPTCHA Enterprise (password
+  ///   sign-in and sign-up, password reset and email link emails, SMS), as
+  ///   `FirebaseUserAuth.recaptchaEnterprise` describes. On the web it is
+  ///   reCAPTCHA Enterprise in the app's page by default; elsewhere there is
+  ///   none unless one is passed here (for example
+  ///   `RecaptchaEnterpriseVerification((r) => RecaptchaFlow.enterprise(siteKey:
+  ///   r.siteKey!, action: r.action.value).run())`, a page on localhost in the
+  ///   system browser, whose key must allow `localhost`).
   ///
   /// It also replaces the multi-factor generators of `firebase_auth` (TOTP and
-  /// SMS) and the `RecaptchaVerifier` factory (which renders nothing: the
-  /// proof is [appVerification]) with those of this package.
+  /// SMS) and the `RecaptchaVerifier` factory (on the web the reCAPTCHA v2
+  /// widget in the page; elsewhere it renders nothing and the proof is
+  /// [appVerification]) with those of this package.
   ///
   /// Throws a [StateError] when the instance of an app has already been
   /// created: the configuration is read then.
@@ -159,6 +178,7 @@ abstract final class FirebaseAuthDart {
     OAuthProvidersFactory? oauthProvidersFor,
     SecurePresenter? presenter,
     AppVerification? appVerification,
+    RecaptchaEnterpriseVerification? recaptchaEnterprise,
   }) {
     final Map<String, OAuthLoopbackProvider> byId = providersById(
       oauthProviders,
@@ -177,6 +197,7 @@ abstract final class FirebaseAuthDart {
       oauthProvidersFor: oauthProvidersFor,
       presenter: presenter,
       appVerification: appVerification,
+      recaptchaEnterprise: recaptchaEnterprise,
     );
     installCoreIfNeeded(force: useDartCore);
     if (!isRegistered) {

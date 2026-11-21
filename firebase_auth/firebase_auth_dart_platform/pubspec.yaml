@@ -44,6 +44,11 @@ dependencies:
   flutter:
     sdk: flutter
   http: ^1.2.0
+  # The reCAPTCHA of the web (the in-page presenter behind RecaptchaVerifier and
+  # the default reCAPTCHA Enterprise source). Already in the dependency graph
+  # through firebase_auth_providers_dart; resolved from the sibling directory
+  # through pubspec_overrides.yaml.
+  secure_flow: ^0.1.0
 
 dev_dependencies:
   # Its FlutterFireAuthTokenProvider is the documented way to give Firestore the

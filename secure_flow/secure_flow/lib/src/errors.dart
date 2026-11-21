@@ -44,3 +44,42 @@ final class SecureFlowNoPresenter extends SecureFlowException {
   /// No default presenter.
   const SecureFlowNoPresenter(super.message);
 }
+
+/// Why a [RecaptchaFailure] happened.
+enum RecaptchaFailureReason {
+  /// Google's script did not load (blocked, offline, refused by the page's content security
+  /// policy).
+  scriptLoad,
+
+  /// Google's script did not call back within the presenter's load timeout.
+  loadTimeout,
+
+  /// The widget reported an error (its `error-callback`; usually the network), or reCAPTCHA
+  /// Enterprise refused to make a token.
+  widget,
+
+  /// The presenter returned an empty token.
+  noToken,
+
+  /// A newer check of the same presenter replaced this one while it waited.
+  superseded,
+}
+
+/// A reCAPTCHA presenter could not produce a token. Not a [SecureFlowException]: it comes from the
+/// presenter (a widget in the app's page), not from the run of the flow, and `SecureFlow.run`
+/// rethrows it as it is.
+///
+/// The message never contains a site key or a token.
+final class RecaptchaFailure implements Exception {
+  /// A failure for [reason], described by [message].
+  const RecaptchaFailure(this.reason, this.message);
+
+  /// What went wrong.
+  final RecaptchaFailureReason reason;
+
+  /// What happened, for a person.
+  final String message;
+
+  @override
+  String toString() => 'RecaptchaFailure(${reason.name}): $message';
+}
