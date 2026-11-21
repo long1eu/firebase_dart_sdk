@@ -18,7 +18,7 @@ Maintained, tested and published (`cloud_firestore_dart` 0.3.2, Dart `^3.8.0`):
 | `firebase_auth_dart_platform` (0.1.0, Flutter, unreleased) | `firebase_auth/firebase_auth_dart_platform` |
 | `firebase_admin_dart` (0.1.0; trusted code only, never ship a service account key) | `firebase_admin/firebase_admin_dart` |
 
-- `examples/`: complete example packages (`server_shelf`, `cli`, `cloud_run_job`).
+- `examples/`: complete example packages (`server_shelf`, `cli`, `storage_cli`, `cloud_run_job`).
 - `docs/`: guides (`docs/guides/`), parity, support policy, how we test, upstream sync records.
   The SVG figures in `docs/images/` follow the palette and light/dark rules of
   `docs/images/README.md`; check them with `dart tool/check_figures.dart`.
