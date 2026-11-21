@@ -1,5 +1,7 @@
-// Threat model: storage_threat_model.md, "Hosts, schemes and redirects" (T3, T4, T5, T6).
+// Threat model: storage_threat_model.md, "Hosts, schemes and redirects" (T3, T4, T5, T6, T7).
 import 'package:firebase_storage_dart/firebase_storage_dart.dart';
+// ignore: implementation_imports, the token-scope tests drive the internal request layer.
+import 'package:firebase_storage_dart/src/request/requester.dart';
 import 'package:test/test.dart';
 
 import 'security_support.dart';
@@ -168,22 +170,98 @@ void main() {
     });
 
     test(
-      'the App Check token is not sent over plain http to the emulator',
+      'the configured emulator gets both tokens over plain http (lead decision, JS behaviour)',
       () async {
+        // Not a loopback address: the tokens go there only because it is the configured emulatorHost.
         final FirebaseStorage storage = securityStorage(
           securityApp(),
           client,
-          emulatorHost: '127.0.0.1:9199',
+          emulatorHost: '10.0.0.5:9199',
         );
         addTearDown(storage.close);
         await storage.ref('x').metadata();
         final SentRequest sent = client.sent.single;
-        expect(sent.url.scheme, 'http');
-        expect(
-          sent.headers.keys.map((String k) => k.toLowerCase()),
-          isNot(contains('x-firebase-appcheck')),
-        );
+        expect(sent.url.origin, 'http://10.0.0.5:9199');
+        expect(sent.headers['Authorization'], 'Firebase $secretIdToken');
+        expect(sent.headers['X-Firebase-AppCheck'], secretAppCheckToken);
       },
     );
+  });
+
+  group('token scope of the request layer', () {
+    // The public API cannot aim a request at another host (refFromUrl keeps the origin, the upload session
+    // URL is checked), so this drives the internal request layer directly to pin the rule underneath.
+    Future<SentRequest> sendTo(String url, {String? emulatorHost}) async {
+      final RecordingClient recording = RecordingClient(
+        (SentRequest r) => respond(200),
+      );
+      final FirebaseStorage storage = securityStorage(
+        securityApp(),
+        recording,
+        emulatorHost: emulatorHost,
+      );
+      addTearDown(storage.close);
+      // ignore: invalid_use_of_internal_member, the rule lives in the internal Requester.
+      await storage.requester.send(
+        // ignore: invalid_use_of_internal_member, same.
+        StorageRequest(
+          method: 'GET',
+          url: Uri.parse(url),
+          timeout: Duration.zero,
+          errorMapper: (int status, String body) => FirebaseStorageException(
+            code: 'unknown',
+            message: 'HTTP $status',
+          ),
+        ),
+      );
+      return recording.sent.single;
+    }
+
+    bool carriesAnyToken(SentRequest sent) {
+      final String headers = sent.headers.entries
+          .map((MapEntry<String, String> e) => '${e.key}: ${e.value}')
+          .join('\n');
+      return sent.headers.keys.any(
+            (String k) =>
+                k.toLowerCase() == 'authorization' ||
+                k.toLowerCase() == 'x-firebase-appcheck',
+          ) ||
+          headers.contains(secretIdToken) ||
+          headers.contains(secretAppCheckToken);
+    }
+
+    for (final String url in <String>[
+      'http://evil.example/v0/b/b/o/x',
+      'http://firebasestorage.googleapis.com/v0/b/b/o/x',
+      'http://10.0.0.6:9199/v0/b/b/o/x',
+      'http://10.0.0.5:9200/v0/b/b/o/x',
+      'http://127.0.0.1.evil.example/v0/b/b/o/x',
+      'http://localhost.evil.example/v0/b/b/o/x',
+    ]) {
+      test('no token of any kind goes to $url', () async {
+        expect(
+          carriesAnyToken(await sendTo(url, emulatorHost: '10.0.0.5:9199')),
+          isFalse,
+        );
+      });
+    }
+
+    for (final String url in <String>[
+      'https://firebasestorage.googleapis.com/v0/b/b/o/x',
+      'http://10.0.0.5:9199/v0/b/b/o/x',
+      'http://127.0.0.1:9199/v0/b/b/o/x',
+      'http://localhost:9199/v0/b/b/o/x',
+      'http://[::1]:9199/v0/b/b/o/x',
+    ]) {
+      test(
+        'tokens go to $url (https, the configured emulator, loopback)',
+        () async {
+          expect(
+            carriesAnyToken(await sendTo(url, emulatorHost: '10.0.0.5:9199')),
+            isTrue,
+          );
+        },
+      );
+    }
   });
 }

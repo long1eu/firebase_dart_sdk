@@ -1,6 +1,7 @@
 // Threat model: storage_threat_model.md, "Secrets in errors and logs" (T7, T8).
 import 'dart:convert';
 
+import 'package:firebase_app_dart/firebase_app_dart.dart';
 import 'package:firebase_storage_dart/firebase_storage_dart.dart';
 import 'package:http/http.dart' as http;
 import 'package:test/test.dart';
@@ -115,4 +116,63 @@ void main() {
       );
     },
   );
+
+  test(
+    'a failing token provider leaves its message out; it is kept as the cause',
+    () async {
+      final FirebaseApp app = securityApp(signedIn: false);
+      final _LeakyAuth auth = _LeakyAuth();
+      app.authProvider = auth;
+      final RecordingClient client = RecordingClient(
+        (SentRequest r) => respondJson(objectResource('x')),
+      );
+      final FirebaseStorage storage = securityStorage(app, client);
+      addTearDown(storage.close);
+      Object? caught;
+      try {
+        await storage.ref('x').metadata();
+      } on Object catch (e) {
+        caught = e;
+      }
+      expect(caught, isA<FirebaseStorageException>());
+      final FirebaseStorageException e = caught! as FirebaseStorageException;
+      expect(e.code, 'unauthenticated');
+      expect(everythingPrinted(e), isNot(contains(_LeakyAuth.secret)));
+      expect(e.message, contains('_ProviderError'));
+      expect(e.cause, same(auth.thrown));
+      expect(e.stackTrace, isNotNull);
+      expect(client.sent, isEmpty);
+    },
+  );
+}
+
+class _ProviderError implements Exception {
+  _ProviderError(this.detail);
+
+  final String detail;
+
+  @override
+  String toString() => '_ProviderError: $detail';
+}
+
+class _LeakyAuth extends AuthTokenProvider {
+  static const String secret = 'REFRESH-TOKEN-SECRET-ab12';
+
+  _ProviderError? thrown;
+
+  @override
+  Future<GetTokenResult> getAccessToken({required bool forceRefresh}) async {
+    final _ProviderError error = _ProviderError(
+      'refresh with refresh_token=$secret failed',
+    );
+    thrown = error;
+    throw error;
+  }
+
+  @override
+  String? get uid => 'u1';
+
+  @override
+  Stream<AuthTokenChange> get onTokenChanged =>
+      const Stream<AuthTokenChange>.empty();
 }
