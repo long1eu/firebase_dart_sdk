@@ -24,6 +24,13 @@ const int maxErrorBodyBytes = 16 * 1024;
 bool isRetryStatus(int status) =>
     (status >= 500 && status < 600) || status == 408 || status == 429;
 
+/// Thrown by [Requester.send] when the body is longer than its `maxBodyBytes`.
+@internal
+final class BodyTooLargeException implements Exception {
+  /// Creates the exception.
+  const BodyTooLargeException();
+}
+
 /// One logical request: what to send and how to treat the response. The [Requester] adds the common headers and
 /// retries it.
 @immutable
@@ -123,39 +130,95 @@ final class StorageResponse {
 class Requester {
   /// Creates a requester that sends through [client] (closed by [close] when [ownsClient]).
   ///
-  /// [mockUserToken] replaces the token of the app's auth provider (emulator only). [requestTimeout] bounds the
-  /// wait for the response headers of each attempt and every pause while reading a body; an attempt that runs
-  /// over it fails like a network error, so it is retried. [clock], [random] and [delay] are for tests.
+  /// [mockUserToken] replaces the token of the app's auth provider (emulator only). [emulatorHost] is the
+  /// `host:port` of the emulator, which may receive tokens over plain HTTP (see [mayCarryTokens]).
+  /// [requestTimeout] bounds the wait for the response headers of each attempt and every pause while reading a
+  /// body; an attempt that runs over it fails like a network error, so it is retried. [clock], [random] and
+  /// [delay] are for tests.
   Requester({
     required this.app,
     required http.Client client,
     required bool ownsClient,
-    required Duration requestTimeout,
+    required this.requestTimeout,
+    String? emulatorHost,
     String? mockUserToken,
     DateTime Function()? clock,
     double Function()? random,
     Future<void> Function(Duration duration)? delay,
   }) : _client = client,
        _ownsClient = ownsClient,
-       _requestTimeout = requestTimeout,
+       _emulatorHost = emulatorHost?.toLowerCase(),
        _mockUserToken = mockUserToken,
        _clock = clock ?? DateTime.now,
        random = random ?? _defaultRandom,
-       _delay = delay ?? Future<void>.delayed;
+       _delay = delay;
 
   /// The app whose tokens are sent.
   final FirebaseApp app;
 
-  /// A number in `[0, 1)`: the jitter of the backoff, also used for multipart boundaries.
+  /// A number in `[0, 1)`: the jitter of the backoff.
   final double Function() random;
+
+  /// The longest wait for the response headers of an attempt, and for each chunk of a body. Readers of
+  /// [open] apply it as the idle timeout of the body.
+  final Duration requestTimeout;
 
   final http.Client _client;
   final bool _ownsClient;
-  final Duration _requestTimeout;
+  final String? _emulatorHost;
   final String? _mockUserToken;
   final DateTime Function() _clock;
-  final Future<void> Function(Duration duration) _delay;
+  final Future<void> Function(Duration duration)? _delay;
   bool _closed = false;
+
+  /// The current time (the injected clock in tests).
+  DateTime now() => _clock();
+
+  /// Waits [duration], or less when [abortTrigger] completes first; it returns normally either way.
+  ///
+  /// Uses the injected delay in tests, otherwise a [Timer] that is cancelled on abort, so that a canceled
+  /// operation does not keep the process alive.
+  Future<void> wait(Duration duration, {Future<void>? abortTrigger}) {
+    final Completer<void> done = Completer<void>();
+    void finish() {
+      if (!done.isCompleted) {
+        done.complete();
+      }
+    }
+
+    final Future<void> Function(Duration duration)? delay = _delay;
+    Timer? timer;
+    if (delay == null) {
+      timer = Timer(duration, finish);
+    } else {
+      delay(duration).then((_) => finish(), onError: (Object _) => finish());
+    }
+    abortTrigger?.then(
+      (_) {
+        timer?.cancel();
+        finish();
+      },
+      onError: (Object _) {
+        timer?.cancel();
+        finish();
+      },
+    );
+    return done.future;
+  }
+
+  /// Whether a request to [url] may carry the auth and App Check tokens: over HTTPS, to the emulator host, or
+  /// to a loopback host. Like `StorageTokenAuthorizer` of the iOS SDK, tokens never travel in clear text to
+  /// anybody else.
+  bool mayCarryTokens(Uri url) {
+    if (url.scheme == 'https') {
+      return true;
+    }
+    final String host = url.host.toLowerCase();
+    return url.authority.toLowerCase() == _emulatorHost ||
+        host == 'localhost' ||
+        host == '::1' ||
+        RegExp(r'^127\.\d{1,3}\.\d{1,3}\.\d{1,3}$').hasMatch(host);
+  }
 
   /// Whether [close] was called.
   bool get isClosed => _closed;
@@ -172,14 +235,18 @@ class Requester {
   }
 
   /// Sends [request] and returns the complete response once its status is one of the success codes.
+  ///
+  /// With [maxBodyBytes], reading stops as soon as the body is longer and [BodyTooLargeException] is thrown.
+  /// A body cut by a network error is requested again, within the retry time.
   Future<StorageResponse> send(
     StorageRequest request, {
     Future<void>? abortTrigger,
+    int? maxBodyBytes,
   }) {
     return _execute(request, abortTrigger, (
       http.StreamedResponse response,
     ) async {
-      final Uint8List bytes = await _readAll(response.stream);
+      final Uint8List bytes = await _readAll(response.stream, maxBodyBytes);
       return StorageResponse(response.statusCode, response.headers, bytes);
     });
   }
@@ -205,8 +272,11 @@ class Requester {
     _checkOpen();
     final _AbortState abort = _AbortState(abortTrigger);
     final DateTime deadline = _clock().add(request.timeout);
-    String? authToken = await _authToken(forceRefresh: false);
-    final String? appCheckToken = await _appCheckToken();
+    final bool withTokens = mayCarryTokens(request.url);
+    String? authToken = withTokens
+        ? await _authToken(forceRefresh: false)
+        : null;
+    final String? appCheckToken = withTokens ? await _appCheckToken() : null;
     bool refreshed = false;
     int waitSeconds = 1;
     while (true) {
@@ -247,21 +317,24 @@ class Requester {
       }
       abort.check();
       _checkOpen();
-      final DateTime now = _clock();
-      if (!now.isBefore(deadline)) {
-        throw retryLimitExceeded(httpStatus: failedStatus, cause: failure);
+      final DateTime current = _clock();
+      if (!current.isBefore(deadline)) {
+        throw retryLimitExceeded(
+          httpStatus: failedStatus,
+          cause: _describe(failure, request),
+        );
       }
       if (waitSeconds < 64) {
         waitSeconds *= 2;
       }
-      Duration wait = Duration(
+      Duration pause = Duration(
         milliseconds: ((waitSeconds + random()) * 1000).round(),
       );
-      final Duration remaining = deadline.difference(now);
-      if (wait > remaining) {
-        wait = remaining;
+      final Duration remaining = deadline.difference(current);
+      if (pause > remaining) {
+        pause = remaining;
       }
-      await abort.race(_delay(wait));
+      await wait(pause, abortTrigger: abortTrigger);
     }
   }
 
@@ -286,11 +359,15 @@ class Requester {
     _AbortState abort,
   ) {
     final Completer<void> attemptAbort = Completer<void>();
-    final http.AbortableRequest httpRequest = http.AbortableRequest(
-      request.method,
-      request.url,
-      abortTrigger: attemptAbort.future,
-    )..headers.addAll(headers);
+    final http.AbortableRequest httpRequest =
+        http.AbortableRequest(
+            request.method,
+            request.url,
+            abortTrigger: attemptAbort.future,
+          )
+          // The REST API never redirects, and a redirect would carry the App Check header to another host.
+          ..followRedirects = false
+          ..headers.addAll(headers);
     final Uint8List? body = request.body;
     if (body != null) {
       httpRequest.bodyBytes = body;
@@ -307,11 +384,11 @@ class Requester {
       }
     }
 
-    final Timer timer = Timer(_requestTimeout, () {
+    final Timer timer = Timer(requestTimeout, () {
       fail(
         TimeoutException(
           'No response from ${request.method} ${request.url.path}',
-          _requestTimeout,
+          requestTimeout,
         ),
       );
     });
@@ -337,17 +414,34 @@ class Requester {
     return result.future;
   }
 
-  Future<Uint8List> _readAll(Stream<List<int>> stream) async {
+  Future<Uint8List> _readAll(Stream<List<int>> stream, int? maxBytes) async {
     final BytesBuilder builder = BytesBuilder(copy: false);
-    await stream.timeout(_requestTimeout).forEach(builder.add);
+    await for (final List<int> chunk in stream.timeout(requestTimeout)) {
+      builder.add(chunk);
+      if (maxBytes != null && builder.length > maxBytes) {
+        throw const BodyTooLargeException();
+      }
+    }
     return builder.takeBytes();
+  }
+
+  /// [failure] for a message: the exception's message with the method and path of the request, never the
+  /// query (it can hold an upload id or a download token).
+  static String _describe(Object? failure, StorageRequest request) {
+    final String target = '${request.method} ${request.url.path}';
+    return switch (failure) {
+      http.ClientException(:final String message) =>
+        '${failure.runtimeType}: $message ($target)',
+      TimeoutException() => 'TimeoutException ($target)',
+      _ => '$failure ($target)',
+    };
   }
 
   Future<String> _readErrorBody(http.StreamedResponse response) async {
     final BytesBuilder builder = BytesBuilder(copy: false);
     try {
       await for (final List<int> chunk in response.stream.timeout(
-        _requestTimeout,
+        requestTimeout,
       )) {
         builder.add(chunk);
         if (builder.length >= maxErrorBodyBytes) {
@@ -458,19 +552,5 @@ final class _AbortState {
     } else {
       _listeners.add(listener);
     }
-  }
-
-  /// Completes when [future] completes or the trigger fires, whichever comes first.
-  Future<void> race(Future<void> future) {
-    final Completer<void> completer = Completer<void>();
-    void done() {
-      if (!completer.isCompleted) {
-        completer.complete();
-      }
-    }
-
-    future.then((_) => done(), onError: (Object _) => done());
-    onAbort(done);
-    return completer.future;
   }
 }

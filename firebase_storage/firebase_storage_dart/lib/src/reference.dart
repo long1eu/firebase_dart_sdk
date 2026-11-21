@@ -203,8 +203,8 @@ final class Reference {
   /// Downloads the object into memory.
   ///
   /// With [maxSize], only that many bytes are requested (with a `Range` header) and an object larger than
-  /// [maxSize] throws `download-size-exceeded`, like the Android SDK and FlutterFire's `getData`. The JS SDK
-  /// returns the first [maxSize] bytes instead. A negative [maxSize] throws `invalid-argument`.
+  /// [maxSize] throws `download-size-exceeded`, like the Android, iOS and C++ SDKs; reading stops as soon as
+  /// more than [maxSize] bytes arrived. The JS SDK returns the first [maxSize] bytes instead. A negative [maxSize] throws `invalid-argument`.
   Future<Uint8List> getBytes({int? maxSize}) async {
     throwIfRoot('getBytes');
     if (maxSize != null && maxSize < 0) {
@@ -212,26 +212,29 @@ final class Reference {
         "Invalid value for 'maxSize'. Expected 0 or greater.",
       );
     }
-    final StorageResponse response = await _requester.send(
-      StorageRequest(
-        method: 'GET',
-        url: objectUrl(media: true),
-        // Like the JS SDK, one byte more than the maximum: that byte tells an object that is too large.
-        headers: <String, String>{
-          if (maxSize != null) 'Range': 'bytes=0-$maxSize',
-        },
-        successCodes: maxSize == null
-            ? const <int>{200}
-            : const <int>{200, 206},
-        timeout: storage.retry.download,
-        errorMapper: _objectErrors(),
-      ),
-    );
-    final Uint8List bytes = response.bodyBytes;
-    if (maxSize != null && bytes.length > maxSize) {
-      throw downloadSizeExceeded(fullPath, maxSize);
+    final StorageResponse response;
+    try {
+      response = await _requester.send(
+        maxBodyBytes: maxSize,
+        StorageRequest(
+          method: 'GET',
+          url: objectUrl(media: true),
+          // Like the JS SDK, one byte more than the maximum: that byte tells an object that is too large.
+          headers: <String, String>{
+            if (maxSize != null) 'Range': 'bytes=0-$maxSize',
+          },
+          successCodes: maxSize == null
+              ? const <int>{200}
+              : const <int>{200, 206},
+          timeout: storage.retry.download,
+          errorMapper: _objectErrors(),
+        ),
+      );
+    } on BodyTooLargeException {
+      // Reading stopped at maxSize + 1 bytes, even from a server that ignores the Range header.
+      throw downloadSizeExceeded(fullPath, maxSize!);
     }
-    return bytes;
+    return response.bodyBytes;
   }
 
   /// Uploads [data] in one multipart request and returns the metadata of the new object, replacing an object
@@ -266,25 +269,33 @@ final class Reference {
     Uint8List data,
     SettableMetadata? metadata,
   ) async {
-    final String boundary = multipartBoundary(_requester.random);
     final StorageResponse response = await _requester.send(
-      StorageRequest(
-        method: 'POST',
-        url: uploadUrl,
-        headers: <String, String>{
-          'X-Goog-Upload-Protocol': 'multipart',
-          'Content-Type': 'multipart/related; boundary=$boundary',
-        },
-        body: multipartBody(
-          boundary: boundary,
-          metadata: SettableMetadata.uploadJson(fullPath, metadata),
-          data: data,
-        ),
-        timeout: storage.retry.upload,
-        errorMapper: sharedErrorMapper(bucket, fullPath),
-      ),
+      multipartRequest(data, metadata),
     );
     return metadataOf(response);
+  }
+
+  /// The multipart upload of [data] with [metadata] (`multipartUpload` of the JS SDK), for `putBytes`,
+  /// `putString` and the small uploads of an upload task. Throws `invalid-argument` for a content type with a
+  /// control character.
+  @internal
+  StorageRequest multipartRequest(Uint8List data, SettableMetadata? metadata) {
+    final String boundary = multipartBoundary();
+    return StorageRequest(
+      method: 'POST',
+      url: uploadUrl,
+      headers: <String, String>{
+        'X-Goog-Upload-Protocol': 'multipart',
+        'Content-Type': 'multipart/related; boundary=$boundary',
+      },
+      body: multipartBody(
+        boundary: boundary,
+        metadata: SettableMetadata.uploadJson(fullPath, metadata),
+        data: data,
+      ),
+      timeout: storage.retry.upload,
+      errorMapper: sharedErrorMapper(bucket, fullPath),
+    );
   }
 
   /// The URL that uploads (multipart or resumable start) go to: `/v0/b/<bucket>/o?name=<path>`.
@@ -302,9 +313,15 @@ final class Reference {
 
   /// Throws `invalid-root-operation` for [operation] when this is the root of the bucket.
   @internal
+  ///
+  /// Also throws `invalid-argument` for the paths `.` and `..`: Cloud Storage forbids those names, and a URL
+  /// would resolve them as dot segments to another resource.
   void throwIfRoot(String operation) {
     if (location.isRoot) {
       throw invalidRootOperation(operation);
+    }
+    if (location.path == '.' || location.path == '..') {
+      throw invalidArgument("The object name '${location.path}' is not valid.");
     }
   }
 

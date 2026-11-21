@@ -3,17 +3,23 @@
 library;
 
 import 'dart:convert';
+import 'dart:math' as math;
 import 'dart:typed_data';
 
 import 'package:meta/meta.dart';
 
-/// A multipart boundary of decimal digits, like the JS SDK's two `Math.random()` strings, from [random] (a
-/// number in `[0, 1)`).
+/// A multipart boundary of 32 decimal digits, like the JS SDK's two `Math.random()` strings, from a secure
+/// random generator so that the content cannot guess it and forge the metadata part.
 @internal
-String multipartBoundary(double Function() random) {
-  String digits() => (random() * 1e16).floor().toString().padLeft(16, '0');
-  return '${digits()}${digits()}';
+String multipartBoundary() {
+  final StringBuffer buffer = StringBuffer();
+  for (int i = 0; i < 32; i++) {
+    buffer.write(_secureRandom.nextInt(10));
+  }
+  return buffer.toString();
 }
+
+final math.Random _secureRandom = math.Random.secure();
 
 /// The `multipart/related` body: the JSON [metadata] (which holds the `contentType` of the second part), then
 /// [data], separated by [boundary].
