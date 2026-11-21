@@ -99,7 +99,7 @@ The packages are `firebase_auth_dart`, `firebase_auth_dart_platform`, `firebase_
 
 Recommended: `firebase_auth_secure_storage_dart`, with the class `SecureAuthStorage`. If it wraps a Flutter plugin
 it is not pure Dart and `_dart` is a slight misnomer; `firebase_auth_secure_storage` (no suffix) is the honest
-name for option A and `_dart` fits a later B. This is a question for Razvan (see below).
+name for option A and `_dart` fits a later B. This is a question for the owner (see below).
 
 ## How it plugs in
 
@@ -197,7 +197,7 @@ from the 0600 file, fail-clearly on a missing keyring, and no web support. Leave
 `FileAuthStorage`, and add a pure-Dart backend (B) only when a user needs a keychain outside Flutter. Do not
 change `firebase_auth_dart_platform`; `storageFor` and `FallbackStorage` already fit. About 3 agent days.
 
-## Questions only Razvan can answer
+## Questions only the owner can answer
 
 1. Is a Flutter-only package acceptable (so no `dart run` keychain access), or must the first release work in a
    plain Dart CLI? That decides A or B.
