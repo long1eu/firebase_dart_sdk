@@ -457,6 +457,17 @@ void main() {
       expect(requests, hasLength(1));
     });
 
+    test('a repeated next page token ends listAll with unknown', () async {
+      respond = (_) => json(<String, Object?>{
+        'items': <Object?>[
+          <String, Object?>{'name': 'i'},
+        ],
+        'nextPageToken': 'same',
+      });
+      await expectLater(storage.ref().listAll(), throwsStorageCode('unknown'));
+      expect(requests, hasLength(2));
+    });
+
     test(
       'listPages requests a page only when the previous one was taken',
       () async {
