@@ -139,6 +139,26 @@ void main() {
     expect(cleared.contentType, 'text/x-new');
   }, skip: skip);
 
+  test('updateMetadata removes the custom keys with a null value', () async {
+    final Reference ref = dir.child('custom');
+    await ref.putString(
+      'x',
+      metadata: const SettableMetadata(
+        customMetadata: <String, String?>{'a': '1', 'b': '2'},
+      ),
+    );
+    final FullMetadata updated = await ref.updateMetadata(
+      const SettableMetadata(
+        customMetadata: <String, String?>{'a': null, 'c': '3'},
+      ),
+    );
+    expect(updated.customMetadata, <String, String>{'b': '2', 'c': '3'});
+    expect((await ref.metadata()).customMetadata, <String, String>{
+      'b': '2',
+      'c': '3',
+    });
+  }, skip: skip);
+
   test('list, listAll and listPages', () async {
     for (final String name in <String>[
       'a.txt',

@@ -153,6 +153,54 @@ void main() {
       );
     });
 
+    test('a null custom value removes that key, the others are set', () async {
+      await storage
+          .ref('o')
+          .updateMetadata(
+            const SettableMetadata(
+              customMetadata: <String, String?>{'gone': null, 'kept': 'v'},
+            ),
+          );
+      expect(requests.single.body, '{"metadata":{"gone":null,"kept":"v"}}');
+    });
+
+    test('an upload leaves out the custom keys with a null value', () async {
+      await storage
+          .ref('o')
+          .putBytes(
+            Uint8List(0),
+            metadata: const SettableMetadata(
+              customMetadata: <String, String?>{'gone': null, 'kept': 'v'},
+            ),
+          );
+      expect(
+        requests.single.body,
+        contains(
+          '{"name":"o","contentType":"application/octet-stream","metadata":{"kept":"v"}}',
+        ),
+      );
+    });
+
+    test('equality tells a null value from a missing key', () {
+      const SettableMetadata withNull = SettableMetadata(
+        customMetadata: <String, String?>{'a': null},
+      );
+      const SettableMetadata other = SettableMetadata(
+        customMetadata: <String, String?>{'b': null},
+      );
+      expect(withNull, isNot(other));
+      expect(
+        withNull,
+        const SettableMetadata(customMetadata: <String, String?>{'a': null}),
+      );
+      expect(
+        withNull.hashCode,
+        const SettableMetadata(
+          customMetadata: <String, String?>{'a': null},
+        ).hashCode,
+      );
+    });
+
     test('every field, in the order of the JS SDK', () async {
       await storage
           .ref('o')
