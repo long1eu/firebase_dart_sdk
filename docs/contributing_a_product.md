@@ -3,6 +3,7 @@
 How a new product client (Storage was the last one; Realtime Database, Functions or Remote Config
 could be next) is designed, built and tested in this repository. It is written for contributors,
 human or agent, and complements [AGENTS.md](../AGENTS.md) and [ARCHITECTURE.md](ARCHITECTURE.md).
+[storage_decisions.md](storage_decisions.md) records the decisions of the Storage client, the last product built this way.
 
 ## Design rules
 

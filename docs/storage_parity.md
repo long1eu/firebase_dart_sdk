@@ -256,6 +256,8 @@ Mapping from HTTP status (all SDKs read the status; error body use differs). "Ra
 | CORS (web) | the browser enforces it; the bucket needs a CORS configuration | — | — | — | the production bucket answers `access-control-allow-origin: *`, exposes the `x-goog-upload-*` headers on the session responses, and its preflight to the upload URL allows `x-goog-upload-command` and `x-goog-upload-offset` (verified, see the README of the package) | |
 | HTTP client | XHR / `fetch` (Node) | `HttpURLConnection` | `GTMSessionFetcher` | curl | `package:http` | |
 
+The reasons behind the design are in [storage_decisions.md](storage_decisions.md).
+
 ## Gaps and their state
 
 The state is **0.1.0 (adopted)**: decided and part of the first release; **later**: wanted, not in 0.1.0; or **won't do**.

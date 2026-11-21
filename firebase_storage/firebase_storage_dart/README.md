@@ -305,6 +305,7 @@ inconclusive, because production does not answer 401 to an invalid token. What i
 
 Parity with the other SDKs and the deliberate differences from the JS SDK:
 [docs/storage_parity.md](https://github.com/long1eu/firebase_dart_sdk/blob/main/docs/storage_parity.md).
+Why it is built this way: [docs/storage_decisions.md](https://github.com/long1eu/firebase_dart_sdk/blob/main/docs/storage_decisions.md).
 More: [the Storage guide](https://github.com/long1eu/firebase_dart_sdk/blob/main/docs/guides/storage.md).
 
 ## License
