@@ -16,6 +16,13 @@
 //    file named by `GOOGLE_APPLICATION_CREDENTIALS`, or the credentials of
 //    `gcloud auth application-default login`. Nothing here creates, stores or
 //    prints credentials.
+//  * `FIRESTORE_ENTERPRISE_TEST_DATABASE_ID`, together with
+//    `FIRESTORE_TEST_PROJECT_ID`: opt in to running the tests in
+//    `test/integration_enterprise` against that named Enterprise edition
+//    database of the real project, on the production host, with the same
+//    Application Default Credentials. Every test file shares the one database
+//    (the tests use collections with unique ids) and nothing is bulk-deleted.
+//    Ignored while either emulator variable is set: an emulator always wins.
 
 import 'dart:io';
 
@@ -33,8 +40,10 @@ class EmulatorAddress {
     if (separator < 0) {
       return EmulatorAddress(value, defaultPort);
     }
-    return EmulatorAddress(value.substring(0, separator),
-        int.parse(value.substring(separator + 1)));
+    return EmulatorAddress(
+      value.substring(0, separator),
+      int.parse(value.substring(separator + 1)),
+    );
   }
 
   final String host;
@@ -49,7 +58,7 @@ class TestBackend {
   /// Reads the configuration from [environment] (by default the environment
   /// of the process).
   TestBackend([Map<String, String>? environment])
-      : _environment = environment ?? Platform.environment;
+    : _environment = environment ?? Platform.environment;
 
   static const String emulatorHostVariable = 'FIRESTORE_EMULATOR_HOST';
   static const String enterpriseEmulatorHostVariable =
@@ -57,13 +66,15 @@ class TestBackend {
   static const String emulatorEditionVariable = 'FIRESTORE_EMULATOR_EDITION';
   static const String projectIdVariable = 'FIRESTORE_TEST_PROJECT_ID';
   static const String databaseIdVariable = 'FIRESTORE_TEST_DATABASE_ID';
+  static const String enterpriseDatabaseIdVariable =
+      'FIRESTORE_ENTERPRISE_TEST_DATABASE_ID';
 
   /// The host of production Firestore.
   static const String productionHost = 'firestore.googleapis.com';
 
   /// The OAuth scope requested for the real project.
   static const List<String> scopes = <String>[
-    'https://www.googleapis.com/auth/datastore'
+    'https://www.googleapis.com/auth/datastore',
   ];
 
   final Map<String, String> _environment;
@@ -93,8 +104,11 @@ class TestBackend {
       return emulatorHost != null && emulatorHost == enterpriseEmulatorHost;
     }
     if (edition != 'standard' && edition != 'enterprise') {
-      throw ArgumentError.value(edition, emulatorEditionVariable,
-          "must be 'standard' or 'enterprise'");
+      throw ArgumentError.value(
+        edition,
+        emulatorEditionVariable,
+        "must be 'standard' or 'enterprise'",
+      );
     }
     return edition == 'enterprise';
   }
@@ -105,12 +119,44 @@ class TestBackend {
   String? skipOnEnterprise(String reason) =>
       isEnterpriseEdition ? 'Enterprise edition: $reason' : null;
 
-  /// The reason to skip tests that need the Enterprise edition emulator, or
-  /// null when it is configured. Pass it to `skip:`.
-  String? get enterpriseEmulatorSkipReason => enterpriseEmulatorHost != null
+  /// The reason to skip tests that need an Enterprise edition backend (the
+  /// emulator of [enterpriseEmulatorHost] or the real database of
+  /// [enterpriseUsesRealProject]), or null when one is configured. Pass it to
+  /// `skip:`.
+  String? get enterpriseEmulatorSkipReason =>
+      enterpriseEmulatorHost != null || enterpriseUsesRealProject
       ? null
-      : '$enterpriseEmulatorHostVariable is not set (start the emulator with '
-          'tool/start_enterprise_emulator.sh and export it)';
+      : '$enterpriseEmulatorHostVariable is not set (start the emulator '
+            'with tool/start_enterprise_emulator.sh and export it, or set '
+            '$projectIdVariable and $enterpriseDatabaseIdVariable for a real '
+            'Enterprise edition database)';
+
+  /// Whether the Enterprise edition tests run against a real Enterprise
+  /// edition database: the project id and the Enterprise database id
+  /// variables are set and neither emulator is configured.
+  bool get enterpriseUsesRealProject =>
+      emulatorHost == null &&
+      enterpriseEmulatorHost == null &&
+      realProjectId != null &&
+      _value(enterpriseDatabaseIdVariable) != null;
+
+  /// The named Enterprise edition database of the real project, or null when
+  /// [enterpriseUsesRealProject] is false.
+  String? get realEnterpriseDatabaseId =>
+      enterpriseUsesRealProject ? _value(enterpriseDatabaseIdVariable) : null;
+
+  /// The reason to skip an Enterprise edition test that only holds for the
+  /// emulator (it pins an emulator limitation), or null otherwise. [reason]
+  /// says what the emulator does.
+  String? skipOnEnterpriseEmulator(String reason) =>
+      enterpriseEmulatorHost != null ? reason : null;
+
+  /// The reason to skip an Enterprise edition test that cannot run against
+  /// the shared real database, or null when [enterpriseUsesRealProject] is
+  /// false. [reason] says why.
+  String? skipOnRealEnterprise(String reason) => enterpriseUsesRealProject
+      ? 'Real Enterprise edition database: $reason'
+      : null;
 
   /// Whether the tests run against a real Firebase project: the project id
   /// variable is set and no standard emulator is configured.
@@ -132,29 +178,32 @@ class TestBackend {
 /// refreshed by it. The token is only ever handed to the gRPC call
 /// credentials, it is never logged.
 class ApplicationDefaultTokenSource {
-  ApplicationDefaultTokenSource(
-      {Future<BaseAuthenticator> Function(List<String> scopes)?
-          createAuthenticator})
-      : _createAuthenticator =
-            createAuthenticator ?? applicationDefaultCredentialsAuthenticator;
+  ApplicationDefaultTokenSource({
+    Future<BaseAuthenticator> Function(List<String> scopes)?
+    createAuthenticator,
+  }) : _createAuthenticator =
+           createAuthenticator ?? applicationDefaultCredentialsAuthenticator;
 
   final Future<BaseAuthenticator> Function(List<String> scopes)
-      _createAuthenticator;
+  _createAuthenticator;
   Future<BaseAuthenticator>? _authenticator;
 
   static const String _bearer = 'Bearer ';
 
   /// The current access token.
   Future<String?> get token async {
-    final BaseAuthenticator authenticator =
-        await (_authenticator ??= _createAuthenticator(TestBackend.scopes));
+    final BaseAuthenticator authenticator = await (_authenticator ??=
+        _createAuthenticator(TestBackend.scopes));
     final Map<String, String> metadata = <String, String>{};
     await authenticator.authenticate(
-        metadata, 'https://${TestBackend.productionHost}/');
+      metadata,
+      'https://${TestBackend.productionHost}/',
+    );
     final String? header = metadata['authorization'];
     if (header == null || !header.startsWith(_bearer)) {
       throw StateError(
-          'Application Default Credentials did not produce a bearer token.');
+        'Application Default Credentials did not produce a bearer token.',
+      );
     }
     return header.substring(_bearer.length);
   }

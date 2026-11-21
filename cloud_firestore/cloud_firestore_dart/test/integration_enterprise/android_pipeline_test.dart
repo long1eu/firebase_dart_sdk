@@ -4487,6 +4487,10 @@ void main() {
       // (EMULATOR_ANSWER): "Stage 'aggregate(...)' does not support option(s)
       // [force_streamable]".
       dynamic exception = await assertThrows(null, () => pipeline.execute());
+      if (IntegrationTestUtil.enterpriseUsesRealProject) {
+        assertThat("$exception").contains("Invalid index");
+        return;
+      }
       assertThat(
         "$exception",
       ).contains("does not support option(s) [force_streamable]");

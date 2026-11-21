@@ -21,10 +21,10 @@ signatures are in `test/unit/api/public_api.golden.txt`.
 | not supported | The JS SDK has it and this port does not. |
 | not applicable | The feature is tied to the browser, IndexedDB, TypeScript or the JS build, or Dart has it by other means. |
 
-The area tables below at a glance, one mark per row; most gaps are in Pipelines, multi-client and
+The area tables below at a glance, one mark per row; most gaps are in multi-client and
 the platforms:
 
-![One mark per feature row, by area. Documents and writes: 15 supported, 1 partial, 3 not applicable. Queries and filters: 9 supported. Aggregations: 3 supported. Listeners: 9 supported. Transactions and batches: 6 supported. Offline persistence: 8 supported, 2 not applicable. Indexes: 4 supported, 1 not supported. Bundles: 2 supported. Lite: 4 supported, 1 not supported. Pipelines: 6 supported, 3 partial, 1 not supported. Multi-tab or multi-client: 1 supported, 3 partial. App Check: 1 supported, 1 not supported. Emulator: 2 supported, 1 not applicable. Web transports: 7 supported, 1 not applicable. Platforms: 1 supported, 3 partial, 2 not applicable. In all: 78 supported, 10 partial, 4 not supported, 9 not applicable.](images/readme/parity_summary.svg)
+![One mark per feature row, by area. Documents and writes: 16 supported, 3 not applicable. Queries and filters: 9 supported. Aggregations: 3 supported. Listeners: 9 supported. Transactions and batches: 6 supported. Offline persistence: 8 supported, 2 not applicable. Indexes: 4 supported, 1 not supported. Bundles: 2 supported. Lite: 4 supported, 1 not supported. Pipelines: 9 supported, 1 not supported. Multi-tab or multi-client: 1 supported, 3 partial. App Check: 1 supported, 1 not supported. Emulator: 2 supported, 1 not applicable. Web transports: 7 supported, 1 not applicable. Platforms: 1 supported, 3 partial, 2 not applicable. In all: 82 supported, 6 partial, 4 not supported, 9 not applicable.](images/readme/parity_summary.svg)
 
 ## How it is tested
 
@@ -68,7 +68,7 @@ for a real project that has not been run yet; see [Known limitations](#known-lim
 | `refEqual`, `queryEqual`, `snapshotEqual` | supported | `==` on references, queries and snapshots |
 | `toJSON` / `fromJSON` on `Timestamp`, `GeoPoint`, `Bytes`, `VectorValue`, `DocumentReference` | supported | `toJson()` / `.fromJson(...)` in the JSON format of the JS SDK; `test/unit/firebase/firestore/snapshot_json_test.dart`. A cross-SDK test against the real JS SDK exists (`test/integration/firebase/firestore/js_interop_test.dart`) but is skipped unless Node.js and its harness are installed |
 | Named databases (`getFirestore(app, 'db')`) | supported | `FirebaseFirestore.instanceFor(app: app, databaseId: 'db')`; `test/integration/firebase/firestore/firestore_test.dart` |
-| Documents up to 16 MB | partial | Not verified: the gRPC transport sets no message size limit, but `test/integration/firebase/firestore/large_document_test.dart` needs a production database (the emulator rejects documents over 1 MiB) and has not been run |
+| Documents up to 16 MB | supported (Enterprise edition) | `test/integration/firebase/firestore/large_document_test.dart` passes against a real Enterprise edition database (8 tests with documents of 15.9 MB, 2026-11-21). A Standard edition database rejects a field value over 1 MiB with `invalid-argument`, as the emulator does |
 | `UpdateData<T>` / `WithFieldValue<T>` typing | not applicable | TypeScript typing; `update` takes `Map<String, Object?>` |
 | `ignoreUndefinedProperties` | not applicable | Dart has no `undefined` |
 | `Temporal.Instant` conversion | not applicable | JS type |
@@ -173,9 +173,9 @@ Preview, Enterprise edition only, as in the JS SDK. See [Pipelines](guides/pipel
 | Expressions (string, array, map, math, timestamp, logical, `isType`, `ifNull`, `coalesce`, regex, `parent`, ...) | supported (preview) | `pipeline_surface_test.dart` and the tests above |
 | Subqueries, variables | supported (preview) | See [Pipelines](guides/pipelines.md#variables-subqueries-and-lambdas) |
 | DML stages (`delete`, `update`, `insert`, `upsert`), `literals`, atomic execute | supported (preview) | `test/integration_enterprise/android_pipeline_dml_integration_test.dart`. The emulator denies `literals` to clients under security rules |
-| `createFrom(query)` | partial | `createFrom`, `createFromAggregateQuery`, `createFromVectorQuery`; `test/integration_enterprise/pipeline_create_from_test.dart`. Keeps classic-query results for `!=` / `not-in`, which JS 4.20.0 no longer does; see [Known limitations](#known-limitations) |
-| Full-text search, geo search, window functions | partial | Encoded as the JS SDK encodes them; the emulator rejects them, so they were never run against a backend (`android_pipeline_search_test.dart`, `android_pipeline_window_test.dart`) |
-| Explain options | partial | `PipelineExplainOptions`; the emulator ignores them |
+| `createFrom(query)` | supported | `createFrom`, `createFromAggregateQuery`, `createFromVectorQuery`; `test/integration_enterprise/pipeline_create_from_test.dart`, also against a real Enterprise edition database (2026-11-21). By design it keeps the results of the classic query for `!=` / `not-in`, which JS 4.20.0 no longer does; see [Known limitations](#known-limitations) |
+| Full-text search, geo search, window functions | supported (preview) | Run against a real Enterprise edition database (2026-11-21): `test/integration_enterprise/android_pipeline_search_test.dart` (12 tests; the collection needs a search index with its text fields and its geo field) and `android_pipeline_window_test.dart`. The emulator rejects these stages, so there the tests only check the encoding |
+| Explain options | supported | `PipelineExplainOptions`; a real Enterprise edition database answers with the explain statistics (`test/integration_enterprise/pipeline_surface_test.dart`, `pipeline_phase2_test.dart`, 2026-11-21). The emulator ignores them |
 | Pipelines in a transaction | supported (extra) | `transaction.execute(pipeline)` in read-only transactions (a read-write transaction rejects it). Not in the JS client SDK; `test/integration_enterprise/pipeline_surface_test.dart` |
 | Real-time pipelines | not supported | Also not public in JS 4.20.0 (`RealtimePipeline` is marked `@internal` there); `test/integration_enterprise/android_realtime_pipeline_test.dart` lists the Android tests as skipped |
 
@@ -186,7 +186,7 @@ Preview, Enterprise edition only, as in the JS SDK. See [Pipelines](guides/pipel
 | `persistentSingleTabManager` | supported | The default: one client per cache. On the web a Web Lock (SQLite caches) or the primary lease (IndexedDB cache) keeps a second tab out (`failedPrecondition`) |
 | `persistentMultipleTabManager`: several clients on one cache, one primary, lease of 5 s | partial | On the web, `indexedDbCacheSettings(multiTab: true)` (**preview**, new in 0.3.2): see the two rows below. Clients on one SQLite file (isolates, processes, a Flutter hot restart) elect a primary with the JS lease; the cache stays consistent. `test/unit/firebase/firestore/local/sqlite_shared_clients_test.dart`, `sqlite_shared_processes_test.dart`, `sqlite_primary_lease_test.dart`, `test/unit/firebase/firestore/primary_client_test.dart`, `test/integration/firebase/firestore/shared_cache_isolates_test.dart`. See [Several clients on one cache](guides/multiple_clients.md) |
 | Secondary tabs share the primary's listeners and writes | partial | Only with the IndexedDB cache and `multiTab: true` in Chrome (**preview**, new in 0.3.2): a secondary gets its listeners' results and the acknowledgement of its writes through the primary (`test/browser/web_indexeddb_multi_tab_client_test.dart`, `test/integration/firebase/firestore/shared_client_state_test.dart`). Not with clients on one SQLite file: a secondary there works from the cache, reports itself offline and keeps its writes pending until it becomes primary. Deferred until after 0.1.0 |
-| Several tabs on one cache in a browser | partial | `indexedDbCacheSettings(multiTab: true)` (**preview**, new in 0.3.2), same lease, rows and `localStorage` keys as the JS SDK; tested in Chrome only. Two differences: a secondary takes the lease at once when it hears a closing tab remove its state (JS waits for the next refresh), and a page restored from the back/forward cache comes back with a terminated client. Not tested: a JS SDK tab beside a tab of this SDK, handover on real visibility changes, different users in the tabs. The SQLite caches (IndexedDB, OPFS) stay at one tab, guarded by a Web Lock. See [The IndexedDB cache](guides/web.md#multi-tab-mode-preview) |
+| Several tabs on one cache in a browser | partial | `indexedDbCacheSettings(multiTab: true)` (**preview**, new in 0.3.2), same lease, rows and `localStorage` keys as the JS SDK; tested in Chrome, and its browser tests also pass in Firefox. Two differences: a secondary takes the lease at once when it hears a closing tab remove its state (JS waits for the next refresh), and a page restored from the back/forward cache comes back with a terminated client. Not tested: a JS SDK tab beside a tab of this SDK, handover on real visibility changes, different users in the tabs. The SQLite caches (IndexedDB, OPFS) stay at one tab, guarded by a Web Lock. See [The IndexedDB cache](guides/web.md#multi-tab-mode-preview) |
 
 ## App Check
 
@@ -220,28 +220,30 @@ Preview, Enterprise edition only, as in the JS SDK. See [Pipelines](guides/pipel
 
 | JS feature | Status | Dart API or gap |
 |---|---|---|
-| Browsers | partial (supported in Chrome) | Chrome only (dart2js and dart2wasm); other browsers untested. See [Platforms](guides/platforms.md) |
+| Browsers | partial (supported in Chrome) | Chrome (dart2js and dart2wasm) is the supported browser. Firefox passed the browser test suite (dart2js and dart2wasm, 2026-11-21, not in CI); a Safari run (dart2js) had timeouts that are not explained yet; Edge is untested. See [Platforms](guides/platforms.md) |
 | Node.js | not applicable | The Dart VM takes its place: servers, command line tools, Flutter apps (Android, iOS, desktop) over gRPC |
 | Linux, macOS on the VM | supported | Developed on macOS; unit and integration suites run in a Linux container and on Ubuntu in CI (`tool/linux/run_in_container.sh`) |
-| Windows | partial | Expected to work, not tested |
+| Windows | partial | Run on one Windows 11 x64 VM against the emulator, not in CI. Nothing in `lib/` needed a change; the test suites do not pass cleanly there (timeouts on the VM's slow disk, and test helpers that start `dart run` or delete a file that is still open). See [Platforms](guides/platforms.md) |
 | React Native, service workers | not applicable | |
-| Authentication | partial | No Firebase Auth SDK; `firebase_auth_providers_dart` gets tokens over REST (user sign-in, service accounts, Application Default Credentials). Tested against the Auth emulator only. See [Authentication](guides/authentication.md) |
+| Authentication | partial | No Firebase Auth SDK; `firebase_auth_providers_dart` gets tokens over REST (user sign-in, service accounts, Application Default Credentials). Tested against the Auth emulator and against a real project: a request with the ID token of an anonymous user is served under the security rules (check 13 of the production verification kit, 2026-11-21). See [Authentication](guides/authentication.md) |
 
 ## Known limitations
 
 Every gap and behaviour difference we know of, the ones you are most likely to meet first.
 
 1. **A first release with little production use.** 0.1.0 is the first version on pub.dev under
-   these names. Most testing is against the emulator. Against a real Firestore database only the
-   production verification kit has run (13 of 15 checks passed, 2 skipped); the integration
-   suite's real-project mode, the Enterprise edition features and long-running load have not.
-2. **The web is supported in Chrome only.** Other browsers are untested; the SQLite caches can be open in one tab at a time (the IndexedDB cache can be shared by tabs with `multiTab: true`, a preview);
+   these names. Most testing is against the emulator. Against a real Firestore database the
+   production verification kit has run (Standard edition: every check passed except 1c, which
+   needs a composite index, and 7, which needs the Enterprise edition), and so have the
+   large-document test and the pipeline tests of `test/integration_enterprise` (Enterprise
+   edition); the standard integration suite's real-project mode and long-running load have not.
+2. **The web is supported in Chrome only.** Firefox passed the browser test suite (dart2js and dart2wasm, 2026-11-21, not in CI); a Safari run (dart2js) had timeouts that are not explained yet; Edge is untested; the SQLite caches can be open in one tab at a time (the IndexedDB cache can be shared by tabs with `multiTab: true`, a preview);
    compiled to JavaScript (dart2js), integers above 2^53 lose precision, so prefer dart2wasm;
    against the emulator a query that returns more than about 10,000 documents fails on the web
    transport (production not checked). See [Platforms](guides/platforms.md).
 3. **No device attestation for App Check and no Firebase Auth SDK.** You supply an App Check
    provider and get user tokens through `firebase_auth_providers_dart`, which was tested against
-   the Auth emulator only. App Check enforcement was never tested.
+   the Auth emulator and, for an anonymous user, against a real project. App Check enforcement was never tested.
 4. **Clients that share a cache do not share listeners or writes.** A second isolate, process or
    Flutter hot restart on the same SQLite file works, but only the primary client is online; a
    secondary answers from the cache and keeps its writes pending. The JS SDK shares them between
@@ -264,10 +266,14 @@ Every gap and behaviour difference we know of, the ones you are most likely to m
    it: a listener sees it with `isFromCache: true`, then its removal. The JS SDK keeps it in limbo
    and `getDocsFromServer` does not complete. See
    [Enterprise edition differences](guides/emulator_and_testing.md#enterprise-edition-differences).
-9. **Pipelines are a preview and were run against the Enterprise emulator only.** Server only
+9. **Pipelines are a preview.** Server only
     (no cache, no pending writes, `unavailable` offline); no real-time pipelines (not public in JS
-    either); full-text search, geo search and window functions were only checked for their
-    encoding; explain options are ignored by the emulator.
+    either). The emulator rejects full-text search, geo search and window functions and ignores
+    explain options; these were run against a real Enterprise edition database instead.
+    That run showed that the backend rejects `execute(indexMode: ...)` ("Unsupported option:
+    index_mode"), accepts `geoDistance` only inside `search`, and answers some wrong-type and
+    error cases differently from the emulator; the local evaluator of the test suite (which the
+    client does not use) follows the emulator, so its comparison tests are skipped there.
 10. **`createFrom(query)` keeps classic-query results.** For `!=` and `not-in` the Dart conversion
     excludes documents where the field is `null` or missing, like the query does. JS 4.20.0
     (#9444) drops that check, so its pipeline returns documents without the field. A cursor on a
@@ -292,7 +298,7 @@ Every gap and behaviour difference we know of, the ones you are most likely to m
     the JS SDK cannot read; this port reads it back as the missing document. A serialized query
     snapshot whose documents lack a field the query orders by is rejected as invalid (the JS SDK
     fails an internal assertion).
-16. **Platform details.** Windows is untested; there `clearPersistence()` fails with `unknown`
+16. **Platform details.** Windows was run on one VM only (see [Platforms](guides/platforms.md)); there `clearPersistence()` fails with `unknown`
     while another isolate or process has the file open. On Linux, `package:sqlite3` needs
     `libsqlite3.so` (the example opener falls back to `libsqlite3.so.0`).
 17. **Not ported:** the console-only `_customHeaders` setting of the JS SDK.

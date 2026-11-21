@@ -64,8 +64,9 @@ await auth.signInWithEmailAndPassword(email: 'ada@example.com', password: 'the p
 A sign-in, a sign-out or a switch of users restarts the streams with the new identity, and the
 pending writes of a user stay in the queue of that user, as in the official SDKs. This works the
 same over gRPC, over the web transport and in Firestore Lite (`test/integration_auth`, against
-the Firebase Auth emulator and a Firestore emulator whose rules require a user; nothing was run
-against the real services). You can also implement `AuthTokenProvider` yourself and assign
+the Firebase Auth emulator and a Firestore emulator whose rules require a user; against the real
+services, check 13 of the production verification kit reads a document with the ID token of an
+anonymous user). You can also implement `AuthTokenProvider` yourself and assign
 it to `app.authProvider`.
 
 ## A signed-in user

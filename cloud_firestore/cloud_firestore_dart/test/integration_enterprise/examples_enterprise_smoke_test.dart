@@ -26,56 +26,76 @@ import 'package:test/test.dart';
 import '../util/integration_test_util.dart';
 
 void main() {
-  test('example/pipelines.dart runs against the enterprise emulator', () async {
-    final Process process = await Process.start(
-      Platform.resolvedExecutable,
-      <String>['run', 'example/pipelines.dart'],
-      environment: <String, String>{
-        'FIRESTORE_ENTERPRISE_EMULATOR_HOST':
-            IntegrationTestUtil.enterpriseEmulatorHost!,
-      },
-    );
-    final Future<String> stdoutText =
-        process.stdout.transform(utf8.decoder).join();
-    final Future<String> stderrText =
-        process.stderr.transform(utf8.decoder).join();
+  test(
+    'example/pipelines.dart runs against the enterprise emulator',
+    () async {
+      final Process process = await Process.start(
+        Platform.resolvedExecutable,
+        <String>['run', 'example/pipelines.dart'],
+        environment: <String, String>{
+          'FIRESTORE_ENTERPRISE_EMULATOR_HOST':
+              IntegrationTestUtil.enterpriseEmulatorHost!,
+        },
+      );
+      final Future<String> stdoutText = process.stdout
+          .transform(utf8.decoder)
+          .join();
+      final Future<String> stderrText = process.stderr
+          .transform(utf8.decoder)
+          .join();
 
-    final int exitCode = await process.exitCode
-        .timeout(const Duration(minutes: 2), onTimeout: () {
-      process.kill(ProcessSignal.sigkill);
-      return -1;
-    });
-    final String output = await stdoutText;
-    final String errors = await stderrText;
+      final int exitCode = await process.exitCode.timeout(
+        const Duration(minutes: 2),
+        onTimeout: () {
+          process.kill(ProcessSignal.sigkill);
+          return -1;
+        },
+      );
+      final String output = await stdoutText;
+      final String errors = await stderrText;
 
-    expect(exitCode, 0,
+      expect(
+        exitCode,
+        0,
         reason: exitCode == -1
             ? 'The example did not exit within 2 minutes.\n$output\n$errors'
-            : 'The example failed.\n$output\n$errors');
-    expect(errors, isEmpty, reason: 'The example wrote to stderr.');
-    expect(output, isNot(contains('Skipped')));
-    // A line of every part of the example.
-    expect(output, contains('well rated: '));
-    expect(output, contains('Science Fiction: 2 book(s), average 4.40'));
-    expect(output,
-        contains('query: [hitchhiker, dune], pipeline: [hitchhiker, dune]'));
-    expect(output, contains('marked as classic: 1'));
-  },
-      skip: IntegrationTestUtil.enterpriseEmulatorSkipReason,
-      timeout: const Timeout(Duration(minutes: 3)));
+            : 'The example failed.\n$output\n$errors',
+      );
+      expect(errors, isEmpty, reason: 'The example wrote to stderr.');
+      expect(output, isNot(contains('Skipped')));
+      // A line of every part of the example.
+      expect(output, contains('well rated: '));
+      expect(output, contains('Science Fiction: 2 book(s), average 4.40'));
+      expect(
+        output,
+        contains('query: [hitchhiker, dune], pipeline: [hitchhiker, dune]'),
+      );
+      expect(output, contains('marked as classic: 1'));
+    },
+    skip:
+        IntegrationTestUtil.enterpriseEmulatorSkipReason ??
+        IntegrationTestUtil.skipOnRealEnterprise(
+          'example/pipelines.dart only talks to the emulator of '
+          'FIRESTORE_ENTERPRISE_EMULATOR_HOST',
+        ),
+    timeout: const Timeout(Duration(minutes: 3)),
+  );
 
-  test('example/pipelines.dart only prints a note without the emulator',
-      () async {
-    final Map<String, String> environment =
-        Map<String, String>.of(Platform.environment)
-          ..remove('FIRESTORE_ENTERPRISE_EMULATOR_HOST');
-    final ProcessResult result = await Process.run(
-      Platform.resolvedExecutable,
-      <String>['run', 'example/pipelines.dart'],
-      environment: environment,
-      includeParentEnvironment: false,
-    );
-    expect(result.exitCode, 0, reason: '${result.stdout}\n${result.stderr}');
-    expect(result.stdout, startsWith('Skipped: '));
-  }, timeout: const Timeout(Duration(minutes: 3)));
+  test(
+    'example/pipelines.dart only prints a note without the emulator',
+    () async {
+      final Map<String, String> environment = Map<String, String>.of(
+        Platform.environment,
+      )..remove('FIRESTORE_ENTERPRISE_EMULATOR_HOST');
+      final ProcessResult result = await Process.run(
+        Platform.resolvedExecutable,
+        <String>['run', 'example/pipelines.dart'],
+        environment: environment,
+        includeParentEnvironment: false,
+      );
+      expect(result.exitCode, 0, reason: '${result.stdout}\n${result.stderr}');
+      expect(result.stdout, startsWith('Skipped: '));
+    },
+    timeout: const Timeout(Duration(minutes: 3)),
+  );
 }

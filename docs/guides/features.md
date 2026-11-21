@@ -51,19 +51,22 @@ What `cloud_firestore_dart` does, what it does not do yet, and the known gaps. T
 Not done:
 
 - **Production.** Most of the testing is against the emulator. The production verification kit
-  (`tool/verify_production`) was run against a real Firestore database in Standard edition: 13
-  of its 15 checks passed in one run and 2 were skipped (one needs an Enterprise edition database,
-  the other a Web API key with anonymous sign-in). An earlier run found one bug of this SDK, which
-  is fixed (-0.0 read over the web transport lost its sign). Not verified against production: the Enterprise edition
-  features (only against the Enterprise edition emulator), Firebase Auth user sign-in, the
+  (`tool/verify_production`) was run against a real Firestore database in Standard edition: in the last run
+  (2026-11-21) every check passed except one that was inconclusive (a composite index did not
+  exist) and one that needs an Enterprise edition database; the check that signs in an anonymous
+  user through Firebase Auth passed. The large-document test and the pipeline tests of
+  `test/integration_enterprise` ran against a real Enterprise edition database. An earlier run found one bug of this SDK, which
+  is fixed (-0.0 read over the web transport lost its sign). Not verified against production: Firebase Auth sign-in
+  other than anonymous, the standard
   integration suite (its opt-in real-project mode has not been run) and long-running load.
-- **Web beyond the experiment**: any browser other than Chrome (the OPFS storage was not run
-  in Safari or Firefox either), a cache shared between tabs other than the IndexedDB cache with
+- **Web beyond the experiment**: any browser other than Chrome (Firefox passed the browser tests once, the OPFS storage included; Safari did not), a cache shared between tabs other than the IndexedDB cache with
   `multiTab` (a preview), and a cache owned by a shared worker.
 - **Pipelines** beyond the [preview](pipelines.md): local evaluation (an
   evaluator exists inside the package but the client does not use it yet) and real-time
-  pipelines. Full-text search, window functions and explain options are encoded but were not
-  run against a backend that supports them.
+  pipelines. That evaluator follows the emulator: a real Enterprise edition database answers
+  some wrong-type and error cases differently (for example `equal_any` against a map gives
+  `false`, not an error, and `or` with an erroring operand and a true one gives `true`), so its
+  comparison tests are skipped against a real database.
 - `Query.findNearest` evaluation against the local cache.
 - **Coordination between running clients that share one cache** (the multi-tab support of the
   JS SDK), except the tabs of the web IndexedDB cache with `multiTab: true` (**preview**, new in 0.3.2,

@@ -67,7 +67,13 @@ void main() {
 
   test(
     'pipelines run locally as execute() on the emulator',
-    skip: IntegrationTestUtil.enterpriseEmulatorSkipReason,
+    skip:
+        IntegrationTestUtil.enterpriseEmulatorSkipReason ??
+        IntegrationTestUtil.skipOnRealEnterprise(
+          'the local evaluation follows the emulator; a real Enterprise '
+          'edition database answers some wrong-type and error cases '
+          'differently (docs/parity.md, known limitation 9)',
+        ),
     () async {
       final FirebaseFirestore db =
           await IntegrationTestUtil.testEnterpriseFirestore();

@@ -66,11 +66,12 @@ class IntegrationTestUtil {
   static const String badProjectId = 'test-project-2';
 
   /// Online status of all active Firestore clients.
-  static final Map<FirebaseFirestore, bool> firestoreStatus = <FirebaseFirestore, bool>{};
+  static final Map<FirebaseFirestore, bool> firestoreStatus =
+      <FirebaseFirestore, bool>{};
 
   /// The credentials provider of each test instance, to be able to switch the user.
-  static final Map<FirebaseFirestore, MockCredentialsProvider> credentialsProviders =
-      <FirebaseFirestore, MockCredentialsProvider>{};
+  static final Map<FirebaseFirestore, MockCredentialsProvider>
+  credentialsProviders = <FirebaseFirestore, MockCredentialsProvider>{};
 
   /// Switches the user of the given test [firestore] instance.
   static void testChangeUserTo(FirebaseFirestore firestore, User user) {
@@ -93,10 +94,30 @@ class IntegrationTestUtil {
   static String? get enterpriseEmulatorHost =>
       TestBackend().enterpriseEmulatorHost;
 
-  /// The reason to skip a test that needs the Enterprise edition emulator, or
-  /// null when it is configured: `test('...', skip: enterpriseEmulatorSkipReason, ...)`.
+  /// The reason to skip a test that needs an Enterprise edition backend, or
+  /// null when the emulator or a real Enterprise edition database is
+  /// configured: `test('...', skip: enterpriseEmulatorSkipReason, ...)`.
   static String? get enterpriseEmulatorSkipReason =>
       TestBackend().enterpriseEmulatorSkipReason;
+
+  /// Whether the Enterprise edition tests run against a real Enterprise
+  /// edition database (opt-in with `FIRESTORE_TEST_PROJECT_ID` and
+  /// `FIRESTORE_ENTERPRISE_TEST_DATABASE_ID`, see `test/util/test_backend.dart`)
+  /// instead of the emulator. Tests that pin a limitation of the emulator check
+  /// the backend's real answer when it is true.
+  static bool get enterpriseUsesRealProject =>
+      TestBackend().enterpriseUsesRealProject;
+
+  /// The reason to skip an Enterprise edition test that pins a limitation of
+  /// the emulator, or null against a real database:
+  /// `test('...', skip: skipOnEnterpriseEmulator('what the emulator does'), ...)`.
+  static String? skipOnEnterpriseEmulator(String reason) =>
+      TestBackend().skipOnEnterpriseEmulator(reason);
+
+  /// The reason to skip an Enterprise edition test that cannot run against the
+  /// shared real database, or null against the emulator.
+  static String? skipOnRealEnterprise(String reason) =>
+      TestBackend().skipOnRealEnterprise(reason);
 
   /// Whether the standard suite runs against an Enterprise edition emulator
   /// (`tool/test_integration.sh enterprise`).
@@ -111,19 +132,28 @@ class IntegrationTestUtil {
   static String? skipOnEnterprise(String reason) =>
       TestBackend().skipOnEnterprise(reason);
 
-  /// The project of the Enterprise edition emulator.
-  static const String enterpriseProjectId = FirestoreProvider.fallbackProjectId;
+  /// The project of the Enterprise edition backend: the real project when [enterpriseUsesRealProject], else the
+  /// project of the emulator.
+  static String get enterpriseProjectId =>
+      TestBackend().enterpriseUsesRealProject
+      ? TestBackend().realProjectId!
+      : FirestoreProvider.fallbackProjectId;
 
-  /// The database of the Enterprise edition emulator that [testEnterpriseFirestore] uses: a new one for every test
-  /// file (each file runs in an isolate of its own), so that the files that run at the same time do not share their
-  /// data.
+  /// The database that [testEnterpriseFirestore] uses. Against a real project it is the one named database of
+  /// `FIRESTORE_ENTERPRISE_TEST_DATABASE_ID`, shared by every file (the tests write to collections with unique ids).
+  ///
+  /// On the emulator it is a new one for every test file (each file runs in an isolate of its own), so that the
+  /// files that run at the same time do not share their data.
   ///
   /// The emulator (v1.22.0) keeps the locks of an atomic pipeline (`execute(atomic: true)`) that fails, for about a
   /// minute, and they block every write to the same database: one such test held up the writes of the files next
   /// to it until they timed out after 30 s. Its locks do not reach another database. A database of its own also
   /// keeps a collection group or `database()` pipeline from reading what the other files and earlier runs wrote.
   /// The emulator creates a database on its first use.
-  static final String enterpriseDatabaseId =
+  static String get enterpriseDatabaseId =>
+      TestBackend().realEnterpriseDatabaseId ?? _enterpriseEmulatorDatabaseId;
+
+  static final String _enterpriseEmulatorDatabaseId =
       'it-$pid-${Random.secure().nextInt(1 << 32).toRadixString(36)}';
 
   /// Whether the suite runs against a real Firebase project (opt-in with
@@ -143,7 +173,7 @@ class IntegrationTestUtil {
     // `webchannel-longpolling` requests the streams in long polling mode.
     final bool longPolling = transport == 'webchannel-longpolling';
     final FirestoreTransport Function(FirestoreTransport, DatabaseInfo)?
-        decorate = transportDecorator;
+    decorate = transportDecorator;
     if (transport != 'webchannel' && !longPolling) {
       if (decorate != null) {
         Datastore.transportOverride =
@@ -158,31 +188,33 @@ class IntegrationTestUtil {
     }
     Datastore.transportOverride =
         (DatabaseInfo databaseInfo, ChannelOptionsProvider options) {
-      final FirestoreTransport web = WebChannelTransport(
-        IoWebHttpClient(),
-        DatabaseInfo(
-          databaseInfo.databaseId,
-          databaseInfo.persistenceKey,
-          databaseInfo.host,
-          port: databaseInfo.port,
-          sslEnabled: databaseInfo.sslEnabled,
-          forceLongPolling: longPolling,
-          autoDetectLongPolling:
-              !longPolling && databaseInfo.autoDetectLongPolling,
-          longPollingOptions: databaseInfo.longPollingOptions,
-        ),
-        options,
-      );
-      return decorate == null ? web : decorate(web, databaseInfo);
-    };
+          final FirestoreTransport web = WebChannelTransport(
+            IoWebHttpClient(),
+            DatabaseInfo(
+              databaseInfo.databaseId,
+              databaseInfo.persistenceKey,
+              databaseInfo.host,
+              port: databaseInfo.port,
+              sslEnabled: databaseInfo.sslEnabled,
+              forceLongPolling: longPolling,
+              autoDetectLongPolling:
+                  !longPolling && databaseInfo.autoDetectLongPolling,
+              longPollingOptions: databaseInfo.longPollingOptions,
+            ),
+            options,
+          );
+          return decorate == null ? web : decorate(web, databaseInfo);
+        };
     return true;
   }
 
   /// Wraps the transport of every client created afterwards, whatever the transport of the run is: for tests that
   /// record what goes over the wire (see `WireRecorder` of the chaos tests). Set it back to null afterwards.
   static FirestoreTransport Function(
-      FirestoreTransport transport, DatabaseInfo databaseInfo)?
-      transportDecorator;
+    FirestoreTransport transport,
+    DatabaseInfo databaseInfo,
+  )?
+  transportDecorator;
 
   /// Whether [useWebTransportIfRequested] installed a decorated gRPC transport, to remove it again.
   static bool _decorated = false;
@@ -216,46 +248,72 @@ class IntegrationTestUtil {
 
   static Settings _emulatorSettings(String emulator) {
     final EmulatorAddress address = EmulatorAddress.parse(emulator);
-    return Settings(
-        host: address.host, port: address.port, sslEnabled: false);
+    return Settings(host: address.host, port: address.port, sslEnabled: false);
   }
 
   /// Initializes a new Firestore instance that talks to the Enterprise edition
-  /// emulator, on [enterpriseDatabaseId] unless [databaseId] names another
-  /// database. Guard the tests that use it with [enterpriseEmulatorSkipReason].
-  static Future<FirebaseFirestore> testEnterpriseFirestore([String? dbPath,
-      String? databaseId]) {
+  /// backend, on [enterpriseDatabaseId] unless [databaseId] names another
+  /// database. The backend is the emulator of `FIRESTORE_ENTERPRISE_EMULATOR_HOST`,
+  /// or, when [enterpriseUsesRealProject], the real project on the production
+  /// host with Application Default Credentials (as [testFirestore] does for a
+  /// real project). Guard the tests that use it with
+  /// [enterpriseEmulatorSkipReason].
+  static Future<FirebaseFirestore> testEnterpriseFirestore([
+    String? dbPath,
+    String? databaseId,
+  ]) {
     final String? emulator = enterpriseEmulatorHost;
-    if (emulator == null) {
+    final Settings settings;
+    if (emulator != null) {
+      settings = _emulatorSettings(emulator);
+    } else if (enterpriseUsesRealProject) {
+      useWebTransportIfRequested();
+      settings = Settings();
+    } else {
       throw StateError(enterpriseEmulatorSkipReason!);
     }
     return testFirestoreInstance(
       enterpriseProjectId,
       InternalLogLevel.w,
-      _emulatorSettings(emulator),
+      settings,
       dbPath ?? currentDatabasePath,
       databaseName: databaseId ?? enterpriseDatabaseId,
     );
   }
 
-  /// Deletes all the documents of [enterpriseDatabaseId] from the Enterprise edition emulator.
-  static Future<void> clearEnterpriseEmulatorData() => _clearEmulatorData(
-      enterpriseEmulatorHost, enterpriseProjectId, enterpriseDatabaseId);
+  /// Deletes all the documents of [enterpriseDatabaseId] from the Enterprise edition emulator. Does nothing against
+  /// a real project: its database is shared and never bulk-deleted.
+  static Future<void> clearEnterpriseEmulatorData() async {
+    if (enterpriseUsesRealProject) {
+      return;
+    }
+    await _clearEmulatorData(
+      enterpriseEmulatorHost,
+      enterpriseProjectId,
+      enterpriseDatabaseId,
+    );
+  }
 
   /// Deletes all the documents from the emulator for the test project.
   static Future<void> clearEmulatorData() =>
       _clearEmulatorData(emulatorHost, provider.projectId);
 
-  static Future<void> _clearEmulatorData(String? emulator, String projectId,
-      [String databaseId = DatabaseId.defaultDatabaseId]) async {
+  static Future<void> _clearEmulatorData(
+    String? emulator,
+    String projectId, [
+    String databaseId = DatabaseId.defaultDatabaseId,
+  ]) async {
     if (emulator == null) {
       return;
     }
 
     final HttpClient client = HttpClient();
     try {
-      final HttpClientRequest request = await client.deleteUrl(Uri.parse(
-          'http://$emulator/emulator/v1/projects/$projectId/databases/$databaseId/documents'));
+      final HttpClientRequest request = await client.deleteUrl(
+        Uri.parse(
+          'http://$emulator/emulator/v1/projects/$projectId/databases/$databaseId/documents',
+        ),
+      );
       final HttpClientResponse response = await request.close();
       await response.drain<void>();
     } finally {
@@ -265,8 +323,10 @@ class IntegrationTestUtil {
 
   /// Initializes a new Firestore instance that uses the default project, customized with the provided settings if
   /// provided.
-  static Future<FirebaseFirestore> testFirestore(
-      [Settings? settings, String? dbPath]) async {
+  static Future<FirebaseFirestore> testFirestore([
+    Settings? settings,
+    String? dbPath,
+  ]) async {
     return testFirestoreInstance(
       provider.projectId,
       InternalLogLevel.w,
@@ -288,19 +348,23 @@ class IntegrationTestUtil {
   }
 
   static Future<FirebaseFirestore> forTests(
-      DatabaseId databaseId,
-      String persistenceKey,
-      CredentialsProvider provider,
-      TaskScheduler scheduler,
-      OpenDatabase openDatabase,
-      Settings settings,
-      {ConnectivityChangeDetector? connectivityDetector,
-      SharedClientStateStorage? sharedClientStateStorage}) async {
+    DatabaseId databaseId,
+    String persistenceKey,
+    CredentialsProvider provider,
+    TaskScheduler scheduler,
+    OpenDatabase openDatabase,
+    Settings settings, {
+    ConnectivityChangeDetector? connectivityDetector,
+    SharedClientStateStorage? sharedClientStateStorage,
+  }) async {
     final DatabaseInfo databaseInfo = DatabaseInfo(
-        databaseId, persistenceKey, settings.host,
-        port: settings.port,
-        sslEnabled: settings.sslEnabled,
-        grpcFlowControlWindow: settings.grpcFlowControlWindow);
+      databaseId,
+      persistenceKey,
+      settings.host,
+      port: settings.port,
+      sslEnabled: settings.sslEnabled,
+      grpcFlowControlWindow: settings.grpcFlowControlWindow,
+    );
 
     final BehaviorSubject<bool> onNetworkConnected =
         BehaviorSubject<bool>.seeded(true);
@@ -328,18 +392,24 @@ class IntegrationTestUtil {
   /// [persistenceKey] replaces the generated one (clients that share their state need the same key), and
   /// [sharedClientStateStorage] makes the client share its state with the other clients of its cache (see
   /// `FirestoreClient.start`).
-  static Future<FirebaseFirestore> testFirestoreInstance(String projectId,
-      InternalLogLevel logLevel, Settings settings, String dbPath,
-      {String? fixedDbName,
-      String databaseName = DatabaseId.defaultDatabaseId,
-      ConnectivityChangeDetector? connectivityDetector,
-      String? persistenceKey,
-      SharedClientStateStorage? sharedClientStateStorage}) async {
+  static Future<FirebaseFirestore> testFirestoreInstance(
+    String projectId,
+    InternalLogLevel logLevel,
+    Settings settings,
+    String dbPath, {
+    String? fixedDbName,
+    String databaseName = DatabaseId.defaultDatabaseId,
+    ConnectivityChangeDetector? connectivityDetector,
+    String? persistenceKey,
+    SharedClientStateStorage? sharedClientStateStorage,
+  }) async {
     // This unfortunately is a global setting that affects existing Firestore clients.
     Log.level = logLevel;
 
-    final DatabaseId databaseId =
-        DatabaseId.forDatabase(projectId, databaseName);
+    final DatabaseId databaseId = DatabaseId.forDatabase(
+      projectId,
+      databaseName,
+    );
     persistenceKey ??= 'db${firestoreStatus.length}';
 
     print('index: $dbIndex');
@@ -355,28 +425,34 @@ class IntegrationTestUtil {
     // Only requests to production Firestore of an opted-in real project carry
     // a token; the emulators get none.
     final bool authenticate =
-        usesRealProject && settings.host == TestBackend.productionHost;
+        (usesRealProject || enterpriseUsesRealProject) &&
+        settings.host == TestBackend.productionHost;
     final MockCredentialsProvider credentialsProvider = MockCredentialsProvider(
-        tokenSource: authenticate ? _realProjectTokens : null);
+      tokenSource: authenticate ? _realProjectTokens : null,
+    );
     final FirebaseFirestore firestore = await forTests(
       databaseId,
       persistenceKey,
       credentialsProvider,
       scheduler,
-      (String path,
-          {int? version,
-          OnConfigure? onConfigure,
-          OnCreate? onCreate,
-          OnVersionChange? onUpgrade,
-          OnVersionChange? onDowngrade,
-          OnOpen? onOpen}) async {
-        final DatabaseMock db = await DatabaseMock.create(dbName,
-            version: version,
-            onConfigure: onConfigure,
-            onCreate: onCreate,
-            onUpgrade: onUpgrade,
-            onDowngrade: onDowngrade,
-            onOpen: onOpen);
+      (
+        String path, {
+        int? version,
+        OnConfigure? onConfigure,
+        OnCreate? onCreate,
+        OnVersionChange? onUpgrade,
+        OnVersionChange? onDowngrade,
+        OnOpen? onOpen,
+      }) async {
+        final DatabaseMock db = await DatabaseMock.create(
+          dbName,
+          version: version,
+          onConfigure: onConfigure,
+          onCreate: onCreate,
+          onUpgrade: onUpgrade,
+          onDowngrade: onDowngrade,
+          onOpen: onOpen,
+        );
         db.renamePath = false;
         return db;
       },
@@ -425,29 +501,35 @@ class IntegrationTestUtil {
   }
 
   static Future<DocumentReference> testDocumentWithData(
-      Map<String, Object?> data) async {
+    Map<String, Object?> data,
+  ) async {
     final DocumentReference docRef = await testDocument();
     await docRef.set(data);
     return docRef;
   }
 
   static Future<CollectionReference> testCollection([String? name]) async {
-    return (await testFirestore())
-        .collection(name == null ? autoId() : '$name${autoId()}');
+    return (await testFirestore()).collection(
+      name == null ? autoId() : '$name${autoId()}',
+    );
   }
 
   static Future<CollectionReference> testCollectionWithDocs(
-      Map<String, Map<String, Object?>> docs) async {
+    Map<String, Map<String, Object?>> docs,
+  ) async {
     final CollectionReference collection = await testCollection();
-    final CollectionReference writer =
-        (await testFirestore()).collection(collection.id);
+    final CollectionReference writer = (await testFirestore()).collection(
+      collection.id,
+    );
 
     await writeAllDocs(writer, docs);
     return collection;
   }
 
-  static Future<void> writeAllDocs(CollectionReference collection,
-      Map<String, Map<String, Object?>> docs) async {
+  static Future<void> writeAllDocs(
+    CollectionReference collection,
+    Map<String, Map<String, Object?>> docs,
+  ) async {
     for (MapEntry<String, Map<String, Object?>> doc in docs.entries) {
       await collection.doc(doc.key).set(doc.value);
     }
@@ -457,20 +539,33 @@ class IntegrationTestUtil {
   /// `checkOnlineAndOfflineResultsMatch`). [collection] is read first to populate the cache; the order of the steps
   /// matters. When [expectedDocs] is not empty the server result must be exactly that list of ids.
   static Future<void> checkOnlineAndOfflineResultsMatch(
-      Query collection, Query query, List<String> expectedDocs) async {
+    Query collection,
+    Query query,
+    List<String> expectedDocs,
+  ) async {
     // 1- Pre-populate the cache with the entire collection.
     await collection.get(GetOptions(source: Source.server));
     // 2- Query the cache with a full collection scan.
-    final QuerySnapshot fromCacheFullScan = await query.get(GetOptions(source: Source.cache));
+    final QuerySnapshot fromCacheFullScan = await query.get(
+      GetOptions(source: Source.cache),
+    );
     // 3- Query the backend.
-    final QuerySnapshot fromServer = await query.get(GetOptions(source: Source.server));
+    final QuerySnapshot fromServer = await query.get(
+      GetOptions(source: Source.server),
+    );
     // 4- Query the cache using the remote keys of the query.
-    final QuerySnapshot fromCacheRemoteKeys = await query.get(GetOptions(source: Source.cache));
+    final QuerySnapshot fromCacheRemoteKeys = await query.get(
+      GetOptions(source: Source.cache),
+    );
 
     expect(
-        querySnapshotToIds(fromCacheFullScan), querySnapshotToIds(fromServer));
-    expect(querySnapshotToIds(fromCacheRemoteKeys),
-        querySnapshotToIds(fromServer));
+      querySnapshotToIds(fromCacheFullScan),
+      querySnapshotToIds(fromServer),
+    );
+    expect(
+      querySnapshotToIds(fromCacheRemoteKeys),
+      querySnapshotToIds(fromServer),
+    );
     if (expectedDocs.isNotEmpty) {
       expect(querySnapshotToIds(fromServer), expectedDocs);
     }
@@ -479,25 +574,24 @@ class IntegrationTestUtil {
   /// Port of the upstream `assertSDKQueryResultsConsistentWithBackend`: the cache round trip, then a listener must
   /// first raise the cached and then the server snapshot, both with [expectedDocIds] and the data of [allData].
   static Future<void> assertSDKQueryResultsConsistentWithBackend(
-      Query collection,
-      Query query,
-      Map<String, Map<String, Object?>> allData,
-      List<String> expectedDocIds) async {
+    Query collection,
+    Query query,
+    Map<String, Map<String, Object?>> allData,
+    List<String> expectedDocIds,
+  ) async {
     // Check the cache round trip first so that the listener below can not return partial results of a previous call.
     await checkOnlineAndOfflineResultsMatch(collection, query, expectedDocIds);
 
     final List<QuerySnapshot> snapshots = <QuerySnapshot>[];
     final Completer<void> done = Completer<void>();
-    final StreamSubscription<QuerySnapshot> registration =
-        query.snapshots(includeMetadataChanges: true).listen(
-      (QuerySnapshot snapshot) {
-        snapshots.add(snapshot);
-        if (snapshots.length == 2 && !done.isCompleted) {
-          done.complete();
-        }
-      },
-      onError: done.completeError,
-    );
+    final StreamSubscription<QuerySnapshot> registration = query
+        .snapshots(includeMetadataChanges: true)
+        .listen((QuerySnapshot snapshot) {
+          snapshots.add(snapshot);
+          if (snapshots.length == 2 && !done.isCompleted) {
+            done.complete();
+          }
+        }, onError: done.completeError);
     try {
       await done.future.timeout(const Duration(seconds: 20));
     } finally {
@@ -518,13 +612,15 @@ class IntegrationTestUtil {
   }
 
   static Future<void> waitForOnlineSnapshot(DocumentReference doc) {
-    return doc.snapshots(includeMetadataChanges: true)
+    return doc
+        .snapshots(includeMetadataChanges: true)
         .where((DocumentSnapshot value) => !value.metadata.isFromCache)
         .first;
   }
 
   static List<Map<String, Object?>> querySnapshotToValues(
-      QuerySnapshot querySnapshot) {
+    QuerySnapshot querySnapshot,
+  ) {
     final List<Map<String, Object?>> res = <Map<String, Object?>>[];
     for (DocumentSnapshot doc in querySnapshot) {
       res.add(doc.data()!);
@@ -590,8 +686,10 @@ const double precisionErrorTolerance = 1e-10;
 ///    range.
 ///  * [rectMoreOrLessEquals] and [offsetMoreOrLessEquals], which do something
 ///    similar but for [Rect]s and [Offset]s respectively.
-Matcher moreOrLessEquals(double value,
-    {double epsilon = precisionErrorTolerance}) {
+Matcher moreOrLessEquals(
+  double value, {
+  double epsilon = precisionErrorTolerance,
+}) {
   return _MoreOrLessEquals(value, epsilon);
 }
 
@@ -618,19 +716,27 @@ class _MoreOrLessEquals extends Matcher {
       description.add('$value (±$epsilon)');
 
   @override
-  Description describeMismatch(dynamic item, Description mismatchDescription,
-      Map<dynamic, dynamic> matchState, bool verbose) {
-    return super
-        .describeMismatch(item, mismatchDescription, matchState, verbose)
-      ..add('$item is not in the range of $value (±$epsilon).');
+  Description describeMismatch(
+    dynamic item,
+    Description mismatchDescription,
+    Map<dynamic, dynamic> matchState,
+    bool verbose,
+  ) {
+    return super.describeMismatch(
+      item,
+      mismatchDescription,
+      matchState,
+      verbose,
+    )..add('$item is not in the range of $value (±$epsilon).');
   }
 }
 
 /// A credentials provider that lets a test change the current user.
 class MockCredentialsProvider extends CredentialsProvider {
   // ignore: close_sinks
-  final BehaviorSubject<User> _onChange =
-      BehaviorSubject<User>.seeded(User.unauthenticated);
+  final BehaviorSubject<User> _onChange = BehaviorSubject<User>.seeded(
+    User.unauthenticated,
+  );
 
   MockCredentialsProvider({this.tokenSource});
 

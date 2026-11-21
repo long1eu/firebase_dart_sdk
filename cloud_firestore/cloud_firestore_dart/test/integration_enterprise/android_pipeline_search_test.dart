@@ -27,6 +27,13 @@
 // search) Android's checks apply. The answer (v1.22.0): INVALID_ARGUMENT
 // "The function 'document_matches' does not exist." (or 'geo_distance'). The two `TODO(search)` cases that are
 // commented out in Android are not ported.
+//
+// Against a real Enterprise edition database
+// (IntegrationTestUtil.enterpriseUsesRealProject) that answer is not accepted:
+// every pipeline has to run and return what Android expects. Search needs a
+// text index and a geo index on the "TextSearchIntegrationTests" collection
+// group (description, menu, name; location), so the collection keeps Android's
+// fixed name there; its documents are the same on every run.
 
 // ignore_for_file: prefer_single_quotes, always_specify_types
 // ignore_for_file: lines_longer_than_80_chars, prefer_final_locals
@@ -119,8 +126,13 @@ final Map<String, Map<String, Object?>> restaurantDocs = <String, Object?>{
 
 /// Whether [execute] fails with the emulator's answer to a search stage:
 /// INVALID_ARGUMENT "The function 'document_matches' does not exist." (or
-/// 'geo_distance'). False when the pipeline runs.
+/// 'geo_distance'). False when the pipeline runs. Against a real Enterprise
+/// edition database every failure is rethrown.
 Future<bool> emulatorRejectsSearch(Future<PipelineSnapshot> execute) async {
+  if (IntegrationTestUtil.enterpriseUsesRealProject) {
+    await execute;
+    return false;
+  }
   try {
     await execute;
     return false;

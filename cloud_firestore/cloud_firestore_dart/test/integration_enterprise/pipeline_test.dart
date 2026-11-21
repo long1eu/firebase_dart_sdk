@@ -117,8 +117,9 @@ void main() {
     Pipeline source() => firestore.pipeline().collection(collection);
 
     test('returns the documents of a collection', () async {
-      final PipelineSnapshot snapshot = await source()
-          .sort(<Ordering>[field('__name__').ascending()]).execute();
+      final PipelineSnapshot snapshot = await source().sort(<Ordering>[
+        field('__name__').ascending(),
+      ]).execute();
 
       expect(ids(snapshot), books.keys);
       expect(snapshot.executionTime, isNotNull);
@@ -130,13 +131,17 @@ void main() {
       expect(first.get('awards.hugo'), isTrue);
     });
 
-    test('returns no results and an execution time for an empty collection',
-        () async {
-      final PipelineSnapshot snapshot =
-          await firestore.pipeline().collection('empty_${autoId()}').execute();
-      expect(snapshot.results, isEmpty);
-      expect(snapshot.executionTime, isNotNull);
-    });
+    test(
+      'returns no results and an execution time for an empty collection',
+      () async {
+        final PipelineSnapshot snapshot = await firestore
+            .pipeline()
+            .collection('empty_${autoId()}')
+            .execute();
+        expect(snapshot.results, isEmpty);
+        expect(snapshot.executionTime, isNotNull);
+      },
+    );
 
     test('accepts a collection path', () async {
       final PipelineSnapshot snapshot = await firestore
@@ -150,15 +155,14 @@ void main() {
     test('where, sort, select', () async {
       final PipelineSnapshot snapshot = await source()
           .where(field('rating').greaterThan(4.5))
-          .sort(<Ordering>[field('rating').descending()]).select(<Object>[
-        'title',
-        field('author').toUpper().as('author'),
-      ]).execute();
+          .sort(<Ordering>[field('rating').descending()])
+          .select(<Object>['title', field('author').toUpper().as('author')])
+          .execute();
 
       expect(rows(snapshot), <Map<String, Object?>>[
         <String, Object?>{
           'title': 'The Lord of the Rings',
-          'author': 'J.R.R. TOLKIEN'
+          'author': 'J.R.R. TOLKIEN',
         },
         <String, Object?>{'title': 'Dune', 'author': 'FRANK HERBERT'},
       ]);
@@ -169,15 +173,24 @@ void main() {
 
     test('logical conditions', () async {
       PipelineSnapshot snapshot = await source()
-          .where(and(field('genre').equal('Science Fiction'),
-              field('published').lessThan(1970)))
+          .where(
+            and(
+              field('genre').equal('Science Fiction'),
+              field('published').lessThan(1970),
+            ),
+          )
           .execute();
       expect(ids(snapshot), <String>['book6']);
 
       snapshot = await source()
-          .where(or(field('genre').equal('Romance'),
-              field('genre').equal('Dystopian')))
-          .sort(<Ordering>[field('__name__').ascending()]).execute();
+          .where(
+            or(
+              field('genre').equal('Romance'),
+              field('genre').equal('Dystopian'),
+            ),
+          )
+          .sort(<Ordering>[field('__name__').ascending()])
+          .execute();
       expect(ids(snapshot), <String>['book2', 'book5']);
 
       snapshot = await source()
@@ -187,12 +200,19 @@ void main() {
 
       snapshot = await source()
           .where(field('genre').equalAny(<String>['Romance', 'Fantasy']))
-          .sort(<Ordering>[field('__name__').ascending()]).execute();
+          .sort(<Ordering>[field('__name__').ascending()])
+          .execute();
       expect(ids(snapshot), <String>['book2', 'book4']);
 
       snapshot = await source()
-          .where(field('genre').notEqualAny(
-              <String>['Romance', 'Fantasy', 'Science Fiction', 'Dystopian']))
+          .where(
+            field('genre').notEqualAny(<String>[
+              'Romance',
+              'Fantasy',
+              'Science Fiction',
+              'Dystopian',
+            ]),
+          )
           .execute();
       expect(ids(snapshot), <String>['book3']);
     });
@@ -200,12 +220,14 @@ void main() {
     test('array, map and existence functions', () async {
       PipelineSnapshot snapshot = await source()
           .where(field('tags').arrayContains('adventure'))
-          .sort(<Ordering>[field('__name__').ascending()]).execute();
+          .sort(<Ordering>[field('__name__').ascending()])
+          .execute();
       expect(ids(snapshot), <String>['book1', 'book4']);
 
       snapshot = await source()
           .where(field('tags').arrayContainsAny(<String>['love', 'epic']))
-          .sort(<Ordering>[field('__name__').ascending()]).execute();
+          .sort(<Ordering>[field('__name__').ascending()])
+          .execute();
       expect(ids(snapshot), <String>['book2', 'book4']);
 
       snapshot = await source()
@@ -215,40 +237,42 @@ void main() {
 
       snapshot =
           await source().where(field('awards.nobel').exists()).select(<Object>[
-        field('tags').arrayLength().as('tagCount'),
-        field('awards').mapGet('nobel').as('nobel'),
-        field('awards.hugo').isAbsent().as('noHugo'),
-      ]).execute();
+            field('tags').arrayLength().as('tagCount'),
+            field('awards').mapGet('nobel').as('nobel'),
+            field('awards.hugo').isAbsent().as('noHugo'),
+          ]).execute();
       expect(rows(snapshot), <Map<String, Object?>>[
         <String, Object?>{'tagCount': 3, 'nobel': true, 'noHugo': true},
       ]);
     });
 
     test('arithmetic and string functions', () async {
-      final PipelineSnapshot snapshot =
-          await source().where(field('title').equal('Dune')).select(<Object>[
-        field('published').add(1).as('add'),
-        field('published').subtract(1965).as('subtract'),
-        field('published').multiply(2).as('multiply'),
-        field('published').divide(5).as('divide'),
-        field('published').mod(10).as('mod'),
-        field('title')
-            .stringConcat(<Object?>[' by ', field('author')]).as('concat'),
-        field('title').toLower().as('lower'),
-        field('title').charLength().as('length'),
-        field('title').startsWith('Du').as('starts'),
-        field('title').endsWith('x').as('ends'),
-        field('title').stringContains('un').as('contains'),
-        field('title').like('D%').as('like'),
-        field('title').regexMatch('D.*e').as('regexMatch'),
-        field('author').regexContains('Herb').as('regexContains'),
-        constant('  x ').trim().as('trim'),
-        field('rating')
-            .greaterThan(4.5)
-            .conditional('great', 'good')
-            .as('verdict'),
-        field('__name__').documentId().as('id'),
-      ]).execute();
+      final PipelineSnapshot snapshot = await source()
+          .where(field('title').equal('Dune'))
+          .select(<Object>[
+            field('published').add(1).as('add'),
+            field('published').subtract(1965).as('subtract'),
+            field('published').multiply(2).as('multiply'),
+            field('published').divide(5).as('divide'),
+            field('published').mod(10).as('mod'),
+            field(
+              'title',
+            ).stringConcat(<Object?>[' by ', field('author')]).as('concat'),
+            field('title').toLower().as('lower'),
+            field('title').charLength().as('length'),
+            field('title').startsWith('Du').as('starts'),
+            field('title').endsWith('x').as('ends'),
+            field('title').stringContains('un').as('contains'),
+            field('title').like('D%').as('like'),
+            field('title').regexMatch('D.*e').as('regexMatch'),
+            field('author').regexContains('Herb').as('regexContains'),
+            constant('  x ').trim().as('trim'),
+            field(
+              'rating',
+            ).greaterThan(4.5).conditional('great', 'good').as('verdict'),
+            field('__name__').documentId().as('id'),
+          ])
+          .execute();
 
       expect(rows(snapshot).single, <String, Object?>{
         'add': 1966,
@@ -274,15 +298,15 @@ void main() {
     test('aggregate over everything', () async {
       final PipelineSnapshot snapshot =
           await source().aggregate(<AliasedAggregate>[
-        countAll().as('count'),
-        field('rating').average().as('avg'),
-        field('rating').maximum().as('max'),
-        field('rating').minimum().as('min'),
-        field('published').sum().as('sum'),
-        field('genre').countDistinct().as('genres'),
-        field('rating').greaterThan(4.4).countIf().as('great'),
-        field('awards.hugo').count().as('withHugo'),
-      ]).execute();
+            countAll().as('count'),
+            field('rating').average().as('avg'),
+            field('rating').maximum().as('max'),
+            field('rating').minimum().as('min'),
+            field('published').sum().as('sum'),
+            field('genre').countDistinct().as('genres'),
+            field('rating').greaterThan(4.4).countIf().as('great'),
+            field('awards.hugo').count().as('withHugo'),
+          ]).execute();
 
       final Map<String, Object?> row = rows(snapshot).single;
       expect(row['count'], 6);
@@ -315,16 +339,19 @@ void main() {
 
     test('distinct', () async {
       final PipelineSnapshot snapshot = await source()
-          .distinct(<Object>['genre']).sort(
-              <Ordering>[field('genre').ascending()]).execute();
+          .distinct(<Object>['genre'])
+          .sort(<Ordering>[field('genre').ascending()])
+          .execute();
       expect(
-          rows(snapshot).map((Map<String, Object?> r) => r['genre']), <String>[
-        'Dystopian',
-        'Fantasy',
-        'Magical Realism',
-        'Romance',
-        'Science Fiction',
-      ]);
+        rows(snapshot).map((Map<String, Object?> r) => r['genre']),
+        <String>[
+          'Dystopian',
+          'Fantasy',
+          'Magical Realism',
+          'Romance',
+          'Science Fiction',
+        ],
+      );
     });
 
     test('limit and offset', () async {
@@ -339,9 +366,9 @@ void main() {
     test('addFields and removeFields', () async {
       final PipelineSnapshot snapshot = await source()
           .where(field('title').equal('Dune'))
-          .addFields(<Selectable>[
-        field('published').add(100).as('later')
-      ]).removeFields(<Object>['tags', 'awards', field('author')]).execute();
+          .addFields(<Selectable>[field('published').add(100).as('later')])
+          .removeFields(<Object>['tags', 'awards', field('author')])
+          .execute();
       expect(rows(snapshot).single, <String, Object?>{
         'title': 'Dune',
         'genre': 'Science Fiction',
@@ -357,14 +384,16 @@ void main() {
       final PipelineSnapshot snapshot = await source()
           .where(field('title').equal('Dune'))
           .unnest(field('tags').as('tag'), indexField: 'index')
-          .select(<Object>['tag', 'index']).execute();
+          .select(<Object>['tag', 'index'])
+          .execute();
       expect(
-          rows(snapshot),
-          unorderedEquals(<Map<String, Object?>>[
-            <String, Object?>{'tag': 'politics', 'index': 0},
-            <String, Object?>{'tag': 'desert', 'index': 1},
-            <String, Object?>{'tag': 'ecology', 'index': 2},
-          ]));
+        rows(snapshot),
+        unorderedEquals(<Map<String, Object?>>[
+          <String, Object?>{'tag': 'politics', 'index': 0},
+          <String, Object?>{'tag': 'desert', 'index': 1},
+          <String, Object?>{'tag': 'ecology', 'index': 2},
+        ]),
+      );
     });
 
     test('replaceWith', () async {
@@ -372,8 +401,10 @@ void main() {
           .where(field('title').equal('Dune'))
           .replaceWith('awards')
           .execute();
-      expect(rows(snapshot).single,
-          <String, Object?>{'hugo': true, 'nebula': true});
+      expect(rows(snapshot).single, <String, Object?>{
+        'hugo': true,
+        'nebula': true,
+      });
     });
 
     test('union', () async {
@@ -385,84 +416,100 @@ void main() {
     });
 
     test('sample', () async {
-      final PipelineSnapshot snapshot =
-          await source().sample(documents: 3).execute();
+      final PipelineSnapshot snapshot = await source()
+          .sample(documents: 3)
+          .execute();
       expect(snapshot.results, hasLength(3));
     });
 
     test('documents', () async {
-      final PipelineSnapshot snapshot =
-          await firestore.pipeline().documents(<Object>[
-        collection.doc('book2'),
-        '${collection.path}/book5',
-      ]).sort(<Ordering>[field('__name__').ascending()]).execute();
+      final PipelineSnapshot snapshot = await firestore
+          .pipeline()
+          .documents(<Object>[
+            collection.doc('book2'),
+            '${collection.path}/book5',
+          ])
+          .sort(<Ordering>[field('__name__').ascending()])
+          .execute();
       expect(ids(snapshot), <String>['book2', 'book5']);
     });
 
     test('collectionGroup', () async {
       final String groupId = 'group_${autoId()}';
-      await firestore
-          .collection('a/b/$groupId')
-          .doc('x')
-          .set(<String, Object?>{'n': 1});
-      await firestore
-          .collection('c/d/$groupId')
-          .doc('y')
-          .set(<String, Object?>{'n': 2});
+      await firestore.collection('a/b/$groupId').doc('x').set(<String, Object?>{
+        'n': 1,
+      });
+      await firestore.collection('c/d/$groupId').doc('y').set(<String, Object?>{
+        'n': 2,
+      });
 
       final PipelineSnapshot snapshot = await firestore
           .pipeline()
           .collectionGroup(groupId)
-          .sort(<Ordering>[field('n').ascending()]).execute();
+          .sort(<Ordering>[field('n').ascending()])
+          .execute();
       expect(ids(snapshot), <String>['x', 'y']);
       expect(snapshot.results.first.ref!.path, 'a/b/$groupId/x');
     });
 
-    test('literals', () async {
-      final PipelineSnapshot snapshot = await firestore
-          .pipeline()
-          .literals(<Map<String, Object?>>[
-            <String, Object?>{'name': 'a', 'n': 1},
-            <String, Object?>{'name': 'b', 'n': constant(1).add(2)},
-          ])
-          .where(field('n').greaterThan(1))
-          .execute();
-      expect(rows(snapshot), <Map<String, Object?>>[
-        <String, Object?>{'name': 'b', 'n': 3},
-      ]);
-    },
-        // Verified with an admin (`Bearer owner`) REST call that the server
-        // accepts this encoding; see also the serialization unit tests.
-        skip: 'The emulator rejects the literals source for clients that are '
-            'subject to security rules (permission-denied: No matching allow '
-            'statements), even with allow-all rules.');
+    test(
+      'literals',
+      () async {
+        final PipelineSnapshot snapshot = await firestore
+            .pipeline()
+            .literals(<Map<String, Object?>>[
+              <String, Object?>{'name': 'a', 'n': 1},
+              <String, Object?>{'name': 'b', 'n': constant(1).add(2)},
+            ])
+            .where(field('n').greaterThan(1))
+            .execute();
+        expect(rows(snapshot), <Map<String, Object?>>[
+          <String, Object?>{'name': 'b', 'n': 3},
+        ]);
+      },
+      // Verified with an admin (`Bearer owner`) REST call that the server
+      // accepts this encoding; see also the serialization unit tests.
+      skip: IntegrationTestUtil.skipOnEnterpriseEmulator(
+        'The emulator rejects the literals source for clients that are '
+        'subject to security rules (permission-denied: No matching allow '
+        'statements), even with allow-all rules.',
+      ),
+    );
 
     test('findNearest', () async {
-      final CollectionReference<Map<String, Object?>> vectors =
-          firestore.collection('vectors_${autoId()}');
+      final CollectionReference<Map<String, Object?>> vectors = firestore
+          .collection('vectors_${autoId()}');
       await vectors.doc('near').set(<String, Object?>{
-        'embedding': VectorValue(<double>[1, 1])
+        'embedding': VectorValue(<double>[1, 1]),
       });
       await vectors.doc('far').set(<String, Object?>{
-        'embedding': VectorValue(<double>[10, 10])
+        'embedding': VectorValue(<double>[10, 10]),
       });
       await vectors.doc('none').set(<String, Object?>{'other': 1});
 
       final PipelineSnapshot snapshot = await firestore
           .pipeline()
           .collection(vectors)
-          .findNearest('embedding', <double>[1, 2], DistanceMeasure.euclidean,
-              limit: 2, distanceField: 'distance')
+          .findNearest(
+            'embedding',
+            <double>[1, 2],
+            DistanceMeasure.euclidean,
+            limit: 2,
+            distanceField: 'distance',
+          )
           .execute();
       expect(ids(snapshot), <String>['near', 'far']);
       expect(snapshot.results.first.get('distance'), closeTo(1, 1e-9));
       expect(
-          snapshot.results.first.get('embedding'), VectorValue(<double>[1, 1]));
+        snapshot.results.first.get('embedding'),
+        VectorValue(<double>[1, 1]),
+      );
     });
 
     test('constants of every type round trip', () async {
-      final DocumentReference<Map<String, Object?>> reference =
-          collection.doc('book1');
+      final DocumentReference<Map<String, Object?>> reference = collection.doc(
+        'book1',
+      );
       final Map<String, Object?> values = <String, Object?>{
         'null': null,
         'bool': true,
@@ -475,7 +522,7 @@ void main() {
         'vector': VectorValue(<double>[1, 2]),
         'list': <Object?>[1, 'a', null],
         'map': <String, Object?>{
-          'nested': <Object?>[true]
+          'nested': <Object?>[true],
         },
       };
       final PipelineSnapshot snapshot = await source().limit(1).select(<Object>[
@@ -488,8 +535,10 @@ void main() {
       values.forEach((String key, Object? value) {
         expect(result.get(key), value, reason: key);
       });
-      expect((result.get('ref')! as DocumentReference<Object?>).path,
-          reference.path);
+      expect(
+        (result.get('ref')! as DocumentReference<Object?>).path,
+        reference.path,
+      );
     });
 
     group('more functions', () {
@@ -503,184 +552,216 @@ void main() {
 
       test('math', () async {
         expect(
-            await select(<Selectable>[
-              constant(-2).abs().as('abs'),
-              constant(1.2).ceil().as('ceil'),
-              constant(1.8).floor().as('floor'),
-              constant(1.26).round(1).as('round'),
-              constant(2).pow(3).as('pow'),
-              constant(16).sqrt().as('sqrt'),
-              constant(0).exp().as('exp'),
-              constant(1).ln().as('ln'),
-              constant(8).log(2).as('log'),
-              constant(1).logicalMaximum(<Object?>[3, 2]).as('max'),
-              constant(1).logicalMinimum(<Object?>[3, 2]).as('min'),
-            ]),
-            <String, Object?>{
-              'abs': 2,
-              'ceil': 2.0,
-              'floor': 1.0,
-              'round': 1.3,
-              'pow': 8.0,
-              'sqrt': 4.0,
-              'exp': 1.0,
-              'ln': 0.0,
-              'log': 3.0,
-              'max': 3,
-              'min': 1,
-            });
+          await select(<Selectable>[
+            constant(-2).abs().as('abs'),
+            constant(1.2).ceil().as('ceil'),
+            constant(1.8).floor().as('floor'),
+            constant(1.26).round(1).as('round'),
+            constant(2).pow(3).as('pow'),
+            constant(16).sqrt().as('sqrt'),
+            constant(0).exp().as('exp'),
+            constant(1).ln().as('ln'),
+            constant(8).log(2).as('log'),
+            constant(1).logicalMaximum(<Object?>[3, 2]).as('max'),
+            constant(1).logicalMinimum(<Object?>[3, 2]).as('min'),
+          ]),
+          <String, Object?>{
+            'abs': 2,
+            'ceil': 2.0,
+            'floor': 1.0,
+            'round': 1.3,
+            'pow': 8.0,
+            'sqrt': 4.0,
+            'exp': 1.0,
+            'ln': 0.0,
+            'log': 3.0,
+            'max': 3,
+            'min': 1,
+          },
+        );
       });
 
       test('strings', () async {
         expect(
-            await select(<Selectable>[
-              field('title').substring(1, 2).as('substring'),
-              field('title').stringReverse().as('reverse'),
-              field('title').stringRepeat(2).as('repeat'),
-              field('title').stringIndexOf('n').as('indexOf'),
-              field('title').stringReplaceAll('u', 'oo').as('replaceAll'),
-              field('author').split(' ').as('split'),
-              field('tags').join('+').as('join'),
-              field('title').byteLength().as('bytes'),
-              constant('xxaxx').ltrim('x').as('ltrim'),
-              constant('xxaxx').rtrim('x').as('rtrim'),
-              field('title').type().as('type'),
-            ]),
-            <String, Object?>{
-              'substring': 'un',
-              'reverse': 'enuD',
-              'repeat': 'DuneDune',
-              'indexOf': 2,
-              'replaceAll': 'Doone',
-              'split': <String>['Frank', 'Herbert'],
-              'join': 'politics+desert+ecology',
-              'bytes': 4,
-              'ltrim': 'axx',
-              'rtrim': 'xxa',
-              'type': 'string',
-            });
+          await select(<Selectable>[
+            field('title').substring(1, 2).as('substring'),
+            field('title').stringReverse().as('reverse'),
+            field('title').stringRepeat(2).as('repeat'),
+            field('title').stringIndexOf('n').as('indexOf'),
+            field('title').stringReplaceAll('u', 'oo').as('replaceAll'),
+            field('author').split(' ').as('split'),
+            field('tags').join('+').as('join'),
+            field('title').byteLength().as('bytes'),
+            constant('xxaxx').ltrim('x').as('ltrim'),
+            constant('xxaxx').rtrim('x').as('rtrim'),
+            field('title').type().as('type'),
+          ]),
+          <String, Object?>{
+            'substring': 'un',
+            'reverse': 'enuD',
+            'repeat': 'DuneDune',
+            'indexOf': 2,
+            'replaceAll': 'Doone',
+            'split': <String>['Frank', 'Herbert'],
+            'join': 'politics+desert+ecology',
+            'bytes': 4,
+            'ltrim': 'axx',
+            'rtrim': 'xxa',
+            'type': 'string',
+          },
+        );
       });
 
       test('arrays and maps', () async {
         expect(
-            await select(<Selectable>[
-              field('tags').arrayGet(1).as('get'),
-              field('tags').arrayReverse().as('reverse'),
-              field('tags').arrayConcat(<Object?>[
-                <String>['x']
-              ]).as('concat'),
-              field('tags').arrayFirst().as('first'),
-              field('tags').arrayLast().as('last'),
-              field('tags').arrayIndexOf('desert').as('indexOf'),
-              field('awards').mapKeys().as('keys'),
-              field('awards').mapRemove('hugo').as('removed'),
-              field('awards')
-                  .mapMerge(map(<String, Object?>{'extra': 1}))
-                  .as('merged'),
-              array(<Object?>[1, field('published')]).as('array'),
-              field('missing').ifAbsent('default').as('ifAbsent'),
-              field('missing').isAbsent().as('isAbsent'),
-            ]),
-            <String, Object?>{
-              'get': 'desert',
-              'reverse': <String>['ecology', 'desert', 'politics'],
-              'concat': <String>['politics', 'desert', 'ecology', 'x'],
-              'first': 'politics',
-              'last': 'ecology',
-              'indexOf': 1,
-              'keys': unorderedEquals(<String>['hugo', 'nebula']),
-              'removed': <String, Object?>{'nebula': true},
-              'merged': <String, Object?>{
-                'hugo': true,
-                'nebula': true,
-                'extra': 1
-              },
-              'array': <Object?>[1, 1965],
-              'ifAbsent': 'default',
-              'isAbsent': true,
-            });
+          await select(<Selectable>[
+            field('tags').arrayGet(1).as('get'),
+            field('tags').arrayReverse().as('reverse'),
+            field('tags')
+                .arrayConcat(<Object?>[
+                  <String>['x'],
+                ])
+                .as('concat'),
+            field('tags').arrayFirst().as('first'),
+            field('tags').arrayLast().as('last'),
+            field('tags').arrayIndexOf('desert').as('indexOf'),
+            field('awards').mapKeys().as('keys'),
+            field('awards').mapRemove('hugo').as('removed'),
+            field(
+              'awards',
+            ).mapMerge(map(<String, Object?>{'extra': 1})).as('merged'),
+            array(<Object?>[1, field('published')]).as('array'),
+            field('missing').ifAbsent('default').as('ifAbsent'),
+            field('missing').isAbsent().as('isAbsent'),
+          ]),
+          <String, Object?>{
+            'get': 'desert',
+            'reverse': <String>['ecology', 'desert', 'politics'],
+            'concat': <String>['politics', 'desert', 'ecology', 'x'],
+            'first': 'politics',
+            'last': 'ecology',
+            'indexOf': 1,
+            'keys': unorderedEquals(<String>['hugo', 'nebula']),
+            'removed': <String, Object?>{'nebula': true},
+            'merged': <String, Object?>{
+              'hugo': true,
+              'nebula': true,
+              'extra': 1,
+            },
+            'array': <Object?>[1, 1965],
+            'ifAbsent': 'default',
+            'isAbsent': true,
+          },
+        );
       });
 
       test('timestamps and vectors', () async {
         const Timestamp time = Timestamp(86400, 0);
         expect(
-            await select(<Selectable>[
-              constant(time).timestampAdd('day', 1).as('add'),
-              constant(time).timestampSubtract('hour', 24).as('subtract'),
-              constant(time).timestampToUnixSeconds().as('seconds'),
-              constant(86400000).unixMillisToTimestamp().as('fromMillis'),
-              constant(VectorValue(<double>[3, 4]))
-                  .euclideanDistance(<double>[0, 0]).as('euclidean'),
-              constant(VectorValue(<double>[1, 2]))
-                  .dotProduct(<double>[3, 4]).as('dot'),
-              constant(VectorValue(<double>[1, 2])).vectorLength().as('dims'),
-              field('__name__').collectionId().as('collection'),
-            ]),
-            <String, Object?>{
-              'add': const Timestamp(172800, 0),
-              'subtract': const Timestamp(0, 0),
-              'seconds': 86400,
-              'fromMillis': time,
-              'euclidean': 5.0,
-              'dot': 11.0,
-              'dims': 2,
-              'collection': collection.id,
-            });
+          await select(<Selectable>[
+            constant(time).timestampAdd('day', 1).as('add'),
+            constant(time).timestampSubtract('hour', 24).as('subtract'),
+            constant(time).timestampToUnixSeconds().as('seconds'),
+            constant(86400000).unixMillisToTimestamp().as('fromMillis'),
+            constant(
+              VectorValue(<double>[3, 4]),
+            ).euclideanDistance(<double>[0, 0]).as('euclidean'),
+            constant(
+              VectorValue(<double>[1, 2]),
+            ).dotProduct(<double>[3, 4]).as('dot'),
+            constant(VectorValue(<double>[1, 2])).vectorLength().as('dims'),
+            field('__name__').collectionId().as('collection'),
+          ]),
+          <String, Object?>{
+            'add': const Timestamp(172800, 0),
+            'subtract': const Timestamp(0, 0),
+            'seconds': 86400,
+            'fromMillis': time,
+            'euclidean': 5.0,
+            'dot': 11.0,
+            'dims': 2,
+            'collection': collection.id,
+          },
+        );
       });
 
       test('aggregates', () async {
-        final PipelineSnapshot snapshot = await source().sort(<Ordering>[
-          field('published').ascending()
-        ]).aggregate(<AliasedAggregate>[
-          field('genre').arrayAggDistinct().as('genres'),
-          field('published').arrayAgg().as('years'),
-        ]).execute();
+        final PipelineSnapshot snapshot = await source()
+            .sort(<Ordering>[field('published').ascending()])
+            .aggregate(<AliasedAggregate>[
+              field('genre').arrayAggDistinct().as('genres'),
+              field('published').arrayAgg().as('years'),
+            ])
+            .execute();
         final Map<String, Object?> row = rows(snapshot).single;
         expect(
-            row['genres'],
-            unorderedEquals(<String>[
-              'Dystopian',
-              'Fantasy',
-              'Magical Realism',
-              'Romance',
-              'Science Fiction'
-            ]));
-        expect(row['years'],
-            unorderedEquals(<int>[1979, 1813, 1967, 1954, 1985, 1965]));
+          row['genres'],
+          unorderedEquals(<String>[
+            'Dystopian',
+            'Fantasy',
+            'Magical Realism',
+            'Romance',
+            'Science Fiction',
+          ]),
+        );
+        expect(
+          row['years'],
+          unorderedEquals(<int>[1979, 1813, 1967, 1954, 1985, 1965]),
+        );
       });
     });
 
     test('rawStage and raw functions', () async {
-      final PipelineSnapshot snapshot =
-          await source().rawStage('where', <Object?>[
-        FunctionExpression('equal', <Object?>[field('title'), 'Dune'])
-      ]).rawStage('select', <Object?>[
-        <String, Object?>{
-          'title': field('title'),
-          'reversed':
-              FunctionExpression('string_reverse', <Object?>[field('title')]),
-        }
-      ]).execute();
-      expect(rows(snapshot).single,
-          <String, Object?>{'title': 'Dune', 'reversed': 'enuD'});
+      final PipelineSnapshot snapshot = await source()
+          .rawStage('where', <Object?>[
+            FunctionExpression('equal', <Object?>[field('title'), 'Dune']),
+          ])
+          .rawStage('select', <Object?>[
+            <String, Object?>{
+              'title': field('title'),
+              'reversed': FunctionExpression('string_reverse', <Object?>[
+                field('title'),
+              ]),
+            },
+          ])
+          .execute();
+      expect(rows(snapshot).single, <String, Object?>{
+        'title': 'Dune',
+        'reversed': 'enuD',
+      });
     });
 
     test('fails with invalid-argument for an unknown function', () async {
       await expectLater(
-          source()
-              .where(FunctionExpression('no_such_fn', <Object?>[field('a')])
-                  .asBoolean())
-              .execute(),
-          throwsA(isA<FirestoreException>().having((FirestoreException e) => e.errorCode,
-              'code', FirestoreErrorCode.invalidArgument)));
+        source()
+            .where(
+              FunctionExpression('no_such_fn', <Object?>[
+                field('a'),
+              ]).asBoolean(),
+            )
+            .execute(),
+        throwsA(
+          isA<FirestoreException>().having(
+            (FirestoreException e) => e.errorCode,
+            'code',
+            FirestoreErrorCode.invalidArgument,
+          ),
+        ),
+      );
     });
 
     test('fails with unavailable while the network is disabled', () async {
       await firestore.disableNetwork();
       await expectLater(
-          source().execute(),
-          throwsA(isA<FirestoreException>().having((FirestoreException e) => e.errorCode,
-              'code', FirestoreErrorCode.unavailable)));
+        source().execute(),
+        throwsA(
+          isA<FirestoreException>().having(
+            (FirestoreException e) => e.errorCode,
+            'code',
+            FirestoreErrorCode.unavailable,
+          ),
+        ),
+      );
       await firestore.enableNetwork();
       expect((await source().execute()).results, hasLength(6));
     });
@@ -688,9 +769,9 @@ void main() {
     test('does not see pending writes', () async {
       await firestore.disableNetwork();
       // Not awaited: the write stays pending while offline.
-      final Future<void> write = collection
-          .doc('book7')
-          .set(<String, Object?>{'title': 'Pending'});
+      final Future<void> write = collection.doc('book7').set(<String, Object?>{
+        'title': 'Pending',
+      });
       await firestore.enableNetwork();
       await write;
       expect((await source().execute()).results, hasLength(7));
@@ -698,12 +779,14 @@ void main() {
 
     group('createFrom(query) returns what the query returns', () {
       Future<void> check(Query<Map<String, Object?>> query) async {
-        final List<String> expected = (await query.get(GetOptions(source: Source.server)))
-            .docs
-            .map((QueryDocumentSnapshot<Map<String, Object?>> d) => d.id)
-            .toList();
-        final PipelineSnapshot snapshot =
-            await firestore.pipeline().createFrom(query).execute();
+        final List<String> expected =
+            (await query.get(GetOptions(source: Source.server))).docs
+                .map((QueryDocumentSnapshot<Map<String, Object?>> d) => d.id)
+                .toList();
+        final PipelineSnapshot snapshot = await firestore
+            .pipeline()
+            .createFrom(query)
+            .execute();
         expect(ids(snapshot), expected);
         expect(expected, isNotEmpty, reason: 'the case must match something');
       }
@@ -717,57 +800,69 @@ void main() {
         await check(collection.where('published', isLessThanOrEqualTo: 1965));
         await check(collection.where('tags', arrayContains: 'adventure'));
         await check(
-            collection.where('tags', arrayContainsAny: <String>['love', 'epic']));
+          collection.where('tags', arrayContainsAny: <String>['love', 'epic']),
+        );
         await check(
-            collection.where('genre', whereIn: <String>['Romance', 'Fantasy']));
+          collection.where('genre', whereIn: <String>['Romance', 'Fantasy']),
+        );
         await check(collection.where('genre', whereIn: <String>['Romance']));
         await check(
-            collection.where('genre', whereNotIn: <String>['Romance', 'Fantasy']));
+          collection.where('genre', whereNotIn: <String>['Romance', 'Fantasy']),
+        );
         await check(collection.where('awards.hugo', isEqualTo: true));
       });
 
       test('composite filters', () async {
-        await check(collection.where(Filter.or(<Filter>[
-          Filter('genre', isEqualTo: 'Romance'),
-          Filter.and(<Filter>[
-            Filter('rating', isGreaterThan: 4.5),
-            Filter('published', isLessThan: 1960),
-          ]),
-        ])));
+        await check(
+          collection.where(
+            Filter.or(<Filter>[
+              Filter('genre', isEqualTo: 'Romance'),
+              Filter.and(<Filter>[
+                Filter('rating', isGreaterThan: 4.5),
+                Filter('published', isLessThan: 1960),
+              ]),
+            ]),
+          ),
+        );
       });
 
       test('orderings', () async {
         await check(collection.orderBy('published'));
         await check(collection.orderBy('published', descending: true));
-        await check(collection
-            .orderBy('genre').orderBy('rating', descending: true));
+        await check(
+          collection.orderBy('genre').orderBy('rating', descending: true),
+        );
         // Only documents that have the field are returned.
         await check(collection.orderBy('awards.hugo'));
       });
 
       test('limits', () async {
         await check(collection.orderBy('published').limit(2));
-        await check(
-            collection.orderBy('published', descending: true).limit(2));
+        await check(collection.orderBy('published', descending: true).limit(2));
         await check(collection.orderBy('published').limitToLast(2));
-        await check(collection.orderBy('published', descending: true)
-            .limitToLast(2));
+        await check(
+          collection.orderBy('published', descending: true).limitToLast(2),
+        );
       });
 
       test('cursors', () async {
-        final Query<Map<String, Object?>> ascending =
-            collection.orderBy('published');
+        final Query<Map<String, Object?>> ascending = collection.orderBy(
+          'published',
+        );
         await check(ascending.startAt(<Object?>[1965]));
         await check(ascending.startAfter(<Object?>[1965]));
         await check(ascending.endAt(<Object?>[1965]));
         await check(ascending.endBefore(<Object?>[1965]));
         await check(
-            ascending.startAfter(<Object?>[1813]).endBefore(<Object?>[1985]));
+          ascending.startAfter(<Object?>[1813]).endBefore(<Object?>[1985]),
+        );
       });
 
       test('cursors with a descending ordering', () async {
-        final Query<Map<String, Object?>> descending =
-            collection.orderBy('published', descending: true);
+        final Query<Map<String, Object?>> descending = collection.orderBy(
+          'published',
+          descending: true,
+        );
         await check(descending.startAt(<Object?>[1965]));
         await check(descending.startAfter(<Object?>[1965]));
         await check(descending.endAt(<Object?>[1965]));
@@ -775,24 +870,38 @@ void main() {
       });
 
       test('document cursors and several orderings', () async {
-        final DocumentSnapshot<Map<String, Object?>> middle =
-            await collection.doc('book3').get();
+        final DocumentSnapshot<Map<String, Object?>> middle = await collection
+            .doc('book3')
+            .get();
         await check(collection.orderBy('genre').startAtDocument(middle));
         await check(collection.orderBy('genre').startAfterDocument(middle));
-        await check(collection.orderBy('genre', descending: true)
-            .startAtDocument(middle));
-        await check(collection.orderBy('genre', descending: true)
-            .endAtDocument(middle));
-        await check(collection
-            .orderBy('genre').orderBy('rating', descending: true)
-            .startAfter(<Object?>['Science Fiction', 4.6]));
+        await check(
+          collection.orderBy('genre', descending: true).startAtDocument(middle),
+        );
+        await check(
+          collection.orderBy('genre', descending: true).endAtDocument(middle),
+        );
+        await check(
+          collection
+              .orderBy('genre')
+              .orderBy('rating', descending: true)
+              .startAfter(<Object?>['Science Fiction', 4.6]),
+        );
       });
 
       test('cursors with limitToLast', () async {
-        await check(collection.orderBy('published')
-            .endBefore(<Object?>[1985]).limitToLast(2));
-        await check(collection.orderBy('published', descending: true)
-            .startAfter(<Object?>[1985]).limitToLast(2));
+        await check(
+          collection
+              .orderBy('published')
+              .endBefore(<Object?>[1985])
+              .limitToLast(2),
+        );
+        await check(
+          collection
+              .orderBy('published', descending: true)
+              .startAfter(<Object?>[1985])
+              .limitToLast(2),
+        );
       });
     });
   }, skip: skip);

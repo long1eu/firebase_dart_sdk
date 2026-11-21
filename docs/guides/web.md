@@ -4,8 +4,8 @@ This page shows you how to use `cloud_firestore_dart` in a Dart web app or a Flu
 connect, choose a cache, run several clients in one page, keep the bundle small, and pick a
 compiler. It also lists what does not work in a browser yet.
 
-**Web is supported in Chrome.** It was tested in Chrome only, against the Firestore emulator
-only; Firefox, Safari and Edge are untested. [`examples/web_app/`](../../examples/web_app/) is a
+**Web is supported in Chrome.** It is tested in Chrome, against the Firestore emulator
+only. Firefox passed the browser test suite (dart2js and dart2wasm, 2026-11-21, not in CI); a Safari run (dart2js) had timeouts that are not explained yet; Edge is untested. [`examples/web_app/`](../../examples/web_app/) is a
 complete app you can build and open in a browser, and
 [`examples/flutter_web_two_users/`](../../examples/flutter_web_two_users/) a Flutter web page
 with two signed-in users side by side.
@@ -92,7 +92,7 @@ What does not, or was not tried:
 
 | Item | Status |
 | --- | --- |
-| Browsers other than Chrome | Not tested (Firefox, Safari, Edge; also not the OPFS cache). |
+| Browsers other than Chrome | Firefox passed the browser test suite (dart2js and dart2wasm, 2026-11-21, not in CI); a Safari run (dart2js) had timeouts that are not explained yet; Edge is untested. |
 | The production backend from a browser | Not tested. The browser tests and the example ran against the emulator only. |
 | A persistent cache in several tabs | Only the IndexedDB cache with `multiTab: true` (preview, Chrome only), see [Multi-tab mode](#multi-tab-mode-preview). The SQLite caches: one tab at a time, see [One tab at a time](#one-tab-at-a-time). |
 | Integers above 2^53 with dart2js | Lose precision. Use dart2wasm if you store such integers. |
@@ -659,7 +659,7 @@ Limits:
   start with `unimplemented`.
 - Only the IndexedDB cache. The SQLite caches (IndexedDB, OPFS) stay at one tab. On the Dart VM,
   clients on one SQLite file still do not share state through the public API.
-- Tested in Chrome only, with dart2js and dart2wasm against the emulator. The automated tests run
+- Tested in Chrome, with dart2js and dart2wasm against the emulator (the same tests passed in Firefox on 2026-11-21). The automated tests run
   in headless Chrome, where no tab is hidden.
 - Tried on 2026-11-20 in a visible Chrome 157 window on macOS with two tabs of the
   [web example](../../examples/web_app), seven runs (three dart2wasm, four dart2js), driven by a

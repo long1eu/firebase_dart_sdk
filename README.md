@@ -36,7 +36,7 @@ endorsed by Google or Firebase.
 
 - FlutterFire already works for you on Android, iOS or the web: Google's SDKs come with support and years of
   production use. This client was checked against a real database only by a 15-check kit. On the web it was
-  run in Chrome against the emulator only (Firefox, Safari and production untested).
+  run in Chrome against the emulator only (Firefox passed the browser tests once; Safari and production untested).
 - You need several browser tabs on one cache: only the IndexedDB cache has it (`multiTab: true`, a preview, not
   released yet), and never beside a JS SDK tab. The SQLite caches stay at one tab, and isolates on the Dart VM
   do not share listeners.
