@@ -10,5 +10,9 @@ service firebase.storage {
     match /shared/{allPaths=**} {
       allow read, write: if request.auth != null;
     }
+    // The production verification kit (tool/verify_production_storage) writes here as a signed-in user.
+    match /verify_storage_kit/{allPaths=**} {
+      allow read, write: if request.auth != null;
+    }
   }
 }
