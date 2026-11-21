@@ -124,7 +124,7 @@ void main() {
 
   test('a write that fails leaves nothing behind', () async {
     // The path is a directory with something in it: the rename onto it fails.
-    final String path = '${root.path}/s.json';
+    final String path = '${root.path}${Platform.pathSeparator}s.json';
     Directory(path).createSync();
     File('$path/keep').writeAsStringSync('x');
     await expectLater(

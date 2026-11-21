@@ -241,20 +241,31 @@ Map<String, String>? _queryOf(Uri uri) {
 }
 
 /// The body of [request], or null when it is larger than [maxFormBytes].
+///
+/// The rest of a body that is too large is read and dropped, up to [_maxDrainedBytes]: an answer
+/// sent while the client is still writing closes the connection with unread data, and on Windows
+/// the client then sees a reset instead of the answer.
 Future<Uint8List?> _readBody(HttpRequest request) async {
   final BytesBuilder bytes = BytesBuilder(copy: false);
+  int seen = 0;
   try {
     await for (final Uint8List chunk in request) {
-      bytes.add(chunk);
-      if (bytes.length > maxFormBytes) {
+      seen += chunk.length;
+      if (seen > _maxDrainedBytes) {
         return null;
+      }
+      if (seen <= maxFormBytes) {
+        bytes.add(chunk);
       }
     }
   } on HttpException {
     return null;
   }
-  return bytes.takeBytes();
+  return seen > maxFormBytes ? null : bytes.takeBytes();
 }
+
+/// How much of a body [_readBody] reads before it gives up on the connection.
+const int _maxDrainedBytes = 1024 * 1024;
 
 /// A one-shot HTTP server on the loopback interface: bound by [bind], closed by [close].
 final class LoopbackServer {
