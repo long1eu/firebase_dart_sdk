@@ -250,7 +250,7 @@ needs a browser page, a webview or a native SDK. Emulator column: what the Auth 
 | `linkWithCredential`, `unlink` | **yes (tier 1)** | `signInWithIdp` with `idToken`; `accounts:signUp` with an ID token for a password; `accounts:update` with `deleteProvider` | yes |
 | `account-exists-with-different-credential`, `credential-already-in-use` with recoverable credential | **yes (tier 1)** | `FirebaseAuthException.email` and `.credential` | yes |
 | TOTP multi-factor | **yes (unreleased)** | `startTotpEnrollment`, `finalizeTotpEnrollment`, `unenrollMultiFactor`, `AuthUser.enrolledFactors`, `FirebaseAuthMultiFactorException.resolver`; v2 `mfaEnrollment:start/finalize/withdraw` and `mfaSignIn:finalize` as JSON (the published protos lack the TOTP fields); needs Identity Platform; unit tests against a fake backend, not run against the real service | **no (SMS only)** |
-| `revokeAccessToken` (Apple) | no | `v2/accounts:revokeToken` | **no (501)** |
+| `revokeAccessToken` (Apple) | **yes (unreleased)** | `revokeAccessToken(token)` and `revokeToken(authorizationCode)`, `v2/accounts:revokeToken` with `tenantId`; unit tests only, not run against a real project | **no (501)** |
 | OAuth popup/redirect on the web | no | port the popup/redirect resolver with `package:web`: open `/__/auth/handler`, iframe messaging, event ids, authorized-domain check; 1,000+ lines of JS logic | yes (local handler) |
 | Google sign-in on desktop/CLI | no | browser via loopback redirect + PKCE with the app's own "Desktop" OAuth client (`googleapis_auth` already does this on VM), then `signInWithIdp` with the ID token | exchange part yes |
 | Microsoft, Yahoo, GitHub, generic OIDC on desktop/CLI | no | same loopback flow with the app's own registration at the provider; client id must match the Firebase provider config | exchange part yes |
@@ -300,7 +300,7 @@ against a throwaway real project (owner action: it needs a project and its Web A
 | --- | --- | --- |
 | TOTP multi-factor: enrol, sign in with the resolver, unenrol, list factors, QR URL (`openInOtpApp` stays in a Flutter adapter) | 2 days, 600 lines | unit; real project with Identity Platform (emulator TOTP not documented) |
 | Desktop/CLI OAuth helper (`lib/src/oauth_loopback/`, VM only): browser open, 127.0.0.1 redirect, PKCE, state, timeout; presets for Google and generic OIDC; then tier 1 credentials. **Done (unreleased)**: `signInWithOAuthLoopback`, `authorizeWithOAuthLoopback`, `OAuthLoopbackProvider.google` / `.oidc` / `.discover`; direct code exchange or through `google_sign_in_dart`'s exchange endpoint contract | about 870 lines, plus 550 of tests | unit with an in-process fake IdP (19 tests); not run with a real Google client or project |
-| `revokeAccessToken` (Apple) | 2 h, 60 lines | unit |
+| `revokeAccessToken` (Apple). **Done (unreleased)**: `revokeAccessToken` and `revokeToken` | 2 h, 60 lines | unit |
 | reCAPTCHA Enterprise token on the web for projects that enforce it | 2 days, 400 lines | Chrome with a real site key (owner) |
 | Web popup/redirect resolver with `package:web` | 5 to 8 days, 1,500 lines | Chrome against the emulator's handler; real project for authorized domains |
 

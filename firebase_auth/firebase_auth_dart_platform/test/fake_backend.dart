@@ -10,6 +10,11 @@ import 'package:http/testing.dart';
 String _encode(Object json) =>
     base64Url.encode(utf8.encode(jsonEncode(json))).replaceAll('=', '');
 
+/// An unsigned JWT with [claims].
+String unsignedJwt(Map<String, Object?> claims) =>
+    '${_encode(<String, Object?>{'alg': 'none', 'typ': 'JWT'})}.'
+    '${_encode(claims)}.';
+
 /// An unsigned ID token for [uid].
 String idToken(
   String uid, {
@@ -18,17 +23,16 @@ String idToken(
   int serial = 0,
 }) {
   final int now = DateTime.now().millisecondsSinceEpoch ~/ 1000;
-  return '${_encode(<String, Object?>{'alg': 'none', 'typ': 'JWT'})}.'
-      '${_encode(<String, Object?>{
-        'user_id': uid,
-        'sub': uid,
-        'email': ?email,
-        'auth_time': now,
-        'iat': now,
-        'exp': now + 3600,
-        'serial': serial,
-        'firebase': <String, Object?>{'sign_in_provider': provider},
-      })}.';
+  return unsignedJwt(<String, Object?>{
+    'user_id': uid,
+    'sub': uid,
+    'email': ?email,
+    'auth_time': now,
+    'iat': now,
+    'exp': now + 3600,
+    'serial': serial,
+    'firebase': <String, Object?>{'sign_in_provider': provider},
+  });
 }
 
 http.Response jsonResponse(Object body, [int status = 200]) => http.Response(
@@ -48,7 +52,17 @@ class FakeBackend {
   /// Answers the next request instead of the default backend, when set.
   http.Response? Function(http.Request request)? override;
 
+  /// The second factors of each account (`mfaInfo` entries), by uid. A
+  /// password sign-in of an account with factors answers with the pending
+  /// credential `pending:<uid>`.
+  final Map<String, List<Map<String, Object?>>> factors =
+      <String, List<Map<String, Object?>>>{};
+
+  /// The code the TOTP endpoints accept.
+  static const String totpCode = '123456';
+
   int _serial = 0;
+  int _enrolled = 0;
 
   late final MockClient client = MockClient((http.Request request) async {
     requests.add(request);
@@ -78,6 +92,10 @@ class FakeBackend {
     }
     final Map<String, Object?> body =
         jsonDecode(request.body) as Map<String, Object?>;
+    final http.Response? multiFactor = _multiFactor(path, body);
+    if (multiFactor != null) {
+      return multiFactor;
+    }
     if (path.endsWith('accounts:lookup')) {
       final Map<String, dynamic> claims = _claims(body['idToken']! as String);
       final String? email = claims['email'] as String?;
@@ -89,6 +107,8 @@ class FakeBackend {
             'displayName': 'Ada',
             'createdAt': '1700000000000',
             'lastLoginAt': '1700000001000',
+            if (factors[claims['sub']]?.isNotEmpty ?? false)
+              'mfaInfo': factors[claims['sub']],
             if (email != null) 'passwordHash': 'hash',
             if (email != null)
               'providerUserInfo': <Object?>[
@@ -145,6 +165,94 @@ class FakeBackend {
       ),
       'refreshToken': 'refresh:$uid',
       'expiresIn': '3600',
+    });
+  }
+
+  /// The answer of a v2 multi-factor endpoint, or of a password sign-in of an
+  /// account with factors; null for any other request.
+  http.Response? _multiFactor(String path, Map<String, Object?> body) {
+    if (path.endsWith('accounts:signInWithPassword')) {
+      final String uid = 'uid-of-${body['email']}';
+      final List<Map<String, Object?>>? enrolled = factors[uid];
+      if (enrolled == null || enrolled.isEmpty) {
+        return null;
+      }
+      return jsonResponse(<String, Object?>{
+        'localId': uid,
+        'email': body['email'],
+        'mfaPendingCredential': 'pending:$uid',
+        'mfaInfo': enrolled,
+      });
+    }
+    if (path.endsWith('mfaEnrollment:start')) {
+      return jsonResponse(<String, Object?>{
+        'totpSessionInfo': <String, Object?>{
+          'sharedSecretKey': 'GEZDGNBVGY3TQOJQ',
+          'verificationCodeLength': 6,
+          'hashingAlgorithm': 'SHA1',
+          'periodSec': 30,
+          'sessionInfo': 'enrollment-session',
+          'finalizeEnrollmentTime': '2026-01-01T12:10:00Z',
+        },
+      });
+    }
+    if (path.endsWith('mfaEnrollment:finalize')) {
+      final Map<String, Object?> info =
+          body['totpVerificationInfo']! as Map<String, Object?>;
+      if (info['verificationCode'] != totpCode) {
+        return errorResponse('INVALID_CODE');
+      }
+      final Map<String, dynamic> claims = _claims(body['idToken']! as String);
+      (factors[claims['sub'] as String] ??= <Map<String, Object?>>[])
+          .add(<String, Object?>{
+            'mfaEnrollmentId': 'totp-${++_enrolled}',
+            'displayName': body['displayName'],
+            'totpInfo': <String, Object?>{},
+            'enrolledAt': '2026-01-01T12:00:00Z',
+          });
+      return _tokensOf(claims);
+    }
+    if (path.endsWith('mfaEnrollment:withdraw')) {
+      final Map<String, dynamic> claims = _claims(body['idToken']! as String);
+      final List<Map<String, Object?>>? enrolled = factors[claims['sub']];
+      final int before = enrolled?.length ?? 0;
+      enrolled?.removeWhere(
+        (Map<String, Object?> f) =>
+            f['mfaEnrollmentId'] == body['mfaEnrollmentId'],
+      );
+      if ((enrolled?.length ?? 0) == before) {
+        return errorResponse('MFA_ENROLLMENT_NOT_FOUND');
+      }
+      return _tokensOf(claims);
+    }
+    if (path.endsWith('mfaSignIn:finalize')) {
+      final String uid = (body['mfaPendingCredential']! as String).substring(
+        'pending:'.length,
+      );
+      final Map<String, Object?> info =
+          body['totpVerificationInfo']! as Map<String, Object?>;
+      if (info['verificationCode'] != totpCode) {
+        return errorResponse('INVALID_CODE');
+      }
+      return _tokensOf(<String, dynamic>{
+        'sub': uid,
+        'email': uid.substring('uid-of-'.length),
+      });
+    }
+    return null;
+  }
+
+  /// New tokens for the account of [claims], as the v2 endpoints return them.
+  http.Response _tokensOf(Map<String, dynamic> claims) {
+    final String uid = claims['sub'] as String;
+    return jsonResponse(<String, Object?>{
+      'idToken': idToken(
+        uid,
+        provider: 'password',
+        email: claims['email'] as String?,
+        serial: ++_serial,
+      ),
+      'refreshToken': 'refresh:$uid',
     });
   }
 

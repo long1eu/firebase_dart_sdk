@@ -699,6 +699,42 @@ void main() {
     expect(github.useNonce, isFalse);
   });
 
+  test('copyWith replaces the scopes and parameters and keeps the rest', () {
+    Future<Map<String, Object?>> exchange(OAuthAuthorizationCode code) async =>
+        <String, Object?>{};
+    final OAuthLoopbackProvider original = OAuthLoopbackProvider.oidc(
+      providerId: 'oidc.x',
+      authorizationEndpoint: Uri.parse('https://idp.example.com/authorize'),
+      tokenEndpoint: Uri.parse('https://idp.example.com/token'),
+      clientId: 'c',
+      clientSecret: 's',
+      exchangeCode: exchange,
+      customParameters: <String, String>{'prompt': 'login'},
+      redirectPath: '/cb',
+      port: 4000,
+    );
+    final OAuthLoopbackProvider copy = original.copyWith(
+      scopes: <String>['openid', 'extra'],
+      customParameters: <String, String>{'hd': 'example.com'},
+    );
+    expect(copy.scopes, <String>['openid', 'extra']);
+    expect(copy.customParameters, <String, String>{'hd': 'example.com'});
+    expect(copy.providerId, 'oidc.x');
+    expect(copy.authorizationEndpoint, original.authorizationEndpoint);
+    expect(copy.tokenEndpoint, original.tokenEndpoint);
+    expect(copy.clientId, 'c');
+    expect(copy.clientSecret, 's');
+    expect(copy.exchangeCode, same(original.exchangeCode));
+    expect(copy.useNonce, isTrue);
+    expect(copy.sendNonceToFirebase, isTrue);
+    expect(copy.redirectPath, '/cb');
+    expect(copy.port, 4000);
+
+    final OAuthLoopbackProvider unchanged = original.copyWith();
+    expect(unchanged.scopes, original.scopes);
+    expect(unchanged.customParameters, <String, String>{'prompt': 'login'});
+  });
+
   test('endpoints must be https except on loopback', () {
     expect(
       () => OAuthLoopbackProvider.oidc(

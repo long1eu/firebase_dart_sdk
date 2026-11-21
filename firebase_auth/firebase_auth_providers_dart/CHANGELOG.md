@@ -87,6 +87,10 @@
   link and unlink on an existing account). The backend accepts only a token of the GitHub app configured in the
   project, and the callback URL of the app must be `http://127.0.0.1` without a `/` at the end. All of it is in the
   README.
+- `FirebaseUserAuth.setStorage(storage)` keeps the session in another `AuthStorage` from now on and moves the
+  current one there (`setPersistence` of the JS SDK). The session is written to the new storage first and deleted
+  from the old one after; when the write fails, nothing changes.
+- `OAuthLoopbackProvider.copyWith(scopes:, customParameters:)`.
 
 ## 0.3.0
 

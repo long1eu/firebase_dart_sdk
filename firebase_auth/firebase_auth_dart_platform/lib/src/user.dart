@@ -12,32 +12,28 @@ import 'multi_factor.dart';
 class DartUser extends UserPlatform {
   DartUser(DartFirebaseAuth auth, this.source)
     : _auth = auth,
-      super(auth, DartMultiFactor(auth), userDetailsOf(source));
+      super(auth, DartMultiFactor(auth, source.uid), userDetailsOf(source));
 
   final DartFirebaseAuth _auth;
 
   /// The user of `firebase_auth_providers_dart` this one shows.
   final dart_auth.AuthUser source;
 
-  dart_auth.FirebaseUserAuth get _client {
-    final dart_auth.FirebaseUserAuth userAuth = _auth.client;
-    if (userAuth.uid != uid) {
-      throw noCurrentUser();
-    }
-    return userAuth;
-  }
+  dart_auth.FirebaseUserAuth get _client => _auth.clientFor(uid);
 
   @override
-  Future<void> delete() => guard(() => _client.deleteCurrentUser());
+  Future<void> delete() => guard(_auth, () => _client.deleteCurrentUser());
 
   @override
   Future<String?> getIdToken(bool forceRefresh) => guard(
+    _auth,
     () async =>
         (await _client.getAccessToken(forceRefresh: forceRefresh)).token,
   );
 
   @override
   Future<IdTokenResult> getIdTokenResult(bool forceRefresh) => guard(
+    _auth,
     () async => idTokenResultOf(
       await _client.getAccessToken(forceRefresh: forceRefresh),
     ),
@@ -47,6 +43,7 @@ class DartUser extends UserPlatform {
   Future<UserCredentialPlatform> linkWithCredential(
     AuthCredential credential,
   ) => guard(
+    _auth,
     () async => _auth.resultOf(
       await _client.linkWithCredential(clientCredentialOf(credential)),
     ),
@@ -56,6 +53,7 @@ class DartUser extends UserPlatform {
   Future<UserCredentialPlatform> reauthenticateWithCredential(
     AuthCredential credential,
   ) => guard(
+    _auth,
     () async => _auth.resultOf(
       await _client.reauthenticateWithCredential(
         clientCredentialOf(credential),
@@ -64,11 +62,12 @@ class DartUser extends UserPlatform {
   );
 
   @override
-  Future<void> reload() => guard(() => _client.reload());
+  Future<void> reload() => guard(_auth, () => _client.reload());
 
   @override
   Future<void> sendEmailVerification(ActionCodeSettings? actionCodeSettings) =>
       guard(
+        _auth,
         () => _client.sendEmailVerification(
           actionCodeSettings: actionCodeSettingsOf(actionCodeSettings),
         ),
@@ -76,21 +75,21 @@ class DartUser extends UserPlatform {
 
   @override
   Future<UserPlatform> unlink(String providerId) =>
-      guard(() async => _auth.userOf(await _client.unlink(providerId))!);
+      guard(_auth, () async => _auth.userOf(await _client.unlink(providerId))!);
 
   @override
   Future<void> updateEmail(String newEmail) =>
-      guard(() => _client.updateEmail(newEmail));
+      guard(_auth, () => _client.updateEmail(newEmail));
 
   @override
   Future<void> updatePassword(String newPassword) =>
-      guard(() => _client.updatePassword(newPassword));
+      guard(_auth, () => _client.updatePassword(newPassword));
 
   /// `firebase_auth` passes the fields to change; a null value removes the
   /// field. The client keeps a field for null and removes it for an empty
   /// string.
   @override
-  Future<void> updateProfile(Map<String, String?> profile) => guard(() {
+  Future<void> updateProfile(Map<String, String?> profile) => guard(_auth, () {
     String? valueOf(String key) =>
         profile.containsKey(key) ? profile[key] ?? '' : null;
     return _client.updateProfile(
@@ -104,23 +103,52 @@ class DartUser extends UserPlatform {
     String newEmail, [
     ActionCodeSettings? actionCodeSettings,
   ]) => guard(
+    _auth,
     () => _client.verifyBeforeUpdateEmail(
       newEmail,
       actionCodeSettings: actionCodeSettingsOf(actionCodeSettings),
     ),
   );
 
-  // ---- not available: see the README ----
-
+  /// Links the provider through the system browser and a loopback redirect,
+  /// with the `OAuthLoopbackProvider` passed to `FirebaseAuthDart.use` for the
+  /// id of [provider] (see `DartFirebaseAuth.signInWithProvider`).
   @override
-  Future<UserCredentialPlatform> linkWithProvider(
-    AuthProvider provider,
-  ) async => throw unimplemented('linkWithProvider', noProviderFlow);
+  Future<UserCredentialPlatform> linkWithProvider(AuthProvider provider) =>
+      guard(_auth, () async {
+        final dart_auth.FirebaseUserAuth userAuth = _client;
+        final dart_auth.OAuthLoopbackProvider loopback = _auth
+            .loopbackProviderFor('linkWithProvider', provider);
+        return _auth.resultOf(
+          await userAuth.linkWithOAuthLoopback(
+            loopback,
+            presenter: _auth.presentUrl,
+          ),
+        );
+      });
 
+  /// Signs this user in again through the system browser and a loopback
+  /// redirect, with the `OAuthLoopbackProvider` passed to
+  /// `FirebaseAuthDart.use` for the id of [provider] (see
+  /// `DartFirebaseAuth.signInWithProvider`).
   @override
   Future<UserCredentialPlatform> reauthenticateWithProvider(
     AuthProvider provider,
-  ) async => throw unimplemented('reauthenticateWithProvider', noProviderFlow);
+  ) => guard(_auth, () async {
+    final dart_auth.FirebaseUserAuth userAuth = _client;
+    final dart_auth.OAuthLoopbackProvider loopback = _auth.loopbackProviderFor(
+      'reauthenticateWithProvider',
+      provider,
+    );
+    return _auth.resultOf(
+      await userAuth.reauthenticateWithOAuthLoopback(
+        loopback,
+        presenter: _auth.presentUrl,
+      ),
+    );
+  });
+
+  // ---- not available: see the README ----
 
   @override
   Future<UserCredentialPlatform> linkWithPopup(AuthProvider provider) async =>

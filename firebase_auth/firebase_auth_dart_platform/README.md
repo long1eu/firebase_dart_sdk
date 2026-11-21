@@ -53,6 +53,8 @@ Future<void> main() async {
 | `storageFor` | a file per program (see below); memory on Android, iOS and the web | Returns the `AuthStorage` that keeps the session of a FlutterFire app, for example a `FileAuthStorage` at a path of your choice, or one on top of a secure storage plugin. |
 | `httpClient` | one per app | The `http.Client` of the requests (tests, proxies). |
 | `useDartCore` | Linux only, when `firebase_core` has no other implementation | Installs a small pure-Dart `firebase_core`. Pass `true` to force it (tests), `false` to never do it. |
+| `oauthProviders` | none | The `OAuthLoopbackProvider`s of `signInWithProvider`, `User.linkWithProvider` and `User.reauthenticateWithProvider`, one per Firebase provider id (see [Provider sign-in](#provider-sign-in)). |
+| `presentUrl` | the system browser on macOS, Linux and Windows | Opens the authorization URL of a provider sign-in, for example `url_launcher`'s `launchUrl`. Needed on Android and iOS: without it the provider calls throw `unimplemented`. |
 
 `use()` throws a `StateError` once the `FirebaseAuth` of an app has been used, because the configuration is read
 then.
@@ -97,6 +99,44 @@ do not share a file and `setupFirebaseCoreMocks` keeps working; call `use()` to 
 `setPersistence(Persistence.NONE)` (or `SESSION`) moves the session to memory, so the user is signed out at the next
 start; `Persistence.LOCAL` moves it back.
 
+## Provider sign-in
+
+`signInWithProvider`, `User.linkWithProvider` and `User.reauthenticateWithProvider` run the loopback OAuth flow of
+`firebase_auth_providers_dart`: the authorization URL opens in the system browser, the provider redirects to a
+one-shot server on 127.0.0.1, and the code is exchanged for the provider's tokens (PKCE, RFC 8252). Pass one
+`OAuthLoopbackProvider` per provider to `use`; the call picks the one whose `providerId` is the id of the FlutterFire
+provider (`google.com` for `GoogleAuthProvider`, `github.com` for `GithubAuthProvider`, `oidc.<name>` for
+`OAuthProvider('oidc.<name>')`, ...):
+
+```dart
+FirebaseAuthDart.use(
+  oauthProviders: <OAuthLoopbackProvider>[
+    OAuthLoopbackProvider.google(
+      clientId: '<the client id of a "Desktop app" OAuth client>',
+      clientSecret: '<its client secret>', // not confidential for a desktop client, says Google
+    ),
+    OAuthLoopbackProvider.github(clientId: '<OAuth App client id>', clientSecret: '<its secret>'),
+  ],
+  // Optional on macOS, Linux and Windows (the system browser opens); needed on Android and iOS.
+  presentUrl: (Uri url) => launchUrl(url),
+);
+
+final UserCredential result = await FirebaseAuth.instance.signInWithProvider(
+  GoogleAuthProvider()..addScope('https://www.googleapis.com/auth/drive.file'),
+);
+```
+
+- The scopes (`addScope`) and custom parameters (`setCustomParameters`) of the FlutterFire provider are added to the
+  request of the registered one; a custom parameter of both takes the FlutterFire provider's value.
+- A provider id without an `OAuthLoopbackProvider` throws `unimplemented`, with a message that names the id.
+- The errors are those of the client's flow: `timeout` (five minutes), `user-cancelled`, `invalid-credential`, ...
+  `linkWithProvider` and `reauthenticateWithProvider` throw `no-current-user` before the browser opens when the user
+  is no longer signed in.
+- `OAuthLoopbackProvider` comes from `firebase_auth_providers_dart` and is exported by this package. Its README
+  ("Browser sign-in on desktop and command line") says how to set up the OAuth clients of Google, GitHub and OpenID
+  Connect providers.
+- On the web the flow does not exist: the calls throw `unimplemented`.
+
 ## Firestore
 
 The Firestore platform package sends requests as the signed-in user through `tokenProviderFor`. Two ways, on any
@@ -135,28 +175,31 @@ the new user, `await provider.waitForCurrentUser()` first. `userAuthFor` has no 
 | `authStateChanges()`, `idTokenChanges()`, `userChanges()` | implemented, tested |
 | `tenantId`, `languageCode`, `setLanguageCode`, `useAuthEmulator`, `setPersistence` | implemented, tested |
 | Errors: `FirebaseAuthException` with the client's code (the codes of the JS SDK), `email`, `credential`, `phoneNumber`, `tenantId`; a recoverable credential goes back to `signInWithCredential` unchanged; other errors of the client (`ArgumentError` as `argument-error`, `StateError` and file errors as `internal-error`) are `FirebaseAuthException`s too | implemented, tested |
-| `multi-factor-auth-required`: a `FirebaseAuthMultiFactorException` whose `resolver.hints` lists the factors | implemented, tested; the resolver cannot finish the sign-in (below) |
+| `multi-factor-auth-required`: a `FirebaseAuthMultiFactorException` whose `resolver.hints` lists the factors and whose `resolver.resolveSignIn` finishes the sign-in or reauthentication with `TotpMultiFactorGenerator.getAssertionForSignIn` | implemented, tested |
+| Authenticator app (TOTP) second factors: `User.multiFactor` (`getSession`, `enroll`, `unenroll`, `getEnrolledFactors`), `TotpMultiFactorGenerator` (`generateSecret`, `getAssertionForEnrollment`, `getAssertionForSignIn`), `TotpSecret.generateQrCodeUrl`. SMS factors are listed and can be unenrolled | implemented, tested |
+| `signInWithProvider`, `User.linkWithProvider`, `User.reauthenticateWithProvider` through the loopback OAuth flow, with the providers passed to `use` | implemented, tested with a simulated browser |
 
 These throw a `FirebaseAuthException` with the code `unimplemented` and a message that says why:
 
-- **Provider flows**: `signInWithProvider`, `User.linkWithProvider`, `User.reauthenticateWithProvider`. To sign in
-  with a provider today, use `FirebaseAuthDart.userAuthFor(app).signInWithOAuthLoopback` (the system browser and a
-  loopback redirect), or get the provider's token yourself and use `signInWithCredential`.
 - **Browser flows**: `signInWithPopup`, `signInWithRedirect`, `getRedirectResult`, `User.linkWithPopup`,
-  `User.linkWithRedirect`, `User.reauthenticateWithPopup`, `User.reauthenticateWithRedirect`.
+  `User.linkWithRedirect`, `User.reauthenticateWithPopup`, `User.reauthenticateWithRedirect`. Use
+  `signInWithProvider` instead ([Provider sign-in](#provider-sign-in)).
 - **Phone**: `verifyPhoneNumber`, `signInWithPhoneNumber`, `User.linkWithPhoneNumber`, `User.updatePhoneNumber`,
   `initializeRecaptchaConfig`, a `PhoneAuthCredential`, `PhoneMultiFactorGenerator.getAssertion`. Phone sign-in needs
   reCAPTCHA or the app verification of Android and iOS.
-- **Multi-factor**: `User.multiFactor` (`getSession`, `enroll`, `unenroll`, `getEnrolledFactors`),
-  `MultiFactorResolver.resolveSignIn`, `TotpMultiFactorGenerator`.
-- **Token revocation**: `revokeAccessToken`, `revokeTokenWithAuthorizationCode`.
+- **`TotpSecret.openInOtpApp`**: opening another app needs a URL launcher. Open the URL of `generateQrCodeUrl`
+  with `url_launcher`, or show it as a QR code.
 - **Play Games and Game Center credentials**, which need their native SDKs.
 
 ## How it differs from the official plugin
 
 - **`validatePassword`**: `firebase_auth` does not ask the platform; it fetches the password policy itself from the
-  production endpoint, without the tenant and without the emulator. `FirebaseAuthDart.userAuthFor(app)
-  .validatePassword(password)` asks the client, which sends the tenant and follows `useAuthEmulator`.
+  production endpoint, without the tenant and without the emulator. `FirebaseAuthDart.validatePassword(app, password)`
+  returns the same `PasswordValidationStatus` but asks the client, which sends the tenant, follows `useAuthEmulator`
+  and caches the policy.
+- **Errors keep what the server said**: an error from the backend is a `DartFirebaseAuthException`, a
+  `FirebaseAuthException` with `serverCode` (such as `EMAIL_EXISTS`) and `httpStatus` added, for logs. Branch on
+  `code` as usual.
 - **`useAuthEmulator`**: call it before the first request, as the documentation of `firebase_auth` says. A session
   restored from the real service stays signed in until its first token refresh fails against the emulator.
 - **`User.refreshToken`** is null: the client keeps the refresh token to itself.
@@ -164,6 +207,10 @@ These throw a `FirebaseAuthException` with the code `unimplemented` and a messag
   per change of the user's data.
 - **Apple's `appleFullPersonName`** reaches the client, which, like the JS SDK, does not send it to the backend: set
   the name with `updateDisplayName` after the first sign-in.
+- **TOTP enrolment**: `MultiFactor.enroll` needs a `displayName` (`argument-error` without one; the backend
+  refuses a TOTP factor without a name). `getSession()` sends nothing: the enrolment starts on the backend with
+  `generateSecret`, and the session's `id` is the uid of the user. `generateQrCodeUrl()` defaults the account name
+  to the user's email address and the issuer to the name of the Firebase app, as the JS SDK does.
 - **`setSettings`** is accepted and ignored: its settings are for phone sign-in and the iOS keychain.
 - **App Check** tokens are not sent: the client supports them, but this package has no `firebase_app_check`
   implementation to take them from.
