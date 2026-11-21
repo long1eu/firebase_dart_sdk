@@ -990,6 +990,25 @@ void main() {
       await expectLater(
         guard<void>(
           DartFirebaseAuth(),
+          () => throw UnsupportedError('no loopback server on the web'),
+        ),
+        throwsA(
+          isA<FirebaseAuthException>()
+              .having(
+                (FirebaseAuthException e) => e.code,
+                'code',
+                'unimplemented',
+              )
+              .having(
+                (FirebaseAuthException e) => e.message,
+                'message',
+                contains('no loopback server on the web'),
+              ),
+        ),
+      );
+      await expectLater(
+        guard<void>(
+          DartFirebaseAuth(),
           () => throw const FileSystemException('disk full'),
         ),
         throwsAuthCode('internal-error'),
