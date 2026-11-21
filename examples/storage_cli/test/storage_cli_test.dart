@@ -35,13 +35,18 @@ void main() {
   Future<ProcessResult> cli(
     List<String> arguments, {
     String bucket = 'demo-test.appspot.com',
-  }) => Process.run(Platform.resolvedExecutable, <String>[
-    'run',
-    'bin/storage_cli.dart',
-    '--project=demo-test',
-    '--bucket=$bucket',
-    ...arguments,
-  ], stdoutEncoding: null);
+  }) => Process.run(
+    Platform.resolvedExecutable,
+    <String>[
+      'run',
+      'bin/storage_cli.dart',
+      '--project=demo-test',
+      '--bucket=$bucket',
+      ...arguments,
+    ],
+    stdoutEncoding: null,
+    stderrEncoding: null,
+  );
 
   String text(ProcessResult r) => utf8.decode(r.stdout as List<int>).trim();
   String errorText(ProcessResult r) => utf8.decode(r.stderr as List<int>);
