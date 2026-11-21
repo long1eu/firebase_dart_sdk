@@ -23,6 +23,8 @@ import 'package:firebase_app_dart/firebase_app_dart.dart';
 /// | `invalid-root-operation` | the operation needs an object and the reference is the root of the bucket |
 /// | `no-download-url` | the object has no download token |
 /// | `download-size-exceeded` | the object is larger than the `maxSize` of `Reference.getBytes` |
+/// | `internal-error` | a state the client believes impossible, such as an upload session that reports bytes it was never sent; it points at a bug, worth reporting |
+/// | `object-changed` | the object got a new generation during a download of `startDownloadToFile` or `writeToFile` (`package:firebase_storage_dart/io.dart`), so its parts would come from two versions (Dart only; Android reports "The ETag on the server changed") |
 /// | `unknown` | anything else, for example HTTP 400 or a response that cannot be read; see [httpStatus] and [serverResponse] |
 ///
 /// Unlike the JS SDK, every error that comes from a response carries its [httpStatus], and [serverResponse]

@@ -24,6 +24,7 @@ import 'package:firebase_app_dart/platform_dependencies.dart';
 import 'package:firebase_auth_providers_dart/adc.dart'; // needs dart:io
 import 'package:firebase_auth_providers_dart/firebase_auth_providers_dart.dart';
 import 'package:firebase_storage_dart/firebase_storage_dart.dart';
+import 'package:firebase_storage_dart/io.dart';
 import 'package:http/http.dart' as http;
 import 'package:rxdart/rxdart.dart';
 import 'package:test/test.dart';
@@ -1812,14 +1813,53 @@ Future<void> storageGuideLine102() async {
 
 // ../../docs/guides/storage.md:136
 Future<void> storageGuideLine136() async {
+  Future<FullMetadata> uploadLog(Reference target, Stream<String> lines) {
+    final UploadTask task = target.startStreamUpload(
+      lines.transform(utf8.encoder),
+      metadata: const SettableMetadata(contentType: 'text/plain'),
+    );
+    task.progress.listen((UploadProgress p) {
+      final String total = p.totalBytes < 0 ? 'unknown' : '${p.totalBytes}';
+      print('${p.bytesTransferred} of $total bytes');
+    });
+    return task.result;
+  }
+}
+
+// ../../docs/guides/storage.md:172
+Future<void> storageGuideLine172() async {
+  Future<void> download(Reference video) async {
+    final DownloadTask task = video.startDownloadToFile(File('clip.mp4'));
+    task.progress.listen((DownloadProgress p) {
+      print('${p.state.name}: ${p.bytesTransferred} of ${p.totalBytes} bytes');
+    });
+
+    task.pause(); // closes the connection; the bytes written so far stay
+    task.resume(); // asks for the rest with Range: bytes=<written>-
+
+    try {
+      final FullMetadata metadata = await task.result;
+      print('downloaded generation ${metadata.generation}');
+    } on FirebaseStorageException catch (e) {
+      if (e.code == 'object-changed') {
+        print('the object was overwritten during the download; start again');
+      } else {
+        rethrow;
+      }
+    }
+  }
+}
+
+// ../../docs/guides/storage.md:211
+Future<void> storageGuideLine211() async {
   Future<void> strings(Reference ref) async {
     await ref.putString('aGVsbG8=', format: StringFormat.base64);
     await ref.putString('data:text/plain;base64,aGVsbG8=', format: StringFormat.dataUrl);
   }
 }
 
-// ../../docs/guides/storage.md:151
-Future<void> storageGuideLine151() async {
+// ../../docs/guides/storage.md:226
+Future<void> storageGuideLine226() async {
   Future<void> tag(Reference ref) async {
     final FullMetadata metadata = await ref.updateMetadata(
       const SettableMetadata(
@@ -1831,8 +1871,8 @@ Future<void> storageGuideLine151() async {
   }
 }
 
-// ../../docs/guides/storage.md:172
-Future<void> storageGuideLine172() async {
+// ../../docs/guides/storage.md:247
+Future<void> storageGuideLine247() async {
   Future<void> roundTrip() async {
     final FirebaseApp app = FirebaseApp.withOptions(
       const FirebaseOptions(

@@ -52,6 +52,14 @@ class FakeBackend {
   /// once. A test sets it to hold an upload in the middle.
   Completer<void>? chunkGate;
 
+  /// Completes the response of each media (download) request; null answers at
+  /// once. A test sets it to hold a download before its body.
+  Completer<void>? mediaGate;
+
+  /// The `x-goog-generation` of the media responses instead of the object's,
+  /// as if the object had been overwritten since its metadata was read.
+  String? mediaGeneration;
+
   final Map<String, _Session> _sessions = <String, _Session>{};
   int _generation = 1;
 
@@ -63,6 +71,8 @@ class FakeBackend {
     failMediaWith = null;
     uploadMetadata = null;
     chunkGate = null;
+    mediaGate = null;
+    mediaGeneration = null;
   }
 
   /// Adds an object with [bytes] at [name] of [bucket].
@@ -130,6 +140,10 @@ class FakeBackend {
     }
     switch (request.method) {
       case 'GET' when request.url.queryParameters['alt'] == 'media':
+        final Completer<void>? gate = mediaGate;
+        if (gate != null) {
+          await gate.future;
+        }
         final int? mediaStatus = failMediaWith;
         if (mediaStatus != null) {
           return http.Response('Failure', mediaStatus);
@@ -137,6 +151,7 @@ class FakeBackend {
         return _media(
           object,
           request.headers['range'] ?? request.headers['Range'],
+          mediaGeneration ?? '${object.metadata['generation']}',
         );
       case 'GET':
         return _json(object.metadata);
@@ -152,18 +167,30 @@ class FakeBackend {
     return http.Response('Method', 405);
   }
 
-  http.Response _media(FakeObject object, String? range) {
+  /// The content of [object], in the [range] when there is one, with the
+  /// [generation] header Cloud Storage sends.
+  http.Response _media(FakeObject object, String? range, String generation) {
+    final Map<String, String> headers = <String, String>{
+      'x-goog-generation': generation,
+    };
     final Match? match = range == null
         ? null
         : RegExp(r'bytes=(\d+)-(\d*)').firstMatch(range);
     if (match == null) {
-      return http.Response.bytes(object.bytes, 200);
+      return http.Response.bytes(object.bytes, 200, headers: headers);
     }
     final int start = int.parse(match[1]!);
     final int end = match[2]!.isEmpty
         ? object.bytes.length
         : (int.parse(match[2]!) + 1).clamp(0, object.bytes.length);
-    return http.Response.bytes(object.bytes.sublist(start, end), 206);
+    return http.Response.bytes(
+      object.bytes.sublist(start, end),
+      206,
+      headers: <String, String>{
+        ...headers,
+        'content-range': 'bytes $start-${end - 1}/${object.bytes.length}',
+      },
+    );
   }
 
   http.Response _list(String bucket, Map<String, String> query) {

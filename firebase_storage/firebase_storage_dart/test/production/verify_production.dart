@@ -25,6 +25,7 @@ import 'package:crypto/crypto.dart' as crypto;
 import 'package:firebase_app_dart/firebase_app_dart.dart';
 import 'package:firebase_auth_providers_dart/firebase_auth_providers_dart.dart';
 import 'package:firebase_storage_dart/firebase_storage_dart.dart';
+import 'package:firebase_storage_dart/io.dart';
 import 'package:http/http.dart' as http;
 
 /// The outcome of a check.
@@ -96,17 +97,34 @@ const String webApiKeyVariable = 'FIREBASE_API_KEY';
 const String emulatorHostVariable = 'FIREBASE_STORAGE_EMULATOR_HOST';
 const String authEmulatorHostVariable = 'FIREBASE_AUTH_EMULATOR_HOST';
 
-/// What the SDK's requests looked like: never a header value except the app id, never a URL query.
+/// What the SDK's requests looked like: never a header value except the app id and the `Range`, never a URL
+/// query.
 class Seen {
-  Seen(this.method, this.path, this.status, this.headers);
+  Seen(
+    this.method,
+    this.path,
+    this.status,
+    this.headers, {
+    this.media = false,
+    this.responseHeaders = const <String>{},
+  });
 
   final String method;
   final String path;
   final int? status;
 
-  /// The names of the headers that were sent, lower case, and the value of `x-firebase-gmpid`.
+  /// The names of the headers that were sent, lower case, and the values of `x-firebase-gmpid` and `range`.
   final Map<String, String> headers;
+
+  /// Whether the request read the content of an object (`alt=media`).
+  final bool media;
+
+  /// The names of the response headers, lower case.
+  final Set<String> responseHeaders;
 }
+
+/// The request headers whose values [Seen] keeps; neither is a credential.
+const Set<String> _keptHeaderValues = <String>{'x-firebase-gmpid', 'range'};
 
 /// The HTTP client of the SDK instances of the kit: records what was sent and can answer the first requests
 /// with a 503 of its own, which never reaches the backend.
@@ -124,11 +142,13 @@ class KitClient extends http.BaseClient {
   Future<http.StreamedResponse> send(http.BaseRequest request) async {
     final Map<String, String> names = <String, String>{
       for (final MapEntry<String, String> entry in request.headers.entries)
-        entry.key.toLowerCase(): entry.key.toLowerCase() == 'x-firebase-gmpid'
+        entry.key
+            .toLowerCase(): _keptHeaderValues.contains(entry.key.toLowerCase())
             ? entry.value
             : '',
     };
     final String path = request.url.path;
+    final bool media = request.url.queryParameters['alt'] == 'media';
     if (faults > 0) {
       faults--;
       await request.finalize().drain<void>();
@@ -140,7 +160,18 @@ class KitClient extends http.BaseClient {
       );
     }
     final http.StreamedResponse response = await _inner.send(request);
-    seen.add(Seen(request.method, path, response.statusCode, names));
+    seen.add(
+      Seen(
+        request.method,
+        path,
+        response.statusCode,
+        names,
+        media: media,
+        responseHeaders: <String>{
+          for (final String name in response.headers.keys) name.toLowerCase(),
+        },
+      ),
+    );
     return response;
   }
 
@@ -1666,6 +1697,111 @@ Future<CheckResult> _sdkResumable(Kit kit) async {
   }
 }
 
+Future<CheckResult> _sdkUnknownLength(Kit kit) async {
+  final Uint8List data = Kit.bytes(3 * 1024 * 1024 + 5, 22);
+  final storage = kit.newStorage();
+  try {
+    kit.charge(data.length);
+    final String objectName = kit.name('sdk_unknown_length.bin');
+    kit.track(objectName);
+    // Events of 64 KiB that do not line up with the chunks, from a stream that does not say its length.
+    Stream<List<int>> pieces() async* {
+      for (int i = 0; i < data.length; i += 65536) {
+        yield Uint8List.sublistView(data, i, math.min(i + 65536, data.length));
+      }
+    }
+
+    final UploadTask task = storage.storage
+        .ref(objectName)
+        .startStreamUpload(pieces());
+    final int totalAtStart = task.totalBytes;
+    // The stream closes after its last event, which is delivered after result completes.
+    final Future<List<int>> allTotals = task.progress
+        .map((UploadProgress p) => p.totalBytes)
+        .toList();
+    final FullMetadata metadata = await task.result;
+    final List<int> totals = await allTotals;
+    final List<Seen> sent = storage.client.seen;
+    final bool lengthAnnounced = sent.any(
+      (Seen s) => s.headers.containsKey('x-goog-upload-header-content-length'),
+    );
+    final int chunks = sent
+        .where((Seen s) => s.path.endsWith('/o') && s.method == 'POST')
+        .length;
+    final bool ok =
+        _matches(metadata, data) &&
+        totalAtStart == -1 &&
+        task.totalBytes == data.length &&
+        totals.last == data.length &&
+        !lengthAnnounced;
+    final Map<String, Object?> observed = <String, Object?>{
+      'matches': _matches(metadata, data),
+      'totalAtStart': totalAtStart,
+      'totalAtEnd': task.totalBytes,
+      'lengthAnnounced': lengthAnnounced,
+      'requests': chunks,
+    };
+    return CheckResult(
+      ok ? Status.pass : Status.fail,
+      ok
+          ? 'ACCEPTED: a stream of ${data.length} bytes without a length went in a session started without '
+                'X-Goog-Upload-Header-Content-Length ($chunks requests); totalBytes went from -1 to the size, and '
+                'the stored size and md5 match.'
+          : 'The stream upload of unknown length ended with size ${metadata.size}, md5 match '
+                '${_matches(metadata, data)}, totalBytes $totalAtStart then ${task.totalBytes}, length announced '
+                '$lengthAnnounced.',
+      observed: observed,
+    );
+  } finally {
+    storage.storage.close();
+  }
+}
+
+Future<CheckResult> _sdkEmptyUnknownLength(Kit kit) async {
+  final Uint8List data = Uint8List(0);
+  final storage = kit.newStorage();
+  try {
+    final String objectName = kit.name('sdk_empty_unknown_length.bin');
+    kit.track(objectName);
+    final Reference ref = storage.storage.ref(objectName);
+    final UploadTask task = ref.startStreamUpload(
+      const Stream<List<int>>.empty(),
+    );
+    final int totalAtStart = task.totalBytes;
+    final FullMetadata metadata = await task.result;
+    final Uint8List stored = await ref.getBytes();
+    // The session start and one empty finalize.
+    final int requests = storage.client.seen
+        .where((Seen s) => s.path.endsWith('/o') && s.method == 'POST')
+        .length;
+    final bool ok =
+        _matches(metadata, data) &&
+        stored.isEmpty &&
+        totalAtStart == -1 &&
+        task.totalBytes == 0;
+    final Map<String, Object?> observed = <String, Object?>{
+      'size': metadata.size,
+      'matches': _matches(metadata, data),
+      'storedBytes': stored.length,
+      'totalAtStart': totalAtStart,
+      'totalAtEnd': task.totalBytes,
+      'requests': requests,
+    };
+    return CheckResult(
+      ok ? Status.pass : Status.fail,
+      ok
+          ? 'ACCEPTED: an empty stream without a length went in a session closed by an empty finalize '
+                '($requests requests); the object has 0 bytes and the md5 of no data.'
+          : 'The empty stream upload of unknown length ended with size ${metadata.size}, '
+                '${stored.length} bytes read back, md5 match ${_matches(metadata, data)}, totalBytes '
+                '$totalAtStart then ${task.totalBytes}.',
+      observed: observed,
+    );
+  } finally {
+    storage.storage.close();
+  }
+}
+
 /// Waits for the first event of [task] that [test] accepts.
 Future<UploadProgress> _until(
   UploadTask task,
@@ -1823,6 +1959,209 @@ Future<CheckResult> _sdkDownload(Kit kit) async {
                 'returned the right bytes, maxSize 100 threw $tooLarge and maxSize = size returned everything.'
           : 'A download did not return the expected bytes: $observed.',
       observed: observed,
+    );
+  } finally {
+    storage.storage.close();
+  }
+}
+
+/// What [_downloadPausedAndResumed] saw: where the pause landed, whether the task stayed paused and resumed,
+/// the downloaded bytes, and the requests of the download.
+typedef _PausedDownload = ({
+  DownloadProgress at,
+  bool stayed,
+  bool resumed,
+  Uint8List file,
+  List<Seen> media,
+  int metadataRequests,
+});
+
+/// Downloads [objectName] with `startDownloadToFile`, pauses at the first bytes and resumes. Null when the
+/// download finished before the pause could land (the check is then INCONCLUSIVE).
+Future<_PausedDownload?> _downloadPausedAndResumed(
+  ({FirebaseApp app, FirebaseStorage storage, KitClient client}) storage,
+  String objectName,
+) async {
+  final Directory dir = await Directory.systemTemp.createTemp(
+    'verify_storage_kit',
+  );
+  DownloadTask? task;
+  try {
+    // Only the requests of the download count below.
+    storage.client.seen.clear();
+    final File target = File('${dir.path}/download.bin');
+    final DownloadTask started = task = storage.storage
+        .ref(objectName)
+        .startDownloadToFile(target);
+    final Future<List<DownloadProgress>> events = started.progress.toList();
+    await started.progress.firstWhere(
+      (DownloadProgress p) => p.bytesTransferred > 0,
+      orElse: () => started.snapshot,
+    );
+    final Future<DownloadProgress> pausedEvent = started.progress.firstWhere(
+      (DownloadProgress p) => p.state == DownloadState.paused,
+      orElse: () => started.snapshot,
+    );
+    if (!started.pause()) {
+      // The task finished first: its progress stream closes without a paused event.
+      pausedEvent.ignore();
+      await started.result;
+      await events;
+      return null;
+    }
+    final DownloadProgress at = await pausedEvent.timeout(
+      const Duration(seconds: 60),
+    );
+    await Future<void>.delayed(const Duration(milliseconds: 300));
+    final bool stayed = started.state == DownloadState.paused;
+    final bool resumed = started.resume();
+    await started.result;
+    await events;
+    return (
+      at: at,
+      stayed: stayed,
+      resumed: resumed,
+      file: await target.readAsBytes(),
+      media: <Seen>[
+        for (final Seen s in storage.client.seen)
+          if (s.media) s,
+      ],
+      metadataRequests: storage.client.seen
+          .where((Seen s) => s.method == 'GET' && !s.media)
+          .length,
+    );
+  } finally {
+    if (task != null && task.state != DownloadState.success) {
+      task.cancel();
+      try {
+        await task.result;
+      } on FirebaseStorageException {
+        // canceled, as asked
+      }
+    }
+    await dir.delete(recursive: true);
+  }
+}
+
+/// Whether [run] paused (and stayed paused) before the end of [length] bytes and resumed.
+bool _pausedWell(_PausedDownload run, int length) =>
+    run.at.state == DownloadState.paused &&
+    run.stayed &&
+    run.resumed &&
+    run.at.bytesTransferred < length;
+
+Future<CheckResult> _sdkDownloadTask(Kit kit) async {
+  final Uint8List data = Kit.bytes(3 * 1024 * 1024, 24);
+  final storage = kit.newStorage();
+  try {
+    await kit.put(storage.storage, 'sdk_download_task.bin', data);
+    final _PausedDownload? run = await _downloadPausedAndResumed(
+      storage,
+      kit.name('sdk_download_task.bin'),
+    );
+    if (run == null) {
+      return CheckResult(
+        Status.inconclusive,
+        'The download finished before it could be paused; run it again.',
+      );
+    }
+    final List<Seen> media = run.media;
+    final bool matches = _same(run.file, data);
+    final String expectedRange = 'bytes=${run.at.bytesTransferred}-';
+    final bool ranged =
+        media.length >= 2 && media.last.headers['range'] == expectedRange;
+    final bool generationHeader =
+        media.isNotEmpty &&
+        media.every(
+          (Seen s) => s.responseHeaders.contains('x-goog-generation'),
+        );
+    final bool ok = _pausedWell(run, data.length) && ranged && matches;
+    return CheckResult(
+      ok ? Status.pass : Status.fail,
+      ok
+          ? 'PAUSED at ${run.at.bytesTransferred} of ${data.length} bytes, resumed with Range: $expectedRange; '
+                'the file matches. Generation header ${generationHeader ? 'on every media response' : 'MISSING '
+                          '(the task used the metadata fallback)'}, ${run.metadataRequests} metadata requests.'
+          : 'Download task ended with paused ${run.at.state == DownloadState.paused}, stayed paused '
+                '${run.stayed}, resumed ${run.resumed}, Range of the last of ${media.length} media requests '
+                '${media.isEmpty ? 'none' : media.last.headers['range']} (expected $expectedRange), file match '
+                '$matches.',
+      observed: <String, Object?>{
+        'pausedAt': run.at.bytesTransferred,
+        'stayed': run.stayed,
+        'ranged': ranged,
+        'matches': matches,
+        'mediaRequests': media.length,
+        'generationHeader': generationHeader,
+        'metadataRequests': run.metadataRequests,
+      },
+    );
+  } finally {
+    storage.storage.close();
+  }
+}
+
+Future<CheckResult> _sdkDownloadGzip(Kit kit) async {
+  // About 1 MiB of text that compresses well, stored gzip-compressed with contentEncoding gzip.
+  final Uint8List plain = Uint8List.fromList(
+    utf8
+        .encode(
+          List<String>.generate(
+            40000,
+            (int i) => 'line $i of the verification kit\n',
+          ).join(),
+        )
+        .sublist(0, 1024 * 1024),
+  );
+  final Uint8List stored = Uint8List.fromList(gzip.encode(plain));
+  final storage = kit.newStorage();
+  try {
+    kit.charge(stored.length);
+    final String objectName = kit.name('sdk_download_gzip.txt');
+    kit.track(objectName);
+    await storage.storage
+        .ref(objectName)
+        .putBytes(
+          stored,
+          metadata: const SettableMetadata(
+            contentType: 'text/plain',
+            contentEncoding: 'gzip',
+          ),
+        );
+    final _PausedDownload? run = await _downloadPausedAndResumed(
+      storage,
+      objectName,
+    );
+    if (run == null) {
+      return CheckResult(
+        Status.inconclusive,
+        'The download finished before it could be paused; run it again.',
+      );
+    }
+    final bool matches = _same(run.file, plain);
+    final int? resumedStatus = run.media.length >= 2
+        ? run.media.last.status
+        : null;
+    final bool contentEncoding = run.media.any(
+      (Seen s) => s.responseHeaders.contains('content-encoding'),
+    );
+    final bool ok = _pausedWell(run, plain.length) && matches;
+    return CheckResult(
+      ok ? Status.pass : Status.fail,
+      ok
+          ? 'UNZIPPED: the ${stored.length}-byte gzip object arrived as its ${plain.length} bytes, paused at '
+                '${run.at.bytesTransferred} and resumed (HTTP $resumedStatus); Content-Encoding '
+                '${contentEncoding ? 'came back' : 'did not come back'}.'
+          : 'The gzip download ended with ${run.file.length} bytes (expected ${plain.length} unzipped, '
+                'match $matches), paused ${run.at.state == DownloadState.paused}, resumed ${run.resumed}, '
+                'resumed status $resumedStatus.',
+      observed: <String, Object?>{
+        'pausedAt': run.at.bytesTransferred,
+        'matches': matches,
+        'resumedStatus': resumedStatus,
+        'contentEncoding': contentEncoding,
+        'mediaRequests': run.media.length,
+      },
     );
   } finally {
     storage.storage.close();
@@ -2093,6 +2432,14 @@ const List<Check> checks = <Check>[
   Check('19', 'SDK download, ranges and maxSize', _sdkDownload),
   Check('20', 'Signed-in round trip', _signedInRoundTrip),
   Check('21', 'Out-of-order chunk', _outOfOrder),
+  Check('22', 'SDK stream upload of unknown length', _sdkUnknownLength),
+  Check('23', 'SDK empty stream of unknown length', _sdkEmptyUnknownLength),
+  Check(
+    '24',
+    'SDK download task, pause, resume and generation header',
+    _sdkDownloadTask,
+  ),
+  Check('25', 'SDK download of a gzip-stored object', _sdkDownloadGzip),
   Check('26', 'SDK reads of a gzip-stored object', _sdkGzipStored),
 ];
 

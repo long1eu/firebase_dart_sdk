@@ -81,6 +81,17 @@ FirebaseStorageException unknownResponse(String detail, {int? httpStatus}) {
   );
 }
 
+/// A state the client believes impossible, such as an upload session that reports bytes the client never sent
+/// (JS `internalError`, iOS `internalError`). It points at a bug, in the client or on the other side.
+@internal
+FirebaseStorageException internalError(String detail, {int? httpStatus}) {
+  return FirebaseStorageException(
+    code: 'internal-error',
+    message: 'Internal error: $detail',
+    httpStatus: httpStatus,
+  );
+}
+
 /// The operation kept failing for longer than its retry time.
 @internal
 FirebaseStorageException retryLimitExceeded({int? httpStatus, Object? cause}) {
@@ -168,5 +179,18 @@ FirebaseStorageException tokenFailed(Object error, StackTrace stackTrace) {
         'Could not get the token of the signed-in user (${error.runtimeType}).',
     cause: error,
     stackTrace: stackTrace,
+  );
+}
+
+/// The object at [path] got a new generation (it was overwritten, or deleted and written again) while it was
+/// downloaded, so the bytes already written and the rest would come from two versions; [detail] says how it
+/// showed. Dart only; Android fails the same way with "The ETag on the server changed".
+@internal
+FirebaseStorageException objectChanged(String path, String detail) {
+  return FirebaseStorageException(
+    code: 'object-changed',
+    message:
+        "Object '$path' changed on the server during the download ($detail); "
+        'download it again.',
   );
 }

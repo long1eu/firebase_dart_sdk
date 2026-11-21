@@ -1,6 +1,8 @@
 // The tasks through the official firebase_storage API, against a fake
 // backend: uploads (putData, putString, putFile) and writeToFile, as futures
-// and as streams of snapshots, with pause, resume and cancel.
+// and as streams of snapshots, with pause, resume and cancel. writeToFile is
+// the resumable DownloadTask of the client; its protocol (Range resume, retry
+// after a broken body, the generation guard) is tested in the client.
 
 import 'dart:async';
 import 'dart:convert';
@@ -8,6 +10,7 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:firebase_storage/firebase_storage.dart';
+import 'package:http/http.dart' as http;
 import 'package:flutter_test/flutter_test.dart';
 
 import 'harness.dart';
@@ -249,6 +252,61 @@ void main() {
       expect(temp.listSync(), isEmpty);
     });
 
+    test('no snapshot before the size is known', () async {
+      final Reference ref = await refAt('down/a');
+      backend.put(bucket, 'down/a', <int>[1, 2, 3]);
+      final DownloadTask task = ref.writeToFile(File('${temp.path}/a'));
+      final List<TaskSnapshot> snapshots = <TaskSnapshot>[];
+      task.snapshotEvents.listen(snapshots.add);
+      await task;
+      expect(snapshots, isNotEmpty);
+      expect(
+        snapshots.every((TaskSnapshot s) => s.totalBytes == 3),
+        isTrue,
+        reason: 'a progress fraction never divides by zero',
+      );
+    });
+
+    test('pause closes the request and resume sends a new one', () async {
+      final Reference ref = await refAt('down/a');
+      backend.put(bucket, 'down/a', <int>[1, 2, 3]);
+      final Completer<void> gate = backend.mediaGate = Completer<void>();
+      final File target = File('${temp.path}/a');
+      final DownloadTask task = ref.writeToFile(target);
+      // The partial file is created with real I/O before the request.
+      for (int i = 0; i < 2000 && _mediaRequests() == 0; i++) {
+        await Future<void>.delayed(const Duration(milliseconds: 1));
+      }
+      expect(_mediaRequests(), 1, reason: 'waiting for the body');
+
+      final Future<TaskSnapshot> pausedEvent = task.snapshotEvents.firstWhere(
+        (TaskSnapshot s) => s.state == TaskState.paused,
+      );
+      expect(await task.pause(), isTrue);
+      final TaskSnapshot paused = await pausedEvent;
+      expect(paused.totalBytes, 3);
+      backend.mediaGate = null;
+      gate.complete();
+      expect(await task.resume(), isTrue);
+      expect((await task).state, TaskState.success);
+      expect(_mediaRequests(), 2);
+      expect(target.readAsBytesSync(), <int>[1, 2, 3]);
+    });
+
+    test('an object overwritten during the download fails with '
+        'object-changed', () async {
+      final Reference ref = await refAt('down/a');
+      backend
+        ..put(bucket, 'down/a', <int>[1, 2, 3])
+        ..mediaGeneration = '999';
+      final File target = File('${temp.path}/a')..writeAsStringSync('old');
+      final DownloadTask task = ref.writeToFile(target);
+      await expectLater(task, throwsStorageCode('object-changed'));
+      expect(task.snapshot.state, TaskState.error);
+      expect(target.readAsStringSync(), 'old');
+      expect(temp.listSync(), hasLength(1), reason: 'no partial file left');
+    });
+
     test('pause, resume and cancel', () async {
       final Reference ref = await refAt('down/a');
       backend.put(bucket, 'down/a', <int>[1, 2, 3]);
@@ -278,4 +336,45 @@ void main() {
       );
     });
   });
+
+  // FlutterFire's Task implements Future<TaskSnapshot> over onComplete, so an
+  // app awaits a task of this package like one of the native plugins.
+  group('tasks are futures', () {
+    test('await putData completes with the success snapshot', () async {
+      final Reference ref = await refAt('future/data');
+      final TaskSnapshot snapshot = await ref.putData(
+        Uint8List.fromList(<int>[4, 5]),
+      );
+      expect(snapshot.state, TaskState.success);
+      expect(snapshot.bytesTransferred, 2);
+      expect(snapshot.metadata!.size, 2);
+      expect(snapshot.ref.fullPath, 'future/data');
+    });
+
+    test('await writeToFile completes with the success snapshot', () async {
+      final Reference ref = await refAt('future/file');
+      backend.put(bucket, 'future/file', <int>[6, 7, 8]);
+      final File target = File('${temp.path}/file');
+      final TaskSnapshot snapshot = await ref.writeToFile(target);
+      expect(snapshot.state, TaskState.success);
+      expect(snapshot.bytesTransferred, 3);
+      expect(snapshot.totalBytes, 3);
+      expect(snapshot.metadata!.fullPath, 'future/file');
+      expect(target.readAsBytesSync(), <int>[6, 7, 8]);
+    });
+
+    test('then and catchError work on a failing task', () async {
+      final Reference ref = await refAt('future/missing');
+      final Object error = await ref
+          .writeToFile(File('${temp.path}/missing'))
+          .then<Object>((TaskSnapshot _) => 'no error')
+          .catchError((Object e) => e);
+      expect(error, isStorageCode('object-not-found'));
+    });
+  });
 }
+
+/// The download (media) requests the backend received.
+int _mediaRequests() => backend.requests
+    .where((http.Request r) => r.url.queryParameters['alt'] == 'media')
+    .length;
