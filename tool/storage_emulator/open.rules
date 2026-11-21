@@ -1,0 +1,9 @@
+rules_version = '2';
+// Bucket demo-test.appspot.com of tool/start_storage_emulator.sh: everything is readable and writable.
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /{allPaths=**} {
+      allow read, write;
+    }
+  }
+}
