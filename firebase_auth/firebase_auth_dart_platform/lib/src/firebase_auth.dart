@@ -50,12 +50,16 @@ class DartFirebaseAuth extends FirebaseAuthPlatform {
   /// The instance without an app, for [FirebaseAuthPlatform.instance].
   DartFirebaseAuth()
     : _client = null,
-      _storage = null,
+      _persistent = null,
       _config = const DartAuthConfig(),
       super();
 
-  DartFirebaseAuth._(FirebaseApp app, this._client, this._storage, this._config)
-    : super(appInstance: app);
+  DartFirebaseAuth._(
+    FirebaseApp app,
+    this._client,
+    this._persistent,
+    this._config,
+  ) : super(appInstance: app);
 
   /// The configuration of the instances created from now on.
   static DartAuthConfig config = const DartAuthConfig();
@@ -77,18 +81,18 @@ class DartFirebaseAuth extends FirebaseAuthPlatform {
       _instances.putIfAbsent(app.name, () {
         final dart_auth.AuthStorage storage =
             config.storageFor?.call(app) ?? defaultStorage();
-        final SwitchableStorage switchable = SwitchableStorage(storage);
+        final FallbackStorage persistent = FallbackStorage(storage);
         final dart_auth.FirebaseUserAuth userAuth = dart_auth.FirebaseUserAuth(
           apiKey: app.options.apiKey,
           appId: app.options.appId,
-          storage: switchable,
+          storage: persistent,
           storageKey: storageKeyOf(app),
           httpClient: config.httpClient,
         );
         // The error of a failed restore (an unreadable storage) reaches
         // authStateReady(); the app starts signed out.
         unawaited(userAuth.restore().catchError((Object _) {}));
-        return DartFirebaseAuth._(app, userAuth, switchable, config);
+        return DartFirebaseAuth._(app, userAuth, persistent, config);
       });
 
   /// The key of the session of [app] in its storage, the one `forApp` of
@@ -97,7 +101,13 @@ class DartFirebaseAuth extends FirebaseAuthPlatform {
       'firebase_auth_providers_dart:${app.options.apiKey}:${app.name}';
 
   final dart_auth.FirebaseUserAuth? _client;
-  final SwitchableStorage? _storage;
+
+  /// The storage of the app (memory after a failed write); the session is
+  /// there unless `setPersistence` moved it to [_memory].
+  final FallbackStorage? _persistent;
+
+  /// Where `setPersistence(Persistence.NONE)` keeps the session.
+  final dart_auth.InMemoryAuthStorage _memory = dart_auth.InMemoryAuthStorage();
   final DartAuthConfig _config;
   final Expando<DartUser> _users = Expando<DartUser>();
 
@@ -254,13 +264,16 @@ class DartFirebaseAuth extends FirebaseAuthPlatform {
   /// [Persistence.NONE] and [Persistence.SESSION] keep the session in memory
   /// only (until the process ends); [Persistence.LOCAL] and
   /// [Persistence.INDEXED_DB] in the storage of the app (by default a file).
-  /// The current session moves to the new place.
+  /// The current session moves to the new place (`setStorage` of the
+  /// client): it is written there first, then deleted from the old place.
   @override
-  Future<void> setPersistence(Persistence persistence) async {
-    client; // Throws for the registered instance.
-    await _storage!.setInMemory(
-      persistence == Persistence.NONE || persistence == Persistence.SESSION,
-      storageKeyOf(app),
+  Future<void> setPersistence(Persistence persistence) {
+    final dart_auth.FirebaseUserAuth userAuth = client;
+    final bool inMemory =
+        persistence == Persistence.NONE || persistence == Persistence.SESSION;
+    return guard(
+      this,
+      () => userAuth.setStorage(inMemory ? _memory : _persistent!),
     );
   }
 
