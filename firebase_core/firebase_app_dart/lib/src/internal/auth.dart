@@ -38,6 +38,7 @@ class GetTokenResult {
   static const String _issuedAtTimestamp = 'iat';
   static const String _firebaseKey = 'firebase';
   static const String _signInProvider = 'sign_in_provider';
+  static const String _signInSecondFactor = 'sign_in_second_factor';
   static const String _extraClaims = 'extra_claims';
 
   /// Firebase Auth ID Token. Useful for authenticating calls against your own backend. Verify the integrity and
@@ -75,6 +76,17 @@ class GetTokenResult {
       final Object? provider = claims[_signInProvider];
       return provider is String ? provider : null;
     }
+  }
+
+  /// The second factor the user signed in with (`totp` or `phone`, the `sign_in_second_factor` claim inside
+  /// `firebase`), or null for a sign-in without one.
+  String? get signInSecondFactor {
+    final Object? firebaseElem = claims[_firebaseKey];
+    if (firebaseElem is Map) {
+      final Object? factor = firebaseElem[_signInSecondFactor];
+      return factor is String ? factor : null;
+    }
+    return null;
   }
 
   /// The `extra_claims` claim of the token, or an empty map when there is none. Custom claims set

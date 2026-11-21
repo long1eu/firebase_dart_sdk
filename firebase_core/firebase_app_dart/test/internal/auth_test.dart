@@ -37,6 +37,29 @@ void main() {
     );
   });
 
+  test('the second factor is read from the firebase element', () {
+    expect(
+      GetTokenResult(
+        _jwt(<String, dynamic>{
+          'firebase': <String, dynamic>{
+            'sign_in_provider': 'password',
+            'sign_in_second_factor': 'totp',
+          },
+        }),
+      ).signInSecondFactor,
+      'totp',
+    );
+    expect(
+      GetTokenResult(
+        _jwt(<String, dynamic>{
+          'firebase': <String, dynamic>{'sign_in_provider': 'password'},
+        }),
+      ).signInSecondFactor,
+      isNull,
+    );
+    expect(GetTokenResult('opaque').signInSecondFactor, isNull);
+  });
+
   test('numeric claims may be doubles', () {
     final GetTokenResult result = GetTokenResult(
       _jwt(<String, dynamic>{'exp': 1700000000.0, 'iat': 5}),

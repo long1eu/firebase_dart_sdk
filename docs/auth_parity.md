@@ -116,11 +116,11 @@ Path shorthand:
 | getIdTokenResult(user, forceRefresh) | `getAccessToken` returns `GetTokenResult` (firebase_core `internal/auth.dart`) | `idTokenResultOf` convert.dart:349 | different | See field rows below. |
 | IdTokenResult.token | `GetTokenResult.token` | `token` | same | |
 | IdTokenResult.claims | `claims` map | `claims` | same | |
-| IdTokenResult.issuedAtTime | `issuedAtTimestamp` (DateTime; 1970 if absent) | `issuedAtTimestamp` ms | different | JS returns a UTC string; Dart returns a DateTime and never null. |
+| IdTokenResult.issuedAtTime | `issuedAtTimestamp` (DateTime; 1970 if absent) | `issuedAtTimestamp` ms | different | JS returns a UTC string and throws `internal-error` when an ID token lacks `exp`, `auth_time` or `iat`, so its times are never null either. Dart returns a DateTime; the epoch only for a token that is not a Firebase ID token (an OAuth access token), which JS never parses. The shim passes null for a missing claim. |
 | IdTokenResult.authTime | `authTimestamp` (1970 if absent) | `authTimestamp` | different | Same. |
 | IdTokenResult.expirationTime | `expirationTimestamp` | `expirationTimestamp` | different | Same. |
 | IdTokenResult.signInProvider | `signInProvider` (also falls back to a top-level claim) | `signInProvider` | same | |
-| IdTokenResult.signInSecondFactor | none on `GetTokenResult` | read from `firebase.sign_in_second_factor` claim, convert.dart:365 | different | Missing in the client (can be read through `claims['firebase']`), present in the shim. |
+| IdTokenResult.signInSecondFactor | `signInSecondFactor` (the `firebase.sign_in_second_factor` claim) | read from the same claim | same | |
 | (no JS peer) `extraClaims` | `GetTokenResult.extraClaims` | none | n/a | Dart extra. |
 | onIdTokenChanged | `idTokenChanges()` FUA:442 (current user on listen, then every new token) and `onTokenChanged` FUA:425 (raw token stream) | firebase_auth.dart:207 | different | Streams, not observers. Two APIs in the client (see Ideas). |
 | onAuthStateChanged | `authStateChanges()` FUA:437 | firebase_auth.dart:203 | same | |
@@ -326,7 +326,7 @@ Effort: S takes hours, M a few days, L more than a week or needs outside pieces.
 | 12 | open | An optional secure-storage adapter (Keychain, Keystore, libsecret), as a separate package | M | no | yes | med | The refresh token sits in a file with mode 0600. |
 | 13 | closed (`app-deleted` in the shim; `missing-continue-uri` and `user-signed-out` are not thrown by JS either) | Client-side validation codes: `missing-continue-uri`, and `app-deleted` or `user-signed-out` after `dispose` | S | no | no | low | Today these show up as server errors, `StateError` or `null-user`. |
 | 14 | partly closed: `OperationType` done | An error-code constants class; aggregate `ProviderId`, `SignInMethod` and `FactorId`; `OperationType` | S | no | no | low | Typo safety only. |
-| 15 | open | `IdTokenResult` parity: nullable times and `signInSecondFactor` | S | no | no | low | `GetTokenResult` lives in `firebase_app_dart` and returns epoch 0 for a missing time. |
+| 15 | closed (`signInSecondFactor`; times stay non-null, as in JS, see the token rows) | `IdTokenResult` parity: nullable times and `signInSecondFactor` | S | no | no | low | `GetTokenResult` lives in `firebase_app_dart` and returns epoch 0 for a missing time. |
 | 16 | closed (`app`; `name` and `config` as the members of the app and the client) | `Auth.name`, `Auth.app`, `Auth.config` | S | no | no | low | Introspection only. |
 | 17 | open | IndexedDB storage on the web | M | yes | no | low-med | The JS default on the web, but the stored data can't be shared with the JS SDK anyway because the key format differs. |
 | 18 | open | Phone sign-in with a verification token supplied by the caller (works with the emulator and test numbers) | L | for production | no | med | Real projects require app verification: reCAPTCHA, Play Integrity or APNs. |
