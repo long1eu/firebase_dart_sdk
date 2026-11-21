@@ -114,7 +114,12 @@ void main() {
                 .having(
                   (FirebaseStorageException e) => e.message,
                   'message',
-                  contains('offline'),
+                  allOf(contains('StateError'), isNot(contains('offline'))),
+                )
+                .having(
+                  (FirebaseStorageException e) => e.cause,
+                  'cause',
+                  isA<StateError>(),
                 ),
           ),
         );
