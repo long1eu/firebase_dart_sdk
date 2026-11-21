@@ -67,6 +67,24 @@ class _SharedStorage {
   }
 }
 
+/// A storage that does not report changes, counting its reads.
+class _CountingStorage extends InMemoryAuthStorage {
+  int reads = 0;
+  int writes = 0;
+
+  @override
+  String? read(String key) {
+    reads++;
+    return super.read(key);
+  }
+
+  @override
+  void write(String key, String? value) {
+    writes++;
+    super.write(key, value);
+  }
+}
+
 class _Tab implements ObservableAuthStorage {
   _Tab(this._shared);
 
@@ -85,17 +103,19 @@ class _Tab implements ObservableAuthStorage {
   /// Tells this tab's listeners that [key] changed, as a storage that reports a rewrite may.
   void emitSpuriously(String key) => _emit(key);
 
-  /// While set, a read waits for it to complete and then answers with the value of that moment.
+  /// While set, a read takes the value at once but answers only when it completes, like a slow
+  /// read whose transaction started before the writes that follow it.
   Completer<void>? readGate;
 
   @override
   FutureOr<String?> read(String key) {
     reads++;
     final Completer<void>? gate = readGate;
+    final String? value = _readNow(key);
     if (gate != null) {
-      return gate.future.then((_) => _readNow(key));
+      return gate.future.then((_) => value);
     }
-    return _readNow(key);
+    return value;
   }
 
   String? _readNow(String key) {
@@ -576,6 +596,72 @@ void main() {
       expect(shared.values[_key], isNot(contains('rotated')));
     });
   });
+
+  // _adoptStoredSession reads what another tab stored. A local change made while that read is
+  // pending is newer than what the read returns.
+  group('during the read that follows another tab', () {
+    test(
+      'a local sign-out is not undone by the value read before it',
+      () async {
+        await signInBoth('a@x.com');
+        final Completer<void> gate = Completer<void>();
+        storageB.readGate = gate;
+        final int reads = storageB.reads;
+        await tabA.signInWithEmailAndPassword(email: 'b@x.com', password: 'pw');
+        await _untilReads(storageB, reads + 1);
+
+        await tabB.signOut();
+        expect(shared.values[_key], isNull);
+        storageB.readGate = null;
+        gate.complete();
+        await settle();
+
+        expect(tabB.currentUser, isNull);
+        expect(shared.values[_key], isNull);
+      },
+    );
+
+    test(
+      'a local sign-in is not cancelled by the sign-out read before it',
+      () async {
+        await signInBoth('a@x.com');
+        final Completer<void> gate = Completer<void>();
+        storageB.readGate = gate;
+        final int reads = storageB.reads;
+        await tabA.signOut();
+        await _untilReads(storageB, reads + 1);
+
+        await tabB.signInWithEmailAndPassword(email: 'c@x.com', password: 'pw');
+        expect(shared.values[_key], contains('uid-of-c@x.com'));
+        storageB.readGate = null;
+        gate.complete();
+        await settle();
+
+        expect(tabB.uid, 'uid-of-c@x.com');
+        expect(shared.values[_key], contains('uid-of-c@x.com'));
+      },
+    );
+  });
+
+  test(
+    'a storage that does not report changes is not read before an update',
+    () async {
+      final _CountingStorage plain = _CountingStorage();
+      final FirebaseUserAuth auth = backend.create(storage: plain);
+      addTearDown(auth.dispose);
+      await auth.signInWithEmailAndPassword(email: 'a@x.com', password: 'pw');
+      backend.accounts['uid-of-a@x.com'] = <String, Object?>{
+        ...?backend.accounts['uid-of-a@x.com'],
+        'displayName': 'Ada',
+      };
+      final int writes = plain.writes;
+
+      await auth.reload();
+
+      expect(plain.writes, writes + 1);
+      expect(plain.reads, 0);
+    },
+  );
 
   group('the subscription', () {
     test('one listener per instance while it uses the storage', () async {

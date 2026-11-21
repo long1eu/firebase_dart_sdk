@@ -268,9 +268,12 @@ class _FlakyLocal extends WebAuthStorage {
   bool readThrows = false;
   bool deleteThrows = false;
 
+  /// Keys (without the prefix) whose read throws.
+  final Set<String> unreadable = <String>{};
+
   @override
   String? read(String key) {
-    if (readThrows) {
+    if (readThrows || unreadable.contains(key)) {
       throw StateError('localStorage read refused');
     }
     return super.read(key);
@@ -991,11 +994,13 @@ void _fallbackWriteTests(_NewStorage newStorage) {
       );
       expect(await next.read('k'), 'B');
       expect(await newStorage(name).read('k'), 'B');
-      // Moved: neither the copy nor the marker stays in localStorage.
-      expect(_ownKeys(), isEmpty);
-      // From now on IndexedDB wins again.
+      // Copied: the marker goes, the copy stays for a tab that may still use localStorage.
+      expect(_ownKeys(), <String>['${_p}k']);
+      expect(web.window.localStorage.getItem('${_p}k'), 'B');
+      // From now on IndexedDB wins again, and a copy that differs is deleted.
       await newStorage(name).write('k', 'C');
       expect(await next.read('k'), 'C');
+      expect(_ownKeys(), isEmpty);
       await next.close();
     },
   );
@@ -1012,8 +1017,54 @@ void _fallbackWriteTests(_NewStorage newStorage) {
         databaseName: name,
       );
       await next.write('k', 'C');
-      expect(_ownKeys(), isEmpty);
+      // The marker goes; the copy follows the write.
+      expect(_ownKeys(), <String>['${_p}k']);
+      expect(web.window.localStorage.getItem('${_p}k'), 'C');
       expect(await next.read('k'), 'C');
+      await next.close();
+    },
+  );
+
+  test('a copy in localStorage follows the writes with IndexedDB', () async {
+    final String name = _newDatabase();
+    final BestWebAuthStorage storage = BestWebAuthStorage(
+      localStoragePrefix: _p,
+      databaseName: name,
+    );
+    await storage.write('k', 'A');
+    // No copy: none is made.
+    expect(_ownKeys(), isEmpty);
+    web.window.localStorage.setItem('${_p}k', 'A');
+    await storage.write('k', 'B');
+    expect(web.window.localStorage.getItem('${_p}k'), 'B');
+    await storage.write('k', null);
+    expect(_ownKeys(), isEmpty);
+    await storage.close();
+  });
+
+  test(
+    'a marked key whose localStorage state cannot be read throws and changes nothing',
+    () async {
+      final String name = _newDatabase();
+      final BestWebAuthStorage first = fallback(name);
+      await first.write('k', 'B');
+      await first.close();
+      await newStorage(name).write('k', 'A');
+      final _FlakyLocal local = _FlakyLocal()..unreadable.add('k');
+      final BestWebAuthStorage next = BestWebAuthStorage.forTesting(
+        databaseName: name,
+        localStorage: local,
+      );
+      // Not null: null would read as a sign-out made in another tab.
+      await expectLater(
+        next.read('k'),
+        throwsA(_storageError(IndexedDbOperation.migrate)),
+      );
+      expect(await newStorage(name).read('k'), 'A');
+      expect(
+        web.window.localStorage.getItem('${_p}k.written-without-indexeddb'),
+        isNotNull,
+      );
       await next.close();
     },
   );

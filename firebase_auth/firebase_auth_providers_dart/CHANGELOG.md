@@ -23,6 +23,12 @@
   there instead of writing over it, so a sign-out in one tab is no longer undone by another tab's next write.
   The JS SDK writes the adopted user back to the persistence; this client does not. Other storages behave as
   before.
+- `BestWebAuthStorage`: the read of a key marked by a write made without IndexedDB copies the state from
+  `localStorage` to IndexedDB and now keeps the `localStorage` copy (only the marker goes), so that a tab that
+  chose `localStorage` is not signed out when a tab on IndexedDB follows its write. A copy, once there, follows
+  the writes made with IndexedDB (a sign-out deletes it), and an unmarked copy is deleted at a read only when it
+  differs from IndexedDB. When `localStorage` cannot be read for a marked key, the read throws an
+  `IndexedDbAuthStorageException` (`migrate`) instead of returning null, which read as a sign-out.
 
 ## 0.3.2
 

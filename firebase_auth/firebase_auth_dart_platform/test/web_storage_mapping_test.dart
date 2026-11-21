@@ -124,9 +124,11 @@ void main() {
     test('passes on the changes of a storage that reports them', () async {
       final _Observable app = _Observable();
       final List<void> events = <void>[];
-      final StreamSubscription<void> subscription = FallbackStorage(
-        app,
-      ).changes(key).listen(events.add);
+      final ObservableAuthStorage storage =
+          FallbackStorage(app) as ObservableAuthStorage;
+      final StreamSubscription<void> subscription = storage
+          .changes(key)
+          .listen(events.add);
       app.changed(key, 'v');
       app.changed('other', 'v');
       await Future<void>.delayed(Duration.zero);
@@ -136,12 +138,14 @@ void main() {
     });
 
     test(
-      'a storage that does not report them gives a stream that ends',
-      () async {
-        final Stream<void> changes = FallbackStorage(
-          InMemoryAuthStorage(),
-        ).changes(key);
-        expect(await changes.isEmpty, isTrue);
+      'in front of a storage that does not report changes it is not observable',
+      () {
+        // So the client never reads the store before it stores an update.
+        expect(
+          FallbackStorage(InMemoryAuthStorage()),
+          isNot(isA<ObservableAuthStorage>()),
+        );
+        expect(FallbackStorage(_Observable()), isA<ObservableAuthStorage>());
       },
     );
 
@@ -149,7 +153,7 @@ void main() {
       final _Observable app = _Observable();
       final FallbackStorage storage = FallbackStorage(app);
       final List<void> events = <void>[];
-      storage.changes(key).listen(events.add);
+      (storage as ObservableAuthStorage).changes(key).listen(events.add);
       app.writeFails = true;
       await storage.write(key, 'v');
       app.changed(key, 'w');

@@ -375,12 +375,77 @@ void main() {
           await _until(() => tabB.uid == expectedUid, 'tab B to follow $what');
           await _severalPolls();
           expect(tabB.uid, expectedUid);
-          // The marked state moved to IndexedDB; neither the copy nor the marker stays.
+          // The marked state is in IndexedDB; the marker goes, a copy of a session stays.
           expect(await indexedDb(name).read(_key), written);
-          expect(_ownKeys(), isEmpty);
+          expect(web.window.localStorage.getItem('$_p$_key'), written);
+          expect(
+            web.window.localStorage.getItem(
+              '$_p$_key.written-without-indexeddb',
+            ),
+            isNull,
+          );
         },
       );
     }
+
+    // Tab A chose IndexedDB, tab B localStorage (its probe failed). Both are in this page, so the
+    // `storage` event that tab A's changes would send to tab B is dispatched by hand.
+    test(
+      'tabs that chose differently follow each other through the copy',
+      () async {
+        final String name = _newDatabase();
+        final BestWebAuthStorage onIndexedDb = BestWebAuthStorage.forTesting(
+          localStoragePrefix: _p,
+          indexedDb: indexedDb(name),
+          indexedDbAvailable: () async => true,
+        );
+        final BestWebAuthStorage onLocal = BestWebAuthStorage.forTesting(
+          localStoragePrefix: _p,
+          databaseName: name,
+          indexedDbAvailable: () async => false,
+        );
+        final FirebaseUserAuth tabA = client(onIndexedDb);
+        final FirebaseUserAuth tabB = client(onLocal);
+        await tabA.restore();
+        await tabB.restore();
+        expect(await onLocal.kind, WebAuthStorageKind.localStorage);
+        await tabA.signInWithEmailAndPassword(email: 'a@x.com', password: 'pw');
+
+        // Tab B's sign-in marks the key and deletes it from IndexedDB: tab A follows it, and keeps
+        // the copy that tab B reads, so tab B is not signed out by the event that follows.
+        await tabB.signInWithEmailAndPassword(email: 'c@x.com', password: 'pw');
+        await _until(
+          () => tabA.uid == 'uid-of-c@x.com',
+          'tab A to follow tab B',
+        );
+        await _severalPolls();
+        expect(
+          web.window.localStorage.getItem('$_p$_key'),
+          contains('uid-of-c@x.com'),
+        );
+        _storageEventFromAnotherTab('$_p$_key');
+        await _severalPolls();
+        expect(tabB.uid, 'uid-of-c@x.com');
+
+        // Tab A's sign-in replaces the copy, which tab B follows.
+        await tabA.signInWithEmailAndPassword(email: 'd@x.com', password: 'pw');
+        expect(
+          web.window.localStorage.getItem('$_p$_key'),
+          contains('uid-of-d@x.com'),
+        );
+        _storageEventFromAnotherTab('$_p$_key');
+        await _until(
+          () => tabB.uid == 'uid-of-d@x.com',
+          'tab B to follow tab A',
+        );
+
+        // Tab A's sign-out deletes the copy.
+        await tabA.signOut();
+        expect(web.window.localStorage.getItem('$_p$_key'), isNull);
+        _storageEventFromAnotherTab('$_p$_key');
+        await _until(() => tabB.currentUser == null, 'tab B to sign out');
+      },
+    );
   });
 
   group('localStorage', () {

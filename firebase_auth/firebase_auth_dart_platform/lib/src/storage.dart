@@ -153,12 +153,21 @@ SecureDefaultStorage secureDefaultStorage(String? sessionFile) {
 /// keychain or the preferences could not be written, so this package keeps
 /// that behaviour here, in front of the client.
 ///
-/// [changes] passes on the changes that other tabs make to the storage of
-/// the app when it reports them (the web storages), so that the client
-/// follows a sign-out or a sign-in made in another tab; once memory is in use
-/// they are ignored.
-class FallbackStorage implements ObservableAuthStorage {
-  FallbackStorage(this._persistent);
+/// When the storage of the app reports the changes other tabs make (an
+/// [ObservableAuthStorage]: the web storages), the object is one too and
+/// passes them on, so that the client follows a sign-out or a sign-in made in
+/// another tab; once memory is in use they are ignored. Otherwise it is a
+/// plain [AuthStorage], so that the client never reads the store (the
+/// Keychain, the Keystore) before it stores an update of the session.
+class FallbackStorage implements AuthStorage {
+  /// The storage of the app [persistent] with memory behind it; an
+  /// [ObservableAuthStorage] when [persistent] is one.
+  factory FallbackStorage(AuthStorage persistent) =>
+      persistent is ObservableAuthStorage
+      ? _ObservableFallbackStorage(persistent)
+      : FallbackStorage._(persistent);
+
+  FallbackStorage._(this._persistent);
 
   final AuthStorage _persistent;
   final InMemoryAuthStorage _memory = InMemoryAuthStorage();
@@ -191,13 +200,17 @@ class FallbackStorage implements ObservableAuthStorage {
       );
     }
   }
+}
+
+/// A [FallbackStorage] in front of an [ObservableAuthStorage]: passes on its
+/// changes until memory is in use.
+class _ObservableFallbackStorage extends FallbackStorage
+    implements ObservableAuthStorage {
+  _ObservableFallbackStorage(ObservableAuthStorage super.persistent)
+    : super._();
 
   @override
-  Stream<void> changes(String key) {
-    final AuthStorage persistent = _persistent;
-    if (persistent is! ObservableAuthStorage) {
-      return const Stream<void>.empty();
-    }
-    return persistent.changes(key).where((_) => !_persistentFailed);
-  }
+  Stream<void> changes(String key) => (_persistent as ObservableAuthStorage)
+      .changes(key)
+      .where((_) => !_persistentFailed);
 }

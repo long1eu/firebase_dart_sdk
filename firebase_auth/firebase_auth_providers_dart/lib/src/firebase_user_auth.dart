@@ -3053,15 +3053,25 @@ class FirebaseUserAuth implements AuthTokenProvider {
   }
 
   /// Reads the session another tab stored and takes it over (the JS SDK's `_onStorageEvent`), after
-  /// a [restore] in progress. A value this class did not write is ignored, as by [restore].
+  /// a [restore] in progress. A value this class did not write is ignored, as by [restore]. When the
+  /// session of this instance changes during the read, the value is dropped and read again (JS runs
+  /// `_onStorageEvent` in `auth.queue` with the sign-ins and the sign-out for the same reason).
   Future<void> _adoptStoredSession() async {
     await _restoring?.then<void>((_) {}, onError: (Object _) {});
     final AuthStorage storage = _storage;
     if (_disposed) {
       return;
     }
+    final int generation = _generation;
+    final _Session? before = _session;
     final String? stored = await storage.read(_storageKey);
     if (_disposed || !identical(storage, _storage)) {
+      return;
+    }
+    if (generation != _generation || !identical(before, _session)) {
+      // A sign-in, sign-out or token change of this instance ran during the read: what was read may
+      // be older than its write. Read again, behind that write.
+      _followAgain = true;
       return;
     }
     final _Session? current = _session;

@@ -733,8 +733,8 @@ class _AbortedByBrowser implements Exception {
 /// it with [WebAuthStorage.local] and [localStoragePrefix]): it is read there, written to
 /// IndexedDB, read back and compared, and only then deleted from `localStorage`.
 ///
-/// * IndexedDB already has a session for the key: it wins, and the copy in `localStorage` is
-///   deleted, unless the marker below says otherwise.
+/// * IndexedDB already has a session for the key: it wins, and a copy in `localStorage` that
+///   differs is deleted, unless the marker below says otherwise.
 /// * The copy read back differs: the copy in IndexedDB is deleted, `localStorage` keeps the
 ///   session, and an [IndexedDbAuthStorageException] with [IndexedDbOperation.migrate] is thrown.
 ///   The next read tries again.
@@ -747,18 +747,26 @@ class _AbortedByBrowser implements Exception {
 /// **Writes without IndexedDB.** When `localStorage` or memory holds the sessions (IndexedDB failed
 /// its probe on this load), every [write] also leaves a marker for the key in `localStorage` (when
 /// it works) and tries to delete the key from IndexedDB, without waiting and ignoring a failure. At
-/// the next load that picks IndexedDB, a marked key takes its state from `localStorage`: the
-/// session there is moved to IndexedDB, or, after a sign-out, the copy in IndexedDB is deleted. So
-/// an older session in IndexedDB does not come back.
+/// the next read that uses IndexedDB (at a later load, or in a tab that chose IndexedDB), a marked
+/// key takes its state from `localStorage`: the session there is copied to IndexedDB (the copy in
+/// `localStorage` stays), or, after a sign-out, the session in IndexedDB is deleted; then the
+/// marker goes. So an older session in IndexedDB does not come back. When `localStorage` cannot be
+/// read then, the read throws an [IndexedDbAuthStorageException] with
+/// [IndexedDbOperation.migrate] and changes nothing.
 ///
 /// A write of null (a sign-out) deletes the key from `localStorage` too, so that a session the move
-/// never reached cannot come back. The calls run one at a time, in order.
+/// never reached cannot come back. A write of a session replaces the copy in `localStorage` when
+/// there is one (or the key is marked), so that the copy is never older than IndexedDB. The calls
+/// run one at a time, in order.
 ///
 /// **Other tabs.** [changes] follows the storage in use: the polls of [IndexedDbAuthStorage], or
 /// the `storage` events of [WebAuthStorage]; with memory it never emits. The read that follows a
 /// change goes through the rules above, so a key marked by a tab without IndexedDB takes its state
-/// from `localStorage` there too. Two tabs that chose differently (one without IndexedDB) do not
-/// see each other's changes.
+/// from `localStorage` there too. Two tabs that chose differently (one without IndexedDB) follow
+/// each other through the copy in `localStorage`. The tab on IndexedDB hears the other's writes
+/// when they delete a session from IndexedDB (they mark the key and delete it there), and keeps the
+/// copy. The tab on `localStorage` hears the writes of the tab on IndexedDB once a copy exists
+/// there (after its own first write); before that, it does not see them.
 ///
 /// On the Dart VM the constructor throws an [UnsupportedError].
 ///
@@ -941,11 +949,15 @@ class BestWebAuthStorage implements ObservableAuthStorage {
     );
   }
 
-  /// IndexedDB holds the newest state of [key]: a copy or marker in `localStorage` is stale.
+  /// IndexedDB holds the newest state of [key]. A sign-out deletes the copy in `localStorage`; a
+  /// session replaces the copy when there is one or the key is marked (a tab on `localStorage`
+  /// follows that copy); the marker goes.
   void _afterIndexedDbWrite(String key, String? value) {
     final bool marked = _marked(key);
-    if (value == null || marked) {
+    if (value == null) {
       _deleteOld(key);
+    } else if (marked || _readOld(key) != null) {
+      _writeOld(key, value);
     }
     if (marked) {
       _deleteOld(_markerOf(key), issueKey: key);
@@ -961,7 +973,8 @@ class BestWebAuthStorage implements ObservableAuthStorage {
     }
     final String? stored = await _indexedDb.read(key);
     if (stored != null) {
-      if (_readOld(key) != null) {
+      final String? copy = _readOld(key);
+      if (copy != null && copy != stored) {
         _deleteOld(key);
       }
       return stored;
@@ -981,27 +994,38 @@ class BestWebAuthStorage implements ObservableAuthStorage {
   }
 
   /// A write made without IndexedDB marked [key]: the state in `localStorage` is the newest. It
-  /// replaces the one in IndexedDB; the marker goes once IndexedDB holds it.
+  /// replaces the one in IndexedDB; the marker goes once IndexedDB holds it. The copy in
+  /// `localStorage` stays, because a tab that uses `localStorage` may be reading it.
+  ///
+  /// Throws when `localStorage` cannot be read: never fall back to IndexedDB's copy (it may be the
+  /// one the marked write replaced), and never answer null, which reads as a sign-out.
   Future<String?> _takeMarkedState(String key) async {
     final String? newest;
     try {
       newest = _local.read(key);
     } on Object catch (e) {
-      // Never fall back to IndexedDB's copy here: it may be the one the marked write replaced.
-      _onMigrationIssue(key, e);
-      return null;
+      throw IndexedDbAuthStorageException(
+        operation: IndexedDbOperation.migrate,
+        databaseName: _indexedDb.databaseName,
+        key: key,
+        name: e.runtimeType.toString(),
+        message:
+            'the key is marked by a write made without IndexedDB, and localStorage, which holds '
+            'its newest state, cannot be read',
+      );
     }
     if (newest == null) {
       await _indexedDb.write(key, null);
     } else {
-      await _move(key, newest);
+      await _move(key, newest, keepCopy: true);
     }
     _deleteOld(_markerOf(key), issueKey: key);
     return newest;
   }
 
-  /// Writes [old] to IndexedDB, reads it back and compares, then deletes it from `localStorage`.
-  Future<void> _move(String key, String old) async {
+  /// Writes [old] to IndexedDB, reads it back and compares, then deletes it from `localStorage`
+  /// unless [keepCopy].
+  Future<void> _move(String key, String old, {bool keepCopy = false}) async {
     await _indexedDb.write(key, old);
     final String? back = await _indexedDb.read(key);
     if (back != old) {
@@ -1019,7 +1043,9 @@ class BestWebAuthStorage implements ObservableAuthStorage {
             'localStorage still holds it',
       );
     }
-    _deleteOld(key);
+    if (!keepCopy) {
+      _deleteOld(key);
+    }
   }
 
   static String _markerOf(String key) => '$key$_markerSuffix';
@@ -1043,6 +1069,15 @@ class BestWebAuthStorage implements ObservableAuthStorage {
       _local.write(key, null);
     } on Object catch (e) {
       _onMigrationIssue(issueKey ?? key, e);
+    }
+  }
+
+  /// Writes [value] under [key] in `localStorage`; a failure goes to `onMigrationIssue`.
+  void _writeOld(String key, String value) {
+    try {
+      _local.write(key, value);
+    } on Object catch (e) {
+      _onMigrationIssue(key, e);
     }
   }
 

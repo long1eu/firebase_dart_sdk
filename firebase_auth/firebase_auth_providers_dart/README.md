@@ -185,9 +185,9 @@ blocked, or in a worker without it) and never throws.
 `localStorage`, else memory (`kind` says which). The probe runs on the connection the sessions then use. When it
 picks IndexedDB, a session that an earlier version of the app kept in `localStorage` (with `WebAuthStorage.local`
 and the same prefix) is moved at the first read: written to IndexedDB, read back, and only then deleted from
-`localStorage`. A session IndexedDB already has wins, and the `localStorage` copy is deleted. On a load where
-IndexedDB failed its probe, each write also leaves a marker in `localStorage` and tries to delete the key from
-IndexedDB; at the next load that picks IndexedDB, the marked state wins (a sign-out made then stays a sign-out).
+`localStorage`. A session IndexedDB already has wins; a `localStorage` copy that differs is deleted. Where IndexedDB
+failed its probe, each write also leaves a marker in `localStorage` and tries to delete the key from IndexedDB; the
+next read with IndexedDB takes the marked state (a sign-out stays one) and keeps a copy that later writes update.
 
 ```dart web
 final FirebaseUserAuth auth = await FirebaseUserAuth.forApp(app, storage: BestWebAuthStorage());
@@ -206,8 +206,8 @@ the `beforeAuthStateChanged` callbacks do not run for such a change. Before it s
 session (a rotated refresh token, a profile update, a reload), it reads the storage and takes over a sign-out or
 another user stored there instead of writing over it, so a sign-out in one tab is not undone by another tab that
 has not heard of it yet. The polls stop when nobody listens and at `close()`, and pause while the page is in the
-back/forward cache. Two tabs where `BestWebAuthStorage` chose differently (one without IndexedDB) do not see each
-other's changes.
+back/forward cache. Two tabs where `BestWebAuthStorage` chose differently (one without IndexedDB) follow each
+other through the `localStorage` copy, once the tab without IndexedDB has written it.
 
 ### Authenticator app second factors (TOTP)
 
