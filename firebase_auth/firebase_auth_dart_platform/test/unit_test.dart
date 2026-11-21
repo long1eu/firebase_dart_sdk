@@ -30,6 +30,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 
+import '../../firebase_auth_providers_dart/test/totp_platform.dart';
 import 'fake_backend.dart';
 
 const FirebaseOptions _options = FirebaseOptions(
@@ -151,8 +152,17 @@ void main() {
 
   setUp(() {
     backend.requests.clear();
+    backend.unhandled.clear();
     backend.override = null;
     presented.clear();
+  });
+
+  tearDown(() {
+    expect(
+      backend.unhandled,
+      isEmpty,
+      reason: 'requests the fake backend has no answer for',
+    );
   });
 
   group('registration', () {
@@ -353,7 +363,7 @@ void main() {
       await multiFactor.enroll(
         await TotpMultiFactorGenerator.getAssertionForEnrollment(
           secret,
-          FakeBackend.totpCode,
+          backend.totpCode,
         ),
         displayName: name,
       );
@@ -375,19 +385,19 @@ void main() {
       final TotpSecret secret = await TotpMultiFactorGenerator.generateSecret(
         session,
       );
-      expect(secret.secretKey, 'GEZDGNBVGY3TQOJQ');
+      expect(secret.secretKey, totpSecretKey);
       expect(secret.codeLength, 6);
       expect(secret.codeIntervalSeconds, 30);
       expect(secret.hashingAlgorithm, 'SHA1');
       expect(
         secret.enrollmentCompletionDeadline,
-        DateTime.utc(2026, 1, 1, 12, 10),
+        DateTime.utc(2026, 1, 1, 12, 10, 0, 123, 456),
       );
 
       await multiFactor.enroll(
         await TotpMultiFactorGenerator.getAssertionForEnrollment(
           secret,
-          FakeBackend.totpCode,
+          backend.totpCode,
         ),
         displayName: 'Phone',
       );
@@ -396,7 +406,7 @@ void main() {
         'displayName': 'Phone',
         'totpVerificationInfo': <String, Object?>{
           'sessionInfo': 'enrollment-session',
-          'verificationCode': FakeBackend.totpCode,
+          'verificationCode': backend.totpCode,
         },
       });
       final List<MultiFactorInfo> factors = await multiFactor
@@ -431,12 +441,12 @@ void main() {
       expect(
         await secret.generateQrCodeUrl(),
         'otpauth://totp/${auth.app.name}:qr@example.com'
-        '?secret=GEZDGNBVGY3TQOJQ&issuer=${auth.app.name}'
+        '?secret=$totpSecretKey&issuer=${auth.app.name}'
         '&algorithm=SHA1&digits=6',
       );
       expect(
         await secret.generateQrCodeUrl(accountName: 'ada', issuer: 'My App'),
-        'otpauth://totp/My%20App:ada?secret=GEZDGNBVGY3TQOJQ'
+        'otpauth://totp/My%20App:ada?secret=$totpSecretKey'
         '&issuer=My%20App&algorithm=SHA1&digits=6',
       );
       await expectLater(
@@ -470,7 +480,7 @@ void main() {
         multiFactor.enroll(
           await TotpMultiFactorGenerator.getAssertionForEnrollment(
             secret,
-            FakeBackend.totpCode,
+            backend.totpCode,
           ),
         ),
         throwsAuthCode('argument-error'),
@@ -515,7 +525,7 @@ void main() {
         final UserCredential result = await e.resolver.resolveSignIn(
           await TotpMultiFactorGenerator.getAssertionForSignIn(
             factor.uid,
-            FakeBackend.totpCode,
+            backend.totpCode,
           ),
         );
         expect(result.user!.uid, 'uid-of-mfa@example.com');
@@ -524,7 +534,7 @@ void main() {
           'mfaPendingCredential': 'pending:uid-of-mfa@example.com',
           'mfaEnrollmentId': factor.uid,
           'totpVerificationInfo': <String, Object?>{
-            'verificationCode': FakeBackend.totpCode,
+            'verificationCode': backend.totpCode,
           },
         });
       }
@@ -549,7 +559,7 @@ void main() {
         final UserCredential result = await e.resolver.resolveSignIn(
           await TotpMultiFactorGenerator.getAssertionForSignIn(
             factor.uid,
-            FakeBackend.totpCode,
+            backend.totpCode,
           ),
         );
         expect(result.user!.uid, user.uid);
@@ -569,7 +579,7 @@ void main() {
         multiFactor.enroll(
           await TotpMultiFactorGenerator.getAssertionForSignIn(
             factor.uid,
-            FakeBackend.totpCode,
+            backend.totpCode,
           ),
           displayName: 'Phone',
         ),
@@ -590,7 +600,7 @@ void main() {
           e.resolver.resolveSignIn(
             await TotpMultiFactorGenerator.getAssertionForEnrollment(
               secret,
-              FakeBackend.totpCode,
+              backend.totpCode,
             ),
           ),
           throwsAuthCode('argument-error'),
@@ -834,6 +844,64 @@ void main() {
           backend.paths.where((String p) => p.endsWith('/token')),
           isEmpty,
         );
+      },
+    );
+
+    test(
+      'oauthProvidersFor adds to oauthProviders and replaces an id',
+      () async {
+        final DartAuthConfig shared = DartFirebaseAuth.config;
+        final List<String> asked = <String>[];
+        DartFirebaseAuth.config = DartAuthConfig(
+          httpClient: shared.httpClient,
+          storageFor: shared.storageFor,
+          oauthProviders: shared.oauthProviders,
+          presentUrl: shared.presentUrl,
+          oauthProvidersFor: (FirebaseApp app) {
+            asked.add(app.name);
+            return <dart_auth.OAuthLoopbackProvider>[
+              dart_auth.OAuthLoopbackProvider.google(
+                clientId: 'client-of-${app.name}',
+                clientSecret: 'secret-of-${app.name}',
+              ),
+            ];
+          },
+        );
+        addTearDown(() => DartFirebaseAuth.config = shared);
+        final FirebaseAuth auth = await newAuth();
+        backend.override = providerTokens;
+        await auth.signInWithProvider(GoogleAuthProvider());
+        expect(
+          presented.last.queryParameters['client_id'],
+          'client-of-${auth.app.name}',
+        );
+        await auth.signOut();
+        // GitHub comes from oauthProviders.
+        await auth.signInWithProvider(GithubAuthProvider());
+        expect(presented.last.queryParameters['client_id'], 'github-client');
+        expect(asked, <String>[auth.app.name], reason: 'called once per app');
+      },
+    );
+
+    test(
+      'oauthProvidersFor with two providers of one id fails at first use',
+      () async {
+        final DartAuthConfig shared = DartFirebaseAuth.config;
+        DartFirebaseAuth.config = DartAuthConfig(
+          httpClient: shared.httpClient,
+          storageFor: shared.storageFor,
+          oauthProvidersFor: (FirebaseApp app) =>
+              <dart_auth.OAuthLoopbackProvider>[
+                oauthProviders.first,
+                oauthProviders.first,
+              ],
+        );
+        addTearDown(() => DartFirebaseAuth.config = shared);
+        final FirebaseApp app = await Firebase.initializeApp(
+          name: 'app${_apps++}',
+          options: _options,
+        );
+        expect(() => DartFirebaseAuth.forApp(app), throwsArgumentError);
       },
     );
 

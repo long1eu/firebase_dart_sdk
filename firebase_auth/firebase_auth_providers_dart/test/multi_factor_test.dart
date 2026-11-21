@@ -13,50 +13,58 @@ import 'package:test/test.dart';
 import 'fakes.dart';
 import 'harness.dart';
 import 'totp.dart';
+import 'totp_platform.dart';
 
 const String email = 'ada@example.com';
 const String uid = 'uid-of-$email';
 const String storageKey = 'firebase_auth_providers_dart:$apiKey';
 
-/// The secret the fake backend hands out (base32 of "12345678901234567890", the key of RFC 6238's test vectors).
-const String secretKey = 'GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ';
+/// The secret the fake backend hands out.
+const String secretKey = totpSecretKey;
 
-/// A fake Identity Platform with TOTP: the v2 multi-factor methods in JSON; a password sign-in of an account with
-/// factors answers with a pending credential.
+/// A fake Identity Platform with TOTP: [TotpPlatform] over the accounts of [FakeBackend]; a password sign-in of an
+/// account with factors answers with a pending credential.
 class TotpBackend {
   TotpBackend() {
-    backend
-      ..on('accounts:signInWithPassword', _signInWithPassword)
-      ..on('mfaEnrollment:start', _start)
-      ..on('mfaEnrollment:finalize', _finalize)
-      ..on('mfaEnrollment:withdraw', (Map<String, Object?> body) {
-        return _withdraw(
-              body['idToken']! as String,
-              body['mfaEnrollmentId']! as String,
-            ) ??
-            errorResponse('MFA_ENROLLMENT_NOT_FOUND');
-      })
-      ..on('mfaSignIn:finalize', _finalizeSignIn);
+    platform = TotpPlatform(
+      uidOf: (String idToken) =>
+          GetTokenResult(idToken).claims['sub']! as String,
+      readFactors: factorsOf,
+      writeFactors: (String user, List<Map<String, Object?>> factors) {
+        final Map<String, Object?> account = <String, Object?>{
+          ...?backend.accounts[user],
+        };
+        if (factors.isEmpty) {
+          account.remove('mfaInfo');
+        } else {
+          account['mfaInfo'] = factors;
+        }
+        backend.accounts[user] = account;
+      },
+      tokensFor: (String user, String stage) => <String, Object?>{
+        'idToken': backend.tokensFor(user, email: email)['idToken'],
+        'refreshToken': 'refresh:$user:$stage',
+      },
+      now: () => backend.clock.now,
+    );
+    backend.on('accounts:signInWithPassword', _signInWithPassword);
+    platform.handlers.forEach(backend.on);
   }
 
   final FakeBackend backend = FakeBackend();
-  int _enrolled = 0;
+  late final TotpPlatform platform;
 
-  /// The time the codes are computed for: the fake clock of the client.
-  DateTime get now => backend.clock.now;
+  String codeNow() => platform.codeNow();
 
-  String codeNow() => totpCode(base32Decode(secretKey), now);
+  List<Map<String, Object?>> factorsOf(String user) => <Map<String, Object?>>[
+    for (final Object? f
+        in (backend.accounts[user]?['mfaInfo'] as List<Object?>?) ??
+            const <Object?>[])
+      f! as Map<String, Object?>,
+  ];
 
-  List<Object?> factorsOf(String user) =>
-      (backend.accounts[user]?['mfaInfo'] as List<Object?>?) ??
-      const <Object?>[];
-
-  void addFactor(String user, Map<String, Object?> factor) {
-    backend.accounts[user] = <String, Object?>{
-      ...?backend.accounts[user],
-      'mfaInfo': <Object?>[...factorsOf(user), factor],
-    };
-  }
+  void addFactor(String user, Map<String, Object?> factor) =>
+      platform.addFactor(user, factor);
 
   void _ensureAccount() => backend.accounts[uid] ??= <String, Object?>{
     'email': email,
@@ -73,117 +81,14 @@ class TotpBackend {
 
   http.Response _signInWithPassword(Map<String, Object?> body) {
     _ensureAccount();
-    final List<Object?> factors = factorsOf(uid);
-    if (factors.isEmpty) {
-      return jsonResponse(<String, Object?>{
-        'kind': 'identitytoolkit#VerifyPasswordResponse',
-        'email': email,
-        'registered': true,
-        ...backend.tokensFor(uid, email: email),
-      });
-    }
+    final Map<String, Object?>? challenge = platform.challengeFor(uid);
     return jsonResponse(<String, Object?>{
       'kind': 'identitytoolkit#VerifyPasswordResponse',
-      'localId': uid,
       'email': email,
       'registered': true,
-      'mfaPendingCredential': 'pending:$uid',
-      'mfaInfo': <Object?>[
-        for (final Object? f in factors)
-          <String, Object?>{
-            ...f! as Map<String, Object?>,
-            if ((f as Map<String, Object?>).containsKey('phoneInfo'))
-              'phoneInfo': '+*******0100',
-          },
-      ],
-    });
-  }
-
-  String _uidOf(Object? idToken) =>
-      GetTokenResult(idToken! as String).claims['sub']! as String;
-
-  http.Response _start(Map<String, Object?> body) {
-    _uidOf(body['idToken']);
-    return jsonResponse(<String, Object?>{
-      'totpSessionInfo': <String, Object?>{
-        'sharedSecretKey': secretKey,
-        'verificationCodeLength': 6,
-        'hashingAlgorithm': 'SHA1',
-        'periodSec': 30,
-        'sessionInfo': 'enrollment-session',
-        'finalizeEnrollmentTime': '2026-01-01T12:10:00.123456789Z',
-      },
-    });
-  }
-
-  http.Response _finalize(Map<String, Object?> body) {
-    final String user = _uidOf(body['idToken']);
-    final Map<String, Object?> info =
-        body['totpVerificationInfo']! as Map<String, Object?>;
-    if (info['sessionInfo'] != 'enrollment-session') {
-      return errorResponse('INVALID_SESSION_INFO');
-    }
-    if (info['verificationCode'] != codeNow()) {
-      return errorResponse('INVALID_CODE');
-    }
-    addFactor(user, <String, Object?>{
-      'mfaEnrollmentId': 'totp-${++_enrolled}',
-      'displayName': ?body['displayName'],
-      'totpInfo': <String, Object?>{},
-      'enrolledAt': '2026-01-01T12:00:00Z',
-    });
-    return jsonResponse(<String, Object?>{
-      'idToken': backend.tokensFor(user, email: email)['idToken'],
-      'refreshToken': 'refresh:$user:enrolled',
-    });
-  }
-
-  /// Withdraws [enrollmentId]; null when the account has no such factor.
-  http.Response? _withdraw(String idToken, String enrollmentId) {
-    final String user = _uidOf(idToken);
-    final List<Object?> factors = factorsOf(user);
-    final List<Object?> left = <Object?>[
-      for (final Object? f in factors)
-        if ((f! as Map<String, Object?>)['mfaEnrollmentId'] != enrollmentId) f,
-    ];
-    if (left.length == factors.length) {
-      return null;
-    }
-    backend.accounts[user] = <String, Object?>{
-      ...backend.accounts[user]!,
-      'mfaInfo': left,
-    };
-    if (left.isEmpty) {
-      backend.accounts[user]!.remove('mfaInfo');
-    }
-    return jsonResponse(<String, Object?>{
-      'idToken': backend.tokensFor(user, email: email)['idToken'],
-      'refreshToken': 'refresh:$user:withdrawn',
-    });
-  }
-
-  http.Response _finalizeSignIn(Map<String, Object?> body) {
-    final Object? pending = body['mfaPendingCredential'];
-    if (pending is! String || !pending.startsWith('pending:')) {
-      return errorResponse('INVALID_MFA_PENDING_CREDENTIAL');
-    }
-    final String user = pending.substring('pending:'.length);
-    final bool known = factorsOf(user).any(
-      (Object? f) =>
-          (f! as Map<String, Object?>)['mfaEnrollmentId'] ==
-          body['mfaEnrollmentId'],
-    );
-    if (!known) {
-      return errorResponse('MFA_ENROLLMENT_NOT_FOUND');
-    }
-    final Map<String, Object?> info =
-        body['totpVerificationInfo']! as Map<String, Object?>;
-    if (info['verificationCode'] != codeNow()) {
-      return errorResponse('INVALID_CODE');
-    }
-    return jsonResponse(<String, Object?>{
-      'idToken': backend.tokensFor(user, email: email)['idToken'],
-      'refreshToken': 'refresh:$user:second-factor',
+      if (challenge == null) ...backend.tokensFor(uid, email: email),
+      if (challenge != null) 'localId': uid,
+      ...?challenge,
     });
   }
 }
@@ -699,6 +604,64 @@ void main() {
       await auth.signOut();
       await signIn();
       expect(auth.uid, uid);
+    });
+
+    int withdraws() => backend.methods
+        .where((String m) => m == 'mfaEnrollment:withdraw')
+        .length;
+
+    /// The backend answers the withdraw without tokens and rejects the ID
+    /// token the withdraw was sent with, as when it revokes the session.
+    void withdrawWithoutTokens() {
+      final Set<String> rejected = <String>{};
+      backend
+        ..on('mfaEnrollment:withdraw', (Map<String, Object?> body) {
+          final http.Response answer =
+              server.platform.handlers['mfaEnrollment:withdraw']!(body);
+          if (answer.statusCode != 200) {
+            return answer;
+          }
+          rejected.add(body['idToken']! as String);
+          return jsonResponse(<String, Object?>{});
+        })
+        ..on('accounts:lookup', (Map<String, Object?> body) {
+          if (rejected.contains(body['idToken'])) {
+            return errorResponse('TOKEN_EXPIRED');
+          }
+          final String user =
+              GetTokenResult(body['idToken']! as String).claims['sub']!
+                  as String;
+          return jsonResponse(<String, Object?>{
+            'users': <Object?>[
+              <String, Object?>{'localId': user, ...?backend.accounts[user]},
+            ],
+          });
+        });
+    }
+
+    test('a withdraw that ends the session removes the factor once and signs '
+        'the user out', () async {
+      withdrawWithoutTokens();
+      backend.on(
+        'token',
+        (Map<String, Object?> body) => errorResponse('TOKEN_EXPIRED'),
+      );
+      await expectLater(
+        auth.unenrollMultiFactor('totp-1'),
+        throwsAuth('user-token-expired'),
+      );
+      expect(withdraws(), 1);
+      expect(server.factorsOf(uid), isEmpty);
+      expect(auth.currentUser, isNull);
+    });
+
+    test('a withdraw without new tokens keeps a session whose refresh token '
+        'still works, and is sent once', () async {
+      withdrawWithoutTokens();
+      await auth.unenrollMultiFactor('totp-1');
+      expect(withdraws(), 1);
+      expect(server.factorsOf(uid), isEmpty);
+      expect(auth.currentUser!.enrolledFactors, isEmpty);
     });
 
     test('an unknown factor is multi-factor-info-not-found', () async {

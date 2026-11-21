@@ -47,7 +47,8 @@ export 'package:firebase_auth_providers_dart/firebase_auth_providers_dart.dart'
         UrlPresenter;
 
 export 'src/convert.dart' show DartFirebaseAuthException;
-export 'src/firebase_auth.dart' show AuthStorageFactory, DartFirebaseAuth;
+export 'src/firebase_auth.dart'
+    show AuthStorageFactory, DartFirebaseAuth, OAuthProvidersFactory;
 export 'src/storage.dart' show defaultSessionFile;
 
 /// Selects `firebase_auth_providers_dart` as the implementation of the official
@@ -108,6 +109,13 @@ abstract final class FirebaseAuthDart {
   ///   parameters of the FlutterFire provider are added to its request. A
   ///   provider id without one throws `unimplemented`. Two providers with one
   ///   id throw an [ArgumentError].
+  /// * [oauthProvidersFor] returns the providers of one FlutterFire app, for an
+  ///   app with several Firebase projects that each have their own OAuth
+  ///   client: it is called once, when the instance of the app is created.
+  ///   With both, an app has the providers of [oauthProviders] and its own,
+  ///   and its own replace those of [oauthProviders] with the same id. Two of
+  ///   its providers with one id throw an [ArgumentError] then, at the first
+  ///   use of that app's `FirebaseAuth`.
   /// * [presentUrl] opens the authorization URL of those flows, for example
   ///   `url_launcher`'s `launchUrl` on Android and iOS; by default the system
   ///   browser on macOS, Linux and Windows.
@@ -124,20 +132,13 @@ abstract final class FirebaseAuthDart {
     bool? useDartCore,
     Iterable<OAuthLoopbackProvider> oauthProviders =
         const <OAuthLoopbackProvider>[],
+    OAuthProvidersFactory? oauthProvidersFor,
     UrlPresenter? presentUrl,
   }) {
-    final Map<String, OAuthLoopbackProvider> byId =
-        <String, OAuthLoopbackProvider>{};
-    for (final OAuthLoopbackProvider provider in oauthProviders) {
-      if (byId.containsKey(provider.providerId)) {
-        throw ArgumentError.value(
-          provider.providerId,
-          'oauthProviders',
-          'has two providers with this id',
-        );
-      }
-      byId[provider.providerId] = provider;
-    }
+    final Map<String, OAuthLoopbackProvider> byId = providersById(
+      oauthProviders,
+      'oauthProviders',
+    );
     if (DartFirebaseAuth.anyStarted) {
       throw StateError(
         'FirebaseAuthDart.use must be called before the first use of '
@@ -147,7 +148,8 @@ abstract final class FirebaseAuthDart {
     DartFirebaseAuth.config = DartAuthConfig(
       storageFor: storageFor,
       httpClient: httpClient,
-      oauthProviders: Map<String, OAuthLoopbackProvider>.unmodifiable(byId),
+      oauthProviders: byId,
+      oauthProvidersFor: oauthProvidersFor,
       presentUrl: presentUrl,
     );
     installCoreIfNeeded(force: useDartCore);

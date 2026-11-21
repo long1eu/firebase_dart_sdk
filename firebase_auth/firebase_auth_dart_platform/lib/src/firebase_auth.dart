@@ -17,6 +17,32 @@ import 'user.dart';
 /// `FirebaseAuthDart.use`).
 typedef AuthStorageFactory = dart_auth.AuthStorage Function(FirebaseApp app);
 
+/// Returns the loopback providers of the FlutterFire [app] (see
+/// `FirebaseAuthDart.use`).
+typedef OAuthProvidersFactory =
+    Iterable<dart_auth.OAuthLoopbackProvider> Function(FirebaseApp app);
+
+/// [providers] by their Firebase provider id; throws an [ArgumentError] naming
+/// [argument] when two have the same id.
+Map<String, dart_auth.OAuthLoopbackProvider> providersById(
+  Iterable<dart_auth.OAuthLoopbackProvider> providers,
+  String argument,
+) {
+  final Map<String, dart_auth.OAuthLoopbackProvider> byId =
+      <String, dart_auth.OAuthLoopbackProvider>{};
+  for (final dart_auth.OAuthLoopbackProvider provider in providers) {
+    if (byId.containsKey(provider.providerId)) {
+      throw ArgumentError.value(
+        provider.providerId,
+        argument,
+        'has two providers with this id',
+      );
+    }
+    byId[provider.providerId] = provider;
+  }
+  return Map<String, dart_auth.OAuthLoopbackProvider>.unmodifiable(byId);
+}
+
 /// What `FirebaseAuthDart.use` configures; read when the instance of an app is
 /// created.
 class DartAuthConfig {
@@ -24,6 +50,7 @@ class DartAuthConfig {
     this.storageFor,
     this.httpClient,
     this.oauthProviders = const <String, dart_auth.OAuthLoopbackProvider>{},
+    this.oauthProvidersFor,
     this.presentUrl,
   });
 
@@ -33,6 +60,10 @@ class DartAuthConfig {
   /// The providers of `signInWithProvider` and its link and reauthenticate
   /// variants, by Firebase provider id (`google.com`, `github.com`, ...).
   final Map<String, dart_auth.OAuthLoopbackProvider> oauthProviders;
+
+  /// The providers of one app, added to [oauthProviders] for that app; a
+  /// provider here replaces the one of [oauthProviders] with the same id.
+  final OAuthProvidersFactory? oauthProvidersFor;
 
   /// Opens the authorization URL of a provider sign-in; the client's default
   /// (`openInSystemBrowser`) when null.
@@ -52,6 +83,7 @@ class DartFirebaseAuth extends FirebaseAuthPlatform {
     : _client = null,
       _persistent = null,
       _config = const DartAuthConfig(),
+      _oauthProviders = const <String, dart_auth.OAuthLoopbackProvider>{},
       super();
 
   DartFirebaseAuth._(
@@ -59,6 +91,7 @@ class DartFirebaseAuth extends FirebaseAuthPlatform {
     this._client,
     this._persistent,
     this._config,
+    this._oauthProviders,
   ) : super(appInstance: app);
 
   /// The configuration of the instances created from now on.
@@ -79,6 +112,16 @@ class DartFirebaseAuth extends FirebaseAuthPlatform {
   /// `authStateChanges().first`.
   static DartFirebaseAuth forApp(FirebaseApp app) =>
       _instances.putIfAbsent(app.name, () {
+        // Read first: a duplicate id throws before anything is created.
+        final Map<String, dart_auth.OAuthLoopbackProvider> providers =
+            <String, dart_auth.OAuthLoopbackProvider>{
+              ...config.oauthProviders,
+              ...providersById(
+                config.oauthProvidersFor?.call(app) ??
+                    const <dart_auth.OAuthLoopbackProvider>[],
+                'oauthProvidersFor',
+              ),
+            };
         final dart_auth.AuthStorage storage =
             config.storageFor?.call(app) ?? defaultStorage();
         final FallbackStorage persistent = FallbackStorage(storage);
@@ -92,7 +135,13 @@ class DartFirebaseAuth extends FirebaseAuthPlatform {
         // The error of a failed restore (an unreadable storage) reaches
         // authStateReady(); the app starts signed out.
         unawaited(userAuth.restore().catchError((Object _) {}));
-        return DartFirebaseAuth._(app, userAuth, persistent, config);
+        return DartFirebaseAuth._(
+          app,
+          userAuth,
+          persistent,
+          config,
+          Map<String, dart_auth.OAuthLoopbackProvider>.unmodifiable(providers),
+        );
       });
 
   /// The key of the session of [app] in its storage, the one `forApp` of
@@ -109,6 +158,10 @@ class DartFirebaseAuth extends FirebaseAuthPlatform {
   /// Where `setPersistence(Persistence.NONE)` keeps the session.
   final dart_auth.InMemoryAuthStorage _memory = dart_auth.InMemoryAuthStorage();
   final DartAuthConfig _config;
+
+  /// The loopback providers of this instance's app: those of `use`'s
+  /// `oauthProviders` and `oauthProvidersFor`, by provider id.
+  final Map<String, dart_auth.OAuthLoopbackProvider> _oauthProviders;
   final Expando<DartUser> _users = Expando<DartUser>();
 
   /// The client of this instance's app.
@@ -171,7 +224,7 @@ class DartFirebaseAuth extends FirebaseAuthPlatform {
       throw unimplemented(member, noPresentUrl);
     }
     final dart_auth.OAuthLoopbackProvider? registered =
-        _config.oauthProviders[provider.providerId];
+        _oauthProviders[provider.providerId];
     if (registered == null) {
       throw unimplemented(member, noProviderFlowFor(provider.providerId));
     }

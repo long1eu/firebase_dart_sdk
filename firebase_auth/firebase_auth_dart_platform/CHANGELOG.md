@@ -33,3 +33,5 @@
   the instance was disposed one with `app-deleted`.
 - `setPersistence` moves the session with the client's `setStorage`. The session is still kept in memory when the
   storage of the app cannot be written.
+- `FirebaseAuthDart.use(oauthProvidersFor:)`: the loopback providers of one app, added to `oauthProviders`; a
+  provider with the same id replaces the shared one for that app. Exports `OAuthProvidersFactory`.
