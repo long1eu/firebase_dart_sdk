@@ -197,7 +197,7 @@ class FirebaseUserAuth implements AuthTokenProvider {
       emulatorHost: emulatorHost,
       emulatorOptions: emulatorOptions,
       httpClient: httpClient,
-    );
+    ).._app = app;
     try {
       await auth.restore();
     } finally {
@@ -229,6 +229,14 @@ class FirebaseUserAuth implements AuthTokenProvider {
 
   /// The Web API key of the project.
   final String apiKey;
+
+  /// The app this instance was created for by [forApp] (`Auth.app` of the JS SDK; its `name` is `Auth.name`), or
+  /// null for an instance made with the constructor.
+  ///
+  /// The rest of the JS SDK's `Auth.config` is here as separate members: [apiKey], [appId], [emulatorConfig] (the
+  /// host and scheme requests go to, when not the real service) and [clientVersion].
+  FirebaseApp? get app => _app;
+  FirebaseApp? _app;
 
   /// The Auth emulator as it was passed to the constructor or to [useEmulator] (`host:port`, or with a scheme), or
   /// null for the real service.
@@ -2534,7 +2542,7 @@ class FirebaseUserAuth implements AuthTokenProvider {
 
   void _checkNotDisposed() {
     if (_disposed) {
-      throw StateError('This FirebaseUserAuth was disposed.');
+      throw FirebaseUserAuthDisposedError();
     }
   }
 

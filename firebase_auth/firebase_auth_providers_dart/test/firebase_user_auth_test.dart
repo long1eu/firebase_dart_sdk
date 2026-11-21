@@ -1767,6 +1767,7 @@ void main() {
           httpClient: client,
         );
         expect(app.authProvider, same(first));
+        expect(first.app, same(app));
         await first.signInAnonymously();
         expect(
           storage.read('firebase_auth_providers_dart:$apiKey:${app.name}'),
@@ -1841,6 +1842,7 @@ void main() {
 
     test('every request: client version and app id; content types', () async {
       final FirebaseUserAuth auth = withAppCheck(null);
+      expect(auth.app, isNull, reason: 'made with the constructor');
       await auth.signInAnonymously();
       await auth.getAccessToken(forceRefresh: true);
       expect(requests, hasLength(3));

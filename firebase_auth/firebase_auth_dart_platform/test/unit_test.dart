@@ -16,7 +16,11 @@ import 'package:firebase_auth_platform_interface/firebase_auth_platform_interfac
     show FirebaseAuthPlatform;
 import 'package:firebase_auth_providers_dart/firebase_auth_providers_dart.dart'
     as dart_auth
-    show AuthStorage, OAuthCredential, OAuthLoopbackProvider;
+    show
+        AuthStorage,
+        FirebaseUserAuthDisposedError,
+        OAuthCredential,
+        OAuthLoopbackProvider;
 import 'package:firebase_auth_providers_dart/firebase_auth_providers_dart.dart'
     show InMemoryAuthStorage;
 import 'package:firebase_core/firebase_core.dart';
@@ -941,6 +945,36 @@ void main() {
       expect(jsonDecode(storage.read(key)!), isA<Map<String, Object?>>());
     });
 
+    test(
+      'after setPersistence(SESSION) a new instance restores nothing',
+      () async {
+        final FirebaseAuth first = await newAuth();
+        await first.signInAnonymously();
+        await first.setPersistence(Persistence.SESSION);
+        expect(first.currentUser?.uid, 'anon-user');
+        final String name = first.app.name;
+        await first.app.delete();
+        final FirebaseApp app = await Firebase.initializeApp(
+          name: name,
+          options: _options,
+        );
+        final FirebaseAuth second = FirebaseAuth.instanceFor(app: app);
+        expect(await second.authStateChanges().first, isNull);
+      },
+    );
+
+    test('setPersistence works after a failed write of the storage', () async {
+      storageOverrides['app$_apps'] = _FailingStorage();
+      final FirebaseAuth auth = await newAuth();
+      await auth.signInAnonymously();
+      await auth.setPersistence(Persistence.NONE);
+      expect(auth.currentUser?.uid, 'anon-user');
+      await auth.setPersistence(Persistence.LOCAL);
+      expect(auth.currentUser?.uid, 'anon-user');
+      await auth.signOut();
+      expect(auth.currentUser, isNull);
+    });
+
     test('a stored session is restored by a new instance', () async {
       final FirebaseAuth first = await newAuth();
       await first.signInAnonymously();
@@ -984,8 +1018,34 @@ void main() {
         throwsAuthCode('internal-error'),
       );
       await expectLater(
+        guard<void>(
+          DartFirebaseAuth(),
+          () => throw dart_auth.FirebaseUserAuthDisposedError(),
+        ),
+        throwsAuthCode('app-deleted'),
+      );
+      await expectLater(
         guard<void>(DartFirebaseAuth(), () => throw ArgumentError('argument')),
         throwsAuthCode('argument-error'),
+      );
+      await expectLater(
+        guard<void>(
+          DartFirebaseAuth(),
+          () => throw UnsupportedError('no loopback server on the web'),
+        ),
+        throwsA(
+          isA<FirebaseAuthException>()
+              .having(
+                (FirebaseAuthException e) => e.code,
+                'code',
+                'unimplemented',
+              )
+              .having(
+                (FirebaseAuthException e) => e.message,
+                'message',
+                contains('no loopback server on the web'),
+              ),
+        ),
       );
       await expectLater(
         guard<void>(

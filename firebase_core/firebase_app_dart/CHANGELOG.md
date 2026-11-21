@@ -1,3 +1,7 @@
+## Unreleased
+
+- `GetTokenResult.signInSecondFactor`: the second factor of the sign-in (`firebase.sign_in_second_factor`), or null.
+
 ## 0.2.0
 
 Breaking: the API takes the names and shapes of FlutterFire's `firebase_core`. Every change is in
