@@ -56,14 +56,26 @@ void main() {
     expect(metadata.contentType, 'application/x-test');
     expect(metadata.customMetadata, <String, String>{'k': 'v'});
     expect(task.sessionUri?.queryParameters['upload_id'], isNotEmpty);
-    expect((await events).map((UploadProgress p) => p.bytesTransferred), <int>[
-      0,
-      256 * 1024,
-      768 * 1024,
-      1792 * 1024,
-      data.length,
-      data.length,
-    ]);
+    // On the VM progress is also reported while a chunk is sent (at most every 64 KiB and 100 ms),
+    // so a slow runner sees events between the chunk boundaries. What is fixed: the count never goes
+    // down, every confirmed chunk boundary is reported, and the last event is the whole object.
+    final List<int> transferred = (await events)
+        .map((UploadProgress p) => p.bytesTransferred)
+        .toList();
+    for (int i = 1; i < transferred.length; i++) {
+      expect(transferred[i], greaterThanOrEqualTo(transferred[i - 1]));
+    }
+    expect(
+      transferred,
+      containsAllInOrder(<int>[
+        0,
+        256 * 1024,
+        768 * 1024,
+        1792 * 1024,
+        data.length,
+      ]),
+    );
+    expect(transferred.last, data.length);
     expect(await ref.getBytes(), data);
   });
 

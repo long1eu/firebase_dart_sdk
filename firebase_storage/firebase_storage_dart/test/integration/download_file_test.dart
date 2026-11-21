@@ -85,16 +85,27 @@ void main() {
         );
       });
 
+      // How many bytes arrive before the cancel depends on the runner: a fast one can deliver the whole
+      // object as the first chunk. So the test checks what does not depend on timing: leaving the loop
+      // after the first chunk returns promptly, that chunk is a prefix of the object, and the next read
+      // works. That the cancel closes the HTTP response is pinned by the unit tests (download_test.dart).
       test('canceling after the first chunk stops the download', () async {
-        final Uint8List data = Uint8List(2 * 1024 * 1024);
+        final Uint8List data = Uint8List.fromList(
+          List<int>.generate(2 * 1024 * 1024, (int i) => i % 251),
+        );
         final Reference big = folder.child('big.bin');
         await big.putBytes(data);
-        int received = 0;
-        await for (final List<int> chunk in big.openRead()) {
-          received += chunk.length;
-          break;
-        }
-        expect(received, inInclusiveRange(1, data.length - 1));
+        final List<int> first = <int>[];
+        await () async {
+          await for (final List<int> chunk in big.openRead()) {
+            first.addAll(chunk);
+            break;
+          }
+        }().timeout(const Duration(seconds: 10));
+        expect(first, isNotEmpty);
+        expect(first.length, lessThanOrEqualTo(data.length));
+        expect(first, data.sublist(0, first.length));
+        expect(await big.getBytes(), data);
       });
     },
   );
