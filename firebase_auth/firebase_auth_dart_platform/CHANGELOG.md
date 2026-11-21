@@ -29,3 +29,7 @@
 - `FirebaseAuthDart.validatePassword(app, password)` checks a password against the policy of the project or the
   tenant, also on the emulator. `FirebaseAuth.validatePassword` of `firebase_auth` does not go through the platform
   interface: it asks the production backend itself.
+- An `UnsupportedError` of the client is a `FirebaseAuthException` with the code `unimplemented`, and a call after
+  the instance was disposed one with `app-deleted`.
+- `setPersistence` moves the session with the client's `setStorage`. The session is still kept in memory when the
+  storage of the app cannot be written.
