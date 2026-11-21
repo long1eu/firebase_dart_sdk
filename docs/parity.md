@@ -38,16 +38,18 @@ These are the numbers behind the statements below. Each one says where it comes 
 | The same tests with WebChannel in long-polling mode (`--transport=webchannel-longpolling`) | 882 passed, 26 skipped, 0 failed | run for this page on 2026-11-14 |
 | Browser tests in Chrome (`tool/test_browser.sh both`) | 57 tests per compiler, 56 pass and 1 is skipped, on dart2js and dart2wasm | [Platforms](guides/platforms.md); run on 2026-11-17 on the branch wave/web-support |
 | Production verification kit (`tool/verify_production`) against a real Standard edition database | 13 of 15 checks passed, 2 skipped | [Features and limits](guides/features.md), [The emulator and testing](guides/emulator_and_testing.md) |
+| Enterprise edition suite (`test/integration_enterprise`) against a real Enterprise edition database | 444 passed, 89 skipped, 0 failed | run on 2026-11-21; the skips are tests written for the emulator's answers |
+| The same suite against the Enterprise emulator | 446 passed, 86 skipped, 1 failed (`examples_enterprise_smoke_test.dart` stopped at a build message on stderr; not investigated yet) | run on 2026-11-21 |
 
 Each integration run used a fresh emulator. The same 908 tests run on every transport. The web transport skips five
 more than gRPC: two because the emulator's JSON endpoints store -0.0 as 0.0, two backoff measurements that only apply
 to gRPC, and one that needs two increments in flight at once. Among the skips on every transport: 8 large-document
 tests (production only), 7 tests against the real JS SDK (they need Node.js, which the machine that ran them does not
-have) and the opt-in scale soak. The Enterprise edition suites (`test/integration_enterprise`, and
-the standard suite against the Enterprise emulator) were not run for this page.
+have) and the opt-in scale soak. The standard suite against the Enterprise emulator was not run for
+this page.
 
-Most of the testing is against the Firestore emulator. The integration suite has an opt-in mode
-for a real project that has not been run yet; see [Known limitations](#known-limitations).
+Most of the testing is against the Firestore emulator. The standard integration suite has an opt-in
+mode for a real project that has not been run yet; see [Known limitations](#known-limitations).
 
 ## Documents and writes
 
