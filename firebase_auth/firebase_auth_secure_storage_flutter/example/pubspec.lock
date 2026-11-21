@@ -103,14 +103,14 @@ packages:
       path: "../../../firebase_core/firebase_app_dart"
       relative: true
     source: path
-    version: "0.2.0"
+    version: "0.2.1"
   firebase_auth_providers_dart:
     dependency: "direct main"
     description:
       path: "../../firebase_auth_providers_dart"
       relative: true
     source: path
-    version: "0.3.0"
+    version: "0.3.1"
   firebase_auth_secure_storage_flutter:
     dependency: "direct main"
     description:
