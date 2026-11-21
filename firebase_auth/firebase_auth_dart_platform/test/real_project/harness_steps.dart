@@ -606,6 +606,7 @@ class HarnessRun {
       } on FirebaseAuthException catch (e) {
         final bool refused = const <String>{
           'missing-app-credential',
+          'missing-client-identifier',
           'invalid-app-credential',
           'captcha-check-failed',
         }.contains(e.code);
