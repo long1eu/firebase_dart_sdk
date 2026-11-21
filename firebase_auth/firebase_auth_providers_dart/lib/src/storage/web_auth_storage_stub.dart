@@ -1,4 +1,4 @@
-import '../auth_storage.dart';
+import 'package:firebase_auth_providers_dart/src/auth_storage.dart';
 
 /// An [AuthStorage] in the browser's `sessionStorage` ([WebAuthStorage.session]) or `localStorage`
 /// ([WebAuthStorage.local]), the JS SDK's `browserSessionPersistence` and `browserLocalPersistence`. It needs a
@@ -6,7 +6,7 @@ import '../auth_storage.dart';
 ///
 /// Both storages are readable by every script of the origin: a cross-site scripting flaw gives the refresh token
 /// (which does not expire) away. See the documentation of the web implementation.
-class WebAuthStorage implements AuthStorage {
+class WebAuthStorage implements ObservableAuthStorage {
   /// The `sessionStorage` of the page: the session lasts as long as the tab. [prefix] goes before every key. Throws
   /// an [UnsupportedError] on this platform.
   WebAuthStorage.session({this.prefix = ''}) {
@@ -27,4 +27,8 @@ class WebAuthStorage implements AuthStorage {
 
   @override
   void write(String key, String? value) => throw UnsupportedError('No browser');
+
+  /// Emits when another tab changed [key] (the browser's `storage` event).
+  @override
+  Stream<void> changes(String key) => throw UnsupportedError('No browser');
 }

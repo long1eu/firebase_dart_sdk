@@ -12,12 +12,13 @@ import 'package:meta/meta.dart';
 /// `indexedDBLocalPersistence`). It needs a browser: on the Dart VM the constructor throws an
 /// [UnsupportedError] and [isAvailable] returns false; use `FileAuthStorage` there. See the
 /// documentation of the web implementation.
-class IndexedDbAuthStorage implements AuthStorage {
+class IndexedDbAuthStorage implements ObservableAuthStorage {
   /// A storage in the IndexedDB database [databaseName]. Throws an [UnsupportedError] on this
   /// platform.
   IndexedDbAuthStorage({
     this.databaseName = defaultDatabaseName,
     this.requestTimeout = defaultRequestTimeout,
+    this.pollInterval = defaultPollInterval,
   }) {
     throw UnsupportedError('IndexedDbAuthStorage needs a browser.');
   }
@@ -34,6 +35,9 @@ class IndexedDbAuthStorage implements AuthStorage {
   /// The time one request has when none is given.
   static const Duration defaultRequestTimeout = Duration(milliseconds: 2500);
 
+  /// How often [changes] reads the watched keys when none is given.
+  static const Duration defaultPollInterval = Duration(milliseconds: 800);
+
   /// The key under which [isAvailable] writes, reads back and deletes its probe value.
   static const String probeKey = '.availability-probe';
 
@@ -42,6 +46,9 @@ class IndexedDbAuthStorage implements AuthStorage {
 
   /// The time each request has to finish.
   final Duration requestTimeout;
+
+  /// How often [changes] reads the keys that are listened to.
+  final Duration pollInterval;
 
   /// Whether IndexedDB can be used here: always false on this platform. Never throws.
   static Future<bool> isAvailable({
@@ -56,14 +63,26 @@ class IndexedDbAuthStorage implements AuthStorage {
   Future<void> write(String key, String? value) =>
       throw UnsupportedError('No browser');
 
-  /// Closes the connection to the database.
+  /// Emits when another tab changed [key].
+  @override
+  Stream<void> changes(String key) => throw UnsupportedError('No browser');
+
+  /// The number of polls started so far, for tests.
+  @visibleForTesting
+  int get pollCount => throw UnsupportedError('No browser');
+
+  /// Whether the polls of [changes] run, for tests.
+  @visibleForTesting
+  bool get isPolling => throw UnsupportedError('No browser');
+
+  /// Ends the streams of [changes] and closes the connection to the database.
   Future<void> close() => throw UnsupportedError('No browser');
 }
 
 /// The best persistent [AuthStorage] the browser offers: IndexedDB, else `localStorage`, else
 /// memory, decided once. It needs a browser: on the Dart VM the constructor throws an
 /// [UnsupportedError]. See the documentation of the web implementation.
-class BestWebAuthStorage implements AuthStorage {
+class BestWebAuthStorage implements ObservableAuthStorage {
   /// A storage that chooses between IndexedDB, `localStorage` and memory. Throws an
   /// [UnsupportedError] on this platform.
   BestWebAuthStorage({
@@ -101,6 +120,10 @@ class BestWebAuthStorage implements AuthStorage {
   Future<void> write(String key, String? value) =>
       throw UnsupportedError('No browser');
 
-  /// Closes the IndexedDB connection.
+  /// Emits when another tab changed [key] in the storage in use.
+  @override
+  Stream<void> changes(String key) => throw UnsupportedError('No browser');
+
+  /// Ends the streams of [changes] and closes the IndexedDB connection.
   Future<void> close() => throw UnsupportedError('No browser');
 }

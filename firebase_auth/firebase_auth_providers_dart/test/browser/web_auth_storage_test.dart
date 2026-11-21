@@ -13,10 +13,25 @@ import 'package:firebase_auth_providers_dart/firebase_auth_providers_dart.dart';
 import 'package:test/test.dart';
 import 'package:web/web.dart' as web;
 
+/// What goes before the storage keys of this file. The browser test files run side by side on one
+/// origin and share `localStorage` (and the frames of one tab share `sessionStorage`), so each file
+/// uses and cleans its own keys only.
+const String _p = 'web_auth_storage_test:';
+
+void _clearOwnKeys(web.Storage storage) {
+  final List<String> own = <String>[
+    for (int i = 0; i < storage.length; i++)
+      if (storage.key(i) case final String key when key.startsWith(_p)) key,
+  ];
+  for (final String key in own) {
+    storage.removeItem(key);
+  }
+}
+
 void main() {
   tearDown(() {
-    web.window.sessionStorage.clear();
-    web.window.localStorage.clear();
+    _clearOwnKeys(web.window.sessionStorage);
+    _clearOwnKeys(web.window.localStorage);
   });
 
   for (final (
@@ -43,22 +58,22 @@ void main() {
         ),
       ]) {
     test('$name: stores, reads and removes, under the prefix', () {
-      final WebAuthStorage auth = create(prefix: 'app:');
+      final WebAuthStorage auth = create(prefix: '${_p}app:');
       expect(auth.read('k'), isNull);
       auth.write('k', 'v');
       expect(auth.read('k'), 'v');
-      expect(storage().getItem('app:k'), 'v');
-      expect(create(prefix: 'app:').read('k'), 'v');
-      expect(create().read('k'), isNull);
+      expect(storage().getItem('${_p}app:k'), 'v');
+      expect(create(prefix: '${_p}app:').read('k'), 'v');
+      expect(create(prefix: '${_p}other:').read('k'), isNull);
       auth.write('k', null);
-      expect(storage().getItem('app:k'), isNull);
+      expect(storage().getItem('${_p}app:k'), isNull);
     });
   }
 
   test('a FirebaseUserAuth keeps its session in sessionStorage', () async {
     final InMemoryAuthStorage unused = InMemoryAuthStorage();
     expect(unused.read('x'), isNull);
-    final WebAuthStorage storage = WebAuthStorage.session();
+    final WebAuthStorage storage = WebAuthStorage.session(prefix: _p);
     final FirebaseUserAuth auth = FirebaseUserAuth(
       apiKey: 'key',
       storage: storage,
