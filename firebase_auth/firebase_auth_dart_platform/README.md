@@ -11,7 +11,7 @@ You need it for a Flutter app on Linux desktop, where `firebase_auth` and `fireb
 their own: add it to `pubspec.yaml` and it registers itself. On other platforms it is an opt-in. It is not affiliated
 with or endorsed by Google or Firebase.
 
-> **Status: 0.1.0, unreleased.** Unit-tested with `flutter test` through the classes of `firebase_auth` 7.1.0
+> **Status: 0.1.0.** Unit-tested with `flutter test` through the classes of `firebase_auth` 7.1.0
 > (`firebase_auth_platform_interface` 9.2.0), against a fake backend. The client underneath is tested against the
 > Auth emulator in its own package. This package has not yet run in a Linux desktop build, against the emulator, or
 > against a production project.
