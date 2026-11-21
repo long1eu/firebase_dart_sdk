@@ -87,6 +87,17 @@
   link and unlink on an existing account). The backend accepts only a token of the GitHub app configured in the
   project, and the callback URL of the app must be `http://127.0.0.1` without a `/` at the end. All of it is in the
   README.
+- `FirebaseUserAuth.setStorage(storage)` keeps the session in another `AuthStorage` from now on and moves the
+  current one there (`setPersistence` of the JS SDK). The session is written to the new storage first and deleted
+  from the old one after; when the write fails, nothing changes.
+- `OAuthLoopbackProvider.copyWith(scopes:, customParameters:)`.
+- A call after `dispose` throws `FirebaseUserAuthDisposedError`, a `StateError`.
+- `FirebaseUserAuth.app`: the app of an instance made by `forApp`; null for one made with the constructor.
+- Constants `ProviderId`, `SignInMethod`, `FactorId` and `AuthErrorCode` (the codes of the JS SDK and the five only
+  this client has). `MultiFactorInfo.phoneFactorId` and `totpFactorId` are the `FactorId` values.
+- `FirebaseAuthException.serverResponse`: the answer of the backend on the errors the JS SDK tags with it
+  (`account-exists-with-different-credential`, `credential-already-in-use`, `email-already-in-use`,
+  `user-disabled`). It is unmodifiable, and neither it nor the exception prints its values.
 
 ## 0.3.0
 

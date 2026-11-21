@@ -144,7 +144,7 @@ against the Firebase Auth emulator; nothing was run against the real service.
 | `fetchSignInMethodsForEmail(auth, email)` (deprecated upstream: empty with email enumeration protection) | `fetchSignInMethodsForEmail(email)` | emulator, Chrome |
 | `connectAuthEmulator(auth, url)` | the `emulatorHost` argument | emulator, Chrome |
 | `user.uid`, `email`, `emailVerified`, `isAnonymous`, `displayName`, `photoURL`, `phoneNumber`, `tenantId`, `metadata`, `providerData` | `currentUser` (`AuthUser`, read with `accounts:lookup` after every sign-in) | emulator |
-| `setPersistence` (`inMemory`, `browserSession`, `browserLocal`) | an `AuthStorage`: `InMemoryAuthStorage` (default), `WebAuthStorage.session()`, `WebAuthStorage.local()`, and `FileAuthStorage(path)` on the VM | unit, Chrome |
+| `setPersistence` (`inMemory`, `browserSession`, `browserLocal`) | an `AuthStorage`: `InMemoryAuthStorage` (default), `WebAuthStorage.session()`, `WebAuthStorage.local()`, and `FileAuthStorage(path)` on the VM, given to the constructor or switched later with `setStorage`, which moves the session | unit, Chrome |
 | `ActionCodeSettings` (`url`, `handleCodeInApp`, `iOS`, `android`, `linkDomain`) | `ActionCodeSettings` (flattened; no `dynamicLinkDomain`) | unit |
 | Popup and redirect flows on desktop and command line (no JS SDK equivalent) | `signInWithOAuthLoopback(OAuthLoopbackProvider.google(...))` / `.github(...)` / `.oidc(...)` / `.discover(...)`, `linkWithOAuthLoopback`, `reauthenticateWithOAuthLoopback`, or `authorizeWithOAuthLoopback(...)` for the credential (VM only; see below) | unit (fake identity provider); Google with a Desktop client against a real project |
 | Popup and redirect flows in a browser, `signInWithProvider`, SAML | – (use a token from elsewhere with `signInWithCredential`) | |
@@ -244,6 +244,8 @@ print(result.user?.email);
   the same user in again. Both take the same arguments as `signInWithOAuthLoopback`, and throw `null-user` before
   the browser opens when nobody is signed in.
 - `authorizeWithOAuthLoopback` returns the tokens and the credential without signing in.
+- `provider.copyWith(scopes:, customParameters:)` makes a provider for one request that asks for more, such as one
+  more scope: `google.copyWith(scopes: <String>[...google.scopes, 'https://www.googleapis.com/auth/drive.file'])`.
 - Only the code is exchanged: once signed in, the Firebase session refreshes itself; the provider's refresh token is
   returned but not used.
 - Errors are `FirebaseAuthException`s: `timeout` (five minutes by default), `user-cancelled`,

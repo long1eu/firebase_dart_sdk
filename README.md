@@ -43,8 +43,9 @@ endorsed by Google or Firebase.
 - You ship a Windows app and cannot test it yourself first: it was run on one Windows 11 VM against the
   emulator only (the Dart VM suites and two Flutter debug apps, no window drawn), not in CI, not in a
   release build and not against production.
-- You need a provider's sign-in page (popup or redirect), phone sign-in, multi-factor, Storage, Messaging or the other Firebase
-  services, or admin jobs such as bulk writes and recursive deletes (use `firebase_admin_sdk`).
+- You need a provider's sign-in page in a browser (popup or redirect), phone sign-in, SMS multi-factor, Storage,
+  Messaging or the other Firebase services, or admin jobs such as bulk writes and recursive deletes
+  (use `firebase_admin_sdk`).
 - You need a vendor to call: one person maintains it, with no SLA.
 
 **Start** with the emulator (`firebase emulators:start --only firestore --project demo-my-app`):
@@ -219,17 +220,24 @@ code; he reviews and tests it. Response times are in the [support policy](docs/s
   other browser was tried, and no browser was run against a production backend (the verification
   kit used the web transport against production from the VM).
 - Not implemented: coordination between clients that share one SQLite cache (isolates and processes;
-  deferred until after 0.1.0; the tabs of the web IndexedDB cache have a preview, `multiTab: true`), a full Firebase Auth SDK (no popup or redirect sign-in, phone or multi-factor), and
+  deferred until after 0.1.0; the tabs of the web IndexedDB cache have a preview, `multiTab: true`), the parts of Firebase Auth that need a browser or app verification (popup and redirect sign-in,
+  phone sign-in and SMS multi-factor), and
   Pipelines beyond the preview (no real-time pipelines and no offline evaluation; a local
   evaluator exists but is internal and not used yet; search, window functions and explain
   options are only checked for their encoding, since the emulator rejects them).
   [docs/guides/features.md](docs/guides/features.md) lists the known gaps.
 
-This repository ports Firestore and the Firebase Core pieces it needs, plus token providers for
-Firestore in `firebase_auth/firebase_auth_providers_dart` and a few Firebase Auth admin calls in
-`firebase_admin/firebase_admin_dart`. `firebase_auth/firebase_auth_dart_platform` runs the official `firebase_auth` API on top of those.
-`firebase_storage/firebase_storage_dart` is a Cloud Storage for Firebase client. There is no full Auth SDK
-and no Realtime Database client here; for those see
+This repository ports Firestore and the Firebase Core pieces it needs, a Firebase Auth client in
+`firebase_auth/firebase_auth_providers_dart`, and a few Firebase Auth admin calls in
+`firebase_admin/firebase_admin_dart`. `firebase_auth/firebase_auth_dart_platform` runs the official
+`firebase_auth` API on top of the Auth client. The Auth client covers email, anonymous, custom token,
+email link and provider sign-in (with tokens the app holds, or through a loopback browser flow on
+desktop), account management, linking and TOTP multi-factor; it has no popup or redirect sign-in,
+no phone sign-in and no SMS multi-factor.
+[docs/auth_parity.md](docs/auth_parity.md) compares it with the JS SDK, method by method.
+`firebase_storage/firebase_storage_dart` is a Cloud Storage for Firebase client
+([docs/storage_parity.md](docs/storage_parity.md)). There is no Realtime Database client here; for
+that see
 [appsup-dart/firebase_dart](https://github.com/appsup-dart/firebase_dart). The other directories
 under `firebase_auth`, and `google_sign_in_dart`, are older code from
 the original project and are not part of the migrated, tested set.

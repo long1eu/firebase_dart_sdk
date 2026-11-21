@@ -9,12 +9,18 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_auth_dart_platform/firebase_auth_dart_platform.dart';
 import 'package:firebase_auth_dart_platform/src/convert.dart';
 import 'package:firebase_auth_dart_platform/src/core.dart';
+import 'package:firebase_auth_dart_platform/src/firebase_auth.dart'
+    show DartAuthConfig;
 import 'package:firebase_auth_dart_platform/src/storage.dart';
 import 'package:firebase_auth_platform_interface/firebase_auth_platform_interface.dart'
     show FirebaseAuthPlatform;
 import 'package:firebase_auth_providers_dart/firebase_auth_providers_dart.dart'
     as dart_auth
-    show AuthStorage, OAuthCredential;
+    show
+        AuthStorage,
+        FirebaseUserAuthDisposedError,
+        OAuthCredential,
+        OAuthLoopbackProvider;
 import 'package:firebase_auth_providers_dart/firebase_auth_providers_dart.dart'
     show InMemoryAuthStorage;
 import 'package:firebase_core/firebase_core.dart';
@@ -56,6 +62,64 @@ Future<FirebaseAuth> newAuth() async {
   return FirebaseAuth.instanceFor(app: app);
 }
 
+/// The authorization URLs the provider flows presented, in order.
+final List<Uri> presented = <Uri>[];
+
+/// The providers of the provider flows: Google with a login hint, and GitHub.
+final List<dart_auth.OAuthLoopbackProvider> oauthProviders =
+    <dart_auth.OAuthLoopbackProvider>[
+      dart_auth.OAuthLoopbackProvider.google(
+        clientId: 'desktop-client',
+        clientSecret: 'desktop-secret',
+        loginHint: 'ada@example.com',
+      ),
+      dart_auth.OAuthLoopbackProvider.github(
+        clientId: 'github-client',
+        clientSecret: 'github-secret',
+      ),
+    ];
+
+/// Plays the browser of a provider flow: the provider redirects to the
+/// loopback server of the flow at once, with a code and the state it was sent.
+Future<void> followRedirect(Uri url) async {
+  presented.add(url);
+  final Map<String, String> query = url.queryParameters;
+  final Uri redirect = Uri.parse(query['redirect_uri']!).replace(
+    queryParameters: <String, String>{
+      'code': 'the-code',
+      'state': query['state']!,
+    },
+  );
+  final http.Client browser = http.Client();
+  try {
+    await browser.get(redirect);
+  } finally {
+    browser.close();
+  }
+}
+
+/// Answers the code exchange at the token endpoints of Google and GitHub
+/// (the client sends it through the http client of `use`); null for the
+/// requests of the default backend.
+http.Response? providerTokens(http.Request request) =>
+    switch (request.url.host) {
+      'oauth2.googleapis.com' => jsonResponse(<String, Object?>{
+        'access_token': 'google-access-token',
+        'id_token': unsignedJwt(<String, Object?>{
+          'sub': 'google-sub',
+          'nonce': presented.last.queryParameters['nonce'],
+        }),
+        'expires_in': 3599,
+        'token_type': 'Bearer',
+      }),
+      'github.com' => jsonResponse(<String, Object?>{
+        'access_token': 'github-access-token',
+        'token_type': 'bearer',
+        'scope': 'read:user',
+      }),
+      _ => null,
+    };
+
 Matcher throwsAuthCode(String code) => throwsA(
   isA<FirebaseAuthException>().having(
     (FirebaseAuthException e) => e.code,
@@ -76,6 +140,8 @@ void main() {
       storageFor: (FirebaseApp app) =>
           storageOverrides[app.name] ??
           storages.putIfAbsent(app.name, InMemoryAuthStorage.new),
+      oauthProviders: oauthProviders,
+      presentUrl: followRedirect,
     );
   });
 
@@ -86,6 +152,7 @@ void main() {
   setUp(() {
     backend.requests.clear();
     backend.override = null;
+    presented.clear();
   });
 
   group('registration', () {
@@ -267,32 +334,518 @@ void main() {
         throwsAuthCode('email-already-in-use'),
       );
     });
+  });
 
-    test('a second factor gives the hints, and cannot be resolved', () async {
+  group('multi-factor', () {
+    setUp(backend.factors.clear);
+
+    /// Signs [email] in and enrols a TOTP factor named [name]; returns it.
+    Future<MultiFactorInfo> enrollTotp(
+      FirebaseAuth auth,
+      String email, {
+      String name = 'Phone',
+    }) async {
+      await auth.signInWithEmailAndPassword(email: email, password: 'p');
+      final MultiFactor multiFactor = auth.currentUser!.multiFactor;
+      final TotpSecret secret = await TotpMultiFactorGenerator.generateSecret(
+        await multiFactor.getSession(),
+      );
+      await multiFactor.enroll(
+        await TotpMultiFactorGenerator.getAssertionForEnrollment(
+          secret,
+          FakeBackend.totpCode,
+        ),
+        displayName: name,
+      );
+      return (await multiFactor.getEnrolledFactors()).single;
+    }
+
+    test('enrol a TOTP factor, list it, and unenrol it', () async {
       final FirebaseAuth auth = await newAuth();
-      backend.override = (http.Request r) => jsonResponse(<String, Object?>{
-        'localId': 'uid',
-        'mfaPendingCredential': 'pending',
-        'mfaInfo': <Object?>[
-          <String, Object?>{
-            'mfaEnrollmentId': 'totp-1',
-            'totpInfo': <String, Object?>{},
-          },
-        ],
+      await auth.signInWithEmailAndPassword(
+        email: 'enrol@example.com',
+        password: 'p',
+      );
+      final MultiFactor multiFactor = auth.currentUser!.multiFactor;
+      expect(await multiFactor.getEnrolledFactors(), isEmpty);
+
+      final MultiFactorSession session = await multiFactor.getSession();
+      expect(session.id, auth.currentUser!.uid);
+      expect(backend.paths.where((p) => p.contains('mfa')), isEmpty);
+      final TotpSecret secret = await TotpMultiFactorGenerator.generateSecret(
+        session,
+      );
+      expect(secret.secretKey, 'GEZDGNBVGY3TQOJQ');
+      expect(secret.codeLength, 6);
+      expect(secret.codeIntervalSeconds, 30);
+      expect(secret.hashingAlgorithm, 'SHA1');
+      expect(
+        secret.enrollmentCompletionDeadline,
+        DateTime.utc(2026, 1, 1, 12, 10),
+      );
+
+      await multiFactor.enroll(
+        await TotpMultiFactorGenerator.getAssertionForEnrollment(
+          secret,
+          FakeBackend.totpCode,
+        ),
+        displayName: 'Phone',
+      );
+      expect(backend.bodyOf('mfaEnrollment:finalize'), <String, Object?>{
+        'idToken': isA<String>(),
+        'displayName': 'Phone',
+        'totpVerificationInfo': <String, Object?>{
+          'sessionInfo': 'enrollment-session',
+          'verificationCode': FakeBackend.totpCode,
+        },
       });
+      final List<MultiFactorInfo> factors = await multiFactor
+          .getEnrolledFactors();
+      final MultiFactorInfo factor = factors.single;
+      expect(factor, isA<TotpMultiFactorInfo>());
+      expect(factor.factorId, 'totp');
+      expect(factor.displayName, 'Phone');
+      expect(factor.enrollmentTimestamp, 1767268800);
+
+      await multiFactor.unenroll(multiFactorInfo: factor);
+      expect(
+        backend.bodyOf('mfaEnrollment:withdraw'),
+        containsPair('mfaEnrollmentId', factor.uid),
+      );
+      expect(await multiFactor.getEnrolledFactors(), isEmpty);
+      await expectLater(
+        multiFactor.unenroll(factorUid: factor.uid),
+        throwsAuthCode('multi-factor-info-not-found'),
+      );
+    });
+
+    test('the QR code URL defaults to the email and the app name', () async {
+      final FirebaseAuth auth = await newAuth();
+      await auth.signInWithEmailAndPassword(
+        email: 'qr@example.com',
+        password: 'p',
+      );
+      final TotpSecret secret = await TotpMultiFactorGenerator.generateSecret(
+        await auth.currentUser!.multiFactor.getSession(),
+      );
+      expect(
+        await secret.generateQrCodeUrl(),
+        'otpauth://totp/${auth.app.name}:qr@example.com'
+        '?secret=GEZDGNBVGY3TQOJQ&issuer=${auth.app.name}'
+        '&algorithm=SHA1&digits=6',
+      );
+      expect(
+        await secret.generateQrCodeUrl(accountName: 'ada', issuer: 'My App'),
+        'otpauth://totp/My%20App:ada?secret=GEZDGNBVGY3TQOJQ'
+        '&issuer=My%20App&algorithm=SHA1&digits=6',
+      );
+      await expectLater(
+        secret.openInOtpApp('otpauth://totp/x'),
+        throwsAuthCode('unimplemented'),
+      );
+    });
+
+    test('a wrong code or a missing display name does not enrol', () async {
+      final FirebaseAuth auth = await newAuth();
+      await auth.signInWithEmailAndPassword(
+        email: 'wrong@example.com',
+        password: 'p',
+      );
+      final MultiFactor multiFactor = auth.currentUser!.multiFactor;
+      final TotpSecret secret = await TotpMultiFactorGenerator.generateSecret(
+        await multiFactor.getSession(),
+      );
+      await expectLater(
+        multiFactor.enroll(
+          await TotpMultiFactorGenerator.getAssertionForEnrollment(
+            secret,
+            '000000',
+          ),
+          displayName: 'Phone',
+        ),
+        throwsAuthCode('invalid-verification-code'),
+      );
+      backend.requests.clear();
+      await expectLater(
+        multiFactor.enroll(
+          await TotpMultiFactorGenerator.getAssertionForEnrollment(
+            secret,
+            FakeBackend.totpCode,
+          ),
+        ),
+        throwsAuthCode('argument-error'),
+      );
+      expect(backend.requests, isEmpty);
+      expect(await multiFactor.getEnrolledFactors(), isEmpty);
+    });
+
+    test('a TOTP code resolves a sign-in with a second factor', () async {
+      final FirebaseAuth auth = await newAuth();
+      final MultiFactorInfo factor = await enrollTotp(auth, 'mfa@example.com');
+      // A second authenticator app: the resolver must name the factor.
+      backend.factors['uid-of-mfa@example.com']!.insert(0, <String, Object?>{
+        'mfaEnrollmentId': 'totp-other',
+        'totpInfo': <String, Object?>{},
+      });
+      await auth.signOut();
       try {
-        await auth.signInWithEmailAndPassword(email: 'a@b.c', password: 'p');
+        await auth.signInWithEmailAndPassword(
+          email: 'mfa@example.com',
+          password: 'p',
+        );
         fail('expected a FirebaseAuthMultiFactorException');
       } on FirebaseAuthMultiFactorException catch (e) {
         expect(e.code, 'multi-factor-auth-required');
-        expect(e.resolver.hints.single, isA<TotpMultiFactorInfo>());
-        expect(e.resolver.hints.single.uid, 'totp-1');
-        expect(e.resolver.session.id, 'pending');
+        expect(e.resolver.hints, everyElement(isA<TotpMultiFactorInfo>()));
+        expect(
+          <String>[for (final h in e.resolver.hints) h.uid],
+          <String>['totp-other', factor.uid],
+        );
+        expect(e.resolver.session.id, 'pending:uid-of-mfa@example.com');
+        expect(auth.currentUser, isNull);
+        await expectLater(
+          e.resolver.resolveSignIn(
+            await TotpMultiFactorGenerator.getAssertionForSignIn(
+              factor.uid,
+              '000000',
+            ),
+          ),
+          throwsAuthCode('invalid-verification-code'),
+        );
+        final UserCredential result = await e.resolver.resolveSignIn(
+          await TotpMultiFactorGenerator.getAssertionForSignIn(
+            factor.uid,
+            FakeBackend.totpCode,
+          ),
+        );
+        expect(result.user!.uid, 'uid-of-mfa@example.com');
+        expect(auth.currentUser!.uid, 'uid-of-mfa@example.com');
+        expect(backend.bodyOf('mfaSignIn:finalize'), <String, Object?>{
+          'mfaPendingCredential': 'pending:uid-of-mfa@example.com',
+          'mfaEnrollmentId': factor.uid,
+          'totpVerificationInfo': <String, Object?>{
+            'verificationCode': FakeBackend.totpCode,
+          },
+        });
       }
-      // The assertion the resolver would need cannot be made yet.
+    });
+
+    test('a reauthentication with a second factor is resolved', () async {
+      final FirebaseAuth auth = await newAuth();
+      final MultiFactorInfo factor = await enrollTotp(
+        auth,
+        'reauth@example.com',
+      );
+      final User user = auth.currentUser!;
+      try {
+        await user.reauthenticateWithCredential(
+          EmailAuthProvider.credential(
+            email: 'reauth@example.com',
+            password: 'p',
+          ),
+        );
+        fail('expected a FirebaseAuthMultiFactorException');
+      } on FirebaseAuthMultiFactorException catch (e) {
+        final UserCredential result = await e.resolver.resolveSignIn(
+          await TotpMultiFactorGenerator.getAssertionForSignIn(
+            factor.uid,
+            FakeBackend.totpCode,
+          ),
+        );
+        expect(result.user!.uid, user.uid);
+        expect(auth.currentUser!.uid, user.uid);
+      }
+    });
+
+    test('wrong assertions, sessions and secrets are refused', () async {
+      final FirebaseAuth auth = await newAuth();
+      final MultiFactorInfo factor = await enrollTotp(auth, 'kind@example.com');
+      final MultiFactor multiFactor = auth.currentUser!.multiFactor;
       await expectLater(
-        TotpMultiFactorGenerator.getAssertionForSignIn('totp-1', '123456'),
+        TotpMultiFactorGenerator.generateSecret(MultiFactorSession('made-up')),
+        throwsAuthCode('argument-error'),
+      );
+      await expectLater(
+        multiFactor.enroll(
+          await TotpMultiFactorGenerator.getAssertionForSignIn(
+            factor.uid,
+            FakeBackend.totpCode,
+          ),
+          displayName: 'Phone',
+        ),
+        throwsAuthCode('argument-error'),
+      );
+      final TotpSecret secret = await TotpMultiFactorGenerator.generateSecret(
+        await multiFactor.getSession(),
+      );
+      await auth.signOut();
+      try {
+        await auth.signInWithEmailAndPassword(
+          email: 'kind@example.com',
+          password: 'p',
+        );
+        fail('expected a FirebaseAuthMultiFactorException');
+      } on FirebaseAuthMultiFactorException catch (e) {
+        await expectLater(
+          e.resolver.resolveSignIn(
+            await TotpMultiFactorGenerator.getAssertionForEnrollment(
+              secret,
+              FakeBackend.totpCode,
+            ),
+          ),
+          throwsAuthCode('argument-error'),
+        );
+      }
+      expect(
+        () => PhoneMultiFactorGenerator.getAssertion(
+          PhoneAuthProvider.credential(verificationId: 'v', smsCode: '1'),
+        ),
         throwsAuthCode('unimplemented'),
+      );
+    });
+
+    test('a signed-out user cannot use its multi-factor API', () async {
+      final FirebaseAuth auth = await newAuth();
+      await auth.signInWithEmailAndPassword(
+        email: 'gone@example.com',
+        password: 'p',
+      );
+      final MultiFactor multiFactor = auth.currentUser!.multiFactor;
+      final MultiFactorSession session = await multiFactor.getSession();
+      await auth.signOut();
+      await expectLater(
+        multiFactor.getSession(),
+        throwsAuthCode('no-current-user'),
+      );
+      await expectLater(
+        multiFactor.getEnrolledFactors(),
+        throwsAuthCode('no-current-user'),
+      );
+      await expectLater(
+        TotpMultiFactorGenerator.generateSecret(session),
+        throwsAuthCode('no-current-user'),
+      );
+    });
+  });
+
+  group('provider sign-in', () {
+    test(
+      'signInWithProvider runs the loopback flow of the provider passed to '
+      'use, with the scopes and parameters of the FlutterFire provider',
+      () async {
+        final FirebaseAuth auth = await newAuth();
+        backend.override = providerTokens;
+        final UserCredential result = await auth.signInWithProvider(
+          GoogleAuthProvider()
+            ..addScope('https://www.googleapis.com/auth/drive.file')
+            ..addScope('email')
+            ..setCustomParameters(<String, String>{
+              'prompt': 'consent',
+              'login_hint': 'bob@example.com',
+            }),
+        );
+        expect(result.user!.uid, 'google-user');
+        expect(result.credential?.providerId, 'google.com');
+
+        final Uri url = presented.single;
+        expect(url.host, 'accounts.google.com');
+        expect(url.queryParameters['client_id'], 'desktop-client');
+        expect(
+          url.queryParameters['scope'],
+          'openid email profile https://www.googleapis.com/auth/drive.file',
+        );
+        expect(url.queryParameters['prompt'], 'consent');
+        expect(url.queryParameters['login_hint'], 'bob@example.com');
+        final Map<String, String> exchange = backend.requests
+            .singleWhere(
+              (http.Request r) => r.url.host == 'oauth2.googleapis.com',
+            )
+            .bodyFields;
+        expect(exchange['code'], 'the-code');
+        expect(exchange['client_secret'], 'desktop-secret');
+        final Map<String, String> post = Uri.splitQueryString(
+          backend.bodyOf('accounts:signInWithIdp')['postBody']! as String,
+        );
+        expect(post['providerId'], 'google.com');
+        expect(post['access_token'], 'google-access-token');
+
+        // The provider passed to use is not changed by the request.
+        await auth.signOut();
+        await auth.signInWithProvider(GoogleAuthProvider());
+        expect(presented.last.queryParameters['scope'], 'openid email profile');
+        expect(presented.last.queryParameters['login_hint'], 'ada@example.com');
+        expect(presented.last.queryParameters.containsKey('prompt'), isFalse);
+      },
+    );
+
+    test(
+      'linkWithProvider and reauthenticateWithProvider act on the user',
+      () async {
+        final FirebaseAuth auth = await newAuth();
+        await auth.signInAnonymously();
+        final String uid = auth.currentUser!.uid;
+        backend.override = (http.Request r) =>
+            providerTokens(r) ??
+            (r.url.path.endsWith('accounts:signInWithIdp')
+                ? jsonResponse(<String, Object?>{
+                    'localId': uid,
+                    'providerId': 'github.com',
+                    'idToken': idToken(uid, provider: 'github.com'),
+                    'refreshToken': 'refresh:$uid',
+                    'expiresIn': '3600',
+                  })
+                : null);
+
+        final UserCredential linked = await auth.currentUser!.linkWithProvider(
+          GithubAuthProvider()..addScope('repo'),
+        );
+        expect(linked.user!.uid, uid);
+        final Uri url = presented.single;
+        expect(url.host, 'github.com');
+        expect(url.queryParameters['client_id'], 'github-client');
+        expect(url.queryParameters['scope'], 'read:user user:email repo');
+        expect(url.queryParameters.containsKey('nonce'), isFalse);
+        final Map<String, Object?> body = backend.bodyOf(
+          'accounts:signInWithIdp',
+        );
+        expect(body['idToken'], isNotNull);
+        final Map<String, String> post = Uri.splitQueryString(
+          body['postBody']! as String,
+        );
+        expect(post['providerId'], 'github.com');
+        expect(post['access_token'], 'github-access-token');
+
+        final UserCredential again = await auth.currentUser!
+            .reauthenticateWithProvider(GithubAuthProvider());
+        expect(again.user!.uid, uid);
+        expect(presented, hasLength(2));
+        expect(presented.last.queryParameters['scope'], 'read:user user:email');
+      },
+    );
+
+    test('a provider id that was not passed to use throws unimplemented '
+        'before the browser opens', () async {
+      final FirebaseAuth auth = await newAuth();
+      await expectLater(
+        auth.signInWithProvider(OAuthProvider('oidc.none')),
+        throwsA(
+          isA<FirebaseAuthException>()
+              .having(
+                (FirebaseAuthException e) => e.code,
+                'code',
+                'unimplemented',
+              )
+              .having(
+                (FirebaseAuthException e) => e.message,
+                'message',
+                allOf(contains('"oidc.none"'), contains('oauthProviders')),
+              ),
+        ),
+      );
+      await auth.signInAnonymously();
+      await expectLater(
+        auth.currentUser!.linkWithProvider(MicrosoftAuthProvider()),
+        throwsAuthCode('unimplemented'),
+      );
+      await expectLater(
+        auth.currentUser!.reauthenticateWithProvider(YahooAuthProvider()),
+        throwsAuthCode('unimplemented'),
+      );
+      expect(presented, isEmpty);
+    });
+
+    test(
+      'errors of the flow are FirebaseAuthExceptions with their code',
+      () async {
+        final FirebaseAuth auth = await newAuth();
+        backend.override = (http.Request r) =>
+            r.url.host == 'oauth2.googleapis.com'
+            ? jsonResponse(<String, Object?>{'error': 'invalid_grant'}, 400)
+            : null;
+        await expectLater(
+          auth.signInWithProvider(GoogleAuthProvider()),
+          throwsAuthCode('invalid-credential'),
+        );
+        expect(auth.currentUser, isNull);
+
+        // A user that is no longer signed in fails before the browser opens.
+        backend.override = null;
+        await auth.signInAnonymously();
+        final User stale = auth.currentUser!;
+        await auth.signOut();
+        presented.clear();
+        await expectLater(
+          stale.linkWithProvider(GoogleAuthProvider()),
+          throwsAuthCode('no-current-user'),
+        );
+        expect(presented, isEmpty);
+      },
+    );
+
+    test(
+      'without presentUrl, Android and iOS throw before the flow starts',
+      () async {
+        final DartAuthConfig configured = DartFirebaseAuth.config;
+        DartFirebaseAuth.config = DartAuthConfig(
+          httpClient: backend.client,
+          storageFor: (FirebaseApp app) => InMemoryAuthStorage(),
+          oauthProviders: <String, dart_auth.OAuthLoopbackProvider>{
+            'google.com': oauthProviders.first,
+          },
+        );
+        final FirebaseAuth auth;
+        try {
+          auth = await newAuth();
+          await auth.signInAnonymously();
+        } finally {
+          DartFirebaseAuth.config = configured;
+        }
+        for (final TargetPlatform platform in <TargetPlatform>[
+          TargetPlatform.android,
+          TargetPlatform.iOS,
+        ]) {
+          debugDefaultTargetPlatformOverride = platform;
+          try {
+            await expectLater(
+              auth.signInWithProvider(GoogleAuthProvider()),
+              throwsA(
+                isA<FirebaseAuthException>()
+                    .having(
+                      (FirebaseAuthException e) => e.code,
+                      'code',
+                      'unimplemented',
+                    )
+                    .having(
+                      (FirebaseAuthException e) => e.message,
+                      'message',
+                      contains('presentUrl'),
+                    ),
+              ),
+            );
+            await expectLater(
+              auth.currentUser!.linkWithProvider(GoogleAuthProvider()),
+              throwsAuthCode('unimplemented'),
+            );
+          } finally {
+            debugDefaultTargetPlatformOverride = TargetPlatform.linux;
+          }
+        }
+        expect(
+          backend.paths.where((String p) => p.endsWith('/token')),
+          isEmpty,
+        );
+      },
+    );
+
+    test('use rejects two providers with one id', () {
+      expect(
+        () => FirebaseAuthDart.use(
+          oauthProviders: <dart_auth.OAuthLoopbackProvider>[
+            oauthProviders.first,
+            oauthProviders.first,
+          ],
+        ),
+        throwsArgumentError,
       );
     });
   });
@@ -392,6 +945,36 @@ void main() {
       expect(jsonDecode(storage.read(key)!), isA<Map<String, Object?>>());
     });
 
+    test(
+      'after setPersistence(SESSION) a new instance restores nothing',
+      () async {
+        final FirebaseAuth first = await newAuth();
+        await first.signInAnonymously();
+        await first.setPersistence(Persistence.SESSION);
+        expect(first.currentUser?.uid, 'anon-user');
+        final String name = first.app.name;
+        await first.app.delete();
+        final FirebaseApp app = await Firebase.initializeApp(
+          name: name,
+          options: _options,
+        );
+        final FirebaseAuth second = FirebaseAuth.instanceFor(app: app);
+        expect(await second.authStateChanges().first, isNull);
+      },
+    );
+
+    test('setPersistence works after a failed write of the storage', () async {
+      storageOverrides['app$_apps'] = _FailingStorage();
+      final FirebaseAuth auth = await newAuth();
+      await auth.signInAnonymously();
+      await auth.setPersistence(Persistence.NONE);
+      expect(auth.currentUser?.uid, 'anon-user');
+      await auth.setPersistence(Persistence.LOCAL);
+      expect(auth.currentUser?.uid, 'anon-user');
+      await auth.signOut();
+      expect(auth.currentUser, isNull);
+    });
+
     test('a stored session is restored by a new instance', () async {
       final FirebaseAuth first = await newAuth();
       await first.signInAnonymously();
@@ -431,27 +1014,173 @@ void main() {
 
     test('guard turns other errors into FirebaseAuthException', () async {
       await expectLater(
-        guard<void>(() => throw StateError('state')),
+        guard<void>(DartFirebaseAuth(), () => throw StateError('state')),
         throwsAuthCode('internal-error'),
       );
       await expectLater(
-        guard<void>(() => throw ArgumentError('argument')),
+        guard<void>(
+          DartFirebaseAuth(),
+          () => throw dart_auth.FirebaseUserAuthDisposedError(),
+        ),
+        throwsAuthCode('app-deleted'),
+      );
+      await expectLater(
+        guard<void>(DartFirebaseAuth(), () => throw ArgumentError('argument')),
         throwsAuthCode('argument-error'),
       );
       await expectLater(
-        guard<void>(() => throw const FileSystemException('disk full')),
+        guard<void>(
+          DartFirebaseAuth(),
+          () => throw UnsupportedError('no loopback server on the web'),
+        ),
+        throwsA(
+          isA<FirebaseAuthException>()
+              .having(
+                (FirebaseAuthException e) => e.code,
+                'code',
+                'unimplemented',
+              )
+              .having(
+                (FirebaseAuthException e) => e.message,
+                'message',
+                contains('no loopback server on the web'),
+              ),
+        ),
+      );
+      await expectLater(
+        guard<void>(
+          DartFirebaseAuth(),
+          () => throw const FileSystemException('disk full'),
+        ),
         throwsAuthCode('internal-error'),
       );
     });
   });
 
-  group('not available', () {
-    test('provider, popup, redirect and phone throw unimplemented', () async {
+  group('passthroughs', () {
+    test('revokeAccessToken and revokeTokenWithAuthorizationCode reach the '
+        'revoke endpoint', () async {
+      final FirebaseAuth auth = await newAuth();
+      await auth.signInAnonymously();
+      backend.override = (http.Request request) =>
+          request.url.path.endsWith('accounts:revokeToken')
+          ? jsonResponse(<String, Object?>{})
+          : null;
+      await auth.revokeAccessToken('apple-access-token');
+      expect(backend.bodyOf('accounts:revokeToken'), <String, Object?>{
+        'providerId': 'apple.com',
+        'tokenType': 'ACCESS_TOKEN',
+        'token': 'apple-access-token',
+        'idToken': isA<String>(),
+      });
+      await auth.revokeTokenWithAuthorizationCode('apple-code');
+      expect(
+        backend.bodyOf('accounts:revokeToken'),
+        containsPair('tokenType', '3'),
+      );
+      expect(
+        backend.bodyOf('accounts:revokeToken'),
+        containsPair('token', 'apple-code'),
+      );
+      expect(
+        backend.requests.last.url.path,
+        endsWith('v2/accounts:revokeToken'),
+      );
+    });
+
+    test('revoking without a user fails like the other user calls', () async {
       final FirebaseAuth auth = await newAuth();
       await expectLater(
-        auth.signInWithProvider(GoogleAuthProvider()),
-        throwsAuthCode('unimplemented'),
+        auth.revokeAccessToken('apple-access-token'),
+        throwsA(isA<FirebaseAuthException>()),
       );
+      expect(backend.paths, isNot(contains(endsWith('accounts:revokeToken'))));
+    });
+
+    test('a server error keeps the server code and the HTTP status', () async {
+      final FirebaseAuth auth = await newAuth();
+      backend.override = (http.Request request) =>
+          jsonResponse(<String, Object?>{
+            'error': <String, Object?>{'code': 400, 'message': 'EMAIL_EXISTS'},
+          }, 400);
+      await expectLater(
+        auth.createUserWithEmailAndPassword(
+          email: 'a@example.com',
+          password: 'secret1',
+        ),
+        throwsA(
+          isA<DartFirebaseAuthException>()
+              .having(
+                (DartFirebaseAuthException e) => e.code,
+                'code',
+                'email-already-in-use',
+              )
+              .having(
+                (DartFirebaseAuthException e) => e.serverCode,
+                'serverCode',
+                'EMAIL_EXISTS',
+              )
+              .having(
+                (DartFirebaseAuthException e) => e.httpStatus,
+                'httpStatus',
+                400,
+              ),
+        ),
+      );
+    });
+
+    test('validatePassword checks against the fetched policy', () async {
+      final FirebaseAuth auth = await newAuth();
+      backend.override = (http.Request request) =>
+          request.url.path.endsWith('passwordPolicy')
+          ? jsonResponse(<String, Object?>{
+              'customStrengthOptions': <String, Object?>{
+                'minPasswordLength': 8,
+                'containsNumericCharacter': true,
+              },
+              'allowedNonAlphanumericCharacters': <String>['!'],
+              'enforcementState': 'ENFORCE',
+              'schemaVersion': 1,
+            })
+          : null;
+      final PasswordValidationStatus weak =
+          await FirebaseAuthDart.validatePassword(auth.app, 'abc');
+      expect(weak.isValid, isFalse);
+      expect(weak.meetsMinPasswordLength, isFalse);
+      expect(weak.meetsDigitsRequirement, isFalse);
+      expect(weak.meetsLowercaseRequirement, isTrue);
+      expect(weak.passwordPolicy.minPasswordLength, 8);
+      expect(weak.passwordPolicy.containsNumericCharacter, isTrue);
+      expect(weak.passwordPolicy.allowedNonAlphanumericCharacters, <String>[
+        '!',
+      ]);
+      expect(weak.passwordPolicy.enforcementState, 'ENFORCE');
+      final PasswordValidationStatus strong =
+          await FirebaseAuthDart.validatePassword(auth.app, 'abcdefg1');
+      expect(strong.isValid, isTrue);
+      expect(
+        backend.paths.where((String path) => path.endsWith('passwordPolicy')),
+        hasLength(1),
+        reason: 'the policy is cached',
+      );
+    });
+
+    test(
+      'validatePassword rejects an empty password without a request',
+      () async {
+        final FirebaseAuth auth = await newAuth();
+        await expectLater(
+          FirebaseAuthDart.validatePassword(auth.app, ''),
+          throwsAuthCode('invalid-password'),
+        );
+        expect(backend.requests, isEmpty);
+      },
+    );
+  });
+
+  group('not available', () {
+    test('popup, redirect and phone throw unimplemented', () async {
+      final FirebaseAuth auth = await newAuth();
       await expectLater(
         auth.signInWithPopup(GoogleAuthProvider()),
         throwsAuthCode('unimplemented'),
@@ -474,11 +1203,7 @@ void main() {
       );
       await auth.signInAnonymously();
       await expectLater(
-        auth.currentUser!.linkWithProvider(GoogleAuthProvider()),
-        throwsAuthCode('unimplemented'),
-      );
-      await expectLater(
-        auth.currentUser!.multiFactor.getEnrolledFactors(),
+        auth.currentUser!.linkWithPopup(GoogleAuthProvider()),
         throwsAuthCode('unimplemented'),
       );
     });

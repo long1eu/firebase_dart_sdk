@@ -9,6 +9,7 @@ import 'package:firebase_auth_platform_interface/firebase_auth_platform_interfac
 import 'package:firebase_auth_providers_dart/firebase_auth_providers_dart.dart'
     as dart_auth;
 
+import 'firebase_auth.dart';
 import 'multi_factor.dart';
 import 'storage.dart' show isFileSystemException;
 
@@ -30,32 +31,38 @@ const String noBrowserFlow =
     'popup and redirect flows exist only in a browser. Get the provider token '
     'yourself and use signInWithCredential.';
 
-/// Why signInWithProvider and its link and reauthenticate variants throw.
-const String noProviderFlow =
-    'it has no provider flow of its own. To sign in with a provider, use '
-    'FirebaseAuthDart.userAuthFor(app).signInWithOAuthLoopback (the system '
-    'browser and a loopback redirect), or get the provider token yourself and '
-    'use signInWithCredential.';
-
-/// Why the multi-factor members throw.
-const String noMultiFactor =
-    'multi-factor authentication is not supported yet.';
-
 /// Runs [body] and rethrows its errors as the exceptions of the platform
 /// interface, so that an app always gets a [FirebaseAuthException]: the
-/// errors of `firebase_auth_providers_dart` with the same code, an
-/// [ArgumentError] as `argument-error`, a [StateError] and a failed file
+/// errors of `firebase_auth_providers_dart` with the same code (a
+/// second-factor challenge with a resolver that signs in to [auth]), an
+/// [ArgumentError] as `argument-error`, an [UnsupportedError] (a flow the
+/// platform does not have, such as the loopback flow on the web) as
+/// `unimplemented`, a call after the client was disposed (its app was
+/// deleted) as `app-deleted`, another [StateError] and a failed file
 /// operation as `internal-error`.
-Future<T> guard<T>(Future<T> Function() body) async {
+Future<T> guard<T>(DartFirebaseAuth auth, Future<T> Function() body) async {
   try {
     return await body();
   } on dart_auth.FirebaseAuthException catch (e, stackTrace) {
-    Error.throwWithStackTrace(exceptionOf(e), stackTrace);
+    Error.throwWithStackTrace(exceptionOf(e, auth), stackTrace);
   } on dart_app.FirebaseNoSignedInUserException catch (_, stackTrace) {
     Error.throwWithStackTrace(noCurrentUser(), stackTrace);
   } on ArgumentError catch (e, stackTrace) {
     Error.throwWithStackTrace(
       FirebaseAuthException(code: 'argument-error', message: '${e.message}'),
+      stackTrace,
+    );
+  } on dart_auth.FirebaseUserAuthDisposedError catch (e, stackTrace) {
+    Error.throwWithStackTrace(
+      FirebaseAuthException(code: 'app-deleted', message: e.message),
+      stackTrace,
+    );
+  } on UnsupportedError catch (e, stackTrace) {
+    Error.throwWithStackTrace(
+      FirebaseAuthException(
+        code: 'unimplemented',
+        message: 'Not available on this platform: ${e.message}',
+      ),
       stackTrace,
     );
   } on StateError catch (e, stackTrace) {
@@ -83,9 +90,13 @@ FirebaseAuthException noCurrentUser() => FirebaseAuthException(
 
 /// [e] as an exception of the platform interface: the same code, message,
 /// email, phone number, tenant and credential. A second-factor challenge
-/// becomes a [FirebaseAuthMultiFactorExceptionPlatform] whose resolver cannot
-/// finish the sign-in yet.
-FirebaseAuthException exceptionOf(dart_auth.FirebaseAuthException e) {
+/// becomes a [FirebaseAuthMultiFactorExceptionPlatform] whose resolver
+/// finishes it with a TOTP code, through the client's resolver, and returns
+/// the result as a credential of [auth].
+FirebaseAuthException exceptionOf(
+  dart_auth.FirebaseAuthException e,
+  DartFirebaseAuth auth,
+) {
   if (e is dart_auth.FirebaseAuthMultiFactorException) {
     return FirebaseAuthMultiFactorExceptionPlatform(
       code: e.code,
@@ -94,19 +105,78 @@ FirebaseAuthException exceptionOf(dart_auth.FirebaseAuthException e) {
       phoneNumber: e.phoneNumber,
       tenantId: e.tenantId,
       credential: credentialOf(e.credential),
-      resolver: DartMultiFactorResolver(<MultiFactorInfo>[
-        for (final hint in e.hints) multiFactorInfoOf(hint),
-      ], MultiFactorSession(e.pendingCredential)),
+      resolver: DartMultiFactorResolver(
+        <MultiFactorInfo>[for (final hint in e.hints) multiFactorInfoOf(hint)],
+        MultiFactorSession(e.pendingCredential),
+        auth: auth,
+        source: e.resolver,
+      ),
     );
   }
-  return FirebaseAuthException(
+  return DartFirebaseAuthException(
     code: e.code,
     message: e.message,
     email: e.email,
     phoneNumber: e.phoneNumber,
     tenantId: e.tenantId,
     credential: credentialOf(e.credential),
+    serverCode: e.serverCode,
+    httpStatus: e.httpStatus,
   );
+}
+
+/// A [FirebaseAuthException] of the platform interface that also keeps what
+/// the server answered, for logs: `firebase_auth` passes it to the app as it
+/// is, so `catch (e)` can test `e is DartFirebaseAuthException`.
+class DartFirebaseAuthException extends FirebaseAuthException {
+  /// Creates the exception; [exceptionOf] creates them.
+  DartFirebaseAuthException({
+    required super.code,
+    super.message,
+    super.email,
+    super.credential,
+    super.phoneNumber,
+    super.tenantId,
+    this.serverCode,
+    this.httpStatus,
+  });
+
+  /// The error code of the server before mapping (`EMAIL_EXISTS`), or null
+  /// when the error did not come from the server.
+  final String? serverCode;
+
+  /// The HTTP status of the response, or null when there was none.
+  final int? httpStatus;
+}
+
+/// The result of `validatePassword` of the client as the interface's
+/// [PasswordValidationStatus], with a [PasswordPolicy] built from the same
+/// policy.
+PasswordValidationStatus passwordValidationStatusOf(
+  dart_auth.PasswordValidationStatus status,
+) {
+  final dart_auth.PasswordPolicy policy = status.passwordPolicy;
+  final PasswordPolicy interfacePolicy = PasswordPolicy(<String, dynamic>{
+    'customStrengthOptions': <String, dynamic>{
+      'minPasswordLength': policy.minPasswordLength,
+      'maxPasswordLength': ?policy.maxPasswordLength,
+      'containsLowercaseCharacter': ?policy.containsLowercaseCharacter,
+      'containsUppercaseCharacter': ?policy.containsUppercaseCharacter,
+      'containsNumericCharacter': ?policy.containsNumericCharacter,
+      'containsNonAlphanumericCharacter':
+          ?policy.containsNonAlphanumericCharacter,
+    },
+    'allowedNonAlphanumericCharacters': policy.allowedNonAlphanumericCharacters,
+    'enforcementState': policy.enforcementState,
+    'schemaVersion': policy.schemaVersion,
+  });
+  return PasswordValidationStatus(status.isValid, interfacePolicy)
+    ..meetsMinPasswordLength = status.meetsMinPasswordLength
+    ..meetsMaxPasswordLength = status.meetsMaxPasswordLength
+    ..meetsLowercaseRequirement = status.meetsLowercaseRequirement
+    ..meetsUppercaseRequirement = status.meetsUppercaseRequirement
+    ..meetsDigitsRequirement = status.meetsDigitsRequirement
+    ..meetsSymbolsRequirement = status.meetsSymbolsRequirement;
 }
 
 /// A second factor of the client as the interface lists it. The enrolment time

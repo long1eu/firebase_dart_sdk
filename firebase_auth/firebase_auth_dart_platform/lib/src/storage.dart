@@ -22,32 +22,32 @@ AuthStorage? _defaultStorage;
 /// so that two apps do not overwrite each other's session.
 AuthStorage defaultStorage() => _defaultStorage ??= path.defaultFileStorage();
 
-/// The storage of one auth instance: the storage of the app, or memory after
-/// `setPersistence(Persistence.NONE)`.
+/// The storage of the sessions of one auth instance: the storage of the app,
+/// with memory behind it.
 ///
 /// When a write to the storage of the app fails (a `FileSystemException` of
 /// the default file, for example), the session is kept in memory for the rest
 /// of the run, so that the sign-in still succeeds, and the failure is printed
-/// once.
-class SwitchableStorage implements AuthStorage {
-  SwitchableStorage(this._persistent);
+/// once. The client itself rethrows a failed write (and stores the session
+/// again at the next change); the official plugins never fail a sign-in
+/// because the keychain or the preferences could not be written, so this
+/// package keeps that behaviour here, in front of the client.
+class FallbackStorage implements AuthStorage {
+  FallbackStorage(this._persistent);
 
   final AuthStorage _persistent;
   final InMemoryAuthStorage _memory = InMemoryAuthStorage();
-  bool _inMemory = false;
 
   /// Whether a write to [_persistent] failed: memory is used from then on.
   bool _persistentFailed = false;
 
-  bool get _useMemory => _inMemory || _persistentFailed;
-
   @override
   FutureOr<String?> read(String key) =>
-      _useMemory ? _memory.read(key) : _persistent.read(key);
+      _persistentFailed ? _memory.read(key) : _persistent.read(key);
 
   @override
   FutureOr<void> write(String key, String? value) {
-    if (_useMemory) {
+    if (_persistentFailed) {
       _memory.write(key, value);
       return null;
     }
@@ -64,25 +64,6 @@ class SwitchableStorage implements AuthStorage {
         'firebase_auth_dart_platform: the session could not be stored ($e); '
         'it is kept in memory until the program ends.',
       );
-    }
-  }
-
-  /// Moves the value of [key] to memory ([inMemory]) or back to the storage of
-  /// the app, and removes it where it was, as the JS SDK does when the
-  /// persistence changes.
-  Future<void> setInMemory(bool inMemory, String key) async {
-    if (inMemory == _inMemory) {
-      return;
-    }
-    final String? value = await read(key);
-    _inMemory = inMemory;
-    await write(key, value);
-    if (inMemory) {
-      if (!_persistentFailed) {
-        await _writePersistent(key, null);
-      }
-    } else if (!_persistentFailed) {
-      _memory.write(key, null);
     }
   }
 }

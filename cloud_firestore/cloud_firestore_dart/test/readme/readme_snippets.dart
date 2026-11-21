@@ -129,8 +129,8 @@ class City {
   Map<String, Object?> toMap() => {'name': name, 'population': population};
 }
 
-// ../../README.md:56
-Future<void> rootReadmeLine56() async {
+// ../../README.md:57
+Future<void> rootReadmeLine57() async {
   final FirebaseApp app = FirebaseApp.withOptions(
     const FirebaseOptions(apiKey: 'demo-key', appId: '1:1234567890:dart:demo', projectId: 'demo-my-app'),
   );
@@ -246,8 +246,8 @@ Future<void> authProvidersReadmeLine214() async {
   print(result.user?.email);
 }
 
-// ../../firebase_auth/firebase_auth_providers_dart/README.md:261
-Future<void> authProvidersReadmeLine261() async {
+// ../../firebase_auth/firebase_auth_providers_dart/README.md:263
+Future<void> authProvidersReadmeLine263() async {
   final OAuthLoopbackProvider provider = OAuthLoopbackProvider.oidc(
     providerId: 'oidc.example',
     authorizationEndpoint: Uri.parse('https://idp.example.com/authorize'),
