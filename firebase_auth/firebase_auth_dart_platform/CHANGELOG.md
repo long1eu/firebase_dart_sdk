@@ -13,6 +13,9 @@
   `use` got an `appVerification`. Elsewhere it still renders nothing.
 - Exports `RecaptchaEnterpriseVerification`, `RecaptchaEnterpriseRequest`, `RecaptchaClientType`, `RecaptchaFlow`
   and `InPageRecaptchaPresenter`; depends on `secure_flow` directly.
+- The OAuth credentials the shim hands out (`UserCredential.credential`, `FirebaseAuthException.credential`) no
+  longer print their access token: their `toString` shows only the provider and the sign-in method. The platform
+  interface's `toString` printed the token. `asMap()` is unchanged.
 
 ## 0.1.1
 

@@ -9,6 +9,7 @@ import 'errors.dart';
 import 'firebase_storage.dart';
 import 'list_result.dart';
 import 'location.dart';
+import 'media_headers_stub.dart' if (dart.library.io) 'media_headers_io.dart';
 import 'metadata.dart';
 import 'request/requester.dart';
 import 'string_format.dart';
@@ -230,6 +231,7 @@ final class Reference {
           url: objectUrl(media: true),
           // Like the JS SDK, one byte more than the maximum: that byte tells an object that is too large.
           headers: <String, String>{
+            ...mediaRequestHeaders,
             if (maxSize != null) 'Range': 'bytes=0-$maxSize',
           },
           successCodes: maxSize == null

@@ -75,6 +75,7 @@ void main() {
         // size received is 262144 (neither 0 nor 524288) and the check cannot judge. Production is expected
         // to answer REFUSED (PASS).
         '21': Status.inconclusive,
+        '26': Status.pass,
       };
       final Map<String, Status> actual = <String, Status>{
         for (final MapEntry<String, CheckResult> e in run.results.entries)

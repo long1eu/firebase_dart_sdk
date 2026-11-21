@@ -1,0 +1,9 @@
+# The options of the repository, plus the documentation lints (this package
+# passes both). Not published (see .pubignore): it includes a file outside the
+# package.
+include: ../../analysis_options.yaml
+
+linter:
+  rules:
+    - comment_references
+    - public_member_api_docs
