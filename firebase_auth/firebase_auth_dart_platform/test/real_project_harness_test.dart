@@ -341,6 +341,10 @@ class _Project {
   /// `needConfirmation` (one account per email) instead of a new account.
   bool oneAccountPerEmail = true;
 
+  /// How many more `mfaEnrollment:start` requests answer
+  /// `requires-recent-login`.
+  int recentLoginsRequired = 0;
+
   static const String uid = 'google-user';
 
   List<Map<String, Object?>> get _factors =>
@@ -378,6 +382,10 @@ class _Project {
       if (deleted is List && deleted.contains('github.com')) {
         githubLinked = false;
       }
+    }
+    if (path.endsWith('mfaEnrollment:start') && recentLoginsRequired > 0) {
+      recentLoginsRequired--;
+      return errorResponse('CREDENTIAL_TOO_OLD_LOGIN_AGAIN');
     }
     if (path.endsWith('accounts:revokeToken')) {
       return errorResponse('INVALID_IDP_RESPONSE');
@@ -551,6 +559,29 @@ void _stepTests() {
     expect(_backend.factors[_Project.uid], isEmpty);
     expect(ledger.pending, isEmpty);
     expect(run.auth.currentUser!.uid, _Project.uid);
+  });
+
+  test('totp signs in again with Google when the enrolment needs a recent '
+      'sign-in, then enrols', () async {
+    final (HarnessRun run, CleanupLedger ledger, _Codes codes) = await _newRun(
+      <String>[_backend.totpCode, _backend.totpCode],
+    );
+    _project.recentLoginsRequired = 1;
+    final int idpBefore = _backend.paths
+        .where((String p) => p.endsWith('accounts:signInWithIdp'))
+        .length;
+    expect((await run.runStep(HarnessStep.totp)).line(), 'PASS totp');
+    expect(_project.recentLoginsRequired, 0);
+    expect(
+      _backend.paths
+          .where((String p) => p.endsWith('accounts:signInWithIdp'))
+          .length,
+      greaterThan(idpBefore + 1),
+      reason: 'a reauthentication besides the second-factor sign-in',
+    );
+    expect(_backend.factors[_Project.uid], isEmpty);
+    expect(ledger.pending, isEmpty);
+    expect(codes.prompts, hasLength(2));
   });
 
   test('a wrong code at the totp sign-in fails the step, and the pending '

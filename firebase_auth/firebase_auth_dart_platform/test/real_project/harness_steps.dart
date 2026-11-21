@@ -339,27 +339,27 @@ class HarnessRun {
     return null;
   }
 
+  /// Runs [action]; when the backend asks for a recent sign-in
+  /// (`requires-recent-login`), reauthenticates with Google and runs it once
+  /// more.
+  Future<T> _withRecentLogin<T>(Future<T> Function() action) async {
+    try {
+      return await action();
+    } on FirebaseAuthException catch (e) {
+      if (e.code != 'requires-recent-login') {
+        rethrow;
+      }
+      log(
+        '  requires-recent-login: signing in again with Google, then retrying',
+      );
+      await _reauthenticate();
+      return action();
+    }
+  }
+
   Future<String?> _totp() async {
     final User user = await ensurePrimary();
-    final TotpSecret secret = await TotpMultiFactorGenerator.generateSecret(
-      await user.multiFactor.getSession(),
-    );
-    final String uri = await secret.generateQrCodeUrl(
-      accountName: maskEmail(user.email),
-      issuer: totpDisplayName,
-    );
-    log('  otpauth URI of a throwaway factor (unenrolled at the end): $uri');
-    final String enrolCode = await codes.ask(
-      'The code of the new "$totpDisplayName" entry of your authenticator app',
-      otpauthUri: uri,
-    );
-    await user.multiFactor.enroll(
-      await TotpMultiFactorGenerator.getAssertionForEnrollment(
-        secret,
-        enrolCode,
-      ),
-      displayName: totpDisplayName,
-    );
+    await _withRecentLogin(() => _enrolHarnessFactor(user));
     final CleanupToken unenrol = ledger.register(
       'unenrol the TOTP factor "$totpDisplayName"',
       _unenrolHarnessFactor,
@@ -386,6 +386,30 @@ class HarnessRun {
     return null;
   }
 
+  /// Enrols the throwaway TOTP factor of the harness: a new secret, its code
+  /// from the code page, and `enroll`.
+  Future<void> _enrolHarnessFactor(User user) async {
+    final TotpSecret secret = await TotpMultiFactorGenerator.generateSecret(
+      await user.multiFactor.getSession(),
+    );
+    final String uri = await secret.generateQrCodeUrl(
+      accountName: maskEmail(user.email),
+      issuer: totpDisplayName,
+    );
+    log('  otpauth URI of a throwaway factor (unenrolled at the end): $uri');
+    final String enrolCode = await codes.ask(
+      'The code of the new "$totpDisplayName" entry of your authenticator app',
+      otpauthUri: uri,
+    );
+    await user.multiFactor.enroll(
+      await TotpMultiFactorGenerator.getAssertionForEnrollment(
+        secret,
+        enrolCode,
+      ),
+      displayName: totpDisplayName,
+    );
+  }
+
   /// The factor the harness enrolled, newest first if there are several.
   Future<MultiFactorInfo?> _harnessFactor(User user) async {
     final List<MultiFactorInfo> factors = await user.multiFactor
@@ -399,7 +423,9 @@ class HarnessRun {
     final User user = await ensurePrimary();
     final MultiFactorInfo? factor = await _harnessFactor(user);
     if (factor != null) {
-      await user.multiFactor.unenroll(factorUid: factor.uid);
+      await _withRecentLogin(
+        () => user.multiFactor.unenroll(factorUid: factor.uid),
+      );
     }
   }
 
