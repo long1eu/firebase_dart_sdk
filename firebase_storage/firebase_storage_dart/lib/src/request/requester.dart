@@ -479,8 +479,8 @@ class Requester {
       return null;
     } on FirebaseApiNotAvailableException {
       return null;
-    } on Object catch (e) {
-      throw tokenFailed(e);
+    } on Object catch (e, stackTrace) {
+      throw tokenFailed(e, stackTrace);
     }
   }
 
