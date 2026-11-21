@@ -99,7 +99,7 @@ The packages are `firebase_auth_dart`, `firebase_auth_dart_platform`, `firebase_
 
 Recommended: `firebase_auth_secure_storage_dart`, with the class `SecureAuthStorage`. If it wraps a Flutter plugin
 it is not pure Dart and `_dart` is a slight misnomer; `firebase_auth_secure_storage` (no suffix) is the honest
-name for option A and `_dart` fits a later B. This is a question for the owner (see below).
+name for option A and `_dart` fits a later B. This was a question for the owner; see Decisions below.
 
 ## How it plugs in
 
@@ -197,18 +197,19 @@ from the 0600 file, fail-clearly on a missing keyring, and no web support. Leave
 `FileAuthStorage`, and add a pure-Dart backend (B) only when a user needs a keychain outside Flutter. Do not
 change `firebase_auth_dart_platform`; `storageFor` and `FallbackStorage` already fit. About 3 agent days.
 
-## Questions only the owner can answer
+## Decisions
 
-1. Is a Flutter-only package acceptable (so no `dart run` keychain access), or must the first release work in a
-   plain Dart CLI? That decides A or B.
-2. The name: `firebase_auth_secure_storage` or `firebase_auth_secure_storage_dart`?
-3. Should the package live in this repository (`firebase_auth/`) or in its own, given that it adds a Flutter plugin
-   dependency to a repository whose clients are pure Dart?
-4. Should the shim make the secure store the default on Android and iOS (where memory is the default today), which
-   would make the package a dependency of `firebase_auth_dart_platform`, or stay opt-in through `storageFor`?
-5. macOS: is a build that needs the `keychain-access-groups` entitlement (and so a provisioning profile) acceptable
-   by default, or should the adapter default to `usesDataProtectionKeychain: false`?
-6. Who owns the manual checks on Windows, iOS and a real Android device?
+> **Update, 2026-11-21.** The owner answered the questions this note ended with; the lead decided the rest for
+> now, and the owner may overrule those. The plan below replaces the single-package recommendation above.
+
+| # | Question | Decision | By |
+|---|---|---|---|
+| 1 | Flutter only, or also plain Dart (CLIs, servers)? | Both, in two layers. First a Flutter package on `flutter_secure_storage` (option A); later a pure-Dart package with FFI backends (option B, without Android) behind the same `AuthStorage`, so apps do not change their code when it lands. A headless server without a keyring still gets a clear error, never a silent file. | the owner |
+| 2 | Name | `firebase_auth_secure_storage_flutter` for the Flutter package built now, `firebase_auth_secure_storage_dart` for the pure-Dart package later. Working names, to be confirmed before any publish. | the lead |
+| 3 | This repository or its own? | This repository, under `firebase_auth/`, next to the client and the shim, which already depends on Flutter plugins. | the lead |
+| 4 | Default or opt-in? | The default. `firebase_auth_dart_platform` uses the secure store by default on every platform but the web, moves an existing session file into it on first use, and falls back to today's default (the file, or memory) with one printed line per process only when the store is unavailable. `storageFor` still overrides it. Keys carry a namespace per program, so two programs that share a store (desktop) do not see each other's sessions. | the owner (the lead had proposed opt-in) |
+| 5 | macOS keychain | The data-protection keychain, with the `keychain-access-groups` entitlement, in signed apps. Unsigned builds (and a later pure-Dart CLI) use the login keychain. | the owner |
+| 6 | Who checks it on real systems? | Desktop first: macOS on the maintainers' Mac (a build signed with the owner's team, and an unsigned one), Windows in a Windows 11 VM, Linux in a throwaway container with and without a keyring. iOS and Android later, on a device, with the owner. | the owner |
 
 ## Not checked
 
