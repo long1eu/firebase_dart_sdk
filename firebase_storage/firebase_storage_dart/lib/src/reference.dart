@@ -259,7 +259,10 @@ final class Reference {
 
   /// Uploads [data] in one multipart request and returns the metadata of the new object, replacing an object
   /// at the same path. The content type is that of [metadata], else `application/octet-stream`.
-  Future<FullMetadata> putBytes(Uint8List data, {SettableMetadata? metadata}) {
+  Future<FullMetadata> putBytes(
+    Uint8List data, {
+    SettableMetadata? metadata,
+  }) async {
     throwIfRoot('putBytes');
     return _multipartUpload(data, metadata);
   }
