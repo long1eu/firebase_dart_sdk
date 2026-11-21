@@ -140,14 +140,14 @@ packages:
       path: "../firebase_auth_providers_dart"
       relative: true
     source: path
-    version: "0.3.2"
+    version: "0.4.0"
   firebase_auth_secure_storage_flutter:
     dependency: "direct main"
     description:
       path: "../firebase_auth_secure_storage_flutter"
       relative: true
     source: path
-    version: "0.1.0"
+    version: "0.1.1"
   firebase_auth_web:
     dependency: transitive
     description:
@@ -529,7 +529,7 @@ packages:
       path: "../../secure_flow/secure_flow"
       relative: true
     source: path
-    version: "0.1.0"
+    version: "0.2.0"
   semaphore:
     dependency: transitive
     description:

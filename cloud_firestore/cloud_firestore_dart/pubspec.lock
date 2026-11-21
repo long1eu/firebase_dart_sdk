@@ -189,14 +189,14 @@ packages:
       path: "../../firebase_auth/firebase_auth_providers_dart"
       relative: true
     source: path
-    version: "0.3.2"
+    version: "0.4.0"
   firebase_storage_dart:
     dependency: "direct dev"
     description:
       path: "../../firebase_storage/firebase_storage_dart"
       relative: true
     source: path
-    version: "0.1.1"
+    version: "0.2.0"
   fixnum:
     dependency: "direct main"
     description:
@@ -443,7 +443,7 @@ packages:
       path: "../../secure_flow/secure_flow"
       relative: true
     source: path
-    version: "0.1.0"
+    version: "0.2.0"
   semaphore:
     dependency: "direct main"
     description:

@@ -3,7 +3,7 @@ description: >-
   Unofficial secure storage for the Firebase Auth session of
   firebase_auth_providers_dart in Flutter apps: the Keychain, the Android
   Keystore, libsecret and DPAPI through flutter_secure_storage.
-version: 0.1.0
+version: 0.1.1
 homepage: https://github.com/long1eu/firebase_dart_sdk
 repository: https://github.com/long1eu/firebase_dart_sdk/tree/main/firebase_auth/firebase_auth_secure_storage_flutter
 issue_tracker: https://github.com/long1eu/firebase_dart_sdk/issues
@@ -24,7 +24,7 @@ dependencies:
   # Local development resolves firebase_auth_providers_dart (and its
   # firebase_app_dart) from the sibling packages through pubspec_overrides.yaml
   # (not published). AuthStorage is the interface this package implements.
-  firebase_auth_providers_dart: ^0.3.0
+  firebase_auth_providers_dart: '>=0.3.0 <0.5.0'
   flutter:
     sdk: flutter
   flutter_secure_storage: ^11.2.0

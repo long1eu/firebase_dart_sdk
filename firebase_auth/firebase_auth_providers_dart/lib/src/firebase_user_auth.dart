@@ -349,7 +349,7 @@ class FirebaseUserAuth implements AuthTokenProvider {
 
   /// The value of `X-Client-Version`, in the format of the JS SDK (`Chrome/JsCore/<version>/FirebaseCore-web`):
   /// platform, implementation, version of the package, framework.
-  static const String clientVersion = 'Dart/DartCore/0.3.2/FirebaseCore-dart';
+  static const String clientVersion = 'Dart/DartCore/0.4.0/FirebaseCore-dart';
 
   /// `http://host:port` (or `https://...`) of the Auth emulator; null for the real service.
   String? get _emulatorOrigin {

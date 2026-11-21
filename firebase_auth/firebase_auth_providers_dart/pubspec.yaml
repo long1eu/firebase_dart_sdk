@@ -3,7 +3,7 @@ description: >-
   Unofficial pure-Dart token providers for firebase_app_dart and
   cloud_firestore_dart: service accounts, Application Default Credentials and
   Firebase Auth user sign-in over REST.
-version: 0.3.2
+version: 0.4.0
 homepage: https://github.com/long1eu/firebase_dart_sdk
 repository: https://github.com/long1eu/firebase_dart_sdk/tree/main/firebase_auth/firebase_auth_providers_dart
 issue_tracker: https://github.com/long1eu/firebase_dart_sdk/issues
@@ -38,7 +38,7 @@ dependencies:
   # The browser flows (the OAuth loopback sign-in, the reCAPTCHA page) and their presenters.
   # Local development resolves it from ../../secure_flow/secure_flow through
   # pubspec_overrides.yaml.
-  secure_flow: ^0.1.0
+  secure_flow: ^0.2.0
   # navigator.language and the browser storages on the web (FirebaseUserAuth.useDeviceLanguage, WebAuthStorage).
   # Already part of the dependency graph through package:http.
   web: ^1.1.0

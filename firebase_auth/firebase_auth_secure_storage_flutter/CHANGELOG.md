@@ -1,3 +1,8 @@
+## 0.1.1
+
+No code change. The constraint on `firebase_auth_providers_dart` is `>=0.3.0 <0.5.0` instead of `^0.3.0`, so
+that the package can be used with `firebase_auth_providers_dart` 0.4.0.
+
 ## 0.1.0
 
 - First version: `SecureAuthStorage`, an `AuthStorage` of `firebase_auth_providers_dart` on top of

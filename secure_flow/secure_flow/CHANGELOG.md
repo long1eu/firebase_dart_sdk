@@ -1,4 +1,7 @@
-## Unreleased
+## 0.2.0
+
+- Breaking for exhaustive `switch` statements: `SecurePresenterKind` has the new value `inPage`, and
+  `RecaptchaAction` has new values for the Enterprise actions.
 
 - `RecaptchaFlow.enterprise(siteKey:, action:)`: a reCAPTCHA Enterprise token for an action. Its loopback page
   loads `enterprise.js?render=<site key>` and posts the token of `grecaptcha.enterprise.execute` as soon as it is
