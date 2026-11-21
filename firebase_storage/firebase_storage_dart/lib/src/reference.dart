@@ -325,22 +325,43 @@ final class Reference {
     );
   }
 
-  /// Starts an upload of the [length] bytes of [data]; see [UploadTask] and [startUpload].
+  /// Starts an upload of [data], of [length] bytes when you know it; see [UploadTask] and [startUpload].
   ///
   /// The stream is read one chunk at a time as the upload goes, so only one chunk (at most 16 MiB, or the
   /// `maxUploadChunkSize` of `FirebaseStorage`) is held in memory: the chunk is what is sent again after a
-  /// failure, so a stream upload always goes in chunks. It must produce exactly [length] bytes, otherwise the task fails with `invalid-argument`; an error
-  /// of the stream fails the task with that error. The stream is canceled when the task ends. To resume with
-  /// [existingSessionUri], pass a stream of the whole data again: the bytes the server already has are read
-  /// and skipped. Throws an [ArgumentError] when [length] is negative, `invalid-root-operation` on the root of
-  /// the bucket, and `invalid-argument` for an [existingSessionUri] on another host.
+  /// failure, so a stream upload always goes in chunks. With a [length], the stream must produce exactly that
+  /// many bytes, otherwise the task fails with `invalid-argument`. An error of the stream fails the task with
+  /// that error. The stream is canceled when the task ends.
+  ///
+  /// Without a [length] (like `putStream` on Android), the upload always opens a resumable session, even for a
+  /// few bytes, and [UploadTask.totalBytes] is -1 until the stream ended; the last chunk is sent once the
+  /// stream reports its end, so the task reads one stream event past each chunk to know whether it is the
+  /// last. Memory stays at one chunk plus that event. An empty stream makes an empty object. So the last
+  /// chunk goes only when the stream closes: a live producer that goes quiet right after a full chunk holds
+  /// that chunk in memory, and the task keeps its `maxConcurrentUploads` slot, until it sends more or closes.
+  /// Close the stream as soon as the data is complete.
+  ///
+  /// To resume with [existingSessionUri], pass a stream of the whole data again, with or without a [length]:
+  /// the task asks the server how many bytes it has, then reads and skips those. Throws an [ArgumentError]
+  /// when [length] is negative, `invalid-root-operation` on the root of the bucket, and `invalid-argument` for
+  /// an [existingSessionUri] on another host.
+  ///
+  /// ```dart
+  /// final UploadTask task = storage.ref('logs/today.txt').startStreamUpload(
+  ///   lines.transform(utf8.encoder),
+  ///   metadata: const SettableMetadata(contentType: 'text/plain'),
+  /// );
+  /// final FullMetadata metadata = await task.result;
+  /// ```
   UploadTask startStreamUpload(
     Stream<List<int>> data, {
-    required int length,
+    int? length,
     SettableMetadata? metadata,
     Uri? existingSessionUri,
   }) {
-    RangeError.checkNotNegative(length, 'length');
+    if (length != null) {
+      RangeError.checkNotNegative(length, 'length');
+    }
     throwIfRoot('startStreamUpload');
     return UploadTask.start(
       this,

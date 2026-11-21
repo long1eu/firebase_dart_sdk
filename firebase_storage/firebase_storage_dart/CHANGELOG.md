@@ -1,3 +1,26 @@
+## 0.2.0
+
+- `startStreamUpload` takes the `length` as an optional argument. Without it the stream is uploaded in a
+  resumable session until it ends, holding one chunk plus one read-ahead event in memory, like `putStream` on
+  Android. Existing calls are unchanged. New: `UploadTask.totalBytes` and `UploadProgress.totalBytes` are -1
+  while the length is unknown, so code that divides by them must check for it. `existingSessionUri` works
+  with such a stream too (pass the whole data again).
+- The error code `internal-error` (as in the JS and iOS SDKs) reports a state the client believes impossible,
+  such as an upload session that reports bytes it was never sent.
+- `startDownloadToFile(File)` in `package:firebase_storage_dart/io.dart` returns a `DownloadTask`: `progress`
+  (`DownloadProgress` with `DownloadState`, at most one event per 64 KiB and 100 ms plus every change of
+  state), `pause`, `resume`, `cancel` (from running and paused) and `result` (the `FullMetadata` of the
+  object). A pause closes the connection; resuming asks for the rest with `Range: bytes=<written>-`. A body
+  that breaks on the network is asked for again from the bytes written, with the backoff and the `download`
+  time of `StorageRetryPolicy`; bytes received reset that time.
+- Downloads to a file check the generation of the object on each response (`x-goog-generation`, or the
+  metadata read again when a server does not send it) and fail with the new code `object-changed` instead
+  of joining two versions of an object.
+- File downloads send `Accept-Encoding: identity`, so a `Range` and the bytes received count the same stored
+  bytes; an object stored with `Content-Encoding: gzip` arrives unzipped by the server.
+- `writeToFile` runs on `DownloadTask`, so it also resumes after a network failure. It reads the metadata of
+  the object before the content.
+
 ## 0.1.2
 
 - Fix: on the VM, `openRead` from an offset and `getBytes(maxSize:)` of an object stored gzip-compressed

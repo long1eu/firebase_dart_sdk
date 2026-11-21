@@ -1,9 +1,10 @@
-/// The data of an `UploadTask`: bytes in memory, a seekable source such as a file, or a stream of known
-/// length read one chunk at a time.
+/// The data of an `UploadTask`: bytes in memory, a seekable source such as a file, or a stream (of known or
+/// unknown length) read one chunk at a time.
 @internal
 library;
 
 import 'dart:async';
+import 'dart:math' as math;
 import 'dart:typed_data';
 
 import 'package:meta/meta.dart';
@@ -17,11 +18,15 @@ abstract interface class UploadSource {
   /// The data in [bytes].
   factory UploadSource.bytes(Uint8List bytes) = _BytesSource;
 
-  /// The data of [stream], which must have exactly [length] bytes.
+  /// The data of [stream], which must have exactly [length] bytes; with a null [length], all the bytes the
+  /// stream produces.
   ///
   /// Only the chunk being sent is kept in memory (plus the rest of the last event of the stream), so a chunk
-  /// can be sent again from any offset inside it, but not from an earlier one.
-  factory UploadSource.stream(Stream<List<int>> stream, int length) =
+  /// can be sent again from any offset inside it, but not from an earlier one. Without a [length], a read also
+  /// pulls the stream one event past the chunk, to tell whether the chunk is the last; [length] is null until
+  /// the stream ended. The bytes of each event are copied once as they are read, so the producer may reuse
+  /// its buffer for the next event.
+  factory UploadSource.stream(Stream<List<int>> stream, int? length) =
       _StreamSource;
 
   /// [length] bytes that [openFrom] reads from any offset to the end, such as a file
@@ -35,10 +40,11 @@ abstract interface class UploadSource {
   /// files); null for a stream. The upload task checks that the stream ends exactly at [length].
   Stream<List<int>> Function(int offset)? get openFrom;
 
-  /// The size of the data.
-  int get length;
+  /// The size of the data; null for a stream of unknown length until a read reached its end.
+  int? get length;
 
-  /// The [size] bytes at [offset].
+  /// The [size] bytes at [offset]. Fewer only for a stream of unknown length that ended before
+  /// [offset] + [size]; [length] is then set.
   Future<Uint8List> read(int offset, int size);
 
   /// Releases the data (cancels the stream).
@@ -102,22 +108,44 @@ final class _SeekableSource implements UploadSource {
 }
 
 final class _StreamSource implements UploadSource {
-  _StreamSource(Stream<List<int>> stream, this.length)
+  _StreamSource(Stream<List<int>> stream, this._declared)
     : _input = StreamIterator<List<int>>(stream);
 
+  /// The length the caller gave, or null.
+  final int? _declared;
+
+  /// The length found at the end of a stream of unknown length.
+  int? _found;
+
   @override
-  final int length;
+  int? get length => _declared ?? _found;
 
   @override
   Stream<List<int>> Function(int offset)? get openFrom => null;
 
   final StreamIterator<List<int>> _input;
 
-  /// The bytes from [_bufferStart] that were read from the stream and may be needed again.
+  /// The bytes read from the stream that may be needed again (the chunk being sent, and what was read after
+  /// it) are `_buffer[_head.._tail]`, the stream bytes from [_windowStart].
+  ///
+  /// Each event is copied into [_buffer] once as it is read: a producer may reuse its buffer for the next
+  /// event. Bytes once handed out by [read] are never written again; the buffer only grows past [_tail], or
+  /// is replaced by a new one that holds the live bytes.
   Uint8List _buffer = Uint8List(0);
-  int _bufferStart = 0;
+  int _head = 0;
+  int _tail = 0;
+  int _windowStart = 0;
+
   bool _ended = false;
+
+  /// The error of the stream, once it failed. Every later read throws it again: a read that the task stopped
+  /// waiting for (a pause) can meet it, and the stream reports nothing after an error.
+  (Object, StackTrace)? _failure;
   Future<void> _previousRead = Future<void>.value();
+
+  int get _windowLength => _tail - _head;
+
+  int get _windowEnd => _windowStart + _windowLength;
 
   /// Reads one after the other: a read that the task stopped waiting for still owns the stream until it ends.
   @override
@@ -130,72 +158,130 @@ final class _StreamSource implements UploadSource {
   }
 
   Future<Uint8List> _read(int offset, int size) async {
-    if (offset < _bufferStart) {
+    if (_failure case (final Object error, final StackTrace stackTrace)) {
+      Error.throwWithStackTrace(error, stackTrace);
+    }
+    if (offset < _windowStart) {
       throw FirebaseStorageException(
         code: 'server-file-wrong-size',
         message:
             'Server recorded incorrect upload file size, please retry the '
             'upload. It asked for byte $offset of a stream that is past '
-            '$_bufferStart.',
+            '$_windowStart.',
       );
     }
-    final BytesBuilder builder = BytesBuilder(copy: false)
-      ..add(await _skipTo(offset));
-    while (builder.length < size) {
-      if (!await _input.moveNext()) {
-        _ended = true;
-        throw _endedAt(offset + builder.length);
+    await _dropBefore(offset, offset + size);
+    final bool full = await _fill(offset + size);
+    final int? declared = _declared;
+    if (declared != null) {
+      if (!full) {
+        throw _endedBefore(_windowEnd, declared);
       }
-      builder.add(_input.current);
+      if (_windowEnd > declared ||
+          (offset + size == declared && await _fill(declared + 1))) {
+        throw invalidArgument(
+          'The data stream has more than its length of $declared bytes.',
+        );
+      }
+    } else {
+      if (full && _windowEnd == offset + size) {
+        // Read ahead: whether this chunk is the last one decides its command.
+        await _fill(_windowEnd + 1);
+      }
+      if (_ended) {
+        _found = _windowEnd;
+      }
     }
-    _buffer = builder.takeBytes();
-    _bufferStart = offset;
-    if (_bufferStart + _buffer.length > length ||
-        (offset + size == length && await _hasMore())) {
-      throw invalidArgument(
-        'The data stream has more than its length of $length bytes.',
-      );
-    }
-    return Uint8List.sublistView(_buffer, 0, size);
+    return Uint8List.sublistView(
+      _buffer,
+      _head,
+      _head + math.min(size, _windowLength),
+    );
   }
 
-  /// The bytes from [offset] that were already read: from the buffer, or after skipping the stream to
-  /// [offset] (when a resumed session already has the bytes before it).
-  Future<Uint8List> _skipTo(int offset) async {
-    int position = _bufferStart + _buffer.length;
-    if (offset <= position) {
-      return Uint8List.sublistView(_buffer, offset - _bufferStart);
+  /// Forgets the bytes before [offset]. When a resumed session already has more than was read, the stream is
+  /// skipped up to [offset] without copying: only the part of the event that crosses it is kept, in a buffer
+  /// sized for a chunk that ends at [end].
+  Future<void> _dropBefore(int offset, int end) async {
+    if (offset <= _windowEnd) {
+      _head += offset - _windowStart;
+      _windowStart = offset;
+      return;
     }
+    int position = _windowEnd;
     _buffer = Uint8List(0);
-    Uint8List kept = Uint8List(0);
-    while (position < offset) {
-      if (!await _input.moveNext()) {
-        _ended = true;
-        throw _endedAt(position);
+    _head = 0;
+    _tail = 0;
+    while (true) {
+      if (!await _next()) {
+        throw _declared == null
+            ? invalidArgument(
+                'The data stream ended after $position bytes, before the '
+                '$offset bytes that the upload session already has.',
+              )
+            : _endedBefore(position, _declared);
       }
       final List<int> event = _input.current;
       if (position + event.length > offset) {
-        kept = Uint8List.fromList(event.sublist(offset - position));
+        _windowStart = offset;
+        _append(event, end, from: offset - position);
+        return;
       }
       position += event.length;
     }
-    return kept;
   }
 
-  FirebaseStorageException _endedAt(int position) => invalidArgument(
-    'The data stream ended after $position bytes, before its length of '
-    '$length bytes.',
-  );
+  /// Reads the stream until the window reaches [end]; false when the stream ended before.
+  Future<bool> _fill(int end) async {
+    while (_windowEnd < end && !_ended) {
+      if (await _next()) {
+        _append(_input.current, end);
+      }
+    }
+    return _windowEnd >= end;
+  }
 
-  Future<bool> _hasMore() async {
-    while (!_ended && await _input.moveNext()) {
-      if (_input.current.isNotEmpty) {
+  /// The next event of the stream; false at its end. An error of the stream is kept in [_failure].
+  Future<bool> _next() async {
+    try {
+      if (await _input.moveNext()) {
         return true;
       }
+    } on Object catch (error, stackTrace) {
+      _failure = (error, stackTrace);
+      _ended = true;
+      rethrow;
     }
     _ended = true;
     return false;
   }
+
+  /// Copies [event] from [from] after the window. When the buffer has no room, the live bytes move to a new
+  /// buffer sized for the window up to [end], plus room for one more event like this one (at least 64 KiB, at
+  /// most the size of the chunk), so that the next fills of this chunk copy nothing again.
+  void _append(List<int> event, int end, {int from = 0}) {
+    final int length = event.length - from;
+    if (length <= 0) {
+      return;
+    }
+    if (_tail + length > _buffer.length) {
+      final int live = _windowLength;
+      final int chunk = end - _windowStart;
+      final int slack = math.max(64 * 1024, math.min(length, chunk));
+      final int capacity = math.max(chunk + slack, live + length);
+      _buffer = Uint8List(capacity)..setRange(0, live, _buffer, _head);
+      _head = 0;
+      _tail = live;
+    }
+    _buffer.setRange(_tail, _tail + length, event, from);
+    _tail += length;
+  }
+
+  static FirebaseStorageException _endedBefore(int position, int length) =>
+      invalidArgument(
+        'The data stream ended after $position bytes, before its length of '
+        '$length bytes.',
+      );
 
   @override
   Future<void> close() async {

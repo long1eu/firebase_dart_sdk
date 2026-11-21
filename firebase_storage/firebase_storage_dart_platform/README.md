@@ -121,8 +121,8 @@ first provides `firebase_core`, and the others keep it. Under `flutter test`, th
 | `getData(maxSize)` | `getBytes(maxSize:)` | `download-size-exceeded` above `maxSize` |
 | `putData`, `putString` | resumable `startUpload` | `putString` decodes the string first (`invalid-format` when it does not match) |
 | `putFile` | resumable upload streamed from the disk | without a content type, it comes from the file's extension, as on Android and iOS |
-| `writeToFile` | `openRead` into a temporary file next to the target, renamed over it at the end | progress, pause, resume and cancel; `totalBytes` from the object's metadata, read first |
-| `Task`: `snapshotEvents`, `snapshot`, awaiting it, `pause`, `resume`, `cancel` | the client's `UploadTask` (`progress`, `result`) | `cancel` works from `paused` too |
+| `writeToFile` | the client's `startDownloadToFile` (`DownloadTask`): a partial file next to the target, renamed over it at the end | progress, pause, resume and cancel; a pause closes the connection and resuming (also after a network failure) asks for the rest with a `Range` request; `totalBytes` from the object's metadata, read first; an object overwritten during the download fails with `object-changed`, a code the official plugin does not have |
+| `Task`: `snapshotEvents`, `snapshot`, awaiting it, `pause`, `resume`, `cancel` | the client's `UploadTask` and `DownloadTask` (`progress`, `result`) | `cancel` works from `paused` too |
 
 Errors are `FirebaseException`s of `firebase_core` with the plugin `firebase_storage` and the client's code, which is
 the JS SDK's without its `storage/` prefix (`object-not-found`, `unauthorized`, `unauthenticated`, `canceled`,

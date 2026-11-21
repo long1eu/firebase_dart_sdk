@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_storage_dart/firebase_storage_dart.dart' as fs;
+import 'package:firebase_storage_dart/io.dart' as fs_io;
 import 'package:firebase_storage_platform_interface/firebase_storage_platform_interface.dart';
 
 import 'errors.dart';
@@ -238,117 +239,95 @@ class _FailedTask extends DartTask {
   Future<bool> cancel() async => false;
 }
 
-/// `writeToFile`: reads the object with `openRead` of the client into a
-/// temporary file next to the target, and renames it over the target at the
-/// end. The size comes from the metadata of the object, read first.
+/// `writeToFile`: the resumable file download of the client (`DownloadTask`
+/// of `package:firebase_storage_dart/io.dart`) as a FlutterFire task.
 ///
-/// Pausing stops reading the response (the connection stays open); canceling
-/// closes it and removes the temporary file. On an error the target is left
-/// as it was.
+/// The bytes go to a partial file next to the target, which replaces it once
+/// the download is complete. Pausing closes the connection and resuming asks
+/// for the rest with a `Range` request; a network failure is resumed the same
+/// way. An object overwritten during the download fails the task with the
+/// code `object-changed`, which the official plugin does not have. On an error
+/// or a cancel the partial file is removed and the target is left as it was.
 class DartDownloadTask extends DartTask {
-  DartDownloadTask._(super.ref, this._file);
+  DartDownloadTask._(super.ref, this._task);
 
   /// Starts the download of [ref] to [file].
-  static DartTask start(DartReference ref, File file) =>
-      DartDownloadTask._(ref, file).._run();
-
-  final File _file;
-  StreamIterator<List<int>>? _reader;
-  bool _paused = false;
-  bool _canceled = false;
-  Completer<void>? _resumed;
-
-  Future<void> _run() async {
-    final File temporary = File(
-      '${_file.path}.download-${DateTime.now().microsecondsSinceEpoch}',
-    );
-    RandomAccessFile? output;
+  static DartTask start(DartReference ref, File file) {
+    final fs_io.DownloadTask task;
     try {
-      final fs.Reference source = ref.clientRef;
-      final fs.FullMetadata metadata = await source.metadata();
-      final int total = metadata.size ?? 0;
-      if (_canceled) {
-        return;
-      }
-      emit(_paused ? TaskState.paused : TaskState.running, 0, total);
-      output = await temporary.open(mode: FileMode.write);
-      final StreamIterator<List<int>> reader = _reader = StreamIterator(
-        source.openRead(),
-      );
-      int written = 0;
-      while (await _waitWhilePaused() && await reader.moveNext()) {
-        await output.writeFrom(reader.current);
-        written += reader.current.length;
-        emit(TaskState.running, written, total);
-      }
-      await output.close();
-      output = null;
-      if (_canceled) {
-        await _delete(temporary);
-        return;
-      }
-      await temporary.rename(_file.path);
-      succeed(written, total, metadata);
+      task = ref.clientRef.startDownloadToFile(file);
     } catch (error, stackTrace) {
-      await output?.close();
-      await _delete(temporary);
-      fail(error, stackTrace);
+      return _FailedTask(ref, error, stackTrace);
     }
+    return DartDownloadTask._(ref, task).._listen();
   }
 
-  /// Waits while the task is paused; false when it was canceled.
-  Future<bool> _waitWhilePaused() async {
-    while (_paused && !_canceled) {
-      await (_resumed ??= Completer<void>()).future;
-    }
-    return !_canceled;
-  }
+  final fs_io.DownloadTask _task;
 
-  static Future<void> _delete(File file) async {
-    try {
-      await file.delete();
-    } on FileSystemException {
-      // It was never created.
-    }
+  void _listen() {
+    _task.progress.listen((fs_io.DownloadProgress progress) {
+      // The end comes from the result, with the metadata or the error.
+      switch (progress.state) {
+        case fs_io.DownloadState.running:
+          // Before the metadata the size is unknown: a snapshot with
+          // totalBytes 0 would make a progress fraction divide by zero.
+          if (progress.totalBytes == 0 && progress.bytesTransferred == 0) {
+            break;
+          }
+          emit(
+            TaskState.running,
+            progress.bytesTransferred,
+            progress.totalBytes,
+          );
+        case fs_io.DownloadState.paused:
+          emit(
+            TaskState.paused,
+            progress.bytesTransferred,
+            progress.totalBytes,
+          );
+        case fs_io.DownloadState.success:
+        case fs_io.DownloadState.canceled:
+        case fs_io.DownloadState.error:
+          break;
+      }
+    });
+    _task.result.then(
+      (fs.FullMetadata metadata) =>
+          succeed(_task.bytesTransferred, _task.totalBytes, metadata),
+      onError: fail,
+    );
   }
 
   @override
   Future<bool> pause() async {
-    if (isFinished || _paused) {
-      return false;
+    final bool paused = _task.pause();
+    if (paused) {
+      emit(
+        TaskState.paused,
+        _task.bytesTransferred,
+        _task.totalBytes,
+        silent: true,
+      );
     }
-    _paused = true;
-    emit(TaskState.paused, snapshot.bytesTransferred, snapshot.totalBytes);
-    return true;
+    return paused;
   }
 
   @override
   Future<bool> resume() async {
-    if (isFinished || !_paused) {
-      return false;
+    final bool resumed = _task.resume();
+    if (resumed) {
+      emit(
+        TaskState.running,
+        _task.bytesTransferred,
+        _task.totalBytes,
+        silent: true,
+      );
     }
-    _paused = false;
-    _wake();
-    emit(TaskState.running, snapshot.bytesTransferred, snapshot.totalBytes);
-    return true;
+    return resumed;
   }
 
-  /// Cancels the download, from `running` or `paused`; the task fails with
-  /// the code `canceled` at once, and the temporary file is removed.
+  /// Cancels the download, from `running` or `paused`; the task then fails
+  /// with the code `canceled` once the partial file is removed.
   @override
-  Future<bool> cancel() async {
-    if (isFinished) {
-      return false;
-    }
-    _canceled = true;
-    _wake();
-    fail(DartTask.canceledException(), StackTrace.current);
-    await _reader?.cancel();
-    return true;
-  }
-
-  void _wake() {
-    _resumed?.complete();
-    _resumed = null;
-  }
+  Future<bool> cancel() async => _task.cancel();
 }

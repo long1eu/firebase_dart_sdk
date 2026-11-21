@@ -14,18 +14,17 @@ Section 6 describes an upload strategy that is not on `main` yet (branch `storag
 
 **Decision.** The client is designed as a Dart library. Configuration is immutable and goes to the
 constructor (`FirebaseStorage(app, bucket:, emulatorHost:, mockUserToken:, retry:, httpClient:)`). There is no
-`instanceFor` cache, no retry setters and no `DownloadTask`. FlutterFire's shape (`FirebaseStorage.instance`,
+`instanceFor` cache and no retry setters. FlutterFire's shape (`FirebaseStorage.instance`,
 `setMaxUploadRetryTime`, tasks that are futures) lives in `firebase_storage_dart_platform`, which maps onto the
 client. FlutterFire names stay where they are also natural Dart: `Reference`, `FullMetadata`,
 `SettableMetadata`, `ListResult`, kebab-case error codes.
 
 **Why.** The same split already exists for Firestore and Auth. A client shaped after a platform interface
 carries its global state and its mutable settings into every program. Downloads are a `Stream` (`openRead`)
-or a file (`writeToFile` in `io.dart`); the JS SDK has no download task either.
+or a file (`startDownloadToFile` and `writeToFile` in `io.dart`); only the file download is a task (section 13).
 
 **What we gave up.** A program written for `firebase_storage` does not compile against the client; it needs the
-adapter, which is thicker as a result. Download progress and pause are not in the client (a gap in
-[storage_parity.md](storage_parity.md), state "later").
+adapter, which is thicker as a result.
 
 **Pinned by.** `lib/src/firebase_storage.dart` (the constructor and its fields are `final`);
 `../firebase_storage_dart_platform/lib/src/firebase_storage.dart`, `task.dart` and `reference.dart` (the
@@ -149,6 +148,14 @@ order, at most the limit at once" and the pause and cancel cases while waiting);
 for the chunked path; `test/integration/upload_task_emulator_test.dart` ("20 MiB in one request, paused and
 resumed", "6 uploads with maxConcurrentUploads 2 keep at most 2 sessions open").
 
+**Unknown length (0.2.0).** `startStreamUpload` without a `length` always opens a session, started without
+`X-Goog-Upload-Header-Content-Length`, and sends chunks as above. The task reads one stream event past each
+chunk: if the stream ended, the chunk goes with `upload, finalize`; an empty stream sends one empty
+`finalize`. The chunk stays in memory until the server confirms it, so a retry or a resume (from any offset
+inside it) sends it again. `totalBytes` is -1 until the end, as `getTotalByteCount()` on Android. Not done: a
+multipart request for a short stream of unknown length (it would need to buffer 256 KiB before choosing).
+Pinned by `test/upload_unknown_length_test.dart`.
+
 ## 7. Progress
 
 **Decision.** On the VM, `UploadTask.progress` reports bytes as they are written, at most every 100 ms and 64 KiB; on the
@@ -260,3 +267,39 @@ client's API to be in `main` to be tested. A single review sees the whole featur
 
 **Pinned by.** `tool/publish_first_version.sh`; `.github/workflows/publish.yml` and `release.yml` (both list
 `firebase_storage_dart` and `firebase_storage_dart_platform`); `CHANGELOG.md` of each package.
+
+## 13. A download task for files (0.2.0)
+
+**Decision.** `startDownloadToFile(File)` in `io.dart` returns a `DownloadTask` shaped like `UploadTask`
+(`progress`, `state`, `pause`, `resume`, `cancel`, `result`). It reads the metadata first (size and
+generation), writes to `<file>.<random>.part` created exclusively, and renames it over the target at the end.
+A pause closes the connection; resuming, and recovering from a body that broke on the network, send
+`Range: bytes=<written>-`. Each response is checked against the generation: its `x-goog-generation` header
+when the server sends one (production and the emulator do), otherwise a metadata read before each resumed
+request and once before the rename. Two metadata reads with the same generation prove that every response
+between them came from it, since a generation never comes back. A change fails with `object-changed`.
+`writeToFile` runs on the task. The task lives in `io.dart` only; streams keep `openRead`.
+
+**Why.** A paused HTTP response held open times out on the server, so pausing by not reading only defers
+the failure. Without a guard a resumed download can join the start of one version of an object to the end of
+another, which is silent corruption; Android fails on an `ETag` change for the same reason. The `ETag` is not
+used because it follows the metageneration (the emulator computes it from generation and metageneration), so a
+metadata-only update would fail a download whose bytes did not change. A file is the natural resume buffer:
+the bytes already written are the offset.
+
+**What we gave up.** One metadata request before the content, which `writeToFile` did not make before, and two
+more per download from a server without the generation header. No task on the web, where there is no file
+to resume from. The requests of the task send `Accept-Encoding: identity` (it runs on the VM only),
+so offsets count stored bytes: the `dart:io` client would otherwise ask for gzip and unzip on its own. Before
+the rename the file must hold exactly the metadata size, and a 206 must start at the offset asked for. An
+object stored with `Content-Encoding: gzip` is the exception: the server unzips it and ignores ranges, so the
+task asks for the whole object again after a pause or a failure, skips what it has, and cannot compare the
+length with the stored size. The partial file is opened by its path right after its exclusive create, so a
+process that can write to the directory could swap it in between; downloads belong in a directory only the
+program writes to.
+
+**Pinned by.** `test/download_task_test.dart` (groups "pause and resume", "resume after a failure",
+"generation guard", "end of the content", "encoding", "cancel and errors"); `test/production/verify_production.dart`
+(checks 24 and 25); `test/integration/download_file_test.dart` ("an 8 MiB download task
+paused and resumed", "an object overwritten while the task is paused fails it with object-changed");
+`../firebase_storage_dart_platform/test/task_test.dart` (group "writeToFile").

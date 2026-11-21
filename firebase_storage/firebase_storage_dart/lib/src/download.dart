@@ -21,6 +21,43 @@ Stream<List<int>> openReadStream(Reference ref, int? start, int? end) {
   return _Download(ref, start ?? 0, end).stream;
 }
 
+/// The GET of the content of [ref] from byte [start] (inclusive) to byte [end] (exclusive, null for the end of
+/// the object), with a `Range` header unless it is the whole object. A ranged request also accepts 206 and
+/// 416 (the range starts at or after the end of the object); see [rangeSkip]. On the VM it asks for the
+/// identity encoding (see `media_headers_io.dart`).
+@internal
+StorageRequest mediaRequest(Reference ref, int start, int? end) {
+  final bool ranged = start > 0 || end != null;
+  final String last = end == null ? '' : '${end - 1}';
+  return StorageRequest(
+    method: 'GET',
+    url: ref.objectUrl(media: true),
+    headers: <String, String>{
+      ...mediaRequestHeaders,
+      if (ranged) 'Range': 'bytes=$start-$last',
+    },
+    successCodes: ranged ? const <int>{200, 206, 416} : const <int>{200},
+    timeout: ref.storage.retry.download,
+    errorMapper: objectErrorMapper(ref.bucket, ref.fullPath),
+  );
+}
+
+/// How many bytes to drop from the body of a response with [status] to a [mediaRequest] that started at
+/// [start]: [start] for a 200 (the whole object: the emulator ignores ranges it cannot satisfy), 0 for a 206,
+/// and -1 for a 416, which has no content to read.
+@internal
+int rangeSkip(int status, int start) => switch (status) {
+  200 => start,
+  416 => -1,
+  _ => 0,
+};
+
+/// Whether a response body that failed with [error] broke on the network (a closed connection, the idle
+/// timeout), so that requesting the rest again can succeed.
+@internal
+bool isTransientBodyError(Object error) =>
+    error is http.ClientException || error is TimeoutException;
+
 /// One download: the request starts when the stream is listened to.
 ///
 /// Failures before the first byte reaches the listener (the request, or the body breaking before it delivered
@@ -90,7 +127,7 @@ final class _Download {
     int waitSeconds = 1;
     while (!_canceled) {
       final http.StreamedResponse response = await _requester.open(
-        _request(),
+        mediaRequest(_ref, _start, _end),
         abortTrigger: _abort.future,
       );
       final Object? failure = await _pipe(response);
@@ -115,34 +152,12 @@ final class _Download {
     }
   }
 
-  StorageRequest _request() {
-    final int? wanted = _wanted;
-    final bool ranged = _start > 0 || wanted != null;
-    final String last = wanted == null ? '' : '${_start + wanted - 1}';
-    return StorageRequest(
-      method: 'GET',
-      url: _ref.objectUrl(media: true),
-      headers: <String, String>{
-        ...mediaRequestHeaders,
-        if (ranged) 'Range': 'bytes=$_start-$last',
-      },
-      // 416: the range starts at or after the end of the object, so there is nothing to read.
-      successCodes: ranged ? const <int>{200, 206, 416} : const <int>{200},
-      timeout: _ref.storage.retry.download,
-      errorMapper: objectErrorMapper(_ref.bucket, _ref.fullPath),
-    );
-  }
-
   /// Forwards the body of [response] to the listener. Returns null when the download is over (complete,
   /// failed after delivering bytes, or canceled) and the error when the body broke before its first byte was
   /// delivered, which is retried.
   Future<Object?> _pipe(http.StreamedResponse response) {
     final Completer<Object?> outcome = Completer<Object?>();
-    // A 200 answered to a ranged request is the whole object: the emulator ignores ranges it cannot satisfy.
-    int skip = response.statusCode == 200 ? _start : 0;
-    if (response.statusCode == 416) {
-      skip = -1;
-    }
+    int skip = rangeSkip(response.statusCode, _start);
     final StreamSubscription<List<int>> body = response.stream
         .timeout(_requester.requestTimeout)
         .listen(null);
@@ -191,7 +206,7 @@ final class _Download {
         body.cancel().ignore();
         if (_canceled) {
           finish(null);
-        } else if (_delivered == 0 && _isTransient(error)) {
+        } else if (_delivered == 0 && isTransientBodyError(error)) {
           finish(error);
         } else {
           _controller.addError(_interrupted(error), stackTrace);
@@ -228,9 +243,6 @@ final class _Download {
           'bytes: $error',
     );
   }
-
-  static bool _isTransient(Object error) =>
-      error is http.ClientException || error is TimeoutException;
 
   static Uint8List _bytes(List<int> data) =>
       data is Uint8List ? data : Uint8List.fromList(data);

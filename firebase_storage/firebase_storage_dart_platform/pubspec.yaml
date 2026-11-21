@@ -3,7 +3,7 @@ description: >-
   Unofficial pure-Dart implementation of the FlutterFire Cloud Storage platform
   interface: the official firebase_storage API on Linux, or on any platform you
   choose.
-version: 0.1.2
+version: 0.2.0
 homepage: https://github.com/long1eu/firebase_dart_sdk
 repository: https://github.com/long1eu/firebase_dart_sdk/tree/main/firebase_storage/firebase_storage_dart_platform
 issue_tracker: https://github.com/long1eu/firebase_dart_sdk/issues
@@ -34,7 +34,7 @@ dependencies:
   firebase_app_dart: ^0.2.0
   firebase_core: ^5.1.0
   firebase_core_platform_interface: ^8.1.1
-  firebase_storage_dart: ^0.1.1
+  firebase_storage_dart: ^0.2.0
   firebase_storage_platform_interface: ^6.1.0
   flutter:
     sdk: flutter

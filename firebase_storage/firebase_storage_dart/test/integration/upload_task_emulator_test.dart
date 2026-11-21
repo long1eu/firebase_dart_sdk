@@ -104,6 +104,74 @@ void main() {
     expect(await ref.getBytes(), data);
   });
 
+  group('a stream of unknown length', () {
+    Stream<List<int>> pieces(Uint8List data, int size) async* {
+      for (int i = 0; i < data.length; i += size) {
+        yield data.sublist(i, math.min(i + size, data.length));
+      }
+    }
+
+    test('in several chunks stores every byte', () async {
+      final Uint8List data = patternBytes(1024 * 1024 + 4321);
+      final Reference ref = storage.ref('$prefix/unknown.bin');
+      final UploadTask task = ref.startStreamUpload(
+        pieces(data, 10000),
+        metadata: const SettableMetadata(contentType: 'application/x-test'),
+      );
+      expect(task.totalBytes, -1);
+
+      final FullMetadata metadata = await task.result;
+      expect(metadata.size, data.length);
+      expect(metadata.contentType, 'application/x-test');
+      expect(task.totalBytes, data.length);
+      expect(await ref.getBytes(), data);
+    });
+
+    test('of a few bytes goes in a session', () async {
+      final Uint8List data = patternBytes(1000);
+      final Reference ref = storage.ref('$prefix/unknown-small.bin');
+      final UploadTask task = ref.startStreamUpload(pieces(data, 7));
+      expect((await task.result).size, data.length);
+      expect(task.sessionUri, isNotNull);
+      expect(await ref.getBytes(), data);
+    });
+
+    test('that is empty makes an empty object', () async {
+      final Reference ref = storage.ref('$prefix/unknown-empty.bin');
+      final FullMetadata metadata = await ref
+          .startStreamUpload(const Stream<List<int>>.empty())
+          .result;
+      expect(metadata.size, 0);
+      expect(await ref.getBytes(), isEmpty);
+    });
+
+    test('paused between chunks and resumed', () async {
+      storage.close();
+      storage = FirebaseStorage(
+        app,
+        emulatorHost: host,
+        maxUploadChunkSize: 256 * 1024,
+      );
+      final Uint8List data = patternBytes(2 * 1024 * 1024 + 99);
+      final Reference ref = storage.ref('$prefix/unknown-paused.bin');
+      final UploadTask task = ref.startStreamUpload(pieces(data, 64 * 1024));
+
+      await task.progress.firstWhere(
+        (UploadProgress p) => p.bytesTransferred > 0,
+      );
+      expect(task.pause(), isTrue);
+      final UploadProgress paused = await task.progress.firstWhere(
+        (UploadProgress p) => p.state == UploadState.paused,
+        orElse: () => task.snapshot,
+      );
+      expect(paused.bytesTransferred, lessThan(data.length));
+      task.resume();
+
+      expect((await task.result).size, data.length);
+      expect(await ref.getBytes(), data);
+    });
+  });
+
   test('pause and resume', () async {
     // Pausing between chunks: a single request on loopback ends before a pause can land.
     storage.close();

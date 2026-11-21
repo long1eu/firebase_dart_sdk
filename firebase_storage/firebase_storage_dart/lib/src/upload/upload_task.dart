@@ -47,7 +47,9 @@ final class UploadProgress {
   /// The bytes the server has confirmed so far.
   final int bytesTransferred;
 
-  /// The size of the upload.
+  /// The size of the upload; -1 while it is unknown: a stream given to `Reference.startStreamUpload` without a
+  /// `length`, until the task has read its end. The change has no event of its own: the next event (the
+  /// confirmation of the last chunk, then success) is the first to carry the real size.
   final int totalBytes;
 
   /// The metadata of the new object, once [state] is [UploadState.success]; null before.
@@ -66,8 +68,10 @@ final class UploadProgress {
       Object.hash(state, bytesTransferred, totalBytes, metadata);
 
   @override
-  String toString() =>
-      'UploadProgress(${state.name}, $bytesTransferred/$totalBytes bytes)';
+  String toString() {
+    final String total = totalBytes < 0 ? '?' : '$totalBytes';
+    return 'UploadProgress(${state.name}, $bytesTransferred/$total bytes)';
+  }
 }
 
 /// The size above which an upload is resumable, and its first chunk: 256 KiB, as in the JS SDK.
@@ -101,6 +105,9 @@ enum _Phase { running, pausing, paused, canceling, success, canceled, error }
 ///   with a `maxUploadChunkSize` go in chunks: they start at 256 KiB and double after each one that succeeds,
 ///   up to 16 MiB (or `maxUploadChunkSize`). A stream needs chunks because the chunk is what is sent again
 ///   after a failure; the web, because the browser reports no progress inside a request.
+/// * A stream without a `length` always uses a session, whatever its size. The session starts without the
+///   total, [totalBytes] is -1 until the stream ended, and each chunk is sent once the task has read one
+///   stream event past it (or the end), so that the last chunk carries `upload, finalize`.
 ///
 /// When a request fails with a network error or a retryable status (5xx, 408, 429), the task waits (1 s,
 /// doubling up to 64 s), asks the server how much it has, and goes on from there (with a 256 KiB chunk when
@@ -139,7 +146,7 @@ final class UploadTask {
     Uri? existingSessionUri,
   }) : _source = source,
        _metadata = metadata,
-       totalBytes = source.length {
+       _total = source.length {
     if (existingSessionUri != null) {
       if (!_onStorageHost(existingSessionUri)) {
         throw invalidArgument(
@@ -149,6 +156,7 @@ final class UploadTask {
       }
       _sessionUrl = existingSessionUri;
       _needStatus = true;
+      _adoptedSession = true;
     }
     _lastEventAt = _requester.now();
     _result.future.ignore();
@@ -158,10 +166,15 @@ final class UploadTask {
   /// The reference the data goes to.
   final Reference ref;
 
-  /// The size of the upload in bytes.
-  final int totalBytes;
+  /// The size of the upload in bytes; -1 while it is unknown (a stream given to `Reference.startStreamUpload`
+  /// without a `length`, until the task has read its end). It changes to the size without an event on
+  /// [progress]; the next event carries it.
+  int get totalBytes => _total ?? -1;
 
   final UploadSource _source;
+
+  /// The size of the data, once known.
+  int? _total;
   final SettableMetadata? _metadata;
   final Completer<FullMetadata> _result = Completer<FullMetadata>();
   final StreamController<UploadProgress> _events =
@@ -170,6 +183,13 @@ final class UploadTask {
   _Phase _phase = _Phase.running;
   int _transferred = 0;
   int _confirmed = 0;
+
+  /// The end of the data handed to the client for this session so far; the server cannot have more.
+  int _sent = 0;
+
+  /// Whether the session came from `existingSessionUri` and its first query has not answered yet: until then
+  /// the server may have bytes that this task never sent.
+  bool _adoptedSession = false;
   DateTime? _lastEventAt;
   FullMetadata? _uploaded;
   bool _looping = false;
@@ -342,8 +362,9 @@ final class UploadTask {
     if (!_holdsSlot) {
       return _takeSlot();
     }
-    if (_sessionUrl == null && totalBytes <= resumableChunkSize) {
-      return _oneShot();
+    final int? total = _total;
+    if (_sessionUrl == null && total != null && total <= resumableChunkSize) {
+      return _oneShot(total);
     }
     if (_sessionUrl == null) {
       return _createSession();
@@ -385,7 +406,7 @@ final class UploadTask {
       _source.openFrom != null &&
       ref.storage.maxUploadChunkSize == null;
 
-  Future<void> _oneShot() async {
+  Future<void> _oneShot(int totalBytes) async {
     final Uint8List data = await _read(0, totalBytes);
     _throwIfStopped();
     final StorageRequest request = ref.multipartRequest(data, _metadata);
@@ -419,7 +440,9 @@ final class UploadTask {
         headers: <String, String>{
           'X-Goog-Upload-Protocol': 'resumable',
           'X-Goog-Upload-Command': 'start',
-          'X-Goog-Upload-Header-Content-Length': '$totalBytes',
+          // Optional in the protocol: a stream of unknown length starts without it.
+          if (_total case final int total)
+            'X-Goog-Upload-Header-Content-Length': '$total',
           'X-Goog-Upload-Header-Content-Type': '${json['contentType']}',
           'Content-Type': 'application/json; charset=utf-8',
         },
@@ -474,11 +497,24 @@ final class UploadTask {
         httpStatus: response.statusCode,
       );
     }
+    final int? total = _total;
     if (received < _confirmed ||
-        received > totalBytes ||
-        (status == 'final' && received != totalBytes)) {
+        (total != null && received > total) ||
+        (total != null && status == 'final' && received != total)) {
       throw _wrongSize(received);
     }
+    if (!_adoptedSession && received > _sent) {
+      throw internalError(
+        'the upload session has $received bytes, but only $_sent were sent.',
+        httpStatus: response.statusCode,
+      );
+    }
+    if (status == 'final') {
+      // An adopted session of a stream of unknown length: the server's size is the size of the object.
+      _total ??= received;
+    }
+    _adoptedSession = false;
+    _sent = math.max(_sent, received);
     _setProgress(received);
     _needStatus = false;
     _needMetadata = status == 'final';
@@ -499,17 +535,33 @@ final class UploadTask {
 
   Future<void> _uploadChunk() async {
     final int offset = _confirmed;
-    final int left = totalBytes - offset;
-    final bool single = _singleRequest && left > 0;
-    final int size = single ? left : math.min(left, _chunkSize);
-    final Uint8List? data = single ? null : await _read(offset, size);
+    final int? knownTotal = _total;
+    final bool single =
+        _singleRequest && knownTotal != null && knownTotal > offset;
+    final int wanted = knownTotal == null
+        ? _chunkSize
+        : math.min(knownTotal - offset, _chunkSize);
+    final Uint8List? data = single ? null : await _read(offset, wanted);
+    // A stream of unknown length knows its size once a read reached its end.
+    final int? total = _total ??= _source.length;
+    final int size = data?.length ?? knownTotal! - offset;
+    if (data != null &&
+        size != wanted &&
+        !(size < wanted && total != null && offset + size == total)) {
+      throw internalError(
+        'the data source gave $size bytes at offset $offset instead of '
+        '$wanted.',
+      );
+    }
     _throwIfStopped();
     _sourceFailure = null;
+    final bool last = total != null && offset + size == total;
     final String command = switch (size) {
-      0 => 'finalize',
-      _ when size == left => 'upload, finalize',
+      0 when last => 'finalize',
+      _ when last => 'upload, finalize',
       _ => 'upload',
     };
+    _sent = math.max(_sent, offset + size);
     final StorageResponse response;
     try {
       response = await _requester.send(
@@ -567,7 +619,7 @@ final class UploadTask {
     _failingSince = null;
     _setProgress(offset + size);
     if (status == 'final') {
-      if (offset + size != totalBytes) {
+      if (!last) {
         throw _wrongSize(offset + size);
       }
       _succeed(_checkSize(ref.metadataOf(response)));
@@ -677,18 +729,22 @@ final class UploadTask {
 
   FullMetadata _checkSize(FullMetadata metadata) {
     final int? size = metadata.size;
-    if (size != null && size != totalBytes) {
+    final int? total = _total;
+    if (size != null && total != null && size != total) {
       throw _wrongSize(size);
     }
     return metadata;
   }
 
   FirebaseStorageException _wrongSize(int serverSize) {
+    final String has = _total == null
+        ? '$serverSize bytes, before the end of the data'
+        : '$serverSize of $_total bytes';
     return FirebaseStorageException(
       code: 'server-file-wrong-size',
       message:
           'Server recorded incorrect upload file size, please retry the '
-          'upload. It has $serverSize of $totalBytes bytes.',
+          'upload. It has $has.',
     );
   }
 

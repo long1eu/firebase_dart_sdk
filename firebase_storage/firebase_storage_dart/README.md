@@ -5,7 +5,7 @@ for Dart servers, command line tools, Flutter apps and the web. It speaks the sa
 Firebase JS SDK, with Dart names (`Reference`, `putBytes`, `UploadTask`) instead of a Flutter plugin or a
 native SDK. It is not affiliated with or supported by Google or Firebase.
 
-> **Status: 0.1.1, unreleased.** Verified with unit tests, against the Firebase Storage emulator, and once
+> **Status: 0.2.0.** Verified with unit tests, against the Firebase Storage emulator, and
 > against a real Firebase project with a signed-in throwaway user (see [Verified](#verified)).
 
 ## Install
@@ -214,7 +214,8 @@ How the data goes:
   web, because the browser reports no progress inside a request, so progress there comes per chunk.
 
 `startStreamUpload(stream, length: n)` uploads a stream whose total length you know, holding one chunk in
-memory.
+memory. Without `length` it uploads a stream of unknown length (like `putStream` on Android): always in a
+resumable session, with `totalBytes` at -1 until the stream ended.
 
 At most `maxConcurrentUploads` uploads of a `FirebaseStorage` run at once (8 by default; `putBytes` and
 `putString` count). The others wait in order in the running state with 0 bytes; `pause()` and `cancel()`
@@ -241,13 +242,24 @@ Future<void> files(Reference backup) async {
 
   final int written = await backup.writeToFile(File('restored.tar.gz'));
   print('$written bytes');
+
+  final DownloadTask download = backup.startDownloadToFile(File('copy.tar.gz'));
+  download.progress.listen((DownloadProgress p) {
+    print('${p.state.name}: ${p.bytesTransferred} of ${p.totalBytes} bytes');
+  });
+  // download.pause(); download.resume(); download.cancel();
+  await download.result;
 }
 ```
 
 `putFile` is a resumable upload that streams from disk; after a failure it reads the file again from the
-offset the server reports. `writeToFile` streams into a temporary file next
-to the target and renames it when the download finishes, so a failed download does not leave a partial
-file.
+offset the server reports. `startDownloadToFile` returns a `DownloadTask` with progress, `pause`, `resume`
+and `cancel`: it writes into a partial file next to the target and renames it when the download finishes,
+so a failed or canceled download leaves no partial file and the target untouched. A pause closes the
+connection; resuming, and recovering from a broken connection, ask for the rest with a `Range` request
+from the bytes already written. Each response is checked against the generation of the object, so an
+object overwritten during the download fails the task with `object-changed` instead of producing a file
+joined from two versions. `writeToFile` is the same download without the controls.
 
 ## Web
 
@@ -297,7 +309,7 @@ default). A 401 triggers one token refresh and one more try. Production answers 
 ## Verified
 
 The verification kit (`tool/verify_production_storage` in the repository) ran against a real project with a
-signed-in throwaway user: 19 of its 20 checks passed, and check 13 (the refresh after a 401) was
+signed-in throwaway user: 25 of its 26 checks passed (0.2.0), and check 13 (the refresh after a 401) was
 inconclusive, because production does not answer 401 to an invalid token. What it found:
 
 - A missing object answers 404 with a JSON envelope; the emulator sends plain text.
@@ -311,10 +323,17 @@ inconclusive, because production does not answer 401 to an invalid token. What i
 - CORS: `access-control-allow-origin` is `*`, the `x-goog-upload-*` headers are exposed on the session
   responses, and the preflight to the upload URL allows `x-goog-upload-command` and `x-goog-upload-offset`.
 - Upload progress is per byte on the VM and per chunk on the web.
+- A session started without a length accepts chunks and an empty `finalize`, so streams of unknown length and
+  empty streams upload.
+- Media responses carry `x-goog-generation`, so a resumed `DownloadTask` checks the generation without reading
+  the metadata again.
+- An object stored gzip-compressed is unzipped by the server for a request that asks for the identity
+  encoding, and a `Range` is then answered with the whole object (200); the client cuts it.
 
 ## What is not supported
 
-- No `DownloadTask`: stream with `openRead` or `writeToFile`.
+- No download task on the web: `DownloadTask` writes to a file and lives in `io.dart`; on the web, read with
+  `getBytes` or `openRead`.
 - No `FirebaseStorage.instance`, and no instance cache: keep the object you create.
 - No Firebase Auth in this package; use
   [`firebase_auth_providers_dart`](https://pub.dev/packages/firebase_auth_providers_dart).

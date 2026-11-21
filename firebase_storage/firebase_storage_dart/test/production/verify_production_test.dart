@@ -75,6 +75,11 @@ void main() {
         // size received is 262144 (neither 0 nor 524288) and the check cannot judge. Production is expected
         // to answer REFUSED (PASS).
         '21': Status.inconclusive,
+        '22': Status.pass,
+        '23': Status.pass,
+        '24': Status.pass,
+        // The emulator unzips a gzip-stored object for an identity request and ignores the Range: a 200.
+        '25': Status.pass,
         '26': Status.pass,
       };
       final Map<String, Status> actual = <String, Status>{
@@ -85,9 +90,9 @@ void main() {
       if (actual['14'] == Status.inconclusive) {
         actual['14'] = Status.pass;
       }
-      // On loopback one streamed request can finish before the pause of checks 17 and 18 lands; the
-      // kit then says INCONCLUSIVE ("run it again"), which is not a failure of the SDK.
-      for (final String id in <String>['17', '18']) {
+      // On loopback one streamed request can finish before the pause of checks 17, 18, 24 and 25 lands;
+      // the kit then says INCONCLUSIVE ("run it again"), which is not a failure of the SDK.
+      for (final String id in <String>['17', '18', '24', '25']) {
         if (actual[id] == Status.inconclusive) {
           actual[id] = Status.pass;
         }
@@ -117,6 +122,21 @@ void main() {
         );
       }
       expect(run.results['19']!.observed['tooLarge'], 'download-size-exceeded');
+      expect(run.results['22']!.observed['totalAtStart'], -1);
+      expect(run.results['22']!.observed['lengthAnnounced'], isFalse);
+      expect(run.results['23']!.observed['size'], 0);
+      expect(run.results['23']!.observed['storedBytes'], 0);
+      if (run.results['24']!.status == Status.pass) {
+        // The emulator sends x-goog-generation, so the task needs no metadata read beyond the first.
+        expect(run.results['24']!.observed['ranged'], isTrue);
+        expect(run.results['24']!.observed['generationHeader'], isTrue);
+        expect(run.results['24']!.observed['metadataRequests'], 1);
+        expect(run.results['24']!.observed['mediaRequests'], 2);
+      }
+      if (run.results['25']!.status == Status.pass) {
+        expect(run.results['25']!.observed['resumedStatus'], 200);
+        expect(run.results['25']!.observed['contentEncoding'], isFalse);
+      }
 
       expect(run.uploadedBytes, greaterThan(0));
       expect(run.deleted, greaterThan(0));
