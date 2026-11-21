@@ -71,6 +71,10 @@ void main() {
         '19': Status.pass,
         // Needs --create-user and the Auth emulator; see the last test.
         '20': Status.skipped,
+        // The emulator ignores upload offsets: it appends the early chunk at the start of the session, so
+        // size received is 262144 (neither 0 nor 524288) and the check cannot judge. Production is expected
+        // to answer REFUSED (PASS).
+        '21': Status.inconclusive,
       };
       final Map<String, Status> actual = <String, Status>{
         for (final MapEntry<String, CheckResult> e in run.results.entries)

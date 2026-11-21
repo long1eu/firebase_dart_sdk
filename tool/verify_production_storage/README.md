@@ -101,6 +101,8 @@ copes. `FAIL` means the client misbehaved or the backend does something it does 
 | 17 | SDK pause and resume | `UploadTask.pause()` then `resume()` finishes the upload. `INCONCLUSIVE` if it finished before it could be paused. |
 | 18 | SDK session resume | A second task started with `existingSessionUri` of a paused one finishes the upload. |
 | 19 | SDK download | `getBytes`, `openRead(100, 200)`, an open-ended `openRead`, `maxSize` too small (`download-size-exceeded`) and equal to the size. |
+| 20 | Signed-in round trip | Needs `--create-user`. As the throwaway user, upload, read, describe, list and delete an object (in `--denied-bucket` when given, else the main bucket); with `--denied-bucket` the same read without a user must answer `unauthorized`. With check 2 (the signed-out 403) it covers the rules in both directions. |
+| 21 | Out-of-order chunk | A resumable session for 768 KiB gets the second chunk first (`X-Goog-Upload-Offset: 262144`). `REFUSED` (PASS): a 4xx or size received stays 0 (the line shows the status, headers and a body snippet), and the session then takes the chunks in order and the stored size and md5 match. `FAIL` (`ACCEPTED`): size received becomes 524288, the early bytes were taken as valid. `INCONCLUSIVE` otherwise, e.g. the emulator, which ignores offsets. |
 
 What to send back: the whole report. The most valuable lines are the answers of 1, 2, 3, 10, 11 and 14,
 and the results of 8, 9, 13, 17 and 18.
@@ -126,6 +128,7 @@ named here.
 | 15 | PASS (simulated 503s, about 6 s of backoff) | PASS |
 | 16-19 | PASS | PASS |
 | 20 | SKIPPED without `--create-user`; PASS with it and the Auth emulator | PASS |
+| 21 | INCONCLUSIVE: the emulator ignores offsets and appends the early chunk | not run yet |
 
 Upload progress is per byte on the VM and per chunk on the web.
 
