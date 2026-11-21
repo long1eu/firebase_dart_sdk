@@ -3,6 +3,10 @@
 - The id of a `MultiFactorResolver.session` is opaque (`sign-in-<n>`) instead of the backend's pending credential,
   so printing or logging the session shows no secret. `verifyPhoneNumber(multiFactorSession:)` with it still sends
   the SMS of the sign-in through the client's resolver, whose new `session` carries the credential.
+- On the web the tabs follow each other's sign-outs and sign-ins: the storage wrapper passes on the changes of a
+  storage that reports them (`ObservableAuthStorage` of `firebase_auth_providers_dart`, which the default
+  IndexedDB/`localStorage` storage and `sessionStorage` are) to the client, and ignores them once a failed write
+  moved the session to memory. Needs the next release of `firebase_auth_providers_dart`.
 
 ## 0.1.1
 

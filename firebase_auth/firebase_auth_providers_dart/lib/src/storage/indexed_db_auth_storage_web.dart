@@ -38,8 +38,13 @@ import 'package:web/web.dart' as web;
 /// origin: a cross-site scripting flaw gives the refresh token (which does not expire) away. See
 /// [WebAuthStorage].
 ///
-/// Changes made by another tab are read at the next [read]; nothing tells this one about them (no
-/// cross-tab sync).
+/// **Other tabs.** While [changes] of a key is listened to, the key is read every [pollInterval]
+/// (800 ms by default, as in the JS SDK) in a `readonly` transaction, and the stream emits when the
+/// value differs from the last one this object read, wrote or saw. Another object on the same
+/// database, in this page or another tab, counts as someone else; the writes of this object never
+/// emit. The polls pause while the page is hidden in the back/forward cache (`pagehide`) and resume
+/// on `pageshow`. They stop when nobody listens any more and at [close]. A poll that fails is
+/// ignored and tried again at the next one.
 ///
 /// On the Dart VM the constructor throws an [UnsupportedError] and [isAvailable] returns false.
 ///
@@ -49,12 +54,14 @@ import 'package:web/web.dart' as web;
 ///   storage: IndexedDbAuthStorage(),
 /// );
 /// ```
-class IndexedDbAuthStorage implements AuthStorage {
+class IndexedDbAuthStorage implements ObservableAuthStorage {
   /// A storage in the IndexedDB database [databaseName], whose requests each have [requestTimeout]
-  /// to finish. Does no I/O: the database is opened (and created) at the first [read] or [write].
+  /// to finish, and whose [changes] look for the changes of other tabs every [pollInterval]. Does
+  /// no I/O: the database is opened (and created) at the first [read] or [write].
   IndexedDbAuthStorage({
     this.databaseName = defaultDatabaseName,
     this.requestTimeout = defaultRequestTimeout,
+    this.pollInterval = defaultPollInterval,
   }) {
     if (databaseName.isEmpty) {
       throw ArgumentError.value(
@@ -67,6 +74,13 @@ class IndexedDbAuthStorage implements AuthStorage {
       throw ArgumentError.value(
         requestTimeout,
         'requestTimeout',
+        'must be positive',
+      );
+    }
+    if (pollInterval <= Duration.zero) {
+      throw ArgumentError.value(
+        pollInterval,
+        'pollInterval',
         'must be positive',
       );
     }
@@ -88,6 +102,10 @@ class IndexedDbAuthStorage implements AuthStorage {
   /// The time one request has when none is given (the JS SDK's limit).
   static const Duration defaultRequestTimeout = Duration(milliseconds: 2500);
 
+  /// How often [changes] reads the watched keys when none is given (the JS SDK's
+  /// `_POLLING_INTERVAL_MS`).
+  static const Duration defaultPollInterval = Duration(milliseconds: 800);
+
   /// The key under which [isAvailable] writes, reads back and deletes its probe value.
   static const String probeKey = '.availability-probe';
 
@@ -97,7 +115,24 @@ class IndexedDbAuthStorage implements AuthStorage {
   /// The time each request (the open, the deletion of a database, a transaction) has to finish.
   final Duration requestTimeout;
 
+  /// How often [changes] reads the keys that are listened to.
+  final Duration pollInterval;
+
   web.IDBDatabase? _db;
+
+  /// The listeners of [changes], by key.
+  final Map<String, Set<MultiStreamController<void>>> _watchers =
+      <String, Set<MultiStreamController<void>>>{};
+
+  /// The last value of each key that this object read, wrote or saw in a poll.
+  final Map<String, String?> _known = <String, String?>{};
+
+  Timer? _pollTimer;
+  bool _polling = false;
+  bool _pageHidden = false;
+  JSFunction? _onPageHide;
+  JSFunction? _onPageShow;
+  int _polls = 0;
 
   /// Counts the connections opened, so that the event of an older one does not drop a newer one.
   int _generation = 0;
@@ -147,21 +182,176 @@ class IndexedDbAuthStorage implements AuthStorage {
   }
 
   @override
-  Future<String?> read(String key) =>
-      _serial(() => _transact(IndexedDbOperation.read, key, null));
+  Future<String?> read(String key) => _serial(() async {
+    final String? value = await _transact(IndexedDbOperation.read, key, null);
+    _known[key] = value;
+    return value;
+  });
 
   @override
-  Future<void> write(String key, String? value) => _serial(
-    () => _transact(
+  Future<void> write(String key, String? value) => _serial(() async {
+    await _transact(
       value == null ? IndexedDbOperation.delete : IndexedDbOperation.write,
       key,
       value,
-    ),
-  );
+    );
+    _known[key] = value;
+  });
 
-  /// Closes the connection once the calls made before have finished. A later [read] or [write]
-  /// opens it again. Never fails.
-  Future<void> close() => _serial(() async => _drop());
+  /// Emits when another object (another tab, or another storage on [databaseName]) changed [key]:
+  /// see "Other tabs" in [IndexedDbAuthStorage]. Polling runs while at least one stream is listened
+  /// to. A key whose value this object does not know yet is read at the first listen, so that the
+  /// first poll compares with it.
+  @override
+  Stream<void> changes(String key) =>
+      Stream<void>.multi((MultiStreamController<void> controller) {
+        _watchers
+            .putIfAbsent(key, () => <MultiStreamController<void>>{})
+            .add(controller);
+        if (!_known.containsKey(key)) {
+          // Only fills [_known]; a failure leaves it to the first poll.
+          unawaited(read(key).then<void>((_) {}, onError: (Object _) {}));
+        }
+        _startPolling();
+        controller.onCancel = () => _unwatch(key, controller);
+      });
+
+  /// The number of polls started so far, for tests.
+  @visibleForTesting
+  int get pollCount => _polls;
+
+  /// Whether the polls of [changes] run (someone listens and the page is not hidden), for tests.
+  @visibleForTesting
+  bool get isPolling => _pollTimer != null;
+
+  /// Ends the streams of [changes] and stops their polls at once, then closes the connection once
+  /// the calls made before have finished. A later [read] or [write] opens it again, and a later
+  /// listen to [changes] polls again. Never fails.
+  Future<void> close() {
+    final List<MultiStreamController<void>> controllers =
+        <MultiStreamController<void>>[
+          for (final Set<MultiStreamController<void>> set in _watchers.values)
+            ...set,
+        ];
+    _watchers.clear();
+    _stopPolling();
+    for (final MultiStreamController<void> controller in controllers) {
+      controller.closeSync();
+    }
+    return _serial(() async => _drop());
+  }
+
+  void _unwatch(String key, MultiStreamController<void> controller) {
+    final Set<MultiStreamController<void>>? set = _watchers[key];
+    if (set == null) {
+      return;
+    }
+    set.remove(controller);
+    if (set.isEmpty) {
+      _watchers.remove(key);
+    }
+    if (_watchers.isEmpty) {
+      _stopPolling();
+    }
+  }
+
+  void _startPolling() {
+    _listenToPageLifecycle();
+    if (_pollTimer != null || _pageHidden) {
+      return;
+    }
+    _pollTimer = Timer.periodic(pollInterval, (_) => _poll());
+  }
+
+  void _stopPolling() {
+    _pollTimer?.cancel();
+    _pollTimer = null;
+    _forgetPageLifecycle();
+  }
+
+  /// Reads the watched keys, behind the calls made before, and tells the listeners of the keys
+  /// whose value changed. One poll at a time.
+  void _poll() {
+    if (_polling) {
+      return;
+    }
+    _polling = true;
+    _polls++;
+    unawaited(_serial(_readWatched).whenComplete(() => _polling = false));
+  }
+
+  Future<void> _readWatched() async {
+    for (final String key in List<String>.of(_watchers.keys)) {
+      final String? stored;
+      try {
+        stored = await _transact(IndexedDbOperation.read, key, null);
+      } on Object {
+        // The next poll tries again.
+        return;
+      }
+      final bool knew = _known.containsKey(key);
+      final String? before = _known[key];
+      _known[key] = stored;
+      if (!knew || before == stored) {
+        continue;
+      }
+      final Set<MultiStreamController<void>>? set = _watchers[key];
+      if (set == null) {
+        continue;
+      }
+      for (final MultiStreamController<void> controller
+          in List<MultiStreamController<void>>.of(set)) {
+        controller.add(null);
+      }
+    }
+  }
+
+  /// Pauses the polls while the page is in the back/forward cache, like the JS SDK, so that a
+  /// suspended page holds no transaction, and closes the connection (the next call reopens it).
+  void _listenToPageLifecycle() {
+    if (_onPageHide != null) {
+      return;
+    }
+    final JSFunction onHide = ((web.Event _) {
+      _pageHidden = true;
+      _pollTimer?.cancel();
+      _pollTimer = null;
+      unawaited(_serial(() async => _drop()));
+    }).toJS;
+    final JSFunction onShow = ((web.Event _) {
+      _pageHidden = false;
+      if (_watchers.isNotEmpty) {
+        _startPolling();
+      }
+    }).toJS;
+    try {
+      final web.EventTarget global = globalContext as web.EventTarget;
+      global.addEventListener('pagehide', onHide);
+      global.addEventListener('pageshow', onShow);
+      _onPageHide = onHide;
+      _onPageShow = onShow;
+    } on Object {
+      // No event target here: the polls just never pause.
+    }
+  }
+
+  void _forgetPageLifecycle() {
+    final JSFunction? onHide = _onPageHide;
+    final JSFunction? onShow = _onPageShow;
+    _onPageHide = null;
+    _onPageShow = null;
+    _pageHidden = false;
+    if (onHide == null || onShow == null) {
+      return;
+    }
+    try {
+      final web.EventTarget global = globalContext as web.EventTarget;
+      global.removeEventListener('pagehide', onHide);
+      global.removeEventListener('pageshow', onShow);
+    } on Object {
+      // Nothing was added.
+    }
+  }
 
   Future<T> _serial<T>(Future<T> Function() operation) {
     final Future<T> next = _last.then((_) => operation());
@@ -564,6 +754,12 @@ class _AbortedByBrowser implements Exception {
 /// A write of null (a sign-out) deletes the key from `localStorage` too, so that a session the move
 /// never reached cannot come back. The calls run one at a time, in order.
 ///
+/// **Other tabs.** [changes] follows the storage in use: the polls of [IndexedDbAuthStorage], or
+/// the `storage` events of [WebAuthStorage]; with memory it never emits. The read that follows a
+/// change goes through the rules above, so a key marked by a tab without IndexedDB takes its state
+/// from `localStorage` there too. Two tabs that chose differently (one without IndexedDB) do not
+/// see each other's changes.
+///
 /// On the Dart VM the constructor throws an [UnsupportedError].
 ///
 /// ```dart
@@ -572,7 +768,7 @@ class _AbortedByBrowser implements Exception {
 ///   storage: BestWebAuthStorage(),
 /// );
 /// ```
-class BestWebAuthStorage implements AuthStorage {
+class BestWebAuthStorage implements ObservableAuthStorage {
   /// A storage that chooses between IndexedDB (the database [databaseName]), `localStorage` (keys
   /// under [localStoragePrefix]) and memory.
   ///
@@ -629,6 +825,10 @@ class BestWebAuthStorage implements AuthStorage {
 
   Future<WebAuthStorageKind>? _kind;
   Future<void> _last = Future<void>.value();
+
+  /// The listeners of [changes], and the subscription to the storage in use behind each.
+  final Map<MultiStreamController<void>, StreamSubscription<void>?> _followers =
+      <MultiStreamController<void>, StreamSubscription<void>?>{};
 
   /// Where the sessions are kept; the checks run at the first use of this getter, [read] or
   /// [write].
@@ -688,9 +888,41 @@ class BestWebAuthStorage implements AuthStorage {
     }
   });
 
-  /// Closes the IndexedDB connection once the calls made before (and the deletions they started)
-  /// have finished. A later [read] or [write] opens it again. Never fails.
-  Future<void> close() => _serial(_indexedDb.close);
+  /// Emits when another tab changed [key] in the storage in use: see "Other tabs" in
+  /// [BestWebAuthStorage]. Listening makes the choice of [kind] if it was not made yet.
+  @override
+  Stream<void> changes(String key) =>
+      Stream<void>.multi((MultiStreamController<void> controller) {
+        _followers[controller] = null;
+        controller.onCancel = () => _followers.remove(controller)?.cancel();
+        kind.then<void>((WebAuthStorageKind kind) {
+          if (!_followers.containsKey(controller)) {
+            return;
+          }
+          final Stream<void>? source = switch (kind) {
+            WebAuthStorageKind.indexedDb => _indexedDb.changes(key),
+            WebAuthStorageKind.localStorage => _local.changes(key),
+            WebAuthStorageKind.memory => null,
+          };
+          _followers[controller] = source?.listen(controller.add);
+        }, onError: (Object _) {});
+      });
+
+  /// Ends the streams of [changes] and stops their polls at once, then closes the IndexedDB
+  /// connection once the calls made before (and the deletions they started) have finished. A later
+  /// [read] or [write] opens it again. Never fails.
+  Future<void> close() {
+    final List<MapEntry<MultiStreamController<void>, StreamSubscription<void>?>>
+    followers = _followers.entries.toList();
+    _followers.clear();
+    for (final MapEntry<MultiStreamController<void>, StreamSubscription<void>?>
+        entry
+        in followers) {
+      unawaited(entry.value?.cancel());
+      entry.key.closeSync();
+    }
+    return _serial(_indexedDb.close);
+  }
 
   Future<T> _serial<T>(Future<T> Function() operation) {
     final Future<T> next = _last.then((_) => operation());

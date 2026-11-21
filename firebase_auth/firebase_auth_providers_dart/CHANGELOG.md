@@ -8,6 +8,21 @@
 - `MultiFactorResolver.session`: a `MultiFactorSession` of type `MultiFactorSessionType.signIn` that wraps the
   pending credential of the sign-in (`resolver.session` of the JS SDK). It is opaque: no member, `toString` or JSON
   form shows the credential.
+- Cross-tab sync on the web, as in the JS SDK. `ObservableAuthStorage` is an `AuthStorage` with
+  `changes(key)`, a stream that emits when someone else (another tab) changed the key; `WebAuthStorage`
+  (the browser's `storage` event), `IndexedDbAuthStorage` (a `readonly` read every `pollInterval`, 800 ms by
+  default, while the stream is listened to) and `BestWebAuthStorage` (whichever storage it chose) implement it.
+  The writes of the object itself never emit. The polls stop when nobody listens and at `close()`, also
+  `BestWebAuthStorage.close()`, and pause while the page is in the back/forward cache.
+- `FirebaseUserAuth` follows an `ObservableAuthStorage` while it uses it: a sign-out in another tab signs it out,
+  another user signed in there becomes its user, and new tokens or data of the same user are taken over (the ID
+  token stays until the next refresh, which uses the stored refresh token). `authStateChanges`, `idTokenChanges`,
+  `userChanges` and `onTokenChanged` emit as for a sign-in or sign-out here; the `beforeAuthStateChanged`
+  callbacks do not run. It never writes back what it read. Before it stores an update of the user's session (a
+  rotated refresh token, new user data), it reads the storage and takes over a sign-out or another user stored
+  there instead of writing over it, so a sign-out in one tab is no longer undone by another tab's next write.
+  The JS SDK writes the adopted user back to the persistence; this client does not. Other storages behave as
+  before.
 
 ## 0.3.2
 

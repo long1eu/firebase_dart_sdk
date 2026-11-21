@@ -8,6 +8,7 @@ import 'package:firebase_auth_providers_dart/firebase_auth_providers_dart.dart'
         BestWebAuthStorage,
         FileAuthStorage,
         InMemoryAuthStorage,
+        ObservableAuthStorage,
         WebAuthStorage;
 import 'package:firebase_auth_secure_storage_flutter/firebase_auth_secure_storage_flutter.dart'
     show SecureAuthStorage;
@@ -151,7 +152,12 @@ SecureDefaultStorage secureDefaultStorage(String? sessionFile) {
 /// the next change); the official plugins never fail a sign-in because the
 /// keychain or the preferences could not be written, so this package keeps
 /// that behaviour here, in front of the client.
-class FallbackStorage implements AuthStorage {
+///
+/// [changes] passes on the changes that other tabs make to the storage of
+/// the app when it reports them (the web storages), so that the client
+/// follows a sign-out or a sign-in made in another tab; once memory is in use
+/// they are ignored.
+class FallbackStorage implements ObservableAuthStorage {
   FallbackStorage(this._persistent);
 
   final AuthStorage _persistent;
@@ -184,5 +190,14 @@ class FallbackStorage implements AuthStorage {
         'it is kept in memory until the program ends.',
       );
     }
+  }
+
+  @override
+  Stream<void> changes(String key) {
+    final AuthStorage persistent = _persistent;
+    if (persistent is! ObservableAuthStorage) {
+      return const Stream<void>.empty();
+    }
+    return persistent.changes(key).where((_) => !_persistentFailed);
   }
 }

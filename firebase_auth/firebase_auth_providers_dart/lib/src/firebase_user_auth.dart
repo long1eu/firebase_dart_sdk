@@ -86,6 +86,15 @@ import 'environment_stub.dart'
 /// the session at [signOut], the user is signed out all the same and [signOut] throws the error of the storage;
 /// [restore] on that instance deletes it again instead of loading it, but a new instance still finds it.
 ///
+/// **Other tabs.** With a storage that reports the changes other tabs make
+/// ([ObservableAuthStorage]: the web storages of this package), the instance follows them while it
+/// uses the storage, like the JS SDK: a sign-out there signs out here, another user signed in there
+/// becomes the user here, and new tokens or user data of the same user are taken over. It reads
+/// what the other tab stored and never writes it back. The streams emit as for a sign-in or
+/// sign-out here, and the [beforeAuthStateChanged] callbacks do not run (as in JS). Before it
+/// stores an update of the user's session (a rotated refresh token, new user data), it reads the
+/// storage, and takes over a sign-out or another user stored there instead of writing over it.
+///
 /// **Errors.** Requests fail with a [FirebaseAuthException]; its [FirebaseAuthException.code] lists
 /// the codes. Any request can fail with `network-request-failed`, `too-many-requests`, `invalid-api-key` or
 /// `internal-error`. The operations of the signed-in user throw `null-user` when nobody is signed in, and sign the
@@ -174,6 +183,7 @@ class FirebaseUserAuth implements AuthTokenProvider {
       onListen: _scheduleProactiveRefresh,
       onCancel: _cancelProactiveRefresh,
     );
+    _followStorage();
   }
 
   /// Creates the instance for [app] (with the API key and the application id of its options, and its App Check
@@ -468,6 +478,15 @@ class FirebaseUserAuth implements AuthTokenProvider {
   /// The [restore] in progress.
   Future<void>? _restoring;
 
+  /// The changes other tabs make to the session in an [ObservableAuthStorage].
+  StreamSubscription<void>? _storageChanges;
+
+  /// The reading of a session another tab stored, while it runs.
+  Future<void>? _following;
+
+  /// Whether another change was reported while [_following] ran.
+  bool _followAgain = false;
+
   MultiFactorApi get _multiFactor => MultiFactorApi.json(
     MultiFactorTransport(
       postJson: (String method, Map<String, Object?> body) =>
@@ -711,6 +730,7 @@ class FirebaseUserAuth implements AuthTokenProvider {
     _storage = storage;
     // The session is stored now, also when an earlier write to the old storage had failed.
     _unsaved = false;
+    _followStorage();
     await previous.write(_storageKey, null);
   }
 
@@ -2194,6 +2214,9 @@ class FirebaseUserAuth implements AuthTokenProvider {
   /// app) first.
   Future<void> dispose() async {
     _disposed = true;
+    final StreamSubscription<void>? storageChanges = _storageChanges;
+    _storageChanges = null;
+    await storageChanges?.cancel();
     _cancelProactiveRefresh();
     await _tokenChanges.close();
     await _userChanges.close();
@@ -2342,6 +2365,7 @@ class FirebaseUserAuth implements AuthTokenProvider {
       persist:
           updated.refreshToken != session.refreshToken ||
           newUser != session.user,
+      update: true,
     );
     if (generation != _generation) {
       return;
@@ -2896,6 +2920,7 @@ class FirebaseUserAuth implements AuthTokenProvider {
     await _setSession(
       refreshed,
       persist: refreshed.refreshToken != session.refreshToken,
+      update: true,
     );
     if (generation != _generation) {
       return null;
@@ -2918,11 +2943,21 @@ class FirebaseUserAuth implements AuthTokenProvider {
   /// changes in memory first, like `directlySetCurrentUser` of the JS SDK: the backend may already have replaced
   /// the refresh token, so the old session is not kept for a failed write. The error of the write is rethrown and
   /// the next session change (a token refresh, a reload, a sign-in) writes again.
-  Future<void> _setSession(_Session session, {required bool persist}) async {
+  ///
+  /// An [update] of the signed-in user's session is not written when another tab replaced the
+  /// stored session (see [_replacedElsewhere]).
+  Future<void> _setSession(
+    _Session session, {
+    required bool persist,
+    bool update = false,
+  }) async {
     _session = session;
     _sessionOfUser[session.user] = (apiKey, session);
     try {
       if (persist || _unsaved) {
+        if (update && !_unsaved && await _replacedElsewhere(session)) {
+          return;
+        }
         _unsaved = true;
         await _storage.write(
           _storageKey,
@@ -2957,6 +2992,171 @@ class FirebaseUserAuth implements AuthTokenProvider {
       _notifyAuthState();
       await _letListenersReact();
     }
+  }
+
+  /// Follows the changes other tabs make to the session in [_storage] when it reports them
+  /// ([ObservableAuthStorage]), and stops following the storage used before.
+  void _followStorage() {
+    final StreamSubscription<void>? previous = _storageChanges;
+    _storageChanges = null;
+    if (previous != null) {
+      unawaited(previous.cancel());
+    }
+    final AuthStorage storage = _storage;
+    if (storage is! ObservableAuthStorage || _disposed) {
+      return;
+    }
+    try {
+      _storageChanges = storage
+          .changes(_storageKey)
+          .listen(
+            (_) => _onStoredSessionChanged(),
+            onError: (Object error) => _logFollowError('report', error),
+          );
+    } on Object catch (e) {
+      _logFollowError('watch', e);
+    }
+  }
+
+  /// The type of [error] only: an error of a storage may quote what it read.
+  static void _logFollowError(String step, Object error) => Log.w(
+    'FirebaseUserAuth',
+    'The storage failed to $step a change of the session made in another tab: ${error.runtimeType}',
+  );
+
+  void _onStoredSessionChanged() {
+    if (_following != null) {
+      _followAgain = true;
+      return;
+    }
+    _following = _followStoredSession().whenComplete(() => _following = null);
+  }
+
+  Future<void> _followStoredSession() async {
+    do {
+      _followAgain = false;
+      try {
+        await _adoptStoredSession();
+      } on Object catch (e) {
+        _logFollowError('read', e);
+      }
+    } while (_followAgain && !_disposed);
+  }
+
+  /// Reads the session another tab stored and takes it over (the JS SDK's `_onStorageEvent`), after
+  /// a [restore] in progress. A value this class did not write is ignored, as by [restore].
+  Future<void> _adoptStoredSession() async {
+    await _restoring?.then<void>((_) {}, onError: (Object _) {});
+    final AuthStorage storage = _storage;
+    if (_disposed) {
+      return;
+    }
+    final String? stored = await storage.read(_storageKey);
+    if (_disposed || !identical(storage, _storage)) {
+      return;
+    }
+    final _Session? current = _session;
+    if (current != null &&
+        stored == encodeSession(current.user, current.refreshToken)) {
+      // The storage holds this instance's own session.
+      _unsaved = false;
+      return;
+    }
+    final _Stored read = _Stored.of(stored);
+    if (!read.foreign) {
+      _applyStoredSession(read.session);
+    }
+  }
+
+  /// Makes the session another tab stored the current one, without writing it back: signed out for
+  /// null, the tokens and data of the same user, or another user. The stored state is the newest,
+  /// so a session whose write failed here ([_unsaved]) is not written again.
+  void _applyStoredSession(({AuthUser user, String refreshToken})? stored) {
+    _unsaved = false;
+    final _Session? current = _session;
+    if (stored == null) {
+      if (current != null) {
+        _signOutFromStorage();
+      }
+      return;
+    }
+    if (current != null && current.user.uid == stored.user.uid) {
+      // The ID token stays: it belongs to the same user and is valid until it expires. The next
+      // refresh uses the stored refresh token.
+      final _Session session = _Session(
+        stored.user,
+        stored.refreshToken,
+        current.idToken,
+        current.expiry,
+      );
+      _session = session;
+      _sessionOfUser[session.user] = (apiKey, session);
+      if (stored.user != current.user && !_userChanges.isClosed) {
+        _userChanges.add(stored.user);
+      }
+      return;
+    }
+    _switchToStoredUser(stored.user, stored.refreshToken);
+  }
+
+  void _signOutFromStorage() {
+    _generation++;
+    _session = null;
+    _cancelProactiveRefresh();
+    if (!_userChanges.isClosed) {
+      _userChanges.add(null);
+    }
+    _emitToken('');
+    _notifyAuthState();
+  }
+
+  /// Like [restore], for a user signed in by another tab; the ID token comes with the first
+  /// refresh, so the token listeners get an empty token first, as after [updateCurrentUser] with a
+  /// restored user.
+  void _switchToStoredUser(AuthUser user, String refreshToken) {
+    _generation++;
+    final _Session session = _Session(user, refreshToken, null, null);
+    _session = session;
+    _sessionOfUser[user] = (apiKey, session);
+    _refreshFailures = 0;
+    _cancelProactiveRefresh();
+    if (_tokenChanges.hasListener) {
+      _scheduleProactiveRefresh();
+    }
+    if (!_userChanges.isClosed) {
+      _userChanges.add(user);
+    }
+    _emitToken('');
+    _notifyAuthState();
+  }
+
+  /// Before an update of [session] is stored in a storage that other tabs share: whether the stored
+  /// session is no longer this user's because another tab signed out or signed in another user.
+  /// That state is taken over then, instead of being written over. A storage that cannot be read,
+  /// or holds a value this class did not write, does not stop the write.
+  Future<bool> _replacedElsewhere(_Session session) async {
+    final AuthStorage storage = _storage;
+    if (storage is! ObservableAuthStorage) {
+      return false;
+    }
+    final String? stored;
+    try {
+      stored = await storage.read(_storageKey);
+    } on Object {
+      // The write that follows reports the failure of the storage.
+      return false;
+    }
+    if (_disposed ||
+        !identical(storage, _storage) ||
+        !identical(session, _session)) {
+      return false;
+    }
+    final _Stored read = _Stored.of(stored);
+    if (read.foreign || read.session?.user.uid == session.user.uid) {
+      return false;
+    }
+    _applyStoredSession(read.session);
+    return true;
   }
 
   /// Tells the token listeners (Firestore) and [idTokenChanges] about a new ID token of the current session, or an
@@ -3141,6 +3341,25 @@ class _Session {
   /// Null after [FirebaseUserAuth.restore], until the first refresh.
   final String? idToken;
   final DateTime? expiry;
+}
+
+/// A value read from the storage: the [session] in it (null for none), or [foreign] when this class
+/// did not write it.
+class _Stored {
+  _Stored(this.session, {required this.foreign});
+
+  factory _Stored.of(String? stored) {
+    if (stored == null) {
+      return _Stored(null, foreign: false);
+    }
+    final ({AuthUser user, String refreshToken})? session = decodeSession(
+      stored,
+    );
+    return _Stored(session, foreign: session == null);
+  }
+
+  final ({AuthUser user, String refreshToken})? session;
+  final bool foreign;
 }
 
 /// The error of the account read after a change of the account: [FirebaseUserAuth]'s `_forUser` rethrows it
