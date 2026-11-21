@@ -515,6 +515,11 @@ class FirebaseUserAuth implements AuthTokenProvider {
   @override
   String? get uid => _session?.user.uid;
 
+  /// The refresh token of the signed-in user's session, or null when signed out. It changes when the server
+  /// rotates it, and outlives the ID tokens it mints: treat it as a credential and never log it. Unlike the JS SDK,
+  /// it is not a field of [AuthUser], so a user that is printed or serialized never carries it.
+  String? get refreshToken => _session?.refreshToken;
+
   /// Emits the user after every sign-in and sign-out (null when signed out), and after a change of the data of the
   /// signed-in user ([updateProfile], [updateEmail], [reload], ...). It does not emit the current user when it is
   /// listened to: read [currentUser] for that.

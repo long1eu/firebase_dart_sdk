@@ -95,7 +95,7 @@ Path shorthand:
 | User.tenantId | `AuthUser.tenantId` | convert.dart | same | auth_user.dart |
 | User.metadata | `UserMetadata` with `DateTime` | converted to millis (convert.dart) | different | JS `creationTime`/`lastSignInTime` are strings; auth_user.dart |
 | User.providerData / UserInfo | `List<UserInfo>` | passed through | same | auth_user.dart |
-| User.refreshToken | none public; `getAccessToken` only | — | missing | firebase_user_auth.dart |
+| User.refreshToken | `FirebaseUserAuth.refreshToken` (the session's, null when signed out), not on `AuthUser` | `User.refreshToken` while that user is signed in, else null (user.dart) | different | JS has it on `User`, and `user.toJSON()` includes it; here a printed or serialized `AuthUser` never carries it. FlutterFire's `User.toString()` prints it. firebase_user_auth.dart |
 | User.providerId (`'firebase'`) | `AuthUser.providerId` auth_user.dart | — | same | A getter that returns `'firebase'`. |
 | updateProfile({displayName, photoURL}) | `updateProfile({displayName, photoUrl})` on the client | user.dart | different | `''` removes, null keeps; firebase_user_auth.dart |
 | updateEmail | `updateEmail` on the client | user.dart | same | firebase_user_auth.dart |
@@ -319,7 +319,7 @@ Effort: S takes hours, M a few days, L more than a week or needs outside pieces.
 | 5 | closed | `toJson`/`fromJson` for `EmailAuthCredential` and `OAuthCredential`, plus `OAuthProvider.credentialFromJson` | S | no | no | med | Keeps a pending credential across the `account-exists-with-different-credential` flow. Uses the JS JSON format. |
 | 6 | closed | `revokeAccessToken(token)` (ACCESS_TOKEN, `tenantId`) in the client, and both revoke methods in the shim | S | no | no | med | The endpoint call already exists. Apple's account-deletion rule makes it matter on iOS and macOS. |
 | 7 | partly closed: `emulatorConfig` and `disableWarnings` done; no `emulator-config-failed` or `invalid-emulator-scheme` code, by design | Emulator parity: an `emulator-config-failed` guard, an `invalid-emulator-scheme` code, a parsed `emulatorConfig`, and `disableWarnings` | S | no | no | med | Today a late emulator setting silently mixes origins, and a bad host throws `ArgumentError`. |
-| 8 | partly closed: `refreshToken` left; `UserCredential.providerId` not added, by design (see the user table) | `User.providerId`, `User.refreshToken` and `User.toJson`; `UserCredential.operationType` and `providerId` | S | no | no | med | Plain fields that JS exposes. |
+| 8 | closed; `UserCredential.providerId` not added, by design (see the user table) | `User.providerId`, `User.refreshToken` and `User.toJson`; `UserCredential.operationType` and `providerId` | S | no | no | med | Plain fields that JS exposes. |
 | 9 | closed (as `setStorage(AuthStorage)`) | `setPersistence` and a `Persistence` enum in the client, using the shim's `SwitchableStorage` | S | no | no | med | The shim already has this logic. Without it, apps that don't use the shim pick storage only at construction. |
 | 10 | closed (`validatePassword` as `FirebaseAuthDart.validatePassword`) | Shim passthroughs: `validatePassword`, and keeping `serverCode` and `httpStatus` in `exceptionOf` | S | no | no | med | The client has them; the shim drops them. |
 | 11 | closed (`serverResponse`) | Keep the raw server response on tagged errors (JS `_tokenResponse`) | S | no | no | low-med | Helps handle linking and debugging. |
