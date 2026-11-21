@@ -11,7 +11,7 @@ You need it for a Flutter app on Linux desktop, where `firebase_storage` and `fi
 of their own: add it to `pubspec.yaml` and it registers itself. On other platforms it is an opt-in. It is not
 affiliated with or endorsed by Google or Firebase.
 
-> **Status: 0.1.0, unreleased.** Unit-tested with `flutter test` through the classes of `firebase_storage` 14.1.0
+> **Status: 0.1.2.** Unit-tested with `flutter test` through the classes of `firebase_storage` 14.1.0
 > (`firebase_storage_platform_interface` 6.1.0), against a fake backend. The client underneath is tested against the
 > Storage emulator in its own package. This package has not yet run in a Linux desktop build, against the emulator,
 > or against a production project.
@@ -62,11 +62,38 @@ Without it, requests carry no user, which is enough for the emulator and for ope
 package already set up the app (it keeps a `firebase_app_dart` app per FlutterFire app), Storage uses that app and its
 token provider, and `tokenProviderFor` is not called.
 
+### App Check
+
+With the official [`firebase_app_check`](https://pub.dev/packages/firebase_app_check), requests carry its token in
+the `X-Firebase-AppCheck` header once you pass `appCheckProviderFor`. The provider is the `FlutterFireAppCheckProvider`
+of [`cloud_firestore_dart_flutterfire`](https://pub.dev/packages/cloud_firestore_dart_flutterfire), the same one the
+Firestore bridge takes; neither package depends on `firebase_app_check`, so an app without App Check does not get
+the plugin and its native SDKs.
+
+```dart
+FirebaseStorageDart.use(
+  appCheckProviderFor: (FirebaseApp app) {
+    final FirebaseAppCheck appCheck = FirebaseAppCheck.instanceFor(app: app);
+    return FlutterFireAppCheckProvider(
+      getToken: appCheck.getToken,
+      onTokenChange: appCheck.onTokenChange,
+    );
+  },
+);
+```
+
+Activate App Check (`FirebaseAppCheck.instance.activate(...)`) as usual. Without `appCheckProviderFor`, or when it
+returns null, requests have no App Check header. A token that cannot be had (App Check throws or returns none) fails
+nothing: the request goes without the header and the backend decides, as with the App Check SDKs. A
+`firebase_app_dart` app set up by the Firestore platform package keeps its token provider and gets this App Check
+provider when it has none.
+
 ### Options of `use`
 
 | Argument | Default | What it does |
 | --- | --- | --- |
 | `tokenProviderFor` | none: no user | Returns the token provider of a FlutterFire app; called once per app. |
+| `appCheckProviderFor` | none: no App Check header | Returns the App Check token provider of a FlutterFire app (above); called once per app. |
 | `httpClient` | one for all instances | The `http.Client` of the requests (tests, proxies). |
 | `useDartCore` | Linux only, when `firebase_core` has no other implementation | Installs a small pure-Dart `firebase_core`. Pass `true` to force it (tests), `false` to never do it. |
 
@@ -118,8 +145,8 @@ its `FirebaseStorageException`s.
 - **`setMax*RetryTime`** applies to the operations started afterwards.
 - **Error details**: the official exception has no HTTP status or response body; `clientFor` gives the client's
   exceptions, which have both.
-- **App Check** tokens are not sent: the client supports them, but this package has no `firebase_app_check`
-  implementation to take them from.
+- **App Check** is opt-in: pass `appCheckProviderFor` (see "App Check" above). The official plugin picks up
+  `firebase_app_check` by itself.
 - **`updateMetadata`** cannot remove a field: a null field means "leave it", and the official API has no other way to
   say "remove it". `clientFor(app).ref(path).updateMetadata` with `SettableMetadata.delete` can.
 - **Tasks** are not resumed after the app restarts, as on the web.

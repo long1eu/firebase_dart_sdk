@@ -4,10 +4,12 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
+import 'package:firebase_app_dart/firebase_app_dart.dart' as dart_app;
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:firebase_storage_dart/firebase_storage_dart.dart' as fs;
 import 'package:firebase_storage_dart_platform/firebase_storage_dart_platform.dart';
+import 'package:firebase_storage_dart_platform/src/app.dart' show dartOptionsOf;
 import 'package:firebase_storage_dart_platform/src/reference.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
@@ -83,6 +85,120 @@ void main() {
         backend.requests.single.headers.containsKey('Authorization'),
         isFalse,
       );
+    });
+  });
+
+  group('App Check', () {
+    String? appCheckHeader(http.Request request) =>
+        request.headers['X-Firebase-AppCheck'];
+
+    test('a token of firebase_app_check goes in X-Firebase-AppCheck', () async {
+      final FirebaseApp app = await newApp();
+      final FakeAppCheck appCheck = appChecks[app.name] = FakeAppCheck()
+        ..token = 'app-check-1';
+      backend.put(bucket, 'a', <int>[1]);
+      await FirebaseStorage.instanceFor(app: app).ref('a').getMetadata();
+      expect(appCheckHeader(backend.requests.single), 'app-check-1');
+      expect(appCheck.calls, <bool>[false]);
+    });
+
+    test('without App Check the requests have no header', () async {
+      final FirebaseApp app = await newApp();
+      backend.put(bucket, 'a', <int>[1]);
+      await FirebaseStorage.instanceFor(app: app).ref('a').getMetadata();
+      expect(appCheckHeader(backend.requests.single), isNull);
+      expect(FirebaseStorageDart.clientFor(app).app.appCheckProvider, isNull);
+    });
+
+    test('no token or a failing App Check fails nothing: no header', () async {
+      final FirebaseApp app = await newApp();
+      final FakeAppCheck appCheck = appChecks[app.name] = FakeAppCheck();
+      backend.put(bucket, 'a', <int>[1]);
+      final Reference ref = FirebaseStorage.instanceFor(app: app).ref('a');
+
+      await ref.getMetadata();
+      appCheck.error = FirebaseException(
+        plugin: 'firebase_app_check',
+        code: 'unknown',
+        message: 'attestation failed',
+      );
+      await ref.getMetadata();
+
+      expect(backend.requests, hasLength(2));
+      expect(backend.requests.map(appCheckHeader), <String?>[null, null]);
+      expect(appCheck.calls, hasLength(2));
+    });
+
+    test('forceRefresh reaches firebase_app_check', () async {
+      final FirebaseApp app = await newApp();
+      final FakeAppCheck appCheck = appChecks[app.name] = FakeAppCheck()
+        ..token = 'fresh';
+      final dart_app.AppCheckTokenProvider provider =
+          FirebaseStorageDart.clientFor(app).app.appCheckProvider!;
+
+      final dart_app.AppCheckTokenResult result = await provider.getToken(
+        forceRefresh: true,
+      );
+      await provider.getToken(forceRefresh: false);
+
+      expect(result.token, 'fresh');
+      expect(appCheck.calls, <bool>[true, false]);
+    });
+
+    test(
+      'a token change is seen by the provider and by the next request',
+      () async {
+        final FirebaseApp app = await newApp();
+        final FakeAppCheck appCheck = appChecks[app.name] = FakeAppCheck()
+          ..token = 'first';
+        backend.put(bucket, 'a', <int>[1]);
+        final Reference ref = FirebaseStorage.instanceFor(app: app).ref('a');
+        await ref.getMetadata();
+        final Future<dart_app.AppCheckTokenResult> changed =
+            FirebaseStorageDart.clientFor(
+              app,
+            ).app.appCheckProvider!.onTokenChanged.first;
+
+        appCheck.change('second');
+
+        expect((await changed).token, 'second');
+        await ref.getMetadata();
+        expect(backend.requests.map(appCheckHeader), <String?>[
+          'first',
+          'second',
+        ]);
+      },
+    );
+
+    test('an existing firebase_app_dart app without App Check gets it, one '
+        'with App Check keeps its own', () async {
+      final FirebaseApp app = await newApp();
+      final FirebaseApp other = await newApp();
+      appChecks[app.name] = FakeAppCheck()..token = 'from-flutterfire';
+      appChecks[other.name] = FakeAppCheck()..token = 'from-flutterfire';
+      final dart_app.FirebaseApp bare = dart_app.FirebaseApp.withOptions(
+        dartOptionsOf(app.options),
+        name: app.name,
+      );
+      final _FixedAppCheck own = _FixedAppCheck('own');
+      dart_app.FirebaseApp.withOptions(
+        dartOptionsOf(other.options),
+        name: other.name,
+      ).appCheckProvider = own;
+      backend.put(bucket, 'a', <int>[1]);
+
+      await FirebaseStorage.instanceFor(app: app).ref('a').getMetadata();
+      await FirebaseStorage.instanceFor(app: other).ref('a').getMetadata();
+
+      expect(bare.appCheckProvider, isNotNull);
+      expect(
+        FirebaseStorageDart.clientFor(other).app.appCheckProvider,
+        same(own),
+      );
+      expect(backend.requests.map(appCheckHeader), <String?>[
+        'from-flutterfire',
+        'own',
+      ]);
     });
   });
 
@@ -407,4 +523,20 @@ void main() {
       );
     });
   });
+}
+
+/// An App Check provider of a `firebase_app_dart` app set up elsewhere.
+class _FixedAppCheck extends dart_app.AppCheckTokenProvider {
+  _FixedAppCheck(this.token);
+
+  final String token;
+
+  @override
+  Future<dart_app.AppCheckTokenResult> getToken({
+    required bool forceRefresh,
+  }) async => dart_app.AppCheckTokenResult(token);
+
+  @override
+  Stream<dart_app.AppCheckTokenResult> get onTokenChanged =>
+      const Stream<dart_app.AppCheckTokenResult>.empty();
 }
