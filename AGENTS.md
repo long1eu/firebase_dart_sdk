@@ -17,7 +17,8 @@ Maintained, tested and published (`cloud_firestore_dart` 0.3.2, Dart `^3.8.0`):
 | `cloud_firestore_dart_flutterfire` (0.1.2, Flutter) | `cloud_firestore/cloud_firestore_dart_flutterfire` |
 | `cloud_firestore_dart_platform` (0.1.2, Flutter) | `cloud_firestore/cloud_firestore_dart_platform` |
 | `firebase_auth_dart_platform` (0.1.0, Flutter, unreleased) | `firebase_auth/firebase_auth_dart_platform` |
-| `firebase_storage_dart` (0.1.0, unreleased) | `firebase_storage/firebase_storage_dart` |
+| `firebase_storage_dart` (0.1.0) | `firebase_storage/firebase_storage_dart` |
+| `firebase_storage_dart_platform` (0.1.0, Flutter) | `firebase_storage/firebase_storage_dart_platform` |
 | `firebase_admin_dart` (0.1.0; trusted code only, never ship a service account key) | `firebase_admin/firebase_admin_dart` |
 
 - `examples/`: complete example packages (`server_shelf`, `cli`, `storage_cli`, `cloud_run_job`).
