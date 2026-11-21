@@ -34,6 +34,9 @@ class _Pipe {
       onDone: _onDone,
       onError: (Object _) => _onFailure(),
     );
+    // A write to a peer that reset the connection (a client that aborts its request on pause) fails on
+    // `done`; without a handler that error would be unhandled.
+    _sink.done.then((_) {}, onError: (Object _) => _onFailure());
   }
 
   static const int _highWater = 1024 * 1024;
