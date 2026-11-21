@@ -206,10 +206,24 @@ final class UploadTask {
     metadata: _uploaded,
   );
 
-  /// The progress of the upload: the current [snapshot] when you listen, then one event after each chunk and
-  /// on each change of state ([UploadState.paused], back to [UploadState.running], and the final one). The
+  /// The progress of the upload: the current [snapshot] when you listen, then events while data is sent (on
+  /// the VM at most one per 64 KiB and 100 ms, plus one per confirmed chunk; on the web one per chunk) and on
+  /// each change of state ([UploadState.paused], back to [UploadState.running], and the final one). The
   /// stream closes after the final event; errors are not sent on it but in [result]. It can be listened to
-  /// any number of times.
+  /// any number of times, and earlier events are not replayed.
+  ///
+  /// The stream can close before an event you wait for arrives: an upload can finish before a pause takes
+  /// effect, and then no [UploadState.paused] event comes. `progress.firstWhere(...)` then throws a
+  /// [StateError] ("No element"). Check what [pause] returns, or wait with an `orElse`:
+  ///
+  /// ```dart
+  /// if (task.pause()) {
+  ///   final UploadProgress paused = await task.progress.firstWhere(
+  ///     (UploadProgress p) => p.state == UploadState.paused,
+  ///     orElse: () => task.snapshot, // finished or failed meanwhile
+  ///   );
+  /// }
+  /// ```
   Stream<UploadProgress> get progress => Stream<UploadProgress>.multi((
     MultiStreamController<UploadProgress> controller,
   ) {
@@ -235,7 +249,9 @@ final class UploadTask {
   /// session until it expires (a week on Google's servers), so store it like a credential.
   Uri? get sessionUri => _sessionUrl;
 
-  /// Pauses a running task: the request in flight is aborted. Returns false when the task is not running.
+  /// Pauses a running task: the request in flight is aborted. Returns false when the task is not running,
+  /// for example when it already finished, as `UploadTask.pause` of the JS SDK does. After true, the paused
+  /// event follows on [progress] unless the task ends first (see [progress]).
   bool pause() {
     if (_phase != _Phase.running) {
       return false;
