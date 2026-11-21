@@ -555,7 +555,7 @@ jobs:
   # tool/start_storage_emulator.sh starts on 9299 with an open bucket and one whose rules need a
   # signed-in user. The rules runtime JAR is fetched by `firebase setup:emulators:storage` (the
   # emulators action caches ~/.cache/firebase/emulators, so it is downloaded once per CLI
-  # version). A skipped test means STORAGE_EMULATOR_HOST did not reach it: the step fails then.
+  # version). A skipped test means FIREBASE_STORAGE_EMULATOR_HOST did not reach it: the step fails then.
   # Starts at once, in parallel with the other emulator suites, so it adds no time to a run.
   storage:
     name: Storage emulator integration tests
@@ -582,13 +582,13 @@ jobs:
       - name: Run the emulator tests of firebase_storage_dart
         working-directory: firebase_storage/firebase_storage_dart
         env:
-          STORAGE_EMULATOR_HOST: 127.0.0.1:9299
+          FIREBASE_STORAGE_EMULATOR_HOST: 127.0.0.1:9299
         run: |
           set -o pipefail
           dart pub get
           dart test --reporter expanded test/integration 2>&1 | tee "$EMULATOR_DIR/storage_integration.log"
           if grep -Eq ' ~[0-9]+' "$EMULATOR_DIR/storage_integration.log"; then
-            echo "::error::The Storage emulator tests skipped: STORAGE_EMULATOR_HOST did not reach them."
+            echo "::error::The Storage emulator tests skipped: FIREBASE_STORAGE_EMULATOR_HOST did not reach them."
             exit 1
           fi
       - name: Stop the Storage emulator
