@@ -1,4 +1,5 @@
-// The libraries without dart:io compile with dart2js and with dart2wasm (neither accepts dart:io or dart:ffi).
+// The libraries for the web compile with dart2js and with dart2wasm. A compile does not prove the absence of
+// dart:io (both compilers accept the import); web_imports_test.dart checks that.
 
 @TestOn('vm')
 library;

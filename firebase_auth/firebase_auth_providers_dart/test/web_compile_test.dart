@@ -1,4 +1,5 @@
-// The main library is web-compatible: it compiles with dart2js and with dart2wasm (neither accepts dart:io).
+// The main library compiles with dart2js and with dart2wasm. A compile does not prove the absence of dart:io
+// (both compilers accept the import); web_imports_test.dart checks that.
 
 @TestOn('vm')
 library;
