@@ -11,10 +11,10 @@ Firebase.
 `FirebaseUserAuth` uses it only when the app passes it. It needs Flutter; a command line tool or a server keeps
 `FileAuthStorage`.
 
-> **Status: 0.1.0, unreleased.** Unit-tested with `flutter test` against a fake of the plugin's method channel. It
-> has not yet run against a real Keychain, Keystore, Secret Service or DPAPI. The integration tests of `example/` are
-> for the real macOS data-protection keychain; a signed macOS job runs them on main after the owner's approval, and
-> its first run is still to come (see [Signed integration tests](#signed-integration-tests)).
+> **Status: 0.1.0, unreleased.** Unit-tested with `flutter test` against a fake of the plugin's method channel. On
+> macOS, the six integration tests of `example/` pass against the real data-protection keychain in a Developer ID
+> signed build on a GitHub-hosted runner (see [Signed integration tests](#signed-integration-tests)). It has not yet
+> run in CI against the iOS Keychain, the Android Keystore, a Secret Service or DPAPI.
 
 ## How to use it
 
@@ -225,8 +225,8 @@ entitlement fails there with `errSecMissingEntitlement`), a round trip, two name
 move from a `FileAuthStorage` (the file's session moves and the file is deleted; a session already in the keychain wins, and a
 sign-out deletes both), and a last check that no entry written by the run is left in the keychain.
 
-The workflow `.github/workflows/secure_storage_signed_macos.yml` runs them on a GitHub-hosted macOS runner (its first
-run is still to come), on a push to main that touches this package (`example/` included) or the workflow, and by
+The workflow `.github/workflows/secure_storage_signed_macos.yml` runs them on a GitHub-hosted macOS runner (all six
+passed on its first run), on a push to main that touches this package (`example/` included) or the workflow, and by
 hand. Never on a pull request. Its job uses the `signing` environment, which only accepts main and waits for the owner's approval. It has no secrets
 and no notarization credentials, and it uploads nothing: no artifact, no build output, no keychain.
 
