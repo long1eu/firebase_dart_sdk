@@ -954,7 +954,7 @@ class FirebaseUserAuth implements AuthTokenProvider {
       tenant: true,
     );
     if (response['email'] != _session?.user.email) {
-      await _reload(generation);
+      await _reloadAfterChange(generation);
     }
   });
 
@@ -978,7 +978,7 @@ class FirebaseUserAuth implements AuthTokenProvider {
       tenant: true,
     );
     if (response['email'] != _session?.user.email) {
-      await _reload(generation);
+      await _reloadAfterChange(generation);
     }
   });
 
@@ -1361,7 +1361,7 @@ class FirebaseUserAuth implements AuthTokenProvider {
       throw _overtaken;
     }
     await _updateSession(response, generation);
-    await _reload(generation);
+    await _reloadAfterChange(generation);
     return _result(response, _session?.user ?? user, OperationType.link);
   });
 
@@ -1557,7 +1557,7 @@ class FirebaseUserAuth implements AuthTokenProvider {
           tenantId: tenantId,
         );
     await _updateSession(response, generation);
-    await _reload(generation);
+    await _reloadAfterChange(generation);
   });
 
   /// Removes the second factor [uid] (a [MultiFactorInfo.uid] of [AuthUser.enrolledFactors]) from the account of the
@@ -1576,7 +1576,7 @@ class FirebaseUserAuth implements AuthTokenProvider {
           tenantId: tenantId,
         );
         await _updateSession(response, generation);
-        await _reload(generation);
+        await _reloadAfterChange(generation);
       });
 
   /// The request that signs in with [credential] (`_getIdTokenResponse` of the JS SDK's credentials), links it to
@@ -1782,6 +1782,8 @@ class FirebaseUserAuth implements AuthTokenProvider {
     final String idToken = await _idTokenOf(generation);
     try {
       return await operation(idToken, generation);
+    } on _ChangeDone catch (done, stackTrace) {
+      Error.throwWithStackTrace(done.error, stackTrace);
     } on FirebaseAuthException catch (e) {
       if (e.httpStatus != 400 ||
           generation != _generation ||
@@ -1849,7 +1851,7 @@ class FirebaseUserAuth implements AuthTokenProvider {
           },
         );
         await _updateSession(response, generation);
-        await _reload(generation);
+        await _reloadAfterChange(generation);
       });
 
   /// Takes the tokens of [response] (when it has them) and [user] (when given) into the session of [generation],
@@ -1897,6 +1899,41 @@ class FirebaseUserAuth implements AuthTokenProvider {
   }
 
   /// Reads the account of the signed-in user (`accounts:lookup`) and takes it into the session of [generation].
+  /// [_reload] after a request of [_forUser]'s operation changed the account (the backend may have revoked the
+  /// ID token it was sent with, like `_updateTokensIfNecessary` and `reload` after `withdrawMfa` in the JS SDK's
+  /// `MultiFactorUser.unenroll`). A rejected token is refreshed and the account read once more here; whatever
+  /// fails then is thrown as a [_ChangeDone], so that [_forUser] rethrows it instead of sending the change again.
+  Future<void> _reloadAfterChange(int generation) async {
+    try {
+      await _reload(generation);
+    } on FirebaseAuthException catch (e) {
+      final String? rejected = _session?.idToken;
+      final bool tokenRejected =
+          e.httpStatus == 400 &&
+          (e.code == 'user-token-expired' || e.code == 'invalid-user-token');
+      if (e.httpStatus == 400 &&
+          e.code == 'user-disabled' &&
+          generation == _generation) {
+        await _clearSession();
+      }
+      if (!tokenRejected || rejected == null || generation != _generation) {
+        throw _ChangeDone(e);
+      }
+      final String? refreshed = await _refreshAfterRejection(
+        rejected,
+        generation,
+      );
+      if (refreshed == null) {
+        throw _ChangeDone(e);
+      }
+      try {
+        await _reload(generation);
+      } on FirebaseAuthException catch (again) {
+        throw _ChangeDone(again);
+      }
+    }
+  }
+
   Future<void> _reload(int generation) async {
     if (_session == null || generation != _generation) {
       return;
@@ -2576,4 +2613,12 @@ class _Session {
   /// Null after [FirebaseUserAuth.restore], until the first refresh.
   final String? idToken;
   final DateTime? expiry;
+}
+
+/// The error of the account read after a change of the account: [FirebaseUserAuth]'s `_forUser` rethrows it
+/// without sending the change again.
+class _ChangeDone implements Exception {
+  _ChangeDone(this.error);
+
+  final FirebaseAuthException error;
 }

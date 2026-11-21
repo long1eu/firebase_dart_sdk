@@ -606,6 +606,64 @@ void main() {
       expect(auth.uid, uid);
     });
 
+    int withdraws() => backend.methods
+        .where((String m) => m == 'mfaEnrollment:withdraw')
+        .length;
+
+    /// The backend answers the withdraw without tokens and rejects the ID
+    /// token the withdraw was sent with, as when it revokes the session.
+    void withdrawWithoutTokens() {
+      final Set<String> rejected = <String>{};
+      backend
+        ..on('mfaEnrollment:withdraw', (Map<String, Object?> body) {
+          final http.Response answer =
+              server.platform.handlers['mfaEnrollment:withdraw']!(body);
+          if (answer.statusCode != 200) {
+            return answer;
+          }
+          rejected.add(body['idToken']! as String);
+          return jsonResponse(<String, Object?>{});
+        })
+        ..on('accounts:lookup', (Map<String, Object?> body) {
+          if (rejected.contains(body['idToken'])) {
+            return errorResponse('TOKEN_EXPIRED');
+          }
+          final String user =
+              GetTokenResult(body['idToken']! as String).claims['sub']!
+                  as String;
+          return jsonResponse(<String, Object?>{
+            'users': <Object?>[
+              <String, Object?>{'localId': user, ...?backend.accounts[user]},
+            ],
+          });
+        });
+    }
+
+    test('a withdraw that ends the session removes the factor once and signs '
+        'the user out', () async {
+      withdrawWithoutTokens();
+      backend.on(
+        'token',
+        (Map<String, Object?> body) => errorResponse('TOKEN_EXPIRED'),
+      );
+      await expectLater(
+        auth.unenrollMultiFactor('totp-1'),
+        throwsAuth('user-token-expired'),
+      );
+      expect(withdraws(), 1);
+      expect(server.factorsOf(uid), isEmpty);
+      expect(auth.currentUser, isNull);
+    });
+
+    test('a withdraw without new tokens keeps a session whose refresh token '
+        'still works, and is sent once', () async {
+      withdrawWithoutTokens();
+      await auth.unenrollMultiFactor('totp-1');
+      expect(withdraws(), 1);
+      expect(server.factorsOf(uid), isEmpty);
+      expect(auth.currentUser!.enrolledFactors, isEmpty);
+    });
+
     test('an unknown factor is multi-factor-info-not-found', () async {
       await expectLater(
         auth.unenrollMultiFactor('nope'),
