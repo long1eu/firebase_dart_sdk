@@ -292,6 +292,17 @@ void main() {
       await s2.cancel();
     });
 
+    test('User.refreshToken: the session token while that user is signed '
+        'in', () async {
+      final FirebaseAuth auth = await newAuth();
+      final UserCredential result = await auth.signInAnonymously();
+      final User kept = result.user!;
+      expect(kept.refreshToken, 'refresh:anon-user');
+      expect(auth.currentUser!.refreshToken, 'refresh:anon-user');
+      await auth.signOut();
+      expect(kept.refreshToken, isNull);
+    });
+
     test('userChanges: one event per sign-in, refresh, profile change and '
         'sign-out', () async {
       final FirebaseAuth auth = await newAuth();

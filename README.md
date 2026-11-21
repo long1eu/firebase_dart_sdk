@@ -12,7 +12,7 @@ endorsed by Google or Firebase.
 1. **You build a Flutter app for Linux desktop.** FlutterFire has no Linux implementation and says it is not
    on its roadmap. Add `cloud_firestore_dart_platform` and keep the official `cloud_firestore` API. Caveat:
    one app was built and run on Debian 13 x86_64, a debug build against the emulator only. For sign-in on
-   Linux add `firebase_auth_dart_platform` (0.1.0) and keep the official `firebase_auth` API.
+   Linux add `firebase_auth_dart_platform` (0.1.1) and keep the official `firebase_auth` API.
 2. **You write a Dart server, worker or CLI that needs listeners, an offline cache, or to act as a signed-in
    Firebase user under security rules.** The official Dart Admin SDK has no listeners and always bypasses
    rules. Caveat: it has draft PRs for listeners since 2026-11-09, so that part of the gap may close.
@@ -82,12 +82,12 @@ from 0.1? The 0.2 API took FlutterFire's names: [what changed](docs/api_migratio
 |---|---|---|
 | [`cloud_firestore_dart`](cloud_firestore/cloud_firestore_dart/) | 0.3.2 | Any Dart program, server or Flutter app that calls Firestore through this client |
 | [`firebase_app_dart`](firebase_core/firebase_app_dart/) | 0.2.1 | Every user of `cloud_firestore_dart`: the `FirebaseApp` and its options |
-| [`firebase_auth_providers_dart`](firebase_auth/firebase_auth_providers_dart/) | 0.3.1 | Apps with signed-in users, and servers with a service account or Application Default Credentials |
+| [`firebase_auth_providers_dart`](firebase_auth/firebase_auth_providers_dart/) | 0.3.2 | Apps with signed-in users, and servers with a service account or Application Default Credentials |
 | [`secure_flow`](secure_flow/secure_flow/) | 0.1.0 | Desktop apps and command line tools with a browser step (OAuth sign-in, reCAPTCHA, a typed code); used by `firebase_auth_providers_dart` |
 | [`cloud_firestore_dart_sqlite`](cloud_firestore/cloud_firestore_dart_sqlite/) | 0.1.3 | Anyone who wants the offline cache on disk instead of in memory |
 | [`cloud_firestore_dart_platform`](cloud_firestore/cloud_firestore_dart_platform/) | 0.1.2 | Flutter apps written against the official `cloud_firestore` API, on Linux or by choice elsewhere |
 | [`cloud_firestore_dart_flutterfire`](cloud_firestore/cloud_firestore_dart_flutterfire/) | 0.1.2 | Flutter apps that sign in with `firebase_auth` and want `cloud_firestore_dart` to use that user |
-| [`firebase_auth_dart_platform`](firebase_auth/firebase_auth_dart_platform/) | 0.1.0 | Flutter apps written against the official `firebase_auth` API, on Linux or by choice elsewhere; needs `firebase_auth_providers_dart` 0.3.1 |
+| [`firebase_auth_dart_platform`](firebase_auth/firebase_auth_dart_platform/) | 0.1.1 | Flutter apps written against the official `firebase_auth` API, on Linux or by choice elsewhere; needs `firebase_auth_providers_dart` 0.3.2 |
 | [`firebase_storage_dart`](firebase_storage/firebase_storage_dart/) | 0.1.0, unreleased | Apps and servers that upload, download and list Cloud Storage for Firebase objects ([guide](docs/guides/storage.md), [parity](docs/storage_parity.md)) |
 | [`firebase_admin_dart`](firebase_admin/firebase_admin_dart/) | 0.1.1 | Servers, tools and integration tests that mint custom tokens, manage users or verify ID tokens |
 

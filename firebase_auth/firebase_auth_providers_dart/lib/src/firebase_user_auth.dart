@@ -321,7 +321,7 @@ class FirebaseUserAuth implements AuthTokenProvider {
 
   /// The value of `X-Client-Version`, in the format of the JS SDK (`Chrome/JsCore/<version>/FirebaseCore-web`):
   /// platform, implementation, version of the package, framework.
-  static const String clientVersion = 'Dart/DartCore/0.3.1/FirebaseCore-dart';
+  static const String clientVersion = 'Dart/DartCore/0.3.2/FirebaseCore-dart';
 
   /// `http://host:port` (or `https://...`) of the Auth emulator; null for the real service.
   String? get _emulatorOrigin {
@@ -514,6 +514,11 @@ class FirebaseUserAuth implements AuthTokenProvider {
   /// The id of the signed-in user, or null.
   @override
   String? get uid => _session?.user.uid;
+
+  /// The refresh token of the signed-in user's session, or null when signed out. It changes when the server
+  /// rotates it, and outlives the ID tokens it mints: treat it as a credential and never log it. Unlike the JS SDK,
+  /// it is not a field of [AuthUser], so a user that is printed or serialized never carries it.
+  String? get refreshToken => _session?.refreshToken;
 
   /// Emits the user after every sign-in and sign-out (null when signed out), and after a change of the data of the
   /// signed-in user ([updateProfile], [updateEmail], [reload], ...). It does not emit the current user when it is

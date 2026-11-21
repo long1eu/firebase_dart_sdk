@@ -1,5 +1,7 @@
-## Unreleased
+## 0.1.1
 
+- `User.refreshToken`: the client's refresh token while that user is signed in, null for a `User` kept after a
+  sign-out or a switch of user. FlutterFire's own `User.toString()` prints it, as on the native platforms.
 - Phone sign-in through the client: `verifyPhoneNumber` (`codeSent` with the verification id,
   `verificationFailed`, `codeAutoRetrievalTimeout` after `timeout`; never `verificationCompleted`, since there is
   no instant verification or SMS auto-retrieval outside Android), `signInWithPhoneNumber` and

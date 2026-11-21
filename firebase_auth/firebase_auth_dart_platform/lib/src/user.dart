@@ -23,6 +23,14 @@ class DartUser extends UserPlatform {
 
   dart_auth.FirebaseUserAuth get _client => _auth.clientFor(uid);
 
+  /// The refresh token of the client's session while this user is signed in,
+  /// otherwise null (a user object kept after a sign-out or a switch of user).
+  @override
+  String? get refreshToken {
+    final dart_auth.FirebaseUserAuth client = _auth.client;
+    return client.uid == uid ? client.refreshToken : null;
+  }
+
   @override
   Future<void> delete() => guard(_auth, () => _client.deleteCurrentUser());
 
