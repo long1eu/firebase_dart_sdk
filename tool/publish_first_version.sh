@@ -15,7 +15,9 @@
 #   4. runs `pub get` and `pub publish --dry-run` (flutter for Flutter packages);
 #   5. runs `pub publish`, which shows the archive and asks y/N. Publishing cannot be undone.
 #
-# DRY_RUN=1 stops after step 4.
+# DRY_RUN=1 stops after step 4. Without a terminal (a '!' command in Claude Code, CI) pub cannot
+# ask y/N: then it publishes only with CONFIRM=publish, which is the confirmation, and otherwise
+# stops after the dry run.
 #
 # It never reads or prints credentials; pub uses the login of whoever runs it.
 set -euo pipefail
@@ -70,5 +72,15 @@ if [ "${DRY_RUN:-}" = 1 ]; then
   echo "The dry run passed (DRY_RUN=1: nothing published)."
   exit 0
 fi
-echo "The dry run passed. pub now shows the archive and asks for confirmation."
-"${pub[@]}" publish
+if [ -t 0 ]; then
+  echo "The dry run passed. pub now shows the archive and asks for confirmation."
+  "${pub[@]}" publish
+elif [ "${CONFIRM:-}" = publish ]; then
+  echo "The dry run passed. CONFIRM=publish: publishing $name $version without a prompt."
+  "${pub[@]}" publish --force
+else
+  echo "The dry run passed, but there is no terminal to answer pub's y/N prompt (for example a"
+  echo "'!' command in Claude Code). Nothing was published. To publish without the prompt, run:"
+  echo "  CONFIRM=publish $0 $name${2:+ $2}"
+  exit 3
+fi
