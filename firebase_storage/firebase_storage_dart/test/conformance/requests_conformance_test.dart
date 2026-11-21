@@ -13,7 +13,8 @@ import 'conformance.dart';
 // header, body) and the parsing of its response, through the public API. The JS test builds RequestInfos; here
 // the request is the one a MockClient receives.
 //
-// The JS locations: locationNormal = ('b', 'o'), locationEscapes = ('b/', 'o?').
+// The JS locations: locationNormal = ('b', 'o'), locationEscapes = ('b/', 'o?'). A bucket name with '/' is
+// rejected here (see 'locationEscapes: bucket b/'), so escapes() keeps the escaped object path in bucket 'b'.
 void main() {
   late FirebaseApp app;
   late List<Recorded> requests;
@@ -32,7 +33,7 @@ void main() {
   }
 
   Reference normal() => storage().ref('o');
-  Reference escapes() => storage(bucket: 'b/').ref('o?');
+  Reference escapes() => storage().ref('o?');
 
   setUp(() {
     app = newApp(storageBucket: 'b');
@@ -74,6 +75,14 @@ void main() {
     customMetadata: <String, String>{'foo': 'bar'},
   );
 
+  test(
+    'locationEscapes: bucket b/ is an ArgumentError (JS escapes it to b%2F)',
+    () {
+      // Deliberate difference: an invalid bucket name fails at construction instead of reaching the URL.
+      expect(() => storage(bucket: 'b/'), throwsArgumentError);
+    },
+  );
+
   test('getMetadata request info', () async {
     await normal().metadata();
     await escapes().metadata();
@@ -86,7 +95,7 @@ void main() {
     expectRequest(
       requests[1],
       method: 'GET',
-      url: '$prod/v0/b/b%2F/o/o%3F',
+      url: '$prod/v0/b/b/o/o%3F',
       headers: commonHeaders(),
     );
   });
@@ -124,7 +133,7 @@ void main() {
       requests[1],
       method: 'GET',
       url:
-          '$prod/v0/b/b%2F/o?prefix=o%3F%2F&delimiter=%2F'
+          '$prod/v0/b/b/o?prefix=o%3F%2F&delimiter=%2F'
           '&pageToken=$pageToken&maxResults=13',
       headers: commonHeaders(),
     );
@@ -186,7 +195,7 @@ void main() {
     expectRequest(
       requests[1],
       method: 'GET',
-      url: '$prod/v0/b/b%2F/o/o%3F',
+      url: '$prod/v0/b/b/o/o%3F',
       headers: commonHeaders(),
     );
   });
@@ -229,7 +238,7 @@ void main() {
     expectRequest(
       requests[1],
       method: 'PATCH',
-      url: '$prod/v0/b/b%2F/o/o%3F',
+      url: '$prod/v0/b/b/o/o%3F',
       headers: headers,
       body: body,
     );
@@ -252,7 +261,7 @@ void main() {
     expectRequest(
       requests[1],
       method: 'DELETE',
-      url: '$prod/v0/b/b%2F/o/o%3F',
+      url: '$prod/v0/b/b/o/o%3F',
       headers: commonHeaders(),
     );
   });
