@@ -363,6 +363,7 @@ command):
 | `AUTH_HARNESS_GITHUB_ACCOUNT_EXISTS` | optional, `github` | `1` to start the GitHub step with the `account-exists-with-different-credential` recovery (below) |
 | `AUTH_HARNESS_GOOGLE_LOGIN_HINT` | optional | The Google account's email address, passed as `login_hint` so that Google skips the account chooser on each of the browser trips. Never printed |
 | `AUTH_HARNESS_PHONE_NUMBER`, `AUTH_HARNESS_PHONE_CODE` | `phone`, `sms` (skipped without them) | A test phone number of the project in E.164 form and its code (Authentication, Sign-in method, Phone, "Phone numbers for testing"). No SMS is sent. Never printed in full |
+| `AUTH_HARNESS_LOG_ANSWERS` | optional | `1` to print, for every Identity Toolkit call, the method, the HTTP status and the names of the fields of the answer (for example `accounts:signInWithIdp 200: mfaInfo[…], mfaPendingCredential`). Values are never printed, except the backend's error code. For finding out why a step failed. |
 
 **Each step prints one line**, `PASS <step>`, `FAIL <step>: <error code>` or `SKIP <step>: <reason>`:
 
