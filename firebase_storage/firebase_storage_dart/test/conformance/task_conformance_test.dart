@@ -731,7 +731,8 @@ void main() {
         requests.single,
         method: 'GET',
         url: '$prod/v0/b/b/o/o?alt=media',
-        headers: commonHeaders(),
+        // Dart addition: the identity encoding on the VM, so offsets of a gzip-stored object are unzipped bytes.
+        headers: commonHeaders(<String, String>{'accept-encoding': 'identity'}),
       );
     });
 

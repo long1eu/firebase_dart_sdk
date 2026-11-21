@@ -209,7 +209,11 @@ segments, so these need explicit code.
 
 **Decision.** The documentation states what one run of the verification kit against a real project found:
 `md5Hash` is not verified by the server; an invalid ID token gets 403, not 401; a missing object answers a
-JSON envelope; `Range` gets 206 and 416; CORS exposes the `x-goog-upload-*` headers. A legacy `*.appspot.com`
+JSON envelope; `Range` gets 206 and 416; CORS exposes the `x-goog-upload-*` headers. An object stored
+gzip-compressed is sent compressed to a client that accepts gzip, with `Range` applied to the compressed
+bytes; asked for the identity encoding, the server unzips it and answers a `Range` with the whole object
+(200). Since 0.1.2 the client asks for the identity encoding on the VM, where `dart:io` would otherwise ask
+for gzip and unzip on its own, so offsets and `maxSize` are in unzipped bytes (check 26). A legacy `*.appspot.com`
 bucket needs the Blaze plan, and without it the server answers 402, which maps to `quota-exceeded`.
 
 **Why.** The emulator differs from production in each of these, and the API docs would be wrong if written

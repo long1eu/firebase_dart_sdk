@@ -1,3 +1,13 @@
+## 0.1.2
+
+- Fix: on the VM, `openRead` from an offset and `getBytes(maxSize:)` of an object stored gzip-compressed
+  (`contentEncoding: gzip`) failed with `unknown` ("Filter error, bad data"), or counted compressed bytes.
+  The `dart:io` client asked for gzip, so the server sent the stored bytes and applied the `Range` header
+  to them, while the client unzipped them. Requests for the bytes of an object now ask for the identity
+  encoding on the VM: the server unzips the object, offsets and `maxSize` are in unzipped bytes, and the
+  server answers a ranged request with the whole object (200), which the client cuts to the range. Seen on
+  a real project (verification kit check 26). The web is unchanged: browsers unzip by themselves.
+
 ## 0.1.1
 
 - On the VM, `startUpload` and `putFile` send the data in one streamed request of the resumable session,
