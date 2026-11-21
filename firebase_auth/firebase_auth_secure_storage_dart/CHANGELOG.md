@@ -16,5 +16,5 @@
   value is ever printed or put in an exception, and nothing is written anywhere else instead.
 - `migrateFrom` moves a session from another storage with the rules of the Flutter package (read, write, read back
   and compare, then delete there; a sign-out deletes it there too).
-- Tested: unit tests with fakes of the store; the integration tests ran on macOS only. Linux and Windows are
-  untested.
+- Tested: unit tests with fakes of the store; the integration tests run in CI against the real store on Linux
+  (libsecret, gnome-keyring), Windows (DPAPI) and macOS (login keychain).
