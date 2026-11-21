@@ -74,8 +74,11 @@ final class SettableMetadata {
   /// named stay; an upload leaves the keys with a null value out.
   final Map<String, String?>? customMetadata;
 
-  /// The MD5 hash of the content in base64, sent with an upload so that the backend checks it (like
-  /// `UploadMetadata.md5Hash` of the JS SDK). `updateMetadata` ignores it.
+  /// The MD5 hash of the content in base64, sent with an upload (like `UploadMetadata.md5Hash` of the JS SDK).
+  /// `updateMetadata` ignores it.
+  ///
+  /// The backend does not verify it: in production the object is stored with the real hash of the data, whatever
+  /// you send here. To check an upload, compare the `md5Hash` of the returned `FullMetadata` with your own.
   final String? md5Hash;
 
   /// The fields that `Reference.updateMetadata` removes from the object. A field named here and also given a

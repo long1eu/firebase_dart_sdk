@@ -18,7 +18,7 @@ app for:
   returns a token;
 - `X-Firebase-Storage-Version: dart/<version>` and `X-Firebase-GMPID: <appId>`.
 
-A 401 answer makes the client fetch a fresh token once and send the request again.
+A 401 answer makes the client fetch a fresh token once and send the request again. Production answers an invalid ID token with 403, not 401, so that retry does not apply to invalid tokens.
 
 The provider has to be set on the app before the first request. With `firebase_auth_providers_dart`:
 
@@ -97,7 +97,7 @@ uploads and for downloads.
 `startUpload`, `startStreamUpload` and `putFile` use the resumable protocol: the client opens an upload
 session, sends the data in chunks and finalizes it. A chunk that fails is asked about (`query`) and sent
 again from the offset the server has, so a dropped connection costs one chunk. `putBytes` and `putString`
-send one multipart request; use them for small objects.
+send one multipart request whatever the size, with no session and no progress; use them for small objects.
 
 ```dart
 import 'dart:typed_data';
@@ -197,7 +197,7 @@ Future<void> roundTrip() async {
 }
 ```
 
-Things the emulator does differently from production: it does not enforce the 256 KiB multiple of resumable
+Things the emulator does differently from production: it answers a missing object with a plain text body (production sends a JSON envelope), it does not enforce the 256 KiB multiple of resumable
 chunks, and it ignores the content type of a request that is not multipart, so use `putBytes` or the
 resumable calls with `SettableMetadata(contentType: ...)` when a test depends on it. Mock users
 (`mockUserToken`) are evaluated by the rules of the emulator; tests of the rules themselves are better run

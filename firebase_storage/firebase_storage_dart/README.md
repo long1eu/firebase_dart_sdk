@@ -5,8 +5,8 @@ for Dart servers, command line tools, Flutter apps and the web. It speaks the sa
 Firebase JS SDK, with Dart names (`Reference`, `putBytes`, `UploadTask`) instead of a Flutter plugin or a
 native SDK. It is not affiliated with or supported by Google or Firebase.
 
-> **Status: 0.1.0, unreleased.** Verified with unit tests and against the Firebase Storage emulator. It has
-> not been run against a real Firebase project.
+> **Status: 0.1.0, unreleased.** Verified with unit tests, against the Firebase Storage emulator, and once
+> against a real Firebase project with a signed-in throwaway user (see [Verified](#verified)).
 
 ## Install
 
@@ -198,7 +198,7 @@ Future<void> resumable(Reference target, Uint8List data) async {
 ```
 
 `progress` is a broadcast stream that emits on every chunk and every state change and closes when the task
-ends. The task starts as soon as it is created, so listen right away to see the first event. Chunks start at
+ends. The task starts as soon as it is created. A stream you listen to first emits the current snapshot, then the new events; earlier events are not replayed. Chunks start at
 256 KiB and double after each success up to 16 MiB. `cancel()` works from the running and the paused state.
 
 `startStreamUpload(stream, length: n)` uploads a stream whose total length you know, without holding it in
@@ -270,7 +270,26 @@ response, capped at 16 KiB; it never holds headers or tokens.
 
 Requests that fail with a network error, a 408, 429 or 5xx status are retried with exponential backoff
 until the `StorageRetryPolicy` time runs out (2 minutes for an operation, 10 for an upload or a download by
-default). A 401 triggers one token refresh and one more try.
+default). A 401 triggers one token refresh and one more try. Production answers an invalid ID token with 403, not
+401, so that refresh is not reached by invalid tokens.
+
+## Verified
+
+The verification kit (`tool/verify_production_storage` in the repository) ran against a real project with a
+signed-in throwaway user: 19 of its 20 checks passed, and check 13 (the refresh after a 401) was
+inconclusive, because production does not answer 401 to an invalid token. What it found:
+
+- A missing object answers 404 with a JSON envelope; the emulator sends plain text.
+- `Range` gets 206, and a range past the end of the object gets 416.
+- List page tokens are 72 base64 characters long.
+- `md5Hash` is not verified on upload. Production stores the real hash of the data, whatever you send, so
+  compare the `md5Hash` of the returned `FullMetadata` with your own.
+- The App Check header and `X-Firebase-GMPID` are accepted.
+- An invalid ID token gets 403, not 401. The one forced token refresh on a 401 is therefore not reached by
+  invalid tokens.
+- CORS: `access-control-allow-origin` is `*`, the `x-goog-upload-*` headers are exposed on the session
+  responses, and the preflight to the upload URL allows `x-goog-upload-command` and `x-goog-upload-offset`.
+- Upload progress is per byte on the VM and per chunk on the web.
 
 ## What is not supported
 
@@ -280,7 +299,9 @@ default). A 401 triggers one token refresh and one more try.
   [`firebase_auth_providers_dart`](https://pub.dev/packages/firebase_auth_providers_dart).
 - No Admin SDK features (signed URLs, ACLs, bucket management); those belong to the Google Cloud Storage
   client for trusted code.
-- Not run against a real Firebase project yet; the emulator is the reference used by the tests.
+- A download URL needs a download token that the backend created at upload. Objects uploaded with the plain
+  Cloud Storage API have none, and `downloadUrl()` throws `no-download-url` for them; minting a token is a
+  server task.
 
 Parity with the other SDKs and the deliberate differences from the JS SDK:
 [docs/storage_parity.md](https://github.com/long1eu/firebase_dart_sdk/blob/main/docs/storage_parity.md).

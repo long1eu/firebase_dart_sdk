@@ -10,7 +10,8 @@ The code is `firebase_storage/firebase_storage_dart/test/production/verify_produ
 `run.sh` here runs it from the right directory. It is modelled on `tool/verify_production` (Firestore).
 
 **Status of the kit itself:** it runs against the Storage emulator, where the result of every check is
-known (`test/production/verify_production_test.dart`). It has **not** been run against a real project.
+known (`test/production/verify_production_test.dart`). It has been run once against a real project with a
+signed-in throwaway user (`--create-user`): 19 of 20 checks passed and check 13 was inconclusive.
 
 ## What it does to your project
 
@@ -106,28 +107,31 @@ and the results of 8, 9, 13, 17 and 18.
 
 ## Known results
 
-Only the emulator has been run (`demo-test.appspot.com` open, `demo-test-auth.appspot.com` with rules that
-need a user). Production: not run.
+Emulator: `demo-test.appspot.com` open, `demo-test-auth.appspot.com` with rules that need a user.
+Production: one run against a real project with a signed-in throwaway user; no project, account or bucket is
+named here.
 
 | id | emulator | production |
 | --- | --- | --- |
-| 1 | INCONCLUSIVE: plain `Not Found` body | expected `JSON ENVELOPE` |
-| 2 | PASS: 403 with an envelope | to be run |
-| 3 | PASS, `HONOURED`; the past-the-end range answers 200 | to be run |
-| 4 | PASS; a wrong token is served (the emulator does not check it) | to be run |
-| 5 | PASS (the emulator repeats the prefix on every page; its token has other characters) | to be run |
-| 6-9 | PASS | to be run |
-| 10 | PASS, `NOT VERIFIED` | to be run |
-| 11, 12 | PASS, `ACCEPTED` and `SENT` | to be run |
-| 13 | SKIPPED without `--create-user` | to be run |
-| 14 | PASS | to be run |
-| 15 | PASS (simulated 503s, about 6 s of backoff) | to be run |
-| 16-19 | PASS | to be run |
-| 20 | SKIPPED without `--create-user`; with it, not run yet (the kit was written without running it) | to be run |
+| 1 | INCONCLUSIVE: plain `Not Found` body | PASS, `JSON ENVELOPE` |
+| 2 | PASS: 403 with an envelope | PASS |
+| 3 | PASS, `HONOURED`; the past-the-end range answers 200 | PASS, `HONOURED`: 206 for the range, 416 past the end |
+| 4 | PASS; a wrong token is served (the emulator does not check it) | PASS |
+| 5 | PASS (the emulator repeats the prefix on every page; its token has other characters) | PASS; the page token is 72 base64 characters |
+| 6-9 | PASS | PASS |
+| 10 | PASS, `NOT VERIFIED` | PASS, `NOT VERIFIED`: production stores the real hash of the data, so the client compares the returned `md5Hash` |
+| 11, 12 | PASS, `ACCEPTED` and `SENT` | PASS, `ACCEPTED` and `SENT`: both headers are accepted |
+| 13 | SKIPPED without `--create-user` | INCONCLUSIVE: an invalid ID token gets 403 (`unauthorized`), not 401, so the refresh path is not reached |
+| 14 | PASS | PASS: the preflight answers `access-control-allow-origin: *` and the session responses echo the request origin; the `x-goog-upload-*` headers are exposed on the session responses; the preflight to the upload URL allows `x-goog-upload-command` and `x-goog-upload-offset` |
+| 15 | PASS (simulated 503s, about 6 s of backoff) | PASS |
+| 16-19 | PASS | PASS |
+| 20 | SKIPPED without `--create-user`; PASS with it and the Auth emulator | PASS |
+
+Upload progress is per byte on the VM and per chunk on the web.
 
 ## Not verified
 
-- The kit itself against a real project.
+- The kit against more than one real project.
 - App Check with a real token; the kit has no App Check token provider.
 - A real 5xx of the backend (check 15 simulates it).
 - Browser behaviour: check 14 reads the CORS headers, no browser is involved.

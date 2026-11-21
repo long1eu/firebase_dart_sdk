@@ -79,7 +79,7 @@ Field names are given per SDK. "R" = read-only, "S" = settable at upload or upda
 | size | `size` R (number) | `getSizeBytes()` R | `size` R | `size_bytes()` R | `size` R (int) | |
 | timeCreated | `timeCreated` R (ISO string) | `getCreationTimeMillis()` R | `timeCreated` R (Date) | `creation_time()` R (seconds on desktop, C:d metadata_desktop.cc:41) | `timeCreated` R (DateTime?) | |
 | updated | `updated` R (string) | `getUpdatedTimeMillis()` R | `updated` R | `updated_time()` R | `updated` R | |
-| md5Hash | `md5Hash` R, and in `UploadMetadata` settable ("Base64 MD5 of the object being uploaded", public-types.ts:169) | `getMd5Hash()` R | `md5Hash` R | `md5_hash()` R | `md5Hash` R and S (0.1.0) | `SettableMetadata.md5Hash` is sent with the upload, as `UploadMetadata.md5Hash` in JS. Nothing verifies it on the client. |
+| md5Hash | `md5Hash` R, and in `UploadMetadata` settable ("Base64 MD5 of the object being uploaded", public-types.ts:169) | `getMd5Hash()` R | `md5Hash` R | `md5_hash()` R | `md5Hash` R and S (0.1.0) | `SettableMetadata.md5Hash` is sent with an upload, as `UploadMetadata.md5Hash` in JS. Production does not verify it: it stores the real hash of the data, so compare the `md5Hash` of the returned `FullMetadata` yourself. |
 | cacheControl | S | `setCacheControl` S | S | `set_cache_control` S | S | |
 | contentDisposition | S | S | S | S | S | |
 | contentEncoding | S | S | S | S | S | |
@@ -90,7 +90,7 @@ Field names are given per SDK. "R" = read-only, "S" = settable at upload or upda
 | Back-reference to reference | `ref` R (optional) | `getReference()` | — | `reference()` | gap (won't do) | Dart `FullMetadata` has no `ref`, `Reference` already holds it. |
 | isFile / isFolder | — | — | `isFile`, `isFolder` (I:StorageMetadata.swift:130; `.folder` is never set) | — | gap (won't do) | |
 | Raw dictionary form | — | — | `dictionaryRepresentation()`, `init(dictionary:)` | — | `toJson()` | |
-| Copy-with | — | `Builder(original)` | `copy()` | copy ctor | `copyWith` | |
+| Copy-with | — | `Builder(original)` | `copy()` | copy ctor | `SettableMetadata.copyWith` |  |
 | `getMetadata` | `getMetadata(ref)` | `getMetadata()` | `getMetadata(completion:)` | `GetMetadata()` | `metadata()` | GET `/b/<bucket>/o/<path>` in all of them. |
 | `updateMetadata` | `updateMetadata(ref, SettableMetadata)` | `updateMetadata(metadata)` | `updateMetadata(_:)` | `UpdateMetadata(metadata)` | `updateMetadata` | PATCH. JS semantics for "clear a field" (null) are in `implementation/metadata.ts` (`metadataToDict`); the Dart documentation of `SettableMetadata` states it. |
 | Default content type at upload | `metadata.contentType`, else blob type, else `application/octet-stream` (requests.ts:300) | from stream/uri, else `application/octet-stream` | from file extension (I:StorageUploadTask.swift:310), else required | `content_type` argument | yes (JS rule) | |
@@ -101,7 +101,7 @@ Field names are given per SDK. "R" = read-only, "S" = settable at upload or upda
 |---|---|---|---|---|---|---|
 | Upload bytes, simple | `uploadBytes(ref, Blob/Uint8Array/ArrayBuffer, metadata)` (multipart/related, `X-Goog-Upload-Protocol: multipart`) requests.ts:330 | `putBytes(byte[], metadata?)` (always resumable) | `putData(_:metadata:)` (always resumable) | `PutBytes(buffer, size, metadata?, listener?, controller?)` (desktop: one POST of the raw body, C:d storage_reference_desktop.cc:445) | `putBytes` | Only JS has a non-resumable multipart path. Android, iOS use resumable for every size. |
 | Upload bytes, resumable, with task | `uploadBytesResumable` | `putBytes` returns `UploadTask` | `putData` returns `StorageUploadTask` | `PutBytes` returns a future plus `Controller` | `startUpload` | |
-| Resumable threshold | data > 256 KiB resumable; smaller single request (task.ts:172) | always | always | none (single POST) | up to 256 KiB: one multipart request; above: resumable (0.1.0) | Decided for 0.1.0, as JS. `putBytes` and `putString` use the same rule. |
+| Resumable threshold | data > 256 KiB resumable; smaller single request (task.ts:172) | always | always | none (single POST) | `startUpload`: up to 256 KiB one multipart request, above that a session; `putBytes` and `putString` always one multipart request (0.1.0) | As JS for `startUpload`. `putBytes` and `putString` never open a session, whatever the size. |
 | String upload | `uploadString(ref, value, format, metadata)` | — | — | — | `putString` | |
 | String formats | `raw` (UTF-8), `base64`, `base64url`, `data_url` (J:implementation/string.ts:38-62) | — | — | — | `StringFormat.raw/base64/base64Url/dataUrl` | `invalid-format` on bad input. |
 | Upload from file | — (browser `File` is a `Blob`) | `putFile(Uri, metadata?, existingUploadUri?)` | `putFile(from: URL, metadata?)` | `PutFile(path, metadata?, listener?, controller?)` | `putFile(File)` in `io.dart` | iOS on device can use a background URLSession for file uploads (I:StorageUploadTask.swift:130-140); no Dart equivalent. |
@@ -127,7 +127,7 @@ Field names are given per SDK. "R" = read-only, "S" = settable at upload or upda
 | Chunk size, first | 256 KiB (`RESUMABLE_UPLOAD_CHUNK_SIZE`) | 256 KiB (`PREFERRED_CHUNK_SIZE`) | whole object by default (`.max`), caller can cap | — | 256 KiB | |
 | Chunk growth | doubles after each success while `size*2 < 32 MiB`, so the cap is 16 MiB (task.ts:336) | doubles while `< 32 MiB`, resets to 256 KiB after a failed send (A:UploadTask.java:486-497) | none | — | doubling, cap 16 MiB | Android resets the chunk size after a failure, JS does not. |
 | Upload commands | `upload`, `upload, finalize`, `finalize` with `X-Goog-Upload-Offset` (requests.ts:538) | same | GTM | — | yes | |
-| Checksum on upload | `md5Hash` in `UploadMetadata`; no client-side verification | none; HTTP 409 maps to `ERROR_INVALID_CHECKSUM` (A:StorageException.java:89) | none (`nonMatchingChecksum` exists, but nothing raises it, I:StorageError.swift:121) | `kErrorNonMatchingChecksum` (mapped from iOS/Android) | gap | No official SDK verifies the MD5 or CRC32C on the client. JS has a TODO for per-range `x-range-md5` (requests.ts:560). |
+| Checksum on upload | `md5Hash` in `UploadMetadata`; no client-side verification | none; HTTP 409 maps to `ERROR_INVALID_CHECKSUM` (A:StorageException.java:89) | none (`nonMatchingChecksum` exists, but nothing raises it, I:StorageError.swift:121) | `kErrorNonMatchingChecksum` (mapped from iOS/Android) | gap: the client does not verify; production does not either | No official SDK verifies the MD5 or CRC32C on the client. JS has a TODO for per-range `x-range-md5` (requests.ts:560). |
 | Server size mismatch guard | `server-file-wrong-size` when status total differs from the data (requests.ts:529) | "Unexpected error. The server lost a chunk update." (A:UploadTask.java:406) | — | — | `server-file-wrong-size` | |
 | Retry of a failing chunk | whole-request backoff (see section 10) | per-chunk loop with `sleepTime` that resets on success (A:UploadTask.java:341-456) | GTM retry | desktop retries whole POST | JS backoff, with the wait reset | |
 
@@ -179,14 +179,14 @@ Mapping from HTTP status (all SDKs read the status; error body use differs). "Ra
 |---|---|---|---|---|---|---|
 | `unknown` | yes (any other status) | `ERROR_UNKNOWN` -13000 | `unknown` -13000 | `kErrorUnknown` | `unknown` | |
 | `object-not-found` | 404 | `ERROR_OBJECT_NOT_FOUND` -13010 (404) | `objectNotFound` -13010 (404) | `kErrorObjectNotFound` | `object-not-found` | |
-| `bucket-not-found` | defined, never raised | `ERROR_BUCKET_NOT_FOUND` -13011, never raised | `bucketNotFound` -13011, never raised | `kErrorBucketNotFound`, never raised on desktop | `bucket-not-found` | Server 404 is ambiguous, all SDKs report object-not-found. |
-| `project-not-found` | defined, never raised | `ERROR_PROJECT_NOT_FOUND` -13012, never raised | `projectNotFound` -13012, never raised | `kErrorProjectNotFound` | `project-not-found` | |
+| `bucket-not-found` | defined, never raised | `ERROR_BUCKET_NOT_FOUND` -13011, never raised | `bucketNotFound` -13011, never raised | `kErrorBucketNotFound`, never raised on desktop | not raised | Server 404 is ambiguous, all SDKs report object-not-found. |
+| `project-not-found` | defined, never raised | `ERROR_PROJECT_NOT_FOUND` -13012, never raised | `projectNotFound` -13012, never raised | `kErrorProjectNotFound` | not raised |  |
 | `quota-exceeded` | 402 | `ERROR_QUOTA_EXCEEDED` -13013 (no 402 mapping in `calculateErrorCode`) | `quotaExceeded` (402) | `kErrorQuotaExceeded` (402) | `quota-exceeded` | |
 | `unauthenticated` | 401 | `ERROR_NOT_AUTHENTICATED` -13020 | `unauthenticated` -13020 | `kErrorUnauthenticated` | `unauthenticated` | |
 | `unauthorized` | 403 | `ERROR_NOT_AUTHORIZED` -13021 | `unauthorized` -13021 | `kErrorUnauthorized` | `unauthorized` | |
 | `unauthorized-app` | 401 with body text "Firebase App Check token is invalid" (requests.ts:112) | — | — | — | `unauthorized-app` (from the body of the error response) | JS only. |
 | `retry-limit-exceeded` | backoff budget spent (request.ts:182, task.ts:130) | `ERROR_RETRY_LIMIT_EXCEEDED` -13030 (`NETWORK_UNAVAILABLE`); `getIsRecoverableException()` | `retryLimitExceeded` -13030 | `kErrorRetryLimitExceeded` (also 408 on desktop, C:d curl_requests.cc:84) | `retry-limit-exceeded` | |
-| `invalid-checksum` | defined, never raised | `ERROR_INVALID_CHECKSUM` -13031 (HTTP 409) | `nonMatchingChecksum` -13031, never raised | `kErrorNonMatchingChecksum` | `invalid-checksum` | Mapped by status 409 only on Android. |
+| `invalid-checksum` | defined, never raised | `ERROR_INVALID_CHECKSUM` -13031 (HTTP 409) | `nonMatchingChecksum` -13031, never raised | `kErrorNonMatchingChecksum` | not raised | Mapped by status 409 only on Android. |
 | `download-size-exceeded` | — | — (wrapped as unknown) | `downloadSizeExceeded` -13032 | `kErrorDownloadSizeExceeded` | `download-size-exceeded` | |
 | `canceled` | yes | `ERROR_CANCELED` -13040 | `cancelled` -13040 | `kErrorCancelled` | `canceled` | Spelling differs between SDKs, Dart follows JS. |
 | `invalid-event-name` | defined, never raised | — | — | — | gap (won't do) | |
@@ -216,11 +216,11 @@ Mapping from HTTP status (all SDKs read the status; error body use differs). "Ra
 |---|---|---|---|---|---|---|
 | Observer API | `on('state_changed', next?, error?, complete?)` or `StorageObserver` object; returns `Unsubscribe` | per-state `addOn…Listener` | `observe(status, handler)` -> handle string | `Listener` subclass (`OnPaused`, `OnProgress`) | `progress` broadcast stream | |
 | States | `running`, `paused`, `success`, `canceled`, `error` | `isInProgress/isPaused/isComplete/isSuccessful/isCanceled` | `StorageTaskStatus {unknown, resume, progress, pause, success, failure}` | paused flag | `UploadState {running, paused, success, canceled, error}` | iOS has a distinct `resume` event. |
-| Replay the last state to a late subscriber | `on` delivers the current state first (observer.ts) | listeners get a callback if already complete | `observe` after success fires immediately | — | the progress stream does not replay (0.1.0) | Decided for 0.1.0: read `state` and `bytesTransferred`, or await `result`, to see what happened before you listened. |
+| Replay the last state to a late subscriber | `on` delivers the current state first (observer.ts) | listeners get a callback if already complete | `observe` after success fires immediately | — | `progress` starts with the current snapshot and does not replay earlier events (0.1.0) | Decided for 0.1.0: a late subscriber gets the snapshot of the moment it listens, then the new events. `state`, `bytesTransferred` and `result` give the rest. |
 | Thread / queue of callbacks | event loop | main thread by default, `Executor` overloads | `callbackQueue` (default main) | arbitrary thread | event loop | |
 | Task scheduling | — | `StorageTaskScheduler` thread pools (A:StorageTaskScheduler.java) | `dispatchQueue` | one thread per retried request (`std::thread`, C:d storage_reference_desktop.cc:341) | n/a | |
 | Continuations | `then`/`catch` | `continueWith`, `continueWithTask`, `onSuccessTask` | — | `OnCompletion` on `Future` | n/a | |
-| Progress is throttled | per chunk (XHR upload progress inside a chunk too, request.ts:100) | per chunk | per GTM callback | per curl callback | on each chunk and state change | JS also reports sub-chunk progress through the connection's upload progress listener; Dart `http.Client` has none. |
+| Progress is throttled | per chunk (XHR upload progress inside a chunk too, request.ts:100) | per chunk | per GTM callback | per curl callback | on each chunk and state change | JS also reports sub-chunk progress through the connection's upload progress listener. Dart does the same on the VM (per byte, at most every 100 ms) and reports per chunk on the web, where the browser gives no upload progress. |
 
 ## 10. Retry and backoff behaviour
 
@@ -253,6 +253,7 @@ Mapping from HTTP status (all SDKs read the status; error body use differs). "Ra
 | FirebaseServerApp | `appCheckToken` setting honoured (service.ts:182) | — | — | — | n/a | Server runtime object. |
 | Large-file memory | `Blob` slice per chunk | `AdaptiveStreamBuffer` reads chunk by chunk | GTM reads file | desktop reads the whole file into memory for `PutFile` (TODO in C:d storage_reference_desktop.cc:493) | stream from disk | |
 | Wire protocol | REST `https://firebasestorage.googleapis.com/v0/b/<bucket>/o…` | same | same (`www.googleapis.com` rewrite for uploads, I:StorageUploadTask.swift:103) | same | yes | |
+| CORS (web) | the browser enforces it; the bucket needs a CORS configuration | — | — | — | the production bucket answers `access-control-allow-origin: *`, exposes the `x-goog-upload-*` headers on the session responses, and its preflight to the upload URL allows `x-goog-upload-command` and `x-goog-upload-offset` (verified, see the README of the package) | |
 | HTTP client | XHR / `fetch` (Node) | `HttpURLConnection` | `GTMSessionFetcher` | curl | `package:http` | |
 
 ## Gaps and their state
@@ -261,13 +262,13 @@ The state is **0.1.0 (adopted)**: decided and part of the first release; **later
 
 | # | State | Gap | What 0.1.0 does, or why not |
 |---|---|---|---|
-| 1 | 0.1.0 (adopted) | `md5Hash` in upload metadata (JS `UploadMetadata.md5Hash`) | `SettableMetadata.md5Hash`. Adding a field to the immutable metadata class later would be a breaking change. |
+| 1 | 0.1.0 (adopted) | `md5Hash` in upload metadata (JS `UploadMetadata.md5Hash`) | `SettableMetadata.md5Hash`. Adding a field to the immutable metadata class later would be a breaking change. Production does not verify the hash on upload; compare the returned `md5Hash`. |
 | 2 | 0.1.0 (adopted) | Size-limit semantics of `getBytes` (JS truncates silently; Android, iOS and C++ fail) | `getBytes` throws `download-size-exceeded` when the object is larger than `maxSize`. It asks for `maxSize + 1` bytes with a `Range` header, so one extra byte proves the overflow. |
 | 3 | 0.1.0 (adopted) | Resuming an upload session after the process was killed (Android `existingUploadUri`) | `UploadTask.sessionUri`, and `existingSessionUri` on `startUpload`, `startStreamUpload` and `putFile`. |
 | 4 | 0.1.0 (adopted) | Error codes `invalid-root-operation` and `no-download-url`, which JS raises | Both exist, with the JS meaning. |
-| 5 | 0.1.0 (adopted) | One request or a session for small uploads | A single multipart request up to 256 KiB, a resumable session above, as JS. |
+| 5 | 0.1.0 (adopted) | One request or a session for small uploads | `startUpload` sends a single multipart request up to 256 KiB and uses a resumable session above, as JS. `putBytes` and `putString` are always one multipart request. |
 | 6 | 0.1.0 (adopted) | Tokens over plain http (iOS refuses unless https or loopback) | The client attaches a token only over https, to `emulatorHost`, or to a loopback host. |
-| 7 | 0.1.0 (adopted) | Replay of the last state to a late subscriber (JS `on` does) | The `progress` stream does not replay. `state` and `bytesTransferred` are readable at any time, and `result` completes for a task that already finished. |
+| 7 | 0.1.0 (adopted) | Replay of the last state to a late subscriber (JS `on` does) | The `progress` stream starts with the current snapshot and does not replay earlier events. `state` and `bytesTransferred` are readable at any time, and `result` completes for a task that already finished. |
 | 8 | later | Pause, resume and progress for downloads (Android and iOS tasks, C++ controllers) | A `DownloadTask` in the FlutterFire shim and `io.dart`, with `Range` resume from the offset of the temporary file. Not in the 0.1.0 surface. |
 | 9 | later | An `ETag` or generation guard on resumed downloads (Android fails when the `ETag` changed) | Comes with 8; without it a resumed download can join two versions of an object. |
 | 10 | later | Stream upload of unknown length (Android `putStream`) | `startStreamUpload` needs `length`. The resumable protocol needs the total at the end, so an unknown length needs buffering. |
@@ -279,20 +280,20 @@ The state is **0.1.0 (adopted)**: decided and part of the first release; **later
 
 ## Deliberate differences from the JS SDK
 
-Each of these is a fix, an addition or a choice. Each one has a test; its name goes in the last column.
+Each of these is a fix, an addition or a choice. Each one has a test, named in the last column (paths are relative to `firebase_storage/firebase_storage_dart`).
 
 | # | JS behaviour | Dart behaviour | Pinned by |
 |---|---|---|---|
-| 1 | `X-Firebase-GMPID` is never sent (`_appId` is always null, request.ts:251) | Sends `X-Firebase-GMPID: <app.options.appId>`, as Android and iOS do | TODO: test name |
-| 2 | `StorageError.status` is 0 for `object-not-found` (error.ts:42) | `httpStatus` holds the real HTTP status for every error | TODO: test name |
-| 3 | The body of an error response is not read for the status | `serverResponse` holds the body, capped at 16 KiB, never headers or tokens; a body that says the App Check token is invalid maps to `unauthorized-app` | TODO: test name |
-| 4 | `cancel()` acts from `running` only, although its doc says paused too | `cancel()` works from `paused` as well as `running`, as on Android | TODO: test name |
-| 5 | Chunks double while the size stays under 32 MiB; the effective cap is 16 MiB | Chunks start at 256 KiB, double after each successful chunk, stop at 16 MiB, and are a multiple of 256 KiB except the last | TODO: test name |
-| 6 | The backoff wait of the upload retry loop (`sleepTime`) never resets | The wait starts again from the beginning after a successful request | TODO: test name |
-| 7 | A 401 is final and maps to `unauthenticated` | One forced token refresh and one more request on a 401; a second 401 maps to `unauthenticated`. No official SDK does this | TODO: test name |
-| 8 | Tokens are sent over any scheme | Tokens are sent only over https, to `emulatorHost`, or to a loopback host | TODO: test name |
-| 9 | `getBytes` truncates silently at `maxDownloadSizeBytes` | `getBytes` throws `download-size-exceeded` | TODO: test name |
-| 10 | Downloads use the operation retry time (2 minutes) | `StorageRetryPolicy.download` has its own value, 10 minutes, as Android, iOS and C++ | TODO: test name |
+| 1 | `X-Firebase-GMPID` is never sent (`_appId` is always null, request.ts:251) | Sends `X-Firebase-GMPID: <app.options.appId>`, as Android and iOS do | `test/requester_test.dart`: headers > version and app id on every request, no token without a provider |
+| 2 | `StorageError.status` is 0 for `object-not-found` (error.ts:42) | `httpStatus` holds the real HTTP status for every error | `test/conformance/errors_conformance_test.dart`: status mapping > 404 is object-not-found, with the status and the body (one test per status) |
+| 3 | The body of an error response is not read for the status | `serverResponse` holds the body, capped at 16 KiB, never headers or tokens; a body that says the App Check token is invalid maps to `unauthorized-app` | `test/conformance/errors_conformance_test.dart`: the body in serverResponse is cut at 16 KiB; 401 with the App Check message in the body is unauthorized-app |
+| 4 | `cancel()` acts from `running` only, although its doc says paused too | `cancel()` works from `paused` as well as `running`, as on Android | `test/conformance/task_conformance_test.dart`: cancel works from paused; `test/upload_task_test.dart`: cancel from paused |
+| 5 | Chunks double while the size stays under 32 MiB; the effective cap is 16 MiB | Chunks start at 256 KiB, double after each successful chunk, stop at 16 MiB, and are a multiple of 256 KiB except the last | `test/upload_task_test.dart`: chunks double from 256 KiB and stop at 16 MiB |
+| 6 | The backoff wait of the upload retry loop (`sleepTime`) never resets | The wait starts again from the beginning after a successful request | `test/conformance/task_conformance_test.dart`: the retry wait resets after a successful chunk; `test/upload_task_test.dart`: the wait doubles while chunks keep failing and starts over after a success |
+| 7 | A 401 is final and maps to `unauthenticated` | One forced token refresh and one more request on a 401; a second 401 maps to `unauthenticated`. No official SDK does this. In production an invalid ID token gets 403 (`unauthorized`), not 401, so the refresh is not reached by invalid tokens; it applies when the backend answers 401 | `test/requester_test.dart`: 401 > is retried once with a refreshed token, a second 401 is unauthenticated; `test/conformance/errors_conformance_test.dart`: a 401 is sent again once with a refreshed token |
+| 8 | Tokens are sent over any scheme | Tokens are sent only over https, to `emulatorHost`, or to a loopback host | `test/hardening_test.dart`: tokens travel only over https, to the emulator or to loopback; `test/security/hosts_test.dart`: token scope of the request layer |
+| 9 | `getBytes` truncates silently at `maxDownloadSizeBytes` | `getBytes` throws `download-size-exceeded` | `test/reference_operations_test.dart`: an object larger than maxSize is download-size-exceeded; `test/security/limits_test.dart`: asks for maxSize + 1 bytes with a Range header |
+| 10 | Downloads use the operation retry time (2 minutes) | `StorageRetryPolicy.download` has its own value, 10 minutes, as Android, iOS and C++ | `test/requester_test.dart`: downloads and uploads use their own retry time |
 
 ## Differences between JS and the native SDKs worth knowing
 
