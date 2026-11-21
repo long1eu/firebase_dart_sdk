@@ -25,5 +25,5 @@
   namespaces, both cases of a move from a `FileAuthStorage`, and no entry left behind. The workflow
   `secure_storage_signed_macos.yml` runs them in a signed build on main (on a push and by hand), with a Developer ID
   certificate and profile from fastlane match (readonly, Workload Identity Federation, no secrets) and the owner's
-  approval; its first run is still to come. The key is fetched only after the dependencies are resolved from the
+  approval; all six tests passed on its first run. The key is fetched only after the dependencies are resolved from the
   committed lock files.
