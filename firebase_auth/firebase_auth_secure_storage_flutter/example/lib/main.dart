@@ -7,7 +7,8 @@
 //   FirebaseAuthDart.use(storageFor: (FirebaseApp app) => storage);
 //
 // Run it against an emulator started with
-// `firebase emulators:start --only auth` (project demo-test).
+// `firebase emulators:start --only auth` (project demo-test). On macOS the app
+// must be signed: see "macOS" in the README of the package.
 
 import 'package:firebase_auth_providers_dart/firebase_auth_providers_dart.dart';
 import 'package:firebase_auth_secure_storage_flutter/firebase_auth_secure_storage_flutter.dart';
@@ -15,6 +16,10 @@ import 'package:flutter/widgets.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  runApp(_Message(await _signIn()));
+}
+
+Future<String> _signIn() async {
   final FirebaseUserAuth auth = FirebaseUserAuth(
     apiKey: 'demo-api-key',
     storage: SecureAuthStorage(),
@@ -22,15 +27,33 @@ Future<void> main() async {
   );
   try {
     await auth.restore();
+    if (auth.uid == null) {
+      await auth.signInAnonymously();
+    }
+    return 'Signed in as ${auth.uid}; the session survives a restart.';
   } on SecureAuthStorageException catch (e) {
     // No keyring, a locked keychain, a missing entitlement: the message says
     // which, and what to do.
-    debugPrint('$e');
-    return;
+    return '$e';
+  } on Exception catch (e) {
+    // The Auth emulator is not running, for example.
+    return 'Sign-in failed: $e';
+  } finally {
+    await auth.dispose();
   }
-  if (auth.uid == null) {
-    await auth.signInAnonymously();
+}
+
+class _Message extends StatelessWidget {
+  const _Message(this.text);
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    debugPrint(text);
+    return Directionality(
+      textDirection: TextDirection.ltr,
+      child: Center(child: Text(text)),
+    );
   }
-  debugPrint('Signed in as ${auth.uid}; the session survives a restart.');
-  await auth.dispose();
 }

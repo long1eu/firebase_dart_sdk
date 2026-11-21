@@ -20,3 +20,10 @@
   compare, then delete there); a sign-out deletes it there too. A failed read or delete of the old storage goes to
   `onMigrationIssue`; a failed secure write is rethrown and a read-back mismatch throws
   `SecureAuthStorageMigrationException`, both leaving the old storage unchanged.
+- `example/` is a macOS app with the `keychain-access-groups` entitlement, whose integration tests run
+  `SecureAuthStorage` against the real data-protection keychain: a write with the defaults, a round trip, separate
+  namespaces, both cases of a move from a `FileAuthStorage`, and no entry left behind. The workflow
+  `secure_storage_signed_macos.yml` runs them in a signed build on main (on a push and by hand), with a Developer ID
+  certificate and profile from fastlane match (readonly, Workload Identity Federation, no secrets) and the owner's
+  approval; its first run is still to come. The key is fetched only after the dependencies are resolved from the
+  committed lock files.

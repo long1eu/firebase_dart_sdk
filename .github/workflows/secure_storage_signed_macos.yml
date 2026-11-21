@@ -1,0 +1,216 @@
+name: Secure storage (signed macOS)
+
+# The integration tests of firebase_auth_secure_storage_flutter against the real data-protection
+# keychain of macOS (example/integration_test), in the example app signed with a Developer ID
+# certificate and profile. The keychain-access-groups entitlement needs a provisioning profile, so
+# an unsigned build cannot reach that keychain; ci.yml runs the unit tests only. A development
+# profile runs only on the Macs registered in it, and each hosted runner is a new, unregistered
+# Mac; a Developer ID profile runs on any Mac.
+#
+# The certificate and the profile come from fastlane match in readonly mode, from the Google Cloud
+# Storage bucket gs://flutter-sdk-match. Google Cloud is reached through Workload Identity
+# Federation: GitHub's OIDC token is exchanged for a short-lived token of a service account that
+# can only read that bucket. There are no secrets: match does not encrypt a Google Cloud Storage
+# backend, readonly mode never calls App Store Connect, and nothing is notarized (no notarization
+# credentials exist for this job or its environment).
+#
+# The signing key is present for as little of the job as possible:
+# * the dependencies are resolved from the committed lock files (`--enforce-lockfile`, and a
+#   check that `pod install` leaves Podfile.lock as it is) before the key is fetched. The build
+#   hooks of the dependencies run while the key is in the keychain, so the lock files are what
+#   decides which code that is;
+# * match imports into a staging keychain that is deleted in the same step; the key is then
+#   imported into the signing keychain with codesign as the only trusted application and the
+#   partition list apple-tool:,apple:, and the exported files are deleted;
+# * both keychains are deleted in an `if: always()` step.
+# Nothing is uploaded: no artifact, no build output, no keychain. Nothing signed leaves the runner.
+#
+# Only pushes to main and runs by hand: never pull requests, whose code would run with access to
+# the signing material. The `signing` environment needs the owner's approval and accepts main
+# only. tool/README.md ("CI") and the package README ("Signed integration tests") describe the job.
+on:
+  push:
+    branches: [main]
+    paths:
+      - firebase_auth/firebase_auth_secure_storage_flutter/**
+      - .github/workflows/secure_storage_signed_macos.yml
+  workflow_dispatch:
+
+# Granted to the one job below only.
+permissions: {}
+
+# One signed run at a time; a newer one waits instead of cancelling the one with the keychain.
+concurrency:
+  group: secure-storage-signed-macos
+  cancel-in-progress: false
+
+env:
+  APP_IDENTIFIER: dev.upcode.firebaseAuthSecureStorageExample
+  TEAM_ID: DKY2FBVP6L
+  EXAMPLE_DIR: firebase_auth/firebase_auth_secure_storage_flutter/example
+
+jobs:
+  keychain:
+    name: Integration tests on the data-protection keychain (signed)
+    # Named instead of macos-latest, as the jobs of ci.yml name their images.
+    runs-on: macos-26
+    environment: signing
+    permissions:
+      contents: read # the checkout
+      id-token: write # the OIDC token that Workload Identity Federation exchanges
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # The version of the Flutter job of ci.yml. No cache: nothing a job without the signing
+      # material writes is restored into this one.
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          channel: stable
+          flutter-version: 3.44.9
+          cache: false
+      # Everything that fetches or generates dependencies runs here, before the key exists:
+      # `pub get` fails if pubspec.lock would change, and the configuration-only build runs
+      # `pod install`, which must leave Podfile.lock as committed.
+      - name: Resolve the dependencies from the lock files
+        working-directory: ${{ env.EXAMPLE_DIR }}
+        run: |
+          set -euo pipefail
+          flutter --version
+          xcodebuild -version
+          flutter pub get --enforce-lockfile
+          flutter build macos --debug --config-only
+          git diff --exit-code -- pubspec.lock macos/Podfile.lock
+      # Writes an external-account credential file and exports GOOGLE_APPLICATION_CREDENTIALS,
+      # which match reads as Application Default Credentials. The next step deletes the file.
+      - name: Authenticate to Google Cloud (Workload Identity Federation)
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
+        with:
+          workload_identity_provider: projects/233259864964/locations/global/workloadIdentityPools/github/providers/firebase-dart-sdk
+          service_account: github-match-ci@flutter-sdk.iam.gserviceaccount.com
+          create_credentials_file: true
+          export_environment_variables: true
+      # match always imports what it fetches into a keychain, with its own list of trusted
+      # applications (codesign, security, productbuild, productsign) and the partition list
+      # apple-tool:,apple:,codesign:. So it imports into a staging keychain, deleted here, and
+      # exports the files to a directory of the job; the key is then imported into the signing
+      # keychain with codesign as its only trusted application, and the files are deleted.
+      - name: Fetch the Developer ID certificate and profile, and import the key for codesign
+        env:
+          FASTLANE_SKIP_UPDATE_CHECK: '1'
+          FASTLANE_HIDE_CHANGELOG: '1'
+        run: |
+          set -euo pipefail
+          staging="$RUNNER_TEMP/match-staging.keychain-db"
+          keychain="$RUNNER_TEMP/match-signing.keychain-db"
+          exported="$RUNNER_TEMP/match-export"
+          password="$(openssl rand -hex 32)"
+          echo "::add-mask::$password"
+          {
+            echo "MATCH_STAGING_KEYCHAIN=$staging"
+            echo "MATCH_KEYCHAIN=$keychain"
+            echo "MATCH_EXPORT_DIR=$exported"
+          } >> "$GITHUB_ENV"
+          cleanup() {
+            rm -rf "$exported"
+            if [ -f "$staging" ]; then security delete-keychain "$staging"; fi
+            rm -f "${GOOGLE_APPLICATION_CREDENTIALS:-}"
+          }
+          trap cleanup EXIT
+
+          security create-keychain -p "$password" "$staging"
+          fastlane --version
+          MATCH_KEYCHAIN_PASSWORD="$password" fastlane match developer_id --readonly \
+            --platform macos \
+            --app_identifier "$APP_IDENTIFIER" \
+            --team_id "$TEAM_ID" \
+            --storage_mode google_cloud \
+            --google_cloud_bucket_name flutter-sdk-match \
+            --google_cloud_project_id flutter-sdk \
+            --skip_google_cloud_account_confirmation \
+            --keychain_name "$staging" \
+            --skip_set_partition_list \
+            --output_path "$exported"
+          security delete-keychain "$staging"
+          rm -f "${GOOGLE_APPLICATION_CREDENTIALS:-}"
+
+          shopt -s nullglob
+          keys=("$exported"/*.p12)
+          certs=("$exported"/*.cer)
+          if [ "${#keys[@]}" -ne 1 ] || [ "${#certs[@]}" -ne 1 ]; then
+            echo "::error::match exported ${#keys[@]} keys and ${#certs[@]} certificates, expected one of each."
+            exit 1
+          fi
+          # The profile must grant the keychain group of the entitlement, or the app is killed at
+          # launch; checked here rather than discovered as a failed launch after the build.
+          profiles=("$exported"/*.provisionprofile)
+          if [ "${#profiles[@]}" -ne 1 ]; then
+            echo "::error::match exported ${#profiles[@]} profiles, expected one."
+            exit 1
+          fi
+          decoded="$RUNNER_TEMP/profile.plist"
+          security cms -D -i "${profiles[0]}" > "$decoded"
+          name="$(/usr/libexec/PlistBuddy -c 'Print :Name' "$decoded")"
+          groups="$(/usr/libexec/PlistBuddy -c 'Print :Entitlements:keychain-access-groups' "$decoded" \
+            2>/dev/null || true)"
+          rm -f "$decoded"
+          echo "Profile: $name"
+          echo "keychain-access-groups: $groups"
+          if [ "$name" != "match Direct $APP_IDENTIFIER macos" ]; then
+            echo "::error::Unexpected profile name: $name"
+            exit 1
+          fi
+          if ! grep -qxE "[[:space:]]*($TEAM_ID\\.\\*|$TEAM_ID\\.$APP_IDENTIFIER)" <<<"$groups"; then
+            echo "::error::The profile does not grant $TEAM_ID.$APP_IDENTIFIER in keychain-access-groups."
+            exit 1
+          fi
+          security create-keychain -p "$password" "$keychain"
+          # No auto-lock during the job.
+          security set-keychain-settings -lut 21600 "$keychain"
+          security unlock-keychain -p "$password" "$keychain"
+          # match stores the key without a passphrase. codesign is its only trusted application.
+          security import "${keys[0]}" -k "$keychain" -P "" -T /usr/bin/codesign
+          # The certificate may already have come in with the key.
+          if ! out="$(security import "${certs[0]}" -k "$keychain" 2>&1)"; then
+            if ! grep -q 'already exists' <<<"$out"; then
+              echo "$out"
+              exit 1
+            fi
+          fi
+          # Narrower than match's apple-tool:,apple:,codesign: (codesign is an Apple tool).
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$password" "$keychain" \
+            > /dev/null
+          # In the search list, ahead of the existing keychains, so codesign finds the identity.
+          existing=()
+          while IFS= read -r line; do
+            existing+=("$line")
+          done < <(security list-keychains -d user | sed -e 's/^[[:space:]]*"//' -e 's/"$//')
+          security list-keychains -d user -s "$keychain" "${existing[@]}"
+          security find-identity -v -p codesigning "$keychain"
+      # Replaces the automatic development signing of macos/Runner/Configs/Signing.xcconfig for
+      # this build. A Developer ID profile does not allow com.apple.security.get-task-allow, which
+      # Xcode adds to a Debug build unless CODE_SIGN_INJECT_BASE_ENTITLEMENTS is NO; the tests do
+      # not need it (the Dart VM service is reached over the network).
+      - name: Select the match profile
+        run: |
+          set -euo pipefail
+          cat > "$EXAMPLE_DIR/macos/Runner/Configs/Signing.local.xcconfig" <<EOF
+          CODE_SIGN_STYLE = Manual
+          CODE_SIGN_IDENTITY = Developer ID Application
+          DEVELOPMENT_TEAM = $TEAM_ID
+          PROVISIONING_PROFILE_SPECIFIER = match Direct $APP_IDENTIFIER macos
+          CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO
+          OTHER_CODE_SIGN_FLAGS = --keychain $MATCH_KEYCHAIN
+          EOF
+      # --no-pub: the dependencies were resolved before the key was fetched.
+      - name: Run the integration tests
+        working-directory: ${{ env.EXAMPLE_DIR }}
+        run: flutter test integration_test -d macos --no-pub --reporter expanded
+      - name: Delete the keychains and the exported files
+        if: always()
+        run: |
+          for k in "${MATCH_KEYCHAIN:-}" "${MATCH_STAGING_KEYCHAIN:-}"; do
+            if [ -n "$k" ] && [ -f "$k" ]; then security delete-keychain "$k"; fi
+          done
+          if [ -n "${MATCH_EXPORT_DIR:-}" ]; then rm -rf "$MATCH_EXPORT_DIR"; fi

@@ -1,0 +1,9 @@
+# The sibling checkouts instead of the hosted packages, as in the package's own
+# pubspec_overrides.yaml.
+dependency_overrides:
+  firebase_auth_providers_dart:
+    path: ../../firebase_auth_providers_dart
+  firebase_app_dart:
+    path: ../../../firebase_core/firebase_app_dart
+  secure_flow:
+    path: ../../../secure_flow/secure_flow

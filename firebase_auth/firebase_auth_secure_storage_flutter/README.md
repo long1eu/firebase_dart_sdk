@@ -12,7 +12,9 @@ Firebase.
 `FileAuthStorage`.
 
 > **Status: 0.1.0, unreleased.** Unit-tested with `flutter test` against a fake of the plugin's method channel. It
-> has not yet run against a real Keychain, Keystore, Secret Service or DPAPI.
+> has not yet run against a real Keychain, Keystore, Secret Service or DPAPI. The integration tests of `example/` are
+> for the real macOS data-protection keychain; a signed macOS job runs them on main after the owner's approval, and
+> its first run is still to come (see [Signed integration tests](#signed-integration-tests)).
 
 ## How to use it
 
@@ -214,6 +216,71 @@ SecureAuthStorage(
 
 Items of the two keychains are separate: switching loses the stored sessions.
 
+#### Signed integration tests
+
+`example/` is a macOS app (`dev.upcode.firebaseAuthSecureStorageExample`, team `DKY2FBVP6L`) with the
+`keychain-access-groups` entitlement. Its integration tests (`example/integration_test`) use `SecureAuthStorage`
+alone, against the real data-protection keychain: a write with the package defaults (a build without the
+entitlement fails there with `errSecMissingEntitlement`), a round trip, two namespaces kept apart, both cases of a
+move from a `FileAuthStorage` (the file's session moves and the file is deleted; a session already in the keychain wins, and a
+sign-out deletes both), and a last check that no entry written by the run is left in the keychain.
+
+The workflow `.github/workflows/secure_storage_signed_macos.yml` runs them on a GitHub-hosted macOS runner (its first
+run is still to come), on a push to main that touches this package (`example/` included) or the workflow, and by
+hand. Never on a pull request. Its job uses the `signing` environment, which only accepts main and waits for the owner's approval. It has no secrets
+and no notarization credentials, and it uploads nothing: no artifact, no build output, no keychain.
+
+* Google Cloud is reached by Workload Identity Federation: `google-github-actions/auth` exchanges the job's GitHub
+  OIDC token for a short-lived token of a service account that can only read the bucket of fastlane match, and
+  exports it as Application Default Credentials.
+* `fastlane match developer_id --readonly` fetches the Developer ID Application certificate and the Developer ID
+  profile `match Direct dev.upcode.firebaseAuthSecureStorageExample macos` from that bucket. A development profile
+  runs only on the Macs registered in it, and each hosted runner is a new Mac; a Developer ID profile runs on any
+  Mac. match does not encrypt a Google Cloud Storage backend (no `MATCH_PASSWORD`), and in readonly mode it never
+  signs in to App Store Connect. The certificate's private key exists only in that private bucket, which only this
+  job reads, without a key: from main, in the `signing` environment, after the owner's approval.
+* The dependencies are resolved before the key is fetched: `flutter pub get --enforce-lockfile` fails if
+  `pubspec.lock` would change, and the `pod install` of a configuration-only build must leave `Podfile.lock` as
+  committed. The test run then uses `--no-pub`. The build hooks of the dependencies (and the CocoaPods and Xcode build
+  phases) run while the key is in the keychain, so the committed lock files are the guard: they decide which code
+  runs next to the key. No dependency update merges without the owner reviewing the diff of `pubspec.lock` and
+  `Podfile.lock` of `example/`.
+* match imports into a staging keychain, deleted in the same step, and exports the files; the key is imported into
+  the signing keychain with `codesign` as its only trusted application and the partition list `apple-tool:,apple:`
+  (match itself would also trust `security`, `productbuild` and `productsign`, and add `codesign:`), and the exported
+  files are deleted. Both keychains have a random password and are deleted at the end of the job, even when a step
+  fails. Before the build, the job checks that the profile is the expected one and grants the app's keychain group in
+  `keychain-access-groups`, so a wrong profile fails with that message rather than as a failed launch.
+* The job writes `macos/Runner/Configs/Signing.local.xcconfig` (manual signing with `Developer ID Application`
+  and that profile, and `CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO`, because a Developer ID profile does not allow the
+  `get-task-allow` entitlement that Xcode adds to a Debug build) and runs `flutter test integration_test -d macos`.
+
+Changes to `firebase_auth_providers_dart`, `firebase_app_dart` or `secure_flow`, which the example resolves through
+`pubspec_overrides.yaml`, do not start the job; run it by hand after such a change.
+
+To run them yourself, on a Mac signed in to Xcode with an Apple ID that can sign for the app:
+
+```sh
+cd example
+flutter test integration_test -d macos
+```
+
+Local builds keep automatic development signing: `macos/Runner/Configs/Signing.xcconfig` signs for team
+`DKY2FBVP6L`, but `flutter` does not let Xcode create the profile (`-allowProvisioningUpdates`): open `macos/Runner.xcworkspace` in Xcode once and build
+the Runner scheme, which creates the development profile and registers the Mac. In another team, put your own
+settings in `macos/Runner/Configs/Signing.local.xcconfig` (ignored by git), which replaces those of
+`Signing.xcconfig`:
+
+```
+DEVELOPMENT_TEAM = <your team ID>
+PRODUCT_BUNDLE_IDENTIFIER = <a bundle ID of your team>
+```
+
+The entitlement names `$(AppIdentifierPrefix)$(PRODUCT_BUNDLE_IDENTIFIER)`, so it follows. A build without signing
+cannot run the tests: an ad-hoc signature cannot carry the entitlement, and the first write fails with
+`errSecMissingEntitlement`. The tests write only keys that contain the id of the run, under the Keychain service
+`firebase_auth_secure_storage` of the example app, and delete them.
+
 ### iOS
 
 The default accessibility is `unlocked`: the session cannot be read or written while the device is locked. An app
@@ -256,5 +323,8 @@ options per platform, each error remedy, and every migration path. The Windows i
 channel: it keeps one DPAPI-encrypted map in `flutter_secure_storage.dat` and calls the legacy C++ Credential Manager
 path over the channel on every read and write. Its errors are tested by shape only, with an exception whose
 `toString()` is that of `WindowsException` of `package:win32` 6.x; DPAPI itself never runs in the tests.
+
+The integration tests of `example/` are for the real macOS keychain, in a signed build; see
+[Signed integration tests](#signed-integration-tests).
 
 In your own tests, `FlutterSecureStorage.setMockInitialValues({})` replaces the platform with an in-memory one.
