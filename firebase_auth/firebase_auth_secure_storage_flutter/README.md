@@ -11,7 +11,7 @@ Firebase.
 `FirebaseUserAuth` uses it only when the app passes it. It needs Flutter; a command line tool or a server keeps
 `FileAuthStorage`.
 
-> **Status: 0.1.0, unreleased.** Unit-tested with `flutter test` against a fake of the plugin's method channel. On
+> **Status: 0.1.0.** Unit-tested with `flutter test` against a fake of the plugin's method channel. On
 > macOS, the six integration tests of `example/` pass against the real data-protection keychain in a Developer ID
 > signed build on a GitHub-hosted runner (see [Signed integration tests](#signed-integration-tests)). It has not yet
 > run in CI against the iOS Keychain, the Android Keystore, a Secret Service or DPAPI.
