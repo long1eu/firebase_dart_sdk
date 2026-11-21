@@ -1,4 +1,5 @@
 import 'package:http/http.dart' as http;
+import 'package:secure_flow/secure_flow.dart';
 
 import 'oauth_loopback.dart';
 
@@ -7,14 +8,10 @@ import 'oauth_loopback.dart';
 /// implementation for the details.
 Future<OAuthLoopbackResult> authorizeWithOAuthLoopback(
   OAuthLoopbackProvider provider, {
-  UrlPresenter? presenter,
+  SecurePresenter? presenter,
+  SecureEnvironment? environment,
   Duration timeout = const Duration(minutes: 5),
   http.Client? httpClient,
 }) => throw UnsupportedError(
   'The loopback OAuth sign-in needs dart:io (desktop and command line).',
-);
-
-/// Opens [url] in the system browser. Needs `dart:io`; on this platform it throws an [UnsupportedError].
-Future<void> openInSystemBrowser(Uri url) => throw UnsupportedError(
-  'openInSystemBrowser needs dart:io (desktop and command line).',
 );

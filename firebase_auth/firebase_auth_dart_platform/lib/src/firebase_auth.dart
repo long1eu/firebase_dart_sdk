@@ -51,7 +51,7 @@ class DartAuthConfig {
     this.httpClient,
     this.oauthProviders = const <String, dart_auth.OAuthLoopbackProvider>{},
     this.oauthProvidersFor,
-    this.presentUrl,
+    this.presenter,
   });
 
   final AuthStorageFactory? storageFor;
@@ -65,9 +65,10 @@ class DartAuthConfig {
   /// provider here replaces the one of [oauthProviders] with the same id.
   final OAuthProvidersFactory? oauthProvidersFor;
 
-  /// Opens the authorization URL of a provider sign-in; the client's default
-  /// (`openInSystemBrowser`) when null.
-  final dart_auth.UrlPresenter? presentUrl;
+  /// Runs the browser flow of a provider sign-in; the client's default
+  /// (the presenter of the environment that the flow ranks best: the system
+  /// browser on a desktop) when null.
+  final dart_auth.SecurePresenter? presenter;
 }
 
 /// The implementation of [FirebaseAuthPlatform] on top of
@@ -211,7 +212,7 @@ class DartFirebaseAuth extends FirebaseAuthPlatform {
   ///
   /// Throws `unimplemented` when no provider is registered for that id, on
   /// the web, where the loopback flow does not exist, and on a platform without
-  /// a default browser launcher (Android, iOS) when `use` got no `presentUrl`.
+  /// a default browser launcher (Android, iOS) when `use` got no `presenter`.
   dart_auth.OAuthLoopbackProvider loopbackProviderFor(
     String member,
     AuthProvider provider,
@@ -219,9 +220,9 @@ class DartFirebaseAuth extends FirebaseAuthPlatform {
     if (kIsWeb) {
       throw unimplemented(member, noLoopbackOnWeb);
     }
-    if (_config.presentUrl == null &&
+    if (_config.presenter == null &&
         !_systemBrowserPlatforms.contains(defaultTargetPlatform)) {
-      throw unimplemented(member, noPresentUrl);
+      throw unimplemented(member, noPresenter);
     }
     final dart_auth.OAuthLoopbackProvider? registered =
         _oauthProviders[provider.providerId];
@@ -242,15 +243,15 @@ class DartFirebaseAuth extends FirebaseAuthPlatform {
     );
   }
 
-  /// Where the client opens the system browser without a `presentUrl`.
+  /// Where the client opens the system browser without a `presenter`.
   static const Set<TargetPlatform> _systemBrowserPlatforms = <TargetPlatform>{
     TargetPlatform.macOS,
     TargetPlatform.linux,
     TargetPlatform.windows,
   };
 
-  /// The presenter of the authorization URL passed to `FirebaseAuthDart.use`.
-  dart_auth.UrlPresenter? get presentUrl => _config.presentUrl;
+  /// The presenter of the provider flows passed to `FirebaseAuthDart.use`.
+  dart_auth.SecurePresenter? get presenter => _config.presenter;
 
   // ---- plumbing ----
 
@@ -552,7 +553,7 @@ class DartFirebaseAuth extends FirebaseAuthPlatform {
           provider,
         );
         return resultOf(
-          await client.signInWithOAuthLoopback(loopback, presenter: presentUrl),
+          await client.signInWithOAuthLoopback(loopback, presenter: presenter),
         );
       });
 

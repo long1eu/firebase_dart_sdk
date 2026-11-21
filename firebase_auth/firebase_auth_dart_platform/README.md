@@ -50,12 +50,12 @@ Future<void> main() async {
 
 | Argument | Default | What it does |
 | --- | --- | --- |
-| `storageFor` | a file per program (see below); memory on Android, iOS and the web | Returns the `AuthStorage` that keeps the session of a FlutterFire app, for example a `FileAuthStorage` at a path of your choice, or one on top of a secure storage plugin. |
+| `storageFor` | the secure store of the platform, with the session file as fallback (see [The session](#the-session)); memory on the web | Returns the `AuthStorage` that keeps the session of a FlutterFire app, for example a `FileAuthStorage` at a path of your choice. It replaces the default entirely. |
 | `httpClient` | one per app | The `http.Client` of the requests (tests, proxies). |
 | `useDartCore` | Linux only, when `firebase_core` has no other implementation | Installs a small pure-Dart `firebase_core`. Pass `true` to force it (tests), `false` to never do it. |
 | `oauthProviders` | none | The `OAuthLoopbackProvider`s of `signInWithProvider`, `User.linkWithProvider` and `User.reauthenticateWithProvider`, one per Firebase provider id (see [Provider sign-in](#provider-sign-in)). |
 | `oauthProvidersFor` | none | The providers of one FlutterFire app, for apps with several Firebase projects that each have their own OAuth client; called once per app. They are added to `oauthProviders`, and one with the same id as a provider of `oauthProviders` replaces it for that app. |
-| `presentUrl` | the system browser on macOS, Linux and Windows | Opens the authorization URL of a provider sign-in, for example `url_launcher`'s `launchUrl`. Needed on Android and iOS: without it the provider calls throw `unimplemented`. |
+| `presenter` | the presenter the `OAuthFlow` of `secure_flow` ranks best in the environment: the system browser on macOS, Linux and Windows, the URL on stderr over SSH or without a display | A `SecurePresenter` that runs the browser part of a provider sign-in: it shows the authorization URL and takes the redirect on 127.0.0.1. `CallbackPresenter((Uri url) => launchUrl(url))` with `url_launcher`, for example. Needed on Android and iOS: without it the provider calls throw `unimplemented`. |
 
 `use()` throws a `StateError` once the `FirebaseAuth` of an app has been used, because the configuration is read
 then.
@@ -78,7 +78,45 @@ the app's `FirebaseAuth` instance is created (`firebase_auth` creates it at the 
 final User? user = await FirebaseAuth.instance.authStateChanges().first;
 ```
 
-By default the sessions are in one file per program, written owner-only (mode 0600) by `FileAuthStorage`:
+By default the sessions are in the secure store of the platform, through
+[`firebase_auth_secure_storage_flutter`](https://pub.dev/packages/firebase_auth_secure_storage_flutter) (`SecureAuthStorage`, under its
+default namespace, which is unique per program):
+
+| Platform | Store | Needed |
+| --- | --- | --- |
+| Linux | libsecret (GNOME Keyring, KDE Wallet) | `libsecret-1-dev` to build, a running Secret Service to use it |
+| macOS | data-protection keychain | the `keychain-access-groups` entitlement in a signed app |
+| Windows | one DPAPI-encrypted map in `flutter_secure_storage.dat` in the application support directory | the C++ ATL libraries of Visual Studio Build Tools to build; an interactive logon (not SSH, not a service) to use it |
+| Android | AES-GCM values, key wrapped by the Android Keystore | exclude the plugin's preferences from Auto Backup |
+| iOS | Keychain, accessible while unlocked | nothing |
+| Web | memory (the secure store is not used) | nothing |
+
+The README of `firebase_auth_secure_storage_flutter` explains each set-up.
+
+**Moving from the session file.** The session file (below) is where the fallback keeps the sessions, and where
+builds of this package from before the secure store was the default kept them. At the first read of an app's
+session, a session found in that file and not in the secure store moves there: it is written, read
+back and compared, and only then deleted from the file (the file goes with its last session). When the secure store
+already has a session for that app, it wins, and the file is left alone; the two are never merged.
+
+**When the secure store is unavailable.** Before the first read or write of the run, a probe decides for the whole
+run: it writes an entry (`<namespace>/.probe`), reads it back and deletes it. A read alone cannot tell, because a macOS
+build without the keychain entitlement reads a missing key as null and fails only at the first write. Operations that
+start while the probe runs wait for it; the probe entry is deleted also when its read-back fails. When a step fails
+because the store as a whole cannot be used (`SecureAuthStorageException.isUnavailable`: no plugin, no Secret Service
+or D-Bus session bus, a locked keyring, a macOS build without the entitlement, Windows without an interactive logon
+such as an SSH session or a service, where DPAPI refuses access; or no services binding yet), every session
+of the run is kept in the session file instead (memory on Android and iOS, which have no file), and one line per
+process says where. Nothing is written to the secure store for the rest of the run. Any other failure of the probe is
+thrown by the operation that waited for it, and the next operation probes again. Once the probe has succeeded, a later
+failure in the same run is not a reason to switch: it is thrown like the errors below. Other errors (a value that
+cannot be read or decrypted, an iOS device that is locked for now) are thrown, never answered from the file: the restore
+fails, the app starts signed out with the error in `authStateReady()`, and the stored session is not replaced by the
+file's. A store that becomes unavailable after it held a session (a keyring locked at the next start) starts the app
+signed out on the file, and nothing is copied back into the secure store afterwards: at a later start where the store
+works again, its older session wins over one signed in to meanwhile in the file.
+
+The session file of the fallback:
 
 | Platform | File |
 | --- | --- |
@@ -87,15 +125,30 @@ By default the sessions are in one file per program, written owner-only (mode 06
 | Windows | `%APPDATA%\<executable>\firebase_auth_dart_platform\sessions.json` |
 
 `<executable>` is the file name of the program, which for a Flutter desktop app is the name of the project.
-`defaultSessionFile()` returns the path. The file holds a refresh token, which does not expire: anyone who can read
-it can act as the user. Pass `storageFor` to keep it in the system keyring instead. Separate processes of the same
-program share the file: the last one to write it wins.
+`defaultSessionFile()` returns the path. It is written owner-only (mode 0600) by `FileAuthStorage`. It holds a refresh
+token, which does not expire: anyone who can read it can act as the user. Separate processes of the same program share
+it: the last one to write it wins.
 
-If the file cannot be written (a read-only or full disk), the sign-in still succeeds: the session stays in memory until
-the program ends, and the failure is printed once.
+**Keeping the file instead.** `storageFor` replaces the default, secure store and fallback included:
 
-Under `flutter test`, the registration on Linux uses neither the file nor this package's `firebase_core`, so tests
-do not share a file and `setupFirebaseCoreMocks` keeps working; call `use()` to choose otherwise.
+```dart
+// FileAuthStorage and InMemoryAuthStorage come from firebase_auth_providers_dart.
+final String? file = defaultSessionFile(); // null on Android and iOS
+FirebaseAuthDart.use(
+  storageFor: (FirebaseApp app) => file == null ? InMemoryAuthStorage() : FileAuthStorage(file),
+);
+```
+
+**Failed writes.** Whatever the storage, a write that fails (the secure store refuses it, or the fallback file cannot
+be written: a read-only or full disk) does not fail the sign-in: the session of that app stays in memory until the
+program ends, and the failure is printed once. So there are three levels: the secure store; the session file, for the
+whole run, only when the probe finds the store unavailable; memory, for one app, after a failed write to either.
+A failed read is never answered from memory or the file.
+
+Under `flutter test`, the registration on Linux uses neither the default storage nor this package's
+`firebase_core`, so tests do not share a file, need no secure storage plugin and print nothing, and
+`setupFirebaseCoreMocks` keeps working; call `use()` to choose otherwise. A test that uses the default storage
+without faking the plugin's channel gets the fallback and its line.
 
 `setPersistence(Persistence.NONE)` (or `SESSION`) moves the session to memory, so the user is signed out at the next
 start; `Persistence.LOCAL` moves it back.
@@ -119,7 +172,7 @@ FirebaseAuthDart.use(
     OAuthLoopbackProvider.github(clientId: '<OAuth App client id>', clientSecret: '<its secret>'),
   ],
   // Optional on macOS, Linux and Windows (the system browser opens); needed on Android and iOS.
-  presentUrl: (Uri url) => launchUrl(url),
+  presenter: CallbackPresenter((Uri url) => launchUrl(url)),
 );
 
 final UserCredential result = await FirebaseAuth.instance.signInWithProvider(
@@ -222,9 +275,9 @@ These throw a `FirebaseAuthException` with the code `unimplemented` and a messag
 
 | Platform | Selected by | Notes |
 | --- | --- | --- |
-| Linux | automatic (`dartPluginClass`) | `firebase_core` is installed too, unless another package did it first |
-| Windows, macOS | `FirebaseAuthDart.use()` | `firebase_core` stays native; the session file is in the user's application data |
-| Android, iOS | `FirebaseAuthDart.use()` | the session is in memory unless you pass `storageFor` |
+| Linux | automatic (`dartPluginClass`) | `firebase_core` is installed too, unless another package did it first; the session is in libsecret (`libsecret-1-dev` to build) |
+| Windows, macOS | `FirebaseAuthDart.use()` | `firebase_core` stays native; the session is in DPAPI (Windows) or the keychain (macOS; the session file when the build lacks the keychain entitlement) |
+| Android, iOS | `FirebaseAuthDart.use()` | the session is in the Keystore or the Keychain |
 | Web | not supported | use the official plugin |
 
 ## Real-project harness

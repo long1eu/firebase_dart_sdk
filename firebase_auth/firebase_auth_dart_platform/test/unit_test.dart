@@ -142,7 +142,7 @@ void main() {
           storageOverrides[app.name] ??
           storages.putIfAbsent(app.name, InMemoryAuthStorage.new),
       oauthProviders: oauthProviders,
-      presentUrl: followRedirect,
+      presenter: CallbackPresenter(followRedirect),
     );
   });
 
@@ -793,7 +793,7 @@ void main() {
     );
 
     test(
-      'without presentUrl, Android and iOS throw before the flow starts',
+      'without a presenter, Android and iOS throw before the flow starts',
       () async {
         final DartAuthConfig configured = DartFirebaseAuth.config;
         DartFirebaseAuth.config = DartAuthConfig(
@@ -828,7 +828,7 @@ void main() {
                     .having(
                       (FirebaseAuthException e) => e.message,
                       'message',
-                      contains('presentUrl'),
+                      contains('presenter'),
                     ),
               ),
             );
@@ -856,7 +856,7 @@ void main() {
           httpClient: shared.httpClient,
           storageFor: shared.storageFor,
           oauthProviders: shared.oauthProviders,
-          presentUrl: shared.presentUrl,
+          presenter: shared.presenter,
           oauthProvidersFor: (FirebaseApp app) {
             asked.add(app.name);
             return <dart_auth.OAuthLoopbackProvider>[

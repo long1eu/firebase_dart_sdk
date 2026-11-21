@@ -122,7 +122,7 @@ class DartUser extends UserPlatform {
         return _auth.resultOf(
           await userAuth.linkWithOAuthLoopback(
             loopback,
-            presenter: _auth.presentUrl,
+            presenter: _auth.presenter,
           ),
         );
       });
@@ -143,7 +143,7 @@ class DartUser extends UserPlatform {
     return _auth.resultOf(
       await userAuth.reauthenticateWithOAuthLoopback(
         loopback,
-        presenter: _auth.presentUrl,
+        presenter: _auth.presenter,
       ),
     );
   });

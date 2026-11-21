@@ -151,7 +151,8 @@ against the Firebase Auth emulator; nothing was run against the real service.
 | `multiFactor(user).getSession()` + `TotpMultiFactorGenerator.generateSecret`, `TotpSecret.generateQrCodeUrl` | `startTotpEnrollment()`, `TotpSecret.otpauthUri(issuer:)` and its parameters (see below) | unit (fake backend) |
 | `multiFactor(user).enroll(TotpMultiFactorGenerator.assertionForEnrollment(...))`, `unenroll`, `enrolledFactors` | `finalizeTotpEnrollment(secret, code:, displayName:)`, `unenrollMultiFactor(uid)`, `AuthUser.enrolledFactors` | unit; real project, 2026-11-20 |
 | `getMultiFactorResolver(auth, error).resolveSignIn(TotpMultiFactorGenerator.assertionForSignIn(...))` | `FirebaseAuthMultiFactorException.resolver.resolveSignInWithTotp(code)` | unit; real project, 2026-11-20 |
-| Phone sign-in, SMS second factors (enrolment and sign-in), reCAPTCHA, `revokeAccessToken`, passkeys | – (SMS factors are listed and can be unenrolled) | |
+| `RecaptchaVerifier` (a reCAPTCHA v2 token) on desktop and command line; `getRecaptchaParams` | `AppVerification.recaptchaV2Loopback()` (VM only; the `RecaptchaFlow` of `secure_flow`), `getRecaptchaSiteKey()`, and the `AppVerification` value the phone calls will take (see below) | unit (simulated browser, fake backend); not run against Google |
+| Phone sign-in, SMS second factors (enrolment and sign-in), reCAPTCHA Enterprise configuration, passkeys | – (SMS factors are listed and can be unenrolled) | |
 
 Of the federated providers, only the request and the flows were exercised, against the emulator with fake
 tokens (the emulator checks no signature, audience or nonce). The checks of the real backend (the audience of an
@@ -222,8 +223,18 @@ final UserCredential result = await auth.signInWithOAuthLoopback(
 print(result.user?.email);
 ```
 
-- The browser is opened with `open`, `xdg-open` or `rundll32` (`openInSystemBrowser`); pass `presenter:` to open it
-  another way (`url_launcher` in a Flutter app, or a printed link). The package depends on no Flutter plugin.
+- The request runs as an `OAuthFlow` of [`secure_flow`](https://pub.dev/packages/secure_flow) (its presenters are
+  re-exported here). Without `presenter:`, the flow takes the best presenter of `environment:` (the real one by
+  default): a `ProviderAppPresenter` registered for the provider (an SDK that returns the provider's tokens; none is
+  part of these packages), then the system browser (`open`, `xdg-open` or `rundll32`), an in-app browser, the
+  console (only the URL, on stderr, over SSH or without a display). Pass `presenter:` to choose:
+  `SystemBrowserPresenter()`, `ConsolePresenter()`, or `CallbackPresenter((Uri url) => launchUrl(url))` with
+  `url_launcher` in a Flutter app. A presenter the flow does not accept (a web view,
+  `CallbackPresenter(..., kind: SecurePresenterKind.embeddedWebView)`) is refused with `SecureFlowRefused`, never replaced.
+  The package depends on no Flutter plugin.
+- Tokens from a provider app skip the code exchange: the nonce claim of the ID token is checked against the hash
+  that was sent, and the raw nonce goes to Firebase with the credential (for OpenID Connect providers), as after a
+  redirect.
 - The code is exchanged at the provider's token endpoint with the client id and the secret. Google with a
   "Desktop app" client needs nothing more: Google says the secret of such a client is not confidential.
 - `exchangeCode:` is optional. It is for a provider that wants a confidential client, whose secret must stay on a
@@ -307,10 +318,52 @@ Not offered by the loopback helper:
   exact match), and Firebase documents a Facebook ID token only for iOS Limited Login.
 - Microsoft: Firebase does not support direct sign-in with Microsoft OAuth tokens
   ([Firebase docs](https://firebase.google.com/docs/auth/web/microsoft-oauth)).
-- Phone sign-in, from plain Dart outside the Auth emulator: `sendVerificationCode` needs app verification
-  (reCAPTCHA, Play Integrity or APNs).
+- Phone sign-in: not in the client yet. On a real project `sendVerificationCode` needs app verification
+  (reCAPTCHA, Play Integrity or APNs); see the loopback reCAPTCHA page below.
 - Auth-domain options (`customAuthDomain`): the loopback flow builds no hosted auth-domain page, so they do not
   apply.
+
+### App verification and the loopback reCAPTCHA page
+
+Phone requests (`accounts:sendVerificationCode`, the start of an SMS second factor) carry a proof that they come
+from a real app. Phone sign-in is not in the client yet; these are the pieces it will use:
+
+- `AppVerification`, a sealed value with three shapes: a reCAPTCHA v2 token
+  (`AppVerification.recaptchaV2(source)`, where `source` is yours and is called with the project's site key, or
+  `AppVerification.recaptchaV2Loopback()` for the page below); a reCAPTCHA Enterprise token of yours
+  (`AppVerification.recaptchaEnterprise(source, clientType:)`); and no proof (`AppVerification.none()`, for the
+  Auth emulator and test phone numbers, like the iOS SDK in test mode; whether a real project accepts it for a
+  test number has not been checked).
+- `auth.getRecaptchaSiteKey()`: the reCAPTCHA v2 site key of the project (`v1/recaptchaParams`), from the
+  emulator when one is set (the emulator returns a fake key).
+- `AppVerification.recaptchaV2Loopback(presenter:, timeout:)` (VM only; on the web the presenters throw an
+  `UnsupportedError`): for each phone request, a `RecaptchaFlow` of `secure_flow` serves a page with the
+  reCAPTCHA v2 checkbox for the project's site key on localhost, the presenter shows it (the default presenter of
+  the environment when null), and the token the page posts back is the proof.
+
+```dart
+final AppVerification verification = AppVerification.recaptchaV2Loopback();
+```
+
+How the page is served (by `secure_flow`):
+
+- The server listens on 127.0.0.1 and, on the same port, on ::1, and on no other interface. The page address is
+  `http://localhost:<port>/<random path>?state=<random state>`: `localhost` is the domain that Firebase projects
+  and their reCAPTCHA site keys allow by default, 127.0.0.1 is not. Listening on ::1 too means a browser that
+  tries ::1 first for `localhost` still reaches this server, not another process.
+- The page loads only Google's reCAPTCHA script (`https://www.google.com/recaptcha/api.js`), under a content
+  security policy with a nonce. It follows the system's light or dark setting. Its referrer policy sends Google
+  the origin only, not the path or the state.
+- The token ends the wait only when posted to the random path with the `Host` `localhost:<port>`, the page's
+  `Origin` (when sent), and the state of this check (compared in constant time). Anything else gets an error
+  page and the server keeps waiting. Only one answer is ever taken.
+- The server is closed on success, on timeout (the token source throws `timeout`, after five minutes by default)
+  and when the presenter throws. Nothing is logged; the token and the state are never part of an exception
+  message.
+
+Not checked against Google: whether a token made on a localhost page is accepted for a real project. That depends
+on the project (the allowed domains of the key, reCAPTCHA Enterprise enforcement, SMS defense). Serving Google's
+widget from a page of your app is a use of reCAPTCHA under Google's terms; check that they fit your app.
 
 ## Documentation
 

@@ -1,0 +1,11 @@
+firebase_auth_secure_storage_flutter
+Copyright 2026 Razvan Lung (long1eu) and contributors.
+
+This package implements the AuthStorage interface of firebase_auth_providers_dart
+on top of the flutter_secure_storage plugin (BSD 3-Clause license). It depends
+on that package; it does not copy its code.
+
+This package is not affiliated with, endorsed by or supported by Google LLC or
+Firebase. "Firebase" is a trademark of Google LLC.
+
+Licensed under the Apache License, Version 2.0; see the LICENSE file.

@@ -494,7 +494,7 @@ void _setUpFakeProject() {
         OAuthLoopbackProvider.google(clientId: 'id', clientSecret: 'secret'),
         OAuthLoopbackProvider.github(clientId: 'id', clientSecret: 'secret'),
       ],
-      presentUrl: _followRedirect,
+      presenter: CallbackPresenter(_followRedirect),
     );
   });
   tearDownAll(() => _sessions.delete(recursive: true));

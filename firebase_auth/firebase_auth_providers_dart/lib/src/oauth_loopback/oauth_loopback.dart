@@ -6,10 +6,6 @@ import 'package:http/http.dart' as http;
 import '../auth_credential.dart';
 import '../auth_exception.dart';
 
-/// Opens [url] for the user: the system browser, a browser tab of a Flutter plugin (`url_launcher`), or a line
-/// printed by a command line tool. It may return before the user is done; the sign-in waits for the redirect.
-typedef UrlPresenter = FutureOr<void> Function(Uri url);
-
 /// Exchanges an authorization code for the provider's tokens somewhere else than at the token endpoint: on a server
 /// of yours that holds the client secret. It returns the JSON object of the token endpoint (`id_token`,
 /// `access_token`, `expires_in`, ...). Throw a [FirebaseAuthException] to choose the error of the sign-in; any other

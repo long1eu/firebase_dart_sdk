@@ -35,6 +35,10 @@ dependencies:
   googleapis_auth: ^2.0.0
   http: ^1.2.0
   meta: ^1.11.0
+  # The browser flows (the OAuth loopback sign-in, the reCAPTCHA page) and their presenters.
+  # Local development resolves it from ../../secure_flow/secure_flow through
+  # pubspec_overrides.yaml.
+  secure_flow: ^0.1.0
   # navigator.language and the browser storages on the web (FirebaseUserAuth.useDeviceLanguage, WebAuthStorage).
   # Already part of the dependency graph through package:http.
   web: ^1.1.0

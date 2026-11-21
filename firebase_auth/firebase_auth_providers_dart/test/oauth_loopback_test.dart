@@ -204,7 +204,7 @@ void main() {
     Duration timeout = const Duration(seconds: 10),
   }) => authorizeWithOAuthLoopback(
     provider,
-    presenter: presenter.call,
+    presenter: CallbackPresenter(presenter.call),
     timeout: timeout,
     httpClient: client,
   );
@@ -370,7 +370,7 @@ void main() {
       final List<int> statuses = <int>[];
       final OAuthLoopbackResult result = await authorizeWithOAuthLoopback(
         oidc(),
-        presenter: (Uri url) async {
+        presenter: CallbackPresenter((Uri url) async {
           final Uri redirect = Uri.parse(url.queryParameters['redirect_uri']!);
           final String state = url.queryParameters['state']!;
           // An invalid UTF-8 escape: Uri.queryParameters throws on it.
@@ -395,7 +395,7 @@ void main() {
             io.close(force: true);
           }
           await presenter(url);
-        },
+        }),
         timeout: const Duration(seconds: 10),
         httpClient: client,
       );
@@ -464,7 +464,7 @@ void main() {
     await expectLater(
       authorizeWithOAuthLoopback(
         oidc(),
-        presenter: (Uri u) => url = u,
+        presenter: CallbackPresenter((Uri u) => url = u),
         timeout: const Duration(milliseconds: 200),
         httpClient: client,
       ),
@@ -484,7 +484,7 @@ void main() {
     final Completer<int> other = Completer<int>();
     final Future<OAuthLoopbackResult> result = authorizeWithOAuthLoopback(
       oidc(redirectPath: '/callback'),
-      presenter: (Uri url) async {
+      presenter: CallbackPresenter((Uri url) async {
         final Uri redirect = Uri.parse(url.queryParameters['redirect_uri']!);
         expect(redirect.path, '/callback');
         final http.Response favicon = await presenter.client.get(
@@ -501,7 +501,7 @@ void main() {
         );
         other.complete(favicon.statusCode + root.statusCode);
         await presenter(url);
-      },
+      }),
       timeout: const Duration(seconds: 10),
       httpClient: client,
     );
@@ -513,7 +513,7 @@ void main() {
     await expectLater(
       authorizeWithOAuthLoopback(
         oidc(),
-        presenter: (_) => throw StateError('no browser'),
+        presenter: CallbackPresenter((_) => throw StateError('no browser')),
         httpClient: client,
       ),
       throwsStateError,
@@ -584,7 +584,7 @@ void main() {
           clientId: 'github-client',
           clientSecret: 'github-secret',
         ),
-        presenter: (Uri authorizationUrl) async {
+        presenter: CallbackPresenter((Uri authorizationUrl) async {
           url = authorizationUrl;
           final Uri redirect = Uri.parse(
             authorizationUrl.queryParameters['redirect_uri']!,
@@ -597,7 +597,7 @@ void main() {
               },
             ),
           );
-        },
+        }),
         httpClient: github,
       );
 
@@ -643,7 +643,7 @@ void main() {
             clientId: 'github-client',
             clientSecret: 'github-secret',
           ),
-          presenter: (Uri authorizationUrl) async {
+          presenter: CallbackPresenter((Uri authorizationUrl) async {
             final Uri redirect = Uri.parse(
               authorizationUrl.queryParameters['redirect_uri']!,
             );
@@ -655,7 +655,7 @@ void main() {
                 },
               ),
             );
-          },
+          }),
           httpClient: MockClient(
             (http.Request request) async => jsonResponse(answer),
           ),
@@ -906,7 +906,7 @@ void main() {
 
       final UserCredential result = await auth.signInWithOAuthLoopback(
         oidc(),
-        presenter: presenter.call,
+        presenter: CallbackPresenter(presenter.call),
         httpClient: client,
       );
       expect(result.user!.uid, 'idp-user');
@@ -925,7 +925,7 @@ void main() {
       await expectLater(
         auth.linkWithOAuthLoopback(
           oidc(),
-          presenter: presenter.call,
+          presenter: CallbackPresenter(presenter.call),
           httpClient: client,
         ),
         throwsA(authError('null-user')),
@@ -956,7 +956,7 @@ void main() {
 
       final UserCredential result = await auth.linkWithOAuthLoopback(
         oidc(),
-        presenter: presenter.call,
+        presenter: CallbackPresenter(presenter.call),
         httpClient: client,
       );
       expect(presenter.url, isNotNull);
@@ -992,7 +992,7 @@ void main() {
 
       final UserCredential result = await auth.reauthenticateWithOAuthLoopback(
         oidc(),
-        presenter: presenter.call,
+        presenter: CallbackPresenter(presenter.call),
         httpClient: client,
       );
       expect(result.user!.uid, user.uid);
