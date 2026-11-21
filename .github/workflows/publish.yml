@@ -68,6 +68,8 @@ jobs:
             cloud_firestore/cloud_firestore_dart_platform \
             firebase_auth/firebase_auth_dart_platform \
             firebase_admin/firebase_admin_dart; do
+            # Not listed yet, on purpose: firebase_storage/firebase_storage_dart and
+            # firebase_storage/firebase_storage_dart_platform wait for the maintainer's release.
             if [ "$(basename "$candidate")" = "$name" ]; then dir="$candidate"; fi
           done
           if [ -z "$dir" ]; then

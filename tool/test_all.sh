@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
 # Runs pub get, analyze (lib) and tests for the packages of the revival.
-# cloud_firestore_dart runs only test/unit (integration needs a live backend).
+# cloud_firestore_dart runs only test/unit (integration needs a live backend); firebase_storage_dart
+# runs only test/unit too (test/integration needs the Storage emulator: the CI job "storage").
 # The example programs in examples/ are analyzed only (their tests need an emulator); select
 # them alone with the name "examples", or one with "examples/<name>".
 # The Flutter packages (cloud_firestore_dart_flutterfire, cloud_firestore_dart_platform,
-# firebase_auth_dart_platform) and the
+# firebase_auth_dart_platform, firebase_storage_dart_platform) and the
 # Flutter examples need the Flutter SDK and are skipped without it; the CI job "flutter" runs
 # them (with FIRESTORE_EMULATOR_HOST and FIREBASE_AUTH_EMULATOR_HOST set, so that the emulator tests
 # of the platform packages run).
@@ -29,6 +30,7 @@ PACKAGES=(
   "cloud_firestore_dart|cloud_firestore/cloud_firestore_dart|test/unit"
   "cloud_firestore_dart_sqlite|cloud_firestore/cloud_firestore_dart_sqlite|"
   "firebase_admin_dart|firebase_admin/firebase_admin_dart|"
+  "firebase_storage_dart|firebase_storage/firebase_storage_dart|test/unit"
 )
 
 summary=()
@@ -134,7 +136,8 @@ done
 # firebase_auth_dart_platform only when FIREBASE_AUTH_EMULATOR_HOST is set.
 for entry in "cloud_firestore_dart_flutterfire|cloud_firestore/cloud_firestore_dart_flutterfire" \
   "cloud_firestore_dart_platform|cloud_firestore/cloud_firestore_dart_platform" \
-  "firebase_auth_dart_platform|firebase_auth/firebase_auth_dart_platform"; do
+  "firebase_auth_dart_platform|firebase_auth/firebase_auth_dart_platform" \
+  "firebase_storage_dart_platform|firebase_storage/firebase_storage_dart_platform"; do
   IFS='|' read -r name dir <<<"$entry"
   if [ $# -gt 0 ] && ! printf '%s\n' "$@" | grep -qx "$name"; then continue; fi
   echo "=== $name ==="
