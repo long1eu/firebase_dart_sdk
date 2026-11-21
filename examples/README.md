@@ -1,12 +1,13 @@
 # Examples
 
-Small, complete programs that use `cloud_firestore_dart`: servers and tools, a worker, a Flutter
+Small, complete programs that use `cloud_firestore_dart` (and, for `storage_cli`, `firebase_storage_dart`): servers and tools, a worker, a Flutter
 app and a browser app. Each directory is a package of its own with a `pubspec.yaml` and a README.
 
 | Directory | What it is |
 | --- | --- |
 | [`server_shelf/`](server_shelf/) | An HTTP API on `package:shelf`: reads and writes Firestore, and sends the changes of one real-time listener to every client as server-sent events. |
 | [`cli/`](cli/) | A command-line tool on `package:args`: imports a JSON file with batched writes, exports a query to JSON, watches a query. |
+| [`storage_cli/`](storage_cli/) | A command-line tool on `package:args` and `firebase_storage_dart`: `ls`, `put` (resumable, with a progress line), `get` (streamed to a file), `cat`, `stat`, `rm`, `url`; optional email/password sign-in so rules with `request.auth` pass. Run against the Storage emulator. |
 | [`cloud_run_job/`](cloud_run_job/) | A one-shot job: an aggregation query, a transaction that writes once per execution, retries with backoff, and a `Dockerfile` for a native binary. |
 | [`worker_queue/`](worker_queue/) | A long-running worker: a listener to wake up, a transaction that claims each job once, results in a batch, a clean stop on `SIGTERM`. |
 | [`flutter_notes/`](flutter_notes/) | A Flutter notes app: a real-time list, offline edits in a SQLite cache, an offline indicator, connectivity events and a clean shutdown. Built and run on macOS, and on Windows from an SSH session (no window drawn). |
@@ -26,6 +27,7 @@ flowchart TD
   serverKind -- "runs once and exits" --> cloudRunJob["cloud_run_job"]
   serverKind -- "runs until stopped, takes jobs" --> workerQueue["worker_queue"]
   start -- "a terminal" --> cli["cli"]
+  start -- "a terminal, Cloud Storage" --> storageCli["storage_cli"]
   start -- "a Flutter app" --> flutterNotes["flutter_notes"]
   start -- "a Flutter web page" --> flutterWeb["flutter_web_two_users"]
   start -- "a browser, without Flutter" --> webApp["web_app"]
