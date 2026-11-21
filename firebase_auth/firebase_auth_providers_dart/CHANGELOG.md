@@ -1,5 +1,8 @@
 ## Unreleased
 
+- `FirebaseUserAuth.refreshToken`: the refresh token of the signed-in user's session, null when signed out; it
+  follows the server's rotation. It is not a field of `AuthUser` (JS has `User.refreshToken`), so a user that is
+  printed or serialized never carries it.
 - Phone sign-in, with the names of the iOS SDK: `FirebaseUserAuth.verifyPhoneNumber(phoneNumber, appVerification:)`
   sends the SMS code (`v1/accounts:sendVerificationCode`, with the reCAPTCHA v2 or Enterprise token of the
   `AppVerification`, or none for the emulator) and returns the verification id; `PhoneAuthProvider.credential(

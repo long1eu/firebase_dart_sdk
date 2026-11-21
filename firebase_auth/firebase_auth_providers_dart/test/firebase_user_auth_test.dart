@@ -359,6 +359,31 @@ void main() {
   });
 
   group('tokens', () {
+    test('refreshToken follows sign-in, rotation and sign-out', () async {
+      expect(auth.refreshToken, isNull);
+      await auth.signInAnonymously();
+      expect(auth.refreshToken, 'refresh:anon-user');
+      handler = (http.Request request) async {
+        if (request.url.path.endsWith('/token')) {
+          return json(<String, Object?>{
+            'id_token': idToken(
+              'anon-user',
+              expires: clock.now.add(const Duration(hours: 1)),
+              tag: 'rotated',
+            ),
+            'refresh_token': 'refresh:anon-user:rotated',
+            'expires_in': '3600',
+            'user_id': 'anon-user',
+          });
+        }
+        return backend(request);
+      };
+      await auth.getAccessToken(forceRefresh: true);
+      expect(auth.refreshToken, 'refresh:anon-user:rotated');
+      await auth.signOut();
+      expect(auth.refreshToken, isNull);
+    });
+
     test('nobody signed in: no uid, FirebaseNoSignedInUserError', () async {
       expect(auth.uid, isNull);
       expect(auth.currentUser, isNull);
@@ -1927,6 +1952,12 @@ void main() {
       'AuthUser(uid: uid-of-a@example.com, isAnonymous: false)',
     );
     expect('$token', isNot(contains(token.token)));
+    final String refreshToken = auth.refreshToken!;
+    expect('${auth.currentUser}', isNot(contains(refreshToken)));
+    expect(
+      jsonEncode(auth.currentUser!.toJson()),
+      isNot(contains(refreshToken)),
+    );
   });
 }
 
