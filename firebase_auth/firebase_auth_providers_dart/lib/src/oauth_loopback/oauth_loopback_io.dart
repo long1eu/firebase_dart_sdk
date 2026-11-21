@@ -24,8 +24,10 @@ import 'oauth_loopback.dart';
 ///    [CallbackPresenter] of your own (`url_launcher`'s `launchUrl`).
 ///
 ///    A provider app returns the provider's tokens itself ([OAuthTokens]): no server and no code
-///    exchange; the nonce claim of its ID token is checked as below, and the credential carries
-///    the raw nonce when [OAuthLoopbackProvider.sendNonceToFirebase] is set. The other presenters
+///    exchange. With a nonce, its ID token must carry the nonce claim, and the claim must be the
+///    hash that was sent; an access token without an ID token is accepted only with
+///    [OAuthLoopbackProvider.acceptAccessTokenOnly]. The credential carries the raw nonce when
+///    [OAuthLoopbackProvider.sendNonceToFirebase] is set. The other presenters
 ///    show the authorization URL; the redirect comes back to a one-shot HTTP server bound to
 ///    127.0.0.1 (never to another interface), on [OAuthLoopbackProvider.port] (any free port by
 ///    default).
@@ -48,8 +50,8 @@ import 'oauth_loopback.dart';
 /// | --- | --- |
 /// | `timeout` | no redirect of this sign-in came back within [timeout] |
 /// | `user-cancelled` | the provider answered `access_denied` (the user refused) |
-/// | `invalid-oauth-response` | the provider answered another `error` ([FirebaseAuthException.serverCode]), no code, or no token |
-/// | `missing-or-invalid-nonce` | the ID token carries another nonce than the one sent |
+/// | `invalid-oauth-response` | the provider answered another `error` ([FirebaseAuthException.serverCode]), no code, or no token; a provider app returned only an access token without [OAuthLoopbackProvider.acceptAccessTokenOnly] |
+/// | `missing-or-invalid-nonce` | the ID token carries another nonce than the one sent, or an ID token of a provider app carries none |
 /// | `invalid-credential` | the token endpoint or `exchangeCode` refused the code ([FirebaseAuthException.serverCode] is its `error`) |
 /// | `network-request-failed` | the token endpoint could not be reached, or it or `exchangeCode` did not answer within 30 seconds |
 ///
@@ -221,8 +223,9 @@ Future<OAuthLoopbackResult> _complete(
   );
 }
 
-/// The result of the tokens a provider app returned ([OAuthTokens]): no code exchange; the nonce
-/// of the ID token is checked as after an exchange.
+/// The result of the tokens a provider app returned ([OAuthTokens]): no code exchange. Nothing
+/// but the nonce ties these tokens to this request, so with a nonce the ID token must carry it,
+/// and an access token alone needs [OAuthLoopbackProvider.acceptAccessTokenOnly].
 OAuthLoopbackResult _fromTokens(
   OAuthLoopbackProvider provider, {
   required String? idToken,
@@ -232,7 +235,17 @@ OAuthLoopbackResult _fromTokens(
 }) {
   final String? id = _nonEmptyString(idToken);
   final String? access = _nonEmptyString(accessToken);
-  _checkNonce(id, hashedNonce);
+  // OAuthTokens holds at least one token: without an ID token there is an access token.
+  if (id == null && !provider.acceptAccessTokenOnly) {
+    throw FirebaseAuthException(
+      code: 'invalid-oauth-response',
+      message:
+          'The provider app returned an access token without an ID token, which nothing ties '
+          'to this sign-in. Set acceptAccessTokenOnly on the OAuthLoopbackProvider of '
+          '${provider.providerId} to accept it.',
+    );
+  }
+  _checkNonce(id, hashedNonce, required: true);
   return OAuthLoopbackResult(
     credential: provider.credentialFor(
       idToken: id,
@@ -246,13 +259,25 @@ OAuthLoopbackResult _fromTokens(
 }
 
 /// Throws `missing-or-invalid-nonce` when [idToken] has a `nonce` claim that is not
-/// [hashedNonce]. A token without the claim passes: Firebase checks the raw nonce of the
-/// credential (as the JS SDK leaves the check to the backend).
-void _checkNonce(String? idToken, String? hashedNonce) {
+/// [hashedNonce], or, when [required], none. Without [required] (a token from the code exchange,
+/// which PKCE ties to this request) a token without the claim passes: Firebase checks the raw
+/// nonce of the credential (as the JS SDK leaves the check to the backend).
+void _checkNonce(
+  String? idToken,
+  String? hashedNonce, {
+  bool required = false,
+}) {
   if (idToken == null || hashedNonce == null) {
     return;
   }
   final Object? nonce = _claimsOf(idToken)?['nonce'];
+  if (nonce == null && required) {
+    throw const FirebaseAuthException(
+      code: 'missing-or-invalid-nonce',
+      message:
+          'The ID token of the provider app carries no nonce, but one was sent.',
+    );
+  }
   if (nonce != null && !constantTimeEquals('$nonce', hashedNonce)) {
     throw const FirebaseAuthException(
       code: 'missing-or-invalid-nonce',

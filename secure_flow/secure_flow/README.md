@@ -117,7 +117,8 @@ pass one). Errors of the parser and of the presenter are rethrown as they are.
   for OAuth; kinds are declarations, not checks. A web view the app controls can read and change
   the page.
 - **A provider app.** Its result is trusted as the app returns it; the caller checks the nonce of an
-  ID token, and Firebase checks the token.
+  ID token, and Firebase checks the token. An access token alone carries no nonce, so nothing ties
+  it to the request: `firebase_auth_providers_dart` refuses one unless its provider opts in.
 - **Google's verdict.** Whether a reCAPTCHA token made on a localhost page is accepted depends on the
   site key and the project; it has not been checked against Google.
 

@@ -9,8 +9,11 @@
   `ssh -L` forward that would help). A presenter the flow does not accept (a web view) is refused with
   `SecureFlowRefused`.
 - A `ProviderAppPresenter` (the provider's app or SDK; none is part of this package) returns the provider's tokens
-  directly: they go to `signInWithIdp` without a code exchange, with the same nonce check of the ID token and the
-  raw nonce in the credential for OpenID Connect providers. Tested with a fake presenter only. The redirect URI (`http://127.0.0.1:<port>`), PKCE, the state and
+  directly: they go to `signInWithIdp` without a code exchange, with the raw nonce in the credential for OpenID
+  Connect providers. When a nonce was sent, the ID token must carry it: an ID token without the nonce claim fails
+  with `missing-or-invalid-nonce`, like one with another nonce. An access token without an ID token fails with
+  `invalid-oauth-response` unless the provider sets the new `OAuthLoopbackProvider.acceptAccessTokenOnly` (off by
+  default; such a token has no binding to the request). Tested with a fake presenter only. The redirect URI (`http://127.0.0.1:<port>`), PKCE, the state and
   the nonce are unchanged.
 - `AppVerification.recaptchaV2Loopback(presenter:, environment:, timeout:)` serves the reCAPTCHA v2 page with the
   `RecaptchaFlow` of `secure_flow`; a timeout is `timeout`. Its site key comes from `getRecaptchaSiteKey()`.

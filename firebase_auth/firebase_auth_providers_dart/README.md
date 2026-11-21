@@ -232,9 +232,11 @@ print(result.user?.email);
   `url_launcher` in a Flutter app. A presenter the flow does not accept (a web view,
   `CallbackPresenter(..., kind: SecurePresenterKind.embeddedWebView)`) is refused with `SecureFlowRefused`, never replaced.
   The package depends on no Flutter plugin.
-- Tokens from a provider app skip the code exchange: the nonce claim of the ID token is checked against the hash
-  that was sent, and the raw nonce goes to Firebase with the credential (for OpenID Connect providers), as after a
-  redirect.
+- Tokens from a provider app skip the code exchange: the ID token must carry the nonce claim, and it must be the
+  hash that was sent (`missing-or-invalid-nonce` otherwise), and the raw nonce goes to Firebase with the credential
+  (for OpenID Connect providers), as after a redirect. An access token without an ID token fails with
+  `invalid-oauth-response` unless the provider is made with `acceptAccessTokenOnly: true`: such a token has no
+  binding to this request (no nonce, no state), so turn it on only for a provider whose app returns no ID token.
 - The code is exchanged at the provider's token endpoint with the client id and the secret. Google with a
   "Desktop app" client needs nothing more: Google says the secret of such a client is not confidential.
 - `exchangeCode:` is optional. It is for a provider that wants a confidential client, whose secret must stay on a

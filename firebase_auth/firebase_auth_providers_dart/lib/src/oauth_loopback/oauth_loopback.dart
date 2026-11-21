@@ -67,8 +67,11 @@ class OAuthLoopbackProvider {
   ///   only on `127.0.0.1` and `::1`, for tests and local identity providers); otherwise an [ArgumentError] is thrown.
   /// * [scopes] are requested as one space-separated `scope` parameter.
   /// * [useNonce] sends the SHA-256 hash (hex) of a random nonce as the `nonce` parameter and checks it against the
-  ///   `nonce` claim of the ID token (when the token has one). [sendNonceToFirebase] adds the raw nonce to the
+  ///   `nonce` claim of the ID token (when a token from the code exchange has one; a token from a provider app must
+  ///   have it). [sendNonceToFirebase] adds the raw nonce to the
   ///   credential, for the Firebase backend to check (OpenID Connect providers configured in Identity Platform).
+  /// * [acceptAccessTokenOnly] lets a provider app (a `ProviderAppPresenter`) return an access token without an ID
+  ///   token. Off by default: see the field.
   /// * [customParameters] are added to the authorization request (`prompt`, `login_hint`, ...). They cannot
   ///   replace the parameters of the flow (`state`, `redirect_uri`, `code_challenge`, ...): those win.
   /// * [redirectPath] is the path of the redirect URL, `/` by default (the redirect URL is then
@@ -84,6 +87,7 @@ class OAuthLoopbackProvider {
     this.scopes = defaultScopes,
     this.useNonce = true,
     this.sendNonceToFirebase = false,
+    this.acceptAccessTokenOnly = false,
     this.customParameters = const <String, String>{},
     this.redirectPath = '/',
     this.port = 0,
@@ -345,6 +349,15 @@ class OAuthLoopbackProvider {
   /// Whether the credential carries the raw nonce for the Firebase backend.
   final bool sendNonceToFirebase;
 
+  /// Whether the tokens a provider app returns (`OAuthTokens`) may be an access token alone, without an ID token.
+  ///
+  /// Off by default, and then such a result fails with `invalid-oauth-response`. An access token has no binding to
+  /// this request: it carries neither the nonce nor the state, so the client cannot tell it from an access token
+  /// issued earlier or to another request, and Firebase accepts any valid one. Turn it on only for a provider whose
+  /// app returns no ID token, and only for an app you trust to hand over the token of this sign-in. It does not
+  /// concern the code exchange of the browser flow, where PKCE binds the code to the request.
+  final bool acceptAccessTokenOnly;
+
   /// Extra parameters of the authorization request.
   final Map<String, String> customParameters;
 
@@ -375,6 +388,7 @@ class OAuthLoopbackProvider {
     scopes: scopes ?? this.scopes,
     useNonce: useNonce,
     sendNonceToFirebase: sendNonceToFirebase,
+    acceptAccessTokenOnly: acceptAccessTokenOnly,
     customParameters: customParameters ?? this.customParameters,
     redirectPath: redirectPath,
     port: port,

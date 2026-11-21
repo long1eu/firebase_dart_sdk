@@ -106,7 +106,32 @@ void main() {
     },
   );
 
-  test('an access token alone is enough', () async {
+  test(
+    'an access token alone is refused unless the provider accepts it',
+    () async {
+      final FakeBackend backend = FakeBackend();
+      final FirebaseUserAuth auth = backend.create();
+      addTearDown(auth.dispose);
+      await expectLater(
+        auth.signInWithOAuthLoopback(
+          _oidc(),
+          presenter: _FakeProviderApp(<String>{
+            'oidc.fake',
+          }, (_) => OAuthTokens(accessToken: 'only-access')),
+        ),
+        throwsA(
+          _authError('invalid-oauth-response').having(
+            (FirebaseAuthException e) => e.message,
+            'message',
+            contains('acceptAccessTokenOnly'),
+          ),
+        ),
+      );
+      expect(backend.methods, isNot(contains('accounts:signInWithIdp')));
+    },
+  );
+
+  test('with acceptAccessTokenOnly an access token alone is enough', () async {
     final FakeBackend backend = FakeBackend();
     final FirebaseUserAuth auth = backend.create();
     addTearDown(auth.dispose);
@@ -122,13 +147,79 @@ void main() {
       });
     });
     final UserCredential result = await auth.signInWithOAuthLoopback(
-      _oidc(),
+      OAuthLoopbackProvider(
+        providerId: 'oidc.fake',
+        authorizationEndpoint: Uri.parse('https://idp.example/authorize'),
+        tokenEndpoint: Uri.parse('https://idp.example/token'),
+        clientId: 'client-1',
+        acceptAccessTokenOnly: true,
+      ),
       presenter: _FakeProviderApp(<String>{
         'oidc.fake',
       }, (_) => OAuthTokens(accessToken: 'only-access')),
     );
     expect(result.user!.uid, 'u2');
   });
+
+  test('acceptAccessTokenOnly survives copyWith', () {
+    final OAuthLoopbackProvider provider = OAuthLoopbackProvider(
+      providerId: 'oidc.fake',
+      authorizationEndpoint: Uri.parse('https://idp.example/authorize'),
+      tokenEndpoint: Uri.parse('https://idp.example/token'),
+      clientId: 'client-1',
+      acceptAccessTokenOnly: true,
+    );
+    expect(_oidc().acceptAccessTokenOnly, isFalse);
+    expect(
+      provider.copyWith(scopes: <String>['openid']).acceptAccessTokenOnly,
+      isTrue,
+    );
+  });
+
+  test(
+    'an ID token without a nonce claim is refused when a nonce was sent, even with an access '
+    'token',
+    () async {
+      final FakeBackend backend = FakeBackend();
+      final FirebaseUserAuth auth = backend.create();
+      addTearDown(auth.dispose);
+      await expectLater(
+        auth.signInWithOAuthLoopback(
+          _oidc(),
+          presenter: _FakeProviderApp(
+            <String>{'oidc.fake'},
+            (_) => OAuthTokens(
+              idToken: _jwt(<String, Object?>{'sub': 'idp-user'}),
+              accessToken: 'app-access-token',
+            ),
+          ),
+        ),
+        throwsA(_authError('missing-or-invalid-nonce')),
+      );
+      expect(backend.methods, isNot(contains('accounts:signInWithIdp')));
+    },
+  );
+
+  test(
+    'without a nonce (useNonce: false) an ID token without the claim passes',
+    () async {
+      final OAuthLoopbackResult result = await authorizeWithOAuthLoopback(
+        OAuthLoopbackProvider(
+          providerId: 'oidc.fake',
+          authorizationEndpoint: Uri.parse('https://idp.example/authorize'),
+          tokenEndpoint: Uri.parse('https://idp.example/token'),
+          clientId: 'client-1',
+          useNonce: false,
+        ),
+        presenter: _FakeProviderApp(<String>{'oidc.fake'}, (OAuthAppRequest r) {
+          expect(r.hashedNonce, isNull);
+          return OAuthTokens(idToken: _jwt(<String, Object?>{'sub': 'u'}));
+        }),
+      );
+      expect(result.idToken, isNotNull);
+      expect(result.rawNonce, isNull);
+    },
+  );
 
   test(
     'an ID token with another nonce is refused by the client before Firebase is called',
