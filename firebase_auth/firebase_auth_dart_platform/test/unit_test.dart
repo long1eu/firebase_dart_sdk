@@ -16,7 +16,11 @@ import 'package:firebase_auth_platform_interface/firebase_auth_platform_interfac
     show FirebaseAuthPlatform;
 import 'package:firebase_auth_providers_dart/firebase_auth_providers_dart.dart'
     as dart_auth
-    show AuthStorage, OAuthCredential, OAuthLoopbackProvider;
+    show
+        AuthStorage,
+        FirebaseUserAuthDisposedError,
+        OAuthCredential,
+        OAuthLoopbackProvider;
 import 'package:firebase_auth_providers_dart/firebase_auth_providers_dart.dart'
     show InMemoryAuthStorage;
 import 'package:firebase_core/firebase_core.dart';
@@ -1012,6 +1016,13 @@ void main() {
       await expectLater(
         guard<void>(DartFirebaseAuth(), () => throw StateError('state')),
         throwsAuthCode('internal-error'),
+      );
+      await expectLater(
+        guard<void>(
+          DartFirebaseAuth(),
+          () => throw dart_auth.FirebaseUserAuthDisposedError(),
+        ),
+        throwsAuthCode('app-deleted'),
       );
       await expectLater(
         guard<void>(DartFirebaseAuth(), () => throw ArgumentError('argument')),

@@ -110,7 +110,11 @@ void main() {
 
   test('throws after dispose', () async {
     await auth.dispose();
-    expect(() => auth.setStorage(InMemoryAuthStorage()), throwsStateError);
+    expect(
+      () => auth.setStorage(InMemoryAuthStorage()),
+      throwsA(isA<FirebaseUserAuthDisposedError>()),
+    );
+    expect(auth.signInAnonymously, throwsStateError);
   });
 }
 

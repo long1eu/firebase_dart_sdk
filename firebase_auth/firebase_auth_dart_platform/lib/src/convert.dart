@@ -37,8 +37,9 @@ const String noBrowserFlow =
 /// second-factor challenge with a resolver that signs in to [auth]), an
 /// [ArgumentError] as `argument-error`, an [UnsupportedError] (a flow the
 /// platform does not have, such as the loopback flow on the web) as
-/// `unimplemented`, a [StateError] and a failed file operation as
-/// `internal-error`.
+/// `unimplemented`, a call after the client was disposed (its app was
+/// deleted) as `app-deleted`, another [StateError] and a failed file
+/// operation as `internal-error`.
 Future<T> guard<T>(DartFirebaseAuth auth, Future<T> Function() body) async {
   try {
     return await body();
@@ -49,6 +50,11 @@ Future<T> guard<T>(DartFirebaseAuth auth, Future<T> Function() body) async {
   } on ArgumentError catch (e, stackTrace) {
     Error.throwWithStackTrace(
       FirebaseAuthException(code: 'argument-error', message: '${e.message}'),
+      stackTrace,
+    );
+  } on dart_auth.FirebaseUserAuthDisposedError catch (e, stackTrace) {
+    Error.throwWithStackTrace(
+      FirebaseAuthException(code: 'app-deleted', message: e.message),
       stackTrace,
     );
   } on UnsupportedError catch (e, stackTrace) {

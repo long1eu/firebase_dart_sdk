@@ -2534,7 +2534,7 @@ class FirebaseUserAuth implements AuthTokenProvider {
 
   void _checkNotDisposed() {
     if (_disposed) {
-      throw StateError('This FirebaseUserAuth was disposed.');
+      throw FirebaseUserAuthDisposedError();
     }
   }
 

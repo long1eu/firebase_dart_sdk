@@ -513,3 +513,13 @@ class FirebaseAuthMultiFactorException extends FirebaseAuthException {
   /// [FirebaseUserAuth.linkWithCredential] (a link cannot be finished with a second factor, as in the JS SDK).
   final MultiFactorResolver? resolver;
 }
+
+/// Thrown by a call on a `FirebaseUserAuth` after its `dispose` (the `app-deleted` condition of the JS SDK).
+///
+/// A [StateError], since using a disposed object is a programming error; `firebase_auth_dart_platform` reports it
+/// as a `FirebaseAuthException` with the code `app-deleted`.
+class FirebaseUserAuthDisposedError extends StateError {
+  /// Creates the error.
+  FirebaseUserAuthDisposedError()
+    : super('This FirebaseUserAuth was disposed.');
+}
