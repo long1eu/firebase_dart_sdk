@@ -8,6 +8,7 @@ import 'package:firebase_auth_providers_dart/firebase_auth_providers_dart.dart'
         BestWebAuthStorage,
         FileAuthStorage,
         InMemoryAuthStorage,
+        ObservableAuthStorage,
         WebAuthStorage;
 import 'package:firebase_auth_secure_storage_flutter/firebase_auth_secure_storage_flutter.dart'
     show SecureAuthStorage;
@@ -151,8 +152,22 @@ SecureDefaultStorage secureDefaultStorage(String? sessionFile) {
 /// the next change); the official plugins never fail a sign-in because the
 /// keychain or the preferences could not be written, so this package keeps
 /// that behaviour here, in front of the client.
+///
+/// When the storage of the app reports the changes other tabs make (an
+/// [ObservableAuthStorage]: the web storages), the object is one too and
+/// passes them on, so that the client follows a sign-out or a sign-in made in
+/// another tab; once memory is in use they are ignored. Otherwise it is a
+/// plain [AuthStorage], so that the client never reads the store (the
+/// Keychain, the Keystore) before it stores an update of the session.
 class FallbackStorage implements AuthStorage {
-  FallbackStorage(this._persistent);
+  /// The storage of the app [persistent] with memory behind it; an
+  /// [ObservableAuthStorage] when [persistent] is one.
+  factory FallbackStorage(AuthStorage persistent) =>
+      persistent is ObservableAuthStorage
+      ? _ObservableFallbackStorage(persistent)
+      : FallbackStorage._(persistent);
+
+  FallbackStorage._(this._persistent);
 
   final AuthStorage _persistent;
   final InMemoryAuthStorage _memory = InMemoryAuthStorage();
@@ -185,4 +200,17 @@ class FallbackStorage implements AuthStorage {
       );
     }
   }
+}
+
+/// A [FallbackStorage] in front of an [ObservableAuthStorage]: passes on its
+/// changes until memory is in use.
+class _ObservableFallbackStorage extends FallbackStorage
+    implements ObservableAuthStorage {
+  _ObservableFallbackStorage(ObservableAuthStorage super.persistent)
+    : super._();
+
+  @override
+  Stream<void> changes(String key) => (_persistent as ObservableAuthStorage)
+      .changes(key)
+      .where((_) => !_persistentFailed);
 }

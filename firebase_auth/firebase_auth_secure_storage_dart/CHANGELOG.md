@@ -1,3 +1,14 @@
+## Unreleased
+
+- `isAvailable()` probes under a key of its own for each call (`<namespace>/.probe-<pid>-<random>`), so processes
+  of one program that start together no longer read each other's probe value and throw.
+- Windows: each write goes through a temporary file of its own (`<file>.<pid>.<random>.tmp`) before the rename, so
+  two processes writing the same session cannot leave a corrupt file. A file that does not decrypt still fails the
+  read with a `CryptUnprotectData` error that is not "unavailable", and is left in place.
+- Windows: `CryptProtectData` and `CryptUnprotectData` are no longer leaf calls, so a slow DPAPI call (an RPC to
+  LSASS or a domain controller) no longer holds up garbage collection. The error code is still read right after
+  the call; a code that looks overwritten by the VM (0 or 127) makes the call once more.
+
 ## 0.1.0
 
 - First version: `SecureAuthStorage`, an `AuthStorage` of `firebase_auth_providers_dart` for command line tools and
@@ -16,5 +27,5 @@
   value is ever printed or put in an exception, and nothing is written anywhere else instead.
 - `migrateFrom` moves a session from another storage with the rules of the Flutter package (read, write, read back
   and compare, then delete there; a sign-out deletes it there too).
-- Tested: unit tests with fakes of the store; the integration tests ran on macOS only. Linux and Windows are
-  untested.
+- Tested: unit tests with fakes of the store; the integration tests run in CI against the real store on Linux
+  (libsecret, gnome-keyring), Windows (DPAPI) and macOS (login keychain).

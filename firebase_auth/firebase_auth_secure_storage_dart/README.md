@@ -11,8 +11,9 @@ covers Android, iOS and the data-protection keychain of signed macOS apps). Both
 `migrateFrom` rules.
 
 > **Status: 0.1.0, not published.** Unit-tested with fakes of the store on any system. The integration tests run
-> against the real store of each system; only macOS has run them so far. **Linux and Windows are untested**: the
-> code is written against the documented libsecret and DPAPI interfaces, not proven on a real system. See
+> against the real store of each system and run in CI on every change to the package, on GitHub-hosted runners:
+> libsecret with gnome-keyring on Ubuntu, DPAPI on Windows and the login keychain on macOS. KDE Wallet and
+> KeePassXC, the other Secret Service providers, have not been tried. See
 > [Integration tests](#integration-tests) for the commands.
 
 ## How a command line tool uses it
@@ -46,7 +47,8 @@ Future<FirebaseUserAuth> openAuth(String apiKey) async {
 }
 ```
 
-`isAvailable()` writes, reads back and deletes a probe entry (`<namespace>/.probe`). It returns false only when the
+`isAvailable()` writes, reads back and deletes a probe entry of its own (`<namespace>/.probe-<pid>-<random>`, so
+processes of one program that start together do not collide). It returns false only when the
 store as a whole cannot be used in this run (`SecureAuthStorageException.isUnavailable`), and throws for anything else,
 so a session that is stored but cannot be read now (a locked macOS keychain over SSH, a value that does not decrypt)
 is never mistaken for no session. The fallback is the caller's choice: this package never writes a session anywhere
@@ -162,7 +164,7 @@ Linux (Debian or Ubuntu with `libsecret-1-0`, `gnome-keyring` and `dbus`; `libse
 attributes), headless:
 
 ```sh
-FIREBASE_AUTH_SECURE_STORAGE_INTEGRATION=1 dbus-run-session -- sh -c 'printf "" | gnome-keyring-daemon --unlock --components=secrets >/dev/null && dart test test/integration/linux_libsecret_test.dart'
+FIREBASE_AUTH_SECURE_STORAGE_INTEGRATION=1 dbus-run-session -- sh -c 'printf "test\n" | gnome-keyring-daemon --unlock --components=secrets >/dev/null && dart test test/integration/linux_libsecret_test.dart'
 ```
 
 Windows, in the user's desktop session (DPAPI refuses access over SSH), in PowerShell:

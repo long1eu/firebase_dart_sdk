@@ -26,10 +26,12 @@ import 'firebase_user_auth.dart';
 ///
 /// Delete the value ([write] with null) when the user signs out; [FirebaseUserAuth] does that itself.
 ///
-/// [FirebaseUserAuth] calls [read] once, in [FirebaseUserAuth.restore], and [write] after every sign-in, sign-out
-/// and change of the user or of the refresh token, and waits for both. An exception they throw reaches the caller
-/// of the operation. The value is a JSON object with a `version` (2 since 0.3; 0.2 wrote no version); treat it as
-/// opaque.
+/// [FirebaseUserAuth] calls [read] in [FirebaseUserAuth.restore] (and, for an
+/// [ObservableAuthStorage], after a change made elsewhere and before it stores an update of the
+/// signed-in user's session), and [write] after every sign-in, sign-out and change of the user or
+/// of the refresh token, and waits for both. An exception they throw reaches the caller of the
+/// operation. The value is a JSON object with a `version` (2 since 0.3; 0.2 wrote no version);
+/// treat it as opaque.
 ///
 /// ```dart
 /// // Dart VM: a command line tool keeps its session in the user's configuration directory.
@@ -47,6 +49,25 @@ abstract class AuthStorage {
 
   /// Stores [value] under [key]; null removes it. The value is a credential (see [AuthStorage]).
   FutureOr<void> write(String key, String? value);
+}
+
+/// An [AuthStorage] that tells when a stored value was changed by someone else: another tab or
+/// window of the browser (the JS SDK's `_addListener` and `_removeListener` of a persistence).
+///
+/// `WebAuthStorage`, `IndexedDbAuthStorage` and `BestWebAuthStorage` implement it.
+/// [FirebaseUserAuth] listens to [changes] of its key while it uses the storage: when another tab
+/// signs out, signs in another user or stores new tokens, it reads the stored session and takes it
+/// over without writing it back, so that a sign-out in one tab is not undone by the next write of
+/// another.
+///
+/// An implementation keeps the writes made through the object itself out of [changes], and reports
+/// the changes of other tabs; whether it also reports those of another object in the same page
+/// depends on the storage (see its documentation).
+abstract interface class ObservableAuthStorage implements AuthStorage {
+  /// Emits after the value under [key] was changed by someone else; the event carries no value:
+  /// read it. It may also emit when the value was written again unchanged. The storage watches
+  /// [key] only while the stream is listened to, and may end the stream when it is closed.
+  Stream<void> changes(String key);
 }
 
 /// An [AuthStorage] that lives as long as the object: the default of [FirebaseUserAuth]. The user has to sign in

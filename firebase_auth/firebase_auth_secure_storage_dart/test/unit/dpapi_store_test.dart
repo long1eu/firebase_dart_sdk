@@ -33,9 +33,10 @@ class _FakeCipher implements DpapiCipher {
 
   @override
   Uint8List unprotect(Uint8List blob, Uint8List entropy) {
-    final int length = blob[0];
-    final List<int> stored = blob.sublist(1, 1 + length);
-    if (!_same(stored, entropy)) {
+    final int length = blob.isEmpty ? 0 : blob[0];
+    if (blob.isEmpty ||
+        blob.length < 1 + length ||
+        !_same(blob.sublist(1, 1 + length), entropy)) {
       throw const SecretStoreError(
         function: 'CryptUnprotectData',
         status: 13,
@@ -215,6 +216,86 @@ void main() {
           (SecretStoreError e) => e.message,
           'message',
           'the stored secret is not UTF-8 text',
+        ),
+      ),
+    );
+  });
+
+  test('a write does not use a shared temporary name', () async {
+    // The temporary name of earlier versions, taken by something else.
+    final Directory shared = Directory('${store.fileOf(_account)}.tmp')
+      ..createSync(recursive: true);
+    await store.write(_account, _secret);
+    expect(await store.read(_account), _secret);
+    expect(shared.existsSync(), isTrue);
+  });
+
+  test(
+    'another process\'s temporary file is neither used nor removed',
+    () async {
+      final File foreign = File('${store.fileOf(_account)}.999.deadbeef.tmp')
+        ..parent.createSync(recursive: true)
+        ..writeAsBytesSync(<int>[1, 2, 3]);
+      await store.write(_account, _secret);
+      expect(await store.read(_account), _secret);
+      expect(foreign.readAsBytesSync(), <int>[1, 2, 3]);
+      final List<String> names = <String>[
+        for (final FileSystemEntity e in Directory(dir).listSync())
+          e.path.split(Platform.pathSeparator).last,
+      ];
+      expect(names.where((String n) => n.endsWith('.tmp')), hasLength(1));
+    },
+  );
+
+  test('two writes of one account at once leave one whole value', () async {
+    await Future.wait(<Future<void>>[
+      store.write(_account, 'value a'),
+      store.write(_account, 'value b'),
+    ]);
+    expect(await store.read(_account), anyOf('value a', 'value b'));
+    expect(Directory(dir).listSync(), hasLength(1));
+  });
+
+  test(
+    'a corrupt file fails as a typed error, not unavailable, and stays',
+    () async {
+      final File file = File(store.fileOf(_account))
+        ..parent.createSync(recursive: true)
+        ..writeAsBytesSync(<int>[0xFF, 0x00, 0x42]);
+      Object? error;
+      try {
+        await store.read(_account);
+      } on SecretStoreError catch (e) {
+        error = e;
+      }
+      expect(error, isA<SecretStoreError>());
+      final SecretStoreError failure = error! as SecretStoreError;
+      expect(failure.function, 'CryptUnprotectData');
+      expect(
+        SecureAuthStorageException(
+          platform: 'windows',
+          operation: 'read',
+          cause: failure,
+        ).isUnavailable,
+        isFalse,
+      );
+      expect(file.readAsBytesSync(), <int>[0xFF, 0x00, 0x42]);
+      await store.delete(_account);
+      expect(file.existsSync(), isFalse);
+    },
+  );
+
+  test('an empty file fails the same way', () async {
+    File(store.fileOf(_account))
+      ..parent.createSync(recursive: true)
+      ..writeAsBytesSync(<int>[]);
+    await expectLater(
+      store.read(_account),
+      throwsA(
+        isA<SecretStoreError>().having(
+          (SecretStoreError e) => e.function,
+          'function',
+          'CryptUnprotectData',
         ),
       ),
     );

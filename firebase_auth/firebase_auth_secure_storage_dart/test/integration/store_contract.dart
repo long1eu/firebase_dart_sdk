@@ -103,23 +103,43 @@ void defineStoreContract({
       const String key = 'firebase_auth_providers_dart:api-key';
       await file.write(key, '{"version":2}');
 
+      final _RecordingStore recording = _RecordingStore(store, written);
       final SecureAuthStorage storage = SecureAuthStorage(
         namespace: 'integration',
-        store: store,
+        store: recording,
         migrateFrom: file,
       );
-      written
-        ..add('integration/${SecureAuthStorage.probeKey}')
-        ..add('integration/$key');
       expect(await storage.isAvailable(), isTrue);
-      expect(
-        await store.read('integration/${SecureAuthStorage.probeKey}'),
-        isNull,
-      );
+      final List<String> probes = written
+          .where((String a) => a.startsWith('integration/.probe-'))
+          .toList();
+      expect(probes, hasLength(1));
+      expect(await store.read(probes.single), isNull);
       expect(await storage.read(key), '{"version":2}');
       expect(await file.read(key), isNull);
       await storage.write(key, null);
       expect(await storage.read(key), isNull);
     },
   );
+}
+
+/// A [SecretStore] that adds every account written to [written] (so the
+/// teardown deletes it) and passes the calls on to [inner].
+class _RecordingStore implements SecretStore {
+  _RecordingStore(this.inner, this.written);
+
+  final SecretStore inner;
+  final Set<String> written;
+
+  @override
+  Future<String?> read(String account) => inner.read(account);
+
+  @override
+  Future<void> write(String account, String secret) {
+    written.add(account);
+    return inner.write(account, secret);
+  }
+
+  @override
+  Future<void> delete(String account) => inner.delete(account);
 }
