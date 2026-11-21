@@ -22,6 +22,10 @@ enum SecurePresenterKind {
   /// A terminal: a URL printed on it, or a line typed into it.
   console,
 
+  /// An element of the web page the app itself runs in (a web build of the app): a widget
+  /// rendered into the page's DOM, which returns the result without the loopback server.
+  inPage,
+
   /// A presenter of a third party that fits none of the kinds above.
   other,
 }
@@ -36,6 +40,8 @@ typedef ShowUrl = FutureOr<void> Function(Uri url);
 /// * [LoopbackPresenter]: shows a URL; the answer comes back over the loopback server.
 /// * [PromptPresenter]: asks for a line of text and returns it (a terminal).
 /// * `ProviderAppPresenter`: signs in through the provider's app or SDK and returns the result.
+/// * `RecaptchaPresenter`: runs a reCAPTCHA itself (in the page of a web app) and returns the
+///   token.
 abstract interface class SecurePresenter {
   /// The kind of surface, for the ranking of the flows.
   SecurePresenterKind get kind;

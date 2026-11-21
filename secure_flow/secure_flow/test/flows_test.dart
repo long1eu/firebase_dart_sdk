@@ -175,7 +175,7 @@ void main() {
       expect(flow.answer.path, isNull);
       expect(flow.state, isNull);
       expect(flow.port, 0);
-      expect(flow.presenterKinds.first, SecurePresenterKind.embeddedWebView);
+      expect(flow.presenterKinds.first, SecurePresenterKind.inPage);
       expect(
         flow.start(_session(SecureFlowHost.localhost)).toString(),
         'http://localhost:4321/p4th?state=st4te',

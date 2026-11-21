@@ -17,9 +17,10 @@ import 'package:firebase_auth_dart_platform/src/convert.dart';
 import 'package:firebase_auth_dart_platform/src/core.dart';
 import 'package:firebase_auth_dart_platform/src/firebase_auth.dart'
     show DartAuthConfig;
+import 'package:firebase_auth_dart_platform/src/phone.dart';
 import 'package:firebase_auth_dart_platform/src/storage.dart';
 import 'package:firebase_auth_platform_interface/firebase_auth_platform_interface.dart'
-    show FirebaseAuthPlatform;
+    show FirebaseAuthPlatform, RecaptchaVerifierFactoryPlatform;
 import 'package:firebase_auth_providers_dart/firebase_auth_providers_dart.dart'
     as dart_auth
     show
@@ -29,6 +30,9 @@ import 'package:firebase_auth_providers_dart/firebase_auth_providers_dart.dart'
         OAuthCredential,
         OAuthLoopbackProvider,
         RecaptchaAction,
+        RecaptchaClientType,
+        RecaptchaEnterpriseRequest,
+        RecaptchaEnterpriseVerification,
         RecaptchaV2Request;
 import 'package:firebase_auth_providers_dart/firebase_auth_providers_dart.dart'
     show InMemoryAuthStorage;
@@ -38,6 +42,15 @@ import 'package:firebase_core_platform_interface/firebase_core_platform_interfac
 import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
+import 'package:secure_flow/secure_flow.dart'
+    show
+        InPageRecaptchaPresenter,
+        RecaptchaFailure,
+        RecaptchaFailureReason,
+        RecaptchaRequest,
+        RecaptchaSize,
+        RecaptchaTheme,
+        SecurePresenterKind;
 
 import '../../firebase_auth_providers_dart/test/phone_platform.dart';
 import '../../firebase_auth_providers_dart/test/totp_platform.dart';
@@ -1504,6 +1517,198 @@ void main() {
       expect(sent.error!.message, isNot(contains('5555550100')));
     });
 
+    group('the RecaptchaVerifier on the web', () {
+      late _FakeInPagePresenter presenter;
+      late DartRecaptchaVerifierFactory factory;
+
+      setUp(() {
+        presenter = _FakeInPagePresenter();
+        factory = DartRecaptchaVerifierFactory(
+          inPage: true,
+          presenterFor:
+              ({
+                String? containerId,
+                void Function()? onVerified,
+                void Function()? onExpired,
+                void Function(RecaptchaFailure failure)? onError,
+              }) => presenter
+                ..containerId = containerId
+                ..onVerified = onVerified
+                ..onExpired = onExpired
+                ..onError = onError,
+        );
+      });
+
+      test(
+        'container, size, theme and callbacks reach the presenter',
+        () async {
+          final FirebaseAuth auth = await newAuth();
+          int successes = 0;
+          int expiries = 0;
+          final List<FirebaseAuthException> errors = <FirebaseAuthException>[];
+          final RecaptchaVerifierFactoryPlatform verifier = factory.delegateFor(
+            auth: DartFirebaseAuth.forApp(auth.app),
+            container: 'recaptcha-box',
+            size: RecaptchaVerifierSize.compact,
+            theme: RecaptchaVerifierTheme.dark,
+            onSuccess: () => successes++,
+            onExpired: () => expiries++,
+            onError: errors.add,
+          );
+          expect(verifier, isA<DartInPageRecaptchaVerifier>());
+          expect(verifier.type, 'recaptcha');
+          final DartInPageRecaptchaVerifier inPage =
+              verifier as DartInPageRecaptchaVerifier;
+          expect(inPage.size, RecaptchaSize.compact);
+          expect(inPage.theme, RecaptchaTheme.dark);
+          expect(presenter.containerId, 'recaptcha-box');
+          presenter.onVerified!();
+          presenter.onExpired!();
+          presenter.onError!(
+            const RecaptchaFailure(RecaptchaFailureReason.widget, 'offline'),
+          );
+          expect(successes, 1);
+          expect(expiries, 1);
+          expect(errors.single.code, 'network-request-failed');
+          // No container: the presenter makes an invisible one.
+          factory.delegateFor(
+            auth: DartFirebaseAuth.forApp(auth.app),
+            container: '',
+          );
+          expect(presenter.containerId, isNull);
+        },
+      );
+
+      test('render and verify use the site key of the project', () async {
+        final FirebaseAuth auth = await newAuth();
+        final RecaptchaVerifierFactoryPlatform verifier = factory.delegateFor(
+          auth: DartFirebaseAuth.forApp(auth.app),
+          container: 'recaptcha-box',
+          theme: RecaptchaVerifierTheme.dark,
+        );
+        expect(await verifier.render(), 7);
+        expect(presenter.rendered.single.siteKey, recaptchaSiteKey);
+        expect(presenter.rendered.single.theme, RecaptchaTheme.dark);
+        expect(await verifier.verify(), 'widget-token');
+        expect(presenter.requests.single.siteKey, recaptchaSiteKey);
+        expect(presenter.requests.single.isEnterprise, isFalse);
+        verifier.clear();
+        expect(presenter.cleared, 1);
+        presenter.failure = const RecaptchaFailure(
+          RecaptchaFailureReason.scriptLoad,
+          'blocked',
+        );
+        await expectLater(verifier.verify(), throwsAuthCode('internal-error'));
+      });
+
+      test('signInWithPhoneNumber takes the token of the verifier', () async {
+        backend.phone.requireProof = true;
+        final FirebaseAuth auth = await authWith(
+          DartAuthConfig(
+            httpClient: backend.client,
+            storageFor: (FirebaseApp app) => InMemoryAuthStorage(),
+          ),
+        );
+        final DartFirebaseAuth platform = DartFirebaseAuth.forApp(auth.app);
+        final RecaptchaVerifierFactoryPlatform verifier = factory.delegateFor(
+          auth: platform,
+          container: 'recaptcha-box',
+        );
+        await platform.signInWithPhoneNumber(number, verifier);
+        expect(
+          backend.bodyOf('accounts:sendVerificationCode'),
+          <String, Object?>{
+            'phoneNumber': number,
+            'recaptchaToken': 'widget-token',
+          },
+        );
+        expect(presenter.requests.single.siteKey, recaptchaSiteKey);
+      });
+
+      test('the appVerification of use wins over the verifier', () async {
+        backend.phone.requireProof = true;
+        final FirebaseAuth auth = await authWith(
+          DartAuthConfig(
+            httpClient: backend.client,
+            storageFor: (FirebaseApp app) => InMemoryAuthStorage(),
+            appVerification: dart_auth.AppVerification.recaptchaV2(
+              (dart_auth.RecaptchaV2Request request) => 'configured-token',
+            ),
+          ),
+        );
+        final DartFirebaseAuth platform = DartFirebaseAuth.forApp(auth.app);
+        await platform.signInWithPhoneNumber(
+          number,
+          factory.delegateFor(auth: platform),
+        );
+        expect(
+          backend.bodyOf('accounts:sendVerificationCode')['recaptchaToken'],
+          'configured-token',
+        );
+        expect(presenter.requests, isEmpty);
+      });
+
+      test('off the web the factory still renders nothing', () {
+        final DartRecaptchaVerifierFactory native =
+            DartRecaptchaVerifierFactory();
+        expect(native.inPage, isFalse);
+        expect(
+          native.delegateFor(auth: FirebaseAuthPlatform.instance),
+          same(native),
+        );
+      });
+    });
+
+    test('the recaptchaEnterprise of use reaches the client', () async {
+      final dart_auth.RecaptchaEnterpriseVerification source =
+          dart_auth.RecaptchaEnterpriseVerification(
+            (dart_auth.RecaptchaEnterpriseRequest request) => 'token',
+          );
+      final FirebaseAuth auth = await authWith(
+        DartAuthConfig(
+          httpClient: backend.client,
+          storageFor: (FirebaseApp app) => InMemoryAuthStorage(),
+          recaptchaEnterprise: source,
+        ),
+      );
+      expect(
+        FirebaseAuthDart.userAuthFor(auth.app).recaptchaEnterprise,
+        same(source),
+      );
+      // Off the web there is no default source.
+      final FirebaseAuth plain = await newAuth();
+      expect(
+        FirebaseAuthDart.userAuthFor(plain.app).recaptchaEnterprise,
+        isNull,
+      );
+    });
+
+    test('the Enterprise source of the web runs in the page', () async {
+      final dart_auth.RecaptchaEnterpriseVerification source =
+          inPageRecaptchaEnterprise();
+      expect(source.clientType, dart_auth.RecaptchaClientType.web);
+      // On the VM the in-page presenter is not available.
+      await expectLater(
+        Future<String>.sync(
+          () async => source.token(
+            const dart_auth.RecaptchaEnterpriseRequest(
+              action: dart_auth.RecaptchaAction.signInWithPassword,
+              siteKey: 'enterprise-key',
+            ),
+          ),
+        ),
+        throwsUnsupportedError,
+      );
+      expect(
+        () => source.token(
+          const dart_auth.RecaptchaEnterpriseRequest(
+            action: dart_auth.RecaptchaAction.signInWithPassword,
+          ),
+        ),
+        throwsStateError,
+      );
+    });
+
     test('verificationFailed gets the errors, without the number', () async {
       final FirebaseAuth auth = await newPhoneAuth();
       final ({String? id, FirebaseAuthException? error}) sent = await sendCode(
@@ -1744,16 +1949,45 @@ void main() {
     });
   });
 
+  group('reCAPTCHA Enterprise configuration', () {
+    test('initializeRecaptchaConfig reads it through the client', () async {
+      backend.override = (http.Request r) =>
+          r.url.pathSegments.last == 'recaptchaConfig'
+          ? jsonResponse(<String, Object?>{
+              'recaptchaKey': 'projects/demo-unit/keys/enterprise-key',
+              'recaptchaEnforcementState': <Object?>[
+                <String, Object?>{
+                  'provider': 'EMAIL_PASSWORD_PROVIDER',
+                  'enforcementState': 'AUDIT',
+                },
+              ],
+            })
+          : null;
+      final FirebaseAuth auth = await newAuth();
+      await auth.initializeRecaptchaConfig();
+      expect(backend.paths, contains('/v2/recaptchaConfig'));
+      expect(
+        FirebaseAuthDart.userAuthFor(auth.app).recaptchaConfig?.siteKey,
+        'enterprise-key',
+      );
+    });
+
+    test('its errors keep the codes of the JS SDK', () async {
+      backend.override = (http.Request r) =>
+          errorResponse('RECAPTCHA_NOT_ENABLED');
+      final FirebaseAuth auth = await newAuth();
+      await expectLater(
+        auth.initializeRecaptchaConfig(),
+        throwsAuthCode('recaptcha-not-enabled'),
+      );
+    });
+  });
+
   group('not available', () {
-    test('popup, redirect and the reCAPTCHA configuration throw '
-        'unimplemented', () async {
+    test('popup and redirect throw unimplemented', () async {
       final FirebaseAuth auth = await newAuth();
       await expectLater(
         auth.signInWithPopup(GoogleAuthProvider()),
-        throwsAuthCode('unimplemented'),
-      );
-      await expectLater(
-        auth.initializeRecaptchaConfig(),
         throwsAuthCode('unimplemented'),
       );
       await auth.signInAnonymously();
@@ -1777,4 +2011,50 @@ class _FailingStorage implements dart_auth.AuthStorage {
 class _OtherCore extends FirebasePlatform {
   @override
   List<FirebaseAppPlatform> get apps => const <FirebaseAppPlatform>[];
+}
+
+/// An in-page presenter for the VM: records what it is asked and answers
+/// `widget-token` (or throws [failure]).
+class _FakeInPagePresenter implements InPageRecaptchaPresenter {
+  @override
+  String? containerId;
+
+  @override
+  void Function()? onVerified;
+
+  @override
+  void Function()? onExpired;
+
+  @override
+  void Function(RecaptchaFailure failure)? onError;
+
+  RecaptchaFailure? failure;
+  final List<RecaptchaRequest> requests = <RecaptchaRequest>[];
+  final List<RecaptchaRequest> rendered = <RecaptchaRequest>[];
+  int cleared = 0;
+
+  @override
+  Duration get scriptTimeout => const Duration(seconds: 30);
+
+  @override
+  SecurePresenterKind get kind => SecurePresenterKind.inPage;
+
+  @override
+  Future<String> recaptcha(RecaptchaRequest request) async {
+    final RecaptchaFailure? failure = this.failure;
+    if (failure != null) {
+      throw failure;
+    }
+    requests.add(request);
+    return 'widget-token';
+  }
+
+  @override
+  Future<int> render(RecaptchaRequest request) async {
+    rendered.add(request);
+    return 7;
+  }
+
+  @override
+  void clear() => cleared++;
 }

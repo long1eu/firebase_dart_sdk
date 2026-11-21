@@ -56,6 +56,7 @@ class DartAuthConfig {
     this.oauthProvidersFor,
     this.presenter,
     this.appVerification,
+    this.recaptchaEnterprise,
   });
 
   final AuthStorageFactory? storageFor;
@@ -76,6 +77,10 @@ class DartAuthConfig {
 
   /// The proof of the phone requests; see `DartFirebaseAuth.appVerification`.
   final dart_auth.AppVerification? appVerification;
+
+  /// The reCAPTCHA Enterprise token source of the clients; on the web
+  /// `inPageRecaptchaEnterprise()` when null, elsewhere none.
+  final dart_auth.RecaptchaEnterpriseVerification? recaptchaEnterprise;
 }
 
 /// The implementation of [FirebaseAuthPlatform] on top of
@@ -150,6 +155,9 @@ class DartFirebaseAuth extends FirebaseAuthPlatform {
           ),
           storageKey: key,
           httpClient: config.httpClient,
+          recaptchaEnterprise:
+              config.recaptchaEnterprise ??
+              (kIsWeb ? inPageRecaptchaEnterprise() : null),
         );
         // The error of a failed restore (an unreadable storage) reaches
         // authStateReady(); the app starts signed out.
@@ -292,14 +300,28 @@ class DartFirebaseAuth extends FirebaseAuthPlatform {
   /// emulator does not check it); else the `appVerification` of `use`, by
   /// default the reCAPTCHA v2 page of the client, shown by the `presenter` of
   /// `use` (the system browser on a desktop when there is none).
-  dart_auth.AppVerification get appVerification {
+  dart_auth.AppVerification get appVerification => appVerificationWith(null);
+
+  /// [appVerification], except that a [DartInPageRecaptchaVerifier] the app
+  /// passed ([verifier], on the web) gives the reCAPTCHA v2 token when
+  /// `FirebaseAuthDart.use` got no `appVerification`. Without either, the
+  /// default reCAPTCHA v2 flow of the client runs in the app's page on the
+  /// web (an invisible widget), in the system browser elsewhere.
+  dart_auth.AppVerification appVerificationWith(
+    RecaptchaVerifierFactoryPlatform? verifier,
+  ) {
     final dart_auth.AppVerification? configured = _config.appVerification;
     if (_appVerificationDisabled ||
         (configured == null && client.emulatorConfig != null)) {
       return const dart_auth.AppVerification.none();
     }
-    return configured ??
-        dart_auth.AppVerification.recaptchaV2Loopback(presenter: presenter);
+    if (configured != null) {
+      return configured;
+    }
+    if (verifier is DartInPageRecaptchaVerifier) {
+      return verifier.appVerification;
+    }
+    return dart_auth.AppVerification.recaptchaV2Loopback(presenter: presenter);
   }
 
   // ---- plumbing ----
@@ -631,16 +653,22 @@ class DartFirebaseAuth extends FirebaseAuthPlatform {
   Future<UserCredentialPlatform> getRedirectResult() async =>
       throw unimplemented('getRedirectResult', noBrowserFlow);
 
+  /// Reads the reCAPTCHA Enterprise configuration of the project (or of the
+  /// tenant) through the client (`FirebaseUserAuth.initializeRecaptchaConfig`):
+  /// the requests the project protects then carry a token of the
+  /// `recaptchaEnterprise` source of `FirebaseAuthDart.use` (on the web, by
+  /// default, reCAPTCHA Enterprise in the app's page).
   @override
-  Future<void> initializeRecaptchaConfig() async =>
-      throw unimplemented('initializeRecaptchaConfig', noRecaptchaConfig);
+  Future<void> initializeRecaptchaConfig() =>
+      guard(this, () => client.initializeRecaptchaConfig());
 
   // ---- phone ----
 
-  /// Sends the SMS code to [phoneNumber] with the proof of [appVerification]
-  /// and returns a [ConfirmationResultPlatform] whose `confirm` signs in with
-  /// the code. [applicationVerifier] is not used (see
-  /// `DartRecaptchaVerifierFactory`).
+  /// Sends the SMS code to [phoneNumber] with the proof of
+  /// [appVerificationWith] [applicationVerifier] and returns a
+  /// [ConfirmationResultPlatform] whose `confirm` signs in with the code. The
+  /// verifier gives the token only on the web, where it renders into the page
+  /// (see `DartRecaptchaVerifierFactory`).
   @override
   Future<ConfirmationResultPlatform> signInWithPhoneNumber(
     String phoneNumber,
@@ -649,7 +677,7 @@ class DartFirebaseAuth extends FirebaseAuthPlatform {
     final dart_auth.FirebaseUserAuth userAuth = client;
     final String verificationId = await userAuth.verifyPhoneNumber(
       phoneNumber,
-      appVerification: appVerification,
+      appVerification: appVerificationWith(applicationVerifier),
     );
     return DartConfirmationResult(
       this,

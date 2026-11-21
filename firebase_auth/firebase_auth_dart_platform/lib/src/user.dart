@@ -159,8 +159,9 @@ class DartUser extends UserPlatform {
   });
 
   /// Sends the SMS code to [phoneNumber] with the proof of
-  /// `DartFirebaseAuth.appVerification`; the `confirm` of the result links the
-  /// number to this user. [applicationVerifier] is not used. Like the JS SDK,
+  /// `DartFirebaseAuth.appVerificationWith` [applicationVerifier] (the
+  /// verifier counts only on the web); the `confirm` of the result links the
+  /// number to this user. Like the JS SDK,
   /// it reads the account first and throws `provider-already-linked`, before
   /// any SMS, when the user has a phone number already.
   @override
@@ -182,7 +183,7 @@ class DartUser extends UserPlatform {
     }
     final String verificationId = await userAuth.verifyPhoneNumber(
       phoneNumber,
-      appVerification: _auth.appVerification,
+      appVerification: _auth.appVerificationWith(applicationVerifier),
     );
     return DartConfirmationResult(
       _auth,

@@ -56,7 +56,8 @@ Future<void> main() async {
 | `oauthProviders` | none | The `OAuthLoopbackProvider`s of `signInWithProvider`, `User.linkWithProvider` and `User.reauthenticateWithProvider`, one per Firebase provider id (see [Provider sign-in](#provider-sign-in)). |
 | `oauthProvidersFor` | none | The providers of one FlutterFire app, for apps with several Firebase projects that each have their own OAuth client; called once per app. They are added to `oauthProviders`, and one with the same id as a provider of `oauthProviders` replaces it for that app. |
 | `presenter` | the presenter the `OAuthFlow` of `secure_flow` ranks best in the environment: the system browser on macOS, Linux and Windows, the URL on stderr over SSH or without a display | A `SecurePresenter` that runs the browser part of a provider sign-in: it shows the authorization URL and takes the redirect on 127.0.0.1. `CallbackPresenter((Uri url) => launchUrl(url))` with `url_launcher`, for example. Needed on Android and iOS: without it the provider calls throw `operation-not-supported-in-this-environment`. |
-| `appVerification` | `AppVerification.recaptchaV2Loopback(presenter:)` with the `presenter` above: a reCAPTCHA v2 page on 127.0.0.1, once per phone request (in the system browser on a desktop without a `presenter`); no proof with the Auth emulator | The proof of the phone requests (`verifyPhoneNumber`, `signInWithPhoneNumber`, `User.linkWithPhoneNumber`, the SMS second factor): an `AppVerification` of `firebase_auth_providers_dart`, such as `AppVerification.recaptchaV2((request) => tokenFromYourWebView())` (see [Phone sign-in](#phone-sign-in)). `setSettings(appVerificationDisabledForTesting: true)` sends none. |
+| `appVerification` | `AppVerification.recaptchaV2Loopback(presenter:)` with the `presenter` above: a reCAPTCHA v2 page on 127.0.0.1, once per phone request (in the system browser on a desktop without a `presenter`); no proof with the Auth emulator | The proof of the phone requests (`verifyPhoneNumber`, `signInWithPhoneNumber`, `User.linkWithPhoneNumber`, the SMS second factor): an `AppVerification` of `firebase_auth_providers_dart`, such as `AppVerification.recaptchaV2((request) => tokenFromYourWebView())` (see [Phone sign-in](#phone-sign-in)). `setSettings(appVerificationDisabledForTesting: true)` sends none. On the web, without one, the `RecaptchaVerifier` of `signInWithPhoneNumber` renders the reCAPTCHA v2 widget in the page and gives the token. |
+| `recaptchaEnterprise` | on the web, reCAPTCHA Enterprise in the app's page (`RecaptchaFlow.enterprise` with `InPageRecaptchaPresenter`); elsewhere none | The reCAPTCHA Enterprise token source of the requests the project protects (password sign-in and sign-up, password reset and email link emails, SMS), as `FirebaseUserAuth.recaptchaEnterprise` of the client describes (see [reCAPTCHA](#recaptcha)). |
 
 `use()` throws a `StateError` once the `FirebaseAuth` of an app has been used, because the configuration is read
 then.
@@ -257,14 +258,16 @@ the new user, `await provider.waitForCurrentUser()` first. `userAuthFor` has no 
 | Phone: `verifyPhoneNumber`, `signInWithPhoneNumber` and `User.linkWithPhoneNumber` (`ConfirmationResult.confirm`), `User.updatePhoneNumber`, `PhoneAuthProvider.credential` in `signInWithCredential`, `linkWithCredential` and `reauthenticateWithCredential` | implemented, unit-tested; run against a real project with a test phone number and no proof; not with a real SMS or against the emulator |
 | SMS second factors: `verifyPhoneNumber` with the session of `getSession()` or of a `MultiFactorResolver`, `PhoneMultiFactorGenerator.getAssertion`, `MultiFactor.enroll` | implemented, unit-tested; run against a real project with a test phone number and no proof; not with a real SMS or against the emulator |
 | `signInWithProvider`, `User.linkWithProvider`, `User.reauthenticateWithProvider` through the loopback OAuth flow, with the providers passed to `use` | implemented, tested with a simulated browser |
+| `initializeRecaptchaConfig`, reCAPTCHA Enterprise on the requests the project protects | implemented through the client; unit-tested against a fake backend; not run against a real project |
+| `RecaptchaVerifier` on the web (`container`, `size`, `theme`, `onSuccess`, `onError`, `onExpired`; `render`, `verify`, `clear`) | implemented with the in-page presenter of `secure_flow`; the mapping unit-tested on the VM, the presenter tested against a fake `grecaptcha` in Chrome; not run in a Flutter web app |
 
 These throw a `FirebaseAuthException` with the code `unimplemented` and a message that says why:
 
 - **Browser flows**: `signInWithPopup`, `signInWithRedirect`, `getRedirectResult`, `User.linkWithPopup`,
   `User.linkWithRedirect`, `User.reauthenticateWithPopup`, `User.reauthenticateWithRedirect`. Use
   `signInWithProvider` instead ([Provider sign-in](#provider-sign-in)).
-- **`initializeRecaptchaConfig`** and **`RecaptchaVerifier.verify`**: the proof of a phone request comes from the
-  `appVerification` of `use`; the reCAPTCHA Enterprise configuration of the project is not read.
+- **`RecaptchaVerifier.verify`** off the web: the proof of a phone request comes from the `appVerification` of
+  `use`, and the verifier renders nothing.
 - **A `PhoneAuthCredential` of `credentialFromToken`** (Android only) is an `argument-error`.
 - **`TotpSecret.openInOtpApp`**: opening another app needs a URL launcher. Open the URL of `generateQrCodeUrl`
   with `url_launcher`, or show it as a QR code.
@@ -325,6 +328,31 @@ The SMS second factor goes through `verifyPhoneNumber` with `multiFactorSession`
 then `PhoneMultiFactorGenerator.getAssertion(PhoneAuthProvider.credential(verificationId: ..., smsCode: ...))`.
 No error holds the phone number, the verification id, the code or the reCAPTCHA token.
 
+## reCAPTCHA
+
+- **On the web** the `RecaptchaVerifier` the app creates renders the reCAPTCHA v2 widget into the element
+  `container` (with its `size` and `theme`; invisible in a new element without a `container`, as FlutterFire's web
+  plugin does), and `signInWithPhoneNumber` and `User.linkWithPhoneNumber` take the token from it unless `use` got
+  an `appVerification`. `onSuccess`, `onExpired` and `onError` (a `FirebaseAuthException`) are called by the
+  widget. Popup and redirect sign-in are not planned: get the provider's token and use `signInWithCredential`.
+- **reCAPTCHA Enterprise**: `initializeRecaptchaConfig` reads the project's configuration through the client;
+  the requests the project protects then carry a token of the `recaptchaEnterprise` source of `use` (on the web,
+  by default, reCAPTCHA Enterprise in the page). Elsewhere pass one, for example:
+
+```dart
+FirebaseAuthDart.use(
+  recaptchaEnterprise: RecaptchaEnterpriseVerification(
+    (RecaptchaEnterpriseRequest request) => RecaptchaFlow.enterprise(
+      siteKey: request.siteKey!,
+      action: request.action.value,
+    ).run(), // a page on localhost in the system browser
+  ),
+);
+```
+
+  The Enterprise key must allow the domain of the page that makes the token: the app's domain on the web,
+  `localhost` for the page of `RecaptchaFlow`. Not run against a real project.
+
 ## Platforms
 
 | Platform | Selected by | Notes |
@@ -332,7 +360,7 @@ No error holds the phone number, the verification id, the code or the reCAPTCHA 
 | Linux | automatic (`dartPluginClass`) | `firebase_core` is installed too, unless another package did it first; the session is in libsecret (`libsecret-1-dev` to build) |
 | Windows, macOS | `FirebaseAuthDart.use()` | `firebase_core` stays native; the session is in DPAPI (Windows) or the keychain (macOS; the session file when the build lacks the keychain entitlement) |
 | Android, iOS | `FirebaseAuthDart.use()` | the session is in the Keystore or the Keychain |
-| Web | not supported | use the official plugin |
+| Web | `FirebaseAuthDart.use()` | not run in a Flutter web app: the official plugin is the tested choice. Sessions in `BestWebAuthStorage`; `RecaptchaVerifier` and reCAPTCHA Enterprise in the page; no popup or redirect |
 
 ## Real-project harness
 

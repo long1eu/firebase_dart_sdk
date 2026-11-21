@@ -8,6 +8,21 @@
 - `MultiFactorResolver.session`: a `MultiFactorSession` of type `MultiFactorSessionType.signIn` that wraps the
   pending credential of the sign-in (`resolver.session` of the JS SDK). It is opaque: no member, `toString` or JSON
   form shows the credential.
+- reCAPTCHA Enterprise, as the JS SDK does it: `FirebaseUserAuth.initializeRecaptchaConfig()` reads
+  `v2/recaptchaConfig` (the Enterprise site key and the `ENFORCE`/`AUDIT`/`OFF` state of `EMAIL_PASSWORD_PROVIDER`
+  and `PHONE_PROVIDER`, per tenant) into a `RecaptchaConfig`, and `recaptchaConfig` returns it. With a token source
+  passed as `recaptchaEnterprise` (constructor and `forApp`), the password sign-in and sign-up, password
+  credentials, and the password reset and email link emails carry `captchaResponse` (`captchaResp` for the
+  emails), `clientType` and `recaptchaVersion` when the provider is protected, and are sent again with a token
+  after `missing-recaptcha-token`. SMS requests with a reCAPTCHA v2 proof read the configuration first, send the
+  Enterprise token when the phone provider is protected, fall back to the v2 token under AUDIT after
+  `missing-recaptcha-token` or `invalid-app-credential`, and otherwise send the v2 token with
+  `captchaResponse: NO_RECAPTCHA`. A failing source is asked again after the configuration is read again. Without
+  a source nothing changes. Tested against a fake backend; not run against a real project.
+- `RecaptchaEnterpriseRequest` carries the Enterprise `siteKey` (null before the configuration is read) and the
+  `languageCode`; `RecaptchaAction` has `signInWithPassword`, `signUpPassword` and `getOobCode`.
+- `AppVerification.recaptchaV2Loopback()` works on the web: `secure_flow` runs the widget in the app's page there.
+  A `RecaptchaFailure` of a widget becomes `internal-error`, `network-request-failed` or `missing-app-credential`.
 
 ## 0.3.2
 

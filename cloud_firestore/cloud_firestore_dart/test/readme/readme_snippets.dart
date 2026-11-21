@@ -211,8 +211,8 @@ Future<void> authProvidersReadmeLine89() async {
   print(result.additionalUserInfo?.isNewUser);
 }
 
-// ../../firebase_auth/firebase_auth_providers_dart/README.md:208
-Future<void> authProvidersReadmeLine208() async {
+// ../../firebase_auth/firebase_auth_providers_dart/README.md:209
+Future<void> authProvidersReadmeLine209() async {
   final FirebaseUserAuth auth = await FirebaseUserAuth.forApp(app);
 
   // Enrol: show the URI as a QR code (or the secret for typing in), then ask for a code of the app.
@@ -234,8 +234,8 @@ Future<void> authProvidersReadmeLine208() async {
   await auth.unenrollMultiFactor(auth.currentUser!.enrolledFactors.first.uid);
 }
 
-// ../../firebase_auth/firebase_auth_providers_dart/README.md:248
-Future<void> authProvidersReadmeLine248() async {
+// ../../firebase_auth/firebase_auth_providers_dart/README.md:249
+Future<void> authProvidersReadmeLine249() async {
   final FirebaseUserAuth auth = await FirebaseUserAuth.forApp(app);
   const String codeFromYourTextField = '123456';
 
@@ -277,8 +277,8 @@ Future<void> authProvidersReadmeLine248() async {
   }
 }
 
-// ../../firebase_auth/firebase_auth_providers_dart/README.md:310
-Future<void> authProvidersReadmeLine310() async {
+// ../../firebase_auth/firebase_auth_providers_dart/README.md:311
+Future<void> authProvidersReadmeLine311() async {
   final FirebaseUserAuth auth = await FirebaseUserAuth.forApp(app);
   final UserCredential result = await auth.signInWithOAuthLoopback(
     OAuthLoopbackProvider.google(
@@ -289,8 +289,8 @@ Future<void> authProvidersReadmeLine310() async {
   print(result.user?.email);
 }
 
-// ../../firebase_auth/firebase_auth_providers_dart/README.md:371
-Future<void> authProvidersReadmeLine371() async {
+// ../../firebase_auth/firebase_auth_providers_dart/README.md:372
+Future<void> authProvidersReadmeLine372() async {
   final OAuthLoopbackProvider provider = OAuthLoopbackProvider.oidc(
     providerId: 'oidc.example',
     authorizationEndpoint: Uri.parse('https://idp.example.com/authorize'),
@@ -315,9 +315,24 @@ Future<void> authProvidersReadmeLine371() async {
   );
 }
 
-// ../../firebase_auth/firebase_auth_providers_dart/README.md:439
-Future<void> authProvidersReadmeLine439() async {
+// ../../firebase_auth/firebase_auth_providers_dart/README.md:441
+Future<void> authProvidersReadmeLine441() async {
   final AppVerification verification = AppVerification.recaptchaV2Loopback();
+}
+
+// ../../firebase_auth/firebase_auth_providers_dart/README.md:470
+Future<void> authProvidersReadmeLine470() async {
+  final FirebaseUserAuth auth = FirebaseUserAuth(
+    apiKey: '<the Web API key of the project>',
+    recaptchaEnterprise: RecaptchaEnterpriseVerification(
+      (RecaptchaEnterpriseRequest request) => RecaptchaFlow.enterprise(
+        siteKey: request.siteKey!,
+        action: request.action.value,
+      ).run(), // package:secure_flow: in the app's page on the web, a page on localhost elsewhere
+    ),
+  );
+  final RecaptchaConfig config = await auth.initializeRecaptchaConfig();
+  print(config.isAnyProviderEnabled);
 }
 
 // ../../docs/migrating_from_vm_packages.md:67

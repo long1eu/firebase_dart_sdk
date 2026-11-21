@@ -53,11 +53,12 @@ final class CallbackPresenter extends LoopbackPresenter {
     ShowUrl show, {
     this.kind = SecurePresenterKind.systemBrowser,
   }) : _show = show {
-    if (kind == SecurePresenterKind.providerApp) {
+    if (kind == SecurePresenterKind.providerApp ||
+        kind == SecurePresenterKind.inPage) {
       throw ArgumentError.value(
         kind,
         'kind',
-        'a provider app does not show a URL',
+        'a provider app or an in-page presenter does not show a URL',
       );
     }
   }

@@ -21,12 +21,6 @@ FirebaseAuthException unimplemented(String member, String why) =>
       message: '$member is not available in firebase_auth_dart_platform: $why',
     );
 
-/// Why `initializeRecaptchaConfig` throws.
-const String noRecaptchaConfig =
-    'the reCAPTCHA Enterprise configuration of the project is not read here. '
-    'Phone requests carry the proof of the AppVerification passed to '
-    'FirebaseAuthDart.use.';
-
 /// Why the popup and redirect members throw.
 const String noBrowserFlow =
     'popup and redirect flows exist only in a browser. Get the provider token '

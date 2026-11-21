@@ -128,16 +128,18 @@ final class ConsolePresenter extends LoopbackPresenter
 /// browser would be used for OAuth.
 final class CallbackPresenter extends LoopbackPresenter {
   /// A presenter that shows URLs with [show]. [kind] cannot be
-  /// [SecurePresenterKind.providerApp], which returns results without the loopback server.
+  /// [SecurePresenterKind.providerApp] or [SecurePresenterKind.inPage], which return results
+  /// without the loopback server.
   CallbackPresenter(
     ShowUrl show, {
     this.kind = SecurePresenterKind.systemBrowser,
   }) : _show = show {
-    if (kind == SecurePresenterKind.providerApp) {
+    if (kind == SecurePresenterKind.providerApp ||
+        kind == SecurePresenterKind.inPage) {
       throw ArgumentError.value(
         kind,
         'kind',
-        'a provider app does not show a URL',
+        'a provider app or an in-page presenter does not show a URL',
       );
     }
   }

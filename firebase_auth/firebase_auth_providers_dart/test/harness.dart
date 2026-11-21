@@ -81,10 +81,12 @@ class FakeBackend {
     AuthStorage? storage,
     String? appId,
     Duration requestTimeout = const Duration(seconds: 30),
+    RecaptchaEnterpriseVerification? recaptchaEnterprise,
   }) => FirebaseUserAuth(
     apiKey: apiKey,
     requestTimeout: requestTimeout,
     appId: appId,
+    recaptchaEnterprise: recaptchaEnterprise,
     storage: storage ?? this.storage,
     emulatorHost: emulatorHost,
     httpClient: MockClient((http.Request request) {
