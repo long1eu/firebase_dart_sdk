@@ -1,4 +1,4 @@
-## 0.1.0 (unreleased)
+## 0.1.0
 
 - First version: `FirebaseStorage` (bucket from the app's options or `gs://`, emulator host, retry policy),
   `Reference` (path operations, `metadata`, `updateMetadata`, `downloadUrl`, `delete`, `list`, `listAll`,
