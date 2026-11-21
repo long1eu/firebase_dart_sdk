@@ -3,11 +3,17 @@
 // through the CleanupLedger; none deletes an account.
 
 import 'dart:async';
+import 'dart:math';
 
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_auth_dart_platform/firebase_auth_dart_platform.dart';
 import 'package:firebase_auth_providers_dart/firebase_auth_providers_dart.dart'
-    show AuthStorage;
+    show
+        AppVerification,
+        AuthStorage,
+        RecaptchaV2Request,
+        RecaptchaV2TokenSource,
+        RecaptchaV2Verification;
 
 import 'cleanup.dart';
 import 'code_prompt.dart';
@@ -125,6 +131,54 @@ class RecordingStorage extends AuthStorage {
 /// The display name of the TOTP factor the harness enrols.
 const String totpDisplayName = 'auth-harness';
 
+/// The display name of the SMS factor the harness enrols.
+const String smsDisplayName = 'auth-harness-sms';
+
+/// The proofs the phone requests of the harness try, in this order, until the
+/// project accepts one (a test phone number may need less than a real one).
+enum ProofMode {
+  /// No proof: `setSettings(appVerificationDisabledForTesting: true)`.
+  none('no proof'),
+
+  /// A random 50-character `recaptchaToken`, as the JS SDK sends for test
+  /// numbers with `appVerificationDisabledForTesting`.
+  fakeToken('a placeholder reCAPTCHA token'),
+
+  /// A real reCAPTCHA v2 token from the client's page in the browser.
+  recaptchaPage('the reCAPTCHA page');
+
+  const ProofMode(this.label);
+
+  /// How the report names it.
+  final String label;
+}
+
+/// The `AppVerification` of the harness, passed to `FirebaseAuthDart.use`: a
+/// reCAPTCHA v2 token that is a placeholder or comes from the page, by [mode].
+class HarnessProof {
+  /// The source of [verification]; [ProofMode.none] is not set here but with
+  /// `setSettings`.
+  ProofMode mode = ProofMode.fakeToken;
+
+  final RecaptchaV2TokenSource _page =
+      (AppVerification.recaptchaV2Loopback() as RecaptchaV2Verification).token;
+
+  /// What `FirebaseAuthDart.use` gets.
+  AppVerification get verification =>
+      AppVerification.recaptchaV2((RecaptchaV2Request request) {
+        if (mode == ProofMode.recaptchaPage) {
+          return _page(request);
+        }
+        const String letters =
+            'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+        final Random random = Random.secure();
+        return String.fromCharCodes(<int>[
+          for (int i = 0; i < 50; i++)
+            letters.codeUnitAt(random.nextInt(letters.length)),
+        ]);
+      });
+}
+
 /// The placeholder `revokeAccessToken` is called with.
 const String placeholderAppleToken = 'auth-harness-placeholder-token';
 
@@ -141,6 +195,9 @@ class HarnessRun {
     required this.storage,
     required this.log,
     required this.githubAccountExists,
+    this.phoneNumber,
+    this.phoneCode,
+    this.proof,
   });
 
   /// The `FirebaseAuth` of the app.
@@ -161,6 +218,20 @@ class HarnessRun {
   /// See [HarnessConfig.githubAccountExists].
   final bool githubAccountExists;
 
+  /// See [HarnessConfig.phoneNumber]; the phone and sms steps are skipped
+  /// without it.
+  final String? phoneNumber;
+
+  /// See [HarnessConfig.phoneCode].
+  final String? phoneCode;
+
+  /// The `AppVerification` passed to `FirebaseAuthDart.use`; without it the
+  /// phone requests try [ProofMode.none] only.
+  final HarnessProof? proof;
+
+  /// The proof the phone requests use now: the first the project accepted.
+  ProofMode proofMode = ProofMode.none;
+
   /// The uid of the primary account, once signed in.
   String? primaryUid;
 
@@ -172,6 +243,8 @@ class HarnessRun {
         HarnessStep.github => _github(),
         HarnessStep.reauthenticate => _reauthenticate(),
         HarnessStep.totp => _totp(),
+        HarnessStep.phone => _phone(),
+        HarnessStep.sms => _sms(),
         HarnessStep.revoke => _revoke(),
         HarnessStep.persistence => _persistence(),
       };
@@ -190,7 +263,7 @@ class HarnessRun {
     try {
       credential = await auth.signInWithProvider(provider);
     } on FirebaseAuthMultiFactorException catch (e) {
-      credential = await resolveTotp(e.resolver);
+      credential = await resolveChallenge(e.resolver);
     }
     final User user = credential.user!;
     if (credential.additionalUserInfo?.isNewUser ?? false) {
@@ -202,6 +275,51 @@ class HarnessRun {
       throw StepFailure('new-account-created');
     }
     return credential;
+  }
+
+  /// Finishes the second-factor challenge of [resolver]: with a TOTP code when
+  /// the account has a TOTP factor, else with the SMS code of the test phone
+  /// number when it has an SMS factor and the phone variables are set.
+  Future<UserCredential> resolveChallenge(MultiFactorResolver resolver) {
+    final bool totp = resolver.hints.any(
+      (MultiFactorInfo info) => info is TotpMultiFactorInfo,
+    );
+    final bool sms = resolver.hints.any(
+      (MultiFactorInfo info) => info is PhoneMultiFactorInfo,
+    );
+    return !totp && sms && phoneNumber != null
+        ? resolveSms(resolver)
+        : resolveTotp(resolver);
+  }
+
+  /// Finishes the second-factor challenge of [resolver] with the SMS code of
+  /// the test phone number: for the factor [factorUid], or the first SMS
+  /// factor.
+  Future<UserCredential> resolveSms(
+    MultiFactorResolver resolver, {
+    String? factorUid,
+  }) async {
+    final (_, String code) = _testPhone();
+    final PhoneMultiFactorInfo hint =
+        resolver.hints
+            .whereType<PhoneMultiFactorInfo>()
+            .where(
+              (MultiFactorInfo info) =>
+                  factorUid == null || info.uid == factorUid,
+            )
+            .firstOrNull ??
+        (throw StepFailure('no-sms-factor'));
+    final String verificationId = await _withProof(
+      () => _sendCode(session: resolver.session, hint: hint),
+    );
+    return resolver.resolveSignIn(
+      PhoneMultiFactorGenerator.getAssertion(
+        PhoneAuthProvider.credential(
+          verificationId: verificationId,
+          smsCode: code,
+        ),
+      ),
+    );
   }
 
   /// Finishes the second-factor challenge of [resolver] with a TOTP code: for
@@ -333,7 +451,7 @@ class HarnessRun {
     try {
       credential = await user.reauthenticateWithProvider(GoogleAuthProvider());
     } on FirebaseAuthMultiFactorException catch (e) {
-      credential = await resolveTotp(e.resolver);
+      credential = await resolveChallenge(e.resolver);
     }
     _expectPrimary(credential.user);
     return null;
@@ -362,10 +480,10 @@ class HarnessRun {
     await _withRecentLogin(() => _enrolHarnessFactor(user));
     final CleanupToken unenrol = ledger.register(
       'unenrol the TOTP factor "$totpDisplayName"',
-      _unenrolHarnessFactor,
+      () => _unenrolFactorNamed(totpDisplayName),
     );
     final String factorUid =
-        (await _harnessFactor(user))?.uid ??
+        (await _factorNamed(user, totpDisplayName))?.uid ??
         (throw StepFailure('enrolled-factor-not-listed'));
     await auth.signOut();
     try {
@@ -410,23 +528,166 @@ class HarnessRun {
     );
   }
 
-  /// The factor the harness enrolled, newest first if there are several.
-  Future<MultiFactorInfo?> _harnessFactor(User user) async {
+  /// The factor named [name] that the harness enrolled, newest first if there
+  /// are several.
+  Future<MultiFactorInfo?> _factorNamed(User user, String name) async {
     final List<MultiFactorInfo> factors = await user.multiFactor
         .getEnrolledFactors();
     return factors.reversed
-        .where((MultiFactorInfo info) => info.displayName == totpDisplayName)
+        .where((MultiFactorInfo info) => info.displayName == name)
         .firstOrNull;
   }
 
-  Future<void> _unenrolHarnessFactor() async {
+  Future<void> _unenrolFactorNamed(String name) async {
     final User user = await ensurePrimary();
-    final MultiFactorInfo? factor = await _harnessFactor(user);
+    final MultiFactorInfo? factor = await _factorNamed(user, name);
     if (factor != null) {
       await _withRecentLogin(
         () => user.multiFactor.unenroll(factorUid: factor.uid),
       );
     }
+  }
+
+  /// The test phone number and its code, or a skip when they are not set.
+  (String, String) _testPhone() {
+    final String? number = phoneNumber;
+    final String? code = phoneCode;
+    if (number == null || code == null) {
+      throw StepSkipped(
+        'set $phoneNumberVariable and $phoneCodeVariable (a test phone number '
+        'of the project and its code)',
+      );
+    }
+    return (number, code);
+  }
+
+  /// The verification id of an SMS sent by `verifyPhoneNumber`, or the error
+  /// of `verificationFailed`.
+  Future<String> _sendCode({
+    String? phoneNumber,
+    MultiFactorSession? session,
+    PhoneMultiFactorInfo? hint,
+  }) {
+    final Completer<String> sent = Completer<String>();
+    unawaited(
+      auth.verifyPhoneNumber(
+        phoneNumber: phoneNumber,
+        multiFactorSession: session,
+        multiFactorInfo: hint,
+        verificationCompleted: (_) {},
+        verificationFailed: sent.completeError,
+        codeSent: (String verificationId, int? _) =>
+            sent.complete(verificationId),
+        codeAutoRetrievalTimeout: (_) {},
+      ),
+    );
+    return sent.future;
+  }
+
+  /// Runs the phone request [send] with [proofMode]; when the project refuses
+  /// the proof, moves to the next [ProofMode] and sends again.
+  Future<T> _withProof<T>(Future<T> Function() send) async {
+    while (true) {
+      await auth.setSettings(
+        appVerificationDisabledForTesting: proofMode == ProofMode.none,
+      );
+      proof?.mode = proofMode;
+      try {
+        return await send();
+      } on FirebaseAuthException catch (e) {
+        final bool refused = const <String>{
+          'missing-app-credential',
+          'invalid-app-credential',
+          'captcha-check-failed',
+        }.contains(e.code);
+        final int next = proofMode.index + 1;
+        if (!refused || proof == null || next >= ProofMode.values.length) {
+          rethrow;
+        }
+        log(
+          '  The project refused the phone request with ${proofMode.label} '
+          '(${e.code}); trying ${ProofMode.values[next].label}.',
+        );
+        proofMode = ProofMode.values[next];
+      }
+    }
+  }
+
+  Future<String?> _phone() async {
+    final (String number, String code) = _testPhone();
+    final User user = await ensurePrimary();
+    if (user.providerData.any((UserInfo info) => info.providerId == 'phone')) {
+      throw StepSkipped(
+        'the account already has a phone number; unlink it to run this step',
+      );
+    }
+    final ConfirmationResult link = await _withProof(
+      () => user.linkWithPhoneNumber(number),
+    );
+    _expectPrimary((await link.confirm(code)).user);
+    final CleanupToken unlink = ledger.register(
+      'unlink phone',
+      () => _unlink('phone'),
+    );
+    log('  Linked ${maskPhone(number)}.');
+    await auth.signOut();
+    final ConfirmationResult signIn = await _withProof(
+      () => auth.signInWithPhoneNumber(number),
+    );
+    _expectPrimary((await signIn.confirm(code)).user);
+    final String verificationId = await _withProof(
+      () => _sendCode(phoneNumber: number),
+    );
+    _expectPrimary(
+      (await auth.currentUser!.reauthenticateWithCredential(
+        PhoneAuthProvider.credential(
+          verificationId: verificationId,
+          smsCode: code,
+        ),
+      )).user,
+    );
+    await ledger.run(unlink);
+    return 'link, sign-in, reauthentication and unlink; proof: '
+        '${proofMode.label}';
+  }
+
+  Future<String?> _sms() async {
+    final (String number, String code) = _testPhone();
+    final User user = await ensurePrimary();
+    await _withRecentLogin(() async {
+      final String verificationId = await _withProof(
+        () async => _sendCode(
+          phoneNumber: number,
+          session: await user.multiFactor.getSession(),
+        ),
+      );
+      await user.multiFactor.enroll(
+        PhoneMultiFactorGenerator.getAssertion(
+          PhoneAuthProvider.credential(
+            verificationId: verificationId,
+            smsCode: code,
+          ),
+        ),
+        displayName: smsDisplayName,
+      );
+    });
+    final CleanupToken unenrol = ledger.register(
+      'unenrol the SMS factor "$smsDisplayName"',
+      () => _unenrolFactorNamed(smsDisplayName),
+    );
+    final String factorUid =
+        (await _factorNamed(user, smsDisplayName))?.uid ??
+        (throw StepFailure('enrolled-factor-not-listed'));
+    await auth.signOut();
+    try {
+      await auth.signInWithProvider(GoogleAuthProvider());
+      throw StepFailure('no-second-factor-challenge');
+    } on FirebaseAuthMultiFactorException catch (e) {
+      _expectPrimary((await resolveSms(e.resolver, factorUid: factorUid)).user);
+    }
+    await ledger.run(unenrol);
+    return 'enrol, sign-in through the resolver and unenrol; proof: '
+        '${proofMode.label}';
   }
 
   Future<String?> _revoke() async {

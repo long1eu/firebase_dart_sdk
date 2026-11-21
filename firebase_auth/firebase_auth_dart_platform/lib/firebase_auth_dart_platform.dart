@@ -26,6 +26,7 @@ library;
 import 'package:firebase_auth_platform_interface/firebase_auth_platform_interface.dart';
 import 'package:firebase_auth_providers_dart/firebase_auth_providers_dart.dart'
     show
+        AppVerification,
         FirebaseUserAuth,
         InMemoryAuthStorage,
         OAuthLoopbackProvider,
@@ -36,11 +37,14 @@ import 'package:http/http.dart' as http;
 import 'src/convert.dart' show guard, passwordValidationStatusOf;
 import 'src/core.dart';
 import 'src/firebase_auth.dart';
+import 'package:firebase_auth_dart_platform/src/phone.dart';
+
 import 'src/multi_factor.dart';
 import 'src/storage.dart' show runningUnderFlutterTest;
 
 export 'package:firebase_auth_providers_dart/firebase_auth_providers_dart.dart'
     show
+        AppVerification,
         CallbackPresenter,
         ConsolePresenter,
         OAuthAuthorizationCode,
@@ -131,10 +135,18 @@ abstract final class FirebaseAuthDart {
   ///   system browser on macOS, Linux and Windows (the URL on stderr over SSH
   ///   or without a display). On Android and iOS pass one, for example
   ///   `CallbackPresenter((Uri url) => launchUrl(url))` with `url_launcher`.
+  /// * [appVerification] is the proof that the phone requests
+  ///   (`verifyPhoneNumber`, `signInWithPhoneNumber`,
+  ///   `User.linkWithPhoneNumber`, the SMS second factor) come from a real
+  ///   app. By default `AppVerification.recaptchaV2Loopback()`: a reCAPTCHA v2
+  ///   page on 127.0.0.1 in the system browser, once per request. With the
+  ///   Auth emulator, or after
+  ///   `setSettings(appVerificationDisabledForTesting: true)`, no proof is
+  ///   sent unless one is passed here.
   ///
-  /// It also replaces the multi-factor generators of `firebase_auth`: the
-  /// TOTP one works through the client, the phone one throws
-  /// `unimplemented`.
+  /// It also replaces the multi-factor generators of `firebase_auth` (TOTP and
+  /// SMS) and the `RecaptchaVerifier` factory (which renders nothing: the
+  /// proof is [appVerification]) with those of this package.
   ///
   /// Throws a [StateError] when the instance of an app has already been
   /// created: the configuration is read then.
@@ -146,6 +158,7 @@ abstract final class FirebaseAuthDart {
         const <OAuthLoopbackProvider>[],
     OAuthProvidersFactory? oauthProvidersFor,
     SecurePresenter? presenter,
+    AppVerification? appVerification,
   }) {
     final Map<String, OAuthLoopbackProvider> byId = providersById(
       oauthProviders,
@@ -163,6 +176,7 @@ abstract final class FirebaseAuthDart {
       oauthProviders: byId,
       oauthProvidersFor: oauthProvidersFor,
       presenter: presenter,
+      appVerification: appVerification,
     );
     installCoreIfNeeded(force: useDartCore);
     if (!isRegistered) {
@@ -173,6 +187,7 @@ abstract final class FirebaseAuthDart {
     PhoneMultiFactorGeneratorPlatform.instance =
         DartPhoneMultiFactorGenerator();
     TotpMultiFactorGeneratorPlatform.instance = DartTotpMultiFactorGenerator();
+    RecaptchaVerifierFactoryPlatform.instance = DartRecaptchaVerifierFactory();
   }
 
   /// The `FirebaseUserAuth` behind `FirebaseAuth.instanceFor(app: app)`, for

@@ -17,10 +17,13 @@ import 'package:firebase_auth_platform_interface/firebase_auth_platform_interfac
 import 'package:firebase_auth_providers_dart/firebase_auth_providers_dart.dart'
     as dart_auth
     show
+        AppVerification,
         AuthStorage,
         FirebaseUserAuthDisposedError,
         OAuthCredential,
-        OAuthLoopbackProvider;
+        OAuthLoopbackProvider,
+        RecaptchaAction,
+        RecaptchaV2Request;
 import 'package:firebase_auth_providers_dart/firebase_auth_providers_dart.dart'
     show InMemoryAuthStorage;
 import 'package:firebase_core/firebase_core.dart';
@@ -30,6 +33,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 
+import '../../firebase_auth_providers_dart/test/phone_platform.dart';
 import '../../firebase_auth_providers_dart/test/totp_platform.dart';
 import 'fake_backend.dart';
 
@@ -611,12 +615,6 @@ void main() {
           throwsAuthCode('argument-error'),
         );
       }
-      expect(
-        () => PhoneMultiFactorGenerator.getAssertion(
-          PhoneAuthProvider.credential(verificationId: 'v', smsCode: '1'),
-        ),
-        throwsAuthCode('unimplemented'),
-      );
     });
 
     test('a signed-out user cannot use its multi-factor API', () async {
@@ -1251,27 +1249,357 @@ void main() {
     );
   });
 
+  group('phone', () {
+    const String number = '+15555550100';
+
+    setUp(() {
+      backend.factors.clear();
+      backend.phones.clear();
+      backend.phone.requireProof = false;
+    });
+    tearDown(() => backend.phone.requireProof = true);
+
+    /// What one verifyPhoneNumber call reported.
+    Future<({String? id, FirebaseAuthException? error})> sendCode(
+      FirebaseAuth auth, {
+      String? phoneNumber = number,
+      MultiFactorSession? session,
+      PhoneMultiFactorInfo? hint,
+    }) async {
+      final Completer<({String? id, FirebaseAuthException? error})> done =
+          Completer<({String? id, FirebaseAuthException? error})>();
+      await auth.verifyPhoneNumber(
+        phoneNumber: phoneNumber,
+        multiFactorSession: session,
+        multiFactorInfo: hint,
+        verificationCompleted: (_) => fail('no instant verification'),
+        verificationFailed: (FirebaseAuthException e) =>
+            done.complete((id: null, error: e)),
+        codeSent: (String id, int? resendToken) {
+          expect(resendToken, isNull);
+          done.complete((id: id, error: null));
+        },
+        codeAutoRetrievalTimeout: (_) {},
+      );
+      return done.future;
+    }
+
+    /// The FirebaseAuth of a new app whose phone requests carry no proof.
+    Future<FirebaseAuth> newPhoneAuth() async {
+      final FirebaseAuth auth = await newAuth();
+      await auth.setSettings(appVerificationDisabledForTesting: true);
+      return auth;
+    }
+
+    Future<String> verificationIdOf(
+      FirebaseAuth auth, {
+      String phoneNumber = number,
+      MultiFactorSession? session,
+      PhoneMultiFactorInfo? hint,
+    }) async {
+      final ({String? id, FirebaseAuthException? error}) sent = await sendCode(
+        auth,
+        phoneNumber: phoneNumber,
+        session: session,
+        hint: hint,
+      );
+      expect(sent.error, isNull);
+      return sent.id!;
+    }
+
+    test('verifyPhoneNumber sends the code without a proof after setSettings, '
+        'then the credential signs in', () async {
+      final FirebaseAuth auth = await newAuth();
+      await auth.setSettings(appVerificationDisabledForTesting: true);
+      final List<String> timedOut = <String>[];
+      final Completer<String> sent = Completer<String>();
+      await auth.verifyPhoneNumber(
+        phoneNumber: number,
+        timeout: const Duration(milliseconds: 10),
+        verificationCompleted: (_) => fail('no instant verification'),
+        verificationFailed: (FirebaseAuthException e) => fail('$e'),
+        codeSent: (String id, int? _) => sent.complete(id),
+        codeAutoRetrievalTimeout: timedOut.add,
+      );
+      final String verificationId = await sent.future;
+      expect(backend.bodyOf('accounts:sendVerificationCode'), <String, Object?>{
+        'phoneNumber': number,
+      });
+      await Future<void>.delayed(const Duration(milliseconds: 30));
+      expect(timedOut, <String>[verificationId]);
+
+      final UserCredential result = await auth.signInWithCredential(
+        PhoneAuthProvider.credential(
+          verificationId: verificationId,
+          smsCode: smsCode,
+        ),
+      );
+      expect(result.user!.phoneNumber, number);
+      expect(result.additionalUserInfo!.providerId, 'phone');
+      expect(auth.currentUser!.providerData.single.providerId, 'phone');
+    });
+
+    test('the emulator gets no proof by default', () async {
+      final FirebaseAuth auth = await newAuth();
+      await auth.useAuthEmulator('127.0.0.1', 9099);
+      await verificationIdOf(auth);
+      expect(
+        backend.requests.last.url.path,
+        endsWith(
+          '/identitytoolkit.googleapis.com/v1/accounts:sendVerificationCode',
+        ),
+      );
+      expect(backend.bodyOf('accounts:sendVerificationCode'), <String, Object?>{
+        'phoneNumber': number,
+      });
+    });
+
+    test('the appVerification of use goes with every request', () async {
+      backend.phone.requireProof = true;
+      final DartAuthConfig shared = DartFirebaseAuth.config;
+      final List<dart_auth.RecaptchaAction> actions =
+          <dart_auth.RecaptchaAction>[];
+      DartFirebaseAuth.config = DartAuthConfig(
+        httpClient: backend.client,
+        storageFor: (FirebaseApp app) => InMemoryAuthStorage(),
+        appVerification: dart_auth.AppVerification.recaptchaV2((
+          dart_auth.RecaptchaV2Request request,
+        ) {
+          expect(request.siteKey, recaptchaSiteKey);
+          actions.add(request.action);
+          return 'token-${actions.length}';
+        }),
+      );
+      final FirebaseAuth auth;
+      try {
+        auth = await newAuth();
+        // The instance of the app, created now, reads the configuration.
+        await auth.setSettings();
+      } finally {
+        DartFirebaseAuth.config = shared;
+      }
+      final ConfirmationResult confirmation = await auth.signInWithPhoneNumber(
+        number,
+      );
+      expect(backend.bodyOf('accounts:sendVerificationCode'), <String, Object?>{
+        'phoneNumber': number,
+        'recaptchaToken': 'token-1',
+      });
+      await confirmation.confirm(smsCode);
+      expect(auth.currentUser!.phoneNumber, number);
+      // The test switch wins over the configured proof.
+      await auth.setSettings(appVerificationDisabledForTesting: true);
+      backend.phone.requireProof = false;
+      await verificationIdOf(auth);
+      expect(actions, <dart_auth.RecaptchaAction>[
+        dart_auth.RecaptchaAction.sendVerificationCode,
+      ]);
+    });
+
+    test('verificationFailed gets the errors, without the number', () async {
+      final FirebaseAuth auth = await newPhoneAuth();
+      final ({String? id, FirebaseAuthException? error}) sent = await sendCode(
+        auth,
+        phoneNumber: '5555550100',
+      );
+      expect(sent.id, isNull);
+      expect(sent.error!.code, 'invalid-phone-number');
+      expect(sent.error!.message, isNot(contains('5555550100')));
+      expect(sent.error!.phoneNumber, isNull);
+
+      backend.phone.requireProof = true;
+      final ({String? id, FirebaseAuthException? error}) refused =
+          await sendCode(auth);
+      expect(refused.error!.code, 'missing-app-credential');
+      expect('${refused.error}', isNot(contains(number)));
+    });
+
+    test('signInWithPhoneNumber confirms with the code', () async {
+      final FirebaseAuth auth = await newPhoneAuth();
+      final ConfirmationResult confirmation = await auth.signInWithPhoneNumber(
+        number,
+      );
+      expect(confirmation.verificationId, startsWith('session-'));
+      await expectLater(
+        confirmation.confirm('000000'),
+        throwsAuthCode('invalid-verification-code'),
+      );
+      final UserCredential result = await confirmation.confirm(smsCode);
+      expect(result.user!.uid, 'uid-of-$number');
+      expect(result.additionalUserInfo!.isNewUser, isTrue);
+    });
+
+    test('linkWithPhoneNumber links the number to the user', () async {
+      final FirebaseAuth auth = await newPhoneAuth();
+      await auth.signInWithEmailAndPassword(
+        email: 'link@example.com',
+        password: 'p',
+      );
+      final ConfirmationResult confirmation = await auth.currentUser!
+          .linkWithPhoneNumber(number);
+      final UserCredential result = await confirmation.confirm(smsCode);
+      expect(result.user!.uid, 'uid-of-link@example.com');
+      expect(
+        auth.currentUser!.providerData.map((UserInfo i) => i.providerId),
+        containsAll(<String>['password', 'phone']),
+      );
+      expect(
+        backend.bodyOf('accounts:signInWithPhoneNumber')['idToken'],
+        isA<String>(),
+      );
+    });
+
+    test('updatePhoneNumber and reauthenticateWithCredential', () async {
+      final FirebaseAuth auth = await newPhoneAuth();
+      await auth.signInWithEmailAndPassword(
+        email: 'update@example.com',
+        password: 'p',
+      );
+      await auth.currentUser!.updatePhoneNumber(
+        PhoneAuthProvider.credential(
+          verificationId: await verificationIdOf(auth),
+          smsCode: smsCode,
+        ),
+      );
+      expect(auth.currentUser!.phoneNumber, number);
+      final UserCredential again = await auth.currentUser!
+          .reauthenticateWithCredential(
+            PhoneAuthProvider.credential(
+              verificationId: await verificationIdOf(auth),
+              smsCode: smsCode,
+            ),
+          );
+      expect(again.user!.uid, 'uid-of-update@example.com');
+      expect(
+        backend.bodyOf('accounts:signInWithPhoneNumber')['operation'],
+        'REAUTH',
+      );
+      backend.phones['someone-else'] = '+15555550199';
+      await expectLater(
+        auth.currentUser!.updatePhoneNumber(
+          PhoneAuthProvider.credential(
+            verificationId: await verificationIdOf(
+              auth,
+              phoneNumber: '+15555550199',
+            ),
+            smsCode: smsCode,
+          ),
+        ),
+        throwsAuthCode('credential-already-in-use'),
+      );
+    });
+
+    test('a credential from a token is an argument-error', () async {
+      final FirebaseAuth auth = await newAuth();
+      await expectLater(
+        auth.signInWithCredential(PhoneAuthProvider.credentialFromToken(1)),
+        throwsAuthCode('argument-error'),
+      );
+    });
+
+    test('the RecaptchaVerifier renders nothing', () async {
+      final RecaptchaVerifier verifier = RecaptchaVerifier(
+        auth: FirebaseAuthPlatform.instance,
+      );
+      expect(verifier.type, 'recaptcha');
+      expect(await verifier.render(), 0);
+      verifier.clear();
+      await expectLater(verifier.verify(), throwsAuthCode('unimplemented'));
+    });
+
+    test('enrol an SMS factor and sign in with it', () async {
+      final FirebaseAuth auth = await newPhoneAuth();
+      await auth.signInWithEmailAndPassword(
+        email: 'sms@example.com',
+        password: 'p',
+      );
+      final MultiFactor multiFactor = auth.currentUser!.multiFactor;
+      final String enrolId = await verificationIdOf(
+        auth,
+        session: await multiFactor.getSession(),
+      );
+      expect(
+        backend.bodyOf('mfaEnrollment:start')['phoneEnrollmentInfo'],
+        <String, Object?>{'phoneNumber': number},
+      );
+      await multiFactor.enroll(
+        PhoneMultiFactorGenerator.getAssertion(
+          PhoneAuthProvider.credential(
+            verificationId: enrolId,
+            smsCode: smsCode,
+          ),
+        ),
+        displayName: 'Work phone',
+      );
+      final MultiFactorInfo factor =
+          (await multiFactor.getEnrolledFactors()).single;
+      expect(factor, isA<PhoneMultiFactorInfo>());
+      expect((factor as PhoneMultiFactorInfo).phoneNumber, number);
+      expect(factor.displayName, 'Work phone');
+
+      await auth.signOut();
+      try {
+        await auth.signInWithEmailAndPassword(
+          email: 'sms@example.com',
+          password: 'p',
+        );
+        fail('expected a FirebaseAuthMultiFactorException');
+      } on FirebaseAuthMultiFactorException catch (e) {
+        final PhoneMultiFactorInfo hint =
+            e.resolver.hints.single as PhoneMultiFactorInfo;
+        expect(hint.phoneNumber, '+*******0100');
+        final String signInId = await verificationIdOf(
+          auth,
+          session: e.resolver.session,
+          hint: hint,
+        );
+        expect(
+          backend.bodyOf('mfaSignIn:start')['mfaEnrollmentId'],
+          factor.uid,
+        );
+        final UserCredential result = await e.resolver.resolveSignIn(
+          PhoneMultiFactorGenerator.getAssertion(
+            PhoneAuthProvider.credential(
+              verificationId: signInId,
+              smsCode: smsCode,
+            ),
+          ),
+        );
+        expect(result.user!.uid, 'uid-of-sms@example.com');
+      }
+      expect(auth.currentUser!.uid, 'uid-of-sms@example.com');
+    });
+
+    test(
+      'verifyPhoneNumber refuses a session of another implementation',
+      () async {
+        final FirebaseAuth auth = await newAuth();
+        final ({String? id, FirebaseAuthException? error}) sent =
+            await sendCode(auth, session: MultiFactorSession('elsewhere'));
+        expect(sent.error!.code, 'argument-error');
+      },
+    );
+
+    test('getAssertion refuses a credential from a token', () {
+      expect(
+        () => PhoneMultiFactorGenerator.getAssertion(
+          PhoneAuthProvider.credentialFromToken(1),
+        ),
+        throwsAuthCode('argument-error'),
+      );
+    });
+  });
+
   group('not available', () {
-    test('popup, redirect and phone throw unimplemented', () async {
+    test('popup, redirect and the reCAPTCHA configuration throw '
+        'unimplemented', () async {
       final FirebaseAuth auth = await newAuth();
       await expectLater(
         auth.signInWithPopup(GoogleAuthProvider()),
         throwsAuthCode('unimplemented'),
       );
       await expectLater(
-        auth.signInWithCredential(
-          PhoneAuthProvider.credential(verificationId: 'v', smsCode: '1'),
-        ),
-        throwsAuthCode('unimplemented'),
-      );
-      await expectLater(
-        auth.verifyPhoneNumber(
-          phoneNumber: '+15555550100',
-          verificationCompleted: (_) {},
-          verificationFailed: (_) {},
-          codeSent: (_, _) {},
-          codeAutoRetrievalTimeout: (_) {},
-        ),
+        auth.initializeRecaptchaConfig(),
         throwsAuthCode('unimplemented'),
       );
       await auth.signInAnonymously();

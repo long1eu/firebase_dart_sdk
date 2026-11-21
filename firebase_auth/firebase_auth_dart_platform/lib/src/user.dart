@@ -4,6 +4,8 @@ import 'package:firebase_auth_providers_dart/firebase_auth_providers_dart.dart'
 
 import 'convert.dart';
 import 'firebase_auth.dart';
+import 'package:firebase_auth_dart_platform/src/phone.dart';
+
 import 'multi_factor.dart';
 
 /// A user of [DartFirebaseAuth]: a snapshot of the client's user. Its
@@ -148,6 +150,33 @@ class DartUser extends UserPlatform {
     );
   });
 
+  /// Sends the SMS code to [phoneNumber] with the proof of
+  /// `DartFirebaseAuth.appVerification`; the `confirm` of the result links the
+  /// number to this user. [applicationVerifier] is not used.
+  @override
+  Future<ConfirmationResultPlatform> linkWithPhoneNumber(
+    String phoneNumber,
+    RecaptchaVerifierFactoryPlatform applicationVerifier,
+  ) => guard(_auth, () async {
+    final dart_auth.FirebaseUserAuth userAuth = _client;
+    final String verificationId = await userAuth.verifyPhoneNumber(
+      phoneNumber,
+      appVerification: _auth.appVerification,
+    );
+    return DartConfirmationResult(
+      _auth,
+      verificationId,
+      (dart_auth.PhoneAuthCredential credential) =>
+          _auth.clientFor(uid).linkWithCredential(credential),
+    );
+  });
+
+  @override
+  Future<void> updatePhoneNumber(PhoneAuthCredential phoneCredential) => guard(
+    _auth,
+    () => _client.updatePhoneNumber(clientPhoneCredentialOf(phoneCredential)),
+  );
+
   // ---- not available: see the README ----
 
   @override
@@ -166,16 +195,6 @@ class DartUser extends UserPlatform {
   @override
   Future<void> reauthenticateWithRedirect(AuthProvider provider) async =>
       throw unimplemented('reauthenticateWithRedirect', noBrowserFlow);
-
-  @override
-  Future<ConfirmationResultPlatform> linkWithPhoneNumber(
-    String phoneNumber,
-    RecaptchaVerifierFactoryPlatform applicationVerifier,
-  ) async => throw unimplemented('linkWithPhoneNumber', noPhone);
-
-  @override
-  Future<void> updatePhoneNumber(PhoneAuthCredential phoneCredential) async =>
-      throw unimplemented('updatePhoneNumber', noPhone);
 }
 
 /// The result of a sign-in, a link or a reauthentication.

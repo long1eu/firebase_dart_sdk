@@ -1,3 +1,23 @@
+## Unreleased
+
+- Phone sign-in through the client: `verifyPhoneNumber` (`codeSent` with the verification id,
+  `verificationFailed`, `codeAutoRetrievalTimeout` after `timeout`; never `verificationCompleted`, since there is
+  no instant verification or SMS auto-retrieval outside Android), `signInWithPhoneNumber` and
+  `User.linkWithPhoneNumber` (a `ConfirmationResult` whose `confirm` takes the code), `User.updatePhoneNumber`, and
+  phone credentials in `signInWithCredential`, `linkWithCredential` and `reauthenticateWithCredential`.
+- `FirebaseAuthDart.use(appVerification:)`: the proof of the phone requests, by default the reCAPTCHA v2 page of
+  the client in the system browser. With the Auth emulator, or after
+  `setSettings(appVerificationDisabledForTesting: true)` (no longer ignored), no proof is sent. `use` also
+  registers a `RecaptchaVerifier` factory, so that `signInWithPhoneNumber` without a verifier works; it renders
+  nothing, and `RecaptchaVerifier.verify` throws `unimplemented`.
+- SMS second factors: `verifyPhoneNumber` with the session of `User.multiFactor.getSession()` (enrolment) or of a
+  `MultiFactorResolver` (sign-in), `PhoneMultiFactorGenerator.getAssertion`, and `MultiFactor.enroll` and
+  `MultiFactorResolver.resolveSignIn` with the assertion.
+- The real-project harness has `phone` and `sms` steps for a test phone number of the console
+  (`AUTH_HARNESS_PHONE_NUMBER`, `AUTH_HARNESS_PHONE_CODE`; skipped without them).
+- Tested with unit tests against a fake backend; the emulator tests and the harness steps are written but were not
+  run.
+
 ## 0.1.0
 
 - First version: an implementation of `FirebaseAuthPlatform` (the platform interface of the official `firebase_auth`

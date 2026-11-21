@@ -36,8 +36,13 @@ import 'user_record.dart' show credentialFromResponse;
 /// | `password-does-not-meet-requirements` | the password fails the project's policy (`FirebaseUserAuth.validatePassword`) |
 /// | `argument-error` | an argument the backend was not asked about is wrong (an email link that is not one, a presenter a browser flow refuses: [cause] is the `SecureFlowRefused`) |
 /// | `operation-not-supported-in-this-environment` | a browser flow found no presenter for this environment (Android and iOS without one passed): [cause] is the `SecureFlowNoPresenter` |
-/// | `multi-factor-auth-required` | the account has a second factor: finish with a code of an authenticator app (a [FirebaseAuthMultiFactorException] with a [FirebaseAuthMultiFactorException.resolver]) |
-/// | `multi-factor-info-not-found` | the second factor is not one this package can use (SMS), or the account has no such factor |
+/// | `invalid-phone-number`, `missing-phone-number` | the phone number is not in E.164 form (`+15555550100`) or empty |
+/// | `invalid-verification-code`, `missing-verification-code`, `code-expired` | the SMS code is wrong, empty or too old: send a new one |
+/// | `invalid-verification-id`, `missing-verification-id` | the verification id of a phone credential is not one the backend gave out (or empty) |
+/// | `missing-app-credential`, `invalid-app-credential`, `captcha-check-failed` | the reCAPTCHA token of a phone request is missing, invalid or used up |
+/// | `quota-exceeded` | the project sent too many SMS messages; `too-many-requests` is this client sending too many |
+/// | `multi-factor-auth-required` | the account has a second factor: finish with a code of an authenticator app or of an SMS (a [FirebaseAuthMultiFactorException] with a [FirebaseAuthMultiFactorException.resolver]) |
+/// | `multi-factor-info-not-found` | the account has no second factor of that kind or id |
 /// | `user-token-expired`, `invalid-refresh-token` | the session ended (account deleted, refresh token revoked); the user is signed out |
 /// | `invalid-user-token` | the backend refused the ID token |
 /// | `expired-action-code`, `invalid-action-code` | the code of an email link is used up, expired or wrong |
@@ -232,7 +237,8 @@ class FirebaseAuthException extends FirebaseException {
         'user-not-found',
       }.contains(code);
 
-  /// `SERVER_ERROR_MAP` of the JS SDK (`packages/auth/src/api/errors.ts` of `@firebase/auth` 1.13.10), complete.
+  /// `SERVER_ERROR_MAP` of the JS SDK (`packages/auth/src/api/errors.ts` of `@firebase/auth`
+  /// 1.13.10), complete, and the phone codes that map to the names of the iOS SDK and FlutterFire.
   /// Codes that are not listed map to their kebab case form, as in the JS SDK.
   static const Map<String, String> _codes = <String, String>{
     // Custom token.
@@ -273,6 +279,17 @@ class FirebaseAuthException extends FirebaseException {
     'INVALID_TEMPORARY_PROOF': 'invalid-credential',
     'MISSING_SESSION_INFO': 'missing-verification-id',
     'SESSION_EXPIRED': 'code-expired',
+    // Phone codes the JS SDK leaves to the kebab case rule, listed so that the codes stay those of
+    // the JS SDK and FlutterFire whatever the rule does; MISSING_CODE and CODE_EXPIRED are named as
+    // the iOS SDK names them.
+    'MISSING_CODE': 'missing-verification-code',
+    'CODE_EXPIRED': 'code-expired',
+    'INVALID_PHONE_NUMBER': 'invalid-phone-number',
+    'MISSING_PHONE_NUMBER': 'missing-phone-number',
+    'QUOTA_EXCEEDED': 'quota-exceeded',
+    'MISSING_APP_CREDENTIAL': 'missing-app-credential',
+    'INVALID_APP_CREDENTIAL': 'invalid-app-credential',
+    'CAPTCHA_CHECK_FAILED': 'captcha-check-failed',
     // Action code settings.
     'MISSING_ANDROID_PACKAGE_NAME': 'missing-android-pkg-name',
     'UNAUTHORIZED_DOMAIN': 'unauthorized-continue-uri',
@@ -376,7 +393,14 @@ class FirebaseAuthException extends FirebaseException {
     'missing-or-invalid-nonce':
         'The request does not contain a valid nonce. This can occur if the SHA-256 hash of the provided raw nonce '
         'does not match the hashed nonce in the ID token payload.',
+    'missing-app-credential':
+        'The phone verification request is missing an application verifier assertion. '
+        'A reCAPTCHA response token needs to be provided.',
     'missing-password': 'A non-empty password must be provided.',
+    'missing-phone-number':
+        'To send verification codes, provide a phone number for the recipient.',
+    'missing-verification-code':
+        'The phone auth credential was created with an empty SMS verification code.',
     'missing-verification-id':
         'The phone auth credential was created with an empty verification ID.',
     'multi-factor-info-not-found':
@@ -454,10 +478,10 @@ class _ServerResponse extends UnmodifiableMapView<String, Object?> {
 /// the password (or another first factor) were right, and the backend asks for the second factor before it issues
 /// tokens. Its [code] is `multi-factor-auth-required`, like the JS SDK's `auth/multi-factor-auth-required`.
 ///
-/// Nobody is signed in by the first factor alone, and the previous user, if any, stays signed in. [resolver]
-/// finishes the sign-in with a code of an authenticator app (TOTP); [hints] lists the account's factors. SMS second
-/// factors are listed but cannot be used by this package: when they are the only factors of the account, [message]
-/// says so and the resolver throws `multi-factor-info-not-found`.
+/// Nobody is signed in by the first factor alone, and the previous user, if any, stays signed in.
+/// [resolver] finishes the sign-in with a code of an authenticator app (TOTP) or of an SMS; [hints]
+/// lists the account's factors. When none of them is of a kind this package knows, [message] says
+/// so.
 ///
 /// It is a [FirebaseAuthException], so `on FirebaseAuthException catch (e)` with `e.code` keeps working.
 ///
@@ -469,6 +493,7 @@ class _ServerResponse extends UnmodifiableMapView<String, Object?> {
 ///     print('${hint.factorId}: ${hint.displayName ?? hint.phoneNumber ?? hint.uid}');
 ///   }
 ///   final UserCredential result = await e.resolver!.resolveSignInWithTotp(codeFromTheApp);
+///   // or, for an SMS factor: e.resolver!.startPhoneSignIn(...), then resolveSignInWithPhone(...)
 /// }
 /// ```
 class FirebaseAuthMultiFactorException extends FirebaseAuthException {
@@ -481,26 +506,27 @@ class FirebaseAuthMultiFactorException extends FirebaseAuthException {
     this.resolver,
   }) : super(code: 'multi-factor-auth-required');
 
-  /// The [message] when the account has an authenticator app (TOTP) factor, or when it lists none.
+  /// The [message] when the account has an authenticator app (TOTP) or SMS factor, or when it lists
+  /// none.
   static const String defaultMessage =
       'The account has a second factor (multi-factor authentication): finish the sign-in with a code of the '
-      'authenticator app (FirebaseAuthMultiFactorException.resolver).';
+      'authenticator app or of an SMS (FirebaseAuthMultiFactorException.resolver).';
 
-  /// The [message] when the account's second factors are all of a kind this package cannot use (SMS).
+  /// The [message] when the account's second factors are all of a kind this package does not know.
   static const String unsupportedFactorsMessage =
-      'The account has a second factor (multi-factor authentication) that this package cannot use: its second '
-      'factors are SMS only, which needs reCAPTCHA or a native Firebase SDK. Sign in with an official Firebase SDK, '
-      'or enrol an authenticator app (TOTP) factor on the account.';
+      'The account has a second factor (multi-factor authentication) that this package '
+      'cannot use: none of its second factors is an authenticator app (TOTP) or SMS '
+      'factor. Sign in with an official Firebase SDK.';
 
   /// The exception for an answer of a sign-in endpoint of the Identity Toolkit API (for example
   /// `accounts:signInWithPassword`) that asks for a second factor, or null when [response] is not such an answer.
   /// It has no [resolver]: [FirebaseUserAuth] adds one to the exceptions it throws.
   ///
-  /// Such an answer has HTTP status 200, no `idToken`, an `mfaPendingCredential` and the enrolled factors in
-  /// `mfaInfo` (see [MultiFactorInfo.fromResponse]); the JS SDK detects it the same way
-  /// (`_performSignInRequest`). Entries of `mfaInfo` without an `mfaEnrollmentId` are left out. The [message] is
-  /// [unsupportedFactorsMessage] when the factors are listed and none is an authenticator app factor, and
-  /// [defaultMessage] otherwise.
+  /// Such an answer has HTTP status 200, no `idToken`, an `mfaPendingCredential` and the enrolled
+  /// factors in `mfaInfo` (see [MultiFactorInfo.fromResponse]); the JS SDK detects it the same way
+  /// (`_performSignInRequest`). Entries of `mfaInfo` without an `mfaEnrollmentId` are left out. The
+  /// [message] is [unsupportedFactorsMessage] when the factors are listed and none is an
+  /// authenticator app or SMS factor, and [defaultMessage] otherwise.
   static FirebaseAuthMultiFactorException? fromResponse(
     Map<String, Object?> response, {
     int? httpStatus,
@@ -523,7 +549,8 @@ class FirebaseAuthMultiFactorException extends FirebaseAuthException {
           hints.isNotEmpty &&
               !hints.any(
                 (MultiFactorInfo h) =>
-                    h.factorId == MultiFactorInfo.totpFactorId,
+                    h.factorId == MultiFactorInfo.totpFactorId ||
+                    h.factorId == MultiFactorInfo.phoneFactorId,
               )
           ? unsupportedFactorsMessage
           : defaultMessage,
