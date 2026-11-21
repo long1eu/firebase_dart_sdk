@@ -126,9 +126,21 @@ class _Tab implements ObservableAuthStorage {
     return _shared.values[key];
   }
 
+  /// While set, a write is applied only when it completes; reads made meanwhile see the old
+  /// value (no read waits behind a write), so a test does not rely on a storage's queueing.
+  Completer<void>? writeGate;
+
   @override
-  void write(String key, String? value) {
+  FutureOr<void> write(String key, String? value) {
     writes++;
+    final Completer<void>? gate = writeGate;
+    if (gate != null) {
+      return gate.future.then((_) => _apply(key, value));
+    }
+    _apply(key, value);
+  }
+
+  void _apply(String key, String? value) {
     _shared._store(key, value);
     _shared._notify(this, key);
   }
@@ -157,6 +169,14 @@ Future<void> settle() async {
   for (int i = 0; i < 5; i++) {
     await pump();
   }
+}
+
+/// Waits until [tab] has started [count] writes.
+Future<void> _untilWrites(_Tab tab, int count) async {
+  for (int i = 0; i < 100 && tab.writes < count; i++) {
+    await pump();
+  }
+  expect(tab.writes, count, reason: 'the write never started');
 }
 
 /// Waits until [tab] has started [count] reads.
@@ -662,6 +682,57 @@ void main() {
       expect(plain.reads, 0);
     },
   );
+
+  // A change event that arrives while a write of this instance is pending: the storage still holds
+  // the value before that write, and the fake does not order the read behind the write.
+  group('while a local write is pending', () {
+    test('a sign-out is not undone by the session still stored', () async {
+      await signInBoth('a@x.com');
+      final Completer<void> gate = Completer<void>();
+      storageB.writeGate = gate;
+      final int writes = storageB.writes;
+      final Future<void> signingOut = tabB.signOut();
+      await _untilWrites(storageB, writes + 1);
+      expect(shared.values[_key], contains('uid-of-a@x.com'));
+
+      storageB.emitSpuriously(_key);
+      await settle();
+      expect(tabB.currentUser, isNull);
+
+      storageB.writeGate = null;
+      gate.complete();
+      await signingOut;
+      await settle();
+
+      expect(tabB.currentUser, isNull);
+      expect(shared.values[_key], isNull);
+    });
+
+    test('a sign-in is not replaced by the session still stored', () async {
+      await signInBoth('a@x.com');
+      final Completer<void> gate = Completer<void>();
+      storageB.writeGate = gate;
+      final int writes = storageB.writes;
+      final Future<void> signingIn = tabB.signInWithEmailAndPassword(
+        email: 'c@x.com',
+        password: 'pw',
+      );
+      await _untilWrites(storageB, writes + 1);
+      expect(shared.values[_key], contains('uid-of-a@x.com'));
+
+      storageB.emitSpuriously(_key);
+      await settle();
+      expect(tabB.uid, 'uid-of-c@x.com');
+
+      storageB.writeGate = null;
+      gate.complete();
+      await signingIn;
+      await settle();
+
+      expect(tabB.uid, 'uid-of-c@x.com');
+      expect(shared.values[_key], contains('uid-of-c@x.com'));
+    });
+  });
 
   group('the subscription', () {
     test('one listener per instance while it uses the storage', () async {

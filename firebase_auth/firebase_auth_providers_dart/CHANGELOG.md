@@ -52,6 +52,9 @@
   the writes made with IndexedDB (a sign-out deletes it), and an unmarked copy is deleted at a read only when it
   differs from IndexedDB. When `localStorage` cannot be read for a marked key, the read throws an
   `IndexedDbAuthStorageException` (`migrate`) instead of returning null, which read as a sign-out.
+- `FirebaseUserAuth` reads a change made in another tab only after its own pending writes of the session have
+  finished, so a sign-out or sign-in of this tab whose write is still in flight is not replaced by the value that
+  write replaces, whatever the storage's ordering of reads and writes.
 
 ## 0.3.2
 

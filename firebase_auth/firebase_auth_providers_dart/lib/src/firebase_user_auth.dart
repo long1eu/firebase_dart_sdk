@@ -505,6 +505,10 @@ class FirebaseUserAuth implements AuthTokenProvider {
   /// Whether another change was reported while [_following] ran.
   bool _followAgain = false;
 
+  /// Completes when the writes of the session that this instance has started have finished
+  /// (successfully or not); null when none is pending.
+  Future<void>? _pendingWrite;
+
   MultiFactorApi get _multiFactor => MultiFactorApi.json(
     MultiFactorTransport(
       postJson: (String method, Map<String, Object?> body) =>
@@ -683,7 +687,7 @@ class FirebaseUserAuth implements AuthTokenProvider {
   Future<void> _restore() async {
     if (_unsaved && _session == null) {
       // A sign-out failed to delete the stored session: delete it, never load it.
-      await _storage.write(_storageKey, null);
+      await _writeStored(null);
       // A sign-in during the write may have been stored before it: store that session again.
       _unsaved = _session != null;
       return;
@@ -3104,10 +3108,7 @@ class FirebaseUserAuth implements AuthTokenProvider {
           }
         }
         _unsaved = true;
-        await _storage.write(
-          _storageKey,
-          encodeSession(session.user, session.refreshToken),
-        );
+        await _writeStored(encodeSession(session.user, session.refreshToken));
         _unsaved = false;
       }
     } finally {
@@ -3115,6 +3116,28 @@ class FirebaseUserAuth implements AuthTokenProvider {
         _scheduleProactiveRefresh();
       }
     }
+  }
+
+  /// Writes [value] (the encoded session, or null) to the storage, and records the write in
+  /// [_pendingWrite] until it has finished, so that [_adoptStoredSession] does not read the value
+  /// this write replaces. The error of the write is returned to the caller.
+  Future<void> _writeStored(String? value) {
+    final Future<void> write = Future<void>.sync(
+      () => _storage.write(_storageKey, value),
+    );
+    final Future<void>? earlier = _pendingWrite;
+    late final Future<void> pending;
+    pending =
+        Future.wait<void>(<Future<void>>[
+          ?earlier,
+          write.then<void>((_) {}, onError: (Object _) {}),
+        ]).then<void>((_) {
+          if (identical(_pendingWrite, pending)) {
+            _pendingWrite = null;
+          }
+        });
+    _pendingWrite = pending;
+    return write;
   }
 
   Future<void> _clearSession() async {
@@ -3125,7 +3148,7 @@ class FirebaseUserAuth implements AuthTokenProvider {
       if (!_disposed) {
         // After dispose the stored session may belong to a new instance that restored it.
         _unsaved = true;
-        await _storage.write(_storageKey, null);
+        await _writeStored(null);
       }
       _unsaved = false;
     } finally {
@@ -3189,11 +3212,21 @@ class FirebaseUserAuth implements AuthTokenProvider {
   }
 
   /// Reads the session another tab stored and takes it over (the JS SDK's `_onStorageEvent`), after
-  /// a [restore] in progress. A value this class did not write is ignored, as by [restore]. When the
-  /// session of this instance changes during the read, the value is dropped and read again (JS runs
-  /// `_onStorageEvent` in `auth.queue` with the sign-ins and the sign-out for the same reason).
+  /// a [restore] in progress and the pending writes of this instance. A value this class did not
+  /// write is ignored, as by [restore]. When the session of this instance changes during the read,
+  /// the value is dropped and read again (JS runs `_onStorageEvent` in `auth.queue` with the
+  /// sign-ins and the sign-out for the same reason).
   Future<void> _adoptStoredSession() async {
     await _restoring?.then<void>((_) {}, onError: (Object _) {});
+    // Until a write of this instance has finished, the storage may still hold the value it
+    // replaces: a read now would take an older session for another tab's change.
+    for (
+      Future<void>? pending = _pendingWrite;
+      pending != null;
+      pending = _pendingWrite
+    ) {
+      await pending;
+    }
     final AuthStorage storage = _storage;
     if (_disposed) {
       return;
