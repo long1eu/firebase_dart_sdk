@@ -20,7 +20,9 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart'
     show TargetPlatform, debugDefaultTargetPlatformOverride;
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
 
+import 'answer_log.dart';
 import 'cleanup.dart';
 import 'code_prompt.dart';
 import 'harness_config.dart';
@@ -65,6 +67,9 @@ Future<(List<StepResult>, List<String>)> _run(HarnessConfig config) async {
   );
   final HarnessProof proof = HarnessProof();
   FirebaseAuthDart.use(
+    httpClient: Platform.environment[logAnswersVariable] == '1'
+        ? AnswerLoggingClient(http.Client(), print)
+        : null,
     appVerification: proof.verification,
     storageFor: (FirebaseApp app) => storage,
     useDartCore: true,

@@ -427,8 +427,8 @@ from a real app. These are the pieces:
   (`AppVerification.recaptchaV2(source)`, where `source` is yours and is called with the project's site key, or
   `AppVerification.recaptchaV2Loopback()` for the page below); a reCAPTCHA Enterprise token of yours
   (`AppVerification.recaptchaEnterprise(source, clientType:)`); and no proof (`AppVerification.none()`, for the
-  Auth emulator and test phone numbers, like the iOS SDK in test mode; whether a real project accepts it for a
-  test number has not been checked).
+  Auth emulator and test phone numbers, like the iOS SDK in test mode; a real project accepts it for a
+  test number).
 - `auth.getRecaptchaSiteKey()`: the reCAPTCHA v2 site key of the project (`v1/recaptchaParams`), from the
   emulator when one is set (the emulator returns a fake key).
 - `AppVerification.recaptchaV2Loopback(presenter:, timeout:)` (VM only; on the web the presenters throw an
@@ -480,7 +480,8 @@ widget from a page of your app is a use of reCAPTCHA under Google's terms; check
   redirects). There are no popup or redirect flows in a browser.
   The reCAPTCHA Enterprise configuration of the project is not read (the table above lists the rest). A project
   that enforces reCAPTCHA Enterprise for email and password refuses these sign-ins (`missing-recaptcha-token`).
-- Phone sign-in and SMS second factors were not run against the emulator or a real project; Play Integrity and
+- Phone sign-in and SMS second factors were run against a real project with a test phone number and no proof,
+  not with a real SMS or against the emulator; Play Integrity and
   APNs app verification are not there.
 - An account with a second factor signs in with an authenticator app or SMS code through
   `FirebaseAuthMultiFactorException.resolver`.
