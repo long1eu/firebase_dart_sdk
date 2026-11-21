@@ -21,6 +21,7 @@ when in doubt, search it.
 | The `FirebaseApp` (always) | `firebase_app_dart: ^0.2.0` | `package:firebase_app_dart/firebase_app_dart.dart` |
 | End users signed in (email/password, anonymous, custom token) or a service account key | `firebase_auth_providers_dart: ^0.3.0` | `package:firebase_auth_providers_dart/firebase_auth_providers_dart.dart` |
 | Application Default Credentials (servers, CLIs; needs `dart:io`) | `firebase_auth_providers_dart: ^0.3.0` | `package:firebase_auth_providers_dart/adc.dart` |
+| Cloud Storage for Firebase (uploads, downloads, listing; unreleased, 0.1.0) | `firebase_storage_dart` | `package:firebase_storage_dart/firebase_storage_dart.dart`; `io.dart` for `putFile` and `writeToFile` (needs `dart:io`) |
 | A disk cache (VM, Flutter, web) | `cloud_firestore_dart_sqlite: ^0.1.3` | `package:cloud_firestore_dart_sqlite/cloud_firestore_dart_sqlite.dart` |
 | Firestore Lite, no cache and no listeners | `cloud_firestore_dart` | `package:cloud_firestore_dart/lite.dart` instead of the main library |
 | Pipelines (preview, Enterprise edition databases only) | `cloud_firestore_dart` | `package:cloud_firestore_dart/pipelines.dart` in addition to the main library |

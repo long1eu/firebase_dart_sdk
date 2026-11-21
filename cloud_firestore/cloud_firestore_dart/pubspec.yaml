@@ -57,6 +57,9 @@ dev_dependencies:
   # Only for test/integration_auth. Local development resolves it from
   # ../../firebase_auth/firebase_auth_providers_dart through pubspec_overrides.yaml.
   firebase_auth_providers_dart: ^0.2.0
+  # Only for the Storage snippets of the READMEs and guides (test/readme). Local development
+  # resolves it from ../../firebase_storage/firebase_storage_dart through pubspec_overrides.yaml.
+  firebase_storage_dart: ^0.1.0
   lints: ^6.1.0
   mockito: ^5.4.0
   # The tests use SQLite directly too (package:sqlite3/sqlite3.dart and wasm.dart). The same range as

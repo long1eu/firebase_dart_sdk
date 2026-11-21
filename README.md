@@ -86,6 +86,7 @@ from 0.1? The 0.2 API took FlutterFire's names: [what changed](docs/api_migratio
 | [`cloud_firestore_dart_platform`](cloud_firestore/cloud_firestore_dart_platform/) | 0.1.2 | Flutter apps written against the official `cloud_firestore` API, on Linux or by choice elsewhere |
 | [`cloud_firestore_dart_flutterfire`](cloud_firestore/cloud_firestore_dart_flutterfire/) | 0.1.2 | Flutter apps that sign in with `firebase_auth` and want `cloud_firestore_dart` to use that user |
 | [`firebase_auth_dart_platform`](firebase_auth/firebase_auth_dart_platform/) | 0.1.0, unreleased | Flutter apps written against the official `firebase_auth` API, on Linux or by choice elsewhere; needs `firebase_auth_providers_dart` 0.3.1 |
+| [`firebase_storage_dart`](firebase_storage/firebase_storage_dart/) | 0.1.0, unreleased | Apps and servers that upload, download and list Cloud Storage for Firebase objects ([guide](docs/guides/storage.md)) |
 | [`firebase_admin_dart`](firebase_admin/firebase_admin_dart/) | 0.1.1 | Servers, tools and integration tests that mint custom tokens, manage users or verify ID tokens |
 
 ## How it fits together
@@ -226,10 +227,11 @@ code; he reviews and tests it. Response times are in the [support policy](docs/s
 
 This repository ports Firestore and the Firebase Core pieces it needs, plus token providers for
 Firestore in `firebase_auth/firebase_auth_providers_dart` and a few Firebase Auth admin calls in
-`firebase_admin/firebase_admin_dart`. `firebase_auth/firebase_auth_dart_platform` runs the official `firebase_auth` API on top of those. There is no full Auth SDK, no Storage
+`firebase_admin/firebase_admin_dart`. `firebase_auth/firebase_auth_dart_platform` runs the official `firebase_auth` API on top of those.
+`firebase_storage/firebase_storage_dart` is a Cloud Storage for Firebase client. There is no full Auth SDK
 and no Realtime Database client here; for those see
 [appsup-dart/firebase_dart](https://github.com/appsup-dart/firebase_dart). The other directories
-under `firebase_auth`, and `firebase_storage_dart` and `google_sign_in_dart`, are older code from
+under `firebase_auth`, and `google_sign_in_dart`, are older code from
 the original project and are not part of the migrated, tested set.
 
 ## Packages
