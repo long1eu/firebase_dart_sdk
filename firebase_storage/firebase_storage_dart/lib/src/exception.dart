@@ -47,6 +47,7 @@ class FirebaseStorageException extends FirebaseException {
     required String message,
     this.httpStatus,
     this.serverResponse,
+    this.cause,
     super.stackTrace,
   }) : super(plugin: 'firebase_storage', code: code, message: message);
 
@@ -57,6 +58,11 @@ class FirebaseStorageException extends FirebaseException {
   /// The body of the response that caused the error, cut at 16 KiB. It never holds request or response
   /// headers, so no token.
   final String? serverResponse;
+
+  /// The error that caused this one, when it came from outside the package (for example the auth provider
+  /// that failed to hand out a token). It is never part of [message] or [toString]: its text may hold
+  /// credentials. Inspect it yourself when you know it is safe to log.
+  final Object? cause;
 
   @override
   String toString() {

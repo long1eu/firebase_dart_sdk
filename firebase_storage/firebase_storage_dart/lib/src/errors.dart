@@ -157,10 +157,16 @@ FirebaseStorageException downloadSizeExceeded(String path, int maxSize) {
 }
 
 /// The token provider failed with something other than "nobody is signed in".
+///
+/// Only the type of [error] goes into the message: the text of a provider's error may hold a token. [error]
+/// and [stackTrace] are kept as the `cause` and `stackTrace` of the exception.
 @internal
-FirebaseStorageException tokenFailed(Object error) {
+FirebaseStorageException tokenFailed(Object error, StackTrace stackTrace) {
   return FirebaseStorageException(
     code: 'unauthenticated',
-    message: 'Could not get the token of the signed-in user: $error',
+    message:
+        'Could not get the token of the signed-in user (${error.runtimeType}).',
+    cause: error,
+    stackTrace: stackTrace,
   );
 }
