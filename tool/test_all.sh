@@ -3,6 +3,8 @@
 # cloud_firestore_dart runs only test/unit (integration needs a live backend). firebase_storage_dart
 # runs all of test/: its emulator and production-kit tests skip themselves without
 # FIREBASE_STORAGE_EMULATOR_HOST (the CI job "storage" sets it) and test/browser runs only in a browser.
+# firebase_auth_secure_storage_dart runs all of test/: its integration tests against the real secret
+# store skip themselves without FIREBASE_AUTH_SECURE_STORAGE_INTEGRATION=1.
 # The example programs in examples/ are analyzed only (their tests need an emulator); select
 # them alone with the name "examples", or one with "examples/<name>".
 # The Flutter packages (cloud_firestore_dart_flutterfire, cloud_firestore_dart_platform,
@@ -33,6 +35,7 @@ PACKAGES=(
   "cloud_firestore_dart_sqlite|cloud_firestore/cloud_firestore_dart_sqlite|"
   "firebase_admin_dart|firebase_admin/firebase_admin_dart|"
   "firebase_storage_dart|firebase_storage/firebase_storage_dart|"
+  "firebase_auth_secure_storage_dart|firebase_auth/firebase_auth_secure_storage_dart|"
 )
 
 summary=()
