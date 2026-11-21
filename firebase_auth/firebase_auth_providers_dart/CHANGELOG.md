@@ -1,4 +1,7 @@
-## Unreleased
+## 0.4.0
+
+- Breaking: the package re-exports `secure_flow`, which is now 0.2.0 (new enum values in
+  `SecurePresenterKind` and `RecaptchaAction`); exhaustive `switch` statements over them need the new cases.
 
 - `PhoneAuthCredential.toJson` and `PhoneAuthCredential.fromJson`, in the JSON format of the JS SDK's `toJSON` and
   `fromJSON`: a verification id with its code, or a temporary proof with its phone number (the `credential` of

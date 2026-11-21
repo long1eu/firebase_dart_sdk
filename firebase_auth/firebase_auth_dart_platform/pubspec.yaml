@@ -3,7 +3,7 @@ description: >-
   Unofficial pure-Dart implementation of the FlutterFire Firebase Auth platform
   interface: the official firebase_auth API on Linux, or on any platform you
   choose.
-version: 0.1.1
+version: 0.2.0
 homepage: https://github.com/long1eu/firebase_dart_sdk
 repository: https://github.com/long1eu/firebase_dart_sdk/tree/main/firebase_auth/firebase_auth_dart_platform
 issue_tracker: https://github.com/long1eu/firebase_dart_sdk/issues
@@ -35,10 +35,10 @@ dependencies:
   # phone sign-in and BestWebAuthStorage.
   firebase_app_dart: ^0.2.1
   firebase_auth_platform_interface: ^9.1.2
-  firebase_auth_providers_dart: ^0.3.2
+  firebase_auth_providers_dart: ^0.4.0
   # The default storage of the sessions (not on the web). Resolved from the
   # sibling directory through pubspec_overrides.yaml (not published).
-  firebase_auth_secure_storage_flutter: ^0.1.0
+  firebase_auth_secure_storage_flutter: ^0.1.1
   firebase_core: ^5.1.0
   firebase_core_platform_interface: ^8.1.1
   flutter:
@@ -48,7 +48,7 @@ dependencies:
   # the default reCAPTCHA Enterprise source). Already in the dependency graph
   # through firebase_auth_providers_dart; resolved from the sibling directory
   # through pubspec_overrides.yaml.
-  secure_flow: ^0.1.0
+  secure_flow: ^0.2.0
 
 dev_dependencies:
   # Its FlutterFireAuthTokenProvider is the documented way to give Firestore the

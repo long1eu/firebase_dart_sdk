@@ -1,4 +1,7 @@
-## Unreleased
+## 0.2.0
+
+- Breaking: the package re-exports `secure_flow`, which is now 0.2.0 (new enum values). Needs
+  `firebase_auth_providers_dart` 0.4.0 and `firebase_auth_secure_storage_flutter` 0.1.1.
 
 - The id of a `MultiFactorResolver.session` is opaque (`sign-in-<n>`) instead of the backend's pending credential,
   so printing or logging the session shows no secret. `verifyPhoneNumber(multiFactorSession:)` with it still sends

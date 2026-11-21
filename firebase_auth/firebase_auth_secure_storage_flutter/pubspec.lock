@@ -102,7 +102,7 @@ packages:
       path: "../firebase_auth_providers_dart"
       relative: true
     source: path
-    version: "0.3.2"
+    version: "0.4.0"
   flutter:
     dependency: "direct main"
     description: flutter
@@ -420,7 +420,7 @@ packages:
       path: "../../secure_flow/secure_flow"
       relative: true
     source: path
-    version: "0.1.0"
+    version: "0.2.0"
   sky_engine:
     dependency: transitive
     description: flutter

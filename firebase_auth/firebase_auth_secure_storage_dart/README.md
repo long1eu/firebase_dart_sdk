@@ -10,7 +10,7 @@ A Flutter app uses [`firebase_auth_secure_storage_flutter`](../firebase_auth_sec
 covers Android, iOS and the data-protection keychain of signed macOS apps). Both use the same key scheme and the same
 `migrateFrom` rules.
 
-> **Status: 0.1.0, not published.** Unit-tested with fakes of the store on any system. The integration tests run
+> **Status: 0.1.0.** Unit-tested with fakes of the store on any system. The integration tests run
 > against the real store of each system and run in CI on every change to the package, on GitHub-hosted runners:
 > libsecret with gnome-keyring on Ubuntu, DPAPI on Windows and the login keychain on macOS. KDE Wallet and
 > KeePassXC, the other Secret Service providers, have not been tried. See
@@ -20,7 +20,7 @@ covers Android, iOS and the data-protection keychain of signed macOS apps). Both
 
 ```yaml
 dependencies:
-  firebase_auth_providers_dart: ^0.3.0
+  firebase_auth_providers_dart: ^0.4.0
   firebase_auth_secure_storage_dart: ^0.1.0
 ```
 

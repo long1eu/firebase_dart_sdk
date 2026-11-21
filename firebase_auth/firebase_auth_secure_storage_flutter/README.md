@@ -11,7 +11,7 @@ Firebase.
 `FirebaseUserAuth` uses it only when the app passes it. It needs Flutter; a command line tool or a server keeps
 `FileAuthStorage`.
 
-> **Status: 0.1.0.** Unit-tested with `flutter test` against a fake of the plugin's method channel. On
+> **Status: 0.1.1.** Unit-tested with `flutter test` against a fake of the plugin's method channel. On
 > macOS, the six integration tests of `example/` pass against the real data-protection keychain in a Developer ID
 > signed build on a GitHub-hosted runner (see [Signed integration tests](#signed-integration-tests)). It has not yet
 > run in CI against the iOS Keychain, the Android Keystore, a Secret Service or DPAPI.
@@ -20,7 +20,7 @@ Firebase.
 
 ```yaml
 dependencies:
-  firebase_auth_secure_storage_flutter: ^0.1.0
+  firebase_auth_secure_storage_flutter: ^0.1.1
 ```
 
 With `firebase_auth_dart_platform` there is nothing to do: it is the default. Pass your own only to change its

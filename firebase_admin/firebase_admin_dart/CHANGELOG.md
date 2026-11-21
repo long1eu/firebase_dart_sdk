@@ -1,3 +1,8 @@
+## 0.1.2
+
+No code change. The constraint on `firebase_auth_providers_dart` is `>=0.2.0 <0.5.0` instead of
+`>=0.2.0 <0.4.0`, so that the package can be used with `firebase_auth_providers_dart` 0.4.0.
+
 ## 0.1.1
 
 No code change. The constraint on `firebase_auth_providers_dart` is `>=0.2.0 <0.4.0` instead of `^0.2.0`, so that
