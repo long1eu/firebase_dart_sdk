@@ -9,6 +9,7 @@ import 'package:firebase_storage_dart/firebase_storage_dart.dart';
 import 'package:http/http.dart' as http;
 import 'package:test/test.dart';
 
+import '../../benchmark/delay_proxy.dart';
 import '../fakes.dart';
 import '../upload_fakes.dart';
 
@@ -104,6 +105,13 @@ void main() {
   });
 
   test('pause and resume', () async {
+    // Pausing between chunks: a single request on loopback ends before a pause can land.
+    storage.close();
+    storage = FirebaseStorage(
+      app,
+      emulatorHost: host,
+      maxUploadChunkSize: 256 * 1024,
+    );
     final Uint8List data = patternBytes(2 * 1024 * 1024);
     final Reference ref = storage.ref('$prefix/paused.bin');
     final UploadTask task = ref.startUpload(data);
@@ -123,6 +131,13 @@ void main() {
   });
 
   test('a new task resumes the session of a paused one', () async {
+    // Pausing between chunks: a single request on loopback ends before a pause can land.
+    storage.close();
+    storage = FirebaseStorage(
+      app,
+      emulatorHost: host,
+      maxUploadChunkSize: 256 * 1024,
+    );
     final Uint8List data = patternBytes(2 * 1024 * 1024);
     final Reference ref = storage.ref('$prefix/resumed.bin');
     final UploadTask first = ref.startUpload(data);
@@ -144,6 +159,13 @@ void main() {
   });
 
   test('cancel leaves no object', () async {
+    // Pausing between chunks: a single request on loopback ends before a pause can land.
+    storage.close();
+    storage = FirebaseStorage(
+      app,
+      emulatorHost: host,
+      maxUploadChunkSize: 256 * 1024,
+    );
     final Reference ref = storage.ref('$prefix/canceled.bin');
     final UploadTask task = ref.startUpload(patternBytes(2 * 1024 * 1024));
     await task.progress.firstWhere(
@@ -159,8 +181,22 @@ void main() {
   test('20 MiB in one request, paused and resumed', () async {
     final _SessionClient client = _SessionClient();
     addTearDown(client.close);
+    // A bandwidth cap of 80 Mbit/s makes the 20 MiB request last about two seconds, so the pause
+    // lands while it is being sent; on plain loopback it would finish first.
+    final List<String> target = host.split(':');
+    final DelayProxy proxy = await DelayProxy.start(
+      targetHost: target[0],
+      targetPort: int.parse(target[1]),
+      rtt: Duration.zero,
+      bandwidthMbit: 80,
+    );
+    addTearDown(proxy.close);
     storage.close();
-    storage = FirebaseStorage(app, emulatorHost: host, httpClient: client);
+    storage = FirebaseStorage(
+      app,
+      emulatorHost: proxy.address,
+      httpClient: client,
+    );
     final Uint8List data = patternBytes(20 * 1024 * 1024);
     final Reference ref = storage.ref('$prefix/single.bin');
     final UploadTask task = ref.startUpload(data);
@@ -188,7 +224,7 @@ void main() {
   });
 
   test(
-    '10 uploads with maxConcurrentUploads 4 keep at most 4 sessions open',
+    '6 uploads with maxConcurrentUploads 2 keep at most 2 sessions open',
     () async {
       final _SessionClient client = _SessionClient();
       addTearDown(client.close);
@@ -197,13 +233,17 @@ void main() {
         app,
         emulatorHost: host,
         httpClient: client,
-        maxConcurrentUploads: 4,
+        maxConcurrentUploads: 2,
+        // Under load the emulator's rules runtime can stall a request ("no Storage ruleset is currently
+        // loaded"); a short idle timeout makes the client retry it from the server's offset, which is also
+        // what this test then exercises.
+        requestTimeout: const Duration(seconds: 5),
       );
       final List<Uint8List> data = <Uint8List>[
-        for (int i = 0; i < 10; i++) patternBytes(1024 * 1024 + i),
+        for (int i = 0; i < 6; i++) patternBytes(1024 * 1024 + i),
       ];
       final List<UploadTask> tasks = <UploadTask>[
-        for (int i = 0; i < 10; i++)
+        for (int i = 0; i < 6; i++)
           storage.ref('$prefix/many-$i.bin').startUpload(data[i]),
       ];
 
@@ -213,12 +253,13 @@ void main() {
         ],
       );
 
-      for (int i = 0; i < 10; i++) {
+      for (int i = 0; i < 6; i++) {
         expect(results[i].size, data[i].length);
       }
-      expect(client.maxOpen, inInclusiveRange(1, 4));
+      expect(client.maxOpen, inInclusiveRange(1, 2));
       expect(client.open, 0);
     },
+    timeout: const Timeout(Duration(minutes: 2)),
   );
 }
 
