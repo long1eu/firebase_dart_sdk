@@ -101,12 +101,14 @@ FirebaseStorageException canceled() {
   );
 }
 
-/// [url] is not a Cloud Storage URL.
+/// [url] is not a Cloud Storage URL. The message leaves out the query and the fragment, which can hold a
+/// download token.
 @internal
 FirebaseStorageException invalidUrl(String url) {
+  final String shown = url.split(RegExp('[?#]')).first;
   return FirebaseStorageException(
     code: 'invalid-url',
-    message: "Invalid URL '$url'.",
+    message: "Invalid URL '$shown'.",
   );
 }
 

@@ -13,7 +13,8 @@ import 'retry_policy.dart';
 /// Requests run as the signed-in user of the app: they carry the token of `app.authProvider` (for example a
 /// `FirebaseUserAuth` of `package:firebase_auth_providers_dart`), so the security rules see `request.auth`, and the
 /// token of `app.appCheckProvider` when the app has one. Nobody signed in means no token. A request answered
-/// with 401 is sent once more with a token fetched with `forceRefresh: true`.
+/// with 401 is sent once more with a token fetched with `forceRefresh: true`. Tokens are only sent over HTTPS,
+/// to the [emulatorHost], or to a loopback host; never in clear text to anybody else.
 ///
 /// ```dart
 /// import 'dart:convert';
@@ -30,10 +31,7 @@ import 'retry_policy.dart';
 ///       storageBucket: 'my-project.appspot.com',
 ///     ),
 ///   );
-///   final FirebaseStorage storage = FirebaseStorage(
-///     app,
-///     emulatorHost: FirebaseStorage.emulatorHostFromEnvironment,
-///   );
+///   final FirebaseStorage storage = FirebaseStorage(app);
 ///   final Reference ref = storage.ref('notes/hello.txt');
 ///   await ref.putString('Hello!');
 ///   print(utf8.decode(await ref.getBytes()));
@@ -51,7 +49,8 @@ class FirebaseStorage {
   ///   app's options. An [ArgumentError] is thrown when there is neither, or when [bucket] has an object path
   ///   (`gs://my-bucket/a`).
   /// * [emulatorHost] (`host:port`) sends the requests to the Cloud Storage emulator over plain HTTP; see
-  ///   [emulatorHostFromEnvironment]. Anything else than a host and a port throws an [ArgumentError].
+  ///   [emulatorHostFromEnvironment]. Anything else than a host and a port throws an [ArgumentError]. The
+  ///   tokens of the app are sent to it in clear text: set it only for an emulator you run.
   /// * [mockUserToken] is sent as the user token in place of the app's auth provider, like the
   ///   `mockUserToken` string of `connectStorageEmulator` in the JS SDK. Only with [emulatorHost]; an
   ///   [ArgumentError] otherwise.
@@ -88,6 +87,7 @@ class FirebaseStorage {
       client: httpClient ?? http.Client(),
       ownsClient: httpClient == null,
       requestTimeout: requestTimeout,
+      emulatorHost: emulatorHost,
       mockUserToken: mockUserToken,
       clock: clock,
       random: random,

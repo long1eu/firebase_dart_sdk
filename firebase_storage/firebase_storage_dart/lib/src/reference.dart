@@ -4,6 +4,7 @@ import 'dart:typed_data';
 
 import 'package:meta/meta.dart';
 
+import 'download.dart';
 import 'errors.dart';
 import 'firebase_storage.dart';
 import 'list_result.dart';
@@ -12,6 +13,8 @@ import 'metadata.dart';
 import 'request/requester.dart';
 import 'string_format.dart';
 import 'upload/multipart.dart';
+import 'upload/upload_source.dart';
+import 'upload/upload_task.dart';
 
 /// A pointer to an object (or a "folder") in a Cloud Storage bucket. Creating one makes no request.
 ///
@@ -187,7 +190,8 @@ final class Reference {
   }
 
   /// The pages of [list], one after another: the next page is requested when the previous one was delivered
-  /// and the stream is listened to. [pageSize] is the `maxResults` of each page.
+  /// and the stream is listened to. [pageSize] is the `maxResults` of each page. A page whose next token is the
+  /// one it was requested with ends the stream with `unknown`, instead of requesting it forever.
   Stream<ListResult> listPages({int? pageSize}) async* {
     String? pageToken;
     do {
@@ -195,16 +199,21 @@ final class Reference {
         maxResults: pageSize,
         pageToken: pageToken,
       );
+      final String? next = page.nextPageToken;
+      if (next != null && next.isNotEmpty && next == pageToken) {
+        // A server that hands back the token it was sent would make this loop forever.
+        throw unknownResponse('the server returned the same page token again.');
+      }
       yield page;
-      pageToken = page.nextPageToken;
+      pageToken = next;
     } while (pageToken != null && pageToken.isNotEmpty);
   }
 
   /// Downloads the object into memory.
   ///
   /// With [maxSize], only that many bytes are requested (with a `Range` header) and an object larger than
-  /// [maxSize] throws `download-size-exceeded`, like the Android SDK and FlutterFire's `getData`. The JS SDK
-  /// returns the first [maxSize] bytes instead. A negative [maxSize] throws `invalid-argument`.
+  /// [maxSize] throws `download-size-exceeded`, like the Android, iOS and C++ SDKs; reading stops as soon as
+  /// more than [maxSize] bytes arrived. The JS SDK returns the first [maxSize] bytes instead. A negative [maxSize] throws `invalid-argument`.
   Future<Uint8List> getBytes({int? maxSize}) async {
     throwIfRoot('getBytes');
     if (maxSize != null && maxSize < 0) {
@@ -212,31 +221,56 @@ final class Reference {
         "Invalid value for 'maxSize'. Expected 0 or greater.",
       );
     }
-    final StorageResponse response = await _requester.send(
-      StorageRequest(
-        method: 'GET',
-        url: objectUrl(media: true),
-        // Like the JS SDK, one byte more than the maximum: that byte tells an object that is too large.
-        headers: <String, String>{
-          if (maxSize != null) 'Range': 'bytes=0-$maxSize',
-        },
-        successCodes: maxSize == null
-            ? const <int>{200}
-            : const <int>{200, 206},
-        timeout: storage.retry.download,
-        errorMapper: _objectErrors(),
-      ),
-    );
-    final Uint8List bytes = response.bodyBytes;
-    if (maxSize != null && bytes.length > maxSize) {
-      throw downloadSizeExceeded(fullPath, maxSize);
+    final StorageResponse response;
+    try {
+      response = await _requester.send(
+        maxBodyBytes: maxSize,
+        StorageRequest(
+          method: 'GET',
+          url: objectUrl(media: true),
+          // Like the JS SDK, one byte more than the maximum: that byte tells an object that is too large.
+          headers: <String, String>{
+            if (maxSize != null) 'Range': 'bytes=0-$maxSize',
+          },
+          successCodes: maxSize == null
+              ? const <int>{200}
+              : const <int>{200, 206},
+          timeout: storage.retry.download,
+          errorMapper: _objectErrors(),
+        ),
+      );
+    } on BodyTooLargeException {
+      // Reading stopped at maxSize + 1 bytes, even from a server that ignores the Range header.
+      throw downloadSizeExceeded(fullPath, maxSize!);
     }
-    return bytes;
+    return response.bodyBytes;
   }
+
+  /// Downloads the object as a stream of byte chunks, like `File.openRead`: from byte [start] (default 0) up to
+  /// byte [end] (exclusive; default the end of the object). The bytes are not kept in memory.
+  ///
+  /// Nothing is requested until the stream is listened to; it is single-subscription. Pausing the subscription
+  /// pauses the download, and canceling it aborts the request. A range that starts past the end of the object
+  /// gives an empty stream.
+  ///
+  /// Failures before the first byte arrives are retried until `StorageRetryPolicy.download` runs out
+  /// (`retry-limit-exceeded`). Once bytes were delivered, a failure ends the stream with an error (`unknown`)
+  /// and is not retried, since it would repeat bytes; read the rest with a new [openRead] from the next offset.
+  /// A negative [start] or an [end] before [start] fails with `invalid-argument`.
+  ///
+  /// ```dart
+  /// final int size = await ref.openRead().fold(0, (int n, List<int> chunk) => n + chunk.length);
+  /// final List<int> head = await ref.openRead(0, 512).expand((List<int> c) => c).toList();
+  /// ```
+  Stream<List<int>> openRead([int? start, int? end]) =>
+      openReadStream(this, start, end);
 
   /// Uploads [data] in one multipart request and returns the metadata of the new object, replacing an object
   /// at the same path. The content type is that of [metadata], else `application/octet-stream`.
-  Future<FullMetadata> putBytes(Uint8List data, {SettableMetadata? metadata}) {
+  Future<FullMetadata> putBytes(
+    Uint8List data, {
+    SettableMetadata? metadata,
+  }) async {
     throwIfRoot('putBytes');
     return _multipartUpload(data, metadata);
   }
@@ -262,29 +296,84 @@ final class Reference {
     return _multipartUpload(decoded.bytes, effective);
   }
 
+  /// Starts an upload of [data] that can be paused, resumed and canceled; see [UploadTask]. Up to 256 KiB it is
+  /// one multipart request, like [putBytes], but with the controls and progress of a task.
+  ///
+  /// With [existingSessionUri] (the [UploadTask.sessionUri] of an earlier task for the same data and
+  /// reference), the task asks that session how much it has and sends the rest. It must be on the host of this
+  /// `FirebaseStorage` (the emulator's, with an `emulatorHost`); any other URI throws `invalid-argument`.
+  ///
+  /// Throws `invalid-root-operation` on the root of the bucket; other errors come through
+  /// [UploadTask.result].
+  UploadTask startUpload(
+    Uint8List data, {
+    SettableMetadata? metadata,
+    Uri? existingSessionUri,
+  }) {
+    throwIfRoot('startUpload');
+    return UploadTask.start(
+      this,
+      UploadSource.bytes(data),
+      metadata,
+      existingSessionUri: existingSessionUri,
+    );
+  }
+
+  /// Starts an upload of the [length] bytes of [data]; see [UploadTask] and [startUpload].
+  ///
+  /// The stream is read one chunk at a time as the upload goes, so only one chunk (at most 16 MiB) is held in
+  /// memory. It must produce exactly [length] bytes, otherwise the task fails with `invalid-argument`; an error
+  /// of the stream fails the task with that error. The stream is canceled when the task ends. To resume with
+  /// [existingSessionUri], pass a stream of the whole data again: the bytes the server already has are read
+  /// and skipped. Throws an [ArgumentError] when [length] is negative, `invalid-root-operation` on the root of
+  /// the bucket, and `invalid-argument` for an [existingSessionUri] on another host.
+  UploadTask startStreamUpload(
+    Stream<List<int>> data, {
+    required int length,
+    SettableMetadata? metadata,
+    Uri? existingSessionUri,
+  }) {
+    RangeError.checkNotNegative(length, 'length');
+    throwIfRoot('startStreamUpload');
+    return UploadTask.start(
+      this,
+      UploadSource.stream(data, length),
+      metadata,
+      existingSessionUri: existingSessionUri,
+    );
+  }
+
   Future<FullMetadata> _multipartUpload(
     Uint8List data,
     SettableMetadata? metadata,
   ) async {
-    final String boundary = multipartBoundary(_requester.random);
     final StorageResponse response = await _requester.send(
-      StorageRequest(
-        method: 'POST',
-        url: uploadUrl,
-        headers: <String, String>{
-          'X-Goog-Upload-Protocol': 'multipart',
-          'Content-Type': 'multipart/related; boundary=$boundary',
-        },
-        body: multipartBody(
-          boundary: boundary,
-          metadata: SettableMetadata.uploadJson(fullPath, metadata),
-          data: data,
-        ),
-        timeout: storage.retry.upload,
-        errorMapper: sharedErrorMapper(bucket, fullPath),
-      ),
+      multipartRequest(data, metadata),
     );
     return metadataOf(response);
+  }
+
+  /// The multipart upload of [data] with [metadata] (`multipartUpload` of the JS SDK), for `putBytes`,
+  /// `putString` and the small uploads of an upload task. Throws `invalid-argument` for a content type with a
+  /// control character.
+  @internal
+  StorageRequest multipartRequest(Uint8List data, SettableMetadata? metadata) {
+    final String boundary = multipartBoundary();
+    return StorageRequest(
+      method: 'POST',
+      url: uploadUrl,
+      headers: <String, String>{
+        'X-Goog-Upload-Protocol': 'multipart',
+        'Content-Type': 'multipart/related; boundary=$boundary',
+      },
+      body: multipartBody(
+        boundary: boundary,
+        metadata: SettableMetadata.uploadJson(fullPath, metadata),
+        data: data,
+      ),
+      timeout: storage.retry.upload,
+      errorMapper: sharedErrorMapper(bucket, fullPath),
+    );
   }
 
   /// The URL that uploads (multipart or resumable start) go to: `/v0/b/<bucket>/o?name=<path>`.
@@ -302,9 +391,15 @@ final class Reference {
 
   /// Throws `invalid-root-operation` for [operation] when this is the root of the bucket.
   @internal
+  ///
+  /// Also throws `invalid-argument` for the paths `.` and `..`: Cloud Storage forbids those names, and a URL
+  /// would resolve them as dot segments to another resource.
   void throwIfRoot(String operation) {
     if (location.isRoot) {
       throw invalidRootOperation(operation);
+    }
+    if (location.path == '.' || location.path == '..') {
+      throw invalidArgument("The object name '${location.path}' is not valid.");
     }
   }
 

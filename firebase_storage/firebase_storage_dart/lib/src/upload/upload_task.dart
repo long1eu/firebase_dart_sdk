@@ -1,0 +1,624 @@
+import 'dart:async';
+import 'dart:convert';
+import 'dart:math' as math;
+import 'dart:typed_data';
+
+import 'package:meta/meta.dart';
+
+import '../errors.dart';
+import '../exception.dart';
+import '../metadata.dart';
+import '../reference.dart';
+import '../request/requester.dart';
+import 'upload_source.dart';
+
+/// The state of an [UploadTask].
+enum UploadState {
+  /// Sending data, or waiting before it retries.
+  running,
+
+  /// Paused by [UploadTask.pause]; [UploadTask.resume] goes on where the server stopped.
+  paused,
+
+  /// Done: the object exists, [UploadTask.result] has its metadata.
+  success,
+
+  /// Stopped by [UploadTask.cancel]; [UploadTask.result] failed with `canceled`.
+  canceled,
+
+  /// Failed; [UploadTask.result] holds the error.
+  error,
+}
+
+/// A snapshot of an [UploadTask], as emitted by [UploadTask.progress].
+@immutable
+final class UploadProgress {
+  /// Creates a snapshot. The package creates them; you need this only in tests.
+  const UploadProgress({
+    required this.state,
+    required this.bytesTransferred,
+    required this.totalBytes,
+    this.metadata,
+  });
+
+  /// The state of the task.
+  final UploadState state;
+
+  /// The bytes the server has confirmed so far.
+  final int bytesTransferred;
+
+  /// The size of the upload.
+  final int totalBytes;
+
+  /// The metadata of the new object, once [state] is [UploadState.success]; null before.
+  final FullMetadata? metadata;
+
+  @override
+  bool operator ==(Object other) =>
+      other is UploadProgress &&
+      other.state == state &&
+      other.bytesTransferred == bytesTransferred &&
+      other.totalBytes == totalBytes &&
+      other.metadata == metadata;
+
+  @override
+  int get hashCode =>
+      Object.hash(state, bytesTransferred, totalBytes, metadata);
+
+  @override
+  String toString() =>
+      'UploadProgress(${state.name}, $bytesTransferred/$totalBytes bytes)';
+}
+
+/// The size above which an upload is resumable, and its first chunk: 256 KiB, as in the JS SDK.
+@internal
+const int resumableChunkSize = 256 * 1024;
+
+/// The largest chunk: 16 MiB, the effective limit of the JS SDK.
+@internal
+const int maxChunkSize = 16 * 1024 * 1024;
+
+/// The longest wait between two attempts at a failing chunk.
+const Duration _maxRetryWait = Duration(seconds: 64);
+
+enum _Phase { running, pausing, paused, canceling, success, canceled, error }
+
+/// An upload that can be paused, resumed and canceled, and reports its progress. It starts when it is created
+/// (by `Reference.startUpload` or `Reference.startStreamUpload`); await [result] for the metadata of the new
+/// object.
+///
+/// Up to 256 KiB the data goes in one multipart request, like `Reference.putBytes`. Larger data uses a
+/// resumable upload session: the chunks start at 256 KiB and double after each one that succeeds, up to
+/// 16 MiB. When a chunk fails with a network error or a retryable status (5xx, 408, 429), the task waits (1 s,
+/// doubling up to 64 s), asks the server how much it has, and goes on from there with a 256 KiB chunk; it
+/// gives up with `retry-limit-exceeded` once the failures have lasted the `upload` time of the
+/// `StorageRetryPolicy`. A success resets both the wait and that time.
+///
+/// ```dart
+/// final UploadTask task = storage.ref('videos/clip.mp4').startUpload(bytes);
+/// task.progress.listen((UploadProgress p) {
+///   print('${p.state.name}: ${p.bytesTransferred} of ${p.totalBytes} bytes');
+/// });
+/// final FullMetadata metadata = await task.result;
+/// ```
+///
+/// The task is not a `Future`; pausing aborts the request in flight and resuming asks the server where it
+/// stopped. [cancel] works while running and while paused.
+final class UploadTask {
+  /// Starts an upload of [source] to [ref] with [metadata]. Use `Reference.startUpload` or
+  /// `Reference.startStreamUpload` instead.
+  @internal
+  ///
+  /// With [existingSessionUri] it resumes that session: it asks the server how much data it has first. Throws
+  /// `invalid-argument` when that URI is not on the host of `ref.storage`.
+  @internal
+  UploadTask.start(
+    this.ref,
+    UploadSource source,
+    SettableMetadata? metadata, {
+    Uri? existingSessionUri,
+  }) : _source = source,
+       _metadata = metadata,
+       totalBytes = source.length {
+    if (existingSessionUri != null) {
+      if (!_onStorageHost(existingSessionUri)) {
+        throw invalidArgument(
+          'existingSessionUri is not an upload session of '
+          '${ref.storage.origin}.',
+        );
+      }
+      _sessionUrl = existingSessionUri;
+      _needStatus = true;
+    }
+    _result.future.ignore();
+    unawaited(_run());
+  }
+
+  /// The reference the data goes to.
+  final Reference ref;
+
+  /// The size of the upload in bytes.
+  final int totalBytes;
+
+  final UploadSource _source;
+  final SettableMetadata? _metadata;
+  final Completer<FullMetadata> _result = Completer<FullMetadata>();
+  final StreamController<UploadProgress> _events =
+      StreamController<UploadProgress>.broadcast();
+
+  _Phase _phase = _Phase.running;
+  int _transferred = 0;
+  FullMetadata? _uploaded;
+  bool _looping = false;
+
+  Uri? _sessionUrl;
+  bool _needStatus = false;
+  bool _needMetadata = false;
+  int _chunkSize = resumableChunkSize;
+  Duration _retryWait = Duration.zero;
+  bool _waitBeforeNextStep = false;
+  DateTime? _failingSince;
+  Completer<void>? _abort;
+
+  /// The state of the task.
+  UploadState get state => switch (_phase) {
+    _Phase.running || _Phase.pausing || _Phase.canceling => UploadState.running,
+    _Phase.paused => UploadState.paused,
+    _Phase.success => UploadState.success,
+    _Phase.canceled => UploadState.canceled,
+    _Phase.error => UploadState.error,
+  };
+
+  /// The bytes the server has confirmed so far. It can go down when the server lost part of a chunk.
+  int get bytesTransferred => _transferred;
+
+  /// The current state as an [UploadProgress].
+  UploadProgress get snapshot => UploadProgress(
+    state: state,
+    bytesTransferred: _transferred,
+    totalBytes: totalBytes,
+    metadata: _uploaded,
+  );
+
+  /// The progress of the upload: the current [snapshot] when you listen, then one event after each chunk and
+  /// on each change of state ([UploadState.paused], back to [UploadState.running], and the final one). The
+  /// stream closes after the final event; errors are not sent on it but in [result]. It can be listened to
+  /// any number of times.
+  Stream<UploadProgress> get progress => Stream<UploadProgress>.multi((
+    MultiStreamController<UploadProgress> controller,
+  ) {
+    controller.add(snapshot);
+    if (_events.isClosed) {
+      controller.close();
+      return;
+    }
+    final StreamSubscription<UploadProgress> subscription = _events.stream
+        .listen(controller.add, onDone: controller.close);
+    controller.onCancel = subscription.cancel;
+  }, isBroadcast: true);
+
+  /// Completes with the metadata of the new object, or fails with a `FirebaseStorageException` (`canceled`
+  /// after [cancel]). An error of the data stream of `Reference.startStreamUpload` is passed on as it is.
+  Future<FullMetadata> get result => _result.future;
+
+  /// The URI of the resumable upload session, once the server has created it; null for a one-shot upload (up
+  /// to 256 KiB) and before the session exists.
+  ///
+  /// Keep it to resume the upload after a restart: pass it as `existingSessionUri` to `Reference.startUpload`
+  /// or `Reference.startStreamUpload` with the same data and reference. Anyone who has it can write to that
+  /// session until it expires (a week on Google's servers), so store it like a credential.
+  Uri? get sessionUri => _sessionUrl;
+
+  /// Pauses a running task: the request in flight is aborted. Returns false when the task is not running.
+  bool pause() {
+    if (_phase != _Phase.running) {
+      return false;
+    }
+    _phase = _Phase.pausing;
+    _abortInFlight();
+    return true;
+  }
+
+  /// Resumes a paused task; it first asks the server how much data it has. Returns false when the task is not
+  /// paused (or pausing).
+  bool resume() {
+    switch (_phase) {
+      case _Phase.paused:
+        _phase = _Phase.running;
+        _waitBeforeNextStep = false;
+        _emit();
+        unawaited(_run());
+        return true;
+      case _Phase.pausing:
+        _phase = _Phase.running;
+        return true;
+      case _Phase.running ||
+          _Phase.canceling ||
+          _Phase.success ||
+          _Phase.canceled ||
+          _Phase.error:
+        return false;
+    }
+  }
+
+  /// Cancels a running or paused task: [result] fails with `canceled`. Returns false when the task already
+  /// ended (or is being canceled).
+  bool cancel() {
+    switch (_phase) {
+      case _Phase.running || _Phase.pausing:
+        _phase = _Phase.canceling;
+        _abortInFlight();
+        return true;
+      case _Phase.paused:
+        _end(_Phase.canceled, canceled());
+        return true;
+      case _Phase.canceling ||
+          _Phase.success ||
+          _Phase.canceled ||
+          _Phase.error:
+        return false;
+    }
+  }
+
+  Requester get _requester => ref.storage.requester;
+
+  Future<void> _run() async {
+    if (_looping) {
+      return;
+    }
+    _looping = true;
+    try {
+      while (_phase == _Phase.running) {
+        _abort = Completer<void>();
+        try {
+          await _step();
+        } on Object catch (error, stackTrace) {
+          _onStepError(error, stackTrace);
+        }
+      }
+      switch (_phase) {
+        case _Phase.pausing:
+          _phase = _Phase.paused;
+          _emit();
+        case _Phase.canceling:
+          _end(_Phase.canceled, canceled());
+        case _Phase.running ||
+            _Phase.paused ||
+            _Phase.success ||
+            _Phase.canceled ||
+            _Phase.error:
+          break;
+      }
+    } finally {
+      _looping = false;
+      _abort = null;
+    }
+  }
+
+  Future<void> _step() {
+    if (_sessionUrl == null && totalBytes <= resumableChunkSize) {
+      return _oneShot();
+    }
+    if (_sessionUrl == null) {
+      return _createSession();
+    }
+    if (_waitBeforeNextStep) {
+      return _wait();
+    }
+    if (_needStatus) {
+      return _queryStatus();
+    }
+    if (_needMetadata) {
+      return _fetchMetadata();
+    }
+    return _uploadChunk();
+  }
+
+  Future<void> _oneShot() async {
+    final Uint8List data = await _read(0, totalBytes);
+    _throwIfStopped();
+    final StorageResponse response = await _requester.send(
+      ref.multipartRequest(data, _metadata),
+      abortTrigger: _abortTrigger,
+    );
+    final FullMetadata metadata = ref.metadataOf(response);
+    _setProgress(totalBytes);
+    _succeed(metadata);
+  }
+
+  Future<void> _createSession() async {
+    final Map<String, Object?> json = SettableMetadata.uploadJson(
+      ref.fullPath,
+      _metadata,
+    );
+    final StorageResponse response = await _requester.send(
+      StorageRequest(
+        method: 'POST',
+        url: ref.uploadUrl,
+        headers: <String, String>{
+          'X-Goog-Upload-Protocol': 'resumable',
+          'X-Goog-Upload-Command': 'start',
+          'X-Goog-Upload-Header-Content-Length': '$totalBytes',
+          'X-Goog-Upload-Header-Content-Type': '${json['contentType']}',
+          'Content-Type': 'application/json; charset=utf-8',
+        },
+        body: utf8.encode(jsonEncode(json)),
+        timeout: ref.storage.retry.upload,
+        errorMapper: _errors,
+      ),
+      abortTrigger: _abortTrigger,
+    );
+    final Uri? url = Uri.tryParse(response.headers['x-goog-upload-url'] ?? '');
+    if (_uploadStatus(response) != 'active' || url == null) {
+      throw unknownResponse(
+        'the upload session was not started.',
+        httpStatus: response.statusCode,
+      );
+    }
+    if (!_onStorageHost(url)) {
+      throw unknownResponse(
+        'the upload session is on another host than ${ref.storage.origin}.',
+        httpStatus: response.statusCode,
+      );
+    }
+    _sessionUrl = url;
+  }
+
+  Future<void> _wait() async {
+    await _requester.wait(_retryWait, abortTrigger: _abortTrigger);
+    _throwIfStopped();
+    _waitBeforeNextStep = false;
+  }
+
+  Future<void> _queryStatus() async {
+    final StorageResponse response = await _requester.send(
+      StorageRequest(
+        method: 'POST',
+        url: _sessionUrl!,
+        headers: const <String, String>{'X-Goog-Upload-Command': 'query'},
+        timeout: ref.storage.retry.upload,
+        errorMapper: _errors,
+      ),
+      abortTrigger: _abortTrigger,
+    );
+    final String? status = _uploadStatus(response);
+    final String receivedHeader =
+        response.headers['x-goog-upload-size-received'] ?? '';
+    final int? received = RegExp(r'^[0-9]{1,15}$').hasMatch(receivedHeader)
+        ? int.parse(receivedHeader)
+        : null;
+    if ((status != 'active' && status != 'final') || received == null) {
+      throw unknownResponse(
+        'the status of the upload session cannot be read.',
+        httpStatus: response.statusCode,
+      );
+    }
+    if (received < _transferred ||
+        received > totalBytes ||
+        (status == 'final' && received != totalBytes)) {
+      throw _wrongSize(received);
+    }
+    _setProgress(received);
+    _needStatus = false;
+    _needMetadata = status == 'final';
+  }
+
+  Future<void> _fetchMetadata() async {
+    final StorageResponse response = await _requester.send(
+      StorageRequest(
+        method: 'GET',
+        url: ref.objectUrl(),
+        timeout: ref.storage.retry.operation,
+        errorMapper: objectErrorMapper(ref.bucket, ref.fullPath),
+      ),
+      abortTrigger: _abortTrigger,
+    );
+    _succeed(_checkSize(ref.metadataOf(response)));
+  }
+
+  Future<void> _uploadChunk() async {
+    final int offset = _transferred;
+    final int left = totalBytes - offset;
+    final int size = math.min(left, _chunkSize);
+    final Uint8List data = await _read(offset, size);
+    _throwIfStopped();
+    final String command = switch (size) {
+      0 => 'finalize',
+      _ when size == left => 'upload, finalize',
+      _ => 'upload',
+    };
+    final StorageResponse response;
+    try {
+      response = await _requester.send(
+        StorageRequest(
+          method: 'POST',
+          url: _sessionUrl!,
+          headers: <String, String>{
+            'X-Goog-Upload-Command': command,
+            'X-Goog-Upload-Offset': '$offset',
+          },
+          body: data,
+          // A single attempt: a chunk that fails is retried only after a query, here.
+          timeout: Duration.zero,
+          retryOnStatus: false,
+          errorMapper: _errors,
+        ),
+        abortTrigger: _abortTrigger,
+      );
+    } on FirebaseStorageException catch (error) {
+      if (error.code == 'retry-limit-exceeded' ||
+          isRetryStatus(error.httpStatus ?? 0)) {
+        _scheduleRetry(error);
+        return;
+      }
+      rethrow;
+    }
+    final String? status = _uploadStatus(response);
+    if (status != 'active' && status != 'final') {
+      throw unknownResponse(
+        'the upload session answered a chunk without a status.',
+        httpStatus: response.statusCode,
+      );
+    }
+    _chunkSize = math.min(_chunkSize * 2, maxChunkSize);
+    _retryWait = Duration.zero;
+    _failingSince = null;
+    _setProgress(offset + size);
+    if (status == 'final') {
+      if (offset + size != totalBytes) {
+        throw _wrongSize(offset + size);
+      }
+      _succeed(_checkSize(ref.metadataOf(response)));
+    }
+  }
+
+  /// Reads from the source, giving up (with `canceled`) when the task is paused or canceled meanwhile: a stream
+  /// can stall.
+  Future<Uint8List> _read(int offset, int size) {
+    final Completer<Uint8List> result = Completer<Uint8List>();
+    _source
+        .read(offset, size)
+        .then(
+          (Uint8List data) {
+            if (!result.isCompleted) {
+              result.complete(data);
+            }
+          },
+          onError: (Object error, StackTrace stackTrace) {
+            if (!result.isCompleted) {
+              result.completeError(error, stackTrace);
+            }
+          },
+        );
+    _abortTrigger?.then((_) {
+      if (!result.isCompleted) {
+        result.completeError(canceled());
+      }
+    });
+    return result.future;
+  }
+
+  void _scheduleRetry(FirebaseStorageException error) {
+    final DateTime now = _requester.now();
+    final DateTime since = _failingSince ??= now;
+    if (now.difference(since) >= ref.storage.retry.upload) {
+      throw retryLimitExceeded(httpStatus: error.httpStatus, cause: error);
+    }
+    final Duration doubled = _retryWait * 2;
+    _retryWait = doubled < const Duration(seconds: 1)
+        ? const Duration(seconds: 1)
+        : (doubled > _maxRetryWait ? _maxRetryWait : doubled);
+    _chunkSize = resumableChunkSize;
+    _waitBeforeNextStep = true;
+    _needStatus = true;
+  }
+
+  void _onStepError(Object error, StackTrace stackTrace) {
+    _chunkSize = resumableChunkSize;
+    if (error is FirebaseStorageException && error.code == 'canceled') {
+      // Our own abort (pause, cancel): where the server stopped is unknown.
+      _needStatus = _sessionUrl != null;
+      return;
+    }
+    _end(_Phase.error, error, stackTrace);
+  }
+
+  void _throwIfStopped() {
+    if (_phase != _Phase.running) {
+      throw canceled();
+    }
+  }
+
+  void _abortInFlight() {
+    final Completer<void>? abort = _abort;
+    if (abort != null && !abort.isCompleted) {
+      abort.complete();
+    }
+  }
+
+  Future<void>? get _abortTrigger => _abort?.future;
+
+  StorageErrorMapper get _errors => sharedErrorMapper(ref.bucket, ref.fullPath);
+
+  static String? _uploadStatus(StorageResponse response) =>
+      response.headers['x-goog-upload-status'];
+
+  FullMetadata _checkSize(FullMetadata metadata) {
+    final int? size = metadata.size;
+    if (size != null && size != totalBytes) {
+      throw _wrongSize(size);
+    }
+    return metadata;
+  }
+
+  FirebaseStorageException _wrongSize(int serverSize) {
+    return FirebaseStorageException(
+      code: 'server-file-wrong-size',
+      message:
+          'Server recorded incorrect upload file size, please retry the '
+          'upload. It has $serverSize of $totalBytes bytes.',
+    );
+  }
+
+  void _setProgress(int transferred) {
+    if (transferred == _transferred) {
+      return;
+    }
+    _transferred = transferred;
+    _emit();
+  }
+
+  void _succeed(FullMetadata metadata) {
+    _uploaded = metadata;
+    _phase = _Phase.success;
+    _emit();
+    unawaited(_events.close());
+    unawaited(_source.close());
+    _result.complete(metadata);
+  }
+
+  void _end(_Phase phase, Object error, [StackTrace? stackTrace]) {
+    if (phase == _Phase.canceled) {
+      _cancelSession();
+    }
+    _phase = phase;
+    _emit();
+    unawaited(_events.close());
+    unawaited(_source.close());
+    _result.completeError(error, stackTrace);
+  }
+
+  void _emit() => _events.add(snapshot);
+
+  /// Tells the server to drop the session, without waiting and ignoring the outcome: the task is canceled
+  /// either way, and the session expires by itself.
+  void _cancelSession() {
+    final Uri? url = _sessionUrl;
+    if (url == null || _needMetadata || _requester.isClosed) {
+      return;
+    }
+    _requester
+        .send(
+          StorageRequest(
+            method: 'POST',
+            url: url,
+            headers: const <String, String>{'X-Goog-Upload-Command': 'cancel'},
+            timeout: Duration.zero,
+            retryOnStatus: false,
+            errorMapper: _errors,
+          ),
+        )
+        .ignore();
+  }
+
+  /// Whether [uri] has the scheme, host and port of the REST API of `ref.storage`, so that the data and the
+  /// tokens go nowhere else.
+  bool _onStorageHost(Uri uri) {
+    final Uri origin = Uri.parse(ref.storage.origin);
+    return uri.scheme == origin.scheme &&
+        uri.host.toLowerCase() == origin.host.toLowerCase() &&
+        uri.port == origin.port &&
+        uri.userInfo.isEmpty &&
+        uri.path.startsWith('/v0/b/');
+  }
+}
