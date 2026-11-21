@@ -10,9 +10,9 @@ The code is `cloud_firestore/cloud_firestore_dart/test/production/verify_product
 
 **Status of the kit itself:** it runs against the emulators (Standard and Enterprise edition),
 where the expected results are known (`test/production/verify_production_test.dart`). It was
-also run against a real Firestore database in Standard edition: in one run 13 checks passed and 2
-were skipped (7, which needs an Enterprise edition database, and 13, which needs a Web API key
-with anonymous sign-in). An earlier run found a bug of the SDK that is fixed since. The result of
+also run against a real Firestore database in Standard edition: in the last run (2026-11-21)
+every check passed except 1c (inconclusive: the composite index did not exist) and 7 (skipped: it
+needs an Enterprise edition database); check 13 ran with a Web API key and passed. An earlier run found a bug of the SDK that is fixed since. The result of
 each check is in the table under "Known results" below; what these runs did not cover is listed
 under "Not verified".
 
@@ -130,7 +130,7 @@ SKIPPED, in one run. The answers of 2, 3, 4, 6, 9, 10 and 11 are what that run o
 | 10 | SKIPPED | SKIPPED | PASS: requests with the OAuth access token were accepted; the same read without a token was rejected with `permissionDenied` |
 | 11 | PASS | PASS | PASS: REST unary calls (read, transaction, aggregation) and the WebChannel streams (listen and write); the backend asked for session routing and the channel requests carried a `gsessionid` |
 | 12 | PASS | PASS | PASS over gRPC and over REST: CRUD, a batch, queries, an aggregation, a transaction and a read-only transaction |
-| 13 | SKIPPED; PASS with the Auth emulator (`tool/start_auth_emulators.sh`) | not run | SKIPPED: no Web API key was given |
+| 13 | SKIPPED; PASS with the Auth emulator (`tool/start_auth_emulators.sh`) | not run | PASS (2026-11-21): a read with the ID token of an anonymous user was served under the security rules; the user was deleted afterwards |
 
 Each production run made 55 of at most 80 writes and deleted its 28 documents at the end.
 
@@ -172,8 +172,6 @@ write), the OAuth access token from Application Default Credentials (10), the we
 
 - **An Enterprise edition database:** check 7 (BSON numeric increment) and the Enterprise answer
   of check 6.
-- **Firebase Auth user sign-in:** check 13 needs the Web API key of the project and the Anonymous
-  sign-in provider.
 - **App Check:** the kit has no App Check token provider.
 - **Load:** the kit makes at most 80 writes; it says nothing about long-running use.
 - The edition of the database is inferred from check 6; the kit cannot ask the backend for it.

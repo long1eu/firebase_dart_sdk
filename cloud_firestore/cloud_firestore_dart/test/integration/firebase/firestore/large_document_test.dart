@@ -31,7 +31,9 @@ import '../../../util/integration_test_util.dart';
 // Port of the upstream LargeDocumentTest (documents of ~15.9 MB, the 16 MiB limit of the current backend).
 //
 // The Firestore emulator does not accept documents that large: its write rejects them (see EMULATOR_LIMIT below), so
-// the whole suite is skipped when it runs against the emulator and meant to run against a production database.
+// the whole suite is skipped when it runs against the emulator and meant to run against a production database in
+// Enterprise edition (FIRESTORE_TEST_PROJECT_ID and FIRESTORE_TEST_DATABASE_ID). A Standard edition database rejects
+// a field value over 1 MiB like the emulator does. Passed against a real Enterprise edition database on 2026-11-21.
 void main() {
   IntegrationTestUtil.currentDatabasePath = 'integration/large_document';
 

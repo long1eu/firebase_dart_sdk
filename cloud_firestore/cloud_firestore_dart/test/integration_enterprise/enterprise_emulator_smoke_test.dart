@@ -29,43 +29,62 @@ void main() {
     await IntegrationTestUtil.tearDown();
   });
 
-  test('writes and reads documents on the enterprise emulator',
-      skip: skipReason, () async {
-    final FirebaseFirestore firestore =
-        await IntegrationTestUtil.testEnterpriseFirestore();
-    final CollectionReference collection =
-        firestore.collection('enterprise-smoke-${autoId()}');
-    final DocumentReference doc = collection.doc('a');
+  test(
+    'writes and reads documents on the enterprise emulator',
+    skip: skipReason,
+    () async {
+      final FirebaseFirestore firestore =
+          await IntegrationTestUtil.testEnterpriseFirestore();
+      final CollectionReference collection = firestore.collection(
+        'enterprise-smoke-${autoId()}',
+      );
+      final DocumentReference doc = collection.doc('a');
 
-    await doc.set(<String, Object?>{'value': 1, 'name': 'enterprise'});
-    await collection.doc('b').set(<String, Object?>{'value': 2});
+      await doc.set(<String, Object?>{'value': 1, 'name': 'enterprise'});
+      await collection.doc('b').set(<String, Object?>{'value': 2});
 
-    final DocumentSnapshot snapshot = await doc.get(GetOptions(source: Source.server));
-    expect(snapshot.exists, isTrue);
-    expect(snapshot.data(), <String, Object?>{'value': 1, 'name': 'enterprise'});
-    expect(snapshot.metadata.isFromCache, isFalse);
+      final DocumentSnapshot snapshot = await doc.get(
+        GetOptions(source: Source.server),
+      );
+      expect(snapshot.exists, isTrue);
+      expect(snapshot.data(), <String, Object?>{
+        'value': 1,
+        'name': 'enterprise',
+      });
+      expect(snapshot.metadata.isFromCache, isFalse);
 
-    final QuerySnapshot query =
-        await collection.where('value', isGreaterThan: 1).get(GetOptions(source: Source.server));
-    expect(query.docs.map((DocumentSnapshot d) => d.id), <String>['b']);
-  });
+      final QuerySnapshot query = await collection
+          .where('value', isGreaterThan: 1)
+          .get(GetOptions(source: Source.server));
+      expect(query.docs.map((DocumentSnapshot d) => d.id), <String>['b']);
+    },
+  );
 
-  test('the enterprise emulator is separate from the standard one',
-      skip: skipReason ??
-          (IntegrationTestUtil.emulatorHost == null
-              ? 'FIRESTORE_EMULATOR_HOST is not set: needs both emulators'
-              : IntegrationTestUtil.emulatorHost ==
-                      IntegrationTestUtil.enterpriseEmulatorHost
-                  ? 'both variables name the same emulator: needs both emulators'
-                  : null), () async {
-    final String path = 'enterprise-smoke-${autoId()}/doc';
-    final FirebaseFirestore enterprise =
-        await IntegrationTestUtil.testEnterpriseFirestore();
-    await enterprise.doc(path).set(<String, Object?>{'value': 1});
+  test(
+    'the enterprise emulator is separate from the standard one',
+    skip:
+        skipReason ??
+        IntegrationTestUtil.skipOnRealEnterprise(
+          'compares the two emulators',
+        ) ??
+        (IntegrationTestUtil.emulatorHost == null
+            ? 'FIRESTORE_EMULATOR_HOST is not set: needs both emulators'
+            : IntegrationTestUtil.emulatorHost ==
+                  IntegrationTestUtil.enterpriseEmulatorHost
+            ? 'both variables name the same emulator: needs both emulators'
+            : null),
+    () async {
+      final String path = 'enterprise-smoke-${autoId()}/doc';
+      final FirebaseFirestore enterprise =
+          await IntegrationTestUtil.testEnterpriseFirestore();
+      await enterprise.doc(path).set(<String, Object?>{'value': 1});
 
-    final FirebaseFirestore standard = await IntegrationTestUtil.testFirestore();
-    final DocumentSnapshot snapshot =
-        await standard.doc(path).get(GetOptions(source: Source.server));
-    expect(snapshot.exists, isFalse);
-  });
+      final FirebaseFirestore standard =
+          await IntegrationTestUtil.testFirestore();
+      final DocumentSnapshot snapshot = await standard
+          .doc(path)
+          .get(GetOptions(source: Source.server));
+      expect(snapshot.exists, isFalse);
+    },
+  );
 }

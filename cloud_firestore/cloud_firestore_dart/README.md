@@ -44,8 +44,8 @@ any release. Authentication is in the companion package
 tokens can be supplied through the app.
 
 **Platforms.** The Dart VM on macOS (developed and tested there) and Linux (tested in CI);
-Windows is expected to work but is not tested. Flutter on Android, iOS and desktop, as a plain
-Dart package. The web: supported in Chrome, tested against the emulator; Firefox, Safari and Edge are untested. Dart 3.8 or later.
+Windows was run on one Windows 11 VM against the emulator and is not in CI. Flutter on Android, iOS and desktop, as a plain
+Dart package. The web: supported in Chrome, tested against the emulator; Firefox passed the browser tests once; Safari and Edge are untested. Dart 3.8 or later.
 
 Inside the package, every call goes through one queue to the local cache and to the network; the
 transport depends on the platform, and Firestore Lite skips the cache:

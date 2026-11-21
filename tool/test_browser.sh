@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Runs the browser tests of cloud_firestore_dart (test/browser) in Chrome, compiled with
-# dart2wasm and with dart2js, against a private Firestore emulator on 127.0.0.1:8090 (or the
+# Runs the browser tests of cloud_firestore_dart (test/browser) in Chrome (or the browser in
+# TEST_BROWSER), compiled with dart2wasm and with dart2js, against a private Firestore emulator on 127.0.0.1:8090 (or the
 # port in FIRESTORE_EMULATOR_PORT).
 #
 # The browser tests of firebase_storage_dart have their own script: tool/test_browser_storage.sh.
@@ -19,6 +19,9 @@
 # tool/build_web_test_assets.sh. Without them those tests skip themselves.
 #
 # Environment:
+#   TEST_BROWSER  chrome (default), firefox or safari. Safari needs "Allow remote automation"
+#                 (Safari settings, Developer) and only runs dart2js: the runner falls back to
+#                 it without a message, so dart2wasm is not run there.
 #   TEST_LOG_DIR  where the full outputs go (default: a new temp dir)
 #   SQLITE3_WASM  a sqlite3.wasm to use instead of downloading one (build_web_test_assets.sh)
 #   FIRESTORE_EMULATOR_PORT  the port of the private emulator (default 8090). The tests read
@@ -44,10 +47,19 @@ esac
 AUTH_PORT="${AUTH_EMULATOR_PORT:-9297}"
 RULES_PORT="${AUTH_RULES_EMULATOR_PORT:-8297}"
 
+BROWSER="${TEST_BROWSER:-chrome}"
+case "$BROWSER" in
+  chrome|firefox|safari) ;;
+  *) echo "TEST_BROWSER must be chrome, firefox or safari"; exit 2;;
+esac
+
 COMPILERS=(dart2wasm dart2js)
 case "${1:-}" in
   dart2wasm|dart2js) COMPILERS=("$1"); shift;;
   both) shift;;
+esac
+case "$BROWSER" in
+  safari) COMPILERS=(dart2js);;
   -h|--help) sed -n '2,35p' "$0" | sed 's/^# \{0,1\}//'; exit 0;;
 esac
 if [ $# -eq 0 ]; then
@@ -97,11 +109,11 @@ trap 'rm -f "$PORT_FILE" "$AUTH_FILE"' EXIT
 failed=0
 summary=()
 for compiler in "${COMPILERS[@]}"; do
-  log="$LOG_DIR/browser_$compiler.log"
-  echo "=== $compiler: dart test -j 1 -p chrome -c $compiler $*"
+  log="$LOG_DIR/browser_${BROWSER}_$compiler.log"
+  echo "=== $compiler: dart test -j 1 -p $BROWSER -c $compiler $*"
   # The expanded reporter is named explicitly: under GitHub Actions `dart test` switches to
   # its github reporter, whose output the summary below cannot read.
-  (cd "$PKG" && dart test --reporter expanded -j 1 -p chrome -c "$compiler" "$@") >"$log" 2>&1
+  (cd "$PKG" && dart test --reporter expanded -j 1 -p "$BROWSER" -c "$compiler" "$@") >"$log" 2>&1
   rc=$?
   last=$(tr '\r' '\n' <"$log" | grep -E "^[0-9:]+ \+[0-9]+" | tail -1)
   if [ $rc -eq 0 ]; then

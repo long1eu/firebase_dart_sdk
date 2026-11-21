@@ -10,8 +10,8 @@ In short, read across a row for the transport and the caches of a platform:
 |---|---|---|---|---|
 | Dart VM (servers, command line) | gRPC | memory | SQLite file (`cloud_firestore_dart_sqlite`) | macOS, Linux, Windows 11 x64 (one VM, not in CI) |
 | Flutter on Android, iOS, desktop | gRPC | memory | SQLite file (`cloud_firestore_dart_sqlite`) | not on Android or iOS; desktop apps on macOS, Linux (Debian 13 x86_64, and a release build in an Ubuntu 24.04 arm64 container) and Windows 11 x64, against the emulator |
-| Web, dart2wasm | REST and WebChannel over `fetch` | memory | SQLite in WebAssembly, in IndexedDB or OPFS (`cloud_firestore_dart_sqlite`) | Chrome, against the emulator |
-| Web, dart2js | REST and WebChannel over `fetch` | memory | the same as dart2wasm | Chrome, against the emulator; integers above 2^53 lose precision |
+| Web, dart2wasm | REST and WebChannel over `fetch` | memory | SQLite in WebAssembly, in IndexedDB or OPFS (`cloud_firestore_dart_sqlite`) | Chrome, against the emulator (Firefox: one run of the browser tests) |
+| Web, dart2js | REST and WebChannel over `fetch` | memory | the same as dart2wasm | Chrome, against the emulator (Firefox: one run of the browser tests); integers above 2^53 lose precision |
 
 ## The Dart VM and Flutter
 
@@ -24,7 +24,11 @@ emulator (903 passed, 22 skipped) pass, after fixes to test helpers that assumed
 that an open file can be deleted; nothing in `lib/` changed. CI does not run Windows. SQLite commits were much
 slower on that VM than on a Mac (about 78 ms each in rollback-journal mode and 24 ms in WAL mode, against 0.3 and 0.1 ms), because
 each commit waits for the virtual disk to flush; two to four tests on SQLite (depending on the load) needed more
-than their timeouts there and passed with `--ignore-timeouts`. Flutter apps (Android, iOS, desktop) can use it as
+than their timeouts there and passed with `--ignore-timeouts`. A second run on the same VM on 2026-11-21, of a
+later commit and without `--ignore-timeouts`, did not pass cleanly: unit tests 6864 passed and 4 failed, integration
+888 passed, 22 skipped and 27 failed. No failure was a wrong result: 20 were tests that start `dart run` while the
+test process has `sqlite3.dll` loaded (below), 2 were test helpers that delete a database file another isolate still
+has open, and 9 were timeouts (most in tests on SQLite, some while the `dart run` tests were failing next to them). Flutter apps (Android, iOS, desktop) can use it as
 a plain Dart package.
 
 - Linux: with `sqlite3` 3.x (Dart 3.10 and later) the opener of `cloud_firestore_dart_sqlite` uses the SQLite that
@@ -49,7 +53,7 @@ a plain Dart package.
 
 ## The web (supported in Chrome)
 
-Web is supported in Chrome; Firefox, Safari and Edge are untested. Browsers have no sockets, so there the client talks to
+Web is supported in Chrome. Firefox passed the browser test suite (dart2js and dart2wasm, 2026-11-21, not in CI); a Safari run (dart2js) had timeouts that are not explained yet; Edge is untested. Browsers have no sockets, so there the client talks to
 Firestore the way the JS SDK does: REST/JSON for the one-shot calls and WebChannel for the
 listen and write streams, over `fetch`. What to know:
 
@@ -127,8 +131,8 @@ listen and write streams, over `fetch`. What to know:
   from the repository root; 56 pass and 1 is skipped with each compiler: under dart2wasm the
   crash harness of the IndexedDB storage, under dart2js the test of 64 bit integers), and the
   whole standard integration suite on the VM over the web transport
-  (`tool/test_integration.sh standard --transport=webchannel`). Other browsers and the
-  production backend are untested.
+  (`tool/test_integration.sh standard --transport=webchannel`). The same browser tests passed in Firefox on 2026-11-21
+  (`TEST_BROWSER=firefox tool/test_browser.sh`); Safari, Edge and the production backend are untested.
 - A Flutter web app works the same way: [A Flutter web app](web.md#a-flutter-web-app) and
   [`examples/flutter_web_two_users`](../../examples/flutter_web_two_users/), built with both
   compilers in CI. On Flutter 3.44 pin `sqlite3: 3.3.4` for the IndexedDB cache:

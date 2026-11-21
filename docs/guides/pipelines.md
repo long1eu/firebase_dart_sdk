@@ -216,16 +216,24 @@ final PipelineSnapshot explained = await firestore
 print(explained.explainStats);
 ```
 
-The option names are those of the Node.js server SDK. The emulator ignores them, so no
-explanation was seen in a test.
+The option names are those of the Node.js server SDK. The emulator ignores them; a real
+Enterprise edition database returns the statistics (run on 2026-11-21). The same run showed two
+differences from the emulator: `execute(indexMode: ...)` is rejected with `invalid-argument`
+("Unsupported option: index_mode"), and a `forceIndex` that names no index fails instead of
+being ignored.
 
 ## Beta server features
 
 Full-text search and window functions are beta upstream. They are encoded as the JS SDK encodes
-them, but the emulator rejects both, so they were checked for their encoding only:
+them:
 `search(documentMatches('...'), sort: [score().descending()])`, and
 `addWindowFields(WindowSpec(...), [rank().as('rank'), field('n').sum().over(WindowFrame.documents(preceding: 1, following: 1)).as('moving')])`.
-The emulator also rejects `geoDistance`. The emulator also denies the `literals` source to clients that are subject to
+The emulator rejects both, so there the tests only check the encoding; against a real Enterprise
+edition database the ported Android tests for both pass (2026-11-21). Search needs a search
+index on the collection, with the text fields and the geo field it uses; without one the
+backend answers `failed-precondition` ("No matching search index found for query").
+`geoDistance` is only accepted inside the `search` stage (anywhere else the backend answers
+`invalid-argument`); the emulator rejects it everywhere. The emulator also denies the `literals` source to clients that are subject to
 security rules.
 
 More examples: [`example/pipelines.dart`](../../cloud_firestore/cloud_firestore_dart/example/pipelines.dart).

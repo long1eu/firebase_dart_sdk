@@ -53,7 +53,13 @@ void main() {
   test(
     'every function agrees with the emulator on nulls, missing values, '
     'wrong types and errors in its arguments',
-    skip: IntegrationTestUtil.enterpriseEmulatorSkipReason,
+    skip:
+        IntegrationTestUtil.enterpriseEmulatorSkipReason ??
+        IntegrationTestUtil.skipOnRealEnterprise(
+          'the local evaluation follows the emulator; a real Enterprise '
+          'edition database answers some wrong-type and error cases '
+          'differently (docs/parity.md, known limitation 9)',
+        ),
     () async {
       final FirebaseFirestore db =
           await IntegrationTestUtil.testEnterpriseFirestore();
@@ -99,7 +105,12 @@ void main() {
 
   test(
     'the recorded emulator results of the fixed cases are current',
-    skip: IntegrationTestUtil.enterpriseEmulatorSkipReason,
+    skip:
+        IntegrationTestUtil.enterpriseEmulatorSkipReason ??
+        IntegrationTestUtil.skipOnRealEnterprise(
+          'the golden file records the answers of the emulator, for its '
+          'project and default database',
+        ),
     () async {
       // The recorded references name the project, the default database and the document.
       final FirebaseFirestore db =
@@ -182,7 +193,13 @@ void main() {
 
   test(
     'aggregate functions evaluate locally as aggregate() on the emulator',
-    skip: IntegrationTestUtil.enterpriseEmulatorSkipReason,
+    skip:
+        IntegrationTestUtil.enterpriseEmulatorSkipReason ??
+        IntegrationTestUtil.skipOnRealEnterprise(
+          'the local evaluation follows the emulator; a real Enterprise '
+          'edition database answers some wrong-type and error cases '
+          'differently (docs/parity.md, known limitation 9)',
+        ),
     () async {
       final FirebaseFirestore db =
           await IntegrationTestUtil.testEnterpriseFirestore();
@@ -317,7 +334,13 @@ void main() {
 
   test(
     'expressions evaluate locally as select(expression) on the emulator',
-    skip: IntegrationTestUtil.enterpriseEmulatorSkipReason,
+    skip:
+        IntegrationTestUtil.enterpriseEmulatorSkipReason ??
+        IntegrationTestUtil.skipOnRealEnterprise(
+          'the local evaluation follows the emulator; a real Enterprise '
+          'edition database answers some wrong-type and error cases '
+          'differently (docs/parity.md, known limitation 9)',
+        ),
     () async {
       final FirebaseFirestore db =
           await IntegrationTestUtil.testEnterpriseFirestore();

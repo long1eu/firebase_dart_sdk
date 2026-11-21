@@ -26,6 +26,12 @@
 // condition), and it ignores explain options. The last group records those
 // answers, so that a newer emulator that supports them shows up as a failure.
 // Everything is skipped, with a reason, when the variable is not set.
+//
+// Against a real Enterprise edition database
+// (IntegrationTestUtil.enterpriseUsesRealProject) the explain options are
+// checked for an explanation, and the group that pins the emulator's answers
+// is skipped: android_pipeline_window_test.dart and
+// android_pipeline_search_test.dart run those stages against the backend.
 
 import 'package:cloud_firestore_dart/cloud_firestore_dart.dart';
 import 'package:cloud_firestore_dart/pipelines.dart';
@@ -198,6 +204,28 @@ void main() {
     group('explain options', () {
       test('are accepted; the emulator runs the pipeline and explains '
           'nothing', () async {
+        if (IntegrationTestUtil.enterpriseUsesRealProject) {
+          for (final PipelineExplainMode mode in PipelineExplainMode.values) {
+            final PipelineSnapshot snapshot = await source()
+                .sort(<Ordering>[field('n').ascending()])
+                .execute(
+                  explainOptions: PipelineExplainOptions(
+                    mode: mode,
+                    outputFormat: PipelineExplainOutputFormat.text,
+                  ),
+                );
+            // `explain` only plans the pipeline; `analyze` runs it too.
+            expect(
+              snapshot.results,
+              hasLength(mode == PipelineExplainMode.explain ? 0 : 2),
+              reason: mode.name,
+            );
+            if (mode != PipelineExplainMode.execute) {
+              expect(snapshot.explainStats, isNotNull, reason: mode.name);
+            }
+          }
+          return;
+        }
         for (final PipelineExplainMode mode in PipelineExplainMode.values) {
           final PipelineSnapshot snapshot = await source()
               .sort(<Ordering>[field('n').ascending()])
@@ -215,31 +243,38 @@ void main() {
       }, skip: skip);
     });
 
-    group('what the emulator does not support', () {
-      test('add_window_fields is an unsupported stage', () async {
-        await expectLater(
-          source().addWindowFields(
-            WindowSpec(sort: <Ordering>[field('n').ascending()]),
-            <Object>[rank().as('rank'), field('n').sum().as('total')],
-          ).execute(),
-          failsWith(FirestoreErrorCode.invalidArgument, 'add_window_fields'),
-        );
-      }, skip: skip);
+    group(
+      'what the emulator does not support',
+      skip: IntegrationTestUtil.skipOnRealEnterprise(
+        'pins the answers of the emulator; the window and search tests '
+        'run these stages against the backend',
+      ),
+      () {
+        test('add_window_fields is an unsupported stage', () async {
+          await expectLater(
+            source().addWindowFields(
+              WindowSpec(sort: <Ordering>[field('n').ascending()]),
+              <Object>[rank().as('rank'), field('n').sum().as('total')],
+            ).execute(),
+            failsWith(FirestoreErrorCode.invalidArgument, 'add_window_fields'),
+          );
+        }, skip: skip);
 
-      test('search, document_matches and score do not exist', () async {
-        await expectLater(
-          source().search('waffles').execute(),
-          failsWith(FirestoreErrorCode.invalidArgument, 'document_matches'),
-        );
-        await expectLater(
-          source().select(<Object>[score().as('s')]).execute(),
-          failsWith(FirestoreErrorCode.invalidArgument, 'score'),
-        );
-        await expectLater(
-          source().search(field('n').greaterThan(0)).execute(),
-          failsWith(FirestoreErrorCode.internal),
-        );
-      }, skip: skip);
-    });
+        test('search, document_matches and score do not exist', () async {
+          await expectLater(
+            source().search('waffles').execute(),
+            failsWith(FirestoreErrorCode.invalidArgument, 'document_matches'),
+          );
+          await expectLater(
+            source().select(<Object>[score().as('s')]).execute(),
+            failsWith(FirestoreErrorCode.invalidArgument, 'score'),
+          );
+          await expectLater(
+            source().search(field('n').greaterThan(0)).execute(),
+            failsWith(FirestoreErrorCode.internal),
+          );
+        }, skip: skip);
+      },
+    );
   });
 }

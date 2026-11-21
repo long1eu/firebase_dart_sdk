@@ -829,8 +829,10 @@ void main() {
       // replaces the field with the operand. The backend adds them.
       skip:
           skip ??
-          'The Firestore emulator ignores BSON numbers in increment '
-              'transforms (v1.22.0), this needs a real Enterprise database',
+          IntegrationTestUtil.skipOnEnterpriseEmulator(
+            'The Firestore emulator ignores BSON numbers in increment '
+            'transforms (v1.22.0), this needs a real Enterprise database',
+          ),
     );
 
     test('numericMinimumAndMaximumWithBsonTypes', () async {

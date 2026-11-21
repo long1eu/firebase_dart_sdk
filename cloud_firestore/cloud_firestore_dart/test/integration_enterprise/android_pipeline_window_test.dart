@@ -26,6 +26,11 @@
 // record that answer: where the pipeline fails with it the case passes,
 // where it runs (a backend with window functions) Android's checks apply.
 // The cases that expect a server error check the emulator's.
+//
+// Against a real Enterprise edition database
+// (IntegrationTestUtil.enterpriseUsesRealProject) the emulator's answer is not
+// accepted: every pipeline has to run and return Android's expected results,
+// and the cases that expect a server error check the backend's.
 
 // ignore_for_file: prefer_single_quotes, always_specify_types
 // ignore_for_file: lines_longer_than_80_chars, prefer_final_locals
@@ -90,10 +95,21 @@ final Map<String, Map<String, Object?>> windowTestDocs =
 Future<CollectionReference<Map<String, Object?>>> windowTestCollection() =>
     testCollectionWithDocs(windowTestDocs);
 
-/// The emulator's answer to a pipeline with add_window_fields.
-Future<void> expectEmulatorRejectsWindows(Future<Object?> execute) async {
+/// The emulator's answer to a pipeline with add_window_fields. Against a real
+/// Enterprise edition database, the server error Android expects instead: a
+/// [FirestoreException] whose text contains [backendMessage] when given.
+Future<void> expectEmulatorRejectsWindows(
+  Future<Object?> execute, {
+  String? backendMessage,
+}) async {
   final Object error = await assertThrows(null, () => execute);
   expect(error, isA<FirestoreException>());
+  if (IntegrationTestUtil.enterpriseUsesRealProject) {
+    if (backendMessage != null) {
+      assertThat("$error".toLowerCase()).contains(backendMessage);
+    }
+    return;
+  }
   expect(
     (error as FirestoreException).errorCode,
     FirestoreErrorCode.invalidArgument,
@@ -103,8 +119,13 @@ Future<void> expectEmulatorRejectsWindows(Future<Object?> execute) async {
 
 /// Whether [execute] fails with the emulator's answer to add_window_fields.
 /// False when the pipeline runs (a backend with window functions); any
-/// other failure is rethrown.
+/// other failure is rethrown, and against a real Enterprise edition database
+/// every failure is.
 Future<bool> emulatorRejectsWindows(Future<PipelineSnapshot> execute) async {
+  if (IntegrationTestUtil.enterpriseUsesRealProject) {
+    await execute;
+    return false;
+  }
   try {
     await execute;
     return false;
@@ -324,6 +345,7 @@ void main() {
           ),
           <Object>[ex("quantity").count().as("windowCount")],
         ).execute(),
+        backendMessage: "range",
       );
     });
 
