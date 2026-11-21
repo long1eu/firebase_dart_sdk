@@ -58,8 +58,11 @@ SDK. Without a signed-in user the request carries no `Authorization` header.
 **Why.** Any token provider works, including a service account or a test fake. A token in clear text to an
 arbitrary host is a credential leak, and a misconfigured host is easy to produce.
 
-**What we gave up.** A plain-http server on a private address (for example an emulator reached through another
-host name) gets no token unless it is the configured `emulatorHost`.
+**What we gave up.** Nothing in normal use: every request goes to the client's own origin (production over https,
+or the configured `emulatorHost`, also on another machine), redirects are refused, and a session URI must be on
+that origin. The rule is a backstop for a request that would ever go elsewhere; the one setup it refuses is a
+plain-http host that is not the configured `emulatorHost`, for example an emulator reached through a second name
+that the client was not given.
 
 **Pinned by.** `test/hardening_test.dart` (group "tokens travel only over https, to the emulator or to
 loopback"); `test/security/hosts_test.dart` (groups "token scope of the request layer" and "emulator", test
