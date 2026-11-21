@@ -7,7 +7,7 @@ configuration of a Firebase project and connects the services to the platform (s
 App Check tokens). A Flutter app that keeps the official `firebase_core` API does not add it by hand. It is not
 affiliated with or endorsed by Google or Firebase.
 
-> **Status: 0.2.0.** Unit tests, plus `cloud_firestore_dart`'s integration
+> **Status: 0.2.1.** Unit tests, plus `cloud_firestore_dart`'s integration
 > suite against the Firestore emulator. Against production it was only used by the short
 > verification kit of `cloud_firestore_dart`, on one Firestore database.
 

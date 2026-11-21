@@ -1,4 +1,4 @@
-## Unreleased
+## 0.3.1
 
 - The browser flows run on the new package `secure_flow` (a new dependency, `^0.1.0`), whose presenters,
   environment and errors this library re-exports. `authorizeWithOAuthLoopback`, `signInWithOAuthLoopback`,
