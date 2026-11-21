@@ -211,9 +211,9 @@ Path shorthand:
 | Auth.settings.appVerificationDisabledForTesting | none | accepted and ignored (:191) | n/a outside a browser | phone/reCAPTCHA only |
 | initializeAuth | `FirebaseUserAuth(...)` (storage, requestTimeout, appCheck) | `DartFirebaseAuth` | different | firebase_user_auth.dart:100-134 |
 | getAuth | `FirebaseUserAuth.forApp(app)` | `delegateFor` | different | firebase_user_auth.dart:163 |
-| Auth.app | none (`apiKey`, `appId` only) | — | missing | firebase_user_auth.dart:206-213 |
-| Auth.name | none | — | missing | |
-| Auth.config | none (`apiKey`, `appId`, `emulatorHost`) | — | different | firebase_user_auth.dart:206-213 |
+| Auth.app | `FirebaseUserAuth.app`, set by `forApp`; null for an instance made with the constructor | `FirebaseAuth.app` of `firebase_auth` | same | |
+| Auth.name | `app?.name` | `FirebaseAuth.app.name` | different | No separate getter: the name is the app's. |
+| Auth.config | separate members: `apiKey`, `appId`, `emulatorConfig`, `clientVersion` | — | different | No config object. `apiHost`, `apiScheme` and `tokenApiHost` are the real service unless `emulatorConfig` is set; `authDomain` is not used, as there is no hosted sign-in page. |
 | Auth.currentUser | `currentUser` | :143 | same | firebase_user_auth.dart:410 |
 | Auth.emulatorConfig | `emulatorConfig` (`AuthEmulatorConfig`) | `useAuthEmulator` (:168) | same | firebase_user_auth.dart:261 |
 | onAuthStateChanged / onIdTokenChanged | `authStateChanges()`, `idTokenChanges()`, `userChanges()` streams | :203-220 | different | streams, not callbacks; firebase_user_auth.dart:419-442 |
@@ -327,7 +327,7 @@ Effort: S takes hours, M a few days, L more than a week or needs outside pieces.
 | 13 | closed (`app-deleted` in the shim; `missing-continue-uri` and `user-signed-out` are not thrown by JS either) | Client-side validation codes: `missing-continue-uri`, and `app-deleted` or `user-signed-out` after `dispose` | S | no | no | low | Today these show up as server errors, `StateError` or `null-user`. |
 | 14 | partly closed: `OperationType` done | An error-code constants class; aggregate `ProviderId`, `SignInMethod` and `FactorId`; `OperationType` | S | no | no | low | Typo safety only. |
 | 15 | open | `IdTokenResult` parity: nullable times and `signInSecondFactor` | S | no | no | low | `GetTokenResult` lives in `firebase_app_dart` and returns epoch 0 for a missing time. |
-| 16 | open | `Auth.name`, `Auth.app`, `Auth.config` | S | no | no | low | Introspection only. |
+| 16 | closed (`app`; `name` and `config` as the members of the app and the client) | `Auth.name`, `Auth.app`, `Auth.config` | S | no | no | low | Introspection only. |
 | 17 | open | IndexedDB storage on the web | M | yes | no | low-med | The JS default on the web, but the stored data can't be shared with the JS SDK anyway because the key format differs. |
 | 18 | open | Phone sign-in with a verification token supplied by the caller (works with the emulator and test numbers) | L | for production | no | med | Real projects require app verification: reCAPTCHA, Play Integrity or APNs. |
 | 19 | open | reCAPTCHA Enterprise (`initializeRecaptchaConfig`, token on sign-in) | L | yes, or a WebView | yes | high where enforcement is on | A project in enforce mode rejects REST sign-ins that carry no token. |
