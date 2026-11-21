@@ -586,7 +586,7 @@ jobs:
         run: |
           set -o pipefail
           dart pub get
-          dart test --reporter expanded test/integration 2>&1 | tee "$EMULATOR_DIR/storage_integration.log"
+          dart test --reporter expanded test/integration test/production 2>&1 | tee "$EMULATOR_DIR/storage_integration.log"
           if grep -Eq ' ~[0-9]+' "$EMULATOR_DIR/storage_integration.log"; then
             echo "::error::The Storage emulator tests skipped: FIREBASE_STORAGE_EMULATOR_HOST did not reach them."
             exit 1
