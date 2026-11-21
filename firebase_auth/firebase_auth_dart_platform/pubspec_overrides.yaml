@@ -3,8 +3,12 @@
 dependency_overrides:
   firebase_auth_providers_dart:
     path: ../firebase_auth_providers_dart
+  firebase_auth_secure_storage_flutter:
+    path: ../firebase_auth_secure_storage_flutter
   firebase_app_dart:
     path: ../../firebase_core/firebase_app_dart
+  secure_flow:
+    path: ../../secure_flow/secure_flow
   cloud_firestore_dart:
     path: ../../cloud_firestore/cloud_firestore_dart
   cloud_firestore_dart_flutterfire:

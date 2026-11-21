@@ -15,10 +15,10 @@ const String noLoopbackOnWeb =
 
 /// Why the provider flows throw on a platform where the client cannot open the
 /// browser itself.
-const String noPresentUrl =
-    'on this platform the authorization URL needs a presenter. Pass '
-    'presentUrl to FirebaseAuthDart.use, for example '
-    '(Uri url) => launchUrl(url) of url_launcher.';
+const String noPresenter =
+    'on this platform the provider flow needs a presenter. Pass '
+    'presenter to FirebaseAuthDart.use, for example '
+    'CallbackPresenter((Uri url) => launchUrl(url)) with url_launcher.';
 
 /// The scopes and custom parameters set on [provider] (`addScope`,
 /// `setCustomParameters`), for the providers of FlutterFire that have them;

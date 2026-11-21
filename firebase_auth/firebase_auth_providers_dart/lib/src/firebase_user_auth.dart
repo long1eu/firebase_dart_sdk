@@ -5,8 +5,11 @@ import 'package:firebase_app_dart/firebase_app_dart.dart';
 import 'package:firebase_app_dart/internal.dart' show Log;
 import 'package:http/http.dart' as http;
 import 'package:meta/meta.dart';
+import 'package:secure_flow/secure_flow.dart'
+    show SecureEnvironment, SecurePresenter;
 
 import 'action_code.dart';
+import 'app_verification.dart';
 import 'auth_credential.dart';
 import 'auth_emulator_config.dart';
 import 'auth_exception.dart';
@@ -1107,6 +1110,34 @@ class FirebaseUserAuth implements AuthTokenProvider {
     return policy;
   }
 
+  // ---- app verification ----
+
+  /// The reCAPTCHA v2 site key of the project (`v1/recaptchaParams`, `getRecaptchaParams` of the JS
+  /// SDK): the key a reCAPTCHA v2 widget renders with, for example in a `RecaptchaFlow` of
+  /// `package:secure_flow` or in a WebView of yours.
+  ///
+  /// The request goes to the Auth emulator when one is set; the emulator answers with a fake key,
+  /// and phone requests to it need no proof ([AppVerification.none]). No tenant is sent, as in the
+  /// JS SDK: the key belongs to the project. The key is fetched on every call.
+  ///
+  /// Throws a [FirebaseAuthException] when the request fails (`network-request-failed`, ...), and
+  /// `internal-error` when the answer has no site key.
+  Future<String> getRecaptchaSiteKey() async {
+    _checkNotDisposed();
+    final Map<String, Object?> response = await _send(
+      _identityToolkit('recaptchaParams'),
+      get: true,
+    );
+    final Object? siteKey = response['recaptchaSiteKey'];
+    if (siteKey is! String || siteKey.isEmpty) {
+      throw const FirebaseAuthException(
+        code: 'internal-error',
+        message: 'The authentication service returned no reCAPTCHA site key.',
+      );
+    }
+    return siteKey;
+  }
+
   /// Like `recachePasswordPolicy` of the JS SDK: when [operation] fails with `password-does-not-meet-requirements`
   /// and a policy was fetched before, it is fetched again in the background.
   Future<T> _recachePasswordPolicyOnFailure<T>(
@@ -1245,7 +1276,9 @@ class FirebaseUserAuth implements AuthTokenProvider {
   /// [authorizeWithOAuthLoopback] and then [signInWithCredential] with the credential of the provider's tokens. On
   /// the web it throws an [UnsupportedError].
   ///
-  /// [presenter] opens the authorization URL ([openInSystemBrowser] by default), [timeout] bounds the wait for the
+  /// [presenter] runs the browser part (when null, the presenter of [environment] that an
+  /// `OAuthFlow` ranks best: a provider app registered there for this provider, the system browser,
+  /// an in-app browser, the console), [timeout] bounds the wait for the
   /// redirect, and [httpClient] is used for the code exchange (the client of this instance by default). It throws
   /// what both steps throw: `timeout`, `user-cancelled`, `invalid-oauth-response`, `invalid-credential`, ...
   ///
@@ -1261,7 +1294,8 @@ class FirebaseUserAuth implements AuthTokenProvider {
   /// ```
   Future<UserCredential> signInWithOAuthLoopback(
     OAuthLoopbackProvider provider, {
-    UrlPresenter? presenter,
+    SecurePresenter? presenter,
+    SecureEnvironment? environment,
     Duration timeout = const Duration(minutes: 5),
     http.Client? httpClient,
   }) async {
@@ -1269,6 +1303,7 @@ class FirebaseUserAuth implements AuthTokenProvider {
     final OAuthLoopbackResult result = await authorizeWithOAuthLoopback(
       provider,
       presenter: presenter,
+      environment: environment,
       timeout: timeout,
       httpClient: httpClient ?? _http,
     );
@@ -1284,7 +1319,8 @@ class FirebaseUserAuth implements AuthTokenProvider {
   /// `credential-already-in-use`, ...
   Future<UserCredential> linkWithOAuthLoopback(
     OAuthLoopbackProvider provider, {
-    UrlPresenter? presenter,
+    SecurePresenter? presenter,
+    SecureEnvironment? environment,
     Duration timeout = const Duration(minutes: 5),
     http.Client? httpClient,
   }) async {
@@ -1293,6 +1329,7 @@ class FirebaseUserAuth implements AuthTokenProvider {
     final OAuthLoopbackResult result = await authorizeWithOAuthLoopback(
       provider,
       presenter: presenter,
+      environment: environment,
       timeout: timeout,
       httpClient: httpClient ?? _http,
     );
@@ -1308,7 +1345,8 @@ class FirebaseUserAuth implements AuthTokenProvider {
   /// in to the provider with another account), ...
   Future<UserCredential> reauthenticateWithOAuthLoopback(
     OAuthLoopbackProvider provider, {
-    UrlPresenter? presenter,
+    SecurePresenter? presenter,
+    SecureEnvironment? environment,
     Duration timeout = const Duration(minutes: 5),
     http.Client? httpClient,
   }) async {
@@ -1317,6 +1355,7 @@ class FirebaseUserAuth implements AuthTokenProvider {
     final OAuthLoopbackResult result = await authorizeWithOAuthLoopback(
       provider,
       presenter: presenter,
+      environment: environment,
       timeout: timeout,
       httpClient: httpClient ?? _http,
     );

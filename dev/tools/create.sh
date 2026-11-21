@@ -6,7 +6,7 @@ export DESCRIPTION="Dart implementation of cloud_firestore using cloud_firestore
 dart $PWD/dev/tools/lib/create_app.dart                                                      \
     --serviceAccount="$PWD/dev/tools/service-account.json"                                   \
     --name="${NAME}"                                                                         \
-    --org='eu.long1'                                                                         \
+    --org='dev.upcode'                                                                         \
     --description="${DESCRIPTION}"                                                           \
     --path="${MODULE_PATH}"                                                                  \
     --sha1='38eb99cf2426f2ea789fce2f4f19fd14ea580167'                                        \

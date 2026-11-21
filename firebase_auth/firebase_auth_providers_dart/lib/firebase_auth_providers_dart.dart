@@ -33,12 +33,38 @@
 /// service account, Application Default Credentials, and the wiring into Firestore.
 library;
 
+// The presenters of the browser flows and their errors, so that one import is enough for
+// `signInWithOAuthLoopback` and `AppVerification.recaptchaV2Loopback`.
+export 'package:secure_flow/secure_flow.dart'
+    show
+        CallbackPresenter,
+        ConsolePresenter,
+        LoopbackPresenter,
+        OAuthAppRequest,
+        OAuthRedirect,
+        OAuthResult,
+        OAuthTokens,
+        PromptPresenter,
+        ProviderAppPresenter,
+        SecureEnvironment,
+        SecureFlowCancelled,
+        SecureFlowException,
+        SecureFlowNoPresenter,
+        SecureFlowRefused,
+        SecureFlowTimeout,
+        SecurePresenter,
+        SecurePresenterKind,
+        ShowUrl,
+        SystemBrowserPresenter,
+        openInSystemBrowser;
+
 // Imported for the references in the documentation above.
 import 'src/auth_storage.dart';
 import 'src/firebase_user_auth.dart';
 import 'src/oauth_token_provider.dart';
 
 export 'src/action_code.dart';
+export 'src/app_verification.dart' hide appVerificationFields;
 export 'src/auth_constants.dart';
 export 'src/auth_credential.dart';
 export 'src/auth_emulator_config.dart';

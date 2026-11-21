@@ -1,6 +1,6 @@
-# Analysis options of cloud_firestore_dart, firebase_app_dart and firebase_auth_providers_dart
-# (each depends on package:lints): the recommended set, plus the rules of the earlier house style
-# that the code follows.
+# Analysis options of cloud_firestore_dart, firebase_app_dart, firebase_auth_providers_dart and
+# secure_flow (each depends on package:lints): the recommended set, plus the rules of the earlier
+# house style that the code follows.
 include: package:lints/recommended.yaml
 
 analyzer:

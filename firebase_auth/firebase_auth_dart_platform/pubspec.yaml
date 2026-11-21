@@ -36,6 +36,9 @@ dependencies:
   firebase_app_dart: ^0.2.0
   firebase_auth_platform_interface: ^9.1.2
   firebase_auth_providers_dart: ^0.3.1
+  # The default storage of the sessions (not on the web). Resolved from the
+  # sibling directory through pubspec_overrides.yaml (not published).
+  firebase_auth_secure_storage_flutter: ^0.1.0
   firebase_core: ^5.1.0
   firebase_core_platform_interface: ^8.1.1
   flutter:
@@ -50,6 +53,9 @@ dev_dependencies:
   cloud_firestore_dart_flutterfire: ^0.1.0
   # The app-facing package the tests drive, as an app would.
   firebase_auth: ^7.0.1
+  # test/secure_default_storage_test.dart installs a FlutterSecureStoragePlatform
+  # that behaves like the Windows implementation (Dart FFI, not the channel).
+  flutter_secure_storage_platform_interface: ^2.1.1
   flutter_test:
     sdk: flutter
   lints: ^6.1.0

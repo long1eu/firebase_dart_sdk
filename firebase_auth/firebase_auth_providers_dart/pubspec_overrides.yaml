@@ -1,8 +1,10 @@
-# Local development only: use the sibling firebase_app_dart and
-# cloud_firestore_dart checkouts instead of the hosted packages. Excluded from
+# Local development only: use the sibling firebase_app_dart, cloud_firestore_dart
+# and secure_flow checkouts instead of the hosted packages. Excluded from
 # the published archive by .pubignore.
 dependency_overrides:
   cloud_firestore_dart:
     path: ../../cloud_firestore/cloud_firestore_dart
   firebase_app_dart:
     path: ../../firebase_core/firebase_app_dart
+  secure_flow:
+    path: ../../secure_flow/secure_flow

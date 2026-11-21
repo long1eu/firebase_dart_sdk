@@ -1,0 +1,29 @@
+name: secure_flow
+description: >-
+  Pure-Dart browser round trips for desktop apps and command line tools: OAuth
+  redirects, reCAPTCHA and code entry answered over a hardened one-shot
+  loopback server.
+version: 0.1.0
+homepage: https://github.com/long1eu/firebase_dart_sdk
+repository: https://github.com/long1eu/firebase_dart_sdk/tree/main/secure_flow/secure_flow
+issue_tracker: https://github.com/long1eu/firebase_dart_sdk/issues
+topics:
+  - oauth
+  - authentication
+  - cli
+  - desktop
+
+platforms:
+  android:
+  ios:
+  linux:
+  macos:
+  web:
+  windows:
+
+environment:
+  sdk: ^3.8.0
+
+dev_dependencies:
+  lints: ^6.1.0
+  test: ^1.25.0

@@ -29,7 +29,7 @@ import 'package:firebase_auth_providers_dart/firebase_auth_providers_dart.dart'
         FirebaseUserAuth,
         InMemoryAuthStorage,
         OAuthLoopbackProvider,
-        UrlPresenter;
+        SecurePresenter;
 import 'package:firebase_core/firebase_core.dart';
 import 'package:http/http.dart' as http;
 
@@ -41,10 +41,13 @@ import 'src/storage.dart' show runningUnderFlutterTest;
 
 export 'package:firebase_auth_providers_dart/firebase_auth_providers_dart.dart'
     show
+        CallbackPresenter,
+        ConsolePresenter,
         OAuthAuthorizationCode,
         OAuthCodeExchange,
         OAuthLoopbackProvider,
-        UrlPresenter;
+        SecurePresenter,
+        SystemBrowserPresenter;
 
 export 'src/convert.dart' show DartFirebaseAuthException;
 export 'src/firebase_auth.dart'
@@ -89,10 +92,17 @@ abstract final class FirebaseAuthDart {
   /// configuration.
   ///
   /// * [storageFor] returns where the session (the refresh token) of a
-  ///   FlutterFire app is kept, for example a `FileAuthStorage` of your choice
-  ///   or a storage on top of a secure storage plugin. By default it is a file
-  ///   in the user's data directory ([defaultSessionFile]), or memory where
-  ///   there is none (Android, iOS, web).
+  ///   FlutterFire app is kept; whatever it returns replaces the default.
+  ///   By default it is the secure store of the platform (the Keychain, the
+  ///   Android Keystore, libsecret, DPAPI) through
+  ///   `firebase_auth_secure_storage_flutter`. A session left in the file of
+  ///   earlier versions ([defaultSessionFile]) moves there at its first read.
+  ///   When a probe (write, read back, delete) before the first operation
+  ///   finds the store unavailable (no Secret Service, a locked keyring, a
+  ///   macOS build without the keychain entitlement), the
+  ///   sessions are kept in that file for the run instead (memory where there
+  ///   is none), and one line says so. On the web it is memory. To keep the
+  ///   file, return `FileAuthStorage(defaultSessionFile()!)`.
   /// * [httpClient] sends the requests (for tests and proxies); by default
   ///   each app's client creates its own.
   /// * [useDartCore] replaces the implementation of `firebase_core` with a
@@ -116,9 +126,11 @@ abstract final class FirebaseAuthDart {
   ///   and its own replace those of [oauthProviders] with the same id. Two of
   ///   its providers with one id throw an [ArgumentError] then, at the first
   ///   use of that app's `FirebaseAuth`.
-  /// * [presentUrl] opens the authorization URL of those flows, for example
-  ///   `url_launcher`'s `launchUrl` on Android and iOS; by default the system
-  ///   browser on macOS, Linux and Windows.
+  /// * [presenter] runs the browser part of those flows: shows the
+  ///   authorization URL and takes the redirect on 127.0.0.1. By default the
+  ///   system browser on macOS, Linux and Windows (the URL on stderr over SSH
+  ///   or without a display). On Android and iOS pass one, for example
+  ///   `CallbackPresenter((Uri url) => launchUrl(url))` with `url_launcher`.
   ///
   /// It also replaces the multi-factor generators of `firebase_auth`: the
   /// TOTP one works through the client, the phone one throws
@@ -133,7 +145,7 @@ abstract final class FirebaseAuthDart {
     Iterable<OAuthLoopbackProvider> oauthProviders =
         const <OAuthLoopbackProvider>[],
     OAuthProvidersFactory? oauthProvidersFor,
-    UrlPresenter? presentUrl,
+    SecurePresenter? presenter,
   }) {
     final Map<String, OAuthLoopbackProvider> byId = providersById(
       oauthProviders,
@@ -150,7 +162,7 @@ abstract final class FirebaseAuthDart {
       httpClient: httpClient,
       oauthProviders: byId,
       oauthProvidersFor: oauthProvidersFor,
-      presentUrl: presentUrl,
+      presenter: presenter,
     );
     installCoreIfNeeded(force: useDartCore);
     if (!isRegistered) {

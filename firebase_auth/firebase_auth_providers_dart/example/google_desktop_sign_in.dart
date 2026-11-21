@@ -1,6 +1,8 @@
 // Google sign-in for a desktop app or a command line tool: the system browser
 // opens Google's sign-in page, the redirect comes back to 127.0.0.1, and the
-// Google ID token signs the user in to Firebase.
+// Google ID token signs the user in to Firebase. Over SSH or without a display
+// the sign-in URL is printed on stderr instead (open it on the same machine, or
+// forward the port with `ssh -L`).
 //
 //     GOOGLE_DESKTOP_CLIENT_ID=<client id> \
 //     GOOGLE_DESKTOP_CLIENT_SECRET=<client secret> \
@@ -45,17 +47,6 @@ Future<void> main() async {
         clientId: clientId,
         clientSecret: env['GOOGLE_DESKTOP_CLIENT_SECRET'],
       ),
-      // Opens the system browser; also print the address, for a machine
-      // without one (open it on the same machine: the redirect goes to
-      // 127.0.0.1).
-      presenter: (Uri url) async {
-        print('Sign in in your browser. If it did not open, visit:\n$url\n');
-        try {
-          await openInSystemBrowser(url);
-        } on Object catch (e) {
-          print('(could not open the browser: $e)');
-        }
-      },
     );
     final AuthUser user = result.user!;
     print('signed in: ${user.uid} (${user.email ?? 'no email'})');

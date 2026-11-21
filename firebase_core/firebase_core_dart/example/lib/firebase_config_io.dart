@@ -24,7 +24,7 @@ FirebaseOptions get firebaseOptions {
       apiKey: Platform.isIOS
           ? 'AIzaSyBguTk4w2Xk2LD0mSdB2Pi9LTtt5BeAE6U'
           : 'AIzaSyAM1bGAY-Bd4onFPFb2dBCJA3kx0eiWnSg',
-      bundleID: 'eu.long1.firebaseCoreDartExample',
+      bundleID: 'dev.upcode.firebaseCoreDartExample',
       androidClientID:
           '233259864964-atj096gj4dkn2q5iciufgrugequubseo.apps.googleusercontent.com',
       clientID:

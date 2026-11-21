@@ -6,7 +6,7 @@
 # The example programs in examples/ are analyzed only (their tests need an emulator); select
 # them alone with the name "examples", or one with "examples/<name>".
 # The Flutter packages (cloud_firestore_dart_flutterfire, cloud_firestore_dart_platform,
-# firebase_auth_dart_platform, firebase_storage_dart_platform) and the
+# firebase_auth_dart_platform, firebase_storage_dart_platform, firebase_auth_secure_storage_flutter) and the
 # Flutter examples need the Flutter SDK and are skipped without it; the CI job "flutter" runs
 # them (with FIRESTORE_EMULATOR_HOST and FIREBASE_AUTH_EMULATOR_HOST set, so that the emulator tests
 # of the platform packages run).
@@ -26,6 +26,7 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 # CI runs cloud_firestore_dart and the others in separate legs (.github/workflows/ci.yml,
 # unit-legs and unit-stable-legs): a package added here goes into their `others` leg too.
 PACKAGES=(
+  "secure_flow|secure_flow/secure_flow|"
   "firebase_app_dart|firebase_core/firebase_app_dart|"
   "firebase_auth_providers_dart|firebase_auth/firebase_auth_providers_dart|"
   "cloud_firestore_dart|cloud_firestore/cloud_firestore_dart|test/unit"
@@ -85,12 +86,10 @@ for entry in "${PACKAGES[@]}"; do
     # to its github reporter, whose output the summary below cannot read.
     dart test --reporter expanded "$target" >"$LOG/$name.test" 2>&1
     rc=$?
-    # Final progress line looks like "00:05 +42 -2: ..." / "+44: All tests passed!"
-    last=$(grep -E "^[0-9:]+ \+[0-9]+" "$LOG/$name.test" | tail -1)
-    p=$(echo "$last" | sed -nE 's/.*\+([0-9]+).*/\1/p'); p=${p:-0}
-    f=$(echo "$last" | sed -nE 's/.* -([0-9]+).*/\1/p'); f=${f:-0}
-    if [ $rc -eq 0 ]; then tests="PASS ($p passed, $f failed)"; else
-      tests="FAIL ($p passed, $f failed)"; "$ROOT/tool/print_test_failures.sh" "$LOG/$name.test"; fi
+    # "N passed, N skipped, N failed" from the final progress line.
+    counts=$(test_counts "$LOG/$name.test")
+    if [ $rc -eq 0 ]; then tests="PASS ($counts)"; else
+      tests="FAIL ($counts)"; "$ROOT/tool/print_test_failures.sh" "$LOG/$name.test"; fi
   fi
 
   case "$pub$analyze$tests" in *FAIL*) failed=1;; esac
@@ -134,11 +133,13 @@ done
 
 # The Flutter packages: `dart test` cannot load flutter_test. The emulator tests of
 # cloud_firestore_dart_platform run only when FIRESTORE_EMULATOR_HOST is set, those of
-# firebase_auth_dart_platform only when FIREBASE_AUTH_EMULATOR_HOST is set.
+# firebase_auth_dart_platform only when FIREBASE_AUTH_EMULATOR_HOST is set;
+# firebase_auth_secure_storage_flutter has unit tests only (a fake of the plugin's channel).
 for entry in "cloud_firestore_dart_flutterfire|cloud_firestore/cloud_firestore_dart_flutterfire" \
   "cloud_firestore_dart_platform|cloud_firestore/cloud_firestore_dart_platform" \
   "firebase_auth_dart_platform|firebase_auth/firebase_auth_dart_platform" \
-  "firebase_storage_dart_platform|firebase_storage/firebase_storage_dart_platform"; do
+  "firebase_storage_dart_platform|firebase_storage/firebase_storage_dart_platform" \
+  "firebase_auth_secure_storage_flutter|firebase_auth/firebase_auth_secure_storage_flutter"; do
   IFS='|' read -r name dir <<<"$entry"
   if [ $# -gt 0 ] && ! printf '%s\n' "$@" | grep -qx "$name"; then continue; fi
   echo "=== $name ==="

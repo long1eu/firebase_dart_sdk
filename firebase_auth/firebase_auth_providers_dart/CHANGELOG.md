@@ -1,5 +1,27 @@
 ## Unreleased
 
+- The browser flows run on the new package `secure_flow` (a new dependency, `^0.1.0`), whose presenters,
+  environment and errors this library re-exports. `authorizeWithOAuthLoopback`, `signInWithOAuthLoopback`,
+  `linkWithOAuthLoopback` and `reauthenticateWithOAuthLoopback` take a `presenter` (a `SecurePresenter`) and an
+  `environment` (a `SecureEnvironment`); without a presenter, the `OAuthFlow` takes the best one the environment
+  offers: a `ProviderAppPresenter` registered for the provider, the system browser on a desktop, an in-app
+  browser, the console (only the URL on stderr over SSH or on Linux without a display; a timeout then names the
+  `ssh -L` forward that would help). A presenter the flow does not accept (a web view, a provider app for another
+  provider) fails with a `FirebaseAuthException` `argument-error`, and no presenter for the environment (Android
+  and iOS without one passed) with `operation-not-supported-in-this-environment`; both carry the `SecureFlowRefused`
+  or `SecureFlowNoPresenter` of `secure_flow` in the new `FirebaseAuthException.cause`. Before, the flow threw an
+  `UnsupportedError` on Android and iOS, where it had no browser launcher. An error of the presenter itself is
+  rethrown as it is. `AppVerification.recaptchaV2Loopback` maps them the same way.
+- A `ProviderAppPresenter` (the provider's app or SDK; none is part of this package) returns the provider's tokens
+  directly: they go to `signInWithIdp` without a code exchange, with the raw nonce in the credential for OpenID
+  Connect providers. When a nonce was sent, the ID token must carry it: an ID token without the nonce claim fails
+  with `missing-or-invalid-nonce`, like one with another nonce. An access token without an ID token fails with
+  `invalid-oauth-response` unless the provider sets the new `OAuthLoopbackProvider.acceptAccessTokenOnly` (off by
+  default; such a token has no binding to the request). Tested with a fake presenter only. The redirect URI (`http://127.0.0.1:<port>`), PKCE, the state and
+  the nonce are unchanged.
+- `AppVerification.recaptchaV2Loopback(presenter:, environment:, timeout:)` serves the reCAPTCHA v2 page with the
+  `RecaptchaFlow` of `secure_flow`; a timeout is `timeout`. Its site key comes from `getRecaptchaSiteKey()`.
+  Not run against Google.
 - `FirebaseUserAuth.useEmulator(emulatorHost)`: sends the later requests to the Auth emulator, for an instance that
   is created before the emulator is known (FlutterFire's `useAuthEmulator`). `emulatorHost` is now a getter.
 - Authenticator app (TOTP) multi-factor authentication, for projects on Identity Platform:
@@ -16,7 +38,7 @@
 
 - Browser sign-in for desktop apps and command line tools (VM only): `FirebaseUserAuth.signInWithOAuthLoopback`
   and `authorizeWithOAuthLoopback`, with `OAuthLoopbackProvider.google`, `.oidc` and `.discover`. The system
-  browser (`openInSystemBrowser`, or a `presenter` of your own) runs the authorization code flow with PKCE (S256),
+  browser (through a `presenter`, see the `secure_flow` entry below) runs the authorization code flow with PKCE (S256),
   a random `state` (compared in constant time) and a nonce; the redirect comes back to a one-shot server on
   127.0.0.1 that answers 404 to any other path and is always closed (success, error or `timeout`). The code is
   exchanged at the token endpoint with the client id and secret. Google with a "Desktop app" client needs nothing

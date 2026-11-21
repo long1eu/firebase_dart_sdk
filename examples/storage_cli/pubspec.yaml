@@ -35,3 +35,5 @@ dependency_overrides:
     path: ../../firebase_auth/firebase_auth_providers_dart
   firebase_storage_dart:
     path: ../../firebase_storage/firebase_storage_dart
+  secure_flow:
+    path: ../../secure_flow/secure_flow
