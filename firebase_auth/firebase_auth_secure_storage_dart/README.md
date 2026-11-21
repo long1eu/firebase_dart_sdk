@@ -162,7 +162,7 @@ Linux (Debian or Ubuntu with `libsecret-1-0`, `gnome-keyring` and `dbus`; `libse
 attributes), headless:
 
 ```sh
-FIREBASE_AUTH_SECURE_STORAGE_INTEGRATION=1 dbus-run-session -- sh -c 'printf "" | gnome-keyring-daemon --unlock --components=secrets >/dev/null && dart test test/integration/linux_libsecret_test.dart'
+FIREBASE_AUTH_SECURE_STORAGE_INTEGRATION=1 dbus-run-session -- sh -c 'printf "test\n" | gnome-keyring-daemon --unlock --components=secrets >/dev/null && dart test test/integration/linux_libsecret_test.dart'
 ```
 
 Windows, in the user's desktop session (DPAPI refuses access over SSH), in PowerShell:

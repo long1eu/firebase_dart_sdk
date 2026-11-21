@@ -650,7 +650,8 @@ jobs:
   # otherwise).
   #
   # Linux: libsecret over the Secret Service of gnome-keyring, in a session bus of its own
-  # (dbus-run-session) with the login keyring created and unlocked with an empty password.
+  # (dbus-run-session) with the login keyring created and unlocked with a throwaway password (with an empty one
+  # gnome-keyring-daemon creates no login keyring, and every write then needs a prompt).
   # secret-tool (libsecret-tools) lets the test check the attributes of the stored item. The test
   # also runs test/integration/linux_no_bus.dart in a child process with a bus that does not exist,
   # so that program needs no step of its own. Required.
@@ -679,7 +680,7 @@ jobs:
         run: |
           set -o pipefail
           dart pub get
-          dbus-run-session -- sh -c 'printf "" | gnome-keyring-daemon --unlock --components=secrets >/dev/null &&
+          dbus-run-session -- sh -c 'printf "test\n" | gnome-keyring-daemon --unlock --components=secrets >/dev/null &&
             dart test --reporter expanded --no-color test/integration/linux_libsecret_test.dart' 2>&1 \
             | tee "$RUNNER_TEMP/secure_storage_linux.log"
           if ! grep -Eq '^[0-9:]+ \+[1-9][0-9]*: All tests passed!$' "$RUNNER_TEMP/secure_storage_linux.log"; then
