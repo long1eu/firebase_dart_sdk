@@ -88,6 +88,7 @@ from 0.1? The 0.2 API took FlutterFire's names: [what changed](docs/api_migratio
 | [`cloud_firestore_dart_platform`](cloud_firestore/cloud_firestore_dart_platform/) | 0.1.2 | Flutter apps written against the official `cloud_firestore` API, on Linux or by choice elsewhere |
 | [`cloud_firestore_dart_flutterfire`](cloud_firestore/cloud_firestore_dart_flutterfire/) | 0.1.2 | Flutter apps that sign in with `firebase_auth` and want `cloud_firestore_dart` to use that user |
 | [`firebase_auth_dart_platform`](firebase_auth/firebase_auth_dart_platform/) | 0.1.1 | Flutter apps written against the official `firebase_auth` API, on Linux or by choice elsewhere; needs `firebase_auth_providers_dart` 0.3.2 |
+| [`firebase_auth_secure_storage_dart`](firebase_auth/firebase_auth_secure_storage_dart/) | 0.1.0, unreleased | Command line tools and servers that keep the signed-in session in the system's secret store (macOS Keychain; Linux and Windows untested) instead of a file |
 | [`firebase_storage_dart`](firebase_storage/firebase_storage_dart/) | 0.1.0, unreleased | Apps and servers that upload, download and list Cloud Storage for Firebase objects ([guide](docs/guides/storage.md), [parity](docs/storage_parity.md)) |
 | [`firebase_admin_dart`](firebase_admin/firebase_admin_dart/) | 0.1.1 | Servers, tools and integration tests that mint custom tokens, manage users or verify ID tokens |
 
