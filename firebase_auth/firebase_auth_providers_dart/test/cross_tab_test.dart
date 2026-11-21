@@ -85,9 +85,20 @@ class _Tab implements ObservableAuthStorage {
   /// Tells this tab's listeners that [key] changed, as a storage that reports a rewrite may.
   void emitSpuriously(String key) => _emit(key);
 
+  /// While set, a read waits for it to complete and then answers with the value of that moment.
+  Completer<void>? readGate;
+
   @override
-  String? read(String key) {
+  FutureOr<String?> read(String key) {
     reads++;
+    final Completer<void>? gate = readGate;
+    if (gate != null) {
+      return gate.future.then((_) => _readNow(key));
+    }
+    return _readNow(key);
+  }
+
+  String? _readNow(String key) {
     final StateError? error = readError;
     if (error != null) {
       throw error;
@@ -126,6 +137,14 @@ Future<void> settle() async {
   for (int i = 0; i < 5; i++) {
     await pump();
   }
+}
+
+/// Waits until [tab] has started [count] reads.
+Future<void> _untilReads(_Tab tab, int count) async {
+  for (int i = 0; i < 100 && tab.reads < count; i++) {
+    await pump();
+  }
+  expect(tab.reads, count, reason: 'the read before the write never started');
 }
 
 void main() {
@@ -473,6 +492,89 @@ void main() {
         expect(shared.values[_key], isNull);
       },
     );
+  });
+
+  // _setSession reads an observable storage before it stores an update of the session. Whatever
+  // runs while that read is pending and replaces the session owns the storage afterwards.
+  group('during the read before an update is stored', () {
+    late Completer<void> gate;
+    late int readsBefore;
+    late Future<void> refreshing;
+
+    /// Signs in in tab A, then starts a refresh that rotates the refresh token and holds the read
+    /// it makes before storing it.
+    Future<void> holdRotation() async {
+      await tabA.signInWithEmailAndPassword(email: 'a@x.com', password: 'pw');
+      await settle();
+      backend.on(
+        'token',
+        (Map<String, Object?> body) => jsonResponse(<String, Object?>{
+          'id_token': idToken(
+            'uid-of-a@x.com',
+            expires: backend.clock.now.add(const Duration(hours: 1)),
+            tag: 'rotation',
+          ),
+          'refresh_token': 'refresh:uid-of-a@x.com:rotated',
+          'expires_in': '3600',
+        }),
+      );
+      gate = Completer<void>();
+      storageA.readGate = gate;
+      readsBefore = storageA.reads;
+      refreshing = tabA
+          .getAccessToken(forceRefresh: true)
+          .then<void>((_) {}, onError: (Object _) {});
+      await _untilReads(storageA, readsBefore + 1);
+    }
+
+    test('a sign-out keeps the storage empty', () async {
+      await holdRotation();
+      await tabA.signOut();
+      expect(shared.values[_key], isNull);
+      final int writes = storageA.writes;
+
+      storageA.readGate = null;
+      gate.complete();
+      await refreshing;
+      await settle();
+
+      expect(shared.values[_key], isNull);
+      expect(storageA.writes, writes);
+      expect(tabA.currentUser, isNull);
+    });
+
+    test('a sign-in of another user keeps that user stored', () async {
+      await holdRotation();
+      await tabA.signInWithEmailAndPassword(email: 'b@x.com', password: 'pw');
+      final String? stored = shared.values[_key];
+      expect(stored, contains('uid-of-b@x.com'));
+      final int writes = storageA.writes;
+
+      storageA.readGate = null;
+      gate.complete();
+      await refreshing;
+      await settle();
+
+      expect(shared.values[_key], stored);
+      expect(storageA.writes, writes);
+      expect(tabA.uid, 'uid-of-b@x.com');
+    });
+
+    test('dispose writes nothing', () async {
+      await holdRotation();
+      final String? stored = shared.values[_key];
+      final int writes = storageA.writes;
+      await tabA.dispose();
+
+      storageA.readGate = null;
+      gate.complete();
+      await refreshing;
+      await settle();
+
+      expect(storageA.writes, writes);
+      expect(shared.values[_key], stored);
+      expect(shared.values[_key], isNot(contains('rotated')));
+    });
   });
 
   group('the subscription', () {

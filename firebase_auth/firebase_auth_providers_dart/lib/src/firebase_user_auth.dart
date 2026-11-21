@@ -2944,8 +2944,14 @@ class FirebaseUserAuth implements AuthTokenProvider {
   /// the refresh token, so the old session is not kept for a failed write. The error of the write is rethrown and
   /// the next session change (a token refresh, a reload, a sign-in) writes again.
   ///
-  /// An [update] of the signed-in user's session is not written when another tab replaced the
-  /// stored session (see [_replacedElsewhere]).
+  /// An [update] of the signed-in user's session in an [ObservableAuthStorage] reads the storage
+  /// first, and is not written when another tab replaced the stored session (see
+  /// [_replacedElsewhere]). That read lets other code run before the write: a [signOut], a sign-in
+  /// of another user or [dispose] may come in between. When [session] is no longer the current one
+  /// or the instance is disposed by then, the newer operation owns the storage and [session] is not
+  /// written; otherwise the old session would land after the sign-out's deletion (or over the new
+  /// user) and the next [restore] would bring it back. A read that fails or finds a value this class
+  /// did not write still lets the write go on.
   Future<void> _setSession(
     _Session session, {
     required bool persist,
@@ -2955,8 +2961,11 @@ class FirebaseUserAuth implements AuthTokenProvider {
     _sessionOfUser[session.user] = (apiKey, session);
     try {
       if (persist || _unsaved) {
-        if (update && !_unsaved && await _replacedElsewhere(session)) {
-          return;
+        if (update && !_unsaved && _storage is ObservableAuthStorage) {
+          final bool replaced = await _replacedElsewhere(session);
+          if (replaced || _disposed || !identical(session, _session)) {
+            return;
+          }
         }
         _unsaved = true;
         await _storage.write(
