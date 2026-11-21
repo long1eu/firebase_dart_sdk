@@ -847,6 +847,64 @@ void main() {
       },
     );
 
+    test(
+      'oauthProvidersFor adds to oauthProviders and replaces an id',
+      () async {
+        final DartAuthConfig shared = DartFirebaseAuth.config;
+        final List<String> asked = <String>[];
+        DartFirebaseAuth.config = DartAuthConfig(
+          httpClient: shared.httpClient,
+          storageFor: shared.storageFor,
+          oauthProviders: shared.oauthProviders,
+          presentUrl: shared.presentUrl,
+          oauthProvidersFor: (FirebaseApp app) {
+            asked.add(app.name);
+            return <dart_auth.OAuthLoopbackProvider>[
+              dart_auth.OAuthLoopbackProvider.google(
+                clientId: 'client-of-${app.name}',
+                clientSecret: 'secret-of-${app.name}',
+              ),
+            ];
+          },
+        );
+        addTearDown(() => DartFirebaseAuth.config = shared);
+        final FirebaseAuth auth = await newAuth();
+        backend.override = providerTokens;
+        await auth.signInWithProvider(GoogleAuthProvider());
+        expect(
+          presented.last.queryParameters['client_id'],
+          'client-of-${auth.app.name}',
+        );
+        await auth.signOut();
+        // GitHub comes from oauthProviders.
+        await auth.signInWithProvider(GithubAuthProvider());
+        expect(presented.last.queryParameters['client_id'], 'github-client');
+        expect(asked, <String>[auth.app.name], reason: 'called once per app');
+      },
+    );
+
+    test(
+      'oauthProvidersFor with two providers of one id fails at first use',
+      () async {
+        final DartAuthConfig shared = DartFirebaseAuth.config;
+        DartFirebaseAuth.config = DartAuthConfig(
+          httpClient: shared.httpClient,
+          storageFor: shared.storageFor,
+          oauthProvidersFor: (FirebaseApp app) =>
+              <dart_auth.OAuthLoopbackProvider>[
+                oauthProviders.first,
+                oauthProviders.first,
+              ],
+        );
+        addTearDown(() => DartFirebaseAuth.config = shared);
+        final FirebaseApp app = await Firebase.initializeApp(
+          name: 'app${_apps++}',
+          options: _options,
+        );
+        expect(() => DartFirebaseAuth.forApp(app), throwsArgumentError);
+      },
+    );
+
     test('use rejects two providers with one id', () {
       expect(
         () => FirebaseAuthDart.use(

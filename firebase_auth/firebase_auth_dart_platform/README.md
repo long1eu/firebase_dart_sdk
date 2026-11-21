@@ -54,6 +54,7 @@ Future<void> main() async {
 | `httpClient` | one per app | The `http.Client` of the requests (tests, proxies). |
 | `useDartCore` | Linux only, when `firebase_core` has no other implementation | Installs a small pure-Dart `firebase_core`. Pass `true` to force it (tests), `false` to never do it. |
 | `oauthProviders` | none | The `OAuthLoopbackProvider`s of `signInWithProvider`, `User.linkWithProvider` and `User.reauthenticateWithProvider`, one per Firebase provider id (see [Provider sign-in](#provider-sign-in)). |
+| `oauthProvidersFor` | none | The providers of one FlutterFire app, for apps with several Firebase projects that each have their own OAuth client; called once per app. They are added to `oauthProviders`, and one with the same id as a provider of `oauthProviders` replaces it for that app. |
 | `presentUrl` | the system browser on macOS, Linux and Windows | Opens the authorization URL of a provider sign-in, for example `url_launcher`'s `launchUrl`. Needed on Android and iOS: without it the provider calls throw `unimplemented`. |
 
 `use()` throws a `StateError` once the `FirebaseAuth` of an app has been used, because the configuration is read
