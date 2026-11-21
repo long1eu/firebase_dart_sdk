@@ -98,6 +98,9 @@
 - `FirebaseAuthException.serverResponse`: the answer of the backend on the errors the JS SDK tags with it
   (`account-exists-with-different-credential`, `credential-already-in-use`, `email-already-in-use`,
   `user-disabled`). It is unmodifiable, and neither it nor the exception prints its values.
+- A change of the account (email verification, `verifyBeforeUpdateEmail`, linking, TOTP enrolment and unenrolment,
+  email and password updates) is no longer sent a second time when the backend rejects the ID token of the account
+  read that follows it.
 
 ## 0.3.0
 

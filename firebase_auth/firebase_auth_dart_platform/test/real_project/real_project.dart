@@ -1,7 +1,9 @@
 // The real-project harness: drives the official firebase_auth API, on top of
 // this package, against a real Firebase project, with a person at the
 // browser. Skipped unless AUTH_HARNESS_STEPS is set; see "Real-project
-// harness" in the README for the command and the console setup.
+// harness" in the README for the command and the console setup. The file name
+// does not end in _test.dart on purpose: a plain `flutter test` must not pick
+// it up, because CI fails when a test of this package is skipped.
 //
 // It runs under `flutter test` because package:flutter needs the engine's
 // dart:ui, which `dart run` does not have. It uses a plain test() with no

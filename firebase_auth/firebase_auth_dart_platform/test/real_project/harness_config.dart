@@ -1,4 +1,4 @@
-// The configuration of the real-project harness (real_project_test.dart),
+// The configuration of the real-project harness (real_project.dart),
 // read from environment variables only, and the text helpers that keep
 // emails out of its output.
 

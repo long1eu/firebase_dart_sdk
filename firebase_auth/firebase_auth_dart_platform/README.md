@@ -229,13 +229,13 @@ These throw a `FirebaseAuthException` with the code `unimplemented` and a messag
 
 ## Real-project harness
 
-`test/real_project/real_project_test.dart` drives the official `firebase_auth` API on top of this package against a
+`test/real_project/real_project.dart` drives the official `firebase_auth` API on top of this package against a
 real Firebase project, with you at the browser. It is for the maintainers; it is skipped unless
 `AUTH_HARNESS_STEPS` is set, so a plain `flutter test` does not run it. On macOS (Linux should work too, untested):
 
 ```shell
 cd firebase_auth/firebase_auth_dart_platform
-AUTH_HARNESS_STEPS=all flutter test test/real_project/real_project_test.dart -r expanded
+AUTH_HARNESS_STEPS=all flutter test test/real_project/real_project.dart -r expanded
 ```
 
 It runs under `flutter test` because `package:flutter`, which `firebase_core` and `firebase_auth` import, needs the
