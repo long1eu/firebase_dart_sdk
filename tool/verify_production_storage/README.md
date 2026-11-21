@@ -128,7 +128,7 @@ named here.
 | 15 | PASS (simulated 503s, about 6 s of backoff) | PASS |
 | 16-19 | PASS | PASS |
 | 20 | SKIPPED without `--create-user`; PASS with it and the Auth emulator | PASS |
-| 21 | INCONCLUSIVE: the emulator ignores offsets and appends the early chunk | not run yet |
+| 21 | INCONCLUSIVE: the emulator ignores offsets and appends the early chunk | PASS, `REFUSED`: HTTP 400 "Client uploaded to the wrong offset (262144 instead of 0).", size received stays 0, then the chunks in order are stored |
 
 Upload progress is per byte on the VM and per chunk on the web.
 
