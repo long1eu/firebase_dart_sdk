@@ -1,8 +1,5 @@
 import 'dart:io';
 
-import 'package:firebase_auth_providers_dart/firebase_auth_providers_dart.dart'
-    show AuthStorage, FileAuthStorage, InMemoryAuthStorage;
-
 /// The file that keeps the sessions when the app passes no storage, or null
 /// where there is no sensible default (Android, iOS: pass `storageFor` to
 /// `FirebaseAuthDart.use`).
@@ -46,12 +43,6 @@ String? defaultSessionFile() {
     'firebase_auth_dart_platform',
     'sessions.json',
   ].join(Platform.pathSeparator);
-}
-
-/// A [FileAuthStorage] in [defaultSessionFile], or memory when there is none.
-AuthStorage defaultFileStorage() {
-  final String? file = defaultSessionFile();
-  return file == null ? InMemoryAuthStorage() : FileAuthStorage(file);
 }
 
 String _executableName() {

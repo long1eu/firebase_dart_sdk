@@ -1,3 +1,12 @@
+## Unreleased
+
+- On the web the default storage of the sessions is `BestWebAuthStorage` of `firebase_auth_providers_dart`
+  (IndexedDB, else `localStorage`, else memory) instead of memory, so the user stays signed in after a reload. A
+  session an app kept in `localStorage` under the same key moves to IndexedDB at the first read.
+- `setPersistence` on the web: `LOCAL` and `INDEXED_DB` keep the session in the storage of the app (that default, or
+  `storageFor`), `SESSION` in the tab's `sessionStorage` (`WebAuthStorage.session`), `NONE` in memory. Elsewhere
+  nothing changes (`SESSION` is memory). `FirebaseAuthDart.use(storageFor: ...)` still replaces the default.
+
 ## 0.1.0
 
 - First version: an implementation of `FirebaseAuthPlatform` (the platform interface of the official `firebase_auth`

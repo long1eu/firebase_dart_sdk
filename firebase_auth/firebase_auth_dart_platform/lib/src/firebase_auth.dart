@@ -158,6 +158,13 @@ class DartFirebaseAuth extends FirebaseAuthPlatform {
 
   /// Where `setPersistence(Persistence.NONE)` keeps the session.
   final dart_auth.InMemoryAuthStorage _memory = dart_auth.InMemoryAuthStorage();
+
+  /// Where `setPersistence(Persistence.SESSION)` keeps the session on the web:
+  /// the `sessionStorage` of the tab, with memory behind it. Created at first
+  /// use, only on the web.
+  late final FallbackStorage _session = FallbackStorage(
+    dart_auth.WebAuthStorage.session(),
+  );
   final DartAuthConfig _config;
 
   /// The loopback providers of this instance's app: those of `use`'s
@@ -320,20 +327,25 @@ class DartFirebaseAuth extends FirebaseAuthPlatform {
     client.useEmulator(authority);
   }
 
-  /// [Persistence.NONE] and [Persistence.SESSION] keep the session in memory
-  /// only (until the process ends); [Persistence.LOCAL] and
-  /// [Persistence.INDEXED_DB] in the storage of the app (by default a file).
-  /// The current session moves to the new place (`setStorage` of the
-  /// client): it is written there first, then deleted from the old place.
+  /// [Persistence.NONE] keeps the session in memory only (until the process
+  /// ends); [Persistence.LOCAL] and [Persistence.INDEXED_DB] in the storage of
+  /// the app (by default the secure store, and on the web IndexedDB, else
+  /// `localStorage`, else memory). [Persistence.SESSION] keeps it in the
+  /// `sessionStorage` of the tab on the web, and in memory elsewhere (see
+  /// `storageForPersistence`). The current session moves to the new place
+  /// (`setStorage` of the client): it is written there first, then deleted
+  /// from the old place.
   @override
   Future<void> setPersistence(Persistence persistence) {
     final dart_auth.FirebaseUserAuth userAuth = client;
-    final bool inMemory =
-        persistence == Persistence.NONE || persistence == Persistence.SESSION;
-    return guard(
-      this,
-      () => userAuth.setStorage(inMemory ? _memory : _persistent!),
+    final dart_auth.AuthStorage target = storageForPersistence(
+      persistence,
+      web: kIsWeb,
+      persistent: _persistent!,
+      memory: _memory,
+      session: () => _session,
     );
+    return guard(this, () => userAuth.setStorage(target));
   }
 
   /// Accepted and ignored: the settings are for phone sign-in and the iOS

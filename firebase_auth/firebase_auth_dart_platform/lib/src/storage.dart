@@ -1,7 +1,9 @@
 import 'dart:async';
 
+import 'package:firebase_auth_platform_interface/firebase_auth_platform_interface.dart'
+    show Persistence;
 import 'package:firebase_auth_providers_dart/firebase_auth_providers_dart.dart'
-    show AuthStorage, FileAuthStorage, InMemoryAuthStorage;
+    show AuthStorage, BestWebAuthStorage, FileAuthStorage, InMemoryAuthStorage;
 import 'package:firebase_auth_secure_storage_flutter/firebase_auth_secure_storage_flutter.dart'
     show SecureAuthStorage;
 import 'package:flutter/foundation.dart';
@@ -18,15 +20,46 @@ export 'storage_path_stub.dart'
 AuthStorage? _defaultStorage;
 
 /// The storage of the sessions when the app passes none: the secure store of
-/// the platform ([secureDefaultStorage]), except on the web, where it is
-/// memory.
+/// the platform ([secureDefaultStorage]), except on the web, where it is the
+/// best storage of the browser ([BestWebAuthStorage]: IndexedDB, else
+/// `localStorage`, else memory).
 ///
 /// One object for the whole program, shared by the instances of every app: it
 /// holds one session per app, and one object writes them one at a time, so
 /// that two apps do not overwrite each other's session.
-AuthStorage defaultStorage() => _defaultStorage ??= kIsWeb
-    ? path.defaultFileStorage()
-    : secureDefaultStorage(path.defaultSessionFile());
+AuthStorage defaultStorage() =>
+    _defaultStorage ??= defaultStorageFor(web: kIsWeb);
+
+/// What [defaultStorage] creates: [webStorage] (by default a
+/// [BestWebAuthStorage]) when [web] is true, else [secureDefaultStorage] in
+/// the default session file. Nothing is read or written here.
+@visibleForTesting
+AuthStorage defaultStorageFor({
+  required bool web,
+  AuthStorage Function() webStorage = BestWebAuthStorage.new,
+}) => web ? webStorage() : secureDefaultStorage(path.defaultSessionFile());
+
+/// The storage `setPersistence(persistence)` moves the session to.
+///
+/// * [Persistence.NONE]: [memory].
+/// * [Persistence.LOCAL] and [Persistence.INDEXED_DB]: [persistent], the
+///   storage of the app (`storageFor` of `FirebaseAuthDart.use`, else
+///   [defaultStorage]; on the web by default IndexedDB, else `localStorage`,
+///   else memory).
+/// * [Persistence.SESSION]: on the web ([web] true) [session], the
+///   `sessionStorage` of the tab; elsewhere [memory], the nearest thing
+///   outside a browser. [session] is only called on the web.
+AuthStorage storageForPersistence(
+  Persistence persistence, {
+  required bool web,
+  required AuthStorage persistent,
+  required AuthStorage memory,
+  required AuthStorage Function() session,
+}) => switch (persistence) {
+  Persistence.NONE => memory,
+  Persistence.LOCAL || Persistence.INDEXED_DB => persistent,
+  Persistence.SESSION => web ? session() : memory,
+};
 
 /// A [SecureDefaultStorage]: a [SecureAuthStorage] that moves the sessions
 /// found in [sessionFile] (see `defaultSessionFile`) into the secure store,
