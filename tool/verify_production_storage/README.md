@@ -22,7 +22,7 @@ signed-in throwaway user (`--create-user`): 19 of 20 checks passed and check 13 
 - It prints the project, bucket and prefix first. Against production it does nothing more without
   `--yes`.
 - It uploads at most `--max-bytes` in total (default 64 MiB, counted per upload); a check that would pass
-  the cap stops before it uploads and is `INCONCLUSIVE`. A full run uploads about 11 MiB.
+  the cap stops before it uploads and is `INCONCLUSIVE`. A full run uploads about 14 MiB.
 - Credentials: it never reads or prints any. Requests carry no user, or, with `--create-user`, the token
   of a throwaway user the kit signs up itself (`storage-verify-<run>@example.com`, a random password that
   lives in memory and is never printed or stored). It signs in through `FirebaseUserAuth`
@@ -103,10 +103,14 @@ copes. `FAIL` means the client misbehaved or the backend does something it does 
 | 19 | SDK download | `getBytes`, `openRead(100, 200)`, an open-ended `openRead`, `maxSize` too small (`download-size-exceeded`) and equal to the size. |
 | 20 | Signed-in round trip | Needs `--create-user`. As the throwaway user, upload, read, describe, list and delete an object (in `--denied-bucket` when given, else the main bucket); with `--denied-bucket` the same read without a user must answer `unauthorized`. With check 2 (the signed-out 403) it covers the rules in both directions. |
 | 21 | Out-of-order chunk | A resumable session for 768 KiB gets the second chunk first (`X-Goog-Upload-Offset: 262144`). `REFUSED` (PASS): a 4xx or size received stays 0 (the line shows the status, headers and a body snippet), and the session then takes the chunks in order and the stored size and md5 match. `FAIL` (`ACCEPTED`): size received becomes 524288, the early bytes were taken as valid. `INCONCLUSIVE` otherwise, e.g. the emulator, which ignores offsets. |
+| 22 | SDK stream of unknown length | `Reference.startStreamUpload` without a `length`, about 3 MiB in 64 KiB events: the session starts without `X-Goog-Upload-Header-Content-Length`, the chunks end with `upload, finalize`, `totalBytes` goes from -1 to the size, and the stored size and md5 match (`ACCEPTED`). `FAIL` if the backend refuses a session without a length or the object differs. |
+| 23 | SDK empty stream of unknown length | `Reference.startStreamUpload` of an empty stream without a `length`: a session closed by one empty `finalize` must make a 0-byte object (size 0, the md5 of no data, nothing read back), with `totalBytes` from -1 to 0 (`ACCEPTED`). `FAIL` if the backend refuses the empty finalize or the object is not empty. |
+| 24 | SDK download task | `startDownloadToFile` of a 3 MiB object is paused after the first bytes and resumed: the resumed request carries `Range: bytes=<n>-` and the file matches. The line and `observed` say whether every media response carried `x-goog-generation` and how many metadata requests were made (1 with the header; more means the task used the metadata fallback). `INCONCLUSIVE` if it finished before it could be paused. |
+| 25 | SDK gzip download | About 1 MiB of text stored gzip-compressed with `contentEncoding: gzip` is downloaded with `startDownloadToFile` (which asks for `Accept-Encoding: identity`), paused and resumed. PASS when the file holds the unzipped bytes. The line and `observed` give the status of the resumed response (200: the server ignores the Range of a transcoded object, as Cloud Storage documents) and whether `Content-Encoding` came back. `INCONCLUSIVE` if it finished before it could be paused. |
 | 26 | SDK reads of a gzip-stored object | Uploads about 45 KiB of gzip with `contentEncoding: gzip` (about 200 KiB unzipped), then `getBytes`, `openRead(1000)`, `openRead(1000, 2000)` and `getBytes(maxSize:)` at and below the unzipped size. PASS when all of them come back unzipped, with offsets and `maxSize` in unzipped bytes. |
 
 What to send back: the whole report. The most valuable lines are the answers of 1, 2, 3, 10, 11 and 14,
-and the results of 8, 9, 13, 17 and 18.
+and the results of 8, 9, 13, 17, 18, 24 and 25.
 
 ## Known results
 
@@ -130,6 +134,10 @@ named here.
 | 16-19 | PASS | PASS |
 | 20 | SKIPPED without `--create-user`; PASS with it and the Auth emulator | PASS |
 | 21 | INCONCLUSIVE: the emulator ignores offsets and appends the early chunk | PASS, `REFUSED`: HTTP 400 "Client uploaded to the wrong offset (262144 instead of 0).", size received stays 0, then the chunks in order are stored |
+| 22 | PASS | PASS (0.2.0): 3145733 bytes in 5 requests, the start without `X-Goog-Upload-Header-Content-Length`, totalBytes -1 then the size, size and md5 match |
+| 23 | PASS | PASS (0.2.0): the session closed by an empty `finalize` (2 requests) made a 0-byte object with the md5 of no data |
+| 24 | PASS (generation header on every media response, 1 metadata request), or INCONCLUSIVE when the download finished before the pause | PASS (0.2.0): paused at about 66 KiB of 3 MiB, resumed with `Range: bytes=<n>-`, the file matches; `x-goog-generation` on every media response, 1 metadata request |
+| 25 | PASS (unzipped by the emulator, resumed with 200, no `Content-Encoding`), or INCONCLUSIVE when the download finished before the pause | PASS (0.2.0): a 70 KiB gzip object arrived as its 1 MiB, resumed with HTTP 200 (the server ignores the range of a transcoded object), no `Content-Encoding` |
 | 26 | PASS | PASS (0.1.2). With 0.1.1 it FAILS: `openRead(1000)` and `openRead(1000, 2000)` end with `unknown`, because the client asked for gzip and the server applied the range to the compressed bytes |
 
 Upload progress is per byte on the VM and per chunk on the web.

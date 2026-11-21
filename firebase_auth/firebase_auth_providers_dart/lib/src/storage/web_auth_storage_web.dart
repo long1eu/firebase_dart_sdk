@@ -1,6 +1,8 @@
-import 'package:web/web.dart' as web;
+import 'dart:async';
+import 'dart:js_interop';
 
-import '../auth_storage.dart';
+import 'package:firebase_auth_providers_dart/src/auth_storage.dart';
+import 'package:web/web.dart' as web;
 
 /// An [AuthStorage] in the browser's `sessionStorage` or `localStorage` (the JS SDK's `browserSessionPersistence`
 /// and `browserLocalPersistence`).
@@ -19,6 +21,11 @@ import '../auth_storage.dart';
 /// A storage that the browser refuses (for example with cookies blocked) throws from [read] and [write], so
 /// `FirebaseUserAuth.forApp` fails: catch that and fall back to `InMemoryAuthStorage` if you want.
 ///
+/// **Other tabs.** [changes] emits when another tab or window of the origin changes the key or
+/// clears the storage (the browser's `storage` event). The browser sends that event to the other
+/// pages only, so the writes of this page, through this object or another, never emit. With
+/// `sessionStorage` the other page can only be another frame of the same tab.
+///
 /// On the Dart VM the constructors throw an [UnsupportedError]: use `FileAuthStorage` there.
 ///
 /// ```dart
@@ -27,7 +34,7 @@ import '../auth_storage.dart';
 ///   storage: WebAuthStorage.session(),
 /// );
 /// ```
-class WebAuthStorage implements AuthStorage {
+class WebAuthStorage implements ObservableAuthStorage {
   /// The `sessionStorage` of the page. [prefix] goes before every key.
   WebAuthStorage.session({this.prefix = ''}) : _local = false;
 
@@ -51,6 +58,35 @@ class WebAuthStorage implements AuthStorage {
       _storage.removeItem('$prefix$key');
     } else {
       _storage.setItem('$prefix$key', value);
+    }
+  }
+
+  /// Emits when another tab or window changes [key] (under [prefix]) or clears the storage: the
+  /// browser's `storage` event of this storage. The listener on `window` is added while the stream
+  /// is listened to.
+  @override
+  Stream<void> changes(String key) {
+    final String storageKey = '$prefix$key';
+    return Stream<void>.multi((MultiStreamController<void> controller) {
+      final JSFunction listener = ((web.StorageEvent event) {
+        final String? changed = event.key;
+        if ((changed == null || changed == storageKey) && _isMine(event)) {
+          controller.add(null);
+        }
+      }).toJS;
+      web.window.addEventListener('storage', listener);
+      controller.onCancel = () {
+        web.window.removeEventListener('storage', listener);
+      };
+    });
+  }
+
+  bool _isMine(web.StorageEvent event) {
+    try {
+      return event.storageArea.strictEquals(_storage).toDart;
+    } on Object {
+      // The browser refuses this storage now (site data blocked): there is nothing to follow.
+      return false;
     }
   }
 }

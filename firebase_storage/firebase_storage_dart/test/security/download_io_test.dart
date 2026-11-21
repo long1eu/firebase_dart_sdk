@@ -1,6 +1,7 @@
 // Threat model: storage_threat_model.md, "Downloads to files and streams" (T15, T16).
 //
-// Written against the contract (Reference.openRead, ReferenceIo.writeToFile) before the download code landed.
+// Written against the contract (Reference.openRead, ReferenceIo.writeToFile) before the download code landed;
+// writeToFile reads the metadata first since it became a resumable DownloadTask.
 @TestOn('vm')
 library;
 
@@ -33,10 +34,16 @@ void main() {
           .toList()
         ..sort();
 
-  FirebaseStorage storageAnswering(SecurityHandler handler) {
+  /// Answers the media requests with [media] and the metadata request (writeToFile reads it first) with the
+  /// resource of object `x`.
+  FirebaseStorage storageAnswering(SecurityHandler media) {
     final FirebaseStorage storage = securityStorage(
       securityApp(),
-      RecordingClient(handler),
+      RecordingClient(
+        (SentRequest r) => r.url.queryParameters['alt'] == 'media'
+            ? media(r)
+            : respondJson(objectResource('x')),
+      ),
       retry: const StorageRetryPolicy(download: Duration.zero),
     );
     addTearDown(storage.close);
@@ -119,7 +126,7 @@ void main() {
       'the file is not readable by others while it is written (POSIX)',
       () async {
         final FirebaseStorage storage = storageAnswering(
-          (SentRequest r) => respond(200, body: 'secret'),
+          (SentRequest r) => respond(200, body: 'secret-key'),
         );
         final File target = File('${dir.path}/out.bin');
         await storage.ref('x').writeToFile(target);

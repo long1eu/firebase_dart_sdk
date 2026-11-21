@@ -1,3 +1,9 @@
+## 0.2.0
+
+- `writeToFile` runs on the `DownloadTask` of `firebase_storage_dart` 0.2.0: a pause closes the connection
+  and resuming asks for the rest with a `Range` request, a network failure is resumed the same way, and an
+  object overwritten during the download fails the task with `object-changed`.
+
 ## 0.1.2
 
 - `FirebaseStorageDart.use` takes `appCheckProviderFor`: the App Check token of each FlutterFire app goes in the

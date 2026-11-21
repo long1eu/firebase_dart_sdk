@@ -24,6 +24,7 @@ import 'package:firebase_app_dart/platform_dependencies.dart';
 import 'package:firebase_auth_providers_dart/adc.dart'; // needs dart:io
 import 'package:firebase_auth_providers_dart/firebase_auth_providers_dart.dart';
 import 'package:firebase_storage_dart/firebase_storage_dart.dart';
+import 'package:firebase_storage_dart/io.dart';
 import 'package:http/http.dart' as http;
 import 'package:rxdart/rxdart.dart';
 import 'package:test/test.dart';
@@ -211,8 +212,8 @@ Future<void> authProvidersReadmeLine89() async {
   print(result.additionalUserInfo?.isNewUser);
 }
 
-// ../../firebase_auth/firebase_auth_providers_dart/README.md:209
-Future<void> authProvidersReadmeLine209() async {
+// ../../firebase_auth/firebase_auth_providers_dart/README.md:218
+Future<void> authProvidersReadmeLine218() async {
   final FirebaseUserAuth auth = await FirebaseUserAuth.forApp(app);
 
   // Enrol: show the URI as a QR code (or the secret for typing in), then ask for a code of the app.
@@ -234,8 +235,8 @@ Future<void> authProvidersReadmeLine209() async {
   await auth.unenrollMultiFactor(auth.currentUser!.enrolledFactors.first.uid);
 }
 
-// ../../firebase_auth/firebase_auth_providers_dart/README.md:249
-Future<void> authProvidersReadmeLine249() async {
+// ../../firebase_auth/firebase_auth_providers_dart/README.md:258
+Future<void> authProvidersReadmeLine258() async {
   final FirebaseUserAuth auth = await FirebaseUserAuth.forApp(app);
   const String codeFromYourTextField = '123456';
 
@@ -277,8 +278,8 @@ Future<void> authProvidersReadmeLine249() async {
   }
 }
 
-// ../../firebase_auth/firebase_auth_providers_dart/README.md:311
-Future<void> authProvidersReadmeLine311() async {
+// ../../firebase_auth/firebase_auth_providers_dart/README.md:320
+Future<void> authProvidersReadmeLine320() async {
   final FirebaseUserAuth auth = await FirebaseUserAuth.forApp(app);
   final UserCredential result = await auth.signInWithOAuthLoopback(
     OAuthLoopbackProvider.google(
@@ -289,8 +290,8 @@ Future<void> authProvidersReadmeLine311() async {
   print(result.user?.email);
 }
 
-// ../../firebase_auth/firebase_auth_providers_dart/README.md:372
-Future<void> authProvidersReadmeLine372() async {
+// ../../firebase_auth/firebase_auth_providers_dart/README.md:381
+Future<void> authProvidersReadmeLine381() async {
   final OAuthLoopbackProvider provider = OAuthLoopbackProvider.oidc(
     providerId: 'oidc.example',
     authorizationEndpoint: Uri.parse('https://idp.example.com/authorize'),
@@ -315,13 +316,13 @@ Future<void> authProvidersReadmeLine372() async {
   );
 }
 
-// ../../firebase_auth/firebase_auth_providers_dart/README.md:441
-Future<void> authProvidersReadmeLine441() async {
+// ../../firebase_auth/firebase_auth_providers_dart/README.md:450
+Future<void> authProvidersReadmeLine450() async {
   final AppVerification verification = AppVerification.recaptchaV2Loopback();
 }
 
-// ../../firebase_auth/firebase_auth_providers_dart/README.md:470
-Future<void> authProvidersReadmeLine470() async {
+// ../../firebase_auth/firebase_auth_providers_dart/README.md:479
+Future<void> authProvidersReadmeLine479() async {
   final FirebaseUserAuth auth = FirebaseUserAuth(
     apiKey: '<the Web API key of the project>',
     recaptchaEnterprise: RecaptchaEnterpriseVerification(
@@ -1827,14 +1828,53 @@ Future<void> storageGuideLine102() async {
 
 // ../../docs/guides/storage.md:136
 Future<void> storageGuideLine136() async {
+  Future<FullMetadata> uploadLog(Reference target, Stream<String> lines) {
+    final UploadTask task = target.startStreamUpload(
+      lines.transform(utf8.encoder),
+      metadata: const SettableMetadata(contentType: 'text/plain'),
+    );
+    task.progress.listen((UploadProgress p) {
+      final String total = p.totalBytes < 0 ? 'unknown' : '${p.totalBytes}';
+      print('${p.bytesTransferred} of $total bytes');
+    });
+    return task.result;
+  }
+}
+
+// ../../docs/guides/storage.md:172
+Future<void> storageGuideLine172() async {
+  Future<void> download(Reference video) async {
+    final DownloadTask task = video.startDownloadToFile(File('clip.mp4'));
+    task.progress.listen((DownloadProgress p) {
+      print('${p.state.name}: ${p.bytesTransferred} of ${p.totalBytes} bytes');
+    });
+
+    task.pause(); // closes the connection; the bytes written so far stay
+    task.resume(); // asks for the rest with Range: bytes=<written>-
+
+    try {
+      final FullMetadata metadata = await task.result;
+      print('downloaded generation ${metadata.generation}');
+    } on FirebaseStorageException catch (e) {
+      if (e.code == 'object-changed') {
+        print('the object was overwritten during the download; start again');
+      } else {
+        rethrow;
+      }
+    }
+  }
+}
+
+// ../../docs/guides/storage.md:211
+Future<void> storageGuideLine211() async {
   Future<void> strings(Reference ref) async {
     await ref.putString('aGVsbG8=', format: StringFormat.base64);
     await ref.putString('data:text/plain;base64,aGVsbG8=', format: StringFormat.dataUrl);
   }
 }
 
-// ../../docs/guides/storage.md:151
-Future<void> storageGuideLine151() async {
+// ../../docs/guides/storage.md:226
+Future<void> storageGuideLine226() async {
   Future<void> tag(Reference ref) async {
     final FullMetadata metadata = await ref.updateMetadata(
       const SettableMetadata(
@@ -1846,8 +1886,8 @@ Future<void> storageGuideLine151() async {
   }
 }
 
-// ../../docs/guides/storage.md:172
-Future<void> storageGuideLine172() async {
+// ../../docs/guides/storage.md:247
+Future<void> storageGuideLine247() async {
   Future<void> roundTrip() async {
     final FirebaseApp app = FirebaseApp.withOptions(
       const FirebaseOptions(

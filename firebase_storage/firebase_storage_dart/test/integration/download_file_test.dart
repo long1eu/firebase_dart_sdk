@@ -11,6 +11,7 @@ import 'dart:typed_data';
 import 'package:firebase_app_dart/firebase_app_dart.dart';
 import 'package:firebase_storage_dart/firebase_storage_dart.dart';
 import 'package:firebase_storage_dart/io.dart';
+import 'package:http/http.dart' as http;
 import 'package:test/test.dart';
 
 final String? _host = FirebaseStorage.emulatorHostFromEnvironment;
@@ -152,6 +153,94 @@ void main() {
         );
       });
 
+      test('an 8 MiB download task paused and resumed', () async {
+        final math.Random random = math.Random(7);
+        final Uint8List data = Uint8List.fromList(
+          List<int>.generate(8 * 1024 * 1024, (_) => random.nextInt(256)),
+        );
+        final _SlowClient client = _SlowClient();
+        final FirebaseStorage slow = FirebaseStorage(
+          app,
+          emulatorHost: _host,
+          httpClient: client,
+        );
+        addTearDown(slow.close);
+        final Reference ref = slow.ref(folder.child('paused.bin').fullPath);
+        await ref.putBytes(data);
+
+        final File target = File('${dir.path}/paused.bin');
+        final DownloadTask task = ref.startDownloadToFile(target);
+        final DownloadProgress running = await task.progress.firstWhere(
+          (DownloadProgress p) =>
+              p.state == DownloadState.running && p.bytesTransferred > 0,
+        );
+        expect(
+          task.pause(),
+          isTrue,
+          reason: 'paused at ${running.bytesTransferred}',
+        );
+        final DownloadProgress paused = await task.progress.firstWhere(
+          (DownloadProgress p) => p.state == DownloadState.paused,
+        );
+        expect(paused.bytesTransferred, greaterThan(0));
+        expect(paused.bytesTransferred, lessThan(data.length));
+        expect(paused.totalBytes, data.length);
+
+        expect(task.resume(), isTrue);
+        final FullMetadata metadata = await task.result;
+        expect(metadata.size, data.length);
+        expect(target.readAsBytesSync(), data);
+        expect(client.ranges.first, isNull);
+        expect(client.ranges.last, 'bytes=${paused.bytesTransferred}-');
+        expect(
+          dir.listSync().map((FileSystemEntity e) => e.uri.pathSegments.last),
+          <String>['paused.bin'],
+        );
+      });
+
+      test('an object overwritten while the task is paused fails it with '
+          'object-changed', () async {
+        final Uint8List data = Uint8List(4 * 1024 * 1024);
+        final FirebaseStorage slow = FirebaseStorage(
+          app,
+          emulatorHost: _host,
+          httpClient: _SlowClient(),
+        );
+        addTearDown(slow.close);
+        final Reference ref = slow.ref(folder.child('changed.bin').fullPath);
+        await ref.putBytes(data);
+
+        final File target = File('${dir.path}/changed.bin')
+          ..writeAsStringSync('old');
+        final DownloadTask task = ref.startDownloadToFile(target);
+        await task.progress.firstWhere(
+          (DownloadProgress p) =>
+              p.state == DownloadState.running && p.bytesTransferred > 0,
+        );
+        expect(task.pause(), isTrue);
+        await task.progress.firstWhere(
+          (DownloadProgress p) => p.state == DownloadState.paused,
+        );
+        await ref.putBytes(Uint8List(4 * 1024 * 1024)..fillRange(0, 10, 1));
+
+        expect(task.resume(), isTrue);
+        await expectLater(
+          task.result,
+          throwsA(
+            isA<FirebaseStorageException>().having(
+              (FirebaseStorageException e) => e.code,
+              'code',
+              'object-changed',
+            ),
+          ),
+        );
+        expect(target.readAsStringSync(), 'old');
+        expect(
+          dir.listSync().map((FileSystemEntity e) => e.uri.pathSegments.last),
+          <String>['changed.bin'],
+        );
+      });
+
       test('writeToFile of a missing object leaves no file behind', () async {
         final File target = File('${dir.path}/target.bin');
         await expectLater(
@@ -162,4 +251,46 @@ void main() {
       });
     },
   );
+}
+
+/// A client that slows the media bodies down (a few milliseconds per chunk), so that a download of a few MiB
+/// from a local emulator lasts long enough to be paused, and records the `Range` header of each media
+/// request (null when there is none).
+final class _SlowClient extends http.BaseClient {
+  final http.Client _inner = http.Client();
+
+  final List<String?> ranges = <String?>[];
+
+  @override
+  Future<http.StreamedResponse> send(http.BaseRequest request) async {
+    final bool media = request.url.queryParameters['alt'] == 'media';
+    if (media) {
+      ranges.add(request.headers['Range']);
+    }
+    final http.StreamedResponse response = await _inner.send(request);
+    if (!media) {
+      return response;
+    }
+    return http.StreamedResponse(
+      _slices(response.stream),
+      response.statusCode,
+      contentLength: response.contentLength,
+      headers: response.headers,
+      request: response.request,
+    );
+  }
+
+  // The emulator can send a large object in a few big chunks, too fast for a progress event or a pause: cut
+  // the body into 64 KiB slices, 5 ms apart.
+  static Stream<List<int>> _slices(Stream<List<int>> body) async* {
+    await for (final List<int> chunk in body) {
+      for (int i = 0; i < chunk.length; i += 65536) {
+        await Future<void>.delayed(const Duration(milliseconds: 5));
+        yield chunk.sublist(i, math.min(i + 65536, chunk.length));
+      }
+    }
+  }
+
+  @override
+  void close() => _inner.close();
 }

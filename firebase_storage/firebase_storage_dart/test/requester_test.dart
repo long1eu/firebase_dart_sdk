@@ -66,7 +66,7 @@ void main() {
       () async {
         await storageOf(statuses(<int>[200])).ref('o').metadata();
         final Map<String, String> headers = requests.single.headers;
-        expect(headers['X-Firebase-Storage-Version'], 'dart/0.1.2');
+        expect(headers['X-Firebase-Storage-Version'], 'dart/0.2.0');
         expect(headers['X-Firebase-GMPID'], '1:123:dart:abc');
         expect(headers.containsKey('Authorization'), isFalse);
         expect(headers.containsKey('X-Firebase-AppCheck'), isFalse);
@@ -185,7 +185,7 @@ void main() {
       expect(requests.single.headers['X-Goog-Upload-Protocol'], 'multipart');
       expect(
         requests.single.headers['X-Firebase-Storage-Version'],
-        'dart/0.1.2',
+        'dart/0.2.0',
       );
     });
   });

@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
 
 import 'package:crypto/crypto.dart';
 import 'package:firebase_auth_providers_dart/firebase_auth_providers_dart.dart'
@@ -93,7 +94,8 @@ class SecureAuthStorage implements AuthStorage {
   /// [SecretStore.platform]: `firebase_auth_secure_storage`.
   static const String keychainService = SecretStore.defaultService;
 
-  /// The key of the entry [isAvailable] writes, reads back and deletes.
+  /// The prefix of the key of the entry [isAvailable] writes, reads back and
+  /// deletes: `.probe`, followed by `-<pid>-<random>` for each call.
   static const String probeKey = '.probe';
 
   /// The namespace of this program when none is given:
@@ -138,6 +140,8 @@ class SecureAuthStorage implements AuthStorage {
 
   Future<void> _last = Future<void>.value();
 
+  static final Random _random = Random.secure();
+
   /// The key under which the session of [key] is kept in the store.
   String storageKeyFor(String key) => '$namespace/$key';
 
@@ -148,8 +152,12 @@ class SecureAuthStorage implements AuthStorage {
   Future<void> write(String key, String? value) =>
       _serial(() => _write(key, value));
 
-  /// Whether the store can be used in this run: writes a value under
-  /// [probeKey] in this namespace, reads it back and deletes it.
+  /// Whether the store can be used in this run: writes a value under a
+  /// probe key of its own in this namespace ([probeKey], the process ID and
+  /// 8 random hexadecimal digits: `<namespace>/.probe-<pid>-<random>`), reads
+  /// it back and deletes it. Each call has its own key, so processes of the
+  /// same program that probe at the same time do not read each other's
+  /// value.
   ///
   /// Returns false when a step fails with a [SecureAuthStorageException]
   /// whose `isUnavailable` is true (nothing is left behind then, unless the
@@ -169,8 +177,13 @@ class SecureAuthStorage implements AuthStorage {
   });
 
   Future<void> _probe() async {
-    final String account = storageKeyFor(probeKey);
-    final String value = 'probe ${DateTime.now().microsecondsSinceEpoch}';
+    final String unique = _random
+        .nextInt(1 << 32)
+        .toRadixString(16)
+        .padLeft(8, '0');
+    final String account = storageKeyFor('$probeKey-$pid-$unique');
+    final String value =
+        'probe ${DateTime.now().microsecondsSinceEpoch} $unique';
     // A failed write stores nothing: there is nothing to delete then.
     await _secure('write', () => store.write(account, value));
     final String? back;

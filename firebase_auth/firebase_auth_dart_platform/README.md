@@ -174,8 +174,11 @@ start; `Persistence.LOCAL` moves it back. On the web, `LOCAL` (or `INDEXED_DB`) 
 (by default IndexedDB, else `localStorage`, else memory). Without `storageFor`, `SESSION` on the web moves it to the
 tab's `sessionStorage`: a reload of the tab restores it from there, and a `setPersistence(SESSION)` at start keeps
 it. With `storageFor`, `SESSION` stays memory, so the session is never written outside the storage you chose.
-IndexedDB, `localStorage` and `sessionStorage` are readable by every script of the origin; there is no cross-tab
-sync, so a sign-out in one tab can be undone by another signed-in tab's next write until that tab reloads.
+IndexedDB, `localStorage` and `sessionStorage` are readable by every script of the origin. The tabs follow each
+other, as with the JS SDK: a sign-out or a sign-in in one tab reaches the others (at once with `localStorage`,
+within about a second with IndexedDB), and a tab that has not heard of a sign-out yet does not write the session
+back. A storage passed with `storageFor` takes part when it reports changes (`ObservableAuthStorage`, as the web
+storages of `firebase_auth_providers_dart` do).
 
 ## Provider sign-in
 

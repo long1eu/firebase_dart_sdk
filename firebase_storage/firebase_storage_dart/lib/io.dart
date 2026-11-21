@@ -12,14 +12,23 @@
 ///   final int bytes = await ref.writeToFile(File('restored.sqlite'));
 ///   print('restored $bytes bytes');
 /// }
+///
+/// Future<void> fetchVideo(FirebaseStorage storage) async {
+///   final DownloadTask task = storage.ref('videos/clip.mp4').startDownloadToFile(File('clip.mp4'));
+///   task.progress.listen((DownloadProgress p) => print('${p.bytesTransferred}/${p.totalBytes}'));
+///   await task.result;
+/// }
 /// ```
 library;
 
 import 'dart:io';
 
 import 'package:firebase_storage_dart/firebase_storage_dart.dart';
-import 'package:firebase_storage_dart/src/io/write_file.dart';
+import 'package:firebase_storage_dart/src/io/download_task.dart';
 import 'package:firebase_storage_dart/src/upload/upload_source.dart';
+
+export 'package:firebase_storage_dart/src/io/download_task.dart'
+    show DownloadProgress, DownloadState, DownloadTask;
 
 /// Uploads from and downloads to files.
 extension ReferenceIo on Reference {
@@ -46,10 +55,27 @@ extension ReferenceIo on Reference {
     );
   }
 
-  /// Downloads the object into [file] and returns its size in bytes.
+  /// Starts a download of the object into [file] that can be paused, resumed and canceled, and resumes by
+  /// itself after a network failure; see [DownloadTask].
   ///
   /// The bytes go to a new file next to [file] (`<file>.<random>.part`), which is renamed to [file] once the
-  /// download is complete, replacing a file already there. When the download fails, the partial file is
-  /// deleted, [file] is left untouched and the error is rethrown. The directory of [file] must exist.
-  Future<int> writeToFile(File file) => writeStreamToFile(openRead(), file);
+  /// download is complete, replacing a file already there. When the download fails or is canceled, the
+  /// partial file is deleted and [file] is left untouched. The directory of [file] must exist.
+  ///
+  /// Throws `invalid-root-operation` on the root of the bucket; other errors come through
+  /// [DownloadTask.result].
+  DownloadTask startDownloadToFile(File file) {
+    throwIfRoot('startDownloadToFile');
+    return DownloadTask.start(this, file);
+  }
+
+  /// Downloads the object into [file] and returns its size in bytes: [startDownloadToFile] without the
+  /// controls, so it resumes after a network failure the same way.
+  ///
+  /// When the download fails, the partial file is deleted, [file] is left untouched and the error is thrown.
+  Future<int> writeToFile(File file) async {
+    final DownloadTask task = startDownloadToFile(file);
+    await task.result;
+    return task.bytesTransferred;
+  }
 }

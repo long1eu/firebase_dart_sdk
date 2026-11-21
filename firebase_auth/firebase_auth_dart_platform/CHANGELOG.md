@@ -13,6 +13,12 @@
   `use` got an `appVerification`. Elsewhere it still renders nothing.
 - Exports `RecaptchaEnterpriseVerification`, `RecaptchaEnterpriseRequest`, `RecaptchaClientType`, `RecaptchaFlow`
   and `InPageRecaptchaPresenter`; depends on `secure_flow` directly.
+- On the web the tabs follow each other's sign-outs and sign-ins: the storage wrapper passes on the changes of a
+  storage that reports them (`ObservableAuthStorage` of `firebase_auth_providers_dart`, which the default
+  IndexedDB/`localStorage` storage and `sessionStorage` are) to the client, and ignores them once a failed write
+  moved the session to memory. In front of a storage that does not report changes (the secure store on the other
+  platforms) the wrapper is a plain storage, so the client does not read it before storing an update. Needs the
+  next release of `firebase_auth_providers_dart`.
 - The OAuth credentials the shim hands out (`UserCredential.credential`, `FirebaseAuthException.credential`) no
   longer print their access token: their `toString` shows only the provider and the sign-in method. The platform
   interface's `toString` printed the token. `asMap()` is unchanged.

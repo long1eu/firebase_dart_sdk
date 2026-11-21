@@ -1,13 +1,19 @@
 // The choice of storage on the web, with fakes on the VM: the default storage, where
-// setPersistence puts the session on the web and elsewhere, and the storage a reloaded tab starts
-// on after SESSION.
+// setPersistence puts the session on the web and elsewhere, the storage a reloaded tab starts
+// on after SESSION, and the changes of other tabs passed through FallbackStorage.
+
+import 'dart:async';
 
 import 'package:firebase_auth_dart_platform/src/secure_default_storage.dart';
 import 'package:firebase_auth_dart_platform/src/storage.dart';
 import 'package:firebase_auth_platform_interface/firebase_auth_platform_interface.dart'
     show Persistence;
 import 'package:firebase_auth_providers_dart/firebase_auth_providers_dart.dart'
-    show AuthStorage, FirebaseUserAuth, InMemoryAuthStorage;
+    show
+        AuthStorage,
+        FirebaseUserAuth,
+        InMemoryAuthStorage,
+        ObservableAuthStorage;
 import 'package:flutter_test/flutter_test.dart';
 
 /// A storage that only has a name, to tell the fakes apart.
@@ -112,6 +118,70 @@ void main() {
     });
   });
 
+  group('FallbackStorage.changes', () {
+    const String key = 'firebase_auth_providers_dart:key:[DEFAULT]';
+
+    test('passes on the changes of a storage that reports them', () async {
+      final _Observable app = _Observable();
+      final List<void> events = <void>[];
+      final ObservableAuthStorage storage =
+          FallbackStorage(app) as ObservableAuthStorage;
+      final StreamSubscription<void> subscription = storage
+          .changes(key)
+          .listen(events.add);
+      app.changed(key, 'v');
+      app.changed('other', 'v');
+      await Future<void>.delayed(Duration.zero);
+      expect(events, hasLength(1));
+      await subscription.cancel();
+      expect(app.hasListener, isFalse);
+    });
+
+    test(
+      'in front of a storage that does not report changes it is not observable',
+      () {
+        // So the client never reads the store before it stores an update.
+        expect(
+          FallbackStorage(InMemoryAuthStorage()),
+          isNot(isA<ObservableAuthStorage>()),
+        );
+        expect(FallbackStorage(_Observable()), isA<ObservableAuthStorage>());
+      },
+    );
+
+    test('once memory is in use, the changes are ignored', () async {
+      final _Observable app = _Observable();
+      final FallbackStorage storage = FallbackStorage(app);
+      final List<void> events = <void>[];
+      (storage as ObservableAuthStorage).changes(key).listen(events.add);
+      app.writeFails = true;
+      await storage.write(key, 'v');
+      app.changed(key, 'w');
+      await Future<void>.delayed(Duration.zero);
+      expect(events, isEmpty);
+      expect(storage.read(key), 'v');
+    });
+
+    test('the client follows a sign-out made in another tab', () async {
+      final _Observable app = _Observable();
+      app.write(key, '{"version":2,"uid":"u1","refreshToken":"r"}');
+      final FirebaseUserAuth auth = FirebaseUserAuth(
+        apiKey: 'key',
+        storage: FallbackStorage(app),
+        storageKey: key,
+      );
+      addTearDown(auth.dispose);
+      await auth.restore();
+      expect(auth.uid, 'u1');
+      expect(app.hasListener, isTrue);
+
+      app.changed(key, null);
+      await Future<void>.delayed(Duration.zero);
+      await Future<void>.delayed(Duration.zero);
+      expect(auth.currentUser, isNull);
+    });
+  });
+
   group('initialStorage', () {
     const String key = 'firebase_auth_providers_dart:key:[DEFAULT]';
     const String stored = '{"version":2,"uid":"u1","refreshToken":"r"}';
@@ -174,6 +244,35 @@ void main() {
       await second.auth.dispose();
     });
   });
+}
+
+/// A storage whose [changed] tells its listeners that another tab changed a key, and whose
+/// writes can be made to fail.
+class _Observable extends InMemoryAuthStorage implements ObservableAuthStorage {
+  final StreamController<String> _changes = StreamController<String>.broadcast(
+    sync: true,
+  );
+  bool writeFails = false;
+
+  bool get hasListener => _changes.hasListener;
+
+  /// Another tab stored [value] under [key].
+  void changed(String key, String? value) {
+    super.write(key, value);
+    _changes.add(key);
+  }
+
+  @override
+  void write(String key, String? value) {
+    if (writeFails) {
+      throw Exception('refused');
+    }
+    super.write(key, value);
+  }
+
+  @override
+  Stream<void> changes(String key) =>
+      _changes.stream.where((String changed) => changed == key);
 }
 
 /// One load of a tab on the web without `storageFor`, wired as `DartFirebaseAuth.forApp` and its

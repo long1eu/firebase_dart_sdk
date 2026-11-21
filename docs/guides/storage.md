@@ -125,8 +125,83 @@ States: `running`, `paused`, `success`, `canceled`, `error`. `pause`, `resume` a
 when the current state does not allow them. `result` completes with the object's `FullMetadata`, or with a
 `FirebaseStorageException`: `canceled` after `cancel()`, otherwise the error of the failed request.
 
-An upload session lives only as long as the `UploadTask`; there is no way to continue it from another
-process.
+To continue an upload from another process, keep `task.sessionUri` (store it like a credential: whoever has
+it can write to the session for a week) and pass it as `existingSessionUri` to a new task with the same data.
+
+### A stream of unknown length
+
+`startStreamUpload` takes a `length` when you know it. Without one (like `putStream` on Android), the task
+always opens a resumable session and sends chunks until the stream ends; `totalBytes` is -1 until then.
+
+```dart
+import 'dart:convert';
+
+import 'package:firebase_storage_dart/firebase_storage_dart.dart';
+
+Future<FullMetadata> uploadLog(Reference target, Stream<String> lines) {
+  final UploadTask task = target.startStreamUpload(
+    lines.transform(utf8.encoder),
+    metadata: const SettableMetadata(contentType: 'text/plain'),
+  );
+  task.progress.listen((UploadProgress p) {
+    final String total = p.totalBytes < 0 ? 'unknown' : '${p.totalBytes}';
+    print('${p.bytesTransferred} of $total bytes');
+  });
+  return task.result;
+}
+```
+
+Memory: the task holds the chunk being sent (256 KiB, doubling up to 16 MiB or `maxUploadChunkSize`) until
+the server confirms it, so it can send it again after a failure or a pause, plus one event of the stream read
+ahead to tell whether that chunk is the last. Lower `maxUploadChunkSize` to hold less. An empty stream
+creates an empty object.
+
+The last chunk goes only when the stream closes. A live producer that goes quiet right after a full chunk
+holds that chunk in memory, and the task keeps its `maxConcurrentUploads` slot, until it sends more or
+closes; close the stream as soon as the data is complete. `totalBytes` turns from -1 to the size without
+an event of its own: the next event carries it.
+
+## Downloads to a file
+
+`startDownloadToFile` of `package:firebase_storage_dart/io.dart` (not on the web) returns a `DownloadTask`
+with the same shape as an `UploadTask`: `progress`, `pause`, `resume`, `cancel` and `result`. It reads the
+object's metadata first (its size and generation), writes the content to a partial file next to the target
+and renames it over the target at the end; a failure or a cancel deletes the partial file and leaves the
+target as it was.
+
+```dart
+import 'dart:io';
+
+import 'package:firebase_storage_dart/firebase_storage_dart.dart';
+import 'package:firebase_storage_dart/io.dart';
+
+Future<void> download(Reference video) async {
+  final DownloadTask task = video.startDownloadToFile(File('clip.mp4'));
+  task.progress.listen((DownloadProgress p) {
+    print('${p.state.name}: ${p.bytesTransferred} of ${p.totalBytes} bytes');
+  });
+
+  task.pause(); // closes the connection; the bytes written so far stay
+  task.resume(); // asks for the rest with Range: bytes=<written>-
+
+  try {
+    final FullMetadata metadata = await task.result;
+    print('downloaded generation ${metadata.generation}');
+  } on FirebaseStorageException catch (e) {
+    if (e.code == 'object-changed') {
+      print('the object was overwritten during the download; start again');
+    } else {
+      rethrow;
+    }
+  }
+}
+```
+
+A connection that breaks in the middle is resumed the same way, from the bytes already written, with the
+backoff of the client and the `download` time of `StorageRetryPolicy`; bytes received reset that time. Every
+response is checked against the generation in the metadata, so the file is never put together from two
+versions of the object. `writeToFile` is the same download without the controls; `openRead` streams the
+content (with a range) without a file and without resuming.
 
 ## Strings, and the format of the data
 
@@ -213,6 +288,6 @@ with the Firebase rules unit-testing library.
 
 ## Not covered
 
-No `DownloadTask`, no singleton and no instance cache, no signed URLs, no ACL or bucket management. The
+No download task on the web, no singleton and no instance cache, no signed URLs, no ACL or bucket management. The
 `firebase_storage` API of FlutterFire is not offered by this package; a separate platform package is planned
 to put that API on top of it.

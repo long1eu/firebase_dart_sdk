@@ -186,20 +186,29 @@ blocked, or in a worker without it) and never throws.
 `localStorage`, else memory (`kind` says which). The probe runs on the connection the sessions then use. When it
 picks IndexedDB, a session that an earlier version of the app kept in `localStorage` (with `WebAuthStorage.local`
 and the same prefix) is moved at the first read: written to IndexedDB, read back, and only then deleted from
-`localStorage`. A session IndexedDB already has wins, and the `localStorage` copy is deleted. On a load where
-IndexedDB failed its probe, each write also leaves a marker in `localStorage` and tries to delete the key from
-IndexedDB; at the next load that picks IndexedDB, the marked state wins (a sign-out made then stays a sign-out).
+`localStorage`. A session IndexedDB already has wins; a `localStorage` copy that differs is deleted. Where IndexedDB
+failed its probe, each write also leaves a marker in `localStorage` and tries to delete the key from IndexedDB; the
+next read with IndexedDB takes the marked state (a sign-out stays one) and keeps a copy that later writes update.
 
 ```dart web
 final FirebaseUserAuth auth = await FirebaseUserAuth.forApp(app, storage: BestWebAuthStorage());
 ```
 
 Both are readable by every script of the origin, like `localStorage`: a cross-site scripting flaw gives the refresh
-token away. A change made in another tab is seen at the next read only; there is no cross-tab sync, and none is
-planned here. One consequence: a sign-out in one tab can be undone by another tab that is still signed in, at its
-next write of the session (a refresh that rotates the refresh token, a profile update, a reload of the
-user), until that tab is reloaded. On
-the Dart VM their constructors throw an `UnsupportedError`.
+token away. On the Dart VM their constructors throw an `UnsupportedError`.
+
+The tabs of a browser follow each other, as in the JS SDK. The web storages are `ObservableAuthStorage`s:
+`IndexedDbAuthStorage` reads the key in a `readonly` transaction every 800 ms (`pollInterval`) while someone
+listens, `WebAuthStorage` listens to the browser's `storage` event, and `BestWebAuthStorage` follows whichever it
+chose. A `FirebaseUserAuth` on one of them listens from its construction until `dispose` (or `setStorage` to
+another storage): a sign-out in another tab signs it out, another user signed in there becomes its user, and new
+tokens or data of the same user are taken over. It reads what the other tab stored and never writes it back, and
+the `beforeAuthStateChanged` callbacks do not run for such a change. Before it stores an update of the user's
+session (a rotated refresh token, a profile update, a reload), it reads the storage and takes over a sign-out or
+another user stored there instead of writing over it, so a sign-out in one tab is not undone by another tab that
+has not heard of it yet. The polls stop when nobody listens and at `close()`, and pause while the page is in the
+back/forward cache. Two tabs where `BestWebAuthStorage` chose differently (one without IndexedDB) follow each
+other through the `localStorage` copy, once the tab without IndexedDB has written it.
 
 ### Authenticator app second factors (TOTP)
 
