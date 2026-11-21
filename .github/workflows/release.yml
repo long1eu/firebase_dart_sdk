@@ -11,14 +11,14 @@ name: Release check
 #   v<version>                 the three core packages (firebase_app_dart,
 #                              firebase_auth_providers_dart, cloud_firestore_dart), which must all
 #                              be at <version>
-#   <package>-v<version>       one of the eight packages that publish.yml publishes, for example
+#   <package>-v<version>       one of the ten packages that publish.yml publishes, for example
 #                              cloud_firestore_dart-v0.1.1 or firebase_admin_dart-v0.1.0
 #
 # For each package of the tag, in dependency order (the same order as publish.yml:
 # firebase_app_dart, firebase_auth_providers_dart, cloud_firestore_dart, then
 # cloud_firestore_dart_sqlite, cloud_firestore_dart_flutterfire, cloud_firestore_dart_platform,
 # firebase_auth_dart_platform (needs firebase_auth_providers_dart 0.3.1, so release that first),
-# firebase_admin_dart): the version in pubspec.yaml is the version of the tag, CHANGELOG.md has a
+# firebase_admin_dart, firebase_storage_dart, firebase_storage_dart_platform): the version in pubspec.yaml is the version of the tag, CHANGELOG.md has a
 # `## <version>` heading, and `pub publish --dry-run` passes (with Flutter for the three Flutter
 # packages).
 on:
@@ -54,9 +54,7 @@ jobs:
           set -eu
           # In dependency order. A v<version> tag checks the three core packages only.
           core="firebase_core/firebase_app_dart firebase_auth/firebase_auth_providers_dart cloud_firestore/cloud_firestore_dart"
-          # Not listed yet, on purpose: firebase_storage/firebase_storage_dart and
-          # firebase_storage/firebase_storage_dart_platform wait for the maintainer's release.
-          all="$core cloud_firestore/cloud_firestore_dart_sqlite cloud_firestore/cloud_firestore_dart_flutterfire cloud_firestore/cloud_firestore_dart_platform firebase_auth/firebase_auth_dart_platform firebase_admin/firebase_admin_dart"
+          all="$core cloud_firestore/cloud_firestore_dart_sqlite cloud_firestore/cloud_firestore_dart_flutterfire cloud_firestore/cloud_firestore_dart_platform firebase_auth/firebase_auth_dart_platform firebase_admin/firebase_admin_dart firebase_storage/firebase_storage_dart firebase_storage/firebase_storage_dart_platform"
           case "$TAG" in
             v[0-9]*) version="${TAG#v}"; dirs="$core" ;;
             *-v[0-9]*)
