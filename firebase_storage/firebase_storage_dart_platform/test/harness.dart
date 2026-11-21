@@ -35,6 +35,8 @@ void registerForTests() {
     debugDefaultTargetPlatformOverride = TargetPlatform.linux;
     FirebaseStorageDart.use(
       httpClient: backend.client,
+      // Chunks of 256 KiB: the task tests follow progress and pauses between chunks.
+      maxUploadChunkSize: 256 * 1024,
       useDartCore: true,
       tokenProviderFor: (FirebaseApp app) {
         final String? token = tokens[app.name];

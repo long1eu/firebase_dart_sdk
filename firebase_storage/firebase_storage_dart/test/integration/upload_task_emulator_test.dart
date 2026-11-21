@@ -1,12 +1,15 @@
 @TestOn('vm')
 library;
 
+import 'dart:math' as math;
 import 'dart:typed_data';
 
 import 'package:firebase_app_dart/firebase_app_dart.dart';
 import 'package:firebase_storage_dart/firebase_storage_dart.dart';
+import 'package:http/http.dart' as http;
 import 'package:test/test.dart';
 
+import '../../benchmark/delay_proxy.dart';
 import '../fakes.dart';
 import '../upload_fakes.dart';
 
@@ -39,6 +42,12 @@ void main() {
   });
 
   test('a multi-chunk upload stores every byte and its metadata', () async {
+    storage.close();
+    storage = FirebaseStorage(
+      app,
+      emulatorHost: host,
+      maxUploadChunkSize: chunkedUploads,
+    );
     final Uint8List data = patternBytes(3 * 1024 * 1024 + 17);
     final Reference ref = storage.ref('$prefix/big.bin');
     final UploadTask task = ref.startUpload(
@@ -96,6 +105,13 @@ void main() {
   });
 
   test('pause and resume', () async {
+    // Pausing between chunks: a single request on loopback ends before a pause can land.
+    storage.close();
+    storage = FirebaseStorage(
+      app,
+      emulatorHost: host,
+      maxUploadChunkSize: 256 * 1024,
+    );
     final Uint8List data = patternBytes(2 * 1024 * 1024);
     final Reference ref = storage.ref('$prefix/paused.bin');
     final UploadTask task = ref.startUpload(data);
@@ -115,6 +131,13 @@ void main() {
   });
 
   test('a new task resumes the session of a paused one', () async {
+    // Pausing between chunks: a single request on loopback ends before a pause can land.
+    storage.close();
+    storage = FirebaseStorage(
+      app,
+      emulatorHost: host,
+      maxUploadChunkSize: 256 * 1024,
+    );
     final Uint8List data = patternBytes(2 * 1024 * 1024);
     final Reference ref = storage.ref('$prefix/resumed.bin');
     final UploadTask first = ref.startUpload(data);
@@ -136,6 +159,13 @@ void main() {
   });
 
   test('cancel leaves no object', () async {
+    // Pausing between chunks: a single request on loopback ends before a pause can land.
+    storage.close();
+    storage = FirebaseStorage(
+      app,
+      emulatorHost: host,
+      maxUploadChunkSize: 256 * 1024,
+    );
     final Reference ref = storage.ref('$prefix/canceled.bin');
     final UploadTask task = ref.startUpload(patternBytes(2 * 1024 * 1024));
     await task.progress.firstWhere(
@@ -147,4 +177,117 @@ void main() {
     expect(task.state, UploadState.canceled);
     await expectLater(ref.metadata(), throwsStorageCode('object-not-found'));
   });
+
+  test('20 MiB in one request, paused and resumed', () async {
+    final _SessionClient client = _SessionClient();
+    addTearDown(client.close);
+    // A bandwidth cap of 80 Mbit/s makes the 20 MiB request last about two seconds, so the pause
+    // lands while it is being sent; on plain loopback it would finish first.
+    final List<String> target = host.split(':');
+    final DelayProxy proxy = await DelayProxy.start(
+      targetHost: target[0],
+      targetPort: int.parse(target[1]),
+      rtt: Duration.zero,
+      bandwidthMbit: 80,
+    );
+    addTearDown(proxy.close);
+    storage.close();
+    storage = FirebaseStorage(
+      app,
+      emulatorHost: proxy.address,
+      httpClient: client,
+    );
+    final Uint8List data = patternBytes(20 * 1024 * 1024);
+    final Reference ref = storage.ref('$prefix/single.bin');
+    final UploadTask task = ref.startUpload(data);
+
+    await task.progress.firstWhere(
+      (UploadProgress p) => p.bytesTransferred > 1024 * 1024,
+    );
+    expect(task.pause(), isTrue);
+    final UploadProgress paused = await task.progress.firstWhere(
+      (UploadProgress p) => p.state == UploadState.paused,
+    );
+    expect(paused.bytesTransferred, lessThan(data.length));
+    expect(task.resume(), isTrue);
+
+    expect((await task.result).size, data.length);
+    expect(await ref.getBytes(), data);
+    // One data request before the pause and one after it (an empty finalize when the first had sent
+    // everything): never a chunk sequence.
+    final List<String> dataRequests = <String>[
+      for (final String command in client.commands)
+        if (command.contains('upload') || command == 'finalize') command,
+    ];
+    expect(dataRequests.length, lessThanOrEqualTo(2), reason: '$dataRequests');
+    expect(dataRequests.last, anyOf('upload, finalize', 'finalize'));
+  });
+
+  test(
+    '6 uploads with maxConcurrentUploads 2 keep at most 2 sessions open',
+    () async {
+      final _SessionClient client = _SessionClient();
+      addTearDown(client.close);
+      storage.close();
+      storage = FirebaseStorage(
+        app,
+        emulatorHost: host,
+        httpClient: client,
+        maxConcurrentUploads: 2,
+        // Under load the emulator's rules runtime can stall a request ("no Storage ruleset is currently
+        // loaded"); a short idle timeout makes the client retry it from the server's offset, which is also
+        // what this test then exercises.
+        requestTimeout: const Duration(seconds: 5),
+      );
+      final List<Uint8List> data = <Uint8List>[
+        for (int i = 0; i < 6; i++) patternBytes(1024 * 1024 + i),
+      ];
+      final List<UploadTask> tasks = <UploadTask>[
+        for (int i = 0; i < 6; i++)
+          storage.ref('$prefix/many-$i.bin').startUpload(data[i]),
+      ];
+
+      final List<FullMetadata> results = await Future.wait(
+        <Future<FullMetadata>>[
+          for (final UploadTask task in tasks) task.result,
+        ],
+      );
+
+      for (int i = 0; i < 6; i++) {
+        expect(results[i].size, data[i].length);
+      }
+      expect(client.maxOpen, inInclusiveRange(1, 2));
+      expect(client.open, 0);
+    },
+    timeout: const Timeout(Duration(minutes: 2)),
+  );
+}
+
+/// Counts the open resumable sessions: from a successful `start` to the response that finalizes them.
+final class _SessionClient extends http.BaseClient {
+  final http.Client _inner = http.Client();
+  final List<String> commands = <String>[];
+  int open = 0;
+  int maxOpen = 0;
+
+  @override
+  Future<http.StreamedResponse> send(http.BaseRequest request) async {
+    final String? command = request.headers['x-goog-upload-command'];
+    if (command != null) {
+      commands.add(command);
+    }
+    final http.StreamedResponse response = await _inner.send(request);
+    if (command == 'start' && response.statusCode == 200) {
+      open++;
+      maxOpen = math.max(maxOpen, open);
+    } else if (command != null &&
+        command.contains('finalize') &&
+        response.headers['x-goog-upload-status'] == 'final') {
+      open--;
+    }
+    return response;
+  }
+
+  @override
+  void close() => _inner.close();
 }

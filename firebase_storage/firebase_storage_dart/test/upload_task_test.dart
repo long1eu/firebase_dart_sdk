@@ -27,14 +27,19 @@ void main() {
   }) {
     storage.close();
     time = clock;
-    return storage = storageWith(app, server.handle, time: clock, retry: retry);
+    return storage = chunkedStorageWith(
+      app,
+      server.handle,
+      time: clock,
+      retry: retry,
+    );
   }
 
   setUp(() {
     app = newApp();
     server = FakeUploadServer();
     time = FakeTime();
-    storage = storageWith(app, server.handle, time: time);
+    storage = chunkedStorageWith(app, server.handle, time: time);
   });
 
   tearDown(() async {
@@ -108,7 +113,7 @@ void main() {
     test('cancel while the request is in flight', () async {
       final Completer<void> gate = Completer<void>();
       final Completer<void> sent = Completer<void>();
-      storage = storageWith(app, (Recorded r) async {
+      storage = chunkedStorageWith(app, (Recorded r) async {
         sent.complete();
         await gate.future;
         return server.handle(r);
@@ -125,7 +130,7 @@ void main() {
     test('pause and resume send the request again', () async {
       final Completer<void> gate = Completer<void>();
       int calls = 0;
-      storage = storageWith(app, (Recorded r) async {
+      storage = chunkedStorageWith(app, (Recorded r) async {
         if (calls++ == 0) {
           await gate.future;
         }
@@ -420,7 +425,7 @@ void main() {
     });
 
     test('a start without an upload URL fails with unknown', () async {
-      storage = storageWith(
+      storage = chunkedStorageWith(
         app,
         (_) async => http.Response(
           'OK',
@@ -436,7 +441,7 @@ void main() {
     });
 
     test('a start answered with 403 fails with unauthorized', () async {
-      storage = storageWith(
+      storage = chunkedStorageWith(
         app,
         (_) async => http.Response('denied', 403),
         time: time,
@@ -683,7 +688,7 @@ void main() {
     test('cancel during the session start', () async {
       final Completer<void> gate = Completer<void>();
       final Completer<void> reached = Completer<void>();
-      storage = storageWith(app, (Recorded r) async {
+      storage = chunkedStorageWith(app, (Recorded r) async {
         reached.complete();
         await gate.future;
         return server.handle(r);
@@ -893,7 +898,7 @@ void main() {
       'existingSessionUri must be on the emulator host with an emulatorHost',
       () async {
         storage.close();
-        storage = storageWith(
+        storage = chunkedStorageWith(
           app,
           server.handle,
           time: time,
@@ -926,7 +931,7 @@ void main() {
         ]) {
           server.requests.clear();
           storage.close();
-          storage = storageWith(app, (Recorded r) async {
+          storage = chunkedStorageWith(app, (Recorded r) async {
             server.requests.add(r);
             return http.Response(
               'OK',
@@ -984,7 +989,7 @@ void main() {
               },
             );
           storage.close();
-          storage = storageWith(app, server.handle, time: time);
+          storage = chunkedStorageWith(app, server.handle, time: time);
           await expectLater(
             ref().startUpload(patternBytes(300 * kib)).result,
             throwsStorageCode('unknown'),
@@ -1043,7 +1048,7 @@ void main() {
 
     test('a one-shot cancel sends no cancel command', () async {
       final Completer<void> gate = Completer<void>();
-      storage = storageWith(app, (Recorded r) async {
+      storage = chunkedStorageWith(app, (Recorded r) async {
         server.requests.add(r);
         await gate.future;
         return http.Response('', 500);

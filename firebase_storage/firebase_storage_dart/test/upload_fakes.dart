@@ -187,9 +187,13 @@ FirebaseStorage slowStorage(
   FakeTime time, {
   Duration perPiece = const Duration(milliseconds: 200),
   Future<void> Function(Recorded request, int consumed)? onConsumed,
+  int? maxUploadChunkSize = chunkedUploads,
+  Duration requestTimeout = const Duration(minutes: 1),
 }) {
   return FirebaseStorage(
     app,
+    maxUploadChunkSize: maxUploadChunkSize,
+    requestTimeout: requestTimeout,
     httpClient: MockClient.streaming((
       http.BaseRequest request,
       http.ByteStream body,

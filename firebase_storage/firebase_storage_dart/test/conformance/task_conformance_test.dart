@@ -21,6 +21,10 @@ import 'conformance.dart';
 // the number of events.
 //
 // JS smallBlob = 1 byte, bigBlob = 1 MiB.
+//
+// The JS SDK always sends chunks; so does this package on the web and for streams. On the VM, uploads of
+// bytes go in one request unless FirebaseStorage.maxUploadChunkSize is set, so these tests use
+// chunkedStorageWith (a 16 MiB cap) to run the chunked protocol.
 const int kib = 1024;
 const int mib = 1024 * kib;
 
@@ -57,14 +61,14 @@ void main() {
   FirebaseStorage storageFor(FakeTime clock) {
     storage.close();
     time = clock;
-    return storage = storageWith(app, server.handle, time: clock);
+    return storage = chunkedStorageWith(app, server.handle, time: clock);
   }
 
   setUp(() {
     app = newApp();
     server = FakeUploadServer();
     time = FakeTime();
-    storage = storageWith(app, server.handle, time: time);
+    storage = chunkedStorageWith(app, server.handle, time: time);
   });
 
   tearDown(() async {
@@ -357,7 +361,7 @@ void main() {
       () async {
         // fakeOneShot503ServerHandler: every request is 503. The multipart request is retried until the upload
         // retry time is over.
-        final FirebaseStorage failing = storageWith(
+        final FirebaseStorage failing = chunkedStorageWith(
           app,
           (Recorded r) async => http.Response('', 503),
           time: time,
@@ -393,7 +397,7 @@ void main() {
       ]) {
         // A server of its own per upload: the fake keeps the bytes it received.
         final FakeUploadServer fresh = FakeUploadServer();
-        final FirebaseStorage instance = storageWith(
+        final FirebaseStorage instance = chunkedStorageWith(
           app,
           fresh.handle,
           bucket: bucket,
@@ -437,7 +441,7 @@ void main() {
             'x-goog-upload-url': FakeUploadServer.sessionUrl,
           },
         ]) {
-          final FirebaseStorage odd = storageWith(
+          final FirebaseStorage odd = chunkedStorageWith(
             app,
             (Recorded r) async => http.Response('OK', 200, headers: headers),
             time: time,
@@ -657,7 +661,7 @@ void main() {
     test(
       'a session URL on another host is refused (JS uses X-Goog-Upload-URL verbatim)',
       () async {
-        final FirebaseStorage elsewhere = storageWith(
+        final FirebaseStorage elsewhere = chunkedStorageWith(
           app,
           (Recorded r) async => http.Response(
             'OK',
@@ -708,7 +712,7 @@ void main() {
     setUp(() {
       requests = <Recorded>[];
       respond = (_) async => http.Response.bytes(content, 200);
-      downloads = storageWith(
+      downloads = chunkedStorageWith(
         app,
         (Recorded r) => respond(r),
         requests: requests,

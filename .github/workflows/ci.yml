@@ -607,10 +607,12 @@ jobs:
         env:
           FIREBASE_STORAGE_EMULATOR_HOST: 127.0.0.1:9299
           FIREBASE_AUTH_EMULATOR_HOST: 127.0.0.1:9398
+        # One test file at a time: the emulator's rules runtime stalls under concurrent uploads from
+        # several files ("no Storage ruleset is currently loaded").
         run: |
           set -o pipefail
           dart pub get
-          dart test --reporter expanded test/integration test/production 2>&1 | tee "$EMULATOR_DIR/storage_integration.log"
+          dart test -j 1 --reporter expanded test/integration test/production 2>&1 | tee "$EMULATOR_DIR/storage_integration.log"
           if grep -Eq ' ~[0-9]+' "$EMULATOR_DIR/storage_integration.log"; then
             echo "::error::The Storage emulator tests skipped: FIREBASE_STORAGE_EMULATOR_HOST did not reach them."
             exit 1

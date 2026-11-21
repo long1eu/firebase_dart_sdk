@@ -267,6 +267,8 @@ final class Reference {
 
   /// Uploads [data] in one multipart request and returns the metadata of the new object, replacing an object
   /// at the same path. The content type is that of [metadata], else `application/octet-stream`.
+  ///
+  /// It counts toward `FirebaseStorage.maxConcurrentUploads`: over the limit it waits for its turn.
   Future<FullMetadata> putBytes(
     Uint8List data, {
     SettableMetadata? metadata,
@@ -297,7 +299,9 @@ final class Reference {
   }
 
   /// Starts an upload of [data] that can be paused, resumed and canceled; see [UploadTask]. Up to 256 KiB it is
-  /// one multipart request, like [putBytes], but with the controls and progress of a task.
+  /// one multipart request, like [putBytes], but with the controls and progress of a task. Above that, on the
+  /// VM the data goes in one streamed request of a resumable session (unless `FirebaseStorage` has a
+  /// `maxUploadChunkSize`), and in chunks on the web.
   ///
   /// With [existingSessionUri] (the [UploadTask.sessionUri] of an earlier task for the same data and
   /// reference), the task asks that session how much it has and sends the rest. It must be on the host of this
@@ -321,8 +325,9 @@ final class Reference {
 
   /// Starts an upload of the [length] bytes of [data]; see [UploadTask] and [startUpload].
   ///
-  /// The stream is read one chunk at a time as the upload goes, so only one chunk (at most 16 MiB) is held in
-  /// memory. It must produce exactly [length] bytes, otherwise the task fails with `invalid-argument`; an error
+  /// The stream is read one chunk at a time as the upload goes, so only one chunk (at most 16 MiB, or the
+  /// `maxUploadChunkSize` of `FirebaseStorage`) is held in memory: the chunk is what is sent again after a
+  /// failure, so a stream upload always goes in chunks. It must produce exactly [length] bytes, otherwise the task fails with `invalid-argument`; an error
   /// of the stream fails the task with that error. The stream is canceled when the task ends. To resume with
   /// [existingSessionUri], pass a stream of the whole data again: the bytes the server already has are read
   /// and skipped. Throws an [ArgumentError] when [length] is negative, `invalid-root-operation` on the root of
@@ -343,12 +348,30 @@ final class Reference {
     );
   }
 
+  /// Starts an upload of [source]: for `putFile` of `package:firebase_storage_dart/io.dart`.
+  @internal
+  UploadTask startUploadFrom(
+    UploadSource source, {
+    required String operation,
+    SettableMetadata? metadata,
+    Uri? existingSessionUri,
+  }) {
+    throwIfRoot(operation);
+    return UploadTask.start(
+      this,
+      source,
+      metadata,
+      existingSessionUri: existingSessionUri,
+    );
+  }
+
   Future<FullMetadata> _multipartUpload(
     Uint8List data,
     SettableMetadata? metadata,
   ) async {
-    final StorageResponse response = await _requester.send(
-      multipartRequest(data, metadata),
+    // Counts toward FirebaseStorage.maxConcurrentUploads like an upload task.
+    final StorageResponse response = await storage.uploadSlots.run(
+      () => _requester.send(multipartRequest(data, metadata)),
     );
     return metadataOf(response);
   }

@@ -106,7 +106,7 @@ void main() {
           reason: '${request.url}',
         );
         expect(request.headers.containsKey('X-Firebase-AppCheck'), isFalse);
-        expect(request.headers['X-Firebase-Storage-Version'], 'dart/0.1.0');
+        expect(request.headers['X-Firebase-Storage-Version'], 'dart/0.1.1');
       }
     });
 

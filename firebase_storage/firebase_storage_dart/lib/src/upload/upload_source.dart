@@ -1,4 +1,5 @@
-/// The data of an `UploadTask`: bytes in memory, or a stream of known length read one chunk at a time.
+/// The data of an `UploadTask`: bytes in memory, a seekable source such as a file, or a stream of known
+/// length read one chunk at a time.
 @internal
 library;
 
@@ -23,6 +24,17 @@ abstract interface class UploadSource {
   factory UploadSource.stream(Stream<List<int>> stream, int length) =
       _StreamSource;
 
+  /// [length] bytes that [openFrom] reads from any offset to the end, such as a file
+  /// (`(int offset) => file.openRead(offset)`).
+  factory UploadSource.seekable(
+    int length,
+    Stream<List<int>> Function(int offset) openFrom,
+  ) = _SeekableSource;
+
+  /// Opens the data from an offset to its end, for sources that can be read again from anywhere (bytes and
+  /// files); null for a stream. The upload task checks that the stream ends exactly at [length].
+  Stream<List<int>> Function(int offset)? get openFrom;
+
   /// The size of the data.
   int get length;
 
@@ -46,6 +58,46 @@ final class _BytesSource implements UploadSource {
       Uint8List.sublistView(_bytes, offset, offset + size);
 
   @override
+  Stream<List<int>> Function(int offset) get openFrom =>
+      (int offset) =>
+          Stream<List<int>>.value(Uint8List.sublistView(_bytes, offset));
+
+  @override
+  Future<void> close() async {}
+}
+
+final class _SeekableSource implements UploadSource {
+  _SeekableSource(this.length, this._open);
+
+  @override
+  final int length;
+
+  final Stream<List<int>> Function(int offset) _open;
+
+  @override
+  Stream<List<int>> Function(int offset) get openFrom => _open;
+
+  @override
+  Future<Uint8List> read(int offset, int size) async {
+    final BytesBuilder builder = BytesBuilder(copy: false);
+    if (size > 0) {
+      await for (final List<int> event in _open(offset)) {
+        builder.add(event);
+        if (builder.length >= size) {
+          break;
+        }
+      }
+    }
+    if (builder.length < size) {
+      throw invalidArgument(
+        'The data ended after ${offset + builder.length} bytes, before its '
+        'length of $length bytes.',
+      );
+    }
+    return Uint8List.sublistView(builder.takeBytes(), 0, size);
+  }
+
+  @override
   Future<void> close() async {}
 }
 
@@ -55,6 +107,9 @@ final class _StreamSource implements UploadSource {
 
   @override
   final int length;
+
+  @override
+  Stream<List<int>> Function(int offset)? get openFrom => null;
 
   final StreamIterator<List<int>> _input;
 
