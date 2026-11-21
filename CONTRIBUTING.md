@@ -35,6 +35,9 @@ Do not weaken or remove an assertion to get a test passing. If a test is flaky, 
 ported keeps the upstream names, so the Android source is the best reference for why something is the way it
 is.
 
+To add a Firebase product that the SDK does not cover yet, follow
+[`docs/contributing_a_product.md`](docs/contributing_a_product.md).
+
 ## Licence
 
 Contributions to the published packages are under the Apache License 2.0, the licence of those packages.

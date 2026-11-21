@@ -21,6 +21,7 @@ Maintained, tested and published (`cloud_firestore_dart` 0.3.2, Dart `^3.8.0`):
 
 - `examples/`: complete example packages (`server_shelf`, `cli`, `storage_cli`, `cloud_run_job`).
 - `docs/`: guides (`docs/guides/`), parity, support policy, how we test, upstream sync records.
+  Adding a new Firebase product: [docs/contributing_a_product.md](docs/contributing_a_product.md).
   The SVG figures in `docs/images/` follow the palette and light/dark rules of
   `docs/images/README.md`; check them with `dart tool/check_figures.dart`.
 - `tool/`: test, emulator and size scripts; `tool/README.md` describes each one.
