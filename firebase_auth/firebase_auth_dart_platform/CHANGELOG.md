@@ -7,6 +7,9 @@
   storage that reports them (`ObservableAuthStorage` of `firebase_auth_providers_dart`, which the default
   IndexedDB/`localStorage` storage and `sessionStorage` are) to the client, and ignores them once a failed write
   moved the session to memory. Needs the next release of `firebase_auth_providers_dart`.
+- The OAuth credentials the shim hands out (`UserCredential.credential`, `FirebaseAuthException.credential`) no
+  longer print their access token: their `toString` shows only the provider and the sign-in method. The platform
+  interface's `toString` printed the token. `asMap()` is unchanged.
 
 ## 0.1.1
 

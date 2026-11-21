@@ -113,6 +113,10 @@ class SecureAuthStorage implements AuthStorage {
 
   /// The default namespace on [platform] (the name of a [TargetPlatform], or
   /// `web`) for the program at [executable].
+  ///
+  /// The desktop branch is shared with `SecureAuthStorage.namespaceFor` of
+  /// `firebase_auth_secure_storage_dart`, whose unit tests pin the values
+  /// (group "stored layout (pinned)"); change both or neither.
   @visibleForTesting
   static String namespaceFor({required String platform, String? executable}) {
     final String app = switch (platform) {

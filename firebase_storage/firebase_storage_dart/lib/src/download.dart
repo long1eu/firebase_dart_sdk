@@ -10,6 +10,7 @@ import 'package:meta/meta.dart';
 
 import 'errors.dart';
 import 'exception.dart';
+import 'media_headers_stub.dart' if (dart.library.io) 'media_headers_io.dart';
 import 'reference.dart';
 import 'request/requester.dart';
 
@@ -121,7 +122,10 @@ final class _Download {
     return StorageRequest(
       method: 'GET',
       url: _ref.objectUrl(media: true),
-      headers: <String, String>{if (ranged) 'Range': 'bytes=$_start-$last'},
+      headers: <String, String>{
+        ...mediaRequestHeaders,
+        if (ranged) 'Range': 'bytes=$_start-$last',
+      },
       // 416: the range starts at or after the end of the object, so there is nothing to read.
       successCodes: ranged ? const <int>{200, 206, 416} : const <int>{200},
       timeout: _ref.storage.retry.download,
