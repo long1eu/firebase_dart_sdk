@@ -18,10 +18,17 @@ class FakeSecretStore implements SecretStore {
   /// What a read returns instead of the stored secret, while set.
   String? Function(String? stored)? readFilter;
 
+  /// Awaited by every read before it looks at [secrets], while set.
+  Future<void> Function()? beforeRead;
+
   @override
   Future<String?> read(String account) async {
     calls.add('read $account');
     _fail('read');
+    final Future<void> Function()? gate = beforeRead;
+    if (gate != null) {
+      await gate();
+    }
     final String? stored = secrets[account];
     final String? Function(String? stored)? filter = readFilter;
     return filter == null ? stored : filter(stored);

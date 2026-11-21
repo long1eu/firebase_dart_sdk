@@ -180,10 +180,13 @@ void main() {
       );
     });
 
-    test('probe account: <namespace>/.probe', () async {
+    test('probe account: <namespace>/.probe-<pid>-<8 hex digits>', () async {
       expect(SecureAuthStorage.probeKey, '.probe');
       await storage().isAvailable();
-      expect(store.calls.first, 'write test-ns/.probe');
+      expect(
+        store.calls.first,
+        matches(RegExp('^write test-ns/\\.probe-$pid-[0-9a-f]{8}\$')),
+      );
     });
 
     test('keychain service: firebase_auth_secure_storage', () {
@@ -250,10 +253,16 @@ void main() {
   });
 
   group('isAvailable', () {
-    const String probe = '$_ns/.probe';
+    /// The probe account of the first call recorded by the fake store.
+    String probeOf(List<String> calls) {
+      final String first = calls.first;
+      expect(first, startsWith('write $_ns/.probe-'));
+      return first.substring('write '.length);
+    }
 
     test('writes, reads back and deletes the probe entry', () async {
       expect(await storage().isAvailable(), isTrue);
+      final String probe = probeOf(store.calls);
       expect(store.calls, <String>[
         'write $probe',
         'read $probe',
@@ -262,17 +271,47 @@ void main() {
       expect(store.secrets, isEmpty);
     });
 
+    test('each call probes under a key of its own', () async {
+      final SecureAuthStorage s = storage();
+      await s.isAvailable();
+      final String first = probeOf(store.calls);
+      store.calls.clear();
+      await s.isAvailable();
+      expect(probeOf(store.calls), isNot(first));
+    });
+
+    test('two processes of one program probing at once both succeed', () async {
+      // Both writes happen before either read, as when two processes start
+      // together: with one shared probe key, the first would read back the
+      // second's value and throw.
+      final Completer<void> bothWritten = Completer<void>();
+      store.beforeRead = () => bothWritten.future;
+      final SecureAuthStorage a = storage();
+      final SecureAuthStorage b = storage();
+      final Future<List<bool>> results = Future.wait(<Future<bool>>[
+        a.isAvailable(),
+        b.isAvailable(),
+      ]);
+      while (store.calls.where((String c) => c.startsWith('write')).length <
+          2) {
+        await Future<void>.delayed(Duration.zero);
+      }
+      bothWritten.complete();
+      expect(await results, <bool>[true, true]);
+      expect(store.secrets, isEmpty);
+    });
+
     test('false when the store is unavailable, nothing left behind', () async {
       store.failures['read'] = _storeDown;
       expect(await storage().isAvailable(), isFalse);
-      expect(store.calls.last, 'delete $probe');
+      expect(store.calls.last, 'delete ${probeOf(store.calls)}');
       expect(store.secrets, isEmpty);
     });
 
     test('false when the write is refused as unavailable', () async {
       store.failures['write'] = _storeDown;
       expect(await storage().isAvailable(), isFalse);
-      expect(store.calls, <String>['write $probe']);
+      expect(store.calls, <String>['write ${probeOf(store.calls)}']);
     });
 
     test('another failure is thrown', () async {

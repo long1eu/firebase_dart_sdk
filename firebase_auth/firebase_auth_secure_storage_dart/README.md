@@ -47,7 +47,8 @@ Future<FirebaseUserAuth> openAuth(String apiKey) async {
 }
 ```
 
-`isAvailable()` writes, reads back and deletes a probe entry (`<namespace>/.probe`). It returns false only when the
+`isAvailable()` writes, reads back and deletes a probe entry of its own (`<namespace>/.probe-<pid>-<random>`, so
+processes of one program that start together do not collide). It returns false only when the
 store as a whole cannot be used in this run (`SecureAuthStorageException.isUnavailable`), and throws for anything else,
 so a session that is stored but cannot be read now (a locked macOS keychain over SSH, a value that does not decrypt)
 is never mistaken for no session. The fallback is the caller's choice: this package never writes a session anywhere
