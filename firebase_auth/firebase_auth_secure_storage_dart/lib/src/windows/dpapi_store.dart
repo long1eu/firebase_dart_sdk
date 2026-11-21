@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:crypto/crypto.dart';
@@ -24,9 +25,14 @@ abstract interface class DpapiCipher {
 /// its account name, with the extension `.dpapi` (an account name has `:`
 /// and `/`, which file names cannot), and holds the DPAPI blob of the UTF-8
 /// secret. The account name is the DPAPI entropy, so a file copied or
-/// renamed onto another account does not decrypt. A file is written next to
-/// its final name and then renamed over it, so a crash never leaves half a
-/// secret.
+/// renamed onto another account does not decrypt. A file is written to a
+/// temporary file of its own next to its final name
+/// (`<name>.<pid>.<random>.tmp`) and then renamed over it, so neither a
+/// crash nor two processes writing at once leave half a secret.
+///
+/// A file that does not decrypt (corrupt, or written by another user) fails
+/// the read with a [SecretStoreError] of `CryptUnprotectData`, which is not
+/// "unavailable"; the file is left as it is.
 ///
 /// The directory and its files keep the access control of their parent
 /// (`%LOCALAPPDATA%` grants only the user, SYSTEM and the administrators).
@@ -99,7 +105,7 @@ class DpapiSecretStore implements SecretStore {
     } finally {
       bytes.fillRange(0, bytes.length, 0);
     }
-    final File temporary = File('$path.tmp');
+    final File temporary = File(_temporaryOf(path));
     try {
       temporary.parent.createSync(recursive: true);
       temporary.writeAsBytesSync(blob, flush: true);
@@ -122,6 +128,20 @@ class DpapiSecretStore implements SecretStore {
   });
 
   static Uint8List _entropy(String account) => utf8.encode(account);
+
+  static final Random _random = Random.secure();
+
+  /// A temporary name next to [path] of this write only:
+  /// `<path>.<pid>.<8 random hex digits>.tmp`. Two processes (or two writes)
+  /// of the same account never write the same temporary file, so each
+  /// rename puts a whole blob in place and the last one wins.
+  static String _temporaryOf(String path) {
+    final String unique = _random
+        .nextInt(1 << 32)
+        .toRadixString(16)
+        .padLeft(8, '0');
+    return '$path.$pid.$unique.tmp';
+  }
 
   /// Deletes the temporary file of a failed write. The write's own error is
   /// what the caller sees; a failure here leaves only an encrypted file,

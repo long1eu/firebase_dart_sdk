@@ -183,7 +183,10 @@ void main() {
   });
 
   test('a lost error code is reported as such, not as unavailable', () {
-    final SecretStoreError lost = dpapiError('CryptProtectData', -1);
+    final SecretStoreError lost = dpapiError(
+      'CryptProtectData',
+      dpapiLostError,
+    );
     expect(lost.message, contains('the error code was lost'));
     expect(
       SecureAuthStorageException(
@@ -193,5 +196,76 @@ void main() {
       ).isUnavailable,
       isFalse,
     );
+  });
+
+  group('a code that looks overwritten by the VM', () {
+    test('a lost code is retried once; the second code counts', () {
+      calls.failures.addAll(<int>[dpapiLostError, 5]);
+      expect(
+        () => cipher.protect(data, entropy),
+        throwsA(
+          isA<SecretStoreError>().having(
+            (SecretStoreError e) => e.status,
+            'status',
+            5,
+          ),
+        ),
+      );
+      expect(calls.order.where((String c) => c == 'protect'), hasLength(2));
+    });
+
+    test('127 is retried once too, for unprotect as well', () {
+      final Uint8List blob = cipher.protect(data, entropy);
+      calls.order.clear();
+      calls.failures.addAll(<int>[127, 5]);
+      expect(
+        () => cipher.unprotect(blob, entropy),
+        throwsA(
+          isA<SecretStoreError>().having(
+            (SecretStoreError e) => e.status,
+            'status',
+            5,
+          ),
+        ),
+      );
+      expect(calls.order, <String>['unprotect', 'unprotect']);
+    });
+
+    test('a retry that succeeds returns the data', () {
+      calls.failures.add(dpapiLostError);
+      final Uint8List blob = cipher.protect(data, entropy);
+      expect(cipher.unprotect(blob, entropy), data);
+      expect(calls.allocated, 0);
+    });
+
+    test('lost twice is reported as lost, and not unavailable', () {
+      calls.failures.addAll(<int>[dpapiLostError, dpapiLostError]);
+      Object? error;
+      try {
+        cipher.protect(data, entropy);
+      } on SecretStoreError catch (e) {
+        error = e;
+      }
+      final SecretStoreError failure = error! as SecretStoreError;
+      expect(failure.status, dpapiLostError);
+      expect(failure.message, contains('was lost'));
+      expect(
+        SecureAuthStorageException(
+          platform: 'windows',
+          operation: 'write',
+          cause: failure,
+        ).isUnavailable,
+        isFalse,
+      );
+    });
+
+    test('a real DPAPI code (5, 13) is not retried', () {
+      calls.failures.addAll(<int>[13]);
+      expect(
+        () => cipher.protect(data, entropy),
+        throwsA(isA<SecretStoreError>()),
+      );
+      expect(calls.order.where((String c) => c == 'protect'), hasLength(1));
+    });
   });
 }
