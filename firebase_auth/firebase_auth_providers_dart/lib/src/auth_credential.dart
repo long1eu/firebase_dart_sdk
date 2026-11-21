@@ -95,7 +95,7 @@ class EmailAuthCredential extends AuthCredential {
   /// The JSON of an email link holds only the code of the link and its tenant: the [emailLink] of the credential is
   /// then a link made of them, `https://localhost/?apiKey=none&mode=signIn&oobCode=<code>[&tenantId=<tenant>]`.
   static EmailAuthCredential? fromJson(Object json) {
-    final Map<Object?, Object?>? map = _jsonMap(json);
+    final Map<Object?, Object?>? map = credentialJsonMap(json);
     final Object? email = map?['email'];
     final Object? password = map?['password'];
     if (email is! String ||
@@ -122,8 +122,8 @@ class EmailAuthCredential extends AuthCredential {
 }
 
 /// [json] as a map: a map as it is, and a string decoded first (a [FormatException] when it is not JSON); null for
-/// anything else.
-Map<Object?, Object?>? _jsonMap(Object json) {
+/// anything else. For the `fromJson` of the credentials; not exported.
+Map<Object?, Object?>? credentialJsonMap(Object json) {
   final Object? value = json is String ? jsonDecode(json) : json;
   return value is Map ? value : null;
 }
@@ -255,7 +255,7 @@ class OAuthCredential extends AuthCredential {
   /// needs no token (an empty `idToken`, `accessToken` or `pendingToken` counts as none):
   /// [OAuthProvider.credentialFromJson] checks that there is one.
   static OAuthCredential? fromJson(Object json) {
-    final Map<Object?, Object?>? map = _jsonMap(json);
+    final Map<Object?, Object?>? map = credentialJsonMap(json);
     if (map == null) {
       return null;
     }
@@ -409,7 +409,7 @@ class OAuthProvider {
   /// is not JSON. As in the JS SDK, `nonce` is dropped when there is a `pendingToken`. Unlike the JS SDK, which drops
   /// it here, `secret` is kept, so that a Twitter credential still signs in.
   static OAuthCredential credentialFromJson(Object json) {
-    final Map<Object?, Object?>? map = _jsonMap(json);
+    final Map<Object?, Object?>? map = credentialJsonMap(json);
     final OAuthCredential? read = map == null
         ? null
         : OAuthCredential.fromJson(map);

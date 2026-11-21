@@ -128,11 +128,16 @@ class DartMultiFactorSession extends MultiFactorSession {
   final DartMultiFactor multiFactor;
 }
 
-/// The session of a [DartMultiFactorResolver]: its id is the backend's pending
-/// credential, and `FirebaseAuth.verifyPhoneNumber` with it sends the SMS code
-/// of an SMS factor through the client's resolver, [source].
+/// The session of a [DartMultiFactorResolver]: `FirebaseAuth.verifyPhoneNumber`
+/// with it sends the SMS code of an SMS factor through the client's resolver,
+/// [source], whose `session` wraps the backend's pending credential. Its [id]
+/// is opaque (`sign-in-<n>`, numbered in the order the sessions were made): it
+/// is not the pending credential, so printing or logging it shows no secret.
 class DartMultiFactorSignInSession extends MultiFactorSession {
-  DartMultiFactorSignInSession(super.id, this.source);
+  DartMultiFactorSignInSession(this.source)
+    : super('sign-in-${++_signInSessions}');
+
+  static int _signInSessions = 0;
 
   /// The resolver of `firebase_auth_providers_dart`; null for a challenge the
   /// client cannot finish (a link of a credential).

@@ -1,3 +1,14 @@
+## Unreleased
+
+- `PhoneAuthCredential.toJson` and `PhoneAuthCredential.fromJson`, in the JSON format of the JS SDK's `toJSON` and
+  `fromJSON`: a verification id with its code, or a temporary proof with its phone number (the `credential` of
+  `credential-already-in-use`). As in the JS SDK, empty values are left out and read back as missing, and
+  `fromJson` returns null when all four values are missing; it also returns null for JSON that is not a map or a
+  value that is not a string. `toString` still shows none of the values.
+- `MultiFactorResolver.session`: a `MultiFactorSession` of type `MultiFactorSessionType.signIn` that wraps the
+  pending credential of the sign-in (`resolver.session` of the JS SDK). It is opaque: no member, `toString` or JSON
+  form shows the credential.
+
 ## 0.3.2
 
 - `FirebaseUserAuth.refreshToken`: the refresh token of the signed-in user's session, null when signed out; it

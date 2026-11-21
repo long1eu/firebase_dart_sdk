@@ -1,3 +1,9 @@
+## Unreleased
+
+- The id of a `MultiFactorResolver.session` is opaque (`sign-in-<n>`) instead of the backend's pending credential,
+  so printing or logging the session shows no secret. `verifyPhoneNumber(multiFactorSession:)` with it still sends
+  the SMS of the sign-in through the client's resolver, whose new `session` carries the credential.
+
 ## 0.1.1
 
 - `User.refreshToken`: the client's refresh token while that user is signed in, null for a `User` kept after a

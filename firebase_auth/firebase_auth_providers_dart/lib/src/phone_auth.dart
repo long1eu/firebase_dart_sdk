@@ -82,7 +82,69 @@ class PhoneAuthCredential extends AuthCredential {
 
   /// The verified phone number of a temporary proof; null otherwise. Not part of [toString].
   final String? phoneNumber;
+
+  /// The credential in the JSON shape of the JS SDK's `toJSON`, which [fromJson] here and
+  /// `PhoneAuthCredential.fromJSON` of the JS SDK read back: `providerId` (`phone`), then
+  /// `phoneNumber`, `temporaryProof`, `verificationCode` and `verificationId` when they are set and
+  /// not empty.
+  ///
+  /// The map holds the code of the SMS or the temporary proof and the phone number: keep it as
+  /// secret as they are.
+  Map<String, Object?> toJson() => <String, Object?>{
+    'providerId': providerId,
+    'phoneNumber': ?_nonEmptyString(phoneNumber),
+    'temporaryProof': ?_nonEmptyString(temporaryProof),
+    'verificationCode': ?_nonEmptyString(verificationCode),
+    'verificationId': ?_nonEmptyString(verificationId),
+  };
+
+  /// Reads the JSON of [toJson] or of the JS SDK's `toJSON` (`PhoneAuthCredential.fromJSON`):
+  /// [json] is the map, or its JSON text. Both forms read back: a verification id with its code,
+  /// and a temporary proof with its phone number (the [FirebaseAuthException.credential] of
+  /// `credential-already-in-use`).
+  ///
+  /// As in the JS SDK, `providerId` is not looked at, an empty value counts as missing, and the
+  /// result is null when `verificationId`, `verificationCode`, `phoneNumber` and `temporaryProof`
+  /// are all missing; text that is not JSON throws (a [FormatException] here, as `JSON.parse`
+  /// throws there). Like the JS SDK, it does not check that the values make one of the two forms: a
+  /// credential without one fails when it is used. Unlike the JS SDK, the result is also null when
+  /// [json] is not a map or one of the four fields is there and not a string.
+  static PhoneAuthCredential? fromJson(Object json) {
+    final Map<Object?, Object?>? map = credentialJsonMap(json);
+    if (map == null ||
+        _phoneJsonKeys.any((String key) => map[key] is! String?)) {
+      return null;
+    }
+    final String? verificationId = _nonEmptyString(map['verificationId']);
+    final String? verificationCode = _nonEmptyString(map['verificationCode']);
+    final String? temporaryProof = _nonEmptyString(map['temporaryProof']);
+    final String? phoneNumber = _nonEmptyString(map['phoneNumber']);
+    if (verificationId == null &&
+        verificationCode == null &&
+        temporaryProof == null &&
+        phoneNumber == null) {
+      return null;
+    }
+    return PhoneAuthCredential._(
+      verificationId: verificationId,
+      verificationCode: verificationCode,
+      temporaryProof: temporaryProof,
+      phoneNumber: phoneNumber,
+    );
+  }
 }
+
+/// The keys of the JSON of a [PhoneAuthCredential] that hold an optional string.
+const List<String> _phoneJsonKeys = <String>[
+  'verificationId',
+  'verificationCode',
+  'temporaryProof',
+  'phoneNumber',
+];
+
+/// [value] when it is a string that is not empty, else null (`value || undefined` of the JS SDK).
+String? _nonEmptyString(Object? value) =>
+    value is String && value.isNotEmpty ? value : null;
 
 /// The credential of a temporary proof of the backend, or null when [response] has none. Not
 /// exported.

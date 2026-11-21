@@ -1,9 +1,11 @@
-// The JSON of the credentials: the shape of toJSON of the JS SDK (as JSON.stringify writes it), and fromJSON /
-// OAuthProvider.credentialFromJSON reading it back.
+// The JSON of the credentials: the shape of toJSON of the JS SDK (as JSON.stringify writes it), and
+// fromJSON / OAuthProvider.credentialFromJSON reading it back.
 //
-// The fixtures are what the JS SDK writes, derived from its sources (packages/auth/src/core/credentials/email.ts
-// toJSON and oauth.ts toJSON): JSON.stringify drops the keys whose value is undefined and keeps the null ones
-// (EmailAuthCredential._tenantId and OAuthCredential.pendingToken default to null).
+// The fixtures are what the JS SDK writes, derived from its sources
+// (packages/auth/src/core/credentials/email.ts, oauth.ts and phone.ts toJSON): JSON.stringify drops
+// the keys whose value is undefined and keeps the null ones (EmailAuthCredential._tenantId and
+// OAuthCredential.pendingToken default to null); phone.ts writes only the values that are set and
+// not empty.
 
 import 'dart:convert';
 
@@ -314,6 +316,115 @@ void main() {
       expect('$read $email', isNot(contains('secret')));
     });
   });
+  group('PhoneAuthCredential', () {
+    test('verification id and code: the JSON of the JS SDK, and back', () {
+      final PhoneAuthCredential credential = PhoneAuthProvider.credential(
+        verificationId: 'session-1',
+        verificationCode: '123456',
+      );
+
+      final Map<String, Object?> json = credential.toJson();
+
+      expect(
+        jsonEncode(json),
+        '{"providerId":"phone","verificationCode":"123456","verificationId":"session-1"}',
+      );
+      for (final Object input in <Object>[json, jsonEncode(json)]) {
+        final PhoneAuthCredential read = PhoneAuthCredential.fromJson(input)!;
+        expect(read.providerId, 'phone');
+        expect(read.signInMethod, 'phone');
+        expect(read.verificationId, 'session-1');
+        expect(read.verificationCode, '123456');
+        expect(read.temporaryProof, isNull);
+        expect(read.phoneNumber, isNull);
+        expect(read.toJson(), json);
+      }
+    });
+
+    test(
+      'temporary proof and phone number: the JSON of the JS SDK, and back',
+      () {
+        const String js =
+            '{"providerId":"phone","phoneNumber":"+15555550100","temporaryProof":"proof-1"}';
+
+        final PhoneAuthCredential read = PhoneAuthCredential.fromJson(js)!;
+
+        expect(read.temporaryProof, 'proof-1');
+        expect(read.phoneNumber, '+15555550100');
+        expect(read.verificationId, isNull);
+        expect(read.verificationCode, isNull);
+        expect(jsonEncode(read.toJson()), js);
+        expect(_stringified(read.toJson()), read.toJson());
+      },
+    );
+
+    test('empty values are left out of toJson and read back as missing', () {
+      final PhoneAuthCredential credential = PhoneAuthProvider.credential(
+        verificationId: 'session-1',
+        verificationCode: '',
+      );
+
+      expect(credential.toJson(), <String, Object?>{
+        'providerId': 'phone',
+        'verificationId': 'session-1',
+      });
+      final PhoneAuthCredential read = PhoneAuthCredential.fromJson(
+        '{"verificationId":"session-1","verificationCode":"","phoneNumber":""}',
+      )!;
+      expect(read.verificationCode, isNull);
+      expect(read.phoneNumber, isNull);
+    });
+
+    test('fromJson does not look at providerId, as in the JS SDK', () {
+      final PhoneAuthCredential read = PhoneAuthCredential.fromJson(
+        '{"providerId":"password","verificationId":"session-1","verificationCode":"1"}',
+      )!;
+
+      expect(read.providerId, 'phone');
+      expect(read.verificationId, 'session-1');
+    });
+
+    test('fromJson returns null for JSON that is not a phone credential', () {
+      final List<Object> inputs = <Object>[
+        <String, Object?>{},
+        <String, Object?>{'providerId': 'phone'},
+        <String, Object?>{
+          'verificationId': '',
+          'verificationCode': '',
+          'phoneNumber': '',
+          'temporaryProof': '',
+        },
+        <String, Object?>{'verificationId': 1, 'verificationCode': '1'},
+        <String, Object?>{'temporaryProof': 'p', 'phoneNumber': true},
+        '[]',
+        '"phone"',
+        '1',
+        <Object?>['verificationId'],
+      ];
+      for (final Object input in inputs) {
+        expect(PhoneAuthCredential.fromJson(input), isNull, reason: '$input');
+      }
+    });
+
+    test('fromJson throws a FormatException for text that is not JSON', () {
+      expect(
+        () => PhoneAuthCredential.fromJson('{verificationId:'),
+        throwsFormatException,
+      );
+    });
+
+    test('toString leaves out the code, the proof and the number', () {
+      final PhoneAuthCredential code = PhoneAuthCredential.fromJson(
+        '{"verificationId":"id-secret","verificationCode":"code-secret"}',
+      )!;
+      final PhoneAuthCredential proof = PhoneAuthCredential.fromJson(
+        '{"temporaryProof":"proof-secret","phoneNumber":"+15555550100"}',
+      )!;
+
+      expect('$code $proof', isNot(contains('secret')));
+      expect('$proof', isNot(contains('5555550100')));
+    });
+  });
   group('a credential read from the JSON of the JS SDK signs in', () {
     late FakeBackend backend;
     late FirebaseUserAuth auth;
@@ -368,5 +479,55 @@ void main() {
         'providerId': 'twitter.com',
       });
     });
+
+    test('a phone credential sends the verification id and the code', () async {
+      backend.on('accounts:signInWithPhoneNumber', (Map<String, Object?> body) {
+        backend.accounts['u'] = <String, Object?>{
+          'phoneNumber': '+15555550100',
+        };
+        return jsonResponse(backend.tokensFor('u', provider: 'phone'));
+      });
+
+      await auth.signInWithCredential(
+        PhoneAuthCredential.fromJson(
+          '{"providerId":"phone","verificationCode":"123456",'
+          '"verificationId":"session-1"}',
+        )!,
+      );
+
+      expect(
+        backend.bodiesOf('accounts:signInWithPhoneNumber').single,
+        <String, Object?>{'sessionInfo': 'session-1', 'code': '123456'},
+      );
+    });
+
+    test(
+      'a phone credential sends the temporary proof and the number',
+      () async {
+        backend.on('accounts:signInWithPhoneNumber', (
+          Map<String, Object?> body,
+        ) {
+          backend.accounts['u'] = <String, Object?>{
+            'phoneNumber': '+15555550100',
+          };
+          return jsonResponse(backend.tokensFor('u', provider: 'phone'));
+        });
+
+        await auth.signInWithCredential(
+          PhoneAuthCredential.fromJson(
+            '{"providerId":"phone","phoneNumber":"+15555550100",'
+            '"temporaryProof":"proof-1"}',
+          )!,
+        );
+
+        expect(
+          backend.bodiesOf('accounts:signInWithPhoneNumber').single,
+          <String, Object?>{
+            'temporaryProof': 'proof-1',
+            'phoneNumber': '+15555550100',
+          },
+        );
+      },
+    );
   });
 }

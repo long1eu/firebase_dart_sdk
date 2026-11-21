@@ -66,7 +66,7 @@ import 'src/oauth_token_provider.dart';
 export 'src/action_code.dart';
 export 'src/app_verification.dart' hide appVerificationFields;
 export 'src/auth_constants.dart';
-export 'src/auth_credential.dart';
+export 'src/auth_credential.dart' hide credentialJsonMap;
 export 'src/auth_emulator_config.dart';
 export 'src/auth_exception.dart';
 export 'src/auth_storage.dart';
