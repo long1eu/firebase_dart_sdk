@@ -29,14 +29,14 @@ enum MetadataField {
 /// A field left null is not sent: an upload uses the default of the backend (for [contentType],
 /// `application/octet-stream`), and `updateMetadata` leaves the field of the object as it is. To remove a field
 /// with `updateMetadata`, name it in [delete]; the JS SDK does the same with a field set to `null`, which a Dart
-/// constructor cannot tell apart from a field that is not given. [customMetadata] replaces the custom keys it
-/// names and keeps the others.
+/// constructor cannot tell apart from a field that is not given. [customMetadata] sets the custom keys it
+/// names, removes those whose value is null (like a `null` value in the JS SDK), and keeps the others.
 ///
 /// ```dart
 /// await ref.updateMetadata(
 ///   const SettableMetadata(
 ///     cacheControl: 'public, max-age=300',
-///     customMetadata: <String, String>{'owner': 'me'},
+///     customMetadata: <String, String?>{'owner': 'me', 'draft': null},
 ///     delete: <MetadataField>{MetadataField.contentLanguage},
 ///   ),
 /// );
@@ -70,8 +70,9 @@ final class SettableMetadata {
   /// `Content-Type` of the object, for example `image/png`.
   final String? contentType;
 
-  /// Your own key-value pairs.
-  final Map<String, String>? customMetadata;
+  /// Your own key-value pairs. With `Reference.updateMetadata`, a null value removes that key and the keys not
+  /// named stay; an upload leaves the keys with a null value out.
+  final Map<String, String?>? customMetadata;
 
   /// The MD5 hash of the content in base64, sent with an upload so that the backend checks it (like
   /// `UploadMetadata.md5Hash` of the JS SDK). `updateMetadata` ignores it.
@@ -88,7 +89,7 @@ final class SettableMetadata {
     String? contentEncoding,
     String? contentLanguage,
     String? contentType,
-    Map<String, String>? customMetadata,
+    Map<String, String?>? customMetadata,
     String? md5Hash,
     Set<MetadataField>? delete,
   }) {
@@ -159,8 +160,11 @@ final class SettableMetadata {
       if (metadata?.contentLanguage case final String value)
         'contentLanguage': value,
       'contentType': contentType,
-      if (metadata?.customMetadata case final Map<String, String> value)
-        'metadata': value,
+      if (metadata?.customMetadata case final Map<String, String?> value)
+        'metadata': <String, String>{
+          for (final MapEntry<String, String?> entry in value.entries)
+            if (entry.value case final String text) entry.key: text,
+        },
     };
   }
 
@@ -369,18 +373,18 @@ final class FullMetadata {
       value is String ? DateTime.tryParse(value) : null;
 }
 
-int _entryHash(MapEntry<String, String> entry) =>
+int _entryHash(MapEntry<String, String?> entry) =>
     Object.hash(entry.key, entry.value);
 
-bool _mapEquals(Map<String, String>? a, Map<String, String>? b) {
+bool _mapEquals(Map<String, String?>? a, Map<String, String?>? b) {
   if (a == null || b == null) {
     return a == b;
   }
   if (a.length != b.length) {
     return false;
   }
-  for (final MapEntry<String, String> entry in a.entries) {
-    if (b[entry.key] != entry.value) {
+  for (final MapEntry<String, String?> entry in a.entries) {
+    if (!b.containsKey(entry.key) || b[entry.key] != entry.value) {
       return false;
     }
   }
