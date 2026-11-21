@@ -1,4 +1,4 @@
-## Unreleased
+## 0.2.1
 
 - `GetTokenResult.signInSecondFactor`: the second factor of the sign-in (`firebase.sign_in_second_factor`), or null.
 

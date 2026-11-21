@@ -126,7 +126,7 @@ packages:
       path: "../../firebase_core/firebase_app_dart"
       relative: true
     source: path
-    version: "0.2.0"
+    version: "0.2.1"
   fixnum:
     dependency: transitive
     description:

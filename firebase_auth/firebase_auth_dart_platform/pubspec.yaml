@@ -33,7 +33,7 @@ dependencies:
   # firebase_app_dart from the sibling packages through pubspec_overrides.yaml
   # (not published). 0.3.1 is the first version with
   # FirebaseUserAuth.useEmulator.
-  firebase_app_dart: ^0.2.0
+  firebase_app_dart: ^0.2.1
   firebase_auth_platform_interface: ^9.1.2
   firebase_auth_providers_dart: ^0.3.1
   # The default storage of the sessions (not on the web). Resolved from the
