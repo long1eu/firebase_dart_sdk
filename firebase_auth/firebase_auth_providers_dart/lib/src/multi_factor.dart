@@ -399,8 +399,16 @@ class MultiFactorResolver {
   String toString() => 'MultiFactorResolver(hints: $hints)';
 }
 
-/// The kind of a [MultiFactorSession] (`MultiFactorSessionType` of the JS SDK).
+/// The kind of a [MultiFactorSession] (`MultiFactorSessionType` of the JS SDK): the same two kinds
+/// as there, so that a `switch` over it stays exhaustive when this package makes an enrolment
+/// session.
 enum MultiFactorSessionType {
+  /// The session of an enrolment of a second factor for the signed-in user (`ENROLL` of the JS
+  /// SDK, which wraps the user's ID token). This package makes none yet: its enrolments use the
+  /// signed-in user directly ([FirebaseUserAuth.startTotpEnrollment],
+  /// [FirebaseUserAuth.startPhoneEnrollment]).
+  enroll,
+
   /// The session of a sign-in or a reauthentication that waits for a second factor: it wraps the
   /// backend's pending credential (`SIGN_IN` of the JS SDK).
   signIn,
@@ -408,9 +416,9 @@ enum MultiFactorSessionType {
 
 /// The session of a multi-factor operation (`MultiFactorSession` of the JS SDK and of FlutterFire):
 /// in this package only [MultiFactorResolver.session], of type [MultiFactorSessionType.signIn],
-/// which wraps the pending credential of the sign-in. The enrolments of this package need no session object:
-/// [FirebaseUserAuth.startPhoneEnrollment] and [FirebaseUserAuth.startTotpEnrollment] use the
-/// signed-in user.
+/// which wraps the pending credential of the sign-in. The enrolments of this package need no
+/// session object: [FirebaseUserAuth.startPhoneEnrollment] and
+/// [FirebaseUserAuth.startTotpEnrollment] use the signed-in user.
 ///
 /// It is opaque: the pending credential is a secret, and neither [toString] nor any member shows
 /// it. Its resolver finishes the sign-in.

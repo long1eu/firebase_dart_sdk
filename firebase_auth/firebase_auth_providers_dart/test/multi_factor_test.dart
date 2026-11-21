@@ -351,6 +351,11 @@ void main() {
         final MultiFactorResolver resolver = e.resolver!;
 
         expect(resolver.session.type, MultiFactorSessionType.signIn);
+        // ENROLL and SIGN_IN, as in the JS SDK, so that a switch stays exhaustive.
+        expect(MultiFactorSessionType.values, <MultiFactorSessionType>[
+          MultiFactorSessionType.enroll,
+          MultiFactorSessionType.signIn,
+        ]);
         expect(identical(resolver.session, resolver.session), isTrue);
         expect('${resolver.session}', 'MultiFactorSession(signIn)');
         expect('$resolver', isNot(contains('pending:')));

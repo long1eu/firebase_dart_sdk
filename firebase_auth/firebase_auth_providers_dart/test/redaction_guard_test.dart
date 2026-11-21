@@ -245,7 +245,53 @@ _holders = <(String, Object Function())>[
       resolver: _resolver(),
     ),
   ),
+  (
+    'FormatException of malformed phone JSON (verification code)',
+    () => _thrown(
+      () => PhoneAuthCredential.fromJson(
+        '{"verificationId":"sentinel-verification-id","verificationCode":"sentinel-sms-code"',
+      ),
+    ),
+  ),
+  (
+    'FormatException of malformed phone JSON (temporary proof)',
+    () => _thrown(
+      () => PhoneAuthCredential.fromJson(
+        '{"temporaryProof":"sentinel-temporary-proof","phoneNumber":sentinel-phone}',
+      ),
+    ),
+  ),
+  (
+    'FormatException of malformed email JSON',
+    () => _thrown(
+      () => EmailAuthCredential.fromJson(
+        '{"email":"sentinel@example.com","password":"sentinel-password',
+      ),
+    ),
+  ),
+  (
+    'FormatException of malformed OAuth JSON',
+    () => _thrown(
+      () => OAuthCredential.fromJson('{"accessToken":"sentinel-access-token",'),
+    ),
+  ),
+  (
+    'FormatException of malformed OAuth JSON (credentialFromJson)',
+    () => _thrown(
+      () => OAuthProvider.credentialFromJson("{'idToken':'sentinel-id-token'}"),
+    ),
+  ),
 ];
+
+/// What [read] throws; the test fails when it returns.
+Object _thrown(Object? Function() read) {
+  try {
+    read();
+  } on Object catch (e) {
+    return e;
+  }
+  fail('expected an exception');
+}
 
 /// The `toJson` of types whose JSON is not meant to carry secrets.
 final List<(String, Map<String, Object?> Function())> _jsonWithoutSecrets =
@@ -287,6 +333,7 @@ List<String> _stringsOf(Object value) => <String>[
     '${value.user}',
   ],
   if (value is OAuthLoopbackResult) '${value.credential}',
+  if (value is FormatException) ...<String>[value.message, '${value.source}'],
 ];
 
 void main() {
