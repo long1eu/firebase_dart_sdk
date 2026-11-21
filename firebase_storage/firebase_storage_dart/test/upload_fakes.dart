@@ -2,7 +2,10 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 
+import 'package:firebase_app_dart/firebase_app_dart.dart';
+import 'package:firebase_storage_dart/firebase_storage_dart.dart';
 import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
 
 import 'fakes.dart';
 
@@ -175,3 +178,51 @@ final class GatedTime extends FakeTime {
 Uint8List patternBytes(int length) => Uint8List.fromList(
   List<int>.generate(length, (int i) => (i * 7 + i ~/ 251) & 0xff),
 );
+
+/// A [FirebaseStorage] whose client reads each request body slowly: every piece of it advances [time] by
+/// [perPiece], then waits for [onConsumed] (with the bytes read so far), before [server] handles the request.
+FirebaseStorage slowStorage(
+  FirebaseApp app,
+  FakeUploadServer server,
+  FakeTime time, {
+  Duration perPiece = const Duration(milliseconds: 200),
+  Future<void> Function(Recorded request, int consumed)? onConsumed,
+}) {
+  return FirebaseStorage(
+    app,
+    httpClient: MockClient.streaming((
+      http.BaseRequest request,
+      http.ByteStream body,
+    ) async {
+      final BytesBuilder builder = BytesBuilder();
+      final Recorded partial = Recorded(
+        request.method,
+        request.url,
+        request.headers,
+        const <int>[],
+      );
+      await for (final List<int> piece in body) {
+        builder.add(piece);
+        time.now = time.now.add(perPiece);
+        await onConsumed?.call(partial, builder.length);
+        await Future<void>.delayed(Duration.zero);
+      }
+      final http.Response response = await server.handle(
+        Recorded(
+          request.method,
+          request.url,
+          request.headers,
+          builder.takeBytes(),
+        ),
+      );
+      return http.StreamedResponse(
+        Stream<List<int>>.value(response.bodyBytes),
+        response.statusCode,
+        headers: response.headers,
+      );
+    }),
+    clock: time.clock,
+    random: () => 0.5,
+    delay: time.delay,
+  );
+}

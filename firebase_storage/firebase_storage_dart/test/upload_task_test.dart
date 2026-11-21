@@ -1069,6 +1069,164 @@ void main() {
     });
   });
 
+  group('progress while sending', () {
+    /// The events of [events] that are not at a confirmed offset in [confirmed].
+    List<int> inChunk(List<UploadProgress> events, Set<int> confirmed) => <int>[
+      for (final UploadProgress p in events)
+        if (!confirmed.contains(p.bytesTransferred)) p.bytesTransferred,
+    ];
+
+    test('a chunk reports its bytes as the client takes them', () async {
+      storage.close();
+      storage = slowStorage(app, server, time);
+      final Uint8List data = patternBytes(1 * mib);
+      final UploadTask task = ref().startUpload(data);
+      final List<UploadProgress> events = await eventsOf(task);
+
+      const Set<int> confirmed = <int>{0, 256 * kib, 768 * kib, 1 * mib};
+      final List<int> sending = inChunk(events, confirmed);
+      expect(sending, isNotEmpty);
+      // Every confirmed offset has its own event.
+      for (final int offset in confirmed) {
+        expect(
+          events.map((UploadProgress p) => p.bytesTransferred),
+          contains(offset),
+        );
+      }
+      // Never backwards without a failure, at least 64 KiB apart, and never past the data.
+      for (int i = 1; i < events.length; i++) {
+        final int step =
+            events[i].bytesTransferred - events[i - 1].bytesTransferred;
+        expect(step, greaterThanOrEqualTo(0), reason: 'event $i');
+        if (events[i].state == UploadState.running) {
+          expect(step, greaterThanOrEqualTo(64 * kib), reason: 'event $i');
+        }
+      }
+      expect(
+        events.every((UploadProgress p) => p.totalBytes == data.length),
+        isTrue,
+      );
+      expect(events.last.state, UploadState.success);
+      expect(server.received, data);
+    });
+
+    test('events come at most every 100 ms', () async {
+      storage.close();
+      storage = slowStorage(
+        app,
+        server,
+        time,
+        perPiece: const Duration(milliseconds: 10),
+      );
+      final List<UploadProgress> slow = await eventsOf(
+        ref().startUpload(patternBytes(4 * mib)),
+      );
+      final List<int> sending = inChunk(slow, <int>{
+        0,
+        256 * kib,
+        768 * kib,
+        1792 * kib,
+        3840 * kib,
+        4 * mib,
+      });
+      // 64 pieces of 10 ms: 640 ms, so at most 6 events between the confirmed ones.
+      expect(sending, isNotEmpty);
+      expect(sending.length, lessThanOrEqualTo(6));
+    });
+
+    test(
+      'a failed chunk goes back to the confirmed bytes with an event',
+      () async {
+        storage.close();
+        server.chunkHook = (int index, _) =>
+            index == 1 ? http.Response('', 503) : null;
+        storage = slowStorage(app, server, time);
+        final Uint8List data = patternBytes(1 * mib);
+        final UploadTask task = ref().startUpload(data);
+        final List<int> bytes = <int>[
+          for (final UploadProgress p in await eventsOf(task))
+            p.bytesTransferred,
+        ];
+
+        final int peak = bytes.indexWhere((int b) => b > 256 * kib);
+        expect(peak, isNot(-1));
+        final int back = bytes.indexOf(256 * kib, peak);
+        expect(back, greaterThan(peak), reason: '$bytes');
+        expect(bytes.last, data.length);
+        expect(server.received, data);
+        expect(commands(), contains('query'));
+      },
+    );
+
+    test(
+      'pause during a chunk reports the confirmed bytes, then paused',
+      () async {
+        storage.close();
+        final Completer<void> reached = Completer<void>();
+        final Completer<void> gate = Completer<void>();
+        storage = slowStorage(
+          app,
+          server,
+          time,
+          onConsumed: (Recorded request, int consumed) async {
+            final bool secondChunk =
+                request.headers['x-goog-upload-offset'] == '${256 * kib}';
+            if (secondChunk && consumed >= 192 * kib) {
+              if (!reached.isCompleted) {
+                reached.complete();
+              }
+              await gate.future;
+            }
+          },
+        );
+        final UploadTask task = ref().startUpload(patternBytes(1 * mib));
+        final Future<List<UploadProgress>> events = eventsOf(task);
+        await reached.future;
+        await pumpEventQueue();
+        expect(task.bytesTransferred, greaterThan(256 * kib));
+
+        expect(task.pause(), isTrue);
+        final UploadProgress paused = await task.progress.firstWhere(
+          (UploadProgress p) => p.state == UploadState.paused,
+        );
+        expect(paused.bytesTransferred, 256 * kib);
+        expect(task.bytesTransferred, 256 * kib);
+        task.cancel();
+        await expectLater(task.result, throwsStorageCode('canceled'));
+        final List<UploadProgress> all = await events;
+        final int pausedAt = all.indexWhere(
+          (UploadProgress p) => p.state == UploadState.paused,
+        );
+        expect(all[pausedAt - 1].state, UploadState.running);
+        expect(all[pausedAt - 1].bytesTransferred, 256 * kib);
+        gate.complete();
+      },
+    );
+
+    test('a one-shot upload reports the data part of its body', () async {
+      storage.close();
+      storage = slowStorage(app, server, time);
+      final Uint8List data = patternBytes(250 * kib);
+      final List<UploadProgress> events = await eventsOf(
+        ref().startUpload(data),
+      );
+
+      final List<int> sending = inChunk(events, <int>{0, data.length});
+      expect(sending, isNotEmpty);
+      expect(sending.every((int b) => b > 0 && b < data.length), isTrue);
+      expect(
+        events
+            .sublist(events.length - 2)
+            .map((UploadProgress p) => (p.state, p.bytesTransferred)),
+        <(UploadState, int)>[
+          (UploadState.running, data.length),
+          (UploadState.success, data.length),
+        ],
+      );
+      expect(server.requests, hasLength(1));
+    });
+  });
+
   group('stream', () {
     Stream<List<int>> eventsOfSize(Uint8List data, int size) async* {
       for (int i = 0; i < data.length; i += size) {
