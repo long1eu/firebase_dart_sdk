@@ -17,6 +17,8 @@ import 'package:firebase_auth_dart_platform/firebase_auth_dart_platform.dart';
 import 'package:firebase_auth_providers_dart/firebase_auth_providers_dart.dart'
     show FileAuthStorage, openInSystemBrowser;
 import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter/foundation.dart'
+    show TargetPlatform, debugDefaultTargetPlatformOverride;
 import 'package:flutter_test/flutter_test.dart';
 
 import 'cleanup.dart';
@@ -29,6 +31,14 @@ void main() {
   test(
     'real-project auth harness',
     () async {
+      // `flutter test` reports Android as the platform; the shim then asks for
+      // a presenter. The harness runs on the desktop it is started on.
+      debugDefaultTargetPlatformOverride = switch (Platform.operatingSystem) {
+        'macos' => TargetPlatform.macOS,
+        'windows' => TargetPlatform.windows,
+        _ => TargetPlatform.linux,
+      };
+      addTearDown(() => debugDefaultTargetPlatformOverride = null);
       final (List<StepResult> results, List<String> problems) = await _run(
         HarnessConfig.fromEnvironment(Platform.environment),
       );
