@@ -1,0 +1,13 @@
+// Code signing of the Runner target. The keychain-access-groups entitlement (the data-protection
+// keychain) needs a provisioning profile, so the app is signed with an Apple Development
+// certificate even in Debug; ad-hoc signing ("Sign to Run Locally") cannot carry it.
+//
+// By default Xcode manages a development profile (automatic signing) for team DKY2FBVP6L. To
+// use another team, or the Developer ID profile of fastlane match (as CI does), write the
+// settings to Signing.local.xcconfig next to this file (ignored by git); its values replace
+// these. The README of the package has both.
+CODE_SIGN_STYLE = Automatic
+CODE_SIGN_IDENTITY = Apple Development
+DEVELOPMENT_TEAM = DKY2FBVP6L
+
+#include? "Signing.local.xcconfig"

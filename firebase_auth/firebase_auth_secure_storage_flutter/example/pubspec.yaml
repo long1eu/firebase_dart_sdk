@@ -1,0 +1,25 @@
+name: firebase_auth_secure_storage_example
+description: >-
+  A Flutter macOS app that keeps the session of a FirebaseUserAuth in the
+  data-protection keychain, and the integration tests of
+  firebase_auth_secure_storage_flutter against the real keychain.
+publish_to: none
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.8.0
+  flutter: '>=3.32.0'
+
+dependencies:
+  firebase_auth_providers_dart: ^0.3.0
+  firebase_auth_secure_storage_flutter:
+    path: ../
+  flutter:
+    sdk: flutter
+
+dev_dependencies:
+  flutter_lints: ^6.0.0
+  flutter_test:
+    sdk: flutter
+  integration_test:
+    sdk: flutter
