@@ -22,6 +22,7 @@ Future<void> main() async {
     await ref.openRead(0, 10).length,
     await ref.getBytes(maxSize: 10),
     await ref.metadata(),
+    ref.startStreamUpload,
   ]);
   storage.close();
 }

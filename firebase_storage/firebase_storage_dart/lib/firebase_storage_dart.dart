@@ -38,3 +38,5 @@ export 'src/metadata.dart' show FullMetadata, MetadataField, SettableMetadata;
 export 'src/reference.dart';
 export 'src/retry_policy.dart';
 export 'src/string_format.dart' show StringFormat;
+export 'src/upload/upload_task.dart'
+    show UploadProgress, UploadState, UploadTask;

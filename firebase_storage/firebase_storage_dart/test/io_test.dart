@@ -120,4 +120,15 @@ void main() {
       expect(namesIn(dir), isEmpty);
     });
   });
+
+  group('putFile', () {
+    test('a missing file throws a FileSystemException at once', () {
+      expect(
+        () => refOn(
+          StreamingClient.chunks(<String>[]),
+        ).putFile(File('${dir.path}/missing.bin')),
+        throwsA(isA<FileSystemException>()),
+      );
+    });
+  });
 }
