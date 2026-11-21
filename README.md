@@ -81,8 +81,8 @@ from 0.1? The 0.2 API took FlutterFire's names: [what changed](docs/api_migratio
 | Package | pub.dev | Who needs it |
 |---|---|---|
 | [`cloud_firestore_dart`](cloud_firestore/cloud_firestore_dart/) | 0.3.2 | Any Dart program, server or Flutter app that calls Firestore through this client |
-| [`firebase_app_dart`](firebase_core/firebase_app_dart/) | 0.2.0 | Every user of `cloud_firestore_dart`: the `FirebaseApp` and its options |
-| [`firebase_auth_providers_dart`](firebase_auth/firebase_auth_providers_dart/) | 0.3.0 | Apps with signed-in users, and servers with a service account or Application Default Credentials |
+| [`firebase_app_dart`](firebase_core/firebase_app_dart/) | 0.2.1 | Every user of `cloud_firestore_dart`: the `FirebaseApp` and its options |
+| [`firebase_auth_providers_dart`](firebase_auth/firebase_auth_providers_dart/) | 0.3.1 | Apps with signed-in users, and servers with a service account or Application Default Credentials |
 | [`secure_flow`](secure_flow/secure_flow/) | 0.1.0, unreleased | Desktop apps and command line tools with a browser step (OAuth sign-in, reCAPTCHA, a typed code); used by `firebase_auth_providers_dart` |
 | [`cloud_firestore_dart_sqlite`](cloud_firestore/cloud_firestore_dart_sqlite/) | 0.1.3 | Anyone who wants the offline cache on disk instead of in memory |
 | [`cloud_firestore_dart_platform`](cloud_firestore/cloud_firestore_dart_platform/) | 0.1.2 | Flutter apps written against the official `cloud_firestore` API, on Linux or by choice elsewhere |
