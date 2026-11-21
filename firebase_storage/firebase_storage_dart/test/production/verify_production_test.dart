@@ -68,6 +68,8 @@ void main() {
         '17': Status.pass,
         '18': Status.pass,
         '19': Status.pass,
+        // Needs --create-user and the Auth emulator; see the last test.
+        '20': Status.skipped,
       };
       expect(
         <String, Status>{
@@ -184,18 +186,71 @@ void main() {
     expect(run.exitCode, 2);
   });
 
-  test('--auth=user needs the whole test user in the environment', () async {
+  test('--create-user needs the API key in production', () async {
     final StringBuffer out = StringBuffer();
     final KitRun run = await runKit(
-      <String>['--backend=emulator', '--auth=user'],
+      <String>['--backend=production', '--create-user', '--yes'],
       out: out,
       environment: <String, String>{
-        emulatorHostVariable: '127.0.0.1:1',
-        userEmailVariable: 'someone@example.com',
+        projectVariable: 'my-project',
+        bucketVariable: 'b',
       },
     );
     expect(run.exitCode, 2);
-    expect(out.toString(), contains(userPasswordVariable));
-    expect(out.toString(), isNot(contains('someone@example.com')));
+    expect(out.toString(), contains(webApiKeyVariable));
+    expect(run.results, isEmpty);
   });
+
+  test('--create-user on the emulator needs the Auth emulator', () async {
+    final KitRun run = await runKit(
+      <String>['--backend=emulator', '--create-user'],
+      out: StringBuffer(),
+      environment: <String, String>{emulatorHostVariable: '127.0.0.1:1'},
+    );
+    expect(run.exitCode, 2);
+  });
+
+  // Needs the Auth emulator too: tool/start_auth_emulators.sh 9398 9397 (AUTH_HUB_PORT=9498
+  // AUTH_LOGGING_PORT=9598) and FIREBASE_AUTH_EMULATOR_HOST=127.0.0.1:9398.
+  final String? authHost = Platform.environment[authEmulatorHostVariable];
+  test(
+    'a throwaway user signs the checks in and is deleted at the end',
+    () async {
+      final StringBuffer out = StringBuffer();
+      final KitRun run = await runKit(
+        <String>[
+          '--backend=emulator',
+          '--create-user',
+          deniedBucket,
+          '--only=2,12,13,20',
+        ],
+        out: out,
+        environment: <String, String>{
+          ...environment,
+          authEmulatorHostVariable: authHost ?? '',
+        },
+      );
+      final String report = out.toString();
+      expect(run.results['2']!.status, Status.pass, reason: report);
+      expect(run.results['12']!.status, Status.pass, reason: report);
+      expect(run.results['20']!.status, Status.pass, reason: report);
+      expect(run.results['20']!.observed['withoutUser'], 'unauthorized');
+      expect(
+        run.results['13']!.status,
+        anyOf(Status.pass, Status.inconclusive),
+        reason: report,
+      );
+      expect(report, contains('The throwaway user was deleted.'));
+      expect(report, isNot(contains('FAILED')));
+      final http.Response accounts = await http.get(
+        Uri.parse('http://$authHost/emulator/v1/projects/demo-test/accounts'),
+      );
+      expect(accounts.body, isNot(contains('storage-verify-')));
+      expect(await objectsBelow(run.prefix!), isEmpty);
+    },
+    skip:
+        skip ??
+        (authHost == null ? '$authEmulatorHostVariable is not set.' : null),
+    timeout: const Timeout(Duration(minutes: 3)),
+  );
 }
