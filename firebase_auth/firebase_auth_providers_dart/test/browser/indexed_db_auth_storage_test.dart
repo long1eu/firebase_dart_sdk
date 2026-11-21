@@ -19,6 +19,24 @@ import 'package:firebase_auth_providers_dart/firebase_auth_providers_dart.dart';
 import 'package:test/test.dart';
 import 'package:web/web.dart' as web;
 
+/// What goes before the `localStorage` keys of this file. The browser test files run side by side
+/// on one origin and share `localStorage`, so each file uses and cleans its own keys only.
+const String _p = 'idb_auth_storage_test:';
+
+/// The `localStorage` keys of this file.
+List<String> _ownKeys() => <String>[
+  for (int i = 0; i < web.window.localStorage.length; i++)
+    if (web.window.localStorage.key(i) case final String key
+        when key.startsWith(_p))
+      key,
+];
+
+void _clearOwnKeys() {
+  for (final String key in _ownKeys()) {
+    web.window.localStorage.removeItem(key);
+  }
+}
+
 int _databases = 0;
 
 /// The databases the current test used, deleted after it.
@@ -245,7 +263,7 @@ TypeMatcher<IndexedDbAuthStorageException> _storageError(
 
 /// The `localStorage` of the tests, whose read or delete can be made to throw.
 class _FlakyLocal extends WebAuthStorage {
-  _FlakyLocal() : super.local();
+  _FlakyLocal() : super.local(prefix: _p);
 
   bool readThrows = false;
   bool deleteThrows = false;
@@ -321,7 +339,7 @@ void main() {
       await _deleteDatabase(name);
     }
     _used.clear();
-    web.window.localStorage.clear();
+    _clearOwnKeys();
   });
 
   group('IndexedDbAuthStorage', () {
@@ -618,6 +636,7 @@ void _databaseTests(_NewStorage newStorage) {
         throwsA(_storageError(IndexedDbOperation.open)),
       );
       final BestWebAuthStorage best = BestWebAuthStorage(
+        localStoragePrefix: _p,
         databaseName: _newDatabase(),
       );
       expect(await best.kind, WebAuthStorageKind.localStorage);
@@ -683,7 +702,10 @@ void _choiceTests(_NewStorage newStorage) {
     () async {
       final String name = _newDatabase();
       final List<int> opens = _countOpens(name);
-      final BestWebAuthStorage storage = BestWebAuthStorage(databaseName: name);
+      final BestWebAuthStorage storage = BestWebAuthStorage(
+        localStoragePrefix: _p,
+        databaseName: name,
+      );
       expect(await storage.kind, WebAuthStorageKind.indexedDb);
       await storage.write('k', 'v');
       expect(await storage.read('k'), 'v');
@@ -694,38 +716,40 @@ void _choiceTests(_NewStorage newStorage) {
         await newStorage(name).read(IndexedDbAuthStorage.probeKey),
         isNull,
       );
-      expect(web.window.localStorage.getItem('k'), isNull);
+      expect(web.window.localStorage.getItem('${_p}k'), isNull);
     },
   );
 
   test('keys of other prefixes stay in localStorage', () async {
-    web.window.localStorage.setItem('other:k', 'theirs');
+    web.window.localStorage.setItem('${_p}other:k', 'theirs');
     final BestWebAuthStorage storage = BestWebAuthStorage(
       databaseName: _newDatabase(),
-      localStoragePrefix: 'app:',
+      localStoragePrefix: '${_p}app:',
     );
-    expect(storage.localStoragePrefix, 'app:');
+    expect(storage.localStoragePrefix, '${_p}app:');
     expect(await storage.read('k'), isNull);
-    expect(web.window.localStorage.getItem('other:k'), 'theirs');
+    expect(web.window.localStorage.getItem('${_p}other:k'), 'theirs');
   });
 
   test('falls back to localStorage without IndexedDB', () async {
     final String name = _newDatabase();
     final BestWebAuthStorage storage = BestWebAuthStorage.forTesting(
+      localStoragePrefix: _p,
       databaseName: name,
       indexedDbAvailable: () async => false,
     );
     expect(await storage.kind, WebAuthStorageKind.localStorage);
     await storage.write('k', 'v');
-    expect(web.window.localStorage.getItem('k'), 'v');
+    expect(web.window.localStorage.getItem('${_p}k'), 'v');
     expect(await storage.read('k'), 'v');
     expect(await newStorage(name).read('k'), isNull);
     await storage.write('k', null);
-    expect(web.window.localStorage.getItem('k'), isNull);
+    expect(web.window.localStorage.getItem('${_p}k'), isNull);
   });
 
   test('a check that throws counts as unavailable', () async {
     final BestWebAuthStorage storage = BestWebAuthStorage.forTesting(
+      localStoragePrefix: _p,
       databaseName: _newDatabase(),
       indexedDbAvailable: () => Future<bool>.error(StateError('boom')),
     );
@@ -735,6 +759,7 @@ void _choiceTests(_NewStorage newStorage) {
   test('falls back to memory without IndexedDB and localStorage', () async {
     final String name = _newDatabase();
     final BestWebAuthStorage storage = BestWebAuthStorage.forTesting(
+      localStoragePrefix: _p,
       databaseName: name,
       indexedDbAvailable: () async => false,
       localStorageAvailable: () => false,
@@ -742,11 +767,12 @@ void _choiceTests(_NewStorage newStorage) {
     expect(await storage.kind, WebAuthStorageKind.memory);
     await storage.write('k', 'v');
     expect(await storage.read('k'), 'v');
-    expect(web.window.localStorage.getItem('k'), isNull);
+    expect(web.window.localStorage.getItem('${_p}k'), isNull);
     expect(await newStorage(name).read('k'), isNull);
     // Memory belongs to the object.
     expect(
       await BestWebAuthStorage.forTesting(
+        localStoragePrefix: _p,
         databaseName: name,
         indexedDbAvailable: () async => false,
         localStorageAvailable: () => false,
@@ -758,6 +784,7 @@ void _choiceTests(_NewStorage newStorage) {
   test('decides once', () async {
     int checks = 0;
     final BestWebAuthStorage storage = BestWebAuthStorage.forTesting(
+      localStoragePrefix: _p,
       databaseName: _newDatabase(),
       indexedDbAvailable: () async {
         checks++;
@@ -781,7 +808,7 @@ void _choiceTests(_NewStorage newStorage) {
     );
     final FirebaseUserAuth auth = FirebaseUserAuth(
       apiKey: 'key',
-      storage: BestWebAuthStorage(databaseName: name),
+      storage: BestWebAuthStorage(localStoragePrefix: _p, databaseName: name),
     );
     await auth.restore();
     expect(auth.uid, 'u1');
@@ -797,13 +824,13 @@ void _choiceTests(_NewStorage newStorage) {
 void _migrationTests(_NewStorage newStorage) {
   test('moves a session from localStorage to IndexedDB', () async {
     final String name = _newDatabase();
-    web.window.localStorage.setItem('app:k', 'old');
+    web.window.localStorage.setItem('${_p}app:k', 'old');
     final BestWebAuthStorage storage = BestWebAuthStorage(
       databaseName: name,
-      localStoragePrefix: 'app:',
+      localStoragePrefix: '${_p}app:',
     );
     expect(await storage.read('k'), 'old');
-    expect(web.window.localStorage.getItem('app:k'), isNull);
+    expect(web.window.localStorage.getItem('${_p}app:k'), isNull);
     expect(await newStorage(name).read('k'), 'old');
     // Read again: from IndexedDB.
     expect(await storage.read('k'), 'old');
@@ -814,22 +841,28 @@ void _migrationTests(_NewStorage newStorage) {
     () async {
       final String name = _newDatabase();
       await newStorage(name).write('k', 'new');
-      web.window.localStorage.setItem('k', 'old');
-      final BestWebAuthStorage storage = BestWebAuthStorage(databaseName: name);
+      web.window.localStorage.setItem('${_p}k', 'old');
+      final BestWebAuthStorage storage = BestWebAuthStorage(
+        localStoragePrefix: _p,
+        databaseName: name,
+      );
       expect(await storage.read('k'), 'new');
       expect(await newStorage(name).read('k'), 'new');
       // The stale copy is deleted.
-      expect(web.window.localStorage.getItem('k'), isNull);
+      expect(web.window.localStorage.getItem('${_p}k'), isNull);
     },
   );
 
   test('a sign-out deletes the key from localStorage too', () async {
     final String name = _newDatabase();
-    final BestWebAuthStorage storage = BestWebAuthStorage(databaseName: name);
+    final BestWebAuthStorage storage = BestWebAuthStorage(
+      localStoragePrefix: _p,
+      databaseName: name,
+    );
     await storage.write('k', 'v');
-    web.window.localStorage.setItem('k', 'stale');
+    web.window.localStorage.setItem('${_p}k', 'stale');
     await storage.write('k', null);
-    expect(web.window.localStorage.getItem('k'), isNull);
+    expect(web.window.localStorage.getItem('${_p}k'), isNull);
     expect(await storage.read('k'), isNull);
   });
 
@@ -837,9 +870,10 @@ void _migrationTests(_NewStorage newStorage) {
     'a copy read back that differs fails the move and keeps localStorage',
     () async {
       final String name = _newDatabase();
-      web.window.localStorage.setItem('k', 'old');
+      web.window.localStorage.setItem('${_p}k', 'old');
       final List<String> issues = <String>[];
       final BestWebAuthStorage storage = BestWebAuthStorage.forTesting(
+        localStoragePrefix: _p,
         indexedDb: _OverwrittenIndexedDb(name),
         indexedDbAvailable: () async => true,
         onMigrationIssue: (String key, Object _) => issues.add(key),
@@ -848,12 +882,12 @@ void _migrationTests(_NewStorage newStorage) {
         storage.read('k'),
         throwsA(_storageError(IndexedDbOperation.migrate)),
       );
-      expect(web.window.localStorage.getItem('k'), 'old');
+      expect(web.window.localStorage.getItem('${_p}k'), 'old');
       expect(await newStorage(name).read('k'), isNull);
       expect(issues, isEmpty);
       // The next read tries again.
       expect(await storage.read('k'), 'old');
-      expect(web.window.localStorage.getItem('k'), isNull);
+      expect(web.window.localStorage.getItem('${_p}k'), isNull);
       await storage.close();
     },
   );
@@ -862,7 +896,7 @@ void _migrationTests(_NewStorage newStorage) {
     'a localStorage that cannot be read gives null and reports it',
     () async {
       final String name = _newDatabase();
-      web.window.localStorage.setItem('k', 'old');
+      web.window.localStorage.setItem('${_p}k', 'old');
       final List<(String, Object)> issues = <(String, Object)>[];
       final _FlakyLocal local = _FlakyLocal()..readThrows = true;
       final BestWebAuthStorage storage = BestWebAuthStorage.forTesting(
@@ -884,7 +918,7 @@ void _migrationTests(_NewStorage newStorage) {
     'a localStorage that cannot delete keeps a copy and reports it',
     () async {
       final String name = _newDatabase();
-      web.window.localStorage.setItem('k', 'old');
+      web.window.localStorage.setItem('${_p}k', 'old');
       final List<String> issues = <String>[];
       final _FlakyLocal local = _FlakyLocal()..deleteThrows = true;
       final BestWebAuthStorage storage = BestWebAuthStorage.forTesting(
@@ -895,7 +929,7 @@ void _migrationTests(_NewStorage newStorage) {
       );
       expect(await storage.read('k'), 'old');
       expect(await newStorage(name).read('k'), 'old');
-      expect(web.window.localStorage.getItem('k'), 'old');
+      expect(web.window.localStorage.getItem('${_p}k'), 'old');
       expect(issues, <String>['k: Bad state: localStorage delete refused']);
       // The report names the key and the error, never the session.
       expect(issues.single, isNot(contains('old')));
@@ -907,6 +941,7 @@ void _migrationTests(_NewStorage newStorage) {
 void _fallbackWriteTests(_NewStorage newStorage) {
   /// A storage that falls back to localStorage on [name], as on a load where the probe failed.
   BestWebAuthStorage fallback(String name) => BestWebAuthStorage.forTesting(
+    localStoragePrefix: _p,
     databaseName: name,
     indexedDbAvailable: () async => false,
   );
@@ -931,10 +966,13 @@ void _fallbackWriteTests(_NewStorage newStorage) {
       // The deletion in IndexedDB did not happen (it failed, or another tab wrote): the marker
       // decides.
       await newStorage(name).write('k', 'A');
-      final BestWebAuthStorage next = BestWebAuthStorage(databaseName: name);
+      final BestWebAuthStorage next = BestWebAuthStorage(
+        localStoragePrefix: _p,
+        databaseName: name,
+      );
       expect(await next.read('k'), isNull);
       expect(await newStorage(name).read('k'), isNull);
-      expect(web.window.localStorage.length, 0);
+      expect(_ownKeys(), isEmpty);
       await next.close();
     },
   );
@@ -947,11 +985,14 @@ void _fallbackWriteTests(_NewStorage newStorage) {
       await first.write('k', 'B');
       await first.close();
       await newStorage(name).write('k', 'A');
-      final BestWebAuthStorage next = BestWebAuthStorage(databaseName: name);
+      final BestWebAuthStorage next = BestWebAuthStorage(
+        localStoragePrefix: _p,
+        databaseName: name,
+      );
       expect(await next.read('k'), 'B');
       expect(await newStorage(name).read('k'), 'B');
       // Moved: neither the copy nor the marker stays in localStorage.
-      expect(web.window.localStorage.length, 0);
+      expect(_ownKeys(), isEmpty);
       // From now on IndexedDB wins again.
       await newStorage(name).write('k', 'C');
       expect(await next.read('k'), 'C');
@@ -966,9 +1007,12 @@ void _fallbackWriteTests(_NewStorage newStorage) {
       final BestWebAuthStorage first = fallback(name);
       await first.write('k', 'B');
       await first.close();
-      final BestWebAuthStorage next = BestWebAuthStorage(databaseName: name);
+      final BestWebAuthStorage next = BestWebAuthStorage(
+        localStoragePrefix: _p,
+        databaseName: name,
+      );
       await next.write('k', 'C');
-      expect(web.window.localStorage.length, 0);
+      expect(_ownKeys(), isEmpty);
       expect(await next.read('k'), 'C');
       await next.close();
     },

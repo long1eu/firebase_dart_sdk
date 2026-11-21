@@ -20,6 +20,19 @@ import '../fakes.dart';
 import '../harness.dart';
 
 const String _key = 'firebase_auth_providers_dart:$apiKey';
+
+/// What goes before the `localStorage` keys of this file. The browser test files run side by side
+/// on one origin and share `localStorage`, so each file uses and cleans its own keys only, and a
+/// `storage` event of another file's write is filtered out by the prefix.
+const String _p = 'cross_tab_sync_test:';
+
+/// The `localStorage` keys of this file.
+List<String> _ownKeys() => <String>[
+  for (int i = 0; i < web.window.localStorage.length; i++)
+    if (web.window.localStorage.key(i) case final String key
+        when key.startsWith(_p))
+      key,
+];
 const Duration _poll = Duration(milliseconds: 40);
 
 int _databases = 0;
@@ -60,7 +73,7 @@ class _CountingIndexedDb extends IndexedDbAuthStorage {
 
 /// A localStorage storage that counts its writes.
 class _CountingLocal extends WebAuthStorage {
-  _CountingLocal() : super.local(prefix: 'xtab:');
+  _CountingLocal() : super.local(prefix: _p);
 
   int writes = 0;
 
@@ -130,7 +143,9 @@ void main() {
       await _deleteDatabase(name);
     }
     _used.clear();
-    web.window.localStorage.clear();
+    for (final String key in _ownKeys()) {
+      web.window.localStorage.removeItem(key);
+    }
   });
 
   group('IndexedDB', () {
@@ -314,6 +329,7 @@ void main() {
     test('close stops the polls of its IndexedDB storage', () async {
       final _CountingIndexedDb inner = indexedDb(_newDatabase());
       final BestWebAuthStorage best = BestWebAuthStorage.forTesting(
+        localStoragePrefix: _p,
         indexedDb: inner,
         indexedDbAvailable: () async => true,
       );
@@ -338,6 +354,7 @@ void main() {
           final String name = _newDatabase();
           final BestWebAuthStorage withIndexedDb =
               BestWebAuthStorage.forTesting(
+                localStoragePrefix: _p,
                 indexedDb: indexedDb(name),
                 indexedDbAvailable: () async => true,
               );
@@ -347,6 +364,7 @@ void main() {
           expect(await withIndexedDb.kind, WebAuthStorageKind.indexedDb);
 
           final BestWebAuthStorage fallback = BestWebAuthStorage.forTesting(
+            localStoragePrefix: _p,
             databaseName: name,
             indexedDbAvailable: () async => false,
           );
@@ -359,7 +377,7 @@ void main() {
           expect(tabB.uid, expectedUid);
           // The marked state moved to IndexedDB; neither the copy nor the marker stays.
           expect(await indexedDb(name).read(_key), written);
-          expect(web.window.localStorage.length, 0);
+          expect(_ownKeys(), isEmpty);
         },
       );
     }
@@ -381,13 +399,13 @@ void main() {
       final List<AuthUser?> states = <AuthUser?>[];
       tab.authStateChanges().skip(1).listen(states.add);
 
-      web.window.localStorage.removeItem('xtab:$_key');
-      _storageEventFromAnotherTab('xtab:$_key');
+      web.window.localStorage.removeItem('$_p$_key');
+      _storageEventFromAnotherTab('$_p$_key');
       await _until(() => tab.currentUser == null, 'the sign-out');
 
       expect(states, <AuthUser?>[null]);
       expect(storage.writes, writes);
-      expect(web.window.localStorage.getItem('xtab:$_key'), isNull);
+      expect(web.window.localStorage.getItem('$_p$_key'), isNull);
     });
 
     test('another user signed in there becomes the user here', () async {
@@ -395,10 +413,10 @@ void main() {
       final int writes = storage.writes;
 
       web.window.localStorage.setItem(
-        'xtab:$_key',
+        '$_p$_key',
         '{"version":2,"uid":"u2","refreshToken":"refresh:u2"}',
       );
-      _storageEventFromAnotherTab('xtab:$_key');
+      _storageEventFromAnotherTab('$_p$_key');
       await _until(() => tab.uid == 'u2', 'the switch');
 
       expect(storage.writes, writes);
@@ -406,33 +424,32 @@ void main() {
 
     test('a clear of the storage in another tab signs out here', () async {
       await tab.signInAnonymously();
-      web.window.localStorage.clear();
+      // A real clear() would wipe the keys of the other test files: remove this file's key and
+      // send the event of a clear (no key).
+      web.window.localStorage.removeItem('$_p$_key');
       _storageEventFromAnotherTab(null);
       await _until(() => tab.currentUser == null, 'the sign-out');
     });
 
     test('events of another key or of sessionStorage are ignored', () async {
       await tab.signInAnonymously();
-      web.window.localStorage.removeItem('xtab:$_key');
-      _storageEventFromAnotherTab('xtab:other');
-      _storageEventFromAnotherTab(
-        'xtab:$_key',
-        area: web.window.sessionStorage,
-      );
+      web.window.localStorage.removeItem('$_p$_key');
+      _storageEventFromAnotherTab('${_p}other');
+      _storageEventFromAnotherTab('$_p$_key', area: web.window.sessionStorage);
       await Future<void>.delayed(const Duration(milliseconds: 50));
       expect(tab.uid, 'anon-user');
     });
 
     test('the listener is removed when the stream is cancelled', () async {
-      final WebAuthStorage local = WebAuthStorage.local();
+      final WebAuthStorage local = WebAuthStorage.local(prefix: _p);
       int events = 0;
       final StreamSubscription<void> subscription = local
           .changes('k')
           .listen((_) => events++);
-      _storageEventFromAnotherTab('k');
+      _storageEventFromAnotherTab('${_p}k');
       await _until(() => events == 1, 'the event');
       await subscription.cancel();
-      _storageEventFromAnotherTab('k');
+      _storageEventFromAnotherTab('${_p}k');
       await Future<void>.delayed(const Duration(milliseconds: 20));
       expect(events, 1);
     });
