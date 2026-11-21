@@ -45,7 +45,7 @@ they never look at a presenter's class, and presenters never look at a flow's.
 | Presenter | Kind | In the environment when |
 | --- | --- | --- |
 | `SystemBrowserPresenter()` | systemBrowser: `open`, `xdg-open` or `rundll32` (`openInSystemBrowser`) | macOS or Windows, or Linux with `DISPLAY` or `WAYLAND_DISPLAY`, not over SSH |
-| `ConsolePresenter(sink:, input:)` | console: writes only the URL to `sink` (stderr); prompts read a line from `input` (stdin) | stdin and stderr are terminals |
+| `ConsolePresenter(sink:, input:)` | console: writes only the URL to `sink` (stderr), which carries the state and the PKCE challenge (see [What it does not protect against](#what-it-does-not-protect-against)); prompts read a line from `input` (stdin) | stdin and stderr are terminals |
 | `CallbackPresenter(show, kind:)` | the kind you declare (systemBrowser by default) | you register it |
 | a `ProviderAppPresenter` of yours | providerApp | you register it |
 
@@ -108,8 +108,16 @@ pass one). Errors of the parser and of the presenter are rethrown as they are.
 - **Other programs of the same user.** They can read the URL from the list of processes while the
   browser starts, connect to the loopback port, or drive the browser. PKCE keeps an intercepted OAuth
   code useless to them; nothing here hides a URL from them.
-- **Whoever sees the terminal** of a `ConsolePresenter`: it is only a URL (with the state of the
-  run in it), or a typed code, on a terminal.
+- **Whoever sees the terminal or its logs** of a `ConsolePresenter`. The URL it prints carries the
+  state of the run and, for an OAuth request with PKCE, the code challenge (and the nonce hash when
+  one is sent).
+  When stderr is captured (a CI log, `journald`, a log shipper, `script`, a terminal multiplexer's
+  scrollback), the log holds them, and they stay good for the life of the flow (five minutes by
+  default). Someone who reads the log in that time and can reach the loopback port (a program on
+  this machine) can get an authorization code for an account of their own, issued for that
+  challenge, and send it with the state: the app then signs in to their account. PKCE keeps a code
+  of the user's useless to them, because the verifier is never printed. Where stderr is recorded,
+  pass `ConsolePresenter(sink:)` a sink that is not, or use another presenter.
 - **A remote browser.** The answer must reach this machine's loopback interface. Over SSH, forward
   the port while the flow waits (`ssh -L <port>:127.0.0.1:<port> <host>`, or `localhost` for a
   reCAPTCHA flow); without that, the run ends with a `SecureFlowTimeout` whose message says so.
