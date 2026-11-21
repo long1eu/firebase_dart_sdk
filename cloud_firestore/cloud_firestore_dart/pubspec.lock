@@ -196,7 +196,7 @@ packages:
       path: "../../firebase_storage/firebase_storage_dart"
       relative: true
     source: path
-    version: "0.1.0"
+    version: "0.1.1"
   fixnum:
     dependency: "direct main"
     description:

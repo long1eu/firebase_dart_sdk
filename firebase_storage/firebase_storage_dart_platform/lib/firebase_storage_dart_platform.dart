@@ -77,6 +77,10 @@ abstract final class FirebaseStorageDart {
   ///   one) is used as it is, with its own providers.
   /// * [httpClient] sends the requests (for tests and proxies); by default
   ///   one client is shared by all instances.
+  /// * [maxConcurrentUploads] and [maxUploadChunkSize] are those of the
+  ///   `firebase_storage_dart` client: at most that many uploads of one app
+  ///   and bucket run at once (8), and on the VM an upload of bytes or a file
+  ///   goes as one streamed request unless [maxUploadChunkSize] sets chunks.
   /// * [useDartCore] replaces the implementation of `firebase_core` with a
   ///   small pure-Dart one. By default (null) that happens only on Linux, and
   ///   only while `firebase_core` has no other implementation; pass true to
@@ -87,6 +91,8 @@ abstract final class FirebaseStorageDart {
   static void use({
     TokenProviderFactory? tokenProviderFor,
     http.Client? httpClient,
+    int maxConcurrentUploads = 8,
+    int? maxUploadChunkSize,
     bool? useDartCore,
   }) {
     if (DartFirebaseStorage.anyStarted) {
@@ -98,6 +104,8 @@ abstract final class FirebaseStorageDart {
     DartFirebaseStorage.config = DartStorageConfig(
       tokenProviderFor: tokenProviderFor,
       httpClient: httpClient,
+      maxConcurrentUploads: maxConcurrentUploads,
+      maxUploadChunkSize: maxUploadChunkSize,
     );
     installCoreIfNeeded(force: useDartCore);
     if (!isRegistered) {

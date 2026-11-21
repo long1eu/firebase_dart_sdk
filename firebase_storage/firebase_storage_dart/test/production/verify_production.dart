@@ -1686,6 +1686,8 @@ Future<CheckResult> _sdkPauseResume(Kit kit) async {
       (UploadProgress p) => p.state == UploadState.paused,
     );
     if (!task.pause()) {
+      // The task finished first: its progress stream closes without a paused event.
+      paused.ignore();
       await task.result;
       return CheckResult(
         Status.inconclusive,
@@ -1736,6 +1738,8 @@ Future<CheckResult> _sdkSessionResume(Kit kit) async {
       (UploadProgress p) => p.state == UploadState.paused,
     );
     if (!first.pause()) {
+      // The task finished first: its progress stream closes without a paused event.
+      paused.ignore();
       await first.result;
       return CheckResult(
         Status.inconclusive,

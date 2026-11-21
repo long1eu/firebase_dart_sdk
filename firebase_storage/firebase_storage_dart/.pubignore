@@ -21,3 +21,6 @@ analysis_options.yaml
 # The index of the examples is for the repository: pub.dev would show it in place of
 # example/main.dart (pana tries example/README.md first).
 example/README.md
+
+# Benchmarks are for the repository.
+benchmark/

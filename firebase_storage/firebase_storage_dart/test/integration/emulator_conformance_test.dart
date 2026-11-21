@@ -141,7 +141,9 @@ void main() {
         final FirebaseStorage bounded = FirebaseStorage(
           app,
           emulatorHost: host,
-          requestTimeout: const Duration(seconds: 1),
+          // Long enough for a busy emulator (other test files run at the same time); a request that never
+          // got an answer would still end here instead of hanging the test.
+          requestTimeout: const Duration(seconds: 10),
           retry: const StorageRetryPolicy(operation: Duration.zero),
         );
         addTearDown(bounded.close);

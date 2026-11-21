@@ -10,10 +10,21 @@ import 'reference.dart';
 /// What `FirebaseStorageDart.use` configures; read when an instance creates
 /// its client.
 class DartStorageConfig {
-  const DartStorageConfig({this.tokenProviderFor, this.httpClient});
+  const DartStorageConfig({
+    this.tokenProviderFor,
+    this.httpClient,
+    this.maxConcurrentUploads = 8,
+    this.maxUploadChunkSize,
+  });
 
   final TokenProviderFactory? tokenProviderFor;
   final http.Client? httpClient;
+
+  /// `FirebaseStorage.maxConcurrentUploads` of each client.
+  final int maxConcurrentUploads;
+
+  /// `FirebaseStorage.maxUploadChunkSize` of each client.
+  final int? maxUploadChunkSize;
 }
 
 /// The implementation of [FirebaseStoragePlatform] on top of
@@ -87,6 +98,8 @@ class DartFirebaseStorage extends FirebaseStoragePlatform {
         download: _downloadRetry,
       ),
       httpClient: config.httpClient ?? (_sharedHttpClient ??= http.Client()),
+      maxConcurrentUploads: config.maxConcurrentUploads,
+      maxUploadChunkSize: config.maxUploadChunkSize,
     );
   }
 
