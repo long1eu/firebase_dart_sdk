@@ -103,6 +103,7 @@ copes. `FAIL` means the client misbehaved or the backend does something it does 
 | 19 | SDK download | `getBytes`, `openRead(100, 200)`, an open-ended `openRead`, `maxSize` too small (`download-size-exceeded`) and equal to the size. |
 | 20 | Signed-in round trip | Needs `--create-user`. As the throwaway user, upload, read, describe, list and delete an object (in `--denied-bucket` when given, else the main bucket); with `--denied-bucket` the same read without a user must answer `unauthorized`. With check 2 (the signed-out 403) it covers the rules in both directions. |
 | 21 | Out-of-order chunk | A resumable session for 768 KiB gets the second chunk first (`X-Goog-Upload-Offset: 262144`). `REFUSED` (PASS): a 4xx or size received stays 0 (the line shows the status, headers and a body snippet), and the session then takes the chunks in order and the stored size and md5 match. `FAIL` (`ACCEPTED`): size received becomes 524288, the early bytes were taken as valid. `INCONCLUSIVE` otherwise, e.g. the emulator, which ignores offsets. |
+| 26 | SDK reads of a gzip-stored object | Uploads about 45 KiB of gzip with `contentEncoding: gzip` (about 200 KiB unzipped), then `getBytes`, `openRead(1000)`, `openRead(1000, 2000)` and `getBytes(maxSize:)` at and below the unzipped size. PASS when all of them come back unzipped, with offsets and `maxSize` in unzipped bytes. |
 
 What to send back: the whole report. The most valuable lines are the answers of 1, 2, 3, 10, 11 and 14,
 and the results of 8, 9, 13, 17 and 18.
@@ -129,6 +130,7 @@ named here.
 | 16-19 | PASS | PASS |
 | 20 | SKIPPED without `--create-user`; PASS with it and the Auth emulator | PASS |
 | 21 | INCONCLUSIVE: the emulator ignores offsets and appends the early chunk | PASS, `REFUSED`: HTTP 400 "Client uploaded to the wrong offset (262144 instead of 0).", size received stays 0, then the chunks in order are stored |
+| 26 | PASS | PASS (0.1.2). With 0.1.1 it FAILS: `openRead(1000)` and `openRead(1000, 2000)` end with `unknown`, because the client asked for gzip and the server applied the range to the compressed bytes |
 
 Upload progress is per byte on the VM and per chunk on the web.
 

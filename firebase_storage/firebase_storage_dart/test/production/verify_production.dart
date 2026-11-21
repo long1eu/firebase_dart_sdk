@@ -1829,6 +1829,75 @@ Future<CheckResult> _sdkDownload(Kit kit) async {
   }
 }
 
+/// An object stored gzip-compressed: whole and ranged reads must come back unzipped, with offsets and maxSize
+/// in unzipped bytes. The dart:io client asks for gzip unless the client asks for the identity encoding.
+Future<CheckResult> _sdkGzipStored(Kit kit) async {
+  final Uint8List plain = Uint8List.fromList(
+    utf8.encode(List<String>.generate(20000, (int i) => 'line $i\n').join()),
+  );
+  final Uint8List stored = Uint8List.fromList(gzip.encode(plain));
+  final storage = kit.newStorage();
+  try {
+    kit.charge(stored.length);
+    final String objectName = kit.name('sdk_gzip.txt');
+    kit.track(objectName);
+    final Reference ref = storage.storage.ref(objectName);
+    await ref.putBytes(
+      stored,
+      metadata: const SettableMetadata(
+        contentType: 'text/plain',
+        contentEncoding: 'gzip',
+      ),
+    );
+    Future<Object> attempt(Future<List<int>> Function() read) async {
+      try {
+        return await read();
+      } on Object catch (e) {
+        return e is FirebaseStorageException ? e.code : '$e';
+      }
+    }
+
+    Future<List<int>> collect(Stream<List<int>> s) =>
+        s.expand((List<int> c) => c).toList();
+    final Object whole = await attempt(ref.getBytes);
+    final Object tail = await attempt(() => collect(ref.openRead(1000)));
+    final Object range = await attempt(() => collect(ref.openRead(1000, 2000)));
+    final Object limited = await attempt(
+      () => ref.getBytes(maxSize: plain.length),
+    );
+    final Object tooLarge = await attempt(
+      () => ref.getBytes(maxSize: plain.length - 1),
+    );
+    final Map<String, Object?> observed = <String, Object?>{
+      'storedBytes': stored.length,
+      'plainBytes': plain.length,
+      'whole': whole is List<int> ? _same(whole, plain) : whole,
+      'tail': tail is List<int> ? _same(tail, plain.sublist(1000)) : tail,
+      'range': range is List<int>
+          ? _same(range, plain.sublist(1000, 2000))
+          : range,
+      'limited': limited is List<int> ? _same(limited, plain) : limited,
+      'tooLarge': tooLarge is List<int> ? 'no error' : tooLarge,
+    };
+    final bool ok =
+        observed['whole'] == true &&
+        observed['tail'] == true &&
+        observed['range'] == true &&
+        observed['limited'] == true &&
+        observed['tooLarge'] == 'download-size-exceeded';
+    return CheckResult(
+      ok ? Status.pass : Status.fail,
+      ok
+          ? 'UNZIPPED: a gzip-stored object (${stored.length} bytes stored, ${plain.length} unzipped) read whole, '
+                'from offset 1000 and as 1000..2000 in unzipped bytes; maxSize counts unzipped bytes.'
+          : 'A read of a gzip-stored object went wrong: $observed.',
+      observed: observed,
+    );
+  } finally {
+    storage.storage.close();
+  }
+}
+
 Future<CheckResult> _signedInRoundTrip(Kit kit) async {
   if (kit.userAuth == null) {
     return CheckResult(
@@ -2024,6 +2093,7 @@ const List<Check> checks = <Check>[
   Check('19', 'SDK download, ranges and maxSize', _sdkDownload),
   Check('20', 'Signed-in round trip', _signedInRoundTrip),
   Check('21', 'Out-of-order chunk', _outOfOrder),
+  Check('26', 'SDK reads of a gzip-stored object', _sdkGzipStored),
 ];
 
 // ---------------------------------------------------------------------------------------------------------------
