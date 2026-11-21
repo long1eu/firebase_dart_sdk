@@ -7,6 +7,8 @@ form { display: flex; gap: 0.5rem; margin: 1rem 0; }
 form input { flex: 1; }
 .online { color: #186a3b; }
 .offline { color: #a04000; }
+progress { width: 100%; }
+.thumbnail { max-width: 12rem; max-height: 8rem; margin-top: 0.25rem; }
 #error { color: #b03a2e; }
 
 /* Dark when the system or browser asks for it; the browser draws the page and controls. */

@@ -1,0 +1,14 @@
+# The Flutter lints, plus the rules of the packages of this repository (see the
+# analysis_options.yaml at the root of the repository).
+include: package:flutter_lints/flutter.yaml
+
+linter:
+  rules:
+    always_declare_return_types: true
+    always_put_control_body_on_new_line: true
+    avoid_void_async: true
+    only_throw_errors: true
+    prefer_single_quotes: true
+    sort_pub_dependencies: true
+    unawaited_futures: true
+    unnecessary_parenthesis: true

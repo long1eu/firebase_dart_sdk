@@ -43,6 +43,9 @@ flowchart LR
   signals["SIGINT or SIGTERM"] --> shutdown["close server, end streams, terminate()"]
 ```
 
+A second program in the same package, `bin/file_server.dart`, keeps files in Cloud Storage; see
+[Files](#files-with-cloud-storage) below.
+
 ## Run it against the Firestore emulator
 
 Needs the Dart SDK (3.8 or later) and a Firestore emulator. From this directory:
@@ -135,6 +138,60 @@ it. Do not commit key files.
 This program has been run against the emulator only, not against a real project. The
 credential path it uses is the one of `firebase_auth_providers_dart`, whose own status is in
 [docs/guides/authentication.md](../../docs/guides/authentication.md).
+
+## Files with Cloud Storage
+
+`bin/file_server.dart` serves `lib/file_api.dart`, a file API on `firebase_storage_dart` that holds
+no file in memory:
+
+| Route | What it does |
+| --- | --- |
+| `PUT /files/<path>` | Streams the request body into a resumable upload (`startStreamUpload`); the `Content-Type` header becomes the content type of the object. `201` with the path, size and content type; `411` without a `Content-Length`. |
+| `GET /files/<path>` | Streams the object to the response (`openRead`). `Range: bytes=a-b`, `bytes=a-` and `bytes=-n` give `206` with the matching `Content-Range`. `404` for a missing object. |
+| `DELETE /files/<path>` | Deletes it; `204`. |
+| `GET /healthz` | `ok` |
+
+The request is not read into a `Uint8List`: the upload takes `request.read()` and sends it chunk by
+chunk, which is why it needs the length first (the resumable upload declares the size when it
+starts). A Storage error becomes a status: `object-not-found` 404, `unauthenticated` 401,
+`unauthorized` 403, `quota-exceeded` 507, anything else 502.
+
+```mermaid
+flowchart LR
+  client["HTTP client"] -- "PUT body, Content-Length" --> put["FileApi PUT"]
+  put -- "request.read() into startStreamUpload" --> storage["FirebaseStorage"]
+  client -- "GET, Range" --> get["FileApi GET"]
+  get -- "metadata(), then openRead(start, end)" --> storage
+  storage -- "HTTPS" --> bucket["Storage emulator or bucket"]
+```
+
+Start a Storage emulator from the root of the repository (it needs Java and the Firebase CLI in
+`.emulator/`, see `tool/README.md`), then, in this directory:
+
+```sh
+./tool/start_storage_emulator.sh 9199        # in the repository root: bucket demo-test.appspot.com
+dart pub get
+FIREBASE_STORAGE_EMULATOR_HOST=127.0.0.1:9199 PORT=8001 dart run bin/file_server.dart
+```
+
+```sh
+head -c 3000000 /dev/urandom > big.bin
+curl -X PUT -H 'Content-Type: application/octet-stream' --data-binary @big.bin localhost:8001/files/demo/big.bin
+curl -s localhost:8001/files/demo/big.bin | cmp - big.bin && echo identical
+curl -s -H 'Range: bytes=0-9' localhost:8001/files/demo/big.bin | wc -c
+curl -X DELETE localhost:8001/files/demo/big.bin
+```
+
+The environment is read by `lib/storage_from_env.dart`: `FIREBASE_STORAGE_EMULATOR_HOST` for the
+emulator (project `demo-test`, bucket `<project>.appspot.com`, or `STORAGE_BUCKET`), otherwise
+`FIREBASE_PROJECT_ID` and Application Default Credentials, which bypass the Storage security
+rules. Add authentication in front of the API before you expose it. Run against the emulator only.
+
+The test runs the API in-process against the Storage emulator and is skipped without it:
+
+```sh
+FIREBASE_STORAGE_EMULATOR_HOST=127.0.0.1:9199 dart test test/file_api_test.dart
+```
 
 ## Notes
 

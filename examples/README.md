@@ -1,19 +1,20 @@
 # Examples
 
-Small, complete programs that use `cloud_firestore_dart` (and, for `storage_cli`, `firebase_storage_dart`): servers and tools, a worker, a Flutter
+Small, complete programs that use `cloud_firestore_dart` and `firebase_storage_dart`: servers and tools, a worker, a Flutter
 app and a browser app. Each directory is a package of its own with a `pubspec.yaml` and a README.
 
 | Directory | What it is |
 | --- | --- |
-| [`server_shelf/`](server_shelf/) | An HTTP API on `package:shelf`: reads and writes Firestore, and sends the changes of one real-time listener to every client as server-sent events. |
+| [`server_shelf/`](server_shelf/) | Two HTTP APIs on `package:shelf`: tasks in Firestore, with the changes of one real-time listener sent to every client as server-sent events; and files in Cloud Storage, with the request body streamed into a resumable upload and the object streamed to the response (ranges included). |
 | [`cli/`](cli/) | A command-line tool on `package:args`: imports a JSON file with batched writes, exports a query to JSON, watches a query. |
 | [`storage_cli/`](storage_cli/) | A command-line tool on `package:args` and `firebase_storage_dart`: `ls`, `put` (resumable, with a progress line), `get` (streamed to a file), `cat`, `stat`, `rm`, `url`; optional email/password sign-in so rules with `request.auth` pass. Run against the Storage emulator. |
 | [`cloud_run_job/`](cloud_run_job/) | A one-shot job: an aggregation query, a transaction that writes once per execution, retries with backoff, and a `Dockerfile` for a native binary. |
 | [`worker_queue/`](worker_queue/) | A long-running worker: a listener to wake up, a transaction that claims each job once, results in a batch, a clean stop on `SIGTERM`. |
 | [`flutter_notes/`](flutter_notes/) | A Flutter notes app: a real-time list, offline edits in a SQLite cache, an offline indicator, connectivity events and a clean shutdown. Built and run on macOS, and on Windows from an SSH session (no window drawn). |
 | [`flutterfire_on_linux/`](flutterfire_on_linux/) | A Flutter Linux desktop app written only against the official `cloud_firestore` and `firebase_core` API; `cloud_firestore_dart_platform` registers itself, with no code: a live list, add/edit/delete, a batch, a transaction, a query, an optional SQLite cache, and integration tests. Run on Debian 13 x86_64 and, in release, in an Ubuntu 24.04 arm64 container, against the emulator. |
+| [`flutterfire_storage_on_linux/`](flutterfire_storage_on_linux/) | A Flutter Linux desktop app written only against the official `firebase_storage` and `firebase_core` API; `firebase_storage_dart_platform` registers itself, with no code: an upload of a generated image with a progress bar and pause, resume and cancel, a folder listing, images by download URL, delete, and an integration test. Against the Storage emulator; **not yet built or run on Linux**. |
 | [`flutterfire_on_windows/`](flutterfire_on_windows/) | A Flutter Windows app on the official `cloud_firestore` API, with `cloud_firestore_dart` selected by `CloudFirestoreDart.use()` instead of the native plugin: a live list, add/edit/delete, a batch, a transaction, a query, a sum and average aggregation, an optional SQLite cache, and integration tests. Run on Windows 11 against the emulator. |
-| [`web_app/`](web_app/) | A browser app in plain Dart (`package:web`): a real-time list, offline writes, a memory or SQLite (IndexedDB/OPFS) cache, and a Firestore Lite page to compare sizes. Supported in Chrome, untested elsewhere. |
+| [`web_app/`](web_app/) | A browser app in plain Dart (`package:web`): a real-time list, offline writes, a memory or SQLite (IndexedDB/OPFS) cache, and a Firestore Lite page to compare sizes, and a Storage page: a file picker, an upload with a progress bar and pause, resume and cancel, a folder listing and images by download URL. Supported in Chrome, untested elsewhere. |
 | [`flutter_web_two_users/`](flutter_web_two_users/) | A Flutter web page with two signed-in users side by side (Auth emulator), each with its own `FirebaseApp` and Firestore client: each sees the other's writes, the security rules refuse the guest what the owner may do, and a SQLite cache in IndexedDB answers before the network after a reload. `run.sh` starts the emulators and serves the build on another port. Built with dart2js and dart2wasm, tried in Chrome. |
 | [`playground/`](playground/) | A browser playground with no backend: the client runs with its network disabled on a memory cache, and the page shows each snapshot event, the writes waiting for a server and a timeline. Static files only, ready for any static host. Supported in Chrome, untested elsewhere. |
 
@@ -31,11 +32,19 @@ flowchart TD
   start -- "a Flutter app" --> flutterNotes["flutter_notes"]
   start -- "a Flutter web page" --> flutterWeb["flutter_web_two_users"]
   start -- "a browser, without Flutter" --> webApp["web_app"]
-  start -- "I want one API topic" --> apiExamples["cloud_firestore_dart/example/"]
+  start -- "I want one Firestore API topic" --> apiExamples["cloud_firestore_dart/example/"]
+  start -- "I want files, not documents" --> storageKind{"Where does your code run?"}
+  storageKind -- "a server, streaming bodies" --> serverShelf
+  storageKind -- "a browser, without Flutter" --> webApp
+  storageKind -- "a Flutter app on Linux" --> flutterStorage["flutterfire_storage_on_linux"]
+  storageKind -- "a terminal" --> storageCli
+  storageKind -- "I want one Storage API topic" --> storageExamples["firebase_storage_dart/example/"]
 ```
 
 For the API one topic at a time, see
-the programs in [`cloud_firestore/cloud_firestore_dart/example/`](../cloud_firestore/cloud_firestore_dart/example/README.md).
+the programs in [`cloud_firestore/cloud_firestore_dart/example/`](../cloud_firestore/cloud_firestore_dart/example/README.md)
+and, for Cloud Storage, those in
+[`firebase_storage/firebase_storage_dart/example/`](../firebase_storage/firebase_storage_dart/example/README.md).
 
 ## Running them
 
