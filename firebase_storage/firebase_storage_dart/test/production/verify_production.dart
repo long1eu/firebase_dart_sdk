@@ -1515,6 +1515,201 @@ Future<CheckResult> _retry5xx(Kit kit) async {
   }
 }
 
+bool _matches(FullMetadata metadata, Uint8List data) =>
+    metadata.size == data.length && metadata.md5Hash == Kit.md5Base64(data);
+
+Future<CheckResult> _sdkResumable(Kit kit) async {
+  final Uint8List data = Kit.bytes(1024 * 1024, 16);
+  final storage = kit.newStorage();
+  try {
+    kit.charge(data.length);
+    final String objectName = kit.name('sdk_resumable.bin');
+    kit.track(objectName);
+    final UploadTask task = storage.storage.ref(objectName).startUpload(data);
+    final List<int> steps = <int>[];
+    final StreamSubscription<UploadProgress> sub = task.progress.listen(
+      (UploadProgress p) => steps.add(p.bytesTransferred),
+    );
+    final FullMetadata metadata = await task.result;
+    await sub.cancel();
+    final bool ok = _matches(metadata, data) && task.sessionUri != null;
+    final Map<String, Object?> observed = <String, Object?>{
+      'sessionUri': task.sessionUri != null,
+      'events': steps.length,
+      'matches': _matches(metadata, data),
+    };
+    return CheckResult(
+      ok ? Status.pass : Status.fail,
+      ok
+          ? 'RESUMABLE: UploadTask sent ${data.length} bytes in a session (${steps.length} progress events); the stored size and md5 match.'
+          : 'UploadTask finished with size ${metadata.size}, md5 match ${_matches(metadata, data)}, session URI '
+                '${task.sessionUri != null ? 'present' : 'missing'}.',
+      observed: observed,
+    );
+  } finally {
+    storage.storage.close();
+  }
+}
+
+/// Waits for the first event of [task] that [test] accepts.
+Future<UploadProgress> _until(
+  UploadTask task,
+  bool Function(UploadProgress p) test,
+) => task.progress.firstWhere(test);
+
+Future<CheckResult> _sdkPauseResume(Kit kit) async {
+  final Uint8List data = Kit.bytes(3 * 1024 * 1024, 17);
+  final storage = kit.newStorage();
+  try {
+    kit.charge(data.length + 2 * chunkSize);
+    final String objectName = kit.name('sdk_paused.bin');
+    kit.track(objectName);
+    final UploadTask task = storage.storage.ref(objectName).startUpload(data);
+    await _until(task, (UploadProgress p) => p.bytesTransferred > 0);
+    final Future<UploadProgress> paused = _until(
+      task,
+      (UploadProgress p) => p.state == UploadState.paused,
+    );
+    if (!task.pause()) {
+      await task.result;
+      return CheckResult(
+        Status.inconclusive,
+        'The upload finished before it could be paused; run it again.',
+      );
+    }
+    final UploadProgress at = await paused.timeout(const Duration(seconds: 60));
+    await Future<void>.delayed(const Duration(milliseconds: 300));
+    final bool stayed = task.state == UploadState.paused;
+    final bool resumed = task.resume();
+    final FullMetadata metadata = await task.result;
+    final bool ok =
+        stayed &&
+        resumed &&
+        at.bytesTransferred < data.length &&
+        _matches(metadata, data);
+    return CheckResult(
+      ok ? Status.pass : Status.fail,
+      ok
+          ? 'PAUSED at ${at.bytesTransferred} of ${data.length} bytes, stayed paused, resumed where the server '
+                'stopped; the stored size and md5 match.'
+          : 'Pause and resume ended with stayed-paused $stayed, resumed $resumed, stored match '
+                '${_matches(metadata, data)}.',
+      observed: <String, Object?>{
+        'pausedAt': at.bytesTransferred,
+        'stayed': stayed,
+        'matches': _matches(metadata, data),
+      },
+    );
+  } finally {
+    storage.storage.close();
+  }
+}
+
+Future<CheckResult> _sdkSessionResume(Kit kit) async {
+  final Uint8List data = Kit.bytes(3 * 1024 * 1024, 18);
+  final storage = kit.newStorage();
+  UploadTask? first;
+  try {
+    kit.charge(data.length + 2 * chunkSize);
+    final String objectName = kit.name('sdk_session.bin');
+    kit.track(objectName);
+    final Reference ref = storage.storage.ref(objectName);
+    first = ref.startUpload(data);
+    await _until(first, (UploadProgress p) => p.bytesTransferred > 0);
+    final Future<UploadProgress> paused = _until(
+      first,
+      (UploadProgress p) => p.state == UploadState.paused,
+    );
+    if (!first.pause()) {
+      await first.result;
+      return CheckResult(
+        Status.inconclusive,
+        'The upload finished before it could be paused; run it again.',
+      );
+    }
+    final UploadProgress at = await paused.timeout(const Duration(seconds: 60));
+    final Uri? session = first.sessionUri;
+    if (session == null) {
+      return CheckResult(Status.fail, 'A paused upload has no session URI.');
+    }
+    // The app "restarts": a second task knows only the reference, the data and the session URI.
+    final UploadTask second = ref.startUpload(
+      data,
+      existingSessionUri: session,
+    );
+    final FullMetadata metadata = await second.result;
+    final bool ok = _matches(metadata, data);
+    return CheckResult(
+      ok ? Status.pass : Status.fail,
+      ok
+          ? 'RESUMED by session URI: a new task continued the upload paused at ${at.bytesTransferred} of '
+                '${data.length} bytes; the stored size and md5 match.'
+          : 'The task resumed by session URI stored size ${metadata.size}, md5 match $ok.',
+      observed: <String, Object?>{
+        'pausedAt': at.bytesTransferred,
+        'matches': ok,
+      },
+    );
+  } finally {
+    if (first != null && first.state != UploadState.success) {
+      first.cancel();
+      try {
+        await first.result;
+      } on FirebaseStorageException {
+        // canceled, as asked
+      }
+    }
+    storage.storage.close();
+  }
+}
+
+Future<CheckResult> _sdkDownload(Kit kit) async {
+  final Uint8List data = Kit.bytes(64 * 1024, 19);
+  final storage = kit.newStorage();
+  try {
+    await kit.put(storage.storage, 'sdk_download.bin', data);
+    final Reference ref = storage.storage.ref(kit.name('sdk_download.bin'));
+    final Uint8List whole = await ref.getBytes();
+    final List<int> part = <int>[
+      for (final List<int> chunk in await ref.openRead(100, 200).toList())
+        ...chunk,
+    ];
+    final List<int> tail = <int>[
+      for (final List<int> chunk
+          in await ref.openRead(data.length - 10).toList())
+        ...chunk,
+    ];
+    String tooLarge;
+    try {
+      await ref.getBytes(maxSize: 100);
+      tooLarge = 'no error';
+    } on FirebaseStorageException catch (e) {
+      tooLarge = e.code;
+    }
+    final Uint8List limited = await ref.getBytes(maxSize: data.length);
+    final Map<String, Object?> observed = <String, Object?>{
+      'whole': _same(whole, data),
+      'range': _same(part, data.sublist(100, 200)),
+      'tail': _same(tail, data.sublist(data.length - 10)),
+      'tooLarge': tooLarge,
+      'limited': _same(limited, data),
+    };
+    final bool ok = observed.values.every(
+      (Object? v) => v == true || v == 'download-size-exceeded',
+    );
+    return CheckResult(
+      ok ? Status.pass : Status.fail,
+      ok
+          ? 'DOWNLOADED: getBytes returned all ${data.length} bytes, openRead(100, 200) and the open-ended tail '
+                'returned the right bytes, maxSize 100 threw $tooLarge and maxSize = size returned everything.'
+          : 'A download did not return the expected bytes: $observed.',
+      observed: observed,
+    );
+  } finally {
+    storage.storage.close();
+  }
+}
+
 const List<Check> checks = <Check>[
   Check('1', 'Error answer of a missing object (404 envelope)', _error404),
   Check('2', 'Error answer under rules (403 envelope)', _error403),
@@ -1531,6 +1726,10 @@ const List<Check> checks = <Check>[
   Check('13', 'Refresh after a 401', _refresh401),
   Check('14', 'CORS headers of the resumable protocol', _cors),
   Check('15', 'Retry on a 5xx', _retry5xx),
+  Check('16', 'SDK resumable upload (UploadTask)', _sdkResumable),
+  Check('17', 'SDK upload, pause and resume', _sdkPauseResume),
+  Check('18', 'SDK upload, resume by session URI', _sdkSessionResume),
+  Check('19', 'SDK download, ranges and maxSize', _sdkDownload),
 ];
 
 // ---------------------------------------------------------------------------------------------------------------

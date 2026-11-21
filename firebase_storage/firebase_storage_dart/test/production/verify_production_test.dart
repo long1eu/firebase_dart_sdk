@@ -64,6 +64,10 @@ void main() {
         '13': Status.skipped,
         '14': Status.pass,
         '15': Status.pass,
+        '16': Status.pass,
+        '17': Status.pass,
+        '18': Status.pass,
+        '19': Status.pass,
       };
       expect(
         <String, Status>{
@@ -90,6 +94,11 @@ void main() {
       expect(run.results['11']!.observed['outcome'], 'ACCEPTED');
       expect(run.results['12']!.observed['allSent'], isTrue);
       expect(run.results['15']!.observed['statuses'], <int>[503, 503, 200]);
+      expect(
+        run.results['17']!.observed['pausedAt'],
+        lessThan(3 * 1024 * 1024),
+      );
+      expect(run.results['19']!.observed['tooLarge'], 'download-size-exceeded');
 
       expect(run.uploadedBytes, greaterThan(0));
       expect(run.deleted, greaterThan(0));
