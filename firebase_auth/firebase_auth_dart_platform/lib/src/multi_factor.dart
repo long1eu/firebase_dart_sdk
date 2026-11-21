@@ -5,10 +5,11 @@ import 'package:firebase_auth_providers_dart/firebase_auth_providers_dart.dart'
 import 'convert.dart';
 import 'firebase_auth.dart';
 
-// Multi-factor authentication with an authenticator app (TOTP), on top of the
-// client's startTotpEnrollment, finalizeTotpEnrollment, unenrollMultiFactor
-// and MultiFactorResolver.resolveSignInWithTotp. SMS second factors are listed
-// and can be unenrolled, but not enrolled or used to sign in (noPhone).
+// Multi-factor authentication with an authenticator app (TOTP) or SMS, on top
+// of the client's startTotpEnrollment, finalizeTotpEnrollment,
+// startPhoneEnrollment, finalizePhoneEnrollment, unenrollMultiFactor and its
+// MultiFactorResolver. The SMS codes are sent by
+// DartFirebaseAuth.verifyPhoneNumber with one of the sessions here.
 
 /// The multi-factor API of the user [uid]. Each member throws
 /// `no-current-user` once another user (or nobody) is signed in.
@@ -23,8 +24,9 @@ class DartMultiFactor extends MultiFactorPlatform {
   dart_auth.FirebaseUserAuth get _client => _auth.clientFor(uid);
 
   /// A session for enrolling a factor of this user: pass it to
-  /// `TotpMultiFactorGenerator.generateSecret`. Nothing is sent: the backend
-  /// session starts with `generateSecret`.
+  /// `TotpMultiFactorGenerator.generateSecret`, or to
+  /// `FirebaseAuth.verifyPhoneNumber` with the number of an SMS factor.
+  /// Nothing is sent: the backend session starts with either of those.
   @override
   Future<MultiFactorSession> getSession() => guard(_auth, () async {
     _client;
@@ -32,18 +34,29 @@ class DartMultiFactor extends MultiFactorPlatform {
   });
 
   /// Finishes the enrolment of a TOTP assertion of
-  /// `TotpMultiFactorGenerator.getAssertionForEnrollment`. [displayName] is
-  /// required: the backend refuses a TOTP factor without one.
+  /// `TotpMultiFactorGenerator.getAssertionForEnrollment`, or of an SMS
+  /// assertion of `PhoneMultiFactorGenerator.getAssertion` (the verification
+  /// id that `verifyPhoneNumber` passed to `codeSent` with the session of
+  /// [getSession], and the code of the SMS). [displayName] is required for a
+  /// TOTP factor: the backend refuses one without it.
   @override
   Future<void> enroll(
     MultiFactorAssertionPlatform assertion, {
     String? displayName,
   }) => guard(_auth, () async {
+    if (assertion is DartPhoneAssertion) {
+      await _client.finalizePhoneEnrollment(
+        assertion.credential,
+        displayName: displayName,
+      );
+      return;
+    }
     if (assertion is! DartTotpEnrollmentAssertion) {
       throw _wrongAssertion(
         assertion,
         'enroll takes an assertion of '
-        'TotpMultiFactorGenerator.getAssertionForEnrollment',
+        'TotpMultiFactorGenerator.getAssertionForEnrollment or '
+        'PhoneMultiFactorGenerator.getAssertion',
       );
     }
     if (displayName == null || displayName.isEmpty) {
@@ -87,6 +100,17 @@ class DartMultiFactor extends MultiFactorPlatform {
     ];
   });
 
+  /// Sends the SMS code of an enrolment of [phoneNumber] for this user and
+  /// returns the verification id (`verifyPhoneNumber` with the session of
+  /// [getSession]).
+  Future<String> startPhoneEnrollment(
+    String phoneNumber,
+    dart_auth.AppVerification appVerification,
+  ) => _client.startPhoneEnrollment(
+    phoneNumber,
+    appVerification: appVerification,
+  );
+
   Future<DartTotpSecret> _startTotpEnrollment() => guard(
     _auth,
     () async =>
@@ -104,10 +128,43 @@ class DartMultiFactorSession extends MultiFactorSession {
   final DartMultiFactor multiFactor;
 }
 
+/// The session of a [DartMultiFactorResolver]: its id is the backend's pending
+/// credential, and `FirebaseAuth.verifyPhoneNumber` with it sends the SMS code
+/// of an SMS factor through the client's resolver, [source].
+class DartMultiFactorSignInSession extends MultiFactorSession {
+  DartMultiFactorSignInSession(super.id, this.source);
+
+  /// The resolver of `firebase_auth_providers_dart`; null for a challenge the
+  /// client cannot finish (a link of a credential).
+  final dart_auth.MultiFactorResolver? source;
+
+  /// Sends the SMS code of the factor [enrollmentId] (the single SMS factor
+  /// when null) and returns the verification id.
+  Future<String> startPhoneSignIn(
+    String? enrollmentId,
+    dart_auth.AppVerification appVerification,
+  ) => _resolverOf(source).startPhoneSignIn(
+    enrollmentId: enrollmentId,
+    appVerification: appVerification,
+  );
+}
+
+/// [source], or the `internal-error` of a challenge that cannot be finished.
+dart_auth.MultiFactorResolver _resolverOf(
+  dart_auth.MultiFactorResolver? source,
+) =>
+    source ??
+    (throw FirebaseAuthException(
+      code: 'internal-error',
+      message:
+          'This second-factor challenge cannot be finished: it came from '
+          'linking a credential. Sign in or reauthenticate instead.',
+    ));
+
 /// The resolver of a `multi-factor-auth-required` error: [hints] lists the
-/// enrolled factors, the [session] id is the backend's pending credential, and
+/// enrolled factors, the [session] is a [DartMultiFactorSignInSession], and
 /// [resolveSignIn] finishes the sign-in (or the reauthentication) with a TOTP
-/// assertion through the client's resolver, [source].
+/// or SMS assertion through the client's resolver, [source].
 class DartMultiFactorResolver extends MultiFactorResolverPlatform {
   DartMultiFactorResolver(
     super.hints,
@@ -122,29 +179,28 @@ class DartMultiFactorResolver extends MultiFactorResolverPlatform {
   /// the client cannot finish (a link of a credential).
   final dart_auth.MultiFactorResolver? source;
 
-  /// Takes an assertion of `TotpMultiFactorGenerator.getAssertionForSignIn`.
-  /// Throws `argument-error` for another assertion: phone assertions cannot be
-  /// made here (`PhoneMultiFactorGenerator.getAssertion` throws).
+  /// Takes an assertion of `TotpMultiFactorGenerator.getAssertionForSignIn`,
+  /// or of `PhoneMultiFactorGenerator.getAssertion` (the verification id that
+  /// `verifyPhoneNumber` passed to `codeSent` with this resolver's session,
+  /// and the code of the SMS). Throws `argument-error` for another assertion.
   @override
   Future<UserCredentialPlatform> resolveSignIn(
     MultiFactorAssertionPlatform assertion,
   ) => guard(_auth, () async {
+    if (assertion is DartPhoneAssertion) {
+      return _auth.resultOf(
+        await _resolverOf(source).resolveSignInWithPhone(assertion.credential),
+      );
+    }
     if (assertion is! DartTotpSignInAssertion) {
       throw _wrongAssertion(
         assertion,
         'resolveSignIn takes an assertion of '
-        'TotpMultiFactorGenerator.getAssertionForSignIn',
+        'TotpMultiFactorGenerator.getAssertionForSignIn or '
+        'PhoneMultiFactorGenerator.getAssertion',
       );
     }
-    final dart_auth.MultiFactorResolver? resolver = source;
-    if (resolver == null) {
-      throw FirebaseAuthException(
-        code: 'internal-error',
-        message:
-            'This second-factor challenge cannot be finished: it came from '
-            'linking a credential. Sign in or reauthenticate instead.',
-      );
-    }
+    final dart_auth.MultiFactorResolver resolver = _resolverOf(source);
     return _auth.resultOf(
       await resolver.resolveSignInWithTotp(
         assertion.oneTimePassword,
@@ -154,12 +210,22 @@ class DartMultiFactorResolver extends MultiFactorResolverPlatform {
   });
 }
 
-/// `PhoneMultiFactorGenerator`: phone factors need SMS verification, which
-/// this package does not have.
+/// `PhoneMultiFactorGenerator`: the assertion of an SMS factor, for
+/// `MultiFactor.enroll` and `MultiFactorResolver.resolveSignIn`.
 class DartPhoneMultiFactorGenerator extends PhoneMultiFactorGeneratorPlatform {
+  /// Throws `argument-error` for a credential without a verification id or
+  /// SMS code.
   @override
   MultiFactorAssertionPlatform getAssertion(PhoneAuthCredential credential) =>
-      throw unimplemented('PhoneMultiFactorGenerator.getAssertion', noPhone);
+      DartPhoneAssertion(clientPhoneCredentialOf(credential));
+}
+
+/// What `MultiFactor.enroll` and `MultiFactorResolver.resolveSignIn` take for
+/// an SMS factor: the client's phone credential.
+class DartPhoneAssertion extends MultiFactorAssertionPlatform {
+  DartPhoneAssertion(this.credential);
+
+  final dart_auth.PhoneAuthCredential credential;
 }
 
 /// `TotpMultiFactorGenerator`: secrets and assertions for an authenticator app

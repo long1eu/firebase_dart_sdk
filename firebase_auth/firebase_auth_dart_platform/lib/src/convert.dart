@@ -21,10 +21,11 @@ FirebaseAuthException unimplemented(String member, String why) =>
       message: '$member is not available in firebase_auth_dart_platform: $why',
     );
 
-/// Why the phone members throw.
-const String noPhone =
-    'phone sign-in needs reCAPTCHA or the native app verification of Android '
-    'and iOS, which a pure-Dart client does not have.';
+/// Why `initializeRecaptchaConfig` throws.
+const String noRecaptchaConfig =
+    'the reCAPTCHA Enterprise configuration of the project is not read here. '
+    'Phone requests carry the proof of the AppVerification passed to '
+    'FirebaseAuthDart.use.';
 
 /// Why the popup and redirect members throw.
 const String noBrowserFlow =
@@ -91,7 +92,7 @@ FirebaseAuthException noCurrentUser() => FirebaseAuthException(
 /// [e] as an exception of the platform interface: the same code, message,
 /// email, phone number, tenant and credential. A second-factor challenge
 /// becomes a [FirebaseAuthMultiFactorExceptionPlatform] whose resolver
-/// finishes it with a TOTP code, through the client's resolver, and returns
+/// finishes it with a TOTP or SMS code, through the client's resolver, and returns
 /// the result as a credential of [auth].
 FirebaseAuthException exceptionOf(
   dart_auth.FirebaseAuthException e,
@@ -107,7 +108,7 @@ FirebaseAuthException exceptionOf(
       credential: credentialOf(e.credential),
       resolver: DartMultiFactorResolver(
         <MultiFactorInfo>[for (final hint in e.hints) multiFactorInfoOf(hint)],
-        MultiFactorSession(e.pendingCredential),
+        DartMultiFactorSignInSession(e.pendingCredential, e.resolver),
         auth: auth,
         source: e.resolver,
       ),
@@ -252,17 +253,60 @@ AuthCredential? credentialOf(
     :final String emailLink?,
   ) =>
     EmailAuthProvider.credentialWithLink(email: email, emailLink: emailLink),
+  dart_auth.PhoneAuthCredential(:final String temporaryProof?) =>
+    temporaryProof.isEmpty ? null : DartPhoneProofCredential(credential),
   _ => null,
 };
 
+/// The phone credential of a `credential-already-in-use` error: a temporary
+/// proof of a verified number, which `signInWithCredential` takes back to sign
+/// in to the account that has the number. FlutterFire's `PhoneAuthCredential`
+/// has no field for a proof (and no public constructor), so this is a plain
+/// [AuthCredential] of the phone provider that carries the client's credential.
+/// Its `toString` and `asMap` show no proof and no number.
+class DartPhoneProofCredential extends AuthCredential {
+  DartPhoneProofCredential(this.source)
+    : super(providerId: 'phone', signInMethod: 'phone');
+
+  /// The credential of `firebase_auth_providers_dart`.
+  final dart_auth.PhoneAuthCredential source;
+}
+
+/// A phone credential of the interface (a verification id and an SMS code) as
+/// the client takes it. Throws `argument-error` for one made with the
+/// Android-only `PhoneAuthProvider.credentialFromToken`.
+dart_auth.PhoneAuthCredential clientPhoneCredentialOf(
+  PhoneAuthCredential credential,
+) {
+  final String? verificationId = credential.verificationId;
+  final String? smsCode = credential.smsCode;
+  if (verificationId == null || smsCode == null) {
+    throw FirebaseAuthException(
+      code: 'argument-error',
+      message:
+          'A phone credential needs a verification id and an SMS code '
+          '(PhoneAuthProvider.credential); credentialFromToken is Android '
+          'only.',
+    );
+  }
+  return dart_auth.PhoneAuthProvider.credential(
+    verificationId: verificationId,
+    verificationCode: smsCode,
+  );
+}
+
 /// A credential of the interface as the client takes it.
 ///
-/// Throws `unimplemented` for phone, Play Games and Game Center credentials,
-/// which need native SDKs, and `argument-error` for an OAuth credential
-/// without a token or a credential of another implementation.
+/// Throws `unimplemented` for Play Games and Game Center credentials, which
+/// need native SDKs, and `argument-error` for an OAuth credential without a
+/// token, a phone credential without a verification id or SMS code (the
+/// Android-only `PhoneAuthProvider.credentialFromToken`), or a credential of
+/// another implementation.
 dart_auth.AuthCredential clientCredentialOf(AuthCredential credential) {
   switch (credential) {
     case DartOAuthCredential(:final dart_auth.OAuthCredential source):
+      return source;
+    case DartPhoneProofCredential(:final dart_auth.PhoneAuthCredential source):
       return source;
     case EmailAuthCredential(:final String email, :final String password?):
       return dart_auth.EmailAuthProvider.credential(
@@ -275,7 +319,7 @@ dart_auth.AuthCredential clientCredentialOf(AuthCredential credential) {
         emailLink: emailLink,
       );
     case PhoneAuthCredential():
-      throw unimplemented('A phone credential', noPhone);
+      return clientPhoneCredentialOf(credential);
     case OAuthCredential(providerId: 'playgames.google.com' || 'gc.apple.com'):
       throw unimplemented(
         'A ${credential.providerId} credential',

@@ -211,8 +211,8 @@ Future<void> authProvidersReadmeLine89() async {
   print(result.additionalUserInfo?.isNewUser);
 }
 
-// ../../firebase_auth/firebase_auth_providers_dart/README.md:175
-Future<void> authProvidersReadmeLine175() async {
+// ../../firebase_auth/firebase_auth_providers_dart/README.md:177
+Future<void> authProvidersReadmeLine177() async {
   final FirebaseUserAuth auth = await FirebaseUserAuth.forApp(app);
 
   // Enrol: show the URI as a QR code (or the secret for typing in), then ask for a code of the app.
@@ -234,8 +234,51 @@ Future<void> authProvidersReadmeLine175() async {
   await auth.unenrollMultiFactor(auth.currentUser!.enrolledFactors.first.uid);
 }
 
-// ../../firebase_auth/firebase_auth_providers_dart/README.md:215
-Future<void> authProvidersReadmeLine215() async {
+// ../../firebase_auth/firebase_auth_providers_dart/README.md:217
+Future<void> authProvidersReadmeLine217() async {
+  final FirebaseUserAuth auth = await FirebaseUserAuth.forApp(app);
+  const String codeFromYourTextField = '123456';
+
+  // Sign in (or linkWithCredential, reauthenticateWithCredential, updatePhoneNumber with the same credential).
+  final String verificationId = await auth.verifyPhoneNumber(
+    '+15555550100',
+    appVerification: AppVerification.recaptchaV2Loopback(),
+  );
+  await auth.signInWithCredential(
+    PhoneAuthProvider.credential(
+      verificationId: verificationId,
+      verificationCode: codeFromYourTextField,
+    ),
+  );
+
+  // A program without a code field: the reCAPTCHA page, then the code on the terminal or a small page.
+  final PhoneAuthCredential credential = await auth.verifyPhoneNumberInteractively('+15555550100');
+
+  // Enrol an SMS second factor (Identity Platform with SMS multi-factor enabled, a verified email address).
+  final String enrolmentId = await auth.startPhoneEnrollment(
+    '+15555550100',
+    appVerification: AppVerification.recaptchaV2Loopback(),
+  );
+  await auth.finalizePhoneEnrollment(
+    PhoneAuthProvider.credential(verificationId: enrolmentId, verificationCode: codeFromYourTextField),
+    displayName: 'Work phone',
+  );
+
+  // Sign in with it.
+  try {
+    await auth.signInWithEmailAndPassword(email: 'ada@example.com', password: '<the password>');
+  } on FirebaseAuthMultiFactorException catch (e) {
+    final String signInId = await e.resolver!.startPhoneSignIn(
+      appVerification: AppVerification.recaptchaV2Loopback(),
+    );
+    await e.resolver!.resolveSignInWithPhone(
+      PhoneAuthProvider.credential(verificationId: signInId, verificationCode: codeFromYourTextField),
+    );
+  }
+}
+
+// ../../firebase_auth/firebase_auth_providers_dart/README.md:279
+Future<void> authProvidersReadmeLine279() async {
   final FirebaseUserAuth auth = await FirebaseUserAuth.forApp(app);
   final UserCredential result = await auth.signInWithOAuthLoopback(
     OAuthLoopbackProvider.google(
@@ -246,8 +289,8 @@ Future<void> authProvidersReadmeLine215() async {
   print(result.user?.email);
 }
 
-// ../../firebase_auth/firebase_auth_providers_dart/README.md:276
-Future<void> authProvidersReadmeLine276() async {
+// ../../firebase_auth/firebase_auth_providers_dart/README.md:340
+Future<void> authProvidersReadmeLine340() async {
   final OAuthLoopbackProvider provider = OAuthLoopbackProvider.oidc(
     providerId: 'oidc.example',
     authorizationEndpoint: Uri.parse('https://idp.example.com/authorize'),
@@ -272,8 +315,8 @@ Future<void> authProvidersReadmeLine276() async {
   );
 }
 
-// ../../firebase_auth/firebase_auth_providers_dart/README.md:346
-Future<void> authProvidersReadmeLine346() async {
+// ../../firebase_auth/firebase_auth_providers_dart/README.md:408
+Future<void> authProvidersReadmeLine408() async {
   final AppVerification verification = AppVerification.recaptchaV2Loopback();
 }
 

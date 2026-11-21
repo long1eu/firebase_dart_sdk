@@ -2,6 +2,9 @@
 // that finishes a sign-in with a second factor. The functions at the end are for FirebaseUserAuth and are not
 // exported.
 
+import 'package:firebase_auth_providers_dart/src/app_verification.dart';
+import 'package:firebase_auth_providers_dart/src/phone_auth.dart';
+
 import 'auth_constants.dart';
 import 'auth_exception.dart';
 import 'auth_user.dart';
@@ -20,9 +23,9 @@ class MultiFactorInfo {
     this.enrollmentTime,
   });
 
-  /// The [factorId] of an SMS second factor (`PhoneMultiFactorGenerator.FACTOR_ID` of the JS SDK). This package
-  /// lists such factors and can unenrol them ([FirebaseUserAuth.unenrollMultiFactor]), but cannot enrol them or sign
-  /// in with them.
+  /// The [factorId] of an SMS second factor (`PhoneMultiFactorGenerator.FACTOR_ID` of the JS SDK):
+  /// [FirebaseUserAuth.startPhoneEnrollment] enrols one, [MultiFactorResolver.startPhoneSignIn]
+  /// signs in with it.
   static const String phoneFactorId = FactorId.phone;
 
   /// The [factorId] of a time-based one-time password (authenticator app) second factor
@@ -65,8 +68,9 @@ class MultiFactorInfo {
     );
   }
 
-  /// The id of the enrolment (`mfaEnrollmentId` of the REST API): what [FirebaseUserAuth.unenrollMultiFactor] and
-  /// [MultiFactorResolver.resolveSignInWithTotp] take.
+  /// The id of the enrolment (`mfaEnrollmentId` of the REST API): what
+  /// [FirebaseUserAuth.unenrollMultiFactor], [MultiFactorResolver.resolveSignInWithTotp] and
+  /// [MultiFactorResolver.startPhoneSignIn] take.
   final String uid;
 
   /// The kind of factor: [phoneFactorId], [totpFactorId] or [unknownFactorId].
@@ -210,88 +214,160 @@ class TotpSecret {
 /// [FirebaseAuthMultiFactorException.resolver] of the exception that [FirebaseUserAuth] threw (FlutterFire's and
 /// the JS SDK's `MultiFactorResolver`).
 ///
-/// It finishes with a code of an authenticator app (TOTP). An account whose only second factors are SMS cannot be
-/// finished with this package: [resolveSignInWithTotp] throws `multi-factor-info-not-found` there, and the message
-/// of the exception says so from the start.
+/// It finishes with a code of an authenticator app (TOTP, [resolveSignInWithTotp]) or of an SMS:
+/// [startPhoneSignIn] sends the SMS to the number of the factor and returns a verification id, and
+/// [resolveSignInWithPhone] finishes with the credential of that id and the code the user typed in
+/// (`verifyPhoneNumber` with a multi-factor session and `PhoneMultiFactorGenerator` of the iOS
+/// SDK).
 ///
 /// ```dart
 /// try {
 ///   await auth.signInWithEmailAndPassword(email: email, password: password);
 /// } on FirebaseAuthMultiFactorException catch (e) {
-///   final String code = await askForTheCodeOfTheAuthenticatorApp();
-///   final UserCredential result = await e.resolver!.resolveSignInWithTotp(code);
+///   final MultiFactorResolver resolver = e.resolver!;
+///   final String verificationId = await resolver.startPhoneSignIn(
+///     appVerification: AppVerification.recaptchaV2Loopback(),
+///   );
+///   final UserCredential result = await resolver.resolveSignInWithPhone(
+///     PhoneAuthProvider.credential(
+///       verificationId: verificationId,
+///       verificationCode: await askForTheCodeOfTheSms(),
+///     ),
+///   );
 ///   print(result.user?.uid);
 /// }
 /// ```
 class MultiFactorResolver {
-  MultiFactorResolver._(this.hints, this._resolveTotp);
+  MultiFactorResolver._(
+    this.hints, {
+    required Future<UserCredential> Function(String enrollmentId, String code)
+    resolveTotp,
+    required Future<String> Function(
+      String enrollmentId,
+      AppVerification appVerification,
+    )
+    startPhone,
+    required Future<UserCredential> Function(PhoneAuthCredential credential)
+    resolvePhone,
+  }) : _resolveTotp = resolveTotp,
+       _startPhone = startPhone,
+       _resolvePhone = resolvePhone;
 
   /// The second factors of the account, as [FirebaseAuthMultiFactorException.hints] lists them.
   final List<MultiFactorInfo> hints;
 
   final Future<UserCredential> Function(String enrollmentId, String code)
   _resolveTotp;
+  final Future<String> Function(
+    String enrollmentId,
+    AppVerification appVerification,
+  )
+  _startPhone;
+  final Future<UserCredential> Function(PhoneAuthCredential credential)
+  _resolvePhone;
 
   /// Finishes the sign-in with [code], the code an authenticator app shows for the account
   /// (`v2/accounts/mfaSignIn:finalize`), and returns what the sign-in would have returned: for a sign-in the new
   /// user is signed in (the streams emit and the session is stored as for any sign-in); for a reauthentication the
   /// signed-in user continues with the new tokens.
   ///
-  /// [enrollmentId] is the [MultiFactorInfo.uid] of the factor; it can be left out when the account has a single
-  /// authenticator app factor among [hints].
+  /// [enrollmentId] is the [MultiFactorInfo.uid] of the factor; it can be left out when the account
+  /// has a single authenticator app factor among [hints].
   ///
-  /// Throws a [FirebaseAuthException] with the code `multi-factor-info-not-found` when the account has no
-  /// authenticator app factor (only SMS: this package cannot finish such a sign-in) or [enrollmentId] is a factor of
-  /// another kind, `argument-error` when [enrollmentId] is needed and missing, and what the backend answers: a wrong
-  /// or old code, `invalid-multi-factor-session` (the pending sign-in expired after a few minutes: sign in again),
-  /// `cancelled` (another sign-in or a sign-out overtook it), ...
+  /// Throws a [FirebaseAuthException] with the code `multi-factor-info-not-found` when the account
+  /// has no authenticator app factor or [enrollmentId] is a factor of another kind,
+  /// `argument-error` when [enrollmentId] is needed and missing, and what the backend answers: a
+  /// wrong or old code, `invalid-multi-factor-session` (the pending sign-in expired after a few
+  /// minutes: sign in again), `cancelled` (another sign-in or a sign-out overtook it), ...
   Future<UserCredential> resolveSignInWithTotp(
     String code, {
     String? enrollmentId,
-  }) async {
-    final List<MultiFactorInfo> totp = <MultiFactorInfo>[
+  }) async => _resolveTotp(
+    _enrollmentOf(MultiFactorInfo.totpFactorId, enrollmentId),
+    code,
+  );
+
+  /// Sends an SMS code to the phone number of an SMS second factor (`v2/accounts/mfaSignIn:start`)
+  /// and returns the verification id: pair it with the code the user types in
+  /// ([PhoneAuthProvider.credential]) and pass the credential to [resolveSignInWithPhone].
+  ///
+  /// [enrollmentId] is the [MultiFactorInfo.uid] of the factor; it can be left out when the account
+  /// has a single SMS factor among [hints]. [appVerification] is the proof of
+  /// `FirebaseUserAuth.verifyPhoneNumber`.
+  ///
+  /// Throws `multi-factor-info-not-found` when the account has no SMS factor or [enrollmentId] is a
+  /// factor of another kind, `argument-error` when [enrollmentId] is needed and missing, and what
+  /// the backend answers: `invalid-multi-factor-session`, `invalid-app-credential`,
+  /// `quota-exceeded`, `too-many-requests`, ... No error holds the verification id or the reCAPTCHA
+  /// token.
+  Future<String> startPhoneSignIn({
+    String? enrollmentId,
+    required AppVerification appVerification,
+  }) async => _startPhone(
+    _enrollmentOf(MultiFactorInfo.phoneFactorId, enrollmentId),
+    appVerification,
+  );
+
+  /// Finishes the sign-in with [credential], the verification id of [startPhoneSignIn] and the code
+  /// of its SMS (`v2/accounts/mfaSignIn:finalize` with `phoneVerificationInfo`), and returns what
+  /// the sign-in would have returned, like [resolveSignInWithTotp].
+  ///
+  /// Throws `missing-verification-id` and `missing-verification-code` (an empty part, before
+  /// anything is sent), `invalid-verification-code`, `code-expired`, `invalid-verification-id`,
+  /// `invalid-multi-factor-session`, `cancelled`, ... No error holds the verification id or the
+  /// code.
+  Future<UserCredential> resolveSignInWithPhone(
+    PhoneAuthCredential credential,
+  ) async => _resolvePhone(credential);
+
+  /// The enrolment id of the factor of [factorId] to use: [enrollmentId] when given (and not a
+  /// factor of another kind), else the single factor of that kind among [hints].
+  String _enrollmentOf(String factorId, String? enrollmentId) {
+    final String kind = _kindOf(factorId);
+    if (enrollmentId != null) {
+      for (final MultiFactorInfo hint in hints) {
+        if (hint.uid == enrollmentId && hint.factorId != factorId) {
+          throw FirebaseAuthException(
+            code: 'multi-factor-info-not-found',
+            message:
+                'The second factor $enrollmentId is not an $kind factor but '
+                '${_kinds(<MultiFactorInfo>[hint])}.',
+          );
+        }
+      }
+      return enrollmentId;
+    }
+    final List<MultiFactorInfo> matching = <MultiFactorInfo>[
       for (final MultiFactorInfo hint in hints)
-        if (hint.factorId == MultiFactorInfo.totpFactorId) hint,
+        if (hint.factorId == factorId) hint,
     ];
-    if (enrollmentId == null) {
-      if (totp.isEmpty) {
-        throw FirebaseAuthException(
-          code: 'multi-factor-info-not-found',
-          message:
-              'The account has no authenticator app (TOTP) second factor; its second factors are '
-              '${_kinds(hints)}. This package cannot finish a sign-in with an SMS second factor.',
-        );
-      }
-      if (totp.length > 1) {
-        throw const FirebaseAuthException(
-          code: 'argument-error',
-          message:
-              'The account has several authenticator app factors: pass the enrollmentId of one of them.',
-        );
-      }
-      return _resolveTotp(totp.single.uid, code);
+    if (matching.isEmpty) {
+      throw FirebaseAuthException(
+        code: 'multi-factor-info-not-found',
+        message:
+            'The account has no $kind second factor; its second factors are ${_kinds(hints)}.',
+      );
     }
-    for (final MultiFactorInfo hint in hints) {
-      if (hint.uid == enrollmentId &&
-          hint.factorId != MultiFactorInfo.totpFactorId) {
-        throw FirebaseAuthException(
-          code: 'multi-factor-info-not-found',
-          message:
-              'The second factor $enrollmentId is not an authenticator app (TOTP) factor but '
-              '${_kinds(<MultiFactorInfo>[hint])}; this package can finish a sign-in only with an authenticator app.',
-        );
-      }
+    if (matching.length > 1) {
+      throw FirebaseAuthException(
+        code: 'argument-error',
+        message:
+            'The account has several $kind factors: pass the enrollmentId of one of them.',
+      );
     }
-    return _resolveTotp(enrollmentId, code);
+    return matching.single.uid;
   }
+
+  static String _kindOf(String factorId) => switch (factorId) {
+    MultiFactorInfo.phoneFactorId => 'SMS (phone)',
+    MultiFactorInfo.totpFactorId => 'authenticator app (TOTP)',
+    _ => factorId,
+  };
 
   static String _kinds(List<MultiFactorInfo> factors) => factors.isEmpty
       ? 'not listed'
       : <String>{
-          for (final MultiFactorInfo f in factors)
-            f.factorId == MultiFactorInfo.phoneFactorId
-                ? 'SMS (phone)'
-                : f.factorId,
+          for (final MultiFactorInfo f in factors) _kindOf(f.factorId),
         }.join(', ');
 
   @override
@@ -300,11 +376,26 @@ class MultiFactorResolver {
 
 // ---- for FirebaseUserAuth, not exported ----
 
-/// Creates the resolver of a sign-in that needs a second factor; [resolveTotp] finishes it.
+/// Creates the resolver of a sign-in that needs a second factor: [resolveTotp] finishes it with a
+/// TOTP code, [startPhone] sends the SMS of a phone factor and returns its verification id, and
+/// [resolvePhone] finishes it with a phone credential.
 MultiFactorResolver createMultiFactorResolver(
-  List<MultiFactorInfo> hints,
-  Future<UserCredential> Function(String enrollmentId, String code) resolveTotp,
-) => MultiFactorResolver._(hints, resolveTotp);
+  List<MultiFactorInfo> hints, {
+  required Future<UserCredential> Function(String enrollmentId, String code)
+  resolveTotp,
+  required Future<String> Function(
+    String enrollmentId,
+    AppVerification appVerification,
+  )
+  startPhone,
+  required Future<UserCredential> Function(PhoneAuthCredential credential)
+  resolvePhone,
+}) => MultiFactorResolver._(
+  hints,
+  resolveTotp: resolveTotp,
+  startPhone: startPhone,
+  resolvePhone: resolvePhone,
+);
 
 /// The `sessionInfo` that `mfaEnrollment:finalize` takes back with the code.
 String? totpSessionInfoOf(TotpSecret secret) => secret._sessionInfo;

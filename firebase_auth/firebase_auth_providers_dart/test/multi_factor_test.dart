@@ -1,6 +1,6 @@
-// Authenticator app (TOTP) multi-factor authentication against a fake Identity Toolkit backend that checks real
-// RFC 6238 codes: enrolment, sign-in and reauthentication with the resolver, unenrolment, the factor list, SMS-only
-// accounts, and the JSON bodies of the v2 calls.
+// Authenticator app (TOTP) multi-factor authentication against a fake Identity Toolkit backend that
+// checks real RFC 6238 codes: enrolment, sign-in and reauthentication with the resolver,
+// unenrolment, the factor list, SMS accounts, and the JSON bodies of the v2 calls.
 
 import 'dart:async';
 import 'dart:convert';
@@ -495,15 +495,12 @@ void main() {
       });
     });
 
-    test('an SMS-only account says it cannot be finished here', () async {
+    test('an SMS-only account cannot be finished with a TOTP code', () async {
       final FirebaseAuthMultiFactorException e = await secondFactorRequired(
         signIn(),
       );
       expect(e.code, 'multi-factor-auth-required');
-      expect(
-        e.message,
-        FirebaseAuthMultiFactorException.unsupportedFactorsMessage,
-      );
+      expect(e.message, FirebaseAuthMultiFactorException.defaultMessage);
       expect(e.hints.single.phoneNumber, '+*******0100');
       final int sent = backend.requests.length;
       await expectLater(

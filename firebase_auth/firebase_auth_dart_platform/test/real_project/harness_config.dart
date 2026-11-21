@@ -21,6 +21,18 @@ enum HarnessStep {
   /// unenrol.
   totp,
 
+  /// Phone sign-in with a test phone number of the console
+  /// ([HarnessConfig.phoneNumber]): `linkWithPhoneNumber`, sign out,
+  /// `signInWithPhoneNumber`, reauthenticate with a credential of
+  /// `verifyPhoneNumber`, unlink. Skipped without the phone variables.
+  phone,
+
+  /// SMS second factor with the test phone number: enrol through
+  /// `verifyPhoneNumber` with the session of `getSession()`, sign out, sign
+  /// in through the `MultiFactorResolver`, unenrol. Skipped without the phone
+  /// variables.
+  sms,
+
   /// `revokeAccessToken`, which is for Apple tokens only: reported as a skip.
   revoke,
 
@@ -39,6 +51,15 @@ const String githubAccountExistsVariable = 'AUTH_HARNESS_GITHUB_ACCOUNT_EXISTS';
 /// An optional email address passed to Google as `login_hint`, so that the
 /// account chooser is skipped. Never printed.
 const String googleLoginHintVariable = 'AUTH_HARNESS_GOOGLE_LOGIN_HINT';
+
+/// A test phone number of the project (Authentication > Sign-in method >
+/// Phone > Phone numbers for testing), in E.164 form, for the phone and sms
+/// steps. Never printed in full.
+const String phoneNumberVariable = 'AUTH_HARNESS_PHONE_NUMBER';
+
+/// The verification code the console set for [phoneNumberVariable]. Never
+/// printed.
+const String phoneCodeVariable = 'AUTH_HARNESS_PHONE_CODE';
 
 const List<String> _firebaseVariables = <String>[
   'FIREBASE_API_KEY',
@@ -83,6 +104,8 @@ class HarnessConfig {
     required this.githubClientSecret,
     required this.githubAccountExists,
     required this.googleLoginHint,
+    required this.phoneNumber,
+    required this.phoneCode,
   });
 
   /// Reads the configuration from [environment] (`Platform.environment`).
@@ -107,6 +130,7 @@ class HarnessConfig {
     }
     String value(String name) => environment[name]!.trim();
     final String appId = value('FIREBASE_APP_ID');
+    final (String? phoneNumber, String? phoneCode) = _phoneOf(environment);
     return HarnessConfig._(
       steps: steps,
       options: FirebaseOptions(
@@ -127,7 +151,31 @@ class HarnessConfig {
         null || '' => null,
         final String hint => hint,
       },
+      phoneNumber: phoneNumber,
+      phoneCode: phoneCode,
     );
+  }
+
+  /// The test phone number and its code; both or neither.
+  static (String?, String?) _phoneOf(Map<String, String> environment) {
+    String? read(String name) => switch (environment[name]?.trim()) {
+      null || '' => null,
+      final String text => text,
+    };
+    final String? number = read(phoneNumberVariable);
+    final String? code = read(phoneCodeVariable);
+    if ((number == null) != (code == null)) {
+      throw HarnessConfigException(
+        'Set both $phoneNumberVariable and $phoneCodeVariable (a test phone '
+        'number of the project and its code), or neither.',
+      );
+    }
+    if (number != null && !RegExp(r'^\+[1-9]\d{6,14}$').hasMatch(number)) {
+      throw HarnessConfigException(
+        '$phoneNumberVariable should be in E.164 form: + and the digits.',
+      );
+    }
+    return (number, code);
   }
 
   /// The steps to run, in the order of [HarnessStep].
@@ -159,6 +207,13 @@ class HarnessConfig {
   /// Google account). Off by default: if either is not true, that sign-in
   /// creates a new account, which the harness cannot delete.
   final bool githubAccountExists;
+
+  /// The test phone number of the phone and sms steps, from
+  /// [phoneNumberVariable]; null when not set (those steps are skipped).
+  final String? phoneNumber;
+
+  /// Its code, from [phoneCodeVariable].
+  final String? phoneCode;
 }
 
 /// The steps named in [value], in the order of [HarnessStep], without
@@ -241,6 +296,12 @@ String maskEmail(String? email) {
 final RegExp _email = RegExp(
   r'[^\s@<>"(),;:]+@[^\s@<>"(),;:]+\.[^\s@<>"(),;:]+',
 );
+
+/// [phoneNumber] with all but its last two digits hidden: `+*********00`.
+String maskPhone(String phoneNumber) => phoneNumber.length <= 3
+    ? '***'
+    : '+${'*' * (phoneNumber.length - 3)}'
+          '${phoneNumber.substring(phoneNumber.length - 2)}';
 
 /// [text] with every email address in it masked as [maskEmail] does, and cut
 /// to [maxLength] characters.

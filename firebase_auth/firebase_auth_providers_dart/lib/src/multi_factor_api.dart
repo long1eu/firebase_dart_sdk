@@ -1,10 +1,16 @@
-// The four calls of the Identity Toolkit API v2 that authenticator app (TOTP) multi-factor authentication makes,
-// behind one seam so that another wire format can be added later. Not exported.
+// The calls of the Identity Toolkit API v2 that multi-factor authentication makes, for
+// authenticator app (TOTP) and SMS second factors, behind one seam so that another wire format can
+// be added later. Not exported.
 //
-// Every call answers in the JSON shape of the REST API (`idToken`, `refreshToken`, `totpSessionInfo`, ...).
+// Every call answers in the JSON shape of the REST API (`idToken`, `refreshToken`,
+// `totpSessionInfo`, `phoneSessionInfo`, ...).
 //
-// All calls go as JSON: Google's published definitions (googleapis, google/cloud/identitytoolkit/v2) have no TOTP
-// fields.
+// All calls go as JSON: Google's published definitions (googleapis,
+// google/cloud/identitytoolkit/v2) have no TOTP fields. The SMS fields are those of the published
+// messages (`phoneEnrollmentInfo` and `phoneSignInInfo` are `StartMfaPhoneRequestInfo`,
+// `phoneVerificationInfo` is `FinalizeMfaPhoneRequestInfo`, `phoneSessionInfo` and
+// `phoneResponseInfo` are `StartMfaPhoneResponseInfo`), plus the reCAPTCHA Enterprise fields the JS
+// SDK sends.
 
 import 'auth_exception.dart';
 
@@ -59,10 +65,48 @@ abstract class MultiFactorApi {
     required String code,
     String? tenantId,
   });
+
+  /// `accounts/mfaEnrollment:start` with `phoneEnrollmentInfo` (the number and the
+  /// [appVerification] fields): the answer has `phoneSessionInfo.sessionInfo`.
+  Future<Map<String, Object?>> startPhoneEnrollment({
+    required String idToken,
+    required String phoneNumber,
+    required Map<String, Object?> appVerification,
+    String? tenantId,
+  });
+
+  /// `accounts/mfaEnrollment:finalize` with `phoneVerificationInfo`: the answer has `idToken` and
+  /// `refreshToken`.
+  Future<Map<String, Object?>> finalizePhoneEnrollment({
+    required String idToken,
+    required String sessionInfo,
+    required String code,
+    String? displayName,
+    String? tenantId,
+  });
+
+  /// `accounts/mfaSignIn:start` with `mfaEnrollmentId` and `phoneSignInInfo` (the [appVerification]
+  /// fields): the answer has `phoneResponseInfo.sessionInfo`.
+  Future<Map<String, Object?>> startPhoneSignIn({
+    required String pendingCredential,
+    required String enrollmentId,
+    required Map<String, Object?> appVerification,
+    String? tenantId,
+  });
+
+  /// `accounts/mfaSignIn:finalize` with `phoneVerificationInfo`: the answer has `idToken` and
+  /// `refreshToken`.
+  Future<Map<String, Object?>> finalizePhoneSignIn({
+    required String pendingCredential,
+    required String sessionInfo,
+    required String code,
+    String? tenantId,
+  });
 }
 
 /// The request bodies of the JS SDK (`startEnrollTotpMfa`, `finalizeEnrollTotpMfa`, `withdrawMfa`,
-/// `finalizeSignInTotpMfa`) and the iOS SDK.
+/// `finalizeSignInTotpMfa`, `startEnrollPhoneMfa`, `finalizeEnrollPhoneMfa`, `startSignInPhoneMfa`,
+/// `finalizeSignInPhoneMfa`) and the iOS SDK.
 class _JsonMultiFactorApi implements MultiFactorApi {
   _JsonMultiFactorApi(this.transport);
 
@@ -116,6 +160,66 @@ class _JsonMultiFactorApi implements MultiFactorApi {
     'mfaPendingCredential': pendingCredential,
     'mfaEnrollmentId': enrollmentId,
     'totpVerificationInfo': <String, Object?>{'verificationCode': code},
+    'tenantId': ?tenantId,
+  });
+
+  @override
+  Future<Map<String, Object?>> startPhoneEnrollment({
+    required String idToken,
+    required String phoneNumber,
+    required Map<String, Object?> appVerification,
+    String? tenantId,
+  }) => transport.postJson('accounts/mfaEnrollment:start', <String, Object?>{
+    'idToken': idToken,
+    'phoneEnrollmentInfo': <String, Object?>{
+      'phoneNumber': phoneNumber,
+      ...appVerification,
+    },
+    'tenantId': ?tenantId,
+  });
+
+  @override
+  Future<Map<String, Object?>> finalizePhoneEnrollment({
+    required String idToken,
+    required String sessionInfo,
+    required String code,
+    String? displayName,
+    String? tenantId,
+  }) => transport.postJson('accounts/mfaEnrollment:finalize', <String, Object?>{
+    'idToken': idToken,
+    'displayName': ?displayName,
+    'phoneVerificationInfo': <String, Object?>{
+      'sessionInfo': sessionInfo,
+      'code': code,
+    },
+    'tenantId': ?tenantId,
+  });
+
+  @override
+  Future<Map<String, Object?>> startPhoneSignIn({
+    required String pendingCredential,
+    required String enrollmentId,
+    required Map<String, Object?> appVerification,
+    String? tenantId,
+  }) => transport.postJson('accounts/mfaSignIn:start', <String, Object?>{
+    'mfaPendingCredential': pendingCredential,
+    'mfaEnrollmentId': enrollmentId,
+    'phoneSignInInfo': <String, Object?>{...appVerification},
+    'tenantId': ?tenantId,
+  });
+
+  @override
+  Future<Map<String, Object?>> finalizePhoneSignIn({
+    required String pendingCredential,
+    required String sessionInfo,
+    required String code,
+    String? tenantId,
+  }) => transport.postJson('accounts/mfaSignIn:finalize', <String, Object?>{
+    'mfaPendingCredential': pendingCredential,
+    'phoneVerificationInfo': <String, Object?>{
+      'sessionInfo': sessionInfo,
+      'code': code,
+    },
     'tenantId': ?tenantId,
   });
 }
