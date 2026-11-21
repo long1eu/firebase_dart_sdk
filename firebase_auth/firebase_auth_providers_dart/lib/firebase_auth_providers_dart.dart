@@ -82,5 +82,8 @@ export 'src/password_policy.dart';
 export 'src/service_account_key.dart';
 export 'src/storage/file_auth_storage_stub.dart'
     if (dart.library.io) 'src/storage/file_auth_storage_io.dart';
+export 'src/storage/indexed_db_auth_storage_stub.dart'
+    if (dart.library.js_interop) 'src/storage/indexed_db_auth_storage_web.dart';
+export 'src/storage/indexed_db_types.dart';
 export 'src/storage/web_auth_storage_stub.dart'
     if (dart.library.js_interop) 'src/storage/web_auth_storage_web.dart';

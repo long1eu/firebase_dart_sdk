@@ -5,9 +5,11 @@ import 'firebase_user_auth.dart';
 /// Where [FirebaseUserAuth] keeps the session of the signed-in user (its refresh token and the user record), so
 /// that the user is still signed in after a restart.
 ///
-/// The package has three: [InMemoryAuthStorage] (the default; forgets the session when the process ends),
-/// `FileAuthStorage` (an owner-only file on the Dart VM) and `WebAuthStorage` (`sessionStorage` or `localStorage`
-/// in a browser). An application that keeps secrets elsewhere implements this on top of its own storage.
+/// The package has [InMemoryAuthStorage] (the default; forgets the session when the process ends),
+/// `FileAuthStorage` (an owner-only file on the Dart VM), `WebAuthStorage` (`sessionStorage` or `localStorage`
+/// in a browser), `IndexedDbAuthStorage` (IndexedDB in a browser) and `BestWebAuthStorage` (IndexedDB, else
+/// `localStorage`, else memory, chosen once). An application that keeps secrets elsewhere implements this on top of
+/// its own storage.
 ///
 /// **The stored value is a credential.** It holds the refresh token of the user, which does not expire: whoever
 /// reads it can get ID tokens and act as that user (read and write what the security rules allow the user) until

@@ -1,3 +1,18 @@
+## Unreleased
+
+- `IndexedDbAuthStorage`: an `AuthStorage` in IndexedDB for the web (the JS SDK's `indexedDBLocalPersistence`), in
+  its own database (`firebase_auth_providers_dart`, store `sessions`; not the JS SDK's format). A write completes
+  once its transaction has completed (`durability: 'strict'`); the calls of one instance run in order; a connection
+  closed by a `versionchange` or by the browser (the database was deleted) is opened again once. Errors are
+  `IndexedDbAuthStorageException`s (with an `IndexedDbOperation`), which carry no stored value.
+  `IndexedDbAuthStorage.isAvailable()` probes IndexedDB and never throws.
+- `BestWebAuthStorage`: IndexedDB, else `localStorage`, else memory, decided once by the availability checks
+  (`kind`, a `WebAuthStorageKind`), like `getAuth` of the JS SDK. With IndexedDB, a session of the same key found in
+  `localStorage` (`localStoragePrefix`) is moved at the first read: written, read back, then deleted from
+  `localStorage`; a session IndexedDB already has wins and the `localStorage` copy is deleted.
+- No cross-tab sync. On the Dart VM both constructors throw an `UnsupportedError`. The browser tests
+  (`test/browser/indexed_db_auth_storage_test.dart`) are written but have not been run yet.
+
 ## 0.3.1
 
 - The browser flows run on the new package `secure_flow` (a new dependency, `^0.1.0`), whose presenters,
