@@ -15,6 +15,12 @@ class _FakeCalls implements DpapiCalls {
   /// The flags of every call.
   final List<int> flags = <int>[];
 
+  /// Every call by name, in order.
+  final List<String> order = <String>[];
+
+  @override
+  void prepare() => order.add('prepare');
+
   int allocated = 0;
 
   @override
@@ -23,7 +29,10 @@ class _FakeCalls implements DpapiCalls {
     Pointer<DataBlob> entropy,
     int flags,
     Pointer<DataBlob> output,
-  ) => _call(input, flags, output);
+  ) {
+    order.add('protect');
+    return _call(input, flags, output);
+  }
 
   @override
   int unprotect(
@@ -31,10 +40,14 @@ class _FakeCalls implements DpapiCalls {
     Pointer<DataBlob> entropy,
     int flags,
     Pointer<DataBlob> output,
-  ) => _call(input, flags, output);
+  ) {
+    order.add('unprotect');
+    return _call(input, flags, output);
+  }
 
   @override
   void localFree(Pointer<Void> memory) {
+    order.add('localFree');
     allocated--;
     calloc.free(memory);
   }
@@ -142,6 +155,32 @@ void main() {
       );
     },
   );
+
+  test('GetLastError and LocalFree are bound before the first DPAPI call', () {
+    final _FakeCalls fresh = _FakeCalls()..failures.add(5);
+    final Crypt32Cipher prepared = Crypt32Cipher(fresh);
+    expect(fresh.order, <String>['prepare']);
+    expect(
+      () => prepared.protect(data, entropy),
+      throwsA(isA<SecretStoreError>()),
+    );
+    prepared.protect(data, entropy);
+    expect(fresh.order, <String>['prepare', 'protect', 'protect', 'localFree']);
+  });
+
+  test('127 says the code may be wrong and is not unavailable', () {
+    final SecretStoreError procNotFound = dpapiError('CryptProtectData', 127);
+    expect(procNotFound.status, 127);
+    expect(procNotFound.message, contains('may be wrong'));
+    expect(
+      SecureAuthStorageException(
+        platform: 'windows',
+        operation: 'write',
+        cause: procNotFound,
+      ).isUnavailable,
+      isFalse,
+    );
+  });
 
   test('a lost error code is reported as such, not as unavailable', () {
     final SecretStoreError lost = dpapiError('CryptProtectData', -1);

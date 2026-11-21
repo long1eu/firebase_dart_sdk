@@ -11,6 +11,9 @@ const int cryptProtectUiForbidden = 0x1;
 /// `ERROR_ACCESS_DENIED`.
 const int _errorAccessDenied = 5;
 
+/// `ERROR_PROC_NOT_FOUND`: what a failed `GetProcAddress` leaves behind.
+const int _errorProcNotFound = 127;
+
 /// `DATA_BLOB` (`CRYPT_INTEGER_BLOB`).
 final class DataBlob extends Struct {
   /// The number of bytes.
@@ -46,6 +49,15 @@ abstract interface class DpapiCalls {
 
   /// `LocalFree(memory)`, for the output of a successful call.
   void localFree(Pointer<Void> memory);
+
+  /// Binds `GetLastError` and `LocalFree` before the first DPAPI call.
+  ///
+  /// A `@Native` function is resolved at its first call, and a symbol lookup
+  /// that misses on the way (`GetProcAddress` fails with
+  /// `ERROR_PROC_NOT_FOUND`, 127) overwrites the thread's last error. Done
+  /// after a failed DPAPI call, the first read of the error would get 127
+  /// instead of the DPAPI code.
+  void prepare();
 }
 
 @Native<
@@ -179,6 +191,16 @@ class Crypt32Calls implements DpapiCalls {
     _localFree(memory);
   }
 
+  /// Calls `GetLastError` and `LocalFree(NULL)` (which frees nothing) once,
+  /// so that both are resolved before any DPAPI call can fail. The DPAPI
+  /// functions themselves are resolved before their own call, which is
+  /// harmless.
+  @override
+  void prepare() {
+    _getLastError();
+    _localFree(nullptr);
+  }
+
   /// A failed call whose last error reads 0 still failed: report it as -1,
   /// "the code was lost", rather than as success.
   static int _nonZero(int error) => error == 0 ? -1 : error;
@@ -189,8 +211,11 @@ class Crypt32Calls implements DpapiCalls {
 /// Every failure is a new [SecretStoreError] with the error code [calls]
 /// returned for that very call; nothing is cached between calls.
 class Crypt32Cipher implements DpapiCipher {
-  /// A cipher over [calls].
-  Crypt32Cipher(this.calls);
+  /// A cipher over [calls]; [DpapiCalls.prepare] runs here, before any DPAPI
+  /// call.
+  Crypt32Cipher(this.calls) {
+    calls.prepare();
+  }
 
   /// A cipher over the real DPAPI ([Crypt32Calls.load]).
   factory Crypt32Cipher.load() => Crypt32Cipher(Crypt32Calls.load());
@@ -274,6 +299,10 @@ SecretStoreError dpapiError(String function, int code) => SecretStoreError(
   message: switch (code) {
     _errorAccessDenied => 'access denied (ERROR_ACCESS_DENIED)',
     -1 => 'failed, but GetLastError returned 0 (the error code was lost)',
+    _errorProcNotFound =>
+      'Win32 error 127 (ERROR_PROC_NOT_FOUND); DPAPI does not set this '
+          'itself, so the code may be wrong: a symbol lookup may have '
+          'overwritten the last error',
     _ => 'Win32 error $code',
   },
 );
