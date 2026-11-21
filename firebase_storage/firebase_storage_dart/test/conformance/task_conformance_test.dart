@@ -247,10 +247,13 @@ void main() {
           UploadState.error,
         ]);
         expect(error, storageCode('retry-limit-exceeded'));
+        // Per-byte progress may report bytes of the first chunk before the 503; nothing is
+        // ever confirmed, so no event passes the first chunk and the last one is back at 0.
         expect(
-          events.map((UploadProgress e) => e.bytesTransferred).toSet(),
-          <int>{0},
+          events.every((UploadProgress e) => e.bytesTransferred < 256 * 1024),
+          isTrue,
         );
+        expect(events.last.bytesTransferred, 0);
       },
     );
 
@@ -305,10 +308,13 @@ void main() {
           UploadState.error,
         ]);
         expect(error, storageCode('retry-limit-exceeded'));
+        // Per-byte progress may report bytes of the first chunk before the 503; nothing is
+        // ever confirmed, so no event passes the first chunk and the last one is back at 0.
         expect(
-          events.map((UploadProgress e) => e.bytesTransferred).toSet(),
-          <int>{0},
+          events.every((UploadProgress e) => e.bytesTransferred < 256 * 1024),
+          isTrue,
         );
+        expect(events.last.bytesTransferred, 0);
       },
     );
 
