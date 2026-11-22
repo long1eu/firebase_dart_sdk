@@ -124,6 +124,37 @@ void main() {
       );
 
       test(
+        'get() of an ordered query without .indexOn returns the children in order',
+        () async {
+          final FirebaseDatabase db = open();
+          final DatabaseReference list = db.ref('$root/ordered');
+          await list.set(<String, Object?>{
+            'a': <String, Object?>{'n': 3},
+            'b': <String, Object?>{'n': 1},
+            'c': <String, Object?>{'n': 2},
+          });
+          // Sent as the default get and ordered on the client, as a listen is.
+          final DataSnapshot snapshot = await list.orderByChild('n').get();
+          expect(snapshot.children.map((DataSnapshot c) => c.key), <String>[
+            'b',
+            'c',
+            'a',
+          ]);
+          // A limited one is sent as it is and refused.
+          await expectLater(
+            list.orderByChild('n').limitToLast(2).get(),
+            throwsA(
+              isA<FirebaseDatabaseException>().having(
+                (FirebaseDatabaseException e) => e.code,
+                'code',
+                'index-not-defined',
+              ),
+            ),
+          );
+        },
+      );
+
+      test(
         '.info/connected turns true and a mock user token is accepted',
         () async {
           final FirebaseDatabase db = open(

@@ -289,6 +289,11 @@ base class Query {
   /// 5. When the server refuses the read it fails with `permission-denied`, never with a cached answer.
   ///
   /// Outside case 1 the answer does not include this client's pending writes.
+  ///
+  /// A query with an order but no range and no limit asks the server for all the data at its path and
+  /// orders the children here, as a listener does, so it needs no `.indexOn` rule (JS sends the ordered
+  /// query and the server refuses it without one). A query with a range or a limit is sent as it is and
+  /// fails with `index-not-defined` when the rules have no `.indexOn` for its order.
   Future<DataSnapshot> get() {
     final DatabaseReference location = ref;
     return database.request<DataSnapshot>((

@@ -70,8 +70,7 @@ final class FirebaseDatabase {
   /// The constructor is synchronous, also with persistence: opening the store and restoring writes happen in
   /// the background, and calls made meanwhile wait for it, in call order.
   ///
-  /// [clock], [random] and [delay] replace the wall clock, the random source (push ids, backoff) and the
-  /// timers, for tests.
+  /// [clock] and [random] replace the wall clock and the random source (push ids, backoff), for tests.
   FirebaseDatabase(
     this.app, {
     String? databaseUrl,
@@ -81,7 +80,6 @@ final class FirebaseDatabase {
     DatabaseLogger? logger,
     @visibleForTesting DateTime Function()? clock,
     @visibleForTesting double Function()? random,
-    @visibleForTesting Future<void> Function(Duration)? delay,
   }) {
     final _Target target = _Target.resolve(
       app,
