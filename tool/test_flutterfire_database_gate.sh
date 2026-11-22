@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Runs FlutterFire's own firebase_database integration tests (the example's integration_test/, 78
+# Runs FlutterFire's own firebase_database integration tests (the example's integration_test/, 77
 # tests) against firebase_database_dart_platform and the Realtime Database emulator: the acceptance
 # gate of the shim.
 #
@@ -9,7 +9,8 @@
 #   --dry-run      prints every step and the files it would write, and changes nothing (no temp
 #                  directory, no emulator, no flutter command).
 #   --device <id>  passed to `flutter test -d` (for example `linux` on a Linux desktop with a
-#                  display). Without it the tests run on the host VM (flutter_tester).
+#                  display). Without it the tests run on the host test runner, through
+#                  test/gate_test.dart.
 #
 # What it does:
 #   1. checks that FLUTTERFIRE_DIR is a FlutterFire checkout at the pinned commit, with no local
@@ -33,9 +34,11 @@
 #   5. starts the Database emulator on GATE_DATABASE_PORT with tool/start_database_emulator.sh
 #      (from the branch rtdb/emulator), and loads FlutterFire's rules into the namespace of the
 #      databaseURL through the emulator's REST API;
-#   6. runs `flutter test integration_test/gate_test.dart`, prints the passed, failed and skipped
-#      counts, and fails on any failure or on a skip count other than EXPECTED_SKIPS (2: the web
-#      only test and the Android only stream test skip themselves on Linux);
+#   6. runs `flutter test test/gate_test.dart` (a file under integration_test/ would make flutter
+#      pick a connected device; with --device it runs integration_test/gate_test.dart), prints
+#      the passed, failed and skipped
+#      counts, and fails on any failure or on a skip count other than EXPECTED_SKIPS (1, as measured on the
+#      host test runner);
 #   7. stops the emulator it started; removes the temporary directory when the gate passed and
 #      keeps it (path printed) when it failed.
 #
@@ -47,7 +50,7 @@
 #                       git -C flutterfire checkout 6a80b1b5eea1ea86ba8c7e7bf2a8525cabb77126
 #   FLUTTER           the flutter command (default: flutter on the PATH; the repository pins 3.44.9)
 #   GATE_DATABASE_PORT  the port of the emulator (default 9100)
-#   EXPECTED_SKIPS    the number of skipped tests that passes the gate (default 2)
+#   EXPECTED_SKIPS    the number of skipped tests that passes the gate (default 1)
 set -euo pipefail
 
 PINNED_COMMIT=6a80b1b5eea1ea86ba8c7e7bf2a8525cabb77126
@@ -60,7 +63,7 @@ RULES_PATH=.github/workflows/scripts/database.rules.json
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 SHIM="$ROOT/firebase_database/firebase_database_dart_platform"
 FLUTTER="${FLUTTER:-flutter}"
-EXPECTED_SKIPS="${EXPECTED_SKIPS:-2}"
+EXPECTED_SKIPS="${EXPECTED_SKIPS:-1}"
 EMULATOR_PORT="${GATE_DATABASE_PORT:-9100}"
 case "$EMULATOR_PORT" in
 '' | *[!0-9]*)
@@ -233,6 +236,15 @@ void main() {
 }
 EOF
 
+run mkdir -p "$APP/test"
+write_file "$APP/test/gate_test.dart" <<'EOF2'
+// The gate on the host test runner: `flutter test` on a file under integration_test/ picks a
+// connected device, so the run without --device goes through this file under test/.
+import '../integration_test/gate_test.dart' as gate;
+
+void main() => gate.main();
+EOF2
+
 E2E="$APP/integration_test/e2e_test.dart"
 run perl -pi -e "s{^const emulatorPort = 9000;\$}{const emulatorPort = $EMULATOR_PORT;}" "$E2E"
 expect_in "$E2E" "const emulatorPort = $EMULATOR_PORT;"
@@ -251,10 +263,12 @@ run curl -sSf -X PUT -H 'Authorization: Bearer owner' --data-binary "@$RULES" \
   "http://127.0.0.1:$EMULATOR_PORT/.settings/rules.json?ns=$NAMESPACE"
 
 step "6. Running FlutterFire's integration tests"
-test_args=(test integration_test/gate_test.dart --file-reporter "json:$RESULTS")
 if [ -n "$DEVICE" ]; then
-  test_args+=(-d "$DEVICE")
+  test_args=(test integration_test/gate_test.dart -d "$DEVICE")
+else
+  test_args=(test test/gate_test.dart)
 fi
+test_args+=(--file-reporter "json:$RESULTS")
 echo "+ (cd $APP && $FLUTTER ${test_args[*]})"
 if [ "$DRY_RUN" = 1 ]; then
   echo "Dry run: nothing was changed."
