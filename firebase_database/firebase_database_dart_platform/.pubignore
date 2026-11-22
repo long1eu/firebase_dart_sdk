@@ -1,0 +1,27 @@
+# Files left out of the published package. When this file exists, pub does not
+# read .gitignore in this directory, so the build output entries are repeated.
+.dart_tool/
+.packages
+.pub/
+build/
+doc/api/
+.idea/
+*.iml
+.DS_Store
+.metadata
+pubspec.lock
+
+# Local development only: path overrides for the sibling packages.
+pubspec_overrides.yaml
+
+# Includes the analysis options of the repository root, which are not part of
+# the package.
+analysis_options.yaml
+
+# The tests need the sibling packages of the repository.
+test/
+.flutter-plugins
+.flutter-plugins-dependencies
+
+# Ownership table of the skeleton phase, for the repository only.
+lib/src/OWNERS.md
