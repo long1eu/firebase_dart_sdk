@@ -87,6 +87,26 @@ void main() {
     );
   });
 
+  test('value index orders integers beyond 2^53 exactly', () {
+    // Measured on the emulator (probe addendum 4): orderByValue with limitToFirst(1) returns the
+    // child holding ...992, not ...993. dart2js cannot tell them apart (web limitation).
+    final Node node = nodeFromJson(<String, Object?>{
+      'x': int.parse('9007199254740993'),
+      'y': int.parse('9007199254740992'),
+      'z': 9007199254740994.0,
+    }).withIndex(valueIndex);
+    expect(names((node as ChildrenNode).childrenInOrder(valueIndex)), <String>[
+      'y',
+      'x',
+      'z',
+    ]);
+    expect(
+      LeafNode(int.parse('9007199254740993')) ==
+          LeafNode(int.parse('9007199254740992')),
+      isFalse,
+    );
+  }, testOn: '!js');
+
   test('value index after withIndex', () {
     final Node node = nodeFromJson(<String, Object?>{
       'a': 'str',
