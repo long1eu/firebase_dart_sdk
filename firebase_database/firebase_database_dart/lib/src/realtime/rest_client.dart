@@ -730,7 +730,8 @@ String? _jsonProblem(Object? root, int maxDepth) {
   while (stack.isNotEmpty) {
     final (Object? value, int depth) = stack.removeLast();
     switch (value) {
-      case final double number when !number.isFinite:
+      // `num`, not `double`: on the web an infinity also is an `int`.
+      case final num number when !number.isFinite:
         return 'a number that is not finite';
       case Map<String, Object?>() || List<Object?>() when depth >= maxDepth:
         return 'a nesting deeper than $maxDepth';

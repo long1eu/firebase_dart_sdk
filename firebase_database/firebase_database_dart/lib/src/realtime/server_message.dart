@@ -309,7 +309,7 @@ Ignored _violation(String why) => Ignored(why, isProtocolError: true);
 
 ServerMessage _decodeResponse(Map<String, Object?> json) {
   final Object? r = json[RealtimeProtocol.requestNumberKey];
-  if (r is! int || r < 0) {
+  if (r is! int || !r.isFinite || r < 0) {
     return _violation('request number is not a non-negative integer');
   }
   final Object? body = json[RealtimeProtocol.bodyKey];
@@ -503,7 +503,7 @@ WireRangeMerge? _rangeEntry(Object? entry, int index, int count) {
   if (tag == null) {
     return (true, null);
   }
-  if (tag is! int || tag < 0) {
+  if (tag is! int || !tag.isFinite || tag < 0) {
     return (false, null);
   }
   return (true, tag == 0 ? null : tag);
@@ -570,10 +570,11 @@ String? _dataProblem(Object? root, {required bool checkKeys}) {
   final List<Object?> pending = <Object?>[root];
   while (pending.isNotEmpty) {
     final Object? value = pending.removeLast();
-    if (value == null || value is bool || value is int) {
+    if (value == null || value is bool) {
       continue;
     }
-    if (value is double) {
+    // On the web an infinity also passes `is int`, so finiteness is asked of every number.
+    if (value is num) {
       if (!value.isFinite) {
         return 'non-finite number';
       }

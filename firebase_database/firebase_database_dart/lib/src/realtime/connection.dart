@@ -411,7 +411,8 @@ final class RealtimeConnection {
     final Object? ts = payload['ts'];
     final Object? sessionId = payload['s'];
     final Object? host = payload['h'];
-    if (ts is! int || sessionId is! String || host is! String) {
+    // On the web an infinity (`1e400`) also passes `is int`.
+    if (ts is! int || !ts.isFinite || sessionId is! String || host is! String) {
       _protocolError('hello with a missing or invalid ts, s or h');
       return;
     }
