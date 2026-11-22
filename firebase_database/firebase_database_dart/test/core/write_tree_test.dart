@@ -1,5 +1,7 @@
 // Own tests for WriteTree (no upstream unit test). Expected values follow Android
 // core/WriteTree.java (same logic as JS core/WriteTree.ts).
+import 'dart:math' as math;
+
 import 'package:firebase_database_dart/src/core/compound_write.dart';
 import 'package:firebase_database_dart/src/core/path.dart';
 import 'package:firebase_database_dart/src/core/snap/child_key.dart';
@@ -316,5 +318,62 @@ void main() {
     final ref = tree.childWrites(p('a/b'));
     expect(ref.treePath, p('a/b'));
     expect(ref.writeTree, same(tree));
+  });
+
+  group('removeWrite of merges at one location', () {
+    // Upstream rebuilds the visible writes whenever two merges share a location; here merges of
+    // different children are removed one by one. The state must be the one a rebuild gives.
+    Node visible(WriteTree t) =>
+        t.calcCompleteEventCache(p('r'), ChildrenNode.empty)!;
+
+    test('any removal order gives the state of a rebuild', () {
+      const List<String> keys = <String>['a', 'b', 'c', 'a/x', 'a/y', 'b/x'];
+      for (int seed = 0; seed < 200; seed++) {
+        final math.Random random = math.Random(seed);
+        final Map<int, CompoundWrite> pending = <int, CompoundWrite>{};
+        final WriteTree tree = WriteTree();
+        for (int id = 1; id <= 12; id++) {
+          final CompoundWrite merge = cw(<String, Object?>{
+            for (int j = 0; j <= random.nextInt(3); j++)
+              keys[random.nextInt(keys.length)]: id * 10 + j,
+          });
+          pending[id] = merge;
+          tree.addMerge(p('r'), merge, id);
+        }
+        final List<int> order = pending.keys.toList()..shuffle(random);
+        for (final int id in order) {
+          tree.removeWrite(id);
+          pending.remove(id);
+          final WriteTree rebuilt = WriteTree();
+          pending.forEach(
+            (int id, CompoundWrite merge) =>
+                rebuilt.addMerge(p('r'), merge, id),
+          );
+          expect(
+            visible(tree),
+            visible(rebuilt),
+            reason: 'seed $seed, after $id',
+          );
+        }
+      }
+    });
+
+    test('1000 merges of different children are removed without a rebuild', () {
+      final WriteTree tree = WriteTree();
+      for (int id = 1; id <= 1000; id++) {
+        tree.addMerge(
+          p('r'),
+          cw(<String, Object?>{'$id/a': id, '$id/b': id}),
+          id,
+        );
+      }
+      final Stopwatch watch = Stopwatch()..start();
+      for (int id = 1; id <= 1000; id++) {
+        expect(tree.removeWrite(id), isTrue);
+      }
+      // About 20 ms; the rebuild on every removal took about a second.
+      expect(watch.elapsedMilliseconds, lessThan(500));
+      expect(visible(tree), ChildrenNode.empty);
+    });
   });
 }

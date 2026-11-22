@@ -11,6 +11,8 @@ import 'package:firebase_database_dart/src/core/snap/indexes/key_index.dart';
 import 'package:firebase_database_dart/src/core/snap/named_node.dart';
 import 'package:firebase_database_dart/src/core/snap/node.dart';
 import 'package:firebase_database_dart/src/core/user_write_record.dart';
+import 'package:firebase_database_dart/src/core/util/immutable_tree.dart';
+import 'package:firebase_database_dart/src/core/util/sorted_map.dart';
 import 'package:firebase_database_dart/src/core/view/cache_node.dart';
 import 'package:firebase_database_dart/src/core/write_id.dart';
 import 'package:firebase_database_dart/src/core/write_tree_ref.dart';
@@ -104,7 +106,8 @@ final class WriteTree {
         if (i >= idx && _recordContainsPath(currentWrite, writeToRemove.path)) {
           // A later write shadowed the removed one completely.
           removedWriteWasVisible = false;
-        } else if (writeToRemove.path.contains(currentWrite.path)) {
+        } else if (writeToRemove.path.contains(currentWrite.path) &&
+            _recordsOverlap(writeToRemove, currentWrite)) {
           // Either we cover some writes or they cover part of us.
           removedWriteOverlapsWithOtherWrites = true;
         }
@@ -296,12 +299,65 @@ final class WriteTree {
     return currentNext;
   }
 
+  /// Whether a path written by [a] is, contains or lies under a path written by [b].
+  ///
+  /// JS and Android compare only the paths of the two records, so two merges at one location
+  /// always count as overlapping and each acknowledgement rebuilds the visible writes: with n
+  /// pending `update` calls at one location that is n rebuilds of n writes. Here a merge counts by
+  /// the paths of its children, so merges of different children are removed one by one.
+  bool _recordsOverlap(UserWriteRecord a, UserWriteRecord b) {
+    if (a.isOverwrite && b.isOverwrite) {
+      return true;
+    }
+    if (!a.isOverwrite && !b.isOverwrite && a.path == b.path) {
+      // The common case, checked without building paths: two merges at one location overlap
+      // only when they share a first key. Sharing one is not yet an overlap (`x/a` and `x/b`),
+      // so that case goes on to the exact check.
+      final SortedMap<ChildKey, ImmutableTree<Node>> aChildren =
+          a.merge!.writeTree.children;
+      final bool shared = b.merge!.writeTree.children.inOrderTraversal(
+        (ChildKey key, ImmutableTree<Node> _) => aChildren.containsKey(key),
+      );
+      if (!shared) {
+        return false;
+      }
+    }
+    final Iterable<Path> aPaths = a.isOverwrite
+        ? <Path>[a.path]
+        : a.merge!.entries.map(
+            (MapEntry<Path, Node> entry) => a.path.childPath(entry.key),
+          );
+    final List<Path> bPaths = b.isOverwrite
+        ? <Path>[b.path]
+        : b.merge!.entries
+              .map((MapEntry<Path, Node> entry) => b.path.childPath(entry.key))
+              .toList(growable: false);
+    for (final Path aPath in aPaths) {
+      for (final Path bPath in bPaths) {
+        if (aPath.contains(bPath) || bPath.contains(aPath)) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
   bool _recordContainsPath(UserWriteRecord writeRecord, Path path) {
     if (writeRecord.isOverwrite) {
       return writeRecord.path.contains(path);
     }
+    // A child of the merge can contain [path] only when [path] lies strictly below the merge;
+    // this is asked once per pending write on every acknowledgement, so the usual "no" must not
+    // walk the merge.
+    if (!writeRecord.path.contains(path)) {
+      return false;
+    }
+    final Path relative = Path.relative(writeRecord.path, path);
+    if (relative.isEmpty) {
+      return false;
+    }
     for (final MapEntry<Path, Node> entry in writeRecord.merge!.entries) {
-      if (writeRecord.path.childPath(entry.key).contains(path)) {
+      if (entry.key.contains(relative)) {
         return true;
       }
     }
