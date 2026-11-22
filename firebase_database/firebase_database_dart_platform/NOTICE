@@ -1,0 +1,17 @@
+firebase_database_dart_platform
+Copyright 2026 Razvan Lung (long1eu) and contributors.
+
+This package implements the platform interface of the FlutterFire
+firebase_database plugin (firebase_database_platform_interface, Copyright 2019
+the Chromium project authors, BSD 3-Clause license) and the platform interface
+of firebase_core (firebase_core_platform_interface, BSD 3-Clause license). It
+depends on those packages. lib/src/values.dart ports transformValue from
+firebase_database_platform_interface
+(lib/src/method_channel/utils/utils.dart, BSD 3-Clause license). The work is
+done by firebase_database_dart, an unofficial pure-Dart client of the Firebase
+Realtime Database.
+
+This package is not affiliated with, endorsed by or supported by Google LLC or
+Firebase. "Firebase" is a trademark of Google LLC.
+
+Licensed under the Apache License, Version 2.0; see the LICENSE file.

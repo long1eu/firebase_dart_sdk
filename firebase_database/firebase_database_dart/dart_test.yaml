@@ -1,0 +1,11 @@
+# The contract tests (test/contract) run on the VM; browser tests come with the connection.
+tags:
+  browser:
+    test_on: browser
+    timeout: 2x
+  # Needs the Database emulator: FIREBASE_DATABASE_EMULATOR_HOST=127.0.0.1:9100 dart test -t emulator -j 1
+  emulator:
+    timeout: 30s
+  emulator-slow:
+    skip: 'runs for minutes: dart test --run-skipped -t emulator-slow'
+    timeout: 4m
