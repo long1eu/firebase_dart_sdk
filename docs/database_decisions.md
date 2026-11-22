@@ -844,7 +844,8 @@ Choices:
   Windows, when the adapter is a direct dependency of the app, Flutter's tool selects it instead of the native
   plugin and leaves the native plugin out of the build. On Flutter 3.41.6, with two throwaway plugins, a
   direct dependency gave the adapter and no native entry in `generated_plugins.cmake`, and a transitive one
-  gave the native plugin. A real Windows build has not been run.
+  gave the native plugin. A real Windows build confirms it: the generated plugin registrant calls
+  `FirebaseDatabaseDart.registerWith()`.
 
 **Why.** The platform interface hands every query call its modifiers, so the adapter holds no query state
 (`firebase_database/lib/src/query.dart:9-27` in FlutterFire 13.1.0). The FlutterFire sources show the quirks:
@@ -860,7 +861,7 @@ inclusive; its own integration tests skip those on Windows (`database_reference_
 
 **What we gave up.** Code that works around the child-event reference quirk by treating `event.snapshot.ref`
 as the list reference changes meaning. A mutable copy costs one deep copy per snapshot whose value is read.
-`windows` is declared, but a real Windows build of an app with the adapter has not been run.
+A release build on Windows and a Linux desktop build of an app with the adapter have not been run.
 
 **Pinned by.** In `firebase_database_dart_platform/test/`: `quirks_test.dart` (the three quirks),
 `values_test.dart` (stringified keys, mutable copies), `transaction_test.dart` (an invalid stringified key is
@@ -871,8 +872,9 @@ against the emulator with `tool/test_flutterfire_database_gate.sh`: 76 pass and 
 host test runner. The script patches a copy of the example (a Linux case in the options, a `databaseURL`, no
 workspace resolution, the emulator port) and never changes the FlutterFire checkout.
 
-Status: built. The suite passes against the adapter on macOS; the registration experiment was run on fake
-plugins (Flutter 3.41.6) only, and the Windows build and a built desktop app with the adapter have not been run.
+Status: built. The suite passes against the adapter on macOS. On Windows 11 x64 (Flutter 3.47.8, debug) an app
+written against `firebase_database` alone was built with the adapter and did a write, a read and a transaction
+against the emulator. Not run: a release build, a Linux desktop app.
 
 ## 23. How the connection is tested
 
@@ -910,8 +912,10 @@ browser test cannot open a server socket, so the browser channel test starts a l
 
 | Where | Result |
 |---|---|
-| macOS, VM | 2,125 tests of the client |
-| Chrome | dart2js 1,125 tests, dart2wasm 1,128 tests |
+| macOS, VM | 2,137 tests of the client |
+| macOS, Chrome | the whole test tree: dart2js 1,997 tests, dart2wasm 2,000 tests |
+| Windows 11 x64, VM (Dart 3.14.1) | 2,126 tests of the client (at an earlier commit) |
+| Windows 11 x64, Flutter debug app | built with the adapter; a write, a read and a transaction against the emulator |
 | Linux x64, VM | 2,058 tests of the client; SQLite package 168 tests (at an earlier commit) |
 | Linux x64, Chrome | dart2js 1,125 tests, dart2wasm 1,128 tests |
 | Database emulator | 33 tests (tag `emulator`) |
@@ -921,7 +925,11 @@ browser test cannot open a server socket, so the browser channel test starts a l
 Two independent code reviews found, in the connection, 3 high, 8 medium and 7 low findings, and in the SQLite
 engine 1 high, 5 medium and 10 low; each was fixed with a test that fails without the fix.
 
-Not run: Windows, a production project, and a built desktop app with the adapter.
+The connection's own unit tests first ran in a browser late, and found one web-only defect: compiled to
+JavaScript an infinity passes `is int`, so `1e999` from the server passed the number checks. Every number from the
+server is now asked for finiteness (`server_message_test`, `c_limits_test`, `k_server_input_test`).
+
+Not run: a production project, a release build of a desktop app, a Linux desktop app, Safari and Firefox.
 
 **Pinned by.** `test/realtime/`, `test/integration/`, `test/security/`, `test/contract/` and the tags in
 `dart_test.yaml` (`browser`, `emulator`, `emulator-slow`).
