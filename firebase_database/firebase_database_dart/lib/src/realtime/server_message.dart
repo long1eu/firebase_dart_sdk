@@ -8,6 +8,9 @@
 library;
 
 import 'package:firebase_database_dart/src/core/connection/wire_range_merge.dart';
+import 'package:firebase_database_dart/src/core/database_error.dart';
+import 'package:firebase_database_dart/src/realtime/connection_timings.dart';
+import 'package:firebase_database_dart/src/realtime/realtime_error.dart';
 
 /// One data message of the server (the `d` of `{"t":"d","d":...}`), decoded.
 sealed class ServerMessage {
@@ -18,7 +21,13 @@ sealed class ServerMessage {
 /// The response to request [r] (4): `{"r":n,"b":{"s":status,"d":data}}`.
 ///
 /// A body that is not an object or a status that is not a string decodes to a response with status
-/// `failed` (iOS U-I06, U-I07); a non-integer `r` decodes to [Ignored] (U-I09).
+/// `failure`, the wire status of `DatabaseErrorCode.operationFailed` (iOS U-I06, U-I07 use
+/// `failed`, which the core's vocabulary does not have); a non-integer or negative `r` decodes to
+/// [Ignored] (U-I09). An `ok` answer whose data holds a non-finite number or an oversized string
+/// also decodes to `failure` (threat model T11). A non-`ok` status and a string [data] are cleaned
+/// by [safeServerText]; other data of a non-`ok` answer is dropped. The keys of `ok` data are not
+/// checked here (an `auth` answer echoes token claims such as `https://x/roles`): the owner checks
+/// the data of a `g` answer with [isValidServerData].
 final class Response extends ServerMessage {
   /// Creates the response to [r] with [status] and [data].
   const Response(this.r, this.status, this.data);
@@ -190,20 +199,68 @@ final class RangeMergePush extends Push {
 
 /// A message that is malformed or of an unknown kind (unknown actions, non-object messages):
 /// logged and dropped (iOS U-I05, U-I08, U-I09; test plan B-5.4).
+///
+/// With [isProtocolError] the message broke a rule of threat model T11 (a known message of the
+/// wrong shape, a bad path or key, a non-integer `r` or `t`, a non-finite number): the owner closes
+/// the connection as a protocol error with backoff (brief, security rule 4). Without it the message
+/// is only logged: an unknown action, or an `rm` with an empty list (a compound hash match).
 final class Ignored extends ServerMessage {
   /// Creates the record with [why] it was ignored (no server data in it).
-  const Ignored(this.why);
+  const Ignored(this.why, {this.isProtocolError = false});
 
   /// Why the message was dropped, for the log.
   final String why;
 
+  /// Whether the message broke a protocol rule and the connection must close.
+  final bool isProtocolError;
+
   @override
-  String toString() => 'Ignored($why)';
+  String toString() =>
+      'Ignored($why${isProtocolError ? ', protocol error' : ''})';
 }
 
 /// Decodes [json], the `d` of a data message. Never throws (test plan idea 3: fuzzed).
+///
+/// The order of the checks is JS's (PersistentConnection.ts:642-656): a message with `r` is a
+/// response, one with `error` a [ServerError], one with `a` a [Push]. Every path, key, tag and
+/// number of a push is validated (threat model T11) and every path is converted with
+/// [wirePathFromServer]. An unknown action is [Ignored] without a protocol error, so a newer server
+/// does not break the connection.
 ServerMessage decodeServerMessage(Object? json) {
-  throw UnimplementedError();
+  if (json is! Map<String, Object?>) {
+    return const Ignored(
+      'data message is not an object',
+      isProtocolError: true,
+    );
+  }
+  if (json.containsKey(RealtimeProtocol.requestNumberKey)) {
+    return _decodeResponse(json);
+  }
+  if (json.containsKey(_errorKey)) {
+    final Object? error = json[_errorKey];
+    if (error is! String) {
+      return const Ignored('error is not a string', isProtocolError: true);
+    }
+    return ServerError(safeServerText(error));
+  }
+  final Object? action = json[RealtimeProtocol.actionKey];
+  if (action is! String) {
+    return const Ignored('action is not a string', isProtocolError: true);
+  }
+  final Object? body = json[RealtimeProtocol.bodyKey];
+  if (body is! Map<String, Object?>) {
+    return const Ignored('push body is not an object', isProtocolError: true);
+  }
+  return switch (action) {
+    RealtimeProtocol.pushData => _decodeDataPush(body, isMerge: false),
+    RealtimeProtocol.pushMerge => _decodeDataPush(body, isMerge: true),
+    RealtimeProtocol.pushListenCancelled => _decodeListenRevoked(body),
+    RealtimeProtocol.pushAuthRevoked => _decodeRevoke(body, appCheck: false),
+    RealtimeProtocol.pushAppCheckRevoked => _decodeRevoke(body, appCheck: true),
+    RealtimeProtocol.pushSecurityDebug => _decodeSecurityDebug(body),
+    RealtimeProtocol.pushRangeMerge => _decodeRangeMerge(body),
+    _ => const Ignored('unknown action'),
+  };
 }
 
 /// The seam form of a path the server sent (`rtdb_seam_changes.md` A.3): `a/b` becomes `/a/b`,
@@ -214,5 +271,358 @@ ServerMessage decodeServerMessage(Object? json) {
 /// one place where the connection half converts; used for `d`, `m`, `c`, `rm` and the `s`/`e` of
 /// range merges. Validation (threat model T11) is separate.
 String wirePathFromServer(String serverPath) {
-  throw UnimplementedError();
+  if (serverPath.startsWith('/')) {
+    return serverPath;
+  }
+  return '/$serverPath';
+}
+
+/// Whether [data] is acceptable server data (threat model T11), checked without recursion: JSON
+/// values only, finite numbers, strings of at most 10 MiB of UTF-8, and object keys that follow
+/// the write rules (non-empty, at most 768 UTF-8 bytes, none of `. # $ [ ] /` or a control
+/// character), except `.priority` anywhere and `.value` next to nothing but `.priority`. `.sv`
+/// from the server is refused.
+///
+/// The decoder applies it to push data; the owner applies it to the data of a `g` answer, which
+/// [decodeServerMessage] cannot tell from other answers. Nesting depth is bounded by the frame
+/// assembler (T10), not here.
+bool isValidServerData(Object? data) =>
+    _dataProblem(data, checkKeys: true) == null;
+
+const String _errorKey = 'error';
+const String _pathKey = 'p';
+const String _dataKey = 'd';
+const String _tagKey = 't';
+const String _queriesKey = 'q';
+const String _statusKey = 's';
+const String _messageKey = 'msg';
+const String _startKey = 's';
+const String _endKey = 'e';
+const String _mergeKey = 'm';
+const String _ok = 'ok';
+const String _priorityKey = '.priority';
+const String _valueKey = '.value';
+
+String get _failed => DatabaseErrorCode.operationFailed.wireStatus;
+
+Ignored _violation(String why) => Ignored(why, isProtocolError: true);
+
+ServerMessage _decodeResponse(Map<String, Object?> json) {
+  final Object? r = json[RealtimeProtocol.requestNumberKey];
+  if (r is! int || r < 0) {
+    return _violation('request number is not a non-negative integer');
+  }
+  final Object? body = json[RealtimeProtocol.bodyKey];
+  if (body is! Map<String, Object?>) {
+    return Response(r, _failed, null);
+  }
+  final Object? status = body[RealtimeProtocol.statusKey];
+  if (status is! String) {
+    return Response(r, _failed, null);
+  }
+  final Object? data = body[_dataKey];
+  if (status == _ok) {
+    if (_dataProblem(data, checkKeys: false) != null) {
+      return Response(r, _failed, null);
+    }
+    return Response(r, status, data);
+  }
+  return Response(
+    r,
+    safeServerText(status),
+    data is String ? safeServerText(data) : null,
+  );
+}
+
+ServerMessage _decodeDataPush(
+  Map<String, Object?> body, {
+  required bool isMerge,
+}) {
+  final Object? path = body[_pathKey];
+  if (path is! String || _pathProblem(path) != null) {
+    return _violation('push path is invalid');
+  }
+  final (bool tagOk, int? tag) = _tag(body);
+  if (!tagOk) {
+    return _violation('push tag is not a non-negative integer');
+  }
+  if (!body.containsKey(_dataKey)) {
+    return _violation('push has no data');
+  }
+  final Object? data = body[_dataKey];
+  if (isMerge) {
+    if (data is! Map<String, Object?>) {
+      return _violation('merge data is not an object');
+    }
+    for (final MapEntry<String, Object?> entry in data.entries) {
+      if (entry.key.isEmpty ||
+          entry.key.startsWith('/') ||
+          _pathProblem('$path/${entry.key}') != null) {
+        return _violation('merge key is not a valid relative path');
+      }
+      if (_dataProblem(entry.value, checkKeys: true) != null) {
+        return _violation('merge data is invalid');
+      }
+    }
+  } else if (_dataProblem(data, checkKeys: true) != null) {
+    return _violation('push data is invalid');
+  }
+  return DataPush(
+    path: wirePathFromServer(path),
+    data: data,
+    isMerge: isMerge,
+    tag: tag,
+  );
+}
+
+ServerMessage _decodeListenRevoked(Map<String, Object?> body) {
+  final Object? path = body[_pathKey];
+  if (path is! String || _pathProblem(path) != null) {
+    return _violation('listen revoke path is invalid');
+  }
+  final Object? queries = body[_queriesKey];
+  if (queries == null) {
+    return ListenRevokedPush(path: wirePathFromServer(path));
+  }
+  if (queries is! List<Object?>) {
+    return _violation('listen revoke queries are not a list');
+  }
+  final List<Map<String, Object?>> objects = <Map<String, Object?>>[];
+  for (final Object? query in queries) {
+    if (query is! Map<String, Object?> ||
+        _dataProblem(query, checkKeys: false) != null) {
+      return _violation('listen revoke query is not an object');
+    }
+    objects.add(query);
+  }
+  return ListenRevokedPush(path: wirePathFromServer(path), queries: objects);
+}
+
+ServerMessage _decodeRevoke(
+  Map<String, Object?> body, {
+  required bool appCheck,
+}) {
+  final Object? status = body[_statusKey];
+  final Object? explanation = body[_dataKey];
+  if (status is! String || (explanation != null && explanation is! String)) {
+    return _violation('revoke status or explanation is not a string');
+  }
+  final String cleanStatus = safeServerText(status);
+  final String cleanExplanation = safeServerText(
+    explanation is String ? explanation : '',
+  );
+  if (appCheck) {
+    return AppCheckRevokedPush(
+      status: cleanStatus,
+      explanation: cleanExplanation,
+    );
+  }
+  return AuthRevokedPush(status: cleanStatus, explanation: cleanExplanation);
+}
+
+ServerMessage _decodeSecurityDebug(Map<String, Object?> body) {
+  final Object? message = body[_messageKey];
+  if (message is! String) {
+    return _violation('security debug message is not a string');
+  }
+  return SecurityDebugPush(safeServerText(message));
+}
+
+ServerMessage _decodeRangeMerge(Map<String, Object?> body) {
+  final Object? path = body[_pathKey];
+  if (path is! String || _pathProblem(path) != null) {
+    return _violation('range merge path is invalid');
+  }
+  final (bool tagOk, int? tag) = _tag(body);
+  if (!tagOk) {
+    return _violation('range merge tag is not a non-negative integer');
+  }
+  final Object? ranges = body[_dataKey];
+  if (ranges is! List<Object?>) {
+    return _violation('range merge data is not a list');
+  }
+  if (ranges.isEmpty) {
+    return const Ignored('empty range merge');
+  }
+  final List<WireRangeMerge> merges = <WireRangeMerge>[];
+  for (int i = 0; i < ranges.length; i++) {
+    final WireRangeMerge? merge = _rangeEntry(ranges[i], i, ranges.length);
+    if (merge == null) {
+      return _violation('range merge entry is malformed');
+    }
+    merges.add(merge);
+  }
+  return RangeMergePush(
+    path: wirePathFromServer(path),
+    merges: merges,
+    tag: tag,
+  );
+}
+
+/// Entry [index] of [count], in the shapes measured on the emulator (probe, addendum B): a single
+/// entry has neither `s` nor `e`; otherwise the first has only `e`, the last only `s`, the middle
+/// ones both; every entry has `m` and no other key.
+WireRangeMerge? _rangeEntry(Object? entry, int index, int count) {
+  if (entry is! Map<String, Object?> || !entry.containsKey(_mergeKey)) {
+    return null;
+  }
+  for (final String key in entry.keys) {
+    if (key != _startKey && key != _endKey && key != _mergeKey) {
+      return null;
+    }
+  }
+  final bool wantStart = count > 1 && index > 0;
+  final bool wantEnd = count > 1 && index < count - 1;
+  if (entry.containsKey(_startKey) != wantStart ||
+      entry.containsKey(_endKey) != wantEnd) {
+    return null;
+  }
+  final Object? start = entry[_startKey];
+  final Object? end = entry[_endKey];
+  if (wantStart && (start is! String || _pathProblem(start) != null)) {
+    return null;
+  }
+  if (wantEnd && (end is! String || _pathProblem(end) != null)) {
+    return null;
+  }
+  final Object? data = entry[_mergeKey];
+  if (_dataProblem(data, checkKeys: true) != null) {
+    return null;
+  }
+  return WireRangeMerge(
+    exclusiveStart: start is String ? wirePathFromServer(start) : null,
+    inclusiveEnd: end is String ? wirePathFromServer(end) : null,
+    data: data,
+  );
+}
+
+/// The tag of a push: absent, null and 0 are untagged (5, Repo.ts:354-410); a positive integer is
+/// the tag; anything else is invalid (the first value false).
+(bool, int?) _tag(Map<String, Object?> body) {
+  final Object? tag = body[_tagKey];
+  if (tag == null) {
+    return (true, null);
+  }
+  if (tag is! int || tag < 0) {
+    return (false, null);
+  }
+  return (true, tag == 0 ? null : tag);
+}
+
+/// Why [path] is not a valid server path (threat model T11), or null when it is: an optional
+/// leading `/`, then segments that are valid keys, at most 32 of them and 768 UTF-8 bytes in all;
+/// no empty segment; `.priority` only as the last of two or more segments. The empty path is the
+/// root.
+String? _pathProblem(String path) {
+  final String relative = path.startsWith('/') ? path.substring(1) : path;
+  if (relative.isEmpty) {
+    return null;
+  }
+  if (_utf8Exceeds(relative, RealtimeProtocol.maxPathLengthBytes)) {
+    return 'too long';
+  }
+  final List<String> segments = relative.split('/');
+  if (segments.length > RealtimeProtocol.maxPathDepth) {
+    return 'too deep';
+  }
+  for (int i = 0; i < segments.length; i++) {
+    final String segment = segments[i];
+    final bool priorityLeaf =
+        segment == _priorityKey && i > 0 && i == segments.length - 1;
+    if (!priorityLeaf && !_isValidKeyText(segment)) {
+      return 'invalid segment';
+    }
+  }
+  return null;
+}
+
+/// Whether [key] is a valid plain key: non-empty, at most 768 UTF-8 bytes, none of `. # $ [ ] /`
+/// and no control character (INVALID_KEY_REGEX_, core/util/validation.ts:45).
+bool _isValidKeyText(String key) {
+  if (key.isEmpty || _utf8Exceeds(key, RealtimeProtocol.maxPathLengthBytes)) {
+    return false;
+  }
+  for (int i = 0; i < key.length; i++) {
+    final int unit = key.codeUnitAt(i);
+    if (unit < 0x20 || unit == 0x7F || _forbiddenKeyUnits.contains(unit)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+/// `.` `#` `$` `[` `]` `/`.
+const Set<int> _forbiddenKeyUnits = <int>{0x2E, 0x23, 0x24, 0x5B, 0x5D, 0x2F};
+
+bool _isValidDataKey(String key, Map<String, Object?> parent) {
+  if (key == _priorityKey) {
+    return true;
+  }
+  if (key == _valueKey) {
+    return parent.keys.every((String k) => k == _valueKey || k == _priorityKey);
+  }
+  return _isValidKeyText(key);
+}
+
+/// Why [root] is not acceptable server data, or null (see [isValidServerData]); [checkKeys] off
+/// checks only the values (answers, query objects). Iterative: no recursion on server input.
+String? _dataProblem(Object? root, {required bool checkKeys}) {
+  final List<Object?> pending = <Object?>[root];
+  while (pending.isNotEmpty) {
+    final Object? value = pending.removeLast();
+    if (value == null || value is bool || value is int) {
+      continue;
+    }
+    if (value is double) {
+      if (!value.isFinite) {
+        return 'non-finite number';
+      }
+    } else if (value is String) {
+      if (_utf8Exceeds(value, RealtimeProtocol.maxLeafBytes)) {
+        return 'string too long';
+      }
+    } else if (value is List<Object?>) {
+      pending.addAll(value);
+    } else if (value is Map<String, Object?>) {
+      for (final MapEntry<String, Object?> entry in value.entries) {
+        if (checkKeys && !_isValidDataKey(entry.key, value)) {
+          return 'invalid key';
+        }
+        pending.add(entry.value);
+      }
+    } else {
+      return 'not a JSON value';
+    }
+  }
+  return null;
+}
+
+/// Whether the UTF-8 encoding of [text] is longer than [limit] bytes, counted only as far as
+/// needed (a lone surrogate counts 3 bytes, as its U+FFFD replacement).
+bool _utf8Exceeds(String text, int limit) {
+  if (text.length * 3 <= limit) {
+    return false;
+  }
+  int bytes = 0;
+  for (int i = 0; i < text.length; i++) {
+    final int unit = text.codeUnitAt(i);
+    if (unit < 0x80) {
+      bytes += 1;
+    } else if (unit < 0x800) {
+      bytes += 2;
+    } else if (unit >= 0xD800 &&
+        unit <= 0xDBFF &&
+        i + 1 < text.length &&
+        text.codeUnitAt(i + 1) >= 0xDC00 &&
+        text.codeUnitAt(i + 1) <= 0xDFFF) {
+      bytes += 4;
+      i++;
+    } else {
+      bytes += 3;
+    }
+    if (bytes > limit) {
+      return true;
+    }
+  }
+  return false;
 }
