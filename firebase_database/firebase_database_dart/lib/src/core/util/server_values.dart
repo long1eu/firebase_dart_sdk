@@ -101,8 +101,9 @@ Object resolveDeferredLeafValue(
   return result ?? value;
 }
 
-/// The existing number plus [delta], or [delta] when the existing value is not a number. Integer
-/// sums stay integers while within plus or minus 2^53, beyond that the sum is a double, as JS.
+/// The existing number plus [delta], or [delta] when the existing value is not a number. Two
+/// integers give an integer unless the sum overflows 64 bits, then a double, as Android
+/// (`ServerValues.java` resolveComplexDeferredValue) and the server.
 num _resolveIncrement(num delta, ValueProvider existing) {
   final Node existingNode = existing.node();
   if (!existingNode.isLeafNode) {
@@ -113,9 +114,13 @@ num _resolveIncrement(num delta, ValueProvider existing) {
     return delta;
   }
   if (existingValue is int && delta is int) {
+    // On the web both are doubles and the sum never wraps.
     final int sum = existingValue + delta;
-    if (sum.abs() <= maxSafeInteger) {
-      return sum;
+    final bool overflow =
+        (existingValue > 0 && delta > 0 && sum < 0) ||
+        (existingValue < 0 && delta < 0 && sum >= 0);
+    if (!overflow) {
+      return normalizeNumber(sum);
     }
   }
   return normalizeNumber(existingValue.toDouble() + delta.toDouble());

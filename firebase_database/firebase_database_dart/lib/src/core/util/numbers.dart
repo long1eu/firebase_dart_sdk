@@ -2,9 +2,11 @@
 /// `doubleToIEEE754String`, `tryParseInt`, `INTEGER_32_MIN/MAX`, `isInvalidJSONNumber`); Android:
 /// `snapshot/LongNode.java`, `DoubleNode.java`, `core/utilities/Utilities.java` (part).
 ///
-/// One rule on every platform: a value is an "integer" when it is integral and within the 53-bit
-/// safe range, so hashes and ordering agree between the VM and the web. Nothing here relies on
-/// `is int` or `is double`, which mean nothing on the web.
+/// The server keeps the number it was given, so the client does too: an `int` stays an `int`
+/// (the VM and wasm keep all 64 bits); a `double` that is integral and within the 53-bit safe
+/// range reads as an `int`; negative zero, fractions and larger doubles stay doubles. Hashes go
+/// through the double form on every platform. On the web every number is a double, so `is int`
+/// alone decides nothing here.
 library;
 
 import 'dart:typed_data';
@@ -23,18 +25,23 @@ bool isIntegral(num value) =>
     // The range check comes first: it is false for NaN and the infinities.
     value >= -maxSafeInteger && value <= maxSafeInteger && value % 1 == 0;
 
-/// Returns [value] as an `int` when [isIntegral], otherwise as a `double`, identically on the VM
-/// and the web.
+/// The stored form of [value]: an `int` is returned as it is, also beyond [maxSafeInteger] (the
+/// server stores 64-bit integers exactly); a `double` becomes an `int` when [isIntegral] and not
+/// negative zero; every other `double` is returned as it is.
 ///
 /// This is the rule for values from the server and the cache: a negative zero stays the double
 /// `-0.0` (its hash has the sign bit set, JS `util.ts` doubleToIEEE754String). Values the user
 /// writes go through [normalizeUserNumber] instead.
 num normalizeNumber(num value) {
-  if (value == 0) {
-    // 0, 0.0 or -0.0: keep the sign of a negative zero, as a double.
-    return value.isNegative ? value.toDouble() : 0;
+  // False on the VM and wasm for an int; true for every number on the web.
+  if (value is! double) {
+    return value;
   }
-  return isIntegral(value) ? value.toInt() : value.toDouble();
+  if (value == 0) {
+    // 0.0 or -0.0: keep the sign of a negative zero, as a double.
+    return value.isNegative ? value : 0;
+  }
+  return isIntegral(value) ? value.toInt() : value;
 }
 
 /// [normalizeNumber] for a value the user writes: a negative zero becomes `0`, so every platform
@@ -106,6 +113,8 @@ int? tryParseIntKey(String key) {
   return value <= int32Max ? value : null;
 }
 
+final RegExp _fractionOrExponent = RegExp('[.eE]');
+
 final RegExp _jsonNumber = RegExp(r'^-?(0|[1-9]\d*)(\.\d+)?([eE][+-]?\d+)?$');
 
 /// Parses a JSON number as the server sends it, including the Java forms `1.0E21` and
@@ -113,6 +122,14 @@ final RegExp _jsonNumber = RegExp(r'^-?(0|[1-9]\d*)(\.\d+)?([eE][+-]?\d+)?$');
 num? tryParseJsonNumber(String text) {
   if (!_jsonNumber.hasMatch(text)) {
     return null;
+  }
+  if (!text.contains(_fractionOrExponent)) {
+    // Integer form: exact on the VM up to 64 bits; larger values fall through to a double.
+    final int? integer = int.tryParse(text);
+    // "-0" goes on to the double path, which keeps the sign.
+    if (integer != null && integer != 0) {
+      return normalizeNumber(integer);
+    }
   }
   final double value = double.parse(text);
   if (value.isInfinite) {

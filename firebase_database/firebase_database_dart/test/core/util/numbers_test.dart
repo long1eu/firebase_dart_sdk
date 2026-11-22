@@ -49,6 +49,21 @@ void main() {
       expect(normalizeNumber(0.0).isNegative, isFalse);
     });
 
+    test('an int beyond 2^53 stays the same int on the VM', () {
+      // The server stores 64-bit integers exactly (measured: 9007199254740993 and int64 max
+      // round-trip). On the web the literal is already the nearest double.
+      // Parsed at run time: dart2js refuses the literal.
+      final int big = int.parse('9007199254740993');
+      expect(identical(normalizeNumber(big), big), isTrue);
+      expect(normalizeNumber(big).toString(), big.toString());
+      expect(tryParseJsonNumber('9007199254740993'), big);
+      // A double beyond the safe range stays a double.
+      expect(
+        normalizeNumber(9007199254740992.0).toString(),
+        9007199254740992.0.toString(),
+      );
+    });
+
     test('a negative zero from the user becomes zero', () {
       final num n = normalizeUserNumber(-0.0);
       expect(n, 0);

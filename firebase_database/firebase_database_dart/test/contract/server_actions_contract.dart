@@ -191,8 +191,8 @@ void runServerActionsContract(ServerActionsHarness Function() create) {
   test('a failed get fails with ServerActionsException', () async {
     final Future<Object?> result = actions.get(defaultSpec);
     await pumpEventQueue();
-    await harness.answer('g', status: 'permission_denied', data: 'denied');
-    await expectLater(
+    // The expectation listens before the answer, or the error would be unhandled.
+    final Future<void> failed = expectLater(
       result,
       throwsA(
         isA<ServerActionsException>()
@@ -204,6 +204,8 @@ void runServerActionsContract(ServerActionsHarness Function() create) {
             .having((ServerActionsException e) => e.reason, 'reason', 'denied'),
       ),
     );
+    await harness.answer('g', status: 'permission_denied', data: 'denied');
+    await failed;
   });
 
   test('interrupt reasons are tracked', () {
