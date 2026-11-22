@@ -5,8 +5,9 @@ against the Database emulator.
 
 - `FirebaseDatabase(app, databaseUrl:, emulatorHost:, mockUserToken:, persistence:, logger:)`: one instance is one
   connection; configuration is constructor-only and there is no instance cache.
-- Reads and writes: `get`, `once`, `set`, `update`, `push`, `setPriority`, `remove`; `DataSnapshot.value` is plain,
-  unmodifiable Dart data. A filtered or limited `get()` needs `.indexOn` in the rules; an order-only one does not.
+- Reads and writes: `get`, `once`, `set`, `update`, `push`, `setPriority`, `remove`, `refFromUrl`; `DataSnapshot.value`
+  is plain, unmodifiable Dart data. A `get()` with a range or a limit on `orderByChild` or `orderByValue` needs
+  `.indexOn` in the rules; an order-only one does not.
 - Listening: `onValue`, `onChildAdded`, `onChildChanged`, `onChildMoved`, `onChildRemoved` and `onChildEvents`, one
   ordered stream of the four child events.
 - Queries: `orderByChild`, `orderByKey`, `orderByValue`, `orderByPriority`, `startAt`, `startAfter`, `endAt`,
@@ -21,7 +22,9 @@ against the Database emulator.
   `unavailable`, `network-error`, `write-canceled`, `index-not-defined`, `operation-failed`, `too-big`, `read-only`,
   `database-closed` and `unknown`.
 - Logging through a callback, off by default; credentials are never logged.
-- Optional disk persistence through `firebase_database_dart_sqlite`.
+- Optional disk persistence through `firebase_database_dart_sqlite`; `cacheServerData: false` keeps only the pending
+  writes. `package:firebase_database_dart/storage_engine.dart` is the library for custom persistence engines.
 - `package:firebase_database_dart/testing.dart`: a fake server for tests of your own code.
 - Writes are delivered at least once: a re-sent `ServerValue.increment` can apply twice.
-- Not included: long polling, typed converters, a writing REST client, web disk persistence, the compat API.
+- Not included: long polling, typed converters, a REST client, web disk persistence, an instance cache, the compat
+  API, proxy settings for the VM.

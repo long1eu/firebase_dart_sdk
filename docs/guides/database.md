@@ -17,6 +17,11 @@ never against a production project; where a statement below depends on the serve
 | The same, disk cache on the VM | `firebase_database_dart_sqlite` | Writes kept, offline reads | Web |
 | Flutter app on `firebase_database` | `firebase_database_dart_platform` | Official API on the client | Mobile |
 
+The official Flutter plugin `firebase_database` declares Android, iOS, macOS, Windows and web, and no Linux. On Linux
+this client, through the adapter, is the only implementation. On Windows and macOS the official plugin exists (on
+Windows through the Firebase C++ SDK) and this client is an alternative written in Dart, with no native SDK in the
+build. For servers and command line tools in Dart there is no official client at all.
+
 The first has no disk cache and no long polling (networks that block the WebSocket upgrade cannot use it).
 The second has no web persistence and no cache shared by two processes. The third is for desktop: on Android and
 iOS the native plugin is the maintained path, and the adapter is an opt-in there.
@@ -29,7 +34,9 @@ providers). The adapter's README has the registration details and the options of
 
 A `FirebaseDatabase` is one WebSocket to one database. There is no instance cache: two instances on one URL are two
 connections, and every setting is a constructor argument. The URL is the `databaseURL` of the app's options, else
-`https://<projectId>-default-rtdb.firebaseio.com`; another region or a second database needs its own `databaseUrl`.
+`https://<projectId>-default-rtdb.firebaseio.com`; another region or a second database needs its own `databaseUrl`. The
+constructor refuses, with an `ArgumentError` before any connection, a URL with a path, a custom domain without `?ns=`, a
+port other than 443 on a host that is not loopback, and an invalid project id.
 
 After the hello of the server, the client sends the credentials and then the listens and writes, without waiting for
 the answers:
@@ -41,8 +48,9 @@ the answers:
 - On the Dart VM the App Check token and the app id also travel in the headers of the upgrade request
   (`X-Firebase-AppCheck`, `X-Firebase-GMPID`). A browser socket cannot set headers, so on the web they are the `ac` and
   `p` query parameters of the WebSocket URL, visible in the network panel. The ID token is never in a URL, on either.
-- Tokens go only over TLS, to the exact `host:port` given as `emulatorHost`, or to a loopback host. A `databaseUrl`
-  with `http://` is refused with a pointer to `emulatorHost`, so a real token cannot go over plain text. The server may
+- Tokens go only over TLS or to the exact `host:port` given as `emulatorHost`. A plain-text `databaseUrl` is refused
+  outside the emulator (the message says to use an https URL or `emulatorHost`), so a real token cannot go over plain
+  text. The server may
   name another host in its hello or in a reset; the client follows it only if it is on `firebaseio.com` or
   `firebasedatabase.app` (or the configured host).
 
@@ -104,9 +112,9 @@ the call, before anything is sent, not an exception through a Future.
   persistent cache also after a restart. The protocol has no idempotency key, and the official SDKs behave the same. A
   repeated `set` changes nothing, but a repeated `ServerValue.increment` adds twice. Count with a transaction when the
   number must be exact.
-- **`get()` offline waits 3 s, then answers from the cache or fails with `unavailable`.** The JS SDK queues the
-  request with no limit. After `goOffline()` there is no wait. The 3 s is not configurable; use `.timeout()` for
-  another bound.
+- **`get()` offline waits 3 s, then answers from the cache (only when it holds the complete value for that query, limit
+  applied; a cached empty location answers null) or fails with `unavailable`.** The JS SDK queues the request with no
+  limit. After `goOffline()` there is no wait. The 3 s is not configurable; use `.timeout()` for another bound.
 - **Numbers.** An `int` stays an `int`. An integral value within 2^53 reads back as an `int` even if you wrote `5.0`,
   and anything else is a `double`; read numbers as `num`. On the web, integers beyond 2^53 lose precision. Keys that
   look like integers sort first, numerically, as the server orders them; other keys sort by UTF-16 code unit. A map
@@ -117,7 +125,9 @@ the call, before anything is sent, not an exception through a Future.
   sent again; only requests queued while offline are sent after the next connect. Register again whenever
   `onConnected` says true, and do not expect a registration to survive a restart.
 - **Transactions run their handler more than once**, up to 25 times, then fail with `max-retries`. The first run
-  often sees `null`, because the client has no data yet. They are never persisted.
+  often sees `null`, because the client has no data yet. A transaction that was sent and loses its connection before
+  the answer is not run again: its local write is rolled back and it fails with `disconnected`. They are never
+  persisted.
 
 The full list is the table in [section 25 of the decisions document](../database_decisions.md), with the test that pins
 each row and the reason.
@@ -150,10 +160,12 @@ once. A file that cannot be trusted (damaged, foreign, or of a newer major versi
 starts.
 
 **The engine runs on the calling isolate**, which is the UI isolate in Flutter. Measured on one Mac (these are one
-machine's numbers, from a benchmark whose report is being written): a point read, and one pending write, take about
-0.1 to 0.2 ms whatever the size of the cache. Loading a whole subtree costs about 60 ms per MB: 56 ms for 1 MB, 615 ms
-for 10 MB and 2968 ms for 50 MB. A listener loads the subtree below its path, so listen below the root of a large
-cache, or loading 50 MB at the root takes about 3 s on the calling isolate.
+machine's numbers: macOS, AOT, medians of 5, rows of about 100 bytes): a point read takes 0.1 to 0.2 ms and one
+pending write 0.1 ms, whatever the size of the cache. Loading a whole subtree takes 56.2 ms for 1 MB, 615.2 ms for
+10 MB and 2,968.3 ms for 50 MB; writing it takes 51.9, 483.8 and 2,123.7 ms; reopening the file takes 3.4, 12.7 and
+55.5 ms. macOS `fsync` does not force the drive cache, so the write cost on Linux and Windows is not measured. A
+listener loads the subtree below its path, so listen below the root of a large cache, or loading 50 MB at the root
+takes about 3 s on the calling isolate.
 
 ```dart
 import 'package:firebase_database_dart/firebase_database_dart.dart';
@@ -176,7 +188,8 @@ connection is up. `isConnected`, `serverTimeOffset` and `estimatedServerTime` ar
 
 `goOffline()` and `goOnline()` are synchronous. Offline, listeners keep their data and writes wait in a queue that
 `goOnline()` sends in order. `purgeOutstandingWrites()` rolls back every pending write and fails their Futures with
-`write-canceled`.
+`write-canceled`, aborts transactions and completes queued `onDisconnect` operations with `write-canceled`, as
+Android's does. An `onDisconnect` operation or a transaction already sent to the server is not undone by it.
 
 **Reconnecting.** After a failure the client waits a random time between zero and a delay that starts at 1 s and grows
 by a factor of 1.3 per failure to a cap of 30 s (the JS SDK caps at 5 minutes). The delay goes back to 1 s after a
@@ -197,6 +210,10 @@ timeouts (30 s, 15 s, 60 s) are chosen, not measured against production.
 
 **The TLS handshake.** `dart:io` cannot close a connection attempt that is stuck inside the handshake. The client gives
 up on it after its 30 s connect timeout and tries again, but the socket stays until the peer or the system ends it.
+
+**Proxies.** On the Dart VM a secure connection honours `HTTPS_PROXY` and `NO_PROXY` (and the lower-case forms), as
+Dart's `HttpClient` does. Loopback addresses and the emulator are always reached directly, and there is no option in the
+API. A proxy that refuses the tunnel fails the connection attempt with an error that names the proxy and the status.
 
 **Shutting down.** An open `FirebaseDatabase` keeps a command line program alive. `close()` ends every stream with
 `database-closed`, fails the Futures of writes that are still pending with `database-closed`, releases the cache lease
@@ -269,5 +286,5 @@ unit-testing library.
 - Programs: [`example/`](../../firebase_database/firebase_database_dart/example/README.md) (one per topic, against the
   emulator) and the apps `examples/rtdb_cli`, `examples/rtdb_server_shelf`, `examples/rtdb_presence_worker`,
   `examples/rtdb_web_app` and `examples/rtdb_playground`.
-- `docs/database_benchmarks.md`: the benchmark report, which is being written and is not in the repository yet.
-  The cache numbers above come from it.
+- `docs/database_benchmarks.md`: the benchmark report, which is not in the repository yet. The cache numbers above come
+  from a separate load measurement, `firebase_database/firebase_database_dart_sqlite/tool/bench_load.dart`.
