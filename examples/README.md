@@ -21,6 +21,7 @@ app and a browser app. Each directory is a package of its own with a `pubspec.ya
 | [`rtdb_presence_worker/`](rtdb_presence_worker/) | A worker that keeps a presence record with a heartbeat and an `onDisconnect` write, and a watcher that lists who is online. Run against the Database emulator, including a killed worker. |
 | [`rtdb_web_app/`](rtdb_web_app/) | A browser app in plain Dart (`package:web`) on the Realtime Database. |
 | [`rtdb_playground/`](rtdb_playground/) | A browser playground for the Realtime Database with no backend: the client runs against a fake server in the page. Static files only. Loads in Chrome with dart2js and dart2wasm. |
+| [`flutterfire_database_on_linux/`](flutterfire_database_on_linux/) | A Flutter Linux desktop app written only against the official `firebase_database` and `firebase_core` API; `firebase_database_dart_platform` registers itself, with no code: the connection state, a query bound to a live list, push, delete, a transaction on a counter, presence with `onDisconnect`, and an integration test. Against the Database emulator; **not yet built or run on Linux**. |
 | [`playground/`](playground/) | A browser playground with no backend: the client runs with its network disabled on a memory cache, and the page shows each snapshot event, the writes waiting for a server and a timeline. Static files only, ready for any static host. Supported in Chrome, untested elsewhere. |
 
 To pick one, start from where your code runs and follow the arrows:
