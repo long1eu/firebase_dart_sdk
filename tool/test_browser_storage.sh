@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Runs the browser tests of firebase_storage_dart (test/browser) in Chrome, compiled with
-# dart2wasm and with dart2js, against a private Storage emulator on 127.0.0.1:9385 (or the port
-# in STORAGE_EMULATOR_PORT).
+# Runs the browser tests of firebase_storage_dart (test/browser) in Chrome (or the browser in
+# TEST_BROWSER), compiled with dart2wasm and with dart2js, against a private Storage emulator on
+# 127.0.0.1:9385 (or the port in STORAGE_EMULATOR_PORT).
 #
 # Usage: tool/test_browser_storage.sh [dart2wasm|dart2js|both] [dart test arguments...]
 #
@@ -11,6 +11,8 @@
 # refused by the start script.
 #
 # Environment:
+#   TEST_BROWSER           chrome (default), firefox or safari. Safari only runs dart2js: the
+#                          runner falls back to it without a message.
 #   STORAGE_EMULATOR_PORT  the port of the private emulator (default 9385; its hub and logging
 #                          server take the next two ports)
 #   TEST_LOG_DIR           where the full outputs go (default: a new temp dir)
@@ -23,12 +25,21 @@ case "$PORT" in
 '' | *[!0-9]*) echo "STORAGE_EMULATOR_PORT must be a port number"; exit 2 ;;
 esac
 
+BROWSER="${TEST_BROWSER:-chrome}"
+case "$BROWSER" in
+chrome | firefox | safari) ;;
+*) echo "TEST_BROWSER must be chrome, firefox or safari"; exit 2 ;;
+esac
+
 COMPILERS=(dart2wasm dart2js)
 case "${1:-}" in
 dart2wasm | dart2js) COMPILERS=("$1"); shift ;;
 both) shift ;;
--h | --help) sed -n '2,17p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+-h | --help) sed -n '2,19p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
 esac
+if [ "$BROWSER" = safari ]; then
+  COMPILERS=(dart2js)
+fi
 if [ $# -eq 0 ]; then
   set -- test/browser
 fi
@@ -55,9 +66,9 @@ fi
 failed=0
 summary=()
 for compiler in "${COMPILERS[@]}"; do
-  log="$LOG_DIR/browser_storage_$compiler.log"
-  echo "=== $compiler: dart test -j 1 -p chrome -c $compiler $*"
-  (cd "$PKG" && dart test --reporter expanded -j 1 -p chrome -c "$compiler" "$@") >"$log" 2>&1
+  log="$LOG_DIR/browser_storage_${BROWSER}_$compiler.log"
+  echo "=== $compiler: dart test -j 1 -p $BROWSER -c $compiler $*"
+  (cd "$PKG" && dart test --reporter expanded -j 1 -p "$BROWSER" -c "$compiler" "$@") >"$log" 2>&1
   rc=$?
   last=$(tr '\r' '\n' <"$log" | grep -E "^[0-9:]+ \+[0-9]+" | tail -1)
   if [ $rc -eq 0 ]; then
