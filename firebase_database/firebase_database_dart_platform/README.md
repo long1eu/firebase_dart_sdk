@@ -20,8 +20,10 @@ affiliated with or endorsed by Google or Firebase.
 > - FlutterFire's own `firebase_database` integration suite (77 tests) is the acceptance gate
 >   (`tool/test_flutterfire_database_gate.sh`, against the Database emulator): 76 pass and 1 skips itself, on
 >   macOS with the host test runner. It has **not run yet** on Linux or Windows, or in a built desktop app.
-> - The Windows registration is verified with stand-in plugins; a real Windows build has **not run yet** and is run
->   before release.
+> - A real Windows build has run (Windows 11 x64, Flutter 3.47.8, debug): the generated plugin registrant calls
+>   `FirebaseDatabaseDart.registerWith()`, and an app written against `firebase_database` alone wrote a value,
+>   read it back and committed a transaction against the Database emulator. A release build and a Linux desktop
+>   build have **not run yet**.
 > - Nothing has run against a production project.
 
 ## How to enable it
