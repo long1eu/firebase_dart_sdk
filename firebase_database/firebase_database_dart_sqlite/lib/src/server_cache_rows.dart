@@ -1,27 +1,15 @@
+import 'dart:convert';
 import 'dart:typed_data';
 
-// switch to storage_engine.dart
-import 'package:firebase_database_dart/src/core/compound_write.dart';
-// switch to storage_engine.dart
-import 'package:firebase_database_dart/src/core/path.dart';
-// switch to storage_engine.dart
-import 'package:firebase_database_dart/src/core/persistence/prune_forest.dart';
-// switch to storage_engine.dart
-import 'package:firebase_database_dart/src/core/snap/child_key.dart';
-// switch to storage_engine.dart
-import 'package:firebase_database_dart/src/core/snap/children_node.dart';
-// switch to storage_engine.dart
+import 'package:firebase_database_dart/firebase_database_dart.dart'
+    show DatabaseLogLevel, DatabaseLogger;
+// not exported by storage_engine.dart
 import 'package:firebase_database_dart/src/core/snap/indexes/key_index.dart';
-// switch to storage_engine.dart
-import 'package:firebase_database_dart/src/core/snap/node.dart';
-// switch to storage_engine.dart
-import 'package:firebase_database_dart/src/core/util/hash.dart';
-// switch to storage_engine.dart
+// not exported by storage_engine.dart
 import 'package:firebase_database_dart/src/core/util/immutable_tree.dart';
-// switch to storage_engine.dart (DatabaseLogger: the main library if it is not there)
-import 'package:firebase_database_dart/src/core/util/logger.dart';
-// switch to storage_engine.dart
+// not exported by storage_engine.dart
 import 'package:firebase_database_dart/src/core/util/node_size_estimator.dart';
+import 'package:firebase_database_dart/storage_engine.dart';
 import 'package:firebase_database_dart_sqlite/src/node_codec.dart';
 import 'package:firebase_database_dart_sqlite/src/sqlite_connection.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
@@ -83,7 +71,7 @@ final class ServerCacheRows {
   Node load(Path path) {
     // Rows come ordered by path: the ancestors of [path] (and [path] itself) first, root first,
     // then the rows below it. A row below another one was written after it.
-    Node node = ChildrenNode.empty;
+    Node node = NodeCodec.emptyNode;
     // An ancestor row that does not decode hides everything below it, until a deeper ancestor row
     // (written later, covering all of [path]) replaces it.
     bool ancestorUnreadable = false;
@@ -112,14 +100,14 @@ final class ServerCacheRows {
       if (rowNode == null) {
         skipped++;
         if (isAncestor) {
-          node = ChildrenNode.empty;
+          node = NodeCodec.emptyNode;
           ancestorUnreadable = true;
         } else {
           // Never let an ancestor row show through: the subtree of this row is not known.
           unreadable.add(rowPath);
           node = node.updateChild(
             Path.relative(path, rowPath),
-            ChildrenNode.empty,
+            NodeCodec.emptyNode,
           );
         }
       } else if (isAncestor) {
@@ -249,7 +237,7 @@ final class ServerCacheRows {
         rows++;
       }
       // Hides what a row of an ancestor holds at this path.
-      _saveRow(path, ChildrenNode.empty);
+      _saveRow(path, NodeCodec.emptyNode);
       return rows + 1;
     }
     _saveRow(path, node);
@@ -281,7 +269,7 @@ final class ServerCacheRows {
       'INSERT OR REPLACE INTO server_cache (path, value) VALUES (?, ?)',
       <Object?>[key, value],
     );
-    size += utf8Length(key) + value.length;
+    size += utf8.encode(key).length + value.length;
   }
 
   void _removeNested(Path path) {

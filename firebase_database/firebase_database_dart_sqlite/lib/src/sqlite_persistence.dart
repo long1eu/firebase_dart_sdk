@@ -1,11 +1,8 @@
 import 'dart:io';
 
-// switch to storage_engine.dart
-import 'package:firebase_database_dart/src/core/persistence/persistence_storage_engine.dart';
-// switch to storage_engine.dart
-import 'package:firebase_database_dart/src/core/persistence/persistence_storage_engine_opener.dart';
-// switch to storage_engine.dart (DatabaseLogger: the main library if it is not there)
-import 'package:firebase_database_dart/src/core/util/logger.dart';
+import 'package:firebase_database_dart/firebase_database_dart.dart'
+    show DatabaseLogger, DatabasePersistence;
+import 'package:firebase_database_dart/storage_engine.dart';
 import 'package:firebase_database_dart_sqlite/src/sqlite_connection.dart';
 import 'package:firebase_database_dart_sqlite/src/sqlite_files.dart';
 import 'package:firebase_database_dart_sqlite/src/sqlite_lease.dart';
@@ -13,15 +10,6 @@ import 'package:firebase_database_dart_sqlite/src/sqlite_open.dart';
 import 'package:firebase_database_dart_sqlite/src/sqlite_storage_engine.dart';
 import 'package:meta/meta.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
-
-/// The default size above which the server cache is pruned: 10 MiB, as on Android.
-const int defaultCacheSizeBytes = 10 * 1024 * 1024;
-
-/// The smallest allowed cache size: 1 MiB, as on Android.
-const int minimumCacheSizeBytes = 1024 * 1024;
-
-/// The largest allowed cache size: 100 MiB, as on Android.
-const int maximumCacheSizeBytes = 100 * 1024 * 1024;
 
 /// An offline cache in SQLite files under [directory], for `FirebaseDatabase(persistence: ...)`.
 ///
@@ -31,17 +19,17 @@ const int maximumCacheSizeBytes = 100 * 1024 * 1024;
 /// `$XDG_DATA_HOME/<app>/firebase_database` on Linux and `%LOCALAPPDATA%\<app>\firebase_database`
 /// on Windows.
 ///
-/// [cacheSizeBytes] is the size above which the cached server data is pruned, from
-/// [minimumCacheSizeBytes] to [maximumCacheSizeBytes] ([RangeError] otherwise). Pending writes are
-/// never pruned.
+/// [cacheSizeBytes] is the size above which the client prunes the cached server data: 1 MiB to
+/// 100 MiB, 10 MiB when null ([ArgumentError] outside, from [databasePersistence]). Pending writes
+/// are never pruned.
 ///
-/// Returns the opener `FirebaseDatabase(persistence: ...)` calls once at start. Use
-/// [SqlitePersistence] directly to also delete a cache ([SqlitePersistence.clear]).
-PersistenceStorageEngineOpener sqlitePersistence(
-  String directory, {
-  int cacheSizeBytes = defaultCacheSizeBytes,
-}) {
-  return SqlitePersistence(directory, cacheSizeBytes: cacheSizeBytes).open;
+/// An [ArgumentError] when [directory] is empty. Delete a cache with [clearSqlitePersistence]; find
+/// its file with [SqlitePersistence.pathOf].
+DatabasePersistence sqlitePersistence(String directory, {int? cacheSizeBytes}) {
+  return databasePersistence(
+    opener: SqlitePersistence(directory).open,
+    cacheSizeBytes: cacheSizeBytes,
+  );
 }
 
 /// Deletes the cache files of [databaseUrl] of the app named [appName] in [directory]: the
@@ -82,25 +70,15 @@ final class SqlitePersistence {
   /// SQLite files in [directory]; see [sqlitePersistence].
   SqlitePersistence(
     this.directory, {
-    this.cacheSizeBytes = defaultCacheSizeBytes,
     @visibleForTesting SqliteStoreOptions? options,
   }) : _options = options ?? SqliteStoreOptions() {
     if (directory.isEmpty) {
       throw ArgumentError.value(directory, 'directory', 'must not be empty');
     }
-    RangeError.checkValueInInterval(
-      cacheSizeBytes,
-      minimumCacheSizeBytes,
-      maximumCacheSizeBytes,
-      'cacheSizeBytes',
-    );
   }
 
   /// The directory of the store files.
   final String directory;
-
-  /// The size above which the server cache is pruned, in bytes.
-  final int cacheSizeBytes;
 
   final SqliteStoreOptions _options;
 

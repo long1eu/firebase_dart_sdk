@@ -1,8 +1,8 @@
 import 'dart:async';
 import 'dart:io';
 
-// switch to storage_engine.dart (DatabaseLogger: the main library if it is not there)
-import 'package:firebase_database_dart/src/core/util/logger.dart';
+import 'package:firebase_database_dart/firebase_database_dart.dart'
+    show DatabaseLogLevel;
 import 'package:firebase_database_dart_sqlite/src/sqlite_connection.dart';
 import 'package:firebase_database_dart_sqlite/src/sqlite_files.dart';
 import 'package:firebase_database_dart_sqlite/src/sqlite_open.dart';

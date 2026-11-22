@@ -1,15 +1,8 @@
 import 'dart:convert';
 
-// switch to storage_engine.dart
-import 'package:firebase_database_dart/src/core/persistence/tracked_query.dart';
-// switch to storage_engine.dart
-import 'package:firebase_database_dart/src/core/snap/child_key.dart';
-// switch to storage_engine.dart (DatabaseLogger: the main library if it is not there)
-import 'package:firebase_database_dart/src/core/util/logger.dart';
-// switch to storage_engine.dart
-import 'package:firebase_database_dart/src/core/view/query_params.dart';
-// switch to storage_engine.dart
-import 'package:firebase_database_dart/src/core/view/query_spec.dart';
+import 'package:firebase_database_dart/firebase_database_dart.dart'
+    show DatabaseLogLevel, DatabaseLogger;
+import 'package:firebase_database_dart/storage_engine.dart';
 import 'package:firebase_database_dart_sqlite/src/node_codec.dart';
 import 'package:firebase_database_dart_sqlite/src/sqlite_connection.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
@@ -26,12 +19,13 @@ final class TrackedQueryRows {
   /// 3.32.
   static const int chunkSize = 500;
 
-  /// The `query_params` column form of [params]: the wire object as JSON with its keys sorted at
-  /// every level, so one query always has one text (the unique index `tracked_queries_by_query`
-  /// relies on it). Numbers are written by `jsonEncode`: an `int` stays an `int`, `1.0` stays
-  /// `1.0`.
-  static String encodeParams(QueryParams params) =>
-      jsonEncode(_sortedKeys(params.toWireObject()));
+  /// The `query_params` column form of the parameters of [spec]: the wire object as JSON with its
+  /// keys sorted at every level, so one query always has one text (the unique index
+  /// `tracked_queries_by_query` relies on it). Numbers are as the core puts them in the wire
+  /// object (an integral double within 2^53 is already an int there, so `1.0` and `1` are one
+  /// query); `jsonEncode` adds no rule of its own.
+  static String encodeParams(QuerySpec spec) =>
+      jsonEncode(_sortedKeys(spec.params.toWireObject()));
 
   static Object? _sortedKeys(Object? value) {
     if (value is! Map) {
@@ -50,7 +44,7 @@ final class TrackedQueryRows {
   /// `TrackedQueryManager` keeps one id per query, so this happens only with a damaged store.
   void save(TrackedQuery query) {
     final String path = PathKey.of(query.querySpec.path);
-    final String params = encodeParams(query.querySpec.params);
+    final String params = encodeParams(query.querySpec);
     _connection.execute(
       'DELETE FROM tracked_keys WHERE query_id IN (SELECT id FROM tracked_queries '
       'WHERE path = ? AND query_params = ? AND id <> ?)',

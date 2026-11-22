@@ -1,19 +1,23 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
-import 'package:firebase_database_dart/src/core/compound_write.dart';
-import 'package:firebase_database_dart/src/core/path.dart';
-import 'package:firebase_database_dart/src/core/snap/child_key.dart';
+// not exported by storage_engine.dart
 import 'package:firebase_database_dart/src/core/snap/indexes/path_index.dart';
-import 'package:firebase_database_dart/src/core/snap/node.dart';
+// not exported by storage_engine.dart
 import 'package:firebase_database_dart/src/core/snap/node_from_json.dart';
+// not exported by storage_engine.dart
 import 'package:firebase_database_dart/src/core/view/query_params.dart';
+import 'package:firebase_database_dart/storage_engine.dart';
 import 'package:firebase_database_dart_sqlite/src/node_codec.dart';
 import 'package:firebase_database_dart_sqlite/src/tracked_query_rows.dart';
 import 'package:test/test.dart';
 
 /// 2^53 + 1: the first integer a double can not hold.
 const int beyondDouble = 9007199254740993;
+
+/// The stored text of [params].
+String encodeParams(QueryParams params) =>
+    TrackedQueryRows.encodeParams(QuerySpec(Path.empty, params));
 
 /// Reads the stored form of [node] back as export JSON.
 Object? roundTrip(Node node) =>
@@ -154,13 +158,13 @@ void main() {
           .startAt(nodeFromJson('startVal'), ChildKey('startKey'))
           .endAt(nodeFromJson('endVal'), ChildKey('endKey'))
           .limitToLast(5);
-      final String text = TrackedQueryRows.encodeParams(params);
+      final String text = encodeParams(params);
       final Map<String, Object?> decoded =
           jsonDecode(text) as Map<String, Object?>;
       final List<String> keys = decoded.keys.toList();
       expect(keys, List<String>.of(keys)..sort());
       expect(QueryParams.fromWireObject(decoded), params);
-      expect(TrackedQueryRows.encodeParams(QueryParams.defaultParams), '{}');
+      expect(encodeParams(QueryParams.defaultParams), '{}');
     });
 
     // The core's number rule: an integral double within 2^53 is the same query as that int (a
@@ -173,15 +177,15 @@ void main() {
 
     test('an integral double bound is stored as the core writes it', () {
       final QueryParams params = startAt(1.0);
-      final String text = TrackedQueryRows.encodeParams(params);
+      final String text = encodeParams(params);
       expect(decode(text), params);
-      expect(text, TrackedQueryRows.encodeParams(startAt(1)));
+      expect(text, encodeParams(startAt(1)));
     });
 
     test('fractional and beyond-2^53 bounds keep their exact value', () {
       for (final Object bound in <Object>[1.5, beyondDouble]) {
         final QueryParams params = startAt(bound);
-        final String text = TrackedQueryRows.encodeParams(params);
+        final String text = encodeParams(params);
         expect(decode(text), params, reason: '$bound');
         final Map<String, Object?> wire =
             jsonDecode(text) as Map<String, Object?>;

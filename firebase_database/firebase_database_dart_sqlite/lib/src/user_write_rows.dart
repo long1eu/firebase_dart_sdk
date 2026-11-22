@@ -1,17 +1,8 @@
 import 'dart:typed_data';
 
-// switch to storage_engine.dart
-import 'package:firebase_database_dart/src/core/compound_write.dart';
-// switch to storage_engine.dart
-import 'package:firebase_database_dart/src/core/path.dart';
-// switch to storage_engine.dart
-import 'package:firebase_database_dart/src/core/snap/node.dart';
-// switch to storage_engine.dart
-import 'package:firebase_database_dart/src/core/user_write_record.dart';
-// switch to storage_engine.dart (DatabaseLogger: the main library if it is not there)
-import 'package:firebase_database_dart/src/core/util/logger.dart';
-// switch to storage_engine.dart
-import 'package:firebase_database_dart/src/core/write_id.dart';
+import 'package:firebase_database_dart/firebase_database_dart.dart'
+    show DatabaseLogLevel, DatabaseLogger;
+import 'package:firebase_database_dart/storage_engine.dart';
 import 'package:firebase_database_dart_sqlite/src/node_codec.dart';
 import 'package:firebase_database_dart_sqlite/src/sqlite_connection.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
@@ -31,14 +22,14 @@ final class UserWriteRows {
   static const String _merge = 'm';
 
   /// Stores an overwrite of [node] at [path] as write [writeId], replacing a write of the same id.
-  void saveOverwrite(Path path, Node node, WriteId writeId) =>
+  void saveOverwrite(Path path, Node node, int writeId) =>
       _save(writeId, path, _overwrite, NodeCodec.encodeNode(node));
 
   /// Stores a merge of [children] at [path] as write [writeId], replacing a write of the same id.
-  void saveMerge(Path path, CompoundWrite children, WriteId writeId) =>
+  void saveMerge(Path path, CompoundWrite children, int writeId) =>
       _save(writeId, path, _merge, NodeCodec.encodeMerge(children));
 
-  void _save(WriteId writeId, Path path, String type, Uint8List value) {
+  void _save(int writeId, Path path, String type, Uint8List value) {
     _connection.execute(
       'INSERT OR REPLACE INTO user_writes (id, path, type, value) VALUES (?, ?, ?, ?)',
       <Object?>[writeId, PathKey.of(path), type, value],
@@ -46,7 +37,7 @@ final class UserWriteRows {
   }
 
   /// Removes write [writeId]; an unknown id removes nothing.
-  void remove(WriteId writeId) {
+  void remove(int writeId) {
     _connection.execute('DELETE FROM user_writes WHERE id = ?', <Object?>[
       writeId,
     ]);

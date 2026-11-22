@@ -3,13 +3,10 @@
 // name is a hash here, so any app name and URL are safe.
 import 'dart:io';
 
+import 'package:firebase_database_dart/firebase_database_dart.dart'
+    show DatabaseLogLevel, DatabasePersistence;
+import 'package:firebase_database_dart/storage_engine.dart';
 import 'package:firebase_database_dart_sqlite/firebase_database_dart_sqlite.dart';
-// switch to storage_engine.dart
-import 'package:firebase_database_dart/src/core/persistence/persistence_storage_engine.dart';
-// switch to storage_engine.dart
-import 'package:firebase_database_dart/src/core/persistence/persistence_storage_engine_opener.dart';
-// switch to storage_engine.dart (DatabaseLogger: the main library if it is not there)
-import 'package:firebase_database_dart/src/core/util/logger.dart';
 import 'package:firebase_database_dart_sqlite/src/sqlite_files.dart';
 import 'package:test/test.dart';
 
@@ -62,26 +59,22 @@ void main() {
   });
 
   group('sqlitePersistence', () {
-    test('checks its arguments', () {
+    // The size range is the client's (databasePersistence): 1 MiB to 100 MiB, 10 MiB when null.
+    test('checks its arguments and gives the client a DatabasePersistence', () {
       expect(() => sqlitePersistence(''), throwsArgumentError);
       expect(
-        () => sqlitePersistence(
-          '/tmp/x',
-          cacheSizeBytes: minimumCacheSizeBytes - 1,
-        ),
-        throwsRangeError,
+        () => sqlitePersistence('/tmp/x', cacheSizeBytes: 1024 * 1024 - 1),
+        throwsArgumentError,
       );
       expect(
-        () => sqlitePersistence(
-          '/tmp/x',
-          cacheSizeBytes: maximumCacheSizeBytes + 1,
-        ),
-        throwsRangeError,
+        () =>
+            sqlitePersistence('/tmp/x', cacheSizeBytes: 100 * 1024 * 1024 + 1),
+        throwsArgumentError,
       );
-      expect(SqlitePersistence('/tmp/x').cacheSizeBytes, defaultCacheSizeBytes);
+      expect(sqlitePersistence('/tmp/x'), isA<DatabasePersistence>());
       expect(
-        sqlitePersistence('/tmp/x'),
-        isA<PersistenceStorageEngineOpener>(),
+        sqlitePersistence('/tmp/x', cacheSizeBytes: 20 * 1024 * 1024),
+        isA<DatabasePersistence>(),
       );
     });
 

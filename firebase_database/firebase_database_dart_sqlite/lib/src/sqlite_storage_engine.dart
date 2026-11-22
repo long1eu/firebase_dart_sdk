@@ -1,25 +1,7 @@
-// switch to storage_engine.dart
-import 'package:firebase_database_dart/src/core/compound_write.dart';
-// switch to storage_engine.dart
-import 'package:firebase_database_dart/src/core/path.dart';
-// switch to storage_engine.dart
-import 'package:firebase_database_dart/src/core/persistence/persistence_storage_engine.dart';
-// switch to storage_engine.dart
-import 'package:firebase_database_dart/src/core/persistence/prune_forest.dart';
-// switch to storage_engine.dart
-import 'package:firebase_database_dart/src/core/persistence/tracked_query.dart';
-// switch to storage_engine.dart
-import 'package:firebase_database_dart/src/core/snap/child_key.dart';
-// switch to storage_engine.dart
-import 'package:firebase_database_dart/src/core/snap/children_node.dart';
-// switch to storage_engine.dart
-import 'package:firebase_database_dart/src/core/snap/node.dart';
-// switch to storage_engine.dart
-import 'package:firebase_database_dart/src/core/user_write_record.dart';
-// switch to storage_engine.dart (DatabaseLogger: the main library if it is not there)
-import 'package:firebase_database_dart/src/core/util/logger.dart';
-// switch to storage_engine.dart
-import 'package:firebase_database_dart/src/core/write_id.dart';
+import 'package:firebase_database_dart/firebase_database_dart.dart'
+    show DatabaseLogger;
+import 'package:firebase_database_dart/storage_engine.dart';
+import 'package:firebase_database_dart_sqlite/src/node_codec.dart';
 import 'package:firebase_database_dart_sqlite/src/server_cache_rows.dart';
 import 'package:firebase_database_dart_sqlite/src/sqlite_connection.dart';
 import 'package:firebase_database_dart_sqlite/src/tracked_query_rows.dart';
@@ -101,19 +83,19 @@ final class SqliteStorageEngine implements PersistenceStorageEngine {
   }
 
   @override
-  void saveUserOverwrite(Path path, Node node, WriteId writeId) {
+  void saveUserOverwrite(Path path, Node node, int writeId) {
     _requireTransaction();
     _userWrites.saveOverwrite(path, node, writeId);
   }
 
   @override
-  void saveUserMerge(Path path, CompoundWrite children, WriteId writeId) {
+  void saveUserMerge(Path path, CompoundWrite children, int writeId) {
     _requireTransaction();
     _userWrites.saveMerge(path, children, writeId);
   }
 
   @override
-  void removeUserWrite(WriteId writeId) {
+  void removeUserWrite(int writeId) {
     _requireTransaction();
     _userWrites.remove(writeId);
   }
@@ -130,7 +112,7 @@ final class SqliteStorageEngine implements PersistenceStorageEngine {
   @override
   Node serverCache(Path path) {
     if (!isDurable) {
-      return ChildrenNode.empty;
+      return NodeCodec.emptyNode;
     }
     return _serverCache.load(path);
   }

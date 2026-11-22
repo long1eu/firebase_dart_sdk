@@ -7,8 +7,7 @@
 /// );
 /// ```
 ///
-/// Work in progress: the store opens, owns and quarantines its files; the engine that reads and
-/// writes nodes is being written.
+/// Work in progress, not published.
 library;
 
 export 'package:firebase_database_dart_sqlite/src/sqlite_persistence.dart'
@@ -16,7 +15,4 @@ export 'package:firebase_database_dart_sqlite/src/sqlite_persistence.dart'
         ClearPersistenceException,
         SqlitePersistence,
         clearSqlitePersistence,
-        defaultCacheSizeBytes,
-        maximumCacheSizeBytes,
-        minimumCacheSizeBytes,
         sqlitePersistence;

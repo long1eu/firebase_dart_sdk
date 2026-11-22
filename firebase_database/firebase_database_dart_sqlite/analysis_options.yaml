@@ -7,6 +7,7 @@ linter:
   rules:
     comment_references: true
     public_member_api_docs: true
-    # The engine interface, node and path types are under lib/src of firebase_database_dart until
-    # its author gives engine packages one public entry point. Remove this line then.
+    # storage_engine.dart of firebase_database_dart does not export nodeFromJson, keyIndex,
+    # ImmutableTree or estimateSerializedNodeSize (lib), nor ChildrenNode, PathIndex or QueryParams
+    # (tests). Remove this line when it does.
     implementation_imports: false

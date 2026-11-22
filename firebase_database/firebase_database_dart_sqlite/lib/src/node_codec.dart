@@ -1,14 +1,9 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
-// switch to storage_engine.dart
-import 'package:firebase_database_dart/src/core/compound_write.dart';
-// switch to storage_engine.dart
-import 'package:firebase_database_dart/src/core/path.dart';
-// switch to storage_engine.dart
-import 'package:firebase_database_dart/src/core/snap/node.dart';
-// switch to storage_engine.dart
+// not exported by storage_engine.dart
 import 'package:firebase_database_dart/src/core/snap/node_from_json.dart';
+import 'package:firebase_database_dart/storage_engine.dart';
 
 /// The `path` column form of a [Path]: `/` for the root, `/a/b/` otherwise (Android's
 /// `pathToKey`, `SqlPersistenceStorageEngine.java:1066-1077`).
@@ -51,6 +46,9 @@ abstract final class NodeCodec {
   /// The deepest nesting of objects and arrays a stored value may have: 32 levels of data, the
   /// `.value`/`.priority` wrappers and a margin (threat model T10).
   static const int maxNestingDepth = 64;
+
+  /// The empty node (no value, no children, no priority).
+  static final Node emptyNode = nodeFromJson(null);
 
   static final Converter<List<int>, Object?> _decoder = utf8.decoder.fuse(
     json.decoder,

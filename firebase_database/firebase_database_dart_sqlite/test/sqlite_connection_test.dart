@@ -3,8 +3,8 @@
 // testConcurrentUsageFails at the connection level; E-D1 is new.
 import 'dart:typed_data';
 
-// switch to storage_engine.dart (DatabaseLogger: the main library if it is not there)
-import 'package:firebase_database_dart/src/core/util/logger.dart';
+import 'package:firebase_database_dart/firebase_database_dart.dart'
+    show DatabaseLogLevel;
 import 'package:firebase_database_dart_sqlite/src/sqlite_connection.dart';
 import 'package:firebase_database_dart_sqlite/src/sqlite_lease.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
