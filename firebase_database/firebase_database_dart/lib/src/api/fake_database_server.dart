@@ -836,11 +836,18 @@ final class _FakeConnection implements ServerActions {
   void onDisconnectCancel(String path, {RequestResultCallback? onComplete}) =>
       _addWrite(_Write('onDisconnectCancel', path, null, null, onComplete));
 
+  /// As the real connection does: every put and merge not answered, then every onDisconnect
+  /// request queued while offline (not sent), each in the order made, completes with
+  /// `write_canceled` in a microtask and is never sent. A sent onDisconnect request is left for its
+  /// answer or the drop. An answer the test gives later through [_wire] for a purged write is
+  /// ignored, and [FakeDatabaseServer.ackLastWrite] and its siblings no longer see it.
   @override
   void purgeOutstandingWrites() {
     final List<_Write> canceled = <_Write>[
       for (final _Write write in _writes)
         if (!write.isOnDisconnect) write,
+      for (final _Write write in _writes)
+        if (write.isOnDisconnect && write.wire == null) write,
     ];
     for (final _Write write in canceled) {
       _writes.remove(write);

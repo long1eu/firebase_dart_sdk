@@ -10,6 +10,7 @@ import 'package:firebase_database_dart/src/core/connection/listen_hash_provider.
 import 'package:firebase_database_dart/src/core/connection/listen_spec.dart';
 import 'package:firebase_database_dart/src/core/connection/server_actions.dart';
 import 'package:firebase_database_dart/src/core/connection/wire_range_merge.dart';
+import 'package:firebase_database_dart/src/core/database_error.dart';
 import 'package:firebase_database_dart/src/core/path.dart';
 import 'package:firebase_database_dart/src/core/snap/children_node.dart';
 import 'package:firebase_database_dart/src/core/snap/node.dart';
@@ -64,8 +65,9 @@ final class ServerCall {
   bool get answered => _answered;
   bool _answered = false;
 
-  /// Whether the call was made while the fake was connected (a sent request, as opposed to one
-  /// the connection queues while offline).
+  /// Whether the request has left: made while the fake was connected, or still unanswered at a
+  /// later [FakeServerActions.connect], which replays it as the real connection does. Otherwise
+  /// it is one the connection queues while offline.
   bool get sent => _sent;
   bool _sent = false;
 
@@ -287,17 +289,33 @@ final class FakeServerActions implements ServerActions {
         ServerCall('onDisconnectCancel', path: path, onComplete: onComplete),
       );
 
+  /// As the real connection does: every unanswered put and merge, sent or not, then every
+  /// onDisconnect request not yet [ServerCall.sent], each in call order, completes with
+  /// `write_canceled` (no reason), one microtask per completion, never inside this call. A sent
+  /// onDisconnect request is left for its own answer or a [disconnect].
+  ///
+  /// The purged calls count as answered at once: a later [respond], [queueResponse] or
+  /// [ackWrite] for one throws a [StateError] (the fake's rule for a second answer), and
+  /// [pendingWrites], [disconnect] and the `*Last*` helpers skip them. The real connection
+  /// instead drops a server answer for a purged write without a word.
   @override
   void purgeOutstandingWrites() {
     _record(ServerCall('purgeOutstandingWrites'));
-    for (final ServerCall call in pendingWrites) {
-      if (call.action == 'put' || call.action == 'merge') {
-        respond(
-          call,
-          status: 'write_canceled',
-          data: 'The write was canceled by the user.',
-        );
-      }
+    final List<ServerCall> pending = pendingWrites;
+    final List<ServerCall> purged = <ServerCall>[
+      for (final ServerCall call in pending)
+        if (call.action == 'put' || call.action == 'merge') call,
+      for (final ServerCall call in pending)
+        if (call.action.startsWith('onDisconnect') && !call.sent) call,
+    ];
+    for (final ServerCall call in purged) {
+      call._answered = true;
+      scheduleMicrotask(
+        () => call.onComplete?.call(
+          DatabaseErrorCode.writeCanceled.wireStatus,
+          null,
+        ),
+      );
     }
   }
 
@@ -442,6 +460,9 @@ final class FakeServerActions implements ServerActions {
     if (call.action != 'put' && call.action != 'merge') {
       throw ArgumentError.value(call, 'call', 'Not a put or merge.');
     }
+    if (call._answered) {
+      throw StateError('$call was already answered.');
+    }
     final String writePath = normalizePath(call.path!);
     final String? hash = call.hash;
     if (hash != null && _store.getChild(Path(writePath)).hash() != hash) {
@@ -517,9 +538,14 @@ final class FakeServerActions implements ServerActions {
   }
 
   /// Whether a tagged listen gets the whole data at its path for every write that overlaps it,
-  /// instead of the write itself. Whether the server pushes a write below a query's path when the
-  /// written child is not in the client's window yet is not measured; this is the form that holds
-  /// either way.
+  /// instead of the write itself.
+  ///
+  /// Measured on the emulator (probe addendum 5): the server pushes a deep write at its deep path
+  /// only when the written child is already in the query's window; a child entering the window is
+  /// pushed whole at the child's path, and a child leaving while another enters comes as one merge
+  /// at the query's path. A client therefore never gets a deep write below a child it does not
+  /// hold. This fake does not model windows: false pushes every write as written, true pushes the
+  /// whole data, which is the form that is right for any window.
   bool taggedListensGetWholeData = false;
 
   /// Pushes a write at [writePath] once to each overlapping listen.
@@ -557,9 +583,15 @@ final class FakeServerActions implements ServerActions {
   static bool _covers(String outer, String inner) =>
       outer == '/' || inner == outer || inner.startsWith('$outer/');
 
-  /// Reports the connection up (after the replay).
+  /// Reports the connection up (after the replay): every unanswered request counts as
+  /// [ServerCall.sent] from now on.
   void connect() {
     isConnected = true;
+    for (final ServerCall call in calls) {
+      if (!call._answered) {
+        call._sent = true;
+      }
+    }
     _delegate.onConnect();
   }
 

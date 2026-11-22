@@ -153,6 +153,66 @@ void main() {
   });
 
   group('onDisconnect through the API', () {
+    scenario(
+      'purgeOutstandingWrites fails onDisconnect requests made offline; none is kept or sent',
+      (Harness h) {
+        h.listenAnswered('S1', h.ref('a').onValue, 'a', <String, Object?>{
+          'x': 1,
+        });
+        h.goDown();
+        h.log.clear();
+
+        h.track('F', h.ref('a/x').onDisconnect.set(2));
+        h.track('U', h.ref('a').onDisconnect.update(<String, Object?>{'y': 2}));
+        h.track('C', h.ref('b').onDisconnect.cancel());
+        h.settle();
+        h.track('P', h.db.purgeOutstandingWrites());
+        h.settle();
+        expect(h.log.where((String e) => !e.startsWith('P:')), <String>[
+          'F:E(write-canceled)',
+          'U:E(write-canceled)',
+          'C:E(write-canceled)',
+        ]);
+        expect(h.named('P'), <String>['P:ok']);
+
+        final int before = h.server.requests.length;
+        h.reconnect();
+        expect(
+          h.server.requests.skip(before).where((String r) => r.startsWith('o')),
+          isEmpty,
+        );
+        h.log.clear();
+        h.goDown();
+        expect(h.log, isEmpty, reason: 'nothing registered locally');
+      },
+    );
+
+    scenario(
+      'purgeOutstandingWrites leaves sent onDisconnect requests, answered or not',
+      (Harness h) {
+        h.listenAnswered('S1', h.ref('a').onValue, 'a', <String, Object?>{
+          'x': 1,
+        });
+        h.track('A', h.ref('a/x').onDisconnect.set(2));
+        h.settle();
+        h.server.ackLastOnDisconnect();
+        h.track('F', h.ref('a/y').onDisconnect.set(2));
+        h.settle();
+        h.log.clear();
+
+        h.track('P', h.db.purgeOutstandingWrites());
+        h.settle();
+        expect(h.log, <String>['P:ok']);
+        h.server.ackLastOnDisconnect();
+        h.settle();
+        expect(h.named('F'), <String>['F:ok']);
+        h.log.clear();
+
+        h.goDown();
+        expect(h.log, <String>['S1:V({x:2})', 'S1:V({x:2,y:2})']);
+      },
+    );
+
     scenario('update registers om and applies the children on a drop', (
       Harness h,
     ) {

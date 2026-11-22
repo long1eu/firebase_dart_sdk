@@ -169,6 +169,11 @@ abstract interface class ServerActions {
   ///
   /// Every write gets exactly one completion. The connection completes each write it still holds
   /// unanswered with `write_canceled` and from then on drops any answer the server sends for it.
+  /// It also completes with `write_canceled` every onDisconnect request still queued locally (made
+  /// while offline, not sent yet), after the puts and merges, each group in the order made, and
+  /// never sends it; an onDisconnect request already sent is left alone and completes with the
+  /// server's answer or [statusDisconnect]. No completion runs inside this call.
+  ///
   /// One case remains by design: an answer the connection had already received, whose completion
   /// is already queued when the core purges, is delivered after the purge, as ok or as the
   /// server's error, because the server did apply or refuse that write. So the core must tolerate

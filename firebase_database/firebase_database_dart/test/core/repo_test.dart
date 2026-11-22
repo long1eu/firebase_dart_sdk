@@ -671,6 +671,90 @@ void main() {
       },
     );
 
+    test(
+      'purgeOutstandingWrites cancels onDisconnect requests made offline: none is kept or sent',
+      () async {
+        final RepoHarness h = RepoHarness();
+        h.listen('S1', 'p');
+        h.answer('p', <String, Object?>{'a': 1, 'b': 1});
+        await settle();
+        h.server.disconnect();
+        await settle();
+        h.log.clear();
+
+        h.repo.onDisconnectSetValue(
+          Path('p/a'),
+          nodeFromJson(2),
+          onComplete: h.completion('F'),
+        );
+        h.repo.onDisconnectUpdate(
+          Path('p'),
+          <Path, Node>{Path('b'): nodeFromJson(2)},
+          <String, Object?>{'b': 2},
+          onComplete: h.completion('U'),
+        );
+        h.repo.onDisconnectCancel(Path('p/c'), onComplete: h.completion('X'));
+        await settle();
+        h.repo.purgeOutstandingWrites();
+        await settle();
+        expect(h.log, <String>[
+          'F:E(write-canceled)',
+          'U:E(write-canceled)',
+          'X:E(write-canceled)',
+        ]);
+        // Answered by the purge: the connection has nothing left to send at the next connect.
+        expect(h.server.pendingWrites, isEmpty);
+
+        final int before = h.server.calls.length;
+        h.server.connect();
+        await settle();
+        expect(
+          h.server.calls
+              .skip(before)
+              .where((ServerCall c) => c.action.startsWith('onDisconnect')),
+          isEmpty,
+        );
+        h.log.clear();
+        h.server.disconnect();
+        await settle();
+        expect(h.log, isEmpty, reason: 'nothing registered locally');
+      },
+    );
+
+    test(
+      'purgeOutstandingWrites leaves sent onDisconnect requests, answered or not',
+      () async {
+        final RepoHarness h = RepoHarness();
+        h.listen('S1', 'p');
+        h.answer('p', <String, Object?>{'a': 1, 'b': 1});
+        h.repo.onDisconnectSetValue(
+          Path('p/a'),
+          nodeFromJson(2),
+          onComplete: h.completion('A'),
+        );
+        await settle();
+        h.server.ackLastOnDisconnect();
+        h.repo.onDisconnectSetValue(
+          Path('p/b'),
+          nodeFromJson(2),
+          onComplete: h.completion('F'),
+        );
+        await settle();
+        h.log.clear();
+
+        h.repo.purgeOutstandingWrites();
+        await settle();
+        expect(h.log, isEmpty);
+        h.server.ackLastOnDisconnect();
+        await settle();
+        expect(h.log, <String>['F:ok']);
+        h.log.clear();
+        h.server.disconnect();
+        await settle();
+        expect(h.log, <String>['S1:V({"a":2,"b":1})', 'S1:V({"a":2,"b":2})']);
+      },
+    );
+
     test('an empty update completes without a request', () async {
       final RepoHarness h = RepoHarness();
       h.repo.onDisconnectUpdate(

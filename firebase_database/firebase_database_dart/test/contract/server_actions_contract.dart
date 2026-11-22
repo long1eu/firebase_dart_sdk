@@ -179,6 +179,46 @@ void runServerActionsContract(ServerActionsHarness Function() create) {
     },
   );
 
+  test(
+    'purgeOutstandingWrites cancels unanswered puts and merges, then onDisconnect requests '
+    'queued offline, never synchronously; a sent onDisconnect request is kept',
+    () async {
+      final List<String> log = <String>[];
+      RequestResultCallback record(String name) =>
+          (String status, _) => log.add('$name $status');
+      actions.put('/a', 1, onComplete: record('a'));
+      actions.onDisconnectPut('/kept', 1, onComplete: record('kept'));
+      await pumpEventQueue();
+      actions.purgeOutstandingWrites();
+      expect(log, isEmpty);
+      await pumpEventQueue();
+      expect(log, <String>['a write_canceled']);
+      await harness.answer('o');
+      await pumpEventQueue();
+      expect(log, <String>['a write_canceled', 'kept $statusOk']);
+
+      await harness.drop();
+      await pumpEventQueue();
+      log.clear();
+      actions.onDisconnectMerge('/m', <String, Object?>{
+        'x': 1,
+      }, onComplete: record('om'));
+      actions.merge('/b', <String, Object?>{'x': 1}, onComplete: record('b'));
+      actions.onDisconnectCancel('/c', onComplete: record('oc'));
+      actions.put('/d', 1, onComplete: record('d'));
+      await pumpEventQueue();
+      actions.purgeOutstandingWrites();
+      expect(log, isEmpty);
+      await pumpEventQueue();
+      expect(log, <String>[
+        'b write_canceled',
+        'd write_canceled',
+        'om write_canceled',
+        'oc write_canceled',
+      ]);
+    },
+  );
+
   test('a get completes with the data', () async {
     final Future<Object?> result = actions.get(defaultSpec);
     await pumpEventQueue();
