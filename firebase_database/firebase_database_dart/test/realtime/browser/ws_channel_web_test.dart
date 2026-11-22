@@ -58,7 +58,8 @@ void main() {
 
   setUpAll(() async {
     server = StreamIterator<Object?>(spawnHybridCode(_serverCode).stream);
-    port = await _next(server) as int;
+    // A number from the hybrid isolate is a double under dart2wasm.
+    port = (await _next(server) as num).toInt();
   });
 
   Uri url([String path = '/.ws', String query = 'v=5']) =>

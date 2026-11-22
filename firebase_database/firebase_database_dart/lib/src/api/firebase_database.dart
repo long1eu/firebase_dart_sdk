@@ -32,6 +32,7 @@ import 'package:firebase_database_dart/src/core/util/push_id.dart';
 import 'package:firebase_database_dart/src/core/util/validation.dart';
 import 'package:firebase_database_dart/src/core/view/event.dart';
 import 'package:firebase_database_dart/src/core/view/query_spec.dart';
+import 'package:firebase_database_dart/src/realtime/server_actions_factories.dart';
 import 'package:meta/meta.dart';
 
 /// The environment variable [FirebaseDatabase.emulatorHostFromEnvironment] reads.
@@ -58,8 +59,10 @@ final class FirebaseDatabase {
   ///
   /// [emulatorHost] (`'host:port'` or `'[ipv6]:port'`) connects to the Database emulator over plain
   /// WebSocket, with the database URL's namespace (by default `<projectId>-default-rtdb`). See
-  /// [emulatorHostFromEnvironment]. [mockUserToken] is the emulator's mock auth token; passing it without
-  /// [emulatorHost] throws an [ArgumentError].
+  /// [emulatorHostFromEnvironment]. [mockUserToken] is sent to the emulator as it is: build a user's token
+  /// with `mockUserTokenFor`. A string that is not such a token (the literal `'owner'` included) is an
+  /// admin credential for the emulator and bypasses the rules. Passing it without [emulatorHost], or
+  /// empty, throws an [ArgumentError].
   ///
   /// [persistence] turns on disk persistence (memory only when null). [logger] receives log messages
   /// (silent when null).
@@ -92,8 +95,8 @@ final class FirebaseDatabase {
         app,
         target.info,
         mockUserToken: mockUserToken,
+        clock: clock,
         random: random,
-        delay: delay,
       ),
       persistence: persistence,
       logger: logger,
@@ -529,16 +532,45 @@ ServerActionsFactory _realtimeConnectionFactory(
   FirebaseApp app,
   RepoInfo info, {
   String? mockUserToken,
+  DateTime Function()? clock,
   double Function()? random,
-  Future<void> Function(Duration)? delay,
-}) =>
-    (_, _) =>
-        // TODO(realtime): build the PersistentConnection of lib/src/realtime/ for [info], with the
-        // app's token source, [mockUserToken], [random] (backoff) and [delay] (timers).
-        throw UnimplementedError(
-          'The realtime connection is not built yet; use databaseWithFakeServer '
-          'of package:firebase_database_dart/testing.dart.',
-        );
+}) => persistentConnectionFactory(
+  info,
+  // With no provider set the app answers as its own provider and throws: that means no user.
+  authProvider: mockUserToken != null
+      ? _MockUserTokenProvider(mockUserToken)
+      : identical(app.authProvider, app)
+      ? null
+      : app.authProvider,
+  appCheckProvider: app.appCheckProvider,
+  appId: app.options.appId,
+  // The app replays its current state to a new listener: only a change to "connected" is a hint.
+  connectivityHints: app.onNetworkConnected
+      .distinct()
+      .skip(1)
+      .where((bool connected) => connected)
+      .map((bool _) {}),
+  clock: clock,
+  random: random,
+);
+
+/// The auth provider of an instance created with `mockUserToken`: always that token.
+final class _MockUserTokenProvider extends AuthTokenProvider {
+  _MockUserTokenProvider(this._token);
+
+  final String _token;
+
+  @override
+  Future<GetTokenResult> getAccessToken({required bool forceRefresh}) async =>
+      GetTokenResult(_token);
+
+  @override
+  String? get uid => null;
+
+  @override
+  Stream<AuthTokenChange> get onTokenChanged =>
+      const Stream<AuthTokenChange>.empty();
+}
 
 /// One open event stream.
 final class _Listener {
@@ -651,6 +683,13 @@ final class _Target {
     String? emulatorHost,
     String? mockUserToken,
   }) {
+    if (mockUserToken != null && mockUserToken.isEmpty) {
+      throw ArgumentError.value(
+        mockUserToken,
+        'mockUserToken',
+        'Must not be empty.',
+      );
+    }
     if (mockUserToken != null && emulatorHost == null) {
       throw ArgumentError.value(
         mockUserToken,

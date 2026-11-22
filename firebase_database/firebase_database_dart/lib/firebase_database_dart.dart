@@ -4,8 +4,7 @@
 /// listen with its `on<Thing>` streams and write with `set`, `update` and transactions. Errors from the
 /// server are [FirebaseDatabaseException]s. This library imports no `dart:io` and no native code.
 ///
-/// Work in progress: the client runs against the fake server of `testing.dart`; the realtime connection
-/// is not wired into `FirebaseDatabase(app)` yet.
+/// Work in progress: tested against the Database emulator, not yet against a production database.
 ///
 /// ```dart
 /// import 'package:firebase_app_dart/firebase_app_dart.dart';
@@ -45,6 +44,7 @@ export 'src/api/database_reference.dart' show DatabaseReference;
 export 'src/api/firebase_database.dart' show FirebaseDatabase;
 export 'src/api/firebase_database_exception.dart'
     show FirebaseDatabaseException;
+export 'src/api/mock_user_token.dart' show mockUserTokenFor;
 export 'src/api/on_disconnect.dart' show OnDisconnect;
 export 'src/api/query.dart' show Query;
 export 'src/api/server_value.dart' show ServerValue;

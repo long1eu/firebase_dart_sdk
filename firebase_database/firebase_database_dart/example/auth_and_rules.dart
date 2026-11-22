@@ -20,11 +20,13 @@ import 'common.dart';
 Future<void> main() async {
   // No user: rules that read `auth` see null.
   final FirebaseDatabase anonymous = emulatorDatabase(appName: 'anonymous');
-  // A mock user: the emulator takes the token as a signed-in user. Only the
-  // emulator accepts it. With a real project the token comes from the app's
-  // Auth (firebase_auth_providers_dart); there is nothing to pass here.
+  // A mock user: mockUserTokenFor builds an unsigned token that the emulator
+  // takes as the signed-in user `ada`. Only the emulator accepts it. Do not
+  // pass a plain string: the emulator treats that as an admin credential,
+  // which bypasses the rules. With a real project the token comes from the
+  // app's Auth (firebase_auth_providers_dart); there is nothing to pass here.
   final FirebaseDatabase ada = emulatorDatabase(
-    mockUserToken: 'ada',
+    mockUserToken: mockUserTokenFor('ada', projectId: projectId),
     appName: 'ada',
   );
   final String key = freshKey('auth');
