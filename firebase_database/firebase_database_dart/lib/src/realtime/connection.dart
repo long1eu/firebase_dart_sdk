@@ -2,8 +2,9 @@
 /// dispatch, close and the connect timeout (`rtdb_protocol.md` 3.2 to 3.5).
 library;
 
-import 'package:firebase_database_dart/src/realtime/connection_timings.dart';
 import 'package:firebase_database_dart/src/realtime/realtime_target.dart';
+import 'package:firebase_database_dart/src/realtime/connection_timings.dart';
+import 'package:firebase_database_dart/src/realtime/seam_pending.dart';
 import 'package:firebase_database_dart/src/realtime/transport/ws_channel.dart';
 
 /// Why a [RealtimeConnection] ended (test plan section 5, interface C to P).
@@ -44,7 +45,7 @@ abstract interface class RealtimeDelegate {
 ///
 /// Owns the frames (`FrameSplitter`, `FrameAssembler`), the liveness timers (`Liveness`) and the
 /// connect timeout. A server host from the hello or a reset goes through
-/// [ConnectionTarget.acceptServerHost] (threat model T1); at most
+/// [RealtimeTarget.acceptServerHost] (threat model T1); at most
 /// `ConnectionTimings.maxResetsPerAttempt` resets are followed in one attempt (T2). Malformed
 /// control messages close the connection as an ordinary failure (iOS U-I13, U-I14).
 final class RealtimeConnection {
@@ -52,15 +53,17 @@ final class RealtimeConnection {
   ///
   /// [lastSessionId] becomes `ls` of the URL (2.3); [appId] and [appCheckToken] go into the
   /// headers or the URL as [target] decides. [now] and [random] replace the clock and the random
-  /// source (test plan 2.4).
+  /// source (test plan 2.4). [logger] gets the `e` control errors, unknown control types and the
+  /// version warning, cleaned by `safeServerText` (threat model T7).
   RealtimeConnection(
-    ConnectionTarget target,
+    RealtimeTarget target,
     WsConnector connector,
     ConnectionTimings timings,
     RealtimeDelegate delegate, {
     String? lastSessionId,
     String? appId,
     String? appCheckToken,
+    required DatabaseLogger logger,
     required DateTime Function() now,
     required double Function() random,
   }) {

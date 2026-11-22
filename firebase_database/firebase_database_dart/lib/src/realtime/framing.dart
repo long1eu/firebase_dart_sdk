@@ -13,8 +13,11 @@ final class FrameSplitter {
   final int maxFrameUnits;
 
   /// The frames of [json]: [json] itself when it fits in one frame; otherwise the decimal count of
-  /// pieces, then the pieces. A piece never ends inside a surrogate pair (test plan B-3.1c; JS
-  /// splits by code unit, Q5), so a piece may be one unit shorter than [maxFrameUnits].
+  /// pieces, then the pieces. Pieces are cut on code-point boundaries, never inside a surrogate
+  /// pair: the server decodes each frame as UTF-8 on its own, so a split inside a UTF-8 sequence
+  /// makes it drop the whole message silently, and a lone surrogate is stored as U+FFFD
+  /// (`rtdb_emulator_probe.md` addendum 2 item 5, measured; JS splits by code unit, a defect). A
+  /// piece may therefore be one unit shorter than [maxFrameUnits].
   List<String> framesFor(String json) {
     throw UnimplementedError();
   }

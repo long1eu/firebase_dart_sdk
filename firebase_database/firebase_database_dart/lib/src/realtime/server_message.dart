@@ -1,7 +1,13 @@
 /// Decoding the data messages of the server into typed records (owner K): `rtdb_protocol.md` 4
 /// (responses) and 5 (pushes), with the hardening of iOS U-I01, U-I05 to U-I11 and threat model
 /// T11.
+///
+/// Paths in pushes arrive without the leading slash; every decoded path goes through
+/// [wirePathFromServer]. Merge maps keep their keys as the server sent them
+/// (`rtdb_seam_changes.md` A.3).
 library;
+
+import 'package:firebase_database_dart/src/core/connection/wire_range_merge.dart';
 
 /// One data message of the server (the `d` of `{"t":"d","d":...}`), decoded.
 sealed class ServerMessage {
@@ -50,8 +56,9 @@ final class DataPush extends Push {
     this.tag,
   });
 
-  /// The location, validated as a server path (T11: no `.#$[]`, no control characters, at most 768
-  /// UTF-8 bytes and 32 segments, first segment not starting with `.`).
+  /// The location as `/a/b` (the server's `a/b` with the slash added), validated as a server
+  /// path (T11: no `.#$[]`, no control characters, at most 768 UTF-8 bytes and 32 segments, first
+  /// segment not starting with `.`).
   final String path;
 
   /// The JSON value; for a merge an object of child keys or relative paths to values (null
@@ -78,7 +85,7 @@ final class ListenRevokedPush extends Push {
   /// Creates the push for [path] with the [queries] the server named.
   const ListenRevokedPush({required this.path, this.queries});
 
-  /// The location.
+  /// The location as `/a/b` ([wirePathFromServer]).
   final String path;
 
   /// The query objects of `q`, or null when absent.
@@ -155,7 +162,33 @@ final class ServerError extends ServerMessage {
   String toString() => 'ServerError';
 }
 
-/// A message that is malformed or of an unknown kind (`rm`, unknown actions, non-object messages):
+/// A range merge (`rm`, 7.4): only after a listen sent a compound hash `ch`.
+///
+/// The entry shapes are those measured on the emulator (probe, addendum B): `{"e":..}` first,
+/// `{"s":..,"e":..}` in the middle, `{"s":..}` last, neither for a single entry, each with `m`. An
+/// empty list (a hash match) decodes to [Ignored]: the seam promises a non-empty list.
+final class RangeMergePush extends Push {
+  /// Creates the push of [merges] at [path].
+  const RangeMergePush({required this.path, required this.merges, this.tag});
+
+  /// The location as `/a/b`, validated as [DataPush.path].
+  final String path;
+
+  /// The ranges, never empty; their `s`/`e` paths also as `/a/b`.
+  final List<WireRangeMerge> merges;
+
+  /// The query tag, or null when untagged.
+  final int? tag;
+
+  @override
+  String get action => 'rm';
+
+  @override
+  String toString() =>
+      'RangeMergePush($path, ${merges.length} ranges, tag: $tag)';
+}
+
+/// A message that is malformed or of an unknown kind (unknown actions, non-object messages):
 /// logged and dropped (iOS U-I05, U-I08, U-I09; test plan B-5.4).
 final class Ignored extends ServerMessage {
   /// Creates the record with [why] it was ignored (no server data in it).
@@ -170,5 +203,16 @@ final class Ignored extends ServerMessage {
 
 /// Decodes [json], the `d` of a data message. Never throws (test plan idea 3: fuzzed).
 ServerMessage decodeServerMessage(Object? json) {
+  throw UnimplementedError();
+}
+
+/// The seam form of a path the server sent (`rtdb_seam_changes.md` A.3): `a/b` becomes `/a/b`,
+/// `""` (the root) becomes `/`; a path that already starts with `/` is kept.
+///
+/// The server pushes paths without the leading slash (`"p":"ws/a"`, root `""`), while requests may
+/// carry one (`rtdb_emulator_probe.md`, "Paths in pushes have no leading slash", measured). The
+/// one place where the connection half converts; used for `d`, `m`, `c`, `rm` and the `s`/`e` of
+/// range merges. Validation (threat model T11) is separate.
+String wirePathFromServer(String serverPath) {
   throw UnimplementedError();
 }

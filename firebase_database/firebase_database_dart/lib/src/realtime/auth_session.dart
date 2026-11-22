@@ -4,6 +4,7 @@
 library;
 
 import 'package:firebase_app_dart/firebase_app_dart.dart';
+import 'package:firebase_database_dart/src/realtime/connection_timings.dart';
 
 /// Sends a request on the live connection: [action] with [body]; [onResponse] gets the response
 /// body `{"s":..,"d":..}`, or is null when the response is ignored (test plan section 5).
@@ -90,11 +91,19 @@ final class ProviderTokenSource implements RealtimeTokenSource {
 /// logged as `<action> (contents hidden)` (T7).
 final class AuthSession {
   /// Creates the session sending through [send] and reading [tokens]. [invalidTokenThreshold] is
-  /// `ConnectionTimings.invalidTokenThreshold` (3).
+  /// `ConnectionTimings.invalidTokenThreshold` (3); [protocol] gives the App Check removal action
+  /// of the server ([RealtimeProtocol.unappCheck]).
+  ///
+  /// [onAuthStatus] gets the result of every current `auth`/`gauth` and every `ac` push (`ok`, or
+  /// the revoke status and the server's explanation); [onAppCheckStatus] the same for `appcheck`
+  /// and `apc`. The persistent connection forwards both to `ServerActionsDelegate`.
   AuthSession(
     RequestSender send,
     RealtimeTokenSource tokens, {
     required int invalidTokenThreshold,
+    required RealtimeProtocol protocol,
+    required void Function(String status, String? explanation) onAuthStatus,
+    required void Function(String status, String? explanation) onAppCheckStatus,
   }) {
     throw UnimplementedError();
   }

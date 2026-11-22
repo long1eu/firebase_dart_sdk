@@ -29,6 +29,10 @@ final class ServerSeen {
 }
 
 /// A scripted Realtime Database server for the unit tests of `PersistentConnection`.
+///
+/// Push paths are given as `/a/b` and sent like the real server does: without the leading slash
+/// (`a/b`, root `""`; emulator probe, measured). A ping is answered with a pong
+/// `{"t":"c","d":{"t":"o","d":null}}` at any time.
 final class FakeRtdbServer {
   /// Creates the server. Every accepted connection gets a hello after [helloDelay] with session id
   /// [session] and host [host]; [clock] gives the hello `ts` in ms.
@@ -80,6 +84,16 @@ final class FakeRtdbServer {
 
   /// Pushes `m` with [changes] at [path], tagged with [tag] when given.
   void pushMerge(String path, Map<String, Object?> changes, {int? tag}) {
+    throw UnimplementedError();
+  }
+
+  /// Pushes `rm` at [path] with [ranges] (`{"s":..,"e":..,"m":..}` entries as measured, their
+  /// `s`/`e` paths sent without the leading slash), tagged with [tag] when given.
+  void pushRangeMerge(
+    String path,
+    List<Map<String, Object?>> ranges, {
+    int? tag,
+  }) {
     throw UnimplementedError();
   }
 

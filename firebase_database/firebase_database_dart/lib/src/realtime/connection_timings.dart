@@ -32,17 +32,23 @@ final class ConnectionTimings {
     this.maxResetsPerAttempt = 3,
     this.forcedRefreshMinInterval = const Duration(seconds: 60),
     this.getTimeout = const Duration(seconds: 3),
+    this.requestTimeout = const Duration(seconds: 60),
+    this.maxRequestTimeouts = 2,
     this.maxMessageBytes = 256 * 1024 * 1024,
     this.maxJsonDepth = 64,
   });
 
   /// The largest outgoing frame, in UTF-16 code units: WEBSOCKET_MAX_FRAME_SIZE 16384
   /// (`rtdb_protocol.md` 1.2, realtime/WebSocketConnection.ts:44; Android
-  /// WebsocketConnection.java:37-39).
+  /// WebsocketConnection.java:37-39). The emulator's real limit is 65536 bytes per frame (a larger
+  /// frame is closed with 1002; `rtdb_emulator_probe.md` addendum 2 item 5, measured), which 16384
+  /// units (at most 49152 UTF-8 bytes) never reach.
   final int maxFrameUnits;
 
   /// Silence (no send, no receive) after which the keep-alive frame `0` is sent:
-  /// WEBSOCKET_KEEPALIVE_INTERVAL 45000 ms (1.2, WebSocketConnection.ts:45,425-435).
+  /// WEBSOCKET_KEEPALIVE_INTERVAL 45000 ms (1.2, WebSocketConnection.ts:45,425-435). Must stay
+  /// below the server's idle close: the emulator closes a connection that sent no frame for
+  /// exactly 120 s (`rtdb_emulator_probe.md`, measured).
   final Duration keepAlive;
 
   /// How long an attempt may take from opening the socket to the hello: 30000 ms (1.2, Android
@@ -69,9 +75,10 @@ final class ConnectionTimings {
   /// 100 * 1024 (1.2, Connection.ts:44).
   final int bytesReceivedHealthyOverride;
 
-  /// Inbound silence after which a control ping probes the link: the dead-link rule of the lead
-  /// (test plan header and B-3.1i); 30 s is the builder's proposal in test plan 2.4. Upstream has
-  /// no inbound timeout (1.2 note, 3.1).
+  /// Inbound silence after which a control ping probes the link (the server answers a ping with a
+  /// pong at any time, even before the hello; probe addendum 2 item 9, measured): the dead-link
+  /// rule of the lead (test plan header and B-3.1i); 30 s is the builder's proposal in test plan
+  /// 2.4. Upstream has no inbound timeout (1.2 note, 3.1).
   final Duration idleProbeAfter;
 
   /// Time a dead-link probe waits for any inbound frame before the connection is closed with
@@ -110,6 +117,18 @@ final class ConnectionTimings {
   /// lead's decision (Android GET_CONNECT_TIMEOUT; JS waits forever, `rtdb_protocol.md` 12 Q16).
   final Duration getTimeout;
 
+  /// How long a request that expects an answer waits for it before the connection is closed and
+  /// replayed: the server answers a request it cannot parse with a control error `e` that has no
+  /// request id, or not at all (`rtdb_emulator_probe.md`, measured; lead's decision). The timer
+  /// arms only when the request is sent on a connected socket, never while it waits offline. 60 s
+  /// is a proposal, NOT MEASURED; the liveness pings already prove that the link is up.
+  final Duration requestTimeout;
+
+  /// Timeouts on live connections after which a request fails with status `network_error`
+  /// (`DatabaseErrorCode.networkError`) and is not replayed again: 2, the lead's decision. Before
+  /// that, a timeout closes the connection and the request is replayed after the reconnect.
+  final int maxRequestTimeouts;
+
   /// Largest inbound message, counted while its frames arrive: 256 MiB, threat model T9 (to be
   /// confirmed by the probe of its open item 5).
   final int maxMessageBytes;
@@ -120,7 +139,15 @@ final class ConnectionTimings {
 }
 
 /// The wire strings of protocol 5 (`rtdb_protocol.md` 1.1, 1.2, 1.3, 4.10 and 5).
-abstract final class RealtimeProtocol {
+///
+/// Almost everything is a static constant. The one string that differs between servers is an
+/// instance field ([unappCheck]); build the instance with [RealtimeProtocol.new] from
+/// `RepoInfo.isUsingEmulator`.
+final class RealtimeProtocol {
+  /// The wire strings for a production database or, with [isUsingEmulator], the emulator.
+  const RealtimeProtocol({required bool isUsingEmulator})
+    : unappCheck = isUsingEmulator ? 'unappcheck' : 'unappeck';
+
   /// PROTOCOL_VERSION `5` (1.1, realtime/Constants.ts:18).
   static const String protocolVersion = '5';
 
@@ -246,12 +273,12 @@ abstract final class RealtimeProtocol {
   /// Action `appcheck` (4.8).
   static const String appCheck = 'appcheck';
 
-  /// Action removing App Check: JS sends `unappeck` (PersistentConnection.ts:371), Android
-  /// `unappcheck` (4.8). Open question Q2: fixed after the emulator probe.
-  static const String unappCheck = 'unappeck';
-
-  /// Action `s` stats, sent once on the first connection (4.9).
-  static const String stats = 's';
+  /// Action removing App Check (4.8). The emulator knows `unappcheck` (Android's spelling) and
+  /// answers `unappeck` with a control error (`rtdb_emulator_probe.md`, measured). Production uses
+  /// `unappeck`, the spelling of the JS SDK (PersistentConnection.ts:371); that production accepts
+  /// it is UNVERIFIED (no production probe yet). Stats (`s`, 4.9) are not sent, so there is no
+  /// constant for them (`rtdb_seam_changes.md` D).
+  final String unappCheck;
 
   /// Push `d`: data set (5).
   static const String pushData = 'd';

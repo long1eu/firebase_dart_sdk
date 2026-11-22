@@ -1,86 +1,35 @@
-/// The exception of the package and the mapping of wire status strings to it (owner K):
-/// `rtdb_protocol.md` 9; threat model T7, T8.
+/// Wire status strings as the connection half reads them (owner K): `rtdb_protocol.md` 9 and 10;
+/// threat model T7.
+///
+/// One error vocabulary for the package: the core's `DatabaseErrorCode` / `DatabaseError`
+/// (`rtdb_seam_changes.md` A.9). Statuses cross the seam as strings (and a failed `get` as a
+/// `ServerActionsException`); mapping them to codes is the core's `DatabaseError.fromStatus`. This
+/// file only holds what the connection half itself needs: the REST status rule, the invalid-token
+/// rule and the cleaning of server text. It declares no exception type.
 library;
 
-import 'package:firebase_app_dart/firebase_app_dart.dart';
+/// The listen-response warning key value for a query without an index rule (4.1): `no_index`.
+const String noIndexWarning = 'no_index';
 
-/// The status strings of `rtdb_protocol.md` 9.
-abstract final class RealtimeStatus {
-  /// Success.
-  static const String ok = 'ok';
+/// Prefix of the status a REST listen synthesises for a non-2xx answer other than 401:
+/// `rest_error:<code>` (10, ReadonlyRestClient.ts:124).
+const String restErrorPrefix = 'rest_error:';
 
-  /// Rules deny; also the status of a `c` push and of REST 401.
-  static const String permissionDenied = 'permission_denied';
-
-  /// The data exceeds the size of one request.
-  static const String tooBig = 'too_big';
-
-  /// The service is unavailable.
-  static const String unavailable = 'unavailable';
-
-  /// A transaction put whose hash no longer matches: rerun.
-  static const String datastale = 'datastale';
-
-  /// The token was rejected (`auth`, `ac`, `apc`).
-  static const String invalidToken = 'invalid_token';
-
-  /// Local only: a sent transaction put lost its connection.
-  static const String disconnect = 'disconnect';
-
-  /// Local only: a transaction ran out of retries.
-  static const String maxRetry = 'maxretry';
-
-  /// Local only: a `set` overwrote the transaction's location.
-  static const String set = 'set';
-
-  /// Local only: the transaction had no data.
-  static const String noData = 'nodata';
-
-  /// Warning inside a listen response `d.w`: the query has no index rule.
-  static const String noIndex = 'no_index';
-
-  /// Prefix of the synthesised REST status `rest_error:<code>` (10).
-  static const String restErrorPrefix = 'rest_error:';
+/// The status of a REST listen answered with [httpStatus] (10): `permission_denied` for 401,
+/// `rest_error:<httpStatus>` for any other non-2xx except 404 (404 is null data, not an error).
+String restListenStatus(int httpStatus) {
+  throw UnimplementedError();
 }
 
-/// Thrown when a Realtime Database operation fails.
-///
-/// Extends [FirebaseException] with the [plugin] `firebase_database` (Storage precedent). Neither
-/// [message] nor [toString] holds a URL query, a request body or a token-provider message
-/// (threat model T8); server text in [message] is cut at 1 KiB with control characters escaped
-/// (T7).
-final class FirebaseDatabaseException extends FirebaseException {
-  /// Creates an exception with [code] (kebab case, for example `permission-denied`) and a
-  /// [message].
-  const FirebaseDatabaseException({
-    required String code,
-    required String message,
-    this.status,
-    this.cause,
-    super.stackTrace,
-  }) : super(plugin: 'firebase_database', code: code, message: message);
-
-  /// The wire status that caused it (for example `permission_denied`), when it came from the
-  /// server.
-  final String? status;
-
-  /// The error that caused this one when it came from outside the package (a token provider, the
-  /// HTTP client). Never part of [message] or [toString]: it may hold credentials.
-  final Object? cause;
-
-  @override
-  String toString() => '[$plugin/$code] $message';
+/// Whether [status] counts toward the invalid-token threshold of 8.3: `invalid_token` or
+/// `permission_denied` (PersistentConnection.ts:985-1004).
+bool countsAsInvalidToken(String status) {
+  throw UnimplementedError();
 }
 
-/// The exception of a failed request with wire [status] and the server's [reason], at [path]
-/// (9; core/util/util.ts:473-491, core/Repo.ts:892-917).
-///
-/// The code is [status] in kebab case (`permission_denied` -> `permission-denied`); the message is
-/// `<STATUS> at <path>: <text>` with the standard text of 9 when [reason] is null.
-FirebaseDatabaseException statusToError(
-  String status,
-  String? reason, {
-  String? path,
-}) {
+/// [text] from the server made safe for a log line or an error message (threat model T7): cut at
+/// 1 KiB with a marker, control characters escaped as `\uXXXX`. For the shutdown reason, `e`
+/// control errors, revoke explanations and `sd` messages.
+String safeServerText(String text) {
   throw UnimplementedError();
 }

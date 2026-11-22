@@ -1,12 +1,22 @@
 # Owners of the connection half
 
 One builder per file, no shared file (`rtdb_connection_test_plan.md` section 5). "Needs" lists
-the declarations of other owners' files that a file compiles against; every one of them exists in the
-skeleton with its final signature. Spec sections: `rtdb_protocol.md` numbers, `T<n>` = threat model.
+the declarations of other files that a file compiles against; every one exists with its final
+signature. Spec sections: `rtdb_protocol.md` numbers; `T<n>` = threat model; `A.<n>` =
+`rtdb_seam_changes.md`; "probe" = `rtdb_emulator_probe.md` (measured).
 
 Owners: **T** transport and framing, **C** connection, **P** persistent connection, **K** tokens,
-backoff and message decoding, **R** REST client (and the `ListenSpec` interface), **U** URL,
-RepoInfo, emulator and test rig.
+backoff, message decoding and status strings, **R** REST client, **U** URL, `RealtimeTarget`,
+emulator and test rig.
+
+The seam with the core is `lib/src/core/connection/` (`ServerActions`, `ServerActionsDelegate`,
+`ListenSpec`, `ListenHashProvider`, `WireRangeMerge`), with `core/repo_info.dart` (`RepoInfo`) and
+`core/database_error.dart` (`DatabaseErrorCode`, `DatabaseError`). Those files belong to the core;
+the connection half imports and implements them, and declares no `ListenSpec`, `QuerySpec`,
+`RepoInfo` or exception of its own. Paths cross the seam as `/a/b` (root `/`) both ways.
+
+`seam_pending.dart` holds stand-ins for decided seam items the core has not landed yet (A.1, A.2,
+A.4, A.7, A.10); it is deleted when that core commit arrives (see its header).
 
 ## lib/src/realtime
 
@@ -16,31 +26,34 @@ RepoInfo, emulator and test rig.
 | `transport/ws_channel_io.dart` | T | `ws_channel.dart` | 2.3 (headers); 3.4 (no `pingInterval`); T4, T5, T9 |
 | `transport/ws_channel_web.dart` | T | `ws_channel.dart` | 2.3 (`p`/`ac` in URL); T25, T27 |
 | `transport/ws_connector.dart` | T | `ws_channel*.dart` | conditional import (test plan 2.1) |
-| `framing.dart` | T | nothing (`maxFrameUnits` etc. are passed in) | 3.1; T9, T10 |
-| `connection.dart` | C | T: `WsConnector`, `WsChannel`, `WsEvent`, `FrameSplitter`, `FrameAssembler`, `FramingException`; U: `ConnectionTarget`; C: `ConnectionTimings`, `Liveness` | 3.2, 3.3, 3.5; T1, T2, T7, T11 |
-| `liveness.dart` | C | C: `ConnectionTimings`, `DisconnectReason` | 3.1 (keep-alive), 3.4; dead-link rule |
-| `connection_timings.dart` | C | nothing | 1.1, 1.2, 1.3, 1.4 (server limits); T2, T9, T10, T14 |
-| `persistent_connection.dart` | P | C: `RealtimeConnection`, `RealtimeDelegate`, `DisconnectReason`, `ConnectionTimings`, `RealtimeProtocol`; K: `AuthSession`, `RealtimeTokenSource`, `ReconnectBackoff`, `decodeServerMessage` and its records, `statusToError`; U: `ConnectionTarget`; R: `ListenSpec`; P: `RequestTable` | 4, 5, 8.1, 8.2, 8.4 to 8.8; T13, T15, T18 |
-| `request_table.dart` | P | nothing | 4 (envelope, `r` counter) |
-| `auth_session.dart` | K | `firebase_app_dart` (`AuthTokenProvider`, `AppCheckTokenProvider`) | 4.6, 4.7, 4.8, 8.1, 8.3; T7, T14 |
+| `framing.dart` | T | nothing (limits passed in) | 3.1, code-point splitting (probe: 65536-byte frames, UTF-8 split drops the message); T9, T10 |
+| `connection.dart` | C | T: `WsConnector`, `WsChannel`, `WsEvent`, `FrameSplitter`, `FrameAssembler`, `FramingException`; U: `RealtimeTarget`; C: `ConnectionTimings`, `RealtimeProtocol`, `Liveness`; K: `safeServerText`; pending: `DatabaseLogger` | 3.2, 3.3, 3.5; T1, T2, T7, T11 |
+| `liveness.dart` | C | C: `ConnectionTimings`, `DisconnectReason` | 3.1 (keep-alive under the 120 s idle close), 3.4, dead-link probe (pong at any time) |
+| `connection_timings.dart` | C | nothing | 1.1 to 1.4; `unappCheck` by emulator (probe); T2, T9, T10, T14 |
+| `persistent_connection.dart` | P | core: implements `ServerActions`, calls `ServerActionsDelegate`, reads `ListenSpec`, `ListenHashProvider`; C: `RealtimeConnection`, `RealtimeDelegate`, `DisconnectReason`, `ConnectionTimings`, `RealtimeProtocol`; K: `AuthSession`, `RealtimeTokenSource`, `ReconnectBackoff`, `decodeServerMessage` and its records, `wirePathFromServer`, `countsAsInvalidToken`; U: `RealtimeTarget`; P: `RequestTable`; pending: `SeamPendingTokenRefresh`, `ServerActionsException`, `DatabaseLogger` | 4, 5, 8.1, 8.2, 8.4 to 8.8; A.1 to A.3, A.6; T13, T15, T18 |
+| `request_table.dart` | P | nothing | 4 (envelope, `r` counter, per-request timeout: probe) |
+| `auth_session.dart` | K | `firebase_app_dart` (`AuthTokenProvider`, `AppCheckTokenProvider`); C: `RealtimeProtocol` | 4.6, 4.7, 4.8, 8.1, 8.3; A.1; T7, T14 |
 | `reconnect_backoff.dart` | K | nothing | 8.2; T13 |
-| `server_message.dart` | K | nothing | 4 (responses), 5 (pushes); T11 (shapes, paths) |
-| `realtime_error.dart` | K | `firebase_app_dart` (`FirebaseException`) | 9; T7, T8 |
-| `rest_client.dart` | R | U: `RepoInfo.restUri`, `RepoInfo.mayReceiveTokens`; K: `RealtimeTokenSource`, `FirebaseDatabaseException`, `statusToError`; R: `ListenSpec`; `package:http` | 6.4, 9, 10; T7, T8, T23 |
-| `listen_spec.dart` | R (interface only; the query half implements it) | nothing | 6.1 to 6.4 |
-| `database_url.dart` | U | K: `FirebaseDatabaseException` (its constructor is real code) | 1.1, 2.1, 2.4 (env value); T3, T6 |
-| `repo_info.dart` | U | U: `DatabaseUrl` | 2.2, 2.3, 2.4, 10 (REST URL); T1, T3, T6 |
+| `server_message.dart` | K | core: `WireRangeMerge` | 4 (responses), 5 (pushes, `rm` as measured), `wirePathFromServer` (A.3); T11 |
+| `realtime_error.dart` | K | core: `DatabaseErrorCode` | 9, 10 (status strings to `DatabaseErrorCode`, REST status); A.9; T7 (`safeServerText`) |
+| `rest_client.dart` | R | core: implements `ServerActions` read-only, reads `ListenSpec` (`restParams`); U: `RealtimeTarget.restUri`, `RealtimeTarget.mayReceiveTokens`; K: `RealtimeTokenSource`, `restListenStatus`; `package:http`; pending: `SeamPendingTokenRefresh`, `SeamPendingRestParams`, `ServerActionsException`, `statusReadOnly`, `DatabaseLogger` | 6.4, 9, 10; A.2, A.4, A.7; T7, T8, T23 |
+| `database_url.dart` | U | core: `RepoInfo` | 1.1, 2.1, 2.4 (env value); T3, T6; bad URL = `FormatException`/`ArgumentError` |
+| `realtime_target.dart` | U | core: `RepoInfo` | 2.2, 2.3, 2.4, 10 (REST URL); A.5; T1, T3, T6 |
 | `emulator_token.dart` | U | nothing | 2.4; T3 |
+| `seam_pending.dart` | lead (temporary) | core: `ListenSpec` | stand-ins for A.1, A.2, A.4, A.7, A.10 |
 
-## test/util
+## test
 
 | File | Owner | Needs | Implements |
 |---|---|---|---|
-| `fake_ws.dart` | T | T: `ws_channel.dart` | test plan 2.2 |
-| `fake_rtdb_server.dart` | T | T: `fake_ws.dart`, `ws_channel.dart` | test plan 2.3 |
-| `fakes.dart` | K | K: `RequestSender`; `firebase_app_dart` | test plan 2.4, 2.4a |
-| `chaos_proxy.dart` | U | `dart:io` (copy of the Firestore proxy) | test plan 2.5 |
-| `ws_tap.dart` | U | U: `chaos_proxy.dart` | test plan 2.5 |
+| `test/util/fake_ws.dart` | T | T: `ws_channel.dart` | test plan 2.2 |
+| `test/util/fake_rtdb_server.dart` | T | T: `fake_ws.dart`, `ws_channel.dart` | test plan 2.3; push paths without the leading slash (probe) |
+| `test/util/fakes.dart` | K | K: `RequestSender`; `firebase_app_dart` | test plan 2.4, 2.4a |
+| `test/util/chaos_proxy.dart` | U | `dart:io` (copy of the Firestore proxy) | test plan 2.5 |
+| `test/util/ws_tap.dart` | U | U: `chaos_proxy.dart` | test plan 2.5 |
+| `test/realtime/skeleton_compile_test.dart` | lead | every lib file but `ws_channel_web.dart` | references every public symbol; a builder who adds or renames a public symbol updates it |
+
+The recording `ServerActionsDelegate` for the tests of P and R comes from the core (A.8).
 
 ## Rules for every file
 
@@ -48,6 +61,7 @@ RepoInfo, emulator and test rig.
   (`dart tool/check_web_imports.dart firebase_database/firebase_database_dart <lib files>` passes).
 - `final` classes, `sealed` where a set of records is closed, no global mutable state, injected
   `now`/`random` and plain `Timer`s (no rxdart, no `DateTime.now()`, `Random()` or `Future.delayed`).
-- Every type that can hold a token, a session id or a URL with a query hides it in `toString`.
+- Every type that can hold a token, a session id or a URL with a query hides it in `toString`; log
+  lines go through the injected `DatabaseLogger` and never carry a token (T7).
 - `package:firebase_database_dart/...` imports in `lib`; the test helpers import each other by
   relative path (a `package:` URI cannot reach `test/`).
