@@ -127,10 +127,9 @@ The second run may wait about 7.5 seconds before it owns the SQLite file, if the
   - `integration_test/app_test.dart`: 4 of 4 pass.
   - `integration_test/disk_cache_test.dart` passes in both phases (write with the emulator up, then read with the
     emulator stopped and `START_OFFLINE=true`).
-- The child-event version, on the same VM at a later trunk: tests 1, 2 and 4 of `app_test.dart` passed. Test 3
-  (the order and the window of 10) failed in the test, not in the app: a tap on Push takes the focus from the note
-  field and closes its text input connection, and the next `enterText` into the same field was dropped. The tests
-  now tap the field before typing (`typeInto` in `integration_test/helpers.dart`) and scroll to the oldest row
-  before checking it. The fixed test has not run yet.
+- The child-event version, on the same VM at a later trunk: `app_test.dart` passes 4 of 4 (connect and the empty
+  list; push, edit and delete through the UI; the order kept and the oldest leaving the window of 10; both counters,
+  presence and a note pushed offline). `disk_cache_test.dart` passed with the earlier `onValue` version and has not
+  been rerun with this one.
 - Not run: a release build, the app against a production project, the window drawn on a screen (the tests ran
   over SSH).
