@@ -188,7 +188,7 @@ final class _StoreOpener {
           }
           _disposeQuietly(db);
           handedOver = true;
-          return _quarantine(
+          return await _quarantine(
             kind == _FileKind.newer
                 ? 'it was written by a newer version'
                 : 'it is damaged',
@@ -197,7 +197,7 @@ final class _StoreOpener {
         case _FileKind.foreign:
           _disposeQuietly(db);
           handedOver = true;
-          return _quarantine(
+          return await _quarantine(
             'it is not a Realtime Database cache',
             afterMoveAside: afterMoveAside,
           );
@@ -230,7 +230,10 @@ final class _StoreOpener {
           lease.release(db);
           _disposeQuietly(db);
           handedOver = true;
-          return _quarantine('it is damaged', afterMoveAside: afterMoveAside);
+          return await _quarantine(
+            'it is damaged',
+            afterMoveAside: afterMoveAside,
+          );
         case LeaseAcquired():
           break;
       }
