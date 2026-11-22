@@ -112,6 +112,7 @@ Paths are under `lib/src/`. Android paths are relative to `com/google/firebase/d
 | `core/persistence/noop_persistence_manager.dart` | SYNC | - | core/persistence/NoopPersistenceManager | compound_write, path, persistence_manager, child_key, node, user_write_record, cache_node, query_spec, write_id |
 | `core/persistence/persistence_storage_engine.dart` | PERSIST | - | core/persistence/PersistenceStorageEngine | compound_write, path, prune_forest, tracked_query, child_key, node, user_write_record, write_id |
 | `core/persistence/persistence_storage_engine_opener.dart` | PERSIST | - | core/Platform.createPersistenceManager | persistence_storage_engine, logger |
+| `core/persistence/database_persistence.dart` | PERSIST | - | core/DatabaseConfig (persistence, cache size) | persistence_storage_engine_opener |
 | `core/persistence/tracked_query.dart` | PERSIST | - | core/persistence/TrackedQuery | query_spec |
 | `core/persistence/prune_forest.dart` | PERSIST | - | core/persistence/PruneForest | path, child_key, immutable_tree |
 | `core/persistence/cache_policy.dart` | PERSIST | - | core/persistence/CachePolicy | - |
@@ -129,14 +130,29 @@ Paths are under `lib/src/`. Android paths are relative to `com/google/firebase/d
 | `core/callback_event_registration.dart` | REPO | api/Reference_impl.ts Value/ChildEventRegistration | core/ValueEventRegistration, ChildEventRegistration | database_error, event_registration, change, event, query_spec |
 | `testing/fake_server_actions.dart` | FROZEN (real) | - | - | listen_hash_provider, listen_spec, server_actions, wire_range_merge |
 | `testing/recording_server_actions_delegate.dart` | FROZEN (real) | - | - | server_actions, wire_range_merge |
-| `testing/in_memory_persistence_storage_engine.dart` | FROZEN (real) | - | testUtil MockPersistenceStorageEngine | compound_write, path, persistence_storage_engine, prune_forest, tracked_query, child_key, children_node, priority_index, node, user_write_record, node_size_estimator, write_id |
+| `testing/in_memory_persistence_storage_engine.dart` | FROZEN (real) | - | testUtil MockPersistenceStorageEngine | compound_write, path, persistence_storage_engine, prune_forest, tracked_query, child_key, children_node, priority_index, node, user_write_record, logger, node_size_estimator, write_id |
+| `api/firebase_database.dart` | API | api/Database.ts | FirebaseDatabase | logger, database_persistence (core), database_reference |
+| `api/query.dart` | API | api/Reference_impl.ts (QueryImpl) | Query | data_snapshot, database_event, database_event_type, database_reference, firebase_database, query_spec |
+| `api/database_reference.dart` | API | api/Reference_impl.ts (ReferenceImpl) | DatabaseReference | firebase_database, on_disconnect, query, transaction_handler, transaction_result |
+| `api/data_snapshot.dart` | API | api/Reference_impl.ts (DataSnapshot) | DataSnapshot | database_reference, index, node |
+| `api/database_event.dart` | API | api/Reference_impl.ts (callbacks) | ChildEventListener, ValueEventListener | data_snapshot, database_event_type |
+| `api/database_event_type.dart` | API (real) | api/Reference_impl.ts (EventType) | core/view/Event.EventType | - |
+| `api/transaction.dart` | API (real) | api/Reference_impl.ts (runTransaction) | Transaction (Result) | - |
+| `api/transaction_handler.dart` | API (real) | api/Reference_impl.ts (transactionUpdate) | Transaction.Handler | database_reference, transaction |
+| `api/transaction_result.dart` | API (real) | api/Reference_impl.ts (TransactionResult) | Transaction.Handler.onComplete | data_snapshot |
+| `api/on_disconnect.dart` | API | api/OnDisconnect.ts | OnDisconnect | database_reference |
+| `api/server_value.dart` | API (real) | api/ServerValue.ts | ServerValue | - |
+| `api/firebase_database_exception.dart` | API (real) | core/util/util.ts errorForServerCode | DatabaseError, DatabaseException | database_error |
+| `api/fake_database_server.dart` | API (testing.dart) | - | - | - |
+| `api/fake_database.dart` | API (testing.dart) | - | - | logger, database_persistence (core), fake_database_server, firebase_database |
 
-`lib/firebase_database_dart.dart` is a placeholder library (no exports); the public API is a later contract.
+`lib/firebase_database_dart.dart` exports the public API of contract `14_api_contract.md` sections 1 to 6 (files
+owned by API above); `lib/testing.dart` exports section 7.1 and `lib/storage_engine.dart` section 7.2 (the core
+persistence types, `databasePersistence` and the opener types, plus `InMemoryPersistenceStorageEngine`). `test/api/public_surface_test.dart` pins every public
+signature at analysis time.
 
 Not here on purpose: `lib/src/realtime/*`, `PersistentConnection`, `ConnectionTarget`, `RealtimeTokenSource`, the REST
-client (connection team); the public API
-(`FirebaseDatabase`, `DatabaseReference`, `Query`, `DataSnapshot`, event streams, `OnDisconnect`, `ServerValue`);
-`io.dart` with the SQLite engine factory.
+client (connection team); the SQLite engine (separate package `firebase_database_dart_sqlite`).
 
 ## Places where JS and Android disagree and which one the signature follows
 

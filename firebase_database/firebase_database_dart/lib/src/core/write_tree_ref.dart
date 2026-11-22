@@ -13,7 +13,7 @@ import 'package:firebase_database_dart/src/core/write_tree.dart';
 
 /// [writeTree] at [treePath]: each method is the [WriteTree] method with the path filled in.
 final class WriteTreeRef {
-  /// Creates a reference.
+  /// Creates a reference. Android: `WriteTreeRef(Path, WriteTree)`.
   const WriteTreeRef(this.treePath, this.writeTree);
 
   /// The path.
@@ -22,39 +22,60 @@ final class WriteTreeRef {
   /// The tree.
   final WriteTree writeTree;
 
-  /// See [WriteTree.calcCompleteEventCache].
+  /// See [WriteTree.calcCompleteEventCache]. Android: `WriteTreeRef.calcCompleteEventCache`.
   Node? calcCompleteEventCache(
     Node? completeServerCache, {
     List<WriteId> writeIdsToExclude = const <WriteId>[],
     bool includeHiddenWrites = false,
-  }) => throw UnimplementedError();
+  }) => writeTree.calcCompleteEventCache(
+    treePath,
+    completeServerCache,
+    writeIdsToExclude: writeIdsToExclude,
+    includeHiddenWrites: includeHiddenWrites,
+  );
 
-  /// See [WriteTree.calcCompleteEventChildren].
+  /// See [WriteTree.calcCompleteEventChildren]. Android:
+  /// `WriteTreeRef.calcCompleteEventChildren`.
   Node calcCompleteEventChildren(Node completeServerChildren) =>
-      throw UnimplementedError();
+      writeTree.calcCompleteEventChildren(treePath, completeServerChildren);
 
-  /// See [WriteTree.calcEventCacheAfterServerOverwrite].
+  /// See [WriteTree.calcEventCacheAfterServerOverwrite]. Android:
+  /// `WriteTreeRef.calcEventCacheAfterServerOverwrite`.
   Node? calcEventCacheAfterServerOverwrite(
     Path path,
     Node? existingEventSnap,
     Node? existingServerSnap,
-  ) => throw UnimplementedError();
+  ) => writeTree.calcEventCacheAfterServerOverwrite(
+    treePath,
+    path,
+    existingEventSnap,
+    existingServerSnap,
+  );
 
-  /// See [WriteTree.shadowingWrite].
-  Node? shadowingWrite(Path path) => throw UnimplementedError();
+  /// See [WriteTree.shadowingWrite]; [path] is relative to [treePath]. Android:
+  /// `WriteTreeRef.shadowingWrite`.
+  Node? shadowingWrite(Path path) =>
+      writeTree.shadowingWrite(treePath.childPath(path));
 
-  /// See [WriteTree.calcNextNodeAfterPost].
+  /// See [WriteTree.calcNextNodeAfterPost]. Android: `WriteTreeRef.calcNextNodeAfterPost`.
   NamedNode? calcNextNodeAfterPost(
     Node completeServerData,
     NamedNode startPost,
     Index index, {
     required bool reverse,
-  }) => throw UnimplementedError();
+  }) => writeTree.calcNextNodeAfterPost(
+    treePath,
+    completeServerData,
+    startPost,
+    index,
+    reverse: reverse,
+  );
 
-  /// See [WriteTree.calcCompleteChild].
+  /// See [WriteTree.calcCompleteChild]. Android: `WriteTreeRef.calcCompleteChild`.
   Node? calcCompleteChild(ChildKey childKey, CacheNode existingServerCache) =>
-      throw UnimplementedError();
+      writeTree.calcCompleteChild(treePath, childKey, existingServerCache);
 
-  /// The reference at child [childKey].
-  WriteTreeRef child(ChildKey childKey) => throw UnimplementedError();
+  /// The reference at child [childKey]. Android: `WriteTreeRef.child`.
+  WriteTreeRef child(ChildKey childKey) =>
+      WriteTreeRef(treePath.child(childKey), writeTree);
 }

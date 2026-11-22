@@ -7,9 +7,17 @@ final class ListenComplete extends Operation {
   /// Creates the operation.
   const ListenComplete(super.source, super.path);
 
+  /// The same listen complete one level down (still at the root when [path] is empty).
+  /// Android: `ListenComplete.operationForChild`.
   @override
-  Operation? operationForChild(ChildKey key) => throw UnimplementedError();
+  Operation? operationForChild(ChildKey key) {
+    if (path.isEmpty) {
+      return ListenComplete(source, Path.empty);
+    }
+    return ListenComplete(source, path.popFront());
+  }
 
+  /// Android: `ListenComplete.toString`.
   @override
-  String toString() => throw UnimplementedError();
+  String toString() => 'ListenComplete { path=$path, source=$source }';
 }

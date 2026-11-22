@@ -1,8 +1,9 @@
 /// How the client opens a storage engine. JS: none; Android: `core/Platform.java`
 /// (`createPersistenceManager`), `android/AndroidPlatform.java` (one cache per app and database).
 ///
-/// No I/O library is imported here: a VM engine (SQLite) lives behind `package:firebase_database_dart/io.dart`
-/// and only its opener is passed in.
+/// No I/O library is imported here: a VM engine (SQLite) lives in its own package and only its
+/// opener reaches the client, wrapped with the cache size in a `DatabasePersistence`
+/// (database_persistence.dart); the opener does not carry the cache size.
 library;
 
 import 'package:firebase_database_dart/src/core/persistence/persistence_storage_engine.dart';

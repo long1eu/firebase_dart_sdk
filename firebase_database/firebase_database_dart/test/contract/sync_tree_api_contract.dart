@@ -204,6 +204,10 @@ void runSyncTreeApiContract(
       ),
       hasLength(1),
     );
+    // The server pushes the written data to the listen before it answers ok (measured), and the
+    // ack re-applies the server cache (JS ViewProcessor.ts:670-704): without the push the view
+    // would fall back to the old value.
+    expect(values(tree.applyServerOverwrite(Path('/a'), two)), isEmpty);
     expect(
       values(
         tree.ackUserWrite(

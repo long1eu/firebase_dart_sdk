@@ -35,9 +35,12 @@ final class OperationSource {
   /// Whether it is for one tagged query.
   final bool tagged;
 
-  /// Whether the server sent it.
-  bool get fromServer => throw UnimplementedError();
+  /// Whether the server sent it. Android: `OperationSource.isFromServer`.
+  bool get fromServer => !fromUser;
 
+  /// Android: `OperationSource.toString`.
   @override
-  String toString() => throw UnimplementedError();
+  String toString() =>
+      'OperationSource{source=${fromUser ? 'User' : 'Server'}, '
+      'queryParams=$queryParams, tagged=$tagged}';
 }

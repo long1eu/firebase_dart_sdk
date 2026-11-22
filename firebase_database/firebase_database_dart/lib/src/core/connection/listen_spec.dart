@@ -51,12 +51,19 @@ final class ListenSpec {
   /// client. Unmodifiable.
   final Map<String, String> restParams;
 
+  // Identity is path + queryIdentifier, as JS `PersistentConnection.listens_` keys its table
+  // (`pathString` -> `queryId`). Android's `PersistentConnectionImpl.QuerySpec` compares the path
+  // and the query params map instead; queryIdentifier is the canonical JSON of that map.
   @override
-  bool operator ==(Object other) => throw UnimplementedError();
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ListenSpec &&
+          other.path == path &&
+          other.queryIdentifier == queryIdentifier;
 
   @override
-  int get hashCode => throw UnimplementedError();
+  int get hashCode => Object.hash(path, queryIdentifier);
 
   @override
-  String toString() => throw UnimplementedError();
+  String toString() => '$path (params: $queryIdentifier)';
 }

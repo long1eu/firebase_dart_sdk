@@ -31,20 +31,47 @@ final class TrackedQuery {
   final bool active;
 
   /// With [lastUse].
-  TrackedQuery withLastUse(int lastUse) => throw UnimplementedError();
+  TrackedQuery withLastUse(int lastUse) => TrackedQuery(
+    id: id,
+    querySpec: querySpec,
+    lastUse: lastUse,
+    complete: complete,
+    active: active,
+  );
 
   /// Marked complete.
-  TrackedQuery withComplete() => throw UnimplementedError();
+  TrackedQuery withComplete() => TrackedQuery(
+    id: id,
+    querySpec: querySpec,
+    lastUse: lastUse,
+    complete: true,
+    active: active,
+  );
 
   /// With [active].
-  TrackedQuery withActiveState(bool active) => throw UnimplementedError();
+  TrackedQuery withActiveState(bool active) => TrackedQuery(
+    id: id,
+    querySpec: querySpec,
+    lastUse: lastUse,
+    complete: complete,
+    active: active,
+  );
 
   @override
-  bool operator ==(Object other) => throw UnimplementedError();
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is TrackedQuery &&
+          other.id == id &&
+          other.querySpec == querySpec &&
+          other.lastUse == lastUse &&
+          other.complete == complete &&
+          other.active == active;
 
   @override
-  int get hashCode => throw UnimplementedError();
+  int get hashCode => Object.hash(id, querySpec, lastUse, complete, active);
 
   @override
-  String toString() => throw UnimplementedError();
+  String toString() =>
+      'TrackedQuery{id=$id, querySpec=$querySpec, lastUse=$lastUse, '
+      'complete=$complete, active=$active}';
 }

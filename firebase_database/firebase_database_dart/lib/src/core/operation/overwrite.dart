@@ -10,9 +10,18 @@ final class Overwrite extends Operation {
   /// The new data.
   final Node snapshot;
 
+  /// At the root, the child [key] of [snapshot]; else the same overwrite one level down.
+  /// Android: `Overwrite.operationForChild`.
   @override
-  Operation? operationForChild(ChildKey key) => throw UnimplementedError();
+  Operation? operationForChild(ChildKey key) {
+    if (path.isEmpty) {
+      return Overwrite(source, Path.empty, snapshot.getImmediateChild(key));
+    }
+    return Overwrite(source, path.popFront(), snapshot);
+  }
 
+  /// Android: `Overwrite.toString`.
   @override
-  String toString() => throw UnimplementedError();
+  String toString() =>
+      'Overwrite { path=$path, source=$source, snapshot=$snapshot }';
 }
