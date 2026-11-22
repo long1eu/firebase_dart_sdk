@@ -5,6 +5,10 @@
 /// `WebSocket.fromUpgradedSocket` with compression off (T5) and no `pingInterval` (liveness is the
 /// protocol's ping, `rtdb_protocol.md` 3.4). The bytes of one message are counted on the detached
 /// socket and the channel closes past `maxMessageBytes` (T9).
+///
+/// A `wss` attempt goes through the HTTP proxy that the environment names for it, as
+/// `HttpClient.findProxyFromEnvironment` reads it (`HTTPS_PROXY`, `NO_PROXY` and their lower-case
+/// forms); a loopback target and every `ws` target are always direct (see [ioWsConnector]).
 library;
 
 import 'dart:async';
@@ -28,27 +32,39 @@ WsConnector createWsConnector({required int maxMessageBytes}) =>
 
 /// A connector over `dart:io`.
 ///
-/// [httpClient] is used for the upgrade when given (for a proxy through `HttpClient.findProxy`;
-/// none is read from the environment, threat model T4); otherwise a new one is created per attempt,
-/// with [upgradeTimeout] as its `connectionTimeout`, and closed after it. No
-/// `badCertificateCallback` is ever set.
+/// [httpClient] is used for the upgrade when given, with its own `findProxy` (a new `HttpClient`
+/// reads the environment); otherwise a new one is created per attempt, with [upgradeTimeout] as
+/// its `connectionTimeout`, and closed after it. No `badCertificateCallback` is ever set.
 ///
-/// An attempt that has no open channel after [upgradeTimeout] (TCP, TLS and the upgrade answer
-/// together), or whose `abort` future completes first, aborts its pending request, closes a client
-/// of its own with force and fails with [WsConnectFailure.other]: a server that accepts and stays
-/// silent leaves no socket behind (review M2), with one limit of dart:io: an attempt that stalls
-/// inside the TLS handshake keeps its socket until the peer or the OS closes it, because dart:io
-/// offers no handle before the handshake completes (`SecureSocket.secure` detaches the socket,
-/// after which `Socket.destroy` is a no-op); the socket is destroyed as soon as the handshake ends.
+/// Proxy, for a client of its own: a `wss` target uses the proxy that
+/// `HttpClient.findProxyFromEnvironment` finds in [environment] (null: the process environment),
+/// that is `https_proxy` or `HTTPS_PROXY` unless `no_proxy` or `NO_PROXY` lists a suffix of the
+/// host. A proxy URL may hold `user:password@`, sent as `Proxy-Authorization: Basic` on the
+/// CONNECT. Always direct: a loopback target (`localhost` or a loopback IP literal), and every
+/// `ws` target, because plain text is only ever the emulator (`RealtimeTarget` refuses it for any
+/// other database) and a proxy would read its frames. Through a proxy, `HttpClient` sends
+/// `CONNECT host:port` and runs TLS over the tunnel; the upgrade request, its headers and every
+/// frame travel inside that TLS. [environment] exists for tests.
+///
+/// An attempt that has no open channel after [upgradeTimeout] (TCP, CONNECT, TLS and the upgrade
+/// answer together), or whose `abort` future completes first, aborts its pending request, closes
+/// a client of its own with force and fails with [WsConnectFailure.other]: a server or a proxy
+/// that accepts and stays silent leaves no socket behind (review M2), with one limit of dart:io: an
+/// attempt that stalls inside the TLS handshake keeps its socket until the peer or the OS closes
+/// it, because dart:io offers no handle before the handshake completes (`SecureSocket.secure`
+/// detaches the socket, after which `Socket.destroy` is a no-op); the socket is destroyed as soon
+/// as the handshake ends. Through a proxy the same holds for the TLS handshake inside the tunnel.
 WsConnector ioWsConnector({
   HttpClient? httpClient,
   required int maxMessageBytes,
   Duration upgradeTimeout = const Duration(seconds: 30),
+  Map<String, String>? environment,
 }) {
   final _IoConnector connector = _IoConnector(
     httpClient,
     maxMessageBytes,
     upgradeTimeout,
+    environment,
   );
   return (
     Uri url, {
@@ -65,11 +81,17 @@ String _expectedAccept(String key) =>
     base64Encode(sha1.convert(ascii.encode('$key$_acceptGuid')).bytes);
 
 final class _IoConnector {
-  _IoConnector(this._httpClient, this._maxMessageBytes, this._upgradeTimeout);
+  _IoConnector(
+    this._httpClient,
+    this._maxMessageBytes,
+    this._upgradeTimeout,
+    this._environment,
+  );
 
   final HttpClient? _httpClient;
   final int _maxMessageBytes;
   final Duration _upgradeTimeout;
+  final Map<String, String>? _environment;
 
   Future<WsChannel> connect(
     Uri url,
@@ -91,10 +113,14 @@ final class _IoConnector {
         'a URL with user info is refused',
       );
     }
+    final Uri httpUrl = url.replace(scheme: httpScheme);
     final HttpClient? shared = _httpClient;
     final _UpgradeAttempt attempt = shared != null
         ? _UpgradeAttempt.shared(shared)
-        : _UpgradeAttempt.owned(_upgradeTimeout);
+        : _UpgradeAttempt.owned(
+            _upgradeTimeout,
+            _proxyRoute(httpUrl, _environment),
+          );
     final Timer timer = Timer(
       _upgradeTimeout,
       () => attempt.stop('the WebSocket upgrade timed out'),
@@ -107,7 +133,7 @@ final class _IoConnector {
       // A shared client may keep connecting until its own connectionTimeout: the attempt fails at
       // once when stopped, and a request that opens later is dropped by `upgrade`.
       final Socket socket = await Future.any(<Future<Socket>>[
-        attempt.upgrade(url.replace(scheme: httpScheme), headers),
+        attempt.upgrade(httpUrl, headers),
         attempt.whenStopped,
       ]);
       final _MeteredSocket metered = _MeteredSocket(socket, _maxMessageBytes);
@@ -118,7 +144,10 @@ final class _IoConnector {
       );
       return IoWsChannel._(webSocket, _maxMessageBytes, metered);
     } on Object catch (e) {
-      final WsConnectException? failure = attempt.stopped ?? _connectFailure(e);
+      final WsConnectException? failure =
+          attempt.stopped ??
+          _tunnelRefused(e, attempt.proxy) ??
+          _connectFailure(e);
       if (failure == null) {
         rethrow;
       }
@@ -148,30 +177,106 @@ WsConnectException? _connectFailure(Object e) => switch (e) {
   _ => null,
 };
 
+/// The proxy of one `wss` attempt: its `host:port` for messages (never the credentials) and the
+/// configuration string for `HttpClient.findProxy`.
+typedef _ProxyRoute = ({String address, String configuration});
+
+/// The proxy that the environment names for [httpUrl], or null for a direct connection: always
+/// null for `http` (a `ws` target) and for a loopback host (see [ioWsConnector]).
+///
+/// Throws [WsConnectException] for a proxy setting that `HttpClient` would refuse, with a message
+/// that does not repeat the setting (it may hold a password).
+_ProxyRoute? _proxyRoute(Uri httpUrl, Map<String, String>? environment) {
+  if (httpUrl.scheme != 'https' || _isLoopback(httpUrl.host)) {
+    return null;
+  }
+  final String configuration = HttpClient.findProxyFromEnvironment(
+    httpUrl,
+    environment: environment,
+  );
+  const String prefix = 'PROXY ';
+  if (!configuration.startsWith(prefix)) {
+    return null;
+  }
+  // `PROXY [user:password@]host:port`, checked as `HttpClient` parses it (_ProxyConfiguration).
+  final String proxy = configuration.substring(prefix.length).trim();
+  final int at = proxy.lastIndexOf('@');
+  final String userInfo = at == -1 ? '' : proxy.substring(0, at).trim();
+  final int userColon = userInfo.indexOf(':');
+  final String address = proxy.substring(at + 1).trim();
+  final int colon = address.lastIndexOf(':');
+  final bool valid =
+      (at == -1 || (userColon > 0 && userColon < userInfo.length - 1)) &&
+      colon > 0 &&
+      int.tryParse(address.substring(colon + 1).trim()) != null;
+  if (!valid) {
+    throw const WsConnectException(
+      WsConnectFailure.other,
+      'the proxy in HTTPS_PROXY (or https_proxy) is not valid: '
+      'use http://host:port or http://user:password@host:port',
+    );
+  }
+  return (address: address, configuration: configuration);
+}
+
+/// Whether [host] is `localhost` or a loopback IP literal (`127.0.0.0/8`, `::1`).
+bool _isLoopback(String host) {
+  final String name = host.toLowerCase();
+  return name == 'localhost' ||
+      (InternetAddress.tryParse(name)?.isLoopback ?? false);
+}
+
+/// The failure of a proxy that answered CONNECT with another status than 200, or null when [e] is
+/// not that. `HttpClient` reports it as an [HttpException] whose message starts with
+/// `Proxy failed to establish tunnel (<status> <reason>)`.
+WsConnectException? _tunnelRefused(Object e, _ProxyRoute? proxy) {
+  if (proxy == null || e is! HttpException) {
+    return null;
+  }
+  final Match? match = RegExp(
+    r'^Proxy failed to establish tunnel \((\d{3})',
+  ).firstMatch(e.message);
+  if (match == null) {
+    return null;
+  }
+  return WsConnectException(
+    WsConnectFailure.other,
+    'the proxy ${proxy.address} answered CONNECT with HTTP ${match.group(1)}: check the proxy '
+    'address and credentials in HTTPS_PROXY (or https_proxy), or list the host in NO_PROXY',
+    cause: e,
+  );
+}
+
 /// One upgrade in flight: its client and pending request, and whether it was stopped (review M2).
 ///
-/// With a client of its own, the attempt opens the TCP socket and runs the TLS handshake itself
-/// (through `HttpClient.connectionFactory`), so a stop cancels the TCP connect, destroys the socket
-/// while it waits for TLS or for the upgrade answer, and destroys a socket whose handshake ends
-/// after the stop. Inside the handshake itself dart:io gives no handle (see [ioWsConnector]). With
-/// a shared client it can only abort the request once `openUrl` has returned one; the client's
-/// own `connectionTimeout` bounds the rest.
+/// With a client of its own, the attempt opens the TCP socket (to the target or to the proxy) and,
+/// when direct, runs the TLS handshake itself (through `HttpClient.connectionFactory`), so a stop
+/// cancels the TCP connect, destroys the socket while it waits for TLS, for the proxy's CONNECT
+/// answer or for the upgrade answer, and destroys a socket whose direct handshake ends after the
+/// stop. Inside a handshake dart:io gives no handle (see [ioWsConnector]). With a shared client it
+/// can only abort the request once `openUrl` has returned one; the client's own
+/// `connectionTimeout` bounds the rest.
 final class _UpgradeAttempt {
   _UpgradeAttempt.shared(HttpClient client)
     : _client = client,
-      _ownsClient = false;
+      _ownsClient = false,
+      proxy = null;
 
-  _UpgradeAttempt.owned(Duration timeout)
+  _UpgradeAttempt.owned(Duration timeout, this.proxy)
     : _client = HttpClient(),
       _ownsClient = true {
+    final String route = proxy?.configuration ?? 'DIRECT';
     _client
       ..connectionTimeout = timeout
-      ..findProxy = ((Uri _) => 'DIRECT')
+      ..findProxy = ((Uri _) => route)
       ..connectionFactory = _connectSocket;
   }
 
   final HttpClient _client;
   final bool _ownsClient;
+
+  /// The proxy of a client of its own, or null when the attempt is direct or the client shared.
+  final _ProxyRoute? proxy;
   final List<ConnectionTask<Socket>> _tcpTasks = <ConnectionTask<Socket>>[];
   final List<Socket> _rawSockets = <Socket>[];
   HttpClientRequest? _request;
@@ -184,47 +289,60 @@ final class _UpgradeAttempt {
   /// The failure of a stopped attempt (timed out or aborted), or null while it runs.
   WsConnectException? stopped;
 
-  /// The connection factory of a client of its own: a TCP connect, then TLS for `https`, with the
-  /// raw socket kept for [stop] (until TLS takes it over, see [ioWsConnector]). The client is direct,
-  /// so there is never a proxy.
+  /// The connection factory of a client of its own: a TCP connect, then TLS for a direct `https`
+  /// target, with the raw socket kept for [stop] (until TLS takes it over, see [ioWsConnector]).
+  ///
+  /// With [proxyHost] and [proxyPort] (only for the [proxy] of this attempt) it connects to the
+  /// proxy and returns the plain socket: `HttpClient` sends CONNECT on it and runs TLS over the
+  /// tunnel itself.
   Future<ConnectionTask<Socket>> _connectSocket(
     Uri url,
     String? proxyHost,
     int? proxyPort,
   ) async {
-    final ConnectionTask<Socket> tcp = await Socket.startConnect(
-      url.host,
-      url.port,
-    );
+    final ConnectionTask<Socket> tcp = switch ((proxyHost, proxyPort)) {
+      (final String host, final int port) => await Socket.startConnect(
+        host,
+        port,
+      ),
+      _ => await Socket.startConnect(url.host, url.port),
+    };
+    final bool viaProxy = proxyHost != null;
+    final _ProxyRoute? route = proxy;
     _tcpTasks.add(tcp);
     if (stopped != null) {
       tcp.cancel();
     }
-    final Future<Socket> connected = tcp.socket.then((Socket raw) {
-      _rawSockets.add(raw);
-      final WsConnectException? stoppedMeanwhile = stopped;
-      if (stoppedMeanwhile != null) {
-        raw.destroy();
-        throw stoppedMeanwhile;
-      }
-      if (url.scheme != 'https') {
-        return raw;
-      }
-      // After this call `raw.destroy()` does nothing: dart:io moves the native socket into the
-      // RawSecureSocket it builds and returns no handle before the handshake ends. So a socket
-      // stalled in the handshake can only be dropped when the handshake completes or fails.
-      return SecureSocket.secure(raw, host: url.host).then((
-        SecureSocket secured,
-      ) {
-        _rawSockets.add(secured);
-        final WsConnectException? stoppedLate = stopped;
-        if (stoppedLate != null) {
-          secured.destroy();
-          throw stoppedLate;
+    final Future<Socket> connected = tcp.socket.then(
+      (Socket raw) {
+        _rawSockets.add(raw);
+        final WsConnectException? stoppedMeanwhile = stopped;
+        if (stoppedMeanwhile != null) {
+          raw.destroy();
+          throw stoppedMeanwhile;
         }
-        return secured;
-      });
-    });
+        if (viaProxy || url.scheme != 'https') {
+          return raw;
+        }
+        // After this call `raw.destroy()` does nothing: dart:io moves the native socket into the
+        // RawSecureSocket it builds and returns no handle before the handshake ends. So a socket
+        // stalled in the handshake can only be dropped when the handshake completes or fails.
+        return SecureSocket.secure(raw, host: url.host).then((
+          SecureSocket secured,
+        ) {
+          _rawSockets.add(secured);
+          final WsConnectException? stoppedLate = stopped;
+          if (stoppedLate != null) {
+            secured.destroy();
+            throw stoppedLate;
+          }
+          return secured;
+        });
+      },
+      onError: viaProxy && route != null
+          ? (Object e, StackTrace s) => _proxyUnreachable(e, s, route)
+          : null,
+    );
     return ConnectionTask.fromSocket(connected, _dropSockets);
   }
 
@@ -338,6 +456,20 @@ String? _upgradeProblem(HttpHeaders headers, String key) {
     return 'the upgrade answer selects an extension that was not offered';
   }
   return null;
+}
+
+/// Rethrows [e], an error of the TCP connect to [proxy], with the proxy named in the message.
+Never _proxyUnreachable(Object e, StackTrace stackTrace, _ProxyRoute proxy) {
+  if (e is! SocketException) {
+    Error.throwWithStackTrace(e, stackTrace);
+  }
+  final WsConnectException failure = _socketFailure(e);
+  throw WsConnectException(
+    failure.kind,
+    '${failure.message} (the proxy ${proxy.address}): check HTTPS_PROXY (or https_proxy), '
+    'or list the host in NO_PROXY',
+    cause: e,
+  );
 }
 
 /// The connect failure of a [SocketException], without its address in the message.

@@ -6,6 +6,7 @@ library;
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:crypto/crypto.dart';
 import 'package:firebase_database_dart/src/realtime/transport/ws_channel.dart';
@@ -615,6 +616,255 @@ void main() {
     },
     skip: _hasOpenssl() ? false : 'needs openssl to make a certificate',
   );
+
+  group('through an HTTP proxy from the environment', () {
+    Future<_FakeProxy> startProxy({
+      String? answer = 'HTTP/1.1 200 Connection established\r\n\r\n',
+      int? upstreamPort,
+    }) async {
+      final _FakeProxy proxy = await _FakeProxy.start(
+        answer: answer,
+        upstreamPort: upstreamPort,
+      );
+      addTearDown(proxy.close);
+      return proxy;
+    }
+
+    Matcher failsAs(String message) => throwsA(
+      isA<WsConnectException>()
+          .having(
+            (WsConnectException e) => e.kind,
+            'kind',
+            WsConnectFailure.other,
+          )
+          .having((WsConnectException e) => e.message, 'message', message),
+    );
+
+    test(
+      'a wss target is reached through CONNECT; the proxy sees no token',
+      () async {
+        final Directory directory = Directory.systemTemp.createTempSync(
+          'rtdb_proxy_tls_',
+        );
+        addTearDown(() => directory.deleteSync(recursive: true));
+        final String certificate = '${directory.path}/cert.pem';
+        final String key = '${directory.path}/key.pem';
+        final ProcessResult made = Process.runSync('openssl', <String>[
+          'req', '-x509', '-newkey', 'rsa:2048', '-nodes', '-days', '2', //
+          '-keyout', key, '-out', certificate, '-subj', '/CN=db.example.test',
+          '-addext', 'subjectAltName=DNS:db.example.test',
+          '-addext', 'extendedKeyUsage=serverAuth',
+        ]);
+        expect(made.exitCode, 0, reason: '${made.stderr}');
+        // Only this name is trusted, and only in this test isolate.
+        SecurityContext.defaultContext.setTrustedCertificates(certificate);
+        final HttpServer server = await HttpServer.bindSecure(
+          InternetAddress.loopbackIPv4,
+          0,
+          SecurityContext()
+            ..useCertificateChain(certificate)
+            ..usePrivateKey(key),
+        );
+        addTearDown(() => server.close(force: true));
+        final List<HttpHeaders> requests = <HttpHeaders>[];
+        server.listen((HttpRequest request) async {
+          requests.add(request.headers);
+          final WebSocket socket = await WebSocketTransformer.upgrade(request);
+          socket.listen((Object? message) => socket.add('echo:$message'));
+        });
+        final _FakeProxy proxy = await startProxy(upstreamPort: server.port);
+
+        final WsChannel channel =
+            await ioWsConnector(
+              maxMessageBytes: 1000,
+              environment: <String, String>{'HTTPS_PROXY': proxy.url},
+            )(
+              Uri.parse('wss://db.example.test/.ws?v=5&ls=secret-ls'),
+              headers: <String, String>{'X-Firebase-AppCheck': 'secret-ac'},
+            );
+        final StreamIterator<WsEvent> events = StreamIterator<WsEvent>(
+          channel.events,
+        );
+        channel.sendText('{"t":"d"}');
+        expect(await events.moveNext(), isTrue);
+        expect((events.current as WsText).data, 'echo:{"t":"d"}');
+        await channel.close();
+        await events.cancel();
+
+        expect(requests.single.value('X-Firebase-AppCheck'), 'secret-ac');
+        final String head = proxy.heads.single;
+        expect(head, startsWith('CONNECT db.example.test:443 HTTP/1.1\r\n'));
+        for (final String secret in <String>['secret-ac', 'secret-ls', '.ws']) {
+          expect(head, isNot(contains(secret)));
+        }
+        // 0x16: a TLS handshake record. Nothing in clear text follows the CONNECT.
+        expect(proxy.tunnelled.first, 0x16);
+      },
+      skip: _hasOpenssl() ? false : 'needs openssl to make a certificate',
+    );
+
+    test('a ws target never uses the proxy, even with HTTP_PROXY', () async {
+      final _FakeProxy proxy = await startProxy();
+      final WsConnector connector = ioWsConnector(
+        maxMessageBytes: 1000,
+        upgradeTimeout: const Duration(milliseconds: 300),
+        environment: <String, String>{
+          'HTTP_PROXY': proxy.url,
+          'HTTPS_PROXY': proxy.url,
+        },
+      );
+      // 192.0.2.1 (TEST-NET-1) is not loopback and answers nothing: only the route matters.
+      await expectLater(
+        connector(Uri.parse('ws://192.0.2.1:9/.ws')),
+        throwsA(isA<WsConnectException>()),
+      );
+      expect(proxy.accepted, 0);
+    });
+
+    test('a host matched by NO_PROXY goes direct', () async {
+      final _FakeProxy proxy = await startProxy();
+      final WsConnector connector = ioWsConnector(
+        maxMessageBytes: 1000,
+        upgradeTimeout: const Duration(milliseconds: 300),
+        environment: <String, String>{
+          'HTTPS_PROXY': proxy.url,
+          'NO_PROXY': 'localhost,192.0.2.1',
+        },
+      );
+      await expectLater(
+        connector(Uri.parse('wss://192.0.2.1:9/.ws')),
+        throwsA(isA<WsConnectException>()),
+      );
+      expect(proxy.accepted, 0);
+    });
+
+    test('a loopback target goes direct without NO_PROXY', () async {
+      final _FakeProxy proxy = await startProxy();
+      int direct = 0;
+      final ServerSocket listener = await ServerSocket.bind(
+        InternetAddress.loopbackIPv4,
+        0,
+      );
+      addTearDown(listener.close);
+      listener.listen((Socket socket) {
+        direct++;
+        socket.destroy();
+      });
+      final WsConnector connector = ioWsConnector(
+        maxMessageBytes: 1000,
+        environment: <String, String>{'https_proxy': proxy.url},
+      );
+      for (final String host in <String>['127.0.0.1', 'LOCALHOST']) {
+        await expectLater(
+          connector(Uri.parse('wss://$host:${listener.port}/.ws')),
+          throwsA(isA<WsConnectException>()),
+        );
+      }
+      expect(proxy.accepted, 0);
+      expect(direct, 2);
+    });
+
+    for (final int status in <int>[407, 403, 502]) {
+      test(
+        'CONNECT answered with $status names the proxy, never its password',
+        () async {
+          final _FakeProxy proxy = await startProxy(
+            answer:
+                'HTTP/1.1 $status Refused\r\n'
+                '${status == 407 ? 'Proxy-Authenticate: Basic realm="corp"\r\n' : ''}'
+                'Content-Length: 0\r\n\r\n',
+          );
+          final WsConnector connector = ioWsConnector(
+            maxMessageBytes: 1000,
+            environment: <String, String>{
+              'HTTPS_PROXY': 'http://alice:s3cret@127.0.0.1:${proxy.port}',
+            },
+          );
+          try {
+            await connector(Uri.parse('wss://db.example.test/.ws'));
+            fail('connected through a proxy that refused CONNECT');
+          } on WsConnectException catch (e) {
+            expect(e.kind, WsConnectFailure.other);
+            expect(e.message, contains('the proxy 127.0.0.1:${proxy.port}'));
+            expect(e.message, contains('HTTP $status'));
+            expect(e.message, contains('HTTPS_PROXY'));
+            expect('$e', isNot(contains('s3cret')));
+            expect('$e', isNot(contains('alice')));
+          }
+          // The credentials of the proxy URL went to the proxy, as HttpClient sends them.
+          expect(
+            _headerValue(proxy.heads.single, 'proxy-authorization'),
+            'Basic ${base64Encode(utf8.encode('alice:s3cret'))}',
+          );
+        },
+      );
+    }
+
+    test('a proxy setting HttpClient would refuse fails before any socket, '
+        'without the password', () async {
+      final _FakeProxy proxy = await startProxy();
+      final WsConnector connector = ioWsConnector(
+        maxMessageBytes: 1000,
+        environment: <String, String>{
+          'HTTPS_PROXY': 'http://:s3cret@127.0.0.1:${proxy.port}',
+        },
+      );
+      try {
+        await connector(Uri.parse('wss://db.example.test/.ws'));
+        fail('connected with an invalid proxy setting');
+      } on WsConnectException catch (e) {
+        expect(e.message, contains('HTTPS_PROXY'));
+        expect('$e', isNot(contains('s3cret')));
+      }
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+      expect(proxy.accepted, 0);
+    });
+
+    test('20 attempts to a proxy that never answers CONNECT time out and close '
+        'their sockets (review M2)', () async {
+      final _FakeProxy proxy = await startProxy(answer: null);
+      final WsConnector bounded = ioWsConnector(
+        maxMessageBytes: 1000,
+        upgradeTimeout: const Duration(milliseconds: 100),
+        environment: <String, String>{'HTTPS_PROXY': proxy.url},
+      );
+      await Future.wait(<Future<void>>[
+        for (int i = 0; i < 20; i++)
+          expectLater(
+            bounded(Uri.parse('wss://db.example.test/.ws')),
+            failsAs('the WebSocket upgrade timed out'),
+          ),
+      ]);
+      await proxy.allClosed();
+      expect(proxy.accepted, 20);
+      expect(proxy.heads, hasLength(20));
+      expect(proxy.open, isEmpty);
+    });
+
+    test('20 attempts aborted while CONNECT is pending fail at once and close '
+        'their sockets (review M2)', () async {
+      final _FakeProxy proxy = await startProxy(answer: null);
+      final WsConnector slow = ioWsConnector(
+        maxMessageBytes: 1000,
+        environment: <String, String>{'HTTPS_PROXY': proxy.url},
+      );
+      final Stopwatch watch = Stopwatch()..start();
+      await Future.wait(<Future<void>>[
+        for (int i = 0; i < 20; i++)
+          expectLater(
+            slow(
+              Uri.parse('wss://db.example.test/.ws'),
+              abort: Future<void>.delayed(const Duration(milliseconds: 100)),
+            ),
+            failsAs('the connect attempt was aborted'),
+          ),
+      ]);
+      expect(watch.elapsed, lessThan(const Duration(seconds: 5)));
+      await proxy.allClosed();
+      expect(proxy.accepted, 20);
+      expect(proxy.open, isEmpty);
+    });
+  });
 }
 
 /// Whether `openssl` can be run; a missing program throws a [ProcessException] (there is no `which`
@@ -624,5 +874,139 @@ bool _hasOpenssl() {
     return Process.runSync('openssl', <String>['version']).exitCode == 0;
   } on ProcessException {
     return false;
+  }
+}
+
+/// The value of header [name] (lower case) in a request [head], or null.
+String? _headerValue(String head, String name) {
+  for (final String line in head.split('\r\n').skip(1)) {
+    final int colon = line.indexOf(':');
+    if (colon > 0 && line.substring(0, colon).toLowerCase() == name) {
+      return line.substring(colon + 1).trim();
+    }
+  }
+  return null;
+}
+
+/// A loopback HTTP proxy that speaks CONNECT. Each request head is kept in [heads]. The `answer`
+/// is written after the head; when it is a 200 the connection is then piped to `upstreamPort` on
+/// loopback, whatever host the CONNECT names, and the first bytes sent into the tunnel are kept in
+/// [tunnelled]. A null `answer` leaves the client waiting. [open] holds the client sockets the
+/// proxy has not yet seen closed.
+final class _FakeProxy {
+  _FakeProxy._(this._listener, this._answer, this._upstreamPort);
+
+  static Future<_FakeProxy> start({
+    String? answer = 'HTTP/1.1 200 Connection established\r\n\r\n',
+    int? upstreamPort,
+  }) async {
+    final _FakeProxy proxy = _FakeProxy._(
+      await ServerSocket.bind(InternetAddress.loopbackIPv4, 0),
+      answer,
+      upstreamPort,
+    );
+    proxy._listener.listen(proxy._serve);
+    return proxy;
+  }
+
+  final ServerSocket _listener;
+  final String? _answer;
+  final int? _upstreamPort;
+  final List<String> heads = <String>[];
+  final List<int> tunnelled = <int>[];
+  final Set<Socket> open = <Socket>{};
+  int accepted = 0;
+
+  int get port => _listener.port;
+
+  String get url => 'http://127.0.0.1:$port';
+
+  void _serve(Socket client) {
+    accepted++;
+    open.add(client);
+    final BytesBuilder head = BytesBuilder();
+    Socket? upstream;
+    late final StreamSubscription<Uint8List> subscription;
+    void tunnel(List<int> bytes) {
+      if (tunnelled.length < 16) {
+        tunnelled.addAll(bytes.take(16 - tunnelled.length));
+      }
+      upstream?.add(bytes);
+    }
+
+    subscription = client.listen(
+      (Uint8List chunk) {
+        if (upstream != null) {
+          tunnel(chunk);
+          return;
+        }
+        head.add(chunk);
+        final List<int> bytes = head.toBytes();
+        final int end = _headEnd(bytes);
+        if (end < 0) {
+          return;
+        }
+        heads.add(latin1.decode(bytes.sublist(0, end)));
+        head.clear();
+        final String? answer = _answer;
+        final int? upstreamPort = _upstreamPort;
+        if (answer == null) {
+          return;
+        }
+        if (!answer.startsWith('HTTP/1.1 200') || upstreamPort == null) {
+          client.write(answer);
+          return;
+        }
+        subscription.pause();
+        unawaited(
+          Socket.connect(InternetAddress.loopbackIPv4, upstreamPort).then((
+            Socket socket,
+          ) {
+            upstream = socket;
+            socket.listen(
+              client.add,
+              onError: (Object _) {},
+              onDone: client.destroy,
+            );
+            client.write(answer);
+            tunnel(bytes.sublist(end));
+            subscription.resume();
+          }),
+        );
+      },
+      onError: (Object _) {},
+      onDone: () {
+        open.remove(client);
+        upstream?.destroy();
+        client.destroy();
+      },
+    );
+  }
+
+  /// The end of the head (after the empty line) in [bytes], or -1.
+  static int _headEnd(List<int> bytes) {
+    for (int i = 3; i < bytes.length; i++) {
+      if (bytes[i - 3] == 13 &&
+          bytes[i - 2] == 10 &&
+          bytes[i - 1] == 13 &&
+          bytes[i] == 10) {
+        return i + 1;
+      }
+    }
+    return -1;
+  }
+
+  /// Waits up to 1 s for the client sockets to be seen closed.
+  Future<void> allClosed() async {
+    for (int i = 0; i < 50 && open.isNotEmpty; i++) {
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+    }
+  }
+
+  Future<void> close() async {
+    for (final Socket socket in List<Socket>.of(open)) {
+      socket.destroy();
+    }
+    await _listener.close();
   }
 }
