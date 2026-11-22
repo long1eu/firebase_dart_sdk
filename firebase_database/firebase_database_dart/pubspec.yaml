@@ -1,0 +1,38 @@
+name: firebase_database_dart
+description: >-
+  Unofficial pure-Dart client of the Firebase Realtime Database. Work in
+  progress: this version is the signature-only skeleton of the core.
+version: 0.0.1
+publish_to: none
+homepage: https://github.com/long1eu/firebase_dart_sdk
+repository: https://github.com/long1eu/firebase_dart_sdk/tree/main/firebase_database/firebase_database_dart
+issue_tracker: https://github.com/long1eu/firebase_dart_sdk/issues
+topics:
+  - firebase
+  - database
+  - dart
+
+platforms:
+  android:
+  ios:
+  linux:
+  macos:
+  web:
+  windows:
+
+environment:
+  sdk: ^3.8.0
+
+dependencies:
+  collection: ^1.18.0
+  # SHA-1 of node hashes and compound hashes.
+  crypto: ^3.0.3
+  # Local development resolves this from ../../firebase_core/firebase_app_dart
+  # through pubspec_overrides.yaml (not published).
+  firebase_app_dart: ^0.2.0
+  meta: ^1.11.0
+  web: ^1.1.0
+
+dev_dependencies:
+  lints: ^6.1.0
+  test: ^1.25.0

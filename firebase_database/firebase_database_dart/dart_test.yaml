@@ -1,0 +1,5 @@
+# The contract tests (test/contract) run on the VM; browser tests come with the connection.
+tags:
+  browser:
+    test_on: browser
+    timeout: 2x
