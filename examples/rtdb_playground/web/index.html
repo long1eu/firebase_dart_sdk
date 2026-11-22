@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- The page loads only its own files and can connect to nothing but its own origin:
+       connect-src 'self', which the fetch of main.wasm needs. 'wasm-unsafe-eval' lets the dart2wasm
+       build compile its module. -->
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'none'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self'; connect-src 'self'; img-src 'self'; base-uri 'none'; form-action 'none'">
+  <meta name="color-scheme" content="light dark">
+  <title>Realtime Database playground: firebase_database_dart</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header>
+    <h1>Realtime Database playground</h1>
+    <p class="lead">Try <code>firebase_database_dart</code>, the pure-Dart Realtime Database client.
+      Compiled with <span id="compiler">dart2wasm</span>.</p>
+    <p class="banner" role="note"><strong>Simulated server: rules are not evaluated; this is not the
+      real backend.</strong> The client is the real one. The server is a small program in this page
+      that answers it from its own data. The page can connect to nothing but the host that serves it, and everything is gone
+      when you reload.</p>
+    <p id="error" role="alert"></p>
+  </header>
+
+  <main>
+    <section id="trees" aria-labelledby="trees-title">
+      <h2 id="trees-title">Data</h2>
+      <div class="status">
+        <label class="switch"><input type="checkbox" id="reachable" checked> Server reachable</label>
+        <span id="conn" class="badge">starting</span>
+        <button type="button" id="reject" class="danger" aria-pressed="false">Server rejects next write</button>
+      </div>
+      <div class="two">
+        <div>
+          <h3>Client</h3>
+          <div id="client-tree" class="tree" aria-live="polite"></div>
+          <p class="hint">What the client shows, local writes included. It listens to the root, so the
+            server sees one listen at <code>/</code>.</p>
+        </div>
+        <div>
+          <h3>Simulated server</h3>
+          <div id="server-tree" class="tree"></div>
+          <p class="hint">Changes only when the server accepts a write.</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="write-panel" aria-labelledby="write-title">
+      <h2 id="write-title">Write</h2>
+      <form id="f-set">
+        <div class="row"><label for="set-path">set</label><input id="set-path" value="todos/b" autocomplete="off" spellcheck="false"></div>
+        <textarea id="set-value" rows="2" spellcheck="false" aria-label="JSON value to set">{"title": "Try offline", "done": false}</textarea>
+        <div class="actions"><button type="submit">set</button></div>
+      </form>
+      <form id="f-update">
+        <div class="row"><label for="upd-path">update</label><input id="upd-path" value="todos/a" autocomplete="off" spellcheck="false"></div>
+        <textarea id="upd-value" rows="2" spellcheck="false" aria-label="JSON object to merge">{"done": true}</textarea>
+        <div class="actions"><button type="submit">update</button></div>
+      </form>
+      <form id="f-push">
+        <div class="row"><label for="push-path">push</label><input id="push-path" value="todos" autocomplete="off" spellcheck="false"></div>
+        <textarea id="push-value" rows="2" spellcheck="false" aria-label="JSON value to push">{"title": "New item", "done": false}</textarea>
+        <div class="actions"><button type="submit">push</button></div>
+      </form>
+      <form id="f-remove">
+        <div class="row"><label for="rm-path">remove</label><input id="rm-path" value="todos/a" autocomplete="off" spellcheck="false"></div>
+        <div class="actions"><button type="submit">remove</button></div>
+      </form>
+      <form id="f-tx">
+        <div class="row"><label for="tx-path">transaction</label><input id="tx-path" value="counter" autocomplete="off" spellcheck="false"></div>
+        <div class="row"><label for="tx-op">handler</label>
+          <select id="tx-op">
+            <option value="inc">add 1 to a number</option>
+            <option value="bang">append "!" to a string</option>
+            <option value="once">write only if empty (abort otherwise)</option>
+          </select></div>
+        <div class="actions"><button type="submit">run transaction</button></div>
+      </form>
+      <h3>Writes waiting for the server <span id="pending-count" class="count">0</span></h3>
+      <ol id="pending" class="queue"></ol>
+    </section>
+
+    <section id="listen-panel" aria-labelledby="listen-title">
+      <h2 id="listen-title">Listeners</h2>
+      <form id="f-listen">
+        <div class="row three">
+          <label class="sr" for="l-path">Path</label>
+          <input id="l-path" value="todos" autocomplete="off" spellcheck="false">
+          <label class="sr" for="l-type">Event</label>
+          <select id="l-type">
+            <option value="value">onValue</option>
+            <option value="added">onChildAdded</option>
+            <option value="changed">onChildChanged</option>
+            <option value="removed">onChildRemoved</option>
+          </select>
+          <button type="submit">Listen</button>
+        </div>
+      </form>
+      <ul id="listeners" class="chips"></ul>
+      <h3>Events in order</h3>
+      <ol id="events" class="log" aria-live="polite"></ol>
+    </section>
+
+    <section id="server-panel" aria-labelledby="server-title">
+      <h2 id="server-title">What the server saw</h2>
+      <p class="hint">Requests are recorded when they are sent. While the server is unreachable nothing
+        is sent: writes wait in the client and are sent after it connects, newest answered first.</p>
+      <ol id="server-log" class="log"></ol>
+    </section>
+  </main>
+
+  <footer>
+    <p>Run it on the other compiler: <a id="other-compiler" href="./?compiler=js">dart2js</a>.
+      The source is in <code>examples/rtdb_playground/</code> of the repository.</p>
+  </footer>
+  <script src="bootstrap.js" data-app="main"></script>
+</body>
+</html>
