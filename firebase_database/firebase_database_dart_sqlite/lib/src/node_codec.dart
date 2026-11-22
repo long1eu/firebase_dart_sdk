@@ -1,8 +1,6 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
-// not exported by storage_engine.dart
-import 'package:firebase_database_dart/src/core/snap/node_from_json.dart';
 import 'package:firebase_database_dart/storage_engine.dart';
 
 /// The `path` column form of a [Path]: `/` for the root, `/a/b/` otherwise (Android's

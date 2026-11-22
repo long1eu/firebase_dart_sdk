@@ -7,7 +7,3 @@ linter:
   rules:
     comment_references: true
     public_member_api_docs: true
-    # storage_engine.dart of firebase_database_dart does not export nodeFromJson, keyIndex,
-    # ImmutableTree or estimateSerializedNodeSize (lib), nor ChildrenNode, PathIndex or QueryParams
-    # (tests). Remove this line when it does.
-    implementation_imports: false

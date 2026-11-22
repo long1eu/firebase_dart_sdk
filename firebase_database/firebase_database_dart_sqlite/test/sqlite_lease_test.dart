@@ -156,6 +156,29 @@ void main() {
   );
 
   test(
+    'a timer refresh rewrites the row once, also right after a transaction rewrote it',
+    () async {
+      // Fails if refreshLease leaves the rewrite to extendIfDue alone (sqlite_connection.dart,
+      // refreshLease): the gap between two writes could then reach 7.5 s, the whole observation.
+      final SqliteConnection store = await fixture.open();
+      addTearDown(store.close);
+      fixture.clock.advance(const Duration(seconds: 3));
+      store.begin();
+      store.commit();
+      final int afterTransaction = currentLease().expiresAtMs;
+
+      fixture.clock.advance(const Duration(seconds: 2));
+      store.refreshLease();
+
+      expect(currentLease().expiresAtMs, greaterThan(afterTransaction));
+      expect(
+        currentLease().expiresAtMs,
+        fixture.clock.nowMs + SqliteLease.duration.inMilliseconds,
+      );
+    },
+  );
+
+  test(
     'a refresh after another owner took the lease fences the connection',
     () async {
       final SqliteConnection store = await fixture.open();

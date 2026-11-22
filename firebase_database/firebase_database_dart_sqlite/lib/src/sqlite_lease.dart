@@ -268,11 +268,15 @@ final class SqliteLease {
 
   /// [extend] when more than half a [refreshInterval] passed since the last write of the row, so
   /// that an owner busy in storage transactions keeps its lease even when its timer is late.
-  void extendIfDue(sqlite.Database db) {
+  ///
+  /// Returns whether the row was rewritten.
+  bool extendIfDue(sqlite.Database db) {
     final int sinceLast = _nowMs() - _lastExtendedAtMs;
     if (sinceLast < 0 || sinceLast >= refreshInterval.inMilliseconds ~/ 2) {
       extend(db);
+      return true;
     }
+    return false;
   }
 
   /// Removes the row if it is still ours, in a transaction of its own; best effort.

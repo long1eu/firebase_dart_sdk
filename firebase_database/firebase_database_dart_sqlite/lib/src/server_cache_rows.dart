@@ -3,12 +3,6 @@ import 'dart:typed_data';
 
 import 'package:firebase_database_dart/firebase_database_dart.dart'
     show DatabaseLogLevel, DatabaseLogger;
-// not exported by storage_engine.dart
-import 'package:firebase_database_dart/src/core/snap/indexes/key_index.dart';
-// not exported by storage_engine.dart
-import 'package:firebase_database_dart/src/core/util/immutable_tree.dart';
-// not exported by storage_engine.dart
-import 'package:firebase_database_dart/src/core/util/node_size_estimator.dart';
 import 'package:firebase_database_dart/storage_engine.dart';
 import 'package:firebase_database_dart_sqlite/src/node_codec.dart';
 import 'package:firebase_database_dart_sqlite/src/sql_in_list.dart';

@@ -11,12 +11,6 @@ import 'package:firebase_database_dart/src/core/snap/children_node.dart';
 // not exported by storage_engine.dart
 import 'package:firebase_database_dart/src/core/snap/indexes/path_index.dart';
 // not exported by storage_engine.dart
-import 'package:firebase_database_dart/src/core/snap/node_from_json.dart';
-// not exported by storage_engine.dart
-import 'package:firebase_database_dart/src/core/util/immutable_tree.dart';
-// not exported by storage_engine.dart
-import 'package:firebase_database_dart/src/core/util/node_size_estimator.dart';
-// not exported by storage_engine.dart
 import 'package:firebase_database_dart/src/core/view/query_params.dart';
 import 'package:firebase_database_dart/storage_engine.dart';
 import 'package:firebase_database_dart_sqlite/src/sqlite_connection.dart';

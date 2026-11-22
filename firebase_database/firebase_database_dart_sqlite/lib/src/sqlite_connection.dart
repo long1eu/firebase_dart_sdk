@@ -114,6 +114,7 @@ final class SqliteConnection {
   bool _inTransaction = false;
   bool _transactionFailed = false;
   bool _sqliteTransactionOpen = false;
+  bool _extendedInTransaction = false;
   int _consecutiveBusy = 0;
   final Map<String, sqlite.PreparedStatement> _statements =
       <String, sqlite.PreparedStatement>{};
@@ -154,7 +155,11 @@ final class SqliteConnection {
       rollback();
       return;
     }
-    _guard(() => _lease!.extend(_db!));
+    // The timer always rewrites the row, so a live owner writes it at least every refresh
+    // interval; once per transaction: `begin` may already have rewritten it (extendIfDue).
+    if (!_extendedInTransaction) {
+      _guard(() => _lease!.extend(_db!));
+    }
     commit();
   }
 
@@ -170,6 +175,7 @@ final class SqliteConnection {
     }
     _inTransaction = true;
     _transactionFailed = false;
+    _extendedInTransaction = false;
     if (!isDurable) {
       return false;
     }
@@ -199,7 +205,10 @@ final class SqliteConnection {
       );
       return false;
     }
-    _guard(() => _lease!.extendIfDue(db));
+    _extendedInTransaction = _guard(
+      () => _lease!.extendIfDue(db),
+      fallback: false,
+    );
     return isDurable && !_transactionFailed;
   }
 
