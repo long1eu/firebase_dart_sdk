@@ -1,6 +1,7 @@
 import 'dart:async';
 
-import 'package:firebase_database_dart_sqlite/src/engine_contract_placeholder.dart';
+// switch to storage_engine.dart (DatabaseLogger: the main library if it is not there)
+import 'package:firebase_database_dart/src/core/util/logger.dart';
 import 'package:firebase_database_dart_sqlite/src/sqlite_lease.dart';
 import 'package:firebase_database_dart_sqlite/src/sqlite_schema.dart';
 import 'package:meta/meta.dart';
@@ -58,7 +59,7 @@ final class SqliteConnection {
     required sqlite.Database database,
     required String this.path,
     required SqliteLease lease,
-    required StoreLogger log,
+    required DatabaseLogger log,
     required PeriodicTimerFactory periodicTimer,
     void Function()? onClosed,
   }) : _db = database,
@@ -71,7 +72,7 @@ final class SqliteConnection {
   /// A connection without a file. [reason] is logged once; it must not contain data.
   SqliteConnection.memoryOnly({
     required String reason,
-    required StoreLogger log,
+    required DatabaseLogger log,
   }) : _db = null,
        path = null,
        _lease = null,
@@ -79,7 +80,7 @@ final class SqliteConnection {
        _periodicTimer = null,
        _onClosed = null,
        _state = StoreState.memoryOnly {
-    _log(reason);
+    _log(DatabaseLogLevel.warning, reason);
   }
 
   /// How many prepared statements are kept, least recently used dropped first. Preparing was about
@@ -91,7 +92,7 @@ final class SqliteConnection {
 
   sqlite.Database? _db;
   final SqliteLease? _lease;
-  final StoreLogger _log;
+  final DatabaseLogger _log;
   final PeriodicTimerFactory? _periodicTimer;
   void Function()? _onClosed;
   StoreState _state;
@@ -321,6 +322,7 @@ final class SqliteConnection {
     }
     _dispose();
     _log(
+      DatabaseLogLevel.warning,
       'Realtime Database offline cache: $what; this instance keeps data in memory only.',
     );
   }

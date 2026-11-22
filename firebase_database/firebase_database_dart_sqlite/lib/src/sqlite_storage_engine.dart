@@ -1,14 +1,23 @@
 // BUILDER B's FILE. Signature-only stub written by builder A so that the package analyzes before
 // B starts: `isDurable` and `close` are real (the opener's tests need them); every data method
 // throws. B replaces the bodies; design: rtdb_storage_engine_design.md sections 1-3, 5, 6, 9.
+// switch to storage_engine.dart
 import 'package:firebase_database_dart/src/core/compound_write.dart';
+// switch to storage_engine.dart
 import 'package:firebase_database_dart/src/core/path.dart';
+// switch to storage_engine.dart
 import 'package:firebase_database_dart/src/core/persistence/persistence_storage_engine.dart';
+// switch to storage_engine.dart
 import 'package:firebase_database_dart/src/core/persistence/prune_forest.dart';
+// switch to storage_engine.dart
 import 'package:firebase_database_dart/src/core/persistence/tracked_query.dart';
+// switch to storage_engine.dart
 import 'package:firebase_database_dart/src/core/snap/child_key.dart';
+// switch to storage_engine.dart
 import 'package:firebase_database_dart/src/core/snap/node.dart';
+// switch to storage_engine.dart
 import 'package:firebase_database_dart/src/core/user_write_record.dart';
+// switch to storage_engine.dart
 import 'package:firebase_database_dart/src/core/write_id.dart';
 import 'package:firebase_database_dart_sqlite/src/sqlite_connection.dart';
 
@@ -16,7 +25,10 @@ import 'package:firebase_database_dart_sqlite/src/sqlite_connection.dart';
 /// the nested-row layout of the design (16 KiB child split, no leaf parts).
 final class SqliteStorageEngine implements PersistenceStorageEngine {
   /// An engine over [connection], whose server cache is pruned above [cacheSizeBytes].
-  SqliteStorageEngine(this._connection, {required this.cacheSizeBytes});
+  SqliteStorageEngine(
+    SqliteConnection connection, {
+    required this.cacheSizeBytes,
+  }) : _connection = connection;
 
   final SqliteConnection _connection;
 
@@ -24,7 +36,9 @@ final class SqliteStorageEngine implements PersistenceStorageEngine {
   final int cacheSizeBytes;
 
   static Never _notWritten() {
-    throw UnimplementedError('SqliteStorageEngine is not written yet (builder B).');
+    throw UnimplementedError(
+      'SqliteStorageEngine is not written yet (builder B).',
+    );
   }
 
   @override
@@ -34,10 +48,12 @@ final class SqliteStorageEngine implements PersistenceStorageEngine {
   void close() => _connection.close();
 
   @override
-  void saveUserOverwrite(Path path, Node node, WriteId writeId) => _notWritten();
+  void saveUserOverwrite(Path path, Node node, WriteId writeId) =>
+      _notWritten();
 
   @override
-  void saveUserMerge(Path path, CompoundWrite children, WriteId writeId) => _notWritten();
+  void saveUserMerge(Path path, CompoundWrite children, WriteId writeId) =>
+      _notWritten();
 
   @override
   void removeUserWrite(WriteId writeId) => _notWritten();
@@ -58,7 +74,8 @@ final class SqliteStorageEngine implements PersistenceStorageEngine {
   void mergeIntoServerCache(Path path, Node node) => _notWritten();
 
   @override
-  void mergeIntoServerCacheWrite(Path path, CompoundWrite children) => _notWritten();
+  void mergeIntoServerCacheWrite(Path path, CompoundWrite children) =>
+      _notWritten();
 
   @override
   int serverCacheEstimatedSizeInBytes() => _notWritten();
@@ -76,7 +93,8 @@ final class SqliteStorageEngine implements PersistenceStorageEngine {
   void resetPreviouslyActiveTrackedQueries(int lastUse) => _notWritten();
 
   @override
-  void saveTrackedQueryKeys(int trackedQueryId, Set<ChildKey> keys) => _notWritten();
+  void saveTrackedQueryKeys(int trackedQueryId, Set<ChildKey> keys) =>
+      _notWritten();
 
   @override
   void updateTrackedQueryKeys(

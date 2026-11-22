@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:io';
 
+// switch to storage_engine.dart (DatabaseLogger: the main library if it is not there)
+import 'package:firebase_database_dart/src/core/util/logger.dart';
 import 'package:firebase_database_dart_sqlite/src/sqlite_connection.dart';
 import 'package:firebase_database_dart_sqlite/src/sqlite_files.dart';
 import 'package:firebase_database_dart_sqlite/src/sqlite_open.dart';
@@ -84,7 +86,7 @@ final class StoreFixture {
       delay: clock.delay,
       periodicTimer: (Duration period, void Function(Timer timer) tick) =>
           InertTimer(),
-      log: log.add,
+      log: (DatabaseLogLevel level, String message) => log.add(message),
       newOwnerId: () => 'owner-${++_owners}',
       sqliteVersionNumber: sqliteVersionNumber,
     );

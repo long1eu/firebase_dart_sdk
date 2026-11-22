@@ -15,6 +15,7 @@ export 'package:firebase_database_dart_sqlite/src/sqlite_persistence.dart'
     show
         ClearPersistenceException,
         SqlitePersistence,
+        clearSqlitePersistence,
         defaultCacheSizeBytes,
         maximumCacheSizeBytes,
         minimumCacheSizeBytes,

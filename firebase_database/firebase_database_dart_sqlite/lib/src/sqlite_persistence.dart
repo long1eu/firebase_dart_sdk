@@ -1,10 +1,16 @@
 import 'dart:io';
 
-import 'package:firebase_database_dart_sqlite/src/engine_contract_placeholder.dart';
+// switch to storage_engine.dart
+import 'package:firebase_database_dart/src/core/persistence/persistence_storage_engine.dart';
+// switch to storage_engine.dart
+import 'package:firebase_database_dart/src/core/persistence/persistence_storage_engine_opener.dart';
+// switch to storage_engine.dart (DatabaseLogger: the main library if it is not there)
+import 'package:firebase_database_dart/src/core/util/logger.dart';
 import 'package:firebase_database_dart_sqlite/src/sqlite_connection.dart';
 import 'package:firebase_database_dart_sqlite/src/sqlite_files.dart';
 import 'package:firebase_database_dart_sqlite/src/sqlite_lease.dart';
 import 'package:firebase_database_dart_sqlite/src/sqlite_open.dart';
+import 'package:firebase_database_dart_sqlite/src/sqlite_storage_engine.dart';
 import 'package:meta/meta.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
@@ -28,11 +34,38 @@ const int maximumCacheSizeBytes = 100 * 1024 * 1024;
 /// [cacheSizeBytes] is the size above which the cached server data is pruned, from
 /// [minimumCacheSizeBytes] to [maximumCacheSizeBytes] ([RangeError] otherwise). Pending writes are
 /// never pruned.
-SqlitePersistence sqlitePersistence(
+///
+/// Returns the opener `FirebaseDatabase(persistence: ...)` calls once at start. Use
+/// [SqlitePersistence] directly to also delete a cache ([SqlitePersistence.clear]).
+PersistenceStorageEngineOpener sqlitePersistence(
   String directory, {
   int cacheSizeBytes = defaultCacheSizeBytes,
 }) {
-  return SqlitePersistence(directory, cacheSizeBytes: cacheSizeBytes);
+  return SqlitePersistence(directory, cacheSizeBytes: cacheSizeBytes).open;
+}
+
+/// Deletes the cache files of [databaseUrl] of the app named [appName] in [directory]: the
+/// database file, its side files and its moved-aside copies.
+///
+/// Throws a [StateError] while an instance holds the file (in this process or another: a live
+/// lease), and a [ClearPersistenceException] listing the files that could not be deleted.
+Future<void> clearSqlitePersistence(
+  String directory, {
+  required String appName,
+  required Uri databaseUrl,
+}) {
+  return SqlitePersistence(
+    directory,
+  ).clear(PersistenceKey(appName: appName, databaseUrl: databaseUrl));
+}
+
+/// SEAM between builder A and builder B: the engine over an opened [connection]. Builder B owns
+/// [SqliteStorageEngine] (lib/src/sqlite_storage_engine.dart and the row files next to it).
+PersistenceStorageEngine engineOverConnection(
+  SqliteConnection connection, {
+  required int cacheSizeBytes,
+}) {
+  return SqliteStorageEngine(connection, cacheSizeBytes: cacheSizeBytes);
 }
 
 /// SQLite files of the offline cache, one per app and database URL, in one directory.
@@ -81,12 +114,16 @@ final class SqlitePersistence {
     );
   }
 
-  /// [open] as the client's opener type, for `FirebaseDatabase(persistence: ...)`.
-  PersistenceStorageEngineOpener get opener => open;
-
-  /// Opens the store of [key]; what `FirebaseDatabase` calls once at Repo start. Never fails: a
-  /// store that can not own its file comes back with `isDurable` false.
-  Future<PersistenceStorageEngine> open(PersistenceKey key) async {
+  /// Opens the store of [key]; what `FirebaseDatabase` calls once at Repo start (this method has
+  /// the client's opener type). Never fails: a store that can not own its file comes back with
+  /// `isDurable` false. Messages go to [logger] when given, else to the logger of the options.
+  Future<PersistenceStorageEngine> open(
+    PersistenceKey key, {
+    DatabaseLogger? logger,
+  }) async {
+    final SqliteStoreOptions options = logger == null
+        ? _options
+        : _options.withLogger(logger);
     final String fileName = SqliteFiles.fileName(key.appName, key.databaseUrl);
     final String path = SqliteFiles.join(directory, fileName);
     if (_openPaths.contains(path)) {
@@ -95,7 +132,7 @@ final class SqlitePersistence {
           reason:
               'Realtime Database offline cache $fileName: another instance of this database is '
               'using it; this instance keeps data in memory only.',
-          log: _options.log,
+          log: options.log,
         ),
         cacheSizeBytes: cacheSizeBytes,
       );
@@ -104,7 +141,7 @@ final class SqlitePersistence {
     final SqliteConnection connection = await openSqliteStore(
       directory: directory,
       fileName: fileName,
-      options: _options,
+      options: options,
       onClosed: () => _openPaths.remove(path),
     );
     if (!connection.isDurable) {

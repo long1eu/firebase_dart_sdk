@@ -4,7 +4,12 @@
 import 'dart:io';
 
 import 'package:firebase_database_dart_sqlite/firebase_database_dart_sqlite.dart';
-import 'package:firebase_database_dart_sqlite/src/engine_contract_placeholder.dart';
+// switch to storage_engine.dart
+import 'package:firebase_database_dart/src/core/persistence/persistence_storage_engine.dart';
+// switch to storage_engine.dart
+import 'package:firebase_database_dart/src/core/persistence/persistence_storage_engine_opener.dart';
+// switch to storage_engine.dart (DatabaseLogger: the main library if it is not there)
+import 'package:firebase_database_dart/src/core/util/logger.dart';
 import 'package:firebase_database_dart_sqlite/src/sqlite_files.dart';
 import 'package:test/test.dart';
 
@@ -73,11 +78,29 @@ void main() {
         ),
         throwsRangeError,
       );
-      expect(sqlitePersistence('/tmp/x').cacheSizeBytes, defaultCacheSizeBytes);
-      final PersistenceStorageEngineOpener opener = sqlitePersistence(
-        '/tmp/x',
-      ).opener;
-      expect(opener, isNotNull);
+      expect(SqlitePersistence('/tmp/x').cacheSizeBytes, defaultCacheSizeBytes);
+      expect(
+        sqlitePersistence('/tmp/x'),
+        isA<PersistenceStorageEngineOpener>(),
+      );
+    });
+
+    test('logs to the logger the client passes, with a level', () async {
+      final PersistenceStorageEngine first = await persistence.open(key);
+      addTearDown(first.close);
+      final List<(DatabaseLogLevel, String)> clientLog =
+          <(DatabaseLogLevel, String)>[];
+
+      final PersistenceStorageEngine second = await persistence.open(
+        key,
+        logger: (DatabaseLogLevel level, String message) =>
+            clientLog.add((level, message)),
+      );
+
+      expect(second.isDurable, isFalse);
+      expect(fixture.log, isEmpty);
+      expect(clientLog.single.$1, DatabaseLogLevel.warning);
+      expect(clientLog.single.$2, contains('another instance'));
     });
 
     test('opens a durable store in the directory', () async {
@@ -131,6 +154,20 @@ void main() {
         expect(left, isEmpty);
       },
     );
+
+    test('clearSqlitePersistence deletes the files of one database', () async {
+      final String path = persistence.pathOf(key);
+      (await persistence.open(key)).close();
+      expect(File(path).existsSync(), isTrue);
+
+      await clearSqlitePersistence(
+        fixture.directory,
+        appName: key.appName,
+        databaseUrl: key.databaseUrl,
+      );
+
+      expect(File(path).existsSync(), isFalse);
+    });
 
     test('is refused while this persistence has the store open', () async {
       final PersistenceStorageEngine engine = await persistence.open(key);

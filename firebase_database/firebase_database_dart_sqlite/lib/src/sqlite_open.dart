@@ -2,7 +2,8 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:math';
 
-import 'package:firebase_database_dart_sqlite/src/engine_contract_placeholder.dart';
+// switch to storage_engine.dart (DatabaseLogger: the main library if it is not there)
+import 'package:firebase_database_dart/src/core/util/logger.dart';
 import 'package:firebase_database_dart_sqlite/src/posix_file_mode.dart';
 import 'package:firebase_database_dart_sqlite/src/sqlite_connection.dart';
 import 'package:firebase_database_dart_sqlite/src/sqlite_files.dart';
@@ -23,7 +24,7 @@ final class SqliteStoreOptions {
     int Function()? nowMs,
     Future<void> Function(Duration duration)? delay,
     PeriodicTimerFactory? periodicTimer,
-    StoreLogger? log,
+    DatabaseLogger? log,
     String Function()? newOwnerId,
     this.sqliteVersionNumber,
     sqlite.Database Function(String path)? openDatabase,
@@ -44,7 +45,7 @@ final class SqliteStoreOptions {
   final PeriodicTimerFactory periodicTimer;
 
   /// Receives one message per state change of a store; never data.
-  final StoreLogger log;
+  final DatabaseLogger log;
 
   /// Creates the random owner id of a connection.
   final String Function() newOwnerId;
@@ -55,12 +56,25 @@ final class SqliteStoreOptions {
   /// Opens (and creates) the database file at a path.
   final sqlite.Database Function(String path) openDatabase;
 
+  /// These options with [log] as the logger.
+  SqliteStoreOptions withLogger(DatabaseLogger log) {
+    return SqliteStoreOptions(
+      nowMs: nowMs,
+      delay: delay,
+      periodicTimer: periodicTimer,
+      log: log,
+      newOwnerId: newOwnerId,
+      sqliteVersionNumber: sqliteVersionNumber,
+      openDatabase: openDatabase,
+    );
+  }
+
   static int _wallClockMs() => DateTime.now().millisecondsSinceEpoch;
 
   static Future<void> _wait(Duration duration) =>
       Future<void>.delayed(duration);
 
-  static void _silent(String message) {}
+  static void _silent(DatabaseLogLevel level, String message) {}
 
   static sqlite.Database _openFile(String path) => sqlite.sqlite3.open(path);
 
@@ -254,6 +268,7 @@ final class _StoreOpener {
       );
     }
     options.log(
+      DatabaseLogLevel.warning,
       'Realtime Database offline cache $fileName: $why; it was moved aside and the cache starts '
       'empty.',
     );
@@ -282,6 +297,7 @@ final class _StoreOpener {
     if (mode != null &&
         !mode.makePrivate(path, mode: PosixFileMode.privateFile)) {
       options.log(
+        DatabaseLogLevel.warning,
         'Realtime Database offline cache $fileName: its file mode could not be set.',
       );
     }
@@ -332,6 +348,7 @@ final class _StoreOpener {
         .columnAt(0);
     if ('$mode'.toLowerCase() != 'wal') {
       options.log(
+        DatabaseLogLevel.info,
         'Realtime Database offline cache $fileName: the file system keeps journal mode "$mode".',
       );
     }

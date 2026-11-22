@@ -132,7 +132,8 @@ void main() {
         db.execute('CREATE TABLE notes (body TEXT)');
         db.execute("INSERT INTO notes VALUES ('kept for diagnosis')");
       });
-      // A stray log next to the file must not end up next to the new file of the same name.
+      // A stray log next to the file must not end up next to the new file of the same name. SQLite
+      // may replace it on its own here; the move itself is pinned in sqlite_files_test.dart.
       File('${fixture.path}-wal').writeAsStringSync('old log');
 
       final SqliteConnection store = await fixture.open();

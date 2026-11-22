@@ -7,3 +7,6 @@ linter:
   rules:
     comment_references: true
     public_member_api_docs: true
+    # The engine interface, node and path types are under lib/src of firebase_database_dart until
+    # its author gives engine packages one public entry point. Remove this line then.
+    implementation_imports: false

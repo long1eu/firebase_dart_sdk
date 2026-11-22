@@ -3,6 +3,8 @@
 // testConcurrentUsageFails at the connection level; E-D1 is new.
 import 'dart:typed_data';
 
+// switch to storage_engine.dart (DatabaseLogger: the main library if it is not there)
+import 'package:firebase_database_dart/src/core/util/logger.dart';
 import 'package:firebase_database_dart_sqlite/src/sqlite_connection.dart';
 import 'package:firebase_database_dart_sqlite/src/sqlite_lease.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
@@ -76,7 +78,7 @@ void main() {
       final List<String> log = <String>[];
       final SqliteConnection store = SqliteConnection.memoryOnly(
         reason: 'why',
-        log: log.add,
+        log: (DatabaseLogLevel level, String message) => log.add(message),
       );
 
       expect(store.begin(), isFalse);
