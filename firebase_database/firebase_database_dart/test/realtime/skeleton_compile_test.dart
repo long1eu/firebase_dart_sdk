@@ -143,6 +143,7 @@ final List<Object?> _topLevel = <Object?>[
   Ignored.new,
   decodeServerMessage,
   wirePathFromServer,
+  isValidServerData,
   // transport/ws_channel.dart
   WsEvent,
   WsText.new,
@@ -205,6 +206,7 @@ List<Object?> _members({
     session.appCheckChanged,
     session.forceRefreshNext,
     session.invalidTokenThresholdReached,
+    session.invalidAppCheckThresholdReached,
     session.onAuthRevoked,
     session.onAppCheckRevoked,
     session.connectionMustClose,
@@ -293,6 +295,7 @@ List<Object?> _members({
     rangeMerge.tag,
     serverError.message,
     ignored.why,
+    ignored.isProtocolError,
     text.data,
     binary.data,
     closed.code,
