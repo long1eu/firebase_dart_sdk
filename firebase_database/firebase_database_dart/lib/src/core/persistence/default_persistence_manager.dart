@@ -15,34 +15,41 @@ import 'package:firebase_database_dart/src/core/snap/children_node.dart';
 import 'package:firebase_database_dart/src/core/snap/node.dart';
 import 'package:firebase_database_dart/src/core/user_write_record.dart';
 import 'package:firebase_database_dart/src/core/util/clock.dart';
+import 'package:firebase_database_dart/src/core/util/logger.dart';
 import 'package:firebase_database_dart/src/core/view/cache_node.dart';
 import 'package:firebase_database_dart/src/core/view/query_spec.dart';
 import 'package:firebase_database_dart/src/core/write_id.dart';
 
 /// A [PersistenceManager] over a storage engine, tracking queries and pruning by a cache policy.
 ///
-/// Android: `DefaultPersistenceManager.java`. Differences: no logger (Android logs the prune
-/// checks at debug level and a caught body exception at error level), and [runInTransaction]
-/// rethrows the body's exception as is instead of wrapping it in a `RuntimeException`.
+/// Android: `DefaultPersistenceManager.java`. Difference: [runInTransaction] rethrows the body's
+/// exception as is (after logging it) instead of wrapping it in a `RuntimeException`.
 final class DefaultPersistenceManager implements PersistenceManager {
   /// Creates a manager over [storageLayer]; builds its `TrackedQueryManager`, which resets the
   /// previously active tracked queries in a transaction of its own. Android:
-  /// `DefaultPersistenceManager(Context, PersistenceStorageEngine, CachePolicy, Clock)`.
+  /// `DefaultPersistenceManager(Context, PersistenceStorageEngine, CachePolicy, Clock)`; the
+  /// Context's logger is [logger] (Repo's, null: dropped), shared with the tracked queries.
   factory DefaultPersistenceManager(
     PersistenceStorageEngine storageLayer,
     CachePolicy cachePolicy,
-    Clock clock,
-  ) => DefaultPersistenceManager._(
+    Clock clock, {
+    DatabaseLogger? logger,
+  }) => DefaultPersistenceManager._(
     storageLayer,
-    TrackedQueryManager(storageLayer, clock),
+    TrackedQueryManager(storageLayer, clock, logger: logger),
     cachePolicy,
+    logger,
   );
 
   DefaultPersistenceManager._(
     this._storageLayer,
     this._trackedQueryManager,
     this._cachePolicy,
+    this._logger,
   );
+
+  /// Android: `DefaultPersistenceManager.logger`.
+  final DatabaseLogger? _logger;
 
   final PersistenceStorageEngine _storageLayer;
   final TrackedQueryManager _trackedQueryManager;
@@ -226,6 +233,9 @@ final class DefaultPersistenceManager implements PersistenceManager {
       final T result = body();
       _storageLayer.setTransactionSuccessful();
       return result;
+    } on Object catch (e) {
+      _logger?.call(DatabaseLogLevel.error, 'Caught Throwable. $e');
+      rethrow;
     } finally {
       _storageLayer.endTransaction();
     }
@@ -238,9 +248,11 @@ final class DefaultPersistenceManager implements PersistenceManager {
     )) {
       return;
     }
+    _logger?.call(DatabaseLogLevel.debug, 'Reached prune check threshold.');
     _serverCacheUpdatesSinceLastPruneCheck = 0;
     bool canPrune = true;
     int cacheSize = _storageLayer.serverCacheEstimatedSizeInBytes();
+    _logger?.call(DatabaseLogLevel.debug, 'Cache size: $cacheSize');
     while (canPrune &&
         _cachePolicy.shouldPrune(
           cacheSize,
@@ -255,6 +267,10 @@ final class DefaultPersistenceManager implements PersistenceManager {
         canPrune = false;
       }
       cacheSize = _storageLayer.serverCacheEstimatedSizeInBytes();
+      _logger?.call(
+        DatabaseLogLevel.debug,
+        'Cache size after prune: $cacheSize',
+      );
     }
   }
 }

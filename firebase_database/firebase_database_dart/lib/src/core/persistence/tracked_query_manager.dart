@@ -9,6 +9,7 @@ import 'package:firebase_database_dart/src/core/persistence/tracked_query.dart';
 import 'package:firebase_database_dart/src/core/snap/child_key.dart';
 import 'package:firebase_database_dart/src/core/util/clock.dart';
 import 'package:firebase_database_dart/src/core/util/immutable_tree.dart';
+import 'package:firebase_database_dart/src/core/util/logger.dart';
 import 'package:firebase_database_dart/src/core/view/query_params.dart';
 import 'package:firebase_database_dart/src/core/view/query_spec.dart';
 
@@ -21,14 +22,17 @@ import 'package:firebase_database_dart/src/core/view/query_spec.dart';
 final class TrackedQueryManager {
   /// Resets the previously active tracked queries of [storageLayer] in a transaction of its own,
   /// then loads them; a loaded query that repeats another query's spec under a different id is a
-  /// [StateError] (Android `TrackedQueryManager.java:97-124`).
+  /// [StateError] (Android `TrackedQueryManager.java:97-124`). Prune decisions go to [logger] at
+  /// debug level, as Android logs them (null: dropped).
   factory TrackedQueryManager(
     PersistenceStorageEngine storageLayer,
-    Clock clock,
-  ) {
+    Clock clock, {
+    DatabaseLogger? logger,
+  }) {
     final TrackedQueryManager manager = TrackedQueryManager._(
       storageLayer,
       clock,
+      logger,
     );
     manager._resetPreviouslyActiveTrackedQueries();
     // Populate the in-memory cache from the storage layer.
@@ -41,7 +45,10 @@ final class TrackedQueryManager {
     return manager;
   }
 
-  TrackedQueryManager._(this._storageLayer, this._clock);
+  TrackedQueryManager._(this._storageLayer, this._clock, this._logger);
+
+  /// Android: `TrackedQueryManager.logger`.
+  final DatabaseLogger? _logger;
 
   /// Android: `TrackedQueryManager.storageLayer`, where tracked queries are stored for good.
   final PersistenceStorageEngine _storageLayer;
@@ -210,6 +217,11 @@ final class TrackedQueryManager {
       prunable.length,
     );
     PruneForest forest = PruneForest();
+    _logger?.call(
+      DatabaseLogLevel.debug,
+      'Pruning old queries.  Prunable: ${prunable.length} '
+      'Count to prune: $countToPrune',
+    );
 
     // A stable sort by last use, as Java's Collections.sort is.
     final List<int> order = List<int>.generate(prunable.length, (int i) => i)
@@ -235,7 +247,14 @@ final class TrackedQueryManager {
     }
 
     // Also keep the unprunable queries.
-    for (final TrackedQuery toKeep in _getQueriesMatching(_isQueryUnprunable)) {
+    final List<TrackedQuery> unprunable = _getQueriesMatching(
+      _isQueryUnprunable,
+    );
+    _logger?.call(
+      DatabaseLogLevel.debug,
+      'Unprunable queries: ${unprunable.length}',
+    );
+    for (final TrackedQuery toKeep in unprunable) {
       forest = forest.keep(toKeep.querySpec.path);
     }
     return forest;

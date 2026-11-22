@@ -15,11 +15,16 @@ final class ServerClock {
   final Clock clock;
 
   /// The last server time offset in milliseconds (server minus local).
-  int get offsetMillis => throw UnimplementedError();
+  /// Android `OffsetClock.offset`.
+  // The getter and setter pair is the skeleton's signature.
+  // ignore: unnecessary_getters_setters
+  int get offsetMillis => _offsetMillis;
+  int _offsetMillis = 0;
 
-  /// Sets the server time offset in milliseconds.
-  set offsetMillis(int value) => throw UnimplementedError();
+  /// Sets the server time offset in milliseconds (Android `OffsetClock.setOffset`).
+  set offsetMillis(int value) => _offsetMillis = value;
 
   /// The estimated server time in milliseconds since the epoch: local time plus the offset.
-  int nowMillis() => throw UnimplementedError();
+  /// Android `OffsetClock.millis`; JS `repoServerTime`.
+  int nowMillis() => clock().millisecondsSinceEpoch + _offsetMillis;
 }

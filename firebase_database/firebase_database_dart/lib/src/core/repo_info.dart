@@ -29,21 +29,38 @@ final class RepoInfo {
   final bool isUsingEmulator;
 
   /// Whether [host] is a demo host (`*.firebaseio-demo.com`), which warns about data loss.
-  bool get isDemoHost => throw UnimplementedError();
+  /// JS `RepoInfo.isDemoHost`; Android `RepoInfo.isDemoHost`.
+  bool get isDemoHost => host.contains('.firebaseio-demo.com');
 
   /// The database URL: `https://host` (plus `?ns=` for the emulator); the persistence key
   /// (`PersistenceKey.databaseUrl`) uses it.
-  Uri get databaseUrl => throw UnimplementedError();
+  /// JS `RepoInfo.toURLString`; Android `RepoInfo.toString`.
+  Uri get databaseUrl => Uri.parse(toUrlString());
 
-  /// [databaseUrl] as a string.
-  String toUrlString() => throw UnimplementedError();
+  /// [databaseUrl] as a string. JS `RepoInfo.toURLString` (without its trailing `/`).
+  String toUrlString() {
+    final String scheme = secure ? 'https' : 'http';
+    final String query = isUsingEmulator
+        ? '?ns=${Uri.encodeQueryComponent(namespace)}'
+        : '';
+    return '$scheme://$host$query';
+  }
 
+  /// Equal when host, namespace, security and emulator flag are (Android `RepoInfo.equals`).
   @override
-  bool operator ==(Object other) => throw UnimplementedError();
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is RepoInfo &&
+          other.host == host &&
+          other.namespace == namespace &&
+          other.secure == secure &&
+          other.isUsingEmulator == isUsingEmulator;
 
+  /// Android `RepoInfo.hashCode`.
   @override
-  int get hashCode => throw UnimplementedError();
+  int get hashCode => Object.hash(host, namespace, secure, isUsingEmulator);
 
+  /// [toUrlString] (Android `RepoInfo.toString`).
   @override
-  String toString() => throw UnimplementedError();
+  String toString() => toUrlString();
 }
