@@ -54,6 +54,8 @@ jobs:
       securestorage: ${{ github.event_name == 'workflow_dispatch' || steps.browser.outputs.securestorage == 'true' }}
       # Whether the change touches the Realtime Database packages or their scripts.
       database: ${{ github.event_name == 'workflow_dispatch' || steps.browser.outputs.database == 'true' }}
+      # Whether the change touches the examples or the gallery scripts.
+      gallery: ${{ github.event_name == 'workflow_dispatch' || steps.browser.outputs.gallery == 'true' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
@@ -76,7 +78,8 @@ jobs:
           # `browser` is true when any changed file is one of these: the library, the SQLite
           # opener package (the web opener and OPFS worker the tests use), the browser tests, and
           # what runs them.
-          # `indexeddb`, `securestorage` and `database` work the same way for their own jobs.
+          # `indexeddb`, `securestorage`, `database` and `gallery` work the same way for their own
+          # jobs.
           filters: |
             browser:
               - 'cloud_firestore/cloud_firestore_dart/lib/**'
@@ -122,6 +125,20 @@ jobs:
               - 'tool/test_flutterfire_database_gate.sh'
               - '.github/workflows/ci.yml'
               - '.github/actions/**'
+            gallery:
+              - 'examples/**'
+              - 'tool/build_gallery.sh'
+              - 'tool/check_gallery.sh'
+              - 'tool/smoke_gallery.mjs'
+              # What examples/web_app resolves by path (the rtdb examples are covered by `database`).
+              - 'cloud_firestore/cloud_firestore_dart/lib/**'
+              - 'cloud_firestore/cloud_firestore_dart/pubspec.yaml'
+              - 'cloud_firestore/cloud_firestore_dart_sqlite/lib/**'
+              - 'cloud_firestore/cloud_firestore_dart_sqlite/pubspec.yaml'
+              - 'firebase_storage/firebase_storage_dart/lib/**'
+              - 'firebase_storage/firebase_storage_dart/pubspec.yaml'
+              - 'firebase_core/firebase_app_dart/lib/**'
+              - 'firebase_core/firebase_app_dart/pubspec.yaml'
 
   # The unit suite (tool/test_all.sh) runs in two parallel legs per SDK: cloud_firestore_dart
   # alone (its tests take about 9 of the 11 minutes) and every other package with the examples.
@@ -211,7 +228,11 @@ jobs:
       - name: Check formatting (firebase_database_dart_sqlite)
         if: ${{ !cancelled() && matrix.leg == 'others' }}
         working-directory: firebase_database/firebase_database_dart_sqlite
-        run: dart format --output=none --set-exit-if-changed lib test tool
+        # Without test/readme: readme_snippets_test.dart generates it and the formatter does not
+        # leave it unchanged.
+        run: |
+          find lib test tool -name '*.dart' -not -path 'test/readme/*' -print0 \
+            | xargs -0 dart format --output=none --set-exit-if-changed
       - name: Lowest versions of the dependencies (firebase_auth_providers_dart)
         # The package claims `googleapis_auth: ^2.0.0`, `http: ^1.2.0` and `crypto: ^3.0.3`: run its
         # tests with the lowest versions this SDK resolves (only the runtime dependencies are
@@ -812,6 +833,71 @@ jobs:
           name: database-flutterfire-gate-log
           path: ${{ runner.temp }}/emulator/*.log
 
+  # The web gallery: tool/build_gallery.sh compiles each web example with dart2wasm and dart2js
+  # into build/gallery, tool/check_gallery.sh checks the built entry files and every file each
+  # index.html references, and tool/smoke_gallery.mjs clicks through rtdb_web_app and
+  # rtdb_playground in headless Chrome on both builds (Node's own WebSocket, no npm package),
+  # with the pages served from 127.0.0.1:8080 and a Database emulator on 9100, the script's
+  # defaults. The script writes no screenshots: its output is the log. Only when the change
+  # touches what the `database` filter covers, the examples or the three gallery scripts.
+  # Required: no other job compiles the examples to the web or runs them in a browser.
+  gallery:
+    name: Web gallery build and smoke test (Chrome)
+    needs: changes
+    if: >-
+      ${{ needs.changes.outputs.code == 'true' && (needs.changes.outputs.database == 'true' ||
+      needs.changes.outputs.gallery == 'true') }}
+    runs-on: ubuntu-26.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set the emulator work directory
+        # The `runner` context is not available in job-level `env`.
+        run: echo "EMULATOR_DIR=$RUNNER_TEMP/emulator" >> "$GITHUB_ENV"
+      - uses: ./.github/actions/dart
+        with:
+          sdk: stable
+      - uses: ./.github/actions/emulators
+      - name: Build the gallery
+        run: ./tool/build_gallery.sh
+      - name: Check the built files
+        run: ./tool/check_gallery.sh
+      - name: Download the Database emulator
+        # Does nothing when the cache restored the JAR of this CLI version.
+        run: firebase setup:emulators:database
+      - name: Start the Database emulator
+        run: ./tool/start_database_emulator.sh 9100
+      - name: Smoke test the Realtime Database examples (dart2js and dart2wasm)
+        env:
+          CHROME: google-chrome
+        run: |
+          set -o pipefail
+          python3 -m http.server 8080 --bind 127.0.0.1 --directory build/gallery \
+            > "$EMULATOR_DIR/http_server.log" 2>&1 &
+          server=$!
+          trap 'kill "$server"' EXIT
+          for _ in $(seq 1 30); do
+            if curl -sf -o /dev/null http://127.0.0.1:8080/; then break; fi
+            sleep 1
+          done
+          if ! curl -sf -o /dev/null http://127.0.0.1:8080/; then
+            echo "::error::The HTTP server of build/gallery did not answer on 127.0.0.1:8080."
+            cat "$EMULATOR_DIR/http_server.log"
+            exit 1
+          fi
+          node tool/smoke_gallery.mjs 2>&1 | tee "$EMULATOR_DIR/smoke_gallery.log"
+      - name: Stop the Database emulator
+        if: always()
+        run: ./tool/stop_database_emulator.sh 9100
+      - name: Upload the logs
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: gallery-log
+          path: ${{ runner.temp }}/emulator/*.log
+
   # firebase_auth_secure_storage_dart against the real secret store of each system
   # (test/integration, skipped without FIREBASE_AUTH_SECURE_STORAGE_INTEGRATION=1; the unit legs run
   # the rest of its tests). Only when a change touches the package, ci.yml or .github/actions/. Each
@@ -939,7 +1025,9 @@ jobs:
   # (FIRESTORE_EMULATOR_HOST: 15 of the Firestore package's 29 tests skip without it;
   # FIREBASE_AUTH_EMULATOR_HOST, from tool/start_auth_emulators.sh, for the Auth package;
   # FIREBASE_DATABASE_EMULATOR_HOST, from tool/start_database_emulator.sh on 9100, for the Database
-  # package: 5 of its tests skip without it), flutter analyze of examples/flutter_notes, and
+  # package: 5 of its tests skip without it), flutter analyze of examples/flutter_notes and of the
+  # desktop examples (flutterfire_on_linux, flutterfire_on_windows, flutterfire_storage_on_linux,
+  # flutterfire_database_on_linux, flutterfire_database_on_windows; analyze only, no build), and
   # flutter analyze and the web builds
   # (`flutter build web` and `flutter build web --wasm`) of examples/flutter_web_two_users. Through tool/test_all.sh, with
   # TEST_ALL_REQUIRE_FLUTTER=1 so that a missing Flutter fails the job instead of skipping. The
@@ -990,7 +1078,12 @@ jobs:
           ./tool/test_all.sh cloud_firestore_dart_flutterfire cloud_firestore_dart_platform \
             firebase_auth_dart_platform firebase_storage_dart_platform \
             firebase_database_dart_platform firebase_auth_secure_storage_flutter \
-            examples/flutter_notes examples/flutter_web_two_users 2>&1 \
+            examples/flutter_notes examples/flutter_web_two_users \
+            examples/flutterfire_on_linux \
+            examples/flutterfire_on_windows \
+            examples/flutterfire_storage_on_linux \
+            examples/flutterfire_database_on_linux \
+            examples/flutterfire_database_on_windows 2>&1 \
             | tee "$RUNNER_TEMP/flutter_summary.txt"
           if ! grep -Eq '^cloud_firestore_dart_platform: .*test PASS \([0-9]+ passed, 0 skipped' \
             "$RUNNER_TEMP/flutter_summary.txt"; then

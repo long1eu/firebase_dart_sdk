@@ -7,9 +7,14 @@
 # store skip themselves without FIREBASE_AUTH_SECURE_STORAGE_INTEGRATION=1.
 # firebase_database_dart runs all of test/: its emulator tests skip themselves without
 # FIREBASE_DATABASE_EMULATOR_HOST (the CI job "database" sets it) and its browser tests run only in
-# a browser. firebase_database_dart_sqlite runs all of test/ (VM only, real SQLite files).
+# a browser. firebase_database_dart_sqlite runs all of test/ (VM only, real SQLite files), with
+# test/readme_snippets_test.dart, which compiles the README snippets into test/readme (resolved
+# with firebase_auth_providers_dart, cloud_firestore_dart and secure_flow from their sibling
+# directories; that generated folder is not formatter-stable: the format check of CI leaves it out).
 # The example programs in examples/ are analyzed only (their tests need an emulator); select
-# them alone with the name "examples", or one with "examples/<name>".
+# them alone with the name "examples", or one with "examples/<name>". The web builds of the
+# gallery and their smoke test are not run here: tool/build_gallery.sh, tool/check_gallery.sh and
+# tool/smoke_gallery.mjs (the CI job "gallery").
 # The Flutter packages (cloud_firestore_dart_flutterfire, cloud_firestore_dart_platform,
 # firebase_auth_dart_platform, firebase_storage_dart_platform, firebase_database_dart_platform,
 # firebase_auth_secure_storage_flutter) and the Flutter examples need the Flutter SDK and are
