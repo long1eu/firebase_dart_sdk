@@ -115,7 +115,6 @@ void _firebaseDatabase(FirebaseApp app, FirebaseDatabase db) {
       DatabaseLogger? logger,
       DateTime Function()? clock,
       double Function()? random,
-      Future<void> Function(Duration)? delay,
     })
   >
   _ = FirebaseDatabase.new.exact;

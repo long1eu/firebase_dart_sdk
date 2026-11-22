@@ -980,6 +980,52 @@ void main() {
       },
       persisted: <String, Object?>{'a': 1},
     );
+
+    void logKeys(Harness h, DataSnapshot s) =>
+        h.log.add(s.children.map((DataSnapshot c) => c.key).join(','));
+
+    scenario('get() of an ordered query asks for the default query', (
+      Harness h,
+    ) {
+      h.trackValue(
+        'G',
+        h.ref('l').orderByChild('x').get(),
+        then: (DataSnapshot s) => logKeys(h, s),
+      );
+      h.settle();
+      expect(h.server.requests.last, 'g /l');
+      h.server.answerGet('l', <String, Object?>{
+        'a': <String, Object?>{'x': 3},
+        'b': <String, Object?>{'x': 1},
+        'c': <String, Object?>{'x': 2},
+      });
+      h.settle();
+      expect(h.log.last, 'b,c,a');
+    });
+
+    scenario('get() of an orderByValue query asks for the default query', (
+      Harness h,
+    ) {
+      h.trackValue(
+        'G',
+        h.ref('l').orderByValue().get(),
+        then: (DataSnapshot s) => logKeys(h, s),
+      );
+      h.settle();
+      expect(h.server.requests.last, 'g /l');
+      h.server.answerGet('l', <String, Object?>{'a': 3, 'b': 1, 'c': 2});
+      h.settle();
+      expect(h.log.last, 'b,c,a');
+    });
+
+    scenario('get() of a limited ordered query sends its query', (Harness h) {
+      h.trackValue('G', h.ref('l').orderByChild('x').limitToLast(2).get());
+      h.settle();
+      expect(h.server.requests.last, startsWith('g /l {'));
+      h.server.failGet('l', 'no_index');
+      h.settle();
+      expect(h.log, <String>['G:E(index-not-defined)']);
+    });
   });
 
   group('4.4 connection state and snapshots', () {

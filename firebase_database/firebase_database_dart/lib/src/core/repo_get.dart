@@ -23,8 +23,9 @@ extension _RepoGet on Repo {
   /// 1. Complete local data (an active complete view, or pending writes covering the query)
   ///    answers at once (JS `syncTreeGetServerValue`).
   /// 2. After goOffline the persisted cache answers at once, else `unavailable`.
-  /// 3. Otherwise the request goes out. While connected there is no timer; while disconnected (or
-  ///    from a drop on) a [getPersistedFallbackDelay] wait starts, after which the persisted cache
+  /// 3. Otherwise the request goes out; a query that loads all data asks for the default query
+  ///    and is ordered here. While connected there is no timer; while disconnected (or from a
+  ///    drop on) a [getPersistedFallbackDelay] wait starts, after which the persisted cache
   ///    answers, else `unavailable`. A connection stops the wait.
   /// 4. A failure (`permission_denied`, `network_error`, ...) fails the get; it never answers
   ///    from the cache.
@@ -51,8 +52,14 @@ extension _RepoGet on Repo {
       _answerGetFromCache(request);
       return request.completer.future;
     }
+    // A query that loads all data is asked for as the default query and ordered here, as a listen
+    // is (sync tree `_queryForListening`): the server refuses an ordered get with `no_index` when
+    // the rules have no `.indexOn`, while it answers the default get.
+    final QuerySpec wireQuery = query.loadsAllData && !query.isDefault
+        ? QuerySpec.defaultAt(query.path)
+        : query;
     _connection
-        .get(query.toListenSpec())
+        .get(wireQuery.toListenSpec())
         .then<void>(
           (Object? payload) => _onGetResult(request, payload),
           onError: (Object error, StackTrace stackTrace) =>
