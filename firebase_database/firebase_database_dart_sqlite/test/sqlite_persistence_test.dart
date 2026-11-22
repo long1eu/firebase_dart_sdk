@@ -224,10 +224,20 @@ void main() {
         final PersistenceStorageEngine crashed = await other.open(key);
         addTearDown(crashed.close);
 
-        await persistence.clear(key);
+        // The stand-in still holds its file handles, which a crashed process does not. Windows
+        // refuses to delete an open file, so there the clear reports the files it could not
+        // delete; the tombstone is written either way.
+        if (Platform.isWindows) {
+          await expectLater(
+            persistence.clear(key),
+            throwsA(isA<ClearPersistenceException>()),
+          );
+        } else {
+          await persistence.clear(key);
+          expect(File(persistence.pathOf(key)).existsSync(), isFalse);
+        }
 
         expect(fixture.clock.delays, <Duration>[SqliteLease.observation]);
-        expect(File(persistence.pathOf(key)).existsSync(), isFalse);
       },
     );
 
