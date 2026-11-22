@@ -165,8 +165,8 @@ name and database URL, so one directory serves every app.
 
 Errors are `FirebaseException`s of `firebase_core` with the plugin `firebase_database` and FlutterFire's codes:
 `permission-denied`, `disconnected`, `max-retries`, `overridden-by-set`, `unavailable`, `network-error`,
-`index-not-defined`, `write-cancelled`, `failure`, `unknown`, plus the client's `database-closed`, `too-big` and
-`read-only`, which FlutterFire does not have.
+`index-not-defined`, `write-cancelled`, `failure`, `unknown`, plus the client's `database-closed` and `too-big`,
+which FlutterFire does not have.
 
 ### Transactions
 

@@ -1,9 +1,8 @@
 // Contract of ServerActions and ServerActionsDelegate (lib/src/core/connection/server_actions.dart).
 //
-// Any connection must pass runServerActionsContract with a harness that plays the server; a
-// read-only connection (the REST client) must also pass runReadOnlyServerActionsContract.
-// server_actions_contract_test.dart runs both against FakeServerActions; the connection team runs
-// them against its implementations with a harness over a local fake server. No main here: other
+// Any connection must pass runServerActionsContract with a harness that plays the server.
+// server_actions_contract_test.dart runs it against FakeServerActions; the connection team runs
+// it against its implementations with a harness over a local fake server. No main here: other
 // packages import this file.
 import 'dart:async';
 
@@ -45,7 +44,6 @@ const ListenSpec defaultSpec = ListenSpec(
   isDefault: true,
   loadsAllData: true,
   indexName: '.priority',
-  restParams: <String, String>{},
 );
 
 /// A tagged (limited) listen spec at `/users`.
@@ -56,7 +54,6 @@ const ListenSpec taggedSpec = ListenSpec(
   isDefault: false,
   loadsAllData: false,
   indexName: 'age',
-  restParams: <String, String>{'orderBy': '"age"', 'limitToFirst': '10'},
 );
 
 /// The contract every connection passes.
@@ -258,39 +255,6 @@ void runServerActionsContract(ServerActionsHarness Function() create) {
   test('shutdown completes', () async {
     await actions.shutdown();
   });
-}
-
-/// The contract of a read-only connection (the REST client): every write and onDisconnect
-/// request completes, asynchronously, with [statusReadOnly]. [start] creates the connection
-/// reporting to the given delegate.
-void runReadOnlyServerActionsContract(
-  Future<ServerActions> Function(ServerActionsDelegate delegate) start,
-) {
-  late ServerActions actions;
-
-  setUp(() async {
-    actions = await start(RecordingServerActionsDelegate());
-  });
-
-  test(
-    'every write and onDisconnect request completes with read_only',
-    () async {
-      final List<String> statuses = <String>[];
-      void record(String status, Object? _) => statuses.add(status);
-
-      actions.put('/a', 1, onComplete: record);
-      actions.put('/a', 1, hash: 'h', onComplete: record);
-      actions.merge('/a', <String, Object?>{'b': 1}, onComplete: record);
-      actions.onDisconnectPut('/a', 1, onComplete: record);
-      actions.onDisconnectMerge('/a', <String, Object?>{
-        'b': 1,
-      }, onComplete: record);
-      actions.onDisconnectCancel('/a', onComplete: record);
-      expect(statuses, isEmpty);
-      await pumpEventQueue();
-      expect(statuses, List<String>.filled(6, statusReadOnly));
-    },
-  );
 }
 
 /// A hash provider with a fixed simple hash and no compound hash.

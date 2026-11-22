@@ -95,14 +95,7 @@ final class ServerCall {
 /// [ServerActionsException].
 final class FakeServerActions implements ServerActions {
   /// Creates a fake; set [delegate] before delivering anything.
-  FakeServerActions([this.delegate]) : readOnly = false;
-
-  /// Creates a read-only fake: every write and onDisconnect request is recorded and completed
-  /// with [statusReadOnly] in a microtask.
-  FakeServerActions.readOnly([this.delegate]) : readOnly = true;
-
-  /// Whether writes and onDisconnect requests are refused with [statusReadOnly].
-  final bool readOnly;
+  FakeServerActions([this.delegate]);
 
   /// The receiver of server pushes, normally the Repo.
   ServerActionsDelegate? delegate;
@@ -144,17 +137,6 @@ final class FakeServerActions implements ServerActions {
   ServerCall _record(ServerCall call) {
     call._sent = isConnected;
     calls.add(call);
-    if (readOnly && _writeActions.contains(call.action)) {
-      scheduleMicrotask(() {
-        if (!call._answered) {
-          respond(
-            call,
-            status: statusReadOnly,
-            data: 'This database is read-only here.',
-          );
-        }
-      });
-    }
     return call;
   }
 

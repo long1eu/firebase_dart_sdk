@@ -18,7 +18,7 @@ const String databasePlugin = 'firebase_database';
 /// * `write-canceled` is `write-cancelled` on Android and the web.
 /// * `operation-failed` is `failure` on Android (`DatabaseError.OPERATION_FAILED`).
 ///
-/// `too-big`, `read-only` and `database-closed` have no FlutterFire
+/// `too-big` and `database-closed` have no FlutterFire
 /// counterpart and pass through, as every other code does. The client has no
 /// `expired-token` or `invalid-token` code (nothing raises them).
 const Map<String, String> flutterFireCodes = <String, String>{
@@ -32,7 +32,6 @@ const Map<String, String> flutterFireCodes = <String, String>{
   'index-not-defined': 'index-not-defined',
   'operation-failed': 'failure',
   'too-big': 'too-big',
-  'read-only': 'read-only',
   'database-closed': 'database-closed',
   'unknown': 'unknown',
 };

@@ -156,7 +156,6 @@ ListenSpec defaultListen(String path) => ListenSpec(
   isDefault: true,
   loadsAllData: true,
   indexName: '.priority',
-  restParams: const <String, String>{},
 );
 
 /// A filtered listen spec at [path] (limit 10 on `age`).
@@ -167,7 +166,6 @@ ListenSpec taggedListen(String path) => ListenSpec(
   isDefault: false,
   loadsAllData: false,
   indexName: 'age',
-  restParams: const <String, String>{'orderBy': '"age"', 'limitToFirst': '10'},
 );
 
 /// Timings shrunk so a scenario takes milliseconds; reconnects wait [reconnectMin] unless a test

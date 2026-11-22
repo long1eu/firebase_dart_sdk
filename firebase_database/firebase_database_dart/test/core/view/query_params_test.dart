@@ -1,5 +1,5 @@
-// QueryParams: the wire object, query identifier and REST parameters must equal the JS SDK's
-// (queryParamsGetQueryObject, ObjectToUniqueKey, queryParamsToRestQueryStringParameters), plus a
+// QueryParams: the wire object and query identifier must equal the JS SDK's
+// (queryParamsGetQueryObject, ObjectToUniqueKey), plus a
 // port of Android QueryParamsTest.java.
 import 'dart:convert';
 
@@ -29,7 +29,6 @@ void main() {
       expect(def.index, priorityIndex);
       expect(def.toWireObject(), isEmpty);
       expect(def.toQueryIdentifier(), 'default');
-      expect(def.toRestQueryStringParameters(), isEmpty);
     });
 
     test('a plain orderBy loads all data but is not the default query', () {
@@ -38,9 +37,6 @@ void main() {
       expect(q.isDefault, isFalse);
       expect(q.toWireObject(), <String, Object?>{'i': 'age'});
       expect(q.toQueryIdentifier(), '{"i":"age"}');
-      expect(q.toRestQueryStringParameters(), <String, String>{
-        'orderBy': '"age"',
-      });
     });
   });
 
@@ -247,63 +243,8 @@ void main() {
         jsonEncode(asDouble.toWireObject()),
         jsonEncode(asInt.toWireObject()),
       );
-      expect(
-        asDouble.toRestQueryStringParameters(),
-        asInt.toRestQueryStringParameters(),
-      );
       expect(asDouble, asInt);
       expect(asDouble.hashCode, asInt.hashCode);
-    });
-  });
-
-  group('REST parameters (JS queryParamsToRestQueryStringParameters)', () {
-    test('index names', () {
-      expect(
-        def.limitToFirst(2).toRestQueryStringParameters(),
-        <String, String>{'orderBy': r'"$priority"', 'limitToFirst': '2'},
-      );
-      expect(
-        def.orderBy(valueIndex).toRestQueryStringParameters(),
-        <String, String>{'orderBy': r'"$value"'},
-      );
-      expect(
-        def.orderBy(keyIndex).toRestQueryStringParameters(),
-        <String, String>{'orderBy': r'"$key"'},
-      );
-      expect(
-        byChild('address/city').toRestQueryStringParameters(),
-        <String, String>{'orderBy': '"address/city"'},
-      );
-    });
-
-    test('bounds and limits', () {
-      expect(
-        byChild('age')
-            .startAt(n(20), ChildKey('b'))
-            .limitToLast(3)
-            .toRestQueryStringParameters(),
-        <String, String>{
-          'orderBy': '"age"',
-          'startAt': '20,"b"',
-          'limitToLast': '3',
-        },
-      );
-      expect(
-        byChild('age').startAfter(n(20)).toRestQueryStringParameters(),
-        <String, String>{'orderBy': '"age"', 'startAfter': '20,"[MAX_NAME]"'},
-      );
-      expect(
-        byChild('age').endAt(n('x')).toRestQueryStringParameters(),
-        <String, String>{'orderBy': '"age"', 'endAt': '"x"'},
-      );
-      expect(
-        def.orderBy(keyIndex).endBefore(n('b')).toRestQueryStringParameters(),
-        <String, String>{'orderBy': r'"$key"', 'endBefore': '"b"'},
-      );
-      expect(
-        def.startAt(ChildrenNode.empty).toRestQueryStringParameters(),
-        <String, String>{'orderBy': r'"$priority"', 'startAt': 'null'},
-      );
     });
   });
 

@@ -20,7 +20,6 @@ final class ListenSpec {
     required this.isDefault,
     required this.loadsAllData,
     required this.indexName,
-    required this.restParams,
   });
 
   /// The path in wire form: `/a/b`, `/` for the root.
@@ -45,10 +44,6 @@ final class ListenSpec {
   /// The index wire name (`.priority`, `.key`, `.value` or a child path), for the "Using an
   /// unspecified index" warning when the listen response carries `w: ['no_index']`.
   final String indexName;
-
-  /// The REST query string parameters (`orderBy`, `startAt`, `limitToFirst`, ...), from
-  /// `QueryParams.toRestQueryStringParameters()`; `{}` for the default query. Unmodifiable.
-  final Map<String, String> restParams;
 
   // Identity is path + queryIdentifier, as JS `PersistentConnection.listens_` keys its table
   // (`pathString` -> `queryId`). Android's `PersistentConnectionImpl.QuerySpec` compares the path

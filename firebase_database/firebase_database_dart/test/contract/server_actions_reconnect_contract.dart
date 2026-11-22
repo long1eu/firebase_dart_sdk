@@ -1,8 +1,7 @@
 // Owner P. The reconnect part of the ServerActions contract (lib/src/core/connection/
 // server_actions.dart): what an implementation that keeps a connection across drops must do, on
 // top of runServerActionsContract (server_actions_contract.dart). A function file, no main: P's
-// runner (over FakeRtdbServer) imports it and calls runServerActionsReconnectContract. The
-// read-only REST client does not run it (it has no connection to lose).
+// runner (over FakeRtdbServer) imports it and calls runServerActionsReconnectContract.
 
 import 'package:firebase_database_dart/src/core/connection/server_actions.dart';
 import 'package:firebase_database_dart/src/testing/recording_server_actions_delegate.dart';

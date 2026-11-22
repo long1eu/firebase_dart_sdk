@@ -732,7 +732,7 @@ Status: built.
 `firebase_database`, a kebab-case code, a message that never contains a token or a URL query, the original
 error as `cause`, and `serverStatus`, the raw status and reason from the server. Codes: `permission-denied`,
 `disconnected`, `max-retries`, `overridden-by-set`, `unavailable`, `network-error`, `write-canceled`,
-`index-not-defined`, `operation-failed`, `too-big`, `read-only`, `database-closed`, `unknown`
+`index-not-defined`, `operation-failed`, `too-big`, `database-closed`, `unknown`
 (`firebaseDatabaseExceptionCodes`). A rejected or expired token is not a code of its own: the server answers
 `permission-denied` to an operation, and the connection retries the token itself. The server's `datastale` and
 the code `user-code-exception` (a throwing transaction handler, whose own exception is rethrown) are internal

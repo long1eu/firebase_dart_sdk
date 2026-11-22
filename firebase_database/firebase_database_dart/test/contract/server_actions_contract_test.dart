@@ -72,10 +72,4 @@ final class _FakeHarness implements ServerActionsHarness {
 
 void main() {
   group('FakeServerActions', () => runServerActionsContract(_FakeHarness.new));
-  group('FakeServerActions.readOnly', () {
-    runReadOnlyServerActionsContract(
-      (ServerActionsDelegate delegate) async =>
-          FakeServerActions.readOnly(delegate)..initialize(),
-    );
-  });
 }

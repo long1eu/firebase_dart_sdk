@@ -59,7 +59,6 @@ ListenSpec defaultSpec(String path) => ListenSpec(
   isDefault: true,
   loadsAllData: true,
   indexName: '.priority',
-  restParams: const <String, String>{},
 );
 
 /// A `.key` query of [path] limited to the first [limit] children.
@@ -70,7 +69,6 @@ ListenSpec keyLimitSpec(String path, int limit) => ListenSpec(
   isDefault: false,
   loadsAllData: false,
   indexName: '.key',
-  restParams: <String, String>{'orderBy': '"\$key"', 'limitToFirst': '$limit'},
 );
 
 /// A hash provider with a fixed simple hash (`""`: the client holds nothing) and no compound

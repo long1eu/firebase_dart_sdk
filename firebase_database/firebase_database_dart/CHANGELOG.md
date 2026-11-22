@@ -31,7 +31,7 @@ against the Database emulator.
   auth provider is a signal and the client fetches the token (an empty token means signed out); `mockUserTokenFor` for
   the emulator.
 - `FirebaseDatabaseException` with the codes `permission-denied`, `disconnected`, `max-retries`, `overridden-by-set`,
-  `unavailable`, `network-error`, `write-canceled`, `index-not-defined`, `operation-failed`, `too-big`, `read-only`,
+  `unavailable`, `network-error`, `write-canceled`, `index-not-defined`, `operation-failed`, `too-big`,
   `database-closed` and `unknown`.
 - Logging through a callback, off by default; credentials are never logged.
 - Optional disk persistence through `firebase_database_dart_sqlite`; only data under a listener or `keepSynced` is

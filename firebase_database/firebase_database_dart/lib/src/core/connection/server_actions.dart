@@ -31,10 +31,6 @@ const String statusDisconnect = 'disconnect';
 /// closed and the request replayed). Maps to `DatabaseErrorCode.networkError`.
 const String statusNetworkError = 'network_error';
 
-/// The status a read-only [ServerActions] completes every write and onDisconnect request with;
-/// maps to `DatabaseErrorCode.readOnly`.
-const String statusReadOnly = 'read_only';
-
 /// The failure of [ServerActions.get]: the wire [status] (`permission_denied`, ...) and the
 /// server's optional [reason]. JS: the `Error` `PersistentConnection.get` rejects with; Android:
 /// `PersistentConnection.get`'s failed task.
@@ -77,9 +73,6 @@ typedef RequestResultCallback = void Function(String status, Object? data);
 ///
 /// Paths cross this seam as `/a/b`, root `/`, in both directions. The server pushes `a/b` and
 /// `""` for the root; the connection normalises before calling the delegate.
-///
-/// A read-only implementation completes every write and onDisconnect request ([put], [merge],
-/// [onDisconnectPut], [onDisconnectMerge], [onDisconnectCancel]) with [statusReadOnly].
 ///
 /// Reconnect contract: after a reconnect the connection replays by itself, in this order: `auth`,
 /// `appcheck`, every listen still registered (with a freshly computed hash), every put and merge

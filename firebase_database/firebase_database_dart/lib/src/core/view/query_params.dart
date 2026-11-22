@@ -28,7 +28,7 @@ enum ViewFrom {
 /// The immutable parameters of a query: index, bounds and limit. Every builder returns a copy.
 ///
 /// Mirrors the JS fields (`startSet_`, `startNameSet_`, `startAfterSet_`, ...), so the wire object,
-/// the query identifier and the REST parameters equal the JS SDK's.
+/// the wire object and the query identifier equal the JS SDK's.
 final class QueryParams {
   QueryParams._({
     this.index = priorityIndex,
@@ -280,50 +280,6 @@ final class QueryParams {
     final String id = objectToUniqueKey(toWireObject());
     return id == '{}' ? 'default' : id;
   }();
-
-  /// The REST query parameters (`orderBy`, `startAt`, ..., `limitToFirst`).
-  Map<String, String> toRestQueryStringParameters() {
-    final Map<String, String> qs = <String, String>{};
-    if (isDefault) {
-      return qs;
-    }
-
-    final String orderBy;
-    if (index == priorityIndex) {
-      orderBy = r'$priority';
-    } else if (index == valueIndex) {
-      orderBy = r'$value';
-    } else if (index == keyIndex) {
-      orderBy = r'$key';
-    } else {
-      assert(index is PathIndex, 'Unrecognized index type!');
-      orderBy = index.queryDefinition;
-    }
-    qs['orderBy'] = jsStringify(orderBy);
-
-    if (hasStart) {
-      final String param = startInclusive ? 'startAt' : 'startAfter';
-      String value = jsStringify(_boundJson(_startValue!));
-      final ChildKey? startName = _startName;
-      if (startName != null) {
-        value += ',${jsStringify(startName.name)}';
-      }
-      qs[param] = value;
-    }
-    if (hasEnd) {
-      final String param = endInclusive ? 'endAt' : 'endBefore';
-      String value = jsStringify(_boundJson(_endValue!));
-      final ChildKey? endName = _endName;
-      if (endName != null) {
-        value += ',${jsStringify(endName.name)}';
-      }
-      qs[param] = value;
-    }
-    if (hasLimit) {
-      qs[isViewFromLeft ? 'limitToFirst' : 'limitToLast'] = '$_limit';
-    }
-    return qs;
-  }
 
   /// Two parameters are equal when their query identifiers are (JS `Query.isEqual`).
   @override

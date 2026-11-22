@@ -17,7 +17,6 @@ void main() {
     'user_code_exception': DatabaseErrorCode.userCodeException,
     statusNetworkError: DatabaseErrorCode.networkError,
     'write_canceled': DatabaseErrorCode.writeCanceled,
-    statusReadOnly: DatabaseErrorCode.readOnly,
     'no_index': DatabaseErrorCode.indexNotDefined,
     'database_closed': DatabaseErrorCode.databaseClosed,
     'unknown': DatabaseErrorCode.unknown,

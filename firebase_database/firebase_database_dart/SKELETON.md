@@ -24,9 +24,8 @@ constants, trivial field-holding constructors, `CachePolicy.none`, `ServerAction
 
 Contract tests (written, not run yet). Each contract is a function file `test/contract/<x>_contract.dart` (no
 `main`, importable by other packages, imports no `*_test.dart`) plus a runner `<x>_contract_test.dart` that runs it
-against our implementation: `server_actions_contract.dart` (`runServerActionsContract`,
-`runReadOnlyServerActionsContract`; run against `FakeServerActions` and `FakeServerActions.readOnly`; the connection
-team adds its harness), `persistence_storage_engine_contract.dart` (`runStorageEngineContract`),
+against our implementation: `server_actions_contract.dart` (`runServerActionsContract`; run against
+`FakeServerActions`; the connection team adds its harness), `persistence_storage_engine_contract.dart` (`runStorageEngineContract`),
 `persistence_manager_contract.dart` (`runPersistenceManagerContract`: Noop, Default, WritesOnly),
 `sync_tree_api_contract.dart` (`runSyncTreeApiContract`), `listen_provider_contract.dart`
 (`runListenProviderContract`: RepoListenProvider over FakeServerActions). `test/contract/server_actions_reconnect_contract.dart`

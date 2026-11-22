@@ -25,7 +25,6 @@ import 'package:meta/meta.dart';
 /// | `index-not-defined` | the query orders by a child that has no `.indexOn` rule (server status `no_index`) |
 /// | `operation-failed` | the server reported that the operation failed (server status `failure`) |
 /// | `too-big` | the data is larger than the server accepts in one request (server status `too_big`) |
-/// | `read-only` | the connection is read only and refused a write or onDisconnect request |
 /// | `database-closed` | the `FirebaseDatabase` was closed, or its app deleted |
 /// | `unknown` | any other server status (`invalid_parameters`, `internal_error`, ...); the raw status is in [serverStatus] |
 ///
@@ -84,7 +83,6 @@ const List<String> firebaseDatabaseExceptionCodes = <String>[
   'index-not-defined',
   'operation-failed',
   'too-big',
-  'read-only',
   'database-closed',
   'unknown',
 ];

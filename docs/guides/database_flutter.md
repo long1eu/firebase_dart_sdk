@@ -119,7 +119,7 @@ restart and are sent again; transactions and `onDisconnect` registrations do not
 | Map keys that are not strings | stringified on write | stringified on write, the later entry wins on a collision; a key invalid after that (`1.5`) is an `ArgumentError` | no |
 | Values handed to the app | mutable `Map<Object?, Object?>` and `List<Object?>` | the same types, a deep copy made once per snapshot, so two listeners never share one | no |
 | Event streams | broadcast | not broadcast: each `listen` is its own registration with its own initial event | yes, if two parts of the app share one stream object and expect one initial event |
-| Error codes | `write-cancelled`, `failure` | the same spellings; plus `database-closed`, `too-big` and `read-only`, which FlutterFire does not have | no |
+| Error codes | `write-cancelled`, `failure` | the same spellings; plus `database-closed` and `too-big`, which FlutterFire does not have | no |
 | Programmer errors and handler exceptions | reported as `FirebaseException` | a bad path, key, value or query is an `ArgumentError` or `StateError`; an exception thrown in a transaction handler fails `runTransaction` as itself | yes, if code catches only `FirebaseException` |
 | Where a bad reference is reported | at the call | `ref('a.b')` makes no client, so it fails at the first read or write | yes, if a test expects a throw from `ref` |
 | Modifier order | `startAt(1).orderByChild('x')` accepted | accepted: applied in one order whatever the call order; an invalid combination fails the stream or `get`, not the call | no |

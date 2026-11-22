@@ -497,7 +497,7 @@ try {
 
 `FirebaseDatabaseException.cause` holds the underlying error when it came from outside the package; it is never part of
 the message. The codes are `permission-denied`, `disconnected`, `max-retries`, `overridden-by-set`, `unavailable`,
-`network-error`, `write-canceled`, `index-not-defined`, `operation-failed`, `too-big`, `read-only`, `database-closed`
+`network-error`, `write-canceled`, `index-not-defined`, `operation-failed`, `too-big`, `database-closed`
 and `unknown`. `serverStatus` is the raw status and reason from the server. A message never contains a token or a URL
 query. A rejected or expired token is not a code of its own: the server answers `permission-denied` and the connection
 retries the token itself. A bad path, key, value or query is an `ArgumentError` or `StateError` at the call, not an

@@ -41,7 +41,6 @@ void main() {
         'network-error',
         'index-not-defined',
         'too-big',
-        'read-only',
         'database-closed',
         'unknown',
       ];

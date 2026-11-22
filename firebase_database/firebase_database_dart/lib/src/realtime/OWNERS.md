@@ -16,7 +16,7 @@ the connection half imports and implements them, and declares no `ListenSpec`, `
 
 The decided seam changes (A.1 to A.10) are in the core since 7cbaba84: tokens belong to the
 connection, `Future<void> shutdown()`, `ServerActionsException` for a failed `get`,
-`ListenSpec.restParams`, `statusReadOnly`, `DatabaseLogger` (`core/util/logger.dart`, nullable:
+`DatabaseLogger` (`core/util/logger.dart`, nullable:
 the core's `ServerActionsFactory` passes `DatabaseLogger?`). `RealtimeTarget` is the class A.5
 calls `ConnectionTarget`.
 

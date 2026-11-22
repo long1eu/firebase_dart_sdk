@@ -42,10 +42,6 @@ enum DatabaseErrorCode {
   /// The write was canceled by the user (purgeOutstandingWrites).
   writeCanceled('write-canceled', 'write_canceled'),
 
-  /// The database is read-only here: a read-only connection completes every write and
-  /// onDisconnect request with this status.
-  readOnly('read-only', 'read_only'),
-
   /// The query orders by a child the security rules give no `.indexOn` (the server's `no_index`).
   indexNotDefined('index-not-defined', 'no_index'),
 
@@ -151,7 +147,6 @@ String _messageFor(DatabaseErrorCode code) => switch (code) {
   DatabaseErrorCode.networkError =>
     'The operation could not be performed due to a network error.',
   DatabaseErrorCode.writeCanceled => 'The write was canceled by the user.',
-  DatabaseErrorCode.readOnly => 'The database is read-only here.',
   DatabaseErrorCode.indexNotDefined =>
     'Index not defined: add ".indexOn" to the security rules for this query.',
   DatabaseErrorCode.databaseClosed => 'The database was closed.',

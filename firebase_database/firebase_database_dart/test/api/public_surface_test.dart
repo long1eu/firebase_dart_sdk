@@ -47,7 +47,6 @@ void main() {
       'index-not-defined',
       'operation-failed',
       'too-big',
-      'read-only',
       'database-closed',
       'unknown',
     ]);
@@ -66,7 +65,6 @@ void main() {
         DatabaseErrorCode.tooBig => 'too-big',
         DatabaseErrorCode.networkError => 'network-error',
         DatabaseErrorCode.writeCanceled => 'write-canceled',
-        DatabaseErrorCode.readOnly => 'read-only',
         DatabaseErrorCode.indexNotDefined => 'index-not-defined',
         DatabaseErrorCode.databaseClosed => 'database-closed',
         DatabaseErrorCode.unknown => 'unknown',
