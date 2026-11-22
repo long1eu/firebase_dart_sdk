@@ -348,6 +348,7 @@ async function webApp(browser, opts, rid, compiler) {
     await webAppPanel(c);
     await webAppSkew(c);
     await webAppRules(c);
+    await webAppHiddenBurst(c);
   } finally {
     try {
       await c.db.rules(true, true);
@@ -539,47 +540,62 @@ async function webAppPanel(c) {
   });
 }
 
-// Step 13: a late handshake makes the server time offset too small, so a local ServerValue.timestamp
-// estimate sorts before an item the server already stamped, and the real value moves it later
-// (onChildMoved). The page is not changed: a script added before the page loads makes the first
-// WebSocket message handler of each socket busy-wait 300 ms.
+// Step 13: a late handshake makes the server time offset too small, so a local
+// ServerValue.timestamp estimate sorts before an item the server already stamped, and the real value moves it later
+// (onChildMoved). The page is not changed: a script added before the page loads wraps the
+// WebSocket `onmessage` setter (the client sets that property, `ws_channel_web.dart`) so the first
+// message of each socket, the handshake, waits SKEW_STALL_MS first. The stall is far longer than
+// the time between the two adds, so the estimate of "two" always sorts first until the server
+// value arrives.
+const SKEW_STALL_MS = 3000;
+
 async function webAppSkew(c) {
   const { browser, opts, compiler, group, pages, rid } = c;
   const project = `demo-smoke-${rid}-${compiler}-skew`;
   const compilerName = compiler === 'js' ? 'dart2js' : 'dart2wasm';
-  await step(group, '13 server time offset skew', 'with a 300 ms stall on the first WebSocket ' +
-    'message, items added one after the other end in order one, two (the row is moved when the ' +
-    'server timestamp arrives)', async () => {
+  await step(group, '13 server time offset skew', `with a ${SKEW_STALL_MS} ms stall on the ` +
+    'handshake, "two" added right after "one" is first shown before "one", then moved: the list ' +
+    'ends one, two', async () => {
     const page = await Page.open(browser, 'skew');
     pages.push(page);
     await page.send('Page.addScriptToEvaluateOnNewDocument', { source: `(() => {
-      const add = EventTarget.prototype.addEventListener;
-      EventTarget.prototype.addEventListener = function (type, fn, ...rest) {
-        if (type === 'message' && this instanceof WebSocket && typeof fn === 'function') {
+      window.__stalls = 0;
+      const d = Object.getOwnPropertyDescriptor(WebSocket.prototype, 'onmessage');
+      Object.defineProperty(WebSocket.prototype, 'onmessage', {
+        configurable: true, enumerable: d.enumerable, get() { return d.get.call(this); },
+        set(fn) {
+          if (typeof fn !== 'function') return d.set.call(this, fn);
           let first = true;
-          const wrapped = function (...args) {
+          d.set.call(this, function (...args) {
             if (first) {
               first = false;
-              const end = performance.now() + 300;
+              window.__stalls++;
+              const end = performance.now() + ${SKEW_STALL_MS};
               while (performance.now() < end);
             }
             return fn.apply(this, args);
-          };
-          return add.call(this, type, wrapped, ...rest);
-        }
-        return add.call(this, type, fn, ...rest);
-      };
+          });
+        },
+      });
     })();` });
     await page.goto(`${opts.base}/rtdb_web_app/?emulator=${opts.emulator}&project=${project}` +
       `&compiler=${compiler}`);
     await page.waitUntil(WA, (s) => s && s.compiler === compilerName &&
-      s.connected === 'Connected' && s.pending === 'No writes waiting', 15000, showWa);
-    await page.eval(`setVal('text', 'one'); submitForm('add'); return true;`);
+      s.connected === 'Connected' && s.pending === 'No writes waiting', 20000, showWa);
+    const stalls = await page.eval('return window.__stalls;');
+    check(stalls >= 1, `the handshake was not stalled (${stalls} stalls)`);
+    await page.eval(`window.__orders = [];
+      new MutationObserver(() => window.__orders.push(lis('items').join())).observe($('items'),
+        { childList: true });
+      setVal('text', 'one'); submitForm('add'); return true;`);
     await page.waitUntil(WA, (s) => s.items.join() === 'one' && s.classes[0] === '', 10000, showWa);
     await page.eval(`setVal('text', 'two'); submitForm('add'); return true;`);
     await page.waitUntil(WA, (s) => s.items.join() === 'one,two' &&
       s.pending === 'No writes waiting', 10000, showWa);
     await page.waitUntil(WA, (s) => s.items.join() === 'one,two', 1000, showWa);
+    const orders = await page.eval('return window.__orders;');
+    check(orders.includes('two,one'), `"two" was never shown first: ${JSON.stringify(orders)}`);
+    return `orders seen: ${orders.join(' | ')}`;
   });
 }
 
@@ -611,6 +627,62 @@ async function webAppRules(c) {
       10000, showWa);
     check(/permission.denied/i.test(s.error), `#error ${JSON.stringify(s.error)}`);
     return `#error ${JSON.stringify(s.error)}`;
+  });
+}
+
+// Step 14: more separate changes than one drain slice, queued in one task, in a hidden tab. The
+// event dispatcher yields to the event loop every 1000 events; a hidden tab delays chained timers
+// to about one a second, so the yield must not be a timer. Server pushes do not reach this path
+// (each WebSocket message is its own task, and the drain runs after it), so the page goes offline
+// and its own form is submitted BURST times in one evaluation: one local write, one change, per
+// submit. The time counted is from the end of that loop to the last li.
+const BURST = 20000;
+const BURST_BOUND_MS = 1500;
+
+async function webAppHiddenBurst(c) {
+  const { browser, opts, compiler, group, pages, rid } = c;
+  const project = `demo-smoke-${rid}-${compiler}-burst`;
+  const compilerName = compiler === 'js' ? 'dart2js' : 'dart2wasm';
+  await step(group, '14 hidden tab burst', `offline, ${BURST} adds in one task in a minimised ` +
+    `window (visibilityState hidden); the ${BURST} li show within ${BURST_BOUND_MS} ms of the ` +
+    'end of that task', async () => {
+    const page = await Page.open(browser, 'burst', { newWindow: true });
+    pages.push(page);
+    await page.send('Emulation.setFocusEmulationEnabled', { enabled: false });
+    const { windowId } = await browser.cdp.send('Browser.getWindowForTarget',
+      { targetId: page.targetId });
+    await browser.cdp.send('Browser.setWindowBounds',
+      { windowId, bounds: { windowState: 'minimized' } });
+    await page.goto(`${opts.base}/rtdb_web_app/?emulator=${opts.emulator}&project=${project}` +
+      `&compiler=${compiler}`);
+    await page.waitUntil(WA, (s) => s && s.compiler === compilerName &&
+      s.connected === 'Connected' && !s.addDisabled && s.items.length === 0, 15000, showWa);
+    await page.eval(`$('toggle').click(); return true;`);
+    await page.waitUntil(WA, (s) => s.toggle === 'Go online' && s.connected === 'Not connected',
+      10000, showWa);
+    const vis = await page.eval('return document.visibilityState;');
+    check(vis === 'hidden', `visibilityState ${vis}`);
+    // A MutationObserver callback is a microtask, so the time it records is not delayed by the
+    // hidden tab's timer throttling.
+    await page.eval(`window.__burst = null;
+      const list = $('items');
+      new MutationObserver((_, o) => {
+        if (list.children.length >= ${BURST}) {
+          window.__burst = performance.now(); o.disconnect();
+        }
+      }).observe(list, { childList: true });
+      const t0 = performance.now();
+      for (let i = 0; i < ${BURST}; i++) { setVal('text', 'b' + i); submitForm('add'); }
+      window.__loop = [t0, performance.now()];
+      return true;`);
+    const r = await page.waitUntil(`return { done: window.__burst, loop: window.__loop,
+      n: $('items').children.length, vis: document.visibilityState };`,
+    (v) => v.done !== null, 120000, (v) => v);
+    const ms = Math.round(r.done - r.loop[1]);
+    const actual = `${r.n} li ${ms} ms after the loop (the loop took ` +
+      `${Math.round(r.loop[1] - r.loop[0])} ms; visibilityState ${r.vis})`;
+    check(r.vis === 'hidden' && ms < BURST_BOUND_MS, actual);
+    return actual;
   });
 }
 

@@ -365,6 +365,11 @@ void main() {
     });
 
     scenario('D19 yield between changes', (Harness h) {
+      // In a browser the yield is a message task, which the fake clock of these scenarios does
+      // not drive; test/core/repo_test.dart D19 covers the browsers with the real event loop.
+      if (const bool.fromEnvironment('dart.library.js_interop')) {
+        return;
+      }
       const int n = eventsPerDrainSlice;
       bool armed = false;
       h.listenAnswered(

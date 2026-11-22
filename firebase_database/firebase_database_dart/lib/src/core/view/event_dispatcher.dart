@@ -11,8 +11,10 @@ import 'dart:collection';
 
 import 'package:firebase_database_dart/src/core/event_registration.dart';
 import 'package:firebase_database_dart/src/core/view/event.dart';
+import 'package:firebase_database_dart/src/core/view/macrotask_web.dart'
+    if (dart.library.io) 'package:firebase_database_dart/src/core/view/macrotask_io.dart';
 
-/// The number of events after which a drain yields to the event loop (`Timer.run`) at the next
+/// The number of events after which a drain yields to the event loop (a macrotask) at the next
 /// change boundary, so a listener that writes on every event cannot starve I/O.
 const int eventsPerDrainSlice = 1000;
 
@@ -25,25 +27,30 @@ const int eventsPerDrainSlice = 1000;
 /// - An event whose [EventRegistration] is zombied (cancelled) is skipped, including events
 ///   already in the current drain.
 /// - A listener that throws does not stop the drain; the error is reported to the zone.
-/// - After `yieldEvery` events the drain yields to the event loop, but only between changes:
-///   the events of one change are always delivered together.
+/// - After `yieldEvery` events the drain yields to the event loop with the injected `macrotask`
+///   (a `MessageChannel` post in a browser, which a hidden tab does not delay; `Timer.run`
+///   elsewhere), but only between changes: the events of one change are always delivered
+///   together.
 final class EventDispatcher {
-  /// Creates a dispatcher that schedules its drain with [schedule] and yields after [yieldEvery]
-  /// events. Replaces JS `EventQueue` and Android `EventRaiser`.
+  /// Creates a dispatcher that schedules its drain with [schedule] and, after [yieldEvery]
+  /// events, goes on in a later task scheduled with [macrotask]. Replaces JS `EventQueue` and
+  /// Android `EventRaiser`.
   factory EventDispatcher({
     void Function(void Function()) schedule = scheduleMicrotask,
     int yieldEvery = eventsPerDrainSlice,
-  }) => EventDispatcher._(schedule, yieldEvery);
+    void Function(void Function()) macrotask = scheduleMacrotask,
+  }) => EventDispatcher._(schedule, yieldEvery, macrotask);
 
-  EventDispatcher._(this._schedule, this._yieldEvery);
+  EventDispatcher._(this._schedule, this._yieldEvery, this._macrotask);
 
   final void Function(void Function()) _schedule;
   final int _yieldEvery;
+  final void Function(void Function()) _macrotask;
 
   /// The changes not delivered yet, oldest first; each change is delivered whole.
   final Queue<List<Event>> _changes = Queue<List<Event>>();
 
-  /// Whether a drain (the first microtask or a yield's `Timer.run`) is scheduled.
+  /// Whether a drain (the first microtask or a yield's macrotask) is scheduled.
   bool _scheduled = false;
 
   /// Whether a drain is running (events a listener causes are appended, never fired nested).
@@ -72,9 +79,10 @@ final class EventDispatcher {
     try {
       while (_changes.isNotEmpty) {
         if (delivered >= _yieldEvery) {
-          // Only between changes: let timers and I/O run, then go on with the next change.
+          // Only between changes: let rendering, input and I/O run, then go on with the next
+          // change.
           _scheduled = true;
-          Timer.run(_drain);
+          _macrotask(_drain);
           return;
         }
         final List<Event> change = _changes.removeFirst();

@@ -1,4 +1,4 @@
-// EventDispatcher: delivery on a later turn, FIFO order, whole changes, the Timer.run yield,
+// EventDispatcher: delivery on a later turn, FIFO order, whole changes, the macrotask yield,
 // zombied registrations, cancel events, throwing listeners (contract rules 4.4, 4.5, 4.11,
 // 4.12; 13_engine_rules.md event delivery 2 to 6).
 import 'dart:async';
@@ -9,6 +9,8 @@ import 'package:firebase_database_dart/src/core/path.dart';
 import 'package:firebase_database_dart/src/core/snap/node_from_json.dart';
 import 'package:firebase_database_dart/src/core/view/event.dart';
 import 'package:firebase_database_dart/src/core/view/event_dispatcher.dart';
+import 'package:firebase_database_dart/src/core/view/macrotask_web.dart'
+    if (dart.library.io) 'package:firebase_database_dart/src/core/view/macrotask_io.dart';
 import 'package:firebase_database_dart/src/core/view/query_spec.dart';
 import 'package:test/test.dart';
 
@@ -65,22 +67,89 @@ void main() {
     expect(log, <String>['A:1', 'enqueued', 'B:1', 'B:2', 'A:3']);
   });
 
-  test('yields with Timer.run only between changes', () async {
-    final EventDispatcher dispatcher = EventDispatcher(yieldEvery: 2);
-    final CallbackEventRegistration r = registration(
-      'R',
-      after: (DataEvent event) {
-        if (event.snapshot.value == 1) {
-          Timer.run(() => log.add('T'));
-        }
-      },
+  test('yields to the injected macrotask only between changes', () async {
+    final List<void Function()> tasks = <void Function()>[];
+    final EventDispatcher dispatcher = EventDispatcher(
+      yieldEvery: 2,
+      macrotask: tasks.add,
     );
+    final CallbackEventRegistration r = registration('R');
     dispatcher
       ..enqueue(<Event>[value(r, 1), value(r, 2), value(r, 3)])
       ..enqueue(<Event>[value(r, 4)]);
+    // Timers and microtasks run; the rest waits for the injected macrotask, not for Timer.run.
     await pumpEventQueue();
+    expect(log, <String>['R:1', 'R:2', 'R:3']);
+    expect(tasks, hasLength(1));
+    log.add('T');
+    tasks.removeAt(0)();
     expect(log, <String>['R:1', 'R:2', 'R:3', 'T', 'R:4']);
+    expect(tasks, isEmpty);
   });
+
+  test('events enqueued during a yield follow it, none is lost', () async {
+    final List<void Function()> tasks = <void Function()>[];
+    final EventDispatcher dispatcher = EventDispatcher(
+      yieldEvery: 1,
+      macrotask: tasks.add,
+    );
+    final CallbackEventRegistration r = registration('R');
+    dispatcher
+      ..enqueue(<Event>[value(r, 1)])
+      ..enqueue(<Event>[value(r, 2)]);
+    await pumpEventQueue();
+    // A change that arrives while the yield is pending goes behind it; no second drain starts.
+    dispatcher.enqueue(<Event>[value(r, 3)]);
+    await pumpEventQueue();
+    expect(log, <String>['R:1']);
+    expect(tasks, hasLength(1));
+    tasks.removeAt(0)();
+    expect(log, <String>['R:1', 'R:2']);
+    tasks.removeAt(0)();
+    expect(log, <String>['R:1', 'R:2', 'R:3']);
+    expect(tasks, isEmpty);
+  });
+
+  test('a close during a yield delivers nothing more', () async {
+    final List<void Function()> tasks = <void Function()>[];
+    final EventDispatcher dispatcher = EventDispatcher(
+      yieldEvery: 1,
+      macrotask: tasks.add,
+    );
+    final CallbackEventRegistration r = registration('R');
+    dispatcher
+      ..enqueue(<Event>[value(r, 1)])
+      ..enqueue(<Event>[value(r, 2)]);
+    await pumpEventQueue();
+    expect(log, <String>['R:1']);
+    // Repo.close fires the cancel and zombifies every registration synchronously.
+    r.zombify();
+    tasks.removeAt(0)();
+    await pumpEventQueue();
+    expect(log, <String>['R:1']);
+    expect(tasks, isEmpty);
+  });
+
+  test(
+    'the default yield is a macrotask: microtasks and earlier tasks run first',
+    () async {
+      final EventDispatcher dispatcher = EventDispatcher(yieldEvery: 1);
+      final CallbackEventRegistration r = registration(
+        'R',
+        after: (DataEvent event) {
+          if (event.snapshot.value == 1) {
+            scheduleMacrotask(() => log.add('M'));
+            scheduleMicrotask(() => log.add('m'));
+          }
+        },
+      );
+      dispatcher
+        ..enqueue(<Event>[value(r, 1)])
+        ..enqueue(<Event>[value(r, 2)]);
+      await pumpEventQueue();
+      expect(log, <String>['R:1', 'm', 'M', 'R:2']);
+    },
+  );
 
   test('a yield pending keeps later changes behind it', () async {
     final EventDispatcher dispatcher = EventDispatcher(yieldEvery: 1);

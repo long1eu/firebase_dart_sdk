@@ -18,6 +18,8 @@ import 'package:firebase_database_dart/src/core/snap/node_from_json.dart';
 import 'package:firebase_database_dart/src/core/user_write_record.dart';
 import 'package:firebase_database_dart/src/core/view/event.dart';
 import 'package:firebase_database_dart/src/core/view/event_dispatcher.dart';
+import 'package:firebase_database_dart/src/core/view/macrotask_web.dart'
+    if (dart.library.io) 'package:firebase_database_dart/src/core/view/macrotask_io.dart';
 import 'package:firebase_database_dart/src/core/view/query_params.dart';
 import 'package:firebase_database_dart/src/core/view/query_spec.dart';
 import 'package:firebase_database_dart/src/testing/fake_server_actions.dart';
@@ -283,7 +285,8 @@ void main() {
         after: (_) {
           if (!scheduled) {
             scheduled = true;
-            Timer.run(() => h.log.add('T'));
+            // The dispatcher's own kind of task: in a browser a timer runs after it.
+            scheduleMacrotask(() => h.log.add('T'));
           }
         },
       );
