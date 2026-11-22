@@ -203,6 +203,106 @@ void main() {
     expect(keys(map.reverseEntriesFrom(5)), isEmpty);
   });
 
+  test('every iterator variant is empty on an empty map', () {
+    final SortedMap<int, int> empty = SortedMap<int, int>(_cmp);
+    expect(empty.entries, isEmpty);
+    expect(empty.reverseEntries, isEmpty);
+    expect(empty.entriesFrom(1), isEmpty);
+    expect(empty.reverseEntriesFrom(1), isEmpty);
+    expect(empty.reverseEntries.length, 0);
+    expect(empty.entriesFrom(1).length, 0);
+    expect(empty.reverseTraversal((int k, int v) => true), isFalse);
+    expect(empty.inOrderTraversal((int k, int v) => true), isFalse);
+  });
+
+  test('a one-entry map', () {
+    final SortedMap<int, int> one = _of(<int>[5]);
+    List<int> keys(Iterable<MapEntry<int, int>> e) =>
+        e.map((MapEntry<int, int> x) => x.key).toList();
+    expect(one.minKey, 5);
+    expect(one.maxKey, 5);
+    expect(one.predecessorKey(5), isNull);
+    expect(one.successorKey(5), isNull);
+    expect(keys(one.entries), <int>[5]);
+    expect(keys(one.reverseEntries), <int>[5]);
+    expect(keys(one.entriesFrom(5)), <int>[5]);
+    expect(keys(one.entriesFrom(4)), <int>[5]);
+    expect(keys(one.entriesFrom(6)), isEmpty);
+    expect(keys(one.reverseEntriesFrom(5)), <int>[5]);
+    expect(keys(one.reverseEntriesFrom(6)), <int>[5]);
+    expect(keys(one.reverseEntriesFrom(4)), isEmpty);
+  });
+
+  test('iterables can be iterated more than once and report their length', () {
+    final SortedMap<int, int> map = _of(<int>[10, 20, 30, 40]);
+    final Iterable<MapEntry<int, int>> reverse = map.reverseEntries;
+    final Iterable<MapEntry<int, int>> from = map.reverseEntriesFrom(25);
+    expect(reverse.map((MapEntry<int, int> e) => e.key), <int>[40, 30, 20, 10]);
+    expect(reverse.map((MapEntry<int, int> e) => e.key), <int>[40, 30, 20, 10]);
+    expect(reverse.length, 4);
+    expect(reverse.isEmpty, isFalse);
+    expect(from.length, 2);
+    expect(from.first.key, 20);
+    expect(from.first.key, 20);
+    expect(map.reverseEntriesFrom(5).isEmpty, isTrue);
+    expect(map.entriesFrom(45).isEmpty, isTrue);
+    expect(map.entriesFrom(25).length, 2);
+  });
+
+  test('reverseTraversal stops when the action returns true', () {
+    final SortedMap<int, int> map = _of(<int>[1, 2, 3, 4]);
+    final List<int> seen = <int>[];
+    expect(
+      map.reverseTraversal((int key, int value) {
+        seen.add(key);
+        return key == 3;
+      }),
+      isTrue,
+    );
+    expect(seen, <int>[4, 3]);
+  });
+
+  test('every iterator variant and neighbour lookup match a sorted list', () {
+    // Odd keys only, so every even probe falls between two keys (or outside the range). Built both
+    // by random inserts and from sorted entries, so both tree shapes are walked.
+    final Random random = Random(3);
+    for (final int n in <int>[1, 2, 3, 7, 8, 31, 64, 100]) {
+      final List<int> sorted = List<int>.generate(n, (int i) => 2 * i + 1);
+      final List<SortedMap<int, int>> maps = <SortedMap<int, int>>[
+        _of(sorted.toList()..shuffle(random)),
+        SortedMap<int, int>.fromSortedEntries(<MapEntry<int, int>>[
+          for (final int k in sorted) MapEntry<int, int>(k, -k),
+        ], _cmp),
+      ];
+      for (final SortedMap<int, int> map in maps) {
+        List<int> keys(Iterable<MapEntry<int, int>> e) =>
+            e.map((MapEntry<int, int> x) => x.key).toList();
+        expect(keys(map.entries), sorted);
+        expect(keys(map.reverseEntries), sorted.reversed.toList());
+        expect(map.minKey, sorted.first);
+        expect(map.maxKey, sorted.last);
+        for (int probe = 0; probe <= 2 * n + 1; probe++) {
+          expect(
+            keys(map.entriesFrom(probe)),
+            sorted.where((int k) => k >= probe).toList(),
+            reason: 'entriesFrom($probe), n=$n',
+          );
+          expect(
+            keys(map.reverseEntriesFrom(probe)),
+            sorted.reversed.where((int k) => k <= probe).toList(),
+            reason: 'reverseEntriesFrom($probe), n=$n',
+          );
+        }
+        for (int i = 0; i < n; i++) {
+          final int k = sorted[i];
+          expect(map.predecessorKey(k), i == 0 ? null : sorted[i - 1]);
+          expect(map.successorKey(k), i == n - 1 ? null : sorted[i + 1]);
+          expect(map.indexOf(k), i);
+        }
+      }
+    }
+  });
+
   test('fromSortedEntries builds a valid tree for every size up to 300', () {
     for (int n = 0; n <= 300; n++) {
       final SortedMap<int, int> map = SortedMap<int, int>.fromSortedEntries(

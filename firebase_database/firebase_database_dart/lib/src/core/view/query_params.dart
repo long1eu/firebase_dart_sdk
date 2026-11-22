@@ -416,16 +416,18 @@ String jsStringify(Object? value) {
 }
 
 String _jsNumber(num value) {
+  // On the web every number is a double and `is int` holds for -0.0, so zero
+  // and the non-finite values are handled before any type test.
+  if (value == 0) {
+    return '0';
+  }
+  if (value.isNaN || value.isInfinite) {
+    return 'null';
+  }
   if (value is int) {
     return value.toString();
   }
   final double d = value as double;
-  if (d.isNaN || d.isInfinite) {
-    return 'null';
-  }
-  if (d == 0) {
-    return '0';
-  }
   if (d == d.truncateToDouble() && d.abs() < 1e21) {
     return BigInt.from(d).toString();
   }

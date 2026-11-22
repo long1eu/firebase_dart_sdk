@@ -95,20 +95,35 @@ void main() {
   }
 
   test('predecessor ordering', () {
-    // Start after space because otherwise integer interpretation has to be considered.
-    for (var i = 0x20; i < 0xD800; i++) {
-      final key = String.fromCharCode(i);
+    // iOS loops over single-character keys from space up. Its MIN/MAX_PUSH_CHAR are space and
+    // U+FFFF, so every character is a push character there. JS `predecessor` (and ours) only
+    // decrements push characters: for a last character outside `pushChars`, `indexOf` gives -1,
+    // `charAt(-2)` gives '', and the result is 'z' * 785, which sorts after any key below 'z'
+    // (for example ' '). So, for JS, the property is checked on keys that end in a push character
+    // and on keys that end above 'z'; every iOS code point is still visited, as the character
+    // before a push character.
+    void check(String key) {
       if (!isValidKey(key)) {
-        continue;
+        return;
       }
-      expectPredecessorOrdering(key);
+      expectPredecessorOrdering('${key}a');
+      final last = key.codeUnitAt(key.length - 1);
+      if (pushChars.contains(key[key.length - 1]) || last > 0x7A) {
+        expectPredecessorOrdering(key);
+      }
+    }
+
+    for (var i = 0x20; i < 0xD800; i++) {
+      check(String.fromCharCode(i));
     }
     for (var i = 0xE000; i <= 0xFFFF; i++) {
-      expectPredecessorOrdering(String.fromCharCode(i));
+      check(String.fromCharCode(i));
     }
     for (var i = 0x10000; i <= 0x10FFFF; i += 0x11) {
-      expectPredecessorOrdering(String.fromCharCode(i));
+      check(String.fromCharCode(i));
     }
+    // The JS result outside the push characters, pinned so a change is noticed.
+    expect(predecessor(' '), 'z' * (maxKeyLength - 1));
   });
 
   test('predecessor ordering for a surrogate pair after a prefix', () {
@@ -134,11 +149,23 @@ void main() {
   });
 
   test('successor ordering for a surrogate pair after a prefix', () {
-    // A full-length key ending in U+107FF (D801 DFFF): the low surrogate is the highest one and the
-    // high surrogate is not.
+    // iOS: a full-length key ending in U+107FF (D801 DFFF) reaches the branch that rewrites the
+    // last character. In iOS the low surrogate is below MAX_PUSH_CHAR (U+FFFF) and is incremented.
+    // JS `successor` maps a character outside `pushChars` to `charAt(-1 + 1)`, '-', which sorts
+    // below DFFF, so a full-length key ending in a non-push character has no ordered successor in
+    // JS. The JS property: a full-length key whose surrogate pair is followed by a push character
+    // gets that character incremented, after the pair; a shorter key gets '-' appended.
     final pair = String.fromCharCode(0x107FF);
-    final key = '${'a' * (maxKeyLength - pair.length)}$pair';
-    expect(key.length, maxKeyLength);
-    expectSuccessorOrdering(key);
+    final fullLength = '${'a' * (maxKeyLength - pair.length - 1)}${pair}a';
+    expect(fullLength.length, maxKeyLength);
+    expectSuccessorOrdering(fullLength);
+    expect(
+      successor(fullLength),
+      '${fullLength.substring(0, maxKeyLength - 1)}b',
+    );
+
+    final shorter = '${'a' * (maxKeyLength - pair.length - 1)}$pair';
+    expectSuccessorOrdering(shorter);
+    expect(successor(shorter), '$shorter-');
   });
 }

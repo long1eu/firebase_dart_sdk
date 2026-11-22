@@ -588,9 +588,15 @@ final class _EntryIterator<K, V> implements Iterator<MapEntry<K, V>> {
   ) {
     _Node<K, V>? node = root;
     while (node != null) {
-      int cmp = hasStart ? comparator(node.key, startKey as K) : 1;
-      if (_reverse) {
-        cmp = -cmp;
+      // Without a start key every node is "after" it in the iteration direction. JS computes
+      // cmp = 1 and then negates it for reverse, which would skip the whole tree; flip only a
+      // real comparison (Android `ImmutableSortedMapIterator` pushes the right spine instead).
+      int cmp = 1;
+      if (hasStart) {
+        cmp = comparator(node.key, startKey as K);
+        if (_reverse) {
+          cmp = -cmp;
+        }
       }
       if (cmp < 0) {
         node = _reverse ? node.left : node.right;

@@ -61,10 +61,17 @@ void main() {
       null,
       'c',
     ]);
-    // maxKey 3 is not below 2 * 2 keys.
+    // JS ChildrenNode.val(): a list when maxKey < 2 * numKeys. maxKey 3 is below 2 * 2 keys.
+    expect(nodeFromJson(<String, Object?>{'1': 'b', '3': 'd'}).value, <Object?>[
+      null,
+      'b',
+      null,
+      'd',
+    ]);
+    // maxKey 4 is not below 2 * 2 keys.
     expect(
-      nodeFromJson(<String, Object?>{'1': 'b', '3': 'd'}).value,
-      isA<Map<String, Object?>>(),
+      nodeFromJson(<String, Object?>{'1': 'b', '4': 'e'}).value,
+      <String, Object?>{'1': 'b', '4': 'e'},
     );
     expect(nodeFromJson(<Object?>['a', null, 'c']).value, <Object?>[
       'a',

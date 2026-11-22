@@ -20,7 +20,7 @@ import 'package:firebase_database_dart/src/core/snap/node.dart';
 import 'package:firebase_database_dart/src/core/snap/node_from_json.dart';
 import 'package:firebase_database_dart/src/core/sync_tree.dart';
 import 'package:firebase_database_dart/src/core/tag.dart';
-import 'package:firebase_database_dart/src/core/util/clock.dart';
+import 'package:firebase_database_dart/src/core/util/server_values.dart';
 import 'package:firebase_database_dart/src/core/view/change.dart';
 import 'package:firebase_database_dart/src/core/view/event.dart';
 import 'package:firebase_database_dart/src/core/view/query_params.dart';
@@ -185,9 +185,6 @@ final class _ScenarioRun {
     persistenceManager: NoopPersistenceManager(),
   );
   final Map<Object, _Listener> listeners = <Object, _Listener>{};
-  final ServerClock serverClock = ServerClock(
-    () => DateTime.fromMillisecondsSinceEpoch(0, isUtc: true),
-  );
 
   /// JS and Android both number writes from 0; the spec's `writeId`s refer to these.
   WriteId nextWriteId = 0;
@@ -326,7 +323,7 @@ final class _ScenarioRun {
             step['writeId']! as int,
             revert: step['revert'] as bool? ?? false,
             persist: true,
-            serverClock: serverClock,
+            serverValues: generateServerValues(timestamp: 0),
           ),
         );
       case 'suppressWarning':

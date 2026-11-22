@@ -45,7 +45,9 @@ final class QuerySpec {
     isDefault: params.isDefault,
     loadsAllData: params.loadsAllData,
     indexName: params.index.queryDefinition,
-    // MERGE: restParams: Map.unmodifiable(params.toRestQueryStringParameters()),
+    restParams: Map<String, String>.unmodifiable(
+      params.toRestQueryStringParameters(),
+    ),
   );
 
   @override
